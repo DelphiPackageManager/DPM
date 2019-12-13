@@ -51,7 +51,7 @@ Not yet, but that is being worked on.
 
 ## Can I help
 
-Yep, see [Contributing to DPM](./contributing.md).
+Yep, see [Contributing to DPM](./contributing-todpm.md).
 
 ## How does it work
 
