@@ -53,6 +53,10 @@ Not yet, but that is being worked on.
 
 See [this page](./concepts/how-it-works.md)
 
+## Known Issues
+
+See [known issues](./known-issues.md)
+
 ## Can I help
 
 Yep, see [Contributing to DPM](./contributing-dpm.md).
