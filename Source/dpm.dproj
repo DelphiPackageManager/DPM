@@ -28,12 +28,6 @@
         <CfgParent>Base</CfgParent>
         <Base>true</Base>
     </PropertyGroup>
-    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_1)'=='true') or '$(Cfg_1_Win32)'!=''">
-        <Cfg_1_Win32>true</Cfg_1_Win32>
-        <CfgParent>Cfg_1</CfgParent>
-        <Cfg_1>true</Cfg_1>
-        <Base>true</Base>
-    </PropertyGroup>
     <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Cfg_1)'=='true') or '$(Cfg_1_Win64)'!=''">
         <Cfg_1_Win64>true</Cfg_1_Win64>
         <CfgParent>Cfg_1</CfgParent>
@@ -69,7 +63,7 @@
         <VerInfo_MajorVer>0</VerInfo_MajorVer>
         <DCC_UnitSearchPath>Libs\Spring4D\Source;Libs\Spring4D\Source\Base;Libs\Spring4D\Source\Base\Logging;Libs\Spring4D\Source\Base\Collections;Libs\Spring4D\Source\Core\Interception;Libs\Spring4D\Source\Core\Container;Libs\Spring4D\Source\Core\Services;Libs\Spring4D\Source\Extensions\Cryptography;Libs\Spring4D\Source\Extensions\Utils;Libs\VSoft.CommandLineParser\src;Libs\VSoft.SemanticVersion\source;Libs\VSoft.AntPatterns\source;Libs\VSoft.Uri\src;Libs\JsonDataObjects\Source;Core;Core\Cache;Core\Configuration;Core\Dependency;Core\Logging;Core\Options;Core\Package;Core\Packaging;Core\Project;Core\Repository;Core\Sources;Core\Spec;Core\Utils;Core\Xml;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <DCC_ExeOutput>..\Output</DCC_ExeOutput>
-        <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
+        <Manifest_File>None</Manifest_File>
         <DCC_N>false</DCC_N>
         <DCC_S>false</DCC_S>
         <DCC_K>false</DCC_K>
@@ -79,7 +73,7 @@
         <SanitizedProjectName>dpm</SanitizedProjectName>
         <DCC_ImageBase>00400000</DCC_ImageBase>
         <DCC_F>false</DCC_F>
-        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=0.1.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=;CFBundleName=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=0.1.0.0;InternalName=;LegalCopyright=© 2019 Vincent Parrett and Contributors;LegalTrademarks=;OriginalFilename=dpm.exe;ProductName=DPM;ProductVersion=0.1.0.0;Comments=0.1.0-aplha;CFBundleName=</VerInfo_Keys>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <DCC_UsePackage>rtl;$(DCC_UsePackage)</DCC_UsePackage>
@@ -93,9 +87,6 @@
         <DCC_DebugInformation>0</DCC_DebugInformation>
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
         <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
-        <Manifest_File>None</Manifest_File>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
         <Manifest_File>None</Manifest_File>
