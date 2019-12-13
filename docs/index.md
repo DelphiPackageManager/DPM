@@ -52,3 +52,7 @@ Not yet, but that is being worked on.
 ## How does it work
 
 See [this page](./concepts/how-it-works.md)
+
+## Can I help
+
+Yep, See [Contributing to DPM](./contributing.md)
