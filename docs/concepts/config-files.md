@@ -38,8 +38,8 @@ Note - do not read too much into the domains below, they are just for illustrati
       "enabled": true
     },
     {
-      "name": "tdpm.org",
-      "source": "https://dpm.org/api/v1",
+      "name": "delphipm.org",
+      "source": "https://delphipm.org/api/v1",
       "enabled": false,
       "apiKey": "6E29A27D0870B988C9FB2B89D4A0C3E7"
     },
