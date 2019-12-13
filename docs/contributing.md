@@ -17,17 +17,17 @@ We make extensive use of Spring4D for Dependency Injection and collections. Make
 
 DPM uses the following external libs
 
-https://github.com/VSoftTechnologies/VSoft.AntPatterns
+<https://github.com/VSoftTechnologies/VSoft.AntPatterns>
 
-https://github.com/VSoftTechnologies/VSoft.Uri
+<https://github.com/VSoftTechnologies/VSoft.Uri>
 
-https://github.com/VSoftTechnologies/VSoft.CommandLineParser
+<https://github.com/VSoftTechnologies/VSoft.CommandLineParser>
 
-https://github.com/VSoftTechnologies/VSoft.SemanticVersion
+<https://github.com/VSoftTechnologies/VSoft.SemanticVersion>
 
-https://github.com/ahausladen/JsonDataObjects
+<https://github.com/ahausladen/JsonDataObjects>
 
-https://bitbucket.org/sglienke/spring4d
+<https://bitbucket.org/sglienke/spring4d>
 
 Clone these repos to your machine, then add Symlinks in the Source\Libs folder for each one
 
