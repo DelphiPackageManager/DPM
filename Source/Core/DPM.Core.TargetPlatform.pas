@@ -83,14 +83,14 @@ begin
     TCompilerVersion.RSXE2:  result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32];
     TCompilerVersion.RSXE3:  result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32];
     TCompilerVersion.RSXE4:  result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32];
-    TCompilerVersion.RSXE5..TCompilerVersion.RS10_1 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndriodArm32];
-    TCompilerVersion.RS10_2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.OSX64, TDPMPlatform.iOS32, TDPMPlatform.AndriodArm32,
+    TCompilerVersion.RSXE5..TCompilerVersion.RS10_1 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32];
+    TCompilerVersion.RS10_2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.OSX64, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32,
                                          TDPMPlatform.LinuxIntel64];
-    TCompilerVersion.RS10_3 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.OSX64, TDPMPlatform.iOS32, TDPMPlatform.AndriodArm32,
-                                         TDPMPlatform.LinuxIntel64, TDPMPlatform.AndriodArm64];
+    TCompilerVersion.RS10_3 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.OSX64, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32,
+                                         TDPMPlatform.LinuxIntel64, TDPMPlatform.AndroidArm64];
   else
     raise EArgumentOutOfRangeException.Create('Invalid compiler version');
-//    result := [Win32,Win64,OSX32,iOS32,AndriodArm32, LinuxIntel64]; //Tokyo or later.
+//    result := [Win32,Win64,OSX32,iOS32,AndroidArm32, LinuxIntel64]; //Tokyo or later.
   end;
 end;
 

@@ -76,8 +76,8 @@ type
     WinArm64,       //reserved for future use
     OSX32,
     OSX64,        //reserved for future use
-    AndriodArm32,
-    AndriodArm64,
+    AndroidArm32,
+    AndroidArm64,
     AndroidIntel32, //reserved for future use
     AndroidIntel64, //reserved for future use
     iOS32,
@@ -169,7 +169,7 @@ begin
   if iValue = -1 then
   begin
     if value = 'Android' then
-      result := TDPMPlatform.AndriodArm32
+      result := TDPMPlatform.AndroidArm32
     else if value = 'Linux' then
       result := TDPMPlatform.LinuxIntel64
     else
@@ -205,7 +205,7 @@ end;
 function DPMPlatformToBDString(const value : TDPMPlatform) : string;
 begin
   case value of
-    TDPMPlatform.AndriodArm32: result := 'Android';
+    TDPMPlatform.AndroidArm32: result := 'Android';
   else
     result := GetEnumName(TypeInfo(TDPMPlatform), ord(value));
   end;
@@ -243,12 +243,12 @@ begin
     TCompilerVersion.RSXE5,
     TCompilerVersion.RSXE6,
     TCompilerVersion.RSXE7,
-    TCompilerVersion.RSXE8  : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndriodArm32];
+    TCompilerVersion.RSXE8  : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32];
     TCompilerVersion.RS10_0,
-    TCompilerVersion.RS10_1 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndriodArm32];
-    TCompilerVersion.RS10_2 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndriodArm32, TDPMPlatform.LinuxIntel64];
-    TCompilerVersion.RS10_3 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndriodArm32, TDPMPlatform.LinuxIntel64,
-                                         TDPMPlatform.AndriodArm64, TDPMPlatform.OSX64];
+    TCompilerVersion.RS10_1 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32];
+    TCompilerVersion.RS10_2 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64];
+    TCompilerVersion.RS10_3 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64,
+                                         TDPMPlatform.AndroidArm64, TDPMPlatform.OSX64];
   else
     raise Exception.Create('AllPlatforms is missing for : ' + CompilerToString(compiler));  end;
 end;
