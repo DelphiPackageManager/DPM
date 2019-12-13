@@ -1,0 +1,115 @@
+{
+  "metadata": {
+    "id": "DPM.Core",
+    "version": "0.0.1",
+    "description": "Delphi Package Manager Core",
+    "authors": "Vincent Parrett",
+    "projectUrl": "https://github.com/DelphiPackageManager/DPM.Client",
+    "license": "Apache-2.0",
+    "icon": "images\\logo.png",
+    "copyright": "2019 Vincent Parrett and contributors",
+    "tags": "DPM"
+  },
+  "targetPlatforms": [
+    {
+      "compiler": "XE2",
+      "platforms": "Win32, Win64",
+      "template": "default"
+    },
+    {
+      "compiler": "XE3",
+      "platforms": "Win32, Win64",
+      "template": "default"
+    },
+    {
+      "compiler": "XE4",
+      "platforms": "Win32, Win64",
+      "template": "default"
+    },
+    {
+      "compiler": "XE5",
+      "platforms": "Win32, Win64",
+      "template": "default"
+    },
+    {
+      "compiler": "XE6",
+      "platforms": "Win32, Win64",
+      "template": "default"
+    },
+    {
+      "compiler": "XE7",
+      "platforms": "Win32, Win64",
+      "template": "default"
+    },
+    {
+      "compiler": "XE8",
+      "platforms": "Win32, Win64",
+      "template": "default"
+    },
+    {
+      "compiler": "10.0",
+      "platforms": "Win32, Win64",
+      "template": "default"
+    },
+    {
+      "compiler": "10.1",
+      "platforms": "Win32, Win64",
+      "template": "default"
+    },
+    {
+      "compiler": "10.2",
+      "platforms": "Win32, Win64",
+      "template": "default"
+    },
+    {
+      "compiler": "10.3",
+      "platforms": "Win32, Win64",
+      "template": "default"
+    }
+  ],
+  "templates": [
+    {
+      "name": "default",
+      "dependencies": [
+        {
+          "id": "Spring.Base",
+          "version": "[2.1.0,]"
+        },
+        {
+          "id": "VSoft.SemanticVersion",
+          "version": "[1.0.0,]"
+        },
+        {
+          "id": "VSoft.AntPatterns",
+          "version": "[1.0.0,]"
+        },
+        {
+          "id": "VSoft.Uri",
+          "version": "[1.0.0,]"
+        },
+        {
+          "id": "AH.JSONDataObjects",
+          "version": "[1.0.0,]"
+        }
+      ],
+      "source": [
+        {
+          "src": ".\\Core\\**,pas",
+          "dest": "src",
+          "flatten": true
+        }
+      ],
+      "files": [
+        {
+          "src": ".\\imageslogo.png",
+          "dest": "images"
+        }
+      ],
+      "searchPaths": [
+        {
+          "path": "src"
+        }
+      ]
+    }
+  ]
+}

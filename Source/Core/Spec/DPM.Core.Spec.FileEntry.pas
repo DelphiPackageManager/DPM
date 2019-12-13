@@ -1,0 +1,142 @@
+{***************************************************************************}
+{                                                                           }
+{           Delphi Package Manager - DPM                                    }
+{                                                                           }
+{           Copyright © 2019 Vincent Parrett and contributors               }
+{                                                                           }
+{           vincent@finalbuilder.com                                        }
+{           https://www.finalbuilder.com                                    }
+{                                                                           }
+{                                                                           }
+{***************************************************************************}
+{                                                                           }
+{  Licensed under the Apache License, Version 2.0 (the "License");          }
+{  you may not use this file except in compliance with the License.         }
+{  You may obtain a copy of the License at                                  }
+{                                                                           }
+{      http://www.apache.org/licenses/LICENSE-2.0                           }
+{                                                                           }
+{  Unless required by applicable law or agreed to in writing, software      }
+{  distributed under the License is distributed on an "AS IS" BASIS,        }
+{  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. }
+{  See the License for the specific language governing permissions and      }
+{  limitations under the License.                                           }
+{                                                                           }
+{***************************************************************************}
+
+unit DPM.Core.Spec.FileEntry;
+
+interface
+
+uses
+  JsonDataObjects,
+  DPM.Core.Logging,
+  DPM.Core.Spec.Interfaces,
+  DPM.Core.Spec.Node;
+
+type
+  TSpecFileEntry = class(TSpecNode, ISpecFileEntry)
+  private
+  protected
+    //making these protected to simplify clone;
+    FSource  : string;
+    FDestination : string;
+    FExclude : string;
+    FFlatten : boolean;
+
+    function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
+    function GetSource: string;
+    function GetDestination: string;
+    function GetExclude: string;
+    function GetFlatten: Boolean;
+    procedure SetSource(const value : string);
+    procedure SetDestination(const value : string);
+
+
+    constructor CreateClone(const logger: ILogger; const src : string; const dest : string; const exclude : string; const flatten : boolean);virtual;
+    function Clone: ISpecFileEntry;overload;
+  public
+    constructor Create(const logger: ILogger); override;
+
+  end;
+
+implementation
+
+uses
+  System.SysUtils;
+
+{ TSpecFileEntry }
+
+function TSpecFileEntry.Clone: ISpecFileEntry;
+begin
+  result := TSpecFileEntry.CreateClone(logger,FSource, FDestination, FExclude, FFlatten);
+end;
+
+constructor TSpecFileEntry.Create(const logger: ILogger);
+begin
+  inherited Create(Logger);
+
+end;
+
+constructor TSpecFileEntry.CreateClone(const logger: ILogger; const src, dest, exclude: string; const flatten: boolean);
+begin
+  inherited Create(logger);
+  FSource := src;
+  FDestination := dest;
+  FExclude := exclude;
+  FFlatten := flatten;
+end;
+
+function TSpecFileEntry.GetExclude: string;
+begin
+  result := FExclude;
+end;
+
+function TSpecFileEntry.GetFlatten: Boolean;
+begin
+  result := FFlatten;
+end;
+
+function TSpecFileEntry.GetSource: string;
+begin
+  result := FSource;
+end;
+
+function TSpecFileEntry.GetDestination: string;
+begin
+  result := FDestination;
+end;
+
+function TSpecFileEntry.LoadFromJson(const jsonObject: TJsonObject): Boolean;
+begin
+  result := true;
+  FSource := jsonObject.S['src'];
+  if FSource = '' then
+  begin
+    result := false;
+    Logger.Error('Required attribute [src] is missing');
+  end;
+  FDestination := jsonObject.S['dest'];
+  if FDestination = '' then
+  begin
+    result := false;
+    Logger.Error('Required attribute [dest] is missing');
+  end;
+
+  FFlatten := jsonObject.B['flatten'];
+
+  FExclude := jsonObject.S['exclude'];
+
+end;
+
+procedure TSpecFileEntry.SetSource(const value: string);
+begin
+  FSource := value;
+end;
+
+procedure TSpecFileEntry.SetDestination(const value: string);
+begin
+  FDestination := value;
+end;
+
+end.

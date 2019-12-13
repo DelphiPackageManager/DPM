@@ -1,0 +1,87 @@
+{
+  metadata: {
+    id : "VSoft.D",
+    version : "0.0.1",
+    description : "Test package D",
+    authors : "Vincent Parrett",
+    projectUrl : "https://github.com/DelphiPackageManager/DPM.Client",
+    license : "Apache-2.0",
+    icon : "images\logo.png",
+    copyright : "2019 Vincent Parrett and contributors",
+    tags : "Test"
+  },
+  targetPlatforms : [
+    {
+      compiler : "XE2",
+      platforms : "Win32, Win64",
+      template : "default"
+    },
+    {
+      compiler : "XE3",
+      platforms : "Win32, Win64",
+      template : "default"
+    },
+    {
+      compiler : "XE4",
+      platforms : "Win32, Win64",
+      template : "default"
+    },
+    {
+      compiler : "XE5",
+      platforms : "Win32, Win64",
+      template : "default"
+    },
+    {
+      compiler : "XE6",
+      platforms : "Win32, Win64",
+      template : "default"
+    },
+    {
+      compiler : "XE7",
+      platforms : "Win32, Win64",
+      template : "default"
+    },
+    {
+      compiler : "XE8",
+      platforms : "Win32, Win64",
+      template : "default"
+    },
+    {
+      compiler : "10.0",
+      platforms : "Win32, Win64",
+      template : "default"
+    },
+    {
+      compiler : "10.1",
+      platforms : "Win32, Win64",
+      template : "default"
+    },
+    {
+      compiler : "10.2",
+      platforms : "Win32, Win64",
+      template : "default"
+    },
+    {
+      compiler : "10.3",
+      platforms : "Win32, Win64",
+      template : "default"
+    }
+  ],
+  templates : [
+    {
+      name : "default",
+      source : [
+        {
+          src : ".\\VSoft.D.pas",
+          dest : "src"
+        }
+      ],
+      searchPaths : [
+        {
+          path : "src"
+        }
+      
+      ]
+    } 
+  ]
+}

@@ -1,0 +1,190 @@
+{***************************************************************************}
+{                                                                           }
+{           Delphi Package Manager - DPM                                    }
+{                                                                           }
+{           Copyright © 2019 Vincent Parrett and contributors               }
+{                                                                           }
+{           vincent@finalbuilder.com                                        }
+{           https://www.finalbuilder.com                                    }
+{                                                                           }
+{                                                                           }
+{***************************************************************************}
+{                                                                           }
+{  Licensed under the Apache License, Version 2.0 (the "License");          }
+{  you may not use this file except in compliance with the License.         }
+{  You may obtain a copy of the License at                                  }
+{                                                                           }
+{      http://www.apache.org/licenses/LICENSE-2.0                           }
+{                                                                           }
+{  Unless required by applicable law or agreed to in writing, software      }
+{  distributed under the License is distributed on an "AS IS" BASIS,        }
+{  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. }
+{  See the License for the specific language governing permissions and      }
+{  limitations under the License.                                           }
+{                                                                           }
+{***************************************************************************}
+
+unit DPM.Core.Options.Install;
+
+interface
+
+
+uses
+  DPM.Core.Types,
+  DPM.Core.Logging,
+  DPM.Core.Options.Search;
+
+type
+  TInstallOptions = class(TSearchOptions)
+  private
+    FPackageFile    : string;
+    FPreRelease     : boolean;
+    FVersionString  : string;
+    FVersion        : TPackageVersion;
+    FNoCache        : boolean;
+    FProjectPath    : string;
+    FFloat          : boolean;
+    FForce          : boolean;
+    class var
+      FDefault : TInstallOptions;
+  protected
+    function GetPackageId: string;
+    procedure SetPackageId(const Value: string);
+    constructor CreateClone(const original : TInstallOptions);reintroduce;
+  public
+    class constructor CreateDefault;
+    class property Default : TInstallOptions read FDefault;
+    constructor Create;override;
+    function Validate(const logger: ILogger): Boolean; override;
+    function Clone : TInstallOptions;reintroduce;
+
+    property PackageId    : string      read GetPackageId write SetPackageId;
+    property PackageFile  : string      read FPackageFile write FPackageFile;
+    property PreRelease   : boolean     read FPreRelease  write FPreRelease;
+    property ProjectPath  : string      read FProjectPath write FProjectPath;
+    property VersionString: string      read FVersionString  write FVersionString;
+    property Version      : TPackageVersion read FVersion  write FVersion;
+    property Force        : boolean     read FForce       write FForce;
+  end;
+
+implementation
+
+uses
+  System.SysUtils,
+  System.RegularExpressions,
+  DPM.Core.Constants;
+
+{ TInstallOptions }
+
+function TInstallOptions.Clone: TInstallOptions;
+begin
+  result := TInstallOptions.CreateClone(self);
+
+end;
+
+constructor TInstallOptions.Create;
+begin
+  inherited;
+  FExact := true;
+  FVersion := TPackageVersion.Empty;
+end;
+
+constructor TInstallOptions.CreateClone(const original: TInstallOptions);
+begin
+  inherited CreateClone(original);
+  FPackageFile    := original.FPackageFile;
+  FPreRelease     := original.FPreRelease;
+  FVersionString  := original.FVersionString;
+  FVersion        := original.FVersion;
+  FNoCache        := original.FNoCache;
+  FProjectPath    := original.FProjectPath;
+  FFloat          := original.FFloat;
+  FForce          := original.FForce;
+end;
+
+class constructor TInstallOptions.CreateDefault;
+begin
+  FDefault := TInstallOptions.Create;
+end;
+
+function TInstallOptions.GetPackageId: string;
+begin
+  result := SearchTerms;
+end;
+
+procedure TInstallOptions.SetPackageId(const Value: string);
+begin
+  SearchTerms := value;
+end;
+
+function TInstallOptions.Validate(const logger: ILogger): Boolean;
+var
+  packageString   : string;
+  error : string;
+begin
+  //must call inherited
+  result := inherited Validate(logger);
+
+  if TInstallOptions.Default.PackageId = '' then
+    if TInstallOptions.Default.PackageFile = '' then
+    begin
+      Logger.Error('Either the <package> option or packageFile option must be specified.');
+      result := false;
+    end;
+
+  if ConfigFile = '' then
+  begin
+    Logger.Error('No configuration file specified');
+    exit;
+  end;
+
+  if (PackageId = '') and (FPackageFile = '')  then
+  begin
+    Logger.Error('Either the <package> option or packageFile option must be specified.');
+    result := false;
+  end
+  else if (PackageId <> '') and (FPackageFile <> '') then
+  begin
+    PackageId := '';
+    Logger.Warning('Both <package> and packageFile were specified, using packageFile');
+    if not FileExists(FPackageFile) then
+    begin
+      Logger.Error('The specified packageFile [' + FPackageFile + '] does not exist.');
+      result := false;
+    end;
+    packageString := ChangeFileExt(ExtractFileName(FPackageFile),'');
+
+    if not TRegEx.IsMatch(packageString, cPackageFileRegex) then
+    begin
+      Logger.Error('The specified packageFile name [' + packageString + '] is not in the correct format.');
+      result := false;
+    end;
+  end
+  else
+  begin
+    if not TRegEx.IsMatch(PackageId, cPackageIdRegex) then
+    begin
+      Logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
+      result := false;
+    end;
+  end;
+
+  if VersionString <> '' then
+  begin
+    if not TPackageVersion.TryParseWithError(VersionString, FVersion, error) then
+    begin
+      Logger.Error('The specified package Version  [' + VersionString + '] is not a valid version - ' + error);
+      result := false;
+    end;
+  end;
+
+  if FProjectPath = '' then
+  begin
+    Logger.Error('Project path cannot be empty, must either be a directory or project file.');
+    result := false;
+  end;
+
+  FIsValid := result;
+end;
+
+end.
