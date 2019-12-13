@@ -55,4 +55,4 @@ See [this page](./concepts/how-it-works.md)
 
 ## Can I help
 
-Yep, see [Contributing to DPM](./contributing.md)
+Yep, see [Contributing to DPM](./contributing.md).
