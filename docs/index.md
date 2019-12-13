@@ -49,10 +49,10 @@ Maybe, [see here](./compiler-versions.md) for supported compiler versions. All t
 
 Not yet, but that is being worked on.
 
-## How does it work
-
-See [this page](./concepts/how-it-works.md)
-
 ## Can I help
 
 Yep, see [Contributing to DPM](./contributing.md).
+
+## How does it work
+
+See [this page](./concepts/how-it-works.md)
