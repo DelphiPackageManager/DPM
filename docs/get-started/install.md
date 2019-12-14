@@ -1,6 +1,6 @@
 # Installing DPM
 
-DPM currently only has a command line interface. You can find the latest version under [Releases](https://github.com/xxxxupdatemexxx) on the Github page.
+DPM currently only has a command line interface. You can find the latest version under [Releases](https://github.com/DelphiPackageManager/DPM/releases) on the Github page.
 
 We recommend you add the folder you extract it into, to the system path as this will make working with it easier.
 
