@@ -12,7 +12,7 @@
     </PropertyGroup>
     <PropertyGroup>
         <DPMCompiler>XE7</DPMCompiler>
-        <DPMCache Condition="'$(DPMCache)' == ''">.\.packages</DPMCache>
+        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
         <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.A\0.1.5\src;$(DPM)\VSoft.B\0.0.4\src;$(DPM)\VSoft.D\0.0.8\src;$(DPM)\VSoft.C\0.0.7\src;</DPMSearch>
         <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.A\0.1.5\src;$(DPM)\VSoft.B\0.0.4\src;$(DPM)\VSoft.D\0.0.8\src;$(DPM)\VSoft.C\0.0.7\src;</DPMSearch>
