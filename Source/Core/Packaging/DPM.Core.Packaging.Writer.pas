@@ -45,11 +45,11 @@ type
     FLogger : ILogger;
     FArchiveWriter : IPackageArchiveWriter;
     FSpecReader : IPackageSpecReader;
-    procedure ProcessPattern(const basePath, dest: string; const pattern: IFileSystemPattern; const searchPath: string; const flatten: boolean; var fileCount: integer);
+    procedure ProcessPattern(const basePath, dest: string; const pattern: IFileSystemPattern; const searchPath: string; const flatten: boolean; const excludePatterns : TArray<IFileSystemPattern>;  var fileCount: integer);
   protected
 
     function WritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion; const basePath : string) : boolean;
-  
+
     //Generate zip file and xml metadata file.
     function WritePackageFromSpec(const options : TPackOptions) : boolean;
   public
@@ -65,9 +65,11 @@ uses
   System.Types,
   System.IOUtils,
   System.Classes,
+  System.Masks,
   DPM.Core.Constants,
   DPM.Core.Spec,
-  DPM.Core.Utils.Strings;
+  DPM.Core.Utils.Strings,
+  DPM.Core.Utils.Path;
 
 { TPackageWriter }
 
@@ -100,11 +102,35 @@ begin
     result := Copy(value,1, i -1);
 end;
 
-procedure TPackageWriter.ProcessPattern(const basePath: string; const dest : string; const pattern : IFileSystemPattern; const searchPath : string; const flatten : boolean; var fileCount : integer);
+procedure TPackageWriter.ProcessPattern(const basePath: string; const dest : string; const pattern : IFileSystemPattern; const searchPath : string; const flatten : boolean; const excludePatterns : TArray<IFileSystemPattern>; var fileCount : integer);
 var
   files : TStringDynArray;
   f : string;
   archivePath : string;
+
+  function IsFileExcluded(const fileName : string) : boolean;
+  var
+    excludePatten : IFileSystemPattern;
+    mask : string;
+  begin
+    result := false;
+    if Length(excludePatterns) > 0 then
+    begin
+      for excludePatten in excludePatterns do
+      begin
+        mask := excludePatten.FileMask;
+        if TPathUtils.IsRelativePath(mask) then
+          mask := TPath.Combine(basePath, mask);
+
+        //this might be slow.. Creates/Destroys TMask each time
+        //if it is then create a record based mask type to do the job.
+        if MatchesMask(fileName,  mask) then
+          exit(true);
+      end;
+    end;
+
+  end;
+
 begin
   if not TDirectory.Exists(pattern.Directory) then
     raise Exception.Create('Directory not found : ' + pattern.Directory);
@@ -112,8 +138,13 @@ begin
   files := TDirectory.GetFiles(pattern.Directory, pattern.FileMask, TSearchOption.soTopDirectoryOnly);
   for f in files do
   begin
+    if IsFileExcluded(f) then
+      continue;
+
     if not TFile.Exists(f) then
       raise Exception.Create('File not found : ' + f);
+
+
     if flatten then
       archivePath := dest + '\' + ExtractFileName(f)
     else
@@ -136,19 +167,23 @@ var
   fileEntry : ISpecFileEntry;
   bplEntry : ISpecBPLEntry;
 
-  procedure ProcessEntry(const source, dest : string; const flatten : boolean);
+  procedure ProcessEntry(const source, dest : string; const flatten : boolean; const exclude : string);
   var
     fsPatterns : TArray<IFileSystemPattern>;
     fsPattern : IFileSystemPattern;
+    fsExcludePatterns : TArray<IFileSystemPattern>;
     nonWildcardPath : string;
     fileCount : integer;
+
   begin
     nonWildcardPath := GetNonWildcardPath(source);
     fsPatterns := antPattern.Expand(source);
+    if exclude <> '' then
+      fsExcludePatterns := antPattern.Expand(exclude);
     fileCount := 0;
 
     for fsPattern in fsPatterns do
-     ProcessPattern(basePath, dest, fsPattern, nonWildcardPath, flatten, fileCount);
+     ProcessPattern(basePath, dest, fsPattern, nonWildcardPath, flatten, fsExcludePatterns, fileCount);
 
     if fileCount = 0 then
      FLogger.Warning('No files were found for pattern [' + source + ']');
@@ -180,19 +215,19 @@ begin
     antPattern := TAntPattern.Create(basePath);
 
     for fileEntry in targetPlatform.SourceFiles do
-      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten);
+      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude);
 
     for fileEntry in targetPlatform.Files do
-      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten);
+      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude);
 
     for fileEntry in targetPlatform.LibFiles do
-      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten);
+      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude);
 
     for bplEntry in targetPlatform.RuntimeFiles do
-      ProcessEntry(bplEntry.Source, bplEntry.Destination, bplEntry.Flatten);
+      ProcessEntry(bplEntry.Source, bplEntry.Destination, bplEntry.Flatten, bplEntry.Exclude);
 
     for bplEntry in targetPlatform.DesignFiles do
-      ProcessEntry(bplEntry.Source, bplEntry.Destination, bplEntry.Flatten);
+      ProcessEntry(bplEntry.Source, bplEntry.Destination, bplEntry.Flatten, bplEntry.Exclude);
 
   finally
     FArchiveWriter.Close;
