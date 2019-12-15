@@ -2,7 +2,7 @@
 
 ## Installing
 
-The first step is to install the dpm command line client. See the [installation information](./install.md).
+The first step is to install the dpm command-line client. See the [installation information](./install.md).
 
 # Concepts
 

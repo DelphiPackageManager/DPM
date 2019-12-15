@@ -1,6 +1,6 @@
 # Package Spec (dspec)
 
-The Package Spec file (packagename.dspec) is a json file which defines the package metadata, which compiler/platforms the package supports, and which files are to be included in the package.
+The Package Spec file (packagename.dspec) is a json file that defines the package metadata, which compiler/platforms the package supports, and which files are to be included in the package.
 
 ## metadata (required)
 
@@ -11,7 +11,7 @@ The metadata object provides static information the package consumer can inspect
 | Property    | Description                                    |
 | ----------- | ---------------------------------------------- |
 | id          | The package id, eg. Spring.Base                |
-| version     | The package Semantic Version , eg. 0.1.2-alpha |
+| version     | The package Semantic Version, eg. 0.1.2-alpha  |
 | description | A text description of a package.               |
 | authors     | Who created this package.                      |
 
@@ -22,9 +22,9 @@ Note that the version property can be overridden from the [pack command](./comma
 | Property         | Description                                                                                                                                                                                                                                                                                               |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | minClientVersion | Specifies the minimum version of dpm that can install this package.                                                                                                                                                                                                                                       |
-| owners           | A comma separated list of package creator profilenames on dpm website.                                                                                                                                                                                                                                    |
-| projectUrl       | url for the packages home page. Will be displayed in the UI.                                                                                                                                                                                                                                              |
-| license          | Tthe package license, will be displayed in the UI. See the [SPDX License List](https://spdx.org/licenses/)                                                                                                                                                                                                |
+| owners           | A comma-separated list of package creator profilenames on dpm website.                                                                                                                                                                                                                                    |
+| projectUrl       | URL for the packages home page. Will be displayed in the UI.                                                                                                                                                                                                                                              |
+| license          | The package license, will be displayed in the UI. See the [SPDX License List](https://spdx.org/licenses/)                                                                                                                                                                                                 |
 | icon             | File path in the package for a 64x64 image with a transparent background (png), for display in the UI.                                                                                                                                                                                                    |
 | releaseNotes     | A description of the changes made in this release of the package, often used in UI like the Updates tab Package Manager in place of the package description.                                                                                                                                              |
 | copyright        | Copyright details for the package.                                                                                                                                                                                                                                                                        |
@@ -60,7 +60,7 @@ An array of 1 or more objects, which specify the compiler/platform combinations 
 | Property  | Description                                               |
 | --------- | --------------------------------------------------------- |
 | compiler  | the [compiler version](./compiler-versions.md) (required) |
-| platforms | A comma separated list of [platforms](./platforms.md)     |
+| platforms | A comma-separated list of [platforms](./platforms.md)     |
 
 A targetPlatform object must also define either :
 
@@ -177,11 +177,11 @@ An array of 1 or more designPackage objects, which define which compiled design 
 
 When creating a package using the dpm pack command, \$ delimited tokens in the dspec file's `metadata` node will be replaced with values that come from either the project file, or the -properties argument of the pack command.
 
-To use the values from the project file, use the pack command with the dproj file rather than the the dspec file. The dspec file and dproj file must live in the same folder, with the same name.
+To use the values from the project file, use the pack command with the dproj file rather than the dspec file. The dspec file and dproj file must live in the same folder, with the same name.
 
-Values provided on the command line will overrided any values taken from the dproj.
+Values provided on the command line will override any values taken from the dproj.
 
-TODO : Define actual tokens when implemented.
+TODO: Define actual tokens when implemented.
 
 | **Token**         | **Value source** | **Value**                          |
 | ----------------- | ---------------- | ---------------------------------- |
