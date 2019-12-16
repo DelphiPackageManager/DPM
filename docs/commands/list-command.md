@@ -8,7 +8,7 @@ Displays a list of packages from a given source. If no sources are specified, al
 dpm list [search terms] [options]
 ```
 
-where the optional search terms will filter the displayed list. Search terms are applied to the names of packages (folder), tags and package descriptions (http feeds).
+where the optional search terms will filter the displayed list. Search terms are applied to the names of packages (folder), tags and package descriptions (HTTP feeds).
 
 ## Options
 

@@ -1,6 +1,6 @@
 # DPM Config files
 
-dpm.config file are json format files which store the location of the package cache, along with the registered sources.
+dpm.config files are json format files which store the location of the package cache, along with the registered sources.
 
 The default config file lives in `%APPDATA%\.dpm\dpm.config` - it will be created when first accessed.
 

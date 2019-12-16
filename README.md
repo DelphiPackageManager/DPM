@@ -2,11 +2,11 @@
 
 ## Introducing DPM
 
-DPM is an open source package/library manager for Delphi XE2 or later. It is heavily influenced by Nuget, so the cli, docs etc will seem very familiar to nuget users. Delphi's development environment is quite different from .net, and has different challenges to overcome, so whilst we were influenced by nuget, DPM is not identical to nuget. We also took a close look at many other package managers for other development eco systems.
+DPM is an open-source package/library manager for Delphi XE2 or later. It is heavily influenced by NuGet, so the cli, docs etc will seem very familiar to NuGet users. Delphi's development environment is quite different from .net, and has different challenges to overcome, so whilst we were influenced by NuGet, DPM is not identical to NuGet. We also took a close look at many other package managers for other development eco-systems.
 
 ## What is a Package Manager
 
-A package manager provides a standard for developers to share and consume code. Authors create packages that other developers can consume. The package manager provides a simple way to automate the installation, upgrading or removal of packages. This streamlines the development process, allowing developers to get up and running on a project quickly, without needing to understand the (usually adhoc) way the project or organization has structured their third party libraries. This also translates into simpler build/CI processes, with less 'compiles on my machine' style issues.
+A package manager provides a standard for developers to share and consume code. Authors create packages that other developers can consume. The package manager provides a simple way to automate the installation, upgrading or removal of packages. This streamlines the development process, allowing developers to get up and running on a project quickly, without needing to understand the (usually ad-hoc) way the project or organization has structured their third party libraries. This also translates into simpler build/CI processes, with less 'compiles on my machine' style issues.
 
 ## Who and Why
 
@@ -35,9 +35,9 @@ Not yet but it is planned. If you are a wiz with the open tools api and want to 
 
 ## Is there a central package source
 
-Not yet but it is planned. At the moment, only local folder based [sources](./docs/concepts/sources.md) are supported. The client code architecture has a provision for http based sources in the future, however right now we are focused on nailing down the package format, dependency resolution, installation, updating packages etc.
+Not yet but it is planned. At the moment, only local folder based [sources](./docs/concepts/sources.md) are supported. The client code architecture has a provision for HTTP based sources in the future, however right now we are focused on nailing down the package format, dependency resolution, installation, updating packages etc.
 
-## Is my old version of delphi supported
+## Is my old version of Delphi supported
 
 Maybe, [see here](./docs/compiler-versions.md) for supported compiler versions. All target [platforms](./docs/platforms.md) for supported compiler versions are supported.
 
@@ -45,7 +45,7 @@ Maybe, [see here](./docs/compiler-versions.md) for supported compiler versions. 
 
 [see here](./docs/compiler-versions.md)
 
-## Does it support design time components
+## Does it support design-time components
 
 Not yet, but that is being worked on.
 

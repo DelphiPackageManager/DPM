@@ -1,6 +1,6 @@
 # Package Sources
 
-A Package Source is either a folder or a http service which contains package files, and allows for searching, dowloading or uploading of package files. Currently only folder based package sources are implemented.
+A Package Source is either a folder or an HTTP service which contains package files, and allows for searching, downloading or uploading of package files. Currently, only folder-based package sources are implemented.
 
 Multiple package sources can be defined, and they will be searched in the order they are defined. So when installing a package, if I don't specify a package version, each registered package source will be searched, and the highest version chosen.
 

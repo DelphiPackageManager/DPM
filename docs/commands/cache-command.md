@@ -19,7 +19,7 @@ where `<packageID>` names the package to download (using the latest version). Yo
 | help       | Displays help information for the command.                                                                                            |
 | platforms  | The platforms to download (comma separated). Default is to download for all platforms available. See [platforms](../platforms.md).    |
 | preRelease | Allows prerelease packages to be downloaded.                                                                                          |
-| sources    | Specifies a comma separated list of package sources to use. If omitted, the command uses the sources provided in configuration files. |
+| sources    | Specifies a comma-separated list of package sources to use. If omitted, the command uses the sources provided in configuration files. |
 | verbosity  | Specifies the amount of detail displayed in the output: _normal_, _quiet_, _detailed_.                                                |
 | version    | Specifies the version of the package to download.                                                                                     |
 
