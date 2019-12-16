@@ -2,7 +2,7 @@
 
 A Version Range is used when defining package dependencies, it defines the range of versions that are compatible.
 
-This is modelled off the nuget VersionRange, however we only allow the patch version to float, as there a lot of issue with maintaining compatibility in Delphi.
+This is modelled off the nuget VersionRange, however we only allow the patch version to float, as there are lots of issues with maintaining compatibility in Delphi (see [package versioning](./concepts/package-versioning.md)).
 
 Rules
 
