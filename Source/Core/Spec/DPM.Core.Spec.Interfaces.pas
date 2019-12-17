@@ -109,7 +109,7 @@ type
   ['{2BE821AA-94C7-439C-B236-85D8901FFA81}']
     function GetSource : string;
     function GetDestination : string;
-    function GetExclude : string;
+    function GetExclude : IList<string>;
     function GetFlatten : boolean;
     procedure SetSource(const value : string);
     procedure SetDestination(const value : string);
@@ -118,7 +118,7 @@ type
 
     property Source  : string read GetSource write SetSource;
     property Destination  : string read GetDestination write SetDestination;
-    property Exclude : string read GetExclude;
+    property Exclude : IList<string> read GetExclude;
     property Flatten : boolean read GetFlatten;
   end;
 

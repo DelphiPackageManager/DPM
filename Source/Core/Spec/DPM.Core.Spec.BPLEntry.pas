@@ -30,6 +30,7 @@ interface
 
 uses
   JsonDataObjects,
+  Spring.Collections,
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.FileEntry;
@@ -45,7 +46,7 @@ type
     function GetCopyLocal: Boolean;
     function GetInstall: Boolean;
     function Clone: ISpecBPLEntry;overload;
-    constructor CreateClone(const logger: ILogger; const src : string; const dest : string; const exclude : string; const flatten, copyLocal, install : boolean);reintroduce;
+    constructor CreateClone(const logger: ILogger; const src : string; const dest : string; const exclude : IList<string>; const flatten, copyLocal, install : boolean);reintroduce;
   public
     constructor Create(const logger: ILogger); override;
   end;
@@ -68,7 +69,7 @@ begin
 
 end;
 
-constructor TSpecBPLEntry.CreateClone(const logger: ILogger; const src, dest, exclude: string; const flatten, copyLocal, install: boolean);
+constructor TSpecBPLEntry.CreateClone(const logger: ILogger; const src, dest : string; const exclude: IList<string>; const flatten, copyLocal, install: boolean);
 begin
   inherited CreateClone(logger, src, dest, exclude, flatten);
   FCopyLocal := copyLocal;

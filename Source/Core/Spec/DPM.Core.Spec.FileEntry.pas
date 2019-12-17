@@ -30,6 +30,7 @@ interface
 
 uses
   JsonDataObjects,
+  Spring.Collections,
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Node;
@@ -41,19 +42,19 @@ type
     //making these protected to simplify clone;
     FSource  : string;
     FDestination : string;
-    FExclude : string;
+    FExclude : IList<string>;
     FFlatten : boolean;
 
     function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
     function GetSource: string;
     function GetDestination: string;
-    function GetExclude: string;
+    function GetExclude: IList<string>;
     function GetFlatten: Boolean;
     procedure SetSource(const value : string);
     procedure SetDestination(const value : string);
 
 
-    constructor CreateClone(const logger: ILogger; const src : string; const dest : string; const exclude : string; const flatten : boolean);virtual;
+    constructor CreateClone(const logger: ILogger; const src : string; const dest : string; const exclude : IList<string>; const flatten : boolean);virtual;
     function Clone: ISpecFileEntry;overload;
   public
     constructor Create(const logger: ILogger); override;
@@ -75,19 +76,20 @@ end;
 constructor TSpecFileEntry.Create(const logger: ILogger);
 begin
   inherited Create(Logger);
-
+  FExclude := TCollections.CreateList<string>;
 end;
 
-constructor TSpecFileEntry.CreateClone(const logger: ILogger; const src, dest, exclude: string; const flatten: boolean);
+constructor TSpecFileEntry.CreateClone(const logger: ILogger; const src, dest : string; const  exclude: IList<string>; const flatten: boolean);
 begin
   inherited Create(logger);
   FSource := src;
   FDestination := dest;
-  FExclude := exclude;
+  FExclude := TCollections.CreateList<string>;
+  FExclude.AddRange(exclude);
   FFlatten := flatten;
 end;
 
-function TSpecFileEntry.GetExclude: string;
+function TSpecFileEntry.GetExclude: IList<string>;
 begin
   result := FExclude;
 end;
@@ -108,6 +110,10 @@ begin
 end;
 
 function TSpecFileEntry.LoadFromJson(const jsonObject: TJsonObject): Boolean;
+var
+  excludeArray : TJsonArray;
+  entry : string;
+  i: Integer;
 begin
   result := true;
   FSource := jsonObject.S['src'];
@@ -125,8 +131,14 @@ begin
 
   FFlatten := jsonObject.B['flatten'];
 
-  FExclude := jsonObject.S['exclude'];
+  excludeArray := jsonObject.A['exclude'];
 
+  for i := 0 to excludeArray.Count -1 do
+  begin
+    entry := excludeArray.S[i];
+    if entry <> '' then
+      FExclude.Add(entry);
+  end;
 end;
 
 procedure TSpecFileEntry.SetSource(const value: string);

@@ -66,6 +66,7 @@ uses
   System.IOUtils,
   System.Classes,
   System.Masks,
+  Spring.Collections,
   DPM.Core.Constants,
   DPM.Core.Spec,
   DPM.Core.Utils.Strings,
@@ -167,23 +168,29 @@ var
   fileEntry : ISpecFileEntry;
   bplEntry : ISpecBPLEntry;
 
-  procedure ProcessEntry(const source, dest : string; const flatten : boolean; const exclude : string);
+  procedure ProcessEntry(const source, dest : string; const flatten : boolean; const exclude : IList<string>);
   var
     fsPatterns : TArray<IFileSystemPattern>;
     fsPattern : IFileSystemPattern;
-    fsExcludePatterns : TArray<IFileSystemPattern>;
+    fsExcludePatterns : IList<IFileSystemPattern>;
     nonWildcardPath : string;
     fileCount : integer;
-
+    excludePattern: string;
   begin
     nonWildcardPath := GetNonWildcardPath(source);
     fsPatterns := antPattern.Expand(source);
-    if exclude <> '' then
-      fsExcludePatterns := antPattern.Expand(exclude);
+
+    fsExcludePatterns := TCollections.CreateList<IFileSystemPattern>;
+
+    for excludePattern in exclude do
+      fsExcludePatterns.AddRange(antPattern.Expand(excludePattern));
+
     fileCount := 0;
 
+
+
     for fsPattern in fsPatterns do
-     ProcessPattern(basePath, dest, fsPattern, nonWildcardPath, flatten, fsExcludePatterns, fileCount);
+     ProcessPattern(basePath, dest, fsPattern, nonWildcardPath, flatten, fsExcludePatterns.ToArray , fileCount);
 
     if fileCount = 0 then
      FLogger.Warning('No files were found for pattern [' + source + ']');
