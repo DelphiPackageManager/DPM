@@ -89,7 +89,7 @@ function TSpecBPLEntry.LoadFromJson(const jsonObject: TJsonObject): Boolean;
 begin
   result := inherited LoadFromJson(jsonObject);
   FCopyLocal := jsonObject.B['copylocal'];
-  FInstall := jsonObject.B['copylocal'];
+  FInstall := jsonObject.B['install'];
 end;
 
 
