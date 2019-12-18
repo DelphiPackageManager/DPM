@@ -35,6 +35,7 @@ type
 
   TDPMWindowsUtils = class
     class function GetVersionString: string;
+    class procedure GetResourceVersionNumbers(out AMajor, AMinor, ARelease, ABuild: Integer);
   end;
 
 implementation
@@ -56,7 +57,10 @@ begin
 end;
 
 //Get the windows version info, if it fails we just return 0.0.0.0 as this only used for informational purposes.
-procedure GetResourceVersionNumbers(out AMajor, AMinor, ARelease, ABuild: Integer);
+
+{ TDPMWindowsUtils }
+
+class procedure TDPMWindowsUtils.GetResourceVersionNumbers(out AMajor, AMinor, ARelease, ABuild: Integer);
 var
   HResource: TResourceHandle;
   HResData: THandle;
@@ -92,8 +96,6 @@ begin
     end;
   end;
 end;
-
-{ TDPMWindowsUtils }
 
 class function TDPMWindowsUtils.GetVersionString: string;
 var
