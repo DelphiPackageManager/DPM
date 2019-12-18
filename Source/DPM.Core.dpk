@@ -112,7 +112,11 @@ contains
   DPM.Core.Options.Cache in 'Core\Options\DPM.Core.Options.Cache.pas',
   DPM.Core.Options.Remove in 'Core\Options\DPM.Core.Options.Remove.pas',
   DPM.Core.Utils.Config in 'Core\Utils\DPM.Core.Utils.Config.pas',
-  DPM.Core.Utils.Path in 'Core\Utils\DPM.Core.Utils.Path.pas';
+  DPM.Core.Utils.Path in 'Core\Utils\DPM.Core.Utils.Path.pas',
+  DPM.Core.Compiler.Interfaces in 'Core\Compiler\DPM.Core.Compiler.Interfaces.pas',
+  DPM.Core.Compiler.EnvironmentProvider in 'Core\Compiler\DPM.Core.Compiler.EnvironmentProvider.pas',
+  DPM.Core.Compiler.MSBuild in 'Core\Compiler\DPM.Core.Compiler.MSBuild.pas',
+  DPM.Core.Compiler.Factory in 'Core\Compiler\DPM.Core.Compiler.Factory.pas';
 
 end.
 

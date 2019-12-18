@@ -175,6 +175,10 @@
         <DCCReference Include="Core\Options\DPM.Core.Options.Remove.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Config.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Path.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.Interfaces.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.EnvironmentProvider.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.MSBuild.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.Factory.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
