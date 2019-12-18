@@ -44,7 +44,16 @@
         <CfgParent>Base</CfgParent>
         <Base>true</Base>
     </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_2)'=='true') or '$(Cfg_2_Win32)'!=''">
+        <Cfg_2_Win32>true</Cfg_2_Win32>
+        <CfgParent>Cfg_2</CfgParent>
+        <Cfg_2>true</Cfg_2>
+        <Base>true</Base>
+    </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
+        <DCC_UnitSearchPath>Libs\Spring4D\Source;Libs\Spring4D\Source\Base;Libs\Spring4D\Source\Base\Logging;Libs\Spring4D\Source\Base\Collections;Libs\Spring4D\Source\Core\Interception;Libs\Spring4D\Source\Core\Container;Libs\Spring4D\Source\Core\Services;Libs\Spring4D\Source\Extensions\Cryptography;Libs\Spring4D\Source\Extensions\Utils;Libs\VSoft.CommandLineParser\src;Libs\VSoft.SemanticVersion\source;Libs\VSoft.AntPatterns\source;Libs\VSoft.Uri\src;Libs\JsonDataObjects\Source;Core;Core\Cache;Core\Configuration;Core\Dependency;Core\Logging;Core\Options;Core\Package;Core\Packaging;Core\Project;Core\Repository;Core\Sources;Core\Spec;Core\Utils;Core\Xml;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UsePackage>designide;rtl;vcl;$(DCC_UsePackage)</DCC_UsePackage>
+        <UsePackages>true</UsePackages>
         <VerInfo_Locale>3081</VerInfo_Locale>
         <Manifest_File>None</Manifest_File>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
@@ -60,17 +69,15 @@
         <DCC_K>false</DCC_K>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_OSX32)'!=''">
-        <DCC_UsePackage>fmx;rtl;dbrtl;IndySystem;bindcomp;xmlrtl;DbxCommonDriver;IndyProtocols;bindengine;soaprtl;CustomIPTransport;dsnap;IndyIPServer;fmxase;IndyCore;IndyIPCommon;inet;fmxobj;dsnapxml;fmxdae;IndyIPClient;$(DCC_UsePackage)</DCC_UsePackage>
+        <DCC_UsePackage>fmx;dbrtl;IndySystem;bindcomp;xmlrtl;DbxCommonDriver;IndyProtocols;bindengine;soaprtl;CustomIPTransport;dsnap;IndyIPServer;fmxase;IndyCore;IndyIPCommon;inet;fmxobj;dsnapxml;fmxdae;IndyIPClient;$(DCC_UsePackage)</DCC_UsePackage>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
         <VerInfo_Locale>1033</VerInfo_Locale>
-        <DCC_UsePackage>NxLayout6Run_dxe7;madBasic_;NxGridRun_dxe7;FBMiscComponents;RaizeComponentsVclDb;dwWin7Controls;fmx;rtl;dbrtl;IndySystem;RaizeComponentsVcl;FixInsight_XE7;bindcomp;FBDreamRuntime;madDisAsm_;xmlrtl;DbxCommonDriver;vclimg;IndyProtocols;SpTBXLib_d21;NxCommonDsgn_dxe7;vclactnband;bindengine;vcldb;FBFormDesigner;VSPageR;soaprtl;NxCommonRun_dxe7;vclie;NxGrid6Run_dxe7;madExcept_;vcltouch;FrameViewerXE7;CustomIPTransport;VclSmp;dsnap;NxGridDsgn_dxe7;IndyIPServer;fmxase;vcl;IndyCore;SynEdit_RXE7;IndyIPCommon;KWizardR;inet;fmxobj;FBSynEditHighlighters;vclx;lmdrtdocking;DCEF_XE7;NxStandard6Run_dxe7;dsnapxml;fmxdae;JSDialogPack;tb2k;VirtualTreesR;lmdrtl;adortl;IndyIPClient;$(DCC_UsePackage)</DCC_UsePackage>
-        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
-        <DCC_UsePackage>NxLayout6Run_dxe7;NxGridRun_dxe7;RaizeComponentsVclDb;fmx;rtl;dbrtl;IndySystem;RaizeComponentsVcl;bindcomp;xmlrtl;DbxCommonDriver;vclimg;IndyProtocols;NxCommonDsgn_dxe7;vclactnband;bindengine;vcldb;soaprtl;NxCommonRun_dxe7;vclie;NxGrid6Run_dxe7;vcltouch;CustomIPTransport;VclSmp;dsnap;NxGridDsgn_dxe7;IndyIPServer;fmxase;vcl;IndyCore;IndyIPCommon;inet;fmxobj;vclx;lmdrtdocking;NxStandard6Run_dxe7;dsnapxml;fmxdae;VirtualTreesR;lmdrtl;adortl;IndyIPClient;$(DCC_UsePackage)</DCC_UsePackage>
+        <DCC_UsePackage>NxLayout6Run_dxe7;NxGridRun_dxe7;RaizeComponentsVclDb;fmx;dbrtl;IndySystem;RaizeComponentsVcl;bindcomp;xmlrtl;DbxCommonDriver;vclimg;IndyProtocols;NxCommonDsgn_dxe7;vclactnband;bindengine;vcldb;soaprtl;NxCommonRun_dxe7;vclie;NxGrid6Run_dxe7;vcltouch;CustomIPTransport;VclSmp;dsnap;NxGridDsgn_dxe7;IndyIPServer;fmxase;IndyCore;IndyIPCommon;inet;fmxobj;vclx;lmdrtdocking;NxStandard6Run_dxe7;dsnapxml;fmxdae;VirtualTreesR;lmdrtl;adortl;IndyIPClient;$(DCC_UsePackage)</DCC_UsePackage>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1)'!=''">
         <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
@@ -81,8 +88,9 @@
         <DCC_RemoteDebug>true</DCC_RemoteDebug>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
+        <Debugger_RunParams>-rOpenToolsAPI</Debugger_RunParams>
+        <Debugger_HostApplication>E:\Emb\Studio\15.0\bin\bds.exe</Debugger_HostApplication>
         <VerInfo_Locale>1033</VerInfo_Locale>
-        <Manifest_File>None</Manifest_File>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <DCC_RemoteDebug>false</DCC_RemoteDebug>
     </PropertyGroup>
@@ -92,10 +100,18 @@
         <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
         <DCC_DebugInformation>0</DCC_DebugInformation>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+        <VerInfo_Locale>1033</VerInfo_Locale>
+    </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
+        <DCCReference Include="IDE\DPM.IDE.Main.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.Wizard.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectStorageNotifier.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.Logger.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
@@ -118,9 +134,18 @@
                 </Source>
                 <Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dclIPIndyImpl210.bpl">IP Abstraction Indy Implementation Design Time</Excluded_Packages>
+                    <Excluded_Packages Name="C:\Users\Public\Documents\Embarcadero\Studio\15.0\Bpl\TMSLoggingPkgCoreDXE7.bpl">File C:\Users\Public\Documents\Embarcadero\Studio\15.0\Bpl\TMSLoggingPkgCoreDXE7.bpl not found</Excluded_Packages>
+                    <Excluded_Packages Name="C:\Users\Public\Documents\Embarcadero\Studio\15.0\Bpl\TMSLoggingPkgFMXDXE7.bpl">File C:\Users\Public\Documents\Embarcadero\Studio\15.0\Bpl\TMSLoggingPkgFMXDXE7.bpl not found</Excluded_Packages>
+                    <Excluded_Packages Name="C:\Users\Public\Documents\Embarcadero\Studio\15.0\Bpl\TMSLoggingPkgVCLDXE7.bpl">File C:\Users\Public\Documents\Embarcadero\Studio\15.0\Bpl\TMSLoggingPkgVCLDXE7.bpl not found</Excluded_Packages>
                 </Excluded_Packages>
             </Delphi.Personality>
             <Deployment>
+                <DeployFile LocalName="..\Output\DPM.IDE.dll" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win32">
+                        <RemoteName>DPM_IDE.dll</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
                 <DeployFile LocalName="$(BDS)\Redist\osx32\libcgunwind.1.0.dylib" Class="DependencyModule">
                     <Platform Name="OSX32">
                         <Overwrite>true</Overwrite>

@@ -24,27 +24,123 @@
 {                                                                           }
 {***************************************************************************}
 
-library DPM.IDE;
+unit DPM.IDE.Wizard;
 
-{ Important note about DLL memory management: ShareMem must be the
-  first unit in your library's USES clause AND your project's (select
-  Project-View Source) USES clause if your DLL exports any procedures or
-  functions that pass strings as parameters or function results. This
-  applies to all strings passed to and from your DLL--even those that
-  are nested in records and classes. ShareMem is the interface unit to
-  the BORLNDMM.DLL shared memory manager, which must be deployed along
-  with your DLL. To avoid using BORLNDMM.DLL, pass string information
-  using PChar or ShortString parameters. }
+interface
+
+uses
+  ToolsApi,
+  Spring.Container,
+  DPM.Core.Logging;
+
+type
+  TDPMWizard = class(TInterfacedObject, IOTAWizard)
+  private
+    FStorageNotifier : integer;
+    FLogger : ILogger;
+    FContainer : TContainer;
+    procedure InitContainer;
+  protected
+
+    //IOTAWizard
+    procedure Execute;
+    function GetIDString: string;
+    function GetName: string;
+    function GetState: TWizardState;
+
+    //IOTANotifier
+    procedure AfterSave;
+    procedure BeforeSave;
+    procedure Destroyed;
+    procedure Modified;
+  public
+    constructor Create;
+    destructor Destroy;override;
+  end;
+
+implementation
 
 uses
   System.SysUtils,
-  System.Classes,
-  DPM.IDE.Main in 'IDE\DPM.IDE.Main.pas',
-  DPM.IDE.Wizard in 'IDE\DPM.IDE.Wizard.pas',
-  DPM.IDE.ProjectStorageNotifier in 'IDE\DPM.IDE.ProjectStorageNotifier.pas',
-  DPM.IDE.Logger in 'IDE\DPM.IDE.Logger.pas';
+  DPM.IDE.Logger,
+  DPM.Core.Init,
+  DPM.IDE.ProjectStorageNotifier;
 
-{$R *.res}
+{ TDPMWizard }
 
+procedure TDPMWizard.InitContainer;
 begin
+  try
+    FContainer := TContainer.Create;
+    FContainer.RegisterInstance<ILogger>(FLogger);
+    DPM.Core.Init.InitCore(FContainer);
+    FContainer.Build;
+  except
+    on e : Exception do
+    begin
+
+    end;
+  end;
+end;
+
+
+procedure TDPMWizard.AfterSave;
+begin
+
+end;
+
+procedure TDPMWizard.BeforeSave;
+begin
+
+end;
+
+constructor TDPMWizard.Create;
+var
+  storageNotifier : IOTAProjectFileStorageNotifier;
+begin
+  FLogger := TDPMIDELogger.Create;
+  InitContainer;
+
+  storageNotifier := TDPMProjectStorageNotifier.Create(FLogger as IDPMIDELogger);
+  FStorageNotifier := (BorlandIDEServices As IOTAProjectFileStorage).AddNotifier(storageNotifier);
+
+end;
+
+destructor TDPMWizard.Destroy;
+begin
+  If FStorageNotifier > -1 then
+    (BorlandIDEServices As IOTAProjectFileStorage).RemoveNotifier(FStorageNotifier);
+
+  inherited;
+end;
+
+procedure TDPMWizard.Destroyed;
+begin
+
+end;
+
+procedure TDPMWizard.Execute;
+begin
+end;
+
+function TDPMWizard.GetIDString: string;
+begin
+  result := 'DPM.IDE';
+end;
+
+function TDPMWizard.GetName: string;
+begin
+  result := 'DPM';
+end;
+
+function TDPMWizard.GetState: TWizardState;
+begin
+  result := [wsEnabled];
+end;
+
+procedure TDPMWizard.Modified;
+begin
+
+end;
+
 end.

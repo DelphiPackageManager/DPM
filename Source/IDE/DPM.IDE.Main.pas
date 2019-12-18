@@ -24,27 +24,34 @@
 {                                                                           }
 {***************************************************************************}
 
-library DPM.IDE;
+unit DPM.IDE.Main;
 
-{ Important note about DLL memory management: ShareMem must be the
-  first unit in your library's USES clause AND your project's (select
-  Project-View Source) USES clause if your DLL exports any procedures or
-  functions that pass strings as parameters or function results. This
-  applies to all strings passed to and from your DLL--even those that
-  are nested in records and classes. ShareMem is the interface unit to
-  the BORLNDMM.DLL shared memory manager, which must be deployed along
-  with your DLL. To avoid using BORLNDMM.DLL, pass string information
-  using PChar or ShortString parameters. }
+interface
 
-uses
-  System.SysUtils,
-  System.Classes,
-  DPM.IDE.Main in 'IDE\DPM.IDE.Main.pas',
-  DPM.IDE.Wizard in 'IDE\DPM.IDE.Wizard.pas',
-  DPM.IDE.ProjectStorageNotifier in 'IDE\DPM.IDE.ProjectStorageNotifier.pas',
-  DPM.IDE.Logger in 'IDE\DPM.IDE.Logger.pas';
+Uses
+  ToolsAPI,
+  DPM.IDE.Wizard;
 
-{$R *.res}
 
-begin
+function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
+  RegisterProc: TWizardRegisterProc;
+  var Terminate: TWizardTerminateProc): Boolean; stdcall;
+
+
+Exports
+  InitWizard Name WizardEntryPoint;
+
+implementation
+
+function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
+  RegisterProc: TWizardRegisterProc;
+  var Terminate: TWizardTerminateProc): Boolean; stdcall;  //FI:O804
+
+Begin
+  Result := BorlandIDEServices <> Nil;
+  RegisterProc(TDPMWizard.Create);
+End;
+
+
+
 end.
