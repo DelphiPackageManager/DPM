@@ -112,6 +112,7 @@
         <DCCReference Include="IDE\DPM.IDE.Wizard.pas"/>
         <DCCReference Include="IDE\DPM.IDE.ProjectStorageNotifier.pas"/>
         <DCCReference Include="IDE\DPM.IDE.Logger.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.Notifier.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

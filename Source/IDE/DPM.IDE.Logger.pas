@@ -110,13 +110,19 @@ begin
 end;
 
 procedure TDPMIDELogger.Error(const data: string);
+var
+  lineRef : Pointer;
 begin
+  //TODO : Send custom message so we can color it
+  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
 
 end;
 
 procedure TDPMIDELogger.Information(const data: string; const important: Boolean);
+var
+  lineRef : Pointer;
 begin
-
+  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
 end;
 
 procedure TDPMIDELogger.ShowMessageTab;
@@ -137,13 +143,17 @@ begin
 end;
 
 procedure TDPMIDELogger.Verbose(const data: string);
+var
+  lineRef : Pointer;
 begin
-
+  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
 end;
 
 procedure TDPMIDELogger.Warning(const data: string);
+var
+  lineRef : Pointer;
 begin
-
+  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
 end;
 
 end.

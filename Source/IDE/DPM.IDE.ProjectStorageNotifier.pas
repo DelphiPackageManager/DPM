@@ -178,7 +178,6 @@ end;
 
 procedure TDPMProjectStorageNotifier.ProjectLoaded(const ProjectOrGroup: IOTAModule; const Node: IXMLNode);
 var
-  lineRef : Pointer;
   i : integer;
 begin
   //Note : We cannot use the Node here, as it's ownerdocument is not the full dproj, it appears to be

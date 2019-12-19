@@ -36,7 +36,8 @@ uses
 type
   TDPMWizard = class(TInterfacedObject, IOTAWizard)
   private
-    FStorageNotifier : integer;
+    //FStorageNotifier : integer;
+    FIDENotifier : integer;
     FLogger : ILogger;
     FContainer : TContainer;
     procedure InitContainer;
@@ -64,7 +65,9 @@ uses
   System.SysUtils,
   DPM.IDE.Logger,
   DPM.Core.Init,
-  DPM.IDE.ProjectStorageNotifier;
+  DPM.IDE.ProjectStorageNotifier,
+  DPM.IDE.Notifier,
+  DPM.Core.Package.Interfaces;
 
 { TDPMWizard }
 
@@ -96,20 +99,30 @@ end;
 
 constructor TDPMWizard.Create;
 var
-  storageNotifier : IOTAProjectFileStorageNotifier;
+  //storageNotifier : IOTAProjectFileStorageNotifier;
+  ideNotifier : IOTAIDENotifier;
+  packageInstaller : IPackageInstaller;
 begin
   FLogger := TDPMIDELogger.Create;
   InitContainer;
 
-  storageNotifier := TDPMProjectStorageNotifier.Create(FLogger as IDPMIDELogger);
-  FStorageNotifier := (BorlandIDEServices As IOTAProjectFileStorage).AddNotifier(storageNotifier);
+  packageInstaller := FContainer.Resolve<IPackageInstaller>;
+
+  ideNotifier := TDPMIDENotifier.Create(FLogger as IDPMIDELogger, packageInstaller);
+  FIDENotifier := (BorlandIDEServices as IOTAServices).AddNotifier(ideNotifier)
+
+//  storageNotifier := TDPMProjectStorageNotifier.Create(FLogger as IDPMIDELogger);
+//  FStorageNotifier := (BorlandIDEServices As IOTAProjectFileStorage).AddNotifier(storageNotifier);
 
 end;
 
 destructor TDPMWizard.Destroy;
 begin
-  If FStorageNotifier > -1 then
-    (BorlandIDEServices As IOTAProjectFileStorage).RemoveNotifier(FStorageNotifier);
+//  If FStorageNotifier > -1 then
+//    (BorlandIDEServices As IOTAProjectFileStorage).RemoveNotifier(FStorageNotifier);
+  if FIDENotifier > -1 then
+    (BorlandIDEServices as IOTAServices).RemoveNotifier(FIDENotifier);
+
 
   inherited;
 end;

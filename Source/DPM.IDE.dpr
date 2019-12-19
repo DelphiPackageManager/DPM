@@ -42,7 +42,8 @@ uses
   DPM.IDE.Main in 'IDE\DPM.IDE.Main.pas',
   DPM.IDE.Wizard in 'IDE\DPM.IDE.Wizard.pas',
   DPM.IDE.ProjectStorageNotifier in 'IDE\DPM.IDE.ProjectStorageNotifier.pas',
-  DPM.IDE.Logger in 'IDE\DPM.IDE.Logger.pas';
+  DPM.IDE.Logger in 'IDE\DPM.IDE.Logger.pas',
+  DPM.IDE.Notifier in 'IDE\DPM.IDE.Notifier.pas';
 
 {$R *.res}
 
