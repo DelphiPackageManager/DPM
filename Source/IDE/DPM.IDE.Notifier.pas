@@ -14,7 +14,6 @@ type
   private
     FLogger : IDPMIDELogger;
     FLoadingGroup : boolean;
-    FGroupProjects : IList<string>;
     FPackageInstaller : IPackageInstaller;
 
   protected
@@ -29,8 +28,6 @@ type
     procedure BeforeCompile(const Project: IOTAProject; var Cancel: Boolean);
     procedure FileNotification(NotifyCode: TOTAFileNotification; const FileName: string; var Cancel: Boolean);
 
-    function LoadProjectGroup(const fileName : string) : boolean;
-
     function CreateOptions(const fileName : string) : TRestoreOptions;
 
   public
@@ -43,8 +40,6 @@ implementation
 uses
   System.SysUtils,
   DPM.Core.Utils.Path,
-  DPM.Core.Project.Interfaces,
-  DPM.Core.Project.GroupProjReader,
   DPM.Core.Options.Common;
 
 { TDPMIDENotifier }
@@ -73,7 +68,6 @@ constructor TDPMIDENotifier.Create(const logger: IDPMIDELogger; const packageIns
 begin
   FLogger := logger;
   FPackageInstaller := packageInstaller;
-  FGroupProjects := TCollections.CreateList<string>;
 end;
 
 function TDPMIDENotifier.CreateOptions(const fileName : string) : TRestoreOptions;
@@ -142,43 +136,10 @@ begin
 
   FLogger.EndRestore;
 
-
-
-end;
-
-function TDPMIDENotifier.LoadProjectGroup(const fileName: string): boolean;
-var
-  i : integer;
-  projectGroup : IOTAProjectGroup;
-  groupReader : IGroupProjectReader;
-  projectRoot : string;
-begin
-  result := false;
-  FLogger.Clear;
-  FLogger.StartRestore;
-  FGroupProjects.Clear;
-  groupReader := TGroupProjectReader.Create(FLogger);
-  if groupReader.LoadGroupProj(fileName) then
-  begin
-    groupReader.ExtractProjects(FGroupProjects);
-    projectRoot := ExtractFilePath(fileName);
-    //projects likely to be relative, so make them full paths
-    for i := 0 to FGroupProjects.Count -1 do
-    begin
-      //sysutils.IsRelativePath returns false with paths starting with .\
-      if TPathUtils.IsRelativePath(FGroupProjects[i]) then
-        //TPath.Combine really should do this but it doesn't
-        FGroupProjects[i] := TPathUtils.CompressRelativePath(projectRoot, FGroupProjects[i])
-    end;
-    result := true;
-  end;
 end;
 
 procedure TDPMIDENotifier.Modified;
 begin
-
-
-
 end;
 
 end.
