@@ -593,7 +593,7 @@ begin
   for platform in platforms do
   begin
     options.Platforms := [platform];
-    FLogger.Information('Attempting install [' + options.SearchTerms + '-' + DPMPlatformToString(platform) + '] into [' + projectFile + ']', true);
+    FLogger.Information('Installing [' + options.SearchTerms + '-' + DPMPlatformToString(platform) + '] into [' + projectFile + ']', true);
     platformResult  := DoInstallPackage(options, projectFile, projectEditor, platform, config);
     if not platformResult then
       FLogger.Error('Install failed for [' + options.SearchTerms + '-' + DPMPlatformToString(platform) + ']');
@@ -873,7 +873,7 @@ begin
   for platform in platforms do
   begin
     options.Platforms := [platform];
-    FLogger.Information('Attempting restore on [' + projectFile +'] for [' + DPMPlatformToString(platform) + ']', true);
+    FLogger.Information('Restoring project [' + projectFile +'] for [' + DPMPlatformToString(platform) + ']', true);
     platformResult  := DoRestoreProject(options, projectFile, projectEditor, platform, config);
     if not platformResult then
       FLogger.Error('Restore failed for ' + DPMPlatformToString(platform));
