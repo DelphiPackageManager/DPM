@@ -15,7 +15,7 @@ type
     FLogger : IDPMIDELogger;
     FLoadingGroup : boolean;
     FPackageInstaller : IPackageInstaller;
-
+    FGroupProjects : IList<string>;
   protected
     //IOTANotifier
     procedure AfterSave;
@@ -30,6 +30,7 @@ type
 
     function CreateOptions(const fileName : string) : TRestoreOptions;
 
+    function LoadProjectGroup(const fileName : string) : boolean;
   public
     constructor Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller);
     destructor Destroy;override;
@@ -40,6 +41,8 @@ implementation
 uses
   System.SysUtils,
   DPM.Core.Utils.Path,
+  DPM.Core.Project.Interfaces,
+  DPM.Core.Project.GroupProjReader,
   DPM.Core.Options.Common;
 
 { TDPMIDENotifier }
@@ -68,6 +71,7 @@ constructor TDPMIDENotifier.Create(const logger: IDPMIDELogger; const packageIns
 begin
   FLogger := logger;
   FPackageInstaller := packageInstaller;
+  FGroupProjects := TCollections.CreateList<string>;
 end;
 
 function TDPMIDENotifier.CreateOptions(const fileName : string) : TRestoreOptions;
@@ -91,6 +95,34 @@ begin
 
 end;
 
+
+function TDPMIDENotifier.LoadProjectGroup(const fileName: string): boolean;
+var
+  i : integer;
+  groupReader : IGroupProjectReader;
+  projectRoot : string;
+begin
+  result := false;
+  FLogger.Clear;
+  FLogger.StartRestore;
+  FGroupProjects.Clear;
+  groupReader := TGroupProjectReader.Create(FLogger);
+  if groupReader.LoadGroupProj(fileName) then
+  begin
+    groupReader.ExtractProjects(FGroupProjects);
+    projectRoot := ExtractFilePath(fileName);
+    //projects likely to be relative, so make them full paths
+    for i := 0 to FGroupProjects.Count -1 do
+    begin
+      //sysutils.IsRelativePath returns false with paths starting with .\
+      if TPathUtils.IsRelativePath(FGroupProjects[i]) then
+        //TPath.Combine really should do this but it doesn't
+        FGroupProjects[i] := TPathUtils.CompressRelativePath(projectRoot, FGroupProjects[i])
+    end;
+    result := true;
+  end;
+end;
+
 procedure TDPMIDENotifier.FileNotification(NotifyCode: TOTAFileNotification; const FileName: string; var Cancel: Boolean);
 var
   restoreOptions : TRestoreOptions;
@@ -110,27 +142,35 @@ begin
   end;
 
 
+  //
   if FLoadingGroup then
+  begin
+    FGroupProjects.Remove(FileName);
+    if FGroupProjects.Count = 0 then
+      FLoadingGroup := false;
     exit;
+  end;
+
 
   if (not FLoadingGroup) and (ExtractFileExt(FileName) = '.groupproj') then
   begin
     FLoadingGroup := true;
-//    if not LoadProjectGroup(FileName) then
-//    begin
-//      //log error
-//      exit;
-//    end;
+    //need this to determine when we are done loading the project group.
+    if not LoadProjectGroup(FileName) then
+    begin
+      //log error
+      exit;
+    end;
   end
   else
     FLoadingGroup := false;
+
 
   FLogger.Clear;
   FLogger.ShowMessageTab;
   FLogger.StartRestore;
   FLogger.StartProject(FileName);
   restoreOptions := CreateOptions(fileName);
-
 
   FPackageInstaller.Restore(restoreOptions);
 
@@ -140,6 +180,7 @@ end;
 
 procedure TDPMIDENotifier.Modified;
 begin
+
 end;
 
 end.
