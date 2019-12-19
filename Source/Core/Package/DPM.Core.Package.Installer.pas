@@ -104,6 +104,7 @@ uses
   System.Types,
   System.SysUtils,
   DPM.Core.Constants,
+  DPM.Core.Utils.Path,
   DPM.Core.Utils.System,
   DPM.Core.Project.Editor,
   DPM.Core.Project.GroupProjReader,
@@ -754,6 +755,8 @@ var
   config       : IConfiguration;
   groupProjReader : IGroupProjectReader;
   projectList : IList<string>;
+  i : integer;
+  projectRoot : string;
 begin
   result := false;
   //commandline would have validated already, but IDE probably not.
@@ -787,6 +790,16 @@ begin
       projectList := TCollections.CreateList<string>;
       if not groupProjReader.ExtractProjects(projectList) then
         exit;
+
+     //projects in a project group are likely to be relative, so make them full paths
+      projectRoot := ExtractFilePath(options.ProjectPath);
+      for i := 0 to projectList.Count -1 do
+      begin
+        //sysutils.IsRelativePath returns false with paths starting with .\
+        if TPathUtils.IsRelativePath(projectList[i]) then
+          //TPath.Combine really should do this but it doesn't
+          projectList[i] := TPathUtils.CompressRelativePath(projectRoot, projectList[i])
+      end;
       projectFiles := projectList.ToArray;
     end
     else
