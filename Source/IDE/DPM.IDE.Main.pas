@@ -30,8 +30,10 @@ interface
 
 Uses
   ToolsAPI,
+  WinApi.Windows,
+  System.SysUtils,
+  Vcl.Dialogs,
   DPM.IDE.Wizard;
-
 
 function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
   RegisterProc: TWizardRegisterProc;
@@ -39,18 +41,64 @@ function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
 
 
 Exports
-  InitWizard Name WizardEntryPoint;
+  InitWizard name ToolsAPI.WizardEntryPoint;
 
 implementation
+
+uses
+  Vcl.Graphics,
+  DPM.IDE.Constants;
+
+var
+  SplashImage: TBitmap;
+
+function CreateWizard(const BorlandIDEServices: IBorlandIDEServices) : IOTAWizard;
+begin
+  try
+    result := TDPMWizard.Create;
+    SplashImage := Vcl.Graphics.TBitmap.Create;
+    SplashImage.LoadFromResourceName(HInstance, 'DPMIDELOGO');
+    SplashScreenServices.AddPluginBitmap(sWizardTitle ,SplashImage.Handle);
+
+    (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo(sWizardTitle,  sWizardTitle  , SplashImage.Handle);
+
+  except
+    on E: Exception do
+    begin
+      MessageDlg('Failed to load wizard splash image', mtError, [mbOK], 0);
+      OutputDebugString('Failed to load splash image');
+      result := nil;
+    end;
+  end;
+
+end;
+
 
 function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
   RegisterProc: TWizardRegisterProc;
   var Terminate: TWizardTerminateProc): Boolean; stdcall;  //FI:O804
+var
+  wizard : IOTAWizard;
+begin
+  try
+    wizard := CreateWizard(BorlandIDEServices);
+    if wizard <> nil then
+    begin
+      RegisterProc(wizard);
+      Result := True;
+    end
+    else
+      Result := False;
 
-Begin
-  Result := BorlandIDEServices <> Nil;
-  RegisterProc(TDPMWizard.Create);
-End;
+  except
+    on E: Exception do
+    begin
+      MessageDlg('Failed to load wizard. internal failure:' + E.ClassName + ':'
+        + E.Message, mtError, [mbOK], 0);
+      Result := False;
+    end;
+  end;
+end;
 
 
 

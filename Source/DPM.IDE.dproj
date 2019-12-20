@@ -113,6 +113,12 @@
         <DCCReference Include="IDE\DPM.IDE.ProjectStorageNotifier.pas"/>
         <DCCReference Include="IDE\DPM.IDE.Logger.pas"/>
         <DCCReference Include="IDE\DPM.IDE.Notifier.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectMenu.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.Constants.pas"/>
+        <RcItem Include="images\dpm.bmp">
+            <ResourceType>BITMAP</ResourceType>
+            <ResourceId>DPMIDELOGO</ResourceId>
+        </RcItem>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

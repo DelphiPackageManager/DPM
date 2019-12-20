@@ -24,40 +24,14 @@
 {                                                                           }
 {***************************************************************************}
 
-library DPM.IDE;
+unit DPM.IDE.Constants;
 
-{ Important note about DLL memory management: ShareMem must be the
-  first unit in your library's USES clause AND your project's (select
-  Project-View Source) USES clause if your DLL exports any procedures or
-  functions that pass strings as parameters or function results. This
-  applies to all strings passed to and from your DLL--even those that
-  are nested in records and classes. ShareMem is the interface unit to
-  the BORLNDMM.DLL shared memory manager, which must be deployed along
-  with your DLL. To avoid using BORLNDMM.DLL, pass string information
-  using PChar or ShortString parameters. }
+interface
 
+const
+  sWizardTitle = 'DPM Package Manager';
+  sWizardProjectMenuCaption = 'Manage DPM Packages';
 
+implementation
 
-
-
-
-
-
-
-{$R *.dres}
-
-uses
-  System.SysUtils,
-  System.Classes,
-  DPM.IDE.Main in 'IDE\DPM.IDE.Main.pas',
-  DPM.IDE.Wizard in 'IDE\DPM.IDE.Wizard.pas',
-  DPM.IDE.ProjectStorageNotifier in 'IDE\DPM.IDE.ProjectStorageNotifier.pas',
-  DPM.IDE.Logger in 'IDE\DPM.IDE.Logger.pas',
-  DPM.IDE.Notifier in 'IDE\DPM.IDE.Notifier.pas',
-  DPM.IDE.ProjectMenu in 'IDE\DPM.IDE.ProjectMenu.pas',
-  DPM.IDE.Constants in 'IDE\DPM.IDE.Constants.pas';
-
-{$R *.res}
-
-begin
 end.
