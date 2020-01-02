@@ -40,7 +40,7 @@ type
     FContainer : TContainer;
     FLogger   : ILogger;
   protected
-      function CreateRepository(const repoType : string; const source : ISourceConfig) : IPackageRepository;
+      function CreateRepository(const repoType : string) : IPackageRepository;
   public
     constructor Create(const container : TContainer; const logger : ILogger);
   end;
@@ -60,7 +60,7 @@ begin
   FLogger := logger;
 end;
 
-function TPackageRepositoryFactory.CreateRepository(const repoType : string; const source: ISourceConfig): IPackageRepository;
+function TPackageRepositoryFactory.CreateRepository(const repoType : string): IPackageRepository;
 begin
   result := FContainer.Resolve<IPackageRepository>(repoType);
 end;

@@ -230,7 +230,7 @@ type
   ['{8A20F825-8DCA-4784-BDBD-8F91A651BA72}']
     function ReadSpec(const fileName : string) : IPackageSpec;overload;
    // function ReadSpec(const stream : TStream) : IPackageSpec;overload;
-    function ReadSpecString(const specString : string) : IPackageSpec; //for testing only!
+    function ReadSpecString(const specString : string) : IPackageSpec;
   end;
 
   IPackageSpecWriter = interface

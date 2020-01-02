@@ -91,7 +91,7 @@ begin
       exit(true);
     end;
 
-    TFile.Copy(pushOptions.PackagePath, targetFile, false);
+    TFile.Copy(pushOptions.PackagePath, targetFile, true);
     FLogger.Information('Package pushed ok.', true);
     result := true;
   except

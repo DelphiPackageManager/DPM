@@ -419,7 +419,7 @@ begin
     else
       repoType := 'http';
 
-    repo := FRepoFactory.CreateRepository(repoType, source);
+    repo := FRepoFactory.CreateRepository(repoType);
     repo.Init(source, repoType = 'http');
     FRepositories.Add(repo);
   end;

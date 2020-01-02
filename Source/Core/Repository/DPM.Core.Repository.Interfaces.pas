@@ -73,7 +73,7 @@ type
 
   IPackageRepositoryFactory = interface
   ['{67014BE3-AA4C-45ED-A043-68262E57B89A}']
-    function CreateRepository(const repoType : string; const source : ISourceConfig) : IPackageRepository;
+    function CreateRepository(const repoType : string) : IPackageRepository;
   end;
 
 
