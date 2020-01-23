@@ -182,7 +182,7 @@ end;
 
 function TVersionRange.IsSubsetOrEqualTo(const possibleSuperset: TVersionRange): boolean;
 begin
-  result := false;
+  result := (FMinVersion >= possibleSuperset.MinVersion) and (FMaxVersion <= possibleSuperset.MaxVersion);
 end;
 
 class function TVersionRange.IsValidFloat(const minVersion, maxVersion: TPackageVersion): boolean;
