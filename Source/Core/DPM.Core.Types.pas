@@ -217,8 +217,9 @@ var
   p : TDPMPlatform;
   i : integer;
 begin
+  result := '';
   i := 0;
-  
+
   for p in value do
   begin
     if i = 0 then
