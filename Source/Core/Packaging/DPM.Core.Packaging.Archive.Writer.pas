@@ -48,7 +48,6 @@ type
     function AddFile(const filePath: string): Boolean;overload;
     function AddFile(const fileName : string; const archiveFileName : string) : boolean;overload;
     function AddFiles(const files: System.TArray<System.string>): Boolean;
-    function RemoveFile(const filePath: string): Boolean;
     function WriteMetaDataFile(const stream: TStream): Boolean;overload;
     function WriteMetaDataFile(const fileName : string) : boolean;overload;
     function Exists: Boolean;
@@ -183,11 +182,6 @@ begin
     end;
   end;
 
-end;
-
-function TPackageArchiveWriter.RemoveFile(const filePath: string): Boolean;
-begin
-  raise ENotImplemented.Create('RemoveFile not implemented');
 end;
 
 procedure TPackageArchiveWriter.SetBasePath(const path: string);
