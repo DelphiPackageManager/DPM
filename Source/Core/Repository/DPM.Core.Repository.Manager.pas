@@ -117,6 +117,7 @@ function TPackageRepositoryManager.GetPackageInfo(const packageIdentity: IPackag
 var
   repo : IPackageRepository;
 begin
+  result := nil;
   if packageIdentity.SourceName <> '' then
   begin
     repo := GetRepositoryByName(packageIdentity.SourceName);
