@@ -259,21 +259,21 @@ end;
 function CompilerToLibSuffix(const compiler : TCompilerVersion) : string;
 begin
   case compiler of
-    TCompilerVersion.RS2009: result := '200';
-    TCompilerVersion.RS2010: result := '210';
-    TCompilerVersion.RSXE  : result := '220';
-    TCompilerVersion.RSXE2 : result := '230';
-    TCompilerVersion.RSXE3 : result := '240';
-    TCompilerVersion.RSXE4 : result := '250';
-    TCompilerVersion.RSXE5 : result := '260';
-    TCompilerVersion.RSXE6 : result := '270';
-    TCompilerVersion.RSXE7 : result := '280';
-    TCompilerVersion.RSXE8 : result := '290';
-    TCompilerVersion.RS10_0: result := '300';
-    TCompilerVersion.RS10_1: result := '310';
-    TCompilerVersion.RS10_2: result := '320';
-    TCompilerVersion.RS10_3: result := '330';
-    TCompilerVersion.RS10_4: result := '340';
+    TCompilerVersion.RS2009: result := '120';
+    TCompilerVersion.RS2010: result := '140';
+    TCompilerVersion.RSXE  : result := '150';
+    TCompilerVersion.RSXE2 : result := '160';
+    TCompilerVersion.RSXE3 : result := '170';
+    TCompilerVersion.RSXE4 : result := '180';
+    TCompilerVersion.RSXE5 : result := '190';
+    TCompilerVersion.RSXE6 : result := '200';
+    TCompilerVersion.RSXE7 : result := '210';
+    TCompilerVersion.RSXE8 : result := '220';
+    TCompilerVersion.RS10_0: result := '230';
+    TCompilerVersion.RS10_1: result := '240';
+    TCompilerVersion.RS10_2: result := '250';
+    TCompilerVersion.RS10_3: result := '260';
+    TCompilerVersion.RS10_4: result := '270';
   else
     raise Exception.Create('LibSuffix is missing for : ' + CompilerToString(compiler));
   end;
