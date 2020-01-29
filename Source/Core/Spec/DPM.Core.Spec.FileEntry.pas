@@ -44,6 +44,7 @@ type
     FDestination : string;
     FExclude : IList<string>;
     FFlatten : boolean;
+    FIgnore : boolean;
 
     function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
     function GetSource: string;
@@ -52,9 +53,9 @@ type
     function GetFlatten: Boolean;
     procedure SetSource(const value : string);
     procedure SetDestination(const value : string);
+    function GetIgnore : boolean;
 
-
-    constructor CreateClone(const logger: ILogger; const src : string; const dest : string; const exclude : IList<string>; const flatten : boolean);virtual;
+    constructor CreateClone(const logger: ILogger; const src : string; const dest : string; const exclude : IList<string>; const flatten : boolean; const ignore : boolean);virtual;
     function Clone: ISpecFileEntry;overload;
   public
     constructor Create(const logger: ILogger); override;
@@ -70,7 +71,7 @@ uses
 
 function TSpecFileEntry.Clone: ISpecFileEntry;
 begin
-  result := TSpecFileEntry.CreateClone(logger,FSource, FDestination, FExclude, FFlatten);
+  result := TSpecFileEntry.CreateClone(logger,FSource, FDestination, FExclude, FFlatten, FIgnore );
 end;
 
 constructor TSpecFileEntry.Create(const logger: ILogger);
@@ -79,7 +80,7 @@ begin
   FExclude := TCollections.CreateList<string>;
 end;
 
-constructor TSpecFileEntry.CreateClone(const logger: ILogger; const src, dest : string; const  exclude: IList<string>; const flatten: boolean);
+constructor TSpecFileEntry.CreateClone(const logger: ILogger; const src, dest : string; const  exclude: IList<string>; const flatten: boolean; const ignore : boolean);
 begin
   inherited Create(logger);
   FSource := src;
@@ -87,6 +88,7 @@ begin
   FExclude := TCollections.CreateList<string>;
   FExclude.AddRange(exclude);
   FFlatten := flatten;
+  FIgnore := ignore;
 end;
 
 function TSpecFileEntry.GetExclude: IList<string>;
@@ -97,6 +99,11 @@ end;
 function TSpecFileEntry.GetFlatten: Boolean;
 begin
   result := FFlatten;
+end;
+
+function TSpecFileEntry.GetIgnore: boolean;
+begin
+  result := FIgnore;
 end;
 
 function TSpecFileEntry.GetSource: string;
@@ -130,14 +137,18 @@ begin
   end;
 
   FFlatten := jsonObject.B['flatten'];
+  FIgnore := jsonObject.B['ignore'];
 
-  excludeArray := jsonObject.A['exclude'];
-
-  for i := 0 to excludeArray.Count -1 do
+  if jsonObject.Contains('exclude') then
   begin
-    entry := excludeArray.S[i];
-    if entry <> '' then
-      FExclude.Add(entry);
+    excludeArray := jsonObject.A['exclude']; //this is causing an av!
+
+    for i := 0 to excludeArray.Count -1 do
+    begin
+      entry := excludeArray.S[i];
+      if entry <> '' then
+        FExclude.Add(entry);
+    end;
   end;
 end;
 

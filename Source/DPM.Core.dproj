@@ -179,6 +179,8 @@
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.EnvironmentProvider.pas"/>
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.MSBuild.pas"/>
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.Factory.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Process.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

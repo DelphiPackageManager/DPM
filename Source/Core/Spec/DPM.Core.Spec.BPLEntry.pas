@@ -71,7 +71,7 @@ end;
 
 constructor TSpecBPLEntry.CreateClone(const logger: ILogger; const src, dest : string; const exclude: IList<string>; const flatten, copyLocal, install: boolean);
 begin
-  inherited CreateClone(logger, src, dest, exclude, flatten);
+  inherited CreateClone(logger, src, dest, exclude, flatten, false);
   FCopyLocal := copyLocal;
   FInstall := install;
 end;

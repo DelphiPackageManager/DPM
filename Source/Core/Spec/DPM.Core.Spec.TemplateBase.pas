@@ -47,6 +47,7 @@ type
     FRuntimeFiles : IList<ISpecBPLEntry>;
     FSourceFiles : IList<ISpecFileEntry>;
     FSearchPaths : IList<ISpecSearchPath>;
+    FBuildEntries : IList<ISpecBuildEntry>;
   protected
     function IsTemplate : boolean;virtual;
     function AllowDependencyGroups : boolean;virtual;
@@ -58,6 +59,7 @@ type
     function GetRuntimeFiles: IList<ISpecBPLEntry>;
     function GetSourceFiles: IList<ISpecFileEntry>;
     function GetSearchPaths: IList<ISpecSearchPath>;
+    function GetBuildEntries: IList<ISpecBuildEntry>;
 
     function FindDependencyById(const id : string) : ISpecDependency;
     function FindDependencyGroupByTargetPlatform(const targetPlatform : TTargetPlatform) : ISpecDependencyGroup;
@@ -67,6 +69,7 @@ type
     function FindLibFileBySrc(const src : string) : ISpecFileEntry;
     function FindSourceFileBySrc(const src : string) : ISpecFileEntry;
     function FindOtherFileBySrc(const src : string) : ISpecFileEntry;
+    function FindBuildEntryById(const id : string) : ISpecBuildEntry;
 
 
 //    function LoadCollection(const rootElement : IXMLDOMElement; const collectionPath : string; const nodeClass : TSpecNodeClass; const action : TConstProc<ISpecNode>) : boolean;
@@ -78,6 +81,7 @@ type
     function LoadDesignFromJson(const designArray : TJsonArray): Boolean;
     function LoadFilesFromJson(const filesArray : TJsonArray): Boolean;
     function LoadSearchPathsFromJson(const searchPathsArray: TJsonArray): Boolean;
+    function LoadBuildEntriesFromJson(const buildArray: TJsonArray): Boolean;
 
     function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
 
@@ -86,6 +90,7 @@ type
                             const source, lib, files : IList<ISpecFileEntry>; const search : IList<ISpecSearchPath>);
   public
     constructor Create(const logger : ILogger);override;
+
 
   end;
 
@@ -100,7 +105,7 @@ uses
   DPM.Core.Spec.Dependency,
   DPM.Core.Spec.DependencyGroup,
   DPM.Core.Spec.SearchPath,
-  DPM.Core.Spec.SearchPathGroup;
+  DPM.Core.Spec.SearchPathGroup, DPM.Core.Spec.BuildEntry;
 
 
 { TSpecTemplateBase }
@@ -125,6 +130,7 @@ begin
   FRuntimeFiles := TCollections.CreateList<ISpecBPLEntry>;
   FSourceFiles  := TCollections.CreateList<ISpecFileEntry>;
   FSearchPaths  := TCollections.CreateList<ISpecSearchPath>;
+  FBuildEntries := TCollections.CreateList<ISpecBuildEntry>;
 end;
 
 constructor TSpecTemplateBase.CreateClone(const logger: ILogger; const deps: IList<ISpecDependency>; const design, runtime: IList<ISpecBPLEntry>; const source, lib, files: IList<ISpecFileEntry>; const search: IList<ISpecSearchPath>);
@@ -138,6 +144,15 @@ begin
   FSourceFiles.AddRange(source);
   FSearchPaths.AddRange(search);
 
+end;
+
+function TSpecTemplateBase.FindBuildEntryById(const id: string): ISpecBuildEntry;
+begin
+  result := FBuildEntries.Where(
+    function(const item : ISpecBuildEntry) : boolean
+    begin
+      result := SameText(item.Id, id);
+    end).FirstOrDefault;
 end;
 
 function TSpecTemplateBase.FindDependencyById(const id: string): ISpecDependency;
@@ -219,6 +234,11 @@ begin
     end).FirstOrDefault;
 end;
 
+function TSpecTemplateBase.GetBuildEntries: IList<ISpecBuildEntry>;
+begin
+  result := FBuildEntries;
+end;
+
 function TSpecTemplateBase.GetDependencies: IList<ISpecDependency>;
 begin
   result := FDependencies;
@@ -278,6 +298,15 @@ end;
 //    action(item);
 //  end;
 //end;
+
+function TSpecTemplateBase.LoadBuildEntriesFromJson(const buildArray: TJsonArray): Boolean;
+begin
+  result := LoadJsonCollection(buildArray, TSpecBuildEntry,
+    procedure(const value : IInterface)
+    begin
+      FBuildEntries.Add(value as ISpecBuildEntry);
+    end);
+end;
 
 function TSpecTemplateBase.LoadDependenciesFromJson(const dependenciesArray: TJsonArray): Boolean;
 var
@@ -483,6 +512,11 @@ begin
     result := false;
     Logger.Error('Required field [searchPaths] not found');
   end;
+
+  collectionObj := jsonObject.A['build'];
+  if collectionObj.Count > 0 then
+    result := LoadBuildEntriesFromJson(collectionObj) and result;
+
 
 end;
 

@@ -33,8 +33,11 @@ uses
   Spring.Collections,
   DPM.Core.Types;
 
+{$SCOPEDENUMS ON}
 
 type
+  TCompilerVerbosity = (Quiet, Minimal, Normal, Detailed,Diagnostic);
+
   ICompiler = interface
   ['{4A56BA53-6ACD-4A5D-8D55-B921D6CDC8A0}']
     function GetCompilerVersion : TCompilerVersion;
@@ -58,17 +61,25 @@ type
     function GetHPPOutput : string;
     procedure SetHPPOutput(const value : string);
 
-    function BuildProject(const projectFile : string): boolean;
+    function GetVerbosity : TCompilerVerbosity;
+    procedure SetVerbosity(const value : TCompilerVerbosity);
+
+    function GetCompilerOutput : TStrings;
+
+    function BuildProject(const projectFile : string; const configName : string): boolean;
 
     property CompilerVersion : TCompilerVersion read GetCompilerVersion;
     property Configuration : string read GetConfiguration write SetConfiguration;
     property Platform : TDPMPlatform read GetPlatform;
+    property Verbosity : TCompilerVerbosity read GetVerbosity write SetVerbosity;
 
     property BPLOutputDir : string read GetBPLOutput write SetBPLOutput;
     property DCPOutputDir : string read GetDCPOutput write SetDCPOutput;
     property DCUOutputDir : string read GetDCUOutput write SetDCUOutput;
     property OBJOutputDir : string read GetOBJOutput write SetOBJOutput;
     property HPPOutputDir : string read GetHPPOutput write SetHPPOutput;
+
+    property CompilerOutput : TStrings read GetCompilerOutput;
   end;
 
   //inject

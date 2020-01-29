@@ -29,6 +29,7 @@ unit DPM.Core.Compiler.MSBuild;
 interface
 
 uses
+  System.Classes,
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Logging,
@@ -40,19 +41,23 @@ type
   private
     FLogger : ILogger;
     FEnv : ICompilerEnvironmentProvider;
+    FCompilerLogFile : string;
 
     FBPLOutput: string;
-    FCompilerVersion : TCompilerVersion;
-    FConfiguration: string;
     FDCPOutput: string;
     FDCUOutput: string;
     FHPPOutput: string;
     FOBJOutput: string;
+
+
+    FCompilerVersion : TCompilerVersion;
+    FConfiguration: string;
     FPlatform: TDPMPlatform;
     FSearchPaths: IList<string>;
+    FVerbosity : TCompilerVerbosity;
 
+    FCompilerOutput : TStringList;
   protected
-
     function GetBPLOutput: string;
     function GetCompilerVersion: TCompilerVersion;
     function GetConfiguration: string;
@@ -69,20 +74,57 @@ type
     procedure SetHPPOutput(const value: string);
     procedure SetOBJOutput(const value: string);
     procedure SetSearchPaths(const value: IList<string>);
+    function GetVerbosity: TCompilerVerbosity;
+    procedure SetVerbosity(const value: TCompilerVerbosity);
 
-    function BuildProject(const projectFile: string): Boolean;
+
+    function GetCompilerOutput : TStrings;
+
+    function GetMSBuildParameters(const configName : string) : string;
+    function GetCommandLine(const projectFile : string; const configName : string) : string;
+
+    function BuildProject(const projectFile: string; const configName : string): Boolean;
   public
     constructor Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const env : ICompilerEnvironmentProvider);
+    destructor Destroy;override;
 
   end;
 
 implementation
 
+uses
+  System.SysUtils,
+  System.IOUtils,
+  DPM.Core.Utils.Process;
+
+
 { TMSBuildCompiler }
 
-function TMSBuildCompiler.BuildProject(const projectFile: string): Boolean;
+function TMSBuildCompiler.BuildProject(const projectFile: string; const configName : string): Boolean;
+var
+  commandLine : string;
 begin
   result := false;
+
+  FCompilerLogFile := TPath.GetTempFileName;
+
+  commandLine := GetCommandLine(projectFile, configName );
+
+  try
+    result :=  TProcess.Execute('cmd.exe', commandLine) = 0;
+  except
+    on e : Exception do
+    begin
+      FLogger.Error('Error executing compiler : '  + e.Message );
+    end;
+  end;
+
+  //TODO : Doesn't give realtime feedback, remove when we have a CreateProcess version of TProcess.
+  if TFile.Exists(FCompilerLogFile) then
+  begin
+    FCompilerOutput.LoadFromFile(FCompilerLogFile);
+    TFile.Delete(FCompilerLogFile);
+  end;
 
 end;
 
@@ -93,11 +135,34 @@ begin
   FPlatform := platform;
   FEnv := env;
   FSearchPaths := TCollections.CreateList<string>;
+  FCompilerOutput := TStringList.Create;
+end;
+
+destructor TMSBuildCompiler.Destroy;
+begin
+  FCompilerOutput.Free;
+  inherited;
 end;
 
 function TMSBuildCompiler.GetBPLOutput: string;
 begin
   result := FBPLOutput;
+end;
+
+function TMSBuildCompiler.GetCommandLine(const projectFile, configName: string): string;
+var
+  cmd : string;
+begin
+  //I don't like this... but it will do for a start.
+
+  result := 'call "' + FEnv.GetRsVarsFilePath(FCompilerVersion) + '\rsvars.bat"';
+  result := result + '& msbuild "' + projectfile + '" ' + GetMSBuildParameters(configName);
+  result := 'cmd.exe /c ' + cmd + ' > ' + FCompilerLogFile;
+end;
+
+function TMSBuildCompiler.GetCompilerOutput: TStrings;
+begin
+  result := FCompilerOutput;
 end;
 
 function TMSBuildCompiler.GetCompilerVersion: TCompilerVersion;
@@ -125,6 +190,31 @@ begin
   result := FHPPOutput;
 end;
 
+function TMSBuildCompiler.GetMSBuildParameters(const configName : string) : string;
+begin
+  result := '/target:Build';
+  result := result + ' /p:config=' + configName;
+  result := result + ' /p:platform=' + DPMPlatformToBDString(FPlatform);
+
+  //TODO : Check that these props are correctly named for all supported compiler versions.
+
+  if FDCPOutput <> '' then
+    result := result + ' /p:DCC_DcpOutput' + ExcludeTrailingPathDelimiter(FDCPOutput); //msbuild is fussy!
+
+  if FDCUOutput <> '' then
+    result := result + ' /p:DCC_DcuOutput' + ExcludeTrailingPathDelimiter(FDCUOutput);
+
+  if FBPLOutput <> '' then
+    result := result + ' /p:DCC_BplOutput' + ExcludeTrailingPathDelimiter(FBPLOutput);
+
+  if FOBJOutput <> '' then
+    result := result + ' /p:DCC_ObjOutput' + ExcludeTrailingPathDelimiter(FOBJOutput);
+
+  if FHPPOutput <> '' then
+    result := result + ' /p:DCC_HppOutput' + ExcludeTrailingPathDelimiter(FHPPOutput);
+
+end;
+
 function TMSBuildCompiler.GetOBJOutput: string;
 begin
   result := FOBJOutput;
@@ -138,6 +228,11 @@ end;
 function TMSBuildCompiler.GetSearchPaths: IList<string>;
 begin
   result := FSearchPaths;
+end;
+
+function TMSBuildCompiler.GetVerbosity: TCompilerVerbosity;
+begin
+  result := FVerbosity;
 end;
 
 procedure TMSBuildCompiler.SetBPLOutput(const value: string);
@@ -173,6 +268,11 @@ end;
 procedure TMSBuildCompiler.SetSearchPaths(const value: IList<string>);
 begin
   FSearchPaths := value;
+end;
+
+procedure TMSBuildCompiler.SetVerbosity(const value: TCompilerVerbosity);
+begin
+  FVerbosity := value;
 end;
 
 end.

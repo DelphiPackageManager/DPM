@@ -560,7 +560,7 @@ begin
   ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion);
 
   if ambiguousProjectVersion and (options.CompilerVersion = TCompilerVersion.UnknownVersion) then
-     FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous, recommend specifying compiler on command line.');
+     FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous, recommend specifying compiler version on command line.');
 
   //if the compiler version was specified (either on the command like or through a package file)
   //then make sure our dproj is actually for that version.

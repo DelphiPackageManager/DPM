@@ -59,6 +59,7 @@ type
     function ApplyOtherFiles(const targetPlatform : ISpecTargetPlatform; const files : IList<ISpecFileEntry>) : boolean;
     function ApplyDesign(const targetPlatform : ISpecTargetPlatform; const designFiles : IList<ISpecBPLEntry>) : boolean;
     function ApplyRuntime(const targetPlatform : ISpecTargetPlatform; const runtimeFiles : IList<ISpecBPLEntry>) : boolean;
+    function ApplyBuild(const targetPlatform : ISpecTargetPlatform; const buildEntries : IList<ISpecBuildEntry>) : boolean;
 
     function ApplyTemplates: Boolean;
     function ExpandTargetPlatforms : boolean;
@@ -99,6 +100,28 @@ uses
 { TSpec }
 
 
+
+function TSpec.ApplyBuild(const targetPlatform: ISpecTargetPlatform; const buildEntries: IList<ISpecBuildEntry>): boolean;
+var
+  existing : ISpecBuildEntry;
+  newBuildEntry : ISpecBuildEntry;
+begin
+  result := true;
+  for newBuildEntry in buildEntries do
+  begin
+    existing := targetPlatform.FindBuildEntryById(newBuildEntry.id);
+    if existing <> nil then
+    begin
+      result := false;
+      Logger.Error('Duplicate Build entry ' + newBuildEntry.Id + '] found in targetPlatform and template');
+    end
+    else
+    begin
+      existing := newBuildEntry.Clone;
+      targetPlatform.BuildEntries.Add(existing.Clone);
+    end;
+  end;
+end;
 
 function TSpec.ApplyDependencies(const targetPlatform: ISpecTargetPlatform; const dependencies: IList<ISpecDependency>): boolean;
 var
@@ -364,6 +387,7 @@ begin
       result := ApplyOtherFiles(targetPlatform, template.Files) and result;
       result := ApplyRuntime(targetPlatform, template.RuntimeFiles) and result;
       result := ApplyDesign(targetPlatform, template.DesignFiles) and result;
+      result := ApplyBuild(targetPlatform, template.BuildEntries) and result;
     end
     else
     begin
@@ -470,10 +494,12 @@ var
   Obj : TJsonObject;
   dependency : ISpecDependency;
   searchPath : ISpecSearchPath;
+  buildEntry : ISpecBuildEntry;
   metaDataObj : TJsonObject;
   targetPlatformObject : TJDOJsonObject;
   dependencyObj : TJsonObject;
   seachPathObj : TJsonObject;
+  buildEntryObj : TJsonObject;
 begin
   result := '';
 
@@ -513,13 +539,32 @@ begin
       end;
     end;
 
-    for searchPath in targetPlatform.SearchPaths do
+    if targetPlatform.SearchPaths.Any then
     begin
-      seachPathObj := targetPlatformObject.A['searchPaths'].AddObject;
-      seachPathObj['path'] := searchPath.Path;
-      seachPathObj['sourceOnly'] := LowerCase(BoolToStr(searchPath.SourceOnly, true));
-      seachPathObj['binariesOnly'] := LowerCase(BoolToStr(searchPath.BinariesOnly,true));
+      for searchPath in targetPlatform.SearchPaths do
+      begin
+        seachPathObj := targetPlatformObject.A['searchPaths'].AddObject;
+        seachPathObj['path'] := searchPath.Path;
+        seachPathObj['sourceOnly'] := LowerCase(BoolToStr(searchPath.SourceOnly, true));
+        seachPathObj['binariesOnly'] := LowerCase(BoolToStr(searchPath.BinariesOnly,true));
+      end;
     end;
+
+    if targetPlatform.BuildEntries.Any then
+    begin
+      for buildEntry in targetPlatform.BuildEntries do
+      begin
+        buildEntryObj := targetPlatformObject.A['build'].AddObject;
+        buildEntryObj['id'] := buildEntry.Id;
+        buildEntryObj['project'] := buildEntry.Project;
+        buildEntryObj['bplOutputDir'] := buildEntry.BplOutputDir;
+        buildEntryObj['dcpOutputDir'] := buildEntry.BplOutputDir;
+        buildEntryObj['dcuOutputDir'] := buildEntry.BplOutputDir;
+        buildEntryObj['keepBin'] := LowerCase(BoolToStr(buildEntry.KeepBin,true)); ;
+      end;
+    end;
+
+
 
     result := Obj.ToJSON(False);
   finally
@@ -653,6 +698,7 @@ var
   targetPlatform : ISpecTargetPlatform;
   fileEntry : ISpecFileEntry;
   bplEntry  : ISpecBPLEntry;
+  buildEntry : ISpecBuildEntry;
   regEx : TRegEx;
   evaluator : TMatchEvaluator;
 begin
@@ -705,6 +751,11 @@ begin
         begin
           bplEntry.Source := regEx.Replace(bplEntry.Source, evaluator);
           bplEntry.Destination := regEx.Replace(bplEntry.Destination, evaluator);
+        end;
+
+        for buildEntry in targetPlatform.BuildEntries do
+        begin
+          buildEntry.Project := regEx.Replace(buildEntry.Project, evaluator);
         end;
       end;
 

@@ -53,7 +53,7 @@ type
     function IsGroup : boolean;
     function Clone : ISpecDependency;
     property Id : string read GetId;
-    property Version : TVersionRange read GeTVersionRange;
+    property Version : TVersionRange read GetVersionRange;
   end;
 
 
@@ -113,6 +113,7 @@ type
     function GetFlatten : boolean;
     procedure SetSource(const value : string);
     procedure SetDestination(const value : string);
+    function GetIgnore : boolean;
 
     function Clone : ISpecFileEntry;
 
@@ -120,6 +121,7 @@ type
     property Destination  : string read GetDestination write SetDestination;
     property Exclude : IList<string> read GetExclude;
     property Flatten : boolean read GetFlatten;
+    property Ignore : boolean read GetIgnore;
   end;
 
 
@@ -157,6 +159,26 @@ type
     property SearchPaths : IList<ISpecSearchPath> read GetSearchPaths;
   end;
 
+  ISpecBuildEntry = interface(ISpecNode)
+  ['{9E1850EB-40C4-421F-A47F-03FDD6286573}']
+    function GetId : string;
+    function GetProject : string;
+    function GetConfig : string;
+    function GetKeepBin : boolean;
+    function GetBplOutputDir : string;
+    function GetDcuOutputDir : string;
+    function GetDcpOutputDir : string;
+    procedure SetProject(const value : string);
+
+    function Clone : ISpecBuildEntry;
+    property Id : string read GetId;
+    property Project : string read GetProject write SetProject;
+    property Config : string read GetConfig;
+    property KeepBin : boolean read GetKeepBin;
+    property BplOutputDir : string read GetBplOutputDir;
+    property DcuOutputDir : string read GetDcuOutputDir;
+    property DcpOutputDir : string read GetDcpOutputDir;
+  end;
 
 
   ISpecTemplateBase = interface(ISpecNode)
@@ -168,6 +190,7 @@ type
     function GetDesignFiles : IList<ISpecBPLEntry>;
     function GetDependencies : IList<ISpecDependency>;
     function GetSearchPaths : IList<ISpecSearchPath>;
+    function GetBuildEntries : IList<ISpecBuildEntry>;
 
     function FindDependencyById(const id : string) : ISpecDependency;
     function FindDependencyGroupByTargetPlatform(const targetPlatform : TTargetPlatform) : ISpecDependencyGroup;
@@ -177,6 +200,7 @@ type
     function FindLibFileBySrc(const src : string) : ISpecFileEntry;
     function FindSourceFileBySrc(const src : string) : ISpecFileEntry;
     function FindOtherFileBySrc(const src : string) : ISpecFileEntry;
+    function FindBuildEntryById(const id : string) : ISpecBuildEntry;
 
 
     property LibFiles : IList<ISpecFileEntry> read GetLibFiles;
@@ -186,7 +210,7 @@ type
     property DesignFiles : IList<ISpecBPLEntry> read GetDesignFiles;
     property Dependencies : IList<ISpecDependency> read GetDependencies;
     property SearchPaths : IList<ISpecSearchPath> read GetSearchPaths;
-
+    property BuildEntries : IList<ISpecBuildEntry> read GetBuildEntries;
   end;
 
   ISpecTemplate = interface(ISpecTemplateBase)
