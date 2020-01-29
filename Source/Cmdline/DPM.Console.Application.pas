@@ -55,6 +55,7 @@ uses
   DPM.Console.Writer,
   DPM.Console.Banner,
   DPM.Console.Command,
+  DPM.Core.Logging,
   DPM.Console.Reg;
 
 { TPackItApplications }
@@ -86,6 +87,7 @@ var
   commandFactory : ICommandFactory;
   bError : boolean;
   command : TDPMCommand;
+  logger : ILogger;
 begin
   result := InitContainer; //Init our DI container
   if result <> TExitCode.OK then
@@ -104,6 +106,9 @@ begin
     bError := true;
     TCommonOptions.Default.Help := true; //if it's a valid command but invalid options this will give us command help.
   end;
+
+  logger := FContainer.Resolve<ILogger>;
+  logger.Verbosity := TCommonOptions.Default.Verbosity;
 
   command := GetCommandFromString(parseresult.Command);
 

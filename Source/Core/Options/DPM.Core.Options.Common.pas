@@ -58,7 +58,11 @@ implementation
 
 constructor TCommonOptions.Create;
 begin
+  {$IFDEF DEBUG}
+  FVerbosity := TVerbosity.Debug;
+  {$ELSE}
   FVerbosity := TVerbosity.Normal;
+  {$ENDIF}
 end;
 
 class constructor TCommonOptions.CreateDefault;

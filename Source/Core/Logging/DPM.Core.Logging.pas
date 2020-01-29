@@ -28,6 +28,9 @@ unit DPM.Core.Logging;
 
 interface
 
+uses
+  DPM.Core.Types;
+
 type
   ILogger = interface
   ['{92B7AF6E-37BC-4315-A59F-275DD5D906A1}']
@@ -36,13 +39,12 @@ type
     procedure Information(const data : string; const important : boolean = false);
     procedure Warning(const data : string);
     procedure Error(const data : string);
-  end;
 
-  TLogLevel = (Verbose,
-            Debug,
-            Information,
-            Warning,
-            Error );
+    function GetVerbosity : TVerbosity;
+    procedure SetVerbosity(const value : TVerbosity);
+
+    property Verbosity : TVerbosity read GetVerbosity write SetVerbosity;
+  end;
 
 implementation
 

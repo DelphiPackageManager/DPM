@@ -37,7 +37,7 @@ uses
 type
   TPackageVersion = VSoft.SemanticVersion.TSemanticVersion;
   TClientVersion = VSoft.SemanticVersion.TSemanticVersion;
-  TVerbosity = (Quiet,Normal,Detailed);
+  TVerbosity = (Quiet,Normal,Detailed, Debug);
 
 
   //TODO : Decide on min delphi version supported. Ideally go back as far as possible

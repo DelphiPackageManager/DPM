@@ -29,6 +29,7 @@ unit DPM.Console.Logger;
 interface
 
 uses
+  DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Console.Writer;
 
@@ -36,13 +37,15 @@ type
   TDPMConsoleLogger = class(TInterfacedObject, ILogger)
   private
     FConsole : IConsoleWriter;
-    FLogLevel : TLogLevel;
+    FVerbosity : TVerbosity;
   protected
     procedure Debug(const data: string);
     procedure Error(const data: string);
     procedure Information(const data: string; const important : boolean = false);
     procedure Verbose(const data: string);
     procedure Warning(const data: string);
+    function GetVerbosity : TVerbosity;
+    procedure SetVerbosity(const value : TVerbosity);
 
   public
     constructor Create(const console : IConsoleWriter);
@@ -55,27 +58,35 @@ implementation
 constructor TDPMConsoleLogger.Create(const console: IConsoleWriter);
 begin
   FConsole := console;
-  FLogLevel := TLogLevel.Debug; //TODO : make this configurable.
+  FVerbosity := TVerbosity.Debug;
 end;
 
 procedure TDPMConsoleLogger.Debug(const data: string);
 begin
-  if FLogLevel > TLogLevel.Debug then
+  if FVerbosity < TVerbosity.Debug then
     exit;
+
   FConsole.SetColour(ccWhite);
   FConsole.Write(data);
 end;
 
 procedure TDPMConsoleLogger.Error(const data: string);
 begin
+  //always log errors
+
   FConsole.SetColour(ccBrightRed);
   FConsole.Write(data);
   FConsole.SetColour(ccDefault);
 end;
 
+function TDPMConsoleLogger.GetVerbosity: TVerbosity;
+begin
+  result := FVerbosity;
+end;
+
 procedure TDPMConsoleLogger.Information(const data: string; const important : boolean);
 begin
-  if FLogLevel > TLogLevel.Information then
+  if (FVerbosity < TVerbosity.Normal) and (not important) then
     exit;
 
   if important then
@@ -86,9 +97,14 @@ begin
   FConsole.SetColour(ccDefault);
 end;
 
+procedure TDPMConsoleLogger.SetVerbosity(const value: TVerbosity);
+begin
+  FVerbosity := value;
+end;
+
 procedure TDPMConsoleLogger.Verbose(const data: string);
 begin
-  if FLogLevel > TLogLevel.Verbose then
+  if (FVerbosity < TVerbosity.Detailed) then
     exit;
 
   FConsole.SetColour(ccWhite);
@@ -98,8 +114,7 @@ end;
 
 procedure TDPMConsoleLogger.Warning(const data: string);
 begin
-  if FLogLevel > TLogLevel.Warning then
-    exit;
+  //always log warnings
 
   FConsole.SetColour(ccBrightYellow);
   FConsole.Write(data);

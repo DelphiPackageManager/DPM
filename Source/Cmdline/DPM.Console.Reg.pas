@@ -78,7 +78,7 @@ begin
   console := TMacOSConsole.Create;
 {$ENDIF}
  container.RegisterInstance<IConsoleWriter>(console);
- container.RegisterType<ILogger, TDPMConsoleLogger>;
+ container.RegisterType<ILogger, TDPMConsoleLogger>.AsSingleton();
 
  container.RegisterType<ICommandHandler,TCacheCommand>('command.cache');
  container.RegisterType<ICommandHandler,TConfigCommand>('command.config');
