@@ -36,6 +36,7 @@ type
   TDPMConsoleLogger = class(TInterfacedObject, ILogger)
   private
     FConsole : IConsoleWriter;
+    FLogLevel : TLogLevel;
   protected
     procedure Debug(const data: string);
     procedure Error(const data: string);
@@ -54,10 +55,13 @@ implementation
 constructor TDPMConsoleLogger.Create(const console: IConsoleWriter);
 begin
   FConsole := console;
+  FLogLevel := TLogLevel.Debug; //TODO : make this configurable.
 end;
 
 procedure TDPMConsoleLogger.Debug(const data: string);
 begin
+  if FLogLevel > TLogLevel.Debug then
+    exit;
   FConsole.SetColour(ccWhite);
   FConsole.Write(data);
 end;
@@ -71,6 +75,9 @@ end;
 
 procedure TDPMConsoleLogger.Information(const data: string; const important : boolean);
 begin
+  if FLogLevel > TLogLevel.Information then
+    exit;
+
   if important then
     FConsole.SetColour(ccBrightWhite)
   else
@@ -81,6 +88,9 @@ end;
 
 procedure TDPMConsoleLogger.Verbose(const data: string);
 begin
+  if FLogLevel > TLogLevel.Verbose then
+    exit;
+
   FConsole.SetColour(ccWhite);
   FConsole.Write(data);
   FConsole.SetColour(ccDefault);
@@ -88,6 +98,9 @@ end;
 
 procedure TDPMConsoleLogger.Warning(const data: string);
 begin
+  if FLogLevel > TLogLevel.Warning then
+    exit;
+
   FConsole.SetColour(ccBrightYellow);
   FConsole.Write(data);
   FConsole.SetColour(ccDefault);

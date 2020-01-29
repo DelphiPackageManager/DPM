@@ -38,8 +38,8 @@ type
     procedure Error(const data : string);
   end;
 
-  TLogLevel = (Debug,
-            Verbose,
+  TLogLevel = (Verbose,
+            Debug,
             Information,
             Warning,
             Error );

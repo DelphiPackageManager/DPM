@@ -48,6 +48,7 @@ type
   private
     FMessageServices : IOTAMessageServices;
     FMessageGroup : IOTAMessageGroup;
+    FLogLevel : TLogLevel;
   protected
     procedure Debug(const data: string);
     procedure Error(const data: string);
@@ -82,11 +83,17 @@ begin
   FMessageGroup := FMessageServices.AddMessageGroup('DPM');
   FMessageGroup.CanClose := false;
   FMessageGroup.AutoScroll := true;
+  FLogLevel := TLogLevel.Debug; //TODO : Need to make this configurable
 end;
 
 procedure TDPMIDELogger.Debug(const data: string);
+var
+  lineRef : Pointer;
 begin
+  if FLogLevel > TLogLevel.Debug then
+    exit;
 
+  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
 end;
 
 destructor TDPMIDELogger.Destroy;
@@ -122,6 +129,9 @@ procedure TDPMIDELogger.Information(const data: string; const important: Boolean
 var
   lineRef : Pointer;
 begin
+  if FLogLevel > TLogLevel.Information then
+    exit;
+
   FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
 end;
 
@@ -146,6 +156,9 @@ procedure TDPMIDELogger.Verbose(const data: string);
 var
   lineRef : Pointer;
 begin
+  if FLogLevel > TLogLevel.Verbose then
+    exit;
+
   FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
 end;
 
@@ -153,6 +166,9 @@ procedure TDPMIDELogger.Warning(const data: string);
 var
   lineRef : Pointer;
 begin
+  if FLogLevel > TLogLevel.Warning then
+    exit;
+
   FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
 end;
 
