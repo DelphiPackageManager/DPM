@@ -45,7 +45,7 @@ type
     FLogger : ILogger;
     FArchiveWriter : IPackageArchiveWriter;
     FSpecReader : IPackageSpecReader;
-    procedure ProcessPattern(const basePath, dest: string; const pattern: IFileSystemPattern; const searchPath: string; const flatten: boolean; const excludePatterns : TArray<IFileSystemPattern>;  var fileCount: integer);
+    procedure ProcessPattern(const basePath, dest: string; const pattern: IFileSystemPattern; const searchPath: string; const flatten: boolean; const excludePatterns : TArray<IFileSystemPattern>; const ignore : boolean;  var fileCount: integer);
   protected
 
     function WritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion; const basePath : string) : boolean;
@@ -103,7 +103,7 @@ begin
     result := Copy(value,1, i -1);
 end;
 
-procedure TPackageWriter.ProcessPattern(const basePath: string; const dest : string; const pattern : IFileSystemPattern; const searchPath : string; const flatten : boolean; const excludePatterns : TArray<IFileSystemPattern>; var fileCount : integer);
+procedure TPackageWriter.ProcessPattern(const basePath: string; const dest : string; const pattern : IFileSystemPattern; const searchPath : string; const flatten : boolean; const excludePatterns : TArray<IFileSystemPattern>; const ignore : boolean; var fileCount : integer);
 var
   files : TStringDynArray;
   f : string;
@@ -133,8 +133,12 @@ var
   end;
 
 begin
+
   if not TDirectory.Exists(pattern.Directory) then
-    raise Exception.Create('Directory not found : ' + pattern.Directory);
+    if ignore then
+      exit
+    else
+      raise Exception.Create('Directory not found : ' + pattern.Directory);
 
   files := TDirectory.GetFiles(pattern.Directory, pattern.FileMask, TSearchOption.soTopDirectoryOnly);
   for f in files do
@@ -168,7 +172,7 @@ var
   fileEntry : ISpecFileEntry;
   bplEntry : ISpecBPLEntry;
 
-  procedure ProcessEntry(const source, dest : string; const flatten : boolean; const exclude : IList<string>);
+  procedure ProcessEntry(const source, dest : string; const flatten : boolean; const exclude : IList<string>; const ignore : boolean);
   var
     fsPatterns : TArray<IFileSystemPattern>;
     fsPattern : IFileSystemPattern;
@@ -190,7 +194,7 @@ var
 
 
     for fsPattern in fsPatterns do
-     ProcessPattern(basePath, dest, fsPattern, nonWildcardPath, flatten, fsExcludePatterns.ToArray , fileCount);
+     ProcessPattern(basePath, dest, fsPattern, nonWildcardPath, flatten, fsExcludePatterns.ToArray , ignore,  fileCount);
 
     if fileCount = 0 then
      FLogger.Warning('No files were found for pattern [' + source + ']');
@@ -222,19 +226,19 @@ begin
     antPattern := TAntPattern.Create(basePath);
 
     for fileEntry in targetPlatform.SourceFiles do
-      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude);
+      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, false);
 
     for fileEntry in targetPlatform.Files do
-      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude);
+      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, false);
 
     for fileEntry in targetPlatform.LibFiles do
-      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude);
+      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, fileEntry.Ignore );
 
     for bplEntry in targetPlatform.RuntimeFiles do
-      ProcessEntry(bplEntry.Source, bplEntry.Destination, bplEntry.Flatten, bplEntry.Exclude);
+      ProcessEntry(bplEntry.Source, bplEntry.Destination, bplEntry.Flatten, bplEntry.Exclude, fileEntry.Ignore);
 
     for bplEntry in targetPlatform.DesignFiles do
-      ProcessEntry(bplEntry.Source, bplEntry.Destination, bplEntry.Flatten, bplEntry.Exclude);
+      ProcessEntry(bplEntry.Source, bplEntry.Destination, bplEntry.Flatten, bplEntry.Exclude, fileEntry.Ignore);
 
   finally
     FArchiveWriter.Close;
