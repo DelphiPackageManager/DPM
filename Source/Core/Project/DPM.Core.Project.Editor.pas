@@ -516,7 +516,7 @@ begin
           sUsePackages := 'false';
           TryGetConfigValue(sKey, sPlatform, 'UsePackages', sUsePackages);
           newConfig := TProjectConfiguration.Create(configKeys.Names[i], sOutputDir, platform, StrToBoolDef(sUsePackages,false), nil);
-          FConfigurations.AddOrSetValue(LowerCase(configKeys.Names[i]), newConfig);
+          FConfigurations[LowerCase(configKeys.Names[i])] := newConfig;
         end;
       end;
       result := true;

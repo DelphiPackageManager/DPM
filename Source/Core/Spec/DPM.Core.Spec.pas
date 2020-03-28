@@ -594,6 +594,7 @@ var
   targetPlatformsArray : TJsonArray;
 begin
   FIsValid := false;
+  Logger.Debug('Reading spec metadata');
   if not jsonObject.Contains('metadata') then
   begin
     Logger.Error('Required element [metadata] not found!');
@@ -604,8 +605,10 @@ begin
     metaDataObj := jsonObject.O['metadata'];
     result := FMetaData.LoadFromJson(metaDataObj)
   end;
+
   if jsonObject.Contains('templates') then
   begin
+    Logger.Debug('Reading spec templates');
     templatesArray := jsonObject.A['templates'];
     result := LoadTemplatesFromJson(templatesArray) and result;
   end;
@@ -617,6 +620,7 @@ begin
   end
   else
   begin
+    Logger.Debug('Reading spec targetPlatforms');
     targetPlatformsArray := jsonObject.A['targetPlatforms'];
     result := LoadTargetPlatformsFromJson(targetPlatformsArray) and result;
   end;

@@ -3,6 +3,7 @@ unit TestLogger;
 interface
 
 uses
+  DPM.Core.Types,
   DPM.Core.Logging;
 
 type
@@ -14,6 +15,9 @@ type
     procedure Information(const data: string; const important : boolean = false);
     procedure Verbose(const data: string);
     procedure Warning(const data: string);
+
+    function GetVerbosity : TVerbosity;
+    procedure SetVerbosity(const value : TVerbosity);
   end;
 
 implementation
@@ -30,7 +34,17 @@ begin
 
 end;
 
+function TTestLogger.GetVerbosity: TVerbosity;
+begin
+
+end;
+
 procedure TTestLogger.Information(const data: string; const important : boolean);
+begin
+
+end;
+
+procedure TTestLogger.SetVerbosity(const value: TVerbosity);
 begin
 
 end;

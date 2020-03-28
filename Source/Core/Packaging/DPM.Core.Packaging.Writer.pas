@@ -215,7 +215,7 @@ begin
     FLogger.Warning('Could not open package file [' + packageFileName + '] - skipping');
     exit;
   end;
-//  FLogger.Debug('Writing file : ' + packageFileName);
+  FLogger.Debug('Writing file : ' + packageFileName);
   try
     sStream := TStringStream.Create(sManifest,TEncoding.UTF8);
     try

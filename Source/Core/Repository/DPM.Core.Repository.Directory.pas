@@ -88,7 +88,6 @@ uses
   System.IOUtils,
   System.RegularExpressions,
   System.Zip,
-  Spring.Collections.Enumerable,
   Spring.Collections.Extensions,
   DPM.Core.Constants,
   DPM.Core.Package.Metadata,
@@ -393,6 +392,7 @@ function TDirectoryPackageRepository.DoExactSearch(const id : string; const comp
 var
   searchTerm : string;
   files : TStringDynArray;
+  fileList : IList<string>;
 begin
   result := TCollections.CreateList<string>;
   searchTerm := id;
@@ -408,14 +408,15 @@ begin
    searchTerm := searchTerm + '-*'  + cPackageFileExt;
 
   files := TDirectory.GetFiles(FSource,searchTerm);
+  fileList := TCollections.CreateList<string>(files);
   //dedupe
-  result.AddRange(Enumerable<string>.Create(files).Distinct(TStringComparer.OrdinalIgnoreCase));
-
+  result.AddRange(TEnumerable.Distinct<string>(fileList, TStringComparer.OrdinalIgnoreCase));
 end;
 
 function TDirectoryPackageRepository.DoSearch(searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
 var
   files : TStringDynArray;
+  fileList : IList<string>;
 begin
   result := TCollections.CreateList<string>;
   if searchTerm <> '*' then
@@ -429,8 +430,9 @@ begin
     searchTerm := searchTerm + '-' + DPMPlatformToString(platform) + '-*'  + cPackageFileExt;
 
   files := TDirectory.GetFiles(FSource,searchTerm);
+  fileList := TCollections.CreateList<string>(files);
   //dedupe
-  result.AddRange(Enumerable<string>.Create(files).Distinct(TStringComparer.OrdinalIgnoreCase));
+  result.AddRange(TEnumerable.Distinct<string>(fileList, TStringComparer.OrdinalIgnoreCase ));
 
 end;
 

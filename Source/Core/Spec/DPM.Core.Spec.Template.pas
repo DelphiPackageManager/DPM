@@ -90,6 +90,8 @@ function TSpecTemplate.LoadFromJson(const jsonObject: TJsonObject): Boolean;
 begin
   result := true;
   FName := jsonObject.S['name'];
+  Logger.Debug('[template] name : ' + FName);
+
   result := inherited LoadFromJson(jsonObject) and result;
 end;
 

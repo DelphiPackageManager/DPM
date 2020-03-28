@@ -347,8 +347,9 @@ begin
 
   //turn them into packageIdentity's so we can get their Info/dependencies
   packageIdentities := TCollections.CreateList<IPackageIdentity>;
-  packageIdentities.AddRange(TEnumerable.Select<IPackageReference, IPackageIdentity>(packageReferences,
-    function(packageReference : IPackageReference) : IPackageIdentity
+  packageIdentities.AddRange(
+    TEnumerable.Select<IPackageReference, IPackageIdentity>(packageReferences,
+    function(const packageReference : IPackageReference) : IPackageIdentity
     begin
       result := TPackageIdentity.Create(packageReference.Id,'', packageReference.Version, options.CompilerVersion, platform);
     end));
@@ -455,7 +456,7 @@ begin
   //turn them into packageIdentity's so we can get their Info/dependencies
   packageIdentities := TCollections.CreateList<IPackageIdentity>;
   packageIdentities.AddRange(TEnumerable.Select<IPackageReference, IPackageIdentity>(packageReferences,
-    function(packageReference : IPackageReference) : IPackageIdentity
+    function(const packageReference : IPackageReference) : IPackageIdentity
     begin
       result := TPackageIdentity.Create(packageReference.Id,'', packageReference.Version, options.CompilerVersion, platform);
     end));

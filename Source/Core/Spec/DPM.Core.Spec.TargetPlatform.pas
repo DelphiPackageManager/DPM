@@ -201,7 +201,9 @@ begin
   else
   begin
     sValue := StringReplace(sValue,' ','', [rfReplaceAll]);
+    Logger.Debug('[targetPlatform] platforms : ' + sValue);
     platformStrings := TStringUtils.SplitStr(sValue,',');
+
     if Length(platformStrings) > 0 then
     begin
       platformList := TCollections.CreateList<TDPMPlatform>;
