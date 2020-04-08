@@ -31,6 +31,7 @@ interface
 uses
   Spring.Collections,
   System.Classes,
+  VSoft.Awaitable,
   DPM.Core.Logging,
   DPM.Core.Types,
   DPM.Core.Options.Search,
@@ -123,8 +124,8 @@ type
   IDependencyResolver = interface
   ['{B187F0DB-FEA1-48B4-81F2-CECF073C2FB0}']
     //returns true if all dependencies were resolved. If true, the graph is fully populated and can be serialized.
-    function ResolveForInstall(const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageInfo>; const lockFile : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
-    function ResolveForRestore(const options : TSearchOptions; const projectReferences : IList<IPackageInfo>; const lockFile : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageInfo>; const lockFile : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForRestore(const cancellationToken : ICancellationToken; const options : TSearchOptions; const projectReferences : IList<IPackageInfo>; const lockFile : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
   end;
 
 

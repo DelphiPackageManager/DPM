@@ -32,6 +32,7 @@ interface
 //https://theimowski.com/blog/2016/10-30-paket-why-command/index.html
 
 uses
+  VSoft.Awaitable,
   DPM.Console.ExitCodes,
   DPM.Console.Command,
   DPM.Console.Command.Base;
@@ -39,7 +40,7 @@ uses
 type
   TWhyCommand = class(TBaseCommand)
   protected
-    function Execute: TExitCode; override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
   end;
 
 
@@ -47,7 +48,7 @@ implementation
 
 { TWhyCommand }
 
-function TWhyCommand.Execute: TExitCode;
+function TWhyCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
   Logger.Error('Why command not implemented');
   result := TExitCode.NotImplemented;

@@ -29,6 +29,7 @@ unit DPM.Console.Command.Cache;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
@@ -41,7 +42,7 @@ type
     FPackageInstaller : IPackageInstaller;
 
   protected
-    function Execute: TExitCode; override;
+    function Execute(const cancellationToken : ICancellationToken): TExitCode; override;
   public
     constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const packageInstaller : IPackageInstaller);reintroduce;
   end;
@@ -63,7 +64,7 @@ begin
   FPackageInstaller := packageInstaller;
 end;
 
-function TCacheCommand.Execute: TExitCode;
+function TCacheCommand.Execute(const cancellationToken : ICancellationToken): TExitCode;
 begin
   TCacheOptions.Default.ApplyCommon(TCommonOptions.Default);
 
@@ -73,7 +74,7 @@ begin
     exit;
   end;
 
-  if not FPackageInstaller.Cache(TCacheOptions.Default) then
+  if not FPackageInstaller.Cache(cancellationToken, TCacheOptions.Default) then
     result := TExitCode.Error
   else
     result := TExitCode.OK;

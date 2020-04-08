@@ -29,6 +29,7 @@ unit DPM.Console.Command.Restore;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
@@ -40,7 +41,7 @@ type
   private
     FPackageInstaller : IPackageInstaller;
   protected
-    function Execute: TExitCode;override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode;override;
   public
     constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const packageInstaller : IPackageInstaller);reintroduce;
   end;
@@ -61,7 +62,7 @@ begin
   FPackageInstaller := packageInstaller;
 end;
 
-function TRestoreCommand.Execute: TExitCode;
+function TRestoreCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
   TRestoreOptions.Default.ApplyCommon(TCommonOptions.Default);
 
@@ -77,7 +78,7 @@ begin
     exit;
   end;
 
-  if not FPackageInstaller.Restore(TRestoreOptions.Default) then
+  if not FPackageInstaller.Restore(cancellationToken, TRestoreOptions.Default) then
     result := TExitCode.Error
   else
     result := TExitCode.OK;

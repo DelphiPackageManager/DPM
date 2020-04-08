@@ -397,7 +397,7 @@ begin
       TPackOptions.Default.Properties := value;
     end);
 
-  cmd.RegisterOption<string>('version','v','Overrides the version number from the dspec file.',
+  cmd.RegisterOption<string>('version','','Overrides the version number from the dspec file.',
     procedure(const value : string)
     begin
       TPackOptions.Default.Version := value;

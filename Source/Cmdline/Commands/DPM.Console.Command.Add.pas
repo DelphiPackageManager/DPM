@@ -30,6 +30,7 @@ unit DPM.Console.Command.Add;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Console.ExitCodes,
   DPM.Console.Command.Base;
 
@@ -38,14 +39,14 @@ type
   private
 
   protected
-    function Execute: TExitCode; override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
   end;
 
 implementation
 
 { TAddCommand }
 
-function TAddCommand.Execute: TExitCode;
+function TAddCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
   Logger.Error('Add command not implemented');
   result := TExitCode.NotImplemented;

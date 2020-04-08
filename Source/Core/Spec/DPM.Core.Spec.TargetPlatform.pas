@@ -174,6 +174,7 @@ var
   platform : TDPMPlatform;
   platformList : IList<TDPMPlatform>;
   sCompiler : string;
+  sTemplate : string;
 begin
   result := true;
   sCompiler := jsonObject.S['compiler'];
@@ -234,7 +235,9 @@ begin
     end;
   end;
 
-  FTemplateName := jsonObject.S['template'];
+  sTemplate := jsonObject.S['template'];
+  if sTemplate <> '' then
+    FTemplateName := sTemplate;
 
   result := inherited LoadFromJson(jsonObject) and result;
 end;

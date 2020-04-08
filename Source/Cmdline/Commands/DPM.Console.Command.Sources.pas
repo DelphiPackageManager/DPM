@@ -29,6 +29,7 @@ unit DPM.Console.Command.Sources;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Logging,
   DPM.Console.ExitCodes,
@@ -40,7 +41,7 @@ type
   private
     FSourcesManager : ISourcesManager;
   protected
-    function Execute: TExitCode; override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
     function ForceNoBanner: Boolean; override;
 
   public
@@ -65,7 +66,7 @@ begin
   FSourcesManager := sourcesManager;
 end;
 
-function TSourcesCommand.Execute: TExitCode;
+function TSourcesCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 var
   bResult : boolean;
   newConfig : IConfiguration;

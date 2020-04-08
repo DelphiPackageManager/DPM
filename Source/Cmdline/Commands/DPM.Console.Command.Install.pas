@@ -29,6 +29,7 @@ unit DPM.Console.Command.Install;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
@@ -40,7 +41,7 @@ type
   private
     FPackageInstaller : IPackageInstaller;
   protected
-    function Execute: TExitCode;override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode;override;
   public
     constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const packageInstaller : IPackageInstaller);reintroduce;
   end;
@@ -62,7 +63,7 @@ begin
 
 end;
 
-function TInstallCommand.Execute: TExitCode;
+function TInstallCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
   TInstallOptions.Default.ApplyCommon(TCommonOptions.Default);
 
@@ -79,7 +80,7 @@ begin
   end;
 
  //TODO : This is not ideal, we have no way of returning more specific exit codes here - rethink api?
-  if not FPackageInstaller.Install(TInstallOptions.Default) then
+  if not FPackageInstaller.Install(cancellationToken, TInstallOptions.Default) then
     result := TExitCode.Error
   else
     result := TExitCode.OK;

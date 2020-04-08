@@ -29,6 +29,7 @@ unit DPM.Console.Command.ExitCodes;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Console.Writer,
   DPM.Console.ExitCodes,
   DPM.Console.Command;
@@ -38,8 +39,8 @@ type
   private
     FConsole : IConsoleWriter;
   protected
-    function ExecuteCommand: TExitCode;
-    function Execute: TExitCode;
+    function ExecuteCommand(const cancellationToken : ICancellationToken) : TExitCode;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode;
     function ForceNoBanner: Boolean;
 
   public
@@ -61,7 +62,7 @@ begin
   FConsole := console;
 end;
 
-function TExitCodesCommand.Execute: TExitCode;
+function TExitCodesCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
   FConsole.WriteLine;
   FConsole.WriteLine('Exit Codes :',ccBrightWhite);
@@ -69,9 +70,9 @@ begin
   result := TExitCode.OK;
 end;
 
-function TExitCodesCommand.ExecuteCommand: TExitCode;
+function TExitCodesCommand.ExecuteCommand(const cancellationToken : ICancellationToken) : TExitCode;
 begin
-  result := Execute;
+  result := Execute(cancellationToken);
 end;
 
 function TExitCodesCommand.ForceNoBanner: Boolean;

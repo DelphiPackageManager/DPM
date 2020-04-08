@@ -29,6 +29,7 @@ unit DPM.Console.Command.Delete;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Console.ExitCodes,
   DPM.Console.Command,
   DPM.Console.Command.Base;
@@ -36,14 +37,14 @@ uses
 type
   TDeleteCommand = class(TBaseCommand)
   protected
-    function Execute: TExitCode; override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
   end;
 
 implementation
 
 { TDeleteCommand }
 
-function TDeleteCommand.Execute: TExitCode;
+function TDeleteCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
   Logger.Error('Delete command not implemented');
   result := TExitCode.NotImplemented;

@@ -31,6 +31,7 @@ interface
 uses
   System.Generics.Defaults,
   Spring.Collections,
+  VSoft.Awaitable,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
   DPM.Core.Logging,
@@ -50,15 +51,20 @@ type
     function Initialize( const configuration : IConfiguration) : boolean;
 
 
-    function DownloadPackage(const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
+    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
     function GetRepositories: IList<IPackageRepository>;
     function GetRepositoryByName(const value: string): IPackageRepository;
-    function Search(const options: TSearchOptions): IPackageSearchResult;overload;
-    function Search(const id : string; const range : TVersionRange) : IPackageSearchResult;overload;
+    function Search(const cancellationToken : ICancellationToken; const options: TSearchOptions): IPackageSearchResult;overload;
+    function Search(const cancellationToken : ICancellationToken; const id : string; const range : TVersionRange) : IPackageSearchResult;overload;
+
     function UpdateRepositories( const configuration : IConfiguration) : boolean;
-//    function GetPackageVersions(const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange) : IList<TPackageVersion>;
-    function GetPackageInfo(const packageIdentity: IPackageIdentity): IPackageInfo;
-    function GetPackageVersions(const options : TSearchOptions; const platform : TDPMPlatform;const versionRange : TVersionRange) : IList<IPackageInfo>;
+
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform;const versionRange : TVersionRange) : IList<IPackageInfo>;
+
+    //UI specific stuff
+    function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
+
   public
     constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const repoFactory : IPackageRepositoryFactory);
   end;
@@ -66,6 +72,7 @@ type
 implementation
 
 uses
+  System.Classes,
   System.SysUtils,
   System.StrUtils,
   Spring.Collections.Extensions,
@@ -85,7 +92,7 @@ begin
   FRepositories := TCollections.CreateList<IPackageRepository>;
 end;
 
-function TPackageRepositoryManager.DownloadPackage(const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
+function TPackageRepositoryManager.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
 var
   repo : IPackageRepository;
 begin
@@ -100,20 +107,46 @@ begin
       exit;
     end;
     FLogger.Information('Downloading package [' + packageIdentity.ToString + '] from [' + repo.Source +']');
-    result := repo.DownloadPackage(packageIdentity, localFolder, fileName);
+    result := repo.DownloadPackage(cancellationToken, packageIdentity, localFolder, fileName);
   end
   else
   begin
    for repo in FRepositories do
     begin
-      result := repo.DownloadPackage(packageIdentity, localFolder, fileName) or result;
+      if  cancellationToken.IsCancelled then
+        exit;
+      result := repo.DownloadPackage(cancellationToken, packageIdentity, localFolder, fileName) or result;
       if result then
         exit;
     end;
   end;
 end;
 
-function TPackageRepositoryManager.GetPackageInfo(const packageIdentity: IPackageIdentity): IPackageInfo;
+function TPackageRepositoryManager.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil): IList<IPackageSearchResultItem>;
+var
+  config : IConfiguration;
+begin
+  result := TCollections.CreateList<IPackageSearchResultItem>;
+
+  config := configuration;
+  if config = nil then
+  begin
+    if options.ConfigFile = '' then
+    begin
+      FLogger.Error('No configuration file specified');
+      exit;
+    end;
+
+    config := FConfigurationManager.LoadConfig(options.ConfigFile);
+    if config = nil then
+      exit;
+  end;
+
+  //TODO : Interate over sources.
+
+end;
+
+function TPackageRepositoryManager.GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
 var
   repo : IPackageRepository;
 begin
@@ -126,19 +159,21 @@ begin
       FLogger.Error('Unabled to find repository for source [' + packageIdentity.SourceName + ']');
       exit;
     end;
-    result := repo.GetPackageInfo(packageIdentity);
+    result := repo.GetPackageInfo(cancellationToken, packageIdentity);
   end
   else
   begin
     for repo in FRepositories do
     begin
-      result := repo.GetPackageInfo(packageIdentity);
+      result := repo.GetPackageInfo(cancellationToken, packageIdentity);
       if result <> nil then
         exit;
     end;
   end;
 end;
-function TPackageRepositoryManager.GetPackageVersions(const options: TSearchOptions; const platform: TDPMPlatform; const versionRange: TVersionRange): IList<IPackageInfo>;
+
+
+function TPackageRepositoryManager.GetPackageVersions(const cancellationToken : ICancellationToken; const options: TSearchOptions; const platform: TDPMPlatform; const versionRange: TVersionRange): IList<IPackageInfo>;
 var
   config : IConfiguration;
   repo : IPackageRepository;
@@ -175,7 +210,10 @@ begin
 
   for repo in FRepositories do
   begin
-    searchResult := repo.GetPackageVersionsWithDependencies(options.SearchTerms, options.CompilerVersion,platform,versionRange, options.Prerelease);
+    if cancellationToken.IsCancelled then
+      exit;
+
+    searchResult := repo.GetPackageVersionsWithDependencies(cancellationToken, options.SearchTerms, options.CompilerVersion,platform,versionRange, options.Prerelease);
     unfilteredResults.AddRange(searchResult);
   end;
 
@@ -279,12 +317,12 @@ begin
   result := UpdateRepositories(configuration);
 end;
 
-function TPackageRepositoryManager.Search(const id: string; const range: TVersionRange): IPackageSearchResult;
+function TPackageRepositoryManager.Search(const cancellationToken : ICancellationToken; const id: string; const range: TVersionRange): IPackageSearchResult;
 begin
   result := nil
 end;
 
-function TPackageRepositoryManager.Search(const options: TSearchOptions): IPackageSearchResult;
+function TPackageRepositoryManager.Search(const cancellationToken : ICancellationToken; const options: TSearchOptions): IPackageSearchResult;
 var
   config : IConfiguration;
   repo : IPackageRepository;
@@ -295,6 +333,7 @@ var
   distinctResults : IEnumerable<IPackageIdentity>;
   sortFunc : TComparison<IPackageIdentity>;
   packages : IList<IPackageIdentity>;
+  sources : TStringList;
 begin
   result := TPackageSearchResult.Create;
   if options.ConfigFile = '' then
@@ -313,14 +352,36 @@ begin
     exit;
   end;
 
+  if options.Sources <> '' then
+  begin
+    sources := TStringList.Create;
+    sources.Delimiter := ',';
+    sources.DelimitedText := options.Sources;
+  end
+  else
+    sources := nil;
+
   unfilteredResults := TCollections.CreateList<IPackageIdentity>;
   //create the list here as if there are no repos it will be nil.
   searchResult := TCollections.CreateList<IPackageIdentity>;
-  for repo in FRepositories do
-  begin
-    searchResult := repo.Search(options);
-    unfilteredResults.AddRange(searchResult);
+
+  try
+    for repo in FRepositories do
+    begin
+      if sources <> nil then
+      begin
+        if sources.IndexOf(repo.Name) = -1 then
+          continue;
+      end;
+      searchResult := repo.Search(cancellationToken, options);
+      unfilteredResults.AddRange(searchResult);
+    end;
+  finally
+    if sources <> nil then
+      sources.Free;
   end;
+  if cancellationToken.IsCancelled then
+    exit;
 
   sortFunc := function(const Left, Right: IPackageIdentity): Integer
               begin
@@ -353,6 +414,9 @@ begin
     prevInfo := nil;
     for info in searchResult do
     begin
+      if cancellationToken.IsCancelled then
+        exit;
+
       if (prevInfo = nil) or (info.id <> prevInfo.id) then
       begin
         prevInfo := info;

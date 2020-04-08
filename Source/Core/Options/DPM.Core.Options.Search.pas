@@ -55,6 +55,7 @@ type
     property Prerelease       : boolean read FPrerelease write FPrerelease;
     //IncludeDelisted not implemented. yet.
     property IncludeDelisted  : boolean read FIncludeDelisted write FIncludeDelisted;
+    //comma separated list of sources, empty means all.
     property Sources          : string  read FSources write FSources;
     property SearchTerms      : string  read FSearchTerms write FSearchTerms;
     property Skip             : integer read FSkip write FSkip;

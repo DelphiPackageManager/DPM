@@ -65,7 +65,7 @@ type
 
   );
 
-  TTargets = set of TCompilerVersion;
+  TCompilerVersions = set of TCompilerVersion;
 
   //covering all bases here.
   TDPMPlatform = (
@@ -108,6 +108,10 @@ type
   function StringToDPMPlatform(const value : string) : TDPMPlatform;
 
   function CompilerToString(const value : TCompilerVersion) : string;
+  function CompilerCodeName(const value : TCompilerVersion) : string;
+  function CompilerWithCodeName(const value : TCompilerVersion) : string;
+
+
   function IsValidCompilerString(const value : string) : boolean;
 
   function IsValidPlatformString(const value : string) : boolean;
@@ -248,12 +252,37 @@ begin
     TCompilerVersion.RS10_0,
     TCompilerVersion.RS10_1 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32];
     TCompilerVersion.RS10_2 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64];
-    TCompilerVersion.RS10_3 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64,
+    TCompilerVersion.RS10_3,
+    TCompilerVersion.RS10_4 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64,
                                          TDPMPlatform.AndroidArm64, TDPMPlatform.OSX64];
   else
     raise Exception.Create('AllPlatforms is missing for : ' + CompilerToString(compiler));  end;
 end;
 
+function CompilerCodeName(const value : TCompilerVersion) : string;
+begin
+  case value of
+    TCompilerVersion.RS10_0: result := 'Seattle';
+    TCompilerVersion.RS10_1: result := 'Berlin';
+    TCompilerVersion.RS10_2: result := 'Tokyo';
+    TCompilerVersion.RS10_3: result := 'Rio';
+    TCompilerVersion.RS10_4: result := 'Denali';
+  else
+    result := '';
+  end;
+
+end;
+
+
+function CompilerWithCodeName(const value : TCompilerVersion) : string;
+var
+  codeName : string;
+begin
+  result := CompilerToString(value);
+  codeName := CompilerCodeName(value);
+  if codeName <> '' then
+    result := result + ' ' + codeName;
+end;
 
 
 function CompilerToLibSuffix(const compiler : TCompilerVersion) : string;
@@ -373,6 +402,7 @@ begin
       case minor of
         1    : result := true; //ambiguous could be 10.0 Update 1 and Delphi 10.1
         2    : result := true; //ambigous could be 10.1 Update 1 and Delphi 10.2
+        8    : result := true; //ambigous could be 10.3.x or Delphi 10.4
       end;
     end;
   end;

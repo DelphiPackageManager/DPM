@@ -29,6 +29,7 @@ unit DPM.Console.Command.List;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Console.ExitCodes,
   DPM.Console.Command.Base,
   DPM.Core.Logging,
@@ -40,7 +41,7 @@ type
   private
     FRepositoryManager : IPackageRepositoryManager;
   protected
-    function Execute: TExitCode; override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
   public
     constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const repositoryManager : IPackageRepositoryManager);reintroduce;
   end;
@@ -61,7 +62,7 @@ begin
   FRepositoryManager := repositoryManager;
 end;
 
-function TListCommand.Execute: TExitCode;
+function TListCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 var
   searchResults : IPackageSearchResult;
   info, prevInfo : IPackageIdentity;
@@ -76,7 +77,7 @@ begin
     exit;
   end;
 
-  searchResults := FRepositoryManager.Search(TListOptions.Default);
+  searchResults := FRepositoryManager.Search(cancellationToken, TListOptions.Default);
   if searchResults.Packages.Any then
   begin
     prevInfo := nil;
@@ -84,6 +85,9 @@ begin
     //group by id+version+compiler, collect platforms
     for info in searchResults.Packages do
     begin
+      if cancellationToken.IsCancelled then
+        exit;
+
       if (prevInfo = nil) then
       begin
         prevInfo := info;

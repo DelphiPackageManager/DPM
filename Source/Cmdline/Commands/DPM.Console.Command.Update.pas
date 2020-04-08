@@ -29,6 +29,7 @@ unit DPM.Console.Command.Update;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Console.ExitCodes,
   DPM.Console.Command,
   DPM.Console.Command.Base;
@@ -37,7 +38,7 @@ type
   TUpdateCommand = class(TBaseCommand)
 
   protected
-    function Execute: TExitCode; override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
   end;
 
 implementation
@@ -48,7 +49,7 @@ implementation
 
 { TUpdateCommand }
 
-function TUpdateCommand.Execute: TExitCode;
+function TUpdateCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
   Logger.Error('Update command not implemented');
   result := TExitCode.NotImplemented;

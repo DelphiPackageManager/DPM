@@ -76,7 +76,7 @@ begin
   if FConfigFile = '' then
   begin
     //check the current directory
-    sConfigFile := IncludeTrailingPathDelimiter(GetCurrentDir) + cConfigFileName;
+    sConfigFile := IncludeTrailingPathDelimiter(GetCurrentDir) + cDPMConfigFileName;
     if FileExists(sConfigFile) then
       FConfigFile := sConfigFile;
     //if it's still empty, use the profile default.

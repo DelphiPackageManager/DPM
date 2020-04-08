@@ -31,7 +31,7 @@ interface
 uses
   Spring.Collections,
   System.Generics.Defaults,
-
+  VSoft.Awaitable,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
   DPM.Core.TargetPlatform,
@@ -40,7 +40,8 @@ uses
   DPM.Core.Options.Restore;
 
 type
-  //Only has info we can get from the filename!
+  //represents the core package identity, ie id, version, compiler, platform
+  //Note this only has info we can get from the package filename!
   IPackageIdentity = interface
   ['{E9E49A25-3ECA-4380-BB75-AC9E29725BEE}']
     function GetId : string;
@@ -49,6 +50,7 @@ type
     function GetCompilerVersion : TCompilerVersion;
     function GetPlatform : TDPMPlatform;
     function ToString : string;
+    function ToIdVersionString : string;
     property Id : string read GetId;
     property Version : TPackageVersion read GetVersion;
     property SourceName : string read GetSourceName;
@@ -62,7 +64,6 @@ type
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
     function ToString : string;
-
     property Id : string read GetId;
     property Version : TVersionRange read GetVersionRange write SetVersionRange;
   end;
@@ -113,18 +114,92 @@ type
     property SearchPaths  : IList<IPackageSearchPath> read GetSearchPaths;
   end;
 
+  //dependencies list for a single platform
+  IPackagePlatformDependencies = interface
+  ['{0C274B9B-ACD5-4355-8EDD-DA2E51247075}']
+    function GetPlatform : TDPMPlatform;
+    function GetDependencies : IList<IPackageDependency>;
+    property Dependencies : IList<IPackageDependency> read GetDependencies;
+  end;
+
+  //The available platforms and dependencies for a package version.
+  IPackageVersionResult = interface
+  ['{45329FED-210A-42E1-B2A2-243C7DB0A645}']
+    function GetVersion : string;
+    function GetPlatforms : TDPMPlatforms;
+    function GetDependencies : IList<IPackagePlatformDependencies> ;
+
+    property Version: string read GetVersion;
+    property Platforms : TDPMPlatforms read GetPlatforms;
+    property Dependencies : IList<IPackagePlatformDependencies> read GetDependencies;
+  end;
+
+  IPackageVersionsResults = interface
+  ['{273329F2-3996-454F-9E93-BFB898C97F05}']
+    function GetId : string;
+    function GetResults : IList<IPackageVersionResult>;
+
+    property Id           : string  read GetId;
+    property Results : IList<IPackageVersionResult> read GetResults;
+  end;
+
+
+  //this is what is returned from a package feed for the UI.
+  //note for version we are using strings to improve performance
+  IPackageSearchResultItem = interface
+  ['{8EB6EA16-3708-41F7-93A2-FE56EB75510B}']
+    function GetId : string;
+    function GetVersion : string;
+    function GetPlatforms : TDPMPlatforms;
+    function GetDependencies : IList<IPackagePlatformDependencies>;
+
+    function GetDescription   : string;
+    function GetAuthors       : string;
+    function GetProjectUrl    : string;
+    function GetLicense       : string;
+    function GetIcon          : string;
+    function GetCopyright     : string;
+    function GetTags          : string;
+    function GetIsTrial       : boolean;
+    function GetIsCommercial  : boolean;
+
+    property Id           : string  read GetId;
+    property Version      : string  read GetVersion;
+    property Description  : string  read GetDescription;
+    property Authors      : string  read GetAuthors;
+    property ProjectUrl   : string  read GetProjectUrl;
+    property License      : string  read GetLicense;
+    property Icon         : string  read GetIcon;
+    property Copyright    : string  read GetCopyright;
+    property Tags         : string  read GetTags;
+    property IsTrial      : boolean read GetIsTrial;
+    property IsCommercial : boolean read GetIsCommercial;
+    property Dependencies : IList<IPackagePlatformDependencies> read GetDependencies;
+  end;
+
+
   //does the work of installing/restoring packages.
   IPackageInstaller = interface
   ['{554A0842-6C83-42BD-882C-B49FE4619DE0}']
-    function Install(const options : TInstallOptions) : boolean;
-    function Restore(const options : TRestoreOptions) : boolean;
-    function Cache(const options : TCacheOptions) : boolean;
+    function Install(const cancellationToken : ICancellationToken; const options : TInstallOptions) : boolean;
+    function Restore(const cancellationToken : ICancellationToken; const options : TRestoreOptions) : boolean;
+    function Cache(const cancellationToken : ICancellationToken; const options : TCacheOptions) : boolean;
   end;
 
   //used to collect and detect package conflicts when working with multiple projects.
+  //will also be used to collect build instructions and
+  //design-time packages to install etc.
   IPackageInstallerContext = interface
   ['{8FD229A2-FE7B-4315-84B2-FF18B78C76DC}']
     procedure Reset;
+//    //provides context for build and runtime package copying.
+//    procedure StartProject(const projectFile : string);
+//
+//    procedure EndProject(const projectFile : string);
+//
+//    //register a bpl for install into the IDE.
+//    procedure RegisterDesignPackage(const packageFile : string; const dependsOn : IList<string>);
+//
 
   end;
 

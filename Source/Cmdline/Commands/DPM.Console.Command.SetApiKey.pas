@@ -29,6 +29,7 @@ unit DPM.Console.Command.SetApiKey;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Console.ExitCodes,
   DPM.Console.Command.Base;
 
@@ -37,7 +38,7 @@ type
 
 
   protected
-    function Execute: TExitCode; override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
   end;
 
 
@@ -48,7 +49,7 @@ implementation
 
 { TSetApiKeyCommand }
 
-function TSetApiKeyCommand.Execute: TExitCode;
+function TSetApiKeyCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
   Logger.Error('SetApiKey command not implemented');
   result := TExitCode.NotImplemented;

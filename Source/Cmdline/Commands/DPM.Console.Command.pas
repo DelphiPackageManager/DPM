@@ -31,12 +31,13 @@ interface
 uses
   Spring.Container.Common,
   DPM.Console.Types,
-  DPM.Console.ExitCodes;
+  DPM.Console.ExitCodes,
+  VSoft.Awaitable;
 
 type
   ICommandHandler = interface
   ['{84F36151-773B-47B2-A396-728CB2D9D78E}']
-    function ExecuteCommand : TExitCode;
+    function ExecuteCommand(const cancellationToken : ICancellationToken) : TExitCode;
     function ForceNoBanner  : boolean;
   end;
 

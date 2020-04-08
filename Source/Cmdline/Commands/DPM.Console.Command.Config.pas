@@ -29,6 +29,7 @@ unit DPM.Console.Command.Config;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Core.Logging,
   DPM.Core.Configuration.Interfaces,
   DPM.Console.ExitCodes,
@@ -40,7 +41,7 @@ type
   private
 
   protected
-    function Execute: TExitCode; override;
+    function Execute(const cancellationToken : ICancellationToken): TExitCode; override;
   public
     constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager);override;
   end;
@@ -59,7 +60,7 @@ begin
 
 end;
 
-function TConfigCommand.Execute: TExitCode;
+function TConfigCommand.Execute(const cancellationToken : ICancellationToken): TExitCode;
 begin
   Logger.Error('Config command not implemented');
   result := TExitCode.NotImplemented;

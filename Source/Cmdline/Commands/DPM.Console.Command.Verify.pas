@@ -29,6 +29,7 @@ unit DPM.Console.Command.Verify;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Console.ExitCodes,
   DPM.Console.Command.Base;
 
@@ -37,14 +38,14 @@ type
   TVerifyCommand = class(TBaseCommand)
   private
   protected
-    function Execute: TExitCode;override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode;override;
   end;
 
 
 implementation
 
 
-function TVerifyCommand.Execute: TExitCode;
+function TVerifyCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
   Logger.Error('Verify command not implemented');
   result := TExitCode.NotImplemented;

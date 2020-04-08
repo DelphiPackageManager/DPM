@@ -464,6 +464,8 @@ begin
     list.Add('version=' + FMetaData.Version.ToString);
   list.Add('target=' + CompilerToString(target));
   list.Add('compiler=' + CompilerToString(target));
+  list.Add('compilerCodeName=' + CompilerCodeName(target));
+  list.Add('compilerWithCodeName=' + CompilerWithCodeName(target));
   list.Add('platform=' + DPMPlatformToString(platform));
   list.Add('compilerVersion=' + CompilerToCompilerVersionIntStr(target));
   list.Add('libSuffix=' + CompilerToLibSuffix(target));
@@ -735,26 +737,26 @@ begin
 
         for fileEntry in targetPlatform.LibFiles do
         begin
-          fileEntry.Source := regEx.Replace(fileEntry.Source, evaluator);
-          fileEntry.Destination := regEx.Replace(fileEntry.Destination, evaluator);
+          fileEntry.Source := TRim(regEx.Replace(fileEntry.Source, evaluator));
+          fileEntry.Destination := Trim(regEx.Replace(fileEntry.Destination, evaluator));
         end;
 
         for fileEntry in targetPlatform.Files do
         begin
-          fileEntry.Source := regEx.Replace(fileEntry.Source, evaluator);
-          fileEntry.Destination := regEx.Replace(fileEntry.Destination, evaluator);
+          fileEntry.Source := Trim(regEx.Replace(fileEntry.Source, evaluator));
+          fileEntry.Destination := Trim(regEx.Replace(fileEntry.Destination, evaluator));
         end;
 
         for bplEntry in targetPlatform.RuntimeFiles do
         begin
-          bplEntry.Source := regEx.Replace(bplEntry.Source, evaluator);
-          bplEntry.Destination := regEx.Replace(bplEntry.Destination, evaluator);
+          bplEntry.Source := Trim(regEx.Replace(bplEntry.Source, evaluator));
+          bplEntry.Destination := Trim(regEx.Replace(bplEntry.Destination, evaluator));
         end;
 
         for bplEntry in targetPlatform.DesignFiles do
         begin
-          bplEntry.Source := regEx.Replace(bplEntry.Source, evaluator);
-          bplEntry.Destination := regEx.Replace(bplEntry.Destination, evaluator);
+          bplEntry.Source := Trim(regEx.Replace(bplEntry.Source, evaluator));
+          bplEntry.Destination := Trim(regEx.Replace(bplEntry.Destination, evaluator));
         end;
 
         for buildEntry in targetPlatform.BuildEntries do

@@ -29,6 +29,7 @@ unit DPM.Console.Command.Help;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Logging,
   DPM.Console.Writer,
@@ -41,7 +42,7 @@ type
   private
     FConsole : IConsoleWriter;
   protected
-    function Execute: TExitCode;override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode;override;
   public
     constructor Create(const console : IConsoleWriter; const logger : ILogger; const configurationManager : IConfigurationManager);reintroduce;
   end;
@@ -66,7 +67,7 @@ begin
 
 end;
 
-function THelpCommand.Execute: TExitCode;
+function THelpCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 var
   cw : integer;
   maxDescW : integer;

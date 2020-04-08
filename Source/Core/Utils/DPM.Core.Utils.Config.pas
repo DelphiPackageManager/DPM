@@ -33,6 +33,7 @@ type
   public
     class procedure EnsureDefaultConfigDir;
     class function GetDefaultConfigFileName : string;
+    class function GetDefaultDMPFolder : string;
   end;
 
 implementation
@@ -60,6 +61,11 @@ end;
 class function TConfigUtils.GetDefaultConfigFileName: string;
 begin
   result := TSystemUtils.ExpandEnvironmentStrings(cDefaultConfigFile);
+end;
+
+class function TConfigUtils.GetDefaultDMPFolder: string;
+begin
+  result := TSystemUtils.ExpandEnvironmentStrings(cDefaultDPMFolder);
 end;
 
 end.

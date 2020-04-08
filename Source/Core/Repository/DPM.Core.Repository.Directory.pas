@@ -30,6 +30,7 @@ interface
 
 uses
   Generics.Defaults,
+  VSoft.Awaitable,
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
@@ -52,6 +53,8 @@ type
     FIsRemote: Boolean;
     FName: string;
     FSource: string;
+    FPermissionsChecked : boolean;
+    FIsWritable : boolean;
   protected
     function DoSearch(searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
     function DoExactSearch(const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const version : string) : IList<string>;
@@ -62,18 +65,21 @@ type
     function GetIsRemote: Boolean;
     function GetName: string;
     function GetSource: string;
-    function Search(const options : TSearchOptions): IList<IPackageIdentity>;overload;
-    function Search(const id : string; const range : TVersionRange) :  IList<IPackageIdentity>;overload;
-    function DownloadPackage(const packageMetadata : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
 
-    function GetPackageMetaData(const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageMetadata;overload;
-    function GetPackageMetaData(const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platforms : TDPMPlatforms) : IList<IPackageMetadata>;overload;
+    function Search(const cancellationToken : ICancellationToken; const options : TSearchOptions): IList<IPackageIdentity>;overload;
+    function Search(const cancellationToken : ICancellationToken; const id : string; const range : TVersionRange) :  IList<IPackageIdentity>;overload;
+    function DownloadPackage(const cancellationToken : ICancellationToken; const packageMetadata : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
 
-    function GetPackageVersions(const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : boolean) : IList<TPackageVersion>;
-    function GetPackageVersionsWithDependencies(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
+//    function DoGetPackageMetaData(const packageIdentity : IPackageIdentity; const platform : TDPMPlatform) : IPackageMetadata;
+//
+//    function GetPackageMetaData(const packageIdentity : IPackageIdentity) : IPackageMetadata;overload;
+//    function GetPackageMetaData(const packageIdentity : IPackageIdentity; const platforms : TDPMPlatforms) : IList<IPackageMetadata>;overload;
 
-    function GetPackageInfo(const packageIdentity: IPackageIdentity): IPackageInfo;overload;
-    function GetPackageInfo(const fileName : string) : IPackageInfo; overload;
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : boolean) : IList<TPackageVersion>;
+    function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
+
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;overload;
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const fileName : string) : IPackageInfo; overload;
 
   public
     constructor Create(const logger : ILogger);
@@ -94,7 +100,8 @@ uses
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Reader,
   DPM.Core.Utils.Strings,
-  DPM.Core.Utils.Path;
+  DPM.Core.Utils.Path,
+  DPM.Core.Utils.Directory;
 
 { TDirectoryPackageRespository }
 
@@ -125,9 +132,11 @@ end;
 constructor TDirectoryPackageRepository.Create(const logger: ILogger);
 begin
   FLogger := logger;
+  FPermissionsChecked := false;
+  FIsWritable := false;
 end;
 
-function TDirectoryPackageRepository.DownloadPackage(const packageMetadata : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
+function TDirectoryPackageRepository.DownloadPackage(const cancellationToken : ICancellationToken; const packageMetadata : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
 var
   sourceFile : string;
   destFile : string;
@@ -169,52 +178,13 @@ function TDirectoryPackageRepository.GetName: string;
 begin
   result := FName;
 end;
+//
+//function TDirectoryPackageRepository.GetPackageMetaData(const packageIdentity : IPackageIdentity): IPackageMetadata;
+//begin
+//  result := DoGetPackageMetaData(packageIdentity, packageIdentity.Platform);
+//end;
 
-function TDirectoryPackageRepository.GetPackageMetaData(const id: string; const version: TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform): IPackageMetadata;
-var
-  packagFileName : string;
-  zipFile : TZipFile;
-  metaBytes : TBytes;
-  metaString : string;
-  spec : IPackageSpec;
-  reader : IPackageSpecReader;
-begin
-  result := nil;
-  packagFileName := Format('%s-%s-%s-%s.dpkg',[id, CompilerToString(compilerVersion),DPMPlatformToString(platform), version.ToStringNoMeta]);
-  packagFileName := IncludeTrailingPathDelimiter(FSource) + packagFileName;
-  if not FileExists(packagFileName) then
-    exit;
-
-
-
-  zipFile := TZipFile.Create;
-  try
-    try
-      zipFile.Open(packagFileName, TZipMode.zmRead);
-      zipFile.Read(cPackageMetaFile, metaBytes);
-    except
-      on e : Exception do
-      begin
-        FLogger.Error('Error opening package file [' + packagFileName + ']');
-        exit;
-      end;
-    end;
-  finally
-    zipFile.Free;
-  end;
-  //doing this outside the try/finally to avoid locking the package for too long.
-  metaString := TEncoding.UTF8.GetString(metaBytes);
-  reader := TPackageSpecReader.Create(FLogger);
-  spec := reader.ReadSpecString(metaString);
-  if spec = nil then
-    exit;
-
-//  result := TPackageMetadata
-
-
-end;
-
-function TDirectoryPackageRepository.GetPackageInfo(const packageIdentity: IPackageIdentity): IPackageInfo;
+function TDirectoryPackageRepository.GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
 var
   packagFileName : string;
 begin
@@ -223,18 +193,37 @@ begin
   packagFileName := IncludeTrailingPathDelimiter(FSource) + packagFileName;
   if not FileExists(packagFileName) then
     exit;
+  if cancellationToken.IsCancelled then
+    exit;
 
-  result := GetPackageInfo(packagFileName);
+  result := GetPackageInfo(cancellationToken, packagFileName);
 end;
 
-function TDirectoryPackageRepository.GetPackageInfo(const fileName: string): IPackageInfo;
+function TDirectoryPackageRepository.GetPackageInfo(const cancellationToken : ICancellationToken; const fileName: string): IPackageInfo;
 var
   zipFile : TZipFile;
   metaBytes : TBytes;
   metaString : string;
   spec : IPackageSpec;
   reader : IPackageSpecReader;
+  extractedFile : string;
 begin
+  reader := TPackageSpecReader.Create(FLogger);
+
+  //first see if the spec has been extracted already.
+  extractedFile := ChangeFileExt(fileName, '.dspec');
+  if FileExists(extractedFile) then
+  begin
+    spec := reader.ReadSpec(extractedFile);
+    if spec <> nil then
+    begin
+      result := TPackageInfo.CreateFromSpec(FName,spec);
+      exit;
+    end;
+
+  end;
+  //failed to read so try extract again
+
   result := nil;
   zipFile := TZipFile.Create;
   try
@@ -253,28 +242,41 @@ begin
   end;
   //doing this outside the try/finally to avoid locking the package for too long.
   metaString := TEncoding.UTF8.GetString(metaBytes);
-  reader := TPackageSpecReader.Create(FLogger);
   spec := reader.ReadSpecString(metaString);
   if spec = nil then
     exit;
   result := TPackageInfo.CreateFromSpec(FName,spec);
-end;
-
-function TDirectoryPackageRepository.GetPackageMetaData(const id: string; const version: TPackageVersion; const compilerVersion : TCompilerVersion; const platforms: TDPMPlatforms): IList<IPackageMetadata>;
-var
-  platform : TDPMPlatform;
-  metadata : IPackageMetadata;
-begin
-  result := TCollections.CreateList<IPackageMetadata>;
-  for platform in platforms do
+  if not FPermissionsChecked then
   begin
-    metadata := GetPackageMetaData(id,version, compilerVersion, platform );
-    if metadata <> nil then
-      result.Add(metadata);
+    FIsWritable := TDirectoryUtils.IsDirectoryWriteable(ExtractFilePath(fileName));
+    FPermissionsChecked := true;
+  end;
+
+  if FIsWritable then
+  begin
+    try
+      TFile.WriteAllText(extractedFile, metaString, TEncoding.UTF8);
+    except
+      //even though we test for write access other errors might occur (eg with network drives disconnected etc).
+    end;
   end;
 end;
 
-function TDirectoryPackageRepository.GetPackageVersions(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease : boolean): IList<TPackageVersion>;
+//function TDirectoryPackageRepository.GetPackageMetaData(const packageIdentity : IPackageIdentity; const platforms: TDPMPlatforms): IList<IPackageMetadata>;
+//var
+//  platform : TDPMPlatform;
+//  metadata : IPackageMetadata;
+//begin
+//  result := TCollections.CreateList<IPackageMetadata>;
+//  for platform in platforms do
+//  begin
+//    metadata := DoGetPackageMetaData(packageIdentity, platform );
+//    if metadata <> nil then
+//      result.Add(metadata);
+//  end;
+//end;
+
+function TDirectoryPackageRepository.GetPackageVersions(const cancellationToken : ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease : boolean): IList<TPackageVersion>;
 var
   searchFiles : IList<string>;
   regex : TRegEx;
@@ -317,7 +319,7 @@ begin
 
 end;
 
-function TDirectoryPackageRepository.GetPackageVersionsWithDependencies(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
+function TDirectoryPackageRepository.GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
 var
   searchFiles : IList<string>;
   regex : TRegEx;
@@ -347,7 +349,7 @@ begin
         if not packageVersion.IsStable then
           continue;
 
-      packageInfo := GetPackageInfo(searchFiles[i]);
+      packageInfo := GetPackageInfo(cancellationToken, searchFiles[i]);
       result.Add(packageInfo);
     end;
   end;
@@ -374,7 +376,7 @@ begin
   FIsLocal := not FIsRemote;
 end;
 
-function TDirectoryPackageRepository.Search(const id: string; const range : TVersionRange): IList<IPackageIdentity>;
+function TDirectoryPackageRepository.Search(const cancellationToken : ICancellationToken; const id: string; const range : TVersionRange): IList<IPackageIdentity>;
 begin
   result := nil;
 end;
@@ -413,6 +415,44 @@ begin
   result.AddRange(TEnumerable.Distinct<string>(fileList, TStringComparer.OrdinalIgnoreCase));
 end;
 
+//function TDirectoryPackageRepository.DoGetPackageMetaData(const packageIdentity: IPackageIdentity; const platform: TDPMPlatform): IPackageMetadata;
+//var
+//  packagFileName : string;
+//  zipFile : TZipFile;
+//  metaBytes : TBytes;
+//  metaString : string;
+//  spec : IPackageSpec;
+//  reader : IPackageSpecReader;
+//begin
+//  result := nil;
+//  packagFileName := Format('%s-%s-%s-%s.dpkg',[packageIdentity.Id, CompilerToString(packageIdentity.compilerVersion),DPMPlatformToString(platform), packageIdentity.version.ToStringNoMeta]);
+//  packagFileName := IncludeTrailingPathDelimiter(FSource) + packagFileName;
+//  if not FileExists(packagFileName) then
+//    exit;
+//  zipFile := TZipFile.Create;
+//  try
+//    try
+//      zipFile.Open(packagFileName, TZipMode.zmRead);
+//      zipFile.Read(cPackageMetaFile, metaBytes);
+//    except
+//      on e : Exception do
+//      begin
+//        FLogger.Error('Error opening package file [' + packagFileName + ']');
+//        exit;
+//      end;
+//    end;
+//  finally
+//    zipFile.Free;
+//  end;
+//  //doing this outside the try/finally to avoid locking the package for too long.
+//  metaString := TEncoding.UTF8.GetString(metaBytes);
+//  reader := TPackageSpecReader.Create(FLogger);
+//  spec := reader.ReadSpecString(metaString);
+//  if spec = nil then
+//    exit;
+//  result := TPackageMetadata.CreateFromSpec(FName, spec);
+//end;
+
 function TDirectoryPackageRepository.DoSearch(searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
 var
   files : TStringDynArray;
@@ -436,7 +476,7 @@ begin
 
 end;
 
-function TDirectoryPackageRepository.Search(const options : TSearchOptions): IList<IPackageIdentity>;
+function TDirectoryPackageRepository.Search(const cancellationToken : ICancellationToken; const options : TSearchOptions): IList<IPackageIdentity>;
 var
   searchTerms : TArray<string>;
   searchFiles : IList<string>;

@@ -30,22 +30,32 @@ interface
 
 uses
   DPM.Console.ExitCodes,
-  Spring.Container;
+  DPM.Core.Logging,
+  Spring.Container,
+  VSoft.Awaitable;
 
 type
   TDPMConsoleApplication = class
   private
     class var
       FContainer : TContainer;
+      FLogger : ILogger;
+      FCancellationTokenSource : ICancellationTokenSource;
   protected
     class function InitContainer : TExitCode;
   public
     class function Run : TExitCode;
+    class procedure CtrlCPressed;
+    class procedure CtrlBreakPressed;
+    class procedure CloseEvent;
+    class procedure ShutdownEvent;
+
   end;
 
 implementation
 
 uses
+  WinApi.Windows,
   System.SysUtils,
   VSoft.CommandLine.Options,
   DPM.Core.Options.Common,
@@ -55,12 +65,42 @@ uses
   DPM.Console.Writer,
   DPM.Console.Banner,
   DPM.Console.Command,
-  DPM.Core.Logging,
   DPM.Console.Reg;
 
-{ TPackItApplications }
+function ConProc(CtrlType : DWord) : Bool; stdcall;
+begin
+ Result := True;
+ case CtrlType of
+   CTRL_C_EVENT        : TDPMConsoleApplication.CtrlCPressed;
+   CTRL_BREAK_EVENT    : TDPMConsoleApplication.CtrlBreakPressed;
+   CTRL_CLOSE_EVENT    : TDPMConsoleApplication.CloseEvent;
+   CTRL_SHUTDOWN_EVENT : TDPMConsoleApplication.ShutdownEvent;
+ end;
+end;
+
+
+
+{ T }
 
 ///
+class procedure TDPMConsoleApplication.CloseEvent;
+begin
+  FLogger.Information('Close Detected.');
+
+end;
+
+class procedure TDPMConsoleApplication.CtrlBreakPressed;
+begin
+  FLogger.Information('Ctrl-Break detected.');
+  FCancellationTokenSource.Cancel;
+end;
+
+class procedure TDPMConsoleApplication.CtrlCPressed;
+begin
+  FLogger.Information('Ctrl-C detected.');
+  FCancellationTokenSource.Cancel;
+end;
+
 class function TDPMConsoleApplication.InitContainer : TExitCode;
 begin
   result := TExitCode.OK;
@@ -87,13 +127,18 @@ var
   commandFactory : ICommandFactory;
   bError : boolean;
   command : TDPMCommand;
-  logger : ILogger;
+
 begin
+  FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
+
+  SetConsoleCtrlHandler(@ConProc, True);
+
   result := InitContainer; //Init our DI container
   if result <> TExitCode.OK then
     exit;
   console := FContainer.Resolve<IConsoleWriter>();
   Assert(console <> nil);
+  FLogger := FContainer.Resolve<ILogger>;
   bError := false;
 
   parseresult := TOptionsRegistry.Parse;
@@ -107,8 +152,7 @@ begin
     TCommonOptions.Default.Help := true; //if it's a valid command but invalid options this will give us command help.
   end;
 
-  logger := FContainer.Resolve<ILogger>;
-  logger.Verbosity := TCommonOptions.Default.Verbosity;
+  FLogger.Verbosity := TCommonOptions.Default.Verbosity;
 
   command := GetCommandFromString(parseresult.Command);
 
@@ -145,10 +189,17 @@ begin
   if (not TCommonOptions.Default.NoBanner) and (not commandHandler.ForceNoBanner) then
     ShowBanner(console);
 
-  result := commandHandler.ExecuteCommand;
+  result := commandHandler.ExecuteCommand(FCancellationTokenSource.Token);
   if bError then //an error occured earlier so ignore command result.
     result := TExitCode.InvalidArguments;
   FreeAndNil(FContainer);
+end;
+
+class procedure TDPMConsoleApplication.ShutdownEvent;
+begin
+  FLogger.Information('Shutdown detected.');
+  FCancellationTokenSource.Cancel;
+
 end;
 
 end.

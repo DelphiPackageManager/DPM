@@ -44,7 +44,7 @@
         <DCC_BplOutput>..\Output</DCC_BplOutput>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <VerInfo_Locale>3081</VerInfo_Locale>
-        <DCC_UnitSearchPath>Libs\Spring4D\Source;Libs\Spring4D\Source\Base;Libs\Spring4d\Source\Base\Logging;Libs\Spring4D\Source\Base\Collections;Libs\Spring4D\Source\Core\Interception;Libs\Spring4D\Source\Core\Container;Libs\Spring4D\Source\Core\Services;Libs\Spring4D\Source\Extensions\Cryptography;Libs\Spring4D\Source\Extensions\Utils;Libs\VSoft.AntPatterns\source;Libs\VSoft.SemanticVersion\source;Libs\VSoft.Uri\src;Libs\JsonDataObjects\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>Libs\Spring4D\Source;Libs\Spring4D\Source\Base;Libs\Spring4d\Source\Base\Logging;Libs\Spring4D\Source\Base\Collections;Libs\Spring4D\Source\Core\Interception;Libs\Spring4D\Source\Core\Container;Libs\Spring4D\Source\Base\Patterns;Libs\Spring4D\Source\Core\Services;Libs\Spring4D\Source\Extensions\Cryptography;Libs\Spring4D\Source\Extensions\Utils;Libs\VSoft.AntPatterns\source;Libs\VSoft.SemanticVersion\source;Libs\VSoft.Uri\src;Libs\JsonDataObjects\Source;Libs\OmniThreadLibrary;Libs\OmniThreadLibrary\src;Libs\VSoft.Awaitable\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <GenPackage>true</GenPackage>
         <DCC_CBuilderOutput>All</DCC_CBuilderOutput>
         <GenDll>true</GenDll>
@@ -181,6 +181,13 @@
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.Factory.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Process.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Directory.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.SearchResults.pas"/>
+        <DCCReference Include="Core\Imports\DPM.Core.Imports.WinHttp.pas"/>
+        <DCCReference Include="Core\Http\DPM.Core.Http.pas"/>
+        <DCCReference Include="Core\Http\DPM.Core.Http.WinHttpClient.pas"/>
+        <DCCReference Include="Core\Http\DPM.Core.Http.Request.pas"/>
+        <DCCReference Include="Core\Http\DPM.Core.Http.Response.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

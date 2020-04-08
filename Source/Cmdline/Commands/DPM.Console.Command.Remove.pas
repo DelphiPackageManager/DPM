@@ -29,6 +29,7 @@ unit DPM.Console.Command.Remove;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Console.ExitCodes,
   DPM.Console.Command,
   DPM.Console.Command.Base;
@@ -36,7 +37,7 @@ uses
 type
   TRemoveCommand = class(TBaseCommand)
   protected
-    function Execute: TExitCode; override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
   end;
 
 
@@ -44,7 +45,7 @@ implementation
 
 { TRemoveCommand }
 
-function TRemoveCommand.Execute: TExitCode;
+function TRemoveCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
   Logger.Error('Remove command not implemented');
   result := TExitCode.NotImplemented;

@@ -29,6 +29,7 @@ unit DPM.Console.Command.Sign;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Console.ExitCodes,
   DPM.Console.Command.Base;
 
@@ -37,7 +38,7 @@ type
   TSignCommand = class(TBaseCommand)
   private
   protected
-    function Execute: TExitCode;override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode;override;
   public
 
   end;
@@ -46,7 +47,7 @@ type
 implementation
 
 
-function TSignCommand.Execute: TExitCode;
+function TSignCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
   Logger.Error('Sign command not implemented');
   result := TExitCode.NotImplemented;

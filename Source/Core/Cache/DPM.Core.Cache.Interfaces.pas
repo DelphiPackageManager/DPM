@@ -29,6 +29,7 @@ unit DPM.Core.Cache.Interfaces;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Core.Types,
   DPM.Core.Package.Interfaces;
 
@@ -56,7 +57,7 @@ type
     function InstallPackageFromFile(const packageFileName : string; const saveFile : boolean) : boolean;
 
     //gets the package info with dependencies. Calls EnsurePackage.
-    function GetPackageInfo(const packageIdentity : IPackageIdentity) : IPackageInfo;
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity) : IPackageInfo;
 
     //gets the full package metadata including search paths.
     function GetPackageMetadata(const packageIdentity : IPackageIdentity) : IPackageMetadata;

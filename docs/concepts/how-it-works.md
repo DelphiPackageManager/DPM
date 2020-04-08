@@ -8,7 +8,7 @@ DPM packages are a zip file that contains source files and/or compiled dcu/dcp/b
 
 ### So how are packages created
 
-See [creating packages](../get-started/creating-packages.md).
+See [creating packages](../concepts/creating-packages.md).
 
 ### What does installing a package actually do
 

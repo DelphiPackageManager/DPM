@@ -31,6 +31,7 @@ interface
 uses
   Spring.Collections,
   System.Diagnostics,
+  VSoft.Awaitable,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
@@ -52,11 +53,11 @@ type
   protected
     function SetInitialState(const newPackage : IPackageInfo; const projectReferences : IList<IPackageInfo>; const lockFile : IGraphNode) : boolean;
 
-    function DoResolve(const options : TSearchOptions; const lockFile : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
+    function DoResolve(const cancellationToken : ICancellationToken; const options : TSearchOptions; const lockFile : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
 
-    function ResolveForInstall(const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageInfo>; const lockFile : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageInfo>; const lockFile : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
 
-    function ResolveForRestore(const options : TSearchOptions; const projectReferences : IList<IPackageInfo>; const lockFile : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForRestore(const cancellationToken : ICancellationToken; const options : TSearchOptions; const projectReferences : IList<IPackageInfo>; const lockFile : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
 
   public
     constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager);
@@ -95,7 +96,7 @@ begin
     result := -1;
 end;
 
-function TDependencyResolver.DoResolve(const options: TSearchOptions; const lockFile: IGraphNode; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; out resolved: IList<IPackageInfo>): boolean;
+function TDependencyResolver.DoResolve(const cancellationToken : ICancellationToken; const options: TSearchOptions; const lockFile: IGraphNode; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; out resolved: IList<IPackageInfo>): boolean;
 var
   currentPackage : IPackageInfo;
   dependency : IPackageDependency;
@@ -183,7 +184,7 @@ begin
         begin
            searchOptions := options.Clone;
            searchOptions.SearchTerms := dependency.Id;
-           versions := FRepositoryManager.GetPackageVersions(searchOptions, platform, TVersionRange.Empty);
+           versions := FRepositoryManager.GetPackageVersions(cancellationToken, searchOptions, platform, TVersionRange.Empty);
            if versions.Any then
               FContext.AddVersions(dependency.Id, versions);
         end;
@@ -266,25 +267,25 @@ begin
 
 end;
 
-function TDependencyResolver.ResolveForInstall(const options : TSearchOptions; const newPackage: IPackageInfo; const projectReferences: IList<IPackageInfo>; const lockFile: IGraphNode; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; out resolved : IList<IPackageInfo>): boolean;
+function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const options : TSearchOptions; const newPackage: IPackageInfo; const projectReferences: IList<IPackageInfo>; const lockFile: IGraphNode; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; out resolved : IList<IPackageInfo>): boolean;
 begin
   FContext.Reset;
   resolved := nil;
   //TODO : Use the graph to record resolutions and setup initial state.
   SetInitialState(newPackage, projectReferences,lockFile);
 
-  result := DoResolve(options, lockFile, compilerVersion, platform, resolved);
+  result := DoResolve(cancellationToken, options, lockFile, compilerVersion, platform, resolved);
 
 end;
 
-function TDependencyResolver.ResolveForRestore(const options: TSearchOptions; const projectReferences : IList<IPackageInfo>; const lockFile: IGraphNode; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; out resolved: IList<IPackageInfo>): boolean;
+function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancellationToken; const options: TSearchOptions; const projectReferences : IList<IPackageInfo>; const lockFile: IGraphNode; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; out resolved: IList<IPackageInfo>): boolean;
 begin
   FContext.Reset;
   resolved := nil;
   //TODO : Use the graph to record resolutions and setup initial state.
   SetInitialState(nil, projectReferences,lockFile);
 
-  result := DoResolve(options, lockFile, compilerVersion, platform, resolved);
+  result := DoResolve(cancellationToken, options, lockFile, compilerVersion, platform, resolved);
 
   FContext.Reset;
 

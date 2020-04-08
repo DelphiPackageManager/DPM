@@ -29,20 +29,21 @@ unit DPM.Console.Command.Spec;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Console.ExitCodes,
   DPM.Console.Command.Base;
 
 type
   TSpecCommand = class(TBaseCommand)
   protected
-    function Execute: TExitCode;override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode;override;
   end;
 
 implementation
 
 { TSpecCommand }
 
-function TSpecCommand.Execute: TExitCode;
+function TSpecCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
   Logger.Error('Spec command not implemented');
   result := TExitCode.Error;

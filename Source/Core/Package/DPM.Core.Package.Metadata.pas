@@ -50,6 +50,7 @@ type
     function GetPlatform: TDPMPlatform;
     function GetSourceName: string;
     function GetVersion: TPackageVersion;
+    function ToIdVersionString : string;
     constructor Create(const sourceName : string; const spec : IPackageSpec);overload;virtual;
   public
     function ToString : string;override;
@@ -181,6 +182,11 @@ end;
 function TPackageIdentity.GetVersion: TPackageVersion;
 begin
   result := FVersion;
+end;
+
+function TPackageIdentity.ToIdVersionString: string;
+begin
+  result := FId +' [' + FVersion.ToStringNoMeta + ']';
 end;
 
 function TPackageIdentity.ToString: string;

@@ -197,7 +197,7 @@ begin
   result := true;
   FName     := jsonObj['name'];
   FSource   := jsonObj['source'];
-  FUserName := jsonObj['userNAme'];
+  FUserName := jsonObj['userName'];
   FPassword := jsonObj['password'];
   if FPassword <> '' then
     FPassword := DecryptString(FPassword);

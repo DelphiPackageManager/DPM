@@ -29,6 +29,7 @@ unit DPM.Console.Command.Push;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Console.ExitCodes,
   DPM.Console.Command.Base,
   DPM.Core.Configuration.Interfaces,
@@ -40,7 +41,7 @@ type
   private
     FClientFactory : ISourceClientFactory;
   protected
-    function Execute: TExitCode; override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
   public
     constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const clientFactory : ISourceClientFactory);reintroduce;
   end;
@@ -62,7 +63,7 @@ begin
   FClientFactory := clientFactory;
 end;
 
-function TPushCommand.Execute: TExitCode;
+function TPushCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 var
   config : IConfiguration;
   sourceConfig : ISourceConfig;

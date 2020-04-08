@@ -29,6 +29,7 @@ unit DPM.Core.Cache;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
@@ -52,7 +53,7 @@ type
     function GetPackagePath(const packageIndentity : IPackageIdentity): string;
     function EnsurePackage(const packageIndentity : IPackageIdentity): Boolean;
 
-    function GetPackageInfo(const packageIdentity : IPackageIdentity) : IPackageInfo;
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity) : IPackageInfo;
 
     function GetPackageMetadata(const packageIdentity : IPackageIdentity) : IPackageMetadata;
 
@@ -108,7 +109,7 @@ begin
   result := FLocation;
 end;
 
-function TPackageCache.GetPackageInfo(const packageIdentity: IPackageIdentity): IPackageInfo;
+function TPackageCache.GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
 var
   packageFolder : string;
   metaDataFile : string;

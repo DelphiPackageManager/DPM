@@ -37,10 +37,11 @@ const
   //fixed filename for the package dspec so we can easily extract it
   cPackageMetaFile = 'package' + cPackageSpecExt;
 
-  cConfigFileName = 'dpm.config';
+  cDPMConfigFileName = 'dpm.config';
 
-  cDefaultConfigFile = '%APPDATA%\.dpm\' + cConfigFileName;
-  cDefaultPackageCache = '%APPDATA%\.dpm\packages';
+  cDefaultDPMFolder = '%APPDATA%\.dpm';
+  cDefaultConfigFile = cDefaultDPMFolder + '\' + cDPMConfigFileName;
+  cDefaultPackageCache = cDefaultDPMFolder + '\packages';
   cDPMPackageCacheEnviromentVar = 'DPMPACKAGECACHE';
 
   cTargetPlatformAttribute = 'targetPlatform';

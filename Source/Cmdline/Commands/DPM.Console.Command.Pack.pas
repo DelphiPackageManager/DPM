@@ -29,6 +29,7 @@ unit DPM.Console.Command.Pack;
 interface
 
 uses
+  VSoft.Awaitable,
   Spring.Container.Common,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Logging,
@@ -43,7 +44,7 @@ type
   private
     FWriter : IPackageWriter;
   protected
-    function Execute: TExitCode;override;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode;override;
   public
     constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const writer : IPackageWriter);reintroduce;
   end;
@@ -68,7 +69,7 @@ begin
   FWriter := writer;
 end;
 
-function TPackCommand.Execute: TExitCode;
+function TPackCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 var
   mcVer : TSemanticVersion;
   packVer : TPackageVersion;

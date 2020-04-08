@@ -32,7 +32,8 @@ uses
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Logging,
   DPM.Console.ExitCodes,
-  DPM.Console.Command;
+  DPM.Console.Command,
+  VSoft.Awaitable;
 
 type
   TBaseCommand = class(TInterfacedObject, ICommandHandler)
@@ -40,8 +41,8 @@ type
     FLogger : ILogger;
   protected
     FConfigurationManager : IConfigurationManager;
-    function Execute: TExitCode;virtual;
-    function ExecuteCommand: TExitCode;
+    function Execute(const cancellationToken : ICancellationToken): TExitCode;virtual;
+    function ExecuteCommand(const cancellationToken : ICancellationToken) : TExitCode;
     function ForceNoBanner  : boolean;virtual;
     property Logger : ILogger read FLogger;
   public
@@ -65,17 +66,17 @@ begin
 end;
 
 
-function TBaseCommand.Execute: TExitCode;
+function TBaseCommand.Execute(const cancellationToken : ICancellationToken): TExitCode;
 begin
   result := TExitCode.NotImplemented;
 end;
 
-function TBaseCommand.ExecuteCommand: TExitCode;
+function TBaseCommand.ExecuteCommand(const cancellationToken : ICancellationToken): TExitCode;
 begin
   if not FConfigurationManager.EnsureDefaultConfig then
     result := TExitCode.InitException
   else
-    result := Execute;
+    result := Execute(cancellationToken);
 end;
 
 function TBaseCommand.ForceNoBanner: boolean;
