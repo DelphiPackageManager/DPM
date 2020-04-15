@@ -38,9 +38,7 @@ type
   TInstallOptions = class(TSearchOptions)
   private
     FPackageFile    : string;
-    FPreRelease     : boolean;
     FVersionString  : string;
-    FVersion        : TPackageVersion;
     FNoCache        : boolean;
     FProjectPath    : string;
     FFloat          : boolean;
@@ -60,10 +58,8 @@ type
 
     property PackageId    : string      read GetPackageId write SetPackageId;
     property PackageFile  : string      read FPackageFile write FPackageFile;
-    property PreRelease   : boolean     read FPreRelease  write FPreRelease;
     property ProjectPath  : string      read FProjectPath write FProjectPath;
     property VersionString: string      read FVersionString  write FVersionString;
-    property Version      : TPackageVersion read FVersion  write FVersion;
     property Force        : boolean     read FForce       write FForce;
   end;
 
@@ -86,16 +82,13 @@ constructor TInstallOptions.Create;
 begin
   inherited;
   FExact := true;
-  FVersion := TPackageVersion.Empty;
 end;
 
 constructor TInstallOptions.CreateClone(const original: TInstallOptions);
 begin
   inherited CreateClone(original);
   FPackageFile    := original.FPackageFile;
-  FPreRelease     := original.FPreRelease;
   FVersionString  := original.FVersionString;
-  FVersion        := original.FVersion;
   FNoCache        := original.FNoCache;
   FProjectPath    := original.FProjectPath;
   FFloat          := original.FFloat;
@@ -121,6 +114,7 @@ function TInstallOptions.Validate(const logger: ILogger): Boolean;
 var
   packageString   : string;
   error : string;
+  theVersion : TPackageVersion;
 begin
   //must call inherited
   result := inherited Validate(logger);
@@ -171,11 +165,12 @@ begin
 
   if VersionString <> '' then
   begin
-    if not TPackageVersion.TryParseWithError(VersionString, FVersion, error) then
+    if not TPackageVersion.TryParseWithError(VersionString, theVersion, error) then
     begin
       Logger.Error('The specified package Version  [' + VersionString + '] is not a valid version - ' + error);
       result := false;
     end;
+    Self.Version := theVersion;
   end;
 
   if FProjectPath = '' then

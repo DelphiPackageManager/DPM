@@ -464,6 +464,7 @@ begin
     list.Add('version=' + FMetaData.Version.ToString);
   list.Add('target=' + CompilerToString(target));
   list.Add('compiler=' + CompilerToString(target));
+  list.Add('compilerNoPoint='  + CompilerToStringNoPoint(target));
   list.Add('compilerCodeName=' + CompilerCodeName(target));
   list.Add('compilerWithCodeName=' + CompilerWithCodeName(target));
   list.Add('platform=' + DPMPlatformToString(platform));

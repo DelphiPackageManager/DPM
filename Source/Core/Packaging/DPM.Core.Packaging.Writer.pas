@@ -93,6 +93,13 @@ begin
     result := ExtractFileName(fileName);
 end;
 
+function StripCurrent(const value : string) : string;
+begin
+  result := value;
+  if result.StartsWith('.\') then
+    Delete(result, 1,2);
+end;
+
 function GetNonWildcardPath(const value : string) : string;
 var
   i : integer;
@@ -153,7 +160,7 @@ begin
     if flatten then
       archivePath := dest + '\' + ExtractFileName(f)
     else
-      archivePath := dest + '\' + StripBase(IncludeTrailingPathDelimiter(basePath) + searchPath , f);
+      archivePath := dest + '\' + StripBase(TPathUtils.CompressRelativePath(basePath,  searchPath) , f);
       if TStringUtils.StartsWith(archivePath, '\') then
         Delete(archivePath,1,1);
     Inc(fileCount);
@@ -215,7 +222,7 @@ begin
     FLogger.Warning('Could not open package file [' + packageFileName + '] - skipping');
     exit;
   end;
-  FLogger.Debug('Writing file : ' + packageFileName);
+  FLogger.Information('Writing package to file : ' + packageFileName);
   try
     sStream := TStringStream.Create(sManifest,TEncoding.UTF8);
     try

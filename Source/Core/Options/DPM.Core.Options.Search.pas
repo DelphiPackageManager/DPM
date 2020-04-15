@@ -48,6 +48,7 @@ type
   protected
     FExact : boolean;
     constructor CreateClone(const original : TSearchOptions);reintroduce;
+
   public
     constructor Create;override;
     function Clone : TSearchOptions;virtual;

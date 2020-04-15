@@ -57,7 +57,6 @@ type
     property IsValid : boolean read GetIsValid;
   end;
 
-function GetTargeTDPMPlatformsForCompiler(const target : TCompilerVersion) : TDPMPlatforms;
 
 //make sure the compiler supports the platform
 function ValidatePlatform(const target : TCompilerVersion; const platform : TDPMPlatform) : boolean;
@@ -73,31 +72,10 @@ uses
 
 
 
-function GetTargeTDPMPlatformsForCompiler(const target : TCompilerVersion) : DPM.Core.Types.TDPMPlatforms;
-begin
-  //TODO : Add onther plaforms
-  case target of
-    TCompilerVersion.RS2009: result := [TDPMPlatform.Win32];
-    TCompilerVersion.RS2010: result := [TDPMPlatform.Win32];
-    TCompilerVersion.RSXE:   result := [TDPMPlatform.Win32];
-    TCompilerVersion.RSXE2:  result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32];
-    TCompilerVersion.RSXE3:  result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32];
-    TCompilerVersion.RSXE4:  result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32];
-    TCompilerVersion.RSXE5..TCompilerVersion.RS10_1 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32];
-    TCompilerVersion.RS10_2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.OSX64, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32,
-                                         TDPMPlatform.LinuxIntel64];
-    TCompilerVersion.RS10_3,
-    TCompilerVersion.RS10_4 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.OSX64, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32,
-                                         TDPMPlatform.LinuxIntel64, TDPMPlatform.AndroidArm64];
-  else
-    raise EArgumentOutOfRangeException.Create('Invalid compiler version');
-//    result := [Win32,Win64,OSX32,iOS32,AndroidArm32, LinuxIntel64]; //Tokyo or later.
-  end;
-end;
 
 function ValidatePlatform(const target : TCompilerVersion; const platform : TDPMPlatform) : boolean;
 begin
-  result := platform in GetTargeTDPMPlatformsForCompiler(target);
+  result := platform in AllPlatforms(target);
 end;
 
 

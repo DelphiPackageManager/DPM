@@ -108,6 +108,8 @@ type
   function StringToDPMPlatform(const value : string) : TDPMPlatform;
 
   function CompilerToString(const value : TCompilerVersion) : string;
+  function CompilerToStringNoPoint(const value : TCompilerVersion) : string;
+
   function CompilerCodeName(const value : TCompilerVersion) : string;
   function CompilerWithCodeName(const value : TCompilerVersion) : string;
 
@@ -194,6 +196,17 @@ begin
   Delete(result,1,2);// remove RS
   result := StringReplace(result, '_', '.', [rfReplaceAll]);
 end;
+
+function CompilerToStringNoPoint(const value : TCompilerVersion) : string;
+var
+  i : integer;
+begin
+  result := CompilerToString(value);
+  i := pos('.', result);
+  if i > 0 then
+    Delete(result, i, length(result));
+end;
+
 
 function IsValidCompilerString(const value : string) : boolean;
 begin
@@ -473,6 +486,7 @@ begin
         5..8 : result := TCompilerVersion.RS10_3; //18.8 for 10.3.3
       end;
     end;
+    19 : result := TCompilerVersion.RS10_4; //TODO : this is assuming they will bump the version! Check this!!!
   end;
 end;
 
