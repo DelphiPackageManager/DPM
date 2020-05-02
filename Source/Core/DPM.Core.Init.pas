@@ -38,6 +38,7 @@ implementation
 
 uses
   Spring.Container.Common,
+  DPM.Core.Utils.Enum,
   DPM.Core.Packaging,
   DPM.Core.Packaging.Writer,
   DPM.Core.Packaging.Archive,
@@ -46,11 +47,10 @@ uses
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec,
   DPM.Core.Spec.Reader,
-//  DPM.Core.Project.Interfaces,
-//  DPM.Core.Project.Editor,
   DPM.Core.Package.Interfaces,
   DPM.Core.Package.Installer,
   DPM.Core.Package.InstallerContext,
+  DPM.Core.Types,
   DPM.Core.Sources.Interfaces,
   DPM.Core.Sources.Manager,
   DPM.Core.Sources.ClientFactory,
@@ -60,6 +60,7 @@ uses
   DPM.Core.Repository.Manager,
   DPM.Core.Repository.Factory,
   DPM.Core.Repository.Directory,
+  DPM.Core.Repository.Http,
   DPM.Core.Cache.Interfaces,
   DPM.Core.Cache,
   DPM.Core.Dependency.Interfaces,
@@ -93,7 +94,9 @@ begin
 
   Container.RegisterType<IPackageRepositoryFactory,TPackageRepositoryFactory>;
   Container.RegisterType<IPackageRepositoryManager,TPackageRepositoryManager>;
-  Container.RegisterType<IPackageRepository,TDirectoryPackageRepository>('directory');
+
+  Container.RegisterType<IPackageRepository,TDirectoryPackageRepository>(TEnumUtils.EnumToString<TSourceType>(TSourceType.Folder) );
+  Container.RegisterType<IPackageRepository,TDPMServerPackageRepository>(TEnumUtils.EnumToString<TSourceType>(TSourceType.DPMServer) );
 
   Container.RegisterType<IPackageCache,TPackageCache>;
 

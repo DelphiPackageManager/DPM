@@ -456,9 +456,7 @@ var
   uri : IUri;
   error : string;
   source : ISourceConfig;
-  repoType : string;
   repo : IPackageRepository;
-
 begin
   result := false;
   FRepositories.Clear;
@@ -479,13 +477,8 @@ begin
       exit;
     end;
 
-    if uri.Scheme = 'file' then
-      repoType := 'directory'
-    else
-      repoType := 'http';
-
-    repo := FRepoFactory.CreateRepository(repoType);
-    repo.Init(source, repoType = 'http');
+    repo := FRepoFactory.CreateRepository(source.SourceType);
+    repo.Configure(source);
     FRepositories.Add(repo);
   end;
   result := true;

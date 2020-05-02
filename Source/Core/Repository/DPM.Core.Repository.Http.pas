@@ -28,6 +28,72 @@ unit DPM.Core.Repository.Http;
 
 interface
 
+uses
+  Generics.Defaults,
+  VSoft.Awaitable,
+  Spring.Collections,
+  DPM.Core.Types,
+  DPM.Core.Dependency.Version,
+  DPM.Core.Logging,
+  DPM.Core.Options.Search,
+  DPM.Core.Package.Interfaces,
+  DPM.Core.Configuration.Interfaces,
+  DPM.Core.Repository.Interfaces,
+  DPM.Core.Repository.Base;
+
+
+type
+  TDPMServerPackageRepository = class(TBaseRepository,IPackageRepository)
+  private
+  protected
+    function DownloadPackage(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity; const localFolder: string; var fileName: string): Boolean;
+    function GetPackageInfo(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
+    function GetPackageVersions(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): Spring.Collections.IList<TPackageVersion>;
+    function GetPackageVersionsWithDependencies(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
+
+    function Search(const cancellationToken : ICancellationToken; const options : TSearchOptions ) : IList<IPackageIdentity>;overload;
+
+  public
+    constructor Create(const logger : ILogger);override;
+
+  end;
+
 implementation
+
+{ TDPMServerPackageRepository }
+
+constructor TDPMServerPackageRepository.Create(const logger: ILogger);
+begin
+  inherited Create(logger);
+
+end;
+
+function TDPMServerPackageRepository.DownloadPackage(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity; const localFolder: string; var fileName: string): Boolean;
+begin
+  result := false;
+end;
+
+
+function TDPMServerPackageRepository.GetPackageInfo(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
+begin
+  result := nil;
+end;
+
+function TDPMServerPackageRepository.GetPackageVersions(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<TPackageVersion>;
+begin
+  result := TCollections.CreateList<TPackageVersion>;
+end;
+
+function TDPMServerPackageRepository.GetPackageVersionsWithDependencies(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
+begin
+  result := TCollections.CreateList<IPackageInfo>;
+end;
+
+
+function TDPMServerPackageRepository.Search(const cancellationToken: ICancellationToken; const options: TSearchOptions): IList<IPackageIdentity>;
+begin
+  result := TCollections.CreateList<IPackageIdentity>;
+end;
+
 
 end.

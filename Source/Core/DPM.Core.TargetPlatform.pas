@@ -71,8 +71,6 @@ uses
   System.Types;
 
 
-
-
 function ValidatePlatform(const target : TCompilerVersion; const platform : TDPMPlatform) : boolean;
 begin
   result := platform in AllPlatforms(target);

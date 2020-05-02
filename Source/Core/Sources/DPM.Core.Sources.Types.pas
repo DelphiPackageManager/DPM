@@ -35,7 +35,6 @@ type
 
   TSourcesFormat  = (Invalid,Detailed,Short);
 
-
 implementation
 
 end.

@@ -1,3 +1,29 @@
+{***************************************************************************}
+{                                                                           }
+{           Delphi Package Manager - DPM                                    }
+{                                                                           }
+{           Copyright © 2019 Vincent Parrett and contributors               }
+{                                                                           }
+{           vincent@finalbuilder.com                                        }
+{           https://www.finalbuilder.com                                    }
+{                                                                           }
+{                                                                           }
+{***************************************************************************}
+{                                                                           }
+{  Licensed under the Apache License, Version 2.0 (the "License");          }
+{  you may not use this file except in compliance with the License.         }
+{  You may obtain a copy of the License at                                  }
+{                                                                           }
+{      http://www.apache.org/licenses/LICENSE-2.0                           }
+{                                                                           }
+{  Unless required by applicable law or agreed to in writing, software      }
+{  distributed under the License is distributed on an "AS IS" BASIS,        }
+{  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. }
+{  See the License for the specific language governing permissions and      }
+{  limitations under the License.                                           }
+{                                                                           }
+{***************************************************************************}
+
 unit DPM.IDE.Notifier;
 
 interface
@@ -40,6 +66,7 @@ implementation
 
 uses
   System.SysUtils,
+  VSoft.Awaitable,
   DPM.Core.Utils.Path,
   DPM.Core.Project.Interfaces,
   DPM.Core.Project.GroupProjReader,
@@ -101,6 +128,7 @@ var
   i : integer;
   groupReader : IGroupProjectReader;
   projectRoot : string;
+  ext : string;
 begin
   result := false;
   FLogger.Clear;
@@ -114,10 +142,15 @@ begin
     //projects likely to be relative, so make them full paths
     for i := 0 to FGroupProjects.Count -1 do
     begin
-      //sysutils.IsRelativePath returns false with paths starting with .\
-      if TPathUtils.IsRelativePath(FGroupProjects[i]) then
-        //TPath.Combine really should do this but it doesn't
-        FGroupProjects[i] := TPathUtils.CompressRelativePath(projectRoot, FGroupProjects[i])
+      ext := ExtractFileExt(FGroupProjects[i]);
+      //TODO : Allow cbproj when cbuilder supported.
+      if ext = '.dproj' then
+      begin
+        //sysutils.IsRelativePath returns false with paths starting with .\
+        if TPathUtils.IsRelativePath(FGroupProjects[i]) then
+          //TPath.Combine really should do this but it doesn't
+          FGroupProjects[i] := TPathUtils.CompressRelativePath(projectRoot, FGroupProjects[i])
+      end;
     end;
     result := true;
   end;
@@ -126,13 +159,14 @@ end;
 procedure TDPMIDENotifier.FileNotification(NotifyCode: TOTAFileNotification; const FileName: string; var Cancel: Boolean);
 var
   restoreOptions : TRestoreOptions;
+  cancellationTokenSource : ICancellationTokenSource;
   ext : string;
 begin
   if not (NotifyCode in  [ofnFileOpening, ofnFileClosing])  then
     exit;
 
   ext := ExtractFileExt(FileName);
-  if (ext <> '.groupproj') and (ext <> '.dproj') then
+  if (ext <> '.groupproj') and (ext <> '.dproj') then //TODO : Add cbproj one day!
     exit;
 
   if NotifyCode = ofnFileClosing then
@@ -141,6 +175,16 @@ begin
     exit;
   end;
 
+  {
+    Since there's no built in way to determine when the project group has finished
+    loading, we have to cheat here.
+
+    We load up the list of projects in the group, and then as each one is loaded
+    (we get notified here) we remove them from the list. when the list is empty
+    we are done and can continue. This has the added benefit of running restore
+    when the grouproj is loading but before the project is loaded, so no reload loop
+    to deal with!
+  }
 
   //
   if FLoadingGroup then
@@ -152,7 +196,7 @@ begin
   end;
 
 
-  if (not FLoadingGroup) and (ExtractFileExt(FileName) = '.groupproj') then
+  if (not FLoadingGroup) and (ext = '.groupproj') then
   begin
     FLoadingGroup := true;
     //need this to determine when we are done loading the project group.
@@ -165,14 +209,14 @@ begin
   else
     FLoadingGroup := false;
 
-
+  cancellationTokenSource := TCancellationTokenSourceFactory.Create;
   FLogger.Clear;
   FLogger.ShowMessageTab;
   FLogger.StartRestore;
   FLogger.StartProject(FileName);
   restoreOptions := CreateOptions(fileName);
 
-  FPackageInstaller.Restore(restoreOptions);
+  FPackageInstaller.Restore(cancellationTokenSource.Token, restoreOptions);
 
   FLogger.EndRestore;
 

@@ -121,11 +121,9 @@ contains
   DPM.Core.Utils.Process in 'Core\Utils\DPM.Core.Utils.Process.pas',
   DPM.Core.Utils.Directory in 'Core\Utils\DPM.Core.Utils.Directory.pas',
   DPM.Core.Package.SearchResults in 'Core\Package\DPM.Core.Package.SearchResults.pas',
-  DPM.Core.Imports.WinHttp in 'Core\Imports\DPM.Core.Imports.WinHttp.pas',
-  DPM.Core.Http in 'Core\Http\DPM.Core.Http.pas',
-  DPM.Core.Http.WinHttpClient in 'Core\Http\DPM.Core.Http.WinHttpClient.pas',
-  DPM.Core.Http.Request in 'Core\Http\DPM.Core.Http.Request.pas',
-  DPM.Core.Http.Response in 'Core\Http\DPM.Core.Http.Response.pas';
+  DPM.Core.Repository.BaseGithub in 'Core\Repository\DPM.Core.Repository.BaseGithub.pas',
+  DPM.Core.Utils.Enum in 'Core\Utils\DPM.Core.Utils.Enum.pas',
+  DPM.Core.Repository.Base in 'Core\Repository\DPM.Core.Repository.Base.pas';
 
 end.
 

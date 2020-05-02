@@ -232,7 +232,7 @@ begin
   result := false;
   if not options.Version.IsEmpty then
     //sourceName will be empty if we are installing the package from a file
-    packageIdentity := TPackageIdentity.Create(options.PackageId, '', options.Version, options.CompilerVersion, platform)
+    packageIdentity := TPackageIdentity.Create(options.PackageId, '', options.Version, options.CompilerVersion, platform, '')
   else
   begin
     //no version specified, so we need to get the latest version available;
@@ -285,7 +285,7 @@ begin
   //if the user specified a version, either the on the command line or via a file then we will use that
   if not options.Version.IsEmpty then
     //sourceName will be empty if we are installing the package from a file
-    packageIdentity := TPackageIdentity.Create(options.PackageId, '', options.Version, options.CompilerVersion, platform)
+    packageIdentity := TPackageIdentity.Create(options.PackageId, '', options.Version, options.CompilerVersion, platform, '')
   else
   begin
     //no version specified, so we need to get the latest version available;
@@ -354,7 +354,7 @@ begin
     TEnumerable.Select<IPackageReference, IPackageIdentity>(packageReferences,
     function(const packageReference : IPackageReference) : IPackageIdentity
     begin
-      result := TPackageIdentity.Create(packageReference.Id,'', packageReference.Version, options.CompilerVersion, platform);
+      result := TPackageIdentity.Create(packageReference.Id,'', packageReference.Version, options.CompilerVersion, platform, '');
     end));
 
   projectPackageInfos := TCollections.CreateList<IPackageInfo>;
@@ -461,7 +461,7 @@ begin
   packageIdentities.AddRange(TEnumerable.Select<IPackageReference, IPackageIdentity>(packageReferences,
     function(const packageReference : IPackageReference) : IPackageIdentity
     begin
-      result := TPackageIdentity.Create(packageReference.Id,'', packageReference.Version, options.CompilerVersion, platform);
+      result := TPackageIdentity.Create(packageReference.Id,'', packageReference.Version, options.CompilerVersion, platform, '');
     end));
 
 

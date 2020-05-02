@@ -30,6 +30,7 @@ interface
 
 uses
   Spring.Container,
+  DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Repository.Interfaces;
@@ -40,7 +41,7 @@ type
     FContainer : TContainer;
     FLogger   : ILogger;
   protected
-      function CreateRepository(const repoType : string) : IPackageRepository;
+    function CreateRepository(const repoType : TSourceType) : IPackageRepository;
   public
     constructor Create(const container : TContainer; const logger : ILogger);
   end;
@@ -50,6 +51,7 @@ implementation
 uses
   System.SysUtils,
   System.StrUtils,
+  DPM.Core.Utils.Enum,
   VSoft.Uri;
 
 { TPackageRepositoryFactory }
@@ -60,9 +62,9 @@ begin
   FLogger := logger;
 end;
 
-function TPackageRepositoryFactory.CreateRepository(const repoType : string): IPackageRepository;
+function TPackageRepositoryFactory.CreateRepository(const repoType : TSourceType): IPackageRepository;
 begin
-  result := FContainer.Resolve<IPackageRepository>(repoType);
+  result := FContainer.Resolve<IPackageRepository>(TEnumUtils.EnumToString<TSourceType>(repoType));
 end;
 
 end.

@@ -38,7 +38,8 @@ uses
   DPM.Core.Options.Search,
   DPM.Core.Package.Interfaces,
   DPM.Core.Configuration.Interfaces,
-  DPM.Core.Repository.Interfaces;
+  DPM.Core.Repository.Interfaces,
+  DPM.Core.Repository.Base;
 
   //TODO : makes this work for structured folders too
   //eg : \Vsoft.AntPattterns\Win32
@@ -46,13 +47,8 @@ uses
   // see https://docs.microsoft.com/en-au/nuget/reference/cli-reference/cli-ref-add
 
 type
-  TDirectoryPackageRepository = class(TInterfacedObject, IPackageRepository)
+  TDirectoryPackageRepository = class(TBaseRepository, IPackageRepository)
   private
-    FLogger : ILogger;
-    FIsLocal: Boolean;
-    FIsRemote: Boolean;
-    FName: string;
-    FSource: string;
     FPermissionsChecked : boolean;
     FIsWritable : boolean;
   protected
@@ -60,14 +56,9 @@ type
     function DoExactSearch(const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const version : string) : IList<string>;
 
 
-    procedure Init(const source : ISourceConfig; const isRemote : boolean);
-    function GetIsLocal: Boolean;
-    function GetIsRemote: Boolean;
-    function GetName: string;
-    function GetSource: string;
+
 
     function Search(const cancellationToken : ICancellationToken; const options : TSearchOptions): IList<IPackageIdentity>;overload;
-    function Search(const cancellationToken : ICancellationToken; const id : string; const range : TVersionRange) :  IList<IPackageIdentity>;overload;
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageMetadata : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
 
 //    function DoGetPackageMetaData(const packageIdentity : IPackageIdentity; const platform : TDPMPlatform) : IPackageMetadata;
@@ -82,7 +73,7 @@ type
     function GetPackageInfo(const cancellationToken : ICancellationToken; const fileName : string) : IPackageInfo; overload;
 
   public
-    constructor Create(const logger : ILogger);
+    constructor Create(const logger : ILogger);override;
   end;
 
 implementation
@@ -131,7 +122,7 @@ end;
 
 constructor TDirectoryPackageRepository.Create(const logger: ILogger);
 begin
-  FLogger := logger;
+  inherited Create(logger);
   FPermissionsChecked := false;
   FIsWritable := false;
 end;
@@ -142,10 +133,10 @@ var
   destFile : string;
 begin
   result := false;
-  sourceFile := IncludeTrailingPathDelimiter(FSource) + packageMetadata.ToString + cPackageFileExt;
+  sourceFile := IncludeTrailingPathDelimiter(Source) + packageMetadata.ToString + cPackageFileExt;
   if not FileExists(sourceFile) then
   begin
-    FLogger.Error('File not found in repository [' + sourceFile + ']');
+    Logger.Error('File not found in repository [' + sourceFile + ']');
     exit;
   end;
   destFile := IncludeTrailingPathDelimiter(localFolder) + packageMetadata.ToString + cPackageFileExt;
@@ -159,24 +150,9 @@ begin
   except
     on e : Exception do
     begin
-      FLogger.Error('Error downloading  [' + sourceFile + '] to [' + destFile + ']');
+      Logger.Error('Error downloading  [' + sourceFile + '] to [' + destFile + ']');
     end;
   end;
-end;
-
-function TDirectoryPackageRepository.GetIsLocal: Boolean;
-begin
-  result := FIsLocal;
-end;
-
-function TDirectoryPackageRepository.GetIsRemote: Boolean;
-begin
-  result := FIsRemote;
-end;
-
-function TDirectoryPackageRepository.GetName: string;
-begin
-  result := FName;
 end;
 //
 //function TDirectoryPackageRepository.GetPackageMetaData(const packageIdentity : IPackageIdentity): IPackageMetadata;
@@ -190,7 +166,7 @@ var
 begin
   result := nil;
   packagFileName := Format('%s-%s-%s-%s.dpkg',[ packageIdentity.Id, CompilerToString(packageIdentity.CompilerVersion),DPMPlatformToString(PackageIdentity.Platform), packageIdentity.Version.ToStringNoMeta]);
-  packagFileName := IncludeTrailingPathDelimiter(FSource) + packagFileName;
+  packagFileName := IncludeTrailingPathDelimiter(Source) + packagFileName;
   if not FileExists(packagFileName) then
     exit;
   if cancellationToken.IsCancelled then
@@ -208,7 +184,7 @@ var
   reader : IPackageSpecReader;
   extractedFile : string;
 begin
-  reader := TPackageSpecReader.Create(FLogger);
+  reader := TPackageSpecReader.Create(Logger);
 
   //first see if the spec has been extracted already.
   extractedFile := ChangeFileExt(fileName, '.dspec');
@@ -217,7 +193,7 @@ begin
     spec := reader.ReadSpec(extractedFile);
     if spec <> nil then
     begin
-      result := TPackageInfo.CreateFromSpec(FName,spec);
+      result := TPackageInfo.CreateFromSpec(Name,spec);
       exit;
     end;
 
@@ -233,7 +209,7 @@ begin
     except
       on e : Exception do
       begin
-        FLogger.Error('Error opening package file [' + fileName + ']');
+        Logger.Error('Error opening package file [' + fileName + ']');
         exit;
       end;
     end;
@@ -245,7 +221,7 @@ begin
   spec := reader.ReadSpecString(metaString);
   if spec = nil then
     exit;
-  result := TPackageInfo.CreateFromSpec(FName,spec);
+  result := TPackageInfo.CreateFromSpec(Name,spec);
   if not FPermissionsChecked then
   begin
     FIsWritable := TDirectoryUtils.IsDirectoryWriteable(ExtractFilePath(fileName));
@@ -363,23 +339,7 @@ begin
 
 end;
 
-function TDirectoryPackageRepository.GetSource: string;
-begin
-  result := FSource;
-end;
 
-procedure TDirectoryPackageRepository.Init(const source: ISourceConfig; const isRemote : boolean);
-begin
-  FName := source.Name;
-  FSource := source.Source;
-  FIsRemote := isRemote;
-  FIsLocal := not FIsRemote;
-end;
-
-function TDirectoryPackageRepository.Search(const cancellationToken : ICancellationToken; const id: string; const range : TVersionRange): IList<IPackageIdentity>;
-begin
-  result := nil;
-end;
 
 function CompilerVersionToSearchPart(const compilerVersion : TCompilerVersion) : string;
 begin
@@ -409,10 +369,17 @@ begin
   else
    searchTerm := searchTerm + '-*'  + cPackageFileExt;
 
-  files := TDirectory.GetFiles(FSource,searchTerm);
-  fileList := TCollections.CreateList<string>(files);
-  //dedupe
-  result.AddRange(TEnumerable.Distinct<string>(fileList, TStringComparer.OrdinalIgnoreCase));
+  try
+    files := TDirectory.GetFiles(Source,searchTerm);
+    fileList := TCollections.CreateList<string>(files);
+    //dedupe
+    result.AddRange(TEnumerable.Distinct<string>(fileList, TStringComparer.OrdinalIgnoreCase));
+  except
+    on e : Exception do
+    begin
+      Logger.Error('Error searching source [' + Name + '] : ' + e.Message );
+    end;
+  end;
 end;
 
 //function TDirectoryPackageRepository.DoGetPackageMetaData(const packageIdentity: IPackageIdentity; const platform: TDPMPlatform): IPackageMetadata;
@@ -426,7 +393,7 @@ end;
 //begin
 //  result := nil;
 //  packagFileName := Format('%s-%s-%s-%s.dpkg',[packageIdentity.Id, CompilerToString(packageIdentity.compilerVersion),DPMPlatformToString(platform), packageIdentity.version.ToStringNoMeta]);
-//  packagFileName := IncludeTrailingPathDelimiter(FSource) + packagFileName;
+//  packagFileName := IncludeTrailingPathDelimiter(Source) + packagFileName;
 //  if not FileExists(packagFileName) then
 //    exit;
 //  zipFile := TZipFile.Create;
@@ -437,7 +404,7 @@ end;
 //    except
 //      on e : Exception do
 //      begin
-//        FLogger.Error('Error opening package file [' + packagFileName + ']');
+//        Logger.Error('Error opening package file [' + packagFileName + ']');
 //        exit;
 //      end;
 //    end;
@@ -469,7 +436,7 @@ begin
   else
     searchTerm := searchTerm + '-' + DPMPlatformToString(platform) + '-*'  + cPackageFileExt;
 
-  files := TDirectory.GetFiles(FSource,searchTerm);
+  files := TDirectory.GetFiles(Source,searchTerm);
   fileList := TCollections.CreateList<string>(files);
   //dedupe
   result.AddRange(TEnumerable.Distinct<string>(fileList, TStringComparer.OrdinalIgnoreCase ));
@@ -560,7 +527,7 @@ begin
         if not packageVersion.IsStable then
           continue;
       //not using the trycreate here as we need a specific regex.
-      info := TPackageIdentity.Create(id, FName, packageVersion, cv, platform);
+      info := TPackageIdentity.Create(id, Name, packageVersion, cv, platform, '');
       result.Add(info);
     end;
   end;

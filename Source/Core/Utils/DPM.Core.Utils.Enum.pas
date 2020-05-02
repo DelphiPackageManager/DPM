@@ -24,57 +24,78 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.Core.Options.Sources;
+unit DPM.Core.Utils.Enum;
 
 interface
 
-uses
-  DPM.Core.Types,
-  DPM.Core.Sources.Types,
-  DPM.Core.Options.Base;
-
 type
-  TSourcesOptions = class(TOptionsBase)
-  private
-    FSubCommand : TSourcesSubCommand;
-    FName       : string;
-    FSource     : string;
-    FUserName   : string;
-    FPassword   : string;
-    FFormat     : TSourcesFormat;
-    FSourceType : TSourceType;
-    class var
-      FDefault : TSourcesOptions;
+  TEnumUtils = class
   public
-    class constructor CreateDefault;
-    class property Default : TSourcesOptions read FDefault;
-    constructor Create;override;
-
-    property Command  : TSourcesSubCommand read FSubCommand  write FSubCommand;
-    property Name     : string          read FName        write FName;
-    property Source   : string          read FSource      write FSource;
-    property SourceType : TSourceType   read FSourceType  write FSourceType;
-    property Format   : TSourcesFormat  read FFormat      write FFormat;
-    property UserName : string          read FUserName    write FUserName;
-    property Password : string          read FPassword    write FPassword;
-
-
+    class function StringToEnum<T: record>(const value : string) : T;
+    class function EnumToString<T: record>(const value : T) : string;
   end;
 
 implementation
 
-{ TSourcesOptions }
+uses
+  System.SysUtils,
+  System.TypInfo,
+  System.Math;
 
-constructor TSourcesOptions.Create;
+
+{ TEnumUtils }
+
+class function TEnumUtils.EnumToString<T>(const value: T): string;
+var
+  P: PTypeInfo;
 begin
-  inherited;
-  FSubCommand := TSourcesSubCommand.List;
-  FSourceType := TSourceType.Folder;
+  P := TypeInfo(T);
+  case P^.Kind of
+    tkEnumeration:
+      case GetTypeData(P)^.OrdType of
+        otSByte, otUByte:
+          Result := GetEnumName(P, PByte(@Value)^);
+        otSWord, otUWord:
+          Result := GetEnumName(P, PWord(@Value)^);
+        otSLong, otULong:
+          Result := GetEnumName(P, PCardinal(@Value)^);
+      end;
+    else
+      raise EArgumentException.CreateFmt('Type %s is not enumeration', [P^.Name]);
+  end;
 end;
 
-class constructor TSourcesOptions.CreateDefault;
+class function TEnumUtils.StringToEnum<T>(const value: string): T;
+var
+  P: PTypeInfo;
+  i : integer;
 begin
-  FDefault := TSourcesOptions.Create;
+  P := TypeInfo(T);
+  case P^.Kind of
+    tkEnumeration:
+    begin
+      i := GetEnumValue(P, value);
+      if InRange(i, p.TypeData.MinValue, p.TypeData.MaxValue) then
+      begin
+        case Sizeof(T) of
+          1: PByte(@Result)^ := GetEnumValue(P, value);
+          2: PWord(@Result)^ := GetEnumValue(P, value);
+          4: PCardinal(@Result)^ := GetEnumValue(P, value);
+        end;
+      end
+      else //this should probably throw!
+      begin
+        case Sizeof(T) of
+          1: PByte(@Result)^ := p.TypeData.MinValue;
+          2: PWord(@Result)^ := p.TypeData.MinValue;
+          4: PCardinal(@Result)^ := p.TypeData.MinValue;
+        end;
+      end;
+    end
+  else
+    raise EArgumentException.CreateFmt('Type %s is not enumeration', [P^.Name]);
+  end;
+
 end;
 
 end.

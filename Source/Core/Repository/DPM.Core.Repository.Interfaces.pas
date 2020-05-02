@@ -32,6 +32,7 @@ uses
   Spring.Collections,
   VSoft.Awaitable,
   DPM.Core.Types,
+  DPM.Core.Sources.Types,
   DPM.Core.Dependency.Version,
   DPM.Core.Options.Search,
   DPM.Core.Configuration.Interfaces,
@@ -50,15 +51,17 @@ type
 
   IPackageRepository = interface
   ['{0B495C12-4BDF-4C1C-9BD6-B008F0BA7F18}']
+    function GetRepositoryType : TSourceType;
     function GetName : string;
     function GetSource : string;
-    function GetIsLocal : boolean;
-    function GetIsRemote : boolean;
-    procedure Init(const source : ISourceConfig; const isRemote : boolean);
+//    function GetIsLocal : boolean;
+//    function GetIsRemote : boolean;
+    procedure Configure(const source : ISourceConfig);
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
     function Search(const cancellationToken : ICancellationToken; const options : TSearchOptions ) : IList<IPackageIdentity>;overload;
-    function Search(const cancellationToken : ICancellationToken; const id : string; const range : TVersionRange)  : IList<IPackageIdentity>;overload;
+
+
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity) : IPackageInfo;
 
 
@@ -67,14 +70,14 @@ type
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : boolean) : IList<IPackageInfo>;
 
 
-
     property Name   : string read GetName;
     property Source : string read GetSource;
+    property RepositoryType : TSourceType read GetRepositoryType;
   end;
 
   IPackageRepositoryFactory = interface
   ['{67014BE3-AA4C-45ED-A043-68262E57B89A}']
-    function CreateRepository(const repoType : string) : IPackageRepository;
+    function CreateRepository(const repoType : TSourceType) : IPackageRepository;
   end;
 
 
@@ -82,7 +85,6 @@ type
   ['{86DEB23D-7229-4F1C-949C-0A5CFB421152}']
     function Initialize( const configuration : IConfiguration) : boolean;
     function Search(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IPackageSearchResult;overload;
-    function Search(const cancellationToken : ICancellationToken; const id : string; const range : TVersionRange) : IPackageSearchResult;overload;
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity) : IPackageInfo;
     function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform;const versionRange : TVersionRange) : IList<IPackageInfo>;

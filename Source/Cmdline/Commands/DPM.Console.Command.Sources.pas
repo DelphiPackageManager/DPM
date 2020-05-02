@@ -53,6 +53,8 @@ implementation
 
 uses
   System.SysUtils,
+  VSoft.Uri,
+  DPM.Core.Types,
   DPM.Core.Options.Common,
   DPM.Core.Options.Sources,
   DPM.Core.Sources.Types;
@@ -70,6 +72,8 @@ function TSourcesCommand.Execute(const cancellationToken : ICancellationToken) :
 var
   bResult : boolean;
   newConfig : IConfiguration;
+  uri : IUri;
+  sUriError : string;
 begin
   TSourcesOptions.Default.ApplyCommon(TCommonOptions.Default);
 
@@ -110,6 +114,28 @@ begin
         result := TExitCode.MissingArg;
         exit;
       end;
+      if not TUriFactory.TryParseWithError(TSourcesOptions.Default.Source, false, uri, sUriError) then
+      begin
+        Logger.Error('Source uri is not valid : ' + sUriError);
+        result := TExitCode.InvalidArguments;
+        exit;
+      end;
+
+      //this logic is not quite all there.. more testing required.
+      if (uri.Scheme = 'file') and (TSourcesOptions.Default.SourceType <> TSourceType.Folder)  then
+      begin
+        Logger.Error('Source uri is not valid for folder source');
+        result := TExitCode.InvalidArguments;
+        exit;
+      end
+      else if uri.Scheme <> 'file' then
+      begin
+        if (uri.Scheme = 'http') or (uri.Scheme = 'https') then
+        begin
+           TSourcesOptions.Default.SourceType := TSourceType.DPMServer;
+        end;
+      end;
+
       bResult := FSourcesManager.AddSource(TSourcesOptions.Default);
     end;
     TSourcesSubCommand.Remove : bResult := FSourcesManager.RemoveSource(TSourcesOptions.Default);

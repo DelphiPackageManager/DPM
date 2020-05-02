@@ -24,57 +24,84 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.Core.Options.Sources;
+unit DPM.Core.Repository.Base;
 
 interface
 
 uses
+  Generics.Defaults,
+  VSoft.Awaitable,
+  Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Sources.Types,
-  DPM.Core.Options.Base;
+  DPM.Core.Dependency.Version,
+  DPM.Core.Logging,
+  DPM.Core.Options.Search,
+  DPM.Core.Package.Interfaces,
+  DPM.Core.Configuration.Interfaces,
+  DPM.Core.Repository.Interfaces;
 
 type
-  TSourcesOptions = class(TOptionsBase)
+  TBaseRepository = class(TInterfacedObject)
   private
-    FSubCommand : TSourcesSubCommand;
-    FName       : string;
-    FSource     : string;
-    FUserName   : string;
-    FPassword   : string;
-    FFormat     : TSourcesFormat;
-    FSourceType : TSourceType;
-    class var
-      FDefault : TSourcesOptions;
+    FLogger : ILogger;
+    FName     : string;
+    FSource   : string;
+    FUserName : string;
+    FPassword : string;
+    FRepositoryType : TSourceType;
+  protected
+    //IPackageRepository;
+    function GetRepositoryType : TSourceType;
+    function GetName : string;
+    function GetSource : string;
+    procedure Configure(const source: ISourceConfig);virtual;
+
+    //exposing these for descendants
+    property Logger : ILogger read FLogger;
+
+    property Name   : string read FName;
+    property Source : string read FSource;
+    property UserName : string read FUserName;
+    property Password : string read FPassword;
+
+    property RepositoryType : TSourceType read GetRepositoryType;
   public
-    class constructor CreateDefault;
-    class property Default : TSourcesOptions read FDefault;
-    constructor Create;override;
-
-    property Command  : TSourcesSubCommand read FSubCommand  write FSubCommand;
-    property Name     : string          read FName        write FName;
-    property Source   : string          read FSource      write FSource;
-    property SourceType : TSourceType   read FSourceType  write FSourceType;
-    property Format   : TSourcesFormat  read FFormat      write FFormat;
-    property UserName : string          read FUserName    write FUserName;
-    property Password : string          read FPassword    write FPassword;
-
+    constructor Create(const logger : ILogger);virtual;
 
   end;
 
 implementation
 
-{ TSourcesOptions }
+{ TBaseRepository }
 
-constructor TSourcesOptions.Create;
+constructor TBaseRepository.Create(const logger: ILogger);
 begin
-  inherited;
-  FSubCommand := TSourcesSubCommand.List;
-  FSourceType := TSourceType.Folder;
+  FLogger := logger;
 end;
 
-class constructor TSourcesOptions.CreateDefault;
+function TBaseRepository.GetName: string;
 begin
-  FDefault := TSourcesOptions.Create;
+  result := FName;
+end;
+
+function TBaseRepository.GetRepositoryType: TSourceType;
+begin
+  result := FRepositoryType;
+end;
+
+function TBaseRepository.GetSource: string;
+begin
+  result := FSource;
+end;
+
+procedure TBaseRepository.Configure(const source: ISourceConfig);
+begin
+  FName := source.Name;
+  FSource := source.Source;
+  FUserName := source.UserName;
+  FPassword := source.Password;
+  FRepositoryType := source.SourceType;
 end;
 
 end.

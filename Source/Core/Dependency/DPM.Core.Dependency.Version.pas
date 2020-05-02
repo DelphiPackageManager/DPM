@@ -75,7 +75,7 @@ type
 
     //NOTE : we only allow the Patch to float for now - this is where it is enforced.
     class function GetMinFromMax(const maxVersion : TPackageVersion) : TPackageVersion;static;
-    class function GetMaxFromMin(const maxVersion : TPackageVersion) : TPackageVersion;static;
+    class function GetMaxFromMin(const minVersion : TPackageVersion) : TPackageVersion;static;
     class function IsValidFloat(const minVersion : TPackageVersion; const  maxVersion : TPackageVersion) : boolean;static;
   public
 
@@ -154,12 +154,12 @@ begin
            (a.MaxVersion = b.MaxVersion);
 end;
 
-class function TVersionRange.GetMaxFromMin(const maxVersion: TPackageVersion): TPackageVersion;
+class function TVersionRange.GetMaxFromMin(const minVersion: TPackageVersion): TPackageVersion;
 var
   patch : Word;
 begin
   patch := High(word);
-  result := TPackageVersion.Create(maxVersion.Major, maxVersion.Minor, patch);
+  result := TPackageVersion.Create(minVersion.Major, minVersion.Minor, patch);
 end;
 
 class function TVersionRange.GetMinFromMax(const maxVersion: TPackageVersion): TPackageVersion;

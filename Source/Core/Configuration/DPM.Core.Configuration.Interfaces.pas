@@ -31,7 +31,8 @@ interface
 uses
   JsonDataObjects,
   VSoft.Uri,
-  Spring.Collections;
+  Spring.Collections,
+  DPM.Core.Types;
 
 type
   IConfigNode = interface
@@ -46,27 +47,25 @@ type
     function GetSource : string;
     function GetUserName : string;
     function GetPassword : string;
-    function GetApiKey : string;
     function GetIsEnabled : boolean;
     function GetFileName : string;
-    function GetIsHttp : boolean;
+    function GetSourceType : TSourceType;
 
     procedure SetName(const value : string);
     procedure SetSource(const value : string);
     procedure SetUserName(const value : string);
     procedure SetPassword(const value : string);
-    procedure SetApiKey(const value : string);
     procedure SetIsEnabled(const value : boolean);
+    procedure SetSourceType(const value : TSourceType);
 
 
     property Name : string read GetName write SetName;
     property Source : string read GetSource write SetSource;
     property UserName : string read GetUserName write SetUserName;
     property Password : string read GetPassword write SetPassword;
-    property ApiKey : string read GetApiKey write SetApiKey;
     property FileName : string read GetFileName;
     property IsEnabled : boolean read GetIsEnabled write SetIsEnabled;
-    property IsHttp : boolean read GetIsHttp;
+    property SourceType : TSourceType read GetSourceType write SetSourceType;
   end;
 
 
@@ -75,6 +74,7 @@ type
     function GetPackageCacheLocation : string;
     procedure SetPackageCacheLocation(const value : string);
     function GetIsDefaultPackageCacheLocation : boolean;
+    procedure AddDefaultSources;
 
     function GetSources : IList<ISourceConfig>;
     function GetFileName : string;

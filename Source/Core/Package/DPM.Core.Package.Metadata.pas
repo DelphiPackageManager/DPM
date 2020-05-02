@@ -44,17 +44,20 @@ type
     FPlatform: TDPMPlatform;
     FSourceName: string;
     FVersion: TPackageVersion;
+    FProjectUrl : string;
   protected
     function GetCompilerVersion: TCompilerVersion;
     function GetId: string;
     function GetPlatform: TDPMPlatform;
+    function GetProjectUrl: string;
+
     function GetSourceName: string;
     function GetVersion: TPackageVersion;
     function ToIdVersionString : string;
     constructor Create(const sourceName : string; const spec : IPackageSpec);overload;virtual;
   public
     function ToString : string;override;
-    constructor Create(const id, source : string; const version : TPackageVersion; const compilerVersion: TCompilerVersion; const platform : TDPMPlatform);overload;virtual;
+    constructor Create(const id, source : string; const version : TPackageVersion; const compilerVersion: TCompilerVersion; const platform : TDPMPlatform; const projectUrl : string);overload;virtual;
     class function TryCreateFromString(const logger : ILogger; const value : string; const source : string; out packageIdentity : IPackageIdentity) : boolean;
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageIdentity;
   end;
@@ -78,7 +81,6 @@ type
     FIsCommercial: Boolean;
     FIsTrial: Boolean;
     FLicense: string;
-    FProjectUrl: string;
     FTags: string;
     FSearchPaths : IList<IPackageSearchPath>;
   protected
@@ -89,7 +91,6 @@ type
     function GetIsCommercial: Boolean;
     function GetIsTrial: Boolean;
     function GetLicense: string;
-    function GetProjectUrl: string;
     function GetTags: string;
     function GetSearchPaths: IList<IPackageSearchPath>;
     constructor Create(const sourceName : string; const spec : IPackageSpec);reintroduce;
@@ -136,7 +137,7 @@ uses
 
 { TPackageMetadata }
 
-constructor TPackageIdentity.Create(const id, source : string; const version : TPackageVersion; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform);
+constructor TPackageIdentity.Create(const id, source : string; const version : TPackageVersion; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const projectUrl : string);
 begin
   FId := id;
   FVersion := version;
@@ -172,6 +173,11 @@ end;
 function TPackageIdentity.GetPlatform: TDPMPlatform;
 begin
   result := FPlatform;
+end;
+
+function TPackageIdentity.GetProjectUrl: string;
+begin
+  result := FProjectUrl;
 end;
 
 function TPackageIdentity.GetSourceName: string;
@@ -229,7 +235,7 @@ begin
    end;
 
    //we dont' have a source.
-   packageIdentity := TPackageIdentity.Create(id, '', packageVersion, cv, platform);
+   packageIdentity := TPackageIdentity.Create(id, '', packageVersion, cv, platform, '');
    result := true;
 
 
@@ -359,10 +365,6 @@ begin
   result := FLicense;
 end;
 
-function TPackageMetadata.GetProjectUrl: string;
-begin
-  result := FProjectUrl;
-end;
 
 function TPackageMetadata.GetSearchPaths: IList<IPackageSearchPath>;
 begin
@@ -413,7 +415,7 @@ begin
      exit;
    end;
    //we dont' have a source.
-   identity := TPackageIdentity.Create(id, '', packageVersion, cv, platform);
+   identity := TPackageIdentity.Create(id, '', packageVersion, cv, platform, '');
    result := true;
 end;
 

@@ -72,7 +72,7 @@ begin
   //TODO : pull in VSoft.SemanticVersion as a package once we are bootstrapped.
   //TODO : pull in VSoft.CommmandLine as a package once we are bootstrapped.
   //TODO : pull in VSoft.AntPatterns as a package once we are bootstrapped.
-  CoInitialize(nil); //needed for msxml
+  CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml
   try
     System.ExitCode := Ord(TDPMConsoleApplication.Run);
     {$IFDEF DEBUG}

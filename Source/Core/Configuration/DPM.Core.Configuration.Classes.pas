@@ -32,6 +32,7 @@ uses
   JsonDataObjects,
   Spring.Cryptography,
   DPM.Core.Types,
+  DPM.Core.Sources.Types,
   DPM.Core.Logging,
   DPM.Core.Configuration.Interfaces,
   Spring.Collections;
@@ -40,7 +41,6 @@ type
 
   TSourceConfig = class(TInterfacedObject, ISourceConfig)
   private
-    FApiKey: string;
     FEnabled: Boolean;
     FFileName: string;
     FName: string;
@@ -49,8 +49,8 @@ type
     FSource : string;
     FLogger : ILogger;
     FCrypt  : ISymmetricAlgorithm;
+    FSourceType : TSourceType;
   protected
-    function GetApiKey: string;
     function GetIsEnabled: Boolean;
     function GetFileName: string;
     function GetName: string;
@@ -58,21 +58,24 @@ type
     function GetUserName: string;
     function GetSource: string;
     function GetIsHttp: Boolean;
+    function GetSourceType: TSourceType;
     //TODO : Move these to a utils class
     function EncryptString(const value : string) : string;
     function DecryptString(const value : string) : string;
     function CreateCrypt : ISymmetricAlgorithm;
-    procedure SetApiKey(const value: string);
     procedure SetIsEnabled(const value: Boolean);
     procedure SetName(const value: string);
     procedure SetPassword(const value: string);
     procedure SetUserName(const value: string);
     procedure SetSource(const value: string);
+    procedure SetSourceType(const value: TSourceType);
+
 
     function LoadFromJson(const jsonObj : TJsonObject) : boolean;
     function SaveToJson(const parentObj : TJsonObject) : boolean;
   public
-    constructor Create(const logger: ILogger);
+    constructor Create(const logger: ILogger);overload;
+    constructor Create(const name : string; const source : string; const sourceType : TSourceType; const userName : string; const password : string; const enabled : boolean);overload;
   end;
 
   TConfiguration = class(TInterfacedObject, IConfiguration,IConfigurationLoadSave)
@@ -88,6 +91,7 @@ type
     function GetSources: IList<ISourceConfig>;
     procedure SetPackageCacheLocation(const value : string);
     function GetIsDefaultPackageCacheLocation: Boolean;
+    procedure AddDefaultSources;
 
     function LoadFromFile(const fileName : string) : boolean;
     function SaveToFile(const fileName : string) : boolean;
@@ -107,7 +111,9 @@ uses
   Spring.Cryptography.DES,
   DPM.Core.Constants,
   DPM.Core.Utils.System,
-  DPM.Core.Utils.Strings;
+  DPM.Core.Utils.Strings,
+  DPM.Core.Utils.Enum,
+  VSoft.Uri;
 
 { TSourceConfig }
 
@@ -117,12 +123,23 @@ begin
   FLogger := logger;
   FEnabled := true;
   FCrypt := CreateCrypt;
+  FSourceType := TSourceType.Folder;
 end;
 
 //NOTE : DO NOT CHANGE THIS KEY - YOU WILL BREAK THINGS FOR EXISTING SOURCES!
 const
   key: array[0..23] of Byte = ($11, $03, $45, $6, $8A, $8B, $DD, $EF, $EE,
     $0C, $1A, $38, $26, $41, $32, $A0, $89, $AB, $CD, $EF, $01, $23, $45, $67);
+
+constructor TSourceConfig.Create(const name, source: string; const sourceType: TSourceType; const userName, password: string; const enabled : boolean);
+begin
+  FName := name;
+  FSource := source;
+  FSourceType := sourceType;
+  FUserName := userName;
+  FPassword := password;
+  FEnabled := enabled;
+end;
 
 function TSourceConfig.CreateCrypt: ISymmetricAlgorithm;
 begin
@@ -152,10 +169,6 @@ begin
   result := output.ToHexString;
 end;
 
-function TSourceConfig.GetApiKey: string;
-begin
-  result := FApiKey;
-end;
 
 function TSourceConfig.GetIsEnabled: Boolean;
 begin
@@ -192,20 +205,55 @@ begin
   result := FSource;
 end;
 
+function TSourceConfig.GetSourceType: TSourceType;
+begin
+  result := FSourceType;
+end;
+
 function TSourceConfig.LoadFromJson(const jsonObj: TJsonObject): boolean;
+var
+  srcType : string;
+  uri : IUri;
 begin
   result := true;
-  FName     := jsonObj['name'];
-  FSource   := jsonObj['source'];
-  FUserName := jsonObj['userName'];
-  FPassword := jsonObj['password'];
+  FName     := jsonObj.S['name'];
+  FSource   := jsonObj.S['source'];
+  FUserName := jsonObj.S['userName'];
+  FPassword := jsonObj.S['password'];
+  srcType   := jsonObj.S['type'];
+
   if FPassword <> '' then
     FPassword := DecryptString(FPassword);
-  FApiKey   := jsonObj['apiKey'];
-  if FApiKey <> '' then
-    FApiKey := DecryptString(FApiKey);
+
   if jsonObj.Contains('enabled') then
     FEnabled := jsonObj.B['enabled'];
+
+
+
+  if srcType <> '' then
+    FSourceType :=  TEnumUtils.StringtoEnum<TSourceType>(srcType)
+  else
+    FSourceType := TSourceType.Folder;
+
+  //source type was added later so we can differenciate between
+  //remote source types like github and https servers
+
+  if FSourceType = TSourceType.Folder then
+  begin
+    //it might not have been set before, so we need to figure it out.
+    if TUriFactory.TryParse(FSource, false, uri) then
+    begin
+      if uri.Scheme <> 'file' then
+      begin
+        if (uri.Scheme = 'http') or (uri.Scheme = 'https') then
+        begin
+            FSourceType := TSourceType.DPMServer;
+        end;
+      end;
+    end;
+  end;
+
+
 end;
 
 function TSourceConfig.SaveToJson(const parentObj: TJsonObject): boolean;
@@ -213,26 +261,21 @@ var
   sourceObj : TJsonObject;
 begin
   sourceObj := parentObj.A['packageSources'].AddObject;
-  sourceObj['name'] := FName;
-  sourceObj['source'] := FSource;
+  sourceObj.S['name'] := FName;
+  sourceObj.S['source'] := FSource;
   if FUserName <> '' then
-    sourceObj['userName'] :=  FUserName;
+    sourceObj.S['userName'] :=  FUserName;
 
+  sourceObj.S['type'] := TEnumUtils.EnumToString<TSourceType>(FSourceType);
 
   if FPassword <> '' then
-    sourceObj['password'] := EncryptString(FPassword);
-  if FApiKey <> '' then
-    sourceObj['apiKey'] := EncryptString(FApiKey);
+    sourceObj.S['password'] := EncryptString(FPassword);
 
   sourceObj.B['enabled'] := FEnabled;
   result := true;
 end;
 
 
-procedure TSourceConfig.SetApiKey(const value: string);
-begin
-  FApiKey := value;
-end;
 
 procedure TSourceConfig.SetIsEnabled(const value: Boolean);
 begin
@@ -259,7 +302,16 @@ begin
   FSource := value;
 end;
 
+procedure TSourceConfig.SetSourceType(const value: TSourceType);
+begin
+  FSourceType := value;
+end;
+
 { TConfiguration }
+
+procedure TConfiguration.AddDefaultSources;
+begin
+end;
 
 constructor TConfiguration.Create(const logger: ILogger);
 begin

@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{CFBF7204-5639-4643-B895-08DDF96E0F8F}</ProjectGuid>
         <MainSource>dpm.dpr</MainSource>
@@ -9,6 +9,12 @@
         <FrameworkType>None</FrameworkType>
         <ProjectVersion>16.1</ProjectVersion>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
+    </PropertyGroup>
+    <PropertyGroup>
+        <DPMCompiler>XE7</DPMCompiler>
+        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
+        <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.AntPatterns\0.0.3\src;$(DPM)\VSoft.SemanticVersion\0.0.1\src;$(DPM)\VSoft.Uri\0.0.1\src;$(DPM)\Ahausladen.JsonDataObjects\0.0.1\src;$(DPM)\VSoft.Awaitable\0.1.0\src;$(DPM)\Spring4D.Base\2.0.0-alpha.2\src;$(DPM)\Spring4D.Base\2.0.0-alpha.2\src\Base;$(DPM)\Spring4D.Base\2.0.0-alpha.2\src\Base\Collections;$(DPM)\Spring4D.Base\2.0.0-alpha.2\src\Base\Logging;$(DPM)\Spring4D.Base\2.0.0-alpha.2\src\Base\Patches;$(DPM)\Spring4D.Base\2.0.0-alpha.2\src\Base\Patterns;$(DPM)\Spring4D.Core\2.0.0-alpha.2\src;$(DPM)\Spring4D.Core\2.0.0-alpha.2\src\Core\Container;$(DPM)\Spring4D.Core\2.0.0-alpha.2\src\Core\Interception;$(DPM)\Spring4D.Core\2.0.0-alpha.2\src\Core\Logging;$(DPM)\Spring4D.Core\2.0.0-alpha.2\src\Core\Mocking;$(DPM)\Spring4D.Core\2.0.0-alpha.2\src\Core\Services;$(DPM)\Spring4D.Extensions\2.0.0-alpha.2\src;$(DPM)\Spring4D.Extensions\2.0.0-alpha.2\src\Extensions;$(DPM)\Spring4D.Extensions\2.0.0-alpha.2\src\Extensions\Cryptography;$(DPM)\Spring4D.Extensions\2.0.0-alpha.2\src\Extensions\Utils;$(DPM)\VSoft.CommandLine\0.0.1\src;$(DPM)\VSoft.HttpClient\0.0.1\src;$(DPM)\Gabr42.OmniThreadLibrary\3.7.7\src;$(DPM)\Gabr42.OmniThreadLibrary\3.7.7\src\src;$(DPM)\VSoft.CancellationToken\0.0.1\src;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -67,7 +73,6 @@
         <VerInfo_Release>2</VerInfo_Release>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_MajorVer>0</VerInfo_MajorVer>
-        <DCC_UnitSearchPath>Libs\Spring4D\Source;Libs\Spring4D\Source\Base;Libs\Spring4D\Source\Base\Logging;Libs\Spring4D\Source\Base\Collections;Libs\Spring4D\Source\Base\Patterns;Libs\Spring4D\Source\Core\Interception;Libs\Spring4D\Source\Core\Container;Libs\Spring4D\Source\Core\Services;Libs\Spring4D\Source\Extensions\Cryptography;Libs\Spring4D\Source\Extensions\Utils;Libs\VSoft.CommandLineParser\src;Libs\VSoft.SemanticVersion\source;Libs\VSoft.AntPatterns\source;Libs\VSoft.Uri\src;Libs\JsonDataObjects\Source;Libs\OmniThreadLibrary;Libs\OmniThreadLibrary\src;Libs\VSoft.Awaitable\Source;Core;Core\Cache;Core\Configuration;Core\Dependency;Core\Logging;Core\Options;Core\Package;Core\Packaging;Core\Project;Core\Repository;Core\Sources;Core\Spec;Core\Utils;Core\Xml;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <DCC_ExeOutput>..\Output</DCC_ExeOutput>
         <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
         <DCC_N>false</DCC_N>
@@ -80,6 +85,7 @@
         <DCC_ImageBase>00400000</DCC_ImageBase>
         <DCC_F>false</DCC_F>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=0.0.2.0;InternalName=;LegalCopyright=© 2019 Vincent Parrett and Contributors;LegalTrademarks=;OriginalFilename=dpm.exe;ProductName=DPM;ProductVersion=0.1.0.0;Comments=0.1.0-aplha2;CFBundleName=</VerInfo_Keys>
+        <DCC_UnitSearchPath>$(DPMSearch);Core;Core\Cache;Core\Configuration;Core\Dependency;Core\Logging;Core\Options;Core\Package;Core\Packaging;Core\Project;Core\Repository;Core\Sources;Core\Spec;Core\Utils;Core\Xml;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <DCC_UsePackage>rtl;$(DCC_UsePackage)</DCC_UsePackage>
@@ -95,8 +101,10 @@
         <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
-        <VerInfo_Release>1</VerInfo_Release>
-        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=0.1.1.0;InternalName=;LegalCopyright=© 2019 Vincent Parrett and Contributors;LegalTrademarks=;OriginalFilename=dpm.exe;ProductName=DPM;ProductVersion=0.1.0.0;Comments=0.1.1-aplha;CFBundleName=</VerInfo_Keys>
+        <Debugger_CWD>I:\Github\VSoftTechnologies\Indy</Debugger_CWD>
+        <Debugger_RunParams>pack Indy.System.dspec -o=i:\dpmfeed</Debugger_RunParams>
+        <Debugger_HostApplication>I:\Github\DelphiPackageManager\DPM\Output\dpm.exe</Debugger_HostApplication>
+        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=0.1.2.0;InternalName=;LegalCopyright=© 2019 Vincent Parrett and Contributors;LegalTrademarks=;OriginalFilename=dpm.exe;ProductName=DPM;ProductVersion=0.1.2.0;Comments=0.1.2-aplha;CFBundleName=</VerInfo_Keys>
         <VerInfo_MinorVer>1</VerInfo_MinorVer>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
@@ -112,8 +120,8 @@
         <BT_BuildType>Debug</BT_BuildType>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <Debugger_CWD>I:\Github\VSoftTechnologies\Delphi-Mocks</Debugger_CWD>
-        <Debugger_RunParams>pack Delphi.Mocks.dspec -o=i:\dpmfeed</Debugger_RunParams>
+        <Debugger_CWD>I:\Github\DelphiPackageManager\DPM\Source</Debugger_CWD>
+        <Debugger_RunParams>list -take=10 -source=DPMGithub</Debugger_RunParams>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
         <Debugger_RunParams>pack I:\Github\VSoftTechnologies\VSoft.AntPatterns\VSoft.AntPatterns.dspec -OutputFolder=c:\temp -basepath=. -minclientversion=1.0</Debugger_RunParams>
@@ -513,20 +521,16 @@
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>
-            <packages targetPlatform="DelphiXE7.1.Win32">
-                <package id="Spring4D.Base" version="1.0.0"/>
-                <package id="Spring4D.Core" version="1.0.0"/>
-                <package id="Spring4D.Extensions" version="1.0.0"/>
-                <package id="VSoft.Commandline" version="1.0.0"/>
-                <package id="DPM.Core" version="0.0.1-Beta"/>
-            </packages>
-            <packages targetPlatform="DelphiXE7.1.Win64">
-                <package id="Spring4D.Base" version="1.0.0"/>
-                <package id="Spring4D.Core" version="1.0.0"/>
-                <package id="Spring4D.Extensions" version="1.0.0"/>
-                <package id="VSoft.Commandline" version="1.0.0"/>
-                <package id="DPM.Core" version="0.0.1-Beta"/>
-            </packages>
+            <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.0.3"/>
+            <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.0.1"/>
+            <PackageReference id="VSoft.Uri" platform="Win32" version="0.0.1"/>
+            <PackageReference id="Ahausladen.JsonDataObjects" platform="Win32" version="0.0.1"/>
+            <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.1.0"/>
+            <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-alpha.2"/>
+            <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.0-alpha.2"/>
+            <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.0-alpha.2"/>
+            <PackageReference id="VSoft.CommandLine" platform="Win32" version="0.0.1"/>
+            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.0.1"/>
         </DPM>
     </ProjectExtensions>
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>

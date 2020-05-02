@@ -485,13 +485,22 @@ begin
     end);
    option.AllowMultiple := true;
 
+  option := cmd.RegisterOption<string>('compiler','c', 'The compiler version to resore.',
+   procedure(const value : string)
+    begin
+      TRestoreOptions.Default.CompilerVersion := StringToCompilerVersion(value);
+      if TRestoreOptions.Default.CompilerVersion = TCompilerVersion.UnknownVersion then
+        raise EArgumentException.Create('Invalid compiler version : ' + value);
+    end);
 
-  cmd.Examples.Add('resore .\MyProject.dproj');
-  cmd.Examples.Add('resore c:\Projects\MyProject.dproj -source=local');
-  cmd.Examples.Add('resore c:\Projects -source=local');
-  cmd.Examples.Add('resore c:\Projects\AllProjects.groupproj -source=local');
 
-  cmd.Examples.Add('resore c:\Projects\AllProjects.groupproj -configFile=.\dev.dpm.config');
+
+  cmd.Examples.Add('restore .\MyProject.dproj');
+  cmd.Examples.Add('restore c:\Projects\MyProject.dproj -source=local');
+  cmd.Examples.Add('restore c:\Projects -source=local');
+  cmd.Examples.Add('restore c:\Projects\AllProjects.groupproj -source=local');
+
+  cmd.Examples.Add('restore c:\Projects\AllProjects.groupproj -configFile=.\dev.dpm.config');
 
 end;
 
@@ -526,7 +535,7 @@ var
 begin
   cmd := TOptionsRegistry.RegisterCommand('sources', '', 'Provides the ability to manage list of sources located in %AppData%\DPM\DPM.config',
                                                       '',
-                                                      'sources <List|Add|Remove|Enable|Disable|Update> -Name [name] -Source [source]');
+                                                      'sources <List|Add|Remove|Enable|Disable|Update> -Name [name] -Source [source] -type <Folder|DMPServer|GitHubDPM|GitHubDN>');
   option := cmd.RegisterUnNamedOption<TSourcesSubCommand>('<List|Add|Remove|Enable|Disable|Update>','operation',
     procedure(const value : TSourcesSubCommand)
     begin
@@ -535,31 +544,38 @@ begin
 //  option.Required := true;
   option.HasValue := false;
 
-  option := cmd.RegisterOption<string>('name','n','The source Name.',
+  cmd.RegisterOption<string>('name','n','The source Name.',
     procedure(const value : string)
     begin
       TSourcesOptions.Default.Name := value;
     end);
 
-  option := cmd.RegisterOption<string>('source','s','The source.',
+  cmd.RegisterOption<string>('source','s','The source.',
     procedure(const value : string)
     begin
       TSourcesOptions.Default.Source := value;
     end);
 
-  option := cmd.RegisterOption<TSourcesFormat>('format','f','Applies to the list action. Accepts two values: Detailed (the default) and Short.',
+  cmd.RegisterOption<TSourceType>('type','t','The source type',
+    procedure(const value : TSourceType)
+    begin
+      TSourcesOptions.Default.SourceType := value;
+    end);
+
+
+  cmd.RegisterOption<TSourcesFormat>('format','f','Applies to the list action. Accepts two values: Detailed (the default) and Short.',
     procedure(const value : TSourcesFormat)
     begin
       TSourcesOptions.Default.Format := value;
     end);
 
-  option := cmd.RegisterOption<string>('userName','u','Specifies the user name for authenticating with the source.',
+  cmd.RegisterOption<string>('userName','u','Specifies the user name for authenticating with the source.',
     procedure(const value : string)
     begin
       TSourcesOptions.Default.UserName := value;
     end);
 
-  option := cmd.RegisterOption<string>('password','p',' Specifies the password for authenticating with the source.',
+  cmd.RegisterOption<string>('password','p',' Specifies the password for authenticating with the source.',
     procedure(const value : string)
     begin
       TSourcesOptions.Default.Password := value;

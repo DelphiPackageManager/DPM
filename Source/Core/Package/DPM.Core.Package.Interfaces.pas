@@ -49,6 +49,7 @@ type
     function GetSourceName : string;
     function GetCompilerVersion : TCompilerVersion;
     function GetPlatform : TDPMPlatform;
+    function GetProjectUrl    : string;
     function ToString : string;
     function ToIdVersionString : string;
     property Id : string read GetId;
@@ -56,6 +57,9 @@ type
     property SourceName : string read GetSourceName;
     property CompilerVersion : TCompilerVersion read GetCompilerVersion;
     property Platform : TDPMPlatform read GetPlatform;
+    //note : we can't get the project url from the filename
+    //but we need it here for github based repos
+    property ProjectUrl   : string  read GetProjectUrl;
   end;
 
   IPackageDependency = interface
@@ -93,7 +97,6 @@ type
   ['{0C39A81D-63FF-4939-A74A-4BFE29724168}']
     function GetDescription   : string;
     function GetAuthors       : string;
-    function GetProjectUrl    : string;
     function GetLicense       : string;
     function GetIcon          : string;
     function GetCopyright     : string;
@@ -104,7 +107,6 @@ type
 
     property Description  : string  read GetDescription;
     property Authors      : string  read GetAuthors;
-    property ProjectUrl   : string  read GetProjectUrl;
     property License      : string  read GetLicense;
     property Icon         : string  read GetIcon;
     property Copyright    : string  read GetCopyright;

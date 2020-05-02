@@ -99,6 +99,7 @@ type
     property ProjectUrl   : string          read GetProjectUrl    write SetProjectUrl;
     property License      : string          read GetLicense       write SetLicense;
     property Icon         : string          read GetIcon          write SetIcon;
+    //TODO : Add IconUrl
     property Copyright    : string          read GetCopyright     write SetCopyright;
     property Tags         : string          read GetTags          write SetTags;
     property IsTrial      : boolean         read GetIsTrial      write SetIsTrial;

@@ -31,6 +31,7 @@ interface
 
 uses
   ToolsApi,
+  DPM.Core.Types,
   DPM.Core.Logging;
 
 type
@@ -48,13 +49,17 @@ type
   private
     FMessageServices : IOTAMessageServices;
     FMessageGroup : IOTAMessageGroup;
-    FLogLevel : TLogLevel;
+    FVerbosity : TVerbosity;
   protected
     procedure Debug(const data: string);
     procedure Error(const data: string);
     procedure Information(const data: string; const important: Boolean = False);
     procedure Verbose(const data: string);
     procedure Warning(const data: string);
+    function GetVerbosity : TVerbosity;
+    procedure SetVerbosity(const value : TVerbosity);
+
+
 
     procedure Clear;
     procedure ShowMessageTab;
@@ -70,6 +75,10 @@ type
 
 implementation
 
+uses
+  System.SysUtils,
+  System.Classes;
+
 { TDPMIDELogger }
 
 procedure TDPMIDELogger.Clear;
@@ -83,17 +92,28 @@ begin
   FMessageGroup := FMessageServices.AddMessageGroup('DPM');
   FMessageGroup.CanClose := false;
   FMessageGroup.AutoScroll := true;
-  FLogLevel := TLogLevel.Debug; //TODO : Need to make this configurable
+  FVerbosity := TVerbosity.Debug;//TODO : Need to make this configurable
 end;
 
 procedure TDPMIDELogger.Debug(const data: string);
 var
   lineRef : Pointer;
+  debugProc : TThreadProcedure;
 begin
-  if FLogLevel > TLogLevel.Debug then
+  if (FVerbosity < TVerbosity.Debug) then
     exit;
 
-  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
+
+  debugProc := procedure
+               begin
+                 FMessageServices.AddToolMessage('', 'DEBUG: ' + data, '',0,0,nil, lineRef, FMessageGroup)
+               end;
+
+  //FMessageServices is implemented by a vcl control, so we need to ensure it's only updated by the main thread.
+  if TThread.CurrentThread.ThreadID = MainThreadID then
+    debugProc
+  else
+    TThread.Queue(nil, debugProc);
 end;
 
 destructor TDPMIDELogger.Destroy;
@@ -119,20 +139,51 @@ end;
 procedure TDPMIDELogger.Error(const data: string);
 var
   lineRef : Pointer;
+  errorProc : TThreadProcedure;
 begin
-  //TODO : Send custom message so we can color it
-  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
+  //TODO : Send custom message so we can color it etc
+  errorProc := procedure
+               begin
+                  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
+               end;
 
+  if TThread.CurrentThread.ThreadID = MainThreadID then
+    errorProc
+  else
+    TThread.Queue(nil, errorProc);
+
+end;
+
+function TDPMIDELogger.GetVerbosity: TVerbosity;
+begin
+  result := FVerbosity;
 end;
 
 procedure TDPMIDELogger.Information(const data: string; const important: Boolean);
 var
   lineRef : Pointer;
+  infoProc : TThreadProcedure;
 begin
-  if FLogLevel > TLogLevel.Information then
+  if (FVerbosity < TVerbosity.Normal) and (not important) then
     exit;
 
-  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
+  infoProc := procedure
+               begin
+                  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
+               end;
+
+  if TThread.CurrentThread.ThreadID = MainThreadID then
+    infoProc
+  else
+    TThread.Queue(nil, infoProc);
+
+
+
+end;
+
+procedure TDPMIDELogger.SetVerbosity(const value: TVerbosity);
+begin
+  FVerbosity := value;
 end;
 
 procedure TDPMIDELogger.ShowMessageTab;
@@ -155,21 +206,38 @@ end;
 procedure TDPMIDELogger.Verbose(const data: string);
 var
   lineRef : Pointer;
+  verboseProc : TThreadProcedure;
 begin
-  if FLogLevel > TLogLevel.Verbose then
+  if (FVerbosity < TVerbosity.Detailed) then
     exit;
 
-  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
+   verboseProc := procedure
+               begin
+                  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
+               end;
+
+  if TThread.CurrentThread.ThreadID = MainThreadID then
+    verboseProc
+  else
+    TThread.Queue(nil, verboseProc);
+
 end;
 
 procedure TDPMIDELogger.Warning(const data: string);
 var
   lineRef : Pointer;
+  warningProc : TThreadProcedure;
 begin
-  if FLogLevel > TLogLevel.Warning then
-    exit;
 
-  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
+   warningProc := procedure
+               begin
+                  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
+               end;
+
+  if TThread.CurrentThread.ThreadID = MainThreadID then
+    warningProc
+  else
+    TThread.Queue(nil, warningProc);
 end;
 
 end.
