@@ -45,8 +45,8 @@ begin
   consoleWriter.WriteLine('Delphi Package Manager - Version : ' + TDPMWindowsUtils.GetVersionString);
   consoleWriter.SetColour(ccDefault);
   consoleWriter.WriteLine('© 2019 Vincent Parrett and Contributors');
-  consoleWriter.WriteLine('License - http://www.apache.org/licenses/LICENSE-2.0');
-  //consoleWriter.WriteLine('');
+  //consoleWriter.WriteLine('License - http://www.apache.org/licenses/LICENSE-2.0');
+  consoleWriter.WriteLine('');
 end;
 
 end.

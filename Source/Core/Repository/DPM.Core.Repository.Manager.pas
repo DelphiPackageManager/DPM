@@ -32,6 +32,7 @@ uses
   System.Generics.Defaults,
   Spring.Collections,
   VSoft.Awaitable,
+  Vcl.Imaging.pngimage,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
   DPM.Core.Logging,
@@ -54,9 +55,7 @@ type
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
     function GetRepositories: IList<IPackageRepository>;
     function GetRepositoryByName(const value: string): IPackageRepository;
-    function Search(const cancellationToken : ICancellationToken; const options: TSearchOptions): IPackageSearchResult;overload;
-    function Search(const cancellationToken : ICancellationToken; const id : string; const range : TVersionRange) : IPackageSearchResult;overload;
-
+    function List(const cancellationToken : ICancellationToken; const options: TSearchOptions): IList<IPackageIdentity>;
     function UpdateRepositories( const configuration : IConfiguration) : boolean;
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
@@ -64,6 +63,8 @@ type
 
     //UI specific stuff
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
+    function GetPackageIcon(const cancelToken : ICancellationToken; const source: string; const packageId: string; const packageVersion: string;
+                            const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const configuration : IConfiguration): TPngImage;
 
   public
     constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const repoFactory : IPackageRepositoryFactory);
@@ -78,8 +79,7 @@ uses
   Spring.Collections.Extensions,
   VSoft.URI,
   DPM.Core.Constants,
-  DPM.Core.Utils.System,
-  DPM.Core.Repository.SearchResult;
+  DPM.Core.Utils.System;
 
 { TRespositoryManager }
 
@@ -125,24 +125,86 @@ end;
 function TPackageRepositoryManager.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil): IList<IPackageSearchResultItem>;
 var
   config : IConfiguration;
+  repo : IPackageRepository;
+  sources : TStringList;
+  searchResult : IList<IPackageSearchResultItem>;
+  allResults : IList<IPackageSearchResultItem>;
+  distinctResults : IEnumerable<IPackageSearchResultItem>;
+  comparer : IEqualityComparer<IPackageSearchResultItem>;
 begin
   result := TCollections.CreateList<IPackageSearchResultItem>;
 
   config := configuration;
   if config = nil then
-  begin
-    if options.ConfigFile = '' then
-    begin
-      FLogger.Error('No configuration file specified');
-      exit;
-    end;
-
     config := FConfigurationManager.LoadConfig(options.ConfigFile);
-    if config = nil then
-      exit;
+  if config = nil then
+    exit;
+
+  if not UpdateRepositories(config) then
+  begin
+    FLogger.Error('Unabled to search, error loading repositories');
+    exit;
   end;
 
-  //TODO : Interate over sources.
+  if options.Sources <> '' then
+  begin
+    sources := TStringList.Create;
+    sources.Delimiter := ',';
+    sources.DelimitedText := options.Sources;
+  end
+  else
+    sources := nil;
+
+  allResults := TCollections.CreateList<IPackageSearchResultItem>;
+  try
+    for repo in FRepositories do
+    begin
+      if sources <> nil then
+      begin
+        if sources.IndexOf(repo.Name) = -1 then
+          continue;
+      end;
+      searchResult := repo.GetPackageFeed(cancelToken,options, config);
+      allResults.AddRange(searchResult);
+    end;
+  finally
+    if sources <> nil then
+      sources.Free;
+  end;
+  comparer := TPackageSearchResultItemComparer.Create;
+
+  distinctResults := TDistinctIterator<IPackageSearchResultItem>.Create(allResults, comparer);
+  result.AddRange(distinctResults);
+
+
+end;
+
+function TPackageRepositoryManager.GetPackageIcon(const cancelToken : ICancellationToken; const source, packageId, packageVersion: string;
+                                                  const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const configuration : IConfiguration): TPngImage;
+var
+  repo : IPackageRepository;
+begin
+  result := nil;
+
+  if configuration = nil then
+    exit;
+  if not UpdateRepositories(configuration) then
+  begin
+    FLogger.Error('Unabled to search, error loading repositories');
+    exit;
+  end;
+
+  repo := GetRepositoryByName(source);
+  if repo = nil then
+  begin
+    FLogger.Error('Unabled to find repository for source [' + source + ']');
+    exit;
+  end;
+  if cancelToken.IsCancelled then
+    exit;
+
+  result := repo.GetPackageIcon(cancelToken, packageId, packageVersion, compilerVersion, platform);
+
 
 end;
 
@@ -305,7 +367,7 @@ end;
 
 function TPackageRepositoryManager.GetRepositoryByName(const value: string): IPackageRepository;
 begin
-result := FRepositories.Where(function(const repo : IPackageRepository) : boolean
+  result := FRepositories.Where(function(const repo : IPackageRepository) : boolean
                                begin
                                  result := SameText(value, repo.Name);
                                end).FirstOrDefault;
@@ -317,12 +379,7 @@ begin
   result := UpdateRepositories(configuration);
 end;
 
-function TPackageRepositoryManager.Search(const cancellationToken : ICancellationToken; const id: string; const range: TVersionRange): IPackageSearchResult;
-begin
-  result := nil
-end;
-
-function TPackageRepositoryManager.Search(const cancellationToken : ICancellationToken; const options: TSearchOptions): IPackageSearchResult;
+function TPackageRepositoryManager.List(const cancellationToken : ICancellationToken; const options: TSearchOptions): IList<IPackageIdentity>;
 var
   config : IConfiguration;
   repo : IPackageRepository;
@@ -335,7 +392,7 @@ var
   packages : IList<IPackageIdentity>;
   sources : TStringList;
 begin
-  result := TPackageSearchResult.Create;
+  result := TCollections.CreateList<IPackageIdentity>;
   if options.ConfigFile = '' then
   begin
     FLogger.Error('No configuration file specified');
@@ -373,8 +430,10 @@ begin
         if sources.IndexOf(repo.Name) = -1 then
           continue;
       end;
-      searchResult := repo.Search(cancellationToken, options);
+      searchResult := repo.List(cancellationToken, options);
       unfilteredResults.AddRange(searchResult);
+      if cancellationToken.IsCancelled then
+        exit;
     end;
   finally
     if sources <> nil then
@@ -445,10 +504,10 @@ begin
     if options.Take > 0 then
       distinctResults := distinctResults.Take(options.Take);
 
-    result.Packages.AddRange(distinctResults);
+    result.AddRange(distinctResults);
   end
   else
-    result.Packages.AddRange(packages);
+    result.AddRange(packages);
 end;
 
 function TPackageRepositoryManager.UpdateRepositories( const configuration : IConfiguration) : boolean;

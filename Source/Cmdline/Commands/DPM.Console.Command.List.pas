@@ -49,6 +49,7 @@ type
 implementation
 
 uses
+  Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Options.Common,
   DPM.Core.Options.List,
@@ -64,7 +65,7 @@ end;
 
 function TListCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 var
-  searchResults : IPackageSearchResult;
+  searchResults : IList<IPackageIdentity>;
   info, prevInfo : IPackageIdentity;
   resultString : string;
 
@@ -77,13 +78,13 @@ begin
     exit;
   end;
 
-  searchResults := FRepositoryManager.Search(cancellationToken, TListOptions.Default);
-  if searchResults.Packages.Any then
+  searchResults := FRepositoryManager.List(cancellationToken, TListOptions.Default);
+  if searchResults.Any then
   begin
     prevInfo := nil;
     resultString := '';
     //group by id+version+compiler, collect platforms
-    for info in searchResults.Packages do
+    for info in searchResults do
     begin
       if cancellationToken.IsCancelled then
         exit;

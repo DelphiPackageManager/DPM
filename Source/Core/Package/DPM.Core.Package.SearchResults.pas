@@ -50,6 +50,7 @@ type
   TDPMPackageSearchResultItem = class(TInterfacedObject, IPackageSearchResultItem)
   private
     FAuthors: string;
+    FOwners : string;
     FCopyright: string;
     FDependencies: IList<IPackagePlatformDependencies>;
     FDescription: string;
@@ -62,13 +63,21 @@ type
     FProjectUrl: string;
     FTags: string;
     FVersion: string;
+    FDownloadCount : Int64;
+    FInstalled : boolean;
+    FIsReservedPrefix : boolean;
+    FSourceName : string;
   protected
     function GetAuthors: string;
+    function GetOwners: string;
     function GetCopyright: string;
     function GetDependencies: IList<IPackagePlatformDependencies>;
     function GetDescription: string;
     function GetIcon: string;
     function GetId: string;
+    function GetInstalled: Boolean;
+    function GetIsReservedPrefix: Boolean;
+
     function GetIsCommercial: Boolean;
     function GetIsTrial: Boolean;
     function GetLicense: string;
@@ -76,15 +85,16 @@ type
     function GetProjectUrl: string;
     function GetTags: string;
     function GetVersion: string;
+    function GetDownloadCount : Int64;
+    function GetSourceName : string;
 
-    constructor CreateFromJson(const jsonObject : TJsonObject);
-//    constructor Create(const id: string; const authors: string; const copyright: string; const dependencies: IList<IPackagePlatformDependencies>;
-//                       const description: string; const icon: string; const isCommercial: Boolean; const isTrial: Boolean; const license: string;
-//                       const platforms: TDPMPlatforms; const projectUrl: string; const tags: string; const version: string);
-    constructor CreateFromMetaData(const metaData : IPackageMetadata; const platforms : TDPMPlatforms; const dependencies: IList<IPackagePlatformDependencies>);
+    procedure SetInstalled(const value : Boolean);
+
+    constructor CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
+    constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platforms : TDPMPlatforms; const dependencies: IList<IPackagePlatformDependencies>);
   public
-    class function FromJson(const jsonObject : TJsonObject) : IPackageSearchResultItem;
-    class function FromMetaData(const metaData : IPackageMetadata; const platforms : TDPMPlatforms; const dependencies: IList<IPackagePlatformDependencies>) : IPackageSearchResultItem;
+    class function FromJson(const sourceName : string; const jsonObject : TJsonObject) : IPackageSearchResultItem;
+    class function FromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platforms : TDPMPlatforms; const dependencies: IList<IPackagePlatformDependencies>) : IPackageSearchResultItem;
 
   end;
 
@@ -96,7 +106,8 @@ implementation
 constructor TDPMPackagePlatformDependencies.Create(const platform: TDPMPlatform; const dependencies: IList<IPackageDependency>);
 begin
   FPlatform := platform;
-  FDependencies := dependencies;
+  FDependencies := TCollections.CreateList<IPackageDependency>;
+  FDependencies.AddRange(dependencies);
 end;
 
 function TDPMPackagePlatformDependencies.GetDependencies: IList<IPackageDependency>;
@@ -153,19 +164,21 @@ end;
 
 { TDPMPackageSearchResultItem }
 
-constructor TDPMPackageSearchResultItem.CreateFromJson(const jsonObject: TJsonObject);
+constructor TDPMPackageSearchResultItem.CreateFromJson(const sourceName : string; const jsonObject: TJsonObject);
 begin
   FDependencies := TCollections.CreateList<IPackagePlatformDependencies>;
 
   //TODO : implement this;
 end;
 
-constructor TDPMPackageSearchResultItem.CreateFromMetaData(const metaData: IPackageMetadata; const platforms: TDPMPlatforms; const dependencies: IList<IPackagePlatformDependencies>);
+constructor TDPMPackageSearchResultItem.CreateFromMetaData(const sourceName : string; const metaData: IPackageMetadata; const platforms: TDPMPlatforms; const dependencies: IList<IPackagePlatformDependencies>);
 begin
+  FSourceName := sourceName;
   FPlatforms := platforms;
-  FDependencies := dependencies;
-
+  FDependencies := TCollections.CreateList<IPackagePlatformDependencies>;
+  FDependencies.AddRange(dependencies);
   FAuthors := metaData.Authors;
+  FOwners := metaData.Owners;
   FCopyright := metaData.Copyright;
   FDescription := metaData.Description;
   FIcon := metaData.Icon;
@@ -176,16 +189,19 @@ begin
   FProjectUrl := metaData.ProjectUrl;
   FTags := metaData.Tags;
   FVersion := metaData.Version.ToStringNoMeta;
+  FDownloadCount :=  123456;//-1; //indicates not set;
+  FIsReservedPrefix := false;
+
 end;
 
-class function TDPMPackageSearchResultItem.FromJson(const jsonObject: TJsonObject): IPackageSearchResultItem;
+class function TDPMPackageSearchResultItem.FromJson(const sourceName : string; const jsonObject: TJsonObject): IPackageSearchResultItem;
 begin
-  result := TDPMPackageSearchResultItem.CreateFromJson(jsonObject);
+  result := TDPMPackageSearchResultItem.CreateFromJson(sourceName, jsonObject);
 end;
 
-class function TDPMPackageSearchResultItem.FromMetaData(const metaData: IPackageMetadata; const platforms: TDPMPlatforms; const dependencies: IList<IPackagePlatformDependencies>): IPackageSearchResultItem;
+class function TDPMPackageSearchResultItem.FromMetaData(const sourceName : string; const metaData: IPackageMetadata; const platforms: TDPMPlatforms; const dependencies: IList<IPackagePlatformDependencies>): IPackageSearchResultItem;
 begin
-  result := TDPMPackageSearchResultItem.CreateFromMetaData(metaData, platforms, dependencies);
+  result := TDPMPackageSearchResultItem.CreateFromMetaData(sourceName, metaData, platforms, dependencies);
 end;
 
 function TDPMPackageSearchResultItem.GetAuthors: string;
@@ -208,6 +224,11 @@ begin
   result := FDescription;
 end;
 
+function TDPMPackageSearchResultItem.GetDownloadCount: Int64;
+begin
+  result := FDownloadCount;
+end;
+
 function TDPMPackageSearchResultItem.GetIcon: string;
 begin
   result := FIcon;
@@ -218,9 +239,19 @@ begin
   result := FId;
 end;
 
+function TDPMPackageSearchResultItem.GetInstalled: Boolean;
+begin
+  result := FInstalled;
+end;
+
 function TDPMPackageSearchResultItem.GetIsCommercial: Boolean;
 begin
   result := FIsCommercial;
+end;
+
+function TDPMPackageSearchResultItem.GetIsReservedPrefix: Boolean;
+begin
+  result := FIsReservedPrefix;
 end;
 
 function TDPMPackageSearchResultItem.GetIsTrial: Boolean;
@@ -233,6 +264,11 @@ begin
   result := FLicense;
 end;
 
+function TDPMPackageSearchResultItem.GetOwners: string;
+begin
+  result := FOwners;
+end;
+
 function TDPMPackageSearchResultItem.GetPlatforms: TDPMPlatforms;
 begin
   result := FPlatforms;
@@ -243,6 +279,11 @@ begin
   result := FProjectUrl;
 end;
 
+function TDPMPackageSearchResultItem.GetSourceName: string;
+begin
+  result := FSourceName;
+end;
+
 function TDPMPackageSearchResultItem.GetTags: string;
 begin
   result := FTags;
@@ -251,6 +292,12 @@ end;
 function TDPMPackageSearchResultItem.GetVersion: string;
 begin
   result := FVersion;
+end;
+
+
+procedure TDPMPackageSearchResultItem.SetInstalled(const value: Boolean);
+begin
+  FInstalled := value;
 end;
 
 end.

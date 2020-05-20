@@ -44,6 +44,8 @@ type
     FVersion  : TPackageVersion;
     FAllVersions : boolean;
     FPrerelease : boolean;
+    FCommercial : boolean;
+    FTrial      : boolean;
     FIncludeDelisted : boolean;
   protected
     FExact : boolean;
@@ -54,6 +56,8 @@ type
     function Clone : TSearchOptions;virtual;
     property AllVersions      : boolean read FAllVersions write FAllVersions;
     property Prerelease       : boolean read FPrerelease write FPrerelease;
+    property Commercial       : boolean read FCommercial write FCommercial;
+    property Trial            : boolean read FTrial write FTrial;
     //IncludeDelisted not implemented. yet.
     property IncludeDelisted  : boolean read FIncludeDelisted write FIncludeDelisted;
     //comma separated list of sources, empty means all.

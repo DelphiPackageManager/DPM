@@ -75,6 +75,7 @@ type
   TPackageMetadata = class(TPackageInfo, IPackageMetadata)
   private
     FAuthors: string;
+    FOwners : string;
     FCopyright: string;
     FDescription: string;
     FIcon: string;
@@ -84,6 +85,7 @@ type
     FTags: string;
     FSearchPaths : IList<IPackageSearchPath>;
   protected
+    function GetOwners: string;
     function GetAuthors: string;
     function GetCopyright: string;
     function GetDescription: string;
@@ -97,7 +99,6 @@ type
   public
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageMetadata;
   end;
-
 
   TPackageDependency = class(TInterfacedObject, IPackageDependency)
   private
@@ -309,6 +310,7 @@ begin
   inherited Create(sourceName, spec);
   FSearchPaths  :=  TCollections.CreateList<IPackageSearchPath>;
   FAuthors      := spec.MetaData.Authors;
+  FOwners       := spec.MetaData.Owners;
   FCopyright    := spec.MetaData.Copyright;
   FDescription  := spec.MetaData.Description;
   FIcon         := spec.MetaData.Icon;
@@ -365,6 +367,11 @@ begin
   result := FLicense;
 end;
 
+
+function TPackageMetadata.GetOwners: string;
+begin
+  result := FOwners;
+end;
 
 function TPackageMetadata.GetSearchPaths: IList<IPackageSearchPath>;
 begin

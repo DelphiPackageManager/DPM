@@ -73,6 +73,7 @@ type
     function GetProjectVersion: string;
     function GetPackageReferences: IList<IPackageReference>;
     function GetAppType: TAppType;
+    procedure SetCompiler(const value : TCompilerVersion);
 
     function LoadProject(const filename: string): Boolean;
     function SaveProject(const filename: string): Boolean;
@@ -766,6 +767,11 @@ begin
       FLogger.Error('  ' + e.Message);
     end;
   end;
+end;
+
+procedure TProjectEditor.SetCompiler(const value: TCompilerVersion);
+begin
+  FCompiler := value;
 end;
 
 end.

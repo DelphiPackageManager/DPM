@@ -76,6 +76,8 @@ type
     function GetPackageReferences : IList<IPackageReference>;
     function GetAppType : TAppType;
 
+    procedure SetCompiler(const value : TCompilerVersion);
+
     function LoadProject(const filename : string) : boolean;
     procedure Reset;
 
@@ -84,7 +86,7 @@ type
 
     function SaveProject(const fileName : string = '') : boolean;
 
-    property CompilerVersion : TCompilerVersion read GetCompilerVersion;
+    property CompilerVersion : TCompilerVersion read GetCompilerVersion write SetCompiler;
     property ProjectVersion  : string read GetProjectVersion;
     property Platforms : TDPMPlatforms read GetPlatforms;
     property PackageReferences : IList<IPackageReference> read GetPackageReferences;

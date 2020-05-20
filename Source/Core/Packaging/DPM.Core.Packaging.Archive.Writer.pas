@@ -48,6 +48,7 @@ type
     function AddFile(const filePath: string): Boolean;overload;
     function AddFile(const fileName : string; const archiveFileName : string) : boolean;overload;
     function AddFiles(const files: System.TArray<System.string>): Boolean;
+    function AddIcon(const filePath : string) : boolean;
     function WriteMetaDataFile(const stream: TStream): Boolean;overload;
     function WriteMetaDataFile(const fileName : string) : boolean;overload;
     function Exists: Boolean;
@@ -99,6 +100,15 @@ begin
     if not AddFile(f) then
       Exit(false);
   end;
+  result := true;
+end;
+
+function TPackageArchiveWriter.AddIcon(const filePath: string): boolean;
+var
+  iconBytes : TBytes;
+begin
+  iconBytes := TFile.ReadAllBytes(filePath);
+  FZipFile.Add(iconBytes,cIconFile);
   result := true;
 end;
 

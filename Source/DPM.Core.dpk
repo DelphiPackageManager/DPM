@@ -29,7 +29,9 @@ package DPM.Core;
 
 requires
   rtl,
-  xmlrtl;
+  xmlrtl,
+  vclimg,
+  vcl;
 
 contains
   DPM.Core.Configuration.Interfaces in 'Core\Configuration\DPM.Core.Configuration.Interfaces.pas',
@@ -81,7 +83,6 @@ contains
   DPM.Core.Utils.XML in 'Core\Utils\DPM.Core.Utils.XML.pas',
   DPM.Core.Options.List in 'Core\Options\DPM.Core.Options.List.pas',
   DPM.Core.Repository.Manager in 'Core\Repository\DPM.Core.Repository.Manager.pas',
-  DPM.Core.Repository.SearchResult in 'Core\Repository\DPM.Core.Repository.SearchResult.pas',
   DPM.Core.Package.Metadata in 'Core\Package\DPM.Core.Package.Metadata.pas',
   DPM.Core.Repository.Factory in 'Core\Repository\DPM.Core.Repository.Factory.pas',
   DPM.Core.Repository.Directory in 'Core\Repository\DPM.Core.Repository.Directory.pas',
@@ -123,7 +124,8 @@ contains
   DPM.Core.Package.SearchResults in 'Core\Package\DPM.Core.Package.SearchResults.pas',
   DPM.Core.Repository.BaseGithub in 'Core\Repository\DPM.Core.Repository.BaseGithub.pas',
   DPM.Core.Utils.Enum in 'Core\Utils\DPM.Core.Utils.Enum.pas',
-  DPM.Core.Repository.Base in 'Core\Repository\DPM.Core.Repository.Base.pas';
+  DPM.Core.Repository.Base in 'Core\Repository\DPM.Core.Repository.Base.pas',
+  DPM.Core.Utils.Numbers in 'Core\Utils\DPM.Core.Utils.Numbers.pas';
 
 end.
 

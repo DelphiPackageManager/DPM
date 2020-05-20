@@ -72,6 +72,7 @@ type
     function GetVersion       : TPackageVersion;
     function GetDescription   : string;
     function GetAuthors       : string;
+    function GetOwners        : string;
     function GetProjectUrl    : string;
     function GetLicense       : string;
     function GetIcon          : string;
@@ -84,6 +85,7 @@ type
     procedure SetId(const value : string);
     procedure SetDescription(const value : string);
     procedure SetAuthors(const value : string);
+    procedure SetOwners(const value : string);
     procedure SetProjectUrl(const value : string);
     procedure SetLicense(const value : string);
     procedure SetIcon(const value : string);
@@ -96,6 +98,7 @@ type
     property Version      : TPackageVersion read GetVersion write SetVersion;
     property Description  : string          read GetDescription  write SetDescription;
     property Authors      : string          read GetAuthors       write SetAuthors;
+    property Owners       : string          read GetOwners       write SetOwners;
     property ProjectUrl   : string          read GetProjectUrl    write SetProjectUrl;
     property License      : string          read GetLicense       write SetLicense;
     property Icon         : string          read GetIcon          write SetIcon;
@@ -130,9 +133,11 @@ type
   ['{13723048-E2AA-45BE-A0F1-C446848F3936}']
     function GetCopyLocal : boolean;
     function GetInstall : boolean;
+    function GetPreBuilt : boolean;
     function Clone : ISpecBPLEntry;
     property CopyLocal : boolean read GetCopyLocal; //ignored for design
     property Install : boolean read GetInstall; //ignored for runtime
+    property PreBuilt : boolean read GetPreBuilt; //false for build
   end;
 
   ISpecSearchPath = interface(ISpecNode)
@@ -165,17 +170,15 @@ type
     function GetId : string;
     function GetProject : string;
     function GetConfig : string;
-    function GetKeepBin : boolean;
     function GetBplOutputDir : string;
     function GetDcuOutputDir : string;
     function GetDcpOutputDir : string;
     procedure SetProject(const value : string);
 
     function Clone : ISpecBuildEntry;
-    property Id : string read GetId;
+    property Id : string read GetId; //?What was this for???
     property Project : string read GetProject write SetProject;
     property Config : string read GetConfig;
-    property KeepBin : boolean read GetKeepBin;
     property BplOutputDir : string read GetBplOutputDir;
     property DcuOutputDir : string read GetDcuOutputDir;
     property DcpOutputDir : string read GetDcpOutputDir;

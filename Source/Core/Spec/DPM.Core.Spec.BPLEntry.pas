@@ -40,13 +40,15 @@ type
   private
     FCopyLocal : boolean;
     FInstall   : boolean;
+    FPreBuilt  : boolean;
   protected
     function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
 
     function GetCopyLocal: Boolean;
     function GetInstall: Boolean;
+    function GetPreBuilt : boolean;
     function Clone: ISpecBPLEntry;overload;
-    constructor CreateClone(const logger: ILogger; const src : string; const dest : string; const exclude : IList<string>; const flatten, copyLocal, install : boolean);reintroduce;
+    constructor CreateClone(const logger: ILogger; const src : string; const dest : string; const exclude : IList<string>; const flatten, copyLocal, install, preBuilt : boolean);reintroduce;
   public
     constructor Create(const logger: ILogger); override;
   end;
@@ -60,7 +62,7 @@ uses
 
 function TSpecBPLEntry.Clone: ISpecBPLEntry;
 begin
-  result := TSpecBPLEntry.CreateClone(logger, Self.GetSource, Self.GetDestination,Self.GetExclude,Self.GetFlatten,FCopyLocal, FInstall);
+  result := TSpecBPLEntry.CreateClone(logger, Self.GetSource, Self.GetDestination,Self.GetExclude,Self.GetFlatten,FCopyLocal, FInstall, FPreBuilt);
 end;
 
 constructor TSpecBPLEntry.Create(const logger: ILogger);
@@ -69,11 +71,12 @@ begin
 
 end;
 
-constructor TSpecBPLEntry.CreateClone(const logger: ILogger; const src, dest : string; const exclude: IList<string>; const flatten, copyLocal, install: boolean);
+constructor TSpecBPLEntry.CreateClone(const logger: ILogger; const src, dest : string; const exclude: IList<string>; const flatten, copyLocal, install, preBuilt: boolean);
 begin
   inherited CreateClone(logger, src, dest, exclude, flatten, false);
   FCopyLocal := copyLocal;
   FInstall := install;
+  FPreBuilt := preBuilt;
 end;
 
 function TSpecBPLEntry.GetCopyLocal: Boolean;
@@ -86,11 +89,20 @@ begin
   result := FInstall;
 end;
 
+function TSpecBPLEntry.GetPreBuilt: boolean;
+begin
+  result := FPreBuilt;
+end;
+
 function TSpecBPLEntry.LoadFromJson(const jsonObject: TJsonObject): Boolean;
 begin
   result := inherited LoadFromJson(jsonObject);
   FCopyLocal := jsonObject.B['copylocal'];
   FInstall := jsonObject.B['install'];
+  if jsonObject.Contains('preBuilt') then
+    FPreBuilt := jsonObject.B['preBuilt']
+  else
+    FPreBuilt := true;
 end;
 
 

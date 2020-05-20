@@ -24,56 +24,33 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.Core.Constants;
+unit DPM.Core.Utils.Numbers;
 
 interface
 
-const
-  cDPMClientVersion = '1.0.0-alpha1';
-  cLockFileVersion = '0.0.1';
-  cLockFileExt     = '.dpmlock';
-  cPackageFileExt = '.dpkg';
-  cPackageSpecExt = '.dspec';
-  //fixed filename for the package dspec so we can easily extract it
-  cPackageMetaFile = 'package' + cPackageSpecExt;
-  cIconFile = 'icon.png';
-
-  cDPMConfigFileName = 'dpm.config';
-
-  cDefaultDPMFolder = '%APPDATA%\.dpm';
-  cDefaultConfigFile = cDefaultDPMFolder + '\' + cDPMConfigFileName;
-  cDefaultPackageCache = cDefaultDPMFolder + '\packages';
-  cDPMPackageCacheEnviromentVar = 'DPMPACKAGECACHE';
-
-  cTargetPlatformAttribute = 'targetPlatform';
-  cUnset = '--unset--';
-
-  cMaxPackageIdLength = 100;
-
-  cPackageFileRegex = '^(\w+\.\w+)\-([^\-]+)\-([^\-]+)\-(.*)$';
-  cPackageIdRegex = '^(\w+\.\w+)$';
-
-  //template regexs
-  //compiler version
-  cPackageFileRegexCV = '^(\w+\.\w+)\-(%s)\-([^\-]+)\-(.*)$';
-  //compiler version and platform
-  cPackageFileRegexCVP = '^(\w+\.\w+)\-(%s)\-(%s)\-(.*)$';
-
-  //compiler version and platform and package version
-  cPackageFileRegexCVPV = '^(\w+\.\w+)\-(%s)\-(%s)\-(%s)$';
-
-  //compiler version and package version - don't think this would ever be used?
-  cPackageFileRegexCVV = '^(\w+\.\w+)\-(%s)\-(%s)\-(%s)$';
-
-  //platform
-  cPackageFileRegexP = '^(\w+\.\w+)\-([^\-]+)\-(%s)\-(.*)$';
-
-  //platform and version
-  cPackageFileRegexPV = '^(\w+\.\w+)\-(%s)\-(%s)\-(.*)$';
-
-  //version
-  cPackageFileRegexV = '^(\w+\.\w+)\-([^\-]+)\-([^\-]+)\-(%s)$';
+type
+  TIntegerUtils = class
+  public
+    class function InToStringAbbr(const value : Int64) : string;
+  end;
 
 implementation
+
+uses
+  System.SysUtils;
+
+{ TIntegerUtils }
+
+class function TIntegerUtils.InToStringAbbr(const value: Int64): string;
+var
+  theValue : string;
+begin
+  if value > 1000000 then
+    result := IntToStr(value div 1000000) + 'M'
+  else if value > 1000  then
+    result := IntToStr(value div 1000) + 'K'
+  else
+    result := IntToStr(value);
+end;
 
 end.

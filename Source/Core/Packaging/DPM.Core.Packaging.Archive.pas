@@ -65,6 +65,7 @@ type
   ['{B1BA4ED1-E456-42DE-AA17-AA53480EE645}']
     procedure SetBasePath(const path : string);
     function WriteMetaDataFile(const stream: TStream): Boolean;
+    function AddIcon(const filePath : string) : boolean;
     function AddFile(const filePath: string): Boolean;overload;
     function AddFile(const fileName : string; const archiveFileName : string) : boolean;overload;
     function AddFiles(const files: System.TArray<System.string>): Boolean;

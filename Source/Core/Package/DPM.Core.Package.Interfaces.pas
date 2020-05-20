@@ -97,6 +97,7 @@ type
   ['{0C39A81D-63FF-4939-A74A-4BFE29724168}']
     function GetDescription   : string;
     function GetAuthors       : string;
+    function GetOwners        : string;
     function GetLicense       : string;
     function GetIcon          : string;
     function GetCopyright     : string;
@@ -107,6 +108,7 @@ type
 
     property Description  : string  read GetDescription;
     property Authors      : string  read GetAuthors;
+    property Owners       : string  read GetOwners;
     property License      : string  read GetLicense;
     property Icon         : string  read GetIcon;
     property Copyright    : string  read GetCopyright;
@@ -150,6 +152,7 @@ type
   //note for version we are using strings to improve performance
   IPackageSearchResultItem = interface
   ['{8EB6EA16-3708-41F7-93A2-FE56EB75510B}']
+    function GetSourceName : string;
     function GetId : string;
     function GetVersion : string;
     function GetPlatforms : TDPMPlatforms;
@@ -157,6 +160,7 @@ type
 
     function GetDescription   : string;
     function GetAuthors       : string;
+    function GetOwners        : string;
     function GetProjectUrl    : string;
     function GetLicense       : string;
     function GetIcon          : string;
@@ -164,19 +168,32 @@ type
     function GetTags          : string;
     function GetIsTrial       : boolean;
     function GetIsCommercial  : boolean;
+    function GetDownloadCount : Int64;
+    function GetInstalled : boolean;
+    procedure SetInstalled(const value : boolean);
+    function GetIsReservedPrefix : boolean;
 
     property Id           : string  read GetId;
     property Version      : string  read GetVersion;
     property Description  : string  read GetDescription;
     property Authors      : string  read GetAuthors;
+    property Owners       : string  read GetOwners;
     property ProjectUrl   : string  read GetProjectUrl;
     property License      : string  read GetLicense;
     property Icon         : string  read GetIcon;
     property Copyright    : string  read GetCopyright;
     property Tags         : string  read GetTags;
+    //this is for use by the UI, it's not returned.
+    property Installed    : boolean read GetInstalled write SetInstalled;
+    //only returned from server feeds.
+    property IsReservedPrefix : boolean read  GetIsReservedPrefix;
     property IsTrial      : boolean read GetIsTrial;
     property IsCommercial : boolean read GetIsCommercial;
+    property Platforms    : TDPMPlatforms read GetPlatforms;
     property Dependencies : IList<IPackagePlatformDependencies> read GetDependencies;
+    //returns -1 if not set.
+    property Downloads    : Int64 read GetDownloadCount;
+    property SourceName   : string read GetSourceName;
   end;
 
 
@@ -205,19 +222,17 @@ type
 
   end;
 
-
-  TPackageIdentityComparer = class(TInterfacedObject,IEqualityComparer<IPackageIdentity>)
-  protected
-    function Equals(const Left, Right: IPackageIdentity): Boolean;reintroduce;
-    function GetHashCode(const Value: IPackageIdentity): Integer; reintroduce;
-  end;
-
   TPackageInfoComparer = class(TInterfacedObject,IEqualityComparer<IPackageInfo>)
   protected
     function Equals(const Left, Right: IPackageInfo): Boolean;reintroduce;
     function GetHashCode(const Value: IPackageInfo): Integer; reintroduce;
   end;
 
+  TPackageSearchResultItemComparer = class(TInterfacedObject,IEqualityComparer<IPackageSearchResultItem>)
+  protected
+    function Equals(const Left, Right: IPackageSearchResultItem): Boolean;reintroduce;
+    function GetHashCode(const Value: IPackageSearchResultItem): Integer; reintroduce;
+  end;
 
 
 implementation
@@ -225,20 +240,6 @@ implementation
 uses
   System.SysUtils;
 
-{ TPackageIdentityComparer }
-
-function TPackageIdentityComparer.Equals(const Left, Right: IPackageIdentity): Boolean;
-begin
-  result := SameText(Left.ToString, right.ToString);
-end;
-
-function TPackageIdentityComparer.GetHashCode(const Value: IPackageIdentity): Integer;
-var
-  s : string;
-begin
-  s := Value.ToString;
-  Result := BobJenkinsHash(PChar(s)^, SizeOf(Char) * Length(s), 0);
-end;
 
 { TPackageInfoComparer }
 
@@ -252,6 +253,21 @@ var
   s : string;
 begin
   s := Value.ToString;
+  Result := BobJenkinsHash(PChar(s)^, SizeOf(Char) * Length(s), 0);
+end;
+
+{ TPackageSearchResultItemComparer }
+
+function TPackageSearchResultItemComparer.Equals(const Left, Right: IPackageSearchResultItem): Boolean;
+begin
+  result := SameText(Left.Id, right.Id);
+end;
+
+function TPackageSearchResultItemComparer.GetHashCode(const Value: IPackageSearchResultItem): Integer;
+var
+  s : string;
+begin
+  s := Value.Id;
   Result := BobJenkinsHash(PChar(s)^, SizeOf(Char) * Length(s), 0);
 end;
 

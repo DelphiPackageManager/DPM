@@ -31,6 +31,7 @@ interface
 
 uses
   Spring.Container,
+  Spring.Collections,
   VSoft.AntPatterns,
   DPM.Core.Types,
   DPM.Core.Logging,
@@ -45,7 +46,7 @@ type
     FLogger : ILogger;
     FArchiveWriter : IPackageArchiveWriter;
     FSpecReader : IPackageSpecReader;
-    procedure ProcessPattern(const basePath, dest: string; const pattern: IFileSystemPattern; const searchPath: string; const flatten: boolean; const excludePatterns : TArray<IFileSystemPattern>; const ignore : boolean;  var fileCount: integer);
+    procedure ProcessPattern(const basePath, dest: string; const pattern: IFileSystemPattern; const searchPath: string; const flatten: boolean; const excludePatterns : IList<string>; const ignore : boolean;  var fileCount: integer);
   protected
 
     function WritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion; const basePath : string) : boolean;
@@ -66,7 +67,6 @@ uses
   System.IOUtils,
   System.Classes,
   System.Masks,
-  Spring.Collections,
   DPM.Core.Constants,
   DPM.Core.Spec,
   DPM.Core.Utils.Strings,
@@ -110,7 +110,7 @@ begin
     result := Copy(value,1, i -1);
 end;
 
-procedure TPackageWriter.ProcessPattern(const basePath: string; const dest : string; const pattern : IFileSystemPattern; const searchPath : string; const flatten : boolean; const excludePatterns : TArray<IFileSystemPattern>; const ignore : boolean; var fileCount : integer);
+procedure TPackageWriter.ProcessPattern(const basePath: string; const dest : string; const pattern : IFileSystemPattern; const searchPath : string; const flatten : boolean; const excludePatterns : IList<string>; const ignore : boolean; var fileCount : integer);
 var
   files : TStringDynArray;
   f : string;
@@ -118,27 +118,20 @@ var
 
   function IsFileExcluded(const fileName : string) : boolean;
   var
-    excludePatten : IFileSystemPattern;
-    mask : string;
+    excludePatten : string;
   begin
     result := false;
-    if Length(excludePatterns) > 0 then
+    if excludePatterns.Count > 0 then
     begin
       for excludePatten in excludePatterns do
       begin
-        mask := excludePatten.FileMask;
-        if TPathUtils.IsRelativePath(mask) then
-          mask := TPath.Combine(basePath, mask);
-
         //this might be slow.. Creates/Destroys TMask each time
         //if it is then create a record based mask type to do the job.
-        if MatchesMask(fileName,  mask) then
+        if MatchesMask(fileName,  excludePatten) then
           exit(true);
       end;
     end;
-
   end;
-
 begin
 
   if not TDirectory.Exists(pattern.Directory) then
@@ -183,30 +176,35 @@ var
   var
     fsPatterns : TArray<IFileSystemPattern>;
     fsPattern : IFileSystemPattern;
-    fsExcludePatterns : IList<IFileSystemPattern>;
     nonWildcardPath : string;
     fileCount : integer;
-    excludePattern: string;
   begin
     nonWildcardPath := GetNonWildcardPath(source);
     fsPatterns := antPattern.Expand(source);
-
-    fsExcludePatterns := TCollections.CreateList<IFileSystemPattern>;
-
-    for excludePattern in exclude do
-      fsExcludePatterns.AddRange(antPattern.Expand(excludePattern));
-
     fileCount := 0;
-
-
-
     for fsPattern in fsPatterns do
-     ProcessPattern(basePath, dest, fsPattern, nonWildcardPath, flatten, fsExcludePatterns.ToArray , ignore,  fileCount);
+     ProcessPattern(basePath, dest, fsPattern, nonWildcardPath, flatten, exclude , ignore,  fileCount);
 
     if fileCount = 0 then
      FLogger.Warning('No files were found for pattern [' + source + ']');
   end;
 
+  procedure ProcessBPLEntry(const source, dest : string);
+  var
+    archivePath : string;
+    sourceFile : string;
+    fileName : string;
+  begin
+    sourceFile := TPathUtils.CompressRelativePath(basePath, source);
+    if not FileExists(sourceFile) then
+      raise Exception.Create('File [' + sourceFile + '] does not exist.');
+
+    fileName := ExtractFileName(sourceFile);
+
+    archivePath := dest + '\' + fileName;
+    FLogger.Debug('Writing file [' + archivePath + '] to package.');
+    FArchiveWriter.AddFile(sourceFile,archivePath);
+  end;
 
 begin
   result := false;
@@ -216,7 +214,6 @@ begin
   packageFileName := spec.MetaData.Id + '-' + CompilerToString(targetPlatform.Compiler) + '-' +  DPMPlatformToString(targetPlatform.Platforms[0]) + '-' +  version.ToStringNoMeta + cPackageFileExt;
   packageFileName := IncludeTrailingPathDelimiter(outputFolder) + packageFileName;
   FArchiveWriter.SetBasePath(basePath);
-
   if not FArchiveWriter.Open(packageFileName) then
   begin
     FLogger.Warning('Could not open package file [' + packageFileName + '] - skipping');
@@ -224,6 +221,13 @@ begin
   end;
   FLogger.Information('Writing package to file : ' + packageFileName);
   try
+    if spec.MetaData.Icon <> '' then
+    begin
+      if FArchiveWriter.AddIcon(spec.MetaData.Icon) then
+        spec.MetaData.Icon := cIconFile;
+    end;
+
+
     sStream := TStringStream.Create(sManifest,TEncoding.UTF8);
     try
       FArchiveWriter.WriteMetaDataFile(sStream);
@@ -242,10 +246,12 @@ begin
       ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, fileEntry.Ignore );
 
     for bplEntry in targetPlatform.RuntimeFiles do
-      ProcessEntry(bplEntry.Source, bplEntry.Destination, bplEntry.Flatten, bplEntry.Exclude, fileEntry.Ignore);
+      if bplEntry.PreBuilt then
+        ProcessBPLEntry(bplEntry.Source, bplEntry.Destination);
 
     for bplEntry in targetPlatform.DesignFiles do
-      ProcessEntry(bplEntry.Source, bplEntry.Destination, bplEntry.Flatten, bplEntry.Exclude, fileEntry.Ignore);
+      if bplEntry.PreBuilt then
+        ProcessBPLEntry(bplEntry.Source, bplEntry.Destination);
 
   finally
     FArchiveWriter.Close;

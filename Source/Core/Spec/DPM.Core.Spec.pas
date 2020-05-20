@@ -498,11 +498,14 @@ var
   dependency : ISpecDependency;
   searchPath : ISpecSearchPath;
   buildEntry : ISpecBuildEntry;
+  bplEntry   : ISpecBPLEntry;
   metaDataObj : TJsonObject;
   targetPlatformObject : TJDOJsonObject;
   dependencyObj : TJsonObject;
   seachPathObj : TJsonObject;
   buildEntryObj : TJsonObject;
+  runtimeEntryObj : TJsonObject;
+  designEntryObj : TJsonObject;
 begin
   result := '';
 
@@ -513,6 +516,7 @@ begin
     metaDataObj['version'] := version.ToStringNoMeta;
     metaDataObj['description'] := FMetaData.Description;
     metaDataObj['authors'] := FMetaData.Authors;
+    metaDataObj['owners'] := FMetaData.Owners;
 
     //optional metadata
     if FMetaData.ProjectUrl <> '' then
@@ -532,6 +536,7 @@ begin
     targetPlatformObject := Obj.A['targetPlatforms'].AddObject;
     targetPlatformObject['compiler'] := CompilerToString(targetPlatform.Compiler);
     targetPlatformObject['platforms'] := DPMPlatformToString(targetPlatform.Platforms[0]);
+
     if targetPlatform.Dependencies.Any then
     begin
       for dependency in targetPlatform.Dependencies do
@@ -553,6 +558,32 @@ begin
       end;
     end;
 
+
+    if targetPlatform.RuntimeFiles.Any then
+    begin
+      for bplEntry in targetPlatform.RuntimeFiles  do
+      begin
+        runtimeEntryObj := targetPlatformObject.A['runtime'].AddObject;
+        runtimeEntryObj['preBuilt'] := bplEntry.PreBuilt;
+        runtimeEntryObj['src'] := bplEntry.Source; //TODO : check this is expanded with variables
+        runtimeEntryObj['dest'] := bplEntry.Destination;
+        runtimeEntryObj['copyLocal'] := bplEntry.CopyLocal;
+      end;
+    end;
+
+    if targetPlatform.DesignFiles.Any then
+    begin
+      for bplEntry in targetPlatform.DesignFiles  do
+      begin
+        designEntryObj := targetPlatformObject.A['design'].AddObject;
+        designEntryObj['preBuilt'] := bplEntry.PreBuilt;
+        designEntryObj['src'] := bplEntry.Source; //TODO : check this is expanded with variables
+        designEntryObj['dest'] := bplEntry.Destination;
+        designEntryObj['install'] := bplEntry.Install;
+      end;
+    end;
+
+
     if targetPlatform.BuildEntries.Any then
     begin
       for buildEntry in targetPlatform.BuildEntries do
@@ -560,12 +591,13 @@ begin
         buildEntryObj := targetPlatformObject.A['build'].AddObject;
         buildEntryObj['id'] := buildEntry.Id;
         buildEntryObj['project'] := buildEntry.Project;
+        buildEntryObj['config'] := buildEntry.Config;
         buildEntryObj['bplOutputDir'] := buildEntry.BplOutputDir;
         buildEntryObj['dcpOutputDir'] := buildEntry.BplOutputDir;
         buildEntryObj['dcuOutputDir'] := buildEntry.BplOutputDir;
-        buildEntryObj['keepBin'] := LowerCase(BoolToStr(buildEntry.KeepBin,true)); ;
       end;
     end;
+
 
 
 
@@ -708,6 +740,7 @@ var
   buildEntry : ISpecBuildEntry;
   regEx : TRegEx;
   evaluator : TMatchEvaluator;
+
 begin
   result := true;
   Logger.Information('Replacing tokens..');

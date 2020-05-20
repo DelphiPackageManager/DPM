@@ -31,6 +31,7 @@ interface
 uses
   Spring.Collections,
   VSoft.Awaitable,
+  Vcl.Imaging.pngimage,
   DPM.Core.Types,
   DPM.Core.Sources.Types,
   DPM.Core.Dependency.Version,
@@ -40,11 +41,11 @@ uses
 
 
 type
-  IPackageSearchResult = interface
-  ['{39B253DC-4BC5-4E72-918A-2FACC3EB5AC5}']
-    function GetPackages : IList<IPackageIdentity>;
-    property Packages : IList<IPackageIdentity> read GetPackages;
-  end;
+//  IPackageSearchResult = interface
+//  ['{39B253DC-4BC5-4E72-918A-2FACC3EB5AC5}']
+//    function GetPackages : IList<IPackageIdentity>;
+//    property Packages : IList<IPackageIdentity> read GetPackages;
+//  end;
 
   //bear in mind that there will be a remote repository implemented with http
   //so need to keep that in mind with these interfaces.
@@ -54,21 +55,22 @@ type
     function GetRepositoryType : TSourceType;
     function GetName : string;
     function GetSource : string;
-//    function GetIsLocal : boolean;
-//    function GetIsRemote : boolean;
     procedure Configure(const source : ISourceConfig);
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
-    function Search(const cancellationToken : ICancellationToken; const options : TSearchOptions ) : IList<IPackageIdentity>;overload;
+    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions ) : IList<IPackageIdentity>;overload;
 
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity) : IPackageInfo;
 
 
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : boolean) : IList<TPackageVersion>;
+//    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : boolean) : IList<TPackageVersion>;
 
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : boolean) : IList<IPackageInfo>;
 
+    //ui stuff
+    function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
+    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): TPngImage;
 
     property Name   : string read GetName;
     property Source : string read GetSource;
@@ -84,13 +86,17 @@ type
   IPackageRepositoryManager = interface
   ['{86DEB23D-7229-4F1C-949C-0A5CFB421152}']
     function Initialize( const configuration : IConfiguration) : boolean;
-    function Search(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IPackageSearchResult;overload;
+
+    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>;overload;
+
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity) : IPackageInfo;
     function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform;const versionRange : TVersionRange) : IList<IPackageInfo>;
 
     //ui specific stuff
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
+    function GetPackageIcon(const cancelToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string;
+                            const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const configuration : IConfiguration) : TPngImage;
 
   end;
 

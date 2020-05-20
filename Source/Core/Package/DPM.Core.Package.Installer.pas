@@ -226,7 +226,7 @@ end;
 function TPackageInstaller.DoCachePackage(const cancellationToken : ICancellationToken; const options: TCacheOptions; const platform: TDPMPlatform): boolean;
 var
   packageIdentity : IPackageIdentity;
-  searchResult : IPackageSearchResult;
+  searchResult : IList<IPackageIdentity>;
   packageFileName : string;
 begin
   result := false;
@@ -236,8 +236,8 @@ begin
   else
   begin
     //no version specified, so we need to get the latest version available;
-    searchResult := FRepositoryManager.Search(cancellationToken, options);
-    packageIdentity := searchResult.Packages.FirstOrDefault;
+    searchResult := FRepositoryManager.List(cancellationToken, options);
+    packageIdentity := searchResult.FirstOrDefault;
     if packageIdentity = nil then
     begin
       FLogger.Error('Package [' + options.PackageId + '] for platform [' + DPMPlatformToString(platform) + '] not found on any sources');
@@ -267,7 +267,7 @@ end;
 function TPackageInstaller.DoInstallPackage(const cancellationToken : ICancellationToken; const options: TInstallOptions; const projectFile: string; const projectEditor: IProjectEditor; const platform: TDPMPlatform; const config : IConfiguration): boolean;
 var
   packageIdentity : IPackageIdentity;
-  searchResult : IPackageSearchResult;
+  searchResult : IList<IPackageIdentity>;
   packageFileName : string;
   packageInfo : IPackageInfo; //includes dependencies;
   existingPackageRef : IPackageReference;
@@ -289,8 +289,8 @@ begin
   else
   begin
     //no version specified, so we need to get the latest version available;
-    searchResult := FRepositoryManager.Search(cancellationToken, options);
-    packageIdentity := searchResult.Packages.FirstOrDefault;
+    searchResult := FRepositoryManager.List(cancellationToken, options);
+    packageIdentity := searchResult.FirstOrDefault;
     if packageIdentity = nil then
     begin
       FLogger.Error('Package [' + options.PackageId + '] for platform [' + DPMPlatformToString(platform) + '] not found on any sources');
@@ -585,6 +585,7 @@ begin
       if not ambiguousProjectVersion then
         FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] does not match the compiler version.');
     end;
+    projectEditor.CompilerVersion := options.CompilerVersion;
   end
   else
     options.CompilerVersion := projectEditor.CompilerVersion;

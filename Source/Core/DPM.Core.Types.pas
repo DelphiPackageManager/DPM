@@ -281,7 +281,7 @@ begin
     TCompilerVersion.RS10_1: result := 'Berlin';
     TCompilerVersion.RS10_2: result := 'Tokyo';
     TCompilerVersion.RS10_3: result := 'Rio';
-    TCompilerVersion.RS10_4: result := 'Denali';
+    TCompilerVersion.RS10_4: result := 'Sydney';
   else
     result := '';
   end;
