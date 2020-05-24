@@ -63,7 +63,7 @@ uses
   DPM.Console.Command.Sign in 'Cmdline\Commands\DPM.Console.Command.Sign.pas',
   DPM.Console.Command.Verify in 'Cmdline\Commands\DPM.Console.Command.Verify.pas',
   DPM.Console.Logger in 'Cmdline\Logging\DPM.Console.Logger.pas',
-  DPM.Console.Command.Remove in 'Cmdline\Commands\DPM.Console.Command.Remove.pas',
+  DPM.Console.Command.Uninstall in 'Cmdline\Commands\DPM.Console.Command.Uninstall.pas',
   DPM.Console.Command.Why in 'Cmdline\Commands\DPM.Console.Command.Why.pas',
   DPM.Console.Command.Add in 'Cmdline\Commands\DPM.Console.Command.Add.pas',
   DPM.Console.Command.Cache in 'Cmdline\Commands\DPM.Console.Command.Cache.pas';

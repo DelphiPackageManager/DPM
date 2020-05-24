@@ -46,6 +46,7 @@ uses
   DPM.Core.Options.Pack,
   DPM.Core.Options.Push,
   DPM.Core.Options.Sources,
+  DPM.Core.Options.Uninstall,
   DPM.Core.Options.Restore,
   DPM.Core.Options.Spec,
   DPM.Core.Utils.Strings,
@@ -167,24 +168,34 @@ begin
                                                        'package file (.dpkg).',
                                                       'install <packageId> [options]');
 
-  option := cmd.RegisterUnNamedOption<string>('The package to install','packageId',
+  option := cmd.RegisterUnNamedOption<string>('The package to install','packageId|packagePath',
     procedure(const value : string)
     begin
       TInstallOptions.Default.PackageId := value;
     end);
+  option.Required := true;
 
-  option := cmd.RegisterOption<string>('packageFile','pf', 'Use the specified package file rather than from the cache or a feed',
-   procedure(const value : string)
-    begin
-      TInstallOptions.Default.PackageFile := value;
-    end);
-
-  option := cmd.RegisterOption<string>('projectPath','pp', 'The path to the dproj, or a folder containing 1 or more dproj files. Defaults to current directory.',
-   procedure(const value : string)
+  option := cmd.RegisterUnNamedOption<string>('The package to install','projectPath',
+    procedure(const value : string)
     begin
       TInstallOptions.Default.ProjectPath := value;
     end);
 
+  //option.Required := true;
+
+
+//  option := cmd.RegisterOption<string>('packageFile','pf', 'Use the specified package file rather than from the cache or a feed',
+//   procedure(const value : string)
+//    begin
+//      TInstallOptions.Default.PackageFile := value;
+//    end);
+//
+//  option := cmd.RegisterOption<string>('projectPath','pp', 'The path to the dproj, or a folder containing 1 or more dproj files. Defaults to current directory.',
+//   procedure(const value : string)
+//    begin
+//      TInstallOptions.Default.ProjectPath := value;
+//    end);
+//
 
   option := cmd.RegisterOption<string>('version','', 'The package version to install, if not specified the latest will be downloaded',
    procedure(const value : string)
@@ -485,7 +496,7 @@ begin
     end);
    option.AllowMultiple := true;
 
-  option := cmd.RegisterOption<string>('compiler','c', 'The compiler version to resore.',
+  option := cmd.RegisterOption<string>('compiler','c', 'The compiler version to restore.',
    procedure(const value : string)
     begin
       TRestoreOptions.Default.CompilerVersion := StringToCompilerVersion(value);
@@ -657,17 +668,34 @@ begin
 end;
 
 
-procedure RegisterRemoveCommand;
+procedure RegisterUninstallCommand;
 var
   cmd : TCommandDefinition;
+  option : IOptionDefinition;
 begin
 
-  cmd := TOptionsRegistry.RegisterCommand('remove', '', 'Removes a package from a project',
+  cmd := TOptionsRegistry.RegisterCommand('uninstall', '', 'Removes a package from a project',
                                                       '',
-                                                      'remove',true);
+                                                      'install <packageId> [options]',true);
+  option := cmd.RegisterUnNamedOption<string>('The package to remove','packageId',
+    procedure(const value : string)
+    begin
+      TUninstallOptions.Default.PackageId := value;
+    end);
+  option.Required := true;
 
+  option := cmd.RegisterUnNamedOption<string>('The path to the dproj, or a folder containing 1 or more dproj files. Defaults to current directory.','projectPath',
+   procedure(const value : string)
+    begin
+      TUninstallOptions.Default.ProjectPath := value;
+    end);
 
+  cmd.Examples.Add('uninstall VSoft.CommandLine');
+  cmd.Examples.Add('uninstall VSoft.CommandLine project1.dproj');
+  cmd.Examples.Add('uninstall VSoft.CommandLine c:\myprojects\project1.dproj');
+  cmd.Examples.Add('uninstall VSoft.CommandLine c:\myprojects\project1.groupproj');
 end;
+
 
 
 procedure RegisterWhyCommand;
@@ -726,7 +754,7 @@ begin
   RegisterListCommand;
   RegisterPackCommand;
   RegisterPushCommand;
-  RegisterRemoveCommand;
+  RegisterUninstallCommand;
   RegisterRestoreCommand;
   RegisterSetApiCommand;
   RegisterSignCommand;

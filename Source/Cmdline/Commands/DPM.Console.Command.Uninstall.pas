@@ -24,37 +24,31 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.Core.Repository.SearchResult;
+unit DPM.Console.Command.Uninstall;
 
 interface
 
 uses
-  Spring.Collections,
-  DPM.Core.Package.Interfaces,
-  DPM.Core.Repository.Interfaces;
+  VSoft.Awaitable,
+  DPM.Console.ExitCodes,
+  DPM.Console.Command,
+  DPM.Console.Command.Base;
 
 type
-  TPackageSearchResult = class(TInterfacedObject, IPackageSearchResult)
-  private
-    FPackages : IList<IPackageIdentity>;
+  TUninstallCommand = class(TBaseCommand)
   protected
-    function GetPackages: IList<IPackageIdentity>;
-  public
-    constructor Create;
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
   end;
+
 
 implementation
 
-{ TPackageSearchResult }
+{ TRemoveCommand }
 
-constructor TPackageSearchResult.Create;
+function TUninstallCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
-  FPackages := TCollections.CreateList<IPackageIdentity>;
-end;
-
-function TPackageSearchResult.GetPackages: IList<IPackageIdentity>;
-begin
-  result := FPackages;
+  Logger.Error('Remove command not implemented');
+  result := TExitCode.NotImplemented;
 end;
 
 end.

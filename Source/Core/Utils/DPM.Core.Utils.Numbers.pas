@@ -42,8 +42,6 @@ uses
 { TIntegerUtils }
 
 class function TIntegerUtils.InToStringAbbr(const value: Int64): string;
-var
-  theValue : string;
 begin
   if value > 1000000 then
     result := IntToStr(value div 1000000) + 'M'

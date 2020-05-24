@@ -40,31 +40,30 @@ type
   TResolution = class(TInterfacedObject, IResolution)
   private
     FPackage :  IPackageInfo;
-    FDependency : IPackageDependency;
     FParentId : string;
+    FVersionRange : TVersionRange;
   protected
     function GetPackage :  IPackageInfo;
-    function GetDependency : IPackageDependency;
     function GetParentId : string;
+    function GetVersionRange: TVersionRange;
+    procedure SetVersionRange(const value : TVersionRange);
+
+
   public
-     constructor Create( const package :  IPackageInfo; const dependency : IPackageDependency; const parentId : string);
+     constructor Create( const package :  IPackageInfo; const range : TVersionRange; const parentId : string);
   end;
 
 implementation
 
 { TResolution }
 
-constructor TResolution.Create(const package: IPackageInfo; const dependency: IPackageDependency; const parentId: string);
+constructor TResolution.Create(const package: IPackageInfo; const range : TVersionRange; const parentId: string);
 begin
   FPackage := package;
-  FDependency := dependency;
+  FVersionRange := range;
   FParentId := parentId;
 end;
 
-function TResolution.GetDependency: IPackageDependency;
-begin
-  result := FDependency;
-end;
 
 function TResolution.GetPackage: IPackageInfo;
 begin
@@ -74,6 +73,16 @@ end;
 function TResolution.GetParentId: string;
 begin
   result := FParentId;
+end;
+
+function TResolution.GetVersionRange: TVersionRange;
+begin
+  result := FVersionRange;
+end;
+
+procedure TResolution.SetVersionRange(const value: TVersionRange);
+begin
+  FVersionRange := value;
 end;
 
 end.

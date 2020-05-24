@@ -47,7 +47,7 @@ uses
   DPM.Console.Command.List,
   DPM.Console.Command.Pack,
   DPM.Console.Command.Push,
-  DPM.Console.Command.Remove,
+  DPM.Console.Command.Uninstall,
   DPM.Console.Command.Restore,
   DPM.Console.Command.SetApiKey,
   DPM.Console.Command.Sign,
@@ -89,7 +89,7 @@ begin
  container.RegisterType<ICommandHandler,TListCommand>('command.list');
  container.RegisterType<ICommandHandler,TPackCommand>('command.pack');
  container.RegisterType<ICommandHandler,TPushCommand>('command.push');
- container.RegisterType<ICommandHandler,TRemoveCommand>('command.remove');
+ container.RegisterType<ICommandHandler,TUninstallCommand>('command.uninstall');
  container.RegisterType<ICommandHandler,TRestoreCommand>('command.restore');
  container.RegisterType<ICommandHandler,TSetApiKeyCommand>('command.setapikey');
  container.RegisterType<ICommandHandler,TSignCommand>('command.sign');

@@ -32,6 +32,7 @@ uses
   Spring.Collections,
   DPM.Core.Logging,
   DPM.Core.Types,
+  DPM.Core.Dependency.Version,
   DPM.Core.Dependency.Interfaces,
   DPM.Core.Package.Interfaces;
 
@@ -39,58 +40,64 @@ uses
 type
   IResolverContext = interface
   ['{B97E7843-4C13-490A-A776-DFAC1BC60A0D}']
-    procedure RecordBadChoice(const bad : IPackageInfo);
-    function IsBad(const package : IPackageInfo) : boolean;
-    procedure RecordResolution(const package : IPackageInfo; const dependency : IPackageDependency; const parentId : string);
+    procedure RecordNoGood(const bad : IPackageInfo);
+    function IsNoGood(const package : IPackageInfo) : boolean;
+    procedure RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
     function TryGetResolution(const packageId : string; out resolution : IResolution) : boolean;
     procedure RemoveResolution(const packageId : string);
     procedure PushRequirement(const package : IPackageInfo);
     function PopRequirement : IPackageInfo;
     function GetResolutions : TArray<IResolution>;
-    function AnyOpen : boolean;
-    function GetVersions(const packageId : string) : IList<IPackageInfo>;
-    procedure AddVersions(const packageId : string; const versions : IList<IPackageInfo>);
-    procedure RemoveVersion(const packageId : string; const version : IPackageInfo);
-    procedure Reset;
+    function AnyOpenRequrements : boolean;
+    function GetPackageVersions(const packageId : string) : IList<IPackageInfo>;
+    procedure AddPackageVersions(const packageId : string; const versions : IList<IPackageInfo>);
+    procedure RemovePackageVersion(const packageId : string; const version : IPackageInfo);
     function GetResolvedPackages : IList<IPackageInfo>;
+    function BuildDependencyGraph : IGraphNode;
   end;
 
   TResolverContext = class(TInterfacedObject, IResolverContext)
   private
     FLogger : ILogger;
-    FBadChoices : IDictionary<string, IDictionary<TPackageVersion, byte>>;
+    FNoGoods : IDictionary<string, IDictionary<TPackageVersion, byte>>;
     FResolved : IDictionary<string, IResolution>;
     FOpenRequirements : IQueue<IPackageInfo>;
     FVersionCache : IDictionary<string,IList<IPackageInfo>>;
 
   protected
-    procedure RecordBadChoice(const bad : IPackageInfo);
-    function IsBad(const package : IPackageInfo) : boolean;
-    procedure RecordResolution(const package : IPackageInfo; const dependency : IPackageDependency; const parentId : string);
+    procedure RecordNoGood(const bad : IPackageInfo);
+    function IsNoGood(const package : IPackageInfo) : boolean;
+
+    procedure RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
     function TryGetResolution(const packageId : string; out resolution : IResolution) : boolean;
     procedure RemoveResolution(const packageId : string);
     procedure PushRequirement(const package : IPackageInfo);
     function PopRequirement : IPackageInfo;
     function GetResolutions : TArray<IResolution>;
-    function AnyOpen : boolean;
-    function GetVersions(const packageId : string) : IList<IPackageInfo>;
-    procedure AddVersions(const packageId : string; const versions : IList<IPackageInfo>);
-    procedure RemoveVersion(const packageId : string; const version : IPackageInfo);
-    procedure Reset;
+    function AnyOpenRequrements : boolean;
+    function GetPackageVersions(const packageId : string) : IList<IPackageInfo>;
+    procedure AddPackageVersions(const packageId : string; const versions : IList<IPackageInfo>);
+    procedure RemovePackageVersion(const packageId : string; const version : IPackageInfo);
     function GetResolvedPackages : IList<IPackageInfo>;
+    function BuildDependencyGraph : IGraphNode;
   public
-    constructor Create(const logger : ILogger);
+    constructor Create(const logger : ILogger;  const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference> );
   end;
 
 implementation
 
 uses
   System.SysUtils,
+  DPM.Core.Dependency.Graph,
   DPM.Core.Dependency.Resolution;
+
+const
+  cRoot = 'root';
+
 
 { TResolverContext }
 
-procedure TResolverContext.AddVersions(const packageId: string; const versions: IList<IPackageInfo>);
+procedure TResolverContext.AddPackageVersions(const packageId: string; const versions: IList<IPackageInfo>);
 var
   list : IList<IPackageInfo>;
 begin
@@ -102,19 +109,68 @@ begin
   list.AddRange(versions);
 end;
 
-function TResolverContext.AnyOpen: boolean;
+function TResolverContext.AnyOpenRequrements: boolean;
 begin
   result := FOpenRequirements.Any;
 end;
 
-constructor TResolverContext.Create(const logger: ILogger);
+function TResolverContext.BuildDependencyGraph: IGraphNode;
+var
+  toplevelPackages : IEnumerable<IResolution>;
+  topLevelPackage : IResolution;
+
+  procedure AddNode(const parentNode : IGraphNode; const package : IPackageInfo; const versionRange : TVersionRange);
+  var
+    resolution : IResolution;
+    dependency : IPackageDependency;
+    childNode : IGraphNode;
+  begin
+    childNode := parentNode.AddChildNode(package.Id,package.Version, versionRange);
+    for dependency in package.Dependencies do
+    begin
+      if not TryGetResolution(dependency.Id,resolution) then
+        raise Exception.Create('Didn''t find a resolution for package ['+ dependency.id +']');
+      AddNode(childNode, resolution.Package, resolution.VersionRange);
+    end;
+  end;
+
+begin
+  result := TGraphNode.CreateRoot;
+  toplevelPackages := FResolved.Values.Where(function(const value : IResolution) : boolean
+  begin
+    result := value.ParentId = cRoot;
+  end);
+
+  for toplevelPackage in toplevelPackages do
+    AddNode(result, topLevelPackage.Package, TVersionRange.Empty);
+end;
+
+constructor TResolverContext.Create(const logger: ILogger; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>);
+var
+  projectReference : TProjectReference;
 begin
   FLogger := logger;
-  FBadChoices := TCollections.CreateDictionary<string, IDictionary<TPackageVersion, byte>>;
+  FNoGoods := TCollections.CreateDictionary<string, IDictionary<TPackageVersion, byte>>;
   FResolved := TCollections.CreateDictionary<string, IResolution>;
   FOpenRequirements := TCollections.CreateQueue<IPackageInfo>;
   FVersionCache := TCollections.CreateDictionary<string,IList<IPackageInfo>>;
+
+  for projectReference in projectReferences do
+  begin
+    //don't add to the list of packages to resolve if it has no dependencies..
+    if projectReference.Package.Dependencies.Any then
+      PushRequirement(projectReference.Package);
+
+    RecordResolution(projectReference.Package, projectReference.VersionRange , projectReference.ParentId);
+  end;
+  if newPackage <> nil then
+  begin
+    PushRequirement(newPackage);
+    RecordResolution(newPackage, TVersionRange.Empty, cRoot);
+  end;
+
 end;
+
 
 procedure TResolverContext.PushRequirement(const package: IPackageInfo);
 begin
@@ -135,18 +191,18 @@ begin
     result.Add(resolution.Package);
 end;
 
-function TResolverContext.GetVersions(const packageId: string): IList<IPackageInfo>;
+function TResolverContext.GetPackageVersions(const packageId: string): IList<IPackageInfo>;
 begin
   result := nil;
   FVersionCache.TryGetValue(LowerCase(packageId), result);
 end;
 
-function TResolverContext.IsBad(const package: IPackageInfo): boolean;
+function TResolverContext.IsNoGood(const package: IPackageInfo): boolean;
 var
   dict : IDictionary<TPackageVersion, byte>;
 begin
   result := false;
-  if FBadChoices.TryGetValue(LowerCase(package.Id), dict) then
+  if FNoGoods.TryGetValue(LowerCase(package.Id), dict) then
   begin
     if dict.ContainsKey(package.Version) then
       result := true;
@@ -161,25 +217,25 @@ begin
     result := nil;
 end;
 
-procedure TResolverContext.RecordBadChoice(const bad: IPackageInfo);
+procedure TResolverContext.RecordNoGood(const bad: IPackageInfo);
 var
   dict : IDictionary<TPackageVersion, byte>;
 begin
-  if not FBadChoices.TryGetValue(LowerCase(bad.Id), dict) then
+  if not FNoGoods.TryGetValue(LowerCase(bad.Id), dict) then
   begin
     dict := TCollections.CreateDictionary<TPackageVersion, byte>;
-    FBadChoices.Add(LowerCase(bad.Id), dict);
+    FNoGoods.Add(LowerCase(bad.Id), dict);
   end;
   dict.Add(bad.Version, 0);
 end;
 
-procedure TResolverContext.RecordResolution(const package: IPackageInfo; const dependency: IPackageDependency; const parentId: string);
+procedure TResolverContext.RecordResolution(const package: IPackageInfo; const versionRange : TVersionRange; const parentId: string);
 var
   resolution : IResolution;
 begin
   if FResolved.ContainsKey(LowerCase(package.Id)) then
     raise Exception.Create('Resolution already exists for package [' + package.Id + ']');
-  resolution := TResolution.Create(package, dependency, parentId);
+  resolution := TResolution.Create(package, versionRange, parentId);
   FResolved.Add(LowerCase(package.Id), resolution);
 end;
 
@@ -189,7 +245,7 @@ begin
     FResolved.Remove(LowerCase(packageId));
 end;
 
-procedure TResolverContext.RemoveVersion(const packageId: string; const version: IPackageInfo);
+procedure TResolverContext.RemovePackageVersion(const packageId: string; const version: IPackageInfo);
 var
   list :IList<IPackageInfo>;
 begin
@@ -197,14 +253,6 @@ begin
   begin
     list.Remove(version)
   end;
-end;
-
-procedure TResolverContext.Reset;
-begin
-  FBadChoices.Clear;
-  FResolved.Clear;
-  FOpenRequirements.Clear;
-  FVersionCache.Clear;
 end;
 
 function TResolverContext.TryGetResolution(const packageId: string; out resolution: IResolution): boolean;

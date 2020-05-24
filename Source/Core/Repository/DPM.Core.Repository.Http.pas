@@ -48,7 +48,7 @@ type
   private
   protected
     function DownloadPackage(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity; const localFolder: string; var fileName: string): Boolean;
-    function GetPackageInfo(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
+    function GetPackageInfo(const cancellationToken: ICancellationToken; const packageId : IPackageId): IPackageInfo;
     function GetPackageVersions(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): Spring.Collections.IList<TPackageVersion>;
     function GetPackageVersionsWithDependencies(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
 
@@ -87,7 +87,7 @@ begin
   result := nil;
 end;
 
-function TDPMServerPackageRepository.GetPackageInfo(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
+function TDPMServerPackageRepository.GetPackageInfo(const cancellationToken: ICancellationToken; const packageId : IPackageId): IPackageInfo;
 begin
   result := nil;
 end;

@@ -68,10 +68,10 @@ type
                  ExitCodes,
                  Help,
                  Install,
+                 Uninstall,
                  List,
                  Pack,
                  Push,
-                 Remove,
                  Restore,
                  SetAPIKey,
                  Sign,
@@ -91,10 +91,10 @@ const
                        'exitcodes',
                        'help',
                        'install',
+                       'uninstall',
                        'list',
                        'pack',
                        'push',
-                       'remove',
                        'restore',
                        'setapikey',
                        'sign',
@@ -125,7 +125,6 @@ begin
     result := TDPMCommand(i)
   else
     result := TDPMCommand.Invalid;
-
 end;
 
 end.

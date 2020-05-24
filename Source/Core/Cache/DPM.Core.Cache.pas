@@ -47,17 +47,17 @@ type
     function GetLocation: string;
     function GetPackagesFolder : string;
 
-    function CachePackage(const packageIndentity: IPackageIdentity; const saveFile: Boolean): Boolean;
+    function CachePackage(const packageId : IPackageId; const saveFile: Boolean): Boolean;
     function Clean: Boolean;
-    function CreatePackagePath(const packageIndentity : IPackageIdentity): string;
-    function GetPackagePath(const packageIndentity : IPackageIdentity): string;
-    function EnsurePackage(const packageIndentity : IPackageIdentity): Boolean;
+    function CreatePackagePath(const packageId : IPackageId): string;
+    function GetPackagePath(const packageId : IPackageId): string;
+    function EnsurePackage(const packageId : IPackageId): Boolean;
 
-    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity) : IPackageInfo;
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
 
-    function GetPackageMetadata(const packageIdentity : IPackageIdentity) : IPackageMetadata;
+    function GetPackageMetadata(const packageId : IPackageId) : IPackageMetadata;
 
-    function InstallPackage(const packageIndentity : IPackageIdentity; const saveFile : boolean; const source : string = '' ) : boolean;
+    function InstallPackage(const packageId : IPackageId; const saveFile : boolean; const source : string = '' ) : boolean;
 
     function InstallPackageFromFile(const packageFileName : string; const saveFile : boolean) : boolean;
 
@@ -78,7 +78,7 @@ uses
 
 { TPackageCache }
 
-function TPackageCache.CachePackage(const packageIndentity: IPackageIdentity; const saveFile: Boolean): Boolean;
+function TPackageCache.CachePackage(const packageId : IPackageId; const saveFile: Boolean): Boolean;
 begin
   result := false;
 end;
@@ -94,9 +94,9 @@ begin
   FSpecReader := specReader;
 end;
 
-function TPackageCache.CreatePackagePath(const packageIndentity : IPackageIdentity): string;
+function TPackageCache.CreatePackagePath(const packageId : IPackageId): string;
 begin
-  result := GetPackagePath(packageIndentity);
+  result := GetPackagePath(packageId);
   if not ForceDirectories(result) then
   begin
     FLogger.Error('Error creating package folder [' + result + ']' );
@@ -109,14 +109,14 @@ begin
   result := FLocation;
 end;
 
-function TPackageCache.GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
+function TPackageCache.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId): IPackageInfo;
 var
   packageFolder : string;
   metaDataFile : string;
   spec : IPackageSpec;
 begin
   result := nil;
-  packageFolder := GetPackagePath(packageIdentity);
+  packageFolder := GetPackagePath(packageId);
   if not DirectoryExists(packageFolder) then
     exit;
   metaDataFile := IncludeTrailingPathDelimiter(packageFolder) + cPackageMetaFile;
@@ -128,22 +128,22 @@ begin
   spec :=FSpecReader.ReadSpec(metaDataFile);
   if spec = nil then
     exit;
-  Result := TPackageInfo.CreateFromSpec(packageIdentity.SourceName, spec);
+  Result := TPackageInfo.CreateFromSpec('', spec);
 end;
 
-function TPackageCache.GetPackageMetadata(const packageIdentity: IPackageIdentity): IPackageMetadata;
+function TPackageCache.GetPackageMetadata(const packageId : IPackageId): IPackageMetadata;
 var
   packageFolder : string;
   metaDataFile : string;
   spec : IPackageSpec;
 begin
   result := nil;
-  if not EnsurePackage(packageIdentity) then
+  if not EnsurePackage(packageId) then
   begin
     FLogger.Error('Package metadata file [' + metaDataFile + '] not found in cache.');
     exit;
   end;
-  packageFolder := GetPackagePath(packageIdentity);
+  packageFolder := GetPackagePath(packageId);
   if not DirectoryExists(packageFolder) then
     exit;
   metaDataFile := IncludeTrailingPathDelimiter(packageFolder) + cPackageMetaFile;
@@ -155,12 +155,12 @@ begin
   spec :=FSpecReader.ReadSpec(metaDataFile);
   if spec = nil then
     exit;
-  Result := TPackageMetadata.CreateFromSpec(packageIdentity.SourceName, spec);
+  Result := TPackageMetadata.CreateFromSpec('', spec);
 end;
 
-function TPackageCache.GetPackagePath(const packageIndentity : IPackageIdentity): string;
+function TPackageCache.GetPackagePath(const packageId : IPackageId): string;
 begin
-  result := GetPackagesFolder + PathDelim + CompilerToString(packageIndentity.CompilerVersion) + PathDelim + DPMPlatformToString(packageIndentity.platform) + PathDelim + packageIndentity.Id + PathDelim + packageIndentity.Version.ToStringNoMeta;
+  result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim + DPMPlatformToString(packageId.platform) + PathDelim + packageId.Id + PathDelim + packageId.Version.ToStringNoMeta;
 end;
 
 function TPackageCache.GetPackagesFolder: string;
@@ -169,25 +169,25 @@ begin
   result := TPath.GetFullPath(FLocation)
 end;
 
-function TPackageCache.EnsurePackage(const packageIndentity : IPackageIdentity): Boolean;
+function TPackageCache.EnsurePackage(const packageId : IPackageId): Boolean;
 var
   packageFileName : string;
   packagesFolder : string;
 begin
   //check if we have a package folder and manifest.
-  packageFileName := GetPackagePath(packageIndentity);
+  packageFileName := GetPackagePath(packageId);
   result := DirectoryExists(packageFileName) and FileExists(IncludeTrailingPathDelimiter(packageFileName) + cPackageMetaFile);
   if not result then
   begin
     packagesFolder := GetPackagesFolder;
     //ok, if we still have the file, try install it again.
-    packageFileName := IncludeTrailingPathDelimiter(packagesFolder) + packageIndentity.ToString + cPackageFileExt;
+    packageFileName := IncludeTrailingPathDelimiter(packagesFolder) + packageId.ToString + cPackageFileExt;
     if FileExists(packageFileName) then
       result := InstallPackageFromFile(packageFileName, true)
   end;
 end;
 
-function TPackageCache.InstallPackage(const packageIndentity: IPackageIdentity; const saveFile: boolean; const source: string): boolean;
+function TPackageCache.InstallPackage(const packageId: IPackageId; const saveFile: boolean; const source: string): boolean;
 begin
    result := false;
 end;

@@ -64,8 +64,7 @@ uses
   DPM.Core.Cache.Interfaces,
   DPM.Core.Cache,
   DPM.Core.Dependency.Interfaces,
-  DPM.Core.Dependency.Resolver,
-  DPM.Core.Dependency.LockFile;
+  DPM.Core.Dependency.Resolver;
 
 
 procedure InitCore(const container : TContainer);
@@ -101,8 +100,6 @@ begin
   Container.RegisterType<IPackageCache,TPackageCache>;
 
   Container.RegisterType<IDependencyResolver,TDependencyResolver>;
-
-  Container.RegisterType<ILockFileReader,TLockFileReader>;
 
   Container.RegisterInstance<TContainer>(Container);
 

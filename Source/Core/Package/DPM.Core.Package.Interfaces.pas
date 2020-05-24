@@ -37,26 +37,33 @@ uses
   DPM.Core.TargetPlatform,
   DPM.Core.Options.Cache,
   DPM.Core.Options.Install,
+  DPM.Core.Options.Uninstall,
   DPM.Core.Options.Restore;
 
 type
-  //represents the core package identity, ie id, version, compiler, platform
-  //Note this only has info we can get from the package filename!
-  IPackageIdentity = interface
-  ['{E9E49A25-3ECA-4380-BB75-AC9E29725BEE}']
+  //minimum info needed to identify package
+  //need to make more of the api use this rather than the derived interfaces.
+  IPackageId = interface
+  ['{35FABD79-3880-4F46-9D70-AA19AAE44565}']
     function GetId : string;
     function GetVersion : TPackageVersion;
-    function GetSourceName : string;
     function GetCompilerVersion : TCompilerVersion;
     function GetPlatform : TDPMPlatform;
-    function GetProjectUrl    : string;
     function ToString : string;
     function ToIdVersionString : string;
     property Id : string read GetId;
     property Version : TPackageVersion read GetVersion;
-    property SourceName : string read GetSourceName;
     property CompilerVersion : TCompilerVersion read GetCompilerVersion;
     property Platform : TDPMPlatform read GetPlatform;
+  end;
+
+  //represents the core package identity, ie id, version, compiler, platform
+  //Note this only has info we can get from the package filename!
+  IPackageIdentity = interface(IPackageId)
+  ['{E9E49A25-3ECA-4380-BB75-AC9E29725BEE}']
+    function GetSourceName : string;
+    function GetProjectUrl    : string;
+    property SourceName : string read GetSourceName;
     //note : we can't get the project url from the filename
     //but we need it here for github based repos
     property ProjectUrl   : string  read GetProjectUrl;
@@ -69,7 +76,7 @@ type
     procedure SetVersionRange(const value : TVersionRange);
     function ToString : string;
     property Id : string read GetId;
-    property Version : TVersionRange read GetVersionRange write SetVersionRange;
+    property VersionRange : TVersionRange read GetVersionRange write SetVersionRange;
   end;
 
   //identity plus dependencies. used when resolving.
@@ -203,6 +210,7 @@ type
     function Install(const cancellationToken : ICancellationToken; const options : TInstallOptions) : boolean;
     function Restore(const cancellationToken : ICancellationToken; const options : TRestoreOptions) : boolean;
     function Cache(const cancellationToken : ICancellationToken; const options : TCacheOptions) : boolean;
+    function Remove(const cancellationToken : ICancellationToken; const options : TUninstallOptions) : boolean;
   end;
 
   //used to collect and detect package conflicts when working with multiple projects.
@@ -233,7 +241,6 @@ type
     function Equals(const Left, Right: IPackageSearchResultItem): Boolean;reintroduce;
     function GetHashCode(const Value: IPackageSearchResultItem): Integer; reintroduce;
   end;
-
 
 implementation
 

@@ -36,7 +36,7 @@ end;
 
 function TTestLogger.GetVerbosity: TVerbosity;
 begin
-
+  result := TVerbosity.Normal; //just to shut the compiler up.
 end;
 
 procedure TTestLogger.Information(const data: string; const important : boolean);

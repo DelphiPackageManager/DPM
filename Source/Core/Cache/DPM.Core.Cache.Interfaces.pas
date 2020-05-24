@@ -44,23 +44,23 @@ type
     function Clean : boolean;
 
     // creates the folder where the package would reside and returns the path.
-    function CreatePackagePath(const packageIndentity : IPackageIdentity) : string;
+    function CreatePackagePath(const packageId : IPackageId) : string;
 
-    function GetPackagePath(const packageIndentity : IPackageIdentity) : string;
+    function GetPackagePath(const packageId : IPackageId) : string;
 
     //checks if the package is present as a folder, if not there but the file is
     //then it will call InstallPackage to extract it.
-    function EnsurePackage(const packageIndentity : IPackageIdentity) : boolean;
+    function EnsurePackage(const packageId : IPackageId) : boolean;
 
-    function InstallPackage(const packageIndentity : IPackageIdentity; const saveFile : boolean; const source : string = '' ) : boolean;
+    function InstallPackage(const packageId : IPackageId; const saveFile : boolean; const source : string = '' ) : boolean;
 
     function InstallPackageFromFile(const packageFileName : string; const saveFile : boolean) : boolean;
 
     //gets the package info with dependencies. Calls EnsurePackage.
-    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity) : IPackageInfo;
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
 
     //gets the full package metadata including search paths.
-    function GetPackageMetadata(const packageIdentity : IPackageIdentity) : IPackageMetadata;
+    function GetPackageMetadata(const packageId : IPackageId) : IPackageMetadata;
 
     property Location : string read GetLocation write SetLocation;
     property PackagesFolder : string read GetPackagesFolder;

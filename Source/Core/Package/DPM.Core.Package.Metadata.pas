@@ -37,32 +37,39 @@ uses
   DPM.Core.Spec.Interfaces;
 
 type
-  TPackageIdentity = class(TInterfacedObject, IPackageIdentity)
+  TPackageId = class(TInterfacedObject, IPackageId)
   private
     FCompilerVersion: TCompilerVersion;
     FId: string;
     FPlatform: TDPMPlatform;
-    FSourceName: string;
     FVersion: TPackageVersion;
-    FProjectUrl : string;
   protected
     function GetCompilerVersion: TCompilerVersion;
     function GetId: string;
     function GetPlatform: TDPMPlatform;
-    function GetProjectUrl: string;
-
-    function GetSourceName: string;
     function GetVersion: TPackageVersion;
-    function ToIdVersionString : string;
+    function ToIdVersionString : string;virtual;
+  public
+    constructor Create(const id : string; const version : TPackageVersion; const compilerVersion: TCompilerVersion; const platform : TDPMPlatform);overload;virtual;
+    function ToString : string;override;
+  end;
+
+
+  TPackageIdentity = class(TPackageId, IPackageIdentity, IPackageId)
+  private
+    FSourceName: string;
+    FProjectUrl : string;
+  protected
+    function GetProjectUrl: string;
+    function GetSourceName: string;
     constructor Create(const sourceName : string; const spec : IPackageSpec);overload;virtual;
   public
-    function ToString : string;override;
     constructor Create(const id, source : string; const version : TPackageVersion; const compilerVersion: TCompilerVersion; const platform : TDPMPlatform; const projectUrl : string);overload;virtual;
     class function TryCreateFromString(const logger : ILogger; const value : string; const source : string; out packageIdentity : IPackageIdentity) : boolean;
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageIdentity;
   end;
 
-  TPackageInfo = class(TPackageIdentity, IPackageInfo)
+  TPackageInfo = class(TPackageIdentity, IPackageInfo, IPackageIdentity, IPackageId)
   private
     FDependencies : IList<IPackageDependency>;
   protected
@@ -72,7 +79,7 @@ type
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageInfo;
   end;
 
-  TPackageMetadata = class(TPackageInfo, IPackageMetadata)
+  TPackageMetadata = class(TPackageInfo, IPackageMetadata, IPackageInfo, IPackageIdentity, IPackageId)
   private
     FAuthors: string;
     FOwners : string;
@@ -140,11 +147,8 @@ uses
 
 constructor TPackageIdentity.Create(const id, source : string; const version : TPackageVersion; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const projectUrl : string);
 begin
-  FId := id;
-  FVersion := version;
+  inherited Create(id, version, compilerVersion, platform);
   FSourceName := source;
-  FCompilerVersion := compilerVersion;
-  FPlatform := platform;
 end;
 
 class function TPackageIdentity.CreateFromSpec(const sourceName: string; const spec: IPackageSpec): IPackageIdentity;
@@ -154,26 +158,8 @@ end;
 
 constructor TPackageIdentity.Create(const sourceName: string; const spec: IPackageSpec);
 begin
+  inherited Create(spec.MetaData.Id, spec.MetaData.Version, spec.TargetPlatforms[0].Compiler, spec.TargetPlatforms[0].Platforms[0]);
   FSourceName := sourceName;
-  FId := spec.MetaData.Id;
-  FVersion := spec.MetaData.Version;
-  FPlatform := spec.TargetPlatforms[0].Platforms[0];
-  FCompilerVersion := spec.TargetPlatforms[0].Compiler;
-end;
-
-function TPackageIdentity.GetCompilerVersion: TCompilerVersion;
-begin
-  result := FCompilerVersion;
-end;
-
-function TPackageIdentity.GetId: string;
-begin
-  result := FId;
-end;
-
-function TPackageIdentity.GetPlatform: TDPMPlatform;
-begin
-  result := FPlatform;
 end;
 
 function TPackageIdentity.GetProjectUrl: string;
@@ -184,21 +170,6 @@ end;
 function TPackageIdentity.GetSourceName: string;
 begin
   result := FSourceName;
-end;
-
-function TPackageIdentity.GetVersion: TPackageVersion;
-begin
-  result := FVersion;
-end;
-
-function TPackageIdentity.ToIdVersionString: string;
-begin
-  result := FId +' [' + FVersion.ToStringNoMeta + ']';
-end;
-
-function TPackageIdentity.ToString: string;
-begin
-  result := FId +'-' + CompilerToString(FCompilerVersion) + '-' + DPMPlatformToString(FPlatform) + '-' + FVersion.ToStringNoMeta;
 end;
 
 class function TPackageIdentity.TryCreateFromString(const logger: ILogger; const value: string; const source : string; out packageIdentity: IPackageIdentity): boolean;
@@ -493,6 +464,46 @@ begin
     exit;
   metadata := TPackageMetadata.CreateFromSpec(source, spec);
   result:= true;
+end;
+
+{ TPackageId }
+
+constructor TPackageId.Create(const id: string; const version: TPackageVersion; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform);
+begin
+  FId := id;
+  FVersion := version;
+  FCompilerVersion := compilerVersion;
+  FPlatform := platform;
+end;
+
+function TPackageId.GetCompilerVersion: TCompilerVersion;
+begin
+  result := FCompilerVersion;
+end;
+
+function TPackageId.GetId: string;
+begin
+  result := FId;
+end;
+
+function TPackageId.GetPlatform: TDPMPlatform;
+begin
+  result := FPlatform;
+end;
+
+function TPackageId.GetVersion: TPackageVersion;
+begin
+  result := FVersion;
+end;
+
+function TPackageId.ToIdVersionString: string;
+begin
+  result := FId +' [' + FVersion.ToStringNoMeta + ']';
+end;
+
+function TPackageId.ToString: string;
+begin
+  result := FId +'-' + CompilerToString(FCompilerVersion) + '-' + DPMPlatformToString(FPlatform) + '-' + FVersion.ToStringNoMeta;
 end;
 
 end.

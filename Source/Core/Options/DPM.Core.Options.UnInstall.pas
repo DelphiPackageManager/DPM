@@ -24,31 +24,94 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.Console.Command.Remove;
+unit DPM.Core.Options.UnInstall;
 
 interface
-
 uses
-  VSoft.Awaitable,
-  DPM.Console.ExitCodes,
-  DPM.Console.Command,
-  DPM.Console.Command.Base;
+  DPM.Core.Types,
+  DPM.Core.Logging,
+  DPM.Core.Options.Search;
 
 type
-  TRemoveCommand = class(TBaseCommand)
+  TUninstallOptions = class(TSearchOptions)
+  private
+    FProjectPath    : string;
+    class var
+      FDefault : TUninstallOptions;
   protected
-    function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
-  end;
+    function GetPackageId: string;
+    procedure SetPackageId(const Value: string);
+    constructor CreateClone(const original : TUninstallOptions);reintroduce;
+  public
+    class constructor CreateDefault;
+    class property Default : TUninstallOptions read FDefault;
+    constructor Create;override;
+    function Validate(const logger: ILogger): Boolean; override;
+    function Clone : TUninstallOptions;reintroduce;
 
+    property PackageId    : string      read GetPackageId write SetPackageId;
+    property ProjectPath  : string      read FProjectPath write FProjectPath;
+  end;
 
 implementation
 
-{ TRemoveCommand }
+{ TRemoveOptions }
 
-function TRemoveCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
+function TUninstallOptions.Clone: TUninstallOptions;
 begin
-  Logger.Error('Remove command not implemented');
-  result := TExitCode.NotImplemented;
+  result := TUninstallOptions.CreateClone(self);
+end;
+
+constructor TUninstallOptions.Create;
+begin
+  inherited;
+
+end;
+
+constructor TUninstallOptions.CreateClone(const original: TUninstallOptions);
+begin
+  inherited CreateClone(original);
+  FProjectPath    := original.FProjectPath;
+end;
+
+class constructor TUninstallOptions.CreateDefault;
+begin
+  FDefault := TUninstallOptions.Create;
+end;
+
+function TUninstallOptions.GetPackageId: string;
+begin
+  result := SearchTerms;
+end;
+
+procedure TUninstallOptions.SetPackageId(const Value: string);
+begin
+  SearchTerms := value;
+end;
+
+function TUninstallOptions.Validate(const logger: ILogger): Boolean;
+begin
+  //must call inherited
+  result := inherited Validate(logger);
+
+  if FProjectPath = '' then
+  begin
+    Logger.Error('Project path cannot be empty, must either be a directory or project file.');
+    result := false;
+  end;
+
+  if TUninstallOptions.Default.PackageId = '' then
+  begin
+    Logger.Error('The <packageId> option must be specified.');
+    result := false;
+  end;
+
+  if ConfigFile = '' then
+  begin
+    Logger.Error('No configuration file specified');
+    exit;
+  end;
+
 end;
 
 end.

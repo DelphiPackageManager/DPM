@@ -35,7 +35,6 @@ uses
   DPM.Core.Logging,
   DPM.Core.Types,
   DPM.Core.Options.Search,
-  DPM.Core.Project.Interfaces,
   DPM.Core.Package.Interfaces,
   DPM.Core.Dependency.Version;
 
@@ -44,88 +43,69 @@ type
 
   TNodeVisitProc = reference to procedure(const node : IGraphNode);
 
-  TGraphNodeState = (
-    Unknown,
-    Rejected,
-    Selected,
-    Candidate,
-    Failure
-  );
-
   //a directed asyclic graph (DAG).
   IGraphNode = interface
   ['{20055C26-8E63-4936-8249-ACF8514A37E7}']
     function GetLevel : integer;
     function GetId : string;
     function GetParent : IGraphNode;
-    function GetState : TGraphNodeState;
     function GetSelectedVersion : TPackageVersion;
-    function GetDependencies : IDictionary<string, IPackageDependency>;
-
-    procedure SetState(const value : TGraphNodeState);
     procedure SetSelectedVersion(const value : TPackageVersion);
+
+    function GetSelectedOn : TVersionRange;
+    procedure SetSelectedOn(const value : TVersionRange);
 
     function GetChildNodes : IEnumerable<IGraphNode>;
 
-    function AddChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange; const dependencies : IEnumerable<IPackageDependency>) : IGraphNode;
-    function RemoveChildNode(const  id : string) : boolean;
-
+    function AddChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
     //Breadth first search
-    function FindNode(const id : string ) : IGraphNode;
-
+    function FindFirstNode(const id : string ) : IGraphNode;
+    function FindNodes(const id : string) : IList<IGraphNode>;
     //searches this node only
     function FindChild(const id : string) : IGraphNode;
 
+    //removes any child with id recursively (and it's children)
+    procedure Prune(const id : string);
+    function RemoveNode(const node : IGraphNode) : boolean;
     function IsRoot : boolean;
     function IsTopLevel : boolean;
     function HasChildren : boolean;
     procedure VisitDFS(const visitor : TNodeVisitProc);
 
     property Id : string read GetId;
-    property State : TGraphNodeState read GetState write SetState;
     property SelectedVersion : TPackageVersion read GetSelectedVersion write SetSelectedVersion;
+    property SelectedOn : TVersionRange read GetSelectedOn write SetSelectedOn;
     property Level : integer read GetLevel;
     property ChildNodes : IEnumerable<IGraphNode> read GetChildNodes;
     property Parent : IGraphNode read GetParent;
-    property Dependencies : IDictionary<string, IPackageDependency> read GetDependencies;
   end;
 
-
-  ILockFile = interface
-  ['{777456CA-44C2-4DC8-901A-5332091BD531}']
-    function IsValid(const topLevel : IEnumerable<IPackageDependency>) : boolean;
-    function GetFileName : string;
-    function GetGraph : IGraphNode;
-    function CommitToFile(const newFileName : string = '') : boolean;
-    function CommitToStream(const stream : TStream) : boolean;
-    property FileName : string read GetFileName;
-    property Graph : IGraphNode read GetGraph;
-  end;
-
-  ILockFileReader = interface
-  ['{12D9989C-070C-4872-A56E-CA2EF80B4664}']
-    function TryLoadFromString(const value : string; out lockFile : ILockFile) : boolean;
-    function TryLoadFromFile(const fileName : string; out lockFile : ILockFile) : boolean;
-    function CreateNew(const fileName : string) : ILockFile;
-  end;
 
   IResolution = interface
   ['{CC4F63AA-80F7-46AC-8C42-0F8725B59579}']
     function GetPackage :  IPackageInfo;
-    function GetDependency : IPackageDependency;
+  //  function GetDependency : IPackageDependency;
     function GetParentId : string;
+    function GetVersionRange : TVersionRange;
+    procedure SetVersionRange(const value : TVersionRange);
 
     property Package : IPackageInfo read GetPackage;
-    property Dependency : IPackageDependency read GetDependency;
+    property VersionRange : TVersionRange read GetVersionRange write SetVersionRange;
+  //  property Dependency : IPackageDependency read GetDependency;
     property ParentId : string read GetParentId;
   end;
 
+  TProjectReference = record
+    Package : IPackageInfo;
+    VersionRange : TVersionRange;
+    ParentId : string;
+  end;
 
   IDependencyResolver = interface
   ['{B187F0DB-FEA1-48B4-81F2-CECF073C2FB0}']
     //returns true if all dependencies were resolved. If true, the graph is fully populated and can be serialized.
-    function ResolveForInstall(const cancellationToken : ICancellationToken; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageInfo>; const lockFile : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
-    function ResolveForRestore(const cancellationToken : ICancellationToken; const options : TSearchOptions; const projectReferences : IList<IPackageInfo>; const lockFile : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForRestore(const cancellationToken : ICancellationToken; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
   end;
 
 

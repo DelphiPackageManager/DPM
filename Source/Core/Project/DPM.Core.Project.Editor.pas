@@ -82,7 +82,7 @@ type
     function EnsureBaseSearchPath   : boolean;
 
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string>; const packageCacheLocation : string) : boolean;
-    function AddOrUpdatePackageReference(const packageReference : IPackageReference) : boolean;
+    procedure UpdatePackageReferences(const packageReferences : IList<IPackageReference>; const platform : TDPMPlatform);
 
   public
     constructor Create(const logger : ILogger; const config : IConfiguration);
@@ -137,59 +137,6 @@ begin
 end;
 
 { TProjectEditor }
-
-function TProjectEditor.AddOrUpdatePackageReference(const packageReference: IPackageReference) : boolean;
-var
-  projectExtensionsElement : IXMLDOMElement;
-  dpmElement : IXMLDOMElement;
-  packageReferenceElements : IXMLDOMNodeList;
-  packageReferenceElement : IXMLDOMElement;
-  i : integer;
-  existing : IPackageReference;
-begin
-  result := false;
-  projectExtensionsElement := FProjectXML.selectSingleNode(projectExtensionsXPath) as IXMLDOMElement;
-  if projectExtensionsElement = nil then
-  begin
-    FLogger.Error('Unable to find ProjectExtensions element in project file.');
-    exit;
-  end;
-  dpmElement := projectExtensionsElement.selectSingleNode('x:DPM') as IXMLDOMElement;
-  if dpmElement = nil then
-  begin
-    dpmElement := FProjectXML.createNode(NODE_ELEMENT, 'DPM',msbuildNamespace) as  IXMLDOMElement;
-    projectExtensionsElement.appendChild(dpmElement);
-  end
-  else
-  begin
-    //remove existing nodes, we'll rewrite them below.
-    packageReferenceElements := dpmElement.selectNodes('x:PackageReference');
-    for i := 0 to packageReferenceElements.length -1 do
-      dpmElement.removeChild(packageReferenceElements.item[i]);
-  end;
-
-  existing := FPackageRefences.Where(
-    function(const packageRef : IPackageReference) : boolean
-    begin
-      result := SameText(packageRef.Id, packageReference.Id) and (packageRef.Platform = packageReference.Platform);
-    end).FirstOrDefault;
-
-  if existing <> nil then
-    existing.Version := packageReference.Version
-  else
-    FPackageRefences.Add(packageReference);
-
-  for existing in FPackageRefences do
-  begin
-    packageReferenceElement := FProjectXML.createNode(NODE_ELEMENT, 'PackageReference',msbuildNamespace) as  IXMLDOMElement;
-    packageReferenceElement.setAttribute('id', existing.Id);
-    packageReferenceElement.setAttribute('platform', DPMPlatformToBDString(existing.Platform));
-    packageReferenceElement.setAttribute('version', existing.Version.ToStringNoMeta);
-    dpmElement.appendChild(packageReferenceElement);
-  end;
-  result := true;
-
-end;
 
 function TProjectEditor.AddSearchPaths(const platform: TDPMPlatform; const searchPaths: IList<string>; const packageCacheLocation : string): boolean;
 var
@@ -551,84 +498,137 @@ begin
 end;
 
 function TProjectEditor.LoadPackageRefences: boolean;
-var
-  packageNodes : IXMLDOMNodeList;
-  packageElement : IXMLDOMElement;
-  i : integer;
-  id : string;
-  sVersion : string;
-  version : TPackageVersion;
-  error : string;
-  sPlatform  : string;
-  platform : TDPMPlatform;
-  packageReference : IPackageReference;
-begin
-  result := true;
-  FPackageRefences.Clear;
-  packageNodes := FProjectXML.selectNodes(packageReferencesXPath);
-  if packageNodes.length > 0 then
+
+
+  procedure ReadPackageReferences(const parentReference : IPackageReference; const parentElement : IXMLDOMElement);
+  var
+    isTransitive : boolean;
+    packageNodes : IXMLDOMNodeList;
+    packageElement : IXMLDOMElement;
+    i : integer;
+    id : string;
+    sVersion : string;
+    version : TPackageVersion;
+    error : string;
+    sPlatform  : string;
+    platform : TDPMPlatform;
+    packageReference : IPackageReference;
+    sRange : string;
+    range : TVersionRange;
+    dupList : IList<IPackageReference>;
+    sXPath : string;
   begin
-    for i := 0 to packageNodes.length -1 do
+    isTransitive := parentReference <> nil;
+
+    if isTransitive then
+      sXPath := 'x:PackageReference'
+    else
+      sXPath := packageReferencesXPath;
+
+    packageNodes := parentElement.selectNodes(sXPath);
+    if packageNodes.length > 0 then
     begin
-      packageElement := packageNodes.item[i] as IXMLDOMElement;
-      if packageElement.getAttributeNode('id') <> nil then
+      for i := 0 to packageNodes.length -1 do
       begin
-        id := packageElement.getAttribute('id');
-      end
-      else
-      begin
-        FLogger.Error('Invalid package reference detected in project, missing required [id] attribute');
-        result := false;
-        exit;
-      end;
-      if packageElement.getAttributeNode('version') <> nil then
-      begin
-        sVersion := packageElement.getAttribute('version');
-        if not TPackageVErsion.TryParseWithError(sVersion, version,error) then
+        packageElement := packageNodes.item[i] as IXMLDOMElement;
+        if packageElement.getAttributeNode('id') <> nil then
         begin
-          FLogger.Error('Invalid package reference detected in project, [version] attribute is not valid');
-          FLogger.Error(' ' + error);
+          id := packageElement.getAttribute('id');
+        end
+        else
+        begin
+          FLogger.Error('Invalid package reference detected in project, missing required [id] attribute');
           result := false;
           exit;
         end;
-      end
-      else
-      begin
-        FLogger.Error('Invalid package reference detected in project, missing required [version] attribute');
-        result := false;
-        exit;
-      end;
-      if packageElement.getAttributeNode('platform') <> nil then
-      begin
-        sPlatform := packageElement.getAttribute('platform');
-        platform := StringToDPMPlatform(sPlatform);
-        if platform = TDPMPlatform.UnknownPlatform then
+
+        if packageElement.getAttributeNode('version') <> nil then
         begin
-          FLogger.Error('Invalid package reference platform value [' + sPlatform + '] in platforms attribute for [' + id +']');
+          sVersion := packageElement.getAttribute('version');
+          if not TPackageVErsion.TryParseWithError(sVersion, version,error) then
+          begin
+            FLogger.Error('Invalid package reference detected in project, [version] attribute is not valid');
+            FLogger.Error(' ' + error);
+            result := false;
+            exit;
+          end;
+        end
+        else
+        begin
+          FLogger.Error('Invalid package reference detected in project, missing required [version] attribute');
           result := false;
           exit;
         end;
-        //check for dup
-        if FPackageRefences.Where(
+
+        if packageElement.getAttributeNode('platform') <> nil then
+        begin
+          sPlatform := packageElement.getAttribute('platform');
+          platform := StringToDPMPlatform(sPlatform);
+          if platform = TDPMPlatform.UnknownPlatform then
+          begin
+            FLogger.Error('Invalid package reference platform value [' + sPlatform + '] in platforms attribute for [' + id +']');
+            result := false;
+            exit;
+          end;
+        end;
+
+        //check for duplicate references
+        if isTransitive then
+          dupList := parentReference.Dependencies
+        else
+          dupList := FPackageRefences;
+
+        if dupList.Where(
             function(const item : IPackageReference) : boolean
             begin
                result := SameText(item.Id, id) and (item.Platform = platform) ;
             end).Any then
         begin
-          FLogger.Error('Duplicate package reference for package [' + id +  '  ' + DPMPlatformToString(platform) +']' );
+          if parentReference <> nil then
+            FLogger.Error('Duplicate package reference for package [' + id +  '  ' + DPMPlatformToString(platform) +'] under [' + parentReference.Id +']' )
+          else
+            FLogger.Error('Duplicate package reference for package [' + id +  '  ' + DPMPlatformToString(platform) +']' );
           exit;
         end;
-        packageReference := TPackageReference.Create(id,version, platform);
-        FPackageRefences.Add(packageReference);
-      end
-      else
-      begin
-        FLogger.Error('Invalid package reference detected in project, missing required [version] attribute');
-        result := false;
-        exit;
+
+        //only transitive packages need a range
+        if isTransitive then
+        begin
+          range := TVersionRange.Empty;
+          if packageElement.getAttributeNode('range') <> nil then
+          begin
+            sRange := packageElement.getAttribute('range');
+            if not TVersionRange.TryParseWithError(sRange, range, error) then
+            begin
+              FLogger.Error('Invalid package reference detected in project, [version] attribute is not valid');
+              FLogger.Error(' ' + error);
+              result := false;
+              exit;
+            end;
+          end
+          else
+          begin
+            FLogger.Error('Invalid package reference detected in project, missing required [range] attribute on transitive refererence');
+            FLogger.Error('Remove the reference and run restore to correct the reference.');
+            result := false;
+            exit;
+          end;
+        end;
+        packageReference := TPackageReference.Create(id,version, platform, FCompiler, range, false);
+        if isTransitive then
+          parentReference.Dependencies.Add(packageReference)
+        else
+          FPackageRefences.Add(packageReference);
+        ReadPackageReferences(packageReference, packageElement);
       end;
-    end;
+   end;
   end;
+
+begin
+  result := true;
+  FPackageRefences.Clear;
+  ReadPackageReferences(nil, FProjectXML.documentElement);
+
 end;
 
 function TProjectEditor.LoadProject(const filename: string): Boolean;
@@ -772,6 +772,59 @@ end;
 procedure TProjectEditor.SetCompiler(const value: TCompilerVersion);
 begin
   FCompiler := value;
+end;
+
+procedure TProjectEditor.UpdatePackageReferences(const packageReferences: IList<IPackageReference>; const platform : TDPMPlatform);
+var
+  projectExtensionsElement : IXMLDOMElement;
+  dpmElement : IXMLDOMElement;
+  packageReferenceElements : IXMLDOMNodeList;
+  i : integer;
+
+  procedure WritePackageReference(const parentElement : IXMLDOMElement; const packageReference : IPackageReference);
+  var
+    packageReferenceElement : IXMLDOMElement;
+    j : integer;
+  begin
+    packageReferenceElement := FProjectXML.createNode(NODE_ELEMENT, 'PackageReference',msbuildNamespace) as  IXMLDOMElement;
+    packageReferenceElement.setAttribute('id', packageReference.Id);
+    packageReferenceElement.setAttribute('platform', DPMPlatformToBDString(packageReference.Platform));
+    packageReferenceElement.setAttribute('version', packageReference.Version.ToStringNoMeta);
+    if not packageReference.Range.IsEmpty then
+      packageReferenceElement.setAttribute('range', packageReference.Range.ToString);
+    parentElement.appendChild(packageReferenceElement);
+    if packageReference.Dependencies <> nil then
+    begin
+      for j := 0 to packageReference.Dependencies.Count -1 do
+        WritePackageReference(packageReferenceElement, packageReference.Dependencies[j]);
+    end;
+  end;
+
+
+begin
+  projectExtensionsElement := FProjectXML.selectSingleNode(projectExtensionsXPath) as IXMLDOMElement;
+  if projectExtensionsElement = nil then
+  begin
+    FLogger.Error('Unable to find ProjectExtensions element in project file.');
+    exit;
+  end;
+  dpmElement := projectExtensionsElement.selectSingleNode('x:DPM') as IXMLDOMElement;
+  if dpmElement = nil then
+  begin
+    dpmElement := FProjectXML.createNode(NODE_ELEMENT, 'DPM',msbuildNamespace) as  IXMLDOMElement;
+    projectExtensionsElement.appendChild(dpmElement);
+  end
+  else
+  begin
+    //remove existing nodes, we'll rewrite them below.
+    packageReferenceElements := dpmElement.selectNodes('x:PackageReference[@platform="' + DPMPlatformToString(platform) +'"]' );
+    for i := 0 to packageReferenceElements.length -1 do
+      dpmElement.removeChild(packageReferenceElements.item[i]);
+  end;
+
+  for i := 0 to packageReferences.Count -1 do
+    WritePackageReference(dpmElement, packageReferences[i]);
+
 end;
 
 end.

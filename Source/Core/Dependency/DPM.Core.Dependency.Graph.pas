@@ -32,44 +32,43 @@ uses
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Logging,
-  DPM.Core.Package.Interfaces,
   DPM.Core.Dependency.Interfaces,
   DPM.Core.Dependency.Version;
-
 
 type
   TGraphNode = class(TInterfacedObject, IGraphNode)
   private
-    FParent : Pointer; //todo : use weakref??
+    //todo : in 10.3+ use weakref
+    FParent : Pointer;
     FChildNodes : IDictionary<string,IGraphNode>;
     FId : string;
     FVersion : TPackageVersion;
-    FDependencies : IDictionary<string, IPackageDependency>;
-    FState : TGraphNodeState;
     FSelectedOn : TVersionRange;
     FLevel : integer;
   protected
-    function AddChildNode(const id: string; const version: TPackageVersion; const selectedOn : TVersionRange; const dependencies: IEnumerable<IPackageDependency>): IGraphNode;
-    function FindNode(const id: string): IGraphNode;
+    function AddChildNode(const id: string; const version: TPackageVersion; const selectedOn : TVersionRange): IGraphNode;
+    function FindFirstNode(const id: string): IGraphNode;
+    function FindNodes(const id : string) : IList<IGraphNode>;
     function FindChild(const id : string) : IGraphNode;
     function GetChildNodes: IEnumerable<IGraphNode>;
-    function GetDependencies: IDictionary<string, IPackageDependency>;
     function GetId: string;
     function GetParent: IGraphNode;
+    function GetSelectedOn: TVersionRange;
     function GetSelectedVersion: TPackageVersion;
-    function GetState: TGraphNodeState;
-    function RemoveChildNode(const id: string): Boolean;
     procedure SetSelectedVersion(const value: TPackageVersion);
-    procedure SetState(const value: TGraphNodeState);
+    procedure SetSelectedOn(const value: TVersionRange);
+    function RemoveNode(const node : IGraphNode) : boolean;
     function IsRoot : boolean;
     function IsTopLevel : boolean;
     function HasChildren : boolean;
     function GetLevel: Integer;
     procedure VisitDFS(const visitor : TNodeVisitProc);
+    procedure Prune(const id : string);
 
   public
-    constructor Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const selectedOn : TVersionRange;  const dependencies : IEnumerable<IPackageDependency>);
+    constructor Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const selectedOn : TVersionRange);
     constructor CreateRoot;
+
   end;
 
 
@@ -80,7 +79,7 @@ uses
 
 { TGraphNode }
 
-function TGraphNode.AddChildNode(const id: string; const version: TPackageVersion; const selectedOn : TVersionRange;  const dependencies: IEnumerable<IPackageDependency>): IGraphNode;
+function TGraphNode.AddChildNode(const id: string; const version: TPackageVersion; const selectedOn : TVersionRange): IGraphNode;
 var
   parent : IGraphNode;
 begin
@@ -98,13 +97,11 @@ begin
     parent := parent.Parent;
   end;
 
-  result := TGraphNode.Create(self, id, version, selectedOn, dependencies );
+  result := TGraphNode.Create(self, id, version, selectedOn);
   FChildNodes.Add(LowerCase(id), result);
 end;
 
-constructor TGraphNode.Create(const parent: IGraphNode; const id: string; const version: TPackageVersion;  const selectedOn : TVersionRange;   const dependencies: IEnumerable<IPackageDependency>);
-var
-  dep : IPackageDependency;
+constructor TGraphNode.Create(const parent: IGraphNode; const id: string; const version: TPackageVersion;  const selectedOn : TVersionRange);
 begin
   FLevel := 0;
   if parent <> nil then
@@ -115,27 +112,16 @@ begin
   else
     FParent := nil;
 
-
   FId := id;
   FVersion := version;
   FSelectedOn := selectedOn;
-  FDependencies := TCollections.CreateDictionary<string, IPackageDependency>;
-  if dependencies <> nil then
-  begin
-    for dep in dependencies do
-    begin
-      FDependencies.Add(LowerCase(dep.Id), dep);
-    end;
-  end;
 
-  FChildNodes := TCollections.CreateDictionary<string, IGraphNode>;
-  FState := TGraphNodeState.Unknown;
+  FChildNodes := TCollections.CreateSortedDictionary<string, IGraphNode>();
 end;
 
 constructor TGraphNode.CreateRoot;
 begin
-  Create(nil,'root-node',TPackageVersion.Empty, TVersionRange.Empty,nil);
-  FState := TGraphNodeState.Unknown;
+  Create(nil,'root',TPackageVersion.Empty, TVersionRange.Empty);
 end;
 
 function TGraphNode.FindChild(const id: string): IGraphNode;
@@ -144,7 +130,8 @@ begin
   FChildNodes.TryGetValue(LowerCase(id), result)
 end;
 
-function TGraphNode.FindNode(const id: string): IGraphNode;
+//non recursive breadth first search.
+function TGraphNode.FindFirstNode(const id: string): IGraphNode;
 var
   queue : IQueue<IGraphNode>;
   currentNode : IGraphNode;
@@ -173,14 +160,22 @@ begin
   end;
 end;
 
+function TGraphNode.FindNodes(const id: string): IList<IGraphNode>;
+var
+  list : IList<IGraphNode>;
+begin
+  result := TCollections.CreateList<IGraphNode>;
+  list := result;
+  VisitDFS(procedure(const node : IGraphNode)
+  begin
+    if SameText(id, node.Id) then
+      list.Add(node);
+  end);
+end;
+
 function TGraphNode.GetChildNodes: IEnumerable<IGraphNode>;
 begin
   result := FChildNodes.Values;
-end;
-
-function TGraphNode.GetDependencies: IDictionary<string, IPackageDependency>;
-begin
-  result := FDependencies
 end;
 
 function TGraphNode.GetId: string;
@@ -200,17 +195,16 @@ begin
     result := IGraphNode(FParent)
   else
     result := nil;
+end;
 
+function TGraphNode.GetSelectedOn: TVersionRange;
+begin
+  result := FSelectedOn;
 end;
 
 function TGraphNode.GetSelectedVersion: TPackageVersion;
 begin
   result := FVersion;
-end;
-
-function TGraphNode.GetState: TGraphNodeState;
-begin
-  result := FState;
 end;
 
 function TGraphNode.HasChildren: boolean;
@@ -228,11 +222,38 @@ begin
   result := FLevel = 1;
 end;
 
-function TGraphNode.RemoveChildNode(const id: string): Boolean;
+procedure TGraphNode.Prune(const id: string);
+var
+  childNode : IGraphNode;
 begin
-  result := false;
   if FChildNodes.ContainsKey(LowerCase(id)) then
-    result := FChildNodes.Remove(LowerCase(id));
+    FChildNodes.Remove(LowerCase(id))
+  else
+  begin
+    for childNode in FChildNodes.Values do
+      childNode.Prune(id);
+  end;
+end;
+
+function TGraphNode.RemoveNode(const node: IGraphNode) : boolean;
+var
+  childNode : IGraphNode;
+begin
+  result :=  FChildNodes.ContainsValue(node);
+  if result  then
+    FChildNodes.Remove(LowerCase(node.Id))
+  else
+    for childNode in FChildNodes.Values do
+    begin
+      result := childNode.RemoveNode(node);
+      if result then
+        exit;
+    end;
+end;
+
+procedure TGraphNode.SetSelectedOn(const value: TVersionRange);
+begin
+  FSelectedOn := value;
 end;
 
 procedure TGraphNode.SetSelectedVersion(const value: TPackageVersion);
@@ -240,21 +261,14 @@ begin
   FVersion := value;
 end;
 
-procedure TGraphNode.SetState(const value: TGraphNodeState);
-begin
-  FState := value;
-end;
-
 procedure TGraphNode.VisitDFS(const visitor: TNodeVisitProc);
 var
   childNode : IGraphNode;
 begin
   for childNode in FChildNodes.Values do
-  begin
-    visitor(childNode);
-  end;
-  visitor(self);
+    childNode.VisitDFS(visitor);
 
+  visitor(self);
 end;
 
 

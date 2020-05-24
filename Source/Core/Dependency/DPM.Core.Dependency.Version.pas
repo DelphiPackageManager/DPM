@@ -79,7 +79,8 @@ type
     class function IsValidFloat(const minVersion : TPackageVersion; const  maxVersion : TPackageVersion) : boolean;static;
   public
 
-    constructor Create(const original : string; const minVersion : TPackageVersion; const minInclusive : boolean; const maxVersion : TPackageVersion; const maxInclusive : boolean);
+    constructor Create(const original : string; const minVersion : TPackageVersion; const minInclusive : boolean; const maxVersion : TPackageVersion; const maxInclusive : boolean);overload;
+    constructor Create(const version : TPackageVersion);overload;
     class function Parse(const value : string)  : TVersionRange;static;
 
     class function TryParse(const value : string; out depVersion : TVersionRange) : boolean;static;
@@ -133,6 +134,18 @@ begin
   FMaxVersion :=maxVersion;
   FMaxVersionIsInclusive := maxInclusive;;
   FIsValid := true;
+end;
+
+constructor TVersionRange.Create(const version: TPackageVersion);
+begin
+  FOriginal := version.ToStringNoMeta;
+  FMinVersion := version;
+  FMinVersionIsInclusive := true;
+
+  FMaxVersion :=version;
+  FMaxVersionIsInclusive := True;;
+  FIsValid := true;
+
 end;
 
 constructor TVersionRange.CreateInvalid(dummy: integer);

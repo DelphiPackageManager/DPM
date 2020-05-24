@@ -30,22 +30,31 @@ interface
 
 uses
   Spring.Collections,
+  System.Generics.Defaults,
   DPM.Core.Types,
-  DPM.Core.Dependency.Version;
+  DPM.Core.Dependency.Version,
+  DPM.Core.Package.Interfaces;
 
 {$SCOPEDENUMS ON}
 
 type
   //represents a package reference in the dproj
-  IPackageReference = interface
+  IPackageReference = interface(IPackageId)
   ['{FC4548EF-A449-4E78-9D9B-C01B5BE0E389}']
     function GetId : string;
     function GetVersion : TPackageVersion;
     function GetPlatform : TDPMPlatform;
+    function GetIsTransitive : boolean;
+    function GetRange : TVersionRange;
+    function GetDependencies : IList<IPackageReference>;
     procedure SetVersion(const value : TPackageVersion);
+
     property Id : string read GetId;
     property Version : TPackageVersion read GetVersion write SetVersion;
     property Platform : TDPMPlatform read GetPlatform;
+    property Range : TVersionRange read GetRange;
+    property IsTransitive : boolean read GetIsTransitive;
+    property Dependencies : IList<IPackageReference> read GetDependencies;
   end;
 
 
@@ -82,7 +91,7 @@ type
     procedure Reset;
 
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string>; const packageCacheLocation : string) : boolean;
-    function AddOrUpdatePackageReference(const packageReference : IPackageReference) : boolean;
+    procedure UpdatePackageReferences(const packageReferences : IList<IPackageReference>; const platform : TDPMPlatform);
 
     function SaveProject(const fileName : string = '') : boolean;
 
@@ -102,7 +111,32 @@ type
     function ExtractProjects(const list : IList<string>) : boolean;
   end;
 
+  //just compares id's, not version!
+  TPackageRefenceComparer = class(TInterfacedObject,IEqualityComparer<IPackageReference>)
+  protected
+    function Equals(const Left, Right: IPackageReference): Boolean;reintroduce;
+    function GetHashCode(const Value: IPackageReference): Integer; reintroduce;
+  end;
+
+
 
 implementation
+
+uses
+  System.SysUtils;
+
+{ TPackageRefenceComparer }
+
+function TPackageRefenceComparer.Equals(const Left, Right: IPackageReference): Boolean;
+begin
+  result := SameText(Left.Id, Right.Id);
+end;
+
+function TPackageRefenceComparer.GetHashCode(const Value: IPackageReference): Integer;
+var
+  s : string;
+begin
+  s := Value.Id;
+  Result := BobJenkinsHash(PChar(s)^, SizeOf(Char) * Length(s), 0);end;
 
 end.

@@ -58,7 +58,7 @@ type
     function List(const cancellationToken : ICancellationToken; const options: TSearchOptions): IList<IPackageIdentity>;
     function UpdateRepositories( const configuration : IConfiguration) : boolean;
 
-    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId): IPackageInfo;
     function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform;const versionRange : TVersionRange) : IList<IPackageInfo>;
 
     //UI specific stuff
@@ -208,29 +208,16 @@ begin
 
 end;
 
-function TPackageRepositoryManager.GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
+function TPackageRepositoryManager.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId): IPackageInfo;
 var
   repo : IPackageRepository;
 begin
   result := nil;
-  if packageIdentity.SourceName <> '' then
+  for repo in FRepositories do
   begin
-    repo := GetRepositoryByName(packageIdentity.SourceName);
-    if repo = nil then
-    begin
-      FLogger.Error('Unabled to find repository for source [' + packageIdentity.SourceName + ']');
+    result := repo.GetPackageInfo(cancellationToken, packageId);
+    if result <> nil then
       exit;
-    end;
-    result := repo.GetPackageInfo(cancellationToken, packageIdentity);
-  end
-  else
-  begin
-    for repo in FRepositories do
-    begin
-      result := repo.GetPackageInfo(cancellationToken, packageIdentity);
-      if result <> nil then
-        exit;
-    end;
   end;
 end;
 
@@ -459,6 +446,7 @@ begin
                 end;
               end;
 
+  //what does this do? if we don't provide a comparer?
   distinctResults := TDistinctIterator<IPackageIdentity>.Create(unfilteredResults, nil);
   searchResult.Clear;
   searchResult.AddRange(distinctResults);

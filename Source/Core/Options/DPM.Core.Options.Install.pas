@@ -119,47 +119,36 @@ begin
   //must call inherited
   result := inherited Validate(logger);
 
-  if TInstallOptions.Default.PackageId = '' then
-    if TInstallOptions.Default.PackageFile = '' then
-    begin
-      Logger.Error('Either the <package> option or packageFile option must be specified.');
-      result := false;
-    end;
-
   if ConfigFile = '' then
   begin
     Logger.Error('No configuration file specified');
     exit;
   end;
 
-  if (PackageId = '') and (FPackageFile = '')  then
+  PackageFile := PackageId;
+
+
+  if (PackageId <> '') then
   begin
-    Logger.Error('Either the <package> option or packageFile option must be specified.');
-    result := false;
-  end
-  else if (PackageId <> '') and (FPackageFile <> '') then
-  begin
-    PackageId := '';
-    Logger.Warning('Both <package> and packageFile were specified, using packageFile');
-    if not FileExists(FPackageFile) then
+    if TRegEx.IsMatch(PackageId, cPackageIdRegex) then
+    begin
+//      Logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
+      FPackageFile := ''
+    end
+    else if not FileExists(FPackageFile) then
     begin
       Logger.Error('The specified packageFile [' + FPackageFile + '] does not exist.');
       result := false;
-    end;
-    packageString := ChangeFileExt(ExtractFileName(FPackageFile),'');
-
-    if not TRegEx.IsMatch(packageString, cPackageFileRegex) then
+    end
+    else
     begin
-      Logger.Error('The specified packageFile name [' + packageString + '] is not in the correct format.');
-      result := false;
-    end;
-  end
-  else
-  begin
-    if not TRegEx.IsMatch(PackageId, cPackageIdRegex) then
-    begin
-      Logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
-      result := false;
+      packageString := ChangeFileExt(ExtractFileName(FPackageFile),'');
+      if not TRegEx.IsMatch(packageString, cPackageFileRegex) then
+      begin
+        Logger.Error('The specified packageFile name [' + packageString + '] is not in the correct format.');
+        result := false;
+      end;
+      PackageId := '';
     end;
   end;
 

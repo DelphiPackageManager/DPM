@@ -14,8 +14,7 @@ uses
   TargetPlatformTests in 'Tests\TargetPlatformTests.pas',
   DPM.Core.Tests.Spec.Reader in 'Tests\DPM.Core.Tests.Spec.Reader.pas',
   TestLogger in 'Tests\TestLogger.pas',
-  DependencyVersionTests in 'Tests\DependencyVersionTests.pas',
-  LockFileParserTests in 'Tests\LockFileParserTests.pas';
+  DependencyVersionTests in 'Tests\DependencyVersionTests.pas';
 
 var
   runner : ITestRunner;

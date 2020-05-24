@@ -71,7 +71,7 @@ type
     function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : boolean) : IList<TPackageVersion>;
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
 
-    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;overload;
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId): IPackageInfo;overload;
 
     //ui stuff
 
@@ -225,12 +225,12 @@ begin
   end;
 end;
 
-function TDirectoryPackageRepository.GetPackageInfo(const cancellationToken : ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
+function TDirectoryPackageRepository.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId): IPackageInfo;
 var
   packagFileName : string;
 begin
   result := nil;
-  packagFileName := Format('%s-%s-%s-%s.dpkg',[ packageIdentity.Id, CompilerToString(packageIdentity.CompilerVersion),DPMPlatformToString(PackageIdentity.Platform), packageIdentity.Version.ToStringNoMeta]);
+  packagFileName := Format('%s-%s-%s-%s.dpkg',[ packageId.Id, CompilerToString(packageId.CompilerVersion),DPMPlatformToString(packageId.Platform), packageId.Version.ToStringNoMeta]);
   packagFileName := IncludeTrailingPathDelimiter(Source) + packagFileName;
   if not FileExists(packagFileName) then
     exit;
