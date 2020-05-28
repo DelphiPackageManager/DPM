@@ -24,92 +24,78 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.IDE.Main;
+
+unit DPM.Console.Command.Feed;
 
 interface
 
-Uses
-  ToolsAPI,
-  WinApi.Windows,
-  System.SysUtils,
-  Vcl.Dialogs,
-  DPM.IDE.Wizard;
+uses
+  VSoft.Awaitable,
+  DPM.Console.ExitCodes,
+  DPM.Console.Command.Base,
+  DPM.Core.Logging,
+  DPM.Core.Configuration.Interfaces,
+  DPM.Core.Repository.Interfaces;
 
-function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
-  RegisterProc: TWizardRegisterProc;
-  var Terminate: TWizardTerminateProc): Boolean; stdcall;
-//
+type
+  TFeedCommand = class(TBaseCommand)
+  private
+    FRepositoryManager : IPackageRepositoryManager;
+  protected
+    function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
+  public
+    constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const repositoryManager : IPackageRepositoryManager);reintroduce;
+  end;
 
-Exports
-  InitWizard name ToolsAPI.WizardEntryPoint;
 
 implementation
-
 uses
-  Vcl.Graphics,
-  DPM.IDE.Constants;
+  Spring.Collections,
+  DPM.Core.Types,
+  DPM.Core.Options.Common,
+  DPM.Core.Options.Feed,
+  DPM.Core.Package.Interfaces;
 
-var
-  SplashImage: TBitmap;
-  wizardIdx : integer = -1;
+{ TListCommand }
 
-function CreateWizard(const BorlandIDEServices: IBorlandIDEServices) : IOTAWizard;
+constructor TFeedCommand.Create(const logger: ILogger; const configurationManager: IConfigurationManager; const repositoryManager : IPackageRepositoryManager);
 begin
-  try
-    result := TDPMWizard.Create;
-    SplashImage := Vcl.Graphics.TBitmap.Create;
-    SplashImage.LoadFromResourceName(HInstance, 'DPMIDELOGO');
-    SplashScreenServices.AddPluginBitmap(sWizardTitle ,SplashImage.Handle);
+  inherited Create(logger, configurationManager);
+  FRepositoryManager := repositoryManager;
+end;
 
-    (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo(sWizardTitle,  sWizardTitle  , SplashImage.Handle);
-
-  except
-    on E: Exception do
-    begin
-      MessageDlg('Failed to load wizard splash image', mtError, [mbOK], 0);
-      OutputDebugString('Failed to load splash image');
-      result := nil;
-    end;
+function TFeedCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
+var
+  searchResults : IList<IPackageSearchResultItem>;
+  item : IPackageSearchResultItem;
+  resultString : string;
+begin
+  result := TExitCode.Error;
+  TFeedOptions.Default.ApplyCommon(TCommonOptions.Default);
+  if not TFeedOptions.Default.Validate(Logger) then
+  begin
+    result := TExitCode.InvalidArguments;
+    exit;
   end;
 
-end;
-
-// Remove the wizard when terminating.
-procedure TerminateWizard;
-var
-  Services: IOTAWizardServices;
-begin
-  Services := BorlandIDEServices as IOTAWizardServices;
-  Services.RemoveWizard(wizardIdx);
-end;
-
-
-function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
-  RegisterProc: TWizardRegisterProc;
-  var Terminate: TWizardTerminateProc): Boolean; stdcall;  //FI:O804
-var
-  wizard : IOTAWizard;
-begin
-  try
-    wizard := CreateWizard(BorlandIDEServices);
-    if wizard <> nil then
+  searchResults := FRepositoryManager.GetPackageFeed(cancellationToken, TFeedOptions.Default);
+  if searchResults.Any then
+  begin
+    //group by id+version+compiler, collect platforms
+    for item in searchResults do
     begin
-      RegisterProc(wizard);
-      Result := True;
-      Terminate := TerminateWizard;
-    end
-    else
-      Result := False;
+      if cancellationToken.IsCancelled then
+        exit;
 
-  except
-    on E: Exception do
-    begin
-      MessageDlg('Failed to load wizard. internal failure:' + E.ClassName + ':'
-        + E.Message, mtError, [mbOK], 0);
-      Result := False;
+      resultString := item.Id + '-' + item.Version + ' [' + DPMPlatformsToString(item.Platforms)  + ']';
+      Logger.Information(resultString);
     end;
-  end;
-end;
+     result := TExitCode.OK;
+  end
+  else
+    Logger.Information('No packages were found');
 
+
+end;
 
 end.

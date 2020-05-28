@@ -68,7 +68,7 @@ type
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageMetadata : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
 
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : boolean) : IList<TPackageVersion>;
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion) : IList<TPackageVersion>;overload;
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId): IPackageInfo;overload;
@@ -346,21 +346,7 @@ begin
   end;
 end;
 
-//function TDirectoryPackageRepository.GetPackageMetaData(const packageIdentity : IPackageIdentity; const platforms: TDPMPlatforms): IList<IPackageMetadata>;
-//var
-//  platform : TDPMPlatform;
-//  metadata : IPackageMetadata;
-//begin
-//  result := TCollections.CreateList<IPackageMetadata>;
-//  for platform in platforms do
-//  begin
-//    metadata := DoGetPackageMetaData(packageIdentity, platform );
-//    if metadata <> nil then
-//      result.Add(metadata);
-//  end;
-//end;
-
-function TDirectoryPackageRepository.GetPackageVersions(const cancellationToken : ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease : boolean): IList<TPackageVersion>;
+function TDirectoryPackageRepository.GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion) : IList<TPackageVersion>;
 var
   searchFiles : IList<string>;
   regex : TRegEx;
@@ -371,9 +357,9 @@ var
   packageVersion : TPackageVersion;
 begin
   result := TCollections.CreateList<TPackageVersion>;
-  searchFiles := DoExactList(id, compilerVersion, platform,'');
+  searchFiles := DoExactList(id, compilerVersion,TDPMPlatform.UnknownPlatform ,'');
 
-  searchRegEx := GetSearchRegex(compilerVersion, [platform], '');
+  searchRegEx := GetSearchRegex(compilerVersion, [], '');
   regex := TRegEx.Create(searchRegEx, [roIgnoreCase]);
   for i := 0 to searchFiles.Count -1  do
   begin
@@ -385,16 +371,11 @@ begin
     begin
       if not TPackageVersion.TryParse(match.Groups[4].Value, packageVersion) then
         continue;
-      if not prerelease then
-        if not packageVersion.IsStable then
-          continue;
-
-      if versionRange.IsEmpty or versionRange.Satisfies(packageVersion) then
-        result.Add(packageVersion);
+      result.Add(packageVersion);
     end;
   end;
 
-
+  //no point sorting here or making results distinct as the the repo manager will do both.
 
 //  result.Sort(function(const Left, Right: TPackageVersion): Integer
 //              begin
@@ -614,8 +595,11 @@ begin
 
       packageMetadata := DoGetPackageMetaData(cancelToken, packageFileName);
 
-      platformDependencies := TDPMPackagePlatformDependencies.Create(platform, packageMetadata.Dependencies);
-      packagePlatformDependencies.Add(platformDependencies);
+      if (packageMetadata <> nil) and packageMetadata.Dependencies.Any then
+      begin
+        platformDependencies := TDPMPackagePlatformDependencies.Create(platform, packageMetadata.Dependencies);
+        packagePlatformDependencies.Add(platformDependencies);
+      end;
     end;
 
     if packageMetadata <> nil then

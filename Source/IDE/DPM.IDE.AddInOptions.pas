@@ -24,92 +24,90 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.IDE.Main;
+unit DPM.IDE.AddInOptions;
 
 interface
 
-Uses
-  ToolsAPI,
-  WinApi.Windows,
-  System.SysUtils,
-  Vcl.Dialogs,
-  DPM.IDE.Wizard;
+uses
+  ToolsApi,
+  Vcl.Forms,
+  DPM.IDE.AddInOptionsFrame,
+  Spring.Container,
+  DPM.Core.Logging,
+  DPM.Core.Configuration.Interfaces;
 
-function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
-  RegisterProc: TWizardRegisterProc;
-  var Terminate: TWizardTerminateProc): Boolean; stdcall;
-//
-
-Exports
-  InitWizard name ToolsAPI.WizardEntryPoint;
+type
+  TDPMAddinOptions = class(TInterfacedObject, INTAAddInOptions)
+  private
+    FConfigManager : IConfigurationManager;
+    FLogger : ILogger;
+    FFrame  : TDPMOptionsFrame;
+  protected
+    procedure DialogClosed(Accepted: Boolean);
+    procedure FrameCreated(AFrame: TCustomFrame);
+    function GetArea: string;
+    function GetCaption: string;
+    function GetFrameClass: TCustomFrameClass;
+    function GetHelpContext: Integer;
+    function IncludeInIDEInsight: Boolean;
+    function ValidateContents: Boolean;
+  public
+    constructor Create(const container : TContainer);
+  end;
 
 implementation
 
-uses
-  Vcl.Graphics,
-  DPM.IDE.Constants;
 
-var
-  SplashImage: TBitmap;
-  wizardIdx : integer = -1;
+{ TDPMAddinOptions }
 
-function CreateWizard(const BorlandIDEServices: IBorlandIDEServices) : IOTAWizard;
+constructor TDPMAddinOptions.Create(const container: TContainer);
 begin
-  try
-    result := TDPMWizard.Create;
-    SplashImage := Vcl.Graphics.TBitmap.Create;
-    SplashImage.LoadFromResourceName(HInstance, 'DPMIDELOGO');
-    SplashScreenServices.AddPluginBitmap(sWizardTitle ,SplashImage.Handle);
-
-    (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo(sWizardTitle,  sWizardTitle  , SplashImage.Handle);
-
-  except
-    on E: Exception do
-    begin
-      MessageDlg('Failed to load wizard splash image', mtError, [mbOK], 0);
-      OutputDebugString('Failed to load splash image');
-      result := nil;
-    end;
-  end;
-
+  FConfigManager := container.Resolve<IConfigurationManager>;
+  FLogger := container.Resolve<ILogger>;
 end;
 
-// Remove the wizard when terminating.
-procedure TerminateWizard;
-var
-  Services: IOTAWizardServices;
+procedure TDPMAddinOptions.DialogClosed(Accepted: Boolean);
 begin
-  Services := BorlandIDEServices as IOTAWizardServices;
-  Services.RemoveWizard(wizardIdx);
+  if Accepted then
+    FFrame.SaveSettings;
 end;
 
-
-function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
-  RegisterProc: TWizardRegisterProc;
-  var Terminate: TWizardTerminateProc): Boolean; stdcall;  //FI:O804
-var
-  wizard : IOTAWizard;
+procedure TDPMAddinOptions.FrameCreated(AFrame: TCustomFrame);
 begin
-  try
-    wizard := CreateWizard(BorlandIDEServices);
-    if wizard <> nil then
-    begin
-      RegisterProc(wizard);
-      Result := True;
-      Terminate := TerminateWizard;
-    end
-    else
-      Result := False;
-
-  except
-    on E: Exception do
-    begin
-      MessageDlg('Failed to load wizard. internal failure:' + E.ClassName + ':'
-        + E.Message, mtError, [mbOK], 0);
-      Result := False;
-    end;
-  end;
+  FFrame := TDPMOptionsFrame(AFrame);
+  FFrame.SetConfigManager(FConfigManager);
+  FFrame.SetLogger(FLogger);
+  FFrame.LoadSettings;
 end;
 
+function TDPMAddinOptions.GetArea: string;
+begin
+  result := '';
+end;
+
+function TDPMAddinOptions.GetCaption: string;
+begin
+  result := 'DPM Package Manager';
+end;
+
+function TDPMAddinOptions.GetFrameClass: TCustomFrameClass;
+begin
+  result := TDPMOptionsFrame;
+end;
+
+function TDPMAddinOptions.GetHelpContext: Integer;
+begin
+  result := -1;
+end;
+
+function TDPMAddinOptions.IncludeInIDEInsight: Boolean;
+begin
+  result := true;
+end;
+
+function TDPMAddinOptions.ValidateContents: Boolean;
+begin
+  result := FFrame.Validate;
+end;
 
 end.

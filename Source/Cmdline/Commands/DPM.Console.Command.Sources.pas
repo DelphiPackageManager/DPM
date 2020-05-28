@@ -132,7 +132,10 @@ begin
       begin
         if (uri.Scheme = 'http') or (uri.Scheme = 'https') then
         begin
-           TSourcesOptions.Default.SourceType := TSourceType.DPMServer;
+          if uri.Host = 'api.github.com' then
+            TSourcesOptions.Default.SourceType := TSourceType.DPMGithub
+          else
+            TSourcesOptions.Default.SourceType := TSourceType.DPMServer;
         end;
       end;
 

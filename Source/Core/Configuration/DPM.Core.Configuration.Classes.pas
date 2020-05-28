@@ -247,6 +247,9 @@ begin
       begin
         if (uri.Scheme = 'http') or (uri.Scheme = 'https') then
         begin
+          if uri.Host = 'api.github.com' then
+            FSourceType := TSourceType.DPMGithub
+          else
             FSourceType := TSourceType.DPMServer;
         end;
       end;
@@ -310,7 +313,13 @@ end;
 { TConfiguration }
 
 procedure TConfiguration.AddDefaultSources;
+var
+  source : ISourceConfig;
 begin
+  source := TSourceConfig.Create('DPMGithub', 'https://api.github.com', TSourceType.DPMGithub, 'Set Password to github access token', '',false );
+  FSources.Add(source);
+  source := TSourceConfig.Create('DNGithub', 'https://api.github.com', TSourceType.DNGithub, 'Set Password to github access token', '',false );
+  FSources.Add(source);
 end;
 
 constructor TConfiguration.Create(const logger: ILogger);

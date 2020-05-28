@@ -24,7 +24,7 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.Core.Repository.Http;
+unit DPM.Core.Repository.DNGithub;
 
 interface
 
@@ -40,20 +40,24 @@ uses
   DPM.Core.Package.Interfaces,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Repository.Interfaces,
-  DPM.Core.Repository.Base;
+  DPM.Core.Repository.BaseGitHub;
 
 
 type
-  TDPMServerPackageRepository = class(TBaseRepository,IPackageRepository)
+  TDNGithubPackageRepository = class(TGithubBasePackageRepository, IPackageRepository)
   private
+
   protected
-    function DownloadPackage(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity; const localFolder: string; var fileName: string): Boolean;
+    function DownloadPackage(const cancellationToken: ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder: string; var fileName: string): Boolean;
     function GetPackageInfo(const cancellationToken: ICancellationToken; const packageId : IPackageId): IPackageInfo;
-    function GetPackageVersions(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion): IList<TPackageVersion>;
+
+
+
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion) : IList<TPackageVersion>;overload;
     function GetPackageVersionsWithDependencies(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
 
     function List(const cancellationToken : ICancellationToken; const options : TSearchOptions ) : IList<IPackageIdentity>;overload;
-    function GetPackageFeed(const cancelToken: ICancellationToken; const options: TSearchOptions; const configuration: IConfiguration): IList<IPackageSearchResultItem>;
+    function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
     function GetPackageIcon(const cancelToken : ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): TPngImage;
 
   public
@@ -63,50 +67,56 @@ type
 
 implementation
 
-{ TDPMServerPackageRepository }
+const
+  cGithubDNRepositorySearch = 'search/repositories?q=topic:dpmpackage+archived:false';
+  cGithubDPMSpecSearchFormat = '/search/code?q=extension:dspec+repo:%s'; // add repo to search in
 
-constructor TDPMServerPackageRepository.Create(const logger: ILogger);
+
+{ TDNGithubPackageRepository }
+
+constructor TDNGithubPackageRepository.Create(const logger: ILogger);
 begin
   inherited Create(logger);
-
 end;
 
-function TDPMServerPackageRepository.DownloadPackage(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity; const localFolder: string; var fileName: string): Boolean;
+function TDNGithubPackageRepository.DownloadPackage(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity; const localFolder: string; var fileName: string): Boolean;
 begin
   result := false;
 end;
 
 
-function TDPMServerPackageRepository.GetPackageFeed(const cancelToken: ICancellationToken; const options: TSearchOptions; const configuration: IConfiguration): IList<IPackageSearchResultItem>;
+function TDNGithubPackageRepository.GetPackageFeed(const cancelToken: ICancellationToken; const options: TSearchOptions; const configuration: IConfiguration): IList<IPackageSearchResultItem>;
 begin
   result := TCollections.CreateList<IPackageSearchResultItem>;
 end;
 
-function TDPMServerPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): TPngImage;
+function TDNGithubPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): TPngImage;
 begin
   result := nil;
 end;
 
-function TDPMServerPackageRepository.GetPackageInfo(const cancellationToken: ICancellationToken; const packageId : IPackageId): IPackageInfo;
+function TDNGithubPackageRepository.GetPackageInfo(const cancellationToken: ICancellationToken; const packageId : IPackageId): IPackageInfo;
 begin
-  result := nil;
+  result := nil
 end;
 
-function TDPMServerPackageRepository.GetPackageVersions(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion): IList<TPackageVersion>;
+function TDNGithubPackageRepository.GetPackageVersions(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion): IList<TPackageVersion>;
 begin
   result := TCollections.CreateList<TPackageVersion>;
+
 end;
 
-function TDPMServerPackageRepository.GetPackageVersionsWithDependencies(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
+
+function TDNGithubPackageRepository.GetPackageVersionsWithDependencies(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
 begin
   result := TCollections.CreateList<IPackageInfo>;
+
 end;
 
-
-function TDPMServerPackageRepository.List(const cancellationToken: ICancellationToken; const options: TSearchOptions): IList<IPackageIdentity>;
+function TDNGithubPackageRepository.List(const cancellationToken: ICancellationToken; const options: TSearchOptions): IList<IPackageIdentity>;
 begin
   result := TCollections.CreateList<IPackageIdentity>;
-end;
 
+end;
 
 end.

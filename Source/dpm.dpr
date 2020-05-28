@@ -66,7 +66,8 @@ uses
   DPM.Console.Command.Uninstall in 'Cmdline\Commands\DPM.Console.Command.Uninstall.pas',
   DPM.Console.Command.Why in 'Cmdline\Commands\DPM.Console.Command.Why.pas',
   DPM.Console.Command.Add in 'Cmdline\Commands\DPM.Console.Command.Add.pas',
-  DPM.Console.Command.Cache in 'Cmdline\Commands\DPM.Console.Command.Cache.pas';
+  DPM.Console.Command.Cache in 'Cmdline\Commands\DPM.Console.Command.Cache.pas',
+  DPM.Console.Command.Feed in 'Cmdline\Commands\DPM.Console.Command.Feed.pas';
 
 begin
   //TODO : pull in VSoft.SemanticVersion as a package once we are bootstrapped.

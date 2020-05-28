@@ -51,7 +51,6 @@ type
   protected
     function Initialize( const configuration : IConfiguration) : boolean;
 
-
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
     function GetRepositories: IList<IPackageRepository>;
     function GetRepositoryByName(const value: string): IPackageRepository;
@@ -59,12 +58,18 @@ type
     function UpdateRepositories( const configuration : IConfiguration) : boolean;
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId): IPackageInfo;
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform;const versionRange : TVersionRange) : IList<IPackageInfo>;
 
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange;  const configuration : IConfiguration = nil) : IList<IPackageInfo>;overload;
     //UI specific stuff
+    //TODO : Implement skip/take!
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
+
     function GetPackageIcon(const cancelToken : ICancellationToken; const source: string; const packageId: string; const packageVersion: string;
                             const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const configuration : IConfiguration): TPngImage;
+
+    function GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IEnumerable<IPackageId>; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
+
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<TPackageVersion>;overload;
 
   public
     constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const repoFactory : IPackageRepositoryFactory);
@@ -122,6 +127,52 @@ begin
   end;
 end;
 
+function TPackageRepositoryManager.GetInstalledPackageFeed(const cancelToken: ICancellationToken; const options: TSearchOptions; const installedPackages: IEnumerable<IPackageId>; const configuration: IConfiguration): IList<IPackageSearchResultItem>;
+var
+  config : IConfiguration;
+  searchOptions : TSearchOptions;
+  packageId : IPackageId;
+  packageResults : IList<IPackageSearchResultItem>;
+  item : IPackageSearchResultItem;
+begin
+  result := TCollections.CreateList<IPackageSearchResultItem>;
+
+  config := configuration;
+  if config = nil then
+    config := FConfigurationManager.LoadConfig(options.ConfigFile);
+  if config = nil then
+    exit;
+
+  if not UpdateRepositories(config) then
+  begin
+    FLogger.Error('Unabled to search, error loading repositories');
+    exit;
+  end;
+
+  //TODO : This will be really inefficient/slow when using http
+  //refactor to make single request to repositories.
+  packageId := installedPackages.FirstOrDefault;
+  for packageId in installedPackages do
+  begin
+    searchOptions := options.Clone;
+    searchOptions.SearchTerms := packageId.Id;
+    searchOptions.Version := packageId.Version;
+    searchOptions.CompilerVersion := packageId.CompilerVersion;
+    searchOptions.Platforms := [packageId.Platform];
+
+    packageResults := GetPackageFeed(cancelToken, searchOptions, config);
+    for item in packageResults do
+    begin
+      item.Installed := true;
+      item.InstalledVersion := item.Version;
+    end;
+    result.AddRange(packageResults);
+
+  end;
+
+
+end;
+
 function TPackageRepositoryManager.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil): IList<IPackageSearchResultItem>;
 var
   config : IConfiguration;
@@ -156,6 +207,7 @@ begin
     sources := nil;
 
   allResults := TCollections.CreateList<IPackageSearchResultItem>;
+
   try
     for repo in FRepositories do
     begin
@@ -222,7 +274,69 @@ begin
 end;
 
 
-function TPackageRepositoryManager.GetPackageVersions(const cancellationToken : ICancellationToken; const options: TSearchOptions; const platform: TDPMPlatform; const versionRange: TVersionRange): IList<IPackageInfo>;
+function TPackageRepositoryManager.GetPackageVersions(const cancellationToken: ICancellationToken; const options: TSearchOptions; const configuration: IConfiguration): IList<TPackageVersion>;
+var
+  config : IConfiguration;
+  repo : IPackageRepository;
+  searchResult : IList<TPackageVersion>;
+  unfilteredResults : IList<TPackageVersion>;
+  distinctResults : IEnumerable<TPackageVersion>;
+  comparer : IEqualityComparer<TPackageVersion>;
+begin
+  result := TCollections.CreateList<TPackageVersion>;
+  unfilteredResults := TCollections.CreateList<TPackageVersion>;
+
+  config := configuration;
+  if config = nil then
+  begin
+    if options.ConfigFile = '' then
+    begin
+      FLogger.Error('No configuration file specified');
+      exit;
+    end;
+    config := FConfigurationManager.LoadConfig(options.ConfigFile);
+  end;
+  if config = nil then
+    exit;
+
+  if options.CompilerVersion = TCompilerVersion.UnknownVersion then
+  begin
+    FLogger.Error('Unabled to search, no compiler version specified');
+    exit;
+  end;
+
+
+  if not UpdateRepositories(config) then
+  begin
+    FLogger.Error('Unabled to get package versions, error loading repositories');
+    exit;
+  end;
+
+  for repo in FRepositories do
+  begin
+    if cancellationToken.IsCancelled then
+      exit;
+
+    searchResult := repo.GetPackageVersions(cancellationToken, options.SearchTerms, options.CompilerVersion);
+    unfilteredResults.AddRange(searchResult);
+  end;
+
+  comparer := TPackageVersionComparer.Create;
+
+  //dedupe
+  distinctResults := TDistinctIterator<TPackageVersion>.Create(unfilteredResults, comparer);
+
+  result.AddRange(distinctResults);
+  //todo :// which order is this?  want descending.
+  result.Sort(function(const Left, Right: TPackageVersion): Integer
+    begin
+      result := right.CompareTo(left);
+    end);
+
+
+end;
+
+function TPackageRepositoryManager.GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange;  const configuration : IConfiguration = nil) : IList<IPackageInfo>;
 var
   config : IConfiguration;
   repo : IPackageRepository;
@@ -234,11 +348,18 @@ begin
   result := TCollections.CreateList<IPackageInfo>;
   unfilteredResults := TCollections.CreateList<IPackageInfo>;
 
-  if options.ConfigFile = '' then
+  config := configuration;
+  if config = nil then
   begin
-    FLogger.Error('No configuration file specified');
-    exit;
+    if options.ConfigFile = '' then
+    begin
+      FLogger.Error('No configuration file specified');
+      exit;
+    end;
+    config := FConfigurationManager.LoadConfig(options.ConfigFile);
   end;
+  if config = nil then
+    exit;
 
   if options.CompilerVersion = TCompilerVersion.UnknownVersion then
   begin
@@ -246,9 +367,6 @@ begin
     exit;
   end;
 
-  config := FConfigurationManager.LoadConfig(options.ConfigFile);
-  if config = nil then
-    exit;
 
   if not UpdateRepositories(config) then
   begin
@@ -265,7 +383,6 @@ begin
     searchResult := repo.GetPackageVersionsWithDependencies(cancellationToken, options.SearchTerms, options.CompilerVersion,platform,versionRange, options.Prerelease);
     unfilteredResults.AddRange(searchResult);
   end;
-
 
 
   comparer := TPackageInfoComparer.Create;

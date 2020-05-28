@@ -24,92 +24,42 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.IDE.Main;
+unit DPM.Core.Options.Feed;
 
 interface
 
-Uses
-  ToolsAPI,
-  WinApi.Windows,
-  System.SysUtils,
-  Vcl.Dialogs,
-  DPM.IDE.Wizard;
 
-function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
-  RegisterProc: TWizardRegisterProc;
-  var Terminate: TWizardTerminateProc): Boolean; stdcall;
-//
+uses
+  DPM.Core.Types,
+  DPM.Core.Options.Search;
 
-Exports
-  InitWizard name ToolsAPI.WizardEntryPoint;
+//NOTE : This is just for testing package feeds from the command line.
+
+type
+  TFeedOptions = class(TSearchOptions)
+  private
+    class var
+      FDefault : TFeedOptions;
+  public
+    class constructor CreateDefault;
+    class property Default : TFeedOptions read FDefault;
+    constructor Create;override;
+
+  end;
 
 implementation
 
-uses
-  Vcl.Graphics,
-  DPM.IDE.Constants;
+{ TFeedOptions }
 
-var
-  SplashImage: TBitmap;
-  wizardIdx : integer = -1;
-
-function CreateWizard(const BorlandIDEServices: IBorlandIDEServices) : IOTAWizard;
+constructor TFeedOptions.Create;
 begin
-  try
-    result := TDPMWizard.Create;
-    SplashImage := Vcl.Graphics.TBitmap.Create;
-    SplashImage.LoadFromResourceName(HInstance, 'DPMIDELOGO');
-    SplashScreenServices.AddPluginBitmap(sWizardTitle ,SplashImage.Handle);
-
-    (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo(sWizardTitle,  sWizardTitle  , SplashImage.Handle);
-
-  except
-    on E: Exception do
-    begin
-      MessageDlg('Failed to load wizard splash image', mtError, [mbOK], 0);
-      OutputDebugString('Failed to load splash image');
-      result := nil;
-    end;
-  end;
+  inherited;
 
 end;
 
-// Remove the wizard when terminating.
-procedure TerminateWizard;
-var
-  Services: IOTAWizardServices;
+class constructor TFeedOptions.CreateDefault;
 begin
-  Services := BorlandIDEServices as IOTAWizardServices;
-  Services.RemoveWizard(wizardIdx);
+  FDefault := TFeedOptions.Create;
 end;
-
-
-function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
-  RegisterProc: TWizardRegisterProc;
-  var Terminate: TWizardTerminateProc): Boolean; stdcall;  //FI:O804
-var
-  wizard : IOTAWizard;
-begin
-  try
-    wizard := CreateWizard(BorlandIDEServices);
-    if wizard <> nil then
-    begin
-      RegisterProc(wizard);
-      Result := True;
-      Terminate := TerminateWizard;
-    end
-    else
-      Result := False;
-
-  except
-    on E: Exception do
-    begin
-      MessageDlg('Failed to load wizard. internal failure:' + E.ClassName + ':'
-        + E.Message, mtError, [mbOK], 0);
-      Result := False;
-    end;
-  end;
-end;
-
 
 end.

@@ -53,9 +53,23 @@ uses
   DPM.IDE.Wizard in 'IDE\DPM.IDE.Wizard.pas',
   DPM.IDE.ProjectStorageNotifier in 'IDE\DPM.IDE.ProjectStorageNotifier.pas',
   DPM.IDE.Logger in 'IDE\DPM.IDE.Logger.pas',
-  DPM.IDE.Notifier in 'IDE\DPM.IDE.Notifier.pas',
+  DPM.IDE.IDENotifier in 'IDE\DPM.IDE.IDENotifier.pas',
   DPM.IDE.ProjectMenu in 'IDE\DPM.IDE.ProjectMenu.pas',
-  DPM.IDE.Constants in 'IDE\DPM.IDE.Constants.pas';
+  DPM.IDE.Constants in 'IDE\DPM.IDE.Constants.pas',
+  DPM.IDE.EditorView in 'IDE\DPM.IDE.EditorView.pas',
+  DPM.IDE.EditorViewFrame in 'IDE\DPM.IDE.EditorViewFrame.pas' {DPMEditViewFrame: TFrame},
+  DPM.IDE.EditorViewManager in 'IDE\DPM.IDE.EditorViewManager.pas',
+  DPM.IDE.AddInOptions in 'IDE\DPM.IDE.AddInOptions.pas',
+  DPM.IDE.AddInOptionsFrame in 'IDE\DPM.IDE.AddInOptionsFrame.pas' {DPMOptionsFrame: TFrame},
+  DPM.Controls.ButtonedEdit in 'Controls\DPM.Controls.ButtonedEdit.pas',
+  DPM.Controls.AutoComplete in 'Controls\DPM.Controls.AutoComplete.pas',
+  DPM.IDE.AboutForm in 'IDE\DPM.IDE.AboutForm.pas' {DPMAboutForm},
+  DPM.IDE.Types in 'IDE\DPM.IDE.Types.pas',
+  DPM.Controls.GroupButton in 'Controls\DPM.Controls.GroupButton.pas',
+  DPM.IDE.AddInOptionsHostForm in 'IDE\DPM.IDE.AddInOptionsHostForm.pas' {DPMOptionsHostForm},
+  DPM.IDE.IconCache in 'IDE\DPM.IDE.IconCache.pas',
+  DPM.IDE.PackageDetailsFrame in 'IDE\DPM.IDE.PackageDetailsFrame.pas' {PackageDetailsFrame: TFrame},
+  DPM.IDE.PackageDetailsPanel in 'IDE\DPM.IDE.PackageDetailsPanel.pas';
 
 {$R *.res}
 

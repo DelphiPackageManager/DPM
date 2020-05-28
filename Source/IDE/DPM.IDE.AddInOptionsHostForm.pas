@@ -24,92 +24,56 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.IDE.Main;
+unit DPM.IDE.AddInOptionsHostForm;
 
 interface
 
-Uses
-  ToolsAPI,
-  WinApi.Windows,
-  System.SysUtils,
-  Vcl.Dialogs,
-  DPM.IDE.Wizard;
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
+  DPM.IDE.AddInOptionsFrame,
+  DPM.Core.Logging,
+  DPM.Core.Configuration.Interfaces, Vcl.ExtCtrls, Vcl.StdCtrls;
 
-function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
-  RegisterProc: TWizardRegisterProc;
-  var Terminate: TWizardTerminateProc): Boolean; stdcall;
-//
+type
+  TDPMOptionsHostForm = class(TForm)
+    DPMOptionsFrame: TDPMOptionsFrame;
+    Panel1: TPanel;
+    btnCancel: TButton;
+    btnOK: TButton;
+    procedure btnOKClick(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+    constructor Create(AOwner : TComponent; const configManager : IConfigurationManager; const logger : ILogger; const configFile : string);reintroduce;
+  end;
 
-Exports
-  InitWizard name ToolsAPI.WizardEntryPoint;
+var
+  DPMOptionsHostForm: TDPMOptionsHostForm;
 
 implementation
 
-uses
-  Vcl.Graphics,
-  DPM.IDE.Constants;
+{$R *.dfm}
 
-var
-  SplashImage: TBitmap;
-  wizardIdx : integer = -1;
+{ TDPMOptionsHostForm }
 
-function CreateWizard(const BorlandIDEServices: IBorlandIDEServices) : IOTAWizard;
+procedure TDPMOptionsHostForm.btnOKClick(Sender: TObject);
 begin
-  try
-    result := TDPMWizard.Create;
-    SplashImage := Vcl.Graphics.TBitmap.Create;
-    SplashImage.LoadFromResourceName(HInstance, 'DPMIDELOGO');
-    SplashScreenServices.AddPluginBitmap(sWizardTitle ,SplashImage.Handle);
-
-    (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo(sWizardTitle,  sWizardTitle  , SplashImage.Handle);
-
-  except
-    on E: Exception do
-    begin
-      MessageDlg('Failed to load wizard splash image', mtError, [mbOK], 0);
-      OutputDebugString('Failed to load splash image');
-      result := nil;
-    end;
-  end;
-
-end;
-
-// Remove the wizard when terminating.
-procedure TerminateWizard;
-var
-  Services: IOTAWizardServices;
-begin
-  Services := BorlandIDEServices as IOTAWizardServices;
-  Services.RemoveWizard(wizardIdx);
-end;
-
-
-function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
-  RegisterProc: TWizardRegisterProc;
-  var Terminate: TWizardTerminateProc): Boolean; stdcall;  //FI:O804
-var
-  wizard : IOTAWizard;
-begin
-  try
-    wizard := CreateWizard(BorlandIDEServices);
-    if wizard <> nil then
-    begin
-      RegisterProc(wizard);
-      Result := True;
-      Terminate := TerminateWizard;
-    end
-    else
-      Result := False;
-
-  except
-    on E: Exception do
-    begin
-      MessageDlg('Failed to load wizard. internal failure:' + E.ClassName + ':'
-        + E.Message, mtError, [mbOK], 0);
-      Result := False;
-    end;
+  if DPMOptionsFrame.Validate then
+  begin
+    DPMOptionsFrame.SaveSettings;
+    Self.ModalResult := mrOK;
   end;
 end;
 
+constructor TDPMOptionsHostForm.Create(AOwner: TComponent; const configManager: IConfigurationManager; const logger: ILogger; const configFile: string);
+begin
+  inherited Create(AOwner);
+  DPMOptionsFrame.SetConfigManager(configManager, configFile);
+  DPMOptionsFrame.SetLogger(logger);
+  Self.Caption := 'DPM Options [' + configFile + ']';
+  DPMOptionsFrame.LoadSettings;
+end;
 
 end.

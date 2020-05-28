@@ -24,7 +24,7 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.IDE.Notifier;
+unit DPM.IDE.IDENotifier;
 
 interface
 
@@ -33,7 +33,8 @@ uses
   Spring.Collections,
   DPM.IDE.Logger,
   DPM.Core.Options.Restore,
-  DPM.Core.Package.Interfaces;
+  DPM.Core.Package.Interfaces,
+  DPM.IDE.EditorViewManager;
 
 type
   TDPMIDENotifier = class(TInterfacedObject, IOTANotifier, IOTAIDENotifier)
@@ -42,6 +43,8 @@ type
     FLoadingGroup : boolean;
     FPackageInstaller : IPackageInstaller;
     FGroupProjects : IList<string>;
+
+    FEditorViewManager : IDPMEditorViewManager;
   protected
     //IOTANotifier
     procedure AfterSave;
@@ -58,7 +61,7 @@ type
 
     function LoadProjectGroup(const fileName : string) : boolean;
   public
-    constructor Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller);
+    constructor Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager);
     destructor Destroy;override;
   end;
 
@@ -94,11 +97,12 @@ begin
 
 end;
 
-constructor TDPMIDENotifier.Create(const logger: IDPMIDELogger; const packageInstaller : IPackageInstaller);
+constructor TDPMIDENotifier.Create(const logger: IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager);
 begin
   FLogger := logger;
   FPackageInstaller := packageInstaller;
   FGroupProjects := TCollections.CreateList<string>;
+  FEditorViewManager := editorViewManager;
 end;
 
 function TDPMIDENotifier.CreateOptions(const fileName : string) : TRestoreOptions;
@@ -119,7 +123,8 @@ end;
 
 procedure TDPMIDENotifier.Destroyed;
 begin
-
+  FEditorViewManager.Destroyed;
+  FEditorViewManager := nil;
 end;
 
 
@@ -172,6 +177,7 @@ begin
   if NotifyCode = ofnFileClosing then
   begin
     FLogger.Clear;
+    FEditorViewManager.ProjectClosed(FileName);
     exit;
   end;
 

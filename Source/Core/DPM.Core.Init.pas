@@ -61,6 +61,8 @@ uses
   DPM.Core.Repository.Factory,
   DPM.Core.Repository.Directory,
   DPM.Core.Repository.Http,
+  DPM.Core.Repository.DPMGithub,
+  DPM.Core.Repository.DNGithub,
   DPM.Core.Cache.Interfaces,
   DPM.Core.Cache,
   DPM.Core.Dependency.Interfaces,
@@ -96,6 +98,8 @@ begin
 
   Container.RegisterType<IPackageRepository,TDirectoryPackageRepository>(TEnumUtils.EnumToString<TSourceType>(TSourceType.Folder) );
   Container.RegisterType<IPackageRepository,TDPMServerPackageRepository>(TEnumUtils.EnumToString<TSourceType>(TSourceType.DPMServer) );
+  Container.RegisterType<IPackageRepository,TDPMGithubPackageRepository>(TEnumUtils.EnumToString<TSourceType>(TSourceType.DPMGithub) );
+  Container.RegisterType<IPackageRepository,TDNGithubPackageRepository>(TEnumUtils.EnumToString<TSourceType>(TSourceType.DNGithub) );
 
   Container.RegisterType<IPackageCache,TPackageCache>;
 

@@ -24,92 +24,101 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.IDE.Main;
+unit DPM.IDE.IconCache;
 
 interface
 
-Uses
-  ToolsAPI,
-  WinApi.Windows,
-  System.SysUtils,
-  Vcl.Dialogs,
-  DPM.IDE.Wizard;
+uses
+  Vcl.Imaging.pngimage,
+  Spring.Collections,
+  DPM.Core.Types;
 
-function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
-  RegisterProc: TWizardRegisterProc;
-  var Terminate: TWizardTerminateProc): Boolean; stdcall;
-//
+//In memory cache for package icons.
+//TODO : back this with a disk cache, this will be more important to avoid http requests.
 
-Exports
-  InitWizard name ToolsAPI.WizardEntryPoint;
+type
+  TDPMIconCache = class
+  private
+    FIcons : IDictionary<string, TPngImage>;
+    FLock  : TObject;
+  protected
+
+  public
+    constructor Create;
+    destructor Destroy;override;
+    function Query(const id : string) : boolean;
+    function Request(const id : string ) : TPngImage;
+    procedure Cache(const id : string; const value : TPngImage);
+  end;
 
 implementation
 
 uses
-  Vcl.Graphics,
-  DPM.IDE.Constants;
+  System.SysUtils;
 
-var
-  SplashImage: TBitmap;
-  wizardIdx : integer = -1;
+{ TDPMIconCache }
 
-function CreateWizard(const BorlandIDEServices: IBorlandIDEServices) : IOTAWizard;
+procedure TDPMIconCache.Cache(const id: string; const value: TPngImage);
 begin
+  MonitorEnter(FLock);
   try
-    result := TDPMWizard.Create;
-    SplashImage := Vcl.Graphics.TBitmap.Create;
-    SplashImage.LoadFromResourceName(HInstance, 'DPMIDELOGO');
-    SplashScreenServices.AddPluginBitmap(sWizardTitle ,SplashImage.Handle);
-
-    (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo(sWizardTitle,  sWizardTitle  , SplashImage.Handle);
-
-  except
-    on E: Exception do
-    begin
-      MessageDlg('Failed to load wizard splash image', mtError, [mbOK], 0);
-      OutputDebugString('Failed to load splash image');
-      result := nil;
-    end;
-  end;
-
-end;
-
-// Remove the wizard when terminating.
-procedure TerminateWizard;
-var
-  Services: IOTAWizardServices;
-begin
-  Services := BorlandIDEServices as IOTAWizardServices;
-  Services.RemoveWizard(wizardIdx);
-end;
-
-
-function InitWizard(const BorlandIDEServices: IBorlandIDEServices;
-  RegisterProc: TWizardRegisterProc;
-  var Terminate: TWizardTerminateProc): Boolean; stdcall;  //FI:O804
-var
-  wizard : IOTAWizard;
-begin
-  try
-    wizard := CreateWizard(BorlandIDEServices);
-    if wizard <> nil then
-    begin
-      RegisterProc(wizard);
-      Result := True;
-      Terminate := TerminateWizard;
-    end
-    else
-      Result := False;
-
-  except
-    on E: Exception do
-    begin
-      MessageDlg('Failed to load wizard. internal failure:' + E.ClassName + ':'
-        + E.Message, mtError, [mbOK], 0);
-      Result := False;
-    end;
+    FIcons[LowerCase(Id)] := value;
+  finally
+    MonitorExit(FLock);
   end;
 end;
 
+constructor TDPMIconCache.Create;
+var
+  missingImg : TPngImage;
+begin
+  inherited;
+  FIcons := TCollections.CreateDictionary<string, TPngImage>;
+  FLock  := TObject.Create;
+
+  missingImg := TPngImage.Create;
+  missingImg.LoadFromResourceName(HInstance,'DPM_ICON_MISSING') ;
+  FIcons['missing_icon'] := missingImg;
+end;
+
+destructor TDPMIconCache.Destroy;
+var
+  image : TPngImage;
+begin
+  MonitorEnter(FLock);
+  try
+    for image in FIcons.Values do
+      image.Free;
+  finally
+    MonitorExit(FLock);
+  end;
+  FLock.Free;
+  inherited;
+end;
+
+function TDPMIconCache.Query(const id: string): boolean;
+begin
+  MonitorEnter(FLock);
+  try
+    result := FIcons.ContainsKey(LowerCase(id));
+    if not result then
+      FIcons[LowerCase(Id)] := nil;
+  finally
+    MonitorExit(FLock);
+  end;
+end;
+
+function TDPMIconCache.Request(const id: string): TPngImage;
+begin
+  result := nil;
+  MonitorEnter(FLock);
+  try
+    if FIcons.ContainsKey(LowerCase(id)) then
+      result := FIcons[LowerCase(Id)];
+  finally
+    MonitorExit(FLock);
+  end;
+
+end;
 
 end.

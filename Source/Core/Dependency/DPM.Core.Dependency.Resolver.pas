@@ -219,7 +219,7 @@ begin
           begin
             context.RecordResolution(version, dependency.VersionRange, currentPackage.Id);
             if version.Dependencies.Any then //no point pushing it if there are no dependencies - see top of loop
-              context.PushRequirement(version);
+              context.PushRequirement(version); //resolve it's dependencies
             FLogger.Debug('            selected : ' + version.Id + '.' + version.Version.ToStringNoMeta);
             selected := true;
             break;

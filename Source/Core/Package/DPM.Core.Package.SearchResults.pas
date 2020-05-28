@@ -49,6 +49,7 @@ type
 
   TDPMPackageSearchResultItem = class(TInterfacedObject, IPackageSearchResultItem)
   private
+    FIsError : boolean;
     FAuthors: string;
     FOwners : string;
     FCopyright: string;
@@ -61,12 +62,16 @@ type
     FLicense: string;
     FPlatforms: TDPMPlatforms;
     FProjectUrl: string;
+    FReportUrl : string;
     FTags: string;
     FVersion: string;
+
     FDownloadCount : Int64;
     FInstalled : boolean;
+    FInstalledVersion : string;
     FIsReservedPrefix : boolean;
     FSourceName : string;
+    FPublishedDate : string;
   protected
     function GetAuthors: string;
     function GetOwners: string;
@@ -75,7 +80,11 @@ type
     function GetDescription: string;
     function GetIcon: string;
     function GetId: string;
+
+    function GetPublishedDate: string;
+    function GetReportUrl: string;
     function GetInstalled: Boolean;
+    function GetInstalledVersion : string;
     function GetIsReservedPrefix: Boolean;
 
     function GetIsCommercial: Boolean;
@@ -87,15 +96,20 @@ type
     function GetVersion: string;
     function GetDownloadCount : Int64;
     function GetSourceName : string;
+    function GetIsError : boolean;
 
+    procedure SetPublishedDate(const value: string);
+    procedure SetReportUrl(const value: string);
     procedure SetInstalled(const value : Boolean);
+    procedure SetInstalledVersion(const value : string);
 
     constructor CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
     constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platforms : TDPMPlatforms; const dependencies: IList<IPackagePlatformDependencies>);
+    constructor CreateFromError(const id : string; const version : TPackageVersion; const errorDescription : string);
   public
     class function FromJson(const sourceName : string; const jsonObject : TJsonObject) : IPackageSearchResultItem;
     class function FromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platforms : TDPMPlatforms; const dependencies: IList<IPackagePlatformDependencies>) : IPackageSearchResultItem;
-
+    class function FromError(const id : string; const version : TPackageVersion; const errorDescription : string) : IPackageSearchResultItem;
   end;
 
 
@@ -164,6 +178,14 @@ end;
 
 { TDPMPackageSearchResultItem }
 
+constructor TDPMPackageSearchResultItem.CreateFromError(const id : string; const version : TPackageVersion; const errorDescription : string);
+begin
+  FIsError := true;
+  FId := id;
+  FVersion := version.ToString;
+  FDescription := errorDescription;
+end;
+
 constructor TDPMPackageSearchResultItem.CreateFromJson(const sourceName : string; const jsonObject: TJsonObject);
 begin
   FDependencies := TCollections.CreateList<IPackagePlatformDependencies>;
@@ -191,7 +213,11 @@ begin
   FVersion := metaData.Version.ToStringNoMeta;
   FDownloadCount :=  123456;//-1; //indicates not set;
   FIsReservedPrefix := false;
+end;
 
+class function TDPMPackageSearchResultItem.FromError(const id : string; const version : TPackageVersion; const errorDescription : string): IPackageSearchResultItem;
+begin
+  result := TDPMPackageSearchResultItem.CreateFromError(id, version, errorDescription);
 end;
 
 class function TDPMPackageSearchResultItem.FromJson(const sourceName : string; const jsonObject: TJsonObject): IPackageSearchResultItem;
@@ -244,9 +270,19 @@ begin
   result := FInstalled;
 end;
 
+function TDPMPackageSearchResultItem.GetInstalledVersion: string;
+begin
+  result := FInstalledVersion;
+end;
+
 function TDPMPackageSearchResultItem.GetIsCommercial: Boolean;
 begin
   result := FIsCommercial;
+end;
+
+function TDPMPackageSearchResultItem.GetIsError: boolean;
+begin
+  result := FIsError;
 end;
 
 function TDPMPackageSearchResultItem.GetIsReservedPrefix: Boolean;
@@ -279,6 +315,16 @@ begin
   result := FProjectUrl;
 end;
 
+function TDPMPackageSearchResultItem.GetPublishedDate: string;
+begin
+  result := FPublishedDate;
+end;
+
+function TDPMPackageSearchResultItem.GetReportUrl: string;
+begin
+  result := FReportUrl;
+end;
+
 function TDPMPackageSearchResultItem.GetSourceName: string;
 begin
   result := FSourceName;
@@ -298,6 +344,21 @@ end;
 procedure TDPMPackageSearchResultItem.SetInstalled(const value: Boolean);
 begin
   FInstalled := value;
+end;
+
+procedure TDPMPackageSearchResultItem.SetInstalledVersion(const value: string);
+begin
+  FInstalledVersion := value;
+end;
+
+procedure TDPMPackageSearchResultItem.SetPublishedDate(const value: string);
+begin
+  FPublishedDate := value;
+end;
+
+procedure TDPMPackageSearchResultItem.SetReportUrl(const value: string);
+begin
+  FReportUrl := value;
 end;
 
 end.

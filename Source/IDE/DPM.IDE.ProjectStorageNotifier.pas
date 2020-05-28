@@ -33,7 +33,8 @@ uses
   XML.XMLIntf,
   System.Classes,
   Spring.Collections,
-  DPM.IDE.Logger;
+  DPM.IDE.Logger,
+  DPM.IDE.EditorViewManager;
 
 type
   TDPMProjectStorageNotifier = class(TNotifierObject, IOTAProjectFileStorageNotifier)
@@ -44,6 +45,7 @@ type
     FGroupProjects : IList<string>;
     FProjectGroup : IOTAProjectGroup;
     FModuleServices : IOTAModuleServices;
+    FEditorViewManager : IDPMEditorViewManager;
 
   protected
     procedure AfterSave;
@@ -60,7 +62,7 @@ type
     procedure ProjectLoaded(const ProjectOrGroup: IOTAModule; const Node: IXMLNode);
     procedure ProjectSaving(const ProjectOrGroup: IOTAModule; const Node: IXMLNode);
   public
-    constructor Create(const logger : IDPMIDELogger);
+    constructor Create(const logger : IDPMIDELogger; const editorViewManager : IDPMEditorViewManager);
     destructor Destroy;override;
   end;
 
@@ -85,9 +87,10 @@ begin
 
 end;
 
-constructor TDPMProjectStorageNotifier.Create(const logger : IDPMIDELogger);
+constructor TDPMProjectStorageNotifier.Create(const logger : IDPMIDELogger; const editorViewManager : IDPMEditorViewManager);
 begin
   FLogger := logger;
+  FEditorViewManager := editorViewManager;
   FGroupProjects := TCollections.CreateList<string>;
   FIgnoreReload := TStringList.Create;
   FModuleServices := BorlandIDEServices as IOTAModuleServices;
@@ -108,6 +111,9 @@ end;
 procedure TDPMProjectStorageNotifier.Destroyed;
 begin
   FProjectGroup := nil;
+  FModuleServices := nil;
+  FEditorViewManager := nil;
+
 end;
 
 function TDPMProjectStorageNotifier.GetName: string;

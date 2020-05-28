@@ -122,8 +122,11 @@ contains
   DPM.Core.Utils.Directory in 'Core\Utils\DPM.Core.Utils.Directory.pas',
   DPM.Core.Package.SearchResults in 'Core\Package\DPM.Core.Package.SearchResults.pas',
   DPM.Core.Repository.BaseGithub in 'Core\Repository\DPM.Core.Repository.BaseGithub.pas',
+  DPM.Core.Repository.DNGithub in 'Core\Repository\DPM.Core.Repository.DNGithub.pas',
+  DPM.Core.Repository.DPMGithub in 'Core\Repository\DPM.Core.Repository.DPMGithub.pas',
   DPM.Core.Utils.Enum in 'Core\Utils\DPM.Core.Utils.Enum.pas',
   DPM.Core.Repository.Base in 'Core\Repository\DPM.Core.Repository.Base.pas',
+  DPM.Core.Options.Feed in 'Core\Options\DPM.Core.Options.Feed.pas',
   DPM.Core.Utils.Numbers in 'Core\Utils\DPM.Core.Utils.Numbers.pas';
 
 end.

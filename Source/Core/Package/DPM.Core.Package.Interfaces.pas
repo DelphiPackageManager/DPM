@@ -169,6 +169,8 @@ type
     function GetAuthors       : string;
     function GetOwners        : string;
     function GetProjectUrl    : string;
+    function GetReportUrl     : string;
+    function GetPublishedDate : string;
     function GetLicense       : string;
     function GetIcon          : string;
     function GetCopyright     : string;
@@ -177,7 +179,13 @@ type
     function GetIsCommercial  : boolean;
     function GetDownloadCount : Int64;
     function GetInstalled : boolean;
+    function GetInstalledVersion : string;
+    function GetIsError : boolean;
+
     procedure SetInstalled(const value : boolean);
+    procedure SetInstalledVersion(const value : string);
+    procedure SetReportUrl(const value : string);
+    procedure SetPublishedDate(const value : string);
     function GetIsReservedPrefix : boolean;
 
     property Id           : string  read GetId;
@@ -190,16 +198,23 @@ type
     property Icon         : string  read GetIcon;
     property Copyright    : string  read GetCopyright;
     property Tags         : string  read GetTags;
-    //this is for use by the UI, it's not returned.
-    property Installed    : boolean read GetInstalled write SetInstalled;
+    property Platforms    : TDPMPlatforms read GetPlatforms;
+    property Dependencies : IList<IPackagePlatformDependencies> read GetDependencies;
+
     //only returned from server feeds.
     property IsReservedPrefix : boolean read  GetIsReservedPrefix;
     property IsTrial      : boolean read GetIsTrial;
     property IsCommercial : boolean read GetIsCommercial;
-    property Platforms    : TDPMPlatforms read GetPlatforms;
-    property Dependencies : IList<IPackagePlatformDependencies> read GetDependencies;
     //returns -1 if not set.
     property Downloads    : Int64 read GetDownloadCount;
+
+    //these are for use by the UI, it's not returned.
+    property Installed    : boolean read GetInstalled write SetInstalled;
+    property InstalledVersion : string read GetInstalledVersion write SetInstalledVersion;
+    property ReportUrl    : string  read GetProjectUrl write SetReportUrl;
+    property PublishedDate  : string read GetPublishedDate write SetPublishedDate; //TODO : what format should this be - see repos
+    property IsError      : boolean read GetIsError;
+
     property SourceName   : string read GetSourceName;
   end;
 

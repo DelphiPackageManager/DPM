@@ -39,7 +39,7 @@ type
   TClientVersion = VSoft.SemanticVersion.TSemanticVersion;
   TVerbosity = (Quiet,Normal,Detailed, Debug);
 
-  TSourceType =(Folder, DPMServer);
+  TSourceType =(Folder, DPMServer, DPMGithub, DNGithub);
 
   //TODO : Decide on min delphi version supported. Ideally go back as far as possible
 

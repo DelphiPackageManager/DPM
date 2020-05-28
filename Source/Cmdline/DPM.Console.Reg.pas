@@ -44,6 +44,7 @@ uses
   DPM.Console.Command.ExitCodes,
   DPM.Console.Command.Help,
   DPM.Console.Command.Install,
+  DPM.Console.Command.Feed,
   DPM.Console.Command.List,
   DPM.Console.Command.Pack,
   DPM.Console.Command.Push,
@@ -86,6 +87,10 @@ begin
  container.RegisterType<ICommandHandler,TExitCodesCommand>('command.exitcodes');
  container.RegisterType<ICommandHandler,THelpCommand>('command.help');
  container.RegisterType<ICommandHandler,TInstallCommand>('command.install');
+ {$IFDEF DEBUG}
+ container.RegisterType<ICommandHandler,TFeedCommand>('command.feed');
+ {$ENDIF}
+
  container.RegisterType<ICommandHandler,TListCommand>('command.list');
  container.RegisterType<ICommandHandler,TPackCommand>('command.pack');
  container.RegisterType<ICommandHandler,TPushCommand>('command.push');

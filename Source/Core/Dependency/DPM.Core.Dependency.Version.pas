@@ -96,6 +96,7 @@ type
     function TryGetOverlappingVersion(const otherVersion : TVersionRange; out overlappingVersion : TVersionRange) : boolean;
 
     function ToString : string;
+    function ToDisplayString : string;
     function Clone(const normalize : boolean = false) : TVersionRange;
     function IsEmpty : boolean;
     function IsFixed : boolean;
@@ -371,6 +372,26 @@ begin
     result := result and (packageVersion <= FMaxVersion)
   else
     result := result and (packageVersion <= FMaxVersion)
+end;
+
+function TVersionRange.ToDisplayString: string;
+begin
+  if (FMinVersion = FMaxVersion) and FMaxVersionIsInclusive and FMinVersionIsInclusive then
+    //fixed version.
+    result := FMinVersion.ToString
+  else
+  begin
+    if FMinVersionIsInclusive then
+      result := '>='
+    else
+      result := '>';
+    result := result + FMinVersion.ToString + ', ';
+    if FMaxVersionIsInclusive then
+      result := result + '<='
+    else
+      result := result + '<';
+    result := result + FMaxVersion.ToString;
+  end;
 end;
 
 function TVersionRange.ToString: string;
