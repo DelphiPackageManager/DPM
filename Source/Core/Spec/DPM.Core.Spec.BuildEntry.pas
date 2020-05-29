@@ -54,8 +54,14 @@ type
     function GetProject: string;
     function GetPreBuilt : boolean;
     procedure SetProject(const value : string);
+    procedure SetBplOutputDir(const value: string);
+    procedure SetDcpOutputDir(const value: string);
+    procedure SetDcuOutputDir(const value: string);
+    procedure SetId(const value: string);
+
     function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
     function Clone : ISpecBuildEntry;
+
   public
     constructor CreateClone(const logger: ILogger; const id, project, config, bpldir, dcpdir,dcudir: string; const preBuilt : boolean);reintroduce;
   public
@@ -162,6 +168,26 @@ begin
     FPreBuilt := jsonObject.B['preBuilt']
   else
     FPreBuilt := true;
+end;
+
+procedure TSpecBuildEntry.SetBplOutputDir(const value: string);
+begin
+  FBplOutputDir := value;
+end;
+
+procedure TSpecBuildEntry.SetDcpOutputDir(const value: string);
+begin
+  FDcpOutputDir := value;
+end;
+
+procedure TSpecBuildEntry.SetDcuOutputDir(const value: string);
+begin
+  FDcuOutputDir := value;
+end;
+
+procedure TSpecBuildEntry.SetId(const value: string);
+begin
+  FId := value;
 end;
 
 procedure TSpecBuildEntry.SetProject(const value: string);

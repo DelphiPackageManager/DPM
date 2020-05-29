@@ -173,15 +173,19 @@ type
     function GetBplOutputDir : string;
     function GetDcuOutputDir : string;
     function GetDcpOutputDir : string;
+    procedure SetId(const value : string);
     procedure SetProject(const value : string);
+    procedure SetBplOutputDir(const value : string);
+    procedure SetDcuOutputDir(const value : string);
+    procedure SetDcpOutputDir(const value : string);
 
     function Clone : ISpecBuildEntry;
-    property Id : string read GetId; //?What was this for???
+    property Id : string read GetId write SetId;
     property Project : string read GetProject write SetProject;
     property Config : string read GetConfig;
-    property BplOutputDir : string read GetBplOutputDir;
-    property DcuOutputDir : string read GetDcuOutputDir;
-    property DcpOutputDir : string read GetDcpOutputDir;
+    property BplOutputDir : string read GetBplOutputDir write SetBplOutputDir;
+    property DcuOutputDir : string read GetDcuOutputDir write SetDcuOutputDir;
+    property DcpOutputDir : string read GetDcpOutputDir write SetDcpOutputDir;
   end;
 
 

@@ -795,7 +795,11 @@ begin
 
         for buildEntry in targetPlatform.BuildEntries do
         begin
+          buildEntry.Id := regEx.Replace(buildEntry.Id, evaluator);
           buildEntry.Project := regEx.Replace(buildEntry.Project, evaluator);
+          buildEntry.BplOutputDir := regEx.Replace(buildEntry.BplOutputDir, evaluator);
+          buildEntry.DcuOutputDir := regEx.Replace(buildEntry.DcuOutputDir, evaluator);
+          buildEntry.DcpOutputDir := regEx.Replace(buildEntry.DcpOutputDir, evaluator);
         end;
       end;
 
