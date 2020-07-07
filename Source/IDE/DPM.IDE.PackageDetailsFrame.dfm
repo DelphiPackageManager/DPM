@@ -143,7 +143,6 @@ object PackageDetailsFrame: TPackageDetailsFrame
         Anchors = [akLeft, akTop, akRight]
         Enabled = False
         TabOrder = 0
-        Text = 'txtInstalledVersion'
       end
       object btnUninstall: TButton
         Left = 355
