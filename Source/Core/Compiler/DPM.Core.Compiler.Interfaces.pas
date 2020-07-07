@@ -31,6 +31,7 @@ interface
 uses
   System.Classes,
   Spring.Collections,
+  VSoft.CancellationToken,
   DPM.Core.Types;
 
 {$SCOPEDENUMS ON}
@@ -66,7 +67,7 @@ type
 
     function GetCompilerOutput : TStrings;
 
-    function BuildProject(const projectFile : string; const configName : string): boolean;
+    function BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string): boolean;
 
     property CompilerVersion : TCompilerVersion read GetCompilerVersion;
     property Configuration : string read GetConfiguration write SetConfiguration;

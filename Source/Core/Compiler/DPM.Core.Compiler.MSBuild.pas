@@ -31,6 +31,7 @@ interface
 uses
   System.Classes,
   Spring.Collections,
+  VSoft.CancellationToken,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Compiler.Interfaces;
@@ -83,7 +84,7 @@ type
     function GetMSBuildParameters(const configName : string) : string;
     function GetCommandLine(const projectFile : string; const configName : string) : string;
 
-    function BuildProject(const projectFile: string; const configName : string): Boolean;
+    function BuildProject(const cancellationToken : ICancellationToken; const projectFile: string; const configName : string): Boolean;
   public
     constructor Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const env : ICompilerEnvironmentProvider);
     destructor Destroy;override;
@@ -100,7 +101,7 @@ uses
 
 { TMSBuildCompiler }
 
-function TMSBuildCompiler.BuildProject(const projectFile: string; const configName : string): Boolean;
+function TMSBuildCompiler.BuildProject(const cancellationToken : ICancellationToken; const projectFile: string; const configName : string): Boolean;
 var
   commandLine : string;
 begin
@@ -111,7 +112,7 @@ begin
   commandLine := GetCommandLine(projectFile, configName );
 
   try
-    result :=  TProcess.Execute('cmd.exe', commandLine) = 0;
+    result :=  TProcess.Execute(cancellationToken, 'cmd.exe', commandLine) = 0;
   except
     on e : Exception do
     begin

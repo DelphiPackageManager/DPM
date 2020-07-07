@@ -28,12 +28,15 @@ unit DPM.Core.Utils.Process;
 
 interface
 
+uses
+  VSoft.CancellationToken;
+
 type
   // Simple wrapper around ShellExecute for now
   //TODO : Rework to use CreateProcess and capture stdout using pipes.
   TProcess = class
     //throws if cannot create process.
-    class function Execute(const exe : string; const commandLine : string) : Cardinal;
+    class function Execute(const cancellationToken : ICancellationToken; const exe : string; const commandLine : string) : Cardinal;
   end;
 
 
@@ -46,9 +49,11 @@ uses
 
 { TProcess }
 
-class function TProcess.Execute(const exe, commandLine: string): Cardinal;
+class function TProcess.Execute(const cancellationToken : ICancellationToken; const exe, commandLine: string): Cardinal;
 var
   shellInfo : TShellExecuteInfo;
+  waitHandles : array[0..1] of THandle;
+  waitRes : DWORD;
 begin
   result := MaxInt;
   shellInfo.cbSize := sizeOf(TShellExecuteInfo);
@@ -63,9 +68,32 @@ begin
 
   if ShellExecuteEx(@shellInfo) then
   begin
-    WaitForSingleObject(shellInfo.hProcess,INFINITE);
-    GetExitCodeProcess(shellInfo.hProcess, result);
-    CloseHandle(shellInfo.hProcess);
+    waitHandles[0] := shellInfo.hProcess;
+    waitHandles[1] := cancellationToken.Handle;
+    waitRes := WaitForMultipleObjects(2,@waithandles[0],false, 60000 );
+    try
+      case waitRes of
+        WAIT_OBJECT_0: // Process has exited
+          begin
+            //all good
+          end;
+        WAIT_OBJECT_0 + 1: // Event signalled to terminate process
+          begin
+            TerminateProcess(shellInfo.hProcess, 999);
+            result := 999;
+          end;
+        WAIT_TIMEOUT: // Timed out
+          begin
+            TerminateProcess(shellInfo.hProcess, 888);
+
+          end;
+      else // Something else happened (like WAIT_FAILED)
+          raise Exception.Create('Unexpected event wait result ' + IntToStr(waitRes));
+      end;
+    finally
+      GetExitCodeProcess(shellInfo.hProcess, result);
+      CloseHandle(shellInfo.hProcess);
+    end;
   end
   else
     raise Exception.Create('Unable to execute process : ' + SysErrorMessage(GetLastError));
