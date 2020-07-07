@@ -222,11 +222,7 @@ begin
   FLogger.Information('Writing package to file : ' + packageFileName);
   try
     if spec.MetaData.Icon <> '' then
-    begin
-      if FArchiveWriter.AddIcon(spec.MetaData.Icon) then
-        spec.MetaData.Icon := cIconFile;
-    end;
-
+      FArchiveWriter.AddIcon(spec.MetaData.Icon);
 
     sStream := TStringStream.Create(sManifest,TEncoding.UTF8);
     try

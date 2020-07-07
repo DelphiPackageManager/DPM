@@ -524,7 +524,7 @@ begin
     if FMetaData.License <> '' then
       metaDataObj['license'] := FMetaData.License;
     if FMetaData.Icon <> '' then
-      metaDataObj['icon'] := FMetaData.Icon;
+      metaDataObj['icon'] := cIconFile;//need to do this as the file is written with cIconFile name.
     if FMetaData.Copyright <> '' then
       metaDataObj['copyright'] := FMetaData.Copyright;
     if FMetaData.Tags <> '' then
