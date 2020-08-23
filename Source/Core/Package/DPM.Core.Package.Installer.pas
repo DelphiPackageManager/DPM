@@ -466,7 +466,7 @@ begin
   projectReferences := TCollections.CreateList<TProjectReference>;
 
   projectReferences.AddRange(TEnumerable.Select<IPackageInfo, TProjectReference>(projectPackageInfos,
-    function(const info : IPackageInfo) : TProjectReference
+    function(info : IPackageInfo) : TProjectReference
     var
       node : IGraphNode;
       parentNode : IGraphNode;
@@ -584,7 +584,7 @@ begin
   projectReferences := TCollections.CreateList<TProjectReference>;
 
   projectReferences.AddRange(TEnumerable.Select<IPackageInfo, TProjectReference>(projectPackageInfos,
-    function(const info : IPackageInfo) : TProjectReference
+    function(info : IPackageInfo) : TProjectReference
     var
       node : IGraphNode;
       parentNode : IGraphNode;
