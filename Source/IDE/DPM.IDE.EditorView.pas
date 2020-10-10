@@ -38,7 +38,7 @@ uses
 type
   IDPMEditorView = interface
   ['{1DF76A55-76AC-4789-A35A-CA025583356A}']
-
+    procedure Reloaded;
   end;
 
   TDPMEditorView = class(TInterfacedObject, INTACustomEditorView, INTACustomEditorView150, IDPMEditorView)
@@ -49,6 +49,7 @@ type
     FImageIndex : integer;
     FCaption : string;
   protected
+    procedure Reloaded;
     function CloneEditorView: INTACustomEditorView;
     procedure CloseAllCalled(var ShouldClose: Boolean);
     procedure DeselectView;
@@ -162,6 +163,11 @@ function TDPMEditorView.GetViewIdentifier: string;
 begin
   result := 'DPM_VIEW_' + ChangeFileExt(ExtractFileName(FProject.FileName), '');
   result := StringReplace(result, '.','_', [rfReplaceAll]);
+end;
+
+procedure TDPMEditorView.Reloaded;
+begin
+  FFrame.ProjectReloaded;
 end;
 
 procedure TDPMEditorView.SelectView;

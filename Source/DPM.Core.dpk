@@ -127,7 +127,8 @@ contains
   DPM.Core.Utils.Enum in 'Core\Utils\DPM.Core.Utils.Enum.pas',
   DPM.Core.Repository.Base in 'Core\Repository\DPM.Core.Repository.Base.pas',
   DPM.Core.Options.Feed in 'Core\Options\DPM.Core.Options.Feed.pas',
-  DPM.Core.Utils.Numbers in 'Core\Utils\DPM.Core.Utils.Numbers.pas';
+  DPM.Core.Utils.Numbers in 'Core\Utils\DPM.Core.Utils.Numbers.pas',
+  DPM.Core.Dependency.LockFile in 'Core\Dependency\DPM.Core.Dependency.LockFile.pas';
 
 end.
 

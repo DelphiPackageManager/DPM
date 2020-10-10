@@ -43,6 +43,7 @@ uses
 type
   //minimum info needed to identify package
   //need to make more of the api use this rather than the derived interfaces.
+  //Note this only has info we can get from the package filename!
   IPackageId = interface
   ['{35FABD79-3880-4F46-9D70-AA19AAE44565}']
     function GetId : string;
@@ -58,7 +59,6 @@ type
   end;
 
   //represents the core package identity, ie id, version, compiler, platform
-  //Note this only has info we can get from the package filename!
   IPackageIdentity = interface(IPackageId)
   ['{E9E49A25-3ECA-4380-BB75-AC9E29725BEE}']
     function GetSourceName : string;
@@ -181,12 +181,14 @@ type
     function GetInstalled : boolean;
     function GetInstalledVersion : string;
     function GetIsError : boolean;
+    function GetIsReservedPrefix : boolean;
+    function GetIsTransitive : boolean;
 
     procedure SetInstalled(const value : boolean);
     procedure SetInstalledVersion(const value : string);
     procedure SetReportUrl(const value : string);
     procedure SetPublishedDate(const value : string);
-    function GetIsReservedPrefix : boolean;
+    procedure SetIsTransitive(const value : boolean);
 
     property Id           : string  read GetId;
     property Version      : string  read GetVersion;
@@ -211,6 +213,7 @@ type
     //these are for use by the UI, it's not returned.
     property Installed    : boolean read GetInstalled write SetInstalled;
     property InstalledVersion : string read GetInstalledVersion write SetInstalledVersion;
+    property IsTransitive  : boolean read GetIsTransitive write SetIsTransitive;
     property ReportUrl    : string  read GetProjectUrl write SetReportUrl;
     property PublishedDate  : string read GetPublishedDate write SetPublishedDate; //TODO : what format should this be - see repos
     property IsError      : boolean read GetIsError;
@@ -218,6 +221,7 @@ type
     property SourceName   : string read GetSourceName;
   end;
 
+  IPackageInstallerContext = interface;
 
   //does the work of installing/restoring packages.
   IPackageInstaller = interface
@@ -226,6 +230,7 @@ type
     function Restore(const cancellationToken : ICancellationToken; const options : TRestoreOptions) : boolean;
     function Cache(const cancellationToken : ICancellationToken; const options : TCacheOptions) : boolean;
     function Remove(const cancellationToken : ICancellationToken; const options : TUninstallOptions) : boolean;
+    function Context : IPackageInstallerContext;
   end;
 
   //used to collect and detect package conflicts when working with multiple projects.

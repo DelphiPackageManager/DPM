@@ -34,6 +34,7 @@ uses
   DPM.IDE.Logger,
   DPM.Core.Options.Restore,
   DPM.Core.Package.Interfaces,
+  DPM.IDE.ProjectTreeManager,
   DPM.IDE.EditorViewManager;
 
 type
@@ -45,6 +46,7 @@ type
     FGroupProjects : IList<string>;
 
     FEditorViewManager : IDPMEditorViewManager;
+    FProjectTreeManager : IDPMProjectTreeManager;
   protected
     //IOTANotifier
     procedure AfterSave;
@@ -61,7 +63,8 @@ type
 
     function LoadProjectGroup(const fileName : string) : boolean;
   public
-    constructor Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager);
+    constructor Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager;
+                       const projectTreeManager : IDPMProjectTreeManager);
     destructor Destroy;override;
   end;
 
@@ -97,19 +100,20 @@ begin
 
 end;
 
-constructor TDPMIDENotifier.Create(const logger: IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager);
+constructor TDPMIDENotifier.Create(const logger: IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager; const projectTreeManager : IDPMProjectTreeManager);
 begin
   FLogger := logger;
   FPackageInstaller := packageInstaller;
   FGroupProjects := TCollections.CreateList<string>;
   FEditorViewManager := editorViewManager;
+  FProjectTreeManager := projectTreeManager;
 end;
 
 function TDPMIDENotifier.CreateOptions(const fileName : string) : TRestoreOptions;
 begin
   result := TRestoreOptions.Create;
   result.ApplyCommon(TCommonOptions.Default);
-  result.ProjectPath := fileName;
+ result.ProjectPath := fileName;
 
 
   result.Validate(FLogger);
@@ -167,64 +171,79 @@ var
   cancellationTokenSource : ICancellationTokenSource;
   ext : string;
 begin
-  if not (NotifyCode in  [ofnFileOpening, ofnFileClosing])  then
-    exit;
-
   ext := ExtractFileExt(FileName);
-  if (ext <> '.groupproj') and (ext <> '.dproj') then //TODO : Add cbproj one day!
+  if not (SameText(ext, '.dproj') or SameText(ext, '.groupproj')) then
     exit;
 
-  if NotifyCode = ofnFileClosing then
-  begin
-    FLogger.Clear;
-    FEditorViewManager.ProjectClosed(FileName);
-    exit;
-  end;
-
-  {
-    Since there's no built in way to determine when the project group has finished
-    loading, we have to cheat here.
-
-    We load up the list of projects in the group, and then as each one is loaded
-    (we get notified here) we remove them from the list. when the list is empty
-    we are done and can continue. This has the added benefit of running restore
-    when the grouproj is loading but before the project is loaded, so no reload loop
-    to deal with!
-  }
-
-  //
-  if FLoadingGroup then
-  begin
-    FGroupProjects.Remove(FileName);
-    if FGroupProjects.Count = 0 then
-      FLoadingGroup := false;
-    exit;
-  end;
-
-
-  if (not FLoadingGroup) and (ext = '.groupproj') then
-  begin
-    FLoadingGroup := true;
-    //need this to determine when we are done loading the project group.
-    if not LoadProjectGroup(FileName) then
+  case NotifyCode of
+    ofnFileOpening:
     begin
-      //log error
+      FLogger.Debug('IDE File Opening ' + FileName);
+
+      {
+        Since there's no built in way to determine when the project group has finished
+        loading, we have to cheat here.
+
+        We load up the list of projects in the group, and then as each one is loaded
+        (we get notified here) we remove them from the list. when the list is empty
+        we are done and can continue. This has the added benefit of running restore
+        when the grouproj is loading but before the project is loaded, so no reload loop
+        to deal with!
+      }
+
+      //
+      if FLoadingGroup then
+      begin
+        FGroupProjects.Remove(FileName);
+        if FGroupProjects.Count = 0 then
+          FLoadingGroup := false;
+        exit;
+      end
+      else if (not FLoadingGroup) and (ext = '.groupproj')  then
+      begin
+        //if the groupproj doesn't exist, it's a placeholder and we are about to load a single project
+        if not FileExists(FileName) then
+        begin
+          FProjectTreeManager.NotifyStartLoading(plSingle);
+          exit;
+        end;
+        FLoadingGroup := true;
+        //need this to determine when we are done loading the project group.
+        if not LoadProjectGroup(FileName) then
+          exit;
+        FProjectTreeManager.NotifyStartLoading(plGroup, FGroupProjects);
+      end
+      else
+        FLoadingGroup := false;
+
+      cancellationTokenSource := TCancellationTokenSourceFactory.Create;
+//      FLogger.Clear;
+      FLogger.ShowMessageTab;
+      FLogger.StartRestore;
+      FLogger.StartProject(FileName);
+      restoreOptions := CreateOptions(fileName);
+
+      FPackageInstaller.Restore(cancellationTokenSource.Token, restoreOptions);
+
+      FLogger.EndRestore;
+
+
+    end;
+    ofnFileOpened:
+    begin
+       FLogger.Debug('File Opened ' + FileName);
+
+    end;
+    ofnFileClosing:
+    begin
+      FLogger.Clear;
+      FEditorViewManager.ProjectClosed(FileName);
       exit;
     end;
-  end
   else
-    FLoadingGroup := false;
+    exit;
+  end;
 
-  cancellationTokenSource := TCancellationTokenSourceFactory.Create;
-  FLogger.Clear;
-  FLogger.ShowMessageTab;
-  FLogger.StartRestore;
-  FLogger.StartProject(FileName);
-  restoreOptions := CreateOptions(fileName);
-
-  FPackageInstaller.Restore(cancellationTokenSource.Token, restoreOptions);
-
-  FLogger.EndRestore;
 
 end;
 

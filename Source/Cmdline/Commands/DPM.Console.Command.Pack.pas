@@ -121,7 +121,7 @@ begin
   end;
 
   try
-    if not FWriter.WritePackageFromSpec(TPackOptions.Default) then
+    if not FWriter.WritePackageFromSpec(cancellationToken, TPackOptions.Default) then
       exit(TExitCode.Error);
 
   except

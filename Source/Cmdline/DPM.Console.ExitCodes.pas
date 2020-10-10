@@ -65,6 +65,8 @@ function ExitCodeString(const exitCode : TExitCode) : string;
 begin
   case exitCode of
     TExitCode.OK : result := 'Success.';
+    TExitCode.Error : result := 'Error';
+    TExitCode.MissingArg : result := 'Missing Argument';
     TExitCode.InitException : result := 'Initialization Exception';
     TExitCode.InvalidArguments : result := 'Invalid arguments';
     TExitCode.InvalidCommand : result := 'Invalid command';

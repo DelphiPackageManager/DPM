@@ -54,6 +54,7 @@ type
     function GetIsTransitive: Boolean;
     function GetRange: TVersionRange;
     function GetCompilerVersion: TCompilerVersion;
+    function GetHasDependencies: Boolean;
 
   public
     constructor Create(const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const range : TVersionRange; const isTransitive : boolean);
@@ -72,7 +73,7 @@ begin
   FCompilerVersion := compilerVersion;
   FRange := range;
   FIsTransitive := isTransitive;
-  FDependencies := TCollections.CreateList<IPackageReference>;
+  FDependencies := nil; //TCollections.CreateList<IPackageReference>;
 end;
 
 function TPackageReference.GetCompilerVersion: TCompilerVersion;
@@ -82,7 +83,14 @@ end;
 
 function TPackageReference.GetDependencies: IList<IPackageReference>;
 begin
+  if FDependencies = nil then
+    FDependencies := TCollections.CreateList<IPackageReference>;
   result := FDependencies;
+end;
+
+function TPackageReference.GetHasDependencies: Boolean;
+begin
+  result := (FDependencies <> nil) and FDependencies.Any;
 end;
 
 function TPackageReference.GetId: string;

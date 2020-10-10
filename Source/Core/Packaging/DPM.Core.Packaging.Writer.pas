@@ -33,6 +33,7 @@ uses
   Spring.Container,
   Spring.Collections,
   VSoft.AntPatterns,
+  VSoft.CancellationToken,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Options.Pack,
@@ -52,7 +53,7 @@ type
     function WritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion; const basePath : string) : boolean;
 
     //Generate zip file and xml metadata file.
-    function WritePackageFromSpec(const options : TPackOptions) : boolean;
+    function WritePackageFromSpec(const cancellationToken : ICancellationToken; const options : TPackOptions) : boolean;
   public
     constructor Create(const logger : ILogger; const archiveWriter : IPackageArchiveWriter; const specReader : IPackageSpecReader);
   end;
@@ -185,11 +186,11 @@ var
     for fsPattern in fsPatterns do
      ProcessPattern(basePath, dest, fsPattern, nonWildcardPath, flatten, exclude , ignore,  fileCount);
 
-    if fileCount = 0 then
+    if (not ignore) and (fileCount = 0) then
      FLogger.Warning('No files were found for pattern [' + source + ']');
   end;
 
-  procedure ProcessBPLEntry(const source, dest : string);
+  procedure AddBPLToArchive(const source, dest : string);
   var
     archivePath : string;
     sourceFile : string;
@@ -242,19 +243,19 @@ begin
       ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, fileEntry.Ignore );
 
     for bplEntry in targetPlatform.RuntimeFiles do
-      if bplEntry.PreBuilt then
-        ProcessBPLEntry(bplEntry.Source, bplEntry.Destination);
+      if bplEntry.BuildId = '' then
+        AddBPLToArchive(bplEntry.Source, bplEntry.Destination);
 
     for bplEntry in targetPlatform.DesignFiles do
-      if bplEntry.PreBuilt then
-        ProcessBPLEntry(bplEntry.Source, bplEntry.Destination);
+      if bplEntry.BuildId = '' then
+        AddBPLToArchive(bplEntry.Source, bplEntry.Destination);
 
   finally
     FArchiveWriter.Close;
   end;
 end;
 
-function TPackageWriter.WritePackageFromSpec(const options : TPackOptions) : boolean;
+function TPackageWriter.WritePackageFromSpec(const cancellationToken : ICancellationToken; const options : TPackOptions) : boolean;
 var
   spec : IPackageSpec;
   targetPlatform : ISpecTargetPlatform;
@@ -334,6 +335,9 @@ begin
     FLogger.Information('Spec is valid, writing package files...');
     for targetPlatform in spec.TargetPlatforms do
     begin
+      if cancellationToken.IsCancelled then
+        exit;
+
       if version.IsEmpty then
         version := spec.MetaData.Version;
       result := WritePackage(options.OutputFolder, targetPlatform, spec, version, options.BasePath) and result;

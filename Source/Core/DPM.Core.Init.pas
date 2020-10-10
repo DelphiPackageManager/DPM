@@ -29,10 +29,11 @@ unit DPM.Core.Init;
 interface
 
 uses
-  Spring.Container;
+  Spring.Container,
+  DPM.Core.Types;
 
 //register types with the DI container.
-procedure InitCore(const container : TContainer);
+procedure InitCore(const container : TContainer; const overrideProc : TConstProc<TContainer> = nil);
 
 implementation
 
@@ -50,7 +51,6 @@ uses
   DPM.Core.Package.Interfaces,
   DPM.Core.Package.Installer,
   DPM.Core.Package.InstallerContext,
-  DPM.Core.Types,
   DPM.Core.Sources.Interfaces,
   DPM.Core.Sources.Manager,
   DPM.Core.Sources.ClientFactory,
@@ -66,10 +66,13 @@ uses
   DPM.Core.Cache.Interfaces,
   DPM.Core.Cache,
   DPM.Core.Dependency.Interfaces,
-  DPM.Core.Dependency.Resolver;
+  DPM.Core.Dependency.Resolver,
+  DPM.Core.Compiler.Interfaces,
+  DPM.Core.Compiler.Factory,
+  DPM.Core.Compiler.EnvironmentProvider;
 
 
-procedure InitCore(const container : TContainer);
+procedure InitCore(const container : TContainer; const overrideProc : TConstProc<TContainer>);
 begin
 
   Container.RegisterType<IPackageArchiveReader,TZipFileArchiveReader>('file.archive');
@@ -82,10 +85,18 @@ begin
 
   Container.RegisterType<IPackageSpecReader,TPackageSpecReader>;
 
-//  Container.RegisterType<IProjectEditor,TProjectEditor>;
+  Container.RegisterType<ICompilerEnvironmentProvider, TCompilerEnvironmentProvider>;
+  Container.RegisterType<ICompilerFactory, TCompilerFactory>().AsSingleton();
 
-  Container.RegisterType<IPackageInstallerContext,TPackageInstallerContext>;
-  Container.RegisterType<IPackageInstaller,TPackageInstaller>;
+
+  if Assigned(overrideProc) then
+    //allow IDE plugin to register it's own implementations.
+    overrideProc(container)
+  else
+  begin
+    Container.RegisterType<IPackageInstallerContext,TPackageInstallerContext>;
+    Container.RegisterType<IPackageInstaller,TPackageInstaller>;
+  end;
 
 
   Container.RegisterType<IConfigurationManager,TConfigurationManager>;

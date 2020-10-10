@@ -483,14 +483,40 @@ type
 function TDirectoryPackageRepository.DoGetPackageFeedFiles(const options : TSearchOptions; searchTerm: string): IList<string>;
 var
   files : TStringDynArray;
+  platform : TDPMPlatform;
+  platformSearchTerm : string;
 begin
-  if searchTerm <> '*' then
-    searchTerm := '*' + searchTerm + '*';
+  result:= TCollections.CreateList<string>;
+  if not options.Exact then
+  begin
+    if searchTerm <> '*' then
+      searchTerm := '*' + searchTerm + '*';
+  end;
   searchTerm := searchTerm + '-' + CompilerVersionToSearchPart(options.CompilerVersion) ;
-  searchTerm := searchTerm + '-*-*' + cPackageFileExt;
+  if options.Platforms = [] then
+  begin
+    if options.Version.IsEmpty then
+      searchTerm := searchTerm + '-*-*' + cPackageFileExt
+    else
+      searchTerm := searchTerm + '-*-' + options.Version.ToStringNoMeta + cPackageFileExt;
 
-  files := TDirectory.GetFiles(Source,searchTerm);
-  result:= TCollections.CreateList<string>(files);
+    files := TDirectory.GetFiles(Source,searchTerm);
+    result.AddRange(files);
+  end
+  else
+  begin
+    for platform in options.Platforms do
+    begin
+      platformSearchTerm := searchTerm + '-' + DPMPlatformToString(platform) + '-';
+      if options.Version.IsEmpty then
+        platformSearchTerm := platformSearchTerm + '*' + cPackageFileExt
+      else
+        platformSearchTerm := platformSearchTerm + options.Version.ToStringNoMeta + cPackageFileExt;
+
+      files := TDirectory.GetFiles(Source,platformSearchTerm);
+      result.AddRange(files);
+    end;
+  end;
 
 end;
 

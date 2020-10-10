@@ -38,6 +38,7 @@ type
   ['{BD31BE3A-5255-4290-9991-1A0071B24F81}']
     procedure ShowViewForProject(const project : IOTAProject);
     procedure ProjectClosed(const projectFile : string);
+    procedure ProjectLoaded(const projectFile : string);
     procedure Destroyed;
     //todo : add methods to hand notifications of projects added to group
   end;
@@ -49,6 +50,7 @@ type
     FEditorViewServices : IOTAEditorViewServices;
     FImageIndex : integer;
   protected
+    procedure ProjectLoaded(const projectFile : string);
     procedure ProjectClosed(const projectFile: string);
     procedure ShowViewForProject(const project: IOTAProject);
     procedure Destroyed;
@@ -132,6 +134,18 @@ begin
     end;
     view := nil;
   end;
+end;
+
+procedure TDPMEditorViewManager.ProjectLoaded(const projectFile: string);
+var
+  view : INTACustomEditorView;
+begin
+  //we are only using this for reloads.. if the view is open then tell it to refresh
+  if FOpenViews.TryGetValue(LowerCase(projectFile), view) then
+  begin
+    (view as IDPMEditorView).Reloaded;
+  end;
+
 end;
 
 procedure TDPMEditorViewManager.ShowViewForProject(const project: IOTAProject);

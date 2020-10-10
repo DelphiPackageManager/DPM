@@ -67,7 +67,12 @@ uses
   DPM.Console.Command.Why in 'Cmdline\Commands\DPM.Console.Command.Why.pas',
   DPM.Console.Command.Add in 'Cmdline\Commands\DPM.Console.Command.Add.pas',
   DPM.Console.Command.Cache in 'Cmdline\Commands\DPM.Console.Command.Cache.pas',
-  DPM.Console.Command.Feed in 'Cmdline\Commands\DPM.Console.Command.Feed.pas';
+  DPM.Console.Command.Feed in 'Cmdline\Commands\DPM.Console.Command.Feed.pas',
+  DPM.Core.Compiler.EnvironmentProvider in 'Core\Compiler\DPM.Core.Compiler.EnvironmentProvider.pas',
+  DPM.Core.Compiler.Factory in 'Core\Compiler\DPM.Core.Compiler.Factory.pas',
+  DPM.Core.Compiler.Interfaces in 'Core\Compiler\DPM.Core.Compiler.Interfaces.pas',
+  DPM.Core.Compiler.MSBuild in 'Core\Compiler\DPM.Core.Compiler.MSBuild.pas',
+  DPM.Core.Dependency.LockFile in 'Core\Dependency\DPM.Core.Dependency.LockFile.pas';
 
 begin
   //TODO : pull in VSoft.SemanticVersion as a package once we are bootstrapped.

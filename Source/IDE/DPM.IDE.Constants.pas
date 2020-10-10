@@ -29,8 +29,13 @@ unit DPM.IDE.Constants;
 interface
 
 const
-  sWizardTitle = 'DPM Package Manager';
-  sWizardProjectMenuCaption = 'Manage DPM Packages';
+  cWizardTitle = 'DPM Package Manager';
+  cWizardProjectMenuCaption = 'Manage DPM Packages';
+
+  cDPMPackages = 'DPM Packages';
+  cDPMContainer = 'DPMPackagesContainer'; //just needs to be something the IDE doesn't use already
+  dDPMPackageContainer = 'DPMPackageContainer';
+  cDPMPlatformContainer = 'DPMPlatformContainer';
 
 implementation
 

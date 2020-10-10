@@ -44,7 +44,8 @@ uses
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Cache.Interfaces,
-  DPM.Core.Dependency.Interfaces;
+  DPM.Core.Dependency.Interfaces,
+  DPM.Core.Compiler.Interfaces;
 
 type
   TPackageInstaller = class(TInterfacedObject, IPackageInstaller)
@@ -55,6 +56,7 @@ type
     FPackageCache : IPackageCache;
     FDependencyResolver : IDependencyResolver;
     FContext : IPackageInstallerContext;
+    FCompilerFactory : ICompilerFactory;
   protected
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId): IPackageInfo;
 
@@ -94,10 +96,14 @@ type
 
 
     function Cache(const cancellationToken : ICancellationToken; const options : TCacheOptions) : boolean;
+
+    function Context : IPackageInstallerContext;
+
   public
     constructor Create(const logger :ILogger; const configurationManager : IConfigurationManager;
                        const repositoryManager : IPackageRepositoryManager; const packageCache : IPackageCache;
-                       const dependencyResolver : IDependencyResolver; const context : IPackageInstallerContext);
+                       const dependencyResolver : IDependencyResolver; const context : IPackageInstallerContext;
+                       const compilerFactory : ICompilerFactory);
   end;
 
 implementation
@@ -202,9 +208,15 @@ begin
   end;
 end;
 
+function TPackageInstaller.Context: IPackageInstallerContext;
+begin
+  result := FContext;
+end;
+
 constructor TPackageInstaller.Create(const logger: ILogger; const configurationManager : IConfigurationManager;
                                      const repositoryManager : IPackageRepositoryManager; const packageCache : IPackageCache;
-                                     const dependencyResolver : IDependencyResolver;  const context : IPackageInstallerContext);
+                                     const dependencyResolver : IDependencyResolver;  const context : IPackageInstallerContext;
+                                     const compilerFactory : ICompilerFactory);
 begin
   FLogger               := logger;
   FConfigurationManager := configurationManager;
@@ -212,6 +224,7 @@ begin
   FPackageCache         := packageCache;
   FDependencyResolver   := dependencyResolver;
   FContext              := context;
+  FCompilerFactory      := compilerFactory;
 end;
 
 function GetLockFileName(const projectFileName : string; const platform : TDPMPlatform) : string;
@@ -285,7 +298,7 @@ end;
 
 
 
-procedure BuildPackageReferences(const parentNode : IGraphNode; const parentRef : IPackageReference; const packageReferences : IList<IPackageReference>;
+procedure GeneratePackageReferences(const parentNode : IGraphNode; const parentRef : IPackageReference; const packageReferences : IList<IPackageReference>;
                                  const compilerVersion : TCompilerVersion; const platform : TDPMPlatform);
 var
   childNode : IGraphNode;
@@ -303,7 +316,7 @@ begin
       parentRef.Dependencies.Add(packageRef);
 
     if childNode.HasChildren then
-      BuildPackageReferences(childNode, packageRef, packageReferences, compilerVersion, platform );
+      GeneratePackageReferences(childNode, packageRef, packageReferences, compilerVersion, platform );
   end;
 end;
 
@@ -522,7 +535,7 @@ begin
     exit;
 
   packageReferences.Clear;
-  BuildPackageReferences(dependencyGraph,nil, packageReferences, options.CompilerVersion, platform);
+  GeneratePackageReferences(dependencyGraph,nil, packageReferences, options.CompilerVersion, platform);
 
   projectEditor.UpdatePackageReferences(packageReferences, platform);
   result := projectEditor.SaveProject();
@@ -627,6 +640,7 @@ begin
   if not result then
     exit;
 
+  //TODO : Detect if anything has actually changed and only do this if we need to
   packageSearchPaths := TCollections.CreateList<string>;
 
   if not CollectSearchPaths(resolvedPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
@@ -636,7 +650,7 @@ begin
     exit;
 
   packageReferences.Clear;
-  BuildPackageReferences(dependencyGraph,nil, packageReferences, options.CompilerVersion, platform);
+  GeneratePackageReferences(dependencyGraph,nil, packageReferences, options.CompilerVersion, platform);
 
   projectEditor.UpdatePackageReferences(packageReferences, platform);
   result := projectEditor.SaveProject();

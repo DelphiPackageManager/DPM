@@ -23,15 +23,6 @@ type
     FACEnabled: boolean;
     FACOptions: TACOptions;
     FACSource: TACSource;
-    //debounce stuff
-    FTimer: TTimer;
-    FOnDebounceChanged : TNotifyEvent;
-    FDebounceInterval : Cardinal;
-
-    procedure DoOnTimer(Sender: TObject);
-    procedure DoDebounce(Sender : TObject);
-    procedure SetDebounceInterval(const Value: Cardinal);
-    procedure DoDebounceChanged;
 
     //history
     function GetACStrings: TStringList;
@@ -50,8 +41,6 @@ type
     property ACOptions: TACOptions read FACOptions write SetACOptions;
     property ACSource: TACSource read FACSource write SetACSource;
     property ACStrings: TStringList read GetACStrings write SetACStrings;
-    property DebounceInterval : Cardinal read FDebounceInterval write SetDebounceInterval;
-    property OnDebounceChanged : TNotifyEvent read FOnDebounceChanged write FOnDebounceChanged;
   end;
 
 implementation
@@ -67,13 +56,6 @@ uses
 constructor TButtonedEdit.Create(AOwner: TComponent);
 begin
   inherited;
-  Self.OnChange := DoDebounce;
-  FTimer := TTimer.Create(nil);
-  FTimer.OnTimer := DoOnTimer;;
-  FTimer.Enabled := False;
-  FDebounceInterval := 800;
-  FTimer.Interval := FDebounceInterval;
-
 
   FACList := TEnumString.Create;
   FACEnabled := True;
@@ -114,7 +96,6 @@ end;
 
 destructor TButtonedEdit.Destroy;
 begin
-  FTimer.Free;
   FACList := nil;
   inherited;
 end;
@@ -129,36 +110,6 @@ begin
   inherited;
 end;
 
-procedure TButtonedEdit.DoDebounce(Sender: TObject);
-begin
-  //nothing to do if the event isn't used.
-  if not Assigned(FOnDebounceChanged) then
-    exit;
-
-  if FDebounceInterval = 0 then
-  begin
-    FTimer.Enabled := False;
-    //we are not debouncing, just fire the event;
-    DoDebounceChanged;
-    exit;
-  end;
-  //restart the timer while we are still typing.
-  FTimer.Enabled := False;
-  FTimer.Enabled := true;
-
-end;
-
-procedure TButtonedEdit.DoDebounceChanged;
-begin
-   if Assigned(FOnDebounceChanged) then
-    FOnDebounceChanged(Self);
-end;
-
-procedure TButtonedEdit.DoOnTimer(Sender: TObject);
-begin
-  FTimer.Enabled := false;
-  DoDebounceChanged;
-end;
 
 function TButtonedEdit.GetACStrings: TStringList;
 begin
@@ -219,21 +170,6 @@ procedure TButtonedEdit.SetACStrings(const Value: TStringList);
 begin
   if Value <> FACList.Strings then
     FACList.Strings.Assign(Value);
-end;
-
-procedure TButtonedEdit.SetDebounceInterval(const Value: Cardinal);
-begin
-  if FDebounceInterval <> value then
-  begin
-    FDebounceInterval := Value;
-    if FDebounceInterval <= 0 then
-    begin
-      FDebounceInterval := 0;
-      FTimer.Enabled := false;
-    end;
-    FTimer.Interval := Value;
-
-  end;
 end;
 
 end.

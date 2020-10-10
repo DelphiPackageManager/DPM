@@ -133,7 +133,7 @@ begin
   if FDestination = '' then
   begin
     result := false;
-    Logger.Error('Required attribute [dest] is missing');
+    Logger.Error('Required attribute [dest] is missing for [' + FSource + ']');
   end;
 
   FFlatten := jsonObject.B['flatten'];

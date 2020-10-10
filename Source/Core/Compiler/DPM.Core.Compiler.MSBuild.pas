@@ -106,6 +106,7 @@ var
   commandLine : string;
 begin
   result := false;
+  FCompilerOutput.Clear;
 
   FCompilerLogFile := TPath.GetTempFileName;
 

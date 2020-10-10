@@ -73,6 +73,7 @@ type
     function GetProjectVersion: string;
     function GetPackageReferences: IList<IPackageReference>;
     function GetAppType: TAppType;
+    function GetHasPackages : boolean;
     procedure SetCompiler(const value : TCompilerVersion);
 
     function LoadProject(const filename: string): Boolean;
@@ -299,6 +300,11 @@ begin
 
 end;
 
+function TProjectEditor.GetHasPackages: boolean;
+begin
+  result := FPackageRefences.Any;
+end;
+
 function TProjectEditor.GetOutputElementName: string;
 begin
   case FAppType of
@@ -458,9 +464,9 @@ begin
             sOutputDir := StringReplace(sOutputDir, '$(Platform)', sPlatform, [rfReplaceAll,rfIgnoreCase]);            
             sOutputDir := StringReplace(sOutputDir, '$(Config)', configKeys.Names[i], [rfReplaceAll,rfIgnoreCase]);            
           end;
-          if sOutputDir = '' then
-            FLogger.Warning('No output directory found for config ' + configKeys.Names[i]);
-            
+//          if sOutputDir = '' then
+//            FLogger.Warning('No output directory found for config ' + configKeys.Names[i]);
+
           sUsePackages := 'false';
           TryGetConfigValue(sKey, sPlatform, 'UsePackages', sUsePackages);
           newConfig := TProjectConfiguration.Create(configKeys.Names[i], sOutputDir, platform, StrToBoolDef(sUsePackages,false), nil);
@@ -614,7 +620,7 @@ function TProjectEditor.LoadPackageRefences: boolean;
             exit;
           end;
         end;
-        packageReference := TPackageReference.Create(id,version, platform, FCompiler, range, false);
+        packageReference := TPackageReference.Create(id,version, platform, FCompiler, range, isTransitive);
         if isTransitive then
           parentReference.Dependencies.Add(packageReference)
         else

@@ -33,6 +33,7 @@ uses
   System.Classes,
   Spring.Container.Common,
   Spring.Collections,
+  VSoft.CancellationToken,
   DPM.Core.Options.Pack,
   DPM.Core.Types,
   DPM.Core.TargetPlatform,
@@ -42,7 +43,7 @@ type
   {$M+}
   IPackageWriter = interface
   ['{10944B58-5766-4B73-9C7F-C8488151E42B}']
-    function WritePackageFromSpec(const options : TPackOptions) : boolean;
+    function WritePackageFromSpec(const cancellationToken : ICancellationToken; const options : TPackOptions) : boolean;
   end;
 
 implementation

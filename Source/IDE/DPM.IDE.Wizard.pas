@@ -30,23 +30,24 @@ interface
 
 uses
   ToolsApi,
-  Spring.Container,
   DPM.Core.Logging,
   Vcl.ActnList,
   Vcl.ImgList,
   Vcl.Controls,
+  DPM.IDE.ProjectTreeManager,
+  Spring.Container,
   DPM.IDE.EditorViewManager;
 
 type
   TDPMWizard = class(TInterfacedObject, IOTANotifier, IOTAWizard)
   private
-    //FStorageNotifier : integer;
+    FStorageNotifierID : integer;
     FIDENotifier : integer;
     FProjectMenuNoftifierId : integer;
     FLogger : ILogger;
     FContainer : TContainer;
     FEditorViewManager : IDPMEditorViewManager;
-
+    FProjectTreeManager : IDPMProjectTreeManager;
     procedure InitContainer;
   protected
 
@@ -88,6 +89,7 @@ begin
   try
     FContainer := TContainer.Create;
     FContainer.RegisterInstance<ILogger>(FLogger).AsSingleton();
+    FContainer.RegisterInstance<IDPMIDELogger>(FLogger as IDPMIDELogger).AsSingleton();
     DPM.Core.Init.InitCore(FContainer);
     FContainer.Build;
   except
@@ -111,7 +113,7 @@ end;
 
 constructor TDPMWizard.Create;
 var
-  //storageNotifier : IOTAProjectFileStorageNotifier;
+  storageNotifier : IOTAProjectFileStorageNotifier;
   ideNotifier : IOTAIDENotifier;
   packageInstaller : IPackageInstaller;
   projMenuNotifier : IOTAProjectMenuItemCreatorNotifier;
@@ -121,9 +123,11 @@ begin
   InitContainer;
 
   packageInstaller := FContainer.Resolve<IPackageInstaller>;
-  FEditorViewManager := TDPMEditorViewManager.Create(FContainer);
 
-  ideNotifier := TDPMIDENotifier.Create(FLogger as IDPMIDELogger, packageInstaller, FEditorViewManager );
+  FEditorViewManager := TDPMEditorViewManager.Create(FContainer);
+  FProjectTreeManager := TDPMProjectTreeManager.Create(FContainer, FLogger as IDPMIDELogger);
+
+  ideNotifier := TDPMIDENotifier.Create(FLogger as IDPMIDELogger, packageInstaller, FEditorViewManager, FProjectTreeManager);
   FIDENotifier := (BorlandIDEServices as IOTAServices).AddNotifier(ideNotifier);
 
 
@@ -136,15 +140,15 @@ begin
 
 
   //this didn't work, leaving here as we may need it to try and detect reloads.
-//  storageNotifier := TDPMProjectStorageNotifier.Create(FLogger as IDPMIDELogger);
-//  FStorageNotifier := (BorlandIDEServices As IOTAProjectFileStorage).AddNotifier(storageNotifier);
+  storageNotifier := TDPMProjectStorageNotifier.Create(FLogger as IDPMIDELogger,  FEditorViewManager, FProjectTreeManager);
+  FStorageNotifierID := (BorlandIDEServices As IOTAProjectFileStorage).AddNotifier(storageNotifier);
 
 end;
 
 destructor TDPMWizard.Destroy;
 begin
-////  If FStorageNotifier > -1 then
-////    (BorlandIDEServices As IOTAProjectFileStorage).RemoveNotifier(FStorageNotifier);
+//  If FStorageNotifierId > -1 then
+//    (BorlandIDEServices As IOTAProjectFileStorage).RemoveNotifier(FStorageNotifierId);
 //  if FIDENotifier > -1 then
 //    (BorlandIDEServices as IOTAServices).RemoveNotifier(FIDENotifier);
 //
@@ -157,14 +161,13 @@ end;
 procedure TDPMWizard.Destroyed;
 begin
   FEditorViewManager.Destroyed;
-//  If FStorageNotifier > -1 then
-//    (BorlandIDEServices As IOTAProjectFileStorage).RemoveNotifier(FStorageNotifier);
+  If FStorageNotifierId > -1 then
+    (BorlandIDEServices As IOTAProjectFileStorage).RemoveNotifier(FStorageNotifierId);
   if FIDENotifier > -1 then
     (BorlandIDEServices as IOTAServices).RemoveNotifier(FIDENotifier);
 
   if FProjectMenuNoftifierId > -1 then
     (BorlandIDEServices as IOTAServices).RemoveNotifier(FProjectMenuNoftifierId);
-
 end;
 
 procedure TDPMWizard.Execute;

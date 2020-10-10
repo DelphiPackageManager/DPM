@@ -39,12 +39,13 @@ type
     class function SplitStr(const value : string; const Separator: Char; const options : TSplitStringOptions): TArray<string>;overload;
     class function SplitStr(const value : string; const Separator: Char): TArray<string>; overload;
     class function StartsWith(const theString : string; const value : string; const IgnoreCase : boolean = false) : boolean;
-
+    class function Contains(const theString : string; const value : string; const IgnoreCase : boolean = false) : boolean;
   end;
 
 implementation
 
 uses
+  System.SysUtils,
   System.StrUtils;
 
 { TStringUtils }
@@ -96,6 +97,15 @@ end;
 class function TStringUtils.PadRight(const theString: string; TotalWidth: Integer): string;
 begin
   Result := PadRight(theString, TotalWidth, ' ');
+end;
+
+class function TStringUtils.Contains(const theString, value: string; const IgnoreCase: boolean): boolean;
+begin
+  if IgnoreCase then
+    Result := Pos(LowerCase(value), LowerCase(theString) ) > 0
+  else
+    Result := Pos(value, theString) > 0;
+
 end;
 
 class function TStringUtils.PadRight(const theString: string; TotalWidth: Integer; PaddingChar: Char): string;

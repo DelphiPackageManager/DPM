@@ -71,7 +71,6 @@ type
     function IsTopLevel : boolean;
     function HasChildren : boolean;
     procedure VisitDFS(const visitor : TNodeVisitProc);
-
     property Id : string read GetId;
     property SelectedVersion : TPackageVersion read GetSelectedVersion write SetSelectedVersion;
     property SelectedOn : TVersionRange read GetSelectedOn write SetSelectedOn;
@@ -84,14 +83,12 @@ type
   IResolution = interface
   ['{CC4F63AA-80F7-46AC-8C42-0F8725B59579}']
     function GetPackage :  IPackageInfo;
-  //  function GetDependency : IPackageDependency;
     function GetParentId : string;
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
 
     property Package : IPackageInfo read GetPackage;
     property VersionRange : TVersionRange read GetVersionRange write SetVersionRange;
-  //  property Dependency : IPackageDependency read GetDependency;
     property ParentId : string read GetParentId;
   end;
 

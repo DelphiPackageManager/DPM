@@ -69,7 +69,16 @@ uses
   DPM.IDE.AddInOptionsHostForm in 'IDE\DPM.IDE.AddInOptionsHostForm.pas' {DPMOptionsHostForm},
   DPM.IDE.IconCache in 'IDE\DPM.IDE.IconCache.pas',
   DPM.IDE.PackageDetailsFrame in 'IDE\DPM.IDE.PackageDetailsFrame.pas' {PackageDetailsFrame: TFrame},
-  DPM.IDE.PackageDetailsPanel in 'IDE\DPM.IDE.PackageDetailsPanel.pas';
+  DPM.IDE.PackageDetailsPanel in 'IDE\DPM.IDE.PackageDetailsPanel.pas',
+  DPM.IDE.VSTProxy in 'IDE\DPM.IDE.VSTProxy.pas',
+  DPM.IDE.ProjectTreeManager in 'IDE\DPM.IDE.ProjectTreeManager.pas',
+  DPM.IDE.Utils in 'IDE\DPM.IDE.Utils.pas',
+  DPM.IDE.ProjectTree.Containers in 'IDE\DPM.IDE.ProjectTree.Containers.pas',
+  DPM.Core.Compiler.EnvironmentProvider in 'Core\Compiler\DPM.Core.Compiler.EnvironmentProvider.pas',
+  DPM.Core.Compiler.Factory in 'Core\Compiler\DPM.Core.Compiler.Factory.pas',
+  DPM.Core.Compiler.Interfaces in 'Core\Compiler\DPM.Core.Compiler.Interfaces.pas',
+  DPM.Core.Compiler.MSBuild in 'Core\Compiler\DPM.Core.Compiler.MSBuild.pas',
+  DPM.Core.Dependency.LockFile in 'Core\Dependency\DPM.Core.Dependency.LockFile.pas';
 
 {$R *.res}
 

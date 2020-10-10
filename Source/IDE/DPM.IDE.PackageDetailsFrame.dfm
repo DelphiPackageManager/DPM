@@ -3,7 +3,6 @@ object PackageDetailsFrame: TPackageDetailsFrame
   Top = 0
   Width = 436
   Height = 523
-  Constraints.MinWidth = 300
   DoubleBuffered = True
   ParentDoubleBuffered = False
   TabOrder = 0
@@ -31,15 +30,11 @@ object PackageDetailsFrame: TPackageDetailsFrame
       Caption = 'pnlPackageId'
       ShowCaption = False
       TabOrder = 0
-      DesignSize = (
-        434
-        57)
       object lblPackageId: TLabel
         Left = 47
         Top = 10
         Width = 189
         Height = 25
-        Anchors = [akLeft, akTop, akRight]
         Caption = 'VSoft.SemanticVersion'
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
@@ -184,19 +179,23 @@ object PackageDetailsFrame: TPackageDetailsFrame
         Left = 69
         Top = 6
         Width = 274
-        Height = 21
-        Style = csDropDownList
+        Height = 22
+        Style = csOwnerDrawVariable
         Anchors = [akLeft, akTop, akRight]
         TabOrder = 0
+        OnChange = cboVersionsChange
+        OnDrawItem = cboVersionsDrawItem
+        OnMeasureItem = cboVersionsMeasureItem
       end
-      object btnInstallUpdate: TButton
+      object btnInstallOrUpdate: TButton
         Left = 355
-        Top = 3
+        Top = 5
         Width = 75
         Height = 25
         Anchors = [akTop, akRight]
         Caption = 'Install'
         TabOrder = 1
+        OnClick = btnInstallOrUpdateClick
       end
     end
   end

@@ -44,7 +44,6 @@ type
     FDcuOutputDir: string;
     FId: string;
     FProject: string;
-    FPreBuilt : boolean;
   protected
     function GetBplOutputDir: string;
     function GetConfig: string;
@@ -52,7 +51,6 @@ type
     function GetDcuOutputDir: string;
     function GetId: string;
     function GetProject: string;
-    function GetPreBuilt : boolean;
     procedure SetProject(const value : string);
     procedure SetBplOutputDir(const value: string);
     procedure SetDcpOutputDir(const value: string);
@@ -63,7 +61,7 @@ type
     function Clone : ISpecBuildEntry;
 
   public
-    constructor CreateClone(const logger: ILogger; const id, project, config, bpldir, dcpdir,dcudir: string; const preBuilt : boolean);reintroduce;
+    constructor CreateClone(const logger: ILogger; const id, project, config, bpldir, dcpdir,dcudir: string);reintroduce;
   public
     constructor Create(const logger: ILogger); override;
 
@@ -75,7 +73,7 @@ implementation
 
 function TSpecBuildEntry.Clone: ISpecBuildEntry;
 begin
-  result := TSpecBuildEntry.CreateClone(logger, FId, FProject,FConfig, FBplOutputDir,FDcpOutputDir,FDcuOutputDir, FPreBuilt);
+  result := TSpecBuildEntry.CreateClone(logger, FId, FProject,FConfig, FBplOutputDir,FDcpOutputDir,FDcuOutputDir);
 end;
 
 constructor TSpecBuildEntry.Create(const logger: ILogger);
@@ -84,7 +82,7 @@ begin
 
 end;
 
-constructor TSpecBuildEntry.CreateClone(const logger: ILogger; const id, project, config, bpldir, dcpdir, dcudir: string; const preBuilt : boolean);
+constructor TSpecBuildEntry.CreateClone(const logger: ILogger; const id, project, config, bpldir, dcpdir, dcudir: string);
 begin
   inherited Create(logger);
   FId := id;
@@ -93,7 +91,6 @@ begin
   FBplOutputDir := bpldir;
   FDcpOutputDir := dcpdir;
   FDcuOutputDir := dcudir;
-  FPreBuilt     := preBuilt;
 end;
 
 function TSpecBuildEntry.GetBplOutputDir: string;
@@ -121,10 +118,6 @@ begin
   result := FId;
 end;
 
-function TSpecBuildEntry.GetPreBuilt: Boolean;
-begin
-  result := FPreBuilt;
-end;
 
 function TSpecBuildEntry.GetProject: string;
 begin
@@ -163,11 +156,6 @@ begin
   FDcuOutputDir := jsonObject.S['dcuOutputDir'];
   if FDcuOutputDir = '' then
     FDcuOutputDir := 'lib';
-
-  if jsonObject.Contains('preBuilt') then
-    FPreBuilt := jsonObject.B['preBuilt']
-  else
-    FPreBuilt := true;
 end;
 
 procedure TSpecBuildEntry.SetBplOutputDir(const value: string);

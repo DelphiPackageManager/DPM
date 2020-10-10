@@ -48,6 +48,7 @@ type
     function GetRange : TVersionRange;
     function GetDependencies : IList<IPackageReference>;
     procedure SetVersion(const value : TPackageVersion);
+    function GetHasDependencies : boolean;
 
     property Id : string read GetId;
     property Version : TPackageVersion read GetVersion write SetVersion;
@@ -55,6 +56,7 @@ type
     property Range : TVersionRange read GetRange;
     property IsTransitive : boolean read GetIsTransitive;
     property Dependencies : IList<IPackageReference> read GetDependencies;
+    property HasDependencies : boolean read GetHasDependencies;
   end;
 
 
@@ -84,7 +86,7 @@ type
     function GetProjectVersion : string;
     function GetPackageReferences : IList<IPackageReference>;
     function GetAppType : TAppType;
-
+    function GetHasPackages : boolean;
     procedure SetCompiler(const value : TCompilerVersion);
 
     function LoadProject(const filename : string) : boolean;
@@ -100,6 +102,7 @@ type
     property Platforms : TDPMPlatforms read GetPlatforms;
     property PackageReferences : IList<IPackageReference> read GetPackageReferences;
     property AppType : TAppType read GetAppType;
+    property HasPackages : boolean read GetHasPackages;
 
   end;
 

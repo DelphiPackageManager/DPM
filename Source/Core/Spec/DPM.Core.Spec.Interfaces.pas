@@ -49,11 +49,14 @@ type
   ISpecDependency = interface(ISpecNode)
   ['{6CE14888-54A8-459C-865E-E4B4628DB8C6}']
     function GetId : string;
-    function GeTVersionRange : TVersionRange;
+    function GetVersionRange : TVersionRange;
+    procedure SetVersionRange(const value : TVersionRange);
+    function GetVersionString : string;
     function IsGroup : boolean;
     function Clone : ISpecDependency;
     property Id : string read GetId;
-    property Version : TVersionRange read GetVersionRange;
+    property Version : TVersionRange read GetVersionRange write SetVersionRange;
+    property VersionString : string read GetVersionString;
   end;
 
 
@@ -133,11 +136,11 @@ type
   ['{13723048-E2AA-45BE-A0F1-C446848F3936}']
     function GetCopyLocal : boolean;
     function GetInstall : boolean;
-    function GetPreBuilt : boolean;
+    function GetBuildId : string;
     function Clone : ISpecBPLEntry;
     property CopyLocal : boolean read GetCopyLocal; //ignored for design
     property Install : boolean read GetInstall; //ignored for runtime
-    property PreBuilt : boolean read GetPreBuilt; //false for build
+    property BuildId : string read GetBuildId;
   end;
 
   ISpecSearchPath = interface(ISpecNode)

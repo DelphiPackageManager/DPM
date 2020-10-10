@@ -106,14 +106,15 @@ begin
 
   debugProc := procedure
                begin
-                 FMessageServices.AddToolMessage('', 'DEBUG: ' + data, '',0,0,nil, lineRef, FMessageGroup)
+                if FMessageServices <> nil then
+                   FMessageServices.AddToolMessage('', 'DEBUG: ' + data, '',0,0,nil, lineRef, FMessageGroup)
                end;
 
   //FMessageServices is implemented by a vcl control, so we need to ensure it's only updated by the main thread.
   if TThread.CurrentThread.ThreadID = MainThreadID then
     debugProc
   else
-    TThread.Queue(nil, debugProc);
+    TThread.Synchronize(nil, debugProc);
 end;
 
 destructor TDPMIDELogger.Destroy;
@@ -133,7 +134,7 @@ end;
 
 procedure TDPMIDELogger.EndRestore;
 begin
-  FMessageServices.AddTitleMessage('DPM Restore done.', FMessageGroup);
+//  FMessageServices.AddTitleMessage('DPM Restore done.', FMessageGroup);
 end;
 
 procedure TDPMIDELogger.Error(const data: string);
@@ -200,7 +201,7 @@ end;
 
 procedure TDPMIDELogger.StartRestore;
 begin
-  FMessageServices.AddTitleMessage('Restoring DPM packages', FMessageGroup);
+//  FMessageServices.AddTitleMessage('Restoring DPM packages', FMessageGroup);
 end;
 
 procedure TDPMIDELogger.Verbose(const data: string);

@@ -39,7 +39,7 @@ type
                     UpdateAvailable //installed but not on the latest version
                     );
 
-  TCurrentTab = (Installed, Updates, Search, Conflicts);
+  TCurrentTab = (Search, Installed, Updates, Conflicts);
 
 const
   //The current IDE version to TCompilerVersion.

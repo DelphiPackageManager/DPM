@@ -59,6 +59,7 @@ type
     FId: string;
     FIsCommercial: Boolean;
     FIsTrial: Boolean;
+    FIsTransitive : boolean;
     FLicense: string;
     FPlatforms: TDPMPlatforms;
     FProjectUrl: string;
@@ -97,11 +98,13 @@ type
     function GetDownloadCount : Int64;
     function GetSourceName : string;
     function GetIsError : boolean;
+    function GetIsTransitive: Boolean;
 
     procedure SetPublishedDate(const value: string);
     procedure SetReportUrl(const value: string);
     procedure SetInstalled(const value : Boolean);
     procedure SetInstalledVersion(const value : string);
+    procedure SetIsTransitive(const value: Boolean);
 
     constructor CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
     constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platforms : TDPMPlatforms; const dependencies: IList<IPackagePlatformDependencies>);
@@ -290,6 +293,11 @@ begin
   result := FIsReservedPrefix;
 end;
 
+function TDPMPackageSearchResultItem.GetIsTransitive: Boolean;
+begin
+  result := FIsTransitive;
+end;
+
 function TDPMPackageSearchResultItem.GetIsTrial: Boolean;
 begin
   result := FIsTrial;
@@ -349,6 +357,11 @@ end;
 procedure TDPMPackageSearchResultItem.SetInstalledVersion(const value: string);
 begin
   FInstalledVersion := value;
+end;
+
+procedure TDPMPackageSearchResultItem.SetIsTransitive(const value: Boolean);
+begin
+  FIsTransitive := value;
 end;
 
 procedure TDPMPackageSearchResultItem.SetPublishedDate(const value: string);

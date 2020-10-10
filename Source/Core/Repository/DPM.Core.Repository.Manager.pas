@@ -159,12 +159,13 @@ begin
     searchOptions.Version := packageId.Version;
     searchOptions.CompilerVersion := packageId.CompilerVersion;
     searchOptions.Platforms := [packageId.Platform];
+    searchOptions.Exact := true;
 
     packageResults := GetPackageFeed(cancelToken, searchOptions, config);
     for item in packageResults do
     begin
       item.Installed := true;
-      item.InstalledVersion := item.Version;
+      item.InstalledVersion := packageId.Version.ToStringNoMeta;
     end;
     result.AddRange(packageResults);
 

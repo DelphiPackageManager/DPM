@@ -93,6 +93,7 @@ implementation
 
 uses
   DPM.Core.Constants,
+  DPM.Core.Dependency.Version,
   DPM.Core.Spec.MetaData,
   DPM.Core.Spec.Template,
   DPM.Core.Spec.TargetPlatform;
@@ -564,7 +565,8 @@ begin
       for bplEntry in targetPlatform.RuntimeFiles  do
       begin
         runtimeEntryObj := targetPlatformObject.A['runtime'].AddObject;
-        runtimeEntryObj['preBuilt'] := bplEntry.PreBuilt;
+        if bplEntry.BuildId <> '' then
+          runtimeEntryObj['buildId'] := bplEntry.BuildId;
         runtimeEntryObj['src'] := bplEntry.Source; //TODO : check this is expanded with variables
         runtimeEntryObj['dest'] := bplEntry.Destination;
         runtimeEntryObj['copyLocal'] := bplEntry.CopyLocal;
@@ -576,7 +578,8 @@ begin
       for bplEntry in targetPlatform.DesignFiles  do
       begin
         designEntryObj := targetPlatformObject.A['design'].AddObject;
-        designEntryObj['preBuilt'] := bplEntry.PreBuilt;
+        if bplEntry.BuildId <> '' then
+          designEntryObj['buildId'] := bplEntry.BuildId;
         designEntryObj['src'] := bplEntry.Source; //TODO : check this is expanded with variables
         designEntryObj['dest'] := bplEntry.Destination;
         designEntryObj['install'] := bplEntry.Install;
@@ -738,6 +741,7 @@ var
   fileEntry : ISpecFileEntry;
   bplEntry  : ISpecBPLEntry;
   buildEntry : ISpecBuildEntry;
+  dependency : ISpecDependency;
   regEx : TRegEx;
   evaluator : TMatchEvaluator;
 
@@ -801,6 +805,12 @@ begin
           buildEntry.DcuOutputDir := regEx.Replace(buildEntry.DcuOutputDir, evaluator);
           buildEntry.DcpOutputDir := regEx.Replace(buildEntry.DcpOutputDir, evaluator);
         end;
+        for dependency in targetPlatform.Dependencies do
+        begin
+          if dependency.VersionString = '$version$' then
+            dependency.Version := TVersionRange.Create(FMetaData.Version);
+        end;
+
       end;
 
     finally

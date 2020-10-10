@@ -59,9 +59,9 @@ begin
     result := TDPMWizard.Create;
     SplashImage := Vcl.Graphics.TBitmap.Create;
     SplashImage.LoadFromResourceName(HInstance, 'DPMIDELOGO');
-    SplashScreenServices.AddPluginBitmap(sWizardTitle ,SplashImage.Handle);
+    SplashScreenServices.AddPluginBitmap(cWizardTitle ,SplashImage.Handle);
 
-    (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo(sWizardTitle,  sWizardTitle  , SplashImage.Handle);
+    (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo(cWizardTitle,  cWizardTitle  , SplashImage.Handle);
 
   except
     on E: Exception do

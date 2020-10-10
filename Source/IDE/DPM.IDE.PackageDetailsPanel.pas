@@ -97,6 +97,7 @@ begin
   if FHitElement <> deNone then
   begin
     FHitElement := deNone;
+    Cursor := crDefault;
     invalidate;
   end;
 end;
@@ -177,6 +178,11 @@ begin
   if FHitElement <> prevElement then
     Invalidate;
 
+  if FHitElement in [deProjectUrl, deReportUrl] then
+    Cursor := crHandPoint
+  else
+    Cursor := crDefault;
+
 end;
 
 procedure TPackageDetailsPanel.Paint;
@@ -188,7 +194,6 @@ var
   dependRect : TRect;
   platformDep : IPackagePlatformDependencies;
   packageDep : IPackageDependency;
-  count : integer;
   textSize : TSize;
   value : string;
 begin
