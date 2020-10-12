@@ -126,7 +126,6 @@ type
     FIconCache : TDPMIconCache;
 
     FInstalledPackages : IList<IPackageSearchResultItem>;
-    FGotInstalled : boolean;
 
     FSearchResults : IList<IPackageSearchResultItem>;
     FGotSearchResults : boolean;
@@ -170,12 +169,18 @@ type
 
     function GetInstalledPackages : IAwaitable<IList<IPackageSearchResultItem>>;
     function GetUpdatedPackages : IAwaitable<IList<IPackageSearchResultItem>>;
-    function SearchForPackages(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;
-    function GetSearchOptions: TSearchOptions;
     function GetConflictingPackages : IAwaitable<IList<IPackageSearchResultItem>>;
 
     procedure ReloadSourcesCombo;
+
+    //IPackageSearcher
+    function GetSearchOptions: TSearchOptions;
+    function SearchForPackages(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;
     function GetCurrentPlatform : string;
+    procedure PackageInstalled(const package : IPackageSearchResultItem);
+    procedure PackageUninstalled(const package : IPackageSearchResultItem);
+
+    procedure SaveBeforeChange;
 
     //Create Ui elements at runtime - uses controls that are not installed, saves dev needing
     //to install controls before they can work in this.
@@ -352,7 +357,6 @@ begin
 
   FCancelTokenSource := TCancellationTokenSourceFactory.Create;
   FRequestInFlight := false;
-  FGotInstalled := false;
 
 end;
 
@@ -435,6 +439,7 @@ begin
 
   inherited;
 end;
+
 
 function TDPMEditViewFrame.GetConflictingPackages: IAwaitable<IList<IPackageSearchResultItem>>;
 var
@@ -601,6 +606,36 @@ begin
   FScrollList.RowCount := list.Count;
 end;
 
+procedure TDPMEditViewFrame.PackageInstalled(const package: IPackageSearchResultItem);
+begin
+
+  package.InstalledVersion := package.Version;
+  FInstalledLookup[LowerCase(package.Id)] := package.Version;
+
+  if (FInstalledPackages <> nil) then
+    FInstalledPackages.Add(package)
+  else if FCurrentTab = TCurrentTab.Installed then
+    SwitchedToInstalled(true);
+  FProject.Refresh(true);
+
+  // Do not do this, it will overrwrite package changes.
+  //FProject.MarkModified;
+
+end;
+
+procedure TDPMEditViewFrame.PackageUninstalled(const package: IPackageSearchResultItem);
+begin
+  if FInstalledLookup.ContainsKey(LowerCase(package.Id)) then
+    FInstalledLookup.Remove(LowerCase(package.Id));
+  if FCurrentTab = TCurrentTab.Installed then
+    SwitchedToInstalled(true)
+  else
+    FInstalledPackages := nil;
+  FProject.Refresh(true);
+  // Do not do this, it will overrwrite package changes.
+  //  FProject.MarkModified;
+end;
+
 procedure TDPMEditViewFrame.platformChangeDetectTimerTimer(Sender: TObject);
 begin
   // since the tools api provides no notifications about active platform change
@@ -612,15 +647,9 @@ begin
     begin
       FCurrentPlatform := FProject.CurrentPlatform;
       //TODO : need to do this more safely as it may interrup another operation.
-      //force refresh
+      FInstalledPackages := nil;
       if FCurrentTab = TCurrentTab.Installed then
-        SwitchedToInstalled(true)
-      else
-      begin
-        //clear the packages so that we fetch them next time we switch to the tab.
-        FInstalledPackages := nil;
-        FGotInstalled := false;
-      end;
+        SwitchedToInstalled(true);
     end;
   end;
   platformChangeDetectTimer.Enabled := true;
@@ -718,6 +747,11 @@ begin
 
 
 
+end;
+
+procedure TDPMEditViewFrame.SaveBeforeChange;
+begin
+  (BorlandIDEServices as IOTAModuleServices).SaveAll;
 end;
 
 procedure TDPMEditViewFrame.ScrollListChangeRow(const Sender: TObject; const newRowIndex: Int64; const direction: TScrollDirection; const delta: Int64);
@@ -1009,7 +1043,7 @@ begin
   chkIncludePrerelease.Visible := true;
   chkIncludeCommercial.Visible := false;
   chkIncludeTrial.Visible := false;
-  if FGotInstalled and (not refresh) then
+  if (not refresh) and (FInstalledPackages <> nil) then
     LoadList(FInstalledPackages)
   else
   begin
@@ -1058,8 +1092,6 @@ begin
         FInstalledLookup.Clear;
         for item in FInstalledPackages do
           FInstalledLookup[LowerCase(item.Id)] := item.Version;
-
-        FGotInstalled := true;
         LoadList(FInstalledPackages);
       end);
     end;

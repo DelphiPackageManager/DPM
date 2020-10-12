@@ -24,6 +24,9 @@ type
     function GetSearchOptions : TSearchOptions;
     function SearchForPackages(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;
     function GetCurrentPlatform : string;
+    procedure SaveBeforeChange;
+    procedure PackageInstalled(const package : IPackageSearchResultItem);
+    procedure PackageUninstalled(const package : IPackageSearchResultItem);
   end;
 
   TPackageDetailsFrame = class(TFrame)
@@ -99,27 +102,40 @@ var
 begin
   btnInstallOrUpdate.Enabled := false;
   try
-  if FRequestInFlight then
-    FCancellationTokenSource.Cancel;
+    if FRequestInFlight then
+      FCancellationTokenSource.Cancel;
 
-  while FRequestInFlight do
-    Application.ProcessMessages;
-  FCancellationTokenSource.Reset;
+    while FRequestInFlight do
+      Application.ProcessMessages;
+    FCancellationTokenSource.Reset;
+    FLogger.Clear;
+    FPackageSearcher.SaveBeforeChange;
 
-  options := TInstallOptions.Create;
-  options.ConfigFile := FConfiguration.FileName;
-  options.PackageId := FPackageMetaData.Id;
-  options.Version := TPackageVersion.Parse(FPackageMetaData.Version);
-  options.ProjectPath := FProjectFile;
-  options.Platforms := [ProjectPlatformToDPMPlatform(FPackageSearcher.GetCurrentPlatform)];
+    FLogger.Information('Installing package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + ']' );
 
-  if btnInstallOrUpdate.Caption = 'Update' then
-    options.Force := true;
+    options := TInstallOptions.Create;
+    options.ConfigFile := FConfiguration.FileName;
+    options.PackageId := FPackageMetaData.Id;
+    options.Version := TPackageVersion.Parse(FPackageMetaData.Version);
+    options.ProjectPath := FProjectFile;
+    options.Platforms := [ProjectPlatformToDPMPlatform(FPackageSearcher.GetCurrentPlatform)];
 
-  packageInstaller :=  FContainer.Resolve<IPackageInstaller>;
+    if btnInstallOrUpdate.Caption = 'Update' then
+      options.Force := true;
 
-  FLogger.Information('Installing package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + ']' );
-  packageInstaller.Install(FCancellationTokenSource.Token, options);
+    packageInstaller :=  FContainer.Resolve<IPackageInstaller>;
+
+    if packageInstaller.Install(FCancellationTokenSource.Token, options) then
+    begin
+      FPackageMetaData.InstalledVersion := FPackageMetaData.Version;
+      FPackageMetaData.Installed := true;
+      FPackageInstalledVersion := FPackageMetaData.InstalledVersion;
+      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + '] installed.' );
+      FPackageSearcher.PackageInstalled(FPackageMetaData);
+      SetPackage(FPackageMetaData);
+    end
+    else
+      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + '] did not install.' );
 
   finally
     btnInstallOrUpdate.Enabled := true;

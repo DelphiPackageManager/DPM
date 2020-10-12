@@ -8,13 +8,13 @@ uses
 
 type
   TTestLogger = class(TInterfacedObject, ILogger)
-
   protected
     procedure Debug(const data: string);
     procedure Error(const data: string);
     procedure Information(const data: string; const important : boolean = false);
     procedure Verbose(const data: string);
     procedure Warning(const data: string);
+    procedure Clear;
 
     function GetVerbosity : TVerbosity;
     procedure SetVerbosity(const value : TVerbosity);
@@ -23,6 +23,11 @@ type
 implementation
 
 { TTestLogger }
+
+procedure TTestLogger.Clear;
+begin
+
+end;
 
 procedure TTestLogger.Debug(const data: string);
 begin

@@ -38,7 +38,6 @@ type
   IDPMIDELogger = interface(ILogger)
   ['{02CA41D0-F46A-4FB7-A743-DFCFA3E0EAD9}']
     procedure ShowMessageTab;
-    procedure Clear;
     procedure StartRestore;
     procedure EndRestore;
     procedure StartProject(const fileName : string; const msg : string = '');

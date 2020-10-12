@@ -46,6 +46,7 @@ type
     procedure Warning(const data: string);
     function GetVerbosity : TVerbosity;
     procedure SetVerbosity(const value : TVerbosity);
+    procedure Clear;
 
   public
     constructor Create(const console : IConsoleWriter);
@@ -54,6 +55,11 @@ type
 implementation
 
 { TDPMConsoleLogger }
+
+procedure TDPMConsoleLogger.Clear;
+begin
+  //no-op
+end;
 
 constructor TDPMConsoleLogger.Create(const console: IConsoleWriter);
 begin
