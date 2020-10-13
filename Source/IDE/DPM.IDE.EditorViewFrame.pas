@@ -258,20 +258,22 @@ end;
 
 procedure TDPMEditViewFrame.btnSettingsClick(Sender: TObject);
 var
-  environmentOptions : IOTAEnvironmentOptions;
+  //environmentOptions : IOTAEnvironmentOptions;
   bReload : boolean;
   optionsHost : TDPMOptionsHostForm;
 begin
-  if not FConfigIsLocal or IsProjectGroup then
-  begin
-    //working with user profile config.
-    //since we have no way of knowing if anything changed, we just reload config and sources
-    bReload := true;
-    environmentOptions := (BorlandIDEServices as IOTAServices).GetEnvironmentOptions;
-    environmentOptions.EditOptions('Third Party', 'DPM Package Manager');
-  end
-  else
-  begin
+//The delphi options dialog is just too painfully slow, we'll use our own dialog instead
+
+//  if not FConfigIsLocal or IsProjectGroup then
+//  begin
+//    //working with user profile config.
+//    //since we have no way of knowing if anything changed, we just reload config and sources
+//    bReload := true;
+//    environmentOptions := (BorlandIDEServices as IOTAServices).GetEnvironmentOptions;
+//    environmentOptions.EditOptions('Third Party', 'DPM Package Manager');
+//  end
+//  else
+//  begin
     //working with project or
     optionsHost := TDPMOptionsHostForm.Create(Self, FConfigurationManager, FLogger, FSearchOptions.ConfigFile);
     try
@@ -279,7 +281,7 @@ begin
     finally
        optionsHost.Free;
     end;
-  end;
+//  end;
 
   if bReload then
   begin
@@ -413,6 +415,7 @@ begin
 
   FScrollList.Constraints.MinWidth := 400;
   FScrollList.Color := clWhite;
+  FScrollList.DoubleBuffered := true;
 //  FScrollList.ParentBackground := false;
 
   FScrollList.Parent := PackageListPanel;
@@ -1039,7 +1042,6 @@ begin
     LoadList(FInstalledPackages)
   else
   begin
-    FScrollList.RowCount := 0;
     FRequestInFlight := true;
     FCancelTokenSource.Reset;
     FLogger.Debug('Getting Installed Packages..');
@@ -1073,14 +1075,15 @@ begin
         FLogger.Debug('Got installed packages.');
 
         //filter the list!
-        FInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>(theResult);//.Where(
-//          function(const pkg : IPackageSearchResultItem) : boolean
-//          begin
-//            if searchTxt <> '' then
-//              result := pkg.Id.Contains(searchTxt)
-//            else
-//              result := true;
-//          end));
+        FInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>(theResult.Where(
+          function(const pkg : IPackageSearchResultItem) : boolean
+          begin
+              result := not pkg.IsTransitive;
+              if result and (searchTxt <> '') then
+              begin
+                result := TStringUtils.Contains(pkg.Id, searchTxt,  true);
+              end;
+          end));
         FInstalledLookup.Clear;
         for item in FInstalledPackages do
           FInstalledLookup[LowerCase(item.Id)] := item.Version;
