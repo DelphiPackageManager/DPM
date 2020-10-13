@@ -1,0 +1,112 @@
+{
+  "metadata": {
+    "id": "Spring4D.Base",
+    "version": "2.0.0-dev2",
+    "description": "Spring4D Base",
+    "authors": "Spring4D Team",
+    "projectUrl": "https://bitbucket.org/sglienke/spring4d",
+    "license": "Apache-2.0",
+    "copyright": "2009-2020 Spring4D Team",
+    "tags": "spring4d collections"
+  },
+  "targetPlatforms": [
+    {
+      "compiler": "XE2",
+      "platforms": "Win32, Win64, OSX32",
+      "template": "default"
+    },
+    {
+      "compiler": "XE3",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "XE4",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "XE5",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "XE6",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "XE7",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "XE8",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "10.0",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "10.1",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "10.2",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32, LinuxIntel64",
+      "template": "default"
+    },
+    {
+      "compiler": "10.3",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32, LinuxIntel64",
+      "template": "default"
+    }
+  ],
+  "templates": [
+    {
+      "name": "default",
+      "comment": "due to the layout of the repo and relative paths in the packages we need to keep the same layout rather than flatten",
+      "source": [
+        {
+          "src": ".\\*.inc",
+          "flatten": false,
+          "dest": "src"
+        },
+        {
+          "src": ".\\Base\\**\\*.pas",
+          "flatten": false,
+          "dest": "src\\Base"
+        },
+        {
+          "src": "..\\packages\\Delphi$compilerNoPoint$$CompilerCodeName$\\Spring.Base.*",
+          "flatten": false,
+          "dest": "packages\\Delphi$compilerNoPoint$$CompilerCodeName$"
+        }
+      ],
+      "searchPaths": [
+        {
+          "path": "src"
+        },
+        {
+          "path": "src\\Base"
+        },
+        {
+          "path": "src\\Base\\Collections"
+        },
+        {
+          "path": "src\\Base\\Logging"
+        },
+        {
+          "path": "src\\Base\\Patches"
+        },
+        {
+          "path": "src\\Base\\Patterns"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+{
+  "metadata": {
+    "id": "Spring4D.Persistence",
+    "version": "2.0.0-dev2",
+    "description": "Spring4D Persistence",
+    "authors": "Spring4D Team",
+    "projectUrl": "https://bitbucket.org/sglienke/spring4d",
+    "license": "Apache-2.0",
+    "copyright": "2009-2020 Spring4D Team",
+    "tags": "spring4d Persistence"
+  },
+  "targetPlatforms": [
+    {
+      "compiler": "XE2",
+      "platforms": "Win32, Win64, OSX32",
+      "template": "default"
+    },
+    {
+      "compiler": "XE3",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "XE4",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "XE5",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "XE6",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "XE7",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "XE8",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "10.0",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "10.1",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32",
+      "template": "default"
+    },
+    {
+      "compiler": "10.2",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32, LinuxIntel64",
+      "template": "default"
+    },
+    {
+      "compiler": "10.3",
+      "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32, LinuxIntel64",
+      "template": "default"
+    }
+  ],
+  "templates": [
+    {
+      "name": "default",
+      "dependencies": [
+        {
+          "id": "Spring4D.Base",
+          "version": "[2.0.0-dev2,]"
+        }
+      ],
+      "comment": "due to the layout of the repo and relative paths in the packages we need to keep the same layout",
+      "source": [
+        {
+          "src": ".\\*.inc",
+          "flatten": false,
+          "dest": "src"
+        },
+        {
+          "src": ".\\Persistence\\**\\*.pas",
+          "flatten": false,
+          "dest": "src\\Persistence"
+        },
+        {
+          "src": "..\\packages\\Delphi$compilerNoPoint$$CompilerCodeName$\\Spring.Persistence.*",
+          "flatten": false,
+          "dest": "packages\\Delphi$compilerNoPoint$$CompilerCodeName$"
+        }
+      ],
+      "searchPaths": [
+        {
+          "path": "src"
+        },
+        {
+          "path": "src\\Persistence"
+        },
+        {
+          "path": "src\\Persistence\\Adapters"
+        },
+        {
+          "path": "src\\Persistence\\Core"
+        },
+        {
+          "path": "src\\Persistence\\Criteria"
+        },
+        {
+          "path": "src\\Persistence\\Mapping"
+        },
+        {
+          "path": "src\\Persistence\\SQL"
+        }
+      ]
+    }
+  ]
+}
