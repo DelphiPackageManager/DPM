@@ -32,7 +32,7 @@ uses
   Generics.Defaults,
   VSoft.Awaitable,
   Spring.Collections,
-  Vcl.Imaging.pngimage,
+  SVGInterfaces,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
   DPM.Core.Logging,
@@ -54,7 +54,7 @@ type
 
     function List(const cancellationToken : ICancellationToken; const options : TSearchOptions ) : IList<IPackageIdentity>;overload;
     function GetPackageFeed(const cancelToken: ICancellationToken; const options: TSearchOptions; const configuration: IConfiguration): IList<IPackageSearchResultItem>;
-    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): TPngImage;
+    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): ISVG;
 
   public
     constructor Create(const logger : ILogger);override;
@@ -82,7 +82,7 @@ begin
   result := TCollections.CreateList<IPackageSearchResultItem>;
 end;
 
-function TDPMServerPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): TPngImage;
+function TDPMServerPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): ISVG;
 begin
   result := nil;
 end;

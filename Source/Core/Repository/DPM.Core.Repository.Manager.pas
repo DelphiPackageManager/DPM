@@ -32,7 +32,7 @@ uses
   System.Generics.Defaults,
   Spring.Collections,
   VSoft.Awaitable,
-  Vcl.Imaging.pngimage,
+  SVGInterfaces,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
   DPM.Core.Logging,
@@ -65,7 +65,7 @@ type
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
 
     function GetPackageIcon(const cancelToken : ICancellationToken; const source: string; const packageId: string; const packageVersion: string;
-                            const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const configuration : IConfiguration): TPngImage;
+                            const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const configuration : IConfiguration): ISVG;
 
     function GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IEnumerable<IPackageId>; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
 
@@ -233,7 +233,7 @@ begin
 end;
 
 function TPackageRepositoryManager.GetPackageIcon(const cancelToken : ICancellationToken; const source, packageId, packageVersion: string;
-                                                  const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const configuration : IConfiguration): TPngImage;
+                                                  const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const configuration : IConfiguration): ISVG;
 var
   repo : IPackageRepository;
 begin

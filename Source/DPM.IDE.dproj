@@ -162,6 +162,22 @@
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.Interfaces.pas"/>
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.MSBuild.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.LockFile.pas"/>
+        <DCCReference Include="SVG\SVGParse.pas"/>
+        <DCCReference Include="SVG\SVG.pas"/>
+        <DCCReference Include="SVG\SVGBase64.pas"/>
+        <DCCReference Include="SVG\SVGStyle.pas"/>
+        <DCCReference Include="SVG\SVGCommon.pas"/>
+        <DCCReference Include="SVG\SVGTypes.pas"/>
+        <DCCReference Include="SVG\SVGPath.pas"/>
+        <DCCReference Include="SVG\SVGInterfaces.pas"/>
+        <DCCReference Include="SVG\XmlLite.pas"/>
+        <DCCReference Include="SVG\SVGPaint.pas"/>
+        <DCCReference Include="SVG\PasSVGFactory.pas"/>
+        <DCCReference Include="SVG\GDIPKerning.pas"/>
+        <DCCReference Include="SVG\GDIPOBJ2.pas"/>
+        <DCCReference Include="SVG\GDIPPathText.pas"/>
+        <DCCReference Include="SVG\SVGColor.pas"/>
+        <DCCReference Include="SVG\SVGGraphic.pas"/>
         <RcItem Include="images\dpm.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>DPMIDELOGO</ResourceId>

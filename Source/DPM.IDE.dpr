@@ -78,7 +78,23 @@ uses
   DPM.Core.Compiler.Factory in 'Core\Compiler\DPM.Core.Compiler.Factory.pas',
   DPM.Core.Compiler.Interfaces in 'Core\Compiler\DPM.Core.Compiler.Interfaces.pas',
   DPM.Core.Compiler.MSBuild in 'Core\Compiler\DPM.Core.Compiler.MSBuild.pas',
-  DPM.Core.Dependency.LockFile in 'Core\Dependency\DPM.Core.Dependency.LockFile.pas';
+  DPM.Core.Dependency.LockFile in 'Core\Dependency\DPM.Core.Dependency.LockFile.pas',
+  SVGParse in 'SVG\SVGParse.pas',
+  SVG in 'SVG\SVG.pas',
+  SVGBase64 in 'SVG\SVGBase64.pas',
+  SVGStyle in 'SVG\SVGStyle.pas',
+  SVGCommon in 'SVG\SVGCommon.pas',
+  SVGTypes in 'SVG\SVGTypes.pas',
+  SVGPath in 'SVG\SVGPath.pas',
+  SVGInterfaces in 'SVG\SVGInterfaces.pas',
+  XmlLite in 'SVG\XmlLite.pas',
+  SVGPaint in 'SVG\SVGPaint.pas',
+  PasSVGFactory in 'SVG\PasSVGFactory.pas',
+  GDIPKerning in 'SVG\GDIPKerning.pas',
+  GDIPOBJ2 in 'SVG\GDIPOBJ2.pas',
+  GDIPPathText in 'SVG\GDIPPathText.pas',
+  SVGColor in 'SVG\SVGColor.pas',
+  SVGGraphic in 'SVG\SVGGraphic.pas';
 
 {$R *.res}
 

@@ -4,7 +4,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Imaging.pngimage, Vcl.ExtCtrls,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Package.Interfaces,
   DPM.Core.Logging,
@@ -15,7 +15,8 @@ uses
   Spring.Container,
   Spring.Collections,
   VSoft.Awaitable,
-  ToolsAPI;
+  SVGInterfaces,
+  ToolsAPI, Vcl.Imaging.pngimage;
 
 type
   //implemented by the EditorViewFrame
@@ -83,6 +84,7 @@ implementation
 uses
   System.StrUtils,
   WinApi.ShellApi,
+  SVGGraphic,
   DPM.Core.Types,
   DPM.Core.Utils.Strings,
   DPM.Core.Dependency.Version,
@@ -314,8 +316,10 @@ end;
 
 procedure TPackageDetailsFrame.SetPackage(const package: IPackageSearchResultItem);
 var
-  logo : TPngImage;
+  logo : ISVG;
+  clonedLogo : ISVG;
   bFetchVersions : boolean;
+  graphic : TSVGGraphic;
 begin
   FVersionsDelayTimer.Enabled := false;
   if FRequestInFlight then
@@ -354,8 +358,16 @@ begin
       logo := FIconCache.Request('missing_icon');
     if logo <> nil then
     begin
-      imgPackageLogo.Picture.Assign(logo);
-      imgPackageLogo.Visible := true;
+      clonedLogo := GlobalSVGFactory.NewSvg;
+      clonedLogo.Source := logo.Source;
+      graphic := TSVGGraphic.Create;
+      try
+        graphic.AssignSVG(clonedLogo);
+        imgPackageLogo.Picture.Assign(graphic);
+        imgPackageLogo.Visible := true;
+      finally
+        graphic.Free;
+      end;
     end
     else
       imgPackageLogo.Visible := false;

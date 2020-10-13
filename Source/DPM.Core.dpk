@@ -128,7 +128,22 @@ contains
   DPM.Core.Repository.Base in 'Core\Repository\DPM.Core.Repository.Base.pas',
   DPM.Core.Options.Feed in 'Core\Options\DPM.Core.Options.Feed.pas',
   DPM.Core.Utils.Numbers in 'Core\Utils\DPM.Core.Utils.Numbers.pas',
-  DPM.Core.Dependency.LockFile in 'Core\Dependency\DPM.Core.Dependency.LockFile.pas';
+  DPM.Core.Dependency.LockFile in 'Core\Dependency\DPM.Core.Dependency.LockFile.pas',
+  SVGInterfaces in 'SVG\SVGInterfaces.pas',
+  SVGBase64 in 'SVG\SVGBase64.pas',
+  SVGParse in 'SVG\SVGParse.pas',
+  SVG in 'SVG\SVG.pas',
+  SVGStyle in 'SVG\SVGStyle.pas',
+  SVGCommon in 'SVG\SVGCommon.pas',
+  SVGTypes in 'SVG\SVGTypes.pas',
+  SVGPath in 'SVG\SVGPath.pas',
+  XmlLite in 'SVG\XmlLite.pas',
+  SVGPaint in 'SVG\SVGPaint.pas',
+  PasSVGFactory in 'SVG\PasSVGFactory.pas',
+  GDIPKerning in 'SVG\GDIPKerning.pas',
+  GDIPOBJ2 in 'SVG\GDIPOBJ2.pas',
+  GDIPPathText in 'SVG\GDIPPathText.pas',
+  SVGColor in 'SVG\SVGColor.pas';
 
 end.
 

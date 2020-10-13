@@ -85,7 +85,7 @@
         <DCC_ImageBase>00400000</DCC_ImageBase>
         <DCC_F>false</DCC_F>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=0.0.2.0;InternalName=;LegalCopyright=© 2019 Vincent Parrett and Contributors;LegalTrademarks=;OriginalFilename=dpm.exe;ProductName=DPM;ProductVersion=0.1.0.0;Comments=0.1.0-aplha2;CFBundleName=</VerInfo_Keys>
-        <DCC_UnitSearchPath>$(DPMSearch);Core;Core\Cache;Core\Configuration;Core\Dependency;Core\Logging;Core\Options;Core\Package;Core\Packaging;Core\Project;Core\Repository;Core\Sources;Core\Spec;Core\Utils;Core\Xml;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>$(DPMSearch);Core;Core\Cache;Core\Configuration;Core\Dependency;Core\Logging;Core\Options;Core\Package;Core\Packaging;Core\Project;Core\Repository;Core\Sources;Core\Spec;Core\Utils;Core\Xml;SVG;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <DCC_UsePackage>rtl;$(DCC_UsePackage)</DCC_UsePackage>
@@ -101,11 +101,11 @@
         <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
-        <VerInfo_Release>5</VerInfo_Release>
+        <VerInfo_Release>6</VerInfo_Release>
         <Debugger_CWD>I:\Github\VSoftTechnologies\Indy</Debugger_CWD>
         <Debugger_RunParams>pack Indy.System.dspec -o=i:\dpmfeed</Debugger_RunParams>
         <Debugger_HostApplication>I:\Github\DelphiPackageManager\DPM\Output\dpm.exe</Debugger_HostApplication>
-        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=0.1.5.0;InternalName=;LegalCopyright=© 2019 -2020 Vincent Parrett and Contributors;LegalTrademarks=;OriginalFilename=dpm.exe;ProductName=DPM;ProductVersion=0.1.5.0;Comments=0.1.5-aplha;CFBundleName=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=0.1.6.0;InternalName=;LegalCopyright=© 2019 -2020 Vincent Parrett and Contributors;LegalTrademarks=;OriginalFilename=dpm.exe;ProductName=DPM;ProductVersion=0.1.5.0;Comments=0.1.5-aplha;CFBundleName=</VerInfo_Keys>
         <VerInfo_MinorVer>1</VerInfo_MinorVer>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
@@ -191,6 +191,7 @@
                     <Source Name="MainSource">dpm.dpr</Source>
                 </Source>
                 <Excluded_Packages>
+                    <Excluded_Packages Name="C:\Users\Public\Documents\Embarcadero\Studio\15.0\Bpl\dclSVGIconImageList_DXE7.bpl">Ethea SVGIconImageList VCL components</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dclIPIndyImpl210.bpl">IP Abstraction Indy Implementation Design Time</Excluded_Packages>
                 </Excluded_Packages>
             </Delphi.Personality>

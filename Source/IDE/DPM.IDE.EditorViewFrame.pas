@@ -33,7 +33,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ImgList,
-  Vcl.ComCtrls, Vcl.ExtCtrls,   Vcl.Menus, Vcl.Imaging.pngimage,
+  Vcl.ComCtrls, Vcl.ExtCtrls,   Vcl.Menus, SVGInterfaces,
   DPM.Controls.ButtonedEdit,
   DPM.Controls.GroupButton,
   VSoftVirtualListView,
@@ -128,22 +128,20 @@ type
     FInstalledPackages : IList<IPackageSearchResultItem>;
 
     FSearchResults : IList<IPackageSearchResultItem>;
-    FGotSearchResults : boolean;
 
     FConflicts : IList<IPackageSearchResultItem>;
     FGotConflicts : boolean;
 
-    //since we get lists back, this allows us to 
+    //since we get lists back, this allows us to
     //show whether the latest is installed etc
     //in the list, with a quick lookup.
     FInstalledLookup : IDictionary<string,string>;
-    
+
     FSearchOptions : TSearchOptions;
     FSearchSkip : integer;
     FSearchTake : integer;
 
     FUpdates : IList<IPackageSearchResultItem>;
-    FGotUpdates : boolean;
     //true when we first load the view
     FFirstView : boolean;
   protected
@@ -202,6 +200,7 @@ implementation
 {$R *.dfm}
 
 uses
+  System.Types,
   Xml.XMLIntf,
   Vcl.Themes,
   System.Diagnostics,
@@ -247,7 +246,6 @@ end;
 
 procedure TDPMEditViewFrame.btnRefreshClick(Sender: TObject);
 begin
-  FGotSearchResults := false;
   FSearchResults.Clear;
   //also called by the include checkboxes.
   case FCurrentTab of
@@ -715,8 +713,8 @@ begin
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
   config := FConfiguration;
 
-  TAsync.Configure<TPngImage>(
-    function (const cancelToken : ICancellationToken) : TPngImage
+  TAsync.Configure<ISVG>(
+    function (const cancelToken : ICancellationToken) : ISVG
     begin
       result := repoManager.GetPackageIcon(cancelToken,source,id, version, IDECompilerVersion, platform, FConfiguration);
     end,FCancelTokenSource.Token)
@@ -728,14 +726,10 @@ begin
         FLogger.Error(e.Message);
       end)
     .Await(
-      procedure(const theResult : TPngImage)
+      procedure(const theResult : ISVG)
       begin
         if FClosing then
-        begin
-         if theResult <> nil then
-            theResult.Free;
           exit;
-        end;
         FIconCache.Cache(id, theResult);
         stopWatch.Stop;
         FLogger.Debug('Got icon for [' + id + '.' + version + '] in ' + IntToStr(stopWatch.ElapsedMilliseconds) + 'ms' );
@@ -743,9 +737,6 @@ begin
           //TODO : Instead request repaint of row.
           FScrollList.Invalidate;
       end);
-
-
-
 
 end;
 
@@ -789,7 +780,7 @@ var
   fontSize : integer;
   backgroundColor : TColor;
 //  foregroundColor : TColor;
-  icon : TPngImage;
+  icon : ISVG;
   extent : TSize;
   oldTextAlign : UINT;
   focusRect : TRect;
@@ -842,7 +833,8 @@ begin
     if icon = nil then
       icon := FIconCache.Request('missing_icon');
 
-    ACanvas.StretchDraw(FRowLayout.IconRect, icon );
+    icon.PaintTo(ACanvas.Handle, TRectF.Create(FRowLayout.IconRect));
+    //ACanvas.StretchDraw(FRowLayout.IconRect, icon );
 
     //TODO : this all feels super hacky, revisit when IDE supports high dpi/scaling.
 
@@ -1104,7 +1096,7 @@ begin
   chkIncludePrerelease.Visible := true;
   chkIncludeCommercial.Visible := true;
   chkIncludeTrial.Visible := true;
-  if (not refresh) and FGotSearchResults then
+  if (not refresh) and (FSearchResults <> nil) then
     LoadList(FSearchResults)
   else
   begin
@@ -1153,7 +1145,6 @@ begin
         end;
        
         FScrollList.RowCount := FSearchResults.Count;
-        FGotSearchResults := true;
         LoadList(FSearchResults);
       end);
    end;
@@ -1164,7 +1155,7 @@ begin
   chkIncludePrerelease.Visible := true;
   chkIncludeCommercial.Visible := false;
   chkIncludeTrial.Visible := false;
-  if FGotUpdates then
+  if (not refresh) and (FUpdates <> nil) then
     LoadList(FUpdates)
   else
   begin
@@ -1200,7 +1191,6 @@ begin
         FLogger.Debug('Got updated packages.');
 
         FUpdates := theResult;
-        FGotUpdates := true;
         LoadList(FUpdates);
       end);
     end;
@@ -1315,6 +1305,9 @@ end;
 procedure TDPMEditViewFrame.txtSearchRightButtonClick(Sender: TObject);
 begin
   txtSearch.Text := '';
+  FSearchResults := nil;
+  FInstalledPackages := nil;
+  FUpdates := nil;
   searchDebounceTimerTimer(searchDebounceTimer);
 end;
 

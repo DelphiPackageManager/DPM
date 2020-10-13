@@ -1,9 +1,9 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{08802460-98C3-4AAB-A383-8A008938F27F}</ProjectGuid>
         <MainSource>DPM.Core.dpk</MainSource>
         <ProjectVersion>16.1</ProjectVersion>
-        <FrameworkType>None</FrameworkType>
+        <FrameworkType>VCL</FrameworkType>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
@@ -54,7 +54,7 @@
         <GenPackage>true</GenPackage>
         <DCC_CBuilderOutput>All</DCC_CBuilderOutput>
         <GenDll>true</GenDll>
-        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
+        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;$(DCC_Namespace)</DCC_Namespace>
         <SanitizedProjectName>DPM_Core</SanitizedProjectName>
         <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
         <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
@@ -198,6 +198,21 @@
         <DCCReference Include="Core\Options\DPM.Core.Options.Feed.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Numbers.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.LockFile.pas"/>
+        <DCCReference Include="SVG\SVGInterfaces.pas"/>
+        <DCCReference Include="SVG\SVGBase64.pas"/>
+        <DCCReference Include="SVG\SVGParse.pas"/>
+        <DCCReference Include="SVG\SVG.pas"/>
+        <DCCReference Include="SVG\SVGStyle.pas"/>
+        <DCCReference Include="SVG\SVGCommon.pas"/>
+        <DCCReference Include="SVG\SVGTypes.pas"/>
+        <DCCReference Include="SVG\SVGPath.pas"/>
+        <DCCReference Include="SVG\XmlLite.pas"/>
+        <DCCReference Include="SVG\SVGPaint.pas"/>
+        <DCCReference Include="SVG\PasSVGFactory.pas"/>
+        <DCCReference Include="SVG\GDIPKerning.pas"/>
+        <DCCReference Include="SVG\GDIPOBJ2.pas"/>
+        <DCCReference Include="SVG\GDIPPathText.pas"/>
+        <DCCReference Include="SVG\SVGColor.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
@@ -229,7 +244,7 @@
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="C:\Users\Public\Documents\Embarcadero\Studio\15.0\Bpl\DPM.Core.bpl" Configuration="Release" Class="ProjectOutput">
+                <DeployFile LocalName="C:\Users\Public\Documents\Embarcadero\Studio\15.0\Bpl\DPM.Core.bpl" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>DPM_Core.bpl</RemoteName>
                         <Overwrite>true</Overwrite>
@@ -243,7 +258,7 @@
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="C:\Users\Public\Documents\Embarcadero\Studio\15.0\Bpl\DPM.Core.bpl" Configuration="Debug" Class="ProjectOutput">
+                <DeployFile LocalName="C:\Users\Public\Documents\Embarcadero\Studio\15.0\Bpl\DPM.Core.bpl" Configuration="Release" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>DPM_Core.bpl</RemoteName>
                         <Overwrite>true</Overwrite>

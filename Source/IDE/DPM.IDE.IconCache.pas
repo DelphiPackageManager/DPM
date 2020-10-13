@@ -29,8 +29,8 @@ unit DPM.IDE.IconCache;
 interface
 
 uses
-  Vcl.Imaging.pngimage,
   Spring.Collections,
+  SVGInterfaces,
   DPM.Core.Types;
 
 //In memory cache for package icons.
@@ -39,7 +39,7 @@ uses
 type
   TDPMIconCache = class
   private
-    FIcons : IDictionary<string, TPngImage>;
+    FIcons : IDictionary<string, ISVG>;
     FLock  : TObject;
   protected
 
@@ -47,18 +47,20 @@ type
     constructor Create;
     destructor Destroy;override;
     function Query(const id : string) : boolean;
-    function Request(const id : string ) : TPngImage;
-    procedure Cache(const id : string; const value : TPngImage);
+    function Request(const id : string ) : ISVG;
+    procedure Cache(const id : string; const value : ISVG);
   end;
 
 implementation
 
 uses
+  System.Classes,
+  System.Types,
   System.SysUtils;
 
 { TDPMIconCache }
 
-procedure TDPMIconCache.Cache(const id: string; const value: TPngImage);
+procedure TDPMIconCache.Cache(const id: string; const value: ISVG);
 begin
   MonitorEnter(FLock);
   try
@@ -70,25 +72,30 @@ end;
 
 constructor TDPMIconCache.Create;
 var
-  missingImg : TPngImage;
+  ResStream: TResourceStream;
+  missingImg : ISVG;
 begin
   inherited;
-  FIcons := TCollections.CreateDictionary<string, TPngImage>;
+  FIcons := TCollections.CreateDictionary<string, ISVG>;
   FLock  := TObject.Create;
 
-  missingImg := TPngImage.Create;
-  missingImg.LoadFromResourceName(HInstance,'DPM_ICON_MISSING') ;
+  missingImg := GlobalSVGFactory.NewSvg;
+  resStream := TResourceStream.Create(hInstance, 'DPM_ICON_MISSING_SVG', RT_RCDATA);
+  try
+    missingImg := GlobalSVGFactory.NewSvg;
+    missingImg.LoadFromStream(ResStream);
+  finally
+    ResStream.Free;
+  end;
+  missingImg.Opacity := 0.333;
   FIcons['missing_icon'] := missingImg;
 end;
 
 destructor TDPMIconCache.Destroy;
-var
-  image : TPngImage;
 begin
   MonitorEnter(FLock);
   try
-    for image in FIcons.Values do
-      image.Free;
+    FIcons.Clear;
   finally
     MonitorExit(FLock);
   end;
@@ -108,7 +115,7 @@ begin
   end;
 end;
 
-function TDPMIconCache.Request(const id: string): TPngImage;
+function TDPMIconCache.Request(const id: string): ISVG;
 begin
   result := nil;
   MonitorEnter(FLock);

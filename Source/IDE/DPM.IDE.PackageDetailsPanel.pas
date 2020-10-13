@@ -414,7 +414,7 @@ begin
 
   //widest label
   ACanvas.Font.Style := [];
-  textSize := ACanvas.TextExtent('Date published :');
+  textSize := ACanvas.TextExtent('Date published :    ');
   ACanvas.Font.Style := [];
 
   DescriptionLabelRect := clientRect;

@@ -30,9 +30,9 @@ interface
 
 uses
   Generics.Defaults,
-  Vcl.Imaging.pngimage,
   VSoft.Awaitable,
   Spring.Collections,
+  SVGInterfaces,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
   DPM.Core.Logging,
@@ -76,7 +76,7 @@ type
     //ui stuff
 
     function GetPackageFeed(const cancelToken: ICancellationToken; const options: TSearchOptions; const configuration: IConfiguration): IList<IPackageSearchResultItem>;
-    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): TPngImage;
+    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): ISVG;
 
   public
     constructor Create(const logger : ILogger);override;
@@ -168,7 +168,7 @@ end;
 //  result := DoGetPackageMetaData(packageIdentity, packageIdentity.Platform);
 //end;
 
-function TDirectoryPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): TPngImage;
+function TDirectoryPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): ISVG;
 var
   zipFile : TZipFile;
   iconBytes : TBytes;
@@ -178,15 +178,15 @@ var
 begin
   result := nil;
   packagFileName := Format('%s-%s-%s-%s.dpkg',[ packageId, CompilerToString(compilerVersion),DPMPlatformToString(platform), packageVersion]);
-  iconFileName := ChangeFileExt(packagFileName, '.png');
+  iconFileName := ChangeFileExt(packagFileName, '.svg');
   packagFileName := TPath.Combine(Self.Source, packagFileName);
   iconFileName := TPath.Combine(Self.Source, iconFileName);
 
   //it quite likely already extracted.
   if FileExists(iconFileName) then
   begin
-    result := TPngImage.Create;
-    result.LoadFromFile(iconFileName);
+    result := GlobalSVGFactory.NewSvg;
+    Result.LoadFromFile(iconFileName);
     exit;
   end;
   //
@@ -217,8 +217,8 @@ begin
       stream.WriteBuffer(iconBytes[0], length(IconBytes));
       stream.SaveToFile(iconFileName);
       stream.Position := 0;
-      result := TPngImage.Create;
-      result.LoadFromStream(stream);
+      result := GlobalSVGFactory.NewSvg;
+      Result.LoadFromFile(iconFileName);
     finally
       stream.Free;
     end;
@@ -664,7 +664,7 @@ begin
   if not FileExists(fileName) then
     exit;
 
-  iconFileName := ChangeFileExt(filename, '.png');
+  iconFileName := ChangeFileExt(filename, '.svg');
   zipFile := TZipFile.Create;
   try
     try
@@ -674,7 +674,7 @@ begin
       //for later use.
       if not FileExists(iconFileName) then
       begin
-        if zipFile.IndexOf('icon.png') <> -1 then
+        if zipFile.IndexOf('icon.svg') <> -1 then
         begin
           zipFile.Read(cIconFile, iconBytes);
         end;
