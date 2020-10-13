@@ -317,7 +317,7 @@ begin
 
   CreateControls(AOwner);
   FFirstView := true;
-  
+
   txtSearch.ACEnabled := true;
   txtSearch.ACOptions := [acAutoAppend, acAutoSuggest, acUseArrowKey];
   txtSearch.ACSource := acsList;
@@ -1035,7 +1035,7 @@ begin
   chkIncludePrerelease.Visible := true;
   chkIncludeCommercial.Visible := false;
   chkIncludeTrial.Visible := false;
-  if (not refresh) and (FInstalledPackages <> nil) then
+  if (not refresh) and (FInstalledPackages <> nil) and FInstalledPackages.Any then
     LoadList(FInstalledPackages)
   else
   begin
@@ -1096,7 +1096,7 @@ begin
   chkIncludePrerelease.Visible := true;
   chkIncludeCommercial.Visible := true;
   chkIncludeTrial.Visible := true;
-  if (not refresh) and (FSearchResults <> nil) then
+  if (not refresh) and (FSearchResults <> nil) and FSearchResults.Any then
     LoadList(FSearchResults)
   else
   begin
@@ -1155,7 +1155,7 @@ begin
   chkIncludePrerelease.Visible := true;
   chkIncludeCommercial.Visible := false;
   chkIncludeTrial.Visible := false;
-  if (not refresh) and (FUpdates <> nil) then
+  if (not refresh) and (FUpdates <> nil) and FUpdates.Any then
     LoadList(FUpdates)
   else
   begin
