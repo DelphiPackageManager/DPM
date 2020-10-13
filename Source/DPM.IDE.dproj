@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectVersion>16.1</ProjectVersion>
@@ -57,7 +57,7 @@
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
-        <DCC_UnitSearchPath>$(DPMSearch);Libs\Virtual-TreeView\Source;Core;Core\Cache;Core\Configuration;Core\Dependency;Core\Logging;Core\Options;Core\Package;Core\Packaging;Core\Project;Core\Repository;Core\Sources;Core\Spec;Core\Utils;Core\Xml;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>$(DPMSearch);Libs\Virtual-TreeView\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <DCC_UsePackage>designide;rtl;vcl;$(DCC_UsePackage)</DCC_UsePackage>
         <UsePackages>true</UsePackages>
         <VerInfo_Locale>3081</VerInfo_Locale>
@@ -157,11 +157,6 @@
         <DCCReference Include="IDE\DPM.IDE.ProjectTreeManager.pas"/>
         <DCCReference Include="IDE\DPM.IDE.Utils.pas"/>
         <DCCReference Include="IDE\DPM.IDE.ProjectTree.Containers.pas"/>
-        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.EnvironmentProvider.pas"/>
-        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.Factory.pas"/>
-        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.Interfaces.pas"/>
-        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.MSBuild.pas"/>
-        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.LockFile.pas"/>
         <DCCReference Include="SVG\SVGParse.pas"/>
         <DCCReference Include="SVG\SVG.pas"/>
         <DCCReference Include="SVG\SVGBase64.pas"/>
@@ -178,6 +173,101 @@
         <DCCReference Include="SVG\GDIPPathText.pas"/>
         <DCCReference Include="SVG\SVGColor.pas"/>
         <DCCReference Include="SVG\SVGGraphic.pas"/>
+        <DCCReference Include="Core\Cache\DPM.Core.Cache.Interfaces.pas"/>
+        <DCCReference Include="Core\Cache\DPM.Core.Cache.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.EnvironmentProvider.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.Factory.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.Interfaces.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.MSBuild.pas"/>
+        <DCCReference Include="Core\Configuration\DPM.Core.Configuration.Classes.pas"/>
+        <DCCReference Include="Core\Configuration\DPM.Core.Configuration.Interfaces.pas"/>
+        <DCCReference Include="Core\Configuration\DPM.Core.Configuration.Manager.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Context.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Graph.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Interfaces.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.LockFile.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Resolution.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Resolver.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Version.pas"/>
+        <DCCReference Include="Core\Logging\DPM.Core.Logging.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Base.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Cache.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Common.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Config.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Feed.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Install.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.List.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Pack.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Push.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Restore.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Search.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Sources.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Spec.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.UnInstall.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Dependency.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Installer.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.InstallerContext.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Interfaces.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Metadata.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.SearchPath.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.SearchResults.pas"/>
+        <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.pas"/>
+        <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.Reader.pas"/>
+        <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.Writer.pas"/>
+        <DCCReference Include="Core\Packaging\DPM.Core.Packaging.IdValidator.pas"/>
+        <DCCReference Include="Core\Packaging\DPM.Core.Packaging.pas"/>
+        <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Writer.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.Configuration.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.Editor.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.GroupProjReader.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.Interfaces.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.PackageReference.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.Base.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.BaseGithub.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.Directory.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.DNGithub.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.DPMGithub.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.Factory.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.Http.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.Interfaces.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.Manager.pas"/>
+        <DCCReference Include="Core\Sources\DPM.Core.Sources.ClientFactory.pas"/>
+        <DCCReference Include="Core\Sources\DPM.Core.Sources.Interfaces.pas"/>
+        <DCCReference Include="Core\Sources\DPM.Core.Sources.LocalClient.pas"/>
+        <DCCReference Include="Core\Sources\DPM.Core.Sources.Manager.pas"/>
+        <DCCReference Include="Core\Sources\DPM.Core.Sources.RemoteClient.pas"/>
+        <DCCReference Include="Core\Sources\DPM.Core.Sources.Types.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.BPLEntry.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.Dependency.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.DependencyGroup.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.FileEntry.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.Interfaces.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.MetaData.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.Node.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.Reader.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.SearchPath.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.SearchPathGroup.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.TargetPlatform.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.Template.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.TemplateBase.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.Writer.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Config.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Directory.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Enum.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Numbers.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Path.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Process.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Strings.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.System.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.XML.pas"/>
+        <DCCReference Include="Core\Xml\DPM.Core.MSXML.pas"/>
+        <DCCReference Include="Core\Xml\DPM.Core.XML.NodeBase.pas"/>
+        <DCCReference Include="Core\DPM.Core.Constants.pas"/>
+        <DCCReference Include="Core\DPM.Core.Init.pas"/>
+        <DCCReference Include="Core\DPM.Core.TargetPlatform.pas"/>
+        <DCCReference Include="Core\DPM.Core.Types.pas"/>
         <RcItem Include="images\dpm.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>DPMIDELOGO</ResourceId>
@@ -207,6 +297,7 @@
                     <Source Name="MainSource">DPM.IDE.dpr</Source>
                 </Source>
                 <Excluded_Packages>
+                    <Excluded_Packages Name="C:\Users\Public\Documents\Embarcadero\Studio\15.0\Bpl\dclSVGIconImageList_DXE7.bpl">Ethea SVGIconImageList VCL components</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dclIPIndyImpl210.bpl">IP Abstraction Indy Implementation Design Time</Excluded_Packages>
                 </Excluded_Packages>
             </Delphi.Personality>
