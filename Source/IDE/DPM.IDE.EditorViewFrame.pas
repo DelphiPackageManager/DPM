@@ -652,9 +652,10 @@ begin
     begin
       FCurrentPlatform := FProject.CurrentPlatform;
       //TODO : need to do this more safely as it may interrup another operation.
-      FInstalledPackages := nil;
       if FCurrentTab = TCurrentTab.Installed then
-        SwitchedToInstalled(true);
+        SwitchedToInstalled(true)
+      else
+        FInstalledPackages := nil;
     end;
   end;
   platformChangeDetectTimer.Enabled := true;

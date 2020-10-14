@@ -217,16 +217,10 @@ object DPMEditViewFrame: TDPMEditViewFrame
         inherited pnlPackageId: TPanel
           Width = 436
           ExplicitWidth = 436
-          inherited lblPackageId: TLabel
-            Margins.Bottom = 0
-          end
         end
         inherited pnlInstalled: TPanel
           Width = 436
           ExplicitWidth = 436
-          inherited Label1: TLabel
-            Margins.Bottom = 0
-          end
           inherited txtInstalledVersion: TEdit
             Width = 276
             ExplicitWidth = 276
@@ -239,9 +233,6 @@ object DPMEditViewFrame: TDPMEditViewFrame
         inherited pnlVersion: TPanel
           Width = 436
           ExplicitWidth = 436
-          inherited lblVersionTitle: TLabel
-            Margins.Bottom = 0
-          end
           inherited cboVersions: TComboBox
             Width = 276
             ExplicitWidth = 276
