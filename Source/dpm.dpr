@@ -177,7 +177,8 @@ uses
   GDIPKerning in 'SVG\GDIPKerning.pas',
   GDIPOBJ2 in 'SVG\GDIPOBJ2.pas',
   GDIPPathText in 'SVG\GDIPPathText.pas',
-  SVGColor in 'SVG\SVGColor.pas';
+  SVGColor in 'SVG\SVGColor.pas',
+  DPM.Core.Package.Icon in 'Core\Package\DPM.Core.Package.Icon.pas';
 
 begin
   //TODO : pull in VSoft.SemanticVersion as a package once we are bootstrapped.

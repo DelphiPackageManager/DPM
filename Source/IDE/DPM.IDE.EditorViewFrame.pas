@@ -212,6 +212,7 @@ uses
   DPM.Core.Utils.Strings,
   DPM.Core.Project.Interfaces,
   DPM.Core.Project.Editor,
+  DPM.Core.Package.Icon,
   DPM.Core.Package.SearchResults,
   DPM.Core.Repository.Interfaces,
   DPM.IDE.AboutForm,
@@ -716,8 +717,8 @@ begin
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
   config := FConfiguration;
 
-  TAsync.Configure<ISVG>(
-    function (const cancelToken : ICancellationToken) : ISVG
+  TAsync.Configure<IPackageIcon>(
+    function (const cancelToken : ICancellationToken) : IPackageIcon
     begin
       result := repoManager.GetPackageIcon(cancelToken,source,id, version, IDECompilerVersion, platform, FConfiguration);
     end,FCancelTokenSource.Token)
@@ -729,14 +730,23 @@ begin
         FLogger.Error(e.Message);
       end)
     .Await(
-      procedure(const theResult : ISVG)
+      procedure(const theResult : IPackageIcon)
+      var
+        icon : IPackageIconImage;
       begin
         if FClosing then
           exit;
-        FIconCache.Cache(id, theResult);
-        stopWatch.Stop;
-        FLogger.Debug('Got icon for [' + id + '.' + version + '] in ' + IntToStr(stopWatch.ElapsedMilliseconds) + 'ms' );
+
+        //the result can be nil if there is no icon found
         if theResult <> nil then
+          icon := TPackageIconImage.Create(theResult);
+
+        //we will cache nil to stop future pointeless requests.
+        FIconCache.Cache(id, icon);
+        stopWatch.Stop;
+        if icon <> nil then
+          FLogger.Debug('Got icon for [' + id + '.' + version + '] in ' + IntToStr(stopWatch.ElapsedMilliseconds) + 'ms' );
+        if icon <> nil then
           //TODO : Instead request repaint of row.
           FScrollList.Invalidate;
       end);
@@ -783,7 +793,7 @@ var
   fontSize : integer;
   backgroundColor : TColor;
 //  foregroundColor : TColor;
-  icon : ISVG;
+  icon : IPackageIconImage;
   extent : TSize;
   oldTextAlign : UINT;
   focusRect : TRect;
@@ -836,7 +846,7 @@ begin
     if icon = nil then
       icon := FIconCache.Request('missing_icon');
 
-    icon.PaintTo(ACanvas.Handle, TRectF.Create(FRowLayout.IconRect));
+    icon.PaintTo(ACanvas, FRowLayout.IconRect);
     //ACanvas.StretchDraw(FRowLayout.IconRect, icon );
 
     //TODO : this all feels super hacky, revisit when IDE supports high dpi/scaling.

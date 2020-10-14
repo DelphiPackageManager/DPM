@@ -108,7 +108,10 @@ var
   iconBytes : TBytes;
 begin
   iconBytes := TFile.ReadAllBytes(filePath);
-  FZipFile.Add(iconBytes,cIconFile);
+  if ExtractFileExt(filePath) = '.svg' then
+    FZipFile.Add(iconBytes,cIconFileSVG)
+  else
+    FZipFile.Add(iconBytes,cIconFilePNG);
   result := true;
 end;
 

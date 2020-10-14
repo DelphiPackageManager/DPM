@@ -1,0 +1,1 @@
+Note : Units in the Core folder should NOT reference any VCL or windows GDI api's. This is because the dpm command line tool uses these units, and at some point we want to be able to run dpm.exe in a docker container - referencing any vcl units will bring in staticly linked windows dll's that do not exist on Windows Server Core/windows docker images.

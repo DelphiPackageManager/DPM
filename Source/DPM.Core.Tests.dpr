@@ -124,7 +124,8 @@ uses
   PasSVGFactory in 'SVG\PasSVGFactory.pas',
   GDIPKerning in 'SVG\GDIPKerning.pas',
   GDIPOBJ2 in 'SVG\GDIPOBJ2.pas',
-  GDIPPathText in 'SVG\GDIPPathText.pas';
+  GDIPPathText in 'SVG\GDIPPathText.pas',
+  DPM.Core.Package.Icon in 'Core\Package\DPM.Core.Package.Icon.pas';
 
 var
   runner : ITestRunner;

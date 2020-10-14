@@ -36,7 +36,8 @@ const
   cPackageSpecExt = '.dspec';
   //fixed filename for the package dspec so we can easily extract it
   cPackageMetaFile = 'package' + cPackageSpecExt;
-  cIconFile = 'icon.svg';
+  cIconFileSVG  = 'icon.svg';
+  cIconFilePNG  = 'icon.png';
 
   cDPMConfigFileName = 'dpm.config';
 

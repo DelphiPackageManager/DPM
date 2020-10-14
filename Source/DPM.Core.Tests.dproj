@@ -225,6 +225,7 @@
         <DCCReference Include="SVG\GDIPKerning.pas"/>
         <DCCReference Include="SVG\GDIPOBJ2.pas"/>
         <DCCReference Include="SVG\GDIPPathText.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Icon.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

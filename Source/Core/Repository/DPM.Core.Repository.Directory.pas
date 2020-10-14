@@ -32,7 +32,6 @@ uses
   Generics.Defaults,
   VSoft.Awaitable,
   Spring.Collections,
-  SVGInterfaces,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
   DPM.Core.Logging,
@@ -76,7 +75,7 @@ type
     //ui stuff
 
     function GetPackageFeed(const cancelToken: ICancellationToken; const options: TSearchOptions; const configuration: IConfiguration): IList<IPackageSearchResultItem>;
-    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): ISVG;
+    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageIcon;
 
   public
     constructor Create(const logger : ILogger);override;
@@ -95,6 +94,7 @@ uses
   Spring.Collections.Extensions,
   DPM.Core.Constants,
   DPM.Core.Package.Metadata,
+  DPM.Core.Package.Icon,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Reader,
   DPM.Core.Utils.Strings,
@@ -168,35 +168,88 @@ end;
 //  result := DoGetPackageMetaData(packageIdentity, packageIdentity.Platform);
 //end;
 
-function TDirectoryPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): ISVG;
+function TDirectoryPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageIcon;
 var
   zipFile : TZipFile;
-  iconBytes : TBytes;
+  zipIdx  : integer;
   packagFileName : string;
-  iconFileName : string;
+  svgIconFileName : string;
+  pngIconFileName : string;
   stream : TMemoryStream;
+  DecompressionStream : TStream;
+  fileStream : TFileStream;
+  zipHeader : TZipHeader;
 begin
   result := nil;
   packagFileName := Format('%s-%s-%s-%s.dpkg',[ packageId, CompilerToString(compilerVersion),DPMPlatformToString(platform), packageVersion]);
-  iconFileName := ChangeFileExt(packagFileName, '.svg');
   packagFileName := TPath.Combine(Self.Source, packagFileName);
-  iconFileName := TPath.Combine(Self.Source, iconFileName);
+  svgIconFileName := ChangeFileExt(packagFileName, '.svg');
+  pngIconFileName := ChangeFileExt(packagFileName, '.png');
 
-  //it quite likely already extracted.
-  if FileExists(iconFileName) then
+  //it quite likely already extracted so look for that first
+  //icons can be svg or png.
+  if FileExists(svgIconFileName) then
   begin
-    result := GlobalSVGFactory.NewSvg;
-    Result.LoadFromFile(iconFileName);
+    fileStream := TFileStream.Create(svgIconFileName,fmOpenRead );
+    stream := TMemoryStream.Create;
+    try
+      stream.CopyFrom(fileStream, fileStream.Size);
+    finally
+      fileStream.Free;
+    end;
+    //the icon now owns the stream.
+    result := CreatePackageIcon(TPackageIconKind.ikSvg, stream);
     exit;
   end;
-  //
+
+  if FileExists(pngIconFileName) then
+  begin
+    fileStream := TFileStream.Create(pngIconFileName,fmOpenRead );
+    stream := TMemoryStream.Create;
+    try
+      stream.CopyFrom(fileStream, fileStream.Size);
+    finally
+      fileStream.Free;
+    end;
+    //the icon now owns the stream.
+    result := CreatePackageIcon(TPackageIconKind.ikPng, stream);
+    exit;
+  end;
+
+  //not already extracted, so check the package
   zipFile := TZipFile.Create;
   try
     try
       zipFile.Open(packagFileName, TZipMode.zmRead);
-      if zipFile.IndexOf(cIconFile) <> -1 then
+      zipIdx := zipFile.IndexOf(cIconFileSVG);
+      if zipIdx <> -1 then
       begin
-        zipFile.Read(cIconFile, iconBytes);
+        stream := TMemoryStream.Create;
+        //casting due to broken overload resolution in XE7
+        zipFile.Read(zipIdx, DecompressionStream , zipHeader );
+        stream.CopyFrom(DecompressionStream, DecompressionStream.Size);
+        FreeAndNil(DecompressionStream);
+        //save it to speed up things next time.
+        stream.SaveToFile(svgIconFileName);
+        //result now owns the stream.
+        result := CreatePackageIcon(TPackageIconKind.ikSvg, stream);
+        exit;
+      end;
+      if cancelToken.IsCancelled then
+        exit;
+
+      zipIdx := zipFile.IndexOf(cIconFilePNG);
+      if zipIdx <> -1 then
+      begin
+        stream := TMemoryStream.Create;
+        //casting due to broken overload resolution in XE7
+        zipFile.Read(zipIdx, DecompressionStream , zipHeader );
+        stream.CopyFrom(DecompressionStream, DecompressionStream.Size);
+        FreeAndNil(DecompressionStream);
+        stream.SaveToFile(pngIconFileName);
+        //result now owns the stream.
+        result := CreatePackageIcon(TPackageIconKind.ikPng, stream);
+        exit;
       end;
     except
       on e : Exception do
@@ -207,21 +260,6 @@ begin
     end;
   finally
     zipFile.Free;
-  end;
-  if cancelToken.IsCancelled then
-    exit;
-  if Length(iconBytes) > 0 then
-  begin
-    stream := TMemoryStream.Create;
-    try
-      stream.WriteBuffer(iconBytes[0], length(IconBytes));
-      stream.SaveToFile(iconFileName);
-      stream.Position := 0;
-      result := GlobalSVGFactory.NewSvg;
-      Result.LoadFromFile(iconFileName);
-    finally
-      stream.Free;
-    end;
   end;
 end;
 
@@ -644,8 +682,10 @@ var
   spec : IPackageSpec;
   reader : IPackageSpecReader;
   extractedFile : string;
-  iconFileName : string;
+  svgIconFileName : string;
+  pngIconFileName : string;
   iconBytes : TBytes;
+  isSvg : boolean;
 begin
   result := nil;
   reader := TPackageSpecReader.Create(Logger);
@@ -664,23 +704,38 @@ begin
   if not FileExists(fileName) then
     exit;
 
-  iconFileName := ChangeFileExt(filename, '.svg');
+  isSvg := false;
   zipFile := TZipFile.Create;
   try
     try
       zipFile.Open(fileName, TZipMode.zmRead);
       zipFile.Read(cPackageMetaFile, metaBytes);
+
       //we will take this opportunity to extract the icon file here
       //for later use.
-      if not FileExists(iconFileName) then
+      isSvg := false;
+
+      svgIconFileName := ChangeFileExt(filename, '.svg');
+      if not FileExists(svgIconFileName) then
       begin
-        if zipFile.IndexOf('icon.svg') <> -1 then
+        if zipFile.IndexOf(cIconFileSVG) <> -1 then
         begin
-          zipFile.Read(cIconFile, iconBytes);
+          zipFile.Read(cIconFileSVG, iconBytes);
+          isSvg := true;
+        end;
+      end
+      else
+        isSvg := true;
+      pngIconFileName := ChangeFileExt(filename, '.png');
+      if (not isSvg) and not FileExists(pngIconFileName) then
+      begin
+        if zipFile.IndexOf(cIconFilePNG) <> -1 then
+        begin
+          zipFile.Read(cIconFilePNG, iconBytes);
+          isSvg := false;
         end;
 
       end;
-
     except
       on e : Exception do
       begin
@@ -710,7 +765,10 @@ begin
       //may need to use a lock file.
       TFile.WriteAllText(extractedFile, metaString, TEncoding.UTF8);
       if Length(iconBytes) > 0 then
-        TFile.WriteAllBytes(iconFileName,iconBytes);
+        if isSvg then
+          TFile.WriteAllBytes(svgIconFileName,iconBytes)
+        else
+          TFile.WriteAllBytes(pngIconFileName,iconBytes)
     except
       //even though we test for write access other errors might occur (eg with network drives disconnected etc).
     end;

@@ -316,10 +316,9 @@ end;
 
 procedure TPackageDetailsFrame.SetPackage(const package: IPackageSearchResultItem);
 var
-  logo : ISVG;
-  clonedLogo : ISVG;
+  logo : IPackageIconImage;
   bFetchVersions : boolean;
-  graphic : TSVGGraphic;
+  graphic : TGraphic;
 begin
   FVersionsDelayTimer.Enabled := false;
   if FRequestInFlight then
@@ -358,11 +357,8 @@ begin
       logo := FIconCache.Request('missing_icon');
     if logo <> nil then
     begin
-      clonedLogo := GlobalSVGFactory.NewSvg;
-      clonedLogo.Source := logo.Source;
-      graphic := TSVGGraphic.Create;
+      graphic := logo.ToGraphic;
       try
-        graphic.AssignSVG(clonedLogo);
         imgPackageLogo.Picture.Assign(graphic);
         imgPackageLogo.Visible := true;
       finally

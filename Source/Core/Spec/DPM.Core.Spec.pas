@@ -525,7 +525,13 @@ begin
     if FMetaData.License <> '' then
       metaDataObj['license'] := FMetaData.License;
     if FMetaData.Icon <> '' then
-      metaDataObj['icon'] := cIconFile;//need to do this as the file is written with cIconFile name.
+    begin
+      //ensure consistent icon file name to make it easier to extract later.
+      if ExtractFileExt(FMetaData.Icon) = '.svg' then
+        metaDataObj['icon'] := cIconFileSVG
+      else
+        metaDataObj['icon'] := cIconFilePNG
+    end;
     if FMetaData.Copyright <> '' then
       metaDataObj['copyright'] := FMetaData.Copyright;
     if FMetaData.Tags <> '' then

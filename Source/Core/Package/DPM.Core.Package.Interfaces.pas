@@ -29,8 +29,9 @@ unit DPM.Core.Package.Interfaces;
 interface
 
 uses
-  Spring.Collections,
+  System.Classes,
   System.Generics.Defaults,
+  Spring.Collections,
   VSoft.Awaitable,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
@@ -249,6 +250,19 @@ type
 //
 
   end;
+
+
+  TPackageIconKind = (ikSvg, ikPng);
+
+  IPackageIcon = interface
+  ['{FB87A9AD-B114-4D1D-9AF5-1BD50FE17842}']
+    function GetKind : TPackageIconKind;
+    function GetStream : TStream;
+    procedure SetStream(const value : TStream);
+    property Kind : TPackageIconKind read GetKind;
+    property Stream : TStream read GetStream write SetStream;
+  end;
+
 
   TPackageInfoComparer = class(TInterfacedObject,IEqualityComparer<IPackageInfo>)
   protected

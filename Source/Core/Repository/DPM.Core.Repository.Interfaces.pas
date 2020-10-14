@@ -67,7 +67,7 @@ type
 
     //ui stuff
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
-    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): ISVG;
+    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageIcon;
 
     function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion) : IList<TPackageVersion>;overload;
 
@@ -95,7 +95,7 @@ type
     //ui specific stuff
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
     function GetPackageIcon(const cancelToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string;
-                            const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const configuration : IConfiguration) : ISVG;
+                            const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const configuration : IConfiguration) : IPackageIcon;
     function GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IEnumerable<IPackageId>; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
   end;
 

@@ -73,6 +73,7 @@ object DPMEditViewFrame: TDPMEditViewFrame
       Top = 47
       Width = 25
       Height = 25
+      Hint = 'Refresh'
       ImageAlignment = iaCenter
       ImageIndex = 2
       Images = DPMEditorViewImages
@@ -103,6 +104,7 @@ object DPMEditViewFrame: TDPMEditViewFrame
       Top = 47
       Width = 25
       Height = 25
+      Hint = 'Settings'
       ImageAlignment = iaCenter
       ImageIndex = 1
       Images = DPMEditorViewImages
@@ -114,6 +116,7 @@ object DPMEditViewFrame: TDPMEditViewFrame
       Top = 47
       Width = 25
       Height = 25
+      Hint = 'About'
       ImageAlignment = iaCenter
       ImageIndex = 3
       Images = DPMEditorViewImages
@@ -214,10 +217,16 @@ object DPMEditViewFrame: TDPMEditViewFrame
         inherited pnlPackageId: TPanel
           Width = 436
           ExplicitWidth = 436
+          inherited lblPackageId: TLabel
+            Margins.Bottom = 0
+          end
         end
         inherited pnlInstalled: TPanel
           Width = 436
           ExplicitWidth = 436
+          inherited Label1: TLabel
+            Margins.Bottom = 0
+          end
           inherited txtInstalledVersion: TEdit
             Width = 276
             ExplicitWidth = 276
@@ -230,6 +239,9 @@ object DPMEditViewFrame: TDPMEditViewFrame
         inherited pnlVersion: TPanel
           Width = 436
           ExplicitWidth = 436
+          inherited lblVersionTitle: TLabel
+            Margins.Bottom = 0
+          end
           inherited cboVersions: TComboBox
             Width = 276
             ExplicitWidth = 276
