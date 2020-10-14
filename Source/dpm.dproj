@@ -3,7 +3,7 @@
         <ProjectGuid>{CFBF7204-5639-4643-B895-08DDF96E0F8F}</ProjectGuid>
         <MainSource>dpm.dpr</MainSource>
         <Base>True</Base>
-        <Config Condition="'$(Config)'==''">Debug</Config>
+        <Config Condition="'$(Config)'==''">Release</Config>
         <TargetedPlatforms>1</TargetedPlatforms>
         <AppType>Console</AppType>
         <FrameworkType>None</FrameworkType>
@@ -85,7 +85,7 @@
         <SanitizedProjectName>dpm</SanitizedProjectName>
         <DCC_ImageBase>00400000</DCC_ImageBase>
         <DCC_F>false</DCC_F>
-        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=0.1.7.0;InternalName=;LegalCopyright=© 2019 - 2020 Vincent Parrett and Contributors;LegalTrademarks=;OriginalFilename=dpm.exe;ProductName=DPM;ProductVersion=0.1.0.0;Comments=0.1.7-aplha2;CFBundleName=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=0.1.7.0;InternalName=;LegalCopyright=© 2019 - 2020 Vincent Parrett and Contributors;LegalTrademarks=;OriginalFilename=dpm.exe;ProductName=DPM;ProductVersion=0.1.0.0;Comments=0.1.7-aplha;CFBundleName=</VerInfo_Keys>
         <DCC_UnitSearchPath>$(DPMSearch);$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
