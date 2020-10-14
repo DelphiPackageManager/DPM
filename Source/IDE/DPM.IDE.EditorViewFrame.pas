@@ -46,7 +46,11 @@ uses
   DPM.Core.Logging,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Options.Search,
-  DPM.Core.Package.Interfaces, System.Actions, Vcl.ActnList, DPM.IDE.PackageDetailsFrame;
+  DPM.Core.Package.Interfaces,
+  {$IF CompilerVersion >= 24.0 }
+  System.Actions,
+  {$IFEND}
+  Vcl.ActnList, DPM.IDE.PackageDetailsFrame;
 
 type
   TRowLayout = record

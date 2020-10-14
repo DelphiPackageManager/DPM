@@ -268,8 +268,8 @@ begin
     TCompilerVersion.RS10_2 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64];
     TCompilerVersion.RS10_3 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64,
                                          TDPMPlatform.AndroidArm64, TDPMPlatform.OSX64];
-    TCompilerVersion.RS10_4 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64,
-                                         TDPMPlatform.AndroidArm64, TDPMPlatform.OSX64];
+    TCompilerVersion.RS10_4 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX64, TDPMPlatform.iOS32, TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32,
+                                         TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
   else
     raise Exception.Create('AllPlatforms is missing for : ' + CompilerToString(compiler));  end;
 end;

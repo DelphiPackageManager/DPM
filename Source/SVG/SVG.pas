@@ -2055,16 +2055,13 @@ var
   Size: Integer;
   Buffer: TBytes;
 begin
-  Stream.Position := 0;
   Size := Stream.Size;
   SetLength(Buffer, Size);
   {$IF CompilerVersion >= 24.0 }
   //TODO : confirm when this overload was introduced.
   Stream.Read(Buffer, 0, Size);
   {$ELSE}
-  //This will break if a forward only stream is passed in.
-  Stream.Seek(0,soBeginning);
-  Stream.Read(Buffer,Size);
+  Stream.Read(Buffer[0],Size);
   {$IFEND}
   LoadFromText(TEncoding.UTF8.GetString(Buffer));
 end;

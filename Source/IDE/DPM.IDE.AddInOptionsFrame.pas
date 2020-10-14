@@ -30,7 +30,10 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages,
-  System.Variants, System.Classes, System.Actions,
+  System.Variants, System.Classes,
+  {$IF CompilerVersion >= 24.0 }
+  System.Actions,
+  {$IFEND}
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ActnList, Vcl.ImgList, Vcl.CheckLst,
   Vcl.Buttons, Vcl.ComCtrls, Vcl.ExtCtrls, Vcl.StdCtrls,
   DPM.Core.Logging,

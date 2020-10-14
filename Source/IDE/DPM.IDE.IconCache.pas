@@ -206,6 +206,7 @@ var
   clonedSVG : ISVG;
   clonedPng : TPngImage;
 begin
+  result := nil;
   case FKind of
     ikSvg:
     begin

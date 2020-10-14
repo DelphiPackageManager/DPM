@@ -47,7 +47,7 @@ type
     FLogger : ILogger;
     FArchiveWriter : IPackageArchiveWriter;
     FSpecReader : IPackageSpecReader;
-    procedure ProcessPattern(const basePath, dest: string; const pattern: IFileSystemPattern; const searchPath: string; const flatten: boolean; const excludePatterns : IList<string>; const ignore : boolean;  var fileCount: integer);
+    procedure ProcessPattern(const basePath, dest: string; const pattern: IFileSystemPattern; const flatten: boolean; const excludePatterns : IList<string>; const ignore : boolean;  var fileCount: integer);
   protected
 
     function WritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion; const basePath : string) : boolean;
@@ -97,7 +97,7 @@ end;
 function StripCurrent(const value : string) : string;
 begin
   result := value;
-  if result.StartsWith('.\') then
+  if TStringUtils.StartsWith(result, '.\') then
     Delete(result, 1,2);
 end;
 
@@ -111,7 +111,7 @@ begin
     result := Copy(value,1, i -1);
 end;
 
-procedure TPackageWriter.ProcessPattern(const basePath: string; const dest : string; const pattern : IFileSystemPattern; const searchPath : string; const flatten : boolean; const excludePatterns : IList<string>; const ignore : boolean; var fileCount : integer);
+procedure TPackageWriter.ProcessPattern(const basePath: string; const dest : string; const pattern : IFileSystemPattern; const flatten : boolean; const excludePatterns : IList<string>; const ignore : boolean; var fileCount : integer);
 var
   files : TStringDynArray;
   f : string;
@@ -140,12 +140,12 @@ begin
       exit
     else
       raise Exception.Create('Directory not found : ' + pattern.Directory);
-
+  f := TPath.Combine(pattern.Directory, pattern.FileMask);
   files := TDirectory.GetFiles(pattern.Directory, pattern.FileMask, TSearchOption.soTopDirectoryOnly);
   for f in files do
   begin
     if IsFileExcluded(f) then
-      continue;
+      exit;
 
     if not TFile.Exists(f) then
       raise Exception.Create('File not found : ' + f);
@@ -154,7 +154,7 @@ begin
     if flatten then
       archivePath := dest + '\' + ExtractFileName(f)
     else
-      archivePath := dest + '\' + StripBase(TPathUtils.CompressRelativePath(basePath,  searchPath) , f);
+      archivePath := dest + '\' + StripBase(basePath,  f);
       if TStringUtils.StartsWith(archivePath, '\') then
         Delete(archivePath,1,1);
     Inc(fileCount);
@@ -177,14 +177,26 @@ var
   var
     fsPatterns : TArray<IFileSystemPattern>;
     fsPattern : IFileSystemPattern;
-    nonWildcardPath : string;
+    searchBasePath : string;
     fileCount : integer;
+
+    function StripWildCard(const value : string) : string;
+    var
+      i : integer;
+    begin
+      result := value;
+      i := Pos('*', value);
+      if i > 0 then
+        Delete(result, i, Length(result));
+    end;
+
   begin
-    nonWildcardPath := GetNonWildcardPath(source);
+    searchBasePath := StripWildCard(TPathUtils.CompressRelativePath(basePath,  source));
+    searchBasePath := ExtractFilePath(searchBasePath);
     fsPatterns := antPattern.Expand(source);
     fileCount := 0;
     for fsPattern in fsPatterns do
-     ProcessPattern(basePath, dest, fsPattern, nonWildcardPath, flatten, exclude , ignore,  fileCount);
+     ProcessPattern(searchBasePath, dest, fsPattern, flatten, exclude , ignore,  fileCount);
 
     if (not ignore) and (fileCount = 0) then
      FLogger.Warning('No files were found for pattern [' + source + ']');

@@ -247,7 +247,6 @@ object DPMOptionsFrame: TDPMOptionsFrame
     end
   end
   object dpmOptionsImageList: TImageList
-    GrayscaleFactor = 255
     Left = 336
     Top = 200
     Bitmap = {

@@ -69,7 +69,9 @@ begin
   AutoSize := false;
   Width := 65;
   Height := 24;
+  {$IF CompilerVersion >= 24.0 }
   StyleElements := StyleElements - [seFont];
+  {$IFEND}
   Font.Size := 11;
   Font.Color := StyleServices.GetStyleFontColor(TStyleFont.sfButtonTextNormal);
   FActiveColor := $00CC7A00;

@@ -127,6 +127,37 @@ begin
   fSvgDoc.LoadFromStream(Stream);
 end;
 
+function FitInto(const Source : TRectF; const ADesignatedArea: TRectF; out Ratio: Single): TRectF;overload;
+begin
+  if (ADesignatedArea.Width <= 0) or (ADesignatedArea.Height <= 0) then
+  begin
+    Ratio := 1;
+    Exit(Source);
+  end;
+
+  if (Source.Width / ADesignatedArea.Width) > (Source.Height / ADesignatedArea.Height) then
+    Ratio := Source.Width / ADesignatedArea.Width
+  else
+    Ratio := Source.Height / ADesignatedArea.Height;
+
+  if Ratio = 0 then
+    Exit(Source)
+  else
+  begin
+    Result := TRectF.Create(0, 0, Source.Width / Ratio, Source.Height / Ratio);
+    RectCenter(Result, ADesignatedArea);
+  end;
+end;
+
+
+function FitInto(const Source : TRectF; const ADesignatedArea: TRectF): TRectF;overload;
+var
+  ratio : Single;
+begin
+  result := FitInto(Source, ADesignatedArea, ratio);
+end;
+
+
 procedure TPasSVG.PaintTo(DC: HDC; R: TRectF; KeepAspectRatio: Boolean);
 var
   SvgRect : TRectF;
@@ -135,7 +166,7 @@ begin
   if (fSvgDoc.Width > 0) and (fSvgDoc.Height > 0) and KeepAspectRatio then
   begin
       SvgRect := TRectF.Create(0, 0, fSvgDoc.Width, fSvgDoc.Height);
-      SvgRect := SvgRect.FitInto(R);
+      SvgRect := FitInto(SvgRect, R);
   end;
   fSvgDoc.PaintTo(DC, ToGPRectF(SvgRect), nil, 0);
 end;

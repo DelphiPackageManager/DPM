@@ -88,7 +88,6 @@ object DPMAboutForm: TDPMAboutForm
     Font.Name = 'Tahoma'
     Font.Style = []
     ParentFont = False
-    StyleElements = [seClient, seBorder]
   end
   object Label2: TLabel
     Left = 72

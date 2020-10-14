@@ -68,14 +68,16 @@ end;
 class function TEnumUtils.StringToEnum<T>(const value: string): T;
 var
   P: PTypeInfo;
+  typeData : PTypeData;
   i : integer;
 begin
   P := TypeInfo(T);
+  typeData := GetTypeData(P);
   case P^.Kind of
     tkEnumeration:
     begin
       i := GetEnumValue(P, value);
-      if InRange(i, p.TypeData.MinValue, p.TypeData.MaxValue) then
+      if InRange(i, typeData.MinValue, typeData.MaxValue) then
       begin
         case Sizeof(T) of
           1: PByte(@Result)^ := GetEnumValue(P, value);
@@ -86,9 +88,9 @@ begin
       else //this should probably throw!
       begin
         case Sizeof(T) of
-          1: PByte(@Result)^ := p.TypeData.MinValue;
-          2: PWord(@Result)^ := p.TypeData.MinValue;
-          4: PCardinal(@Result)^ := p.TypeData.MinValue;
+          1: PByte(@Result)^ := typeData.MinValue;
+          2: PWord(@Result)^ := typeData.MinValue;
+          4: PCardinal(@Result)^ := typeData.MinValue;
         end;
       end;
     end

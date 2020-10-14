@@ -204,7 +204,7 @@ begin
         //if the groupproj doesn't exist, it's a placeholder and we are about to load a single project
         if not FileExists(FileName) then
         begin
-          FProjectTreeManager.NotifyStartLoading(plSingle);
+          FProjectTreeManager.NotifyStartLoading(plSingle, nil);
           exit;
         end;
         FLoadingGroup := true;

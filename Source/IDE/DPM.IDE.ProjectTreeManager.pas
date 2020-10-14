@@ -33,10 +33,10 @@ unit DPM.IDE.ProjectTreeManager;
 interface
 
 uses
+  System.Rtti,
   Spring.Collections,
   Spring.Container,
   System.Classes,
-  System.Rtti,
   Vcl.Controls,
   WinApi.Messages,
   DPM.Core.Options.Search,
@@ -51,7 +51,7 @@ type
 
   IDPMProjectTreeManager = interface
   ['{F0BA2907-E337-4591-8E16-FB684AE2E19B}']
-    procedure NotifyStartLoading(const mode : TProjectLoadType; const projects : IList<string> = nil);
+    procedure NotifyStartLoading(const mode : TProjectLoadType; const projects : IList<string>);
 
     procedure NotifyProjectLoaded(const fileName : string);
 
@@ -79,7 +79,7 @@ type
 
     FNodeCache : IDictionary<TProjectTreeContainer, PVirtualNode>;
 
-    procedure DumpInterfaces(AClass: TClass);
+//    procedure DumpInterfaces(AClass: TClass);
   protected
     procedure NotifyProjectLoaded(const fileName : string);
     procedure NotifyStartLoading(const mode: TProjectLoadType; const projects: IList<string>);
@@ -704,29 +704,29 @@ begin
 
 end;
 
-procedure TDPMProjectTreeManager.DumpInterfaces(AClass: TClass);
-var
-  i : integer;
-  InterfaceTable: PInterfaceTable;
-  InterfaceEntry: PInterfaceEntry;
-begin
-  while Assigned(AClass) do
-  begin
-    InterfaceTable := AClass.GetInterfaceTable;
-    if Assigned(InterfaceTable) then
-    begin
-      OutputDebugString(PChar('Implemented interfaces in ' +  AClass.ClassName));
-      for i := 0 to InterfaceTable.EntryCount-1 do
-      begin
-        InterfaceEntry := @InterfaceTable.Entries[i];
-
-        OutputDebugString(PChar(Format('%d. GUID = %s offest = %s',[i, GUIDToString(InterfaceEntry.IID), IntToHex(InterfaceEntry.IOffset,2)])));
-      end;
-    end;
-    AClass := AClass.ClassParent;
-  end;
-  writeln;
-end;
+//procedure TDPMProjectTreeManager.DumpInterfaces(AClass: TClass);
+//var
+//  i : integer;
+//  InterfaceTable: PInterfaceTable;
+//  InterfaceEntry: PInterfaceEntry;
+//begin
+//  while Assigned(AClass) do
+//  begin
+//    InterfaceTable := AClass.GetInterfaceTable;
+//    if Assigned(InterfaceTable) then
+//    begin
+//      OutputDebugString(PChar('Implemented interfaces in ' +  AClass.ClassName));
+//      for i := 0 to InterfaceTable.EntryCount-1 do
+//      begin
+//        InterfaceEntry := @InterfaceTable.Entries[i];
+//
+//        OutputDebugString(PChar(Format('%d. GUID = %s offest = %s',[i, GUIDToString(InterfaceEntry.IID), IntToHex(InterfaceEntry.IOffset,2)])));
+//      end;
+//    end;
+//    AClass := AClass.ClassParent;
+//  end;
+//  writeln;
+//end;
 
 procedure TDPMProjectTreeManager.WndProc(var msg: TMessage);
 var

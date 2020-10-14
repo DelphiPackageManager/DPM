@@ -109,7 +109,8 @@ end;
 
 procedure TDPMEditorView.DeselectView;
 begin
-  FFrame.ViewDeselected;
+  if FFrame <> nil then
+    FFrame.ViewDeselected;
 end;
 
 function TDPMEditorView.EditAction(Action: TEditAction): Boolean;

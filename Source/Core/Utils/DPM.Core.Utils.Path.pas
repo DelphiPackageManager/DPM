@@ -43,7 +43,8 @@ uses
   Spring.Collections,
   System.IOUtils,
   System.SysUtils,
-  System.StrUtils;
+  System.StrUtils,
+  DPM.Core.Utils.Strings;
 
 //Copied from XE7
 function StartsWith(const current : string; const Value: string; IgnoreCase: Boolean = false): Boolean;
@@ -195,7 +196,7 @@ end;
 
 class function TPathUtils.IsRelativePath(const value: string): boolean;
 begin
-  result := (not TPath.IsUNCPath(value) and value.StartsWith('.\')) or  System.SysUtils.IsRelativePath(value);
+  result := (not TPath.IsUNCPath(value) and TStringUtils.StartsWith(value, '.\')) or System.SysUtils.IsRelativePath(value);
 end;
 
 end.

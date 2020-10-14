@@ -704,7 +704,6 @@ begin
   if not FileExists(fileName) then
     exit;
 
-  isSvg := false;
   zipFile := TZipFile.Create;
   try
     try

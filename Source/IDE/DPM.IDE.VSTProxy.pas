@@ -134,7 +134,6 @@ end;
 procedure TVirtualStringTreeProxy.BeginUpdate;
 var
   rttiMethod: TRttiMethod;
-  res : TValue;
 begin
   rttiMethod := FTreeType.GetMethod('BeginUpdate');
   if not Assigned(rttiMethod) then
@@ -172,7 +171,6 @@ end;
 procedure TVirtualStringTreeProxy.EndUpdate;
 var
   rttiMethod: TRttiMethod;
-  res : TValue;
 begin
   rttiMethod := FTreeType.GetMethod('EndUpdate');
   if not Assigned(rttiMethod) then

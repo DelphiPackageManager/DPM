@@ -9,7 +9,7 @@
         <Projects Include="dpm.dproj">
             <Dependencies/>
         </Projects>
-        <Projects Include="DPM.IDE.dproj">
+        <Projects Include="DPM.IDE.XE7.dproj">
             <Dependencies/>
         </Projects>
     </ItemGroup>
@@ -38,23 +38,23 @@
     <Target Name="dpm:Make">
         <MSBuild Projects="dpm.dproj" Targets="Make"/>
     </Target>
-    <Target Name="DPM_IDE">
-        <MSBuild Projects="DPM.IDE.dproj"/>
+    <Target Name="DPM_IDE_XE7">
+        <MSBuild Projects="DPM.IDE.XE7.dproj"/>
     </Target>
-    <Target Name="DPM_IDE:Clean">
-        <MSBuild Projects="DPM.IDE.dproj" Targets="Clean"/>
+    <Target Name="DPM_IDE_XE7:Clean">
+        <MSBuild Projects="DPM.IDE.XE7.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="DPM_IDE:Make">
-        <MSBuild Projects="DPM.IDE.dproj" Targets="Make"/>
+    <Target Name="DPM_IDE_XE7:Make">
+        <MSBuild Projects="DPM.IDE.XE7.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
-        <CallTarget Targets="DPM_Core_Tests;dpm;DPM_IDE"/>
+        <CallTarget Targets="DPM_Core_Tests;dpm;DPM_IDE_XE7"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="DPM_Core_Tests:Clean;dpm:Clean;DPM_IDE:Clean"/>
+        <CallTarget Targets="DPM_Core_Tests:Clean;dpm:Clean;DPM_IDE_XE7:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="DPM_Core_Tests:Make;dpm:Make;DPM_IDE:Make"/>
+        <CallTarget Targets="DPM_Core_Tests:Make;dpm:Make;DPM_IDE_XE7:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

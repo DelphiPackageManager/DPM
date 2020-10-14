@@ -47,7 +47,6 @@ object DPMEditViewFrame: TDPMEditViewFrame
       Font.Name = 'Tahoma'
       Font.Style = []
       ParentFont = False
-      StyleElements = [seClient, seBorder]
     end
     object txtSearch: TButtonedEdit
       Left = 8
