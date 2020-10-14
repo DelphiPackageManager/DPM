@@ -605,7 +605,10 @@ end;
 
 procedure TDPMEditViewFrame.LoadList(const list: IList<IPackageSearchResultItem>);
 begin
-  FScrollList.RowCount := list.Count;
+  if FScrollList.RowCount = list.Count then
+    FScrollList.Invalidate //doing this because if the rowcount is the same it doesn't invalidate.
+  else
+    FScrollList.RowCount := list.Count;
 end;
 
 procedure TDPMEditViewFrame.PackageInstalled(const package: IPackageSearchResultItem);
