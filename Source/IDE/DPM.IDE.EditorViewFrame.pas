@@ -441,7 +441,7 @@ destructor TDPMEditViewFrame.Destroy;
 begin
   FSearchOptions.Free;
   FIconCache.Free;
-  FLogger.Debug('View Destroying');
+  FLogger.Debug('DPMIDE : View Destroying');
 
   inherited;
 end;
@@ -576,7 +576,7 @@ begin
 
         for packageRef in projectEditor.PackageReferences do
           AddPackageIds(packageRef);
-        FLogger.Debug('Got Installed package references, fetching metadata...');
+        FLogger.Debug('DPMIDE : Got Installed package references, fetching metadata...');
         result := repoManager.GetInstalledPackageFeed(cancelToken, options, installedIds.Values,FConfiguration);
         for item in result do
         begin
@@ -584,7 +584,7 @@ begin
           if packageRef <> nil then
             item.IsTransitive := packageRef.IsTransitive;
         end;
-        FLogger.Debug('Got Installed package metadata.');
+        FLogger.Debug('DPMIDE : Got Installed package metadata.');
       end;
 
     end,FCancelTokenSource.Token);
@@ -667,7 +667,7 @@ end;
 
 procedure TDPMEditViewFrame.ProjectReloaded;
 begin
-  FLogger.Debug('EditViewReloaded');
+  FLogger.Debug('DPMIDE : EditViewReloaded');
   FCurrentPlatform := '';
   platformChangeDetectTimerTimer(platformChangeDetectTimer);
 end;
@@ -720,7 +720,7 @@ begin
   id := package.Id;
   version := package.Version;
   source := package.SourceName;
-  FLogger.Debug('Requesting icon for [' + id + '.' + version + ']' );
+  FLogger.Debug('DPMIDE : Requesting icon for [' + id + '.' + version + ']' );
 
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
   config := FConfiguration;
@@ -753,7 +753,7 @@ begin
         FIconCache.Cache(id, icon);
         stopWatch.Stop;
         if icon <> nil then
-          FLogger.Debug('Got icon for [' + id + '.' + version + '] in ' + IntToStr(stopWatch.ElapsedMilliseconds) + 'ms' );
+          FLogger.Debug('DPMIDE : Got icon for [' + id + '.' + version + '] in ' + IntToStr(stopWatch.ElapsedMilliseconds) + 'ms' );
         if icon <> nil then
           //TODO : Instead request repaint of row.
           FScrollList.Invalidate;
@@ -1010,7 +1010,7 @@ begin
     FScrollList.RowCount := 0;
     FRequestInFlight := true;
     FCancelTokenSource.Reset;
-    FLogger.Debug('Searching for conflicting packages');
+    FLogger.Debug('DPMIDE : Searching for conflicting packages');
     GetConflictingPackages
     .OnException(
       procedure(const e : Exception)
@@ -1027,7 +1027,7 @@ begin
         //if the view is closing do not do anything else.
         if FClosing then
           exit;
-        FLogger.Debug('Cancelled getting conflicting packages.');
+        FLogger.Debug('DPMIDE : Cancelled getting conflicting packages.');
       end)
     .Await(
       procedure(const theResult : IList<IPackageSearchResultItem>)
@@ -1036,7 +1036,7 @@ begin
         //if the view is closing do not do anything else.
         if FClosing then
           exit;
-        FLogger.Debug('Got conflicting packages.');
+        FLogger.Debug('DPMIDE : Got conflicting packages.');
 
         FConflicts := theResult;
         FGotConflicts := true;
@@ -1051,7 +1051,7 @@ procedure TDPMEditViewFrame.SwitchedToInstalled(const refresh : boolean);
 var
   searchTxt : string;
 begin
-  FLogger.Debug('SwitchToInstalled');
+  FLogger.Debug('DPMIDE : SwitchToInstalled');
   searchTxt := txtSearch.Text;
   chkIncludePrerelease.Visible := true;
   chkIncludeCommercial.Visible := false;
@@ -1062,7 +1062,7 @@ begin
   begin
     FRequestInFlight := true;
     FCancelTokenSource.Reset;
-    FLogger.Debug('Getting Installed Packages..');
+    FLogger.Debug('DPMIDE : Getting Installed Packages..');
     GetInstalledPackages
     .OnException(
       procedure(const e : Exception)
@@ -1079,7 +1079,7 @@ begin
         //if the view is closing do not do anything else.
         if FClosing then
           exit;
-        FLogger.Debug('Cancelled getting installed packages.');
+        FLogger.Debug('DPMIDE : Cancelled getting installed packages.');
       end)
     .Await(
       procedure(const theResult : IList<IPackageSearchResultItem>)
@@ -1090,7 +1090,7 @@ begin
         //if the view is closing do not do anything else.
         if FClosing then
           exit;
-        FLogger.Debug('Got installed packages.');
+        FLogger.Debug('DPMIDE : Got installed packages.');
 
         //filter the list!
         FInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>(theResult.Where(
@@ -1123,7 +1123,7 @@ begin
   begin
     FRequestInFlight := true;
     FCancelTokenSource.Reset;
-    FLogger.Debug('Searching for Packages..');
+    FLogger.Debug('DPMIDE : Searching for Packages..');
     FSearchOptions.SearchTerms := Trim(txtSearch.Text);
     FSearchOptions.Prerelease := chkIncludePrerelease.Checked;
     FSearchOptions.Commercial := chkIncludeCommercial.Checked;
@@ -1144,7 +1144,7 @@ begin
         //if the view is closing do not do anything else.
         if FClosing then
           exit;
-        FLogger.Debug('Cancelled searching for packages.');
+        FLogger.Debug('DPMIDE : Cancelled searching for packages.');
       end)
     .Await(
       procedure(const theResult : IList<IPackageSearchResultItem>)
@@ -1155,7 +1155,7 @@ begin
         //if the view is closing do not do anything else.
         if FClosing then
           exit;
-        FLogger.Debug('Got search results.');
+        FLogger.Debug('DPMIDE : Got search results.');
 
         FSearchResults := theResult;
         for item in FSearchResults do
@@ -1183,7 +1183,7 @@ begin
     FScrollList.RowCount := 0;
     FRequestInFlight := true;
     FCancelTokenSource.Reset;
-    FLogger.Debug('Getting Updated Packages..');
+    FLogger.Debug('DPMIDE : Getting Updated Packages..');
     GetUpdatedPackages
     .OnException(
       procedure(const e : Exception)
@@ -1200,7 +1200,7 @@ begin
         //if the view is closing do not do anything else.
         if FClosing then
           exit;
-        FLogger.Debug('Cancelled getting updated packages.');
+        FLogger.Debug('DPMIDE : Cancelled getting updated packages.');
       end)
     .Await(
       procedure(const theResult : IList<IPackageSearchResultItem>)
@@ -1209,7 +1209,7 @@ begin
         //if the view is closing do not do anything else.
         if FClosing then
           exit;
-        FLogger.Debug('Got updated packages.');
+        FLogger.Debug('DPMIDE : Got updated packages.');
 
         FUpdates := theResult;
         LoadList(FUpdates);
@@ -1335,14 +1335,14 @@ end;
 procedure TDPMEditViewFrame.ViewDeselected;
 begin
 // The view tab was deselected. Not sure if we need to do anything
-  FLogger.Debug('View Deselected');
+  FLogger.Debug('DPMIDE : View Deselected');
 end;
 
 procedure TDPMEditViewFrame.ViewSelected;
 begin
   //For some reason this get's called twice for each time the view is selected.
 
-  FLogger.Debug('View Selected');
+  FLogger.Debug('DPMIDE : View Selected');
   //The first time the view is opened we want to switch to the installed packages tab
   if FFirstView then
   begin
