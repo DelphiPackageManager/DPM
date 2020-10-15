@@ -480,7 +480,7 @@ end;
 function TDirectoryPackageRepository.DoExactList(const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const version : string) : IList<string>;
 var
   searchTerm : string;
-  files : TStringDynArray;
+  //files : TStringDynArray;
   fileList : IList<string>;
 begin
   result := TCollections.CreateList<string>;
@@ -497,8 +497,8 @@ begin
    searchTerm := searchTerm + '-*'  + cPackageFileExt;
 
   try
-    files := TDirectory.GetFiles(Source,searchTerm);
-    fileList := TCollections.CreateList<string>(files);
+    fileList :=TDirectoryUtils.GetFiles(Source,searchTerm);
+//    fileList := TCollections.CreateList<string>(files);
     //dedupe
     result.AddRange(TEnumerable.Distinct<string>(fileList, TStringComparer.OrdinalIgnoreCase));
   except
@@ -520,7 +520,7 @@ type
 
 function TDirectoryPackageRepository.DoGetPackageFeedFiles(const options : TSearchOptions; searchTerm: string): IList<string>;
 var
-  files : TStringDynArray;
+//  files : TStringDynArray;
   platform : TDPMPlatform;
   platformSearchTerm : string;
 begin
@@ -538,8 +538,8 @@ begin
     else
       searchTerm := searchTerm + '-*-' + options.Version.ToStringNoMeta + cPackageFileExt;
 
-    files := TDirectory.GetFiles(Source,searchTerm);
-    result.AddRange(files);
+    result := TDirectoryUtils.GetFiles(Source,searchTerm);
+    //result.AddRange(files);
   end
   else
   begin
@@ -551,8 +551,8 @@ begin
       else
         platformSearchTerm := platformSearchTerm + options.Version.ToStringNoMeta + cPackageFileExt;
 
-      files := TDirectory.GetFiles(Source,platformSearchTerm);
-      result.AddRange(files);
+      result := TDirectoryUtils.GetFiles(Source,platformSearchTerm);
+      //result.AddRange(files);
     end;
   end;
 
@@ -777,7 +777,7 @@ end;
 
 function TDirectoryPackageRepository.DoList(searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
 var
-  files : TStringDynArray;
+//  files : TStringDynArray;
   fileList : IList<string>;
 begin
   result := TCollections.CreateList<string>;
@@ -791,9 +791,9 @@ begin
   else
     searchTerm := searchTerm + '-' + DPMPlatformToString(platform) + '-*'  + cPackageFileExt;
 
-  files := TDirectory.GetFiles(Source,searchTerm);
+  fileList := TDirectoryUtils.GetFiles(Source,searchTerm);
 
-  fileList := TCollections.CreateList<string>(files);
+  //fileList := TCollections.CreateList<string>(files);
 
   //TODO : Does this really need to be de-duped?
 
