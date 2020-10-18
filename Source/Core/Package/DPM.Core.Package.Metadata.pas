@@ -107,19 +107,7 @@ type
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageMetadata;
   end;
 
-  TPackageDependency = class(TInterfacedObject, IPackageDependency)
-  private
-    FDependencyVersion: TVersionRange;
-    FId: string;
-    FPlatform: TDPMPlatform;
-  protected
-    function GeTVersionRange: TVersionRange;
-    function GetId: string;
-    function GetPlatform: TDPMPlatform;
-    procedure SetVersionRange(const value : TVersionRange);
-  public
-     constructor Create(const id : string; const version : TVersionRange; const platform : TDPMPlatform);
-  end;
+
 
   TPackageMetadataExtractor = class
   public
@@ -139,6 +127,7 @@ uses
   DPM.Core.Constants,
   DPM.Core.Spec.Reader,
   DPM.Core.Package.SearchPath,
+  DPM.Core.Package.Dependency,
   System.SysUtils,
   System.RegularExpressions,
   System.Zip;
@@ -242,34 +231,6 @@ begin
   result := FDependencies;
 end;
 
-{ TPackageDependency }
-
-constructor TPackageDependency.Create(const id: string; const version: TVersionRange; const platform: TDPMPlatform);
-begin
-  FId := id;
-  FDependencyVersion := version;
-  FPlatform := platform;
-end;
-
-function TPackageDependency.GeTVersionRange: TVersionRange;
-begin
-  result := FDependencyVersion;
-end;
-
-procedure TPackageDependency.SetVersionRange(const value: TVersionRange);
-begin
-  FDependencyVersion := value;
-end;
-
-function TPackageDependency.GetId: string;
-begin
-  result := FId;
-end;
-
-function TPackageDependency.GetPlatform: TDPMPlatform;
-begin
-  result := FPlatform;
-end;
 
 { TPackageMetadataFull }
 

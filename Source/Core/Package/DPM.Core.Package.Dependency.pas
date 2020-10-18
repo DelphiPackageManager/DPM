@@ -29,30 +29,44 @@ unit DPM.Core.Package.Dependency;
 interface
 
 uses
+  DPM.Core.Types,
   DPM.Core.Dependency.Version,
   DPM.Core.Package.Interfaces;
 
 type
   TPackageDependency = class(TInterfacedObject, IPackageDependency)
   private
-    FId : string;
-    FRange : TVersionRange;
+    FDependencyVersion: TVersionRange;
+    FId: string;
+    FPlatform: TDPMPlatform;
   protected
+    function GeTVersionRange: TVersionRange;
     function GetId: string;
-    function GetVersionRange: TVersionRange;
-    procedure SetVersionRange(const value: TVersionRange);
+    function GetPlatform: TDPMPlatform;
+    procedure SetVersionRange(const value : TVersionRange);
   public
-    constructor Create(const id, range : string);
-    function ToString : string;override;
-
+     constructor Create(const id : string; const version : TVersionRange; const platform : TDPMPlatform);
   end;
 
 implementation
 
-constructor TPackageDependency.Create(const id, range: string);
+{ TPackageDependency }
+
+constructor TPackageDependency.Create(const id: string; const version: TVersionRange; const platform: TDPMPlatform);
 begin
   FId := id;
-  FRange := TVersionRange.Parse(range);
+  FDependencyVersion := version;
+  FPlatform := platform;
+end;
+
+function TPackageDependency.GeTVersionRange: TVersionRange;
+begin
+  result := FDependencyVersion;
+end;
+
+procedure TPackageDependency.SetVersionRange(const value: TVersionRange);
+begin
+  FDependencyVersion := value;
 end;
 
 function TPackageDependency.GetId: string;
@@ -60,19 +74,9 @@ begin
   result := FId;
 end;
 
-function TPackageDependency.GetVersionRange: TVersionRange;
+function TPackageDependency.GetPlatform: TDPMPlatform;
 begin
-  result := FRange;
-end;
-
-procedure TPackageDependency.SetVersionRange(const value: TVersionRange);
-begin
-  FRange := value;
-end;
-
-function TPackageDependency.ToString: string;
-begin
-  result := FId + ' ' + FRange.ToString;
+  result := FPlatform;
 end;
 
 
