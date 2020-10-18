@@ -2058,6 +2058,7 @@ begin
   Size := Stream.Size;
   SetLength(Buffer, Size);
   {$IF CompilerVersion >= 24.0 }
+  {$LEGACYIFEND ON}
   //TODO : confirm when this overload was introduced.
   Stream.Read(Buffer, 0, Size);
   {$ELSE}

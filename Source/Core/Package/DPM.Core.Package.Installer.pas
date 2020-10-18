@@ -1069,7 +1069,9 @@ begin
     FLogger.Information('Restoring project [' + projectFile +'] for [' + DPMPlatformToString(platform) + ']', true);
     platformResult  := DoRestoreProject(cancellationToken, options, projectFile, projectEditor, platform, config);
     if not platformResult then
-      FLogger.Error('Restore failed for ' + DPMPlatformToString(platform));
+      FLogger.Error('Restore failed for ' + DPMPlatformToString(platform))
+    else
+      FLogger.Error('Restore succeeded for ' + DPMPlatformToString(platform));
     result := platformResult and result;
     FLogger.Information('');
   end;

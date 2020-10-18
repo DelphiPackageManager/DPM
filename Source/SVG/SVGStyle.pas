@@ -443,6 +443,7 @@ begin
   OutS := '';
   for C in S do
   begin
+    {$LEGACYIFEND ON}
     {$IF CompilerVersion >= 24.0 }
     if C.IsWhiteSpace then Continue;
     {$ELSE}

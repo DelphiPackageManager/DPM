@@ -70,6 +70,7 @@ begin
   Width := 65;
   Height := 24;
   {$IF CompilerVersion >= 24.0 }
+  {$LEGACYIFEND ON}
   StyleElements := StyleElements - [seFont];
   {$IFEND}
   Font.Size := 11;

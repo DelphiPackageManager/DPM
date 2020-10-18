@@ -59,7 +59,6 @@ uses
 
 function TPackageSpecReader.ReadSpec(const fileName: string): IPackageSpec;
 var
-//  xmlDoc : IXMLDOMDocument;
   jsonObj: TJsonObject;
 begin
   result := nil;
@@ -68,45 +67,20 @@ begin
     FLogger.Error('Spec file : [' + filename + '] does not exist');
     exit;
   end;
-
-
-//  if ExtractFileExt(fileName) = '.json' then
-//  begin
-    //going with the json version from now on.
+  try
+    jsonObj := TJsonObject.ParseFromFile(fileName) as TJsonObject;
     try
-      jsonObj := TJsonObject.ParseFromFile(fileName) as TJsonObject;
-      try
-        Result := InternalReadPackageSpecJson(fileName, jsonObj);
-      finally
-        jsonObj.Free;
-      end;
-    except
-      on e : Exception do
-      begin
-        FLogger.Error('Error parsing spec json : ' + e.Message);
-        exit;
-      end;
+      Result := InternalReadPackageSpecJson(fileName, jsonObj);
+    finally
+      jsonObj.Free;
     end;
-//  end
-//  else
-//  begin
-//
-//    xmlDoc := CoDOMDocument60.Create;
-//    try
-//      if not xmlDoc.load(fileName) then
-//      begin
-//        FLogger.Error('Error parsing spec xml : ' + xmlDoc.parseError.reason);
-//        exit;
-//      end;
-//    except
-//      on e : Exception do
-//      begin
-//        FLogger.Error('Error loading spec xml doc : ' + e.Message);
-//        exit;
-//      end;
-//    end;
-//    Result := InternalReadPackageSpecXML(fileName, xmlDoc);
-//  end;
+  except
+    on e : Exception do
+    begin
+      FLogger.Error('Error parsing spec json : ' + e.Message);
+      exit;
+    end;
+  end;
 end;
 
 constructor TPackageSpecReader.Create(const logger: ILogger);
@@ -129,9 +103,6 @@ end;
 
 
 function TPackageSpecReader.ReadSpec(const stream: TStream): IPackageSpec;
-//var
-//  xmlDoc : IXMLDOMDocument;
-//  adapter : IStream;
 begin
   result := nil;
   raise ENotImplemented.Create('ReadSpec from stream not implemented');

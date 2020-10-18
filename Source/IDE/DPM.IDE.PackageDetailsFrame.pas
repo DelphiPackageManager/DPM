@@ -122,6 +122,7 @@ begin
     options.ProjectPath := FProjectFile;
     options.Platforms := [ProjectPlatformToDPMPlatform(FPackageSearcher.GetCurrentPlatform)];
 
+    //install will fail if a package is already installed, unless you specify force.
     if btnInstallOrUpdate.Caption = 'Update' then
       options.Force := true;
 

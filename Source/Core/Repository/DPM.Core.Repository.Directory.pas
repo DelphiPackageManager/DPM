@@ -776,11 +776,11 @@ begin
 end;
 
 function TDirectoryPackageRepository.DoList(searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
-var
+//var
 //  files : TStringDynArray;
-  fileList : IList<string>;
+//  fileList : IList<string>;
 begin
-  result := TCollections.CreateList<string>;
+//  result := TCollections.CreateList<string>;
   if searchTerm <> '*' then
     searchTerm := '*' + searchTerm + '*';
 
@@ -791,14 +791,14 @@ begin
   else
     searchTerm := searchTerm + '-' + DPMPlatformToString(platform) + '-*'  + cPackageFileExt;
 
-  fileList := TDirectoryUtils.GetFiles(Source,searchTerm);
+  result := TDirectoryUtils.GetFiles(Source,searchTerm);
 
   //fileList := TCollections.CreateList<string>(files);
 
   //TODO : Does this really need to be de-duped?
 
   //dedupe
-  result.AddRange(TEnumerable.Distinct<string>(fileList, TStringComparer.OrdinalIgnoreCase ));
+  //result.AddRange(TEnumerable.Distinct<string>(fileList, TStringComparer.OrdinalIgnoreCase ));
 end;
 
 function TDirectoryPackageRepository.List(const cancellationToken : ICancellationToken; const options : TSearchOptions): IList<IPackageIdentity>;

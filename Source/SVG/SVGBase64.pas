@@ -11,6 +11,8 @@ function Base64DecodeStream(const InputStream : TStream; const OutputStream: TSt
 
 implementation
 
+{$LEGACYIFEND ON}
+
 uses
 {$IF CompilerVersion > 27}
   System.NetEncoding,

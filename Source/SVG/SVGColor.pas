@@ -41,6 +41,7 @@ Var
 
 implementation
 
+{$LEGACYIFEND ON}
 uses
   System.SysUtils
   , System.UIConsts

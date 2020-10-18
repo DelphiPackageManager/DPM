@@ -131,6 +131,7 @@ uses
   SVGCommon, SVGParse;
 
 {$IF CompilerVersion <= 28}
+{$LEGACYIFEND ON}
 function FMod(const ANumerator, ADenominator: Single): Single;
 begin
   Result := ANumerator - Trunc(ANumerator / ADenominator) * ADenominator;

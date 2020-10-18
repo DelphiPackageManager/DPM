@@ -68,6 +68,8 @@ function ParseFontStyle(AFontStyle: string): Integer;
 
 implementation
 
+{$LEGACYIFEND ON}
+
 uses
   Winapi.Windows,
   System.SysUtils,

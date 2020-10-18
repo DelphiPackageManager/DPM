@@ -127,7 +127,7 @@ var
 begin
   FStopwatch.Reset;
   FStopwatch.Start;
-  FLogger.Debug('Starting dependency resolution...');
+  FLogger.Information('Starting dependency resolution...');
   result := false;
   //for now we will ignore the lock file and just do the full resolution.
 
@@ -186,7 +186,7 @@ begin
         end
         else
         begin
-          FLogger.Debug('       existing selection ok : ' + dependency.Id + '.' + resolution.Package.Version.ToString);
+          FLogger.Debug('       resolved : ' + dependency.Id + '.' + resolution.Package.Version.ToString);
           //in the case where we are promoting a transient to a direct dependency, we need a range.
           //the direct will not have a range so we convert the version to a range.
           if resolution.VersionRange.IsEmpty then
