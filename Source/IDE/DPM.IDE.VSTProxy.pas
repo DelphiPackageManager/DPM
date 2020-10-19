@@ -104,6 +104,7 @@ type
     function AddChildNode(const parentNode : PVirtualNode) : PVirtualNode;
     function InsertNode(const parentNode : PVirtualNode; const attachMode : TVTNodeAttachMode) : PVirtualNode;
     procedure DeleteChildren(const parentNode : PVirtualNode);
+    procedure SetExpanded(const node : PVirtualNode; const value : boolean);
     property Images : TCustomImageList read GetImages;
   end;
 
@@ -288,6 +289,22 @@ begin
   params := rttiMethod.GetParameters;
   TValue.Make(@value, params[0].ParamType.Handle, param);
   Result := rttiMethod.Invoke(FTreeInstance, [param]);
+end;
+
+procedure TVirtualStringTreeProxy.SetExpanded(const node: PVirtualNode; const value: boolean);
+var
+  rttiprop: TRttiIndexedProperty;
+  params: TArray<TRttiParameter>;
+  param1, param2: TValue;
+begin
+  rttiprop := FTreeType.GetIndexedProperty('Expanded');
+  if not Assigned(rttiProp) then
+    raise Exception.Create('RTTI Error accessing [Expanded] property' );
+  params := rttiProp.WriteMethod.GetParameters;
+
+  TValue.Make(@node, params[0].ParamType.Handle, param1);
+  TValue.Make(@value, params[1].ParamType.Handle, param2);
+  rttiProp.WriteMethod.Invoke(FTreeInstance, [param1, param2]);
 end;
 
 procedure TVirtualStringTreeProxy.SetVSTProperty(const propertyName: string; const value: TValue);

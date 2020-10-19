@@ -124,8 +124,8 @@ begin
 
   packageInstaller := FContainer.Resolve<IPackageInstaller>;
 
-  FEditorViewManager := TDPMEditorViewManager.Create(FContainer);
   FProjectTreeManager := TDPMProjectTreeManager.Create(FContainer, FLogger as IDPMIDELogger);
+  FEditorViewManager := TDPMEditorViewManager.Create(FContainer, FProjectTreeManager);
 
   ideNotifier := TDPMIDENotifier.Create(FLogger as IDPMIDELogger, packageInstaller, FEditorViewManager, FProjectTreeManager);
   FIDENotifier := (BorlandIDEServices as IOTAServices).AddNotifier(ideNotifier);

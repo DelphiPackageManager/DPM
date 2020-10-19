@@ -91,7 +91,7 @@ begin
   FMessageGroup := FMessageServices.AddMessageGroup('DPM');
   FMessageGroup.CanClose := false;
   FMessageGroup.AutoScroll := true;
-  FVerbosity := TVerbosity.Debug;//TODO : Need to make this configurable
+  FVerbosity := TVerbosity.Normal;//TODO : Need to make this configurable
 end;
 
 procedure TDPMIDELogger.Debug(const data: string);

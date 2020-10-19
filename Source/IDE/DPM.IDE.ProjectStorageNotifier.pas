@@ -102,17 +102,19 @@ end;
 
 procedure TDPMProjectStorageNotifier.ProjectClosing(const ProjectOrGroup: IOTAModule);
 begin
-end;
-
-procedure TDPMProjectStorageNotifier.ProjectLoaded(const ProjectOrGroup: IOTAModule; const Node: IXMLNode);
-begin
   FLogger.Debug('Storage Project Loaded : ' + ProjectOrGroup.FileName);
   //doesn't seem to get called with the project group?
   if not( ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
     exit;
-  FProjectTreeManager.NotifyProjectLoaded(ProjectOrGroup.FileName);
-  FEditorViewManager.ProjectLoaded(ProjectOrGroup.FileName);
+//  FProjectTreeManager.NotifyProjectClosed(ProjectOrGroup.FileName);
+end;
 
+procedure TDPMProjectStorageNotifier.ProjectLoaded(const ProjectOrGroup: IOTAModule; const Node: IXMLNode);
+begin
+  //doesn't seem to get called with the project group?
+  if not( ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
+    exit;
+  FProjectTreeManager.NotifyProjectLoaded(ProjectOrGroup.FileName)
 end;
 
 procedure TDPMProjectStorageNotifier.ProjectSaving(const ProjectOrGroup: IOTAModule; const Node: IXMLNode);

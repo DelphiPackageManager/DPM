@@ -52,9 +52,9 @@ type
   IDPMProjectTreeManager = interface
   ['{F0BA2907-E337-4591-8E16-FB684AE2E19B}']
     procedure NotifyStartLoading(const mode : TProjectLoadType; const projects : IList<string>);
-
+    procedure NotifyEndLoading(const mode : TProjectLoadType);
     procedure NotifyProjectLoaded(const fileName : string);
-
+    procedure NotifyProjectClosed(const fileName : string);
   end;
 
 const
@@ -68,7 +68,6 @@ type
 
     FWindowHandle : THandle;
     FTimerRunning : boolean;
-    FProcessing : boolean;
 
     FProjectTreeInstance : TControl;
     FVSTProxy : TVirtualStringTreeProxy;
@@ -77,17 +76,20 @@ type
     FProjectLoadList : IQueue<string>;
     FDPMImageIndex : integer;
 
+  //TODO : Invalidate cache when projects close.
     FNodeCache : IDictionary<TProjectTreeContainer, PVirtualNode>;
 
-//    procedure DumpInterfaces(AClass: TClass);
+  //procedure DumpInterfaces(AClass: TClass);
   protected
-    procedure NotifyProjectLoaded(const fileName : string);
     procedure NotifyStartLoading(const mode: TProjectLoadType; const projects: IList<string>);
+    procedure NotifyProjectLoaded(const fileName : string);
+    procedure NotifyProjectClosed(const fileName : string);
+    procedure NotifyEndLoading(const mode : TProjectLoadType);
 
 
     procedure WndProc(var msg: TMessage);
 
-    procedure EnsureProjectTree;
+    function EnsureProjectTree : boolean;
 
     function TryGetContainerTreeNode(const container : TProjectTreeContainer; out containerNode : PVirtualNode) : boolean;
     procedure AddChildContainer(const parentContainer, childContainer : TProjectTreeContainer);
@@ -102,8 +104,6 @@ type
     procedure UpdateProjectDPMPackages(const targetPlatformsContainer : TProjectTreeContainer; const dpmContainer : TProjectTreeContainer; const projectFile : string; const projectEditor : IProjectEditor);
 
     procedure DoProjectLoaded(const projectFile : string);
-
-    procedure LoadProjects;
 
     procedure DoDumpClass(const typ : TRttiInstanceType);
     procedure DumpClass(const obj : TClass);
@@ -121,6 +121,7 @@ uses
   System.TypInfo,
   System.SysUtils,
   WinApi.Windows,
+  Vcl.ImgList,
   Vcl.Graphics,
   Vcl.Forms,
   DPM.Core.Constants,
@@ -175,7 +176,7 @@ var
   dpmContainer : TProjectTreeContainer;
   targetPlatformContainer : TProjectTreeContainer;
   projectEditor : IProjectEditor;
-
+  projectNode : PVirtualNode;
 begin
   projectEditor := TProjectEditor.Create(FLogger as ILogger, config);
 
@@ -183,9 +184,19 @@ begin
   targetPlatformContainer := FindTargetPlatformContainer(projectContainer);
   if targetPlatformContainer = nil then
   begin
-    FLogger.Debug('targetPlatform container not found for  ' + projectfile);
+   //the container might not exists yet if the project node was never expanded.
+   //so we expand and collapse the project node to force it to be created.
+    projectNode := FNodeCache[projectContainer];
+    if projectNode <> nil then
+    begin
+      FVSTProxy.SetExpanded(projectNode,true);
+      FVSTProxy.SetExpanded(projectNode,false);
+    end;
+    targetPlatformContainer := FindTargetPlatformContainer(projectContainer);
 
-    exit;
+    if targetPlatformContainer = nil then
+      exit;
+
   end;
 //  DumpClass(targetPlatformContainer.ClassType);
   //first see if we have allready added dpm to the project
@@ -235,8 +246,6 @@ begin
 
   FNodeCache := TCollections.CreateDictionary<TProjectTreeContainer, PVirtualNode>();
 
-//  SetTimer(FWindowHandle, 1, )
-
 end;
 
 destructor TDPMProjectTreeManager.Destroy;
@@ -248,32 +257,58 @@ begin
   inherited;
 end;
 
-procedure TDPMProjectTreeManager.EnsureProjectTree;
+function TDPMProjectTreeManager.EnsureProjectTree : boolean;
 var
   bitmap : TBitmap;
-//  ctx : TRttiContext;
-//  typ : TRttiInstanceType;
+ BMP:TBitMap;
+ ICO:TIcon;
+ I: Integer;
+ imageList : TCustomImageList;
 begin
   if FVSTProxy <> nil then
-    exit;
+    exit(true);
 
-//  typ := ctx.FindType('TBasePlatformContainer').AsInstance;
-//  DoDumpClass(typ);
-
-
-
+  result := false;
  //TODO : control name and class discovered via IDE Explorer https://www.davidghoyle.co.uk/WordPress - need to check it's the same for all supported versions of the IDE
   if FVSTProxy = nil then
   begin
     FProjectTreeInstance := FindIDEControl('TVirtualStringTree', 'ProjectTree2');
-    Assert(FProjectTreeInstance <> nil);
-    FVSTProxy := TVirtualStringTreeProxy.Create(FProjectTreeInstance, FLogger);
-    bitmap := TBitmap.Create;
-    try
-      bitmap.LoadFromResourceName(HInstance, 'DPMIDELOGO_16');
-      FDPMImageIndex := FVSTProxy.Images.AddMasked(bitmap, clFuchsia);
-    finally
-      bitmap.Free;
+    if FProjectTreeInstance <> nil then
+    begin
+      FVSTProxy := TVirtualStringTreeProxy.Create(FProjectTreeInstance, FLogger);
+//
+//      //peeking at the images to work out indexes
+      imageList := FVSTProxy.Images;
+      BMP:=TBitMap.Create;
+      BMP.Width := imageList.Width * imageList.Count;
+      BMP.Height := imageList.Height;
+      try
+        //SetBitmapAlpha(BMP,0,0,0,0);
+        for I := 0 to imageList.Count-1 do
+          begin
+           ICO:=TIcon.Create;
+           try
+             imageList.GetIcon(i,ICO);
+             BMP.Canvas.Draw(i * imageList.Width, 0, ico);
+           finally
+             ICO.Free;
+           end;
+          end;
+        BMP.SaveToFile('C:\Temp\imgages.bmp');
+      finally
+        BMP.Free;
+      end;
+
+
+      Result := true;
+      bitmap := TBitmap.Create;
+      try
+        bitmap.LoadFromResourceName(HInstance, 'DPMIDELOGO_16');
+        FDPMImageIndex := FVSTProxy.Images.AddMasked(bitmap, clFuchsia);
+
+      finally
+        bitmap.Free;
+      end;
     end;
   end;
 end;
@@ -366,7 +401,7 @@ var
   proxy : TProjectTreeContainer;
 begin
 //
-  EnsureProjectTree;
+  Assert(EnsureProjectTree);
   result := TCollections.CreateList<TProjectTreeContainer>();
   rootNode := FVSTProxy.GetFirstVisibleNode;
   if Assigned(rootNode) then
@@ -386,22 +421,6 @@ begin
   end;
 end;
 
-procedure TDPMProjectTreeManager.LoadProjects;
-var
-  projects : IList<TProjectTreeContainer>;
-  project : TProjectTreeContainer;
-  configurationManager : IConfigurationManager;
-  config : IConfiguration;
-begin
-  //load our dpm configuration
-  configurationManager := FContainer.Resolve<IConfigurationManager>;
-  config := configurationManager.LoadConfig(FSearchOptions.ConfigFile);
-
-  projects := GetProjects;
-  for project in projects do
-    ConfigureProjectDPMNode(project, project.DisplayName + '.dproj', config);
-
-end;
 
 procedure TDPMProjectTreeManager.NotifyStartLoading(const mode : TProjectLoadType; const projects : IList<string>);
 begin
@@ -409,30 +428,35 @@ begin
 end;
 
 
+procedure TDPMProjectTreeManager.NotifyEndLoading(const mode: TProjectLoadType);
+begin
+  //kick off a timer that will eventually sort out the nodes. - see WndProc
+  PostMessage(FWindowHandle, WM_PROJECTLOADED, 0,0);
+end;
+
+procedure TDPMProjectTreeManager.NotifyProjectClosed(const fileName: string);
+//var
+//  projectContainer : TProjectTreeContainer;
+begin
+  //not ideal.. but not sure it will be a problem.. we don't really need the nodes
+  //after it's all setup. When we add packages etc, that triggers a project reload
+  //so the tree is built again.
+  FNodeCache.Clear;
+
+//  this doesn't work, the container's project is already gone when we get here so FindProjectNode fails.
+//  projectContainer := FindProjectNode(fileName);
+//  if projectContainer <> nil then
+//  begin
+//    if FNodeCache.ContainsKey(projectContainer) then
+//      FNodeCache.Remove(projectContainer);
+//  end;
+end;
+
 procedure TDPMProjectTreeManager.NotifyProjectLoaded(const fileName: string);
 begin
   //The project tree nodes do not seem to have been added at this stage
-  //however if we check again after everything is loaded they are accessible
-  //so this just delays things enough for the tree nodes to have been created.
-
-  if FTimerRunning then
-    KillTimer(FWindowHandle, 1);
-
-//  MonitorEnter(Self);
-//  try
-    FProjectLoadList.Enqueue(fileName);
-    //restart it.
-    //experimentation needed to determine optimum value. 200 is too low, 300 works on the
-    //project groups I tested with. Needs more testing.
-//    SetTimer(FWindowHandle, 1, 1000, nil);
-//    FTimerRunning := true;
-
-// this seemed to work ok with single projects, but with groups
-// the message was getting processed before the project tree was constructed fully
-    PostMessage(FWindowHandle, WM_PROJECTLOADED, 0,0);
-//  finally
-//    MonitorExit(Self);
-//  end;
+  //just enqueue the project, and we'll deal with it when all projects are loaded.
+  FProjectLoadList.Enqueue(fileName);
 end;
 
 function TDPMProjectTreeManager.TryGetContainerTreeNode(const container: TProjectTreeContainer; out containerNode: PVirtualNode): boolean;
@@ -440,7 +464,6 @@ var
   node : PVirtualNode;
   nodeData : PNodeData;
 begin
-  //TODO : need a way to clear the cache.
   containerNode := nil;
   result := false;
   if FNodeCache.TryGetValue(container, containerNode) then
@@ -492,20 +515,20 @@ var
     result := -1;
     case pf of
       TDPMPlatform.UnknownPlatform: ;
-      TDPMPlatform.Win32:  result := 90;
-      TDPMPlatform.Win64:  result := 91;
+      TDPMPlatform.Win32:  result := 93;
+      TDPMPlatform.Win64:  result := 94;
       TDPMPlatform.WinArm32: ;
       TDPMPlatform.WinArm64: ;
-      TDPMPlatform.OSX32: result := 88;
-      TDPMPlatform.OSX64: result := 88;
-      TDPMPlatform.AndroidArm32: result := 92;
-      TDPMPlatform.AndroidArm64: result := 92;
+      TDPMPlatform.OSX32: result := 91;
+      TDPMPlatform.OSX64: result := 91;
+      TDPMPlatform.AndroidArm32: result := 95;
+      TDPMPlatform.AndroidArm64: result := 95;
       TDPMPlatform.AndroidIntel32: ;
       TDPMPlatform.AndroidIntel64: ;
-      TDPMPlatform.iOS32: result := 93;
+      TDPMPlatform.iOS32: result := 96;
       TDPMPlatform.iOS64: result := 93;
-      TDPMPlatform.LinuxIntel32: result := 89;
-      TDPMPlatform.LinuxIntel64: result := 89;
+      TDPMPlatform.LinuxIntel32: result := 92;
+      TDPMPlatform.LinuxIntel64: result := 92;
       TDPMPlatform.LinuxArm32: ;
       TDPMPlatform.LinuxArm64: ;
     end;
@@ -740,33 +763,36 @@ begin
         KillTimer(FWindowHandle, 1);
         FTimerRunning := false;
       end;
-      SetTimer(FWindowHandle, 1, 2000, nil);
+      //if we try too early, the tree might not exist yet
+      //or the images are not added to the list and we get the
+      //wrong image indexes for the platforms.
+      SetTimer(FWindowHandle, 1, 500, nil);
       FTimerRunning := true;
       msg.Result := 1;
     end;
     WM_TIMER :
     begin
-      //stop the timer.
-      FTimerRunning := false;
-      KillTimer(FWindowHandle, 1);
-//      MonitorEnter(Self);
-      try
-        FProcessing := true;
-        EnsureProjectTree;
-        FVSTProxy.BeginUpdate;
-        try
-          while FProjectLoadList.TryDequeue(project) do
-          begin
-            DoProjectLoaded(project);
+      if msg.WParam = 1 then
+      begin
+        //sometimes the tree isn't actually available when we get here.
+        //in that case we'll just let the timer continue and try again later.
+        if EnsureProjectTree then
+        begin
+          //stop the timer.
+          FTimerRunning := false;
+          KillTimer(FWindowHandle, 1);
+          FVSTProxy.BeginUpdate;
+          try
+            while FProjectLoadList.TryDequeue(project) do
+            begin
+              DoProjectLoaded(project);
+            end;
+          finally
+            FVSTProxy.EndUpdate;
           end;
-        finally
-          FVSTProxy.EndUpdate;
         end;
-      finally
-        FProcessing := false;
-//        MonitorExit(Self);
+        msg.Result := 1;
       end;
-      msg.Result := 1;
     end
   else
     Msg.Result := DefWindowProc(FWindowHandle, Msg.Msg, Msg.wParam, Msg.lParam);

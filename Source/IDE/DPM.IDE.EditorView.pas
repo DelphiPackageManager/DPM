@@ -33,6 +33,7 @@ uses
   DesignIntf,
   VCL.Forms,
   Spring.Container,
+  DPM.IDE.ProjectTreeManager,
   DPM.IDE.EditorViewFrame;
 
 type
@@ -48,6 +49,7 @@ type
     FFrame   : TDPMEditViewFrame;
     FImageIndex : integer;
     FCaption : string;
+    FProjectTreeManager : IDPMProjectTreeManager;
   protected
     procedure Reloaded;
     function CloneEditorView: INTACustomEditorView;
@@ -68,7 +70,7 @@ type
     function GetTabHintText: string;
     procedure Close(var Allowed: Boolean);
   public
-    constructor Create(const container : TContainer; const project : IOTAProject; const imageIndex : integer);
+    constructor Create(const container : TContainer; const project : IOTAProject; const imageIndex : integer; const projectTreeManager : IDPMProjectTreeManager);
   end;
 
 implementation
@@ -96,11 +98,12 @@ begin
   FFrame.Closing;
 end;
 
-constructor TDPMEditorView.Create(const container : TContainer; const project: IOTAProject; const imageIndex : integer);
+constructor TDPMEditorView.Create(const container : TContainer; const project: IOTAProject; const imageIndex : integer; const projectTreeManager : IDPMProjectTreeManager);
 begin
   FContainer := container;
   FProject := project;
   FImageIndex := imageIndex;
+  FProjectTreeManager := projectTreeManager;
   if Supports(FProject, IOTAProjectGroup) then
     FCaption :=  'DPM : ProjectGroup'
   else
@@ -122,7 +125,7 @@ procedure TDPMEditorView.FrameCreated(AFrame: TCustomFrame);
 begin
   FFrame := TDPMEditViewFrame(AFrame);
   FFrame.Name := GetViewIdentifier;
-  FFrame.Configure(FProject, FContainer);
+  FFrame.Configure(FProject, FContainer, FProjectTreeManager);
 end;
 
 function TDPMEditorView.GetCanCloneView: Boolean;

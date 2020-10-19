@@ -49,6 +49,7 @@ uses
   DPM.Core.Options.Search,
   DPM.Core.Package.Interfaces,
   DPM.Core.Project.Interfaces,
+  DPM.IDE.ProjectTreeManager,
   {$IF CompilerVersion >= 24.0 }
   {$LEGACYIFEND ON}
   System.Actions,
@@ -112,6 +113,7 @@ type
     //dpm core stuff
     FContainer : TContainer;
     FLogger : ILogger;
+    FProjectTreeManager : IDPMProjectTreeManager;
     FConfigurationManager : IConfigurationManager;
     FConfiguration : IConfiguration;
     FConfigIsLocal : boolean;
@@ -199,7 +201,7 @@ type
     destructor Destroy;override;
 
     //called from the EditorView
-    procedure Configure(const projectOrGroup : IOTAProject; const container : TContainer);
+    procedure Configure(const projectOrGroup : IOTAProject; const container : TContainer; const projectTreeManager : IDPMProjectTreeManager);
     procedure ViewSelected;
     procedure ViewDeselected;
     procedure Closing;
@@ -638,7 +640,8 @@ begin
   else if FCurrentTab = TCurrentTab.Installed then
     SwitchedToInstalled(true);
   FProject.Refresh(true);
-
+  //force the project tree to update after installing package.
+  FProjectTreeManager.NotifyEndLoading(TProjectLoadType.plSingle);
   // Do not do this, it will overrwrite package changes.
   //FProject.MarkModified;
 
@@ -1259,11 +1262,12 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame.Configure(const projectOrGroup : IOTAProject; const container : TContainer);
+procedure TDPMEditViewFrame.Configure(const projectOrGroup : IOTAProject; const container : TContainer; const projectTreeManager : IDPMProjectTreeManager);
 var
   sConfigFile : string;
 begin
   FContainer := container;
+  FProjectTreeManager := projectTreeManager;
 
   if not Supports(projectOrGroup, IOTAProjectGroup, FProjectGroup) then
   begin

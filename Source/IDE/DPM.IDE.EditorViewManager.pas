@@ -31,7 +31,8 @@ interface
 uses
   ToolsApi,
   Spring.Container,
-  Spring.Collections;
+  Spring.Collections,
+  DPM.IDE.ProjectTreeManager;
 
 type
   IDPMEditorViewManager = interface
@@ -49,13 +50,14 @@ type
     FOpenViews : IDictionary<string, INTACustomEditorView>;
     FEditorViewServices : IOTAEditorViewServices;
     FImageIndex : integer;
+    FProjectTreeManager : IDPMProjectTreeManager;
   protected
     procedure ProjectLoaded(const projectFile : string);
     procedure ProjectClosed(const projectFile: string);
     procedure ShowViewForProject(const project: IOTAProject);
     procedure Destroyed;
   public
-    constructor Create(const container : TContainer);
+    constructor Create(const container : TContainer; const projectTreeManager : IDPMProjectTreeManager);
     destructor Destroy;override;
   end;
 
@@ -70,13 +72,14 @@ uses
 
 { TDPMEditorViewManager }
 
-constructor TDPMEditorViewManager.Create(const container : TContainer);
+constructor TDPMEditorViewManager.Create(const container : TContainer; const projectTreeManager : IDPMProjectTreeManager);
 var
   imageList : TImageList;
   bmp : TBitmap;
   vs : INTAEditorViewServices;
 begin
   FContainer := container;
+  FProjectTreeManager := projectTreeManager;
   FOpenViews := TCollections.CreateDictionary<string, INTACustomEditorView>;
 
   if not Supports(BorlandIDEServices, IOTAEditorViewServices, FEditorViewServices) then
@@ -154,7 +157,7 @@ var
 begin
   if not FOpenViews.TryGetValue(LowerCase(project.FileName), view) then
   begin
-    view := TDPMEditorView.Create(FContainer, project, FImageIndex);
+    view := TDPMEditorView.Create(FContainer, project, FImageIndex, FProjectTreeManager);
     FOpenViews.Add(LowerCase(project.FileName), view);
   end;
   if FEditorViewServices <> nil then
