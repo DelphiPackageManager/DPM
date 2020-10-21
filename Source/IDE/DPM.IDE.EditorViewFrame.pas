@@ -237,7 +237,7 @@ procedure TDPMEditViewFrame.AddDefaultSearchHistory;
 begin
   //some commonly used open source libs to get people started.
   txtSearch.ACStrings.Add('Spring4D.Core');
-  txtSearch.ACStrings.Add('Spring4D.Collections');
+  txtSearch.ACStrings.Add('Spring4D.Base');
   txtSearch.ACStrings.Add('VSoft');
   txtSearch.ACStrings.Add('VSoft.DUnitX');
   txtSearch.ACStrings.Add('VSoft.DelphiMocks');
@@ -270,30 +270,15 @@ end;
 
 procedure TDPMEditViewFrame.btnSettingsClick(Sender: TObject);
 var
-  //environmentOptions : IOTAEnvironmentOptions;
   bReload : boolean;
   optionsHost : TDPMOptionsHostForm;
 begin
-//The delphi options dialog is just too painfully slow, we'll use our own dialog instead
-
-//  if not FConfigIsLocal or IsProjectGroup then
-//  begin
-//    //working with user profile config.
-//    //since we have no way of knowing if anything changed, we just reload config and sources
-//    bReload := true;
-//    environmentOptions := (BorlandIDEServices as IOTAServices).GetEnvironmentOptions;
-//    environmentOptions.EditOptions('Third Party', 'DPM Package Manager');
-//  end
-//  else
-//  begin
-    //working with project or
-    optionsHost := TDPMOptionsHostForm.Create(Self, FConfigurationManager, FLogger, FSearchOptions.ConfigFile);
-    try
-      bReload := optionsHost.ShowModal = mrOk;
-    finally
-       optionsHost.Free;
-    end;
-//  end;
+  optionsHost := TDPMOptionsHostForm.Create(Self, FConfigurationManager, FLogger, FSearchOptions.ConfigFile);
+  try
+    bReload := optionsHost.ShowModal = mrOk;
+  finally
+     optionsHost.Free;
+  end;
 
   if bReload then
   begin
@@ -308,8 +293,6 @@ procedure TDPMEditViewFrame.chkIncludePrereleaseClick(Sender: TObject);
 begin
   btnRefreshClick(Sender);
   PackageDetailsFrame.IncludePreRelease := chkIncludePrerelease.Checked;
-
-
 end;
 
 procedure TDPMEditViewFrame.Closing;
@@ -348,12 +331,7 @@ begin
   FSearchOptions.CompilerVersion := IDECompilerVersion;
 //  FSearchOptions.Take := 5; //just for testing.
 
-  //make sure we always have a list.
-//  FInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>;
-//  FInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>;
-//  FSearchResults := TCollections.CreateList<IPackageSearchResultItem>;
-//  FUpdates := TCollections.CreateList<IPackageSearchResultItem>;
-//  FConflicts := TCollections.CreateList<IPackageSearchResultItem>;
+
 
   FSearchSkip := 0;
   FSearchTake := 0;
@@ -545,9 +523,6 @@ begin
     var
       packageRef : IPackageReference;
       item : IPackageSearchResultItem;
-
-
-
     begin
       result := TCollections.CreateList<IPackageSearchResultItem>;
 
@@ -559,7 +534,6 @@ begin
       end
       else
       begin
-
         FLogger.Debug('DPMIDE : Got Installed package references, fetching metadata...');
         result := repoManager.GetInstalledPackageFeed(cancelToken, options, GetPackageIdsFromReferences(ProjectPlatformToDPMPlatform(FProject.CurrentPlatform)), FConfiguration);
         for item in result do
@@ -649,8 +623,6 @@ end;
 
 procedure TDPMEditViewFrame.PackageUninstalled(const package: IPackageSearchResultItem);
 begin
-//  if FInstalledLookup.ContainsKey(LowerCase(package.Id)) then
-//    FInstalledLookup.Remove(LowerCase(package.Id));
   if FCurrentTab = TCurrentTab.Installed then
     SwitchedToInstalled(true)
   else
@@ -738,11 +710,12 @@ var
   stopWatch : TStopWatch;
 begin
   stopWatch.Start;
-  //local for capture
+  //we need a platform to pass to the repo, because the directory repo needs to construct a filename
+  //we just get the first plaform in the set, doesn't matter which one.
   for platform in package.Platforms do
-  begin
     break;
-  end;
+
+  //local for capture for use in the anonymous methods below.
   id := package.Id;
   version := package.Version;
   source := package.SourceName;
