@@ -86,7 +86,7 @@ type
     procedure UpdatePackageReferences(const packageReferences : IList<IPackageReference>; const platform : TDPMPlatform);
 
   public
-    constructor Create(const logger : ILogger; const config : IConfiguration);
+    constructor Create(const logger : ILogger; const config : IConfiguration );
   end;
 
 implementation

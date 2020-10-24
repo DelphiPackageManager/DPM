@@ -155,6 +155,7 @@ type
     FUpdates : IList<IPackageSearchResultItem>;
     //true when we first load the view
     FFirstView : boolean;
+    procedure FilterAndLoadInstalledPackages(const searchTxt: string);
   protected
     procedure txtSearchChanged(Sender : TObject);
     procedure ScrollListPaintRow(const Sender : TObject; const ACanvas : TCanvas; const itemRect : TRect; const index : Int64; const state : TPaintRowState);
@@ -258,7 +259,8 @@ end;
 
 procedure TDPMEditViewFrame.btnRefreshClick(Sender: TObject);
 begin
-  FSearchResultPackages.Clear;
+  if FSearchResultPackages <> nil then
+    FSearchResultPackages.Clear;
   //also called by the include checkboxes.
   case FCurrentTab of
     TCurrentTab.Installed: SwitchedToInstalled(true);
@@ -393,9 +395,9 @@ begin
   FScrollList := TVSoftVirtualListView.Create(Self);
   FScrollList.Align := alClient;
   FScrollList.BorderStyle := bsNone;
-  FScrollList.BevelOuter := bvLowered;
-  FScrollList.BevelEdges := [beRight];
-  FScrollList.BevelKind := bkFlat;
+//  FScrollList.BevelOuter := bvLowered;
+//  FScrollList.BevelEdges := [beRight];
+//  FScrollList.BevelKind := bkFlat;
   FScrollList.RowHeight := 75;
   FScrollList.RowCount := 0;
   FScrollList.OnPaintRow := Self.ScrollListPaintRow;
@@ -598,10 +600,19 @@ end;
 
 procedure TDPMEditViewFrame.LoadList(const list: IList<IPackageSearchResultItem>);
 begin
+  if list = nil then
+  begin
+    FScrollList.RowCount := 0;
+    exit;
+  end;
+  FScrollList.CurrentRow := -1;
   if FScrollList.RowCount = list.Count then
     FScrollList.Invalidate //doing this because if the rowcount is the same it doesn't invalidate.
   else
     FScrollList.RowCount := list.Count;
+  if list.Count > 0 then
+    FScrollList.CurrentRow := 0;
+
 end;
 
 procedure TDPMEditViewFrame.PackageInstalled(const package: IPackageSearchResultItem);
@@ -610,7 +621,7 @@ begin
   package.InstalledVersion := package.Version;
 
   if (FAllInstalledPackages <> nil) then
-    FInstalledPackages.Add(package)
+    FAllInstalledPackages.Add(package)
   else if FCurrentTab = TCurrentTab.Installed then
     SwitchedToInstalled(true);
   FProject.Refresh(true);
@@ -626,7 +637,10 @@ begin
   if FCurrentTab = TCurrentTab.Installed then
     SwitchedToInstalled(true)
   else
+  begin
+    FAllInstalledPackages := nil;
     FInstalledPackages := nil;
+  end;
   FProject.Refresh(true);
   // Do not do this, it will overrwrite package changes.
   //  FProject.MarkModified;
@@ -652,6 +666,10 @@ begin
       FPackageReferences := projectEditor.PackageReferences;
       //TODO : need to do this more safely as it may interrup another operation.
       FInstalledPackages := nil; //force refresh as we always need to update the installed packages.
+      FAllInstalledPackages := nil;
+      PackageDetailsFrame.SetPlatform(FCurrentPlatform);
+      PackageDetailsFrame.SetPackage(nil);
+      FScrollList.CurrentRow := -1;
       case FCurrentTab of
         TCurrentTab.Search: SwitchedToSearch(true) ;
         TCurrentTab.Installed: SwitchedToInstalled(true) ;
@@ -1053,29 +1071,40 @@ begin
 
 end;
 
+procedure TDPMEditViewFrame.FilterAndLoadInstalledPackages(const searchTxt : string);
+begin
+   FInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>(FAllInstalledPackages.Where(
+              function(const pkg : IPackageSearchResultItem) : boolean
+              begin
+                  result := not pkg.IsTransitive;
+                  if result and (searchTxt <> '') then
+                  begin
+                    result := TStringUtils.Contains(pkg.Id, searchTxt,  true);
+                  end;
+              end));
+   LoadList(FInstalledPackages);
+end;
+
+type
+  TFilterProc = procedure(const searchTxt : string) of object;
+
 procedure TDPMEditViewFrame.SwitchedToInstalled(const refresh : boolean);
 var
   searchTxt : string;
+
+  filterProc : TFilterProc;
+
+ //filter the list to only show directly installed packages, and on the search term
+
 begin
   FLogger.Debug('DPMIDE : SwitchToInstalled');
   searchTxt := txtSearch.Text;
   chkIncludePrerelease.Visible := true;
   chkIncludeCommercial.Visible := false;
   chkIncludeTrial.Visible := false;
+  filterProc := FilterAndLoadInstalledPackages;
   if (not refresh) and (FAllInstalledPackages <> nil) and FAllInstalledPackages.Any then
-  begin
-    FInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>(FAllInstalledPackages.Where(
-                function(const pkg : IPackageSearchResultItem) : boolean
-                begin
-                    result := not pkg.IsTransitive;
-                    if result and (searchTxt <> '') then
-                    begin
-                      result := TStringUtils.Contains(pkg.Id, searchTxt,  true);
-                    end;
-                end));
-
-    LoadList(FInstalledPackages);
-  end
+    filterProc(searchTxt)
   else
   begin
     FRequestInFlight := true;
@@ -1110,17 +1139,7 @@ begin
 
         FAllInstalledPackages := theResult;
 
-        //filter the list to only show directly installed packages, and on the search term
-        FInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>(FAllInstalledPackages.Where(
-          function(const pkg : IPackageSearchResultItem) : boolean
-          begin
-              result := not pkg.IsTransitive;
-              if result and (searchTxt <> '') then
-              begin
-                result := TStringUtils.Contains(pkg.Id, searchTxt,  true);
-              end;
-          end));
-         LoadList(FInstalledPackages);
+        filterProc(searchTxt);
       end);
     end;
 
@@ -1273,10 +1292,8 @@ begin
   FConfiguration := FConfigurationManager.LoadConfig(FSearchOptions.ConfigFile);
 
   PackageDetailsFrame.Init(FContainer, FIconCache, FConfiguration, Self, FProject.FileName);
-
   //populate the sources combo.
   ReloadSourcesCombo;
-  platformChangeDetectTimerTimer(platformChangeDetectTimer);
 end;
 
 procedure TDPMEditViewFrame.tabMainChange(Sender: TObject);
@@ -1344,7 +1361,7 @@ procedure TDPMEditViewFrame.txtSearchRightButtonClick(Sender: TObject);
 begin
   txtSearch.Text := '';
   FSearchResultPackages := nil;
-  FInstalledPackages := nil;
+  FInstalledPackages := FAllInstalledPackages;
   FUpdates := nil;
   searchDebounceTimerTimer(searchDebounceTimer);
 end;
@@ -1365,8 +1382,8 @@ begin
   if FFirstView then
   begin
     FFirstView := false;
-
-    SwitchedToInstalled(true);
+    platformChangeDetectTimerTimer(platformChangeDetectTimer);
+    //SwitchedToInstalled(true);
   end;
 end;
 

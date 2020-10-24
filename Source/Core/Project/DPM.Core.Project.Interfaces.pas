@@ -126,6 +126,10 @@ type
 implementation
 
 uses
+  {$IF CompilerVersion > 29.0}
+    {$LEGACYIFEND ON}
+  System.Hash,
+  {$IFEND}
   System.SysUtils;
 
 { TPackageRefenceComparer }
@@ -140,6 +144,11 @@ var
   s : string;
 begin
   s := Value.Id;
-  Result := BobJenkinsHash(PChar(s)^, SizeOf(Char) * Length(s), 0);end;
+  {$IF CompilerVersion > 29.0}
+  Result := System.Hash.THashBobJenkins.GetHashValue(s);
+  {$ELSE}
+  Result := BobJenkinsHash(PChar(s)^, SizeOf(Char) * Length(s), 0);
+  {$IFEND}
+end;
 
 end.

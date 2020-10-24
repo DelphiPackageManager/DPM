@@ -214,6 +214,7 @@ type
     //these are for use by the UI, it's not returned.
     property Installed    : boolean read GetInstalled write SetInstalled;
     property InstalledVersion : string read GetInstalledVersion write SetInstalledVersion;
+//    property InstalledPlatforms : TDPMPlatforms read GetInstalledPlatforms write SetInstalledPlatforms;
     property IsTransitive  : boolean read GetIsTransitive write SetIsTransitive;
     property ReportUrl    : string  read GetProjectUrl write SetReportUrl;
     property PublishedDate  : string read GetPublishedDate write SetPublishedDate; //TODO : what format should this be - see repos
@@ -279,6 +280,10 @@ type
 implementation
 
 uses
+  {$IF CompilerVersion > 29.0}
+    {$LEGACYIFEND ON}
+  System.Hash,
+  {$IFEND}
   System.SysUtils;
 
 
@@ -294,7 +299,11 @@ var
   s : string;
 begin
   s := Value.ToString;
+  {$IF CompilerVersion > 29.0}
+  Result := System.Hash.THashBobJenkins.GetHashValue(s);
+  {$ELSE}
   Result := BobJenkinsHash(PChar(s)^, SizeOf(Char) * Length(s), 0);
+  {$IFEND}
 end;
 
 { TPackageSearchResultItemComparer }
@@ -309,7 +318,13 @@ var
   s : string;
 begin
   s := Value.Id;
+  {$IF CompilerVersion > 29.0}
+  Result := System.Hash.THashBobJenkins.GetHashValue(s);
+  {$ELSE}
+//    {$LEGACYIFEND ON}
   Result := BobJenkinsHash(PChar(s)^, SizeOf(Char) * Length(s), 0);
+  {$IFEND}
+
 end;
 
 end.

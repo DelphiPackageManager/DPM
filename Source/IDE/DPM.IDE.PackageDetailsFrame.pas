@@ -5,6 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
+  DPM.Core.Types,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Package.Interfaces,
   DPM.Core.Logging,
@@ -64,6 +65,7 @@ type
     FPackageInstalledVersion : string;
     FPackageId : string;
     FProjectFile : string;
+    FCurrentPlatform : TDPMPlatform;
   protected
     procedure SetIncludePreRelease(const Value: boolean);
     procedure VersionsDelayTimerEvent(Sender : TObject);
@@ -73,6 +75,7 @@ type
     procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectFile : string);
     procedure Configure(const value : TCurrentTab; const preRelease : boolean);
     procedure SetPackage(const package : IPackageSearchResultItem);
+    procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;
     property IncludePreRelease : boolean read FIncludePreRelease write SetIncludePreRelease;
   end;
@@ -85,7 +88,6 @@ uses
   System.StrUtils,
   WinApi.ShellApi,
   SVGGraphic,
-  DPM.Core.Types,
   DPM.Core.Utils.Strings,
   DPM.Core.Dependency.Version,
   DPM.Core.Repository.Interfaces,
@@ -266,6 +268,7 @@ end;
 constructor TPackageDetailsFrame.Create(AOwner: TComponent);
 begin
   inherited;
+  FCurrentPlatform := TDPMPlatform.UnknownPlatform;
   FVersionsDelayTimer := TTimer.Create(AOwner);
   FVersionsDelayTimer.Interval := 200;
   FVersionsDelayTimer.Enabled := false;
@@ -327,7 +330,7 @@ begin
   FPackageMetaData := package;
   if package <> nil then
   begin
-    if package.Id <> FPackageId then
+    if (package.Id <> FPackageId) then
     begin
       bFetchVersions := true;
       FPackageId := package.Id;
@@ -369,10 +372,11 @@ begin
     else
       imgPackageLogo.Visible := false;
 
+    pnlInstalled.Visible := FPackageInstalledVersion <> '';
+
     case FCurrentTab of
       TCurrentTab.Search :
       begin
-        pnlInstalled.Visible := FPackageInstalledVersion <> '';
         if pnlInstalled.Visible then
         begin
           btnInstallOrUpdate.Caption := 'Update'
@@ -384,19 +388,17 @@ begin
       end;
       TCurrentTab.Installed:
       begin
-        pnlInstalled.Visible := true;
         btnInstallOrUpdate.Caption := 'Update';
       end;
       TCurrentTab.Updates:
       begin
-        pnlInstalled.Visible := true;
         btnInstallOrUpdate.Caption := 'Update';
       end;
       TCurrentTab.Conflicts: ;
     end;
 
-    if package.Installed then
-      txtInstalledVersion.Text := package.InstalledVersion;
+    txtInstalledVersion.Text := FPackageInstalledVersion;
+
     btnInstallOrUpdate.Enabled := (not package.Installed) or (package.InstalledVersion <> package.Version);
 
     sbPackageDetails.Visible := true;
@@ -412,6 +414,14 @@ begin
   end;
 
   FDetailsPanel.SetDetails(package);
+end;
+
+procedure TPackageDetailsFrame.SetPlatform(const platform: TDPMPlatform);
+begin
+  if platform <> FCurrentPlatform then
+  begin
+
+  end;
 end;
 
 procedure TPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);
@@ -436,6 +446,7 @@ begin
   options.AllVersions := true;
   options.SearchTerms := FPackageMetaData.Id;
   options.Prerelease := FIncludePreRelease;
+  options.Platforms := [FCurrentPlatform];
 
   config := FConfiguration;
 
@@ -474,41 +485,45 @@ begin
               exit;
             versions := theResult;
             FLogger.Debug('Got package versions .');
-            cboVersions.Clear;
+            cboVersions.Items.BeginUpdate;
+            try
+              cboVersions.Clear;
 
-            if versions.Any then
-            begin
-              if options.Prerelease then
+              if versions.Any then
               begin
+                if options.Prerelease then
+                begin
+                  version := versions.Where(
+                    function(const value : TPackageVersion) : boolean
+                    begin
+                      result := value.IsStable = false;
+                    end).FirstOrDefault;
+                  if not version.IsEmpty then
+                    lPre := cLatestPrerelease + version.ToStringNoMeta;
+                end;
                 version := versions.Where(
                   function(const value : TPackageVersion) : boolean
                   begin
-                    result := value.IsStable = false;
+                    result := value.IsStable;
                   end).FirstOrDefault;
                 if not version.IsEmpty then
-                  lPre := cLatestPrerelease + version.ToStringNoMeta;
-              end;
-              version := versions.Where(
-                function(const value : TPackageVersion) : boolean
+                  lStable := cLatestStable + version.ToStringNoMeta;
+                if (lStable <> '') and (lPre <> '') then
                 begin
-                  result := value.IsStable;
-                end).FirstOrDefault;
-              if not version.IsEmpty then
-                lStable := cLatestStable + version.ToStringNoMeta;
-              if (lStable <> '') and (lPre <> '') then
-              begin
-                cboVersions.Items.Add(lPre);
-                cboVersions.Items.AddObject(lStable, TObject(1));
-              end
-              else if lStable <> '' then
-                cboVersions.Items.AddObject(lStable, TObject(1))
-              else  if lPre <> '' then
-                cboVersions.Items.AddObject(lPre, TObject(1));
-
-              for version in versions do
-                cboVersions.Items.Add(version.ToStringNoMeta);
-              cboVersions.ItemIndex := 0;
-              btnInstallOrUpdate.Enabled := cboVersions.Items[0] <> FPackageInstalledVersion;
+                  cboVersions.Items.Add(lPre);
+                  cboVersions.Items.AddObject(lStable, TObject(1));
+                end
+                else if lStable <> '' then
+                  cboVersions.Items.AddObject(lStable, TObject(1))
+                else  if lPre <> '' then
+                  cboVersions.Items.AddObject(lPre, TObject(1));
+                for version in versions do
+                  cboVersions.Items.Add(version.ToStringNoMeta);
+                cboVersions.ItemIndex := 0;
+                btnInstallOrUpdate.Enabled := cboVersions.Items[0] <> FPackageInstalledVersion;
+              end;
+            finally
+              cboVersions.Items.EndUpdate;
             end;
 
           end);

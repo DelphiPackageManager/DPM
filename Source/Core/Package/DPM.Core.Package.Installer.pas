@@ -469,7 +469,7 @@ begin
     projectPackageInfo := GetPackageInfo(cancellationToken, packageReference);
     if projectPackageInfo = nil then
     begin
-      FLogger.Error('Unable to resolve package [' + newPackageIdentity.ToString + ']');
+      FLogger.Error('Unable to resolve package : ' + newPackageIdentity.ToString);
       exit;
     end;
     projectPackageInfos.Add(projectPackageInfo);
@@ -588,7 +588,7 @@ begin
     projectPackageInfo := GetPackageInfo(cancellationToken, packageReference);
     if projectPackageInfo = nil then
     begin
-      FLogger.Error('Unable to resolve package [' + packageReference.ToString + ']');
+      FLogger.Error('Unable to resolve package : ' + packageReference.ToString);
       exit;
     end;
     projectPackageInfos.Add(projectPackageInfo);
@@ -719,8 +719,8 @@ begin
     begin
       if not ambiguousProjectVersion then
         FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] does not match the compiler version.');
+      projectEditor.CompilerVersion := options.CompilerVersion;
     end;
-    projectEditor.CompilerVersion := options.CompilerVersion;
   end
   else
     options.CompilerVersion := projectEditor.CompilerVersion;
@@ -1015,11 +1015,15 @@ begin
 
   //make sure we can parse the dproj
   projectEditor := TProjectEditor.Create(FLogger, config);
+  if options.CompilerVersion <> TCompilerVersion.UnknownVersion then
+    projectEditor.CompilerVersion := options.CompilerVersion;
+
   if not projectEditor.LoadProject(projectFile) then
   begin
     FLogger.Error('Unable to load project file, cannot continue');
     exit;
   end;
+
 
   if cancellationToken.IsCancelled then
     exit;
@@ -1037,6 +1041,7 @@ begin
     begin
       if not ambiguousProjectVersion then
         FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] does not match the compiler version.');
+      projectEditor.CompilerVersion := options.CompilerVersion;
     end;
   end
   else
@@ -1071,7 +1076,7 @@ begin
     if not platformResult then
       FLogger.Error('Restore failed for ' + DPMPlatformToString(platform))
     else
-      FLogger.Error('Restore succeeded for ' + DPMPlatformToString(platform));
+      FLogger.Information('Restore succeeded for ' + DPMPlatformToString(platform));
     result := platformResult and result;
     FLogger.Information('');
   end;

@@ -71,8 +71,10 @@ type
 implementation
 
 uses
+  System.TypInfo,
   System.SysUtils,
   VCL.Dialogs,
+  Spring.Container.Registration,
   DPM.IDE.Logger,
   DPM.Core.Init,
   DPM.IDE.ProjectStorageNotifier,

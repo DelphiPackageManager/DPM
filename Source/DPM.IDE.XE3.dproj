@@ -1,17 +1,17 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{F777FD5E-96A6-4EEE-88CC-1C098D4E9766}</ProjectGuid>
-        <MainSource>DPM.IDE.XE2.dpr</MainSource>
+        <MainSource>DPM.IDE.XE3.dpr</MainSource>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
         <TargetedPlatforms>1</TargetedPlatforms>
         <AppType>Library</AppType>
         <FrameworkType>None</FrameworkType>
-        <ProjectVersion>13.4</ProjectVersion>
+        <ProjectVersion>14.4</ProjectVersion>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
     </PropertyGroup>
     <PropertyGroup>
-        <DPMCompiler>XE2</DPMCompiler>
+        <DPMCompiler>XE4</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
         <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Ahausladen.JsonDataObjects\0.0.1\src;$(DPM)\Spring4D.Core\2.0.0-dev2\src;$(DPM)\Spring4D.Core\2.0.0-dev2\src\Core\Container;$(DPM)\Spring4D.Core\2.0.0-dev2\src\Core\Interception;$(DPM)\Spring4D.Core\2.0.0-dev2\src\Core\Logging;$(DPM)\Spring4D.Core\2.0.0-dev2\src\Core\Mocking;$(DPM)\Spring4D.Core\2.0.0-dev2\src\Core\Services;$(DPM)\Spring4D.Base\2.0.0-dev2\src;$(DPM)\Spring4D.Base\2.0.0-dev2\src\Base;$(DPM)\Spring4D.Base\2.0.0-dev2\src\Base\Collections;$(DPM)\Spring4D.Base\2.0.0-dev2\src\Base\Logging;$(DPM)\Spring4D.Base\2.0.0-dev2\src\Base\Patches;$(DPM)\Spring4D.Base\2.0.0-dev2\src\Base\Patterns;$(DPM)\Spring4D.Extensions\2.0.0-dev2\src;$(DPM)\Spring4D.Extensions\2.0.0-dev2\src\Extensions;$(DPM)\Spring4D.Extensions\2.0.0-dev2\src\Extensions\Cryptography;$(DPM)\Spring4D.Extensions\2.0.0-dev2\src\Extensions\Utils;$(DPM)\VSoft.AntPatterns\0.0.4\src;$(DPM)\VSoft.Awaitable\0.1.0\src;$(DPM)\Gabr42.OmniThreadLibrary\3.7.7\src;$(DPM)\Gabr42.OmniThreadLibrary\3.7.7\src\src;$(DPM)\VSoft.CancellationToken\0.0.1\src;$(DPM)\VSoft.HttpClient\0.0.2\src;$(DPM)\VSoft.SemanticVersion\0.0.2\src;$(DPM)\VSoft.Uri\0.0.3\src;$(DPM)\VSoft.VirtualListView\0.1.0-rc1\lib;$(DPM)\VSoft.VirtualListView\0.1.0-rc1\Source;</DPMSearch>
@@ -19,13 +19,18 @@
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
     </PropertyGroup>
-    <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Base)'=='true') or '$(Base_Win64)'!=''">
-        <Base_Win64>true</Base_Win64>
+    <PropertyGroup Condition="('$(Platform)'=='OSX32' and '$(Base)'=='true') or '$(Base_OSX32)'!=''">
+        <Base_OSX32>true</Base_OSX32>
         <CfgParent>Base</CfgParent>
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Base)'=='true') or '$(Base_Win32)'!=''">
         <Base_Win32>true</Base_Win32>
+        <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Base)'=='true') or '$(Base_Win64)'!=''">
+        <Base_Win64>true</Base_Win64>
         <CfgParent>Base</CfgParent>
         <Base>true</Base>
     </PropertyGroup>
@@ -37,6 +42,12 @@
     <PropertyGroup Condition="'$(Config)'=='Debug' or '$(Cfg_2)'!=''">
         <Cfg_2>true</Cfg_2>
         <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='OSX32' and '$(Cfg_2)'=='true') or '$(Cfg_2_OSX32)'!=''">
+        <Cfg_2_OSX32>true</Cfg_2_OSX32>
+        <CfgParent>Cfg_2</CfgParent>
+        <Cfg_2>true</Cfg_2>
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_2)'=='true') or '$(Cfg_2_Win32)'!=''">
@@ -62,14 +73,17 @@
         <DCC_K>false</DCC_K>
         <DCC_UnitSearchPath>$(DPMSearch);I:\bitbucket\spring4d\Source;I:\bitbucket\spring4d\Source\Base;I:\bitbucket\spring4d\Source\Base\Collections;I:\bitbucket\spring4d\Source\Base\Logging;I:\bitbucket\spring4d\Source\Base\Patches;I:\bitbucket\spring4d\Source\Base\Patterns;I:\bitbucket\spring4d\Source\Core\Container;I:\bitbucket\spring4d\Source\Core\Interception;I:\bitbucket\spring4d\Source\Core\Logging;I:\bitbucket\spring4d\Source\Core\Services;I:\bitbucket\spring4d\Source\Extensions\Cryptography;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
     </PropertyGroup>
-    <PropertyGroup Condition="'$(Base_Win64)'!=''">
-        <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
+    <PropertyGroup Condition="'$(Base_OSX32)'!=''">
+        <Icns_MainIcns>$(BDS)\bin\delphi_PROJECTICNS.icns</Icns_MainIcns>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <DCC_Namespace>System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
+        <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Base_Win64)'!=''">
         <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1)'!=''">
@@ -82,6 +96,9 @@
         <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
         <DCC_Optimize>false</DCC_Optimize>
         <DCC_GenerateStackFrames>true</DCC_GenerateStackFrames>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_2_OSX32)'!=''">
+        <Icns_MainIcns>$(BDS)\bin\delphi_PROJECTICNS.icns</Icns_MainIcns>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <Debugger_RunParams>-rDPMTesting</Debugger_RunParams>
@@ -262,7 +279,7 @@
         <BorlandProject>
             <Delphi.Personality>
                 <Source>
-                    <Source Name="MainSource">DPM.IDE.XE2.dpr</Source>
+                    <Source Name="MainSource">DPM.IDE.XE3.dpr</Source>
                 </Source>
                 <VersionInfo>
                     <VersionInfo Name="IncludeVerInfo">False</VersionInfo>

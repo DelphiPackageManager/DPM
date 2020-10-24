@@ -68,7 +68,9 @@ function ParseFontStyle(AFontStyle: string): Integer;
 
 implementation
 
+{$IF CompilerVersion > 23.0}
 {$LEGACYIFEND ON}
+{$IFEND}
 
 uses
   Winapi.Windows,

@@ -141,6 +141,10 @@ type
 implementation
 
 uses
+  {$IF CompilerVersion > 29.0}
+    {$LEGACYIFEND ON}
+  System.Hash,
+  {$IFEND}
   System.TypInfo,
   System.SysUtils,
   DPM.Core.Utils.Strings;
@@ -412,6 +416,12 @@ begin
          4 : result := true; //ambiguous could be xe3 update 2
       end;
     end;
+    15:
+    begin
+      case minor of
+         3 : result := true; //ambiguous could be xe6
+      end;
+    end;
     18 :
     begin
       case minor of
@@ -471,7 +481,7 @@ begin
     15 :
     begin
       case minor of
-        0..1 :  result := TCompilerVersion.RSXE5;
+        0..3 :  result := TCompilerVersion.RSXE5;
       else
         result := TCompilerVersion.RSXE6;
       end;
@@ -481,9 +491,8 @@ begin
     18 :
     begin
       case minor of
-        0    : result := TCompilerVersion.RS10_0;
-        1    : result := TCompilerVersion.RS10_1; //ambiguous could be 10.0 update 1
-        2    : result := TCompilerVersion.RS10_2; //ambigous could be 10.1 update 1
+        0..1 : result := TCompilerVersion.RS10_0;
+        2    : result := TCompilerVersion.RS10_1;
         3..4 : result := TCompilerVersion.RS10_2;
         5..8 : result := TCompilerVersion.RS10_3; //18.8 for 10.3.3
       end;
@@ -504,7 +513,12 @@ var
   s : string;
 begin
   s := Value.ToString;
+  {$IF CompilerVersion > 29.0}
+  Result := System.Hash.THashBobJenkins.GetHashValue(s);
+  {$ELSE}
+//    {$LEGACYIFEND ON}
   Result := BobJenkinsHash(PChar(s)^, SizeOf(Char) * Length(s), 0);
+  {$IFEND}
 end;
 
 end.

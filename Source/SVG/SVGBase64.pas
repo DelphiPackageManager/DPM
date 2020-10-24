@@ -11,7 +11,9 @@ function Base64DecodeStream(const InputStream : TStream; const OutputStream: TSt
 
 implementation
 
+{$IF CompilerVersion > 23.0}
 {$LEGACYIFEND ON}
+{$IFEND}
 
 uses
 {$IF CompilerVersion > 27}

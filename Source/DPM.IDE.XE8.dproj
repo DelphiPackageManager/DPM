@@ -1,9 +1,9 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
-        <ProjectVersion>16.1</ProjectVersion>
+        <ProjectVersion>17.2</ProjectVersion>
         <FrameworkType>VCL</FrameworkType>
-        <MainSource>DPM.IDE.XE7.dpr</MainSource>
+        <MainSource>DPM.IDE.XE8.dpr</MainSource>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
@@ -11,7 +11,7 @@
         <AppType>Library</AppType>
     </PropertyGroup>
     <PropertyGroup>
-        <DPMCompiler>XE7</DPMCompiler>
+        <DPMCompiler>XE8</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
         <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Ahausladen.JsonDataObjects\0.0.1\src;$(DPM)\Spring4D.Core\2.0.0-dev2\src;$(DPM)\Spring4D.Core\2.0.0-dev2\src\Core\Container;$(DPM)\Spring4D.Core\2.0.0-dev2\src\Core\Interception;$(DPM)\Spring4D.Core\2.0.0-dev2\src\Core\Logging;$(DPM)\Spring4D.Core\2.0.0-dev2\src\Core\Mocking;$(DPM)\Spring4D.Core\2.0.0-dev2\src\Core\Services;$(DPM)\Spring4D.Base\2.0.0-dev2\src;$(DPM)\Spring4D.Base\2.0.0-dev2\src\Base;$(DPM)\Spring4D.Base\2.0.0-dev2\src\Base\Collections;$(DPM)\Spring4D.Base\2.0.0-dev2\src\Base\Logging;$(DPM)\Spring4D.Base\2.0.0-dev2\src\Base\Patches;$(DPM)\Spring4D.Base\2.0.0-dev2\src\Base\Patterns;$(DPM)\Spring4D.Extensions\2.0.0-dev2\src;$(DPM)\Spring4D.Extensions\2.0.0-dev2\src\Extensions;$(DPM)\Spring4D.Extensions\2.0.0-dev2\src\Extensions\Cryptography;$(DPM)\Spring4D.Extensions\2.0.0-dev2\src\Extensions\Utils;$(DPM)\VSoft.AntPatterns\0.0.4\src;$(DPM)\VSoft.Awaitable\0.1.0\src;$(DPM)\Gabr42.OmniThreadLibrary\3.7.7\src;$(DPM)\Gabr42.OmniThreadLibrary\3.7.7\src\src;$(DPM)\VSoft.CancellationToken\0.0.1\src;$(DPM)\VSoft.HttpClient\0.0.2\src;$(DPM)\VSoft.SemanticVersion\0.0.2\src;$(DPM)\VSoft.Uri\0.0.3\src;$(DPM)\VSoft.VirtualListView\0.1.0-rc1\lib;$(DPM)\VSoft.VirtualListView\0.1.0-rc1\Source;</DPMSearch>
@@ -63,7 +63,7 @@
         <VerInfo_Locale>3081</VerInfo_Locale>
         <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
-        <SanitizedProjectName>DPM_IDE_XE7</SanitizedProjectName>
+        <SanitizedProjectName>DPM_IDE_XE8</SanitizedProjectName>
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;$(DCC_Namespace)</DCC_Namespace>
         <GenDll>true</GenDll>
         <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
@@ -83,7 +83,7 @@
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
-        <DCC_UsePackage>NxLayout6Run_dxe7;NxGridRun_dxe7;RaizeComponentsVclDb;fmx;dbrtl;IndySystem;RaizeComponentsVcl;bindcomp;xmlrtl;DbxCommonDriver;vclimg;IndyProtocols;NxCommonDsgn_dxe7;vclactnband;bindengine;vcldb;soaprtl;NxCommonRun_dxe7;vclie;NxGrid6Run_dxe7;vcltouch;CustomIPTransport;VclSmp;dsnap;NxGridDsgn_dxe7;IndyIPServer;fmxase;IndyCore;IndyIPCommon;inet;fmxobj;vclx;lmdrtdocking;NxStandard6Run_dxe7;dsnapxml;fmxdae;VirtualTreesR;lmdrtl;adortl;IndyIPClient;$(DCC_UsePackage)</DCC_UsePackage>
+        <DCC_UsePackage>NxLayout6Run_dXE8;NxGridRun_dXE8;RaizeComponentsVclDb;fmx;dbrtl;IndySystem;RaizeComponentsVcl;bindcomp;xmlrtl;DbxCommonDriver;vclimg;IndyProtocols;NxCommonDsgn_dXE8;vclactnband;bindengine;vcldb;soaprtl;NxCommonRun_dXE8;vclie;NxGrid6Run_dXE8;vcltouch;CustomIPTransport;VclSmp;dsnap;NxGridDsgn_dXE8;IndyIPServer;fmxase;IndyCore;IndyIPCommon;inet;fmxobj;vclx;lmdrtdocking;NxStandard6Run_dXE8;dsnapxml;fmxdae;VirtualTreesR;lmdrtl;adortl;IndyIPClient;$(DCC_UsePackage)</DCC_UsePackage>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1)'!=''">
         <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
@@ -295,21 +295,13 @@
         <BorlandProject>
             <Delphi.Personality>
                 <Source>
-                    <Source Name="MainSource">DPM.IDE.XE7.dpr</Source>
+                    <Source Name="MainSource">DPM.IDE.XE8.dpr</Source>
                 </Source>
             </Delphi.Personality>
-            <Deployment>
+            <Deployment Version="2">
                 <DeployFile LocalName="..\Output\DPM.IDE.dll" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>DPM_IDE.dll</RemoteName>
-                        <Overwrite>true</Overwrite>
-                    </Platform>
-                </DeployFile>
-                <DeployFile LocalName="$(BDS)\Redist\osx32\libcgunwind.1.0.dylib" Class="DependencyModule">
-                    <Platform Name="OSX32">
-                        <Overwrite>true</Overwrite>
-                    </Platform>
-                    <Platform Name="iOSSimulator">
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
@@ -320,7 +312,7 @@
                     </Platform>
                 </DeployFile>
                 <DeployClass Required="true" Name="DependencyPackage">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice64">
                         <Operation>1</Operation>
                         <Extensions>.dylib</Extensions>
                     </Platform>
@@ -337,9 +329,13 @@
                         <Operation>1</Operation>
                         <Extensions>.dylib</Extensions>
                     </Platform>
+                    <Platform Name="iOSDevice32">
+                        <Operation>1</Operation>
+                        <Extensions>.dylib</Extensions>
+                    </Platform>
                 </DeployClass>
                 <DeployClass Name="DependencyModule">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice64">
                         <Operation>1</Operation>
                         <Extensions>.dylib</Extensions>
                     </Platform>
@@ -356,12 +352,19 @@
                         <Operation>1</Operation>
                         <Extensions>.dylib</Extensions>
                     </Platform>
+                    <Platform Name="iOSDevice32">
+                        <Operation>1</Operation>
+                        <Extensions>.dylib</Extensions>
+                    </Platform>
                 </DeployClass>
                 <DeployClass Name="iPad_Launch2048">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice64">
                         <Operation>1</Operation>
                     </Platform>
                     <Platform Name="iOSSimulator">
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="iOSDevice32">
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
@@ -372,7 +375,11 @@
                     </Platform>
                 </DeployClass>
                 <DeployClass Name="ProjectiOSDeviceDebug">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice64">
+                        <RemoteDir>..\$(PROJECTNAME).app.dSYM\Contents\Resources\DWARF</RemoteDir>
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="iOSDevice32">
                         <RemoteDir>..\$(PROJECTNAME).app.dSYM\Contents\Resources\DWARF</RemoteDir>
                         <Operation>1</Operation>
                     </Platform>
@@ -390,10 +397,13 @@
                     </Platform>
                 </DeployClass>
                 <DeployClass Name="ProjectiOSResource">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice64">
                         <Operation>1</Operation>
                     </Platform>
                     <Platform Name="iOSSimulator">
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="iOSDevice32">
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
@@ -410,10 +420,13 @@
                     </Platform>
                 </DeployClass>
                 <DeployClass Name="iPhone_Launch640">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice64">
                         <Operation>1</Operation>
                     </Platform>
                     <Platform Name="iOSSimulator">
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="iOSDevice32">
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
@@ -430,10 +443,13 @@
                     </Platform>
                 </DeployClass>
                 <DeployClass Name="iPhone_Launch320">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice64">
                         <Operation>1</Operation>
                     </Platform>
                     <Platform Name="iOSSimulator">
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="iOSDevice32">
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
@@ -484,7 +500,11 @@
                     </Platform>
                 </DeployClass>
                 <DeployClass Name="ProjectiOSEntitlements">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice64">
+                        <RemoteDir>../</RemoteDir>
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="iOSDevice32">
                         <RemoteDir>../</RemoteDir>
                         <Operation>1</Operation>
                     </Platform>
@@ -509,18 +529,24 @@
                     </Platform>
                 </DeployClass>
                 <DeployClass Name="ProjectiOSInfoPList">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice64">
                         <Operation>1</Operation>
                     </Platform>
                     <Platform Name="iOSSimulator">
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="iOSDevice32">
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
                 <DeployClass Name="iPad_Launch1024">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice64">
                         <Operation>1</Operation>
                     </Platform>
                     <Platform Name="iOSSimulator">
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="iOSDevice32">
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
@@ -537,24 +563,30 @@
                     </Platform>
                 </DeployClass>
                 <DeployClass Name="ProjectiOSDeviceResourceRules">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice64">
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="iOSDevice32">
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
                 <DeployClass Name="iPad_Launch768">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice64">
                         <Operation>1</Operation>
                     </Platform>
                     <Platform Name="iOSSimulator">
                         <Operation>1</Operation>
                     </Platform>
-                </DeployClass>
-                <DeployClass Required="true" Name="ProjectOutput">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice32">
                         <Operation>1</Operation>
                     </Platform>
+                </DeployClass>
+                <DeployClass Required="true" Name="ProjectOutput">
                     <Platform Name="Android">
                         <RemoteDir>library\lib\armeabi-v7a</RemoteDir>
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="iOSDevice64">
                         <Operation>1</Operation>
                     </Platform>
                     <Platform Name="Win32">
@@ -565,6 +597,9 @@
                         <Operation>1</Operation>
                     </Platform>
                     <Platform Name="iOSSimulator">
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="iOSDevice32">
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
@@ -581,10 +616,10 @@
                     </Platform>
                 </DeployClass>
                 <DeployClass Name="File">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="Android">
                         <Operation>0</Operation>
                     </Platform>
-                    <Platform Name="Android">
+                    <Platform Name="iOSDevice64">
                         <Operation>0</Operation>
                     </Platform>
                     <Platform Name="Win32">
@@ -597,12 +632,18 @@
                     <Platform Name="iOSSimulator">
                         <Operation>0</Operation>
                     </Platform>
+                    <Platform Name="iOSDevice32">
+                        <Operation>0</Operation>
+                    </Platform>
                 </DeployClass>
                 <DeployClass Name="iPhone_Launch640x1136">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice64">
                         <Operation>1</Operation>
                     </Platform>
                     <Platform Name="iOSSimulator">
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="iOSDevice32">
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
@@ -619,10 +660,13 @@
                     </Platform>
                 </DeployClass>
                 <DeployClass Name="iPad_Launch1536">
-                    <Platform Name="iOSDevice">
+                    <Platform Name="iOSDevice64">
                         <Operation>1</Operation>
                     </Platform>
                     <Platform Name="iOSSimulator">
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="iOSDevice32">
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
@@ -643,9 +687,10 @@
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
+                <ProjectRoot Platform="iOSDevice32" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="Android" Name="$(PROJECTNAME)"/>
-                <ProjectRoot Platform="iOSDevice" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="Win32" Name="$(PROJECTNAME)"/>
+                <ProjectRoot Platform="iOSDevice64" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="OSX32" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="iOSSimulator" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="Win64" Name="$(PROJECTNAME)"/>

@@ -130,8 +130,11 @@ uses
   Winapi.GDIPAPI,
   SVGCommon, SVGParse;
 
-{$IF CompilerVersion <= 28}
+{$IF CompilerVersion > 23.0}
 {$LEGACYIFEND ON}
+{$IFEND}
+
+{$IF CompilerVersion <= 28}
 function FMod(const ANumerator, ADenominator: Single): Single;
 begin
   Result := ANumerator - Trunc(ANumerator / ADenominator) * ADenominator;

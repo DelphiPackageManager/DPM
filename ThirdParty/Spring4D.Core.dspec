@@ -64,6 +64,11 @@
       "compiler": "10.3",
       "platforms": "Win32, Win64, OSX32, iOS32, AndroidArm32, LinuxIntel64",
       "template": "default"
+    },
+    {
+      "compiler": "10.4",
+      "platforms": "Win32, Win64, OSX64, iOS32, AndroidArm32, LinuxIntel64",
+      "template": "default"
     }
   ],
   "templates": [

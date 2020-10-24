@@ -38,6 +38,8 @@ procedure InitCore(const container : TContainer; const overrideProc : TConstProc
 implementation
 
 uses
+  System.TypInfo,
+  Spring.Container.Registration,
   Spring.Container.Common,
   DPM.Core.Utils.Enum,
   DPM.Core.Packaging,

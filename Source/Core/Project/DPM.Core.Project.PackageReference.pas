@@ -59,6 +59,7 @@ type
   public
     constructor Create(const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const range : TVersionRange; const isTransitive : boolean);
     function ToIdVersionString: string;
+    function ToString : string;override;
   end;
 
 implementation
@@ -124,6 +125,11 @@ begin
 end;
 
 function TPackageReference.ToIdVersionString: string;
+begin
+  result := FId +' [' + FVersion.ToStringNoMeta + ']';
+end;
+
+function TPackageReference.ToString: string;
 begin
   result := FId +' [' + FVersion.ToStringNoMeta + ']';
 end;

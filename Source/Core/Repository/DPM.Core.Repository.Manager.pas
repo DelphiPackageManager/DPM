@@ -151,7 +151,7 @@ begin
 
   //TODO : This will be really inefficient/slow when using http
   //refactor to make single request to repositories.
-  packageId := installedPackages.FirstOrDefault;
+//  packageId := installedPackages.FirstOrDefault;
   for packageId in installedPackages do
   begin
     searchOptions := options.Clone;
@@ -162,6 +162,7 @@ begin
     searchOptions.Exact := true;
 
     packageResults := GetPackageFeed(cancelToken, searchOptions, config);
+
     for item in packageResults do
     begin
       item.Installed := true;
