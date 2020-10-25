@@ -262,6 +262,7 @@ begin
       if bplEntry.BuildId = '' then
         AddBPLToArchive(bplEntry.Source, bplEntry.Destination);
 
+    result := true;
   finally
     FArchiveWriter.Close;
   end;
@@ -345,10 +346,12 @@ begin
     end;
 
     FLogger.Information('Spec is valid, writing package files...');
+
+    result := true;
     for targetPlatform in spec.TargetPlatforms do
     begin
       if cancellationToken.IsCancelled then
-        exit;
+        exit(false);
 
       if version.IsEmpty then
         version := spec.MetaData.Version;
