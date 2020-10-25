@@ -1065,10 +1065,11 @@ begin
   else
     platforms := projectEditor.Platforms;
 
+  result := true;
   for platform in platforms do
   begin
     if cancellationToken.IsCancelled then
-      exit;
+      exit(false);
 
     options.Platforms := [platform];
     FLogger.Information('Restoring project [' + projectFile +'] for [' + DPMPlatformToString(platform) + ']', true);
