@@ -3,6 +3,12 @@
         <ProjectGuid>{AD0E587D-1B87-4605-8D09-480B22A09CD7}</ProjectGuid>
     </PropertyGroup>
     <ItemGroup>
+        <Projects Include="DPM.Core.Tests.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="dpm.dproj">
+            <Dependencies/>
+        </Projects>
         <Projects Include="DPM.IDE.D104.dproj">
             <Dependencies/>
         </Projects>
@@ -14,6 +20,24 @@
             <Default.Personality/>
         </BorlandProject>
     </ProjectExtensions>
+    <Target Name="DPM_Core_Tests">
+        <MSBuild Projects="DPM.Core.Tests.dproj"/>
+    </Target>
+    <Target Name="DPM_Core_Tests:Clean">
+        <MSBuild Projects="DPM.Core.Tests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="DPM_Core_Tests:Make">
+        <MSBuild Projects="DPM.Core.Tests.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="dpm">
+        <MSBuild Projects="dpm.dproj"/>
+    </Target>
+    <Target Name="dpm:Clean">
+        <MSBuild Projects="dpm.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="dpm:Make">
+        <MSBuild Projects="dpm.dproj" Targets="Make"/>
+    </Target>
     <Target Name="DPM_IDE_D104">
         <MSBuild Projects="DPM.IDE.D104.dproj"/>
     </Target>
@@ -24,13 +48,13 @@
         <MSBuild Projects="DPM.IDE.D104.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
-        <CallTarget Targets="DPM_IDE_D104"/>
+        <CallTarget Targets="DPM_Core_Tests;dpm;DPM_IDE_D104"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="DPM_IDE_D104:Clean"/>
+        <CallTarget Targets="DPM_Core_Tests:Clean;dpm:Clean;DPM_IDE_D104:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="DPM_IDE_D104:Make"/>
+        <CallTarget Targets="DPM_Core_Tests:Make;dpm:Make;DPM_IDE_D104:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>
