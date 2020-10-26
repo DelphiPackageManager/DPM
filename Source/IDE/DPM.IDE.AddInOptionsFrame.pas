@@ -31,7 +31,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages,
   System.Variants, System.Classes,
-  {$IF CompilerVersion >= 24.0 }
+  {$IF CompilerVersion >= 24.0 } //XE3 up
   {$LEGACYIFEND ON}
   //NOTE: The IDE keeps adding this again below, if it happens edit the file outside the IDE.
   System.Actions,
@@ -95,6 +95,7 @@ type
   protected
   public
     constructor Create(AOwner : TComponent);override;
+    destructor Destroy;override;
     { Public declarations }
     procedure LoadSettings;
     procedure SaveSettings;
@@ -201,6 +202,12 @@ begin
 
 end;
 
+destructor TDPMOptionsFrame.Destroy;
+begin
+
+  inherited;
+end;
+
 procedure TDPMOptionsFrame.dpmOptionsActionListUpdate(Action: TBasicAction; var Handled: Boolean);
 var
   selected : TListItem;
@@ -271,7 +278,7 @@ var
 begin
   FConfiguration.PackageCacheLocation := txtPackageCacheLocation.Text;
   FConfiguration.Sources.Clear;
-
+  lvSources.HandleNeeded; //without this, lvSources.Items.Count will be 0 if the frame was never viewed
   for i := 0 to lvSources.Items.Count -1 do
   begin
     item := lvSources.Items[i];
@@ -373,6 +380,7 @@ begin
   nameList := TStringList.Create;
   uriList := TStringList.Create;
   try
+    lvSources.HandleNeeded; //without this, lvSources.Items.Count will be 0 if the frame was never viewed
     for i := 0 to lvSources.Items.Count -1 do
     begin
       if lvSources.Items[i].Checked then

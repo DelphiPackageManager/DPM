@@ -54,7 +54,12 @@ var
 
 implementation
 
+uses
+  ToolsApi;
+
 {$R *.dfm}
+
+{$I DPMIDE.inc}
 
 { TDPMOptionsHostForm }
 
@@ -70,10 +75,22 @@ end;
 constructor TDPMOptionsHostForm.Create(AOwner: TComponent; const configManager: IConfigurationManager; const logger: ILogger; const configFile: string);
 begin
   inherited Create(AOwner);
+  {$IFDEF STYLEELEMENTS}
+  StyleElements := [seFont, seClient, seBorder];
+  {$ENDIF}
+  {$IFDEF THEMESERVICES}
+  (BorlandIDEServices As IOTAIDEThemingServices).ApplyTheme(Self);
+  {$ENDIF}
+
   DPMOptionsFrame.SetConfigManager(configManager, configFile);
   DPMOptionsFrame.SetLogger(logger);
   Self.Caption := 'DPM Options [' + configFile + ']';
   DPMOptionsFrame.LoadSettings;
 end;
+
+{$IFDEF THEMESERVICES}
+initialization
+  (BorlandIDEServices As IOTAIDEThemingServices250).RegisterFormClass(TDPMOptionsHostForm);
+{$ENDIF}
 
 end.

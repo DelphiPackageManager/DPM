@@ -176,7 +176,7 @@ begin
   result := true;
   for projectFile in projectFiles do
   begin
-    projectEditor := TProjectEditor.Create(FLogger, config);
+    projectEditor := TProjectEditor.Create(FLogger, config, options.CompilerVersion );
     result := result and projectEditor.LoadProject(projectFile);
     if result then
       options.Platforms := options.Platforms + projectEditor.Platforms;
@@ -699,7 +699,7 @@ begin
   result := false;
 
   //make sure we can parse the dproj
-  projectEditor := TProjectEditor.Create(FLogger, config);
+  projectEditor := TProjectEditor.Create(FLogger, config, options.CompilerVersion);
   if not projectEditor.LoadProject(projectFile) then
   begin
     FLogger.Error('Unable to load project file, cannot continue');
@@ -770,7 +770,7 @@ begin
   bFirst := true;
   for projectFile in projectFiles do
   begin
-    projectEditor := TProjectEditor.Create(FLogger, config);
+    projectEditor := TProjectEditor.Create(FLogger, config, options.CompilerVersion);
     result := result and projectEditor.LoadProject(projectFile);
     if result then
     begin
@@ -1014,9 +1014,7 @@ begin
   result := false;
 
   //make sure we can parse the dproj
-  projectEditor := TProjectEditor.Create(FLogger, config);
-  if options.CompilerVersion <> TCompilerVersion.UnknownVersion then
-    projectEditor.CompilerVersion := options.CompilerVersion;
+  projectEditor := TProjectEditor.Create(FLogger, config, options.CompilerVersion);
 
   if not projectEditor.LoadProject(projectFile) then
   begin

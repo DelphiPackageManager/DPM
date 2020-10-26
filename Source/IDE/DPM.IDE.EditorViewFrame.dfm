@@ -6,51 +6,56 @@ object DPMEditViewFrame: TDPMEditViewFrame
   Margins.Top = 0
   Constraints.MinWidth = 500
   DoubleBuffered = True
-  Padding.Top = 2
+  Color = clBtnFace
+  ParentBackground = False
+  ParentColor = False
   ParentDoubleBuffered = False
   TabOrder = 0
-  object SearchPanel: TPanel
+  object pnlSearchPanel: TPanel
     Left = 0
-    Top = 2
+    Top = 34
     Width = 978
-    Height = 103
+    Height = 69
     Align = alTop
+    BevelEdges = []
     BevelOuter = bvNone
     BorderWidth = 1
     Padding.Left = 5
     Padding.Top = 5
     Padding.Right = 5
     Padding.Bottom = 5
+    ParentBackground = False
     ShowCaption = False
     TabOrder = 0
     DesignSize = (
       978
-      103)
+      69)
     object lblSources: TLabel
       Left = 718
-      Top = 78
+      Top = 39
       Width = 88
       Height = 13
       Alignment = taRightJustify
       Anchors = [akTop, akRight]
       Caption = 'Package Sources :'
+      ExplicitLeft = 714
     end
     object lblProject: TLabel
       Left = 360
-      Top = 48
-      Width = 94
-      Height = 18
+      Top = 9
+      Width = 117
+      Height = 23
       Caption = 'THE PROJECT'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
-      Font.Height = -15
+      Font.Height = -19
       Font.Name = 'Tahoma'
       Font.Style = []
       ParentFont = False
     end
     object txtSearch: TButtonedEdit
       Left = 8
-      Top = 48
+      Top = 9
       Width = 241
       Height = 21
       Images = DPMEditorViewImages
@@ -69,7 +74,7 @@ object DPMEditViewFrame: TDPMEditViewFrame
     end
     object btnRefresh: TButton
       Left = 255
-      Top = 47
+      Top = 8
       Width = 25
       Height = 25
       Hint = 'Refresh'
@@ -81,7 +86,7 @@ object DPMEditViewFrame: TDPMEditViewFrame
     end
     object chkIncludePrerelease: TCheckBox
       Left = 8
-      Top = 74
+      Top = 35
       Width = 120
       Height = 20
       Caption = 'Include Prerelease'
@@ -90,7 +95,7 @@ object DPMEditViewFrame: TDPMEditViewFrame
     end
     object chkIncludeCommercial: TCheckBox
       Left = 152
-      Top = 74
+      Top = 35
       Width = 128
       Height = 20
       Caption = 'Include Commercial'
@@ -100,7 +105,7 @@ object DPMEditViewFrame: TDPMEditViewFrame
     end
     object btnSettings: TButton
       Left = 286
-      Top = 47
+      Top = 8
       Width = 25
       Height = 25
       Hint = 'Settings'
@@ -112,7 +117,7 @@ object DPMEditViewFrame: TDPMEditViewFrame
     end
     object btnAbout: TButton
       Left = 316
-      Top = 47
+      Top = 8
       Width = 25
       Height = 25
       Hint = 'About'
@@ -124,7 +129,7 @@ object DPMEditViewFrame: TDPMEditViewFrame
     end
     object cbSources: TComboBox
       Left = 812
-      Top = 76
+      Top = 37
       Width = 160
       Height = 21
       Style = csDropDownList
@@ -138,111 +143,91 @@ object DPMEditViewFrame: TDPMEditViewFrame
         'local'
         'Colossus')
     end
-    object pnlButtonBar: TPanel
-      Left = 6
-      Top = 6
-      Width = 966
-      Height = 34
-      Align = alTop
-      BevelOuter = bvNone
-      Caption = 'pnlButtonBar'
-      ShowCaption = False
-      TabOrder = 7
-    end
     object chkIncludeTrial: TCheckBox
       Left = 300
-      Top = 74
+      Top = 35
       Width = 128
       Height = 20
       Caption = 'Include Trials'
-      TabOrder = 8
+      TabOrder = 7
       Visible = False
       OnClick = btnRefreshClick
     end
   end
   object ContentPanel: TPanel
     Left = 0
-    Top = 105
+    Top = 103
     Width = 978
-    Height = 556
+    Height = 558
     Align = alClient
-    BevelOuter = bvLowered
+    BevelEdges = [beTop]
+    BevelOuter = bvNone
     Caption = 'ContentPanel'
     Constraints.MinWidth = 400
+    ParentBackground = False
     ParentColor = True
     ShowCaption = False
     TabOrder = 1
     object Splitter2: TSplitter
-      Left = 533
-      Top = 1
+      Left = 534
+      Top = 0
       Width = 8
-      Height = 554
+      Height = 558
       Align = alRight
-      Beveled = True
       MinSize = 300
       ResizeStyle = rsUpdate
       ExplicitLeft = 532
-      ExplicitTop = 0
       ExplicitHeight = 556
     end
     object PackageListPanel: TPanel
-      Left = 1
-      Top = 1
-      Width = 532
-      Height = 554
+      Left = 0
+      Top = 0
+      Width = 534
+      Height = 558
       Align = alClient
+      BevelEdges = [beRight]
       BevelOuter = bvNone
       Caption = 'PackageListPanel'
+      ParentBackground = False
+      ParentColor = True
       ShowCaption = False
       TabOrder = 0
     end
     inline PackageDetailsFrame: TPackageDetailsFrame
-      Left = 541
-      Top = 1
+      Left = 542
+      Top = 0
       Width = 436
-      Height = 554
+      Height = 558
       Align = alRight
       Constraints.MinWidth = 300
       DoubleBuffered = True
+      Color = clWindow
+      ParentBackground = False
+      ParentColor = False
       ParentDoubleBuffered = False
       TabOrder = 1
-      ExplicitLeft = 541
-      ExplicitTop = 1
-      ExplicitHeight = 554
+      ExplicitLeft = 542
+      ExplicitHeight = 558
       inherited sbPackageDetails: TScrollBox
-        Height = 554
-        BevelOuter = bvNone
-        ExplicitHeight = 554
-        inherited pnlPackageId: TPanel
-          Width = 436
-          ExplicitWidth = 436
-        end
+        Height = 558
+        ExplicitHeight = 558
         inherited pnlInstalled: TPanel
-          Width = 436
-          ExplicitWidth = 436
-          inherited txtInstalledVersion: TEdit
-            Width = 276
-            ExplicitWidth = 276
-          end
-          inherited btnUninstall: TButton
-            Left = 357
-            ExplicitLeft = 357
-          end
-        end
-        inherited pnlVersion: TPanel
-          Width = 436
-          ExplicitWidth = 436
-          inherited cboVersions: TComboBox
-            Width = 276
-            ExplicitWidth = 276
-          end
-          inherited btnInstallOrUpdate: TButton
-            Left = 357
-            ExplicitLeft = 357
-          end
+          ExplicitWidth = 434
         end
       end
     end
+  end
+  object pnlButtonBar: TPanel
+    Left = 0
+    Top = 0
+    Width = 978
+    Height = 34
+    Align = alTop
+    BevelOuter = bvNone
+    Caption = 'pnlButtonBar'
+    ParentBackground = False
+    ShowCaption = False
+    TabOrder = 2
   end
   object DPMEditorViewImages: TImageList
     ColorDepth = cd32Bit

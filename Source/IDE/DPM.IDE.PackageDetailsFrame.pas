@@ -2,9 +2,12 @@ unit DPM.IDE.PackageDetailsFrame;
 
 interface
 
+
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
+  Vcl.Imaging.pngimage,
+  Vcl.Themes,
   DPM.Core.Types,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Package.Interfaces,
@@ -17,7 +20,9 @@ uses
   Spring.Collections,
   VSoft.Awaitable,
   SVGInterfaces,
-  ToolsAPI, Vcl.Imaging.pngimage;
+  ToolsAPI;
+
+{$I DPMIDE.inc}
 
 type
   //implemented by the EditorViewFrame
@@ -66,10 +71,15 @@ type
     FPackageId : string;
     FProjectFile : string;
     FCurrentPlatform : TDPMPlatform;
+
+    FIDEStyleServices : TCustomStyleServices;
+
   protected
     procedure SetIncludePreRelease(const Value: boolean);
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
+    procedure Loaded; override;
+
   public
     constructor Create(AOwner : TComponent);override;
     procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectFile : string);
@@ -77,6 +87,7 @@ type
     procedure SetPackage(const package : IPackageSearchResultItem);
     procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;
+    procedure ThemeChanged;
     property IncludePreRelease : boolean read FIncludePreRelease write SetIncludePreRelease;
   end;
 
@@ -268,6 +279,21 @@ end;
 constructor TPackageDetailsFrame.Create(AOwner: TComponent);
 begin
   inherited;
+  //not published in older versions, so get removed when we edit in older versions.
+  {$IFDEF STYLEELEMENTS}
+  StyleElements := [seFont];
+  {$ENDIF}
+
+  FDetailsPanel := TPackageDetailsPanel.Create(AOwner);
+  FDetailsPanel.ParentColor := false;
+  FDetailsPanel.ParentBackground := false;
+  FDetailsPanel.DoubleBuffered := true;
+  FDetailsPanel.Align := alTop;
+  FDetailsPanel.Height := 200;
+  FDetailsPanel.Top := pnlVErsion.Top + pnlVErsion.Top + 20;
+  FDetailsPanel.OnUriClick := Self.OnDetailsUriClick;
+  FDetailsPanel.Parent := sbPackageDetails;
+
   FCurrentPlatform := TDPMPlatform.UnknownPlatform;
   FVersionsDelayTimer := TTimer.Create(AOwner);
   FVersionsDelayTimer.Interval := 200;
@@ -275,13 +301,7 @@ begin
   FVersionsDelayTimer.OnTimer := VersionsDelayTimerEvent;
   FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
 
-  FDetailsPanel := TPackageDetailsPanel.Create(AOwner);
-  FDetailsPanel.Align := alTop;
-  FDetailsPanel.Height := 200;
-  FDetailsPanel.Color := clRed;
-  FDetailsPanel.Top := pnlVErsion.Top + pnlVErsion.Top + 20;
-  FDetailsPanel.Parent := sbPackageDetails;
-  FDetailsPanel.OnUriClick := Self.OnDetailsUriClick;
+  ThemeChanged;
 
 end;
 
@@ -296,6 +316,19 @@ begin
   SetPackage(nil);
 end;
 
+
+procedure TPackageDetailsFrame.Loaded;
+begin
+  inherited;
+//  sbPackageDetails.Color := Self.Color;
+//  sbPackageDetails.ParentBackground := false;
+//
+//  FDetailsPanel.ParentColor := true;
+//  FDetailsPanel.ParentBackground := false;
+//  FDetailsPanel.Color := Self.Color;
+//  FDetailsPanel.Font.Assign(Self.Font);
+
+end;
 
 procedure TPackageDetailsFrame.OnDetailsUriClick(Sender: TObject; const uri: string; const element: TDetailElement);
 begin
@@ -422,6 +455,38 @@ begin
   begin
 
   end;
+end;
+
+procedure TPackageDetailsFrame.ThemeChanged;
+{$IFDEF THEMESERVICES}
+var
+  ideThemeSvc : IOTAIDEThemingServices;
+{$ENDIF}
+begin
+  {$IFDEF THEMESERVICES}
+  ideThemeSvc := (BorlandIDEServices As IOTAIDEThemingServices);
+  ideThemeSvc.ApplyTheme(Self);
+  FIDEStyleServices := ideThemeSvc.StyleServices;
+  {$ELSE}
+  FIDEStyleServices := Vcl.Themes.StyleServices;
+  {$ENDIF}
+
+  sbPackageDetails.Color := FIDEStyleServices.GetSystemColor(clWindow);
+
+  {$IF CompilerVersion >= 34.0}
+  //10.4 is messing this up!
+  pnlPackageId.StyleElements := [seFont];
+  pnlPackageId.Color := sbPackageDetails.Color;
+
+  pnlInstalled.StyleElements := [seFont];
+  pnlInstalled.Color := sbPackageDetails.Color;
+
+  pnlVersion.StyleElements := [seFont];
+  pnlVersion.Color := sbPackageDetails.Color;
+  {$IFEND}
+
+  FDetailsPanel.Color := FIDEStyleServices.GetSystemColor(clWindow);
+  FDetailsPanel.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
 end;
 
 procedure TPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);

@@ -40,6 +40,7 @@ type
   IDPMEditorView = interface
   ['{1DF76A55-76AC-4789-A35A-CA025583356A}']
     procedure Reloaded;
+    procedure ThemeChanged;
   end;
 
   TDPMEditorView = class(TInterfacedObject, INTACustomEditorView, INTACustomEditorView150, IDPMEditorView)
@@ -51,7 +52,10 @@ type
     FCaption : string;
     FProjectTreeManager : IDPMProjectTreeManager;
   protected
+    //IDPMEditorView
     procedure Reloaded;
+    procedure ThemeChanged;
+
     function CloneEditorView: INTACustomEditorView;
     procedure CloseAllCalled(var ShouldClose: Boolean);
     procedure DeselectView;
@@ -179,6 +183,11 @@ begin
   //Note : For some reason this is getting called twice in XE7 for each selection.
   //TODO : Check if it's the same in other IDE versions
   FFrame.ViewSelected;
+end;
+
+procedure TDPMEditorView.ThemeChanged;
+begin
+  FFrame.ThemeChanged;
 end;
 
 end.

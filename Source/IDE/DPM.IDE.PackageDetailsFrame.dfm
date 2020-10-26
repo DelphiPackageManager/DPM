@@ -4,6 +4,9 @@ object PackageDetailsFrame: TPackageDetailsFrame
   Width = 436
   Height = 523
   DoubleBuffered = True
+  Color = clWindow
+  ParentBackground = False
+  ParentColor = False
   ParentDoubleBuffered = False
   TabOrder = 0
   object sbPackageDetails: TScrollBox
@@ -14,20 +17,24 @@ object PackageDetailsFrame: TPackageDetailsFrame
     VertScrollBar.Smooth = True
     VertScrollBar.Tracking = True
     Align = alClient
-    BevelEdges = [beLeft, beRight]
     BevelInner = bvNone
-    BevelKind = bkFlat
+    BevelOuter = bvNone
     BorderStyle = bsNone
     Constraints.MinWidth = 100
+    Color = clWindow
+    ParentColor = False
     TabOrder = 0
+    StyleElements = [seFont, seBorder]
     object pnlPackageId: TPanel
       Left = 0
       Top = 0
-      Width = 434
+      Width = 436
       Height = 57
       Align = alTop
       BevelOuter = bvNone
       Caption = 'pnlPackageId'
+      ParentBackground = False
+      ParentColor = True
       ShowCaption = False
       TabOrder = 0
       object lblPackageId: TLabel
@@ -107,15 +114,17 @@ object PackageDetailsFrame: TPackageDetailsFrame
     object pnlInstalled: TPanel
       Left = 0
       Top = 57
-      Width = 434
+      Width = 436
       Height = 35
       Align = alTop
       BevelOuter = bvNone
       Caption = 'pnlInstalled'
+      ParentBackground = False
+      ParentColor = True
       ShowCaption = False
       TabOrder = 1
       DesignSize = (
-        434
+        436
         35)
       object Label1: TLabel
         Left = 7
@@ -133,14 +142,14 @@ object PackageDetailsFrame: TPackageDetailsFrame
       object txtInstalledVersion: TEdit
         Left = 69
         Top = 8
-        Width = 274
+        Width = 276
         Height = 21
         Anchors = [akLeft, akTop, akRight]
         Enabled = False
         TabOrder = 0
       end
       object btnUninstall: TButton
-        Left = 355
+        Left = 357
         Top = 6
         Width = 75
         Height = 25
@@ -152,15 +161,17 @@ object PackageDetailsFrame: TPackageDetailsFrame
     object pnlVersion: TPanel
       Left = 0
       Top = 92
-      Width = 434
+      Width = 436
       Height = 34
       Align = alTop
       BevelOuter = bvNone
       Caption = 'Panel1'
+      ParentBackground = False
+      ParentColor = True
       ShowCaption = False
       TabOrder = 2
       DesignSize = (
-        434
+        436
         34)
       object lblVersionTitle: TLabel
         Left = 7
@@ -178,7 +189,7 @@ object PackageDetailsFrame: TPackageDetailsFrame
       object cboVersions: TComboBox
         Left = 69
         Top = 6
-        Width = 274
+        Width = 276
         Height = 22
         Style = csOwnerDrawVariable
         Anchors = [akLeft, akTop, akRight]
@@ -188,7 +199,7 @@ object PackageDetailsFrame: TPackageDetailsFrame
         OnMeasureItem = cboVersionsMeasureItem
       end
       object btnInstallOrUpdate: TButton
-        Left = 355
+        Left = 357
         Top = 5
         Width = 75
         Height = 25

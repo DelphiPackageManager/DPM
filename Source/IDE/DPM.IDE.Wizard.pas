@@ -44,6 +44,8 @@ type
     FStorageNotifierID : integer;
     FIDENotifier : integer;
     FProjectMenuNoftifierId : integer;
+    FThemeChangeNotifierId : integer;
+
     FLogger : ILogger;
     FContainer : TContainer;
     FEditorViewManager : IDPMEditorViewManager;
@@ -129,6 +131,12 @@ begin
   FProjectTreeManager := TDPMProjectTreeManager.Create(FContainer, FLogger as IDPMIDELogger);
   FEditorViewManager := TDPMEditorViewManager.Create(FContainer, FProjectTreeManager);
 
+  {$IF CompilerVersion >= 32.0}
+    FThemeChangeNotifierId := (BorlandIDEServices as IOTAIDEThemingServices).AddNotifier(FEditorViewManager as INTAIDEThemingServicesNotifier);
+  {$ELSE}
+    FThemeChangeNotifierId := -1;
+  {$IFEND}
+
   ideNotifier := TDPMIDENotifier.Create(FLogger as IDPMIDELogger, packageInstaller, FEditorViewManager, FProjectTreeManager);
   FIDENotifier := (BorlandIDEServices as IOTAServices).AddNotifier(ideNotifier);
 
@@ -137,11 +145,8 @@ begin
   FProjectMenuNoftifierId := (BorlandIDEServices as IOTAProjectManager).AddMenuItemCreatorNotifier(projMenuNotifier);
 
   options := TDPMAddinOptions.Create(FContainer);
-
  (BorlandIDEServices As INTAEnvironmentOptionsServices).RegisterAddInOptions(options);
 
-
-  //this didn't work, leaving here as we may need it to try and detect reloads.
   storageNotifier := TDPMProjectStorageNotifier.Create(FLogger as IDPMIDELogger,  FEditorViewManager, FProjectTreeManager);
   FStorageNotifierID := (BorlandIDEServices As IOTAProjectFileStorage).AddNotifier(storageNotifier);
 
@@ -149,14 +154,6 @@ end;
 
 destructor TDPMWizard.Destroy;
 begin
-//  If FStorageNotifierId > -1 then
-//    (BorlandIDEServices As IOTAProjectFileStorage).RemoveNotifier(FStorageNotifierId);
-//  if FIDENotifier > -1 then
-//    (BorlandIDEServices as IOTAServices).RemoveNotifier(FIDENotifier);
-//
-//  if FProjectMenuNoftifierId > -1 then
-//    (BorlandIDEServices as IOTAServices).RemoveNotifier(FProjectMenuNoftifierId);
-
   inherited;
 end;
 
@@ -170,6 +167,12 @@ begin
 
   if FProjectMenuNoftifierId > -1 then
     (BorlandIDEServices as IOTAServices).RemoveNotifier(FProjectMenuNoftifierId);
+
+  {$IF CompilerVersion >= 32.0}
+    if FThemeChangeNotifierId > -1 then
+     (BorlandIDEServices as IOTAIDEThemingServices).RemoveNotifier(FThemeChangeNotifierId);
+  {$IFEND}
+
 end;
 
 procedure TDPMWizard.Execute;

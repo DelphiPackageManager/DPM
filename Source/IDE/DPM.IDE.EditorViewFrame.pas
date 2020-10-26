@@ -30,10 +30,13 @@ unit DPM.IDE.EditorViewFrame;
 
 interface
 
+{$I DPMIDE.inc}
+
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ImgList,
   Vcl.ComCtrls, Vcl.ExtCtrls,   Vcl.Menus, SVGInterfaces,
+  Vcl.Themes,
   DPM.Controls.ButtonedEdit,
   DPM.Controls.GroupButton,
   VSoftVirtualListView,
@@ -54,6 +57,9 @@ uses
   {$LEGACYIFEND ON}
   System.Actions,
   {$IFEND}
+  {$IF CompilerVersion >= 30.0 }
+  System.ImageList,
+  {$IFEND}
   Vcl.ActnList, DPM.IDE.PackageDetailsFrame;
 
 type
@@ -71,7 +77,7 @@ type
   TDPMEditViewFrame = class(TFrame, IPackageSearcher)
     lblProject: TLabel;
     DPMEditorViewImages: TImageList;
-    SearchPanel: TPanel;
+    pnlSearchPanel: TPanel;
     txtSearch: TButtonedEdit;
     btnRefresh: TButton;
     chkIncludePrerelease: TCheckBox;
@@ -123,6 +129,8 @@ type
     FProjectGroup : IOTAProjectGroup;
     FProject : IOTAProject;
     FCurrentPlatform : TDPMPlatform;
+
+    FIDEStyleServices : TCustomStyleServices;
 
     //request stuff
     FCancelTokenSource : ICancellationTokenSource;
@@ -197,6 +205,7 @@ type
     //Create Ui elements at runtime - uses controls that are not installed, saves dev needing
     //to install controls before they can work in this.
     procedure CreateControls(AOwner : TComponent);
+
   public
     constructor Create(AOwner : TComponent);override;
     destructor Destroy;override;
@@ -207,16 +216,18 @@ type
     procedure ViewDeselected;
     procedure Closing;
     procedure ProjectReloaded;
+    procedure ThemeChanged;
   end;
 
 implementation
 
 {$R *.dfm}
 
+
+
 uses
   System.Types,
   Xml.XMLIntf,
-  Vcl.Themes,
   System.Diagnostics,
   DPM.Core.Constants,
   DPM.Core.Options.Common,
@@ -310,11 +321,30 @@ begin
 end;
 
 constructor TDPMEditViewFrame.Create(AOwner: TComponent);
+{$IFDEF THEMESERVICES}
+var
+  ideThemeSvc : IOTAIDEThemingServices;
+{$ENDIF}
 begin
   inherited;
   FIconCache := TDPMIconCache.Create;
+  //not published in older versions, so get removed when we edit in older versions.
+  {$IFDEF STYLEELEMENTS}
+  StyleElements := [seFont, seClient, seBorder];
+  {$ENDIF}
+
+  //todo - check when the IOTAIDEThemingServices was added
+  {$IFDEF THEMESERVICES}
+  ideThemeSvc := (BorlandIDEServices As IOTAIDEThemingServices);
+  ideThemeSvc.ApplyTheme(Self);
+  FIDEStyleServices := ideThemeSvc.StyleServices;
+  {$ELSE}
+  FIDEStyleServices := Vcl.Themes.StyleServices;
+  {$ENDIF}
 
   CreateControls(AOwner);
+  ThemeChanged;
+
   FFirstView := true;
 
   txtSearch.ACEnabled := true;
@@ -332,7 +362,6 @@ begin
   //hard code our compiler version here since when we are running in the IDE we are only working with the IDE version
   FSearchOptions.CompilerVersion := IDECompilerVersion;
 //  FSearchOptions.Take := 5; //just for testing.
-
 
 
   FSearchSkip := 0;
@@ -362,29 +391,26 @@ begin
   FSearchButton.Left := 20;
   FSearchButton.Caption := 'Search';
   FSearchButton.Tag := 0;
+  FSearchButton.Parent := pnlButtonBar;
 
   FInstalledButton.Top := 10;
-  FInstalledButton.Left := FInstalledButton.Left + FInstalledButton.Width + 20;
+  FInstalledButton.Left := FSearchButton.Left + FSearchButton.Width + 20;
   FInstalledButton.Caption := 'Installed';
   FInstalledButton.Tag := 1;
   FInstalledButton.Active := true;
+  FInstalledButton.Parent := pnlButtonBar;
 
   FUpdatesButton.Top := 10;
   FUpdatesButton.Left := FInstalledButton.Left + FInstalledButton.Width + 20;
   FUpdatesButton.Caption := 'Updates';
   FUpdatesButton.Tag := 2;
-
+  FUpdatesButton.Parent := pnlButtonBar;
 
   FConflictsButton.Top := 10;
-  FConflictsButton.Left := FInstalledButton.Left + FInstalledButton.Width + 20;
+  FConflictsButton.Left := FUpdatesButton.Left + FUpdatesButton.Width + 20;
   FConflictsButton.Caption := 'Conflicts';
   FConflictsButton.Tag := 3;
   FConflictsButton.Visible := false;
-
-
-  FInstalledButton.Parent := pnlButtonBar;
-  FUpdatesButton.Parent := pnlButtonBar;
-  FSearchButton.Parent := pnlButtonBar;
   FConflictsButton.Parent := pnlButtonBar;
 
   FInstalledButton.OnClick := tabMainChange;
@@ -393,11 +419,15 @@ begin
   FConflictsButton.OnClick := tabMainChange;
 
   FScrollList := TVSoftVirtualListView.Create(Self);
+  {$IFDEF STYLEELEMENTS}
+  FScrollList.StyleElements := [seFont];
+  {$ENDIF}
   FScrollList.Align := alClient;
   FScrollList.BorderStyle := bsNone;
-//  FScrollList.BevelOuter := bvLowered;
-//  FScrollList.BevelEdges := [beRight];
-//  FScrollList.BevelKind := bkFlat;
+  FScrollList.BevelEdges := [];
+  FScrollList.BevelOuter := bvNone;
+  FScrollList.BevelInner := bvNone;
+  FScrollList.BevelKind := bkNone;
   FScrollList.RowHeight := 75;
   FScrollList.RowCount := 0;
   FScrollList.OnPaintRow := Self.ScrollListPaintRow;
@@ -405,12 +435,12 @@ begin
   FScrollList.OnRowChange := Self.ScrollListChangeRow;
 
   FScrollList.Constraints.MinWidth := 400;
-  FScrollList.Color := clWhite;
-  FScrollList.DoubleBuffered := true;
-//  FScrollList.ParentBackground := false;
+  FScrollList.DoubleBuffered := false;
+  FScrollList.ParentDoubleBuffered := false;
+  FScrollList.ParentBackground := false;
+  FScrollList.ParentColor := false;
 
   FScrollList.Parent := PackageListPanel;
-
 end;
 
 function TDPMEditViewFrame.CurrentList: IList<IPackageSearchResultItem>;
@@ -598,6 +628,7 @@ begin
   result := FProjectGroup <> nil;
 end;
 
+
 procedure TDPMEditViewFrame.LoadList(const list: IList<IPackageSearchResultItem>);
 begin
   if list = nil then
@@ -661,7 +692,7 @@ begin
     if FCurrentPlatform <> projectPlatform then
     begin
       FCurrentPlatform := projectPlatform;
-      projectEditor := TProjectEditor.Create(FLogger, FConfiguration);
+      projectEditor := TProjectEditor.Create(FLogger, FConfiguration, IDECompilerVersion);
       projectEditor.LoadProject(FProject.FileName);
       FPackageReferences := projectEditor.PackageReferences;
       //TODO : need to do this more safely as it may interrup another operation.
@@ -805,6 +836,7 @@ end;
 procedure TDPMEditViewFrame.ScrollListPaintNoRows(const Sender: TObject; const ACanvas: TCanvas; const paintRect: TRect);
 begin
   ACanvas.Font.Assign(Self.Font);
+  ACanvas.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
   ACanvas.TextOut(20,20, 'No Packages found');
 end;
 
@@ -841,13 +873,18 @@ begin
   try
     if (state in [rsFocusedSelected, rsFocusedHot, rsHot]) then
     begin
+      {$IF CompilerVersion < 32.0}
       backgroundColor :=  $00FFF0E9;// StyleServices.GetSystemColor(clHighlight);
-      ACanvas.Font.Color := clWindowText;// StyleServices.GetSystemColor(clHighlightText);
+      ACanvas.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
+      {$ELSE}
+      backgroundColor :=  FIDEStyleServices.GetStyleColor(TStyleColor.scButtonHot);//  $00FFF0E9;// StyleServices.GetSystemColor(clHighlight);
+      ACanvas.Font.Color := FIDEStyleServices.GetSystemColor(clHighlightText);
+      {$IFEND}
     end
     else
     begin
-      backgroundColor := FScrollList.Color;// Self.Color;// StyleServices.GetSystemColor(clWindow);
-      ACanvas.Font.Color := StyleServices.GetSystemColor(clWindowText);
+      backgroundColor := FIDEStyleServices.GetSystemColor(clWindow);
+      ACanvas.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
     end;
 
     //row background
@@ -883,11 +920,11 @@ begin
 
     //make text of different font sizes align correctly.
     oldTextAlign := SetTextAlign(ACanvas.Handle, TA_BASELINE);
+    fontSize := ACanvas.Font.Size;
     try
       //Draw the package Name.
       titleRect := FRowLayout.TitleRect;
       title := item.Id;
-      fontSize := ACanvas.Font.Size;
 
       ACanvas.Font.Size := fontSize + 2;
       ACanvas.Font.Style := [fsBold];
@@ -1311,11 +1348,47 @@ begin
   PackageDetailsFrame.SetPackage(nil);
   PackageDetailsFrame.Configure(FCurrentTab, chkIncludePrerelease.Checked);
   case FCurrentTab of
+    TCurrentTab.Search: SwitchedToSearch(txtSearch.Text <> '');
     TCurrentTab.Installed: SwitchedToInstalled(txtSearch.Text <> '');
     TCurrentTab.Updates: SwitchedToUpdates(txtSearch.Text <> '');
-    TCurrentTab.Search: SwitchedToSearch(txtSearch.Text <> '');
     TCurrentTab.Conflicts : SwitchedToConflicts(txtSearch.Text <> '');
   end;
+end;
+
+procedure TDPMEditViewFrame.ThemeChanged;
+{$IF CompilerVersion >=32.0}
+var
+  ideThemeSvc : IOTAIDEThemingServices;
+{$IFEND}
+begin
+  {$IF CompilerVersion >=32.0}
+  ideThemeSvc := (BorlandIDEServices As IOTAIDEThemingServices);
+  ideThemeSvc.ApplyTheme(Self);
+  FIDEStyleServices := ideThemeSvc.StyleServices;
+  ideThemeSvc.ApplyTheme(pnlButtonBar);
+  ideThemeSvc.ApplyTheme(pnlSearchPanel);
+  ideThemeSvc.ApplyTheme(Splitter2);
+  {$ELSE}
+  FIDEStyleServices := Vcl.Themes.StyleServices;
+  {$IFEND}
+
+  //
+  pnlButtonBar.Color := FIDEStyleServices.GetSystemColor(clBtnFace);
+  pnlButtonBar.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
+  pnlSearchPanel.Color := FIDEStyleServices.GetSystemColor(clBtnFace);
+  pnlSearchPanel.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
+  Splitter2.Color := FIDEStyleServices.GetSystemColor(clBtnFace);
+
+  FSearchButton.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
+  FInstalledButton.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
+  FUpdatesButton.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
+  FConflictsButton.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
+  FScrollList.Color := FIDEStyleServices.GetSystemColor(clWindow);
+  FScrollList.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
+  PackageDetailsFrame.Color := FIDEStyleServices.GetSystemColor(clWindow);
+  PackageDetailsFrame.ThemeChanged;
+//  Self.Invalidate;
+
 end;
 
 procedure TDPMEditViewFrame.txtSearchChange(Sender: TObject);

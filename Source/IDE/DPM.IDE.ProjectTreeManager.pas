@@ -131,7 +131,8 @@ uses
   DPM.Core.Configuration.Manager,
   DPM.Core.Project.Editor,
   DPM.IDE.Constants,
-  DPM.IDE.Utils;
+  DPM.IDE.Utils,
+  DPM.IDE.Types;
 
 
 const
@@ -178,8 +179,7 @@ var
   projectEditor : IProjectEditor;
   projectNode : PVirtualNode;
 begin
-  projectEditor := TProjectEditor.Create(FLogger as ILogger, config);
-
+  projectEditor := TProjectEditor.Create(FLogger as ILogger, config, IDECompilerVersion);
 
   targetPlatformContainer := FindTargetPlatformContainer(projectContainer);
   if targetPlatformContainer = nil then

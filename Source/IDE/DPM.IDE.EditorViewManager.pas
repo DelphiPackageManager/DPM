@@ -44,7 +44,7 @@ type
     //todo : add methods to hand notifications of projects added to group
   end;
 
-  TDPMEditorViewManager = class(TInterfacedObject, IDPMEditorViewManager)
+  TDPMEditorViewManager = class(TInterfacedObject, IDPMEditorViewManager {$IF CompilerVersion >= 32.0}, INTAIDEThemingServicesNotifier{$IFEND} )
   private
     FContainer : TContainer;
     FOpenViews : IDictionary<string, INTACustomEditorView>;
@@ -56,6 +56,17 @@ type
     procedure ProjectClosed(const projectFile: string);
     procedure ShowViewForProject(const project: IOTAProject);
     procedure Destroyed;
+
+    //IOTANotifier
+    procedure AfterSave;
+    procedure BeforeSave;
+    procedure Modified;
+    
+    //INTAIDEThemingServicesNotifier
+    procedure ChangingTheme();
+    { This notifier will be called immediately after the active IDE Theme changes }
+    procedure ChangedTheme();
+
   public
     constructor Create(const container : TContainer; const projectTreeManager : IDPMProjectTreeManager);
     destructor Destroy;override;
@@ -71,6 +82,31 @@ uses
 
 
 { TDPMEditorViewManager }
+
+procedure TDPMEditorViewManager.AfterSave;
+begin
+
+end;
+
+procedure TDPMEditorViewManager.BeforeSave;
+begin
+
+end;
+
+procedure TDPMEditorViewManager.ChangedTheme;
+var
+  view : INTACustomEditorView;
+begin
+  for view in FOpenViews.Values do
+  begin
+    (view as IDPMEditorView).ThemeChanged;
+  end;
+end;
+
+procedure TDPMEditorViewManager.ChangingTheme;
+begin
+
+end;
 
 constructor TDPMEditorViewManager.Create(const container : TContainer; const projectTreeManager : IDPMProjectTreeManager);
 var
@@ -121,6 +157,11 @@ begin
   end;
 
   FEditorViewServices := nil;
+end;
+
+procedure TDPMEditorViewManager.Modified;
+begin
+
 end;
 
 procedure TDPMEditorViewManager.ProjectClosed(const projectFile: string);

@@ -2,6 +2,8 @@ unit DPM.IDE.PackageDetailsPanel;
 
 interface
 
+{$I DPMIDE.inc}
+
 uses
   System.Types,
   System.Classes,
@@ -78,6 +80,15 @@ type
   published
     property OnUriClick : TUriClickEvent read FOnUriClickEvent write FOnUriClickEvent;
     property Color;
+    property Font;
+    property ParentColor;
+    property ParentBackground;
+    property ParentFont;
+    property ParentDoubleBuffered;
+    property DoubleBuffered;
+    {$IFDEF STYLEELEMENTS}
+    property StyleElements;
+    {$ENDIF}
   end;
 
 implementation
@@ -86,6 +97,7 @@ uses
   System.SysUtils,
   System.UITypes,
   Vcl.Themes,
+  Vcl.Forms,
   VSoft.Uri,
   DPM.Core.Types;
 
@@ -106,6 +118,10 @@ constructor TPackageDetailsPanel.Create(AOwner: TComponent);
 begin
   inherited;
   DoubleBuffered := true;
+  ParentColor := false;
+  {$IFDEF STYLEELEMENTS}
+  StyleElements := [seFont];
+  {$ENDIF}
 end;
 
 function TPackageDetailsPanel.HitTest(const pt: TPoint): TDetailElement;
@@ -188,7 +204,7 @@ end;
 procedure TPackageDetailsPanel.Paint;
 var
   fontStyle : TFontStyles;
-  LStyles : TCustomStyleServices;
+  fillColor : TColor;
   fontColor : TColor;
   uriColor : TColor;
   dependRect : TRect;
@@ -197,21 +213,14 @@ var
   textSize : TSize;
   value : string;
 begin
-  LStyles := StyleServices;
+  Canvas.Brush.Style := bsSolid;
 
-  if LStyles.Enabled then
-    Canvas.Brush.Color := LStyles.GetStyleColor(TStyleColor.scPanel)
-  else
-    Canvas.Brush.Color := Self.Color;
+  fillColor := Self.Color;
+  fontColor := Self.Font.Color;
+  Canvas.Font.Color := fontColor;
+  Canvas.Brush.Color := fillColor;
   Canvas.FillRect(ClientRect);
 
-
-  if LStyles.Enabled then
-    fontColor := LStyles.GetStyleFontColor(sfWindowTextNormal)
-  else
-    fontColor := Self.Color;
-
-  Canvas.Font.Color := fontColor;
 
   uriColor := $00C57321;
 

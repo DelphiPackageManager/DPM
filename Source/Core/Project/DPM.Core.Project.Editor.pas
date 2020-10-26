@@ -86,7 +86,7 @@ type
     procedure UpdatePackageReferences(const packageReferences : IList<IPackageReference>; const platform : TDPMPlatform);
 
   public
-    constructor Create(const logger : ILogger; const config : IConfiguration );
+    constructor Create(const logger : ILogger; const config : IConfiguration; const compilerVersion : TCompilerVersion );
   end;
 
 implementation
@@ -182,11 +182,11 @@ begin
 
 end;
 
-constructor TProjectEditor.Create(const logger: ILogger; const config : IConfiguration);
+constructor TProjectEditor.Create(const logger: ILogger; const config : IConfiguration; const compilerVersion : TCompilerVersion);
 begin
   FLogger := logger;
   FConfig := config;
-  FCompiler := TCompilerVersion.UnknownVersion;
+  FCompiler := compilerVersion;
   FPlatforms := [];
   FPackageRefences := TCollections.CreateList<IPackageReference>;
   FConfigurations :=  TCollections.CreateDictionary<string, IProjectConfiguration>;
@@ -716,11 +716,17 @@ begin
     FProjectVersion := xmlElement.text;
     if FProjectVersion <> '' then
     begin
-      FCompiler := ProjectVersionToCompilerVersion(FProjectVersion);
-      if FCompiler <> TCompilerVersion.UnknownVersion then
-        result := true
+      //only use the projectversion if we haven't already set the compilerversion.
+      if FCompiler = TCompilerVersion.UnknownVersion then
+      begin
+        FCompiler :=ProjectVersionToCompilerVersion(FProjectVersion);
+        if FCompiler <> TCompilerVersion.UnknownVersion then
+          result := true
+        else
+          FLogger.Error('Unable to determine Compiler version from ProjectVersion');
+      end
       else
-        FLogger.Error('Unable to determine Compiler version from ProjectVersion');
+        result := true;
     end
     else
       FLogger.Error('ProjectVersion element is empty, unable to determine Compiler version.');
@@ -778,6 +784,8 @@ end;
 procedure TProjectEditor.SetCompiler(const value: TCompilerVersion);
 begin
   FCompiler := value;
+
+
 end;
 
 procedure TProjectEditor.UpdatePackageReferences(const packageReferences: IList<IPackageReference>; const platform : TDPMPlatform);

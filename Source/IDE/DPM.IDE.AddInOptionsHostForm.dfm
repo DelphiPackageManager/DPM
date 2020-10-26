@@ -23,31 +23,44 @@ object DPMOptionsHostForm: TDPMOptionsHostForm
     Height = 504
     Align = alClient
     TabOrder = 0
+    ExplicitWidth = 720
+    ExplicitHeight = 504
     inherited Panel1: TPanel
       Width = 720
+      ExplicitWidth = 720
       inherited SpeedButton1: TSpeedButton
         Left = 539
+        ExplicitLeft = 539
       end
       inherited SpeedButton2: TSpeedButton
         Left = 584
+        ExplicitLeft = 584
       end
       inherited SpeedButton3: TSpeedButton
         Left = 629
+        ExplicitLeft = 629
       end
       inherited SpeedButton4: TSpeedButton
         Left = 674
+        ExplicitLeft = 674
       end
     end
     inherited Panel2: TPanel
-      Top = 254
+      Top = 293
       Width = 720
+      ExplicitTop = 293
+      ExplicitWidth = 720
     end
     inherited Panel3: TPanel
       Width = 720
-      Height = 165
+      Height = 204
+      ExplicitWidth = 720
+      ExplicitHeight = 204
       inherited lvSources: TListView
         Width = 720
-        Height = 165
+        Height = 204
+        ExplicitWidth = 720
+        ExplicitHeight = 204
       end
     end
   end

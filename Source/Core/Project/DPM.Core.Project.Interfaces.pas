@@ -126,7 +126,7 @@ type
 implementation
 
 uses
-  {$IF CompilerVersion > 29.0}
+  {$IF CompilerVersion >= 29.0}
     {$LEGACYIFEND ON}
   System.Hash,
   {$IFEND}
@@ -144,7 +144,7 @@ var
   s : string;
 begin
   s := Value.Id;
-  {$IF CompilerVersion > 29.0}
+  {$IF CompilerVersion >= 29.0}
   Result := System.Hash.THashBobJenkins.GetHashValue(s);
   {$ELSE}
   Result := BobJenkinsHash(PChar(s)^, SizeOf(Char) * Length(s), 0);
