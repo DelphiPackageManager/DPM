@@ -473,8 +473,12 @@ begin
 
   sbPackageDetails.Color := FIDEStyleServices.GetSystemColor(clWindow);
 
-  {$IF CompilerVersion >= 34.0}
-  //10.4 is messing this up!
+  {$IF CompilerVersion >= 32.0}
+  sbPackageDetails.ParentColor := false;
+  sbPackageDetails.ParentBackground := false;
+  sbPackageDetails.StyleElements := [seFont];
+  sbPackageDetails.Color := FIDEStyleServices.GetSystemColor(clWindow);
+
   pnlPackageId.StyleElements := [seFont];
   pnlPackageId.Color := sbPackageDetails.Color;
 
@@ -483,10 +487,18 @@ begin
 
   pnlVersion.StyleElements := [seFont];
   pnlVersion.Color := sbPackageDetails.Color;
-  {$IFEND}
 
+  FDetailsPanel.StyleElements := [seFont];
+  FDetailsPanel.Color := sbPackageDetails.Color;
+  FDetailsPanel.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);;
+
+  {$ELSE}
+  sbPackageDetails.Color := FIDEStyleServices.GetSystemColor(clWindow);
   FDetailsPanel.Color := FIDEStyleServices.GetSystemColor(clWindow);
   FDetailsPanel.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
+
+  {$IFEND}
+
 end;
 
 procedure TPackageDetailsFrame.VersionsDelayTimerEvent(Sender : TObject);

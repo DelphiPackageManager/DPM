@@ -36,7 +36,7 @@ uses
   //NOTE: The IDE keeps adding this again below, if it happens edit the file outside the IDE.
   System.Actions,
   {$IFEND}
-  {$IF CompilerVersion >= 25.0 } //XE3 up
+  {$IF CompilerVersion >= 29.0 } //XE3 up
   System.ImageList,
   {$IFEND}
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ActnList, Vcl.ImgList, Vcl.CheckLst,
