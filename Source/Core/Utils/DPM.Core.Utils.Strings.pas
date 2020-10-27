@@ -34,10 +34,10 @@ type
   TStringUtils = class
     //mostly functions from TStringHelper that are useful.
 
-    class function PadRight(const theString : string; TotalWidth: Integer): string; overload; inline;
-    class function PadRight(const theString : string; TotalWidth: Integer; PaddingChar: Char): string; overload; inline;
-    class function SplitStr(const value : string; const Separator: Char; const options : TSplitStringOptions): TArray<string>;overload;
-    class function SplitStr(const value : string; const Separator: Char): TArray<string>; overload;
+    class function PadRight(const theString : string; TotalWidth : Integer) : string; overload; inline;
+    class function PadRight(const theString : string; TotalWidth : Integer; PaddingChar : Char) : string; overload; inline;
+    class function SplitStr(const value : string; const Separator : Char; const options : TSplitStringOptions) : TArray<string>; overload;
+    class function SplitStr(const value : string; const Separator : Char) : TArray<string>; overload;
     class function StartsWith(const theString : string; const value : string; const IgnoreCase : boolean = false) : boolean;
     class function Contains(const theString : string; const value : string; const IgnoreCase : boolean = false) : boolean;
   end;
@@ -52,20 +52,20 @@ uses
 
 
 //borrowed from stringhelper, works in more versions of delphi
-class function TStringUtils.SplitStr(const value : string; const Separator: Char; const options : TSplitStringOptions): TArray<string>;
+class function TStringUtils.SplitStr(const value : string; const Separator : Char; const options : TSplitStringOptions) : TArray<string>;
 const
   DeltaGrow = 4; //we are not likely to need a lot
 var
-  NextSeparator, LastIndex: Integer;
-  Total: Integer;
-  CurrentLength: Integer;
+  NextSeparator, LastIndex : Integer;
+  Total : Integer;
+  CurrentLength : Integer;
   s : string;
 begin
   Total := 0;
   LastIndex := 1;
   CurrentLength := 0;
-  NextSeparator := PosEx(Separator,value, LastIndex);
-  while (NextSeparator > 0)  do
+  NextSeparator := PosEx(Separator, value, LastIndex);
+  while (NextSeparator > 0) do
   begin
     s := Copy(value, LastIndex, NextSeparator - LastIndex);
     if (S <> '') or ((S = '') and (Options <> ExcludeEmpty)) then
@@ -79,14 +79,14 @@ begin
       Result[Total - 1] := S;
     end;
     LastIndex := NextSeparator + 1;
-    NextSeparator :=  PosEx(Separator,value, LastIndex);
+    NextSeparator := PosEx(Separator, value, LastIndex);
   end;
 
   if (LastIndex <= Length(value)) then
   begin
     Inc(Total);
     SetLength(Result, Total);
-    Result[Total - 1] := Copy(value,LastIndex, Length(value) - LastIndex + 1);
+    Result[Total - 1] := Copy(value, LastIndex, Length(value) - LastIndex + 1);
   end
   else
     SetLength(Result, Total);
@@ -94,21 +94,21 @@ begin
 end;
 
 
-class function TStringUtils.PadRight(const theString: string; TotalWidth: Integer): string;
+class function TStringUtils.PadRight(const theString : string; TotalWidth : Integer) : string;
 begin
   Result := PadRight(theString, TotalWidth, ' ');
 end;
 
-class function TStringUtils.Contains(const theString, value: string; const IgnoreCase: boolean): boolean;
+class function TStringUtils.Contains(const theString, value : string; const IgnoreCase : boolean) : boolean;
 begin
   if IgnoreCase then
-    Result := Pos(LowerCase(value), LowerCase(theString) ) > 0
+    Result := Pos(LowerCase(value), LowerCase(theString)) > 0
   else
     Result := Pos(value, theString) > 0;
 
 end;
 
-class function TStringUtils.PadRight(const theString: string; TotalWidth: Integer; PaddingChar: Char): string;
+class function TStringUtils.PadRight(const theString : string; TotalWidth : Integer; PaddingChar : Char) : string;
 begin
   TotalWidth := TotalWidth - Length(theString);
   if TotalWidth > 0 then
@@ -117,16 +117,16 @@ begin
     Result := theString;
 end;
 
-class function TStringUtils.SplitStr(const value: string; const Separator: Char): TArray<string>;
+class function TStringUtils.SplitStr(const value : string; const Separator : Char) : TArray<string>;
 begin
   result := SplitStr(value, Separator, TSplitStringOptions.ExcludeEmpty);
 end;
 
 //copied from XE7
-function StrLComp(const Str1, Str2: PWideChar; MaxLen: Cardinal): Integer;
+function StrLComp(const Str1, Str2 : PWideChar; MaxLen : Cardinal) : Integer;
 var
-  I: Cardinal;
-  P1, P2: PWideChar;
+  I : Cardinal;
+  P1, P2 : PWideChar;
 begin
   P1 := Str1;
   P2 := Str2;
@@ -144,11 +144,12 @@ begin
 end;
 
 {$WARN WIDECHAR_REDUCED OFF} //not an issue as the set is a..z
-function StrLIComp(const Str1, Str2: PWideChar; MaxLen: Cardinal): Integer;
+
+function StrLIComp(const Str1, Str2 : PWideChar; MaxLen : Cardinal) : Integer;
 var
-  P1, P2: PWideChar;
-  I: Cardinal;
-  C1, C2: WideChar;
+  P1, P2 : PWideChar;
+  I : Cardinal;
+  C1, C2 : WideChar;
 begin
   P1 := Str1;
   P2 := Str2;
@@ -176,7 +177,7 @@ begin
 end;
 {$WARN WIDECHAR_REDUCED ON}
 
-class function TStringUtils.StartsWith(const theString, value: string; const IgnoreCase : boolean): boolean;
+class function TStringUtils.StartsWith(const theString, value : string; const IgnoreCase : boolean) : boolean;
 begin
   if not IgnoreCase then
     Result := StrLComp(PChar(theString), PChar(Value), Length(Value)) = 0
@@ -185,3 +186,4 @@ begin
 end;
 
 end.
+

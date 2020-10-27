@@ -42,8 +42,8 @@ type
     FLogger : ILogger;
     function InternalReadPackageSpecJson(const fileName : string; const jsonObject : TJsonObject) : IPackageSpec;
   protected
-    function ReadSpec(const fileName : string) : IPackageSpec;overload;
-    function ReadSpec(const stream : TStream) : IPackageSpec;overload;
+    function ReadSpec(const fileName : string) : IPackageSpec; overload;
+    function ReadSpec(const stream : TStream) : IPackageSpec; overload;
     function ReadSpecString(const specString : string) : IPackageSpec;
   public
     constructor Create(const logger : ILogger);
@@ -57,9 +57,9 @@ uses
 
 { TSpecReader }
 
-function TPackageSpecReader.ReadSpec(const fileName: string): IPackageSpec;
+function TPackageSpecReader.ReadSpec(const fileName : string) : IPackageSpec;
 var
-  jsonObj: TJsonObject;
+  jsonObj : TJsonObject;
 begin
   result := nil;
   if not FileExists(fileName) then
@@ -83,12 +83,12 @@ begin
   end;
 end;
 
-constructor TPackageSpecReader.Create(const logger: ILogger);
+constructor TPackageSpecReader.Create(const logger : ILogger);
 begin
   FLogger := logger;
 end;
 
-function TPackageSpecReader.InternalReadPackageSpecJson(const fileName : string; const jsonObject: TJsonObject): IPackageSpec;
+function TPackageSpecReader.InternalReadPackageSpecJson(const fileName : string; const jsonObject : TJsonObject) : IPackageSpec;
 begin
   result := nil;
   if not jsonObject.Contains('metadata') then
@@ -102,13 +102,13 @@ begin
 end;
 
 
-function TPackageSpecReader.ReadSpec(const stream: TStream): IPackageSpec;
+function TPackageSpecReader.ReadSpec(const stream : TStream) : IPackageSpec;
 begin
   result := nil;
   raise ENotImplemented.Create('ReadSpec from stream not implemented');
 end;
 
-function TPackageSpecReader.ReadSpecString(const specString: string): IPackageSpec;
+function TPackageSpecReader.ReadSpecString(const specString : string) : IPackageSpec;
 var
   jsonObj : TJsonObject;
 begin
@@ -136,3 +136,4 @@ begin
 end;
 
 end.
+

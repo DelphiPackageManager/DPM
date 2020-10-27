@@ -34,13 +34,13 @@ uses
 
 type
   TDPMAboutForm = class(TForm)
-    Image1: TImage;
-    Label1: TLabel;
-    Label2: TLabel;
-    Label3: TLabel;
-    githubLinkLabel: TLinkLabel;
-    Label4: TLabel;
-    procedure githubLinkLabelLinkClick(Sender: TObject; const Link: string; LinkType: TSysLinkType);
+    Image1 : TImage;
+    Label1 : TLabel;
+    Label2 : TLabel;
+    Label3 : TLabel;
+    githubLinkLabel : TLinkLabel;
+    Label4 : TLabel;
+    procedure githubLinkLabelLinkClick(Sender : TObject; const Link : string; LinkType : TSysLinkType);
   private
     { Private declarations }
   public
@@ -48,7 +48,7 @@ type
   end;
 
 var
-  DPMAboutForm: TDPMAboutForm;
+  DPMAboutForm : TDPMAboutForm;
 
 implementation
 
@@ -57,9 +57,10 @@ uses
 
 {$R *.dfm}
 
-procedure TDPMAboutForm.githubLinkLabelLinkClick(Sender: TObject; const Link: string; LinkType: TSysLinkType);
+procedure TDPMAboutForm.githubLinkLabelLinkClick(Sender : TObject; const Link : string; LinkType : TSysLinkType);
 begin
   ShellExecute(0, 'Open', PChar(Link), nil, nil, SW_SHOWNORMAL);
 end;
 
 end.
+

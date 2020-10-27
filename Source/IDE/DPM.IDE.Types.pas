@@ -35,30 +35,31 @@ uses
 
 type
   TDPMPackageStatus = (NotInstalled,
-                    Installed, //latest version installed.
-                    UpdateAvailable //installed but not on the latest version
-                    );
+    Installed, //latest version installed.
+    UpdateAvailable //installed but not on the latest version
+    );
 
   TCurrentTab = (Search, Installed, Updates, Conflicts);
 
 const
   //The current IDE version to TCompilerVersion.
-    {$IFDEF VER340}IDECompilerVersion = TCompilerVersion.RS10_4;{$ENDIF}
-    {$IFDEF VER330}IDECompilerVersion = TCompilerVersion.RS10_3;{$ENDIF}
-    {$IFDEF VER320}IDECompilerVersion = TCompilerVersion.RS10_2;{$ENDIF}
-    {$IFDEF VER310}IDECompilerVersion = TCompilerVersion.RS10_1;{$ENDIF}
-    {$IFDEF VER300}IDECompilerVersion = TCompilerVersion.RS10_0;{$ENDIF}
-    {$IFDEF VER290}IDECompilerVersion = TCompilerVersion.RSXE8;{$ENDIF}
-    {$IFDEF VER280}IDECompilerVersion = TCompilerVersion.RSXE7;{$ENDIF}
-    {$IFDEF VER270}IDECompilerVersion = TCompilerVersion.RSXE6;{$ENDIF}
-    {$IFDEF VER260}IDECompilerVersion = TCompilerVersion.RSXE5;{$ENDIF}
-    {$IFDEF VER250}IDECompilerVersion = TCompilerVersion.RSXE4;{$ENDIF}
-    {$IFDEF VER240}IDECompilerVersion = TCompilerVersion.RSXE3;{$ENDIF}
-    {$IFDEF VER230}IDECompilerVersion = TCompilerVersion.RSXE2;{$ENDIF}
-    {$IFDEF VER220}IDECompilerVersion = TCompilerVersion.RSXE;{$ENDIF}
-    {$IFDEF VER210}IDECompilerVersion = TCompilerVersion.RS2010;{$ENDIF}
+  {$IFDEF VER340}IDECompilerVersion = TCompilerVersion.RS10_4; {$ENDIF}
+  {$IFDEF VER330}IDECompilerVersion = TCompilerVersion.RS10_3; {$ENDIF}
+  {$IFDEF VER320}IDECompilerVersion = TCompilerVersion.RS10_2; {$ENDIF}
+  {$IFDEF VER310}IDECompilerVersion = TCompilerVersion.RS10_1; {$ENDIF}
+  {$IFDEF VER300}IDECompilerVersion = TCompilerVersion.RS10_0; {$ENDIF}
+  {$IFDEF VER290}IDECompilerVersion = TCompilerVersion.RSXE8; {$ENDIF}
+  {$IFDEF VER280}IDECompilerVersion = TCompilerVersion.RSXE7; {$ENDIF}
+  {$IFDEF VER270}IDECompilerVersion = TCompilerVersion.RSXE6; {$ENDIF}
+  {$IFDEF VER260}IDECompilerVersion = TCompilerVersion.RSXE5; {$ENDIF}
+  {$IFDEF VER250}IDECompilerVersion = TCompilerVersion.RSXE4; {$ENDIF}
+  {$IFDEF VER240}IDECompilerVersion = TCompilerVersion.RSXE3; {$ENDIF}
+  {$IFDEF VER230}IDECompilerVersion = TCompilerVersion.RSXE2; {$ENDIF}
+  {$IFDEF VER220}IDECompilerVersion = TCompilerVersion.RSXE; {$ENDIF}
+  {$IFDEF VER210}IDECompilerVersion = TCompilerVersion.RS2010; {$ENDIF}
 
 
 implementation
 
 end.
+

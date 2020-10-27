@@ -66,30 +66,30 @@ type
   TVersionRange = record
   private
     FOriginal : string;
-    FMaxVersion: TPackageVersion;
-    FMaxVersionIsInclusive: boolean;
-    FMinVersion: TPackageVersion;
-    FMinVersionIsInclusive: boolean;
+    FMaxVersion : TPackageVersion;
+    FMaxVersionIsInclusive : boolean;
+    FMinVersion : TPackageVersion;
+    FMinVersionIsInclusive : boolean;
     FIsValid : boolean;
     constructor CreateInvalid(dummy : integer);
 
     //NOTE : we only allow the Patch to float for now - this is where it is enforced.
-    class function GetMinFromMax(const maxVersion : TPackageVersion) : TPackageVersion;static;
-    class function GetMaxFromMin(const minVersion : TPackageVersion) : TPackageVersion;static;
-    class function IsValidFloat(const minVersion : TPackageVersion; const  maxVersion : TPackageVersion) : boolean;static;
+    class function GetMinFromMax(const maxVersion : TPackageVersion) : TPackageVersion; static;
+    class function GetMaxFromMin(const minVersion : TPackageVersion) : TPackageVersion; static;
+    class function IsValidFloat(const minVersion : TPackageVersion; const maxVersion : TPackageVersion) : boolean; static;
   public
 
-    constructor Create(const original : string; const minVersion : TPackageVersion; const minInclusive : boolean; const maxVersion : TPackageVersion; const maxInclusive : boolean);overload;
-    constructor Create(const version : TPackageVersion);overload;
-    class function Parse(const value : string)  : TVersionRange;static;
+    constructor Create(const original : string; const minVersion : TPackageVersion; const minInclusive : boolean; const maxVersion : TPackageVersion; const maxInclusive : boolean); overload;
+    constructor Create(const version : TPackageVersion); overload;
+    class function Parse(const value : string) : TVersionRange; static;
 
-    class function TryParse(const value : string; out depVersion : TVersionRange) : boolean;static;
-    class function TryParseWithError(const value : string; out depVersion : TVersionRange; out error : string) : boolean;static;
-    class function Empty : TVersionRange;static;
-    class operator Equal(a: TVersionRange; b: TVersionRange) : boolean;
+    class function TryParse(const value : string; out depVersion : TVersionRange) : boolean; static;
+    class function TryParseWithError(const value : string; out depVersion : TVersionRange; out error : string) : boolean; static;
+    class function Empty : TVersionRange; static;
+    class operator Equal(a : TVersionRange; b : TVersionRange) : boolean;
 
     procedure Normalize;
-    function Satisfies(const packageVersion: TPackageVersion): Boolean;
+    function Satisfies(const packageVersion : TPackageVersion) : Boolean;
 
     function IsSubsetOrEqualTo(const possibleSuperset : TVersionRange) : boolean;
 
@@ -119,7 +119,7 @@ uses
 
 { TVersionRange }
 
-function TVersionRange.Clone(const normalize : boolean = false): TVersionRange;
+function TVersionRange.Clone(const normalize : boolean = false) : TVersionRange;
 begin
   result := TVersionRange.Create(FOriginal, FMinVersion.Clone, FMinVersionIsInclusive, FMaxVersion.Clone, FMaxVersionIsInclusive);
   if normalize then
@@ -132,43 +132,43 @@ begin
   FMinVersion := minVersion;
   FMinVersionIsInclusive := minInclusive;
 
-  FMaxVersion :=maxVersion;
-  FMaxVersionIsInclusive := maxInclusive;;
+  FMaxVersion := maxVersion;
+  FMaxVersionIsInclusive := maxInclusive; ;
   FIsValid := true;
 end;
 
-constructor TVersionRange.Create(const version: TPackageVersion);
+constructor TVersionRange.Create(const version : TPackageVersion);
 begin
   FOriginal := version.ToStringNoMeta;
   FMinVersion := version;
   FMinVersionIsInclusive := true;
 
-  FMaxVersion :=version;
-  FMaxVersionIsInclusive := True;;
+  FMaxVersion := version;
+  FMaxVersionIsInclusive := True; ;
   FIsValid := true;
 
 end;
 
-constructor TVersionRange.CreateInvalid(dummy: integer);
+constructor TVersionRange.CreateInvalid(dummy : integer);
 begin
   FIsValid := false;
 end;
 
 
-class function TVersionRange.Empty: TVersionRange;
+class function TVersionRange.Empty : TVersionRange;
 begin
   result := TVersionRange.Create('', TPackageVersion.Empty, true, TPackageVersion.Empty, true);
 end;
 
-class operator TVersionRange.Equal(a, b: TVersionRange): boolean;
+class operator TVersionRange.Equal(a, b : TVersionRange) : boolean;
 begin
- result := (a.MinVersionIsInclusive = b.MinVersionIsInclusive) and
-           (a.MaxVersionIsInclusive = b.MaxVersionIsInclusive) and
-           (b.MinVersion = a.MinVersion) and
-           (a.MaxVersion = b.MaxVersion);
+  result := (a.MinVersionIsInclusive = b.MinVersionIsInclusive) and
+  (a.MaxVersionIsInclusive = b.MaxVersionIsInclusive) and
+  (b.MinVersion = a.MinVersion) and
+  (a.MaxVersion = b.MaxVersion);
 end;
 
-class function TVersionRange.GetMaxFromMin(const minVersion: TPackageVersion): TPackageVersion;
+class function TVersionRange.GetMaxFromMin(const minVersion : TPackageVersion) : TPackageVersion;
 var
   patch : Word;
 begin
@@ -176,7 +176,7 @@ begin
   result := TPackageVersion.Create(minVersion.Major, minVersion.Minor, patch);
 end;
 
-class function TVersionRange.GetMinFromMax(const maxVersion: TPackageVersion): TPackageVersion;
+class function TVersionRange.GetMinFromMax(const maxVersion : TPackageVersion) : TPackageVersion;
 var
   patch : Word;
 begin
@@ -184,46 +184,46 @@ begin
   result := TPackageVersion.Create(maxVersion.Major, maxVersion.Minor, patch);
 end;
 
-function TVersionRange.IsEmpty: boolean;
+function TVersionRange.IsEmpty : boolean;
 begin
   result := FMinVersion.IsEmpty and FMaxVersion.IsEmpty;
 end;
 
-function TVersionRange.IsFixed: boolean;
+function TVersionRange.IsFixed : boolean;
 begin
   result := FMinVersion = FMaxVersion;
 end;
 
-function TVersionRange.IsSubsetOrEqualTo(const possibleSuperset: TVersionRange): boolean;
+function TVersionRange.IsSubsetOrEqualTo(const possibleSuperset : TVersionRange) : boolean;
 begin
   result := (FMinVersion >= possibleSuperset.MinVersion) and (FMaxVersion <= possibleSuperset.MaxVersion);
 end;
 
-class function TVersionRange.IsValidFloat(const minVersion, maxVersion: TPackageVersion): boolean;
+class function TVersionRange.IsValidFloat(const minVersion, maxVersion : TPackageVersion) : boolean;
 begin
   result := (minVersion.Major = maxVersion.Major) and
-            (minVersion.Minor = maxVersion.Minor);
+  (minVersion.Minor = maxVersion.Minor);
 end;
 
 procedure TVersionRange.Normalize;
 begin
   if not FMinVersionIsInclusive then
   begin
-    FMinVersion.Patch := FMinVersion.Patch +1;
+    FMinVersion.Patch := FMinVersion.Patch + 1;
     FMinVersionIsInclusive := true;
     FOriginal := '';
   end;
   if not FMaxVersionIsInclusive then
   begin
-    FMaxVersion.Patch := FMaxVersion.Patch -1;
+    FMaxVersion.Patch := FMaxVersion.Patch - 1;
     FMaxVersionIsInclusive := true;
     FOriginal := ''; //we're changing it so do not display original value in tostring
   end;
 end;
 
-class function TVersionRange.Parse(const value: string): TVersionRange;
+class function TVersionRange.Parse(const value : string) : TVersionRange;
 var
-//  c : Char;
+  //  c : Char;
   sValue : string;
   i : integer;
   len : integer;
@@ -248,7 +248,7 @@ begin
   minInclusive := false;
   {$WARN WIDECHAR_REDUCED OFF}
   if not (sValue[1] in ['(', '[']) then
-  {$WARN WIDECHAR_REDUCED ON}
+    {$WARN WIDECHAR_REDUCED ON}
   begin
     //single version
     if not TPackageVersion.TryParse(sValue, minVersion) then
@@ -270,9 +270,9 @@ begin
       raise EArgumentException.Create('Invalid VersionRange "' + sValue + '" - trailing character in range - must be ) or ]');
     end;
     //remove the brackets;
-    Delete(sValue,len,1);
-    Delete(sValue,1,1);
-    i := pos(',',sValue);
+    Delete(sValue, len, 1);
+    Delete(sValue, 1, 1);
+    i := pos(',', sValue);
     if i = 0 then
       raise EArgumentException.Create('Invalid VersionRange "' + sValue + '" - range must include comma after min version');
 
@@ -281,46 +281,46 @@ begin
     //
     if (len = 2) and (range[0] = '') then
     begin
-      range := TArray<string>.Create(range[1]);
+      range := TArray <string> .Create(range[1]);
       len := 1;
     end;
 
     case len of
       1 :
-      begin
-        //only min or max version specified, determine which from the comma position.
-        if i = 1 then //max version specified
         begin
-          if not TPackageVersion.TryParseWithError(range[0], maxVersion, sError) then
-            raise Exception.Create('Invalid VersionRange - ' + sError);
-          minVersion := GetMinFromMax(maxVersion);
-          //if exclusive range, then max must be 2 more than min
-          if (not minInclusive) or (not maxInclusive) then
+          //only min or max version specified, determine which from the comma position.
+          if i = 1 then //max version specified
           begin
-            if Abs(maxVersion.Patch - minVersion.Patch) < 2 then
-              raise EArgumentException.Create('Invalid VersionRange "' + sValue + '" - invalid range - no valid version in range.');
-          end;
-          result := TVersionRange.Create(value, minVersion, minInclusive, maxVersion, maxInclusive);
-          exit;
-        end
-        else //min version specified
-        begin
-          if not TPackageVersion.TryParseWithError(range[0], minVersion, sError) then
-            raise Exception.Create('Invalid dependency version - ' + sError);
-          maxVersion := GetMaxFromMin(minVersion);
-          //if exclusive range, then max must be 2 more than min
-          if (not minInclusive) or (not maxInclusive) then
+            if not TPackageVersion.TryParseWithError(range[0], maxVersion, sError) then
+              raise Exception.Create('Invalid VersionRange - ' + sError);
+            minVersion := GetMinFromMax(maxVersion);
+            //if exclusive range, then max must be 2 more than min
+            if (not minInclusive) or (not maxInclusive) then
+            begin
+              if Abs(maxVersion.Patch - minVersion.Patch) < 2 then
+                raise EArgumentException.Create('Invalid VersionRange "' + sValue + '" - invalid range - no valid version in range.');
+            end;
+            result := TVersionRange.Create(value, minVersion, minInclusive, maxVersion, maxInclusive);
+            exit;
+          end
+          else //min version specified
           begin
-            if Abs(maxVersion.Patch - minVersion.Patch) < 2 then
-              raise EArgumentException.Create('Invalid VersionRange "' + sValue + '" - invalid range - no valid version in range.');
+            if not TPackageVersion.TryParseWithError(range[0], minVersion, sError) then
+              raise Exception.Create('Invalid dependency version - ' + sError);
+            maxVersion := GetMaxFromMin(minVersion);
+            //if exclusive range, then max must be 2 more than min
+            if (not minInclusive) or (not maxInclusive) then
+            begin
+              if Abs(maxVersion.Patch - minVersion.Patch) < 2 then
+                raise EArgumentException.Create('Invalid VersionRange "' + sValue + '" - invalid range - no valid version in range.');
+            end;
+            result := TVersionRange.Create(value, minVersion, minInclusive, maxVersion, maxInclusive);
+            exit;
           end;
-          result := TVersionRange.Create(value, minVersion,minInclusive , maxVersion, maxInclusive);
-          exit;
-       end;
-      end;
+        end;
       2 :
-      begin
-        //min and max specified
+        begin
+          //min and max specified
           if not TPackageVersion.TryParseWithError(range[0], minVersion, sError) then
             raise Exception.Create('Invalid VersionRange - ' + sError);
           if not TPackageVersion.TryParseWithError(range[1], maxVersion, sError) then
@@ -344,8 +344,8 @@ begin
           if (maxPatch - minPatch) < 0 then
             raise EArgumentException.Create('Invalid VersionRange "' + sValue + '" - invalid range - no valid version in range.');
 
-          result := TVersionRange.Create(value, minVersion,minInclusive , maxVersion, maxInclusive);
-      end;
+          result := TVersionRange.Create(value, minVersion, minInclusive, maxVersion, maxInclusive);
+        end;
     else
       raise EArgumentException.Create('Invalid VersionRange "' + sValue + '" - invalid range count');
 
@@ -353,7 +353,7 @@ begin
   end;
 end;
 
-function TVersionRange.PatchWidth: integer;
+function TVersionRange.PatchWidth : integer;
 var
   x : TVersionRange;
 begin
@@ -361,7 +361,7 @@ begin
   result := integer(x.MaxVersion.Patch) - integer(x.MinVersion.Patch);
 end;
 
-function TVersionRange.Satisfies(const packageVersion: TPackageVersion): Boolean;
+function TVersionRange.Satisfies(const packageVersion : TPackageVersion) : Boolean;
 begin
   if FMinVersionIsInclusive then
     result := packageVersion >= FMinVersion
@@ -374,7 +374,7 @@ begin
     result := result and (packageVersion <= FMaxVersion)
 end;
 
-function TVersionRange.ToDisplayString: string;
+function TVersionRange.ToDisplayString : string;
 begin
   if (FMinVersion = FMaxVersion) and FMaxVersionIsInclusive and FMinVersionIsInclusive then
     //fixed version.
@@ -394,7 +394,7 @@ begin
   end;
 end;
 
-function TVersionRange.ToString: string;
+function TVersionRange.ToString : string;
 begin
   if FOriginal <> '' then
   begin
@@ -419,7 +419,7 @@ begin
   end;
 end;
 
-function TVersionRange.TryGetOverlappingVersion(const otherVersion: TVersionRange; out overlappingVersion: TVersionRange): boolean;
+function TVersionRange.TryGetOverlappingVersion(const otherVersion : TVersionRange; out overlappingVersion : TVersionRange) : boolean;
 var
   left : TVersionRange;
   right : TVersionRange;
@@ -451,7 +451,7 @@ begin
   result := true;
 end;
 
-class function TVersionRange.TryParse(const value: string; out depVersion: TVersionRange): boolean;
+class function TVersionRange.TryParse(const value : string; out depVersion : TVersionRange) : boolean;
 begin
   result := true;
   try
@@ -462,7 +462,7 @@ begin
   end;
 end;
 
-class function TVersionRange.TryParseWithError(const value: string; out depVersion: TVersionRange; out error: string): boolean;
+class function TVersionRange.TryParseWithError(const value : string; out depVersion : TVersionRange; out error : string) : boolean;
 begin
   result := true;
   try
@@ -479,3 +479,4 @@ begin
 end;
 
 end.
+

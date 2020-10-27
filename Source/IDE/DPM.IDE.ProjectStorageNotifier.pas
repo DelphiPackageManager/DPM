@@ -46,15 +46,15 @@ type
 
   protected
 
-  //IOTAProjectFileStorageNotifier
-    procedure CreatingProject(const ProjectOrGroup: IOTAModule);
-    function GetName: string;
-    procedure ProjectClosing(const ProjectOrGroup: IOTAModule);
-    procedure ProjectLoaded(const ProjectOrGroup: IOTAModule; const Node: IXMLNode);
-    procedure ProjectSaving(const ProjectOrGroup: IOTAModule; const Node: IXMLNode);
+    //IOTAProjectFileStorageNotifier
+    procedure CreatingProject(const ProjectOrGroup : IOTAModule);
+    function GetName : string;
+    procedure ProjectClosing(const ProjectOrGroup : IOTAModule);
+    procedure ProjectLoaded(const ProjectOrGroup : IOTAModule; const Node : IXMLNode);
+    procedure ProjectSaving(const ProjectOrGroup : IOTAModule; const Node : IXMLNode);
   public
     constructor Create(const logger : IDPMIDELogger; const editorViewManager : IDPMEditorViewManager; const projectTreeManager : IDPMProjectTreeManager);
-    destructor Destroy;override;
+    destructor Destroy; override;
   end;
 
 implementation
@@ -74,9 +74,9 @@ begin
   FEditorViewManager := editorViewManager;
 end;
 
-procedure TDPMProjectStorageNotifier.CreatingProject(const ProjectOrGroup: IOTAModule);
+procedure TDPMProjectStorageNotifier.CreatingProject(const ProjectOrGroup : IOTAModule);
 begin
-  if not( ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
+  if not (ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
     exit;
   FProjectTreeManager.NotifyProjectLoaded(ProjectOrGroup.FileName)
 end;
@@ -89,7 +89,7 @@ begin
 end;
 
 
-function TDPMProjectStorageNotifier.GetName: string;
+function TDPMProjectStorageNotifier.GetName : string;
 begin
   //this has to be a node under BorlandProject
   //we don't really care what this is, we are not going to modify it,
@@ -100,26 +100,27 @@ end;
 
 
 
-procedure TDPMProjectStorageNotifier.ProjectClosing(const ProjectOrGroup: IOTAModule);
+procedure TDPMProjectStorageNotifier.ProjectClosing(const ProjectOrGroup : IOTAModule);
 begin
   FLogger.Debug('Storage Project Loaded : ' + ProjectOrGroup.FileName);
   //doesn't seem to get called with the project group?
-  if not( ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
+  if not (ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
     exit;
-//  FProjectTreeManager.NotifyProjectClosed(ProjectOrGroup.FileName);
+  //  FProjectTreeManager.NotifyProjectClosed(ProjectOrGroup.FileName);
 end;
 
-procedure TDPMProjectStorageNotifier.ProjectLoaded(const ProjectOrGroup: IOTAModule; const Node: IXMLNode);
+procedure TDPMProjectStorageNotifier.ProjectLoaded(const ProjectOrGroup : IOTAModule; const Node : IXMLNode);
 begin
   //doesn't seem to get called with the project group?
-  if not( ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
+  if not (ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
     exit;
   FProjectTreeManager.NotifyProjectLoaded(ProjectOrGroup.FileName)
 end;
 
-procedure TDPMProjectStorageNotifier.ProjectSaving(const ProjectOrGroup: IOTAModule; const Node: IXMLNode);
+procedure TDPMProjectStorageNotifier.ProjectSaving(const ProjectOrGroup : IOTAModule; const Node : IXMLNode);
 begin
 
 end;
 
 end.
+

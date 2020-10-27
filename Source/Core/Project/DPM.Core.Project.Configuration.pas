@@ -36,17 +36,17 @@ uses
 type
   TProjectConfiguration = class(TInterfacedObject, IProjectConfiguration)
   private
-    FName: string;
-    FOutputDir: string;
-    FPlatform: TDPMPlatform;
-    FLinkWithRuntime: Boolean;
+    FName : string;
+    FOutputDir : string;
+    FPlatform : TDPMPlatform;
+    FLinkWithRuntime : Boolean;
     FPackages : IList<string>;
   protected
-    function GetLinkWithRuntime: Boolean;
-    function GetName: string;
-    function GetOutputDir: string;
-    function GetPlatform: TDPMPlatform;
-    function GetPackages: IList<string>;
+    function GetLinkWithRuntime : Boolean;
+    function GetName : string;
+    function GetOutputDir : string;
+    function GetPlatform : TDPMPlatform;
+    function GetPackages : IList<string>;
   public
     constructor Create(const name, outputdir : string; const platform : TDPMPlatform; const linkWithRuntime : boolean; const packages : IEnumerable<string>);
   end;
@@ -55,40 +55,41 @@ implementation
 
 { TProjectConfiguration }
 
-constructor TProjectConfiguration.Create(const name, outputdir : string; const platform: TDPMPlatform; const linkWithRuntime: boolean; const packages : IEnumerable<string>);
+constructor TProjectConfiguration.Create(const name, outputdir : string; const platform : TDPMPlatform; const linkWithRuntime : boolean; const packages : IEnumerable<string>);
 begin
-  FName       := name;
-  FOutputDir  := outputdir;
-  FPlatform   := platform;
+  FName := name;
+  FOutputDir := outputdir;
+  FPlatform := platform;
   FLinkWithRuntime := linkWithRuntime;
-  FPackages   := TCollections.CreateList<string>;
+  FPackages := TCollections.CreateList <string> ;
   if packages <> nil then
     FPackages.AddRange(packages);
 end;
 
-function TProjectConfiguration.GetLinkWithRuntime: Boolean;
+function TProjectConfiguration.GetLinkWithRuntime : Boolean;
 begin
   result := FLinkWithRuntime;
 end;
 
-function TProjectConfiguration.GetName: string;
+function TProjectConfiguration.GetName : string;
 begin
   result := FName;
 end;
 
-function TProjectConfiguration.GetOutputDir: string;
+function TProjectConfiguration.GetOutputDir : string;
 begin
   result := FOutputDir;
 end;
 
-function TProjectConfiguration.GetPackages: IList<string>;
+function TProjectConfiguration.GetPackages : IList<string>;
 begin
   result := FPackages;
 end;
 
-function TProjectConfiguration.GetPlatform: TDPMPlatform;
+function TProjectConfiguration.GetPlatform : TDPMPlatform;
 begin
   result := FPlatform;
 end;
 
 end.
+

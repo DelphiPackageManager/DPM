@@ -36,22 +36,22 @@ uses
   DPM.Core.Project.Interfaces,
   DPM.Core.Configuration.Interfaces;
 
-  //TODO : create a factory object so we can create different editor implementations for different delphi versions (bdsproj, dof/cfg?)
+//TODO : create a factory object so we can create different editor implementations for different delphi versions (bdsproj, dof/cfg?)
 
 
 type
   TProjectEditor = class(TInterfacedObject, IProjectEditor)
   private
-    FLogger     : ILogger;
-    FConfig     : IConfiguration;
+    FLogger : ILogger;
+    FConfig : IConfiguration;
     FProjectXML : IXMLDOMDocument;
-    FCompiler   : TCompilerVersion;
-    FPlatforms  : TDPMPlatforms;
+    FCompiler : TCompilerVersion;
+    FPlatforms : TDPMPlatforms;
     FMainSource : string;
-    FProjectVersion  : string;
+    FProjectVersion : string;
     FPackageRefences : IList<IPackageReference>;
-    FFileName   : string;
-    FAppType    : TAppType;
+    FFileName : string;
+    FAppType : TAppType;
     FConfigurations : IDictionary<string, IProjectConfiguration>;
   protected
     function GetOutputElementName : string;
@@ -68,25 +68,25 @@ type
     function InternalLoadFromXML : boolean;
     procedure Reset;
 
-    function GetPlatforms: TDPMPlatforms;
-    function GetCompilerVersion: TCompilerVersion;
-    function GetProjectVersion: string;
-    function GetPackageReferences: IList<IPackageReference>;
-    function GetAppType: TAppType;
+    function GetPlatforms : TDPMPlatforms;
+    function GetCompilerVersion : TCompilerVersion;
+    function GetProjectVersion : string;
+    function GetPackageReferences : IList<IPackageReference>;
+    function GetAppType : TAppType;
     function GetHasPackages : boolean;
     procedure SetCompiler(const value : TCompilerVersion);
 
-    function LoadProject(const filename: string): Boolean;
-    function SaveProject(const filename: string): Boolean;
+    function LoadProject(const filename : string) : Boolean;
+    function SaveProject(const filename : string) : Boolean;
 
     function GetDPMPropertyGroup : IXMLDOMElement;
-    function EnsureBaseSearchPath   : boolean;
+    function EnsureBaseSearchPath : boolean;
 
-    function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string>; const packageCacheLocation : string) : boolean;
+    function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string> ; const packageCacheLocation : string) : boolean;
     procedure UpdatePackageReferences(const packageReferences : IList<IPackageReference>; const platform : TDPMPlatform);
 
   public
-    constructor Create(const logger : ILogger; const config : IConfiguration; const compilerVersion : TCompilerVersion );
+    constructor Create(const logger : ILogger; const config : IConfiguration; const compilerVersion : TCompilerVersion);
   end;
 
 implementation
@@ -117,7 +117,7 @@ const
 
   dpmElementPath = '/x:Project/x:PropertyGroup/x:DPM';
 
-  baseConfigPath = '/x:Project/x:PropertyGroup[@Condition="''$(Base)''!=''''"]' ;
+  baseConfigPath = '/x:Project/x:PropertyGroup[@Condition="''$(Base)''!=''''"]';
 
   buildConfigsXPath = 'x:Project/x:ItemGroup/x:BuildConfiguration';
 
@@ -127,7 +127,7 @@ const
 function StringToAppType(const value : string) : TAppType;
 begin
   result := TAppType.Unknown;
-  if (value = 'Application') or (value = 'Console')  then
+  if (value = 'Application') or (value = 'Console') then
     result := TAppType.Application
   else if value = 'Package' then
     result := TAppType.Package
@@ -139,7 +139,7 @@ end;
 
 { TProjectEditor }
 
-function TProjectEditor.AddSearchPaths(const platform: TDPMPlatform; const searchPaths: IList<string>; const packageCacheLocation : string): boolean;
+function TProjectEditor.AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string> ; const packageCacheLocation : string) : boolean;
 var
   dpmGroup : IXMLDOMElement;
   dpmSearchElement : IXMLDOMElement;
@@ -164,9 +164,9 @@ begin
 
   dpmSearchElement := dpmGroup.selectSingleNode('x:DPMSearch[@Condition = "' + condition + '"]') as IXMLDOMElement;
 
-  if dpmSearchElement = nil  then
+  if dpmSearchElement = nil then
   begin
-    dpmSearchElement := FProjectXML.createNode(NODE_ELEMENT, 'DPMSearch',msbuildNamespace) as  IXMLDOMElement;
+    dpmSearchElement := FProjectXML.createNode(NODE_ELEMENT, 'DPMSearch', msbuildNamespace) as IXMLDOMElement;
     dpmGroup.appendChild(dpmSearchElement);
   end;
   dpmSearchElement.setAttribute('Condition', condition);
@@ -182,32 +182,32 @@ begin
 
 end;
 
-constructor TProjectEditor.Create(const logger: ILogger; const config : IConfiguration; const compilerVersion : TCompilerVersion);
+constructor TProjectEditor.Create(const logger : ILogger; const config : IConfiguration; const compilerVersion : TCompilerVersion);
 begin
   FLogger := logger;
   FConfig := config;
   FCompiler := compilerVersion;
   FPlatforms := [];
   FPackageRefences := TCollections.CreateList<IPackageReference>;
-  FConfigurations :=  TCollections.CreateDictionary<string, IProjectConfiguration>;
+  FConfigurations := TCollections.CreateDictionary < string, IProjectConfiguration > ;
 end;
 
-function TProjectEditor.GetPackageReferences: IList<IPackageReference>;
+function TProjectEditor.GetPackageReferences : IList<IPackageReference>;
 begin
   result := FPackageRefences;
 end;
 
-function TProjectEditor.GetPlatforms: TDPMPlatforms;
+function TProjectEditor.GetPlatforms : TDPMPlatforms;
 begin
   result := FPlatforms;
 end;
 
-function TProjectEditor.GetProjectVersion: string;
+function TProjectEditor.GetProjectVersion : string;
 begin
   result := FProjectVersion;
 end;
 
-function TProjectEditor.EnsureBaseSearchPath: boolean;
+function TProjectEditor.EnsureBaseSearchPath : boolean;
 var
   baseElement : IXMLDOMElement;
   dccSearchElement : IXMLDOMElement;
@@ -225,22 +225,22 @@ begin
   dccSearchElement := baseElement.selectSingleNode('x:DCC_UnitSearchPath') as IXMLDOMElement;
   if dccSearchElement = nil then
   begin
-    dccSearchElement := FProjectXML.createNode(NODE_ELEMENT, 'DCC_UnitSearchPath',msbuildNamespace) as  IXMLDOMElement;
+    dccSearchElement := FProjectXML.createNode(NODE_ELEMENT, 'DCC_UnitSearchPath', msbuildNamespace) as IXMLDOMElement;
     dccSearchElement.text := '$(DPMSearch);$(DCC_UnitSearchPath)';
     baseElement.appendChild(dccSearchElement);
   end
   else
   begin
     //remove and add at the beginning
-    searchPath := StringReplace(dccSearchElement.text, '$(DPMSearch);', '', [rfReplaceAll]) ;
-    searchPath := StringReplace(searchPath, '$(DPMSearch)', '', [rfReplaceAll]) ;
+    searchPath := StringReplace(dccSearchElement.text, '$(DPMSearch);', '', [rfReplaceAll]);
+    searchPath := StringReplace(searchPath, '$(DPMSearch)', '', [rfReplaceAll]);
     searchPath := '$(DPMSearch);' + searchPath;
     dccSearchElement.text := searchPath;
   end;
   result := true;
 end;
 
-function TProjectEditor.GetDPMPropertyGroup: IXMLDOMElement;
+function TProjectEditor.GetDPMPropertyGroup : IXMLDOMElement;
 var
   projectVersionGroup : IXMLDOMElement;
   xmlElement : IXMLDOMElement;
@@ -260,8 +260,8 @@ begin
       exit;
     end;
     projectVersionGroup := xmlElement.parentNode as IXMLDOMElement;
-    result := FProjectXML.createNode(NODE_ELEMENT, 'PropertyGroup',msbuildNamespace) as  IXMLDOMElement;
-    FProjectXML.documentElement.insertBefore(result,projectVersionGroup.nextSibling);
+    result := FProjectXML.createNode(NODE_ELEMENT, 'PropertyGroup', msbuildNamespace) as IXMLDOMElement;
+    FProjectXML.documentElement.insertBefore(result, projectVersionGroup.nextSibling);
   end
   else
     result := dpmElement.parentNode as IXMLDOMElement;
@@ -269,7 +269,7 @@ begin
   dpmCompilerElement := result.selectSingleNode('x:DPMCompiler') as IXMLDOMElement;
   if dpmCompilerElement = nil then
   begin
-    dpmCompilerElement := FProjectXML.createNode(NODE_ELEMENT, 'DPMCompiler',msbuildNamespace) as  IXMLDOMElement;
+    dpmCompilerElement := FProjectXML.createNode(NODE_ELEMENT, 'DPMCompiler', msbuildNamespace) as IXMLDOMElement;
     result.appendChild(dpmCompilerElement);
   end;
   dpmCompilerElement.text := CompilerToString(FCompiler);
@@ -278,54 +278,54 @@ begin
   dpmCondition := result.selectSingleNode('x:DPMCache[@Condition != '''']') as IXMLDOMElement;
   if dpmCondition = nil then
   begin
-    dpmCondition := FProjectXML.createNode(NODE_ELEMENT, 'DPMCache',msbuildNamespace) as  IXMLDOMElement;
+    dpmCondition := FProjectXML.createNode(NODE_ELEMENT, 'DPMCache', msbuildNamespace) as IXMLDOMElement;
     result.appendChild(dpmCondition);
   end;
-  dpmCondition.setAttribute('Condition',  '''$(DPMCache)'' == ''''' );
+  dpmCondition.setAttribute('Condition', '''$(DPMCache)'' == ''''');
   if FConfig.IsDefaultPackageCacheLocation then
-    dpmCondition.text := StringReplace(cDefaultPackageCache, '%APPDATA%', '$(APPDATA)', [rfIgnoreCase])//
+    dpmCondition.text := StringReplace(cDefaultPackageCache, '%APPDATA%', '$(APPDATA)', [rfIgnoreCase]) //
   else
   begin
     //see if we can covert this to a relative path
     dpmCondition.text := FConfig.PackageCacheLocation;
   end;
 
-  dpmElement := result.selectSingleNode('x:DPM')  as IXMLDOMElement;
+  dpmElement := result.selectSingleNode('x:DPM') as IXMLDOMElement;
   if dpmElement = nil then
   begin
-    dpmElement := FProjectXML.createNode(NODE_ELEMENT, 'DPM',msbuildNamespace) as  IXMLDOMElement;
+    dpmElement := FProjectXML.createNode(NODE_ELEMENT, 'DPM', msbuildNamespace) as IXMLDOMElement;
     result.appendChild(dpmElement);
   end;
   dpmElement.text := '$(DPMCache)\$(DPMCompiler)\$(Platform)';
 
 end;
 
-function TProjectEditor.GetHasPackages: boolean;
+function TProjectEditor.GetHasPackages : boolean;
 begin
   result := FPackageRefences.Any;
 end;
 
-function TProjectEditor.GetOutputElementName: string;
+function TProjectEditor.GetOutputElementName : string;
 begin
   case FAppType of
     TAppType.Application,
     TAppType.Lib : result := 'x:DCC_ExeOutput';
-    TAppType.Package:     result := 'x:DCC_BplOutput';
-    TAppType.Unknown: raise Exception.Create('Invalid AppType');
+    TAppType.Package : result := 'x:DCC_BplOutput';
+    TAppType.Unknown : raise Exception.Create('Invalid AppType');
   end;
 end;
 
-function TProjectEditor.GetAppType: TAppType;
+function TProjectEditor.GetAppType : TAppType;
 begin
   result := FAppType;
 end;
 
-function TProjectEditor.GetCompilerVersion: TCompilerVersion;
+function TProjectEditor.GetCompilerVersion : TCompilerVersion;
 begin
   result := FCompiler;
 end;
 
-function TProjectEditor.InternalLoadFromXML: boolean;
+function TProjectEditor.InternalLoadFromXML : boolean;
 begin
   result := LoadProjectVersion;
   result := result and LoadMainSource;
@@ -335,7 +335,7 @@ begin
   result := result and LoadPackageRefences;
 end;
 
-function TProjectEditor.LoadAppType: boolean;
+function TProjectEditor.LoadAppType : boolean;
 var
   xmlElement : IXMLDOMElement;
   sAppType : string;
@@ -361,30 +361,30 @@ begin
     FLogger.Error('ProjectVersion element not found, unable to determine AppType from project file.');
 end;
 
-function TProjectEditor.LoadConfigurations: boolean;
+function TProjectEditor.LoadConfigurations : boolean;
 var
   configNodeList : IXMLDOMNodeList;
-  tmpElement    : IXMLDOMElement;
-  keyElement    : IXMLDOMElement;
+  tmpElement : IXMLDOMElement;
+  keyElement : IXMLDOMElement;
   parentElement : IXMLDOMElement;
-  i             : integer;
-  sName         : string;
-  sKey          : string;
-  sParent       : string;
-  configKeys    : TStringList;
+  i : integer;
+  sName : string;
+  sKey : string;
+  sParent : string;
+  configKeys : TStringList;
   configParents : TStringList;
-  platform      : TDPMPlatform;
-  sPlatform     : string;
+  platform : TDPMPlatform;
+  sPlatform : string;
 
-  sOutputDir    : string;
-  sUsePackages  : string;
-  newConfig     : IProjectConfiguration;
+  sOutputDir : string;
+  sUsePackages : string;
+  newConfig : IProjectConfiguration;
 
   function TryGetConfigValue(configKey : string; const platform : string; const elementName : string; out value : string) : boolean;
   var
     configElement : IXMLDOMElement;
-    valueElement  : IXMLDOMElement; 
-    sParentKey    : string;
+    valueElement : IXMLDOMElement;
+    sParentKey : string;
   begin
     result := false;
     //first we try the config_platform eg cfg_3_Win32
@@ -412,11 +412,11 @@ var
     //that didn't work, so recurse
     sParentKey := configParents.Values[configKey];
     if sParentKey = '' then //we are at Base so we're done
-      exit;  
-      
-    result := TryGetConfigValue(sParentKey, platform, elementName, value);    
+      exit;
+
+    result := TryGetConfigValue(sParentKey, platform, elementName, value);
   end;
-  
+
 begin
   result := false;
   configNodeList := FProjectXML.selectNodes(buildConfigsXPath);
@@ -427,8 +427,8 @@ begin
     try
       for i := 0 to configNodeList.length - 1 do
       begin
-        sName   := '';
-        sKey    := '';
+        sName := '';
+        sKey := '';
         sParent := '';
         tmpElement := configNodeList.item[i] as IXMLDOMElement;
         if tmpElement <> nil then
@@ -461,15 +461,15 @@ begin
           if TryGetConfigValue(sKey, sPlatform, GetOutputElementName, sOutputDir) then
           begin
             //deal with $(Platform)\$(Config)
-            sOutputDir := StringReplace(sOutputDir, '$(Platform)', sPlatform, [rfReplaceAll,rfIgnoreCase]);            
-            sOutputDir := StringReplace(sOutputDir, '$(Config)', configKeys.Names[i], [rfReplaceAll,rfIgnoreCase]);            
+            sOutputDir := StringReplace(sOutputDir, '$(Platform)', sPlatform, [rfReplaceAll, rfIgnoreCase]);
+            sOutputDir := StringReplace(sOutputDir, '$(Config)', configKeys.Names[i], [rfReplaceAll, rfIgnoreCase]);
           end;
-//          if sOutputDir = '' then
-//            FLogger.Warning('No output directory found for config ' + configKeys.Names[i]);
+          //          if sOutputDir = '' then
+          //            FLogger.Warning('No output directory found for config ' + configKeys.Names[i]);
 
           sUsePackages := 'false';
           TryGetConfigValue(sKey, sPlatform, 'UsePackages', sUsePackages);
-          newConfig := TProjectConfiguration.Create(configKeys.Names[i], sOutputDir, platform, StrToBoolDef(sUsePackages,false), nil);
+          newConfig := TProjectConfiguration.Create(configKeys.Names[i], sOutputDir, platform, StrToBoolDef(sUsePackages, false), nil);
           FConfigurations[LowerCase(configKeys.Names[i])] := newConfig;
         end;
       end;
@@ -486,7 +486,7 @@ begin
 
 end;
 
-function TProjectEditor.LoadMainSource: boolean;
+function TProjectEditor.LoadMainSource : boolean;
 var
   xmlElement : IXMLDOMElement;
 begin
@@ -503,7 +503,7 @@ begin
     FLogger.Error('ProjectVersion element not found, unable to determine Compiler version');
 end;
 
-function TProjectEditor.LoadPackageRefences: boolean;
+function TProjectEditor.LoadPackageRefences : boolean;
 
 
   procedure ReadPackageReferences(const parentReference : IPackageReference; const parentElement : IXMLDOMElement);
@@ -516,7 +516,7 @@ function TProjectEditor.LoadPackageRefences: boolean;
     sVersion : string;
     version : TPackageVersion;
     error : string;
-    sPlatform  : string;
+    sPlatform : string;
     platform : TDPMPlatform;
     packageReference : IPackageReference;
     sRange : string;
@@ -534,7 +534,7 @@ function TProjectEditor.LoadPackageRefences: boolean;
     packageNodes := parentElement.selectNodes(sXPath);
     if packageNodes.length > 0 then
     begin
-      for i := 0 to packageNodes.length -1 do
+      for i := 0 to packageNodes.length - 1 do
       begin
         packageElement := packageNodes.item[i] as IXMLDOMElement;
         if packageElement.getAttributeNode('id') <> nil then
@@ -551,7 +551,7 @@ function TProjectEditor.LoadPackageRefences: boolean;
         if packageElement.getAttributeNode('version') <> nil then
         begin
           sVersion := packageElement.getAttribute('version');
-          if not TPackageVErsion.TryParseWithError(sVersion, version,error) then
+          if not TPackageVErsion.TryParseWithError(sVersion, version, error) then
           begin
             FLogger.Error('Invalid package reference detected in project, [version] attribute is not valid');
             FLogger.Error(' ' + error);
@@ -572,7 +572,7 @@ function TProjectEditor.LoadPackageRefences: boolean;
           platform := StringToDPMPlatform(sPlatform);
           if platform = TDPMPlatform.UnknownPlatform then
           begin
-            FLogger.Error('Invalid package reference platform value [' + sPlatform + '] in platforms attribute for [' + id +']');
+            FLogger.Error('Invalid package reference platform value [' + sPlatform + '] in platforms attribute for [' + id + ']');
             result := false;
             exit;
           end;
@@ -585,15 +585,15 @@ function TProjectEditor.LoadPackageRefences: boolean;
           dupList := FPackageRefences;
 
         if dupList.Where(
-            function(const item : IPackageReference) : boolean
-            begin
-               result := SameText(item.Id, id) and (item.Platform = platform) ;
-            end).Any then
+          function(const item : IPackageReference) : boolean
+          begin
+            result := SameText(item.Id, id) and (item.Platform = platform);
+          end).Any then
         begin
           if parentReference <> nil then
-            FLogger.Error('Duplicate package reference for package [' + id +  '  ' + DPMPlatformToString(platform) +'] under [' + parentReference.Id +']' )
+            FLogger.Error('Duplicate package reference for package [' + id + '  ' + DPMPlatformToString(platform) + '] under [' + parentReference.Id + ']')
           else
-            FLogger.Error('Duplicate package reference for package [' + id +  '  ' + DPMPlatformToString(platform) +']' );
+            FLogger.Error('Duplicate package reference for package [' + id + '  ' + DPMPlatformToString(platform) + ']');
           exit;
         end;
 
@@ -620,14 +620,14 @@ function TProjectEditor.LoadPackageRefences: boolean;
             exit;
           end;
         end;
-        packageReference := TPackageReference.Create(id,version, platform, FCompiler, range, isTransitive);
+        packageReference := TPackageReference.Create(id, version, platform, FCompiler, range, isTransitive);
         if isTransitive then
           parentReference.Dependencies.Add(packageReference)
         else
           FPackageRefences.Add(packageReference);
         ReadPackageReferences(packageReference, packageElement);
       end;
-   end;
+    end;
   end;
 
 begin
@@ -637,12 +637,12 @@ begin
 
 end;
 
-function TProjectEditor.LoadProject(const filename: string): Boolean;
+function TProjectEditor.LoadProject(const filename : string) : Boolean;
 begin
   result := false;
   FPackageRefences.Clear;
   FPlatforms := [];
-  FProjectVersion :='';
+  FProjectVersion := '';
 
   if not FileExists(fileName) then
   begin
@@ -655,7 +655,7 @@ begin
     result := FProjectXML.load(fileName);
     if not result then
     begin
-      FLogger.Error('Error loading project file : '  + FProjectXML.parseError.reason);
+      FLogger.Error('Error loading project file : ' + FProjectXML.parseError.reason);
       exit;
     end;
     FFileName := filename;
@@ -673,7 +673,7 @@ begin
 end;
 
 //TODO - check that the dproj platforms convert to ours.
-function TProjectEditor.LoadProjectPlatforms: boolean;
+function TProjectEditor.LoadProjectPlatforms : boolean;
 var
   platformNodes : IXMLDOMNodeList;
   platformElement : IXMLDOMElement;
@@ -686,14 +686,14 @@ begin
   platformNodes := FProjectXML.selectNodes(platformsXPath);
   if platformNodes.length > 0 then
   begin
-    for i := 0 to platformNodes.length -1 do
+    for i := 0 to platformNodes.length - 1 do
     begin
       sValue := '';
       platformElement := platformNodes.item[i] as IXMLDOMElement;
       if platformElement.getAttributeNode('value') <> nil then
         sValue := platformElement.getAttribute('value');
       sEnabled := platformElement.text;
-      if StrToBoolDef(sEnabled,false) then
+      if StrToBoolDef(sEnabled, false) then
       begin
         platform := ProjectPlatformToDPMPlatform(sValue);
         if platform <> TDPMPlatform.UnknownPlatform then
@@ -705,7 +705,7 @@ begin
   end;
 end;
 
-function TProjectEditor.LoadProjectVersion: boolean;
+function TProjectEditor.LoadProjectVersion : boolean;
 var
   xmlElement : IXMLDOMElement;
 begin
@@ -719,7 +719,7 @@ begin
       //only use the projectversion if we haven't already set the compilerversion.
       if FCompiler = TCompilerVersion.UnknownVersion then
       begin
-        FCompiler :=ProjectVersionToCompilerVersion(FProjectVersion);
+        FCompiler := ProjectVersionToCompilerVersion(FProjectVersion);
         if FCompiler <> TCompilerVersion.UnknownVersion then
           result := true
         else
@@ -742,12 +742,12 @@ begin
   FPlatforms := [];
 end;
 
-function TProjectEditor.SavePackageReferences: boolean;
+function TProjectEditor.SavePackageReferences : boolean;
 begin
   result := false;
 end;
 
-function TProjectEditor.SaveProject(const filename: string): Boolean;
+function TProjectEditor.SaveProject(const filename : string) : Boolean;
 var
   projectFileName : string;
 begin
@@ -781,14 +781,14 @@ begin
   end;
 end;
 
-procedure TProjectEditor.SetCompiler(const value: TCompilerVersion);
+procedure TProjectEditor.SetCompiler(const value : TCompilerVersion);
 begin
   FCompiler := value;
 
 
 end;
 
-procedure TProjectEditor.UpdatePackageReferences(const packageReferences: IList<IPackageReference>; const platform : TDPMPlatform);
+procedure TProjectEditor.UpdatePackageReferences(const packageReferences : IList<IPackageReference>; const platform : TDPMPlatform);
 var
   projectExtensionsElement : IXMLDOMElement;
   dpmElement : IXMLDOMElement;
@@ -800,7 +800,7 @@ var
     packageReferenceElement : IXMLDOMElement;
     j : integer;
   begin
-    packageReferenceElement := FProjectXML.createNode(NODE_ELEMENT, 'PackageReference',msbuildNamespace) as  IXMLDOMElement;
+    packageReferenceElement := FProjectXML.createNode(NODE_ELEMENT, 'PackageReference', msbuildNamespace) as IXMLDOMElement;
     packageReferenceElement.setAttribute('id', packageReference.Id);
     packageReferenceElement.setAttribute('platform', DPMPlatformToBDString(packageReference.Platform));
     packageReferenceElement.setAttribute('version', packageReference.Version.ToStringNoMeta);
@@ -809,7 +809,7 @@ var
     parentElement.appendChild(packageReferenceElement);
     if packageReference.Dependencies <> nil then
     begin
-      for j := 0 to packageReference.Dependencies.Count -1 do
+      for j := 0 to packageReference.Dependencies.Count - 1 do
         WritePackageReference(packageReferenceElement, packageReference.Dependencies[j]);
     end;
   end;
@@ -825,20 +825,21 @@ begin
   dpmElement := projectExtensionsElement.selectSingleNode('x:DPM') as IXMLDOMElement;
   if dpmElement = nil then
   begin
-    dpmElement := FProjectXML.createNode(NODE_ELEMENT, 'DPM',msbuildNamespace) as  IXMLDOMElement;
+    dpmElement := FProjectXML.createNode(NODE_ELEMENT, 'DPM', msbuildNamespace) as IXMLDOMElement;
     projectExtensionsElement.appendChild(dpmElement);
   end
   else
   begin
     //remove existing nodes, we'll rewrite them below.
-    packageReferenceElements := dpmElement.selectNodes('x:PackageReference[@platform="' + DPMPlatformToString(platform) +'"]' );
-    for i := 0 to packageReferenceElements.length -1 do
+    packageReferenceElements := dpmElement.selectNodes('x:PackageReference[@platform="' + DPMPlatformToString(platform) + '"]');
+    for i := 0 to packageReferenceElements.length - 1 do
       dpmElement.removeChild(packageReferenceElements.item[i]);
   end;
 
-  for i := 0 to packageReferences.Count -1 do
+  for i := 0 to packageReferences.Count - 1 do
     WritePackageReference(dpmElement, packageReferences[i]);
 
 end;
 
 end.
+

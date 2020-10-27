@@ -42,12 +42,12 @@ uses
   DPM.Core.Packaging.Archive;
 
 type
-  TPackageWriter = class(TInterfacedObject,IPackageWriter)
+  TPackageWriter = class(TInterfacedObject, IPackageWriter)
   private
     FLogger : ILogger;
     FArchiveWriter : IPackageArchiveWriter;
     FSpecReader : IPackageSpecReader;
-    procedure ProcessPattern(const basePath, dest: string; const pattern: IFileSystemPattern; const flatten: boolean; const excludePatterns : IList<string>; const ignore : boolean;  var fileCount: integer);
+    procedure ProcessPattern(const basePath, dest : string; const pattern : IFileSystemPattern; const flatten : boolean; const excludePatterns : IList<string> ; const ignore : boolean; var fileCount : integer);
   protected
 
     function WritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion; const basePath : string) : boolean;
@@ -75,7 +75,7 @@ uses
 
 { TPackageWriter }
 
-constructor TPackageWriter.Create(const logger: ILogger; const archiveWriter : IPackageArchiveWriter; const specReader : IPackageSpecReader);
+constructor TPackageWriter.Create(const logger : ILogger; const archiveWriter : IPackageArchiveWriter; const specReader : IPackageSpecReader);
 begin
   FLogger := logger;
   FArchiveWriter := archiveWriter;
@@ -98,7 +98,7 @@ function StripCurrent(const value : string) : string;
 begin
   result := value;
   if TStringUtils.StartsWith(result, '.\') then
-    Delete(result, 1,2);
+    Delete(result, 1, 2);
 end;
 
 function GetNonWildcardPath(const value : string) : string;
@@ -106,12 +106,12 @@ var
   i : integer;
 begin
   result := '';
-  i :=  Pos('*', value);
+  i := Pos('*', value);
   if i > 0 then
-    result := Copy(value,1, i -1);
+    result := Copy(value, 1, i - 1);
 end;
 
-procedure TPackageWriter.ProcessPattern(const basePath: string; const dest : string; const pattern : IFileSystemPattern; const flatten : boolean; const excludePatterns : IList<string>; const ignore : boolean; var fileCount : integer);
+procedure TPackageWriter.ProcessPattern(const basePath : string; const dest : string; const pattern : IFileSystemPattern; const flatten : boolean; const excludePatterns : IList<string> ; const ignore : boolean; var fileCount : integer);
 var
   files : TStringDynArray;
   f : string;
@@ -128,7 +128,7 @@ var
       begin
         //this might be slow.. Creates/Destroys TMask each time
         //if it is then create a record based mask type to do the job.
-        if MatchesMask(fileName,  excludePatten) then
+        if MatchesMask(fileName, excludePatten) then
           exit(true);
       end;
     end;
@@ -154,17 +154,17 @@ begin
     if flatten then
       archivePath := dest + '\' + ExtractFileName(f)
     else
-      archivePath := dest + '\' + StripBase(basePath,  f);
-      if TStringUtils.StartsWith(archivePath, '\') then
-        Delete(archivePath,1,1);
+      archivePath := dest + '\' + StripBase(basePath, f);
+    if TStringUtils.StartsWith(archivePath, '\') then
+      Delete(archivePath, 1, 1);
     Inc(fileCount);
-   // FLogger.Debug('Writing file [' + archivePath + '] to package.');
-    FArchiveWriter.AddFile(f,archivePath);
+    // FLogger.Debug('Writing file [' + archivePath + '] to package.');
+    FArchiveWriter.AddFile(f, archivePath);
   end;
 end;
 
 
-function TPackageWriter.WritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion; const basePath : string): boolean;
+function TPackageWriter.WritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion; const basePath : string) : boolean;
 var
   sManifest : string;
   packageFileName : string;
@@ -173,7 +173,7 @@ var
   fileEntry : ISpecFileEntry;
   bplEntry : ISpecBPLEntry;
 
-  procedure ProcessEntry(const source, dest : string; const flatten : boolean; const exclude : IList<string>; const ignore : boolean);
+  procedure ProcessEntry(const source, dest : string; const flatten : boolean; const exclude : IList<string> ; const ignore : boolean);
   var
     fsPatterns : TArray<IFileSystemPattern>;
     fsPattern : IFileSystemPattern;
@@ -191,15 +191,15 @@ var
     end;
 
   begin
-    searchBasePath := StripWildCard(TPathUtils.CompressRelativePath(basePath,  source));
+    searchBasePath := StripWildCard(TPathUtils.CompressRelativePath(basePath, source));
     searchBasePath := ExtractFilePath(searchBasePath);
     fsPatterns := antPattern.Expand(source);
     fileCount := 0;
     for fsPattern in fsPatterns do
-     ProcessPattern(searchBasePath, dest, fsPattern, flatten, exclude , ignore,  fileCount);
+      ProcessPattern(searchBasePath, dest, fsPattern, flatten, exclude, ignore, fileCount);
 
     if (not ignore) and (fileCount = 0) then
-     FLogger.Warning('No files were found for pattern [' + source + ']');
+      FLogger.Warning('No files were found for pattern [' + source + ']');
   end;
 
   procedure AddBPLToArchive(const source, dest : string);
@@ -216,7 +216,7 @@ var
 
     archivePath := dest + '\' + fileName;
     FLogger.Debug('Writing file [' + archivePath + '] to package.');
-    FArchiveWriter.AddFile(sourceFile,archivePath);
+    FArchiveWriter.AddFile(sourceFile, archivePath);
   end;
 
 begin
@@ -224,7 +224,7 @@ begin
   sManifest := spec.GenerateManifestJson(version, targetPlatform);
   //going with json
 //  sManifest := spec.GenerateManifestXML(version, targetPlatform);
-  packageFileName := spec.MetaData.Id + '-' + CompilerToString(targetPlatform.Compiler) + '-' +  DPMPlatformToString(targetPlatform.Platforms[0]) + '-' +  version.ToStringNoMeta + cPackageFileExt;
+  packageFileName := spec.MetaData.Id + '-' + CompilerToString(targetPlatform.Compiler) + '-' + DPMPlatformToString(targetPlatform.Platforms[0]) + '-' + version.ToStringNoMeta + cPackageFileExt;
   packageFileName := IncludeTrailingPathDelimiter(outputFolder) + packageFileName;
   FArchiveWriter.SetBasePath(basePath);
   if not FArchiveWriter.Open(packageFileName) then
@@ -237,7 +237,7 @@ begin
     if spec.MetaData.Icon <> '' then
       FArchiveWriter.AddIcon(spec.MetaData.Icon);
 
-    sStream := TStringStream.Create(sManifest,TEncoding.UTF8);
+    sStream := TStringStream.Create(sManifest, TEncoding.UTF8);
     try
       FArchiveWriter.WriteMetaDataFile(sStream);
     finally
@@ -252,7 +252,7 @@ begin
       ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, false);
 
     for fileEntry in targetPlatform.LibFiles do
-      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, fileEntry.Ignore );
+      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, fileEntry.Ignore);
 
     for bplEntry in targetPlatform.RuntimeFiles do
       if bplEntry.BuildId = '' then
@@ -285,7 +285,7 @@ begin
   if not FileExists(options.SpecFile) then
     raise EArgumentException.Create('Spec file : ' + options.SpecFile + ' - does not exist!');
   if ExtractFileExt(options.SpecFile) <> cPackageSpecExt then
-    raise EArgumentException.Create('Spec file : ' + options.SpecFile + ' - is likely not a spec file, incorrect extension, should be [' +  cPackageSpecExt + ']');
+    raise EArgumentException.Create('Spec file : ' + options.SpecFile + ' - is likely not a spec file, incorrect extension, should be [' + cPackageSpecExt + ']');
 
   //output and base path default to current folder if not set
   if options.OutputFolder = '' then
@@ -299,7 +299,7 @@ begin
     options.BasePath := TPath.GetFullPath(options.BasePath);
 
   if not DirectoryExists(options.BasePath) then
-      raise EArgumentException.Create('Base Path : ' + options.BasePath + ' - does not exist!');
+    raise EArgumentException.Create('Base Path : ' + options.BasePath + ' - does not exist!');
 
   if options.Version <> '' then
   begin
@@ -339,7 +339,7 @@ begin
       end;
     end;
 
-    if not spec.PreProcess(version, properties)  then
+    if not spec.PreProcess(version, properties) then
     begin
       FLogger.Error('Spec is not valid, exiting.');
       exit;
@@ -368,3 +368,4 @@ begin
 end;
 
 end.
+

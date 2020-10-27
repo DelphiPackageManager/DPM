@@ -47,7 +47,7 @@ uses
   DPM.Core.Utils.Strings;
 
 //Copied from XE7
-function StartsWith(const current : string; const Value: string; IgnoreCase: Boolean = false): Boolean;
+function StartsWith(const current : string; const Value : string; IgnoreCase : Boolean = false) : Boolean;
 begin
   if not IgnoreCase then
     Result := System.SysUtils.StrLComp(PChar(current), PChar(Value), Length(Value)) = 0
@@ -55,7 +55,7 @@ begin
     Result := System.SysUtils.StrLIComp(PChar(current), PChar(Value), Length(Value)) = 0;
 end;
 
-function EndsWith(const theString : string; const Value: string; IgnoreCase: Boolean = true): Boolean;
+function EndsWith(const theString : string; const Value : string; IgnoreCase : Boolean = true) : Boolean;
 begin
   if IgnoreCase then
     Result := EndsText(Value, theString)
@@ -66,11 +66,11 @@ end;
 
 
 
-function IndexOfAny(const value : string; const AnyOf: array of Char; StartIndex, Count: Integer): Integer;
+function IndexOfAny(const value : string; const AnyOf : array of Char; StartIndex, Count : Integer) : Integer;
 var
-  I: Integer;
-  C: Char;
-  Max: Integer;
+  I : Integer;
+  C : Char;
+  Max : Integer;
 begin
   if (StartIndex + Count) >= Length(value) then
     Max := Length(value)
@@ -88,10 +88,10 @@ begin
   Result := -1;
 end;
 
-function LastIndexOf(const theString : string; Value: Char; StartIndex, Count: Integer): Integer;
+function LastIndexOf(const theString : string; Value : Char; StartIndex, Count : Integer) : Integer;
 var
-  I: Integer;
-  Min: Integer;
+  I : Integer;
+  Min : Integer;
 begin
   if StartIndex < Length(theString) then
     I := StartIndex
@@ -114,14 +114,15 @@ end;
 
 type
   TAntStringSplitOptions = (None, ExcludeEmpty);
-function AntSplit(const value : string; const Separator: array of Char; Count: Integer;  Options: TAntStringSplitOptions): TArray<string>;
+
+function AntSplit(const value : string; const Separator : array of Char; Count : Integer; Options : TAntStringSplitOptions) : TArray<string>;
 const
   DeltaGrow = 32;
 var
-  NextSeparator, LastIndex: Integer;
-  Total: Integer;
-  CurrentLength: Integer;
-  S: string;
+  NextSeparator, LastIndex : Integer;
+  Total : Integer;
+  CurrentLength : Integer;
+  S : string;
 begin
   Total := 0;
   LastIndex := 1;
@@ -157,7 +158,7 @@ end;
 
 { TPathUtils }
 
-class function TPathUtils.CompressRelativePath(const basePath: string; path: string): string;
+class function TPathUtils.CompressRelativePath(const basePath : string; path : string) : string;
 var
   stack : IStack<string>;
   segments : TArray<string>;
@@ -169,7 +170,7 @@ begin
     exit(path); //should probably except ?
 
   segments := AntSplit(path, [PathDelim], MaxInt, None);
-  stack := TCollections.CreateStack<string>;
+  stack := TCollections.CreateStack < string > ;
   for segment in segments do
   begin
     if segment = '..' then
@@ -194,9 +195,10 @@ begin
     result := IncludeTrailingPathDelimiter(result);
 end;
 
-class function TPathUtils.IsRelativePath(const value: string): boolean;
+class function TPathUtils.IsRelativePath(const value : string) : boolean;
 begin
   result := (not TPath.IsUNCPath(value) and TStringUtils.StartsWith(value, '.\')) or System.SysUtils.IsRelativePath(value);
 end;
 
 end.
+

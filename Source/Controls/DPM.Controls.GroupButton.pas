@@ -10,32 +10,32 @@ uses
   Vcl.StdCtrls;
 
 const
-   CM_ACTIVE_CHANGED = CM_BASE + 501;
+  CM_ACTIVE_CHANGED = CM_BASE + 501;
 
 type
   TDPMGroupButton = class(TCustomLabel)
   private
     FActive : boolean;
-    FHover  : boolean;
+    FHover : boolean;
     FActiveColor : TColor;
     FHoverColor : TColor;
     FGroupIndex : NativeUInt;
     FBarHeight : Integer;
-    procedure SetActive(const Value: boolean);
-    procedure SetActiveColor(const Value: TColor);
-    procedure SetHoverColor(const Value: TColor);
-    procedure SetBarHeight(const Value: Integer);
+    procedure SetActive(const Value : boolean);
+    procedure SetActiveColor(const Value : TColor);
+    procedure SetHoverColor(const Value : TColor);
+    procedure SetBarHeight(const Value : Integer);
   protected
-    procedure WMLButtonDown(var Message: TWMLButtonDown); message WM_LBUTTONDOWN;
-    procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
-    procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
-    procedure Paint;override;
+    procedure WMLButtonDown(var Message : TWMLButtonDown); message WM_LBUTTONDOWN;
+    procedure CMMouseEnter(var Message : TMessage); message CM_MOUSEENTER;
+    procedure CMMouseLeave(var Message : TMessage); message CM_MOUSELEAVE;
+    procedure Paint; override;
 
     procedure SendActiveChangedMessage;
 
     procedure CMActiveChanged(var Message : TMessage); message CM_ACTIVE_CHANGED;
   public
-    constructor Create(AOwner : TComponent);override;
+    constructor Create(AOwner : TComponent); override;
   published
     property Active : boolean read FActive write SetActive;
     property ActiveColor : TColor read FActiveColor write SetActiveColor;
@@ -60,7 +60,7 @@ uses
   Vcl.Forms,
   Vcl.Themes;
 
-constructor TDPMGroupButton.Create(AOwner: TComponent);
+constructor TDPMGroupButton.Create(AOwner : TComponent);
 begin
   inherited;
   FActive := false;
@@ -81,7 +81,7 @@ begin
 end;
 
 
-procedure TDPMGroupButton.CMActiveChanged(var Message: TMessage);
+procedure TDPMGroupButton.CMActiveChanged(var Message : TMessage);
 begin
   //ignore those for other groups.
   if Message.WParam <> FGroupIndex then
@@ -95,14 +95,14 @@ begin
   Message.Result := 0;
 end;
 
-procedure TDPMGroupButton.CMMouseEnter(var Message: TMessage);
+procedure TDPMGroupButton.CMMouseEnter(var Message : TMessage);
 begin
   FHover := True;
   inherited;
   Invalidate;
 end;
 
-procedure TDPMGroupButton.CMMouseLeave(var Message: TMessage);
+procedure TDPMGroupButton.CMMouseLeave(var Message : TMessage);
 begin
   FHover := false;
   inherited;
@@ -130,30 +130,30 @@ end;
 procedure TDPMGroupButton.SendActiveChangedMessage;
 var
   message : TMessage;
-//  form : TCustomForm;
+  //  form : TCustomForm;
 begin
   message.Msg := CM_ACTIVE_CHANGED;
   message.LParam := NativeInt(Self);
   message.WParam := FGroupIndex;
   if Self.Parent <> nil then
-   Self.Parent.Broadcast(message);
-//  form := GetParentForm(Self);
-//  if form <> nil then
-//    form.Broadcast(message);
+    Self.Parent.Broadcast(message);
+  //  form := GetParentForm(Self);
+  //  if form <> nil then
+  //    form.Broadcast(message);
 end;
 
-procedure TDPMGroupButton.SetActive(const Value: boolean);
+procedure TDPMGroupButton.SetActive(const Value : boolean);
 begin
   FActive := Value;
 
-//  Caption := BoolToStr(FActive,true);
+  //  Caption := BoolToStr(FActive,true);
 
   if FActive then
     SendActiveChangedMessage;
   Refresh;
 end;
 
-procedure TDPMGroupButton.SetActiveColor(const Value: TColor);
+procedure TDPMGroupButton.SetActiveColor(const Value : TColor);
 begin
   if FActiveColor <> Value then
   begin
@@ -163,7 +163,7 @@ begin
 
 end;
 
-procedure TDPMGroupButton.SetBarHeight(const Value: Integer);
+procedure TDPMGroupButton.SetBarHeight(const Value : Integer);
 begin
   if FBarHeight <> value then
   begin
@@ -175,7 +175,7 @@ begin
   end;
 end;
 
-procedure TDPMGroupButton.SetHoverColor(const Value: TColor);
+procedure TDPMGroupButton.SetHoverColor(const Value : TColor);
 begin
   if FHoverColor <> Value then
   begin
@@ -183,7 +183,7 @@ begin
   end;
 end;
 
-procedure TDPMGroupButton.WMLButtonDown(var Message: TWMLButtonDown);
+procedure TDPMGroupButton.WMLButtonDown(var Message : TWMLButtonDown);
 begin
   SetActive(true);
   inherited;
@@ -191,3 +191,4 @@ end;
 
 
 end.
+

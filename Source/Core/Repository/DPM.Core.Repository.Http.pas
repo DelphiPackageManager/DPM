@@ -43,20 +43,20 @@ uses
 
 
 type
-  TDPMServerPackageRepository = class(TBaseRepository,IPackageRepository)
+  TDPMServerPackageRepository = class(TBaseRepository, IPackageRepository)
   private
   protected
-    function DownloadPackage(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity; const localFolder: string; var fileName: string): Boolean;
-    function GetPackageInfo(const cancellationToken: ICancellationToken; const packageId : IPackageId): IPackageInfo;
-    function GetPackageVersions(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion): IList<TPackageVersion>;
-    function GetPackageVersionsWithDependencies(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
+    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : Boolean;
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion) : IList<TPackageVersion>;
+    function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
 
-    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions ) : IList<IPackageIdentity>;overload;
-    function GetPackageFeed(const cancelToken: ICancellationToken; const options: TSearchOptions; const configuration: IConfiguration): IList<IPackageSearchResultItem>;
-    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageIcon;
+    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>; overload;
+    function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration) : IList<IPackageSearchResultItem>;
+    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
 
   public
-    constructor Create(const logger : ILogger);override;
+    constructor Create(const logger : ILogger); override;
 
   end;
 
@@ -64,48 +64,49 @@ implementation
 
 { TDPMServerPackageRepository }
 
-constructor TDPMServerPackageRepository.Create(const logger: ILogger);
+constructor TDPMServerPackageRepository.Create(const logger : ILogger);
 begin
   inherited Create(logger);
 
 end;
 
-function TDPMServerPackageRepository.DownloadPackage(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity; const localFolder: string; var fileName: string): Boolean;
+function TDPMServerPackageRepository.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : Boolean;
 begin
   result := false;
 end;
 
 
-function TDPMServerPackageRepository.GetPackageFeed(const cancelToken: ICancellationToken; const options: TSearchOptions; const configuration: IConfiguration): IList<IPackageSearchResultItem>;
+function TDPMServerPackageRepository.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration) : IList<IPackageSearchResultItem>;
 begin
   result := TCollections.CreateList<IPackageSearchResultItem>;
 end;
 
-function TDPMServerPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageIcon;
+function TDPMServerPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
 begin
   result := nil;
 end;
 
-function TDPMServerPackageRepository.GetPackageInfo(const cancellationToken: ICancellationToken; const packageId : IPackageId): IPackageInfo;
+function TDPMServerPackageRepository.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
 begin
   result := nil;
 end;
 
-function TDPMServerPackageRepository.GetPackageVersions(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion): IList<TPackageVersion>;
+function TDPMServerPackageRepository.GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion) : IList<TPackageVersion>;
 begin
   result := TCollections.CreateList<TPackageVersion>;
 end;
 
-function TDPMServerPackageRepository.GetPackageVersionsWithDependencies(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
+function TDPMServerPackageRepository.GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
 begin
   result := TCollections.CreateList<IPackageInfo>;
 end;
 
 
-function TDPMServerPackageRepository.List(const cancellationToken: ICancellationToken; const options: TSearchOptions): IList<IPackageIdentity>;
+function TDPMServerPackageRepository.List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>;
 begin
   result := TCollections.CreateList<IPackageIdentity>;
 end;
 
 
 end.
+

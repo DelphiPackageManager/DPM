@@ -34,39 +34,38 @@ uses
 type
   TXMLUtils = class
     //we are using this to preserve the formatting of the dproj file.
-    class procedure PrettyFormatXML(const node: IXMLDOMNode; const indentSize: integer);
+    class procedure PrettyFormatXML(const node : IXMLDOMNode; const indentSize : integer);
   end;
 
 implementation
 
-procedure DoPrettyFormatXML(const node: IXMLDOMNode; const indentSize: integer; var indentLen: integer);
+procedure DoPrettyFormatXML(const node : IXMLDOMNode; const indentSize : integer; var indentLen : integer);
 const
   CRLF = #13#10;
   TAB = #9;
 var
-  i: integer;
-  newnode: IXMLDOMNode;
-  childNode: IXMLDOMNode;
-  siblingNode: IXMLDOMNode;
-  stmp: string;
-  sDebug: string;
+  i : integer;
+  newnode : IXMLDOMNode;
+  childNode : IXMLDOMNode;
+  siblingNode : IXMLDOMNode;
+  stmp : string;
+  sDebug : string;
 
-  function SpaceString(stringLen: integer): string;
+  function SpaceString(stringLen : integer) : string;
   begin
     result := StringOfChar(' ', stringLen);
   end;
 
-  function hasChildElements(const anode: IXMLDOMNode): boolean;
+  function hasChildElements(const anode : IXMLDOMNode) : boolean;
   var
-    j: integer;
-    cnode: IXMLDOMNode;
+    j : integer;
+    cnode : IXMLDOMNode;
   begin
     result := False;
     for j := 0 to anode.childNodes.length - 1 do
     begin
       cnode := anode.childNodes.item[j];
-      if (cnode.nodeType = NODE_ELEMENT) or (cnode.nodeType = NODE_CDATA_SECTION)
-      then
+      if (cnode.nodeType = NODE_ELEMENT) or (cnode.nodeType = NODE_CDATA_SECTION) then
       begin
         result := True;
         break;
@@ -75,7 +74,7 @@ var
 
   end;
 
-  function GetNextElement(const anode: IXMLDOMNode): IXMLDOMNode;
+  function GetNextElement(const anode : IXMLDOMNode) : IXMLDOMNode;
   begin
     result := anode.nextSibling;
     while result <> nil do
@@ -101,7 +100,7 @@ begin
         childNode := node.childNodes.item[i];
         sDebug := childNode.nodeName;
         case childNode.nodeType of //
-          NODE_ELEMENT, NODE_CDATA_SECTION:
+          NODE_ELEMENT, NODE_CDATA_SECTION :
             begin
               stmp := CRLF + SpaceString(indentLen);
               newnode := node.ownerDocument.createTextNode(stmp);
@@ -117,7 +116,7 @@ begin
                 node.insertBefore(newnode, siblingNode);
               Inc(i);
             end;
-          NODE_TEXT:
+          NODE_TEXT :
             begin
               // remove any old formatting nodes.
               node.removeChild(childNode);
@@ -135,12 +134,13 @@ begin
 
 end;
 
-class procedure TXMLUtils.PrettyFormatXML(const node: IXMLDOMNode; const indentSize: integer);
+class procedure TXMLUtils.PrettyFormatXML(const node : IXMLDOMNode; const indentSize : integer);
 var
-  indentLen: integer;
+  indentLen : integer;
 begin
   indentLen := 0;
   DoPrettyFormatXML(node, indentSize, indentLen);
 end;
 
 end.
+

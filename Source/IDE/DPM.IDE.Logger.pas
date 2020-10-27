@@ -36,7 +36,7 @@ uses
 
 type
   IDPMIDELogger = interface(ILogger)
-  ['{02CA41D0-F46A-4FB7-A743-DFCFA3E0EAD9}']
+    ['{02CA41D0-F46A-4FB7-A743-DFCFA3E0EAD9}']
     procedure ShowMessageTab;
     procedure StartRestore;
     procedure EndRestore;
@@ -50,11 +50,11 @@ type
     FMessageGroup : IOTAMessageGroup;
     FVerbosity : TVerbosity;
   protected
-    procedure Debug(const data: string);
-    procedure Error(const data: string);
-    procedure Information(const data: string; const important: Boolean = False);
-    procedure Verbose(const data: string);
-    procedure Warning(const data: string);
+    procedure Debug(const data : string);
+    procedure Error(const data : string);
+    procedure Information(const data : string; const important : Boolean = False);
+    procedure Verbose(const data : string);
+    procedure Warning(const data : string);
     function GetVerbosity : TVerbosity;
     procedure SetVerbosity(const value : TVerbosity);
 
@@ -68,7 +68,7 @@ type
     procedure EndRestore;
   public
     constructor Create;
-    destructor Destroy;override;
+    destructor Destroy; override;
   end;
 
 
@@ -91,10 +91,10 @@ begin
   FMessageGroup := FMessageServices.AddMessageGroup('DPM');
   FMessageGroup.CanClose := false;
   FMessageGroup.AutoScroll := true;
-  FVerbosity := TVerbosity.Normal;//TODO : Need to make this configurable
+  FVerbosity := TVerbosity.Normal; //TODO : Need to make this configurable
 end;
 
-procedure TDPMIDELogger.Debug(const data: string);
+procedure TDPMIDELogger.Debug(const data : string);
 var
   lineRef : Pointer;
   debugProc : TThreadProcedure;
@@ -104,10 +104,10 @@ begin
 
 
   debugProc := procedure
-               begin
-                if FMessageServices <> nil then
-                   FMessageServices.AddToolMessage('', 'DEBUG: ' + data, '',0,0,nil, lineRef, FMessageGroup)
-               end;
+  begin
+    if FMessageServices <> nil then
+      FMessageServices.AddToolMessage('', 'DEBUG: ' + data, '', 0, 0, nil, lineRef, FMessageGroup)
+  end;
 
   //FMessageServices is implemented by a vcl control, so we need to ensure it's only updated by the main thread.
   if TThread.CurrentThread.ThreadID = MainThreadID then
@@ -123,29 +123,29 @@ begin
   inherited;
 end;
 
-procedure TDPMIDELogger.EndProject(const fileName: string; const msg : string);
+procedure TDPMIDELogger.EndProject(const fileName : string; const msg : string);
 var
   lineRef : Pointer;
 begin
-  FMessageServices.AddToolMessage(fileName, 'Done.' + msg, '',0,0,nil, lineRef, FMessageGroup);
+  FMessageServices.AddToolMessage(fileName, 'Done.' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
 
 end;
 
 procedure TDPMIDELogger.EndRestore;
 begin
-//  FMessageServices.AddTitleMessage('DPM Restore done.', FMessageGroup);
+  //  FMessageServices.AddTitleMessage('DPM Restore done.', FMessageGroup);
 end;
 
-procedure TDPMIDELogger.Error(const data: string);
+procedure TDPMIDELogger.Error(const data : string);
 var
   lineRef : Pointer;
   errorProc : TThreadProcedure;
 begin
   //TODO : Send custom message so we can color it etc
   errorProc := procedure
-               begin
-                  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
-               end;
+  begin
+    FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+  end;
 
   if TThread.CurrentThread.ThreadID = MainThreadID then
     errorProc
@@ -154,12 +154,12 @@ begin
 
 end;
 
-function TDPMIDELogger.GetVerbosity: TVerbosity;
+function TDPMIDELogger.GetVerbosity : TVerbosity;
 begin
   result := FVerbosity;
 end;
 
-procedure TDPMIDELogger.Information(const data: string; const important: Boolean);
+procedure TDPMIDELogger.Information(const data : string; const important : Boolean);
 var
   lineRef : Pointer;
   infoProc : TThreadProcedure;
@@ -168,9 +168,9 @@ begin
     exit;
 
   infoProc := procedure
-               begin
-                  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
-               end;
+  begin
+    FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+  end;
 
   if TThread.CurrentThread.ThreadID = MainThreadID then
     infoProc
@@ -181,7 +181,7 @@ begin
 
 end;
 
-procedure TDPMIDELogger.SetVerbosity(const value: TVerbosity);
+procedure TDPMIDELogger.SetVerbosity(const value : TVerbosity);
 begin
   FVerbosity := value;
 end;
@@ -191,19 +191,19 @@ begin
   FMessageServices.ShowMessageView(FMessageGroup);
 end;
 
-procedure TDPMIDELogger.StartProject(const fileName: string; const msg : string);
+procedure TDPMIDELogger.StartProject(const fileName : string; const msg : string);
 var
   lineRef : Pointer;
 begin
-  FMessageServices.AddToolMessage(fileName, 'Restoring packages...' + msg, '',0,0,nil, lineRef, FMessageGroup);
+  FMessageServices.AddToolMessage(fileName, 'Restoring packages...' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
 end;
 
 procedure TDPMIDELogger.StartRestore;
 begin
-//  FMessageServices.AddTitleMessage('Restoring DPM packages', FMessageGroup);
+  //  FMessageServices.AddTitleMessage('Restoring DPM packages', FMessageGroup);
 end;
 
-procedure TDPMIDELogger.Verbose(const data: string);
+procedure TDPMIDELogger.Verbose(const data : string);
 var
   lineRef : Pointer;
   verboseProc : TThreadProcedure;
@@ -211,10 +211,10 @@ begin
   if (FVerbosity < TVerbosity.Detailed) then
     exit;
 
-   verboseProc := procedure
-               begin
-                  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
-               end;
+  verboseProc := procedure
+  begin
+    FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+  end;
 
   if TThread.CurrentThread.ThreadID = MainThreadID then
     verboseProc
@@ -223,16 +223,16 @@ begin
 
 end;
 
-procedure TDPMIDELogger.Warning(const data: string);
+procedure TDPMIDELogger.Warning(const data : string);
 var
   lineRef : Pointer;
   warningProc : TThreadProcedure;
 begin
 
-   warningProc := procedure
-               begin
-                  FMessageServices.AddToolMessage('', data, '',0,0,nil, lineRef, FMessageGroup);
-               end;
+  warningProc := procedure
+  begin
+    FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+  end;
 
   if TThread.CurrentThread.ThreadID = MainThreadID then
     warningProc
@@ -241,3 +241,4 @@ begin
 end;
 
 end.
+

@@ -39,25 +39,25 @@ uses
 type
   TResolution = class(TInterfacedObject, IResolution)
   private
-    FPackage :  IPackageInfo;
+    FPackage : IPackageInfo;
     FParentId : string;
     FVersionRange : TVersionRange;
   protected
-    function GetPackage :  IPackageInfo;
+    function GetPackage : IPackageInfo;
     function GetParentId : string;
-    function GetVersionRange: TVersionRange;
+    function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
 
 
   public
-     constructor Create( const package :  IPackageInfo; const range : TVersionRange; const parentId : string);
+    constructor Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string);
   end;
 
 implementation
 
 { TResolution }
 
-constructor TResolution.Create(const package: IPackageInfo; const range : TVersionRange; const parentId: string);
+constructor TResolution.Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string);
 begin
   FPackage := package;
   FVersionRange := range;
@@ -65,24 +65,25 @@ begin
 end;
 
 
-function TResolution.GetPackage: IPackageInfo;
+function TResolution.GetPackage : IPackageInfo;
 begin
   result := FPackage;
 end;
 
-function TResolution.GetParentId: string;
+function TResolution.GetParentId : string;
 begin
   result := FParentId;
 end;
 
-function TResolution.GetVersionRange: TVersionRange;
+function TResolution.GetVersionRange : TVersionRange;
 begin
   result := FVersionRange;
 end;
 
-procedure TResolution.SetVersionRange(const value: TVersionRange);
+procedure TResolution.SetVersionRange(const value : TVersionRange);
 begin
   FVersionRange := value;
 end;
 
 end.
+

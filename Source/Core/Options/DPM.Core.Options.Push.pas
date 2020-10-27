@@ -48,13 +48,13 @@ type
   public
     class constructor CreateDefault;
     class property Default : TPushOptions read FDefault;
-    constructor Create;override;
+    constructor Create; override;
 
-    property ApiKey       : string  read FApiKey      write FApiKey;
-    property PackagePath  : string  read FPackagePath write FPackagePath;
-    property SkipDuplicate: boolean read FSkipDuplicate write FSkipDuplicate;
-    property Source       : string  read FSource      write FSource;
-    property Timeout      : integer read FTimeout     write FTimeout;
+    property ApiKey : string read FApiKey write FApiKey;
+    property PackagePath : string read FPackagePath write FPackagePath;
+    property SkipDuplicate : boolean read FSkipDuplicate write FSkipDuplicate;
+    property Source : string read FSource write FSource;
+    property Timeout : integer read FTimeout write FTimeout;
   end;
 
 
@@ -74,3 +74,4 @@ begin
 end;
 
 end.
+

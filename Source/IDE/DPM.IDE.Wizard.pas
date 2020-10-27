@@ -55,9 +55,9 @@ type
 
     //IOTAWizard
     procedure Execute;
-    function GetIDString: string;
-    function GetName: string;
-    function GetState: TWizardState;
+    function GetIDString : string;
+    function GetName : string;
+    function GetState : TWizardState;
 
     //IOTANotifier
     procedure AfterSave;
@@ -67,7 +67,7 @@ type
 
   public
     constructor Create;
-    destructor Destroy;override;
+    destructor Destroy; override;
   end;
 
 implementation
@@ -132,9 +132,9 @@ begin
   FEditorViewManager := TDPMEditorViewManager.Create(FContainer, FProjectTreeManager);
 
   {$IF CompilerVersion >= 32.0}
-    FThemeChangeNotifierId := (BorlandIDEServices as IOTAIDEThemingServices).AddNotifier(FEditorViewManager as INTAIDEThemingServicesNotifier);
+  FThemeChangeNotifierId := (BorlandIDEServices as IOTAIDEThemingServices).AddNotifier(FEditorViewManager as INTAIDEThemingServicesNotifier);
   {$ELSE}
-    FThemeChangeNotifierId := -1;
+  FThemeChangeNotifierId := -1;
   {$IFEND}
 
   ideNotifier := TDPMIDENotifier.Create(FLogger as IDPMIDELogger, packageInstaller, FEditorViewManager, FProjectTreeManager);
@@ -145,10 +145,10 @@ begin
   FProjectMenuNoftifierId := (BorlandIDEServices as IOTAProjectManager).AddMenuItemCreatorNotifier(projMenuNotifier);
 
   options := TDPMAddinOptions.Create(FContainer);
- (BorlandIDEServices As INTAEnvironmentOptionsServices).RegisterAddInOptions(options);
+  (BorlandIDEServices as INTAEnvironmentOptionsServices).RegisterAddInOptions(options);
 
-  storageNotifier := TDPMProjectStorageNotifier.Create(FLogger as IDPMIDELogger,  FEditorViewManager, FProjectTreeManager);
-  FStorageNotifierID := (BorlandIDEServices As IOTAProjectFileStorage).AddNotifier(storageNotifier);
+  storageNotifier := TDPMProjectStorageNotifier.Create(FLogger as IDPMIDELogger, FEditorViewManager, FProjectTreeManager);
+  FStorageNotifierID := (BorlandIDEServices as IOTAProjectFileStorage).AddNotifier(storageNotifier);
 
 end;
 
@@ -160,8 +160,8 @@ end;
 procedure TDPMWizard.Destroyed;
 begin
   FEditorViewManager.Destroyed;
-  If FStorageNotifierId > -1 then
-    (BorlandIDEServices As IOTAProjectFileStorage).RemoveNotifier(FStorageNotifierId);
+  if FStorageNotifierId > -1 then
+    (BorlandIDEServices as IOTAProjectFileStorage).RemoveNotifier(FStorageNotifierId);
   if FIDENotifier > -1 then
     (BorlandIDEServices as IOTAServices).RemoveNotifier(FIDENotifier);
 
@@ -169,8 +169,8 @@ begin
     (BorlandIDEServices as IOTAServices).RemoveNotifier(FProjectMenuNoftifierId);
 
   {$IF CompilerVersion >= 32.0}
-    if FThemeChangeNotifierId > -1 then
-     (BorlandIDEServices as IOTAIDEThemingServices).RemoveNotifier(FThemeChangeNotifierId);
+  if FThemeChangeNotifierId > -1 then
+    (BorlandIDEServices as IOTAIDEThemingServices).RemoveNotifier(FThemeChangeNotifierId);
   {$IFEND}
 
 end;
@@ -179,17 +179,17 @@ procedure TDPMWizard.Execute;
 begin
 end;
 
-function TDPMWizard.GetIDString: string;
+function TDPMWizard.GetIDString : string;
 begin
   result := 'DPM.IDE';
 end;
 
-function TDPMWizard.GetName: string;
+function TDPMWizard.GetName : string;
 begin
   result := 'DPM';
 end;
 
-function TDPMWizard.GetState: TWizardState;
+function TDPMWizard.GetState : TWizardState;
 begin
   result := [wsEnabled];
 end;
@@ -200,3 +200,4 @@ begin
 end;
 
 end.
+

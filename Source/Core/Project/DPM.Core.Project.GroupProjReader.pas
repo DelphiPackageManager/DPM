@@ -41,7 +41,7 @@ type
     FXmlDoc : IXMLDOMDocument;
   protected
     function ExtractProjects(const list : IList<string>) : boolean;
-    function LoadGroupProj(const groupProjFile: string): Boolean;
+    function LoadGroupProj(const groupProjFile : string) : Boolean;
     procedure Close;
   public
     constructor Create(const logger : ILogger);
@@ -56,20 +56,20 @@ uses
 const
   projectXPath = '/x:Project/x:ItemGroup/x:Projects';
 
-{ TGroupProjectReader }
+  { TGroupProjectReader }
 
 procedure TGroupProjectReader.Close;
 begin
   FXmlDoc := nil;
 end;
 
-constructor TGroupProjectReader.Create(const logger: ILogger);
+constructor TGroupProjectReader.Create(const logger : ILogger);
 begin
   FLogger := logger;
 
 end;
 
-function TGroupProjectReader.ExtractProjects(const list : IList<string>) : boolean;
+function TGroupProjectReader.ExtractProjects(const list : IList<string> ) : boolean;
 var
   projectNodes : IXMLDOMNodeList;
   projectElement : IXMLDOMElement;
@@ -90,9 +90,9 @@ begin
     FXmlDoc := nil;
     exit;
   end;
-  for i := 0 to projectNodes.length -1 do
+  for i := 0 to projectNodes.length - 1 do
   begin
-    projectElement :=projectNodes.item[i] as IXMLDOMElement;
+    projectElement := projectNodes.item[i] as IXMLDOMElement;
     if projectElement.getAttributeNode('Include') <> nil then
       list.Add(projectElement.getAttribute('Include'))
   end;
@@ -103,7 +103,7 @@ begin
     result := true;
 end;
 
-function TGroupProjectReader.LoadGroupProj(const groupProjFile: string): Boolean;
+function TGroupProjectReader.LoadGroupProj(const groupProjFile : string) : Boolean;
 begin
   result := true;
 
@@ -112,8 +112,8 @@ begin
     if not FXmlDoc.load(groupProjFile) then
     begin
       result := false;
-      FLogger.Error('Error parsing group project [' + groupProjFile + ']' );
-      FLogger.Error('  ' + FXmlDoc.parseError.reason );
+      FLogger.Error('Error parsing group project [' + groupProjFile + ']');
+      FLogger.Error('  ' + FXmlDoc.parseError.reason);
       FXmlDoc := nil;
     end;
     (FXmlDoc as IXMLDOMDocument2).setProperty('SelectionLanguage', 'XPath');
@@ -121,9 +121,10 @@ begin
   except
     on e : Exception do
     begin
-      FLogger.Error('Error loading group project [' + groupProjFile +'] ' + e.Message);
+      FLogger.Error('Error loading group project [' + groupProjFile + '] ' + e.Message);
     end;
   end;
 end;
 
 end.
+

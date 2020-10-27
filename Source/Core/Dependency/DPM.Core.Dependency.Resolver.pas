@@ -69,14 +69,14 @@ uses
 
 { TDependencyResolver }
 
-constructor TDependencyResolver.Create(const logger: ILogger; const repositoryManager : IPackageRepositoryManager);
+constructor TDependencyResolver.Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager);
 begin
   FLogger := logger;
   FRepositoryManager := repositoryManager;
   FStopwatch := TStopwatch.Create;
 end;
 
-function SortDependencies(const Left, Right: IPackageDependency): integer;
+function SortDependencies(const Left, Right : IPackageDependency) : integer;
 var
   w : integer;
 begin
@@ -85,7 +85,7 @@ begin
   w := Left.VersionRange.PatchWidth - Right.VersionRange.PatchWidth;
   if w = 0 then
     result := 0
-  else if w > 0  then
+  else if w > 0 then
     result := 1
   else
     result := -1;
@@ -112,7 +112,7 @@ end;
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md
 /// If anyone is good math and want's to have a stab at implementing it in Delphi that would be great!
 
-function TDependencyResolver.DoResolve(const cancellationToken : ICancellationToken; const options: TSearchOptions; const context : IResolverContext; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): boolean;
+function TDependencyResolver.DoResolve(const cancellationToken : ICancellationToken; const options : TSearchOptions; const context : IResolverContext; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : boolean;
 var
   currentPackage : IPackageInfo;
   dependency : IPackageDependency;
@@ -161,7 +161,7 @@ begin
           end;
 
           //see if we can reduce to an overlapping versionrange that satisfies both
-          if resolution.VersionRange.TryGetOverlappingVersion(dependency.VersionRange,overlappingRange) then
+          if resolution.VersionRange.TryGetOverlappingVersion(dependency.VersionRange, overlappingRange) then
           begin
             //resolution.Dependency.Version := overlappingRange;
             dependency.VersionRange := overlappingRange;
@@ -201,13 +201,13 @@ begin
         versions := context.GetPackageVersions(dependency.Id);
         if versions = nil then
         begin
-           searchOptions := options.Clone;
-           searchOptions.SearchTerms := dependency.Id;
-           //passing in the version range to filter the results - not sure if this is valid.. do we need all versions?
-           //I suspect it may result in more failures
-           versions := FRepositoryManager.GetPackageVersions(cancellationToken, searchOptions, platform, dependency.VersionRange);// TVersionRange.Empty);
-           if versions.Any then
-              context.AddPackageVersions(dependency.Id, versions);
+          searchOptions := options.Clone;
+          searchOptions.SearchTerms := dependency.Id;
+          //passing in the version range to filter the results - not sure if this is valid.. do we need all versions?
+          //I suspect it may result in more failures
+          versions := FRepositoryManager.GetPackageVersions(cancellationToken, searchOptions, platform, dependency.VersionRange); // TVersionRange.Empty);
+          if versions.Any then
+            context.AddPackageVersions(dependency.Id, versions);
         end;
 
         selected := false;
@@ -252,7 +252,7 @@ begin
               if context.TryGetResolution(currentPackage.Id, resolution) then
               begin
                 //can't backtrack to a root (direct dependency)
-                if (resolution.ParentId <> 'root') and context.TryGetResolution(resolution.ParentId, parentResolution)  then
+                if (resolution.ParentId <> 'root') and context.TryGetResolution(resolution.ParentId, parentResolution) then
                 begin
                   FLogger.Debug('Backtracking to : ' + parentResolution.Package.Id + '-' + parentResolution.Package.Version.ToString);
                   context.RemoveResolution(currentPackage.Id); //shouldn't this be the parentResolution.Pacakage???
@@ -273,7 +273,7 @@ begin
 
   result := true;
 
-  FLogger.Debug('Dependency resolution done in '  + IntToStr(FStopwatch.ElapsedMilliseconds) + 'ms');
+  FLogger.Debug('Dependency resolution done in ' + IntToStr(FStopwatch.ElapsedMilliseconds) + 'ms');
 
 end;
 
@@ -281,7 +281,7 @@ function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancel
 var
   context : IResolverContext;
 begin
-  context := TResolverContext.Create(FLogger,  newPackage, projectReferences);
+  context := TResolverContext.Create(FLogger, newPackage, projectReferences);
   result := DoResolve(cancellationToken, options, context, compilerVersion, platform);
   resolved := context.GetResolvedPackages;
   dependencyGraph := context.BuildDependencyGraph;
@@ -299,3 +299,4 @@ end;
 
 
 end.
+

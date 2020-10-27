@@ -36,6 +36,9 @@ uses
   //NOTE: The IDE keeps adding this again below, if it happens edit the file outside the IDE.
   System.Actions,
   {$IFEND}
+  {$IF CompilerVersion >= 25.0 } //XE3 up
+  System.ImageList,
+  {$IFEND}
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ActnList, Vcl.ImgList, Vcl.CheckLst,
   Vcl.Buttons, Vcl.ComCtrls, Vcl.ExtCtrls, Vcl.StdCtrls,
   DPM.Core.Logging,
@@ -44,58 +47,58 @@ uses
 {$WARN SYMBOL_PLATFORM OFF}
 type
   TDPMOptionsFrame = class(TFrame)
-    Panel1: TPanel;
-    dpmOptionsActionList: TActionList;
-    dpmOptionsImageList: TImageList;
-    Panel2: TPanel;
-    Panel3: TPanel;
-    lvSources: TListView;
-    Label1: TLabel;
-    txtName: TEdit;
-    Label2: TLabel;
-    Label4: TLabel;
-    Label3: TLabel;
-    txtPackageCacheLocation: TButtonedEdit;
-    txtUri: TButtonedEdit;
-    actAddSource: TAction;
-    actRemoveSource: TAction;
-    actMoveSourceUp: TAction;
-    actMoveSourceDown: TAction;
-    SpeedButton1: TSpeedButton;
-    SpeedButton2: TSpeedButton;
-    SpeedButton3: TSpeedButton;
-    SpeedButton4: TSpeedButton;
-    Label5: TLabel;
-    Label6: TLabel;
-    txtUserName: TEdit;
-    txtPassword: TEdit;
-    FolderSelectDialog: TFileOpenDialog;
-    cboSourceType: TComboBox;
-    Label8: TLabel;
-    procedure lvSourcesSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
-    procedure txtNameChange(Sender: TObject);
-    procedure txtUriChange(Sender: TObject);
-    procedure actAddSourceExecute(Sender: TObject);
-    procedure actRemoveSourceExecute(Sender: TObject);
-    procedure dpmOptionsActionListUpdate(Action: TBasicAction; var Handled: Boolean);
-    procedure actMoveSourceUpExecute(Sender: TObject);
-    procedure actMoveSourceDownExecute(Sender: TObject);
-    procedure txtUserNameChange(Sender: TObject);
-    procedure txtPasswordChange(Sender: TObject);
-    procedure txtPackageCacheLocationRightButtonClick(Sender: TObject);
-    procedure txtUriRightButtonClick(Sender: TObject);
-    procedure cboSourceTypeChange(Sender: TObject);
+    Panel1 : TPanel;
+    dpmOptionsActionList : TActionList;
+    dpmOptionsImageList : TImageList;
+    Panel2 : TPanel;
+    Panel3 : TPanel;
+    lvSources : TListView;
+    Label1 : TLabel;
+    txtName : TEdit;
+    Label2 : TLabel;
+    Label4 : TLabel;
+    Label3 : TLabel;
+    txtPackageCacheLocation : TButtonedEdit;
+    txtUri : TButtonedEdit;
+    actAddSource : TAction;
+    actRemoveSource : TAction;
+    actMoveSourceUp : TAction;
+    actMoveSourceDown : TAction;
+    SpeedButton1 : TSpeedButton;
+    SpeedButton2 : TSpeedButton;
+    SpeedButton3 : TSpeedButton;
+    SpeedButton4 : TSpeedButton;
+    Label5 : TLabel;
+    Label6 : TLabel;
+    txtUserName : TEdit;
+    txtPassword : TEdit;
+    FolderSelectDialog : TFileOpenDialog;
+    cboSourceType : TComboBox;
+    Label8 : TLabel;
+    procedure lvSourcesSelectItem(Sender : TObject; Item : TListItem; Selected : Boolean);
+    procedure txtNameChange(Sender : TObject);
+    procedure txtUriChange(Sender : TObject);
+    procedure actAddSourceExecute(Sender : TObject);
+    procedure actRemoveSourceExecute(Sender : TObject);
+    procedure dpmOptionsActionListUpdate(Action : TBasicAction; var Handled : Boolean);
+    procedure actMoveSourceUpExecute(Sender : TObject);
+    procedure actMoveSourceDownExecute(Sender : TObject);
+    procedure txtUserNameChange(Sender : TObject);
+    procedure txtPasswordChange(Sender : TObject);
+    procedure txtPackageCacheLocationRightButtonClick(Sender : TObject);
+    procedure txtUriRightButtonClick(Sender : TObject);
+    procedure cboSourceTypeChange(Sender : TObject);
   private
     { Private declarations }
     FConfigFile : string;
     FConfigManager : IConfigurationManager;
     FConfiguration : IConfiguration;
     FLogger : ILogger;
-    procedure ExchangeItems(const a, b: Integer);
+    procedure ExchangeItems(const a, b : Integer);
   protected
   public
-    constructor Create(AOwner : TComponent);override;
-    destructor Destroy;override;
+    constructor Create(AOwner : TComponent); override;
+    destructor Destroy; override;
     { Public declarations }
     procedure LoadSettings;
     procedure SaveSettings;
@@ -120,7 +123,7 @@ uses
 
 { TDPMOptionsFrame }
 
-procedure TDPMOptionsFrame.actAddSourceExecute(Sender: TObject);
+procedure TDPMOptionsFrame.actAddSourceExecute(Sender : TObject);
 var
   newItem : TListItem;
 begin
@@ -134,7 +137,7 @@ begin
   lvSources.ItemIndex := newItem.Index;
 end;
 
-procedure TDPMOptionsFrame.actMoveSourceDownExecute(Sender: TObject);
+procedure TDPMOptionsFrame.actMoveSourceDownExecute(Sender : TObject);
 var
   selected : TListItem;
 begin
@@ -142,7 +145,7 @@ begin
   if selected = nil then
     exit;
 
-  ExchangeItems(selected.Index, selected.Index+1);
+  ExchangeItems(selected.Index, selected.Index + 1);
   lvSources.ItemIndex := selected.Index + 1;
 
 end;
@@ -164,7 +167,7 @@ begin
 
 end;
 
-procedure TDPMOptionsFrame.actMoveSourceUpExecute(Sender: TObject);
+procedure TDPMOptionsFrame.actMoveSourceUpExecute(Sender : TObject);
 var
   selected : TListItem;
 begin
@@ -172,13 +175,13 @@ begin
   if selected = nil then
     exit;
 
-  ExchangeItems(selected.Index, selected.Index-1);
+  ExchangeItems(selected.Index, selected.Index - 1);
 
-  lvSources.ItemIndex := selected.Index -1;
+  lvSources.ItemIndex := selected.Index - 1;
 
 end;
 
-procedure TDPMOptionsFrame.actRemoveSourceExecute(Sender: TObject);
+procedure TDPMOptionsFrame.actRemoveSourceExecute(Sender : TObject);
 var
   selectedItem : TListItem;
 begin
@@ -187,7 +190,7 @@ begin
     lvSources.DeleteSelected;
 end;
 
-procedure TDPMOptionsFrame.cboSourceTypeChange(Sender: TObject);
+procedure TDPMOptionsFrame.cboSourceTypeChange(Sender : TObject);
 var
   item : TListItem;
 begin
@@ -196,7 +199,7 @@ begin
     item.SubItems[1] := cboSourceType.Items[cboSourceType.ItemIndex];
 end;
 
-constructor TDPMOptionsFrame.Create(AOwner: TComponent);
+constructor TDPMOptionsFrame.Create(AOwner : TComponent);
 begin
   inherited;
 
@@ -208,14 +211,14 @@ begin
   inherited;
 end;
 
-procedure TDPMOptionsFrame.dpmOptionsActionListUpdate(Action: TBasicAction; var Handled: Boolean);
+procedure TDPMOptionsFrame.dpmOptionsActionListUpdate(Action : TBasicAction; var Handled : Boolean);
 var
   selected : TListItem;
 begin
   selected := lvSources.Selected;
   actRemoveSource.Enabled := selected <> nil;
   actMoveSourceUp.Enabled := (selected <> nil) and (selected.Index > 0);
-  actMoveSourceDown.Enabled := (selected <> nil) and (lvSources.Items.Count > 1) and (selected.Index < lvSources.Items.Count -1 );
+  actMoveSourceDown.Enabled := (selected <> nil) and (lvSources.Items.Count > 1) and (selected.Index < lvSources.Items.Count - 1);
 end;
 
 procedure TDPMOptionsFrame.LoadSettings;
@@ -244,7 +247,7 @@ begin
 
 end;
 
-procedure TDPMOptionsFrame.lvSourcesSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
+procedure TDPMOptionsFrame.lvSourcesSelectItem(Sender : TObject; Item : TListItem; Selected : Boolean);
 begin
   if Selected then
   begin
@@ -272,14 +275,14 @@ end;
 
 procedure TDPMOptionsFrame.SaveSettings;
 var
-  i: Integer;
+  i : Integer;
   sourceConfig : ISourceConfig;
   item : TListItem;
 begin
   FConfiguration.PackageCacheLocation := txtPackageCacheLocation.Text;
   FConfiguration.Sources.Clear;
   lvSources.HandleNeeded; //without this, lvSources.Items.Count will be 0 if the frame was never viewed
-  for i := 0 to lvSources.Items.Count -1 do
+  for i := 0 to lvSources.Items.Count - 1 do
   begin
     item := lvSources.Items[i];
     sourceConfig := TSourceConfig.Create(FLogger);
@@ -299,18 +302,18 @@ begin
   FConfigManager.SaveConfig(FConfiguration);
 end;
 
-procedure TDPMOptionsFrame.SetConfigManager(const manager: IConfigurationManager; const configFile : string);
+procedure TDPMOptionsFrame.SetConfigManager(const manager : IConfigurationManager; const configFile : string);
 begin
   FConfigManager := manager;
-  FConfigFile    := configFile;
+  FConfigFile := configFile;
 end;
 
-procedure TDPMOptionsFrame.SetLogger(const logger: ILogger);
+procedure TDPMOptionsFrame.SetLogger(const logger : ILogger);
 begin
   FLogger := logger;
 end;
 
-procedure TDPMOptionsFrame.txtNameChange(Sender: TObject);
+procedure TDPMOptionsFrame.txtNameChange(Sender : TObject);
 var
   item : TListItem;
 begin
@@ -319,7 +322,7 @@ begin
     item.Caption := txtName.Text;
 end;
 
-procedure TDPMOptionsFrame.txtPackageCacheLocationRightButtonClick(Sender: TObject);
+procedure TDPMOptionsFrame.txtPackageCacheLocationRightButtonClick(Sender : TObject);
 begin
   FolderSelectDialog.Title := 'Select Package Cache Folder';
   FolderSelectDialog.DefaultFolder := txtPackageCacheLocation.Text;
@@ -328,7 +331,7 @@ begin
 
 end;
 
-procedure TDPMOptionsFrame.txtPasswordChange(Sender: TObject);
+procedure TDPMOptionsFrame.txtPasswordChange(Sender : TObject);
 var
   item : TListItem;
 begin
@@ -337,7 +340,7 @@ begin
     item.SubItems[3] := txtPassword.Text;
 end;
 
-procedure TDPMOptionsFrame.txtUriChange(Sender: TObject);
+procedure TDPMOptionsFrame.txtUriChange(Sender : TObject);
 var
   item : TListItem;
 begin
@@ -346,7 +349,7 @@ begin
     item.SubItems[0] := txtUri.Text;
 end;
 
-procedure TDPMOptionsFrame.txtUriRightButtonClick(Sender: TObject);
+procedure TDPMOptionsFrame.txtUriRightButtonClick(Sender : TObject);
 begin
   FolderSelectDialog.Title := 'Select Package Source Folder';
   FolderSelectDialog.DefaultFolder := txtUri.Text;
@@ -355,7 +358,7 @@ begin
 
 end;
 
-procedure TDPMOptionsFrame.txtUserNameChange(Sender: TObject);
+procedure TDPMOptionsFrame.txtUserNameChange(Sender : TObject);
 var
   item : TListItem;
 begin
@@ -364,9 +367,9 @@ begin
     item.SubItems[2] := txtUserName.Text;
 end;
 
-function TDPMOptionsFrame.Validate: boolean;
+function TDPMOptionsFrame.Validate : boolean;
 var
-  i, j: Integer;
+  i, j : Integer;
   enabledCount : integer;
   sErrorMessage : string;
   nameList : TStringList;
@@ -381,26 +384,26 @@ begin
   uriList := TStringList.Create;
   try
     lvSources.HandleNeeded; //without this, lvSources.Items.Count will be 0 if the frame was never viewed
-    for i := 0 to lvSources.Items.Count -1 do
+    for i := 0 to lvSources.Items.Count - 1 do
     begin
       if lvSources.Items[i].Checked then
         Inc(enabledCount);
       sName := lvSources.Items[i].Caption;
       if nameList.IndexOf(sName) > -1 then
-        sErrorMessage := sErrorMessage + 'Duplicate Source Name [' + sName +']' + #13#10;
+        sErrorMessage := sErrorMessage + 'Duplicate Source Name [' + sName + ']' + #13#10;
       nameList.Add(sName);
 
-      if (lvSources.Items[i].SubItems.Count > 0 ) then
+      if (lvSources.Items[i].SubItems.Count > 0) then
         sUri := lvSources.Items[i].SubItems[0]
       else
         sUri := '';
-      if (lvSources.Items[i].SubItems.Count > 1 ) then
+      if (lvSources.Items[i].SubItems.Count > 1) then
         sourceType := lvSources.Items[i].SubItems[1]
       else
         sourceType := 'Folder';
 
       if sUri = '' then
-        sErrorMessage := sErrorMessage + 'No Uri for Source  [' + sName +']' + #13#10
+        sErrorMessage := sErrorMessage + 'No Uri for Source  [' + sName + ']' + #13#10
       else
       begin
         j := uriList.IndexOfName(sUri);
@@ -408,21 +411,21 @@ begin
         begin
           //duplicate uri, check if the type is the same.
           if SameText(sourceType, uriList.ValueFromIndex[j]) then
-            sErrorMessage := sErrorMessage + 'Duplicate Uri/type  [' + sName +']' + #13#10;
+            sErrorMessage := sErrorMessage + 'Duplicate Uri/type  [' + sName + ']' + #13#10;
         end;
       end;
 
       uriList.Add(sUri + '=' + sourceType);
       try
         uri := TUriFactory.Parse(sUri);
-//          if not (uri.IsFile or uri.IsUnc) then
-//          begin
-//            sErrorMessage := sErrorMessage + 'only folder uri type is supported at the moment' + #13#10;
-//          end;
+        //          if not (uri.IsFile or uri.IsUnc) then
+        //          begin
+        //            sErrorMessage := sErrorMessage + 'only folder uri type is supported at the moment' + #13#10;
+        //          end;
       except
         on e : Exception do
         begin
-          sErrorMessage := sErrorMessage + 'Invalid Uri for Source  [' + sName +'] : ' + e.Message + #13#10;
+          sErrorMessage := sErrorMessage + 'Invalid Uri for Source  [' + sName + '] : ' + e.Message + #13#10;
         end;
       end;
     end;
@@ -435,7 +438,7 @@ begin
 
 
   if enabledCount = 0 then
-    sErrorMessage := sErrorMessage +  'At least 1 source must be defined and enabled!';
+    sErrorMessage := sErrorMessage + 'At least 1 source must be defined and enabled!';
 
   result := sErrorMessage = '';
   if not result then
@@ -447,3 +450,4 @@ begin
 end;
 
 end.
+

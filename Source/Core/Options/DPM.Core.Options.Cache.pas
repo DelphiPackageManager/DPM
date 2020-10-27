@@ -36,27 +36,27 @@ uses
 type
   TCacheOptions = class(TSearchOptions)
   private
-    FPreRelease     : boolean;
-    FVersionString  : string;
-    FVersion        : TPackageVersion;
+    FPreRelease : boolean;
+    FVersionString : string;
+    FVersion : TPackageVersion;
     class var
       FDefault : TCacheOptions;
   protected
-    function GetPackageId: string;
-    procedure SetPackageId(const Value: string);
-    constructor CreateClone(const original : TCacheOptions);reintroduce;
+    function GetPackageId : string;
+    procedure SetPackageId(const Value : string);
+    constructor CreateClone(const original : TCacheOptions); reintroduce;
 
   public
     class constructor CreateDefault;
     class property Default : TCacheOptions read FDefault;
-    constructor Create;override;
-    function Validate(const logger: ILogger): Boolean; override;
-    function Clone : TCacheOptions;reintroduce;
+    constructor Create; override;
+    function Validate(const logger : ILogger) : Boolean; override;
+    function Clone : TCacheOptions; reintroduce;
 
-    property PackageId    : string      read GetPackageId write SetPackageId;
-    property PreRelease   : boolean     read FPreRelease  write FPreRelease;
-    property VersionString: string      read FVersionString  write FVersionString;
-    property Version      : TPackageVersion read FVersion  write FVersion;
+    property PackageId : string read GetPackageId write SetPackageId;
+    property PreRelease : boolean read FPreRelease write FPreRelease;
+    property VersionString : string read FVersionString write FVersionString;
+    property Version : TPackageVersion read FVersion write FVersion;
 
   end;
 
@@ -69,7 +69,7 @@ uses
 
 { TCacheOptions }
 
-function TCacheOptions.Clone: TCacheOptions;
+function TCacheOptions.Clone : TCacheOptions;
 begin
   result := TCacheOptions.CreateClone(self);
 end;
@@ -80,12 +80,12 @@ begin
   FVersion := TPackageVersion.Empty;
 end;
 
-constructor TCacheOptions.CreateClone(const original: TCacheOptions);
+constructor TCacheOptions.CreateClone(const original : TCacheOptions);
 begin
   inherited CreateClone(original);
-  FPreRelease     := original.FPreRelease;
-  FVersionString  := original.FVersionString;
-  FVersion        := original.FVersion;
+  FPreRelease := original.FPreRelease;
+  FVersionString := original.FVersionString;
+  FVersion := original.FVersion;
 end;
 
 class constructor TCacheOptions.CreateDefault;
@@ -93,17 +93,17 @@ begin
   FDefault := TCacheOptions.Create;
 end;
 
-function TCacheOptions.GetPackageId: string;
+function TCacheOptions.GetPackageId : string;
 begin
   result := SearchTerms;
 end;
 
-procedure TCacheOptions.SetPackageId(const Value: string);
+procedure TCacheOptions.SetPackageId(const Value : string);
 begin
   SearchTerms := value;
 end;
 
-function TCacheOptions.Validate(const logger: ILogger): Boolean;
+function TCacheOptions.Validate(const logger : ILogger) : Boolean;
 var
   error : string;
 begin
@@ -147,3 +147,4 @@ begin
 end;
 
 end.
+

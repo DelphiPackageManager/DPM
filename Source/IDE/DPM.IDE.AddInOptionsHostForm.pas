@@ -37,20 +37,20 @@ uses
 
 type
   TDPMOptionsHostForm = class(TForm)
-    DPMOptionsFrame: TDPMOptionsFrame;
-    Panel1: TPanel;
-    btnCancel: TButton;
-    btnOK: TButton;
-    procedure btnOKClick(Sender: TObject);
+    DPMOptionsFrame : TDPMOptionsFrame;
+    Panel1 : TPanel;
+    btnCancel : TButton;
+    btnOK : TButton;
+    procedure btnOKClick(Sender : TObject);
   private
     { Private declarations }
   public
     { Public declarations }
-    constructor Create(AOwner : TComponent; const configManager : IConfigurationManager; const logger : ILogger; const configFile : string);reintroduce;
+    constructor Create(AOwner : TComponent; const configManager : IConfigurationManager; const logger : ILogger; const configFile : string); reintroduce;
   end;
 
 var
-  DPMOptionsHostForm: TDPMOptionsHostForm;
+  DPMOptionsHostForm : TDPMOptionsHostForm;
 
 implementation
 
@@ -63,7 +63,7 @@ uses
 
 { TDPMOptionsHostForm }
 
-procedure TDPMOptionsHostForm.btnOKClick(Sender: TObject);
+procedure TDPMOptionsHostForm.btnOKClick(Sender : TObject);
 begin
   if DPMOptionsFrame.Validate then
   begin
@@ -72,14 +72,14 @@ begin
   end;
 end;
 
-constructor TDPMOptionsHostForm.Create(AOwner: TComponent; const configManager: IConfigurationManager; const logger: ILogger; const configFile: string);
+constructor TDPMOptionsHostForm.Create(AOwner : TComponent; const configManager : IConfigurationManager; const logger : ILogger; const configFile : string);
 begin
   inherited Create(AOwner);
   {$IFDEF STYLEELEMENTS}
   StyleElements := [seFont, seClient, seBorder];
   {$ENDIF}
   {$IFDEF THEMESERVICES}
-  (BorlandIDEServices As IOTAIDEThemingServices).ApplyTheme(Self);
+  (BorlandIDEServices as IOTAIDEThemingServices).ApplyTheme(Self);
   {$ENDIF}
 
   DPMOptionsFrame.SetConfigManager(configManager, configFile);
@@ -90,7 +90,8 @@ end;
 
 {$IFDEF THEMESERVICES}
 initialization
-  (BorlandIDEServices As IOTAIDEThemingServices250).RegisterFormClass(TDPMOptionsHostForm);
-{$ENDIF}
+  (BorlandIDEServices as IOTAIDEThemingServices250).RegisterFormClass(TDPMOptionsHostForm);
+  {$ENDIF}
 
 end.
+

@@ -60,7 +60,7 @@
         <DCC_N>false</DCC_N>
         <DCC_F>false</DCC_F>
         <DCC_K>false</DCC_K>
-        <DCC_UnitSearchPath>$(DPMSearch);I:\bitbucket\spring4d\Source;I:\bitbucket\spring4d\Source\Base;I:\bitbucket\spring4d\Source\Base\Collections;I:\bitbucket\spring4d\Source\Base\Logging;I:\bitbucket\spring4d\Source\Base\Patches;I:\bitbucket\spring4d\Source\Base\Patterns;I:\bitbucket\spring4d\Source\Core\Container;I:\bitbucket\spring4d\Source\Core\Interception;I:\bitbucket\spring4d\Source\Core\Logging;I:\bitbucket\spring4d\Source\Core\Services;I:\bitbucket\spring4d\Source\Extensions\Cryptography;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>$(DPMSearch);$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
         <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>

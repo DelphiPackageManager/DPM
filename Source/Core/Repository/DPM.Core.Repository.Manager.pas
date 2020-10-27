@@ -49,27 +49,27 @@ type
     FRepositories : IList<IPackageRepository>;
     FRepoFactory : IPackageRepositoryFactory;
   protected
-    function Initialize( const configuration : IConfiguration) : boolean;
+    function Initialize(const configuration : IConfiguration) : boolean;
 
-    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
-    function GetRepositories: IList<IPackageRepository>;
-    function GetRepositoryByName(const value: string): IPackageRepository;
-    function List(const cancellationToken : ICancellationToken; const options: TSearchOptions): IList<IPackageIdentity>;
-    function UpdateRepositories( const configuration : IConfiguration) : boolean;
+    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
+    function GetRepositories : IList<IPackageRepository>;
+    function GetRepositoryByName(const value : string) : IPackageRepository;
+    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>;
+    function UpdateRepositories(const configuration : IConfiguration) : boolean;
 
-    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId): IPackageInfo;
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
 
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange;  const configuration : IConfiguration = nil) : IList<IPackageInfo>;overload;
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange; const configuration : IConfiguration = nil) : IList<IPackageInfo>; overload;
     //UI specific stuff
     //TODO : Implement skip/take!
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
 
-    function GetPackageIcon(const cancelToken : ICancellationToken; const source: string; const packageId: string; const packageVersion: string;
-                            const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const configuration : IConfiguration): IPackageIcon;
+    function GetPackageIcon(const cancelToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string;
+      const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const configuration : IConfiguration) : IPackageIcon;
 
     function GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IEnumerable<IPackageId>; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
 
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<TPackageVersion>;overload;
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<TPackageVersion>; overload;
 
   public
     constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const repoFactory : IPackageRepositoryFactory);
@@ -88,7 +88,7 @@ uses
 
 { TRespositoryManager }
 
-constructor TPackageRepositoryManager.Create(const logger: ILogger; const configurationManager: IConfigurationManager; const repoFactory : IPackageRepositoryFactory);
+constructor TPackageRepositoryManager.Create(const logger : ILogger; const configurationManager : IConfigurationManager; const repoFactory : IPackageRepositoryFactory);
 begin
   inherited Create;
   FLogger := logger;
@@ -97,7 +97,7 @@ begin
   FRepositories := TCollections.CreateList<IPackageRepository>;
 end;
 
-function TPackageRepositoryManager.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
+function TPackageRepositoryManager.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
 var
   repo : IPackageRepository;
 begin
@@ -111,14 +111,14 @@ begin
 
       exit;
     end;
-    FLogger.Information('Downloading package [' + packageIdentity.ToString + '] from [' + repo.Source +']');
+    FLogger.Information('Downloading package [' + packageIdentity.ToString + '] from [' + repo.Source + ']');
     result := repo.DownloadPackage(cancellationToken, packageIdentity, localFolder, fileName);
   end
   else
   begin
-   for repo in FRepositories do
+    for repo in FRepositories do
     begin
-      if  cancellationToken.IsCancelled then
+      if cancellationToken.IsCancelled then
         exit;
       result := repo.DownloadPackage(cancellationToken, packageIdentity, localFolder, fileName) or result;
       if result then
@@ -127,7 +127,7 @@ begin
   end;
 end;
 
-function TPackageRepositoryManager.GetInstalledPackageFeed(const cancelToken: ICancellationToken; const options: TSearchOptions; const installedPackages: IEnumerable<IPackageId>; const configuration: IConfiguration): IList<IPackageSearchResultItem>;
+function TPackageRepositoryManager.GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IEnumerable<IPackageId>; const configuration : IConfiguration) : IList<IPackageSearchResultItem>;
 var
   config : IConfiguration;
   searchOptions : TSearchOptions;
@@ -175,7 +175,7 @@ begin
 
 end;
 
-function TPackageRepositoryManager.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil): IList<IPackageSearchResultItem>;
+function TPackageRepositoryManager.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
 var
   config : IConfiguration;
   repo : IPackageRepository;
@@ -218,7 +218,7 @@ begin
         if sources.IndexOf(repo.Name) = -1 then
           continue;
       end;
-      searchResult := repo.GetPackageFeed(cancelToken,options, config);
+      searchResult := repo.GetPackageFeed(cancelToken, options, config);
       allResults.AddRange(searchResult);
     end;
   finally
@@ -233,8 +233,8 @@ begin
 
 end;
 
-function TPackageRepositoryManager.GetPackageIcon(const cancelToken : ICancellationToken; const source, packageId, packageVersion: string;
-                                                  const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const configuration : IConfiguration): IPackageIcon;
+function TPackageRepositoryManager.GetPackageIcon(const cancelToken : ICancellationToken; const source, packageId, packageVersion : string;
+  const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const configuration : IConfiguration) : IPackageIcon;
 var
   repo : IPackageRepository;
 begin
@@ -262,7 +262,7 @@ begin
 
 end;
 
-function TPackageRepositoryManager.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId): IPackageInfo;
+function TPackageRepositoryManager.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
 var
   repo : IPackageRepository;
 begin
@@ -276,7 +276,7 @@ begin
 end;
 
 
-function TPackageRepositoryManager.GetPackageVersions(const cancellationToken: ICancellationToken; const options: TSearchOptions; const configuration: IConfiguration): IList<TPackageVersion>;
+function TPackageRepositoryManager.GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration) : IList<TPackageVersion>;
 var
   config : IConfiguration;
   repo : IPackageRepository;
@@ -330,7 +330,7 @@ begin
 
   result.AddRange(distinctResults);
   //todo :// which order is this?  want descending.
-  result.Sort(function(const Left, Right: TPackageVersion): Integer
+  result.Sort(function(const Left, Right : TPackageVersion) : Integer
     begin
       result := right.CompareTo(left);
     end);
@@ -338,7 +338,7 @@ begin
 
 end;
 
-function TPackageRepositoryManager.GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange;  const configuration : IConfiguration = nil) : IList<IPackageInfo>;
+function TPackageRepositoryManager.GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange; const configuration : IConfiguration = nil) : IList<IPackageInfo>;
 var
   config : IConfiguration;
   repo : IPackageRepository;
@@ -382,7 +382,7 @@ begin
     if cancellationToken.IsCancelled then
       exit;
 
-    searchResult := repo.GetPackageVersionsWithDependencies(cancellationToken, options.SearchTerms, options.CompilerVersion,platform,versionRange, options.Prerelease);
+    searchResult := repo.GetPackageVersionsWithDependencies(cancellationToken, options.SearchTerms, options.CompilerVersion, platform, versionRange, options.Prerelease);
     unfilteredResults.AddRange(searchResult);
   end;
 
@@ -394,11 +394,11 @@ begin
 
   result.AddRange(distinctResults);
   //todo :// which order is this?  want descending.
-  result.Sort(function(const Left, Right: IPackageInfo): Integer
+  result.Sort(function(const Left, Right : IPackageInfo) : Integer
     begin
-      result := right.Version.CompareTo(left.Version);;
+      result := right.Version.CompareTo(left.Version); ;
     end);
-//
+  //
 end;
 
 (*
@@ -449,7 +449,7 @@ begin
     searchResult := repo.GetPackageVersions(options.SearchTerms, options.CompilerVersion,platform,versionRange, options.Prerelease);
     unfilteredResults.AddRange(searchResult);
   end;
-  
+
   comparer := TPackageVersionComparer.Create;
 
   //dedupe
@@ -466,26 +466,26 @@ end;
 *)
 
 
-function TPackageRepositoryManager.GetRepositories: IList<IPackageRepository>;
+function TPackageRepositoryManager.GetRepositories : IList<IPackageRepository>;
 begin
   result := FRepositories;
 end;
 
-function TPackageRepositoryManager.GetRepositoryByName(const value: string): IPackageRepository;
+function TPackageRepositoryManager.GetRepositoryByName(const value : string) : IPackageRepository;
 begin
   result := FRepositories.Where(function(const repo : IPackageRepository) : boolean
-                               begin
-                                 result := SameText(value, repo.Name);
-                               end).FirstOrDefault;
+    begin
+      result := SameText(value, repo.Name);
+    end).FirstOrDefault;
 end;
 
 
-function TPackageRepositoryManager.Initialize(const configuration: IConfiguration): boolean;
+function TPackageRepositoryManager.Initialize(const configuration : IConfiguration) : boolean;
 begin
   result := UpdateRepositories(configuration);
 end;
 
-function TPackageRepositoryManager.List(const cancellationToken : ICancellationToken; const options: TSearchOptions): IList<IPackageIdentity>;
+function TPackageRepositoryManager.List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>;
 var
   config : IConfiguration;
   repo : IPackageRepository;
@@ -548,22 +548,22 @@ begin
   if cancellationToken.IsCancelled then
     exit;
 
-  sortFunc := function(const Left, Right: IPackageIdentity): Integer
-              begin
-                result := CompareText(left.Id, right.Id);
-                if result = 0 then
-                begin
-                   result := right.Version.CompareTo(left.Version);
-                   if result = 0 then
-                   begin
-                     result := Ord(left.CompilerVersion) - Ord(right.CompilerVersion);
-                     if result = 0 then
-                     begin
-                       result := Ord(left.Platform) - Ord(right.Platform);
-                     end;
-                   end;
-                end;
-              end;
+  sortFunc := function(const Left, Right : IPackageIdentity) : Integer
+  begin
+    result := CompareText(left.Id, right.Id);
+    if result = 0 then
+    begin
+      result := right.Version.CompareTo(left.Version);
+      if result = 0 then
+      begin
+        result := Ord(left.CompilerVersion) - Ord(right.CompilerVersion);
+        if result = 0 then
+        begin
+          result := Ord(left.Platform) - Ord(right.Platform);
+        end;
+      end;
+    end;
+  end;
 
   //what does this do? if we don't provide a comparer?
   distinctResults := TDistinctIterator<IPackageIdentity>.Create(unfilteredResults, nil);
@@ -617,7 +617,7 @@ begin
     result.AddRange(packages);
 end;
 
-function TPackageRepositoryManager.UpdateRepositories( const configuration : IConfiguration) : boolean;
+function TPackageRepositoryManager.UpdateRepositories(const configuration : IConfiguration) : boolean;
 var
   uri : IUri;
   error : string;
@@ -631,7 +631,7 @@ begin
     if not source.IsEnabled then
       continue;
 
-    if not TUriFactory.TryParseWithError(source.Source,false, uri, error) then
+    if not TUriFactory.TryParseWithError(source.Source, false, uri, error) then
     begin
       FLogger.Error('Invalid source uri : ' + source.Source);
       exit;
@@ -651,3 +651,4 @@ begin
 end;
 
 end.
+

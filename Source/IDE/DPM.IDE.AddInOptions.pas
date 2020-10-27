@@ -41,16 +41,16 @@ type
   private
     FConfigManager : IConfigurationManager;
     FLogger : ILogger;
-    FFrame  : TDPMOptionsFrame;
+    FFrame : TDPMOptionsFrame;
   protected
-    procedure DialogClosed(Accepted: Boolean);
-    procedure FrameCreated(AFrame: TCustomFrame);
-    function GetArea: string;
-    function GetCaption: string;
-    function GetFrameClass: TCustomFrameClass;
-    function GetHelpContext: Integer;
-    function IncludeInIDEInsight: Boolean;
-    function ValidateContents: Boolean;
+    procedure DialogClosed(Accepted : Boolean);
+    procedure FrameCreated(AFrame : TCustomFrame);
+    function GetArea : string;
+    function GetCaption : string;
+    function GetFrameClass : TCustomFrameClass;
+    function GetHelpContext : Integer;
+    function IncludeInIDEInsight : Boolean;
+    function ValidateContents : Boolean;
   public
     constructor Create(const container : TContainer);
   end;
@@ -60,19 +60,19 @@ implementation
 
 { TDPMAddinOptions }
 
-constructor TDPMAddinOptions.Create(const container: TContainer);
+constructor TDPMAddinOptions.Create(const container : TContainer);
 begin
   FConfigManager := container.Resolve<IConfigurationManager>;
   FLogger := container.Resolve<ILogger>;
 end;
 
-procedure TDPMAddinOptions.DialogClosed(Accepted: Boolean);
+procedure TDPMAddinOptions.DialogClosed(Accepted : Boolean);
 begin
   if Accepted then
     FFrame.SaveSettings;
 end;
 
-procedure TDPMAddinOptions.FrameCreated(AFrame: TCustomFrame);
+procedure TDPMAddinOptions.FrameCreated(AFrame : TCustomFrame);
 begin
   FFrame := TDPMOptionsFrame(AFrame);
   FFrame.SetConfigManager(FConfigManager);
@@ -80,34 +80,35 @@ begin
   FFrame.LoadSettings;
 end;
 
-function TDPMAddinOptions.GetArea: string;
+function TDPMAddinOptions.GetArea : string;
 begin
   result := '';
 end;
 
-function TDPMAddinOptions.GetCaption: string;
+function TDPMAddinOptions.GetCaption : string;
 begin
   result := 'DPM Package Manager';
 end;
 
-function TDPMAddinOptions.GetFrameClass: TCustomFrameClass;
+function TDPMAddinOptions.GetFrameClass : TCustomFrameClass;
 begin
   result := TDPMOptionsFrame;
 end;
 
-function TDPMAddinOptions.GetHelpContext: Integer;
+function TDPMAddinOptions.GetHelpContext : Integer;
 begin
   result := -1;
 end;
 
-function TDPMAddinOptions.IncludeInIDEInsight: Boolean;
+function TDPMAddinOptions.IncludeInIDEInsight : Boolean;
 begin
   result := true;
 end;
 
-function TDPMAddinOptions.ValidateContents: Boolean;
+function TDPMAddinOptions.ValidateContents : Boolean;
 begin
   result := FFrame.Validate;
 end;
 
 end.
+

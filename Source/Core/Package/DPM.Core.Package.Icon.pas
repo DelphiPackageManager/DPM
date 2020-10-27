@@ -7,7 +7,7 @@ uses
   DPM.Core.Package.Interfaces;
 
 
-  function CreatePackageIcon(const iconKind : TPackageIconKind; const stream : TStream) : IPackageIcon;
+function CreatePackageIcon(const iconKind : TPackageIconKind; const stream : TStream) : IPackageIcon;
 
 implementation
 
@@ -17,12 +17,12 @@ type
     FKind : TPackageIconKind;
     FStream : TStream;
   protected
-    function GetKind: TPackageIconKind;
-    function GetStream: TStream;
-    procedure SetStream(const value: TStream);
+    function GetKind : TPackageIconKind;
+    function GetStream : TStream;
+    procedure SetStream(const value : TStream);
   public
     constructor Create(const iconKind : TPackageIconKind; const stream : TStream);
-    destructor Destroy;override;
+    destructor Destroy; override;
   end;
 
 
@@ -35,7 +35,7 @@ end;
 
 { TPackageIcon }
 
-constructor TPackageIcon.Create(const iconKind: TPackageIconKind; const stream: TStream);
+constructor TPackageIcon.Create(const iconKind : TPackageIconKind; const stream : TStream);
 begin
   FKind := iconKind;
   FStream := stream;
@@ -49,19 +49,20 @@ begin
   inherited;
 end;
 
-function TPackageIcon.GetKind: TPackageIconKind;
+function TPackageIcon.GetKind : TPackageIconKind;
 begin
   result := FKind;
 end;
 
-function TPackageIcon.GetStream: TStream;
+function TPackageIcon.GetStream : TStream;
 begin
   result := FStream;
 end;
 
-procedure TPackageIcon.SetStream(const value: TStream);
+procedure TPackageIcon.SetStream(const value : TStream);
 begin
   FStream := value;
 end;
 
 end.
+

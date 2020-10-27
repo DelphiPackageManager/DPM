@@ -36,7 +36,7 @@ uses
 
 type
   ISourcesManager = interface
-  ['{8854A223-60C9-4D65-8FFC-37A0AA503103}']
+    ['{8854A223-60C9-4D65-8FFC-37A0AA503103}']
     function AddSource(const options : TSourcesOptions) : boolean;
     function RemoveSource(const options : TSourcesOptions) : boolean;
     function ListSources(const options : TSourcesOptions) : boolean;
@@ -47,12 +47,12 @@ type
   end;
 
   ISourceClient = interface
-  ['{DE344763-CFAA-491A-84F0-5E8462D2F6C3}']
+    ['{DE344763-CFAA-491A-84F0-5E8462D2F6C3}']
     function Push(const pushOptions : TPushOptions) : boolean;
   end;
 
   ISourceClientFactory = interface
-  ['{02B5206C-6DBF-41C0-AAC6-09E23856C980}']
+    ['{02B5206C-6DBF-41C0-AAC6-09E23856C980}']
     function CreateClient(const uri : IUri) : ISourceClient;
   end;
 
@@ -60,3 +60,4 @@ type
 implementation
 
 end.
+

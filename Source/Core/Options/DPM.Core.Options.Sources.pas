@@ -37,26 +37,26 @@ type
   TSourcesOptions = class(TOptionsBase)
   private
     FSubCommand : TSourcesSubCommand;
-    FName       : string;
-    FSource     : string;
-    FUserName   : string;
-    FPassword   : string;
-    FFormat     : TSourcesFormat;
+    FName : string;
+    FSource : string;
+    FUserName : string;
+    FPassword : string;
+    FFormat : TSourcesFormat;
     FSourceType : TSourceType;
     class var
       FDefault : TSourcesOptions;
   public
     class constructor CreateDefault;
     class property Default : TSourcesOptions read FDefault;
-    constructor Create;override;
+    constructor Create; override;
 
-    property Command  : TSourcesSubCommand read FSubCommand  write FSubCommand;
-    property Name     : string          read FName        write FName;
-    property Source   : string          read FSource      write FSource;
-    property SourceType : TSourceType   read FSourceType  write FSourceType;
-    property Format   : TSourcesFormat  read FFormat      write FFormat;
-    property UserName : string          read FUserName    write FUserName;
-    property Password : string          read FPassword    write FPassword;
+    property Command : TSourcesSubCommand read FSubCommand write FSubCommand;
+    property Name : string read FName write FName;
+    property Source : string read FSource write FSource;
+    property SourceType : TSourceType read FSourceType write FSourceType;
+    property Format : TSourcesFormat read FFormat write FFormat;
+    property UserName : string read FUserName write FUserName;
+    property Password : string read FPassword write FPassword;
 
 
   end;
@@ -78,3 +78,4 @@ begin
 end;
 
 end.
+

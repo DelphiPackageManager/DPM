@@ -39,7 +39,7 @@ type
   TPackageRepositoryFactory = class(TInterfacedObject, IPackageRepositoryFactory)
   private
     FContainer : TContainer;
-    FLogger   : ILogger;
+    FLogger : ILogger;
   protected
     function CreateRepository(const repoType : TSourceType) : IPackageRepository;
   public
@@ -56,15 +56,16 @@ uses
 
 { TPackageRepositoryFactory }
 
-constructor TPackageRepositoryFactory.Create(const container: TContainer; const logger : ILogger);
+constructor TPackageRepositoryFactory.Create(const container : TContainer; const logger : ILogger);
 begin
   FContainer := container;
   FLogger := logger;
 end;
 
-function TPackageRepositoryFactory.CreateRepository(const repoType : TSourceType): IPackageRepository;
+function TPackageRepositoryFactory.CreateRepository(const repoType : TSourceType) : IPackageRepository;
 begin
   result := FContainer.Resolve<IPackageRepository>(TEnumUtils.EnumToString<TSourceType>(repoType));
 end;
 
 end.
+

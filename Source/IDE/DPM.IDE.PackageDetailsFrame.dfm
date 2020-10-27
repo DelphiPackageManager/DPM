@@ -24,7 +24,6 @@ object PackageDetailsFrame: TPackageDetailsFrame
     Color = clWindow
     ParentColor = False
     TabOrder = 0
-    StyleElements = [seFont, seBorder]
     object pnlPackageId: TPanel
       Left = 0
       Top = 0

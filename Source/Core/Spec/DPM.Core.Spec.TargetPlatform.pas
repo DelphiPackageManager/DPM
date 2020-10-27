@@ -48,11 +48,11 @@ type
     function GetPlatforms : TArray<TDPMPlatform>;
     function GetTemplateName : string;
     function GetCompiler : TCompilerVersion;
-    function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
+    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function CloneForPlatform(const platform : TDPMPlatform) : ISpecTargetPlatform;
   public
-    constructor Create(const logger: ILogger); override;
-    constructor CreateReducedClone(const logger: ILogger; const targetPlatform : ISpecTargetPlatform ; const platform : TDPMPlatform);
+    constructor Create(const logger : ILogger); override;
+    constructor CreateReducedClone(const logger : ILogger; const targetPlatform : ISpecTargetPlatform; const platform : TDPMPlatform);
 
   end;
 
@@ -75,7 +75,7 @@ begin
   result := TSpecTargetPlatform.CreateReducedClone(logger, self, platform);
 end;
 
-constructor TSpecTargetPlatform.Create(const logger: ILogger);
+constructor TSpecTargetPlatform.Create(const logger : ILogger);
 begin
   inherited Create(logger);
   SetLength(FPlatforms, 0);
@@ -84,15 +84,15 @@ begin
 end;
 
 
-constructor TSpecTargetPlatform.CreateReducedClone(const logger: ILogger; const targetPlatform : ISpecTargetPlatform; const platform: TDPMPlatform);
+constructor TSpecTargetPlatform.CreateReducedClone(const logger : ILogger; const targetPlatform : ISpecTargetPlatform; const platform : TDPMPlatform);
 var
-  deps: IList<ISpecDependency>;
+  deps : IList<ISpecDependency>;
   dep, newDep : ISpecDependency;
-  designFiles, runtimeFiles: IList<ISpecBPLEntry>;
+  designFiles, runtimeFiles : IList<ISpecBPLEntry>;
   bpl, newBpl : ISpecBPLEntry;
-  sourceFiles, libFiles, otherFiles: IList<ISpecFileEntry>;
+  sourceFiles, libFiles, otherFiles : IList<ISpecFileEntry>;
   fileEntry, newFileEntry : ISpecFileEntry;
-  searchPaths: IList<ISpecSearchPath>;
+  searchPaths : IList<ISpecSearchPath>;
   path, newPath : ISpecSearchPath;
 begin
   deps := TCollections.CreateList<ISpecDependency>;
@@ -144,14 +144,14 @@ begin
     searchPaths.Add(newPath);
   end;
 
-  inherited CreateClone(logger, deps, designFiles, runtimeFiles, sourceFiles, libFiles,otherFiles, searchPaths );
+  inherited CreateClone(logger, deps, designFiles, runtimeFiles, sourceFiles, libFiles, otherFiles, searchPaths);
 
   FTemplateName := targetPlatform.TemplateName;
   FCompiler := targetPlatform.Compiler;
   FPlatforms := TArray<TDPMPlatform>.Create(platform);
 end;
 
-function TSpecTargetPlatform.GetPlatforms: TArray<TDPMPlatform>;
+function TSpecTargetPlatform.GetPlatforms : TArray<TDPMPlatform>;
 begin
   result := FPlatforms;
 end;
@@ -162,12 +162,12 @@ begin
 end;
 
 
-function TSpecTargetPlatform.GetTemplateName: string;
+function TSpecTargetPlatform.GetTemplateName : string;
 begin
   result := FTemplateName;
 end;
 
-function TSpecTargetPlatform.LoadFromJson(const jsonObject: TJsonObject): Boolean;
+function TSpecTargetPlatform.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var
   sValue : string;
   platformStrings : TArray<string>;
@@ -201,9 +201,9 @@ begin
   end
   else
   begin
-    sValue := StringReplace(sValue,' ','', [rfReplaceAll]);
+    sValue := StringReplace(sValue, ' ', '', [rfReplaceAll]);
     Logger.Debug('[targetPlatform] platforms : ' + sValue);
-    platformStrings := TStringUtils.SplitStr(sValue,',');
+    platformStrings := TStringUtils.SplitStr(sValue, ',');
 
     if Length(platformStrings) > 0 then
     begin
@@ -243,3 +243,4 @@ begin
 end;
 
 end.
+

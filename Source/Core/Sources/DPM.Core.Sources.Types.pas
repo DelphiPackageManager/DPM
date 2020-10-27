@@ -31,10 +31,11 @@ interface
 {$SCOPEDENUMS ON}
 
 type
-  TSourcesSubCommand = (Invalid,List,Add,Remove,Enable,Disable,Update);
+  TSourcesSubCommand = (Invalid, List, Add, Remove, Enable, Disable, Update);
 
-  TSourcesFormat  = (Invalid,Detailed,Short);
+  TSourcesFormat = (Invalid, Detailed, Short);
 
 implementation
 
 end.
+

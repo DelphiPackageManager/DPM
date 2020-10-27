@@ -45,8 +45,8 @@ type
   TBaseRepository = class(TInterfacedObject)
   private
     FLogger : ILogger;
-    FName     : string;
-    FSource   : string;
+    FName : string;
+    FSource : string;
     FUserName : string;
     FPassword : string;
     FRepositoryType : TSourceType;
@@ -55,19 +55,19 @@ type
     function GetRepositoryType : TSourceType;
     function GetName : string;
     function GetSource : string;
-    procedure Configure(const source: ISourceConfig);virtual;
+    procedure Configure(const source : ISourceConfig); virtual;
 
     //exposing these for descendants
     property Logger : ILogger read FLogger;
 
-    property Name   : string read FName;
+    property Name : string read FName;
     property Source : string read FSource;
     property UserName : string read FUserName;
     property Password : string read FPassword;
 
     property RepositoryType : TSourceType read GetRepositoryType;
   public
-    constructor Create(const logger : ILogger);virtual;
+    constructor Create(const logger : ILogger); virtual;
 
   end;
 
@@ -75,27 +75,27 @@ implementation
 
 { TBaseRepository }
 
-constructor TBaseRepository.Create(const logger: ILogger);
+constructor TBaseRepository.Create(const logger : ILogger);
 begin
   FLogger := logger;
 end;
 
-function TBaseRepository.GetName: string;
+function TBaseRepository.GetName : string;
 begin
   result := FName;
 end;
 
-function TBaseRepository.GetRepositoryType: TSourceType;
+function TBaseRepository.GetRepositoryType : TSourceType;
 begin
   result := FRepositoryType;
 end;
 
-function TBaseRepository.GetSource: string;
+function TBaseRepository.GetSource : string;
 begin
   result := FSource;
 end;
 
-procedure TBaseRepository.Configure(const source: ISourceConfig);
+procedure TBaseRepository.Configure(const source : ISourceConfig);
 begin
   FName := source.Name;
   FSource := source.Source;
@@ -105,3 +105,4 @@ begin
 end;
 
 end.
+

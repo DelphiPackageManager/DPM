@@ -47,19 +47,19 @@ type
   private
 
   protected
-    function DownloadPackage(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity; const localFolder: string; var fileName: string): Boolean;
-    function GetPackageInfo(const cancellationToken: ICancellationToken; const packageId : IPackageId): IPackageInfo;
-    function GetPackageVersions(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion): IList<TPackageVersion>;
-    function GetPackageVersionsWithDependencies(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
+    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : Boolean;
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion) : IList<TPackageVersion>;
+    function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
 
-    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions ) : IList<IPackageIdentity>;overload;
+    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>; overload;
 
     //ui
-    function GetPackageFeed(const cancelToken: ICancellationToken; const options: TSearchOptions; const configuration: IConfiguration = nil): IList<IPackageSearchResultItem>;
-    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageIcon;
+    function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
+    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
 
   public
-    constructor Create(const logger : ILogger);override;
+    constructor Create(const logger : ILogger); override;
 
   end;
 
@@ -77,45 +77,45 @@ const
   cGithubDPMSpecSearchFormat = '/search/code?q=extension:dspec+repo:%s'; // add repo to search in
 
 
-{ TDPMGithubPackageRepository }
+  { TDPMGithubPackageRepository }
 
-constructor TDPMGithubPackageRepository.Create(const logger: ILogger);
+constructor TDPMGithubPackageRepository.Create(const logger : ILogger);
 begin
   inherited Create(logger);
 end;
 
-function TDPMGithubPackageRepository.DownloadPackage(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity; const localFolder: string; var fileName: string): Boolean;
+function TDPMGithubPackageRepository.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : Boolean;
 begin
   result := false;
 end;
 
-function TDPMGithubPackageRepository.GetPackageFeed(const cancelToken: ICancellationToken; const options: TSearchOptions; const configuration: IConfiguration): IList<IPackageSearchResultItem>;
+function TDPMGithubPackageRepository.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration) : IList<IPackageSearchResultItem>;
 begin
   result := TCollections.CreateList<IPackageSearchResultItem>;
 end;
 
-function TDPMGithubPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageIcon;
+function TDPMGithubPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
 begin
   result := nil;
 end;
 
-function TDPMGithubPackageRepository.GetPackageInfo(const cancellationToken: ICancellationToken; const packageId : IPackageId): IPackageInfo;
+function TDPMGithubPackageRepository.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
 begin
   result := nil;
 end;
 
-function TDPMGithubPackageRepository.GetPackageVersions(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion): IList<TPackageVersion>;
+function TDPMGithubPackageRepository.GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion) : IList<TPackageVersion>;
 begin
   result := TCollections.CreateList<TPackageVersion>;
 end;
 
-function TDPMGithubPackageRepository.GetPackageVersionsWithDependencies(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): IList<IPackageInfo>;
+function TDPMGithubPackageRepository.GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
 begin
   result := TCollections.CreateList<IPackageInfo>;
 end;
 
 
-function TDPMGithubPackageRepository.List(const cancellationToken: ICancellationToken; const options: TSearchOptions): IList<IPackageIdentity>;
+function TDPMGithubPackageRepository.List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>;
 var
   pageSize : string;
   pageNo : string;
@@ -130,8 +130,8 @@ var
 
   specSearchJson : TJSonObject;
   specItems : TJsonArray;
-//  specItem : TJDOJsonObject;
-  specUrl  : string;
+  //  specItem : TJDOJsonObject;
+  specUrl : string;
 begin
   result := TCollections.CreateList<IPackageIdentity>;
   if options.Take > 0 then
@@ -169,7 +169,7 @@ begin
   jsonObj := TJsonObject.ParseFromStream(response.ResponseStream) as TJsonObject;
   try
     items := jsonObj.ExtractArray('items');
-    for i := 0 to items.Count -1 do
+    for i := 0 to items.Count - 1 do
     begin
       repoItem := items.O[i];
       repoId := repoItem.S['full_name'];
@@ -194,7 +194,7 @@ begin
       specSearchJson := TJsonObject.ParseFromStream(response.ResponseStream) as TJsonObject;
       try
         specItems := specSearchJson.ExtractArray('items');
-        for j := 0 to specItems.Count -1 do
+        for j := 0 to specItems.Count - 1 do
         begin
           specUrl := specItems.O[j].S['html_url'];
           Logger.Debug(specUrl);
@@ -218,3 +218,4 @@ end;
 
 
 end.
+

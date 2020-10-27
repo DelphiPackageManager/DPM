@@ -31,8 +31,8 @@ interface
 type
   TEnumUtils = class
   public
-    class function StringToEnum<T: record>(const value : string) : T;
-    class function EnumToString<T: record>(const value : T) : string;
+    class function StringToEnum<T : record>(const value : string) : T;
+    class function EnumToString<T : record>(const value : T) : string;
   end;
 
 implementation
@@ -45,55 +45,55 @@ uses
 
 { TEnumUtils }
 
-class function TEnumUtils.EnumToString<T>(const value: T): string;
+class function TEnumUtils.EnumToString<T>(const value : T) : string;
 var
-  P: PTypeInfo;
+  P : PTypeInfo;
 begin
   P := TypeInfo(T);
   case P^.Kind of
-    tkEnumeration:
+    tkEnumeration :
       case GetTypeData(P)^.OrdType of
-        otSByte, otUByte:
+        otSByte, otUByte :
           Result := GetEnumName(P, PByte(@Value)^);
-        otSWord, otUWord:
+        otSWord, otUWord :
           Result := GetEnumName(P, PWord(@Value)^);
-        otSLong, otULong:
+        otSLong, otULong :
           Result := GetEnumName(P, PCardinal(@Value)^);
       end;
-    else
-      raise EArgumentException.CreateFmt('Type %s is not enumeration', [P^.Name]);
+  else
+    raise EArgumentException.CreateFmt('Type %s is not enumeration', [P^.Name]);
   end;
 end;
 
-class function TEnumUtils.StringToEnum<T>(const value: string): T;
+class function TEnumUtils.StringToEnum<T>(const value : string) : T;
 var
-  P: PTypeInfo;
+  P : PTypeInfo;
   typeData : PTypeData;
   i : integer;
 begin
   P := TypeInfo(T);
   typeData := GetTypeData(P);
   case P^.Kind of
-    tkEnumeration:
-    begin
-      i := GetEnumValue(P, value);
-      if InRange(i, typeData.MinValue, typeData.MaxValue) then
+    tkEnumeration :
       begin
-        case Sizeof(T) of
-          1: PByte(@Result)^ := GetEnumValue(P, value);
-          2: PWord(@Result)^ := GetEnumValue(P, value);
-          4: PCardinal(@Result)^ := GetEnumValue(P, value);
+        i := GetEnumValue(P, value);
+        if InRange(i, typeData.MinValue, typeData.MaxValue) then
+        begin
+          case Sizeof(T) of
+            1 : PByte(@Result)^ := GetEnumValue(P, value);
+            2 : PWord(@Result)^ := GetEnumValue(P, value);
+            4 : PCardinal(@Result)^ := GetEnumValue(P, value);
+          end;
+        end
+        else //this should probably throw!
+        begin
+          case Sizeof(T) of
+            1 : PByte(@Result)^ := typeData.MinValue;
+            2 : PWord(@Result)^ := typeData.MinValue;
+            4 : PCardinal(@Result)^ := typeData.MinValue;
+          end;
         end;
       end
-      else //this should probably throw!
-      begin
-        case Sizeof(T) of
-          1: PByte(@Result)^ := typeData.MinValue;
-          2: PWord(@Result)^ := typeData.MinValue;
-          4: PCardinal(@Result)^ := typeData.MinValue;
-        end;
-      end;
-    end
   else
     raise EArgumentException.CreateFmt('Type %s is not enumeration', [P^.Name]);
   end;
@@ -101,3 +101,4 @@ begin
 end;
 
 end.
+

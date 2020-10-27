@@ -42,15 +42,15 @@ type
     FNonInteractive : boolean;
   protected
     FValidated : boolean;
-    FIsValid   : boolean;
-    constructor CreateClone(const original : TOptionsBase);virtual;
+    FIsValid : boolean;
+    constructor CreateClone(const original : TOptionsBase); virtual;
   public
-    constructor Create;virtual;
+    constructor Create; virtual;
     procedure ApplyCommon(const options : TCommonOptions);
-    function Validate(const logger : ILogger) : boolean;virtual;
-    property ConfigFile : string     read FConfigFile write FConfigFile;
+    function Validate(const logger : ILogger) : boolean; virtual;
+    property ConfigFile : string read FConfigFile write FConfigFile;
     property NonInteractive : boolean read FNonInteractive write FNonInteractive;
-    property Verbosity  : TVerbosity read FVerbosity write FVerbosity;
+    property Verbosity : TVerbosity read FVerbosity write FVerbosity;
     property Validated : boolean read FValidated;
     property IsValid : boolean read FIsValid;
   end;
@@ -65,11 +65,11 @@ uses
 
 { TOptionsBase }
 
-procedure TOptionsBase.ApplyCommon(const options: TCommonOptions);
+procedure TOptionsBase.ApplyCommon(const options : TCommonOptions);
 var
   sConfigFile : string;
 begin
-  FVerbosity  := options.Verbosity;
+  FVerbosity := options.Verbosity;
   FConfigFile := options.ConfigFile;
   FNonInteractive := options.NonInteractive;
   //check if there is a config file in the curent folder.
@@ -93,19 +93,19 @@ constructor TOptionsBase.Create;
 begin
   FVerbosity := TVerbosity.Normal;
   FValidated := false;
-  FIsValid   := false;
+  FIsValid := false;
 end;
 
-constructor TOptionsBase.CreateClone(const original: TOptionsBase);
+constructor TOptionsBase.CreateClone(const original : TOptionsBase);
 begin
   FVerbosity := original.Verbosity;
   FConfigFile := original.FConfigFile;
   FNonInteractive := original.FNonInteractive;
   FValidated := original.FValidated;
-  FIsValid   := original.FIsValid;
+  FIsValid := original.FIsValid;
 end;
 
-function TOptionsBase.Validate(const logger: ILogger): boolean;
+function TOptionsBase.Validate(const logger : ILogger) : boolean;
 begin
   result := true;
   FValidated := true;
@@ -113,3 +113,4 @@ begin
 end;
 
 end.
+

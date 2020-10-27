@@ -37,8 +37,8 @@ uses
 
 type
   IXMLNodeBase = interface
-  ['{3716A814-0213-4845-80D2-2BD164E139D8}']
-    function LoadFromXML(const xmlElement: IXMLDOMElement): boolean;
+    ['{3716A814-0213-4845-80D2-2BD164E139D8}']
+    function LoadFromXML(const xmlElement : IXMLDOMElement) : boolean;
   end;
 
 
@@ -46,19 +46,19 @@ type
 
   TXMLNodeBaseClass = class of TXMLNodeBase;
 
-  TXMLNodeBase = class(TInterfacedObject,IXMLNodeBase)
+  TXMLNodeBase = class(TInterfacedObject, IXMLNodeBase)
   private
     FLogger : ILogger;
   protected
     property Logger : ILogger read FLogger;
-    function SafeGetAttribute(const xmlElement :IXMLDOMElement; const attributeName : string) : string;
+    function SafeGetAttribute(const xmlElement : IXMLDOMElement; const attributeName : string) : string;
     function ReadStringValue(const xmlElement : IXMLDOMElement; const nodeName : string; const required : boolean; var field : string) : boolean;
     function ReadBoolValue(const xmlElement : IXMLDOMElement; const nodeName : string; const required : boolean; var field : boolean) : boolean;
     function ReadBoolAttribute(const xmlElement : IXMLDOMElement; const attributeName : string; const required : boolean; var field : boolean) : boolean;
-    function LoadFromXML(const xmlElement: IXMLDOMElement): Boolean;virtual;abstract;
-    function LoadCollection(const rootElement: IXMLDOMElement; const collectionPath: string; const nodeClass: TXMLNodeBaseClass; const action: TConstProc<IInterface>): boolean;
+    function LoadFromXML(const xmlElement : IXMLDOMElement) : Boolean; virtual; abstract;
+    function LoadCollection(const rootElement : IXMLDOMElement; const collectionPath : string; const nodeClass : TXMLNodeBaseClass; const action : TConstProc<IInterface>) : boolean;
   public
-    constructor Create(const logger : ILogger);virtual;
+    constructor Create(const logger : ILogger); virtual;
   end;
 
 implementation
@@ -67,12 +67,12 @@ uses
   System.SysUtils,
   System.Variants;
 
-constructor TXMLNodeBase.Create(const logger: ILogger);
+constructor TXMLNodeBase.Create(const logger : ILogger);
 begin
   FLogger := logger;
 end;
 
-function TXMLNodeBase.ReadBoolAttribute(const xmlElement: IXMLDOMElement; const attributeName: string; const required: boolean; var field: boolean): boolean;
+function TXMLNodeBase.ReadBoolAttribute(const xmlElement : IXMLDOMElement; const attributeName : string; const required : boolean; var field : boolean) : boolean;
 var
   attributeValue : Variant;
   sValue : string;
@@ -81,7 +81,7 @@ begin
   attributeValue := xmlElement.getAttribute(attributeName);
   if VarIsNull(attributeValue) then
   begin
-    if required  then
+    if required then
       logger.Error('Required attribute [' + attributeName + '] is empty.')
     else
       result := true;
@@ -92,30 +92,30 @@ begin
     field := StrToBool(sValue);
     result := true;
   except
-    logger.Error('Invalid  value [' + sValue + '] for ' + attributeName );
+    logger.Error('Invalid  value [' + sValue + '] for ' + attributeName);
   end;
 
 end;
 
-function TXMLNodeBase.ReadBoolValue(const xmlElement: IXMLDOMElement; const nodeName: string; const required: boolean; var field: boolean): boolean;
+function TXMLNodeBase.ReadBoolValue(const xmlElement : IXMLDOMElement; const nodeName : string; const required : boolean; var field : boolean) : boolean;
 var
   sValue : string;
 begin
-  result := ReadStringValue(xmlElement,nodeName,required,sValue);
+  result := ReadStringValue(xmlElement, nodeName, required, sValue);
   if result then
   begin
     if sValue = '' then
       exit;
-      try
-        field := StrToBool(sValue)
-      except
-        logger.Error('Invalid  value [' + sValue + '] for ' + nodeName );
-        result := false;
-      end;
+    try
+      field := StrToBool(sValue)
+    except
+      logger.Error('Invalid  value [' + sValue + '] for ' + nodeName);
+      result := false;
+    end;
   end;
 end;
 
-function TXMLNodeBase.ReadStringValue(const xmlElement : IXMLDOMElement; const nodeName: string; const required: boolean; var field: string): boolean;
+function TXMLNodeBase.ReadStringValue(const xmlElement : IXMLDOMElement; const nodeName : string; const required : boolean; var field : string) : boolean;
 var
   tmpNode : IXMLDOMElement;
 begin
@@ -123,16 +123,16 @@ begin
   tmpNode := xmlElement.selectSingleNode(nodeName) as IXMLDOMElement;
   if tmpNode = nil then
   begin
-    if required  then
+    if required then
       logger.Error('Required Element [' + nodeName + '] not found.')
     else
       result := true;
     exit;
   end;
-  field :=  tmpNode.text;
+  field := tmpNode.text;
   if field = '' then
   begin
-    if required  then
+    if required then
       logger.Error('Required Element [' + nodeName + '] is empty.');
     exit;
   end
@@ -141,7 +141,7 @@ begin
 end;
 
 
-function TXMLNodeBase.SafeGetAttribute(const xmlElement: IXMLDOMElement; const attributeName: string): string;
+function TXMLNodeBase.SafeGetAttribute(const xmlElement : IXMLDOMElement; const attributeName : string) : string;
 var
   attributeValue : Variant;
 begin
@@ -151,21 +151,21 @@ begin
     result := attributeValue;
 end;
 
-function TXMLNodeBase.LoadCollection(const rootElement : IXMLDOMElement; const collectionPath: string; const nodeClass: TXMLNodeBaseClass; const action: TConstProc<IInterface>): boolean;
+function TXMLNodeBase.LoadCollection(const rootElement : IXMLDOMElement; const collectionPath : string; const nodeClass : TXMLNodeBaseClass; const action : TConstProc<IInterface>) : boolean;
 var
   element : IXMLDOMElement;
   nodeList : IXMLDOMNodeList;
   item : IXMLNodeBase;
-  i: Integer;
+  i : Integer;
 begin
   result := true;
   nodeList := rootElement.selectNodes(collectionPath);
   if nodeList.length = 0 then
     exit;
-  for i := 0 to nodeList.length -1 do
+  for i := 0 to nodeList.length - 1 do
   begin
     element := nodeList.item[i] as IXMLDOMElement;
-    item := nodeClass.Create(Logger) as IXMLNodeBase ;
+    item := nodeClass.Create(Logger) as IXMLNodeBase;
     item.LoadFromXML(element);
     action(item);
   end;
@@ -173,3 +173,4 @@ end;
 
 
 end.
+

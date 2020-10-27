@@ -40,25 +40,25 @@ type
   private
   protected
     //making these protected to simplify clone;
-    FSource  : string;
+    FSource : string;
     FDestination : string;
     FExclude : IList<string>;
     FFlatten : boolean;
     FIgnore : boolean;
 
-    function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
-    function GetSource: string;
-    function GetDestination: string;
-    function GetExclude: IList<string>;
-    function GetFlatten: Boolean;
+    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
+    function GetSource : string;
+    function GetDestination : string;
+    function GetExclude : IList<string>;
+    function GetFlatten : Boolean;
     procedure SetSource(const value : string);
     procedure SetDestination(const value : string);
     function GetIgnore : boolean;
 
-    constructor CreateClone(const logger: ILogger; const src : string; const dest : string; const exclude : IList<string>; const flatten : boolean; const ignore : boolean);virtual;
-    function Clone: ISpecFileEntry;overload;
+    constructor CreateClone(const logger : ILogger; const src : string; const dest : string; const exclude : IList<string>; const flatten : boolean; const ignore : boolean); virtual;
+    function Clone : ISpecFileEntry; overload;
   public
-    constructor Create(const logger: ILogger); override;
+    constructor Create(const logger : ILogger); override;
 
   end;
 
@@ -69,58 +69,58 @@ uses
 
 { TSpecFileEntry }
 
-function TSpecFileEntry.Clone: ISpecFileEntry;
+function TSpecFileEntry.Clone : ISpecFileEntry;
 begin
-  result := TSpecFileEntry.CreateClone(logger,FSource, FDestination, FExclude, FFlatten, FIgnore );
+  result := TSpecFileEntry.CreateClone(logger, FSource, FDestination, FExclude, FFlatten, FIgnore);
 end;
 
-constructor TSpecFileEntry.Create(const logger: ILogger);
+constructor TSpecFileEntry.Create(const logger : ILogger);
 begin
   inherited Create(Logger);
-  FExclude := TCollections.CreateList<string>;
+  FExclude := TCollections.CreateList < string > ;
 end;
 
-constructor TSpecFileEntry.CreateClone(const logger: ILogger; const src, dest : string; const  exclude: IList<string>; const flatten: boolean; const ignore : boolean);
+constructor TSpecFileEntry.CreateClone(const logger : ILogger; const src, dest : string; const exclude : IList<string> ; const flatten : boolean; const ignore : boolean);
 begin
   inherited Create(logger);
   FSource := src;
   FDestination := dest;
-  FExclude := TCollections.CreateList<string>;
+  FExclude := TCollections.CreateList < string > ;
   FExclude.AddRange(exclude);
   FFlatten := flatten;
   FIgnore := ignore;
 end;
 
-function TSpecFileEntry.GetExclude: IList<string>;
+function TSpecFileEntry.GetExclude : IList<string>;
 begin
   result := FExclude;
 end;
 
-function TSpecFileEntry.GetFlatten: Boolean;
+function TSpecFileEntry.GetFlatten : Boolean;
 begin
   result := FFlatten;
 end;
 
-function TSpecFileEntry.GetIgnore: boolean;
+function TSpecFileEntry.GetIgnore : boolean;
 begin
   result := FIgnore;
 end;
 
-function TSpecFileEntry.GetSource: string;
+function TSpecFileEntry.GetSource : string;
 begin
   result := FSource;
 end;
 
-function TSpecFileEntry.GetDestination: string;
+function TSpecFileEntry.GetDestination : string;
 begin
   result := FDestination;
 end;
 
-function TSpecFileEntry.LoadFromJson(const jsonObject: TJsonObject): Boolean;
+function TSpecFileEntry.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var
   excludeArray : TJsonArray;
   entry : string;
-  i: Integer;
+  i : Integer;
 begin
   result := true;
   FSource := jsonObject.S['src'];
@@ -143,7 +143,7 @@ begin
   begin
     excludeArray := jsonObject.A['exclude']; //this is causing an av!
 
-    for i := 0 to excludeArray.Count -1 do
+    for i := 0 to excludeArray.Count - 1 do
     begin
       entry := excludeArray.S[i];
       if entry <> '' then
@@ -152,14 +152,15 @@ begin
   end;
 end;
 
-procedure TSpecFileEntry.SetSource(const value: string);
+procedure TSpecFileEntry.SetSource(const value : string);
 begin
   FSource := value;
 end;
 
-procedure TSpecFileEntry.SetDestination(const value: string);
+procedure TSpecFileEntry.SetDestination(const value : string);
 begin
   FDestination := value;
 end;
 
 end.
+

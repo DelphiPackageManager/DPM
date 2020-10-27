@@ -18,29 +18,29 @@ type
 
   TButtonedEdit = class(Vcl.ExtCtrls.TButtonedEdit)
   private
-    FACList: IDelphiEnumString;
-    FAutoComplete: IAutoComplete;
-    FACEnabled: boolean;
-    FACOptions: TACOptions;
-    FACSource: TACSource;
+    FACList : IDelphiEnumString;
+    FAutoComplete : IAutoComplete;
+    FACEnabled : boolean;
+    FACOptions : TACOptions;
+    FACSource : TACSource;
 
     //history
-    function GetACStrings: TStringList;
-    procedure SetACEnabled(const Value: boolean);
-    procedure SetACOptions(const Value: TACOptions);
-    procedure SetACSource(const Value: TACSource);
-    procedure SetACStrings(const Value: TStringList);
+    function GetACStrings : TStringList;
+    procedure SetACEnabled(const Value : boolean);
+    procedure SetACOptions(const Value : TACOptions);
+    procedure SetACSource(const Value : TACSource);
+    procedure SetACStrings(const Value : TStringList);
   protected
     procedure CreateWnd; override;
     procedure DestroyWnd; override;
   public
-    constructor Create(AOwner: TComponent); override;
+    constructor Create(AOwner : TComponent); override;
     destructor Destroy; override;
   published
-    property ACEnabled: boolean read FACEnabled write SetACEnabled;
-    property ACOptions: TACOptions read FACOptions write SetACOptions;
-    property ACSource: TACSource read FACSource write SetACSource;
-    property ACStrings: TStringList read GetACStrings write SetACStrings;
+    property ACEnabled : boolean read FACEnabled write SetACEnabled;
+    property ACOptions : TACOptions read FACOptions write SetACOptions;
+    property ACSource : TACSource read FACSource write SetACSource;
+    property ACStrings : TStringList read GetACStrings write SetACStrings;
   end;
 
 implementation
@@ -53,7 +53,7 @@ uses
   System.Win.ComObj,
   WinApi.ActiveX;
 
-constructor TButtonedEdit.Create(AOwner: TComponent);
+constructor TButtonedEdit.Create(AOwner : TComponent);
 begin
   inherited;
 
@@ -65,20 +65,20 @@ end;
 
 procedure TButtonedEdit.CreateWnd;
 var
-  Dummy: IUnknown;
-  Strings: IEnumString;
+  Dummy : IUnknown;
+  Strings : IEnumString;
 begin
   inherited;
   if HandleAllocated then
   begin
     try
       Dummy := CreateComObject(CLSID_AutoComplete);
-      if (Dummy <> nil) and  (Dummy.QueryInterface(IID_IAutoComplete, FAutoComplete) = S_OK) then
+      if (Dummy <> nil) and (Dummy.QueryInterface(IID_IAutoComplete, FAutoComplete) = S_OK) then
       begin
         case FACSource of
-          acsHistory: Strings := CreateComObject(CLSID_ACLHistory) as  IEnumString;
-          acsMRU: Strings := CreateComObject(CLSID_ACLMRU) as  IEnumString;
-          acsShell: Strings := CreateComObject(CLSID_ACListISF) as IEnumString;
+          acsHistory : Strings := CreateComObject(CLSID_ACLHistory) as IEnumString;
+          acsMRU : Strings := CreateComObject(CLSID_ACLMRU) as IEnumString;
+          acsShell : Strings := CreateComObject(CLSID_ACListISF) as IEnumString;
         else
           Strings := FACList as IEnumString;
         end;
@@ -111,12 +111,12 @@ begin
 end;
 
 
-function TButtonedEdit.GetACStrings: TStringList;
+function TButtonedEdit.GetACStrings : TStringList;
 begin
   Result := FACList.Strings;
 end;
 
-procedure TButtonedEdit.SetACEnabled(const Value: Boolean);
+procedure TButtonedEdit.SetACEnabled(const Value : Boolean);
 begin
   if (FAutoComplete <> nil) then
   begin
@@ -125,21 +125,21 @@ begin
   FACEnabled := Value;
 end;
 
-procedure TButtonedEdit.SetACOptions(const Value: TACOptions);
+procedure TButtonedEdit.SetACOptions(const Value : TACOptions);
 const
   Options : array[TACOption] of integer = (ACO_AUTOAPPEND,
-                                           ACO_AUTOSUGGEST,
-                                           ACO_UPDOWNKEYDROPSLIST,
-                                           ACO_SEARCH,
-                                           ACO_FILTERPREFIXES,
-                                           ACO_USETAB,
-                                           ACO_RTLREADING,
-                                           ACO_WORD_FILTER,
-                                           ACO_NOPREFIXFILTERING);
+    ACO_AUTOSUGGEST,
+    ACO_UPDOWNKEYDROPSLIST,
+    ACO_SEARCH,
+    ACO_FILTERPREFIXES,
+    ACO_USETAB,
+    ACO_RTLREADING,
+    ACO_WORD_FILTER,
+    ACO_NOPREFIXFILTERING);
 var
-  Option:TACOption;
-  Opt: DWORD;
-  AC2: IAutoComplete2;
+  Option : TACOption;
+  Opt : DWORD;
+  AC2 : IAutoComplete2;
 begin
   if (FAutoComplete <> nil) then
   begin
@@ -157,7 +157,7 @@ begin
   FACOptions := Value;
 end;
 
-procedure TButtonedEdit.SetACSource(const Value: TACSource);
+procedure TButtonedEdit.SetACSource(const Value : TACSource);
 begin
   if FACSource <> Value then
   begin
@@ -166,10 +166,11 @@ begin
   end;
 end;
 
-procedure TButtonedEdit.SetACStrings(const Value: TStringList);
+procedure TButtonedEdit.SetACStrings(const Value : TStringList);
 begin
   if Value <> FACList.Strings then
     FACList.Strings.Assign(Value);
 end;
 
 end.
+

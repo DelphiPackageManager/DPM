@@ -42,10 +42,10 @@ type
     FLogger : ILogger;
   protected
     property Logger : ILogger read FLogger;
-    function LoadFromJson(const jsonObject : TJsonObject) : boolean;virtual;abstract;
-    function LoadJsonCollection(const collection : TJSonArray; const nodeClass: TSpecNodeClass; const action: TConstProc<IInterface>): boolean;
+    function LoadFromJson(const jsonObject : TJsonObject) : boolean; virtual; abstract;
+    function LoadJsonCollection(const collection : TJSonArray; const nodeClass : TSpecNodeClass; const action : TConstProc<IInterface>) : boolean;
   public
-    constructor Create(const logger : ILogger);virtual;
+    constructor Create(const logger : ILogger); virtual;
   end;
 
 
@@ -54,22 +54,22 @@ implementation
 
 { TSpecNode }
 
-constructor TSpecNode.Create(const logger: ILogger);
+constructor TSpecNode.Create(const logger : ILogger);
 begin
   FLogger := logger;
 end;
 
-function TSpecNode.LoadJsonCollection(const collection : TJSonArray; const nodeClass: TSpecNodeClass; const action: TConstProc<IInterface>): boolean;
+function TSpecNode.LoadJsonCollection(const collection : TJSonArray; const nodeClass : TSpecNodeClass; const action : TConstProc<IInterface>) : boolean;
 var
   item : ISpecNode;
-  i: Integer;
+  i : Integer;
   obj : TJsonObject;
 begin
   result := true;
   if collection.Count = 0 then
     exit;
 
-  for i := 0 to collection.Count -1 do
+  for i := 0 to collection.Count - 1 do
   begin
     item := nodeClass.Create(Logger) as ISpecNode;
     obj := collection.O[i];
@@ -79,3 +79,4 @@ begin
 end;
 
 end.
+

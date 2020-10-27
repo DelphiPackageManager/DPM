@@ -49,20 +49,20 @@ type
     FHttpClient : IHttpClient;
 
   protected
-//    function DownloadPackage(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity; const localFolder: string; var fileName: string): Boolean;
-//    function GetIsLocal: Boolean;
-//    function GetIsRemote: Boolean;
-//    function GetName: string;
-//    function GetPackageInfo(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
-//    function GetPackageVersions(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): Spring.Collections.IList<VSoft.SemanticVersion.TSemanticVersion>;
-//    function GetPackageVersionsWithDependencies(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): Spring.Collections.IList<DPM.Core.Package.Interfaces.IPackageInfo>;
-//    function GetSource: string;
-      procedure Configure(const source: ISourceConfig);override;
-//    function Search(const cancellationToken: ICancellationToken; const id: string; const range: TVersionRange): Spring.Collections.IList<DPM.Core.Package.Interfaces.IPackageIdentity>;
+    //    function DownloadPackage(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity; const localFolder: string; var fileName: string): Boolean;
+    //    function GetIsLocal: Boolean;
+    //    function GetIsRemote: Boolean;
+    //    function GetName: string;
+    //    function GetPackageInfo(const cancellationToken: ICancellationToken; const packageIdentity: IPackageIdentity): IPackageInfo;
+    //    function GetPackageVersions(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): Spring.Collections.IList<VSoft.SemanticVersion.TSemanticVersion>;
+    //    function GetPackageVersionsWithDependencies(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const versionRange: TVersionRange; const preRelease: Boolean): Spring.Collections.IList<DPM.Core.Package.Interfaces.IPackageInfo>;
+    //    function GetSource: string;
+    procedure Configure(const source : ISourceConfig); override;
+    //    function Search(const cancellationToken: ICancellationToken; const id: string; const range: TVersionRange): Spring.Collections.IList<DPM.Core.Package.Interfaces.IPackageIdentity>;
 
     property HttpClient : IHttpClient read FHttpClient;
   public
-    constructor Create(const logger : ILogger);override;
+    constructor Create(const logger : ILogger); override;
 
   end;
 
@@ -81,7 +81,7 @@ implementation
 
 { TGithubBasePackageRepository }
 
-procedure TGithubBasePackageRepository.Configure(const source: ISourceConfig);
+procedure TGithubBasePackageRepository.Configure(const source : ISourceConfig);
 begin
   inherited Configure(source);
   FHttpClient := THttpClientFactory.CreateClient(Self.Source);
@@ -94,7 +94,7 @@ begin
     FHttpClient.AuthType := THttpAuthType.None;
 end;
 
-constructor TGithubBasePackageRepository.Create(const logger: ILogger);
+constructor TGithubBasePackageRepository.Create(const logger : ILogger);
 begin
   inherited Create(logger)
 
@@ -102,3 +102,4 @@ end;
 
 
 end.
+

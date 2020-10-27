@@ -36,7 +36,7 @@ uses
 
 type
   IPackageCache = interface
-  ['{4285BB27-6E42-4B2A-9B81-B63505ABF934}']
+    ['{4285BB27-6E42-4B2A-9B81-B63505ABF934}']
     function GetLocation : string;
     procedure SetLocation(const value : string);
     function GetPackagesFolder : string;
@@ -52,7 +52,7 @@ type
     //then it will call InstallPackage to extract it.
     function EnsurePackage(const packageId : IPackageId) : boolean;
 
-    function InstallPackage(const packageId : IPackageId; const saveFile : boolean; const source : string = '' ) : boolean;
+    function InstallPackage(const packageId : IPackageId; const saveFile : boolean; const source : string = '') : boolean;
 
     function InstallPackageFromFile(const packageFileName : string; const saveFile : boolean) : boolean;
 
@@ -69,3 +69,4 @@ type
 implementation
 
 end.
+

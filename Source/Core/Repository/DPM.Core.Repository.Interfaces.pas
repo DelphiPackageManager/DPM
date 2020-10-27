@@ -41,24 +41,24 @@ uses
 
 
 type
-//  IPackageSearchResult = interface
-//  ['{39B253DC-4BC5-4E72-918A-2FACC3EB5AC5}']
-//    function GetPackages : IList<IPackageIdentity>;
-//    property Packages : IList<IPackageIdentity> read GetPackages;
-//  end;
+  //  IPackageSearchResult = interface
+  //  ['{39B253DC-4BC5-4E72-918A-2FACC3EB5AC5}']
+  //    function GetPackages : IList<IPackageIdentity>;
+  //    property Packages : IList<IPackageIdentity> read GetPackages;
+  //  end;
 
-  //bear in mind that there will be a remote repository implemented with http
-  //so need to keep that in mind with these interfaces.
+    //bear in mind that there will be a remote repository implemented with http
+    //so need to keep that in mind with these interfaces.
 
   IPackageRepository = interface
-  ['{0B495C12-4BDF-4C1C-9BD6-B008F0BA7F18}']
+    ['{0B495C12-4BDF-4C1C-9BD6-B008F0BA7F18}']
     function GetRepositoryType : TSourceType;
     function GetName : string;
     function GetSource : string;
     procedure Configure(const source : ISourceConfig);
 
-    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
-    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions ) : IList<IPackageIdentity>;overload;
+    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
+    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>; overload;
 
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
@@ -67,35 +67,35 @@ type
 
     //ui stuff
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
-    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageIcon;
+    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
 
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion) : IList<TPackageVersion>;overload;
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion) : IList<TPackageVersion>; overload;
 
-    property Name   : string read GetName;
+    property Name : string read GetName;
     property Source : string read GetSource;
     property RepositoryType : TSourceType read GetRepositoryType;
   end;
 
   IPackageRepositoryFactory = interface
-  ['{67014BE3-AA4C-45ED-A043-68262E57B89A}']
+    ['{67014BE3-AA4C-45ED-A043-68262E57B89A}']
     function CreateRepository(const repoType : TSourceType) : IPackageRepository;
   end;
 
 
   IPackageRepositoryManager = interface
-  ['{86DEB23D-7229-4F1C-949C-0A5CFB421152}']
-    function Initialize( const configuration : IConfiguration) : boolean;
+    ['{86DEB23D-7229-4F1C-949C-0A5CFB421152}']
+    function Initialize(const configuration : IConfiguration) : boolean;
 
-    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>;overload;
+    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>; overload;
 
-    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string ) : boolean;
+    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange;  const configuration : IConfiguration = nil) : IList<IPackageInfo>;overload;
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<TPackageVersion>;overload;
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange; const configuration : IConfiguration = nil) : IList<IPackageInfo>; overload;
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<TPackageVersion>; overload;
     //ui specific stuff
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
     function GetPackageIcon(const cancelToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string;
-                            const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const configuration : IConfiguration) : IPackageIcon;
+      const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const configuration : IConfiguration) : IPackageIcon;
     function GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IEnumerable<IPackageId>; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
   end;
 
@@ -103,3 +103,4 @@ type
 implementation
 
 end.
+

@@ -37,17 +37,17 @@ uses
 type
   TPackageVersion = VSoft.SemanticVersion.TSemanticVersion;
   TClientVersion = VSoft.SemanticVersion.TSemanticVersion;
-  TVerbosity = (Quiet,Normal,Detailed, Debug);
+  TVerbosity = (Quiet, Normal, Detailed, Debug);
 
-  TSourceType =(Folder, DPMServer, DPMGithub, DNGithub);
+  TSourceType = (Folder, DPMServer, DPMGithub, DNGithub);
 
   //TODO : Decide on min delphi version supported. Ideally go back as far as possible
 
   TCompilerVersion = (
     UnknownVersion,
-//    RS7,        //need dof
-//    RS2005,     //need bdsproj support
-//    RS2006,     //need bdsproj support
+    //    RS7,        //need dof
+    //    RS2005,     //need bdsproj support
+    //    RS2006,     //need bdsproj support
     RS2009,
     RS2010,
     RSXE,
@@ -64,7 +64,7 @@ type
     RS10_3,
     RS10_4 //probably the next version.
 
-  );
+    );
 
   TCompilerVersions = set of TCompilerVersion;
 
@@ -73,76 +73,76 @@ type
     UnknownPlatform,
     Win32,
     Win64,
-    WinArm32,       //reserved for future use
-    WinArm64,       //reserved for future use
+    WinArm32, //reserved for future use
+    WinArm64, //reserved for future use
     OSX32,
-    OSX64,        //reserved for future use
+    OSX64, //reserved for future use
     AndroidArm32,
     AndroidArm64,
     AndroidIntel32, //reserved for future use
     AndroidIntel64, //reserved for future use
     iOS32,
-    iOS64,          //reserved for future use
-    LinuxIntel32,   //reserved for future use
+    iOS64, //reserved for future use
+    LinuxIntel32, //reserved for future use
     LinuxIntel64,
-    LinuxArm32,     //reserved for future use
-    LinuxArm64      //reserved for future use
+    LinuxArm32, //reserved for future use
+    LinuxArm64 //reserved for future use
     );
 
   TDPMPlatforms = set of TDPMPlatform;
 
 
-  TConstProc<T> = reference to procedure (const Arg1: T);
-  TConstProc<T1,T2> = reference to procedure (const Arg1: T1; const Arg2: T2);
-  TConstProc<T1,T2,T3> = reference to procedure (const Arg1: T1; const Arg2: T2; const Arg3: T3);
-  TConstProc<T1,T2,T3,T4> = reference to procedure (const Arg1: T1; const Arg2: T2; const Arg3: T3; const Arg4: T4);
+  TConstProc<T> = reference to procedure(const Arg1 : T);
+  TConstProc<T1, T2> = reference to procedure(const Arg1 : T1; const Arg2 : T2);
+  TConstProc<T1, T2, T3> = reference to procedure(const Arg1 : T1; const Arg2 : T2; const Arg3 : T3);
+  TConstProc<T1, T2, T3, T4> = reference to procedure(const Arg1 : T1; const Arg2 : T2; const Arg3 : T3; const Arg4 : T4);
 
-  TPackageVersionComparer = class(TInterfacedObject,IEqualityComparer<TPackageVersion>)
+  TPackageVersionComparer = class(TInterfacedObject, IEqualityComparer<TPackageVersion>)
   protected
-    function Equals(const Left, Right: TPackageVersion): Boolean;reintroduce;
-    function GetHashCode(const Value: TPackageVersion): Integer; reintroduce;
+    function Equals(const Left, Right : TPackageVersion) : Boolean; reintroduce;
+    function GetHashCode(const Value : TPackageVersion) : Integer; reintroduce;
   end;
 
 
-  function DesignTimePlatform(const target : TCompilerVersion) : TDPMPlatform;
-  function StringToCompilerVersion(const value : string) : TCompilerVersion;
-  function StringToDPMPlatform(const value : string) : TDPMPlatform;
+function DesignTimePlatform(const target : TCompilerVersion) : TDPMPlatform;
+function StringToCompilerVersion(const value : string) : TCompilerVersion;
+function StringToDPMPlatform(const value : string) : TDPMPlatform;
 
-  function CompilerToString(const value : TCompilerVersion) : string;
-  function CompilerToStringNoPoint(const value : TCompilerVersion) : string;
+function CompilerToString(const value : TCompilerVersion) : string;
+function CompilerToStringNoPoint(const value : TCompilerVersion) : string;
 
-  function CompilerCodeName(const value : TCompilerVersion) : string;
-  function CompilerWithCodeName(const value : TCompilerVersion) : string;
-
-
-  function IsValidCompilerString(const value : string) : boolean;
-
-  function IsValidPlatformString(const value : string) : boolean;
-  function DPMPlatformToString(const value : TDPMPlatform) : string;
-  function DPMPlatformToBDString(const value : TDPMPlatform) : string;
-
-  function DPMPlatformsToString(const value : TDPMPlatforms; const sep : string = ',') : string;
+function CompilerCodeName(const value : TCompilerVersion) : string;
+function CompilerWithCodeName(const value : TCompilerVersion) : string;
 
 
-  function CompilerToLibSuffix(const compiler : TCompilerVersion) : string;
+function IsValidCompilerString(const value : string) : boolean;
 
-  function CompilerToBDSVersion(const compiler : TCompilerVersion) : string;
+function IsValidPlatformString(const value : string) : boolean;
+function DPMPlatformToString(const value : TDPMPlatform) : string;
+function DPMPlatformToBDString(const value : TDPMPlatform) : string;
 
-  //returns the delphi compiler version
-  function CompilerToCompilerVersionIntStr(const compiler : TCompilerVersion) : string;
+function DPMPlatformsToString(const value : TDPMPlatforms; const sep : string = ',') : string;
 
-  function ProjectVersionToCompilerVersion(const value : string) : TCompilerVersion;
-  function IsAmbigousProjectVersion(const value : string) : boolean;
 
-  function ProjectPlatformToDPMPlatform(const value : string) : TDPMPlatform;
+function CompilerToLibSuffix(const compiler : TCompilerVersion) : string;
 
-  function AllPlatforms(const compiler : TCompilerVersion ) : TDPMPlatforms;
+function CompilerToBDSVersion(const compiler : TCompilerVersion) : string;
+
+//returns the delphi compiler version
+function CompilerToCompilerVersionIntStr(const compiler : TCompilerVersion) : string;
+
+function ProjectVersionToCompilerVersion(const value : string) : TCompilerVersion;
+function IsAmbigousProjectVersion(const value : string) : boolean;
+
+function ProjectPlatformToDPMPlatform(const value : string) : TDPMPlatform;
+
+function AllPlatforms(const compiler : TCompilerVersion) : TDPMPlatforms;
 
 implementation
 
 uses
   {$IF CompilerVersion >= 29.0}
-    {$LEGACYIFEND ON}
+  {$LEGACYIFEND ON}
   System.Hash,
   {$IFEND}
   System.TypInfo,
@@ -162,7 +162,7 @@ begin
   sValue := value;
   if not TStringUtils.StartsWith(sValue, 'RS') then
     sValue := 'RS' + sValue;
-  sValue := StringReplace(sValue,'.','_',[rfReplaceAll]);
+  sValue := StringReplace(sValue, '.', '_', [rfReplaceAll]);
 
   iValue := GetEnumValue(typeInfo(TCompilerVersion), sValue);
 
@@ -198,7 +198,7 @@ end;
 function CompilerToString(const value : TCompilerVersion) : string;
 begin
   result := GetEnumName(TypeInfo(TCompilerVersion), ord(value));
-  Delete(result,1,2);// remove RS
+  Delete(result, 1, 2); // remove RS
   result := StringReplace(result, '_', '.', [rfReplaceAll]);
 end;
 
@@ -227,7 +227,7 @@ end;
 function DPMPlatformToBDString(const value : TDPMPlatform) : string;
 begin
   case value of
-    TDPMPlatform.AndroidArm32: result := 'Android';
+    TDPMPlatform.AndroidArm32 : result := 'Android';
   else
     result := GetEnumName(TypeInfo(TDPMPlatform), ord(value));
   end;
@@ -253,39 +253,40 @@ begin
 end;
 
 
-function AllPlatforms(const compiler : TCompilerVersion ) : TDPMPlatforms;
+function AllPlatforms(const compiler : TCompilerVersion) : TDPMPlatforms;
 begin
   result := [];
   case compiler of
     TCompilerVersion.RS2009,
     TCompilerVersion.RS2010,
-    TCompilerVersion.RSXE   : result := [TDPMPlatform.Win32];
-    TCompilerVersion.RSXE2  : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32];
+    TCompilerVersion.RSXE : result := [TDPMPlatform.Win32];
+    TCompilerVersion.RSXE2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32];
     TCompilerVersion.RSXE3,
     TCompilerVersion.RSXE4,
     TCompilerVersion.RSXE5,
     TCompilerVersion.RSXE6,
     TCompilerVersion.RSXE7,
-    TCompilerVersion.RSXE8  : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32];
+    TCompilerVersion.RSXE8 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32];
     TCompilerVersion.RS10_0,
-    TCompilerVersion.RS10_1 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32];
-    TCompilerVersion.RS10_2 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64];
-    TCompilerVersion.RS10_3 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64,
-                                         TDPMPlatform.AndroidArm64, TDPMPlatform.OSX64];
-    TCompilerVersion.RS10_4 : result := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX64, TDPMPlatform.iOS32, TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32,
-                                         TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
+    TCompilerVersion.RS10_1 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32];
+    TCompilerVersion.RS10_2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64];
+    TCompilerVersion.RS10_3 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64,
+        TDPMPlatform.AndroidArm64, TDPMPlatform.OSX64];
+    TCompilerVersion.RS10_4 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX64, TDPMPlatform.iOS32, TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32,
+        TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
   else
-    raise Exception.Create('AllPlatforms is missing for : ' + CompilerToString(compiler));  end;
+    raise Exception.Create('AllPlatforms is missing for : ' + CompilerToString(compiler));
+  end;
 end;
 
 function CompilerCodeName(const value : TCompilerVersion) : string;
 begin
   case value of
-    TCompilerVersion.RS10_0: result := 'Seattle';
-    TCompilerVersion.RS10_1: result := 'Berlin';
-    TCompilerVersion.RS10_2: result := 'Tokyo';
-    TCompilerVersion.RS10_3: result := 'Rio';
-    TCompilerVersion.RS10_4: result := 'Sydney';
+    TCompilerVersion.RS10_0 : result := 'Seattle';
+    TCompilerVersion.RS10_1 : result := 'Berlin';
+    TCompilerVersion.RS10_2 : result := 'Tokyo';
+    TCompilerVersion.RS10_3 : result := 'Rio';
+    TCompilerVersion.RS10_4 : result := 'Sydney';
   else
     result := '';
   end;
@@ -307,9 +308,9 @@ end;
 function CompilerToLibSuffix(const compiler : TCompilerVersion) : string;
 begin
   case compiler of
-    TCompilerVersion.RS2009: result := '120';
-    TCompilerVersion.RS2010: result := '140';
-    TCompilerVersion.RSXE  : result := '150';
+    TCompilerVersion.RS2009 : result := '120';
+    TCompilerVersion.RS2010 : result := '140';
+    TCompilerVersion.RSXE : result := '150';
     TCompilerVersion.RSXE2 : result := '160';
     TCompilerVersion.RSXE3 : result := '170';
     TCompilerVersion.RSXE4 : result := '180';
@@ -317,11 +318,11 @@ begin
     TCompilerVersion.RSXE6 : result := '200';
     TCompilerVersion.RSXE7 : result := '210';
     TCompilerVersion.RSXE8 : result := '220';
-    TCompilerVersion.RS10_0: result := '230';
-    TCompilerVersion.RS10_1: result := '240';
-    TCompilerVersion.RS10_2: result := '250';
-    TCompilerVersion.RS10_3: result := '260';
-    TCompilerVersion.RS10_4: result := '270';
+    TCompilerVersion.RS10_0 : result := '230';
+    TCompilerVersion.RS10_1 : result := '240';
+    TCompilerVersion.RS10_2 : result := '250';
+    TCompilerVersion.RS10_3 : result := '260';
+    TCompilerVersion.RS10_4 : result := '270';
   else
     raise Exception.Create('LibSuffix is missing for : ' + CompilerToString(compiler));
   end;
@@ -331,9 +332,9 @@ end;
 function CompilerToBDSVersion(const compiler : TCompilerVersion) : string;
 begin
   case compiler of
-    TCompilerVersion.RS2009: result := '6.0';
-    TCompilerVersion.RS2010: result := '7.0';
-    TCompilerVersion.RSXE  : result := '8.0';
+    TCompilerVersion.RS2009 : result := '6.0';
+    TCompilerVersion.RS2010 : result := '7.0';
+    TCompilerVersion.RSXE : result := '8.0';
     TCompilerVersion.RSXE2 : result := '9.0';
     TCompilerVersion.RSXE3 : result := '10.0';
     TCompilerVersion.RSXE4 : result := '11.0';
@@ -341,11 +342,11 @@ begin
     TCompilerVersion.RSXE6 : result := '14.0';
     TCompilerVersion.RSXE7 : result := '15.0';
     TCompilerVersion.RSXE8 : result := '16.0';
-    TCompilerVersion.RS10_0: result := '17.0';
-    TCompilerVersion.RS10_1: result := '18.0';
-    TCompilerVersion.RS10_2: result := '19.0';
-    TCompilerVersion.RS10_3: result := '20.0';
-    TCompilerVersion.RS10_4: result := '21.0';
+    TCompilerVersion.RS10_0 : result := '17.0';
+    TCompilerVersion.RS10_1 : result := '18.0';
+    TCompilerVersion.RS10_2 : result := '19.0';
+    TCompilerVersion.RS10_3 : result := '20.0';
+    TCompilerVersion.RS10_4 : result := '21.0';
   else
     raise Exception.Create('BDSVersion is missing for : ' + CompilerToString(compiler));
   end;
@@ -355,9 +356,9 @@ end;
 function CompilerToCompilerVersionIntStr(const compiler : TCompilerVersion) : string;
 begin
   case compiler of
-    TCompilerVersion.RS2009: result := '20';
-    TCompilerVersion.RS2010: result := '21';
-    TCompilerVersion.RSXE  : result := '22';
+    TCompilerVersion.RS2009 : result := '20';
+    TCompilerVersion.RS2010 : result := '21';
+    TCompilerVersion.RSXE : result := '22';
     TCompilerVersion.RSXE2 : result := '23';
     TCompilerVersion.RSXE3 : result := '24';
     TCompilerVersion.RSXE4 : result := '25';
@@ -365,11 +366,11 @@ begin
     TCompilerVersion.RSXE6 : result := '27';
     TCompilerVersion.RSXE7 : result := '28';
     TCompilerVersion.RSXE8 : result := '29';
-    TCompilerVersion.RS10_0: result := '30';
-    TCompilerVersion.RS10_1: result := '31';
-    TCompilerVersion.RS10_2: result := '32';
-    TCompilerVersion.RS10_3: result := '33';
-    TCompilerVersion.RS10_4: result := '34';
+    TCompilerVersion.RS10_0 : result := '30';
+    TCompilerVersion.RS10_1 : result := '31';
+    TCompilerVersion.RS10_2 : result := '32';
+    TCompilerVersion.RS10_3 : result := '33';
+    TCompilerVersion.RS10_4 : result := '34';
   else
     raise Exception.Create('BDSVersion is missing for : ' + CompilerToString(compiler));
   end;
@@ -397,7 +398,7 @@ begin
     exit;
 
   if length(elements) > 1 then
-    minor := StrToIntDef(elements[1],-1)
+    minor := StrToIntDef(elements[1], -1)
   else
     minor := 0;
   if minor = -1 then
@@ -405,31 +406,31 @@ begin
 
   case major of
     12 :
-    begin
-      case minor of
-        0 : result := true; //ambiguous could be Delphi 2009 or Delphi 2010
+      begin
+        case minor of
+          0 : result := true; //ambiguous could be Delphi 2009 or Delphi 2010
+        end;
       end;
-    end;
     14 :
-    begin
-      case minor of
-         4 : result := true; //ambiguous could be xe3 update 2
+      begin
+        case minor of
+          4 : result := true; //ambiguous could be xe3 update 2
+        end;
       end;
-    end;
-    15:
-    begin
-      case minor of
-         3 : result := true; //ambiguous could be xe6
+    15 :
+      begin
+        case minor of
+          3 : result := true; //ambiguous could be xe6
+        end;
       end;
-    end;
     18 :
-    begin
-      case minor of
-        1    : result := true; //ambiguous could be 10.0 Update 1 and Delphi 10.1
-        2    : result := true; //ambigous could be 10.1 Update 1 and Delphi 10.2
-        8    : result := true; //ambigous could be 10.3.x or Delphi 10.4
+      begin
+        case minor of
+          1 : result := true; //ambiguous could be 10.0 Update 1 and Delphi 10.1
+          2 : result := true; //ambigous could be 10.1 Update 1 and Delphi 10.2
+          8 : result := true; //ambigous could be 10.3.x or Delphi 10.4
+        end;
       end;
-    end;
   end;
 end;
 
@@ -453,7 +454,7 @@ begin
     exit;
 
   if length(elements) > 1 then
-    minor := StrToIntDef(elements[1],-1)
+    minor := StrToIntDef(elements[1], -1)
   else
     minor := 0;
   if minor = -1 then
@@ -462,53 +463,53 @@ begin
 
   case major of
     12 :
-    begin
-      case minor of
-        0..1 : result := TCompilerVersion.RS2010;
-        2..3 : result := TCompilerVersion.RSXE;
+      begin
+        case minor of
+          0..1 : result := TCompilerVersion.RS2010;
+          2..3 : result := TCompilerVersion.RSXE;
+        end;
       end;
-    end;
     13 : result := TCompilerVersion.RSXE2;
     14 :
-    begin
-      case minor of
-        0..3 : result := TCompilerVersion.RSXE3;
-           4 : result := TCompilerVersion.RSXE4; //ambiguous could be xe3 update 2
-      else
-        result := TCompilerVersion.RSXE4;
+      begin
+        case minor of
+          0..3 : result := TCompilerVersion.RSXE3;
+          4 : result := TCompilerVersion.RSXE4; //ambiguous could be xe3 update 2
+        else
+          result := TCompilerVersion.RSXE4;
+        end;
       end;
-    end;
     15 :
-    begin
-      case minor of
-        0..3 :  result := TCompilerVersion.RSXE5;
-      else
-        result := TCompilerVersion.RSXE6;
+      begin
+        case minor of
+          0..3 : result := TCompilerVersion.RSXE5;
+        else
+          result := TCompilerVersion.RSXE6;
+        end;
       end;
-    end;
     16 : result := TCompilerVersion.RSXE7;
     17 : result := TCompilerVersion.RSXE8;
     18 :
-    begin
-      case minor of
-        0..1 : result := TCompilerVersion.RS10_0;
-        2    : result := TCompilerVersion.RS10_1;
-        3..4 : result := TCompilerVersion.RS10_2;
-        5..8 : result := TCompilerVersion.RS10_3; //18.8 for 10.3.3
+      begin
+        case minor of
+          0..1 : result := TCompilerVersion.RS10_0;
+          2 : result := TCompilerVersion.RS10_1;
+          3..4 : result := TCompilerVersion.RS10_2;
+          5..8 : result := TCompilerVersion.RS10_3; //18.8 for 10.3.3
+        end;
       end;
-    end;
     19 : result := TCompilerVersion.RS10_4; //TODO : this is assuming they will bump the version! Check this!!!
   end;
 end;
 
 { TPackageVersionComparer }
 
-function TPackageVersionComparer.Equals(const Left, Right: TPackageVersion): Boolean;
+function TPackageVersionComparer.Equals(const Left, Right : TPackageVersion) : Boolean;
 begin
   result := Left = Right;
 end;
 
-function TPackageVersionComparer.GetHashCode(const Value: TPackageVersion): Integer;
+function TPackageVersionComparer.GetHashCode(const Value : TPackageVersion) : Integer;
 var
   s : string;
 begin
@@ -516,10 +517,11 @@ begin
   {$IF CompilerVersion >= 29.0}
   Result := System.Hash.THashBobJenkins.GetHashValue(s);
   {$ELSE}
-//    {$LEGACYIFEND ON}
+  //    {$LEGACYIFEND ON}
   Result := BobJenkinsHash(PChar(s)^, SizeOf(Char) * Length(s), 0);
   {$IFEND}
 end;
 
 end.
+
 

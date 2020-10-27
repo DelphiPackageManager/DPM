@@ -37,26 +37,26 @@ type
   TRestoreOptions = class(TSearchOptions)
   private
     FProjectPath : string;
-  class var
-    FDefault : TRestoreOptions;
+    class var
+      FDefault : TRestoreOptions;
   protected
-    constructor CreateClone(const original : TRestoreOptions);reintroduce;
+    constructor CreateClone(const original : TRestoreOptions); reintroduce;
 
   public
     class constructor CreateDefault;
     class property Default : TRestoreOptions read FDefault;
-    constructor Create;override;
-    function Validate(const logger: ILogger): Boolean; override;
-    function Clone : TRestoreOptions;reintroduce;
+    constructor Create; override;
+    function Validate(const logger : ILogger) : Boolean; override;
+    function Clone : TRestoreOptions; reintroduce;
 
-    property ProjectPath  : string  read FProjectPath write FProjectPath;
+    property ProjectPath : string read FProjectPath write FProjectPath;
   end;
 
 implementation
 
 { TRestoreOptions }
 
-function TRestoreOptions.Clone: TRestoreOptions;
+function TRestoreOptions.Clone : TRestoreOptions;
 begin
   result := TRestoreOptions.CreateClone(Self);
 end;
@@ -66,7 +66,7 @@ begin
   inherited;
 end;
 
-constructor TRestoreOptions.CreateClone(const original: TRestoreOptions);
+constructor TRestoreOptions.CreateClone(const original : TRestoreOptions);
 begin
   inherited CreateClone(original);
   FProjectPath := original.ProjectPath;
@@ -78,7 +78,7 @@ begin
   FDefault := TRestoreOptions.Create;
 end;
 
-function TRestoreOptions.Validate(const logger: ILogger): Boolean;
+function TRestoreOptions.Validate(const logger : ILogger) : Boolean;
 begin
   //must call inherited
   result := inherited Validate(logger);
@@ -93,3 +93,4 @@ begin
 end;
 
 end.
+

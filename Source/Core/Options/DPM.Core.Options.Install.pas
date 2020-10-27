@@ -37,30 +37,30 @@ uses
 type
   TInstallOptions = class(TSearchOptions)
   private
-    FPackageFile    : string;
-    FVersionString  : string;
-    FNoCache        : boolean;
-    FProjectPath    : string;
-    FFloat          : boolean;
-    FForce          : boolean;
+    FPackageFile : string;
+    FVersionString : string;
+    FNoCache : boolean;
+    FProjectPath : string;
+    FFloat : boolean;
+    FForce : boolean;
     class var
       FDefault : TInstallOptions;
   protected
-    function GetPackageId: string;
-    procedure SetPackageId(const Value: string);
-    constructor CreateClone(const original : TInstallOptions);reintroduce;
+    function GetPackageId : string;
+    procedure SetPackageId(const Value : string);
+    constructor CreateClone(const original : TInstallOptions); reintroduce;
   public
     class constructor CreateDefault;
     class property Default : TInstallOptions read FDefault;
-    constructor Create;override;
-    function Validate(const logger: ILogger): Boolean; override;
-    function Clone : TInstallOptions;reintroduce;
+    constructor Create; override;
+    function Validate(const logger : ILogger) : Boolean; override;
+    function Clone : TInstallOptions; reintroduce;
 
-    property PackageId    : string      read GetPackageId write SetPackageId;
-    property PackageFile  : string      read FPackageFile write FPackageFile;
-    property ProjectPath  : string      read FProjectPath write FProjectPath;
-    property VersionString: string      read FVersionString  write FVersionString;
-    property Force        : boolean     read FForce       write FForce;
+    property PackageId : string read GetPackageId write SetPackageId;
+    property PackageFile : string read FPackageFile write FPackageFile;
+    property ProjectPath : string read FProjectPath write FProjectPath;
+    property VersionString : string read FVersionString write FVersionString;
+    property Force : boolean read FForce write FForce;
   end;
 
 implementation
@@ -72,7 +72,7 @@ uses
 
 { TInstallOptions }
 
-function TInstallOptions.Clone: TInstallOptions;
+function TInstallOptions.Clone : TInstallOptions;
 begin
   result := TInstallOptions.CreateClone(self);
 
@@ -84,15 +84,15 @@ begin
   FExact := true;
 end;
 
-constructor TInstallOptions.CreateClone(const original: TInstallOptions);
+constructor TInstallOptions.CreateClone(const original : TInstallOptions);
 begin
   inherited CreateClone(original);
-  FPackageFile    := original.FPackageFile;
-  FVersionString  := original.FVersionString;
-  FNoCache        := original.FNoCache;
-  FProjectPath    := original.FProjectPath;
-  FFloat          := original.FFloat;
-  FForce          := original.FForce;
+  FPackageFile := original.FPackageFile;
+  FVersionString := original.FVersionString;
+  FNoCache := original.FNoCache;
+  FProjectPath := original.FProjectPath;
+  FFloat := original.FFloat;
+  FForce := original.FForce;
 end;
 
 class constructor TInstallOptions.CreateDefault;
@@ -100,19 +100,19 @@ begin
   FDefault := TInstallOptions.Create;
 end;
 
-function TInstallOptions.GetPackageId: string;
+function TInstallOptions.GetPackageId : string;
 begin
   result := SearchTerms;
 end;
 
-procedure TInstallOptions.SetPackageId(const Value: string);
+procedure TInstallOptions.SetPackageId(const Value : string);
 begin
   SearchTerms := value;
 end;
 
-function TInstallOptions.Validate(const logger: ILogger): Boolean;
+function TInstallOptions.Validate(const logger : ILogger) : Boolean;
 var
-  packageString   : string;
+  packageString : string;
   error : string;
   theVersion : TPackageVersion;
 begin
@@ -132,7 +132,7 @@ begin
   begin
     if TRegEx.IsMatch(PackageId, cPackageIdRegex) then
     begin
-//      Logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
+      //      Logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
       FPackageFile := ''
     end
     else if not FileExists(FPackageFile) then
@@ -142,7 +142,7 @@ begin
     end
     else
     begin
-      packageString := ChangeFileExt(ExtractFileName(FPackageFile),'');
+      packageString := ChangeFileExt(ExtractFileName(FPackageFile), '');
       if not TRegEx.IsMatch(packageString, cPackageFileRegex) then
       begin
         Logger.Error('The specified packageFile name [' + packageString + '] is not in the correct format.');
@@ -172,3 +172,4 @@ begin
 end;
 
 end.
+

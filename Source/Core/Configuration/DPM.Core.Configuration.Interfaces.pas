@@ -36,13 +36,13 @@ uses
 
 type
   IConfigNode = interface
-  ['{18443C57-FA60-4DAB-BB67-10ACCBB7EC3B}']
+    ['{18443C57-FA60-4DAB-BB67-10ACCBB7EC3B}']
     function LoadFromJson(const jsonObj : TJsonObject) : boolean;
     function SaveToJson(const parentObj : TJsonObject) : boolean;
   end;
 
   ISourceConfig = interface(IConfigNode)
-  ['{88D98629-8276-4782-B46B-004E7B9934E4}']
+    ['{88D98629-8276-4782-B46B-004E7B9934E4}']
     function GetName : string;
     function GetSource : string;
     function GetUserName : string;
@@ -70,7 +70,7 @@ type
 
 
   IConfiguration = interface(IConfigNode)
-  ['{C5B88059-C5C8-4207-BF5A-503FFE31863D}']
+    ['{C5B88059-C5C8-4207-BF5A-503FFE31863D}']
     function GetPackageCacheLocation : string;
     procedure SetPackageCacheLocation(const value : string);
     function GetIsDefaultPackageCacheLocation : boolean;
@@ -85,19 +85,19 @@ type
     property PackageCacheLocation : string read GetPackageCacheLocation write SetPackageCacheLocation;
     property IsDefaultPackageCacheLocation : boolean read GetIsDefaultPackageCacheLocation;
 
-    property Sources : IList<ISourceConfig> read GetSources;
+    property Sources : IList<ISourceConfig>read GetSources;
 
   end;
 
   IConfigurationLoadSave = interface(IConfiguration)
-['{17DDD5AB-5262-4E51-918E-170BC25BFE8A}']
+    ['{17DDD5AB-5262-4E51-918E-170BC25BFE8A}']
     function LoadFromFile(const fileName : string) : boolean;
     function SaveToFile(const fileName : string) : boolean;
   end;
 
   //use DI to inject this where needed
   IConfigurationManager = interface
-  ['{7A2A8F5E-A241-459C-BD62-AB265AA5935F}']
+    ['{7A2A8F5E-A241-459C-BD62-AB265AA5935F}']
     function LoadConfig(const configFile : string) : IConfiguration;
     function NewConfig : IConfiguration;
     function EnsureDefaultConfig : boolean;
@@ -108,3 +108,4 @@ type
 implementation
 
 end.
+

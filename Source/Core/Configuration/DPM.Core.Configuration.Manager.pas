@@ -37,9 +37,9 @@ type
   private
     FLogger : ILogger;
   protected
-    function LoadConfig(const configFile: string): IConfiguration;
-    function SaveConfig(const configuration: IConfiguration; const fileName : string = ''): Boolean;
-    function NewConfig: IConfiguration;
+    function LoadConfig(const configFile : string) : IConfiguration;
+    function SaveConfig(const configuration : IConfiguration; const fileName : string = '') : Boolean;
+    function NewConfig : IConfiguration;
     function EnsureDefaultConfig : boolean;
   public
     constructor Create(const logger : ILogger);
@@ -56,17 +56,17 @@ uses
 
 { TConfigurationManager }
 
-constructor TConfigurationManager.Create(const logger: ILogger);
+constructor TConfigurationManager.Create(const logger : ILogger);
 begin
   FLogger := logger;
 end;
 
-function TConfigurationManager.EnsureDefaultConfig: boolean;
+function TConfigurationManager.EnsureDefaultConfig : boolean;
 var
   sDefaultConfigFile : string;
   config : IConfiguration;
 begin
-  sDefaultConfigFile :=  TConfigUtils.GetDefaultConfigFileName;
+  sDefaultConfigFile := TConfigUtils.GetDefaultConfigFileName;
   //if it exists, load it to make sure it's valid.
   if FileExists(sDefaultConfigFile) then
   begin
@@ -80,13 +80,13 @@ begin
   begin
     config := NewConfig;
     TConfigUtils.EnsureDefaultConfigDir;
-    result := SaveConfig(config,sDefaultConfigFile);
+    result := SaveConfig(config, sDefaultConfigFile);
     if not result then
       FLogger.Error('No default config file found and unable to create one at : ' + cDefaultConfigFile);
   end;
 end;
 
-function TConfigurationManager.LoadConfig(const configFile: string): IConfiguration;
+function TConfigurationManager.LoadConfig(const configFile : string) : IConfiguration;
 var
   config : IConfigurationLoadSave;
 begin
@@ -97,7 +97,7 @@ begin
     result := config;
 end;
 
-function TConfigurationManager.NewConfig: IConfiguration;
+function TConfigurationManager.NewConfig : IConfiguration;
 begin
   result := TConfiguration.Create(FLogger);
   result.PackageCacheLocation := GetEnvironmentVariable(cDPMPackageCacheEnviromentVar);
@@ -105,7 +105,7 @@ begin
     result.PackageCacheLocation := TSystemUtils.ExpandEnvironmentStrings(cDefaultPackageCache);
 end;
 
-function TConfigurationManager.SaveConfig(const configuration: IConfiguration; const fileName : string): Boolean;
+function TConfigurationManager.SaveConfig(const configuration : IConfiguration; const fileName : string) : Boolean;
 var
   config : IConfigurationLoadSave;
 begin
@@ -114,7 +114,9 @@ begin
   if config <> nil then
     result := config.SaveToFile(fileName)
   else
-    FLogger.Error('configuration does not implement IConfigurationLoadSave' );
+    FLogger.Error('configuration does not implement IConfigurationLoadSave');
 end;
 
 end.
+
+

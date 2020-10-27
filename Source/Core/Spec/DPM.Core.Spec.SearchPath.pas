@@ -40,20 +40,20 @@ type
   private
     FPath : string;
     FBinariesOnly : boolean;
-    FSourceOnly   : boolean;
+    FSourceOnly : boolean;
   protected
-    function GetBinariesOnly: Boolean;
-    function GetPath: string;
-    function GetSourceOnly: Boolean;
-    procedure SetPath(const value: string);
+    function GetBinariesOnly : Boolean;
+    function GetPath : string;
+    function GetSourceOnly : Boolean;
+    procedure SetPath(const value : string);
 
-    function IsGroup: Boolean;virtual;
-    function Clone: ISpecSearchPath;virtual;
-    function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
+    function IsGroup : Boolean; virtual;
+    function Clone : ISpecSearchPath; virtual;
+    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
 
-    constructor CreateClone(const logger : ILogger; const path :string; const binariesOnly : boolean; const sourceOnly : boolean);
+    constructor CreateClone(const logger : ILogger; const path : string; const binariesOnly : boolean; const sourceOnly : boolean);
   public
-    constructor Create(const logger: ILogger); override;
+    constructor Create(const logger : ILogger); override;
 
   end;
 
@@ -65,18 +65,18 @@ uses
 
 { TSpecSearchPath }
 
-function TSpecSearchPath.Clone: ISpecSearchPath;
+function TSpecSearchPath.Clone : ISpecSearchPath;
 begin
   result := TSpecSearchPath.CreateClone(logger, FPath, FBinariesOnly, FSourceOnly);
 end;
 
-constructor TSpecSearchPath.Create(const logger: ILogger);
+constructor TSpecSearchPath.Create(const logger : ILogger);
 begin
   inherited Create(logger);
 
 end;
 
-constructor TSpecSearchPath.CreateClone(const logger: ILogger; const path: string; const binariesOnly, sourceOnly: boolean);
+constructor TSpecSearchPath.CreateClone(const logger : ILogger; const path : string; const binariesOnly, sourceOnly : boolean);
 begin
   inherited Create(logger);
   FPath := path;
@@ -85,28 +85,28 @@ begin
 
 end;
 
-function TSpecSearchPath.GetBinariesOnly: Boolean;
+function TSpecSearchPath.GetBinariesOnly : Boolean;
 begin
   result := FBinariesOnly;
 end;
 
-function TSpecSearchPath.GetPath: string;
+function TSpecSearchPath.GetPath : string;
 begin
   result := FPath;
 end;
 
-function TSpecSearchPath.GetSourceOnly: Boolean;
+function TSpecSearchPath.GetSourceOnly : Boolean;
 begin
   result := FSourceOnly;
 end;
 
-function TSpecSearchPath.IsGroup: Boolean;
+function TSpecSearchPath.IsGroup : Boolean;
 begin
   result := false;
 end;
 
 
-function TSpecSearchPath.LoadFromJson(const jsonObject: TJsonObject): Boolean;
+function TSpecSearchPath.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 begin
   result := true;
   FPath := jsonObject.S['path'];
@@ -121,9 +121,10 @@ begin
 
 end;
 
-procedure TSpecSearchPath.SetPath(const value: string);
+procedure TSpecSearchPath.SetPath(const value : string);
 begin
   FPath := value;
 end;
 
 end.
+

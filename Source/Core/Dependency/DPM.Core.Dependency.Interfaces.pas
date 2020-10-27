@@ -45,7 +45,7 @@ type
 
   //a directed asyclic graph (DAG).
   IGraphNode = interface
-  ['{20055C26-8E63-4936-8249-ACF8514A37E7}']
+    ['{20055C26-8E63-4936-8249-ACF8514A37E7}']
     function GetLevel : integer;
     function GetId : string;
     function GetParent : IGraphNode;
@@ -59,7 +59,7 @@ type
 
     function AddChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
     //Breadth first search
-    function FindFirstNode(const id : string ) : IGraphNode;
+    function FindFirstNode(const id : string) : IGraphNode;
     function FindNodes(const id : string) : IList<IGraphNode>;
     //searches this node only
     function FindChild(const id : string) : IGraphNode;
@@ -75,14 +75,14 @@ type
     property SelectedVersion : TPackageVersion read GetSelectedVersion write SetSelectedVersion;
     property SelectedOn : TVersionRange read GetSelectedOn write SetSelectedOn;
     property Level : integer read GetLevel;
-    property ChildNodes : IEnumerable<IGraphNode> read GetChildNodes;
+    property ChildNodes : IEnumerable<IGraphNode>read GetChildNodes;
     property Parent : IGraphNode read GetParent;
   end;
 
 
   IResolution = interface
-  ['{CC4F63AA-80F7-46AC-8C42-0F8725B59579}']
-    function GetPackage :  IPackageInfo;
+    ['{CC4F63AA-80F7-46AC-8C42-0F8725B59579}']
+    function GetPackage : IPackageInfo;
     function GetParentId : string;
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
@@ -99,7 +99,7 @@ type
   end;
 
   IDependencyResolver = interface
-  ['{B187F0DB-FEA1-48B4-81F2-CECF073C2FB0}']
+    ['{B187F0DB-FEA1-48B4-81F2-CECF073C2FB0}']
     //returns true if all dependencies were resolved. If true, the graph is fully populated and can be serialized.
     function ResolveForInstall(const cancellationToken : ICancellationToken; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
     function ResolveForRestore(const cancellationToken : ICancellationToken; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
@@ -109,3 +109,4 @@ type
 implementation
 
 end.
+

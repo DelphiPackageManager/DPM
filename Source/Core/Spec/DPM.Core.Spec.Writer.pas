@@ -13,7 +13,7 @@ type
   private
     FLogger : ILogger;
   protected
-    function CreateSpecFile(const options: TSpecOptions): Boolean;
+    function CreateSpecFile(const options : TSpecOptions) : Boolean;
   public
     constructor Create(const logger : ILogger);
   end;
@@ -25,15 +25,16 @@ uses
 
 { TPackageSpecWriter }
 
-constructor TPackageSpecWriter.Create(const logger: ILogger);
+constructor TPackageSpecWriter.Create(const logger : ILogger);
 begin
   FLogger := logger;
 end;
 
-function TPackageSpecWriter.CreateSpecFile(const options: TSpecOptions): Boolean;
+function TPackageSpecWriter.CreateSpecFile(const options : TSpecOptions) : Boolean;
 begin
   result := false;
 
 end;
 
 end.
+

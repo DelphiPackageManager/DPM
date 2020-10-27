@@ -39,32 +39,32 @@ uses
 type
   TPackageId = class(TInterfacedObject, IPackageId)
   private
-    FCompilerVersion: TCompilerVersion;
-    FId: string;
-    FPlatform: TDPMPlatform;
-    FVersion: TPackageVersion;
+    FCompilerVersion : TCompilerVersion;
+    FId : string;
+    FPlatform : TDPMPlatform;
+    FVersion : TPackageVersion;
   protected
-    function GetCompilerVersion: TCompilerVersion;
-    function GetId: string;
-    function GetPlatform: TDPMPlatform;
-    function GetVersion: TPackageVersion;
-    function ToIdVersionString : string;virtual;
+    function GetCompilerVersion : TCompilerVersion;
+    function GetId : string;
+    function GetPlatform : TDPMPlatform;
+    function GetVersion : TPackageVersion;
+    function ToIdVersionString : string; virtual;
   public
-    constructor Create(const id : string; const version : TPackageVersion; const compilerVersion: TCompilerVersion; const platform : TDPMPlatform);overload;virtual;
-    function ToString : string;override;
+    constructor Create(const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform); overload; virtual;
+    function ToString : string; override;
   end;
 
 
   TPackageIdentity = class(TPackageId, IPackageIdentity, IPackageId)
   private
-    FSourceName: string;
+    FSourceName : string;
     FProjectUrl : string;
   protected
-    function GetProjectUrl: string;
-    function GetSourceName: string;
-    constructor Create(const sourceName : string; const spec : IPackageSpec);overload;virtual;
+    function GetProjectUrl : string;
+    function GetSourceName : string;
+    constructor Create(const sourceName : string; const spec : IPackageSpec); overload; virtual;
   public
-    constructor Create(const id, source : string; const version : TPackageVersion; const compilerVersion: TCompilerVersion; const platform : TDPMPlatform; const projectUrl : string);overload;virtual;
+    constructor Create(const id, source : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectUrl : string); overload; virtual;
     class function TryCreateFromString(const logger : ILogger; const value : string; const source : string; out packageIdentity : IPackageIdentity) : boolean;
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageIdentity;
   end;
@@ -73,36 +73,36 @@ type
   private
     FDependencies : IList<IPackageDependency>;
   protected
-    function GetDependencies: IList<IPackageDependency>;
-    constructor Create(const sourceName : string; const spec : IPackageSpec);override;
+    function GetDependencies : IList<IPackageDependency>;
+    constructor Create(const sourceName : string; const spec : IPackageSpec); override;
   public
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageInfo;
   end;
 
   TPackageMetadata = class(TPackageInfo, IPackageMetadata, IPackageInfo, IPackageIdentity, IPackageId)
   private
-    FAuthors: string;
+    FAuthors : string;
     FOwners : string;
-    FCopyright: string;
-    FDescription: string;
-    FIcon: string;
-    FIsCommercial: Boolean;
-    FIsTrial: Boolean;
-    FLicense: string;
-    FTags: string;
+    FCopyright : string;
+    FDescription : string;
+    FIcon : string;
+    FIsCommercial : Boolean;
+    FIsTrial : Boolean;
+    FLicense : string;
+    FTags : string;
     FSearchPaths : IList<IPackageSearchPath>;
   protected
-    function GetOwners: string;
-    function GetAuthors: string;
-    function GetCopyright: string;
-    function GetDescription: string;
-    function GetIcon: string;
-    function GetIsCommercial: Boolean;
-    function GetIsTrial: Boolean;
-    function GetLicense: string;
-    function GetTags: string;
-    function GetSearchPaths: IList<IPackageSearchPath>;
-    constructor Create(const sourceName : string; const spec : IPackageSpec);reintroduce;
+    function GetOwners : string;
+    function GetAuthors : string;
+    function GetCopyright : string;
+    function GetDescription : string;
+    function GetIcon : string;
+    function GetIsCommercial : Boolean;
+    function GetIsTrial : Boolean;
+    function GetLicense : string;
+    function GetTags : string;
+    function GetSearchPaths : IList<IPackageSearchPath>;
+    constructor Create(const sourceName : string; const spec : IPackageSpec); reintroduce;
   public
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageMetadata;
   end;
@@ -112,14 +112,14 @@ type
   TPackageMetadataExtractor = class
   public
     //these will read the manifest
-    class function TryExtractFull(const logger : ILogger; const fileName : string; out metadata : IPackageMetadata; const source : string = ''): boolean;
-    class function TryExtractInfo(const logger : ILogger; const fileName : string; out info : IPackageInfo; const source : string = ''): boolean;
+    class function TryExtractFull(const logger : ILogger; const fileName : string; out metadata : IPackageMetadata; const source : string = '') : boolean;
+    class function TryExtractInfo(const logger : ILogger; const fileName : string; out info : IPackageInfo; const source : string = '') : boolean;
     //this just parses the filename
-    class function TryExtractIdentity(const logger : ILogger; const fileName : string; out identity : IPackageIdentity; const source : string = ''): boolean;
+    class function TryExtractIdentity(const logger : ILogger; const fileName : string; out identity : IPackageIdentity; const source : string = '') : boolean;
   end;
 
 
-//  TPackageMetadataComparer = class
+  //  TPackageMetadataComparer = class
 
 implementation
 
@@ -134,34 +134,34 @@ uses
 
 { TPackageMetadata }
 
-constructor TPackageIdentity.Create(const id, source : string; const version : TPackageVersion; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const projectUrl : string);
+constructor TPackageIdentity.Create(const id, source : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectUrl : string);
 begin
   inherited Create(id, version, compilerVersion, platform);
   FSourceName := source;
 end;
 
-class function TPackageIdentity.CreateFromSpec(const sourceName: string; const spec: IPackageSpec): IPackageIdentity;
+class function TPackageIdentity.CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageIdentity;
 begin
   result := TPackageIdentity.Create(sourceName, spec);
 end;
 
-constructor TPackageIdentity.Create(const sourceName: string; const spec: IPackageSpec);
+constructor TPackageIdentity.Create(const sourceName : string; const spec : IPackageSpec);
 begin
   inherited Create(spec.MetaData.Id, spec.MetaData.Version, spec.TargetPlatforms[0].Compiler, spec.TargetPlatforms[0].Platforms[0]);
   FSourceName := sourceName;
 end;
 
-function TPackageIdentity.GetProjectUrl: string;
+function TPackageIdentity.GetProjectUrl : string;
 begin
   result := FProjectUrl;
 end;
 
-function TPackageIdentity.GetSourceName: string;
+function TPackageIdentity.GetSourceName : string;
 begin
   result := FSourceName;
 end;
 
-class function TPackageIdentity.TryCreateFromString(const logger: ILogger; const value: string; const source : string; out packageIdentity: IPackageIdentity): boolean;
+class function TPackageIdentity.TryCreateFromString(const logger : ILogger; const value : string; const source : string; out packageIdentity : IPackageIdentity) : boolean;
 var
   match : TMatch;
   id : string;
@@ -176,28 +176,28 @@ begin
     logger.Error('Package name is not a valid package [' + value + ']');
     exit;
   end;
-   id := match.Groups[1].Value;
-   cv := StringToCompilerVersion(match.Groups[2].Value);
-   if cv = TCompilerVersion.UnknownVersion then
-   begin
-     logger.Error('Compiler version segment is not a valid version [' + match.Groups[2].Value + ']');
-     exit;
-   end;
-   platform := StringToDPMPlatform(match.Groups[3].Value);
-   if platform = TDPMPlatform.UnknownPlatform then
-   begin
-     logger.Error('Platform segment is not a valid platform [' + match.Groups[3].Value + ']');
-     exit;
-   end;
-   if not TPackageVersion.TryParse(match.Groups[4].Value, packageVersion) then
-   begin
-     logger.Error('Version segment is not a valid version [' + match.Groups[4].Value + ']');
-     exit;
-   end;
+  id := match.Groups[1].Value;
+  cv := StringToCompilerVersion(match.Groups[2].Value);
+  if cv = TCompilerVersion.UnknownVersion then
+  begin
+    logger.Error('Compiler version segment is not a valid version [' + match.Groups[2].Value + ']');
+    exit;
+  end;
+  platform := StringToDPMPlatform(match.Groups[3].Value);
+  if platform = TDPMPlatform.UnknownPlatform then
+  begin
+    logger.Error('Platform segment is not a valid platform [' + match.Groups[3].Value + ']');
+    exit;
+  end;
+  if not TPackageVersion.TryParse(match.Groups[4].Value, packageVersion) then
+  begin
+    logger.Error('Version segment is not a valid version [' + match.Groups[4].Value + ']');
+    exit;
+  end;
 
-   //we dont' have a source.
-   packageIdentity := TPackageIdentity.Create(id, '', packageVersion, cv, platform, '');
-   result := true;
+  //we dont' have a source.
+  packageIdentity := TPackageIdentity.Create(id, '', packageVersion, cv, platform, '');
+  result := true;
 
 
 end;
@@ -205,7 +205,7 @@ end;
 { TPackageMetaDataWithDependencies }
 
 
-constructor TPackageInfo.Create(const sourceName: string; const spec: IPackageSpec);
+constructor TPackageInfo.Create(const sourceName : string; const spec : IPackageSpec);
 var
   dep : ISpecDependency;
   newDep : IPackageDependency;
@@ -221,12 +221,12 @@ begin
 
 end;
 
-class function TPackageInfo.CreateFromSpec(const sourceName: string; const spec: IPackageSpec): IPackageInfo;
+class function TPackageInfo.CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageInfo;
 begin
   result := TPackageInfo.Create(sourceName, spec);
 end;
 
-function TPackageInfo.GetDependencies: IList<IPackageDependency>;
+function TPackageInfo.GetDependencies : IList<IPackageDependency>;
 begin
   result := FDependencies;
 end;
@@ -234,23 +234,23 @@ end;
 
 { TPackageMetadataFull }
 
-constructor TPackageMetadata.Create(const sourceName : string; const spec: IPackageSpec);
+constructor TPackageMetadata.Create(const sourceName : string; const spec : IPackageSpec);
 var
   specSearchPath : ISpecSearchPath;
   searchPath : IPackageSearchPath;
 begin
   inherited Create(sourceName, spec);
-  FSearchPaths  :=  TCollections.CreateList<IPackageSearchPath>;
-  FAuthors      := spec.MetaData.Authors;
-  FOwners       := spec.MetaData.Owners;
-  FCopyright    := spec.MetaData.Copyright;
-  FDescription  := spec.MetaData.Description;
-  FIcon         := spec.MetaData.Icon;
+  FSearchPaths := TCollections.CreateList<IPackageSearchPath>;
+  FAuthors := spec.MetaData.Authors;
+  FOwners := spec.MetaData.Owners;
+  FCopyright := spec.MetaData.Copyright;
+  FDescription := spec.MetaData.Description;
+  FIcon := spec.MetaData.Icon;
   FIsCommercial := spec.MetaData.IsCommercial;
-  FIsTrial      := spec.MetaData.IsTrial;
-  FLicense      := spec.MetaData.License;
-  FProjectUrl   := spec.MetaData.ProjectUrl;
-  FTags         := spec.MetaData.Tags;
+  FIsTrial := spec.MetaData.IsTrial;
+  FLicense := spec.MetaData.License;
+  FProjectUrl := spec.MetaData.ProjectUrl;
+  FTags := spec.MetaData.Tags;
 
   for specSearchPath in spec.TargetPlatforms[0].SearchPaths do
   begin
@@ -259,65 +259,65 @@ begin
   end;
 end;
 
-class function TPackageMetadata.CreateFromSpec(const sourceName: string; const spec: IPackageSpec): IPackageMetadata;
+class function TPackageMetadata.CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageMetadata;
 begin
   result := TPackageMetadata.Create(sourceName, spec);
 end;
 
-function TPackageMetadata.GetAuthors: string;
+function TPackageMetadata.GetAuthors : string;
 begin
   result := FAuthors;
 end;
 
-function TPackageMetadata.GetCopyright: string;
+function TPackageMetadata.GetCopyright : string;
 begin
   result := FCopyright;
 end;
 
-function TPackageMetadata.GetDescription: string;
+function TPackageMetadata.GetDescription : string;
 begin
   result := FDescription;
 end;
 
-function TPackageMetadata.GetIcon: string;
+function TPackageMetadata.GetIcon : string;
 begin
   result := FIcon;
 end;
 
-function TPackageMetadata.GetIsCommercial: Boolean;
+function TPackageMetadata.GetIsCommercial : Boolean;
 begin
   result := FIsCommercial;
 end;
 
-function TPackageMetadata.GetIsTrial: Boolean;
+function TPackageMetadata.GetIsTrial : Boolean;
 begin
   result := FIsTrial;
 end;
 
-function TPackageMetadata.GetLicense: string;
+function TPackageMetadata.GetLicense : string;
 begin
   result := FLicense;
 end;
 
 
-function TPackageMetadata.GetOwners: string;
+function TPackageMetadata.GetOwners : string;
 begin
   result := FOwners;
 end;
 
-function TPackageMetadata.GetSearchPaths: IList<IPackageSearchPath>;
+function TPackageMetadata.GetSearchPaths : IList<IPackageSearchPath>;
 begin
   result := FSearchPaths;
 end;
 
-function TPackageMetadata.GetTags: string;
+function TPackageMetadata.GetTags : string;
 begin
   result := FTags;
 end;
 
 { TPackageMetadataExtractor }
 
-class function TPackageMetadataExtractor.TryExtractIdentity(const logger : ILogger; const fileName : string; out identity : IPackageIdentity; const source : string): boolean;
+class function TPackageMetadataExtractor.TryExtractIdentity(const logger : ILogger; const fileName : string; out identity : IPackageIdentity; const source : string) : boolean;
 var
   match : TMatch;
   id : string;
@@ -335,30 +335,30 @@ begin
     logger.Error('Package name is not a valid package [' + value + ']');
     exit;
   end;
-   id := match.Groups[1].Value;
-   cv := StringToCompilerVersion(match.Groups[2].Value);
-   if cv = TCompilerVersion.UnknownVersion then
-   begin
-     logger.Error('Compiler version segment is not a valid version [' + match.Groups[2].Value + ']');
-     exit;
-   end;
-   platform := StringToDPMPlatform(match.Groups[3].Value);
-   if platform = TDPMPlatform.UnknownPlatform then
-   begin
-     logger.Error('Platform segment is not a valid platform [' + match.Groups[3].Value + ']');
-     exit;
-   end;
-   if not TPackageVersion.TryParse(match.Groups[4].Value, packageVersion) then
-   begin
-     logger.Error('Version segment is not a valid version [' + match.Groups[4].Value + ']');
-     exit;
-   end;
-   //we dont' have a source.
-   identity := TPackageIdentity.Create(id, '', packageVersion, cv, platform, '');
-   result := true;
+  id := match.Groups[1].Value;
+  cv := StringToCompilerVersion(match.Groups[2].Value);
+  if cv = TCompilerVersion.UnknownVersion then
+  begin
+    logger.Error('Compiler version segment is not a valid version [' + match.Groups[2].Value + ']');
+    exit;
+  end;
+  platform := StringToDPMPlatform(match.Groups[3].Value);
+  if platform = TDPMPlatform.UnknownPlatform then
+  begin
+    logger.Error('Platform segment is not a valid platform [' + match.Groups[3].Value + ']');
+    exit;
+  end;
+  if not TPackageVersion.TryParse(match.Groups[4].Value, packageVersion) then
+  begin
+    logger.Error('Version segment is not a valid version [' + match.Groups[4].Value + ']');
+    exit;
+  end;
+  //we dont' have a source.
+  identity := TPackageIdentity.Create(id, '', packageVersion, cv, platform, '');
+  result := true;
 end;
 
-class function TPackageMetadataExtractor.TryExtractInfo(const logger: ILogger; const fileName: string; out info: IPackageInfo; const source: string): boolean;
+class function TPackageMetadataExtractor.TryExtractInfo(const logger : ILogger; const fileName : string; out info : IPackageInfo; const source : string) : boolean;
 var
   zipFile : TZipFile;
   metaBytes : TBytes;
@@ -389,11 +389,11 @@ begin
   if spec = nil then
     exit;
   info := TPackageMetadata.CreateFromSpec(source, spec);
-  result:= true;
+  result := true;
 
 end;
 
-class function TPackageMetadataExtractor.TryExtractFull(const logger : ILogger; const fileName : string; out metadata : IPackageMetadata; const source : string = ''): boolean;
+class function TPackageMetadataExtractor.TryExtractFull(const logger : ILogger; const fileName : string; out metadata : IPackageMetadata; const source : string = '') : boolean;
 var
   zipFile : TZipFile;
   metaBytes : TBytes;
@@ -424,12 +424,12 @@ begin
   if spec = nil then
     exit;
   metadata := TPackageMetadata.CreateFromSpec(source, spec);
-  result:= true;
+  result := true;
 end;
 
 { TPackageId }
 
-constructor TPackageId.Create(const id: string; const version: TPackageVersion; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform);
+constructor TPackageId.Create(const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform);
 begin
   FId := id;
   FVersion := version;
@@ -437,34 +437,35 @@ begin
   FPlatform := platform;
 end;
 
-function TPackageId.GetCompilerVersion: TCompilerVersion;
+function TPackageId.GetCompilerVersion : TCompilerVersion;
 begin
   result := FCompilerVersion;
 end;
 
-function TPackageId.GetId: string;
+function TPackageId.GetId : string;
 begin
   result := FId;
 end;
 
-function TPackageId.GetPlatform: TDPMPlatform;
+function TPackageId.GetPlatform : TDPMPlatform;
 begin
   result := FPlatform;
 end;
 
-function TPackageId.GetVersion: TPackageVersion;
+function TPackageId.GetVersion : TPackageVersion;
 begin
   result := FVersion;
 end;
 
-function TPackageId.ToIdVersionString: string;
+function TPackageId.ToIdVersionString : string;
 begin
-  result := FId +' [' + FVersion.ToStringNoMeta + ']';
+  result := FId + ' [' + FVersion.ToStringNoMeta + ']';
 end;
 
-function TPackageId.ToString: string;
+function TPackageId.ToString : string;
 begin
-  result := FId +'-' + CompilerToString(FCompilerVersion) + '-' + DPMPlatformToString(FPlatform) + '-' + FVersion.ToStringNoMeta;
+  result := FId + '-' + CompilerToString(FCompilerVersion) + '-' + DPMPlatformToString(FPlatform) + '-' + FVersion.ToStringNoMeta;
 end;
 
 end.
+

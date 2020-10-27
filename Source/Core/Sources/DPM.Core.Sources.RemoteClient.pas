@@ -40,7 +40,7 @@ type
     FLogger : ILogger;
     FSourceUri : IUri;
   protected
-    function Push(const pushOptions: TPushOptions): Boolean;
+    function Push(const pushOptions : TPushOptions) : Boolean;
   public
     constructor Create(const logger : ILogger; const sourceUri : IUri);
   end;
@@ -49,13 +49,13 @@ implementation
 
 { TLocalClient }
 
-constructor TRemoteClient.Create(const logger: ILogger; const sourceUri : IUri);
+constructor TRemoteClient.Create(const logger : ILogger; const sourceUri : IUri);
 begin
   FLogger := logger;
   FSourceUri := sourceUri;
 end;
 
-function TRemoteClient.Push(const pushOptions: TPushOptions): Boolean;
+function TRemoteClient.Push(const pushOptions : TPushOptions) : Boolean;
 begin
   FLogger.Error('Remote client not implemented yet, no server implementation exists!');
   result := false;
@@ -64,3 +64,4 @@ end;
 
 
 end.
+

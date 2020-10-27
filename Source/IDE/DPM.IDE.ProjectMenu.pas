@@ -39,7 +39,7 @@ type
   private
     FEditorViewManager : IDPMEditorViewManager;
   protected
-    procedure AddMenu(const Project: IOTAProject; const IdentList: TStrings; const ProjectManagerMenuList: IInterfaceList; IsMultiSelect: Boolean);
+    procedure AddMenu(const Project : IOTAProject; const IdentList : TStrings; const ProjectManagerMenuList : IInterfaceList; IsMultiSelect : Boolean);
     procedure AfterSave;
     procedure BeforeSave;
     procedure Destroyed;
@@ -64,27 +64,27 @@ type
     procedure Modified;
 
     //IOTALocalMenu
-    function GetCaption: string;
-    function GetChecked: Boolean;
-    function GetEnabled: Boolean;
-    function GetHelpContext: Integer;
-    function GetName: string;
-    function GetParent: string;
-    function GetPosition: Integer;
-    function GetVerb: string;
-    procedure SetCaption(const Value: string);
-    procedure SetChecked(Value: Boolean);
-    procedure SetEnabled(Value: Boolean);
-    procedure SetHelpContext(Value: Integer);
-    procedure SetName(const Value: string);
-    procedure SetParent(const Value: string);
-    procedure SetPosition(Value: Integer);
-    procedure SetVerb(const Value: string);
-    procedure Execute(const MenuContextList: IInterfaceList);
-    function GetIsMultiSelectable: Boolean;
-    function PostExecute(const MenuContextList: IInterfaceList): Boolean;
-    function PreExecute(const MenuContextList: IInterfaceList): Boolean;
-    procedure SetIsMultiSelectable(Value: Boolean);
+    function GetCaption : string;
+    function GetChecked : Boolean;
+    function GetEnabled : Boolean;
+    function GetHelpContext : Integer;
+    function GetName : string;
+    function GetParent : string;
+    function GetPosition : Integer;
+    function GetVerb : string;
+    procedure SetCaption(const Value : string);
+    procedure SetChecked(Value : Boolean);
+    procedure SetEnabled(Value : Boolean);
+    procedure SetHelpContext(Value : Integer);
+    procedure SetName(const Value : string);
+    procedure SetParent(const Value : string);
+    procedure SetPosition(Value : Integer);
+    procedure SetVerb(const Value : string);
+    procedure Execute(const MenuContextList : IInterfaceList);
+    function GetIsMultiSelectable : Boolean;
+    function PostExecute(const MenuContextList : IInterfaceList) : Boolean;
+    function PreExecute(const MenuContextList : IInterfaceList) : Boolean;
+    procedure SetIsMultiSelectable(Value : Boolean);
   public
     constructor Create(const handler : TNotifyEvent; const project : IOTAProject; const editorViewManager : IDPMEditorViewManager);
 
@@ -102,11 +102,11 @@ uses
 
 { TDPMProjectMenu }
 
-procedure TDPMProjectMenuNotifier.AddMenu(const Project: IOTAProject; const IdentList: TStrings; const ProjectManagerMenuList: IInterfaceList; IsMultiSelect: Boolean);
+procedure TDPMProjectMenuNotifier.AddMenu(const Project : IOTAProject; const IdentList : TStrings; const ProjectManagerMenuList : IInterfaceList; IsMultiSelect : Boolean);
 var
-  menu: IOTAProjectManagerMenu;
+  menu : IOTAProjectManagerMenu;
 begin
-  if Assigned(Project) and ((IdentList.IndexOf( cDPMContainer ) <> -1) or (IdentList.IndexOf(sProjectContainer) <> -1) or (IdentList.IndexOf(sProjectGroupContainer) <> -1)) then
+  if Assigned(Project) and ((IdentList.IndexOf(cDPMContainer) <> -1) or (IdentList.IndexOf(sProjectContainer) <> -1) or (IdentList.IndexOf(sProjectGroupContainer) <> -1)) then
   begin
     menu := TDPMProjectMenu.Create(Self.OnManagePackages, Project, FEditorViewManager);
     ProjectManagerMenuList.Add(menu);
@@ -139,7 +139,7 @@ begin
 
 end;
 
-procedure TDPMProjectMenuNotifier.OnManagePackages(Sender: TObject);
+procedure TDPMProjectMenuNotifier.OnManagePackages(Sender : TObject);
 begin
 
 end;
@@ -170,16 +170,16 @@ begin
   FProject := nil;
 end;
 
-procedure TDPMProjectMenu.Execute(const MenuContextList: IInterfaceList);
+procedure TDPMProjectMenu.Execute(const MenuContextList : IInterfaceList);
 begin
   if FProject <> nil then
   begin
-//    ShowMessage('Manage DPM Packages for : ' + FProject.FileName);
+    //    ShowMessage('Manage DPM Packages for : ' + FProject.FileName);
     FEditorViewManager.ShowViewForProject(FProject);
   end;
 end;
 
-function TDPMProjectMenu.GetCaption: string;
+function TDPMProjectMenu.GetCaption : string;
 var
   pg : IOTAProjectGroup;
 begin
@@ -189,43 +189,43 @@ begin
     result := Format('Manage DPM Packages : %s', [ExtractFileName(FProject.FileName)]); //sWizardProjectMenuCaption;
 end;
 
-function TDPMProjectMenu.GetChecked: Boolean;
+function TDPMProjectMenu.GetChecked : Boolean;
 begin
   result := false;
 end;
 
-function TDPMProjectMenu.GetEnabled: Boolean;
+function TDPMProjectMenu.GetEnabled : Boolean;
 begin
   //since we may need to work directly with the file, it must have been saved before we can manage packages.
   result := FileExists(FProject.FileName);
 end;
 
-function TDPMProjectMenu.GetHelpContext: Integer;
+function TDPMProjectMenu.GetHelpContext : Integer;
 begin
   result := -1;
 end;
 
-function TDPMProjectMenu.GetIsMultiSelectable: Boolean;
+function TDPMProjectMenu.GetIsMultiSelectable : Boolean;
 begin
   result := true;
 end;
 
-function TDPMProjectMenu.GetName: string;
+function TDPMProjectMenu.GetName : string;
 begin
   result := 'ManageDPM';
 end;
 
-function TDPMProjectMenu.GetParent: string;
+function TDPMProjectMenu.GetParent : string;
 begin
   result := '';
 end;
 
-function TDPMProjectMenu.GetPosition: Integer;
+function TDPMProjectMenu.GetPosition : Integer;
 begin
   result := pmmpCompile;
 end;
 
-function TDPMProjectMenu.GetVerb: string;
+function TDPMProjectMenu.GetVerb : string;
 begin
   result := 'ManageDPM';
 end;
@@ -235,59 +235,60 @@ begin
 
 end;
 
-function TDPMProjectMenu.PostExecute(const MenuContextList: IInterfaceList): Boolean;
+function TDPMProjectMenu.PostExecute(const MenuContextList : IInterfaceList) : Boolean;
 begin
   Result := True;
 end;
 
-function TDPMProjectMenu.PreExecute(const MenuContextList: IInterfaceList): Boolean;
+function TDPMProjectMenu.PreExecute(const MenuContextList : IInterfaceList) : Boolean;
 begin
   Result := True;
 end;
 
-procedure TDPMProjectMenu.SetCaption(const Value: string);
+procedure TDPMProjectMenu.SetCaption(const Value : string);
 begin
 
 end;
 
-procedure TDPMProjectMenu.SetChecked(Value: Boolean);
+procedure TDPMProjectMenu.SetChecked(Value : Boolean);
 begin
 
 end;
 
-procedure TDPMProjectMenu.SetEnabled(Value: Boolean);
+procedure TDPMProjectMenu.SetEnabled(Value : Boolean);
 begin
 
 end;
 
-procedure TDPMProjectMenu.SetHelpContext(Value: Integer);
+procedure TDPMProjectMenu.SetHelpContext(Value : Integer);
 begin
 
 end;
 
-procedure TDPMProjectMenu.SetIsMultiSelectable(Value: Boolean);
+procedure TDPMProjectMenu.SetIsMultiSelectable(Value : Boolean);
 begin
 
 end;
 
-procedure TDPMProjectMenu.SetName(const Value: string);
+procedure TDPMProjectMenu.SetName(const Value : string);
 begin
 
 end;
 
-procedure TDPMProjectMenu.SetParent(const Value: string);
+procedure TDPMProjectMenu.SetParent(const Value : string);
 begin
 
 end;
 
-procedure TDPMProjectMenu.SetPosition(Value: Integer);
+procedure TDPMProjectMenu.SetPosition(Value : Integer);
 begin
 
 end;
 
-procedure TDPMProjectMenu.SetVerb(const Value: string);
+procedure TDPMProjectMenu.SetVerb(const Value : string);
 begin
 
 end;
 
 end.
+

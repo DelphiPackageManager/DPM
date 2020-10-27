@@ -49,17 +49,17 @@ type
     FSearchPaths : IList<ISpecSearchPath>;
     FBuildEntries : IList<ISpecBuildEntry>;
   protected
-    function IsTemplate : boolean;virtual;
-    function AllowDependencyGroups : boolean;virtual;
-    function AllowSearchPathGroups : boolean;virtual;
-    function GetDependencies: IList<ISpecDependency>;
-    function GetDesignFiles: IList<ISpecBPLEntry>;
-    function GetFiles: IList<ISpecFileEntry>;
-    function GetLibFiles: IList<ISpecFileEntry>;
-    function GetRuntimeFiles: IList<ISpecBPLEntry>;
-    function GetSourceFiles: IList<ISpecFileEntry>;
-    function GetSearchPaths: IList<ISpecSearchPath>;
-    function GetBuildEntries: IList<ISpecBuildEntry>;
+    function IsTemplate : boolean; virtual;
+    function AllowDependencyGroups : boolean; virtual;
+    function AllowSearchPathGroups : boolean; virtual;
+    function GetDependencies : IList<ISpecDependency>;
+    function GetDesignFiles : IList<ISpecBPLEntry>;
+    function GetFiles : IList<ISpecFileEntry>;
+    function GetLibFiles : IList<ISpecFileEntry>;
+    function GetRuntimeFiles : IList<ISpecBPLEntry>;
+    function GetSourceFiles : IList<ISpecFileEntry>;
+    function GetSearchPaths : IList<ISpecSearchPath>;
+    function GetBuildEntries : IList<ISpecBuildEntry>;
 
     function FindDependencyById(const id : string) : ISpecDependency;
     function FindDependencyGroupByTargetPlatform(const targetPlatform : TTargetPlatform) : ISpecDependencyGroup;
@@ -72,24 +72,24 @@ type
     function FindBuildEntryById(const id : string) : ISpecBuildEntry;
 
 
-//    function LoadCollection(const rootElement : IXMLDOMElement; const collectionPath : string; const nodeClass : TSpecNodeClass; const action : TConstProc<ISpecNode>) : boolean;
+    //    function LoadCollection(const rootElement : IXMLDOMElement; const collectionPath : string; const nodeClass : TSpecNodeClass; const action : TConstProc<ISpecNode>) : boolean;
 
-    function LoadDependenciesFromJson(const dependenciesArray : TJsonArray): Boolean;
-    function LoadLibraryFromJson(const libArray: TJsonArray): Boolean;
-    function LoadSourceFromJson(const sourceArray: TJsonArray): Boolean;
-    function LoadRuntimeFromJson(const runtimeArray : TJsonArray): Boolean;
-    function LoadDesignFromJson(const designArray : TJsonArray): Boolean;
-    function LoadFilesFromJson(const filesArray : TJsonArray): Boolean;
-    function LoadSearchPathsFromJson(const searchPathsArray: TJsonArray): Boolean;
-    function LoadBuildEntriesFromJson(const buildArray: TJsonArray): Boolean;
+    function LoadDependenciesFromJson(const dependenciesArray : TJsonArray) : Boolean;
+    function LoadLibraryFromJson(const libArray : TJsonArray) : Boolean;
+    function LoadSourceFromJson(const sourceArray : TJsonArray) : Boolean;
+    function LoadRuntimeFromJson(const runtimeArray : TJsonArray) : Boolean;
+    function LoadDesignFromJson(const designArray : TJsonArray) : Boolean;
+    function LoadFilesFromJson(const filesArray : TJsonArray) : Boolean;
+    function LoadSearchPathsFromJson(const searchPathsArray : TJsonArray) : Boolean;
+    function LoadBuildEntriesFromJson(const buildArray : TJsonArray) : Boolean;
 
-    function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
+    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
 
 
     constructor CreateClone(const logger : ILogger; const deps : IList<ISpecDependency>; const design, runtime : IList<ISpecBPLEntry>;
-                            const source, lib, files : IList<ISpecFileEntry>; const search : IList<ISpecSearchPath>);
+      const source, lib, files : IList<ISpecFileEntry>; const search : IList<ISpecSearchPath>);
   public
-    constructor Create(const logger : ILogger);override;
+    constructor Create(const logger : ILogger); override;
 
 
   end;
@@ -110,30 +110,30 @@ uses
 
 { TSpecTemplateBase }
 
-function TSpecTemplateBase.AllowDependencyGroups: boolean;
+function TSpecTemplateBase.AllowDependencyGroups : boolean;
 begin
   result := false;
 end;
 
-function TSpecTemplateBase.AllowSearchPathGroups: boolean;
+function TSpecTemplateBase.AllowSearchPathGroups : boolean;
 begin
   result := false;
 end;
 
-constructor TSpecTemplateBase.Create(const logger: ILogger);
+constructor TSpecTemplateBase.Create(const logger : ILogger);
 begin
   inherited Create(Logger);
   FDependencies := TCollections.CreateList<ISpecDependency>;
-  FDesignFiles  := TCollections.CreateList<ISpecBPLEntry>;
-  FFiles        := TCollections.CreateList<ISpecFileEntry>;
-  FLibFiles     := TCollections.CreateList<ISpecFileEntry>;
+  FDesignFiles := TCollections.CreateList<ISpecBPLEntry>;
+  FFiles := TCollections.CreateList<ISpecFileEntry>;
+  FLibFiles := TCollections.CreateList<ISpecFileEntry>;
   FRuntimeFiles := TCollections.CreateList<ISpecBPLEntry>;
-  FSourceFiles  := TCollections.CreateList<ISpecFileEntry>;
-  FSearchPaths  := TCollections.CreateList<ISpecSearchPath>;
+  FSourceFiles := TCollections.CreateList<ISpecFileEntry>;
+  FSearchPaths := TCollections.CreateList<ISpecSearchPath>;
   FBuildEntries := TCollections.CreateList<ISpecBuildEntry>;
 end;
 
-constructor TSpecTemplateBase.CreateClone(const logger: ILogger; const deps: IList<ISpecDependency>; const design, runtime: IList<ISpecBPLEntry>; const source, lib, files: IList<ISpecFileEntry>; const search: IList<ISpecSearchPath>);
+constructor TSpecTemplateBase.CreateClone(const logger : ILogger; const deps : IList<ISpecDependency>; const design, runtime : IList<ISpecBPLEntry>; const source, lib, files : IList<ISpecFileEntry>; const search : IList<ISpecSearchPath>);
 begin
   Create(logger);
   FDependencies.AddRange(deps);
@@ -146,7 +146,7 @@ begin
 
 end;
 
-function TSpecTemplateBase.FindBuildEntryById(const id: string): ISpecBuildEntry;
+function TSpecTemplateBase.FindBuildEntryById(const id : string) : ISpecBuildEntry;
 begin
   result := FBuildEntries.Where(
     function(const item : ISpecBuildEntry) : boolean
@@ -155,7 +155,7 @@ begin
     end).FirstOrDefault;
 end;
 
-function TSpecTemplateBase.FindDependencyById(const id: string): ISpecDependency;
+function TSpecTemplateBase.FindDependencyById(const id : string) : ISpecDependency;
 begin
   result := FDependencies.Where(
     function(const item : ISpecDependency) : boolean
@@ -164,19 +164,19 @@ begin
     end).FirstOrDefault;
 end;
 
-function TSpecTemplateBase.FindDependencyGroupByTargetPlatform(const targetPlatform: TTargetPlatform): ISpecDependencyGroup;
+function TSpecTemplateBase.FindDependencyGroupByTargetPlatform(const targetPlatform : TTargetPlatform) : ISpecDependencyGroup;
 begin
   result := FDependencies.Where(
     function(const item : ISpecDependency) : boolean
     begin
       result := false;
       if item.IsGroup then
-        result:= (item as ISpecDependencyGroup).TargetPlatform = targetPlatform;
+        result := (item as ISpecDependencyGroup).TargetPlatform = targetPlatform;
     end).FirstOrDefault as ISpecDependencyGroup;
 
 end;
 
-function TSpecTemplateBase.FindDesignBplBySrc(const src: string): ISpecBPLEntry;
+function TSpecTemplateBase.FindDesignBplBySrc(const src : string) : ISpecBPLEntry;
 begin
   result := FDesignFiles.Where(
     function(const item : ISpecBPLEntry) : boolean
@@ -185,7 +185,7 @@ begin
     end).FirstOrDefault;
 end;
 
-function TSpecTemplateBase.FindLibFileBySrc(const src: string): ISpecFileEntry;
+function TSpecTemplateBase.FindLibFileBySrc(const src : string) : ISpecFileEntry;
 begin
   result := FLibFiles.Where(
     function(const item : ISpecFileEntry) : boolean
@@ -195,7 +195,7 @@ begin
 
 end;
 
-function TSpecTemplateBase.FindOtherFileBySrc(const src: string): ISpecFileEntry;
+function TSpecTemplateBase.FindOtherFileBySrc(const src : string) : ISpecFileEntry;
 begin
   result := FFiles.Where(
     function(const item : ISpecFileEntry) : boolean
@@ -205,7 +205,7 @@ begin
 
 end;
 
-function TSpecTemplateBase.FindRuntimeBplBySrc(const src: string): ISpecBPLEntry;
+function TSpecTemplateBase.FindRuntimeBplBySrc(const src : string) : ISpecBPLEntry;
 begin
   result := FRuntimeFiles.Where(
     function(const item : ISpecBPLEntry) : boolean
@@ -215,7 +215,7 @@ begin
 
 end;
 
-function TSpecTemplateBase.FindSearchPathByPath(const path: string): ISpecSearchPath;
+function TSpecTemplateBase.FindSearchPathByPath(const path : string) : ISpecSearchPath;
 begin
   result := FSearchPaths.Where(
     function(const item : ISpecSearchPath) : boolean
@@ -225,7 +225,7 @@ begin
 
 end;
 
-function TSpecTemplateBase.FindSourceFileBySrc(const src: string): ISpecFileEntry;
+function TSpecTemplateBase.FindSourceFileBySrc(const src : string) : ISpecFileEntry;
 begin
   result := FSourceFiles.Where(
     function(const item : ISpecFileEntry) : boolean
@@ -234,42 +234,42 @@ begin
     end).FirstOrDefault;
 end;
 
-function TSpecTemplateBase.GetBuildEntries: IList<ISpecBuildEntry>;
+function TSpecTemplateBase.GetBuildEntries : IList<ISpecBuildEntry>;
 begin
   result := FBuildEntries;
 end;
 
-function TSpecTemplateBase.GetDependencies: IList<ISpecDependency>;
+function TSpecTemplateBase.GetDependencies : IList<ISpecDependency>;
 begin
   result := FDependencies;
 end;
 
-function TSpecTemplateBase.GetDesignFiles: IList<ISpecBPLEntry>;
+function TSpecTemplateBase.GetDesignFiles : IList<ISpecBPLEntry>;
 begin
   result := FDesignFiles;
 end;
 
-function TSpecTemplateBase.GetFiles: IList<ISpecFileEntry>;
+function TSpecTemplateBase.GetFiles : IList<ISpecFileEntry>;
 begin
   result := FFiles;
 end;
 
-function TSpecTemplateBase.GetLibFiles: IList<ISpecFileEntry>;
+function TSpecTemplateBase.GetLibFiles : IList<ISpecFileEntry>;
 begin
   result := FLibFiles;
 end;
 
-function TSpecTemplateBase.GetRuntimeFiles: IList<ISpecBPLEntry>;
+function TSpecTemplateBase.GetRuntimeFiles : IList<ISpecBPLEntry>;
 begin
   result := FRuntimeFiles;
 end;
 
-function TSpecTemplateBase.GetSearchPaths: IList<ISpecSearchPath>;
+function TSpecTemplateBase.GetSearchPaths : IList<ISpecSearchPath>;
 begin
   result := FSearchPaths;
 end;
 
-function TSpecTemplateBase.GetSourceFiles: IList<ISpecFileEntry>;
+function TSpecTemplateBase.GetSourceFiles : IList<ISpecFileEntry>;
 begin
   result := FSourceFiles;
 end;
@@ -299,7 +299,7 @@ end;
 //  end;
 //end;
 
-function TSpecTemplateBase.LoadBuildEntriesFromJson(const buildArray: TJsonArray): Boolean;
+function TSpecTemplateBase.LoadBuildEntriesFromJson(const buildArray : TJsonArray) : Boolean;
 begin
   result := LoadJsonCollection(buildArray, TSpecBuildEntry,
     procedure(const value : IInterface)
@@ -308,7 +308,7 @@ begin
     end);
 end;
 
-function TSpecTemplateBase.LoadDependenciesFromJson(const dependenciesArray: TJsonArray): Boolean;
+function TSpecTemplateBase.LoadDependenciesFromJson(const dependenciesArray : TJsonArray) : Boolean;
 var
   i : integer;
   dependencyObj : TJsonObject;
@@ -317,10 +317,10 @@ begin
   result := true;
   if dependenciesArray.Count = 0 then
     exit;
-  for i := 0 to dependenciesArray.Count -1  do
+  for i := 0 to dependenciesArray.Count - 1 do
   begin
     dependencyObj := dependenciesArray[i];
-    if dependencyObj.Contains('targetPlatform')then
+    if dependencyObj.Contains('targetPlatform') then
     begin
       if not IsTemplate then
       begin
@@ -338,7 +338,7 @@ begin
   end;
 end;
 
-function TSpecTemplateBase.LoadDesignFromJson(const designArray: TJsonArray): Boolean;
+function TSpecTemplateBase.LoadDesignFromJson(const designArray : TJsonArray) : Boolean;
 begin
   result := LoadJsonCollection(designArray, TSpecBPLEntry,
     procedure(const value : IInterface)
@@ -349,7 +349,7 @@ begin
 end;
 
 
-function TSpecTemplateBase.LoadFilesFromJson(const filesArray: TJsonArray): Boolean;
+function TSpecTemplateBase.LoadFilesFromJson(const filesArray : TJsonArray) : Boolean;
 begin
   result := LoadJsonCollection(filesArray, TSpecFileEntry,
     procedure(const value : IInterface)
@@ -360,7 +360,7 @@ begin
 end;
 
 
-function TSpecTemplateBase.LoadLibraryFromJson(const libArray: TJsonArray): Boolean;
+function TSpecTemplateBase.LoadLibraryFromJson(const libArray : TJsonArray) : Boolean;
 begin
   result := LoadJsonCollection(libArray, TSpecFileEntry,
     procedure(const value : IInterface)
@@ -370,7 +370,7 @@ begin
 
 end;
 
-function TSpecTemplateBase.LoadRuntimeFromJson(const runtimeArray: TJsonArray): Boolean;
+function TSpecTemplateBase.LoadRuntimeFromJson(const runtimeArray : TJsonArray) : Boolean;
 begin
   result := LoadJsonCollection(runtimeArray, TSpecBPLEntry,
     procedure(const value : IInterface)
@@ -380,7 +380,7 @@ begin
 end;
 
 
-function TSpecTemplateBase.LoadSearchPathsFromJson(const searchPathsArray: TJsonArray): Boolean;
+function TSpecTemplateBase.LoadSearchPathsFromJson(const searchPathsArray : TJsonArray) : Boolean;
 var
   i : integer;
   searchPath : ISpecSearchPath;
@@ -429,7 +429,7 @@ begin
 end;
 
 
-function TSpecTemplateBase.LoadSourceFromJson(const sourceArray: TJsonArray): Boolean;
+function TSpecTemplateBase.LoadSourceFromJson(const sourceArray : TJsonArray) : Boolean;
 begin
   result := LoadJsonCollection(sourceArray, TSpecFileEntry,
     procedure(const value : IInterface)
@@ -439,16 +439,16 @@ begin
 end;
 
 
-function TSpecTemplateBase.LoadFromJson(const jsonObject: TJsonObject): Boolean;
+function TSpecTemplateBase.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var
   hasChildren : boolean;
-  sValue: string;
+  sValue : string;
   collectionObj : TJsonArray;
 begin
   result := true;
   if IsTemplate then
   begin
-    if jsonObject.Contains('template')  then
+    if jsonObject.Contains('template') then
     begin
       result := false;
       Logger.Error('template property not valid in a template!');
@@ -469,11 +469,11 @@ begin
   else
   begin
     //if we point to a template and have props other than compiler + platforms then fail
-    if jsonObject.Contains('template')  then
+    if jsonObject.Contains('template') then
     begin
       if jsonObject.Count > 3 then //compiler + platforms + template
       begin
-        Logger.Error('targetPlatform cannot specify a template and it''s own definition, pick one' );
+        Logger.Error('targetPlatform cannot specify a template and it''s own definition, pick one');
         result := false;
       end;
       exit;
@@ -523,3 +523,4 @@ end;
 
 
 end.
+

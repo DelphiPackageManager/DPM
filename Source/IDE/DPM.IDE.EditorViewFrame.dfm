@@ -211,9 +211,6 @@ object DPMEditViewFrame: TDPMEditViewFrame
       inherited sbPackageDetails: TScrollBox
         Height = 558
         ExplicitHeight = 558
-        inherited pnlInstalled: TPanel
-          ExplicitWidth = 434
-        end
       end
     end
   end

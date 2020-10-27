@@ -47,12 +47,12 @@ type
     FFound : array[TCompilerVersion.UnknownVersion..TCompilerVersion.RS10_4] of TStatus;
     FRsVarFiles : array[TCompilerVersion.UnknownVersion..TCompilerVersion.RS10_4] of string;
   protected
-    function FoundCompilerInfo(const compilerVersion: TCompilerVersion): Boolean;
+    function FoundCompilerInfo(const compilerVersion : TCompilerVersion) : Boolean;
     function GetRsVarsFilePath(const compilerVersion : TCompilerVersion) : string;
 
   public
     constructor Create(const logger : ILogger);
-    destructor Destroy;override;
+    destructor Destroy; override;
   end;
 
 implementation
@@ -64,7 +64,7 @@ uses
 
 
 { TCompilerEnvironmentProvider }
-constructor TCompilerEnvironmentProvider.Create(const logger: ILogger);
+constructor TCompilerEnvironmentProvider.Create(const logger : ILogger);
 begin
   FLogger := logger;
 end;
@@ -75,66 +75,68 @@ begin
   inherited;
 end;
 
-function TCompilerEnvironmentProvider.FoundCompilerInfo(const compilerVersion: TCompilerVersion): Boolean;
+function TCompilerEnvironmentProvider.FoundCompilerInfo(const compilerVersion : TCompilerVersion) : Boolean;
 begin
   result := FFound[compilerVersion] = TStatus.found;
 end;
 
-function TCompilerEnvironmentProvider.GetRsVarsFilePath(const compilerVersion: TCompilerVersion): string;
+function TCompilerEnvironmentProvider.GetRsVarsFilePath(const compilerVersion : TCompilerVersion) : string;
 var
-  bdsVersion : string;
-  key : string;
-  reg : TRegistry;
-  rootDir : string;
+  bdsVersion                  : string;
+  key                         : string;
+  reg                         : TRegistry;
+  rootDir                     : string;
 begin
   result := '';
   case FFound[compilerVersion] of
     TStatus.found :
-    begin
-      result := FRsVarFiles[compilerVersion];
-      exit;
-    end;
+      begin
+        result := FRsVarFiles[compilerVersion];
+        exit;
+      end;
     TStatus.notfound :
       exit;
     TStatus.unknown :
-    begin
-      bdsVersion := CompilerToBDSVersion(compilerVersion);
-      case compilerVersion of
-        TCompilerVersion.RS2009: ;
-        TCompilerVersion.RS2010: key := 'Software\CodeGear\BDS\%s';
-      else
-        key := 'Software\Embarcadero\BDS\%s';
-      end;
+      begin
+        bdsVersion := CompilerToBDSVersion(compilerVersion);
+        case compilerVersion of
+          TCompilerVersion.RS2009 : ;
+          TCompilerVersion.RS2010 : key := 'Software\CodeGear\BDS\%s';
+        else
+          key := 'Software\Embarcadero\BDS\%s';
+        end;
 
-      key := Format(key,[bdsVersion]);
+        key := Format(key, [bdsVersion]);
 
-      reg := TRegistry.Create(KEY_READ);
-      try
-        reg.RootKey := HKEY_LOCAL_MACHINE;
-        if reg.OpenKey(key, False) then
-        begin
-          rootDir := reg.ReadString('RootDir');
-          if rootDir = '' then
+        reg := TRegistry.Create(KEY_READ);
+        try
+          reg.RootKey := HKEY_LOCAL_MACHINE;
+          if reg.OpenKey(key, False) then
+          begin
+            rootDir := reg.ReadString('RootDir');
+            if rootDir = '' then
+            begin
+              FLogger.Error('Unable to find install location for compiler [' + CompilerToString(compilerVersion) + ']');
+              FFound[compilerVersion] := TStatus.notfound;
+              exit;
+            end;
+          end
+          else
           begin
             FLogger.Error('Unable to find install location for compiler [' + CompilerToString(compilerVersion) + ']');
             FFound[compilerVersion] := TStatus.notfound;
             exit;
           end;
-        end
-        else
-        begin
-          FLogger.Error('Unable to find install location for compiler [' + CompilerToString(compilerVersion) + ']');
-          FFound[compilerVersion] := TStatus.notfound;
-          exit;
+        finally
+          reg.Free;
         end;
-      finally
-        reg.Free;
+        FRsVarFiles[compilerVersion] := IncludeTrailingPathDelimiter(rootDir) + 'bin\rsvars.bat';
+        result := FRsVarFiles[compilerVersion];
+        FFound[compilerVersion] := TStatus.found;
       end;
-      FRsVarFiles[compilerVersion] := IncludeTrailingPathDelimiter(rootDir) + 'bin\rsvars.bat';
-      result := FRsVarFiles[compilerVersion];
-      FFound[compilerVersion] := TStatus.found;
-    end;
   end;
 end;
 
 end.
+
+

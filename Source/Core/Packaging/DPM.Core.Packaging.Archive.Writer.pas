@@ -36,34 +36,34 @@ uses
   DPM.Core.Packaging.Archive;
 
 type
-  TPackageArchiveWriter = class(TInterfacedObject,IPackageArchiveWriter)
+  TPackageArchiveWriter = class(TInterfacedObject, IPackageArchiveWriter)
   private
-    FFileName   : string;
-    FZipFile    : TZipFile;
-    FLastError  : string;
-    FBasePath   : string;
-    FVersion    : TPackageVersion;
-    FLogger     : ILogger;
+    FFileName : string;
+    FZipFile : TZipFile;
+    FLastError : string;
+    FBasePath : string;
+    FVersion : TPackageVersion;
+    FLogger : ILogger;
   protected
-    function AddFile(const filePath: string): Boolean;overload;
-    function AddFile(const fileName : string; const archiveFileName : string) : boolean;overload;
-    function AddFiles(const files: System.TArray<System.string>): Boolean;
+    function AddFile(const filePath : string) : Boolean; overload;
+    function AddFile(const fileName : string; const archiveFileName : string) : boolean; overload;
+    function AddFiles(const files : System.TArray < System.string > ) : Boolean;
     function AddIcon(const filePath : string) : boolean;
-    function WriteMetaDataFile(const stream: TStream): Boolean;overload;
-    function WriteMetaDataFile(const fileName : string) : boolean;overload;
-    function Exists: Boolean;
-    function GetArchiveName: string;
-    function GetArchivePath: string;
-    function GetLastErrorString: string;
-    function IsArchive: Boolean;
+    function WriteMetaDataFile(const stream : TStream) : Boolean; overload;
+    function WriteMetaDataFile(const fileName : string) : boolean; overload;
+    function Exists : Boolean;
+    function GetArchiveName : string;
+    function GetArchivePath : string;
+    function GetLastErrorString : string;
+    function IsArchive : Boolean;
     function Open(const fileName : string) : Boolean;
     procedure Close;
     procedure SetBasePath(const path : string);
-    function GetPackageVersion: TPackageVersion;
+    function GetPackageVersion : TPackageVersion;
 
   public
-    constructor Create(const logger : ILogger);overload;
-    destructor Destroy;override;
+    constructor Create(const logger : ILogger); overload;
+    destructor Destroy; override;
   end;
 
 
@@ -76,22 +76,22 @@ uses
 
 { TPackageArchiveWriter }
 
-function TPackageArchiveWriter.AddFile(const filePath: string): Boolean;
+function TPackageArchiveWriter.AddFile(const filePath : string) : Boolean;
 var
   archiveFileName : string;
 begin
-  archiveFileName := ExtractRelativePath(FBasePath,filePath);
-  FZipFile.Add(filePath,archiveFileName);
+  archiveFileName := ExtractRelativePath(FBasePath, filePath);
+  FZipFile.Add(filePath, archiveFileName);
   result := true;
 end;
 
-function TPackageArchiveWriter.AddFile(const fileName, archiveFileName: string): boolean;
+function TPackageArchiveWriter.AddFile(const fileName, archiveFileName : string) : boolean;
 begin
-  FZipFile.Add(fileName,archiveFileName);
+  FZipFile.Add(fileName, archiveFileName);
   result := true;
 end;
 
-function TPackageArchiveWriter.AddFiles(const files: System.TArray<System.string>): Boolean;
+function TPackageArchiveWriter.AddFiles(const files : System.TArray < System.string > ) : Boolean;
 var
   f : string;
 begin
@@ -103,15 +103,15 @@ begin
   result := true;
 end;
 
-function TPackageArchiveWriter.AddIcon(const filePath: string): boolean;
+function TPackageArchiveWriter.AddIcon(const filePath : string) : boolean;
 var
   iconBytes : TBytes;
 begin
   iconBytes := TFile.ReadAllBytes(filePath);
   if ExtractFileExt(filePath) = '.svg' then
-    FZipFile.Add(iconBytes,cIconFileSVG)
+    FZipFile.Add(iconBytes, cIconFileSVG)
   else
-    FZipFile.Add(iconBytes,cIconFilePNG);
+    FZipFile.Add(iconBytes, cIconFilePNG);
   result := true;
 end;
 
@@ -139,36 +139,36 @@ begin
   inherited;
 end;
 
-function TPackageArchiveWriter.Exists: Boolean;
+function TPackageArchiveWriter.Exists : Boolean;
 begin
   result := (FZipFile <> nil) or TFile.Exists(FFileName);
 end;
 
-function TPackageArchiveWriter.GetArchiveName: string;
+function TPackageArchiveWriter.GetArchiveName : string;
 begin
   result := TPath.GetFileName(FFileName);
 end;
 
-function TPackageArchiveWriter.GetArchivePath: string;
+function TPackageArchiveWriter.GetArchivePath : string;
 begin
-//  if FFileStream <> nil then
-//    result := 'c:\'
-//  else
-    result := TPath.GetDirectoryName(FFileName);
+  //  if FFileStream <> nil then
+  //    result := 'c:\'
+  //  else
+  result := TPath.GetDirectoryName(FFileName);
 
 end;
 
-function TPackageArchiveWriter.GetLastErrorString: string;
+function TPackageArchiveWriter.GetLastErrorString : string;
 begin
   result := FLastError;
 end;
 
-function TPackageArchiveWriter.GetPackageVersion: TPackageVersion;
+function TPackageArchiveWriter.GetPackageVersion : TPackageVersion;
 begin
   result := FVersion;
 end;
 
-function TPackageArchiveWriter.IsArchive: Boolean;
+function TPackageArchiveWriter.IsArchive : Boolean;
 begin
   result := true;
 end;
@@ -184,7 +184,7 @@ begin
 
   FZipFile := TZipFile.Create;
   try
-    FZipFile.Open(FFileName,TZipMode.zmWrite);
+    FZipFile.Open(FFileName, TZipMode.zmWrite);
     result := true;
   except
     on e : Exception do
@@ -197,22 +197,23 @@ begin
 
 end;
 
-procedure TPackageArchiveWriter.SetBasePath(const path: string);
+procedure TPackageArchiveWriter.SetBasePath(const path : string);
 begin
   FBasePath := path;
 end;
 
-function TPackageArchiveWriter.WriteMetaDataFile(const fileName: string): boolean;
+function TPackageArchiveWriter.WriteMetaDataFile(const fileName : string) : boolean;
 begin
   FZipFile.Add(fileName, cPackageMetaFile);
   result := true;
 end;
 
-function TPackageArchiveWriter.WriteMetaDataFile(const stream: TStream): Boolean;
+function TPackageArchiveWriter.WriteMetaDataFile(const stream : TStream) : Boolean;
 begin
-  FZipFile.Add(stream,cPackageMetaFile);
+  FZipFile.Add(stream, cPackageMetaFile);
   result := true;
 end;
 
 
 end.
+

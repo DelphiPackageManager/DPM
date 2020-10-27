@@ -31,13 +31,13 @@ interface
 const
   cDPMClientVersion = '1.0.0-alpha1';
   cLockFileVersion = '0.0.1';
-  cLockFileExt     = '.dpmlock';
+  cLockFileExt = '.dpmlock';
   cPackageFileExt = '.dpkg';
   cPackageSpecExt = '.dspec';
   //fixed filename for the package dspec so we can easily extract it
   cPackageMetaFile = 'package' + cPackageSpecExt;
-  cIconFileSVG  = 'icon.svg';
-  cIconFilePNG  = 'icon.png';
+  cIconFileSVG = 'icon.svg';
+  cIconFilePNG = 'icon.png';
 
   cDPMConfigFileName = 'dpm.config';
 
@@ -78,3 +78,4 @@ const
 implementation
 
 end.
+

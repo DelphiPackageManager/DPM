@@ -41,41 +41,41 @@ type
     FTake : integer;
     FCompilerVersion : TCompilerVersion;
     FPlatforms : TDPMPlatforms;
-    FVersion  : TPackageVersion;
+    FVersion : TPackageVersion;
     FAllVersions : boolean;
     FPrerelease : boolean;
     FCommercial : boolean;
-    FTrial      : boolean;
+    FTrial : boolean;
     FIncludeDelisted : boolean;
   protected
     FExact : boolean;
-    constructor CreateClone(const original : TSearchOptions);reintroduce;
+    constructor CreateClone(const original : TSearchOptions); reintroduce;
 
   public
-    constructor Create;override;
-    function Clone : TSearchOptions;virtual;
-    property AllVersions      : boolean read FAllVersions write FAllVersions;
-    property Prerelease       : boolean read FPrerelease write FPrerelease;
-    property Commercial       : boolean read FCommercial write FCommercial;
-    property Trial            : boolean read FTrial write FTrial;
+    constructor Create; override;
+    function Clone : TSearchOptions; virtual;
+    property AllVersions : boolean read FAllVersions write FAllVersions;
+    property Prerelease : boolean read FPrerelease write FPrerelease;
+    property Commercial : boolean read FCommercial write FCommercial;
+    property Trial : boolean read FTrial write FTrial;
     //IncludeDelisted not implemented. yet.
-    property IncludeDelisted  : boolean read FIncludeDelisted write FIncludeDelisted;
+    property IncludeDelisted : boolean read FIncludeDelisted write FIncludeDelisted;
     //comma separated list of sources, empty means all.
-    property Sources          : string  read FSources write FSources;
-    property SearchTerms      : string  read FSearchTerms write FSearchTerms;
-    property Skip             : integer read FSkip write FSkip;
-    property Take             : integer read FTake write FTake;
-    property CompilerVersion  : TCompilerVersion read FCompilerVersion write FCompilerVersion;
-    property Platforms        : TDPMPlatforms read FPlatforms write FPlatforms;
-    property Version          : TPackageVersion read FVersion write FVersion;
-    property Exact            : boolean read FExact write FExact; //search term is a package id.
+    property Sources : string read FSources write FSources;
+    property SearchTerms : string read FSearchTerms write FSearchTerms;
+    property Skip : integer read FSkip write FSkip;
+    property Take : integer read FTake write FTake;
+    property CompilerVersion : TCompilerVersion read FCompilerVersion write FCompilerVersion;
+    property Platforms : TDPMPlatforms read FPlatforms write FPlatforms;
+    property Version : TPackageVersion read FVersion write FVersion;
+    property Exact : boolean read FExact write FExact; //search term is a package id.
   end;
 
 implementation
 
 { TSearchOptions }
 
-function TSearchOptions.Clone: TSearchOptions;
+function TSearchOptions.Clone : TSearchOptions;
 begin
   result := TSearchOptions.CreateClone(Self);
 end;
@@ -91,7 +91,7 @@ begin
   FExact := false;
 end;
 
-constructor TSearchOptions.CreateClone(const original: TSearchOptions);
+constructor TSearchOptions.CreateClone(const original : TSearchOptions);
 begin
   inherited CreateClone(original);
   FSources := original.FSources;
@@ -100,10 +100,11 @@ begin
   FTake := original.FTake;
   FCompilerVersion := original.FCompilerVersion;
   FPlatforms := original.FPlatforms;
-  FVersion  := original.FVersion;
+  FVersion := original.FVersion;
   FAllVersions := original.FAllVersions;
   FPrerelease := original.FPrerelease;
   FIncludeDelisted := original.FIncludeDelisted;
 end;
 
 end.
+

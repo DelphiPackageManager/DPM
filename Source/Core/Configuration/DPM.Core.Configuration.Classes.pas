@@ -41,44 +41,44 @@ type
 
   TSourceConfig = class(TInterfacedObject, ISourceConfig)
   private
-    FEnabled: Boolean;
-    FFileName: string;
-    FName: string;
-    FPassword: string;
-    FUserName: string;
+    FEnabled : Boolean;
+    FFileName : string;
+    FName : string;
+    FPassword : string;
+    FUserName : string;
     FSource : string;
     FLogger : ILogger;
-    FCrypt  : ISymmetricAlgorithm;
+    FCrypt : ISymmetricAlgorithm;
     FSourceType : TSourceType;
   protected
-    function GetIsEnabled: Boolean;
-    function GetFileName: string;
-    function GetName: string;
-    function GetPassword: string;
-    function GetUserName: string;
-    function GetSource: string;
-    function GetIsHttp: Boolean;
-    function GetSourceType: TSourceType;
+    function GetIsEnabled : Boolean;
+    function GetFileName : string;
+    function GetName : string;
+    function GetPassword : string;
+    function GetUserName : string;
+    function GetSource : string;
+    function GetIsHttp : Boolean;
+    function GetSourceType : TSourceType;
     //TODO : Move these to a utils class
     function EncryptString(const value : string) : string;
     function DecryptString(const value : string) : string;
     function CreateCrypt : ISymmetricAlgorithm;
-    procedure SetIsEnabled(const value: Boolean);
-    procedure SetName(const value: string);
-    procedure SetPassword(const value: string);
-    procedure SetUserName(const value: string);
-    procedure SetSource(const value: string);
-    procedure SetSourceType(const value: TSourceType);
+    procedure SetIsEnabled(const value : Boolean);
+    procedure SetName(const value : string);
+    procedure SetPassword(const value : string);
+    procedure SetUserName(const value : string);
+    procedure SetSource(const value : string);
+    procedure SetSourceType(const value : TSourceType);
 
 
     function LoadFromJson(const jsonObj : TJsonObject) : boolean;
     function SaveToJson(const parentObj : TJsonObject) : boolean;
   public
-    constructor Create(const logger: ILogger);overload;
-    constructor Create(const name : string; const source : string; const sourceType : TSourceType; const userName : string; const password : string; const enabled : boolean);overload;
+    constructor Create(const logger : ILogger); overload;
+    constructor Create(const name : string; const source : string; const sourceType : TSourceType; const userName : string; const password : string; const enabled : boolean); overload;
   end;
 
-  TConfiguration = class(TInterfacedObject, IConfiguration,IConfigurationLoadSave)
+  TConfiguration = class(TInterfacedObject, IConfiguration, IConfigurationLoadSave)
   private
     FSources : IList<ISourceConfig>;
     FPackageCacheLocation : string;
@@ -87,10 +87,10 @@ type
   protected
     function GetFileName : string;
     procedure SetFileName(const value : string);
-    function GetPackageCacheLocation: string;
-    function GetSources: IList<ISourceConfig>;
+    function GetPackageCacheLocation : string;
+    function GetSources : IList<ISourceConfig>;
     procedure SetPackageCacheLocation(const value : string);
-    function GetIsDefaultPackageCacheLocation: Boolean;
+    function GetIsDefaultPackageCacheLocation : Boolean;
     procedure AddDefaultSources;
 
     function LoadFromFile(const fileName : string) : boolean;
@@ -99,7 +99,7 @@ type
     function LoadFromJson(const jsonObj : TJsonObject) : boolean;
     function SaveToJson(const parentObj : TJsonObject) : boolean;
   public
-    constructor Create(const logger: ILogger);
+    constructor Create(const logger : ILogger);
   end;
 
   //TODO : should be checking for invalid xml chars when saving!
@@ -117,7 +117,7 @@ uses
 
 { TSourceConfig }
 
-constructor TSourceConfig.Create(const logger: ILogger);
+constructor TSourceConfig.Create(const logger : ILogger);
 begin
   inherited Create;
   FLogger := logger;
@@ -128,10 +128,10 @@ end;
 
 //NOTE : DO NOT CHANGE THIS KEY - YOU WILL BREAK THINGS FOR EXISTING SOURCES!
 const
-  key: array[0..23] of Byte = ($11, $03, $45, $6, $8A, $8B, $DD, $EF, $EE,
+  key : array[0..23] of Byte = ($11, $03, $45, $6, $8A, $8B, $DD, $EF, $EE,
     $0C, $1A, $38, $26, $41, $32, $A0, $89, $AB, $CD, $EF, $01, $23, $45, $67);
 
-constructor TSourceConfig.Create(const name, source: string; const sourceType: TSourceType; const userName, password: string; const enabled : boolean);
+constructor TSourceConfig.Create(const name, source : string; const sourceType : TSourceType; const userName, password : string; const enabled : boolean);
 begin
   FName := name;
   FSource := source;
@@ -141,7 +141,7 @@ begin
   FEnabled := enabled;
 end;
 
-function TSourceConfig.CreateCrypt: ISymmetricAlgorithm;
+function TSourceConfig.CreateCrypt : ISymmetricAlgorithm;
 begin
   result := TTripleDES.Create;
   result.CipherMode := TCipherMode.ECB;
@@ -149,7 +149,7 @@ begin
   result.Key := TBuffer.Create(key);
 end;
 
-function TSourceConfig.DecryptString(const value: string): string;
+function TSourceConfig.DecryptString(const value : string) : string;
 var
   input : TBuffer;
   output : TBuffer;
@@ -159,7 +159,7 @@ begin
   result := TEncoding.Unicode.GetString(output.AsBytes);
 end;
 
-function TSourceConfig.EncryptString(const value: string): string;
+function TSourceConfig.EncryptString(const value : string) : string;
 var
   input : TBuffer;
   output : TBuffer;
@@ -170,57 +170,57 @@ begin
 end;
 
 
-function TSourceConfig.GetIsEnabled: Boolean;
+function TSourceConfig.GetIsEnabled : Boolean;
 begin
   result := FEnabled;
 end;
 
-function TSourceConfig.GetFileName: string;
+function TSourceConfig.GetFileName : string;
 begin
   result := FFileName;
 end;
 
-function TSourceConfig.GetIsHttp: Boolean;
+function TSourceConfig.GetIsHttp : Boolean;
 begin
   result := TStringUtils.StartsWith(LowerCase(FSource), 'http://') or TStringUtils.StartsWith(LowerCase(FSource), 'https://')
 end;
 
-function TSourceConfig.GetName: string;
+function TSourceConfig.GetName : string;
 begin
   result := FName;
 end;
 
-function TSourceConfig.GetPassword: string;
+function TSourceConfig.GetPassword : string;
 begin
   result := FPassword;
 end;
 
-function TSourceConfig.GetUserName: string;
+function TSourceConfig.GetUserName : string;
 begin
   result := FUserName;
 end;
 
-function TSourceConfig.GetSource: string;
+function TSourceConfig.GetSource : string;
 begin
   result := FSource;
 end;
 
-function TSourceConfig.GetSourceType: TSourceType;
+function TSourceConfig.GetSourceType : TSourceType;
 begin
   result := FSourceType;
 end;
 
-function TSourceConfig.LoadFromJson(const jsonObj: TJsonObject): boolean;
+function TSourceConfig.LoadFromJson(const jsonObj : TJsonObject) : boolean;
 var
   srcType : string;
   uri : IUri;
 begin
   result := true;
-  FName     := jsonObj.S['name'];
-  FSource   := jsonObj.S['source'];
+  FName := jsonObj.S['name'];
+  FSource := jsonObj.S['source'];
   FUserName := jsonObj.S['userName'];
   FPassword := jsonObj.S['password'];
-  srcType   := jsonObj.S['type'];
+  srcType := jsonObj.S['type'];
 
   if FPassword <> '' then
     FPassword := DecryptString(FPassword);
@@ -231,7 +231,7 @@ begin
 
 
   if srcType <> '' then
-    FSourceType :=  TEnumUtils.StringtoEnum<TSourceType>(srcType)
+    FSourceType := TEnumUtils.StringtoEnum<TSourceType>(srcType)
   else
     FSourceType := TSourceType.Folder;
 
@@ -259,7 +259,7 @@ begin
 
 end;
 
-function TSourceConfig.SaveToJson(const parentObj: TJsonObject): boolean;
+function TSourceConfig.SaveToJson(const parentObj : TJsonObject) : boolean;
 var
   sourceObj : TJsonObject;
 begin
@@ -267,7 +267,7 @@ begin
   sourceObj.S['name'] := FName;
   sourceObj.S['source'] := FSource;
   if FUserName <> '' then
-    sourceObj.S['userName'] :=  FUserName;
+    sourceObj.S['userName'] := FUserName;
 
   sourceObj.S['type'] := TEnumUtils.EnumToString<TSourceType>(FSourceType);
 
@@ -280,32 +280,32 @@ end;
 
 
 
-procedure TSourceConfig.SetIsEnabled(const value: Boolean);
+procedure TSourceConfig.SetIsEnabled(const value : Boolean);
 begin
   FEnabled := value;
 end;
 
-procedure TSourceConfig.SetName(const value: string);
+procedure TSourceConfig.SetName(const value : string);
 begin
   FName := value;
 end;
 
-procedure TSourceConfig.SetPassword(const value: string);
+procedure TSourceConfig.SetPassword(const value : string);
 begin
   FPassword := value;
 end;
 
-procedure TSourceConfig.SetUserName(const value: string);
+procedure TSourceConfig.SetUserName(const value : string);
 begin
   FUserName := value;
 end;
 
-procedure TSourceConfig.SetSource(const value: string);
+procedure TSourceConfig.SetSource(const value : string);
 begin
   FSource := value;
 end;
 
-procedure TSourceConfig.SetSourceType(const value: TSourceType);
+procedure TSourceConfig.SetSourceType(const value : TSourceType);
 begin
   FSourceType := value;
 end;
@@ -316,13 +316,13 @@ procedure TConfiguration.AddDefaultSources;
 var
   source : ISourceConfig;
 begin
-  source := TSourceConfig.Create('DPMGithub', 'https://api.github.com', TSourceType.DPMGithub, 'Set Password to github access token', '',false );
+  source := TSourceConfig.Create('DPMGithub', 'https://api.github.com', TSourceType.DPMGithub, 'Set Password to github access token', '', false);
   FSources.Add(source);
-  source := TSourceConfig.Create('DNGithub', 'https://api.github.com', TSourceType.DNGithub, 'Set Password to github access token', '',false );
+  source := TSourceConfig.Create('DNGithub', 'https://api.github.com', TSourceType.DNGithub, 'Set Password to github access token', '', false);
   FSources.Add(source);
 end;
 
-constructor TConfiguration.Create(const logger: ILogger);
+constructor TConfiguration.Create(const logger : ILogger);
 begin
   inherited Create;
   FLogger := logger;
@@ -330,28 +330,28 @@ begin
 
 end;
 
-function TConfiguration.GetFileName: string;
+function TConfiguration.GetFileName : string;
 begin
   result := FFileName;
 end;
 
-function TConfiguration.GetIsDefaultPackageCacheLocation: Boolean;
+function TConfiguration.GetIsDefaultPackageCacheLocation : Boolean;
 begin
   result := SameText(FPackageCacheLocation, cDefaultPackageCache) or
-            SameText(FPackageCacheLocation, TSystemUtils.ExpandEnvironmentStrings(cDefaultPackageCache));
+  SameText(FPackageCacheLocation, TSystemUtils.ExpandEnvironmentStrings(cDefaultPackageCache));
 end;
 
-function TConfiguration.GetPackageCacheLocation: string;
+function TConfiguration.GetPackageCacheLocation : string;
 begin
   result := FPackageCacheLocation;
 end;
 
-function TConfiguration.GetSources: IList<ISourceConfig>;
+function TConfiguration.GetSources : IList<ISourceConfig>;
 begin
   result := FSources;
 end;
 
-function TConfiguration.LoadFromFile(const fileName: string): boolean;
+function TConfiguration.LoadFromFile(const fileName : string) : boolean;
 var
   jsonObj : TJsonObject;
 begin
@@ -375,7 +375,7 @@ begin
   FFileName := fileName;
 end;
 
-function TConfiguration.LoadFromJson(const jsonObj: TJsonObject): boolean;
+function TConfiguration.LoadFromJson(const jsonObj : TJsonObject) : boolean;
 var
   sourcesArray : TJsonArray;
   source : ISourceConfig;
@@ -386,16 +386,16 @@ begin
   FPackageCacheLocation := jsonObj['packageCacheLocation'];
   sourcesArray := jsonObj.A['packageSources'];
 
-  for i := 0 to sourcesArray.Count -1 do
+  for i := 0 to sourcesArray.Count - 1 do
   begin
     source := TSourceConfig.Create(FLogger);
     bResult := source.LoadFromJson(sourcesArray.O[i]);
     if bResult then
     begin
-      if not FSources.Where(function(const item : ISourceConfig):boolean
-                            begin
-                              result := SameText(item.Name, source.Name);
-                            end).Any then
+      if not FSources.Where(function(const item : ISourceConfig) : boolean
+        begin
+          result := SameText(item.Name, source.Name);
+        end).Any then
       begin
         FSources.Add(source);
       end;
@@ -404,7 +404,7 @@ begin
   end;
 end;
 
-function TConfiguration.SaveToFile(const fileName: string): boolean;
+function TConfiguration.SaveToFile(const fileName : string) : boolean;
 var
   sFileName : string;
   jsonObj : TJsonObject;
@@ -440,26 +440,28 @@ begin
   end;
 end;
 
-function TConfiguration.SaveToJson(const parentObj: TJsonObject): boolean;
+function TConfiguration.SaveToJson(const parentObj : TJsonObject) : boolean;
 var
-  i: integer;
+  i : integer;
 begin
   result := true;
   parentObj['packageCacheLocation'] := FPackageCacheLocation;
 
-  for i := 0 to FSources.Count -1 do
+  for i := 0 to FSources.Count - 1 do
     result := FSources[i].SaveToJson(parentObj) and result;
 
 end;
 
-procedure TConfiguration.SetFileName(const value: string);
+procedure TConfiguration.SetFileName(const value : string);
 begin
   FFileName := value;
 end;
 
-procedure TConfiguration.SetPackageCacheLocation(const value: string);
+procedure TConfiguration.SetPackageCacheLocation(const value : string);
 begin
   FPackageCacheLocation := value;
 end;
 
 end.
+
+

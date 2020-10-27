@@ -35,14 +35,14 @@ uses
   DPM.Core.Compiler.Interfaces;
 
 type
-  TCompilerFactory = class(TInterfacedObject,ICompilerFactory)
+  TCompilerFactory = class(TInterfacedObject, ICompilerFactory)
   private
     FLogger : ILogger;
-    FEnv    : ICompilerEnvironmentProvider;
+    FEnv : ICompilerEnvironmentProvider;
   protected
     function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler;
   public
-    constructor Create(const logger: ILogger; const env : ICompilerEnvironmentProvider);
+    constructor Create(const logger : ILogger; const env : ICompilerEnvironmentProvider);
   end;
 
 implementation
@@ -52,13 +52,13 @@ uses
 
 { TCompilerFactory }
 
-constructor TCompilerFactory.Create(const logger: ILogger; const env: ICompilerEnvironmentProvider);
+constructor TCompilerFactory.Create(const logger : ILogger; const env : ICompilerEnvironmentProvider);
 begin
   FLogger := logger;
   FEnv := env;
 end;
 
-function TCompilerFactory.CreateCompiler(const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): ICompiler;
+function TCompilerFactory.CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler;
 begin
   //if we have different compiler implementations then work that out here.
   result := TMSBuildCompiler.Create(FLogger, compilerVersion, platform, FEnv);
@@ -66,3 +66,4 @@ begin
 end;
 
 end.
+

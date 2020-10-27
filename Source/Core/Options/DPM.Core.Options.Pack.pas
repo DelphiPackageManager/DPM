@@ -36,27 +36,27 @@ uses
 type
   TPackOptions = class(TOptionsBase)
   private
-    FSpecFile       : string;
-    FOutputFolder   : string;
-    FBasePath       : string;
-    FVersion        : string;
-    FExclude        : boolean;
-    FMinClientVer   : string;
-    FProperties     : string;
+    FSpecFile : string;
+    FOutputFolder : string;
+    FBasePath : string;
+    FVersion : string;
+    FExclude : boolean;
+    FMinClientVer : string;
+    FProperties : string;
     class var
       FDefault : TPackOptions;
   public
     class constructor CreateDefault;
     class property Default : TPackOptions read FDefault;
-    constructor Create;override;
+    constructor Create; override;
 
-    property SpecFile         : string  read FSpecFile     write FSpecFile;
-    property OutputFolder     : string  read FOutputFolder write FOutputFolder;
-    property BasePath         : string  read FBasePath     write FBasePath;
-    property Version          : string  read FVersion      write FVersion;
-    property Exclude          : boolean read FExclude      write FExclude;
-    property MinClientVersion : string  read FMinClientVer write FMinClientVer;
-    property Properties       : string  read FProperties write FProperties;
+    property SpecFile : string read FSpecFile write FSpecFile;
+    property OutputFolder : string read FOutputFolder write FOutputFolder;
+    property BasePath : string read FBasePath write FBasePath;
+    property Version : string read FVersion write FVersion;
+    property Exclude : boolean read FExclude write FExclude;
+    property MinClientVersion : string read FMinClientVer write FMinClientVer;
+    property Properties : string read FProperties write FProperties;
   end;
 
 implementation
@@ -79,3 +79,4 @@ end;
 
 
 end.
+

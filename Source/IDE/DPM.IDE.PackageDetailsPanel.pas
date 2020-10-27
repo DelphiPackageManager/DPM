@@ -50,7 +50,7 @@ type
 
     LayoutHeight : integer;
 
-    procedure Update(const ACanvas : TCanvas; const AControl : TPackageDetailsPanel; const package : IPackageSearchResultItem; const optionalElements : TDetailElements );
+    procedure Update(const ACanvas : TCanvas; const AControl : TPackageDetailsPanel; const package : IPackageSearchResultItem; const optionalElements : TDetailElements);
   end;
 
   TUriClickEvent = procedure(Sender : TObject; const uri : string; const element : TDetailElement) of object;
@@ -68,14 +68,14 @@ type
     procedure UpdateLayout;
     procedure Paint; override;
     procedure Resize; override;
-    procedure WMEraseBkgnd(var Message: TWmEraseBkgnd); message WM_ERASEBKGND;
-    function HitTest(const pt: TPoint): TDetailElement;
-    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer); override;
-    procedure MouseMove(Shift: TShiftState; X: Integer; Y: Integer); override;
-    procedure CMMouseLeave(var Msg: TMessage); message CM_MouseLeave;
+    procedure WMEraseBkgnd(var Message : TWmEraseBkgnd); message WM_ERASEBKGND;
+    function HitTest(const pt : TPoint) : TDetailElement;
+    procedure MouseDown(Button : TMouseButton; Shift : TShiftState; X : Integer; Y : Integer); override;
+    procedure MouseMove(Shift : TShiftState; X : Integer; Y : Integer); override;
+    procedure CMMouseLeave(var Msg : TMessage); message CM_MouseLeave;
   public
-    constructor Create(AOwner : TComponent);override;
-    procedure SetDetails(const package: IPackageSearchResultItem);
+    constructor Create(AOwner : TComponent); override;
+    procedure SetDetails(const package : IPackageSearchResultItem);
 
   published
     property OnUriClick : TUriClickEvent read FOnUriClickEvent write FOnUriClickEvent;
@@ -104,7 +104,7 @@ uses
 { TPackageDetailsPanel }
 
 
-procedure TPackageDetailsPanel.CMMouseLeave(var Msg: TMessage);
+procedure TPackageDetailsPanel.CMMouseLeave(var Msg : TMessage);
 begin
   if FHitElement <> deNone then
   begin
@@ -114,7 +114,7 @@ begin
   end;
 end;
 
-constructor TPackageDetailsPanel.Create(AOwner: TComponent);
+constructor TPackageDetailsPanel.Create(AOwner : TComponent);
 begin
   inherited;
   DoubleBuffered := true;
@@ -124,7 +124,7 @@ begin
   {$ENDIF}
 end;
 
-function TPackageDetailsPanel.HitTest(const pt: TPoint): TDetailElement;
+function TPackageDetailsPanel.HitTest(const pt : TPoint) : TDetailElement;
 begin
   result := deNone;
   if FPackage = nil then
@@ -150,7 +150,7 @@ begin
 
 end;
 
-procedure TPackageDetailsPanel.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+procedure TPackageDetailsPanel.MouseDown(Button : TMouseButton; Shift : TShiftState; X, Y : Integer);
 var
   sUri : string;
 begin
@@ -163,19 +163,19 @@ begin
   if Button = mbLeft then
   begin
 
-    FHitElement := HitTest(Point(X,Y));
+    FHitElement := HitTest(Point(X, Y));
     if FHitElement <> deNone then
     begin
       case FHitElement of
-        deLicense:
-        begin
-          if FLicenseIsUri then
-            sUri := FPackage.License
-          else
-            exit;
-        end;
-        deProjectUrl: sUri := FPackage.ProjectUrl;
-        deReportUrl: sUri := FPackage.ProjectUrl;
+        deLicense :
+          begin
+            if FLicenseIsUri then
+              sUri := FPackage.License
+            else
+              exit;
+          end;
+        deProjectUrl : sUri := FPackage.ProjectUrl;
+        deReportUrl : sUri := FPackage.ProjectUrl;
       else
         exit;
       end;
@@ -184,13 +184,13 @@ begin
   end;
 end;
 
-procedure TPackageDetailsPanel.MouseMove(Shift: TShiftState; X, Y: Integer);
+procedure TPackageDetailsPanel.MouseMove(Shift : TShiftState; X, Y : Integer);
 var
   prevElement : TDetailElement;
 begin
   inherited;
   prevElement := FHitElement;
-  FHitElement := HitTest(Point(X,Y));
+  FHitElement := HitTest(Point(X, Y));
   if FHitElement <> prevElement then
     Invalidate;
 
@@ -239,7 +239,7 @@ begin
   DrawText(Canvas.Handle, 'Version :', Length('Version :'), FLayout.VersionLabelRect, DT_LEFT);
 
   Canvas.Font.Style := [];
-  DrawText(Canvas.Handle, FPackage.Version, Length(FPackage.Version), FLayout.VersionRect, DT_LEFT+ DT_WORDBREAK);
+  DrawText(Canvas.Handle, FPackage.Version, Length(FPackage.Version), FLayout.VersionRect, DT_LEFT + DT_WORDBREAK);
 
   Canvas.Font.Style := [fsBold];
   DrawText(Canvas.Handle, 'Authors :', Length('Authors :'), FLayout.AuthorsLabelRect, DT_LEFT);
@@ -321,16 +321,16 @@ begin
       dependRect.Left := FLayout.DependRect.Left + textSize.cy;
       dependRect.Bottom := dependRect.Top + textSize.cy;
       value := '- ' + DPMPlatformToString(platformDep.GetPlatform);
-      DrawText(Canvas.Handle, value , Length(value), dependRect, DT_LEFT);
+      DrawText(Canvas.Handle, value, Length(value), dependRect, DT_LEFT);
 
       dependRect.Left := dependRect.Left + textSize.cy;
-      dependRect.Offset(0, textSize.cy *2);
+      dependRect.Offset(0, textSize.cy * 2);
 
       for packageDep in platformDep.Dependencies do
       begin
         value := '- ' + packageDep.Id + ' ( ' + packageDep.VersionRange.ToDisplayString + ' )';
-        DrawText(Canvas.Handle, value , Length(value), dependRect, DT_LEFT);
-        dependRect.Offset(0, textSize.cy *2);
+        DrawText(Canvas.Handle, value, Length(value), dependRect, DT_LEFT);
+        dependRect.Offset(0, textSize.cy * 2);
       end;
     end;
 
@@ -348,7 +348,7 @@ begin
   UpdateLayout;
 end;
 
-procedure TPackageDetailsPanel.SetDetails(const package: IPackageSearchResultItem);
+procedure TPackageDetailsPanel.SetDetails(const package : IPackageSearchResultItem);
 var
   uri : IUri;
 begin
@@ -398,7 +398,7 @@ begin
 
 end;
 
-procedure TPackageDetailsPanel.WMEraseBkgnd(var Message: TWmEraseBkgnd);
+procedure TPackageDetailsPanel.WMEraseBkgnd(var Message : TWmEraseBkgnd);
 begin
   message.Result := 1;
 end;
@@ -406,7 +406,7 @@ end;
 { TDetailsLayout }
 
 
-procedure TDetailsLayout.Update(const ACanvas: TCanvas; const AControl: TPackageDetailsPanel; const package : IPackageSearchResultItem; const optionalElements: TDetailElements);
+procedure TDetailsLayout.Update(const ACanvas : TCanvas; const AControl : TPackageDetailsPanel; const package : IPackageSearchResultItem; const optionalElements : TDetailElements);
 var
   textSize : TSize;
   clientRect : TRect;
@@ -417,7 +417,7 @@ begin
   if package = nil then
     exit;
   clientRect := AControl.ClientRect;
-  InflateRect(clientRect, -6,-4);
+  InflateRect(clientRect, -6, -4);
   //we are going to calc this anyway
   clientRect.Height := 1000;
 
@@ -440,7 +440,7 @@ begin
   VersionLabelRect.Height := textSize.cy;
 
 
-  VersionRect.Top  := VersionLabelRect.Top;
+  VersionRect.Top := VersionLabelRect.Top;
   VersionRect.Left := VersionLabelRect.Right + 6;
   VersionRect.Right := clientRect.Right;
   VersionRect.Height := textSize.cy;
@@ -582,8 +582,9 @@ begin
 
 
   //Change this as we add more fields
-  LayoutHeight := bottom -  clientRect.Top + textSize.cy * 2;
+  LayoutHeight := bottom - clientRect.Top + textSize.cy * 2;
 end;
 
 end.
+
 

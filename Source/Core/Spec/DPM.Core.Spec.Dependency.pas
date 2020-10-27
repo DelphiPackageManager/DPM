@@ -42,16 +42,16 @@ type
     FVersion : TVersionRange;
     FVersionString : string;
   protected
-    function GetId: string;
+    function GetId : string;
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
     function GetVersionString : string;
-    function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
-    function IsGroup: Boolean;virtual;
+    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
+    function IsGroup : Boolean; virtual;
     constructor CreateClone(const logger : ILogger; const id : string; const version : TVersionRange; const versionString : string);
-    function Clone: ISpecDependency;virtual;
+    function Clone : ISpecDependency; virtual;
   public
-    constructor Create(const logger : ILogger);override;
+    constructor Create(const logger : ILogger); override;
   end;
 
 implementation
@@ -62,23 +62,23 @@ uses
 
 { TSpecDependency }
 
-function TSpecDependency.Clone: ISpecDependency;
+function TSpecDependency.Clone : ISpecDependency;
 begin
   result := TSpecDependency.CreateClone(Logger, FId, FVersion.Clone, FVersionString);
 end;
 
-constructor TSpecDependency.Create(const logger: ILogger);
+constructor TSpecDependency.Create(const logger : ILogger);
 begin
   inherited Create(logger);
 
 end;
 
-function TSpecDependency.GetId: string;
+function TSpecDependency.GetId : string;
 begin
   result := FId;
 end;
 
-constructor TSpecDependency.CreateClone(const logger: ILogger; const id: string; const version: TVersionRange; const versionString : string);
+constructor TSpecDependency.CreateClone(const logger : ILogger; const id : string; const version : TVersionRange; const versionString : string);
 begin
   inherited Create(logger);
   FId := id;
@@ -91,17 +91,17 @@ begin
   result := FVersion;
 end;
 
-function TSpecDependency.GetVersionString: string;
+function TSpecDependency.GetVersionString : string;
 begin
   result := FVersionString;
 end;
 
-function TSpecDependency.IsGroup: Boolean;
+function TSpecDependency.IsGroup : Boolean;
 begin
   result := false;
 end;
 
-function TSpecDependency.LoadFromJson(const jsonObject: TJsonObject): Boolean;
+function TSpecDependency.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var
   sValue : string;
   sError : string;
@@ -127,17 +127,18 @@ begin
   end
   else if sValue = '$version$' then
     FVersionString := sValue
-  else if not TVersionRange.TryParseWithError(sValue, FVersion, sError)  then
+  else if not TVersionRange.TryParseWithError(sValue, FVersion, sError) then
   begin
-    Logger.Error('Invalid dependency version attribute [' + sValue + '] - '+ sError );
+    Logger.Error('Invalid dependency version attribute [' + sValue + '] - ' + sError);
     result := false;
   end;
 
 end;
 
-procedure TSpecDependency.SetVersionRange(const value: TVersionRange);
+procedure TSpecDependency.SetVersionRange(const value : TVersionRange);
 begin
   FVersion := value;
 end;
 
 end.
+

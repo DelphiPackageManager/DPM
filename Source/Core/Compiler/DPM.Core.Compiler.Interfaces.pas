@@ -37,10 +37,10 @@ uses
 {$SCOPEDENUMS ON}
 
 type
-  TCompilerVerbosity = (Quiet, Minimal, Normal, Detailed,Diagnostic);
+  TCompilerVerbosity = (Quiet, Minimal, Normal, Detailed, Diagnostic);
 
   ICompiler = interface
-  ['{4A56BA53-6ACD-4A5D-8D55-B921D6CDC8A0}']
+    ['{4A56BA53-6ACD-4A5D-8D55-B921D6CDC8A0}']
     function GetCompilerVersion : TCompilerVersion;
     function GetPlatform : TDPMPlatform;
 
@@ -49,7 +49,7 @@ type
 
 
     function GetSearchPaths : IList<string>;
-    procedure SetSearchPaths(const value : IList<string>);
+    procedure SetSearchPaths(const value : IList<string> );
 
     function GetBPLOutput : string;
     procedure SetBPLOutput(const value : string);
@@ -67,7 +67,7 @@ type
 
     function GetCompilerOutput : TStrings;
 
-    function BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string): boolean;
+    function BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string) : boolean;
 
     property CompilerVersion : TCompilerVersion read GetCompilerVersion;
     property Configuration : string read GetConfiguration write SetConfiguration;
@@ -85,16 +85,18 @@ type
 
   //inject
   ICompilerEnvironmentProvider = interface
-  ['{54814318-551F-4F53-B0FB-66AC0E430DB7}']
+    ['{54814318-551F-4F53-B0FB-66AC0E430DB7}']
     function GetRsVarsFilePath(const compilerVersion : TCompilerVersion) : string;
   end;
 
   //inject
   ICompilerFactory = interface
-  ['{3405435B-5D3A-409A-AFB7-FEFA0EA07060}']
+    ['{3405435B-5D3A-409A-AFB7-FEFA0EA07060}']
     function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler;
   end;
 
 implementation
 
 end.
+
+

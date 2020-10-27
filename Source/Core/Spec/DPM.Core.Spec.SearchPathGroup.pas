@@ -44,14 +44,14 @@ type
     FSearchPaths : IList<ISpecSearchPath>;
   protected
     function GetTargetPlatform : TTargetPlatform;
-    function GetSearchPaths: IList<ISpecSearchPath>;
-    function Clone: ISpecSearchPath;override;
-    function IsGroup: Boolean;override;
-    function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
+    function GetSearchPaths : IList<ISpecSearchPath>;
+    function Clone : ISpecSearchPath; override;
+    function IsGroup : Boolean; override;
+    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
 
-    constructor CreateClone(const logger: ILogger; const targetPlatform : TTargetPlatform; const searchPaths : IList<ISpecSearchPath>);
+    constructor CreateClone(const logger : ILogger; const targetPlatform : TTargetPlatform; const searchPaths : IList<ISpecSearchPath>);
   public
-    constructor Create(const logger: ILogger); override;
+    constructor Create(const logger : ILogger); override;
   end;
 
 implementation
@@ -61,7 +61,7 @@ uses
 
 { TSpecSearchPathGroup }
 
-function TSpecSearchPathGroup.Clone: ISpecSearchPath;
+function TSpecSearchPathGroup.Clone : ISpecSearchPath;
 var
   searchPaths : IList<ISpecSearchPath>;
   clonePath, path : ISpecSearchPath;
@@ -75,7 +75,7 @@ begin
   result := TSpecSearchPathGroup.CreateClone(logger, FTargetPlatform.Clone, searchPaths);
 end;
 
-constructor TSpecSearchPathGroup.Create(const logger: ILogger);
+constructor TSpecSearchPathGroup.Create(const logger : ILogger);
 begin
   inherited Create(logger);
   FTargetPlatform := TTargetPlatform.Empty;
@@ -83,7 +83,7 @@ begin
 
 end;
 
-constructor TSpecSearchPathGroup.CreateClone(const logger: ILogger; const targetPlatform: TTargetPlatform; const searchPaths: IList<ISpecSearchPath>);
+constructor TSpecSearchPathGroup.CreateClone(const logger : ILogger; const targetPlatform : TTargetPlatform; const searchPaths : IList<ISpecSearchPath>);
 begin
   inherited Create(logger);
   FTargetPlatform := targetPlatform;
@@ -91,22 +91,22 @@ begin
   FSearchPaths.AddRange(searchPaths);
 end;
 
-function TSpecSearchPathGroup.GetSearchPaths: IList<ISpecSearchPath>;
+function TSpecSearchPathGroup.GetSearchPaths : IList<ISpecSearchPath>;
 begin
   result := FSearchPaths;
 end;
 
-function TSpecSearchPathGroup.GetTargetPlatform: TTargetPlatform;
+function TSpecSearchPathGroup.GetTargetPlatform : TTargetPlatform;
 begin
   result := FTargetPlatform;
 end;
 
-function TSpecSearchPathGroup.IsGroup: Boolean;
+function TSpecSearchPathGroup.IsGroup : Boolean;
 begin
   result := true;
 end;
 
-function TSpecSearchPathGroup.LoadFromJson(const jsonObject: TJsonObject): Boolean;
+function TSpecSearchPathGroup.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var
   i : integer;
   searchPath : ISpecSearchPath;
@@ -119,7 +119,7 @@ begin
   if sValue = '' then
   begin
     result := false;
-    Logger.Error('Required property [' + cTargetPlatformAttribute + '] is missing.' );
+    Logger.Error('Required property [' + cTargetPlatformAttribute + '] is missing.');
   end
   else
   begin
@@ -134,7 +134,7 @@ begin
   if searchPathsArray.Count = 0 then
     exit;
 
-  for i := 0 to searchPathsArray.Count -1 do
+  for i := 0 to searchPathsArray.Count - 1 do
   begin
     searchPath := TSpecSearchPath.Create(Logger);
     FSearchPaths.Add(searchPath);
@@ -144,3 +144,4 @@ end;
 
 
 end.
+

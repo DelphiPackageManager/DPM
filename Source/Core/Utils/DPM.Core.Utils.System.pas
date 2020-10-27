@@ -43,9 +43,9 @@ uses
 
 { TSystemUtils }
 
-class function TSystemUtils.ExpandEnvironmentStrings(const value: string): string;
+class function TSystemUtils.ExpandEnvironmentStrings(const value : string) : string;
 var
-  bufferLen: Integer;
+  bufferLen : Integer;
 begin
   bufferLen := Winapi.Windows.ExpandEnvironmentStrings(PChar(value), nil, 0);
   SetLength(result, bufferLen);
@@ -53,7 +53,7 @@ begin
   result := TrimRight(result); //trim the extr a null char.
 end;
 
-class function TSystemUtils.GetEnvironmentVariableDef(const name, default: string): string;
+class function TSystemUtils.GetEnvironmentVariableDef(const name, default : string) : string;
 begin
   result := GetEnvironmentVariable(name);
   if result = '' then
@@ -61,3 +61,4 @@ begin
 end;
 
 end.
+

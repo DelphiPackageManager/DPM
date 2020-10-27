@@ -38,7 +38,7 @@ type
   private
     FLogger : ILogger;
   protected
-    function CreateClient(const uri: IUri): ISourceClient;
+    function CreateClient(const uri : IUri) : ISourceClient;
   public
     constructor Create(const logger : ILogger);
   end;
@@ -53,12 +53,12 @@ uses
 
 { TClientFactory }
 
-constructor TClientFactory.Create(const logger: ILogger);
+constructor TClientFactory.Create(const logger : ILogger);
 begin
   FLogger := logger;
 end;
 
-function TClientFactory.CreateClient(const uri: IUri): ISourceClient;
+function TClientFactory.CreateClient(const uri : IUri) : ISourceClient;
 begin
   result := nil;
   if SameText(uri.Scheme, 'http') or SameText(uri.Scheme, 'https') then
@@ -70,3 +70,4 @@ begin
 end;
 
 end.
+

@@ -49,23 +49,24 @@ class procedure TConfigUtils.EnsureDefaultConfigDir;
 var
   sConfigFolder : string;
 begin
-    sConfigFolder := ExtractFilePath(TSystemUtils.ExpandEnvironmentStrings(cDefaultConfigFile));
-    if not DirectoryExists(sConfigFolder) then
-    begin
-      //ensure our .dpm folder exists.
-      ForceDirectories(sConfigFolder);
-    end;
+  sConfigFolder := ExtractFilePath(TSystemUtils.ExpandEnvironmentStrings(cDefaultConfigFile));
+  if not DirectoryExists(sConfigFolder) then
+  begin
+    //ensure our .dpm folder exists.
+    ForceDirectories(sConfigFolder);
+  end;
 
 end;
 
-class function TConfigUtils.GetDefaultConfigFileName: string;
+class function TConfigUtils.GetDefaultConfigFileName : string;
 begin
   result := TSystemUtils.ExpandEnvironmentStrings(cDefaultConfigFile);
 end;
 
-class function TConfigUtils.GetDefaultDMPFolder: string;
+class function TConfigUtils.GetDefaultDMPFolder : string;
 begin
   result := TSystemUtils.ExpandEnvironmentStrings(cDefaultDPMFolder);
 end;
 
 end.
+

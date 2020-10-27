@@ -41,7 +41,7 @@ type
   public
     class constructor CreateDefault;
     class property Default : TListOptions read FDefault;
-    constructor Create;override;
+    constructor Create; override;
 
   end;
 
@@ -60,3 +60,4 @@ begin
 end;
 
 end.
+

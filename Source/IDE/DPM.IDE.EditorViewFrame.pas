@@ -35,7 +35,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ImgList,
-  Vcl.ComCtrls, Vcl.ExtCtrls,   Vcl.Menus, SVGInterfaces,
+  Vcl.ComCtrls, Vcl.ExtCtrls, Vcl.Menus, SVGInterfaces,
   Vcl.Themes,
   DPM.Controls.ButtonedEdit,
   DPM.Controls.GroupButton,
@@ -66,44 +66,44 @@ type
   TRowLayout = record
     RowWidth : integer;
     IconRect : TRect;
-    TitleRect: TRect;
+    TitleRect : TRect;
     VersionRect : TRect;
     InstalledVersionRect : TRect;
     DescriptionRect : TRect;
-    procedure Update(const ACanvas : TCanvas; const rowRect : TRect; const showSelect : Boolean );
+    procedure Update(const ACanvas : TCanvas; const rowRect : TRect; const showSelect : Boolean);
   end;
 
 
   TDPMEditViewFrame = class(TFrame, IPackageSearcher)
-    lblProject: TLabel;
-    DPMEditorViewImages: TImageList;
-    pnlSearchPanel: TPanel;
-    txtSearch: TButtonedEdit;
-    btnRefresh: TButton;
-    chkIncludePrerelease: TCheckBox;
-    ContentPanel: TPanel;
-    Splitter2: TSplitter;
-    chkIncludeCommercial: TCheckBox;
-    btnSettings: TButton;
-    btnAbout: TButton;
-    lblSources: TLabel;
-    cbSources: TComboBox;
-    pnlButtonBar: TPanel;
-    chkIncludeTrial: TCheckBox;
-    searchDebounceTimer: TTimer;
-    PackageListPanel: TPanel;
-    PackageDetailsFrame: TPackageDetailsFrame;
-    platformChangeDetectTimer: TTimer;
-    procedure txtSearchKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
-    procedure btnAboutClick(Sender: TObject);
-    procedure btnSettingsClick(Sender: TObject);
-    procedure tabMainChange(Sender: TObject);
-    procedure searchDebounceTimerTimer(Sender: TObject);
-    procedure btnRefreshClick(Sender: TObject);
-    procedure chkIncludePrereleaseClick(Sender: TObject);
-    procedure platformChangeDetectTimerTimer(Sender: TObject);
-    procedure txtSearchChange(Sender: TObject);
-    procedure txtSearchRightButtonClick(Sender: TObject);
+    lblProject : TLabel;
+    DPMEditorViewImages : TImageList;
+    pnlSearchPanel : TPanel;
+    txtSearch : TButtonedEdit;
+    btnRefresh : TButton;
+    chkIncludePrerelease : TCheckBox;
+    ContentPanel : TPanel;
+    Splitter2 : TSplitter;
+    chkIncludeCommercial : TCheckBox;
+    btnSettings : TButton;
+    btnAbout : TButton;
+    lblSources : TLabel;
+    cbSources : TComboBox;
+    pnlButtonBar : TPanel;
+    chkIncludeTrial : TCheckBox;
+    searchDebounceTimer : TTimer;
+    PackageListPanel : TPanel;
+    PackageDetailsFrame : TPackageDetailsFrame;
+    platformChangeDetectTimer : TTimer;
+    procedure txtSearchKeyDown(Sender : TObject; var Key : Word; Shift : TShiftState);
+    procedure btnAboutClick(Sender : TObject);
+    procedure btnSettingsClick(Sender : TObject);
+    procedure tabMainChange(Sender : TObject);
+    procedure searchDebounceTimerTimer(Sender : TObject);
+    procedure btnRefreshClick(Sender : TObject);
+    procedure chkIncludePrereleaseClick(Sender : TObject);
+    procedure platformChangeDetectTimerTimer(Sender : TObject);
+    procedure txtSearchChange(Sender : TObject);
+    procedure txtSearchRightButtonClick(Sender : TObject);
   private
     //controls
     FInstalledButton : TDPMGroupButton;
@@ -163,12 +163,12 @@ type
     FUpdates : IList<IPackageSearchResultItem>;
     //true when we first load the view
     FFirstView : boolean;
-    procedure FilterAndLoadInstalledPackages(const searchTxt: string);
+    procedure FilterAndLoadInstalledPackages(const searchTxt : string);
   protected
     procedure txtSearchChanged(Sender : TObject);
     procedure ScrollListPaintRow(const Sender : TObject; const ACanvas : TCanvas; const itemRect : TRect; const index : Int64; const state : TPaintRowState);
     procedure ScrollListPaintNoRows(const Sender : TObject; const ACanvas : TCanvas; const paintRect : TRect);
-    procedure ScrollListChangeRow(const Sender : TObject; const newRowIndex : Int64; const direction : TScrollDirection; const delta : Int64 );
+    procedure ScrollListChangeRow(const Sender : TObject; const newRowIndex : Int64; const direction : TScrollDirection; const delta : Int64);
 
     procedure RequestPackageIcon(const index : integer; const package : IPackageSearchResultItem);
 
@@ -194,7 +194,7 @@ type
     procedure ReloadSourcesCombo;
 
     //IPackageSearcher
-    function GetSearchOptions: TSearchOptions;
+    function GetSearchOptions : TSearchOptions;
     function SearchForPackages(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;
     function GetCurrentPlatform : string;
     procedure PackageInstalled(const package : IPackageSearchResultItem);
@@ -207,8 +207,8 @@ type
     procedure CreateControls(AOwner : TComponent);
 
   public
-    constructor Create(AOwner : TComponent);override;
-    destructor Destroy;override;
+    constructor Create(AOwner : TComponent); override;
+    destructor Destroy; override;
 
     //called from the EditorView
     procedure Configure(const projectOrGroup : IOTAProject; const container : TContainer; const projectTreeManager : IDPMProjectTreeManager);
@@ -241,9 +241,10 @@ uses
   DPM.IDE.AboutForm,
   DPM.IDE.AddInOptionsHostForm;
 
-const cDMPSearchHistoryFile = 'packagesearch.txt';
+const
+  cDMPSearchHistoryFile = 'packagesearch.txt';
 
-{ TDPMEditViewFrame }
+  { TDPMEditViewFrame }
 
 procedure TDPMEditViewFrame.AddDefaultSearchHistory;
 begin
@@ -256,9 +257,9 @@ begin
   txtSearch.ACStrings.Add('Gabr42.OmniThreadLibrary');
 end;
 
-procedure TDPMEditViewFrame.btnAboutClick(Sender: TObject);
+procedure TDPMEditViewFrame.btnAboutClick(Sender : TObject);
 var
-   aboutForm : TDPMAboutForm;
+  aboutForm : TDPMAboutForm;
 begin
   aboutForm := TDPMAboutForm.Create(nil);
   try
@@ -268,20 +269,20 @@ begin
   end;
 end;
 
-procedure TDPMEditViewFrame.btnRefreshClick(Sender: TObject);
+procedure TDPMEditViewFrame.btnRefreshClick(Sender : TObject);
 begin
   if FSearchResultPackages <> nil then
     FSearchResultPackages.Clear;
   //also called by the include checkboxes.
   case FCurrentTab of
-    TCurrentTab.Installed: SwitchedToInstalled(true);
-    TCurrentTab.Updates: SwitchedToUpdates(true);
-    TCurrentTab.Search: SwitchedToSearch(true);
-    TCurrentTab.Conflicts: SwitchedToConflicts(true);
+    TCurrentTab.Installed : SwitchedToInstalled(true);
+    TCurrentTab.Updates : SwitchedToUpdates(true);
+    TCurrentTab.Search : SwitchedToSearch(true);
+    TCurrentTab.Conflicts : SwitchedToConflicts(true);
   end;
 end;
 
-procedure TDPMEditViewFrame.btnSettingsClick(Sender: TObject);
+procedure TDPMEditViewFrame.btnSettingsClick(Sender : TObject);
 var
   bReload : boolean;
   optionsHost : TDPMOptionsHostForm;
@@ -290,7 +291,7 @@ begin
   try
     bReload := optionsHost.ShowModal = mrOk;
   finally
-     optionsHost.Free;
+    optionsHost.Free;
   end;
 
   if bReload then
@@ -302,7 +303,7 @@ begin
   end;
 end;
 
-procedure TDPMEditViewFrame.chkIncludePrereleaseClick(Sender: TObject);
+procedure TDPMEditViewFrame.chkIncludePrereleaseClick(Sender : TObject);
 begin
   btnRefreshClick(Sender);
   PackageDetailsFrame.IncludePreRelease := chkIncludePrerelease.Checked;
@@ -320,11 +321,11 @@ begin
     Application.ProcessMessages;
 end;
 
-constructor TDPMEditViewFrame.Create(AOwner: TComponent);
+constructor TDPMEditViewFrame.Create(AOwner : TComponent);
 {$IFDEF THEMESERVICES}
 var
   ideThemeSvc : IOTAIDEThemingServices;
-{$ENDIF}
+  {$ENDIF}
 begin
   inherited;
   FIconCache := TDPMIconCache.Create;
@@ -335,7 +336,7 @@ begin
 
   //todo - check when the IOTAIDEThemingServices was added
   {$IFDEF THEMESERVICES}
-  ideThemeSvc := (BorlandIDEServices As IOTAIDEThemingServices);
+  ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
   ideThemeSvc.ApplyTheme(Self);
   FIDEStyleServices := ideThemeSvc.StyleServices;
   {$ELSE}
@@ -361,7 +362,7 @@ begin
   FSearchOptions := TSearchOptions.Create;
   //hard code our compiler version here since when we are running in the IDE we are only working with the IDE version
   FSearchOptions.CompilerVersion := IDECompilerVersion;
-//  FSearchOptions.Take := 5; //just for testing.
+  //  FSearchOptions.Take := 5; //just for testing.
 
 
   FSearchSkip := 0;
@@ -380,7 +381,7 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame.CreateControls(AOwner: TComponent);
+procedure TDPMEditViewFrame.CreateControls(AOwner : TComponent);
 begin
   FInstalledButton := TDPMGroupButton.Create(Self);
   FUpdatesButton := TDPMGroupButton.Create(Self);
@@ -443,12 +444,12 @@ begin
   FScrollList.Parent := PackageListPanel;
 end;
 
-function TDPMEditViewFrame.CurrentList: IList<IPackageSearchResultItem>;
+function TDPMEditViewFrame.CurrentList : IList<IPackageSearchResultItem>;
 begin
   case FCurrentTab of
     TCurrentTab.Installed : result := FInstalledPackages;
-    TCurrentTab.Updates   : result := FUpdates;
-    TCurrentTab.Search    : result := FSearchResultPackages;
+    TCurrentTab.Updates : result := FUpdates;
+    TCurrentTab.Search : result := FSearchResultPackages;
     TCurrentTab.Conflicts : result := FConflictPackages;
   end;
 end;
@@ -463,7 +464,7 @@ begin
 end;
 
 
-function TDPMEditViewFrame.GetConflictingPackages: IAwaitable<IList<IPackageSearchResultItem>>;
+function TDPMEditViewFrame.GetConflictingPackages : IAwaitable<IList<IPackageSearchResultItem>>;
 var
   lSearchTerm : string;
   lProjectFile : string;
@@ -476,8 +477,8 @@ begin
     lProjectFile := FProject.FileName;
 
 
-  result := TAsync.Configure<IList<IPackageSearchResultItem>>(
-    function (const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
+  result := TAsync.Configure < IList<IPackageSearchResultItem> > (
+    function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
     var
       filter : string;
     begin
@@ -493,7 +494,7 @@ begin
 
       //simulating long running.
       WaitForSingleObject(cancelToken.Handle, 3000);
-    end,FCancelTokenSource.Token);
+    end, FCancelTokenSource.Token);
 end;
 
 function FindPackageRef(const references : IList<IPackageReference>; const platform : TDPMPlatform; const searchItem : IPackageSearchResultItem) : IPackageReference;
@@ -519,13 +520,13 @@ begin
 end;
 
 
-function TDPMEditViewFrame.GetCurrentPlatform: string;
+function TDPMEditViewFrame.GetCurrentPlatform : string;
 begin
   //todo : change this.
   result := DPMPlatformToString(FCurrentPlatform);
 end;
 
-function TDPMEditViewFrame.GetInstalledPackages: IAwaitable<IList<IPackageSearchResultItem>>;
+function TDPMEditViewFrame.GetInstalledPackages : IAwaitable<IList<IPackageSearchResultItem>>;
 var
   lProjectFile : string;
   repoManager : IPackageRepositoryManager;
@@ -550,8 +551,8 @@ begin
     options.Platforms := [FCurrentPlatform];
 
 
-  result := TAsync.Configure<IList<IPackageSearchResultItem>>(
-    function (const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
+  result := TAsync.Configure < IList<IPackageSearchResultItem> > (
+    function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
     var
       packageRef : IPackageReference;
       item : IPackageSearchResultItem;
@@ -570,14 +571,14 @@ begin
         result := repoManager.GetInstalledPackageFeed(cancelToken, options, GetPackageIdsFromReferences(ProjectPlatformToDPMPlatform(FProject.CurrentPlatform)), FConfiguration);
         for item in result do
         begin
-          packageRef := FindPackageRef(FPackageReferences,FCurrentPlatform, item);
+          packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
           if packageRef <> nil then
             item.IsTransitive := packageRef.IsTransitive;
         end;
         FLogger.Debug('DPMIDE : Got Installed package metadata.');
       end;
 
-    end,FCancelTokenSource.Token);
+    end, FCancelTokenSource.Token);
 end;
 
 function TDPMEditViewFrame.GetPackageIdsFromReferences(const platform : TDPMPlatform) : IList<IPackageId>;
@@ -589,7 +590,7 @@ var
   var
     childRef : IPackageReference;
   begin
-    if not (value.Platform = platform ) then
+    if not (value.Platform = platform) then
       exit;
 
     if not lookup.ContainsKey(Lowercase(value.Id)) then
@@ -601,7 +602,7 @@ var
 
 
 begin
-  lookup := TCollections.CreateDictionary<string, IPackageId>;
+  lookup := TCollections.CreateDictionary < string, IPackageId > ;
   result := TCollections.CreateList<IPackageId>;
 
   for packageRef in FPackageReferences do
@@ -611,25 +612,25 @@ begin
   result.AddRange(lookup.Values);
 end;
 
-function TDPMEditViewFrame.GetUpdatedPackages: IAwaitable<IList<IPackageSearchResultItem>>;
+function TDPMEditViewFrame.GetUpdatedPackages : IAwaitable<IList<IPackageSearchResultItem>>;
 begin
-  result := TAsync.Configure<IList<IPackageSearchResultItem>>(
-    function (const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
+  result := TAsync.Configure < IList<IPackageSearchResultItem> > (
+    function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
     begin
       result := TCollections.CreateList<IPackageSearchResultItem>;
 
       //simulating long running.
       //WaitForSingleObject(cancelToken.Handle, 3000);
-    end,FCancelTokenSource.Token);
+    end, FCancelTokenSource.Token);
 end;
 
-function TDPMEditViewFrame.IsProjectGroup: boolean;
+function TDPMEditViewFrame.IsProjectGroup : boolean;
 begin
   result := FProjectGroup <> nil;
 end;
 
 
-procedure TDPMEditViewFrame.LoadList(const list: IList<IPackageSearchResultItem>);
+procedure TDPMEditViewFrame.LoadList(const list : IList<IPackageSearchResultItem>);
 begin
   if list = nil then
   begin
@@ -646,7 +647,7 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame.PackageInstalled(const package: IPackageSearchResultItem);
+procedure TDPMEditViewFrame.PackageInstalled(const package : IPackageSearchResultItem);
 begin
 
   package.InstalledVersion := package.Version;
@@ -663,7 +664,7 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame.PackageUninstalled(const package: IPackageSearchResultItem);
+procedure TDPMEditViewFrame.PackageUninstalled(const package : IPackageSearchResultItem);
 begin
   if FCurrentTab = TCurrentTab.Installed then
     SwitchedToInstalled(true)
@@ -677,7 +678,7 @@ begin
   //  FProject.MarkModified;
 end;
 
-procedure TDPMEditViewFrame.platformChangeDetectTimerTimer(Sender: TObject);
+procedure TDPMEditViewFrame.platformChangeDetectTimerTimer(Sender : TObject);
 var
   projectEditor : IProjectEditor;
   projectPlatform : TDPMPlatform;
@@ -702,10 +703,10 @@ begin
       PackageDetailsFrame.SetPackage(nil);
       FScrollList.CurrentRow := -1;
       case FCurrentTab of
-        TCurrentTab.Search: SwitchedToSearch(true) ;
-        TCurrentTab.Installed: SwitchedToInstalled(true) ;
-        TCurrentTab.Updates: SwitchedToUpdates(true);
-        TCurrentTab.Conflicts: SwitchedToConflicts(True);
+        TCurrentTab.Search : SwitchedToSearch(true);
+        TCurrentTab.Installed : SwitchedToInstalled(true);
+        TCurrentTab.Updates : SwitchedToUpdates(true);
+        TCurrentTab.Conflicts : SwitchedToConflicts(True);
       end;
     end;
   end;
@@ -722,7 +723,7 @@ end;
 procedure TDPMEditViewFrame.ReloadSourcesCombo;
 var
   sCurrent : string;
-  source: ISourceConfig;
+  source : ISourceConfig;
   idx : integer;
 begin
   if cbSources.Items.Count > 0 then
@@ -748,7 +749,7 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame.RequestPackageIcon(const index : integer; const package: IPackageSearchResultItem);
+procedure TDPMEditViewFrame.RequestPackageIcon(const index : integer; const package : IPackageSearchResultItem);
 var
   platform : TDPMPlatform;
   id : string;
@@ -768,44 +769,44 @@ begin
   id := package.Id;
   version := package.Version;
   source := package.SourceName;
-  FLogger.Debug('DPMIDE : Requesting icon for [' + id + '.' + version + ']' );
+  FLogger.Debug('DPMIDE : Requesting icon for [' + id + '.' + version + ']');
 
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
   config := FConfiguration;
 
   TAsync.Configure<IPackageIcon>(
-    function (const cancelToken : ICancellationToken) : IPackageIcon
+    function(const cancelToken : ICancellationToken) : IPackageIcon
     begin
-      result := repoManager.GetPackageIcon(cancelToken,source,id, version, IDECompilerVersion, platform, FConfiguration);
-    end,FCancelTokenSource.Token)
-   .OnException(
-      procedure(const e : Exception)
-      begin
-        if FClosing then
-          exit;
-        FLogger.Error(e.Message);
-      end)
-    .Await(
-      procedure(const theResult : IPackageIcon)
-      var
-        icon : IPackageIconImage;
-      begin
-        if FClosing then
-          exit;
+      result := repoManager.GetPackageIcon(cancelToken, source, id, version, IDECompilerVersion, platform, FConfiguration);
+    end, FCancelTokenSource.Token)
+  .OnException(
+    procedure(const e : Exception)
+    begin
+      if FClosing then
+        exit;
+      FLogger.Error(e.Message);
+    end)
+  .Await(
+    procedure(const theResult : IPackageIcon)
+    var
+      icon : IPackageIconImage;
+    begin
+      if FClosing then
+        exit;
 
-        //the result can be nil if there is no icon found
-        if theResult <> nil then
-          icon := TPackageIconImage.Create(theResult);
+      //the result can be nil if there is no icon found
+      if theResult <> nil then
+        icon := TPackageIconImage.Create(theResult);
 
-        //we will cache nil to stop future pointeless requests.
-        FIconCache.Cache(id, icon);
-        stopWatch.Stop;
-        if icon <> nil then
-          FLogger.Debug('DPMIDE : Got icon for [' + id + '.' + version + '] in ' + IntToStr(stopWatch.ElapsedMilliseconds) + 'ms' );
-        if icon <> nil then
-          //TODO : Instead request repaint of row.
-          FScrollList.Invalidate;
-      end);
+      //we will cache nil to stop future pointeless requests.
+      FIconCache.Cache(id, icon);
+      stopWatch.Stop;
+      if icon <> nil then
+        FLogger.Debug('DPMIDE : Got icon for [' + id + '.' + version + '] in ' + IntToStr(stopWatch.ElapsedMilliseconds) + 'ms');
+      if icon <> nil then
+        //TODO : Instead request repaint of row.
+        FScrollList.Invalidate;
+    end);
 
 end;
 
@@ -814,33 +815,33 @@ begin
   (BorlandIDEServices as IOTAModuleServices).SaveAll;
 end;
 
-procedure TDPMEditViewFrame.ScrollListChangeRow(const Sender: TObject; const newRowIndex: Int64; const direction: TScrollDirection; const delta: Int64);
+procedure TDPMEditViewFrame.ScrollListChangeRow(const Sender : TObject; const newRowIndex : Int64; const direction : TScrollDirection; const delta : Int64);
 var
   item : IPackageSearchResultItem;
   list : IList<IPackageSearchResultItem>;
 begin
-    list := CurrentList;
-    if list = nil then
-    begin
-      PackageDetailsFrame.SetPackage(nil);
-      exit;
-    end;
+  list := CurrentList;
+  if list = nil then
+  begin
+    PackageDetailsFrame.SetPackage(nil);
+    exit;
+  end;
 
-    item := nil;
-    if (newRowIndex >= 0) and (newRowIndex < list.Count) then
-      item := list[newRowIndex];
-    PackageDetailsFrame.SetPackage(item);
+  item := nil;
+  if (newRowIndex >= 0) and (newRowIndex < list.Count) then
+    item := list[newRowIndex];
+  PackageDetailsFrame.SetPackage(item);
 
 end;
 
-procedure TDPMEditViewFrame.ScrollListPaintNoRows(const Sender: TObject; const ACanvas: TCanvas; const paintRect: TRect);
+procedure TDPMEditViewFrame.ScrollListPaintNoRows(const Sender : TObject; const ACanvas : TCanvas; const paintRect : TRect);
 begin
   ACanvas.Font.Assign(Self.Font);
   ACanvas.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
-  ACanvas.TextOut(20,20, 'No Packages found');
+  ACanvas.TextOut(20, 20, 'No Packages found');
 end;
 
-procedure TDPMEditViewFrame.ScrollListPaintRow(const Sender: TObject; const ACanvas: TCanvas; const itemRect: TRect; const index: Int64; const state: TPaintRowState);
+procedure TDPMEditViewFrame.ScrollListPaintRow(const Sender : TObject; const ACanvas : TCanvas; const itemRect : TRect; const index : Int64; const state : TPaintRowState);
 var
   item : IPackageSearchResultItem;
   list : IList<IPackageSearchResultItem>;
@@ -849,7 +850,7 @@ var
   title : string;
   fontSize : integer;
   backgroundColor : TColor;
-//  foregroundColor : TColor;
+  //  foregroundColor : TColor;
   icon : IPackageIconImage;
   extent : TSize;
   oldTextAlign : UINT;
@@ -874,10 +875,10 @@ begin
     if (state in [rsFocusedSelected, rsFocusedHot, rsHot]) then
     begin
       {$IF CompilerVersion < 32.0}
-      backgroundColor :=  $00FFF0E9;// StyleServices.GetSystemColor(clHighlight);
+      backgroundColor := $00FFF0E9; // StyleServices.GetSystemColor(clHighlight);
       ACanvas.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
       {$ELSE}
-      backgroundColor :=  FIDEStyleServices.GetStyleColor(TStyleColor.scButtonHot);//  $00FFF0E9;// StyleServices.GetSystemColor(clHighlight);
+      backgroundColor := FIDEStyleServices.GetStyleColor(TStyleColor.scButtonHot); //  $00FFF0E9;// StyleServices.GetSystemColor(clHighlight);
       ACanvas.Font.Color := FIDEStyleServices.GetSystemColor(clHighlightText);
       {$IFEND}
     end
@@ -930,7 +931,7 @@ begin
       ACanvas.Font.Style := [fsBold];
 
       extent := ACanvas.TextExtent(title);
-      ExtTextOut(ACanvas.Handle, titleRect.Left, titleRect.Bottom - 6, ETO_CLIPPED, titleRect, title, Length(title),nil );
+      ExtTextOut(ACanvas.Handle, titleRect.Left, titleRect.Bottom - 6, ETO_CLIPPED, titleRect, title, Length(title), nil);
       titleRect.Left := titleRect.Left + extent.cx + 4;
 
       ACanvas.Font.Size := fontSize;
@@ -940,7 +941,7 @@ begin
       if item.IsReservedPrefix and ((FRowLayout.VersionRect.Left - titleRect.Right) > 16) then
       begin
         reservedRect.Left := titleRect.Right + 2;
-        reservedRect.Top  := titleRect.Top + 4;
+        reservedRect.Top := titleRect.Top + 4;
         reservedRect.Width := 16;
         reservedRect.Height := 16;
         DPMEditorViewImages.Draw(ACanvas, reservedRect.Left, reservedRect.Top, 4, TDrawingStyle.dsTransparent, TImageType.itImage);
@@ -954,7 +955,7 @@ begin
 
       extent := ACanvas.TextExtent(title);
 
-      ExtTextOut(ACanvas.Handle, titleRect.Left, titleRect.Bottom - 6, ETO_CLIPPED, titleRect, title, Length(title),nil );
+      ExtTextOut(ACanvas.Handle, titleRect.Left, titleRect.Bottom - 6, ETO_CLIPPED, titleRect, title, Length(title), nil);
       titleRect.Left := titleRect.Left + extent.cx;
 
       if item.Downloads > 0 then
@@ -962,34 +963,34 @@ begin
         title := TIntegerUtils.InToStringAbbr(item.Downloads);
         ACanvas.Font.Style := [fsBold];
         extent := ACanvas.TextExtent(title);
-        ExtTextOut(ACanvas.Handle, titleRect.Left, titleRect.Bottom - 6, ETO_CLIPPED, titleRect, title, Length(title),nil );
+        ExtTextOut(ACanvas.Handle, titleRect.Left, titleRect.Bottom - 6, ETO_CLIPPED, titleRect, title, Length(title), nil);
         titleRect.Left := titleRect.Left + extent.cx + 4;
 
         ACanvas.Font.Style := [];
         title := ' downloads';
         extent := ACanvas.TextExtent(title);
-        ExtTextOut(ACanvas.Handle, titleRect.Left, titleRect.Bottom - 6, ETO_CLIPPED, titleRect, title, Length(title),nil );
+        ExtTextOut(ACanvas.Handle, titleRect.Left, titleRect.Bottom - 6, ETO_CLIPPED, titleRect, title, Length(title), nil);
       end;
     finally
       //this is important
       SetTextAlign(ACanvas.Handle, oldTextAlign);
     end;
     //version
-    if item.Installed and (item.Version <> item.InstalledVersion)then
+    if item.Installed and (item.Version <> item.InstalledVersion) then
       title := 'v' + item.InstalledVersion
     else
       title := 'v' + item.Version;
-    ACanvas.TextRect(FRowLayout.VersionRect, title , [tfSingleLine, tfVerticalCenter, tfRight]);
+    ACanvas.TextRect(FRowLayout.VersionRect, title, [tfSingleLine, tfVerticalCenter, tfRight]);
 
     if item.Installed and (item.Version <> item.InstalledVersion) then
     begin
       title := 'v' + item.Version;
-      ACanvas.TextRect(FRowLayout.InstalledVersionRect, title , [tfSingleLine, tfVerticalCenter, tfRight]);
+      ACanvas.TextRect(FRowLayout.InstalledVersionRect, title, [tfSingleLine, tfVerticalCenter, tfRight]);
     end;
 
     //description
     title := item.Description;
-    ACanvas.TextRect(FRowLayout.DescriptionRect, title , [tfEndEllipsis,tfWordBreak]);
+    ACanvas.TextRect(FRowLayout.DescriptionRect, title, [tfEndEllipsis, tfWordBreak]);
 
 
     if (state in [rsFocusedSelected, rsSelected]) then
@@ -1005,7 +1006,7 @@ begin
   end;
 end;
 
-procedure TDPMEditViewFrame.searchDebounceTimerTimer(Sender: TObject);
+procedure TDPMEditViewFrame.searchDebounceTimerTimer(Sender : TObject);
 begin
   searchDebounceTimer.Enabled := false;
 
@@ -1018,23 +1019,23 @@ begin
   FCancelTokenSource.Reset;
 
   case FCurrentTab of
-    TCurrentTab.Installed:
-    begin
-      //todo : apply filter to installed
-      SwitchedToInstalled(true);
-    end;
-    TCurrentTab.Updates:
-    begin
-      SwitchedToUpdates(true);
-    end;
-    TCurrentTab.Search:
-    begin
-      SwitchedToSearch(true);
-    end;
-    TCurrentTab.Conflicts:
-    begin
+    TCurrentTab.Installed :
+      begin
+        //todo : apply filter to installed
+        SwitchedToInstalled(true);
+      end;
+    TCurrentTab.Updates :
+      begin
+        SwitchedToUpdates(true);
+      end;
+    TCurrentTab.Search :
+      begin
+        SwitchedToSearch(true);
+      end;
+    TCurrentTab.Conflicts :
+      begin
 
-    end;
+      end;
   end;
 
 
@@ -1046,19 +1047,19 @@ begin
   result := FSearchOptions.Clone;
 end;
 
-function TDPMEditViewFrame.SearchForPackages(const options: TSearchOptions): IAwaitable<IList<IPackageSearchResultItem>>;
+function TDPMEditViewFrame.SearchForPackages(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;
 var
   repoManager : IPackageRepositoryManager;
 begin
   //local for capture
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
 
-  result := TAsync.Configure<IList<IPackageSearchResultItem>>(
-    function (const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
+  result := TAsync.Configure < IList<IPackageSearchResultItem> > (
+    function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
     begin
-      result :=repoManager.GetPackageFeed(cancelToken, options, FConfiguration);
+      result := repoManager.GetPackageFeed(cancelToken, options, FConfiguration);
       //simulating long running.
-    end,FCancelTokenSource.Token);
+    end, FCancelTokenSource.Token);
 
 end;
 
@@ -1103,23 +1104,23 @@ begin
         FGotConflicts := true;
         LoadList(FConflictPackages);
       end);
-    end;
+  end;
 
 
 end;
 
 procedure TDPMEditViewFrame.FilterAndLoadInstalledPackages(const searchTxt : string);
 begin
-   FInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>(FAllInstalledPackages.Where(
-              function(const pkg : IPackageSearchResultItem) : boolean
-              begin
-                  result := not pkg.IsTransitive;
-                  if result and (searchTxt <> '') then
-                  begin
-                    result := TStringUtils.Contains(pkg.Id, searchTxt,  true);
-                  end;
-              end));
-   LoadList(FInstalledPackages);
+  FInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>(FAllInstalledPackages.Where(
+    function(const pkg : IPackageSearchResultItem) : boolean
+    begin
+      result := not pkg.IsTransitive;
+      if result and (searchTxt <> '') then
+      begin
+        result := TStringUtils.Contains(pkg.Id, searchTxt, true);
+      end;
+    end));
+  LoadList(FInstalledPackages);
 end;
 
 type
@@ -1131,7 +1132,7 @@ var
 
   filterProc : TFilterProc;
 
- //filter the list to only show directly installed packages, and on the search term
+  //filter the list to only show directly installed packages, and on the search term
 
 begin
   FLogger.Debug('DPMIDE : SwitchToInstalled');
@@ -1178,7 +1179,7 @@ begin
 
         filterProc(searchTxt);
       end);
-    end;
+  end;
 
 end;
 
@@ -1198,7 +1199,7 @@ begin
     FSearchOptions.SearchTerms := Trim(txtSearch.Text);
     FSearchOptions.Prerelease := chkIncludePrerelease.Checked;
     FSearchOptions.Commercial := chkIncludeCommercial.Checked;
-    FSearchOptions.Trial      := chkIncludeTrial.Checked;
+    FSearchOptions.Trial := chkIncludeTrial.Checked;
     SearchForPackages(FSearchOptions)
     .OnException(
       procedure(const e : Exception)
@@ -1235,13 +1236,13 @@ begin
           packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
           item.Installed := packageRef <> nil;
           if item.Installed then
-             item.InstalledVersion := packageRef.Version.ToStringNoMeta;
+            item.InstalledVersion := packageRef.Version.ToStringNoMeta;
         end;
-       
+
         FScrollList.RowCount := FSearchResultPackages.Count;
         LoadList(FSearchResultPackages);
       end);
-   end;
+  end;
 end;
 
 procedure TDPMEditViewFrame.SwitchedToUpdates(const refresh : boolean);
@@ -1287,7 +1288,7 @@ begin
         FUpdates := theResult;
         LoadList(FUpdates);
       end);
-    end;
+  end;
 
 end;
 
@@ -1333,7 +1334,7 @@ begin
   ReloadSourcesCombo;
 end;
 
-procedure TDPMEditViewFrame.tabMainChange(Sender: TObject);
+procedure TDPMEditViewFrame.tabMainChange(Sender : TObject);
 begin
   if FRequestInFlight then
     FCancelTokenSource.Cancel;
@@ -1348,9 +1349,9 @@ begin
   PackageDetailsFrame.SetPackage(nil);
   PackageDetailsFrame.Configure(FCurrentTab, chkIncludePrerelease.Checked);
   case FCurrentTab of
-    TCurrentTab.Search: SwitchedToSearch(txtSearch.Text <> '');
-    TCurrentTab.Installed: SwitchedToInstalled(txtSearch.Text <> '');
-    TCurrentTab.Updates: SwitchedToUpdates(txtSearch.Text <> '');
+    TCurrentTab.Search : SwitchedToSearch(txtSearch.Text <> '');
+    TCurrentTab.Installed : SwitchedToInstalled(txtSearch.Text <> '');
+    TCurrentTab.Updates : SwitchedToUpdates(txtSearch.Text <> '');
     TCurrentTab.Conflicts : SwitchedToConflicts(txtSearch.Text <> '');
   end;
 end;
@@ -1359,10 +1360,10 @@ procedure TDPMEditViewFrame.ThemeChanged;
 {$IF CompilerVersion >=32.0}
 var
   ideThemeSvc : IOTAIDEThemingServices;
-{$IFEND}
+  {$IFEND}
 begin
   {$IF CompilerVersion >=32.0}
-  ideThemeSvc := (BorlandIDEServices As IOTAIDEThemingServices);
+  ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
   ideThemeSvc.ApplyTheme(Self);
   FIDEStyleServices := ideThemeSvc.StyleServices;
   ideThemeSvc.ApplyTheme(pnlButtonBar);
@@ -1387,50 +1388,50 @@ begin
   FScrollList.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
   PackageDetailsFrame.Color := FIDEStyleServices.GetSystemColor(clWindow);
   PackageDetailsFrame.ThemeChanged;
-//  Self.Invalidate;
+  //  Self.Invalidate;
 
 end;
 
-procedure TDPMEditViewFrame.txtSearchChange(Sender: TObject);
+procedure TDPMEditViewFrame.txtSearchChange(Sender : TObject);
 begin
   txtSearch.RightButton.Visible := txtSearch.Text <> '';
 end;
 
-procedure TDPMEditViewFrame.txtSearchChanged(Sender: TObject);
+procedure TDPMEditViewFrame.txtSearchChanged(Sender : TObject);
 begin
 end;
 
-procedure TDPMEditViewFrame.txtSearchKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+procedure TDPMEditViewFrame.txtSearchKeyDown(Sender : TObject; var Key : Word; Shift : TShiftState);
 var
   i : integer;
 begin
   searchDebounceTimer.Enabled := false;
   case key of
     VK_RETURN :
-    begin
-      i := txtSearch.ACStrings.IndexOf(txtSearch.Text);
-      if i = -1 then
-        txtSearch.ACStrings.Insert(0, txtSearch.Text)
-      else
-        txtSearch.ACStrings.Move(i, 0);
-      try
-        txtSearch.ACStrings.SaveToFile(FSearchHistFile);
-      except
-        //ignore the error, not much we can do?
-        //perhaps log it?
+      begin
+        i := txtSearch.ACStrings.IndexOf(txtSearch.Text);
+        if i = -1 then
+          txtSearch.ACStrings.Insert(0, txtSearch.Text)
+        else
+          txtSearch.ACStrings.Move(i, 0);
+        try
+          txtSearch.ACStrings.SaveToFile(FSearchHistFile);
+        except
+          //ignore the error, not much we can do?
+          //perhaps log it?
+        end;
       end;
-    end;
     VK_ESCAPE :
-    begin
-      txtSearch.Text := '';
-      searchDebounceTimerTimer(searchDebounceTimer);
-    end
+      begin
+        txtSearch.Text := '';
+        searchDebounceTimerTimer(searchDebounceTimer);
+      end
   else
     searchDebounceTimer.Enabled := true;
   end;
 end;
 
-procedure TDPMEditViewFrame.txtSearchRightButtonClick(Sender: TObject);
+procedure TDPMEditViewFrame.txtSearchRightButtonClick(Sender : TObject);
 begin
   txtSearch.Text := '';
   FSearchResultPackages := nil;
@@ -1441,7 +1442,7 @@ end;
 
 procedure TDPMEditViewFrame.ViewDeselected;
 begin
-// The view tab was deselected.
+  // The view tab was deselected.
   FLogger.Debug('DPMIDE : View Deselected');
   platformChangeDetectTimer.Enabled := false;
 end;
@@ -1462,7 +1463,7 @@ end;
 
 { TRowLayout }
 
-procedure TRowLayout.Update(const ACanvas : TCanvas; const rowRect: TRect; const showSelect: Boolean);
+procedure TRowLayout.Update(const ACanvas : TCanvas; const rowRect : TRect; const showSelect : Boolean);
 var
   bUpdateLayout : boolean;
 begin
@@ -1478,14 +1479,14 @@ begin
     VersionRect.Right := rowRect.Right - 50;
     VersionRect.Height := Abs(ACanvas.Font.Height) + 10;
     //TODO : Figure out a better way to ensure this will be correct
-    VersionRect.Left  := rowRect.Right - ACanvas.TextExtent('1.100.100-aplha123aaaaa').Width - 10;
+    VersionRect.Left := rowRect.Right - ACanvas.TextExtent('1.100.100-aplha123aaaaa').Width - 10;
 
     InstalledVersionRect.Top := VersionRect.Bottom + 10;
     InstalledVersionRect.Right := rowRect.Right - 50;
     InstalledVersionRect.Height := Abs(ACanvas.Font.Height) + 10;
 
     //TODO : Figure out a better way to ensure this will be correct
-    InstalledVersionRect.Left  := VersionRect.Left;
+    InstalledVersionRect.Left := VersionRect.Left;
 
     TitleRect.Top := IconRect.Top;
     TitleRect.Height := Abs(ACanvas.Font.Height) * 2;
@@ -1522,3 +1523,4 @@ begin
 end;
 
 end.
+

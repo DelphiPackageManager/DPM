@@ -19,69 +19,69 @@ type
   end;
 
   IGraphData = interface
-  ['{F0DDFBA3-8EA2-491E-B63D-C6023955E3F6}']
+    ['{F0DDFBA3-8EA2-491E-B63D-C6023955E3F6}']
   end;
 
   ICustomProjectGroupProject = interface
     ['{F567E16A-DA4E-459F-9718-9A51559FFA0B}']
   end;
 
-//Since we don't have dcu's or dcp for the container classes, we are doing a direct
-//cast to our container class below, and using RTTI to access the private fields.
-//hacky but works!
+  //Since we don't have dcu's or dcp for the container classes, we are doing a direct
+  //cast to our container class below, and using RTTI to access the private fields.
+  //hacky but works!
 
-{
-  The class heirachy looks like this
+  {
+    The class heirachy looks like this
 
- TInterfacedObject
-  TBaseContainer
-    TStdContainer
-      TStdFileContainer
-        TStdProjectContainer
-          TStdDelphiProjectContainer
-    TStdContainerCategory
+   TInterfacedObject
+    TBaseContainer
+      TStdContainer
+        TStdFileContainer
+          TStdProjectContainer
+            TStdDelphiProjectContainer
+      TStdContainerCategory
 
-    The idea here is to match the public interface of container classes which we got via RTTI.
-    This is actually TStdProjectContainer but we can use it for other container types
-    provided we don't use props that don't exist.
+      The idea here is to match the public interface of container classes which we got via RTTI.
+      This is actually TStdProjectContainer but we can use it for other container types
+      provided we don't use props that don't exist.
 
-    Seems to work fine in XE7 at least!
-}
+      Seems to work fine in XE7 at least!
+  }
 
   TProjectTreeContainer = class(TInterfacedObject)
   private
     class var
-     FRttiContext : TRttiContext;
-     FCategoryRttiType: TRttiInstanceType;
-     FContainerConstructor : TRttiMethod;
+      FRttiContext : TRttiContext;
+      FCategoryRttiType : TRttiInstanceType;
+      FContainerConstructor : TRttiMethod;
   private
-    function GetImageIndex: Integer;
-    procedure SetImageIndex(const Value: Integer);
-    function GetDisplayName: string;
+    function GetImageIndex : Integer;
+    procedure SetImageIndex(const Value : Integer);
+    function GetDisplayName : string;
 
-   class constructor Create;
-    function GetChildren: IInterfaceList;
-    function GetModelContainer: IModelContainer;
-    function GetGraphLocation: IGraphLocation;
-    function GetGraphData: IGraphData;
-    function GetParent: IGraphLocation;
-    function GetProject: ICustomProjectGroupProject;
-    procedure SetChildren(const Value: IInterfaceList);
-    function GetFileName: string;
-    procedure SetFileName(const Value: string);
+    class constructor Create;
+    function GetChildren : IInterfaceList;
+    function GetModelContainer : IModelContainer;
+    function GetGraphLocation : IGraphLocation;
+    function GetGraphData : IGraphData;
+    function GetParent : IGraphLocation;
+    function GetProject : ICustomProjectGroupProject;
+    procedure SetChildren(const Value : IInterfaceList);
+    function GetFileName : string;
+    procedure SetFileName(const Value : string);
 
   public
     class function CreateNewContainer(const parentContainer : TProjectTreeContainer; const displayName : string; const identifier : string; const childId : string = '') : TProjectTreeContainer;
 
     property FileName : string read GetFileName write SetFileName;
-    property ModelContainer: IModelContainer read GetModelContainer;
-    property Parent: IGraphLocation read GetParent;
-    property Project: ICustomProjectGroupProject read GetProject;
-    property ImageIndex: Integer read GetImageIndex write SetImageIndex;
-    property DisplayName: string read GetDisplayName;
-    property Children: IInterfaceList read GetChildren write SetChildren;
-    property GraphLocation: IGraphLocation read GetGraphLocation;
-    property GraphData: IGraphData read GetGraphData;
+    property ModelContainer : IModelContainer read GetModelContainer;
+    property Parent : IGraphLocation read GetParent;
+    property Project : ICustomProjectGroupProject read GetProject;
+    property ImageIndex : Integer read GetImageIndex write SetImageIndex;
+    property DisplayName : string read GetDisplayName;
+    property Children : IInterfaceList read GetChildren write SetChildren;
+    property GraphLocation : IGraphLocation read GetGraphLocation;
+    property GraphData : IGraphData read GetGraphData;
   end;
 
 
@@ -118,9 +118,9 @@ begin
   end;
 end;
 
-class function TProjectTreeContainer.CreateNewContainer(const parentContainer: TProjectTreeContainer; const displayName, identifier, childId: string): TProjectTreeContainer;
+class function TProjectTreeContainer.CreateNewContainer(const parentContainer : TProjectTreeContainer; const displayName, identifier, childId : string) : TProjectTreeContainer;
 var
-  params: TArray<TRttiParameter>;
+  params : TArray<TRttiParameter>;
   locationParam, projectParam, modelParam : TValue;
   model : IInterface; //note this can't be more specific
   project : IInterface;
@@ -152,71 +152,72 @@ begin
   TValue.Make(@graphLocation, params[2].ParamType.Handle, locationParam);
 
 
-  Result := TProjectTreeContainer(FContainerConstructor.Invoke(FCategoryRttiType.MetaclassType, [modelParam, projectParam, locationParam , displayName, identifier, childId]).AsObject);
+  Result := TProjectTreeContainer(FContainerConstructor.Invoke(FCategoryRttiType.MetaclassType, [modelParam, projectParam, locationParam, displayName, identifier, childId]).AsObject);
 
 
 end;
 
-function TProjectTreeContainer.GetChildren: IInterfaceList;
+function TProjectTreeContainer.GetChildren : IInterfaceList;
 begin
   Result := IInterfaceList(FRttiContext.GetType(ClassType).GetField('FChildren').GetValue(Self).AsInterface);
 end;
 
-function TProjectTreeContainer.GetDisplayName: string;
+function TProjectTreeContainer.GetDisplayName : string;
 begin
   Result := FRttiContext.GetType(ClassType).GetField('FDisplayName').GetValue(Self).AsString;
 end;
 
-function TProjectTreeContainer.GetFileName: string;
+function TProjectTreeContainer.GetFileName : string;
 begin
   Result := FRttiContext.GetType(ClassType).GetField('FFileName').GetValue(Self).AsString;
 end;
 
-function TProjectTreeContainer.GetImageIndex: Integer;
+function TProjectTreeContainer.GetImageIndex : Integer;
 begin
   Result := FRttiContext.GetType(ClassType).GetField('FImageIndex').GetValue(Self).AsInteger;
 end;
 
-function TProjectTreeContainer.GetModelContainer: IModelContainer;
+function TProjectTreeContainer.GetModelContainer : IModelContainer;
 begin
-//  Result := FRttiContext.GetType(ClassType).GetField('FModelContainer').GetValue(Self).AsType<IModelContainer>;  //gets typecast error
+  //  Result := FRttiContext.GetType(ClassType).GetField('FModelContainer').GetValue(Self).AsType<IModelContainer>;  //gets typecast error
   Result := IModelContainer(FRttiContext.GetType(ClassType).GetField('FModelContainer').GetValue(Self).AsInterface);
 end;
 
-function TProjectTreeContainer.GetGraphLocation: IGraphLocation;
+function TProjectTreeContainer.GetGraphLocation : IGraphLocation;
 begin
   result := TInterfacedObject(Self) as IGraphLocation;
 end;
 
-function TProjectTreeContainer.GetGraphData: IGraphData;
+function TProjectTreeContainer.GetGraphData : IGraphData;
 begin
   result := TInterfacedObject(Self) as IGraphData;
 end;
 
-function TProjectTreeContainer.GetParent: IGraphLocation;
+function TProjectTreeContainer.GetParent : IGraphLocation;
 begin
   Result := IGraphLocation(FRttiContext.GetType(ClassType).GetField('FGraphParent').GetValue(Self).AsInterface);
 end;
 
-function TProjectTreeContainer.GetProject: ICustomProjectGroupProject;
+function TProjectTreeContainer.GetProject : ICustomProjectGroupProject;
 begin
   Result := ICustomProjectGroupProject(FRttiContext.GetType(ClassType).GetField('FProject').GetValue(Self).AsInterface);
 end;
 
-procedure TProjectTreeContainer.SetChildren(const Value: IInterfaceList);
+procedure TProjectTreeContainer.SetChildren(const Value : IInterfaceList);
 begin
   FRttiContext.GetType(ClassType).GetField('FChildren').SetValue(Self, TValue.From(Value));
 end;
 
-procedure TProjectTreeContainer.SetFileName(const Value: string);
+procedure TProjectTreeContainer.SetFileName(const Value : string);
 begin
   FRttiContext.GetType(ClassType).GetField('FFileName').SetValue(Self, TValue.From(Value));
 end;
 
-procedure TProjectTreeContainer.SetImageIndex(const Value: Integer);
+procedure TProjectTreeContainer.SetImageIndex(const Value : Integer);
 begin
   FRttiContext.GetType(ClassType).GetField('FImageIndex').SetValue(Self, Value);
 end;
 
 
 end.
+

@@ -61,31 +61,31 @@ type
     function ApplyRuntime(const targetPlatform : ISpecTargetPlatform; const runtimeFiles : IList<ISpecBPLEntry>) : boolean;
     function ApplyBuild(const targetPlatform : ISpecTargetPlatform; const buildEntries : IList<ISpecBuildEntry>) : boolean;
 
-    function ApplyTemplates: Boolean;
+    function ApplyTemplates : Boolean;
     function ExpandTargetPlatforms : boolean;
     function ReplaceTokens(const version : TPackageVersion; const properties : TStringList) : boolean;
 
     procedure GetTokensForTargetPlatform(const target : TCompilerVersion; const platform : TDPMPlatform; const version : TPackageVersion; const list : TStringList);
 
-    function TokenMatchEvaluator(const match: TMatch): string;
+    function TokenMatchEvaluator(const match : TMatch) : string;
     function PreProcess(const version : TPackageVersion; const properties : TStringList) : boolean;
-    function GenerateManifestJson(const version: TSemanticVersion; const targetPlatform: ISpecTargetPlatform): string;
+    function GenerateManifestJson(const version : TSemanticVersion; const targetPlatform : ISpecTargetPlatform) : string;
 
     function GetFileName : string;
     function GetIsValid : boolean;
-    function GetMetaData: ISpecMetaData;
-    function GetTargetPlatforms: IList<ISpecTargetPlatform>;
-    function GetTemplates: IList<ISpecTemplate>;
+    function GetMetaData : ISpecMetaData;
+    function GetTargetPlatforms : IList<ISpecTargetPlatform>;
+    function GetTemplates : IList<ISpecTemplate>;
     function LoadTemplateFromJson(const templateObj : TJsonObject; const templateNo : integer) : boolean;
 
     function LoadTemplatesFromJson(const templatesArray : TJsonArray) : boolean;
 
     function LoadTargetPlatformsFromJson(const targetPlatformsArray : TJsonArray) : boolean;
-    function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
+    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
 
     function FindTemplate(const name : string) : ISpecTemplate;
   public
-    constructor Create(const logger : ILogger; const fileName : string);reintroduce;
+    constructor Create(const logger : ILogger; const fileName : string); reintroduce;
   end;
 
 
@@ -102,7 +102,7 @@ uses
 
 
 
-function TSpec.ApplyBuild(const targetPlatform: ISpecTargetPlatform; const buildEntries: IList<ISpecBuildEntry>): boolean;
+function TSpec.ApplyBuild(const targetPlatform : ISpecTargetPlatform; const buildEntries : IList<ISpecBuildEntry>) : boolean;
 var
   existing : ISpecBuildEntry;
   newBuildEntry : ISpecBuildEntry;
@@ -124,7 +124,7 @@ begin
   end;
 end;
 
-function TSpec.ApplyDependencies(const targetPlatform: ISpecTargetPlatform; const dependencies: IList<ISpecDependency>): boolean;
+function TSpec.ApplyDependencies(const targetPlatform : ISpecTargetPlatform; const dependencies : IList<ISpecDependency>) : boolean;
 var
   newDependency : ISpecDependency;
   existingDependency : ISpecDependency;
@@ -141,13 +141,13 @@ begin
     var
       group : ISpecDependencyGroup;
     begin
-        result := dependency.IsGroup;
-        if result then
-        begin
-          group := dependency as ISpecDependencyGroup;
-          result := (group.TargetPlatform.Compiler = targetPlatform.Compiler)
-                    and (group.TargetPlatform.Platform = targetPlatform.Platforms[0]);
-        end;
+      result := dependency.IsGroup;
+      if result then
+      begin
+        group := dependency as ISpecDependencyGroup;
+        result := (group.TargetPlatform.Compiler = targetPlatform.Compiler)
+        and (group.TargetPlatform.Platform = targetPlatform.Platforms[0]);
+      end;
 
     end).FirstOrDefault as ISpecDependencyGroup;
 
@@ -183,7 +183,7 @@ begin
 
 end;
 
-function TSpec.ApplyDesign(const targetPlatform: ISpecTargetPlatform; const designFiles: IList<ISpecBPLEntry>): boolean;
+function TSpec.ApplyDesign(const targetPlatform : ISpecTargetPlatform; const designFiles : IList<ISpecBPLEntry>) : boolean;
 var
   existing : ISpecBPLEntry;
   newBPL : ISpecBPLEntry;
@@ -205,7 +205,7 @@ begin
   end;
 end;
 
-function TSpec.ApplyLibrary(const targetPlatform: ISpecTargetPlatform; const libs: IList<ISpecFileEntry>): boolean;
+function TSpec.ApplyLibrary(const targetPlatform : ISpecTargetPlatform; const libs : IList<ISpecFileEntry>) : boolean;
 var
   existing : ISpecFileEntry;
   newEntry : ISpecFileEntry;
@@ -228,7 +228,7 @@ begin
 
 end;
 
-function TSpec.ApplyOtherFiles(const targetPlatform: ISpecTargetPlatform; const files: IList<ISpecFileEntry>): boolean;
+function TSpec.ApplyOtherFiles(const targetPlatform : ISpecTargetPlatform; const files : IList<ISpecFileEntry>) : boolean;
 var
   existing : ISpecFileEntry;
   newEntry : ISpecFileEntry;
@@ -251,7 +251,7 @@ begin
 
 end;
 
-function TSpec.ApplyRuntime(const targetPlatform: ISpecTargetPlatform; const runtimeFiles: IList<ISpecBPLEntry>): boolean;
+function TSpec.ApplyRuntime(const targetPlatform : ISpecTargetPlatform; const runtimeFiles : IList<ISpecBPLEntry>) : boolean;
 var
   existing : ISpecBPLEntry;
   newBPL : ISpecBPLEntry;
@@ -274,9 +274,9 @@ begin
 
 end;
 
-function TSpec.ApplySearchPaths(const targetPlatform: ISpecTargetPlatform; const searchPaths: IList<ISpecSearchPath>): boolean;
+function TSpec.ApplySearchPaths(const targetPlatform : ISpecTargetPlatform; const searchPaths : IList<ISpecSearchPath>) : boolean;
 var
-  newSearchPath: ISpecSearchPath;
+  newSearchPath : ISpecSearchPath;
   existingSearchPath : ISpecSearchPath;
   searchPathGroup : ISpecSearchPathGroup;
 begin
@@ -291,13 +291,13 @@ begin
     var
       group : ISpecSearchPathGroup;
     begin
-        result := searchPath.IsGroup;
-        if result then
-        begin
-          group := searchPath as ISpecSearchPathGroup;
-          result := (group.TargetPlatform.Compiler= targetPlatform.Compiler)
-                    and (group.TargetPlatform.Platform = targetPlatform.Platforms[0]);
-        end;
+      result := searchPath.IsGroup;
+      if result then
+      begin
+        group := searchPath as ISpecSearchPathGroup;
+        result := (group.TargetPlatform.Compiler = targetPlatform.Compiler)
+        and (group.TargetPlatform.Platform = targetPlatform.Platforms[0]);
+      end;
 
     end).FirstOrDefault as ISpecSearchPathGroup;
 
@@ -307,8 +307,8 @@ begin
     targetPlatform.SearchPaths.Clear;
     for newSearchPath in searchPathGroup.SearchPaths do
     begin
-        existingSearchPath := newSearchPath.Clone;
-        targetPlatform.SearchPaths.Add(existingSearchPath);
+      existingSearchPath := newSearchPath.Clone;
+      targetPlatform.SearchPaths.Add(existingSearchPath);
     end;
     exit;
   end;
@@ -329,7 +329,7 @@ begin
   end;
 end;
 
-function TSpec.ApplySource(const targetPlatform: ISpecTargetPlatform; const sourceFiles: IList<ISpecFileEntry>): boolean;
+function TSpec.ApplySource(const targetPlatform : ISpecTargetPlatform; const sourceFiles : IList<ISpecFileEntry>) : boolean;
 var
   existing : ISpecFileEntry;
   newEntry : ISpecFileEntry;
@@ -351,7 +351,7 @@ begin
   end;
 end;
 
-function TSpec.ApplyTemplates: Boolean;
+function TSpec.ApplyTemplates : Boolean;
 var
   template : ISpecTemplate;
   targetPlatform : ISpecTargetPlatform;
@@ -360,13 +360,13 @@ begin
   Logger.Information('Applying templates..');
   //if any targetPlatforms reference a template
   if not FTargetPlatforms.Where(function(const item : ISpecTargetPlatform) : boolean
-                                begin
-                                  result := item.TemplateName <> '';
-                                end).Any then
+    begin
+      result := item.TemplateName <> '';
+    end).Any then
     exit;
 
   //if we don't have templates then the spec is not valid.
-  if not FTemplates.Any  then
+  if not FTemplates.Any then
   begin
     Logger.Error('No templates were found but targetPlatforms reference a template.');
     exit(false);
@@ -405,7 +405,7 @@ begin
   FFileName := fileName;
   FMetaData := TSpecMetaData.Create(logger);
   FTargetPlatforms := TCollections.CreateList<ISpecTargetPlatform>;
-  FTemplates :=TCollections.CreateList<ISpecTemplate>;
+  FTemplates := TCollections.CreateList<ISpecTemplate>;
 end;
 
 function TSpec.ExpandTargetPlatforms : boolean;
@@ -421,10 +421,10 @@ begin
   Logger.Information('Expanding targetPlatforms');
 
   toProcessTargetPlatforms := FTargetPlatforms.Where(
-                                function(const tp : ISpecTargetPlatform) : boolean
-                                begin
-                                  result := Length(tp.Platforms) > 1;
-                                end).ToArray;
+    function(const tp : ISpecTargetPlatform) : boolean
+    begin
+      result := Length(tp.Platforms) > 1;
+    end).ToArray;
 
   if length(toProcessTargetPlatforms) = 0 then
     exit;
@@ -440,7 +440,7 @@ begin
         newTargetPlatform := targetPlatform.CloneForPlatform(platform);
         newTargetPlatforms.Add(newTargetPlatform);
         Logger.Debug('Expanded ' + CompilerToString(newTargetPlatform.Compiler) + '.' + DPMPlatformToString(newTargetPlatform.Platforms[0]));
-       end;
+      end;
       toRemoveTargetPlatforms.Add(targetPlatform);
     end;
     FTargetPlatforms.RemoveRange(toRemoveTargetPlatforms);
@@ -456,7 +456,7 @@ begin
   //TODO : Sort targetPlatforms by compiler then platform
 end;
 
-procedure TSpec.GetTokensForTargetPlatform(const target : TCompilerVersion; const platform: TDPMPlatform; const version : TPackageVersion; const list: TStringList);
+procedure TSpec.GetTokensForTargetPlatform(const target : TCompilerVersion; const platform : TDPMPlatform; const version : TPackageVersion; const list : TStringList);
 begin
   list.Clear;
   if not version.IsEmpty then
@@ -465,7 +465,7 @@ begin
     list.Add('version=' + FMetaData.Version.ToString);
   list.Add('target=' + CompilerToString(target));
   list.Add('compiler=' + CompilerToString(target));
-  list.Add('compilerNoPoint='  + CompilerToStringNoPoint(target));
+  list.Add('compilerNoPoint=' + CompilerToStringNoPoint(target));
   list.Add('compilerCodeName=' + CompilerCodeName(target));
   list.Add('compilerWithCodeName=' + CompilerWithCodeName(target));
   list.Add('platform=' + DPMPlatformToString(platform));
@@ -474,7 +474,7 @@ begin
   list.Add('bdsVersion=' + CompilerToBDSVersion(target));
 end;
 
-function TSpec.FindTemplate(const name: string): ISpecTemplate;
+function TSpec.FindTemplate(const name : string) : ISpecTemplate;
 begin
   result := FTemplates.Where(
     function(const item : ISpecTemplate) : boolean
@@ -483,23 +483,23 @@ begin
     end).FirstOrDefault;
 end;
 
-function TSpec.GetTargetPlatforms: IList<ISpecTargetPlatform>;
+function TSpec.GetTargetPlatforms : IList<ISpecTargetPlatform>;
 begin
   result := FTargetPlatforms;
 end;
 
-function TSpec.GetTemplates: IList<ISpecTemplate>;
+function TSpec.GetTemplates : IList<ISpecTemplate>;
 begin
   result := FTemplates;
 end;
 
-function TSpec.GenerateManifestJson(const version: TSemanticVersion; const targetPlatform: ISpecTargetPlatform): string;
+function TSpec.GenerateManifestJson(const version : TSemanticVersion; const targetPlatform : ISpecTargetPlatform) : string;
 var
   Obj : TJsonObject;
   dependency : ISpecDependency;
   searchPath : ISpecSearchPath;
   buildEntry : ISpecBuildEntry;
-  bplEntry   : ISpecBPLEntry;
+  bplEntry : ISpecBPLEntry;
   metaDataObj : TJsonObject;
   targetPlatformObject : TJDOJsonObject;
   dependencyObj : TJsonObject;
@@ -537,7 +537,7 @@ begin
     if FMetaData.Tags <> '' then
       metaDataObj['tags'] := FMetaData.tags;
 
-    metaDataObj['isTrial']  :=  LowerCase(BoolToStr(FMetaData.IsTrial, true));
+    metaDataObj['isTrial'] := LowerCase(BoolToStr(FMetaData.IsTrial, true));
     metaDataObj['isCommercial'] := LowerCase(BoolToStr(FMetaData.IsCommercial, true));
 
     targetPlatformObject := Obj.A['targetPlatforms'].AddObject;
@@ -561,14 +561,14 @@ begin
         seachPathObj := targetPlatformObject.A['searchPaths'].AddObject;
         seachPathObj['path'] := searchPath.Path;
         seachPathObj['sourceOnly'] := LowerCase(BoolToStr(searchPath.SourceOnly, true));
-        seachPathObj['binariesOnly'] := LowerCase(BoolToStr(searchPath.BinariesOnly,true));
+        seachPathObj['binariesOnly'] := LowerCase(BoolToStr(searchPath.BinariesOnly, true));
       end;
     end;
 
 
     if targetPlatform.RuntimeFiles.Any then
     begin
-      for bplEntry in targetPlatform.RuntimeFiles  do
+      for bplEntry in targetPlatform.RuntimeFiles do
       begin
         runtimeEntryObj := targetPlatformObject.A['runtime'].AddObject;
         if bplEntry.BuildId <> '' then
@@ -581,7 +581,7 @@ begin
 
     if targetPlatform.DesignFiles.Any then
     begin
-      for bplEntry in targetPlatform.DesignFiles  do
+      for bplEntry in targetPlatform.DesignFiles do
       begin
         designEntryObj := targetPlatformObject.A['design'].AddObject;
         if bplEntry.BuildId <> '' then
@@ -617,21 +617,22 @@ begin
 end;
 
 
-function TSpec.GetFileName: string;
+function TSpec.GetFileName : string;
 begin
   result := FFileName;
 end;
 
-function TSpec.GetIsValid: boolean;
+function TSpec.GetIsValid : boolean;
 begin
   result := FIsValid;
 end;
 
-function TSpec.GetMetaData: ISpecMetaData;
+function TSpec.GetMetaData : ISpecMetaData;
 begin
   result := FMetaData;
 end;
-function TSpec.LoadFromJson(const jsonObject: TJsonObject): Boolean;
+
+function TSpec.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var
   metaDataObj : TJsonObject;
   templatesArray : TJsonArray;
@@ -674,7 +675,7 @@ end;
 
 
 
-function TSpec.LoadTargetPlatformsFromJson(const targetPlatformsArray: TJsonArray): boolean;
+function TSpec.LoadTargetPlatformsFromJson(const targetPlatformsArray : TJsonArray) : boolean;
 var
   i : integer;
   targetPlatform : ISpecTargetPlatform;
@@ -696,7 +697,7 @@ begin
 end;
 
 
-function TSpec.LoadTemplateFromJson(const templateObj: TJsonObject; const templateNo: integer): boolean;
+function TSpec.LoadTemplateFromJson(const templateObj : TJsonObject; const templateNo : integer) : boolean;
 var
   template : ISpecTemplate;
 begin
@@ -712,19 +713,19 @@ begin
 end;
 
 
-function TSpec.LoadTemplatesFromJson(const templatesArray: TJsonArray): boolean;
+function TSpec.LoadTemplatesFromJson(const templatesArray : TJsonArray) : boolean;
 var
   i : integer;
 begin
   result := true;
   if templatesArray.Count > 0 then
   begin
-    for i := 0 to templatesArray.Count -1 do
+    for i := 0 to templatesArray.Count - 1 do
       result := LoadTemplateFromJson(templatesArray.O[i], i + 1) and result;
   end;
 end;
 
-function TSpec.PreProcess(const version : TPackageVersion; const properties : TStringList): boolean;
+function TSpec.PreProcess(const version : TPackageVersion; const properties : TStringList) : boolean;
 begin
   result := false;
   Logger.Information('Preprocessing spec file..');
@@ -740,12 +741,12 @@ begin
   result := true;
 end;
 
-function TSpec.ReplaceTokens(const version : TPackageVersion; const properties : TStringList): boolean;
+function TSpec.ReplaceTokens(const version : TPackageVersion; const properties : TStringList) : boolean;
 var
   tokenList : TStringList;
   targetPlatform : ISpecTargetPlatform;
   fileEntry : ISpecFileEntry;
-  bplEntry  : ISpecBPLEntry;
+  bplEntry : ISpecBPLEntry;
   buildEntry : ISpecBuildEntry;
   dependency : ISpecDependency;
   regEx : TRegEx;
@@ -826,7 +827,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error replacing tokens : ' +e.Message);
+      Logger.Error('Error replacing tokens : ' + e.Message);
       result := false;
     end;
 
@@ -834,11 +835,11 @@ begin
 
 end;
 
-function TSpec.TokenMatchEvaluator(const match: TMatch): string;
+function TSpec.TokenMatchEvaluator(const match : TMatch) : string;
 begin
   if match.Success and (match.Groups.Count = 2) then
   begin
-  //  Logger.Debug('Replacing ' + match.Groups.Item[1].Value);
+    //  Logger.Debug('Replacing ' + match.Groups.Item[1].Value);
     if FCurrentTokens.IndexOfName(match.Groups.Item[1].Value) <> -1 then
       result := FCurrentTokens.Values[match.Groups.Item[1].Value]
     else
@@ -849,3 +850,4 @@ begin
 end;
 
 end.
+

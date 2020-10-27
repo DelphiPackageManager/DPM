@@ -38,7 +38,7 @@ uses
 
 type
   IDPMEditorView = interface
-  ['{1DF76A55-76AC-4789-A35A-CA025583356A}']
+    ['{1DF76A55-76AC-4789-A35A-CA025583356A}']
     procedure Reloaded;
     procedure ThemeChanged;
   end;
@@ -47,7 +47,7 @@ type
   private
     FContainer : TContainer;
     FProject : IOTAProject;
-    FFrame   : TDPMEditViewFrame;
+    FFrame : TDPMEditViewFrame;
     FImageIndex : integer;
     FCaption : string;
     FProjectTreeManager : IDPMProjectTreeManager;
@@ -56,23 +56,23 @@ type
     procedure Reloaded;
     procedure ThemeChanged;
 
-    function CloneEditorView: INTACustomEditorView;
-    procedure CloseAllCalled(var ShouldClose: Boolean);
+    function CloneEditorView : INTACustomEditorView;
+    procedure CloseAllCalled(var ShouldClose : Boolean);
     procedure DeselectView;
-    function EditAction(Action: TEditAction): Boolean;
-    procedure FrameCreated(AFrame: TCustomFrame);
-    function GetCanCloneView: Boolean;
-    function GetCaption: string;
-    function GetEditState: TEditState;
-    function GetEditorWindowCaption: string;
-    function GetFrameClass: TCustomFrameClass;
-    function GetViewIdentifier: string;
+    function EditAction(Action : TEditAction) : Boolean;
+    procedure FrameCreated(AFrame : TCustomFrame);
+    function GetCanCloneView : Boolean;
+    function GetCaption : string;
+    function GetEditState : TEditState;
+    function GetEditorWindowCaption : string;
+    function GetFrameClass : TCustomFrameClass;
+    function GetViewIdentifier : string;
     procedure SelectView;
 
     //INTACustomEditorView150
-    function GetImageIndex: Integer;
-    function GetTabHintText: string;
-    procedure Close(var Allowed: Boolean);
+    function GetImageIndex : Integer;
+    function GetTabHintText : string;
+    procedure Close(var Allowed : Boolean);
   public
     constructor Create(const container : TContainer; const project : IOTAProject; const imageIndex : integer; const projectTreeManager : IDPMProjectTreeManager);
   end;
@@ -84,32 +84,32 @@ uses
 
 { TDPMEditorView }
 
-function TDPMEditorView.CloneEditorView: INTACustomEditorView;
+function TDPMEditorView.CloneEditorView : INTACustomEditorView;
 begin
   result := nil;
 end;
 
-procedure TDPMEditorView.Close(var Allowed: Boolean);
+procedure TDPMEditorView.Close(var Allowed : Boolean);
 begin
   Allowed := true;
   FFrame.Closing;
 end;
 
-procedure TDPMEditorView.CloseAllCalled(var ShouldClose: Boolean);
+procedure TDPMEditorView.CloseAllCalled(var ShouldClose : Boolean);
 begin
   //doesn't seem to get called???
   ShouldClose := true;
   FFrame.Closing;
 end;
 
-constructor TDPMEditorView.Create(const container : TContainer; const project: IOTAProject; const imageIndex : integer; const projectTreeManager : IDPMProjectTreeManager);
+constructor TDPMEditorView.Create(const container : TContainer; const project : IOTAProject; const imageIndex : integer; const projectTreeManager : IDPMProjectTreeManager);
 begin
   FContainer := container;
   FProject := project;
   FImageIndex := imageIndex;
   FProjectTreeManager := projectTreeManager;
   if Supports(FProject, IOTAProjectGroup) then
-    FCaption :=  'DPM : ProjectGroup'
+    FCaption := 'DPM : ProjectGroup'
   else
     FCaption := 'DPM : ' + ChangeFileExt(ExtractFileName(FProject.FileName), '');
 end;
@@ -120,57 +120,57 @@ begin
     FFrame.ViewDeselected;
 end;
 
-function TDPMEditorView.EditAction(Action: TEditAction): Boolean;
+function TDPMEditorView.EditAction(Action : TEditAction) : Boolean;
 begin
   result := false;
 end;
 
-procedure TDPMEditorView.FrameCreated(AFrame: TCustomFrame);
+procedure TDPMEditorView.FrameCreated(AFrame : TCustomFrame);
 begin
   FFrame := TDPMEditViewFrame(AFrame);
   FFrame.Name := GetViewIdentifier;
   FFrame.Configure(FProject, FContainer, FProjectTreeManager);
 end;
 
-function TDPMEditorView.GetCanCloneView: Boolean;
+function TDPMEditorView.GetCanCloneView : Boolean;
 begin
   result := false;
 end;
 
-function TDPMEditorView.GetCaption: string;
+function TDPMEditorView.GetCaption : string;
 begin
   result := FCaption;
 end;
 
-function TDPMEditorView.GetEditorWindowCaption: string;
+function TDPMEditorView.GetEditorWindowCaption : string;
 begin
   result := 'DPM Packages';
 end;
 
-function TDPMEditorView.GetEditState: TEditState;
+function TDPMEditorView.GetEditState : TEditState;
 begin
   result := [];
 end;
 
-function TDPMEditorView.GetFrameClass: TCustomFrameClass;
+function TDPMEditorView.GetFrameClass : TCustomFrameClass;
 begin
   result := TDPMEditViewFrame;
 end;
 
-function TDPMEditorView.GetImageIndex: Integer;
+function TDPMEditorView.GetImageIndex : Integer;
 begin
   result := FImageIndex;
 end;
 
-function TDPMEditorView.GetTabHintText: string;
+function TDPMEditorView.GetTabHintText : string;
 begin
   result := GetCaption;
 end;
 
-function TDPMEditorView.GetViewIdentifier: string;
+function TDPMEditorView.GetViewIdentifier : string;
 begin
   result := 'DPM_VIEW_' + ChangeFileExt(ExtractFileName(FProject.FileName), '');
-  result := StringReplace(result, '.','_', [rfReplaceAll]);
+  result := StringReplace(result, '.', '_', [rfReplaceAll]);
 end;
 
 procedure TDPMEditorView.Reloaded;
@@ -191,3 +191,4 @@ begin
 end;
 
 end.
+

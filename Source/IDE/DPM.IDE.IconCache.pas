@@ -40,26 +40,26 @@ uses
 type
   //This is a wrapper around either an svg or a png.
   IPackageIconImage = interface
-  ['{E5617EA7-DEA6-41CF-BC40-64DF7705C6D6}']
+    ['{E5617EA7-DEA6-41CF-BC40-64DF7705C6D6}']
     procedure PaintTo(const ACanvas : TCanvas; const bounds : TRect);
     function ToGraphic : TGraphic;
   end;
 
-//In memory cache for package icons.
-//TODO : back this with a disk cache, this will be more important to avoid http requests.
+  //In memory cache for package icons.
+  //TODO : back this with a disk cache, this will be more important to avoid http requests.
 
 type
   TDPMIconCache = class
   private
     FIcons : IDictionary<string, IPackageIconImage>;
-    FLock  : TObject;
+    FLock : TObject;
   protected
 
   public
     constructor Create;
-    destructor Destroy;override;
+    destructor Destroy; override;
     function Query(const id : string) : boolean;
-    function Request(const id : string ) : IPackageIconImage;
+    function Request(const id : string) : IPackageIconImage;
     procedure Cache(const id : string; const value : IPackageIconImage);
   end;
 
@@ -70,13 +70,13 @@ type
     FKind : TPackageIconKind;
 
   protected
-    procedure PaintTo(const ACanvas : TCanvas; const bounds: TRect);
+    procedure PaintTo(const ACanvas : TCanvas; const bounds : TRect);
     function ToGraphic : TGraphic;
   public
-    constructor Create(const icon : IPackageIcon);overload;
-    constructor Create(const icon : ISVG);overload;
-    constructor Create(const icon : TPngImage);overload;
-    destructor Destroy;override;
+    constructor Create(const icon : IPackageIcon); overload;
+    constructor Create(const icon : ISVG); overload;
+    constructor Create(const icon : TPngImage); overload;
+    destructor Destroy; override;
   end;
 
 
@@ -89,7 +89,7 @@ uses
 
 { TDPMIconCache }
 
-procedure TDPMIconCache.Cache(const id: string; const value: IPackageIconImage);
+procedure TDPMIconCache.Cache(const id : string; const value : IPackageIconImage);
 begin
   MonitorEnter(FLock);
   try
@@ -101,12 +101,12 @@ end;
 
 constructor TDPMIconCache.Create;
 var
-  ResStream: TResourceStream;
+  ResStream : TResourceStream;
   missingImg : ISVG;
 begin
   inherited;
-  FIcons := TCollections.CreateDictionary<string, IPackageIconImage>;
-  FLock  := TObject.Create;
+  FIcons := TCollections.CreateDictionary < string, IPackageIconImage > ;
+  FLock := TObject.Create;
 
   missingImg := GlobalSVGFactory.NewSvg;
   resStream := TResourceStream.Create(hInstance, 'DPM_ICON_MISSING_SVG', RT_RCDATA);
@@ -132,7 +132,7 @@ begin
   inherited;
 end;
 
-function TDPMIconCache.Query(const id: string): boolean;
+function TDPMIconCache.Query(const id : string) : boolean;
 begin
   MonitorEnter(FLock);
   try
@@ -144,7 +144,7 @@ begin
   end;
 end;
 
-function TDPMIconCache.Request(const id: string): IPackageIconImage;
+function TDPMIconCache.Request(const id : string) : IPackageIconImage;
 begin
   result := nil;
   MonitorEnter(FLock);
@@ -159,26 +159,26 @@ end;
 
 { TPackageIconImage }
 
-constructor TPackageIconImage.Create(const icon: IPackageIcon);
+constructor TPackageIconImage.Create(const icon : IPackageIcon);
 begin
   FKind := icon.Kind;
   FPng := nil;
   case icon.Kind of
-    ikSvg:
-    begin
-      FSVG := GlobalSVGFactory.NewSvg;
-      FSVG.LoadFromStream(icon.Stream);
-    end;
-    ikPng:
-    begin
-      FPng := TPngImage.Create;
-      icon.stream.Position := 0;
-      FPng.LoadFromStream(icon.stream);
-    end;
+    ikSvg :
+      begin
+        FSVG := GlobalSVGFactory.NewSvg;
+        FSVG.LoadFromStream(icon.Stream);
+      end;
+    ikPng :
+      begin
+        FPng := TPngImage.Create;
+        icon.stream.Position := 0;
+        FPng.LoadFromStream(icon.stream);
+      end;
   end;
 end;
 
-constructor TPackageIconImage.Create(const icon: ISVG);
+constructor TPackageIconImage.Create(const icon : ISVG);
 begin
   FSVG := icon;
   FKind := TPackageIconKind.ikSvg;
@@ -192,40 +192,40 @@ begin
   inherited;
 end;
 
-procedure TPackageIconImage.PaintTo(const ACanvas : TCanvas; const bounds: TRect);
+procedure TPackageIconImage.PaintTo(const ACanvas : TCanvas; const bounds : TRect);
 begin
   case FKind of
-    ikSvg: FSVG.PaintTo(ACanvas.Handle, TRectF.Create(bounds));
-    ikPng: FPng.Draw(ACanvas, bounds);
+    ikSvg : FSVG.PaintTo(ACanvas.Handle, TRectF.Create(bounds));
+    ikPng : FPng.Draw(ACanvas, bounds);
   end;
 end;
 
-function TPackageIconImage.ToGraphic: TGraphic;
+function TPackageIconImage.ToGraphic : TGraphic;
 var
-  svgGraphic: TSVGGraphic;
+  svgGraphic : TSVGGraphic;
   clonedSVG : ISVG;
   clonedPng : TPngImage;
 begin
   result := nil;
   case FKind of
-    ikSvg:
-    begin
-      clonedSVG := GlobalSVGFactory.NewSvg;
-      clonedSVG.Source := FSVG.Source;
-      svgGraphic := TSVGGraphic.Create;
-      svgGraphic.AssignSVG(clonedSVG);
-      exit(svgGraphic);
-    end;
-    ikPng:
-    begin
-      clonedPng := TPngImage.Create;
-      clonedPng.Assign(FPng);
-      exit(clonedPng);
-    end;
+    ikSvg :
+      begin
+        clonedSVG := GlobalSVGFactory.NewSvg;
+        clonedSVG.Source := FSVG.Source;
+        svgGraphic := TSVGGraphic.Create;
+        svgGraphic.AssignSVG(clonedSVG);
+        exit(svgGraphic);
+      end;
+    ikPng :
+      begin
+        clonedPng := TPngImage.Create;
+        clonedPng.Assign(FPng);
+        exit(clonedPng);
+      end;
   end;
 end;
 
-constructor TPackageIconImage.Create(const icon: TPngImage);
+constructor TPackageIconImage.Create(const icon : TPngImage);
 begin
   FPng := TPngImage.Create;
   FPng.Assign(icon);
@@ -233,3 +233,4 @@ begin
 end;
 
 end.
+

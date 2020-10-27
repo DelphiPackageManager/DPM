@@ -38,32 +38,32 @@ type
   TSpecBuildEntry = class(TSpecNode, ISpecBuildEntry)
   private
     FLogger : ILogger;
-    FBplOutputDir: string;
-    FConfig: string;
-    FDcpOutputDir: string;
-    FDcuOutputDir: string;
-    FId: string;
-    FProject: string;
+    FBplOutputDir : string;
+    FConfig : string;
+    FDcpOutputDir : string;
+    FDcuOutputDir : string;
+    FId : string;
+    FProject : string;
   protected
-    function GetBplOutputDir: string;
-    function GetConfig: string;
-    function GetDcpOutputDir: string;
-    function GetDcuOutputDir: string;
-    function GetId: string;
-    function GetProject: string;
+    function GetBplOutputDir : string;
+    function GetConfig : string;
+    function GetDcpOutputDir : string;
+    function GetDcuOutputDir : string;
+    function GetId : string;
+    function GetProject : string;
     procedure SetProject(const value : string);
-    procedure SetBplOutputDir(const value: string);
-    procedure SetDcpOutputDir(const value: string);
-    procedure SetDcuOutputDir(const value: string);
-    procedure SetId(const value: string);
+    procedure SetBplOutputDir(const value : string);
+    procedure SetDcpOutputDir(const value : string);
+    procedure SetDcuOutputDir(const value : string);
+    procedure SetId(const value : string);
 
-    function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
+    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function Clone : ISpecBuildEntry;
 
   public
-    constructor CreateClone(const logger: ILogger; const id, project, config, bpldir, dcpdir,dcudir: string);reintroduce;
+    constructor CreateClone(const logger : ILogger; const id, project, config, bpldir, dcpdir, dcudir : string); reintroduce;
   public
-    constructor Create(const logger: ILogger); override;
+    constructor Create(const logger : ILogger); override;
 
   end;
 
@@ -71,18 +71,18 @@ implementation
 
 { TSpecBuildEntry }
 
-function TSpecBuildEntry.Clone: ISpecBuildEntry;
+function TSpecBuildEntry.Clone : ISpecBuildEntry;
 begin
-  result := TSpecBuildEntry.CreateClone(logger, FId, FProject,FConfig, FBplOutputDir,FDcpOutputDir,FDcuOutputDir);
+  result := TSpecBuildEntry.CreateClone(logger, FId, FProject, FConfig, FBplOutputDir, FDcpOutputDir, FDcuOutputDir);
 end;
 
-constructor TSpecBuildEntry.Create(const logger: ILogger);
+constructor TSpecBuildEntry.Create(const logger : ILogger);
 begin
   inherited Create(logger);
 
 end;
 
-constructor TSpecBuildEntry.CreateClone(const logger: ILogger; const id, project, config, bpldir, dcpdir, dcudir: string);
+constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const id, project, config, bpldir, dcpdir, dcudir : string);
 begin
   inherited Create(logger);
   FId := id;
@@ -93,38 +93,38 @@ begin
   FDcuOutputDir := dcudir;
 end;
 
-function TSpecBuildEntry.GetBplOutputDir: string;
+function TSpecBuildEntry.GetBplOutputDir : string;
 begin
   result := FBplOutputDir;
 end;
 
-function TSpecBuildEntry.GetConfig: string;
+function TSpecBuildEntry.GetConfig : string;
 begin
   result := FConfig;
 end;
 
-function TSpecBuildEntry.GetDcpOutputDir: string;
+function TSpecBuildEntry.GetDcpOutputDir : string;
 begin
   result := FDcpOutputDir;
 end;
 
-function TSpecBuildEntry.GetDcuOutputDir: string;
+function TSpecBuildEntry.GetDcuOutputDir : string;
 begin
   result := FDcuOutputDir;
 end;
 
-function TSpecBuildEntry.GetId: string;
+function TSpecBuildEntry.GetId : string;
 begin
   result := FId;
 end;
 
 
-function TSpecBuildEntry.GetProject: string;
+function TSpecBuildEntry.GetProject : string;
 begin
   result := FProject;
 end;
 
-function TSpecBuildEntry.LoadFromJson(const jsonObject: TJsonObject): Boolean;
+function TSpecBuildEntry.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 begin
   result := true;
   FId := jsonObject.S['id'];
@@ -158,29 +158,30 @@ begin
     FDcuOutputDir := 'lib';
 end;
 
-procedure TSpecBuildEntry.SetBplOutputDir(const value: string);
+procedure TSpecBuildEntry.SetBplOutputDir(const value : string);
 begin
   FBplOutputDir := value;
 end;
 
-procedure TSpecBuildEntry.SetDcpOutputDir(const value: string);
+procedure TSpecBuildEntry.SetDcpOutputDir(const value : string);
 begin
   FDcpOutputDir := value;
 end;
 
-procedure TSpecBuildEntry.SetDcuOutputDir(const value: string);
+procedure TSpecBuildEntry.SetDcuOutputDir(const value : string);
 begin
   FDcuOutputDir := value;
 end;
 
-procedure TSpecBuildEntry.SetId(const value: string);
+procedure TSpecBuildEntry.SetId(const value : string);
 begin
   FId := value;
 end;
 
-procedure TSpecBuildEntry.SetProject(const value: string);
+procedure TSpecBuildEntry.SetProject(const value : string);
 begin
   FProject := value;
 end;
 
 end.
+

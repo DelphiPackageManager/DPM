@@ -89,10 +89,10 @@ uses
 
 procedure TVersionRangeTests.Can_Parse_ExclusiveRange;
 var
-  depVersion : TVersionRange;
-  error : string;
+  depVersion :TVersionRange;
+  error :string;
 begin
-  Assert.IsTrue(TVersionRange.TryParseWithError('(1.0.1,1.0.3)', depVersion, error),error);
+  Assert.IsTrue(TVersionRange.TryParseWithError('(1.0.1,1.0.3)', depVersion, error), error);
   Assert.IsTrue(depVersion.IsValid);
   Assert.IsFalse(depVersion.MinVersionIsInclusive);
   Assert.IsFalse(depVersion.MaxVersionIsInclusive);
@@ -100,11 +100,11 @@ end;
 
 procedure TVersionRangeTests.Can_Parse_ExclusiveRange_OpenEnded;
 var
-  depVersion : TVersionRange;
-  maxVersion : TPackageVersion;
-  error : string;
+  depVersion :TVersionRange;
+  maxVersion :TPackageVersion;
+  error :string;
 begin
-  Assert.IsTrue(TVersionRange.TryParseWithError('(1.0.1,)', depVersion, error),error);
+  Assert.IsTrue(TVersionRange.TryParseWithError('(1.0.1,)', depVersion, error), error);
   Assert.IsTrue(depVersion.IsValid);
   Assert.IsFalse(depVersion.MinVersionIsInclusive);
   maxVersion := TPackageVersion.Create(1, 0, High(word));
@@ -115,11 +115,11 @@ end;
 
 procedure TVersionRangeTests.Can_Parse_ExclusiveRange_OpenStart;
 var
-  depVersion : TVersionRange;
-  minVersion : TPackageVersion;
-  error : string;
+  depVersion :TVersionRange;
+  minVersion :TPackageVersion;
+  error :string;
 begin
-  Assert.IsTrue(TVersionRange.TryParseWithError('(,1.0.2)', depVersion, error),error);
+  Assert.IsTrue(TVersionRange.TryParseWithError('(,1.0.2)', depVersion, error), error);
   Assert.IsTrue(depVersion.IsValid);
   Assert.IsFalse(depVersion.MinVersionIsInclusive);
   minVersion := TPackageVersion.Create(1, 0, 0);
@@ -128,10 +128,10 @@ end;
 
 procedure TVersionRangeTests.Can_Parse_InclusiveRange;
 var
-  depVersion : TVersionRange;
-  error : string;
+  depVersion :TVersionRange;
+  error :string;
 begin
-  Assert.IsTrue(TVersionRange.TryParseWithError('[1.0.1, 1.0.3]', depVersion, error),error);
+  Assert.IsTrue(TVersionRange.TryParseWithError('[1.0.1, 1.0.3]', depVersion, error), error);
   Assert.IsTrue(depVersion.IsValid);
   Assert.IsTrue(depVersion.MinVersionIsInclusive);
   Assert.IsTrue(depVersion.MaxVersionIsInclusive);
@@ -140,84 +140,84 @@ end;
 
 procedure TVersionRangeTests.Can_Parse_ValidFixed_Version;
 var
-  depVersion : TVersionRange;
-  error : string;
+  depVersion :TVersionRange;
+  error :string;
 begin
-  Assert.IsTrue(TVersionRange.TryParseWithError('1.0.1', depVersion, error),error);
+  Assert.IsTrue(TVersionRange.TryParseWithError('1.0.1', depVersion, error), error);
   Assert.IsTrue(depVersion.IsValid);
   Assert.IsTrue(depVersion.IsFixed);
-  Assert.AreEqual<TPackageVersion>(depVersion.MinVersion,depVersion.MaxVersion);
+  Assert.AreEqual<TPackageVersion>(depVersion.MinVersion, depVersion.MaxVersion);
 end;
 
 procedure TVersionRangeTests.Will_Fail_On_Empty_Exlusive_Range;
 var
-  depVersion : TVersionRange;
-  error : string;
+  depVersion :TVersionRange;
+  error :string;
 begin
-  Assert.IsFalse(TVersionRange.TryParseWithError('(1.0.1,1.0.2)', depVersion, error),error);
+  Assert.IsFalse(TVersionRange.TryParseWithError('(1.0.1,1.0.2)', depVersion, error), error);
   Assert.IsFalse(depVersion.IsValid);
 
 end;
 
 procedure TVersionRangeTests.Will_Fail_on_empty_string;
 var
-  depVersion : TVersionRange;
-  error : string;
+  depVersion :TVersionRange;
+  error :string;
 begin
-  Assert.IsFalse(TVersionRange.TryParseWithError('', depVersion, error),error);
+  Assert.IsFalse(TVersionRange.TryParseWithError('', depVersion, error), error);
 end;
 
 procedure TVersionRangeTests.Will_Fail_On_ExclusiveRange_NoComma;
 var
-  depVersion : TVersionRange;
-  error : string;
+  depVersion :TVersionRange;
+  error :string;
 begin
-  Assert.IsFalse(TVersionRange.TryParseWithError('(1.0.1)', depVersion, error),error);
+  Assert.IsFalse(TVersionRange.TryParseWithError('(1.0.1)', depVersion, error), error);
   Assert.IsFalse(depVersion.IsValid);
 end;
 
 procedure TVersionRangeTests.Will_Fail_On_Exclusive_Range_Open_No_Gap;
 var
-  depVersion : TVersionRange;
-  error : string;
+  depVersion :TVersionRange;
+  error :string;
 begin
-  Assert.IsFalse(TVersionRange.TryParseWithError('(,1.0.1)', depVersion, error),error);
+  Assert.IsFalse(TVersionRange.TryParseWithError('(,1.0.1)', depVersion, error), error);
   Assert.IsFalse(depVersion.IsValid);
 
 end;
 
 procedure TVersionRangeTests.Will_Fail_on_fixed_major_minor;
 var
-  depVersion : TVersionRange;
-  error : string;
+  depVersion :TVersionRange;
+  error :string;
 begin
-  Assert.IsFalse(TVersionRange.TryParseWithError('1.0', depVersion, error),error);
+  Assert.IsFalse(TVersionRange.TryParseWithError('1.0', depVersion, error), error);
 end;
 
 procedure TVersionRangeTests.Will_Fail_On_InvalidSemver;
 var
-  depVersion : TVersionRange;
-  error : string;
+  depVersion :TVersionRange;
+  error :string;
 begin
-  Assert.IsFalse(TVersionRange.TryParseWithError('(1.0.1.2,1.0.2.2)', depVersion, error),error);
+  Assert.IsFalse(TVersionRange.TryParseWithError('(1.0.1.2,1.0.2.2)', depVersion, error), error);
   Assert.IsFalse(depVersion.IsValid);
 end;
 
 procedure TVersionRangeTests.Will_Fail_On_Invalid_Float;
 var
-  depVersion : TVersionRange;
-  error : string;
+  depVersion :TVersionRange;
+  error :string;
 begin
-  Assert.IsFalse(TVersionRange.TryParseWithError('[1.0.1,1.2.3]', depVersion, error),error);
+  Assert.IsFalse(TVersionRange.TryParseWithError('[1.0.1,1.2.3]', depVersion, error), error);
   Assert.IsFalse(depVersion.IsValid);
 end;
 
 procedure TVersionRangeTests.Will_Normalize_To_Fixed;
 var
-  depVersion : TVersionRange;
-  error : string;
+  depVersion :TVersionRange;
+  error :string;
 begin
-  Assert.IsTrue(TVersionRange.TryParseWithError('[1.0.1,1.0.2)', depVersion, error),error);
+  Assert.IsTrue(TVersionRange.TryParseWithError('[1.0.1,1.0.2)', depVersion, error), error);
   Assert.IsTrue(depVersion.IsValid);
   Assert.IsTrue(depVersion.MinVersionIsInclusive);
   Assert.IsFalse(depVersion.MaxVersionIsInclusive);
@@ -230,3 +230,4 @@ initialization
   TDUnitX.RegisterTestFixture(TVersionRangeTests);
 
 end.
+

@@ -43,15 +43,15 @@ type
     FTargetPlatform : TTargetPlatform;
     FDependencies : IList<ISpecDependency>;
   protected
-    function GetDependencies: IList<ISpecDependency>;
+    function GetDependencies : IList<ISpecDependency>;
     function GetTargetPlatform : TTargetPlatform;
-    function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
+    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
 
-    function IsGroup: Boolean;override;
-    function Clone: ISpecDependency;override;
+    function IsGroup : Boolean; override;
+    function Clone : ISpecDependency; override;
     constructor CreateClone(const logger : ILogger; const targetPlatform : TTargetPlatform; const dependencies : IList<ISpecDependency>);
   public
-    constructor Create(const logger : ILogger);override;
+    constructor Create(const logger : ILogger); override;
 
   end;
 
@@ -62,7 +62,7 @@ uses
 
 { TSpecDependencyGroup }
 
-function TSpecDependencyGroup.Clone: ISpecDependency;
+function TSpecDependencyGroup.Clone : ISpecDependency;
 var
   dependencies : IList<ISpecDependency>;
   dep : ISpecDependency;
@@ -74,7 +74,7 @@ begin
     cloneDep := dep.Clone;
     dependencies.Add(cloneDep)
   end;
-  result := TSpecDependencyGroup.CreateClone(logger, FTargetPlatform.Clone,dependencies );
+  result := TSpecDependencyGroup.CreateClone(logger, FTargetPlatform.Clone, dependencies);
 end;
 
 constructor TSpecDependencyGroup.Create(const logger : ILogger);
@@ -83,12 +83,12 @@ begin
   FDependencies := TCollections.CreateList<ISpecDependency>;
 end;
 
-function TSpecDependencyGroup.GetTargetPlatform: TTargetPlatform;
+function TSpecDependencyGroup.GetTargetPlatform : TTargetPlatform;
 begin
-   result := FTargetPlatform;
+  result := FTargetPlatform;
 end;
 
-constructor TSpecDependencyGroup.CreateClone(const logger: ILogger; const targetPlatform: TTargetPlatform; const dependencies: IList<ISpecDependency>);
+constructor TSpecDependencyGroup.CreateClone(const logger : ILogger; const targetPlatform : TTargetPlatform; const dependencies : IList<ISpecDependency>);
 var
   dependency : ISpecDependency;
 begin
@@ -99,17 +99,17 @@ begin
     FDependencies.Add(dependency.Clone);
 end;
 
-function TSpecDependencyGroup.GetDependencies: IList<ISpecDependency>;
+function TSpecDependencyGroup.GetDependencies : IList<ISpecDependency>;
 begin
   result := FDependencies;
 end;
 
-function TSpecDependencyGroup.IsGroup: Boolean;
+function TSpecDependencyGroup.IsGroup : Boolean;
 begin
   result := true;
 end;
 
-function TSpecDependencyGroup.LoadFromJson(const jsonObject: TJsonObject): Boolean;
+function TSpecDependencyGroup.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var
   sValue : string;
   i : integer;
@@ -121,7 +121,7 @@ begin
   if sValue = '' then
   begin
     result := false;
-    Logger.Error('Required property [' + cTargetPlatformAttribute + '] is missing.' );
+    Logger.Error('Required property [' + cTargetPlatformAttribute + '] is missing.');
   end
   else
   begin
@@ -137,7 +137,7 @@ begin
   if dependencies.Count = 0 then
     exit;
 
-  for i := 0 to dependencies.Count -1 do
+  for i := 0 to dependencies.Count - 1 do
   begin
     dependency := TSpecDependency.Create(Logger);
     FDependencies.Add(dependency);
@@ -146,3 +146,4 @@ begin
 end;
 
 end.
+

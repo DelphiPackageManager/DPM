@@ -36,7 +36,7 @@ uses
 
 type
   IDPMEditorViewManager = interface
-  ['{BD31BE3A-5255-4290-9991-1A0071B24F81}']
+    ['{BD31BE3A-5255-4290-9991-1A0071B24F81}']
     procedure ShowViewForProject(const project : IOTAProject);
     procedure ProjectClosed(const projectFile : string);
     procedure ProjectLoaded(const projectFile : string);
@@ -44,7 +44,7 @@ type
     //todo : add methods to hand notifications of projects added to group
   end;
 
-  TDPMEditorViewManager = class(TInterfacedObject, IDPMEditorViewManager {$IF CompilerVersion >= 32.0}, INTAIDEThemingServicesNotifier{$IFEND} )
+  TDPMEditorViewManager = class(TInterfacedObject, IDPMEditorViewManager{$IF CompilerVersion >= 32.0}, INTAIDEThemingServicesNotifier{$IFEND})
   private
     FContainer : TContainer;
     FOpenViews : IDictionary<string, INTACustomEditorView>;
@@ -53,15 +53,15 @@ type
     FProjectTreeManager : IDPMProjectTreeManager;
   protected
     procedure ProjectLoaded(const projectFile : string);
-    procedure ProjectClosed(const projectFile: string);
-    procedure ShowViewForProject(const project: IOTAProject);
+    procedure ProjectClosed(const projectFile : string);
+    procedure ShowViewForProject(const project : IOTAProject);
     procedure Destroyed;
 
     //IOTANotifier
     procedure AfterSave;
     procedure BeforeSave;
     procedure Modified;
-    
+
     //INTAIDEThemingServicesNotifier
     procedure ChangingTheme();
     { This notifier will be called immediately after the active IDE Theme changes }
@@ -69,7 +69,7 @@ type
 
   public
     constructor Create(const container : TContainer; const projectTreeManager : IDPMProjectTreeManager);
-    destructor Destroy;override;
+    destructor Destroy; override;
   end;
 
 implementation
@@ -116,7 +116,7 @@ var
 begin
   FContainer := container;
   FProjectTreeManager := projectTreeManager;
-  FOpenViews := TCollections.CreateDictionary<string, INTACustomEditorView>;
+  FOpenViews := TCollections.CreateDictionary < string, INTACustomEditorView > ;
 
   if not Supports(BorlandIDEServices, IOTAEditorViewServices, FEditorViewServices) then
     raise Exception.Create('Unable to get IOTAEditorViewServices');
@@ -128,7 +128,7 @@ begin
   imageList := TImageList.Create(nil);
   bmp := TBitmap.Create;
   try
-    bmp.LoadFromResourceName(HInstance, 'DPMIDELOGO_16' );
+    bmp.LoadFromResourceName(HInstance, 'DPMIDELOGO_16');
     imageList.AddMasked(bmp, clFuchsia);
     FImageIndex := vs.AddImages(imageList, 'DPM');
   finally
@@ -164,7 +164,7 @@ begin
 
 end;
 
-procedure TDPMEditorViewManager.ProjectClosed(const projectFile: string);
+procedure TDPMEditorViewManager.ProjectClosed(const projectFile : string);
 var
   view : INTACustomEditorView;
 begin
@@ -180,7 +180,7 @@ begin
   end;
 end;
 
-procedure TDPMEditorViewManager.ProjectLoaded(const projectFile: string);
+procedure TDPMEditorViewManager.ProjectLoaded(const projectFile : string);
 var
   view : INTACustomEditorView;
 begin
@@ -192,7 +192,7 @@ begin
 
 end;
 
-procedure TDPMEditorViewManager.ShowViewForProject(const project: IOTAProject);
+procedure TDPMEditorViewManager.ShowViewForProject(const project : IOTAProject);
 var
   view : INTACustomEditorView;
 begin
@@ -208,3 +208,4 @@ begin
 end;
 
 end.
+

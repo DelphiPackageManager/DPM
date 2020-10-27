@@ -44,39 +44,39 @@ type
     FEnv : ICompilerEnvironmentProvider;
     FCompilerLogFile : string;
 
-    FBPLOutput: string;
-    FDCPOutput: string;
-    FDCUOutput: string;
-    FHPPOutput: string;
-    FOBJOutput: string;
+    FBPLOutput : string;
+    FDCPOutput : string;
+    FDCUOutput : string;
+    FHPPOutput : string;
+    FOBJOutput : string;
 
 
     FCompilerVersion : TCompilerVersion;
-    FConfiguration: string;
-    FPlatform: TDPMPlatform;
-    FSearchPaths: IList<string>;
+    FConfiguration : string;
+    FPlatform : TDPMPlatform;
+    FSearchPaths : IList<string>;
     FVerbosity : TCompilerVerbosity;
 
     FCompilerOutput : TStringList;
   protected
-    function GetBPLOutput: string;
-    function GetCompilerVersion: TCompilerVersion;
-    function GetConfiguration: string;
-    function GetDCPOutput: string;
-    function GetDCUOutput: string;
-    function GetHPPOutput: string;
-    function GetOBJOutput: string;
-    function GetPlatform: TDPMPlatform;
-    function GetSearchPaths: IList<string>;
-    procedure SetBPLOutput(const value: string);
-    procedure SetConfiguration(const value: string);
-    procedure SetDCPOutput(const value: string);
-    procedure SetDCUOutput(const value: string);
-    procedure SetHPPOutput(const value: string);
-    procedure SetOBJOutput(const value: string);
-    procedure SetSearchPaths(const value: IList<string>);
-    function GetVerbosity: TCompilerVerbosity;
-    procedure SetVerbosity(const value: TCompilerVerbosity);
+    function GetBPLOutput : string;
+    function GetCompilerVersion : TCompilerVersion;
+    function GetConfiguration : string;
+    function GetDCPOutput : string;
+    function GetDCUOutput : string;
+    function GetHPPOutput : string;
+    function GetOBJOutput : string;
+    function GetPlatform : TDPMPlatform;
+    function GetSearchPaths : IList<string>;
+    procedure SetBPLOutput(const value : string);
+    procedure SetConfiguration(const value : string);
+    procedure SetDCPOutput(const value : string);
+    procedure SetDCUOutput(const value : string);
+    procedure SetHPPOutput(const value : string);
+    procedure SetOBJOutput(const value : string);
+    procedure SetSearchPaths(const value : IList<string>);
+    function GetVerbosity : TCompilerVerbosity;
+    procedure SetVerbosity(const value : TCompilerVerbosity);
 
 
     function GetCompilerOutput : TStrings;
@@ -84,10 +84,10 @@ type
     function GetMSBuildParameters(const configName : string) : string;
     function GetCommandLine(const projectFile : string; const configName : string) : string;
 
-    function BuildProject(const cancellationToken : ICancellationToken; const projectFile: string; const configName : string): Boolean;
+    function BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string) : Boolean;
   public
     constructor Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const env : ICompilerEnvironmentProvider);
-    destructor Destroy;override;
+    destructor Destroy; override;
 
   end;
 
@@ -101,23 +101,23 @@ uses
 
 { TMSBuildCompiler }
 
-function TMSBuildCompiler.BuildProject(const cancellationToken : ICancellationToken; const projectFile: string; const configName : string): Boolean;
+function TMSBuildCompiler.BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string) : Boolean;
 var
-  commandLine : string;
+  commandLine                 : string;
 begin
   result := false;
   FCompilerOutput.Clear;
 
   FCompilerLogFile := TPath.GetTempFileName;
 
-  commandLine := GetCommandLine(projectFile, configName );
+  commandLine := GetCommandLine(projectFile, configName);
 
   try
-    result :=  TProcess.Execute(cancellationToken, 'cmd.exe', commandLine) = 0;
+    result := TProcess.Execute(cancellationToken, 'cmd.exe', commandLine) = 0;
   except
     on e : Exception do
     begin
-      FLogger.Error('Error executing compiler : '  + e.Message );
+      FLogger.Error('Error executing compiler : ' + e.Message);
     end;
   end;
 
@@ -130,13 +130,13 @@ begin
 
 end;
 
-constructor TMSBuildCompiler.Create(const logger: ILogger; const compilerVersion: TCompilerVersion; const platform : TDPMPlatform; const env: ICompilerEnvironmentProvider);
+constructor TMSBuildCompiler.Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const env : ICompilerEnvironmentProvider);
 begin
   FLogger := logger;
   FCompilerVersion := compilerVersion;
   FPlatform := platform;
   FEnv := env;
-  FSearchPaths := TCollections.CreateList<string>;
+  FSearchPaths := TCollections.CreateList <string> ;
   FCompilerOutput := TStringList.Create;
 end;
 
@@ -146,14 +146,14 @@ begin
   inherited;
 end;
 
-function TMSBuildCompiler.GetBPLOutput: string;
+function TMSBuildCompiler.GetBPLOutput : string;
 begin
   result := FBPLOutput;
 end;
 
-function TMSBuildCompiler.GetCommandLine(const projectFile, configName: string): string;
+function TMSBuildCompiler.GetCommandLine(const projectFile, configName : string) : string;
 var
-  cmd : string;
+  cmd                         : string;
 begin
   //I don't like this... but it will do for a start.
 
@@ -162,32 +162,32 @@ begin
   result := 'cmd.exe /c ' + cmd + ' > ' + FCompilerLogFile;
 end;
 
-function TMSBuildCompiler.GetCompilerOutput: TStrings;
+function TMSBuildCompiler.GetCompilerOutput : TStrings;
 begin
   result := FCompilerOutput;
 end;
 
-function TMSBuildCompiler.GetCompilerVersion: TCompilerVersion;
+function TMSBuildCompiler.GetCompilerVersion : TCompilerVersion;
 begin
   result := FCompilerVersion;
 end;
 
-function TMSBuildCompiler.GetConfiguration: string;
+function TMSBuildCompiler.GetConfiguration : string;
 begin
   result := FConfiguration;
 end;
 
-function TMSBuildCompiler.GetDCPOutput: string;
+function TMSBuildCompiler.GetDCPOutput : string;
 begin
   result := FDCPOutput;
 end;
 
-function TMSBuildCompiler.GetDCUOutput: string;
+function TMSBuildCompiler.GetDCUOutput : string;
 begin
   result := FDCUOutput;
 end;
 
-function TMSBuildCompiler.GetHPPOutput: string;
+function TMSBuildCompiler.GetHPPOutput : string;
 begin
   result := FHPPOutput;
 end;
@@ -217,64 +217,65 @@ begin
 
 end;
 
-function TMSBuildCompiler.GetOBJOutput: string;
+function TMSBuildCompiler.GetOBJOutput : string;
 begin
   result := FOBJOutput;
 end;
 
-function TMSBuildCompiler.GetPlatform: TDPMPlatform;
+function TMSBuildCompiler.GetPlatform : TDPMPlatform;
 begin
   result := FPlatform;
 end;
 
-function TMSBuildCompiler.GetSearchPaths: IList<string>;
+function TMSBuildCompiler.GetSearchPaths : IList<string>;
 begin
   result := FSearchPaths;
 end;
 
-function TMSBuildCompiler.GetVerbosity: TCompilerVerbosity;
+function TMSBuildCompiler.GetVerbosity : TCompilerVerbosity;
 begin
   result := FVerbosity;
 end;
 
-procedure TMSBuildCompiler.SetBPLOutput(const value: string);
+procedure TMSBuildCompiler.SetBPLOutput(const value : string);
 begin
   FBPLOutput := value;
 end;
 
-procedure TMSBuildCompiler.SetConfiguration(const value: string);
+procedure TMSBuildCompiler.SetConfiguration(const value : string);
 begin
   FConfiguration := value;
 end;
 
-procedure TMSBuildCompiler.SetDCPOutput(const value: string);
+procedure TMSBuildCompiler.SetDCPOutput(const value : string);
 begin
   FDCPOutput := value;
 end;
 
-procedure TMSBuildCompiler.SetDCUOutput(const value: string);
+procedure TMSBuildCompiler.SetDCUOutput(const value : string);
 begin
   FDCUOutput := value;
 end;
 
-procedure TMSBuildCompiler.SetHPPOutput(const value: string);
+procedure TMSBuildCompiler.SetHPPOutput(const value : string);
 begin
   FHPPOutput := value;
 end;
 
-procedure TMSBuildCompiler.SetOBJOutput(const value: string);
+procedure TMSBuildCompiler.SetOBJOutput(const value : string);
 begin
   FOBJOutput := value;
 end;
 
-procedure TMSBuildCompiler.SetSearchPaths(const value: IList<string>);
+procedure TMSBuildCompiler.SetSearchPaths(const value : IList<string> );
 begin
   FSearchPaths := value;
 end;
 
-procedure TMSBuildCompiler.SetVerbosity(const value: TCompilerVerbosity);
+procedure TMSBuildCompiler.SetVerbosity(const value : TCompilerVerbosity);
 begin
   FVerbosity := value;
 end;
 
 end.
+

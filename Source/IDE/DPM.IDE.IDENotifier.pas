@@ -57,17 +57,17 @@ type
     procedure Modified;
 
     //IOTAIDENotifier
-    procedure AfterCompile(Succeeded: Boolean);
-    procedure BeforeCompile(const Project: IOTAProject; var Cancel: Boolean);
-    procedure FileNotification(NotifyCode: TOTAFileNotification; const FileName: string; var Cancel: Boolean);
+    procedure AfterCompile(Succeeded : Boolean);
+    procedure BeforeCompile(const Project : IOTAProject; var Cancel : Boolean);
+    procedure FileNotification(NotifyCode : TOTAFileNotification; const FileName : string; var Cancel : Boolean);
 
     function CreateOptions(const fileName : string) : TRestoreOptions;
 
     function LoadProjectGroup(const fileName : string) : boolean;
   public
     constructor Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager;
-                       const projectTreeManager : IDPMProjectTreeManager);
-    destructor Destroy;override;
+      const projectTreeManager : IDPMProjectTreeManager);
+    destructor Destroy; override;
   end;
 
 implementation
@@ -82,7 +82,7 @@ uses
 
 { TDPMIDENotifier }
 
-procedure TDPMIDENotifier.AfterCompile(Succeeded: Boolean);
+procedure TDPMIDENotifier.AfterCompile(Succeeded : Boolean);
 begin
 
 end;
@@ -92,7 +92,7 @@ begin
 
 end;
 
-procedure TDPMIDENotifier.BeforeCompile(const Project: IOTAProject; var Cancel: Boolean);
+procedure TDPMIDENotifier.BeforeCompile(const Project : IOTAProject; var Cancel : Boolean);
 begin
 
 end;
@@ -102,11 +102,11 @@ begin
 
 end;
 
-constructor TDPMIDENotifier.Create(const logger: IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager; const projectTreeManager : IDPMProjectTreeManager);
+constructor TDPMIDENotifier.Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager; const projectTreeManager : IDPMProjectTreeManager);
 begin
   FLogger := logger;
   FPackageInstaller := packageInstaller;
-  FGroupProjects := TCollections.CreateList<string>;
+  FGroupProjects := TCollections.CreateList < string > ;
   FEditorViewManager := editorViewManager;
   FProjectTreeManager := projectTreeManager;
   FLoadMode := TProjectLoadType.plNone;
@@ -116,7 +116,7 @@ function TDPMIDENotifier.CreateOptions(const fileName : string) : TRestoreOption
 begin
   result := TRestoreOptions.Create;
   result.ApplyCommon(TCommonOptions.Default);
- result.ProjectPath := fileName;
+  result.ProjectPath := fileName;
 
 
   result.Validate(FLogger);
@@ -135,7 +135,7 @@ begin
 end;
 
 
-function TDPMIDENotifier.LoadProjectGroup(const fileName: string): boolean;
+function TDPMIDENotifier.LoadProjectGroup(const fileName : string) : boolean;
 var
   i : integer;
   groupReader : IGroupProjectReader;
@@ -152,7 +152,7 @@ begin
     groupReader.ExtractProjects(FGroupProjects);
     projectRoot := ExtractFilePath(fileName);
     //projects likely to be relative, so make them full paths
-    for i := 0 to FGroupProjects.Count -1 do
+    for i := 0 to FGroupProjects.Count - 1 do
     begin
       ext := ExtractFileExt(FGroupProjects[i]);
       //TODO : Allow cbproj when cbuilder supported.
@@ -168,7 +168,7 @@ begin
   end;
 end;
 
-procedure TDPMIDENotifier.FileNotification(NotifyCode: TOTAFileNotification; const FileName: string; var Cancel: Boolean);
+procedure TDPMIDENotifier.FileNotification(NotifyCode : TOTAFileNotification; const FileName : string; var Cancel : Boolean);
 var
   restoreOptions : TRestoreOptions;
   cancellationTokenSource : ICancellationTokenSource;
@@ -179,94 +179,94 @@ begin
     exit;
 
   case NotifyCode of
-    ofnFileOpening:
-    begin
-      FLogger.Debug('IDE File Opening ' + FileName);
-
-      {
-        Since there's no built in way to determine when the project group has finished
-        loading, we have to cheat here.
-
-        We load up the list of projects in the group, and then as each one is loaded
-        (we get notified here) we remove them from the list. when the list is empty
-        we are done and can continue. This has the added benefit of running restore
-        when the grouproj is loading but before the project is loaded, so no reload loop
-        to deal with!
-      }
-
-      //
-      if (not FLoadingGroup) and (ext = '.groupproj')  then
+    ofnFileOpening :
       begin
-        //if the groupproj doesn't exist, it's a placeholder and we are about to load a single project
-        if not FileExists(FileName) then
+        FLogger.Debug('IDE File Opening ' + FileName);
+
+        {
+          Since there's no built in way to determine when the project group has finished
+          loading, we have to cheat here.
+
+          We load up the list of projects in the group, and then as each one is loaded
+          (we get notified here) we remove them from the list. when the list is empty
+          we are done and can continue. This has the added benefit of running restore
+          when the grouproj is loading but before the project is loaded, so no reload loop
+          to deal with!
+        }
+
+        //
+        if (not FLoadingGroup) and (ext = '.groupproj') then
+        begin
+          //if the groupproj doesn't exist, it's a placeholder and we are about to load a single project
+          if not FileExists(FileName) then
+          begin
+            FLoadMode := TProjectLoadType.plSingle;
+            FProjectTreeManager.NotifyStartLoading(plSingle, nil);
+            exit;
+          end;
+          //the group file exists, so we are definitely loading a group
+          FLoadingGroup := true;
+          FLoadMode := TProjectLoadType.plGroup;
+          //need this to determine when we are done loading the project group.
+          if not LoadProjectGroup(FileName) then
+            exit;
+          FLoadMode := TProjectLoadType.plGroup;
+          FProjectTreeManager.NotifyStartLoading(plGroup, FGroupProjects);
+          exit;
+        end
+        else
         begin
           FLoadMode := TProjectLoadType.plSingle;
           FProjectTreeManager.NotifyStartLoading(plSingle, nil);
-          exit;
+          FLoadingGroup := false;
         end;
-        //the group file exists, so we are definitely loading a group
-        FLoadingGroup := true;
-        FLoadMode := TProjectLoadType.plGroup;
-        //need this to determine when we are done loading the project group.
-        if not LoadProjectGroup(FileName) then
-          exit;
-        FLoadMode := TProjectLoadType.plGroup;
-        FProjectTreeManager.NotifyStartLoading(plGroup, FGroupProjects);
-        exit;
-      end
-      else
+
+
+        cancellationTokenSource := TCancellationTokenSourceFactory.Create;
+        FLogger.ShowMessageTab;
+        FLogger.StartRestore;
+        FLogger.StartProject(FileName);
+        restoreOptions := CreateOptions(fileName);
+
+        FPackageInstaller.Restore(cancellationTokenSource.Token, restoreOptions);
+
+        FLogger.EndRestore;
+
+
+
+      end;
+    ofnFileOpened :
       begin
-        FLoadMode := TProjectLoadType.plSingle;
-        FProjectTreeManager.NotifyStartLoading(plSingle, nil);
-        FLoadingGroup := false;
-      end;
+        if ext <> '.dproj' then
+          exit;
 
-
-      cancellationTokenSource := TCancellationTokenSourceFactory.Create;
-      FLogger.ShowMessageTab;
-      FLogger.StartRestore;
-      FLogger.StartProject(FileName);
-      restoreOptions := CreateOptions(fileName);
-
-      FPackageInstaller.Restore(cancellationTokenSource.Token, restoreOptions);
-
-      FLogger.EndRestore;
-
-
-
-    end;
-    ofnFileOpened:
-    begin
-      if ext <> '.dproj' then
-        exit;
-
-      case FLoadMode of
-        plNone: ;
-        plSingle: FProjectTreeManager.NotifyEndLoading(plSingle);
-        plGroup:
-        begin
-          if FLoadingGroup and (ext = '.dproj')  then
-          begin
-            FGroupProjects.Remove(FileName);
-            if FGroupProjects.Count = 0 then
+        case FLoadMode of
+          plNone : ;
+          plSingle : FProjectTreeManager.NotifyEndLoading(plSingle);
+          plGroup :
             begin
-              FLoadingGroup := false;
-              FProjectTreeManager.NotifyEndLoading(plGroup);
-              FLoadMode := plNone;
+              if FLoadingGroup and (ext = '.dproj') then
+              begin
+                FGroupProjects.Remove(FileName);
+                if FGroupProjects.Count = 0 then
+                begin
+                  FLoadingGroup := false;
+                  FProjectTreeManager.NotifyEndLoading(plGroup);
+                  FLoadMode := plNone;
+                end;
+              end;
             end;
-          end;
         end;
       end;
-    end;
-    ofnFileClosing:
-    begin
-      if not( ExtractFileExt(FileName) = '.dproj') then
+    ofnFileClosing :
+      begin
+        if not (ExtractFileExt(FileName) = '.dproj') then
+          exit;
+        FLogger.Clear;
+        FProjectTreeManager.NotifyProjectClosed(FileName);
+        FEditorViewManager.ProjectClosed(FileName);
         exit;
-      FLogger.Clear;
-      FProjectTreeManager.NotifyProjectClosed(FileName);
-      FEditorViewManager.ProjectClosed(FileName);
-      exit;
-    end;
+      end;
   else
     exit;
   end;
@@ -280,3 +280,4 @@ begin
 end;
 
 end.
+

@@ -38,7 +38,7 @@ uses
 type
   //wrapper for archive zip file (or extracted folder).
   IPackageArchive = interface
-  ['{A5CE5203-6405-49D9-9F86-AB6D10580D1C}']
+    ['{A5CE5203-6405-49D9-9F86-AB6D10580D1C}']
     function GetArchiveName : string;
     function GetArchivePath : string;
     function Open(const fileName : string) : boolean;
@@ -53,7 +53,7 @@ type
   end;
 
   IPackageArchiveReader = interface(IPackageArchive)
-  ['{28705A4E-7B7D-4C56-A48F-77D706D0AD26}']
+    ['{28705A4E-7B7D-4C56-A48F-77D706D0AD26}']
     //Read the metaDataFile into a stream;
     function ReadMetaDataFile(const stream : TStream) : boolean;
     function ReadFileNames : TArray<string>;
@@ -62,13 +62,13 @@ type
   end;
 
   IPackageArchiveWriter = interface(IPackageArchive)
-  ['{B1BA4ED1-E456-42DE-AA17-AA53480EE645}']
+    ['{B1BA4ED1-E456-42DE-AA17-AA53480EE645}']
     procedure SetBasePath(const path : string);
-    function WriteMetaDataFile(const stream: TStream): Boolean;
+    function WriteMetaDataFile(const stream : TStream) : Boolean;
     function AddIcon(const filePath : string) : boolean;
-    function AddFile(const filePath: string): Boolean;overload;
-    function AddFile(const fileName : string; const archiveFileName : string) : boolean;overload;
-    function AddFiles(const files: System.TArray<System.string>): Boolean;
+    function AddFile(const filePath : string) : Boolean; overload;
+    function AddFile(const fileName : string; const archiveFileName : string) : boolean; overload;
+    function AddFiles(const files : System.TArray < System.string > ) : Boolean;
   end;
 
 
@@ -77,4 +77,5 @@ implementation
 
 
 end.
+
 

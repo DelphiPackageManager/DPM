@@ -40,14 +40,14 @@ type
   private
     FName : string;
   protected
-    function GetName: string;
-    function LoadFromJson(const jsonObject: TJsonObject): Boolean;override;
-    function AllowDependencyGroups: Boolean; override;
-    function AllowSearchPathGroups: Boolean; override;
-    function IsTemplate: Boolean; override;
+    function GetName : string;
+    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
+    function AllowDependencyGroups : Boolean; override;
+    function AllowSearchPathGroups : Boolean; override;
+    function IsTemplate : Boolean; override;
 
   public
-    constructor Create(const logger : ILogger);override;
+    constructor Create(const logger : ILogger); override;
 
   end;
 
@@ -59,34 +59,34 @@ uses
 
 { TSpecTemplate }
 
-function TSpecTemplate.AllowDependencyGroups: Boolean;
+function TSpecTemplate.AllowDependencyGroups : Boolean;
 begin
   result := true;
 end;
 
-function TSpecTemplate.AllowSearchPathGroups: Boolean;
+function TSpecTemplate.AllowSearchPathGroups : Boolean;
 begin
   result := true;
 end;
 
-constructor TSpecTemplate.Create(const logger: ILogger);
+constructor TSpecTemplate.Create(const logger : ILogger);
 begin
   inherited Create(logger);
 end;
 
 
-function TSpecTemplate.GetName: string;
+function TSpecTemplate.GetName : string;
 begin
   result := FName;
 end;
 
 
-function TSpecTemplate.IsTemplate: Boolean;
+function TSpecTemplate.IsTemplate : Boolean;
 begin
   result := true;
 end;
 
-function TSpecTemplate.LoadFromJson(const jsonObject: TJsonObject): Boolean;
+function TSpecTemplate.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 begin
   result := true;
   FName := jsonObject.S['name'];
@@ -96,3 +96,4 @@ begin
 end;
 
 end.
+

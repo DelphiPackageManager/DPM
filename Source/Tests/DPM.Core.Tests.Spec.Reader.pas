@@ -36,11 +36,9 @@ type
   {$M+}
   [TestFixture]
   TSpecReaderTests = class
-
   public
     [SetupFixture]
     procedure FixtureSetup;
-
     [TearDownFixture]
     procedure FixtureTearDown;
   published
@@ -71,10 +69,10 @@ end;
 
 procedure TSpecReaderTests.Test_can_load_core_spec;
 var
-  spec : IPackageSpec;
-  reader : IPackageSpecReader;
-//  lastError : string;
-  filePath : string;
+  spec :IPackageSpec;
+  reader :IPackageSpecReader;
+  //  lastError : string;
+  filePath :string;
 begin
   reader := TPackageSpecReader.Create(TTestLogger.Create);
   filePath := ExtractFilePath(ParamStr(0)) + '..\..\..\DPM.Core.dspec';
@@ -87,3 +85,4 @@ initialization
   //TDUnitX.RegisterTestFixture(TSpecReaderTests);
 
 end.
+

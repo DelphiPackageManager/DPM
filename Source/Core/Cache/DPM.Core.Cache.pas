@@ -44,20 +44,20 @@ type
     FLocation : string;
   protected
     procedure SetLocation(const value : string);
-    function GetLocation: string;
+    function GetLocation : string;
     function GetPackagesFolder : string;
 
-    function CachePackage(const packageId : IPackageId; const saveFile: Boolean): Boolean;
-    function Clean: Boolean;
-    function CreatePackagePath(const packageId : IPackageId): string;
-    function GetPackagePath(const packageId : IPackageId): string;
-    function EnsurePackage(const packageId : IPackageId): Boolean;
+    function CachePackage(const packageId : IPackageId; const saveFile : Boolean) : Boolean;
+    function Clean : Boolean;
+    function CreatePackagePath(const packageId : IPackageId) : string;
+    function GetPackagePath(const packageId : IPackageId) : string;
+    function EnsurePackage(const packageId : IPackageId) : Boolean;
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
 
     function GetPackageMetadata(const packageId : IPackageId) : IPackageMetadata;
 
-    function InstallPackage(const packageId : IPackageId; const saveFile : boolean; const source : string = '' ) : boolean;
+    function InstallPackage(const packageId : IPackageId; const saveFile : boolean; const source : string = '') : boolean;
 
     function InstallPackageFromFile(const packageFileName : string; const saveFile : boolean) : boolean;
 
@@ -78,38 +78,38 @@ uses
 
 { TPackageCache }
 
-function TPackageCache.CachePackage(const packageId : IPackageId; const saveFile: Boolean): Boolean;
+function TPackageCache.CachePackage(const packageId : IPackageId; const saveFile : Boolean) : Boolean;
 begin
   result := false;
 end;
 
-function TPackageCache.Clean: Boolean;
+function TPackageCache.Clean : Boolean;
 begin
   result := false;
 end;
 
-constructor TPackageCache.Create(const logger: ILogger; const specReader : IPackageSpecReader);
+constructor TPackageCache.Create(const logger : ILogger; const specReader : IPackageSpecReader);
 begin
   FLogger := logger;
   FSpecReader := specReader;
 end;
 
-function TPackageCache.CreatePackagePath(const packageId : IPackageId): string;
+function TPackageCache.CreatePackagePath(const packageId : IPackageId) : string;
 begin
   result := GetPackagePath(packageId);
   if not ForceDirectories(result) then
   begin
-    FLogger.Error('Error creating package folder [' + result + ']' );
+    FLogger.Error('Error creating package folder [' + result + ']');
     exit;
   end;
 end;
 
-function TPackageCache.GetLocation: string;
+function TPackageCache.GetLocation : string;
 begin
   result := FLocation;
 end;
 
-function TPackageCache.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId): IPackageInfo;
+function TPackageCache.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
 var
   packageFolder : string;
   metaDataFile : string;
@@ -125,13 +125,13 @@ begin
     FLogger.Debug('Package metadata file [' + metaDataFile + '] not found in cache.');
     exit;
   end;
-  spec :=FSpecReader.ReadSpec(metaDataFile);
+  spec := FSpecReader.ReadSpec(metaDataFile);
   if spec = nil then
     exit;
   Result := TPackageInfo.CreateFromSpec('', spec);
 end;
 
-function TPackageCache.GetPackageMetadata(const packageId : IPackageId): IPackageMetadata;
+function TPackageCache.GetPackageMetadata(const packageId : IPackageId) : IPackageMetadata;
 var
   packageFolder : string;
   metaDataFile : string;
@@ -152,24 +152,24 @@ begin
     FLogger.Debug('Package metadata file [' + metaDataFile + '] not found in cache.');
     exit;
   end;
-  spec :=FSpecReader.ReadSpec(metaDataFile);
+  spec := FSpecReader.ReadSpec(metaDataFile);
   if spec = nil then
     exit;
   Result := TPackageMetadata.CreateFromSpec('', spec);
 end;
 
-function TPackageCache.GetPackagePath(const packageId : IPackageId): string;
+function TPackageCache.GetPackagePath(const packageId : IPackageId) : string;
 begin
   result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim + DPMPlatformToString(packageId.platform) + PathDelim + packageId.Id + PathDelim + packageId.Version.ToStringNoMeta;
 end;
 
-function TPackageCache.GetPackagesFolder: string;
+function TPackageCache.GetPackagesFolder : string;
 begin
-//  result := IncludeTrailingPathDelimiter(FLocation);
+  //  result := IncludeTrailingPathDelimiter(FLocation);
   result := TPath.GetFullPath(FLocation)
 end;
 
-function TPackageCache.EnsurePackage(const packageId : IPackageId): Boolean;
+function TPackageCache.EnsurePackage(const packageId : IPackageId) : Boolean;
 var
   packageFileName : string;
   packagesFolder : string;
@@ -187,12 +187,12 @@ begin
   end;
 end;
 
-function TPackageCache.InstallPackage(const packageId: IPackageId; const saveFile: boolean; const source: string): boolean;
+function TPackageCache.InstallPackage(const packageId : IPackageId; const saveFile : boolean; const source : string) : boolean;
 begin
-   result := false;
+  result := false;
 end;
 
-function TPackageCache.InstallPackageFromFile(const packageFileName: string; const saveFile: boolean): boolean;
+function TPackageCache.InstallPackageFromFile(const packageFileName : string; const saveFile : boolean) : boolean;
 var
   packageFilePath : string;
   fileName : string;
@@ -200,7 +200,7 @@ var
   packageFolder : string;
 begin
   result := false;
-//  FLogger.Debug('[PackageCache] installing from file : ' + packageFileName);
+  //  FLogger.Debug('[PackageCache] installing from file : ' + packageFileName);
   if not FileExists(packageFileName) then
   begin
     FLogger.Error('Package File [' + packageFileName + '] does not exist');
@@ -212,14 +212,14 @@ begin
     exit;
   end;
 
-  fileName := ChangeFileExt(ExtractFileName(packageFileName),'');
+  fileName := ChangeFileExt(ExtractFileName(packageFileName), '');
 
   //if savefile, copy to cache folder.
-  if not TPackageIdentity.TryCreateFromString(FLogger,fileName,'',packageIndentity)  then
+  if not TPackageIdentity.TryCreateFromString(FLogger, fileName, '', packageIndentity) then
     exit;
 
   //creates the folder
-  packageFolder := CreatePackagePath(packageIndentity );
+  packageFolder := CreatePackagePath(packageIndentity);
 
   if saveFile then
   begin
@@ -227,7 +227,7 @@ begin
     begin
       packageFilePath := GetPackagesFolder + PathDelim + ExtractFileName(packageFileName);
       try
-        TFile.Copy(packageFileName,packageFilePath, true);
+        TFile.Copy(packageFileName, packageFilePath, true);
       except
         on e : Exception do
         begin
@@ -267,3 +267,4 @@ begin
 end;
 
 end.
+

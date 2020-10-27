@@ -38,9 +38,9 @@ type
   TLocalClient = class(TInterfacedObject, ISourceClient)
   private
     FLogger : ILogger;
-    FSourceUri  : IUri;
+    FSourceUri : IUri;
   protected
-    function Push(const pushOptions: TPushOptions): Boolean;
+    function Push(const pushOptions : TPushOptions) : Boolean;
   public
     constructor Create(const logger : ILogger; const sourceUri : IUri);
   end;
@@ -53,19 +53,19 @@ uses
 
 { TLocalClient }
 
-constructor TLocalClient.Create(const logger: ILogger; const sourceUri : IUri);
+constructor TLocalClient.Create(const logger : ILogger; const sourceUri : IUri);
 begin
   FLogger := logger;
   FSourceUri := sourceUri;
 end;
 
-function TLocalClient.Push(const pushOptions: TPushOptions): Boolean;
+function TLocalClient.Push(const pushOptions : TPushOptions) : Boolean;
 var
   targetFile : string;
 begin
   result := false;
-//  if TPath.IsRelativePath(pushOptions.PackagePath) then
-    pushOptions.PackagePath := TPath.GetFullPath(pushOptions.PackagePath);
+  //  if TPath.IsRelativePath(pushOptions.PackagePath) then
+  pushOptions.PackagePath := TPath.GetFullPath(pushOptions.PackagePath);
 
   if not FileExists(pushOptions.PackagePath) then
   begin
@@ -87,7 +87,7 @@ begin
     targetFile := TPath.Combine(FSourceUri.LocalPath, TPath.GetFileName(pushOptions.PackagePath));
     if pushOptions.SkipDuplicate and TFile.Exists(targetFile) then
     begin
-      FLogger.Information('Package [' + TPath.GetFileName(pushOptions.PackagePath)+ '] exists and skipDuplicates specified, skipping');
+      FLogger.Information('Package [' + TPath.GetFileName(pushOptions.PackagePath) + '] exists and skipDuplicates specified, skipping');
       exit(true);
     end;
 
@@ -97,9 +97,10 @@ begin
   except
     on e : Exception do
     begin
-      FLogger.Error('Unable to copy file [' + pushOptions.PackagePath +'] to [' + FSourceUri.LocalPath + '] : ' + e.Message);
+      FLogger.Error('Unable to copy file [' + pushOptions.PackagePath + '] to [' + FSourceUri.LocalPath + '] : ' + e.Message);
     end;
   end;
 end;
 
 end.
+

@@ -40,14 +40,14 @@ type
     FLogger : ILogger;
     FConfigManager : IConfigurationManager;
   protected
-    function AddSource(const options: TSourcesOptions): Boolean;
-    function DisableSource(const options: TSourcesOptions): Boolean;
-    function EnableSource(const options: TSourcesOptions): Boolean;
-    function ListSources(const options: TSourcesOptions): Boolean;
-    function RemoveSource(const options: TSourcesOptions): Boolean;
-    function UpdateSource(const options: TSourcesOptions): Boolean;
+    function AddSource(const options : TSourcesOptions) : Boolean;
+    function DisableSource(const options : TSourcesOptions) : Boolean;
+    function EnableSource(const options : TSourcesOptions) : Boolean;
+    function ListSources(const options : TSourcesOptions) : Boolean;
+    function RemoveSource(const options : TSourcesOptions) : Boolean;
+    function UpdateSource(const options : TSourcesOptions) : Boolean;
   public
-    constructor Create(const logger : ILogger; const configManager : IConfigurationManager);reintroduce;
+    constructor Create(const logger : ILogger; const configManager : IConfigurationManager); reintroduce;
   end;
 
 implementation
@@ -61,7 +61,7 @@ uses
 
 { TSourcesManager }
 
-function TSourcesManager.AddSource(const options: TSourcesOptions): Boolean;
+function TSourcesManager.AddSource(const options : TSourcesOptions) : Boolean;
 var
   config : IConfiguration;
   source : ISourceConfig;
@@ -89,10 +89,10 @@ begin
     exit;
   end;
 
-  if config.Sources.Where(function(const item : ISourceConfig):boolean
-                      begin
-                        result := SameText(item.Name, options.Name);
-                      end).Any then
+  if config.Sources.Where(function(const item : ISourceConfig) : boolean
+    begin
+      result := SameText(item.Name, options.Name);
+    end).Any then
   begin
     FLogger.Error('Source with name [' + options.Name + '] already exists');
     exit;
@@ -111,13 +111,13 @@ begin
 
 end;
 
-constructor TSourcesManager.Create(const logger: ILogger; const configManager : IConfigurationManager);
+constructor TSourcesManager.Create(const logger : ILogger; const configManager : IConfigurationManager);
 begin
   FLogger := logger;
   FConfigManager := configManager;
 end;
 
-function TSourcesManager.DisableSource(const options: TSourcesOptions): Boolean;
+function TSourcesManager.DisableSource(const options : TSourcesOptions) : Boolean;
 var
   config : IConfiguration;
   source : ISourceConfig;
@@ -138,10 +138,10 @@ begin
     exit;
   end;
 
-  source := config.Sources.Where(function(const item : ISourceConfig):boolean
-                      begin
-                        result := SameText(item.Name, options.Name);
-                      end).FirstOrDefault;
+  source := config.Sources.Where(function(const item : ISourceConfig) : boolean
+    begin
+      result := SameText(item.Name, options.Name);
+    end).FirstOrDefault;
   if source = nil then
   begin
     FLogger.Error('Source with name [' + options.Name + '] not found.');
@@ -154,7 +154,7 @@ begin
 end;
 
 
-function TSourcesManager.EnableSource(const options: TSourcesOptions): Boolean;
+function TSourcesManager.EnableSource(const options : TSourcesOptions) : Boolean;
 var
   config : IConfiguration;
   source : ISourceConfig;
@@ -175,10 +175,10 @@ begin
     exit;
   end;
 
-  source := config.Sources.Where(function(const item : ISourceConfig):boolean
-                      begin
-                        result := SameText(item.Name, options.Name);
-                      end).FirstOrDefault;
+  source := config.Sources.Where(function(const item : ISourceConfig) : boolean
+    begin
+      result := SameText(item.Name, options.Name);
+    end).FirstOrDefault;
   if source = nil then
   begin
     FLogger.Error('Source with name [' + options.Name + '] not found.');
@@ -190,7 +190,7 @@ begin
     FLogger.Information('Enabled Source  [' + options.Name + '].', false);
 end;
 
-function TSourcesManager.ListSources(const options: TSourcesOptions): Boolean;
+function TSourcesManager.ListSources(const options : TSourcesOptions) : Boolean;
 var
   config : IConfiguration;
   i : integer;
@@ -224,23 +224,23 @@ begin
     exit;
   if options.Format = TSourcesFormat.Short then
   begin
-    for i := 0 to config.Sources.Count -1 do
-      FLogger.Information(Format('%s %s',[EnabledToChar(config.Sources[i].IsEnabled), config.Sources[i].Source]));
+    for i := 0 to config.Sources.Count - 1 do
+      FLogger.Information(Format('%s %s', [EnabledToChar(config.Sources[i].IsEnabled), config.Sources[i].Source]));
   end
   else
   begin
     FLogger.Information('Registered Sources:');
     FLogger.Information('', false);
-    for i := 0 to config.Sources.Count -1 do
+    for i := 0 to config.Sources.Count - 1 do
     begin
-      FLogger.Information(Format('  %d.  %s  [%s]',[i+1,config.Sources[i].Name,EnabledToString(config.Sources[i].IsEnabled)]));
-      FLogger.Information(Format('      %s',[config.Sources[i].Source]) , false);
+      FLogger.Information(Format('  %d.  %s  [%s]', [i + 1, config.Sources[i].Name, EnabledToString(config.Sources[i].IsEnabled)]));
+      FLogger.Information(Format('      %s', [config.Sources[i].Source]), false);
     end;
   end;
   result := true;
 end;
 
-function TSourcesManager.RemoveSource(const options: TSourcesOptions): Boolean;
+function TSourcesManager.RemoveSource(const options : TSourcesOptions) : Boolean;
 var
   config : IConfiguration;
   source : ISourceConfig;
@@ -261,10 +261,10 @@ begin
     exit;
   end;
 
-  source := config.Sources.Where(function(const item : ISourceConfig):boolean
-                      begin
-                        result := SameText(item.Name, options.Name);
-                      end).FirstOrDefault;
+  source := config.Sources.Where(function(const item : ISourceConfig) : boolean
+    begin
+      result := SameText(item.Name, options.Name);
+    end).FirstOrDefault;
   if source = nil then
   begin
     FLogger.Error('Source with name [' + options.Name + '] not found.');
@@ -276,7 +276,7 @@ begin
     FLogger.Information('Source [' + options.Name + '] removed.', false);
 end;
 
-function TSourcesManager.UpdateSource(const options: TSourcesOptions): Boolean;
+function TSourcesManager.UpdateSource(const options : TSourcesOptions) : Boolean;
 var
   config : IConfiguration;
   source : ISourceConfig;
@@ -297,10 +297,10 @@ begin
     exit;
   end;
 
-  source := config.Sources.Where(function(const item : ISourceConfig):boolean
-                      begin
-                        result := SameText(item.Name, options.Name);
-                      end).FirstOrDefault;
+  source := config.Sources.Where(function(const item : ISourceConfig) : boolean
+    begin
+      result := SameText(item.Name, options.Name);
+    end).FirstOrDefault;
   if source = nil then
   begin
     FLogger.Error('Source with name [' + options.Name + '] not found.');
@@ -317,3 +317,4 @@ begin
 end;
 
 end.
+

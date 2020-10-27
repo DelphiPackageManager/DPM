@@ -27,7 +27,7 @@ uses
 type
   //implemented by the EditorViewFrame
   IPackageSearcher = interface
-  ['{4FBB9E7E-886A-4B7D-89FF-FA5DBC9D93FD}']
+    ['{4FBB9E7E-886A-4B7D-89FF-FA5DBC9D93FD}']
     function GetSearchOptions : TSearchOptions;
     function SearchForPackages(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;
     function GetCurrentPlatform : string;
@@ -37,22 +37,22 @@ type
   end;
 
   TPackageDetailsFrame = class(TFrame)
-    sbPackageDetails: TScrollBox;
-    pnlPackageId: TPanel;
-    pnlInstalled: TPanel;
-    lblPackageId: TLabel;
-    imgPackageLogo: TImage;
-    pnlVersion: TPanel;
-    Label1: TLabel;
-    txtInstalledVersion: TEdit;
-    btnUninstall: TButton;
-    lblVersionTitle: TLabel;
-    cboVersions: TComboBox;
-    btnInstallOrUpdate: TButton;
-    procedure cboVersionsMeasureItem(Control: TWinControl; Index: Integer; var Height: Integer);
-    procedure cboVersionsDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
-    procedure cboVersionsChange(Sender: TObject);
-    procedure btnInstallOrUpdateClick(Sender: TObject);
+    sbPackageDetails : TScrollBox;
+    pnlPackageId : TPanel;
+    pnlInstalled : TPanel;
+    lblPackageId : TLabel;
+    imgPackageLogo : TImage;
+    pnlVersion : TPanel;
+    Label1 : TLabel;
+    txtInstalledVersion : TEdit;
+    btnUninstall : TButton;
+    lblVersionTitle : TLabel;
+    cboVersions : TComboBox;
+    btnInstallOrUpdate : TButton;
+    procedure cboVersionsMeasureItem(Control : TWinControl; Index : Integer; var Height : Integer);
+    procedure cboVersionsDrawItem(Control : TWinControl; Index : Integer; Rect : TRect; State : TOwnerDrawState);
+    procedure cboVersionsChange(Sender : TObject);
+    procedure btnInstallOrUpdateClick(Sender : TObject);
   private
     FContainer : TContainer;
     FIconCache : TDPMIconCache;
@@ -75,13 +75,13 @@ type
     FIDEStyleServices : TCustomStyleServices;
 
   protected
-    procedure SetIncludePreRelease(const Value: boolean);
+    procedure SetIncludePreRelease(const Value : boolean);
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
     procedure Loaded; override;
 
   public
-    constructor Create(AOwner : TComponent);override;
+    constructor Create(AOwner : TComponent); override;
     procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectFile : string);
     procedure Configure(const value : TCurrentTab; const preRelease : boolean);
     procedure SetPackage(const package : IPackageSearchResultItem);
@@ -108,9 +108,9 @@ const
   cLatestStable = 'Latest stable ';
   cLatestPrerelease = 'Latest prerelease ';
 
-{ TPackageDetailsFrame }
+  { TPackageDetailsFrame }
 
-procedure TPackageDetailsFrame.btnInstallOrUpdateClick(Sender: TObject);
+procedure TPackageDetailsFrame.btnInstallOrUpdateClick(Sender : TObject);
 var
   packageInstaller : IPackageInstaller;
   options : TInstallOptions;
@@ -126,7 +126,7 @@ begin
     FLogger.Clear;
     FPackageSearcher.SaveBeforeChange;
 
-    FLogger.Information('Installing package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + ']' );
+    FLogger.Information('Installing package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + ']');
 
     options := TInstallOptions.Create;
     options.ConfigFile := FConfiguration.FileName;
@@ -139,19 +139,19 @@ begin
     if btnInstallOrUpdate.Caption = 'Update' then
       options.Force := true;
 
-    packageInstaller :=  FContainer.Resolve<IPackageInstaller>;
+    packageInstaller := FContainer.Resolve<IPackageInstaller>;
 
     if packageInstaller.Install(FCancellationTokenSource.Token, options) then
     begin
       FPackageMetaData.InstalledVersion := FPackageMetaData.Version;
       FPackageMetaData.Installed := true;
       FPackageInstalledVersion := FPackageMetaData.InstalledVersion;
-      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + '] installed.' );
+      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + '] installed.');
       FPackageSearcher.PackageInstalled(FPackageMetaData);
       SetPackage(FPackageMetaData);
     end
     else
-      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + '] did not install.' );
+      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + '] did not install.');
 
   finally
     btnInstallOrUpdate.Enabled := true;
@@ -161,7 +161,7 @@ begin
 
 end;
 
-procedure TPackageDetailsFrame.cboVersionsChange(Sender: TObject);
+procedure TPackageDetailsFrame.cboVersionsChange(Sender : TObject);
 var
   searchOptions : TSearchOptions;
   package : IPackageSearchResultItem;
@@ -172,9 +172,9 @@ begin
 
   sVersion := cboVersions.Items[cboVersions.ItemIndex];
   if TStringUtils.StartsWith(sVersion, cLatestPrerelease, true) then
-    Delete(sVersion,1, Length(cLatestPrerelease))
-  else  if TStringUtils.StartsWith(sVersion, cLatestStable, true) then
-    Delete(sVersion,1, Length(cLatestStable));
+    Delete(sVersion, 1, Length(cLatestPrerelease))
+  else if TStringUtils.StartsWith(sVersion, cLatestStable, true) then
+    Delete(sVersion, 1, Length(cLatestStable));
 
   searchOptions.Version := TPackageVersion.Parse(sVersion);
   searchOptions.Prerelease := true;
@@ -182,37 +182,37 @@ begin
   searchOptions.Trial := true;
 
   FPackageSearcher.SearchForPackages(searchOptions)
-    .OnException(
-      procedure(const e : Exception)
-      begin
-        FRequestInFlight := false;
-        if FClosing then
-          exit;
-        FLogger.Error(e.Message);
-      end)
-    .OnCancellation(
-      procedure
-      begin
-        FRequestInFlight := false;
-        //if the view is closing do not do anything else.
-        if FClosing then
-          exit;
-        FLogger.Debug('Cancelled searching for packages.');
-      end)
-    .Await(
-      procedure(const theResult : IList<IPackageSearchResultItem>)
-      begin
-        FRequestInFlight := false;
-        //if the view is closing do not do anything else.
-        if FClosing then
-          exit;
-//        FLogger.Debug('Got search results.');
-        package := theResult.FirstOrDefault;
-        SetPackage(package);
-      end);
+  .OnException(
+    procedure(const e : Exception)
+    begin
+      FRequestInFlight := false;
+      if FClosing then
+        exit;
+      FLogger.Error(e.Message);
+    end)
+  .OnCancellation(
+    procedure
+    begin
+      FRequestInFlight := false;
+      //if the view is closing do not do anything else.
+      if FClosing then
+        exit;
+      FLogger.Debug('Cancelled searching for packages.');
+    end)
+  .Await(
+    procedure(const theResult : IList<IPackageSearchResultItem>)
+    begin
+      FRequestInFlight := false;
+      //if the view is closing do not do anything else.
+      if FClosing then
+        exit;
+      //        FLogger.Debug('Got search results.');
+      package := theResult.FirstOrDefault;
+      SetPackage(package);
+    end);
 end;
 
-procedure TPackageDetailsFrame.cboVersionsDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
+procedure TPackageDetailsFrame.cboVersionsDrawItem(Control : TWinControl; Index : Integer; Rect : TRect; State : TOwnerDrawState);
 begin
   cboVersions.Canvas.FillRect(Rect);
 
@@ -232,13 +232,13 @@ begin
   begin
     cboVersions.Canvas.Pen.Color := clGray;
     cboVersions.Canvas.MoveTo(Rect.Left, Rect.Bottom - 1);
-    cboVersions.Canvas.LineTo(Rect.Right, Rect.Bottom -1);
+    cboVersions.Canvas.LineTo(Rect.Right, Rect.Bottom - 1);
   end;
 
 
 end;
 
-procedure TPackageDetailsFrame.cboVersionsMeasureItem(Control: TWinControl; Index: Integer; var Height: Integer);
+procedure TPackageDetailsFrame.cboVersionsMeasureItem(Control : TWinControl; Index : Integer; var Height : Integer);
 begin
   if (cboVersions.Items.Count = 0) or (index < 0) then
     exit;
@@ -255,28 +255,28 @@ begin
     FCurrentTab := value;
     FIncludePreRelease := preRelease;
     case FCurrentTab of
-      TCurrentTab.Installed:
-      begin
-        btnInstallOrUpdate.Caption := 'Update';
-      end;
-      TCurrentTab.Updates:
-      begin
-        btnInstallOrUpdate.Caption := 'Update';
+      TCurrentTab.Installed :
+        begin
+          btnInstallOrUpdate.Caption := 'Update';
+        end;
+      TCurrentTab.Updates :
+        begin
+          btnInstallOrUpdate.Caption := 'Update';
 
-      end;
-      TCurrentTab.Search:
-      begin
-        btnInstallOrUpdate.Caption := 'Install';
+        end;
+      TCurrentTab.Search :
+        begin
+          btnInstallOrUpdate.Caption := 'Install';
 
-      end;
-      TCurrentTab.Conflicts: ;
+        end;
+      TCurrentTab.Conflicts : ;
     end;
 
   end;
 
 end;
 
-constructor TPackageDetailsFrame.Create(AOwner: TComponent);
+constructor TPackageDetailsFrame.Create(AOwner : TComponent);
 begin
   inherited;
   //not published in older versions, so get removed when we edit in older versions.
@@ -305,7 +305,7 @@ begin
 
 end;
 
-procedure TPackageDetailsFrame.Init(const container: TContainer; const iconCache: TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectFile : string);
+procedure TPackageDetailsFrame.Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectFile : string);
 begin
   FContainer := container;
   FIconCache := iconCache;
@@ -320,29 +320,29 @@ end;
 procedure TPackageDetailsFrame.Loaded;
 begin
   inherited;
-//  sbPackageDetails.Color := Self.Color;
-//  sbPackageDetails.ParentBackground := false;
-//
-//  FDetailsPanel.ParentColor := true;
-//  FDetailsPanel.ParentBackground := false;
-//  FDetailsPanel.Color := Self.Color;
-//  FDetailsPanel.Font.Assign(Self.Font);
+  //  sbPackageDetails.Color := Self.Color;
+  //  sbPackageDetails.ParentBackground := false;
+  //
+  //  FDetailsPanel.ParentColor := true;
+  //  FDetailsPanel.ParentBackground := false;
+  //  FDetailsPanel.Color := Self.Color;
+  //  FDetailsPanel.Font.Assign(Self.Font);
 
 end;
 
-procedure TPackageDetailsFrame.OnDetailsUriClick(Sender: TObject; const uri: string; const element: TDetailElement);
+procedure TPackageDetailsFrame.OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
 begin
   case element of
-    deNone: ;
-    deLicense: ;
+    deNone : ;
+    deLicense : ;
     deProjectUrl,
-    deReportUrl:  ShellExecute(Application.Handle, 'open', PChar(uri), nil, nil, SW_SHOWNORMAL);
-    deTags: ;
+    deReportUrl : ShellExecute(Application.Handle, 'open', PChar(uri), nil, nil, SW_SHOWNORMAL);
+    deTags : ;
   end;
 
 end;
 
-procedure TPackageDetailsFrame.SetIncludePreRelease(const Value: boolean);
+procedure TPackageDetailsFrame.SetIncludePreRelease(const Value : boolean);
 begin
   if FIncludePreRelease <> Value then
   begin
@@ -351,7 +351,7 @@ begin
   end;
 end;
 
-procedure TPackageDetailsFrame.SetPackage(const package: IPackageSearchResultItem);
+procedure TPackageDetailsFrame.SetPackage(const package : IPackageSearchResultItem);
 var
   logo : IPackageIconImage;
   bFetchVersions : boolean;
@@ -409,25 +409,25 @@ begin
 
     case FCurrentTab of
       TCurrentTab.Search :
-      begin
-        if pnlInstalled.Visible then
         begin
-          btnInstallOrUpdate.Caption := 'Update'
-        end
-        else
-        begin
-          btnInstallOrUpdate.Caption := 'Install';
+          if pnlInstalled.Visible then
+          begin
+            btnInstallOrUpdate.Caption := 'Update'
+          end
+          else
+          begin
+            btnInstallOrUpdate.Caption := 'Install';
+          end;
         end;
-      end;
-      TCurrentTab.Installed:
-      begin
-        btnInstallOrUpdate.Caption := 'Update';
-      end;
-      TCurrentTab.Updates:
-      begin
-        btnInstallOrUpdate.Caption := 'Update';
-      end;
-      TCurrentTab.Conflicts: ;
+      TCurrentTab.Installed :
+        begin
+          btnInstallOrUpdate.Caption := 'Update';
+        end;
+      TCurrentTab.Updates :
+        begin
+          btnInstallOrUpdate.Caption := 'Update';
+        end;
+      TCurrentTab.Conflicts : ;
     end;
 
     txtInstalledVersion.Text := FPackageInstalledVersion;
@@ -441,15 +441,15 @@ begin
   else
   begin
     sbPackageDetails.Visible := false;
-//    pnlPackageId.Visible := false;
-//    pnlInstalled.Visible := false;
-//    pnlVErsion.Visible := false;
+    //    pnlPackageId.Visible := false;
+    //    pnlInstalled.Visible := false;
+    //    pnlVErsion.Visible := false;
   end;
 
   FDetailsPanel.SetDetails(package);
 end;
 
-procedure TPackageDetailsFrame.SetPlatform(const platform: TDPMPlatform);
+procedure TPackageDetailsFrame.SetPlatform(const platform : TDPMPlatform);
 begin
   if platform <> FCurrentPlatform then
   begin
@@ -461,10 +461,10 @@ procedure TPackageDetailsFrame.ThemeChanged;
 {$IFDEF THEMESERVICES}
 var
   ideThemeSvc : IOTAIDEThemingServices;
-{$ENDIF}
+  {$ENDIF}
 begin
   {$IFDEF THEMESERVICES}
-  ideThemeSvc := (BorlandIDEServices As IOTAIDEThemingServices);
+  ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
   ideThemeSvc.ApplyTheme(Self);
   FIDEStyleServices := ideThemeSvc.StyleServices;
   {$ELSE}
@@ -489,7 +489,7 @@ begin
   FDetailsPanel.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
 end;
 
-procedure TPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);
+procedure TPackageDetailsFrame.VersionsDelayTimerEvent(Sender : TObject);
 var
   versions : IList<TPackageVersion>;
   repoManager : IPackageRepositoryManager;
@@ -515,83 +515,83 @@ begin
 
   config := FConfiguration;
 
-  TAsync.Configure<IList<TPackageVersion>>(
-        function (const cancelToken : ICancellationToken) : IList<TPackageVersion>
-        begin
-          //this is calling the wrong overload.
-          result := repoManager.GetPackageVersions(cancelToken, options,config);
-          //simulating long running.
-        end,FCancellationTokenSource.Token)
-        .OnException(
-          procedure(const e : Exception)
-          begin
-            FRequestInFlight := false;
-            if FClosing then
-              exit;
-            FLogger.Error(e.Message);
-          end)
-        .OnCancellation(
-        procedure
-        begin
-          FRequestInFlight := false;
-          //if the view is closing do not do anything else.
-          if FClosing then
-            exit;
-          FLogger.Debug('Cancelled getting conflicting packages.');
-        end)
-        .Await(
-          procedure(const theResult : IList<TPackageVersion>)
-          var
-            version : TPackageVersion;
-          begin
-            FRequestInFlight := false;
-            //if the view is closing do not do anything else.
-            if FClosing then
-              exit;
-            versions := theResult;
-            FLogger.Debug('Got package versions .');
-            cboVersions.Items.BeginUpdate;
-            try
-              cboVersions.Clear;
+  TAsync.Configure < IList<TPackageVersion> > (
+    function(const cancelToken : ICancellationToken) : IList<TPackageVersion>
+    begin
+      //this is calling the wrong overload.
+      result := repoManager.GetPackageVersions(cancelToken, options, config);
+      //simulating long running.
+    end, FCancellationTokenSource.Token)
+  .OnException(
+    procedure(const e : Exception)
+    begin
+      FRequestInFlight := false;
+      if FClosing then
+        exit;
+      FLogger.Error(e.Message);
+    end)
+  .OnCancellation(
+    procedure
+    begin
+      FRequestInFlight := false;
+      //if the view is closing do not do anything else.
+      if FClosing then
+        exit;
+      FLogger.Debug('Cancelled getting conflicting packages.');
+    end)
+  .Await(
+    procedure(const theResult : IList<TPackageVersion>)
+    var
+      version : TPackageVersion;
+    begin
+      FRequestInFlight := false;
+      //if the view is closing do not do anything else.
+      if FClosing then
+        exit;
+      versions := theResult;
+      FLogger.Debug('Got package versions .');
+      cboVersions.Items.BeginUpdate;
+      try
+        cboVersions.Clear;
 
-              if versions.Any then
+        if versions.Any then
+        begin
+          if options.Prerelease then
+          begin
+            version := versions.Where(
+              function(const value : TPackageVersion) : boolean
               begin
-                if options.Prerelease then
-                begin
-                  version := versions.Where(
-                    function(const value : TPackageVersion) : boolean
-                    begin
-                      result := value.IsStable = false;
-                    end).FirstOrDefault;
-                  if not version.IsEmpty then
-                    lPre := cLatestPrerelease + version.ToStringNoMeta;
-                end;
-                version := versions.Where(
-                  function(const value : TPackageVersion) : boolean
-                  begin
-                    result := value.IsStable;
-                  end).FirstOrDefault;
-                if not version.IsEmpty then
-                  lStable := cLatestStable + version.ToStringNoMeta;
-                if (lStable <> '') and (lPre <> '') then
-                begin
-                  cboVersions.Items.Add(lPre);
-                  cboVersions.Items.AddObject(lStable, TObject(1));
-                end
-                else if lStable <> '' then
-                  cboVersions.Items.AddObject(lStable, TObject(1))
-                else  if lPre <> '' then
-                  cboVersions.Items.AddObject(lPre, TObject(1));
-                for version in versions do
-                  cboVersions.Items.Add(version.ToStringNoMeta);
-                cboVersions.ItemIndex := 0;
-                btnInstallOrUpdate.Enabled := cboVersions.Items[0] <> FPackageInstalledVersion;
-              end;
-            finally
-              cboVersions.Items.EndUpdate;
-            end;
+                result := value.IsStable = false;
+              end).FirstOrDefault;
+            if not version.IsEmpty then
+              lPre := cLatestPrerelease + version.ToStringNoMeta;
+          end;
+          version := versions.Where(
+            function(const value : TPackageVersion) : boolean
+            begin
+              result := value.IsStable;
+            end).FirstOrDefault;
+          if not version.IsEmpty then
+            lStable := cLatestStable + version.ToStringNoMeta;
+          if (lStable <> '') and (lPre <> '') then
+          begin
+            cboVersions.Items.Add(lPre);
+            cboVersions.Items.AddObject(lStable, TObject(1));
+          end
+          else if lStable <> '' then
+            cboVersions.Items.AddObject(lStable, TObject(1))
+          else if lPre <> '' then
+            cboVersions.Items.AddObject(lPre, TObject(1));
+          for version in versions do
+            cboVersions.Items.Add(version.ToStringNoMeta);
+          cboVersions.ItemIndex := 0;
+          btnInstallOrUpdate.Enabled := cboVersions.Items[0] <> FPackageInstalledVersion;
+        end;
+      finally
+        cboVersions.Items.EndUpdate;
+      end;
 
-          end);
+    end);
 
 end;
 
@@ -603,3 +603,4 @@ begin
 end;
 
 end.
+

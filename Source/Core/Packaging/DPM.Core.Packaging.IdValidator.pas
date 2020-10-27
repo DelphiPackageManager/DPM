@@ -29,10 +29,10 @@ uses
 
 class constructor TPackageIdValidator.Create;
 begin
-  FRegex := TRegex.Create('^[a-zA-Z](?:\w+)\.(?:\w+)$',[roIgnoreCase]);
+  FRegex := TRegex.Create('^[a-zA-Z](?:\w+)\.(?:\w+)$', [roIgnoreCase]);
 end;
 
-class function TPackageIdValidator.IsValidPackageId(const Id: string): boolean;
+class function TPackageIdValidator.IsValidPackageId(const Id : string) : boolean;
 begin
   if Id = '' then
     result := false
@@ -40,17 +40,18 @@ begin
     result := FRegex.IsMatch(Id);
 end;
 
-class procedure TPackageIdValidator.ValidatePackageId(const Id: string);
+class procedure TPackageIdValidator.ValidatePackageId(const Id : string);
 begin
   if Id = '' then
     raise EArgumentNilException.Create('Id is empty');
 
   if Length(Id) > cMaxPackageIdLength then
-    raise EArgumentException.Create('Length of Id [' +Id +'] exceeds max Id length [' + IntToStr(cMaxPackageIdLength) +']');
+    raise EArgumentException.Create('Length of Id [' + Id + '] exceeds max Id length [' + IntToStr(cMaxPackageIdLength) + ']');
 
   if not IsValidPackageId(Id) then
-    raise EArgumentException.Create('Invalid Package Id [' +Id +']');
+    raise EArgumentException.Create('Invalid Package Id [' + Id + ']');
 
 end;
 
 end.
+

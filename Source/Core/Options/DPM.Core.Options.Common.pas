@@ -34,9 +34,9 @@ uses
 type
   TCommonOptions = class
   private
-    FNoBanner   : boolean;
-    FVerbosity  : TVerbosity;
-    FHelp       : boolean;
+    FNoBanner : boolean;
+    FVerbosity : TVerbosity;
+    FHelp : boolean;
     FConfigFile : string;
     FNonInteractive : boolean;
     class var
@@ -47,10 +47,10 @@ type
     constructor Create;
 
     property NonInteractive : boolean read FNonInteractive write FNonInteractive;
-    property NoBanner   : boolean    read FNoBanner  write FNoBanner;
-    property Verbosity  : TVerbosity read FVerbosity write FVerbosity;
-    property Help       : boolean    read FHelp      write FHelp;
-    property ConfigFile : string     read FConfigFile write FConfigFile;
+    property NoBanner : boolean read FNoBanner write FNoBanner;
+    property Verbosity : TVerbosity read FVerbosity write FVerbosity;
+    property Help : boolean read FHelp write FHelp;
+    property ConfigFile : string read FConfigFile write FConfigFile;
   end;
 implementation
 
@@ -71,3 +71,4 @@ begin
 end;
 
 end.
+

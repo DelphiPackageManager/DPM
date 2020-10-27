@@ -57,7 +57,7 @@ uses
 
 procedure TDPMTargetPlatformTestFixture.Can_Parse_Valid_String;
 var
-  value : TTargetPlatform;
+  value :TTargetPlatform;
 begin
   Assert.IsTrue(TTargetPlatform.TryParse('RSXE7.Win32', value));
   Assert.IsTrue(TTargetPlatform.TryParse('10.3.Win32', value));
@@ -69,11 +69,11 @@ begin
   Assert.WillRaise(
     procedure
     var
-      value : TTargetPlatform;
+      value :TTargetPlatform;
     begin
       value := TTargetPlatform.Parse('');
     end
-    ,EArgumentException);
+    , EArgumentException);
 
 end;
 
@@ -82,11 +82,11 @@ begin
   Assert.WillRaise(
     procedure
     var
-      value : TTargetPlatform;
+      value :TTargetPlatform;
     begin
       value := TTargetPlatform.Parse('RSXE9.Win32');
     end
-    ,EArgumentOutOfRangeException);
+    , EArgumentOutOfRangeException);
 
 
 end;
@@ -96,11 +96,11 @@ begin
   Assert.WillRaise(
     procedure
     var
-      value : TTargetPlatform;
+      value :TTargetPlatform;
     begin
       value := TTargetPlatform.Parse('RSXE7.Win23');
     end
-    ,EArgumentOutOfRangeException);
+    , EArgumentOutOfRangeException);
 
 
 end;
@@ -111,11 +111,11 @@ begin
   Assert.WillRaise(
     procedure
     var
-      value : TTargetPlatform;
+      value :TTargetPlatform;
     begin
       value := TTargetPlatform.Parse('XE2.');
     end
-    ,EArgumentException);
+    , EArgumentException);
 
 end;
 
@@ -123,3 +123,4 @@ initialization
   TDUnitX.RegisterTestFixture(TDPMTargetPlatformTestFixture);
 
 end.
+

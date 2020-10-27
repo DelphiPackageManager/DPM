@@ -39,11 +39,11 @@ type
 
     function GetIsValid : boolean;
   public
-    class operator Equal(a: TTargetPlatform; b: TTargetPlatform) : boolean;
+    class operator Equal(a : TTargetPlatform; b : TTargetPlatform) : boolean;
     class operator NotEqual(a : TTargetPlatform; b : TTargetPlatform) : boolean;
-    class function Parse(const value : string) : TTargetPlatform;static;
-    class function TryParse(const value : string; out targetPlatform : TTargetPlatform) : boolean;static;
-    class function Empty : TTargetPlatform;static;
+    class function Parse(const value : string) : TTargetPlatform; static;
+    class function TryParse(const value : string; out targetPlatform : TTargetPlatform) : boolean; static;
+    class function Empty : TTargetPlatform; static;
 
     constructor Create(const compiler : TCompilerVersion; const platform : TDPMPlatform);
 
@@ -80,44 +80,44 @@ end;
 { TTargetPlatform }
 
 
-function TTargetPlatform.IsCompatibleWith(const value: TTargetPlatform): boolean;
+function TTargetPlatform.IsCompatibleWith(const value : TTargetPlatform) : boolean;
 begin
   result := (Self.Compiler = value.Compiler) and (Self.Platform = value.Platform);
-    exit;
+  exit;
 end;
 
-function TTargetPlatform.Clone: TTargetPlatform;
+function TTargetPlatform.Clone : TTargetPlatform;
 begin
   result := TTargetPlatform.Create(FCompiler, FPlatform);
 end;
 
-constructor TTargetPlatform.Create(const compiler: TCompilerVersion; const platform : TDPMPlatform);
+constructor TTargetPlatform.Create(const compiler : TCompilerVersion; const platform : TDPMPlatform);
 begin
   FCompiler := compiler;
   FPlatform := platform;
 end;
 
-class function TTargetPlatform.Empty: TTargetPlatform;
+class function TTargetPlatform.Empty : TTargetPlatform;
 begin
   result := TTargetPlatform.Create(TCompilerVersion.UnknownVersion, TDPMPlatform.UnknownPlatform);
 end;
 
-class operator TTargetPlatform.Equal(a, b: TTargetPlatform): boolean;
+class operator TTargetPlatform.Equal(a, b : TTargetPlatform) : boolean;
 begin
-  result := (a.Compiler = b.Compiler)  and (a.Platform = b.Platform);
+  result := (a.Compiler = b.Compiler) and (a.Platform = b.Platform);
 end;
 
-function TTargetPlatform.GetIsValid: boolean;
+function TTargetPlatform.GetIsValid : boolean;
 begin
   result := ValidatePlatform(FCompiler, FPlatform);
 end;
 
-class operator TTargetPlatform.NotEqual(a, b: TTargetPlatform): boolean;
+class operator TTargetPlatform.NotEqual(a, b : TTargetPlatform) : boolean;
 begin
   result := not (a = b);
 end;
 
-class function TTargetPlatform.Parse(const value: string): TTargetPlatform;
+class function TTargetPlatform.Parse(const value : string) : TTargetPlatform;
 var
   parts : array[0..1] of string;
   target : TCompilerVersion;
@@ -125,9 +125,9 @@ var
   i : integer;
 begin
   i := LastDelimiter('.', value);
-  if i = 0  then
+  if i = 0 then
     raise EArgumentException.Create(value + ' is not a valid target platform, format is [Target].[Platform], e.g: RSXE7.Win32');
-  parts[0] := Copy(value, 1, i -1);
+  parts[0] := Copy(value, 1, i - 1);
   parts[1] := Copy(value, i + 1, length(value));
 
   if (parts[0] = '') or (parts[1] = '') then
@@ -135,33 +135,34 @@ begin
 
   target := StringToCompilerVersion(parts[0]);
   if target = TCompilerVersion.UnknownVersion then
-    raise EArgumentOutOfRangeException.Create('Invalid Compiler version : ' + parts[0] );
+    raise EArgumentOutOfRangeException.Create('Invalid Compiler version : ' + parts[0]);
 
   platform := StringToDPMPlatform(parts[1]);
   if platform = TDPMPlatform.UnknownPlatform then
-    raise EArgumentOutOfRangeException.Create('Invalid Platform : ' + parts[1] );
+    raise EArgumentOutOfRangeException.Create('Invalid Platform : ' + parts[1]);
   result := TTargetPlatform.Create(target, platform);
 end;
 
 
-function TTargetPlatform.ToString: string;
+function TTargetPlatform.ToString : string;
 var
   sCompiler : string;
   sPlatform : string;
 begin
-  sCompiler := GetEnumName(typeinfo(TCompilerVersion),ord(Compiler));
-  sPlatform := GetEnumName(typeinfo(TDPMPlatform),ord(FPlatform));
-  result := Format('%s.%s',[sCompiler, sPlatform]);
+  sCompiler := GetEnumName(typeinfo(TCompilerVersion), ord(Compiler));
+  sPlatform := GetEnumName(typeinfo(TDPMPlatform), ord(FPlatform));
+  result := Format('%s.%s', [sCompiler, sPlatform]);
 end;
 
-class function TTargetPlatform.TryParse(const value: string; out targetPlatform: TTargetPlatform): boolean;
+class function TTargetPlatform.TryParse(const value : string; out targetPlatform : TTargetPlatform) : boolean;
 begin
   result := true;
   try
-    targetPlatform :=  TTargetPlatform.Parse(value);
+    targetPlatform := TTargetPlatform.Parse(value);
   except
     result := false;
   end;
 end;
 
 end.
+

@@ -49,7 +49,7 @@ uses
 
 { TProcess }
 
-class function TProcess.Execute(const cancellationToken : ICancellationToken; const exe, commandLine: string): Cardinal;
+class function TProcess.Execute(const cancellationToken : ICancellationToken; const exe, commandLine : string) : Cardinal;
 var
   shellInfo : TShellExecuteInfo;
   waitHandles : array[0..1] of THandle;
@@ -70,25 +70,25 @@ begin
   begin
     waitHandles[0] := shellInfo.hProcess;
     waitHandles[1] := cancellationToken.Handle;
-    waitRes := WaitForMultipleObjects(2,@waithandles[0],false, 60000 );
+    waitRes := WaitForMultipleObjects(2, @waithandles[0], false, 60000);
     try
       case waitRes of
-        WAIT_OBJECT_0: // Process has exited
+        WAIT_OBJECT_0 : // Process has exited
           begin
             //all good
           end;
-        WAIT_OBJECT_0 + 1: // Event signalled to terminate process
+        WAIT_OBJECT_0 + 1 : // Event signalled to terminate process
           begin
             TerminateProcess(shellInfo.hProcess, 999);
             result := 999;
           end;
-        WAIT_TIMEOUT: // Timed out
+        WAIT_TIMEOUT : // Timed out
           begin
             TerminateProcess(shellInfo.hProcess, 888);
 
           end;
       else // Something else happened (like WAIT_FAILED)
-          raise Exception.Create('Unexpected event wait result ' + IntToStr(waitRes));
+        raise Exception.Create('Unexpected event wait result ' + IntToStr(waitRes));
       end;
     finally
       GetExitCodeProcess(shellInfo.hProcess, result);
@@ -100,3 +100,4 @@ begin
 end;
 
 end.
+

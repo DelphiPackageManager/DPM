@@ -33,7 +33,7 @@ uses
 
 type
   ILogger = interface
-  ['{92B7AF6E-37BC-4315-A59F-275DD5D906A1}']
+    ['{92B7AF6E-37BC-4315-A59F-275DD5D906A1}']
     procedure Debug(const data : string);
     procedure Verbose(const data : string);
     procedure Information(const data : string; const important : boolean = false);
@@ -50,3 +50,4 @@ type
 implementation
 
 end.
+

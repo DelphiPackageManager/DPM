@@ -41,14 +41,15 @@ uses
 
 { TIntegerUtils }
 
-class function TIntegerUtils.InToStringAbbr(const value: Int64): string;
+class function TIntegerUtils.InToStringAbbr(const value : Int64) : string;
 begin
   if value > 1000000 then
     result := IntToStr(value div 1000000) + 'M'
-  else if value > 1000  then
+  else if value > 1000 then
     result := IntToStr(value div 1000) + 'K'
   else
     result := IntToStr(value);
 end;
 
 end.
+
