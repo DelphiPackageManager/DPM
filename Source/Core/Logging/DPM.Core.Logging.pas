@@ -35,10 +35,11 @@ type
   ILogger = interface
     ['{92B7AF6E-37BC-4315-A59F-275DD5D906A1}']
     procedure Debug(const data : string);
-    procedure Verbose(const data : string);
+    procedure Verbose(const data : string; const important : boolean = false);
     procedure Information(const data : string; const important : boolean = false);
-    procedure Warning(const data : string);
+    procedure Warning(const data : string; const important : boolean = false);
     procedure Error(const data : string);
+    procedure Success(const data : string; const important : boolean = false);
     procedure Clear; //not implemented in the console logger.
 
     function GetVerbosity : TVerbosity;

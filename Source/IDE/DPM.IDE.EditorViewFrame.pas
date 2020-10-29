@@ -48,6 +48,7 @@ uses
   DPM.IDE.IconCache,
   DPM.Core.Types,
   DPM.Core.Logging,
+  DPM.IDE.Logger,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Options.Search,
   DPM.Core.Package.Interfaces,
@@ -58,9 +59,9 @@ uses
   System.Actions,
   {$IFEND}
   {$IF CompilerVersion >= 30.0 }
-  System.ImageList,
+//  System.ImageList,
   {$IFEND}
-  Vcl.ActnList, DPM.IDE.PackageDetailsFrame;
+  Vcl.ActnList, DPM.IDE.PackageDetailsFrame, System.ImageList;
 
 type
   TRowLayout = record
@@ -118,7 +119,7 @@ type
 
     //dpm core stuff
     FContainer : TContainer;
-    FLogger : ILogger;
+    FLogger : IDPMIDELogger;
     FProjectTreeManager : IDPMProjectTreeManager;
     FConfigurationManager : IConfigurationManager;
     FConfiguration : IConfiguration;
@@ -659,6 +660,7 @@ begin
   FProject.Refresh(true);
   //force the project tree to update after installing package.
   FProjectTreeManager.NotifyEndLoading(TProjectLoadType.plSingle);
+
   // Do not do this, it will overrwrite package changes.
   //FProject.MarkModified;
 
@@ -674,6 +676,9 @@ begin
     FInstalledPackages := nil;
   end;
   FProject.Refresh(true);
+
+  //force the project tree to update after installing package.
+  FProjectTreeManager.NotifyEndLoading(TProjectLoadType.plSingle);
   // Do not do this, it will overrwrite package changes.
   //  FProject.MarkModified;
 end;
@@ -1312,7 +1317,7 @@ begin
     lblProject.Caption := 'DPM : Project Group';
   end;
 
-  FLogger := FContainer.Resolve<ILogger>;
+  FLogger := FContainer.Resolve<IDPMIDELogger>;
 
   //if there is a project specific config file then that is what we should use.
   sConfigFile := IncludeTrailingPathDelimiter(ExtractFilePath(projectOrGroup.FileName)) + cDPMConfigFileName;

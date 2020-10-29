@@ -12,6 +12,7 @@ uses
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Package.Interfaces,
   DPM.Core.Logging,
+  DPM.IDE.Logger,
   DPM.Core.Options.Search,
   DPM.IDE.PackageDetailsPanel,
   DPM.IDE.IconCache,
@@ -53,6 +54,7 @@ type
     procedure cboVersionsDrawItem(Control : TWinControl; Index : Integer; Rect : TRect; State : TOwnerDrawState);
     procedure cboVersionsChange(Sender : TObject);
     procedure btnInstallOrUpdateClick(Sender : TObject);
+    procedure btnUninstallClick(Sender: TObject);
   private
     FContainer : TContainer;
     FIconCache : TDPMIconCache;
@@ -64,7 +66,7 @@ type
     FRequestInFlight : boolean;
     FVersionsDelayTimer : TTimer;
     FConfiguration : IConfiguration;
-    FLogger : ILogger;
+    FLogger : IDPMIDELogger;
     FClosing : boolean;
     FIncludePreRelease : boolean;
     FPackageInstalledVersion : string;
@@ -102,7 +104,8 @@ uses
   DPM.Core.Utils.Strings,
   DPM.Core.Dependency.Version,
   DPM.Core.Repository.Interfaces,
-  DPM.Core.Options.Install;
+  DPM.Core.Options.Install,
+  DPM.Core.Options.UnInstall;
 
 const
   cLatestStable = 'Latest stable ';
@@ -125,7 +128,7 @@ begin
     FCancellationTokenSource.Reset;
     FLogger.Clear;
     FPackageSearcher.SaveBeforeChange;
-
+    FLogger.ShowMessageTab;
     FLogger.Information('Installing package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + ']');
 
     options := TInstallOptions.Create;
@@ -151,13 +154,58 @@ begin
       SetPackage(FPackageMetaData);
     end
     else
-      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + '] did not install.');
+      FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + '] did not install.');
 
   finally
     btnInstallOrUpdate.Enabled := true;
   end;
 
 
+
+end;
+
+procedure TPackageDetailsFrame.btnUninstallClick(Sender: TObject);
+var
+  packageInstaller : IPackageInstaller;
+  options : TUnInstallOptions;
+begin
+  btnUninstall.Enabled := false;
+  try
+    if FRequestInFlight then
+      FCancellationTokenSource.Cancel;
+
+    while FRequestInFlight do
+      Application.ProcessMessages;
+    FCancellationTokenSource.Reset;
+    FLogger.Clear;
+    FPackageSearcher.SaveBeforeChange;
+    FLogger.ShowMessageTab;
+    FLogger.Information('UnInstalling package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + ']');
+
+    options := TUnInstallOptions.Create;
+    options.ConfigFile := FConfiguration.FileName;
+    options.PackageId := FPackageMetaData.Id;
+    options.Version := TPackageVersion.Parse(FPackageMetaData.Version);
+    options.ProjectPath := FProjectFile;
+    options.Platforms := [ProjectPlatformToDPMPlatform(FPackageSearcher.GetCurrentPlatform)];
+
+    packageInstaller := FContainer.Resolve<IPackageInstaller>;
+
+    if packageInstaller.UnInstall(FCancellationTokenSource.Token, options) then
+    begin
+      FPackageMetaData.InstalledVersion := FPackageMetaData.Version;
+      FPackageMetaData.Installed := true;
+      FPackageInstalledVersion := FPackageMetaData.InstalledVersion;
+      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + '] uninstalled.');
+      FPackageSearcher.PackageUninstalled(FPackageMetaData);
+      SetPackage(nil);
+    end
+    else
+      FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + '] did not uninstall.');
+
+  finally
+  btnUninstall.Enabled := true;
+  end;
 
 end;
 
@@ -310,7 +358,7 @@ begin
   FContainer := container;
   FIconCache := iconCache;
   FConfiguration := config;
-  FLogger := FContainer.Resolve<ILogger>;
+  FLogger := FContainer.Resolve<IDPMIDELogger>;
   FPackageSearcher := packageSearcher;
   FProjectFile := projectFile;
   SetPackage(nil);

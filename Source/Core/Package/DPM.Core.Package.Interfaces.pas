@@ -229,6 +229,7 @@ type
   IPackageInstaller = interface
     ['{554A0842-6C83-42BD-882C-B49FE4619DE0}']
     function Install(const cancellationToken : ICancellationToken; const options : TInstallOptions) : boolean;
+    function UnInstall(const cancellationToken : ICancellationToken; const options : TUnInstallOptions) : boolean;
     function Restore(const cancellationToken : ICancellationToken; const options : TRestoreOptions) : boolean;
     function Cache(const cancellationToken : ICancellationToken; const options : TCacheOptions) : boolean;
     function Remove(const cancellationToken : ICancellationToken; const options : TUninstallOptions) : boolean;

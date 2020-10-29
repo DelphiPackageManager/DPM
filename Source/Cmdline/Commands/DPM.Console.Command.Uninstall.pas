@@ -30,25 +30,63 @@ interface
 
 uses
   VSoft.Awaitable,
+  DPM.Core.Configuration.Interfaces,
+  DPM.Core.Logging,
+  DPM.Core.Package.Interfaces,
   DPM.Console.ExitCodes,
   DPM.Console.Command,
   DPM.Console.Command.Base;
 
 type
   TUninstallCommand = class(TBaseCommand)
+  private
+    FPackageInstaller : IPackageInstaller;
   protected
     function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
+  public
+    constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const packageInstaller : IPackageInstaller);reintroduce;
   end;
 
 
 implementation
 
+uses
+  System.SysUtils,
+  DPM.Core.Types,
+  DPM.Core.Options.Common,
+  DPM.Core.Options.UnInstall;
+
 { TRemoveCommand }
+
+constructor TUninstallCommand.Create(const logger: ILogger; const configurationManager: IConfigurationManager; const packageInstaller: IPackageInstaller);
+begin
+  inherited Create(logger, configurationManager);
+  FPackageInstaller := packageInstaller;
+
+end;
 
 function TUninstallCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
-  Logger.Error('Remove command not implemented');
-  result := TExitCode.NotImplemented;
+  TUnInstallOptions.Default.ApplyCommon(TCommonOptions.Default);
+
+  //project path - if it's empty, specify the current directory
+  //do this before validation!
+
+  if TUnInstallOptions.Default.ProjectPath = '' then
+    TUnInstallOptions.Default.ProjectPath := GetCurrentDir;
+
+  if not TUnInstallOptions.Default.Validate(Logger) then
+  begin
+    result := TExitCode.InvalidArguments;
+    exit;
+  end;
+
+ //TODO : This is not ideal, we have no way of returning more specific exit codes here - rethink api?
+  if not FPackageInstaller.UnInstall(cancellationToken, TUnInstallOptions.Default) then
+    result := TExitCode.Error
+  else
+    result := TExitCode.OK;
+
 end;
 
 end.

@@ -155,6 +155,7 @@ object PackageDetailsFrame: TPackageDetailsFrame
         Anchors = [akTop, akRight]
         Caption = 'Uninstall'
         TabOrder = 1
+        OnClick = btnUninstallClick
       end
     end
     object pnlVersion: TPanel

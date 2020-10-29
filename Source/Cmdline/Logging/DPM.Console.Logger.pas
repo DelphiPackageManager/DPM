@@ -42,8 +42,9 @@ type
     procedure Debug(const data: string);
     procedure Error(const data: string);
     procedure Information(const data: string; const important : boolean = false);
-    procedure Verbose(const data: string);
-    procedure Warning(const data: string);
+    procedure Success(const data: string; const important : boolean = false);
+    procedure Verbose(const data: string; const important : boolean = false);
+    procedure Warning(const data: string; const important : boolean = false);
     function GetVerbosity : TVerbosity;
     procedure SetVerbosity(const value : TVerbosity);
     procedure Clear;
@@ -72,8 +73,9 @@ begin
   if FVerbosity < TVerbosity.Debug then
     exit;
 
-  FConsole.SetColour(ccWhite);
+  FConsole.SetColour(ccGrey);
   FConsole.Write(data);
+  FConsole.SetColour(ccDefault);
 end;
 
 procedure TDPMConsoleLogger.Error(const data: string);
@@ -98,7 +100,7 @@ begin
   if important then
     FConsole.SetColour(ccBrightWhite)
   else
-    FConsole.SetColour(ccDefault);
+    FConsole.SetColour(ccWhite);
   FConsole.Write(data);
   FConsole.SetColour(ccDefault);
 end;
@@ -108,21 +110,39 @@ begin
   FVerbosity := value;
 end;
 
-procedure TDPMConsoleLogger.Verbose(const data: string);
+procedure TDPMConsoleLogger.Success(const data: string; const important: boolean);
 begin
-  if (FVerbosity < TVerbosity.Detailed) then
+  if (FVerbosity < TVerbosity.Normal) and (not important) then
     exit;
 
-  FConsole.SetColour(ccWhite);
+  if important then
+    FConsole.SetColour(ccBrightGreen)
+  else
+    FConsole.SetColour(ccDarkGreen);
   FConsole.Write(data);
   FConsole.SetColour(ccDefault);
 end;
 
-procedure TDPMConsoleLogger.Warning(const data: string);
+procedure TDPMConsoleLogger.Verbose(const data: string; const important : boolean);
+begin
+  if (FVerbosity < TVerbosity.Detailed) then
+    exit;
+
+  if important then
+    FConsole.SetColour(ccBrightWhite)
+  else
+    FConsole.SetColour(ccWhite);
+  FConsole.Write(data);
+  FConsole.SetColour(ccDefault);
+end;
+
+procedure TDPMConsoleLogger.Warning(const data: string; const important : boolean);
 begin
   //always log warnings
-
-  FConsole.SetColour(ccBrightYellow);
+  if important then
+    FConsole.SetColour(ccBrightYellow)
+  else
+    FConsole.SetColour(ccDarkYellow);
   FConsole.Write(data);
   FConsole.SetColour(ccDefault);
 end;

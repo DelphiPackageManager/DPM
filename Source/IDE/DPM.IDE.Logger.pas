@@ -53,12 +53,11 @@ type
     procedure Debug(const data : string);
     procedure Error(const data : string);
     procedure Information(const data : string; const important : Boolean = False);
-    procedure Verbose(const data : string);
-    procedure Warning(const data : string);
+    procedure Success(const data : string; const important : Boolean = False);
+    procedure Verbose(const data : string; const important : Boolean = False);
+    procedure Warning(const data : string; const important : Boolean = False);
     function GetVerbosity : TVerbosity;
     procedure SetVerbosity(const value : TVerbosity);
-
-
 
     procedure Clear;
     procedure ShowMessageTab;
@@ -203,7 +202,26 @@ begin
   //  FMessageServices.AddTitleMessage('Restoring DPM packages', FMessageGroup);
 end;
 
-procedure TDPMIDELogger.Verbose(const data : string);
+procedure TDPMIDELogger.Success(const data: string; const important: Boolean);
+var
+  lineRef : Pointer;
+  infoProc : TThreadProcedure;
+begin
+  if (FVerbosity < TVerbosity.Normal) and (not important) then
+    exit;
+
+  infoProc := procedure
+  begin
+    FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+  end;
+
+  if TThread.CurrentThread.ThreadID = MainThreadID then
+    infoProc
+  else
+    TThread.Queue(nil, infoProc);
+end;
+
+procedure TDPMIDELogger.Verbose(const data : string; const important : Boolean);
 var
   lineRef : Pointer;
   verboseProc : TThreadProcedure;
@@ -223,7 +241,7 @@ begin
 
 end;
 
-procedure TDPMIDELogger.Warning(const data : string);
+procedure TDPMIDELogger.Warning(const data : string; const important : Boolean);
 var
   lineRef : Pointer;
   warningProc : TThreadProcedure;

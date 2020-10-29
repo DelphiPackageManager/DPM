@@ -100,7 +100,7 @@ begin
     result := false;
   end;
 
-  if TUninstallOptions.Default.PackageId = '' then
+  if PackageId = '' then
   begin
     Logger.Error('The <packageId> option must be specified.');
     result := false;

@@ -29,7 +29,8 @@ uses
 
 class constructor TPackageIdValidator.Create;
 begin
-  FRegex := TRegex.Create('^[a-zA-Z](?:\w+)\.(?:\w+)$', [roIgnoreCase]);
+  //prefx must start with A-Z and must be at least 3 chars.
+  FRegex := TRegex.Create('^[A-Z](?:\w+){2,}(?:\.\w+)+$', [roIgnoreCase]);
 end;
 
 class function TPackageIdValidator.IsValidPackageId(const Id : string) : boolean;

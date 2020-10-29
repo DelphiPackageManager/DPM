@@ -787,9 +787,30 @@ begin
       TUninstallOptions.Default.ProjectPath := value;
     end);
 
+
+  option := cmd.RegisterOption<string>('platforms','p', 'The platforms to install for (comma separated). Default is to install for all platforms the project targets.',
+   procedure(const value : string)
+   var
+     platformStrings : TArray<string>;
+     platformString : string;
+     platform : TDPMPlatform;
+   begin
+      platformStrings := TStringUtils.SplitStr(value, ',',TSplitStringOptions.ExcludeEmpty);
+      for platformString in platformStrings do
+      begin
+        platform := StringToDPMPlatform(Trim(platformString));
+        if platform <> TDPMPlatform.UnknownPlatform then
+          TInstallOptions.Default.Platforms := TInstallOptions.Default.Platforms + [platform]
+        else
+          raise Exception.Create('Invalid platform [' + platformString + ']');
+      end;
+    end);
+
+
   cmd.Examples.Add('uninstall VSoft.CommandLine');
   cmd.Examples.Add('uninstall VSoft.CommandLine project1.dproj');
   cmd.Examples.Add('uninstall VSoft.CommandLine c:\myprojects\project1.dproj');
+  cmd.Examples.Add('uninstall VSoft.CommandLine c:\myprojects\project1.dproj -platforms=Win64,OSX64');
   cmd.Examples.Add('uninstall VSoft.CommandLine c:\myprojects\project1.groupproj');
 end;
 

@@ -41,9 +41,10 @@ uses
 procedure ShowBanner(const consoleWriter : IConsoleWriter);
 begin
   Assert(consoleWriter <> nil, 'No console writer available');
-  consoleWriter.SetColour(ccBrightWhite, ccDefault);
-  consoleWriter.WriteLine('Delphi Package Manager - Version : ' + TDPMWindowsUtils.GetVersionString);
-  consoleWriter.SetColour(ccDefault);
+  consoleWriter.WriteLine('');
+  consoleWriter.SetColour(ccBrightAqua, ccDefault);
+  consoleWriter.WriteLine('DPM - Delphi Package Manager - Version : ' + TDPMWindowsUtils.GetVersionString);
+  consoleWriter.SetColour(ccBrightWhite);
   consoleWriter.WriteLine('© 2019-2020 Vincent Parrett and Contributors');
   //consoleWriter.WriteLine('License - http://www.apache.org/licenses/LICENSE-2.0');
   consoleWriter.WriteLine('');

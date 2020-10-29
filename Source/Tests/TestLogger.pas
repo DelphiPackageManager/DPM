@@ -12,8 +12,9 @@ type
     procedure Debug(const data: string);
     procedure Error(const data: string);
     procedure Information(const data: string; const important : boolean = false);
-    procedure Verbose(const data: string);
-    procedure Warning(const data: string);
+    procedure Success(const data: string; const important : boolean = false);
+    procedure Verbose(const data: string; const important : boolean = false);
+    procedure Warning(const data: string; const important : boolean = false);
     procedure Clear;
 
     function GetVerbosity : TVerbosity;
@@ -54,12 +55,17 @@ begin
 
 end;
 
-procedure TTestLogger.Verbose(const data: string);
+procedure TTestLogger.Success(const data: string;  const important: boolean);
 begin
 
 end;
 
-procedure TTestLogger.Warning(const data: string);
+procedure TTestLogger.Verbose(const data: string; const important : boolean);
+begin
+
+end;
+
+procedure TTestLogger.Warning(const data: string; const important : boolean);
 begin
 
 end;
