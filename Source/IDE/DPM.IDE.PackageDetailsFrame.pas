@@ -54,7 +54,7 @@ type
     procedure cboVersionsDrawItem(Control : TWinControl; Index : Integer; Rect : TRect; State : TOwnerDrawState);
     procedure cboVersionsChange(Sender : TObject);
     procedure btnInstallOrUpdateClick(Sender : TObject);
-    procedure btnUninstallClick(Sender: TObject);
+    procedure btnUninstallClick(Sender : TObject);
   private
     FContainer : TContainer;
     FIconCache : TDPMIconCache;
@@ -164,7 +164,7 @@ begin
 
 end;
 
-procedure TPackageDetailsFrame.btnUninstallClick(Sender: TObject);
+procedure TPackageDetailsFrame.btnUninstallClick(Sender : TObject);
 var
   packageInstaller : IPackageInstaller;
   options : TUnInstallOptions;
@@ -204,7 +204,7 @@ begin
       FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + '] did not uninstall.');
 
   finally
-  btnUninstall.Enabled := true;
+    btnUninstall.Enabled := true;
   end;
 
 end;
@@ -538,7 +538,7 @@ begin
 
   FDetailsPanel.StyleElements := [seFont];
   FDetailsPanel.Color := sbPackageDetails.Color;
-  FDetailsPanel.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);;
+  FDetailsPanel.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
 
   {$ELSE}
   sbPackageDetails.Color := FIDEStyleServices.GetSystemColor(clWindow);
@@ -663,4 +663,3 @@ begin
 end;
 
 end.
-
