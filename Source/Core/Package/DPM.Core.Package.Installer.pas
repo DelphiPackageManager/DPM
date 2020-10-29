@@ -356,6 +356,7 @@ var
   packageInfo : IPackageInfo; //includes dependencies;
   existingPackageRef : IPackageReference;
   packageReference : IPackageReference;
+  projectPackageReferences : IList<IPackageReference>;
   packageReferences : IList<IPackageReference>;
   conflictDetect : IDictionary<string, TPackageVersion>;
   projectPackageInfos : IList<IPackageInfo>;
@@ -386,12 +387,39 @@ begin
   end;
   FLogger.Information('Installing package ' + newPackageIdentity.ToString);
 
+  projectPackageReferences := TCollections.CreateList<IPackageReference>;
   packageReferences := TCollections.CreateList<IPackageReference>;
   conflictDetect := TCollections.CreateDictionary < string, TPackageVersion > ;
   dependencyGraph := TGraphNode.CreateRoot;
 
-  //get the packages already referenced by the project for the platform
-  for packageReference in projectEditor.PackageReferences.Where(
+
+  //get the direct dependencies for the platform.
+  projectPackageReferences.AddRange(projectEditor.PackageReferences.Where(
+      function(const packageReference : IPackageReference) : boolean
+      begin
+        result := platform = packageReference.Platform;
+      end));
+
+  //see if we have the pacakge installed already (direct dependency)
+  existingPackageRef := projectPackageReferences.Where(
+    function(const packageRef : IPackageReference) : boolean
+    begin
+      result := SameText(newPackageIdentity.Id, packageRef.Id);
+    end).FirstOrDefault;
+
+  if (existingPackageRef <> nil) then
+  begin
+    //if it's installed already and we're not forcing it to install then we're done.
+    if not options.Force  then
+    begin
+      FLogger.Error('Package [' + newPackageIdentity.ToString + '] is already installed. Use option -force to force reinstall.');
+      exit;
+    end;
+    projectPackageReferences.Remove(existingPackageRef);
+  end;
+
+  //flatten & dedupe the references and build our graph.
+  for packageReference in projectPackageReferences.Where(
     function(const packageReference : IPackageReference) : boolean
     begin
       result := platform = packageReference.Platform;
@@ -401,8 +429,7 @@ begin
     AddPackageReference(packageReference, packageReferences, conflictDetect);
   end;
 
-  //check to ensure we are not trying to install something that is already installed.
-
+  //check to ensure we are not trying to install something that is already a transitive dependency.
   existingPackageRef := packageReferences.Where(
     function(const packageRef : IPackageReference) : boolean
     begin
@@ -475,9 +502,7 @@ begin
     projectPackageInfos.Add(projectPackageInfo);
   end;
 
-
   projectReferences := TCollections.CreateList<TProjectReference>;
-
   projectReferences.AddRange(TEnumerable.Select<IPackageInfo, TProjectReference>(projectPackageInfos,
     function(const info : IPackageInfo) : TProjectReference
     var
