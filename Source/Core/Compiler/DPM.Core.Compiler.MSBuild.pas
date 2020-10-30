@@ -126,8 +126,8 @@ begin
   begin
     FCompilerOutput.LoadFromFile(FCompilerLogFile);
     TFile.Delete(FCompilerLogFile);
+    FLogger.Information(FCompilerOutput.Text);
   end;
-
 end;
 
 constructor TMSBuildCompiler.Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const env : ICompilerEnvironmentProvider);
@@ -201,19 +201,19 @@ begin
   //TODO : Check that these props are correctly named for all supported compiler versions.
 
   if FDCPOutput <> '' then
-    result := result + ' /p:DCC_DcpOutput' + ExcludeTrailingPathDelimiter(FDCPOutput); //msbuild is fussy!
+    result := result + ' /p:DCC_DcpOutput=' + ExcludeTrailingPathDelimiter(FDCPOutput); //msbuild is fussy!
 
   if FDCUOutput <> '' then
-    result := result + ' /p:DCC_DcuOutput' + ExcludeTrailingPathDelimiter(FDCUOutput);
+    result := result + ' /p:DCC_DcuOutput=' + ExcludeTrailingPathDelimiter(FDCUOutput);
 
   if FBPLOutput <> '' then
-    result := result + ' /p:DCC_BplOutput' + ExcludeTrailingPathDelimiter(FBPLOutput);
+    result := result + ' /p:DCC_BplOutput=' + ExcludeTrailingPathDelimiter(FBPLOutput);
 
   if FOBJOutput <> '' then
-    result := result + ' /p:DCC_ObjOutput' + ExcludeTrailingPathDelimiter(FOBJOutput);
+    result := result + ' /p:DCC_ObjOutput=' + ExcludeTrailingPathDelimiter(FOBJOutput);
 
   if FHPPOutput <> '' then
-    result := result + ' /p:DCC_HppOutput' + ExcludeTrailingPathDelimiter(FHPPOutput);
+    result := result + ' /p:DCC_HppOutput=' + ExcludeTrailingPathDelimiter(FHPPOutput);
 
 end;
 
