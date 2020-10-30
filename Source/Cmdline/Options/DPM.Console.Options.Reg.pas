@@ -580,7 +580,6 @@ begin
     begin
       TRestoreOptions.Default.ProjectPath := value;
     end);
-  option.Required := true;
 
 
   option := cmd.RegisterOption<string>('Source','s','Optional source(s), if not specified all sources will be used.',
