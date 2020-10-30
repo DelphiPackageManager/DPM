@@ -267,8 +267,9 @@ var
 begin
   for childNode in FChildNodes.Values do
     childNode.VisitDFS(visitor);
-
-  visitor(self);
+  //don't visit the root node as it's just a container
+  if not self.IsRoot then
+    visitor(self);
 end;
 
 

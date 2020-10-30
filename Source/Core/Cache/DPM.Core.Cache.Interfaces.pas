@@ -31,7 +31,8 @@ interface
 uses
   VSoft.Awaitable,
   DPM.Core.Types,
-  DPM.Core.Package.Interfaces;
+  DPM.Core.Package.Interfaces,
+  DPM.Core.Spec.Interfaces;
 
 
 type
@@ -52,8 +53,6 @@ type
     //then it will call InstallPackage to extract it.
     function EnsurePackage(const packageId : IPackageId) : boolean;
 
-    function InstallPackage(const packageId : IPackageId; const saveFile : boolean; const source : string = '') : boolean;
-
     function InstallPackageFromFile(const packageFileName : string; const saveFile : boolean) : boolean;
 
     //gets the package info with dependencies. Calls EnsurePackage.
@@ -61,6 +60,9 @@ type
 
     //gets the full package metadata including search paths.
     function GetPackageMetadata(const packageId : IPackageId) : IPackageMetadata;
+
+    //gets the deserialized dspec file for the package.
+    function GetPackageSpec(const packageId : IPackageId) : IPackageSpec;
 
     property Location : string read GetLocation write SetLocation;
     property PackagesFolder : string read GetPackagesFolder;

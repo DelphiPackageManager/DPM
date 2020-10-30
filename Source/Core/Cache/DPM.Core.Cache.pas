@@ -57,7 +57,10 @@ type
 
     function GetPackageMetadata(const packageId : IPackageId) : IPackageMetadata;
 
-    function InstallPackage(const packageId : IPackageId; const saveFile : boolean; const source : string = '') : boolean;
+    function GetPackageSpec(const packageId : IPackageId) : IPackageSpec;
+
+
+//    function InstallPackage(const packageId : IPackageId; const saveFile : boolean; const source : string = '') : boolean;
 
     function InstallPackageFromFile(const packageFileName : string; const saveFile : boolean) : boolean;
 
@@ -133,6 +136,27 @@ end;
 
 function TPackageCache.GetPackageMetadata(const packageId : IPackageId) : IPackageMetadata;
 var
+  spec : IPackageSpec;
+begin
+  spec := GetPackageSpec(packageId);
+  if spec = nil then
+    exit;
+  Result := TPackageMetadata.CreateFromSpec('', spec);
+end;
+
+function TPackageCache.GetPackagePath(const packageId : IPackageId) : string;
+begin
+  result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim + DPMPlatformToString(packageId.platform) + PathDelim + packageId.Id + PathDelim + packageId.Version.ToStringNoMeta;
+end;
+
+function TPackageCache.GetPackagesFolder : string;
+begin
+  //  result := IncludeTrailingPathDelimiter(FLocation);
+  result := TPath.GetFullPath(FLocation)
+end;
+
+function TPackageCache.GetPackageSpec(const packageId: IPackageId): IPackageSpec;
+var
   packageFolder : string;
   metaDataFile : string;
   spec : IPackageSpec;
@@ -153,20 +177,6 @@ begin
     exit;
   end;
   spec := FSpecReader.ReadSpec(metaDataFile);
-  if spec = nil then
-    exit;
-  Result := TPackageMetadata.CreateFromSpec('', spec);
-end;
-
-function TPackageCache.GetPackagePath(const packageId : IPackageId) : string;
-begin
-  result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim + DPMPlatformToString(packageId.platform) + PathDelim + packageId.Id + PathDelim + packageId.Version.ToStringNoMeta;
-end;
-
-function TPackageCache.GetPackagesFolder : string;
-begin
-  //  result := IncludeTrailingPathDelimiter(FLocation);
-  result := TPath.GetFullPath(FLocation)
 end;
 
 function TPackageCache.EnsurePackage(const packageId : IPackageId) : Boolean;
@@ -187,10 +197,6 @@ begin
   end;
 end;
 
-function TPackageCache.InstallPackage(const packageId : IPackageId; const saveFile : boolean; const source : string) : boolean;
-begin
-  result := false;
-end;
 
 function TPackageCache.InstallPackageFromFile(const packageFileName : string; const saveFile : boolean) : boolean;
 var

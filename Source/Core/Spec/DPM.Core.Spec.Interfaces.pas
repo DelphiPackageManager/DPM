@@ -247,6 +247,7 @@ type
     ['{9F2BE15D-40DD-4263-925C-01E255D7BE03}']
     function GetMetaData : ISpecMetaData;
     function GetTargetPlatforms : IList<ISpecTargetPlatform>;
+    function GetTargetPlatform : ISpecTargetPlatform;
     function GetTemplates : IList<ISpecTemplate>;
     function GetIsValid : boolean;
     function GetFileName : string;
@@ -256,9 +257,12 @@ type
 
     property MetaData : ISpecMetaData read GetMetaData;
     property TargetPlatforms : IList<ISpecTargetPlatform>read GetTargetPlatforms;
+    property TargetPlatform : ISpecTargetPlatform read GetTargetPlatform;
     property Templates : IList<ISpecTemplate>read GetTemplates;
     property IsValid : boolean read GetIsValid;
     property FileName : string read GetFileName;
+
+
   end;
 
   IPackageSpecReader = interface

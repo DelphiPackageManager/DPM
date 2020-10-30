@@ -123,6 +123,8 @@ type
     property Tags : string read GetTags;
     property IsTrial : boolean read GetIsTrial;
     property IsCommercial : boolean read GetIsCommercial;
+
+    //TODO : We may be able t remove this as the only place it's use will probably be getting the full spec file.
     property SearchPaths : IList<IPackageSearchPath>read GetSearchPaths;
   end;
 

@@ -147,7 +147,7 @@ end;
 
 constructor TPackageIdentity.Create(const sourceName : string; const spec : IPackageSpec);
 begin
-  inherited Create(spec.MetaData.Id, spec.MetaData.Version, spec.TargetPlatforms[0].Compiler, spec.TargetPlatforms[0].Platforms[0]);
+  inherited Create(spec.MetaData.Id, spec.MetaData.Version, spec.TargetPlatform.Compiler, spec.TargetPlatform.Platforms[0]);
   FSourceName := sourceName;
 end;
 
@@ -213,7 +213,7 @@ begin
   inherited Create(sourceName, spec);
   FDependencies := TCollections.CreateList<IPackageDependency>;
 
-  for dep in spec.TargetPlatforms[0].Dependencies do
+  for dep in spec.TargetPlatform.Dependencies do
   begin
     newDep := TPackageDependency.Create(dep.Id, dep.Version, FPlatform);
     FDependencies.Add(newDep);
@@ -252,7 +252,7 @@ begin
   FProjectUrl := spec.MetaData.ProjectUrl;
   FTags := spec.MetaData.Tags;
 
-  for specSearchPath in spec.TargetPlatforms[0].SearchPaths do
+  for specSearchPath in spec.TargetPlatform.SearchPaths do
   begin
     searchPath := TPackageSearchPath.Create(specSearchPath.Path, specSearchPath.BinariesOnly, specSearchPath.SourceOnly);
     FSearchPaths.Add(searchPath);

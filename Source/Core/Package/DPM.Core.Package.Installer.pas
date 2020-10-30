@@ -40,6 +40,7 @@ uses
   DPM.Core.Options.Uninstall,
   DPM.Core.Options.Restore,
   DPM.Core.Project.Interfaces,
+  DPM.Core.Spec.Interfaces,
   DPM.Core.Package.Interfaces,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Repository.Interfaces,
@@ -62,11 +63,14 @@ type
 
     function CollectSearchPaths(const resolvedPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
 
-    function DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages : IList<IPackageInfo>) : boolean;
+    function DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages : IList<IPackageInfo>; var packageSpecs : IDictionary<string, IPackageSpec>) : boolean;
 
     function CollectPlatformsFromProjectFiles(const options : TInstallOptions; const projectFiles : TArray <string> ; const config : IConfiguration) : boolean;
 
     function GetCompilerVersionFromProjectFiles(const options : TInstallOptions; const projectFiles : TArray <string> ; const config : IConfiguration) : boolean;
+
+
+    function CompilePackage(const cancellationToken : ICancellationToken; const compiler : ICompiler; const graphNode : IGraphNode) : boolean;
 
 
     function DoRestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration) : boolean;
@@ -131,7 +135,6 @@ uses
   DPM.Core.Dependency.Graph,
   DPM.Core.Dependency.Version,
   DPM.Core.Package.Metadata,
-  DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Reader;
 
 
@@ -214,6 +217,11 @@ begin
     for packageSearchPath in packageMetadata.SearchPaths do
       searchPaths.Add(packageBasePath + packageSearchPath.Path);
   end;
+end;
+
+function TPackageInstaller.CompilePackage(const cancellationToken: ICancellationToken; const compiler: ICompiler; const graphNode: IGraphNode): boolean;
+begin
+  result := true;
 end;
 
 function TPackageInstaller.Context : IPackageInstallerContext;
@@ -361,6 +369,8 @@ var
   packageReference : IPackageReference;
   projectPackageReferences : IList<IPackageReference>;
   packageReferences : IList<IPackageReference>;
+  packageSpecs : IDictionary<string, IPackageSpec>;
+
   conflictDetect : IDictionary<string, TPackageVersion>;
   projectPackageInfos : IList<IPackageInfo>;
   projectPackageInfo : IPackageInfo;
@@ -371,6 +381,9 @@ var
   packageSearchPaths : IList<string>;
   dependencyGraph : IGraphNode;
   childNode : IGraphNode;
+
+  packageCompiler : ICompiler;
+
 begin
   result := false;
   //if the user specified a version, either the on the command line or via a file then we will use that
@@ -532,6 +545,8 @@ begin
   if not result then
     exit;
 
+  //TODO : The code from here on is the same for install/uninstall/restore - refactor!!!
+
   if resolvedPackages = nil then
   begin
     FLogger.Error('Resolver returned no packages!');
@@ -550,14 +565,54 @@ begin
     exit(false);
   end;
 
-  result := DownloadPackages(cancellationToken, resolvedPackages);
+  //downloads the package files to the cache if they are not already there and
+  //returns the deserialized dspec as we need it for search paths and
+  result := DownloadPackages(cancellationToken, resolvedPackages, packageSpecs);
   if not result then
     exit;
 
-  packageSearchPaths := TCollections.CreateList <string> ;
 
+  packageCompiler := FCompilerFactory.CreateCompiler(options.CompilerVersion, platform);
+
+  //build the dependency graph in the correct order.
+  dependencyGraph.VisitDFS(
+    procedure(const node : IGraphNode)
+    var
+      pkgInfo : IPackageInfo;
+      spec : IPackageSpec;
+    begin
+      Assert(node.IsRoot = false, 'graph should not visit root node');
+
+      pkgInfo := resolvedPackages.Where(
+        function(const value : IPackageInfo) : boolean
+        begin
+          result := SameText(value.Id, node.Id);
+        end).FirstOrDefault;
+      //if it's not found that means we have already processed the package elsewhere in the graph
+      if pkgInfo = nil then
+        exit;
+      //removing it so we don't process it again
+      resolvedPackages.Remove(pkgInfo);
+
+      spec := packageSpecs[LowerCase(node.Id)];
+      Assert(spec <> nil);
+      if spec.TargetPlatform.BuildEntries.Any then
+      begin
+        //we need to build the package.
+      end;
+      if spec.TargetPlatform.DesignFiles.Any then
+      begin
+        //we have design time packages to install.
+
+      end;
+
+    end);
+
+
+  packageSearchPaths := TCollections.CreateList <string> ;
   if not CollectSearchPaths(resolvedPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
     exit;
+
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
     exit;
@@ -575,6 +630,7 @@ function TPackageInstaller.DoRestoreProject(const cancellationToken : ICancellat
 var
   packageReference : IPackageReference;
   packageReferences : IList<IPackageReference>;
+  packageSpecs : IDictionary<string, IPackageSpec>;
   projectPackageInfos : IList<IPackageInfo>;
   projectPackageInfo : IPackageInfo;
   resolvedPackages : IList<IPackageInfo>;
@@ -664,7 +720,7 @@ begin
     FLogger.Information('Resolved : ' + projectPackageInfo.ToIdVersionString);
   end;
 
-  result := DownloadPackages(cancellationToken, resolvedPackages);
+  result := DownloadPackages(cancellationToken, resolvedPackages, packageSpecs );
   if not result then
     exit;
 
@@ -693,6 +749,7 @@ var
   projectPackageInfos : IList<IPackageInfo>;
   projectPackageInfo : IPackageInfo;
   resolvedPackages : IList<IPackageInfo>;
+  packageSpecs : IDictionary<string, IPackageSpec>;
   packageSearchPaths : IList<string>;
   conflictDetect : IDictionary<string, TPackageVersion>;
   dependencyGraph : IGraphNode;
@@ -791,7 +848,7 @@ begin
       FLogger.Information('Resolved : ' + projectPackageInfo.ToIdVersionString);
     end;
 
-    result := DownloadPackages(cancellationToken, resolvedPackages);
+    result := DownloadPackages(cancellationToken, resolvedPackages, packageSpecs );
     if not result then
       exit;
   end;
@@ -812,12 +869,14 @@ begin
   result := projectEditor.SaveProject();
 end;
 
-function TPackageInstaller.DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages : IList<IPackageInfo>) : boolean;
+function TPackageInstaller.DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages : IList<IPackageInfo>; var packageSpecs : IDictionary<string, IPackageSpec>) : boolean;
 var
   packageInfo : IPackageInfo;
   packageFileName : string;
+  spec : IPackageSpec;
 begin
   result := false;
+  packageSpecs := TCollections.CreateDictionary<string, IPackageSpec>;
 
   for packageInfo in resolvedPackages do
   begin
@@ -836,6 +895,13 @@ begin
       begin
         FLogger.Error('Failed to install package file [' + packageFileName + '] into the cache');
         exit;
+      end;
+      if cancellationToken.IsCancelled then
+        exit;
+      if not packageSpecs.ContainsKey(LowerCase(packageInfo.Id)) then
+      begin
+        spec := FPackageCache.GetPackageSpec(packageInfo);
+        packageSpecs[LowerCase(packageInfo.Id)] := spec;
       end;
     end;
   end;

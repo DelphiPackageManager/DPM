@@ -74,6 +74,7 @@ type
     function GetFileName : string;
     function GetIsValid : boolean;
     function GetMetaData : ISpecMetaData;
+    function GetTargetPlatform : ISpecTargetPlatform;
     function GetTargetPlatforms : IList<ISpecTargetPlatform>;
     function GetTemplates : IList<ISpecTemplate>;
     function LoadTemplateFromJson(const templateObj : TJsonObject; const templateNo : integer) : boolean;
@@ -481,6 +482,14 @@ begin
     begin
       result := SameText(name, item.Name);
     end).FirstOrDefault;
+end;
+
+function TSpec.GetTargetPlatform: ISpecTargetPlatform;
+begin
+  if FTargetPlatforms.Any then
+    result := FTargetPlatforms[0]
+  else
+    result := nil;
 end;
 
 function TSpec.GetTargetPlatforms : IList<ISpecTargetPlatform>;
