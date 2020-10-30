@@ -129,7 +129,6 @@ begin
   FStopwatch.Start;
   FLogger.Information('Starting dependency resolution...');
   result := false;
-  //for now we will ignore the lock file and just do the full resolution.
 
   while context.AnyOpenRequrements do
   begin
