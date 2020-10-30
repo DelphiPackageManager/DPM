@@ -68,18 +68,8 @@ begin
 end;
 
 function THelpCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
-var
-  cw : integer;
-  maxDescW : integer;
 begin
   result := TExitCode.OK;
-
-  cw := FConsole.Width;
-
-  if cw < High(Integer) then
-    maxDescW := cw
-  else
-    maxDescW := High(Integer);
 
   if THelpOptions.HelpCommand = TDPMCommand.None then
   begin
