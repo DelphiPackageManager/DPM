@@ -235,11 +235,6 @@ begin
   FCompilerFactory := compilerFactory;
 end;
 
-function GetLockFileName(const projectFileName : string; const platform : TDPMPlatform) : string;
-begin
-  result := projectFileName + '.' + DPMPlatformToString(platform) + cLockFileExt;
-end;
-
 function TPackageInstaller.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
 begin
   result := FPackageCache.GetPackageInfo(cancellationToken, packageId); //faster
