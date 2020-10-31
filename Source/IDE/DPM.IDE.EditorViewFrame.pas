@@ -766,6 +766,8 @@ begin
       //TODO : need to do this more safely as it may interrup another operation.
       FInstalledPackages := nil;  //force refresh as we always need to update the installed packages.
       FAllInstalledPackages := nil;
+      FSearchResultPackages := nil;
+      FUpdates := nil;
       PackageDetailsFrame.SetPlatform(FCurrentPlatform);
       PackageDetailsFrame.SetPackage(nil);
       FScrollList.CurrentRow := -1;

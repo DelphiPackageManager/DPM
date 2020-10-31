@@ -583,7 +583,7 @@ begin
 
   packageLookup := TCollections.CreateDictionary < string, TPackageFind > ;
 
-  searchRegEx := GetSearchRegex(options.CompilerVersion, [], '');
+  searchRegEx := GetSearchRegex(options.CompilerVersion, options.Platforms, '');
   regex := TRegEx.Create(searchRegEx, [roIgnoreCase]);
 
   //work out the latest version for each package and what platforms it supports.
