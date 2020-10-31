@@ -581,8 +581,45 @@ begin
   if not result then
     exit;
 
-  packageSearchPaths := TCollections.CreateList <string> ;
 
+  packageCompiler := FCompilerFactory.CreateCompiler(options.CompilerVersion, platform);
+
+  //build the dependency graph in the correct order.
+  dependencyGraph.VisitDFS(
+    procedure(const node : IGraphNode)
+    var
+      pkgInfo : IPackageInfo;
+      spec : IPackageSpec;
+    begin
+      Assert(node.IsRoot = false, 'graph should not visit root node');
+
+      pkgInfo := resolvedPackages.Where(
+        function(const value : IPackageInfo) : boolean
+        begin
+          result := SameText(value.Id, node.Id);
+        end).FirstOrDefault;
+      //if it's not found that means we have already processed the package elsewhere in the graph
+      if pkgInfo = nil then
+        exit;
+      //removing it so we don't process it again
+      resolvedPackages.Remove(pkgInfo);
+
+      spec := packageSpecs[LowerCase(node.Id)];
+      Assert(spec <> nil);
+      if spec.TargetPlatform.BuildEntries.Any then
+      begin
+        //we need to build the package.
+      end;
+      if spec.TargetPlatform.DesignFiles.Any then
+      begin
+        //we have design time packages to install.
+
+      end;
+
+    end);
+
+
+  packageSearchPaths := TCollections.CreateList <string> ;
   packageCompiler := FCompilerFactory.CreateCompiler(options.CompilerVersion, platform);
 
   try
