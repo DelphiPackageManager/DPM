@@ -143,7 +143,7 @@ begin
   //TODO : Send custom message so we can color it etc
   errorProc := procedure
   begin
-    FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+    FMessageServices.AddToolMessage('', 'ERR: ' + data, '', 0, 0, nil, lineRef, FMessageGroup);
   end;
 
   if TThread.CurrentThread.ThreadID = MainThreadID then

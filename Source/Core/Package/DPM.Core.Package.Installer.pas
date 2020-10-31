@@ -63,6 +63,8 @@ type
 
     function CollectSearchPaths(const resolvedPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
 
+    procedure GenerateSearchPaths(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; packageSpec : IPackageSpec; const searchPaths : IList<string>);
+
     function DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages : IList<IPackageInfo>; var packageSpecs : IDictionary<string, IPackageSpec>) : boolean;
 
     function CollectPlatformsFromProjectFiles(const options : TInstallOptions; const projectFiles : TArray <string> ; const config : IConfiguration) : boolean;
@@ -70,7 +72,7 @@ type
     function GetCompilerVersionFromProjectFiles(const options : TInstallOptions; const projectFiles : TArray <string> ; const config : IConfiguration) : boolean;
 
 
-    function CompilePackage(const cancellationToken : ICancellationToken; const compiler : ICompiler; const graphNode : IGraphNode) : boolean;
+    function CompilePackage(const cancellationToken : ICancellationToken; const compiler : ICompiler; const packageInfo : IPackageInfo; const packageSpec : IPackageSpec) : boolean;
 
 
     function DoRestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration) : boolean;
@@ -219,9 +221,17 @@ begin
   end;
 end;
 
-function TPackageInstaller.CompilePackage(const cancellationToken: ICancellationToken; const compiler: ICompiler; const graphNode: IGraphNode): boolean;
+function TPackageInstaller.CompilePackage(const cancellationToken: ICancellationToken; const compiler: ICompiler; const packageInfo : IPackageInfo; const packageSpec : IPackageSpec): boolean;
+var
+  buildEntry : ISpecBuildEntry;
 begin
   result := true;
+  for buildEntry in packageSpec.TargetPlatform.BuildEntries do
+  begin
+    FLogger.Debug('Compiling package : ' + buildEntry.Project);
+  end;
+
+
 end;
 
 function TPackageInstaller.Context : IPackageInstallerContext;
@@ -571,9 +581,11 @@ begin
   if not result then
     exit;
 
+  packageSearchPaths := TCollections.CreateList <string> ;
 
   packageCompiler := FCompilerFactory.CreateCompiler(options.CompilerVersion, platform);
 
+  try
   //build the dependency graph in the correct order.
   dependencyGraph.VisitDFS(
     procedure(const node : IGraphNode)
@@ -599,20 +611,24 @@ begin
       if spec.TargetPlatform.BuildEntries.Any then
       begin
         //we need to build the package.
+        if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, spec) then
+          raise Exception.Create('Comping package [' + pkgInfo.ToIdVersionString + '] failed.' );
       end;
+
       if spec.TargetPlatform.DesignFiles.Any then
       begin
         //we have design time packages to install.
-
       end;
 
+      GenerateSearchPaths(options.CompilerVersion, platform, spec, packageSearchPaths);
     end);
-
-
-  packageSearchPaths := TCollections.CreateList <string> ;
-  if not CollectSearchPaths(resolvedPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
-    exit;
-
+  except
+    on e : Exception do
+    begin
+      FLogger.Error(e.Message);
+      exit;
+    end;
+  end;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
     exit;
@@ -898,12 +914,13 @@ begin
       end;
       if cancellationToken.IsCancelled then
         exit;
-      if not packageSpecs.ContainsKey(LowerCase(packageInfo.Id)) then
-      begin
-        spec := FPackageCache.GetPackageSpec(packageInfo);
-        packageSpecs[LowerCase(packageInfo.Id)] := spec;
-      end;
     end;
+    if not packageSpecs.ContainsKey(LowerCase(packageInfo.Id)) then
+    begin
+      spec := FPackageCache.GetPackageSpec(packageInfo);
+      packageSpecs[LowerCase(packageInfo.Id)] := spec;
+    end;
+
   end;
   result := true;
 
@@ -980,6 +997,18 @@ begin
     FLogger.Information('');
   end;
 
+end;
+
+procedure TPackageInstaller.GenerateSearchPaths(const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; packageSpec: IPackageSpec;
+                                               const searchPaths: IList<string>);
+var
+  packageBasePath : string;
+  packageSearchPath : ISpecSearchPath;
+begin
+  packageBasePath := packageSpec.MetaData.Id + PathDelim + packageSpec.MetaData.Version.ToStringNoMeta + PathDelim;
+
+  for packageSearchPath  in packageSpec.TargetPlatform.SearchPaths do
+      searchPaths.Add(packageBasePath + packageSearchPath.Path);
 end;
 
 function TPackageInstaller.GetCompilerVersionFromProjectFiles(const options : TInstallOptions; const projectFiles : TArray <string> ; const config : IConfiguration) : boolean;

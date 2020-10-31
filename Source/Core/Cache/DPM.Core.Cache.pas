@@ -159,7 +159,6 @@ function TPackageCache.GetPackageSpec(const packageId: IPackageId): IPackageSpec
 var
   packageFolder : string;
   metaDataFile : string;
-  spec : IPackageSpec;
 begin
   result := nil;
   if not EnsurePackage(packageId) then
@@ -176,7 +175,7 @@ begin
     FLogger.Debug('Package metadata file [' + metaDataFile + '] not found in cache.');
     exit;
   end;
-  spec := FSpecReader.ReadSpec(metaDataFile);
+  result := FSpecReader.ReadSpec(metaDataFile);
 end;
 
 function TPackageCache.EnsurePackage(const packageId : IPackageId) : Boolean;
