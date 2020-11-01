@@ -125,9 +125,14 @@ type
 
 implementation
 
+// For Delphi XE3 and up:
+{$IF CompilerVersion >= 24.0 }
+  {$LEGACYIFEND ON}
+{$IFEND}
+
+
 uses
   {$IF CompilerVersion >= 29.0}
-    {$LEGACYIFEND ON}
   System.Hash,
   {$IFEND}
   System.SysUtils;

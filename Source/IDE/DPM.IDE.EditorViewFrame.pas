@@ -692,8 +692,7 @@ begin
   FProject.Refresh(true);
 
   //force the project tree to update after installing package.
-  FProjectTreeManager.NotifyEndLoading(TProjectLoadType.plSingle);
-
+  FProjectTreeManager.NotifyEndLoading();
 end;
 
 procedure TDPMEditViewFrame.PackageUninstalled(const package : IPackageSearchResultItem);
@@ -741,7 +740,7 @@ begin
   //Tell the IDE to reload the project
   FProject.Refresh(true);
   //force the project tree to update after installing package.
-  FProjectTreeManager.NotifyEndLoading(TProjectLoadType.plSingle);
+  FProjectTreeManager.NotifyEndLoading();
 
 end;
 

@@ -30,7 +30,7 @@ interface
 
 uses
   ToolsApi,
-  DPM.Core.Logging,
+  DPM.IDE.Logger,
   Vcl.ActnList,
   Vcl.ImgList,
   Vcl.Controls,
@@ -45,11 +45,9 @@ type
     FIDENotifier : integer;
     FProjectMenuNoftifierId : integer;
     FThemeChangeNotifierId : integer;
-
-    FLogger : ILogger;
-    FContainer : TContainer;
     FEditorViewManager : IDPMEditorViewManager;
-    FProjectTreeManager : IDPMProjectTreeManager;
+    FLogger : IDPMIDELogger;
+    FContainer : TContainer;
     procedure InitContainer;
   protected
 
@@ -77,8 +75,9 @@ uses
   System.SysUtils,
   VCL.Dialogs,
   Spring.Container.Registration,
-  DPM.IDE.Logger,
+  DPM.Core.Logging,
   DPM.Core.Init,
+  DPM.IDE.ProjectController,
   DPM.IDE.ProjectStorageNotifier,
   DPM.IDE.IDENotifier,
   DPM.IDE.ProjectMenu,
@@ -92,8 +91,11 @@ procedure TDPMWizard.InitContainer;
 begin
   try
     FContainer := TContainer.Create;
-    FContainer.RegisterInstance<ILogger>(FLogger).AsSingleton();
+    FContainer.RegisterInstance<ILogger>(FLogger as ILogger).AsSingleton();
     FContainer.RegisterInstance<IDPMIDELogger>(FLogger as IDPMIDELogger).AsSingleton();
+    FContainer.RegisterType<IDPMProjectTreeManager, TDPMProjectTreeManager>.AsSingleton();
+    FContainer.RegisterType<IDPMEditorViewManager, TDPMEditorViewManager>.AsSingleton();
+    FContainer.RegisterType<IDPMIDEProjectController,TDPMIDEProjectController>.AsSingleton();
     DPM.Core.Init.InitCore(FContainer);
     FContainer.Build;
   except
@@ -119,17 +121,14 @@ constructor TDPMWizard.Create;
 var
   storageNotifier : IOTAProjectFileStorageNotifier;
   ideNotifier : IOTAIDENotifier;
-  packageInstaller : IPackageInstaller;
   projMenuNotifier : IOTAProjectMenuItemCreatorNotifier;
   options : INTAAddInOptions;
+  projectController : IDPMIDEProjectController;
 begin
   FLogger := TDPMIDELogger.Create;
   InitContainer;
 
-  packageInstaller := FContainer.Resolve<IPackageInstaller>;
-
-  FProjectTreeManager := TDPMProjectTreeManager.Create(FContainer, FLogger as IDPMIDELogger);
-  FEditorViewManager := TDPMEditorViewManager.Create(FContainer, FProjectTreeManager);
+  FEditorViewManager := FContainer.Resolve<IDPMEditorViewManager>;
 
   {$IF CompilerVersion >= 32.0}
   FThemeChangeNotifierId := (BorlandIDEServices as IOTAIDEThemingServices).AddNotifier(FEditorViewManager as INTAIDEThemingServicesNotifier);
@@ -137,9 +136,10 @@ begin
   FThemeChangeNotifierId := -1;
   {$IFEND}
 
-  ideNotifier := TDPMIDENotifier.Create(FLogger as IDPMIDELogger, packageInstaller, FEditorViewManager, FProjectTreeManager);
-  FIDENotifier := (BorlandIDEServices as IOTAServices).AddNotifier(ideNotifier);
+  projectController := FContainer.Resolve<IDPMIDEProjectController>;
 
+  ideNotifier := TDPMIDENotifier.Create(FLogger, projectController);
+  FIDENotifier := (BorlandIDEServices as IOTAServices).AddNotifier(ideNotifier);
 
   projMenuNotifier := TDPMProjectMenuNotifier.Create(FEditorViewManager);
   FProjectMenuNoftifierId := (BorlandIDEServices as IOTAProjectManager).AddMenuItemCreatorNotifier(projMenuNotifier);
@@ -147,9 +147,8 @@ begin
   options := TDPMAddinOptions.Create(FContainer);
   (BorlandIDEServices as INTAEnvironmentOptionsServices).RegisterAddInOptions(options);
 
-  storageNotifier := TDPMProjectStorageNotifier.Create(FLogger as IDPMIDELogger, FEditorViewManager, FProjectTreeManager);
+  storageNotifier := TDPMProjectStorageNotifier.Create(FLogger, projectController);
   FStorageNotifierID := (BorlandIDEServices as IOTAProjectFileStorage).AddNotifier(storageNotifier);
-
 end;
 
 destructor TDPMWizard.Destroy;
@@ -159,7 +158,7 @@ end;
 
 procedure TDPMWizard.Destroyed;
 begin
-  FEditorViewManager.Destroyed;
+  FEditorViewManager.Destroyed; //don't try to resolve this here, errors in the rtl on 10.2
   if FStorageNotifierId > -1 then
     (BorlandIDEServices as IOTAProjectFileStorage).RemoveNotifier(FStorageNotifierId);
   if FIDENotifier > -1 then

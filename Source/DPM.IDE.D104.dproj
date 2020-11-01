@@ -14,7 +14,7 @@
         <DPMCompiler>10.4</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Ahausladen.JsonDataObjects\0.0.1\src;$(DPM)\Spring4D.Core\2.0.0-dev3\src;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Container;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Interception;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Logging;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Mocking;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Services;$(DPM)\Spring4D.Base\2.0.0-dev3\src;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base\Collections;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base\Logging;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base\Patches;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base\Patterns;$(DPM)\Spring4D.Extensions\2.0.0-dev3\src;$(DPM)\Spring4D.Extensions\2.0.0-dev3\src\Extensions;$(DPM)\Spring4D.Extensions\2.0.0-dev3\src\Extensions\Cryptography;$(DPM)\Spring4D.Extensions\2.0.0-dev3\src\Extensions\Utils;$(DPM)\VSoft.AntPatterns\0.0.4\src;$(DPM)\VSoft.HttpClient\0.0.2\src;$(DPM)\VSoft.CancellationToken\0.0.1\src;$(DPM)\VSoft.SemanticVersion\0.0.2\src;$(DPM)\VSoft.Uri\0.0.3\src;$(DPM)\VSoft.VirtualListView\0.2.0-rc1\lib;$(DPM)\VSoft.VirtualListView\0.2.0-rc1\Source;$(DPM)\VSoft.Awaitable\0.1.1\src;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\src;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\src\src;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Ahausladen.JsonDataObjects\0.0.1\src;$(DPM)\Spring4D.Core\2.0.0-dev3\src;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Container;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Interception;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Logging;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Mocking;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Services;$(DPM)\Spring4D.Base\2.0.0-dev3\src;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base\Collections;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base\Logging;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base\Patches;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base\Patterns;$(DPM)\Spring4D.Extensions\2.0.0-dev3\src;$(DPM)\Spring4D.Extensions\2.0.0-dev3\src\Extensions;$(DPM)\Spring4D.Extensions\2.0.0-dev3\src\Extensions\Cryptography;$(DPM)\Spring4D.Extensions\2.0.0-dev3\src\Extensions\Utils;$(DPM)\VSoft.AntPatterns\0.0.4\src;$(DPM)\VSoft.Awaitable\0.1.1\src;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\src;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\src\src;$(DPM)\VSoft.CancellationToken\0.0.1\src;$(DPM)\VSoft.HttpClient\0.0.2\src;$(DPM)\VSoft.SemanticVersion\0.0.2\src;$(DPM)\VSoft.Uri\0.0.3\src;$(DPM)\VSoft.VirtualListView\0.2.0-rc1\lib;$(DPM)\VSoft.VirtualListView\0.2.0-rc1\Source;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -276,6 +276,7 @@
         <DCCReference Include="Core\DPM.Core.TargetPlatform.pas"/>
         <DCCReference Include="Core\DPM.Core.Types.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Icon.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectController.pas"/>
         <RcItem Include="images\dpm.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>DPMIDELOGO</ResourceId>
@@ -306,9 +307,9 @@
                 </Source>
             </Delphi.Personality>
             <Deployment Version="3">
-                <DeployFile LocalName="Win32\Debug\DPM.IDE.dll" Configuration="Debug" Class="ProjectOutput">
+                <DeployFile LocalName="..\Output\DPM.IDE.D104.dll" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
-                        <RemoteName>DPM_IDE.dll</RemoteName>
+                        <RemoteName>DPM_IDE_D104.dll</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>

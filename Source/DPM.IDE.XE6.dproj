@@ -244,6 +244,15 @@
         <DCCReference Include="Core\DPM.Core.TargetPlatform.pas"/>
         <DCCReference Include="Core\DPM.Core.Types.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Icon.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectController.pas"/>
+        <RcItem Include="images\dpm.bmp">
+            <ResourceType>BITMAP</ResourceType>
+            <ResourceId>DPMIDELOGO</ResourceId>
+        </RcItem>
+        <RcItem Include="images\dpm16.bmp">
+            <ResourceType>BITMAP</ResourceType>
+            <ResourceId>DPMIDELOGO_16</ResourceId>
+        </RcItem>
         <BuildConfiguration Include="Debug">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
