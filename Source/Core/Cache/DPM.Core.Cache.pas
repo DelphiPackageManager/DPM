@@ -159,7 +159,6 @@ function TPackageCache.GetPackageSpec(const packageId: IPackageId): IPackageSpec
 var
   packageFolder : string;
   metaDataFile : string;
-  spec : IPackageSpec;
 begin
   result := nil;
   if not EnsurePackage(packageId) then
