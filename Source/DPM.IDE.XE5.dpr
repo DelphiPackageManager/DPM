@@ -26,6 +26,8 @@
 
 library DPM.IDE.XE5;
 
+
+
 {$R *.dres}
 
 uses
@@ -167,7 +169,8 @@ uses
   DPM.Core.Init in 'Core\DPM.Core.Init.pas',
   DPM.Core.TargetPlatform in 'Core\DPM.Core.TargetPlatform.pas',
   DPM.Core.Types in 'Core\DPM.Core.Types.pas',
-  DPM.Core.Package.Icon in 'Core\Package\DPM.Core.Package.Icon.pas';
+  DPM.Core.Package.Icon in 'Core\Package\DPM.Core.Package.Icon.pas',
+  DPM.IDE.ProjectController in 'IDE\DPM.IDE.ProjectController.pas';
 
 {$R *.res}
 

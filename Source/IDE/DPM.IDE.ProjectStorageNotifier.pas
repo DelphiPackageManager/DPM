@@ -34,18 +34,14 @@ uses
   System.Classes,
   Spring.Collections,
   DPM.IDE.Logger,
-  DPM.IDE.EditorViewManager,
-  DPM.IDE.ProjectTreeManager;
+  DPM.IDE.ProjectController;
 
 type
   TDPMProjectStorageNotifier = class(TModuleNotifierObject, IOTAProjectFileStorageNotifier)
   private
     FLogger : IDPMIDELogger;
-    FProjectTreeManager : IDPMProjectTreeManager;
-    FEditorViewManager : IDPMEditorViewManager;
-
+    FProjectController : IDPMIDEProjectController;
   protected
-
     //IOTAProjectFileStorageNotifier
     procedure CreatingProject(const ProjectOrGroup : IOTAModule);
     function GetName : string;
@@ -53,7 +49,7 @@ type
     procedure ProjectLoaded(const ProjectOrGroup : IOTAModule; const Node : IXMLNode);
     procedure ProjectSaving(const ProjectOrGroup : IOTAModule; const Node : IXMLNode);
   public
-    constructor Create(const logger : IDPMIDELogger; const editorViewManager : IDPMEditorViewManager; const projectTreeManager : IDPMProjectTreeManager);
+    constructor Create(const logger : IDPMIDELogger; const projectController : IDPMIDEProjectController);
     destructor Destroy; override;
   end;
 
@@ -67,24 +63,23 @@ uses
 { TDPMProjectStorageNotifier }
 
 
-constructor TDPMProjectStorageNotifier.Create(const logger : IDPMIDELogger; const editorViewManager : IDPMEditorViewManager; const projectTreeManager : IDPMProjectTreeManager);
+constructor TDPMProjectStorageNotifier.Create(const logger : IDPMIDELogger; const projectController : IDPMIDEProjectController );
 begin
   FLogger := logger;
-  FProjectTreeManager := projectTreeManager;
-  FEditorViewManager := editorViewManager;
+  FProjectController := projectController
 end;
 
 procedure TDPMProjectStorageNotifier.CreatingProject(const ProjectOrGroup : IOTAModule);
 begin
   if not (ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
     exit;
-  FProjectTreeManager.NotifyProjectLoaded(ProjectOrGroup.FileName)
+  FProjectController.ProjectLoaded(ProjectOrGroup.FileName);
 end;
 
 destructor TDPMProjectStorageNotifier.Destroy;
 begin
   FLogger := nil;
-  FProjectTreeManager := nil;
+  FProjectController := nil;
   inherited;
 end;
 
@@ -102,23 +97,27 @@ end;
 
 procedure TDPMProjectStorageNotifier.ProjectClosing(const ProjectOrGroup : IOTAModule);
 begin
-  FLogger.Debug('Storage Project Loaded : ' + ProjectOrGroup.FileName);
+  FLogger.Debug('Storage Project Closing : ' + ProjectOrGroup.FileName);
   //doesn't seem to get called with the project group?
   if not (ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
     exit;
-  //  FProjectTreeManager.NotifyProjectClosed(ProjectOrGroup.FileName);
+  FProjectController.ProjectClosing(ProjectOrGroup.FileName);
 end;
 
 procedure TDPMProjectStorageNotifier.ProjectLoaded(const ProjectOrGroup : IOTAModule; const Node : IXMLNode);
 begin
-  //doesn't seem to get called with the project group?
+  FLogger.Debug('Storage Project Loaded : ' + ProjectOrGroup.FileName);
+//doesn't seem to get called with the project group?
   if not (ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
     exit;
-  FProjectTreeManager.NotifyProjectLoaded(ProjectOrGroup.FileName)
+  FProjectController.ProjectLoaded(ProjectOrGroup.FileName);
 end;
 
 procedure TDPMProjectStorageNotifier.ProjectSaving(const ProjectOrGroup : IOTAModule; const Node : IXMLNode);
 begin
+  if not (ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
+    exit;
+  FProjectController.ProjectSaving(ProjectOrGroup.FileName);
 
 end;
 

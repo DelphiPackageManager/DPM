@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectVersion>17.2</ProjectVersion>
@@ -269,6 +269,7 @@
         <DCCReference Include="Core\DPM.Core.TargetPlatform.pas"/>
         <DCCReference Include="Core\DPM.Core.Types.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Icon.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectController.pas"/>
         <RcItem Include="images\dpm.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>DPMIDELOGO</ResourceId>
@@ -299,9 +300,9 @@
                 </Source>
             </Delphi.Personality>
             <Deployment Version="2">
-                <DeployFile LocalName="..\Output\DPM.IDE.dll" Configuration="Debug" Class="ProjectOutput">
+                <DeployFile LocalName="..\Output\DPM.IDE.XE8.dll" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
-                        <RemoteName>DPM_IDE.dll</RemoteName>
+                        <RemoteName>DPM_IDE_XE8.dll</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
@@ -687,13 +688,13 @@
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
-                <ProjectRoot Platform="Win64" Name="$(PROJECTNAME)"/>
+                <ProjectRoot Platform="iOSDevice32" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="Android" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="Win32" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="iOSDevice64" Name="$(PROJECTNAME).app"/>
+                <ProjectRoot Platform="Win64" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="OSX32" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="iOSSimulator" Name="$(PROJECTNAME).app"/>
-                <ProjectRoot Platform="iOSDevice32" Name="$(PROJECTNAME).app"/>
             </Deployment>
             <Platforms>
                 <Platform value="OSX32">False</Platform>

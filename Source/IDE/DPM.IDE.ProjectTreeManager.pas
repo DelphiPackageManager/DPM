@@ -47,12 +47,9 @@ uses
   DPM.IDE.ProjectTree.Containers;
 
 type
-  TProjectLoadType = (plNone, plSingle, plGroup);
-
   IDPMProjectTreeManager = interface
   ['{F0BA2907-E337-4591-8E16-FB684AE2E19B}']
-    procedure NotifyStartLoading(const mode : TProjectLoadType; const projects : IList<string>);
-    procedure NotifyEndLoading(const mode : TProjectLoadType);
+    procedure NotifyEndLoading();
     procedure NotifyProjectLoaded(const fileName : string);
     procedure NotifyProjectClosed(const fileName : string);
   end;
@@ -81,10 +78,9 @@ type
 
   //procedure DumpInterfaces(AClass: TClass);
   protected
-    procedure NotifyStartLoading(const mode: TProjectLoadType; const projects: IList<string>);
     procedure NotifyProjectLoaded(const fileName : string);
     procedure NotifyProjectClosed(const fileName : string);
-    procedure NotifyEndLoading(const mode : TProjectLoadType);
+    procedure NotifyEndLoading();
 
 
     procedure WndProc(var msg: TMessage);
@@ -421,14 +417,7 @@ begin
   end;
 end;
 
-
-procedure TDPMProjectTreeManager.NotifyStartLoading(const mode : TProjectLoadType; const projects : IList<string>);
-begin
-
-end;
-
-
-procedure TDPMProjectTreeManager.NotifyEndLoading(const mode: TProjectLoadType);
+procedure TDPMProjectTreeManager.NotifyEndLoading;
 begin
   //kick off a timer that will eventually sort out the nodes. - see WndProc
   PostMessage(FWindowHandle, WM_PROJECTLOADED, 0,0);
