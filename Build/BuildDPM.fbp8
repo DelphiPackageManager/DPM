@@ -83,6 +83,21 @@ begin
                       "SpecialBuildDetails\=0" +
                       ""
       end
+      action.dpm.restore
+      begin
+        actiontypeid = {17B8180A-B96F-4BA3-BCA1-E2FD9132113C}
+        customactionname = "DPM Restore"
+        enabletimeout = false
+        id = {1FA75F61-E2EB-4E44-B6D7-674315BF9A12}
+        impersonateusenetcredonly = false
+        impersonateuser = false
+        terminateontimeout = true
+        timeoutlength = 2
+        as.projectpath = %SRC_ROOT%\\dpm.dproj
+        as.compilerversion = "Use Project"
+        as.verbosity = Normal
+        as.nobanner = True
+      end
       action.delphi.build
       begin
         allowimplicitimport = true
