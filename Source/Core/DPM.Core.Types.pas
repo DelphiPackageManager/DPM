@@ -119,6 +119,7 @@ function IsValidCompilerString(const value : string) : boolean;
 
 function IsValidPlatformString(const value : string) : boolean;
 function DPMPlatformToString(const value : TDPMPlatform) : string;
+function DPMPlatformToDisplayString(const value : TDPMPlatform) : string;
 function DPMPlatformToBDString(const value : TDPMPlatform) : string;
 
 function DPMPlatformsToString(const value : TDPMPlatforms; const sep : string = ',') : string;
@@ -185,7 +186,7 @@ begin
   begin
     if value = 'Android' then
       result := TDPMPlatform.AndroidArm32
-    else if value = 'Linux' then
+    else if value = 'Linux64' then
       result := TDPMPlatform.LinuxIntel64
     else
       result := TDPMPlatform.UnknownPlatform
@@ -222,6 +223,30 @@ begin
   result := StringToCompilerVersion(value) <> TCompilerVersion.UnknownVersion;
 end;
 
+
+function DPMPlatformToDisplayString(const value : TDPMPlatform) : string;
+begin
+  case value of
+    TDPMPlatform.UnknownPlatform: Result := 'Unknown' ;
+    TDPMPlatform.Win32: result := 'Windows 32-bit' ;
+    TDPMPlatform.Win64: result := 'Windows 64-bit';
+    TDPMPlatform.WinArm32: result := 'Windows 32-bit ARM';
+    TDPMPlatform.WinArm64: result := 'Windows 64-bit ARM';
+    TDPMPlatform.OSX32: result := 'macOS 32-bit';
+    TDPMPlatform.OSX64: result := 'macOS 64-bit';
+    TDPMPlatform.AndroidArm32: result := 'Andriod 32-bit ARM';
+    TDPMPlatform.AndroidArm64: result := 'Andriod 64-bit ARM';
+    TDPMPlatform.AndroidIntel32: result := 'Andriod 32-bit Intel';
+    TDPMPlatform.AndroidIntel64: result := 'Andriod 64-bit Intel';
+    TDPMPlatform.iOS32: result := 'iOS 32-bit';
+    TDPMPlatform.iOS64: result := 'iOS 32-bit';
+    TDPMPlatform.LinuxIntel32: result := 'Linux 32-bit';
+    TDPMPlatform.LinuxIntel64: result := 'Linux 64-bit';
+    TDPMPlatform.LinuxArm32: result := 'Linux 32-bit ARM';
+    TDPMPlatform.LinuxArm64: result := 'Linux 32-bit ARM';
+  end;
+
+end;
 
 function DPMPlatformToString(const value : TDPMPlatform) : string;
 begin

@@ -40,3 +40,8 @@ Source/Libs
 
 # Local package cache  #
 .packages
+*.fb8lck
+*.fbpbrk
+*.rsb
+*.fbpInf
+*.fbl8

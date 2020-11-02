@@ -754,7 +754,10 @@ begin
   platformChangeDetectTimer.Enabled := false;
   if FProject <> nil then
   begin
+
     projectPlatform := ProjectPlatformToDPMPlatform(FProject.CurrentPlatform);
+    if projectPlatform = TDPMPlatform.UnknownPlatform then
+      raise Exception.Create('FProject.CurrentPlatform : ' + FProject.CurrentPlatform);
 
     if FCurrentPlatform <> projectPlatform then
     begin
@@ -1268,6 +1271,7 @@ begin
     FSearchOptions.Prerelease := chkIncludePrerelease.Checked;
     FSearchOptions.Commercial := chkIncludeCommercial.Checked;
     FSearchOptions.Trial := chkIncludeTrial.Checked;
+    FSearchOptions.Platforms := [FCurrentPlatform];
     SearchForPackages(FSearchOptions)
     .OnException(
       procedure(const e : Exception)

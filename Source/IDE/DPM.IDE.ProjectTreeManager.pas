@@ -39,6 +39,7 @@ uses
   System.Classes,
   Vcl.Controls,
   WinApi.Messages,
+  DPM.Core.Types,
   DPM.Core.Options.Search,
   DPM.Core.Project.Interfaces,
   DPM.Core.Configuration.Interfaces,
@@ -72,6 +73,7 @@ type
 
     FProjectLoadList : IQueue<string>;
     FDPMImageIndex : integer;
+    FPlatformImageIndexes : array[TDPMPlatform] of integer;
 
   //TODO : Invalidate cache when projects close.
     FNodeCache : IDictionary<TProjectTreeContainer, PVirtualNode>;
@@ -121,7 +123,6 @@ uses
   Vcl.Graphics,
   Vcl.Forms,
   DPM.Core.Constants,
-  DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Options.Common,
   DPM.Core.Configuration.Manager,
@@ -255,10 +256,10 @@ end;
 
 function TDPMProjectTreeManager.EnsureProjectTree : boolean;
 var
-  bitmap : TBitmap;
- BMP:TBitMap;
- ICO:TIcon;
- I: Integer;
+ bitmap : TBitmap;
+
+// i: Integer;
+ platform : TDPMPlatform;
  imageList : TCustomImageList;
 begin
   if FVSTProxy <> nil then
@@ -272,39 +273,54 @@ begin
     if FProjectTreeInstance <> nil then
     begin
       FVSTProxy := TVirtualStringTreeProxy.Create(FProjectTreeInstance, FLogger);
-//
-//      //peeking at the images to work out indexes
       imageList := FVSTProxy.Images;
-      BMP:=TBitMap.Create;
-      BMP.Width := imageList.Width * imageList.Count;
-      BMP.Height := imageList.Height;
-      try
-        //SetBitmapAlpha(BMP,0,0,0,0);
-        for I := 0 to imageList.Count-1 do
-          begin
-           ICO:=TIcon.Create;
-           try
-             imageList.GetIcon(i,ICO);
-             BMP.Canvas.Draw(i * imageList.Width, 0, ico);
-           finally
-             ICO.Free;
-           end;
-          end;
-        BMP.SaveToFile('C:\Temp\imgages.bmp');
-      finally
-        BMP.Free;
-      end;
+
+      //peeking at the images to work out indexes
+//      for i := imageList.Count-1 downto imageList.Count-15  do
+//      begin
+//       bitmap:= TBitmap.Create;
+//       try
+//         imageList.GetBitmap(i, bitmap);
+//         bitmap.SaveToFile('c:\temp\project-tree' + IntToStr(i) + '.bmp');
+//       finally
+//         bitmap.Free;
+//       end;
+//      end;
+      for platform := Low(TDPMPlatform) to High(TDPMPlatform) do
+        FPlatformImageIndexes[platform] := -1;
 
 
       Result := true;
       bitmap := TBitmap.Create;
       try
         bitmap.LoadFromResourceName(HInstance, 'DPMIDELOGO_16');
-        FDPMImageIndex := FVSTProxy.Images.AddMasked(bitmap, clFuchsia);
+        FDPMImageIndex := imageList.AddMasked(bitmap, clFuchsia);
+        bitmap.LoadFromResourceName(HInstance, 'PLATFORM_WIN32');
+        FPlatformImageIndexes[TDPMPlatform.Win32] := imageList.AddMasked(bitmap, clFuchsia);
+        bitmap.LoadFromResourceName(HInstance, 'PLATFORM_WIN64');
+        FPlatformImageIndexes[TDPMPlatform.Win64] := imageList.AddMasked(bitmap, clFuchsia);
+        bitmap.LoadFromResourceName(HInstance, 'PLATFORM_MACOS');
+        FPlatformImageIndexes[TDPMPlatform.OSX32] := imageList.AddMasked(bitmap, clFuchsia);
+        FPlatformImageIndexes[TDPMPlatform.OSX64] := FPlatformImageIndexes[TDPMPlatform.OSX32];
+        bitmap.LoadFromResourceName(HInstance, 'PLATFORM_ANDRIOD');
+        FPlatformImageIndexes[TDPMPlatform.AndroidArm32] := imageList.AddMasked(bitmap, clFuchsia);
+        FPlatformImageIndexes[TDPMPlatform.AndroidArm64] := FPlatformImageIndexes[TDPMPlatform.AndroidArm32];
+        FPlatformImageIndexes[TDPMPlatform.AndroidIntel32] := FPlatformImageIndexes[TDPMPlatform.AndroidArm32];
+        FPlatformImageIndexes[TDPMPlatform.AndroidIntel64] := FPlatformImageIndexes[TDPMPlatform.AndroidArm32];
+        bitmap.LoadFromResourceName(HInstance, 'PLATFORM_IOS');
+        FPlatformImageIndexes[TDPMPlatform.iOS32] := imageList.AddMasked(bitmap, clFuchsia);
+        FPlatformImageIndexes[TDPMPlatform.iOS64] := FPlatformImageIndexes[TDPMPlatform.iOS32];
+        bitmap.LoadFromResourceName(HInstance, 'PLATFORM_LINUX');
+        FPlatformImageIndexes[TDPMPlatform.LinuxIntel32] := imageList.AddMasked(bitmap, clFuchsia);
+        FPlatformImageIndexes[TDPMPlatform.LinuxIntel64] := FPlatformImageIndexes[TDPMPlatform.LinuxIntel32];
+        FPlatformImageIndexes[TDPMPlatform.LinuxArm32] := FPlatformImageIndexes[TDPMPlatform.LinuxIntel32];
+        FPlatformImageIndexes[TDPMPlatform.LinuxArm64] := FPlatformImageIndexes[TDPMPlatform.LinuxIntel32];
 
       finally
         bitmap.Free;
       end;
+
+
     end;
   end;
 end;
@@ -485,6 +501,8 @@ var
   pf : TDPMPlatform;
   dpmNode : PVirtualNode;
   dpmChildren : IInterfaceList;
+  platformSortedList : TStringList;
+  i : integer;
 
   function FindProject : IOTAProject;
   var
@@ -501,26 +519,27 @@ var
   //TODO: Figure out image indexes for platforms.
   function DPMPlatformImageIndex(const pf : TDPMPlatform) : integer;
   begin
-    result := -1;
-    case pf of
-      TDPMPlatform.UnknownPlatform: ;
-      TDPMPlatform.Win32:  result := 93;
-      TDPMPlatform.Win64:  result := 94;
-      TDPMPlatform.WinArm32: ;
-      TDPMPlatform.WinArm64: ;
-      TDPMPlatform.OSX32: result := 91;
-      TDPMPlatform.OSX64: result := 91;
-      TDPMPlatform.AndroidArm32: result := 95;
-      TDPMPlatform.AndroidArm64: result := 95;
-      TDPMPlatform.AndroidIntel32: ;
-      TDPMPlatform.AndroidIntel64: ;
-      TDPMPlatform.iOS32: result := 96;
-      TDPMPlatform.iOS64: result := 93;
-      TDPMPlatform.LinuxIntel32: result := 92;
-      TDPMPlatform.LinuxIntel64: result := 92;
-      TDPMPlatform.LinuxArm32: ;
-      TDPMPlatform.LinuxArm64: ;
-    end;
+    result := FPlatformImageIndexes[pf];
+//
+//    case pf of
+//      TDPMPlatform.UnknownPlatform: ;
+//      TDPMPlatform.Win32:  result := FPlatformImageIndexes[pf];
+//      TDPMPlatform.Win64:  result := 94;
+//      TDPMPlatform.WinArm32: ;
+//      TDPMPlatform.WinArm64: ;
+//      TDPMPlatform.OSX32: result := 91;
+//      TDPMPlatform.OSX64: result := 91;
+//      TDPMPlatform.AndroidArm32: result := 95;
+//      TDPMPlatform.AndroidArm64: result := 95;
+//      TDPMPlatform.AndroidIntel32: ;
+//      TDPMPlatform.AndroidIntel64: ;
+//      TDPMPlatform.iOS32: result := 96;
+//      TDPMPlatform.iOS64: result := 93;
+//      TDPMPlatform.LinuxIntel32: result := 92;
+//      TDPMPlatform.LinuxIntel64: result := 92;
+//      TDPMPlatform.LinuxArm32: ;
+//      TDPMPlatform.LinuxArm64: ;
+//    end;
   end;
 
 
@@ -553,7 +572,7 @@ var
     end;
 
   begin
-    platformContainer := TProjectTreeContainer.CreateNewContainer(dpmContainer, DPMPlatformToString(pf),cDPMContainer);
+    platformContainer := TProjectTreeContainer.CreateNewContainer(dpmContainer, DPMPlatformToDisplayString(pf),cDPMContainer);
     platformContainer.ImageIndex := DPMPlatformImageIndex(pf);
     AddChildContainer(dpmContainer, platformContainer);
     dpmChildren.Add(platformContainer);
@@ -608,13 +627,23 @@ begin
 
   if projectEditor.LoadProject(projectFile) then
   begin
+    platformSortedList := TStringList.Create;
+    platformSortedList.Sorted := true;
+    try
+      for pf in projectEditor.Platforms do
+        platformSortedList.AddObject(DPMPlatformToString(pf), TObjecT(Ord(pf)));
 
-    for pf in projectEditor.Platforms do
-    begin
-//      FLogger.Debug('Target platform : ' + DPMPlatformToString(pf));
-//      Application.ProcessMessages;
-      AddPlatform(pf, projectEditor.PackageReferences);
+      for i := 0 to  platformSortedList.Count -1 do
+      begin
+        pf := TDPMPlatform(Integer(platformSortedList.Objects[i]));
+        AddPlatform(pf, projectEditor.PackageReferences);
+      end;
+    finally
+      platformSortedList.Free;
     end;
+
+  //      FLogger.Debug('Target platform : ' + DPMPlatformToString(pf));
+//      Application.ProcessMessages;
   end;
 
 end;
