@@ -649,12 +649,12 @@ begin
   //if it's in the search results, update the installed version.
   if FSearchResultPackages <> nil then
   begin
-    packageSearchResult := FSearchResultPackages.Where(
+    packageSearchResult := FSearchResultPackages.FirstOrDefault(
       function(const value : IPackageSearchResultItem) : boolean
       begin
         result := SameText(value.Id,
           package.Id) and (value.Version = package.Version);
-      end).FirstOrDefault;
+      end);
 
     if packageSearchResult <> nil then
     begin
@@ -671,12 +671,12 @@ begin
   end
   else
   begin
-    packageSearchResult := FAllInstalledPackages.Where(
+    packageSearchResult := FAllInstalledPackages.FirstOrDefault(
       function(const value : IPackageSearchResultItem) : boolean
       begin
         result := SameText(value.Id,
           package.Id) and (value.Version = package.Version);
-      end).FirstOrDefault;
+      end);
     if packageSearchResult <> nil then
     begin
       packageSearchResult.Installed := true;
@@ -706,12 +706,12 @@ begin
   //might be nil if we haven't switched to the tab yet.
   if FSearchResultPackages <> nil then
   begin
-    packageSearchResult := FSearchResultPackages.Where(
+    packageSearchResult := FSearchResultPackages.FirstOrDefault(
       function(const value : IPackageSearchResultItem) : boolean
       begin
         result := SameText(value.Id,
           package.Id) and (value.Version = package.Version);
-      end).FirstOrDefault;
+      end);
 
     if packageSearchResult <> nil then
     begin
@@ -723,12 +723,12 @@ begin
   //shouldn't be nil
   if FAllInstalledPackages <> nil then
   begin
-    packageSearchResult := FAllInstalledPackages.Where(
+    packageSearchResult := FAllInstalledPackages.FirstOrDefault(
       function(const value : IPackageSearchResultItem) : boolean
       begin
         result := SameText(value.Id,
           package.Id) and (value.Version = package.Version);
-      end).FirstOrDefault;
+      end);
     if packageSearchResult <> nil then
     begin
       FAllInstalledPackages.Remove(packageSearchResult);

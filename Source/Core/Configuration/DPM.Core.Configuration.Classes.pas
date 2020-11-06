@@ -392,10 +392,10 @@ begin
     bResult := source.LoadFromJson(sourcesArray.O[i]);
     if bResult then
     begin
-      if not FSources.Where(function(const item : ISourceConfig) : boolean
+      if not FSources.Any(function(const item : ISourceConfig) : boolean
         begin
           result := SameText(item.Name, source.Name);
-        end).Any then
+        end) then
       begin
         FSources.Add(source);
       end;

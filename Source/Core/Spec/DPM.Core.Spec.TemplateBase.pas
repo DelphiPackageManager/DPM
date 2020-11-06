@@ -148,90 +148,90 @@ end;
 
 function TSpecTemplateBase.FindBuildEntryById(const id : string) : ISpecBuildEntry;
 begin
-  result := FBuildEntries.Where(
+  result := FBuildEntries.FirstOrDefault(
     function(const item : ISpecBuildEntry) : boolean
     begin
       result := SameText(item.Id, id);
-    end).FirstOrDefault;
+    end);
 end;
 
 function TSpecTemplateBase.FindDependencyById(const id : string) : ISpecDependency;
 begin
-  result := FDependencies.Where(
+  result := FDependencies.FirstOrDefault(
     function(const item : ISpecDependency) : boolean
     begin
       result := SameText(item.Id, id);
-    end).FirstOrDefault;
+    end);
 end;
 
 function TSpecTemplateBase.FindDependencyGroupByTargetPlatform(const targetPlatform : TTargetPlatform) : ISpecDependencyGroup;
 begin
-  result := FDependencies.Where(
+  result := FDependencies.FirstOrDefault(
     function(const item : ISpecDependency) : boolean
     begin
       result := false;
       if item.IsGroup then
         result := (item as ISpecDependencyGroup).TargetPlatform = targetPlatform;
-    end).FirstOrDefault as ISpecDependencyGroup;
+    end) as ISpecDependencyGroup;
 
 end;
 
 function TSpecTemplateBase.FindDesignBplBySrc(const src : string) : ISpecBPLEntry;
 begin
-  result := FDesignFiles.Where(
+  result := FDesignFiles.FirstOrDefault(
     function(const item : ISpecBPLEntry) : boolean
     begin
       result := SameText(item.Source, src);
-    end).FirstOrDefault;
+    end);
 end;
 
 function TSpecTemplateBase.FindLibFileBySrc(const src : string) : ISpecFileEntry;
 begin
-  result := FLibFiles.Where(
+  result := FLibFiles.FirstOrDefault(
     function(const item : ISpecFileEntry) : boolean
     begin
       result := SameText(item.Source, src);
-    end).FirstOrDefault;
+    end);
 
 end;
 
 function TSpecTemplateBase.FindOtherFileBySrc(const src : string) : ISpecFileEntry;
 begin
-  result := FFiles.Where(
+  result := FFiles.FirstOrDefault(
     function(const item : ISpecFileEntry) : boolean
     begin
       result := SameText(item.Source, src);
-    end).FirstOrDefault;
+    end);
 
 end;
 
 function TSpecTemplateBase.FindRuntimeBplBySrc(const src : string) : ISpecBPLEntry;
 begin
-  result := FRuntimeFiles.Where(
+  result := FRuntimeFiles.FirstOrDefault(
     function(const item : ISpecBPLEntry) : boolean
     begin
       result := SameText(item.Source, src);
-    end).FirstOrDefault;
+    end);
 
 end;
 
 function TSpecTemplateBase.FindSearchPathByPath(const path : string) : ISpecSearchPath;
 begin
-  result := FSearchPaths.Where(
+  result := FSearchPaths.FirstOrDefault(
     function(const item : ISpecSearchPath) : boolean
     begin
       result := SameText(item.Path, path);
-    end).FirstOrDefault;
+    end);
 
 end;
 
 function TSpecTemplateBase.FindSourceFileBySrc(const src : string) : ISpecFileEntry;
 begin
-  result := FSourceFiles.Where(
+  result := FSourceFiles.FirstOrDefault(
     function(const item : ISpecFileEntry) : boolean
     begin
       result := SameText(item.Source, src);
-    end).FirstOrDefault;
+    end);
 end;
 
 function TSpecTemplateBase.GetBuildEntries : IList<ISpecBuildEntry>;

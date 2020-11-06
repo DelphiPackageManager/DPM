@@ -584,11 +584,11 @@ function TProjectEditor.LoadPackageRefences : boolean;
         else
           dupList := FPackageRefences;
 
-        if dupList.Where(
+        if dupList.Any(
           function(const item : IPackageReference) : boolean
           begin
             result := SameText(item.Id, id) and (item.Platform = platform);
-          end).Any then
+          end) then
         begin
           if parentReference <> nil then
             FLogger.Error('Duplicate package reference for package [' + id + '  ' + DPMPlatformToString(platform) + '] under [' + parentReference.Id + ']')
