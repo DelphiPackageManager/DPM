@@ -427,11 +427,11 @@ begin
       end));
 
   //see if we have the pacakge installed already (direct dependency)
-  existingPackageRef := projectPackageReferences.Where(
+  existingPackageRef := projectPackageReferences.FirstOrDefault(
     function(const packageRef : IPackageReference) : boolean
     begin
       result := SameText(newPackageIdentity.Id, packageRef.Id);
-    end).FirstOrDefault;
+    end);
 
   if (existingPackageRef <> nil) then
   begin
@@ -456,12 +456,12 @@ begin
   end;
 
   //check to ensure we are not trying to install something that is already a transitive dependency.
-  existingPackageRef := packageReferences.Where(
+  existingPackageRef := packageReferences.FirstOrDefault(
     function(const packageRef : IPackageReference) : boolean
     begin
       result := SameText(newPackageIdentity.Id, packageRef.Id);
       result := result and (newPackageIdentity.Platform = packageRef.Platform);
-    end).FirstOrDefault;
+    end);
 
   //We need to see if we are promoting a transitive dependency.
 
@@ -517,6 +517,7 @@ begin
   //turn them into packageIdentity's so we can get their Info/dependencies
 
   projectPackageInfos := TCollections.CreateList<IPackageInfo>;
+  //TODO : When we get to http repos, this might be slow, perhaps parallel for might
   for packageReference in packageReferences do
   begin
     projectPackageInfo := GetPackageInfo(cancellationToken, packageReference);
@@ -563,11 +564,11 @@ begin
     exit(false);
   end;
 
-  packageInfo := resolvedPackages.Where(
+  packageInfo := resolvedPackages.FirstOrDefault(
     function(const info : IPackageInfo) : boolean
     begin
       result := SameText(info.Id, packageInfo.Id);
-    end).FirstOrDefault;
+    end);
 
   if packageInfo = nil then
   begin

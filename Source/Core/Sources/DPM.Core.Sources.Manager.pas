@@ -89,10 +89,10 @@ begin
     exit;
   end;
 
-  if config.Sources.Where(function(const item : ISourceConfig) : boolean
+  if config.Sources.Any(function(const item : ISourceConfig) : boolean
     begin
       result := SameText(item.Name, options.Name);
-    end).Any then
+    end) then
   begin
     FLogger.Error('Source with name [' + options.Name + '] already exists');
     exit;
@@ -138,10 +138,10 @@ begin
     exit;
   end;
 
-  source := config.Sources.Where(function(const item : ISourceConfig) : boolean
+  source := config.Sources.FirstOrDefault(function(const item : ISourceConfig) : boolean
     begin
       result := SameText(item.Name, options.Name);
-    end).FirstOrDefault;
+    end);
   if source = nil then
   begin
     FLogger.Error('Source with name [' + options.Name + '] not found.');
@@ -175,10 +175,10 @@ begin
     exit;
   end;
 
-  source := config.Sources.Where(function(const item : ISourceConfig) : boolean
+  source := config.Sources.FirstOrDefault(function(const item : ISourceConfig) : boolean
     begin
       result := SameText(item.Name, options.Name);
-    end).FirstOrDefault;
+    end);
   if source = nil then
   begin
     FLogger.Error('Source with name [' + options.Name + '] not found.');
@@ -261,10 +261,10 @@ begin
     exit;
   end;
 
-  source := config.Sources.Where(function(const item : ISourceConfig) : boolean
+  source := config.Sources.FirstOrDefault(function(const item : ISourceConfig) : boolean
     begin
       result := SameText(item.Name, options.Name);
-    end).FirstOrDefault;
+    end);
   if source = nil then
   begin
     FLogger.Error('Source with name [' + options.Name + '] not found.');
@@ -297,10 +297,10 @@ begin
     exit;
   end;
 
-  source := config.Sources.Where(function(const item : ISourceConfig) : boolean
+  source := config.Sources.FirstOrDefault(function(const item : ISourceConfig) : boolean
     begin
       result := SameText(item.Name, options.Name);
-    end).FirstOrDefault;
+    end);
   if source = nil then
   begin
     FLogger.Error('Source with name [' + options.Name + '] not found.');

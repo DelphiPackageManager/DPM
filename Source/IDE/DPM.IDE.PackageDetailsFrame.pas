@@ -618,19 +618,19 @@ begin
         begin
           if options.Prerelease then
           begin
-            version := versions.Where(
+            version := versions.FirstOrDefault(
               function(const value : TPackageVersion) : boolean
               begin
                 result := value.IsStable = false;
-              end).FirstOrDefault;
+              end);
             if not version.IsEmpty then
               lPre := cLatestPrerelease + version.ToStringNoMeta;
           end;
-          version := versions.Where(
+          version := versions.FirstOrDefault(
             function(const value : TPackageVersion) : boolean
             begin
               result := value.IsStable;
-            end).FirstOrDefault;
+            end);
           if not version.IsEmpty then
             lStable := cLatestStable + version.ToStringNoMeta;
           if (lStable <> '') and (lPre <> '') then

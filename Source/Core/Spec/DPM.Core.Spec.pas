@@ -137,7 +137,7 @@ begin
 
   //first see if there is a group for this target platform, if there is then that is all we will use.
 
-  depGroup := dependencies.Where(
+  depGroup := dependencies.FirstOrDefault(
     function(const dependency : ISpecDependency) : boolean
     var
       group : ISpecDependencyGroup;
@@ -150,7 +150,7 @@ begin
         and (group.TargetPlatform.Platform = targetPlatform.Platforms[0]);
       end;
 
-    end).FirstOrDefault as ISpecDependencyGroup;
+    end) as ISpecDependencyGroup;
 
   //group replaces existing.
   if depGroup <> nil then
@@ -287,7 +287,7 @@ begin
 
   //first see if there is a group for this target platform, if there is then that is all we will use.
 
-  searchPathGroup := searchPaths.Where(
+  searchPathGroup := searchPaths.FirstOrDefault(
     function(const searchPath : ISpecSearchPath) : boolean
     var
       group : ISpecSearchPathGroup;
@@ -300,7 +300,7 @@ begin
         and (group.TargetPlatform.Platform = targetPlatform.Platforms[0]);
       end;
 
-    end).FirstOrDefault as ISpecSearchPathGroup;
+    end) as ISpecSearchPathGroup;
 
   //if we have a group that matches the targetPlatform then we replace the searchPaths with it's searchPaths
   if searchPathGroup <> nil then
@@ -360,10 +360,10 @@ begin
   result := true;
   Logger.Information('Applying templates..');
   //if any targetPlatforms reference a template
-  if not FTargetPlatforms.Where(function(const item : ISpecTargetPlatform) : boolean
+  if not FTargetPlatforms.Any(function(const item : ISpecTargetPlatform) : boolean
     begin
       result := item.TemplateName <> '';
-    end).Any then
+    end) then
     exit;
 
   //if we don't have templates then the spec is not valid.
@@ -477,11 +477,11 @@ end;
 
 function TSpec.FindTemplate(const name : string) : ISpecTemplate;
 begin
-  result := FTemplates.Where(
+  result := FTemplates.FirstOrDefault(
     function(const item : ISpecTemplate) : boolean
     begin
       result := SameText(name, item.Name);
-    end).FirstOrDefault;
+    end);
 end;
 
 function TSpec.GetTargetPlatform: ISpecTargetPlatform;

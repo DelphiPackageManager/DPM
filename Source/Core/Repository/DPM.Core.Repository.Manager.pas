@@ -473,10 +473,10 @@ end;
 
 function TPackageRepositoryManager.GetRepositoryByName(const value : string) : IPackageRepository;
 begin
-  result := FRepositories.Where(function(const repo : IPackageRepository) : boolean
+  result := FRepositories.FirstOrDefault(function(const repo : IPackageRepository) : boolean
     begin
       result := SameText(value, repo.Name);
-    end).FirstOrDefault;
+    end);
 end;
 
 
