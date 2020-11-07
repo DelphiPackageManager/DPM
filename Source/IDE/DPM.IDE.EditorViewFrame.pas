@@ -732,8 +732,11 @@ begin
     if packageSearchResult <> nil then
     begin
       FAllInstalledPackages.Remove(packageSearchResult);
+      if FInstalledPackages <> nil then
+        FInstalledPackages.Remove(packageSearchResult);
       if FCurrentTab = TCurrentTab.Installed then
-        FilterAndLoadInstalledPackages(txtSearch.Text);
+        SwitchedToInstalled(False);
+//        FilterAndLoadInstalledPackages(txtSearch.Text);
     end;
   end;
 
@@ -1306,7 +1309,7 @@ begin
         for item in FSearchResultPackages do
         begin
           packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
-          item.Installed := packageRef <> nil;
+          item.Installed := (packageRef <> nil) and (not packageRef.IsTransitive);
           if item.Installed then
             item.InstalledVersion := packageRef.Version.ToStringNoMeta;
         end;
