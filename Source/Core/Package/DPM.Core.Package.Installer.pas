@@ -426,7 +426,7 @@ begin
         result := platform = packageReference.Platform;
       end));
 
-  //see if we have the pacakge installed already (direct dependency)
+  //see if we have the package installed already (direct dependency, any version)
   existingPackageRef := projectPackageReferences.FirstOrDefault(
     function(const packageRef : IPackageReference) : boolean
     begin
@@ -438,32 +438,34 @@ begin
     //if it's installed already and we're not forcing it to install then we're done.
     if not options.Force  then
     begin
+      //Note this error won't show from the IDE as we always force install from the IDE.
       FLogger.Error('Package [' + newPackageIdentity.ToString + '] is already installed. Use option -force to force reinstall.');
       exit;
     end;
+    //remove it so we can force resolution to happen later.
     projectPackageReferences.Remove(existingPackageRef);
   end;
 
   //flatten & dedupe the references and build our graph.
-  for packageReference in projectPackageReferences.Where(
-    function(const packageReference : IPackageReference) : boolean
-    begin
-      result := platform = packageReference.Platform;
-    end) do
+  for packageReference in projectPackageReferences do
+  //We shouldn't need this, projectPackageReferences already contains only the desired platforn references
+//    .Where(
+//    function(const packageReference : IPackageReference) : boolean
+//    begin
+//      result := platform = packageReference.Platform;
+//    end) do
   begin
     BuildGraph(packageReference, dependencyGraph);
     AddPackageReference(packageReference, packageReferences, conflictDetect);
   end;
 
-  //check to ensure we are not trying to install something that is already a transitive dependency.
+  //check to see if trying to install something that is already a transitive dependency.
   existingPackageRef := packageReferences.FirstOrDefault(
     function(const packageRef : IPackageReference) : boolean
     begin
       result := SameText(newPackageIdentity.Id, packageRef.Id);
-      result := result and (newPackageIdentity.Platform = packageRef.Platform);
+      // should already be correct platform  - result := result and (newPackageIdentity.Platform = packageRef.Platform);
     end);
-
-  //We need to see if we are promoting a transitive dependency.
 
   //We could have a transitive dependency that is being promoted.
   if (existingPackageRef <> nil) then
@@ -583,41 +585,40 @@ begin
     exit;
 
 
-  packageCompiler := FCompilerFactory.CreateCompiler(options.CompilerVersion, platform);
-
-  //build the dependency graph in the correct order.
-  dependencyGraph.VisitDFS(
-    procedure(const node : IGraphNode)
-    var
-      pkgInfo : IPackageInfo;
-      spec : IPackageSpec;
-    begin
-      Assert(node.IsRoot = false, 'graph should not visit root node');
-
-      pkgInfo := resolvedPackages.Where(
-        function(const value : IPackageInfo) : boolean
-        begin
-          result := SameText(value.Id, node.Id);
-        end).FirstOrDefault;
-      //if it's not found that means we have already processed the package elsewhere in the graph
-      if pkgInfo = nil then
-        exit;
-      //removing it so we don't process it again
-      resolvedPackages.Remove(pkgInfo);
-
-      spec := packageSpecs[LowerCase(node.Id)];
-      Assert(spec <> nil);
-      if spec.TargetPlatform.BuildEntries.Any then
-      begin
-        //we need to build the package.
-      end;
-      if spec.TargetPlatform.DesignFiles.Any then
-      begin
-        //we have design time packages to install.
-
-      end;
-
-    end);
+//  packageCompiler := FCompilerFactory.CreateCompiler(options.CompilerVersion, platform);
+//
+//  //build the dependency graph in the correct order.
+//  dependencyGraph.VisitDFS(
+//    procedure(const node : IGraphNode)
+//    var
+//      pkgInfo : IPackageInfo;
+//      spec : IPackageSpec;
+//    begin
+//      Assert(node.IsRoot = false, 'graph should not visit root node');
+//
+//      pkgInfo := resolvedPackages.FirstOrDefault(
+//        function(const value : IPackageInfo) : boolean
+//        begin
+//          result := SameText(value.Id, node.Id);
+//        end);
+//      //if it's not found that means we have already processed the package elsewhere in the graph
+//      if pkgInfo = nil then
+//        exit;
+//      //removing it so we don't process it again
+//      resolvedPackages.Remove(pkgInfo);
+//      spec := packageSpecs[LowerCase(node.Id)];
+//      Assert(spec <> nil);
+//      if spec.TargetPlatform.BuildEntries.Any then
+//      begin
+//        //we need to build the package.
+//      end;
+//      if spec.TargetPlatform.DesignFiles.Any then
+//      begin
+//        //we have design time packages to install.
+//
+//      end;
+//
+//    end);
 
 
   packageSearchPaths := TCollections.CreateList <string> ;
@@ -633,11 +634,11 @@ begin
     begin
       Assert(node.IsRoot = false, 'graph should not visit root node');
 
-      pkgInfo := resolvedPackages.Where(
+      pkgInfo := resolvedPackages.FirstOrDefault(
         function(const value : IPackageInfo) : boolean
         begin
           result := SameText(value.Id, node.Id);
-        end).FirstOrDefault;
+        end);
       //if it's not found that means we have already processed the package elsewhere in the graph
       if pkgInfo = nil then
         exit;

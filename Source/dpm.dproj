@@ -113,8 +113,8 @@
         <DCC_GenerateStackFrames>true</DCC_GenerateStackFrames>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <Debugger_CWD>C:\Users\vincent.OFFICE\Documents\Embarcadero\Studio\Projects\10.4\DPMTest</Debugger_CWD>
-        <Debugger_RunParams>install spring4d.core -platforms=Win64 -pr -compiler=10.4 -verbosity=debug</Debugger_RunParams>
+        <Debugger_CWD>I:\Github\DelphiPackageManager\DPMMaster\TestPackages</Debugger_CWD>
+        <Debugger_RunParams>pack .\A\VSoft.A.dspec -o=i:\dpmfeed</Debugger_RunParams>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
         <Debugger_RunParams>pack I:\Github\VSoftTechnologies\VSoft.AntPatterns\VSoft.AntPatterns.dspec -OutputFolder=c:\temp -basepath=. -minclientversion=1.0</Debugger_RunParams>

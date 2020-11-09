@@ -4,9 +4,8 @@
     version : "0.0.1",
     description : "Test package A",
     authors : "Vincent Parrett",
-    projectUrl : "https://github.com/DelphiPackageManager/DPM.Client",
+    projectUrl : "https://github.com/DelphiPackageManager/DPM",
     license : "Apache-2.0",
-    icon : "images\logo.png",
     copyright : "2019 Vincent Parrett and contributors",
     tags : "Test"
   },
@@ -63,6 +62,11 @@
     },
     {
       compiler : "10.3",
+      platforms : "Win32, Win64",
+      template : "default"
+    },
+    {
+      compiler : "10.4",
       platforms : "Win32, Win64",
       template : "default"
     }

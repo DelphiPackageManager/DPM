@@ -35,11 +35,22 @@ uses
   DPM.Core.Dependency.Interfaces,
   DPM.Core.Dependency.Version;
 
+  {$LEGACYIFEND ON}
+  {$IF CompilerVersion >= 31.0 }
+    {$DEFINE USEWEAK}
+  {$IFEND}
+
 type
   TGraphNode = class(TInterfacedObject, IGraphNode)
   private
-    //todo : in 10.3+ use weakref
+    //todo : in 10.1+ use weakref
+    {$IFDEF USEWEAK}
+    [weak]
+    FParent : IGraphNode;
+    {$ELSE}
     FParent : Pointer;
+    {$ENDIF}
+
     FChildNodes : IDictionary<string, IGraphNode>;
     FId : string;
     FVersion : TPackageVersion;
@@ -107,7 +118,11 @@ begin
   if parent <> nil then
   begin
     FLevel := parent.Level + 1;
+    {$IFDEF USEWEAK}
+    FParent := parent;
+    {$ELSE}
     FParent := Pointer(parent);
+    {$ENDIF}
   end
   else
     FParent := nil;
@@ -192,7 +207,7 @@ function TGraphNode.GetParent : IGraphNode;
 begin
   //easier to debug this way
   if FParent <> nil then
-    result := IGraphNode(FParent)
+    result := {$IFDEF USEWEAK} FParent {$ELSE} IGraphNode(FParent) {$ENDIF}
   else
     result := nil;
 end;

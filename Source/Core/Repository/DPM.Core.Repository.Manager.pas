@@ -59,7 +59,7 @@ type
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
 
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange; const configuration : IConfiguration = nil) : IList<IPackageInfo>; overload;
+    function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange; const configuration : IConfiguration = nil) : IList<IPackageInfo>; overload;
     //UI specific stuff
     //TODO : Implement skip/take!
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
@@ -319,7 +319,7 @@ begin
     if cancellationToken.IsCancelled then
       exit;
 
-    searchResult := repo.GetPackageVersions(cancellationToken, options.SearchTerms, options.CompilerVersion);
+    searchResult := repo.GetPackageVersions(cancellationToken, options.SearchTerms, options.CompilerVersion, options.Prerelease);
     unfilteredResults.AddRange(searchResult);
   end;
 
@@ -338,7 +338,7 @@ begin
 
 end;
 
-function TPackageRepositoryManager.GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange; const configuration : IConfiguration = nil) : IList<IPackageInfo>;
+function TPackageRepositoryManager.GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange; const configuration : IConfiguration = nil) : IList<IPackageInfo>;
 var
   config : IConfiguration;
   repo : IPackageRepository;

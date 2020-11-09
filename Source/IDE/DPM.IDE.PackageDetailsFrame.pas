@@ -578,9 +578,7 @@ begin
   TAsync.Configure < IList<TPackageVersion> > (
     function(const cancelToken : ICancellationToken) : IList<TPackageVersion>
     begin
-      //this is calling the wrong overload.
       result := repoManager.GetPackageVersions(cancelToken, options, config);
-      //simulating long running.
     end, FCancellationTokenSource.Token)
   .OnException(
     procedure(const e : Exception)

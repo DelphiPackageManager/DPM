@@ -1,8 +1,8 @@
 {
   metadata: {
-    id : "VSoft.D",
+    id : "VSoft.E",
     version : "0.0.1",
-    description : "Test package D",
+    description : "Test package E",
     authors : "Vincent Parrett",
     projectUrl : "https://github.com/DelphiPackageManager/DPM",
     license : "Apache-2.0",
@@ -76,7 +76,7 @@
       name : "default",
       source : [
         {
-          src : ".\\VSoft.D.pas",
+          src : ".\\VSoft.E.pas",
           dest : "src"
         }
       ],

@@ -1,0 +1,28 @@
+/*
+Include manifest xml for XP/Vista
+*/
+1 24 "I:\\Github\\DelphiPackageManager\\DPMMaster\\Source\\dpmManifest.xml"
+1 VERSIONINFO
+FILEVERSION 0,1,9,0
+PRODUCTVERSION 0,1,9,0
+FILEFLAGSMASK 0x3FL
+FILEFLAGS 0x00L
+FILEOS 0x40004L
+FILETYPE 0x1L
+FILESUBTYPE 0x00L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+         BLOCK "0C0904E4"
+         BEGIN
+              VALUE "LegalCopyright", "© 2019 -2020 Vincent Parrett and Contributors\0"
+              VALUE "CompileDate", "Tuesday, 3 November 2020 8:18 AM\0"
+              VALUE "FileVersion", "0.1.9.0\0"
+              VALUE "ProductVersion", "0.1.9.0\0"
+         END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+         VALUE "Translation", 0x0C09, 1252
+    END
+END

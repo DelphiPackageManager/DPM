@@ -1,0 +1,8 @@
+DPMIDELOGO BITMAP "images\\dpm.bmp"
+DPMIDELOGO_16 BITMAP "images\\dpm16.bmp"
+PLATFORM_WIN32 BITMAP "images\\platform-win32.bmp"
+PLATFORM_ANDRIOD BITMAP "images\\platform_andriod.bmp"
+PLATFORM_IOS BITMAP "images\\platform_ios.bmp"
+PLATFORM_LINUX BITMAP "images\\platform_linux.bmp"
+PLATFORM_MACOS BITMAP "images\\platform_macos.bmp"
+PLATFORM_WIN64 BITMAP "images\\platform-win64.bmp"

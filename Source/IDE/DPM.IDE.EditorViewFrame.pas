@@ -303,8 +303,8 @@ end;
 
 procedure TDPMEditViewFrame.chkIncludePrereleaseClick(Sender : TObject);
 begin
-  btnRefreshClick(Sender);
   PackageDetailsFrame.IncludePreRelease := chkIncludePrerelease.Checked;
+  btnRefreshClick(Sender);
 end;
 
 procedure TDPMEditViewFrame.Closing;

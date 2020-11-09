@@ -67,13 +67,12 @@ type
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageMetadata : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
 
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion) : IList<TPackageVersion>; overload;
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo; overload;
 
     //ui stuff
-
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const preRelease : boolean) : IList<TPackageVersion>; overload;
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration) : IList<IPackageSearchResultItem>;
     function GetPackageIcon(const cancelToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
 
@@ -384,7 +383,7 @@ begin
   end;
 end;
 
-function TDirectoryPackageRepository.GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion) : IList<TPackageVersion>;
+function TDirectoryPackageRepository.GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const preRelease : boolean) : IList<TPackageVersion>;
 var
   searchFiles : IList<string>;
   regex : TRegEx;
@@ -409,6 +408,11 @@ begin
     begin
       if not TPackageVersion.TryParse(match.Groups[4].Value, packageVersion) then
         continue;
+
+      if (not preRelease) and (not packageVersion.IsStable)  then
+        continue;
+
+
       result.Add(packageVersion);
     end;
   end;
@@ -448,6 +452,11 @@ begin
     begin
       if not TPackageVersion.TryParse(match.Groups[4].Value, packageVersion) then
         continue;
+
+      //todo : check this is correct.
+      if not versionRange.Satisfies(packageVersion) then
+        continue;
+
       if not prerelease then
         if not packageVersion.IsStable then
           continue;

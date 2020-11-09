@@ -204,7 +204,7 @@ begin
           searchOptions.SearchTerms := dependency.Id;
           //passing in the version range to filter the results - not sure if this is valid.. do we need all versions?
           //I suspect it may result in more failures
-          versions := FRepositoryManager.GetPackageVersions(cancellationToken, searchOptions, platform, dependency.VersionRange); // TVersionRange.Empty);
+          versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, searchOptions, platform, dependency.VersionRange); // TVersionRange.Empty);
           if versions.Any then
             context.AddPackageVersions(dependency.Id, versions);
         end;

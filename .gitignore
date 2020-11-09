@@ -24,7 +24,6 @@
 *.tvsconfig
 *.otares
 *.drc
-*.rc
 *.res
 
 # Output Folders  #

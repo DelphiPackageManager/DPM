@@ -87,8 +87,13 @@ end;
 
 function TPackageArchiveWriter.AddFile(const fileName, archiveFileName : string) : boolean;
 begin
-  FZipFile.Add(fileName, archiveFileName);
-  result := true;
+  try
+    FZipFile.Add(fileName, archiveFileName);
+    result := true;
+  except
+    on e : Exception do
+      raise Exception.Create('Error adding file [' + fileName + '] to package : ' + e.Message);
+  end;
 end;
 
 function TPackageArchiveWriter.AddFiles(const files : System.TArray < System.string > ) : Boolean;
@@ -107,11 +112,16 @@ function TPackageArchiveWriter.AddIcon(const filePath : string) : boolean;
 var
   iconBytes : TBytes;
 begin
-  iconBytes := TFile.ReadAllBytes(filePath);
-  if ExtractFileExt(filePath) = '.svg' then
-    FZipFile.Add(iconBytes, cIconFileSVG)
-  else
-    FZipFile.Add(iconBytes, cIconFilePNG);
+  try
+    iconBytes := TFile.ReadAllBytes(filePath);
+    if ExtractFileExt(filePath) = '.svg' then
+      FZipFile.Add(iconBytes, cIconFileSVG)
+    else
+      FZipFile.Add(iconBytes, cIconFilePNG);
+  except
+    on e : Exception do
+      raise Exception.Create('Error adding icon [' + filePath + '] to package : ' + e.Message);
+  end;
   result := true;
 end;
 

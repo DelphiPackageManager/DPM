@@ -261,8 +261,6 @@ type
     property Templates : IList<ISpecTemplate>read GetTemplates;
     property IsValid : boolean read GetIsValid;
     property FileName : string read GetFileName;
-
-
   end;
 
   IPackageSpecReader = interface

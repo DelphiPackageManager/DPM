@@ -7,6 +7,7 @@ dpm pack .\A\VSoft.A.dspec -version=0.0.6 -outputFolder=%1
 dpm pack .\A\VSoft.A.dspec -version=0.0.7 -outputFolder=%1
 dpm pack .\A\VSoft.A.dspec -version=0.0.8 -outputFolder=%1
 dpm pack .\A\VSoft.A.dspec -version=0.0.9 -outputFolder=%1
+dpm pack .\A\VSoft.A.dspec -version=0.0.10 -outputFolder=%1
 dpm pack .\A\VSoft.A.dspec -version=0.0.11 -outputFolder=%1
 dpm pack .\A\VSoft.A.dspec -version=0.0.12 -outputFolder=%1
 dpm pack .\A\VSoft.A.dspec -version=0.1.0 -outputFolder=%1
@@ -14,6 +15,7 @@ dpm pack .\A\VSoft.A.dspec -version=0.1.2 -outputFolder=%1
 dpm pack .\A\VSoft.A.dspec -version=0.1.3 -outputFolder=%1
 dpm pack .\A\VSoft.A.dspec -version=0.1.4 -outputFolder=%1
 dpm pack .\A\VSoft.A.dspec -version=0.1.5 -outputFolder=%1
+dpm pack .\A\VSoft.A.dspec -version=0.2.0-alpha -outputFolder=%1
 
 
 dpm pack .\B\VSoft.B.dspec -version=0.0.1 -outputFolder=%1
@@ -25,6 +27,7 @@ dpm pack .\B\VSoft.B.dspec -version=0.0.6 -outputFolder=%1
 dpm pack .\B\VSoft.B.dspec -version=0.0.7 -outputFolder=%1
 dpm pack .\B\VSoft.B.dspec -version=0.0.8 -outputFolder=%1
 dpm pack .\B\VSoft.B.dspec -version=0.0.9 -outputFolder=%1
+dpm pack .\B\VSoft.B.dspec -version=0.0.10 -outputFolder=%1
 dpm pack .\B\VSoft.B.dspec -version=0.0.11 -outputFolder=%1
 dpm pack .\B\VSoft.B.dspec -version=0.0.12 -outputFolder=%1
 dpm pack .\B\VSoft.B.dspec -version=0.1.0 -outputFolder=%1
@@ -32,6 +35,7 @@ dpm pack .\B\VSoft.B.dspec -version=0.1.2 -outputFolder=%1
 dpm pack .\B\VSoft.B.dspec -version=0.1.3 -outputFolder=%1
 dpm pack .\B\VSoft.B.dspec -version=0.1.4 -outputFolder=%1
 dpm pack .\B\VSoft.B.dspec -version=0.1.5 -outputFolder=%1
+dpm pack .\B\VSoft.B.dspec -version=0.2.0-alpha -outputFolder=%1
 
 dpm pack .\C\VSoft.C.dspec -version=0.0.1 -outputFolder=%1
 dpm pack .\C\VSoft.C.dspec -version=0.0.2 -outputFolder=%1
@@ -42,6 +46,7 @@ dpm pack .\C\VSoft.C.dspec -version=0.0.6 -outputFolder=%1
 dpm pack .\C\VSoft.C.dspec -version=0.0.7 -outputFolder=%1
 dpm pack .\C\VSoft.C.dspec -version=0.0.8 -outputFolder=%1
 dpm pack .\C\VSoft.C.dspec -version=0.0.9 -outputFolder=%1
+dpm pack .\C\VSoft.C.dspec -version=0.0.10 -outputFolder=%1
 dpm pack .\C\VSoft.C.dspec -version=0.0.11 -outputFolder=%1
 dpm pack .\C\VSoft.C.dspec -version=0.0.12 -outputFolder=%1
 dpm pack .\C\VSoft.C.dspec -version=0.1.0 -outputFolder=%1
@@ -49,6 +54,7 @@ dpm pack .\C\VSoft.C.dspec -version=0.1.2 -outputFolder=%1
 dpm pack .\C\VSoft.C.dspec -version=0.1.3 -outputFolder=%1
 dpm pack .\C\VSoft.C.dspec -version=0.1.4 -outputFolder=%1
 dpm pack .\C\VSoft.C.dspec -version=0.1.5 -outputFolder=%1
+dpm pack .\C\VSoft.C.dspec -version=0.2.0-alpha -outputFolder=%1
 
 dpm pack .\D\VSoft.D.dspec -version=0.0.1 -outputFolder=%1
 dpm pack .\D\VSoft.D.dspec -version=0.0.2 -outputFolder=%1
@@ -59,6 +65,7 @@ dpm pack .\D\VSoft.D.dspec -version=0.0.6 -outputFolder=%1
 dpm pack .\D\VSoft.D.dspec -version=0.0.7 -outputFolder=%1
 dpm pack .\D\VSoft.D.dspec -version=0.0.8 -outputFolder=%1
 dpm pack .\D\VSoft.D.dspec -version=0.0.9 -outputFolder=%1
+dpm pack .\D\VSoft.D.dspec -version=0.0.10 -outputFolder=%1
 dpm pack .\D\VSoft.D.dspec -version=0.0.11 -outputFolder=%1
 dpm pack .\D\VSoft.D.dspec -version=0.0.12 -outputFolder=%1
 dpm pack .\D\VSoft.D.dspec -version=0.1.0 -outputFolder=%1
@@ -66,4 +73,5 @@ dpm pack .\D\VSoft.D.dspec -version=0.1.2 -outputFolder=%1
 dpm pack .\D\VSoft.D.dspec -version=0.1.3 -outputFolder=%1
 dpm pack .\D\VSoft.D.dspec -version=0.1.4 -outputFolder=%1
 dpm pack .\D\VSoft.D.dspec -version=0.1.5 -outputFolder=%1
+dpm pack .\D\VSoft.D.dspec -version=0.2.0-alpha -outputFolder=%1
 
