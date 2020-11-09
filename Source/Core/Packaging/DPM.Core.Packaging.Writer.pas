@@ -145,7 +145,7 @@ begin
   for f in files do
   begin
     if IsFileExcluded(f) then
-      exit;
+      continue;
 
     if not TFile.Exists(f) then
       raise Exception.Create('File not found : ' + f);
