@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{CFBF7204-5639-4643-B895-08DDF96E0F8F}</ProjectGuid>
         <MainSource>dpm.dpr</MainSource>
@@ -113,8 +113,8 @@
         <DCC_GenerateStackFrames>true</DCC_GenerateStackFrames>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <Debugger_CWD>I:\Github\DelphiPackageManager\DPMMaster\TestPackages</Debugger_CWD>
-        <Debugger_RunParams>pack .\A\VSoft.A.dspec -o=i:\dpmfeed</Debugger_RunParams>
+        <Debugger_CWD>I:\Github\VSoftTechnologies\VSoft.VirtualListView</Debugger_CWD>
+        <Debugger_RunParams>pack .\VSoft.VirtualListView.dspec -o=i:\dpmfeed</Debugger_RunParams>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
         <Debugger_RunParams>pack I:\Github\VSoftTechnologies\VSoft.AntPatterns\VSoft.AntPatterns.dspec -OutputFolder=c:\temp -basepath=. -minclientversion=1.0</Debugger_RunParams>
@@ -1067,10 +1067,10 @@
         <DPM>
             <PackageReference id="Ahausladen.JsonDataObjects" platform="Win32" version="0.0.1"/>
             <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.0-dev3">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev3" range="[2.0.0-dev1,]"/>
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev3" range="[2.0.0-dev3,]"/>
             </PackageReference>
             <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.0-dev3">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev3" range="[2.0.0-dev1,]"/>
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev3" range="[2.0.0-dev3,]"/>
             </PackageReference>
             <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.0.4"/>
             <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.1.1">

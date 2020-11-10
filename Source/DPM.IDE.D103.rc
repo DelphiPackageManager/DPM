@@ -16,7 +16,7 @@ BEGIN
          BLOCK "0C0904E4"
          BEGIN
               VALUE "LegalCopyright", "© 2019 -2020 Vincent Parrett and Contributors\0"
-              VALUE "CompileDate", "Tuesday, 3 November 2020 8:19 AM\0"
+              VALUE "CompileDate", "Tuesday, 10 November 2020 12:01 PM\0"
               VALUE "FileVersion", "0.1.9.0\0"
               VALUE "ProductVersion", "0.1.9.0\0"
          END
