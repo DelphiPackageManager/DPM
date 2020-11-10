@@ -224,11 +224,30 @@ end;
 function TPackageInstaller.CompilePackage(const cancellationToken: ICancellationToken; const compiler: ICompiler; const packageInfo : IPackageInfo; const packageSpec : IPackageSpec): boolean;
 var
   buildEntry : ISpecBuildEntry;
+  packagePath : string;
+  projectFile : string;
 begin
   result := true;
+
+  packagePath := FPackageCache.GetPackagePath(packageInfo);
+
   for buildEntry in packageSpec.TargetPlatform.BuildEntries do
   begin
     FLogger.Debug('Compiling package : ' + buildEntry.Project);
+
+    compiler.BPLOutputDir := TPath.Combine(packagePath, buildEntry.BplOutputDir);
+    compiler.DCPOutputDir := TPath.Combine(packagePath, buildEntry.DcpOutputDir);
+    compiler.DCUOutputDir := TPath.Combine(packagePath, buildEntry.DcuOutputDir);
+    compiler.Configuration := buildEntry.Config;
+
+    //TODO : Get the package search paths from somewhere!
+
+    projectFile := TPath.Combine(packagePath, buildEntry.Project);
+
+    result := compiler.BuildProject(cancellationToken, projectFile, buildEntry.Config);
+    FLogger.Debug('Compiler : ' + compiler.CompilerOutput.Text);
+    if not result then
+      exit;
   end;
 
 
@@ -622,52 +641,56 @@ begin
 
 
   packageSearchPaths := TCollections.CreateList <string> ;
-  packageCompiler := FCompilerFactory.CreateCompiler(options.CompilerVersion, platform);
+//  packageCompiler := FCompilerFactory.CreateCompiler(options.CompilerVersion, platform);
+//
+//  try
+//  //build the dependency graph in the correct order.
+//  dependencyGraph.VisitDFS(
+//    procedure(const node : IGraphNode)
+//    var
+//      pkgInfo : IPackageInfo;
+//      spec : IPackageSpec;
+//    begin
+//      Assert(node.IsRoot = false, 'graph should not visit root node');
+//
+//      pkgInfo := resolvedPackages.FirstOrDefault(
+//        function(const value : IPackageInfo) : boolean
+//        begin
+//          result := SameText(value.Id, node.Id);
+//        end);
+//      //if it's not found that means we have already processed the package elsewhere in the graph
+//      if pkgInfo = nil then
+//        exit;
+//      //removing it so we don't process it again
+//      resolvedPackages.Remove(pkgInfo);
+//
+//      spec := packageSpecs[LowerCase(node.Id)];
+//      Assert(spec <> nil);
+//      if spec.TargetPlatform.BuildEntries.Any then
+//      begin
+//        //we need to build the package.
+//        if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, spec) then
+//          raise Exception.Create('Comping package [' + pkgInfo.ToIdVersionString + '] failed.' );
+//      end;
+//
+//      if spec.TargetPlatform.DesignFiles.Any then
+//      begin
+//        //we have design time packages to install.
+//      end;
+//
+//      GenerateSearchPaths(options.CompilerVersion, platform, spec, packageSearchPaths);
+//    end);
+//  except
+//    on e : Exception do
+//    begin
+//      FLogger.Error(e.Message);
+//      exit;
+//    end;
+//  end;
 
-  try
-  //build the dependency graph in the correct order.
-  dependencyGraph.VisitDFS(
-    procedure(const node : IGraphNode)
-    var
-      pkgInfo : IPackageInfo;
-      spec : IPackageSpec;
-    begin
-      Assert(node.IsRoot = false, 'graph should not visit root node');
+  if not CollectSearchPaths(resolvedPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
+    exit;
 
-      pkgInfo := resolvedPackages.FirstOrDefault(
-        function(const value : IPackageInfo) : boolean
-        begin
-          result := SameText(value.Id, node.Id);
-        end);
-      //if it's not found that means we have already processed the package elsewhere in the graph
-      if pkgInfo = nil then
-        exit;
-      //removing it so we don't process it again
-      resolvedPackages.Remove(pkgInfo);
-
-      spec := packageSpecs[LowerCase(node.Id)];
-      Assert(spec <> nil);
-      if spec.TargetPlatform.BuildEntries.Any then
-      begin
-        //we need to build the package.
-        if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, spec) then
-          raise Exception.Create('Comping package [' + pkgInfo.ToIdVersionString + '] failed.' );
-      end;
-
-      if spec.TargetPlatform.DesignFiles.Any then
-      begin
-        //we have design time packages to install.
-      end;
-
-      GenerateSearchPaths(options.CompilerVersion, platform, spec, packageSearchPaths);
-    end);
-  except
-    on e : Exception do
-    begin
-      FLogger.Error(e.Message);
-      exit;
-    end;
-  end;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
     exit;
