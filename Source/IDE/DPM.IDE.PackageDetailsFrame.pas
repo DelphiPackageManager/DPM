@@ -75,7 +75,6 @@ type
     FCurrentPlatform : TDPMPlatform;
 
     FIDEStyleServices : TCustomStyleServices;
-
   protected
     procedure SetIncludePreRelease(const Value : boolean);
     procedure VersionsDelayTimerEvent(Sender : TObject);
@@ -299,6 +298,7 @@ begin
   if (FCurrentTab <> value) or (FIncludePreRelease <> preRelease) then
   begin
     FPackageMetaData := nil;
+    FPackageId := '';
     FDetailsPanel.SetDetails(nil);
     FCurrentTab := value;
     FIncludePreRelease := preRelease;
@@ -319,7 +319,7 @@ begin
         end;
       TCurrentTab.Conflicts : ;
     end;
-
+    SetPackage(nil);
   end;
 
 end;
@@ -408,7 +408,9 @@ begin
   FVersionsDelayTimer.Enabled := false;
   if FRequestInFlight then
     FCancellationTokenSource.Cancel;
+
   FPackageMetaData := package;
+
   if package <> nil then
   begin
     if (package.Id <> FPackageId) then
@@ -595,7 +597,7 @@ begin
       //if the view is closing do not do anything else.
       if FClosing then
         exit;
-      FLogger.Debug('Cancelled getting conflicting packages.');
+      FLogger.Debug('Cancelled getting package versions.');
     end)
   .Await(
     procedure(const theResult : IList<TPackageVersion>)
