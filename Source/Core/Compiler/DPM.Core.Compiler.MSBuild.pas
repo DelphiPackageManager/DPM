@@ -111,7 +111,7 @@ begin
   FCompilerLogFile := TPath.GetTempFileName;
 
   commandLine := GetCommandLine(projectFile, configName);
-
+  FLogger.Debug('Compler - cmdline : ' + commandLine);
   try
     result := TProcess.Execute(cancellationToken, 'cmd.exe', commandLine) = 0;
   except
@@ -153,7 +153,7 @@ end;
 
 function TMSBuildCompiler.GetCommandLine(const projectFile, configName : string) : string;
 var
-  cmd                         : string;
+  cmd : string;
 begin
   //I don't like this... but it will do for a start.
 
