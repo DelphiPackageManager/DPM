@@ -919,7 +919,10 @@ procedure TDPMEditViewFrame.ScrollListPaintNoRows(const Sender : TObject; const 
 begin
   ACanvas.Font.Assign(Self.Font);
   ACanvas.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
-  ACanvas.TextOut(20, 20, 'No Packages found');
+  if FRequestInFlight then
+    ACanvas.TextOut(20, 20, 'Loading....')
+  else
+    ACanvas.TextOut(20, 20, 'No Packages found');
 end;
 
 procedure TDPMEditViewFrame.ScrollListPaintRow(const Sender : TObject; const ACanvas : TCanvas; const itemRect : TRect; const index : Int64; const state : TPaintRowState);
