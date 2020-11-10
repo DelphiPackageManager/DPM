@@ -440,7 +440,7 @@ begin
       begin
         newTargetPlatform := targetPlatform.CloneForPlatform(platform);
         newTargetPlatforms.Add(newTargetPlatform);
-        Logger.Debug('Expanded ' + CompilerToString(newTargetPlatform.Compiler) + '.' + DPMPlatformToString(newTargetPlatform.Platforms[0]));
+        //Logger.Debug('Expanded ' + CompilerToString(newTargetPlatform.Compiler) + '.' + DPMPlatformToString(newTargetPlatform.Platforms[0]));
       end;
       toRemoveTargetPlatforms.Add(targetPlatform);
     end;
@@ -648,7 +648,7 @@ var
   targetPlatformsArray : TJsonArray;
 begin
   FIsValid := false;
-  Logger.Debug('Reading spec metadata');
+  //Logger.Debug('Reading spec metadata');
   if not jsonObject.Contains('metadata') then
   begin
     Logger.Error('Required element [metadata] not found!');
@@ -662,7 +662,7 @@ begin
 
   if jsonObject.Contains('templates') then
   begin
-    Logger.Debug('Reading spec templates');
+    //Logger.Debug('Reading spec templates');
     templatesArray := jsonObject.A['templates'];
     result := LoadTemplatesFromJson(templatesArray) and result;
   end;
@@ -674,7 +674,7 @@ begin
   end
   else
   begin
-    Logger.Debug('Reading spec targetPlatforms');
+    //Logger.Debug('Reading spec targetPlatforms');
     targetPlatformsArray := jsonObject.A['targetPlatforms'];
     result := LoadTargetPlatformsFromJson(targetPlatformsArray) and result;
   end;

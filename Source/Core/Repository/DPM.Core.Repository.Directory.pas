@@ -664,7 +664,7 @@ begin
       packageFileName := IncludeTrailingPathDelimiter(Source) + packageFileName;
       if not FileExists(packageFileName) then
         exit;
-      Logger.Debug('Checking package file [' + packageFileName + ']');
+      //Logger.Debug('Checking package file [' + packageFileName + ']');
 
       packageMetadata := DoGetPackageMetaData(cancelToken, packageFileName);
 
