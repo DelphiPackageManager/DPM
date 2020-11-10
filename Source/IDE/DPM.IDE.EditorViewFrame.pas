@@ -417,7 +417,7 @@ begin
 
   FScrollList := TVSoftVirtualListView.Create(Self);
   {$IFDEF STYLEELEMENTS}
-  FScrollList.StyleElements := [seFont];
+  FScrollList.StyleElements := [seFont, seBorder];
   {$ENDIF}
   FScrollList.Align := alClient;
   FScrollList.BorderStyle := bsNone;
@@ -871,7 +871,12 @@ begin
 
       //the result can be nil if there is no icon found
       if theResult <> nil then
+      try
         icon := TPackageIconImage.Create(theResult);
+      except
+        icon := nil;
+        FLogger.Debug('DPMIDE : INVALID icon for [' + id + '.' + version + ']');
+      end;
 
       //we will cache nil to stop future pointeless requests.
       FIconCache.Cache(id, icon);
@@ -905,6 +910,7 @@ begin
   item := nil;
   if (newRowIndex >= 0) and (newRowIndex < list.Count) then
     item := list[newRowIndex];
+
   PackageDetailsFrame.SetPackage(item);
 
 end;

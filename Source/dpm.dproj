@@ -1067,10 +1067,10 @@
         <DPM>
             <PackageReference id="Ahausladen.JsonDataObjects" platform="Win32" version="0.0.1"/>
             <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.0-dev3">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev3" range="[2.0.0-dev1,]"/>
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev3" range="[2.0.0-dev3,]"/>
             </PackageReference>
             <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.0-dev3">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev3" range="[2.0.0-dev1,]"/>
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev3" range="[2.0.0-dev3,]"/>
             </PackageReference>
             <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.0.4"/>
             <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.1.1">

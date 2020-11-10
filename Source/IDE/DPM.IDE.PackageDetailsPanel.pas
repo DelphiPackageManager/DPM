@@ -99,7 +99,8 @@ uses
   Vcl.Themes,
   Vcl.Forms,
   VSoft.Uri,
-  DPM.Core.Types;
+  DPM.Core.Types,
+  DPM.Core.Utils.Strings;
 
 { TPackageDetailsPanel }
 
@@ -359,7 +360,9 @@ begin
     if package.License <> '' then
     begin
       Include(FOptionalElements, deLicense);
-      FLicenseIsUri := TUriFactory.TryParse(package.License, false, uri);
+      //I know we are calling tryparse but the debugger will stop here an it's annoying me!
+      if TStringUtils.StartsWith(package.License, 'http') then
+        FLicenseIsUri := TUriFactory.TryParse(package.License, false, uri);
     end;
 
     if package.ProjectUrl <> '' then
