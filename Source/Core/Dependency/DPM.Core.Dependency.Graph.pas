@@ -35,10 +35,13 @@ uses
   DPM.Core.Dependency.Interfaces,
   DPM.Core.Dependency.Version;
 
+{$IF CompilerVersion >= 24.0 }
   {$LEGACYIFEND ON}
-  {$IF CompilerVersion >= 31.0 }
-    {$DEFINE USEWEAK}
-  {$IFEND}
+{$IFEND}
+
+{$IF CompilerVersion >= 31.0 }
+  {$DEFINE USEWEAK}
+{$IFEND}
 
 type
   TGraphNode = class(TInterfacedObject, IGraphNode)
