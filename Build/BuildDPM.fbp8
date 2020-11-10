@@ -13,11 +13,8 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
-          legalcopyright = "© 2019 -2020 Vincent Parrett and Contributors"
-          minorversion = 1
           name = DPMVersion
-          productversion = 0.1.9.0
-          releaseversion = 9
+          productversion = 0.0.0.0
         end
       end
       action.propertyset.setvalues
@@ -155,6 +152,15 @@ begin
         versioninfopropertysetname = DPMVersion
         warningsaserror = false
         workaroundd5bug = false
+        action.script
+        begin
+          name = Condition
+          script >
+          beginscript
+            !FBVariables.RESTORE_ONLY
+          endscript
+          scriptlanguage = JavaScript
+        end
         delphi.compileroptions
         begin
           alwaysuseconditionalsfromdof = false
@@ -522,7 +528,7 @@ begin
         compileridl = true
         configname = Release
         debugversionnumbers = false
-        delphiversion = Delphi10_4
+        delphiversion = DelphiXE2
         enabletimeout = false
         eurekalogverboselogging = false
         frameworktype = VCL
@@ -565,6 +571,15 @@ begin
         versioninfopropertysetname = DPMVersion
         warningsaserror = false
         workaroundd5bug = false
+        action.script
+        begin
+          name = Condition
+          script >
+          beginscript
+            !FBVariables.RESTORE_ONLY
+          endscript
+          scriptlanguage = JavaScript
+        end
         action.script
         begin
           name = BeforeAction
@@ -642,6 +657,13 @@ begin
     name = OUTPUT_DIR
     variablescope = vtProject
     variabletype = btString
+  end
+  variable
+  begin
+    defaultvalue = false
+    name = RESTORE_ONLY
+    variablescope = vtProject
+    variabletype = btBoolean
   end
   variable
   begin
