@@ -75,7 +75,6 @@ type
     function GetVersion : TPackageVersion;
     function GetDescription : string;
     function GetAuthors : string;
-    function GetOwners : string;
     function GetProjectUrl : string;
     function GetLicense : string;
     function GetIcon : string;
@@ -88,7 +87,6 @@ type
     procedure SetId(const value : string);
     procedure SetDescription(const value : string);
     procedure SetAuthors(const value : string);
-    procedure SetOwners(const value : string);
     procedure SetProjectUrl(const value : string);
     procedure SetLicense(const value : string);
     procedure SetIcon(const value : string);
@@ -101,7 +99,6 @@ type
     property Version : TPackageVersion read GetVersion write SetVersion;
     property Description : string read GetDescription write SetDescription;
     property Authors : string read GetAuthors write SetAuthors;
-    property Owners : string read GetOwners write SetOwners;
     property ProjectUrl : string read GetProjectUrl write SetProjectUrl;
     property License : string read GetLicense write SetLicense;
     property Icon : string read GetIcon write SetIcon;

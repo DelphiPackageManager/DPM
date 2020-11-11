@@ -202,7 +202,7 @@ begin
   FDependencies := TCollections.CreateList<IPackagePlatformDependencies>;
   FDependencies.AddRange(dependencies);
   FAuthors := metaData.Authors;
-  FOwners := metaData.Owners;
+  FOwners := metaData.Authors;
   FCopyright := metaData.Copyright;
   FDescription := metaData.Description;
   FIcon := metaData.Icon;
