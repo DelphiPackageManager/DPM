@@ -45,12 +45,6 @@ type
 
   TCompilerVersion = (
     UnknownVersion,
-    //    RS7,        //need dof
-    //    RS2005,     //need bdsproj support
-    //    RS2006,     //need bdsproj support
-    RS2009,
-    RS2010,
-    RSXE,
     RSXE2,
     RSXE3,
     RSXE4,
@@ -286,9 +280,6 @@ function AllPlatforms(const compiler : TCompilerVersion) : TDPMPlatforms;
 begin
   result := [];
   case compiler of
-    TCompilerVersion.RS2009,
-    TCompilerVersion.RS2010,
-    TCompilerVersion.RSXE : result := [TDPMPlatform.Win32];
     TCompilerVersion.RSXE2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32];
     TCompilerVersion.RSXE3,
     TCompilerVersion.RSXE4,
@@ -337,9 +328,6 @@ end;
 function CompilerToLibSuffix(const compiler : TCompilerVersion) : string;
 begin
   case compiler of
-    TCompilerVersion.RS2009 : result := '120';
-    TCompilerVersion.RS2010 : result := '140';
-    TCompilerVersion.RSXE : result := '150';
     TCompilerVersion.RSXE2 : result := '160';
     TCompilerVersion.RSXE3 : result := '170';
     TCompilerVersion.RSXE4 : result := '180';
@@ -361,9 +349,6 @@ end;
 function CompilerToBDSVersion(const compiler : TCompilerVersion) : string;
 begin
   case compiler of
-    TCompilerVersion.RS2009 : result := '6.0';
-    TCompilerVersion.RS2010 : result := '7.0';
-    TCompilerVersion.RSXE : result := '8.0';
     TCompilerVersion.RSXE2 : result := '9.0';
     TCompilerVersion.RSXE3 : result := '10.0';
     TCompilerVersion.RSXE4 : result := '11.0';
@@ -385,9 +370,6 @@ end;
 function CompilerToCompilerVersionIntStr(const compiler : TCompilerVersion) : string;
 begin
   case compiler of
-    TCompilerVersion.RS2009 : result := '20';
-    TCompilerVersion.RS2010 : result := '21';
-    TCompilerVersion.RSXE : result := '22';
     TCompilerVersion.RSXE2 : result := '23';
     TCompilerVersion.RSXE3 : result := '24';
     TCompilerVersion.RSXE4 : result := '25';
@@ -491,13 +473,6 @@ begin
 
 
   case major of
-    12 :
-      begin
-        case minor of
-          0..1 : result := TCompilerVersion.RS2010;
-          2..3 : result := TCompilerVersion.RSXE;
-        end;
-      end;
     13 : result := TCompilerVersion.RSXE2;
     14 :
       begin

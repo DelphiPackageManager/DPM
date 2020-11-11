@@ -99,12 +99,7 @@ begin
     TStatus.unknown :
       begin
         bdsVersion := CompilerToBDSVersion(compilerVersion);
-        case compilerVersion of
-          TCompilerVersion.RS2009 : ;
-          TCompilerVersion.RS2010 : key := 'Software\CodeGear\BDS\%s';
-        else
-          key := 'Software\Embarcadero\BDS\%s';
-        end;
+        key := 'Software\Embarcadero\BDS\%s';
 
         key := Format(key, [bdsVersion]);
 
