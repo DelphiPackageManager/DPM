@@ -526,8 +526,7 @@ begin
     metaDataObj['version'] := version.ToStringNoMeta;
     metaDataObj['description'] := FMetaData.Description;
     metaDataObj['authors'] := FMetaData.Authors;
-    metaDataObj['owners'] := FMetaData.Owners;
-
+    
     //optional metadata
     if FMetaData.ProjectUrl <> '' then
       metaDataObj['projectUrl'] := FMetaData.ProjectUrl;

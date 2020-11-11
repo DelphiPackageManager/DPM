@@ -105,7 +105,6 @@ type
     ['{0C39A81D-63FF-4939-A74A-4BFE29724168}']
     function GetDescription : string;
     function GetAuthors : string;
-    function GetOwners : string;
     function GetLicense : string;
     function GetIcon : string;
     function GetCopyright : string;
@@ -116,7 +115,6 @@ type
 
     property Description : string read GetDescription;
     property Authors : string read GetAuthors;
-    property Owners : string read GetOwners;
     property License : string read GetLicense;
     property Icon : string read GetIcon;
     property Copyright : string read GetCopyright;

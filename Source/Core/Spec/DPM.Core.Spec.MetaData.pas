@@ -44,7 +44,6 @@ type
     FVersion : TPackageVersion;
     FDescription : string;
     FAuthors : string;
-    FOwners : string;
     FProjectUrl : string;
     FLicense : string;
     FIcon : string;
@@ -57,7 +56,6 @@ type
     function GetId : string;
     function GetDescription : string;
     function GetAuthors : string;
-    function GetOwners : string;
     function GetProjectUrl : string;
     function GetLicense : string;
     function GetIcon : string;
@@ -69,7 +67,6 @@ type
     procedure SetId(const value : string);
     procedure SetDescription(const value : string);
     procedure SetAuthors(const value : string);
-    procedure SetOwners(const value : string);
     procedure SetProjectUrl(const value : string);
     procedure SetLicense(const value : string);
     procedure SetIcon(const value : string);
@@ -140,11 +137,6 @@ begin
   result := FLicense;
 end;
 
-function TSpecMetaData.GetOwners : string;
-begin
-  result := FOwners;
-end;
-
 function TSpecMetaData.GetProjectUrl : string;
 begin
   result := FProjectUrl;
@@ -202,10 +194,6 @@ begin
     result := false;
   end;
 
-  FOwners := jsonObject.S['owners'];
-  if FOwners = '' then
-    FOwners := FAuthors;
-
   FProjectUrl := jsonObject.S['projectUrl'];
   FLicense := jsonObject.S['license'];
   FIcon := jsonObject.S['icon'];
@@ -254,11 +242,6 @@ end;
 procedure TSpecMetaData.SetLicense(const value : string);
 begin
   FLicense := value;
-end;
-
-procedure TSpecMetaData.SetOwners(const value : string);
-begin
-  FOwners := value;
 end;
 
 procedure TSpecMetaData.SetProjectUrl(const value : string);
