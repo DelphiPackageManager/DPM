@@ -13,8 +13,11 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
+          legalcopyright = "© 2019 -2020 Vincent Parrett and Contributors"
+          minorversion = 1
           name = DPMVersion
-          productversion = 0.0.0.0
+          productversion = 0.1.9.0
+          releaseversion = 9
         end
       end
       action.propertyset.setvalues
@@ -45,9 +48,9 @@ begin
                       "1" +
                       "" +
                       "" +
-                      "0.1.9-alpha" +
+                      "0.1.10-alpha" +
                       "" +
-                      "9" +
+                      "10" +
                       "" +
                       ""
         valuestoset = "AutoUpdateFileVersionString\=0" +
@@ -79,6 +82,20 @@ begin
                       "ReleaseVersion\=-1" +
                       "SpecialBuildDetails\=0" +
                       ""
+      end
+      action.variable.set
+      begin
+        applytoexisting = false
+        doexpandexpression = false
+        expandactionlogtitle = false
+        forcetype = ftString
+        id = {89170321-B758-4743-A4EF-0C428531DB34}
+        modifier = smNone
+        newvalue = "http://timestamp.verisign.com/scripts/timstamp.dll" +
+                   "http://timestamp.comodoca.com/authenticode" +
+                   "http://tsa.starfieldtech.com/" +
+                   "http://www.trustcenter.de/codesigning/timestamp"
+        variablename = TimestampAuth
       end
       action.dpm.restore
       begin
@@ -217,6 +234,46 @@ begin
           usedebugdcu = false
           usepackages = false
           varstringchecks = true
+        end
+      end
+      action.group
+      begin
+        id = {9D926B94-DB4D-4514-91FE-043A81C3276B}
+        variable
+        begin
+          name = BinaryFileName
+          variablescope = vtLocal
+          variabletype = btString
+        end
+        action.variable.set
+        begin
+          applytoexisting = false
+          doexpandexpression = true
+          forcetype = ftString
+          id = {7E4C7689-1B92-4362-A178-AE9107CA70C4}
+          modifier = smNone
+          newvalue = %OUTPUT_DIR%\\dpm.exe
+          variablename = BinaryFileName
+        end
+        action.target.execute
+        begin
+          actionlistid = {CD2E679B-668B-4181-B51E-32647A974CED}
+          failifactionlistempty = false
+          id = {F48903DA-1B21-46BE-9DBB-F5EBF27F6108}
+          resetdependencychain = false
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = "DPM CommandLine"
+              variablename = AppName
+            end
+            target.argvalue
+            begin
+              value = %BinaryFileName%
+              variablename = FileToSign
+            end
+          end
         end
       end
       action.target.execute
@@ -500,7 +557,7 @@ begin
         terminateontimeout = true
         timeoutlength = 2
         as.projectpath = %SRC_ROOT%\\%ProjectFile%oj
-        as.compilerversion = 10.4
+        as.compilerversion = XE2
         as.verbosity = Normal
         as.nobanner = True
         action.script
@@ -647,7 +704,301 @@ begin
           varstringchecks = true
         end
       end
+      action.group
+      begin
+        id = {4CCC5C6C-E37D-4759-BE0D-65D79F791B3F}
+        variable
+        begin
+          name = BinaryFileName
+          variablescope = vtLocal
+          variabletype = btString
+        end
+        action.variable.set
+        begin
+          applytoexisting = false
+          doexpandexpression = true
+          forcetype = ftString
+          id = {F7B22892-8688-4F3B-AED7-CB11BEC4FB4F}
+          modifier = smNone
+          newvalue = %OUTPUT_DIR%\\%ProjectFile%
+          variablename = BinaryFileName
+        end
+        action.path.manipulation
+        begin
+          actiontypeid = {097DBD39-9D4E-416B-A4B0-1FA0ED5FB081}
+          customactionname = "Path Manipulation"
+          description = "Path Manipulation - change file ext"
+          enabletimeout = false
+          id = {9FC74E0B-B460-4C32-BFED-B7023DD5F490}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 2
+          as.applytoinput = True
+          as.usinginputvariable = True
+          as.outputvariable = BinaryFileName
+          as.inputvariable = BinaryFileName
+          as.includetrailingbackslash = False
+          as.excludetrailingbackslash = False
+          as.extractfilename = False
+          as.extractfilepath = False
+          as.extractfiledrive = False
+          as.extractfileext = False
+          as.removefileext = False
+          as.changefileext = True
+          as.newfileext = .dll
+          as.appendsubdirectory = False
+          as.forcetrailingbackslash = False
+          as.expandrelativepath = False
+          as.canonicalizepath = False
+        end
+        action.target.execute
+        begin
+          actionlistid = {CD2E679B-668B-4181-B51E-32647A974CED}
+          failifactionlistempty = false
+          id = {A6B3126A-905F-45F8-B3E3-B78EDA218F63}
+          resetdependencychain = false
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = "DPM IDE %CompilerVersion%"
+              variablename = AppName
+            end
+            target.argvalue
+            begin
+              value = %BinaryFileName%
+              variablename = FileToSign
+            end
+          end
+        end
+      end
     end
+  end
+  target
+  begin
+    name = SignTool
+    targetid = {CD2E679B-668B-4181-B51E-32647A974CED}
+    target.arg
+    begin
+      displayorder = 0
+      name = AppName
+    end
+    target.arg
+    begin
+      displayorder = 0
+      name = FileToSign
+    end
+    rootaction
+    begin
+      action.group
+      begin
+        id = {36D446DA-671F-4EC9-B1A2-732A0365643B}
+        variable
+        begin
+          name = L_SignAuth
+          variablescope = vtLocal
+          variabletype = btString
+        end
+        action.continua.set-buildstatus
+        begin
+          actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
+          customactionname = "Continua CI - Set Build Status"
+          enabletimeout = false
+          id = {1F924697-2245-48C5-ABAE-1F321790274B}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 1
+          as.status = "Signing %FileToSign%"
+          as.verbose = False
+          as.failbuildonerror = False
+        end
+        action.signtool.sign
+        begin
+          actiontypeid = {B89C6983-0697-40BB-BD5A-E74525AFFA5B}
+          customactionname = "Signtool Sign Files"
+          enabletimeout = false
+          id = {35E386FD-AB21-48BF-8754-0A3D920B68C5}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 2
+          as.isverbose = False
+          as.isdescription = True
+          as.description = %AppName%
+          as.isurldescription = True
+          as.urldescription = http://www.finalbuilder.com/
+          as.istimestampservice = False
+          as.isautoselect = False
+          as.iscomputerstore = False
+          as.isenhancedkeyusage = False
+          as.certificate = %File_VSoftPFX%
+          as.token = xwfsnevqoCqqAh6vHUQ\=
+          as.selecteditems = %FileToSign%
+          as.usefilelist = True
+          as.usefileset = False
+          as.generatepagehash = False
+          as.hashalgorithm = "SHA256" +
+                             ""
+          as.isrfc3161timestampservice = False
+          as.appendsignature = False
+          as.addsignature = False
+        end
+        action.group
+        begin
+          id = {DA95A239-AE92-4FC6-BDCC-91433D0D72F1}
+          maxretryattempts = 3
+          retrypauseinterval = 200
+          variable
+          begin
+            defaultvalue = false
+            name = L_LoopFailed
+            variablescope = vtLocal
+            variabletype = btBoolean
+          end
+          action.list.iterator
+          begin
+            failifnoiterations = false
+            fbvariable = L_SignAuth
+            id = {D00D1232-1FD2-465F-A576-B4CCA4946606}
+            listofitems = "%TimestampAuth%" +
+                          ""
+            listseparator = lsCRLF
+            separatorchar = ,
+            skipblanklines = true
+            action.continua.set-buildstatus
+            begin
+              actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
+              customactionname = "Continua CI - Set Build Status"
+              enabletimeout = false
+              id = {5A7AE792-D544-4BDE-92D4-E6523D0FFF8A}
+              impersonateusenetcredonly = false
+              impersonateuser = false
+              terminateontimeout = true
+              timeoutlength = 1
+              as.status = "Timestamping  %FileToSign%"
+              as.verbose = False
+              as.failbuildonerror = False
+            end
+            action.signtool.timestamp
+            begin
+              actiontypeid = {F0DD1ECE-A455-4A8B-988A-9E61B823E5EF}
+              customactionname = "Signtool Timestamp Files"
+              enabletimeout = false
+              id = {76A3050E-2828-435A-B85E-B8B9D658C3BC}
+              ignorefailure = true
+              impersonateusenetcredonly = false
+              impersonateuser = false
+              maxretryattempts = 3
+              retrypauseinterval = 3000
+              terminateontimeout = true
+              timeoutlength = 2
+              as.selecteditems = %FileToSign%
+              as.timestampurl = %L_SignAuth%
+              as.isverbose = False
+              as.usefilelist = True
+              as.usefileset = False
+              as.userfc3161 = False
+              as.signatureindex = 0
+            end
+            action.if.prevfailed
+            begin
+              id = {E62352ED-27ED-48F8-8989-A5945B1D82A5}
+              action.variable.set
+              begin
+                applytoexisting = false
+                doexpandexpression = true
+                forcetype = ftBoolean
+                id = {CD7CDB67-7832-4663-963D-3FA48AE06DCA}
+                modifier = smNone
+                newvalue = true
+                variablename = L_LoopFailed
+              end
+            end
+            action.else
+            begin
+              id = {75673423-4363-4C68-9D7D-A765F3E2A194}
+              action.variable.set
+              begin
+                applytoexisting = false
+                doexpandexpression = true
+                forcetype = ftBoolean
+                id = {A85C7537-8C46-44D8-8036-A428492A9F1B}
+                modifier = smNone
+                newvalue = false
+                variablename = L_LoopFailed
+              end
+              action.loop.exit
+              begin
+                id = {165C9181-0646-4CC0-AC1D-8FEA7C61EF76}
+              end
+            end
+          end
+          action.ifthen
+          begin
+            expandactionlogtitle = false
+            id = {3EFE685C-1ABA-4214-82ED-6684B0807825}
+            lhsstoragestring = "%L_LoopFailed%" +
+                               ""
+            operatorsstoragestring = "\=" +
+                                     ""
+            resultinlogtitle = true
+            rhsstoragestring = "true" +
+                               ""
+            shortcircuitevaluation = true
+            termjoiner = jwOr
+            action.raise
+            begin
+              exceptionmessage = "Signtool timestamp failed."
+              id = {F8379786-3DB4-4AFA-8F03-B86A67B87FAD}
+            end
+          end
+        end
+      end
+      action.continua.set-buildstatus
+      begin
+        actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
+        customactionname = "Continua CI - Set Build Status"
+        enabletimeout = false
+        id = {30433116-CC02-4F48-A317-596E19B356A0}
+        impersonateusenetcredonly = false
+        impersonateuser = false
+        terminateontimeout = true
+        timeoutlength = 1
+        as.status = "Verifying Signatures for  %FileToSign%"
+        as.verbose = False
+        as.failbuildonerror = False
+      end
+      action.signtool.verify
+      begin
+        actiontypeid = {9126FEAA-33D6-4867-87DC-D993F56A18D6}
+        customactionname = "Signtool Verify Digital Signatures"
+        enabletimeout = false
+        id = {7883124D-BB35-4EE5-83F1-5C72F02956FA}
+        impersonateusenetcredonly = false
+        impersonateuser = false
+        terminateontimeout = true
+        timeoutlength = 2
+        as.selecteditems = %FileToSign%
+        as.isallmethods = True
+        as.isdefaultcatalogdatabase = False
+        as.issystemcomponentdatabase = False
+        as.isdefaultauthpolicy = True
+        as.istimestampwarning = False
+        as.isverbose = True
+        as.usefilelist = True
+        as.usefileset = False
+      end
+    end
+  end
+  variable
+  begin
+    defaultvalue = %VSOFTPFX%
+    groupname = Signing
+    name = File_VSoftPFX
+    variablescope = vtProject
+    variabletype = btString
   end
   variable
   begin
@@ -657,6 +1008,13 @@ begin
     name = OUTPUT_DIR
     variablescope = vtProject
     variabletype = btString
+  end
+  variable
+  begin
+    defaultvalue = UploadFB9$
+    groupname = Signing
+    name = PFXPWD
+    variablescope = vtProject
   end
   variable
   begin
@@ -673,5 +1031,11 @@ begin
     name = SRC_ROOT
     variablescope = vtProject
     variabletype = btString
+  end
+  variable
+  begin
+    groupname = Signing
+    name = TimestampAuth
+    variablescope = vtProject
   end
 end
