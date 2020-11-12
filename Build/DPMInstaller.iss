@@ -7,6 +7,9 @@
 #define HelpURL "https://docs.delphipm.org"
 #define SupportURL "https://github.com/DelphiPackageManager/DPM/issues"
 #define UpdatesURL "https://github.com/DelphiPackageManager/DPM/releases"
+#ifndef OutputFileName
+  #define OutputFileName "DPMSetup-0.0.0.0"
+#endif
 
 
 [Setup]
@@ -27,7 +30,8 @@ DisableWelcomePage=no
 LicenseFile=..\LICENSE.txt
 ; need admin if we want to 
 PrivilegesRequired=lowest
-OutputBaseFilename=DPMSetup
+PrivilegesRequiredOverridesAllowed=dialog
+OutputBaseFilename={#OutputFileName}
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern

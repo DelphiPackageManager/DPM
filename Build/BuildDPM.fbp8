@@ -13,11 +13,9 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
-          legalcopyright = "© 2019 -2020 Vincent Parrett and Contributors"
-          minorversion = 1
           name = DPMVersion
-          productversion = 0.1.10.0
-          releaseversion = 10
+          productversion = 0.0.0.0
+          productversionstring = 0.1.10-alpha
         end
       end
       action.propertyset.setvalues
@@ -26,6 +24,7 @@ begin
         propertysetname = DPMVersion
         setvaluesto = "" +
                       "" +
+                      "%BUILD_VERSION%" +
                       "" +
                       "" +
                       "" +
@@ -38,19 +37,18 @@ begin
                       "" +
                       "" +
                       "" +
-                      "" +
-                      "" +
+                      "true" +
                       "" +
                       "© 2019 -2020 Vincent Parrett and Contributors" +
                       "" +
+                      "false" +
+                      "%MAJOR_VERSION%" +
+                      "%MINOR_VERSION%" +
                       "" +
-                      "0" +
-                      "1" +
+                      "DPM Package Manager" +
                       "" +
-                      "" +
-                      "0.1.10-alpha" +
-                      "" +
-                      "10" +
+                      "%PRODUCTVERSION%" +
+                      "%RELEASE_VERSION%" +
                       "" +
                       ""
         valuestoset = "AutoUpdateFileVersionString\=0" +
@@ -68,17 +66,17 @@ begin
                       "FileTypeDRV\=0" +
                       "FileTypeVXD\=0" +
                       "FileVersionString\=0" +
-                      "IncludeCompileDate\=0" +
+                      "IncludeCompileDate\=-1" +
                       "InternalName\=0" +
                       "LegalCopyright\=-1" +
                       "LegalTrademarks\=0" +
-                      "LinkProductVersion\=0" +
+                      "LinkProductVersion\=-1" +
                       "MajorVersion\=-1" +
                       "MinorVersion\=-1" +
                       "OriginalFilename\=0" +
-                      "ProductName\=0" +
-                      "ProductVersion\=-1" +
-                      "ProductVersionString\=0" +
+                      "ProductName\=-1" +
+                      "ProductVersion\=0" +
+                      "ProductVersionString\=-1" +
                       "ReleaseVersion\=-1" +
                       "SpecialBuildDetails\=0" +
                       ""
@@ -96,6 +94,163 @@ begin
                    "http://tsa.starfieldtech.com/" +
                    "http://www.trustcenter.de/codesigning/timestamp"
         variablename = TimestampAuth
+      end
+      action.group
+      begin
+        description = "Build Tests - 10.3"
+        id = {6BFDB7C5-1968-4220-9E27-9899822374AA}
+        action.dpm.restore
+        begin
+          actiontypeid = {17B8180A-B96F-4BA3-BCA1-E2FD9132113C}
+          customactionname = "DPM Restore"
+          enabletimeout = false
+          id = {393A6D67-6B76-4444-8411-8B80385B5C09}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 2
+          as.projectpath = %SRC_ROOT%\\DPM.Core.Tests.dproj
+          as.compilerversion = 10.3
+          as.verbosity = Detailed
+          as.nobanner = True
+        end
+        action.delphi.build
+        begin
+          allowimplicitimport = true
+          alwaysuseconditionalsfromdof = false
+          autoincbuild = false
+          autoupdatefileversion = true
+          autoupdateproductversion = true
+          buildall = true
+          buildversion = 0
+          codepage = 1252
+          compileprojectresources = false
+          compileridl = true
+          configname = Release
+          debugversionnumbers = false
+          delphiversion = Delphi10_3
+          enabletimeout = false
+          eurekalogverboselogging = false
+          frameworktype = VCL
+          hintsaserror = false
+          iconfile = $(BDS)\\bin\\delphi_PROJECTICON.ico
+          id = {A1C1D371-BAEA-44D9-86EB-0AB561265693}
+          includecompiledate = true
+          includemanifest = true
+          includeverinfo = false
+          isdebug = false
+          isdll = false
+          isprerelease = false
+          isprivate = false
+          isspecial = false
+          keepcfg = true
+          linkproductversiontofileversion = true
+          locale = 1033
+          majorversion = 1
+          manifestfile = I:\\Github\\DelphiPackageManager\\DPMMaster\\Source\\dpmManifest.xml
+          minorversion = 0
+          noconfig = true
+          platform = Win32
+          platformsdktype = ProjectSDK
+          projectfile = %SRC_ROOT%\\dpm.core.tests.dpr
+          regenerateresource = true
+          releaseversion = 0
+          resourcecompilertype = rcBorland
+          ridloutputsamefolder = true
+          startingdir = %SRC_ROOT%\\
+          timeoutlength = 1
+          updatedoffile = false
+          updatepackagesource = false
+          updateversioninfokeys = false
+          useeurekalogcompiler = false
+          usefastdcccompiler = false
+          useprojectsettings = []
+          usepropertyset = true
+          useversionfromdof = false
+          verboseoutput = false
+          versioninfokeys = "CompanyName\=" +
+                            "FileVersion\=1.0.0.0" +
+                            "InternalName\=" +
+                            "LegalCopyright\=" +
+                            "LegalTrademarks\=" +
+                            "OriginalFilename\=" +
+                            "ProductVersion\=1.0.0.0" +
+                            "Comments\=" +
+                            "ProgramID\=com.embarcadero.$(MSBuildProjectName)" +
+                            "FileDescription\=$(MSBuildProjectName)" +
+                            "ProductName\=$(MSBuildProjectName)" +
+                            ""
+          versioninfopropertysetname = DPMVersion
+          warningsaserror = false
+          workaroundd5bug = false
+          action.script
+          begin
+            name = Condition
+            script >
+            beginscript
+              !FBVariables.RESTORE_ONLY
+            endscript
+            scriptlanguage = JavaScript
+          end
+          delphi.compileroptions
+          begin
+            alwaysuseconditionalsfromdof = false
+            alwaysusedelphilibrarypath = true
+            alwaysusedofsearchpath = true
+            assertions = true
+            assignableconst = false
+            booleval = false
+            compilerwarnings = "-w-UNSAFE_TYPE\=0" +
+                               "-w-UNSAFE_CODE\=0" +
+                               "-w-UNSAFE_CAST\=0" +
+                               ""
+            conditionals = RELEASE
+            consoleapp = false
+            debuginfo = false
+            definitionsonly = false
+            emitruntimetypeinformation = false
+            exportallsymbols = false
+            extendedsyntax = true
+            externaltd32 = false
+            frameworktype = None
+            generatedocumentation = false
+            generatehpp = false
+            hugestrings = true
+            imagebase = 4194304
+            includenamespaces = false
+            includeremotesymbols = false
+            includetd32 = false
+            inlining = inOn
+            iochecking = true
+            librarypath = E:\\Emb\\Studio\\20.0\\lib\\win32\\release;E:\\Emb\\Studio\\20.0\\Imports;C:\\Users\\Public\\Documents\\Embarcadero\\Studio\\20.0\\Dcp;E:\\Emb\\Studio\\20.0\\include;I:\\FBAT_HG_LIBS8\\madCollection\\madExcept\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\Plugins\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madBasic\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madDisAsm\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madRemote\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madKernel\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madSecurity\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madShell\\BDS20\\win32
+            linkeroutput = 0
+            localsymbols = false
+            mapfile = 0
+            maxstacksize = 1048576
+            minstacksize = 16384
+            namespaceprefixes = System;Xml;Data;Datasnap;Web;Soap;Winapi;System.Win;Data.Win;Web.Win;Soap.Win;Bde
+            openstrings = true
+            optimisation = true
+            outputdir = ..\\Output
+            overflowchecking = false
+            packages = madbasic_;nxgridrun_dxe7;fbmisccomponents;raizecomponentsvcldb;dwwin7controls;fmx;rtl;dbrtl;indysystem;raizecomponentsvcl;fixinsight_xe7;bindcomp;fbdreamruntime;maddisasm_;xmlrtl;dbxcommondriver;vclimg;indyprotocols;sptbxlib_d21;nxcommondsgn_dxe7;vclactnband;bindengine;vcldb;fbformdesigner;vspager;soaprtl;nxcommonrun_dxe7;vclie;madexcept_;vcltouch;frameviewerxe7;customiptransport;vclsmp;dsnap;nxgriddsgn_dxe7;indyipserver;fmxase;vcl;indycore;synedit_rxe7;indyipcommon;kwizardr;inet;fmxobj;fbsynedithighlighters;vclx;lmdrtdocking;dcef_xe7;dsnapxml;fmxdae;jsdialogpack;tb2k;virtualtreesr;lmdrtl;adortl;indyipclient
+            rangechecking = false
+            recordfieldalign = fa8
+            referenceinfo = false
+            safedivide = false
+            searchpath = $(DPMSearch)
+            showhints = true
+            showwarnings = true
+            stackframes = false
+            stringchecks = true
+            typedpointers = false
+            unitaliases = WinTypes\=Windows;WinProcs\=Windows;DbiTypes\=BDE;DbiProcs\=BDE;DbiErrs\=BDE;Types\=System.Types
+            unitoutputdir = .\\$(Platform)\\$(Config)
+            usedebugdcu = false
+            usepackages = false
+            varstringchecks = true
+          end
+        end
       end
       action.group
       begin
@@ -151,12 +306,13 @@ begin
           isprerelease = false
           isprivate = false
           isspecial = false
-          keepcfg = false
-          linkproductversiontofileversion = true
+          keepcfg = true
+          linkproductversiontofileversion = false
           locale = 3081
           majorversion = 0
           manifestfile = I:\\Github\\DelphiPackageManager\\DPMMaster\\Source\\dpmManifest.xml
           minorversion = 1
+          noconfig = false
           platform = Win32
           platformsdktype = ProjectSDK
           projectfile = %SRC_ROOT%\\dpm.dpr
@@ -176,6 +332,8 @@ begin
           useversionfromdof = false
           verboseoutput = false
           versioninfokeys = "LegalCopyright\=© 2019 -2020 Vincent Parrett and Contributors" +
+                            "ProductName\=DPM Package Manager" +
+                            "ProductVersion\=0.1.10-alpha" +
                             ""
           versioninfopropertysetname = DPMVersion
           warningsaserror = false
@@ -548,6 +706,7 @@ begin
         action.innosetup.execute
         begin
           definitions = "MyAppVersion\=%DPMVersion%" +
+                        "OutputFileName\=DPMSetup-%DPMVersion%" +
                         ""
           id = {7CD98D00-B517-41B2-A9DC-37BA9C39D864}
           innoversion = Inno6
@@ -564,7 +723,7 @@ begin
           forcetype = ftString
           id = {65338DAF-82AF-4A0A-A9A4-65FCFD1A9E1C}
           modifier = smNone
-          newvalue = %FBPROJECTDIR%\\Output\\DPMSetup.exe
+          newvalue = %FBPROJECTDIR%\\Output\\DPMSetup-%DPMVersion%.exe
           variablename = BinaryFileName
         end
         action.target.execute
@@ -665,6 +824,7 @@ begin
         majorversion = 0
         manifestfile = I:\\Github\\DelphiPackageManager\\DPMMaster\\Source\\dpmManifest.xml
         minorversion = 1
+        noconfig = false
         platform = Win32
         platformsdktype = ProjectSDK
         projectfile = %SRC_ROOT%\\%ProjectFile%
@@ -1054,11 +1214,35 @@ begin
   end
   variable
   begin
+    defaultvalue = 0
+    groupname = VersionInfo
+    name = BUILD_VERSION
+    variablescope = vtProject
+    variabletype = btInteger
+  end
+  variable
+  begin
     defaultvalue = %VSOFTPFX%
     groupname = Signing
     name = File_VSoftPFX
     variablescope = vtProject
     variabletype = btString
+  end
+  variable
+  begin
+    defaultvalue = 0
+    groupname = VersionInfo
+    name = MAJOR_VERSION
+    variablescope = vtProject
+    variabletype = btInteger
+  end
+  variable
+  begin
+    defaultvalue = 1
+    groupname = VersionInfo
+    name = MINOR_VERSION
+    variablescope = vtProject
+    variabletype = btInteger
   end
   variable
   begin
@@ -1071,10 +1255,34 @@ begin
   end
   variable
   begin
-    defaultvalue = UploadFB9$
+    defaultvalue = %VSOFTPFX-PWD%
     groupname = Signing
     name = PFXPWD
     variablescope = vtProject
+  end
+  variable
+  begin
+    defaultvalue = -alpha
+    groupname = VersionInfo
+    name = PRERELEASE_LABEL
+    variablescope = vtProject
+    variabletype = btString
+  end
+  variable
+  begin
+    defaultvalue = %MAJOR_VERSION%.%MINOR_VERSION%.%RELEASE_VERSION%%PRERELEASE_LABEL%
+    groupname = VersionInfo
+    name = PRODUCTVERSION
+    variablescope = vtProject
+    variabletype = btString
+  end
+  variable
+  begin
+    defaultvalue = 10
+    groupname = VersionInfo
+    name = RELEASE_VERSION
+    variablescope = vtProject
+    variabletype = btInteger
   end
   variable
   begin
