@@ -16,8 +16,8 @@ begin
           legalcopyright = "© 2019 -2020 Vincent Parrett and Contributors"
           minorversion = 1
           name = DPMVersion
-          productversion = 0.1.9.0
-          releaseversion = 9
+          productversion = 0.1.10.0
+          releaseversion = 10
         end
       end
       action.propertyset.setvalues
@@ -97,153 +97,155 @@ begin
                    "http://www.trustcenter.de/codesigning/timestamp"
         variablename = TimestampAuth
       end
-      action.dpm.restore
-      begin
-        actiontypeid = {17B8180A-B96F-4BA3-BCA1-E2FD9132113C}
-        customactionname = "DPM Restore"
-        enabletimeout = false
-        id = {1FA75F61-E2EB-4E44-B6D7-674315BF9A12}
-        impersonateusenetcredonly = false
-        impersonateuser = false
-        terminateontimeout = true
-        timeoutlength = 2
-        as.projectpath = %SRC_ROOT%\\dpm.dproj
-        as.compilerversion = "Use Project"
-        as.verbosity = Normal
-        as.nobanner = True
-      end
-      action.delphi.build
-      begin
-        allowimplicitimport = true
-        alwaysuseconditionalsfromdof = false
-        autoincbuild = false
-        autoupdatefileversion = true
-        autoupdateproductversion = true
-        buildall = true
-        buildversion = 0
-        codepage = 1252
-        compileprojectresources = false
-        compileridl = true
-        configname = Release
-        debugversionnumbers = false
-        delphiversion = Delphi10_4
-        enabletimeout = false
-        eurekalogverboselogging = false
-        frameworktype = VCL
-        hintsaserror = false
-        id = {B81B3BA7-C8A8-4260-938A-A2C94EB5CD6D}
-        includecompiledate = true
-        includemanifest = true
-        includeverinfo = true
-        isdebug = false
-        isdll = false
-        isprerelease = false
-        isprivate = false
-        isspecial = false
-        keepcfg = false
-        linkproductversiontofileversion = true
-        locale = 3081
-        majorversion = 0
-        manifestfile = I:\\Github\\DelphiPackageManager\\DPMMaster\\Source\\dpmManifest.xml
-        minorversion = 1
-        platform = Win32
-        platformsdktype = ProjectSDK
-        projectfile = %SRC_ROOT%\\dpm.dpr
-        regenerateresource = true
-        releaseversion = 9
-        resourcecompilertype = rcBorland
-        ridloutputsamefolder = true
-        startingdir = %SRC_ROOT%\\
-        timeoutlength = 1
-        updatedoffile = false
-        updatepackagesource = false
-        updateversioninfokeys = false
-        useeurekalogcompiler = false
-        usefastdcccompiler = false
-        useprojectsettings = []
-        usepropertyset = true
-        useversionfromdof = false
-        verboseoutput = false
-        versioninfokeys = "LegalCopyright\=© 2019 -2020 Vincent Parrett and Contributors" +
-                          ""
-        versioninfopropertysetname = DPMVersion
-        warningsaserror = false
-        workaroundd5bug = false
-        action.script
-        begin
-          name = Condition
-          script >
-          beginscript
-            !FBVariables.RESTORE_ONLY
-          endscript
-          scriptlanguage = JavaScript
-        end
-        delphi.compileroptions
-        begin
-          alwaysuseconditionalsfromdof = false
-          alwaysusedelphilibrarypath = true
-          alwaysusedofsearchpath = true
-          assertions = true
-          assignableconst = false
-          booleval = false
-          compilerwarnings = "-w-UNSAFE_TYPE\=0" +
-                             "-w-UNSAFE_CODE\=0" +
-                             "-w-UNSAFE_CAST\=0" +
-                             ""
-          conditionals = RELEASE
-          consoleapp = false
-          debuginfo = false
-          definitionsonly = false
-          emitruntimetypeinformation = false
-          exportallsymbols = false
-          extendedsyntax = true
-          externaltd32 = false
-          frameworktype = None
-          generatedocumentation = false
-          generatehpp = false
-          hugestrings = true
-          imagebase = 4194304
-          includenamespaces = false
-          includeremotesymbols = false
-          includetd32 = false
-          inlining = inOn
-          iochecking = true
-          librarypath = $(BDSLIB)\\$(Platform)\\release;$(BDSUSERDIR)\\Imports;$(BDS)\\Imports;$(BDSCOMMONDIR)\\Dcp;$(BDS)\\include
-          linkeroutput = 0
-          localsymbols = false
-          mapfile = 0
-          maxstacksize = 1048576
-          minstacksize = 16384
-          namespaceprefixes = System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;
-          openstrings = true
-          optimisation = true
-          outputdir = %OUTPUT_DIR%
-          overflowchecking = false
-          packages = rtl
-          rangechecking = false
-          recordfieldalign = fa8
-          referenceinfo = false
-          safedivide = false
-          searchpath = $(DPMSearch)
-          showhints = true
-          showwarnings = true
-          stackframes = false
-          stringchecks = true
-          typedpointers = false
-          unitaliases = WinTypes\=Windows;WinProcs\=Windows;DbiTypes\=BDE;DbiProcs\=BDE;DbiErrs\=BDE
-          usedebugdcu = false
-          usepackages = false
-          varstringchecks = true
-        end
-      end
       action.group
       begin
+        description = "Build and Sign Command Line tool"
         id = {9D926B94-DB4D-4514-91FE-043A81C3276B}
         variable
         begin
           name = BinaryFileName
           variablescope = vtLocal
           variabletype = btString
+        end
+        action.dpm.restore
+        begin
+          actiontypeid = {17B8180A-B96F-4BA3-BCA1-E2FD9132113C}
+          customactionname = "DPM Restore"
+          enabletimeout = false
+          id = {1FA75F61-E2EB-4E44-B6D7-674315BF9A12}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 2
+          as.projectpath = %SRC_ROOT%\\dpm.dproj
+          as.compilerversion = 10.3
+          as.verbosity = Normal
+          as.nobanner = True
+        end
+        action.delphi.build
+        begin
+          allowimplicitimport = true
+          alwaysuseconditionalsfromdof = false
+          autoincbuild = false
+          autoupdatefileversion = true
+          autoupdateproductversion = true
+          buildall = true
+          buildversion = 0
+          codepage = 1252
+          compileprojectresources = false
+          compileridl = true
+          configname = Release
+          debugversionnumbers = false
+          delphiversion = Delphi10_3
+          enabletimeout = false
+          eurekalogverboselogging = false
+          frameworktype = VCL
+          hintsaserror = false
+          iconfile = %SRC_ROOT%\\images\\dpm.ico
+          id = {B81B3BA7-C8A8-4260-938A-A2C94EB5CD6D}
+          includecompiledate = true
+          includemanifest = true
+          includeverinfo = true
+          isdebug = false
+          isdll = false
+          isprerelease = false
+          isprivate = false
+          isspecial = false
+          keepcfg = false
+          linkproductversiontofileversion = true
+          locale = 3081
+          majorversion = 0
+          manifestfile = I:\\Github\\DelphiPackageManager\\DPMMaster\\Source\\dpmManifest.xml
+          minorversion = 1
+          platform = Win32
+          platformsdktype = ProjectSDK
+          projectfile = %SRC_ROOT%\\dpm.dpr
+          regenerateresource = true
+          releaseversion = 10
+          resourcecompilertype = rcBorland
+          ridloutputsamefolder = true
+          startingdir = %SRC_ROOT%\\
+          timeoutlength = 1
+          updatedoffile = false
+          updatepackagesource = false
+          updateversioninfokeys = false
+          useeurekalogcompiler = false
+          usefastdcccompiler = false
+          useprojectsettings = []
+          usepropertyset = true
+          useversionfromdof = false
+          verboseoutput = false
+          versioninfokeys = "LegalCopyright\=© 2019 -2020 Vincent Parrett and Contributors" +
+                            ""
+          versioninfopropertysetname = DPMVersion
+          warningsaserror = false
+          workaroundd5bug = false
+          action.script
+          begin
+            name = Condition
+            script >
+            beginscript
+              !FBVariables.RESTORE_ONLY
+            endscript
+            scriptlanguage = JavaScript
+          end
+          delphi.compileroptions
+          begin
+            alwaysuseconditionalsfromdof = false
+            alwaysusedelphilibrarypath = true
+            alwaysusedofsearchpath = true
+            assertions = true
+            assignableconst = false
+            booleval = false
+            compilerwarnings = "-w-UNSAFE_TYPE\=0" +
+                               "-w-UNSAFE_CODE\=0" +
+                               "-w-UNSAFE_CAST\=0" +
+                               ""
+            conditionals = RELEASE
+            consoleapp = false
+            debuginfo = false
+            definitionsonly = false
+            emitruntimetypeinformation = false
+            exportallsymbols = false
+            extendedsyntax = true
+            externaltd32 = false
+            frameworktype = None
+            generatedocumentation = false
+            generatehpp = false
+            hugestrings = true
+            imagebase = 4194304
+            includenamespaces = false
+            includeremotesymbols = false
+            includetd32 = false
+            inlining = inOn
+            iochecking = true
+            librarypath = E:\\Emb\\Studio\\20.0\\lib\\win32\\release;E:\\Emb\\Studio\\20.0\\Imports;C:\\Users\\Public\\Documents\\Embarcadero\\Studio\\20.0\\Dcp;E:\\Emb\\Studio\\20.0\\include;I:\\FBAT_HG_LIBS8\\madCollection\\madExcept\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\Plugins\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madBasic\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madDisAsm\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madRemote\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madKernel\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madSecurity\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madShell\\BDS20\\win32
+            linkeroutput = 0
+            localsymbols = false
+            mapfile = 0
+            maxstacksize = 1048576
+            minstacksize = 16384
+            namespaceprefixes = System;Xml;Data;Datasnap;Web;Soap;Winapi;System.Win;Data.Win;Web.Win;Soap.Win;Bde;
+            openstrings = true
+            optimisation = true
+            outputdir = %OUTPUT_DIR%
+            overflowchecking = false
+            packages = rtl
+            rangechecking = false
+            recordfieldalign = fa8
+            referenceinfo = false
+            safedivide = false
+            searchpath = $(DPMSearch)
+            showhints = true
+            showwarnings = true
+            stackframes = false
+            stringchecks = true
+            typedpointers = false
+            unitaliases = WinTypes\=Windows;WinProcs\=Windows;DbiTypes\=BDE;DbiProcs\=BDE;DbiErrs\=BDE
+            usedebugdcu = false
+            usepackages = false
+            varstringchecks = true
+          end
         end
         action.variable.set
         begin
@@ -276,255 +278,313 @@ begin
           end
         end
       end
-      action.target.execute
+      action.group
       begin
-        actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
-        description = "Run Target [ BuildForCompiler ] XE2"
-        failifactionlistempty = false
-        id = {E18926BA-E666-419A-9D6F-C51CA9EE782F}
-        resetdependencychain = false
-        target.argvalues
+        description = "Build and Sign IDE plugins"
+        id = {DA4815C6-A7AB-47F6-9AB0-7899F6807657}
+        action.target.execute
         begin
-          target.argvalue
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] XE2"
+          failifactionlistempty = false
+          id = {E18926BA-E666-419A-9D6F-C51CA9EE782F}
+          resetdependencychain = false
+          target.argvalues
           begin
-            value = DelphiXE2
-            variablename = CompilerVersion
+            target.argvalue
+            begin
+              value = DelphiXE2
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.XE2.dpr
+              variablename = ProjectFile
+            end
           end
-          target.argvalue
+        end
+        action.target.execute
+        begin
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] XE3"
+          failifactionlistempty = false
+          id = {2CF3AEA0-9248-4729-8141-BB48ED280D44}
+          resetdependencychain = false
+          target.argvalues
           begin
-            value = DPM.IDE.XE2.dpr
-            variablename = ProjectFile
+            target.argvalue
+            begin
+              value = DelphiXE3
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.XE3.dpr
+              variablename = ProjectFile
+            end
+          end
+        end
+        action.target.execute
+        begin
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] XE4"
+          failifactionlistempty = false
+          id = {CD8E6AAE-D083-479B-A611-4420C36F97DF}
+          resetdependencychain = false
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = DelphiXE4
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.XE4.dpr
+              variablename = ProjectFile
+            end
+          end
+        end
+        action.target.execute
+        begin
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] XE5"
+          failifactionlistempty = false
+          id = {B13232A7-8656-417C-BD5F-C30E531F145D}
+          resetdependencychain = false
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = DelphiXE5
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.XE5.dpr
+              variablename = ProjectFile
+            end
+          end
+        end
+        action.target.execute
+        begin
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] XE6"
+          failifactionlistempty = false
+          id = {1DF7D7D0-75AC-46F2-A029-BCF72F6A55BB}
+          resetdependencychain = false
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = DelphiXE6
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.XE6.dpr
+              variablename = ProjectFile
+            end
+          end
+        end
+        action.target.execute
+        begin
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] XE7"
+          failifactionlistempty = false
+          id = {CD063CBA-E2A0-41AF-A5F7-BB1B2761C7F8}
+          resetdependencychain = false
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = DelphiXE7
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.XE7.dpr
+              variablename = ProjectFile
+            end
+          end
+        end
+        action.target.execute
+        begin
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] XE8"
+          failifactionlistempty = false
+          id = {1487745C-9D1E-4CDC-9A2F-CE806907A044}
+          resetdependencychain = false
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = DelphiXE8
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.XE8.dpr
+              variablename = ProjectFile
+            end
+          end
+        end
+        action.target.execute
+        begin
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] 10.0 Seattle"
+          failifactionlistempty = false
+          id = {F5B4093C-AA0A-4AE2-93C7-CEF205E59FC8}
+          resetdependencychain = false
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = Delphi10Seattle
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.D100.dpr
+              variablename = ProjectFile
+            end
+          end
+        end
+        action.target.execute
+        begin
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] 10.1 Berlin"
+          failifactionlistempty = false
+          id = {677BEFF9-7E75-4E78-B109-45F058B81596}
+          resetdependencychain = false
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = Delphi10Berlin
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.D101.dpr
+              variablename = ProjectFile
+            end
+          end
+        end
+        action.target.execute
+        begin
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] 10.2 Tokyo"
+          failifactionlistempty = false
+          id = {68C01FBE-D970-43C1-BBE0-06900CE906FD}
+          resetdependencychain = false
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = Delphi10Tokyo
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.D102.dpr
+              variablename = ProjectFile
+            end
+          end
+        end
+        action.target.execute
+        begin
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] 10.3 Rio"
+          failifactionlistempty = false
+          id = {0E2307E8-90DE-4B65-BFD4-0C72BFC0EB32}
+          resetdependencychain = false
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = Delphi10_3
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.D103.dpr
+              variablename = ProjectFile
+            end
+          end
+        end
+        action.target.execute
+        begin
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] 10.4 Sydney"
+          failifactionlistempty = false
+          id = {BAE83770-9957-4993-8537-17CD779D2852}
+          resetdependencychain = false
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = Delphi10_4
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.D104.dpr
+              variablename = ProjectFile
+            end
           end
         end
       end
-      action.target.execute
+      action.group
       begin
-        actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
-        description = "Run Target [ BuildForCompiler ] XE3"
-        failifactionlistempty = false
-        id = {2CF3AEA0-9248-4729-8141-BB48ED280D44}
-        resetdependencychain = false
-        target.argvalues
+        description = "Build and Sign Installer"
+        id = {15729DB8-9AAA-45CE-9CBA-E64417B605C4}
+        variable
         begin
-          target.argvalue
-          begin
-            value = DelphiXE3
-            variablename = CompilerVersion
-          end
-          target.argvalue
-          begin
-            value = DPM.IDE.XE3.dpr
-            variablename = ProjectFile
-          end
+          name = BinaryFileName
+          variablescope = vtLocal
+          variabletype = btString
         end
-      end
-      action.target.execute
-      begin
-        actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
-        description = "Run Target [ BuildForCompiler ] XE4"
-        failifactionlistempty = false
-        id = {CD8E6AAE-D083-479B-A611-4420C36F97DF}
-        resetdependencychain = false
-        target.argvalues
+        action.innosetup.execute
         begin
-          target.argvalue
-          begin
-            value = DelphiXE4
-            variablename = CompilerVersion
-          end
-          target.argvalue
-          begin
-            value = DPM.IDE.XE4.dpr
-            variablename = ProjectFile
-          end
+          definitions = "MyAppVersion\=%DPMVersion%" +
+                        ""
+          id = {7CD98D00-B517-41B2-A9DC-37BA9C39D864}
+          innoversion = Inno6
+          scriptfile = %FBPROJECTDIR%\\DPMInstaller.iss
+          showprogress = true
+          unicode = true
+          usecommandline = true
+          usepreprocessor = true
         end
-      end
-      action.target.execute
-      begin
-        actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
-        description = "Run Target [ BuildForCompiler ] XE5"
-        failifactionlistempty = false
-        id = {B13232A7-8656-417C-BD5F-C30E531F145D}
-        resetdependencychain = false
-        target.argvalues
+        action.variable.set
         begin
-          target.argvalue
-          begin
-            value = DelphiXE5
-            variablename = CompilerVersion
-          end
-          target.argvalue
-          begin
-            value = DPM.IDE.XE5.dpr
-            variablename = ProjectFile
-          end
+          applytoexisting = false
+          doexpandexpression = true
+          forcetype = ftString
+          id = {65338DAF-82AF-4A0A-A9A4-65FCFD1A9E1C}
+          modifier = smNone
+          newvalue = %FBPROJECTDIR%\\Output\\DPMSetup.exe
+          variablename = BinaryFileName
         end
-      end
-      action.target.execute
-      begin
-        actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
-        description = "Run Target [ BuildForCompiler ] XE6"
-        failifactionlistempty = false
-        id = {1DF7D7D0-75AC-46F2-A029-BCF72F6A55BB}
-        resetdependencychain = false
-        target.argvalues
+        action.target.execute
         begin
-          target.argvalue
+          actionlistid = {CD2E679B-668B-4181-B51E-32647A974CED}
+          failifactionlistempty = false
+          id = {59923895-F98A-4386-AEE4-30A7608338D0}
+          resetdependencychain = false
+          target.argvalues
           begin
-            value = DelphiXE6
-            variablename = CompilerVersion
-          end
-          target.argvalue
-          begin
-            value = DPM.IDE.XE6.dpr
-            variablename = ProjectFile
-          end
-        end
-      end
-      action.target.execute
-      begin
-        actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
-        description = "Run Target [ BuildForCompiler ] XE7"
-        failifactionlistempty = false
-        id = {CD063CBA-E2A0-41AF-A5F7-BB1B2761C7F8}
-        resetdependencychain = false
-        target.argvalues
-        begin
-          target.argvalue
-          begin
-            value = DelphiXE7
-            variablename = CompilerVersion
-          end
-          target.argvalue
-          begin
-            value = DPM.IDE.XE7.dpr
-            variablename = ProjectFile
-          end
-        end
-      end
-      action.target.execute
-      begin
-        actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
-        description = "Run Target [ BuildForCompiler ] XE8"
-        failifactionlistempty = false
-        id = {1487745C-9D1E-4CDC-9A2F-CE806907A044}
-        resetdependencychain = false
-        target.argvalues
-        begin
-          target.argvalue
-          begin
-            value = DelphiXE8
-            variablename = CompilerVersion
-          end
-          target.argvalue
-          begin
-            value = DPM.IDE.XE8.dpr
-            variablename = ProjectFile
-          end
-        end
-      end
-      action.target.execute
-      begin
-        actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
-        description = "Run Target [ BuildForCompiler ] 10.0 Seattle"
-        failifactionlistempty = false
-        id = {F5B4093C-AA0A-4AE2-93C7-CEF205E59FC8}
-        resetdependencychain = false
-        target.argvalues
-        begin
-          target.argvalue
-          begin
-            value = Delphi10Seattle
-            variablename = CompilerVersion
-          end
-          target.argvalue
-          begin
-            value = DPM.IDE.D100.dpr
-            variablename = ProjectFile
-          end
-        end
-      end
-      action.target.execute
-      begin
-        actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
-        description = "Run Target [ BuildForCompiler ] 10.1 Berlin"
-        failifactionlistempty = false
-        id = {677BEFF9-7E75-4E78-B109-45F058B81596}
-        resetdependencychain = false
-        target.argvalues
-        begin
-          target.argvalue
-          begin
-            value = Delphi10Berlin
-            variablename = CompilerVersion
-          end
-          target.argvalue
-          begin
-            value = DPM.IDE.D101.dpr
-            variablename = ProjectFile
-          end
-        end
-      end
-      action.target.execute
-      begin
-        actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
-        description = "Run Target [ BuildForCompiler ] 10.2 Tokyo"
-        failifactionlistempty = false
-        id = {68C01FBE-D970-43C1-BBE0-06900CE906FD}
-        resetdependencychain = false
-        target.argvalues
-        begin
-          target.argvalue
-          begin
-            value = Delphi10Tokyo
-            variablename = CompilerVersion
-          end
-          target.argvalue
-          begin
-            value = DPM.IDE.D102.dpr
-            variablename = ProjectFile
-          end
-        end
-      end
-      action.target.execute
-      begin
-        actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
-        description = "Run Target [ BuildForCompiler ] 10.3 Rio"
-        failifactionlistempty = false
-        id = {0E2307E8-90DE-4B65-BFD4-0C72BFC0EB32}
-        resetdependencychain = false
-        target.argvalues
-        begin
-          target.argvalue
-          begin
-            value = Delphi10_3
-            variablename = CompilerVersion
-          end
-          target.argvalue
-          begin
-            value = DPM.IDE.D103.dpr
-            variablename = ProjectFile
-          end
-        end
-      end
-      action.target.execute
-      begin
-        actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
-        description = "Run Target [ BuildForCompiler ] 10.4 Sydney"
-        failifactionlistempty = false
-        id = {BAE83770-9957-4993-8537-17CD779D2852}
-        resetdependencychain = false
-        target.argvalues
-        begin
-          target.argvalue
-          begin
-            value = Delphi10_4
-            variablename = CompilerVersion
-          end
-          target.argvalue
-          begin
-            value = DPM.IDE.D104.dpr
-            variablename = ProjectFile
+            target.argvalue
+            begin
+              value = "DPM CommandLine"
+              variablename = AppName
+            end
+            target.argvalue
+            begin
+              value = %BinaryFileName%
+              variablename = FileToSign
+            end
           end
         end
       end
@@ -609,7 +669,7 @@ begin
         platformsdktype = ProjectSDK
         projectfile = %SRC_ROOT%\\%ProjectFile%
         regenerateresource = true
-        releaseversion = 9
+        releaseversion = 10
         resourcecompilertype = rcBorland
         ridloutputsamefolder = true
         startingdir = %SRC_ROOT%\\
@@ -828,7 +888,7 @@ begin
           as.isdescription = True
           as.description = %AppName%
           as.isurldescription = True
-          as.urldescription = http://www.finalbuilder.com/
+          as.urldescription = https://docs.delphipm.org
           as.istimestampservice = False
           as.isautoselect = False
           as.iscomputerstore = False
