@@ -467,7 +467,6 @@ begin
       action.group
       begin
         description = "Build and Sign IDE plugins"
-        enabled = false
         id = {DA4815C6-A7AB-47F6-9AB0-7899F6807657}
         action.target.execute
         begin
