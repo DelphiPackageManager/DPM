@@ -147,7 +147,7 @@ begin
           linkproductversiontofileversion = true
           locale = 1033
           majorversion = 1
-          manifestfile = I:\\Github\\DelphiPackageManager\\DPMMaster\\Source\\dpmManifest.xml
+          manifestfile = %SRC_ROOT%\\dpmManifest.xml
           minorversion = 0
           noconfig = false
           platform = Win32
