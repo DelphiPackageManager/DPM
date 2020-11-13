@@ -731,45 +731,6 @@ begin
           variablescope = vtLocal
           variabletype = btString
         end
-        variable
-        begin
-          name = SemVer
-          variablescope = vtLocal
-        end
-        action.variable.set
-        begin
-          applytoexisting = false
-          doexpandexpression = true
-          forcetype = ftDefault
-          id = {725E7B11-C507-4AD0-BA08-8521F641CB42}
-          modifier = smNone
-          newvalue = %DPMVersion.MajorVersion%.%DPMVersion.MinorVersion%.%DPMVersion.ReleaseVersion%
-          variablename = SemVer
-        end
-        action.ifthen
-        begin
-          expandactionlogtitle = false
-          id = {C0D9D95A-AB35-4413-BA0E-37FBC68F6E50}
-          lhsstoragestring = "%PRERELEASE_LABEL%" +
-                             ""
-          operatorsstoragestring = "<\>" +
-                                   ""
-          resultinlogtitle = true
-          rhsstoragestring = "" +
-                             ""
-          shortcircuitevaluation = true
-          termjoiner = jwOr
-          action.variable.set
-          begin
-            applytoexisting = false
-            doexpandexpression = true
-            forcetype = ftDefault
-            id = {2C03BA67-826D-4AF8-8D89-E23814E1C9D5}
-            modifier = smNone
-            newvalue = %SemVer%-%PRERELEASE_LABEL%
-            variablename = SemVer
-          end
-        end
         action.continua.set-buildstatus
         begin
           actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
@@ -1385,6 +1346,14 @@ begin
     name = RESTORE_ONLY
     variablescope = vtProject
     variabletype = btBoolean
+  end
+  variable
+  begin
+    defaultvalue = %MAJOR_VERSION%.%MINOR_VERSION%.%RELEASE_VERSION%-%PRERELEASE_LABEL%
+    groupname = VersionInfo
+    name = SemVer
+    variablescope = vtProject
+    variabletype = btString
   end
   variable
   begin
