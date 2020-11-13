@@ -731,6 +731,21 @@ begin
           variablescope = vtLocal
           variabletype = btString
         end
+        variable
+        begin
+          name = SemVer
+          variablescope = vtLocal
+        end
+        action.variable.set
+        begin
+          applytoexisting = false
+          doexpandexpression = true
+          forcetype = ftDefault
+          id = {725E7B11-C507-4AD0-BA08-8521F641CB42}
+          modifier = smNone
+          newvalue = %DPMVersion.MajorVersion%.%DPMVersion.MinorVersion%.%DPMVersion.BuildVersion%%PRERELEASE_LABEL%
+          variablename = SemVer
+        end
         action.continua.set-buildstatus
         begin
           actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
@@ -748,7 +763,7 @@ begin
         action.innosetup.execute
         begin
           definitions = "MyAppVersion\=%DPMVersion%" +
-                        "OutputFileName\=DPMSetup-%DPMVersion%" +
+                        "OutputFileName\=DPMSetup-%SemVer%" +
                         ""
           id = {7CD98D00-B517-41B2-A9DC-37BA9C39D864}
           innoversion = Inno6
@@ -765,7 +780,7 @@ begin
           forcetype = ftString
           id = {65338DAF-82AF-4A0A-A9A4-65FCFD1A9E1C}
           modifier = smNone
-          newvalue = %FBPROJECTDIR%\\Output\\DPMSetup-%DPMVersion%.exe
+          newvalue = %FBPROJECTDIR%\\Output\\DPMSetup-%SemVer%.exe
           variablename = BinaryFileName
         end
         action.target.execute
