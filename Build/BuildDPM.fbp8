@@ -99,6 +99,20 @@ begin
       begin
         description = "Build Tests - 10.3"
         id = {6BFDB7C5-1968-4220-9E27-9899822374AA}
+        action.continua.set-buildstatus
+        begin
+          actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
+          customactionname = "Continua CI - Set Build Status"
+          enabletimeout = false
+          id = {3BF7DD8B-D005-4522-B787-2F85120F7B13}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 1
+          as.status = "Building Unit Tests"
+          as.verbose = False
+          as.failbuildonerror = False
+        end
         action.dpm.restore
         begin
           actiontypeid = {17B8180A-B96F-4BA3-BCA1-E2FD9132113C}
@@ -261,6 +275,20 @@ begin
           name = BinaryFileName
           variablescope = vtLocal
           variabletype = btString
+        end
+        action.continua.set-buildstatus
+        begin
+          actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
+          customactionname = "Continua CI - Set Build Status"
+          enabletimeout = false
+          id = {A6BFE32A-141F-4801-88BB-2F7915B9D168}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 1
+          as.status = "Building Command line tool"
+          as.verbose = False
+          as.failbuildonerror = False
         end
         action.dpm.restore
         begin
@@ -703,6 +731,20 @@ begin
           variablescope = vtLocal
           variabletype = btString
         end
+        action.continua.set-buildstatus
+        begin
+          actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
+          customactionname = "Continua CI - Set Build Status"
+          enabletimeout = false
+          id = {9816C6E3-E2C7-46E4-AB8C-DFD16849CA32}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 1
+          as.status = "Building Installer"
+          as.verbose = False
+          as.failbuildonerror = False
+        end
         action.innosetup.execute
         begin
           definitions = "MyAppVersion\=%DPMVersion%" +
@@ -765,6 +807,20 @@ begin
     end
     rootaction
     begin
+      action.continua.set-buildstatus
+      begin
+        actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
+        customactionname = "Continua CI - Set Build Status"
+        enabletimeout = false
+        id = {F0472F57-A559-4CB9-BD48-E6B465474B6F}
+        impersonateusenetcredonly = false
+        impersonateuser = false
+        terminateontimeout = true
+        timeoutlength = 1
+        as.status = "Building IDE Plugin [%ProjectFile%]"
+        as.verbose = False
+        as.failbuildonerror = False
+      end
       action.dpm.restore
       begin
         actiontypeid = {17B8180A-B96F-4BA3-BCA1-E2FD9132113C}

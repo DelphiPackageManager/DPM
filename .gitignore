@@ -25,7 +25,6 @@
 *.otares
 *.drc
 *.res
-
 # Output Folders  #
 ###################
 /Output/**
@@ -57,3 +56,6 @@ Source/DPM.IDE.XE6.rc
 Source/DPM.IDE.XE7.rc
 Source/DPM.IDE.XE8.rc
 Source/dpm.rc
+
+!.gitignore
+Source/IDE/DPM.IDE.Resources.res
