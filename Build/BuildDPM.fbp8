@@ -743,7 +743,7 @@ begin
           forcetype = ftDefault
           id = {725E7B11-C507-4AD0-BA08-8521F641CB42}
           modifier = smNone
-          newvalue = %DPMVersion.MajorVersion%.%DPMVersion.MinorVersion%.%DPMVersion.BuildVersion%%PRERELEASE_LABEL%
+          newvalue = %DPMVersion.MajorVersion%.%DPMVersion.MinorVersion%.%DPMVersion.ReleaseVersion%%PRERELEASE_LABEL%
           variablename = SemVer
         end
         action.continua.set-buildstatus
