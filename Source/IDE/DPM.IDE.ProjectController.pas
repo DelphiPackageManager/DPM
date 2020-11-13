@@ -67,7 +67,8 @@ uses
   System.TypInfo,
   VSoft.Awaitable,
   DPM.Core.Options.Common,
-  DPM.Core.Options.Restore;
+  DPM.Core.Options.Restore,
+  DPM.IDE.Types;
 
 { TDPMIDEProjectController }
 
@@ -165,6 +166,7 @@ begin
   options.ApplyCommon(TCommonOptions.Default);
   options.ProjectPath := fileName;
   options.Validate(FLogger);
+  options.CompilerVersion := IDECompilerVersion;
 
 
   cancellationTokenSource := TCancellationTokenSourceFactory.Create;

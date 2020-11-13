@@ -25,7 +25,6 @@
 *.otares
 *.drc
 *.res
-
 # Output Folders  #
 ###################
 /Output/**
@@ -44,3 +43,19 @@ Source/Libs
 *.rsb
 *.fbpInf
 *.fbl8
+Source/DPM.IDE.D100.rc
+Source/DPM.IDE.D101.rc
+Source/DPM.IDE.D102.rc
+Source/DPM.IDE.D103.rc
+Source/DPM.IDE.D104.rc
+Source/DPM.IDE.XE2.rc
+Source/DPM.IDE.XE3.rc
+Source/DPM.IDE.XE4.rc
+Source/DPM.IDE.XE5.rc
+Source/DPM.IDE.XE6.rc
+Source/DPM.IDE.XE7.rc
+Source/DPM.IDE.XE8.rc
+Source/dpm.rc
+
+!.gitignore
+Source/IDE/DPM.IDE.Resources.res
