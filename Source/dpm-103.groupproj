@@ -1,0 +1,60 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{0AB3D6DE-F1E5-4E65-AE1A-CC0F664BE235}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="DPM.Core.Tests.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="dpm.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="DPM.IDE.D103.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="DPM_Core_Tests">
+        <MSBuild Projects="DPM.Core.Tests.dproj"/>
+    </Target>
+    <Target Name="DPM_Core_Tests:Clean">
+        <MSBuild Projects="DPM.Core.Tests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="DPM_Core_Tests:Make">
+        <MSBuild Projects="DPM.Core.Tests.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="dpm">
+        <MSBuild Projects="dpm.dproj"/>
+    </Target>
+    <Target Name="dpm:Clean">
+        <MSBuild Projects="dpm.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="dpm:Make">
+        <MSBuild Projects="dpm.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="DPM_IDE_D103">
+        <MSBuild Projects="DPM.IDE.D103.dproj"/>
+    </Target>
+    <Target Name="DPM_IDE_D103:Clean">
+        <MSBuild Projects="DPM.IDE.D103.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="DPM_IDE_D103:Make">
+        <MSBuild Projects="DPM.IDE.D103.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="DPM_Core_Tests;dpm;DPM_IDE_D103"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="DPM_Core_Tests:Clean;dpm:Clean;DPM_IDE_D103:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="DPM_Core_Tests:Make;dpm:Make;DPM_IDE_D103:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

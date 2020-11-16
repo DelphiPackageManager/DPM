@@ -176,7 +176,7 @@ begin
     end);
   option.Required := true;
 
-  option := cmd.RegisterUnNamedOption<string>('The package to install','projectPath',
+  option := cmd.RegisterUnNamedOption<string>('The project to install into','projectPath',
     procedure(const value : string)
     begin
       TInstallOptions.Default.ProjectPath := value;
