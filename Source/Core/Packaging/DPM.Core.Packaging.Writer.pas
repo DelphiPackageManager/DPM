@@ -173,6 +173,13 @@ var
   fileEntry : ISpecFileEntry;
   bplEntry : ISpecBPLEntry;
 
+  procedure ValidateDestinationPath(const source, dest : string);
+  begin
+    if (pos(#10, dest) > 0) or (pos(#13, dest) > 0) then
+      raise Exception.Create('Entry [' + source + '] has invalid characters in destination [' + dest + ']');
+  end;
+
+
   procedure ProcessEntry(const source, dest : string; const flatten : boolean; const exclude : IList<string> ; const ignore : boolean);
   var
     fsPatterns : TArray<IFileSystemPattern>;
@@ -191,6 +198,7 @@ var
     end;
 
   begin
+    ValidateDestinationPath(source, dest);
     searchBasePath := StripWildCard(TPathUtils.CompressRelativePath(basePath, source));
     searchBasePath := ExtractFilePath(searchBasePath);
     fsPatterns := antPattern.Expand(source);
@@ -208,6 +216,7 @@ var
     sourceFile : string;
     fileName : string;
   begin
+    ValidateDestinationPath(source, dest);
     sourceFile := TPathUtils.CompressRelativePath(basePath, source);
     if not FileExists(sourceFile) then
       raise Exception.Create('File [' + sourceFile + '] does not exist.');
@@ -247,6 +256,7 @@ begin
 
     for fileEntry in targetPlatform.SourceFiles do
       ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, false);
+
 
     for fileEntry in targetPlatform.Files do
       ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, false);
