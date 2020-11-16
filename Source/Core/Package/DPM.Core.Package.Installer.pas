@@ -972,6 +972,7 @@ var
   platform : TDPMPlatform;
   platformResult : boolean;
   ambiguousProjectVersion : boolean;
+  ambiguousVersions : string;
 begin
   result := false;
 
@@ -983,10 +984,10 @@ begin
     exit;
   end;
 
-  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion);
+  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion, ambiguousVersions);
 
   if ambiguousProjectVersion and (options.CompilerVersion = TCompilerVersion.UnknownVersion) then
-    FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous, recommend specifying compiler version on command line.');
+    FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous (' + ambiguousVersions  +'), recommend specifying compiler version on command line.');
 
   //if the compiler version was specified (either on the command like or through a package file)
   //then make sure our dproj is actually for that version.
@@ -1331,6 +1332,7 @@ var
   platform : TDPMPlatform;
   platformResult : boolean;
   ambiguousProjectVersion : boolean;
+  ambiguousVersions : string;
 begin
   result := false;
 
@@ -1347,10 +1349,10 @@ begin
   if cancellationToken.IsCancelled then
     exit;
 
-  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion);
+  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion, ambiguousVersions);
 
   if ambiguousProjectVersion and (options.CompilerVersion = TCompilerVersion.UnknownVersion) then
-    FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous, recommend specifying compiler on command line.', true);
+    FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous (' + ambiguousVersions  +'), recommend specifying compiler version on command line.');
 
   //if the compiler version was specified (either on the command like or through a package file)
   //then make sure our dproj is actually for that version.
@@ -1500,6 +1502,7 @@ var
   platform : TDPMPlatform;
   platformResult : boolean;
   ambiguousProjectVersion : boolean;
+  ambiguousVersions : string;
 begin
   result := false;
 
@@ -1516,10 +1519,10 @@ begin
   if cancellationToken.IsCancelled then
     exit;
 
-  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion);
+  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion, ambiguousVersions);
 
   if ambiguousProjectVersion and (options.CompilerVersion = TCompilerVersion.UnknownVersion) then
-    FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous, recommend specifying compiler on command line.', true);
+    FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous (' + ambiguousVersions  +'), recommend specifying compiler version on command line.');
 
   //if the compiler version was specified (either on the command like or through a package file)
   //then make sure our dproj is actually for that version.

@@ -127,7 +127,7 @@ function CompilerToBDSVersion(const compiler : TCompilerVersion) : string;
 function CompilerToCompilerVersionIntStr(const compiler : TCompilerVersion) : string;
 
 function ProjectVersionToCompilerVersion(const value : string) : TCompilerVersion;
-function IsAmbigousProjectVersion(const value : string) : boolean;
+function IsAmbigousProjectVersion(const value : string; var versions : string) : boolean;
 
 function ProjectPlatformToDPMPlatform(const value : string) : TDPMPlatform;
 
@@ -394,7 +394,7 @@ begin
   result := StringToDPMPlatform(value);
 end;
 
-function IsAmbigousProjectVersion(const value : string) : boolean;
+function IsAmbigousProjectVersion(const value : string; var versions : string) : boolean;
 var
   elements : TArray<string>;
   major : integer;
@@ -416,30 +416,44 @@ begin
     exit;
 
   case major of
-    12 :
-      begin
-        case minor of
-          0 : result := true; //ambiguous could be Delphi 2009 or Delphi 2010
-        end;
-      end;
     14 :
       begin
         case minor of
-          4 : result := true; //ambiguous could be xe3 update 2
+          4 :
+          begin
+            result := true; //ambiguous could be xe3 update 2
+            versions := 'XE3 Update 2 / XE4';
+          end;
         end;
       end;
     15 :
       begin
         case minor of
-          3 : result := true; //ambiguous could be xe6
+          3 :
+          begin
+            result := true; //ambiguous could be xe6
+            versions := 'XE5 / XE6';
+          end;
         end;
       end;
     18 :
       begin
         case minor of
-          1 : result := true; //ambiguous could be 10.0 Update 1 and Delphi 10.1
-          2 : result := true; //ambigous could be 10.1 Update 1 and Delphi 10.2
-          8 : result := true; //ambigous could be 10.3.x or Delphi 10.4
+          1 :
+          begin
+            result := true; //ambiguous could be 10.0 Update 1 and Delphi 10.1
+            versions := '10.0 Update 1 / 10.1';
+          end;
+          2 :
+          begin
+            result := true; //ambigous could be 10.1 Update 1 and Delphi 10.2
+            versions := '10.1 Update 1 / 10.2';
+          end;
+//          8 : //not confirmed.
+//          begin
+//            result := true; //ambigous could be 10.3.x or Delphi 10.4
+//            versions := '10.3 / 10.2';
+//          end;
         end;
       end;
   end;
