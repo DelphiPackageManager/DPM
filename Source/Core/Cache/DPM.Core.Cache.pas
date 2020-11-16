@@ -259,9 +259,14 @@ begin
   except
     on e : exception do
     begin
-      FLogger.Error('Unable to copy file [' + packageFileName + '] to the package cache');
-      FLogger.Error(e.Message);
-      exit;
+       TDirectory.Delete(packageFolder, true); //just empties it but doesn't delete?
+       if not RemoveDir(packageFolder) then
+       begin
+         FLogger.Error('Unable to cleanup directory : ' + packageFolder);
+         FLogger.Error(SysErrorMessage(GetLastError));
+       end;
+      //raising here, if we don't we end up here again!
+      raise Exception.Create('Unable to extract file [' + packageFilePath + '] into the package cache : ' + e.Message);
     end;
   end;
 end;
