@@ -50,6 +50,7 @@ type
     FRepoFactory : IPackageRepositoryFactory;
   protected
     function Initialize(const configuration : IConfiguration) : boolean;
+    function HasSources: Boolean;
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
     function GetRepositories : IList<IPackageRepository>;
@@ -479,6 +480,11 @@ begin
     end);
 end;
 
+
+function TPackageRepositoryManager.HasSources: Boolean;
+begin
+  result := FRepositories.Any;
+end;
 
 function TPackageRepositoryManager.Initialize(const configuration : IConfiguration) : boolean;
 begin

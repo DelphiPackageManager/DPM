@@ -1104,6 +1104,12 @@ begin
       exit;
     end;
 
+    if not FRepositoryManager.HasSources then
+    begin
+      FLogger.Error('No package sources are defined. Use `dpm sources add` command to add a package source.');
+      exit;
+    end;
+
 
     if FileExists(options.ProjectPath) then
     begin
@@ -1244,6 +1250,13 @@ begin
       exit;
     end;
 
+    if not FRepositoryManager.HasSources then
+    begin
+      FLogger.Error('No package sources are defined. Use `dpm sources add` command to add a package source.');
+      exit;
+    end;
+
+
     if FileExists(options.ProjectPath) then
     begin
       //TODO : If we are using a groupProj then we shouldn't allow different versions of a package in different projects
@@ -1337,7 +1350,7 @@ begin
   ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion);
 
   if ambiguousProjectVersion and (options.CompilerVersion = TCompilerVersion.UnknownVersion) then
-    FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous, recommend specifying compiler on command line.');
+    FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous, recommend specifying compiler on command line.', true);
 
   //if the compiler version was specified (either on the command like or through a package file)
   //then make sure our dproj is actually for that version.
@@ -1506,7 +1519,7 @@ begin
   ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion);
 
   if ambiguousProjectVersion and (options.CompilerVersion = TCompilerVersion.UnknownVersion) then
-    FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous, recommend specifying compiler on command line.');
+    FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous, recommend specifying compiler on command line.', true);
 
   //if the compiler version was specified (either on the command like or through a package file)
   //then make sure our dproj is actually for that version.

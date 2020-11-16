@@ -86,6 +86,8 @@ type
     ['{86DEB23D-7229-4F1C-949C-0A5CFB421152}']
     function Initialize(const configuration : IConfiguration) : boolean;
 
+    function HasSources : boolean;
+
     function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>; overload;
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
