@@ -106,7 +106,8 @@ procedure TDPMProjectMenuNotifier.AddMenu(const Project : IOTAProject; const Ide
 var
   menu : IOTAProjectManagerMenu;
 begin
-  if Assigned(Project) and ((IdentList.IndexOf(cDPMContainer) <> -1) or (IdentList.IndexOf(sProjectContainer) <> -1) or (IdentList.IndexOf(sProjectGroupContainer) <> -1)) then
+  //TODO : Uncomment section below when project groups are supported.
+  if Assigned(Project) and ((IdentList.IndexOf(cDPMContainer) <> -1) or (IdentList.IndexOf(sProjectContainer) <> -1) {or (IdentList.IndexOf(sProjectGroupContainer) <> -1) }) then
   begin
     menu := TDPMProjectMenu.Create(Self.OnManagePackages, Project, FEditorViewManager);
     ProjectManagerMenuList.Add(menu);

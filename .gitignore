@@ -59,3 +59,7 @@ Source/dpm.rc
 
 !.gitignore
 Source/IDE/DPM.IDE.Resources.res
+Source/dpm.core.tests.rc
+Source/dpm.used
+*.used
+*.cfg

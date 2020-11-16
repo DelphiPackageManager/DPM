@@ -481,7 +481,6 @@ begin
     end;
 
     txtInstalledVersion.Text := FPackageInstalledVersion;
-
     btnInstallOrUpdate.Enabled := (not package.Installed) or (package.InstalledVersion <> package.Version);
 
     sbPackageDetails.Visible := true;
@@ -559,6 +558,7 @@ var
   config : IConfiguration;
   lStable : string;
   lPre : string;
+  sVersion : string;
 begin
   FVersionsDelayTimer.Enabled := false;
   if FRequestInFlight then
@@ -645,7 +645,14 @@ begin
           for version in versions do
             cboVersions.Items.Add(version.ToStringNoMeta);
           cboVersions.ItemIndex := 0;
-          btnInstallOrUpdate.Enabled := cboVersions.Items[0] <> FPackageInstalledVersion;
+
+          sVersion := cboVersions.Items[0];
+          if TStringUtils.StartsWith(sVersion, cLatestPrerelease, true) then
+            Delete(sVersion, 1, Length(cLatestPrerelease))
+          else if TStringUtils.StartsWith(sVersion, cLatestStable, true) then
+            Delete(sVersion, 1, Length(cLatestStable));
+
+          btnInstallOrUpdate.Enabled := sVersion <> FPackageInstalledVersion;
         end;
       finally
         cboVersions.Items.EndUpdate;

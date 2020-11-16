@@ -748,7 +748,7 @@ begin
         action.innosetup.execute
         begin
           definitions = "MyAppVersion\=%DPMVersion%" +
-                        "OutputFileName\=DPMSetup-%DPMVersion%" +
+                        "OutputFileName\=DPMSetup-%SemVer%" +
                         ""
           id = {7CD98D00-B517-41B2-A9DC-37BA9C39D864}
           innoversion = Inno6
@@ -765,7 +765,7 @@ begin
           forcetype = ftString
           id = {65338DAF-82AF-4A0A-A9A4-65FCFD1A9E1C}
           modifier = smNone
-          newvalue = %FBPROJECTDIR%\\Output\\DPMSetup-%DPMVersion%.exe
+          newvalue = %FBPROJECTDIR%\\Output\\DPMSetup-%SemVer%.exe
           variablename = BinaryFileName
         end
         action.target.execute
@@ -1346,6 +1346,14 @@ begin
     name = RESTORE_ONLY
     variablescope = vtProject
     variabletype = btBoolean
+  end
+  variable
+  begin
+    defaultvalue = %MAJOR_VERSION%.%MINOR_VERSION%.%RELEASE_VERSION%-%PRERELEASE_LABEL%
+    groupname = VersionInfo
+    name = SemVer
+    variablescope = vtProject
+    variabletype = btString
   end
   variable
   begin
