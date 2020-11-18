@@ -62,7 +62,6 @@ type
     FHitElement : TDetailElement;
     FUpdating : boolean;
     FOnUriClickEvent : TUriClickEvent;
-    FLicenseIsUri : boolean;
     FPackage : IPackageSearchResultItem;
   protected
     procedure UpdateLayout;
@@ -131,7 +130,7 @@ begin
   if FPackage = nil then
     exit;
 
-  if FLicenseIsUri and (deLicense in FOptionalElements) then
+  if (deLicense in FOptionalElements) then
   begin
     if FLayout.LicenseRect.Contains(pt) then
       exit(deLicense);
@@ -154,6 +153,7 @@ end;
 procedure TPackageDetailsPanel.MouseDown(Button : TMouseButton; Shift : TShiftState; X, Y : Integer);
 var
   sUri : string;
+  uri : IUri;
 begin
   if not Assigned(FOnUriClickEvent) then
     exit;
@@ -170,10 +170,10 @@ begin
       case FHitElement of
         deLicense :
           begin
-            if FLicenseIsUri then
+            if TUriFactory.TryParse(FPackage.License,false, uri) then
               sUri := FPackage.License
             else
-              exit;
+              sUri := 'https://spdx.org/licenses/' + FPackage.License + '.html';
           end;
         deProjectUrl : sUri := FPackage.ProjectUrl;
         deReportUrl : sUri := FPackage.ProjectUrl;
@@ -195,7 +195,7 @@ begin
   if FHitElement <> prevElement then
     Invalidate;
 
-  if FHitElement in [deProjectUrl, deReportUrl] then
+  if FHitElement in [deProjectUrl, deReportUrl, deLicense] then
     Cursor := crHandPoint
   else
     Cursor := crDefault;
@@ -253,18 +253,15 @@ begin
     Canvas.Font.Style := [fsBold];
     DrawText(Canvas.Handle, 'License :', Length('License :'), FLayout.LicenseLabelRect, DT_LEFT);
 
-    if FLicenseIsUri then
-      Canvas.Font.Color := uriColor
-    else
-      Canvas.Font.Color := fontColor;
+    Canvas.Font.Color := uriColor;
 
     Canvas.Font.Style := [];
     if FHitElement = deLicense then
       Canvas.Font.Style := [fsUnderline];
 
-    if FLicenseIsUri then
-      DrawText(Canvas.Handle, 'View License', Length('View License'), FLayout.LicenseRect, DT_LEFT)
-    else
+//    if FLicenseIsUri then
+//      DrawText(Canvas.Handle, 'View License', Length('View License'), FLayout.LicenseRect, DT_LEFT)
+//    else
       DrawText(Canvas.Handle, FPackage.License, Length(FPackage.License), FLayout.LicenseRect, DT_LEFT + DT_WORDBREAK);
 
   end;
@@ -275,6 +272,9 @@ begin
   DrawText(Canvas.Handle, 'Date published :', Length('Date published :'), FLayout.PublishDateLabelRect, DT_LEFT);
 
   Canvas.Font.Style := [];
+  if FHitElement = deLicense then
+    Canvas.Font.Style := [fsUnderline];
+
   DrawText(Canvas.Handle, FPackage.PublishedDate, Length(FPackage.PublishedDate), FLayout.PublishDateRect, DT_LEFT + DT_WORDBREAK);
 
 
@@ -350,8 +350,6 @@ begin
 end;
 
 procedure TPackageDetailsPanel.SetDetails(const package : IPackageSearchResultItem);
-var
-  uri : IUri;
 begin
   FPackage := package;
   if FPackage <> nil then
@@ -360,9 +358,6 @@ begin
     if package.License <> '' then
     begin
       Include(FOptionalElements, deLicense);
-      //I know we are calling tryparse but the debugger will stop here an it's annoying me!
-      if TStringUtils.StartsWith(package.License, 'http') then
-        FLicenseIsUri := TUriFactory.TryParse(package.License, false, uri);
     end;
 
     if package.ProjectUrl <> '' then
@@ -475,10 +470,7 @@ begin
     LicenseRect.Right := clientRect.Right;
     LicenseRect.Height := textSize.cy;
 
-    if AControl.FLicenseIsUri then
-      DrawText(ACanvas.Handle, 'View License', Length('View License'), LicenseRect, DT_LEFT + DT_CALCRECT)
-    else
-      DrawText(ACanvas.Handle, package.License, Length(package.License), LicenseRect, DT_LEFT + DT_CALCRECT + DT_WORDBREAK);
+    DrawText(ACanvas.Handle, package.License, Length(package.License), LicenseRect, DT_LEFT + DT_CALCRECT + DT_WORDBREAK);
 
     bottom := LicenseRect.Bottom;
   end;
