@@ -182,7 +182,7 @@ begin
   commandHandler := commandFactory.CreateCommand(command);
   if commandHandler = nil then
   begin
-    console.WriteLine('No command handler registred for command : [' + CommandString[command] + ']',ccBrightRed );
+    console.WriteLine('No command handler registered for command : [' + CommandString[command] + ']',ccBrightRed );
     exit(TExitCode.NoCommandHandler);
   end;
 

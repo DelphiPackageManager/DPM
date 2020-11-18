@@ -382,7 +382,7 @@ procedure TPackageDetailsFrame.OnDetailsUriClick(Sender : TObject; const uri : s
 begin
   case element of
     deNone : ;
-    deLicense : ;
+    deLicense,
     deProjectUrl,
     deReportUrl : ShellExecute(Application.Handle, 'open', PChar(uri), nil, nil, SW_SHOWNORMAL);
     deTags : ;
