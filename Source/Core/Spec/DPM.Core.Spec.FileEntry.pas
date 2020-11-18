@@ -129,12 +129,14 @@ begin
     result := false;
     Logger.Error('Required attribute [src] is missing');
   end;
-  FDestination := jsonObject.S['dest'];
-  if FDestination = '' then
+  if not jsonObject.Contains('dest') then
   begin
     result := false;
     Logger.Error('Required attribute [dest] is missing for [' + FSource + ']');
-  end;
+    FDestination := '';
+  end
+  else
+    FDestination := jsonObject.S['dest'];
 
   FFlatten := jsonObject.B['flatten'];
   FIgnore := jsonObject.B['ignore'];
