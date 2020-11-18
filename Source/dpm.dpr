@@ -181,9 +181,6 @@ uses
   DPM.Core.Package.Icon in 'Core\Package\DPM.Core.Package.Icon.pas';
 
 begin
-  //TODO : pull in VSoft.SemanticVersion as a package once we are bootstrapped.
-  //TODO : pull in VSoft.CommmandLine as a package once we are bootstrapped.
-  //TODO : pull in VSoft.AntPatterns as a package once we are bootstrapped.
   CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml
   try
     System.ExitCode := Ord(TDPMConsoleApplication.Run);
