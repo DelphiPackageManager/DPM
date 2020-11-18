@@ -25,7 +25,7 @@ DPM is still in development, so not all functionality is ready yet. At this time
 
 ## How do I use it
 
-See the [getting started guide](./docs/get-started/getting-started.md).
+See [getting started](./GettingStarted.md).
 
 The command line documentation can be found [here](./docs/commands.md).
 
