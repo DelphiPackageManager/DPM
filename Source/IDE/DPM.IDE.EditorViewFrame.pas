@@ -1440,6 +1440,7 @@ begin
 
   //load our dpm configuration
   FConfigurationManager := FContainer.Resolve<IConfigurationManager>;
+  FConfigurationManager.EnsureDefaultConfig;
   FConfiguration := FConfigurationManager.LoadConfig(FSearchOptions.ConfigFile);
 
   PackageDetailsFrame.Init(FContainer, FIconCache, FConfiguration, Self, FProject.FileName);
