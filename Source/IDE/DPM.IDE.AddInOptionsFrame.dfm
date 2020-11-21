@@ -16,7 +16,7 @@ object DPMOptionsFrame: TDPMOptionsFrame
     DesignSize = (
       701
       89)
-    object Label4: TLabel
+    object lblPackageSources: TLabel
       Left = 16
       Top = 61
       Width = 108
@@ -38,6 +38,8 @@ object DPMOptionsFrame: TDPMOptionsFrame
       Height = 24
       Action = actAddSource
       Anchors = [akTop, akRight]
+      ParentShowHint = False
+      ShowHint = True
     end
     object SpeedButton2: TSpeedButton
       Left = 565
@@ -46,6 +48,8 @@ object DPMOptionsFrame: TDPMOptionsFrame
       Height = 24
       Action = actRemoveSource
       Anchors = [akTop, akRight]
+      ParentShowHint = False
+      ShowHint = True
     end
     object SpeedButton3: TSpeedButton
       Left = 610
@@ -54,6 +58,8 @@ object DPMOptionsFrame: TDPMOptionsFrame
       Height = 24
       Action = actMoveSourceUp
       Anchors = [akTop, akRight]
+      ParentShowHint = False
+      ShowHint = True
     end
     object SpeedButton4: TSpeedButton
       Left = 655
@@ -62,6 +68,8 @@ object DPMOptionsFrame: TDPMOptionsFrame
       Height = 24
       Action = actMoveSourceDown
       Anchors = [akTop, akRight]
+      ParentShowHint = False
+      ShowHint = True
     end
     object txtPackageCacheLocation: TButtonedEdit
       Left = 16
@@ -96,9 +104,9 @@ object DPMOptionsFrame: TDPMOptionsFrame
     object Label2: TLabel
       Left = 24
       Top = 49
-      Width = 56
+      Width = 94
       Height = 13
-      Caption = 'Source Uri :'
+      Caption = 'Source Path or Uri :'
     end
     object Label5: TLabel
       Left = 24

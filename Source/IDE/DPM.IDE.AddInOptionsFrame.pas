@@ -34,7 +34,7 @@ uses
   {$IF CompilerVersion >= 24.0 } //XE3 up
   {$LEGACYIFEND ON}
   //NOTE: The IDE keeps adding this again below, if it happens edit the file outside the IDE.
-  System.Actions,
+//  System.Actions,
   {$IFEND}
   {$IF CompilerVersion >= 29.0 } //XE3 up
   System.ImageList,
@@ -42,7 +42,7 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ActnList, Vcl.ImgList, Vcl.CheckLst,
   Vcl.Buttons, Vcl.ComCtrls, Vcl.ExtCtrls, Vcl.StdCtrls,
   DPM.Core.Logging,
-  DPM.Core.Configuration.Interfaces;
+  DPM.Core.Configuration.Interfaces, System.Actions;
 
 {$WARN SYMBOL_PLATFORM OFF}
 type
@@ -56,7 +56,7 @@ type
     Label1 : TLabel;
     txtName : TEdit;
     Label2 : TLabel;
-    Label4 : TLabel;
+    lblPackageSources: TLabel;
     Label3 : TLabel;
     txtPackageCacheLocation : TButtonedEdit;
     txtUri : TButtonedEdit;
@@ -121,20 +121,26 @@ uses
 
 {$R *.dfm}
 
+const
+  cPackageSources =  'DPM Package Sources';
+  cNoPackageSources = cPackageSources + ' - click [+] to create one.' ;
+
 { TDPMOptionsFrame }
 
 procedure TDPMOptionsFrame.actAddSourceExecute(Sender : TObject);
 var
   newItem : TListItem;
 begin
+  cboSourceType.ItemIndex := 0; //TODO : change this to default to DPMServer/Https when we have a server.
   newItem := lvSources.Items.Add;
   newItem.Caption := 'New Source';
-  newItem.Checked := false;
+  newItem.Checked := true;
   newItem.SubItems.Add(''); //uri
-  newItem.SubItems.Add(''); //type
+  newItem.SubItems.Add(cboSourceType.Items[cboSourceType.ItemIndex]);
   newItem.SubItems.Add(''); //username
   newItem.SubItems.Add(''); //password
   lvSources.ItemIndex := newItem.Index;
+  lblPackageSources.Caption := cPackageSources;
 end;
 
 procedure TDPMOptionsFrame.actMoveSourceDownExecute(Sender : TObject);
@@ -188,6 +194,9 @@ begin
   selectedItem := lvSources.Selected;
   if selectedItem <> nil then
     lvSources.DeleteSelected;
+  if lvSources.Items.Count = 0 then
+    lblPackageSources.Caption := cNoPackageSources;
+
 end;
 
 procedure TDPMOptionsFrame.cboSourceTypeChange(Sender : TObject);
@@ -234,16 +243,22 @@ begin
   txtPackageCacheLocation.Text := FConfiguration.PackageCacheLocation;
 
   lvSources.Clear;
-  for sourceConfig in FConfiguration.Sources do
+  if FConfiguration.Sources.Any then
   begin
-    item := lvSources.Items.Add;
-    item.Caption := sourceConfig.Name;
-    item.Checked := sourceConfig.IsEnabled;
-    item.SubItems.Add(sourceConfig.Source);
-    item.SubItems.Add(TEnumUtils.EnumToString<TSourceType>(sourceConfig.SourceType));
-    item.SubItems.Add(sourceConfig.UserName);
-    item.SubItems.Add(sourceConfig.Password);
-  end;
+    lblPackageSources.Caption := cPackageSources;
+    for sourceConfig in FConfiguration.Sources do
+    begin
+      item := lvSources.Items.Add;
+      item.Caption := sourceConfig.Name;
+      item.Checked := sourceConfig.IsEnabled;
+      item.SubItems.Add(sourceConfig.Source);
+      item.SubItems.Add(TEnumUtils.EnumToString<TSourceType>(sourceConfig.SourceType));
+      item.SubItems.Add(sourceConfig.UserName);
+      item.SubItems.Add(sourceConfig.Password);
+    end;
+  end
+  else
+    lblPackageSources.Caption := cNoPackageSources;
 
 end;
 
@@ -413,19 +428,19 @@ begin
           if SameText(sourceType, uriList.ValueFromIndex[j]) then
             sErrorMessage := sErrorMessage + 'Duplicate Uri/type  [' + sName + ']' + #13#10;
         end;
-      end;
 
-      uriList.Add(sUri + '=' + sourceType);
-      try
-        uri := TUriFactory.Parse(sUri);
-        //          if not (uri.IsFile or uri.IsUnc) then
-        //          begin
-        //            sErrorMessage := sErrorMessage + 'only folder uri type is supported at the moment' + #13#10;
-        //          end;
-      except
-        on e : Exception do
-        begin
-          sErrorMessage := sErrorMessage + 'Invalid Uri for Source  [' + sName + '] : ' + e.Message + #13#10;
+        uriList.Add(sUri + '=' + sourceType);
+        try
+          uri := TUriFactory.Parse(sUri);
+          //          if not (uri.IsFile or uri.IsUnc) then
+          //          begin
+          //            sErrorMessage := sErrorMessage + 'only folder uri type is supported at the moment' + #13#10;
+          //          end;
+        except
+          on e : Exception do
+          begin
+            sErrorMessage := sErrorMessage + 'Invalid Uri for Source  [' + sName + '] : ' + e.Message + #13#10;
+          end;
         end;
       end;
     end;
