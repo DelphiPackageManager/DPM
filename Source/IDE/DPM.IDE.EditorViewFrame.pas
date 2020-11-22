@@ -162,6 +162,7 @@ type
     FUpdates : IList<IPackageSearchResultItem>;
     //true when we first load the view
     FFirstView : boolean;
+    FHasSources : boolean;
     procedure FilterAndLoadInstalledPackages(const searchTxt : string);
   protected
     procedure SwitchTabs(const currentTab : TCurrentTab; const refresh : boolean);
@@ -806,11 +807,19 @@ begin
 
   cbSources.Items.Add('All');
 
-  for source in FConfiguration.Sources do
+  if FConfiguration.Sources.Any then
   begin
-    if source.IsEnabled then
-      cbSources.Items.Add(source.Name);
-  end;
+    for source in FConfiguration.Sources do
+    begin
+      if source.IsEnabled then
+      begin
+        cbSources.Items.Add(source.Name);
+        FHasSources := true;
+      end;
+    end;
+  end
+  else
+    FHasSources := false;
 
   if sCurrent <> '' then
   begin
@@ -922,7 +931,12 @@ begin
   if FRequestInFlight then
     ACanvas.TextOut(20, 20, 'Loading....')
   else
-    ACanvas.TextOut(20, 20, 'No Packages found');
+  begin
+    if  FHasSources then
+      ACanvas.TextOut(20, 20, 'No Packages found')
+    else
+      ACanvas.TextOut(20, 20, 'No enabled package sources, add a package source in DPM settings.')
+  end;
 end;
 
 procedure TDPMEditViewFrame.ScrollListPaintRow(const Sender : TObject; const ACanvas : TCanvas; const itemRect : TRect; const index : Int64; const state : TPaintRowState);
@@ -1440,6 +1454,7 @@ begin
 
   //load our dpm configuration
   FConfigurationManager := FContainer.Resolve<IConfigurationManager>;
+  FConfigurationManager.EnsureDefaultConfig;
   FConfiguration := FConfigurationManager.LoadConfig(FSearchOptions.ConfigFile);
 
   PackageDetailsFrame.Init(FContainer, FIconCache, FConfiguration, Self, FProject.FileName);
