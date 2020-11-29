@@ -55,10 +55,14 @@ type
     procedure SetBPLOutput(const value : string);
     function GetDCPOutput : string;
     procedure SetDCPOutput(const value : string);
+    function GetBPIOutput : string;
+    procedure SetBPIOutput(const value : string);
+
     function GetDCUOutput : string;
     procedure SetDCUOutput(const value : string);
     function GetOBJOutput : string;
     procedure SetOBJOutput(const value : string);
+
     function GetHPPOutput : string;
     procedure SetHPPOutput(const value : string);
 
@@ -75,7 +79,9 @@ type
     property Verbosity : TCompilerVerbosity read GetVerbosity write SetVerbosity;
 
     property BPLOutputDir : string read GetBPLOutput write SetBPLOutput;
+    property BPIOutputDir : string read GetBPIOutput write SetBPIOutput;
     property DCPOutputDir : string read GetDCPOutput write SetDCPOutput;
+
     property DCUOutputDir : string read GetDCUOutput write SetDCUOutput;
     property OBJOutputDir : string read GetOBJOutput write SetOBJOutput;
     property HPPOutputDir : string read GetHPPOutput write SetHPPOutput;

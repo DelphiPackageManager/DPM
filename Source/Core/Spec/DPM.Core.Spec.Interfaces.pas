@@ -173,19 +173,29 @@ type
     function GetBplOutputDir : string;
     function GetDcuOutputDir : string;
     function GetDcpOutputDir : string;
+    function GetObjOutputDir : string;
+    function GetHppOutputDir : string;
+    function GetBpiOutputDir : string;
+
     procedure SetId(const value : string);
     procedure SetProject(const value : string);
     procedure SetBplOutputDir(const value : string);
     procedure SetDcuOutputDir(const value : string);
     procedure SetDcpOutputDir(const value : string);
+    procedure SetObjOutputDir(const value : string);
+    procedure SetHppOutputDir(const value : string);
+    procedure SetBpiOutputDir(const value : string);
 
     function Clone : ISpecBuildEntry;
     property Id : string read GetId write SetId;
     property Project : string read GetProject write SetProject;
     property Config : string read GetConfig;
+    property BpiOutputDir : string read GetBpiOutputDir write SetBpiOutputDir;
     property BplOutputDir : string read GetBplOutputDir write SetBplOutputDir;
     property DcuOutputDir : string read GetDcuOutputDir write SetDcuOutputDir;
     property DcpOutputDir : string read GetDcpOutputDir write SetDcpOutputDir;
+    property ObjOutputDir : string read GetObjOutputDir write SetObjOutputDir;
+    property HppOutputDir : string read GetHppOutputDir write SetHppOutputDir;
   end;
 
 

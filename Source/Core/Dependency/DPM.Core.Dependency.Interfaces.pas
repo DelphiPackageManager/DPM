@@ -55,7 +55,11 @@ type
     function GetSelectedOn : TVersionRange;
     procedure SetSelectedOn(const value : TVersionRange);
 
-    function GetSearchPaths : TStrings;
+    function GetSearchPaths : IList<string>;
+    function GetLibPath : string;
+    procedure SetLibPath(const value : string);
+    function GetBplPath : string;
+    procedure SetBplPath(const value : string);
 
     function GetChildNodes : IEnumerable<IGraphNode>;
 
@@ -79,7 +83,9 @@ type
     property Level : integer read GetLevel;
     property ChildNodes : IEnumerable<IGraphNode>read GetChildNodes;
     property Parent : IGraphNode read GetParent;
-    property SearchPaths : TStrings read GetSearchPaths;
+    property SearchPaths : IList<string> read GetSearchPaths;
+    property LibPath : string read GetLibPath write SetLibPath;
+    property BplPath : string read GetBplPath write SetBplPath;
   end;
 
 

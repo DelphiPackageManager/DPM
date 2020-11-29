@@ -60,7 +60,9 @@ type
     FVersion : TPackageVersion;
     FSelectedOn : TVersionRange;
     FLevel : integer;
-    FSearchPaths : TStringList;
+    FSearchPaths : IList<string>;
+    FLibPath : string;
+    FBplPath : string;
   protected
     function AddChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
     function FindFirstNode(const id : string) : IGraphNode;
@@ -71,7 +73,11 @@ type
     function GetParent : IGraphNode;
     function GetSelectedOn : TVersionRange;
     function GetSelectedVersion : TPackageVersion;
-    function GetSearchPaths : TStrings;
+    function GetSearchPaths : IList<string>;
+    function GetLibPath : string;
+    procedure SetLibPath(const value : string);
+    function GetBplPath : string;
+    procedure SetBplPath(const value : string);
 
     procedure SetSelectedVersion(const value : TPackageVersion);
     procedure SetSelectedOn(const value : TVersionRange);
@@ -122,7 +128,7 @@ end;
 
 constructor TGraphNode.Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const selectedOn : TVersionRange);
 begin
-  FSearchPaths := TStringList.Create;
+  FSearchPaths := TCollections.CreateList<string>;
   FLevel := 0;
   if parent <> nil then
   begin
@@ -150,7 +156,6 @@ end;
 
 destructor TGraphNode.Destroy;
 begin
-  FSearchPaths.Free;
   inherited;
 end;
 
@@ -203,6 +208,11 @@ begin
     end);
 end;
 
+function TGraphNode.GetBplPath: string;
+begin
+  result := FBplPath;
+end;
+
 function TGraphNode.GetChildNodes : IEnumerable<IGraphNode>;
 begin
   result := FChildNodes.Values;
@@ -218,6 +228,11 @@ begin
   result := FLevel;
 end;
 
+function TGraphNode.GetLibPath: string;
+begin
+  result := FLibPath;
+end;
+
 function TGraphNode.GetParent : IGraphNode;
 begin
   //easier to debug this way
@@ -227,7 +242,7 @@ begin
     result := nil;
 end;
 
-function TGraphNode.GetSearchPaths: TStrings;
+function TGraphNode.GetSearchPaths: IList<string>;
 begin
   result := FSearchPaths;
 end;
@@ -284,6 +299,16 @@ begin
       if result then
         exit;
     end;
+end;
+
+procedure TGraphNode.SetBplPath(const value: string);
+begin
+  FBplPath := value;
+end;
+
+procedure TGraphNode.SetLibPath(const value: string);
+begin
+  FLibPath := value;
 end;
 
 procedure TGraphNode.SetSelectedOn(const value : TVersionRange);

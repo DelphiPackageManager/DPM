@@ -36,7 +36,7 @@ type
   //TODO : Rework to use CreateProcess and capture stdout using pipes.
   TProcess = class
     //throws if cannot create process.
-    class function Execute(const cancellationToken : ICancellationToken; const exe : string; const commandLine : string) : Cardinal;
+    class function Execute(const cancellationToken : ICancellationToken; const executable : string; const commandLine : string) : Cardinal;
   end;
 
 
@@ -49,7 +49,7 @@ uses
 
 { TProcess }
 
-class function TProcess.Execute(const cancellationToken : ICancellationToken; const exe, commandLine : string) : Cardinal;
+class function TProcess.Execute(const cancellationToken : ICancellationToken; const executable, commandLine : string) : Cardinal;
 var
   shellInfo : TShellExecuteInfo;
   waitHandles : array[0..1] of THandle;
@@ -60,9 +60,9 @@ begin
   shellInfo.fMask := SEE_MASK_NOCLOSEPROCESS;
   shellInfo.Wnd := 0;
   shellInfo.lpVerb := nil;
-  shellInfo.lpFile := 'cmd.exe';
+  shellInfo.lpFile := PChar(executable);
   shellInfo.lpParameters := PChar(commandLine);
-  shellInfo.lpDirectory := nil;
+  shellInfo.lpDirectory := PChar(ExtractFilePath(executable));
   shellInfo.nShow := SW_HIDE;
   shellInfo.hInstApp := 0;
 

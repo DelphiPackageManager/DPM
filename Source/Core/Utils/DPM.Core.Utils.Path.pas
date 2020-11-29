@@ -33,6 +33,7 @@ type
     //sysutils.IsRelativePath returns false with paths starting with .\ grrrrrr
     class function IsRelativePath(const value : string) : boolean;
     class function CompressRelativePath(const basePath : string; path : string) : string;
+    class function QuotePath(const value : string; const force : boolean = false) : string;
   end;
 
 
@@ -198,6 +199,15 @@ end;
 class function TPathUtils.IsRelativePath(const value : string) : boolean;
 begin
   result := (not TPath.IsUNCPath(value) and TStringUtils.StartsWith(value, '.\')) or System.SysUtils.IsRelativePath(value);
+end;
+
+class function TPathUtils.QuotePath(const value: string; const force : boolean = false): string;
+begin
+  if force or (Pos(' ', value) > 0)  then
+    result := '"' + value + '"'
+  else
+    result := value;
+
 end;
 
 end.

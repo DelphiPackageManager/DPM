@@ -610,12 +610,13 @@ begin
         buildEntryObj['project'] := buildEntry.Project;
         buildEntryObj['config'] := buildEntry.Config;
         buildEntryObj['bplOutputDir'] := buildEntry.BplOutputDir;
-        buildEntryObj['dcpOutputDir'] := buildEntry.BplOutputDir;
-        buildEntryObj['dcuOutputDir'] := buildEntry.BplOutputDir;
+        buildEntryObj['dcpOutputDir'] := buildEntry.DcpOutputDir;
+        buildEntryObj['dcuOutputDir'] := buildEntry.DcuOutputDir;
+        buildEntryObj['objOutputDir'] := buildEntry.ObjOutputDir;
+        buildEntryObj['hppOutputDir'] := buildEntry.HppOutputDir;
+        buildEntryObj['bpiOutputDir'] := buildEntry.BpiOutputDir;
       end;
     end;
-
-
 
 
     result := Obj.ToJSON(False);

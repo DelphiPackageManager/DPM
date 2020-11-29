@@ -42,26 +42,37 @@ type
     FConfig : string;
     FDcpOutputDir : string;
     FDcuOutputDir : string;
+    FObjOutputDir : string;
+    FHppOutputDir : string;
+    FBpiOutputDir : string;
     FId : string;
     FProject : string;
   protected
-    function GetBplOutputDir : string;
     function GetConfig : string;
+
+    function GetBplOutputDir : string;
+    function GetBpiOutputDir : string;
     function GetDcpOutputDir : string;
     function GetDcuOutputDir : string;
+    function GetObjOutputDir : string;
+    function GetHppOutputDir : string;
     function GetId : string;
     function GetProject : string;
     procedure SetProject(const value : string);
+
+    procedure SetBpiOutputDir(const value : string);
     procedure SetBplOutputDir(const value : string);
     procedure SetDcpOutputDir(const value : string);
     procedure SetDcuOutputDir(const value : string);
+    procedure SetObjOutputDir(const value : string);
+    procedure SetHppOutputDir(const value : string);
     procedure SetId(const value : string);
 
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function Clone : ISpecBuildEntry;
 
   public
-    constructor CreateClone(const logger : ILogger; const id, project, config, bpldir, dcpdir, dcudir : string); reintroduce;
+    constructor CreateClone(const logger : ILogger; const id, project, config, bpldir, dcpdir, dcudir, objdir, hppdir, bpidir : string); reintroduce;
   public
     constructor Create(const logger : ILogger); override;
 
@@ -73,7 +84,7 @@ implementation
 
 function TSpecBuildEntry.Clone : ISpecBuildEntry;
 begin
-  result := TSpecBuildEntry.CreateClone(logger, FId, FProject, FConfig, FBplOutputDir, FDcpOutputDir, FDcuOutputDir);
+  result := TSpecBuildEntry.CreateClone(logger, FId, FProject, FConfig, FBplOutputDir, FDcpOutputDir, FDcuOutputDir, FObjOutputDir, FHppOutputDir, FBpiOutputDir);
 end;
 
 constructor TSpecBuildEntry.Create(const logger : ILogger);
@@ -82,7 +93,7 @@ begin
 
 end;
 
-constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const id, project, config, bpldir, dcpdir, dcudir : string);
+constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const id, project, config, bpldir, dcpdir, dcudir, objdir, hppdir, bpidir : string);
 begin
   inherited Create(logger);
   FId := id;
@@ -91,6 +102,14 @@ begin
   FBplOutputDir := bpldir;
   FDcpOutputDir := dcpdir;
   FDcuOutputDir := dcudir;
+  FObjOutputDir := objdir;
+  FHppOutputDir := hppdir;
+  FBpiOutputDir := bpidir;
+end;
+
+function TSpecBuildEntry.GetBpiOutputDir: string;
+begin
+  result := FBpiOutputDir;
 end;
 
 function TSpecBuildEntry.GetBplOutputDir : string;
@@ -113,11 +132,21 @@ begin
   result := FDcuOutputDir;
 end;
 
+function TSpecBuildEntry.GetHppOutputDir: string;
+begin
+  result := FHppOutputDir;
+end;
+
 function TSpecBuildEntry.GetId : string;
 begin
   result := FId;
 end;
 
+
+function TSpecBuildEntry.GetObjOutputDir: string;
+begin
+  result := FObjOutputDir;
+end;
 
 function TSpecBuildEntry.GetProject : string;
 begin
@@ -156,6 +185,24 @@ begin
   FDcuOutputDir := jsonObject.S['dcuOutputDir'];
   if FDcuOutputDir = '' then
     FDcuOutputDir := 'lib';
+
+  FObjOutputDir := jsonObject.S['objOutputDir'];
+  if FObjOutputDir = '' then
+    FObjOutputDir := 'lib';
+
+  FHppOutputDir := jsonObject.S['hppOutputDir'];
+  if FHppOutputDir = '' then
+    FHppOutputDir := 'lib';
+
+  FBpiOutputDir := jsonObject.S['bpiOutputDir'];
+  if FBpiOutputDir = '' then
+    FBpiOutputDir := 'lib';
+
+end;
+
+procedure TSpecBuildEntry.SetBpiOutputDir(const value: string);
+begin
+  FBpiOutputDir := value;
 end;
 
 procedure TSpecBuildEntry.SetBplOutputDir(const value : string);
@@ -173,9 +220,19 @@ begin
   FDcuOutputDir := value;
 end;
 
+procedure TSpecBuildEntry.SetHppOutputDir(const value: string);
+begin
+  FHppOutputDir := value;
+end;
+
 procedure TSpecBuildEntry.SetId(const value : string);
 begin
   FId := value;
+end;
+
+procedure TSpecBuildEntry.SetObjOutputDir(const value: string);
+begin
+  FObjOutputDir := value;
 end;
 
 procedure TSpecBuildEntry.SetProject(const value : string);
