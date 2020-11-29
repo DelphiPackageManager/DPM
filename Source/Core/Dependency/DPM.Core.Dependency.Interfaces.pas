@@ -55,6 +55,8 @@ type
     function GetSelectedOn : TVersionRange;
     procedure SetSelectedOn(const value : TVersionRange);
 
+    function GetSearchPaths : TStrings;
+
     function GetChildNodes : IEnumerable<IGraphNode>;
 
     function AddChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
@@ -77,6 +79,7 @@ type
     property Level : integer read GetLevel;
     property ChildNodes : IEnumerable<IGraphNode>read GetChildNodes;
     property Parent : IGraphNode read GetParent;
+    property SearchPaths : TStrings read GetSearchPaths;
   end;
 
 

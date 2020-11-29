@@ -29,6 +29,7 @@ unit DPM.Core.Dependency.Graph;
 interface
 
 uses
+  System.Classes,
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Logging,
@@ -59,6 +60,7 @@ type
     FVersion : TPackageVersion;
     FSelectedOn : TVersionRange;
     FLevel : integer;
+    FSearchPaths : TStringList;
   protected
     function AddChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
     function FindFirstNode(const id : string) : IGraphNode;
@@ -69,6 +71,8 @@ type
     function GetParent : IGraphNode;
     function GetSelectedOn : TVersionRange;
     function GetSelectedVersion : TPackageVersion;
+    function GetSearchPaths : TStrings;
+
     procedure SetSelectedVersion(const value : TPackageVersion);
     procedure SetSelectedOn(const value : TVersionRange);
     function RemoveNode(const node : IGraphNode) : boolean;
@@ -82,6 +86,7 @@ type
   public
     constructor Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const selectedOn : TVersionRange);
     constructor CreateRoot;
+    destructor Destroy;override;
 
   end;
 
@@ -117,6 +122,7 @@ end;
 
 constructor TGraphNode.Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const selectedOn : TVersionRange);
 begin
+  FSearchPaths := TStringList.Create;
   FLevel := 0;
   if parent <> nil then
   begin
@@ -140,6 +146,12 @@ end;
 constructor TGraphNode.CreateRoot;
 begin
   Create(nil, 'root', TPackageVersion.Empty, TVersionRange.Empty);
+end;
+
+destructor TGraphNode.Destroy;
+begin
+  FSearchPaths.Free;
+  inherited;
 end;
 
 function TGraphNode.FindChild(const id : string) : IGraphNode;
@@ -213,6 +225,11 @@ begin
     result := {$IFDEF USEWEAK} FParent {$ELSE} IGraphNode(FParent) {$ENDIF}
   else
     result := nil;
+end;
+
+function TGraphNode.GetSearchPaths: TStrings;
+begin
+  result := FSearchPaths;
 end;
 
 function TGraphNode.GetSelectedOn : TVersionRange;
