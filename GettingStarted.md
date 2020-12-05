@@ -1,7 +1,6 @@
-
 ## Getting Started
 
-Note that DPM is still very much alpha software, things are subject to change. 
+Note that DPM is still very much alpha software, things are subject to change.
 
 ### Installing
 
@@ -9,17 +8,17 @@ Download the latest installer from github (it is codesigned, as are the dll's an
 
 https://github.com/DelphiPackageManager/DPM/releases
 
-The installer will prompt to install for the "only me" (recommended) or everyone (needs admin access for everyone). I recommended you leave the  "add to path" option checked, it makes running the command line easier.
+The installer will prompt to install for the "only me" (recommended) or everyone (needs admin access for everyone). I recommended you leave the "add to path" option checked, it makes running the command line easier.
 
 Create a folder somewhere on your machine or a network share for the packages.
 
 Open a command prompt and run (assuming you left the add to path option checked in the installer).
 
-```dpm sources add -name=local -source=path to the folder you created```
+`dpm sources add -name=local -source=path to the folder you created`
 
 This will add a package source to your config. At this time only folders are supported, http sources will be added later.
 
-When you install packages, they will be downloaded from the package source to the package cache folder.  By default the package cache folder will be in %APPDATA%\.dpm\packages
+When you install packages, they will be downloaded from the package source to the package cache folder. By default the package cache folder will be in %APPDATA%\.dpm\packages
 
 You can change that by editing %APPDATA%\.dpm\dpm.config and changing the packageCacheLocation setting.
 
@@ -49,33 +48,34 @@ https://github.com/VSoftTechnologies/VSoft.CancellationToken/releases
 
 https://github.com/VSoftTechnologies/VSoft.WeakReferences/releases
 
-Once you have some packages, you can either install packages from the command line, or using the IDE plugin. The IDE plugin adds a DPM node to each project in the project tree, 
-and a right click menu to "Manage DPM Packages". The DPM package view will open docked in the IDE code window, opened on the Installed tab. To add packages, switch to the search 
-tab, search or click on the package you want to install, and in the package details panel on the right, click on install. If there are multiple package versions, you can chose 
-which version to install. If you think a package is missing, it may be a pre-release package, in which case check the "Include Prerelease" checkbox under the search box - the list 
-will refresh. Some of the above packages are still prerelease. 
+Once you have some packages, you can either install packages from the command line, or using the IDE plugin. The IDE plugin adds a DPM node to each project in the project tree,
+and a right click menu to "Manage DPM Packages". The DPM package view will open docked in the IDE code window, opened on the Installed tab. To add packages, switch to the search
+tab, search or click on the package you want to install, and in the package details panel on the right, click on install. If there are multiple package versions, you can chose
+which version to install. If you think a package is missing, it may be a pre-release package, in which case check the "Include Prerelease" checkbox under the search box - the list
+will refresh. Some of the above packages are still prerelease.
 
-Note that your dproj will be modified by installing packages. 
+Note that your dproj will be modified by installing packages.
 
 DPM will :
 
 a) Add some msbuild properties, and add a $(DPMSearch) variable to the base configuration project search path for each platform that you install for.
 b) Add a DPM section at the bottom of the file with PackageReference elements, which record which packages are installed in the project.
 
-Note that installing design time packages is not currently supported, I'm working on that still. 
+Note that installing design time packages is not currently supported, I'm working on that still.
 
 The rest of this post is for people that want to compile or contribute or create dpm packages.
 
 ### Creating packages
 
 Create a dspec file - see the dspec files in the ThirdParty folder or the github projects linked above for examples. The docs are out a bit of date so use the source if you need a reference (Source\Core\Spec). I will endeavor to update the docs over the next week or two. If you get stuck just email me or create a github issue.
-To generate the packages you need to run 
+To generate the packages you need to run
 
-```dpm pack My.Package.dspec -o=c:\mypackagefolder```
+`dpm pack My.Package.dspec -o=c:\mypackagefolder`
 
-That will generate 1 file per compiler/platform combination. 
+That will generate 1 file per compiler/platform combination.
 
 ### Building DPM
+
 DPM is bootstrapped, so you need DPM to build dpm!
 
 dpm.dproj requires these packages :
@@ -108,6 +108,28 @@ VSoft.SemanticVersion
 VSoft.Uri
 VSoft.VirtualListView
 
+Some projects do not yet have dpm packages available, for those you will need to pack them yourself. The dspec files for these are in the thirdparty folder Copy the dspec file to the local repo folder
+
+https://github.com/ahausladen/JsonDataObjects
+
+open a command prompt in the repo folder and run
+
+dpm pack Ahausladen.JsonDataObjects.dspec -o=c:\yourpackagefolder
+
+https://github.com/gabr42/OmniThreadLibrary
+
+dpm pack Gabr42.OmniThreadLibrary.dspec -o=c:\yourpackagefolder
+
+https://bitbucket.org/sglienke/spring4d/src/develop/
+
+Copy the Spring4D.xxx.dspec files to the Source folder and open a command prompt there
+
+dpm pack Spring4D.Base.dspec -o=c:\yourpackagefolder
+dpm pack Spring4D.Core.dspec -o=c:\yourpackagefolder
+dpm pack Spring4D.Extensions.dspec -o=c:\yourpackagefolder
+dpm pack Spring4D.Persistence.dspec -o=c:\yourpackagefolder
+dpm pack Spring4D.Data.dspec -o=c:\yourpackagefolder
+
 If you have a package source configured and the IDE plugin installed, it should restore the packages when you load the project. Note that errors in the IDE plugin are not obvious, on some versions of the IDE it does not show the messages view when it should.
 
 Debugging the IDE plugin should be done using runtime parameters : -rDPM
@@ -124,4 +146,3 @@ I do not recommend doing dev work on this project using anything earlier than 10
 If you think you can contribute, create an issue on github and describe the area or feature you would like to work on. Don't just go and create a massive pull request and expect it to be merged! After some discussion to ensure we are all on the same page, we'll invite a pull request. Keep PR's as small and isolated as you can, that will make it easier to merge later.
 
 If you have any ideas to contribute, create an issue on github.
-
