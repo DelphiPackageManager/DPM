@@ -128,6 +128,7 @@ uses
   System.SysUtils,
   Spring.Collections.Extensions,
   DPM.Core.Constants,
+  DPM.Core.Compiler.BOM,
   DPM.Core.Utils.Path,
   DPM.Core.Utils.System,
   DPM.Core.Project.Editor,
@@ -228,12 +229,27 @@ var
   projectFile : string;
   searchPaths : IList<string>;
   childNode: IGraphNode;
+  bomNode : IGraphNode;
+  bomFile : string;
 begin
   result := true;
 
   packagePath := FPackageCache.GetPackagePath(packageInfo);
+  bomFile := TPath.Combine(packagePath, 'package.bom');
 
-  //TODO : Compare Bill of materials file against node dependencies to determine if we need to compile or not.
+  if FileExists(bomFile) then
+  begin
+    //Compare Bill of materials file against node dependencies to determine if we need to compile or not.
+    bomNode := TBOMFile.LoadFromFile(FLogger, bomFile);
+
+    if bomNode <> nil then
+    begin
+      if bomNode.AreEqual(graphNode) then
+        exit;
+    end;
+  end;
+
+  DeleteFile(bomFile);
 
   for buildEntry in packageSpec.TargetPlatform.BuildEntries do
   begin
@@ -275,12 +291,14 @@ begin
     if result then
     begin
       FLogger.Success('Project [' + projectFile + '] Compiled Ok.', true);
-      graphNode.LibPath
     end
     else
       FLogger.Debug(compiler.CompilerOutput.Text);
     if not result then
       exit;
+
+    TBOMFile.SaveToFile(FLogger, bomFile, graphNode);
+
   end;
 
 end;

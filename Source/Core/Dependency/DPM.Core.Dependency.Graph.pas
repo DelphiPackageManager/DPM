@@ -88,7 +88,7 @@ type
     function GetLevel : Integer;
     procedure VisitDFS(const visitor : TNodeVisitProc);
     procedure Prune(const id : string);
-
+    function AreEqual(const otherNode : IGraphNode; const depth : integer = 1) : boolean;
   public
     constructor Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const selectedOn : TVersionRange);
     constructor CreateRoot;
@@ -124,6 +124,41 @@ begin
 
   result := TGraphNode.Create(self, id, version, selectedOn);
   FChildNodes.Add(LowerCase(id), result);
+end;
+
+function TGraphNode.AreEqual(const otherNode: IGraphNode; const depth: integer): boolean;
+var
+  childDepth : integer;
+  childNode : IGraphNode;
+  res : boolean;
+begin
+  result := SameText(FId, otherNode.Id);
+  result := Self.FVersion = otherNode.SelectedVersion;
+  
+  if (not result) or (depth = 0)  then
+    exit;
+
+  result := HasChildren = otherNode.HasChildren;
+  if not result then
+    exit;
+
+  childDepth := depth -1;
+  res := true;
+
+  FChildNodes.ForEach(
+    procedure(const pair : TPair<string, IGraphNode>)
+    var
+      otherChildNode : IGraphNode;
+    begin
+      if not res then
+        exit;
+      otherChildNode := otherNode.FindChild(pair.Value.Id);
+      res := otherChildNode <> nil;
+      if res then
+        res := pair.Value.AreEqual(otherChildNode, childDepth);
+    end);
+  result := res;
+
 end;
 
 constructor TGraphNode.Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const selectedOn : TVersionRange);

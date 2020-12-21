@@ -77,6 +77,10 @@ type
     function IsTopLevel : boolean;
     function HasChildren : boolean;
     procedure VisitDFS(const visitor : TNodeVisitProc);
+
+    //used by BOM check
+    function AreEqual(const otherNode : IGraphNode; const depth : integer = 1) : boolean;
+
     property Id : string read GetId;
     property SelectedVersion : TPackageVersion read GetSelectedVersion write SetSelectedVersion;
     property SelectedOn : TVersionRange read GetSelectedOn write SetSelectedOn;
