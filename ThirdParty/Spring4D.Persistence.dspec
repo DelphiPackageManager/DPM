@@ -1,7 +1,7 @@
 {
   "metadata": {
     "id": "Spring4D.Persistence",
-    "version": "2.0.0-dev3",
+    "version": "2.0.0-dev4",
     "description": "Spring4D Persistence",
     "authors": "Spring4D Team",
     "projectUrl": "https://bitbucket.org/sglienke/spring4d",
@@ -77,7 +77,7 @@
       "dependencies": [
         {
           "id": "Spring4D.Base",
-          "version": "[2.0.0-dev3,]"
+          "version": "[2.0.0-dev4,]"
         }
       ],
       "comment": "due to the layout of the repo and relative paths in the packages we need to keep the same layout",

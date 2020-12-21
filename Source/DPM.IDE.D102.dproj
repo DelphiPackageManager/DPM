@@ -14,7 +14,7 @@
         <DPMCompiler>10.2</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Ahausladen.JsonDataObjects\0.0.1\src;$(DPM)\Spring4D.Core\2.0.0-dev3\src;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Container;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Interception;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Logging;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Mocking;$(DPM)\Spring4D.Core\2.0.0-dev3\src\Core\Services;$(DPM)\Spring4D.Base\2.0.0-dev3\src;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base\Collections;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base\Logging;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base\Patches;$(DPM)\Spring4D.Base\2.0.0-dev3\src\Base\Patterns;$(DPM)\Spring4D.Extensions\2.0.0-dev3\src;$(DPM)\Spring4D.Extensions\2.0.0-dev3\src\Extensions;$(DPM)\Spring4D.Extensions\2.0.0-dev3\src\Extensions\Cryptography;$(DPM)\Spring4D.Extensions\2.0.0-dev3\src\Extensions\Utils;$(DPM)\VSoft.AntPatterns\0.0.4\src;$(DPM)\VSoft.Awaitable\0.1.1\src;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\src;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\src\src;$(DPM)\VSoft.CancellationToken\0.0.1\src;$(DPM)\VSoft.HttpClient\0.0.2\src;$(DPM)\VSoft.SemanticVersion\0.1.0\src;$(DPM)\VSoft.Uri\0.0.3\src;$(DPM)\VSoft.VirtualListView\0.2.1-rc3\lib;$(DPM)\VSoft.VirtualListView\0.2.1-rc3\Source;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Ahausladen.JsonDataObjects\0.0.1\src;$(DPM)\Spring4D.Core\2.0.0-dev4\src;$(DPM)\Spring4D.Core\2.0.0-dev4\src\Core\Container;$(DPM)\Spring4D.Core\2.0.0-dev4\src\Core\Interception;$(DPM)\Spring4D.Core\2.0.0-dev4\src\Core\Logging;$(DPM)\Spring4D.Core\2.0.0-dev4\src\Core\Mocking;$(DPM)\Spring4D.Core\2.0.0-dev4\src\Core\Services;$(DPM)\Spring4D.Base\2.0.0-dev4\src;$(DPM)\Spring4D.Base\2.0.0-dev4\src\Base;$(DPM)\Spring4D.Base\2.0.0-dev4\src\Base\Collections;$(DPM)\Spring4D.Base\2.0.0-dev4\src\Base\Logging;$(DPM)\Spring4D.Base\2.0.0-dev4\src\Base\Patches;$(DPM)\Spring4D.Base\2.0.0-dev4\src\Base\Patterns;$(DPM)\Spring4D.Extensions\2.0.0-dev4\src;$(DPM)\Spring4D.Extensions\2.0.0-dev4\src\Extensions;$(DPM)\Spring4D.Extensions\2.0.0-dev4\src\Extensions\Cryptography;$(DPM)\Spring4D.Extensions\2.0.0-dev4\src\Extensions\Utils;$(DPM)\VSoft.AntPatterns\0.0.4\src;$(DPM)\VSoft.Awaitable\0.1.1\src;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\src;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\src\src;$(DPM)\VSoft.CancellationToken\0.0.1\src;$(DPM)\VSoft.HttpClient\0.0.2\src;$(DPM)\VSoft.SemanticVersion\0.1.0\src;$(DPM)\VSoft.Uri\0.0.3\src;$(DPM)\VSoft.VirtualListView\0.2.2-rc4\lib;$(DPM)\VSoft.VirtualListView\0.2.2-rc4\Source;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -763,11 +763,11 @@
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>
             <PackageReference id="Ahausladen.JsonDataObjects" platform="Win32" version="0.0.1"/>
-            <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.0-dev3">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev3" range="[2.0.0-dev3,]"/>
+            <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.0-dev4">
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev4" range="[2.0.0-dev4,]"/>
             </PackageReference>
-            <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.0-dev3">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev3" range="[2.0.0-dev3,]"/>
+            <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.0-dev4">
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev4" range="[2.0.0-dev4,]"/>
             </PackageReference>
             <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.0.4"/>
             <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.1.1">
@@ -779,7 +779,7 @@
             </PackageReference>
             <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.1.0"/>
             <PackageReference id="VSoft.Uri" platform="Win32" version="0.0.3"/>
-            <PackageReference id="VSoft.VirtualListView" platform="Win32" version="0.2.1-rc3"/>
+            <PackageReference id="VSoft.VirtualListView" platform="Win32" version="0.2.2-rc4"/>
         </DPM>
     </ProjectExtensions>
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>
