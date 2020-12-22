@@ -129,11 +129,10 @@ end;
 function TGraphNode.AreEqual(const otherNode: IGraphNode; const depth: integer): boolean;
 var
   childDepth : integer;
-  childNode : IGraphNode;
   res : boolean;
 begin
   result := SameText(FId, otherNode.Id);
-  result := Self.FVersion = otherNode.SelectedVersion;
+  result := result and (Self.FVersion = otherNode.SelectedVersion);
   
   if (not result) or (depth = 0)  then
     exit;

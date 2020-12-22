@@ -699,10 +699,9 @@ begin
         begin
           //we have design time packages to install.
         end;
-
-
-
       end);
+
+
   except
     on e : Exception do
     begin

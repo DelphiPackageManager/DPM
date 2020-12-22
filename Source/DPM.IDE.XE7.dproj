@@ -270,6 +270,7 @@
         <DCCReference Include="Core\DPM.Core.Types.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Icon.pas"/>
         <DCCReference Include="IDE\DPM.IDE.ProjectController.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.BOM.pas"/>
         <RcItem Include="images\dpm.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>DPMIDELOGO</ResourceId>

@@ -170,7 +170,8 @@ uses
   DPM.Core.TargetPlatform in 'Core\DPM.Core.TargetPlatform.pas',
   DPM.Core.Types in 'Core\DPM.Core.Types.pas',
   DPM.Core.Package.Icon in 'Core\Package\DPM.Core.Package.Icon.pas',
-  DPM.IDE.ProjectController in 'IDE\DPM.IDE.ProjectController.pas';
+  DPM.IDE.ProjectController in 'IDE\DPM.IDE.ProjectController.pas',
+  DPM.Core.Compiler.BOM in 'Core\Compiler\DPM.Core.Compiler.BOM.pas';
 
 {$R *.res}
 

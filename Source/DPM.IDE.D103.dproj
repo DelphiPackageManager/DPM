@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectVersion>18.8</ProjectVersion>
@@ -283,6 +283,7 @@
         <DCCReference Include="Core\DPM.Core.Types.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Icon.pas"/>
         <DCCReference Include="IDE\DPM.IDE.ProjectController.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.BOM.pas"/>
         <RcItem Include="images\dpm.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>DPMIDELOGO</ResourceId>
