@@ -53,25 +53,16 @@ type
 
     function GetBPLOutput : string;
     procedure SetBPLOutput(const value : string);
-    function GetDCPOutput : string;
-    procedure SetDCPOutput(const value : string);
-    function GetBPIOutput : string;
-    procedure SetBPIOutput(const value : string);
 
-    function GetDCUOutput : string;
-    procedure SetDCUOutput(const value : string);
-    function GetOBJOutput : string;
-    procedure SetOBJOutput(const value : string);
-
-    function GetHPPOutput : string;
-    procedure SetHPPOutput(const value : string);
+    function GetLibOutput : string;
+    procedure SetLibOutput(const value : string);
 
     function GetVerbosity : TCompilerVerbosity;
     procedure SetVerbosity(const value : TCompilerVerbosity);
 
     function GetCompilerOutput : TStrings;
 
-    function BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string) : boolean;
+    function BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string; const forDesign : boolean = false) : boolean;
 
     property CompilerVersion : TCompilerVersion read GetCompilerVersion;
     property Configuration : string read GetConfiguration write SetConfiguration;
@@ -79,13 +70,7 @@ type
     property Verbosity : TCompilerVerbosity read GetVerbosity write SetVerbosity;
 
     property BPLOutputDir : string read GetBPLOutput write SetBPLOutput;
-    property BPIOutputDir : string read GetBPIOutput write SetBPIOutput;
-    property DCPOutputDir : string read GetDCPOutput write SetDCPOutput;
-
-    property DCUOutputDir : string read GetDCUOutput write SetDCUOutput;
-    property OBJOutputDir : string read GetOBJOutput write SetOBJOutput;
-    property HPPOutputDir : string read GetHPPOutput write SetHPPOutput;
-
+    property LibOutputDir : string read GetLibOutput write SetLibOutput;
     property CompilerOutput : TStrings read GetCompilerOutput;
   end;
 

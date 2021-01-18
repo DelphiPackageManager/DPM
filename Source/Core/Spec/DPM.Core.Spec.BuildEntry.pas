@@ -40,39 +40,32 @@ type
     FLogger : ILogger;
     FBplOutputDir : string;
     FConfig : string;
-    FDcpOutputDir : string;
-    FDcuOutputDir : string;
-    FObjOutputDir : string;
-    FHppOutputDir : string;
-    FBpiOutputDir : string;
+    FLibOutputDir : string;
     FId : string;
     FProject : string;
+    FDesignOnly : boolean;
+    FBuildForDesign : boolean;
   protected
     function GetConfig : string;
 
     function GetBplOutputDir : string;
-    function GetBpiOutputDir : string;
-    function GetDcpOutputDir : string;
-    function GetDcuOutputDir : string;
-    function GetObjOutputDir : string;
-    function GetHppOutputDir : string;
+    function GetLibOutputDir : string;
     function GetId : string;
     function GetProject : string;
+    function GetDesignOnly : boolean;
+    function GetBuildForDesign : boolean;
     procedure SetProject(const value : string);
 
-    procedure SetBpiOutputDir(const value : string);
+    procedure SetLibOutputDir(const value : string);
     procedure SetBplOutputDir(const value : string);
-    procedure SetDcpOutputDir(const value : string);
-    procedure SetDcuOutputDir(const value : string);
-    procedure SetObjOutputDir(const value : string);
-    procedure SetHppOutputDir(const value : string);
     procedure SetId(const value : string);
-
+    procedure SetDesignOnly(const value : boolean);
+    procedure SetBuildForDesign(const value : boolean);
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function Clone : ISpecBuildEntry;
 
   public
-    constructor CreateClone(const logger : ILogger; const id, project, config, bpldir, dcpdir, dcudir, objdir, hppdir, bpidir : string); reintroduce;
+    constructor CreateClone(const logger : ILogger; const id, project, config, bpldir, libdir : string; const designOnly : boolean; const buildForDesign : boolean); reintroduce;
   public
     constructor Create(const logger : ILogger); override;
 
@@ -84,7 +77,7 @@ implementation
 
 function TSpecBuildEntry.Clone : ISpecBuildEntry;
 begin
-  result := TSpecBuildEntry.CreateClone(logger, FId, FProject, FConfig, FBplOutputDir, FDcpOutputDir, FDcuOutputDir, FObjOutputDir, FHppOutputDir, FBpiOutputDir);
+  result := TSpecBuildEntry.CreateClone(logger, FId, FProject, FConfig, FBplOutputDir, FLibOutputDir, FDesignOnly, FBuildForDesign);
 end;
 
 constructor TSpecBuildEntry.Create(const logger : ILogger);
@@ -93,23 +86,21 @@ begin
 
 end;
 
-constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const id, project, config, bpldir, dcpdir, dcudir, objdir, hppdir, bpidir : string);
+constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const id, project, config, bpldir, libdir : string; const designOnly : boolean; const buildForDesign : boolean);
 begin
   inherited Create(logger);
   FId := id;
   FProject := project;
   FConfig := config;
   FBplOutputDir := bpldir;
-  FDcpOutputDir := dcpdir;
-  FDcuOutputDir := dcudir;
-  FObjOutputDir := objdir;
-  FHppOutputDir := hppdir;
-  FBpiOutputDir := bpidir;
+  FLibOutputDir := libdir;
+  FDesignOnly   := designOnly;
+  FBuildForDesign := buildForDesign;
 end;
 
-function TSpecBuildEntry.GetBpiOutputDir: string;
+function TSpecBuildEntry.GetLibOutputDir: string;
 begin
-  result := FBpiOutputDir;
+  result := FLibOutputDir;
 end;
 
 function TSpecBuildEntry.GetBplOutputDir : string;
@@ -117,24 +108,20 @@ begin
   result := FBplOutputDir;
 end;
 
+function TSpecBuildEntry.GetBuildForDesign: boolean;
+begin
+  result := FBuildForDesign;
+end;
+
 function TSpecBuildEntry.GetConfig : string;
 begin
   result := FConfig;
 end;
 
-function TSpecBuildEntry.GetDcpOutputDir : string;
-begin
-  result := FDcpOutputDir;
-end;
 
-function TSpecBuildEntry.GetDcuOutputDir : string;
+function TSpecBuildEntry.GetDesignOnly: boolean;
 begin
-  result := FDcuOutputDir;
-end;
-
-function TSpecBuildEntry.GetHppOutputDir: string;
-begin
-  result := FHppOutputDir;
+  result := FDesignOnly;
 end;
 
 function TSpecBuildEntry.GetId : string;
@@ -143,10 +130,6 @@ begin
 end;
 
 
-function TSpecBuildEntry.GetObjOutputDir: string;
-begin
-  result := FObjOutputDir;
-end;
 
 function TSpecBuildEntry.GetProject : string;
 begin
@@ -178,31 +161,18 @@ begin
   if FBplOutputDir = '' then
     FBplOutputDir := 'bin';
 
-  FDcpOutputDir := jsonObject.S['dcpOutputDir'];
-  if FDcpOutputDir = '' then
-    FDcpOutputDir := 'lib';
+  FLibOutputDir := jsonObject.S['libOutputDir'];
+  if FLibOutputDir = '' then
+    FLibOutputDir := 'lib';
 
-  FDcuOutputDir := jsonObject.S['dcuOutputDir'];
-  if FDcuOutputDir = '' then
-    FDcuOutputDir := 'lib';
-
-  FObjOutputDir := jsonObject.S['objOutputDir'];
-  if FObjOutputDir = '' then
-    FObjOutputDir := 'lib';
-
-  FHppOutputDir := jsonObject.S['hppOutputDir'];
-  if FHppOutputDir = '' then
-    FHppOutputDir := 'lib';
-
-  FBpiOutputDir := jsonObject.S['bpiOutputDir'];
-  if FBpiOutputDir = '' then
-    FBpiOutputDir := 'lib';
+  FDesignOnly     := jsonObject.B['designOnly'];
+  FBuildForDesign := jsonObject.B['buildForDesign'];
 
 end;
 
-procedure TSpecBuildEntry.SetBpiOutputDir(const value: string);
+procedure TSpecBuildEntry.SetLibOutputDir(const value: string);
 begin
-  FBpiOutputDir := value;
+  FLibOutputDir := value;
 end;
 
 procedure TSpecBuildEntry.SetBplOutputDir(const value : string);
@@ -210,29 +180,19 @@ begin
   FBplOutputDir := value;
 end;
 
-procedure TSpecBuildEntry.SetDcpOutputDir(const value : string);
+procedure TSpecBuildEntry.SetBuildForDesign(const value: boolean);
 begin
-  FDcpOutputDir := value;
+  FBuildForDesign := value;
 end;
 
-procedure TSpecBuildEntry.SetDcuOutputDir(const value : string);
+procedure TSpecBuildEntry.SetDesignOnly(const value: boolean);
 begin
-  FDcuOutputDir := value;
-end;
-
-procedure TSpecBuildEntry.SetHppOutputDir(const value: string);
-begin
-  FHppOutputDir := value;
+  FDesignOnly := value;
 end;
 
 procedure TSpecBuildEntry.SetId(const value : string);
 begin
   FId := value;
-end;
-
-procedure TSpecBuildEntry.SetObjOutputDir(const value: string);
-begin
-  FObjOutputDir := value;
 end;
 
 procedure TSpecBuildEntry.SetProject(const value : string);

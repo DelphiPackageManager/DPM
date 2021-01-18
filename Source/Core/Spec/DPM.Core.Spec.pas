@@ -610,11 +610,9 @@ begin
         buildEntryObj['project'] := buildEntry.Project;
         buildEntryObj['config'] := buildEntry.Config;
         buildEntryObj['bplOutputDir'] := buildEntry.BplOutputDir;
-        buildEntryObj['dcpOutputDir'] := buildEntry.DcpOutputDir;
-        buildEntryObj['dcuOutputDir'] := buildEntry.DcuOutputDir;
-        buildEntryObj['objOutputDir'] := buildEntry.ObjOutputDir;
-        buildEntryObj['hppOutputDir'] := buildEntry.HppOutputDir;
-        buildEntryObj['bpiOutputDir'] := buildEntry.BpiOutputDir;
+        buildEntryObj['libOutputDir'] := buildEntry.LibOutputDir;
+        buildEntryObj['designOnly']   := buildEntry.DesignOnly;
+        buildEntryObj['buildForDesign']   := buildEntry.BuildForDesign;
       end;
     end;
 
@@ -818,8 +816,7 @@ begin
           buildEntry.Id := regEx.Replace(buildEntry.Id, evaluator);
           buildEntry.Project := regEx.Replace(buildEntry.Project, evaluator);
           buildEntry.BplOutputDir := regEx.Replace(buildEntry.BplOutputDir, evaluator);
-          buildEntry.DcuOutputDir := regEx.Replace(buildEntry.DcuOutputDir, evaluator);
-          buildEntry.DcpOutputDir := regEx.Replace(buildEntry.DcpOutputDir, evaluator);
+          buildEntry.LibOutputDir := regEx.Replace(buildEntry.LibOutputDir, evaluator);
         end;
         for dependency in targetPlatform.Dependencies do
         begin

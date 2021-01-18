@@ -45,12 +45,7 @@ type
     FCompilerLogFile : string;
 
     FBPLOutput : string;
-    FDCPOutput : string;
-    FDCUOutput : string;
-    FHPPOutput : string;
-    FOBJOutput : string;
-    FBPIOutput : string;
-
+    FLibOutput : string;
 
     FCompilerVersion : TCompilerVersion;
     FConfiguration : string;
@@ -59,27 +54,21 @@ type
     FVerbosity : TCompilerVerbosity;
 
     FCompilerOutput : TStringList;
+
+    FBuildForDesign : boolean;
   protected
     function GetBPLOutput : string;
     function GetCompilerVersion : TCompilerVersion;
     function GetConfiguration : string;
 
-    function GetBPIOutput : string;
-    function GetDCPOutput : string;
-    function GetDCUOutput : string;
-    function GetHPPOutput : string;
-    function GetOBJOutput : string;
+    function GetLibOutput : string;
     function GetPlatform : TDPMPlatform;
     function GetSearchPaths : IList<string>;
 
     procedure SetConfiguration(const value : string);
 
-    procedure SetBPIOutput(const value : string);
+    procedure SetLibOutput(const value : string);
     procedure SetBPLOutput(const value : string);
-    procedure SetDCPOutput(const value : string);
-    procedure SetDCUOutput(const value : string);
-    procedure SetHPPOutput(const value : string);
-    procedure SetOBJOutput(const value : string);
 
     procedure SetSearchPaths(const value : IList<string>);
     function GetVerbosity : TCompilerVerbosity;
@@ -91,7 +80,7 @@ type
     function GetMSBuildParameters(const configName : string) : string;
     function GetCommandLine(const projectFile : string; const configName : string) : string;
 
-    function BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string) : Boolean;
+    function BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string; const forDesign : boolean) : Boolean;
   public
     constructor Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const env : ICompilerEnvironmentProvider);
     destructor Destroy; override;
@@ -109,11 +98,12 @@ uses
 
 { TMSBuildCompiler }
 
-function TMSBuildCompiler.BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string) : Boolean;
+function TMSBuildCompiler.BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string; const forDesign : boolean) : Boolean;
 var
-  commandLine                 : string;
+  commandLine : string;
 begin
   result := false;
+  FBuildForDesign := forDesign;
   FCompilerOutput.Clear;
 
   FCompilerLogFile := TPath.GetTempFileName;
@@ -127,6 +117,7 @@ begin
     on e : Exception do
     begin
       FLogger.Error('Error executing compiler : ' + e.Message);
+      exit;
     end;
   end;
 
@@ -155,9 +146,9 @@ begin
   inherited;
 end;
 
-function TMSBuildCompiler.GetBPIOutput: string;
+function TMSBuildCompiler.GetLibOutput: string;
 begin
-  result := FBPIOutput;
+  result := FLibOutput;
 end;
 
 function TMSBuildCompiler.GetBPLOutput : string;
@@ -189,69 +180,57 @@ begin
   result := FConfiguration;
 end;
 
-function TMSBuildCompiler.GetDCPOutput : string;
-begin
-  result := FDCPOutput;
-end;
-
-function TMSBuildCompiler.GetDCUOutput : string;
-begin
-  result := FDCUOutput;
-end;
-
-function TMSBuildCompiler.GetHPPOutput : string;
-begin
-  result := FHPPOutput;
-end;
 
 function TMSBuildCompiler.GetMSBuildParameters(const configName : string) : string;
 var
   s: string;
   searchPath : string;
+  libPath : string;
+  bplPath : string;
 begin
   result := '/target:Build';
   result := result + ' /p:config=' + configName;
-  result := result + ' /p:platform=' + DPMPlatformToBDString(FPlatform);
+  if FBuildForDesign then
+    result := result + ' /p:platform=' + DPMPlatformToBDString(TDPMPlatform.Win32)
+  else
+    result := result + ' /p:platform=' + DPMPlatformToBDString(FPlatform);
+
 
   //TODO : Check that these props are correctly named for all supported compiler versions.
 
-  if FDCPOutput <> '' then
-    result := result + ' /p:DCC_DcpOutput=' + TPathUtils.QuotePath(ExcludeTrailingPathDelimiter(FDCPOutput)); //msbuild is fussy about trailing path delimeters!
-
-  if FDCUOutput <> '' then
-    result := result + ' /p:DCC_DcuOutput=' + TPathUtils.QuotePath(ExcludeTrailingPathDelimiter(FDCUOutput));
+  if FLibOutput <> '' then
+  begin
+    libPath := TPathUtils.QuotePath(ExcludeTrailingPathDelimiter(FLibOutput)); //msbuild is fussy about trailing path delimeters!
+    result := result + ' /p:DCC_DcpOutput=' + libPath;
+    result := result + ' /p:DCC_DcuOutput=' + libPath;
+    result := result + ' /p:DCC_ObjOutput=' + libPath;
+    result := result + ' /p:DCC_HppOutput=' + libPath;
+    result := result + ' /p:DCC_BpiOutput=' + libPath;
+  end;
 
   if FBPLOutput <> '' then
-    result := result + ' /p:DCC_BplOutput=' + TPathUtils.QuotePath(ExcludeTrailingPathDelimiter(FBPLOutput));
+  begin
+    bplPath := TPathUtils.QuotePath(ExcludeTrailingPathDelimiter(FBPLOutput));
+    result := result + ' /p:DCC_BplOutput=' + bplPath;
+  end;
 
-  if FOBJOutput <> '' then
-    result := result + ' /p:DCC_ObjOutput=' + TPathUtils.QuotePath(ExcludeTrailingPathDelimiter(FOBJOutput));
 
-  if FHPPOutput <> '' then
-    result := result + ' /p:DCC_HppOutput=' + TPathUtils.QuotePath(ExcludeTrailingPathDelimiter(FHPPOutput));
-
-  if FBPIOutput <> '' then
-    result := result + ' /p:DCC_BpiOutput=' + TPathUtils.QuotePath(ExcludeTrailingPathDelimiter(FBPIOutput));
-
+  result := result + ' /p:DCC_UnitSearchPath=';
+  searchPath := '$(BDSLIB)\$(PLATFORM)\release;$(BDS)\include';
+  // $(BDSLIB)\$(Platform)\release;$(BDSUSERDIR)\Imports;$(BDS)\Imports;$(BDSCOMMONDIR)\Dcp\$(Platform);$(BDS)\include
   if FSearchPaths.Any then
   begin
-    result := result + ' /p:DCC_UnitSearchPath=';
-    searchPath := '';//'$(BDS)\lib;$(BDS)\include';
     for s in FSearchPaths do
     begin
       if searchPath <> '' then
         searchPath := searchPath + ';';
       searchPath := searchPath + ExcludeTrailingPathDelimiter(s);
     end;
-    result := result + TPathUtils.QuotePath(searchPath, true);
   end;
+  result := result + TPathUtils.QuotePath(searchPath, true);
 
 end;
 
-function TMSBuildCompiler.GetOBJOutput : string;
-begin
-  result := FOBJOutput;
-end;
 
 function TMSBuildCompiler.GetPlatform : TDPMPlatform;
 begin
@@ -268,9 +247,9 @@ begin
   result := FVerbosity;
 end;
 
-procedure TMSBuildCompiler.SetBPIOutput(const value: string);
+procedure TMSBuildCompiler.SetLibOutput(const value: string);
 begin
-  FBPIOutput := value;
+  FLibOutput := value;
 end;
 
 procedure TMSBuildCompiler.SetBPLOutput(const value : string);
@@ -283,25 +262,6 @@ begin
   FConfiguration := value;
 end;
 
-procedure TMSBuildCompiler.SetDCPOutput(const value : string);
-begin
-  FDCPOutput := value;
-end;
-
-procedure TMSBuildCompiler.SetDCUOutput(const value : string);
-begin
-  FDCUOutput := value;
-end;
-
-procedure TMSBuildCompiler.SetHPPOutput(const value : string);
-begin
-  FHPPOutput := value;
-end;
-
-procedure TMSBuildCompiler.SetOBJOutput(const value : string);
-begin
-  FOBJOutput := value;
-end;
 
 procedure TMSBuildCompiler.SetSearchPaths(const value : IList<string> );
 begin

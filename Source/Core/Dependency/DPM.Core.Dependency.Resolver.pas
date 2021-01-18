@@ -290,7 +290,7 @@ function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancel
 var
   context : IResolverContext;
 begin
-  context := TResolverContext.Create(FLogger, nil, projectReferences);
+  context := TResolverContext.Create(FLogger, platform, projectReferences);
   result := DoResolve(cancellationToken, options, context, compilerVersion, platform);
   resolved := context.GetResolvedPackages;
   dependencyGraph := context.BuildDependencyGraph;

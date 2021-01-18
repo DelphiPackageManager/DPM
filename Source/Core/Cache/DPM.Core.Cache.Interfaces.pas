@@ -47,7 +47,9 @@ type
     // creates the folder where the package would reside and returns the path.
     function CreatePackagePath(const packageId : IPackageId) : string;
 
-    function GetPackagePath(const packageId : IPackageId) : string;
+    function GetPackagePath(const packageId : IPackageId) : string;overload;
+    function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : string;overload;
+
 
     //checks if the package is present as a folder, if not there but the file is
     //then it will call InstallPackage to extract it.

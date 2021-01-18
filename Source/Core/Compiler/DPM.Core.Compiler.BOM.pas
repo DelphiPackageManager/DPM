@@ -64,6 +64,7 @@ var
   sId : string;
   sVersion : string;
   version : TPackageVersion;
+  platform : TDPMPlatform;
   i : integer;
 begin
   result := nil;
@@ -78,7 +79,9 @@ begin
       sId := jsonObj.S['id'];
       sVersion := jsonObj.S['version'];
       version := TPackageVersion.Parse(sVersion);
-      result := TGraphNode.Create(nil,sId, version, TVersionRange.Empty);
+      platform := StringToDPMPlatform(jsonObj.S['platform']);
+
+      result := TGraphNode.Create(nil,sId, version, platform, TVersionRange.Empty);
 
       if jsonObj.Contains('dependencies') then
       begin
@@ -114,6 +117,7 @@ begin
     try
       jsonObj.S['id'] := graphNode.Id;
       jsonObj.S['version'] := graphNode.SelectedVersion.ToStringNoMeta;
+      jsonObj.S['platform'] := DPMPlatformToString(graphNode.Platform);
       if graphNode.HasChildren then
       begin
         graphNode.ChildNodes.ForEach(

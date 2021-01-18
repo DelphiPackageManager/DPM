@@ -231,6 +231,7 @@ var
   childNode: IGraphNode;
   bomNode : IGraphNode;
   bomFile : string;
+  childSearchPath : string;
 begin
   result := true;
 
@@ -240,15 +241,21 @@ begin
   if FileExists(bomFile) then
   begin
     //Compare Bill of materials file against node dependencies to determine if we need to compile or not.
+    //if the bom file exists that means it was compiled before. We will check that the bom matchs the dependencies
+    //in the graph
     bomNode := TBOMFile.LoadFromFile(FLogger, bomFile);
 
     if bomNode <> nil then
     begin
       if bomNode.AreEqual(graphNode) then
+      begin
         exit;
+      end;
     end;
   end;
 
+  //if we get here the previous compliation was done with different dependency versions,
+  //so we delete the bom and compile again
   DeleteFile(bomFile);
 
   for buildEntry in packageSpec.TargetPlatform.BuildEntries do
@@ -256,50 +263,126 @@ begin
 
     FLogger.Debug('Compiling package : ' + buildEntry.Project);
 
-    compiler.BPLOutputDir := TPath.Combine(packagePath, buildEntry.BplOutputDir);
-    compiler.DCPOutputDir := TPath.Combine(packagePath, buildEntry.DcpOutputDir);
-    compiler.DCUOutputDir := TPath.Combine(packagePath, buildEntry.DcuOutputDir);
-    compiler.OBJOutputDir := TPath.Combine(packagePath, buildEntry.ObjOutputDir);
-    compiler.HPPOutputDir := TPath.Combine(packagePath, buildEntry.HppOutputDir);
-    compiler.BPIOutputDir := TPath.Combine(packagePath, buildEntry.BpiOutputDir);
-    compiler.Configuration := buildEntry.Config;
-
-    graphNode.LibPath := compiler.DCPOutputDir;
-    graphNode.BplPath := compiler.BPLOutputDir;
-
-    if graphNode.HasChildren then
-    begin
-      searchPaths := TCollections.CreateList<string>;
-      for childNode in graphNode.ChildNodes do
-      begin
-        //since childNodes would have already been processed,
-        //if it was compiled we can use the libpath
-        if childNode.LibPath <> '' then
-          searchPaths.Add(childNode.LibPath)
-        else
-          searchPaths.AddRange(childNode.SearchPaths);
-      end;
-      compiler.SetSearchPaths(searchPaths);
-    end
-    else
-      compiler.SetSearchPaths(nil);
-
     projectFile := TPath.Combine(packagePath, buildEntry.Project);
     projectFile := TPathUtils.CompressRelativePath('',projectFile);
 
-    result := compiler.BuildProject(cancellationToken, projectFile, buildEntry.Config);
-    if result then
+
+    // if it's a design time package then we need to do a lot more work.
+    // design time packages are win32 (as the IDE is win32) - since we can
+    // only have one copy of the design package installed we need to check if
+    // it has already been installed via another platform.
+
+    if buildEntry.DesignOnly and ( packageInfo.Platform <> TDPMPlatform.Win32) then
     begin
-      FLogger.Success('Project [' + projectFile + '] Compiled Ok.', true);
+      compiler.BPLOutputDir := TPath.Combine(packagePath, buildEntry.BplOutputDir);
+      compiler.LibOutputDir := TPath.Combine(packagePath, buildEntry.LibOutputDir);
+      compiler.Configuration := buildEntry.Config;
+
+      if compiler.Platform <> TDPMPlatform.Win32 then
+      begin
+        compiler.BPLOutputDir := TPath.Combine(compiler.BPLOutputDir, 'win32');
+        compiler.LibOutputDir := TPath.Combine(compiler.LibOutputDir, 'win32');
+      end
+      else
+      begin
+        graphNode.LibPath := compiler.LibOutputDir;
+        graphNode.BplPath := compiler.BPLOutputDir;
+      end;
+
+      if graphNode.HasChildren then
+      begin
+        searchPaths := TCollections.CreateList<string>;
+        for childNode in graphNode.ChildNodes do
+        begin
+          childSearchPath := FPackageCache.GetPackagePath(childNode.Id, childNode.SelectedVersion.ToStringNoMeta, compiler.CompilerVersion, compiler.Platform );
+          childSearchPath := TPath.Combine(childSearchPath, 'lib\win32');
+          searchPaths.Add(childSearchPath);
+        end;
+        compiler.SetSearchPaths(searchPaths);
+      end
+      else
+        compiler.SetSearchPaths(nil);
+
+      result := compiler.BuildProject(cancellationToken, projectFile, buildEntry.Config, true);
+      if result then
+        FLogger.Success('Project [' + projectFile + '] Compiled for designtime Ok.', true);
+
+      if not result then
+        exit;
+
     end
     else
-      FLogger.Debug(compiler.CompilerOutput.Text);
-    if not result then
-      exit;
+    begin
+      //note we are assuming the build entry paths are all relative.
+      compiler.BPLOutputDir := TPath.Combine(packagePath, buildEntry.BplOutputDir);
+      compiler.LibOutputDir := TPath.Combine(packagePath, buildEntry.LibOutputDir);
+      compiler.Configuration := buildEntry.Config;
 
-    TBOMFile.SaveToFile(FLogger, bomFile, graphNode);
+      graphNode.LibPath := compiler.LibOutputDir;
+      graphNode.BplPath := compiler.BPLOutputDir;
+
+      if graphNode.HasChildren then
+      begin
+        searchPaths := TCollections.CreateList<string>;
+        for childNode in graphNode.ChildNodes do
+        begin
+          childSearchPath := FPackageCache.GetPackagePath(childNode.Id, childNode.SelectedVersion.ToStringNoMeta, compiler.CompilerVersion, compiler.Platform);
+          childSearchPath := TPath.Combine(childSearchPath, 'lib');
+          searchPaths.Add(childSearchPath);
+        end;
+        compiler.SetSearchPaths(searchPaths);
+      end
+      else
+        compiler.SetSearchPaths(nil);
+
+
+      result := compiler.BuildProject(cancellationToken, projectFile, buildEntry.Config);
+      if result then
+        FLogger.Success('Project [' + projectFile + '] Compiled Ok.', true);
+
+      if not result then
+        exit;
+
+
+      if buildEntry.BuildForDesign and (compiler.Platform <> TDPMPlatform.Win32) then
+      begin
+        //if buildForDesign is true, then it means the design time bpl's also reference
+        //this bpl, so if the platform isn't win32 then we need to build it for win32
+        compiler.BPLOutputDir := TPath.Combine(compiler.BPLOutputDir, 'win32');
+        compiler.LibOutputDir := TPath.Combine(compiler.LibOutputDir, 'win32');
+
+        if graphNode.HasChildren then
+        begin
+          searchPaths := TCollections.CreateList<string>;
+          for childNode in graphNode.ChildNodes do
+          begin
+            childSearchPath := FPackageCache.GetPackagePath(childNode.Id, childNode.SelectedVersion.ToStringNoMeta, compiler.CompilerVersion, compiler.Platform );
+            childSearchPath := TPath.Combine(childSearchPath, 'lib\win32');
+            searchPaths.Add(childSearchPath);
+          end;
+          compiler.SetSearchPaths(searchPaths);
+        end
+        else
+          compiler.SetSearchPaths(nil);
+
+        result := compiler.BuildProject(cancellationToken, projectFile, buildEntry.Config, true);
+        if result then
+          FLogger.Success('Project [' + projectFile + '] Compiled for designtime Ok.', true);
+
+        if not result then
+          exit;
+
+      end;
+
+
+
+    end;
 
   end;
+  //save the bill of materials file for future reference.
+  TBOMFile.SaveToFile(FLogger, bomFile, graphNode);
+
+
 
 end;
 
@@ -485,7 +568,7 @@ begin
   projectPackageReferences := TCollections.CreateList<IPackageReference>;
   packageReferences := TCollections.CreateList<IPackageReference>;
   conflictDetect := TCollections.CreateDictionary < string, TPackageVersion > ;
-  dependencyGraph := TGraphNode.CreateRoot;
+  dependencyGraph := TGraphNode.CreateRoot(platform);
 
 
   //get the direct dependencies for the platform.
@@ -685,7 +768,7 @@ begin
           //compiling updates the node searchpaths and libpath, so just copy to any same package nodes
           otherNodes := dependencyGraph.FindNodes(node.Id);
           if otherNodes.Count > 1 then
-          otherNodes.ForEach(procedure(const otherNode : IGraphNode)
+           otherNodes.ForEach(procedure(const otherNode : IGraphNode)
                              begin
                                 otherNode.SearchPaths.Clear;
                                 otherNode.SearchPaths.AddRange(node.SearchPaths);
@@ -747,7 +830,7 @@ begin
 
   conflictDetect := TCollections.CreateDictionary < string, TPackageVersion > ;
 
-  dependencyGraph := TGraphNode.CreateRoot;
+  dependencyGraph := TGraphNode.CreateRoot(platform);
 
   for packageReference in projectEditor.PackageReferences.Where(
     function(const packageReference : IPackageReference) : boolean
@@ -863,7 +946,7 @@ begin
 
   conflictDetect := TCollections.CreateDictionary < string, TPackageVersion > ;
 
-  dependencyGraph := TGraphNode.CreateRoot;
+  dependencyGraph := TGraphNode.CreateRoot(platform);
 
   foundReference := nil;
   for packageReference in projectEditor.PackageReferences.Where(

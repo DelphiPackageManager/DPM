@@ -242,14 +242,13 @@ type
   IPackageInstallerContext = interface
     ['{8FD229A2-FE7B-4315-84B2-FF18B78C76DC}']
     procedure Reset;
-    //    //provides context for build and runtime package copying.
-    //    procedure StartProject(const projectFile : string);
+    procedure StartProject(const projectFile : string);
+    procedure EndProject(const projectFile : string);
     //
-    //    procedure EndProject(const projectFile : string);
-    //
-    //    //register a bpl for install into the IDE.
-    //    procedure RegisterDesignPackage(const packageFile : string; const dependsOn : IList<string>);
-    //
+    //register a bpl for install into the IDE.
+    procedure RegisterDesignPackage(const packageFile : string; const dependsOn : IList<string>);
+
+    function IsDesignPackageInstalled(const packageName : string) : boolean;
 
   end;
 

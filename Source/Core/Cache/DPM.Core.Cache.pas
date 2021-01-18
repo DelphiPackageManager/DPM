@@ -50,7 +50,10 @@ type
     function CachePackage(const packageId : IPackageId; const saveFile : Boolean) : Boolean;
     function Clean : Boolean;
     function CreatePackagePath(const packageId : IPackageId) : string;
-    function GetPackagePath(const packageId : IPackageId) : string;
+
+    function GetPackagePath(const packageId : IPackageId) : string; overload;
+    function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : string;overload;
+
     function EnsurePackage(const packageId : IPackageId) : Boolean;
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
@@ -142,6 +145,11 @@ begin
   if spec = nil then
     exit;
   Result := TPackageMetadata.CreateFromSpec('', spec);
+end;
+
+function TPackageCache.GetPackagePath(const id: string; const version: string; const compilerVersion : TCompilerVersion;const platform: TDPMPlatform): string;
+begin
+  result := GetPackagesFolder + PathDelim + CompilerToString(compilerVersion) + PathDelim + DPMPlatformToString(platform) + PathDelim + Id + PathDelim + Version;
 end;
 
 function TPackageCache.GetPackagePath(const packageId : IPackageId) : string;

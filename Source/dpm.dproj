@@ -113,8 +113,8 @@
         <DCC_GenerateStackFrames>true</DCC_GenerateStackFrames>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <Debugger_CWD>C:\Users\vincent.OFFICE\Documents\Embarcadero\Studio\Projects\10.3\DMPTesting</Debugger_CWD>
-        <Debugger_RunParams>install indy.core .\Project4.dproj -compiler=10.3 -platforms=Win32 -force</Debugger_RunParams>
+        <Debugger_CWD>C:\Users\vincent.OFFICE\Documents\Embarcadero\Studio\Projects\10.3\DPMIndyTest</Debugger_CWD>
+        <Debugger_RunParams>install Indy.Protocols -compiler=10.3 -platforms=Win64</Debugger_RunParams>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
         <Debugger_RunParams>pack I:\Github\VSoftTechnologies\VSoft.AntPatterns\VSoft.AntPatterns.dspec -OutputFolder=c:\temp -basepath=. -minclientversion=1.0</Debugger_RunParams>

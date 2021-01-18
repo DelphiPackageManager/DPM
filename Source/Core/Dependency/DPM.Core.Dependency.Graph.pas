@@ -58,11 +58,13 @@ type
     FChildNodes : IDictionary<string, IGraphNode>;
     FId : string;
     FVersion : TPackageVersion;
+    FPlatform : TDPMPlatform;
     FSelectedOn : TVersionRange;
     FLevel : integer;
     FSearchPaths : IList<string>;
     FLibPath : string;
     FBplPath : string;
+
   protected
     function AddChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
     function FindFirstNode(const id : string) : IGraphNode;
@@ -79,6 +81,7 @@ type
     function GetBplPath : string;
     procedure SetBplPath(const value : string);
 
+    function GetPlatform : TDPMPlatform;
     procedure SetSelectedVersion(const value : TPackageVersion);
     procedure SetSelectedOn(const value : TVersionRange);
     function RemoveNode(const node : IGraphNode) : boolean;
@@ -90,8 +93,8 @@ type
     procedure Prune(const id : string);
     function AreEqual(const otherNode : IGraphNode; const depth : integer = 1) : boolean;
   public
-    constructor Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const selectedOn : TVersionRange);
-    constructor CreateRoot;
+    constructor Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const selectedOn : TVersionRange);
+    constructor CreateRoot(const platform : TDPMPlatform);
     destructor Destroy;override;
 
   end;
@@ -122,7 +125,7 @@ begin
     parent := parent.Parent;
   end;
 
-  result := TGraphNode.Create(self, id, version, selectedOn);
+  result := TGraphNode.Create(self, id, version, FPlatform, selectedOn);
   FChildNodes.Add(LowerCase(id), result);
 end;
 
@@ -160,7 +163,7 @@ begin
 
 end;
 
-constructor TGraphNode.Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const selectedOn : TVersionRange);
+constructor TGraphNode.Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const selectedOn : TVersionRange);
 begin
   FSearchPaths := TCollections.CreateList<string>;
   FLevel := 0;
@@ -178,14 +181,15 @@ begin
 
   FId := id;
   FVersion := version;
+  FPlatform := platform;
   FSelectedOn := selectedOn;
 
   FChildNodes := TCollections.CreateSortedDictionary < string, IGraphNode > ();
 end;
 
-constructor TGraphNode.CreateRoot;
+constructor TGraphNode.CreateRoot(const platform : TDPMPlatform);
 begin
-  Create(nil, 'root', TPackageVersion.Empty, TVersionRange.Empty);
+  Create(nil, 'root', TPackageVersion.Empty, platform, TVersionRange.Empty);
 end;
 
 destructor TGraphNode.Destroy;
@@ -252,6 +256,7 @@ begin
   result := FChildNodes.Values;
 end;
 
+
 function TGraphNode.GetId : string;
 begin
   result := FId;
@@ -274,6 +279,11 @@ begin
     result := {$IFDEF USEWEAK} FParent {$ELSE} IGraphNode(FParent) {$ENDIF}
   else
     result := nil;
+end;
+
+function TGraphNode.GetPlatform: TDPMPlatform;
+begin
+  result := FPlatform;
 end;
 
 function TGraphNode.GetSearchPaths: IList<string>;
