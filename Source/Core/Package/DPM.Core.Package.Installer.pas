@@ -61,7 +61,7 @@ type
   protected
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
 
-    function CollectSearchPaths(const resolvedPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
+    function CollectSearchPaths(const resolvedPackages : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
 
     procedure GenerateSearchPaths(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; packageSpec : IPackageSpec; const searchPaths : IList<string>);
 
@@ -198,7 +198,7 @@ begin
 
 end;
 
-function TPackageInstaller.CollectSearchPaths(const resolvedPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
+function TPackageInstaller.CollectSearchPaths(const resolvedPackages : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
 var
   packageInfo : IPackageInfo;
   packageMetadata : IPackageMetadata;
@@ -207,18 +207,28 @@ var
 begin
   result := true;
 
+  //reverse the list so that we add the paths in reverse order, small optimisation for the compiler.
+  resolvedPackages.Reverse;
   for packageInfo in resolvedPackages do
   begin
-    packageMetadata := FPackageCache.GetPackageMetadata(packageInfo);
-    if packageMetadata = nil then
+    if compiledPackages.Contains(packageInfo) then
     begin
-      FLogger.Error('Unable to get metadata for package ' + packageInfo.ToString);
-      exit(false);
-    end;
-    packageBasePath := packageMetadata.Id + PathDelim + packageMetadata.Version.ToStringNoMeta + PathDelim;
+      packageBasePath := packageInfo.Id + PathDelim + packageInfo.Version.ToStringNoMeta + PathDelim;
+      searchPaths.Add(packageBasePath + 'lib');
+    end
+    else
+    begin
+      packageMetadata := FPackageCache.GetPackageMetadata(packageInfo);
+      if packageMetadata = nil then
+      begin
+        FLogger.Error('Unable to get metadata for package ' + packageInfo.ToString);
+        exit(false);
+      end;
+      packageBasePath := packageMetadata.Id + PathDelim + packageMetadata.Version.ToStringNoMeta + PathDelim;
 
-    for packageSearchPath in packageMetadata.SearchPaths do
-      searchPaths.Add(packageBasePath + packageSearchPath.Path);
+      for packageSearchPath in packageMetadata.SearchPaths do
+        searchPaths.Add(packageBasePath + packageSearchPath.Path);
+    end;
   end;
 end;
 
@@ -540,6 +550,9 @@ var
   projectReferences : IList<TProjectReference>;
 
   resolvedPackages : IList<IPackageInfo>;
+  packagesToCompile : IList<IPackageInfo>;
+
+  compiledPackages : IList<IPackageInfo>;
   packageSearchPaths : IList<string>;
   dependencyGraph : IGraphNode;
   childNode : IGraphNode;
@@ -711,6 +724,7 @@ begin
     exit(false);
   end;
 
+  //get the package we were installing.
   packageInfo := resolvedPackages.FirstOrDefault(function(const info : IPackageInfo) : boolean
                                                  begin
                                                    result := SameText(info.Id, packageInfo.Id);
@@ -728,6 +742,8 @@ begin
   if not result then
     exit;
 
+  compiledPackages := TCollections.CreateList<IPackageInfo>;
+  packagesToCompile := TCollections.CreateList<IPackageInfo>(resolvedPackages);
   packageSearchPaths := TCollections.CreateList<string>;
   packageCompiler := FCompilerFactory.CreateCompiler(options.CompilerVersion, platform);
 
@@ -739,12 +755,10 @@ begin
         pkgInfo : IPackageInfo;
         spec : IPackageSpec;
         otherNodes : IList<IGraphNode>;
-        useSpecForSearchPaths : boolean;
       begin
         Assert(node.IsRoot = false, 'graph should not visit root node');
-        useSpecForSearchPaths := true;
 
-        pkgInfo := resolvedPackages.FirstOrDefault(
+        pkgInfo := packagesToCompile.FirstOrDefault(
           function(const value : IPackageInfo) : boolean
           begin
             result := SameText(value.Id, node.Id);
@@ -754,7 +768,7 @@ begin
           exit;
 
         //removing it so we don't process it again
-        resolvedPackages.Remove(pkgInfo);
+        packagesToCompile.Remove(pkgInfo);
 
         spec := packageSpecs[LowerCase(node.Id)];
         Assert(spec <> nil);
@@ -764,7 +778,7 @@ begin
           //we need to build the package.
           if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, node, spec) then
             raise Exception.Create('Comping package [' + pkgInfo.ToIdVersionString + '] failed.' );
-
+          compiledPackages.Add(pkgInfo);
           //compiling updates the node searchpaths and libpath, so just copy to any same package nodes
           otherNodes := dependencyGraph.FindNodes(node.Id);
           if otherNodes.Count > 1 then
@@ -775,7 +789,6 @@ begin
                                 otherNode.LibPath := node.LibPath;
                                 otherNode.BplPath := node.BplPath;
                              end);
-          useSpecForSearchPaths := false;
         end;
 
         if spec.TargetPlatform.DesignFiles.Any then
@@ -793,7 +806,7 @@ begin
     end;
   end;
 
-  if not CollectSearchPaths(resolvedPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
+  if not CollectSearchPaths(resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
     exit;
 
 
@@ -817,6 +830,7 @@ var
   projectPackageInfos : IList<IPackageInfo>;
   projectPackageInfo : IPackageInfo;
   resolvedPackages : IList<IPackageInfo>;
+  compiledPackages : IList<IPackageInfo>;
   packageSearchPaths : IList<string>;
   conflictDetect : IDictionary<string, TPackageVersion>;
   dependencyGraph : IGraphNode;
@@ -909,8 +923,10 @@ begin
 
   //TODO : Detect if anything has actually changed and only do this if we need to
   packageSearchPaths := TCollections.CreateList <string> ;
+  compiledPackages := TCollections.CreateList<IPackageInfo>;
 
-  if not CollectSearchPaths(resolvedPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
+
+  if not CollectSearchPaths(resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
     exit;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
@@ -932,6 +948,7 @@ var
   projectPackageInfos : IList<IPackageInfo>;
   projectPackageInfo : IPackageInfo;
   resolvedPackages : IList<IPackageInfo>;
+  compiledPackages : IList<IPackageInfo>;
   packageSpecs : IDictionary<string, IPackageSpec>;
   packageSearchPaths : IList<string>;
   conflictDetect : IDictionary<string, TPackageVersion>;
@@ -1039,7 +1056,7 @@ begin
   //TODO : Detect if anything has actually changed and only do this if we need to
   packageSearchPaths := TCollections.CreateList <string> ;
 
-  if not CollectSearchPaths(resolvedPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
+  if not CollectSearchPaths(resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
     exit;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
