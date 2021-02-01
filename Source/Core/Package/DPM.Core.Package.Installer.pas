@@ -72,7 +72,7 @@ type
     function GetCompilerVersionFromProjectFiles(const options : TInstallOptions; const projectFiles : TArray <string> ; const config : IConfiguration) : boolean;
 
 
-    function CompilePackage(const cancellationToken : ICancellationToken; const compiler : ICompiler; const packageInfo : IPackageInfo; const graphNode : IGraphNode; const packageSpec : IPackageSpec) : boolean;
+    function CompilePackage(const cancellationToken : ICancellationToken; const compiler : ICompiler; const packageInfo : IPackageInfo; const graphNode : IGraphNode; const packageSpec : IPackageSpec; const force : boolean) : boolean;
 
 
     function DoRestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration) : boolean;
@@ -127,6 +127,7 @@ uses
   System.Types,
   System.SysUtils,
   Spring.Collections.Extensions,
+  VSoft.AntPatterns,
   DPM.Core.Constants,
   DPM.Core.Compiler.BOM,
   DPM.Core.Utils.Path,
@@ -232,7 +233,7 @@ begin
   end;
 end;
 
-function TPackageInstaller.CompilePackage(const cancellationToken: ICancellationToken; const compiler: ICompiler; const packageInfo : IPackageInfo; const graphNode : IGraphNode; const packageSpec : IPackageSpec): boolean;
+function TPackageInstaller.CompilePackage(const cancellationToken: ICancellationToken; const compiler: ICompiler; const packageInfo : IPackageInfo; const graphNode : IGraphNode; const packageSpec : IPackageSpec; const force : boolean): boolean;
 var
   buildEntry : ISpecBuildEntry;
   packagePath : string;
@@ -242,13 +243,67 @@ var
   bomNode : IGraphNode;
   bomFile : string;
   childSearchPath : string;
+
+  procedure DoCopyFiles(const entry : ISpecBuildEntry);
+  var
+    copyEntry  : ISpecCopyEntry;
+    antPattern : IAntPattern;
+    fsPatterns : TArray<IFileSystemPattern>;
+    fsPattern : IFileSystemPattern;
+    searchBasePath : string;
+    files : TStringDynArray;
+    f : string;
+    destFile : string;
+  begin
+    for copyEntry in entry.CopyFiles do
+    begin
+      FLogger.Debug('Post Compile Copy [' + copyEntry.Source + ']..');
+      try
+        //note : this can throw if the source path steps outside of the base path.
+        searchBasePath := TPathUtils.StripWildCard(TPathUtils.CompressRelativePath(packagePath, copyEntry.Source));
+        searchBasePath := ExtractFilePath(searchBasePath);
+
+        antPattern := TAntPattern.Create(packagePath);
+        fsPatterns := antPattern.Expand(copyEntry.Source);
+        for fsPattern in fsPatterns do
+        begin
+          ForceDirectories(fsPattern.Directory);
+          files := TDirectory.GetFiles(fsPattern.Directory, fsPattern.FileMask, TSearchOption.soTopDirectoryOnly);
+          for f in files do
+          begin
+            //copy file to lib directory.
+            if copyEntry.flatten then
+              destFile := compiler.LibOutputDir + '\' + ExtractFileName(f)
+            else
+              destFile := compiler.LibOutputDir + '\' + TPathUtils.StripBase(searchBasePath, f);
+
+            ForceDirectories(ExtractFilePath(destFile));
+
+            //FLogger.Debug('Copying "' + f + '" to "' + destFile + '"');
+
+            TFile.Copy(f, destFile, true);
+
+          end;
+        end;
+      except
+        on e : Exception do
+        begin
+          FLogger.Error('Error copying files to lib folder : ' + e.Message);
+          raise;
+        end;
+      end;
+      FLogger.Debug('Post Compile Copy [' + copyEntry.Source + ']..');
+
+    end;
+  end;
+
 begin
   result := true;
 
   packagePath := FPackageCache.GetPackagePath(packageInfo);
   bomFile := TPath.Combine(packagePath, 'package.bom');
 
-  if FileExists(bomFile) then
+  if (not force) and FileExists(bomFile) then
   begin
     //Compare Bill of materials file against node dependencies to determine if we need to compile or not.
     //if the bom file exists that means it was compiled before. We will check that the bom matchs the dependencies
@@ -270,8 +325,7 @@ begin
 
   for buildEntry in packageSpec.TargetPlatform.BuildEntries do
   begin
-
-    FLogger.Debug('Compiling package : ' + buildEntry.Project);
+    FLogger.Information('Building package : ' + buildEntry.Project);
 
     projectFile := TPath.Combine(packagePath, buildEntry.Project);
     projectFile := TPathUtils.CompressRelativePath('',projectFile);
@@ -313,12 +367,15 @@ begin
       else
         compiler.SetSearchPaths(nil);
 
+      FLogger.Information('Building project [' + projectFile + '] for design time...');
       result := compiler.BuildProject(cancellationToken, projectFile, buildEntry.Config, true);
       if result then
-        FLogger.Success('Project [' + projectFile + '] Compiled for designtime Ok.', true);
-
-      if not result then
+        FLogger.Success('Ok.')
+      else
+      begin
+        FLogger.Error('Building project [' + projectFile + '] failed.');
         exit;
+      end;
 
     end
     else
@@ -348,14 +405,17 @@ begin
 
       result := compiler.BuildProject(cancellationToken, projectFile, buildEntry.Config);
       if result then
-        FLogger.Success('Project [' + projectFile + '] Compiled Ok.', true);
-
-      if not result then
+        FLogger.Success('Ok.')
+      else
+      begin
+        FLogger.Error('Building project [' + projectFile + '] failed.');
         exit;
+      end;
 
 
       if buildEntry.BuildForDesign and (compiler.Platform <> TDPMPlatform.Win32) then
       begin
+        FLogger.Information('Building project [' + projectFile + '] for design time support...');
         //if buildForDesign is true, then it means the design time bpl's also reference
         //this bpl, so if the platform isn't win32 then we need to build it for win32
         compiler.BPLOutputDir := TPath.Combine(compiler.BPLOutputDir, 'win32');
@@ -377,14 +437,18 @@ begin
 
         result := compiler.BuildProject(cancellationToken, projectFile, buildEntry.Config, true);
         if result then
-          FLogger.Success('Project [' + projectFile + '] Compiled for designtime Ok.', true);
-
-        if not result then
+          FLogger.Success('Project [' + projectFile + '] Compiled for designtime Ok.')
+        else
+        begin
+          FLogger.Error('Building project [' + projectFile + '] failed.');
           exit;
+        end;
+
 
       end;
 
-
+      if buildEntry.CopyFiles.Any then
+        DoCopyFiles(buildEntry);
 
     end;
 
@@ -755,6 +819,7 @@ begin
         pkgInfo : IPackageInfo;
         spec : IPackageSpec;
         otherNodes : IList<IGraphNode>;
+        forceCompile : boolean;
       begin
         Assert(node.IsRoot = false, 'graph should not visit root node');
 
@@ -767,6 +832,9 @@ begin
         if pkgInfo = nil then
           exit;
 
+        //only force compilation for the package we are actually installing, and only if force installing.
+        forceCompile := options.Force and SameText(pkgInfo.Id,options.PackageId);
+
         //removing it so we don't process it again
         packagesToCompile.Remove(pkgInfo);
 
@@ -776,7 +844,7 @@ begin
         if spec.TargetPlatform.BuildEntries.Any then
         begin
           //we need to build the package.
-          if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, node, spec) then
+          if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, node, spec, forceCompile) then
             raise Exception.Create('Comping package [' + pkgInfo.ToIdVersionString + '] failed.' );
           compiledPackages.Add(pkgInfo);
           //compiling updates the node searchpaths and libpath, so just copy to any same package nodes

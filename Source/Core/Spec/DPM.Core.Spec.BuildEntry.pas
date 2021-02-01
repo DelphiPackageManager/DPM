@@ -35,9 +35,26 @@ uses
   DPM.Core.Spec.Node;
 
 type
+  TSpecCopyEntry = class(TSpecNode, ISpecCopyEntry)
+  private
+    FSource : string;
+    FFlatten : boolean;
+
+
+  protected
+    function GetSource : string;
+    function GetFlatten : boolean;
+    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
+    function Clone : ISpecCopyEntry;
+  public
+    constructor CreateClone(const logger : ILogger; const source : string; const flatten : boolean); reintroduce;
+  public
+    constructor Create(const logger : ILogger); override;
+  end;
+
+
   TSpecBuildEntry = class(TSpecNode, ISpecBuildEntry)
   private
-    FLogger : ILogger;
     FBplOutputDir : string;
     FConfig : string;
     FLibOutputDir : string;
@@ -45,6 +62,7 @@ type
     FProject : string;
     FDesignOnly : boolean;
     FBuildForDesign : boolean;
+    FCopyFiles : IList<ISpecCopyEntry>;
   protected
     function GetConfig : string;
 
@@ -54,18 +72,20 @@ type
     function GetProject : string;
     function GetDesignOnly : boolean;
     function GetBuildForDesign : boolean;
-    procedure SetProject(const value : string);
+    function GetCopyFiles: IList<ISpecCopyEntry>;
 
+    procedure SetProject(const value : string);
     procedure SetLibOutputDir(const value : string);
     procedure SetBplOutputDir(const value : string);
     procedure SetId(const value : string);
     procedure SetDesignOnly(const value : boolean);
     procedure SetBuildForDesign(const value : boolean);
+
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function Clone : ISpecBuildEntry;
 
   public
-    constructor CreateClone(const logger : ILogger; const id, project, config, bpldir, libdir : string; const designOnly : boolean; const buildForDesign : boolean); reintroduce;
+    constructor CreateClone(const logger : ILogger; const id, project, config, bpldir, libdir : string; const designOnly : boolean; const buildForDesign : boolean; const copyFiles : IList<ISpecCopyEntry>); reintroduce;
   public
     constructor Create(const logger : ILogger); override;
 
@@ -77,16 +97,18 @@ implementation
 
 function TSpecBuildEntry.Clone : ISpecBuildEntry;
 begin
-  result := TSpecBuildEntry.CreateClone(logger, FId, FProject, FConfig, FBplOutputDir, FLibOutputDir, FDesignOnly, FBuildForDesign);
+  result := TSpecBuildEntry.CreateClone(logger, FId, FProject, FConfig, FBplOutputDir, FLibOutputDir, FDesignOnly, FBuildForDesign, FCopyFiles);
 end;
 
 constructor TSpecBuildEntry.Create(const logger : ILogger);
 begin
   inherited Create(logger);
-
+  FCopyFiles := TCollections.CreateList<ISpecCopyEntry>;
 end;
 
-constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const id, project, config, bpldir, libdir : string; const designOnly : boolean; const buildForDesign : boolean);
+constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const id, project, config, bpldir, libdir : string; const designOnly : boolean; const buildForDesign : boolean; const copyFiles : IList<ISpecCopyEntry>);
+var
+  copyEntry : ISpecCopyEntry;
 begin
   inherited Create(logger);
   FId := id;
@@ -96,6 +118,9 @@ begin
   FLibOutputDir := libdir;
   FDesignOnly   := designOnly;
   FBuildForDesign := buildForDesign;
+  FCopyFiles := TCollections.CreateList<ISpecCopyEntry>;
+  for copyEntry in copyFiles do
+    FCopyFiles.Add(copyEntry.Clone);
 end;
 
 function TSpecBuildEntry.GetLibOutputDir: string;
@@ -119,6 +144,11 @@ begin
 end;
 
 
+function TSpecBuildEntry.GetCopyFiles: IList<ISpecCopyEntry>;
+begin
+  result := FCopyFiles;
+end;
+
 function TSpecBuildEntry.GetDesignOnly: boolean;
 begin
   result := FDesignOnly;
@@ -137,19 +167,21 @@ begin
 end;
 
 function TSpecBuildEntry.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
+var
+  copyFilesArray : TJsonArray;
 begin
   result := true;
   FId := jsonObject.S['id'];
   if FId = '' then
   begin
-    FLogger.Error('Build Entry is missing required [id] property.');
+    Logger.Error('Build Entry is missing required [id] property.');
     result := false;
   end;
 
   FProject := jsonObject.S['project'];
   if FProject = '' then
   begin
-    FLogger.Error('Build Entry is missing required [project] property.');
+    Logger.Error('Build Entry is missing required [project] property.');
     result := false;
   end;
 
@@ -168,6 +200,16 @@ begin
   FDesignOnly     := jsonObject.B['designOnly'];
   FBuildForDesign := jsonObject.B['buildForDesign'];
 
+  if jsonObject.Contains('copyFiles') then
+  begin
+    copyFilesArray :=   jsonObject.A['copyFiles'];
+    LoadJsonCollection(copyFilesArray, TSpecCopyEntry,
+    procedure(const value : IInterface)
+    begin
+      FCopyFiles.Add(value as ISpecCopyEntry);
+    end);
+  end;
+
 end;
 
 procedure TSpecBuildEntry.SetLibOutputDir(const value: string);
@@ -185,6 +227,7 @@ begin
   FBuildForDesign := value;
 end;
 
+
 procedure TSpecBuildEntry.SetDesignOnly(const value: boolean);
 begin
   FDesignOnly := value;
@@ -198,6 +241,48 @@ end;
 procedure TSpecBuildEntry.SetProject(const value : string);
 begin
   FProject := value;
+end;
+
+{ TSpecCopyEntry }
+
+function TSpecCopyEntry.Clone: ISpecCopyEntry;
+begin
+  result := TSpecCopyEntry.CreateClone(Logger, FSource, FFlatten)
+end;
+
+constructor TSpecCopyEntry.Create(const logger: ILogger);
+begin
+  inherited Create(logger);
+
+end;
+
+constructor TSpecCopyEntry.CreateClone(const logger: ILogger;  const source: string; const flatten: boolean);
+begin
+  inherited Create(logger);
+  FSource := source;
+  FFlatten := flatten;
+end;
+
+function TSpecCopyEntry.GetFlatten: boolean;
+begin
+  result := FFlatten;
+end;
+
+function TSpecCopyEntry.GetSource: string;
+begin
+  result := FSource;
+end;
+
+function TSpecCopyEntry.LoadFromJson(const jsonObject: TJsonObject): Boolean;
+begin
+  result := true;
+  FSource := jsonObject.S['src'];
+  if FSource = '' then
+  begin
+    Logger.Error('Copy Entry is missing required [src] property.');
+    result := false;
+  end;
+  FFlatten := jsonObject.B['flatten'];
 end;
 
 end.

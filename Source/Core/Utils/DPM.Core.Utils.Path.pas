@@ -34,6 +34,8 @@ type
     class function IsRelativePath(const value : string) : boolean;
     class function CompressRelativePath(const basePath : string; path : string) : string;
     class function QuotePath(const value : string; const force : boolean = false) : string;
+    class function StripBase(const base : string; const fileName : string) : string;
+    class function StripWildCard(const value : string) : string;
   end;
 
 
@@ -209,6 +211,29 @@ begin
     result := value;
 
 end;
+
+class function TPathUtils.StripBase(const base : string; const fileName : string) : string;
+begin
+  if TStringUtils.StartsWith(fileName, base) then
+    result := Copy(fileName, Length(base) + 1, Length(fileName))
+  else
+    //it's below or outside the base path,
+    //there's no way to know what else to do
+    //but just use the filename, so it will
+    //end up in the root folder??
+    result := ExtractFileName(fileName);
+end;
+
+class function TPathUtils.StripWildCard(const value : string) : string;
+var
+  i : integer;
+begin
+  result := value;
+  i := Pos('*', value);
+  if i > 0 then
+    Delete(result, i, Length(result));
+end;
+
 
 end.
 

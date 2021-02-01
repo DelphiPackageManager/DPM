@@ -101,6 +101,7 @@ uses
 function TMSBuildCompiler.BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string; const forDesign : boolean) : Boolean;
 var
   commandLine : string;
+  env : IEnvironmentBlock;
 begin
   result := false;
   FBuildForDesign := forDesign;
@@ -108,11 +109,22 @@ begin
 
   FCompilerLogFile := TPath.GetTempFileName;
 
+
   commandLine := GetCommandLine(projectFile, configName);
+
+  {$IFDEF DEBUG}
+    //THE IDE set these, which makes it difficult to debug the command line version.
+    env := TEnvironmentBlockFactory.Create(nil, true);
+    env.RemoveVariable('BDS');
+    env.RemoveVariable('BDSLIB');
+    env.RemoveVariable('BDSINCLUDE');
+    env.RemoveVariable('BDSCOMMONDIR');
+  {$ELSE}
+    env := nil;
+  {$ENDIF}
   FLogger.Debug('Compler - cmdline : ' + commandLine);
   try
-
-    result := TProcess.Execute(cancellationToken, 'cmd.exe', commandLine) = 0;
+    result := TProcess.Execute2(cancellationToken, 'cmd.exe', commandLine,'',env) = 0;
   except
     on e : Exception do
     begin
@@ -124,9 +136,13 @@ begin
   //TODO : Doesn't give realtime feedback, remove when we have a CreateProcess version of TProcess.
   if TFile.Exists(FCompilerLogFile) then
   begin
-    FCompilerOutput.LoadFromFile(FCompilerLogFile);
+    if not result then
+    begin
+      FCompilerOutput.LoadFromFile(FCompilerLogFile);
+      FLogger.Debug(FCompilerOutput.Text);
+      FCompilerOutput.Clear;
+    end;
     TFile.Delete(FCompilerLogFile);
-    FLogger.Information(FCompilerOutput.Text);
   end;
 end;
 

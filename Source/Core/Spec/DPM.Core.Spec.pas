@@ -119,8 +119,7 @@ begin
     end
     else
     begin
-      existing := newBuildEntry.Clone;
-      targetPlatform.BuildEntries.Add(existing.Clone);
+      targetPlatform.BuildEntries.Add(newBuildEntry.Clone);
     end;
   end;
 end;
@@ -516,6 +515,8 @@ var
   buildEntryObj : TJsonObject;
   runtimeEntryObj : TJsonObject;
   designEntryObj : TJsonObject;
+  copyFileObj : TJsonObject;
+  i: Integer;
 begin
   result := '';
 
@@ -613,9 +614,17 @@ begin
         buildEntryObj['libOutputDir'] := buildEntry.LibOutputDir;
         buildEntryObj['designOnly']   := buildEntry.DesignOnly;
         buildEntryObj['buildForDesign']   := buildEntry.BuildForDesign;
+        if buildEntry.CopyFiles.Any then
+        begin
+          for i := 0 to buildEntry.CopyFiles.Count -1 do
+          begin
+            copyFileObj := buildEntryObj.A['copyFiles'].AddObject;
+            copyFileObj['src'] := buildEntry.CopyFiles[i].Source;
+            copyFileObj.B['flatten'] := buildEntry.CopyFiles[i].Flatten;
+          end;
+        end;
       end;
     end;
-
 
     result := Obj.ToJSON(False);
   finally

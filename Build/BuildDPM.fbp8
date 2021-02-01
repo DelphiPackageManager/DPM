@@ -13,9 +13,13 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
+          legalcopyright = "© 2019 -2020 Vincent Parrett and Contributors"
+          linkproductversion = false
+          minorversion = 1
           name = DPMVersion
-          productversion = 0.0.0.0
+          productname = "DPM Package Manager"
           productversionstring = 0.1.10-alpha
+          releaseversion = 10
         end
       end
       action.propertyset.setvalues
@@ -89,10 +93,12 @@ begin
         forcetype = ftString
         id = {89170321-B758-4743-A4EF-0C428531DB34}
         modifier = smNone
-        newvalue = "http://timestamp.verisign.com/scripts/timstamp.dll" +
+        newvalue = "http://timestamp.digicert.com" +
                    "http://timestamp.comodoca.com/authenticode" +
-                   "http://tsa.starfieldtech.com/" +
-                   "http://www.trustcenter.de/codesigning/timestamp"
+                   "http://timestamp.globalsign.com/?signature\=sha2" +
+                   "http://timestamp.sectigo.com" +
+                   "http://time.certum.pl" +
+                   "http://tsa.starfieldtech.com"
         variablename = TimestampAuth
       end
       action.group
@@ -832,7 +838,7 @@ begin
         terminateontimeout = true
         timeoutlength = 2
         as.projectpath = %SRC_ROOT%\\%ProjectFile%oj
-        as.compilerversion = XE2
+        as.compilerversion = 10.4
         as.verbosity = Normal
         as.nobanner = True
         action.script
@@ -860,7 +866,7 @@ begin
         compileridl = true
         configname = Release
         debugversionnumbers = false
-        delphiversion = DelphiXE2
+        delphiversion = Delphi10_4
         enabletimeout = false
         eurekalogverboselogging = false
         frameworktype = VCL
@@ -875,7 +881,7 @@ begin
         isprivate = false
         isspecial = false
         keepcfg = false
-        linkproductversiontofileversion = true
+        linkproductversiontofileversion = false
         locale = 3081
         majorversion = 0
         manifestfile = %SRC_ROOT%\\dpmManifest.xml
@@ -900,6 +906,8 @@ begin
         useversionfromdof = false
         verboseoutput = false
         versioninfokeys = "LegalCopyright\=© 2019 -2020 Vincent Parrett and Contributors" +
+                          "ProductName\=DPM Package Manager" +
+                          "ProductVersion\=0.1.10-alpha" +
                           ""
         versioninfopropertysetname = DPMVersion
         warningsaserror = false
@@ -982,6 +990,7 @@ begin
       end
       action.group
       begin
+        description = "Configure and call Signing"
         id = {4CCC5C6C-E37D-4759-BE0D-65D79F791B3F}
         variable
         begin
@@ -1369,5 +1378,6 @@ begin
     groupname = Signing
     name = TimestampAuth
     variablescope = vtProject
+    variabletype = btString
   end
 end

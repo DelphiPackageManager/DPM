@@ -165,6 +165,18 @@ type
     property SearchPaths : IList<ISpecSearchPath>read GetSearchPaths;
   end;
 
+  //post build copy operations for res, dfm etc
+  ISpecCopyEntry = interface(ISpecNode)
+  ['{F36D7156-0537-4BF4-9D51-E873B797FA27}']
+    function GetSource : string;
+    function GetFlatten : boolean;
+
+    function Clone : ISpecCopyEntry;
+
+    property Source : string read GetSource;
+    property Flatten : boolean read GetFlatten;
+  end;
+
   ISpecBuildEntry = interface(ISpecNode)
     ['{9E1850EB-40C4-421F-A47F-03FDD6286573}']
     function GetId : string;
@@ -174,6 +186,8 @@ type
     function GetLibOutputDir : string;
     function GetDesignOnly : boolean;
     function GetBuildForDesign : boolean;
+    function GetCopyFiles : IList<ISpecCopyEntry>;
+
 
     procedure SetId(const value : string);
     procedure SetProject(const value : string);
@@ -191,6 +205,7 @@ type
 
     property DesignOnly   : boolean read GetDesignOnly write SetDesignOnly;
     property BuildForDesign : boolean read GetBuildForDesign write SetBuildForDesign;
+    property CopyFiles : IList<ISpecCopyEntry> read GetCopyFiles;
   end;
 
 
