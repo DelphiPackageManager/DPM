@@ -39,19 +39,16 @@ type
   TSpecSearchPath = class(TSpecNode, ISpecSearchPath)
   private
     FPath : string;
-    FBinariesOnly : boolean;
     FSourceOnly : boolean;
   protected
-    function GetBinariesOnly : Boolean;
     function GetPath : string;
-    function GetSourceOnly : Boolean;
     procedure SetPath(const value : string);
 
     function IsGroup : Boolean; virtual;
     function Clone : ISpecSearchPath; virtual;
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
 
-    constructor CreateClone(const logger : ILogger; const path : string; const binariesOnly : boolean; const sourceOnly : boolean);
+    constructor CreateClone(const logger : ILogger; const path : string);
   public
     constructor Create(const logger : ILogger); override;
 
@@ -67,7 +64,7 @@ uses
 
 function TSpecSearchPath.Clone : ISpecSearchPath;
 begin
-  result := TSpecSearchPath.CreateClone(logger, FPath, FBinariesOnly, FSourceOnly);
+  result := TSpecSearchPath.CreateClone(logger, FPath);
 end;
 
 constructor TSpecSearchPath.Create(const logger : ILogger);
@@ -76,29 +73,19 @@ begin
 
 end;
 
-constructor TSpecSearchPath.CreateClone(const logger : ILogger; const path : string; const binariesOnly, sourceOnly : boolean);
+constructor TSpecSearchPath.CreateClone(const logger : ILogger; const path : string );
 begin
   inherited Create(logger);
   FPath := path;
-  FBinariesOnly := binariesOnly;
-  FSourceOnly := sourceOnly;
 
 end;
 
-function TSpecSearchPath.GetBinariesOnly : Boolean;
-begin
-  result := FBinariesOnly;
-end;
 
 function TSpecSearchPath.GetPath : string;
 begin
   result := FPath;
 end;
 
-function TSpecSearchPath.GetSourceOnly : Boolean;
-begin
-  result := FSourceOnly;
-end;
 
 function TSpecSearchPath.IsGroup : Boolean;
 begin
@@ -115,10 +102,6 @@ begin
     result := false;
     Logger.Error('Required property [path] not found');
   end;
-
-  FBinariesOnly := jsonObject.B['binariesOnly'];
-  FSourceOnly := jsonObject.B['sourceOnly'];
-
 end;
 
 procedure TSpecSearchPath.SetPath(const value : string);

@@ -523,6 +523,8 @@ function TProjectEditor.LoadPackageRefences : boolean;
     range : TVersionRange;
     dupList : IList<IPackageReference>;
     sXPath : string;
+    useSource : boolean;
+    sUseSource : string;
   begin
     isTransitive := parentReference <> nil;
 
@@ -578,6 +580,18 @@ function TProjectEditor.LoadPackageRefences : boolean;
           end;
         end;
 
+        //if the parent reference is using source then we must use source for transient references.
+        if parentReference.UseSource then
+          useSource := true
+        else if packageElement.getAttributeNode('useSource') <> nil then
+        begin
+          sUseSource := packageElement.getAttribute('useSource');
+          useSource := StrToBoolDef(sUseSource, false);
+        end
+        else
+          useSource := false;
+
+
         //check for duplicate references
         if isTransitive then
           dupList := parentReference.Dependencies
@@ -620,7 +634,7 @@ function TProjectEditor.LoadPackageRefences : boolean;
             exit;
           end;
         end;
-        packageReference := TPackageReference.Create(id, version, platform, FCompiler, range, isTransitive);
+        packageReference := TPackageReference.Create(id, version, platform, FCompiler, range, isTransitive,useSource);
         if isTransitive then
           parentReference.Dependencies.Add(packageReference)
         else

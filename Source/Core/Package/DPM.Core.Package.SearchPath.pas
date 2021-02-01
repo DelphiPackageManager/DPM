@@ -36,41 +36,25 @@ uses
 type
   TPackageSearchPath = class(TInterfacedObject, IPackageSearchPath)
   private
-    FBinariesOnly: Boolean;
     FPath: string;
-    FSourceOnly: Boolean;
   protected
-    function GetBinariesOnly: Boolean;
     function GetPath: string;
-    function GetSourceOnly: Boolean;
   public
-    constructor Create(const path : string; const sourceOnly : boolean; const binOnly : boolean);
+    constructor Create(const path : string);
   end;
 
 implementation
 
 { TPackageSearchPath }
 
-constructor TPackageSearchPath.Create(const path: string; const sourceOnly, binOnly: boolean);
+constructor TPackageSearchPath.Create(const path: string);
 begin
   FPath := path;
-  FBinariesOnly := binOnly;
-  FSourceOnly := sourceOnly;
-end;
-
-function TPackageSearchPath.GetBinariesOnly: Boolean;
-begin
-  result := FBinariesOnly;
 end;
 
 function TPackageSearchPath.GetPath: string;
 begin
   result := FPath;
-end;
-
-function TPackageSearchPath.GetSourceOnly: Boolean;
-begin
-  result := FSourceOnly;
 end;
 
 end.

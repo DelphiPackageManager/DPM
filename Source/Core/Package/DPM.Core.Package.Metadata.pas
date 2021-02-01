@@ -251,7 +251,7 @@ begin
 
   for specSearchPath in spec.TargetPlatform.SearchPaths do
   begin
-    searchPath := TPackageSearchPath.Create(specSearchPath.Path, specSearchPath.BinariesOnly, specSearchPath.SourceOnly);
+    searchPath := TPackageSearchPath.Create(specSearchPath.Path);
     FSearchPaths.Add(searchPath);
   end;
 end;

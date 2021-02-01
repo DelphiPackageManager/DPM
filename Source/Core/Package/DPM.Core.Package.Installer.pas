@@ -533,7 +533,7 @@ var
   childRef : IPackageReference;
 begin
   childNode := parentNode.AddChildNode(packageReference.Id, packageReference.Version, packageReference.Range);
-
+  childNode.UseSource := parentNode.UseSource or packageReference.UseSource;
   if (packageReference.Dependencies <> nil) and (packageReference.Dependencies.Any) then
   begin
     for childRef in packageReference.Dependencies do
@@ -556,7 +556,7 @@ begin
 
   for childNode in parentNode.ChildNodes do
   begin
-    packageRef := TPackageReference.Create(childNode.Id, childNode.SelectedVersion, platform, compilerVersion, childNode.SelectedOn, not childNode.IsTopLevel);
+    packageRef := TPackageReference.Create(childNode.Id, childNode.SelectedVersion, platform, compilerVersion, childNode.SelectedOn, not childNode.IsTopLevel, parentNode.UseSource);
     if childNode.IsTopLevel then
       packageReferences.Add(packageRef)
     else

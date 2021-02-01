@@ -49,6 +49,7 @@ type
     function GetDependencies : IList<IPackageReference>;
     procedure SetVersion(const value : TPackageVersion);
     function GetHasDependencies : boolean;
+    function GetUseSource : boolean;
 
     property Id : string read GetId;
     property Version : TPackageVersion read GetVersion write SetVersion;
@@ -57,6 +58,7 @@ type
     property IsTransitive : boolean read GetIsTransitive;
     property Dependencies : IList<IPackageReference> read GetDependencies;
     property HasDependencies : boolean read GetHasDependencies;
+    property UseSource : boolean read GetUseSource;
   end;
 
 

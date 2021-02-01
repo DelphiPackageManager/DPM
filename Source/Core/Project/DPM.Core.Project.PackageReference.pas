@@ -45,6 +45,7 @@ type
     FRange    : TVersionRange;
     FIsTransitive : boolean;
     FDependencies : IList<IPackageReference>;
+    FUseSource : boolean;
   protected
     function GetId: string;
     function GetVersion: TPackageVersion;
@@ -55,9 +56,9 @@ type
     function GetRange: TVersionRange;
     function GetCompilerVersion: TCompilerVersion;
     function GetHasDependencies: Boolean;
-
+    function GetUseSource : boolean;
   public
-    constructor Create(const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const range : TVersionRange; const isTransitive : boolean);
+    constructor Create(const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const range : TVersionRange; const isTransitive : boolean; const useSource : boolean);
     function ToIdVersionString: string;
     function ToString : string;override;
   end;
@@ -66,7 +67,7 @@ implementation
 
 { TPackageRefence }
 
-constructor TPackageReference.Create(const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const range : TVersionRange; const isTransitive : boolean);
+constructor TPackageReference.Create(const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const range : TVersionRange; const isTransitive : boolean; const useSource : boolean);
 begin
   FId := id;
   FVersion := version;
@@ -75,6 +76,7 @@ begin
   FRange := range;
   FIsTransitive := isTransitive;
   FDependencies := nil; //TCollections.CreateList<IPackageReference>;
+  FUseSource := useSource;
 end;
 
 function TPackageReference.GetCompilerVersion: TCompilerVersion;
@@ -112,6 +114,11 @@ end;
 function TPackageReference.GetRange: TVersionRange;
 begin
   result := FRange;
+end;
+
+function TPackageReference.GetUseSource: boolean;
+begin
+  result := FUseSource;
 end;
 
 function TPackageReference.GetVersion: TPackageVersion;

@@ -91,12 +91,8 @@ type
   IPackageSearchPath = interface
     ['{55B09D0C-01E4-4FF3-977F-98A1A57B62B1}']
     function GetPath : string;
-    function GetSourceOnly : boolean;
-    function GetBinariesOnly : boolean;
 
     property Path : string read GetPath;
-    property BinariesOnly : boolean read GetBinariesOnly;
-    property SourceOnly : boolean read GetSourceOnly;
   end;
 
 

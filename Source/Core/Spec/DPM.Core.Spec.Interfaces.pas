@@ -143,16 +143,12 @@ type
   ISpecSearchPath = interface(ISpecNode)
     ['{493371C5-CD82-49EF-9D2A-BA7C4CFA2550}']
     function GetPath : string;
-    function GetSourceOnly : boolean;
-    function GetBinariesOnly : boolean;
     procedure SetPath(const value : string);
 
     function IsGroup : boolean;
     function Clone : ISpecSearchPath;
 
     property Path : string read GetPath write SetPath;
-    property BinariesOnly : boolean read GetBinariesOnly;
-    property SourceOnly : boolean read GetSourceOnly;
   end;
 
 

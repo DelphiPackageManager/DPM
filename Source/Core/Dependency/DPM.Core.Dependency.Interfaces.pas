@@ -60,11 +60,14 @@ type
     procedure SetLibPath(const value : string);
     function GetBplPath : string;
     procedure SetBplPath(const value : string);
+    procedure SetUseSource(const value : boolean);
 
 
     function GetChildNodes : IEnumerable<IGraphNode>;
 
     function GetPlatform : TDPMPlatform;
+    function GetUseSource : boolean;
+
 
     function AddChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
     //Breadth first search
@@ -91,6 +94,7 @@ type
     property ChildNodes : IEnumerable<IGraphNode>read GetChildNodes;
     property Parent : IGraphNode read GetParent;
     property Platform : TDPMPlatform read GetPlatform;
+    property UseSource : boolean read GetUseSource write SetUseSource;
 
     //build support
     property SearchPaths : IList<string> read GetSearchPaths;

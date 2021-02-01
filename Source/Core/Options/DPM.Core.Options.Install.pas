@@ -43,6 +43,7 @@ type
     FProjectPath : string;
     FFloat : boolean;
     FForce : boolean;
+    FUseSource : boolean;
     class var
       FDefault : TInstallOptions;
   protected
@@ -61,6 +62,7 @@ type
     property ProjectPath : string read FProjectPath write FProjectPath;
     property VersionString : string read FVersionString write FVersionString;
     property Force : boolean read FForce write FForce;
+    property UseSource : boolean read FUseSource write FUseSource;
   end;
 
 implementation

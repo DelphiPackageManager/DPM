@@ -569,8 +569,6 @@ begin
       begin
         seachPathObj := targetPlatformObject.A['searchPaths'].AddObject;
         seachPathObj['path'] := searchPath.Path;
-        seachPathObj['sourceOnly'] := LowerCase(BoolToStr(searchPath.SourceOnly, true));
-        seachPathObj['binariesOnly'] := LowerCase(BoolToStr(searchPath.BinariesOnly, true));
       end;
     end;
 

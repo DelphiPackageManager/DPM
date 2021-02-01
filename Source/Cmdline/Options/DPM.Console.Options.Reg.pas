@@ -240,6 +240,12 @@ begin
     end);
   option.HasValue := false;
 
+  option := cmd.RegisterOption<boolean>('useSource','us', 'Reference package source rather than compiling it.',
+   procedure(const value : boolean)
+    begin
+      TInstallOptions.Default.UseSource := value;
+    end);
+  option.HasValue := false;
 
 
   cmd.Examples.Add('install VSoft.CommandLine');

@@ -81,7 +81,7 @@ begin
       version := TPackageVersion.Parse(sVersion);
       platform := StringToDPMPlatform(jsonObj.S['platform']);
 
-      result := TGraphNode.Create(nil,sId, version, platform, TVersionRange.Empty);
+      result := TGraphNode.Create(nil,sId, version, platform, TVersionRange.Empty,false);
 
       if jsonObj.Contains('dependencies') then
       begin

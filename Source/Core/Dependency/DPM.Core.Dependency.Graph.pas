@@ -60,6 +60,7 @@ type
     FVersion : TPackageVersion;
     FPlatform : TDPMPlatform;
     FSelectedOn : TVersionRange;
+    FUseSource : boolean;
     FLevel : integer;
     FSearchPaths : IList<string>;
     FLibPath : string;
@@ -92,10 +93,13 @@ type
     procedure VisitDFS(const visitor : TNodeVisitProc);
     procedure Prune(const id : string);
     function AreEqual(const otherNode : IGraphNode; const depth : integer = 1) : boolean;
+    function GetUseSource: Boolean;
+    procedure SetUseSource(const value: Boolean);
   public
-    constructor Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const selectedOn : TVersionRange);
+    constructor Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const selectedOn : TVersionRange; const useSource : boolean);
     constructor CreateRoot(const platform : TDPMPlatform);
     destructor Destroy;override;
+
 
   end;
 
@@ -125,7 +129,7 @@ begin
     parent := parent.Parent;
   end;
 
-  result := TGraphNode.Create(self, id, version, FPlatform, selectedOn);
+  result := TGraphNode.Create(self, id, version, FPlatform, selectedOn, false);
   FChildNodes.Add(LowerCase(id), result);
 end;
 
@@ -163,7 +167,7 @@ begin
 
 end;
 
-constructor TGraphNode.Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const selectedOn : TVersionRange);
+constructor TGraphNode.Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const selectedOn : TVersionRange; const useSource : boolean);
 begin
   FSearchPaths := TCollections.CreateList<string>;
   FLevel := 0;
@@ -183,13 +187,14 @@ begin
   FVersion := version;
   FPlatform := platform;
   FSelectedOn := selectedOn;
+  FUseSource := useSource;
 
   FChildNodes := TCollections.CreateSortedDictionary < string, IGraphNode > ();
 end;
 
 constructor TGraphNode.CreateRoot(const platform : TDPMPlatform);
 begin
-  Create(nil, 'root', TPackageVersion.Empty, platform, TVersionRange.Empty);
+  Create(nil, 'root', TPackageVersion.Empty, platform, TVersionRange.Empty, false);
 end;
 
 destructor TGraphNode.Destroy;
@@ -301,6 +306,11 @@ begin
   result := FVersion;
 end;
 
+function TGraphNode.GetUseSource: Boolean;
+begin
+  result := FUseSource;
+end;
+
 function TGraphNode.HasChildren : boolean;
 begin
   result := FChildNodes.Any;
@@ -363,6 +373,11 @@ end;
 procedure TGraphNode.SetSelectedVersion(const value : TPackageVersion);
 begin
   FVersion := value;
+end;
+
+procedure TGraphNode.SetUseSource(const value: Boolean);
+begin
+  FUseSource := value;
 end;
 
 procedure TGraphNode.VisitDFS(const visitor : TNodeVisitProc);
