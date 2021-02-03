@@ -64,6 +64,7 @@ type
     FOpenRequirements : IQueue<IPackageInfo>;
     FVersionCache : IDictionary<string, IList<IPackageInfo>>;
     FPlatform : TDPMPlatform;
+    FCompilerVersion : TCompilerVersion;
   protected
     procedure RecordNoGood(const bad : IPackageInfo);
     function IsNoGood(const package : IPackageInfo) : boolean;
@@ -82,7 +83,7 @@ type
     function BuildDependencyGraph : IGraphNode;
   public
     constructor Create(const logger : ILogger; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>);overload;
-    constructor Create(const logger : ILogger; const platform : TDPMPlatform; const projectReferences : IList<TProjectReference>);overload;
+    constructor Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectReferences : IList<TProjectReference>);overload;
   end;
 
 implementation
@@ -136,7 +137,7 @@ var
   end;
 
 begin
-  result := TGraphNode.CreateRoot(FPlatform);
+  result := TGraphNode.CreateRoot(FCompilerVersion, FPlatform);
   toplevelPackages := FResolved.Values.Where(function(const value : IResolution) : boolean
     begin
       result := value.ParentId = cRoot;
@@ -146,10 +147,11 @@ begin
     AddNode(result, topLevelPackage.Package, TVersionRange.Empty);
 end;
 
-constructor TResolverContext.Create(const logger: ILogger; const platform: TDPMPlatform; const projectReferences: IList<TProjectReference>);
+constructor TResolverContext.Create(const logger: ILogger; const compilerVersion : TCompilerVersion; const platform: TDPMPlatform; const projectReferences: IList<TProjectReference>);
 var
   projectReference : TProjectReference;
 begin
+  FCompilerVersion := compilerVersion;
   FPlatform := platform;
   FLogger := logger;
   FNoGoods := TCollections.CreateDictionary < string, IDictionary<TPackageVersion, byte> > ;
@@ -171,7 +173,7 @@ end;
 constructor TResolverContext.Create(const logger : ILogger; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>);
 begin
   Assert(newPackage <> nil);
-  Create(logger,newPackage.Platform, projectReferences);
+  Create(logger, newPackage.CompilerVersion, newPackage.Platform, projectReferences);
   PushRequirement(newPackage);
   RecordResolution(newPackage, TVersionRange.Empty, cRoot);
 end;

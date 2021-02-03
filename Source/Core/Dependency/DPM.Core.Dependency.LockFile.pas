@@ -88,7 +88,7 @@ var
   begin
     if level > 0 then
       space := StringOfChar(' ', level);
-    sList.Add(space + node.Id + ':' + node.SelectedVersion.ToStringNoMeta);
+    sList.Add(space + node.Id + ':' + node.Version.ToStringNoMeta);
     if node.HasChildren then
     begin
       Inc(level);

@@ -33,6 +33,7 @@ uses
   System.Generics.Defaults,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
+  DPM.Core.Dependency.Interfaces,
   DPM.Core.Package.Interfaces;
 
 {$SCOPEDENUMS ON}
@@ -86,7 +87,7 @@ type
     function GetCompilerVersion : TCompilerVersion;
     function GetPlatforms : TDPMPlatforms;
     function GetProjectVersion : string;
-    function GetPackageReferences : IList<IPackageReference>;
+    //function GetPackageReferences : IList<IGraphNode>;
     function GetAppType : TAppType;
     function GetHasPackages : boolean;
     procedure SetCompiler(const value : TCompilerVersion);
@@ -95,14 +96,16 @@ type
     procedure Reset;
 
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string>; const packageCacheLocation : string) : boolean;
-    procedure UpdatePackageReferences(const packageReferences : IList<IPackageReference>; const platform : TDPMPlatform);
+    procedure UpdatePackageReferences(const dependencyGraph : IGraphNode; const platform : TDPMPlatform);
+
+    function GetPackageReferences(const platform : TDPMPlatform) : IGraphNode;
 
     function SaveProject(const fileName : string = '') : boolean;
 
     property CompilerVersion : TCompilerVersion read GetCompilerVersion write SetCompiler;
     property ProjectVersion  : string read GetProjectVersion;
     property Platforms : TDPMPlatforms read GetPlatforms;
-    property PackageReferences : IList<IPackageReference> read GetPackageReferences;
+//    property PackageReferences : IList<IGraphNode> read GetPackageReferences;
     property AppType : TAppType read GetAppType;
     property HasPackages : boolean read GetHasPackages;
 

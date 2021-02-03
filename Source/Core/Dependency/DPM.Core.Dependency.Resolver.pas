@@ -94,7 +94,7 @@ end;
 /// This a simple depth first search with backtracking. It records unresolvable paths (nogoods) to avoid searching those again
 /// When a conflict is found, it tries to resolve that by finding an overlapping dependency version range between the new
 /// dependency range and the one already resolved. If found then it will undo the previous resolution and push it back on
-/// the stack to be redone. If not then we have an unresolvable conflict and exit.
+/// the stack to be redone with the overlapping range. If not then we have an unresolvable conflict and exit.
 ///
 /// Note that top level (non transient) dependencies always win out in conflicts with transient dependencies.
 /// A small optimisation is to sort the dependencies by the width of their dependency version range and
@@ -290,7 +290,7 @@ function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancel
 var
   context : IResolverContext;
 begin
-  context := TResolverContext.Create(FLogger, platform, projectReferences);
+  context := TResolverContext.Create(FLogger, options.CompilerVersion,  platform, projectReferences);
   result := DoResolve(cancellationToken, options, context, compilerVersion, platform);
   resolved := context.GetResolvedPackages;
   dependencyGraph := context.BuildDependencyGraph;

@@ -81,7 +81,8 @@ begin
       version := TPackageVersion.Parse(sVersion);
       platform := StringToDPMPlatform(jsonObj.S['platform']);
 
-      result := TGraphNode.Create(nil,sId, version, platform, TVersionRange.Empty,false);
+      //we don't need the compiler version for this - if that changes we will need to pass it it.
+      result := TGraphNode.Create(nil,sId, version, platform, TCompilerVersion.UnknownVersion, TVersionRange.Empty,false);
 
       if jsonObj.Contains('dependencies') then
       begin
@@ -116,7 +117,7 @@ begin
   try
     try
       jsonObj.S['id'] := graphNode.Id;
-      jsonObj.S['version'] := graphNode.SelectedVersion.ToStringNoMeta;
+      jsonObj.S['version'] := graphNode.Version.ToStringNoMeta;
       jsonObj.S['platform'] := DPMPlatformToString(graphNode.Platform);
       if graphNode.HasChildren then
       begin
@@ -127,7 +128,7 @@ begin
           begin
             depObj := jsonObj.A['dependencies'].AddObject;
             depObj.S['id'] := childNode.Id;
-            depObj.S['version'] := childNode.SelectedVersion.ToStringNoMeta;
+            depObj.S['version'] := childNode.Version.ToStringNoMeta;
           end);
       end;
       jsonObj.SaveToFile(fileName, false, TEncoding.UTF8);

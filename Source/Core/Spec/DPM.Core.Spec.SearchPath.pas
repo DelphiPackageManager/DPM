@@ -39,7 +39,6 @@ type
   TSpecSearchPath = class(TSpecNode, ISpecSearchPath)
   private
     FPath : string;
-    FSourceOnly : boolean;
   protected
     function GetPath : string;
     procedure SetPath(const value : string);
