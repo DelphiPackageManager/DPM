@@ -42,7 +42,6 @@ type
     FNoCache : boolean;
     FProjectPath : string;
     FFloat : boolean;
-    FForce : boolean;
     FUseSource : boolean;
     class var
       FDefault : TInstallOptions;
@@ -61,7 +60,6 @@ type
     property PackageFile : string read FPackageFile write FPackageFile;
     property ProjectPath : string read FProjectPath write FProjectPath;
     property VersionString : string read FVersionString write FVersionString;
-    property Force : boolean read FForce write FForce;
     property UseSource : boolean read FUseSource write FUseSource;
   end;
 
@@ -94,7 +92,7 @@ begin
   FNoCache := original.FNoCache;
   FProjectPath := original.FProjectPath;
   FFloat := original.FFloat;
-  FForce := original.FForce;
+  Force := original.Force;
 end;
 
 class constructor TInstallOptions.CreateDefault;

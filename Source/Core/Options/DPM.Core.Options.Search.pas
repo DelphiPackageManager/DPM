@@ -47,6 +47,7 @@ type
     FCommercial : boolean;
     FTrial : boolean;
     FIncludeDelisted : boolean;
+    FForce : boolean;
   protected
     FExact : boolean;
     constructor CreateClone(const original : TSearchOptions); reintroduce;
@@ -69,6 +70,8 @@ type
     property Platforms : TDPMPlatforms read FPlatforms write FPlatforms;
     property Version : TPackageVersion read FVersion write FVersion;
     property Exact : boolean read FExact write FExact; //search term is a package id.
+    property Force : boolean read FForce write FForce; //needed by the package installer.
+
   end;
 
 implementation

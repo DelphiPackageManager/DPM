@@ -509,10 +509,6 @@ begin
 end;
 
 function TProjectEditor.LoadPackageRefences : boolean;
-var
-  topLevelNodes : IXMLDOMNodeList;
-  topLevelElement : IXMLDOMElement;
-  n : integer;
 
   procedure ReadPackageReferences(const parentReference : IGraphNode; const parentElement : IXMLDOMElement);
   var
@@ -526,7 +522,6 @@ var
     error : string;
     sPlatform : string;
     platform : TDPMPlatform;
-    packageReference : IGraphNode;
     sRange : string;
     range : TVersionRange;
     dupCheckNode : IGraphNode;
@@ -534,7 +529,6 @@ var
     useSource : boolean;
     sUseSource : string;
     newNode : IGraphNode;
-
     rootNode : IGraphNode;
   begin
     isTransitive := parentReference <> nil;
@@ -550,6 +544,7 @@ var
     begin
       for i := 0 to packageNodes.length - 1 do
       begin
+        rootNode := nil;
         packageElement := packageNodes.item[i] as IXMLDOMElement;
         if packageElement.getAttributeNode('id') <> nil then
         begin
@@ -623,17 +618,16 @@ var
 
         //check for duplicate references
         if isTransitive then
-          dupCheckNode := rootNode
+          dupCheckNode := parentReference
         else
-          dupCheckNode := parentReference;
+          dupCheckNode := rootNode;
 
         if dupCheckNode.FindChild(id) <> nil then
         begin
           if parentReference <> nil then
-            FLogger.Error('Duplicate package reference for package [' + id + '  ' + DPMPlatformToString(platform) + '] under [' + parentReference.Id + ']')
+            raise Exception.Create('Duplicate package reference for package [' + id + '  ' + DPMPlatformToString(platform) + '] under [' + parentReference.Id + ']')
           else
-            FLogger.Error('Duplicate package reference for package [' + id + '  ' + DPMPlatformToString(platform) + ']');
-          exit;
+            raise Exception.Create('Duplicate package reference for package [' + id + '  ' + DPMPlatformToString(platform) + ']');
         end;
 
 
@@ -667,34 +661,17 @@ var
         end
         else
         begin
-          rootNode.AddChildNode(id, version, TVersionRange.Empty);
+          newNode := rootNode.AddChildNode(id, version, TVersionRange.Empty);
           newNode.UseSource := useSource;
         end;
-        ReadPackageReferences(packageReference, packageElement);
+        ReadPackageReferences(newNode, packageElement);
       end;
     end;
   end;
 
 begin
   result := true;
-  topLevelNodes := FProjectXML.documentElement.selectNodes(packageReferencesXPath);
-  if topLevelNodes.length > 0 then
-  begin
-    for n := 0 to topLevelNodes.length -1 do
-    begin
-      topLevelElement := topLevelNodes.item[n] as IXMLDOMElement;
-      ReadPackageReferences(nil,FProjectXML.documentElement );
-    end;
-
-
-
-  end;
-
-//  FPackageRefences.Clear;
-//  ReadPackageReferences(nil, FProjectXML.documentElement);
-
-
-
+  ReadPackageReferences(nil, FProjectXML.documentElement );
 
 end;
 
@@ -899,7 +876,7 @@ begin
   end;
 
   for topLevelNode in dependencyGraph.ChildNodes do
-        WritePackageReference(dpmElement, topLevelNode);
+    WritePackageReference(dpmElement, topLevelNode);
 
 end;
 

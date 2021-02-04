@@ -60,6 +60,8 @@ type
     FCompilerFactory : ICompilerFactory;
   protected
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
+    function CreateProjectRefs(const cancellationToken: ICancellationToken; const node: IGraphNode; const seenPackages: IDictionary<string, byte>;
+                               const projectReferences: IList<TProjectReference>): boolean;
 
     function CollectSearchPaths(const resolvedPackages : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
 
@@ -74,7 +76,9 @@ type
 
     function CompilePackage(const cancellationToken : ICancellationToken; const compiler : ICompiler; const packageInfo : IPackageInfo; const graphNode : IGraphNode; const packageSpec : IPackageSpec; const force : boolean) : boolean;
 
-    function BuildDependencies(const cancellationToken : ICancellationToken; const packageCompiler : ICompiler; const projectPackageGraph : IGraphNode; const packagesToCompile : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; packageSpecs : IDictionary<string, IPackageSpec>) : boolean;
+    function BuildDependencies(const cancellationToken : ICancellationToken; const packageCompiler : ICompiler; const projectPackageGraph : IGraphNode;
+                               const packagesToCompile : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; packageSpecs : IDictionary<string, IPackageSpec>;
+                               const force : boolean = false; const forcePackageId : string = '') : boolean;
 
 
     function DoRestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration) : boolean;
@@ -531,6 +535,39 @@ begin
 end;
 
 
+function TPackageInstaller.CreateProjectRefs(const cancellationToken : ICancellationToken; const node : IGraphNode; const seenPackages : IDictionary<string, byte>; const projectReferences : IList<TProjectReference>) : boolean;
+var
+  child : IGraphNode;
+  info : IPackageInfo;
+  projectRef : TProjectReference;
+begin
+  result := true;
+  if not node.IsRoot then
+  begin
+    if seenPackages.ContainsKey(LowerCase(node.Id)) then
+      exit;
+    info := GetPackageInfo(cancellationToken, node);
+    if info = nil then
+    begin
+      FLogger.Error('Unable to resolve package : ' + node.ToString);
+      exit(false);
+    end;
+    projectRef.Package := info;
+    projectRef.VersionRange := node.SelectedOn;
+    projectRef.ParentId := node.Parent.id;
+    seenPackages[LowerCase(node.Id)] := 0;
+    projectReferences.Add(projectRef);
+  end;
+  if node.HasChildren then
+    for child in node.ChildNodes do
+    begin
+      result := CreateProjectRefs(cancellationToken,child, seenPackages, projectReferences);
+      if not result then
+        exit;
+    end;
+end;
+
+
 function TPackageInstaller.DoInstallPackage(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration) : boolean;
 var
   newPackageIdentity : IPackageIdentity;
@@ -541,7 +578,6 @@ var
   projectPackageGraph : IGraphNode;
 
 
-  packageReferences : IList<IGraphNode>;
   packageSpecs : IDictionary<string, IPackageSpec>;
 
   projectReferences : IList<TProjectReference>;
@@ -556,39 +592,6 @@ var
   packageCompiler : ICompiler;
 
   seenPackages : IDictionary<string, byte>;
-
-  function CreateProjectRefs(const node : IGraphNode) : boolean;
-  var
-    child : IGraphNode;
-    info : IPackageInfo;
-    projectRef : TProjectReference;
-  begin
-    result := true;
-    if not node.IsRoot then
-    begin
-      if seenPackages.ContainsKey(node.Id.ToLower) then
-        exit;
-      info := GetPackageInfo(cancellationToken, node);
-      if info = nil then
-      begin
-        FLogger.Error('Unable to resolve package : ' + node.ToString);
-        exit(false);
-      end;
-      projectRef.Package := info;
-      projectRef.VersionRange := node.SelectedOn;
-      projectRef.ParentId := node.Parent.id;
-      seenPackages[node.Id.ToLower] := 0;
-      projectReferences.Add(projectRef);
-    end;
-    if node.HasChildren then
-      for child in node.ChildNodes do
-      begin
-        result := CreateProjectRefs(child);
-        if not result then
-          exit;
-      end;
-  end;
-
 begin
   result := false;
 
@@ -666,13 +669,12 @@ begin
   projectReferences := TCollections.CreateList<TProjectReference>;
 
   //TODO : Can packagerefs be replaced by just adding the info to the nodes?
-  CreateProjectRefs(projectPackageGraph);
+  if not CreateProjectRefs(cancellationtoken, projectPackageGraph, seenPackages, projectReferences) then
+    exit;
 
   result := FDependencyResolver.ResolveForInstall(cancellationToken, options, packageInfo, projectReferences, projectPackageGraph, packageInfo.CompilerVersion, platform, resolvedPackages);
   if not result then
     exit;
-
-  //TODO : The code from here on is the same for install/uninstall/restore - refactor!!!
 
   if resolvedPackages = nil then
   begin
@@ -703,77 +705,14 @@ begin
   packageSearchPaths := TCollections.CreateList<string>;
   packageCompiler := FCompilerFactory.CreateCompiler(options.CompilerVersion, platform);
 
-  try
-    //build the dependency graph in the correct order.
-    projectPackageGraph.VisitDFS(
-      procedure(const node : IGraphNode)
-      var
-        pkgInfo : IPackageInfo;
-        spec : IPackageSpec;
-        otherNodes : IList<IGraphNode>;
-        forceCompile : boolean;
-      begin
-        Assert(node.IsRoot = false, 'graph should not visit root node');
-
-        pkgInfo := packagesToCompile.FirstOrDefault(
-          function(const value : IPackageInfo) : boolean
-          begin
-            result := SameText(value.Id, node.Id);
-          end);
-        //if it's not found that means we have already processed the package elsewhere in the graph
-        if pkgInfo = nil then
-          exit;
-
-        //only force compilation for the package we are actually installing, and only if force installing.
-        forceCompile := options.Force and SameText(pkgInfo.Id,options.PackageId);
-
-        //removing it so we don't process it again
-        packagesToCompile.Remove(pkgInfo);
-
-        spec := packageSpecs[LowerCase(node.Id)];
-        Assert(spec <> nil);
-
-        if spec.TargetPlatform.BuildEntries.Any then
-        begin
-          //we need to build the package.
-          if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, node, spec, forceCompile) then
-            raise Exception.Create('Comping package [' + pkgInfo.ToIdVersionString + '] failed.' );
-          compiledPackages.Add(pkgInfo);
-          //compiling updates the node searchpaths and libpath, so just copy to any same package nodes
-          otherNodes := projectPackageGraph.FindNodes(node.Id);
-          if otherNodes.Count > 1 then
-           otherNodes.ForEach(procedure(const otherNode : IGraphNode)
-                             begin
-                                otherNode.SearchPaths.Clear;
-                                otherNode.SearchPaths.AddRange(node.SearchPaths);
-                                otherNode.LibPath := node.LibPath;
-                                otherNode.BplPath := node.BplPath;
-                             end);
-        end;
-
-        if spec.TargetPlatform.DesignFiles.Any then
-        begin
-          //we have design time packages to install.
-        end;
-      end);
-
-
-  except
-    on e : Exception do
-    begin
-      FLogger.Error(e.Message);
-      exit;
-    end;
-  end;
+  if not BuildDependencies(cancellationToken,packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs, options.Force, options.PackageId ) then
+    exit;
 
   if not CollectSearchPaths(resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
     exit;
 
-
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
     exit;
-
-  packageReferences.Clear;
 
   projectEditor.UpdatePackageReferences(projectPackageGraph, platform);
   result := projectEditor.SaveProject();
@@ -783,57 +722,18 @@ end;
 
 function TPackageInstaller.DoRestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration) : boolean;
 var
-  packageInfo : IPackageInfo; //includes dependencies;
   projectPackageGraph : IGraphNode;
-
-
-  packageReferences : IList<IGraphNode>;
   packageSpecs : IDictionary<string, IPackageSpec>;
-
   projectReferences : IList<TProjectReference>;
-
   resolvedPackages : IList<IPackageInfo>;
   packagesToCompile : IList<IPackageInfo>;
-
   compiledPackages : IList<IPackageInfo>;
   packageSearchPaths : IList<string>;
-
   packageCompiler : ICompiler;
   seenPackages : IDictionary<string, byte>;
-
-  function CreateProjectRefs(const node : IGraphNode) : boolean;
-  var
-    child : IGraphNode;
-    info : IPackageInfo;
-    projectRef : TProjectReference;
-  begin
-    result := true;
-    if not node.IsRoot then
-    begin
-      if seenPackages.ContainsKey(node.Id.ToLower) then
-        exit;
-      info := GetPackageInfo(cancellationToken, node);
-      if info = nil then
-      begin
-        FLogger.Error('Unable to resolve package : ' + node.ToString);
-        exit(false);
-      end;
-      projectRef.Package := info;
-      projectRef.VersionRange := node.SelectedOn;
-      projectRef.ParentId := node.Parent.id;
-      seenPackages[node.Id.ToLower] := 0;
-      projectReferences.Add(projectRef);
-    end;
-    if node.HasChildren then
-      for child in node.ChildNodes do
-      begin
-        result := CreateProjectRefs(child);
-        if not result then
-          exit;
-      end;
-  end;
-
 begin
+  result := false;
+
   projectPackageGraph := projectEditor.GetPackageReferences(platform); //can return nil
   //if there is no project package graph then there is nothing to do.
   if projectPackageGraph = nil then
@@ -843,9 +743,10 @@ begin
   projectReferences := TCollections.CreateList<TProjectReference>;
 
   //TODO : Can packagerefs be replaced by just adding the info to the nodes?
-  CreateProjectRefs(projectPackageGraph);
+  if not CreateProjectRefs(cancellationtoken, projectPackageGraph, seenPackages, projectReferences) then
+    exit;
 
-  result := FDependencyResolver.ResolveForRestore(cancellationToken, options, projectReferences, projectPackageGraph, packageInfo.CompilerVersion, platform, resolvedPackages);
+  result := FDependencyResolver.ResolveForRestore(cancellationToken, options, projectReferences, projectPackageGraph, projectEditor.CompilerVersion, platform, resolvedPackages);
   if not result then
     exit;
 
@@ -868,77 +769,14 @@ begin
   packageSearchPaths := TCollections.CreateList<string>;
   packageCompiler := FCompilerFactory.CreateCompiler(options.CompilerVersion, platform);
 
-  try
-    //build the dependency graph in the correct order.
-    projectPackageGraph.VisitDFS(
-      procedure(const node : IGraphNode)
-      var
-        pkgInfo : IPackageInfo;
-        spec : IPackageSpec;
-        otherNodes : IList<IGraphNode>;
-        forceCompile : boolean;
-      begin
-        Assert(node.IsRoot = false, 'graph should not visit root node');
-
-        pkgInfo := packagesToCompile.FirstOrDefault(
-          function(const value : IPackageInfo) : boolean
-          begin
-            result := SameText(value.Id, node.Id);
-          end);
-        //if it's not found that means we have already processed the package elsewhere in the graph
-        if pkgInfo = nil then
-          exit;
-
-        //do we need an option to force compilation when restoring?
-        forceCompile := false;// options.Force and SameText(pkgInfo.Id,options.PackageId);
-
-        //removing it so we don't process it again
-        packagesToCompile.Remove(pkgInfo);
-
-        spec := packageSpecs[LowerCase(node.Id)];
-        Assert(spec <> nil);
-
-        if spec.TargetPlatform.BuildEntries.Any then
-        begin
-          //we need to build the package.
-          if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, node, spec, forceCompile) then
-            raise Exception.Create('Comping package [' + pkgInfo.ToIdVersionString + '] failed.' );
-          compiledPackages.Add(pkgInfo);
-          //compiling updates the node searchpaths and libpath, so just copy to any same package nodes
-          otherNodes := projectPackageGraph.FindNodes(node.Id);
-          if otherNodes.Count > 1 then
-           otherNodes.ForEach(procedure(const otherNode : IGraphNode)
-                             begin
-                                otherNode.SearchPaths.Clear;
-                                otherNode.SearchPaths.AddRange(node.SearchPaths);
-                                otherNode.LibPath := node.LibPath;
-                                otherNode.BplPath := node.BplPath;
-                             end);
-        end;
-
-        if spec.TargetPlatform.DesignFiles.Any then
-        begin
-          //we have design time packages to install.
-        end;
-      end);
-
-
-  except
-    on e : Exception do
-    begin
-      FLogger.Error(e.Message);
-      exit;
-    end;
-  end;
+  if not BuildDependencies(cancellationToken,packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs ) then
+    exit;
 
   if not CollectSearchPaths(resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
     exit;
 
-
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
     exit;
-
-  packageReferences.Clear;
 
   projectEditor.UpdatePackageReferences(projectPackageGraph, platform);
   result := projectEditor.SaveProject();
@@ -947,59 +785,18 @@ end;
 function TPackageInstaller.DoUninstallFromProject(const cancellationToken: ICancellationToken; const options: TUnInstallOptions; const projectFile: string;
                                                   const projectEditor: IProjectEditor; const platform: TDPMPlatform; const config: IConfiguration): boolean;
 var
-  packageInfo : IPackageInfo; //includes dependencies;
   projectPackageGraph : IGraphNode;
   foundReference : IGraphNode;
-
-
-  packageReferences : IList<IGraphNode>;
   packageSpecs : IDictionary<string, IPackageSpec>;
-
   projectReferences : IList<TProjectReference>;
-
   resolvedPackages : IList<IPackageInfo>;
   packagesToCompile : IList<IPackageInfo>;
-
   compiledPackages : IList<IPackageInfo>;
   packageSearchPaths : IList<string>;
-
   packageCompiler : ICompiler;
-
   seenPackages : IDictionary<string, byte>;
-
-  function CreateProjectRefs(const node : IGraphNode) : boolean;
-  var
-    child : IGraphNode;
-    info : IPackageInfo;
-    projectRef : TProjectReference;
-  begin
-    result := true;
-    if not node.IsRoot then
-    begin
-      if seenPackages.ContainsKey(node.Id.ToLower) then
-        exit;
-      info := GetPackageInfo(cancellationToken, node);
-      if info = nil then
-      begin
-        FLogger.Error('Unable to resolve package : ' + node.ToString);
-        exit(false);
-      end;
-      projectRef.Package := info;
-      projectRef.VersionRange := node.SelectedOn;
-      projectRef.ParentId := node.Parent.id;
-      seenPackages[node.Id.ToLower] := 0;
-      projectReferences.Add(projectRef);
-    end;
-    if node.HasChildren then
-      for child in node.ChildNodes do
-      begin
-        result := CreateProjectRefs(child);
-        if not result then
-          exit;
-      end;
-  end;
-
 begin
+  result := false;
   projectPackageGraph := projectEditor.GetPackageReferences(platform); //can return nil
   //if there is no project package graph then there is nothing to do.
   if projectPackageGraph = nil then
@@ -1024,13 +821,13 @@ begin
   projectReferences := TCollections.CreateList<TProjectReference>;
 
   //TODO : Can packagerefs be replaced by just adding the info to the nodes?
-  CreateProjectRefs(projectPackageGraph);
+  if not CreateProjectRefs(cancellationtoken, projectPackageGraph, seenPackages, projectReferences) then
+    exit;
 
-  result := FDependencyResolver.ResolveForRestore(cancellationToken, options, projectReferences, projectPackageGraph, packageInfo.CompilerVersion, platform, resolvedPackages);
+  result := FDependencyResolver.ResolveForRestore(cancellationToken, options, projectReferences, projectPackageGraph, projectEditor.CompilerVersion, platform, resolvedPackages);
   if not result then
     exit;
 
-  //TODO : The code from here on is the same for install/uninstall/restore - refactor!!!
 
   if resolvedPackages = nil then
   begin
@@ -1051,86 +848,24 @@ begin
 
   //even though we are just uninstalling a package here.. we still need to run the compiliation stage to collect paths
   //it will mostly be a no-op as everyhing is likely already compiled.
-  try
-    //build the dependency graph in the correct order.
-    projectPackageGraph.VisitDFS(
-      procedure(const node : IGraphNode)
-      var
-        pkgInfo : IPackageInfo;
-        spec : IPackageSpec;
-        otherNodes : IList<IGraphNode>;
-        forceCompile : boolean;
-      begin
-        Assert(node.IsRoot = false, 'graph should not visit root node');
-
-        pkgInfo := packagesToCompile.FirstOrDefault(
-          function(const value : IPackageInfo) : boolean
-          begin
-            result := SameText(value.Id, node.Id);
-          end);
-        //if it's not found that means we have already processed the package elsewhere in the graph
-        if pkgInfo = nil then
-          exit;
-
-        //do we need an option to force compilation when restoring?
-        forceCompile := false;// options.Force and SameText(pkgInfo.Id,options.PackageId);
-
-        //removing it so we don't process it again
-        packagesToCompile.Remove(pkgInfo);
-
-        spec := packageSpecs[LowerCase(node.Id)];
-        Assert(spec <> nil);
-
-        if spec.TargetPlatform.BuildEntries.Any then
-        begin
-          //we need to build the package.
-          if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, node, spec, forceCompile) then
-            raise Exception.Create('Comping package [' + pkgInfo.ToIdVersionString + '] failed.' );
-          compiledPackages.Add(pkgInfo);
-          //compiling updates the node searchpaths and libpath, so just copy to any same package nodes
-          otherNodes := projectPackageGraph.FindNodes(node.Id);
-          if otherNodes.Count > 1 then
-           otherNodes.ForEach(procedure(const otherNode : IGraphNode)
-                             begin
-                                otherNode.SearchPaths.Clear;
-                                otherNode.SearchPaths.AddRange(node.SearchPaths);
-                                otherNode.LibPath := node.LibPath;
-                                otherNode.BplPath := node.BplPath;
-                             end);
-        end;
-
-        if spec.TargetPlatform.DesignFiles.Any then
-        begin
-          //we have design time packages to install.
-        end;
-      end);
-
-
-  except
-    on e : Exception do
-    begin
-      FLogger.Error(e.Message);
-      exit;
-    end;
-  end;
+  if not BuildDependencies(cancellationToken,packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs) then
+    exit;
 
   if not CollectSearchPaths(resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
     exit;
 
-
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
     exit;
-
-  packageReferences.Clear;
 
   projectEditor.UpdatePackageReferences(projectPackageGraph, platform);
   result := projectEditor.SaveProject();
 
-
 end;
 
 
-function TPackageInstaller.BuildDependencies(const cancellationToken : ICancellationToken; const packageCompiler : ICompiler; const projectPackageGraph : IGraphNode; const packagesToCompile : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; packageSpecs : IDictionary<string, IPackageSpec>) : boolean;
+function TPackageInstaller.BuildDependencies(const cancellationToken : ICancellationToken; const packageCompiler : ICompiler; const projectPackageGraph : IGraphNode; const packagesToCompile : IList<IPackageInfo>;
+                                             const compiledPackages : IList<IPackageInfo>; packageSpecs : IDictionary<string, IPackageSpec>;
+                                             const force : boolean = false; const forcePackageId : string = '') : boolean;
 begin
   result := false;
   try
@@ -1155,7 +890,7 @@ begin
           exit;
 
         //do we need an option to force compilation when restoring?
-        forceCompile := false;// options.Force and SameText(pkgInfo.Id,options.PackageId);
+        forceCompile := force and SameText(pkgInfo.Id, forcePackageId);
 
         //removing it so we don't process it again
         packagesToCompile.Remove(pkgInfo);

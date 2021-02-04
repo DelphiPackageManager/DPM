@@ -49,6 +49,7 @@ uses
   DPM.IDE.IconCache,
   DPM.Core.Types,
   DPM.Core.Logging,
+  DPM.Core.Dependency.Interfaces,
   DPM.IDE.Logger,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Options.Search,
@@ -153,7 +154,7 @@ type
 
     FGotConflicts : boolean;
 
-    FPackageReferences : IList<IPackageReference>;
+    FPackageReferences : IGraphNode;
 
     FSearchOptions : TSearchOptions;
     FSearchSkip : integer;
@@ -492,21 +493,21 @@ begin
     end, FCancelTokenSource.Token);
 end;
 
-function FindPackageRef(const references : IList<IPackageReference>; const platform : TDPMPlatform; const searchItem : IPackageSearchResultItem) : IPackageReference;
+function FindPackageRef(const references : IGraphNode; const platform : TDPMPlatform; const searchItem : IPackageSearchResultItem) : IGraphNode;
 var
-  ref : IPackageReference;
+  ref : IGraphNode;
 begin
   result := nil;
-  for ref in references do
+  for ref in references.ChildNodes do
   begin
     if ref.Platform <> platform then
       continue;
 
     if SameText(ref.Id, searchItem.Id) then
       Exit(ref);
-    if ref.HasDependencies then
+    if ref.HasChildren then
     begin
-      result := FindPackageRef(ref.Dependencies, platform, searchItem);
+      result := FindPackageRef(ref, platform, searchItem);
       if result <> nil then
         Exit(result);
     end;
@@ -547,7 +548,7 @@ begin
   result := TAsync.Configure < IList<IPackageSearchResultItem> > (
     function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
     var
-      packageRef : IPackageReference;
+      packageRef : IGraphNode;
       item : IPackageSearchResultItem;
     begin
       result := TCollections.CreateList<IPackageSearchResultItem>;
@@ -577,11 +578,11 @@ end;
 function TDPMEditViewFrame.GetPackageIdsFromReferences(const platform : TDPMPlatform) : IList<IPackageId>;
 var
   lookup : IDictionary<string, IPackageId>;
-  packageRef : IPackageReference;
+  packageRef : IGraphNode;
 
-  procedure AddPackageIds(const value : IPackageReference);
+  procedure AddPackageIds(const value : IGraphNode);
   var
-    childRef : IPackageReference;
+    childRef : IGraphNode;
   begin
     if not (value.Platform = platform) then
       exit;
@@ -589,7 +590,7 @@ var
     if not lookup.ContainsKey(Lowercase(value.Id)) then
       lookup[Lowercase(value.Id)] := value;
 
-    for childRef in value.Dependencies do
+    for childRef in value.ChildNodes do
       AddPackageIds(childRef);
   end;
 
@@ -597,7 +598,7 @@ begin
   lookup := TCollections.CreateDictionary < string, IPackageId > ;
   result := TCollections.CreateList<IPackageId>;
 
-  for packageRef in FPackageReferences do
+  for packageRef in FPackageReferences.ChildNodes do
   begin
     AddPackageIds(packageRef);
   end;
@@ -768,7 +769,7 @@ begin
       FCurrentPlatform := projectPlatform;
       projectEditor := TProjectEditor.Create(FLogger, FConfiguration, IDECompilerVersion);
       projectEditor.LoadProject(FProject.FileName);
-      FPackageReferences := projectEditor.PackageReferences;
+      FPackageReferences := projectEditor.GetPackageReferences(FCurrentPlatform);
       //TODO : need to do this more safely as it may interrup another operation.
       FInstalledPackages := nil;  //force refresh as we always need to update the installed packages.
       FAllInstalledPackages := nil;
@@ -1320,7 +1321,7 @@ begin
       procedure(const theResult : IList<IPackageSearchResultItem>)
       var
         item : IPackageSearchResultItem;
-        packageRef : IPackageReference;
+        packageRef : IGraphNode;
       begin
         FRequestInFlight := false;
         //if the view is closing do not do anything else.

@@ -41,6 +41,7 @@ uses
   WinApi.Messages,
   DPM.Core.Types,
   DPM.Core.Options.Search,
+  DPM.Core.Dependency.Interfaces,
   DPM.Core.Project.Interfaces,
   DPM.Core.Configuration.Interfaces,
   DPM.IDE.Logger,
@@ -503,6 +504,7 @@ var
   dpmChildren : IInterfaceList;
   platformSortedList : TStringList;
   i : integer;
+  platformPackageReferences : IGraphNode;
 
   function FindProject : IOTAProject;
   var
@@ -543,29 +545,26 @@ var
   end;
 
 
-  procedure AddPlatform(const pf : TDPMPlatform; const PackageReferences : IList<IPackageReference>);
+  procedure AddPlatform(const pf : TDPMPlatform; const PackageReferences : IGraphNode);
   var
     platformContainer : TProjectTreeContainer;
-    packageRef : IPackageReference;
-    i : integer;
+    packageRef : IGraphNode;
 
-    procedure AddPackage(const parentContainer : TProjectTreeContainer; const packageReference : IPackageReference; const children : IInterfaceList);
+    procedure AddPackage(const parentContainer : TProjectTreeContainer; const packageReference : IGraphNode; const children : IInterfaceList);
     var
       packageRefContainer : TProjectTreeContainer;
-      depRef : IPackageReference;
-      j : integer;
+      depRef : IGraphNode;
     begin
       packageRefContainer := TProjectTreeContainer.CreateNewContainer(parentContainer, packageReference.ToIdVersionString,cDPMContainer);
       packageRefContainer.ImageIndex := -1;
       AddChildContainer(parentContainer, packageRefContainer);
       children.Add(packageRefContainer);
 
-      if packageReference.HasDependencies then
+      if packageReference.HasChildren then
       begin
         packageRefContainer.Children := TInterfaceList.Create;
-        for j := 0 to packageReference.Dependencies.Count -1 do
+        for depRef in packageReference.ChildNodes do
         begin
-          depRef := packageReference.Dependencies[j];
           AddPackage(packageRefContainer, depRef, packageRefContainer.Children);
         end;
       end;
@@ -577,14 +576,13 @@ var
     AddChildContainer(dpmContainer, platformContainer);
     dpmChildren.Add(platformContainer);
 
-    if PackageReferences.Any then
+    if PackageReferences.HasChildren then
     begin
       platformContainer.Children := TInterfaceList.Create;
 
       //using for loop rather the enumerator for per reasons.
-      for i := 0 to PackageReferences.Count -1 do
+      for packageRef in PackageReferences.ChildNodes do
       begin
-        packageRef := PackageReferences[i];
         if packageRef.Platform <> pf then
           continue;
 
@@ -636,7 +634,10 @@ begin
       for i := 0 to  platformSortedList.Count -1 do
       begin
         pf := TDPMPlatform(Integer(platformSortedList.Objects[i]));
-        AddPlatform(pf, projectEditor.PackageReferences);
+        platformPackageReferences := projectEditor.GetPackageReferences(pf);
+        if platformPackageReferences <> nil then
+          AddPlatform(pf, platformPackageReferences);
+
       end;
     finally
       platformSortedList.Free;

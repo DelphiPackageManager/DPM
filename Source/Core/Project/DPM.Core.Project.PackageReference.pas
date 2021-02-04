@@ -28,117 +28,117 @@ unit DPM.Core.Project.PackageReference;
 
 interface
 
-uses
-  Spring.Collections,
-  DPM.Core.Types,
-  DPM.Core.Dependency.Version,
-  DPM.Core.Package.Interfaces,
-  DPM.Core.Project.Interfaces;
-
-type
-  TPackageReference = class(TInterfacedObject, IPackageReference, IPackageId)
-  private
-    FId: string;
-    FVersion : TPackageVersion;
-    FPlatform : TDPMPlatform;
-    FCompilerVersion : TCompilerVersion;
-    FRange    : TVersionRange;
-    FIsTransitive : boolean;
-    FDependencies : IList<IPackageReference>;
-    FUseSource : boolean;
-  protected
-    function GetId: string;
-    function GetVersion: TPackageVersion;
-    function GetPlatform: TDPMPlatform;
-    procedure SetVersion(const value : TPackageVersion);
-    function GetDependencies: IList<IPackageReference>;
-    function GetIsTransitive: Boolean;
-    function GetRange: TVersionRange;
-    function GetCompilerVersion: TCompilerVersion;
-    function GetHasDependencies: Boolean;
-    function GetUseSource : boolean;
-  public
-    constructor Create(const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const range : TVersionRange; const isTransitive : boolean; const useSource : boolean);
-    function ToIdVersionString: string;
-    function ToString : string;override;
-  end;
+//uses
+//  Spring.Collections,
+//  DPM.Core.Types,
+//  DPM.Core.Dependency.Version,
+//  DPM.Core.Package.Interfaces,
+//  DPM.Core.Project.Interfaces;
+//
+//type
+//  TPackageReference = class(TInterfacedObject, IPackageReference, IPackageId)
+//  private
+//    FId: string;
+//    FVersion : TPackageVersion;
+//    FPlatform : TDPMPlatform;
+//    FCompilerVersion : TCompilerVersion;
+//    FRange    : TVersionRange;
+//    FIsTransitive : boolean;
+//    FDependencies : IList<IPackageReference>;
+//    FUseSource : boolean;
+//  protected
+//    function GetId: string;
+//    function GetVersion: TPackageVersion;
+//    function GetPlatform: TDPMPlatform;
+//    procedure SetVersion(const value : TPackageVersion);
+//    function GetDependencies: IList<IPackageReference>;
+//    function GetIsTransitive: Boolean;
+//    function GetRange: TVersionRange;
+//    function GetCompilerVersion: TCompilerVersion;
+//    function GetHasDependencies: Boolean;
+//    function GetUseSource : boolean;
+//  public
+//    constructor Create(const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const range : TVersionRange; const isTransitive : boolean; const useSource : boolean);
+//    function ToIdVersionString: string;
+//    function ToString : string;override;
+//  end;
 
 implementation
 
 { TPackageRefence }
 
-constructor TPackageReference.Create(const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const range : TVersionRange; const isTransitive : boolean; const useSource : boolean);
-begin
-  FId := id;
-  FVersion := version;
-  FPlatform := platform;
-  FCompilerVersion := compilerVersion;
-  FRange := range;
-  FIsTransitive := isTransitive;
-  FDependencies := nil; //TCollections.CreateList<IPackageReference>;
-  FUseSource := useSource;
-end;
-
-function TPackageReference.GetCompilerVersion: TCompilerVersion;
-begin
-  result := FCompilerVersion;
-end;
-
-function TPackageReference.GetDependencies: IList<IPackageReference>;
-begin
-  if FDependencies = nil then
-    FDependencies := TCollections.CreateList<IPackageReference>;
-  result := FDependencies;
-end;
-
-function TPackageReference.GetHasDependencies: Boolean;
-begin
-  result := (FDependencies <> nil) and FDependencies.Any;
-end;
-
-function TPackageReference.GetId: string;
-begin
-  result := FId;
-end;
-
-function TPackageReference.GetIsTransitive: Boolean;
-begin
-  result := FIsTransitive;
-end;
-
-function TPackageReference.GetPlatform: TDPMPlatform;
-begin
-  result := FPlatform;
-end;
-
-function TPackageReference.GetRange: TVersionRange;
-begin
-  result := FRange;
-end;
-
-function TPackageReference.GetUseSource: boolean;
-begin
-  result := FUseSource;
-end;
-
-function TPackageReference.GetVersion: TPackageVersion;
-begin
-  result := FVersion;
-end;
-
-procedure TPackageReference.SetVersion(const value: TPackageVersion);
-begin
-  FVersion := value;
-end;
-
-function TPackageReference.ToIdVersionString: string;
-begin
-  result := FId +' [' + FVersion.ToStringNoMeta + ']';
-end;
-
-function TPackageReference.ToString: string;
-begin
-  result := FId +' [' + FVersion.ToStringNoMeta + ']';
-end;
+//constructor TPackageReference.Create(const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const range : TVersionRange; const isTransitive : boolean; const useSource : boolean);
+//begin
+//  FId := id;
+//  FVersion := version;
+//  FPlatform := platform;
+//  FCompilerVersion := compilerVersion;
+//  FRange := range;
+//  FIsTransitive := isTransitive;
+//  FDependencies := nil; //TCollections.CreateList<IPackageReference>;
+//  FUseSource := useSource;
+//end;
+//
+//function TPackageReference.GetCompilerVersion: TCompilerVersion;
+//begin
+//  result := FCompilerVersion;
+//end;
+//
+//function TPackageReference.GetDependencies: IList<IPackageReference>;
+//begin
+//  if FDependencies = nil then
+//    FDependencies := TCollections.CreateList<IPackageReference>;
+//  result := FDependencies;
+//end;
+//
+//function TPackageReference.GetHasDependencies: Boolean;
+//begin
+//  result := (FDependencies <> nil) and FDependencies.Any;
+//end;
+//
+//function TPackageReference.GetId: string;
+//begin
+//  result := FId;
+//end;
+//
+//function TPackageReference.GetIsTransitive: Boolean;
+//begin
+//  result := FIsTransitive;
+//end;
+//
+//function TPackageReference.GetPlatform: TDPMPlatform;
+//begin
+//  result := FPlatform;
+//end;
+//
+//function TPackageReference.GetRange: TVersionRange;
+//begin
+//  result := FRange;
+//end;
+//
+//function TPackageReference.GetUseSource: boolean;
+//begin
+//  result := FUseSource;
+//end;
+//
+//function TPackageReference.GetVersion: TPackageVersion;
+//begin
+//  result := FVersion;
+//end;
+//
+//procedure TPackageReference.SetVersion(const value: TPackageVersion);
+//begin
+//  FVersion := value;
+//end;
+//
+//function TPackageReference.ToIdVersionString: string;
+//begin
+//  result := FId +' [' + FVersion.ToStringNoMeta + ']';
+//end;
+//
+//function TPackageReference.ToString: string;
+//begin
+//  result := FId +' [' + FVersion.ToStringNoMeta + ']';
+//end;
 
 end.

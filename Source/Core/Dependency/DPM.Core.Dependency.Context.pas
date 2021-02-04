@@ -86,16 +86,14 @@ type
     constructor Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectReferences : IList<TProjectReference>);overload;
   end;
 
+
 implementation
 
 uses
   System.SysUtils,
+  DPM.Core.Constants,
   DPM.Core.Dependency.Graph,
   DPM.Core.Dependency.Resolution;
-
-const
-  cRoot = 'root';
-
 
   { TResolverContext }
 
@@ -140,7 +138,7 @@ begin
   result := TGraphNode.CreateRoot(FCompilerVersion, FPlatform);
   toplevelPackages := FResolved.Values.Where(function(const value : IResolution) : boolean
     begin
-      result := value.ParentId = cRoot;
+      result := value.ParentId = cRootNode;
     end);
 
   for toplevelPackage in toplevelPackages do
@@ -175,7 +173,7 @@ begin
   Assert(newPackage <> nil);
   Create(logger, newPackage.CompilerVersion, newPackage.Platform, projectReferences);
   PushRequirement(newPackage);
-  RecordResolution(newPackage, TVersionRange.Empty, cRoot);
+  RecordResolution(newPackage, TVersionRange.Empty, cRootNode);
 end;
 
 

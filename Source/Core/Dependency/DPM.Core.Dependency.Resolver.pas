@@ -65,6 +65,7 @@ implementation
 uses
   System.SysUtils,
   Generics.Defaults,
+  DPM.Core.Constants,
   DPM.Core.Dependency.Graph;
 
 { TDependencyResolver }
@@ -153,7 +154,7 @@ begin
           FLogger.Debug('       conflict - selected version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
 
           //if it's a top level package then the version is not negotiable.
-          if resolution.ParentId = 'root' then
+          if resolution.ParentId = cRootNode then
           begin
             FLogger.Error('Package conflict - selected version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
             exit;
@@ -251,7 +252,7 @@ begin
               if context.TryGetResolution(currentPackage.Id, resolution) then
               begin
                 //can't backtrack to a root (direct dependency)
-                if (resolution.ParentId <> 'root') and context.TryGetResolution(resolution.ParentId, parentResolution) then
+                if (resolution.ParentId <> cRootNode) and context.TryGetResolution(resolution.ParentId, parentResolution) then
                 begin
                   FLogger.Debug('Backtracking to : ' + parentResolution.Package.Id + '-' + parentResolution.Package.Version.ToString);
                   context.RemoveResolution(currentPackage.Id); //shouldn't this be the parentResolution.Pacakage???

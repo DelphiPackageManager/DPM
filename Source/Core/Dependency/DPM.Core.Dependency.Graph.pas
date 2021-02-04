@@ -110,7 +110,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Constants;
 
 { TGraphNode }
 
@@ -200,7 +201,7 @@ end;
 
 constructor TGraphNode.CreateRoot(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform);
 begin
-  Create(nil, 'root-node', TPackageVersion.Empty, platform, compilerVersion, TVersionRange.Empty, false);
+  Create(nil, cRootNode, TPackageVersion.Empty, platform, compilerVersion, TVersionRange.Empty, false);
 end;
 
 destructor TGraphNode.Destroy;
@@ -280,7 +281,7 @@ end;
 
 function TGraphNode.GetIsTransitive: boolean;
 begin
-  result := (FParent <> nil) and (not FParent.IsRoot);
+  result := (FParent <> nil) and (not {$IFDEF USEWEAK} FParent.IsRoot {$ELSE} IGraphNode(FParent).IsRoot{$ENDIF});
 end;
 
 function TGraphNode.GetLevel : Integer;
@@ -334,12 +335,12 @@ end;
 
 function TGraphNode.IsRoot : boolean;
 begin
-  result := FId = 'root-node';
+  result := FId = cRootNode;
 end;
 
 function TGraphNode.IsTopLevel : boolean;
 begin
-  result := (FParent = nil) or FParent.IsRoot;
+  result := (FParent = nil) or {$IFDEF USEWEAK} FParent.IsRoot {$ELSE} IGraphNode(FParent).IsRoot{$ENDIF};
 end;
 
 procedure TGraphNode.Prune(const id : string);
