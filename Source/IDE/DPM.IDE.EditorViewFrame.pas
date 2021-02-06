@@ -498,6 +498,9 @@ var
   ref : IGraphNode;
 begin
   result := nil;
+  if (references = nil) or (not references.HasChildren) then
+    exit;
+
   for ref in references.ChildNodes do
   begin
     if ref.Platform <> platform then
@@ -565,9 +568,12 @@ begin
         result := repoManager.GetInstalledPackageFeed(cancelToken, options, GetPackageIdsFromReferences(ProjectPlatformToDPMPlatform(FProject.CurrentPlatform)), FConfiguration);
         for item in result do
         begin
-          packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
-          if packageRef <> nil then
-            item.IsTransitive := packageRef.IsTransitive;
+          if FPackageReferences <> nil then
+          begin
+            packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
+            if packageRef <> nil then
+              item.IsTransitive := packageRef.IsTransitive;
+          end;
         end;
         FLogger.Debug('DPMIDE : Got Installed package metadata.');
       end;
@@ -597,12 +603,14 @@ var
 begin
   lookup := TCollections.CreateDictionary < string, IPackageId > ;
   result := TCollections.CreateList<IPackageId>;
-
-  for packageRef in FPackageReferences.ChildNodes do
+  if FPackageReferences <> nil then
   begin
-    AddPackageIds(packageRef);
+    for packageRef in FPackageReferences.ChildNodes do
+    begin
+      AddPackageIds(packageRef);
+    end;
+    result.AddRange(lookup.Values);
   end;
-  result.AddRange(lookup.Values);
 end;
 
 function TDPMEditViewFrame.GetUpdatedPackages : IAwaitable<IList<IPackageSearchResultItem>>;
@@ -769,7 +777,7 @@ begin
       FCurrentPlatform := projectPlatform;
       projectEditor := TProjectEditor.Create(FLogger, FConfiguration, IDECompilerVersion);
       projectEditor.LoadProject(FProject.FileName);
-      FPackageReferences := projectEditor.GetPackageReferences(FCurrentPlatform);
+      FPackageReferences := projectEditor.GetPackageReferences(FCurrentPlatform); //NOTE : Can return nil. Will change internals to return empty root node.
       //TODO : need to do this more safely as it may interrup another operation.
       FInstalledPackages := nil;  //force refresh as we always need to update the installed packages.
       FAllInstalledPackages := nil;
