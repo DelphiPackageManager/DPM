@@ -84,8 +84,12 @@ type
   IPackageInfo = interface(IPackageIdentity)
     ['{5672DB4A-40BC-45E0-857C-39117D03C322}']
     function GetDependencies : IList<IPackageDependency>;
+    function GetUseSource : boolean;
+    procedure SetUseSource(const value : boolean);
+
 
     property Dependencies : IList<IPackageDependency>read GetDependencies;
+    property UseSource : boolean read GetUseSource write SetUseSource;
   end;
 
   IPackageSearchPath = interface

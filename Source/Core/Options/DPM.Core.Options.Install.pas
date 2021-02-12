@@ -42,7 +42,6 @@ type
     FNoCache : boolean;
     FProjectPath : string;
     FFloat : boolean;
-    FUseSource : boolean;
     class var
       FDefault : TInstallOptions;
   protected
@@ -60,7 +59,6 @@ type
     property PackageFile : string read FPackageFile write FPackageFile;
     property ProjectPath : string read FProjectPath write FProjectPath;
     property VersionString : string read FVersionString write FVersionString;
-    property UseSource : boolean read FUseSource write FUseSource;
   end;
 
 implementation

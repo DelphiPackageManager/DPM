@@ -36,6 +36,7 @@ uses
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Options.Cache,
+  DPM.Core.Options.Search,
   DPM.Core.Options.Install,
   DPM.Core.Options.Uninstall,
   DPM.Core.Options.Restore,
@@ -60,10 +61,10 @@ type
     FCompilerFactory : ICompilerFactory;
   protected
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
-    function CreateProjectRefs(const cancellationToken: ICancellationToken; const node: IGraphNode; const seenPackages: IDictionary<string, byte>;
+    function CreateProjectRefs(const cancellationToken: ICancellationToken; const node: IGraphNode; const seenPackages: IDictionary<string, IPackageInfo>;
                                const projectReferences: IList<TProjectReference>): boolean;
 
-    function CollectSearchPaths(const resolvedPackages : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
+    function CollectSearchPaths(const options : TSearchOptions; const resolvedPackages : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
 
     procedure GenerateSearchPaths(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; packageSpec : IPackageSpec; const searchPaths : IList<string>);
 
@@ -78,7 +79,7 @@ type
 
     function BuildDependencies(const cancellationToken : ICancellationToken; const packageCompiler : ICompiler; const projectPackageGraph : IGraphNode;
                                const packagesToCompile : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; packageSpecs : IDictionary<string, IPackageSpec>;
-                               const force : boolean = false; const forcePackageId : string = '') : boolean;
+                               const options : TSearchOptions) : boolean;
 
 
     function DoRestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration) : boolean;
@@ -141,7 +142,6 @@ uses
   DPM.Core.Utils.System,
   DPM.Core.Project.Editor,
   DPM.Core.Project.GroupProjReader,
-  DPM.Core.Project.PackageReference,
   DPM.Core.Options.List,
   DPM.Core.Dependency.Graph,
   DPM.Core.Dependency.Version,
@@ -206,7 +206,7 @@ begin
 
 end;
 
-function TPackageInstaller.CollectSearchPaths(const resolvedPackages : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
+function TPackageInstaller.CollectSearchPaths(const options : TSearchOptions; const resolvedPackages : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
 var
   packageInfo : IPackageInfo;
   packageMetadata : IPackageMetadata;
@@ -219,7 +219,8 @@ begin
   resolvedPackages.Reverse;
   for packageInfo in resolvedPackages do
   begin
-    if compiledPackages.Contains(packageInfo) then
+
+    if not (options.UseSource and SameText(packageInfo.Id, options.SearchTerms)) and compiledPackages.Contains(packageInfo)  then
     begin
       packageBasePath := packageInfo.Id + PathDelim + packageInfo.Version.ToStringNoMeta + PathDelim;
       searchPaths.Add(packageBasePath + 'lib');
@@ -535,7 +536,7 @@ begin
 end;
 
 
-function TPackageInstaller.CreateProjectRefs(const cancellationToken : ICancellationToken; const node : IGraphNode; const seenPackages : IDictionary<string, byte>; const projectReferences : IList<TProjectReference>) : boolean;
+function TPackageInstaller.CreateProjectRefs(const cancellationToken : ICancellationToken; const node : IGraphNode; const seenPackages : IDictionary<string, IPackageInfo>; const projectReferences : IList<TProjectReference>) : boolean;
 var
   child : IGraphNode;
   info : IPackageInfo;
@@ -544,18 +545,24 @@ begin
   result := true;
   if not node.IsRoot then
   begin
-    if seenPackages.ContainsKey(LowerCase(node.Id)) then
+    if seenPackages.TryGetValue(LowerCase(node.Id), info) then
+    begin
+      //if a node uses source then we need to find the projectRef and update i
+      if node.UseSource then
+        info.UseSource := true;
       exit;
+    end;
     info := GetPackageInfo(cancellationToken, node);
     if info = nil then
     begin
       FLogger.Error('Unable to resolve package : ' + node.ToString);
       exit(false);
     end;
+    info.UseSource := node.UseSource;
     projectRef.Package := info;
     projectRef.VersionRange := node.SelectedOn;
     projectRef.ParentId := node.Parent.id;
-    seenPackages[LowerCase(node.Id)] := 0;
+    seenPackages[LowerCase(node.Id)] := info;
     projectReferences.Add(projectRef);
   end;
   if node.HasChildren then
@@ -591,7 +598,7 @@ var
 
   packageCompiler : ICompiler;
 
-  seenPackages : IDictionary<string, byte>;
+  seenPackages : IDictionary<string, IPackageInfo>;
 begin
   result := false;
 
@@ -599,6 +606,7 @@ begin
   if projectPackageGraph = nil then
     projectPackageGraph := TGraphNode.CreateRoot(options.CompilerVersion,  platform);
 
+  //see if it's already installed.
   existingPackageRef := projectPackageGraph.FindChild(options.PackageId);
   if (existingPackageRef <> nil) then
   begin
@@ -611,8 +619,19 @@ begin
     end;
     //remove it so we can force resolution to happen later.
     projectPackageGraph.RemoveNode(existingPackageRef);
+    existingPackageRef := nil; //we no longer need it.
   end;
 
+  //We could have a transitive dependency that is being promoted.
+  //Since we want to control what version is installed, we will remove
+  //any transitive references to that package so the newly installed version
+  //will take precedence when resolving.
+  childNode := projectPackageGraph.FindFirstNode(options.PackageId);
+  while childNode <> nil do
+  begin
+    projectPackageGraph.RemoveNode(childNode);
+    childNode := projectPackageGraph.FindFirstNode(options.PackageId);
+  end;
 
 
   //if the user specified a version, either the on the command line or via a file then we will use that
@@ -632,19 +651,6 @@ begin
   end;
   FLogger.Information('Installing package ' + newPackageIdentity.ToString);
 
-  //We could have a transitive dependency that is being promoted.
-  //Since we want to control what version is installed, we will remove
-  //any transitive references to that package so the newly installed version
-  //will take precedence when resolving.
-  if (existingPackageRef <> nil) then
-  begin
-    childNode := projectPackageGraph.FindFirstNode(existingPackageRef.Id);
-    while childNode <> nil do
-    begin
-      projectPackageGraph.RemoveNode(childNode);
-      childNode := projectPackageGraph.FindFirstNode(existingPackageRef.Id);
-    end;
-  end;
 
 
   if not FPackageCache.EnsurePackage(newPackageIdentity) then
@@ -664,11 +670,11 @@ begin
 
   //get the package info, which has the dependencies.
   packageInfo := GetPackageInfo(cancellationToken, newPackageIdentity);
+  packageInfo.UseSource := options.UseSource; //we need this later when collecting search paths.
 
-  seenPackages := TCollections.CreateDictionary<string, byte>;
+  seenPackages := TCollections.CreateDictionary<string, IPackageInfo>;
   projectReferences := TCollections.CreateList<TProjectReference>;
 
-  //TODO : Can packagerefs be replaced by just adding the info to the nodes?
   if not CreateProjectRefs(cancellationtoken, projectPackageGraph, seenPackages, projectReferences) then
     exit;
 
@@ -705,10 +711,10 @@ begin
   packageSearchPaths := TCollections.CreateList<string>;
   packageCompiler := FCompilerFactory.CreateCompiler(options.CompilerVersion, platform);
 
-  if not BuildDependencies(cancellationToken,packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs, options.Force, options.PackageId ) then
+  if not BuildDependencies(cancellationToken,packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs, options ) then
     exit;
 
-  if not CollectSearchPaths(resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
+  if not CollectSearchPaths(options, resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
     exit;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
@@ -730,7 +736,7 @@ var
   compiledPackages : IList<IPackageInfo>;
   packageSearchPaths : IList<string>;
   packageCompiler : ICompiler;
-  seenPackages : IDictionary<string, byte>;
+  seenPackages : IDictionary<string, IPackageInfo>;
 begin
   result := false;
 
@@ -739,7 +745,7 @@ begin
   if projectPackageGraph = nil then
     exit(true);
 
-  seenPackages := TCollections.CreateDictionary<string, byte>;
+  seenPackages := TCollections.CreateDictionary<string, IPackageInfo>;
   projectReferences := TCollections.CreateList<TProjectReference>;
 
   //TODO : Can packagerefs be replaced by just adding the info to the nodes?
@@ -769,10 +775,10 @@ begin
   packageSearchPaths := TCollections.CreateList<string>;
   packageCompiler := FCompilerFactory.CreateCompiler(options.CompilerVersion, platform);
 
-  if not BuildDependencies(cancellationToken,packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs ) then
+  if not BuildDependencies(cancellationToken,packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs, options ) then
     exit;
 
-  if not CollectSearchPaths(resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
+  if not CollectSearchPaths(options, resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
     exit;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
@@ -794,7 +800,7 @@ var
   compiledPackages : IList<IPackageInfo>;
   packageSearchPaths : IList<string>;
   packageCompiler : ICompiler;
-  seenPackages : IDictionary<string, byte>;
+  seenPackages : IDictionary<string, IPackageInfo>;
 begin
   result := false;
   projectPackageGraph := projectEditor.GetPackageReferences(platform); //can return nil
@@ -817,7 +823,7 @@ begin
   projectPackageGraph.RemoveNode(foundReference);
 
 
-  seenPackages := TCollections.CreateDictionary<string, byte>;
+  seenPackages := TCollections.CreateDictionary<string, IPackageInfo>;
   projectReferences := TCollections.CreateList<TProjectReference>;
 
   //TODO : Can packagerefs be replaced by just adding the info to the nodes?
@@ -848,10 +854,10 @@ begin
 
   //even though we are just uninstalling a package here.. we still need to run the compiliation stage to collect paths
   //it will mostly be a no-op as everyhing is likely already compiled.
-  if not BuildDependencies(cancellationToken,packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs) then
+  if not BuildDependencies(cancellationToken,packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs, options) then
     exit;
 
-  if not CollectSearchPaths(resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
+  if not CollectSearchPaths(options, resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
     exit;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
@@ -864,8 +870,7 @@ end;
 
 
 function TPackageInstaller.BuildDependencies(const cancellationToken : ICancellationToken; const packageCompiler : ICompiler; const projectPackageGraph : IGraphNode; const packagesToCompile : IList<IPackageInfo>;
-                                             const compiledPackages : IList<IPackageInfo>; packageSpecs : IDictionary<string, IPackageSpec>;
-                                             const force : boolean = false; const forcePackageId : string = '') : boolean;
+                                             const compiledPackages : IList<IPackageInfo>; packageSpecs : IDictionary<string, IPackageSpec>; const options : TSearchOptions) : boolean;
 begin
   result := false;
   try
@@ -890,7 +895,7 @@ begin
           exit;
 
         //do we need an option to force compilation when restoring?
-        forceCompile := force and SameText(pkgInfo.Id, forcePackageId);
+        forceCompile := options.force and SameText(pkgInfo.Id, options.SearchTerms); //searchterms backs packageid
 
         //removing it so we don't process it again
         packagesToCompile.Remove(pkgInfo);

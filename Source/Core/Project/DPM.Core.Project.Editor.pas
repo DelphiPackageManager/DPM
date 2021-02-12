@@ -845,6 +845,8 @@ var
     packageReferenceElement.setAttribute('version', packageReference.Version.ToStringNoMeta);
     if not packageReference.SelectedOn.IsEmpty then
       packageReferenceElement.setAttribute('range', packageReference.SelectedOn.ToString);
+    if packageReference.UseSource then
+      packageReferenceElement.setAttribute('useSource', 'true');
     parentElement.appendChild(packageReferenceElement);
     if packageReference.HasChildren then
     begin

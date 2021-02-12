@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectVersion>19.2</ProjectVersion>
@@ -99,7 +99,6 @@
         <DCC_RemoteDebug>true</DCC_RemoteDebug>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
-        <Debugger_RunParams>-rOpenToolsAPI</Debugger_RunParams>
         <Debugger_HostApplication>E:\Emb\Studio\21.0\bin\bds.exe</Debugger_HostApplication>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
@@ -228,7 +227,6 @@
         <DCCReference Include="Core\Project\DPM.Core.Project.Editor.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.GroupProjReader.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Interfaces.pas"/>
-        <DCCReference Include="Core\Project\DPM.Core.Project.PackageReference.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Base.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.BaseGithub.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Directory.pas"/>

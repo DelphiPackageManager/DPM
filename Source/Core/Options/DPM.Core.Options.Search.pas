@@ -48,6 +48,7 @@ type
     FTrial : boolean;
     FIncludeDelisted : boolean;
     FForce : boolean;
+    FUseSource : boolean;
   protected
     FExact : boolean;
     constructor CreateClone(const original : TSearchOptions); reintroduce;
@@ -71,6 +72,7 @@ type
     property Version : TPackageVersion read FVersion write FVersion;
     property Exact : boolean read FExact write FExact; //search term is a package id.
     property Force : boolean read FForce write FForce; //needed by the package installer.
+    property UseSource : boolean read FUseSource write FUseSource; //only used by install but we need it here.
 
   end;
 

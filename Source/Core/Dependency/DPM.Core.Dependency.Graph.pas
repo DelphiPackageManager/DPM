@@ -133,7 +133,7 @@ begin
     parent := parent.Parent;
   end;
 
-  result := TGraphNode.Create(self, id, version, FPlatform, FCompilerVersion, selectedOn,  false);
+  result := TGraphNode.Create(self, id, version, FPlatform, FCompilerVersion, selectedOn,  FUseSource);
   FChildNodes.Add(LowerCase(id), result);
 end;
 
@@ -324,8 +324,12 @@ begin
 end;
 
 function TGraphNode.GetUseSource: Boolean;
+var
+  parent : IGraphNode;
 begin
-  result := FUseSource;
+  parent := GetParent;
+  //if the parent is using the source then we should too.
+  result := FUseSource or ((parent <> nil) and parent.UseSource);
 end;
 
 function TGraphNode.HasChildren : boolean;

@@ -126,6 +126,7 @@ var
     childNode : IGraphNode;
   begin
     childNode := parentNode.AddChildNode(package.Id, package.Version, versionRange);
+    childNode.UseSource := package.UseSource;
     for dependency in package.Dependencies do
     begin
       if not TryGetResolution(dependency.Id, resolution) then

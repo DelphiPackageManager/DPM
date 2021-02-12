@@ -72,8 +72,11 @@ type
   TPackageInfo = class(TPackageIdentity, IPackageInfo, IPackageIdentity, IPackageId)
   private
     FDependencies : IList<IPackageDependency>;
+    FUseSource : boolean;
   protected
     function GetDependencies : IList<IPackageDependency>;
+    function GetUseSource : boolean;
+    procedure SetUseSource(const value : boolean);
     constructor Create(const sourceName : string; const spec : IPackageSpec); override;
   public
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageInfo;
@@ -229,6 +232,16 @@ begin
   result := FDependencies;
 end;
 
+
+function TPackageInfo.GetUseSource: boolean;
+begin
+  result := FUseSource;
+end;
+
+procedure TPackageInfo.SetUseSource(const value: boolean);
+begin
+  FUseSource := value;
+end;
 
 { TPackageMetadataFull }
 
