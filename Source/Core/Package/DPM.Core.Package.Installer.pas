@@ -64,7 +64,7 @@ type
     function CreateProjectRefs(const cancellationToken: ICancellationToken; const node: IGraphNode; const seenPackages: IDictionary<string, IPackageInfo>;
                                const projectReferences: IList<TProjectReference>): boolean;
 
-    function CollectSearchPaths(const options : TSearchOptions; const resolvedPackages : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
+    function CollectSearchPaths(const packageGraph : IGraphNode; const resolvedPackages : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
 
     procedure GenerateSearchPaths(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; packageSpec : IPackageSpec; const searchPaths : IList<string>);
 
@@ -206,7 +206,7 @@ begin
 
 end;
 
-function TPackageInstaller.CollectSearchPaths(const options : TSearchOptions; const resolvedPackages : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
+function TPackageInstaller.CollectSearchPaths(const packageGraph : IGraphNode; const resolvedPackages : IList<IPackageInfo>; const compiledPackages : IList<IPackageInfo>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const searchPaths : IList<string> ) : boolean;
 var
   packageInfo : IPackageInfo;
   packageMetadata : IPackageMetadata;
@@ -215,12 +215,27 @@ var
 begin
   result := true;
 
+  //we need to apply usesource from the graph to the package info's
+  packageGraph.VisitDFS(
+    procedure(const node : IGraphNode)
+    var
+      pkgInfo : IPackageInfo;
+    begin
+      //not the most efficient thing to do
+      pkgInfo := resolvedPackages.Where(
+        function(const pkg : IPackageInfo) : boolean
+        begin
+          result := SameText(pkg.Id, node.Id);
+        end).FirstOrDefault;
+      Assert(pkgInfo <> nil, 'pkgInfo is null, but should never be');
+      pkgInfo.UseSource := pkgInfo.UseSource or node.UseSource;
+    end);
+
   //reverse the list so that we add the paths in reverse order, small optimisation for the compiler.
   resolvedPackages.Reverse;
   for packageInfo in resolvedPackages do
   begin
-
-    if not (options.UseSource and SameText(packageInfo.Id, options.SearchTerms)) and compiledPackages.Contains(packageInfo)  then
+    if (not packageInfo.UseSource) and compiledPackages.Contains(packageInfo) then
     begin
       packageBasePath := packageInfo.Id + PathDelim + packageInfo.Version.ToStringNoMeta + PathDelim;
       searchPaths.Add(packageBasePath + 'lib');
@@ -614,7 +629,7 @@ begin
     if not options.Force  then
     begin
       //Note this error won't show from the IDE as we always force install from the IDE.
-      FLogger.Error('Package [' + newPackageIdentity.ToString + '] is already installed. Use option -force to force reinstall.');
+      FLogger.Error('Package [' + options.PackageId + '] is already installed. Use option -force to force reinstall.');
       exit;
     end;
     //remove it so we can force resolution to happen later.
@@ -670,6 +685,12 @@ begin
 
   //get the package info, which has the dependencies.
   packageInfo := GetPackageInfo(cancellationToken, newPackageIdentity);
+  if packageInfo = nil then
+  begin
+    FLogger.Error('Unable to get package info for package [' + newPackageIdentity.ToIdVersionString + ']');
+    exit(false);
+  end;
+
   packageInfo.UseSource := options.UseSource; //we need this later when collecting search paths.
 
   seenPackages := TCollections.CreateDictionary<string, IPackageInfo>;
@@ -678,8 +699,7 @@ begin
   if not CreateProjectRefs(cancellationtoken, projectPackageGraph, seenPackages, projectReferences) then
     exit;
 
-  result := FDependencyResolver.ResolveForInstall(cancellationToken, options, packageInfo, projectReferences, projectPackageGraph, packageInfo.CompilerVersion, platform, resolvedPackages);
-  if not result then
+  if not FDependencyResolver.ResolveForInstall(cancellationToken, options, packageInfo, projectReferences, projectPackageGraph, packageInfo.CompilerVersion, platform, resolvedPackages) then
     exit;
 
   if resolvedPackages = nil then
@@ -693,7 +713,7 @@ begin
                                                  begin
                                                    result := SameText(info.Id, packageInfo.Id);
                                                  end);
-
+  //this is just a sanity check, should never happen.
   if packageInfo = nil then
   begin
     FLogger.Error('Something went wrong, resolution did not return installed package!');
@@ -702,8 +722,7 @@ begin
 
   //downloads the package files to the cache if they are not already there and
   //returns the deserialized dspec as we need it for search paths and
-  result := DownloadPackages(cancellationToken, resolvedPackages, packageSpecs);
-  if not result then
+  if not DownloadPackages(cancellationToken, resolvedPackages, packageSpecs) then
     exit;
 
   compiledPackages := TCollections.CreateList<IPackageInfo>;
@@ -714,7 +733,7 @@ begin
   if not BuildDependencies(cancellationToken,packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs, options ) then
     exit;
 
-  if not CollectSearchPaths(options, resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
+  if not CollectSearchPaths(projectPackageGraph, resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
     exit;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
@@ -752,8 +771,7 @@ begin
   if not CreateProjectRefs(cancellationtoken, projectPackageGraph, seenPackages, projectReferences) then
     exit;
 
-  result := FDependencyResolver.ResolveForRestore(cancellationToken, options, projectReferences, projectPackageGraph, projectEditor.CompilerVersion, platform, resolvedPackages);
-  if not result then
+  if not  FDependencyResolver.ResolveForRestore(cancellationToken, options, projectReferences, projectPackageGraph, projectEditor.CompilerVersion, platform, resolvedPackages) then
     exit;
 
   //TODO : The code from here on is the same for install/uninstall/restore - refactor!!!
@@ -766,8 +784,7 @@ begin
 
   //downloads the package files to the cache if they are not already there and
   //returns the deserialized dspec as we need it for search paths and
-  result := DownloadPackages(cancellationToken, resolvedPackages, packageSpecs);
-  if not result then
+  if not DownloadPackages(cancellationToken, resolvedPackages, packageSpecs) then
     exit;
 
   compiledPackages := TCollections.CreateList<IPackageInfo>;
@@ -778,7 +795,7 @@ begin
   if not BuildDependencies(cancellationToken,packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs, options ) then
     exit;
 
-  if not CollectSearchPaths(options, resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
+  if not CollectSearchPaths(projectPackageGraph, resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
     exit;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
@@ -830,21 +847,19 @@ begin
   if not CreateProjectRefs(cancellationtoken, projectPackageGraph, seenPackages, projectReferences) then
     exit;
 
-  result := FDependencyResolver.ResolveForRestore(cancellationToken, options, projectReferences, projectPackageGraph, projectEditor.CompilerVersion, platform, resolvedPackages);
-  if not result then
+  if not FDependencyResolver.ResolveForRestore(cancellationToken, options, projectReferences, projectPackageGraph, projectEditor.CompilerVersion, platform, resolvedPackages) then
     exit;
 
 
   if resolvedPackages = nil then
   begin
     FLogger.Error('Resolver returned no packages!');
-    exit(false);
+    exit;
   end;
 
   //downloads the package files to the cache if they are not already there and
   //returns the deserialized dspec as we need it for search paths and
-  result := DownloadPackages(cancellationToken, resolvedPackages, packageSpecs);
-  if not result then
+  if not DownloadPackages(cancellationToken, resolvedPackages, packageSpecs) then
     exit;
 
   compiledPackages := TCollections.CreateList<IPackageInfo>;
@@ -857,7 +872,7 @@ begin
   if not BuildDependencies(cancellationToken,packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs, options) then
     exit;
 
-  if not CollectSearchPaths(options, resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
+  if not CollectSearchPaths(projectPackageGraph, resolvedPackages, compiledPackages, projectEditor.CompilerVersion, platform, packageSearchPaths) then
     exit;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
@@ -1182,6 +1197,11 @@ begin
     result := platformResult and result;
     FLogger.Information('');
   end;
+
+  //TODO : collect errored platforms so we can list them here!
+  if not result then
+    FLogger.Error('Install failed for [' + options.SearchTerms + '] on 1 or more platforms')
+
 
 end;
 
