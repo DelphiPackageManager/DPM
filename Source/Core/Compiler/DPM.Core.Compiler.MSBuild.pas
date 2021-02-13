@@ -230,6 +230,9 @@ begin
     result := result + ' /p:DCC_BplOutput=' + bplPath;
   end;
 
+  //implict rebuild off - stops the E2466 Never-build package 'X' requires always-build package 'Y'
+  //Note that some third party libs like only have always-build/implicitbuild on
+  result := result + ' /p:DCC_OutputNeverBuildDcps=true';
 
   result := result + ' /p:DCC_UnitSearchPath=';
   searchPath := '$(BDSLIB)\$(PLATFORM)\release;$(BDS)\include';
