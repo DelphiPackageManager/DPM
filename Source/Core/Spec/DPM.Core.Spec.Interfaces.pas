@@ -129,12 +129,16 @@ type
   end;
 
 
-  ISpecBPLEntry = interface(ISpecFileEntry)
+  ISpecBPLEntry = interface(ISpecNode)
     ['{13723048-E2AA-45BE-A0F1-C446848F3936}']
+    function GetSource : string;
     function GetCopyLocal : boolean;
     function GetInstall : boolean;
     function GetBuildId : string;
+    procedure SetSource(const value : string);
+
     function Clone : ISpecBPLEntry;
+    property Source : string read GetSource write SetSource;
     property CopyLocal : boolean read GetCopyLocal; //ignored for design
     property Install : boolean read GetInstall; //ignored for runtime
     property BuildId : string read GetBuildId;

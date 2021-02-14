@@ -178,7 +178,8 @@ uses
   GDIPPathText in 'SVG\GDIPPathText.pas',
   SVGColor in 'SVG\SVGColor.pas',
   DPM.Core.Package.Icon in 'Core\Package\DPM.Core.Package.Icon.pas',
-  DPM.Core.Compiler.BOM in 'Core\Compiler\DPM.Core.Compiler.BOM.pas';
+  DPM.Core.Compiler.BOM in 'Core\Compiler\DPM.Core.Compiler.BOM.pas',
+  DPM.Core.Compiler.ProjectSettings in 'Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas';
 
 begin
   CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml

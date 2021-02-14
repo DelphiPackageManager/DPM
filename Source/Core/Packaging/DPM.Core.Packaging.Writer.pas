@@ -160,7 +160,6 @@ var
   sStream : TStringStream;
   antPattern : IAntPattern;
   fileEntry : ISpecFileEntry;
-  bplEntry : ISpecBPLEntry;
 
   procedure ValidateDestinationPath(const source, dest : string);
   begin
@@ -190,29 +189,27 @@ var
       FLogger.Warning('No files were found for pattern [' + source + ']');
   end;
 
-  procedure AddBPLToArchive(const source, dest : string);
-  var
-    archivePath : string;
-    sourceFile : string;
-    fileName : string;
-  begin
-    ValidateDestinationPath(source, dest);
-    sourceFile := TPathUtils.CompressRelativePath(basePath, source);
-    if not FileExists(sourceFile) then
-      raise Exception.Create('File [' + sourceFile + '] does not exist.');
-
-    fileName := ExtractFileName(sourceFile);
-
-    archivePath := dest + '\' + fileName;
-    FLogger.Debug('Writing file [' + archivePath + '] to package.');
-    FArchiveWriter.AddFile(sourceFile, archivePath);
-  end;
+//  procedure AddBPLToArchive(const source, dest : string);
+//  var
+//    archivePath : string;
+//    sourceFile : string;
+//    fileName : string;
+//  begin
+//    ValidateDestinationPath(source, dest);
+//    sourceFile := TPathUtils.CompressRelativePath(basePath, source);
+//    if not FileExists(sourceFile) then
+//      raise Exception.Create('File [' + sourceFile + '] does not exist.');
+//
+//    fileName := ExtractFileName(sourceFile);
+//
+//    archivePath := dest + '\' + fileName;
+//    FLogger.Debug('Writing file [' + archivePath + '] to package.');
+//    FArchiveWriter.AddFile(sourceFile, archivePath);
+//  end;
 
 begin
   result := false;
   sManifest := spec.GenerateManifestJson(version, targetPlatform);
-  //going with json
-//  sManifest := spec.GenerateManifestXML(version, targetPlatform);
   packageFileName := spec.MetaData.Id + '-' + CompilerToString(targetPlatform.Compiler) + '-' + DPMPlatformToString(targetPlatform.Platforms[0]) + '-' + version.ToStringNoMeta + cPackageFileExt;
   packageFileName := IncludeTrailingPathDelimiter(outputFolder) + packageFileName;
   FArchiveWriter.SetBasePath(basePath);
@@ -244,13 +241,13 @@ begin
     for fileEntry in targetPlatform.LibFiles do
       ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, fileEntry.Ignore);
 
-    for bplEntry in targetPlatform.RuntimeFiles do
-      if bplEntry.BuildId = '' then
-        AddBPLToArchive(bplEntry.Source, bplEntry.Destination);
-
-    for bplEntry in targetPlatform.DesignFiles do
-      if bplEntry.BuildId = '' then
-        AddBPLToArchive(bplEntry.Source, bplEntry.Destination);
+//    for bplEntry in targetPlatform.RuntimeFiles do
+//      if bplEntry.BuildId = '' then
+//        AddBPLToArchive(bplEntry.Source, bplEntry.Destination);
+//
+//    for bplEntry in targetPlatform.DesignFiles do
+//      if bplEntry.BuildId = '' then
+//        AddBPLToArchive(bplEntry.Source, bplEntry.Destination);
 
     result := true;
   finally

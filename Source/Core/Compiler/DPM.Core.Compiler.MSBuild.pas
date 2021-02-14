@@ -49,6 +49,7 @@ type
 
     FCompilerVersion : TCompilerVersion;
     FConfiguration : string;
+    FProjectFile : string;
     FPlatform : TDPMPlatform;
     FSearchPaths : IList<string>;
     FVerbosity : TCompilerVerbosity;
@@ -75,6 +76,9 @@ type
     procedure SetVerbosity(const value : TCompilerVerbosity);
 
 
+    function GetPlatformName : string;
+    function GetProjectSearchPath(const configName : string) : string;
+
     function GetCompilerOutput : TStrings;
 
     function GetMSBuildParameters(const configName : string) : string;
@@ -93,7 +97,8 @@ uses
   System.SysUtils,
   System.IOUtils,
   DPM.Core.Utils.Path,
-  DPM.Core.Utils.Process;
+  DPM.Core.Utils.Process,
+  DPM.Core.Compiler.ProjectSettings;
 
 
 { TMSBuildCompiler }
@@ -108,7 +113,7 @@ begin
   FCompilerOutput.Clear;
 
   FCompilerLogFile := TPath.GetTempFileName;
-
+  FProjectFile := projectFile;
 
   commandLine := GetCommandLine(projectFile, configName);
 
@@ -199,8 +204,6 @@ end;
 
 function TMSBuildCompiler.GetMSBuildParameters(const configName : string) : string;
 var
-  s: string;
-  searchPath : string;
   libPath : string;
   bplPath : string;
 begin
@@ -234,19 +237,7 @@ begin
   //Note that some third party libs like only have always-build/implicitbuild on
   result := result + ' /p:DCC_OutputNeverBuildDcps=true';
 
-  result := result + ' /p:DCC_UnitSearchPath=';
-  searchPath := '$(BDSLIB)\$(PLATFORM)\release;$(BDS)\include';
-  // $(BDSLIB)\$(Platform)\release;$(BDSUSERDIR)\Imports;$(BDS)\Imports;$(BDSCOMMONDIR)\Dcp\$(Platform);$(BDS)\include
-  if FSearchPaths.Any then
-  begin
-    for s in FSearchPaths do
-    begin
-      if searchPath <> '' then
-        searchPath := searchPath + ';';
-      searchPath := searchPath + ExcludeTrailingPathDelimiter(s);
-    end;
-  end;
-  result := result + TPathUtils.QuotePath(searchPath, true);
+  result := result + ' /p:DCC_UnitSearchPath=' +  GetProjectSearchPath(configName);
 
 end;
 
@@ -254,6 +245,45 @@ end;
 function TMSBuildCompiler.GetPlatform : TDPMPlatform;
 begin
   result := FPlatform;
+end;
+
+function TMSBuildCompiler.GetPlatformName: string;
+begin
+  if FBuildForDesign then
+    result := DPMPlatformToBDString(TDPMPlatform.Win32)
+  else
+    result := DPMPlatformToBDString(FPlatform);
+end;
+
+function TMSBuildCompiler.GetProjectSearchPath(const configName: string): string;
+var
+  s : string;
+  settingsLoader : IProjectSettingsLoader;
+  platform : TDPMPlatform;
+begin
+  result := '$(BDSLIB)\$(PLATFORM)\release;$(BDS)\include';
+  if FSearchPaths.Any then
+  begin
+    for s in FSearchPaths do
+    begin
+      if result <> '' then
+        result := result + ';';
+      result := result + ExcludeTrailingPathDelimiter(s);
+    end;
+  end;
+
+  if FBuildForDesign then
+    platform := TDPMPlatform.Win32
+  else
+    platform := FPlatform;
+
+  settingsLoader := TDPMProjectSettingsLoader.Create(FProjectFile, configName, platform);
+  s := settingsLoader.GetSearchPath;
+  if s <> '' then
+    result := s + ';' + result;
+
+  result := TPathUtils.QuotePath(result, true);
+
 end;
 
 function TMSBuildCompiler.GetSearchPaths : IList<string>;

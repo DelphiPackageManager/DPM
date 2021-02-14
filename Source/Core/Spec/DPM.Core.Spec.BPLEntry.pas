@@ -33,22 +33,24 @@ uses
   Spring.Collections,
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
-  DPM.Core.Spec.FileEntry;
+  DPM.Core.Spec.Node;
 
 type
-  TSpecBPLEntry = class(TSpecFileEntry, ISpecBPLEntry)
+  TSpecBPLEntry = class(TSpecNode, ISpecBPLEntry)
   private
+    FSource : string;
     FCopyLocal : boolean;
     FInstall : boolean;
     FBuildId : string;
   protected
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
-
+    function GetSource : string;
+    procedure SetSource(const value : string);
     function GetCopyLocal : Boolean;
     function GetInstall : Boolean;
     function GetBuildId : string;
     function Clone : ISpecBPLEntry; overload;
-    constructor CreateClone(const logger : ILogger; const src : string; const dest : string; const exclude : IList<string>; const buildId : string; const flatten, copyLocal, install : boolean); reintroduce;
+    constructor CreateClone(const logger : ILogger; const src : string; const buildId : string; const copyLocal, install : boolean); reintroduce;
   public
     constructor Create(const logger : ILogger); override;
   end;
@@ -62,7 +64,7 @@ uses
 
 function TSpecBPLEntry.Clone : ISpecBPLEntry;
 begin
-  result := TSpecBPLEntry.CreateClone(logger, Self.GetSource, Self.GetDestination, Self.GetExclude, Self.GetBuildId, Self.GetFlatten, FCopyLocal, FInstall);
+  result := TSpecBPLEntry.CreateClone(logger, Self.GetSource, Self.GetBuildId, FCopyLocal, FInstall);
 end;
 
 constructor TSpecBPLEntry.Create(const logger : ILogger);
@@ -71,9 +73,10 @@ begin
 
 end;
 
-constructor TSpecBPLEntry.CreateClone(const logger : ILogger; const src, dest : string; const exclude : IList<string>; const buildId : string; const flatten, copyLocal, install : boolean);
+constructor TSpecBPLEntry.CreateClone(const logger : ILogger; const src : string; const buildId : string; const copyLocal, install : boolean);
 begin
-  inherited CreateClone(logger, src, dest, exclude, flatten, false);
+  inherited Create(logger);
+  FSource := src;
   FCopyLocal := copyLocal;
   FInstall := install;
   FBuildId := buildId;
@@ -94,14 +97,30 @@ begin
   result := FInstall;
 end;
 
+function TSpecBPLEntry.GetSource: string;
+begin
+  result := FSource;
+end;
+
 function TSpecBPLEntry.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 begin
-  result := inherited LoadFromJson(jsonObject);
+  result := true;
+  FSource := jsonObject.S['src'];
+  if FSource = '' then
+  begin
+    Logger.Error('Required attribute [src] is missing');
+    result := false;
+  end;
   FCopyLocal := jsonObject.B['copyLocal'];
   FInstall := jsonObject.B['install'];
   FBuildId := jsonObject.S['buildId'];
 end;
 
+
+procedure TSpecBPLEntry.SetSource(const value: string);
+begin
+  FSource := value;
+end;
 
 end.
 
