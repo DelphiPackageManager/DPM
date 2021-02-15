@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{CFBF7204-5639-4643-B895-08DDF96E0F8F}</ProjectGuid>
         <MainSource>dpm.dpr</MainSource>
@@ -7,14 +7,14 @@
         <TargetedPlatforms>1</TargetedPlatforms>
         <AppType>Console</AppType>
         <FrameworkType>None</FrameworkType>
-        <ProjectVersion>19.2</ProjectVersion>
+        <ProjectVersion>18.8</ProjectVersion>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
     </PropertyGroup>
     <PropertyGroup>
-        <DPMCompiler>10.4</DPMCompiler>
+        <DPMCompiler>10.3</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.Uri\0.0.3\src;$(DPM)\VSoft.SemanticVersion\0.1.0\src;$(DPM)\VSoft.HttpClient\0.1.0\lib;$(DPM)\VSoft.CommandLine\0.0.2\src;$(DPM)\VSoft.CancellationToken\0.0.2\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\VSoft.Awaitable\0.2.0\lib;$(DPM)\VSoft.AntPatterns\0.1.0\lib;$(DPM)\Spring4D.Extensions\2.0.0-dev4\src;$(DPM)\Spring4D.Extensions\2.0.0-dev4\src\Extensions;$(DPM)\Spring4D.Extensions\2.0.0-dev4\src\Extensions\Cryptography;$(DPM)\Spring4D.Extensions\2.0.0-dev4\src\Extensions\Utils;$(DPM)\Spring4D.Base\2.0.0-dev4\src;$(DPM)\Spring4D.Base\2.0.0-dev4\src\Base;$(DPM)\Spring4D.Base\2.0.0-dev4\src\Base\Collections;$(DPM)\Spring4D.Base\2.0.0-dev4\src\Base\Logging;$(DPM)\Spring4D.Base\2.0.0-dev4\src\Base\Patches;$(DPM)\Spring4D.Base\2.0.0-dev4\src\Base\Patterns;$(DPM)\Spring4D.Core\2.0.0-dev4\src;$(DPM)\Spring4D.Core\2.0.0-dev4\src\Core\Container;$(DPM)\Spring4D.Core\2.0.0-dev4\src\Core\Interception;$(DPM)\Spring4D.Core\2.0.0-dev4\src\Core\Logging;$(DPM)\Spring4D.Core\2.0.0-dev4\src\Core\Mocking;$(DPM)\Spring4D.Core\2.0.0-dev4\src\Core\Services;$(DPM)\Ahausladen.JsonDataObjects\0.0.1\src;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.Uri\0.1.0\lib;$(DPM)\VSoft.SemanticVersion\0.2.0\lib;$(DPM)\VSoft.JsonDataObjects\0.1.0\lib;$(DPM)\VSoft.HttpClient\0.1.0\lib;$(DPM)\VSoft.CommandLine\0.1.0\lib;$(DPM)\VSoft.CancellationToken\0.0.2\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\VSoft.Awaitable\0.2.0\lib;$(DPM)\VSoft.AntPatterns\0.1.0\lib;$(DPM)\Spring4D.Extensions\2.0.0-dev5\lib;$(DPM)\Spring4D.Base\2.0.0-dev5\lib;$(DPM)\Spring4D.Core\2.0.0-dev5\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -96,7 +96,7 @@
         <Icns_MainIcns>$(BDS)\bin\delphi_PROJECTICNS.icns</Icns_MainIcns>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_OSX64)'!=''">
-        <VerInfo_Keys>CFBundleName=$(MSBuildProjectName);CFBundleDisplayName=$(MSBuildProjectName);CFBundleIdentifier=$(MSBuildProjectName);CFBundleVersion=1.0.0;CFBundleShortVersionString=1.0.0;CFBundlePackageType=APPL;CFBundleSignature=????;CFBundleAllowMixedLocalizations=YES;CFBundleExecutable=$(MSBuildProjectName);NSHighResolutionCapable=true;LSApplicationCategoryType=public.app-category.utilities;NSLocationUsageDescription=The reason for accessing the location information of the user;NSContactsUsageDescription=The reason for accessing the contacts;NSCalendarsUsageDescription=The reason for accessing the calendar data;NSRemindersUsageDescription=The reason for accessing the reminders;NSCameraUsageDescription=The reason for accessing the camera;NSMicrophoneUsageDescription=The reason for accessing the microphone;NSMotionUsageDescription=The reason for accessing the accelerometer;NSDesktopFolderUsageDescription=The reason for accessing the Desktop folder;NSDocumentsFolderUsageDescription=The reason for accessing the Documents folder;NSDownloadsFolderUsageDescription=The reason for accessing the Downloads folder;NSNetworkVolumesUsageDescription=The reason for accessing files on a network volume;NSRemovableVolumesUsageDescription=The reason for accessing files on a removable volume;NSSpeechRecognitionUsageDescription=The reason for requesting to send user data to Apple&apos;s speech recognition servers</VerInfo_Keys>
+        <VerInfo_Keys>CFBundleName=$(MSBuildProjectName);CFBundleDisplayName=$(MSBuildProjectName);CFBundleIdentifier=$(MSBuildProjectName);CFBundleVersion=1.0.0;CFBundleShortVersionString=1.0.0;CFBundlePackageType=APPL;CFBundleSignature=????;CFBundleAllowMixedLocalizations=YES;CFBundleExecutable=$(MSBuildProjectName);NSHighResolutionCapable=true;LSApplicationCategoryType=public.app-category.utilities;NSLocationUsageDescription=The reason for accessing the location information of the user;NSContactsUsageDescription=The reason for accessing the contacts;NSCalendarsUsageDescription=The reason for accessing the calendar data;NSRemindersUsageDescription=The reason for accessing the reminders;NSCameraUsageDescription=The reason for accessing the camera;NSMicrophoneUsageDescription=The reason for accessing the microphone;NSMotionUsageDescription=The reason for accessing the accelerometer;NSDesktopFolderUsageDescription=The reason for accessing the Desktop folder;NSDocumentsFolderUsageDescription=The reason for accessing the Documents folder;NSDownloadsFolderUsageDescription=The reason for accessing the Downloads folder;NSNetworkVolumesUsageDescription=The reason for accessing files on a network volume;NSRemovableVolumesUsageDescription=The reason for accessing files on a removable volume;NSSpeechRecognitionUsageDescription=The reason for requesting to send user data to Apple's speech recognition servers</VerInfo_Keys>
         <BT_BuildType>Debug</BT_BuildType>
         <VerInfo_IncludeVerInfo>false</VerInfo_IncludeVerInfo>
     </PropertyGroup>
@@ -1344,24 +1344,24 @@
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>
-            <PackageReference id="Ahausladen.JsonDataObjects" platform="Win32" version="0.0.1"/>
-            <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.0-dev4">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev4" range="[2.0.0-dev4,]"/>
+            <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.0-dev5">
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev5" range="[2.0.0-dev5,]"/>
             </PackageReference>
-            <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.0-dev4">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev4" range="[2.0.0-dev4,]"/>
+            <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.0-dev5">
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev5" range="[2.0.0-dev5,]"/>
             </PackageReference>
             <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.1.0"/>
             <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.2.0">
                 <PackageReference id="Gabr42.OmniThreadLibrary" platform="Win32" version="3.7.8" range="[3.7.8,]"/>
                 <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.2" range="[0.0.2, 0.0.65535]"/>
             </PackageReference>
-            <PackageReference id="VSoft.CommandLine" platform="Win32" version="0.0.2"/>
+            <PackageReference id="VSoft.CommandLine" platform="Win32" version="0.1.0"/>
             <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.1.0">
                 <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.2" range="[0.0.2, 0.0.65535]"/>
             </PackageReference>
-            <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.1.0"/>
-            <PackageReference id="VSoft.Uri" platform="Win32" version="0.0.3"/>
+            <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.1.0"/>
+            <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.0"/>
+            <PackageReference id="VSoft.Uri" platform="Win32" version="0.1.0"/>
         </DPM>
     </ProjectExtensions>
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>

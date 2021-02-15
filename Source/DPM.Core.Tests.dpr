@@ -126,7 +126,8 @@ uses
   GDIPPathText in 'SVG\GDIPPathText.pas',
   DPM.Core.Package.Icon in 'Core\Package\DPM.Core.Package.Icon.pas',
   DPM.Core.Tests.Types in 'Tests\DPM.Core.Tests.Types.pas',
-  DPM.Core.Compiler.BOM in 'Core\Compiler\DPM.Core.Compiler.BOM.pas';
+  DPM.Core.Compiler.BOM in 'Core\Compiler\DPM.Core.Compiler.BOM.pas',
+  DPM.Core.Compiler.ProjectSettings in 'Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas';
 
 var
   runner : ITestRunner;
