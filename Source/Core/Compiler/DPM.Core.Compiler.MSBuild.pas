@@ -117,16 +117,17 @@ begin
 
   commandLine := GetCommandLine(projectFile, configName);
 
+  env := TEnvironmentBlockFactory.Create(nil, true);
+  //THE IDE set these, which makes it difficult to debug the command line version.
   {$IFDEF DEBUG}
-    //THE IDE set these, which makes it difficult to debug the command line version.
-    env := TEnvironmentBlockFactory.Create(nil, true);
-    env.RemoveVariable('BDS');
-    env.RemoveVariable('BDSLIB');
-    env.RemoveVariable('BDSINCLUDE');
-    env.RemoveVariable('BDSCOMMONDIR');
-  {$ELSE}
-    env := nil;
+  env.RemoveVariable('BDS');
+  env.RemoveVariable('BDSLIB');
+  env.RemoveVariable('BDSINCLUDE');
+  env.RemoveVariable('BDSCOMMONDIR');
   {$ENDIF}
+  env.RemoveVariable('PLATFORM');
+  //envoptions causes problems on our build machines, haven't figured out why yet.
+  env.AddOrSet('ImportEnvOptions','false');
   FLogger.Debug('Compler - cmdline : ' + commandLine);
   try
     result := TProcess.Execute2(cancellationToken, 'cmd.exe', commandLine,'',env) = 0;
@@ -208,11 +209,11 @@ var
   bplPath : string;
 begin
   result := '/target:Build';
-  result := result + ' /p:config=' + configName;
+  result := result + ' /p:Config=' + configName;
   if FBuildForDesign then
-    result := result + ' /p:platform=' + DPMPlatformToBDString(TDPMPlatform.Win32)
+    result := result + ' /p:Platform=' + DPMPlatformToBDString(TDPMPlatform.Win32)
   else
-    result := result + ' /p:platform=' + DPMPlatformToBDString(FPlatform);
+    result := result + ' /p:Platform=' + DPMPlatformToBDString(FPlatform);
 
 
   //TODO : Check that these props are correctly named for all supported compiler versions.
@@ -234,12 +235,13 @@ begin
   end;
 
   //implict rebuild off - stops the E2466 Never-build package 'X' requires always-build package 'Y'
-  //Note that some third party libs like only have always-build/implicitbuild on
+  //Note that some third party libs like omnithreadlibrary have always-build/implicitbuild on
   result := result + ' /p:DCC_OutputNeverBuildDcps=true';
 
   result := result + ' /p:DCC_UnitSearchPath=' +  GetProjectSearchPath(configName);
 
-end;
+ // result := result +  ' /v:diag';
+ end;
 
 
 function TMSBuildCompiler.GetPlatform : TDPMPlatform;
@@ -261,7 +263,7 @@ var
   settingsLoader : IProjectSettingsLoader;
   platform : TDPMPlatform;
 begin
-  result := '$(BDSLIB)\$(PLATFORM)\release;$(BDS)\include';
+  result := '';// '$(BDSLIB)\$(PLATFORM)\release;$(BDS)\include';
   if FSearchPaths.Any then
   begin
     for s in FSearchPaths do

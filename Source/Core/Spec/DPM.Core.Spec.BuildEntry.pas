@@ -187,7 +187,7 @@ begin
 
   FConfig := jsonObject.S['config'];
   if FConfig = '' then
-    FConfig := 'release';
+    FConfig := 'Release';
 
   FBplOutputDir := jsonObject.S['bplOutputDir'];
   if FBplOutputDir = '' then
