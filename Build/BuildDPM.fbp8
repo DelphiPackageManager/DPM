@@ -13,13 +13,9 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
-          legalcopyright = "© 2019 -2020 Vincent Parrett and Contributors"
-          linkproductversion = false
-          minorversion = 1
           name = DPMVersion
-          productname = "DPM Package Manager"
+          productversion = 0.0.0.0
           productversionstring = 0.1.10-alpha
-          releaseversion = 10
         end
       end
       action.propertyset.setvalues
@@ -43,7 +39,7 @@ begin
                       "" +
                       "true" +
                       "" +
-                      "© 2019 -2020 Vincent Parrett and Contributors" +
+                      "© 2019 -2021 Vincent Parrett and Contributors" +
                       "" +
                       "false" +
                       "%MAJOR_VERSION%" +
