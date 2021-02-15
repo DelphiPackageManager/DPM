@@ -127,7 +127,7 @@ begin
           timeoutlength = 2
           as.projectpath = %SRC_ROOT%\\DPM.Core.Tests.dproj
           as.compilerversion = 10.3
-          as.verbosity = Detailed
+          as.verbosity = Debug
           as.nobanner = True
         end
         action.delphi.build
@@ -304,7 +304,7 @@ begin
           timeoutlength = 2
           as.projectpath = %SRC_ROOT%\\dpm.dproj
           as.compilerversion = 10.3
-          as.verbosity = Normal
+          as.verbosity = Debug
           as.nobanner = True
         end
         action.delphi.build
@@ -835,7 +835,7 @@ begin
         timeoutlength = 2
         as.projectpath = %SRC_ROOT%\\%ProjectFile%oj
         as.compilerversion = 10.4
-        as.verbosity = Normal
+        as.verbosity = Debug
         as.nobanner = True
         action.script
         begin
