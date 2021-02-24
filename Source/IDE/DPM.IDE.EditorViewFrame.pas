@@ -362,7 +362,6 @@ begin
   FSearchOptions := TSearchOptions.Create;
   //hard code our compiler version here since when we are running in the IDE we are only working with the IDE version
   FSearchOptions.CompilerVersion := IDECompilerVersion;
-  //  FSearchOptions.Take := 5; //just for testing.
 
   FSearchSkip := 0;
   FSearchTake := 0;
@@ -746,7 +745,6 @@ begin
         FInstalledPackages.Remove(packageSearchResult);
       if FCurrentTab = TCurrentTab.Installed then
         SwitchedToInstalled(False);
-//        FilterAndLoadInstalledPackages(txtSearch.Text);
     end;
   end;
 
@@ -967,7 +965,6 @@ begin
   if (list = nil) or (not list.Any) then
   begin
     FScrollList.RowCount := 0; //will force a repaint.
-    //ScrollListPaintNoRows(Sender, ACanvas, FScrollList.ClientRect);
     exit;
   end;
   if (index >= 0) and (index < list.Count) then
@@ -982,7 +979,7 @@ begin
     if (state in [rsFocusedSelected, rsFocusedHot, rsHot]) then
     begin
       {$IF CompilerVersion < 32.0}
-      backgroundColor := $00FFF0E9; // StyleServices.GetSystemColor(clHighlight);
+      backgroundColor := $00FFF0E9;
       ACanvas.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
       {$ELSE}
       backgroundColor := FIDEStyleServices.GetStyleColor(TStyleColor.scButtonHot);
@@ -1017,14 +1014,8 @@ begin
       icon := FIconCache.Request('missing_icon');
 
     icon.PaintTo(ACanvas, FRowLayout.IconRect);
-    //ACanvas.StretchDraw(FRowLayout.IconRect, icon );
 
     //TODO : this all feels super hacky, revisit when IDE supports high dpi/scaling.
-
-//    leaving here as it's usefull for debugging layout
-//    ACanvas.Brush.Color := clRed;
-//    ACanvas.FillRect(FRowLayout.TitleRect);
-//    ACanvas.Brush.Color := backgroundColor;
 
     //make text of different font sizes align correctly.
     oldTextAlign := SetTextAlign(ACanvas.Handle, TA_BASELINE);
@@ -1233,11 +1224,8 @@ type
 procedure TDPMEditViewFrame.SwitchedToInstalled(const refresh : boolean);
 var
   searchTxt : string;
-
   filterProc : TFilterProc;
-
   //filter the list to only show directly installed packages, and on the search term
-
 begin
   FLogger.Debug('DPMIDE : SwitchToInstalled');
   searchTxt := txtSearch.Text;
@@ -1404,7 +1392,6 @@ procedure TDPMEditViewFrame.SwitchTabs(const currentTab : TCurrentTab; const
 var
   doRefresh : boolean;
 begin
-
   if FRequestInFlight then
     FCancelTokenSource.Cancel;
 
@@ -1511,8 +1498,6 @@ begin
   FScrollList.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
   PackageDetailsFrame.Color := FIDEStyleServices.GetSystemColor(clWindow);
   PackageDetailsFrame.ThemeChanged;
-  //  Self.Invalidate;
-
 end;
 
 procedure TDPMEditViewFrame.txtSearchChange(Sender : TObject);
@@ -1580,7 +1565,6 @@ begin
   begin
     FFirstView := false;
     platformChangeDetectTimerTimer(platformChangeDetectTimer);
-    //SwitchedToInstalled(true);
   end;
 end;
 

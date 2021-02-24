@@ -802,6 +802,8 @@ begin
     exit;
 
   projectEditor.UpdatePackageReferences(projectPackageGraph, platform);
+  //TODO : need to detect if anything has actually changed and only save if it has.
+  //saving triggers the IDE to reload (although we do work around that) - would be good to avoid.
   result := projectEditor.SaveProject();
 end;
 

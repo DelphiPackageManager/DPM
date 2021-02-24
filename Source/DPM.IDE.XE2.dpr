@@ -171,7 +171,8 @@ uses
   DPM.Core.Package.Icon in 'Core\Package\DPM.Core.Package.Icon.pas',
   DPM.IDE.ProjectController in 'IDE\DPM.IDE.ProjectController.pas',
   DPM.Core.Compiler.BOM in 'Core\Compiler\DPM.Core.Compiler.BOM.pas',
-  DPM.Core.Compiler.ProjectSettings in 'Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas';
+  DPM.Core.Compiler.ProjectSettings in 'Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas',
+  DPM.Controls.VersionGrid in 'Controls\DPM.Controls.VersionGrid.pas';
 
 {$R *.res}
 
