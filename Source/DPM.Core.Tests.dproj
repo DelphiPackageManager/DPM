@@ -11,7 +11,7 @@
         <AppType>Console</AppType>
     </PropertyGroup>
     <PropertyGroup>
-        <DPMCompiler>10.3</DPMCompiler>
+        <DPMCompiler>10.4</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
         <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.Uri\0.1.0\lib;$(DPM)\VSoft.SemanticVersion\0.2.0\lib;$(DPM)\VSoft.JsonDataObjects\0.1.0\lib;$(DPM)\VSoft.HttpClient\0.1.0\lib;$(DPM)\VSoft.CommandLine\0.1.0\lib;$(DPM)\VSoft.CancellationToken\0.0.2\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\VSoft.Awaitable\0.2.0\lib;$(DPM)\VSoft.AntPatterns\0.1.0\lib;$(DPM)\Spring4D.Extensions\2.0.0-dev5\lib;$(DPM)\Spring4D.Base\2.0.0-dev5\lib;$(DPM)\Spring4D.Core\2.0.0-dev5\lib;</DPMSearch>
