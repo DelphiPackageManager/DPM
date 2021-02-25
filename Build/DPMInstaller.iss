@@ -45,17 +45,17 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Components]
 Name: XE2; Description: Delphi XE2 IDE Support; Types: full; check: IsDelphiInstalled('9.0');
-Name: XE3; Description: Delphi XE3 XE3 IDE Support; Types: full; check: IsDelphiInstalled('10.0');
-Name: XE4; Description: Delphi XE4 XE4 IDE Support; Types: full; check: IsDelphiInstalled('11.0');
-Name: XE5; Description: Delphi XE5 XE5 IDE Support; Types: full; check: IsDelphiInstalled('12.0');
-Name: XE6; Description: Delphi XE6 XE6 IDE Support; Types: full; check: IsDelphiInstalled('14.0');
-Name: XE7; Description: Delphi XE7 XE7 IDE Support; Types: full; check: IsDelphiInstalled('15.0');
-Name: XE8; Description: Delphi XE8 XE8 IDE Support; Types: full; check: IsDelphiInstalled('16.0');
-Name: Seattle; Description: Delphi 10.0 10.0 IDE Support; Types: full; check: IsDelphiInstalled('17.0');
-Name: Berlin;  Description: Delphi 10.1 10.1 IDE Support; Types: full; check: IsDelphiInstalled('18.0');
-Name: Tokyo;   Description: Delphi 10.2 10.2 IDE Support; Types: full; check: IsDelphiInstalled('19.0');
-Name: Rio;     Description: Delphi 10.3 10.3 IDE Support; Types: full; check: IsDelphiInstalled('20.0');
-Name: Sydney;  Description: Delphi 10.4 10.4 IDE Support; Types: full; check: IsDelphiInstalled('21.0');
+Name: XE3; Description: Delphi XE3 IDE Support; Types: full; check: IsDelphiInstalled('10.0');
+Name: XE4; Description: Delphi XE4 IDE Support; Types: full; check: IsDelphiInstalled('11.0');
+Name: XE5; Description: Delphi XE5 IDE Support; Types: full; check: IsDelphiInstalled('12.0');
+Name: XE6; Description: Delphi XE6 IDE Support; Types: full; check: IsDelphiInstalled('14.0');
+Name: XE7; Description: Delphi XE7 IDE Support; Types: full; check: IsDelphiInstalled('15.0');
+Name: XE8; Description: Delphi XE8 IDE Support; Types: full; check: IsDelphiInstalled('16.0');
+Name: Seattle; Description: Delphi 10.0 IDE Support; Types: full; check: IsDelphiInstalled('17.0');
+Name: Berlin;  Description: Delphi 10.1 IDE Support; Types: full; check: IsDelphiInstalled('18.0');
+Name: Tokyo;   Description: Delphi 10.2 IDE Support; Types: full; check: IsDelphiInstalled('19.0');
+Name: Rio;     Description: Delphi 10.3 IDE Support; Types: full; check: IsDelphiInstalled('20.0');
+Name: Sydney;  Description: Delphi 10.4 IDE Support; Types: full; check: IsDelphiInstalled('21.0');
 
 
 [Tasks]
