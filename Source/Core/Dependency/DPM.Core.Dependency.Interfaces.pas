@@ -46,7 +46,6 @@ type
   //a directed asyclic graph (DAG).
   IGraphNode = interface(IPackageId)
     ['{20055C26-8E63-4936-8249-ACF8514A37E7}']
-//    function GetLevel : integer;
     function GetId : string;
     function GetParent : IGraphNode;
     function GetVersion : TPackageVersion;
@@ -61,13 +60,14 @@ type
     function GetBplPath : string;
     procedure SetBplPath(const value : string);
     procedure SetUseSource(const value : boolean);
-
+    procedure SetProjectFile(const value : string);
 
     function GetChildNodes : IEnumerable<IGraphNode>;
 
     function GetPlatform : TDPMPlatform;
     function GetUseSource : boolean;
     function GetIsTransitive : boolean;
+    function GetProjectFile : string;
 
 
     function AddChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
@@ -84,6 +84,7 @@ type
     procedure Prune(const id : string);
     function RemoveNode(const node : IGraphNode) : boolean;
     function IsRoot : boolean;
+    function IsProjectNode : boolean;
     function IsTopLevel : boolean;
     function HasChildren : boolean;
     procedure VisitDFS(const visitor : TNodeVisitProc);
@@ -100,6 +101,7 @@ type
     property Parent : IGraphNode read GetParent;
     property Platform : TDPMPlatform read GetPlatform;
     property UseSource : boolean read GetUseSource write SetUseSource;
+    property ProjectFile : string read GetProjectFile write SetProjectFile;
 
     //build support
     property SearchPaths : IList<string> read GetSearchPaths;

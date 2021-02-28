@@ -100,21 +100,20 @@ type
     //resolves package from id - calls InstallPackage
     function InstallPackageFromId(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFiles : TArray <string> ; const config : IConfiguration) : boolean;
 
-    //calls either InstallPackageFromId or InstallPackageFromFile depending on options.
-    function Install(const cancellationToken : ICancellationToken; const options : TInstallOptions) : Boolean;
-
-    function UnInstall(const cancellationToken : ICancellationToken; const options : TUnInstallOptions) : boolean;
 
     function UnInstallFromProject(const cancellationToken : ICancellationToken; const options : TUnInstallOptions; const projectFile : string; const config : IConfiguration) : Boolean;
 
 
     function RestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string; const config : IConfiguration) : Boolean;
 
+    //calls either InstallPackageFromId or InstallPackageFromFile depending on options.
+    function Install(const cancellationToken : ICancellationToken; const options : TInstallOptions; const context : IPackageInstallerContext = nil) : Boolean;
+    function UnInstall(const cancellationToken : ICancellationToken; const options : TUnInstallOptions; const context : IPackageInstallerContext = nil) : boolean;
     //calls restore project
-    function Restore(const cancellationToken : ICancellationToken; const options : TRestoreOptions) : Boolean;
+    function Restore(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const context : IPackageInstallerContext = nil) : Boolean;
+
 
     function Remove(const cancellationToken : ICancellationToken; const options : TUninstallOptions) : boolean;
-
 
     function Cache(const cancellationToken : ICancellationToken; const options : TCacheOptions) : boolean;
 
@@ -146,8 +145,8 @@ uses
   DPM.Core.Dependency.Graph,
   DPM.Core.Dependency.Version,
   DPM.Core.Package.Metadata,
-  DPM.Core.Spec.Reader;
-
+  DPM.Core.Spec.Reader,
+  DPM.Core.Package.InstallerContext;
 
 { TPackageInstaller }
 
@@ -1250,10 +1249,11 @@ begin
   end;
 end;
 
-function TPackageInstaller.Install(const cancellationToken : ICancellationToken; const options : TInstallOptions) : Boolean;
+function TPackageInstaller.Install(const cancellationToken : ICancellationToken; const options : TInstallOptions; const context : IPackageInstallerContext) : Boolean;
 var
   projectFiles : TArray<string>;
   config : IConfiguration;
+  installerContext : IPackageInstallerContext;
 begin
   result := false;
   try
@@ -1265,6 +1265,11 @@ begin
     config := FConfigurationManager.LoadConfig(options.ConfigFile);
     if config = nil then
       exit;
+
+    installerContext := context;
+    //will be nill when called from command line. The IDE will pass one in.
+    if installerContext = nil then
+      installerContext := TPackageInstallerContext.Create(FLogger);
 
     FPackageCache.Location := config.PackageCacheLocation;
     if not FRepositoryManager.Initialize(config) then
@@ -1390,7 +1395,7 @@ begin
   result := false;
 end;
 
-function TPackageInstaller.Restore(const cancellationToken : ICancellationToken; const options : TRestoreOptions) : Boolean;
+function TPackageInstaller.Restore(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const context : IPackageInstallerContext) : Boolean;
 var
   projectFiles : TArray<string>;
   projectFile : string;
@@ -1399,6 +1404,7 @@ var
   projectList : IList<string>;
   i : integer;
   projectRoot : string;
+  installerContext : IPackageInstallerContext;
 begin
   result := false;
   try
@@ -1411,6 +1417,11 @@ begin
     config := FConfigurationManager.LoadConfig(options.ConfigFile);
     if config = nil then //no need to log, config manager will
       exit;
+
+    installerContext := context;
+    //will be nill when called from command line. The IDE will pass one in.
+    if installerContext = nil then
+      installerContext := TPackageInstallerContext.Create(FLogger);
 
     FPackageCache.Location := config.PackageCacheLocation;
     if not FRepositoryManager.Initialize(config) then
@@ -1572,7 +1583,7 @@ begin
   end;
 end;
 
-function TPackageInstaller.UnInstall(const cancellationToken: ICancellationToken; const options: TUnInstallOptions): boolean;
+function TPackageInstaller.UnInstall(const cancellationToken: ICancellationToken; const options: TUnInstallOptions; const context : IPackageInstallerContext): boolean;
 var
   projectFiles : TArray<string>;
   projectFile : string;
@@ -1581,6 +1592,7 @@ var
   projectList : IList<string>;
   i : integer;
   projectRoot : string;
+  installerContext : IPackageInstallerContext;
 begin
   result := false;
   //commandline would have validated already, but IDE probably not.
@@ -1592,6 +1604,11 @@ begin
   config := FConfigurationManager.LoadConfig(options.ConfigFile);
   if config = nil then //no need to log, config manager will
     exit;
+
+  installerContext := context;
+  //will be nill when called from command line. The IDE will pass one in.
+  if installerContext = nil then
+    installerContext := TPackageInstallerContext.Create(FLogger);
 
   FPackageCache.Location := config.PackageCacheLocation;
   if not FRepositoryManager.Initialize(config) then

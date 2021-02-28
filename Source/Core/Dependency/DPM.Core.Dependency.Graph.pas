@@ -47,7 +47,6 @@ uses
 type
   TGraphNode = class(TInterfacedObject, IGraphNode)
   private
-    //todo : in 10.1+ use weakref
     {$IFDEF USEWEAK}
     [weak]
     FParent : IGraphNode;
@@ -66,6 +65,7 @@ type
     FLibPath : string;
     FBplPath : string;
     FCompilerVersion : TCompilerVersion;
+    FProjectFile : string;
   protected
     function AddChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
     function FindFirstNode(const id : string) : IGraphNode;
@@ -82,6 +82,9 @@ type
     function GetBplPath : string;
     function GetCompilerVersion : TCompilerVersion;
     function GetIsTransitive : boolean;
+    function GetProjectFile: string;
+
+    procedure SetProjectFile(const value: string);
 
     procedure SetBplPath(const value : string);
 
@@ -90,6 +93,7 @@ type
     procedure SetSelectedOn(const value : TVersionRange);
     function RemoveNode(const node : IGraphNode) : boolean;
     function IsRoot : boolean;
+    function IsProjectNode: Boolean;
     function IsTopLevel : boolean;
     function HasChildren : boolean;
     function GetLevel : Integer;
@@ -103,7 +107,9 @@ type
   public
     constructor Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const selectedOn : TVersionRange; const useSource : boolean);
     constructor CreateRoot(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform);
+    constructor CreateProject(const rootNode : IGraphNode; const projectFileName : string);
     destructor Destroy;override;
+
   end;
 
 
@@ -119,6 +125,8 @@ function TGraphNode.AddChildNode(const id : string; const version : TPackageVers
 var
   parent : IGraphNode;
 begin
+  //TODO : Assert that we are not a root node here.. should only ever be called on project nodes or child nodes.
+
   //make sure we are not doing something stupid
   if FChildNodes.ContainsKey(LowerCase(id)) then
     raise Exception.Create('Duplicate package reference ' + FId + '->' + id);
@@ -197,6 +205,12 @@ begin
   else
     FCompilerVersion := compilerVersion;
 
+end;
+
+constructor TGraphNode.CreateProject(const rootNode: IGraphNode; const projectFileName: string);
+begin
+  Assert(rootNode <> nil, 'TGraphNode.CreateProject called with nil rootNode');
+  Create(rootNode, cProjectNode, TPackageVersion.Empty, rootNode.Platform, rootNode.CompilerVersion, TVersionRange.Empty, false);
 end;
 
 constructor TGraphNode.CreateRoot(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform);
@@ -308,6 +322,16 @@ begin
   result := FPlatform;
 end;
 
+function TGraphNode.GetProjectFile: string;
+begin
+  if IsRoot or IsProjectNode then
+    result := FProjectFile
+  else if FParent <> nil then
+    result :=  {$IFDEF USEWEAK} FParent.ProjectFile {$ELSE} IGraphNode(FParent).ProjectFile{$ENDIF}
+  else
+    result := '';
+end;
+
 function TGraphNode.GetSearchPaths: IList<string>;
 begin
   result := FSearchPaths;
@@ -335,6 +359,11 @@ end;
 function TGraphNode.HasChildren : boolean;
 begin
   result := FChildNodes.Any;
+end;
+
+function TGraphNode.IsProjectNode: Boolean;
+begin
+  result := FId = cProjectNode;
 end;
 
 function TGraphNode.IsRoot : boolean;
@@ -384,6 +413,12 @@ end;
 procedure TGraphNode.SetLibPath(const value: string);
 begin
   FLibPath := value;
+end;
+
+procedure TGraphNode.SetProjectFile(const value: string);
+begin
+  if IsRoot or IsProjectNode then
+    FProjectFile := value;
 end;
 
 procedure TGraphNode.SetSelectedOn(const value : TVersionRange);
