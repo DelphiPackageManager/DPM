@@ -1252,6 +1252,10 @@ function TPackageInstaller.Install(const cancellationToken : ICancellationToken;
 var
   projectFiles : TArray<string>;
   config : IConfiguration;
+  groupProjReader : IGroupProjectReader;
+  projectList : IList<string>;
+  i : integer;
+  projectRoot : string;
 begin
   result := false;
   try
@@ -1280,12 +1284,32 @@ begin
 
     if FileExists(options.ProjectPath) then
     begin
-      if ExtractFileExt(options.ProjectPath) <> '.dproj' then
+      if ExtractFileExt(options.ProjectPath) = '.groupproj' then
       begin
-        FLogger.Error('Unsupported project file type [' + options.ProjectPath + ']');
+        groupProjReader := TGroupProjectReader.Create(FLogger);
+        if not groupProjReader.LoadGroupProj(options.ProjectPath) then
+          exit;
+
+        projectList := TCollections.CreateList <string> ;
+        if not groupProjReader.ExtractProjects(projectList) then
+          exit;
+
+        //projects in a project group are likely to be relative, so make them full paths
+        projectRoot := ExtractFilePath(options.ProjectPath);
+        for i := 0 to projectList.Count - 1 do
+        begin
+          //sysutils.IsRelativePath returns false with paths starting with .\
+          if TPathUtils.IsRelativePath(projectList[i]) then
+            //TPath.Combine really should do this but it doesn't
+            projectList[i] := TPathUtils.CompressRelativePath(projectRoot, projectList[i])
+        end;
+        projectFiles := projectList.ToArray;
+      end
+      else
+      begin
+        SetLength(projectFiles, 1);
+        projectFiles[0] := options.ProjectPath;
       end;
-      SetLength(projectFiles, 1);
-      projectFiles[0] := options.ProjectPath;
 
     end
     else if DirectoryExists(options.ProjectPath) then
