@@ -103,7 +103,7 @@ begin
       end
       action.group
       begin
-        description = "Build Tests - 10.3"
+        description = "Build Tests - 10.4"
         id = {6BFDB7C5-1968-4220-9E27-9899822374AA}
         action.continua.set-buildstatus
         begin
@@ -130,7 +130,7 @@ begin
           terminateontimeout = true
           timeoutlength = 2
           as.projectpath = %SRC_ROOT%\\DPM.Core.Tests.dproj
-          as.compilerversion = 10.3
+          as.compilerversion = 10.4
           as.verbosity = Debug
           as.nobanner = True
         end
@@ -148,7 +148,7 @@ begin
           compileridl = true
           configname = Release
           debugversionnumbers = false
-          delphiversion = Delphi10_3
+          delphiversion = Delphi10_4
           enabletimeout = false
           eurekalogverboselogging = false
           frameworktype = VCL
@@ -248,7 +248,7 @@ begin
             mapfile = 0
             maxstacksize = 1048576
             minstacksize = 16384
-            namespaceprefixes = System;Xml;Data;Datasnap;Web;Soap;Winapi;System.Win;Data.Win;Web.Win;Soap.Win;Bde
+            namespaceprefixes = System;Xml;Data;Datasnap;Web;Soap;Winapi;System.Win;Data.Win;Web.Win;Soap.Win;Bde;
             openstrings = true
             optimisation = true
             outputdir = ..\\Output
@@ -905,7 +905,7 @@ begin
         usepropertyset = true
         useversionfromdof = false
         verboseoutput = false
-        versioninfokeys = "LegalCopyright\=© 2019 -2020 Vincent Parrett and Contributors" +
+        versioninfokeys = "LegalCopyright\=© 2019 -2021 Vincent Parrett and Contributors" +
                           "ProductName\=DPM Package Manager" +
                           "ProductVersion\=0.1.10-alpha" +
                           ""

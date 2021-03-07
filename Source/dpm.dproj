@@ -132,8 +132,8 @@
         <DCC_RemoteDebug>true</DCC_RemoteDebug>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <Debugger_CWD>C:\Users\vincent.OFFICE\Documents\Embarcadero\Studio\Projects\10.4\DPMConsoleTest</Debugger_CWD>
-        <Debugger_RunParams>install Spring4D.Core -compiler=10.4</Debugger_RunParams>
+        <Debugger_CWD>I:\FBAT_HG9\Src\IDE</Debugger_CWD>
+        <Debugger_RunParams>restore .\FinalBuilder9.dproj -compiler=10.4 -v=debug</Debugger_RunParams>
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
@@ -289,6 +289,7 @@
         <DCCReference Include="Core\Package\DPM.Core.Package.Icon.pas"/>
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.BOM.pas"/>
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Files.pas"/>
         <BuildConfiguration Include="Debug">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

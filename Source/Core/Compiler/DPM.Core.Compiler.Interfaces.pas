@@ -62,7 +62,7 @@ type
 
     function GetCompilerOutput : TStrings;
 
-    function BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string; const forDesign : boolean = false) : boolean;
+    function BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string; const packageVersion : TPackageVersion; const forDesign : boolean = false) : boolean;
 
     property CompilerVersion : TCompilerVersion read GetCompilerVersion;
     property Configuration : string read GetConfiguration write SetConfiguration;

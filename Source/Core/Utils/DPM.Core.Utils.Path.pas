@@ -30,9 +30,12 @@ interface
 
 type
   TPathUtils = class
-    //sysutils.IsRelativePath returns false with paths starting with .\ grrrrrr
+    //TPath.IsPathRooted treats \xx as rooted which is incorrect
+    class function IsPathRooted(const value : string) : boolean;
+    //SysUtils.IsRelativePath returns false with paths starting with .\ grrrrrr
     class function IsRelativePath(const value : string) : boolean;
-    class function CompressRelativePath(const basePath : string; path : string) : string;
+    class function CompressRelativePath(basePath : string; path : string) : string;overload;
+    class function CompressRelativePath(path : string) : string;overload;
     class function QuotePath(const value : string; const force : boolean = false) : string;
     class function StripBase(const base : string; const fileName : string) : string;
     class function StripWildCard(const value : string) : string;
@@ -43,10 +46,11 @@ implementation
 
 uses
   System.Types,
-  Spring.Collections,
   System.IOUtils,
   System.SysUtils,
   System.StrUtils,
+  System.RegularExpressions,
+  Spring.Collections,
   DPM.Core.Utils.Strings;
 
 //Copied from XE7
@@ -115,17 +119,14 @@ end;
 
 
 
-type
-  TAntStringSplitOptions = (None, ExcludeEmpty);
-
-function AntSplit(const value : string; const Separator : array of Char; Count : Integer; Options : TAntStringSplitOptions) : TArray<string>;
+function AntSplit(const value : string; const Separator: array of Char; const Count: Integer): TArray<string>;
 const
   DeltaGrow = 32;
 var
-  NextSeparator, LastIndex : Integer;
-  Total : Integer;
-  CurrentLength : Integer;
-  S : string;
+  NextSeparator, LastIndex: Integer;
+  Total: Integer;
+  CurrentLength: Integer;
+  S: string;
 begin
   Total := 0;
   LastIndex := 1;
@@ -134,7 +135,7 @@ begin
   while (NextSeparator >= 0) and (Total < Count) do
   begin
     S := Copy(value, LastIndex, NextSeparator - LastIndex);
-    if (S <> '') or ((S = '') and (Options <> ExcludeEmpty)) then
+    if (S <> '') then
     begin
       Inc(Total);
       if CurrentLength < Total then
@@ -161,32 +162,107 @@ end;
 
 { TPathUtils }
 
-class function TPathUtils.CompressRelativePath(const basePath : string; path : string) : string;
+//class function TPathUtils.CompressRelativePath(const basePath : string; path : string) : string;
+//var
+//  stack : IStack<string>;
+//  segments : TArray<string>;
+//  segment : string;
+//begin
+//  if not TPath.IsPathRooted(path) then
+//    path := IncludeTrailingPathDelimiter(basePath) + path
+//  else if not StartsWith(path, basePath) then
+//    exit(path); //should probably except ?
+//
+//  segments := AntSplit(path, [PathDelim], MaxInt, None);
+//  stack := TCollections.CreateStack < string > ;
+//  for segment in segments do
+//  begin
+//    if segment = '..' then
+//    begin
+//      if stack.Count > 0 then
+//        stack.Pop //up one
+//      else
+//        raise Exception.Create('Relative path goes below base path');
+//    end
+//    else if segment <> '.' then
+//      stack.Push(segment);
+//  end;
+//  result := '';
+//  while stack.Count > 0 do
+//  begin
+//    if result <> '' then
+//      result := stack.Pop + PathDelim + result
+//    else
+//      result := stack.Pop;
+//  end;
+//  if EndsWith(path, PathDelim) then
+//    result := IncludeTrailingPathDelimiter(result);
+//end;
+
+class function TPathUtils.CompressRelativePath(basePath: string; path: string): string;
 var
   stack : IStack<string>;
   segments : TArray<string>;
   segment : string;
+  baseSegments : TArray<string>;
+  baseSegLength : integer;
+  isUnc : boolean;
 begin
-  if not TPath.IsPathRooted(path) then
-    path := IncludeTrailingPathDelimiter(basePath) + path
-  else if not StartsWith(path, basePath) then
-    exit(path); //should probably except ?
+  if path = '' then
+    exit(path);
 
-  segments := AntSplit(path, [PathDelim], MaxInt, None);
-  stack := TCollections.CreateStack < string > ;
+  isUnc := false;
+  if basePath <> '' then
+  begin
+    if TPath.IsUNCPath(basePath) then
+    begin
+      isUnc := true;
+      Delete(basePath,1,2);
+      if StartsWith(path, PathDelim) then
+        path := basePath + path
+      else
+        path := IncludeTrailingPathDelimiter(basePath) + path;
+    end
+    else
+    begin
+      if not TPathUtils.IsPathRooted(path) then  //TPath.IsPathRooted treats \ as rooted.. which is incorrect
+        path := IncludeTrailingPathDelimiter(basePath) + path
+       else if not StartsWith(path, basePath) then
+         exit(path);
+    end;
+
+    baseSegments := AntSplit(basePath, [PathDelim], MaxInt);
+    baseSegLength := Length(baseSegments);
+  end
+  else
+    baseSegLength := 1;
+
+  stack := TCollections.CreateStack<string>;
+  if TPath.IsUNCPath(path) then
+  begin
+    Delete(path,1,2);
+    isUnc := true;
+  end;
+
+  segments := AntSplit(path, [PathDelim], MaxInt);
+
+
   for segment in segments do
   begin
     if segment = '..' then
     begin
-      if stack.Count > 0 then
-        stack.Pop //up one
-      else
-        raise Exception.Create('Relative path goes below base path');
+      if stack.Count > 1 then
+        stack.Pop; //up one and don't add
     end
     else if segment <> '.' then
       stack.Push(segment);
   end;
   result := '';
+
+  if stack.Count < baseSegLength then
+    exit(path);
+
+
   while stack.Count > 0 do
   begin
     if result <> '' then
@@ -196,6 +272,27 @@ begin
   end;
   if EndsWith(path, PathDelim) then
     result := IncludeTrailingPathDelimiter(result);
+  if EndsWith(result, ':') then
+    result := result + PathDelim;
+
+  if isUnc then
+    result := '\\' +  result;
+
+  if (basePath <> '') then
+  begin
+    if isUnc then
+      basePath := '\\' + basePath;
+    if not StartsWith(result, basePath) then
+      exit(path);
+  end;
+end;
+
+
+class function TPathUtils.CompressRelativePath(path: string): string;
+begin
+  if path = '' then
+    exit(path);
+  result := CompressRelativePath('', path);
 end;
 
 class function TPathUtils.IsRelativePath(const value : string) : boolean;
@@ -232,6 +329,11 @@ begin
   i := Pos('*', value);
   if i > 0 then
     Delete(result, i, Length(result));
+end;
+
+class function TPathUtils.IsPathRooted(const value: string): boolean;
+begin
+  result := TRegEx.IsMatch(value, '^[a-zA-z]\:\\|\\\\');
 end;
 
 

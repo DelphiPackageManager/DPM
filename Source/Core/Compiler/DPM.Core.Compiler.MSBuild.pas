@@ -81,10 +81,10 @@ type
 
     function GetCompilerOutput : TStrings;
 
-    function GetMSBuildParameters(const configName : string) : string;
-    function GetCommandLine(const projectFile : string; const configName : string) : string;
+    function GetMSBuildParameters(const configName : string; const packageVersion : TPackageVersion) : string;
+    function GetCommandLine(const projectFile : string; const configName : string; const packageVersion : TPackageVersion) : string;
 
-    function BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string; const forDesign : boolean) : Boolean;
+    function BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string; const packageVersion : TPackageVersion; const forDesign : boolean) : Boolean;
   public
     constructor Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const env : ICompilerEnvironmentProvider);
     destructor Destroy; override;
@@ -103,7 +103,7 @@ uses
 
 { TMSBuildCompiler }
 
-function TMSBuildCompiler.BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string; const forDesign : boolean) : Boolean;
+function TMSBuildCompiler.BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string; const packageVersion : TPackageVersion; const forDesign : boolean) : Boolean;
 var
   commandLine : string;
   env : IEnvironmentBlock;
@@ -115,7 +115,7 @@ begin
   FCompilerLogFile := TPath.GetTempFileName;
   FProjectFile := projectFile;
 
-  commandLine := GetCommandLine(projectFile, configName);
+  commandLine := GetCommandLine(projectFile, configName, packageVersion);
 
   env := TEnvironmentBlockFactory.Create(nil, true);
   //THE IDE set these, which makes it difficult to debug the command line version.
@@ -178,12 +178,12 @@ begin
   result := FBPLOutput;
 end;
 
-function TMSBuildCompiler.GetCommandLine(const projectFile, configName : string) : string;
+function TMSBuildCompiler.GetCommandLine(const projectFile, configName : string; const packageVersion : TPackageVersion) : string;
 begin
   //I don't like this... but it will do for a start.
 
   result := 'call "' + FEnv.GetRsVarsFilePath(FCompilerVersion) + '"';
-  result := result + '& msbuild "' + projectfile + '" ' + GetMSBuildParameters(configName);
+  result := result + '& msbuild "' + projectfile + '" ' + GetMSBuildParameters(configName, packageVersion);
   result := ' cmd /c ' + result + ' > ' + FCompilerLogFile;
 end;
 
@@ -203,17 +203,30 @@ begin
 end;
 
 
-function TMSBuildCompiler.GetMSBuildParameters(const configName : string) : string;
+function TMSBuildCompiler.GetMSBuildParameters(const configName : string; const packageVersion : TPackageVersion) : string;
 var
   libPath : string;
   bplPath : string;
 begin
-  result := '/target:Build';
+  //build version info resource first, then bpl.
+  result := '/target:ReBuild';
   result := result + ' /p:Config=' + configName;
   if FBuildForDesign then
     result := result + ' /p:Platform=' + DPMPlatformToBDString(TDPMPlatform.Win32)
   else
     result := result + ' /p:Platform=' + DPMPlatformToBDString(FPlatform);
+
+  //THIS DOES NOT WORK!!!
+  //attempting to update version info
+  result := result + ' /p:VerInfo_IncludeVerInfo=true';
+  result := result + ' /p:VerInfo_MajorVer=' + IntToStr(packageVersion.Major);
+  result := result + ' /p:VerInfo_MinorVer=' + IntToStr(packageVersion.Minor);
+  result := result + ' /p:VerInfo_Release=' + IntToStr(packageVersion.Patch);
+
+  if packageVersion.IsStable then
+    result := result + ' /p:VerInfo_Build=1'
+  else
+    result := result + ' /p:VerInfo_Build=0';
 
 
   //TODO : Check that these props are correctly named for all supported compiler versions.
