@@ -262,7 +262,7 @@ begin
     TZipFile.ExtractZipFile(packageFilePath, packageFolder);
     result := FileExists(IncludeTrailingPathDelimiter(packageFolder) + cPackageMetaFile);
     if result then
-      FLogger.Information('Package  [' + packageFilePath + '] added to cache.');
+      FLogger.Verbose('Package  [' + packageFilePath + '] added to cache.');
 
   except
     on e : exception do
