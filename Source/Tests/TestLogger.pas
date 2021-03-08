@@ -16,9 +16,11 @@ type
     procedure Verbose(const data: string; const important : boolean = false);
     procedure Warning(const data: string; const important : boolean = false);
     procedure Clear;
+    procedure NewLine;
 
     function GetVerbosity : TVerbosity;
     procedure SetVerbosity(const value : TVerbosity);
+
   end;
 
 implementation
@@ -48,6 +50,11 @@ end;
 procedure TTestLogger.Information(const data: string; const important : boolean);
 begin
 
+end;
+
+procedure TTestLogger.NewLine;
+begin
+///
 end;
 
 procedure TTestLogger.SetVerbosity(const value: TVerbosity);
