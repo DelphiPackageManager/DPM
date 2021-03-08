@@ -39,36 +39,36 @@ type
     FName : string;
     FOutputDir : string;
     FPlatform : TDPMPlatform;
-    FLinkWithRuntime : Boolean;
+    FUsesRuntimePackages : Boolean;
     FPackages : IList<string>;
   protected
-    function GetLinkWithRuntime : Boolean;
+    function GetUsesRuntimePackages : Boolean;
     function GetName : string;
     function GetOutputDir : string;
     function GetPlatform : TDPMPlatform;
     function GetPackages : IList<string>;
   public
-    constructor Create(const name, outputdir : string; const platform : TDPMPlatform; const linkWithRuntime : boolean; const packages : IEnumerable<string>);
+    constructor Create(const name, outputdir : string; const platform : TDPMPlatform; const usesRuntimePackages : boolean; const packages : IEnumerable<string>);
   end;
 
 implementation
 
 { TProjectConfiguration }
 
-constructor TProjectConfiguration.Create(const name, outputdir : string; const platform : TDPMPlatform; const linkWithRuntime : boolean; const packages : IEnumerable<string>);
+constructor TProjectConfiguration.Create(const name, outputdir : string; const platform : TDPMPlatform; const usesRuntimePackages : boolean; const packages : IEnumerable<string>);
 begin
   FName := name;
   FOutputDir := outputdir;
   FPlatform := platform;
-  FLinkWithRuntime := linkWithRuntime;
+  FUsesRuntimePackages := usesRuntimePackages;
   FPackages := TCollections.CreateList <string> ;
   if packages <> nil then
     FPackages.AddRange(packages);
 end;
 
-function TProjectConfiguration.GetLinkWithRuntime : Boolean;
+function TProjectConfiguration.GetUsesRuntimePackages : Boolean;
 begin
-  result := FLinkWithRuntime;
+  result := FUsesRuntimePackages;
 end;
 
 function TProjectConfiguration.GetName : string;

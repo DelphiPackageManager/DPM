@@ -48,12 +48,14 @@ type
     FProjectXML : IXMLDOMDocument;
     FCompiler : TCompilerVersion;
     FPlatforms : TDPMPlatforms;
+    FProjectFile : string;
     FMainSource : string;
     FProjectVersion : string;
     FPackageRefences : IDictionary<TDPMPlatform, IGraphNode>;
     FFileName : string;
     FAppType : TAppType;
     FConfigurations : IDictionary<string, IProjectConfiguration>;
+    FConfigNames : IList<string>;
   protected
     function GetOutputElementName : string;
 
@@ -74,6 +76,9 @@ type
     function GetProjectVersion : string;
     function GetAppType : TAppType;
     function GetHasPackages : boolean;
+    function GetProjectFile : string;
+    function GetProjectConfiguration(const name : string; const platform : TDPMPlatform) : IProjectConfiguration;
+
     procedure SetCompiler(const value : TCompilerVersion);
 
     function LoadProject(const filename : string) : Boolean;
@@ -85,7 +90,7 @@ type
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string> ; const packageCacheLocation : string) : boolean;
     procedure UpdatePackageReferences(const dependencyGraph : IGraphNode; const platform : TDPMPlatform);
     function GetPackageReferences(const platform : TDPMPlatform) : IGraphNode;
-
+    function GetConfigNames: IReadOnlyList<string>;
   public
     constructor Create(const logger : ILogger; const config : IConfiguration; const compilerVersion : TCompilerVersion);
   end;
@@ -192,6 +197,7 @@ begin
   FPlatforms := [];
   FPackageRefences := TCollections.CreateDictionary<TDPMPlatform, IGraphNode>;
   FConfigurations := TCollections.CreateDictionary <string, IProjectConfiguration> ;
+  FConfigNames := TCollections.CreateList<string>;
 end;
 
 function TProjectEditor.GetPackageReferences(const platform : TDPMPlatform) : IGraphNode;
@@ -205,6 +211,20 @@ end;
 function TProjectEditor.GetPlatforms : TDPMPlatforms;
 begin
   result := FPlatforms;
+end;
+
+function TProjectEditor.GetProjectConfiguration(const name: string;  const platform: TDPMPlatform): IProjectConfiguration;
+var
+  sKey : string;
+begin
+  result := nil;
+  sKey := LowerCase(name + '_' + DPMPlatformToBDString(platform));
+  FConfigurations.TryGetValue(sKey, result);
+end;
+
+function TProjectEditor.GetProjectFile: string;
+begin
+  result := FProjectFile;
 end;
 
 function TProjectEditor.GetProjectVersion : string;
@@ -330,6 +350,11 @@ begin
   result := FCompiler;
 end;
 
+function TProjectEditor.GetConfigNames: IReadOnlyList<string>;
+begin
+  result := FConfigNames as IReadOnlyList<string>;
+end;
+
 function TProjectEditor.InternalLoadFromXML : boolean;
 begin
   result := LoadProjectVersion;
@@ -446,6 +471,7 @@ begin
           if parentElement <> nil then
             sParent := parentElement.text;
 
+          FConfigNames.Add(sName);
           configKeys.Add(sName + '=' + sKey);
           configParents.Add(sKey + '=' + sParent);
         end;
@@ -469,13 +495,14 @@ begin
             sOutputDir := StringReplace(sOutputDir, '$(Platform)', sPlatform, [rfReplaceAll, rfIgnoreCase]);
             sOutputDir := StringReplace(sOutputDir, '$(Config)', configKeys.Names[i], [rfReplaceAll, rfIgnoreCase]);
           end;
-          //          if sOutputDir = '' then
-          //            FLogger.Warning('No output directory found for config ' + configKeys.Names[i]);
+          if sOutputDir = '' then
+             FLogger.Debug('No output directory found for config ' + configKeys.Names[i] + '_' + sPlatform);
 
           sUsePackages := 'false';
-          TryGetConfigValue(sKey, sPlatform, 'UsePackages', sUsePackages);
+          TryGetConfigValue(sKey, sPlatform, 'x:UsePackages', sUsePackages);
           newConfig := TProjectConfiguration.Create(configKeys.Names[i], sOutputDir, platform, StrToBoolDef(sUsePackages, false), nil);
-          FConfigurations[LowerCase(configKeys.Names[i])] := newConfig;
+          sKey := LowerCase(configKeys.Names[i] + '_' + sPlatform);
+          FConfigurations[sKey] := newConfig;
         end;
       end;
       result := true;
@@ -574,7 +601,6 @@ function TProjectEditor.LoadPackageRefences : boolean;
           result := false;
           exit;
         end;
-
         //if we have a parent that isn't root then we will use it's platform
         if (parentReference <> nil) and (not parentReference.IsRoot) then
           platform := parentReference.Platform
@@ -687,6 +713,7 @@ begin
     FLogger.Error('Project file : [' + filename + '] does not exist');
     exit;
   end;
+  FProjectFile := filename;
   FProjectXML := CoDOMDocument60.Create;
 
   try

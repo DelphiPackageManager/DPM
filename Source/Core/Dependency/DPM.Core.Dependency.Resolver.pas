@@ -144,7 +144,7 @@ begin
 
     for dependency in currentPackage.Dependencies do
     begin
-      FLogger.Information('Resolving dependency : ' + currentPackage.Id + '.' + currentPackage.Version.ToStringNoMeta + '->' + dependency.Id + ' ' + dependency.VersionRange.ToString, true);
+      FLogger.Information('Resolving dependency : ' + currentPackage.Id + '.' + currentPackage.Version.ToStringNoMeta + '->' + dependency.Id + ' ' + dependency.VersionRange.ToString);
       //first see if we have resolved this package already.
       if context.TryGetResolution(dependency.Id, resolution) then
       begin
@@ -186,7 +186,7 @@ begin
         end
         else
         begin
-          FLogger.Debug('       resolved : ' + dependency.Id + '.' + resolution.Package.Version.ToString);
+          FLogger.Information('            resolved : ' + dependency.Id + '.' + resolution.Package.Version.ToString);
           //in the case where we are promoting a transient to a direct dependency, we need a range.
           //the direct will not have a range so we convert the version to a range.
           if resolution.VersionRange.IsEmpty then
@@ -273,7 +273,8 @@ begin
 
   result := true;
 
-  FLogger.Debug('Dependency resolution done in ' + IntToStr(FStopwatch.ElapsedMilliseconds) + 'ms');
+  FLogger.Success('Dependency resolution done in [' + IntToStr(FStopwatch.ElapsedMilliseconds) + 'ms]');
+  FLogger.NewLine;
 
 end;
 

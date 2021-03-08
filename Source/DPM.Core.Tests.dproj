@@ -234,6 +234,8 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Types.pas"/>
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.BOM.pas"/>
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Files.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.PathUtils.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

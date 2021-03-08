@@ -48,7 +48,7 @@ type
     function GetVerbosity : TVerbosity;
     procedure SetVerbosity(const value : TVerbosity);
     procedure Clear;
-
+    procedure NewLine;
   public
     constructor Create(const console : IConsoleWriter);
   end;
@@ -103,6 +103,11 @@ begin
     FConsole.SetColour(ccWhite);
   FConsole.Write(data);
   FConsole.SetColour(ccDefault);
+end;
+
+procedure TDPMConsoleLogger.NewLine;
+begin
+  FConsole.WriteLine(' ');
 end;
 
 procedure TDPMConsoleLogger.SetVerbosity(const value: TVerbosity);

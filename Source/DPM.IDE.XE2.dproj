@@ -6,7 +6,7 @@
 			<Config Condition="'$(Config)'==''">Debug</Config>
 			<TargetedPlatforms>1</TargetedPlatforms>
 			<AppType>Library</AppType>
-			<FrameworkType>VCL</FrameworkType>
+        	<FrameworkType>None</FrameworkType>
 			<ProjectVersion>13.4</ProjectVersion>
 			<Platform Condition="'$(Platform)'==''">Win32</Platform>
 		</PropertyGroup>
@@ -247,6 +247,7 @@
 			<DCCReference Include="Core\Compiler\DPM.Core.Compiler.BOM.pas"/>
 			<DCCReference Include="Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas"/>
 			<DCCReference Include="Controls\DPM.Controls.VersionGrid.pas"/>
+        	<DCCReference Include="Core\Utils\DPM.Core.Utils.Files.pas"/>
 			<RcItem Include="images\dpm.bmp">
 				<ResourceType>BITMAP</ResourceType>
 				<ResourceId>DPMIDELOGO</ResourceId>
@@ -335,8 +336,8 @@
 			</BorlandProject>
 			<ProjectFileVersion>12</ProjectFileVersion>
 			<DPM>
-				<PackageReference platform="Win32" id="Spring4D.Core" version="2.0.0-dev5">
-					<PackageReference platform="Win32" id="Spring4D.Base" range="[2.0.0-dev5,]" version="2.0.0-dev5"/>
+            <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.0-dev5">
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev5" range="[2.0.0-dev5,]"/>
 				</PackageReference>
 				<PackageReference platform="Win32" id="Spring4D.Extensions" version="2.0.0-dev5">
 					<PackageReference platform="Win32" id="Spring4D.Base" range="[2.0.0-dev5,]" version="2.0.0-dev5"/>

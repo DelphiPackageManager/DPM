@@ -56,6 +56,7 @@ type
     procedure Success(const data : string; const important : Boolean = False);
     procedure Verbose(const data : string; const important : Boolean = False);
     procedure Warning(const data : string; const important : Boolean = False);
+    procedure NewLine;
     function GetVerbosity : TVerbosity;
     procedure SetVerbosity(const value : TVerbosity);
 
@@ -177,6 +178,24 @@ begin
     TThread.Queue(nil, infoProc);
 
 
+
+end;
+
+procedure TDPMIDELogger.NewLine;
+var
+  lineRef : Pointer;
+  infoProc : TThreadProcedure;
+begin
+
+  infoProc := procedure
+  begin
+    FMessageServices.AddToolMessage('', ' ', '', 0, 0, nil, lineRef, FMessageGroup);
+  end;
+
+  if TThread.CurrentThread.ThreadID = MainThreadID then
+    infoProc
+  else
+    TThread.Queue(nil, infoProc);
 
 end;
 

@@ -41,6 +41,7 @@ type
     procedure Error(const data : string);
     procedure Success(const data : string; const important : boolean = false);
     procedure Clear; //not implemented in the console logger.
+    procedure NewLine;
 
     function GetVerbosity : TVerbosity;
     procedure SetVerbosity(const value : TVerbosity);

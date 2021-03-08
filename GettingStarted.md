@@ -48,6 +48,8 @@ https://github.com/VSoftTechnologies/VSoft.CancellationToken/releases
 
 https://github.com/VSoftTechnologies/VSoft.WeakReferences/releases
 
+https://github.com/VSoftTechnologies/Spring4DMirror
+
 Once you have some packages, you can either install packages from the command line, or using the IDE plugin. The IDE plugin adds a DPM node to each project in the project tree,
 and a right click menu to "Manage DPM Packages". The DPM package view will open docked in the IDE code window, opened on the Installed tab. To add packages, switch to the search
 tab, search or click on the package you want to install, and in the package details panel on the right, click on install. If there are multiple package versions, you can chose
@@ -80,10 +82,11 @@ DPM is bootstrapped, so you need DPM to build dpm!
 
 dpm.dproj requires these packages :
 
-Ahausladen.JsonDataObjects
-Spring4D.Core
-Spring4D.Base
+VSoft.JsonDataObjects 
+Spring4D.Core 
+Spring4D.Base 
 Spring4D.Extensions
+
 VSoft.AntPatterns
 VSoft.Awaitable
 Gabr42.OmniThreadLibrary
@@ -95,7 +98,7 @@ VSoft.Uri
 
 DPM.IDE.XXX.dproj requires these packages :
 
-Ahausladen.JsonDataObjects
+VSoft.JsonDataObjects
 Spring4D.Core
 Spring4D.Base
 Spring4D.Extensions
@@ -110,27 +113,17 @@ VSoft.VirtualListView
 
 Some projects do not yet have dpm packages available, for those you will need to pack them yourself. The dspec files for these are in the thirdparty folder Copy the dspec file to the local repo folder
 
-https://github.com/ahausladen/JsonDataObjects
+https://github.com/gabr42/OmniThreadLibrary
 
 open a command prompt in the repo folder and run
 
-dpm pack Ahausladen.JsonDataObjects.dspec -o=c:\yourpackagefolder
-
-https://github.com/gabr42/OmniThreadLibrary
-
 dpm pack Gabr42.OmniThreadLibrary.dspec -o=c:\yourpackagefolder
 
-https://bitbucket.org/sglienke/spring4d/src/develop/
-
-Copy the Spring4D.xxx.dspec files to the Source folder and open a command prompt there
-
-dpm pack Spring4D.Base.dspec -o=c:\yourpackagefolder
-dpm pack Spring4D.Core.dspec -o=c:\yourpackagefolder
-dpm pack Spring4D.Extensions.dspec -o=c:\yourpackagefolder
-dpm pack Spring4D.Persistence.dspec -o=c:\yourpackagefolder
-dpm pack Spring4D.Data.dspec -o=c:\yourpackagefolder
-
 If you have a package source configured and the IDE plugin installed, it should restore the packages when you load the project. Note that errors in the IDE plugin are not obvious, on some versions of the IDE it does not show the messages view when it should.
+
+You can also restore the packages from the command line (assuming you are in the source folder on the command prompt)
+
+dpm restore .\dpm-104.groupproj -compiler=10.4
 
 Debugging the IDE plugin should be done using runtime parameters : -rDPM
 Host executable should be the same version of bds.exe that you are using to compile with. If you try use a different bds.exe version to debug, it won't be pretty!
