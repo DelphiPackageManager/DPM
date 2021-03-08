@@ -350,7 +350,7 @@ begin
 
   for buildEntry in packageSpec.TargetPlatform.BuildEntries do
   begin
-    FLogger.Information('Building package : ' + buildEntry.Project);
+    FLogger.Information('Building project : ' + buildEntry.Project);
 
     projectFile := TPath.Combine(packagePath, buildEntry.Project);
     projectFile := TPathUtils.CompressRelativePath('',projectFile);
@@ -395,12 +395,13 @@ begin
       FLogger.Information('Building project [' + projectFile + '] for design time...');
       result := compiler.BuildProject(cancellationToken, projectFile, buildEntry.Config, packageInfo.Version, true);
       if result then
-        FLogger.Success('Ok.')
+        FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
       else
       begin
-        FLogger.Error('Building project [' + projectFile + '] failed.');
+        FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
         exit;
       end;
+      FLogger.NewLine;
 
     end
     else
@@ -430,13 +431,13 @@ begin
 
       result := compiler.BuildProject(cancellationToken, projectFile, buildEntry.Config, packageInfo.Version );
       if result then
-        FLogger.Success('Ok.')
+        FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
       else
       begin
-        FLogger.Error('Building project [' + projectFile + '] failed.');
+        FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
         exit;
       end;
-
+      FLogger.NewLine;
 
       if buildEntry.BuildForDesign and (compiler.Platform <> TDPMPlatform.Win32) then
       begin
@@ -462,10 +463,10 @@ begin
 
         result := compiler.BuildProject(cancellationToken, projectFile, buildEntry.Config, packageInfo.Version, true);
         if result then
-          FLogger.Success('Project [' + projectFile + '] Compiled for designtime Ok.')
+          FLogger.Success('Project [' + buildEntry.Project + '] Compiled for designtime Ok.')
         else
         begin
-          FLogger.Error('Building project [' + projectFile + '] failed.');
+          FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
           exit;
         end;
 
@@ -572,11 +573,13 @@ begin
             continue;
           //now actually copy files.
           try
+            ForceDirectories(ExtractFilePath(bplTargetFile));
             TFile.Copy(bplSourceFile, bplTargetFile, true);
           except
             on e : Exception do
             begin
-              FLogger.Warning('Unabled to copy runtime package [' + bplTargetFile + '] during copy local');
+              FLogger.Warning('Unable to copy runtime package [' + bplSourceFile + '] to [' + bplTargetFile + '] during copy local');
+              FLogger.Warning('  ' + e.Message);
             end;
           end;
         end;
@@ -1510,14 +1513,22 @@ end;
 function TPackageInstaller.InstallPackageFromId(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFiles : TArray <string> ; const config : IConfiguration) : boolean;
 var
   projectFile : string;
+  i : integer;
 begin
   result := true;
   FContext.Reset;
   try
-    for projectFile in projectFiles do
+    for i := 0 to Length(projectFiles) - 1 do
     begin
       if cancellationToken.IsCancelled then
         exit;
+      projectFile := projectFiles[0];
+      if TPathUtils.IsRelativePath(projectFile) then
+      begin
+        projectFile := TPath.Combine(GetCurrentDir, projectFile);
+        projectFile := TPathUtils.CompressRelativePath(projectFile);
+      end;
+
       result := InstallPackage(cancellationToken, options, projectFile, config) and result;
     end;
   finally
