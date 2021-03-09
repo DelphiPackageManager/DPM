@@ -32,23 +32,32 @@ interface
 uses
   ToolsApi,
   DPM.Core.Types,
-  DPM.Core.Logging;
+  DPM.Core.Logging,
+  DPM.IDE.MessageService;
 
 type
   IDPMIDELogger = interface(ILogger)
     ['{02CA41D0-F46A-4FB7-A743-DFCFA3E0EAD9}']
     procedure ShowMessageTab;
+
     procedure StartRestore;
     procedure EndRestore;
+    procedure StartInstall;
+    procedure EndInstall;
+    procedure StartUnInstall;
+    procedure EndUnInstall;
+
     procedure StartProject(const fileName : string; const msg : string = '');
     procedure EndProject(const fileName : string; const msg : string = '');
+
   end;
 
-  TDPMIDELogger = class(TInterfacedObject, ILogger, IDPMIDELogger)
+  TDPMIDELogger = class(TInterfacedObject, IDPMIDELogger, ILogger )
   private
     FMessageServices : IOTAMessageServices;
     FMessageGroup : IOTAMessageGroup;
     FVerbosity : TVerbosity;
+    FDPMMessageService : IDPMIDEMessageService;
   protected
     procedure Debug(const data : string);
     procedure Error(const data : string);
@@ -62,12 +71,21 @@ type
 
     procedure Clear;
     procedure ShowMessageTab;
+
     procedure StartProject(const fileName : string; const msg : string = '');
     procedure EndProject(const fileName : string; const msg : string = '');
+
     procedure StartRestore;
     procedure EndRestore;
+
+    procedure StartInstall;
+    procedure EndInstall;
+    procedure StartUnInstall;
+    procedure EndUnInstall;
+
+
   public
-    constructor Create;
+    constructor Create(const dpmMessageService : IDPMIDEMessageService);
     destructor Destroy; override;
   end;
 
@@ -85,8 +103,9 @@ begin
   FMessageServices.ClearMessageGroup(FMessageGroup);
 end;
 
-constructor TDPMIDELogger.Create;
+constructor TDPMIDELogger.Create(const dpmMessageService : IDPMIDEMessageService);
 begin
+  FDPMMessageService := dpmMessageService;
   FMessageServices := BorlandIDEServices as IOTAMessageServices;
   FMessageGroup := FMessageServices.AddMessageGroup('DPM');
   FMessageGroup.CanClose := false;
@@ -123,17 +142,28 @@ begin
   inherited;
 end;
 
-procedure TDPMIDELogger.EndProject(const fileName : string; const msg : string);
-var
-  lineRef : Pointer;
+procedure TDPMIDELogger.EndInstall;
 begin
-  FMessageServices.AddToolMessage(fileName, 'Done.' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
+//  FDPMMessageService.HideMessageWindow;
+end;
+
+procedure TDPMIDELogger.EndProject(const fileName : string; const msg : string);
+//var
+//  lineRef : Pointer;
+begin
+  //FMessageServices.AddToolMessage(fileName, 'Done.' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
 
 end;
 
 procedure TDPMIDELogger.EndRestore;
 begin
+//  FDPMMessageService.HideMessageWindow;
   //  FMessageServices.AddTitleMessage('DPM Restore done.', FMessageGroup);
+end;
+
+procedure TDPMIDELogger.EndUnInstall;
+begin
+//  FDPMMessageService.HideMessageWindow;
 end;
 
 procedure TDPMIDELogger.Error(const data : string);
@@ -145,6 +175,7 @@ begin
   errorProc := procedure
   begin
     FMessageServices.AddToolMessage('', 'ERR: ' + data, '', 0, 0, nil, lineRef, FMessageGroup);
+    FDPMMessageService.Error('ERR: ' + data);
   end;
 
   if TThread.CurrentThread.ThreadID = MainThreadID then
@@ -170,6 +201,7 @@ begin
   infoProc := procedure
   begin
     FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+    FDPMMessageService.Information(data, important);
   end;
 
   if TThread.CurrentThread.ThreadID = MainThreadID then
@@ -190,6 +222,7 @@ begin
   infoProc := procedure
   begin
     FMessageServices.AddToolMessage('', ' ', '', 0, 0, nil, lineRef, FMessageGroup);
+    FDPMMessageService.NewLine;
   end;
 
   if TThread.CurrentThread.ThreadID = MainThreadID then
@@ -207,18 +240,30 @@ end;
 procedure TDPMIDELogger.ShowMessageTab;
 begin
   FMessageServices.ShowMessageView(FMessageGroup);
+  FDPMMessageService.ShowMessageWindow;
+end;
+
+procedure TDPMIDELogger.StartInstall;
+begin
+  FDPMMessageService.ShowMessageWindow;
 end;
 
 procedure TDPMIDELogger.StartProject(const fileName : string; const msg : string);
-var
-  lineRef : Pointer;
+//var
+//  lineRef : Pointer;
 begin
-  FMessageServices.AddToolMessage(fileName, 'Restoring packages...' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
+  //FMessageServices.AddToolMessage(fileName, 'Restoring packages...' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
 end;
 
 procedure TDPMIDELogger.StartRestore;
 begin
   //  FMessageServices.AddTitleMessage('Restoring DPM packages', FMessageGroup);
+  FDPMMessageService.ShowMessageWindow;
+end;
+
+procedure TDPMIDELogger.StartUnInstall;
+begin
+  FDPMMessageService.ShowMessageWindow;
 end;
 
 procedure TDPMIDELogger.Success(const data: string; const important: Boolean);
@@ -232,6 +277,7 @@ begin
   infoProc := procedure
   begin
     FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+    FDPMMessageService.Success(data, important);
   end;
 
   if TThread.CurrentThread.ThreadID = MainThreadID then
@@ -251,6 +297,7 @@ begin
   verboseProc := procedure
   begin
     FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+    FDPMMessageService.Verbose(data, important);
   end;
 
   if TThread.CurrentThread.ThreadID = MainThreadID then
@@ -269,6 +316,7 @@ begin
   warningProc := procedure
   begin
     FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+    FDPMMessageService.Warning(data, important);
   end;
 
   if TThread.CurrentThread.ThreadID = MainThreadID then

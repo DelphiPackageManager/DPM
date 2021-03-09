@@ -126,6 +126,7 @@ begin
       Application.ProcessMessages;
     FCancellationTokenSource.Reset;
     FLogger.Clear;
+    FLogger.StartInstall;
     FPackageSearcher.SaveBeforeChange;
     FLogger.ShowMessageTab;
     FLogger.Information('Installing package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + ']');
@@ -158,6 +159,7 @@ begin
 
   finally
     btnInstallOrUpdate.Enabled := true;
+    FLogger.EndInstall;
   end;
 
 
@@ -178,6 +180,7 @@ begin
       Application.ProcessMessages;
     FCancellationTokenSource.Reset;
     FLogger.Clear;
+    FLogger.StartUnInstall;
     FPackageSearcher.SaveBeforeChange;
     FLogger.ShowMessageTab;
     FLogger.Information('UnInstalling package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + ']');
@@ -205,6 +208,7 @@ begin
 
   finally
     btnUninstall.Enabled := true;
+    FLogger.EndUnInstall;
   end;
 
 end;

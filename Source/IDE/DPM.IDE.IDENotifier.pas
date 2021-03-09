@@ -184,7 +184,7 @@ begin
             //need this to determine when we are done loading the project group.
             if not LoadProjectGroup(FileName) then
             begin
-              //Cancel := true; //stop loading ass the group file is messed up?
+              //Cancel := true; //stop loading as the group file is messed up?
               //not sure this is the right thing to do, we might have a bug that is our fault.
               exit;
             end;

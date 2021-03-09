@@ -54,7 +54,6 @@ type
     procedure ProjectSaving(const fileName : string);
 
     procedure RestoreProject(const fileName : string);
-
   public
     constructor Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager;
                        const projectTreeManager : IDPMProjectTreeManager);
@@ -76,7 +75,7 @@ procedure TDPMIDEProjectController.BeginLoading(const mode: TProjectMode);
 begin
   FProjectMode := mode;
   FLogger.Debug('ProjectController.BeginLoading : ' + GetEnumName(TypeInfo(TProjectMode),Ord(mode)));
-
+  FLogger.StartRestore;
 end;
 
 constructor TDPMIDEProjectController.Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager;
@@ -102,6 +101,7 @@ procedure TDPMIDEProjectController.EndLoading(const mode: TProjectMode);
 begin
 //  FLogger.Debug('ProjectController.EndLoading : ' + GetEnumName(TypeInfo(TProjectMode),Ord(mode)));
   FProjectMode := pmNone;
+  FLogger.EndRestore;
   FProjectTreeManager.NotifyEndLoading;
 end;
 
@@ -148,6 +148,7 @@ begin
     FProjectTreeManager.NotifyEndLoading;
     FEditorViewManager.ProjectLoaded(fileName);
   end;
+  FLogger.EndProject(fileName);
 end;
 
 procedure TDPMIDEProjectController.ProjectSaving(const fileName: string);
@@ -171,13 +172,13 @@ begin
 
   cancellationTokenSource := TCancellationTokenSourceFactory.Create;
   FLogger.ShowMessageTab;
-  FLogger.StartRestore;
   FLogger.StartProject(FileName);
 
   FPackageInstaller.Restore(cancellationTokenSource.Token, options);
-  FLogger.EndRestore;
+  FLogger.EndProject(fileName);
 
 
 end;
+
 
 end.
