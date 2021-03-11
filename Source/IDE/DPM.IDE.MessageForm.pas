@@ -9,7 +9,7 @@ uses
   Vcl.Dialogs,
   Vcl.StdCtrls,
   VSoft.Awaitable,
-  DPM.Controls.LogMemo, Vcl.ActnList, Vcl.ExtCtrls, System.Actions;
+  DPM.Controls.LogMemo, Vcl.ActnList, Vcl.ExtCtrls;
 
 type
   TDPMMessageForm = class(TForm)
