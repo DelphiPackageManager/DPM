@@ -119,7 +119,7 @@ var
 begin
   result := false;
 //  FLogger.Clear;
-  FLogger.StartRestore;
+//  FLogger.StartRestore(FCam;
   FGroupProjects.Clear;
   groupReader := TGroupProjectReader.Create(FLogger);
   if groupReader.LoadGroupProj(fileName) then
@@ -191,7 +191,9 @@ begin
             FProjectController.BeginLoading(TProjectMode.pmGroup);
           end;
           exit;
-        end;
+        end
+        else if not FLoadingGroup then
+          FProjectController.BeginLoading(TProjectMode.pmSingle);
         {$ELSE}
         //10.4 adds ofnBeginProjectGroupOpen, ofnEndProjectGroupOpen, ofnBeginProjectGroupClose, ofnEndProjectGroupClose
         if (ext = '.groupproj') then

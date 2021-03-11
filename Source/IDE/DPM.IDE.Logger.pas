@@ -31,6 +31,7 @@ interface
 
 uses
   ToolsApi,
+  VSoft.Awaitable,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.IDE.MessageService;
@@ -40,12 +41,12 @@ type
     ['{02CA41D0-F46A-4FB7-A743-DFCFA3E0EAD9}']
     procedure ShowMessageTab;
 
-    procedure StartRestore;
-    procedure EndRestore;
-    procedure StartInstall;
-    procedure EndInstall;
-    procedure StartUnInstall;
-    procedure EndUnInstall;
+    procedure StartRestore(const cancellationTokenSource : ICancellationTokenSource);
+    procedure EndRestore(const success  : boolean);
+    procedure StartInstall(const cancellationTokenSource : ICancellationTokenSource);
+    procedure EndInstall(const success  : boolean);
+    procedure StartUnInstall(const cancellationTokenSource : ICancellationTokenSource);
+    procedure EndUnInstall(const success  : boolean);
 
     procedure StartProject(const fileName : string; const msg : string = '');
     procedure EndProject(const fileName : string; const msg : string = '');
@@ -75,13 +76,13 @@ type
     procedure StartProject(const fileName : string; const msg : string = '');
     procedure EndProject(const fileName : string; const msg : string = '');
 
-    procedure StartRestore;
-    procedure EndRestore;
+    procedure StartRestore(const cancellationTokenSource : ICancellationTokenSource);
+    procedure EndRestore(const success  : boolean);
 
-    procedure StartInstall;
-    procedure EndInstall;
-    procedure StartUnInstall;
-    procedure EndUnInstall;
+    procedure StartInstall(const cancellationTokenSource : ICancellationTokenSource);
+    procedure EndInstall(const success  : boolean);
+    procedure StartUnInstall(const cancellationTokenSource : ICancellationTokenSource);
+    procedure EndUnInstall(const success  : boolean);
 
 
   public
@@ -125,7 +126,8 @@ begin
   debugProc := procedure
   begin
     if FMessageServices <> nil then
-      FMessageServices.AddToolMessage('', 'DEBUG: ' + data, '', 0, 0, nil, lineRef, FMessageGroup)
+      FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+    FDPMMessageService.Debug(data);
   end;
 
   //FMessageServices is implemented by a vcl control, so we need to ensure it's only updated by the main thread.
@@ -142,9 +144,9 @@ begin
   inherited;
 end;
 
-procedure TDPMIDELogger.EndInstall;
+procedure TDPMIDELogger.EndInstall(const success  : boolean);
 begin
-//  FDPMMessageService.HideMessageWindow;
+  FDPMMessageService.TaskDone(success);
 end;
 
 procedure TDPMIDELogger.EndProject(const fileName : string; const msg : string);
@@ -155,15 +157,15 @@ begin
 
 end;
 
-procedure TDPMIDELogger.EndRestore;
+procedure TDPMIDELogger.EndRestore(const success  : boolean);
 begin
-//  FDPMMessageService.HideMessageWindow;
   //  FMessageServices.AddTitleMessage('DPM Restore done.', FMessageGroup);
+  FDPMMessageService.TaskDone(success);
 end;
 
-procedure TDPMIDELogger.EndUnInstall;
+procedure TDPMIDELogger.EndUnInstall(const success  : boolean);
 begin
-//  FDPMMessageService.HideMessageWindow;
+  FDPMMessageService.TaskDone(success);
 end;
 
 procedure TDPMIDELogger.Error(const data : string);
@@ -175,7 +177,7 @@ begin
   errorProc := procedure
   begin
     FMessageServices.AddToolMessage('', 'ERR: ' + data, '', 0, 0, nil, lineRef, FMessageGroup);
-    FDPMMessageService.Error('ERR: ' + data);
+    FDPMMessageService.Error(data);
   end;
 
   if TThread.CurrentThread.ThreadID = MainThreadID then
@@ -240,12 +242,11 @@ end;
 procedure TDPMIDELogger.ShowMessageTab;
 begin
   FMessageServices.ShowMessageView(FMessageGroup);
-  FDPMMessageService.ShowMessageWindow;
 end;
 
-procedure TDPMIDELogger.StartInstall;
+procedure TDPMIDELogger.StartInstall(const cancellationTokenSource : ICancellationTokenSource);
 begin
-  FDPMMessageService.ShowMessageWindow;
+  FDPMMessageService.TaskStarted(cancellationTokenSource, mtInstall);
 end;
 
 procedure TDPMIDELogger.StartProject(const fileName : string; const msg : string);
@@ -255,15 +256,15 @@ begin
   //FMessageServices.AddToolMessage(fileName, 'Restoring packages...' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
 end;
 
-procedure TDPMIDELogger.StartRestore;
+procedure TDPMIDELogger.StartRestore(const cancellationTokenSource : ICancellationTokenSource);
 begin
   //  FMessageServices.AddTitleMessage('Restoring DPM packages', FMessageGroup);
-  FDPMMessageService.ShowMessageWindow;
+  FDPMMessageService.TaskStarted(cancellationTokenSource, mtRestore);
 end;
 
-procedure TDPMIDELogger.StartUnInstall;
+procedure TDPMIDELogger.StartUnInstall(const cancellationTokenSource : ICancellationTokenSource);
 begin
-  FDPMMessageService.ShowMessageWindow;
+  FDPMMessageService.TaskStarted(cancellationTokenSource, mtUninstall);
 end;
 
 procedure TDPMIDELogger.Success(const data: string; const important: Boolean);

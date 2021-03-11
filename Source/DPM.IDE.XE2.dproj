@@ -6,7 +6,7 @@
         <Config Condition="'$(Config)'==''">Debug</Config>
         <TargetedPlatforms>1</TargetedPlatforms>
         <AppType>Library</AppType>
-        <FrameworkType>None</FrameworkType>
+        <FrameworkType>VCL</FrameworkType>
         <ProjectVersion>13.4</ProjectVersion>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
     </PropertyGroup>
@@ -53,7 +53,7 @@
         <VerInfo_Locale>3081</VerInfo_Locale>
         <DCC_E>false</DCC_E>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
-        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Winapi;$(DCC_Namespace)</DCC_Namespace>
+        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Winapi;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;$(DCC_Namespace)</DCC_Namespace>
         <DCC_ImageBase>00400000</DCC_ImageBase>
         <DCC_S>false</DCC_S>
         <GenDll>true</GenDll>
@@ -84,6 +84,7 @@
         <DCC_GenerateStackFrames>true</DCC_GenerateStackFrames>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
+        <Debugger_DebugSourcePath>C:\Users\vincent.OFFICE\AppData\Roaming\.dpm\packages\XE2\Win32\VSoft.Awaitable\0.2.0\source\;$(Debugger_DebugSourcePath)</Debugger_DebugSourcePath>
         <Debugger_RunParams>-rDPMTesting</Debugger_RunParams>
         <Debugger_HostApplication>E:\Emb\RS\9.0\bin\bds.exe</Debugger_HostApplication>
         <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
@@ -247,6 +248,12 @@
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.BOM.pas"/>
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Files.pas"/>
+        <DCCReference Include="Controls\DPM.Controls.LogMemo.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.MessageForm.pas">
+            <Form>DPMMessageForm</Form>
+        </DCCReference>
+        <DCCReference Include="IDE\DPM.IDE.MessageService.pas"/>
+        <DCCReference Include="IDE\Options\DPM.IDE.Options.pas"/>
         <RcItem Include="images\dpm.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>DPMIDELOGO</ResourceId>

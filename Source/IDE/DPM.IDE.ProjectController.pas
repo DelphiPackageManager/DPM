@@ -4,6 +4,7 @@ interface
 
 uses
   System.Classes,
+  VSoft.CancellationToken,
   DPM.IDE.Logger,
   DPM.Core.Package.Interfaces,
   DPM.IDE.ProjectTreeManager,
@@ -38,6 +39,8 @@ type
     FProjectTreeManager : IDPMProjectTreeManager;
     FProjectMode : TProjectMode;
     FPackageInstaller : IPackageInstaller;
+    FCancellationTokenSource : ICancellationTokenSource;
+    FLastResult : boolean;
   protected
     //from IDENotifier
     procedure FileOpening(const fileName : string);
@@ -64,7 +67,6 @@ implementation
 
 uses
   System.TypInfo,
-  VSoft.Awaitable,
   DPM.Core.Options.Common,
   DPM.Core.Options.Restore,
   DPM.IDE.Types;
@@ -75,7 +77,9 @@ procedure TDPMIDEProjectController.BeginLoading(const mode: TProjectMode);
 begin
   FProjectMode := mode;
   FLogger.Debug('ProjectController.BeginLoading : ' + GetEnumName(TypeInfo(TProjectMode),Ord(mode)));
-  FLogger.StartRestore;
+  FCancellationTokenSource.Reset;
+  FLastResult := true;
+  FLogger.StartRestore(FCancellationTokenSource);
 end;
 
 constructor TDPMIDEProjectController.Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager;
@@ -87,6 +91,7 @@ begin
   FPackageInstaller := packageInstaller;
   FEditorViewManager := editorViewManager;
   FProjectTreeManager := projectTreeManager;
+  FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
 end;
 
 destructor TDPMIDEProjectController.Destroy;
@@ -101,7 +106,7 @@ procedure TDPMIDEProjectController.EndLoading(const mode: TProjectMode);
 begin
 //  FLogger.Debug('ProjectController.EndLoading : ' + GetEnumName(TypeInfo(TProjectMode),Ord(mode)));
   FProjectMode := pmNone;
-  FLogger.EndRestore;
+  FLogger.EndRestore(FLastResult);
   FProjectTreeManager.NotifyEndLoading;
 end;
 
@@ -160,9 +165,9 @@ end;
 procedure TDPMIDEProjectController.RestoreProject(const fileName: string);
 var
   options : TRestoreOptions;
-  cancellationTokenSource : ICancellationTokenSource;
-
 begin
+  if FCancellationTokenSource.Token.IsCancelled then
+    exit;
   options := TRestoreOptions.Create;
   options.ApplyCommon(TCommonOptions.Default);
   options.ProjectPath := fileName;
@@ -170,11 +175,11 @@ begin
   options.CompilerVersion := IDECompilerVersion;
 
 
-  cancellationTokenSource := TCancellationTokenSourceFactory.Create;
+
   FLogger.ShowMessageTab;
   FLogger.StartProject(FileName);
 
-  FPackageInstaller.Restore(cancellationTokenSource.Token, options);
+  FLastResult := FLastResult and FPackageInstaller.Restore(FCancellationTokenSource.Token, options);
   FLogger.EndProject(fileName);
 
 

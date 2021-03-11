@@ -77,6 +77,7 @@ uses
   System.SysUtils,
   VCL.Dialogs,
   Spring.Container.Registration,
+  DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Init,
   DPM.IDE.ProjectController,
@@ -84,7 +85,8 @@ uses
   DPM.IDE.IDENotifier,
   DPM.IDE.ProjectMenu,
   DPM.Core.Package.Interfaces,
-  DPM.IDE.AddInOptions;
+  DPM.IDE.AddInOptions,
+  DPM.IDE.Options;
 
 {$R DPM.IDE.Resources.res}
 { TDPMWizard }
@@ -93,14 +95,9 @@ procedure TDPMWizard.InitContainer;
 begin
   try
     FContainer := TContainer.Create;
-    //FContainer.RegisterInstance<ILogger>(FLogger as ILogger).AsSingleton();
-//    FContainer.RegisterInstance<IDPMIDELogger>(FLogger as IDPMIDELogger).AsSingleton();
-
+    FContainer.RegisterType<IDPMIDEOptions, TDPMIDEOptions>.AsSingleton();
     FContainer.RegisterType<IDPMIDEMessageService,TDPMIDEMessageService>.AsSingleton();
     FContainer.RegisterType<TDPMIDELogger>.Implements<IDPMIDELogger>.Implements<ILogger>.AsSingleton();
-
-
-//    FContainer.RegisterInstance<IDPMIDELogger>(FLogger as IDPMIDELogger).AsSingleton();
     FContainer.RegisterType<IDPMProjectTreeManager, TDPMProjectTreeManager>.AsSingleton();
     FContainer.RegisterType<IDPMEditorViewManager, TDPMEditorViewManager>.AsSingleton();
     FContainer.RegisterType<IDPMIDEProjectController,TDPMIDEProjectController>.AsSingleton();
@@ -133,10 +130,17 @@ var
   projMenuNotifier : IOTAProjectMenuItemCreatorNotifier;
   options : INTAAddInOptions;
   projectController : IDPMIDEProjectController;
+  dpmIDEOptions : IDPMIDEOptions;
 begin
-//  FLogger := TDPMIDELogger.Create;
   InitContainer;
   FLogger := FContainer.Resolve<IDPMIDELogger>;
+  dpmIDEOptions := FContainer.Resolve<IDPMIDEOptions>;
+  if FileExists(dpmIDEOptions.FileName) then
+    dpmIDEOptions.LoadFromFile()
+  else
+    dpmIDEOptions.SaveToFile(); //create the file
+
+  FLogger.Verbosity := dpmIDEOptions.LogVerbosity;
 
   FEditorViewManager := FContainer.Resolve<IDPMEditorViewManager>;
   FDPMIDEMessageService := FContainer.Resolve<IDPMIDEMessageService>;

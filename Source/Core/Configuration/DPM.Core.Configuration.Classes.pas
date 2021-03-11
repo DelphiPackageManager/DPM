@@ -102,8 +102,6 @@ type
     constructor Create(const logger : ILogger);
   end;
 
-  //TODO : should be checking for invalid xml chars when saving!
-
 implementation
 
 uses
@@ -372,7 +370,6 @@ begin
       exit;
     end;
   end;
-  FFileName := fileName;
 end;
 
 function TConfiguration.LoadFromJson(const jsonObj : TJsonObject) : boolean;

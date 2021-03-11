@@ -37,6 +37,8 @@ uses
 type
   TPackageVersion = VSoft.SemanticVersion.TSemanticVersion;
   TClientVersion = VSoft.SemanticVersion.TSemanticVersion;
+
+  //Note : This type is serialized in options, changing names or order may break things!
   TVerbosity = (Quiet, Normal, Detailed, Debug);
 
   TSourceType = (Folder, DPMServer, DPMGithub, DNGithub);
@@ -70,7 +72,7 @@ type
     WinArm32, //reserved for future use
     WinArm64, //reserved for future use
     OSX32,
-    OSX64, //reserved for future use
+    OSX64,
     AndroidArm32,
     AndroidArm64,
     AndroidIntel32, //reserved for future use

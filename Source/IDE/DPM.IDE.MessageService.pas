@@ -3,15 +3,19 @@ unit DPM.IDE.MessageService;
 interface
 
 uses
-  DPM.IDE.MessageForm;
+  VSoft.Awaitable,
+  DPM.IDE.MessageForm,
+  DPM.IDE.Options;
 
 
 type
+  TMessageTask = (mtRestore, mtInstall, mtUninstall);
+
   ///<Summary>Manages the status windows that shows when installing or restoring packages</Summary>
   IDPMIDEMessageService = interface
   ['{B2305CD4-E2E0-4746-B988-7A0E2EF4DCF6}']
-    procedure HideMessageWindow;
-    procedure ShowMessageWindow;
+    procedure TaskStarted(const cancellationTokenSource : ICancellationTokenSource; const task : TMessageTask);
+    procedure TaskDone(const succes : boolean);
 
     procedure Debug(const data : string);
     procedure Error(const data : string);
@@ -28,12 +32,18 @@ type
 
   TDPMIDEMessageService = class(TInterfacedObject, IDPMIDEMessageService)
   private
+    FOptions : IDPMIDEOptions;
     FMessageForm : TDPMMessageForm;
+    FCancellationTokenSource : ICancellationTokenSource;
+    FCurrentTask : TMessageTask;
   protected
     procedure EnsureMessageForm;
     procedure HideMessageWindow;
     procedure ShowMessageWindow;
     procedure Shutdown;
+
+    procedure TaskStarted(const cancellationTokenSource : ICancellationTokenSource; const task : TMessageTask);
+    procedure TaskDone(const success : boolean);
 
 
     //Logging
@@ -47,7 +57,7 @@ type
     procedure Clear;
 
   public
-    constructor Create;
+    constructor Create(const options : IDPMIDEOptions);
     destructor Destroy;override;
 
   end;
@@ -66,16 +76,17 @@ begin
     FMessageForm.Clear;
 end;
 
-constructor TDPMIDEMessageService.Create;
+constructor TDPMIDEMessageService.Create(const options : IDPMIDEOptions);
 begin
   FMessageForm := nil;
-
+  FOptions := options;
 end;
 
 procedure TDPMIDEMessageService.Debug(const data: string);
 begin
-  EnsureMessageForm;
-  FMessageForm.Debug(data)
+//  EnsureMessageForm;
+  if FMessageForm <> nil then
+    FMessageForm.Debug(data)
 end;
 
 destructor TDPMIDEMessageService.Destroy;
@@ -95,29 +106,34 @@ begin
     FMessageForm := TDPMMessageForm.Create(nil);
     FMessageForm.Parent := Application.MainForm;
   end;
+  FMessageForm.CancellationTokenSource := FCancellationTokenSource;
+  FMessageForm.CloseDelayInSeconds := FOptions.AutoCloseLogDelaySeconds;
 end;
 
 procedure TDPMIDEMessageService.Error(const data: string);
 begin
-  EnsureMessageForm;
-  FMessageForm.Error(data)
+//  EnsureMessageForm;
+  if FMessageForm <> nil then
+    FMessageForm.Error(data)
 end;
 
 procedure TDPMIDEMessageService.HideMessageWindow;
 begin
   if FMessageForm <> nil then
-    FMessageForm.Hide;
+    FMessageForm.DelayHide;
 end;
 
 procedure TDPMIDEMessageService.Information(const data: string; const important: Boolean);
 begin
-  EnsureMessageForm;
-  FMessageForm.Information(data, important);
+//  EnsureMessageForm;
+  if FMessageForm <> nil then
+    FMessageForm.Information(data, important);
 end;
 
 procedure TDPMIDEMessageService.NewLine;
 begin
-  FMessageForm.NewLine;
+  if FMessageForm <> nil then
+    FMessageForm.NewLine;
 end;
 
 procedure TDPMIDEMessageService.ShowMessageWindow;
@@ -142,20 +158,64 @@ end;
 
 procedure TDPMIDEMessageService.Success(const data: string;  const important: Boolean);
 begin
-  EnsureMessageForm;
-  FMessageForm.Success(data, important);
+  //EnsureMessageForm;
+  if FMessageForm <> nil then
+    FMessageForm.Success(data, important);
+end;
+
+procedure TDPMIDEMessageService.TaskDone(const success : boolean);
+begin
+  FCancellationTokenSource := nil;
+  if FMessageForm <> nil then
+  begin
+    FMessageForm.CancellationTokenSource := nil;
+    if FOptions.AutoCloseLogOnSuccess and success then
+    begin
+      //TODO : implement delay in closing
+      HideMessageWindow;
+
+    end;
+  end;
+end;
+
+procedure TDPMIDEMessageService.TaskStarted(const cancellationTokenSource: ICancellationTokenSource; const task : TMessageTask);
+begin
+  FCancellationTokenSource := cancellationTokenSource;
+  FCurrentTask := task;
+
+  case task of
+    mtRestore:
+    begin
+       if FOptions.ShowLogForRestore then
+        ShowMessageWindow;
+    end;
+    mtInstall:
+    begin
+       if FOptions.ShowLogForInstall then
+        ShowMessageWindow;
+    end;
+    mtUninstall:
+    begin
+       if FOptions.ShowLogForUninstall then
+        ShowMessageWindow;
+    end;
+  end;
+
+
 end;
 
 procedure TDPMIDEMessageService.Verbose(const data: string;  const important: Boolean);
 begin
-  EnsureMessageForm;
-  FMessageForm.Verbose(data, important);
+//  EnsureMessageForm;
+  if FMessageForm <> nil then
+    FMessageForm.Verbose(data, important);
 end;
 
 procedure TDPMIDEMessageService.Warning(const data: string;  const important: Boolean);
 begin
-  EnsureMessageForm;
-  FMessageForm.Warning(data, important);
+//  EnsureMessageForm;
+  if FMessageForm <> nil then
+    FMessageForm.Warning(data, important);
 end;
 
 end.
