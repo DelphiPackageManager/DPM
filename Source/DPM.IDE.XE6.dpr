@@ -170,7 +170,11 @@ uses
   DPM.IDE.ProjectController in 'IDE\DPM.IDE.ProjectController.pas',
   DPM.Core.Compiler.BOM in 'Core\Compiler\DPM.Core.Compiler.BOM.pas',
   DPM.Core.Compiler.ProjectSettings in 'Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas',
-  DPM.Core.Utils.Files in 'Core\Utils\DPM.Core.Utils.Files.pas';
+  DPM.Core.Utils.Files in 'Core\Utils\DPM.Core.Utils.Files.pas',
+  DPM.Controls.LogMemo in 'Controls\DPM.Controls.LogMemo.pas',
+  DPM.IDE.MessageForm in 'IDE\DPM.IDE.MessageForm.pas' {DPMMessageForm},
+  DPM.IDE.MessageService in 'IDE\DPM.IDE.MessageService.pas',
+  DPM.IDE.Options in 'IDE\Options\DPM.IDE.Options.pas';
 
 {$R *.res}
 

@@ -9,7 +9,7 @@ uses
   Vcl.Dialogs,
   Vcl.StdCtrls,
   VSoft.Awaitable,
-  DPM.Controls.LogMemo, Vcl.ActnList, Vcl.ExtCtrls;
+  DPM.Controls.LogMemo, Vcl.ActnList, Vcl.ExtCtrls, System.Actions;
 
 type
   TDPMMessageForm = class(TForm)
@@ -64,7 +64,8 @@ implementation
 
 uses
   Vcl.Themes,
-  Vcl.clipbrd;
+  Vcl.clipbrd,
+  ToolsApi;
 
 {$R *.dfm}
 
@@ -161,10 +162,7 @@ begin
   {$IF CompilerVersion >=32.0}
   ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
   ideThemeSvc.ApplyTheme(Self);
-  FIDEStyleServices := ideThemeSvc.StyleServices;
-  ideThemeSvc.ApplyTheme(pnlButtonBar);
-  ideThemeSvc.ApplyTheme(pnlSearchPanel);
-  ideThemeSvc.ApplyTheme(Splitter2);
+  IDEStyleServices := ideThemeSvc.StyleServices;
   {$ELSE}
   IDEStyleServices := Vcl.Themes.StyleServices;
   {$IFEND}
