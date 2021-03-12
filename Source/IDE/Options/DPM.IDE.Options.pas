@@ -157,11 +157,12 @@ begin
   if sFileName = '' then
     raise Exception.Create('No filename set for config file, unable to load');
 
+
   try
     jsonObj := TJsonObject.ParseFromFile(sFileName) as TJsonObject;
     try
       Result := LoadFromJson(jsonObj);
-      FFileName := fileName;
+      FFileName := sFileName;
     finally
       jsonObj.Free;
     end;

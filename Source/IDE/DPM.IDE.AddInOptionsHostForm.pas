@@ -32,6 +32,7 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
   DPM.IDE.AddInOptionsFrame,
+  DPM.IDE.Options,
   DPM.Core.Logging,
   DPM.Core.Configuration.Interfaces, Vcl.ExtCtrls, Vcl.StdCtrls;
 
@@ -46,7 +47,7 @@ type
     { Private declarations }
   public
     { Public declarations }
-    constructor Create(AOwner : TComponent; const configManager : IConfigurationManager; const logger : ILogger; const configFile : string); reintroduce;
+    constructor Create(AOwner : TComponent; const configManager : IConfigurationManager; const logger : ILogger; const ideOptions : IDPMIDEOptions; const configFile : string); reintroduce;
   end;
 
 var
@@ -72,7 +73,7 @@ begin
   end;
 end;
 
-constructor TDPMOptionsHostForm.Create(AOwner : TComponent; const configManager : IConfigurationManager; const logger : ILogger; const configFile : string);
+constructor TDPMOptionsHostForm.Create(AOwner : TComponent; const configManager : IConfigurationManager; const logger : ILogger;  const ideOptions : IDPMIDEOptions; const configFile : string);
 begin
   inherited Create(AOwner);
   {$IFDEF STYLEELEMENTS}
@@ -82,8 +83,7 @@ begin
   (BorlandIDEServices as IOTAIDEThemingServices).ApplyTheme(Self);
   {$ENDIF}
 
-  DPMOptionsFrame.SetConfigManager(configManager, configFile);
-  DPMOptionsFrame.SetLogger(logger);
+  DPMOptionsFrame.Configure(configManager, ideOptions, logger, configFile);
   Self.Caption := 'DPM Options [' + configFile + ']';
   DPMOptionsFrame.LoadSettings;
 end;

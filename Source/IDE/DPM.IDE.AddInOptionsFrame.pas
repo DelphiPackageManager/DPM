@@ -42,7 +42,8 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ActnList, Vcl.ImgList, Vcl.CheckLst,
   Vcl.Buttons, Vcl.ComCtrls, Vcl.ExtCtrls, Vcl.StdCtrls,
   DPM.Core.Logging,
-  DPM.Core.Configuration.Interfaces;
+  DPM.Core.Configuration.Interfaces,
+  DPM.IDE.Options, Vcl.Samples.Spin;
 
 {$WARN SYMBOL_PLATFORM OFF}
 type
@@ -75,6 +76,18 @@ type
     FolderSelectDialog : TFileOpenDialog;
     cboSourceType : TComboBox;
     Label8 : TLabel;
+    pgOptions: TPageControl;
+    tsSources: TTabSheet;
+    tsIDEOptions: TTabSheet;
+    Label4: TLabel;
+    cboLogLevel: TComboBox;
+    Label7: TLabel;
+    chkShowForRestore: TCheckBox;
+    chkShowForInstall: TCheckBox;
+    chkShowForUninstall: TCheckBox;
+    chkAutoClose: TCheckBox;
+    spAutoCloseDelay: TSpinEdit;
+    Label9: TLabel;
     procedure lvSourcesSelectItem(Sender : TObject; Item : TListItem; Selected : Boolean);
     procedure txtNameChange(Sender : TObject);
     procedure txtUriChange(Sender : TObject);
@@ -88,12 +101,14 @@ type
     procedure txtPackageCacheLocationRightButtonClick(Sender : TObject);
     procedure txtUriRightButtonClick(Sender : TObject);
     procedure cboSourceTypeChange(Sender : TObject);
+    procedure chkAutoCloseClick(Sender: TObject);
   private
     { Private declarations }
     FConfigFile : string;
     FConfigManager : IConfigurationManager;
     FConfiguration : IConfiguration;
     FLogger : ILogger;
+    FIDEOptions : IDPMIDEOptions;
     procedure ExchangeItems(const a, b : Integer);
   protected
   public
@@ -102,8 +117,7 @@ type
     { Public declarations }
     procedure LoadSettings;
     procedure SaveSettings;
-    procedure SetConfigManager(const manager : IConfigurationManager; const configFile : string = '');
-    procedure SetLogger(const logger : ILogger);
+    procedure Configure(const manager : IConfigurationManager; const ideOptions : IDPMIDEOptions; const logger : ILogger; const configFile : string = '');
     function Validate : boolean;
   end;
 
@@ -113,6 +127,7 @@ implementation
 
 uses
   System.SysUtils,
+  System.TypInfo,
   VSoft.Uri,
   DPM.Core.Types,
   DPM.Core.Configuration.Classes,
@@ -208,10 +223,15 @@ begin
     item.SubItems[1] := cboSourceType.Items[cboSourceType.ItemIndex];
 end;
 
+procedure TDPMOptionsFrame.chkAutoCloseClick(Sender: TObject);
+begin
+  spAutoCloseDelay.Enabled := chkAutoClose.Checked;
+end;
+
 constructor TDPMOptionsFrame.Create(AOwner : TComponent);
 begin
   inherited;
-
+  pgOptions.ActivePageIndex := 0;
 end;
 
 destructor TDPMOptionsFrame.Destroy;
@@ -260,6 +280,13 @@ begin
   else
     lblPackageSources.Caption := cNoPackageSources;
 
+  cboLogLevel.ItemIndex := Ord(FIDEOptions.LogVerbosity);
+  chkShowForRestore.Checked := FIDEOptions.ShowLogForRestore;
+  chkShowForInstall.Checked := FIDEOptions.ShowLogForInstall;
+  chkShowForUninstall.Checked := FIDEOptions.ShowLogForUninstall;
+  chkAutoClose.Checked := FIDEOptions.AutoCloseLogOnSuccess;
+  spAutoCloseDelay.Value := FIDEOptions.AutoCloseLogDelaySeconds;
+  spAutoCloseDelay.Enabled := chkAutoClose.Checked;
 end;
 
 procedure TDPMOptionsFrame.lvSourcesSelectItem(Sender : TObject; Item : TListItem; Selected : Boolean);
@@ -315,16 +342,24 @@ begin
   end;
 
   FConfigManager.SaveConfig(FConfiguration);
+
+  FIDEOptions.LogVerbosity := TVerbosity(cboLogLevel.ItemIndex);
+  FIDEOptions.ShowLogForRestore := chkShowForRestore.Checked;
+  FIDEOptions.ShowLogForInstall := chkShowForInstall.Checked;
+  FIDEOptions.ShowLogForUninstall := chkShowForUninstall.Checked;
+  FIDEOptions.AutoCloseLogOnSuccess := chkAutoClose.Checked;
+  FIDEOptions.AutoCloseLogDelaySeconds := spAutoCloseDelay.Value;
+
+  FIDEOptions.SaveToFile();
+  FLogger.Verbosity := FIDEOptions.LogVerbosity;
+
 end;
 
-procedure TDPMOptionsFrame.SetConfigManager(const manager : IConfigurationManager; const configFile : string);
+procedure TDPMOptionsFrame.Configure(const manager : IConfigurationManager; const ideOptions : IDPMIDEOptions; const logger : ILogger; const configFile : string);
 begin
   FConfigManager := manager;
   FConfigFile := configFile;
-end;
-
-procedure TDPMOptionsFrame.SetLogger(const logger : ILogger);
-begin
+  FIDEOptions := ideOptions;
   FLogger := logger;
 end;
 
