@@ -88,6 +88,7 @@ type
     chkAutoClose: TCheckBox;
     spAutoCloseDelay: TSpinEdit;
     Label9: TLabel;
+    pnlIDEOptions: TPanel;
     procedure lvSourcesSelectItem(Sender : TObject; Item : TListItem; Selected : Boolean);
     procedure txtNameChange(Sender : TObject);
     procedure txtUriChange(Sender : TObject);

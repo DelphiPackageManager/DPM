@@ -246,84 +246,99 @@ object DPMOptionsFrame: TDPMOptionsFrame
     object tsIDEOptions: TTabSheet
       Caption = 'IDE Options'
       ImageIndex = 1
-      object Label4: TLabel
-        Left = 24
-        Top = 24
-        Width = 65
-        Height = 13
-        Caption = 'Logging Level'
-      end
-      object Label7: TLabel
-        Left = 24
-        Top = 88
-        Width = 95
-        Height = 13
-        Caption = 'Show Log View for :'
-      end
-      object Label9: TLabel
-        Left = 264
-        Top = 111
-        Width = 132
-        Height = 13
-        Caption = 'Auto Close Delay (seconds)'
-      end
-      object cboLogLevel: TComboBox
-        Left = 24
-        Top = 43
-        Width = 145
-        Height = 21
-        Style = csDropDownList
-        ItemIndex = 1
+      object pnlIDEOptions: TPanel
+        Left = 0
+        Top = 0
+        Width = 660
+        Height = 476
+        Align = alClient
+        BevelOuter = bvNone
+        Caption = 'pnlIDEOptions'
+        ShowCaption = False
         TabOrder = 0
-        Text = 'Normal'
-        Items.Strings = (
-          'Quiet'
-          'Normal'
-          'Detailed'
-          'Debug')
-      end
-      object chkShowForRestore: TCheckBox
-        Left = 40
-        Top = 107
-        Width = 97
-        Height = 17
-        Caption = 'Restore'
-        TabOrder = 1
-      end
-      object chkShowForInstall: TCheckBox
-        Left = 40
-        Top = 132
-        Width = 97
-        Height = 17
-        Caption = 'Install'
-        TabOrder = 2
-      end
-      object chkShowForUninstall: TCheckBox
-        Left = 40
-        Top = 158
-        Width = 97
-        Height = 17
-        Caption = 'Uninstall'
-        TabOrder = 3
-      end
-      object chkAutoClose: TCheckBox
-        Left = 240
-        Top = 87
-        Width = 177
-        Height = 17
-        Caption = 'Auto Close Log View on success'
-        TabOrder = 4
-        OnClick = chkAutoCloseClick
-      end
-      object spAutoCloseDelay: TSpinEdit
-        Left = 264
-        Top = 130
-        Width = 121
-        Height = 22
-        MaxValue = 30
-        MinValue = 0
-        TabOrder = 5
-        Value = 0
+        ExplicitLeft = 24
+        ExplicitTop = 11
+        ExplicitWidth = 574
+        ExplicitHeight = 438
+        object Label4: TLabel
+          Left = 24
+          Top = 24
+          Width = 65
+          Height = 13
+          Caption = 'Logging Level'
+        end
+        object Label7: TLabel
+          Left = 24
+          Top = 88
+          Width = 95
+          Height = 13
+          Caption = 'Show Log View for :'
+        end
+        object Label9: TLabel
+          Left = 264
+          Top = 111
+          Width = 132
+          Height = 13
+          Caption = 'Auto Close Delay (seconds)'
+        end
+        object chkShowForInstall: TCheckBox
+          Left = 40
+          Top = 132
+          Width = 97
+          Height = 17
+          Caption = 'Install'
+          TabOrder = 0
+        end
+        object chkShowForRestore: TCheckBox
+          Left = 40
+          Top = 107
+          Width = 97
+          Height = 17
+          Caption = 'Restore'
+          TabOrder = 1
+        end
+        object chkShowForUninstall: TCheckBox
+          Left = 40
+          Top = 158
+          Width = 97
+          Height = 17
+          Caption = 'Uninstall'
+          TabOrder = 2
+        end
+        object spAutoCloseDelay: TSpinEdit
+          Left = 264
+          Top = 130
+          Width = 121
+          Height = 22
+          MaxValue = 30
+          MinValue = 0
+          TabOrder = 3
+          Value = 0
+        end
+        object chkAutoClose: TCheckBox
+          Left = 240
+          Top = 87
+          Width = 177
+          Height = 17
+          Caption = 'Auto Close Log View on success'
+          TabOrder = 4
+          OnClick = chkAutoCloseClick
+        end
+        object cboLogLevel: TComboBox
+          Left = 24
+          Top = 43
+          Width = 145
+          Height = 21
+          Style = csDropDownList
+          ItemIndex = 1
+          TabOrder = 5
+          Text = 'Normal'
+          Items.Strings = (
+            'Quiet'
+            'Normal'
+            'Detailed'
+            'Debug')
+        end
       end
     end
   end
