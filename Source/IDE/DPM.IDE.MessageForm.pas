@@ -111,11 +111,11 @@ end;
 procedure TDPMMessageForm.ClosingInTimerTimer(Sender: TObject);
 begin
   ClosingInTimer.Enabled := false;
+  Dec(FCurrentCloseDelay);
   if FCurrentCloseDelay > 0  then
   begin
     lblClosing.Caption := 'Closing in ' + IntToStr(FCurrentCloseDelay) + ' seconds' + StringOfChar('.', FCurrentCloseDelay);
     ClosingInTimer.Enabled := true;
-    Dec(FCurrentCloseDelay);
   end
   else
   begin
