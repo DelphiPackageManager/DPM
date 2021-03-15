@@ -1887,7 +1887,7 @@ begin
   else
     options.CompilerVersion := projectEditor.CompilerVersion;
 
-  FLogger.Warning('Uninstalling for compiler version  [' + CompilerToString(options.CompilerVersion) + '].');
+  FLogger.Information('Uninstalling for compiler version  [' + CompilerToString(options.CompilerVersion) + '].',true);
 
 
   //if the platform was specified (either on the command like or through a package file)
