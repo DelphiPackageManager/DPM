@@ -7,6 +7,8 @@ uses
   DPM.IDE.MessageForm,
   DPM.IDE.Options;
 
+//TODO : Make the message service own the TStringList that the Logmemo on the form currently owns?
+//that way we don't need the form all the time, only when we need to display it.
 
 type
   TMessageTask = (mtNone, mtRestore, mtInstall, mtUninstall);
@@ -89,7 +91,7 @@ end;
 
 procedure TDPMIDEMessageService.Debug(const data: string);
 begin
-//  EnsureMessageForm;
+  EnsureMessageForm;
   if FMessageForm <> nil then
     FMessageForm.Debug(data)
 end;
@@ -113,12 +115,11 @@ begin
   end;
   FMessageForm.CancellationTokenSource := FCancellationTokenSource;
   FMessageForm.CloseDelayInSeconds := FOptions.AutoCloseLogDelaySeconds;
-  FMessageForm.Clear;
 end;
 
 procedure TDPMIDEMessageService.Error(const data: string);
 begin
-//  EnsureMessageForm;
+  EnsureMessageForm;
   if FMessageForm <> nil then
     FMessageForm.Error(data)
 end;
@@ -131,7 +132,7 @@ end;
 
 procedure TDPMIDEMessageService.Information(const data: string; const important: Boolean);
 begin
-//  EnsureMessageForm;
+  EnsureMessageForm;
   if FMessageForm <> nil then
     FMessageForm.Information(data, important);
 end;
@@ -169,7 +170,7 @@ end;
 
 procedure TDPMIDEMessageService.Success(const data: string;  const important: Boolean);
 begin
-  //EnsureMessageForm;
+  EnsureMessageForm;
   if FMessageForm <> nil then
     FMessageForm.Success(data, important);
 end;
@@ -178,14 +179,18 @@ procedure TDPMIDEMessageService.TaskDone(const success : boolean);
 begin
   FCancellationTokenSource := nil;
   FCurrentTask := mtNone;
-  if FMessageForm <> nil then
+  if not success then
   begin
-    FMessageForm.CancellationTokenSource := nil;
-    if FOptions.AutoCloseLogOnSuccess and success then
+    if FMessageForm <> nil then
+      FMessageForm.CancellationTokenSource := nil;
+    ShowMessageWindow;
+  end
+  else if FOptions.AutoCloseLogOnSuccess and success then
+  begin
+    if FMessageForm <> nil then
     begin
-      //TODO : implement delay in closing
+      FMessageForm.CancellationTokenSource := nil;
       HideMessageWindow;
-
     end;
   end;
 end;
@@ -194,6 +199,9 @@ procedure TDPMIDEMessageService.TaskStarted(const cancellationTokenSource: ICanc
 begin
   FCancellationTokenSource := cancellationTokenSource;
   FCurrentTask := task;
+  EnsureMessageForm;
+  FMessageForm.Clear;
+
 
   case task of
     mtNone :
@@ -222,14 +230,14 @@ end;
 
 procedure TDPMIDEMessageService.Verbose(const data: string;  const important: Boolean);
 begin
-//  EnsureMessageForm;
+  EnsureMessageForm;
   if FMessageForm <> nil then
     FMessageForm.Verbose(data, important);
 end;
 
 procedure TDPMIDEMessageService.Warning(const data: string;  const important: Boolean);
 begin
-//  EnsureMessageForm;
+  EnsureMessageForm;
   if FMessageForm <> nil then
     FMessageForm.Warning(data, important);
 end;

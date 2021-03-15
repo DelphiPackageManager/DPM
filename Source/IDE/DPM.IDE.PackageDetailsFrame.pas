@@ -130,7 +130,6 @@ begin
     FLogger.Clear;
     FLogger.StartInstall(FCancellationTokenSource);
     FPackageSearcher.SaveBeforeChange;
-    FLogger.ShowMessageTab;
     FLogger.Information('Installing package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + ']');
 
     options := TInstallOptions.Create;
@@ -187,7 +186,6 @@ begin
     FLogger.Clear;
     FLogger.StartUnInstall(FCancellationTokenSource);
     FPackageSearcher.SaveBeforeChange;
-    FLogger.ShowMessageTab;
     FLogger.Information('UnInstalling package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + ']');
 
     options := TUnInstallOptions.Create;

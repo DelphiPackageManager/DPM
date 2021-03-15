@@ -174,15 +174,9 @@ begin
   options.Validate(FLogger);
   options.CompilerVersion := IDECompilerVersion;
 
-
-
-  FLogger.ShowMessageTab;
   FLogger.StartProject(FileName);
-
   FLastResult := FLastResult and FPackageInstaller.Restore(FCancellationTokenSource.Token, options);
   FLogger.EndProject(fileName);
-
-
 end;
 
 
