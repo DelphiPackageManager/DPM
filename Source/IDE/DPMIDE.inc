@@ -3,9 +3,9 @@
 //to include ToolsApi
 
 {$IF CompilerVersion >=32.0}
-//  {$IF Declared(IOTAIDEThemingServices)}
+  {$IF Declared(IOTAIDEThemingServices)}
     {$DEFINE THEMESERVICES}
-//  {$IFEND}
+  {$IFEND}
 {$IFEND}
 
 {$IF CompilerVersion >= 24.0 }

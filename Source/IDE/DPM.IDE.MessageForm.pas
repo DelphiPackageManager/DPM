@@ -256,18 +256,20 @@ begin
     FLogMemo.AddRow(data, TLogMessageType.mtWarning);
 end;
 
+{$IF CompilerVersion >= 33.0}
 
-{$IFDEF THEMESERVICES}
-var
-  ideThemeSvc : IOTAIDEThemingServices;
-{$ENDIF}
+  {$IFDEF THEMESERVICES}
+  var
+    ideThemeSvc : IOTAIDEThemingServices250;
+  {$ENDIF}
 
 initialization
 
-{$IFDEF THEMESERVICES}
-  ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
-  ideThemeSvc.RegisterFormClass(TDPMMessageForm);
-{$ENDIF}
+  {$IFDEF THEMESERVICES}
+    ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices250);
+    ideThemeSvc.RegisterFormClass(TDPMMessageForm);
+  {$ENDIF}
+{$IFEND}
 
 
 end.
