@@ -283,8 +283,8 @@ begin
 end;
 
 procedure TDPMIDELogger.Verbose(const data : string; const important : Boolean);
-var
-  lineRef : Pointer;
+//var
+//  lineRef : Pointer;
 //  verboseProc : TThreadProcedure;
 begin
   if (FVerbosity < TVerbosity.Detailed) then
