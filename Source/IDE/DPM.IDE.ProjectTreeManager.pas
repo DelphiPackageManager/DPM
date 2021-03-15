@@ -46,7 +46,8 @@ uses
   DPM.Core.Configuration.Interfaces,
   DPM.IDE.Logger,
   DPM.IDE.VSTProxy,
-  DPM.IDE.ProjectTree.Containers;
+  DPM.IDE.ProjectTree.Containers,
+  DPM.IDE.Options;
 
 type
   IDPMProjectTreeManager = interface
@@ -64,6 +65,7 @@ type
   private
     FContainer : TContainer;
     FLogger : IDPMIDELogger;
+    FOptions : IDPMIDEOptions;
 
     FWindowHandle : THandle;
     FTimerRunning : boolean;
@@ -108,7 +110,7 @@ type
     procedure DumpClass(const obj : TClass);
 
   public
-    constructor Create(const container : TContainer; const logger : IDPMIDELogger);
+    constructor Create(const container : TContainer; const logger : IDPMIDELogger; const options : IDPMIDEOptions);
     destructor Destroy;override;
 
   end;
@@ -226,10 +228,11 @@ begin
 
 end;
 
-constructor TDPMProjectTreeManager.Create(const container : TContainer;const logger : IDPMIDELogger);
+constructor TDPMProjectTreeManager.Create(const container : TContainer;const logger : IDPMIDELogger; const options : IDPMIDEOptions);
 begin
   FContainer := container;
   FLogger := logger;
+  FOptions := options;
   FProjectLoadList := TCollections.CreateQueue<string>;
   FWindowHandle := AllocateHWnd(WndProc);
 
@@ -243,6 +246,7 @@ begin
 
 
   FNodeCache := TCollections.CreateDictionary<TProjectTreeContainer, PVirtualNode>();
+
 
 end;
 
@@ -436,6 +440,8 @@ end;
 
 procedure TDPMProjectTreeManager.NotifyEndLoading;
 begin
+  if not FOptions.AddDPMToProjectTree then
+    exit;
   //kick off a timer that will eventually sort out the nodes. - see WndProc
   PostMessage(FWindowHandle, WM_PROJECTLOADED, 0,0);
 end;
@@ -460,6 +466,8 @@ end;
 
 procedure TDPMProjectTreeManager.NotifyProjectLoaded(const fileName: string);
 begin
+  if not FOptions.AddDPMToProjectTree then
+    exit;
   //The project tree nodes do not seem to have been added at this stage
   //just enqueue the project, and we'll deal with it when all projects are loaded.
   FProjectLoadList.Enqueue(fileName);

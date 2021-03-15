@@ -29,6 +29,9 @@ type
     function GetAutoCloseLogDelaySeconds : integer;
     procedure SetAutoCloseLogDelaySelcond(const value : integer);
 
+    function GetAddDPMToProjectTree : boolean;
+    procedure SetAddDPMToProjectTree(const value : boolean);
+
 
     property LogVerbosity : TVerbosity read GetLogVerbosity write SetLogVebosity;
     property ShowLogForRestore : boolean read GetShowLogForRestore write SetShowLogForRestore;
@@ -38,6 +41,7 @@ type
     property AutoCloseLogOnSuccess : boolean read GetAutoCloseLogOnSuccess write SetAutoCloseLogOnSuccess;
     property AutoCloseLogDelaySeconds : integer read GetAutoCloseLogDelaySeconds write SetAutoCloseLogDelaySelcond;
 
+    property AddDPMToProjectTree : boolean read GetAddDPMToProjectTree write SetAddDPMToProjectTree;
 
     property FileName : string read GetOptionsFileName;
   end;
@@ -51,6 +55,7 @@ type
     FShowLogForUninstall : boolean;
     FAutoCloseOnSuccess : boolean;
     FAutoCloseLogDelaySeconds : integer;
+    FAddDPMToProjectTree : boolean;
   protected
     function LoadFromJson(const jsonObj : TJsonObject) : boolean;
     function SaveToJson(const parentObj : TJsonObject) : boolean;
@@ -77,6 +82,10 @@ type
 
     function GetAutoCloseLogDelaySeconds : integer;
     procedure SetAutoCloseLogDelaySelcond(const value : integer);
+
+    function GetAddDPMToProjectTree : boolean;
+    procedure SetAddDPMToProjectTree(const value : boolean);
+
 
   public
     constructor Create;
@@ -106,6 +115,12 @@ begin
   FShowLogForUninstall := true;
   FAutoCloseOnSuccess := true;
   FAutoCloseLogDelaySeconds := 3;
+  FAddDPMToProjectTree := true;
+end;
+
+function TDPMIDEOptions.GetAddDPMToProjectTree: boolean;
+begin
+  result := FAddDPMToProjectTree;
 end;
 
 function TDPMIDEOptions.GetAutoCloseLogDelaySeconds: integer;
@@ -201,6 +216,9 @@ begin
   if jsonObj.Contains('autocloselogdelayseconds') then
     FAutoCloseLogDelaySeconds := jsonObj.I['autocloselogdelayseconds'];
 
+  if jsonObj.Contains('addtoprojecttree') then
+    FAddDPMToProjectTree := jsonObj.B['addtoprojecttree'];
+
 
 end;
 
@@ -242,7 +260,13 @@ begin
   parentObj.B['showlogforuninstall'] := FShowLogForUninstall;
   parentObj.B['autocloselogonsuccess'] := FAutoCloseOnSuccess;
   parentObj.I['autocloselogdelayseconds'] := FAutoCloseLogDelaySeconds;
+  parentObj.B['addtoprojecttree'] := FAddDPMToProjectTree;
   result := true;
+end;
+
+procedure TDPMIDEOptions.SetAddDPMToProjectTree(const value: boolean);
+begin
+  FAddDPMToProjectTree := value;
 end;
 
 procedure TDPMIDEOptions.SetAutoCloseLogDelaySelcond(const value: integer);
