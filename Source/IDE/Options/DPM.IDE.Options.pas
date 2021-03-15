@@ -227,6 +227,8 @@ var
   sFileName : string;
   jsonObj : TJsonObject;
 begin
+  result := true;
+
   if fileName <> '' then
     sFileName := fileName
   else
@@ -242,7 +244,6 @@ begin
       if result then
         jsonObj.SaveToFile(sFileName, false);
       FFileName := sFileName;
-      result := true;
     except
       on e : Exception do
         raise Exception.Create('Exception while saving config to file [' + sFileName + ']' + #13#10 + e.Message);
