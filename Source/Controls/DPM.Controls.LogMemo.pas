@@ -1026,7 +1026,7 @@ begin
     FTopRow := 0;
 
   FVScrollPos := FTopRow;
-  Invalidate;
+  Update;
   UpdateScrollBars;
 
 end;
