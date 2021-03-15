@@ -4,12 +4,15 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  System.Diagnostics,
   Vcl.Controls,
   Vcl.Forms,
   Vcl.Dialogs,
   Vcl.StdCtrls,
+  Vcl.ActnList,
+  Vcl.ExtCtrls,
   VSoft.Awaitable,
-  DPM.Controls.LogMemo, Vcl.ActnList, Vcl.ExtCtrls;
+  DPM.Controls.LogMemo ;
 
 type
   TDPMMessageForm = class(TForm)
@@ -22,7 +25,6 @@ type
     ClosingInTimer: TTimer;
     lblClosing: TLabel;
     lblDontClose: TLinkLabel;
-    procedure FormCreate(Sender: TObject);
     procedure actCanCancelExecute(Sender: TObject);
     procedure actCopyLogExecute(Sender: TObject);
     procedure FormHide(Sender: TObject);
@@ -40,8 +42,8 @@ type
     procedure SetCloseDelayInSeconds(const Value: integer);
   protected
     procedure CreateParams(var Params: TCreateParams); override;
-
   public
+    constructor Create(AOwner : TComponent);override;
     procedure Debug(const data : string);
     procedure Error(const data : string);
     procedure Information(const data : string; const important : Boolean = False);
@@ -69,7 +71,7 @@ uses
 
 {$R *.dfm}
 
-{ TDPMMessageForm }
+{$I DPMIDE.inc}
 
 
 { TDPMMessageForm }
@@ -106,6 +108,8 @@ procedure TDPMMessageForm.Clear;
 begin
   FLogMemo.Clear;
   FCurrentCloseDelay := FCloseDelayInSeconds;
+  lblClosing.Visible := false;
+  lblDontClose.Visible := false;
 end;
 
 procedure TDPMMessageForm.ClosingInTimerTimer(Sender: TObject);
@@ -124,48 +128,27 @@ begin
   end;
 end;
 
-procedure TDPMMessageForm.CreateParams(var Params: TCreateParams);
+constructor TDPMMessageForm.Create(AOwner: TComponent);
+var
+  {$IFDEF THEMESERVICES}
+  ideThemeSvc : IOTAIDEThemingServices;
+  {$ENDIF}
+  IDEStyleServices : TCustomStyleServices;
 begin
   inherited;
-  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST;
-end;
+  {$IFDEF STYLEELEMENTS}
+  StyleElements := [seFont, seClient, seBorder];
+  {$ENDIF}
 
-procedure TDPMMessageForm.Debug(const data: string);
-begin
-  FLogMemo.AddRow(data, TLogMessageType.mtDebug);
-  Application.ProcessMessages;
-end;
-
-procedure TDPMMessageForm.DelayHide;
-begin
-  ClosingInTimer.Enabled := true;
-  lblClosing.Caption := 'Closing in ' + IntToStr(FCurrentCloseDelay) + ' seconds' + StringOfChar('.', FCurrentCloseDelay);
-  lblDontClose.Left := lblClosing.Left +  lblClosing.Width + 30;
-  lblClosing.Visible := true;
-  lblDontClose.Visible := true;
-  lblClosing.Update;
-end;
-
-procedure TDPMMessageForm.Error(const data: string);
-begin
-  FLogMemo.AddRow(data, TLogMessageType.mtError);
-  Application.ProcessMessages;
-end;
-
-procedure TDPMMessageForm.FormCreate(Sender: TObject);
-var
-  IDEStyleServices : TCustomStyleServices;
-{$IF CompilerVersion >=32.0}
-  ideThemeSvc : IOTAIDEThemingServices;
-  {$IFEND}
-begin
-  {$IF CompilerVersion >=32.0}
+  {$IFDEF THEMESERVICES}
   ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
-  ideThemeSvc.ApplyTheme(Self);
+  if ideThemeSvc.IDEThemingEnabled then
+    ideThemeSvc.ApplyTheme(Self);
   IDEStyleServices := ideThemeSvc.StyleServices;
   {$ELSE}
   IDEStyleServices := Vcl.Themes.StyleServices;
-  {$IFEND}
+  {$ENDIF}
+
 
   FLogMemo := TLogMemo.Create(Self);
   FLogMemo.TabOrder := 0;
@@ -184,6 +167,33 @@ begin
   FCurrentCloseDelay := FCloseDelayInSeconds;
 end;
 
+procedure TDPMMessageForm.CreateParams(var Params: TCreateParams);
+begin
+  inherited;
+  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST;
+end;
+
+procedure TDPMMessageForm.Debug(const data: string);
+begin
+  FLogMemo.AddRow(data, TLogMessageType.mtDebug);
+end;
+
+procedure TDPMMessageForm.DelayHide;
+begin
+  ClosingInTimer.Enabled := true;
+  lblClosing.Caption := 'Closing in ' + IntToStr(FCurrentCloseDelay) + ' seconds' + StringOfChar('.', FCurrentCloseDelay);
+  lblDontClose.Left := lblClosing.Left +  lblClosing.Width + 30;
+  lblClosing.Visible := true;
+  lblDontClose.Visible := true;
+  lblClosing.Update;
+end;
+
+procedure TDPMMessageForm.Error(const data: string);
+begin
+  FLogMemo.AddRow(data, TLogMessageType.mtError);
+end;
+
+
 procedure TDPMMessageForm.FormHide(Sender: TObject);
 begin
   FLogMemo.Clear;
@@ -195,7 +205,6 @@ begin
     FLogMemo.AddRow(data, TLogMessageType.mtImportantInformation)
   else
     FLogMemo.AddRow(data, TLogMessageType.mtInformation);
-  Application.ProcessMessages;
 end;
 
 procedure TDPMMessageForm.lblDontCloseLinkClick(Sender: TObject; const Link: string; LinkType: TSysLinkType);
@@ -229,7 +238,6 @@ begin
     FLogMemo.AddRow(data, TLogMessageType.mtImportantSuccess)
   else
     FLogMemo.AddRow(data, TLogMessageType.mtSuccess);
-  Application.ProcessMessages;
 end;
 
 procedure TDPMMessageForm.Verbose(const data: string;  const important: Boolean);
@@ -238,7 +246,6 @@ begin
     FLogMemo.AddRow(data, TLogMessageType.mtImportantVerbose)
   else
     FLogMemo.AddRow(data, TLogMessageType.mtVerbose);
-  Application.ProcessMessages;
 end;
 
 procedure TDPMMessageForm.Warning(const data: string; const important: Boolean);
@@ -247,7 +254,20 @@ begin
     FLogMemo.AddRow(data, TLogMessageType.mtImportantWarning)
   else
     FLogMemo.AddRow(data, TLogMessageType.mtWarning);
-  Application.ProcessMessages;
 end;
+
+
+{$IFDEF THEMESERVICES}
+var
+  ideThemeSvc : IOTAIDEThemingServices;
+{$ENDIF}
+
+initialization
+
+{$IFDEF THEMESERVICES}
+  ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
+  ideThemeSvc.RegisterFormClass(TDPMMessageForm);
+{$ENDIF}
+
 
 end.

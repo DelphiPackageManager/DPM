@@ -9,13 +9,13 @@ uses
 
 
 type
-  TMessageTask = (mtRestore, mtInstall, mtUninstall);
+  TMessageTask = (mtNone, mtRestore, mtInstall, mtUninstall);
 
   ///<Summary>Manages the status windows that shows when installing or restoring packages</Summary>
   IDPMIDEMessageService = interface
   ['{B2305CD4-E2E0-4746-B988-7A0E2EF4DCF6}']
     procedure TaskStarted(const cancellationTokenSource : ICancellationTokenSource; const task : TMessageTask);
-    procedure TaskDone(const succes : boolean);
+    procedure TaskDone(const success : boolean);
 
     procedure Debug(const data : string);
     procedure Error(const data : string);
@@ -27,6 +27,9 @@ type
     procedure Clear;
 
     procedure Shutdown;
+
+    function CanHandleMessages : boolean;
+
   end;
 
 
@@ -55,6 +58,7 @@ type
     procedure Warning(const data : string; const important : Boolean = False);
     procedure NewLine;
     procedure Clear;
+    function CanHandleMessages : boolean;
 
   public
     constructor Create(const options : IDPMIDEOptions);
@@ -80,6 +84,7 @@ constructor TDPMIDEMessageService.Create(const options : IDPMIDEOptions);
 begin
   FMessageForm := nil;
   FOptions := options;
+  FCurrentTask := TMessageTask.mtNone;
 end;
 
 procedure TDPMIDEMessageService.Debug(const data: string);
@@ -108,6 +113,7 @@ begin
   end;
   FMessageForm.CancellationTokenSource := FCancellationTokenSource;
   FMessageForm.CloseDelayInSeconds := FOptions.AutoCloseLogDelaySeconds;
+  FMessageForm.Clear;
 end;
 
 procedure TDPMIDEMessageService.Error(const data: string);
@@ -134,6 +140,11 @@ procedure TDPMIDEMessageService.NewLine;
 begin
   if FMessageForm <> nil then
     FMessageForm.NewLine;
+end;
+
+function TDPMIDEMessageService.CanHandleMessages: boolean;
+begin
+  result := (FCurrentTask <> TMessageTask.mtNone) and (FMessageForm <> nil) and FMessageForm.Showing;
 end;
 
 procedure TDPMIDEMessageService.ShowMessageWindow;
@@ -166,6 +177,7 @@ end;
 procedure TDPMIDEMessageService.TaskDone(const success : boolean);
 begin
   FCancellationTokenSource := nil;
+  FCurrentTask := mtNone;
   if FMessageForm <> nil then
   begin
     FMessageForm.CancellationTokenSource := nil;
@@ -184,6 +196,10 @@ begin
   FCurrentTask := task;
 
   case task of
+    mtNone :
+    begin
+
+    end;
     mtRestore:
     begin
        if FOptions.ShowLogForRestore then

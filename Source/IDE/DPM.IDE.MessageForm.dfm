@@ -13,7 +13,6 @@ object DPMMessageForm: TDPMMessageForm
   Font.Style = []
   OldCreateOrder = False
   Position = poMainFormCenter
-  OnCreate = FormCreate
   OnHide = FormHide
   DesignSize = (
     781

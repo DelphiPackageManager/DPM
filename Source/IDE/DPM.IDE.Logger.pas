@@ -55,8 +55,8 @@ type
 
   TDPMIDELogger = class(TInterfacedObject, IDPMIDELogger, ILogger )
   private
-    FMessageServices : IOTAMessageServices;
-    FMessageGroup : IOTAMessageGroup;
+//    FMessageServices : IOTAMessageServices;
+//    FMessageGroup : IOTAMessageGroup;
     FVerbosity : TVerbosity;
     FDPMMessageService : IDPMIDEMessageService;
   protected
@@ -101,46 +101,38 @@ uses
 
 procedure TDPMIDELogger.Clear;
 begin
-  FMessageServices.ClearMessageGroup(FMessageGroup);
+//  FMessageServices.ClearMessageGroup(FMessageGroup);
+  FDPMMessageService.Clear;
 end;
 
 constructor TDPMIDELogger.Create(const dpmMessageService : IDPMIDEMessageService);
 begin
   FDPMMessageService := dpmMessageService;
-  FMessageServices := BorlandIDEServices as IOTAMessageServices;
-  FMessageGroup := FMessageServices.AddMessageGroup('DPM');
-  FMessageGroup.CanClose := false;
-  FMessageGroup.AutoScroll := true;
+//  FMessageServices := BorlandIDEServices as IOTAMessageServices;
+//  FMessageGroup := FMessageServices.AddMessageGroup('DPM');
+//  FMessageGroup.CanClose := false;
+//  FMessageGroup.AutoScroll := true;
   FVerbosity := TVerbosity.Debug; //TODO : Need to make this configurable
 end;
 
 procedure TDPMIDELogger.Debug(const data : string);
-var
-  lineRef : Pointer;
-  debugProc : TThreadProcedure;
+//var
+//  lineRef : Pointer;
+//  debugProc : TThreadProcedure;
 begin
   if (FVerbosity < TVerbosity.Debug) then
     exit;
 
-
-  debugProc := procedure
-  begin
-    if FMessageServices <> nil then
-      FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+  //if FMessageServices <> nil then
+    //FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+  if FDPMMessageService.CanHandleMessages then
     FDPMMessageService.Debug(data);
-  end;
-
-  //FMessageServices is implemented by a vcl control, so we need to ensure it's only updated by the main thread.
-  if TThread.CurrentThread.ThreadID = MainThreadID then
-    debugProc
-  else
-    TThread.Synchronize(nil, debugProc);
 end;
 
 destructor TDPMIDELogger.Destroy;
 begin
-  FMessageGroup := nil;
-  FMessageServices := nil;
+//  FMessageGroup := nil;
+//  FMessageServices := nil;
   inherited;
 end;
 
@@ -153,7 +145,7 @@ procedure TDPMIDELogger.EndProject(const fileName : string; const msg : string);
 //var
 //  lineRef : Pointer;
 begin
-  //FMessageServices.AddToolMessage(fileName, 'Done.' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
+  ////FMessageServices.AddToolMessage(fileName, 'Done.' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
 
 end;
 
@@ -169,21 +161,22 @@ begin
 end;
 
 procedure TDPMIDELogger.Error(const data : string);
-var
-  lineRef : Pointer;
-  errorProc : TThreadProcedure;
+//var
+//  lineRef : Pointer;
+//  errorProc : TThreadProcedure;
 begin
   //TODO : Send custom message so we can color it etc
-  errorProc := procedure
-  begin
-    FMessageServices.AddToolMessage('', 'ERR: ' + data, '', 0, 0, nil, lineRef, FMessageGroup);
-    FDPMMessageService.Error(data);
-  end;
-
-  if TThread.CurrentThread.ThreadID = MainThreadID then
-    errorProc
-  else
-    TThread.Queue(nil, errorProc);
+//  errorProc := procedure
+//  begin
+    //FMessageServices.AddToolMessage('', 'ERR: ' + data, '', 0, 0, nil, lineRef, FMessageGroup);
+    if FDPMMessageService.CanHandleMessages then
+      FDPMMessageService.Error(data);
+//  end;
+//
+//  if TThread.CurrentThread.ThreadID = MainThreadID then
+//    errorProc
+//  else
+//    TThread.Queue(nil, errorProc);
 
 end;
 
@@ -193,44 +186,45 @@ begin
 end;
 
 procedure TDPMIDELogger.Information(const data : string; const important : Boolean);
-var
-  lineRef : Pointer;
-  infoProc : TThreadProcedure;
+//var
+//  lineRef : Pointer;
+//  infoProc : TThreadProcedure;
 begin
   if (FVerbosity < TVerbosity.Normal) and (not important) then
     exit;
 
-  infoProc := procedure
-  begin
-    FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+//  infoProc := procedure
+//  begin
+    //FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+  if FDPMMessageService.CanHandleMessages then
     FDPMMessageService.Information(data, important);
-  end;
-
-  if TThread.CurrentThread.ThreadID = MainThreadID then
-    infoProc
-  else
-    TThread.Queue(nil, infoProc);
+//  end;
+//
+//  if TThread.CurrentThread.ThreadID = MainThreadID then
+//    infoProc
+//  else
+//  TThread.Queue(nil, infoProc);
 
 
 
 end;
 
 procedure TDPMIDELogger.NewLine;
-var
-  lineRef : Pointer;
-  infoProc : TThreadProcedure;
+//var
+//  lineRef : Pointer;
+//  infoProc : TThreadProcedure;
 begin
-
-  infoProc := procedure
-  begin
-    FMessageServices.AddToolMessage('', ' ', '', 0, 0, nil, lineRef, FMessageGroup);
+//  infoProc := procedure
+//  begin
+    //FMessageServices.AddToolMessage('', ' ', '', 0, 0, nil, lineRef, FMessageGroup);
+  if FDPMMessageService.CanHandleMessages then
     FDPMMessageService.NewLine;
-  end;
-
-  if TThread.CurrentThread.ThreadID = MainThreadID then
-    infoProc
-  else
-    TThread.Queue(nil, infoProc);
+//  end;
+//
+//  if TThread.CurrentThread.ThreadID = MainThreadID then
+//    infoProc
+//  else
+//    TThread.Queue(nil, infoProc);
 
 end;
 
@@ -241,7 +235,7 @@ end;
 
 procedure TDPMIDELogger.ShowMessageTab;
 begin
-  FMessageServices.ShowMessageView(FMessageGroup);
+//  FMessageServices.ShowMessageView(FMessageGroup);
 end;
 
 procedure TDPMIDELogger.StartInstall(const cancellationTokenSource : ICancellationTokenSource);
@@ -253,7 +247,7 @@ procedure TDPMIDELogger.StartProject(const fileName : string; const msg : string
 //var
 //  lineRef : Pointer;
 begin
-  //FMessageServices.AddToolMessage(fileName, 'Restoring packages...' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
+  ////FMessageServices.AddToolMessage(fileName, 'Restoring packages...' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
 end;
 
 procedure TDPMIDELogger.StartRestore(const cancellationTokenSource : ICancellationTokenSource);
@@ -268,62 +262,65 @@ begin
 end;
 
 procedure TDPMIDELogger.Success(const data: string; const important: Boolean);
-var
-  lineRef : Pointer;
-  infoProc : TThreadProcedure;
+//var
+//  lineRef : Pointer;
+//  infoProc : TThreadProcedure;
 begin
   if (FVerbosity < TVerbosity.Normal) and (not important) then
     exit;
 
-  infoProc := procedure
-  begin
-    FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+//  infoProc := procedure
+//  begin
+    //FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+  if FDPMMessageService.CanHandleMessages then
     FDPMMessageService.Success(data, important);
-  end;
-
-  if TThread.CurrentThread.ThreadID = MainThreadID then
-    infoProc
-  else
-    TThread.Queue(nil, infoProc);
+//  end;
+//
+//  if TThread.CurrentThread.ThreadID = MainThreadID then
+//    infoProc
+//  else
+//    TThread.Queue(nil, infoProc);
 end;
 
 procedure TDPMIDELogger.Verbose(const data : string; const important : Boolean);
 var
   lineRef : Pointer;
-  verboseProc : TThreadProcedure;
+//  verboseProc : TThreadProcedure;
 begin
   if (FVerbosity < TVerbosity.Detailed) then
     exit;
 
-  verboseProc := procedure
-  begin
-    FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+//  verboseProc := procedure
+//  begin
+    //FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+  if FDPMMessageService.CanHandleMessages then
     FDPMMessageService.Verbose(data, important);
-  end;
-
-  if TThread.CurrentThread.ThreadID = MainThreadID then
-    verboseProc
-  else
-    TThread.Queue(nil, verboseProc);
+//  end;
+//
+//  if TThread.CurrentThread.ThreadID = MainThreadID then
+//    verboseProc
+//  else
+//    TThread.Queue(nil, verboseProc);
 
 end;
 
 procedure TDPMIDELogger.Warning(const data : string; const important : Boolean);
-var
-  lineRef : Pointer;
-  warningProc : TThreadProcedure;
+//var
+//  lineRef : Pointer;
+//  warningProc : TThreadProcedure;
 begin
 
-  warningProc := procedure
-  begin
-    FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+//  warningProc := procedure
+//  begin
+    //FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+  if FDPMMessageService.CanHandleMessages then
     FDPMMessageService.Warning(data, important);
-  end;
-
-  if TThread.CurrentThread.ThreadID = MainThreadID then
-    warningProc
-  else
-    TThread.Queue(nil, warningProc);
+//  end;
+//
+//  if TThread.CurrentThread.ThreadID = MainThreadID then
+//    warningProc
+//  else
+//    TThread.Queue(nil, warningProc);
 end;
 
 end.
