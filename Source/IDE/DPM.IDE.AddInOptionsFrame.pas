@@ -89,6 +89,9 @@ type
     spAutoCloseDelay: TSpinEdit;
     Label9: TLabel;
     pnlIDEOptions: TPanel;
+    Label10: TLabel;
+    chkShowOnProjectTree: TCheckBox;
+    Label11: TLabel;
     procedure lvSourcesSelectItem(Sender : TObject; Item : TListItem; Selected : Boolean);
     procedure txtNameChange(Sender : TObject);
     procedure txtUriChange(Sender : TObject);
@@ -288,6 +291,7 @@ begin
   chkAutoClose.Checked := FIDEOptions.AutoCloseLogOnSuccess;
   spAutoCloseDelay.Value := FIDEOptions.AutoCloseLogDelaySeconds;
   spAutoCloseDelay.Enabled := chkAutoClose.Checked;
+  chkShowOnProjectTree.Checked := FIDEOptions.AddDPMToProjectTree;
 end;
 
 procedure TDPMOptionsFrame.lvSourcesSelectItem(Sender : TObject; Item : TListItem; Selected : Boolean);
@@ -350,7 +354,7 @@ begin
   FIDEOptions.ShowLogForUninstall := chkShowForUninstall.Checked;
   FIDEOptions.AutoCloseLogOnSuccess := chkAutoClose.Checked;
   FIDEOptions.AutoCloseLogDelaySeconds := spAutoCloseDelay.Value;
-
+  FIDEOptions.AddDPMToProjectTree := chkShowOnProjectTree.Checked;
   FIDEOptions.SaveToFile();
   FLogger.Verbosity := FIDEOptions.LogVerbosity;
 

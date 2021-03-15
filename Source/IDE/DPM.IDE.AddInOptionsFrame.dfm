@@ -11,6 +11,7 @@ object DPMOptionsFrame: TDPMOptionsFrame
     Height = 504
     ActivePage = tsIDEOptions
     Align = alClient
+    TabHeight = 24
     TabOrder = 0
     object tsSources: TTabSheet
       Caption = 'Package Sources'
@@ -102,7 +103,7 @@ object DPMOptionsFrame: TDPMOptionsFrame
       end
       object Panel2: TPanel
         Left = 0
-        Top = 265
+        Top = 259
         Width = 660
         Height = 211
         Align = alBottom
@@ -201,7 +202,7 @@ object DPMOptionsFrame: TDPMOptionsFrame
         Left = 0
         Top = 89
         Width = 660
-        Height = 176
+        Height = 170
         Align = alClient
         BevelOuter = bvNone
         Caption = 'Panel3'
@@ -210,7 +211,7 @@ object DPMOptionsFrame: TDPMOptionsFrame
           Left = 0
           Top = 0
           Width = 660
-          Height = 176
+          Height = 170
           Align = alClient
           BevelInner = bvNone
           Checkboxes = True
@@ -250,16 +251,12 @@ object DPMOptionsFrame: TDPMOptionsFrame
         Left = 0
         Top = 0
         Width = 660
-        Height = 476
+        Height = 470
         Align = alClient
         BevelOuter = bvNone
         Caption = 'pnlIDEOptions'
         ShowCaption = False
         TabOrder = 0
-        ExplicitLeft = 24
-        ExplicitTop = 11
-        ExplicitWidth = 574
-        ExplicitHeight = 438
         object Label4: TLabel
           Left = 24
           Top = 24
@@ -276,10 +273,25 @@ object DPMOptionsFrame: TDPMOptionsFrame
         end
         object Label9: TLabel
           Left = 264
-          Top = 111
+          Top = 131
           Width = 132
           Height = 13
           Caption = 'Auto Close Delay (seconds)'
+        end
+        object Label10: TLabel
+          Left = 24
+          Top = 196
+          Width = 79
+          Height = 13
+          Caption = 'Project Manager'
+        end
+        object Label11: TLabel
+          Left = 56
+          Top = 238
+          Width = 297
+          Height = 13
+          Caption = 'Experimental - very slow for large project groups.'
+          Enabled = False
         end
         object chkShowForInstall: TCheckBox
           Left = 40
@@ -307,7 +319,7 @@ object DPMOptionsFrame: TDPMOptionsFrame
         end
         object spAutoCloseDelay: TSpinEdit
           Left = 264
-          Top = 130
+          Top = 150
           Width = 121
           Height = 22
           MaxValue = 30
@@ -317,7 +329,7 @@ object DPMOptionsFrame: TDPMOptionsFrame
         end
         object chkAutoClose: TCheckBox
           Left = 240
-          Top = 87
+          Top = 107
           Width = 177
           Height = 17
           Caption = 'Auto Close Log View on success'
@@ -338,6 +350,14 @@ object DPMOptionsFrame: TDPMOptionsFrame
             'Normal'
             'Detailed'
             'Debug')
+        end
+        object chkShowOnProjectTree: TCheckBox
+          Left = 40
+          Top = 215
+          Width = 241
+          Height = 17
+          Caption = 'Show DPM Node in Project Manager'
+          TabOrder = 6
         end
       end
     end
@@ -369,8 +389,8 @@ object DPMOptionsFrame: TDPMOptionsFrame
     end
   end
   object dpmOptionsImageList: TImageList
-    Left = 336
-    Top = 200
+    Left = 568
+    Top = 64
     Bitmap = {
       494C010105000900040010001000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000400000002000000001002000000000000020
