@@ -29,6 +29,7 @@ unit DPM.IDE.Types;
 interface
 
 uses
+  DPM.Core.Constants,
   DPM.Core.Types;
 
 {$SCOPEDENUMS ON}
@@ -58,6 +59,8 @@ const
   {$IFDEF VER220}IDECompilerVersion = TCompilerVersion.RSXE; {$ENDIF}
   {$IFDEF VER210}IDECompilerVersion = TCompilerVersion.RS2010; {$ENDIF}
 
+  cDPMIDEOptionsFileName = 'dpm-ide.config';
+  cDPMIDEDefaultOptionsFile = cDefaultDPMFolder + '\' + cDPMIDEOptionsFileName;
 
 implementation
 

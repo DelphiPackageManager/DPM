@@ -151,7 +151,7 @@ begin
         //check if the dependency range satisfies the already resolved version
         if not dependency.VersionRange.Satisfies(resolution.Package.Version) then
         begin
-          FLogger.Debug('       conflict - selected version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
+          FLogger.Information('       conflict - selected version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
 
           //if it's a top level package then the version is not negotiable.
           if resolution.ParentId = cRootNode then
@@ -220,7 +220,7 @@ begin
             context.RecordResolution(version, dependency.VersionRange, currentPackage.Id);
             if version.Dependencies.Any then //no point pushing it if there are no dependencies - see top of loop
               context.PushRequirement(version); //resolve it's dependencies
-            FLogger.Debug('            selected : ' + version.Id + '.' + version.Version.ToStringNoMeta);
+            FLogger.Information('            selected : ' + version.Id + '.' + version.Version.ToStringNoMeta);
             selected := true;
             break;
           end

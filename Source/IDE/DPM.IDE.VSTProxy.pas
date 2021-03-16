@@ -35,6 +35,7 @@ uses
   System.Rtti,
   Vcl.Controls,
   Vcl.ImgList,
+  Spring.Collections,
   DPM.IDE.Logger,
   DPM.IDE.ProjectTree.Containers;
 
@@ -68,12 +69,28 @@ type
     );
 
 
+  //quickndirty
+  TRttiMethodEntry = class
+  public
+    rttiMethod : TRttiMethod;
+    params : TArray<TRttiParameter>;
+  end;
+
+  TRttiPropEntry = class
+  public
+    rttiProp : TRttiProperty
+  end;
+
+
   TVirtualStringTreeProxy = class
   private
     FTreeInstance : TControl;
     FRttiCtx : TRttiContext;
     FTreeType : TRttiType;
     FLogger : IDPMIDELogger;
+    FMethodCache : IDictionary<string, TRttiMethodEntry>;
+    FPropCache : IDictionary<string, TRttiPropEntry>;
+    FExpandedRttiprop : TRttiIndexedProperty;
   protected
     function GetVSTProperty(const propertyName : string) : TValue;
 
@@ -84,12 +101,12 @@ type
 
     function GetImages : TCustomImageList;
 
+    function GetMethodEntry(const name : string) : TRttiMethodEntry;
+    function GetPropEntry(const name : string) : TRttiPropEntry;
 
   public
     constructor Create(const treeInstance : TControl; const logger : IDPMIDELogger);
     destructor Destroy; override;
-    //just need this for debugging.. but will leave here for checking if it's not what we expect
-    //in future versions
     procedure BeginUpdate;
     procedure EndUpdate;
     function GetNodeDataSize : integer;
@@ -117,29 +134,24 @@ uses
 
 function TVirtualStringTreeProxy.AddChildNode(const parentNode : PVirtualNode) : PVirtualNode;
 var
-  rttiMethod : TRttiMethod;
-  params : TArray<TRttiParameter>;
+  rttiMethodEntry : TRttiMethodEntry;
   param : TValue;
 begin
-  rttiMethod := FTreeType.GetMethod('AddChild');
-  if not Assigned(rttiMethod) then
-    raise Exception.Create('RTTI for method [AddChild] not found.');
-  params := rttiMethod.GetParameters;
-  TValue.Make(@parentNode, params[0].ParamType.Handle, param);
+  rttiMethodEntry := GetMethodEntry('AddChild');
+
+  TValue.Make(@parentNode, rttiMethodEntry.params[0].ParamType.Handle, param);
   // function AddChild(Parent: PVirtualNode; UserData: Pointer = nil): PVirtualNode; overload; virtual;
   //calling with just the parent fails.. seems like with rtti invoke optional params must be supplied?
-  Result := PVirtualNode(PPointer(rttiMethod.Invoke(FTreeInstance, [param, TValue.From<Pointer>(nil)]).GetReferenceToRawData())^);
+  Result := PVirtualNode(PPointer(rttiMethodEntry.rttiMethod.Invoke(FTreeInstance, [param, TValue.From<Pointer>(nil)]).GetReferenceToRawData())^);
 
 end;
 
 procedure TVirtualStringTreeProxy.BeginUpdate;
 var
-  rttiMethod : TRttiMethod;
+  rttiMethodEntry : TRttiMethodEntry;
 begin
-  rttiMethod := FTreeType.GetMethod('BeginUpdate');
-  if not Assigned(rttiMethod) then
-    raise Exception.Create('RTTI for method [BeginUpdate] not found.');
-  rttiMethod.Invoke(FTreeInstance, []);
+  rttiMethodEntry := GetMethodEntry('BeginUpdate');
+  rttiMethodEntry.rttiMethod.Invoke(FTreeInstance, []);
 end;
 
 constructor TVirtualStringTreeProxy.Create(const treeInstance : TControl; const logger : IDPMIDELogger);
@@ -147,36 +159,41 @@ begin
   FTreeInstance := treeInstance;
   FLogger := logger;
   FTreeType := FRttiCtx.GetType(FTreeInstance.ClassType).AsInstance;
+  FMethodCache := TCollections.CreateDictionary<string, TRttiMethodEntry>;
+  FPropCache := TCollections.CreateDictionary<string, TRttiPropEntry>;
+  FExpandedRttiprop := nil;
 end;
 
 procedure TVirtualStringTreeProxy.DeleteChildren(const parentNode : PVirtualNode);
 var
-  rttiMethod : TRttiMethod;
-  params : TArray<TRttiParameter>;
+  rttiMethodEntry : TRttiMethodEntry;
   param : TValue;
 begin
-  rttiMethod := FTreeType.GetMethod('DeleteChildren');
-  if not Assigned(rttiMethod) then
-    raise Exception.Create('RTTI for method [DeleteChildren] not found.');
-
-  params := rttiMethod.GetParameters;
-  TValue.Make(@parentNode, params[0].ParamType.Handle, param);
-  rttiMethod.Invoke(FTreeInstance, [param, true]);
+  rttiMethodEntry := GetMethodEntry('DeleteChildren');
+  TValue.Make(@parentNode, rttiMethodEntry.params[0].ParamType.Handle, param);
+  rttiMethodEntry.rttiMethod.Invoke(FTreeInstance, [param, true]);
 end;
 
 destructor TVirtualStringTreeProxy.Destroy;
+var
+  mEntry : TRttiMethodEntry;
+  propEntry : TRttiPropEntry;
 begin
+  for mEntry in FMethodCache.Values do
+    mEntry.Free;
+
+  for propEntry in FPropCache.Values do
+    propEntry.Free;
+
   inherited;
 end;
 
 procedure TVirtualStringTreeProxy.EndUpdate;
 var
-  rttiMethod : TRttiMethod;
+  rttiMethodEntry : TRttiMethodEntry;
 begin
-  rttiMethod := FTreeType.GetMethod('EndUpdate');
-  if not Assigned(rttiMethod) then
-    raise Exception.Create('RTTI for method [EndUpdate] not found.');
-  rttiMethod.Invoke(FTreeInstance, []);
+  rttiMethodEntry := GetMethodEntry('EndUpdate');
+  rttiMethodEntry.rttiMethod.Invoke(FTreeInstance, []);
 end;
 
 function TVirtualStringTreeProxy.GetFirstChild(node : PVirtualNode) : PVirtualNode;
@@ -186,35 +203,42 @@ end;
 
 function TVirtualStringTreeProxy.GetFirstNode : PVirtualNode;
 var
-  rttiMethod : TRttiMethod;
+  rttiMethodEntry : TRttiMethodEntry;
   res : TValue;
 begin
-  rttiMethod := FTreeType.GetMethod('GetFirst');
-  if not Assigned(rttiMethod) then
-    raise Exception.Create('RTTI for method [GetFirst] not found.');
-
+  rttiMethodEntry := GetMethodEntry('GetFirst');
   //no params so easy
-  res := rttiMethod.Invoke(FTreeInstance, []);
+  res := rttiMethodEntry.rttiMethod.Invoke(FTreeInstance, []);
   Result := PVirtualNode(PPointer(res.GetReferenceToRawData())^);
 end;
 
 function TVirtualStringTreeProxy.GetFirstVisibleNode : PVirtualNode;
 var
-  rttiMethod : TRttiMethod;
+  rttiMethodEntry : TRttiMethodEntry;
   res : TValue;
 begin
-  rttiMethod := FTreeType.GetMethod('GetFirstVisible');
-  if not Assigned(rttiMethod) then
-    raise Exception.Create('RTTI for method [GetFirstVisible] not found.');
-
+  rttiMethodEntry := GetMethodEntry('GetFirstVisible');
   //no params so easy
-  res := rttiMethod.Invoke(FTreeInstance, []);
+  res := rttiMethodEntry.rttiMethod.Invoke(FTreeInstance, []);
   Result := PVirtualNode(PPointer(res.GetReferenceToRawData())^);
 end;
 
 function TVirtualStringTreeProxy.GetImages : TCustomImageList;
 begin
   Result := GetVSTProperty('Images').AsType<TCustomImageList>();
+end;
+
+function TVirtualStringTreeProxy.GetMethodEntry(const name: string): TRttiMethodEntry;
+begin
+  if not FMethodCache.TryGetValue(LowerCase(name), result) then
+  begin
+    result := TRttiMethodEntry.Create;
+    result.rttiMethod := FTreeType.GetMethod(name);
+    if not Assigned(result.rttiMethod) then
+      raise Exception.Create('RTTI for method [' + name + '] not found.');
+    result.params := result.rttiMethod.GetParameters;
+    FMethodCache[LowerCase(name)] := result;
+  end;
 end;
 
 function TVirtualStringTreeProxy.GetNextNode(const node : PVirtualNode) : PVirtualNode;
@@ -245,6 +269,18 @@ begin
   Result := GetVSTProperty('NodeDataSize').AsType<integer>;
 end;
 
+function TVirtualStringTreeProxy.GetPropEntry(const name: string): TRttiPropEntry;
+begin
+  if not FPropCache.TryGetValue(LowerCase(name), result) then
+  begin
+    result := TRttiPropEntry.Create;
+    result.rttiProp := FTreeType.GetProperty(name);
+    if not Assigned(result.rttiProp) then
+      raise Exception.Create('RTTI for property [' + name + '] not found.');
+    FPropCache[LowerCase(name)] := result;
+  end;
+end;
+
 function TVirtualStringTreeProxy.GetRootNode : PVirtualNode;
 begin
   Result := PVirtualNode(PPointer(GetVSTProperty('RootNode').GetReferenceToRawData())^);
@@ -252,70 +288,58 @@ end;
 
 function TVirtualStringTreeProxy.GetVSTProperty(const propertyName : string) : TValue;
 var
-  rttiProp : TRttiProperty;
+  rttiPropEntry :  TRttiPropEntry;
 begin
-  rttiProp := FTreeType.GetProperty(propertyName);
-  if not Assigned(rttiProp) then
-    raise Exception.Create('RTTI Error accessing [' + propertyName + '] property');
-  Result := rttiProp.GetValue(FTreeInstance)
+  rttiPropEntry := GetPropEntry(propertyName);
+  Result := rttiPropEntry.rttiProp.GetValue(FTreeInstance)
 end;
 
 function TVirtualStringTreeProxy.InsertNode(const parentNode : PVirtualNode; const attachMode : TVTNodeAttachMode) : PVirtualNode;
 var
-  rttiMethod : TRttiMethod;
-  params : TArray<TRttiParameter>;
+  rttiMethodEntry : TRttiMethodEntry;
   param1, param2 : TValue;
 begin
-  rttiMethod := FTreeType.GetMethod('InsertNode');
-  if not Assigned(rttiMethod) then
-    raise Exception.Create('RTTI for method [InsertNode] not found.');
-  params := rttiMethod.GetParameters;
-  TValue.Make(@parentNode, params[0].ParamType.Handle, param1);
-  TValue.Make(@attachMode, params[1].ParamType.Handle, param2);
+  rttiMethodEntry := GetMethodEntry('InsertNode');
+  rttiMethodEntry.params := rttiMethodEntry.rttiMethod.GetParameters;
+  TValue.Make(@parentNode, rttiMethodEntry.params[0].ParamType.Handle, param1);
+  TValue.Make(@attachMode, rttiMethodEntry.params[1].ParamType.Handle, param2);
   //function InsertNode(Node: PVirtualNode; Mode: TVTNodeAttachMode; UserData: Pointer = nil): PVirtualNode;
-  Result := PVirtualNode(PPointer(rttiMethod.Invoke(FTreeInstance, [param1, param2, TValue.From<Pointer>(nil)]).GetReferenceToRawData())^);
+  Result := PVirtualNode(PPointer(rttiMethodEntry.rttiMethod.Invoke(FTreeInstance, [param1, param2, TValue.From<Pointer>(nil)]).GetReferenceToRawData())^);
 
 end;
 
 function TVirtualStringTreeProxy.InvokeMethodWithPointerParam(const methodName : string; const value : Pointer) : TValue;
 var
-  rttiMethod : TRttiMethod;
-  params : TArray<TRttiParameter>;
+  rttiMethodEntry : TRttiMethodEntry;
   param : TValue;
 begin
-  rttiMethod := FTreeType.GetMethod(methodName);
-  if not Assigned(rttiMethod) then
-    raise Exception.Create('RTTI for method [' + methodName + '] not found.');
-  params := rttiMethod.GetParameters;
-  TValue.Make(@value, params[0].ParamType.Handle, param);
-  Result := rttiMethod.Invoke(FTreeInstance, [param]);
+  rttiMethodEntry := GetMethodEntry(methodName);
+  TValue.Make(@value, rttiMethodEntry.params[0].ParamType.Handle, param);
+  Result := rttiMethodEntry.rttiMethod.Invoke(FTreeInstance, [param]);
 end;
 
 procedure TVirtualStringTreeProxy.SetExpanded(const node : PVirtualNode; const value : boolean);
 var
-  rttiprop : TRttiIndexedProperty;
   params : TArray<TRttiParameter>;
   param1, param2 : TValue;
 begin
-  rttiprop := FTreeType.GetIndexedProperty('Expanded');
-  if not Assigned(rttiProp) then
+  if FExpandedRttiprop = nil then
+    FExpandedRttiprop := FTreeType.GetIndexedProperty('Expanded');
+  if not Assigned(FExpandedRttiprop) then
     raise Exception.Create('RTTI Error accessing [Expanded] property');
-  params := rttiProp.WriteMethod.GetParameters;
+  params := FExpandedRttiprop.WriteMethod.GetParameters;
 
   TValue.Make(@node, params[0].ParamType.Handle, param1);
   TValue.Make(@value, params[1].ParamType.Handle, param2);
-  rttiProp.WriteMethod.Invoke(FTreeInstance, [param1, param2]);
+  FExpandedRttiprop.WriteMethod.Invoke(FTreeInstance, [param1, param2]);
 end;
 
 procedure TVirtualStringTreeProxy.SetVSTProperty(const propertyName : string; const value : TValue);
 var
-  rttiProp : TRttiProperty;
+  rttiPropEntry : TRttiPropEntry;
 begin
-  rttiProp := FTreeType.GetProperty(propertyName);
-  if not Assigned(rttiProp) then
-    raise Exception.Create('RTTI Error accessing [' + propertyName + '] property');
-  rttiProp.SetValue(FTreeInstance, value);
-
+  rttiPropEntry := GetPropEntry(propertyName);
+  rttiPropEntry.rttiProp.SetValue(FTreeInstance, value);
 end;
 
 end.

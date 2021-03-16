@@ -47,6 +47,7 @@ uses
   VSoft.Awaitable,
   DPM.IDE.Types,
   DPM.IDE.IconCache,
+  DPM.IDE.Options,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Dependency.Interfaces,
@@ -125,6 +126,8 @@ type
     FConfigurationManager : IConfigurationManager;
     FConfiguration : IConfiguration;
     FConfigIsLocal : boolean;
+
+    FDPMIDEOptions : IDPMIDEOptions;
 
     //RS IDE Stuff
     FProjectGroup : IOTAProjectGroup;
@@ -287,7 +290,7 @@ var
   bReload : boolean;
   optionsHost : TDPMOptionsHostForm;
 begin
-  optionsHost := TDPMOptionsHostForm.Create(Self, FConfigurationManager, FLogger, FSearchOptions.ConfigFile);
+  optionsHost := TDPMOptionsHostForm.Create(Self, FConfigurationManager, FLogger, FDPMIDEOptions, FSearchOptions.ConfigFile);
   try
     bReload := optionsHost.ShowModal = mrOk;
   finally
@@ -1436,7 +1439,7 @@ begin
   end;
 
   FLogger := FContainer.Resolve<IDPMIDELogger>;
-
+  FDPMIDEOptions := FContainer.Resolve<IDPMIDEOptions>;
   //if there is a project specific config file then that is what we should use.
   sConfigFile := IncludeTrailingPathDelimiter(ExtractFilePath(projectOrGroup.FileName)) + cDPMConfigFileName;
   if FileExists(sConfigFile) then

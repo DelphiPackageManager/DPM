@@ -34,7 +34,8 @@ uses
   DPM.IDE.AddInOptionsFrame,
   Spring.Container,
   DPM.Core.Logging,
-  DPM.Core.Configuration.Interfaces;
+  DPM.Core.Configuration.Interfaces,
+  DPM.IDE.Options;
 
 type
   TDPMAddinOptions = class(TInterfacedObject, INTAAddInOptions)
@@ -42,6 +43,8 @@ type
     FConfigManager : IConfigurationManager;
     FLogger : ILogger;
     FFrame : TDPMOptionsFrame;
+    FIDEOptions : IDPMIDEOptions;
+
   protected
     procedure DialogClosed(Accepted : Boolean);
     procedure FrameCreated(AFrame : TCustomFrame);
@@ -64,6 +67,7 @@ constructor TDPMAddinOptions.Create(const container : TContainer);
 begin
   FConfigManager := container.Resolve<IConfigurationManager>;
   FLogger := container.Resolve<ILogger>;
+  FIDEOptions := container.Resolve<IDPMIDEOptions>;
 end;
 
 procedure TDPMAddinOptions.DialogClosed(Accepted : Boolean);
@@ -75,8 +79,7 @@ end;
 procedure TDPMAddinOptions.FrameCreated(AFrame : TCustomFrame);
 begin
   FFrame := TDPMOptionsFrame(AFrame);
-  FFrame.SetConfigManager(FConfigManager);
-  FFrame.SetLogger(FLogger);
+  FFrame.Configure(FConfigManager, FIDEOptions, FLogger);
   FFrame.LoadSettings;
 end;
 

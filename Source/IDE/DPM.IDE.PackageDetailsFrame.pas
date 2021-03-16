@@ -116,8 +116,10 @@ procedure TPackageDetailsFrame.btnInstallOrUpdateClick(Sender : TObject);
 var
   packageInstaller : IPackageInstaller;
   options : TInstallOptions;
+  installResult : boolean;
 begin
   btnInstallOrUpdate.Enabled := false;
+  installResult := false;
   try
     if FRequestInFlight then
       FCancellationTokenSource.Cancel;
@@ -126,8 +128,8 @@ begin
       Application.ProcessMessages;
     FCancellationTokenSource.Reset;
     FLogger.Clear;
+    FLogger.StartInstall(FCancellationTokenSource);
     FPackageSearcher.SaveBeforeChange;
-    FLogger.ShowMessageTab;
     FLogger.Information('Installing package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + ']');
 
     options := TInstallOptions.Create;
@@ -144,7 +146,8 @@ begin
 
     packageInstaller := FContainer.Resolve<IPackageInstaller>;
 
-    if packageInstaller.Install(FCancellationTokenSource.Token, options) then
+    installResult := packageInstaller.Install(FCancellationTokenSource.Token, options);
+    if installResult then
     begin
       FPackageMetaData.InstalledVersion := FPackageMetaData.Version;
       FPackageMetaData.Installed := true;
@@ -158,6 +161,7 @@ begin
 
   finally
     btnInstallOrUpdate.Enabled := true;
+    FLogger.EndInstall(installResult);
   end;
 
 
@@ -168,8 +172,10 @@ procedure TPackageDetailsFrame.btnUninstallClick(Sender : TObject);
 var
   packageInstaller : IPackageInstaller;
   options : TUnInstallOptions;
+  uninstallResult : boolean;
 begin
   btnUninstall.Enabled := false;
+  uninstallResult := false;
   try
     if FRequestInFlight then
       FCancellationTokenSource.Cancel;
@@ -178,8 +184,8 @@ begin
       Application.ProcessMessages;
     FCancellationTokenSource.Reset;
     FLogger.Clear;
+    FLogger.StartUnInstall(FCancellationTokenSource);
     FPackageSearcher.SaveBeforeChange;
-    FLogger.ShowMessageTab;
     FLogger.Information('UnInstalling package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + ']');
 
     options := TUnInstallOptions.Create;
@@ -191,7 +197,8 @@ begin
 
     packageInstaller := FContainer.Resolve<IPackageInstaller>;
 
-    if packageInstaller.UnInstall(FCancellationTokenSource.Token, options) then
+    uninstallResult := packageInstaller.UnInstall(FCancellationTokenSource.Token, options);
+    if uninstallResult then
     begin
       FPackageMetaData.InstalledVersion := FPackageMetaData.Version;
       FPackageMetaData.Installed := true;
@@ -205,8 +212,8 @@ begin
 
   finally
     btnUninstall.Enabled := true;
+    FLogger.EndUnInstall(uninstallResult);
   end;
-
 end;
 
 procedure TPackageDetailsFrame.cboVersionsChange(Sender : TObject);

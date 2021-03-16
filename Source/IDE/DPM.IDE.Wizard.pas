@@ -30,12 +30,13 @@ interface
 
 uses
   ToolsApi,
-  DPM.IDE.Logger,
   Vcl.ActnList,
   Vcl.ImgList,
   Vcl.Controls,
-  DPM.IDE.ProjectTreeManager,
   Spring.Container,
+  DPM.IDE.Logger,
+  DPM.IDE.MessageService,
+  DPM.IDE.ProjectTreeManager,
   DPM.IDE.EditorViewManager;
 
 type
@@ -46,6 +47,7 @@ type
     FProjectMenuNoftifierId : integer;
     FThemeChangeNotifierId : integer;
     FEditorViewManager : IDPMEditorViewManager;
+    FDPMIDEMessageService : IDPMIDEMessageService;
     FLogger : IDPMIDELogger;
     FContainer : TContainer;
     procedure InitContainer;
@@ -75,6 +77,7 @@ uses
   System.SysUtils,
   VCL.Dialogs,
   Spring.Container.Registration,
+  DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Init,
   DPM.IDE.ProjectController,
@@ -82,7 +85,8 @@ uses
   DPM.IDE.IDENotifier,
   DPM.IDE.ProjectMenu,
   DPM.Core.Package.Interfaces,
-  DPM.IDE.AddInOptions;
+  DPM.IDE.AddInOptions,
+  DPM.IDE.Options;
 
 {$R DPM.IDE.Resources.res}
 { TDPMWizard }
@@ -91,11 +95,13 @@ procedure TDPMWizard.InitContainer;
 begin
   try
     FContainer := TContainer.Create;
-    FContainer.RegisterInstance<ILogger>(FLogger as ILogger).AsSingleton();
-    FContainer.RegisterInstance<IDPMIDELogger>(FLogger as IDPMIDELogger).AsSingleton();
+    FContainer.RegisterType<IDPMIDEOptions, TDPMIDEOptions>.AsSingleton();
+    FContainer.RegisterType<IDPMIDEMessageService,TDPMIDEMessageService>.AsSingleton();
+    FContainer.RegisterType<TDPMIDELogger>.Implements<IDPMIDELogger>.Implements<ILogger>.AsSingleton();
     FContainer.RegisterType<IDPMProjectTreeManager, TDPMProjectTreeManager>.AsSingleton();
     FContainer.RegisterType<IDPMEditorViewManager, TDPMEditorViewManager>.AsSingleton();
     FContainer.RegisterType<IDPMIDEProjectController,TDPMIDEProjectController>.AsSingleton();
+
     DPM.Core.Init.InitCore(FContainer);
     FContainer.Build;
   except
@@ -124,11 +130,20 @@ var
   projMenuNotifier : IOTAProjectMenuItemCreatorNotifier;
   options : INTAAddInOptions;
   projectController : IDPMIDEProjectController;
+  dpmIDEOptions : IDPMIDEOptions;
 begin
-  FLogger := TDPMIDELogger.Create;
   InitContainer;
+  FLogger := FContainer.Resolve<IDPMIDELogger>;
+  dpmIDEOptions := FContainer.Resolve<IDPMIDEOptions>;
+  if FileExists(dpmIDEOptions.FileName) then
+    dpmIDEOptions.LoadFromFile()
+  else
+    dpmIDEOptions.SaveToFile(); //create the file
+
+  FLogger.Verbosity := dpmIDEOptions.LogVerbosity;
 
   FEditorViewManager := FContainer.Resolve<IDPMEditorViewManager>;
+  FDPMIDEMessageService := FContainer.Resolve<IDPMIDEMessageService>;
 
   {$IF CompilerVersion >= 32.0}
   FThemeChangeNotifierId := (BorlandIDEServices as IOTAIDEThemingServices).AddNotifier(FEditorViewManager as INTAIDEThemingServicesNotifier);
@@ -153,6 +168,7 @@ end;
 
 destructor TDPMWizard.Destroy;
 begin
+
   inherited;
 end;
 
@@ -171,6 +187,8 @@ begin
   if FThemeChangeNotifierId > -1 then
     (BorlandIDEServices as IOTAIDEThemingServices).RemoveNotifier(FThemeChangeNotifierId);
   {$IFEND}
+
+  FDPMIDEMessageService.ShutDown;
 
 end;
 

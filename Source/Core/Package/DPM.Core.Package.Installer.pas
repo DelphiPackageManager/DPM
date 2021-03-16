@@ -397,7 +397,10 @@ begin
         FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
       else
       begin
-        FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
+        if cancellationToken.IsCancelled then
+          FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
+        else
+          FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
         exit;
       end;
       FLogger.NewLine;
@@ -433,7 +436,10 @@ begin
         FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
       else
       begin
-        FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
+        if cancellationToken.IsCancelled then
+          FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
+        else
+          FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
         exit;
       end;
       FLogger.NewLine;
@@ -465,7 +471,10 @@ begin
           FLogger.Success('Project [' + buildEntry.Project + '] Compiled for designtime Ok.')
         else
         begin
-          FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
+          if cancellationToken.IsCancelled then
+            FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
+          else
+            FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
           exit;
         end;
 
@@ -645,7 +654,10 @@ begin
     //not in the cache, so we need to get it from the the repository
     if not FRepositoryManager.DownloadPackage(cancellationToken, packageIdentity, FPackageCache.PackagesFolder, packageFileName) then
     begin
-      FLogger.Error('Failed to download package [' + packageIdentity.ToString + ']');
+      if cancellationToken.IsCancelled then
+        FLogger.Error('Downloading package [' + packageIdentity.ToString + '] cancelled.')
+      else
+        FLogger.Error('Failed to download package [' + packageIdentity.ToString + ']');
       exit;
     end;
     if not FPackageCache.InstallPackageFromFile(packageFileName, true) then
@@ -1038,7 +1050,12 @@ begin
         begin
           //we need to build the package.
           if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, node, spec, forceCompile) then
-            raise Exception.Create('Comping package [' + pkgInfo.ToIdVersionString + '] failed.' );
+          begin
+            if cancellationToken.IsCancelled then
+              raise Exception.Create('Compiling package [' + pkgInfo.ToIdVersionString + '] cancelled.' )
+            else
+              raise Exception.Create('Compiling package [' + pkgInfo.ToIdVersionString + '] failed.' );
+          end;
           compiledPackages.Add(pkgInfo);
           //compiling updates the node searchpaths and libpath, so just copy to any same package nodes
           otherNodes := projectPackageGraph.FindNodes(node.Id);
@@ -1708,7 +1725,7 @@ begin
   else
     options.CompilerVersion := projectEditor.CompilerVersion;
 
-  FLogger.Warning('Restoring for compiler version  [' + CompilerToString(options.CompilerVersion) + '].');
+  FLogger.Information('Restoring for compiler version  [' + CompilerToString(options.CompilerVersion) + '].', true);
 
 
   //if the platform was specified (either on the command like or through a package file)
@@ -1736,7 +1753,12 @@ begin
     FLogger.Information('Restoring project [' + projectFile + '] for [' + DPMPlatformToString(platform) + ']', true);
     platformResult := DoRestoreProject(cancellationToken, options, projectFile, projectEditor, platform, config);
     if not platformResult then
-      FLogger.Error('Restore failed for ' + DPMPlatformToString(platform))
+    begin
+      if cancellationToken.IsCancelled then
+        FLogger.Error('Restore Cancelled.')
+      else
+        FLogger.Error('Restore failed for ' + DPMPlatformToString(platform))
+    end
     else
       FLogger.Success('Restore succeeded for ' + DPMPlatformToString(platform), true);
     result := platformResult and result;
@@ -1884,7 +1906,7 @@ begin
   else
     options.CompilerVersion := projectEditor.CompilerVersion;
 
-  FLogger.Warning('Uninstalling for compiler version  [' + CompilerToString(options.CompilerVersion) + '].');
+  FLogger.Information('Uninstalling for compiler version  [' + CompilerToString(options.CompilerVersion) + '].',true);
 
 
   //if the platform was specified (either on the command like or through a package file)

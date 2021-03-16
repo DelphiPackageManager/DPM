@@ -279,6 +279,11 @@
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.BOM.pas"/>
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Files.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.MessageForm.pas">
+            <Form>DPMMessageForm</Form>
+            <FormType>dfm</FormType>
+        </DCCReference>
+        <DCCReference Include="IDE\DPM.IDE.MessageService.pas"/>
         <RcItem Include="images\dpm.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>DPMIDELOGO</ResourceId>

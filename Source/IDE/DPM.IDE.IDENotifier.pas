@@ -119,7 +119,7 @@ var
 begin
   result := false;
 //  FLogger.Clear;
-  FLogger.StartRestore;
+//  FLogger.StartRestore(FCam;
   FGroupProjects.Clear;
   groupReader := TGroupProjectReader.Create(FLogger);
   if groupReader.LoadGroupProj(fileName) then
@@ -184,14 +184,16 @@ begin
             //need this to determine when we are done loading the project group.
             if not LoadProjectGroup(FileName) then
             begin
-              //Cancel := true; //stop loading ass the group file is messed up?
+              //Cancel := true; //stop loading as the group file is messed up?
               //not sure this is the right thing to do, we might have a bug that is our fault.
               exit;
             end;
             FProjectController.BeginLoading(TProjectMode.pmGroup);
           end;
           exit;
-        end;
+        end
+        else if not FLoadingGroup then
+          FProjectController.BeginLoading(TProjectMode.pmSingle);
         {$ELSE}
         //10.4 adds ofnBeginProjectGroupOpen, ofnEndProjectGroupOpen, ofnBeginProjectGroupClose, ofnEndProjectGroupClose
         if (ext = '.groupproj') then

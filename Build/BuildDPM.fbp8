@@ -307,7 +307,7 @@ begin
           terminateontimeout = true
           timeoutlength = 2
           as.projectpath = %SRC_ROOT%\\dpm.dproj
-          as.compilerversion = 10.3
+          as.compilerversion = 10.4
           as.verbosity = Debug
           as.nobanner = True
         end
@@ -325,7 +325,7 @@ begin
           compileridl = true
           configname = Release
           debugversionnumbers = false
-          delphiversion = Delphi10_3
+          delphiversion = Delphi10_4
           enabletimeout = false
           eurekalogverboselogging = false
           frameworktype = VCL
@@ -838,7 +838,7 @@ begin
         terminateontimeout = true
         timeoutlength = 2
         as.projectpath = %SRC_ROOT%\\%ProjectFile%oj
-        as.compilerversion = 10.4
+        as.compilerversion = XE4
         as.verbosity = Debug
         as.nobanner = True
         action.script
@@ -866,7 +866,7 @@ begin
         compileridl = true
         configname = Release
         debugversionnumbers = false
-        delphiversion = Delphi10_4
+        delphiversion = DelphiXE4
         enabletimeout = false
         eurekalogverboselogging = false
         frameworktype = VCL
