@@ -48,6 +48,7 @@ type
     FThemeType : TThemeType;
     FMessageColors : array[TThemeType] of TMessageColors;
     function GetText: string;
+    procedure SetStyleServices(const Value: TCustomStyleServices);
 
   protected
     procedure SetBorderStyle(const Value: TBorderStyle);
@@ -118,10 +119,11 @@ type
 
     procedure Clear;
     procedure AddRow(const value : string; const messageType : TLogMessageType);
+    procedure CheckTheme;
 
 
     property RowCount : integer read GetRowCount;
-    property StyleServices : TCustomStyleServices read FStyleServices write FStyleServices;
+    property StyleServices : TCustomStyleServices read FStyleServices write SetStyleServices;
 
   published
     property Align;
@@ -156,7 +158,8 @@ implementation
 
 uses
   System.Math,
-  System.UITypes;
+  System.UITypes,
+  DPM.Core.Utils.Strings;
 
 
 { TVSoftColorMemo }
@@ -214,8 +217,7 @@ end;
 procedure TLogMemo.CMStyleChanged(var Message: TMessage);
 begin
   inherited;
-  //TODO : Figure out whether the theme is light or dark.
-
+  CheckTheme;
 end;
 
 class constructor TLogMemo.Create;
@@ -294,8 +296,8 @@ begin
 
   FMessageColors[TThemeType.Dark][mtDebug] := TColorRec.DarkGray;
   FMessageColors[TThemeType.Dark][mtError] := $006464FA;
-  FMessageColors[TThemeType.Dark][mtInformation] := TColorRec.Lightgray;
-  FMessageColors[TThemeType.Dark][mtImportantInformation] := TColorRec.Lightgray;
+  FMessageColors[TThemeType.Dark][mtInformation] := $00CCCCCC;
+  FMessageColors[TThemeType.Dark][mtImportantInformation] := $00CCCCCC;
   FMessageColors[TThemeType.Dark][mtSuccess] := $0084D188;
   FMessageColors[TThemeType.Dark][mtImportantSuccess] := $0084D188;
   FMessageColors[TThemeType.Dark][mtVerbose] := FMessageColors[TThemeType.Light][mtInformation];
@@ -1048,6 +1050,20 @@ begin
     UpdateVisibleRows;
     Invalidate;
   end;
+end;
+
+procedure TLogMemo.SetStyleServices(const Value: TCustomStyleServices);
+begin
+  FStyleServices := Value;
+  CheckTheme;
+end;
+
+procedure TLogMemo.CheckTheme;
+begin
+  if TStringUtils.Contains(FStyleServices.Name, 'Dark') then
+    FThemeType := TThemeType.Dark
+  else
+    FThemeType := TThemeType.Light;
 end;
 
 procedure TLogMemo.UpdateHoverRow(const X, Y: integer);

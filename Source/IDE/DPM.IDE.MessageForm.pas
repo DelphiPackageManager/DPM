@@ -12,10 +12,12 @@ uses
   Vcl.ActnList,
   Vcl.ExtCtrls,
   VSoft.Awaitable,
-  DPM.Controls.LogMemo ;
+  DPM.Controls.LogMemo, ToolsAPI ;
+
+{$I DPMIDE.inc}
 
 type
-  TDPMMessageForm = class(TForm)
+  TDPMMessageForm = class(TForm {$IFDEF THEMESERVICES}, INTAIDEThemingServicesNotifier {$ENDIF})
     btnCancel: TButton;
     ActionList1: TActionList;
     actCanCancel: TAction;
@@ -38,12 +40,28 @@ type
     FCancellationTokenSource : ICancellationTokenSource;
     FCloseDelayInSeconds : integer;
     FCurrentCloseDelay : integer;
+    {$IFDEF THEMESERVICES}
+    FNotifierId : integer;
+    {$ENDIF}
     procedure SetCancellationTokenSource(const Value: ICancellationTokenSource);
     procedure SetCloseDelayInSeconds(const Value: integer);
   protected
     procedure CreateParams(var Params: TCreateParams); override;
+    procedure CMStyleChanged(var Message: TMessage); message CM_STYLECHANGED;
+
+    //INTAIDEThemingServicesNotifier
+    procedure ChangingTheme;
+    procedure ChangedTheme;
+    procedure AfterSave;
+    procedure BeforeSave;
+    procedure Destroyed;
+    procedure Modified;
+
+
   public
     constructor Create(AOwner : TComponent);override;
+    destructor Destroy; override;
+
     procedure Debug(const data : string);
     procedure Error(const data : string);
     procedure Information(const data : string; const important : Boolean = False);
@@ -54,7 +72,7 @@ type
     procedure Clear;
 
     procedure DelayHide;
-
+    
     property CancellationTokenSource : ICancellationTokenSource read FCancellationTokenSource write SetCancellationTokenSource;
     property CloseDelayInSeconds : integer read FCloseDelayInSeconds write SetCloseDelayInSeconds;
   end;
@@ -66,12 +84,9 @@ implementation
 
 uses
   Vcl.Themes,
-  Vcl.clipbrd,
-  ToolsApi;
+  Vcl.clipbrd;
 
 {$R *.dfm}
-
-{$I DPMIDE.inc}
 
 
 { TDPMMessageForm }
@@ -97,12 +112,42 @@ begin
   Handled := true;
 end;
 
+procedure TDPMMessageForm.AfterSave;
+begin
+
+end;
+
+procedure TDPMMessageForm.BeforeSave;
+begin
+
+end;
+
 procedure TDPMMessageForm.btnCloseClick(Sender: TObject);
 begin
   ClosingInTimer.Enabled := false;
   FCurrentCloseDelay := FCloseDelayInSeconds;
   Self.Hide;
 end;
+
+procedure TDPMMessageForm.ChangedTheme;
+{$IFDEF THEMESERVICES}
+var
+  ideThemeSvc : IOTAIDEThemingServices;
+{$ENDIF}
+begin
+  {$IFDEF THEMESERVICES}
+  ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
+  if ideThemeSvc.IDEThemingEnabled then
+    ideThemeSvc.ApplyTheme(Self);
+  FLogMemo.StyleServices := ideThemeSvc.StyleServices;
+  {$ENDIF}
+end;
+
+procedure TDPMMessageForm.ChangingTheme;
+begin
+
+end;
+
 
 procedure TDPMMessageForm.Clear;
 begin
@@ -128,6 +173,13 @@ begin
   end;
 end;
 
+
+procedure TDPMMessageForm.CMStyleChanged(var Message: TMessage);
+begin
+
+  inherited;
+end;
+
 constructor TDPMMessageForm.Create(AOwner: TComponent);
 var
   {$IFDEF THEMESERVICES}
@@ -144,6 +196,7 @@ begin
   ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
   if ideThemeSvc.IDEThemingEnabled then
     ideThemeSvc.ApplyTheme(Self);
+  FNotifierId := ideThemeSvc.AddNotifier(Self);
   IDEStyleServices := ideThemeSvc.StyleServices;
   {$ELSE}
   IDEStyleServices := Vcl.Themes.StyleServices;
@@ -188,6 +241,24 @@ begin
   lblClosing.Update;
 end;
 
+destructor TDPMMessageForm.Destroy;
+  {$IFDEF THEMESERVICES}
+var
+  ideThemeSvc : IOTAIDEThemingServices;
+  {$ENDIF}
+begin
+  {$IFDEF THEMESERVICES}
+  ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
+  ideThemeSvc.RemoveNotifier(FNotifierId);
+  {$ENDIF}
+  inherited;
+end;
+
+procedure TDPMMessageForm.Destroyed;
+begin
+
+end;
+
 procedure TDPMMessageForm.Error(const data: string);
 begin
   FLogMemo.AddRow(data, TLogMessageType.mtError);
@@ -213,6 +284,11 @@ begin
   lblClosing.Visible := false;
   lblDontClose.Visible := false;
   FCurrentCloseDelay := FCloseDelayInSeconds;
+end;
+
+procedure TDPMMessageForm.Modified;
+begin
+
 end;
 
 procedure TDPMMessageForm.NewLine;
@@ -256,20 +332,21 @@ begin
     FLogMemo.AddRow(data, TLogMessageType.mtWarning);
 end;
 
-{$IF CompilerVersion >= 33.0}
-
-  {$IFDEF THEMESERVICES}
-  var
-    ideThemeSvc : IOTAIDEThemingServices250;
-  {$ENDIF}
-
-initialization
-
-  {$IFDEF THEMESERVICES}
-    ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices250);
-    ideThemeSvc.RegisterFormClass(TDPMMessageForm);
-  {$ENDIF}
-{$IFEND}
+//{$IF CompilerVersion >= 33.0}
+//
+//  {$IFDEF THEMESERVICES}
+//  var
+//    ideThemeSvc : IOTAIDEThemingServices250;
+//  {$ENDIF}
+//
+//initialization
+//
+//  {$IFDEF THEMESERVICES}
+//    //ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices250);
+//    //this doesn't seem to work in 10.4
+////    ideThemeSvc.RegisterFormClass(TDPMMessageForm);
+//  {$ENDIF}
+//{$IFEND}
 
 
 end.
