@@ -126,7 +126,7 @@ object PackageDetailsFrame: TPackageDetailsFrame
         436
         35)
       object Label1: TLabel
-        Left = 7
+        Left = 6
         Top = 11
         Width = 56
         Height = 13
@@ -174,7 +174,7 @@ object PackageDetailsFrame: TPackageDetailsFrame
         436
         34)
       object lblVersionTitle: TLabel
-        Left = 7
+        Left = 6
         Top = 9
         Width = 48
         Height = 13
