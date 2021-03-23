@@ -63,7 +63,7 @@ implementation
 
 uses
   WinAPI.Windows,
-  DPM.Console.Utils;
+  DPM.Core.Utils.Strings;
 
 constructor TWindowsConsole.Create;
 var
@@ -223,7 +223,7 @@ var
   dummy : Cardinal;
 begin
   //Add the indenting.
-  output := TDPMStringUtils.PadString(s, length(s)+ Self.CurrentIndentLevel, True, ' ');
+  output := TStringUtils.PadString(s, length(s)+ Self.CurrentIndentLevel, True, ' ');
   if Self.RedirectedStdOut then
     System.Write(output)
   else
@@ -236,7 +236,7 @@ var
   dummy : Cardinal;
 begin
   //Add the indenting.
-  output := TDPMStringUtils.PadString(s, length(s)+ Self.CurrentIndentLevel, True, ' ');
+  output := TStringUtils.PadString(s, length(s)+ Self.CurrentIndentLevel, True, ' ');
 
   //If we are already going to wrap around to the next line. No need to add CRLF
   if Length(output) < ConsoleWidth then

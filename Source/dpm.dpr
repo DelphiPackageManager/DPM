@@ -36,7 +36,6 @@ uses
   WinApi.ActiveX,
   DPM.Console.Types in 'Cmdline\DPM.Console.Types.pas',
   DPM.Console.Reg in 'Cmdline\DPM.Console.Reg.pas',
-  DPM.Console.Utils in 'Cmdline\DPM.Console.Utils.pas',
   DPM.Console.Application in 'Cmdline\DPM.Console.Application.pas',
   DPM.Console.Banner in 'Cmdline\DPM.Console.Banner.pas',
   DPM.Console.Options in 'Cmdline\Options\DPM.Console.Options.pas',

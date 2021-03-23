@@ -33,7 +33,7 @@ type
   //using a class to avoid namespace conflicts
   TStringUtils = class
     //mostly functions from TStringHelper that are useful.
-
+    class function PadString(const s: string; const totalLength: integer; const padLeft: boolean = True; padChr: Char = ' '): string;
     class function PadRight(const theString : string; TotalWidth : Integer) : string; overload; inline;
     class function PadRight(const theString : string; TotalWidth : Integer; PaddingChar : Char) : string; overload; inline;
     class function SplitStr(const value : string; const Separator : Char; const options : TSplitStringOptions) : TArray<string>; overload;
@@ -115,6 +115,18 @@ begin
     Result := theString + System.StringOfChar(PaddingChar, TotalWidth)
   else
     Result := theString;
+end;
+
+class function TStringUtils.PadString(const s: string; const totalLength: integer; const padLeft: boolean; padChr: Char): string;
+begin
+  Result := s;
+  while Length(result) < totalLength do
+  begin
+    if padLeft then
+      Result := padChr + Result
+    else
+      Result := Result + padChr;
+  end;
 end;
 
 class function TStringUtils.SplitStr(const value : string; const Separator : Char) : TArray<string>;

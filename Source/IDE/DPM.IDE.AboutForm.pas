@@ -40,7 +40,9 @@ type
     Label3 : TLabel;
     githubLinkLabel : TLinkLabel;
     Label4 : TLabel;
+    lblVersion: TLabel;
     procedure githubLinkLabelLinkClick(Sender : TObject; const Link : string; LinkType : TSysLinkType);
+    procedure FormCreate(Sender: TObject);
   private
     { Private declarations }
   public
@@ -53,9 +55,15 @@ var
 implementation
 
 uses
-  Winapi.ShellAPI;
+  Winapi.ShellAPI,
+  DPM.Core.Utils.System;
 
 {$R *.dfm}
+
+procedure TDPMAboutForm.FormCreate(Sender: TObject);
+begin
+  lblVersion.Caption := lblVersion.Caption + TSystemUtils.GetVersionString;
+end;
 
 procedure TDPMAboutForm.githubLinkLabelLinkClick(Sender : TObject; const Link : string; LinkType : TSysLinkType);
 begin

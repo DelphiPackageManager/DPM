@@ -182,6 +182,8 @@ begin
   begin
     if value = 'Android' then
       result := TDPMPlatform.AndroidArm32
+    else if value = 'Android64' then
+      result := TDPMPlatform.AndroidArm64
     else if value = 'Linux64' then
       result := TDPMPlatform.LinuxIntel64
     else
@@ -246,13 +248,22 @@ end;
 
 function DPMPlatformToString(const value : TDPMPlatform) : string;
 begin
-  result := GetEnumName(TypeInfo(TDPMPlatform), ord(value));
+  case value  of
+    TDPMPlatform.AndroidArm32: result := 'Android';
+    TDPMPlatform.AndroidArm64: result := 'Android64';
+  else
+    result := GetEnumName(TypeInfo(TDPMPlatform), ord(value));
+  end;
+
+
+
 end;
 
 function DPMPlatformToBDString(const value : TDPMPlatform) : string;
 begin
   case value of
     TDPMPlatform.AndroidArm32 : result := 'Android';
+    TDPMPlatform.AndroidArm64 : result := 'Android64';
   else
     result := GetEnumName(TypeInfo(TDPMPlatform), ord(value));
   end;
