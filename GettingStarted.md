@@ -18,9 +18,9 @@ Open a command prompt and run (assuming you left the add to path option checked 
 
 This will add a package source to your config. At this time only folders are supported, http sources will be added later.
 
-When you install packages, they will be downloaded from the package source to the package cache folder. By default the package cache folder will be in %APPDATA%\.dpm\packages
+When you install packages, they will be downloaded from the package source to the package cache folder. By default the package cache folder will be in %APPDATA%\\.dpm\packages
 
-You can change that by editing %APPDATA%\.dpm\dpm.config and changing the packageCacheLocation setting.
+You can change that by editing %APPDATA%\\.dpm\dpm.config and changing the packageCacheLocation setting.
 
 To use DPM, you need some packages. I have published packages for all of my open source delphi projects, you will find the dpkg files under releases for each project. Packages files are named in a particular manner (eg : VSoft.CommandLine-XE2-Win64-0.0.2.dpkg) , do not rename them. Download the files to the folder you created earlier.
 
