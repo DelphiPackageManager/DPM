@@ -24,43 +24,34 @@ object DPMOptionsHostForm: TDPMOptionsHostForm
     Align = alClient
     TabOrder = 0
     ExplicitWidth = 720
-    ExplicitHeight = 504
-    inherited Panel1: TPanel
+    inherited pgOptions: TPageControl
       Width = 720
-      ExplicitWidth = 720
-      inherited SpeedButton1: TSpeedButton
-        Left = 539
-        ExplicitLeft = 539
+      inherited tsSources: TTabSheet
+        ExplicitLeft = 0
+        ExplicitWidth = 712
+        inherited Panel1: TPanel
+          Width = 712
+          ExplicitWidth = 712
+        end
+        inherited Panel2: TPanel
+          Width = 712
+        end
+        inherited Panel3: TPanel
+          Width = 712
+          ExplicitWidth = 712
+          inherited lvSources: TListView
+            Width = 712
+            ExplicitWidth = 712
+          end
+        end
       end
-      inherited SpeedButton2: TSpeedButton
-        Left = 584
-        ExplicitLeft = 584
-      end
-      inherited SpeedButton3: TSpeedButton
-        Left = 629
-        ExplicitLeft = 629
-      end
-      inherited SpeedButton4: TSpeedButton
-        Left = 674
-        ExplicitLeft = 674
-      end
-    end
-    inherited Panel2: TPanel
-      Top = 293
-      Width = 720
-      ExplicitTop = 293
-      ExplicitWidth = 720
-    end
-    inherited Panel3: TPanel
-      Width = 720
-      Height = 204
-      ExplicitWidth = 720
-      ExplicitHeight = 204
-      inherited lvSources: TListView
-        Width = 720
-        Height = 204
-        ExplicitWidth = 720
-        ExplicitHeight = 204
+      inherited tsIDEOptions: TTabSheet
+        ExplicitTop = 0
+        ExplicitWidth = 0
+        ExplicitHeight = 0
+        inherited pnlIDEOptions: TPanel
+          Width = 712
+        end
       end
     end
   end
@@ -72,6 +63,7 @@ object DPMOptionsHostForm: TDPMOptionsHostForm
     Align = alBottom
     BevelOuter = bvNone
     Caption = 'Panel1'
+    ParentColor = True
     ShowCaption = False
     TabOrder = 1
     object btnCancel: TButton
