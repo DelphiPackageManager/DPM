@@ -9,12 +9,20 @@ object DPMOptionsFrame: TDPMOptionsFrame
     Top = 0
     Width = 668
     Height = 504
-    ActivePage = tsIDEOptions
+    Margins.Left = 0
+    Margins.Top = 0
+    Margins.Right = 0
+    Margins.Bottom = 0
+    ActivePage = tsSources
     Align = alClient
     TabHeight = 24
     TabOrder = 0
     object tsSources: TTabSheet
-      Caption = 'Package Sources'
+      Margins.Left = 0
+      Margins.Top = 0
+      Margins.Right = 0
+      Margins.Bottom = 0
+      Caption = ' Package Sources '
       object Panel1: TPanel
         Left = 0
         Top = 0
@@ -245,8 +253,13 @@ object DPMOptionsFrame: TDPMOptionsFrame
       end
     end
     object tsIDEOptions: TTabSheet
-      Caption = 'IDE Options'
+      Margins.Left = 0
+      Margins.Top = 0
+      Margins.Right = 0
+      Margins.Bottom = 0
+      Caption = ' IDE Options '
       ImageIndex = 1
+      ExplicitLeft = 0
       object pnlIDEOptions: TPanel
         Left = 0
         Top = 0
@@ -288,7 +301,7 @@ object DPMOptionsFrame: TDPMOptionsFrame
         object Label11: TLabel
           Left = 56
           Top = 238
-          Width = 297
+          Width = 239
           Height = 13
           Caption = 'Experimental - very slow for large project groups.'
           Enabled = False
