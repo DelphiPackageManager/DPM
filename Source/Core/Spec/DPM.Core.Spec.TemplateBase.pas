@@ -451,6 +451,7 @@ begin
   end
   else
   begin
+    //TODO : Rethink this validation, doesn't look all that comprehensive.
     //if we point to a template and have props other than compiler + platforms then fail
     if jsonObject.Contains('template') then
     begin
@@ -459,12 +460,13 @@ begin
         Logger.Error('targetPlatform cannot specify a template and it''s own definition, pick one');
         result := false;
       end;
-      // if it's 3 props, then variables must be one of them
-      if not jsonObject.Contains('variables') then
-      begin
-        Logger.Error('targetPlatform cannot specify a template and it''s own definition, pick one');
-        result := false;
-      end;
+      // if it's 4 props, then variables must be one of them
+      if jsonObject.Count > 3 then //compiler + platforms + template
+        if not jsonObject.Contains('variables') then
+        begin
+          Logger.Error('targetPlatform cannot specify a template and it''s own definition, pick one');
+          result := false;
+        end;
       exit;
     end;
   end;
