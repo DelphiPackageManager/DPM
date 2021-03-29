@@ -47,6 +47,8 @@ uses
 type
   TGraphNode = class(TInterfacedObject, IGraphNode)
   private
+    FNodeKind : TNodeKind;
+
     {$IFDEF USEWEAK}
     [weak]
     FParent : IGraphNode;
@@ -67,7 +69,8 @@ type
     FCompilerVersion : TCompilerVersion;
     FProjectFile : string;
   protected
-    function AddChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
+    function AddProjectChildNode(const projectId : string) : IGraphNode;
+    function AddPackageChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
     function FindFirstNode(const id : string) : IGraphNode;
     function FindNodes(const id : string) : IList<IGraphNode>;
     function FindChild(const id : string) : IGraphNode;
@@ -83,6 +86,7 @@ type
     function GetCompilerVersion : TCompilerVersion;
     function GetIsTransitive : boolean;
     function GetProjectFile: string;
+    function GetNodeKind : TNodeKind;
 
     procedure SetProjectFile(const value: string);
 
@@ -121,11 +125,12 @@ uses
 
 { TGraphNode }
 
-function TGraphNode.AddChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
+function TGraphNode.AddPackageChildNode(const id: string; const version: TPackageVersion; const selectedOn: TVersionRange): IGraphNode;
 var
   parent : IGraphNode;
 begin
   //TODO : Assert that we are not a root node here.. should only ever be called on project nodes or child nodes.
+  Assert(FNodeKind in [nkProject, nkPackage]);
 
   //make sure we are not doing something stupid
   if FChildNodes.ContainsKey(LowerCase(id)) then
@@ -143,6 +148,12 @@ begin
 
   result := TGraphNode.Create(self, id, version, FPlatform, FCompilerVersion, selectedOn,  FUseSource);
   FChildNodes.Add(LowerCase(id), result);
+
+end;
+
+function TGraphNode.AddProjectChildNode(const projectId: string): IGraphNode;
+begin
+
 end;
 
 function TGraphNode.AreEqual(const otherNode: IGraphNode; const depth: integer): boolean;
@@ -295,7 +306,7 @@ end;
 
 function TGraphNode.GetIsTransitive: boolean;
 begin
-  result := (FParent <> nil) and (not {$IFDEF USEWEAK} FParent.IsRoot {$ELSE} IGraphNode(FParent).IsRoot{$ENDIF});
+  result := (FParent <> nil) and ({$IFDEF USEWEAK} FParent.NodeKind = nkPackage {$ELSE} IGraphNode(FParent).NodeKind = nkPackage{$ENDIF});
 end;
 
 function TGraphNode.GetLevel : Integer;
@@ -306,6 +317,11 @@ end;
 function TGraphNode.GetLibPath: string;
 begin
   result := FLibPath;
+end;
+
+function TGraphNode.GetNodeKind: TNodeKind;
+begin
+  result := FNodeKind;
 end;
 
 function TGraphNode.GetParent : IGraphNode;

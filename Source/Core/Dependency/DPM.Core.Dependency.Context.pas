@@ -125,7 +125,7 @@ var
     dependency : IPackageDependency;
     childNode : IGraphNode;
   begin
-    childNode := parentNode.AddChildNode(package.Id, package.Version, versionRange);
+    childNode := parentNode.AddPackageChildNode(package.Id, package.Version, versionRange);
     childNode.UseSource := package.UseSource;
     for dependency in package.Dependencies do
     begin

@@ -682,12 +682,12 @@ function TProjectEditor.LoadPackageRefences : boolean;
         end;
         if isTransitive then
         begin
-          newNode  := parentReference.AddChildNode(id, version, range);
+          newNode  := parentReference.AddPackageChildNode(id, version, range);
           newNode.UseSource := useSource;
         end
         else
         begin
-          newNode := rootNode.AddChildNode(id, version, TVersionRange.Empty);
+          newNode := rootNode.AddPackageChildNode(id, version, TVersionRange.Empty);
           newNode.UseSource := useSource;
         end;
         ReadPackageReferences(newNode, packageElement);

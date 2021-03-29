@@ -92,7 +92,7 @@ begin
           sId := depArray.Values[i].S['id'];
           sVersion := depArray.Values[i].S['version'];
           version := TPackageVersion.Parse(sVersion);
-          result.AddChildNode(sId,version, TVersionRange.Empty);
+          result.AddPackageChildNode(sId,version, TVersionRange.Empty);
         end;
       end;
     finally

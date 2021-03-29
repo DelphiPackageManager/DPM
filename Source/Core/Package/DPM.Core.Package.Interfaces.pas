@@ -242,11 +242,11 @@ type
   IPackageInstallerContext = interface
     ['{8FD229A2-FE7B-4315-84B2-FF18B78C76DC}']
     procedure Reset;
-    procedure StartProject(const projectFile : string);
-    procedure EndProject(const projectFile : string);
+    procedure StartProject(const projectFile : string; const platform : TDPMPlatform);
+    procedure EndProject(const projectFile : string; const platform : TDPMPlatform);
     //
     //register a bpl for install into the IDE.
-    procedure RegisterDesignPackage(const packageFile : string; const dependsOn : IList<string>);
+    procedure RegisterDesignPackage(const platform : TDPMPlatform; const packageFile : string; const dependsOn : IList<string>);
 
     function IsDesignPackageInstalled(const packageName : string) : boolean;
 

@@ -14,16 +14,16 @@ type
   private
     FLogger : ILogger;
 
-    FPackageGraphs : IDictionary<string, IDictionary<TDPMPlatform,IGraphNode>>;
+    FProjectGraphs : IDictionary<string, IDictionary<TDPMPlatform,IGraphNode>>;
     //FPackageGraphs : array[TDPMPlatform] of IGraphNode;
 
   protected
     procedure Reset;
   public
     constructor Create(const logger : ILogger);
-    procedure EndProject(const projectFile: string);
-    procedure StartProject(const projectFile: string);
-    procedure RegisterDesignPackage(const packageFile: string; const dependsOn: IList<string>);
+    procedure EndProject(const projectFile: string; const platform : TDPMPlatform);
+    procedure StartProject(const projectFile: string; const platform : TDPMPlatform);
+    procedure RegisterDesignPackage(const platform : TDPMPlatform; const packageFile: string; const dependsOn: IList<string>);
     function IsDesignPackageInstalled(const packageName: string): Boolean;
   end;
 
@@ -34,9 +34,16 @@ implementation
 constructor TPackageInstallerContext.Create(const logger: ILogger);
 begin
   FLogger := logger;
+  FProjectGraphs := TCollections.CreateDictionary<string, IDictionary<TDPMPlatform,IGraphNode>>;
 end;
 
-procedure TPackageInstallerContext.EndProject(const projectFile: string);
+procedure TPackageInstallerContext.StartProject(const projectFile: string; const platform : TDPMPlatform);
+begin
+
+end;
+
+
+procedure TPackageInstallerContext.EndProject(const projectFile: string; const platform : TDPMPlatform);
 begin
 
 end;
@@ -46,7 +53,7 @@ begin
   result := false;
 end;
 
-procedure TPackageInstallerContext.RegisterDesignPackage(const packageFile: string; const dependsOn: IList<string>);
+procedure TPackageInstallerContext.RegisterDesignPackage(const platform : TDPMPlatform; const packageFile: string; const dependsOn: IList<string>);
 begin
 
 end;
@@ -56,9 +63,5 @@ begin
 
 end;
 
-procedure TPackageInstallerContext.StartProject(const projectFile: string);
-begin
-
-end;
 
 end.

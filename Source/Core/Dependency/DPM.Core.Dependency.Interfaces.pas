@@ -43,9 +43,12 @@ type
 
   TNodeVisitProc = reference to procedure(const node : IGraphNode);
 
+  TNodeKind = (nkRoot, nkProject, nkPackage);
+
   //a directed asyclic graph (DAG).
   IGraphNode = interface(IPackageId)
     ['{20055C26-8E63-4936-8249-ACF8514A37E7}']
+    function GetNodeKind : TNodeKind;
     function GetId : string;
     function GetParent : IGraphNode;
     function GetVersion : TPackageVersion;
@@ -69,8 +72,8 @@ type
     function GetIsTransitive : boolean;
     function GetProjectFile : string;
 
-
-    function AddChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
+    function AddProjectChildNode(const projectId : string) : IGraphNode;
+    function AddPackageChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
     ///
     /// Breadth first search
     function FindFirstNode(const id : string) : IGraphNode;
@@ -102,6 +105,7 @@ type
     property Platform : TDPMPlatform read GetPlatform;
     property UseSource : boolean read GetUseSource write SetUseSource;
     property ProjectFile : string read GetProjectFile write SetProjectFile;
+    property NodeKind : TNodeKind read GetNodeKind;
 
     //build support
     property SearchPaths : IList<string> read GetSearchPaths;
