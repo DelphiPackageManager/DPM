@@ -253,10 +253,14 @@ type
     function GetPlatforms : TArray<TDPMPlatform>;
     function GetTemplateName : string;
     function GetCompiler : TCompilerVersion;
+    function GetVariables : TStrings;
+
     function CloneForPlatform(const platform : TDPMPlatform) : ISpecTargetPlatform;
+
     property Compiler : TCompilerVersion read GetCompiler;
     property Platforms : TArray<TDPMPlatform>read GetPlatforms;
     property TemplateName : string read GetTemplateName;
+    property Variables : TStrings read GetVariables;
   end;
 
 
