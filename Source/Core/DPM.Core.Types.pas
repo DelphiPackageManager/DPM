@@ -58,8 +58,8 @@ type
     RS10_1,
     RS10_2,
     RS10_3,
-    RS10_4 //probably the next version.
-
+    RS10_4,
+    RS10_5 //probably the next version.
     );
 
   TCompilerVersions = set of TCompilerVersion;
