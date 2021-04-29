@@ -30,6 +30,7 @@ unit DPM.Core.Spec.TargetPlatform;
 interface
 
 uses
+  System.Classes,
   Spring.Collections,
   JsonDataObjects,
   DPM.Core.Types,
@@ -43,16 +44,20 @@ type
     FTemplateName : string;
     FPlatforms : TArray<TDPMPlatform>;
     FCompiler : TCompilerVersion;
+    FVariables : TStringList;
 
   protected
     function GetPlatforms : TArray<TDPMPlatform>;
     function GetTemplateName : string;
     function GetCompiler : TCompilerVersion;
+    function GetVariables : TStrings;
+
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function CloneForPlatform(const platform : TDPMPlatform) : ISpecTargetPlatform;
   public
     constructor Create(const logger : ILogger); override;
-    constructor CreateReducedClone(const logger : ILogger; const targetPlatform : ISpecTargetPlatform; const platform : TDPMPlatform);
+    constructor CreateReducedClone(const logger : ILogger; const targetPlatform : ISpecTargetPlatform; const platform : TDPMPlatform; const variables : TStrings);
+    destructor Destroy;override;
 
   end;
 
@@ -72,7 +77,7 @@ uses
 
 function TSpecTargetPlatform.CloneForPlatform(const platform : TDPMPlatform) : ISpecTargetPlatform;
 begin
-  result := TSpecTargetPlatform.CreateReducedClone(logger, self, platform);
+  result := TSpecTargetPlatform.CreateReducedClone(logger, self, platform, FVariables);
 end;
 
 constructor TSpecTargetPlatform.Create(const logger : ILogger);
@@ -81,10 +86,11 @@ begin
   SetLength(FPlatforms, 0);
   FCompiler := TCompilerVersion.UnknownVersion;
   FTemplateName := cUnset;
+  FVariables := TStringList.Create;
 end;
 
 
-constructor TSpecTargetPlatform.CreateReducedClone(const logger : ILogger; const targetPlatform : ISpecTargetPlatform; const platform : TDPMPlatform);
+constructor TSpecTargetPlatform.CreateReducedClone(const logger : ILogger; const targetPlatform : ISpecTargetPlatform; const platform : TDPMPlatform; const variables : TStrings);
 var
   deps : IList<ISpecDependency>;
   dep, newDep : ISpecDependency;
@@ -146,9 +152,17 @@ begin
 
   inherited CreateClone(logger, deps, designFiles, runtimeFiles, sourceFiles, libFiles, otherFiles, searchPaths);
 
+  FVariables.Assign(variables);
+
   FTemplateName := targetPlatform.TemplateName;
   FCompiler := targetPlatform.Compiler;
   FPlatforms := TArray<TDPMPlatform>.Create(platform);
+end;
+
+destructor TSpecTargetPlatform.Destroy;
+begin
+  FVariables.Free;
+  inherited;
 end;
 
 function TSpecTargetPlatform.GetPlatforms : TArray<TDPMPlatform>;
@@ -167,6 +181,11 @@ begin
   result := FTemplateName;
 end;
 
+function TSpecTargetPlatform.GetVariables: TStrings;
+begin
+  result := FVariables;
+end;
+
 function TSpecTargetPlatform.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var
   sValue : string;
@@ -175,6 +194,10 @@ var
   platformList : IList<TDPMPlatform>;
   sCompiler : string;
   sTemplate : string;
+
+  variablesObj : TJsonObject;
+  i: Integer;
+
 begin
   result := true;
   sCompiler := jsonObject.S['compiler'];
@@ -238,6 +261,14 @@ begin
   sTemplate := jsonObject.S['template'];
   if sTemplate <> '' then
     FTemplateName := sTemplate;
+
+
+  if jsonObject.Contains('variables') then
+  begin
+    variablesObj := jsonObject.O['variables'];
+    for i := 0 to variablesObj.Count -1 do
+      FVariables.Add(variablesObj.Names[i] + '=' + variablesObj.Values[variablesObj.Names[i]].Value );
+  end;
 
   result := inherited LoadFromJson(jsonObject) and result;
 end;

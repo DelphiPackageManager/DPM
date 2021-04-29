@@ -170,6 +170,7 @@ begin
       case FHitElement of
         deLicense :
           begin
+            //TODO : There can be multiple licenses, comma separated. This does not deal with that.
             if TUriFactory.TryParse(FPackage.License,false, uri) then
               sUri := FPackage.License
             else
@@ -358,6 +359,7 @@ begin
     if package.License <> '' then
     begin
       Include(FOptionalElements, deLicense);
+      //TODO : check for multiple licenses.
     end;
 
     if package.ProjectUrl <> '' then

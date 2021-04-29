@@ -115,7 +115,15 @@ begin
   FCompilerLogFile := TPath.GetTempFileName;
   FProjectFile := projectFile;
 
-  commandLine := GetCommandLine(projectFile, configName, packageVersion);
+  try
+    commandLine := GetCommandLine(projectFile, configName, packageVersion);
+  except
+    on e : Exception do
+    begin
+      FLogger.Error('Error generating command line : ' + e.Message);
+      exit;
+    end;
+  end;
 
   env := TEnvironmentBlockFactory.Create(nil, true);
   //THE IDE set these, which makes it difficult to debug the command line version.

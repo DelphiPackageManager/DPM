@@ -133,7 +133,8 @@ begin
   FBuildEntries := TCollections.CreateList<ISpecBuildEntry>;
 end;
 
-constructor TSpecTemplateBase.CreateClone(const logger : ILogger; const deps : IList<ISpecDependency>; const design, runtime : IList<ISpecBPLEntry>; const source, lib, files : IList<ISpecFileEntry>; const search : IList<ISpecSearchPath>);
+constructor TSpecTemplateBase.CreateClone(const logger : ILogger; const deps : IList<ISpecDependency>; const design, runtime : IList<ISpecBPLEntry>; const source, lib, files : IList<ISpecFileEntry>;
+                                          const search : IList<ISpecSearchPath>);
 begin
   Create(logger);
   FDependencies.AddRange(deps);
@@ -274,30 +275,12 @@ begin
   result := FSourceFiles;
 end;
 
+
 function TSpecTemplateBase.IsTemplate : boolean;
 begin
   result := false;
 end;
 
-//function TSpecTemplateBase.LoadCollection(const rootElement : IXMLDOMElement; const collectionPath: string; const nodeClass: TSpecNodeClass; const action: TConstProc<ISpecNode>): boolean;
-//var
-//  element : IXMLDOMElement;
-//  nodeList : IXMLDOMNodeList;
-//  item : ISpecNode;
-//  i: Integer;
-//begin
-//  result := true;
-//  nodeList := rootElement.selectNodes(collectionPath);
-//  if nodeList.length = 0 then
-//    exit;
-//  for i := 0 to nodeList.length -1 do
-//  begin
-//    element := nodeList.item[i] as IXMLDOMElement;
-//    item := nodeClass.Create(Logger) as ISpecNode ;
-//    item.LoadFromXML(element);
-//    action(item);
-//  end;
-//end;
 
 function TSpecTemplateBase.LoadBuildEntriesFromJson(const buildArray : TJsonArray) : Boolean;
 begin
@@ -468,14 +451,22 @@ begin
   end
   else
   begin
+    //TODO : Rethink this validation, doesn't look all that comprehensive.
     //if we point to a template and have props other than compiler + platforms then fail
     if jsonObject.Contains('template') then
     begin
-      if jsonObject.Count > 3 then //compiler + platforms + template
+      if jsonObject.Count > 4 then //compiler + platforms + template + variables
       begin
         Logger.Error('targetPlatform cannot specify a template and it''s own definition, pick one');
         result := false;
       end;
+      // if it's 4 props, then variables must be one of them
+      if jsonObject.Count > 3 then //compiler + platforms + template
+        if not jsonObject.Contains('variables') then
+        begin
+          Logger.Error('targetPlatform cannot specify a template and it''s own definition, pick one');
+          result := false;
+        end;
       exit;
     end;
   end;
