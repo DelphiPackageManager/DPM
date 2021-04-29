@@ -493,8 +493,6 @@ begin
       list.Values[externalProps.Names[i]] := externalProps.ValueFromIndex[i];
   end;
 
-  FCurrentTokens := list;
-
   regEx := TRegEx.Create('\$(\w+)\$');
   evaluator := TokenMatchEvaluator;
 
@@ -810,6 +808,7 @@ begin
   result := true;
   Logger.Information('Replacing tokens..');
   tokenList := TStringList.Create;
+  FCurrentTokens := tokenList;
   try
     try
       regEx := TRegEx.Create('\$(\w+)\$');
