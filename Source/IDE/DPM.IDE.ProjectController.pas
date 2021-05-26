@@ -8,7 +8,8 @@ uses
   DPM.IDE.Logger,
   DPM.Core.Package.Interfaces,
   DPM.IDE.ProjectTreeManager,
-  DPM.IDE.EditorViewManager;
+  DPM.IDE.EditorViewManager,
+  DPM.Core.Package.Installer.Interfaces;
 
 type
   TProjectMode = (pmNone, pmSingle, pmGroup);
@@ -39,6 +40,7 @@ type
     FProjectTreeManager : IDPMProjectTreeManager;
     FProjectMode : TProjectMode;
     FPackageInstaller : IPackageInstaller;
+    FContext : IPackageInstallerContext;
     FCancellationTokenSource : ICancellationTokenSource;
     FLastResult : boolean;
   protected
@@ -59,7 +61,7 @@ type
     procedure RestoreProject(const fileName : string);
   public
     constructor Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager;
-                       const projectTreeManager : IDPMProjectTreeManager);
+                       const projectTreeManager : IDPMProjectTreeManager; const context : IPackageInstallerContext);
     destructor Destroy;override;
   end;
 
@@ -79,11 +81,12 @@ begin
   FLogger.Debug('ProjectController.BeginLoading : ' + GetEnumName(TypeInfo(TProjectMode),Ord(mode)));
   FCancellationTokenSource.Reset;
   FLastResult := true;
+  FContext.Clear;
   FLogger.StartRestore(FCancellationTokenSource);
 end;
 
 constructor TDPMIDEProjectController.Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager;
-                       const projectTreeManager : IDPMProjectTreeManager);
+                       const projectTreeManager : IDPMProjectTreeManager; const context : IPackageInstallerContext);
 begin
   inherited Create;
   FProjectMode := TProjectMode.pmNone;
@@ -92,6 +95,7 @@ begin
   FEditorViewManager := editorViewManager;
   FProjectTreeManager := projectTreeManager;
   FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
+  FContext := context;
 end;
 
 destructor TDPMIDEProjectController.Destroy;
@@ -115,6 +119,7 @@ begin
 //  FLogger.Debug('ProjectController.FileClosed : ' + fileName);
   FProjectTreeManager.NotifyProjectClosed(FileName);
   FEditorViewManager.ProjectClosed(FileName);
+  FContext.RemoveProject(fileName);
 end;
 
 procedure TDPMIDEProjectController.FileOpened(const fileName: string);
@@ -175,7 +180,7 @@ begin
   options.CompilerVersion := IDECompilerVersion;
 
   FLogger.StartProject(FileName);
-  FLastResult := FLastResult and FPackageInstaller.Restore(FCancellationTokenSource.Token, options);
+  FLastResult := FLastResult and FPackageInstaller.Restore(FCancellationTokenSource.Token, options, FContext);
   FLogger.EndProject(fileName);
 end;
 

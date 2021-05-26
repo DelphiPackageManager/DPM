@@ -34,16 +34,18 @@ uses
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
   DPM.Console.ExitCodes,
-  DPM.Console.Command.Base;
+  DPM.Console.Command.Base,
+  DPM.Core.Package.Installer.Interfaces;
 
 type
   TInstallCommand = class(TBaseCommand)
   private
     FPackageInstaller : IPackageInstaller;
+    FContext : IPackageInstallerContext;
   protected
     function Execute(const cancellationToken : ICancellationToken) : TExitCode;override;
   public
-    constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const packageInstaller : IPackageInstaller);reintroduce;
+    constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const packageInstaller : IPackageInstaller; const context : IPackageInstallerContext);reintroduce;
   end;
 
 implementation
@@ -56,10 +58,11 @@ uses
 
 { TInstallCommand }
 
-constructor TInstallCommand.Create(const logger: ILogger; const configurationManager : IConfigurationManager; const packageInstaller : IPackageInstaller);
+constructor TInstallCommand.Create(const logger: ILogger; const configurationManager : IConfigurationManager; const packageInstaller : IPackageInstaller; const context : IPackageInstallerContext);
 begin
   inherited Create(logger, configurationManager);
   FPackageInstaller := packageInstaller;
+  FContext := context;
 
 end;
 
@@ -80,7 +83,7 @@ begin
   end;
 
  //TODO : This is not ideal, we have no way of returning more specific exit codes here - rethink api?
-  if not FPackageInstaller.Install(cancellationToken, TInstallOptions.Default) then
+  if not FPackageInstaller.Install(cancellationToken, TInstallOptions.Default, FContext) then
     result := TExitCode.Error
   else
     result := TExitCode.OK;

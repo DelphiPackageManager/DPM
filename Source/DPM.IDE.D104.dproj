@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectVersion>19.2</ProjectVersion>
@@ -279,11 +279,15 @@
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.BOM.pas"/>
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Files.pas"/>
+        <DCCReference Include="Controls\DPM.Controls.LogMemo.pas"/>
         <DCCReference Include="IDE\DPM.IDE.MessageForm.pas">
             <Form>DPMMessageForm</Form>
             <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="IDE\DPM.IDE.MessageService.pas"/>
+        <DCCReference Include="IDE\Options\DPM.IDE.Options.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.InstallerContext.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Installer.Interfaces.pas"/>
         <RcItem Include="images\dpm.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>DPMIDELOGO</ResourceId>

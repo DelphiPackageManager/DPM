@@ -35,6 +35,8 @@ uses
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Logging,
+  DPM.Core.Package.Interfaces,
+  DPM.Core.Package.Installer.Interfaces,
   DPM.Core.Options.Cache,
   DPM.Core.Options.Search,
   DPM.Core.Options.Install,
@@ -42,7 +44,6 @@ uses
   DPM.Core.Options.Restore,
   DPM.Core.Project.Interfaces,
   DPM.Core.Spec.Interfaces,
-  DPM.Core.Package.Interfaces,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Cache.Interfaces,
@@ -83,35 +84,35 @@ type
 
     function CopyLocal(const cancellationToken : ICancellationToken; const resolvedPackages : IList<IPackageInfo>; const packageSpecs : IDictionary<string, IPackageSpec>; const projectEditor :  IProjectEditor; const platform : TDPMPlatform) : boolean;
 
-    function DoRestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration) : boolean;
+    function DoRestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration; const context : IPackageInstallerContext) : boolean;
 
-    function DoInstallPackage(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration) : boolean;
+    function DoInstallPackage(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration; const context : IPackageInstallerContext) : boolean;
 
-    function DoUninstallFromProject(const cancellationToken : ICancellationToken; const options : TUnInstallOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration) : boolean;
+    function DoUninstallFromProject(const cancellationToken : ICancellationToken; const options : TUnInstallOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration; const context : IPackageInstallerContext) : boolean;
 
 
     function DoCachePackage(const cancellationToken : ICancellationToken; const options : TCacheOptions; const platform : TDPMPlatform) : boolean;
 
     //works out what compiler/platform then calls DoInstallPackage
-    function InstallPackage(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFile : string; const config : IConfiguration) : boolean;
+    function InstallPackage(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFile : string; const config : IConfiguration; const context : IPackageInstallerContext) : boolean;
 
     //user specified a package file - will install for single compiler/platform - calls InstallPackage
-    function InstallPackageFromFile(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFiles : TArray <string> ; const config : IConfiguration) : boolean;
+    function InstallPackageFromFile(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFiles : TArray <string> ; const config : IConfiguration; const context : IPackageInstallerContext) : boolean;
 
     //resolves package from id - calls InstallPackage
-    function InstallPackageFromId(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFiles : TArray <string> ; const config : IConfiguration) : boolean;
+    function InstallPackageFromId(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFiles : TArray <string> ; const config : IConfiguration; const context : IPackageInstallerContext) : boolean;
 
 
-    function UnInstallFromProject(const cancellationToken : ICancellationToken; const options : TUnInstallOptions; const projectFile : string; const config : IConfiguration) : Boolean;
+    function UnInstallFromProject(const cancellationToken : ICancellationToken; const options : TUnInstallOptions; const projectFile : string; const config : IConfiguration; const context : IPackageInstallerContext) : Boolean;
 
 
-    function RestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string; const config : IConfiguration) : Boolean;
+    function RestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string; const config : IConfiguration; const context : IPackageInstallerContext) : Boolean;
 
     //calls either InstallPackageFromId or InstallPackageFromFile depending on options.
-    function Install(const cancellationToken : ICancellationToken; const options : TInstallOptions; const context : IPackageInstallerContext = nil) : Boolean;
-    function UnInstall(const cancellationToken : ICancellationToken; const options : TUnInstallOptions; const context : IPackageInstallerContext = nil) : boolean;
+    function Install(const cancellationToken : ICancellationToken; const options : TInstallOptions; const context : IPackageInstallerContext) : Boolean;
+    function UnInstall(const cancellationToken : ICancellationToken; const options : TUnInstallOptions; const context : IPackageInstallerContext) : boolean;
     //calls restore project
-    function Restore(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const context : IPackageInstallerContext = nil) : Boolean;
+    function Restore(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const context : IPackageInstallerContext) : Boolean;
 
 
     function Remove(const cancellationToken : ICancellationToken; const options : TUninstallOptions) : boolean;
@@ -490,8 +491,6 @@ begin
   //save the bill of materials file for future reference.
   TBOMFile.SaveToFile(FLogger, bomFile, graphNode);
 
-
-
 end;
 
 function TPackageInstaller.Context : IPackageInstallerContext;
@@ -593,16 +592,7 @@ begin
         end;
       end;
     end;
-
-
-
-
   end;
-
-
-
-
-
 end;
 
 constructor TPackageInstaller.Create(const logger : ILogger; const configurationManager : IConfigurationManager;
@@ -710,7 +700,9 @@ begin
 end;
 
 
-function TPackageInstaller.DoInstallPackage(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration) : boolean;
+function TPackageInstaller.DoInstallPackage(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFile : string;
+                                            const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration;
+                                            const context : IPackageInstallerContext) : boolean;
 var
   newPackageIdentity : IPackageIdentity;
   searchResult : IList<IPackageIdentity>;
@@ -819,7 +811,7 @@ begin
   if not CreateProjectRefs(cancellationtoken, projectPackageGraph, seenPackages, projectReferences) then
     exit;
 
-  if not FDependencyResolver.ResolveForInstall(cancellationToken, options, packageInfo, projectReferences, projectPackageGraph, packageInfo.CompilerVersion, platform, resolvedPackages) then
+  if not FDependencyResolver.ResolveForInstall(cancellationToken, projectFile, options, packageInfo, projectReferences, projectPackageGraph, platform, resolvedPackages) then
     exit;
 
   if resolvedPackages = nil then
@@ -868,7 +860,9 @@ begin
 end;
 
 
-function TPackageInstaller.DoRestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string; const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration) : boolean;
+function TPackageInstaller.DoRestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string;
+                                            const projectEditor : IProjectEditor; const platform : TDPMPlatform; const config : IConfiguration;
+                                            const context : IPackageInstallerContext) : boolean;
 var
   projectPackageGraph : IGraphNode;
   packageSpecs : IDictionary<string, IPackageSpec>;
@@ -894,7 +888,7 @@ begin
   if not CreateProjectRefs(cancellationtoken, projectPackageGraph, seenPackages, projectReferences) then
     exit;
 
-  if not  FDependencyResolver.ResolveForRestore(cancellationToken, options, projectReferences, projectPackageGraph, projectEditor.CompilerVersion, platform, resolvedPackages) then
+  if not  FDependencyResolver.ResolveForRestore(cancellationToken, projectFile, options, projectReferences, projectPackageGraph, platform, resolvedPackages) then
     exit;
 
   //TODO : The code from here on is the same for install/uninstall/restore - refactor!!!
@@ -934,7 +928,8 @@ begin
 end;
 
 function TPackageInstaller.DoUninstallFromProject(const cancellationToken: ICancellationToken; const options: TUnInstallOptions; const projectFile: string;
-                                                  const projectEditor: IProjectEditor; const platform: TDPMPlatform; const config: IConfiguration): boolean;
+                                                  const projectEditor: IProjectEditor; const platform: TDPMPlatform; const config: IConfiguration;
+                                                  const context : IPackageInstallerContext): boolean;
 var
   projectPackageGraph : IGraphNode;
   foundReference : IGraphNode;
@@ -975,7 +970,7 @@ begin
   if not CreateProjectRefs(cancellationtoken, projectPackageGraph, seenPackages, projectReferences) then
     exit;
 
-  if not FDependencyResolver.ResolveForRestore(cancellationToken, options, projectReferences, projectPackageGraph, projectEditor.CompilerVersion, platform, resolvedPackages) then
+  if not FDependencyResolver.ResolveForRestore(cancellationToken, projectFile, options, projectReferences, projectPackageGraph, platform, resolvedPackages) then
     exit;
 
 
@@ -1259,7 +1254,8 @@ begin
 
 end;
 
-function TPackageInstaller.InstallPackage(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFile : string; const config : IConfiguration) : boolean;
+function TPackageInstaller.InstallPackage(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFile : string;
+                                          const config : IConfiguration; const context : IPackageInstallerContext) : boolean;
 var
   projectEditor : IProjectEditor;
   platforms : TDPMPlatforms;
@@ -1321,7 +1317,7 @@ begin
 
     options.Platforms := [platform];
     FLogger.Information('Installing [' + options.SearchTerms + '-' + DPMPlatformToString(platform) + '] into [' + projectFile + ']', true);
-    platformResult := DoInstallPackage(cancellationToken, options, projectFile, projectEditor, platform, config);
+    platformResult := DoInstallPackage(cancellationToken, options, projectFile, projectEditor, platform, config, context);
     if not platformResult then
       FLogger.Error('Install failed for [' + options.SearchTerms + '-' + DPMPlatformToString(platform) + ']')
     else
@@ -1385,7 +1381,6 @@ function TPackageInstaller.Install(const cancellationToken : ICancellationToken;
 var
   projectFiles : TArray<string>;
   config : IConfiguration;
-  installerContext : IPackageInstallerContext;
   groupProjReader : IGroupProjectReader;
   projectList : IList<string>;
   i : integer;
@@ -1402,10 +1397,6 @@ begin
     if config = nil then
       exit;
 
-    installerContext := context;
-    //will be nill when called from command line. The IDE will pass one in.
-    if installerContext = nil then
-      installerContext := TPackageInstallerContext.Create(FLogger);
 
     FPackageCache.Location := config.PackageCacheLocation;
     if not FRepositoryManager.Initialize(config) then
@@ -1476,10 +1467,10 @@ begin
         FLogger.Error('The specified packageFile [' + options.PackageFile + '] does not exist.');
         exit;
       end;
-      result := InstallPackageFromFile(cancellationToken, options, TArray <string> (projectFiles), config);
+      result := InstallPackageFromFile(cancellationToken, options, TArray <string> (projectFiles), config, context);
     end
     else
-      result := InstallPackageFromId(cancellationToken, options, TArray <string> (projectFiles), config);
+      result := InstallPackageFromId(cancellationToken, options, TArray <string> (projectFiles), config, context);
   except
     on e : Exception do
     begin
@@ -1490,7 +1481,8 @@ begin
 
 end;
 
-function TPackageInstaller.InstallPackageFromFile(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFiles : TArray <string> ; const config : IConfiguration) : boolean;
+function TPackageInstaller.InstallPackageFromFile(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFiles : TArray <string>;
+                                                  const config : IConfiguration; const context : IPackageInstallerContext) : boolean;
 var
   packageIdString : string;
   packageIdentity : IPackageIdentity;
@@ -1514,49 +1506,41 @@ begin
   options.CompilerVersion := packageIdentity.CompilerVersion; //package file is for single compiler version
   options.Platforms := [packageIdentity.Platform]; //package file is for single platform.
 
-  FContext.Reset;
-  try
-    for i := 0 to Length(projectFiles) -1 do
+  for i := 0 to Length(projectFiles) -1 do
+  begin
+    if cancellationToken.IsCancelled then
+      exit;
+    if TPathUtils.IsRelativePath(projectFile) then
     begin
-      if cancellationToken.IsCancelled then
-        exit;
-      if TPathUtils.IsRelativePath(projectFile) then
-      begin
-        projectFile := TPath.Combine(GetCurrentDir, projectFile);
-        projectFile := TPathUtils.CompressRelativePath(projectFile);
-      end;
-      result := InstallPackage(cancellationToken, options, projectFile, config) and result;
+      projectFile := TPath.Combine(GetCurrentDir, projectFile);
+      projectFile := TPathUtils.CompressRelativePath(projectFile);
     end;
 
-  finally
-    FContext.Reset; //free up memory as this might be used in the IDE
+
+    result := InstallPackage(cancellationToken, options, projectFile, config, context) and result;
   end;
 
 end;
 
-function TPackageInstaller.InstallPackageFromId(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFiles : TArray <string> ; const config : IConfiguration) : boolean;
+function TPackageInstaller.InstallPackageFromId(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFiles : TArray <string>;
+                                                const config : IConfiguration; const context : IPackageInstallerContext) : boolean;
 var
   projectFile : string;
   i : integer;
 begin
   result := true;
-  FContext.Reset;
-  try
-    for i := 0 to Length(projectFiles) - 1 do
+  for i := 0 to Length(projectFiles) - 1 do
+  begin
+    if cancellationToken.IsCancelled then
+      exit;
+    projectFile := projectFiles[0];
+    if TPathUtils.IsRelativePath(projectFile) then
     begin
-      if cancellationToken.IsCancelled then
-        exit;
-      projectFile := projectFiles[0];
-      if TPathUtils.IsRelativePath(projectFile) then
-      begin
-        projectFile := TPath.Combine(GetCurrentDir, projectFile);
-        projectFile := TPathUtils.CompressRelativePath(projectFile);
-      end;
-
-      result := InstallPackage(cancellationToken, options, projectFile, config) and result;
+      projectFile := TPath.Combine(GetCurrentDir, projectFile);
+      projectFile := TPathUtils.CompressRelativePath(projectFile);
     end;
-  finally
-    FContext.Reset;
+
+    result := InstallPackage(cancellationToken, options, projectFile, config, context) and result;
   end;
 end;
 
@@ -1574,7 +1558,6 @@ var
   projectList : IList<string>;
   i : integer;
   projectRoot : string;
-  installerContext : IPackageInstallerContext;
 begin
   result := false;
   try
@@ -1587,11 +1570,6 @@ begin
     config := FConfigurationManager.LoadConfig(options.ConfigFile);
     if config = nil then //no need to log, config manager will
       exit;
-
-    installerContext := context;
-    //will be nill when called from command line. The IDE will pass one in.
-    if installerContext = nil then
-      installerContext := TPackageInstallerContext.Create(FLogger);
 
     FPackageCache.Location := config.PackageCacheLocation;
     if not FRepositoryManager.Initialize(config) then
@@ -1671,7 +1649,7 @@ begin
         projectFile := TPathUtils.CompressRelativePath(projectFile);
       end;
 
-      result := RestoreProject(cancellationToken, options, projectFile, config) and result;
+      result := RestoreProject(cancellationToken, options, projectFile, config, context) and result;
     end;
   except
     on e : Exception do
@@ -1682,7 +1660,8 @@ begin
   end;
 end;
 
-function TPackageInstaller.RestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string; const config : IConfiguration) : Boolean;
+function TPackageInstaller.RestoreProject(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string;
+                                          const config : IConfiguration; const context : IPackageInstallerContext) : Boolean;
 var
   projectEditor : IProjectEditor;
   platforms : TDPMPlatforms;
@@ -1751,7 +1730,7 @@ begin
 
     options.Platforms := [platform];
     FLogger.Information('Restoring project [' + projectFile + '] for [' + DPMPlatformToString(platform) + ']', true);
-    platformResult := DoRestoreProject(cancellationToken, options, projectFile, projectEditor, platform, config);
+    platformResult := DoRestoreProject(cancellationToken, options, projectFile, projectEditor, platform, config, context);
     if not platformResult then
     begin
       if cancellationToken.IsCancelled then
@@ -1775,7 +1754,6 @@ var
   projectList : IList<string>;
   i : integer;
   projectRoot : string;
-  installerContext : IPackageInstallerContext;
 begin
   result := false;
   //commandline would have validated already, but IDE probably not.
@@ -1788,10 +1766,6 @@ begin
   if config = nil then //no need to log, config manager will
     exit;
 
-  installerContext := context;
-  //will be nill when called from command line. The IDE will pass one in.
-  if installerContext = nil then
-    installerContext := TPackageInstallerContext.Create(FLogger);
 
   FPackageCache.Location := config.PackageCacheLocation;
   if not FRepositoryManager.Initialize(config) then
@@ -1857,13 +1831,14 @@ begin
   begin
     if cancellationToken.IsCancelled then
       exit;
-    result := UnInstallFromProject(cancellationToken, options, projectFile, config) and result;
+    result := UnInstallFromProject(cancellationToken, options, projectFile, config, context) and result;
   end;
 
 
 end;
 
-function TPackageInstaller.UnInstallFromProject(const cancellationToken: ICancellationToken; const options: TUnInstallOptions; const projectFile: string; const config: IConfiguration): Boolean;
+function TPackageInstaller.UnInstallFromProject(const cancellationToken: ICancellationToken; const options: TUnInstallOptions; const projectFile: string;
+                                                const config: IConfiguration; const context : IPackageInstallerContext): Boolean;
 var
   projectEditor : IProjectEditor;
   platforms : TDPMPlatforms;
@@ -1932,7 +1907,7 @@ begin
 
     options.Platforms := [platform];
     FLogger.Information('Uninstalling from project [' + projectFile + '] for [' + DPMPlatformToString(platform) + ']', true);
-    platformResult := DoUninstallFromProject(cancellationToken, options, projectFile, projectEditor, platform, config);
+    platformResult := DoUninstallFromProject(cancellationToken, options, projectFile, projectEditor, platform, config, context);
     if not platformResult then
       FLogger.Error('Uninstall failed for ' + DPMPlatformToString(platform))
     else

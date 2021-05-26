@@ -223,34 +223,6 @@ type
     property SourceName : string read GetSourceName;
   end;
 
-  IPackageInstallerContext = interface;
-
-  //does the work of installing/restoring packages.
-  IPackageInstaller = interface
-    ['{554A0842-6C83-42BD-882C-B49FE4619DE0}']
-    function Install(const cancellationToken : ICancellationToken; const options : TInstallOptions; const context : IPackageInstallerContext = nil) : boolean;
-    function UnInstall(const cancellationToken : ICancellationToken; const options : TUnInstallOptions; const context : IPackageInstallerContext = nil) : boolean;
-    function Restore(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const context : IPackageInstallerContext = nil) : boolean;
-    function Cache(const cancellationToken : ICancellationToken; const options : TCacheOptions) : boolean;
-    function Remove(const cancellationToken : ICancellationToken; const options : TUninstallOptions) : boolean;
-    function Context : IPackageInstallerContext;
-  end;
-
-  //used to collect and detect package conflicts when working with multiple projects.
-  //will also be used to collect build instructions and
-  //design-time packages to install etc.
-  IPackageInstallerContext = interface
-    ['{8FD229A2-FE7B-4315-84B2-FF18B78C76DC}']
-    procedure Reset;
-    procedure StartProject(const projectFile : string; const platform : TDPMPlatform);
-    procedure EndProject(const projectFile : string; const platform : TDPMPlatform);
-    //
-    //register a bpl for install into the IDE.
-    procedure RegisterDesignPackage(const platform : TDPMPlatform; const packageFile : string; const dependsOn : IList<string>);
-
-    function IsDesignPackageInstalled(const packageName : string) : boolean;
-
-  end;
 
 
   TPackageIconKind = (ikSvg, ikPng);

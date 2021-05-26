@@ -227,8 +227,6 @@ var
   sFileName : string;
   jsonObj : TJsonObject;
 begin
-  result := true;
-
   if fileName <> '' then
     sFileName := fileName
   else

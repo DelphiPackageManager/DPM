@@ -42,26 +42,27 @@ type
     FPackage : IPackageInfo;
     FParentId : string;
     FVersionRange : TVersionRange;
+    FProject : string;
   protected
     function GetPackage : IPackageInfo;
     function GetParentId : string;
+    function GetProject : string;
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
-
-
   public
-    constructor Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string);
+    constructor Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
   end;
 
 implementation
 
 { TResolution }
 
-constructor TResolution.Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string);
+constructor TResolution.Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
 begin
   FPackage := package;
   FVersionRange := range;
   FParentId := parentId;
+  FProject := project;
 end;
 
 
@@ -73,6 +74,11 @@ end;
 function TResolution.GetParentId : string;
 begin
   result := FParentId;
+end;
+
+function TResolution.GetProject: string;
+begin
+  result := FProject;
 end;
 
 function TResolution.GetVersionRange : TVersionRange;

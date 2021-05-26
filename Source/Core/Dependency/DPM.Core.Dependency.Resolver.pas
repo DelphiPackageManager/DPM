@@ -40,23 +40,25 @@ uses
   DPM.Core.Dependency.Interfaces,
   DPM.Core.Dependency.Version,
   DPM.Core.Dependency.Context,
-  DPM.Core.Options.Search;
+  DPM.Core.Options.Search,
+  DPM.Core.Package.Installer.Interfaces;
 
 type
   TDependencyResolver = class(TInterfacedObject, IDependencyResolver)
   private
     FLogger : ILogger;
     FRepositoryManager : IPackageRepositoryManager;
+    FPackageInstallerContext : IPackageInstallerContext;
     FStopwatch : TStopWatch;
   protected
-    function DoResolve(const cancellationToken : ICancellationToken; const options : TSearchOptions; const context : IResolverContext; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : boolean;
+    function DoResolve(const cancellationToken : ICancellationToken; const options : TSearchOptions; const context : IResolverContext; const platform : TDPMPlatform) : boolean;
 
-    function ResolveForInstall(const cancellationToken : ICancellationToken; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
 
-    function ResolveForRestore(const cancellationToken : ICancellationToken; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForRestore(const cancellationToken : ICancellationToken; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
 
   public
-    constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager);
+    constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageInstallerContext : IPackageInstallerContext);
 
   end;
 
@@ -70,11 +72,12 @@ uses
 
 { TDependencyResolver }
 
-constructor TDependencyResolver.Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager);
+constructor TDependencyResolver.Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageInstallerContext : IPackageInstallerContext);
 begin
   FLogger := logger;
   FRepositoryManager := repositoryManager;
   FStopwatch := TStopwatch.Create;
+  FPackageInstallerContext := packageInstallerContext;
 end;
 
 function SortDependencies(const Left, Right : IPackageDependency) : integer;
@@ -113,7 +116,7 @@ end;
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md
 /// If anyone is good math and want's to have a stab at implementing it in Delphi that would be great!
 
-function TDependencyResolver.DoResolve(const cancellationToken : ICancellationToken; const options : TSearchOptions; const context : IResolverContext; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : boolean;
+function TDependencyResolver.DoResolve(const cancellationToken : ICancellationToken; const options : TSearchOptions; const context : IResolverContext; const platform : TDPMPlatform) : boolean;
 var
   currentPackage : IPackageInfo;
   dependency : IPackageDependency;
@@ -153,12 +156,20 @@ begin
         begin
           FLogger.Information('       conflict - selected version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
 
-          //if it's a top level package then the version is not negotiable.
-          if resolution.ParentId = cRootNode then
+          //Check if the resolution comes from a different project, if so then record a project conflict but carry on?
+          if not SameText(resolution.Project, context.ProjectFile) then
+          begin
+            FLogger.Error('Package project conflict - selected version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' in project : ' + resolution.Project );
+            //record conflicts here in the context so we can show the user and then continue.. that way we can show the user rather than bombing on the first go?
+            exit;
+          end
+          else if resolution.ParentId = cRootNode then //if it's a top level package then the version is not negotiable.
           begin
             FLogger.Error('Package conflict - selected version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
             exit;
           end;
+
+
 
           //see if we can reduce to an overlapping versionrange that satisfies both
           if resolution.VersionRange.TryGetOverlappingVersion(dependency.VersionRange, overlappingRange) then
@@ -278,24 +289,26 @@ begin
 
 end;
 
-function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
+function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
 var
   context : IResolverContext;
 begin
-  context := TResolverContext.Create(FLogger, newPackage, projectReferences);
-  result := DoResolve(cancellationToken, options, context, compilerVersion, platform);
+  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, newPackage, projectReferences);
+  result := DoResolve(cancellationToken, options, context,  platform);
   resolved := context.GetResolvedPackages;
   dependencyGraph := context.BuildDependencyGraph;
+  FPackageInstallerContext.RecordGraph(projectFile, platform, dependencyGraph, context.GetResolutions);
 end;
 
-function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancellationToken; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
+function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancellationToken; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
 var
   context : IResolverContext;
 begin
-  context := TResolverContext.Create(FLogger, options.CompilerVersion,  platform, projectReferences);
-  result := DoResolve(cancellationToken, options, context, compilerVersion, platform);
+  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, options.CompilerVersion,  platform, projectReferences);
+  result := DoResolve(cancellationToken, options, context,  platform);
   resolved := context.GetResolvedPackages;
   dependencyGraph := context.BuildDependencyGraph;
+  FPackageInstallerContext.RecordGraph(projectFile, platform, dependencyGraph, context.GetResolutions);
 end;
 
 

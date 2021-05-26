@@ -7,61 +7,132 @@ uses
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
-  DPM.Core.Dependency.Interfaces;
+  DPM.Core.Dependency.Interfaces,
+  DPM.Core.Package.Installer.Interfaces;
 
 type
-  TPackageInstallerContext = class(TInterfacedObject, IPackageInstallerContext)
+  TCorePackageInstallerContext = class(TInterfacedObject, IPackageInstallerContext)
   private
-    FLogger : ILogger;
-
-    FProjectGraphs : IDictionary<string, IDictionary<TDPMPlatform,IGraphNode>>;
-    //FPackageGraphs : array[TDPMPlatform] of IGraphNode;
-
+    FProjectGraphs : IDictionary<string, IDictionary<TDPMPlatform, IGraphNode>>;
+    FProjectResolutions : IDictionary<string, IDictionary<TDPMPlatform, IList<IResolution>>>;
   protected
-    procedure Reset;
+    procedure StartProject(const projectFile: string; const platform : TDPMPlatform);virtual;
+    procedure EndProject(const projectFile: string; const platform : TDPMPlatform);virtual;
+
+    function RegisterDesignPackage(const platform : TDPMPlatform; const packageFile: string; const dependsOn: IList<string>) : boolean;virtual;
+    function IsDesignPackageInstalled(const packageName: string): Boolean;virtual;
+    procedure RemoveProject(const projectFile : string);virtual;
+
+    procedure RecordGraph(const projectFile: string; const platform : TDPMPlatform; const graph: IGraphNode; const resolutions : TArray<IResolution>);virtual;
+
+    function FindPackageResolution(const currentProjectFile: string; const packageId : string; const platform : TDPMPlatform) : IResolution;
+
+
+    procedure Clear;virtual;
   public
-    constructor Create(const logger : ILogger);
-    procedure EndProject(const projectFile: string; const platform : TDPMPlatform);
-    procedure StartProject(const projectFile: string; const platform : TDPMPlatform);
-    procedure RegisterDesignPackage(const platform : TDPMPlatform; const packageFile: string; const dependsOn: IList<string>);
-    function IsDesignPackageInstalled(const packageName: string): Boolean;
+    constructor Create;
+
   end;
 
 implementation
 
+uses
+  System.SysUtils,
+  DPM.Core.Dependency.Resolution;
+
+
 { TPackageInstallerContext }
 
-constructor TPackageInstallerContext.Create(const logger: ILogger);
+procedure TCorePackageInstallerContext.Clear;
 begin
-  FLogger := logger;
-  FProjectGraphs := TCollections.CreateDictionary<string, IDictionary<TDPMPlatform,IGraphNode>>;
+  //IDE will override this
 end;
 
-procedure TPackageInstallerContext.StartProject(const projectFile: string; const platform : TDPMPlatform);
+constructor TCorePackageInstallerContext.Create();
+begin
+  FProjectGraphs := TCollections.CreateDictionary<string, IDictionary<TDPMPlatform, IGraphNode>>;
+  FProjectResolutions := TCollections.CreateDictionary<string, IDictionary<TDPMPlatform, IList<IResolution>>>;
+end;
+
+procedure TCorePackageInstallerContext.StartProject(const projectFile: string; const platform : TDPMPlatform);
 begin
 
 end;
 
 
-procedure TPackageInstallerContext.EndProject(const projectFile: string; const platform : TDPMPlatform);
+procedure TCorePackageInstallerContext.EndProject(const projectFile: string; const platform : TDPMPlatform);
 begin
 
 end;
 
-function TPackageInstallerContext.IsDesignPackageInstalled(const packageName: string): Boolean;
+
+function TCorePackageInstallerContext.FindPackageResolution(const currentProjectFile, packageId: string; const platform: TDPMPlatform): IResolution;
+var
+  pair : TPair<string, IDictionary<TDPMPlatform, IList<IResolution>>>;
+  resolutions :  IList<IResolution>;
+begin
+  result := nil;
+  for pair in FProjectResolutions do
+  begin
+    if not SameText(currentProjectFile, pair.Key) then
+    begin
+      if pair.Value.TryGetValue(platform, resolutions) then
+      begin
+        result := resolutions.FirstOrDefault(
+          function (const resolution : IResolution) : boolean
+          begin
+            result := SameText(packageId, resolution.Package.Id);
+          end);
+
+        if result <> nil then
+          exit;
+      end;
+    end;
+  end;
+end;
+
+function TCorePackageInstallerContext.IsDesignPackageInstalled(const packageName: string): Boolean;
 begin
   result := false;
 end;
 
-procedure TPackageInstallerContext.RegisterDesignPackage(const platform : TDPMPlatform; const packageFile: string; const dependsOn: IList<string>);
+procedure TCorePackageInstallerContext.RecordGraph(const projectFile: string; const platform : TDPMPlatform; const graph: IGraphNode; const resolutions : TArray<IResolution>);
+var
+  projectPlatformEntry : IDictionary<TDPMPlatform, IGraphNode>;
+  resolutionPlatformEntry : IDictionary<TDPMPlatform, IList<IResolution>>;
 begin
+  if not FProjectGraphs.TryGetValue(LowerCase(projectFile), projectPlatformEntry) then
+  begin
+    projectPlatformEntry := TCollections.CreateDictionary<TDPMPlatform, IGraphNode>;
+    FProjectGraphs[LowerCase(projectFile)] := projectPlatformEntry;
+  end;
+  projectPlatformEntry[platform] := graph;
+
+  if not FProjectResolutions.TryGetValue(LowerCase(projectFile),resolutionPlatformEntry) then
+  begin
+    resolutionPlatformEntry := TCollections.CreateDictionary<TDPMPlatform, IList<IResolution>>;
+    FProjectResolutions[LowerCase(projectFile)] := resolutionPlatformEntry;
+  end;
+  resolutionPlatformEntry[platform] := TCollections.CreateList<IResolution>(resolutions);
+
+
+
 
 end;
 
-procedure TPackageInstallerContext.Reset;
+function TCorePackageInstallerContext.RegisterDesignPackage(const platform : TDPMPlatform; const packageFile: string; const dependsOn: IList<string>) : boolean;
 begin
-
+  result := true;
 end;
+
+procedure TCorePackageInstallerContext.RemoveProject(const projectFile: string);
+begin
+  if FProjectGraphs.ContainsKey(LowerCase(projectFile)) then
+    FProjectGraphs.Remove(LowerCase(projectFile));
+  if FProjectResolutions.ContainsKey(LowerCase(projectFile)) then
+    FProjectResolutions.Remove(LowerCase(projectFile));
+end;
+
 
 
 end.

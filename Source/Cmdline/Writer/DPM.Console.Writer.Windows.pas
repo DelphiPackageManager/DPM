@@ -168,6 +168,8 @@ begin
       ccDarkPurple: result := ccBrightPurple;
       ccBlack: result := ccGrey ;
       ccWhite: result := ccBrightWhite;
+    else
+      //fi
     end;
   end;
 

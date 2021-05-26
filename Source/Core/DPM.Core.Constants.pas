@@ -76,7 +76,6 @@ const
   cPackageFileRegexV = '^(\w+\.\w+)\-([^\-]+)\-([^\-]+)\-(%s)$';
 
   cRootNode = 'root-node';
-  cProjectNode = 'project-node';
 
 
 implementation

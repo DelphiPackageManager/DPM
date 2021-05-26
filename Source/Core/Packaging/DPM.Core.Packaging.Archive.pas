@@ -52,14 +52,14 @@ type
     property LastErrorString : string read GetLastErrorString;
   end;
 
-  IPackageArchiveReader = interface(IPackageArchive)
-    ['{28705A4E-7B7D-4C56-A48F-77D706D0AD26}']
-    //Read the metaDataFile into a stream;
-    function ReadMetaDataFile(const stream : TStream) : boolean;
-    function ReadFileNames : TArray<string>;
-    function ExtractFileTo(const fileName : string; const destFileName : string) : boolean;
-    function ExtractTo(const path : string) : boolean;
-  end;
+//  IPackageArchiveReader = interface(IPackageArchive)
+//    ['{28705A4E-7B7D-4C56-A48F-77D706D0AD26}']
+//    //Read the metaDataFile into a stream;
+//    function ReadMetaDataFile(const stream : TStream) : boolean;
+//    function ReadFileNames : TArray<string>;
+//    function ExtractFileTo(const fileName : string; const destFileName : string) : boolean;
+//    function ExtractTo(const path : string) : boolean;
+//  end;
 
   IPackageArchiveWriter = interface(IPackageArchive)
     ['{B1BA4ED1-E456-42DE-AA17-AA53480EE645}']

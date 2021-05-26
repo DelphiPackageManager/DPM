@@ -174,7 +174,9 @@ uses
   DPM.Controls.LogMemo in 'Controls\DPM.Controls.LogMemo.pas',
   DPM.IDE.MessageForm in 'IDE\DPM.IDE.MessageForm.pas' {DPMMessageForm},
   DPM.IDE.MessageService in 'IDE\DPM.IDE.MessageService.pas',
-  DPM.IDE.Options in 'IDE\Options\DPM.IDE.Options.pas';
+  DPM.IDE.Options in 'IDE\Options\DPM.IDE.Options.pas',
+  DPM.IDE.InstallerContext in 'IDE\DPM.IDE.InstallerContext.pas',
+  DPM.Core.Package.Installer.Interfaces in 'Core\Package\DPM.Core.Package.Installer.Interfaces.pas';
 
 {$R *.res}
 

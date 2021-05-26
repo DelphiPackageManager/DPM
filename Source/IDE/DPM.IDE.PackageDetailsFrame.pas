@@ -105,7 +105,8 @@ uses
   DPM.Core.Dependency.Version,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Options.Install,
-  DPM.Core.Options.UnInstall;
+  DPM.Core.Options.UnInstall,
+  DPM.Core.Package.Installer.Interfaces;
 
 const
   cLatestStable = 'Latest stable ';
@@ -120,6 +121,7 @@ var
   installResult : boolean;
   newVersion : TPackageVersion;
   sVersion : string;
+  context : IPackageInstallerContext;
 begin
   btnInstallOrUpdate.Enabled := false;
   installResult := false;
@@ -169,8 +171,8 @@ begin
       options.Force := true;
 
     packageInstaller := FContainer.Resolve<IPackageInstaller>;
-
-    installResult := packageInstaller.Install(FCancellationTokenSource.Token, options);
+    context := FContainer.Resolve<IPackageInstallerContext>;
+    installResult := packageInstaller.Install(FCancellationTokenSource.Token, options, context);
     if installResult then
     begin
       FPackageMetaData.InstalledVersion := FPackageMetaData.Version;
@@ -195,6 +197,7 @@ end;
 procedure TPackageDetailsFrame.btnUninstallClick(Sender : TObject);
 var
   packageInstaller : IPackageInstaller;
+  context : IPackageInstallerContext;
   options : TUnInstallOptions;
   uninstallResult : boolean;
 begin
@@ -220,8 +223,8 @@ begin
     options.Platforms := [ProjectPlatformToDPMPlatform(FPackageSearcher.GetCurrentPlatform)];
 
     packageInstaller := FContainer.Resolve<IPackageInstaller>;
-
-    uninstallResult := packageInstaller.UnInstall(FCancellationTokenSource.Token, options);
+    context := FContainer.Resolve<IPackageInstallerContext>;
+    uninstallResult := packageInstaller.UnInstall(FCancellationTokenSource.Token, options, context);
     if uninstallResult then
     begin
       FPackageMetaData.InstalledVersion := FPackageMetaData.Version;
@@ -663,7 +666,7 @@ begin
             version := versions.FirstOrDefault(
               function(const value : TPackageVersion) : boolean
               begin
-                result := value.IsStable = false;
+                result := not value.IsStable;
               end);
             if not version.IsEmpty then
               lPre := cLatestPrerelease + version.ToStringNoMeta;

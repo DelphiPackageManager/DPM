@@ -35,16 +35,18 @@ uses
   DPM.Core.Package.Interfaces,
   DPM.Console.ExitCodes,
   DPM.Console.Command,
-  DPM.Console.Command.Base;
+  DPM.Console.Command.Base,
+  DPM.Core.Package.Installer.Interfaces;
 
 type
   TUninstallCommand = class(TBaseCommand)
   private
     FPackageInstaller : IPackageInstaller;
+    FContext : IPackageInstallerContext;
   protected
     function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
   public
-    constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const packageInstaller : IPackageInstaller);reintroduce;
+    constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const packageInstaller : IPackageInstaller; const context : IPackageInstallerContext);reintroduce;
   end;
 
 
@@ -58,10 +60,11 @@ uses
 
 { TRemoveCommand }
 
-constructor TUninstallCommand.Create(const logger: ILogger; const configurationManager: IConfigurationManager; const packageInstaller: IPackageInstaller);
+constructor TUninstallCommand.Create(const logger: ILogger; const configurationManager: IConfigurationManager; const packageInstaller: IPackageInstaller; const context : IPackageInstallerContext);
 begin
   inherited Create(logger, configurationManager);
   FPackageInstaller := packageInstaller;
+  FContext := context;
 
 end;
 
@@ -82,7 +85,7 @@ begin
   end;
 
  //TODO : This is not ideal, we have no way of returning more specific exit codes here - rethink api?
-  if not FPackageInstaller.UnInstall(cancellationToken, TUnInstallOptions.Default) then
+  if not FPackageInstaller.UnInstall(cancellationToken, TUnInstallOptions.Default, FContext) then
     result := TExitCode.Error
   else
     result := TExitCode.OK;

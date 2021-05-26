@@ -51,6 +51,7 @@ uses
   DPM.Core.Spec,
   DPM.Core.Spec.Reader,
   DPM.Core.Package.Interfaces,
+  DPM.Core.Package.Installer.Interfaces,
   DPM.Core.Package.Installer,
   DPM.Core.Package.InstallerContext,
   DPM.Core.Sources.Interfaces,
@@ -77,8 +78,8 @@ uses
 procedure InitCore(const container : TContainer; const overrideProc : TConstProc<TContainer>);
 begin
 
-  Container.RegisterType<IPackageArchiveReader, TZipFileArchiveReader>('file.archive');
-  Container.RegisterType<IPackageArchiveReader, TFolderArchiveReader>('folder.archive');
+//  Container.RegisterType<IPackageArchiveReader, TZipFileArchiveReader>('file.archive');
+//  Container.RegisterType<IPackageArchiveReader, TFolderArchiveReader>('folder.archive');
 
   Container.RegisterType<IPackageArchiveWriter, TPackageArchiveWriter>;
 
@@ -96,8 +97,9 @@ begin
     overrideProc(container)
   else
   begin
-    Container.RegisterType<IPackageInstallerContext, TPackageInstallerContext>;
+    Container.RegisterType<IPackageInstallerContext, TCorePackageInstallerContext>;
   end;
+
   Container.RegisterType<IPackageInstaller, TPackageInstaller>;
 
 

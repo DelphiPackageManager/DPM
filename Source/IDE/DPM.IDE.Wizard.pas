@@ -80,13 +80,15 @@ uses
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Init,
+  DPM.Core.Package.Interfaces,
+  DPM.Core.Package.Installer.Interfaces,
   DPM.IDE.ProjectController,
   DPM.IDE.ProjectStorageNotifier,
   DPM.IDE.IDENotifier,
   DPM.IDE.ProjectMenu,
-  DPM.Core.Package.Interfaces,
   DPM.IDE.AddInOptions,
-  DPM.IDE.Options;
+  DPM.IDE.Options,
+  DPM.IDE.InstallerContext;
 
 {$R DPM.IDE.Resources.res}
 { TDPMWizard }
@@ -102,12 +104,17 @@ begin
     FContainer.RegisterType<IDPMEditorViewManager, TDPMEditorViewManager>.AsSingleton();
     FContainer.RegisterType<IDPMIDEProjectController,TDPMIDEProjectController>.AsSingleton();
 
-    DPM.Core.Init.InitCore(FContainer);
+    DPM.Core.Init.InitCore(FContainer,
+      //replaces core registration of the IPackageInstallerContext implementation
+      procedure(const container : TContainer)
+      begin
+        container.RegisterType<IPackageInstallerContext, TDPMIDEPackageInstallerContext>().AsSingleton();
+      end);
     FContainer.Build;
   except
     on e : Exception do
     begin
-
+     FLogger.Error('Error setting up the container : ' + e.Message);
     end;
   end;
 end;

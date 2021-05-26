@@ -43,12 +43,9 @@ type
 
   TNodeVisitProc = reference to procedure(const node : IGraphNode);
 
-  TNodeKind = (nkRoot, nkProject, nkPackage);
-
   //a directed asyclic graph (DAG).
   IGraphNode = interface(IPackageId)
     ['{20055C26-8E63-4936-8249-ACF8514A37E7}']
-    function GetNodeKind : TNodeKind;
     function GetId : string;
     function GetParent : IGraphNode;
     function GetVersion : TPackageVersion;
@@ -72,7 +69,6 @@ type
     function GetIsTransitive : boolean;
     function GetProjectFile : string;
 
-    function AddProjectChildNode(const projectId : string) : IGraphNode;
     function AddPackageChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
     ///
     /// Breadth first search
@@ -87,7 +83,6 @@ type
     procedure Prune(const id : string);
     function RemoveNode(const node : IGraphNode) : boolean;
     function IsRoot : boolean;
-    function IsProjectNode : boolean;
     function IsTopLevel : boolean;
     function HasChildren : boolean;
     procedure VisitDFS(const visitor : TNodeVisitProc);
@@ -105,7 +100,6 @@ type
     property Platform : TDPMPlatform read GetPlatform;
     property UseSource : boolean read GetUseSource write SetUseSource;
     property ProjectFile : string read GetProjectFile write SetProjectFile;
-    property NodeKind : TNodeKind read GetNodeKind;
 
     //build support
     property SearchPaths : IList<string> read GetSearchPaths;
@@ -122,10 +116,12 @@ type
     function GetParentId : string;
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
+    function GetProject : string;
 
     property Package : IPackageInfo read GetPackage;
     property VersionRange : TVersionRange read GetVersionRange write SetVersionRange;
     property ParentId : string read GetParentId;
+    property Project : string read GetProject;
   end;
 
   TProjectReference = record
@@ -137,8 +133,8 @@ type
   IDependencyResolver = interface
     ['{B187F0DB-FEA1-48B4-81F2-CECF073C2FB0}']
     //returns true if all dependencies were resolved. If true, the graph is fully populated and can be serialized.
-    function ResolveForInstall(const cancellationToken : ICancellationToken; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
-    function ResolveForRestore(const cancellationToken : ICancellationToken; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForRestore(const cancellationToken : ICancellationToken; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
   end;
 
 
