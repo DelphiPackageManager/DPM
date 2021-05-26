@@ -1257,11 +1257,11 @@ begin
       TScrollCode.scLineDown: FHScrollPos := Min(FMaxWidth - ClientWidth, FHScrollPos + 1) ;
       TScrollCode.scPageUp:
       begin
-        FHScrollPos := Max(0, FHScrollPos - info.nPage)
+        FHScrollPos := Max(0, FHScrollPos - integer(info.nPage))
       end;
       TScrollCode.scPageDown:
       begin
-        FHScrollPos := Min(FHScrollPos + info.nPage, FMaxWidth - ClientWidth );
+        FHScrollPos := Min(FHScrollPos + integer(info.nPage), FMaxWidth - ClientWidth );
       end;
       TScrollCode.scPosition,
       TScrollCode.scTrack:
