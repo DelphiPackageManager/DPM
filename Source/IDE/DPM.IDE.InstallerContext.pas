@@ -13,17 +13,14 @@ type
 
   TDPMIDEPackageInstallerContext = class(TCorePackageInstallerContext, IPackageInstallerContext)
   private
-    FLogger : ILogger;
-    FProjectGraphs : IDictionary<string, IDictionary<TDPMPlatform,IGraphNode>>;
   protected
     procedure StartProject(const projectFile: string; const platform: TDPMPlatform);override;
     procedure EndProject(const projectFile: string; const platform: TDPMPlatform);override;
     function IsDesignPackageInstalled(const packageName: string): Boolean;override;
     function RegisterDesignPackage(const platform: TDPMPlatform; const packageFile: string; const dependsOn: IList<string>) : boolean;override;
     procedure Clear;override;
-
   public
-    constructor Create(const logger : ILogger);
+    constructor Create(const logger : ILogger);override;
   end;
 
 implementation
@@ -32,8 +29,7 @@ implementation
 
 constructor TDPMIDEPackageInstallerContext.Create(const logger: ILogger);
 begin
-  FLogger := logger;
-  FProjectGraphs := TCollections.CreateDictionary<string, IDictionary<TDPMPlatform,IGraphNode>>();
+  inherited Create(logger);
 
 end;
 
@@ -54,7 +50,7 @@ end;
 
 procedure TDPMIDEPackageInstallerContext.Clear;
 begin
-  FProjectGraphs.Clear;
+  inherited;
 end;
 
 procedure TDPMIDEPackageInstallerContext.StartProject(const projectFile: string; const platform: TDPMPlatform);

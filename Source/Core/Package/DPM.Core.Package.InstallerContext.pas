@@ -13,9 +13,11 @@ uses
 type
   TCorePackageInstallerContext = class(TInterfacedObject, IPackageInstallerContext)
   private
+
     FProjectGraphs : IDictionary<string, IDictionary<TDPMPlatform, IGraphNode>>;
     FProjectResolutions : IDictionary<string, IDictionary<TDPMPlatform, IList<IResolution>>>;
   protected
+    FLogger : ILogger;
     procedure StartProject(const projectFile: string; const platform : TDPMPlatform);virtual;
     procedure EndProject(const projectFile: string; const platform : TDPMPlatform);virtual;
 
@@ -30,7 +32,7 @@ type
 
     procedure Clear;virtual;
   public
-    constructor Create;
+    constructor Create(const logger : ILogger);virtual;
 
   end;
 
@@ -48,8 +50,9 @@ begin
   //IDE will override this
 end;
 
-constructor TCorePackageInstallerContext.Create();
+constructor TCorePackageInstallerContext.Create(const logger : ILogger);
 begin
+  FLogger := Logger;
   FProjectGraphs := TCollections.CreateDictionary<string, IDictionary<TDPMPlatform, IGraphNode>>;
   FProjectResolutions := TCollections.CreateDictionary<string, IDictionary<TDPMPlatform, IList<IResolution>>>;
 end;
