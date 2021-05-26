@@ -1,3 +1,29 @@
+{***************************************************************************}
+{                                                                           }
+{           Delphi Package Manager - DPM                                    }
+{                                                                           }
+{           Copyright © 2019 Vincent Parrett and contributors               }
+{                                                                           }
+{           vincent@finalbuilder.com                                        }
+{           https://www.finalbuilder.com                                    }
+{                                                                           }
+{                                                                           }
+{***************************************************************************}
+{                                                                           }
+{  Licensed under the Apache License, Version 2.0 (the "License");          }
+{  you may not use this file except in compliance with the License.         }
+{  You may obtain a copy of the License at                                  }
+{                                                                           }
+{      http://www.apache.org/licenses/LICENSE-2.0                           }
+{                                                                           }
+{  Unless required by applicable law or agreed to in writing, software      }
+{  distributed under the License is distributed on an "AS IS" BASIS,        }
+{  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. }
+{  See the License for the specific language governing permissions and      }
+{  limitations under the License.                                           }
+{                                                                           }
+{***************************************************************************}
+
 unit DPM.Controls.LogMemo;
 
 interface
@@ -42,6 +68,7 @@ type
     FCurrentRow : Int64;
     FMaxWidth : integer;
     FUpdating : boolean;
+    FUpdatingScrollBars : boolean;
 
     FStyleServices : TCustomStyleServices;
 
@@ -56,7 +83,7 @@ type
 
     procedure UpdateVisibleRows;
     function RowInView(const row: integer): boolean;
-    procedure ScrollInView(const index : integer);
+    procedure ScrollInView(const index : integer; const updateSBs : boolean = true);
 
     procedure Loaded; override;
     procedure Resize; override;
@@ -80,7 +107,6 @@ type
 
     procedure WMEraseBkgnd(var Message: TWmEraseBkgnd); message WM_ERASEBKGND;
     procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
-    procedure WMSize(var Message: TWMSize); message WM_SIZE;
     procedure WMVScroll(var Message: TWMVScroll); message WM_VSCROLL;
     procedure WMHScroll(var Message: TWMVScroll); message WM_HSCROLL;
 
@@ -109,6 +135,8 @@ type
     procedure CreateHandle; override;
     procedure CreateParams(var Params: TCreateParams); override;
     procedure CreateWnd; override;
+    procedure ChangeScale(M: Integer; D: Integer; isDpiChange: Boolean); override;
+
 
 
   public
@@ -141,6 +169,7 @@ type
     property Height default 100;
     property ParentBackground;
     property ParentColor;
+    property ParentFont;
     {$IF CompilerVersion >= 24.0}
       {$LEGACYIFEND ON}
     property StyleElements;
@@ -157,20 +186,36 @@ type
 implementation
 
 uses
+  System.SysUtils,
   System.Math,
   System.UITypes,
   DPM.Core.Utils.Strings;
 
 
 { TVSoftColorMemo }
+//copied from StyleUtils.inc
+function TextWidth(Canvas: TCanvas; const AText: string; Flags: Integer = 0): Integer;
+var
+  R: TRect;
+begin
+  R := Rect(0, 0, 0, 0);
+  Winapi.Windows.DrawText(Canvas.Handle, PChar(AText), Length(AText), R, DT_CALCRECT or Flags);
+  Result := R.Right;
+end;
+
 
 procedure TLogMemo.AddRow(const value: string; const messageType : TLogMessageType);
 var
-  width : integer;
+  w : integer;
   idx : integer;
 begin
-  width := Canvas.TextWidth(value) + 15;
-  FMaxWidth := Max(width, FMaxWidth);
+  FPaintBmp.Canvas.Font.Assign(Self.Font);
+  if messageType in [mtImportantInformation, mtImportantSuccess, mtImportantVerbose, mtImportantWarning,mtError] then
+    FPaintBmp.Canvas.Font.Style := [fsBold];
+  w := FPaintBmp.Canvas.TextWidth(value);
+
+  FMaxWidth := Max(w, FMaxWidth);
+  UpdateScrollBars;
   idx := FItems.AddObject(value, TObject(NativeUInt(messageType)) );
   ScrollInView(idx);
 end;
@@ -272,6 +317,7 @@ begin
   ParentBackground := false;
   ParentColor := true;
   ParentDoubleBuffered := false;
+  ParentFont := true;
   DoubleBuffered := false;
   BevelInner := bvNone;
   BevelOuter := bvNone;
@@ -341,7 +387,7 @@ begin
 
   if FTopRow <> oldTopRow then
     //need a full repaint.
-    Invalidate
+    Repaint
   else if FCurrentRow <> oldCurrentRow then
   begin
     rowState := GetRowPaintState(oldCurrentRow);
@@ -381,7 +427,7 @@ begin
     begin
       FTopRow := 0;
       FCurrentRow := 0;
-      Invalidate;
+      Repaint;
     end;
     FVScrollPos := 0;
     UpdateScrollBars;
@@ -413,7 +459,7 @@ begin
 
     FVScrollPos := FTopRow;
     //we scrolled so full paint.
-    Invalidate;
+    Repaint;
     UpdateScrollBars;
   end
   else //from keyboard
@@ -731,7 +777,7 @@ begin
   rowRect := ClientRect;
   rowRect.Top := viewRow * FRowHeight;
   rowRect.Bottom := rowRect.Top + FRowHeight;
-  rowRect.Width := Max(rowRect.Width, FPaintBmp.Width);
+  rowRect.Width := FPaintBmp.Width; //paint bitmap may be wider.
 
 
   if (state in [TPaintRowState.rsFocusedSelected, TPaintRowState.rsFocusedHot, TPaintRowState.rsHot]) then
@@ -899,13 +945,10 @@ begin
   LCanvas := FPaintBmp.Canvas;
   LCanvas.Font.Assign(Self.Font);
 
-
   if FStyleServices.Enabled {$IF CompilerVersion >= 24.0} and (seClient in StyleElements) {$IFEND} then
     backgroundColor := FStyleServices.GetSystemColor(clWindow)
   else
     backgroundColor := clWindow;
-
-
 
   //paint background
   r := Self.ClientRect;
@@ -924,10 +967,11 @@ begin
     DoPaintRow(rowIdx, rowState, false);
   end;
 
+
   r := ClientRect;
   OffsetRect(r, FHScrollPos,0);
-
-  Canvas.CopyRect(ClientRect, FPaintBmp.Canvas, r);
+  BitBlt(Canvas.Handle,0,0,r.Width, r.Height, FPaintBmp.Canvas.Handle,r.Left, r.Top,SRCCOPY);
+//  Canvas.CopyRect(ClientRect, FPaintBmp.Canvas, r); //uses strechblt
 
 end;
 
@@ -944,6 +988,8 @@ begin
   NewWidth := Max(ClientWidth, GetMaxWidth);
   NewHeight := ClientHeight;
 
+  FMaxWidth := Min(FMaxWidth, NewWidth);
+
   if (NewWidth <> FPaintBmp.Width) or (NewHeight <> FPaintBmp.Height) then
   begin
     // TBitmap does some stuff to try and preserve contents
@@ -952,17 +998,23 @@ begin
     FPaintBmp.SetSize(NewWidth, NewHeight);
   end;
 
-  UpdateScrollBars;
+  if FMaxWidth <= ClientWidth then
+    FHScrollPos := 0
+  else if FHScrollPos > (FMaxWidth - ClientWidth) then
+    FHScrollPos := FMaxWidth - ClientWidth;
+
 
   if (RowCount > 0) and (FCurrentRow > -1) then
     if not RowInView(FCurrentRow) then
-      ScrollInView(FCurrentRow);
+      ScrollInView(FCurrentRow, false);
 
+  Refresh;
+  UpdateScrollBars;
 
-  //force repainting scrollbars
-  if sfHandleMessages in StyleServices.Flags then
-    SendMessage(Handle, WM_NCPAINT, 0, 0);
-  inherited;
+//  //force repainting scrollbars
+//  if sfHandleMessages in StyleServices.Flags then
+//    SendMessage(Handle, WM_NCPAINT, 0, 0);
+  //inherited;
 end;
 
 function TLogMemo.RowInView(const row: integer): boolean;
@@ -1013,7 +1065,7 @@ begin
 
 end;
 
-procedure TLogMemo.ScrollInView(const index: integer);
+procedure TLogMemo.ScrollInView(const index: integer; const updateSBs : boolean = true);
 begin
   if (RowCount = 0) or (index > RowCount -1) then
     exit;
@@ -1029,7 +1081,8 @@ begin
 
   FVScrollPos := FTopRow;
   Update;
-  UpdateScrollBars;
+  if updateSBs then
+    UpdateScrollBars;
 
 end;
 
@@ -1056,6 +1109,13 @@ procedure TLogMemo.SetStyleServices(const Value: TCustomStyleServices);
 begin
   FStyleServices := Value;
   CheckTheme;
+end;
+
+procedure TLogMemo.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+begin
+  FMaxWidth := ScaleValue(FMaxWidth);
+  UpdateScrollBars;
+  inherited;
 end;
 
 procedure TLogMemo.CheckTheme;
@@ -1096,44 +1156,53 @@ var
 begin
   if not HandleAllocated then
     exit;
+  if FUpdatingScrollBars  then
+    exit;
 
-  sbInfo.cbSize := SizeOf(TScrollInfo);
-  sbInfo.fMask := SIF_ALL;
-  sbInfo.nMin := 0;
+  FUpdatingScrollBars := true;
+  try
+    sbInfo.cbSize := SizeOf(TScrollInfo);
+    sbInfo.fMask := SIF_ALL;
+    sbInfo.nMin := 0;
 
-  //Note : this may trigger a resize if the visibility changes
-  if RowCount <= FSelectableRows  then
-  begin
-    sbInfo.nMax := 0;
-    sbInfo.nPage := 0;
-    sbInfo.nPos := 0;
-    SetScrollInfo(Handle, SB_VERT, sbInfo, True);
-  end
-  else
-  begin
-    sbInfo.nMax := Max(RowCount -1, 0);
-    sbInfo.nPage := Min(FSelectableRows, RowCount -1);
-    sbInfo.nPos := Min(FVScrollPos, RowCount -1) ;
-    SetScrollInfo(Handle, SB_VERT, sbInfo, True);
-  end;
+    //Note : this may trigger a resize if the visibility changes
+    if RowCount <= FSelectableRows  then
+    begin
+      sbInfo.nMax := 0;
+      sbInfo.nPage := 0;
+      sbInfo.nPos := 0;
+      SetScrollInfo(Handle, SB_VERT, sbInfo, True);
+    end
+    else
+    begin
+      sbInfo.nMax := Max(RowCount -1, 0);
+      sbInfo.nPage := Min(FSelectableRows, RowCount -1);
+      sbInfo.nPos := Min(FVScrollPos, RowCount -1) ;
+      SetScrollInfo(Handle, SB_VERT, sbInfo, True);
+    end;
 
-  sbInfo.cbSize := SizeOf(TScrollInfo);
-  sbInfo.fMask := SIF_ALL;
-  sbInfo.nMin := 0;
+    sbInfo.cbSize := SizeOf(TScrollInfo);
+    sbInfo.fMask := SIF_ALL;
+    sbInfo.nMin := 0;
+    sbInfo.nTrackPos := 0;
 
-  if FPaintBmp.Width <= ClientWidth then
-  begin
-    sbInfo.nMax := 0;
-    sbInfo.nPage := 0;
-    sbInfo.nPos := 0;
-    SetScrollInfo(Handle, SB_HORZ, sbInfo, True);
-  end
-  else
-  begin
-    sbInfo.nMax := Max(FPaintBmp.Width, 0);
-    sbInfo.nPage := ClientWidth;
-    sbInfo.nPos := Min(FHScrollPos, FPaintBmp.Width -1 ) ;
-    SetScrollInfo(Handle, SB_HORZ, sbInfo, True);
+    if FMaxWidth <= ClientWidth then
+    begin
+      FHScrollPos := 0;
+      sbInfo.nMax := 0;
+      sbInfo.nPage := 0;
+      sbInfo.nPos := 0;
+      SetScrollInfo(Handle, SB_HORZ, sbInfo, True);
+    end
+    else
+    begin
+      sbInfo.nMax := Max(FMaxWidth, 0);
+      sbInfo.nPage := ClientWidth;
+      sbInfo.nPos := FHScrollPos;
+      SetScrollInfo(Handle, SB_HORZ, sbInfo, True);
+    end;
+  finally
+    FUpdatingScrollBars := false;
   end;
 end;
 
@@ -1172,57 +1241,42 @@ var
   info : TScrollInfo;
 begin
   Message.Result := 0;
+  if FUpdatingScrollBars then
+    exit;
   with Message do
   begin
     if ScrollCode = 8 then
       exit;
+    ZeroMemory(@info, Sizeof(TScrollInfo));
     info.cbSize := SizeOf(TScrollInfo);
-    info.fMask := SIF_TRACKPOS;
+    info.fMask := SIF_ALL;
     GetScrollInfo(Self.Handle,SB_HORZ, info);
-
 
     case TScrollCode(scrollCode) of
       TScrollCode.scLineUp: FHScrollPos := Max(0, FHScrollPos -1) ;
-      TScrollCode.scLineDown: FHScrollPos := Min(FPaintBmp.Width, FHScrollPos + 1) ;
+      TScrollCode.scLineDown: FHScrollPos := Min(FMaxWidth - ClientWidth, FHScrollPos + 1) ;
       TScrollCode.scPageUp:
       begin
-        FHScrollPos := Max(0, FHScrollPos - ClientWidth)
+        FHScrollPos := Max(0, FHScrollPos - info.nPage)
       end;
       TScrollCode.scPageDown:
       begin
-        FHScrollPos := Min(FHScrollPos + ClientWidth, FPaintBmp.Width );
-
-  //      ScrollPos :=  FVScrollPos + FSelectableRows;
-  //      if ScrollPos > RowCount -1 then
-  //        ScrollPos := RowCount - 1;
-  //      DoPageDown(true, ScrollPos);
+        FHScrollPos := Min(FHScrollPos + info.nPage, FMaxWidth - ClientWidth );
       end;
       TScrollCode.scPosition,
       TScrollCode.scTrack:
       begin
-        FHScrollPos := info.nTrackPos;
-  //      DoTrack(ScrollPos);
+        FHScrollPos := Min(info.nTrackPos, FMaxWidth - ClientWidth )
       end;
       TScrollCode.scTop: FHScrollPos := 0;
-      TScrollCode.scBottom: FHScrollPos := FPaintBmp.Width;
+      TScrollCode.scBottom: FHScrollPos := FMaxWidth;
   //    TScrollCode.scEndScroll: ;
     end;
     UpdateScrollBars;
-    Invalidate;
-
-
-    //handle h scroll
+    Refresh;
   end;
 end;
 
-procedure TLogMemo.WMSize(var Message: TWMSize);
-begin
-  inherited;
-
-  //force repaint during resizing rather than just after.
-  RedrawWindow(Handle, nil, 0, RDW_ERASE or RDW_INVALIDATE or RDW_UPDATENOW);
-
-end;
 
 procedure TLogMemo.WMVScroll(var Message: TWMVScroll);
 var
