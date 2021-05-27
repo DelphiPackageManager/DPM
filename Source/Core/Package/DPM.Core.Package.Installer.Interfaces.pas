@@ -70,9 +70,9 @@ type
  //   procedure EndProject(const projectFile : string; const platform : TDPMPlatform);
     //
     //register a bpl for install into the IDE.
-    function RegisterDesignPackage(const platform : TDPMPlatform; const packageFile : string; const dependsOn : IList<string>) : boolean;
+    function RegisterDesignPackage(const platform : TDPMPlatform; const packageFile : string; const dependsOn : IList<string>; out errorMessage : string) : boolean;
 
-    function IsDesignPackageInstalled(const packageName : string) : boolean;
+    function IsDesignPackageInstalled(const packageName : string; out platform : TDPMPlatform; out project : string) : boolean;
 
     procedure RecordGraph(const projectFile : string; const platform : TDPMPlatform; const graph : IGraphNode; const resolutions : TArray<IResolution>);
     function FindPackageResolution(const currentProjectFile: string; const packageId : string; const platform : TDPMPlatform) : IResolution;

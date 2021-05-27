@@ -16,8 +16,8 @@ type
   protected
     procedure StartProject(const projectFile: string; const platform: TDPMPlatform);override;
     procedure EndProject(const projectFile: string; const platform: TDPMPlatform);override;
-    function IsDesignPackageInstalled(const packageName: string): Boolean;override;
-    function RegisterDesignPackage(const platform: TDPMPlatform; const packageFile: string; const dependsOn: IList<string>) : boolean;override;
+    function IsDesignPackageInstalled(const packageName: string; out platform : TDPMPlatform; out project : string): Boolean;override;
+    function RegisterDesignPackage(const platform: TDPMPlatform; const packageFile: string; const dependsOn: IList<string>; out errorMessage : string) : boolean;override;
     procedure Clear;override;
   public
     constructor Create(const logger : ILogger);override;
@@ -38,12 +38,12 @@ begin
 
 end;
 
-function TDPMIDEPackageInstallerContext.IsDesignPackageInstalled(const packageName: string): Boolean;
+function TDPMIDEPackageInstallerContext.IsDesignPackageInstalled(const packageName: string; out platform : TDPMPlatform; out project : string): Boolean;
 begin
   result := false;
 end;
 
-function TDPMIDEPackageInstallerContext.RegisterDesignPackage(const platform: TDPMPlatform; const packageFile: string; const dependsOn: IList<string>) : boolean;
+function TDPMIDEPackageInstallerContext.RegisterDesignPackage(const platform: TDPMPlatform; const packageFile: string; const dependsOn: IList<string>; out errorMessage : string) : boolean;
 begin
   result := false;
 end;

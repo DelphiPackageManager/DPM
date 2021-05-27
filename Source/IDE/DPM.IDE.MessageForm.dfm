@@ -23,50 +23,44 @@ object DPMMessageForm: TDPMMessageForm
   TextHeight = 13
   object lblClosing: TLabel
     Left = 144
-    Top = 389
+    Top = 394
     Width = 46
     Height = 13
     Anchors = [akLeft, akBottom]
     Caption = 'Closing...'
     Visible = False
-    ExplicitTop = 397
   end
   object btnCancel: TButton
     Left = 770
-    Top = 378
-    Width = 100
-    Height = 35
+    Top = 388
+    Width = 89
+    Height = 28
     Action = actCanCancel
     Anchors = [akRight, akBottom]
     TabOrder = 0
-    ExplicitLeft = 672
-    ExplicitTop = 386
   end
   object btnCopy: TButton
     Left = 8
-    Top = 378
-    Width = 89
-    Height = 35
+    Top = 388
+    Width = 81
+    Height = 28
     Action = actCopyLog
     Anchors = [akLeft, akBottom]
     TabOrder = 2
-    ExplicitTop = 386
   end
   object btnClose: TButton
-    Left = 642
-    Top = 378
-    Width = 100
-    Height = 35
+    Left = 664
+    Top = 389
+    Width = 89
+    Height = 28
     Anchors = [akRight, akBottom]
     Caption = 'Close'
     TabOrder = 1
     OnClick = btnCloseClick
-    ExplicitLeft = 544
-    ExplicitTop = 386
   end
   object lblDontClose: TLinkLabel
     Left = 216
-    Top = 388
+    Top = 393
     Width = 95
     Height = 19
     Anchors = [akLeft, akBottom]
@@ -75,7 +69,6 @@ object DPMMessageForm: TDPMMessageForm
     UseVisualStyle = True
     Visible = False
     OnLinkClick = lblDontCloseLinkClick
-    ExplicitTop = 396
   end
   object ActionList1: TActionList
     OnUpdate = ActionList1Update

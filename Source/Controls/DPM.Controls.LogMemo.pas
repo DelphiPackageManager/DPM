@@ -135,8 +135,7 @@ type
     procedure CreateHandle; override;
     procedure CreateParams(var Params: TCreateParams); override;
     procedure CreateWnd; override;
-    procedure ChangeScale(M: Integer; D: Integer; isDpiChange: Boolean); override;
-
+    procedure ChangeScale(M: Integer; D: Integer {$if CompilerVersion >= 31}; isDpiChange: Boolean{$ifend}); override;
 
 
   public
@@ -1111,9 +1110,9 @@ begin
   CheckTheme;
 end;
 
-procedure TLogMemo.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+procedure TLogMemo.ChangeScale(M, D: Integer {$if CompilerVersion >= 31}; isDpiChange: Boolean{$ifend});
 begin
-  FMaxWidth := ScaleValue(FMaxWidth);
+  FMaxWidth := MulDiv(FMaxWidth, M, D);
   UpdateScrollBars;
   inherited;
 end;

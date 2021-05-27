@@ -21,8 +21,10 @@ type
     procedure StartProject(const projectFile: string; const platform : TDPMPlatform);virtual;
     procedure EndProject(const projectFile: string; const platform : TDPMPlatform);virtual;
 
-    function RegisterDesignPackage(const platform : TDPMPlatform; const packageFile: string; const dependsOn: IList<string>) : boolean;virtual;
-    function IsDesignPackageInstalled(const packageName: string): Boolean;virtual;
+
+    function RegisterDesignPackage(const platform : TDPMPlatform; const packageFile : string; const dependsOn : IList<string>; out errorMessage : string) : boolean;virtual;
+    function IsDesignPackageInstalled(const packageName : string; out platform : TDPMPlatform; out project : string) : boolean;virtual;
+
     procedure RemoveProject(const projectFile : string);virtual;
 
     procedure RecordGraph(const projectFile: string; const platform : TDPMPlatform; const graph: IGraphNode; const resolutions : TArray<IResolution>);virtual;
@@ -48,6 +50,8 @@ uses
 procedure TCorePackageInstallerContext.Clear;
 begin
   //IDE will override this
+  FProjectGraphs.Clear;
+  FProjectResolutions.Clear;
 end;
 
 constructor TCorePackageInstallerContext.Create(const logger : ILogger);
@@ -94,7 +98,7 @@ begin
   end;
 end;
 
-function TCorePackageInstallerContext.IsDesignPackageInstalled(const packageName: string): Boolean;
+function TCorePackageInstallerContext.IsDesignPackageInstalled(const packageName: string; out platform : TDPMPlatform; out project : string): Boolean;
 begin
   result := false;
 end;
@@ -118,12 +122,9 @@ begin
   end;
   resolutionPlatformEntry[platform] := TCollections.CreateList<IResolution>(resolutions);
 
-
-
-
 end;
 
-function TCorePackageInstallerContext.RegisterDesignPackage(const platform : TDPMPlatform; const packageFile: string; const dependsOn: IList<string>) : boolean;
+function TCorePackageInstallerContext.RegisterDesignPackage(const platform : TDPMPlatform; const packageFile: string; const dependsOn: IList<string>; out errorMessage : string) : boolean;
 begin
   result := true;
 end;
