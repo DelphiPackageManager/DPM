@@ -14,7 +14,7 @@ uses
   VSoft.Awaitable,
   DPM.Controls.LogMemo, ToolsAPI ;
 
-{$I DPMIDE.inc}
+{$I ..\DPMIDE.inc}
 
 type
   TDPMMessageForm = class(TForm {$IFDEF THEMESERVICES}, INTAIDEThemingServicesNotifier {$ENDIF})

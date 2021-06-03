@@ -30,7 +30,7 @@ unit DPM.IDE.EditorViewFrame;
 
 interface
 
-{$I DPMIDE.inc}
+{$I '..\DPMIDE.inc'}
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
@@ -39,24 +39,25 @@ uses
   Vcl.ComCtrls, Vcl.ExtCtrls, Vcl.Menus, SVGInterfaces,
   Vcl.Themes,
   DPM.Controls.ButtonedEdit,
-  DPM.Controls.GroupButton,
+  DPM.Controls.ButtonBar,
   VSoftVirtualListView,
   ToolsApi,
   Spring.Collections,
   Spring.Container,
   VSoft.Awaitable,
-  DPM.IDE.Types,
-  DPM.IDE.IconCache,
-  DPM.IDE.Options,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Dependency.Interfaces,
-  DPM.IDE.Logger,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Options.Search,
   DPM.Core.Package.Interfaces,
   DPM.Core.Project.Interfaces,
+  DPM.IDE.Types,
+  DPM.IDE.IconCache,
+  DPM.IDE.Options,
+  DPM.IDE.Logger,
   DPM.IDE.ProjectTreeManager,
+  DPM.IDE.SearchBarFrame,
   {$IF CompilerVersion >= 24.0 }
   {$LEGACYIFEND ON}
   System.Actions,
@@ -78,41 +79,19 @@ type
   end;
 
   TDPMEditViewFrame = class(TFrame, IPackageSearcher)
-    lblProject : TLabel;
-    DPMEditorViewImages : TImageList;
-    pnlSearchPanel : TPanel;
-    txtSearch : TButtonedEdit;
-    btnRefresh : TButton;
-    chkIncludePrerelease : TCheckBox;
     ContentPanel : TPanel;
     Splitter2 : TSplitter;
-    chkIncludeCommercial : TCheckBox;
-    btnSettings : TButton;
-    btnAbout : TButton;
-    lblSources : TLabel;
-    cbSources : TComboBox;
-    pnlButtonBar : TPanel;
-    chkIncludeTrial : TCheckBox;
-    searchDebounceTimer : TTimer;
     PackageListPanel : TPanel;
-    PackageDetailsFrame : TPackageDetailsFrame;
     platformChangeDetectTimer : TTimer;
-    procedure txtSearchKeyDown(Sender : TObject; var Key : Word; Shift : TShiftState);
-    procedure btnAboutClick(Sender : TObject);
-    procedure btnSettingsClick(Sender : TObject);
-    procedure tabMainChange(Sender : TObject);
-    procedure searchDebounceTimerTimer(Sender : TObject);
-    procedure btnRefreshClick(Sender : TObject);
-    procedure chkIncludePrereleaseClick(Sender : TObject);
+    PackageDetailsFrame : TPackageDetailsFrame;
+    procedure tabMainChange(const tab : TDPMCurrentTab);
     procedure platformChangeDetectTimerTimer(Sender : TObject);
-    procedure txtSearchChange(Sender : TObject);
-    procedure txtSearchRightButtonClick(Sender : TObject);
   private
+    FViewMode : TDPMEditViewMode;
+
     //controls
-    FInstalledButton : TDPMGroupButton;
-    FUpdatesButton : TDPMGroupButton;
-    FSearchButton : TDPMGroupButton;
-    FConflictsButton : TDPMGroupButton;
+    FButtonBar : TDPMButtonBar;
+    FSearchBar : TDPMSearchBarFrame;
     FScrollList : TVSoftVirtualListView;
     //controls
 
@@ -141,8 +120,7 @@ type
     FRequestInFlight : boolean;
     FClosing : boolean;
 
-    FSearchHistFile : string;
-    FCurrentTab : TCurrentTab;
+    FCurrentTab : TDPMCurrentTab;
 
     FIconCache : TDPMIconCache;
 
@@ -166,12 +144,13 @@ type
     FUpdates : IList<IPackageSearchResultItem>;
     //true when we first load the view
     FFirstView : boolean;
-    FHasSources : boolean;
     procedure FilterAndLoadInstalledPackages(const searchTxt : string);
   protected
-    procedure SwitchTabs(const currentTab : TCurrentTab; const refresh : boolean);
+    procedure SwitchTabs(const currentTab : TDPMCurrentTab; const refresh : boolean);
 
-    procedure txtSearchChanged(Sender : TObject);
+    procedure SettingsChanged(const configuration : IConfiguration);
+
+    procedure DoSearch(const searchText : string; const searchOptions : TDPMSearchOptions; const source : string; const platform : TDPMPlatform; const refresh : boolean);
     procedure ScrollListPaintRow(const Sender : TObject; const ACanvas : TCanvas; const itemRect : TRect; const index : Int64; const state : TPaintRowState);
     procedure ScrollListPaintNoRows(const Sender : TObject; const ACanvas : TCanvas; const paintRect : TRect);
     procedure ScrollListChangeRow(const Sender : TObject; const newRowIndex : Int64; const direction : TScrollDirection; const delta : Int64);
@@ -180,8 +159,6 @@ type
 
     function IsProjectGroup : boolean;
     function CurrentList : IList<IPackageSearchResultItem>;
-
-    procedure AddDefaultSearchHistory;
 
     procedure LoadList(const list : IList<IPackageSearchResultItem>);
 
@@ -195,8 +172,6 @@ type
     function GetConflictingPackages : IAwaitable<IList<IPackageSearchResultItem>>;
 
     function GetPackageIdsFromReferences(const platform : TDPMPlatform) : IList<IPackageId>;
-
-    procedure ReloadSourcesCombo;
 
     //IPackageSearcher
     function GetSearchOptions : TSearchOptions;
@@ -250,68 +225,6 @@ const
 
   { TDPMEditViewFrame }
 
-procedure TDPMEditViewFrame.AddDefaultSearchHistory;
-begin
-  //some commonly used open source libs to get people started.
-  txtSearch.ACStrings.Add('Spring4D.Core');
-  txtSearch.ACStrings.Add('Spring4D.Base');
-  txtSearch.ACStrings.Add('VSoft');
-  txtSearch.ACStrings.Add('VSoft.DUnitX');
-  txtSearch.ACStrings.Add('VSoft.DelphiMocks');
-  txtSearch.ACStrings.Add('Gabr42.OmniThreadLibrary');
-end;
-
-procedure TDPMEditViewFrame.btnAboutClick(Sender : TObject);
-var
-  aboutForm : TDPMAboutForm;
-begin
-  aboutForm := TDPMAboutForm.Create(nil);
-  try
-    aboutForm.ShowModal;
-  finally
-    aboutForm.Free;
-  end;
-end;
-
-procedure TDPMEditViewFrame.btnRefreshClick(Sender : TObject);
-begin
-  if FSearchResultPackages <> nil then
-    FSearchResultPackages.Clear;
-  //also called by the include checkboxes.
-  case FCurrentTab of
-    TCurrentTab.Installed : SwitchedToInstalled(true);
-    TCurrentTab.Updates : SwitchedToUpdates(true);
-    TCurrentTab.Search : SwitchedToSearch(true);
-    TCurrentTab.Conflicts : SwitchedToConflicts(true);
-  end;
-end;
-
-procedure TDPMEditViewFrame.btnSettingsClick(Sender : TObject);
-var
-  bReload : boolean;
-  optionsHost : TDPMOptionsHostForm;
-begin
-  optionsHost := TDPMOptionsHostForm.Create(Self, FConfigurationManager, FLogger, FDPMIDEOptions, FSearchOptions.ConfigFile);
-  try
-    bReload := optionsHost.ShowModal = mrOk;
-  finally
-    optionsHost.Free;
-  end;
-
-  if bReload then
-  begin
-    FConfiguration := FConfigurationManager.LoadConfig(FSearchOptions.ConfigFile);
-    PackageDetailsFrame.Init(FContainer, FIconCache, FConfiguration, Self, FProject.FileName);
-    //populate the sources combo.
-    ReloadSourcesCombo;
-  end;
-end;
-
-procedure TDPMEditViewFrame.chkIncludePrereleaseClick(Sender : TObject);
-begin
-  PackageDetailsFrame.IncludePreRelease := chkIncludePrerelease.Checked;
-  btnRefreshClick(Sender);
-end;
 
 procedure TDPMEditViewFrame.Closing;
 begin
@@ -352,17 +265,6 @@ begin
 
   FFirstView := true;
 
-  txtSearch.ACEnabled := true;
-  txtSearch.ACOptions := [acAutoAppend, acAutoSuggest, acUseArrowKey];
-  txtSearch.ACSource := acsList;
-
-  FSearchHistFile := TConfigUtils.GetDefaultDMPFolder + '\' + cDMPSearchHistoryFile;
-  if FileExists(FSearchHistFile) then
-    txtSearch.ACStrings.LoadFromFile(FSearchHistFile)
-  else
-    //some common packages to help with the search
-    AddDefaultSearchHistory;
-
   FSearchOptions := TSearchOptions.Create;
   //hard code our compiler version here since when we are running in the IDE we are only working with the IDE version
   FSearchOptions.CompilerVersion := IDECompilerVersion;
@@ -371,8 +273,8 @@ begin
   FSearchTake := 0;
   FRowLayout.RowWidth := -1;
 
-  FCurrentTab := TCurrentTab.Installed;
-  PackageDetailsFrame.Configure(FCurrentTab, chkIncludePrerelease.Checked);
+  FCurrentTab := TDPMCurrentTab.Installed;
+  PackageDetailsFrame.Configure(FCurrentTab, FSearchBar.IncludePrerelease);
   FProjectGroup := nil;
   FProject := nil;
   FCurrentPlatform := TDPMPlatform.UnknownPlatform;
@@ -384,42 +286,56 @@ end;
 
 procedure TDPMEditViewFrame.CreateControls(AOwner : TComponent);
 begin
-  FInstalledButton := TDPMGroupButton.Create(Self);
-  FUpdatesButton := TDPMGroupButton.Create(Self);
-  FSearchButton := TDPMGroupButton.Create(Self);
-  FConflictsButton := TDPMGroupButton.Create(Self);
+  FButtonBar := TDPMButtonBar.Create(Self);
+  FButtonBar.Top := 0;
+  FButtonBar.OnTabChanged := Self.tabMainChange;
+  FButtonBar.ShowConflictsTab := false;
+  FButtonBar.Parent := Self;
 
-  FSearchButton.Top := 10;
-  FSearchButton.Left := 20;
-  FSearchButton.Caption := 'Search';
-  FSearchButton.Tag := 0;
-  FSearchButton.Parent := pnlButtonBar;
+  FSearchBar := TDPMSearchBarFrame.Create(Self);
+  //important to make it appear below the button bar
+  FSearchBar.Top := FButtonBar.Top + FButtonBar.Height;
+  FSearchBar.OnSearch := Self.DoSearch;
+  FSearchBar.OnConfigChanged := Self.SettingsChanged;
+  FSearchBar.Parent := Self;
 
-  FInstalledButton.Top := 10;
-  FInstalledButton.Left := FSearchButton.Left + FSearchButton.Width + 20;
-  FInstalledButton.Caption := 'Installed';
-  FInstalledButton.Tag := 1;
-  FInstalledButton.Active := true;
-  FInstalledButton.Parent := pnlButtonBar;
 
-  FUpdatesButton.Top := 10;
-  FUpdatesButton.Left := FInstalledButton.Left + FInstalledButton.Width + 20;
-  FUpdatesButton.Caption := 'Updates';
-  FUpdatesButton.Tag := 2;
-  FUpdatesButton.Parent := pnlButtonBar;
-
-  FConflictsButton.Top := 10;
-  FConflictsButton.Left := FUpdatesButton.Left + FUpdatesButton.Width + 20;
-  FConflictsButton.Caption := 'Conflicts';
-  FConflictsButton.Tag := 3;
-  FConflictsButton.Visible := false;
-  FConflictsButton.Parent := pnlButtonBar;
-
-  FInstalledButton.OnClick := tabMainChange;
-  FUpdatesButton.OnClick := tabMainChange;
-  FSearchButton.OnClick := tabMainChange;
-  FConflictsButton.OnClick := tabMainChange;
-
+//  FInstalledButton := TDPMGroupButton.Create(Self);
+//  FUpdatesButton := TDPMGroupButton.Create(Self);
+//  FSearchButton := TDPMGroupButton.Create(Self);
+//  FConflictsButton := TDPMGroupButton.Create(Self);
+//
+//  FSearchButton.Top := 10;
+//  FSearchButton.Left := 20;
+//  FSearchButton.Caption := 'Search';
+//  FSearchButton.Tag := 0;
+//  FSearchButton.Parent := pnlButtonBar;
+//
+//  FInstalledButton.Top := 10;
+//  FInstalledButton.Left := FSearchButton.Left + FSearchButton.Width + 20;
+//  FInstalledButton.Caption := 'Installed';
+//  FInstalledButton.Tag := 1;
+//  FInstalledButton.Active := true;
+//  FInstalledButton.Parent := pnlButtonBar;
+//
+//  FUpdatesButton.Top := 10;
+//  FUpdatesButton.Left := FInstalledButton.Left + FInstalledButton.Width + 20;
+//  FUpdatesButton.Caption := 'Updates';
+//  FUpdatesButton.Tag := 2;
+//  FUpdatesButton.Parent := pnlButtonBar;
+//
+//  FConflictsButton.Top := 10;
+//  FConflictsButton.Left := FUpdatesButton.Left + FUpdatesButton.Width + 20;
+//  FConflictsButton.Caption := 'Conflicts';
+//  FConflictsButton.Tag := 3;
+//  FConflictsButton.Visible := false;
+//  FConflictsButton.Parent := pnlButtonBar;
+//
+//  FInstalledButton.OnClick := tabMainChange;
+//  FUpdatesButton.OnClick := tabMainChange;
+//  FSearchButton.OnClick := tabMainChange;
+//  FConflictsButton.OnClick := tabMainChange;
+//
   FScrollList := TVSoftVirtualListView.Create(Self);
   {$IFDEF STYLEELEMENTS}
   FScrollList.StyleElements := [seFont, seBorder];
@@ -448,10 +364,10 @@ end;
 function TDPMEditViewFrame.CurrentList : IList<IPackageSearchResultItem>;
 begin
   case FCurrentTab of
-    TCurrentTab.Installed : result := FInstalledPackages;
-    TCurrentTab.Updates : result := FUpdates;
-    TCurrentTab.Search : result := FSearchResultPackages;
-    TCurrentTab.Conflicts : result := FConflictPackages;
+    TDPMCurrentTab.Installed : result := FInstalledPackages;
+    TDPMCurrentTab.Updates : result := FUpdates;
+    TDPMCurrentTab.Search : result := FSearchResultPackages;
+    TDPMCurrentTab.Conflicts : result := FConflictPackages;
   end;
 end;
 
@@ -464,13 +380,60 @@ begin
   inherited;
 end;
 
+/// called by the searchbar onsearch event.
+procedure TDPMEditViewFrame.DoSearch(const searchText: string; const searchOptions: TDPMSearchOptions; const source: string; const platform : TDPMPlatform; const refresh : boolean);
+begin
+
+  FCurrentPlatform := platform;
+
+  if FRequestInFlight then
+    FCancelTokenSource.Cancel;
+
+  while FRequestInFlight do
+    Application.ProcessMessages;
+
+  FCancelTokenSource.Reset;
+
+  if FSearchResultPackages <> nil then
+    FSearchResultPackages.Clear;
+
+  //this was from the edit right button click.. not sure it's still needed?
+  if refresh and (searchText = '') then
+  begin
+    FSearchResultPackages := nil;
+    FInstalledPackages := FAllInstalledPackages;
+    FUpdates := nil;
+  end;
+
+
+  PackageDetailsFrame.IncludePreRelease := TDPMSearchOption.IncludePrerelease in searchOptions;
+
+  FSearchOptions.Platforms := [platform];
+  FSearchOptions.Prerelease := TDPMSearchOption.IncludePrerelease in searchOptions;
+  FSearchOptions.Commercial := TDPMSearchOption.IncludeCommercial in searchOptions;
+  FSearchOptions.Trial      := TDPMSearchOption.IncludeTrial in searchOptions;
+  FSearchOptions.SearchTerms := Trim(searchText);
+  if source <> 'All' then
+    FSearchOptions.Sources := source
+  else
+    FSearchOptions.Sources := '';
+
+  case FCurrentTab of
+    TDPMCurrentTab.Search     : SwitchedToSearch(refresh);
+    TDPMCurrentTab.Installed  : SwitchedToInstalled(refresh);
+    TDPMCurrentTab.Updates    : SwitchedToUpdates(refresh);
+    TDPMCurrentTab.Conflicts  : ;
+  end;
+
+end;
+
 function TDPMEditViewFrame.GetConflictingPackages : IAwaitable<IList<IPackageSearchResultItem>>;
 var
   lSearchTerm : string;
   lProjectFile : string;
 begin
   //local for capture
-  lSearchTerm := txtSearch.Text;
+  lSearchTerm := FSearchOptions.SearchTerms;
   if IsProjectGroup then
     lProjectFile := FProjectGroup.FileName
   else
@@ -546,7 +509,7 @@ begin
   options.Prerelease := true;
   options.Commercial := true;
   options.Trial := true;
-  options.SearchTerms := txtSearch.Text;
+//  options.SearchTerms := FSearchOptions.SearchTerms;
 
   if not IsProjectGroup then
     options.Platforms := [FCurrentPlatform];
@@ -698,8 +661,8 @@ begin
     else
       FAllInstalledPackages.Add(packageSearchResult);
   end;
-  if FCurrentTab = TCurrentTab.Installed then
-    FilterAndLoadInstalledPackages(txtSearch.Text);
+  if FCurrentTab = TDPMCurrentTab.Installed then
+    FilterAndLoadInstalledPackages(FSearchOptions.SearchTerms);
 
   //Tell the IDE to reload the project as we have just modified it on disk.
   FProject.Refresh(true);
@@ -747,7 +710,7 @@ begin
       FAllInstalledPackages.Remove(packageSearchResult);
       if FInstalledPackages <> nil then
         FInstalledPackages.Remove(packageSearchResult);
-      if FCurrentTab = TCurrentTab.Installed then
+      if FCurrentTab = TDPMCurrentTab.Installed then
         SwitchedToInstalled(False);
     end;
   end;
@@ -789,10 +752,10 @@ begin
       PackageDetailsFrame.SetPackage(nil);
       FScrollList.CurrentRow := -1;
       case FCurrentTab of
-        TCurrentTab.Search : SwitchedToSearch(true);
-        TCurrentTab.Installed : SwitchedToInstalled(true);
-        TCurrentTab.Updates : SwitchedToUpdates(true);
-        TCurrentTab.Conflicts : SwitchedToConflicts(True);
+        TDPMCurrentTab.Search : SwitchedToSearch(true);
+        TDPMCurrentTab.Installed : SwitchedToInstalled(true);
+        TDPMCurrentTab.Updates : SwitchedToUpdates(true);
+        TDPMCurrentTab.Conflicts : SwitchedToConflicts(True);
       end;
     end;
   end;
@@ -806,42 +769,6 @@ begin
   platformChangeDetectTimerTimer(platformChangeDetectTimer);
 end;
 
-procedure TDPMEditViewFrame.ReloadSourcesCombo;
-var
-  sCurrent : string;
-  source : ISourceConfig;
-  idx : integer;
-begin
-  if cbSources.Items.Count > 0 then
-    sCurrent := cbSources.Items[cbSources.ItemIndex];
-  cbSources.Clear;
-
-  cbSources.Items.Add('All');
-
-  if FConfiguration.Sources.Any then
-  begin
-    for source in FConfiguration.Sources do
-    begin
-      if source.IsEnabled then
-      begin
-        cbSources.Items.Add(source.Name);
-        FHasSources := true;
-      end;
-    end;
-  end
-  else
-    FHasSources := false;
-
-  if sCurrent <> '' then
-  begin
-    idx := cbSources.Items.IndexOf(sCurrent);
-    if idx <> -1 then
-      cbSources.ItemIndex := idx
-    else
-      cbSources.ItemIndex := 0;
-  end;
-
-end;
 
 procedure TDPMEditViewFrame.RequestPackageIcon(const index : integer; const package : IPackageSearchResultItem);
 var
@@ -943,7 +870,7 @@ begin
     ACanvas.TextOut(20, 20, 'Loading....')
   else
   begin
-    if  FHasSources then
+    if FSearchBar.HasSources then
       ACanvas.TextOut(20, 20, 'No Packages found')
     else
       ACanvas.TextOut(20, 20, 'No enabled package sources, add a package source in DPM settings.')
@@ -1046,7 +973,7 @@ begin
         reservedRect.Top := titleRect.Top + 4;
         reservedRect.Width := 16;
         reservedRect.Height := 16;
-        DPMEditorViewImages.Draw(ACanvas, reservedRect.Left, reservedRect.Top, 4, TDrawingStyle.dsTransparent, TImageType.itImage);
+        //DPMEditorViewImages.Draw(ACanvas, reservedRect.Left, reservedRect.Top, 4, TDrawingStyle.dsTransparent, TImageType.itImage);
         titleRect.Left := reservedRect.Right + 4;
         titleRect.Right := FRowLayout.TitleRect.Right;
       end;
@@ -1107,40 +1034,6 @@ begin
   end;
 end;
 
-procedure TDPMEditViewFrame.searchDebounceTimerTimer(Sender : TObject);
-begin
-  searchDebounceTimer.Enabled := false;
-
-  if FRequestInFlight then
-    FCancelTokenSource.Cancel;
-
-  while FRequestInFlight do
-    Application.ProcessMessages;
-
-  FCancelTokenSource.Reset;
-
-  case FCurrentTab of
-    TCurrentTab.Installed :
-      begin
-        //todo : apply filter to installed
-        SwitchedToInstalled(true);
-      end;
-    TCurrentTab.Updates :
-      begin
-        SwitchedToUpdates(true);
-      end;
-    TCurrentTab.Search :
-      begin
-        SwitchedToSearch(true);
-      end;
-    TCurrentTab.Conflicts :
-      begin
-
-      end;
-  end;
-
-end;
-
 function TDPMEditViewFrame.GetSearchOptions : TSearchOptions;
 begin
   result := FSearchOptions.Clone;
@@ -1162,6 +1055,12 @@ begin
 
 end;
 
+
+procedure TDPMEditViewFrame.SettingsChanged(const configuration: IConfiguration);
+begin
+  FConfiguration := configuration;
+  PackageDetailsFrame.Init(FContainer, FIconCache, FConfiguration, Self, FProject.FileName);
+end;
 
 function TDPMEditViewFrame.SearchForPackages(const options : TSearchOptions) : IList<IPackageSearchResultItem>;
 var
@@ -1242,10 +1141,7 @@ var
   //filter the list to only show directly installed packages, and on the search term
 begin
   FLogger.Debug('DPMIDE : SwitchToInstalled');
-  searchTxt := txtSearch.Text;
-  chkIncludePrerelease.Visible := true;
-  chkIncludeCommercial.Visible := false;
-  chkIncludeTrial.Visible := false;
+  searchTxt := FSearchOptions.SearchTerms;
   filterProc := FilterAndLoadInstalledPackages;
   if (not refresh) and (FAllInstalledPackages <> nil) and FAllInstalledPackages.Any then
     filterProc(searchTxt)
@@ -1294,9 +1190,6 @@ end;
 
 procedure TDPMEditViewFrame.SwitchedToSearch(const refresh : boolean);
 begin
-  chkIncludePrerelease.Visible := true;
-  chkIncludeCommercial.Visible := true;
-  chkIncludeTrial.Visible := true;
   if (not refresh) and (FSearchResultPackages <> nil) and FSearchResultPackages.Any then
     LoadList(FSearchResultPackages)
   else
@@ -1304,11 +1197,6 @@ begin
     FRequestInFlight := true;
     FCancelTokenSource.Reset;
     FLogger.Debug('DPMIDE : Searching for Packages..');
-    FSearchOptions.SearchTerms := Trim(txtSearch.Text);
-    FSearchOptions.Prerelease := chkIncludePrerelease.Checked;
-    FSearchOptions.Commercial := chkIncludeCommercial.Checked;
-    FSearchOptions.Trial := chkIncludeTrial.Checked;
-    FSearchOptions.Platforms := [FCurrentPlatform];
     SearchForPackagesAsync(FSearchOptions)
     .OnException(
       procedure(const e : Exception)
@@ -1356,9 +1244,6 @@ end;
 
 procedure TDPMEditViewFrame.SwitchedToUpdates(const refresh : boolean);
 begin
-  chkIncludePrerelease.Visible := true;
-  chkIncludeCommercial.Visible := false;
-  chkIncludeTrial.Visible := false;
   if (not refresh) and (FUpdates <> nil) and FUpdates.Any then
     LoadList(FUpdates)
   else
@@ -1401,8 +1286,7 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame.SwitchTabs(const currentTab : TCurrentTab; const
-  refresh : boolean);
+procedure TDPMEditViewFrame.SwitchTabs(const currentTab : TDPMCurrentTab; const refresh : boolean);
 var
   doRefresh : boolean;
 begin
@@ -1413,40 +1297,47 @@ begin
     Application.ProcessMessages;
   FCancelTokenSource.Reset;
 
+
   FCurrentTab := currentTab;
+  FSearchBar.ConfigureForTab(FCurrentTab);
 
   FScrollList.RowCount := 0;
   PackageDetailsFrame.SetPackage(nil);
-  PackageDetailsFrame.Configure(FCurrentTab, chkIncludePrerelease.Checked);
+  PackageDetailsFrame.Configure(FCurrentTab, FSearchBar.IncludePrerelease);
 
-  doRefresh := refresh or (txtSearch.Text <> '');
+  doRefresh := refresh or (FSearchOptions.SearchTerms <> '');
 
   case FCurrentTab of
-    TCurrentTab.Search : SwitchedToSearch(doRefresh);
-    TCurrentTab.Installed : SwitchedToInstalled(doRefresh);
-    TCurrentTab.Updates : SwitchedToUpdates(doRefresh);
-    TCurrentTab.Conflicts : SwitchedToConflicts(doRefresh);
+    TDPMCurrentTab.Search : SwitchedToSearch(doRefresh);
+    TDPMCurrentTab.Installed : SwitchedToInstalled(doRefresh);
+    TDPMCurrentTab.Updates : SwitchedToUpdates(doRefresh);
+    TDPMCurrentTab.Conflicts : SwitchedToConflicts(doRefresh);
   end;
 end;
 
 procedure TDPMEditViewFrame.Configure(const projectOrGroup : IOTAProject; const container : TContainer; const projectTreeManager : IDPMProjectTreeManager);
 var
   sConfigFile : string;
+  sFileName : string;
 begin
   FContainer := container;
   FProjectTreeManager := projectTreeManager;
-
+  sFileName := projectOrGroup.FileName;
   if not Supports(projectOrGroup, IOTAProjectGroup, FProjectGroup) then
   begin
-    lblProject.Caption := 'DPM : ' + ChangeFileExt(ExtractFileName(projectOrGroup.FileName), '');
+    FSearchBar.Caption := 'DPM : ' + ChangeFileExt(ExtractFileName(projectOrGroup.FileName), '');
     FProject := projectOrGroup;
-    FConflictsButton.Visible := false;
+    FButtonBar.ShowConflictsTab := false;
+    //FConflictsButton.Visible := false;
+    FViewMode := TDPMEditViewMode.vmProject;
   end
   else
   begin
-    FConflictsButton.Visible := true;
+    //FConflictsButton.Visible := true;
+    FButtonBar.ShowConflictsTab := true;
     FProject := nil;
-    lblProject.Caption := 'DPM : Project Group';
+    FSearchBar.Caption := 'DPM : Project Group';
+    FViewMode := TDPMEditViewMode.vmGroup;
   end;
 
   FLogger := FContainer.Resolve<IDPMIDELogger>;
@@ -1467,17 +1358,15 @@ begin
   FConfigurationManager.EnsureDefaultConfig;
   FConfiguration := FConfigurationManager.LoadConfig(FSearchOptions.ConfigFile);
 
-  PackageDetailsFrame.Init(FContainer, FIconCache, FConfiguration, Self, FProject.FileName);
-  //populate the sources combo.
-  ReloadSourcesCombo;
+  //TODO : for project group configure with platforms enabled in project.
+  FSearchBar.Configure(FLogger, FDPMIDEOptions, FConfiguration,FConfigurationManager, FSearchOptions.ConfigFile, FCurrentPlatform);
+
+  PackageDetailsFrame.Init(FContainer, FIconCache, FConfiguration, Self, sFileName);
 end;
 
-procedure TDPMEditViewFrame.tabMainChange(Sender : TObject);
-var
-  tab : TCurrentTab;
+procedure TDPMEditViewFrame.tabMainChange(const tab : TDPMCurrentTab);
 begin
-  tab := TCurrentTab(TDPMGroupButton(Sender).Tag);
-  SwitchTabs(tab, txtSearch.Text <> '');
+  SwitchTabs(tab, FSearchOptions.SearchTerms <> '');
 end;
 
 procedure TDPMEditViewFrame.ThemeChanged;
@@ -1490,76 +1379,23 @@ begin
   ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
   ideThemeSvc.ApplyTheme(Self);
   FIDEStyleServices := ideThemeSvc.StyleServices;
-  ideThemeSvc.ApplyTheme(pnlButtonBar);
-  ideThemeSvc.ApplyTheme(pnlSearchPanel);
+  ideThemeSvc.ApplyTheme(FButtonBar);
+  ideThemeSvc.ApplyTheme(FSearchBar);
   ideThemeSvc.ApplyTheme(Splitter2);
   {$ELSE}
   FIDEStyleServices := Vcl.Themes.StyleServices;
   {$IFEND}
 
-  //
-  pnlButtonBar.Color := FIDEStyleServices.GetSystemColor(clBtnFace);
-  pnlButtonBar.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
-  pnlSearchPanel.Color := FIDEStyleServices.GetSystemColor(clBtnFace);
-  pnlSearchPanel.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
+  FButtonBar.ThemeChanged;
+
+  FSearchBar.Color := FIDEStyleServices.GetSystemColor(clBtnFace);
+  FSearchBar.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
   Splitter2.Color := FIDEStyleServices.GetSystemColor(clBtnFace);
 
-  FSearchButton.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
-  FInstalledButton.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
-  FUpdatesButton.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
-  FConflictsButton.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
   FScrollList.Color := FIDEStyleServices.GetSystemColor(clWindow);
   FScrollList.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
   PackageDetailsFrame.Color := FIDEStyleServices.GetSystemColor(clWindow);
   PackageDetailsFrame.ThemeChanged;
-end;
-
-procedure TDPMEditViewFrame.txtSearchChange(Sender : TObject);
-begin
-  txtSearch.RightButton.Visible := txtSearch.Text <> '';
-end;
-
-procedure TDPMEditViewFrame.txtSearchChanged(Sender : TObject);
-begin
-end;
-
-procedure TDPMEditViewFrame.txtSearchKeyDown(Sender : TObject; var Key : Word; Shift : TShiftState);
-var
-  i : integer;
-begin
-  searchDebounceTimer.Enabled := false;
-  case key of
-    VK_RETURN :
-      begin
-        i := txtSearch.ACStrings.IndexOf(txtSearch.Text);
-        if i = -1 then
-          txtSearch.ACStrings.Insert(0, txtSearch.Text)
-        else
-          txtSearch.ACStrings.Move(i, 0);
-        try
-          txtSearch.ACStrings.SaveToFile(FSearchHistFile);
-        except
-          //ignore the error, not much we can do?
-          //perhaps log it?
-        end;
-      end;
-    VK_ESCAPE :
-      begin
-        txtSearch.Text := '';
-        searchDebounceTimerTimer(searchDebounceTimer);
-      end
-  else
-    searchDebounceTimer.Enabled := true;
-  end;
-end;
-
-procedure TDPMEditViewFrame.txtSearchRightButtonClick(Sender : TObject);
-begin
-  txtSearch.Text := '';
-  FSearchResultPackages := nil;
-  FInstalledPackages := FAllInstalledPackages;
-  FUpdates := nil;
-  searchDebounceTimerTimer(searchDebounceTimer);
 end;
 
 procedure TDPMEditViewFrame.ViewDeselected;

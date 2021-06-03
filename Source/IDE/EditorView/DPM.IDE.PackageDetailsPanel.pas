@@ -2,7 +2,7 @@ unit DPM.IDE.PackageDetailsPanel;
 
 interface
 
-{$I DPMIDE.inc}
+{$I ..\DPMIDE.inc}
 
 uses
   System.Types,

@@ -40,10 +40,18 @@ type
     UpdateAvailable //installed but not on the latest version
     );
 
-  TCurrentTab = (Search, Installed, Updates, Conflicts);
+  TDPMEditViewMode = (vmProject, vmGroup);
+
+  TDPMCurrentTab = (Search, Installed, Updates, Conflicts);
+
+  TDPMSearchOption = (IncludePrerelease, IncludeCommercial, IncludeTrial);
+
+  TDPMSearchOptions = set of TDPMSearchOption;
+
 
 const
   //The current IDE version to TCompilerVersion.
+  {$IFDEF VER350}IDECompilerVersion = TCompilerVersion.RS10_5; {$ENDIF}
   {$IFDEF VER340}IDECompilerVersion = TCompilerVersion.RS10_4; {$ENDIF}
   {$IFDEF VER330}IDECompilerVersion = TCompilerVersion.RS10_3; {$ENDIF}
   {$IFDEF VER320}IDECompilerVersion = TCompilerVersion.RS10_2; {$ENDIF}

@@ -17,13 +17,14 @@ uses
   DPM.IDE.PackageDetailsPanel,
   DPM.IDE.IconCache,
   DPM.IDE.Types,
+  DPM.Controls.VersionGrid,
   Spring.Container,
   Spring.Collections,
   VSoft.Awaitable,
   SVGInterfaces,
   ToolsAPI;
 
-{$I DPMIDE.inc}
+{$I ..\DPMIDE.inc}
 
 type
   //implemented by the EditorViewFrame
@@ -58,11 +59,12 @@ type
     procedure btnUninstallClick(Sender : TObject);
   private
     FContainer : TContainer;
+    FVersionGrid : TVersionGrid;
     FIconCache : TDPMIconCache;
     FPackageSearcher : IPackageSearcher;
     FPackageMetaData : IPackageSearchResultItem;
     FDetailsPanel : TPackageDetailsPanel;
-    FCurrentTab : TCurrentTab;
+    FCurrentTab : TDPMCurrentTab;
     FCancellationTokenSource : ICancellationTokenSource;
     FRequestInFlight : boolean;
     FVersionsDelayTimer : TTimer;
@@ -85,7 +87,7 @@ type
   public
     constructor Create(AOwner : TComponent); override;
     procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectFile : string);
-    procedure Configure(const value : TCurrentTab; const preRelease : boolean);
+    procedure Configure(const value : TDPMCurrentTab; const preRelease : boolean);
     procedure SetPackage(const package : IPackageSearchResultItem);
     procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;
@@ -328,7 +330,7 @@ begin
     Inc(Height, 4);
 end;
 
-procedure TPackageDetailsFrame.Configure(const value : TCurrentTab; const preRelease : boolean);
+procedure TPackageDetailsFrame.Configure(const value : TDPMCurrentTab; const preRelease : boolean);
 begin
   if (FCurrentTab <> value) or (FIncludePreRelease <> preRelease) then
   begin
@@ -338,21 +340,21 @@ begin
     FCurrentTab := value;
     FIncludePreRelease := preRelease;
     case FCurrentTab of
-      TCurrentTab.Installed :
+      TDPMCurrentTab.Installed :
         begin
           btnInstallOrUpdate.Caption := 'Update';
         end;
-      TCurrentTab.Updates :
+      TDPMCurrentTab.Updates :
         begin
           btnInstallOrUpdate.Caption := 'Update';
 
         end;
-      TCurrentTab.Search :
+      TDPMCurrentTab.Search :
         begin
           btnInstallOrUpdate.Caption := 'Install';
 
         end;
-      TCurrentTab.Conflicts : ;
+      TDPMCurrentTab.Conflicts : ;
     end;
     SetPackage(nil);
   end;
@@ -397,6 +399,7 @@ begin
   FPackageSearcher := packageSearcher;
   FProjectFile := projectFile;
   SetPackage(nil);
+
 end;
 
 
@@ -491,7 +494,7 @@ begin
       imgPackageLogo.Visible := false;
 
     case FCurrentTab of
-      TCurrentTab.Search :
+      TDPMCurrentTab.Search :
         begin
           pnlInstalled.Visible := FPackageInstalledVersion <> '';
           if pnlInstalled.Visible then
@@ -503,17 +506,17 @@ begin
             btnInstallOrUpdate.Caption := 'Install';
           end;
         end;
-      TCurrentTab.Installed :
+      TDPMCurrentTab.Installed :
         begin
           pnlInstalled.Visible := true;
           btnInstallOrUpdate.Caption := 'Update';
         end;
-      TCurrentTab.Updates :
+      TDPMCurrentTab.Updates :
         begin
           pnlInstalled.Visible := true;
           btnInstallOrUpdate.Caption := 'Update';
         end;
-      TCurrentTab.Conflicts : ;
+      TDPMCurrentTab.Conflicts : ;
     end;
 
     txtInstalledVersion.Text := FPackageInstalledVersion;
@@ -611,7 +614,7 @@ begin
   options.CompilerVersion := IDECompilerVersion;
   options.AllVersions := true;
   options.SearchTerms := FPackageMetaData.Id;
-  if FCurrentTab = TCurrentTab.Installed then
+  if FCurrentTab = TDPMCurrentTab.Installed then
     options.Prerelease := true //should this be checking the package meta data version for pre-release?
   else
     options.Prerelease := FIncludePreRelease;
@@ -622,7 +625,7 @@ begin
 
   sInstalledVersion := FPackageInstalledVersion;
 
-  TAsync.Configure < IList<TPackageVersion> > (
+  TAsync.Configure<IList<TPackageVersion>> (
     function(const cancelToken : ICancellationToken) : IList<TPackageVersion>
     begin
       result := repoManager.GetPackageVersions(cancelToken, options, config);
@@ -690,7 +693,7 @@ begin
           for version in versions do
             cboVersions.Items.Add(version.ToStringNoMeta);
 
-          if FCurrentTab = TCurrentTab.Installed then
+          if FCurrentTab = TDPMCurrentTab.Installed then
             cboVersions.ItemIndex := cboVersions.Items.IndexOf(sInstalledVersion)
           else
             cboVersions.ItemIndex := 0;

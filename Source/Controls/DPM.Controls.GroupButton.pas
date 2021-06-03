@@ -34,6 +34,8 @@ type
     procedure SendActiveChangedMessage;
 
     procedure CMActiveChanged(var Message : TMessage); message CM_ACTIVE_CHANGED;
+    procedure ChangeScale(M: Integer; D: Integer{$if CompilerVersion >= 31}; isDpiChange: Boolean{$ifend}); override;
+
   public
     constructor Create(AOwner : TComponent); override;
   published
@@ -56,6 +58,7 @@ type
 implementation
 
 uses
+  WinApi.Windows,
   System.Types,
   Vcl.Forms,
   Vcl.Themes;
@@ -80,6 +83,14 @@ begin
   FBarHeight := 3;
 end;
 
+
+procedure TDPMGroupButton.ChangeScale(M: Integer; D: Integer{$if CompilerVersion >= 31}; isDpiChange: Boolean{$ifend});
+begin
+  FBarHeight := MulDiv(FBarHeight, M, D);
+  inherited;
+
+
+end;
 
 procedure TDPMGroupButton.CMActiveChanged(var Message : TMessage);
 begin
