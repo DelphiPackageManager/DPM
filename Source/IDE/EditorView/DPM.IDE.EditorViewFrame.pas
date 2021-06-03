@@ -750,6 +750,7 @@ begin
       FUpdates := nil;
       PackageDetailsFrame.SetPlatform(FCurrentPlatform);
       PackageDetailsFrame.SetPackage(nil);
+      FSearchBar.SetPlatform(FCurrentPlatform);
       FScrollList.CurrentRow := -1;
       case FCurrentTab of
         TDPMCurrentTab.Search : SwitchedToSearch(true);
@@ -1306,6 +1307,8 @@ begin
   PackageDetailsFrame.Configure(FCurrentTab, FSearchBar.IncludePrerelease);
 
   doRefresh := refresh or (FSearchOptions.SearchTerms <> '');
+  FSearchOptions.Platforms := [FCurrentPlatform];
+  FSearchOptions.Prerelease := FSearchBar.IncludePrerelease;
 
   case FCurrentTab of
     TDPMCurrentTab.Search : SwitchedToSearch(doRefresh);
@@ -1357,6 +1360,8 @@ begin
   FConfigurationManager := FContainer.Resolve<IConfigurationManager>;
   FConfigurationManager.EnsureDefaultConfig;
   FConfiguration := FConfigurationManager.LoadConfig(FSearchOptions.ConfigFile);
+
+  platformChangeDetectTimerTimer(platformChangeDetectTimer);
 
   //TODO : for project group configure with platforms enabled in project.
   FSearchBar.Configure(FLogger, FDPMIDEOptions, FConfiguration,FConfigurationManager, FSearchOptions.ConfigFile, FCurrentPlatform);

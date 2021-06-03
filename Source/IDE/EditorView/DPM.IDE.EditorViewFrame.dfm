@@ -25,8 +25,6 @@ object DPMEditViewFrame: TDPMEditViewFrame
     ParentColor = True
     ShowCaption = False
     TabOrder = 0
-    ExplicitTop = 69
-    ExplicitHeight = 592
     object Splitter2: TSplitter
       Left = 534
       Top = 0
@@ -51,7 +49,6 @@ object DPMEditViewFrame: TDPMEditViewFrame
       ParentColor = True
       ShowCaption = False
       TabOrder = 0
-      ExplicitHeight = 592
     end
     inline PackageDetailsFrame: TPackageDetailsFrame
       Left = 542
@@ -67,10 +64,10 @@ object DPMEditViewFrame: TDPMEditViewFrame
       ParentDoubleBuffered = False
       TabOrder = 1
       ExplicitLeft = 542
-      ExplicitHeight = 592
+      ExplicitHeight = 661
       inherited sbPackageDetails: TScrollBox
         Height = 661
-        ExplicitHeight = 592
+        ExplicitHeight = 661
       end
     end
   end

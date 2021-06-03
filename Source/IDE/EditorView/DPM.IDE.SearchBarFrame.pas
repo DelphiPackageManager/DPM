@@ -258,6 +258,7 @@ var
 begin
   if Assigned(FOnSearchEvent) then
   begin
+    options := [];
     if chkIncludePrerelease.Checked  then
       Include(options, TDPMSearchOption.IncludePrerelease);
     if chkIncludeCommercial.Checked then
