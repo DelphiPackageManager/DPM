@@ -299,43 +299,6 @@ begin
   FSearchBar.OnConfigChanged := Self.SettingsChanged;
   FSearchBar.Parent := Self;
 
-
-//  FInstalledButton := TDPMGroupButton.Create(Self);
-//  FUpdatesButton := TDPMGroupButton.Create(Self);
-//  FSearchButton := TDPMGroupButton.Create(Self);
-//  FConflictsButton := TDPMGroupButton.Create(Self);
-//
-//  FSearchButton.Top := 10;
-//  FSearchButton.Left := 20;
-//  FSearchButton.Caption := 'Search';
-//  FSearchButton.Tag := 0;
-//  FSearchButton.Parent := pnlButtonBar;
-//
-//  FInstalledButton.Top := 10;
-//  FInstalledButton.Left := FSearchButton.Left + FSearchButton.Width + 20;
-//  FInstalledButton.Caption := 'Installed';
-//  FInstalledButton.Tag := 1;
-//  FInstalledButton.Active := true;
-//  FInstalledButton.Parent := pnlButtonBar;
-//
-//  FUpdatesButton.Top := 10;
-//  FUpdatesButton.Left := FInstalledButton.Left + FInstalledButton.Width + 20;
-//  FUpdatesButton.Caption := 'Updates';
-//  FUpdatesButton.Tag := 2;
-//  FUpdatesButton.Parent := pnlButtonBar;
-//
-//  FConflictsButton.Top := 10;
-//  FConflictsButton.Left := FUpdatesButton.Left + FUpdatesButton.Width + 20;
-//  FConflictsButton.Caption := 'Conflicts';
-//  FConflictsButton.Tag := 3;
-//  FConflictsButton.Visible := false;
-//  FConflictsButton.Parent := pnlButtonBar;
-//
-//  FInstalledButton.OnClick := tabMainChange;
-//  FUpdatesButton.OnClick := tabMainChange;
-//  FSearchButton.OnClick := tabMainChange;
-//  FConflictsButton.OnClick := tabMainChange;
-//
   FScrollList := TVSoftVirtualListView.Create(Self);
   {$IFDEF STYLEELEMENTS}
   FScrollList.StyleElements := [seFont, seBorder];

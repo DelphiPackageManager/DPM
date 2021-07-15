@@ -227,6 +227,10 @@ constructor TDPMSearchBarFrame.Create(AOwner: TComponent);
 begin
   inherited;
   Align := alTop;
+  //not published in older versions, so get removed when we edit in older versions.
+  {$IFDEF STYLEELEMENTS}
+  StyleElements := [seFont, seClient, seBorder];
+  {$ENDIF}
 
   txtSearch.ACEnabled := true;
   txtSearch.ACOptions := [acAutoAppend, acAutoSuggest, acUseArrowKey];
