@@ -44,8 +44,8 @@ type
       TStatus = (unknown, found, notfound);
   private
     FLogger : ILogger;
-    FFound : array[TCompilerVersion.UnknownVersion..TCompilerVersion.RS10_4] of TStatus;
-    FRsVarFiles : array[TCompilerVersion.UnknownVersion..TCompilerVersion.RS10_4] of string;
+    FFound : array[TCompilerVersion.UnknownVersion..TCompilerVersion.RS11] of TStatus;
+    FRsVarFiles : array[TCompilerVersion.UnknownVersion..TCompilerVersion.RS11] of string;
   protected
     function FoundCompilerInfo(const compilerVersion : TCompilerVersion) : Boolean;
     function GetRsVarsFilePath(const compilerVersion : TCompilerVersion) : string;

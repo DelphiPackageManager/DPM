@@ -59,7 +59,7 @@ type
     RS10_2,
     RS10_3,
     RS10_4,
-    RS10_5 //probably the next version.
+    RS11 //probably the next version.
     );
 
   TCompilerVersions = set of TCompilerVersion;
@@ -73,6 +73,7 @@ type
     WinArm64, //reserved for future use
     OSX32,
     OSX64,
+    OSXARM64,
     AndroidArm32,
     AndroidArm64,
     AndroidIntel32, //reserved for future use
@@ -232,6 +233,8 @@ begin
     TDPMPlatform.WinArm64: result := 'Windows 64-bit ARM';
     TDPMPlatform.OSX32: result := 'macOS 32-bit';
     TDPMPlatform.OSX64: result := 'macOS 64-bit';
+    TDPMPlatform.OSXARM64: result := 'macOS Arm 64-bit';
+
     TDPMPlatform.AndroidArm32: result := 'Andriod 32-bit ARM';
     TDPMPlatform.AndroidArm64: result := 'Andriod 64-bit ARM';
     TDPMPlatform.AndroidIntel32: result := 'Andriod 32-bit Intel';
@@ -307,6 +310,8 @@ begin
         TDPMPlatform.AndroidArm64, TDPMPlatform.OSX64];
     TCompilerVersion.RS10_4 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX64, TDPMPlatform.iOS32, TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32,
         TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
+    TCompilerVersion.RS11 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSXARM64, TDPMPlatform.OSX64, TDPMPlatform.iOS32, TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32,
+        TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
   else
     raise Exception.Create('AllPlatforms is missing for : ' + CompilerToString(compiler));
   end;
@@ -320,6 +325,7 @@ begin
     TCompilerVersion.RS10_2 : result := 'Tokyo';
     TCompilerVersion.RS10_3 : result := 'Rio';
     TCompilerVersion.RS10_4 : result := 'Sydney';
+    TCompilerVersion.RS11   : result := 'Olympus';
   else
     result := '';
   end;
@@ -341,18 +347,19 @@ end;
 function CompilerToLibSuffix(const compiler : TCompilerVersion) : string;
 begin
   case compiler of
-    TCompilerVersion.RSXE2 : result := '160';
-    TCompilerVersion.RSXE3 : result := '170';
-    TCompilerVersion.RSXE4 : result := '180';
-    TCompilerVersion.RSXE5 : result := '190';
-    TCompilerVersion.RSXE6 : result := '200';
-    TCompilerVersion.RSXE7 : result := '210';
-    TCompilerVersion.RSXE8 : result := '220';
+    TCompilerVersion.RSXE2  : result := '160';
+    TCompilerVersion.RSXE3  : result := '170';
+    TCompilerVersion.RSXE4  : result := '180';
+    TCompilerVersion.RSXE5  : result := '190';
+    TCompilerVersion.RSXE6  : result := '200';
+    TCompilerVersion.RSXE7  : result := '210';
+    TCompilerVersion.RSXE8  : result := '220';
     TCompilerVersion.RS10_0 : result := '230';
     TCompilerVersion.RS10_1 : result := '240';
     TCompilerVersion.RS10_2 : result := '250';
     TCompilerVersion.RS10_3 : result := '260';
     TCompilerVersion.RS10_4 : result := '270';
+    TCompilerVersion.RS11   : result := '280';
   else
     raise Exception.Create('LibSuffix is missing for : ' + CompilerToString(compiler));
   end;
@@ -362,18 +369,19 @@ end;
 function CompilerToBDSVersion(const compiler : TCompilerVersion) : string;
 begin
   case compiler of
-    TCompilerVersion.RSXE2 : result := '9.0';
-    TCompilerVersion.RSXE3 : result := '10.0';
-    TCompilerVersion.RSXE4 : result := '11.0';
-    TCompilerVersion.RSXE5 : result := '12.0';
-    TCompilerVersion.RSXE6 : result := '14.0';
-    TCompilerVersion.RSXE7 : result := '15.0';
-    TCompilerVersion.RSXE8 : result := '16.0';
+    TCompilerVersion.RSXE2  : result := '9.0';
+    TCompilerVersion.RSXE3  : result := '10.0';
+    TCompilerVersion.RSXE4  : result := '11.0';
+    TCompilerVersion.RSXE5  : result := '12.0';
+    TCompilerVersion.RSXE6  : result := '14.0';
+    TCompilerVersion.RSXE7  : result := '15.0';
+    TCompilerVersion.RSXE8  : result := '16.0';
     TCompilerVersion.RS10_0 : result := '17.0';
     TCompilerVersion.RS10_1 : result := '18.0';
     TCompilerVersion.RS10_2 : result := '19.0';
     TCompilerVersion.RS10_3 : result := '20.0';
     TCompilerVersion.RS10_4 : result := '21.0';
+    TCompilerVersion.RS11   : result := '22.0';
   else
     raise Exception.Create('BDSVersion is missing for : ' + CompilerToString(compiler));
   end;
@@ -383,18 +391,19 @@ end;
 function CompilerToCompilerVersionIntStr(const compiler : TCompilerVersion) : string;
 begin
   case compiler of
-    TCompilerVersion.RSXE2 : result := '23';
-    TCompilerVersion.RSXE3 : result := '24';
-    TCompilerVersion.RSXE4 : result := '25';
-    TCompilerVersion.RSXE5 : result := '26';
-    TCompilerVersion.RSXE6 : result := '27';
-    TCompilerVersion.RSXE7 : result := '28';
-    TCompilerVersion.RSXE8 : result := '29';
+    TCompilerVersion.RSXE2  : result := '23';
+    TCompilerVersion.RSXE3  : result := '24';
+    TCompilerVersion.RSXE4  : result := '25';
+    TCompilerVersion.RSXE5  : result := '26';
+    TCompilerVersion.RSXE6  : result := '27';
+    TCompilerVersion.RSXE7  : result := '28';
+    TCompilerVersion.RSXE8  : result := '29';
     TCompilerVersion.RS10_0 : result := '30';
     TCompilerVersion.RS10_1 : result := '31';
     TCompilerVersion.RS10_2 : result := '32';
     TCompilerVersion.RS10_3 : result := '33';
     TCompilerVersion.RS10_4 : result := '34';
+    TCompilerVersion.RS11   : result := '35';
   else
     raise Exception.Create('BDSVersion is missing for : ' + CompilerToString(compiler));
   end;
@@ -529,7 +538,17 @@ begin
           5..8 : result := TCompilerVersion.RS10_3; //18.8 for 10.3.3
         end;
       end;
-    19 : result := TCompilerVersion.RS10_4; //TODO : this is assuming they will bump the version! Check this!!!
+    19 :
+    begin
+      begin
+        case minor of
+          0..2 : result := TCompilerVersion.RS10_4;
+          else
+            result := TCompilerVersion.RS11; //check on this when 11 is released!
+          end;
+        end;
+
+    end;
   end;
 end;
 
