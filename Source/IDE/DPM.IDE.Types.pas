@@ -51,7 +51,7 @@ type
 
 const
   //The current IDE version to TCompilerVersion.
-  {$IFDEF VER350}IDECompilerVersion = TCompilerVersion.RS10_5; {$ENDIF}
+  {$IFDEF VER350}IDECompilerVersion = TCompilerVersion.RS11; {$ENDIF}
   {$IFDEF VER340}IDECompilerVersion = TCompilerVersion.RS10_4; {$ENDIF}
   {$IFDEF VER330}IDECompilerVersion = TCompilerVersion.RS10_3; {$ENDIF}
   {$IFDEF VER320}IDECompilerVersion = TCompilerVersion.RS10_2; {$ENDIF}
