@@ -67,6 +67,7 @@ type
 implementation
 
 uses
+  ToolsAPI,
   WinApi.Windows,
   Vcl.Graphics,
   Vcl.Forms;
@@ -162,7 +163,7 @@ procedure TDPMButtonBar.ThemeChanged;
 {$IF CompilerVersion >=32.0}
 var
   ideThemeSvc : IOTAIDEThemingServices;
-  {$IFEND}
+{$IFEND}
 begin
   {$IF CompilerVersion >=32.0}
   ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
