@@ -30,7 +30,7 @@ unit DPM.IDE.EditorViewFrame;
 
 interface
 
-{$I DPMIDE.inc}
+{$I ..\DPMIDE.inc}
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,

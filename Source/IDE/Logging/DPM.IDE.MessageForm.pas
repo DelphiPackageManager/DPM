@@ -12,9 +12,9 @@ uses
   Vcl.ActnList,
   Vcl.ExtCtrls,
   VSoft.Awaitable,
-  DPM.Controls.LogMemo, ToolsAPI ;
+  DPM.Controls.LogMemo, ToolsAPI, System.Actions ;
 
-{$I DPMIDE.inc}
+{$I ..\DPMIDE.inc}
 
 type
   TDPMMessageForm = class(TForm {$IFDEF THEMESERVICES}, INTAIDEThemingServicesNotifier {$ENDIF})

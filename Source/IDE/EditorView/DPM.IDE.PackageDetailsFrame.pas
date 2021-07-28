@@ -23,7 +23,7 @@ uses
   SVGInterfaces,
   ToolsAPI;
 
-{$I DPMIDE.inc}
+{$I ..\DPMIDE.inc}
 
 type
   //implemented by the EditorViewFrame

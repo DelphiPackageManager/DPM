@@ -124,16 +124,9 @@
         <DCCReference Include="IDE\DPM.IDE.Main.pas"/>
         <DCCReference Include="IDE\DPM.IDE.Wizard.pas"/>
         <DCCReference Include="IDE\DPM.IDE.ProjectStorageNotifier.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.Logger.pas"/>
         <DCCReference Include="IDE\DPM.IDE.IDENotifier.pas"/>
         <DCCReference Include="IDE\DPM.IDE.ProjectMenu.pas"/>
         <DCCReference Include="IDE\DPM.IDE.Constants.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.EditorView.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.EditorViewFrame.pas">
-            <Form>DPMEditViewFrame</Form>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
-        <DCCReference Include="IDE\DPM.IDE.EditorViewManager.pas"/>
         <DCCReference Include="IDE\DPM.IDE.AddInOptions.pas"/>
         <DCCReference Include="IDE\DPM.IDE.AddInOptionsFrame.pas">
             <Form>DPMOptionsFrame</Form>
@@ -153,11 +146,6 @@
             <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="IDE\DPM.IDE.IconCache.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.PackageDetailsFrame.pas">
-            <Form>PackageDetailsFrame</Form>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
-        <DCCReference Include="IDE\DPM.IDE.PackageDetailsPanel.pas"/>
         <DCCReference Include="IDE\DPM.IDE.VSTProxy.pas"/>
         <DCCReference Include="IDE\DPM.IDE.ProjectTreeManager.pas"/>
         <DCCReference Include="IDE\DPM.IDE.Utils.pas"/>
@@ -278,11 +266,26 @@
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Files.pas"/>
         <DCCReference Include="Controls\DPM.Controls.LogMemo.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.MessageForm.pas">
-            <Form>DPMMessageForm</Form>
-        </DCCReference>
-        <DCCReference Include="IDE\DPM.IDE.MessageService.pas"/>
         <DCCReference Include="IDE\Options\DPM.IDE.Options.pas"/>
+        <DCCReference Include="IDE\Logging\DPM.IDE.Logger.pas"/>
+        <DCCReference Include="IDE\Logging\DPM.IDE.MessageForm.pas">
+            <Form>DPMMessageForm</Form>
+            <FormType>dfm</FormType>
+        </DCCReference>
+        <DCCReference Include="IDE\Logging\DPM.IDE.MessageService.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorView.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorViewFrame.pas">
+            <Form>DPMEditViewFrame</Form>
+            <FormType>dfm</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorViewManager.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.PackageDetailsFrame.pas">
+            <Form>PackageDetailsFrame</Form>
+            <FormType>dfm</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.PackageDetailsPanel.pas"/>
         <RcItem Include="images\dpm.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>DPMIDELOGO</ResourceId>
