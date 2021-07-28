@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{F777FD5E-96A6-4EEE-88CC-1C098D4E9766}</ProjectGuid>
         <MainSource>DPM.IDE.XE3.dpr</MainSource>
@@ -6,7 +6,7 @@
         <Config Condition="'$(Config)'==''">Debug</Config>
         <TargetedPlatforms>1</TargetedPlatforms>
         <AppType>Library</AppType>
-        <FrameworkType>None</FrameworkType>
+        <FrameworkType>VCL</FrameworkType>
         <ProjectVersion>14.4</ProjectVersion>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
     </PropertyGroup>
@@ -111,44 +111,6 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="IDE\DPM.IDE.Main.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.Wizard.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.ProjectStorageNotifier.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.Logger.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.IDENotifier.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.ProjectMenu.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.Constants.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.EditorView.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.EditorViewFrame.pas">
-            <Form>DPMEditViewFrame</Form>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
-        <DCCReference Include="IDE\DPM.IDE.EditorViewManager.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.AddInOptions.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.AddInOptionsFrame.pas">
-            <Form>DPMOptionsFrame</Form>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
-        <DCCReference Include="Controls\DPM.Controls.ButtonedEdit.pas"/>
-        <DCCReference Include="Controls\DPM.Controls.AutoComplete.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.AboutForm.pas">
-            <Form>DPMAboutForm</Form>
-        </DCCReference>
-        <DCCReference Include="IDE\DPM.IDE.Types.pas"/>
-        <DCCReference Include="Controls\DPM.Controls.GroupButton.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.AddInOptionsHostForm.pas">
-            <Form>DPMOptionsHostForm</Form>
-        </DCCReference>
-        <DCCReference Include="IDE\DPM.IDE.IconCache.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.PackageDetailsFrame.pas">
-            <Form>PackageDetailsFrame</Form>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
-        <DCCReference Include="IDE\DPM.IDE.PackageDetailsPanel.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.VSTProxy.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.ProjectTreeManager.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.Utils.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.ProjectTree.Containers.pas"/>
         <DCCReference Include="SVG\SVGParse.pas"/>
         <DCCReference Include="SVG\SVG.pas"/>
         <DCCReference Include="SVG\SVGBase64.pas"/>
@@ -260,19 +222,62 @@
         <DCCReference Include="Core\DPM.Core.TargetPlatform.pas"/>
         <DCCReference Include="Core\DPM.Core.Types.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Icon.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.ProjectController.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Installer.Interfaces.pas"/>
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.BOM.pas"/>
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas"/>
         <DCCReference Include="Controls\DPM.Controls.VersionGrid.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Files.pas"/>
         <DCCReference Include="Controls\DPM.Controls.LogMemo.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.MessageForm.pas">
+        <DCCReference Include="IDE\DPM.IDE.Main.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.Wizard.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectStorageNotifier.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.IDENotifier.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectMenu.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.Constants.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.AddInOptions.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.AddInOptionsFrame.pas">
+            <Form>DPMOptionsFrame</Form>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="Controls\DPM.Controls.ButtonedEdit.pas"/>
+        <DCCReference Include="Controls\DPM.Controls.AutoComplete.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.AboutForm.pas">
+            <Form>DPMAboutForm</Form>
+        </DCCReference>
+        <DCCReference Include="IDE\DPM.IDE.Types.pas"/>
+        <DCCReference Include="Controls\DPM.Controls.GroupButton.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.AddInOptionsHostForm.pas">
+            <Form>DPMOptionsHostForm</Form>
+        </DCCReference>
+        <DCCReference Include="IDE\DPM.IDE.IconCache.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.VSTProxy.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectTreeManager.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.Utils.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectTree.Containers.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectController.pas"/>
+        <DCCReference Include="IDE\Options\DPM.IDE.Options.pas"/>
+        <DCCReference Include="IDE\Logging\DPM.IDE.Logger.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.InstallerContext.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorView.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorViewFrame.pas">
+            <Form>DPMEditViewFrame</Form>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorViewManager.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.PackageDetailsFrame.pas">
+            <Form>PackageDetailsFrame</Form>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.PackageDetailsPanel.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.SearchBarFrame.pas">
+            <Form>DPMSearchBarFrame</Form>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="IDE\Logging\DPM.IDE.MessageForm.pas">
             <Form>DPMMessageForm</Form>
         </DCCReference>
-        <DCCReference Include="IDE\DPM.IDE.MessageService.pas"/>
-        <DCCReference Include="IDE\Options\DPM.IDE.Options.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.InstallerContext.pas"/>
-        <DCCReference Include="Core\Package\DPM.Core.Package.Installer.Interfaces.pas"/>
+        <DCCReference Include="IDE\Logging\DPM.IDE.MessageService.pas"/>
+        <DCCReference Include="Controls\DPM.Controls.ButtonBar.pas"/>
         <RcItem Include="images\dpm.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>DPMIDELOGO</ResourceId>

@@ -680,7 +680,7 @@ begin
     info := GetPackageInfo(cancellationToken, node);
     if info = nil then
     begin
-      FLogger.Error('Unable to resolve package : ' + node.ToString);
+      FLogger.Error('Unable to resolve package : ' + node.ToIdVersionString);
       exit(false);
     end;
     info.UseSource := node.UseSource;

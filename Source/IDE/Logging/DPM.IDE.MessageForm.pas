@@ -12,7 +12,7 @@ uses
   Vcl.ActnList,
   Vcl.ExtCtrls,
   VSoft.Awaitable,
-  DPM.Controls.LogMemo, ToolsAPI ;
+  DPM.Controls.LogMemo, ToolsAPI;
 
 {$I ..\DPMIDE.inc}
 
