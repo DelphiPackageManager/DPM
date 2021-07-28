@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectVersion>17.2</ProjectVersion>
@@ -17,11 +17,6 @@
         <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.VirtualListView\0.3.0-rc6\lib;$(DPM)\VSoft.Uri\0.1.0\lib;$(DPM)\VSoft.SemanticVersion\0.2.0\lib;$(DPM)\VSoft.JsonDataObjects\0.1.0\lib;$(DPM)\VSoft.HttpClient\0.1.0\lib;$(DPM)\VSoft.CancellationToken\0.0.2\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\VSoft.Awaitable\0.2.0\lib;$(DPM)\VSoft.AntPatterns\0.1.0\lib;$(DPM)\Spring4D.Extensions\2.0.0-dev5\lib;$(DPM)\Spring4D.Base\2.0.0-dev5\lib;$(DPM)\Spring4D.Core\2.0.0-dev5\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
-        <Base>true</Base>
-    </PropertyGroup>
-    <PropertyGroup Condition="('$(Platform)'=='OSX32' and '$(Base)'=='true') or '$(Base_OSX32)'!=''">
-        <Base_OSX32>true</Base_OSX32>
-        <CfgParent>Base</CfgParent>
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Base)'=='true') or '$(Base_Win32)'!=''">
@@ -57,7 +52,7 @@
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
-        <DCC_UnitSearchPath>$(DPMSearch);Libs\Virtual-TreeView\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>$(DPMSearch);$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <DCC_UsePackage>designide;rtl;vcl;$(DCC_UsePackage)</DCC_UsePackage>
         <UsePackages>true</UsePackages>
         <VerInfo_Locale>3081</VerInfo_Locale>
@@ -73,9 +68,6 @@
         <DCC_S>false</DCC_S>
         <DCC_F>false</DCC_F>
         <DCC_K>false</DCC_K>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(Base_OSX32)'!=''">
-        <DCC_UsePackage>fmx;dbrtl;IndySystem;bindcomp;xmlrtl;DbxCommonDriver;IndyProtocols;bindengine;soaprtl;CustomIPTransport;dsnap;IndyIPServer;fmxase;IndyCore;IndyIPCommon;inet;fmxobj;dsnapxml;fmxdae;IndyIPClient;$(DCC_UsePackage)</DCC_UsePackage>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
@@ -117,17 +109,9 @@
         <DCCReference Include="IDE\DPM.IDE.Main.pas"/>
         <DCCReference Include="IDE\DPM.IDE.Wizard.pas"/>
         <DCCReference Include="IDE\DPM.IDE.ProjectStorageNotifier.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.Logger.pas"/>
         <DCCReference Include="IDE\DPM.IDE.IDENotifier.pas"/>
         <DCCReference Include="IDE\DPM.IDE.ProjectMenu.pas"/>
         <DCCReference Include="IDE\DPM.IDE.Constants.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.EditorView.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.EditorViewFrame.pas">
-            <Form>DPMEditViewFrame</Form>
-            <FormType>dfm</FormType>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
-        <DCCReference Include="IDE\DPM.IDE.EditorViewManager.pas"/>
         <DCCReference Include="IDE\DPM.IDE.AddInOptions.pas"/>
         <DCCReference Include="IDE\DPM.IDE.AddInOptionsFrame.pas">
             <Form>DPMOptionsFrame</Form>
@@ -147,12 +131,6 @@
             <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="IDE\DPM.IDE.IconCache.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.PackageDetailsFrame.pas">
-            <Form>PackageDetailsFrame</Form>
-            <FormType>dfm</FormType>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
-        <DCCReference Include="IDE\DPM.IDE.PackageDetailsPanel.pas"/>
         <DCCReference Include="IDE\DPM.IDE.VSTProxy.pas"/>
         <DCCReference Include="IDE\DPM.IDE.ProjectTreeManager.pas"/>
         <DCCReference Include="IDE\DPM.IDE.Utils.pas"/>
@@ -273,11 +251,26 @@
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Files.pas"/>
         <DCCReference Include="Controls\DPM.Controls.LogMemo.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.MessageForm.pas">
-            <Form>DPMMessageForm</Form>
-        </DCCReference>
-        <DCCReference Include="IDE\DPM.IDE.MessageService.pas"/>
         <DCCReference Include="IDE\Options\DPM.IDE.Options.pas"/>
+        <DCCReference Include="IDE\Logging\DPM.IDE.Logger.pas"/>
+        <DCCReference Include="IDE\Logging\DPM.IDE.MessageForm.pas">
+            <Form>DPMMessageForm</Form>
+            <FormType>dfm</FormType>
+        </DCCReference>
+        <DCCReference Include="IDE\Logging\DPM.IDE.MessageService.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorView.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorViewFrame.pas">
+            <Form>DPMEditViewFrame</Form>
+            <FormType>dfm</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorViewManager.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.PackageDetailsFrame.pas">
+            <Form>PackageDetailsFrame</Form>
+            <FormType>dfm</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.PackageDetailsPanel.pas"/>
         <RcItem Include="images\dpm.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>DPMIDELOGO</ResourceId>
@@ -330,6 +323,12 @@
                 <Source>
                     <Source Name="MainSource">DPM.IDE.XE8.dpr</Source>
                 </Source>
+                <Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\bcboffice2k220.bpl">Embarcadero C++Builder Office 2000 Servers Package</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\bcbofficexp220.bpl">Embarcadero C++Builder Office XP Servers Package</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k220.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp220.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
+                </Excluded_Packages>
             </Delphi.Personality>
             <Deployment Version="2">
                 <DeployFile LocalName="..\Output\DPM.IDE.XE8.dll" Configuration="Debug" Class="ProjectOutput">
@@ -720,16 +719,15 @@
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
-                <ProjectRoot Platform="iOSDevice32" Name="$(PROJECTNAME).app"/>
+                <ProjectRoot Platform="iOSSimulator" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="Android" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="Win32" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="iOSDevice64" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="Win64" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="OSX32" Name="$(PROJECTNAME).app"/>
-                <ProjectRoot Platform="iOSSimulator" Name="$(PROJECTNAME).app"/>
+                <ProjectRoot Platform="iOSDevice32" Name="$(PROJECTNAME).app"/>
             </Deployment>
             <Platforms>
-                <Platform value="OSX32">False</Platform>
                 <Platform value="Win32">True</Platform>
                 <Platform value="Win64">False</Platform>
             </Platforms>

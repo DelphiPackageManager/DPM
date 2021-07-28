@@ -36,13 +36,9 @@ uses
   DPM.IDE.Main in 'IDE\DPM.IDE.Main.pas',
   DPM.IDE.Wizard in 'IDE\DPM.IDE.Wizard.pas',
   DPM.IDE.ProjectStorageNotifier in 'IDE\DPM.IDE.ProjectStorageNotifier.pas',
-  DPM.IDE.Logger in 'IDE\DPM.IDE.Logger.pas',
   DPM.IDE.IDENotifier in 'IDE\DPM.IDE.IDENotifier.pas',
   DPM.IDE.ProjectMenu in 'IDE\DPM.IDE.ProjectMenu.pas',
   DPM.IDE.Constants in 'IDE\DPM.IDE.Constants.pas',
-  DPM.IDE.EditorView in 'IDE\DPM.IDE.EditorView.pas',
-  DPM.IDE.EditorViewFrame in 'IDE\DPM.IDE.EditorViewFrame.pas' {DPMEditViewFrame: TFrame},
-  DPM.IDE.EditorViewManager in 'IDE\DPM.IDE.EditorViewManager.pas',
   DPM.IDE.AddInOptions in 'IDE\DPM.IDE.AddInOptions.pas',
   DPM.IDE.AddInOptionsFrame in 'IDE\DPM.IDE.AddInOptionsFrame.pas' {DPMOptionsFrame: TFrame},
   DPM.Controls.ButtonedEdit in 'Controls\DPM.Controls.ButtonedEdit.pas',
@@ -52,8 +48,6 @@ uses
   DPM.Controls.GroupButton in 'Controls\DPM.Controls.GroupButton.pas',
   DPM.IDE.AddInOptionsHostForm in 'IDE\DPM.IDE.AddInOptionsHostForm.pas' {DPMOptionsHostForm},
   DPM.IDE.IconCache in 'IDE\DPM.IDE.IconCache.pas',
-  DPM.IDE.PackageDetailsFrame in 'IDE\DPM.IDE.PackageDetailsFrame.pas' {PackageDetailsFrame: TFrame},
-  DPM.IDE.PackageDetailsPanel in 'IDE\DPM.IDE.PackageDetailsPanel.pas',
   DPM.IDE.VSTProxy in 'IDE\DPM.IDE.VSTProxy.pas',
   DPM.IDE.ProjectTreeManager in 'IDE\DPM.IDE.ProjectTreeManager.pas',
   DPM.IDE.Utils in 'IDE\DPM.IDE.Utils.pas',
@@ -174,9 +168,15 @@ uses
   DPM.Core.Compiler.ProjectSettings in 'Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas',
   DPM.Core.Utils.Files in 'Core\Utils\DPM.Core.Utils.Files.pas',
   DPM.Controls.LogMemo in 'Controls\DPM.Controls.LogMemo.pas',
-  DPM.IDE.MessageForm in 'IDE\DPM.IDE.MessageForm.pas' {DPMMessageForm},
-  DPM.IDE.MessageService in 'IDE\DPM.IDE.MessageService.pas',
-  DPM.IDE.Options in 'IDE\Options\DPM.IDE.Options.pas';
+  DPM.IDE.Options in 'IDE\Options\DPM.IDE.Options.pas',
+  DPM.IDE.Logger in 'IDE\Logging\DPM.IDE.Logger.pas',
+  DPM.IDE.MessageForm in 'IDE\Logging\DPM.IDE.MessageForm.pas' {DPMMessageForm},
+  DPM.IDE.MessageService in 'IDE\Logging\DPM.IDE.MessageService.pas',
+  DPM.IDE.EditorView in 'IDE\EditorView\DPM.IDE.EditorView.pas',
+  DPM.IDE.EditorViewFrame in 'IDE\EditorView\DPM.IDE.EditorViewFrame.pas' {DPMEditViewFrame: TFrame},
+  DPM.IDE.EditorViewManager in 'IDE\EditorView\DPM.IDE.EditorViewManager.pas',
+  DPM.IDE.PackageDetailsFrame in 'IDE\EditorView\DPM.IDE.PackageDetailsFrame.pas' {PackageDetailsFrame: TFrame},
+  DPM.IDE.PackageDetailsPanel in 'IDE\EditorView\DPM.IDE.PackageDetailsPanel.pas';
 
 {$R *.res}
 
