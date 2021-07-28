@@ -363,7 +363,7 @@
             <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.1.0"/>
             <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.0"/>
             <PackageReference id="VSoft.Uri" platform="Win32" version="0.1.0"/>
-            <PackageReference id="VSoft.VirtualListView" platform="Win32" version="0.3.0-rc7"/>
+            <PackageReference id="VSoft.VirtualListView" platform="Win32" version="0.3.0-rc6"/>
         </DPM>
     </ProjectExtensions>
     <Import Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>
