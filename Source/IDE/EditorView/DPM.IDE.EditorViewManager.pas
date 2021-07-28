@@ -34,6 +34,8 @@ uses
   Spring.Collections,
   DPM.IDE.ProjectTreeManager;
 
+{$I '..\DPMIDE.inc'}
+
 type
   IDPMEditorViewManager = interface
     ['{BD31BE3A-5255-4290-9991-1A0071B24F81}']
@@ -98,9 +100,7 @@ var
   view : INTACustomEditorView;
 begin
   for view in FOpenViews.Values do
-  begin
     (view as IDPMEditorView).ThemeChanged;
-  end;
 end;
 
 procedure TDPMEditorViewManager.ChangingTheme;

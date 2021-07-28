@@ -251,7 +251,7 @@ begin
   StyleElements := [seFont, seClient, seBorder];
   {$ENDIF}
 
-  //todo - check when the IOTAIDEThemingServices was added
+  //IOTAIDEThemingServices added in 10.2
   {$IFDEF THEMESERVICES}
   ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
   ideThemeSvc.ApplyTheme(Self);
@@ -291,6 +291,9 @@ begin
   FButtonBar.OnTabChanged := Self.tabMainChange;
   FButtonBar.ShowConflictsTab := false;
   FButtonBar.Parent := Self;
+  FButtonBar.ParentBackground := false;
+  FButtonBar.ParentColor := false;
+
 
   FSearchBar := TDPMSearchBarFrame.Create(Self);
   //important to make it appear below the button bar
@@ -1354,10 +1357,9 @@ begin
   FIDEStyleServices := Vcl.Themes.StyleServices;
   {$IFEND}
 
-  FButtonBar.ThemeChanged;
+  FButtonBar.ThemeChanged(FIDEStyleServices);
+  FSearchBar.ThemeChanged(FIDEStyleServices);
 
-  FSearchBar.Color := FIDEStyleServices.GetSystemColor(clBtnFace);
-  FSearchBar.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
   Splitter2.Color := FIDEStyleServices.GetSystemColor(clBtnFace);
 
   FScrollList.Color := FIDEStyleServices.GetSystemColor(clWindow);

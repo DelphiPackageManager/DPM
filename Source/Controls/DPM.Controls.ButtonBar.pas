@@ -28,6 +28,12 @@ unit DPM.Controls.ButtonBar;
 
 interface
 
+//TODO : use inc file when we move this under \IDE
+{$IF CompilerVersion >= 24.0 }
+  {$LEGACYIFEND ON}
+  {$DEFINE STYLEELEMENTS}
+{$IFEND}
+
 uses
   System.Classes,
   Vcl.Controls,
@@ -47,7 +53,6 @@ type
     FSearchButton    : TDPMGroupButton;
     FConflictsButton : TDPMGroupButton;
 
-    FIDEStyleServices : TCustomStyleServices;
     FOnTabChanged : TDPMTabChangedEvent;
   protected
     procedure SetShowConflictsTab(const Value: boolean);
@@ -59,9 +64,17 @@ type
 
   public
     constructor Create(AOwner : TComponent);override;
-    procedure ThemeChanged;
+    procedure ThemeChanged(const ideStyleServices : TCustomStyleServices);
     property ShowConflictsTab : boolean read GetShowConflictsButton write SetShowConflictsTab;
+    {$IF CompilerVersion >= 24.0}
+      {$LEGACYIFEND ON}
+    property StyleElements;
+    {$IFEND}
+
+
     property OnTabChanged : TDPMTabChangedEvent read FOnTabChanged write FOnTabChanged;
+
+
   end;
 
 implementation
@@ -84,12 +97,21 @@ end;
 constructor TDPMButtonBar.Create(AOwner: TComponent);
 begin
   inherited;
+  //not published in older versions, so get removed when we edit in older versions.
+  {$IFDEF STYLEELEMENTS}
+  StyleElements := [seFont, seClient, seBorder];
+  {$ENDIF}
+
   Align := alTop;
   Height := 34;
   BorderStyle := bsNone;
   BevelInner := bvNone;
   BevelOuter := bvNone;
   FButtonHeight := 24;
+
+//  ParentBackground := false;
+//  ParentColor := false;
+
 
   FInstalledButton := TDPMGroupButton.Create(Self);
   FUpdatesButton := TDPMGroupButton.Create(Self);
@@ -159,28 +181,15 @@ begin
   FConflictsButton.Visible := Value;
 end;
 
-procedure TDPMButtonBar.ThemeChanged;
-{$IF CompilerVersion >=32.0}
-var
-  ideThemeSvc : IOTAIDEThemingServices;
-{$IFEND}
+procedure TDPMButtonBar.ThemeChanged(const ideStyleServices : TCustomStyleServices);
 begin
-  {$IF CompilerVersion >=32.0}
-  ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
-  ideThemeSvc.ApplyTheme(Self);
-  FIDEStyleServices := ideThemeSvc.StyleServices;
-  ideThemeSvc.ApplyTheme(Self);
-  {$ELSE}
-  FIDEStyleServices := Vcl.Themes.StyleServices;
-  {$IFEND}
-
-  Self.Color := FIDEStyleServices.GetSystemColor(clBtnFace);
-  Self.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
-
-  FSearchButton.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
-  FInstalledButton.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
-  FUpdatesButton.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
-  FConflictsButton.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
+  Self.Color := ideStyleServices.GetSystemColor(clBtnFace);
+  Self.Font.Color := ideStyleServices.GetSystemColor(clWindowText);
+//
+  FSearchButton.Font.Color := ideStyleServices.GetSystemColor(clWindowText);
+  FInstalledButton.Font.Color := ideStyleServices.GetSystemColor(clWindowText);
+  FUpdatesButton.Font.Color := ideStyleServices.GetSystemColor(clWindowText);
+  FConflictsButton.Font.Color := ideStyleServices.GetSystemColor(clWindowText);
 
 end;
 

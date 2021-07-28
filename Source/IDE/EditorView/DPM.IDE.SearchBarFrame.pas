@@ -6,6 +6,7 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
   Vcl.ImgList, Vcl.StdCtrls, Vcl.ExtCtrls,
+  Vcl.Themes,
   DPM.Core.Types,
   DPM.Core.Configuration.Interfaces,
   DPM.IDE.Types,
@@ -65,9 +66,10 @@ type
     function GetCaption: string;
     procedure SetCaption(const Value: string);
     procedure AddDefaultSearchHistory;
-    
+
     procedure ReloadSourcesCombo;
     procedure DoSearchEvent(const refresh : boolean);
+    procedure Loaded; override;
 
   public
     constructor Create(AOwner : TComponent);override;
@@ -75,7 +77,7 @@ type
     procedure Configure(const logger : IDPMIDELogger; const ideOptions : IDPMIDEOptions; const config : IConfiguration; const configurationManager : IConfigurationManager; const configFile : string; const platform : TDPMPlatform);overload;
     procedure ConfigureForTab(const currentTab : TDPMCurrentTab);
     procedure SetPlatform(const platform : TDPMPlatform);
-    procedure ThemeChanged;
+    procedure ThemeChanged(const ideStyleServices : TCustomStyleServices);
 
     property Caption : string read GetCaption write SetCaption;
     property HasSources : boolean read FHasSources;
@@ -226,11 +228,12 @@ end;
 constructor TDPMSearchBarFrame.Create(AOwner: TComponent);
 begin
   inherited;
-  Align := alTop;
   //not published in older versions, so get removed when we edit in older versions.
   {$IFDEF STYLEELEMENTS}
   StyleElements := [seFont, seClient, seBorder];
   {$ENDIF}
+
+  Align := alTop;
 
   txtSearch.ACEnabled := true;
   txtSearch.ACOptions := [acAutoAppend, acAutoSuggest, acUseArrowKey];
@@ -298,6 +301,15 @@ begin
   result := Trim(txtSearch.Text);
 end;
 
+procedure TDPMSearchBarFrame.Loaded;
+begin
+  inherited;
+{$IF CompilerVersion >= 34.0 }
+//  ParentBackground := false;
+//  ParentColor := false;
+{$IFEND}
+end;
+
 procedure TDPMSearchBarFrame.ReloadSourcesCombo;
 var
   sCurrent : string;
@@ -351,9 +363,12 @@ begin
   FPlatform := platform;
 end;
 
-procedure TDPMSearchBarFrame.ThemeChanged;
+procedure TDPMSearchBarFrame.ThemeChanged(const ideStyleServices : TCustomStyleServices);
 begin
-
+{$IF CompilerVersion < 34.0 }
+  Self.Color := ideStyleServices.GetSystemColor(clBtnFace);
+  Self.Font.Color := ideStyleServices.GetSystemColor(clWindowText);
+{$IFEND}
 end;
 
 procedure TDPMSearchBarFrame.txtSearchChange(Sender: TObject);

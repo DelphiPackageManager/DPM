@@ -6,9 +6,6 @@ object DPMEditViewFrame: TDPMEditViewFrame
   Margins.Top = 0
   Constraints.MinWidth = 500
   DoubleBuffered = True
-  Color = clBtnFace
-  ParentBackground = False
-  ParentColor = False
   ParentDoubleBuffered = False
   TabOrder = 0
   object ContentPanel: TPanel
@@ -21,7 +18,6 @@ object DPMEditViewFrame: TDPMEditViewFrame
     BevelOuter = bvNone
     Caption = 'ContentPanel'
     Constraints.MinWidth = 400
-    ParentBackground = False
     ParentColor = True
     ShowCaption = False
     TabOrder = 0
