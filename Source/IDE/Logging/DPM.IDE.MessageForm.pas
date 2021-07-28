@@ -84,7 +84,8 @@ implementation
 
 uses
   Vcl.Themes,
-  Vcl.clipbrd;
+  Vcl.clipbrd,
+  DPM.IDE.ToolsAPI;
 
 {$R *.dfm}
 
@@ -332,21 +333,9 @@ begin
     FLogMemo.AddRow(data, TLogMessageType.mtWarning);
 end;
 
-//{$IF CompilerVersion >= 33.0}
-//
-//  {$IFDEF THEMESERVICES}
-//  var
-//    ideThemeSvc : IOTAIDEThemingServices250;
-//  {$ENDIF}
-//
-//initialization
-//
-//  {$IFDEF THEMESERVICES}
-//    //ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices250);
-//    //this doesn't seem to work in 10.4
-////    ideThemeSvc.RegisterFormClass(TDPMMessageForm);
-//  {$ENDIF}
-//{$IFEND}
+initialization
+
+  TToolsApiUtils.RegisterFormClassForTheming(TDPMMessageForm);
 
 
 end.

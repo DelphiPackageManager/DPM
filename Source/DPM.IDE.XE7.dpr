@@ -179,7 +179,8 @@ uses
   DPM.IDE.SearchBarFrame in 'IDE\EditorView\DPM.IDE.SearchBarFrame.pas' {DPMSearchBarFrame: TFrame},
   DPM.IDE.MessageForm in 'IDE\Logging\DPM.IDE.MessageForm.pas' {DPMMessageForm},
   DPM.IDE.MessageService in 'IDE\Logging\DPM.IDE.MessageService.pas',
-  DPM.Controls.ButtonBar in 'Controls\DPM.Controls.ButtonBar.pas';
+  DPM.Controls.ButtonBar in 'Controls\DPM.Controls.ButtonBar.pas',
+  DPM.IDE.ToolsAPI in 'IDE\DPM.IDE.ToolsAPI.pas';
 
 {$R *.res}
 

@@ -18,20 +18,21 @@ type
   TConfigChangedEvent = procedure(const configuration : IConfiguration) of object;
   TSearchEvent = procedure(const searchText : string; const searchOptions : TDPMSearchOptions; const source : string; const platform : TDPMPlatform; const refresh : boolean) of object;
   TDPMSearchBarFrame = class(TFrame)
-    txtSearch: TButtonedEdit;
-    chkIncludePrerelease: TCheckBox;
-    chkIncludeCommercial: TCheckBox;
-    chkIncludeTrial: TCheckBox;
-    btnRefresh: TButton;
-    btnSettings: TButton;
-    btnAbout: TButton;
-    lblProject: TLabel;
-    lblSources: TLabel;
-    cbSources: TComboBox;
     DPMEditorViewImages: TImageList;
     DebounceTimer: TTimer;
+    Panel1: TPanel;
+    btnAbout: TButton;
+    btnRefresh: TButton;
+    btnSettings: TButton;
     cbPlatforms: TComboBox;
+    cbSources: TComboBox;
+    chkIncludeCommercial: TCheckBox;
+    chkIncludePrerelease: TCheckBox;
+    chkIncludeTrial: TCheckBox;
     lblPlatform: TLabel;
+    lblProject: TLabel;
+    lblSources: TLabel;
+    txtSearch: TButtonedEdit;
     procedure txtSearchChange(Sender: TObject);
     procedure txtSearchRightButtonClick(Sender: TObject);
     procedure DebounceTimerTimer(Sender: TObject);
@@ -228,9 +229,14 @@ end;
 constructor TDPMSearchBarFrame.Create(AOwner: TComponent);
 begin
   inherited;
+  ParentColor := false;
+  ParentBackground := false;
+
   //not published in older versions, so get removed when we edit in older versions.
   {$IFDEF STYLEELEMENTS}
-  StyleElements := [seFont, seClient, seBorder];
+  StyleElements := [seFont];
+  chkIncludePrerelease.StyleElements := StyleElements := [seFont,seClient, seBorder];
+
   {$ENDIF}
 
   Align := alTop;
@@ -365,10 +371,10 @@ end;
 
 procedure TDPMSearchBarFrame.ThemeChanged(const ideStyleServices : TCustomStyleServices);
 begin
-{$IF CompilerVersion < 34.0 }
+//{$IF CompilerVersion < 34.0 }
   Self.Color := ideStyleServices.GetSystemColor(clBtnFace);
   Self.Font.Color := ideStyleServices.GetSystemColor(clWindowText);
-{$IFEND}
+//{$IFEND}
 end;
 
 procedure TDPMSearchBarFrame.txtSearchChange(Sender: TObject);

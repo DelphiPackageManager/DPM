@@ -2,153 +2,171 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
   Left = 0
   Top = 0
   Width = 767
-  Height = 66
+  Height = 67
+  DoubleBuffered = True
+  Color = clBtnFace
+  ParentBackground = False
+  ParentColor = False
+  ParentDoubleBuffered = False
   TabOrder = 0
-  DesignSize = (
-    767
-    66)
-  object lblProject: TLabel
-    Left = 360
-    Top = 9
-    Width = 117
-    Height = 23
-    Caption = 'THE PROJECT'
-    Font.Charset = DEFAULT_CHARSET
-    Font.Color = clWindowText
-    Font.Height = -19
-    Font.Name = 'Tahoma'
-    Font.Style = []
-    ParentFont = False
-  end
-  object lblSources: TLabel
-    Left = 498
-    Top = 40
-    Width = 88
-    Height = 13
-    Alignment = taRightJustify
-    Anchors = [akTop, akRight]
-    Caption = 'Package Sources :'
-  end
-  object lblPlatform: TLabel
-    Left = 539
-    Top = 12
-    Width = 47
-    Height = 13
-    Alignment = taRightJustify
-    Anchors = [akTop, akRight]
-    Caption = 'Platform :'
-    Visible = False
-  end
-  object txtSearch: TButtonedEdit
-    Left = 8
-    Top = 9
-    Width = 241
-    Height = 21
-    Images = DPMEditorViewImages
-    LeftButton.Enabled = False
-    ParentShowHint = False
-    RightButton.DisabledImageIndex = 0
-    RightButton.Hint = 'Clear Search'
-    RightButton.HotImageIndex = 6
-    RightButton.ImageIndex = 5
-    ShowHint = True
+  object Panel1: TPanel
+    Left = 0
+    Top = 0
+    Width = 767
+    Height = 67
+    Align = alClient
+    BevelOuter = bvNone
+    Caption = 'Panel1'
+    ShowCaption = False
     TabOrder = 0
-    TextHint = 'Search'
-    OnChange = txtSearchChange
-    OnKeyDown = txtSearchKeyDown
-    OnRightButtonClick = txtSearchRightButtonClick
-  end
-  object chkIncludePrerelease: TCheckBox
-    Left = 8
-    Top = 38
-    Width = 120
-    Height = 20
-    Caption = 'Include Prerelease'
-    TabOrder = 1
-    OnClick = chkIncludePrereleaseClick
-  end
-  object chkIncludeCommercial: TCheckBox
-    Left = 152
-    Top = 38
-    Width = 128
-    Height = 20
-    Caption = 'Include Commercial'
-    TabOrder = 2
-    Visible = False
-    OnClick = chkIncludeCommercialClick
-  end
-  object chkIncludeTrial: TCheckBox
-    Left = 300
-    Top = 38
-    Width = 128
-    Height = 20
-    Caption = 'Include Trials'
-    TabOrder = 3
-    Visible = False
-    OnClick = chkIncludeTrialClick
-  end
-  object btnRefresh: TButton
-    Left = 255
-    Top = 8
-    Width = 25
-    Height = 25
-    Hint = 'Refresh'
-    ImageAlignment = iaCenter
-    ImageIndex = 2
-    Images = DPMEditorViewImages
-    TabOrder = 4
-    OnClick = btnRefreshClick
-  end
-  object btnSettings: TButton
-    Left = 286
-    Top = 8
-    Width = 25
-    Height = 25
-    Hint = 'Settings'
-    ImageAlignment = iaCenter
-    ImageIndex = 1
-    Images = DPMEditorViewImages
-    TabOrder = 5
-    OnClick = btnSettingsClick
-  end
-  object btnAbout: TButton
-    Left = 316
-    Top = 8
-    Width = 25
-    Height = 25
-    Hint = 'About'
-    ImageAlignment = iaCenter
-    ImageIndex = 3
-    Images = DPMEditorViewImages
-    TabOrder = 6
-    OnClick = btnAboutClick
-  end
-  object cbSources: TComboBox
-    Left = 592
-    Top = 37
-    Width = 160
-    Height = 21
-    Style = csDropDownList
-    Anchors = [akTop, akRight]
-    ItemIndex = 0
-    TabOrder = 7
-    Text = 'All'
-    OnChange = cbSourcesChange
-    Items.Strings = (
-      'All'
-      'DPM'
-      'local'
-      'Colossus')
-  end
-  object cbPlatforms: TComboBox
-    Left = 592
-    Top = 9
-    Width = 160
-    Height = 21
-    Style = csDropDownList
-    Anchors = [akTop, akRight]
-    TabOrder = 8
-    Visible = False
+    ExplicitTop = 192
+    ExplicitHeight = 80
+    DesignSize = (
+      767
+      67)
+    object lblPlatform: TLabel
+      Left = 539
+      Top = 12
+      Width = 47
+      Height = 13
+      Alignment = taRightJustify
+      Anchors = [akTop, akRight]
+      Caption = 'Platform :'
+      Visible = False
+    end
+    object lblProject: TLabel
+      Left = 360
+      Top = 9
+      Width = 117
+      Height = 23
+      Caption = 'THE PROJECT'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -19
+      Font.Name = 'Tahoma'
+      Font.Style = []
+      ParentFont = False
+    end
+    object lblSources: TLabel
+      Left = 498
+      Top = 40
+      Width = 88
+      Height = 13
+      Alignment = taRightJustify
+      Anchors = [akTop, akRight]
+      Caption = 'Package Sources :'
+    end
+    object btnAbout: TButton
+      Left = 316
+      Top = 8
+      Width = 25
+      Height = 25
+      Hint = 'About'
+      ImageAlignment = iaCenter
+      ImageIndex = 3
+      Images = DPMEditorViewImages
+      TabOrder = 0
+      OnClick = btnAboutClick
+    end
+    object btnRefresh: TButton
+      Left = 255
+      Top = 8
+      Width = 25
+      Height = 25
+      Hint = 'Refresh'
+      ImageAlignment = iaCenter
+      ImageIndex = 2
+      Images = DPMEditorViewImages
+      TabOrder = 1
+      OnClick = btnRefreshClick
+    end
+    object btnSettings: TButton
+      Left = 286
+      Top = 8
+      Width = 25
+      Height = 25
+      Hint = 'Settings'
+      ImageAlignment = iaCenter
+      ImageIndex = 1
+      Images = DPMEditorViewImages
+      TabOrder = 2
+      OnClick = btnSettingsClick
+    end
+    object cbPlatforms: TComboBox
+      Left = 592
+      Top = 9
+      Width = 160
+      Height = 21
+      Style = csDropDownList
+      Anchors = [akTop, akRight]
+      TabOrder = 3
+      Visible = False
+    end
+    object cbSources: TComboBox
+      Left = 592
+      Top = 37
+      Width = 160
+      Height = 21
+      Style = csDropDownList
+      Anchors = [akTop, akRight]
+      ItemIndex = 0
+      TabOrder = 4
+      Text = 'All'
+      OnChange = cbSourcesChange
+      Items.Strings = (
+        'All'
+        'DPM'
+        'local'
+        'Colossus')
+    end
+    object chkIncludeCommercial: TCheckBox
+      Left = 152
+      Top = 38
+      Width = 128
+      Height = 20
+      Caption = 'Include Commercial'
+      TabOrder = 5
+      Visible = False
+      OnClick = chkIncludeCommercialClick
+    end
+    object chkIncludePrerelease: TCheckBox
+      Left = 8
+      Top = 38
+      Width = 120
+      Height = 20
+      Caption = 'Include Prerelease'
+      TabOrder = 6
+      OnClick = chkIncludePrereleaseClick
+    end
+    object chkIncludeTrial: TCheckBox
+      Left = 300
+      Top = 38
+      Width = 128
+      Height = 20
+      Caption = 'Include Trials'
+      TabOrder = 7
+      Visible = False
+      OnClick = chkIncludeTrialClick
+    end
+    object txtSearch: TButtonedEdit
+      Left = 8
+      Top = 9
+      Width = 241
+      Height = 21
+      Images = DPMEditorViewImages
+      LeftButton.Enabled = False
+      ParentShowHint = False
+      RightButton.DisabledImageIndex = 0
+      RightButton.Hint = 'Clear Search'
+      RightButton.HotImageIndex = 6
+      RightButton.ImageIndex = 5
+      ShowHint = True
+      TabOrder = 8
+      TextHint = 'Search'
+      OnChange = txtSearchChange
+      OnKeyDown = txtSearchKeyDown
+      OnRightButtonClick = txtSearchRightButtonClick
+    end
   end
   object DPMEditorViewImages: TImageList
     ColorDepth = cd32Bit
