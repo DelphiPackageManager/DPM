@@ -230,7 +230,7 @@ begin
       end;
     ofnFileClosing :
       begin
-        if not (ExtractFileExt(FileName) = '.dproj') then
+        if not ((ExtractFileExt(FileName) = '.dproj') or (ExtractFileExt(FileName) = '.dproj')) then
           exit;
         FLogger.Clear;
         FProjectController.FileClosed(FileName);

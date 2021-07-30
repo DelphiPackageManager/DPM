@@ -59,7 +59,6 @@ type
     procedure btnUninstallClick(Sender : TObject);
   private
     FContainer : TContainer;
-    FVersionGrid : TVersionGrid;
     FIconCache : TDPMIconCache;
     FPackageSearcher : IPackageSearcher;
     FPackageMetaData : IPackageSearchResultItem;

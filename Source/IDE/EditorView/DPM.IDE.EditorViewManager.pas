@@ -116,14 +116,13 @@ var
 begin
   FContainer := container;
   FProjectTreeManager := projectTreeManager;
-  FOpenViews := TCollections.CreateDictionary < string, INTACustomEditorView > ;
+  FOpenViews := TCollections.CreateDictionary<string, INTACustomEditorView>;
 
   if not Supports(BorlandIDEServices, IOTAEditorViewServices, FEditorViewServices) then
     raise Exception.Create('Unable to get IOTAEditorViewServices');
 
   if not Supports(BorlandIDEServices, INTAEditorViewServices, vs) then
     raise Exception.Create('Unable to get INTAEditorViewServices');
-
 
   imageList := TImageList.Create(nil);
   bmp := TBitmap.Create;
@@ -136,27 +135,20 @@ begin
     imageList.Free;
   end;
 
-
 end;
 
 destructor TDPMEditorViewManager.Destroy;
 begin
   FOpenViews := nil;
   FEditorViewServices := nil;
+  FProjectTreeManager := nil;
   inherited;
 end;
 
 procedure TDPMEditorViewManager.Destroyed;
-var
-  pair : TPair<string, INTACustomEditorView>;
 begin
-  for pair in FOpenViews do
-  begin
-    FEditorViewServices.CloseEditorView(pair.Value);
-    FEditorViewServices.UnregisterEditorView(pair.Value.ViewIdentifier);
-  end;
-
-  FEditorViewServices := nil;
+  //The views are already destroyed by the time we get here, so nothing to do.
+  FOpenViews.Clear;
 end;
 
 procedure TDPMEditorViewManager.Modified;
@@ -174,7 +166,7 @@ begin
     if FEditorViewServices <> nil then
     begin
       FEditorViewServices.CloseEditorView(view);
-      FEditorViewServices.UnregisterEditorView(view.ViewIdentifier);
+      //FEditorViewServices.UnregisterEditorView(view.ViewIdentifier);
     end;
     view := nil;
   end;
@@ -198,14 +190,13 @@ var
 begin
   if not FOpenViews.TryGetValue(LowerCase(project.FileName), view) then
   begin
-    view := TDPMEditorView.Create(FContainer, project, FImageIndex, FProjectTreeManager);
+    view := TDPMEditorView.Create(FContainer, project, FImageIndex, FProjectTreeManager) as INTACustomEditorView;
     FOpenViews.Add(LowerCase(project.FileName), view);
   end;
   if FEditorViewServices <> nil then
-    FEditorViewServices.ShowEditorView(view as INTACustomEditorView);
-
-
+    FEditorViewServices.ShowEditorView(view);
 end;
+
 
 end.
 

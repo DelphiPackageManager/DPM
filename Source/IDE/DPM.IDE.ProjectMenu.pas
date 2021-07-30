@@ -174,10 +174,7 @@ end;
 procedure TDPMProjectMenu.Execute(const MenuContextList : IInterfaceList);
 begin
   if FProject <> nil then
-  begin
-    //    ShowMessage('Manage DPM Packages for : ' + FProject.FileName);
     FEditorViewManager.ShowViewForProject(FProject);
-  end;
 end;
 
 function TDPMProjectMenu.GetCaption : string;
@@ -187,7 +184,7 @@ begin
   if Supports(FProject, IOTAProjectGroup, pg) then
     result := 'Manage DPM Packages for Project Group'
   else
-    result := Format('Manage DPM Packages : %s', [ExtractFileName(FProject.FileName)]); //sWizardProjectMenuCaption;
+    result := Format('Manage DPM Packages : %s', [ExtractFileName(FProject.FileName)]);
 end;
 
 function TDPMProjectMenu.GetChecked : Boolean;

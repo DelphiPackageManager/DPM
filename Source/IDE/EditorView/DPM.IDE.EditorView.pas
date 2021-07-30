@@ -34,7 +34,7 @@ uses
   VCL.Forms,
   Spring.Container,
   DPM.IDE.ProjectTreeManager,
-  DPM.IDE.EditorViewFrame;
+  DPM.IDE.BaseEditViewFrame;
 
 type
   IDPMEditorView = interface
@@ -47,10 +47,13 @@ type
   private
     FContainer : TContainer;
     FProject : IOTAProject;
-    FFrame : TDPMEditViewFrame;
+    FProjectGroup : IOTAProjectGroup;
+    FIsProjectGroup : boolean;
+    FFrame : TDPMBaseEditViewFrame;
     FImageIndex : integer;
     FCaption : string;
     FProjectTreeManager : IDPMProjectTreeManager;
+    FIdentifier : string;
   protected
     //IDPMEditorView
     procedure Reloaded;
@@ -75,12 +78,15 @@ type
     procedure Close(var Allowed : Boolean);
   public
     constructor Create(const container : TContainer; const project : IOTAProject; const imageIndex : integer; const projectTreeManager : IDPMProjectTreeManager);
+    destructor Destroy;override;
   end;
 
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.IDE.EditorViewFrame,
+  DPM.IDE.GroupEditorViewFrame;
 
 { TDPMEditorView }
 
@@ -93,6 +99,7 @@ procedure TDPMEditorView.Close(var Allowed : Boolean);
 begin
   Allowed := true;
   FFrame.Closing;
+  FFrame := nil;
 end;
 
 procedure TDPMEditorView.CloseAllCalled(var ShouldClose : Boolean);
@@ -108,16 +115,31 @@ begin
   FProject := project;
   FImageIndex := imageIndex;
   FProjectTreeManager := projectTreeManager;
-  if Supports(FProject, IOTAProjectGroup) then
+  FProjectGroup := nil;
+  FIsProjectGroup := Supports(FProject, IOTAProjectGroup, FProjectGroup);
+  if FIsProjectGroup then
     FCaption := 'DPM : ProjectGroup'
   else
     FCaption := 'DPM : ' + ChangeFileExt(ExtractFileName(FProject.FileName), '');
+
+  if FProjectGroup <> nil then
+    FIdentifier := 'DPM_GROUP_VIEW_' + ChangeFileExt(ExtractFileName(FProjectGroup.FileName), '')
+  else
+     FIdentifier := 'DPM_VIEW_' + ChangeFileExt(ExtractFileName(FProject.FileName), '');
+   FIdentifier := StringReplace(FIdentifier, '.', '_', [rfReplaceAll]);
+
 end;
 
 procedure TDPMEditorView.DeselectView;
 begin
   if FFrame <> nil then
     FFrame.ViewDeselected;
+end;
+
+destructor TDPMEditorView.Destroy;
+begin
+
+  inherited;
 end;
 
 function TDPMEditorView.EditAction(Action : TEditAction) : Boolean;
@@ -127,7 +149,7 @@ end;
 
 procedure TDPMEditorView.FrameCreated(AFrame : TCustomFrame);
 begin
-  FFrame := TDPMEditViewFrame(AFrame);
+  FFrame := TDPMBaseEditViewFrame(AFrame);
   FFrame.Name := GetViewIdentifier;
   FFrame.Configure(FProject, FContainer, FProjectTreeManager);
 end;
@@ -154,7 +176,10 @@ end;
 
 function TDPMEditorView.GetFrameClass : TCustomFrameClass;
 begin
-  result := TDPMEditViewFrame;
+  if FIsProjectGroup then
+    result := TDPMGroupEditViewFrame
+  else
+    result := TDPMEditViewFrame;
 end;
 
 function TDPMEditorView.GetImageIndex : Integer;
@@ -169,25 +194,27 @@ end;
 
 function TDPMEditorView.GetViewIdentifier : string;
 begin
-  result := 'DPM_VIEW_' + ChangeFileExt(ExtractFileName(FProject.FileName), '');
-  result := StringReplace(result, '.', '_', [rfReplaceAll]);
+  result := FIdentifier;
 end;
 
 procedure TDPMEditorView.Reloaded;
 begin
-  FFrame.ProjectReloaded;
+  if FFrame <> nil then
+    FFrame.ProjectReloaded;
 end;
 
 procedure TDPMEditorView.SelectView;
 begin
   //Note : For some reason this is getting called twice in XE7 for each selection.
   //TODO : Check if it's the same in other IDE versions
-  FFrame.ViewSelected;
+  if FFrame <> nil then
+    FFrame.ViewSelected;
 end;
 
 procedure TDPMEditorView.ThemeChanged;
 begin
-  FFrame.ThemeChanged;
+  if FFrame <> nil then
+    FFrame.ThemeChanged;
 end;
 
 end.

@@ -272,6 +272,14 @@
         <DCCReference Include="IDE\Logging\DPM.IDE.MessageService.pas"/>
         <DCCReference Include="Controls\DPM.Controls.ButtonBar.pas"/>
         <DCCReference Include="IDE\DPM.IDE.ToolsAPI.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.BaseEditViewFrame.pas">
+            <Form>DPMBaseEditViewFrame</Form>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.GroupEditorViewFrame.pas">
+            <Form>DPMGroupEditViewFrame</Form>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
         <RcItem Include="images\dpm.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>DPMIDELOGO</ResourceId>

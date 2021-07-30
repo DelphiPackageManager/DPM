@@ -57,7 +57,9 @@ uses
   DPM.IDE.Options,
   DPM.IDE.Logger,
   DPM.IDE.ProjectTreeManager,
+  DPM.IDE.BaseEditViewFrame,
   DPM.IDE.SearchBarFrame,
+
   {$IF CompilerVersion >= 24.0 }
   {$LEGACYIFEND ON}
   System.Actions,
@@ -78,7 +80,7 @@ type
     procedure Update(const ACanvas : TCanvas; const rowRect : TRect; const showSelect : Boolean);
   end;
 
-  TDPMEditViewFrame = class(TFrame, IPackageSearcher)
+  TDPMEditViewFrame = class(TDPMBaseEditViewFrame, IPackageSearcher)
     ContentPanel : TPanel;
     Splitter2 : TSplitter;
     PackageListPanel : TPanel;
@@ -192,12 +194,12 @@ type
     destructor Destroy; override;
 
     //called from the EditorView
-    procedure Configure(const projectOrGroup : IOTAProject; const container : TContainer; const projectTreeManager : IDPMProjectTreeManager);
-    procedure ViewSelected;
-    procedure ViewDeselected;
-    procedure Closing;
-    procedure ProjectReloaded;
-    procedure ThemeChanged;
+    procedure Configure(const projectOrGroup : IOTAProject; const container : TContainer; const projectTreeManager : IDPMProjectTreeManager);override;
+    procedure ViewSelected;override;
+    procedure ViewDeselected;override;
+    procedure Closing;override;
+    procedure ProjectReloaded;override;
+    procedure ThemeChanged;override;
   end;
 
 implementation
