@@ -181,7 +181,6 @@ end;
 
 procedure TDPMWizard.Destroyed;
 begin
-  FEditorViewManager.Destroyed; //don't try to resolve this here, errors in the rtl on 10.2
   if FStorageNotifierId > -1 then
     (BorlandIDEServices as IOTAProjectFileStorage).RemoveNotifier(FStorageNotifierId);
   if FIDENotifier > -1 then
@@ -196,6 +195,8 @@ begin
   {$IFEND}
 
   FDPMIDEMessageService.ShutDown;
+  FEditorViewManager.Destroyed; //don't try to resolve this here, errors in the rtl on 10.2
+  FEditorViewManager := nil;
 
 end;
 

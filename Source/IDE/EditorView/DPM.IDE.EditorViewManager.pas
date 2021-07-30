@@ -149,6 +149,8 @@ procedure TDPMEditorViewManager.Destroyed;
 begin
   //The views are already destroyed by the time we get here, so nothing to do.
   FOpenViews.Clear;
+  FEditorViewServices := nil;
+  FProjectTreeManager := nil;
 end;
 
 procedure TDPMEditorViewManager.Modified;
@@ -164,10 +166,7 @@ begin
   begin
     FOpenViews.Remove(LowerCase(projectFile));
     if FEditorViewServices <> nil then
-    begin
       FEditorViewServices.CloseEditorView(view);
-      //FEditorViewServices.UnregisterEditorView(view.ViewIdentifier);
-    end;
     view := nil;
   end;
 end;
