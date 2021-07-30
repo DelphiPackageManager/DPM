@@ -1,77 +1,89 @@
 inherited DPMEditViewFrame: TDPMEditViewFrame
-  Width = 934
+  Width = 1001
   Height = 767
   Margins.Top = 0
   Constraints.MinWidth = 320
   DoubleBuffered = True
   ParentDoubleBuffered = False
   ParentFont = False
-  ExplicitWidth = 934
+  ExplicitWidth = 1001
   ExplicitHeight = 767
-  object ContentPanel: TPanel
-    Left = 0
-    Top = 0
-    Width = 934
+  inherited ContentPanel: TPanel
+    Width = 1001
     Height = 767
-    Align = alClient
-    BevelEdges = [beTop]
-    BevelOuter = bvNone
-    Caption = 'ContentPanel'
-    Constraints.MinWidth = 320
-    ParentColor = True
-    ShowCaption = False
-    TabOrder = 0
-    object Splitter2: TSplitter
-      Left = 490
-      Top = 0
-      Width = 8
+    ExplicitWidth = 1001
+    ExplicitHeight = 767
+    inherited Splitter2: TSplitter
+      Left = 528
       Height = 767
-      Align = alRight
-      MinSize = 300
-      ResizeStyle = rsUpdate
-      ExplicitLeft = 532
-      ExplicitHeight = 556
+      ExplicitLeft = 216
+      ExplicitHeight = 341
     end
-    object PackageListPanel: TPanel
-      Left = 0
-      Top = 0
-      Width = 490
+    inherited PackageListPanel: TPanel
+      Width = 528
       Height = 767
-      Align = alClient
-      BevelEdges = [beRight]
-      BevelOuter = bvNone
-      Caption = 'PackageListPanel'
-      ParentBackground = False
-      ParentColor = True
-      ShowCaption = False
-      TabOrder = 0
-    end
-    inline PackageDetailsFrame: TPackageDetailsFrame
-      Left = 498
-      Top = 0
-      Width = 436
-      Height = 767
-      Align = alRight
-      Constraints.MinWidth = 300
-      DoubleBuffered = True
-      Color = clWindow
-      ParentBackground = False
-      ParentColor = False
-      ParentDoubleBuffered = False
-      TabOrder = 1
-      ExplicitLeft = 498
+      ExplicitWidth = 528
       ExplicitHeight = 767
-      inherited sbPackageDetails: TScrollBox
+    end
+    inherited DetailPanel: TPanel
+      Left = 536
+      Width = 465
+      Height = 767
+      ExplicitLeft = 536
+      ExplicitWidth = 465
+      ExplicitHeight = 767
+      inline PackageDetailsFrame: TPackageDetailsFrame
+        Left = 0
+        Top = 0
+        Width = 465
         Height = 767
+        Align = alClient
+        DoubleBuffered = True
+        Color = clWindow
+        ParentBackground = False
+        ParentColor = False
+        ParentDoubleBuffered = False
+        TabOrder = 0
+        ExplicitWidth = 465
         ExplicitHeight = 767
+        inherited sbPackageDetails: TScrollBox
+          Width = 465
+          Height = 767
+          ExplicitWidth = 465
+          ExplicitHeight = 767
+          inherited pnlPackageId: TPanel
+            Width = 465
+            ExplicitWidth = 465
+          end
+          inherited pnlInstalled: TPanel
+            Width = 465
+            ExplicitWidth = 465
+            inherited txtInstalledVersion: TEdit
+              Width = 305
+              ExplicitWidth = 305
+            end
+            inherited btnUninstall: TButton
+              Left = 386
+              ExplicitLeft = 386
+            end
+          end
+          inherited pnlVersion: TPanel
+            Width = 465
+            ExplicitWidth = 465
+            inherited cboVersions: TComboBox
+              Width = 305
+              ExplicitWidth = 305
+            end
+            inherited btnInstallOrUpdate: TButton
+              Left = 386
+              ExplicitLeft = 386
+            end
+          end
+        end
       end
     end
   end
-  object platformChangeDetectTimer: TTimer
-    Enabled = False
-    Interval = 500
-    OnTimer = platformChangeDetectTimerTimer
-    Left = 318
-    Top = 408
+  inherited platformChangeDetectTimer: TTimer
+    OnTimer = nil
   end
 end

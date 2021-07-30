@@ -14,6 +14,7 @@ uses
   DPM.Core.Logging,
   DPM.IDE.Logger,
   DPM.Core.Options.Search,
+  DPM.IDE.Details.Interfaces,
   DPM.IDE.PackageDetailsPanel,
   DPM.IDE.IconCache,
   DPM.IDE.Types,
@@ -27,19 +28,7 @@ uses
 {$I ..\DPMIDE.inc}
 
 type
-  //implemented by the EditorViewFrame
-  IPackageSearcher = interface
-    ['{4FBB9E7E-886A-4B7D-89FF-FA5DBC9D93FD}']
-    function GetSearchOptions : TSearchOptions;
-    function SearchForPackagesAsync(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;overload;
-    function SearchForPackages(const options : TSearchOptions) : IList<IPackageSearchResultItem>;overload;
-    function GetCurrentPlatform : string;
-    procedure SaveBeforeChange;
-    procedure PackageInstalled(const package : IPackageSearchResultItem);
-    procedure PackageUninstalled(const package : IPackageSearchResultItem);
-  end;
-
-  TPackageDetailsFrame = class(TFrame)
+  TPackageDetailsFrame = class(TFrame, IPackageDetailsView)
     sbPackageDetails : TScrollBox;
     pnlPackageId : TPanel;
     pnlInstalled : TPanel;
@@ -78,6 +67,7 @@ type
 
     FIDEStyleServices : TCustomStyleServices;
   protected
+    function GetIncludePreRelease : boolean;
     procedure SetIncludePreRelease(const Value : boolean);
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
@@ -135,7 +125,7 @@ begin
     FCancellationTokenSource.Reset;
     FLogger.Clear;
     FLogger.StartInstall(FCancellationTokenSource);
-    FPackageSearcher.SaveBeforeChange;
+    FPackageSearcher.InstallStarting;
 
     if btnInstallOrUpdate.Caption = 'Update' then
     begin
@@ -213,7 +203,7 @@ begin
     FCancellationTokenSource.Reset;
     FLogger.Clear;
     FLogger.StartUnInstall(FCancellationTokenSource);
-    FPackageSearcher.SaveBeforeChange;
+    FPackageSearcher.InstallStarting;
     FLogger.Information('UnInstalling package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + ']');
 
     options := TUnInstallOptions.Create;
@@ -387,6 +377,11 @@ begin
 
   ThemeChanged;
 
+end;
+
+function TPackageDetailsFrame.GetIncludePreRelease: boolean;
+begin
+  result := FIncludePreRelease;
 end;
 
 procedure TPackageDetailsFrame.Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectFile : string);

@@ -180,7 +180,9 @@ uses
   DPM.IDE.MessageForm in 'IDE\Logging\DPM.IDE.MessageForm.pas' {DPMMessageForm},
   DPM.IDE.MessageService in 'IDE\Logging\DPM.IDE.MessageService.pas',
   DPM.Controls.ButtonBar in 'Controls\DPM.Controls.ButtonBar.pas',
-  DPM.IDE.ToolsAPI in 'IDE\DPM.IDE.ToolsAPI.pas';
+  DPM.IDE.ToolsAPI in 'IDE\DPM.IDE.ToolsAPI.pas',
+  DPM.IDE.BaseEditViewFrame in 'IDE\EditorView\DPM.IDE.BaseEditViewFrame.pas' {DPMBaseEditViewFrame : TFrame},
+  DPM.IDE.GroupEditorViewFrame in 'IDE\EditorView\DPM.IDE.GroupEditorViewFrame.pas' {DPMGroupEditViewFrame: TFrame};
 
 {$R *.res}
 

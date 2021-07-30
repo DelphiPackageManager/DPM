@@ -15,7 +15,7 @@ uses
   ToolsApi,
   Spring.Container,
   DPM.IDE.ProjectTreeManager,
-  DPM.IDE.BaseEditViewFrame;
+  DPM.IDE.BaseEditViewFrame, Vcl.ExtCtrls;
 
 type
   TDPMGroupEditViewFrame = class(TDPMBaseEditViewFrame)

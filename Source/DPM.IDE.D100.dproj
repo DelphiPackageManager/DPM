@@ -243,6 +243,7 @@
         <DCCReference Include="Controls\DPM.Controls.GroupButton.pas"/>
         <DCCReference Include="IDE\DPM.IDE.AddInOptionsHostForm.pas">
             <Form>DPMOptionsHostForm</Form>
+            <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="IDE\DPM.IDE.IconCache.pas"/>
         <DCCReference Include="IDE\DPM.IDE.VSTProxy.pas"/>
@@ -256,11 +257,13 @@
         <DCCReference Include="IDE\EditorView\DPM.IDE.EditorView.pas"/>
         <DCCReference Include="IDE\EditorView\DPM.IDE.EditorViewFrame.pas">
             <Form>DPMEditViewFrame</Form>
+            <FormType>dfm</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
         <DCCReference Include="IDE\EditorView\DPM.IDE.EditorViewManager.pas"/>
         <DCCReference Include="IDE\EditorView\DPM.IDE.PackageDetailsFrame.pas">
             <Form>PackageDetailsFrame</Form>
+            <FormType>dfm</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
         <DCCReference Include="IDE\EditorView\DPM.IDE.PackageDetailsPanel.pas"/>
@@ -270,10 +273,19 @@
         </DCCReference>
         <DCCReference Include="IDE\Logging\DPM.IDE.MessageForm.pas">
             <Form>DPMMessageForm</Form>
+            <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="IDE\Logging\DPM.IDE.MessageService.pas"/>
         <DCCReference Include="Controls\DPM.Controls.ButtonBar.pas"/>
         <DCCReference Include="IDE\DPM.IDE.ToolsAPI.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.BaseEditViewFrame.pas">
+            <Form>DPMBaseEditViewFrame</Form>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.GroupEditorViewFrame.pas">
+            <Form>DPMGroupEditViewFrame</Form>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
         <RcItem Include="images\dpm.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>DPMIDELOGO</ResourceId>
