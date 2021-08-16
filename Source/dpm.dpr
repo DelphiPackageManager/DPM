@@ -179,7 +179,9 @@ uses
   DPM.Core.Package.Icon in 'Core\Package\DPM.Core.Package.Icon.pas',
   DPM.Core.Compiler.BOM in 'Core\Compiler\DPM.Core.Compiler.BOM.pas',
   DPM.Core.Compiler.ProjectSettings in 'Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas',
-  DPM.Core.Utils.Files in 'Core\Utils\DPM.Core.Utils.Files.pas';
+  DPM.Core.Utils.Files in 'Core\Utils\DPM.Core.Utils.Files.pas',
+  DPM.Console.Command.Info in 'Cmdline\Commands\DPM.Console.Command.Info.pas',
+  DPM.Core.Options.Info in 'Core\Options\DPM.Core.Options.Info.pas';
 
 begin
   CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml
