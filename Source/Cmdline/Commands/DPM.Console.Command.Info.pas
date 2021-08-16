@@ -44,7 +44,7 @@ type
   protected
     function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
   public
-    constructor Create(const console : IConsoleWriter; const logger : ILogger; const configurationManager : IConfigurationManager);reintroduce;
+    constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager);reintroduce;
   end;
 
 
@@ -56,17 +56,13 @@ uses
   DPM.Core.Options.Info;
 
 
-constructor TInfoCommand.Create(const console: IConsoleWriter; const logger: ILogger; const configurationManager: IConfigurationManager);
+constructor TInfoCommand.Create(const logger: ILogger; const configurationManager: IConfigurationManager);
 begin
   inherited Create(logger, configurationManager);
-  FConsole := console;
-
 end;
 
 function TInfoCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
-  ShowBanner(FConsole);
-
   TInfoOptions.Default.ApplyCommon(TCommonOptions.Default);
 
 
