@@ -2,7 +2,9 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "DPM Package Manager"
-#define MyAppVersion "0.1.10-alpha"
+#ifndef MyAppVersion
+  #define MyAppVersion "0.1.10-alpha"
+#endif
 #define MyAppPublisher "The Delphi Package Manager Project"
 #define HelpURL "https://docs.delphipm.org"
 #define SupportURL "https://github.com/DelphiPackageManager/DPM/issues"
