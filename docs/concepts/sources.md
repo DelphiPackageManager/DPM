@@ -6,7 +6,7 @@ Multiple package sources can be defined, and they will be searched in the order 
 
 ## Managing Package Sources
 
-Package sources are listed in your [dpm.config](./config-file.md). It is recommended you manage them via the dpm cli [sources command](../commands/sources-command.md).
+Package sources are listed in your [dpm.config](./config-files.md). It is recommended you manage them via the dpm cli [sources command](../commands/sources-command.md).
 
 **Adding a Package Source**
 
