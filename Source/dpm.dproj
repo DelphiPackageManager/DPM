@@ -1346,24 +1346,24 @@
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>
-            <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.0-dev5">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev5" range="[2.0.0-dev5,]"/>
+            <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.0-dev7">
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev7" range="[2.0.0-dev7,]"/>
             </PackageReference>
-            <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.0-dev5">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev5" range="[2.0.0-dev5,]"/>
+            <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.0-dev7">
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev7" range="[2.0.0-dev7,]"/>
             </PackageReference>
             <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.1.0"/>
-            <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.2.0">
+            <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.2.1">
                 <PackageReference id="Gabr42.OmniThreadLibrary" platform="Win32" version="3.7.8" range="[3.7.8,]"/>
-                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.2" range="[0.0.2, 0.0.65535]"/>
+                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.3" range="[0.0.3, 0.0.65535]"/>
             </PackageReference>
-            <PackageReference id="VSoft.CommandLine" platform="Win32" version="0.1.0"/>
-            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.1.0">
-                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.2" range="[0.0.2, 0.0.65535]"/>
+            <PackageReference id="VSoft.CommandLine" platform="Win32" version="0.1.1"/>
+            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.1.1">
+                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.3" range="[0.0.3, 0.0.65535]"/>
             </PackageReference>
-            <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.1.0"/>
-            <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.0"/>
-            <PackageReference id="VSoft.Uri" platform="Win32" version="0.1.0"/>
+            <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.1.2"/>
+            <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.1"/>
+            <PackageReference id="VSoft.Uri" platform="Win32" version="0.1.1"/>
         </DPM>
     </ProjectExtensions>
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>
