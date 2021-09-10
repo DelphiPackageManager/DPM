@@ -58,6 +58,7 @@ Name: Berlin;  Description: Delphi 10.1 IDE Support; Types: full; check: IsDelph
 Name: Tokyo;   Description: Delphi 10.2 IDE Support; Types: full; check: IsDelphiInstalled('19.0');
 Name: Rio;     Description: Delphi 10.3 IDE Support; Types: full; check: IsDelphiInstalled('20.0');
 Name: Sydney;  Description: Delphi 10.4 IDE Support; Types: full; check: IsDelphiInstalled('21.0');
+Name: Alexandria;  Description: Delphi 11 IDE Support; Types: full; check: IsDelphiInstalled('22.0');
 
 
 [Tasks]
@@ -79,6 +80,7 @@ Source: "..\Output\DPM.IDE.D101.dll"; DestDir: "{app}"; Flags: ignoreversion; Co
 Source: "..\Output\DPM.IDE.D102.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Tokyo
 Source: "..\Output\DPM.IDE.D103.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Rio
 Source: "..\Output\DPM.IDE.D104.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Sydney
+Source: "..\Output\DPM.IDE.D110.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Alexandria
 
 [Registry]
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\9.0\Experts";  ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.XE2.dll"; Components: XE2; Flags: uninsdeletevalue
@@ -94,6 +96,7 @@ Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\18.0\Experts"; ValueType: string; 
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\19.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D102.dll"; Components: Tokyo;   Flags: uninsdeletevalue
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\20.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D103.dll"; Components: Rio;     Flags: uninsdeletevalue
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\21.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D104.dll"; Components: Sydney;  Flags: uninsdeletevalue
+Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\22.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D110.dll"; Components: Alexandria;  Flags: uninsdeletevalue
 
 [Code]
 

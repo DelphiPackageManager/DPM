@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{F777FD5E-96A6-4EEE-88CC-1C098D4E9766}</ProjectGuid>
         <MainSource>DPM.IDE.XE5.dpr</MainSource>
