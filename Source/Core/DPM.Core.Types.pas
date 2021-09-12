@@ -59,7 +59,7 @@ type
     RS10_2,
     RS10_3,
     RS10_4,
-    RS11 //probably the next version.
+    RS11
     );
 
   TCompilerVersions = set of TCompilerVersion;
@@ -233,18 +233,18 @@ begin
     TDPMPlatform.WinArm64: result := 'Windows 64-bit ARM';
     TDPMPlatform.OSX32: result := 'macOS 32-bit';
     TDPMPlatform.OSX64: result := 'macOS 64-bit';
-    TDPMPlatform.OSXARM64: result := 'macOS Arm 64-bit';
+    TDPMPlatform.OSXARM64: result := 'macOS ARM 64-bit';
 
     TDPMPlatform.AndroidArm32: result := 'Andriod 32-bit ARM';
     TDPMPlatform.AndroidArm64: result := 'Andriod 64-bit ARM';
     TDPMPlatform.AndroidIntel32: result := 'Andriod 32-bit Intel';
     TDPMPlatform.AndroidIntel64: result := 'Andriod 64-bit Intel';
     TDPMPlatform.iOS32: result := 'iOS 32-bit';
-    TDPMPlatform.iOS64: result := 'iOS 32-bit';
+    TDPMPlatform.iOS64: result := 'iOS 64-bit';
     TDPMPlatform.LinuxIntel32: result := 'Linux 32-bit';
     TDPMPlatform.LinuxIntel64: result := 'Linux 64-bit';
     TDPMPlatform.LinuxArm32: result := 'Linux 32-bit ARM';
-    TDPMPlatform.LinuxArm64: result := 'Linux 32-bit ARM';
+    TDPMPlatform.LinuxArm64: result := 'Linux 64-bit ARM';
   end;
 
 end;
@@ -310,7 +310,7 @@ begin
         TDPMPlatform.AndroidArm64, TDPMPlatform.OSX64];
     TCompilerVersion.RS10_4 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX64, TDPMPlatform.iOS32, TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32,
         TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
-    TCompilerVersion.RS11 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSXARM64, TDPMPlatform.OSX64, TDPMPlatform.iOS32, TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32,
+    TCompilerVersion.RS11 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSXARM64, TDPMPlatform.OSX64, TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32,
         TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
   else
     raise Exception.Create('AllPlatforms is missing for : ' + CompilerToString(compiler));
@@ -325,7 +325,7 @@ begin
     TCompilerVersion.RS10_2 : result := 'Tokyo';
     TCompilerVersion.RS10_3 : result := 'Rio';
     TCompilerVersion.RS10_4 : result := 'Sydney';
-    TCompilerVersion.RS11   : result := 'Olympus';
+    TCompilerVersion.RS11   : result := 'Alexandria';
   else
     result := '';
   end;
@@ -543,8 +543,8 @@ begin
       begin
         case minor of
           0..2 : result := TCompilerVersion.RS10_4;
-          else
-            result := TCompilerVersion.RS11; //check on this when 11 is released!
+          else //.3 is 11.0
+            result := TCompilerVersion.RS11;
           end;
         end;
 

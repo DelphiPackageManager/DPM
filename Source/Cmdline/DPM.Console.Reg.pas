@@ -57,6 +57,7 @@ uses
   DPM.Console.Command.Update,
   DPM.Console.Command.Verify,
   DPM.Console.Command.Why,
+  DPM.Console.Command.Info,
   DPM.Core.Logging,
   DPM.Console.Logger,
   DPM.Console.Writer,
@@ -103,6 +104,7 @@ begin
  container.RegisterType<ICommandHandler,TUpdateCommand>('command.update');
  container.RegisterType<ICommandHandler,TVerifyCommand>('command.verify');
  container.RegisterType<ICommandHandler,TWhyCommand>('command.why');
+ container.RegisterType<ICommandHandler,TInfoCommand>('command.info');
  container.RegisterType<ICommandFactory,TCommandFactory>;
 
 end;

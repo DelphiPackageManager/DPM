@@ -81,6 +81,7 @@ type
                  Update,
                  Verify,
                  Why,
+                 Info,
                  None,
                  Invalid);
 
@@ -105,6 +106,7 @@ const
                        'update',
                        'verify',
                        'why',
+                       'info',
                        '',
                        'invalid');
 

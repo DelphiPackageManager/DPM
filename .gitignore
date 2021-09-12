@@ -63,3 +63,4 @@ Source/dpm.core.tests.rc
 Source/dpm.used
 *.used
 *.cfg
+Source/IDE/EditorView/__recovery

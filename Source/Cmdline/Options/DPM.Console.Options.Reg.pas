@@ -124,8 +124,7 @@ begin
         TCacheOptions.Default.Sources := TCacheOptions.Default.Sources +',' + value;
     end);
   option.AllowMultiple := true;
-
-end;
+  end;
 
 
 procedure RegisterDeleteCommand;
@@ -823,6 +822,18 @@ begin
 
 end;
 
+procedure RegisterInfoCommand;
+var
+  cmd : TCommandDefinition;
+begin
+
+  cmd := TOptionsRegistry.RegisterCommand('info', '', 'Show info about dpm config',
+                                                      '',
+                                                      'info',true);
+
+end;
+
+
 
 procedure RegisterOptions;
 var
@@ -881,6 +892,7 @@ begin
   RegisterVerifyCommand;
   RegisterWhyCommand;
   RegisterExitCodesCommand;
+  RegisterInfoCommand;
 
 end;
 

@@ -24,49 +24,48 @@
 {                                                                           }
 {***************************************************************************}
 
-program dpm;
+library DPM.IDE.D110;
 
-{$APPTYPE CONSOLE}
-
-{$R *.res}
+{$R *.dres}
 
 uses
   System.SysUtils,
-  System.Diagnostics,
-  WinApi.ActiveX,
-  DPM.Console.Types in 'Cmdline\DPM.Console.Types.pas',
-  DPM.Console.Reg in 'Cmdline\DPM.Console.Reg.pas',
-  DPM.Console.Application in 'Cmdline\DPM.Console.Application.pas',
-  DPM.Console.Banner in 'Cmdline\DPM.Console.Banner.pas',
-  DPM.Console.Options in 'Cmdline\Options\DPM.Console.Options.pas',
-  DPM.Console.Options.Reg in 'Cmdline\Options\DPM.Console.Options.Reg.pas',
-  DPM.Console.Writer in 'Cmdline\Writer\DPM.Console.Writer.pas',
-  DPM.Console.Writer.Windows in 'Cmdline\Writer\DPM.Console.Writer.Windows.pas',
-  DPM.Console.Command.Install in 'Cmdline\Commands\DPM.Console.Command.Install.pas',
-  DPM.Console.Command in 'Cmdline\Commands\DPM.Console.Command.pas',
-  DPM.Console.Command.Restore in 'Cmdline\Commands\DPM.Console.Command.Restore.pas',
-  DPM.Console.Command.Pack in 'Cmdline\Commands\DPM.Console.Command.Pack.pas',
-  DPM.Console.Command.Factory in 'Cmdline\Commands\DPM.Console.Command.Factory.pas',
-  DPM.Console.Command.Help in 'Cmdline\Commands\DPM.Console.Command.Help.pas',
-  DPM.Console.Command.Config in 'Cmdline\Commands\DPM.Console.Command.Config.pas',
-  DPM.Console.Command.Delete in 'Cmdline\Commands\DPM.Console.Command.Delete.pas',
-  DPM.Console.Command.List in 'Cmdline\Commands\DPM.Console.Command.List.pas',
-  DPM.Console.Command.Push in 'Cmdline\Commands\DPM.Console.Command.Push.pas',
-  DPM.Console.Command.SetApiKey in 'Cmdline\Commands\DPM.Console.Command.SetApiKey.pas',
-  DPM.Console.Command.Sources in 'Cmdline\Commands\DPM.Console.Command.Sources.pas',
-  DPM.Console.Command.Spec in 'Cmdline\Commands\DPM.Console.Command.Spec.pas',
-  DPM.Console.ExitCodes in 'Cmdline\DPM.Console.ExitCodes.pas',
-  DPM.Console.Command.Update in 'Cmdline\Commands\DPM.Console.Command.Update.pas',
-  DPM.Console.Command.ExitCodes in 'Cmdline\Commands\DPM.Console.Command.ExitCodes.pas',
-  DPM.Console.Command.Base in 'Cmdline\Commands\DPM.Console.Command.Base.pas',
-  DPM.Console.Command.Sign in 'Cmdline\Commands\DPM.Console.Command.Sign.pas',
-  DPM.Console.Command.Verify in 'Cmdline\Commands\DPM.Console.Command.Verify.pas',
-  DPM.Console.Logger in 'Cmdline\Logging\DPM.Console.Logger.pas',
-  DPM.Console.Command.Uninstall in 'Cmdline\Commands\DPM.Console.Command.Uninstall.pas',
-  DPM.Console.Command.Why in 'Cmdline\Commands\DPM.Console.Command.Why.pas',
-  DPM.Console.Command.Add in 'Cmdline\Commands\DPM.Console.Command.Add.pas',
-  DPM.Console.Command.Cache in 'Cmdline\Commands\DPM.Console.Command.Cache.pas',
-  DPM.Console.Command.Feed in 'Cmdline\Commands\DPM.Console.Command.Feed.pas',
+  System.Classes,
+  DPM.IDE.Main in 'IDE\DPM.IDE.Main.pas',
+  DPM.IDE.Wizard in 'IDE\DPM.IDE.Wizard.pas',
+  DPM.IDE.ProjectStorageNotifier in 'IDE\DPM.IDE.ProjectStorageNotifier.pas',
+  DPM.IDE.IDENotifier in 'IDE\DPM.IDE.IDENotifier.pas',
+  DPM.IDE.ProjectMenu in 'IDE\DPM.IDE.ProjectMenu.pas',
+  DPM.IDE.Constants in 'IDE\DPM.IDE.Constants.pas',
+  DPM.IDE.AddInOptions in 'IDE\DPM.IDE.AddInOptions.pas',
+  DPM.IDE.AddInOptionsFrame in 'IDE\DPM.IDE.AddInOptionsFrame.pas' {DPMOptionsFrame: TFrame},
+  DPM.Controls.ButtonedEdit in 'Controls\DPM.Controls.ButtonedEdit.pas',
+  DPM.Controls.AutoComplete in 'Controls\DPM.Controls.AutoComplete.pas',
+  DPM.IDE.AboutForm in 'IDE\DPM.IDE.AboutForm.pas' {DPMAboutForm},
+  DPM.IDE.Types in 'IDE\DPM.IDE.Types.pas',
+  DPM.Controls.GroupButton in 'Controls\DPM.Controls.GroupButton.pas',
+  DPM.IDE.AddInOptionsHostForm in 'IDE\DPM.IDE.AddInOptionsHostForm.pas' {DPMOptionsHostForm},
+  DPM.IDE.IconCache in 'IDE\DPM.IDE.IconCache.pas',
+  DPM.IDE.VSTProxy in 'IDE\DPM.IDE.VSTProxy.pas',
+  DPM.IDE.ProjectTreeManager in 'IDE\DPM.IDE.ProjectTreeManager.pas',
+  DPM.IDE.Utils in 'IDE\DPM.IDE.Utils.pas',
+  DPM.IDE.ProjectTree.Containers in 'IDE\DPM.IDE.ProjectTree.Containers.pas',
+  SVGParse in 'SVG\SVGParse.pas',
+  SVG in 'SVG\SVG.pas',
+  SVGBase64 in 'SVG\SVGBase64.pas',
+  SVGStyle in 'SVG\SVGStyle.pas',
+  SVGCommon in 'SVG\SVGCommon.pas',
+  SVGTypes in 'SVG\SVGTypes.pas',
+  SVGPath in 'SVG\SVGPath.pas',
+  SVGInterfaces in 'SVG\SVGInterfaces.pas',
+  XmlLite in 'SVG\XmlLite.pas',
+  SVGPaint in 'SVG\SVGPaint.pas',
+  PasSVGFactory in 'SVG\PasSVGFactory.pas',
+  GDIPKerning in 'SVG\GDIPKerning.pas',
+  GDIPOBJ2 in 'SVG\GDIPOBJ2.pas',
+  GDIPPathText in 'SVG\GDIPPathText.pas',
+  SVGColor in 'SVG\SVGColor.pas',
+  SVGGraphic in 'SVG\SVGGraphic.pas',
   DPM.Core.Cache.Interfaces in 'Core\Cache\DPM.Core.Cache.Interfaces.pas',
   DPM.Core.Cache in 'Core\Cache\DPM.Core.Cache.pas',
   DPM.Core.Compiler.EnvironmentProvider in 'Core\Compiler\DPM.Core.Compiler.EnvironmentProvider.pas',
@@ -161,47 +160,23 @@ uses
   DPM.Core.Init in 'Core\DPM.Core.Init.pas',
   DPM.Core.TargetPlatform in 'Core\DPM.Core.TargetPlatform.pas',
   DPM.Core.Types in 'Core\DPM.Core.Types.pas',
-  SVGInterfaces in 'SVG\SVGInterfaces.pas',
-  SVGBase64 in 'SVG\SVGBase64.pas',
-  SVGParse in 'SVG\SVGParse.pas',
-  SVG in 'SVG\SVG.pas',
-  SVGStyle in 'SVG\SVGStyle.pas',
-  SVGCommon in 'SVG\SVGCommon.pas',
-  SVGTypes in 'SVG\SVGTypes.pas',
-  SVGPath in 'SVG\SVGPath.pas',
-  XmlLite in 'SVG\XmlLite.pas',
-  SVGPaint in 'SVG\SVGPaint.pas',
-  PasSVGFactory in 'SVG\PasSVGFactory.pas',
-  GDIPKerning in 'SVG\GDIPKerning.pas',
-  GDIPOBJ2 in 'SVG\GDIPOBJ2.pas',
-  GDIPPathText in 'SVG\GDIPPathText.pas',
-  SVGColor in 'SVG\SVGColor.pas',
   DPM.Core.Package.Icon in 'Core\Package\DPM.Core.Package.Icon.pas',
+  DPM.IDE.ProjectController in 'IDE\DPM.IDE.ProjectController.pas',
   DPM.Core.Compiler.BOM in 'Core\Compiler\DPM.Core.Compiler.BOM.pas',
   DPM.Core.Compiler.ProjectSettings in 'Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas',
   DPM.Core.Utils.Files in 'Core\Utils\DPM.Core.Utils.Files.pas',
-  DPM.Core.Package.Installer.Interfaces in 'Core\Package\DPM.Core.Package.Installer.Interfaces.pas',
-  DPM.Console.Command.Info in 'Cmdline\Commands\DPM.Console.Command.Info.pas',
-  DPM.Core.Options.Info in 'Core\Options\DPM.Core.Options.Info.pas';
+  DPM.Controls.LogMemo in 'Controls\DPM.Controls.LogMemo.pas',
+  DPM.IDE.Options in 'IDE\Options\DPM.IDE.Options.pas',
+  DPM.IDE.Logger in 'IDE\Logging\DPM.IDE.Logger.pas',
+  DPM.IDE.MessageForm in 'IDE\Logging\DPM.IDE.MessageForm.pas' {DPMMessageForm},
+  DPM.IDE.MessageService in 'IDE\Logging\DPM.IDE.MessageService.pas',
+  DPM.IDE.EditorView in 'IDE\EditorView\DPM.IDE.EditorView.pas',
+  DPM.IDE.EditorViewFrame in 'IDE\EditorView\DPM.IDE.EditorViewFrame.pas' {DPMEditViewFrame: TFrame},
+  DPM.IDE.EditorViewManager in 'IDE\EditorView\DPM.IDE.EditorViewManager.pas',
+  DPM.IDE.PackageDetailsFrame in 'IDE\EditorView\DPM.IDE.PackageDetailsFrame.pas' {PackageDetailsFrame: TFrame},
+  DPM.IDE.PackageDetailsPanel in 'IDE\EditorView\DPM.IDE.PackageDetailsPanel.pas';
+
+{$R *.res}
 
 begin
-  CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml
-  try
-    System.ExitCode := Ord(TDPMConsoleApplication.Run);
-    {$IFDEF DEBUG}
-      //if running under the debugger, pause so we can see the output!
-      {$WARN SYMBOL_PLATFORM OFF}
-      if DebugHook <> 0 then
-        ReadLn;
-    {$ENDIF};
-  except
-    on E: Exception do
-    begin
-      Writeln(E.ClassName, ': ', E.Message);
-      System.ExitCode := Ord(TExitCode.UnhandledException);
-    {$IFDEF DEBUG}
-      ReadLn;
-    {$ENDIF};
-    end;
-  end;
 end.
