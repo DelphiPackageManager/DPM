@@ -2,16 +2,18 @@ unit DPM.IDE.PackageDetailsPanel;
 
 interface
 
-{$I ..\DPMIDE.inc}
 
 uses
   System.Types,
   System.Classes,
   Vcl.Graphics,
   Vcl.Controls,
+  ToolsApi,
   WinApi.Windows,
   WinApi.Messages,
   DPM.Core.Package.Interfaces;
+
+{$I ..\DPMIDE.inc}
 
 type
   TPackageDetailsPanel = class;

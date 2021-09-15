@@ -30,8 +30,6 @@ unit DPM.IDE.EditorViewFrame;
 
 interface
 
-{$I '..\DPMIDE.inc'}
-
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
   System.Classes,
@@ -69,6 +67,10 @@ uses
   {$IFEND}
   Vcl.ActnList, DPM.IDE.PackageDetailsFrame;
 
+
+{$I '..\DPMIDE.inc'}
+
+
 type
   TDPMEditViewFrame = class(TDPMBaseEditViewFrame)
     PackageDetailsFrame : TPackageDetailsFrame;
@@ -79,7 +81,7 @@ type
     //to install controls before they can work in this.
     procedure CreateControls(AOwner : TComponent);override;
     function GetPackageDetailsView : IPackageDetailsView;override;
-    procedure DoPlatformChange;override;
+    function GetPackageReferences : IGraphNode;override;
 
   public
     constructor Create(AOwner : TComponent); override;
@@ -133,44 +135,6 @@ end;
 
 
 
-procedure TDPMEditViewFrame.DoPlatformChange;
-var
-  projectEditor : IProjectEditor;
-  projectPlatform : TDPMPlatform;
-begin
-  if FProject <> nil then
-  begin
-
-    projectPlatform := ProjectPlatformToDPMPlatform(FProject.CurrentPlatform);
-    if projectPlatform = TDPMPlatform.UnknownPlatform then
-      raise Exception.Create('FProject.CurrentPlatform : ' + FProject.CurrentPlatform);
-
-    if FCurrentPlatform <> projectPlatform then
-    begin
-      FCurrentPlatform := projectPlatform;
-      projectEditor := TProjectEditor.Create(FLogger, FConfiguration, IDECompilerVersion);
-      projectEditor.LoadProject(FProject.FileName);
-      FPackageReferences := projectEditor.GetPackageReferences(FCurrentPlatform); //NOTE : Can return nil. Will change internals to return empty root node.
-      //TODO : need to do this more safely as it may interrup another operation.
-      FInstalledPackages := nil;  //force refresh as we always need to update the installed packages.
-      FAllInstalledPackages := nil;
-      FSearchResultPackages := nil;
-      FUpdates := nil;
-      PackageDetailsView.SetPlatform(FCurrentPlatform);
-      PackageDetailsView.SetPackage(nil);
-      FSearchBar.SetPlatform(FCurrentPlatform);
-      FScrollList.CurrentRow := -1;
-      case FCurrentTab of
-        TDPMCurrentTab.Search : SwitchedToSearch(true);
-        TDPMCurrentTab.Installed : SwitchedToInstalled(true);
-        TDPMCurrentTab.Updates : SwitchedToUpdates(true);
-        TDPMCurrentTab.Conflicts : SwitchedToConflicts(True);
-      end;
-    end;
-  end;
-  *)
-
-end;
 
 function TDPMEditViewFrame.GetPackageDetailsView: IPackageDetailsView;
 begin
@@ -182,47 +146,14 @@ end;
 
 
 
-//procedure TDPMEditViewFrame.platformChangeDetectTimerTimer(Sender : TObject);
-//var
-//  projectEditor : IProjectEditor;
-//  projectPlatform : TDPMPlatform;
-//begin
-//  // since the tools api provides no notifications about active platform change
-//  // we have to resort to this ugly hack.
-//  platformChangeDetectTimer.Enabled := false;
-//  if FProject <> nil then
-//  begin
-//
-//    projectPlatform := ProjectPlatformToDPMPlatform(FProject.CurrentPlatform);
-//    if projectPlatform = TDPMPlatform.UnknownPlatform then
-//      raise Exception.Create('FProject.CurrentPlatform : ' + FProject.CurrentPlatform);
-//
-//    if FCurrentPlatform <> projectPlatform then
-//    begin
-//      FCurrentPlatform := projectPlatform;
-//      projectEditor := TProjectEditor.Create(FLogger, FConfiguration, IDECompilerVersion);
-//      projectEditor.LoadProject(FProject.FileName);
-//      FPackageReferences := projectEditor.GetPackageReferences(FCurrentPlatform); //NOTE : Can return nil. Will change internals to return empty root node.
-//      //TODO : need to do this more safely as it may interrup another operation.
-//      FInstalledPackages := nil;  //force refresh as we always need to update the installed packages.
-//      FAllInstalledPackages := nil;
-//      FSearchResultPackages := nil;
-//      FUpdates := nil;
-//      PackageDetailsFrame.SetPlatform(FCurrentPlatform);
-//      PackageDetailsFrame.SetPackage(nil);
-//      FSearchBar.SetPlatform(FCurrentPlatform);
-//      FScrollList.CurrentRow := -1;
-//      case FCurrentTab of
-//        TDPMCurrentTab.Search : SwitchedToSearch(true);
-//        TDPMCurrentTab.Installed : SwitchedToInstalled(true);
-//        TDPMCurrentTab.Updates : SwitchedToUpdates(true);
-//        TDPMCurrentTab.Conflicts : SwitchedToConflicts(True);
-//      end;
-//    end;
-//  end;
-//  platformChangeDetectTimer.Enabled := true;
-//end;
-
+function TDPMEditViewFrame.GetPackageReferences: IGraphNode;
+var
+  projectEditor : IProjectEditor;
+begin
+  projectEditor := TProjectEditor.Create(Logger, Configuration, IDECompilerVersion);
+  projectEditor.LoadProject(Project.FileName);
+  result := projectEditor.GetPackageReferences(CurrentPlatform); //NOTE : Can return nil. Will change internals to return empty root node.
+end;
 
 end.
 

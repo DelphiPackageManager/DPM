@@ -40,6 +40,9 @@ uses
   {$IFEND}
   Vcl.ActnList;
 
+{$I ..\DPMIDE.inc}
+
+
 type
   TRowLayout = record
     RowWidth : integer;
@@ -97,13 +100,6 @@ type
     FSearchSkip : integer;
     FSearchTake : integer;
 
-    //all installed packages, direct and transitive
-    FAllInstalledPackages : IList<IPackageSearchResultItem>;
-    //directly installed packages, might be fitered.
-    FInstalledPackages : IList<IPackageSearchResultItem>;
-    FSearchResultPackages : IList<IPackageSearchResultItem>;
-    FConflictPackages : IList<IPackageSearchResultItem>;
-    FUpdates : IList<IPackageSearchResultItem>;
 
     FGotConflicts : boolean;
 
@@ -114,6 +110,15 @@ type
     FFirstView : boolean;
 
   protected
+    //all installed packages, direct and transitive
+    FAllInstalledPackages : IList<IPackageSearchResultItem>;
+    //directly installed packages, might be fitered.
+    FInstalledPackages : IList<IPackageSearchResultItem>;
+    FSearchResultPackages : IList<IPackageSearchResultItem>;
+    FConflictPackages : IList<IPackageSearchResultItem>;
+    FUpdates : IList<IPackageSearchResultItem>;
+
+
     //IPackageSearcher
     function GetSearchOptions : TSearchOptions;
     function SearchForPackagesAsync(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;overload;
@@ -127,18 +132,19 @@ type
 
     function IsProjectGroup : boolean;virtual;
     procedure TabChanged(const tab : TDPMCurrentTab);
-    procedure SettingsChanged(const configuration : IConfiguration);
     function CurrentList : IList<IPackageSearchResultItem>;
     procedure RequestPackageIcon(const index : integer; const package : IPackageSearchResultItem);
-    procedure DoPlatformChange;virtual;abstract;
+    procedure DoPlatformChange(const newPlatform : TDPMPlatform);virtual;
     function GetPackageDetailsView : IPackageDetailsView;virtual;abstract;
     procedure SetShowConflictsTab(const value : boolean);
 
-    function GetInstalledPackages : IAwaitable<IList<IPackageSearchResultItem>>;
+    function GetInstalledPackages : IAwaitable<IList<IPackageSearchResultItem>>;virtual;
     function GetUpdatedPackages : IAwaitable<IList<IPackageSearchResultItem>>;
     function GetConflictingPackages : IAwaitable<IList<IPackageSearchResultItem>>;
 
     procedure LoadList(const list : IList<IPackageSearchResultItem>);
+
+    function GetPackageReferences : IGraphNode;virtual;abstract;
 
     function GetPackageIdsFromReferences(const platform : TDPMPlatform) : IList<IPackageId>;
 
@@ -152,8 +158,12 @@ type
 
     procedure SwitchTabs(const currentTab : TDPMCurrentTab; const refresh : boolean);
 
+    //callbacks from the searchbar
+    procedure SearchBarSettingsChanged(const configuration : IConfiguration);
+    procedure SearchBarPlatformChanged(const newPlatform : TDPMPlatform);
+    procedure SearchBarOnSearch(const searchText : string; const searchOptions : TDPMSearchOptions; const source : string; const platform : TDPMPlatform; const refresh : boolean);
 
-    procedure DoSearch(const searchText : string; const searchOptions : TDPMSearchOptions; const source : string; const platform : TDPMPlatform; const refresh : boolean);
+
     procedure ScrollListPaintRow(const Sender : TObject; const ACanvas : TCanvas; const itemRect : TRect; const index : Int64; const state : TPaintRowState);
     procedure ScrollListPaintNoRows(const Sender : TObject; const ACanvas : TCanvas; const paintRect : TRect);
     procedure ScrollListChangeRow(const Sender : TObject; const newRowIndex : Int64; const direction : TScrollDirection; const delta : Int64);
@@ -163,7 +173,19 @@ type
     //to install controls before they can work in this.
     procedure CreateControls(AOwner : TComponent);virtual;
 
+    procedure ConfigureSearchBar;virtual;
+
+    //these are used in the descendants
     property PackageDetailsView : IPackageDetailsView read GetPackageDetailsView;
+    property Project : IOTAProject read FProject;
+    property Logger : IDPMIDELogger read FLogger;
+    property SearchBar : TDPMSearchBarFrame read FSearchBar;
+    property CurrentPlatform : TDPMPlatform read FCurrentPlatform write FCurrentPlatform;
+    property Configuration : IConfiguration read FConfiguration;
+    property ConfigurationManager : IConfigurationManager read FConfigurationManager;
+    property CurrentTab : TDPMCurrentTab read FCurrentTab;
+    property DPMIDEOptions : IDPMIDEOptions read FDPMIDEOptions;
+    property SearchOptions : TSearchOptions read FSearchOptions;
 
   public
     constructor Create(AOwner : TComponent); override;
@@ -277,13 +299,20 @@ begin
   FConfigurationManager.EnsureDefaultConfig;
   FConfiguration := FConfigurationManager.LoadConfig(FSearchOptions.ConfigFile);
 
-  platformChangeDetectTimerTimer(platformChangeDetectTimer);
+  if not IsProjectGroup then
+    platformChangeDetectTimerTimer(platformChangeDetectTimer);
 
   //TODO : for project group configure with platforms enabled in project.
-  FSearchBar.Configure(FLogger, FDPMIDEOptions, FConfiguration,FConfigurationManager, FSearchOptions.ConfigFile, FCurrentPlatform);
+
+  ConfigureSearchBar;
 
   PackageDetailsView.Init(FContainer, FIconCache, FConfiguration, Self, sFileName);
 
+end;
+
+procedure TDPMBaseEditViewFrame.ConfigureSearchBar;
+begin
+  FSearchBar.Configure(FLogger, FDPMIDEOptions, FConfiguration,FConfigurationManager, FSearchOptions.ConfigFile, FCurrentPlatform);
 end;
 
 constructor TDPMBaseEditViewFrame.Create(AOwner: TComponent);
@@ -345,8 +374,9 @@ begin
   FSearchBar := TDPMSearchBarFrame.Create(Self);
   //important to make it appear below the button bar
   FSearchBar.Top := FButtonBar.Top + FButtonBar.Height;
-  FSearchBar.OnSearch := Self.DoSearch;
-  FSearchBar.OnConfigChanged := Self.SettingsChanged;
+  FSearchBar.OnSearch := Self.SearchBarOnSearch;
+  FSearchBar.OnConfigChanged := Self.SearchBarSettingsChanged;
+  FSearchBar.OnPlatformChanged := Self.SearchBarPlatformChanged;
   FSearchBar.Parent := Self;
 
   FScrollList := TVSoftVirtualListView.Create(Self);
@@ -393,7 +423,34 @@ begin
   inherited;
 end;
 
-procedure TDPMBaseEditViewFrame.DoSearch(const searchText: string; const searchOptions: TDPMSearchOptions; const source: string; const platform: TDPMPlatform; const refresh: boolean);
+procedure TDPMBaseEditViewFrame.DoPlatformChange(const newPlatform : TDPMPlatform);
+begin
+
+  if CurrentPlatform <> newPlatform then
+  begin
+    CurrentPlatform := newPlatform;
+    FPackageReferences := GetPackageReferences;
+
+    //TODO : need to do this more safely as it may interrup another operation.
+    FInstalledPackages := nil;  //force refresh as we always need to update the installed packages.
+    FAllInstalledPackages := nil;
+    FSearchResultPackages := nil;
+    FUpdates := nil;
+    PackageDetailsView.SetPlatform(CurrentPlatform);
+    PackageDetailsView.SetPackage(nil);
+    SearchBar.SetPlatform(CurrentPlatform);
+    FSearchOptions.Platforms := [CurrentPlatform];
+    FScrollList.CurrentRow := -1;
+    case CurrentTab of
+      TDPMCurrentTab.Search : SwitchedToSearch(true);
+      TDPMCurrentTab.Installed : SwitchedToInstalled(true);
+      TDPMCurrentTab.Updates : SwitchedToUpdates(true);
+      TDPMCurrentTab.Conflicts : SwitchedToConflicts(True);
+    end;
+  end;
+end;
+
+procedure TDPMBaseEditViewFrame.SearchBarOnSearch(const searchText: string; const searchOptions: TDPMSearchOptions; const source: string; const platform: TDPMPlatform; const refresh: boolean);
 begin
   FCurrentPlatform := platform;
 
@@ -731,47 +788,18 @@ end;
 
 procedure TDPMBaseEditViewFrame.platformChangeDetectTimerTimer(Sender: TObject);
 var
-  projectEditor : IProjectEditor;
   projectPlatform : TDPMPlatform;
 begin
   // since the tools api provides no notifications about active platform change
   // we have to resort to this ugly hack.
   platformChangeDetectTimer.Enabled := false;
-  DoPlatformChange;
-
-  (*
-
   if FProject <> nil then
   begin
-
     projectPlatform := ProjectPlatformToDPMPlatform(FProject.CurrentPlatform);
     if projectPlatform = TDPMPlatform.UnknownPlatform then
       raise Exception.Create('FProject.CurrentPlatform : ' + FProject.CurrentPlatform);
-
-    if FCurrentPlatform <> projectPlatform then
-    begin
-      FCurrentPlatform := projectPlatform;
-      projectEditor := TProjectEditor.Create(FLogger, FConfiguration, IDECompilerVersion);
-      projectEditor.LoadProject(FProject.FileName);
-      FPackageReferences := projectEditor.GetPackageReferences(FCurrentPlatform); //NOTE : Can return nil. Will change internals to return empty root node.
-      //TODO : need to do this more safely as it may interrup another operation.
-      FInstalledPackages := nil;  //force refresh as we always need to update the installed packages.
-      FAllInstalledPackages := nil;
-      FSearchResultPackages := nil;
-      FUpdates := nil;
-      PackageDetailsFrame.SetPlatform(FCurrentPlatform);
-      PackageDetailsFrame.SetPackage(nil);
-      FSearchBar.SetPlatform(FCurrentPlatform);
-      FScrollList.CurrentRow := -1;
-      case FCurrentTab of
-        TDPMCurrentTab.Search : SwitchedToSearch(true);
-        TDPMCurrentTab.Installed : SwitchedToInstalled(true);
-        TDPMCurrentTab.Updates : SwitchedToUpdates(true);
-        TDPMCurrentTab.Conflicts : SwitchedToConflicts(True);
-      end;
-    end;
+    DoPlatformChange(projectPlatform);
   end;
-  *)
   platformChangeDetectTimer.Enabled := true;
 end;
 
@@ -779,7 +807,8 @@ procedure TDPMBaseEditViewFrame.ProjectReloaded;
 begin
   FLogger.Debug('DPMIDE : EditViewReloaded');
   FCurrentPlatform := TDPMPlatform.UnknownPlatform;
-  platformChangeDetectTimerTimer(platformChangeDetectTimer);
+  if not IsProjectGroup then
+    platformChangeDetectTimerTimer(platformChangeDetectTimer);
 end;
 
 procedure TDPMBaseEditViewFrame.RequestPackageIcon(const index: integer; const package: IPackageSearchResultItem);
@@ -875,9 +904,14 @@ begin
 end;
 
 procedure TDPMBaseEditViewFrame.ScrollListPaintNoRows(const Sender: TObject; const ACanvas: TCanvas; const paintRect: TRect);
+var
+  backgroundColor : TColor;
 begin
   ACanvas.Font.Assign(Self.Font);
   ACanvas.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
+  backgroundColor := FIDEStyleServices.GetSystemColor(clWindow);
+
+  ACanvas.Font.Color := backgroundColor;
   if FRequestInFlight then
     ACanvas.TextOut(20, 20, 'Loading....')
   else
@@ -1046,6 +1080,12 @@ begin
   end;
 end;
 
+procedure TDPMBaseEditViewFrame.SearchBarPlatformChanged(const newPlatform: TDPMPlatform);
+begin
+  if IsProjectGroup then
+    DoPlatformChange(newPlatform);
+end;
+
 function TDPMBaseEditViewFrame.SearchForPackages(const options: TSearchOptions): IList<IPackageSearchResultItem>;
 var
   repoManager : IPackageRepositoryManager;
@@ -1074,7 +1114,7 @@ begin
   FButtonBar.ShowConflictsTab := value;
 end;
 
-procedure TDPMBaseEditViewFrame.SettingsChanged(const configuration: IConfiguration);
+procedure TDPMBaseEditViewFrame.SearchBarSettingsChanged(const configuration: IConfiguration);
 begin
   FConfiguration := configuration;
   PackageDetailsView.Init(FContainer, FIconCache, FConfiguration, Self, FProject.FileName);
@@ -1345,7 +1385,7 @@ begin
 //  PackageDetailsFrame.Color := FIDEStyleServices.GetSystemColor(clWindow);
 //  PackageDetailsFrame.ThemeChanged;
 
-  PackageDetailsView.ThemeChanged;
+  PackageDetailsView.ThemeChanged(FIDEStyleServices {$IFDEF THEMESERVICES}, ideThemeSvc {$ENDIF}) ;
 end;
 
 procedure TDPMBaseEditViewFrame.ViewDeselected;
@@ -1358,6 +1398,8 @@ end;
 procedure TDPMBaseEditViewFrame.ViewSelected;
 begin
   //For some reason this get's called twice for each time the view is selected.
+  if IsProjectGroup then
+    exit;
   platformChangeDetectTimer.Enabled := true;
   FLogger.Debug('DPMIDE : View Selected');
   //The first time the view is opened we want to switch to the installed packages tab

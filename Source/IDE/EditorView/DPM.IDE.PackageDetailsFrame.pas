@@ -1,13 +1,39 @@
+{***************************************************************************}
+{                                                                           }
+{           Delphi Package Manager - DPM                                    }
+{                                                                           }
+{           Copyright © 2019 Vincent Parrett and contributors               }
+{                                                                           }
+{           vincent@finalbuilder.com                                        }
+{           https://www.finalbuilder.com                                    }
+{                                                                           }
+{                                                                           }
+{***************************************************************************}
+{                                                                           }
+{  Licensed under the Apache License, Version 2.0 (the "License");          }
+{  you may not use this file except in compliance with the License.         }
+{  You may obtain a copy of the License at                                  }
+{                                                                           }
+{      http://www.apache.org/licenses/LICENSE-2.0                           }
+{                                                                           }
+{  Unless required by applicable law or agreed to in writing, software      }
+{  distributed under the License is distributed on an "AS IS" BASIS,        }
+{  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. }
+{  See the License for the specific language governing permissions and      }
+{  limitations under the License.                                           }
+{                                                                           }
+{***************************************************************************}
+
 unit DPM.IDE.PackageDetailsFrame;
 
 interface
-
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
   Vcl.Imaging.pngimage,
   Vcl.Themes,
+  ToolsAPI,
   DPM.Core.Types,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Package.Interfaces,
@@ -22,8 +48,7 @@ uses
   Spring.Container,
   Spring.Collections,
   VSoft.Awaitable,
-  SVGInterfaces,
-  ToolsAPI;
+  SVGInterfaces;
 
 {$I ..\DPMIDE.inc}
 
@@ -80,7 +105,7 @@ type
     procedure SetPackage(const package : IPackageSearchResultItem);
     procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;
-    procedure ThemeChanged;
+    procedure ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
     property IncludePreRelease : boolean read FIncludePreRelease write SetIncludePreRelease;
   end;
 
@@ -357,7 +382,6 @@ begin
   {$IFDEF STYLEELEMENTS}
   StyleElements := [seFont];
   {$ENDIF}
-
   FDetailsPanel := TPackageDetailsPanel.Create(AOwner);
   FDetailsPanel.ParentColor := false;
   FDetailsPanel.ParentBackground := false;
@@ -374,8 +398,6 @@ begin
   FVersionsDelayTimer.Enabled := false;
   FVersionsDelayTimer.OnTimer := VersionsDelayTimerEvent;
   FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
-
-  ThemeChanged;
 
 end;
 
@@ -539,16 +561,11 @@ begin
   end;
 end;
 
-procedure TPackageDetailsFrame.ThemeChanged;
-{$IFDEF THEMESERVICES}
-var
-  ideThemeSvc : IOTAIDEThemingServices;
-  {$ENDIF}
+procedure TPackageDetailsFrame.ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
 begin
   {$IFDEF THEMESERVICES}
-  ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
+  FIDEStyleServices := StyleServices;
   ideThemeSvc.ApplyTheme(Self);
-  FIDEStyleServices := ideThemeSvc.StyleServices;
   {$ELSE}
   FIDEStyleServices := Vcl.Themes.StyleServices;
   {$ENDIF}

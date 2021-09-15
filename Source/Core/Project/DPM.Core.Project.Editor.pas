@@ -559,7 +559,7 @@ function TProjectEditor.LoadPackageRefences : boolean;
     rootNode : IGraphNode;
   begin
     isTransitive := parentReference <> nil;
-    platform := TDPMPlatform.UnknownPlatform;
+    //platform := TDPMPlatform.UnknownPlatform;
 
     if isTransitive then
       sXPath := 'x:PackageReference'

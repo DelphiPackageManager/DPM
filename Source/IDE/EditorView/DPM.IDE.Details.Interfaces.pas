@@ -3,6 +3,8 @@ unit DPM.IDE.Details.Interfaces;
 interface
 
 uses
+  Vcl.Themes,
+  ToolsApi,
   Spring.Container,
   Spring.Collections,
   VSoft.Awaitable,
@@ -12,6 +14,9 @@ uses
   DPM.Core.Options.Search,
   DPM.IDE.IconCache,
   DPM.IDE.Types;
+
+{$I ..\DPMIDE.inc}
+
 
 type
   //implemented by the EditorViewFrame
@@ -36,7 +41,7 @@ type
     procedure SetPackage(const package : IPackageSearchResultItem);
     procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;
-    procedure ThemeChanged;
+    procedure ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
     property IncludePreRelease : boolean read GetIncludePreRelease write SetIncludePreRelease;
   end;
 

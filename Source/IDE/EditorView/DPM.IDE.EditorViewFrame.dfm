@@ -83,7 +83,4 @@ inherited DPMEditViewFrame: TDPMEditViewFrame
       end
     end
   end
-  inherited platformChangeDetectTimer: TTimer
-    OnTimer = nil
-  end
 end

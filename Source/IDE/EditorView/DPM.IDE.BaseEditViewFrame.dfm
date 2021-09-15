@@ -61,6 +61,7 @@ object DPMBaseEditViewFrame: TDPMBaseEditViewFrame
   object platformChangeDetectTimer: TTimer
     Enabled = False
     Interval = 500
+    OnTimer = platformChangeDetectTimerTimer
     Left = 318
     Top = 408
   end

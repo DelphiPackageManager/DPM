@@ -12,11 +12,13 @@ uses
   DPM.IDE.Types,
   DPM.IDE.Logger,
   DPM.IDE.Options,
-  DPM.Controls.ButtonedEdit;
+  DPM.Controls.ButtonedEdit, System.ImageList;
 
 type
   TConfigChangedEvent = procedure(const configuration : IConfiguration) of object;
+  TPlatformChangedEvent = procedure(const newPlatform : TDPMPlatform) of object;
   TSearchEvent = procedure(const searchText : string; const searchOptions : TDPMSearchOptions; const source : string; const platform : TDPMPlatform; const refresh : boolean) of object;
+
   TDPMSearchBarFrame = class(TFrame)
     DPMEditorViewImages: TImageList;
     DebounceTimer: TTimer;
@@ -45,6 +47,7 @@ type
     procedure chkIncludeCommercialClick(Sender: TObject);
     procedure chkIncludeTrialClick(Sender: TObject);
     procedure cbSourcesChange(Sender: TObject);
+    procedure cbPlatformsChange(Sender: TObject);
   private
     FDPMIDEOptions : IDPMIDEOptions;
     FConfigurationManager : IConfigurationManager;
@@ -58,8 +61,11 @@ type
     FPlatform  : TDPMPlatform;
     FIsGroup   : boolean;
 
+    //events
     FOnSearchEvent : TSearchEvent;
     FOnConfigChanged : TConfigChangedEvent;
+    FOnPlatformChangedEvent : TPlatformChangedEvent;
+
     function GetSearchText: string;
     function GetIncludePreRelease: boolean;
 
@@ -71,6 +77,8 @@ type
     procedure ReloadSourcesCombo;
     procedure DoSearchEvent(const refresh : boolean);
     procedure Loaded; override;
+
+    procedure DoPlatformChangedEvent(const newPlatform : TDPMPlatform);
 
   public
     constructor Create(AOwner : TComponent);override;
@@ -87,6 +95,7 @@ type
 
     property OnConfigChanged : TConfigChangedEvent read FOnConfigChanged write FOnConfigChanged;
     property OnSearch : TSearchEvent read FOnSearchEvent write FOnSearchEvent;
+    property OnPlatformChanged : TPlatformChangedEvent read FOnPlatformChangedEvent write FOnPlatformChangedEvent;
 
   end;
 
@@ -158,6 +167,12 @@ begin
 
 end;
 
+procedure TDPMSearchBarFrame.cbPlatformsChange(Sender: TObject);
+begin
+  if not FLoading then
+    DoPlatformChangedEvent(StringToDPMPlatform(cbPlatforms.Items[cbPlatforms.ItemIndex]));
+end;
+
 procedure TDPMSearchBarFrame.cbSourcesChange(Sender: TObject);
 begin
   if not FLoading then
@@ -183,6 +198,7 @@ procedure TDPMSearchBarFrame.Configure(const logger: IDPMIDELogger; const ideOpt
 var
   platform : TDPMPlatform;
 begin
+  FLoading := true;
   FLogger := logger;
   FDPMIDEOptions := ideOptions;
   FConfiguration := config;
@@ -199,7 +215,8 @@ begin
   end;
   cbPlatforms.Visible := true;
   cbPlatforms.ItemIndex := 0;
- 
+  FLoading := false;
+
 end;
 
 procedure TDPMSearchBarFrame.Configure(const logger: IDPMIDELogger; const ideOptions: IDPMIDEOptions; const config: IConfiguration; const configurationManager: IConfigurationManager; const configFile: string;
@@ -253,7 +270,6 @@ begin
     AddDefaultSearchHistory;
 
 
-  
   FHasSources := false;
 end;
 
@@ -261,6 +277,14 @@ procedure TDPMSearchBarFrame.DebounceTimerTimer(Sender: TObject);
 begin
   DebounceTimer.Enabled := false;
   DoSearchEvent(true);
+end;
+
+procedure TDPMSearchBarFrame.DoPlatformChangedEvent(const newPlatform: TDPMPlatform);
+begin
+  FPlatform := newPlatform;
+
+  if Assigned(FOnPlatformChangedEvent) then
+    FOnPlatformChangedEvent(newPlatform);
 end;
 
 procedure TDPMSearchBarFrame.DoSearchEvent(const refresh : boolean);

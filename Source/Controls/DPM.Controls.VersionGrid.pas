@@ -85,6 +85,7 @@ type
     FCheckAll   : boolean;
     FHitElement : THitElement;
     FMouseCaptured : boolean;
+    procedure SetStyleServices(const Value: TCustomStyleServices);
 
   protected
 
@@ -163,7 +164,7 @@ type
     property CurrentRow : Integer read FCurrentRow;
     property TopRow : Integer read FTopRow;
     //expositing this here so the IDE plugin can set this.
-    property StyleServices : TCustomStyleServices read FStyleServices write FStyleServices;
+    property StyleServices : TCustomStyleServices read FStyleServices write SetStyleServices;
   published
     property Align;
     property Anchors;
@@ -1385,6 +1386,12 @@ begin
     UpdateVisibleRows;
     Invalidate;
   end;
+end;
+
+procedure TVersionGrid.SetStyleServices(const Value: TCustomStyleServices);
+begin
+  FStyleServices := Value;
+  Invalidate;
 end;
 
 procedure TVersionGrid.UpdateHoverRow(const X, Y: integer);
