@@ -280,11 +280,11 @@
             <Form>DPMBaseEditViewFrame</Form>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.Details.Interfaces.pas"/>
         <DCCReference Include="IDE\EditorView\DPM.IDE.GroupEditorViewFrame.pas">
             <Form>DPMGroupEditViewFrame</Form>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
-        <DCCReference Include="IDE\EditorView\DPM.IDE.Details.Interfaces.pas"/>
         <DCCReference Include="IDE\EditorView\DPM.IDE.GroupPackageDetailsFrame.pas">
             <Form>GroupPackageDetailsFrame</Form>
             <FormType>dfm</FormType>

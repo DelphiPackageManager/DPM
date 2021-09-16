@@ -86,12 +86,16 @@ type
     procedure Configure(const logger : IDPMIDELogger; const ideOptions : IDPMIDEOptions; const config : IConfiguration; const configurationManager : IConfigurationManager; const configFile : string; const platform : TDPMPlatform);overload;
     procedure ConfigureForTab(const currentTab : TDPMCurrentTab);
     procedure SetPlatform(const platform : TDPMPlatform);
+    function GetPlatform : TDPMPlatform;
     procedure ThemeChanged(const ideStyleServices : TCustomStyleServices);
+
 
     property Caption : string read GetCaption write SetCaption;
     property HasSources : boolean read FHasSources;
     property SearchText : string read GetSearchText;
     property IncludePrerelease : boolean read GetIncludePreRelease;
+
+    property Platform : TDPMPlatform read GetPlatform;
 
     property OnConfigChanged : TConfigChangedEvent read FOnConfigChanged write FOnConfigChanged;
     property OnSearch : TSearchEvent read FOnSearchEvent write FOnSearchEvent;
@@ -324,6 +328,17 @@ end;
 function TDPMSearchBarFrame.GetIncludePreRelease: boolean;
 begin
   result := chkIncludePrerelease.Checked;
+end;
+
+function TDPMSearchBarFrame.GetPlatform: TDPMPlatform;
+begin
+  if FPlatform = TDPMPlatform.UnknownPlatform then
+  begin
+    if cbPlatforms.Items.Count > 0 then
+      FPlatform := StringToDPMPlatform(cbPlatforms.Items[cbPlatforms.ItemIndex]);
+  end;
+
+  result := FPlatform;
 end;
 
 function TDPMSearchBarFrame.GetSearchText: string;

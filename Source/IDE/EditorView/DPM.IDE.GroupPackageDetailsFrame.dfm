@@ -19,6 +19,15 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
     Color = clWindow
     ParentColor = False
     TabOrder = 0
+    object DetailsSplitter: TSplitter
+      Left = 0
+      Top = 369
+      Width = 436
+      Height = 4
+      Cursor = crVSplit
+      Align = alTop
+      ResizeStyle = rsUpdate
+    end
     object pnlPackageId: TPanel
       Left = 0
       Top = 0
@@ -105,98 +114,113 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
         Stretch = True
       end
     end
-    object pnlInstalled: TPanel
+    object pnlGridHost: TPanel
       Left = 0
       Top = 57
       Width = 436
-      Height = 35
+      Height = 312
       Align = alTop
       BevelOuter = bvNone
-      Caption = 'pnlInstalled'
-      ParentBackground = False
-      ParentColor = True
+      Caption = 'pnlGridHost'
       ShowCaption = False
       TabOrder = 1
-      DesignSize = (
-        436
-        35)
-      object Label1: TLabel
-        Left = 6
-        Top = 11
-        Width = 56
-        Height = 13
-        Caption = 'Installed :'
-        Font.Charset = DEFAULT_CHARSET
-        Font.Color = clWindowText
-        Font.Height = -11
-        Font.Name = 'Tahoma'
-        Font.Style = [fsBold]
-        ParentFont = False
-      end
-      object txtInstalledVersion: TEdit
-        Left = 69
-        Top = 8
-        Width = 276
-        Height = 21
-        Anchors = [akLeft, akTop, akRight]
-        Enabled = False
+      object pnlInstalled: TPanel
+        Left = 0
+        Top = 243
+        Width = 436
+        Height = 35
+        Align = alBottom
+        BevelOuter = bvNone
+        Caption = 'pnlInstalled'
+        ParentBackground = False
+        ParentColor = True
+        ShowCaption = False
         TabOrder = 0
+        ExplicitLeft = 1
+        ExplicitTop = 1
+        ExplicitWidth = 415
+        DesignSize = (
+          436
+          35)
+        object Label1: TLabel
+          Left = 6
+          Top = 11
+          Width = 56
+          Height = 13
+          Caption = 'Installed :'
+          Font.Charset = DEFAULT_CHARSET
+          Font.Color = clWindowText
+          Font.Height = -11
+          Font.Name = 'Tahoma'
+          Font.Style = [fsBold]
+          ParentFont = False
+        end
+        object txtInstalledVersion: TEdit
+          Left = 69
+          Top = 8
+          Width = 276
+          Height = 21
+          Anchors = [akLeft, akTop, akRight]
+          Enabled = False
+          TabOrder = 0
+        end
+        object btnUninstall: TButton
+          Left = 357
+          Top = 6
+          Width = 75
+          Height = 25
+          Anchors = [akTop, akRight]
+          Caption = 'Uninstall'
+          TabOrder = 1
+        end
       end
-      object btnUninstall: TButton
-        Left = 357
-        Top = 6
-        Width = 75
-        Height = 25
-        Anchors = [akTop, akRight]
-        Caption = 'Uninstall'
+      object pnlVersion: TPanel
+        Left = 0
+        Top = 278
+        Width = 436
+        Height = 34
+        Align = alBottom
+        BevelOuter = bvNone
+        Caption = 'Panel1'
+        ParentBackground = False
+        ParentColor = True
+        ShowCaption = False
         TabOrder = 1
-      end
-    end
-    object pnlVersion: TPanel
-      Left = 0
-      Top = 92
-      Width = 436
-      Height = 34
-      Align = alTop
-      BevelOuter = bvNone
-      Caption = 'Panel1'
-      ParentBackground = False
-      ParentColor = True
-      ShowCaption = False
-      TabOrder = 2
-      DesignSize = (
-        436
-        34)
-      object lblVersionTitle: TLabel
-        Left = 6
-        Top = 9
-        Width = 48
-        Height = 13
-        Caption = 'Version :'
-        Font.Charset = DEFAULT_CHARSET
-        Font.Color = clWindowText
-        Font.Height = -11
-        Font.Name = 'Tahoma'
-        Font.Style = [fsBold]
-        ParentFont = False
-      end
-      object cboVersions: TComboBox
-        Left = 69
-        Top = 6
-        Width = 276
-        Height = 22
-        Style = csOwnerDrawVariable
-        Anchors = [akLeft, akTop, akRight]
-        TabOrder = 0
-      end
-      object btnInstallOrUpdate: TButton
-        Left = 357
-        Top = 5
-        Width = 75
-        Height = 25
-        Anchors = [akTop, akRight]
-        Caption = 'Install'
-        TabOrder = 1
+        ExplicitTop = 57
+        DesignSize = (
+          436
+          34)
+        object lblVersionTitle: TLabel
+          Left = 6
+          Top = 9
+          Width = 48
+          Height = 13
+          Caption = 'Version :'
+          Font.Charset = DEFAULT_CHARSET
+          Font.Color = clWindowText
+          Font.Height = -11
+          Font.Name = 'Tahoma'
+          Font.Style = [fsBold]
+          ParentFont = False
+        end
+        object cboVersions: TComboBox
+          Left = 69
+          Top = 6
+          Width = 276
+          Height = 22
+          Style = csOwnerDrawVariable
+          Anchors = [akLeft, akTop, akRight]
+          TabOrder = 0
+        end
+        object btnInstallOrUpdate: TButton
+          Left = 357
+          Top = 5
+          Width = 75
+          Height = 25
+          Anchors = [akTop, akRight]
+          Caption = 'Install'
+          TabOrder = 1
+        end
       end
     end
   end

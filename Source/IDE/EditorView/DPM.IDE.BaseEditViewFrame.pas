@@ -178,6 +178,7 @@ type
     //these are used in the descendants
     property PackageDetailsView : IPackageDetailsView read GetPackageDetailsView;
     property Project : IOTAProject read FProject;
+    property ProjectGroup : IOTAProjectGroup read FProjectGroup;
     property Logger : IDPMIDELogger read FLogger;
     property SearchBar : TDPMSearchBarFrame read FSearchBar;
     property CurrentPlatform : TDPMPlatform read FCurrentPlatform write FCurrentPlatform;
@@ -272,6 +273,7 @@ begin
   begin
     FSearchBar.Caption := 'DPM : ' + ChangeFileExt(ExtractFileName(projectOrGroup.FileName), '');
     FProject := projectOrGroup;
+    FProjectGroup := nil;
     SetShowConflictsTab(false);
   end
   else

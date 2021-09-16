@@ -182,8 +182,8 @@ uses
   DPM.Controls.ButtonBar in 'Controls\DPM.Controls.ButtonBar.pas',
   DPM.IDE.ToolsAPI in 'IDE\DPM.IDE.ToolsAPI.pas',
   DPM.IDE.BaseEditViewFrame in 'IDE\EditorView\DPM.IDE.BaseEditViewFrame.pas' {DPMBaseEditViewFrame: TFrame},
-  DPM.IDE.GroupEditorViewFrame in 'IDE\EditorView\DPM.IDE.GroupEditorViewFrame.pas' {DPMGroupEditViewFrame: TFrame},
   DPM.IDE.Details.Interfaces in 'IDE\EditorView\DPM.IDE.Details.Interfaces.pas',
+  DPM.IDE.GroupEditorViewFrame in 'IDE\EditorView\DPM.IDE.GroupEditorViewFrame.pas' {DPMGroupEditViewFrame: TFrame},
   DPM.IDE.GroupPackageDetailsFrame in 'IDE\EditorView\DPM.IDE.GroupPackageDetailsFrame.pas' {GroupPackageDetailsFrame: TFrame};
 
 {$R *.res}

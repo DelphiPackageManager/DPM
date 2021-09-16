@@ -68,7 +68,7 @@ type
 
     function SavePackageReferences : boolean;
 
-    function InternalLoadFromXML : boolean;
+    function InternalLoadFromXML(const elements : TProjectElements) : boolean;
     procedure Reset;
 
     function GetPlatforms : TDPMPlatforms;
@@ -81,7 +81,7 @@ type
 
     procedure SetCompiler(const value : TCompilerVersion);
 
-    function LoadProject(const filename : string) : Boolean;
+    function LoadProject(const filename : string; const elements : TProjectElements = [TProjectElement.All]) : Boolean;
     function SaveProject(const filename : string) : Boolean;
 
     function GetDPMPropertyGroup : IXMLDOMElement;
@@ -355,14 +355,24 @@ begin
   result := FConfigNames as IReadOnlyList<string>;
 end;
 
-function TProjectEditor.InternalLoadFromXML : boolean;
+function TProjectEditor.InternalLoadFromXML(const elements : TProjectElements) : boolean;
+var
+  loadAll : boolean;
 begin
-  result := LoadProjectVersion;
-  result := result and LoadMainSource;
-  result := result and LoadAppType;
-  result := result and LoadProjectPlatforms;
-  result := result and LoadConfigurations; //must be after platforms
-  result := result and LoadPackageRefences;
+  result := true;
+  loadAll := TProjectElement.All in elements;
+  if loadAll or (TProjectElement.ProjectVersion in elements) then
+    result := result and LoadProjectVersion;
+  if loadAll or (TProjectElement.MainSource in elements) then
+    result := result and LoadMainSource;
+  if loadAll or (TProjectElement.AppType in elements) then
+    result := result and LoadAppType;
+  if loadAll or (TProjectElement.Platforms in elements) then
+    result := result and LoadProjectPlatforms;
+  if loadAll or (TProjectElement.Configs in elements) then
+    result := result and LoadConfigurations; //must be after platforms
+  if loadAll or (TProjectElement.PackageRefs in elements) then
+    result := result and LoadPackageRefences;
 end;
 
 function TProjectEditor.LoadAppType : boolean;
@@ -702,7 +712,7 @@ begin
 
 end;
 
-function TProjectEditor.LoadProject(const filename : string) : Boolean;
+function TProjectEditor.LoadProject(const filename : string; const elements : TProjectElements) : Boolean;
 begin
   result := false;
   FPackageRefences.Clear;
@@ -728,7 +738,7 @@ begin
     (FProjectXML as IXMLDOMDocument2).setProperty('SelectionLanguage', 'XPath');
     (FProjectXML as IXMLDOMDocument2).setProperty('SelectionNamespaces', 'xmlns:x=''http://schemas.microsoft.com/developer/msbuild/2003''');
 
-    result := InternalLoadFromXML;
+    result := InternalLoadFromXML(elements);
   except
     on e : Exception do
     begin

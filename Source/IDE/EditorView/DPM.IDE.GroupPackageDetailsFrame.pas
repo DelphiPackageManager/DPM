@@ -65,13 +65,14 @@ type
     lblVersionTitle: TLabel;
     cboVersions: TComboBox;
     btnInstallOrUpdate: TButton;
+    pnlGridHost: TPanel;
+    DetailsSplitter: TSplitter;
   private
     FContainer : TContainer;
     FIconCache : TDPMIconCache;
     FPackageSearcher : IPackageSearcher;
     FPackageMetaData : IPackageSearchResultItem;
     FProjectsGrid : TVersionGrid;
-    FProjectSplitter : TSplitter;
     FDetailsPanel : TPackageDetailsPanel;
 
     FCurrentTab : TDPMCurrentTab;
@@ -91,8 +92,6 @@ type
   protected
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
-
-
     function GetIncludePreRelease : boolean;
     procedure SetIncludePreRelease(const value : boolean);
 
@@ -127,28 +126,26 @@ begin
 
   //trying to inject the grid and the splitter inside the design time controls.
   FProjectsGrid := TVersionGrid.Create(AOwner);
-  FProjectsGrid.Align := alTop;
-  FProjectsGrid.Top := pnlPackageId.Top;
+  FProjectsGrid.Margins.Left := 5;
+  FProjectsGrid.Margins.Right := 5;
+  FProjectsGrid.AlignWithMargins := true;
+
+  FProjectsGrid.Align := alClient;
+  FProjectsGrid.Top := 0;
   FProjectsGrid.Height := 300;
   FProjectsGrid.ParentColor := false;
   FProjectsGrid.ParentBackground := false;
   FProjectsGrid.DoubleBuffered := true;
-  FProjectsGrid.Parent := sbPackageDetails;
 
-
-  FProjectSplitter := TSplitter.Create(AOwner);
-  FProjectSplitter.Align := alTop;
-  FProjectSplitter.Top := pnlVersion.Top + pnlVersion.Height + 10;
-  FProjectSplitter.ResizeStyle := TResizeStyle.rsUpdate;
-  FProjectSplitter.Parent := sbPackageDetails;
+  FProjectsGrid.Parent := pnlGridHost;
 
   FDetailsPanel := TPackageDetailsPanel.Create(AOwner);
   FDetailsPanel.ParentColor := false;
   FDetailsPanel.ParentBackground := false;
   FDetailsPanel.DoubleBuffered := true;
-  FDetailsPanel.Align := alTop;
+  FDetailsPanel.Align := alClient;
   FDetailsPanel.Height := 200;
-  FDetailsPanel.Top := FProjectSplitter.Top + FProjectSplitter.Height + 5;
+  FDetailsPanel.Top := DetailsSplitter.Top + DetailsSplitter.Height;
   FDetailsPanel.OnUriClick := Self.OnDetailsUriClick;
   FDetailsPanel.Parent := sbPackageDetails;
 

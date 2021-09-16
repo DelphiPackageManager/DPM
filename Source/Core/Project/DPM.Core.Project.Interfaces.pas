@@ -57,6 +57,9 @@ type
 
   TAppType = (Application, Package,Lib, Unknown);
 
+  TProjectElement = (ProjectVersion,MainSource, AppType, Platforms, Configs, PackageRefs, All);
+  TProjectElements = set of TProjectElement;
+
   //used by the package installer
   IProjectEditor = interface
   ['{CFF241F9-8B5B-44FC-95FC-6C1A015637E9}']
@@ -68,7 +71,7 @@ type
     function GetProjectFile : string;
     procedure SetCompiler(const value : TCompilerVersion);
 
-    function LoadProject(const filename : string) : boolean;
+    function LoadProject(const filename : string; const elements : TProjectElements = [TProjectElement.All]) : boolean;
     procedure Reset;
 
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string>; const packageCacheLocation : string) : boolean;

@@ -40,32 +40,40 @@ inherited DPMGroupEditViewFrame: TDPMGroupEditViewFrame
           Height = 670
           ExplicitWidth = 410
           ExplicitHeight = 670
+          inherited DetailsSplitter: TSplitter
+            Width = 410
+            ExplicitWidth = 410
+          end
           inherited pnlPackageId: TPanel
             Width = 410
             ExplicitWidth = 410
           end
-          inherited pnlInstalled: TPanel
+          inherited pnlGridHost: TPanel
             Width = 410
             ExplicitWidth = 410
-            inherited txtInstalledVersion: TEdit
-              Width = 250
-              ExplicitWidth = 250
+            inherited pnlInstalled: TPanel
+              Width = 410
+              ExplicitWidth = 410
+              inherited txtInstalledVersion: TEdit
+                Width = 250
+                ExplicitWidth = 250
+              end
+              inherited btnUninstall: TButton
+                Left = 331
+                ExplicitLeft = 331
+              end
             end
-            inherited btnUninstall: TButton
-              Left = 331
-              ExplicitLeft = 331
-            end
-          end
-          inherited pnlVersion: TPanel
-            Width = 410
-            ExplicitWidth = 410
-            inherited cboVersions: TComboBox
-              Width = 250
-              ExplicitWidth = 250
-            end
-            inherited btnInstallOrUpdate: TButton
-              Left = 331
-              ExplicitLeft = 331
+            inherited pnlVersion: TPanel
+              Width = 410
+              ExplicitWidth = 410
+              inherited cboVersions: TComboBox
+                Width = 250
+                ExplicitWidth = 250
+              end
+              inherited btnInstallOrUpdate: TButton
+                Left = 331
+                ExplicitLeft = 331
+              end
             end
           end
         end

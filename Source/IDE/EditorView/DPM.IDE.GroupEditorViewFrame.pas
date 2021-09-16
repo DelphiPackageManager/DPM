@@ -46,7 +46,10 @@ implementation
 {$R *.dfm}
 
 uses
-  DPM.Core.Types;
+  DPM.Core.Types,
+  DPM.Core.Project.Interfaces,
+  DPM.Core.Project.Editor,
+  DPM.IDE.Types;
 
 
 { TDPMGroupEditViewFrame }
@@ -59,14 +62,27 @@ end;
 procedure TDPMGroupEditViewFrame.Configure(const projectOrGroup: IOTAProject; const container: TContainer; const projectTreeManager: IDPMProjectTreeManager);
 begin
   inherited;
+  CurrentPlatform := SearchBar.Platform;
 end;
 
 procedure TDPMGroupEditViewFrame.ConfigureSearchBar;
 var
   platforms : TDPMPlatforms;
+  i : integer;
+  projectEditor : IProjectEditor;
 begin
-  //TODO : this needs to figure out the enabled platforms in the projects and pass that in
-  platforms := [TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32];
+  //it would be nice to use the open tools api to do this, but so far
+  // - Project.SupportedPlatforms returns all platforms, whether they are enabled for the project or not
+  // - BuildConfig.Platforms is empty.
+
+  //doing it this way is not ideal, as it requires that the project has been saved after a platform was added.
+  projectEditor := TProjectEditor.Create(Logger, Configuration, IDECompilerVersion);
+  platforms := [];//TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32];
+  for i := 0 to ProjectGroup.ProjectCount -1 do
+  begin
+    projectEditor.LoadProject(ProjectGroup.Projects[i].FileName, [TProjectElement.Platforms]);
+    platforms := platforms + projectEditor.Platforms;
+  end;
 
   SearchBar.Configure(Logger, DPMIDEOptions, Configuration, ConfigurationManager, SearchOptions.ConfigFile, platforms);
 end;
@@ -95,7 +111,9 @@ end;
 
 procedure TDPMGroupEditViewFrame.ProjectReloaded;
 begin
-  inherited;
+//  inherited;
+ConfigureSearchBar;
+
 end;
 
 procedure TDPMGroupEditViewFrame.ThemeChanged;
