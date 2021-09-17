@@ -136,9 +136,6 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
         ParentColor = True
         ShowCaption = False
         TabOrder = 0
-        ExplicitLeft = 1
-        ExplicitTop = 1
-        ExplicitWidth = 415
         DesignSize = (
           436
           35)
@@ -186,7 +183,6 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
         ParentColor = True
         ShowCaption = False
         TabOrder = 1
-        ExplicitTop = 57
         DesignSize = (
           436
           34)
@@ -211,6 +207,9 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
           Style = csOwnerDrawVariable
           Anchors = [akLeft, akTop, akRight]
           TabOrder = 0
+          OnChange = cboVersionsChange
+          OnDrawItem = cboVersionsDrawItem
+          OnMeasureItem = cboVersionsMeasureItem
         end
         object btnInstallOrUpdate: TButton
           Left = 357

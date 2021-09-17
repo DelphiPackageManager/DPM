@@ -12,6 +12,7 @@ uses
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Package.Interfaces,
   DPM.Core.Options.Search,
+  DPM.Core.Dependency.Interfaces,
   DPM.IDE.IconCache,
   DPM.IDE.Types;
 
@@ -26,6 +27,7 @@ type
     function SearchForPackagesAsync(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;overload;
     function SearchForPackages(const options : TSearchOptions) : IList<IPackageSearchResultItem>;overload;
     function GetCurrentPlatform : string;
+    function GetPackageReferences : IGraphNode;
     procedure InstallStarting;
     procedure PackageInstalled(const package : IPackageSearchResultItem);
     procedure PackageUninstalled(const package : IPackageSearchResultItem);
@@ -36,7 +38,7 @@ type
     function GetIncludePreRelease : boolean;
     procedure SetIncludePreRelease(const value : boolean);
 
-    procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectFile : string);
+    procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectOrGroup : IOTAProject);
     procedure Configure(const value : TDPMCurrentTab; const preRelease : boolean);
     procedure SetPackage(const package : IPackageSearchResultItem);
     procedure SetPlatform(const platform : TDPMPlatform);

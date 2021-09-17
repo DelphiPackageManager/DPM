@@ -14,6 +14,9 @@ uses
   Vcl.Dialogs,
   ToolsApi,
   Spring.Container,
+  Spring.Collections,
+  VSoft.Awaitable,
+  DPM.Core.Package.Interfaces,
   DPM.Core.Dependency.Interfaces,
   DPM.IDE.Details.Interfaces,
   DPM.IDE.ProjectTreeManager,
@@ -28,9 +31,8 @@ type
   protected
     function IsProjectGroup : boolean;override;
     function GetPackageDetailsView : IPackageDetailsView;override;
-    function GetPackageReferences : IGraphNode;override;
+    function DoGetPackageReferences : IGraphNode;override;
     procedure ConfigureSearchBar;override;
-
   public
     constructor Create(AOwner : TComponent); override;
     procedure Configure(const projectOrGroup : IOTAProject; const container : TContainer; const projectTreeManager : IDPMProjectTreeManager);override;
@@ -49,6 +51,7 @@ uses
   DPM.Core.Types,
   DPM.Core.Project.Interfaces,
   DPM.Core.Project.Editor,
+  DPM.Core.Dependency.Graph,
   DPM.IDE.Types;
 
 
@@ -62,7 +65,7 @@ end;
 procedure TDPMGroupEditViewFrame.Configure(const projectOrGroup: IOTAProject; const container: TContainer; const projectTreeManager: IDPMProjectTreeManager);
 begin
   inherited;
-  CurrentPlatform := SearchBar.Platform;
+  //CurrentPlatform := SearchBar.Platform;
 end;
 
 procedure TDPMGroupEditViewFrame.ConfigureSearchBar;
@@ -94,14 +97,36 @@ begin
 end;
 
 
+
 function TDPMGroupEditViewFrame.GetPackageDetailsView: IPackageDetailsView;
 begin
   result := PackageDetailsFrame as IPackageDetailsView;
 end;
 
-function TDPMGroupEditViewFrame.GetPackageReferences: IGraphNode;
+function TDPMGroupEditViewFrame.DoGetPackageReferences: IGraphNode;
+var
+  projectEditor : IProjectEditor;
+  proj : IOTAProject;
+  i : integer;
+  node : IGraphNode;
+  sProjectId : string;
 begin
-  result := nil; //TODO : build graph with all projects.
+  projectEditor := TProjectEditor.Create(Logger, Configuration, IDECompilerVersion);
+  result := TGraphNode.CreateRoot(IDECompilerVersion, CurrentPlatform);
+
+  for i := 0 to ProjectGroup.ProjectCount -1 do
+  begin
+    proj := ProjectGroup.Projects[i];
+    sProjectId := proj.FileName;
+    projectEditor.LoadProject(sProjectId);
+    node := projectEditor.GetPackageReferences(CurrentPlatform); //NOTE : Can return nil. Will change internals to return empty root node.
+    if node <> nil then
+    begin
+      sProjectId := ChangeFileExt(ExtractFileName(sProjectId), '');
+      Result.AddExistingNode(LowerCase(sProjectId), node);
+    end;
+  end;
+
 end;
 
 function TDPMGroupEditViewFrame.IsProjectGroup: boolean;

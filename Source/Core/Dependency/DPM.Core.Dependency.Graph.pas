@@ -47,7 +47,6 @@ uses
 type
   TGraphNode = class(TInterfacedObject, IGraphNode)
   private
-
     {$IFDEF USEWEAK}
     [weak]
     FParent : IGraphNode;
@@ -61,13 +60,13 @@ type
     FPlatform : TDPMPlatform;
     FSelectedOn : TVersionRange;
     FUseSource : boolean;
-    FLevel : integer;
     FSearchPaths : IList<string>;
     FLibPath : string;
     FBplPath : string;
     FCompilerVersion : TCompilerVersion;
     FProjectFile : string;
   protected
+    procedure AddExistingNode(const id : string; const node : IGraphNode);
     function AddPackageChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
     function FindFirstNode(const id : string) : IGraphNode;
     function FindNodes(const id : string) : IList<IGraphNode>;
@@ -93,12 +92,9 @@ type
     procedure SetSelectedOn(const value : TVersionRange);
     function RemoveNode(const node : IGraphNode) : boolean;
     function IsRoot : boolean;
-    function IsTopLevel : boolean;
     function HasChildren : boolean;
-    function GetLevel : Integer;
     procedure VisitDFS(const visitor : TNodeVisitProc);
 
-    procedure Prune(const id : string);
     function AreEqual(const otherNode : IGraphNode; const depth : integer = 1) : boolean;
     function GetUseSource: Boolean;
     procedure SetUseSource(const value: Boolean);
@@ -118,6 +114,11 @@ uses
   DPM.Core.Constants;
 
 { TGraphNode }
+
+procedure TGraphNode.AddExistingNode(const id: string; const node: IGraphNode);
+begin
+  FChildNodes[LowerCase(id)] := node;
+end;
 
 function TGraphNode.AddPackageChildNode(const id: string; const version: TPackageVersion; const selectedOn: TVersionRange): IGraphNode;
 var
@@ -179,7 +180,6 @@ end;
 constructor TGraphNode.Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const selectedOn : TVersionRange; const useSource : boolean);
 begin
   FSearchPaths := TCollections.CreateList<string>;
-  FLevel := 0;
   if parent <> nil then
   begin
     {$IFDEF USEWEAK}
@@ -289,10 +289,6 @@ begin
  result := (FParent <> nil) and (not {$IFDEF USEWEAK} FParent.IsRoot {$ELSE} IGraphNode(FParent).IsRoot{$ENDIF});
 end;
 
-function TGraphNode.GetLevel : Integer;
-begin
-  result := FLevel;
-end;
 
 function TGraphNode.GetLibPath: string;
 begin
@@ -357,23 +353,6 @@ begin
   result := FId = cRootNode;
 end;
 
-function TGraphNode.IsTopLevel : boolean;
-begin
-  result := (FParent = nil) or {$IFDEF USEWEAK} FParent.IsRoot {$ELSE} IGraphNode(FParent).IsRoot{$ENDIF};
-end;
-
-procedure TGraphNode.Prune(const id : string);
-var
-  childNode : IGraphNode;
-begin
-  if FChildNodes.ContainsKey(LowerCase(id)) then
-    FChildNodes.Remove(LowerCase(id))
-  else
-  begin
-    for childNode in FChildNodes.Values do
-      childNode.Prune(id);
-  end;
-end;
 
 function TGraphNode.RemoveNode(const node : IGraphNode) : boolean;
 var

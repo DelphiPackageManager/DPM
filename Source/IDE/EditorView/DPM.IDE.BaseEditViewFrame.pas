@@ -128,6 +128,8 @@ type
 
     procedure PackageInstalled(const package : IPackageSearchResultItem);
     procedure PackageUninstalled(const package : IPackageSearchResultItem);
+    function GetPackageReferences : IGraphNode;
+
     //IPackageSearcher
 
     function IsProjectGroup : boolean;virtual;
@@ -139,12 +141,12 @@ type
     procedure SetShowConflictsTab(const value : boolean);
 
     function GetInstalledPackages : IAwaitable<IList<IPackageSearchResultItem>>;virtual;
-    function GetUpdatedPackages : IAwaitable<IList<IPackageSearchResultItem>>;
-    function GetConflictingPackages : IAwaitable<IList<IPackageSearchResultItem>>;
+    function GetUpdatedPackages : IAwaitable<IList<IPackageSearchResultItem>>;virtual;
+    function GetConflictingPackages : IAwaitable<IList<IPackageSearchResultItem>>;virtual;
 
     procedure LoadList(const list : IList<IPackageSearchResultItem>);
 
-    function GetPackageReferences : IGraphNode;virtual;abstract;
+    function DoGetPackageReferences : IGraphNode;virtual;abstract;
 
     function GetPackageIdsFromReferences(const platform : TDPMPlatform) : IList<IPackageId>;
 
@@ -187,6 +189,7 @@ type
     property CurrentTab : TDPMCurrentTab read FCurrentTab;
     property DPMIDEOptions : IDPMIDEOptions read FDPMIDEOptions;
     property SearchOptions : TSearchOptions read FSearchOptions;
+    property CancellationTokenSource : ICancellationTokenSource read FCancelTokenSource;
 
   public
     constructor Create(AOwner : TComponent); override;
@@ -269,6 +272,7 @@ begin
   FContainer := container;
   FProjectTreeManager := projectTreeManager;
   sFileName := projectOrGroup.FileName;
+  FProject := projectOrGroup;
   if not Supports(projectOrGroup, IOTAProjectGroup, FProjectGroup) then
   begin
     FSearchBar.Caption := 'DPM : ' + ChangeFileExt(ExtractFileName(projectOrGroup.FileName), '');
@@ -279,7 +283,6 @@ begin
   else
   begin
     SetShowConflictsTab(true);
-    FProject := nil;
     FSearchBar.Caption := 'DPM : Project Group';
   end;
 
@@ -308,8 +311,7 @@ begin
 
   ConfigureSearchBar;
 
-  PackageDetailsView.Init(FContainer, FIconCache, FConfiguration, Self, sFileName);
-
+  PackageDetailsView.Init(FContainer, FIconCache, FConfiguration, Self, projectOrGroup);
 end;
 
 procedure TDPMBaseEditViewFrame.ConfigureSearchBar;
@@ -427,11 +429,10 @@ end;
 
 procedure TDPMBaseEditViewFrame.DoPlatformChange(const newPlatform : TDPMPlatform);
 begin
-
   if CurrentPlatform <> newPlatform then
   begin
     CurrentPlatform := newPlatform;
-    FPackageReferences := GetPackageReferences;
+    FPackageReferences := DoGetPackageReferences;
 
     //TODO : need to do this more safely as it may interrup another operation.
     FInstalledPackages := nil;  //force refresh as we always need to update the installed packages.
@@ -582,28 +583,18 @@ begin
       item : IPackageSearchResultItem;
     begin
       result := TCollections.CreateList<IPackageSearchResultItem>;
-
-      if IsProjectGroup then
+      FLogger.Debug('DPMIDE : Got Installed package references, fetching metadata...');
+      result := repoManager.GetInstalledPackageFeed(cancelToken, options, GetPackageIdsFromReferences(FCurrentPlatform), FConfiguration);
+      for item in result do
       begin
-        //TODO : Figure out how to work with project groups!
-        exit;
-
-      end
-      else
-      begin
-        FLogger.Debug('DPMIDE : Got Installed package references, fetching metadata...');
-        result := repoManager.GetInstalledPackageFeed(cancelToken, options, GetPackageIdsFromReferences(ProjectPlatformToDPMPlatform(FProject.CurrentPlatform)), FConfiguration);
-        for item in result do
+        if FPackageReferences <> nil then
         begin
-          if FPackageReferences <> nil then
-          begin
-            packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
-            if packageRef <> nil then
-              item.IsTransitive := packageRef.IsTransitive;
-          end;
+          packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
+          if packageRef <> nil then
+            item.IsTransitive := packageRef.IsTransitive;
         end;
-        FLogger.Debug('DPMIDE : Got Installed package metadata.');
       end;
+      FLogger.Debug('DPMIDE : Got Installed package metadata.');
 
     end, FCancelTokenSource.Token);
 end;
@@ -612,6 +603,7 @@ function TDPMBaseEditViewFrame.GetPackageIdsFromReferences(const platform: TDPMP
 var
   lookup : IDictionary<string, IPackageId>;
   packageRef : IGraphNode;
+  existing : IPackageId;
 
   procedure AddPackageIds(const value : IGraphNode);
   var
@@ -620,7 +612,13 @@ var
     if not (value.Platform = platform) then
       exit;
 
-    if not lookup.ContainsKey(Lowercase(value.Id)) then
+    if lookup.TryGetValue(Lowercase(value.Id), existing) then
+    begin
+      //add the highest version - with project groups there could be more than 1 version
+      if existing.Version < value.Version then
+        lookup[Lowercase(value.Id)] := value;
+    end
+    else
       lookup[Lowercase(value.Id)] := value;
 
     for childRef in value.ChildNodes do
@@ -638,6 +636,11 @@ begin
     end;
     result.AddRange(lookup.Values);
   end;
+end;
+
+function TDPMBaseEditViewFrame.GetPackageReferences: IGraphNode;
+begin
+  result := FPackageReferences;
 end;
 
 function TDPMBaseEditViewFrame.GetSearchOptions: TSearchOptions;
@@ -808,9 +811,11 @@ end;
 procedure TDPMBaseEditViewFrame.ProjectReloaded;
 begin
   FLogger.Debug('DPMIDE : EditViewReloaded');
-  FCurrentPlatform := TDPMPlatform.UnknownPlatform;
+    FCurrentPlatform := TDPMPlatform.UnknownPlatform;
   if not IsProjectGroup then
-    platformChangeDetectTimerTimer(platformChangeDetectTimer);
+    platformChangeDetectTimerTimer(platformChangeDetectTimer)
+  else
+    SearchBarPlatformChanged(SearchBar.Platform);
 end;
 
 procedure TDPMBaseEditViewFrame.RequestPackageIcon(const index: integer; const package: IPackageSearchResultItem);
@@ -1119,7 +1124,7 @@ end;
 procedure TDPMBaseEditViewFrame.SearchBarSettingsChanged(const configuration: IConfiguration);
 begin
   FConfiguration := configuration;
-  PackageDetailsView.Init(FContainer, FIconCache, FConfiguration, Self, FProject.FileName);
+  PackageDetailsView.Init(FContainer, FIconCache, FConfiguration, Self, FProject);
 end;
 
 procedure TDPMBaseEditViewFrame.SwitchedToConflicts(const refresh: boolean);
@@ -1395,20 +1400,23 @@ begin
   // The view tab was deselected.
   FLogger.Debug('DPMIDE : View Deselected');
   platformChangeDetectTimer.Enabled := false;
+  FFirstView := true;
 end;
 
 procedure TDPMBaseEditViewFrame.ViewSelected;
 begin
-  //For some reason this get's called twice for each time the view is selected.
-  if IsProjectGroup then
-    exit;
-  platformChangeDetectTimer.Enabled := true;
   FLogger.Debug('DPMIDE : View Selected');
+  //For some reason this get's called twice for each time the view is selected.
+  if not IsProjectGroup then
+    platformChangeDetectTimer.Enabled := true;
   //The first time the view is opened we want to switch to the installed packages tab
   if FFirstView then
   begin
     FFirstView := false;
-    platformChangeDetectTimerTimer(platformChangeDetectTimer);
+    if IsProjectGroup then
+      DoPlatformChange(SearchBar.Platform)
+    else
+      platformChangeDetectTimerTimer(platformChangeDetectTimer);
   end;
 end;
 

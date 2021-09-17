@@ -70,6 +70,7 @@ type
     function GetProjectFile : string;
 
     function AddPackageChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
+    procedure AddExistingNode(const id : string; const node : IGraphNode);
     ///
     /// Breadth first search
     function FindFirstNode(const id : string) : IGraphNode;
@@ -80,10 +81,8 @@ type
     function FindChild(const id : string) : IGraphNode;
 
     //removes any child with id recursively (and it's children)
-    procedure Prune(const id : string);
     function RemoveNode(const node : IGraphNode) : boolean;
     function IsRoot : boolean;
-    function IsTopLevel : boolean;
     function HasChildren : boolean;
     procedure VisitDFS(const visitor : TNodeVisitProc);
 
@@ -93,7 +92,6 @@ type
 
     property Id : string read GetId;
     property SelectedOn : TVersionRange read GetSelectedOn write SetSelectedOn;
-//    property Level : integer read GetLevel;
     property IsTransitive : boolean read GetIsTransitive;
     property ChildNodes : IEnumerable<IGraphNode>read GetChildNodes;
     property Parent : IGraphNode read GetParent;

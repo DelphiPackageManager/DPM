@@ -100,7 +100,7 @@ type
 
   public
     constructor Create(AOwner : TComponent); override;
-    procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectFile : string);
+    procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectOrGroup : IOTAProject);
     procedure Configure(const value : TDPMCurrentTab; const preRelease : boolean);
     procedure SetPackage(const package : IPackageSearchResultItem);
     procedure SetPlatform(const platform : TDPMPlatform);
@@ -122,11 +122,8 @@ uses
   DPM.Core.Repository.Interfaces,
   DPM.Core.Options.Install,
   DPM.Core.Options.UnInstall,
-  DPM.Core.Package.Installer.Interfaces;
-
-const
-  cLatestStable = 'Latest stable ';
-  cLatestPrerelease = 'Latest prerelease ';
+  DPM.Core.Package.Installer.Interfaces,
+  DPM.IDE.Constants;
 
   { TPackageDetailsFrame }
 
@@ -406,14 +403,14 @@ begin
   result := FIncludePreRelease;
 end;
 
-procedure TPackageDetailsFrame.Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectFile : string);
+procedure TPackageDetailsFrame.Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectOrGroup : IOTAProject);
 begin
   FContainer := container;
   FIconCache := iconCache;
   FConfiguration := config;
   FLogger := FContainer.Resolve<IDPMIDELogger>;
   FPackageSearcher := packageSearcher;
-  FProjectFile := projectFile;
+  FProjectFile := projectOrGroup.FileName;
   SetPackage(nil);
 
 end;
