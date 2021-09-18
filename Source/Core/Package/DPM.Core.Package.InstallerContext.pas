@@ -29,6 +29,7 @@ type
 
     procedure RecordGraph(const projectFile: string; const platform : TDPMPlatform; const graph: IGraphNode; const resolutions : TArray<IResolution>);virtual;
 
+    //search other projects in the project group to see if they have resolved the package.
     function FindPackageResolution(const currentProjectFile: string; const packageId : string; const platform : TDPMPlatform) : IResolution;
 
 

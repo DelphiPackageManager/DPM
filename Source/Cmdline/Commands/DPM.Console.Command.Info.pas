@@ -39,7 +39,7 @@ uses
 type
   TInfoCommand = class(TBaseCommand)
   private
-    FConsole : IConsoleWriter;
+    //FConsole : IConsoleWriter;
 
   protected
     function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
@@ -64,7 +64,6 @@ end;
 function TInfoCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
   TInfoOptions.Default.ApplyCommon(TCommonOptions.Default);
-
 
   Logger.Information('DPM Config file : '  + TInfoOptions.Default.ConfigFile);
   result := TExitCode.OK;

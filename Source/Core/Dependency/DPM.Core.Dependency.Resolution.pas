@@ -55,12 +55,17 @@ type
 
 implementation
 
+uses
+  System.SysUtils;
+
 { TResolution }
 
 constructor TResolution.Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
 begin
   FPackage := package;
   FVersionRange := range;
+  if FVersionRange.IsEmpty then
+    raise EArgumentOutOfRangeException.Create('Empty version range provided for resolution');
   FParentId := parentId;
   FProject := project;
 end;

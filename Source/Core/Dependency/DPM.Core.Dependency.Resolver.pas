@@ -294,17 +294,18 @@ var
   context : IResolverContext;
   packageRef : TProjectReference;
   resolution : IResolution;
+  errorCount : integer;
 begin
-  result := false;
   //TODO : We need to check the project references against the resolutions because the context only pushes packages with dependencies onto the queue
-
+  errorCount := 0;
   for packageRef in projectReferences do
   begin
     resolution := FPackageInstallerContext.FindPackageResolution(projectFile,packageRef.Package.Id, platform);
     if (resolution <> nil) and (not resolution.VersionRange.Satisfies(packageRef.Package.Version)) then
     begin
       FLogger.Error('Package project group conflict : ' + packageRef.Package.Id + '-' + resolution.Package.Version.ToString + ' in project : ' + resolution.Project + ' does not satisfy ' + packageRef.Package.Version.ToString  );
-      exit;              
+      Inc(errorCount)
+      //exit;
     end;
   end;
   context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, newPackage, projectReferences);
@@ -313,6 +314,7 @@ begin
   resolved := context.GetResolvedPackages;
   dependencyGraph := context.BuildDependencyGraph;
   FPackageInstallerContext.RecordGraph(projectFile, platform, dependencyGraph, context.GetResolutions);
+  result := result and (errorCount = 0);
 end;
 
 function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancellationToken; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
@@ -320,15 +322,17 @@ var
   context : IResolverContext;
   packageRef : TProjectReference;
   resolution : IResolution;
+  errorCount : integer;
 begin
-  result := false;
+  errorCount := 0;
   for packageRef in projectReferences do
   begin
     resolution := FPackageInstallerContext.FindPackageResolution(projectFile,packageRef.Package.Id, platform);
     if (resolution <> nil) and (not resolution.VersionRange.Satisfies(packageRef.Package.Version)) then
     begin
       FLogger.Error('Package project group conflict : ' + packageRef.Package.Id + '-' + resolution.Package.Version.ToString + ' in project : ' + resolution.Project + ' does not satisfy ' + packageRef.Package.Version.ToString  );
-      exit;              
+      Inc(errorCount)
+     // exit;
     end;
   end;
   context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, options.CompilerVersion,  platform, projectReferences);
@@ -337,6 +341,7 @@ begin
   resolved := context.GetResolvedPackages;
   dependencyGraph := context.BuildDependencyGraph;
   FPackageInstallerContext.RecordGraph(projectFile, platform, dependencyGraph, context.GetResolutions);
+  result := result and (errorCount = 0);
 end;
 
 

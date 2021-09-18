@@ -68,7 +68,7 @@ type
 
     FDownloadCount : Int64;
     FInstalled : boolean;
-    FInstalledVersion : string;
+    FLatestVersion : string;
     FIsReservedPrefix : boolean;
     FSourceName : string;
     FPublishedDate : string;
@@ -84,7 +84,7 @@ type
     function GetPublishedDate : string;
     function GetReportUrl : string;
     function GetInstalled : Boolean;
-    function GetInstalledVersion : string;
+    function GetLatestVersion : string;
     function GetIsReservedPrefix : Boolean;
 
     function GetIsCommercial : Boolean;
@@ -99,11 +99,14 @@ type
     function GetIsError : boolean;
     function GetIsTransitive : Boolean;
 
+    procedure SetVersion(const value : string);
     procedure SetPublishedDate(const value : string);
     procedure SetReportUrl(const value : string);
     procedure SetInstalled(const value : Boolean);
-    procedure SetInstalledVersion(const value : string);
+    procedure SetLatestVersion(const value : string);
     procedure SetIsTransitive(const value : Boolean);
+
+
 
     constructor CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
     constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platforms : TDPMPlatforms; const dependencies : IList<IPackagePlatformDependencies>);
@@ -272,10 +275,6 @@ begin
   result := FInstalled;
 end;
 
-function TDPMPackageSearchResultItem.GetInstalledVersion : string;
-begin
-  result := FInstalledVersion;
-end;
 
 function TDPMPackageSearchResultItem.GetIsCommercial : Boolean;
 begin
@@ -300,6 +299,11 @@ end;
 function TDPMPackageSearchResultItem.GetIsTrial : Boolean;
 begin
   result := FIsTrial;
+end;
+
+function TDPMPackageSearchResultItem.GetLatestVersion: string;
+begin
+  result := FLatestVersion;
 end;
 
 function TDPMPackageSearchResultItem.GetLicense : string;
@@ -353,14 +357,15 @@ begin
   FInstalled := value;
 end;
 
-procedure TDPMPackageSearchResultItem.SetInstalledVersion(const value : string);
-begin
-  FInstalledVersion := value;
-end;
 
 procedure TDPMPackageSearchResultItem.SetIsTransitive(const value : Boolean);
 begin
   FIsTransitive := value;
+end;
+
+procedure TDPMPackageSearchResultItem.SetLatestVersion(const value: string);
+begin
+  FLatestVersion := value;
 end;
 
 procedure TDPMPackageSearchResultItem.SetPublishedDate(const value : string);
@@ -371,6 +376,11 @@ end;
 procedure TDPMPackageSearchResultItem.SetReportUrl(const value : string);
 begin
   FReportUrl := value;
+end;
+
+procedure TDPMPackageSearchResultItem.SetVersion(const value: string);
+begin
+  FVersion := value;
 end;
 
 end.

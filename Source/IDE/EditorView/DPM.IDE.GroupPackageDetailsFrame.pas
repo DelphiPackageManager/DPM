@@ -354,7 +354,7 @@ begin
       bFetchVersions := true;
       FPackageId := package.Id;
       if package.Installed then
-        FPackageInstalledVersion := package.InstalledVersion
+        FPackageInstalledVersion := package.Version
       else
         FPackageInstalledVersion := '';
     end
@@ -363,7 +363,7 @@ begin
       //same id, so we might just be displaying a new version.
       //since we're just getting the item from the feed rather than the project
       //it won't have installed or installed version set.
-      package.InstalledVersion := FPackageInstalledVersion;
+      //package.InstalledVersion := FPackageInstalledVersion;
       if package.Installed then
         FPackageInstalledVersion := package.Version
       else
@@ -418,7 +418,7 @@ begin
     end;
 
     txtInstalledVersion.Text := FPackageInstalledVersion;
-    btnInstallOrUpdate.Enabled := (not package.Installed) or (package.InstalledVersion <> package.Version);
+    btnInstallOrUpdate.Enabled := (not package.Installed) or (package.LatestVersion <> package.Version);
 
     sbPackageDetails.Visible := true;
 

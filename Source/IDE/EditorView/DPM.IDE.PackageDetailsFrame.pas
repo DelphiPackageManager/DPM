@@ -188,9 +188,9 @@ begin
     installResult := packageInstaller.Install(FCancellationTokenSource.Token, options, context);
     if installResult then
     begin
-      FPackageMetaData.InstalledVersion := FPackageMetaData.Version;
+//      FPackageMetaData.InstalledVersion := FPackageMetaData.Version;
       FPackageMetaData.Installed := true;
-      FPackageInstalledVersion := FPackageMetaData.InstalledVersion;
+      FPackageInstalledVersion := FPackageMetaData.Version;
       FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + newVersion.ToString + ' [' + FPackageSearcher.GetCurrentPlatform + '] installed.');
       FPackageSearcher.PackageInstalled(FPackageMetaData);
       SetPackage(FPackageMetaData);
@@ -234,15 +234,16 @@ begin
     options.Version := TPackageVersion.Parse(FPackageMetaData.Version);
     options.ProjectPath := FProjectFile;
     options.Platforms := [ProjectPlatformToDPMPlatform(FPackageSearcher.GetCurrentPlatform)];
+    options.CompilerVersion := IDECompilerVersion;
 
     packageInstaller := FContainer.Resolve<IPackageInstaller>;
     context := FContainer.Resolve<IPackageInstallerContext>;
     uninstallResult := packageInstaller.UnInstall(FCancellationTokenSource.Token, options, context);
     if uninstallResult then
     begin
-      FPackageMetaData.InstalledVersion := FPackageMetaData.Version;
+//      FPackageMetaData.InstalledVersion := FPackageMetaData.Version;
       FPackageMetaData.Installed := true;
-      FPackageInstalledVersion := FPackageMetaData.InstalledVersion;
+      FPackageInstalledVersion := FPackageMetaData.Version;
       FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + '] uninstalled.');
       FPackageSearcher.PackageUninstalled(FPackageMetaData);
       SetPackage(nil);
@@ -469,7 +470,7 @@ begin
       bFetchVersions := true;
       FPackageId := package.Id;
       if package.Installed then
-        FPackageInstalledVersion := package.InstalledVersion
+        FPackageInstalledVersion := package.Version
       else
         FPackageInstalledVersion := '';
     end
@@ -478,7 +479,6 @@ begin
       //same id, so we might just be displaying a new version.
       //since we're just getting the item from the feed rather than the project
       //it won't have installed or installed version set.
-      package.InstalledVersion := FPackageInstalledVersion;
       if package.Installed then
         FPackageInstalledVersion := package.Version
       else
@@ -532,8 +532,11 @@ begin
       TDPMCurrentTab.Conflicts : ;
     end;
 
-    txtInstalledVersion.Text := FPackageInstalledVersion;
-    btnInstallOrUpdate.Enabled := (not package.Installed) or (package.InstalledVersion <> package.Version);
+    if FPackageInstalledVersion <> '' then
+      txtInstalledVersion.Text := FPackageInstalledVersion
+    else
+      txtInstalledVersion.Text := 'not installed';
+    btnInstallOrUpdate.Enabled := (not package.Installed) or (package.LatestVersion <> package.Version);
 
     sbPackageDetails.Visible := true;
 
@@ -622,10 +625,7 @@ begin
   options.CompilerVersion := IDECompilerVersion;
   options.AllVersions := true;
   options.SearchTerms := FPackageMetaData.Id;
-  if FCurrentTab = TDPMCurrentTab.Installed then
-    options.Prerelease := true //should this be checking the package meta data version for pre-release?
-  else
-    options.Prerelease := FIncludePreRelease;
+  options.Prerelease := FIncludePreRelease;
 
   options.Platforms := [FCurrentPlatform];
 

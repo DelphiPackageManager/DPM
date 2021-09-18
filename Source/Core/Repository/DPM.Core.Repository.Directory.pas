@@ -71,6 +71,9 @@ type
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo; overload;
 
+    function GetPackageLatestVersions(const cancellationToken : ICancellationToken; const ids : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const preRelease : boolean) : IDictionary<string, TPackageVersion>;
+
+
     //ui stuff
     function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const preRelease : boolean) : IList<TPackageVersion>; overload;
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration) : IList<IPackageSearchResultItem>;
@@ -277,6 +280,7 @@ begin
   result := DoGetPackageInfo(cancellationToken, packagFileName);
 end;
 
+
 function TDirectoryPackageRepository.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration) : IList<IPackageSearchResultItem>;
 var
   searchTerms : TArray<string>;
@@ -383,6 +387,61 @@ begin
   end;
 end;
 
+function TDirectoryPackageRepository.GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion; const preRelease: boolean): IDictionary<string, TPackageVersion>;
+var
+  i : integer;
+  j : integer;
+  id : string;
+  searchFiles : IList<string>;
+  regex : TRegEx;
+  searchRegex : string;
+  packageFile : string;
+  match : TMatch;
+  packageVersion : TPackageVersion;
+  highestVersion : TPackageVersion;
+begin
+  result := TCollections.CreateDictionary<string, TPackageVersion>;
+
+  searchRegEx := GetSearchRegex(compilerVersion, [], '');
+  regex := TRegEx.Create(searchRegEx, [roIgnoreCase]);
+
+  for i := 0 to ids.Count -1 do
+  begin
+    id := ids.Items[i].Id;
+    searchFiles := DoExactList(id, compilerVersion, platform, '');
+    for j := 0 to searchFiles.Count -1 do
+    begin
+      packageFile := ChangeFileExt(ExtractFileName(searchFiles[j]), '');
+      match := regex.Match(packageFile);
+      if match.Success then
+      begin
+        if not TPackageVersion.TryParse(match.Groups[4].Value, packageVersion) then
+          continue;
+
+        if ids.Items[i].Version.IsStable then
+          if (not preRelease) and (not packageVersion.IsStable)  then
+            continue;
+
+        if result.TryGetValue(id, highestVersion) then
+        begin
+          if packageVersion > highestVersion then
+          begin
+            highestVersion := packageVersion;
+            result[id] := highestVersion;
+          end;
+        end
+        else
+        begin
+          highestVersion := packageVersion;
+          result[id] := highestVersion;
+        end;
+      end;
+    end;
+  end;
+end;
+
+
+
 function TDirectoryPackageRepository.GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const preRelease : boolean) : IList<TPackageVersion>;
 var
   searchFiles : IList<string>;
@@ -411,7 +470,6 @@ begin
 
       if (not preRelease) and (not packageVersion.IsStable)  then
         continue;
-
 
       result.Add(packageVersion);
     end;
@@ -507,9 +565,8 @@ begin
 
   try
     fileList := TDirectoryUtils.GetFiles(Source, searchTerm);
-    //    fileList := TCollections.CreateList<string>(files);
-        //dedupe
-    result.AddRange(TEnumerable.Distinct < string > (fileList, TStringComparer.OrdinalIgnoreCase));
+    //dedupe
+    result.AddRange(TEnumerable.Distinct<string>(fileList, TStringComparer.OrdinalIgnoreCase));
   except
     on e : Exception do
     begin
@@ -864,7 +921,7 @@ begin
   end;
 
   //dedupe
-  distinctFiles := TDistinctIterator < string > .Create(allFiles, TStringComparer.OrdinalIgnoreCase);
+  distinctFiles := TDistinctIterator<string>.Create(allFiles, TStringComparer.OrdinalIgnoreCase);
   if options.Skip > 0 then
     distinctFiles := distinctFiles.Skip(options.Skip);
   if options.Take > 0 then

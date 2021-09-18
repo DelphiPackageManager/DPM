@@ -71,6 +71,8 @@ type
 
     function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const preRelease : boolean) : IList<TPackageVersion>; overload;
 
+    function GetPackageLatestVersions(const cancellationToken : ICancellationToken; const ids : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const preRelease : boolean) : IDictionary<string, TPackageVersion>;
+
     property Name : string read GetName;
     property Source : string read GetSource;
     property RepositoryType : TSourceType read GetRepositoryType;
@@ -102,7 +104,7 @@ type
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
     function GetPackageIcon(const cancelToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string;
       const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const configuration : IConfiguration) : IPackageIcon;
-    function GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IEnumerable<IPackageId>; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
+    function GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IList<IPackageId>; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
   end;
 
 

@@ -568,7 +568,7 @@ begin
 
   options := FSearchOptions.Clone;
   //we want all packages for installed as we don't know what types we might have
-  options.Prerelease := true;
+//  options.Prerelease := FSearchOptions.Prerelease;
   options.Commercial := true;
   options.Trial := true;
 //  options.SearchTerms := FSearchOptions.SearchTerms;
@@ -673,6 +673,7 @@ begin
     exit;
   end;
   FScrollList.CurrentRow := -1;
+  PackageDetailsView.SetPackage(nil);
   if FScrollList.RowCount = list.Count then
     FScrollList.Invalidate  //doing this because if the rowcount is the same it doesn't invalidate.
   else
@@ -688,7 +689,7 @@ var
   packageSearchResult : IPackageSearchResultItem;
 begin
   package.Installed := true;
-  package.InstalledVersion := package.Version;
+  //package.InstalledVersion := package.Version;
   FAllInstalledPackages := nil;
   FInstalledPackages := nil;
 
@@ -705,7 +706,7 @@ begin
     if packageSearchResult <> nil then
     begin
       packageSearchResult.Installed := true;
-      packageSearchResult.InstalledVersion := package.Version;
+      //packageSearchResult.InstalledVersion := package.Version;
     end;
   end;
 
@@ -726,7 +727,7 @@ begin
     if packageSearchResult <> nil then
     begin
       packageSearchResult.Installed := true;
-      packageSearchResult.InstalledVersion := package.Version;
+      //packageSearchResult.InstalledVersion := package.Version;
     end
     else
       FAllInstalledPackages.Add(packageSearchResult);
@@ -746,7 +747,7 @@ var
   packageSearchResult : IPackageSearchResultItem;
 begin
   package.Installed := false;
-  package.InstalledVersion := '';
+  //package.InstalledVersion := '';
 
   //if it's in the search results, update the installed version.
   //might be nil if we haven't switched to the tab yet.
@@ -762,7 +763,7 @@ begin
     if packageSearchResult <> nil then
     begin
       packageSearchResult.Installed := false;
-      packageSearchResult.InstalledVersion := '';
+      //packageSearchResult.InstalledVersion := '';
     end;
   end;
 
@@ -1057,16 +1058,17 @@ begin
       //this is important
       SetTextAlign(ACanvas.Handle, oldTextAlign);
     end;
+
     //version
-    if item.Installed and (item.Version <> item.InstalledVersion) then
-      title := 'v' + item.InstalledVersion
-    else
-      title := 'v' + item.Version;
+//    if item.Installed and (item.Version <> item.InstalledVersion) then
+//      title := item.InstalledVersion
+//    else
+    title := item.Version;
     ACanvas.TextRect(FRowLayout.VersionRect, title, [tfSingleLine, tfVerticalCenter, tfRight]);
 
-    if item.Installed and (item.Version <> item.InstalledVersion) then
+    if item.Installed and (item.Version <> item.LatestVersion) then
     begin
-      title := 'v' + item.Version;
+      title := item.LatestVersion;
       ACanvas.TextRect(FRowLayout.InstalledVersionRect, title, [tfSingleLine, tfVerticalCenter, tfRight]);
     end;
 
@@ -1274,7 +1276,10 @@ begin
           packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
           item.Installed := (packageRef <> nil) and (not packageRef.IsTransitive);
           if item.Installed then
-            item.InstalledVersion := packageRef.Version.ToStringNoMeta;
+          begin
+            item.LatestVersion := item.Version;
+            item.Version := packageRef.Version.ToStringNoMeta;
+          end;
         end;
 
         FScrollList.RowCount := FSearchResultPackages.Count;

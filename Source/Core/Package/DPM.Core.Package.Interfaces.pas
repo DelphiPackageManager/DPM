@@ -180,19 +180,20 @@ type
     function GetIsCommercial : boolean;
     function GetDownloadCount : Int64;
     function GetInstalled : boolean;
-    function GetInstalledVersion : string;
+    function GetLatestVersion : string;
     function GetIsError : boolean;
     function GetIsReservedPrefix : boolean;
     function GetIsTransitive : boolean;
 
+    procedure SetVersion(const value : string);
     procedure SetInstalled(const value : boolean);
-    procedure SetInstalledVersion(const value : string);
+    procedure SetLatestVersion(const value : string);
     procedure SetReportUrl(const value : string);
     procedure SetPublishedDate(const value : string);
     procedure SetIsTransitive(const value : boolean);
 
     property Id : string read GetId;
-    property Version : string read GetVersion;
+    property Version : string read GetVersion write SetVersion;
     property Description : string read GetDescription;
     property Authors : string read GetAuthors;
     property Owners : string read GetOwners;
@@ -213,7 +214,7 @@ type
 
     //these are for use by the UI, it's not returned.
     property Installed : boolean read GetInstalled write SetInstalled;
-    property InstalledVersion : string read GetInstalledVersion write SetInstalledVersion;
+    property LatestVersion : string read GetLatestVersion write SetLatestVersion;
     //    property InstalledPlatforms : TDPMPlatforms read GetInstalledPlatforms write SetInstalledPlatforms;
     property IsTransitive : boolean read GetIsTransitive write SetIsTransitive;
     property ReportUrl : string read GetProjectUrl write SetReportUrl;

@@ -121,7 +121,7 @@ end;
 
 function TResolverContext.BuildDependencyGraph : IGraphNode;
 var
-  toplevelPackages : IEnumerable<IResolution>;
+  toplevelPackages : TArray<IResolution>;
   topLevelPackage : IResolution;
 
   procedure AddNode(const parentNode : IGraphNode; const package : IPackageInfo; const versionRange : TVersionRange);
@@ -145,7 +145,7 @@ begin
   toplevelPackages := FResolved.Values.Where(function(const value : IResolution) : boolean
     begin
       result := value.ParentId = cRootNode;
-    end);
+    end).ToArray;
 
   for toplevelPackage in toplevelPackages do
     AddNode(result, topLevelPackage.Package, TVersionRange.Empty);
@@ -160,10 +160,10 @@ begin
   FLogger := logger;
   FPackageInstallerContext := packageInstallerContext;
   FProjectFile := projectFile;
-  FNoGoods := TCollections.CreateDictionary < string, IDictionary<TPackageVersion, byte> > ;
-  FResolved := TCollections.CreateDictionary < string, IResolution > ;
+  FNoGoods := TCollections.CreateDictionary<string, IDictionary<TPackageVersion, byte>>;
+  FResolved := TCollections.CreateDictionary<string, IResolution>;
   FOpenRequirements := TCollections.CreateQueue<IPackageInfo>;
-  FVersionCache := TCollections.CreateDictionary < string, IList<IPackageInfo> > ;
+  FVersionCache := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
 
   for projectReference in projectReferences do
   begin
@@ -181,7 +181,7 @@ begin
   Assert(newPackage <> nil);
   Create(logger, packageInstallerContext, projectFile, newPackage.CompilerVersion, newPackage.Platform, projectReferences);
   PushRequirement(newPackage);
-  RecordResolution(newPackage, TVersionRange.Empty, cRootNode);
+  RecordResolution(newPackage, TVersionRange.Create(newPackage.Version), cRootNode);
 end;
 
 
@@ -280,6 +280,8 @@ begin
   begin
     resolution := FPackageInstallerContext.FindPackageResolution(FProjectFile, packageId, FPlatform);
     result := resolution <> nil;
+    if resolution <> nil then
+      FResolved[Lowercase(packageId)] := resolution;
   end;
 end;
 
