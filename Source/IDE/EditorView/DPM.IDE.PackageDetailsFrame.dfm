@@ -3,11 +3,9 @@ object PackageDetailsFrame: TPackageDetailsFrame
   Top = 0
   Width = 436
   Height = 523
-  DoubleBuffered = True
-  Color = clWindow
+  Color = clBtnFace
   ParentBackground = False
   ParentColor = False
-  ParentDoubleBuffered = False
   TabOrder = 0
   object sbPackageDetails: TScrollBox
     Left = 0

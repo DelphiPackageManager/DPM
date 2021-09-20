@@ -169,8 +169,6 @@ begin
             exit;
           end;
 
-
-
           //see if we can reduce to an overlapping versionrange that satisfies both
           if resolution.VersionRange.TryGetOverlappingVersion(dependency.VersionRange, overlappingRange) then
           begin
@@ -202,6 +200,7 @@ begin
           //the direct will not have a range so we convert the version to a range.
           if resolution.VersionRange.IsEmpty then
             resolution.VersionRange := TVersionRange.Create(resolution.Package.Version);
+          //if the resolution came from another project, then we still need to deal with it's dependencies.
         end;
         //we're good.. this is resolved.
         continue;

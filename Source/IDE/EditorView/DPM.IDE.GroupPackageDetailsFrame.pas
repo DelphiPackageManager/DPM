@@ -467,7 +467,8 @@ begin
   FIDEStyleServices := Vcl.Themes.StyleServices;
   {$ENDIF}
 
-  sbPackageDetails.Color := FIDEStyleServices.GetSystemColor(clWindow);
+  Self.Color := FIDEStyleServices.GetSystemColor(clWindow);
+
 
   {$IF CompilerVersion >= 32.0}
   sbPackageDetails.ParentColor := false;

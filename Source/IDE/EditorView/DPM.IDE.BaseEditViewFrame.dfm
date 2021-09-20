@@ -54,8 +54,8 @@ object DPMBaseEditViewFrame: TDPMBaseEditViewFrame
       Constraints.MinWidth = 400
       ParentBackground = False
       ParentColor = True
-      ShowCaption = False
       TabOrder = 1
+      ExplicitLeft = 598
     end
   end
   object platformChangeDetectTimer: TTimer

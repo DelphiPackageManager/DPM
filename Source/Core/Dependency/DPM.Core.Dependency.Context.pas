@@ -274,14 +274,40 @@ begin
 end;
 
 function TResolverContext.TryGetResolution(const packageId : string; out resolution : IResolution) : boolean;
+
+  procedure CopyDependencies(const res : IResolution);
+  var
+    i: Integer;
+    id : string;
+    childRes : IResolution;
+  begin
+    for i := 0 to res.package.Dependencies.Count -1 do
+    begin
+      id := res.package.Dependencies[i].Id;
+      childRes := FPackageInstallerContext.FindPackageResolution(FProjectFile, id , FPlatform);
+      if childRes <> nil then
+      begin
+        FResolved[Lowercase(id)] := childRes.Clone(FProjectFile); //should we be cloning here?
+        if childRes.Package.Dependencies.Any then
+          CopyDependencies(childRes);
+      end;
+    end;
+  end;
+
 begin
   result := FResolved.TryGetValue(LowerCase(packageId), resolution);
   if not result then
   begin
+    //check if it was resolved in another project in the group
     resolution := FPackageInstallerContext.FindPackageResolution(FProjectFile, packageId, FPlatform);
     result := resolution <> nil;
     if resolution <> nil then
-      FResolved[Lowercase(packageId)] := resolution;
+    begin
+      FResolved[Lowercase(packageId)] := resolution.Clone(FProjectFile);
+      //if we resolved via another projectr in the group, then we need to bring along the resolved dependencies too
+      if resolution.Package.Dependencies.Any then
+        CopyDependencies(resolution);
+    end;
   end;
 end;
 

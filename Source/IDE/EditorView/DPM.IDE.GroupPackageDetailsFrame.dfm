@@ -3,6 +3,9 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
   Top = 0
   Width = 436
   Height = 523
+  Color = clBtnFace
+  ParentBackground = False
+  ParentColor = False
   TabOrder = 0
   object sbPackageDetails: TScrollBox
     Left = 0

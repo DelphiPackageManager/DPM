@@ -82,6 +82,7 @@ begin
   result := nil;
   for pair in FProjectResolutions do
   begin
+    //only check other projects which might have already resolved the package.
     if not SameText(currentProjectFile, pair.Key) then
     begin
       if pair.Value.TryGetValue(platform, resolutions) then

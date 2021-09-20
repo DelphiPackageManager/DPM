@@ -29,6 +29,7 @@ inherited DPMEditViewFrame: TDPMEditViewFrame
       Left = 536
       Width = 465
       Height = 767
+      ParentBackground = True
       ExplicitLeft = 536
       ExplicitWidth = 465
       ExplicitHeight = 767
@@ -38,11 +39,6 @@ inherited DPMEditViewFrame: TDPMEditViewFrame
         Width = 465
         Height = 767
         Align = alClient
-        DoubleBuffered = True
-        Color = clWindow
-        ParentBackground = False
-        ParentColor = False
-        ParentDoubleBuffered = False
         TabOrder = 0
         ExplicitWidth = 465
         ExplicitHeight = 767

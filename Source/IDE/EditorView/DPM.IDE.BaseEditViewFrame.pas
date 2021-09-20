@@ -232,6 +232,7 @@ begin
   if (references = nil) or (not references.HasChildren) then
     exit;
 
+  //breadth first search!
   for ref in references.ChildNodes do
   begin
     if ref.Platform <> platform then
@@ -239,6 +240,13 @@ begin
 
     if SameText(ref.Id, searchItem.Id) then
       Exit(ref);
+  end;
+
+  for ref in references.ChildNodes do
+  begin
+    if ref.Platform <> platform then
+      continue;
+    //depth search
     if ref.HasChildren then
     begin
       result := FindPackageRef(ref, platform, searchItem);
@@ -246,6 +254,7 @@ begin
         Exit(result);
     end;
   end;
+
 
 end;
 
@@ -1386,6 +1395,8 @@ begin
   FIDEStyleServices := Vcl.Themes.StyleServices;
   {$IFEND}
 
+  Self.Color := FIDEStyleServices.GetSystemColor(clWindow);
+
   FButtonBar.ThemeChanged(FIDEStyleServices);
   FSearchBar.ThemeChanged(FIDEStyleServices);
 
@@ -1393,9 +1404,6 @@ begin
 
   FScrollList.Color := FIDEStyleServices.GetSystemColor(clWindow);
   FScrollList.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
-
-//  PackageDetailsFrame.Color := FIDEStyleServices.GetSystemColor(clWindow);
-//  PackageDetailsFrame.ThemeChanged;
 
   PackageDetailsView.ThemeChanged(FIDEStyleServices {$IFDEF THEMESERVICES}, ideThemeSvc {$ENDIF}) ;
 end;

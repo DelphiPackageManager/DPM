@@ -238,8 +238,7 @@ begin
         function(const pkg: IPackageInfo): boolean
         begin
           result := SameText(pkg.Id, node.Id);
-          FLogger.Debug('Testing pkg [' + pkg.Id + '] against [' + node.Id + ']');
-
+          //FLogger.Debug('Testing pkg [' + pkg.Id + '] against [' + node.Id + ']');
         end).FirstOrDefault;
       Assert(pkgInfo <> nil, 'pkgInfo is null for id [' + node.Id + '], but should never be');
       pkgInfo.UseSource := pkgInfo.UseSource or node.UseSource;
@@ -724,8 +723,7 @@ begin
   if node.HasChildren then
     for child in node.ChildNodes do
     begin
-      result := CreateProjectRefs(cancellationToken, child, seenPackages,
-        projectReferences);
+      result := CreateProjectRefs(cancellationToken, child, seenPackages, projectReferences);
       if not result then
         exit;
     end;
@@ -769,7 +767,7 @@ begin
   if (existingPackageRef <> nil) then
   begin
     // if it's installed already and we're not forcing it to install then we're done.
-    if not Options.force then
+    if (not Options.force) and (not existingPackageRef.IsTransitive) then
     begin
       // Note this error won't show from the IDE as we always force install from the IDE.
       FLogger.Error('Package [' + Options.packageId +  '] is already installed. Use option -force to force reinstall.');
@@ -811,8 +809,7 @@ begin
   if not FPackageCache.EnsurePackage(newPackageIdentity) then
   begin
     // not in the cache, so we need to get it from the the repository
-    if not FRepositoryManager.DownloadPackage(cancellationToken,
-      newPackageIdentity, FPackageCache.PackagesFolder, packageFileName) then
+    if not FRepositoryManager.DownloadPackage(cancellationToken, newPackageIdentity, FPackageCache.PackagesFolder, packageFileName) then
     begin
       FLogger.Error('Failed to download package [' + newPackageIdentity.ToString + ']');
       exit;
@@ -846,7 +843,7 @@ begin
     FLogger.Debug('ResolveForInstall failed');
     // we need to carry on here as resolution may have failed for another package
     // not sure what the best solution is here.. a better resolver perhaps.
-    // exit;
+     exit;
   end;
 
   if resolvedPackages = nil then
