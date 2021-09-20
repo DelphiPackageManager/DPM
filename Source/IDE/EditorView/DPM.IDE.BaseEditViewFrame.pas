@@ -1385,12 +1385,12 @@ var
 begin
   {$IF CompilerVersion >=32.0}
   ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
-  FIDEStyleServices := ideThemeSvc.StyleServices;
-  ideThemeSvc.ApplyTheme(FButtonBar);
-  ideThemeSvc.ApplyTheme(FSearchBar);
-  ideThemeSvc.ApplyTheme(FSearchBar.chkIncludePrerelease);
-  ideThemeSvc.ApplyTheme(Splitter2);
   ideThemeSvc.ApplyTheme(Self);
+//  ideThemeSvc.ApplyTheme(FButtonBar);
+//  ideThemeSvc.ApplyTheme(FSearchBar);
+//  ideThemeSvc.ApplyTheme(FSearchBar.chkIncludePrerelease);
+//  ideThemeSvc.ApplyTheme(Splitter2);
+  FIDEStyleServices := ideThemeSvc.StyleServices;
   {$ELSE}
   FIDEStyleServices := Vcl.Themes.StyleServices;
   {$IFEND}

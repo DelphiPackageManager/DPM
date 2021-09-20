@@ -3,6 +3,9 @@ object DPMBaseEditViewFrame: TDPMBaseEditViewFrame
   Top = 0
   Width = 1010
   Height = 581
+  Color = clBtnFace
+  ParentBackground = False
+  ParentColor = False
   TabOrder = 0
   object ContentPanel: TPanel
     Left = 0
@@ -55,7 +58,6 @@ object DPMBaseEditViewFrame: TDPMBaseEditViewFrame
       ParentBackground = False
       ParentColor = True
       TabOrder = 1
-      ExplicitLeft = 598
     end
   end
   object platformChangeDetectTimer: TTimer
