@@ -133,7 +133,7 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <Debugger_CWD>C:\Users\vincent.OFFICE\Documents\Embarcadero\Studio\Projects\DPMGroupTest</Debugger_CWD>
-        <Debugger_RunParams>restore DpmGroupTest.groupproj -v=debug</Debugger_RunParams>
+        <Debugger_RunParams>restore Project3.dproj -v=debug</Debugger_RunParams>
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
