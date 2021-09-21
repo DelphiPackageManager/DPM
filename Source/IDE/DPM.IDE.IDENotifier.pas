@@ -230,11 +230,8 @@ begin
       end;
     ofnFileClosing :
       begin
-        if not ((ExtractFileExt(FileName) = '.dproj') or (ExtractFileExt(FileName) = '.dproj')) then
-          exit;
         FLogger.Clear;
         FProjectController.FileClosed(FileName);
-        exit;
       end;
     {$IF CompilerVersion >= 34.0 }
     //10.4
@@ -258,7 +255,9 @@ begin
     end;
     ofnBeginProjectGroupClose :
     begin
-      //not sure if we need these.
+      //this will dupe the fileclosing on later versions - doesn't matter as we handle it
+      FProjectController.FileClosed(FileName);
+      FLogger.Clear;
     end;
     ofnEndProjectGroupClose :
     begin

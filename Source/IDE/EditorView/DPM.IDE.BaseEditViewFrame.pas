@@ -432,7 +432,8 @@ destructor TDPMBaseEditViewFrame.Destroy;
 begin
   FSearchOptions.Free;
   FIconCache.Free;
-  FLogger.Debug('DPMIDE : View Destroying');
+  if FLogger <> nil then
+    FLogger.Debug('DPMIDE : View Destroying');
   inherited;
 end;
 

@@ -96,10 +96,13 @@ end;
 
 
 procedure TDPMProjectStorageNotifier.ProjectClosing(const ProjectOrGroup : IOTAModule);
+var
+  ext : string;
 begin
   FLogger.Debug('Storage Project Closing : ' + ProjectOrGroup.FileName);
-  //doesn't seem to get called with the project group?
-  if not (ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
+  ext := ExtractFileExt(ProjectOrGroup.FileName);
+
+  if not ((ext = '.dproj') or (ext = '.groupproj')) then
     exit;
   FProjectController.ProjectClosing(ProjectOrGroup.FileName);
 end;
