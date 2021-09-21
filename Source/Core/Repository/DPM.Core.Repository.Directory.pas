@@ -512,7 +512,7 @@ begin
         continue;
 
       //todo : check this is correct.
-      if not versionRange.Satisfies(packageVersion) then
+      if not versionRange.IsSatisfiedBy(packageVersion) then
         continue;
 
       if not prerelease then

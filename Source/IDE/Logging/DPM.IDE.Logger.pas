@@ -117,7 +117,7 @@ begin
   FMessageGroup.CanClose := false;
   FMessageGroup.AutoScroll := true;
   {$ENDIF}
-  FVerbosity := TVerbosity.Debug; //TODO : Need to make this configurable
+  FVerbosity := TVerbosity.Normal; // we can set this from the options.
 end;
 
 procedure TDPMIDELogger.Debug(const data : string);

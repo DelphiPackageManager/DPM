@@ -62,7 +62,7 @@ type
     FCompilerFactory: ICompilerFactory;
   protected
     function GetPackageInfo(const cancellationToken: ICancellationToken; const packageId: IPackageId): IPackageInfo;
-    function CreateProjectRefs(const cancellationToken: ICancellationToken; const node: IGraphNode; const seenPackages: IDictionary<string, IPackageInfo>;
+    function CreateProjectRefs(const cancellationToken: ICancellationToken; const rootnode: IGraphNode; const seenPackages: IDictionary<string, IPackageInfo>;
                                 const projectReferences: IList<TProjectReference>): boolean;
 
     function CollectSearchPaths(const packageGraph: IGraphNode; const resolvedPackages: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
@@ -682,7 +682,7 @@ begin
   result := true;
 end;
 
-function TPackageInstaller.CreateProjectRefs(const cancellationToken : ICancellationToken; const node: IGraphNode; const seenPackages: IDictionary<string, IPackageInfo>;
+function TPackageInstaller.CreateProjectRefs(const cancellationToken : ICancellationToken; const rootnode: IGraphNode; const seenPackages: IDictionary<string, IPackageInfo>;
                                              const projectReferences: IList<TProjectReference>): boolean;
 var
   child: IGraphNode;
@@ -690,37 +690,42 @@ var
   projectRef: TProjectReference;
 begin
   result := true;
-  if not node.IsRoot then
+
+  //breadth first is important here.. we want to process top level nodes first!
+  for child in rootNode.ChildNodes do
   begin
-    if seenPackages.TryGetValue(LowerCase(node.Id), info) then
+    if seenPackages.TryGetValue(LowerCase(child.Id), info) then
     begin
       // if a node uses source then we need to find the projectRef and update i
-      if node.UseSource then
+      if child.UseSource then
         info.UseSource := true;
-      exit;
-    end;
-    info := GetPackageInfo(cancellationToken, node);
-    if info = nil then
+    end
+    else
     begin
-      FLogger.Error('Unable to resolve package : ' + node.ToIdVersionString);
-      exit(false);
-    end;
-    info.UseSource := node.UseSource;
-    projectRef.Package := info;
-    projectRef.VersionRange := node.SelectedOn;
-    if projectRef.VersionRange.IsEmpty then
-      projectRef.VersionRange := TVersionRange.Create(info.Version);
+      info := GetPackageInfo(cancellationToken, child);
+      if info = nil then
+      begin
+        FLogger.Error('Unable to resolve package : ' + child.ToIdVersionString);
+        exit(false);
+      end;
+      info.UseSource := child.UseSource;
+      projectRef.Package := info;
+      projectRef.VersionRange := child.SelectedOn;
+      if projectRef.VersionRange.IsEmpty then
+        projectRef.VersionRange := TVersionRange.Create(info.Version);
 
-    projectRef.ParentId := node.Parent.Id;
-    seenPackages[LowerCase(node.Id)] := info;
-    projectReferences.Add(projectRef);
+      projectRef.ParentId := child.Parent.Id;
+      seenPackages[LowerCase(child.Id)] := info;
+      projectReferences.Add(projectRef);
+    end;
   end;
-  if node.HasChildren then
-    for child in node.ChildNodes do
-    begin
-      result := CreateProjectRefs(cancellationToken, child, seenPackages, projectReferences);
-      if not result then
-        exit;
+
+  for child in rootnode.ChildNodes do
+  begin
+    if child.HasChildren then
+      result := result or CreateProjectRefs(cancellationToken, child, seenPackages, projectReferences);
+    if not result then
+      exit;
     end;
 end;
 
@@ -1002,9 +1007,10 @@ begin
 
   if not FDependencyResolver.ResolveForRestore(cancellationToken, projectFile, Options, projectReferences, projectPackageGraph, platform, resolvedPackages) then
   begin
+    FLogger.Error('Resolver failed!');
     // projectEditor.UpdatePackageReferences(projectPackageGraph, platform);
     // projectEditor.SaveProject();
-    // exit;
+     exit;
   end;
 
   if resolvedPackages = nil then

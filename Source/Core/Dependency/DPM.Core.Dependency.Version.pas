@@ -89,7 +89,7 @@ type
     class operator Equal(a : TVersionRange; b : TVersionRange) : boolean;
 
     procedure Normalize;
-    function Satisfies(const packageVersion : TPackageVersion) : Boolean;
+    function IsSatisfiedBy(const packageVersion : TPackageVersion) : Boolean;
 
     function IsSubsetOrEqualTo(const possibleSuperset : TVersionRange) : boolean;
 
@@ -361,7 +361,7 @@ begin
   result := integer(x.MaxVersion.Patch) - integer(x.MinVersion.Patch);
 end;
 
-function TVersionRange.Satisfies(const packageVersion : TPackageVersion) : Boolean;
+function TVersionRange.IsSatisfiedBy(const packageVersion : TPackageVersion) : Boolean;
 begin
   if FMinVersionIsInclusive then
     result := packageVersion >= FMinVersion
@@ -433,18 +433,18 @@ begin
   right := otherVersion.Clone(true);
 
   min := right.MinVersion;
-  if not Self.Satisfies(min) then
+  if not Self.IsSatisfiedBy(min) then
   begin
     min := left.MinVersion;
-    if not right.Satisfies(min) then
+    if not right.IsSatisfiedBy(min) then
       exit;
   end;
 
   max := right.MaxVersion;
-  if not self.Satisfies(max) then
+  if not self.IsSatisfiedBy(max) then
   begin
     max := left.MaxVersion;
-    if not right.Satisfies(max) then
+    if not right.IsSatisfiedBy(max) then
       exit;
   end;
   overlappingVersion := TVersionRange.Create('', min, true, max, true);

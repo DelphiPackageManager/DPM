@@ -131,7 +131,7 @@ var
 begin
   FStopwatch.Reset;
   FStopwatch.Start;
-  FLogger.Information('Starting dependency resolution...');
+  FLogger.Verbose('Starting dependency resolution...');
   result := false;
 
   while context.AnyOpenRequrements do
@@ -148,11 +148,11 @@ begin
     for dependency in currentPackage.Dependencies do
     begin
       FLogger.Information('Resolving dependency : ' + currentPackage.Id + '.' + currentPackage.Version.ToStringNoMeta + '->' + dependency.Id + ' ' + dependency.VersionRange.ToString);
-      //first see if we have resolved this package already.
+      //first see if we have resolved this package already. That may be in this project, or another project in the group.
       if context.TryGetResolution(dependency.Id, resolution) then
       begin
         //check if the dependency range satisfies the already resolved version
-        if not dependency.VersionRange.Satisfies(resolution.Package.Version) then
+        if not dependency.VersionRange.IsSatisfiedBy(resolution.Package.Version) then
         begin
           FLogger.Information('       conflict - selected version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
 
@@ -169,6 +169,7 @@ begin
             exit;
           end;
 
+          FLogger.Verbose('Attempting to find overalapping versionrange with dependency and earlier resolution');
           //see if we can reduce to an overlapping versionrange that satisfies both
           if resolution.VersionRange.TryGetOverlappingVersion(dependency.VersionRange, overlappingRange) then
           begin
@@ -195,12 +196,19 @@ begin
         end
         else
         begin
-          FLogger.Information('            resolved : ' + dependency.Id + '.' + resolution.Package.Version.ToString);
+          if resolution.Project <> context.ProjectFile then
+          begin
+            FLogger.Information('    resolved earlier : ' + dependency.Id + '.' + resolution.Package.Version.ToString);
+          end
+          else
+            FLogger.Information('            selected : ' + dependency.Id + '.' + resolution.Package.Version.ToString);
           //in the case where we are promoting a transient to a direct dependency, we need a range.
           //the direct will not have a range so we convert the version to a range.
           if resolution.VersionRange.IsEmpty then
             resolution.VersionRange := TVersionRange.Create(resolution.Package.Version);
           //if the resolution came from another project, then we still need to deal with it's dependencies.
+          if resolution.Package.Dependencies.Any then
+            context.PushRequirement(resolution.Package);
         end;
         //we're good.. this is resolved.
         continue;
@@ -225,7 +233,7 @@ begin
         begin
           if context.IsNoGood(version) then
             continue;
-          if dependency.VersionRange.Satisfies(version.Version) then
+          if dependency.VersionRange.IsSatisfiedBy(version.Version) then
           begin
             context.RecordResolution(version, dependency.VersionRange, currentPackage.Id);
             if version.Dependencies.Any then //no point pushing it if there are no dependencies - see top of loop
@@ -300,7 +308,7 @@ begin
   for packageRef in projectReferences do
   begin
     resolution := FPackageInstallerContext.FindPackageResolution(projectFile,packageRef.Package.Id, platform);
-    if (resolution <> nil) and (not resolution.VersionRange.Satisfies(packageRef.Package.Version)) then
+    if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Package.Version)) then
     begin
       FLogger.Error('Package project group conflict : ' + packageRef.Package.Id + '-' + resolution.Package.Version.ToString + ' in project : ' + resolution.Project + ' does not satisfy ' + packageRef.Package.Version.ToString  );
       Inc(errorCount)
@@ -327,7 +335,7 @@ begin
   for packageRef in projectReferences do
   begin
     resolution := FPackageInstallerContext.FindPackageResolution(projectFile,packageRef.Package.Id, platform);
-    if (resolution <> nil) and (not resolution.VersionRange.Satisfies(packageRef.Package.Version)) then
+    if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Package.Version)) then
     begin
       FLogger.Error('Package project group conflict : ' + packageRef.Package.Id + '-' + resolution.Package.Version.ToString + ' in project : ' + resolution.Project + ' does not satisfy ' + packageRef.Package.Version.ToString  );
       Inc(errorCount)

@@ -287,7 +287,7 @@ function TResolverContext.TryGetResolution(const packageId : string; out resolut
       childRes := FPackageInstallerContext.FindPackageResolution(FProjectFile, id , FPlatform);
       if childRes <> nil then
       begin
-        FResolved[Lowercase(id)] := childRes.Clone(FProjectFile); //should we be cloning here?
+        FResolved[Lowercase(id)] := childRes;//.Clone(FProjectFile); //should we be cloning here?
         if childRes.Package.Dependencies.Any then
           CopyDependencies(childRes);
       end;
@@ -303,7 +303,7 @@ begin
     result := resolution <> nil;
     if resolution <> nil then
     begin
-      FResolved[Lowercase(packageId)] := resolution.Clone(FProjectFile);
+      FResolved[Lowercase(packageId)] := resolution;//.Clone(FProjectFile);
       //if we resolved via another projectr in the group, then we need to bring along the resolved dependencies too
       if resolution.Package.Dependencies.Any then
         CopyDependencies(resolution);
