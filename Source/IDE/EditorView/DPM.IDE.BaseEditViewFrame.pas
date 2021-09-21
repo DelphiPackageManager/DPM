@@ -708,8 +708,7 @@ begin
     packageSearchResult := FSearchResultPackages.FirstOrDefault(
       function(const value : IPackageSearchResultItem) : boolean
       begin
-        result := SameText(value.Id,
-          package.Id) and (value.Version = package.Version);
+        result := SameText(value.Id,  package.Id) and (value.Version = package.Version);
       end);
 
     if packageSearchResult <> nil then
@@ -730,8 +729,7 @@ begin
     packageSearchResult := FAllInstalledPackages.FirstOrDefault(
       function(const value : IPackageSearchResultItem) : boolean
       begin
-        result := SameText(value.Id,
-          package.Id) and (value.Version = package.Version);
+        result := SameText(value.Id, package.Id) and (value.Version = package.Version);
       end);
     if packageSearchResult <> nil then
     begin
@@ -765,8 +763,7 @@ begin
     packageSearchResult := FSearchResultPackages.FirstOrDefault(
       function(const value : IPackageSearchResultItem) : boolean
       begin
-        result := SameText(value.Id,
-          package.Id) and (value.Version = package.Version);
+        result := SameText(value.Id, package.Id) and (value.Version = package.Version);
       end);
 
     if packageSearchResult <> nil then
@@ -856,8 +853,7 @@ begin
   TAsync.Configure<IPackageIcon>(
     function(const cancelToken : ICancellationToken) : IPackageIcon
     begin
-      result := repoManager.GetPackageIcon(cancelToken, source, id, version,
-        IDECompilerVersion, platform, FConfiguration);
+      result := repoManager.GetPackageIcon(cancelToken, source, id, version, IDECompilerVersion, platform, FConfiguration);
     end, FCancelTokenSource.Token)
   .OnException(
     procedure(const e : Exception)

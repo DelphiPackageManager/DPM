@@ -58,7 +58,7 @@ begin
     SplashImage.LoadFromResourceName(HInstance, 'DPMIDELOGO');
     SplashScreenServices.AddPluginBitmap(cWizardTitle, SplashImage.Handle);
 
-    (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo(cWizardTitle, cWizardTitle, SplashImage.Handle);
+    (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo(cWizardTitle, cWizardDescription, SplashImage.Handle);
 
   except
     on E : Exception do

@@ -30,6 +30,9 @@ interface
 
 const
   cWizardTitle = 'DPM Package Manager';
+  cWizardDescription = 'DPM is an Open Source package manager - it makes managing dependencies easy' + #13#10 +
+                       '(c) Copyright Vincent Parrett and contributors' + #13#10 +
+                       'https://github.com/DelphiPackageManager/DPM';
   cWizardProjectMenuCaption = 'Manage DPM Packages';
 
   cDPMPackages = 'DPM Packages';

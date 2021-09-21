@@ -234,12 +234,12 @@ begin
       pkgInfo: IPackageInfo;
     begin
       // not the most efficient thing to do
-      pkgInfo := resolvedPackages.Where(
+      pkgInfo := resolvedPackages.FirstOrDefault(
         function(const pkg: IPackageInfo): boolean
         begin
           result := SameText(pkg.Id, node.Id);
           //FLogger.Debug('Testing pkg [' + pkg.Id + '] against [' + node.Id + ']');
-        end).FirstOrDefault;
+        end);
       Assert(pkgInfo <> nil, 'pkgInfo is null for id [' + node.Id + '], but should never be');
       pkgInfo.UseSource := pkgInfo.UseSource or node.UseSource;
     end);
@@ -403,9 +403,7 @@ begin
         searchPaths := TCollections.CreateList<string>;
         for childNode in graphNode.ChildNodes do
         begin
-          childSearchPath := FPackageCache.GetPackagePath(childNode.Id,
-            childNode.Version.ToStringNoMeta, Compiler.compilerVersion,
-            Compiler.platform);
+          childSearchPath := FPackageCache.GetPackagePath(childNode.Id, childNode.Version.ToStringNoMeta, Compiler.compilerVersion, Compiler.platform);
           childSearchPath := TPath.Combine(childSearchPath, 'lib\win32');
           searchPaths.Add(childSearchPath);
         end;
@@ -414,19 +412,16 @@ begin
       else
         Compiler.SetSearchPaths(nil);
 
-      FLogger.Information('Building project [' + projectFile +
-        '] for design time...');
+      FLogger.Information('Building project [' + projectFile + '] for design time...');
       result := Compiler.BuildProject(cancellationToken, projectFile, buildEntry.config, packageInfo.Version, true);
       if result then
         FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
       else
       begin
         if cancellationToken.IsCancelled then
-          FLogger.Error('Building project [' + buildEntry.Project +
-            '] cancelled.')
+          FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
         else
-          FLogger.Error('Building project [' + buildEntry.Project +
-            '] failed.');
+          FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
         exit;
       end;
       FLogger.NewLine;
