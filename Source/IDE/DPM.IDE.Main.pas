@@ -30,7 +30,6 @@ interface
 
 uses
   ToolsAPI,
-  WinApi.Windows,
   System.SysUtils,
   Vcl.Dialogs,
   DPM.IDE.Wizard;
@@ -63,8 +62,7 @@ begin
   except
     on E : Exception do
     begin
-      MessageDlg('Failed to load wizard splash image', mtError, [mbOK], 0);
-      OutputDebugString('Failed to load splash image');
+      MessageDlg('Failed to create Wizard instance ' + #13#10 + e.Message , mtError, [mbOK], 0);
       result := nil;
     end;
   end;
