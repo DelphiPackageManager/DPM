@@ -88,7 +88,21 @@ type
 
     FUpdateCount : integer;
 
+    FCheckedCount : integer;
+    FPackageVersion: string;
+
+
+    FSelectionChangedEvent : TNotifyEvent;
+
   protected
+    function GetHasCheckedProjects : boolean;
+    function GetProjectChecked(index : integer) : boolean;
+    procedure SetProjectChecked(index : integer; value : boolean);
+    function GetProjectName(index: integer): string;
+    function GetCount : integer;
+    procedure SetPackageVersion(const Value: string);
+    function GetProjectVersion(index: integer): string;
+    procedure SetProjectVersion(index: integer; const Value: string);
 
     function GetTotalColumnWidth : integer;
     function GetRowCount: integer;
@@ -152,6 +166,9 @@ type
     procedure MouseMove(Shift: TShiftState; X: Integer; Y: Integer); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
 
+    procedure UpdateCheckedCount(const checked : boolean);
+
+    procedure DoSelectionChanged;
 
     property RowCount : integer read GetRowCount;
 
@@ -167,10 +184,22 @@ type
 
     procedure Clear;
     procedure AddProject(const project : string; const version : string);
+
     property CurrentRow : Integer read FCurrentRow;
     property TopRow : Integer read FTopRow;
-    property Projects : TStringList read FProjects;
-    //expositing this here so the IDE plugin can set this.
+//    property Projects : TStringList read FProjects;
+
+    property Count : integer read GetCount;
+    property HasCheckedProjects : boolean read GetHasCheckedProjects;
+    property ProjectChecked[index : integer] : boolean read GetProjectChecked write SetProjectChecked;
+    property ProjectName[index : integer] : string read GetProjectName;
+    property ProjectVersion[index : integer] : string read GetProjectVersion write SetProjectVersion;
+
+    property PackageVersion : string read FPackageVersion write SetPackageVersion;
+    
+    property OnSelectionChanged : TNotifyEvent read FSelectionChangedEvent write FSelectionChangedEvent;
+
+    //exposing this here so the IDE plugin can set this.
     property StyleServices : TCustomStyleServices read FStyleServices write SetStyleServices;
   published
     property Align;
@@ -210,7 +239,7 @@ uses
 
 procedure TVersionGrid.AddProject(const project, version: string);
 begin
-  FProjects.Add(project + '=' + version);
+  FProjects.AddObject(project + '=' + version,TObject(NativeUInt(false)));
 end;
 
 procedure TVersionGrid.BeginUpdate;
@@ -221,6 +250,7 @@ end;
 procedure TVersionGrid.Clear;
 begin
   FProjects.Clear;
+  FCheckedCount := 0;
 end;
 
 procedure TVersionGrid.CMEnter(var Message: TCMEnter);
@@ -321,6 +351,8 @@ begin
 
   FVScrollPos := 0;
   FHScrollPos := 0;
+
+  FCheckedCount := 0;
 
 end;
 
@@ -861,22 +893,16 @@ begin
       end;
       2 :
       begin
-        txt := FProjects.ValueFromIndex[index];
-
-        if Length(versions) > 0 then
-          txt := versions[0]
+        if FProjects.ValueFromIndex[index] <> '' then
+          txt := FPackageVersion
         else
           txt := '';
-
         LCanvas.Brush.Style := bsClear;
         FStyleServices.DrawText(LCanvas.Handle, LDetails, txt, colRect, [tfLeft, tfSingleLine, tfVerticalCenter, tfEndEllipsis]);
       end;
       3 :
       begin
-        if Length(versions) > 1 then
-          txt := versions[1]
-        else
-          txt := '';
+        txt := FProjects.ValueFromIndex[index];
         LCanvas.Brush.Style := bsClear;
         FStyleServices.DrawText(LCanvas.Handle, LDetails, txt, colRect, [tfLeft, tfSingleLine, tfVerticalCenter, tfEndEllipsis]);
       end;
@@ -890,6 +916,12 @@ begin
   if copyCanvas then
     Canvas.CopyRect(destRect, LCanvas, rowRect);
 
+end;
+
+procedure TVersionGrid.DoSelectionChanged;
+begin
+  if Assigned(FSelectionChangedEvent) then
+    FSelectionChangedEvent(Self);
 end;
 
 procedure TVersionGrid.DoTrack(const newScrollPostition: integer);
@@ -918,6 +950,40 @@ begin
       Invalidate;
     end;
   end;
+end;
+
+function TVersionGrid.GetCount: integer;
+begin
+  result := FProjects.Count;
+end;
+
+function TVersionGrid.GetHasCheckedProjects: boolean;
+begin
+  result := FCheckedCount > 0;
+end;
+
+function TVersionGrid.GetProjectChecked(index: integer): boolean;
+begin
+  if (index >= 0) and (index < FProjects.Count) then
+    result := NativeUInt(FProjects.Objects[index]) <> 0
+  else
+    result := false;
+end;
+
+function TVersionGrid.GetProjectName(index: integer): string;
+begin
+  if (index >= 0) and (index < FProjects.Count) then
+    result := FProjects.Names[index]
+  else
+    result := '';
+end;
+
+function TVersionGrid.GetProjectVersion(index: integer): string;
+begin
+  if (index >= 0) and (index < FProjects.Count) then
+    result := FProjects.ValueFromIndex[index]
+  else 
+    result := '';
 end;
 
 function TVersionGrid.GetRowCount: integer;
@@ -1009,13 +1075,20 @@ begin
       bChecked := NativeUInt(FProjects.Objects[FCurrentRow]) > 0;
       bChecked := not bChecked;
       FProjects.Objects[FCurrentRow] := TObject(NativeUInt(bChecked));
+      UpdateCheckedCount(bChecked);
+      DoSelectionChanged;
     end;
     htColumn0:
     begin
       FCheckAll := not FCheckAll;
       for i := 0 to FProjects.Count -1 do
         FProjects.Objects[i] := TObject(NativeUInt(FCheckAll));
+      if FCheckAll then
+        FCheckedCount := FProjects.Count
+      else
+        FCheckedCount := 0;
       Invalidate;
+      DoSelectionChanged;
       exit;
     end;
     htColumn1:
@@ -1464,6 +1537,41 @@ begin
   end;
 end;
 
+procedure TVersionGrid.SetPackageVersion(const Value: string);
+begin
+  FPackageVersion := Value;
+  Invalidate;
+end;
+
+procedure TVersionGrid.SetProjectChecked(index: integer; value: boolean);
+var
+  oldValue : boolean;
+begin
+  if (index >= 0) and (index < FProjects.Count) then
+  begin
+    oldValue := NativeUInt(FProjects.Objects[index]) <> 0;
+    if oldValue <> value then
+    begin
+      FProjects.Objects[index] := TObject(NativeUInt(value));
+      UpdateCheckedCount(value);
+      DoSelectionChanged;
+    end;
+  end;
+
+end;
+
+procedure TVersionGrid.SetProjectVersion(index: integer; const Value: string);
+begin
+  if (index >= 0) and (index < FProjects.Count) then
+  begin
+    if value <> '' then
+      FProjects.ValueFromIndex[index] := value
+    else
+      FProjects.Strings[index] := FProjects.Names[Index] + '='; //can't use values with empty value as it deletes the item.. stupid design!
+  end;
+    
+end;
+
 procedure TVersionGrid.SetRowHeight(const Value: integer);
 begin
   if FRowHeight <> value then
@@ -1478,6 +1586,16 @@ procedure TVersionGrid.SetStyleServices(const Value: TCustomStyleServices);
 begin
   FStyleServices := Value;
   Invalidate;
+end;
+
+procedure TVersionGrid.UpdateCheckedCount(const checked: boolean);
+begin
+  if checked then
+    Inc(FCheckedCount)
+  else
+    Dec(FCheckedCount);
+  if FCheckedCount < 0 then
+    FCheckedCount := 0;  
 end;
 
 procedure TVersionGrid.UpdateHoverRow(const X, Y: integer);

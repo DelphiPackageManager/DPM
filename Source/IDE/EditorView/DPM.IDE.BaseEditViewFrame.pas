@@ -819,11 +819,11 @@ end;
 procedure TDPMBaseEditViewFrame.ProjectReloaded;
 begin
   FLogger.Debug('DPMIDE : EditViewReloaded');
-    FCurrentPlatform := TDPMPlatform.UnknownPlatform;
+  FCurrentPlatform := TDPMPlatform.UnknownPlatform; //force a reload
   if not IsProjectGroup then
     platformChangeDetectTimerTimer(platformChangeDetectTimer)
   else
-    SearchBarPlatformChanged(SearchBar.Platform);
+    DoPlatformChange(SearchBar.Platform);
 end;
 
 procedure TDPMBaseEditViewFrame.RequestPackageIcon(const index: integer; const package: IPackageSearchResultItem);

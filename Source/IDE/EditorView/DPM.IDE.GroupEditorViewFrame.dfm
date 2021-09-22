@@ -32,6 +32,9 @@ inherited DPMGroupEditViewFrame: TDPMGroupEditViewFrame
         Width = 410
         Height = 670
         Align = alClient
+        Color = clBtnFace
+        ParentBackground = False
+        ParentColor = False
         TabOrder = 0
         ExplicitWidth = 410
         ExplicitHeight = 670
@@ -70,7 +73,7 @@ inherited DPMGroupEditViewFrame: TDPMGroupEditViewFrame
                 Width = 250
                 ExplicitWidth = 250
               end
-              inherited btnInstallOrUpdate: TButton
+              inherited btnInstall: TButton
                 Left = 331
                 ExplicitLeft = 331
               end

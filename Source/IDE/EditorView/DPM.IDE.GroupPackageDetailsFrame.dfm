@@ -172,6 +172,7 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
           Anchors = [akTop, akRight]
           Caption = 'Uninstall'
           TabOrder = 1
+          OnClick = btnUninstallClick
         end
       end
       object pnlVersion: TPanel
@@ -214,7 +215,7 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
           OnDrawItem = cboVersionsDrawItem
           OnMeasureItem = cboVersionsMeasureItem
         end
-        object btnInstallOrUpdate: TButton
+        object btnInstall: TButton
           Left = 357
           Top = 5
           Width = 75
@@ -222,6 +223,7 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
           Anchors = [akTop, akRight]
           Caption = 'Install'
           TabOrder = 1
+          OnClick = btnInstallClick
         end
       end
     end

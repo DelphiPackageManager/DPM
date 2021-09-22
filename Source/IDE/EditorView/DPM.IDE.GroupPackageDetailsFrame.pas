@@ -64,12 +64,14 @@ type
     pnlVersion: TPanel;
     lblVersionTitle: TLabel;
     cboVersions: TComboBox;
-    btnInstallOrUpdate: TButton;
+    btnInstall: TButton;
     pnlGridHost: TPanel;
     DetailsSplitter: TSplitter;
     procedure cboVersionsMeasureItem(Control: TWinControl; Index: Integer; var Height: Integer);
     procedure cboVersionsDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
     procedure cboVersionsChange(Sender: TObject);
+    procedure btnUninstallClick(Sender: TObject);
+    procedure btnInstallClick(Sender: TObject);
   private
     FContainer : TContainer;
     FIconCache : TDPMIconCache;
@@ -95,6 +97,9 @@ type
 
     FIDEStyleServices : TCustomStyleServices;
   protected
+    procedure ProjectSelectionChanged(Sender : TObject);
+    procedure UpdateButtonState;
+  
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
     function GetIncludePreRelease : boolean;
@@ -123,6 +128,16 @@ uses
   DPM.Core.Dependency.Interfaces;
 
 { TGroupPackageDetailsFrame }
+
+procedure TGroupPackageDetailsFrame.btnInstallClick(Sender: TObject);
+begin
+//
+end;
+
+procedure TGroupPackageDetailsFrame.btnUninstallClick(Sender: TObject);
+begin
+//
+end;
 
 procedure TGroupPackageDetailsFrame.cboVersionsChange(Sender: TObject);
 var
@@ -218,23 +233,6 @@ begin
     FDetailsPanel.SetDetails(nil);
     FCurrentTab := value;
     FIncludePreRelease := preRelease;
-    case FCurrentTab of
-      TDPMCurrentTab.Installed :
-        begin
-          btnInstallOrUpdate.Caption := 'Update';
-        end;
-      TDPMCurrentTab.Updates :
-        begin
-          btnInstallOrUpdate.Caption := 'Update';
-
-        end;
-      TDPMCurrentTab.Search :
-        begin
-          btnInstallOrUpdate.Caption := 'Install';
-
-        end;
-      TDPMCurrentTab.Conflicts : ;
-    end;
     SetPackage(nil);
   end;
 
@@ -260,6 +258,7 @@ begin
   FProjectsGrid.ParentColor := false;
   FProjectsGrid.ParentBackground := false;
   FProjectsGrid.DoubleBuffered := true;
+  FProjectsGrid.OnSelectionChanged := Self.ProjectSelectionChanged;
 
   FProjectsGrid.Parent := pnlGridHost;
 
@@ -325,9 +324,18 @@ begin
 
 end;
 
+procedure TGroupPackageDetailsFrame.ProjectSelectionChanged(Sender: TObject);
+begin
+  UpdateButtonState;
+end;
+
 procedure TGroupPackageDetailsFrame.SetIncludePreRelease(const value: boolean);
 begin
-
+  if FIncludePreRelease <> Value then
+  begin
+    FIncludePreRelease := Value;
+    SetPackage(FPackageMetaData);
+  end;
 end;
 
 procedure TGroupPackageDetailsFrame.SetPackage(const package: IPackageSearchResultItem);
@@ -395,50 +403,48 @@ begin
       TDPMCurrentTab.Search :
         begin
           pnlInstalled.Visible := FPackageInstalledVersion <> '';
-          if pnlInstalled.Visible then
-          begin
-            btnInstallOrUpdate.Caption := 'Update'
-          end
-          else
-          begin
-            btnInstallOrUpdate.Caption := 'Install';
-          end;
         end;
       TDPMCurrentTab.Installed :
         begin
           pnlInstalled.Visible := true;
-          btnInstallOrUpdate.Caption := 'Update';
         end;
       TDPMCurrentTab.Updates :
         begin
           pnlInstalled.Visible := true;
-          btnInstallOrUpdate.Caption := 'Update';
         end;
       TDPMCurrentTab.Conflicts : ;
     end;
 
     txtInstalledVersion.Text := FPackageInstalledVersion;
-    btnInstallOrUpdate.Enabled := (not package.Installed) or (package.LatestVersion <> package.Version);
+    UpdateButtonState;
+    //btnInstallOrUpdate.Enabled := ((not FPackageMetaData.Installed) or (FPackageMetaData.LatestVersion <> FPackageMetaData.Version)) and FProjectsGrid.HasCheckedProjects;
 
     sbPackageDetails.Visible := true;
 
     packageRefs := FPackageSearcher.GetPackageReferences;
-    for i := 0 to FProjectsGrid.Projects.Count -1 do
-    begin
-      if packageRefs <> nil then
+
+    FProjectsGrid.BeginUpdate;
+    FProjectsGrid.PackageVersion := package.Version;
+    try
+      for i := 0 to FProjectsGrid.Count -1 do
       begin
-        projectRef := nil;
-        projectRefs := packageRefs.FindChild(LowerCase(FProjectsGrid.Projects.Names[i]));
-        if projectRefs <> nil then
-          projectRef := projectRefs.FindChild(package.Id);
+        if packageRefs <> nil then
+        begin
+          projectRef := nil;
+          projectRefs := packageRefs.FindChild(LowerCase(FProjectsGrid.ProjectName[i]));
+          if projectRefs <> nil then
+            projectRef := projectRefs.FindChild(package.Id);
+        end;
+
+        if projectRef <> nil then
+          sValue := projectRef.Version.ToStringNoMeta
+        else
+          sValue := '';
+        FProjectsGrid.ProjectVersion[i] := sValue;
       end;
-
-      sValue := package.Version + '|';
-      if projectRef <> nil then
-        sValue := sValue + projectRef.Version.ToStringNoMeta;
-      FProjectsGrid.Projects.ValueFromIndex[i] := sValue;
+    finally
+      FProjectsGrid.EndUpdate;
     end;
-
 
     FVersionsDelayTimer.Enabled := bFetchVersions;
   end
@@ -455,7 +461,7 @@ end;
 
 procedure TGroupPackageDetailsFrame.SetPlatform(const platform: TDPMPlatform);
 begin
-
+  FCurrentPlatform := platform;
 end;
 
 procedure TGroupPackageDetailsFrame.ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
@@ -502,6 +508,11 @@ begin
 
 end;
 
+procedure TGroupPackageDetailsFrame.UpdateButtonState;
+begin
+  btnInstall.Enabled := (FPackageMetaData <> nil) and{ ((not FPackageMetaData.Installed) or (FPackageMetaData.LatestVersion <> FPackageMetaData.Version)) and} FProjectsGrid.HasCheckedProjects;
+end;
+
 procedure TGroupPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);
 var
   versions : IList<TPackageVersion>;
@@ -510,7 +521,7 @@ var
   config : IConfiguration;
   lStable : string;
   lPre : string;
-  sVersion : string;
+//  sVersion : string;
   sInstalledVersion : string;
 begin
   FVersionsDelayTimer.Enabled := false;
@@ -611,13 +622,13 @@ begin
           else
             cboVersions.ItemIndex := 0;
 
-          sVersion := cboVersions.Items[cboVersions.ItemIndex];
-          if TStringUtils.StartsWith(sVersion, cLatestPrerelease, true) then
-            Delete(sVersion, 1, Length(cLatestPrerelease))
-          else if TStringUtils.StartsWith(sVersion, cLatestStable, true) then
-            Delete(sVersion, 1, Length(cLatestStable));
+//          sVersion := cboVersions.Items[cboVersions.ItemIndex];
+//          if TStringUtils.StartsWith(sVersion, cLatestPrerelease, true) then
+//            Delete(sVersion, 1, Length(cLatestPrerelease))
+//          else if TStringUtils.StartsWith(sVersion, cLatestStable, true) then
+//            Delete(sVersion, 1, Length(cLatestStable));
 
-          btnInstallOrUpdate.Enabled := sVersion <> sInstalledVersion;
+          btnInstall.Enabled := {(sVersion <> sInstalledVersion) and } FProjectsGrid.HasCheckedProjects;
         end;
       finally
         cboVersions.Items.EndUpdate;

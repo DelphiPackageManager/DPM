@@ -96,8 +96,6 @@ type
     procedure SetIncludePreRelease(const Value : boolean);
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
-    procedure Loaded; override;
-
   public
     constructor Create(AOwner : TComponent); override;
     procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectOrGroup : IOTAProject);
@@ -417,18 +415,6 @@ begin
 end;
 
 
-procedure TPackageDetailsFrame.Loaded;
-begin
-  inherited;
-  //  sbPackageDetails.Color := Self.Color;
-  //  sbPackageDetails.ParentBackground := false;
-  //
-  //  FDetailsPanel.ParentColor := true;
-  //  FDetailsPanel.ParentBackground := false;
-  //  FDetailsPanel.Color := Self.Color;
-  //  FDetailsPanel.Font.Assign(Self.Font);
-
-end;
 
 procedure TPackageDetailsFrame.OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
 begin
@@ -557,7 +543,7 @@ procedure TPackageDetailsFrame.SetPlatform(const platform : TDPMPlatform);
 begin
   if platform <> FCurrentPlatform then
   begin
-
+    FCurrentPlatform := platform;
   end;
 end;
 
