@@ -80,6 +80,7 @@ uses
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Init,
+  DPM.Core.Utils.Config,
   DPM.Core.Package.Interfaces,
   DPM.Core.Package.Installer.Interfaces,
   DPM.IDE.ProjectController,
@@ -145,7 +146,10 @@ begin
   if FileExists(dpmIDEOptions.FileName) then
     dpmIDEOptions.LoadFromFile()
   else
+  begin
+    TConfigUtils.EnsureDefaultConfigDir;
     dpmIDEOptions.SaveToFile(); //create the file
+  end;
 
   FLogger.Verbosity := dpmIDEOptions.LogVerbosity;
 
