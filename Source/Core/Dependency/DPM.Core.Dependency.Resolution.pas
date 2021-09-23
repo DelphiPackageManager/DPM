@@ -49,7 +49,7 @@ type
     function GetProject : string;
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
-    function Clone(const project : string) : IResolution;
+    function Clone(const parentId : string) : IResolution;
   public
     constructor Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
   end;
@@ -61,9 +61,9 @@ uses
 
 { TResolution }
 
-function TResolution.Clone(const project: string): IResolution;
+function TResolution.Clone(const parentId: string): IResolution;
 begin
-  result := TResolution.Create(FPackage, FVersionRange, FParentId, project);
+  result := TResolution.Create(FPackage, FVersionRange, parentId, FProject);
 end;
 
 constructor TResolution.Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);

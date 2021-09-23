@@ -113,7 +113,7 @@ end;
 ///
 /// The PubGrub algorithm used in the dart package manager (pub) looks to be a good contender
 /// https://medium.com/@nex3/pubgrub-2fb6470504f
-/// https://github.com/dart-lang/pub/blob/master/doc/solver.md
+/// ://github.com/dart-lang/pub/blob/master/doc/solver.md
 /// If anyone is good math and want's to have a stab at implementing it in Delphi that would be great!
 
 function TDependencyResolver.DoResolve(const cancellationToken : ICancellationToken; const options : TSearchOptions; const context : IResolverContext; const platform : TDPMPlatform) : boolean;
@@ -149,7 +149,7 @@ begin
     begin
       FLogger.Information('Resolving dependency : ' + currentPackage.Id + '.' + currentPackage.Version.ToStringNoMeta + '->' + dependency.Id + ' ' + dependency.VersionRange.ToString);
       //first see if we have resolved this package already. That may be in this project, or another project in the group.
-      if context.TryGetResolution(dependency.Id, resolution) then
+      if context.TryGetResolution(dependency.Id, currentPackage.Id, resolution) then
       begin
         //check if the dependency range satisfies the already resolved version
         if not dependency.VersionRange.IsSatisfiedBy(resolution.Package.Version) then
@@ -183,7 +183,7 @@ begin
             context.RecordNoGood(resolution.Package);
             //backtrack the package/version that got us here in the first place
             //not 100% sure this is correct here. More testing needed.
-            if context.TryGetResolution(resolution.ParentId, parentResolution) then
+            if context.TryGetResolution(resolution.ParentId, '', parentResolution) then
             begin
               context.RecordNoGood(parentResolution.Package);
               context.PushRequirement(parentResolution.Package);
@@ -267,10 +267,10 @@ begin
             if choices > 0 then
             begin
               //get the parent, and backtrack to it.
-              if context.TryGetResolution(currentPackage.Id, resolution) then
+              if context.TryGetResolution(currentPackage.Id, currentPackage.Id, resolution) then
               begin
                 //can't backtrack to a root (direct dependency)
-                if (resolution.ParentId <> cRootNode) and context.TryGetResolution(resolution.ParentId, parentResolution) then
+                if (resolution.ParentId <> cRootNode) and context.TryGetResolution(resolution.ParentId, '', parentResolution) then
                 begin
                   FLogger.Debug('Backtracking to : ' + parentResolution.Package.Id + '-' + parentResolution.Package.Version.ToString);
                   context.RemoveResolution(currentPackage.Id); //shouldn't this be the parentResolution.Pacakage???

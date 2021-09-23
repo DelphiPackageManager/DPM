@@ -103,8 +103,6 @@ type
     property SearchPaths : IList<string> read GetSearchPaths;
     property LibPath : string read GetLibPath write SetLibPath;
     property BplPath : string read GetBplPath write SetBplPath;
-
-
   end;
 
 
@@ -116,7 +114,7 @@ type
     procedure SetVersionRange(const value : TVersionRange);
     function GetProject : string;
 
-    function Clone(const project : string) : IResolution;
+    function Clone(const parentId : string) : IResolution;
 
     property Package : IPackageInfo read GetPackage;
     property VersionRange : TVersionRange read GetVersionRange write SetVersionRange;

@@ -44,7 +44,7 @@ type
     procedure RecordNoGood(const bad : IPackageInfo);
     function IsNoGood(const package : IPackageInfo) : boolean;
     procedure RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
-    function TryGetResolution(const packageId : string; out resolution : IResolution) : boolean;
+    function TryGetResolution(const packageId : string; const parentId : string; out resolution : IResolution) : boolean;
     procedure RemoveResolution(const packageId : string);
     procedure PushRequirement(const package : IPackageInfo);
     function PopRequirement : IPackageInfo;
@@ -74,7 +74,7 @@ type
     function IsNoGood(const package : IPackageInfo) : boolean;
 
     procedure RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
-    function TryGetResolution(const packageId : string; out resolution : IResolution) : boolean;
+    function TryGetResolution(const packageId : string; const parentId : string; out resolution : IResolution) : boolean;
     procedure RemoveResolution(const packageId : string);
     procedure PushRequirement(const package : IPackageInfo);
     function PopRequirement : IPackageInfo;
@@ -134,7 +134,7 @@ var
     childNode.UseSource := package.UseSource;
     for dependency in package.Dependencies do
     begin
-      if not TryGetResolution(dependency.Id, resolution) then
+      if not TryGetResolution(dependency.Id,parentNode.Id, resolution) then
         raise Exception.Create('Didn''t find a resolution for package [' + dependency.id + ']');
       AddNode(childNode, resolution.Package, resolution.VersionRange);
     end;
@@ -273,9 +273,9 @@ begin
   end;
 end;
 
-function TResolverContext.TryGetResolution(const packageId : string; out resolution : IResolution) : boolean;
+function TResolverContext.TryGetResolution(const packageId : string; const parentId : string; out resolution : IResolution) : boolean;
 
-  procedure CopyDependencies(const res : IResolution);
+  procedure CopyDependencies(const parent : string; const res : IResolution);
   var
     i: Integer;
     id : string;
@@ -289,7 +289,7 @@ function TResolverContext.TryGetResolution(const packageId : string; out resolut
       begin
         FResolved[Lowercase(id)] := childRes;//.Clone(FProjectFile); //should we be cloning here?
         if childRes.Package.Dependencies.Any then
-          CopyDependencies(childRes);
+          CopyDependencies(parent,  childRes);
       end;
     end;
   end;
@@ -303,10 +303,10 @@ begin
     result := resolution <> nil;
     if resolution <> nil then
     begin
-      FResolved[Lowercase(packageId)] := resolution;//.Clone(FProjectFile);
+      FResolved[Lowercase(packageId)] := resolution.Clone(parentId);
       //if we resolved via another projectr in the group, then we need to bring along the resolved dependencies too
       if resolution.Package.Dependencies.Any then
-        CopyDependencies(resolution);
+        CopyDependencies(resolution.Package.Id, resolution);
     end;
   end;
 end;
