@@ -105,7 +105,7 @@ begin
   client := FClientFactory.CreateClient(sourceUri);
   if client <> nil then
   begin
-    if not client.Push(TPushOptions.Default) then
+    if not client.Push(TPushOptions.Default, cancellationToken) then
       exit(TExitCode.Error);
   end
   else

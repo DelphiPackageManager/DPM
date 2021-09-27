@@ -29,6 +29,7 @@ unit DPM.Core.Sources.Interfaces;
 interface
 
 uses
+  VSoft.Awaitable,
   DPM.Core.Sources.Types,
   DPM.Core.Options.Push,
   DPM.Core.Options.Sources,
@@ -48,7 +49,7 @@ type
 
   ISourceClient = interface
     ['{DE344763-CFAA-491A-84F0-5E8462D2F6C3}']
-    function Push(const pushOptions : TPushOptions) : boolean;
+    function Push(const pushOptions : TPushOptions; const cancellationToken : ICancellationToken) : boolean;
   end;
 
   ISourceClientFactory = interface

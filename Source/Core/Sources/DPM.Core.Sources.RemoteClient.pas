@@ -30,6 +30,7 @@ interface
 
 uses
   VSoft.Uri,
+  VSoft.Awaitable,
   DPM.Core.Logging,
   DPM.Core.Options.Push,
   DPM.Core.Sources.Interfaces;
@@ -40,12 +41,16 @@ type
     FLogger : ILogger;
     FSourceUri : IUri;
   protected
-    function Push(const pushOptions : TPushOptions) : Boolean;
+    function Push(const pushOptions : TPushOptions; const cancellationToken : ICancellationToken) : Boolean;
   public
     constructor Create(const logger : ILogger; const sourceUri : IUri);
   end;
 
 implementation
+
+uses
+  System.IOUtils,
+  System.SysUtils;
 
 { TLocalClient }
 
@@ -55,8 +60,17 @@ begin
   FSourceUri := sourceUri;
 end;
 
-function TRemoteClient.Push(const pushOptions : TPushOptions) : Boolean;
+function TRemoteClient.Push(const pushOptions : TPushOptions; const cancellationToken : ICancellationToken) : Boolean;
 begin
+  //  if TPath.IsRelativePath(pushOptions.PackagePath) then
+  pushOptions.PackagePath := TPath.GetFullPath(pushOptions.PackagePath);
+
+  if not FileExists(pushOptions.PackagePath) then
+  begin
+    FLogger.Error('Package file [' + pushOptions.PackagePath + '] not found.');
+    exit;
+  end;
+
   FLogger.Error('Remote client not implemented yet, no server implementation exists!');
   result := false;
 end;

@@ -30,6 +30,7 @@ interface
 
 uses
   VSoft.Uri,
+  VSoft.Awaitable,
   DPM.Core.Logging,
   DPM.Core.Options.Push,
   DPM.Core.Sources.Interfaces;
@@ -40,7 +41,7 @@ type
     FLogger : ILogger;
     FSourceUri : IUri;
   protected
-    function Push(const pushOptions : TPushOptions) : Boolean;
+    function Push(const pushOptions : TPushOptions; const cancellationToken : ICancellationToken) : Boolean;
   public
     constructor Create(const logger : ILogger; const sourceUri : IUri);
   end;
@@ -59,7 +60,7 @@ begin
   FSourceUri := sourceUri;
 end;
 
-function TLocalClient.Push(const pushOptions : TPushOptions) : Boolean;
+function TLocalClient.Push(const pushOptions : TPushOptions; const cancellationToken : ICancellationToken) : Boolean;
 var
   targetFile : string;
 begin
