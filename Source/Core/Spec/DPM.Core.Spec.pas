@@ -564,6 +564,8 @@ begin
     //optional metadata
     if FMetaData.ProjectUrl <> '' then
       metaDataObj['projectUrl'] := FMetaData.ProjectUrl;
+    if FMetaData.RepositoryUrl <> '' then
+      metaDataObj['repositoryUrl'] := FMetaData.RepositoryUrl;
     if FMetaData.License <> '' then
       metaDataObj['license'] := FMetaData.License;
     if FMetaData.Icon <> '' then
@@ -820,6 +822,7 @@ begin
         FMetaData.Description := regEx.Replace(FMetaData.Description, evaluator);
         FMetaData.Authors := regEx.Replace(FMetaData.Authors, evaluator);
         FMetaData.ProjectUrl := regEx.Replace(FMetaData.ProjectUrl, evaluator);
+        FMetaData.RepositoryUrl := regEx.Replace(FMetaData.RepositoryUrl, evaluator);
         FMetaData.License := regEx.Replace(FMetaData.License, evaluator);
         FMetaData.Icon := regEx.Replace(FMetaData.Icon, evaluator);
         FMetaData.Copyright := regEx.Replace(FMetaData.Copyright, evaluator);

@@ -93,6 +93,7 @@ type
     FLicense : string;
     FTags : string;
     FSearchPaths : IList<IPackageSearchPath>;
+    FRepositoryUrl : string;
   protected
     function GetAuthors : string;
     function GetCopyright : string;
@@ -103,6 +104,7 @@ type
     function GetLicense : string;
     function GetTags : string;
     function GetSearchPaths : IList<IPackageSearchPath>;
+    function GetRepositoryUrl: string;
     constructor Create(const sourceName : string; const spec : IPackageSpec); reintroduce;
   public
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageMetadata;
@@ -261,6 +263,7 @@ begin
   FLicense := spec.MetaData.License;
   FProjectUrl := spec.MetaData.ProjectUrl;
   FTags := spec.MetaData.Tags;
+  FRepositoryUrl := spec.MetaData.RepositoryUrl;
 
   for specSearchPath in spec.TargetPlatform.SearchPaths do
   begin
@@ -307,6 +310,11 @@ end;
 function TPackageMetadata.GetLicense : string;
 begin
   result := FLicense;
+end;
+
+function TPackageMetadata.GetRepositoryUrl: string;
+begin
+  result := FRepositoryUrl;
 end;
 
 function TPackageMetadata.GetSearchPaths : IList<IPackageSearchPath>;

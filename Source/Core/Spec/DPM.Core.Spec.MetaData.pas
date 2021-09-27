@@ -45,6 +45,7 @@ type
     FDescription : string;
     FAuthors : string;
     FProjectUrl : string;
+    FRepositoryUrl : string;
     FLicense : string;
     FIcon : string;
     FCopyright : string;
@@ -57,6 +58,7 @@ type
     function GetDescription : string;
     function GetAuthors : string;
     function GetProjectUrl : string;
+    function GetRepositoryUrl : string;
     function GetLicense : string;
     function GetIcon : string;
     function GetCopyright : string;
@@ -68,6 +70,7 @@ type
     procedure SetDescription(const value : string);
     procedure SetAuthors(const value : string);
     procedure SetProjectUrl(const value : string);
+    procedure SetRepositoryUrl(const value : string);
     procedure SetLicense(const value : string);
     procedure SetIcon(const value : string);
     procedure SetCopyright(const value : string);
@@ -140,6 +143,11 @@ end;
 function TSpecMetaData.GetProjectUrl : string;
 begin
   result := FProjectUrl;
+end;
+
+function TSpecMetaData.GetRepositoryUrl: string;
+begin
+  result := FRepositoryUrl;
 end;
 
 function TSpecMetaData.GetTags : string;
@@ -247,6 +255,11 @@ end;
 procedure TSpecMetaData.SetProjectUrl(const value : string);
 begin
   FProjectUrl := value;
+end;
+
+procedure TSpecMetaData.SetRepositoryUrl(const value: string);
+begin
+  FRepositoryUrl := value;
 end;
 
 procedure TSpecMetaData.SetTags(const value : string);

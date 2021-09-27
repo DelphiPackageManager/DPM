@@ -76,6 +76,7 @@ type
     function GetDescription : string;
     function GetAuthors : string;
     function GetProjectUrl : string;
+    function GetRepositoryUrl : string;
     function GetLicense : string;
     function GetIcon : string;
     function GetCopyright : string;
@@ -88,6 +89,7 @@ type
     procedure SetDescription(const value : string);
     procedure SetAuthors(const value : string);
     procedure SetProjectUrl(const value : string);
+    procedure SetRepositoryUrl(const value : string);
     procedure SetLicense(const value : string);
     procedure SetIcon(const value : string);
     procedure SetCopyright(const value : string);
@@ -100,6 +102,7 @@ type
     property Description : string read GetDescription write SetDescription;
     property Authors : string read GetAuthors write SetAuthors;
     property ProjectUrl : string read GetProjectUrl write SetProjectUrl;
+    property RepositoryUrl: string read GetRepositoryUrl write SetRepositoryUrl;
     property License : string read GetLicense write SetLicense;
     property Icon : string read GetIcon write SetIcon;
     //TODO : Add IconUrl

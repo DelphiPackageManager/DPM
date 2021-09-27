@@ -62,6 +62,7 @@ type
     FLicense : string;
     FPlatforms : TDPMPlatforms;
     FProjectUrl : string;
+    FRepositoryUrl : string;
     FReportUrl : string;
     FTags : string;
     FVersion : string;
@@ -92,6 +93,7 @@ type
     function GetLicense : string;
     function GetPlatforms : TDPMPlatforms;
     function GetProjectUrl : string;
+    function GetRepositoryUrl : string;
     function GetTags : string;
     function GetVersion : string;
     function GetDownloadCount : Int64;
@@ -101,6 +103,7 @@ type
 
     procedure SetVersion(const value : string);
     procedure SetPublishedDate(const value : string);
+    procedure SetRepositoryUrl(const value : string);
     procedure SetReportUrl(const value : string);
     procedure SetInstalled(const value : Boolean);
     procedure SetLatestVersion(const value : string);
@@ -214,6 +217,7 @@ begin
   FIsTrial := metaData.IsTrial;
   FLicense := metaData.License;
   FProjectUrl := metaData.ProjectUrl;
+  FRepositoryUrl := metaData.RepositoryUrl;
   FTags := metaData.Tags;
   FVersion := metaData.Version.ToStringNoMeta;
   FDownloadCount := 123456; //-1; //indicates not set;
@@ -336,6 +340,11 @@ begin
   result := FReportUrl;
 end;
 
+function TDPMPackageSearchResultItem.GetRepositoryUrl: string;
+begin
+  result := FRepositoryUrl;
+end;
+
 function TDPMPackageSearchResultItem.GetSourceName : string;
 begin
   result := FSourceName;
@@ -376,6 +385,11 @@ end;
 procedure TDPMPackageSearchResultItem.SetReportUrl(const value : string);
 begin
   FReportUrl := value;
+end;
+
+procedure TDPMPackageSearchResultItem.SetRepositoryUrl(const value: string);
+begin
+  FRepositoryUrl := value;
 end;
 
 procedure TDPMPackageSearchResultItem.SetVersion(const value: string);

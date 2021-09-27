@@ -112,7 +112,7 @@ type
     function GetIsTrial : boolean;
     function GetIsCommercial : boolean;
     function GetSearchPaths : IList<IPackageSearchPath>;
-
+    function GetRepositoryUrl : string;
     property Description : string read GetDescription;
     property Authors : string read GetAuthors;
     property License : string read GetLicense;
@@ -121,6 +121,7 @@ type
     property Tags : string read GetTags;
     property IsTrial : boolean read GetIsTrial;
     property IsCommercial : boolean read GetIsCommercial;
+    property RepositoryUrl : string read GetRepositoryUrl;
 
     //TODO : We may be able t remove this as the only place it's use will probably be getting the full spec file.
     property SearchPaths : IList<IPackageSearchPath>read GetSearchPaths;
@@ -171,6 +172,7 @@ type
     function GetOwners : string;
     function GetProjectUrl : string;
     function GetReportUrl : string;
+    function GetRepositoryUrl : string;
     function GetPublishedDate : string;
     function GetLicense : string;
     function GetIcon : string;
@@ -189,6 +191,7 @@ type
     procedure SetInstalled(const value : boolean);
     procedure SetLatestVersion(const value : string);
     procedure SetReportUrl(const value : string);
+    procedure SetRepositoryUrl(const value : string);
     procedure SetPublishedDate(const value : string);
     procedure SetIsTransitive(const value : boolean);
 
@@ -198,6 +201,7 @@ type
     property Authors : string read GetAuthors;
     property Owners : string read GetOwners;
     property ProjectUrl : string read GetProjectUrl;
+    property RepositoryUrl : string read GetRepositoryUrl;
     property License : string read GetLicense;
     property Icon : string read GetIcon;
     property Copyright : string read GetCopyright;

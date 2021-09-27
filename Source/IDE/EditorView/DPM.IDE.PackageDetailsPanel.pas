@@ -18,7 +18,7 @@ uses
 type
   TPackageDetailsPanel = class;
 
-  TDetailElement = (deNone, deLicense, deProjectUrl, deReportUrl, deTags);
+  TDetailElement = (deNone, deLicense, deProjectUrl, deReportUrl, deRepositoryUrl, deTags);
   TDetailElements = set of TDetailElement;
   TDetailsLayout = record
     VersionLabelRect : TRect;
@@ -41,6 +41,10 @@ type
 
     ReportUrlLabelRect : TRect;
     ReportUrlRect : TRect;
+
+    RepositoryUrlLabelRect : TRect;
+    RepositoryUrlRect : TRect;
+
 
     TagsLabelRect : TRect;
     TagsRect : TRect;
@@ -149,6 +153,13 @@ begin
     if FLayout.ReportUrlRect.Contains(pt) then
       exit(deReportUrl);
   end;
+
+  if deRepositoryUrl in FOptionalElements then
+  begin
+    if FLayout.RepositoryUrlRect.Contains(pt) then
+      exit(deRepositoryUrl);
+  end;
+
 
 end;
 
@@ -301,6 +312,18 @@ begin
     Canvas.Font.Style := [fsUnderline];
   DrawText(Canvas.Handle, FPackage.ReportUrl, Length(FPackage.ReportUrl), FLayout.ReportUrlRect, DT_LEFT + DT_WORDBREAK);
   Canvas.Font.Color := fontColor;
+
+
+  Canvas.Font.Style := [fsBold];
+  DrawText(Canvas.Handle, 'Repository URL :', Length('Repository URL :'), FLayout.RepositoryUrlLabelRect, DT_LEFT);
+
+  Canvas.Font.Color := uriColor;
+  Canvas.Font.Style := [];
+  if FHitElement = deRepositoryUrl then
+    Canvas.Font.Style := [fsUnderline];
+  DrawText(Canvas.Handle, FPackage.RepositoryUrl, Length(FPackage.RepositoryUrl), FLayout.RepositoryUrlRect, DT_LEFT + DT_WORDBREAK);
+  Canvas.Font.Color := fontColor;
+
 
   Canvas.Font.Style := [fsBold];
   DrawText(Canvas.Handle, 'Tags :', Length('Tags :'), FLayout.TagsLabelRect, DT_LEFT);
@@ -530,6 +553,28 @@ begin
     DrawText(ACanvas.Handle, package.ReportUrl, Length(package.ReportUrl), ReportUrlRect, DT_LEFT + DT_CALCRECT);
     bottom := ReportUrlRect.Bottom;
   end;
+
+  if (deRepositoryUrl in optionalElements) then
+  begin
+
+    RepositoryUrlLabelRect.Top := bottom + textSize.cy;
+    RepositoryUrlLabelRect.Left := clientRect.Left;
+    RepositoryUrlLabelRect.Width := textSize.cx;
+    RepositoryUrlLabelRect.Height := textSize.cy;
+
+
+    RepositoryUrlRect.Top := RepositoryUrlLabelRect.Top;
+    RepositoryUrlRect.Left := VersionRect.Left;
+    RepositoryUrlRect.Right := clientRect.Right;
+    ReportUrlRect.Height := textSize.cy;
+    //RepositoryUrlRect doesn't wrap text without breaks and the windows api does not have any such functionalty;
+    //TODO : Write a function to calc and split into lines
+    //TODO : We need reporturl on the searchresultitem
+    DrawText(ACanvas.Handle, package.RepositoryUrl, Length(package.RepositoryUrl), RepositoryUrlRect, DT_LEFT + DT_CALCRECT);
+    bottom := RepositoryUrlRect.Bottom;
+  end;
+
+
 
   TagsLabelRect.Top := bottom + textSize.cy;
   TagsLabelRect.Left := clientRect.Left;
