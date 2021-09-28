@@ -77,39 +77,53 @@ type
     function GetAuthors : string;
     function GetProjectUrl : string;
     function GetRepositoryUrl : string;
+    function GetRepositoryType : string;
+    function GetRepositoryBranch : string;
+    function GetRepositoryCommit : string;
+    function GetReleaseNotes : string;
     function GetLicense : string;
     function GetIcon : string;
     function GetCopyright : string;
     function GetTags : string;
     function GetIsTrial : boolean;
     function GetIsCommercial : boolean;
-    procedure SetVersion(const value : TPackageVersion);
+    function GetReadMe : string;
 
+    procedure SetVersion(const value : TPackageVersion);
     procedure SetId(const value : string);
     procedure SetDescription(const value : string);
     procedure SetAuthors(const value : string);
     procedure SetProjectUrl(const value : string);
     procedure SetRepositoryUrl(const value : string);
+    procedure SetRepositoryType(const value : string);
+    procedure SetRepositoryBranch(const value : string);
+    procedure SetRepositoryCommit(const value : string);
+    procedure SetReleaseNotes(const value : string);
     procedure SetLicense(const value : string);
     procedure SetIcon(const value : string);
     procedure SetCopyright(const value : string);
     procedure SetTags(const value : string);
     procedure SetIsTrial(const value : boolean);
     procedure SetIsCommercial(const value : boolean);
+    procedure SetReadMe(const value : string);
 
     property Id : string read GetId write SetId;
     property Version : TPackageVersion read GetVersion write SetVersion;
     property Description : string read GetDescription write SetDescription;
     property Authors : string read GetAuthors write SetAuthors;
-    property ProjectUrl : string read GetProjectUrl write SetProjectUrl;
-    property RepositoryUrl: string read GetRepositoryUrl write SetRepositoryUrl;
+    property ProjectUrl       : string read GetProjectUrl write SetProjectUrl;
+    property RepositoryUrl    : string read GetRepositoryUrl write SetRepositoryUrl;
+    property RepositoryType   : string read GetRepositoryType write SetRepositoryType;
+    property RepositoryBranch : string read GetRepositoryBranch write SetRepositoryBranch;
+    property RepositoryCommit : string read GetRepositoryCommit write SetRepositoryCommit;
+    property ReleaseNotes     : string read GetReleaseNotes write SetReleaseNotes;
     property License : string read GetLicense write SetLicense;
     property Icon : string read GetIcon write SetIcon;
-    //TODO : Add IconUrl
     property Copyright : string read GetCopyright write SetCopyright;
     property Tags : string read GetTags write SetTags;
     property IsTrial : boolean read GetIsTrial write SetIsTrial;
     property IsCommercial : boolean read GetIsCommercial write SetIsCommercial;
+    property ReadMe : string read GetReadMe write SetReadMe;
   end;
 
   ISpecFileEntry = interface(ISpecNode)

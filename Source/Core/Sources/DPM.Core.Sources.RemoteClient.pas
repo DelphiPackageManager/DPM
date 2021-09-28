@@ -50,7 +50,9 @@ implementation
 
 uses
   System.IOUtils,
-  System.SysUtils;
+  System.SysUtils,
+  JsonDataObjects,
+  VSoft.HttpClient;
 
 { TLocalClient }
 
@@ -61,8 +63,24 @@ begin
 end;
 
 function TRemoteClient.Push(const pushOptions : TPushOptions; const cancellationToken : ICancellationToken) : Boolean;
+var
+  httpClient : IHttpClient;
+  request : IHttpRequest;
+  response : IHttpResponse;
+  jsonObj : TJsonObject;
+  resourcesObj : TJsonArray;
+  i : integer;
+  resourceObj : TJsonObject;
+  resource : string;
 begin
-  //  if TPath.IsRelativePath(pushOptions.PackagePath) then
+  result := false;
+
+  if pushOptions.ApiKey = '' then
+  begin
+    FLogger.Error('ApiKey arg required for remote push');
+  end;
+
+    //  if TPath.IsRelativePath(pushOptions.PackagePath) then
   pushOptions.PackagePath := TPath.GetFullPath(pushOptions.PackagePath);
 
   if not FileExists(pushOptions.PackagePath) then
@@ -70,8 +88,79 @@ begin
     FLogger.Error('Package file [' + pushOptions.PackagePath + '] not found.');
     exit;
   end;
+  //FLogger.Error('Remote client not implemented yet, no server implementation exists!');
 
-  FLogger.Error('Remote client not implemented yet, no server implementation exists!');
+
+  if cancellationToken.IsCancelled then
+    exit;
+
+  httpClient := THttpClientFactory.CreateClient(FSourceUri.ToString);
+  request := THttpClientFactory.CreateRequest;
+
+  response := httpClient.Get(request, cancellationToken);
+
+  if response.ResponseCode <> 200 then
+  begin
+    FLogger.Error(Format('Error [%d] getting source service index : %s ', [response.ResponseCode, response.ErrorMessage]));
+    exit;
+  end;
+
+//  FLogger.Debug(response.Response);
+
+  //TODO : Create a ServiceIndex object to deserialize to as we will need the other services eventually anyway!
+
+  jsonObj := nil;
+  try
+    try
+      jsonObj := TJsonObject.Parse(response.Response) as TJsonObject;
+    except
+      on e : Exception do
+      begin
+        FLogger.Error('Error parsing spec json : ' + e.Message);
+        exit;
+      end;
+    end;
+    if jsonObj = nil then
+    begin
+      FLogger.Error('serviceindex json is nil - should never happen!');
+      exit;
+    end;
+
+
+    resourcesObj := jsonObj.A['resources'];
+
+    for i := 0 to resourcesObj.Count -1 do
+    begin
+      resourceObj := resourcesObj.O[i];
+      if resourceObj.S['resourceType'] = 'PackagePublish' then
+      begin
+        resource := resourceObj.S['id'];
+        Break;
+      end;
+    end;
+
+    if resource = '' then
+    begin
+      FLogger.Error('Unabled to determine PackagePublish resource from Service Index');
+      exit;
+    end;
+
+    FLogger.Debug('PackagePublish : ' + resource);
+  finally
+    jsonObj.Free;
+  end;
+
+  httpClient := THttpClientFactory.CreateClient(resource);
+  request := THttpClientFactory.CreateRequest;
+
+  request.AddHeader('X-ApiKey', pushOptions.ApiKey);
+
+  request.AddFile(pushOptions.PackagePath);
+
+  response := httpClient.Put(request, cancellationToken);
+
+  FLogger.Debug(Format('Package Upload [%d] : %s', [response.ResponseCode, response.ErrorMessage]));
+
   result := false;
 end;
 

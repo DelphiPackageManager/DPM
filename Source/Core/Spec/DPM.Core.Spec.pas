@@ -564,8 +564,16 @@ begin
     //optional metadata
     if FMetaData.ProjectUrl <> '' then
       metaDataObj['projectUrl'] := FMetaData.ProjectUrl;
+
     if FMetaData.RepositoryUrl <> '' then
       metaDataObj['repositoryUrl'] := FMetaData.RepositoryUrl;
+    if FMetaData.RepositoryType <> '' then
+      metaDataObj['repositoryType'] := FMetaData.RepositoryType;
+    if FMetaData.RepositoryBranch <> '' then
+      metaDataObj['repositoryBranch'] := FMetaData.RepositoryBranch;
+    if FMetaData.RepositoryCommit <> '' then
+      metaDataObj['repositoryCommit'] := FMetaData.RepositoryCommit;
+
     if FMetaData.License <> '' then
       metaDataObj['license'] := FMetaData.License;
     if FMetaData.Icon <> '' then
@@ -580,6 +588,12 @@ begin
       metaDataObj['copyright'] := FMetaData.Copyright;
     if FMetaData.Tags <> '' then
       metaDataObj['tags'] := FMetaData.tags;
+
+    if FMetaData.ReadMe <> '' then
+      metaDataObj['readme'] := FMetaData.ReadMe;
+
+    if FMetaData.ReleaseNotes <> '' then
+      metaDataObj['releaseNotes'] := FMetaData.ReleaseNotes;
 
     metaDataObj['isTrial'] := LowerCase(BoolToStr(FMetaData.IsTrial, true));
     metaDataObj['isCommercial'] := LowerCase(BoolToStr(FMetaData.IsCommercial, true));
