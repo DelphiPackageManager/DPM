@@ -161,7 +161,7 @@ begin
 
   FLogger.Debug(Format('Package Upload [%d] : %s', [response.ResponseCode, response.ErrorMessage]));
 
-  result := false;
+  result := response.ResponseCode = 201;
 end;
 
 
