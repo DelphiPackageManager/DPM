@@ -132,9 +132,9 @@ begin
     for i := 0 to resourcesObj.Count -1 do
     begin
       resourceObj := resourcesObj.O[i];
-      if resourceObj.S['resourceType'] = 'PackagePublish' then
+      if resourceObj.S['@type'] = 'PackagePublish' then
       begin
-        resource := resourceObj.S['id'];
+        resource := resourceObj.S['@id'];
         Break;
       end;
     end;
