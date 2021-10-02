@@ -113,6 +113,9 @@ type
     function GetIsCommercial : boolean;
     function GetSearchPaths : IList<IPackageSearchPath>;
     function GetRepositoryUrl : string;
+    function GetRepositoryType : string;
+    function GetRepositoryBranch : string;
+    function GetRepositoryCommit : string;
     property Description : string read GetDescription;
     property Authors : string read GetAuthors;
     property License : string read GetLicense;
@@ -122,6 +125,9 @@ type
     property IsTrial : boolean read GetIsTrial;
     property IsCommercial : boolean read GetIsCommercial;
     property RepositoryUrl : string read GetRepositoryUrl;
+    property RepositoryType   : string read GetRepositoryType;
+    property RepositoryBranch : string read GetRepositoryBranch;
+    property RepositoryCommit : string read GetRepositoryCommit;
 
     //TODO : We may be able t remove this as the only place it's use will probably be getting the full spec file.
     property SearchPaths : IList<IPackageSearchPath>read GetSearchPaths;
@@ -164,7 +170,8 @@ type
     function GetSourceName : string;
     function GetId : string;
     function GetVersion : string;
-    function GetPlatforms : TDPMPlatforms;
+    function GetPlatform : TDPMPlatform;
+    function GetCompilerVersion : TCompilerVersion;
     function GetDependencies : IList<IPackagePlatformDependencies>;
 
     function GetDescription : string;
@@ -173,6 +180,9 @@ type
     function GetProjectUrl : string;
     function GetReportUrl : string;
     function GetRepositoryUrl : string;
+    function GetRepositoryType : string;
+    function GetRepositoryBranch : string;
+    function GetRepositoryCommit : string;
     function GetPublishedDate : string;
     function GetLicense : string;
     function GetIcon : string;
@@ -192,6 +202,9 @@ type
     procedure SetLatestVersion(const value : string);
     procedure SetReportUrl(const value : string);
     procedure SetRepositoryUrl(const value : string);
+    procedure SetRepositoryType(const value : string);
+    procedure SetRepositoryBranch(const value : string);
+    procedure SetRepositoryCommit(const value : string);
     procedure SetPublishedDate(const value : string);
     procedure SetIsTransitive(const value : boolean);
 
@@ -202,11 +215,16 @@ type
     property Owners : string read GetOwners;
     property ProjectUrl : string read GetProjectUrl;
     property RepositoryUrl : string read GetRepositoryUrl;
+    property RepositoryType   : string read GetRepositoryType write SetRepositoryType;
+    property RepositoryBranch : string read GetRepositoryBranch write SetRepositoryBranch;
+    property RepositoryCommit : string read GetRepositoryCommit write SetRepositoryCommit;
     property License : string read GetLicense;
     property Icon : string read GetIcon;
     property Copyright : string read GetCopyright;
     property Tags : string read GetTags;
-    property Platforms : TDPMPlatforms read GetPlatforms;
+
+    property Platform : TDPMPlatform read GetPlatform;
+    property CompilerVersion : TCompilerVersion read GetCompilerVersion;
     property Dependencies : IList<IPackagePlatformDependencies>read GetDependencies;
 
     //only returned from server feeds.
@@ -219,7 +237,6 @@ type
     //these are for use by the UI, it's not returned.
     property Installed : boolean read GetInstalled write SetInstalled;
     property LatestVersion : string read GetLatestVersion write SetLatestVersion;
-    //    property InstalledPlatforms : TDPMPlatforms read GetInstalledPlatforms write SetInstalledPlatforms;
     property IsTransitive : boolean read GetIsTransitive write SetIsTransitive;
     property ReportUrl : string read GetProjectUrl write SetReportUrl;
     property PublishedDate : string read GetPublishedDate write SetPublishedDate; //TODO : what format should this be - see repos

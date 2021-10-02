@@ -141,7 +141,6 @@
         <DCCReference Include="Core\Options\DPM.Core.Options.Cache.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Common.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Config.pas"/>
-        <DCCReference Include="Core\Options\DPM.Core.Options.Feed.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Install.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.List.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Pack.pas"/>

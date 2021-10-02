@@ -60,9 +60,13 @@ type
     FIsTrial : Boolean;
     FIsTransitive : boolean;
     FLicense : string;
-    FPlatforms : TDPMPlatforms;
+    FPlatform : TDPMPlatform;
+    FCompilerVersion : TCompilerVersion;
     FProjectUrl : string;
     FRepositoryUrl : string;
+    FRepositoryType : string;
+    FRepositoryBranch : string;
+    FRepositoryCommit : string;
     FReportUrl : string;
     FTags : string;
     FVersion : string;
@@ -91,9 +95,13 @@ type
     function GetIsCommercial : Boolean;
     function GetIsTrial : Boolean;
     function GetLicense : string;
-    function GetPlatforms : TDPMPlatforms;
+    function GetPlatform : TDPMPlatform;
+    function GetCompilerVersion : TCompilerVersion;
     function GetProjectUrl : string;
     function GetRepositoryUrl : string;
+    function GetRepositoryType : string;
+    function GetRepositoryBranch : string;
+    function GetRepositoryCommit : string;
     function GetTags : string;
     function GetVersion : string;
     function GetDownloadCount : Int64;
@@ -104,6 +112,9 @@ type
     procedure SetVersion(const value : string);
     procedure SetPublishedDate(const value : string);
     procedure SetRepositoryUrl(const value : string);
+    procedure SetRepositoryType(const value : string);
+    procedure SetRepositoryBranch(const value : string);
+    procedure SetRepositoryCommit(const value : string);
     procedure SetReportUrl(const value : string);
     procedure SetInstalled(const value : Boolean);
     procedure SetLatestVersion(const value : string);
@@ -112,11 +123,11 @@ type
 
 
     constructor CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
-    constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platforms : TDPMPlatforms; const dependencies : IList<IPackagePlatformDependencies>);
+    constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion;  const dependencies : IList<IPackagePlatformDependencies>);
     constructor CreateFromError(const id : string; const version : TPackageVersion; const errorDescription : string);
   public
     class function FromJson(const sourceName : string; const jsonObject : TJsonObject) : IPackageSearchResultItem;
-    class function FromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platforms : TDPMPlatforms; const dependencies : IList<IPackagePlatformDependencies>) : IPackageSearchResultItem;
+    class function FromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const dependencies : IList<IPackagePlatformDependencies>) : IPackageSearchResultItem;
     class function FromError(const id : string; const version : TPackageVersion; const errorDescription : string) : IPackageSearchResultItem;
   end;
 
@@ -201,10 +212,11 @@ begin
   //TODO : implement this;
 end;
 
-constructor TDPMPackageSearchResultItem.CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platforms : TDPMPlatforms; const dependencies : IList<IPackagePlatformDependencies>);
+constructor TDPMPackageSearchResultItem.CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const dependencies : IList<IPackagePlatformDependencies>);
 begin
   FSourceName := sourceName;
-  FPlatforms := platforms;
+  FPlatform := platform;
+  FCompilerVersion := compilerVersion;
   FDependencies := TCollections.CreateList<IPackagePlatformDependencies>;
   FDependencies.AddRange(dependencies);
   FAuthors := metaData.Authors;
@@ -218,6 +230,9 @@ begin
   FLicense := metaData.License;
   FProjectUrl := metaData.ProjectUrl;
   FRepositoryUrl := metaData.RepositoryUrl;
+  FRepositoryType := metaData.RepositoryType;
+  FRepositoryBranch := metaData.RepositoryBranch;
+  FRepositoryCommit := metaData.RepositoryCommit;
   FTags := metaData.Tags;
   FVersion := metaData.Version.ToStringNoMeta;
   FDownloadCount := 123456; //-1; //indicates not set;
@@ -234,14 +249,19 @@ begin
   result := TDPMPackageSearchResultItem.CreateFromJson(sourceName, jsonObject);
 end;
 
-class function TDPMPackageSearchResultItem.FromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platforms : TDPMPlatforms; const dependencies : IList<IPackagePlatformDependencies>) : IPackageSearchResultItem;
+class function TDPMPackageSearchResultItem.FromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const dependencies : IList<IPackagePlatformDependencies>) : IPackageSearchResultItem;
 begin
-  result := TDPMPackageSearchResultItem.CreateFromMetaData(sourceName, metaData, platforms, dependencies);
+  result := TDPMPackageSearchResultItem.CreateFromMetaData(sourceName, metaData, platform, compilerVersion, dependencies);
 end;
 
 function TDPMPackageSearchResultItem.GetAuthors : string;
 begin
   result := FAuthors;
+end;
+
+function TDPMPackageSearchResultItem.GetCompilerVersion: TCompilerVersion;
+begin
+  result := FCompilerVersion;
 end;
 
 function TDPMPackageSearchResultItem.GetCopyright : string;
@@ -320,9 +340,9 @@ begin
   result := FOwners;
 end;
 
-function TDPMPackageSearchResultItem.GetPlatforms : TDPMPlatforms;
+function TDPMPackageSearchResultItem.GetPlatform : TDPMPlatform;
 begin
-  result := FPlatforms;
+  result := FPlatform;
 end;
 
 function TDPMPackageSearchResultItem.GetProjectUrl : string;
@@ -338,6 +358,21 @@ end;
 function TDPMPackageSearchResultItem.GetReportUrl : string;
 begin
   result := FReportUrl;
+end;
+
+function TDPMPackageSearchResultItem.GetRepositoryBranch: string;
+begin
+  result := FRepositoryBranch;
+end;
+
+function TDPMPackageSearchResultItem.GetRepositoryCommit: string;
+begin
+  result := FRepositoryCommit;
+end;
+
+function TDPMPackageSearchResultItem.GetRepositoryType: string;
+begin
+  result := FRepositoryType;
 end;
 
 function TDPMPackageSearchResultItem.GetRepositoryUrl: string;
@@ -385,6 +420,21 @@ end;
 procedure TDPMPackageSearchResultItem.SetReportUrl(const value : string);
 begin
   FReportUrl := value;
+end;
+
+procedure TDPMPackageSearchResultItem.SetRepositoryBranch(const value: string);
+begin
+  FRepositoryBranch := value;
+end;
+
+procedure TDPMPackageSearchResultItem.SetRepositoryCommit(const value: string);
+begin
+  FRepositoryCommit := value;
+end;
+
+procedure TDPMPackageSearchResultItem.SetRepositoryType(const value: string);
+begin
+  FRepositoryType := value;
 end;
 
 procedure TDPMPackageSearchResultItem.SetRepositoryUrl(const value: string);

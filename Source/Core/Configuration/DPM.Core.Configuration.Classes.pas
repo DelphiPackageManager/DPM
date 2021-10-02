@@ -241,15 +241,12 @@ begin
     //it might not have been set before, so we need to figure it out.
     if TUriFactory.TryParse(FSource, false, uri) then
     begin
-      if uri.Scheme <> 'file' then
+      if (uri.Scheme <> 'file') then
       begin
         if (uri.Scheme = 'http') or (uri.Scheme = 'https') then
-        begin
-          if uri.Host = 'api.github.com' then
-            FSourceType := TSourceType.DPMGithub
-          else
-            FSourceType := TSourceType.DPMServer;
-        end;
+            FSourceType := TSourceType.DPMServer
+        else
+          raise EArgumentOutOfRangeException.Create('Invalid Source uri scheme - only https or file supported. ');
       end;
     end;
   end;
@@ -314,9 +311,7 @@ procedure TConfiguration.AddDefaultSources;
 var
   source : ISourceConfig;
 begin
-  source := TSourceConfig.Create('DPMGithub', 'https://api.github.com', TSourceType.DPMGithub, 'Set Password to github access token', '', false);
-  FSources.Add(source);
-  source := TSourceConfig.Create('DNGithub', 'https://api.github.com', TSourceType.DNGithub, 'Set Password to github access token', '', false);
+  source := TSourceConfig.Create('DPM', 'https://delphip.org/api/v1/index.json', TSourceType.DPMServer, '', '', true);
   FSources.Add(source);
 end;
 
@@ -389,14 +384,24 @@ begin
     bResult := source.LoadFromJson(sourcesArray.O[i]);
     if bResult then
     begin
-      if not FSources.Any(function(const item : ISourceConfig) : boolean
+      if not FSources.Any(
+        function(const item : ISourceConfig) : boolean
         begin
           result := SameText(item.Name, source.Name);
         end) then
-      begin
-        FSources.Add(source);
-      end;
+        begin
+          FSources.Add(source);
+        end;
     end;
+
+    if not FSources.Any(
+      function(const item : ISourceConfig) : boolean
+      begin
+        result := SameText(item.Name, 'DPM')
+      end) then
+      begin
+        AddDefaultSources;
+      end;
     result := result and bResult;
   end;
 end;

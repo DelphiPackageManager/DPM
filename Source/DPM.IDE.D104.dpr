@@ -68,7 +68,6 @@ uses
   DPM.Core.Options.Cache in 'Core\Options\DPM.Core.Options.Cache.pas',
   DPM.Core.Options.Common in 'Core\Options\DPM.Core.Options.Common.pas',
   DPM.Core.Options.Config in 'Core\Options\DPM.Core.Options.Config.pas',
-  DPM.Core.Options.Feed in 'Core\Options\DPM.Core.Options.Feed.pas',
   DPM.Core.Options.Install in 'Core\Options\DPM.Core.Options.Install.pas',
   DPM.Core.Options.List in 'Core\Options\DPM.Core.Options.List.pas',
   DPM.Core.Options.Pack in 'Core\Options\DPM.Core.Options.Pack.pas',

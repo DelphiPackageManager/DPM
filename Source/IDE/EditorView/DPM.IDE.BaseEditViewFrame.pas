@@ -839,8 +839,10 @@ begin
   stopWatch.Start;
   //we need a platform to pass to the repo, because the directory repo needs to construct a filename
   //we just get the first plaform in the set, doesn't matter which one.
-  for platform in package.Platforms do
-    break;
+//  for platform in package.Platform do
+//    break;
+
+  platform := package.Platform;
 
   //local for capture for use in the anonymous methods below.
   id := package.Id;

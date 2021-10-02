@@ -41,7 +41,7 @@ type
   //Note : This type is serialized in options, changing names or order may break things!
   TVerbosity = (Quiet, Normal, Detailed, Debug);
 
-  TSourceType = (Folder, DPMServer, DPMGithub, DNGithub);
+  TSourceType = (Folder, DPMServer);
 
   //TODO : Decide on min delphi version supported. Ideally go back as far as possible
 

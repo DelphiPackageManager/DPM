@@ -835,12 +835,23 @@ begin
         FMetaData.Id := regEx.Replace(FMetaData.Id, evaluator);
         FMetaData.Description := regEx.Replace(FMetaData.Description, evaluator);
         FMetaData.Authors := regEx.Replace(FMetaData.Authors, evaluator);
-        FMetaData.ProjectUrl := regEx.Replace(FMetaData.ProjectUrl, evaluator);
-        FMetaData.RepositoryUrl := regEx.Replace(FMetaData.RepositoryUrl, evaluator);
+        if FMetaData.ProjectUrl <> '' then
+          FMetaData.ProjectUrl := regEx.Replace(FMetaData.ProjectUrl, evaluator);
+        if FMetaData.RepositoryUrl <> '' then
+          FMetaData.RepositoryUrl := regEx.Replace(FMetaData.RepositoryUrl, evaluator);
+        if FMetaData.RepositoryType <> '' then
+          FMetaData.RepositoryType := regEx.Replace(FMetaData.RepositoryType, evaluator);
+        if FMetaData.RepositoryBranch <> '' then
+          FMetaData.RepositoryBranch := regEx.Replace(FMetaData.RepositoryBranch, evaluator);
+        if FMetaData.RepositoryCommit <> '' then
+          FMetaData.RepositoryCommit := regEx.Replace(FMetaData.RepositoryCommit, evaluator);
         FMetaData.License := regEx.Replace(FMetaData.License, evaluator);
-        FMetaData.Icon := regEx.Replace(FMetaData.Icon, evaluator);
-        FMetaData.Copyright := regEx.Replace(FMetaData.Copyright, evaluator);
-        FMetaData.Tags := regEx.Replace(FMetaData.Tags, evaluator);
+        if FMetaData.Icon <> '' then
+          FMetaData.Icon := regEx.Replace(FMetaData.Icon, evaluator);
+        if FMetaData.Copyright <> '' then
+          FMetaData.Copyright := regEx.Replace(FMetaData.Copyright, evaluator);
+        if FMetaData.Tags <> '' then
+          FMetaData.Tags := regEx.Replace(FMetaData.Tags, evaluator);
 
         for fileEntry in targetPlatform.SourceFiles do
         begin

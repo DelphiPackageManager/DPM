@@ -579,7 +579,7 @@ end;
 type
   TPackageFind = record
     Id : string;
-    Platforms : TDPMPlatforms;
+    Platform : TDPMPlatform;
     LatestVersion : TPackageVersion;
   end;
 
@@ -678,23 +678,23 @@ begin
       if not packageLookup.TryGetValue(LowerCase(id), find) then
       begin
         find.Id := id;
-        find.Platforms := [platform];
+        find.Platform := platform;
         find.LatestVersion := packageVersion;
         packageLookup[LowerCase(id)] := find;
       end
       else
       begin
-
+        {
         if packageVersion = find.LatestVersion then
         begin
           //same version, just add to the platforms
           find.Platforms := find.Platforms + [platform];
         end
-        else if packageVersion > find.LatestVersion then
+        else }if packageVersion > find.LatestVersion then
         begin
           //start again with a new latest version
           find.LatestVersion := packageVersion;
-          find.Platforms := [platform];
+          find.Platform := platform;
         end
         else
           continue; //lower version, ignore.
@@ -712,12 +712,12 @@ begin
     packagePlatformDependencies := TCollections.CreateList<IPackagePlatformDependencies>;
     resultItem := nil;
     packageMetaData := nil;
-    for platform in find.Platforms do
-    begin
+//    for platform in find.Platforms do
+//    begin
       if cancelToken.IsCancelled then
         exit;
 
-      packageFileName := Format('%s-%s-%s-%s.dpkg', [find.Id, CompilerToString(options.CompilerVersion), DPMPlatformToString(platform), find.LatestVersion.ToStringNoMeta]);
+      packageFileName := Format('%s-%s-%s-%s.dpkg', [find.Id, CompilerToString(options.CompilerVersion), DPMPlatformToString(find.platform), find.LatestVersion.ToStringNoMeta]);
       packageFileName := IncludeTrailingPathDelimiter(Source) + packageFileName;
       if not FileExists(packageFileName) then
         exit;
@@ -727,14 +727,14 @@ begin
 
       if (packageMetadata <> nil) and packageMetadata.Dependencies.Any then
       begin
-        platformDependencies := TDPMPackagePlatformDependencies.Create(platform, packageMetadata.Dependencies);
+        platformDependencies := TDPMPackagePlatformDependencies.Create(find.platform, packageMetadata.Dependencies);
         packagePlatformDependencies.Add(platformDependencies);
       end;
-    end;
+//    end;
 
     if packageMetadata <> nil then
     begin
-      resultItem := TDPMPackageSearchResultItem.FromMetaData(Self.Name, packageMetadata, find.Platforms, packagePlatformDependencies);
+      resultItem := TDPMPackageSearchResultItem.FromMetaData(Self.Name, packageMetadata, find.Platform, options.CompilerVersion, packagePlatformDependencies);
       result.Add(resultItem);
     end;
   end;

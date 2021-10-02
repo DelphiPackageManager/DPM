@@ -51,6 +51,7 @@ implementation
 uses
   Spring.Collections,
   DPM.Core.Types,
+  DPM.Core.Utils.Strings,
   DPM.Core.Options.Common,
   DPM.Core.Options.List,
   DPM.Core.Package.Interfaces;
@@ -92,14 +93,14 @@ begin
       if (prevInfo = nil) then
       begin
         prevInfo := info;
-        resultString := info.Id  + '-' + info.Version.ToString + '-' + CompilerToString(info.CompilerVersion) +  ' [' + DPMPlatformToString(info.Platform);
+        resultString := TStringUtils.PadRight(info.Id, 25) + #9+'v'  + info.Version.ToString + ' [Delphi '  + CompilerToString(info.CompilerVersion) +  '] [' + DPMPlatformToString(info.Platform) + ']';
         continue;
       end;
       if (info.Id <> prevInfo.Id) or (info.CompilerVersion <> prevInfo.CompilerVersion) or (info.Version <> prevInfo.Version) then
       begin
         Logger.Information(resultString + ']');
         resultString := '';
-        resultString := info.Id + '-' + info.Version.ToString + '-' + CompilerToString(info.CompilerVersion) +  ' [' + DPMPlatformToString(info.Platform);
+        resultString := TStringUtils.PadRight(info.Id, 25) + #9+'v'  + info.Version.ToString + ' [Delphi '  + CompilerToString(info.CompilerVersion) +  '] [' + DPMPlatformToString(info.Platform);
       end
       else
         //different platform.

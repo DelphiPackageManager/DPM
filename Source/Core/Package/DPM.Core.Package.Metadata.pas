@@ -94,6 +94,9 @@ type
     FTags : string;
     FSearchPaths : IList<IPackageSearchPath>;
     FRepositoryUrl : string;
+    FRepositoryType : string;
+    FRepositoryBranch : string;
+    FRepositoryCommit : string;
   protected
     function GetAuthors : string;
     function GetCopyright : string;
@@ -105,6 +108,9 @@ type
     function GetTags : string;
     function GetSearchPaths : IList<IPackageSearchPath>;
     function GetRepositoryUrl: string;
+    function GetRepositoryType : string;
+    function GetRepositoryBranch : string;
+    function GetRepositoryCommit : string;
     constructor Create(const sourceName : string; const spec : IPackageSpec); reintroduce;
   public
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageMetadata;
@@ -264,6 +270,9 @@ begin
   FProjectUrl := spec.MetaData.ProjectUrl;
   FTags := spec.MetaData.Tags;
   FRepositoryUrl := spec.MetaData.RepositoryUrl;
+  FRepositoryType := spec.MetaData.RepositoryType;
+  FRepositoryBranch := spec.MetaData.RepositoryBranch;
+  FRepositoryCommit := spec.MetaData.RepositoryCommit;
 
   for specSearchPath in spec.TargetPlatform.SearchPaths do
   begin
@@ -310,6 +319,21 @@ end;
 function TPackageMetadata.GetLicense : string;
 begin
   result := FLicense;
+end;
+
+function TPackageMetadata.GetRepositoryBranch: string;
+begin
+  result := FRepositoryBranch;
+end;
+
+function TPackageMetadata.GetRepositoryCommit: string;
+begin
+  result := FRepositoryCommit;
+end;
+
+function TPackageMetadata.GetRepositoryType: string;
+begin
+  result := FRepositoryBranch;
 end;
 
 function TPackageMetadata.GetRepositoryUrl: string;

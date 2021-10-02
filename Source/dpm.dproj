@@ -175,7 +175,6 @@
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Why.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Add.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Cache.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Feed.pas"/>
         <DCCReference Include="Core\Cache\DPM.Core.Cache.Interfaces.pas"/>
         <DCCReference Include="Core\Cache\DPM.Core.Cache.pas"/>
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.EnvironmentProvider.pas"/>
@@ -197,7 +196,6 @@
         <DCCReference Include="Core\Options\DPM.Core.Options.Cache.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Common.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Config.pas"/>
-        <DCCReference Include="Core\Options\DPM.Core.Options.Feed.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Install.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.List.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Pack.pas"/>
@@ -225,10 +223,7 @@
         <DCCReference Include="Core\Project\DPM.Core.Project.GroupProjReader.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Interfaces.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Base.pas"/>
-        <DCCReference Include="Core\Repository\DPM.Core.Repository.BaseGithub.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Directory.pas"/>
-        <DCCReference Include="Core\Repository\DPM.Core.Repository.DNGithub.pas"/>
-        <DCCReference Include="Core\Repository\DPM.Core.Repository.DPMGithub.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Factory.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Http.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Interfaces.pas"/>

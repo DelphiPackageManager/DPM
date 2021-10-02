@@ -131,12 +131,9 @@ begin
       else if uri.Scheme <> 'file' then
       begin
         if (uri.Scheme = 'http') or (uri.Scheme = 'https') then
-        begin
-          if uri.Host = 'api.github.com' then
-            TSourcesOptions.Default.SourceType := TSourceType.DPMGithub
-          else
-            TSourcesOptions.Default.SourceType := TSourceType.DPMServer;
-        end;
+          TSourcesOptions.Default.SourceType := TSourceType.DPMServer
+        else
+          raise Exception.Create('Invalid source uri scheme' + uri.Scheme);
       end;
 
       bResult := FSourcesManager.AddSource(TSourcesOptions.Default);
