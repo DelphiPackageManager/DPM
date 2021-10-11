@@ -36,6 +36,7 @@ uses
   DPM.Core.Sources.Types,
   DPM.Core.Dependency.Version,
   DPM.Core.Options.Search,
+  DPM.Core.Options.Push,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Package.Interfaces;
 
@@ -65,6 +66,9 @@ type
 
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : boolean) : IList<IPackageInfo>;
 
+    //commands
+    function Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions) : Boolean;
+
     //ui stuff
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
     function GetPackageIcon(const cancelToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
@@ -90,7 +94,10 @@ type
 
     function HasSources : boolean;
 
+    //commands
     function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>; overload;
+    function Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions) : Boolean;
+
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;

@@ -30,6 +30,7 @@ interface
 
 uses
   Spring.Collections,
+  JsonDataObjects,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
@@ -58,15 +59,14 @@ type
   TPackageIdentity = class(TPackageId, IPackageIdentity, IPackageId)
   private
     FSourceName : string;
-    FProjectUrl : string;
   protected
-    function GetProjectUrl : string;
     function GetSourceName : string;
     constructor Create(const sourceName : string; const spec : IPackageSpec); overload; virtual;
   public
-    constructor Create(const id, source : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectUrl : string); overload; virtual;
+    constructor Create(const id, source : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform); overload; virtual;
     class function TryCreateFromString(const logger : ILogger; const value : string; const source : string; out packageIdentity : IPackageIdentity) : boolean;
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageIdentity;
+    class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageIdentity : IPackageIdentity) : boolean;
   end;
 
   TPackageInfo = class(TPackageIdentity, IPackageInfo, IPackageIdentity, IPackageId)
@@ -93,6 +93,7 @@ type
     FLicense : string;
     FTags : string;
     FSearchPaths : IList<IPackageSearchPath>;
+    FProjectUrl : string;
     FRepositoryUrl : string;
     FRepositoryType : string;
     FRepositoryBranch : string;
@@ -107,6 +108,7 @@ type
     function GetLicense : string;
     function GetTags : string;
     function GetSearchPaths : IList<IPackageSearchPath>;
+    function GetProjectUrl : string;
     function GetRepositoryUrl: string;
     function GetRepositoryType : string;
     function GetRepositoryBranch : string;
@@ -143,7 +145,7 @@ uses
 
 { TPackageMetadata }
 
-constructor TPackageIdentity.Create(const id, source : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectUrl : string);
+constructor TPackageIdentity.Create(const id, source : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform);
 begin
   inherited Create(id, version, compilerVersion, platform);
   FSourceName := source;
@@ -160,14 +162,47 @@ begin
   FSourceName := sourceName;
 end;
 
-function TPackageIdentity.GetProjectUrl : string;
-begin
-  result := FProjectUrl;
-end;
 
 function TPackageIdentity.GetSourceName : string;
 begin
   result := FSourceName;
+end;
+
+class function TPackageIdentity.TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageIdentity : IPackageIdentity) : boolean;var
+  id : string;
+  stmp : string;
+
+  sVersion : string;
+  cv : TCompilerVersion;
+  platform : TDPMPlatform;
+  packageVersion : TPackageVersion;
+begin
+  result := false;
+  id := jsonObj.S['id'];
+  stmp := jsonObj.S['compiler'];
+  cv := StringToCompilerVersion(stmp);
+  if cv = TCompilerVersion.UnknownVersion then
+  begin
+    logger.Error('Compiler version segment is not a valid version [' + stmp+ ']');
+    exit;
+  end;
+  stmp := jsonObj.S['platform'];
+  platform := StringToDPMPlatform(stmp);
+  if platform = TDPMPlatform.UnknownPlatform then
+  begin
+    logger.Error('Platform segment is not a valid platform [' + stmp+ ']');
+    exit;
+  end;
+  stmp := jsonObj.S['latestVersion'];
+  if not TPackageVersion.TryParse(stmp, packageVersion) then
+  begin
+    logger.Error('Version segment is not a valid version [' + stmp + ']');
+    exit;
+  end;
+
+  packageIdentity := TPackageIdentity.Create(id, source, packageVersion, cv, platform);
+  result := true;
+
 end;
 
 class function TPackageIdentity.TryCreateFromString(const logger : ILogger; const value : string; const source : string; out packageIdentity : IPackageIdentity) : boolean;
@@ -204,8 +239,7 @@ begin
     exit;
   end;
 
-  //we dont' have a source.
-  packageIdentity := TPackageIdentity.Create(id, '', packageVersion, cv, platform, '');
+  packageIdentity := TPackageIdentity.Create(id, source, packageVersion, cv, platform);
   result := true;
 
 
@@ -269,6 +303,7 @@ begin
   FLicense := spec.MetaData.License;
   FProjectUrl := spec.MetaData.ProjectUrl;
   FTags := spec.MetaData.Tags;
+  FProjectUrl := spec.MetaData.ProjectUrl;
   FRepositoryUrl := spec.MetaData.RepositoryUrl;
   FRepositoryType := spec.MetaData.RepositoryType;
   FRepositoryBranch := spec.MetaData.RepositoryBranch;
@@ -319,6 +354,11 @@ end;
 function TPackageMetadata.GetLicense : string;
 begin
   result := FLicense;
+end;
+
+function TPackageMetadata.GetProjectUrl: string;
+begin
+  result := FProjectUrl;
 end;
 
 function TPackageMetadata.GetRepositoryBranch: string;
@@ -390,7 +430,7 @@ begin
     exit;
   end;
   //we dont' have a source.
-  identity := TPackageIdentity.Create(id, '', packageVersion, cv, platform, '');
+  identity := TPackageIdentity.Create(id, '', packageVersion, cv, platform);
   result := true;
 end;
 

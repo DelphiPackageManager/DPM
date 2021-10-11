@@ -30,6 +30,7 @@ interface
 
 uses
   VSoft.Awaitable,
+  Spring.Collections,
   DPM.Core.Sources.Types,
   DPM.Core.Options.Push,
   DPM.Core.Options.Sources,
@@ -47,14 +48,22 @@ type
     //TODO : provide some way to re-order the sources when we have a UI.
   end;
 
-  ISourceClient = interface
-    ['{DE344763-CFAA-491A-84F0-5E8462D2F6C3}']
-    function Push(const pushOptions : TPushOptions; const cancellationToken : ICancellationToken) : boolean;
+  IServiceIndexItem = interface
+    ['{BD0F1369-563C-49BE-A84A-905DAAED47A6}']
+    function GetResourceUrl : string;
+    function GetResourceType : string;
+
+    property ResourceUrl : string read GetResourceUrl;
+    property ResourceType : string read GetResourceType;
   end;
 
-  ISourceClientFactory = interface
-    ['{02B5206C-6DBF-41C0-AAC6-09E23856C980}']
-    function CreateClient(const uri : IUri) : ISourceClient;
+  IServiceIndex = interface
+    ['{0633BFFC-CAC7-464C-8374-07EC3858E585}']
+    function GetItems : IList<IServiceIndexItem>;
+    function FindItems(const resourceType : string) : IEnumerable<IServiceIndexItem>;
+    //just finds the first one of the type.
+    function FindItem(const resourceType : string) : IServiceIndexItem;
+    property Items : IList<IServiceIndexItem> read GetItems;
   end;
 
 

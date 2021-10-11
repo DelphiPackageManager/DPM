@@ -119,11 +119,8 @@ uses
   DPM.Core.Repository.Http in 'Core\Repository\DPM.Core.Repository.Http.pas',
   DPM.Core.Repository.Interfaces in 'Core\Repository\DPM.Core.Repository.Interfaces.pas',
   DPM.Core.Repository.Manager in 'Core\Repository\DPM.Core.Repository.Manager.pas',
-  DPM.Core.Sources.ClientFactory in 'Core\Sources\DPM.Core.Sources.ClientFactory.pas',
   DPM.Core.Sources.Interfaces in 'Core\Sources\DPM.Core.Sources.Interfaces.pas',
-  DPM.Core.Sources.LocalClient in 'Core\Sources\DPM.Core.Sources.LocalClient.pas',
   DPM.Core.Sources.Manager in 'Core\Sources\DPM.Core.Sources.Manager.pas',
-  DPM.Core.Sources.RemoteClient in 'Core\Sources\DPM.Core.Sources.RemoteClient.pas',
   DPM.Core.Sources.Types in 'Core\Sources\DPM.Core.Sources.Types.pas',
   DPM.Core.Spec.BPLEntry in 'Core\Spec\DPM.Core.Spec.BPLEntry.pas',
   DPM.Core.Spec.BuildEntry in 'Core\Spec\DPM.Core.Spec.BuildEntry.pas',
@@ -177,7 +174,8 @@ uses
   DPM.Core.Utils.Files in 'Core\Utils\DPM.Core.Utils.Files.pas',
   DPM.Core.Package.Installer.Interfaces in 'Core\Package\DPM.Core.Package.Installer.Interfaces.pas',
   DPM.Console.Command.Info in 'Cmdline\Commands\DPM.Console.Command.Info.pas',
-  DPM.Core.Options.Info in 'Core\Options\DPM.Core.Options.Info.pas';
+  DPM.Core.Options.Info in 'Core\Options\DPM.Core.Options.Info.pas',
+  DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas';
 
 begin
   CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml

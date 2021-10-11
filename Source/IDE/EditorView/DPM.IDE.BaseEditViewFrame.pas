@@ -578,7 +578,7 @@ begin
 
   options := FSearchOptions.Clone;
   //we want all packages for installed as we don't know what types we might have
-//  options.Prerelease := FSearchOptions.Prerelease;
+  options.Prerelease := true;
   options.Commercial := true;
   options.Trial := true;
 //  options.SearchTerms := FSearchOptions.SearchTerms;

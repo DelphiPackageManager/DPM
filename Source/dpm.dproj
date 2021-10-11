@@ -14,7 +14,7 @@
         <DPMCompiler>10.4</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.Uri\0.1.1\lib;$(DPM)\VSoft.SemanticVersion\0.2.1\lib;$(DPM)\VSoft.JsonDataObjects\0.1.1\lib;$(DPM)\VSoft.HttpClient\0.2.4\source;$(DPM)\VSoft.CommandLine\0.1.1\lib;$(DPM)\VSoft.CancellationToken\0.0.3\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\VSoft.Awaitable\0.2.1\lib;$(DPM)\VSoft.AntPatterns\0.1.0\lib;$(DPM)\Spring4D.Extensions\2.0.0-dev7\lib;$(DPM)\Spring4D.Base\2.0.0-dev7\lib;$(DPM)\Spring4D.Core\2.0.0-dev7\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.0.3\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\Spring4D.Base\2.0.0-dev7\lib;$(DPM)\VSoft.Uri\0.1.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.1\lib;$(DPM)\VSoft.JsonDataObjects\0.1.1\lib;$(DPM)\VSoft.HttpClient\0.3.0\lib;$(DPM)\VSoft.CommandLine\0.1.1\lib;$(DPM)\VSoft.Awaitable\0.2.1\lib;$(DPM)\VSoft.AntPatterns\0.1.0\lib;$(DPM)\Spring4D.Extensions\2.0.0-dev7\lib;$(DPM)\Spring4D.Core\2.0.0-dev7\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -132,8 +132,8 @@
         <DCC_RemoteDebug>true</DCC_RemoteDebug>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <Debugger_CWD>i:\dpmfeed</Debugger_CWD>
-        <Debugger_RunParams>push VSoft.Awaitable-10.0-Win32-0.2.0.dpkg -source=server</Debugger_RunParams>
+        <Debugger_CWD>I:\Github\DelphiPackageManager\DPMMaster\Source</Debugger_CWD>
+        <Debugger_RunParams>list weak -source=server</Debugger_RunParams>
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
@@ -228,11 +228,8 @@
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Http.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Interfaces.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Manager.pas"/>
-        <DCCReference Include="Core\Sources\DPM.Core.Sources.ClientFactory.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Interfaces.pas"/>
-        <DCCReference Include="Core\Sources\DPM.Core.Sources.LocalClient.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Manager.pas"/>
-        <DCCReference Include="Core\Sources\DPM.Core.Sources.RemoteClient.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Types.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.BPLEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
@@ -287,6 +284,7 @@
         <DCCReference Include="Core\Package\DPM.Core.Package.Installer.Interfaces.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Info.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Info.pas"/>
+        <DCCReference Include="Core\Sources\DPM.Core.Sources.ServiceIndex.pas"/>
         <BuildConfiguration Include="Debug">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
@@ -1351,15 +1349,15 @@
             <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.1.0"/>
             <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.2.1">
                 <PackageReference id="Gabr42.OmniThreadLibrary" platform="Win32" version="3.7.8" range="[3.7.8,]"/>
-                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.3" range="[0.0.3, 0.0.65535]"/>
+                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.3" range="[0.0.3,]"/>
             </PackageReference>
             <PackageReference id="VSoft.CommandLine" platform="Win32" version="0.1.1"/>
-            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.2.4">
-                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.3" range="[0.0.3, 0.0.65535]"/>
+            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.3.0">
+                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.3" range="[0.0.3,]"/>
             </PackageReference>
             <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.1.1"/>
             <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.1"/>
-            <PackageReference id="VSoft.Uri" platform="Win32" version="0.1.1"/>
+            <PackageReference id="VSoft.Uri" platform="Win32" version="0.1.2"/>
         </DPM>
     </ProjectExtensions>
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>

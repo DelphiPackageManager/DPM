@@ -93,19 +93,13 @@ uses
   DPM.Core.Project.GroupProjReader in 'Core\Project\DPM.Core.Project.GroupProjReader.pas',
   DPM.Core.Project.Interfaces in 'Core\Project\DPM.Core.Project.Interfaces.pas',
   DPM.Core.Repository.Base in 'Core\Repository\DPM.Core.Repository.Base.pas',
-  DPM.Core.Repository.BaseGithub in 'Core\Repository\DPM.Core.Repository.BaseGithub.pas',
   DPM.Core.Repository.Directory in 'Core\Repository\DPM.Core.Repository.Directory.pas',
-  DPM.Core.Repository.DNGithub in 'Core\Repository\DPM.Core.Repository.DNGithub.pas',
-  DPM.Core.Repository.DPMGithub in 'Core\Repository\DPM.Core.Repository.DPMGithub.pas',
   DPM.Core.Repository.Factory in 'Core\Repository\DPM.Core.Repository.Factory.pas',
   DPM.Core.Repository.Http in 'Core\Repository\DPM.Core.Repository.Http.pas',
   DPM.Core.Repository.Interfaces in 'Core\Repository\DPM.Core.Repository.Interfaces.pas',
   DPM.Core.Repository.Manager in 'Core\Repository\DPM.Core.Repository.Manager.pas',
-  DPM.Core.Sources.ClientFactory in 'Core\Sources\DPM.Core.Sources.ClientFactory.pas',
   DPM.Core.Sources.Interfaces in 'Core\Sources\DPM.Core.Sources.Interfaces.pas',
-  DPM.Core.Sources.LocalClient in 'Core\Sources\DPM.Core.Sources.LocalClient.pas',
   DPM.Core.Sources.Manager in 'Core\Sources\DPM.Core.Sources.Manager.pas',
-  DPM.Core.Sources.RemoteClient in 'Core\Sources\DPM.Core.Sources.RemoteClient.pas',
   DPM.Core.Sources.Types in 'Core\Sources\DPM.Core.Sources.Types.pas',
   DPM.Core.MSXML in 'Core\Xml\DPM.Core.MSXML.pas',
   DPM.Core.XML.NodeBase in 'Core\Xml\DPM.Core.XML.NodeBase.pas',
@@ -130,7 +124,8 @@ uses
   DPM.Core.Compiler.ProjectSettings in 'Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas',
   DPM.Core.Utils.Files in 'Core\Utils\DPM.Core.Utils.Files.pas',
   DPM.Core.Tests.PathUtils in 'Tests\DPM.Core.Tests.PathUtils.pas',
-  DPM.Core.Package.Installer.Interfaces in 'Core\Package\DPM.Core.Package.Installer.Interfaces.pas';
+  DPM.Core.Package.Installer.Interfaces in 'Core\Package\DPM.Core.Package.Installer.Interfaces.pas',
+  DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas';
 
 var
   runner : ITestRunner;

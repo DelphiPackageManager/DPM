@@ -36,16 +36,11 @@ uses
   DPM.Core.Dependency.Version,
   DPM.Core.Logging,
   DPM.Core.Options.Search,
+  DPM.Core.Options.Push,
   DPM.Core.Package.Interfaces,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Repository.Base;
-
-//TODO : makes this work for structured folders too
-//eg : \Vsoft.AntPattterns\Win32
-//     \Vsoft.AntPatterns\Win64
-// see https://docs.microsoft.com/en-au/nuget/reference/cli-reference/cli-ref-add
-
 
 type
   TDirectoryPackageRepository = class(TBaseRepository, IPackageRepository)
@@ -78,6 +73,10 @@ type
     function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const preRelease : boolean) : IList<TPackageVersion>; overload;
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration) : IList<IPackageSearchResultItem>;
     function GetPackageIcon(const cancelToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
+
+    //commands
+    function Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions): Boolean;
+
 
   public
     constructor Create(const logger : ILogger); override;
@@ -143,7 +142,7 @@ var
   destFile : string;
 begin
   result := false;
-  sourceFile := IncludeTrailingPathDelimiter(Source) + packageMetadata.ToString + cPackageFileExt;
+  sourceFile := IncludeTrailingPathDelimiter(SourceUri) + packageMetadata.ToString + cPackageFileExt;
   if not FileExists(sourceFile) then
   begin
     Logger.Error('File not found in repository [' + sourceFile + ']');
@@ -184,7 +183,7 @@ var
 begin
   result := nil;
   packagFileName := Format('%s-%s-%s-%s.dpkg', [packageId, CompilerToString(compilerVersion), DPMPlatformToString(platform), packageVersion]);
-  packagFileName := TPath.Combine(Self.Source, packagFileName);
+  packagFileName := TPath.Combine(Self.SourceUri, packagFileName);
   svgIconFileName := ChangeFileExt(packagFileName, '.svg');
   pngIconFileName := ChangeFileExt(packagFileName, '.png');
 
@@ -271,7 +270,7 @@ var
 begin
   result := nil;
   packagFileName := Format('%s-%s-%s-%s.dpkg', [packageId.Id, CompilerToString(packageId.CompilerVersion), DPMPlatformToString(packageId.Platform), packageId.Version.ToStringNoMeta]);
-  packagFileName := IncludeTrailingPathDelimiter(Source) + packagFileName;
+  packagFileName := IncludeTrailingPathDelimiter(SourceUri) + packagFileName;
   if not FileExists(packagFileName) then
     exit;
   if cancellationToken.IsCancelled then
@@ -477,11 +476,6 @@ begin
 
   //no point sorting here or making results distinct as the the repo manager will do both.
 
-//  result.Sort(function(const Left, Right: TPackageVersion): Integer
-//              begin
-//                   result := right.CompareTo(left);
-//              end);
-
 end;
 
 function TDirectoryPackageRepository.GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
@@ -564,7 +558,7 @@ begin
     searchTerm := searchTerm + '-*' + cPackageFileExt;
 
   try
-    fileList := TDirectoryUtils.GetFiles(Source, searchTerm);
+    fileList := TDirectoryUtils.GetFiles(SourceUri, searchTerm);
     //dedupe
     result.AddRange(TEnumerable.Distinct<string>(fileList, TStringComparer.OrdinalIgnoreCase));
   except
@@ -604,7 +598,7 @@ begin
     else
       searchTerm := searchTerm + '-*-' + options.Version.ToStringNoMeta + cPackageFileExt;
 
-    result := TDirectoryUtils.GetFiles(Source, searchTerm);
+    result := TDirectoryUtils.GetFiles(SourceUri, searchTerm);
     //result.AddRange(files);
   end
   else
@@ -617,7 +611,7 @@ begin
       else
         platformSearchTerm := platformSearchTerm + options.Version.ToStringNoMeta + cPackageFileExt;
 
-      result := TDirectoryUtils.GetFiles(Source, platformSearchTerm);
+      result := TDirectoryUtils.GetFiles(SourceUri, platformSearchTerm);
       //result.AddRange(files);
     end;
   end;
@@ -718,7 +712,7 @@ begin
         exit;
 
       packageFileName := Format('%s-%s-%s-%s.dpkg', [find.Id, CompilerToString(options.CompilerVersion), DPMPlatformToString(find.platform), find.LatestVersion.ToStringNoMeta]);
-      packageFileName := IncludeTrailingPathDelimiter(Source) + packageFileName;
+      packageFileName := IncludeTrailingPathDelimiter(SourceUri) + packageFileName;
       if not FileExists(packageFileName) then
         exit;
       //Logger.Debug('Checking package file [' + packageFileName + ']');
@@ -857,7 +851,7 @@ begin
   else
     searchTerm := searchTerm + '-' + DPMPlatformToString(platform) + '-*' + cPackageFileExt;
 
-  result := TDirectoryUtils.GetFiles(Source, searchTerm);
+  result := TDirectoryUtils.GetFiles(SourceUri, searchTerm);
 
   //fileList := TCollections.CreateList<string>(files);
 
@@ -951,11 +945,48 @@ begin
         if not packageVersion.IsStable then
           continue;
       //not using the trycreate here as we need a specific regex.
-      info := TPackageIdentity.Create(id, Name, packageVersion, cv, platform, '');
+      info := TPackageIdentity.Create(id, Name, packageVersion, cv, platform);
       result.Add(info);
     end;
   end;
+end;
 
+function TDirectoryPackageRepository.Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions): Boolean;
+var
+  targetFile : string;
+begin
+  result := false;
+  //  if TPath.IsRelativePath(pushOptions.PackagePath) then
+  pushOptions.PackagePath := TPath.GetFullPath(pushOptions.PackagePath);
+
+  if not FileExists(pushOptions.PackagePath) then
+  begin
+    Logger.Error('Package file [' + pushOptions.PackagePath + '] not found.');
+    exit;
+  end;
+
+  if not DirectoryExists(SourceUri) then
+  begin
+    Logger.Error('Source uri path does not exist [' + SourceUri + '].');
+    exit;
+  end;
+  try
+    targetFile := TPath.Combine(SourceUri, TPath.GetFileName(pushOptions.PackagePath));
+    if pushOptions.SkipDuplicate and TFile.Exists(targetFile) then
+    begin
+      Logger.Information('Package [' + TPath.GetFileName(pushOptions.PackagePath) + '] exists and skipDuplicates specified, skipping');
+      exit(true);
+    end;
+
+    TFile.Copy(pushOptions.PackagePath, targetFile, true);
+    Logger.Information('Package pushed ok.', true);
+    result := true;
+  except
+    on e : Exception do
+    begin
+      Logger.Error('Unable to copy file [' + pushOptions.PackagePath + '] to [' + SourceUri + '] : ' + e.Message);
+    end;
+  end;
 end;
 
 end.

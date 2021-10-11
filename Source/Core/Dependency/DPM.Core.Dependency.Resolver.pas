@@ -344,6 +344,9 @@ begin
   end;
   context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, options.CompilerVersion,  platform, projectReferences);
 
+  //we always need to look at pre-release packages for restore as the project may be using them.
+  options.Prerelease := true;
+
   result := DoResolve(cancellationToken, options, context,  platform);
   resolved := context.GetResolvedPackages;
   dependencyGraph := context.BuildDependencyGraph;

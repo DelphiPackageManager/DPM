@@ -45,6 +45,7 @@ type
   //minimum info needed to identify package
   //need to make more of the api use this rather than the derived interfaces.
   //Note this only has info we can get from the package filename!
+  //represents the core package identity - id, version, compiler, platform
   IPackageId = interface
     ['{35FABD79-3880-4F46-9D70-AA19AAE44565}']
     function GetId : string;
@@ -59,15 +60,11 @@ type
     property Platform : TDPMPlatform read GetPlatform;
   end;
 
-  //represents the core package identity, ie id, version, compiler, platform
+  //packageid plus sourcename
   IPackageIdentity = interface(IPackageId)
     ['{E9E49A25-3ECA-4380-BB75-AC9E29725BEE}']
     function GetSourceName : string;
-    function GetProjectUrl : string;
     property SourceName : string read GetSourceName;
-    //note : we can't get the project url from the filename
-    //but we need it here for github based repos
-    property ProjectUrl : string read GetProjectUrl;
   end;
 
   IPackageDependency = interface
@@ -111,6 +108,7 @@ type
     function GetTags : string;
     function GetIsTrial : boolean;
     function GetIsCommercial : boolean;
+    function GetProjectUrl : string;
     function GetSearchPaths : IList<IPackageSearchPath>;
     function GetRepositoryUrl : string;
     function GetRepositoryType : string;
@@ -124,6 +122,7 @@ type
     property Tags : string read GetTags;
     property IsTrial : boolean read GetIsTrial;
     property IsCommercial : boolean read GetIsCommercial;
+    property ProjectUrl : string read GetProjectUrl;
     property RepositoryUrl : string read GetRepositoryUrl;
     property RepositoryType   : string read GetRepositoryType;
     property RepositoryBranch : string read GetRepositoryBranch;

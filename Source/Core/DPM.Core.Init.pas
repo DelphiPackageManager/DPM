@@ -56,7 +56,6 @@ uses
   DPM.Core.Package.InstallerContext,
   DPM.Core.Sources.Interfaces,
   DPM.Core.Sources.Manager,
-  DPM.Core.Sources.ClientFactory,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Configuration.Manager,
   DPM.Core.Repository.Interfaces,
@@ -104,7 +103,6 @@ begin
   Container.RegisterType<IConfigurationManager, TConfigurationManager>;
 
   Container.RegisterType<ISourcesManager, TSourcesManager>;
-  Container.RegisterType<ISourceClientFactory, TClientFactory>;
 
   Container.RegisterType<IPackageRepositoryFactory, TPackageRepositoryFactory>;
   Container.RegisterType<IPackageRepositoryManager, TPackageRepositoryManager>;

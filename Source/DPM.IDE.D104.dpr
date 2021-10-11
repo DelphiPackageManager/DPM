@@ -95,19 +95,13 @@ uses
   DPM.Core.Project.GroupProjReader in 'Core\Project\DPM.Core.Project.GroupProjReader.pas',
   DPM.Core.Project.Interfaces in 'Core\Project\DPM.Core.Project.Interfaces.pas',
   DPM.Core.Repository.Base in 'Core\Repository\DPM.Core.Repository.Base.pas',
-  DPM.Core.Repository.BaseGithub in 'Core\Repository\DPM.Core.Repository.BaseGithub.pas',
   DPM.Core.Repository.Directory in 'Core\Repository\DPM.Core.Repository.Directory.pas',
-  DPM.Core.Repository.DNGithub in 'Core\Repository\DPM.Core.Repository.DNGithub.pas',
-  DPM.Core.Repository.DPMGithub in 'Core\Repository\DPM.Core.Repository.DPMGithub.pas',
   DPM.Core.Repository.Factory in 'Core\Repository\DPM.Core.Repository.Factory.pas',
   DPM.Core.Repository.Http in 'Core\Repository\DPM.Core.Repository.Http.pas',
   DPM.Core.Repository.Interfaces in 'Core\Repository\DPM.Core.Repository.Interfaces.pas',
   DPM.Core.Repository.Manager in 'Core\Repository\DPM.Core.Repository.Manager.pas',
-  DPM.Core.Sources.ClientFactory in 'Core\Sources\DPM.Core.Sources.ClientFactory.pas',
   DPM.Core.Sources.Interfaces in 'Core\Sources\DPM.Core.Sources.Interfaces.pas',
-  DPM.Core.Sources.LocalClient in 'Core\Sources\DPM.Core.Sources.LocalClient.pas',
   DPM.Core.Sources.Manager in 'Core\Sources\DPM.Core.Sources.Manager.pas',
-  DPM.Core.Sources.RemoteClient in 'Core\Sources\DPM.Core.Sources.RemoteClient.pas',
   DPM.Core.Sources.Types in 'Core\Sources\DPM.Core.Sources.Types.pas',
   DPM.Core.Spec.BPLEntry in 'Core\Spec\DPM.Core.Spec.BPLEntry.pas',
   DPM.Core.Spec.BuildEntry in 'Core\Spec\DPM.Core.Spec.BuildEntry.pas',
@@ -183,7 +177,8 @@ uses
   DPM.IDE.BaseEditViewFrame in 'IDE\EditorView\DPM.IDE.BaseEditViewFrame.pas' {DPMBaseEditViewFrame: TFrame},
   DPM.IDE.Details.Interfaces in 'IDE\EditorView\DPM.IDE.Details.Interfaces.pas',
   DPM.IDE.GroupEditorViewFrame in 'IDE\EditorView\DPM.IDE.GroupEditorViewFrame.pas' {DPMGroupEditViewFrame: TFrame},
-  DPM.IDE.GroupPackageDetailsFrame in 'IDE\EditorView\DPM.IDE.GroupPackageDetailsFrame.pas' {GroupPackageDetailsFrame: TFrame};
+  DPM.IDE.GroupPackageDetailsFrame in 'IDE\EditorView\DPM.IDE.GroupPackageDetailsFrame.pas' {GroupPackageDetailsFrame: TFrame},
+  DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas';
 
 {$R *.res}
 

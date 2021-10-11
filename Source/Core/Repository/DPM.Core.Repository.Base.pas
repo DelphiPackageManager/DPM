@@ -46,7 +46,7 @@ type
   private
     FLogger : ILogger;
     FName : string;
-    FSource : string;
+    FSourceUri : string;
     FUserName : string;
     FPassword : string;
     FRepositoryType : TSourceType;
@@ -61,7 +61,7 @@ type
     property Logger : ILogger read FLogger;
 
     property Name : string read FName;
-    property Source : string read FSource;
+    property SourceUri : string read FSourceUri;
     property UserName : string read FUserName;
     property Password : string read FPassword;
 
@@ -92,13 +92,13 @@ end;
 
 function TBaseRepository.GetSource : string;
 begin
-  result := FSource;
+  result := FSourceUri;
 end;
 
 procedure TBaseRepository.Configure(const source : ISourceConfig);
 begin
   FName := source.Name;
-  FSource := source.Source;
+  FSourceUri := source.Source;
   FUserName := source.UserName;
   FPassword := source.Password;
   FRepositoryType := source.SourceType;

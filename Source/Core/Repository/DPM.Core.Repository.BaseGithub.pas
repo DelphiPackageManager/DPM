@@ -84,7 +84,7 @@ implementation
 procedure TGithubBasePackageRepository.Configure(const source : ISourceConfig);
 begin
   inherited Configure(source);
-  FHttpClient := THttpClientFactory.CreateClient(Self.Source);
+  FHttpClient := THttpClientFactory.CreateClient(Self.SourceUri);
   FHttpClient.UserName := Self.UserName;
   FHttpClient.Password := Self.Password;
 

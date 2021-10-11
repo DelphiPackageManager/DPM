@@ -37,6 +37,7 @@ uses
   DPM.Core.Dependency.Version,
   DPM.Core.Logging,
   DPM.Core.Options.Search,
+  DPM.Core.Options.Push,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Package.Interfaces,
   DPM.Core.Repository.Interfaces;
@@ -55,7 +56,7 @@ type
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
     function GetRepositories : IList<IPackageRepository>;
     function GetRepositoryByName(const value : string) : IPackageRepository;
-    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>;
+
     function UpdateRepositories(const configuration : IConfiguration) : boolean;
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
@@ -72,6 +73,12 @@ type
 
     function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<TPackageVersion>; overload;
     function GetLatestVersions(const cancellationToken : ICancellationToken; const installedPackages : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const preRelease : boolean; const configuration : IConfiguration) : IDictionary<string, TPackageVersion>;
+
+
+    //commands
+    function Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions) : Boolean;
+    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>;
+
   public
     constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const repoFactory : IPackageRepositoryFactory);
   end;
@@ -681,6 +688,48 @@ begin
   end
   else
     result.AddRange(packages);
+end;
+
+function TPackageRepositoryManager.Push(const cancellationToken: ICancellationToken; const pushOptions: TPushOptions): Boolean;
+var
+  config : IConfiguration;
+  repo : IPackageRepository;
+begin
+  result := false;
+  if cancellationToken.IsCancelled then
+    exit;
+
+  if pushOptions.ConfigFile = '' then
+  begin
+    FLogger.Error('No configuration file specified');
+    exit;
+  end;
+
+  config := FConfigurationManager.LoadConfig(pushOptions.ConfigFile);
+  if config = nil then
+    exit;
+
+  if not UpdateRepositories(config) then
+  begin
+    FLogger.Error('Unabled to push, error loading source repositories');
+    exit;
+  end;
+
+  repo := FRepositories.Where(
+    function(const repository : IPackageRepository) : Boolean
+    begin
+      result := SameText(pushOptions.Source, repository.Name);
+    end).FirstOrDefault;
+
+  if repo = nil then
+  begin
+    FLogger.Error('Unknown Source : ' + pushOptions.Source);
+    exit;
+  end;
+
+  result := repo.Push(cancellationToken, pushOptions);
+
+
 end;
 
 function TPackageRepositoryManager.UpdateRepositories(const configuration : IConfiguration) : boolean;

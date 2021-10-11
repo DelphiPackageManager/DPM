@@ -311,7 +311,7 @@ procedure TConfiguration.AddDefaultSources;
 var
   source : ISourceConfig;
 begin
-  source := TSourceConfig.Create('DPM', 'https://delphip.org/api/v1/index.json', TSourceType.DPMServer, '', '', true);
+  source := TSourceConfig.Create('DPM', 'https://delphipm.org/api/v1/index.json', TSourceType.DPMServer, '', '', true);
   FSources.Add(source);
 end;
 
@@ -378,6 +378,7 @@ begin
   FPackageCacheLocation := jsonObj['packageCacheLocation'];
   sourcesArray := jsonObj.A['packageSources'];
 
+  bResult := false;
   for i := 0 to sourcesArray.Count - 1 do
   begin
     source := TSourceConfig.Create(FLogger);
@@ -393,17 +394,17 @@ begin
           FSources.Add(source);
         end;
     end;
-
-    if not FSources.Any(
-      function(const item : ISourceConfig) : boolean
-      begin
-        result := SameText(item.Name, 'DPM')
-      end) then
-      begin
-        AddDefaultSources;
-      end;
-    result := result and bResult;
   end;
+
+  if not FSources.Any(
+    function(const item : ISourceConfig) : boolean
+    begin
+      result := SameText(item.Name, 'DPM')
+    end) then
+    begin
+      AddDefaultSources;
+    end;
+    result := result and bResult;
 end;
 
 function TConfiguration.SaveToFile(const fileName : string) : boolean;

@@ -14,7 +14,7 @@
         <DPMCompiler>XE8</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.VirtualListView\0.3.0-rc8\lib;$(DPM)\VSoft.Uri\0.1.1\lib;$(DPM)\VSoft.SemanticVersion\0.2.2\lib;$(DPM)\VSoft.JsonDataObjects\0.1.1\lib;$(DPM)\VSoft.HttpClient\0.2.4\lib;$(DPM)\VSoft.CancellationToken\0.0.3\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\VSoft.Awaitable\0.2.1\lib;$(DPM)\VSoft.AntPatterns\0.1.1\lib;$(DPM)\Spring4D.Extensions\2.0.0-dev7\lib;$(DPM)\Spring4D.Base\2.0.0-dev7\lib;$(DPM)\Spring4D.Core\2.0.0-dev7\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.0.3\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\Spring4D.Base\2.0.0-dev7\lib;$(DPM)\VSoft.Uri\0.1.2\lib;$(DPM)\VSoft.VirtualListView\0.3.0-rc8\lib;$(DPM)\VSoft.SemanticVersion\0.2.2\lib;$(DPM)\VSoft.JsonDataObjects\0.1.1\lib;$(DPM)\VSoft.HttpClient\0.2.4\lib;$(DPM)\VSoft.Awaitable\0.2.1\lib;$(DPM)\VSoft.AntPatterns\0.1.1\lib;$(DPM)\Spring4D.Extensions\2.0.0-dev7\lib;$(DPM)\Spring4D.Core\2.0.0-dev7\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -766,7 +766,7 @@
             </PackageReference>
             <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.1.1"/>
             <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.2"/>
-            <PackageReference id="VSoft.Uri" platform="Win32" version="0.1.1"/>
+            <PackageReference id="VSoft.Uri" platform="Win32" version="0.1.2"/>
             <PackageReference id="VSoft.VirtualListView" platform="Win32" version="0.3.0-rc8"/>
         </DPM>
     </ProjectExtensions>
