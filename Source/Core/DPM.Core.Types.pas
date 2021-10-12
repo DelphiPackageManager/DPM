@@ -363,7 +363,7 @@ begin
     TCompilerVersion.RS10_2 : result := '250';
     TCompilerVersion.RS10_3 : result := '260';
     TCompilerVersion.RS10_4 : result := '270';
-    TCompilerVersion.RS11_0   : result := '280';
+    TCompilerVersion.RS11_0 : result := '280';
   else
     raise Exception.Create('LibSuffix is missing for : ' + CompilerToString(compiler));
   end;
@@ -385,7 +385,7 @@ begin
     TCompilerVersion.RS10_2 : result := '19.0';
     TCompilerVersion.RS10_3 : result := '20.0';
     TCompilerVersion.RS10_4 : result := '21.0';
-    TCompilerVersion.RS11_0   : result := '22.0';
+    TCompilerVersion.RS11_0 : result := '22.0';
   else
     raise Exception.Create('BDSVersion is missing for : ' + CompilerToString(compiler));
   end;
@@ -407,7 +407,7 @@ begin
     TCompilerVersion.RS10_2 : result := '32';
     TCompilerVersion.RS10_3 : result := '33';
     TCompilerVersion.RS10_4 : result := '34';
-    TCompilerVersion.RS11_0   : result := '35';
+    TCompilerVersion.RS11_0 : result := '35';
   else
     raise Exception.Create('BDSVersion is missing for : ' + CompilerToString(compiler));
   end;
