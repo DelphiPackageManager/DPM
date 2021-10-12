@@ -263,6 +263,7 @@ begin
     result := FileExists(IncludeTrailingPathDelimiter(packageFolder) + cPackageMetaFile);
     if result then
       FLogger.Verbose('Package  [' + packageFilePath + '] added to cache.');
+    //TODO : extract icon and readme
 
   except
     on e : exception do

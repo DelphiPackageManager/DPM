@@ -90,8 +90,50 @@ begin
 end;
 
 function TDPMServerPackageRepository.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : Boolean;
+var
+  httpClient : IHttpClient;
+  request : IHttpRequest;
+  response : IHttpResponse;
+  serviceIndex : IServiceIndex;
+  serviceItem : IServiceIndexItem;
+  uriTemplate : string;
+  path : string;
 begin
   result := false;
+  serviceIndex := GetServiceIndex(cancellationToken);
+  if serviceIndex = nil then
+    exit;
+
+  serviceItem := serviceIndex.FindItem('PackageDownloadTemplate');
+  if serviceItem = nil then
+  begin
+    Logger.Error('Unabled to determine PackageDownloadTemplate resource from Service Index');
+    exit;
+  end;
+  path := Format('/%s/%s/%s/%s/dpkg', [packageIdentity.Id, CompilerToString(packageIdentity.CompilerVersion), DPMPlatformToString(packageIdentity.Platform),packageIdentity.Version.ToStringNoMeta]);
+
+  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+
+  request := THttpClientFactory.CreateRequest(path);
+
+  try
+    response := httpClient.Get(request);
+  except
+    on ex : Exception do
+    begin
+      Logger.Error('Error fetching list from server : ' + ex.Message);
+      exit;
+    end;
+  end;
+
+  if response.ResponseCode <> 200 then
+  begin
+    Logger.Error('Error fetching list from server : ' + response.ErrorMessage);
+    exit;
+  end;
+
+  response.ResponseStream
+
 end;
 
 
@@ -192,10 +234,10 @@ begin
   if serviceIndex = nil then
     exit;
 
-  serviceItem := serviceIndex.FindItem('ListService');
+  serviceItem := serviceIndex.FindItem('PackageList');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine ListService resource from Service Index');
+    Logger.Error('Unabled to determine PackageList resource from Service Index');
     exit;
   end;
 
@@ -222,8 +264,8 @@ begin
   if options.Platforms  <> [] then
     AddToPath('compiler=' + DPMPlatformsToString(options.Platforms));
 
-  //we need all to roll them up. TODO : Get the server to do the rollup!
-  AddToPath('take=2000000');
+  //we need all to roll them up. TODO : Get the server to do the rollup and send less data?
+  AddToPath('take=2000000'); //if we have more than 2m versions this will need to change!
 
   httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
 

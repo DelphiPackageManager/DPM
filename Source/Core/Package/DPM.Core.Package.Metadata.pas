@@ -78,8 +78,10 @@ type
     function GetUseSource : boolean;
     procedure SetUseSource(const value : boolean);
     constructor Create(const sourceName : string; const spec : IPackageSpec); override;
+    constructor Create(const id, source : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform); override;
   public
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageInfo;
+    class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageInfo : IPackageInfo) : boolean;
   end;
 
   TPackageMetadata = class(TPackageInfo, IPackageMetadata, IPackageInfo, IPackageIdentity, IPackageId)
@@ -168,7 +170,8 @@ begin
   result := FSourceName;
 end;
 
-class function TPackageIdentity.TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageIdentity : IPackageIdentity) : boolean;var
+class function TPackageIdentity.TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageIdentity : IPackageIdentity) : boolean;
+var
   id : string;
   stmp : string;
 
@@ -264,6 +267,12 @@ begin
 
 end;
 
+constructor TPackageInfo.Create(const id, source: string; const version: TPackageVersion; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform);
+begin
+  inherited Create(id, source, version, compilerVersion, platform);
+  FDependencies := TCollections.CreateList<IPackageDependency>;
+end;
+
 class function TPackageInfo.CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageInfo;
 begin
   result := TPackageInfo.Create(sourceName, spec);
@@ -283,6 +292,47 @@ end;
 procedure TPackageInfo.SetUseSource(const value: boolean);
 begin
   FUseSource := value;
+end;
+
+class function TPackageInfo.TryLoadFromJson(const logger: ILogger; const jsonObj: TJsonObject; const source: string; out packageInfo: IPackageInfo): boolean;
+var
+  id : string;
+  stmp : string;
+
+  sVersion : string;
+  cv : TCompilerVersion;
+  platform : TDPMPlatform;
+  packageVersion : TPackageVersion;
+begin
+  result := false;
+  id := jsonObj.S['id'];
+  stmp := jsonObj.S['compiler'];
+  cv := StringToCompilerVersion(stmp);
+  if cv = TCompilerVersion.UnknownVersion then
+  begin
+    logger.Error('Compiler version segment is not a valid version [' + stmp+ ']');
+    exit;
+  end;
+  stmp := jsonObj.S['platform'];
+  platform := StringToDPMPlatform(stmp);
+  if platform = TDPMPlatform.UnknownPlatform then
+  begin
+    logger.Error('Platform segment is not a valid platform [' + stmp+ ']');
+    exit;
+  end;
+  stmp := jsonObj.S['latestVersion'];
+  if not TPackageVersion.TryParse(stmp, packageVersion) then
+  begin
+    logger.Error('Version segment is not a valid version [' + stmp + ']');
+    exit;
+  end;
+
+  packageInfo := TPackageInfo.Create(id, source, packageVersion, cv, platform);
+
+  //TODO : Load dependencies
+
+
+  result := true;
 end;
 
 { TPackageMetadataFull }

@@ -72,7 +72,8 @@ type
     function GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IList<IPackageId>; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
 
     function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<TPackageVersion>; overload;
-    function GetLatestVersions(const cancellationToken : ICancellationToken; const installedPackages : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const preRelease : boolean; const configuration : IConfiguration) : IDictionary<string, TPackageVersion>;
+
+    function InternalGetLatestVersions(const cancellationToken : ICancellationToken; const installedPackages : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const preRelease : boolean; const configuration : IConfiguration) : IDictionary<string, TPackageVersion>;
 
 
     //commands
@@ -174,7 +175,7 @@ begin
 
   platform := installedPackages.First.Platform;
 
-  latestVersions := GetLatestVersions(cancelToken, installedPackages, platform, options.CompilerVersion, options.Prerelease, configuration);
+  latestVersions := InternalGetLatestVersions(cancelToken, installedPackages, platform, options.CompilerVersion, options.Prerelease, configuration);
 
   //TODO : This will be really inefficient/slow when using http
   //refactor to make single request to repositories.
@@ -363,7 +364,7 @@ begin
     end);
 end;
 
-function TPackageRepositoryManager.GetLatestVersions(const cancellationToken : ICancellationToken; const installedPackages : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const preRelease : boolean; const configuration : IConfiguration) : IDictionary<string, TPackageVersion>;
+function TPackageRepositoryManager.InternalGetLatestVersions(const cancellationToken : ICancellationToken; const installedPackages : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const preRelease : boolean; const configuration : IConfiguration) : IDictionary<string, TPackageVersion>;
 var
   config : IConfiguration;
   repo : IPackageRepository;
