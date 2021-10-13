@@ -648,7 +648,7 @@ begin
   result := false;
   if not Options.Version.IsEmpty then
     // sourceName will be empty if we are installing the package from a file
-    packageIdentity := TPackageIdentity.Create(Options.packageId, '', Options.Version, Options.compilerVersion, platform)
+    packageIdentity := TPackageIdentity.Create('', Options.packageId, Options.Version, Options.compilerVersion, platform)
   else
   begin
     // no version specified, so we need to get the latest version available;
@@ -792,7 +792,7 @@ begin
   // if the user specified a version, either the on the command line or via a file then we will use that
   if not Options.Version.IsEmpty then
     // sourceName will be empty if we are installing the package from a file
-    newPackageIdentity := TPackageIdentity.Create(Options.packageId, '',  Options.Version, Options.compilerVersion, platform)
+    newPackageIdentity := TPackageIdentity.Create('', Options.packageId,  Options.Version, Options.compilerVersion, platform)
   else
   begin
     // no version specified, so we need to get the latest version available;

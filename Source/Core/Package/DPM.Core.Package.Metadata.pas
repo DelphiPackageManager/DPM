@@ -156,7 +156,6 @@ constructor TPackageIdentity.Create(const sourceName: string; const jsonObj: TJs
 var
   id : string;
   stmp : string;
-  sVersion : string;
   cv : TCompilerVersion;
   platform : TDPMPlatform;
   packageVersion : TPackageVersion;
@@ -254,7 +253,7 @@ begin
     exit;
   end;
 
-  packageIdentity := TPackageIdentity.Create(id, source, packageVersion, cv, platform);
+  packageIdentity := TPackageIdentity.Create(source, id,  packageVersion, cv, platform);
   result := true;
 
 
@@ -331,19 +330,6 @@ begin
 end;
 
 class function TPackageInfo.TryLoadFromJson(const logger: ILogger; const jsonObj: TJsonObject; const source: string; out packageInfo: IPackageInfo): boolean;
-var
-  id : string;
-  stmp : string;
-  sVersion : string;
-  cv : TCompilerVersion;
-  platform : TDPMPlatform;
-  packageVersion : TPackageVersion;
-  depArr : TJsonArray;
-  depId : string;
-  depVersion : string;
-  i: Integer;
-  range : TVersionRange;
-  dependency : IPackageDependency;
 begin
   result := false;
   try

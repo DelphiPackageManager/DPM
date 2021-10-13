@@ -99,7 +99,6 @@ var
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
-  uriTemplate : string;
   path : string;
   destFile : string;
 begin
@@ -114,7 +113,7 @@ begin
     Logger.Error('Unabled to determine PackageDownload resource from Service Index');
     exit;
   end;
-  path := Format('/%s/%s/%s/%s/dpkg', [packageIdentity.Id, CompilerToString(packageIdentity.CompilerVersion), DPMPlatformToString(packageIdentity.Platform),packageIdentity.Version.ToStringNoMeta]);
+  path := Format('%s/%s/%s/%s/dpkg', [packageIdentity.Id, CompilerToString(packageIdentity.CompilerVersion), DPMPlatformToString(packageIdentity.Platform),packageIdentity.Version.ToStringNoMeta]);
 
   httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
 
@@ -227,7 +226,6 @@ var
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
   path : string;
-  stream : TMemoryStream;
   jsonObj : TJsonObject;
 begin
   result := nil;
@@ -235,10 +233,10 @@ begin
   if serviceIndex = nil then
     exit;
 
-  serviceItem := serviceIndex.FindItem('PackageDownload');
+  serviceItem := serviceIndex.FindItem('PackageInfo');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageDownload resource from Service Index');
+    Logger.Error('Unabled to determine PackageInf resource from Service Index');
     exit;
   end;
   path := Format('/%s/%s/%s/%s/info', [packageId.Id, CompilerToString(packageId.CompilerVersion), DPMPlatformToString(packageId.Platform), packageId.Version.ToStringNoMeta]);
@@ -299,8 +297,82 @@ begin
 end;
 
 function TDPMServerPackageRepository.GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
+var
+  httpClient : IHttpClient;
+  request : IHttpRequest;
+  response : IHttpResponse;
+  serviceIndex : IServiceIndex;
+  serviceItem : IServiceIndexItem;
+  path : string;
+  jsonObj : TJsonObject;
+  versionsArr : TJsonArray;
+  versionObj : TJsonObject;
+  i: Integer;
+  packageInfo : IPackageInfo;
 begin
   result := TCollections.CreateList<IPackageInfo>;
+
+  serviceIndex := GetServiceIndex(cancellationToken);
+  if serviceIndex = nil then
+    exit;
+
+  serviceItem := serviceIndex.FindItem('PackageVersionsWithDeps');
+  if serviceItem = nil then
+  begin
+    Logger.Error('Unabled to determine PackageVersionsWithDeps resource from Service Index');
+    exit;
+  end;
+  path := Format('/%s/%s/%s/%s/versionswithdependencies?includePrerelease=', [id, CompilerToString(compilerVersion), DPMPlatformToString(platform), versionRange.ToString, Lowercase(BoolToStr(preRelease, true))]);
+
+
+  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+
+  request := THttpClientFactory.CreateRequest(path);
+
+  try
+    response := httpClient.Get(request);
+  except
+    on ex : Exception do
+    begin
+      Logger.Error('Error fetching packageinfo from server : ' + ex.Message);
+      exit;
+    end;
+  end;
+
+  if response.ResponseCode <> 200 then
+  begin
+    Logger.Error('Error fetching packageinfo from server : ' + response.ErrorMessage);
+    exit;
+  end;
+
+  try
+    jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+  except
+    on e : Exception do
+    begin
+      Logger.Error('Error fetching parsing json response from server : ' + e.Message);
+      exit;
+    end;
+  end;
+
+  if not jsonObj.Contains('versions') then
+    exit;
+
+  versionsArr := jsonObj.A['versions'];
+
+  for i := 0 to versionsArr.Count -1 do
+  begin
+    versionObj := versionsArr.O[i];
+    if TPackageInfo.TryLoadFromJson(Logger, versionObj, Name, packageInfo) then
+      result.Add(packageInfo)
+  end;
+
+  //TODO : should make sure the server returns a sorted result.
+  result.Sort(TComparer<IPackageInfo>.Construct(
+    function(const Left, Right : IPackageInfo) : Integer
+    begin
+      result := right.Version.CompareTo(left.Version); ;
+    end));
 end;
 
 
@@ -395,7 +467,7 @@ begin
     AddToPath('compiler=' + CompilerToString(options.CompilerVersion));
 
   if options.Platforms  <> [] then
-    AddToPath('compiler=' + DPMPlatformsToString(options.Platforms));
+    AddToPath('platforms=' + DPMPlatformsToString(options.Platforms));
 
   //we need all to roll them up. TODO : Get the server to do the rollup and send less data?
   AddToPath('take=2000000'); //if we have more than 2m versions this will need to change!
