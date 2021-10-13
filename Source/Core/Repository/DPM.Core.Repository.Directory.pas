@@ -945,7 +945,7 @@ begin
         if not packageVersion.IsStable then
           continue;
       //not using the trycreate here as we need a specific regex.
-      info := TPackageIdentity.Create(id, Name, packageVersion, cv, platform);
+      info := TPackageIdentity.Create(Name, id, packageVersion, cv, platform);
       result.Add(info);
     end;
   end;

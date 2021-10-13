@@ -76,8 +76,11 @@ implementation
 uses
   System.SysUtils,
   System.IOUtils,
+  System.Classes,
   JsonDataObjects,
   VSoft.HttpClient,
+  DPM.Core.Package.Icon,
+  DPM.Core.Constants,
   DPM.Core.Package.Metadata,
   DPM.Core.Sources.ServiceIndex;
 
@@ -98,19 +101,80 @@ var
   serviceItem : IServiceIndexItem;
   uriTemplate : string;
   path : string;
+  destFile : string;
 begin
   result := false;
   serviceIndex := GetServiceIndex(cancellationToken);
   if serviceIndex = nil then
     exit;
 
-  serviceItem := serviceIndex.FindItem('PackageDownloadTemplate');
+  serviceItem := serviceIndex.FindItem('PackageDownload');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageDownloadTemplate resource from Service Index');
+    Logger.Error('Unabled to determine PackageDownload resource from Service Index');
     exit;
   end;
   path := Format('/%s/%s/%s/%s/dpkg', [packageIdentity.Id, CompilerToString(packageIdentity.CompilerVersion), DPMPlatformToString(packageIdentity.Platform),packageIdentity.Version.ToStringNoMeta]);
+
+  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+
+  request := THttpClientFactory.CreateRequest(path);
+
+  destFile := IncludeTrailingPathDelimiter(localFolder) + packageIdentity.ToString + cPackageFileExt;
+
+  request.SaveAsFile := destFile;
+
+  try
+    response := httpClient.Get(request);
+  except
+    on ex : Exception do
+    begin
+      Logger.Error('Error fetching list from server : ' + ex.Message);
+      exit;
+    end;
+  end;
+
+  if response.ResponseCode <> 200 then
+  begin
+    Logger.Error('Error fetching list from server : ' + response.ErrorMessage);
+    exit;
+  end;
+
+  fileName := destFile;
+  result := true;
+
+
+
+end;
+
+
+function TDPMServerPackageRepository.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration) : IList<IPackageSearchResultItem>;
+begin
+  result := TCollections.CreateList<IPackageSearchResultItem>;
+end;
+
+function TDPMServerPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
+var
+  httpClient : IHttpClient;
+  request : IHttpRequest;
+  response : IHttpResponse;
+  serviceIndex : IServiceIndex;
+  serviceItem : IServiceIndexItem;
+  path : string;
+  stream : TMemoryStream;
+begin
+  result := nil;
+  serviceIndex := GetServiceIndex(cancelToken);
+  if serviceIndex = nil then
+    exit;
+
+  serviceItem := serviceIndex.FindItem('PackageDownload');
+  if serviceItem = nil then
+  begin
+    Logger.Error('Unabled to determine PackageDownload resource from Service Index');
+    exit;
+  end;
+  path := Format('/%s/%s/%s/%s/icon', [packageId, CompilerToString(compilerVersion), DPMPlatformToString(platform),packageVersion]);
 
   httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
 
@@ -132,24 +196,93 @@ begin
     exit;
   end;
 
-  response.ResponseStream
+  if response.ContentLength = 0 then
+  begin
+    Logger.Verbose('Server returned no content for icon');
+    exit;
+  end;
 
-end;
+
+  if SameText(response.ContentType, 'image/png') then
+  begin
+    stream := TMemoryStream.Create;
+    stream.CopyFrom(response.ResponseStream,response.ContentLength);
+    result := CreatePackageIcon(TPackageIconKind.ikPng, stream);
+  end
+  else if SameText(response.ContentType, 'image/svg+xml') then
+  begin
+    stream := TMemoryStream.Create;
+    stream.CopyFrom(response.ResponseStream,response.ContentLength);
+    result := CreatePackageIcon(TPackageIconKind.ikSvg, stream);
+  end;
 
 
-function TDPMServerPackageRepository.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration) : IList<IPackageSearchResultItem>;
-begin
-  result := TCollections.CreateList<IPackageSearchResultItem>;
-end;
-
-function TDPMServerPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
-begin
-  result := nil;
 end;
 
 function TDPMServerPackageRepository.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
+var
+  httpClient : IHttpClient;
+  request : IHttpRequest;
+  response : IHttpResponse;
+  serviceIndex : IServiceIndex;
+  serviceItem : IServiceIndexItem;
+  path : string;
+  stream : TMemoryStream;
+  jsonObj : TJsonObject;
 begin
   result := nil;
+  serviceIndex := GetServiceIndex(cancellationToken);
+  if serviceIndex = nil then
+    exit;
+
+  serviceItem := serviceIndex.FindItem('PackageDownload');
+  if serviceItem = nil then
+  begin
+    Logger.Error('Unabled to determine PackageDownload resource from Service Index');
+    exit;
+  end;
+  path := Format('/%s/%s/%s/%s/info', [packageId.Id, CompilerToString(packageId.CompilerVersion), DPMPlatformToString(packageId.Platform), packageId.Version.ToStringNoMeta]);
+
+  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+
+  request := THttpClientFactory.CreateRequest(path);
+
+  try
+    response := httpClient.Get(request);
+  except
+    on ex : Exception do
+    begin
+      Logger.Error('Error fetching packageinfo from server : ' + ex.Message);
+      exit;
+    end;
+  end;
+
+  if response.ResponseCode <> 200 then
+  begin
+    Logger.Error('Error fetching packageinfo from server : ' + response.ErrorMessage);
+    exit;
+  end;
+
+  try
+    jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+  except
+    on e : Exception do
+    begin
+      Logger.Error('Error fetching parsing json response from server : ' + e.Message);
+      exit;
+    end;
+  end;
+
+  try
+    result := TPackageMetadata.Create(Name, jsonObj);
+  except
+    on e : Exception do
+    begin
+      Logger.Error('Error fetching reading json response from server : ' + e.Message);
+      exit;
+    end;
+  end;
+
 end;
 
 function TDPMServerPackageRepository.GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion;
@@ -362,7 +495,7 @@ begin
 
   response := httpClient.Put(request, cancellationToken);
 
-  Logger.Debug(Format('Package Upload [%d] : %s', [response.ResponseCode, response.ErrorMessage]));
+  Logger.Information(Format('Package Upload [%d] : %s', [response.ResponseCode, response.Response]));
 
   result := response.ResponseCode = 201;
 end;

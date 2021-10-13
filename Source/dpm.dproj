@@ -132,8 +132,8 @@
         <DCC_RemoteDebug>true</DCC_RemoteDebug>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <Debugger_CWD>I:\Github\DelphiPackageManager\DPMMaster\Source</Debugger_CWD>
-        <Debugger_RunParams>list weak -source=server</Debugger_RunParams>
+        <Debugger_CWD>i:\dpmfeed</Debugger_CWD>
+        <Debugger_RunParams>push Spring4D.Core-11-Win32-2.0.0-dev7.dpkg -apikey=foobar -source=server</Debugger_RunParams>
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
