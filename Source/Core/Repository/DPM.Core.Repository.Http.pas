@@ -128,14 +128,14 @@ begin
   except
     on ex : Exception do
     begin
-      Logger.Error('Error fetching list from server : ' + ex.Message);
+      Logger.Error('Error fetching downloading package from server : ' + ex.Message);
       exit;
     end;
   end;
 
   if response.ResponseCode <> 200 then
   begin
-    Logger.Error('Error fetching list from server : ' + response.ErrorMessage);
+    Logger.Error('Error fetching downloading package from server : ' + response.ErrorMessage);
     exit;
   end;
 
