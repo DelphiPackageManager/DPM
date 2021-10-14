@@ -324,6 +324,9 @@ begin
   result := result and (errorCount = 0);
 end;
 
+
+//This is all wrong. What it should do is just validate the project references and ensure it's correct, not go off and resolve dependencies
+//which might change the dependecy versions. We only want to change the graph if it's wrong.
 function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancellationToken; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; const platform : TDPMPlatform; out resolved : IList<IPackageInfo>) : boolean;
 var
   context : IResolverContext;

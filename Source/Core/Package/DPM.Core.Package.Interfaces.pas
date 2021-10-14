@@ -114,6 +114,7 @@ type
     function GetRepositoryType : string;
     function GetRepositoryBranch : string;
     function GetRepositoryCommit : string;
+
     property Description : string read GetDescription;
     property Authors : string read GetAuthors;
     property License : string read GetLicense;
@@ -132,36 +133,6 @@ type
     property SearchPaths : IList<IPackageSearchPath>read GetSearchPaths;
   end;
 
-  //dependencies list for a single platform
-  IPackagePlatformDependencies = interface
-    ['{0C274B9B-ACD5-4355-8EDD-DA2E51247075}']
-    function GetPlatform : TDPMPlatform;
-    function GetDependencies : IList<IPackageDependency>;
-    property Dependencies : IList<IPackageDependency>read GetDependencies;
-  end;
-
-  //The available platforms and dependencies for a package version.
-  IPackageVersionResult = interface
-    ['{45329FED-210A-42E1-B2A2-243C7DB0A645}']
-    function GetVersion : string;
-    function GetPlatforms : TDPMPlatforms;
-    function GetDependencies : IList<IPackagePlatformDependencies>;
-
-    property Version : string read GetVersion;
-    property Platforms : TDPMPlatforms read GetPlatforms;
-    property Dependencies : IList<IPackagePlatformDependencies>read GetDependencies;
-  end;
-
-  IPackageVersionsResults = interface
-    ['{273329F2-3996-454F-9E93-BFB898C97F05}']
-    function GetId : string;
-    function GetResults : IList<IPackageVersionResult>;
-
-    property Id : string read GetId;
-    property Results : IList<IPackageVersionResult>read GetResults;
-  end;
-
-
   //this is what is returned from a package feed for the UI.
   //note for version we are using strings to improve performance
   IPackageSearchResultItem = interface
@@ -171,7 +142,7 @@ type
     function GetVersion : string;
     function GetPlatform : TDPMPlatform;
     function GetCompilerVersion : TCompilerVersion;
-    function GetDependencies : IList<IPackagePlatformDependencies>;
+    function GetDependencies : IList<IPackageDependency>;
 
     function GetDescription : string;
     function GetAuthors : string;
@@ -224,7 +195,7 @@ type
 
     property Platform : TDPMPlatform read GetPlatform;
     property CompilerVersion : TCompilerVersion read GetCompilerVersion;
-    property Dependencies : IList<IPackagePlatformDependencies>read GetDependencies;
+    property Dependencies : IList<IPackageDependency>read GetDependencies;
 
     //only returned from server feeds.
     property IsReservedPrefix : boolean read GetIsReservedPrefix;
@@ -243,7 +214,6 @@ type
 
     property SourceName : string read GetSourceName;
   end;
-
 
 
   TPackageIconKind = (ikSvg, ikPng);

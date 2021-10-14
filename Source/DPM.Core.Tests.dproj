@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{42F2EF4C-9F0B-408B-8BDD-7CD766A77E4D}</ProjectGuid>
         <ProjectVersion>19.2</ProjectVersion>
@@ -14,7 +14,7 @@
         <DPMCompiler>10.4</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.0.3\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\Spring4D.Base\2.0.0-dev7\lib;$(DPM)\Spring4D.Core\2.0.0-dev7\lib;$(DPM)\VSoft.Uri\0.1.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.1\lib;$(DPM)\VSoft.JsonDataObjects\0.1.1\lib;$(DPM)\VSoft.HttpClient\0.2.4\lib;$(DPM)\VSoft.DUnitX\0.2.1\src;$(DPM)\VSoft.CommandLine\0.1.1\lib;$(DPM)\VSoft.Awaitable\0.2.1\lib;$(DPM)\VSoft.AntPatterns\0.1.0\lib;$(DPM)\Spring4D.Extensions\2.0.0-dev7\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.0.4\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\Spring4D.Base\2.0.0-dev8\lib;$(DPM)\VSoft.Uri\0.1.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.1\lib;$(DPM)\VSoft.JsonDataObjects\0.1.1\lib;$(DPM)\VSoft.HttpClient\0.4.2\lib;$(DPM)\VSoft.DUnitX\0.2.1\src;$(DPM)\VSoft.CommandLine\0.1.1\lib;$(DPM)\VSoft.Awaitable\0.2.1\lib;$(DPM)\VSoft.AntPatterns\0.1.0\lib;$(DPM)\Spring4D.Extensions\2.0.0-dev7\lib;$(DPM)\Spring4D.Core\2.0.0-dev7\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -74,7 +74,7 @@
         <Icon_MainIcon>$(BDS)\bin\delphi_PROJECTICON.ico</Icon_MainIcon>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_OSX64)'!=''">
-        <VerInfo_Keys>CFBundleName=$(MSBuildProjectName);CFBundleDisplayName=$(MSBuildProjectName);CFBundleIdentifier=$(MSBuildProjectName);CFBundleVersion=1.0.0;CFBundleShortVersionString=1.0.0;CFBundlePackageType=APPL;CFBundleSignature=????;CFBundleAllowMixedLocalizations=YES;CFBundleExecutable=$(MSBuildProjectName);NSHighResolutionCapable=true;LSApplicationCategoryType=public.app-category.utilities;NSLocationUsageDescription=The reason for accessing the location information of the user;NSContactsUsageDescription=The reason for accessing the contacts;NSCalendarsUsageDescription=The reason for accessing the calendar data;NSRemindersUsageDescription=The reason for accessing the reminders;NSCameraUsageDescription=The reason for accessing the camera;NSMicrophoneUsageDescription=The reason for accessing the microphone;NSMotionUsageDescription=The reason for accessing the accelerometer;NSDesktopFolderUsageDescription=The reason for accessing the Desktop folder;NSDocumentsFolderUsageDescription=The reason for accessing the Documents folder;NSDownloadsFolderUsageDescription=The reason for accessing the Downloads folder;NSNetworkVolumesUsageDescription=The reason for accessing files on a network volume;NSRemovableVolumesUsageDescription=The reason for accessing files on a removable volume;NSSpeechRecognitionUsageDescription=The reason for requesting to send user data to Apple&apos;s speech recognition servers</VerInfo_Keys>
+        <VerInfo_Keys>CFBundleName=$(MSBuildProjectName);CFBundleDisplayName=$(MSBuildProjectName);CFBundleIdentifier=$(MSBuildProjectName);CFBundleVersion=1.0.0;CFBundleShortVersionString=1.0.0;CFBundlePackageType=APPL;CFBundleSignature=????;CFBundleAllowMixedLocalizations=YES;CFBundleExecutable=$(MSBuildProjectName);NSHighResolutionCapable=true;LSApplicationCategoryType=public.app-category.utilities;NSLocationUsageDescription=The reason for accessing the location information of the user;NSContactsUsageDescription=The reason for accessing the contacts;NSCalendarsUsageDescription=The reason for accessing the calendar data;NSRemindersUsageDescription=The reason for accessing the reminders;NSCameraUsageDescription=The reason for accessing the camera;NSMicrophoneUsageDescription=The reason for accessing the microphone;NSMotionUsageDescription=The reason for accessing the accelerometer;NSDesktopFolderUsageDescription=The reason for accessing the Desktop folder;NSDocumentsFolderUsageDescription=The reason for accessing the Documents folder;NSDownloadsFolderUsageDescription=The reason for accessing the Downloads folder;NSNetworkVolumesUsageDescription=The reason for accessing files on a network volume;NSRemovableVolumesUsageDescription=The reason for accessing files on a removable volume;NSSpeechRecognitionUsageDescription=The reason for requesting to send user data to Apple's speech recognition servers</VerInfo_Keys>
         <BT_BuildType>Debug</BT_BuildType>
         <Base_OSX32>true</Base_OSX32>
         <CfgParent>Base</CfgParent>
@@ -1252,20 +1252,20 @@
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>
             <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.0-dev7">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev7" range="[2.0.0-dev7,]"/>
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev8" range="[2.0.0-dev7,]"/>
             </PackageReference>
             <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.0-dev7">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev7" range="[2.0.0-dev7,]"/>
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev8" range="[2.0.0-dev7,]"/>
             </PackageReference>
             <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.1.0"/>
             <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.2.1">
                 <PackageReference id="Gabr42.OmniThreadLibrary" platform="Win32" version="3.7.8" range="[3.7.8,]"/>
-                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.3" range="[0.0.3,]"/>
+                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.4" range="[0.0.3,]"/>
             </PackageReference>
             <PackageReference id="VSoft.CommandLine" platform="Win32" version="0.1.1"/>
             <PackageReference id="VSoft.DUnitX" platform="Win32" version="0.2.1"/>
-            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.2.4">
-                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.3" range="[0.0.3,]"/>
+            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.4.2">
+                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.4" range="[0.0.3,]"/>
             </PackageReference>
             <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.1.1"/>
             <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.1"/>

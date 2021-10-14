@@ -74,7 +74,7 @@ type
   private
     FContainer : TContainer;
     FIconCache : TDPMIconCache;
-    FPackageSearcher : IPackageSearcher;
+    FHost : IDetailsHost;
     FPackageMetaData : IPackageSearchResultItem;
     FDetailsPanel : TPackageDetailsPanel;
     FCurrentTab : TDPMCurrentTab;
@@ -96,9 +96,13 @@ type
     procedure SetIncludePreRelease(const Value : boolean);
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
+    function SearchForPackagesAsync(const options: TSearchOptions): IAwaitable<IList<IPackageSearchResultItem>>;
+
+    function GetPackageMetaDataAsync(const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const version : string) : IAwaitable<IPackageSearchResultItem>;
+
   public
     constructor Create(AOwner : TComponent); override;
-    procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectOrGroup : IOTAProject);
+    procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProject);
     procedure Configure(const value : TDPMCurrentTab; const preRelease : boolean);
     procedure SetPackage(const package : IPackageSearchResultItem);
     procedure SetPlatform(const platform : TDPMPlatform);
@@ -133,6 +137,7 @@ var
   newVersion : TPackageVersion;
   sVersion : string;
   context : IPackageInstallerContext;
+  sPlatform : string;
 begin
   btnInstallOrUpdate.Enabled := false;
   installResult := false;
@@ -145,7 +150,7 @@ begin
     FCancellationTokenSource.Reset;
     FLogger.Clear;
     FLogger.StartInstall(FCancellationTokenSource);
-    FPackageSearcher.InstallStarting;
+    FHost.SaveBeforeInstall;
 
     if btnInstallOrUpdate.Caption = 'Update' then
     begin
@@ -160,8 +165,9 @@ begin
     else
       newVersion := TPackageVersion.Parse(FPackageMetaData.Version);
 
+    sPlatform := DPMPlatformToString(FPackageMetaData.Platform);
 
-    FLogger.Information('Installing package ' + FPackageMetaData.Id + ' - ' + newVersion.ToString + ' [' + FPackageSearcher.GetCurrentPlatform + ']');
+    FLogger.Information('Installing package ' + FPackageMetaData.Id + ' - ' + newVersion.ToString + ' [' + sPlatform + ']');
 
 
     options := TInstallOptions.Create;
@@ -169,12 +175,13 @@ begin
     options.PackageId := FPackageMetaData.Id;
     options.Version := newVersion;
     options.ProjectPath := FProjectFile;
-    options.Platforms := [ProjectPlatformToDPMPlatform(FPackageSearcher.GetCurrentPlatform)];
+    options.Platforms := [FPackageMetaData.Platform];
     options.Prerelease := FIncludePreRelease;
     options.CompilerVersion := IDECompilerVersion;
 
     //make sure we have the correct metadata for the new version
-    FPackageMetaData := FPackageSearcher.SearchForPackages(options).FirstOrDefault;
+    //Do we really need to do this. It's highly likely we only just got this metadata
+//    FPackageMetaData := FPackageSearcher.SearchForPackages(options).FirstOrDefault;
 
 
     //install will fail if a package is already installed, unless you specify force.
@@ -189,12 +196,12 @@ begin
 //      FPackageMetaData.InstalledVersion := FPackageMetaData.Version;
       FPackageMetaData.Installed := true;
       FPackageInstalledVersion := FPackageMetaData.Version;
-      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + newVersion.ToString + ' [' + FPackageSearcher.GetCurrentPlatform + '] installed.');
-      FPackageSearcher.PackageInstalled(FPackageMetaData);
+      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + newVersion.ToString + ' [' + sPlatform + '] installed.');
+      FHost.PackageInstalled(FPackageMetaData);
       SetPackage(FPackageMetaData);
     end
     else
-      FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + newVersion.ToString + ' [' + FPackageSearcher.GetCurrentPlatform + '] did not install.');
+      FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + newVersion.ToString + ' [' + sPlatform + '] did not install.');
 
   finally
     btnInstallOrUpdate.Enabled := true;
@@ -211,6 +218,7 @@ var
   context : IPackageInstallerContext;
   options : TUnInstallOptions;
   uninstallResult : boolean;
+  sPlatform : string;
 begin
   btnUninstall.Enabled := false;
   uninstallResult := false;
@@ -223,15 +231,18 @@ begin
     FCancellationTokenSource.Reset;
     FLogger.Clear;
     FLogger.StartUnInstall(FCancellationTokenSource);
-    FPackageSearcher.InstallStarting;
-    FLogger.Information('UnInstalling package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + ']');
+    FHost.SaveBeforeInstall;
+
+    sPlatform := DPMPlatformToString(FPackageMetaData.Platform);
+
+    FLogger.Information('UnInstalling package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + sPlatform + ']');
 
     options := TUnInstallOptions.Create;
     options.ConfigFile := FConfiguration.FileName;
     options.PackageId := FPackageMetaData.Id;
     options.Version := TPackageVersion.Parse(FPackageMetaData.Version);
     options.ProjectPath := FProjectFile;
-    options.Platforms := [ProjectPlatformToDPMPlatform(FPackageSearcher.GetCurrentPlatform)];
+    options.Platforms := [FPackageMetaData.Platform];
     options.CompilerVersion := IDECompilerVersion;
 
     packageInstaller := FContainer.Resolve<IPackageInstaller>;
@@ -242,12 +253,12 @@ begin
 //      FPackageMetaData.InstalledVersion := FPackageMetaData.Version;
       FPackageMetaData.Installed := true;
       FPackageInstalledVersion := FPackageMetaData.Version;
-      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + '] uninstalled.');
-      FPackageSearcher.PackageUninstalled(FPackageMetaData);
+      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + sPlatform + '] uninstalled.');
+      FHost.PackageUninstalled(FPackageMetaData);
       SetPackage(nil);
     end
     else
-      FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + FPackageSearcher.GetCurrentPlatform + '] did not uninstall.');
+      FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + sPlatform + '] did not uninstall.');
 
   finally
     btnUninstall.Enabled := true;
@@ -258,10 +269,9 @@ end;
 procedure TPackageDetailsFrame.cboVersionsChange(Sender : TObject);
 var
   searchOptions : TSearchOptions;
-  package : IPackageSearchResultItem;
   sVersion : string;
 begin
-  searchOptions := FPackageSearcher.GetSearchOptions;
+  searchOptions := FHost.GetSearchOptions;
   searchOptions.SearchTerms := FPackageMetaData.Id;
 
   sVersion := cboVersions.Items[cboVersions.ItemIndex];
@@ -275,7 +285,7 @@ begin
   searchOptions.Commercial := true;
   searchOptions.Trial := true;
 
-  FPackageSearcher.SearchForPackagesAsync(searchOptions)
+  GetPackageMetaDataAsync(FPackageMetaData.Id, FPackageMetaData.CompilerVersion, FPackageMetaData.Platform, sVersion)
   .OnException(
     procedure(const e : Exception)
     begin
@@ -294,15 +304,14 @@ begin
       FLogger.Debug('Cancelled searching for packages.');
     end)
   .Await(
-    procedure(const theResult : IList<IPackageSearchResultItem>)
+    procedure(const theResult : IPackageSearchResultItem)
     begin
       FRequestInFlight := false;
       //if the view is closing do not do anything else.
       if FClosing then
         exit;
       //        FLogger.Debug('Got search results.');
-      package := theResult.FirstOrDefault;
-      SetPackage(package);
+      SetPackage(theResult);
     end);
 end;
 
@@ -402,18 +411,50 @@ begin
   result := FIncludePreRelease;
 end;
 
-procedure TPackageDetailsFrame.Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectOrGroup : IOTAProject);
+
+procedure TPackageDetailsFrame.Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProject);
 begin
   FContainer := container;
   FIconCache := iconCache;
   FConfiguration := config;
   FLogger := FContainer.Resolve<IDPMIDELogger>;
-  FPackageSearcher := packageSearcher;
+  FHost := host;
   FProjectFile := projectOrGroup.FileName;
   SetPackage(nil);
 
 end;
 
+function TPackageDetailsFrame.SearchForPackagesAsync(const options: TSearchOptions): IAwaitable<IList<IPackageSearchResultItem>>;
+var
+  repoManager : IPackageRepositoryManager;
+begin
+  //local for capture
+  repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+
+  result := TAsync.Configure <IList<IPackageSearchResultItem>> (
+    function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
+    begin
+      result := repoManager.GetPackageFeed(cancelToken, options, FConfiguration);
+      //simulating long running.
+    end, FCancellationTokenSource.Token);
+end;
+
+
+function TPackageDetailsFrame.GetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string): IAwaitable<IPackageSearchResultItem>;
+var
+  repoManager : IPackageRepositoryManager;
+begin
+  //local for capture
+  repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+
+  result := TAsync.Configure <IPackageSearchResultItem> (
+    function(const cancelToken : ICancellationToken) : IPackageSearchResultItem
+    begin
+      result := repoManager.GetPackageMetaData(cancelToken, id, version, compilerVersion, platform, FConfiguration);
+      //simulating long running.
+    end, FCancellationTokenSource.Token);
+
+end;
 
 
 procedure TPackageDetailsFrame.OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
@@ -711,7 +752,7 @@ end;
 procedure TPackageDetailsFrame.ViewClosing;
 begin
   FClosing := true;
-  FPackageSearcher := nil;
+  FHost := nil;
   FCancellationTokenSource.Cancel;
 end;
 

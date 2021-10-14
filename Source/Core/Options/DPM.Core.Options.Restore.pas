@@ -64,6 +64,7 @@ end;
 constructor TRestoreOptions.Create;
 begin
   inherited;
+  Prerelease := true;
 end;
 
 constructor TRestoreOptions.CreateClone(const original : TRestoreOptions);

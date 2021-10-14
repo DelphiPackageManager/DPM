@@ -103,6 +103,7 @@ uses
   System.UITypes,
   Vcl.Themes,
   Vcl.Forms,
+  Spring.Collections,
   VSoft.Uri,
   DPM.Core.Types,
   DPM.Core.Utils.Strings;
@@ -223,7 +224,6 @@ var
   fontColor : TColor;
   uriColor : TColor;
   dependRect : TRect;
-  platformDep : IPackagePlatformDependencies;
   packageDep : IPackageDependency;
   textSize : TSize;
   value : string;
@@ -341,24 +341,19 @@ begin
   begin
     textSize := Canvas.TextExtent('Win32');
 
-    for platformDep in FPackage.Dependencies do
+    dependRect.Left := FLayout.DependRect.Left + textSize.cy;
+    dependRect.Bottom := dependRect.Top + textSize.cy;
+    value := '- ' + DPMPlatformToString(FPackage.Platform);
+    DrawText(Canvas.Handle, value, Length(value), dependRect, DT_LEFT);
+
+    dependRect.Left := dependRect.Left + textSize.cy;
+    dependRect.Offset(0, textSize.cy * 2);
+
+    for packageDep in FPackage.Dependencies do
     begin
-      if not platformDep.Dependencies.Any then
-        continue;
-      dependRect.Left := FLayout.DependRect.Left + textSize.cy;
-      dependRect.Bottom := dependRect.Top + textSize.cy;
-      value := '- ' + DPMPlatformToString(platformDep.GetPlatform);
+      value := '- ' + packageDep.Id + ' ( ' + packageDep.VersionRange.ToDisplayString + ' )';
       DrawText(Canvas.Handle, value, Length(value), dependRect, DT_LEFT);
-
-      dependRect.Left := dependRect.Left + textSize.cy;
       dependRect.Offset(0, textSize.cy * 2);
-
-      for packageDep in platformDep.Dependencies do
-      begin
-        value := '- ' + packageDep.Id + ' ( ' + packageDep.VersionRange.ToDisplayString + ' )';
-        DrawText(Canvas.Handle, value, Length(value), dependRect, DT_LEFT);
-        dependRect.Offset(0, textSize.cy * 2);
-      end;
     end;
 
   end
@@ -436,7 +431,6 @@ var
   textSize : TSize;
   clientRect : TRect;
   bottom : integer;
-  platformDep : IPackagePlatformDependencies;
   count : integer;
 begin
   if package = nil then
@@ -604,14 +598,9 @@ begin
     DependRect.Right := clientRect.Right;
     count := 0;
     //work out the height;
-    for platformDep in package.Dependencies do
-    begin
-      Inc(count, 2);
-      if platformDep.Dependencies.Any then
-        Inc(count, platformDep.Dependencies.Count * 2);
-    end;
+    Inc(count, 2);
+    Inc(count, package.Dependencies.Count * 2);
     DependRect.Height := count * textSize.cy;
-
   end
   else
   begin

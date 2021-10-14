@@ -9,50 +9,13 @@ uses
   DPM.Core.Package.Interfaces;
 
 type
-  TDPMPackagePlatformDependencies = class(TInterfacedObject, IPackagePlatformDependencies)
-  private
-    FDependencies : IList<IPackageDependency>;
-    FPlatform : TDPMPlatform;
-  protected
-    function GetDependencies : IList<IPackageDependency>;
-    function GetPlatform : TDPMPlatform;
-  public
-    constructor Create(const platform : TDPMPlatform; const dependencies : IList<IPackageDependency>);
-  end;
-
-
-  TDPMPackageVersionResult = class(TInterfacedObject, IPackageVersionResult)
-  private
-    FDependencies : IList<IPackagePlatformDependencies>;
-    FPlatforms : TDPMPlatforms;
-    FVersion : string;
-  protected
-    function GetDependencies : IList<IPackagePlatformDependencies>;
-    function GetPlatforms : TDPMPlatforms;
-    function GetVersion : string;
-  public
-    constructor Create(const version : string; const platforms : TDPMPlatforms; const dependencies : IList<IPackagePlatformDependencies>);
-  end;
-
-  TDPMPackageVersionsResults = class(TInterfacedObject, IPackageVersionsResults)
-  private
-    FId : string;
-    FResults : IList<IPackageVersionResult>;
-  protected
-    function GetId : string;
-    function GetResults : IList<IPackageVersionResult>;
-  public
-    constructor Create(const id : string; const results : IList<IPackageVersionResult>);
-  end;
-
-
   TDPMPackageSearchResultItem = class(TInterfacedObject, IPackageSearchResultItem)
   private
     FIsError : boolean;
     FAuthors : string;
     FOwners : string;
     FCopyright : string;
-    FDependencies : IList<IPackagePlatformDependencies>;
+    FDependencies : IList<IPackageDependency>;
     FDescription : string;
     FIcon : string;
     FId : string;
@@ -81,7 +44,7 @@ type
     function GetAuthors : string;
     function GetOwners : string;
     function GetCopyright : string;
-    function GetDependencies : IList<IPackagePlatformDependencies>;
+    function GetDependencies : IList<IPackageDependency>;
     function GetDescription : string;
     function GetIcon : string;
     function GetId : string;
@@ -123,77 +86,17 @@ type
 
 
     constructor CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
-    constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion;  const dependencies : IList<IPackagePlatformDependencies>);
+    constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata);
     constructor CreateFromError(const id : string; const version : TPackageVersion; const errorDescription : string);
   public
     class function FromJson(const sourceName : string; const jsonObject : TJsonObject) : IPackageSearchResultItem;
-    class function FromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const dependencies : IList<IPackagePlatformDependencies>) : IPackageSearchResultItem;
+    class function FromMetaData(const sourceName : string; const metaData : IPackageMetadata) : IPackageSearchResultItem;
     class function FromError(const id : string; const version : TPackageVersion; const errorDescription : string) : IPackageSearchResultItem;
   end;
 
 
 implementation
 
-{ TDPMPackagePlatformDependencies }
-
-constructor TDPMPackagePlatformDependencies.Create(const platform : TDPMPlatform; const dependencies : IList<IPackageDependency>);
-begin
-  FPlatform := platform;
-  FDependencies := TCollections.CreateList<IPackageDependency>;
-  FDependencies.AddRange(dependencies);
-end;
-
-function TDPMPackagePlatformDependencies.GetDependencies : IList<IPackageDependency>;
-begin
-  result := FDependencies;
-end;
-
-function TDPMPackagePlatformDependencies.GetPlatform : TDPMPlatform;
-begin
-  result := FPlatform;
-end;
-
-{ TDPMPackageVersionResult }
-
-constructor TDPMPackageVersionResult.Create(const version : string; const platforms : TDPMPlatforms; const dependencies : IList<IPackagePlatformDependencies>);
-begin
-  FVersion := version;
-  FPlatforms := platforms;
-  FDependencies := dependencies;
-end;
-
-function TDPMPackageVersionResult.GetDependencies : IList<IPackagePlatformDependencies>;
-begin
-  result := FDependencies;
-end;
-
-function TDPMPackageVersionResult.GetPlatforms : TDPMPlatforms;
-begin
-  result := FPlatforms;
-end;
-
-function TDPMPackageVersionResult.GetVersion : string;
-begin
-  result := FVersion;
-end;
-
-{ TDPMPackageVersionsResults }
-
-constructor TDPMPackageVersionsResults.Create(const id : string; const results : IList<IPackageVersionResult>);
-begin
-  FId := id;
-  FResults := results;
-end;
-
-function TDPMPackageVersionsResults.GetId : string;
-begin
-  result := FId;
-end;
-
-function TDPMPackageVersionsResults.GetResults : IList<IPackageVersionResult>;
-begin
-  result := FResults;
-end;
 
 { TDPMPackageSearchResultItem }
 
@@ -207,18 +110,18 @@ end;
 
 constructor TDPMPackageSearchResultItem.CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
 begin
-  FDependencies := TCollections.CreateList<IPackagePlatformDependencies>;
+  FDependencies := TCollections.CreateList<IPackageDependency>;
 
   //TODO : implement this;
 end;
 
-constructor TDPMPackageSearchResultItem.CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const dependencies : IList<IPackagePlatformDependencies>);
+constructor TDPMPackageSearchResultItem.CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata);
 begin
   FSourceName := sourceName;
-  FPlatform := platform;
-  FCompilerVersion := compilerVersion;
-  FDependencies := TCollections.CreateList<IPackagePlatformDependencies>;
-  FDependencies.AddRange(dependencies);
+  FPlatform := metaData.Platform;
+  FCompilerVersion := metaData.CompilerVersion;
+  FDependencies := TCollections.CreateList<IPackageDependency>;
+  FDependencies.AddRange(metaData.Dependencies);
   FAuthors := metaData.Authors;
   FOwners := metaData.Authors;
   FCopyright := metaData.Copyright;
@@ -249,9 +152,9 @@ begin
   result := TDPMPackageSearchResultItem.CreateFromJson(sourceName, jsonObject);
 end;
 
-class function TDPMPackageSearchResultItem.FromMetaData(const sourceName : string; const metaData : IPackageMetadata; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const dependencies : IList<IPackagePlatformDependencies>) : IPackageSearchResultItem;
+class function TDPMPackageSearchResultItem.FromMetaData(const sourceName : string; const metaData : IPackageMetadata) : IPackageSearchResultItem;
 begin
-  result := TDPMPackageSearchResultItem.CreateFromMetaData(sourceName, metaData, platform, compilerVersion, dependencies);
+  result := TDPMPackageSearchResultItem.CreateFromMetaData(sourceName, metaData);
 end;
 
 function TDPMPackageSearchResultItem.GetAuthors : string;
@@ -269,7 +172,7 @@ begin
   result := FCopyright;
 end;
 
-function TDPMPackageSearchResultItem.GetDependencies : IList<IPackagePlatformDependencies>;
+function TDPMPackageSearchResultItem.GetDependencies : IList<IPackageDependency>;
 begin
   result := FDependencies;
 end;

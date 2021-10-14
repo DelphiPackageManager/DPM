@@ -35,6 +35,7 @@ uses
   Vcl.StdCtrls, Vcl.Imaging.pngimage, Vcl.ExtCtrls,
   ToolsApi,
   Spring.Container,
+  Spring.Collections,
   VSoft.Awaitable,
   DPM.Core.Types,
   DPM.Core.Configuration.Interfaces,
@@ -75,7 +76,7 @@ type
   private
     FContainer : TContainer;
     FIconCache : TDPMIconCache;
-    FPackageSearcher : IPackageSearcher;
+    FHost : IDetailsHost;
     FPackageMetaData : IPackageSearchResultItem;
     FProjectsGrid : TVersionGrid;
     FDetailsPanel : TPackageDetailsPanel;
@@ -105,12 +106,14 @@ type
     function GetIncludePreRelease : boolean;
     procedure SetIncludePreRelease(const value : boolean);
 
-    procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectOrGroup : IOTAProject);
+    procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProject);
     procedure Configure(const value : TDPMCurrentTab; const preRelease : boolean);
     procedure SetPackage(const package : IPackageSearchResultItem);
     procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;
     procedure ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
+
+    function SearchForPackagesAsync(const options: TSearchOptions): IAwaitable<IList<IPackageSearchResultItem>>;
   public
     constructor Create(AOwner : TComponent); override;
   end;
@@ -121,7 +124,6 @@ implementation
 
 uses
   WinApi.ShellApi,
-  Spring.Collections,
   DPM.IDE.Constants,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Utils.Strings,
@@ -145,7 +147,7 @@ var
   package : IPackageSearchResultItem;
   sVersion : string;
 begin
-  searchOptions := FPackageSearcher.GetSearchOptions;
+  searchOptions := FHost.GetSearchOptions;
   searchOptions.SearchTerms := FPackageMetaData.Id;
 
   sVersion := cboVersions.Items[cboVersions.ItemIndex];
@@ -159,7 +161,7 @@ begin
   searchOptions.Commercial := true;
   searchOptions.Trial := true;
 
-  FPackageSearcher.SearchForPackagesAsync(searchOptions)
+  SearchForPackagesAsync(searchOptions)
   .OnException(
     procedure(const e : Exception)
     begin
@@ -289,7 +291,7 @@ begin
    result := false;
 end;
 
-procedure TGroupPackageDetailsFrame.Init(const container: TContainer; const iconCache: TDPMIconCache; const config: IConfiguration; const packageSearcher: IPackageSearcher; const projectOrGroup : IOTAProject);
+procedure TGroupPackageDetailsFrame.Init(const container: TContainer; const iconCache: TDPMIconCache; const config: IConfiguration; const host: IDetailsHost; const projectOrGroup : IOTAProject);
 var
   i: Integer;
   sProject : string;
@@ -298,7 +300,7 @@ begin
   FIconCache := iconCache;
   FConfiguration := config;
   FLogger := FContainer.Resolve<IDPMIDELogger>;
-  FPackageSearcher := packageSearcher;
+  FHost := host;
 //  FProjectFile := projectOrGroup.FileName;
   SetPackage(nil);
 
@@ -327,6 +329,21 @@ end;
 procedure TGroupPackageDetailsFrame.ProjectSelectionChanged(Sender: TObject);
 begin
   UpdateButtonState;
+end;
+
+function TGroupPackageDetailsFrame.SearchForPackagesAsync(const options: TSearchOptions): IAwaitable<IList<IPackageSearchResultItem>>;
+var
+  repoManager : IPackageRepositoryManager;
+begin
+  //local for capture
+  repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+
+  result := TAsync.Configure <IList<IPackageSearchResultItem>> (
+    function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
+    begin
+      result := repoManager.GetPackageFeed(cancelToken, options, FConfiguration);
+      //simulating long running.
+    end, FCancellationTokenSource.Token);
 end;
 
 procedure TGroupPackageDetailsFrame.SetIncludePreRelease(const value: boolean);
@@ -421,7 +438,7 @@ begin
 
     sbPackageDetails.Visible := true;
 
-    packageRefs := FPackageSearcher.GetPackageReferences;
+    packageRefs := FHost.GetPackageReferences;
 
     FProjectsGrid.BeginUpdate;
     FProjectsGrid.PackageVersion := package.Version;
@@ -641,7 +658,7 @@ end;
 procedure TGroupPackageDetailsFrame.ViewClosing;
 begin
   FClosing := true;
-  FPackageSearcher := nil;
+  FHost := nil;
   FCancellationTokenSource.Cancel;
 end;
 

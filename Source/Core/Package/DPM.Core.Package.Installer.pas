@@ -251,8 +251,7 @@ begin
     if (not packageInfo.UseSource) and compiledPackages.Contains(packageInfo)
     then
     begin
-      packageBasePath := packageInfo.Id + PathDelim +
-        packageInfo.Version.ToStringNoMeta + PathDelim;
+      packageBasePath := packageInfo.Id + PathDelim +  packageInfo.Version.ToStringNoMeta + PathDelim;
       searchPaths.Add(packageBasePath + 'lib');
     end
     else

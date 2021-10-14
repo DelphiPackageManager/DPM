@@ -53,27 +53,31 @@ type
     function Initialize(const configuration : IConfiguration) : boolean;
     function HasSources: Boolean;
 
-    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
+    function InternalGetLatestVersions(const cancellationToken : ICancellationToken; const installedPackages : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const preRelease : boolean; const configuration : IConfiguration) : IDictionary<string, TPackageVersion>;
+
+    
     function GetRepositories : IList<IPackageRepository>;
     function GetRepositoryByName(const value : string) : IPackageRepository;
 
     function UpdateRepositories(const configuration : IConfiguration) : boolean;
 
-    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
 
-    function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange; const configuration : IConfiguration = nil) : IList<IPackageInfo>; overload;
     //UI specific stuff
     //TODO : Implement skip/take!
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
 
-    function GetPackageIcon(const cancelToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string;
-      const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const configuration : IConfiguration) : IPackageIcon;
 
     function GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IList<IPackageId>; const configuration : IConfiguration = nil) : IList<IPackageSearchResultItem>;
 
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<TPackageVersion>; overload;
 
-    function InternalGetLatestVersions(const cancellationToken : ICancellationToken; const installedPackages : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const preRelease : boolean; const configuration : IConfiguration) : IDictionary<string, TPackageVersion>;
+
+    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
+    function GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const configuration : IConfiguration) : IPackageSearchResultItem;
+    function GetPackageIcon(const cancelToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const configuration : IConfiguration) : IPackageIcon;  
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration = nil) : IList<TPackageVersion>; overload;
+    function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const options : TSearchOptions; const platform : TDPMPlatform; const versionRange : TVersionRange; const configuration : IConfiguration = nil) : IList<IPackageInfo>; overload;
+
 
 
     //commands
@@ -246,7 +250,7 @@ begin
         if sources.IndexOf(repo.Name) = -1 then
           continue;
       end;
-      searchResult := repo.GetPackageFeed(cancelToken, options, config);
+      searchResult := repo.GetPackageFeed(cancelToken, options);
       allResults.AddRange(searchResult);
     end;
   finally
@@ -300,9 +304,47 @@ begin
     result := repo.GetPackageInfo(cancellationToken, packageId);
     if result <> nil then
       exit;
+    if cancellationToken.IsCancelled then
+      exit;
   end;
 end;
 
+
+function TPackageRepositoryManager.GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform;  const configuration: IConfiguration): IPackageSearchResultItem;
+var
+  repo : IPackageRepository;
+begin
+  result := nil;
+
+  if configuration = nil then
+    exit;
+  if not UpdateRepositories(configuration) then
+  begin
+    FLogger.Error('Unabled to search, error loading repositories');
+    exit;
+  end;
+
+  if compilerVersion = TCompilerVersion.UnknownVersion then
+  begin
+    FLogger.Error('Unabled to search, no compiler version specified');
+    exit;
+  end;
+
+  if platform = TDPMPlatform.UnknownPlatform then
+  begin
+    FLogger.Error('Unabled to search, no platform specified');
+    exit;
+  end;
+
+  for repo in FRepositories do
+  begin
+    result := repo.GetPackageMetaData(cancellationToken, packageId, packageVersion, compilerVersion, platform);
+    if result <> nil then
+      exit;
+    if cancellationToken.IsCancelled then
+      exit;
+  end;
+end;
 
 function TPackageRepositoryManager.GetPackageVersions(const cancellationToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration) : IList<TPackageVersion>;
 var
@@ -312,6 +354,7 @@ var
   unfilteredResults : IList<TPackageVersion>;
   distinctResults : IEnumerable<TPackageVersion>;
   comparer : IEqualityComparer<TPackageVersion>;
+  platform : TDPMPlatform;
 begin
   result := TCollections.CreateList<TPackageVersion>;
   unfilteredResults := TCollections.CreateList<TPackageVersion>;
@@ -335,6 +378,12 @@ begin
     exit;
   end;
 
+  if options.Platforms = [] then
+  begin
+    FLogger.Error('Unabled to search, no platform specified');
+    exit;
+  end;
+
 
   if not UpdateRepositories(config) then
   begin
@@ -342,12 +391,18 @@ begin
     exit;
   end;
 
+//  platform := TDPMPlatform.UnknownPlatform;
+  
+  //is there a better way to do this.
+  for platform in options.Platforms do
+    break;
+
   for repo in FRepositories do
   begin
     if cancellationToken.IsCancelled then
       exit;
 
-    searchResult := repo.GetPackageVersions(cancellationToken, options.SearchTerms, options.CompilerVersion, options.Prerelease);
+    searchResult := repo.GetPackageVersions(cancellationToken, options.SearchTerms, options.CompilerVersion, platform, options.Prerelease);
     unfilteredResults.AddRange(searchResult);
   end;
 

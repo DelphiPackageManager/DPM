@@ -54,14 +54,15 @@ type
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : Boolean;
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const preRelease : boolean) : IList<TPackageVersion>;
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const preRelease : boolean) : IList<TPackageVersion>;
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
     function GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion;
       const preRelease: Boolean): IDictionary<string, TPackageVersion>;
 
     function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>; overload;
-    function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration) : IList<IPackageSearchResultItem>;
+    function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageSearchResultItem>;
     function GetPackageIcon(const cancelToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
+    function GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageSearchResultItem;
 
 
     //commands
@@ -82,6 +83,7 @@ uses
   DPM.Core.Package.Icon,
   DPM.Core.Constants,
   DPM.Core.Package.Metadata,
+  DPM.Core.Package.SearchResults,
   DPM.Core.Sources.ServiceIndex;
 
 { TDPMServerPackageRepository }
@@ -147,7 +149,7 @@ begin
 end;
 
 
-function TDPMServerPackageRepository.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const configuration : IConfiguration) : IList<IPackageSearchResultItem>;
+function TDPMServerPackageRepository.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageSearchResultItem>;
 begin
   result := TCollections.CreateList<IPackageSearchResultItem>;
 end;
@@ -229,6 +231,7 @@ var
   jsonObj : TJsonObject;
 begin
   result := nil;
+
   serviceIndex := GetServiceIndex(cancellationToken);
   if serviceIndex = nil then
     exit;
@@ -236,10 +239,10 @@ begin
   serviceItem := serviceIndex.FindItem('PackageInfo');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageInf resource from Service Index');
+    Logger.Error('Unabled to determine PackageInfo resource from Service Index');
     exit;
   end;
-  path := Format('/%s/%s/%s/%s/info', [packageId.Id, CompilerToString(packageId.CompilerVersion), DPMPlatformToString(packageId.Platform), packageId.Version.ToStringNoMeta]);
+  path := Format('/%s/%s/%s/%s/dspec', [packageId.Id, CompilerToString(packageId.CompilerVersion), DPMPlatformToString(packageId.Platform), packageId.Version.ToStringNoMeta]);
 
   httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
 
@@ -289,9 +292,144 @@ begin
   result := TCollections.CreateDictionary<string, TPackageVersion>;
 end;
 
-function TDPMServerPackageRepository.GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const preRelease : boolean) : IList<TPackageVersion>;
+
+//Note - we are downloading the dpspec file here rather than hitting the database with the /info endpoint.
+//since the dpsec will be on the CDN - this will be less load on the db.
+//TODO : profile CD response times vs hitting the server.
+function TDPMServerPackageRepository.GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageSearchResultItem;
+var
+  httpClient : IHttpClient;
+  request : IHttpRequest;
+  response : IHttpResponse;
+  serviceIndex : IServiceIndex;
+  serviceItem : IServiceIndexItem;
+  path : string;
+  jsonObj : TJsonObject;
+begin
+  result := nil;
+  serviceIndex := GetServiceIndex(cancellationToken);
+  if serviceIndex = nil then
+    exit;
+
+    serviceItem := serviceIndex.FindItem('PackageMetadata');
+  if serviceItem = nil then
+  begin
+    Logger.Error('Unabled to determine PackageMetadata resource from Service Index');
+    exit;
+  end;
+  path := Format('/%s/%s/%s/%s/info', [packageId, CompilerToString(compilerVersion), DPMPlatformToString(platform), packageVersion]);
+
+  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+  
+  request := THttpClientFactory.CreateRequest(path);
+
+  try
+    response := httpClient.Get(request);
+  except
+    on ex : Exception do
+    begin
+      Logger.Error('Error fetching packageinfo from server : ' + ex.Message);
+      exit;
+    end;
+  end;
+
+  if response.ResponseCode <> 200 then
+  begin
+    Logger.Error('Error fetching packageinfo from server : ' + response.ErrorMessage);
+    exit;
+  end;
+
+  try
+    jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+  except
+    on e : Exception do
+    begin
+      Logger.Error('Error fetching parsing json response from server : ' + e.Message);
+      exit;
+    end;
+  end;
+
+  try
+    result := TDPMPackageSearchResultItem.FromJson(Name, jsonObj);
+  except
+    on e : Exception do
+    begin
+      Logger.Error('Error fetching reading json response from server : ' + e.Message);
+      exit;
+    end;
+  end;
+end;
+
+function TDPMServerPackageRepository.GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const preRelease : boolean) : IList<TPackageVersion>;
+var
+  httpClient : IHttpClient;
+  request : IHttpRequest;
+  response : IHttpResponse;
+  serviceIndex : IServiceIndex;
+  serviceItem : IServiceIndexItem;
+  path : string;
+  jsonObj : TJsonObject;
+  versionsArr : TJsonArray;
+  i : integer;
+  sVersion : string;
+  packageVersion : TPackageVersion;
 begin
   result := TCollections.CreateList<TPackageVersion>;
+  serviceIndex := GetServiceIndex(cancellationToken);
+  if serviceIndex = nil then
+    exit;
+
+  serviceItem := serviceIndex.FindItem('PackageVersions');
+  if serviceItem = nil then
+  begin
+    Logger.Error('Unabled to determine PackageVersions resource from Service Index');
+    exit;
+  end;
+  path := Format('/%s/%s/%s/versions?includePrerelease=', [id, CompilerToString(compilerVersion), DPMPlatformToString(platform), Lowercase(BoolToStr(preRelease, true))]);
+
+
+  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+
+  request := THttpClientFactory.CreateRequest(path);
+
+
+  try
+    response := httpClient.Get(request);
+  except
+    on ex : Exception do
+    begin
+      Logger.Error('Error fetching versions from server : ' + ex.Message);
+      exit;
+    end;
+  end;
+
+  if response.ResponseCode <> 200 then
+  begin
+    Logger.Error('Error fetching versions from server : ' + response.ErrorMessage);
+    exit;
+  end;
+
+  try
+    jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+  except
+    on e : Exception do
+    begin
+      Logger.Error('Error fetching parsing json response from server : ' + e.Message);
+      exit;
+    end;
+  end;
+
+  if not jsonObj.Contains('versions') then
+    exit;
+
+  versionsArr := jsonObj.A['versions'];
+
+  for i := 0 to versionsArr.Count -1 do
+  begin
+    sVersion := versionsArr.Items[i].Value;
+    if TPackageVersion.TryParse(sVersion, packageVersion) then
+      result.Add(packageVersion);
+  end;
 
 
 end;
@@ -514,9 +652,6 @@ begin
     end;
 
   end;
-
-
-
 
 end;
 

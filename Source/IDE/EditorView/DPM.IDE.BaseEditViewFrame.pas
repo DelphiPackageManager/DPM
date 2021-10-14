@@ -55,7 +55,7 @@ type
   end;
 
 
-  TDPMBaseEditViewFrame = class(TFrame, IPackageSearcher)
+  TDPMBaseEditViewFrame = class(TFrame, IDetailsHost)
     ContentPanel : TPanel;
     Splitter2 : TSplitter;
     PackageListPanel : TPanel;
@@ -119,13 +119,13 @@ type
     FUpdates : IList<IPackageSearchResultItem>;
 
 
+    function SearchForPackagesAsync(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;overload;
+//    function SearchForPackages(const options : TSearchOptions) : IList<IPackageSearchResultItem>;overload;
+
+
     //IPackageSearcher
     function GetSearchOptions : TSearchOptions;
-    function SearchForPackagesAsync(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;overload;
-    function SearchForPackages(const options : TSearchOptions) : IList<IPackageSearchResultItem>;overload;
-    function GetCurrentPlatform : string;
-    procedure InstallStarting;
-
+    procedure SaveBeforeInstall;
     procedure PackageInstalled(const package : IPackageSearchResultItem);
     procedure PackageUninstalled(const package : IPackageSearchResultItem);
     function GetPackageReferences : IGraphNode;
@@ -556,11 +556,6 @@ begin
 
 end;
 
-function TDPMBaseEditViewFrame.GetCurrentPlatform: string;
-begin
-  //todo : change this.
-  result := DPMPlatformToString(FCurrentPlatform);
-end;
 
 function TDPMBaseEditViewFrame.GetInstalledPackages: IAwaitable<IList<IPackageSearchResultItem>>;
 var
@@ -894,7 +889,7 @@ begin
 
 end;
 
-procedure TDPMBaseEditViewFrame.InstallStarting;
+procedure TDPMBaseEditViewFrame.SaveBeforeInstall;
 begin
   //save before making any changes.
   (BorlandIDEServices as IOTAModuleServices).SaveAll;
@@ -1103,13 +1098,13 @@ begin
     DoPlatformChange(newPlatform);
 end;
 
-function TDPMBaseEditViewFrame.SearchForPackages(const options: TSearchOptions): IList<IPackageSearchResultItem>;
-var
-  repoManager : IPackageRepositoryManager;
-begin
-  repoManager := FContainer.Resolve<IPackageRepositoryManager>;
-  result := repoManager.GetPackageFeed(FCancelTokenSource.Token, options, FConfiguration);
-end;
+//function TDPMBaseEditViewFrame.SearchForPackages(const options: TSearchOptions): IList<IPackageSearchResultItem>;
+//var
+//  repoManager : IPackageRepositoryManager;
+//begin
+//  repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+//  result := repoManager.GetPackageFeed(FCancelTokenSource.Token, options, FConfiguration);
+//end;
 
 function TDPMBaseEditViewFrame.SearchForPackagesAsync(const options: TSearchOptions): IAwaitable<IList<IPackageSearchResultItem>>;
 var

@@ -21,14 +21,16 @@ uses
 
 type
   //implemented by the EditorViewFrame
-  IPackageSearcher = interface
+  //TODO : This is far to convoluted - we should not need to use options here.
+  // we never actually want more than 1 searchresult so this needs to change to
+  // just get the get the package metadata - which might actually come from the
+  // package cache!
+  IDetailsHost = interface
     ['{4FBB9E7E-886A-4B7D-89FF-FA5DBC9D93FD}']
     function GetSearchOptions : TSearchOptions;
-    function SearchForPackagesAsync(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;overload;
-    function SearchForPackages(const options : TSearchOptions) : IList<IPackageSearchResultItem>;overload;
-    function GetCurrentPlatform : string;
+
     function GetPackageReferences : IGraphNode;
-    procedure InstallStarting;
+    procedure SaveBeforeInstall;
     procedure PackageInstalled(const package : IPackageSearchResultItem);
     procedure PackageUninstalled(const package : IPackageSearchResultItem);
   end;
@@ -38,7 +40,7 @@ type
     function GetIncludePreRelease : boolean;
     procedure SetIncludePreRelease(const value : boolean);
 
-    procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const packageSearcher : IPackageSearcher; const projectOrGroup : IOTAProject);
+    procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProject);
     procedure Configure(const value : TDPMCurrentTab; const preRelease : boolean);
     procedure SetPackage(const package : IPackageSearchResultItem);
     procedure SetPlatform(const platform : TDPMPlatform);
