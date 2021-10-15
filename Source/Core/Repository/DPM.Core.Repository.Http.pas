@@ -593,7 +593,7 @@ begin
     AddToPath('q=' + options.SearchTerms);
 
   if not options.Prerelease then
-    AddToPath('prerelease=false');
+    AddToPath('prerel=false');
 
   if not options.Commercial then
     AddToPath('commercial=false');

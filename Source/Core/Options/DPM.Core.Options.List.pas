@@ -52,6 +52,12 @@ implementation
 constructor TListOptions.Create;
 begin
   inherited;
+  Prerelease := false;
+  Commercial := true;
+  Trial := true;
+  Skip := 0;
+  Take := 200;
+
 end;
 
 class constructor TListOptions.CreateDefault;

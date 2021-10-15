@@ -164,15 +164,15 @@ begin
   stmp := jsonObj.S['compiler'];
   cv := StringToCompilerVersion(stmp);
   if cv = TCompilerVersion.UnknownVersion then
-    raise Exception.Create('Compiler version segment is not a valid version [' + stmp+ ']');
+    raise Exception.Create('Compiler segment is not a valid version [' + stmp+ ']');
   stmp := jsonObj.S['platform'];
   platform := StringToDPMPlatform(stmp);
   if platform = TDPMPlatform.UnknownPlatform then
-    raise Exception.Create('Platform segment is not a valid platform [' + stmp+ ']');
+    raise Exception.Create('Platform is not a valid platform [' + stmp+ ']');
 
-  stmp := jsonObj.S['latestVersion'];
+  stmp := jsonObj.S['version'];
   if not TPackageVersion.TryParse(stmp, packageVersion) then
-    raise Exception.Create('Version segment is not a valid version [' + stmp + ']');
+    raise Exception.Create('Version is not a valid version [' + stmp + ']');
 
   inherited Create(id, packageVersion, cv, platform);
   FSourceName := sourceName;
