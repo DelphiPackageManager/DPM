@@ -837,7 +837,7 @@ begin
   if not CreateProjectRefs(cancellationToken, projectPackageGraph, seenPackages, projectReferences) then
     exit;
 
-  if not FDependencyResolver.ResolveForInstall(cancellationToken, projectFile, Options, packageInfo, projectReferences, projectPackageGraph, platform,  resolvedPackages) then
+  if not FDependencyResolver.ResolveForInstall(cancellationToken, Options.CompilerVersion, platform, projectFile, Options, packageInfo, projectReferences, projectPackageGraph, resolvedPackages) then
   begin
     FLogger.Debug('ResolveForInstall failed');
     // we need to carry on here as resolution may have failed for another package
@@ -922,7 +922,7 @@ begin
   if not CreateProjectRefs(cancellationToken, projectPackageGraph, seenPackages, projectReferences) then
     exit;
 
-  if not FDependencyResolver.ResolveForRestore(cancellationToken, projectFile, Options, projectReferences, projectPackageGraph, platform, resolvedPackages) then
+  if not FDependencyResolver.ResolveForRestore(cancellationToken, Options.CompilerVersion, platform, projectFile, Options, projectReferences, projectPackageGraph, resolvedPackages) then
     exit;
 
   // TODO : The code from here on is the same for install/uninstall/restore - refactor!!!
@@ -1004,7 +1004,7 @@ begin
   if not CreateProjectRefs(cancellationToken, projectPackageGraph, seenPackages, projectReferences) then
     exit;
 
-  if not FDependencyResolver.ResolveForRestore(cancellationToken, projectFile, Options, projectReferences, projectPackageGraph, platform, resolvedPackages) then
+  if not FDependencyResolver.ResolveForRestore(cancellationToken, Options.CompilerVersion, platform, projectFile, Options, projectReferences, projectPackageGraph, resolvedPackages) then
   begin
     FLogger.Error('Resolver failed!');
     // projectEditor.UpdatePackageReferences(projectPackageGraph, platform);
@@ -1314,6 +1314,8 @@ begin
     if config = nil then
       exit;
 
+    FDependencyResolver.Initialize(config);
+
     FPackageCache.Location := config.PackageCacheLocation;
     if not FRepositoryManager.Initialize(config) then
     begin
@@ -1488,6 +1490,8 @@ begin
     config := FConfigurationManager.LoadConfig(Options.ConfigFile);
     if config = nil then // no need to log, config manager will
       exit;
+
+    FDependencyResolver.Initialize(config);
 
     FPackageCache.Location := config.PackageCacheLocation;
     if not FRepositoryManager.Initialize(config) then
@@ -1687,6 +1691,8 @@ begin
   config := FConfigurationManager.LoadConfig(Options.ConfigFile);
   if config = nil then // no need to log, config manager will
     exit;
+
+  FDependencyResolver.Initialize(config);
 
   FPackageCache.Location := config.PackageCacheLocation;
   if not FRepositoryManager.Initialize(config) then

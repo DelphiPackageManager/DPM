@@ -163,6 +163,7 @@ type
     function GetDownloadCount : Int64;
     function GetInstalled : boolean;
     function GetLatestVersion : string;
+    function GetLatestStableVersion : string;
     function GetIsError : boolean;
     function GetIsReservedPrefix : boolean;
     function GetIsTransitive : boolean;
@@ -170,6 +171,7 @@ type
     procedure SetVersion(const value : string);
     procedure SetInstalled(const value : boolean);
     procedure SetLatestVersion(const value : string);
+    procedure SetLatestStableVersion(const value : string);
     procedure SetReportUrl(const value : string);
     procedure SetRepositoryUrl(const value : string);
     procedure SetRepositoryType(const value : string);
@@ -207,6 +209,7 @@ type
     //these are for use by the UI, it's not returned.
     property Installed : boolean read GetInstalled write SetInstalled;
     property LatestVersion : string read GetLatestVersion write SetLatestVersion;
+    property LatestStableVersion : string read GetLatestStableVersion write SetLatestStableVersion;
     property IsTransitive : boolean read GetIsTransitive write SetIsTransitive;
     property ReportUrl : string read GetProjectUrl write SetReportUrl;
     property PublishedDate : string read GetPublishedDate write SetPublishedDate; //TODO : what format should this be - see repos

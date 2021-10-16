@@ -103,12 +103,10 @@ type
   
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
-    function GetIncludePreRelease : boolean;
-    procedure SetIncludePreRelease(const value : boolean);
 
     procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProject);
     procedure Configure(const value : TDPMCurrentTab; const preRelease : boolean);
-    procedure SetPackage(const package : IPackageSearchResultItem);
+    procedure SetPackage(const package : IPackageSearchResultItem; const preRelease : boolean);
     procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;
     procedure ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
@@ -188,7 +186,7 @@ begin
         exit;
       //        FLogger.Debug('Got search results.');
       package := theResult.FirstOrDefault;
-      SetPackage(package);
+      SetPackage(package, FIncludePreRelease);
     end);
 
 end;
@@ -235,7 +233,7 @@ begin
     FDetailsPanel.SetDetails(nil);
     FCurrentTab := value;
     FIncludePreRelease := preRelease;
-    SetPackage(nil);
+    SetPackage(nil, FIncludePreRelease );
   end;
 
 end;
@@ -286,10 +284,6 @@ begin
 
 end;
 
-function TGroupPackageDetailsFrame.GetIncludePreRelease: boolean;
-begin
-   result := false;
-end;
 
 procedure TGroupPackageDetailsFrame.Init(const container: TContainer; const iconCache: TDPMIconCache; const config: IConfiguration; const host: IDetailsHost; const projectOrGroup : IOTAProject);
 var
@@ -302,7 +296,7 @@ begin
   FLogger := FContainer.Resolve<IDPMIDELogger>;
   FHost := host;
 //  FProjectFile := projectOrGroup.FileName;
-  SetPackage(nil);
+  SetPackage(nil, FIncludePreRelease);
 
   FProjectGroup := projectOrGroup as IOTAProjectGroup;
   FProjectsGrid.BeginUpdate;
@@ -337,28 +331,19 @@ var
 begin
   //local for capture
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+  repoManager.Initialize(FConfiguration);
 
   result := TAsync.Configure <IList<IPackageSearchResultItem>> (
     function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
     begin
-      result := repoManager.GetPackageFeed(cancelToken, options, FConfiguration);
+      result := repoManager.GetPackageFeed(cancelToken, options);
       //simulating long running.
     end, FCancellationTokenSource.Token);
 end;
 
-procedure TGroupPackageDetailsFrame.SetIncludePreRelease(const value: boolean);
-begin
-  if FIncludePreRelease <> Value then
-  begin
-    FIncludePreRelease := Value;
-    SetPackage(FPackageMetaData);
-  end;
-end;
-
-procedure TGroupPackageDetailsFrame.SetPackage(const package: IPackageSearchResultItem);
+procedure TGroupPackageDetailsFrame.SetPackage(const package: IPackageSearchResultItem; const preRelease : boolean);
 var
   logo : IPackageIconImage;
-  bFetchVersions : boolean;
   graphic : TGraphic;
   packageRefs : IGraphNode;
   projectRefs : IGraphNode;
@@ -376,7 +361,6 @@ begin
   begin
     if (package.Id <> FPackageId) then
     begin
-      bFetchVersions := true;
       FPackageId := package.Id;
       if package.Installed then
         FPackageInstalledVersion := package.Version
@@ -391,12 +375,8 @@ begin
       //package.InstalledVersion := FPackageInstalledVersion;
       if package.Installed then
         FPackageInstalledVersion := package.Version
-      else
-      begin
-        if package.Version = FPackageInstalledVersion then
+      else if package.Version = FPackageInstalledVersion then
           package.Installed := true;
-      end;
-      bFetchVersions := false; //we already have them.
     end;
 
     lblPackageId.Caption := package.Id;
@@ -463,11 +443,12 @@ begin
       FProjectsGrid.EndUpdate;
     end;
 
-    FVersionsDelayTimer.Enabled := bFetchVersions;
+    FVersionsDelayTimer.Enabled := true;
   end
   else
   begin
     sbPackageDetails.Visible := false;
+    cboVersions.Clear;
     //    pnlPackageId.Visible := false;
     //    pnlInstalled.Visible := false;
     //    pnlVErsion.Visible := false;
@@ -534,11 +515,8 @@ procedure TGroupPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);
 var
   versions : IList<TPackageVersion>;
   repoManager : IPackageRepositoryManager;
-  options : TSearchOptions;
-  config : IConfiguration;
   lStable : string;
   lPre : string;
-//  sVersion : string;
   sInstalledVersion : string;
 begin
   FVersionsDelayTimer.Enabled := false;
@@ -550,26 +528,14 @@ begin
 
   cboVersions.Clear;
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
-
-  options := TSearchOptions.Create;
-  options.CompilerVersion := IDECompilerVersion;
-  options.AllVersions := true;
-  options.SearchTerms := FPackageMetaData.Id;
-  if FCurrentTab = TDPMCurrentTab.Installed then
-    options.Prerelease := true //should this be checking the package meta data version for pre-release?
-  else
-    options.Prerelease := FIncludePreRelease;
-
-  options.Platforms := [FCurrentPlatform];
-
-  config := FConfiguration;
+  repoManager.Initialize(FConfiguration);
 
   sInstalledVersion := FPackageInstalledVersion;
 
   TAsync.Configure<IList<TPackageVersion>> (
     function(const cancelToken : ICancellationToken) : IList<TPackageVersion>
     begin
-      result := repoManager.GetPackageVersions(cancelToken, options, config);
+      result := repoManager.GetPackageVersions(cancelToken, IDECompilerVersion, FCurrentPlatform, FPackageMetaData.Id, FIncludePrerelease);
     end, FCancellationTokenSource.Token)
   .OnException(
     procedure(const e : Exception)
@@ -605,7 +571,7 @@ begin
 
         if versions.Any then
         begin
-          if options.Prerelease then
+          if FIncludePrerelease then
           begin
             version := versions.FirstOrDefault(
               function(const value : TPackageVersion) : boolean

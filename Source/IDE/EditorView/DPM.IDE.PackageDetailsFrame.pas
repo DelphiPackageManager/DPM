@@ -92,8 +92,6 @@ type
 
     FIDEStyleServices : TCustomStyleServices;
   protected
-    function GetIncludePreRelease : boolean;
-    procedure SetIncludePreRelease(const Value : boolean);
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
     function SearchForPackagesAsync(const options: TSearchOptions): IAwaitable<IList<IPackageSearchResultItem>>;
@@ -104,11 +102,10 @@ type
     constructor Create(AOwner : TComponent); override;
     procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProject);
     procedure Configure(const value : TDPMCurrentTab; const preRelease : boolean);
-    procedure SetPackage(const package : IPackageSearchResultItem);
+    procedure SetPackage(const package : IPackageSearchResultItem; const preRelease : boolean);
     procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;
     procedure ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
-    property IncludePreRelease : boolean read FIncludePreRelease write SetIncludePreRelease;
   end;
 
 implementation
@@ -183,7 +180,6 @@ begin
     //Do we really need to do this. It's highly likely we only just got this metadata
 //    FPackageMetaData := FPackageSearcher.SearchForPackages(options).FirstOrDefault;
 
-
     //install will fail if a package is already installed, unless you specify force.
     if btnInstallOrUpdate.Caption = 'Update' then
       options.Force := true;
@@ -198,7 +194,7 @@ begin
       FPackageInstalledVersion := FPackageMetaData.Version;
       FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + newVersion.ToString + ' [' + sPlatform + '] installed.');
       FHost.PackageInstalled(FPackageMetaData);
-      SetPackage(FPackageMetaData);
+      SetPackage(FPackageMetaData, FIncludePreRelease);
     end
     else
       FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + newVersion.ToString + ' [' + sPlatform + '] did not install.');
@@ -255,7 +251,7 @@ begin
       FPackageInstalledVersion := FPackageMetaData.Version;
       FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + sPlatform + '] uninstalled.');
       FHost.PackageUninstalled(FPackageMetaData);
-      SetPackage(nil);
+      SetPackage(nil, FIncludePreRelease);
     end
     else
       FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version + ' [' + sPlatform + '] did not uninstall.');
@@ -311,7 +307,7 @@ begin
       if FClosing then
         exit;
       //        FLogger.Debug('Got search results.');
-      SetPackage(theResult);
+      SetPackage(theResult, FIncludePreRelease);
     end);
 end;
 
@@ -375,7 +371,7 @@ begin
         end;
       TDPMCurrentTab.Conflicts : ;
     end;
-    SetPackage(nil);
+    SetPackage(nil, FIncludePreRelease);
   end;
 
 end;
@@ -406,10 +402,6 @@ begin
 
 end;
 
-function TPackageDetailsFrame.GetIncludePreRelease: boolean;
-begin
-  result := FIncludePreRelease;
-end;
 
 
 procedure TPackageDetailsFrame.Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProject);
@@ -420,8 +412,7 @@ begin
   FLogger := FContainer.Resolve<IDPMIDELogger>;
   FHost := host;
   FProjectFile := projectOrGroup.FileName;
-  SetPackage(nil);
-
+  SetPackage(nil, false);
 end;
 
 function TPackageDetailsFrame.SearchForPackagesAsync(const options: TSearchOptions): IAwaitable<IList<IPackageSearchResultItem>>;
@@ -430,11 +421,12 @@ var
 begin
   //local for capture
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+  repoManager.Initialize(FConfiguration);
 
   result := TAsync.Configure <IList<IPackageSearchResultItem>> (
     function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
     begin
-      result := repoManager.GetPackageFeed(cancelToken, options, FConfiguration);
+      result := repoManager.GetPackageFeed(cancelToken, options);
       //simulating long running.
     end, FCancellationTokenSource.Token);
 end;
@@ -446,11 +438,12 @@ var
 begin
   //local for capture
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+  repoManager.Initialize(FConfiguration);
 
   result := TAsync.Configure <IPackageSearchResultItem> (
     function(const cancelToken : ICancellationToken) : IPackageSearchResultItem
     begin
-      result := repoManager.GetPackageMetaData(cancelToken, id, version, compilerVersion, platform, FConfiguration);
+      result := repoManager.GetPackageMetaData(cancelToken, id, version, compilerVersion, platform);
       //simulating long running.
     end, FCancellationTokenSource.Token);
 
@@ -469,32 +462,22 @@ begin
 
 end;
 
-procedure TPackageDetailsFrame.SetIncludePreRelease(const Value : boolean);
-begin
-  if FIncludePreRelease <> Value then
-  begin
-    FIncludePreRelease := Value;
-    SetPackage(FPackageMetaData);
-  end;
-end;
 
-procedure TPackageDetailsFrame.SetPackage(const package : IPackageSearchResultItem);
+procedure TPackageDetailsFrame.SetPackage(const package : IPackageSearchResultItem; const preRelease : boolean);
 var
   logo : IPackageIconImage;
-  bFetchVersions : boolean;
   graphic : TGraphic;
 begin
+  FIncludePreRelease := preRelease;
   FVersionsDelayTimer.Enabled := false;
   if FRequestInFlight then
     FCancellationTokenSource.Cancel;
 
   FPackageMetaData := package;
-
   if package <> nil then
   begin
     if (package.Id <> FPackageId) then
     begin
-      bFetchVersions := true;
       FPackageId := package.Id;
       if package.Installed then
         FPackageInstalledVersion := package.Version
@@ -508,12 +491,8 @@ begin
       //it won't have installed or installed version set.
       if package.Installed then
         FPackageInstalledVersion := package.Version
-      else
-      begin
-        if package.Version = FPackageInstalledVersion then
+      else if package.Version = FPackageInstalledVersion then
           package.Installed := true;
-      end;
-      bFetchVersions := false; //we already have them.
     end;
 
     lblPackageId.Caption := package.Id;
@@ -567,11 +546,12 @@ begin
 
     sbPackageDetails.Visible := true;
 
-    FVersionsDelayTimer.Enabled := bFetchVersions;
+    FVersionsDelayTimer.Enabled := true;
   end
   else
   begin
     sbPackageDetails.Visible := false;
+    cboVersions.Clear;
     //    pnlPackageId.Visible := false;
     //    pnlInstalled.Visible := false;
     //    pnlVErsion.Visible := false;
@@ -631,8 +611,6 @@ procedure TPackageDetailsFrame.VersionsDelayTimerEvent(Sender : TObject);
 var
   versions : IList<TPackageVersion>;
   repoManager : IPackageRepositoryManager;
-  options : TSearchOptions;
-  config : IConfiguration;
   lStable : string;
   lPre : string;
   sVersion : string;
@@ -647,23 +625,15 @@ begin
 
   cboVersions.Clear;
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+  repoManager.Initialize(FConfiguration);
 
-  options := TSearchOptions.Create;
-  options.CompilerVersion := IDECompilerVersion;
-  options.AllVersions := true;
-  options.SearchTerms := FPackageMetaData.Id;
-  options.Prerelease := FIncludePreRelease;
-
-  options.Platforms := [FCurrentPlatform];
-
-  config := FConfiguration;
 
   sInstalledVersion := FPackageInstalledVersion;
 
   TAsync.Configure<IList<TPackageVersion>> (
     function(const cancelToken : ICancellationToken) : IList<TPackageVersion>
     begin
-      result := repoManager.GetPackageVersions(cancelToken, options, config);
+      result := repoManager.GetPackageVersions(cancelToken, IDECompilerVersion, FCurrentPlatform, FPackageMetaData.Id, FIncludePreRelease);
     end, FCancellationTokenSource.Token)
   .OnException(
     procedure(const e : Exception)
@@ -699,7 +669,7 @@ begin
 
         if versions.Any then
         begin
-          if options.Prerelease then
+          if FIncludePreRelease then
           begin
             version := versions.FirstOrDefault(
               function(const value : TPackageVersion) : boolean

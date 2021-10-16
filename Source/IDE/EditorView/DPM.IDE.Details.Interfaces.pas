@@ -37,16 +37,12 @@ type
 
   IPackageDetailsView = interface
   ['{B4B48A9A-D04A-4316-B3FB-B03E4BD763F3}']
-    function GetIncludePreRelease : boolean;
-    procedure SetIncludePreRelease(const value : boolean);
-
     procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProject);
     procedure Configure(const value : TDPMCurrentTab; const preRelease : boolean);
-    procedure SetPackage(const package : IPackageSearchResultItem);
+    procedure SetPackage(const package : IPackageSearchResultItem; const preRelease : boolean);
     procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;
     procedure ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
-    property IncludePreRelease : boolean read GetIncludePreRelease write SetIncludePreRelease;
   end;
 
 implementation

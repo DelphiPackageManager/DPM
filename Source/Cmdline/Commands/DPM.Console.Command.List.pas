@@ -69,7 +69,7 @@ var
   searchResults : IList<IPackageIdentity>;
   info, prevInfo : IPackageIdentity;
   resultString : string;
-
+  config : IConfiguration;
 begin
   result := TExitCode.Error;
   TListOptions.Default.ApplyCommon(TCommonOptions.Default);
@@ -78,6 +78,17 @@ begin
     result := TExitCode.InvalidArguments;
     exit;
   end;
+
+  if TListOptions.Default.ConfigFile = '' then
+  begin
+    result := TExitCode.InvalidArguments;
+    exit;
+  end;
+
+  config := FConfigurationManager.LoadConfig(TListOptions.Default.ConfigFile);
+  if config = nil then
+    exit(TExitCode.InitException);
+  FRepositoryManager.Initialize(config);
 
   searchResults := FRepositoryManager.List(cancellationToken, TListOptions.Default);
   if searchResults.Any then

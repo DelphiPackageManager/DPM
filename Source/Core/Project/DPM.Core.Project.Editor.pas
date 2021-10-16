@@ -569,8 +569,6 @@ function TProjectEditor.LoadPackageRefences : boolean;
     rootNode : IGraphNode;
   begin
     isTransitive := parentReference <> nil;
-    platform := TDPMPlatform.UnknownPlatform;
-
     if isTransitive then
       sXPath := 'x:PackageReference'
     else
@@ -611,7 +609,7 @@ function TProjectEditor.LoadPackageRefences : boolean;
           result := false;
           exit;
         end;
-
+        //platform := TDPMPlatform.UnknownPlatform;
         //if we have a parent that isn't root then we will use it's platform
         if (parentReference <> nil) and (not parentReference.IsRoot) then
           platform := parentReference.Platform

@@ -321,7 +321,7 @@ begin
     distinctFiles := distinctFiles.Skip(options.Skip);
   if options.Take > 0 then
     distinctFiles := distinctFiles.Take(options.Take);
-  searchFiles := TCollections.CreateList < string > (distinctFiles);
+  searchFiles := TCollections.CreateList<string>(distinctFiles);
 
   result := DoGetPackageFeed(cancelToken, options, searchFiles);
 
@@ -538,12 +538,6 @@ begin
 end;
 
 
-type
-  TPackageFind = record
-    Id : string;
-    Platform : TDPMPlatform;
-    LatestVersion : TPackageVersion;
-  end;
 
 
 function TDirectoryPackageRepository.DoGetPackageFeedFiles(const options : TSearchOptions; searchTerm : string) : IList<string>;
@@ -585,6 +579,14 @@ begin
 
 end;
 
+type
+  TPackageFind = record
+    Id : string;
+    Platform : TDPMPlatform;
+    LatestVersion : TPackageVersion;
+    LatestStableVersion : TPackageVersion;
+  end;
+
 
 function TDirectoryPackageRepository.DoGetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const files : IList<string>) : IList<IPackageSearchResultItem>;
 var
@@ -608,10 +610,12 @@ var
 begin
   result := TCollections.CreateList<IPackageSearchResultItem>;
 
-  packageLookup := TCollections.CreateDictionary < string, TPackageFind > ;
+  packageLookup := TCollections.CreateDictionary<string, TPackageFind>  ;
 
   searchRegEx := GetSearchRegex(options.CompilerVersion, options.Platforms, '');
   regex := TRegEx.Create(searchRegEx, [roIgnoreCase]);
+
+
 
   //work out the latest version for each package and what platforms it supports.
   for i := 0 to files.Count - 1 do
@@ -641,24 +645,18 @@ begin
         find.Id := id;
         find.Platform := platform;
         find.LatestVersion := packageVersion;
+        if packageVersion.IsStable then
+          find.LatestStableVersion := packageVersion;
         packageLookup[LowerCase(id)] := find;
       end
       else
       begin
-        {
-        if packageVersion = find.LatestVersion then
-        begin
-          //same version, just add to the platforms
-          find.Platforms := find.Platforms + [platform];
-        end
-        else }if packageVersion > find.LatestVersion then
-        begin
-          //start again with a new latest version
+        if packageVersion > find.LatestVersion then
           find.LatestVersion := packageVersion;
-          find.Platform := platform;
-        end
-        else
-          continue; //lower version, ignore.
+
+        if packageVersion.IsStable then
+          if packageVersion > find.LatestStableVersion then
+            find.LatestStableVersion := packageVersion;
         packageLookup[LowerCase(id)] := find;
       end;
     end;
@@ -690,6 +688,8 @@ begin
     if packageMetadata <> nil then
     begin
       resultItem := TDPMPackageSearchResultItem.FromMetaData(Self.Name, packageMetadata);
+      resultItem.LatestVersion := find.LatestVersion.ToStringNoMeta;
+      resultItem.LatestStableVersion := find.LatestStableVersion.ToStringNoMeta;
       result.Add(resultItem);
     end;
   end;

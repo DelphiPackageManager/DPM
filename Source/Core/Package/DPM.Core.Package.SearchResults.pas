@@ -37,6 +37,7 @@ type
     FDownloadCount : Int64;
     FInstalled : boolean;
     FLatestVersion : string;
+    FLatestStableVersion : string;
     FIsReservedPrefix : boolean;
     FSourceName : string;
     FPublishedDate : string;
@@ -53,6 +54,7 @@ type
     function GetReportUrl : string;
     function GetInstalled : Boolean;
     function GetLatestVersion : string;
+    function GetLatestStableVersion : string;
     function GetIsReservedPrefix : Boolean;
 
     function GetIsCommercial : Boolean;
@@ -81,6 +83,7 @@ type
     procedure SetReportUrl(const value : string);
     procedure SetInstalled(const value : Boolean);
     procedure SetLatestVersion(const value : string);
+    procedure SetLatestStableVersion(const value : string);
     procedure SetIsTransitive(const value : Boolean);
 
 
@@ -228,6 +231,11 @@ begin
   result := FIsTrial;
 end;
 
+function TDPMPackageSearchResultItem.GetLatestStableVersion: string;
+begin
+  result := FLatestStableVersion;
+end;
+
 function TDPMPackageSearchResultItem.GetLatestVersion: string;
 begin
   result := FLatestVersion;
@@ -308,6 +316,11 @@ end;
 procedure TDPMPackageSearchResultItem.SetIsTransitive(const value : Boolean);
 begin
   FIsTransitive := value;
+end;
+
+procedure TDPMPackageSearchResultItem.SetLatestStableVersion(const value: string);
+begin
+  FLatestStableVersion := value;
 end;
 
 procedure TDPMPackageSearchResultItem.SetLatestVersion(const value: string);

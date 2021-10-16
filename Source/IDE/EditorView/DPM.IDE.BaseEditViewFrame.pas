@@ -450,7 +450,7 @@ begin
     FSearchResultPackages := nil;
     FUpdates := nil;
     PackageDetailsView.SetPlatform(CurrentPlatform);
-    PackageDetailsView.SetPackage(nil);
+    PackageDetailsView.SetPackage(nil, FSearchOptions.Prerelease);
     SearchBar.SetPlatform(CurrentPlatform);
     FSearchOptions.Platforms := [CurrentPlatform];
     FScrollList.CurrentRow := -1;
@@ -485,9 +485,6 @@ begin
     FInstalledPackages := FAllInstalledPackages;
     FUpdates := nil;
   end;
-
-
-  PackageDetailsView.IncludePreRelease := TDPMSearchOption.IncludePrerelease in searchOptions;
 
   FSearchOptions.Platforms := [platform];
   FSearchOptions.Prerelease := TDPMSearchOption.IncludePrerelease in searchOptions;
@@ -570,6 +567,7 @@ begin
     lProjectFile := FProject.FileName;
 
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+  repoManager.Initialize(FConfiguration);
 
   options := FSearchOptions.Clone;
   //we want all packages for installed as we don't know what types we might have
@@ -589,7 +587,7 @@ begin
     begin
       result := TCollections.CreateList<IPackageSearchResultItem>;
       FLogger.Debug('DPMIDE : Got Installed package references, fetching metadata...');
-      result := repoManager.GetInstalledPackageFeed(cancelToken, options, GetPackageIdsFromReferences(FCurrentPlatform), FConfiguration);
+      result := repoManager.GetInstalledPackageFeed(cancelToken, options, GetPackageIdsFromReferences(FCurrentPlatform));
       for item in result do
       begin
         if FPackageReferences <> nil then
@@ -678,7 +676,7 @@ begin
     exit;
   end;
   FScrollList.CurrentRow := -1;
-  PackageDetailsView.SetPackage(nil);
+  PackageDetailsView.SetPackage(nil, FSearchOptions.Prerelease);
   if FScrollList.RowCount = list.Count then
     FScrollList.Invalidate  //doing this because if the rowcount is the same it doesn't invalidate.
   else
@@ -828,7 +826,6 @@ var
   version : string;
   source : string;
   repoManager : IPackageRepositoryManager;
-  config : IConfiguration;
   stopWatch : TStopWatch;
 begin
   stopWatch.Start;
@@ -846,12 +843,12 @@ begin
   FLogger.Debug('DPMIDE : Requesting icon for [' + id + '.' + version + ']');
 
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
-  config := FConfiguration;
+  repoManager.Initialize(FConfiguration);
 
   TAsync.Configure<IPackageIcon>(
     function(const cancelToken : ICancellationToken) : IPackageIcon
     begin
-      result := repoManager.GetPackageIcon(cancelToken, source, id, version, IDECompilerVersion, platform, FConfiguration);
+      result := repoManager.GetPackageIcon(cancelToken, source, id, version, IDECompilerVersion, platform);
     end, FCancelTokenSource.Token)
   .OnException(
     procedure(const e : Exception)
@@ -903,7 +900,7 @@ begin
   list := CurrentList;
   if list = nil then
   begin
-    PackageDetailsView.SetPackage(nil);
+    PackageDetailsView.SetPackage(nil, FSearchOptions.Prerelease);
     exit;
   end;
 
@@ -911,7 +908,7 @@ begin
   if (newRowIndex >= 0) and (newRowIndex < list.Count) then
     item := list[newRowIndex];
 
-  PackageDetailsView.SetPackage(item);
+  PackageDetailsView.SetPackage(item, FSearchOptions.Prerelease);
 end;
 
 procedure TDPMBaseEditViewFrame.ScrollListPaintNoRows(const Sender: TObject; const ACanvas: TCanvas; const paintRect: TRect);
@@ -1069,10 +1066,21 @@ begin
     title := item.Version;
     ACanvas.TextRect(FRowLayout.VersionRect, title, [tfSingleLine, tfVerticalCenter, tfRight]);
 
-    if item.Installed and (item.Version <> item.LatestVersion) then
+    if item.Installed then
     begin
-      title := item.LatestVersion;
-      ACanvas.TextRect(FRowLayout.InstalledVersionRect, title, [tfSingleLine, tfVerticalCenter, tfRight]);
+      title := '';
+      if FSearchOptions.Prerelease then
+      begin
+        if (item.Version <> item.LatestVersion) then
+          title := item.LatestVersion;
+      end
+      else
+      begin
+        if (item.Version <> item.LatestStableVersion) then
+          title := item.LatestStableVersion;
+      end;
+      if title <> '' then
+        ACanvas.TextRect(FRowLayout.InstalledVersionRect, title, [tfSingleLine, tfVerticalCenter, tfRight]);
     end;
 
     //description
@@ -1098,13 +1106,6 @@ begin
     DoPlatformChange(newPlatform);
 end;
 
-//function TDPMBaseEditViewFrame.SearchForPackages(const options: TSearchOptions): IList<IPackageSearchResultItem>;
-//var
-//  repoManager : IPackageRepositoryManager;
-//begin
-//  repoManager := FContainer.Resolve<IPackageRepositoryManager>;
-//  result := repoManager.GetPackageFeed(FCancelTokenSource.Token, options, FConfiguration);
-//end;
 
 function TDPMBaseEditViewFrame.SearchForPackagesAsync(const options: TSearchOptions): IAwaitable<IList<IPackageSearchResultItem>>;
 var
@@ -1112,12 +1113,12 @@ var
 begin
   //local for capture
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+  repoManager.Initialize(FConfiguration);
 
   result := TAsync.Configure <IList<IPackageSearchResultItem>> (
     function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
     begin
-      result := repoManager.GetPackageFeed(cancelToken, options, FConfiguration);
-      //simulating long running.
+      result := repoManager.GetPackageFeed(cancelToken, options);
     end, FCancelTokenSource.Token);
 end;
 
@@ -1351,8 +1352,8 @@ begin
   FSearchBar.ConfigureForTab(FCurrentTab);
 
   FScrollList.RowCount := 0;
-  PackageDetailsView.SetPackage(nil);
   PackageDetailsView.Configure(FCurrentTab, FSearchBar.IncludePrerelease);
+//  PackageDetailsView.SetPackage(nil, FSearchOptions.Prerelease); //redundant - configure will call setpackage
 
   doRefresh := refresh or (FSearchOptions.SearchTerms <> '');
   FSearchOptions.Platforms := [FCurrentPlatform];
