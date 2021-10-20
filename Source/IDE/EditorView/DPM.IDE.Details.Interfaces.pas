@@ -27,7 +27,6 @@ type
   // package cache!
   IDetailsHost = interface
     ['{4FBB9E7E-886A-4B7D-89FF-FA5DBC9D93FD}']
-    function GetSearchOptions : TSearchOptions;
 
     function GetPackageReferences : IGraphNode;
     procedure SaveBeforeInstall;

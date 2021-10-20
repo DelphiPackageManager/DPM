@@ -60,7 +60,7 @@ type
       const preRelease: Boolean): IDictionary<string, TPackageVersion>;
 
     function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>; overload;
-    function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageSearchResultItem>;
+    function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
     function GetPackageIcon(const cancelToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
     function GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageSearchResultItem;
 
@@ -149,9 +149,104 @@ begin
 end;
 
 
-function TDPMServerPackageRepository.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageSearchResultItem>;
+function TDPMServerPackageRepository.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
+var
+  httpClient : IHttpClient;
+  request : IHttpRequest;
+  response : IHttpResponse;
+  serviceIndex : IServiceIndex;
+  serviceItem : IServiceIndexItem;
+  path : string;
+  jsonObj : TJsonObject;
+  jsonArr : TJsonArray;
+  itemObj : TJsonObject;
+  i: Integer;
+
+  resultItem : IPackageSearchResultItem;
+
+  procedure AddToPath(const value : string);
+  begin
+    if path = '' then
+      path := '?' + value
+    else
+      path := path + '&' + value;
+  end;
+
 begin
-  result := TCollections.CreateList<IPackageSearchResultItem>;
+  Result := TDPMPackageSearchResult.Create(options.Skip, 0);
+  serviceIndex := GetServiceIndex(cancelToken);
+  if serviceIndex = nil then
+    exit;
+
+  serviceItem := serviceIndex.FindItem('PackageSearch');
+  if serviceItem = nil then
+  begin
+    Logger.Error('Unabled to determine PackageSearch resource from Service Index');
+    exit;
+  end;
+
+  if options.SearchTerms <> '' then
+    AddToPath('q=' + Trim(options.SearchTerms));
+
+  AddToPath('compiler=' + CompilerToString(compilerVersion));
+  AddToPath('platform=' + DPMPlatformToString(platform));
+
+  if options.Skip <> 0 then
+    AddToPath('skip=' + IntToStr(options.Skip));
+
+  if options.Take <> 0 then
+    AddToPath('take=' + IntToStr(options.Take));
+
+  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+
+  request := THttpClientFactory.CreateRequest(path);
+
+  try
+    response := httpClient.Get(request);
+  except
+    on ex : Exception do
+    begin
+      Logger.Error('Error fetching list from server : ' + ex.Message);
+      exit;
+    end;
+  end;
+
+  if response.ResponseCode <> 200 then
+  begin
+    Logger.Error('Error fetching list from server : ' + response.ErrorMessage);
+    exit;
+  end;
+
+  if response.ContentLength = 0 then
+  begin
+    Logger.Verbose('Server returned no content for icon');
+    exit;
+  end;
+
+  try
+    jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+  except
+    on e : Exception do
+    begin
+      Logger.Error('Error parsing json response from server : ' + e.Message);
+      exit;
+    end;
+  end;
+
+  Result.TotalCount := jsonObj.I['totalHits'];
+
+  if jsonObj.Contains('results') then
+  begin
+    jsonArr := jsonObj.A['results'];
+    for i := 0 to jsonArr.Count -1 do
+    begin
+      itemObj := jsonArr.O[i];
+      resultItem := TDPMPackageSearchResultItem.FromJson(Name, itemObj);
+      Result.Results.Add(resultItem);
+    end;
+
+  end;
+
 
 
 
@@ -272,7 +367,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error fetching parsing json response from server : ' + e.Message);
+      Logger.Error('Error parsing json response from server : ' + e.Message);
       exit;
     end;
   end;
@@ -323,7 +418,7 @@ begin
   path := Format('/%s/%s/%s/%s/info', [packageId, CompilerToString(compilerVersion), DPMPlatformToString(platform), packageVersion]);
 
   httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
-  
+
   request := THttpClientFactory.CreateRequest(path);
 
   try
@@ -347,7 +442,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error fetching parsing json response from server : ' + e.Message);
+      Logger.Error('Error parsing json response from server : ' + e.Message);
       exit;
     end;
   end;
@@ -357,7 +452,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error fetching reading json response from server : ' + e.Message);
+      Logger.Error('Error deserializing json response from server : ' + e.Message);
       exit;
     end;
   end;
@@ -417,7 +512,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error fetching parsing json response from server : ' + e.Message);
+      Logger.Error('Error parsing json response from server : ' + e.Message);
       exit;
     end;
   end;
@@ -491,7 +586,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error fetching parsing json response from server : ' + e.Message);
+      Logger.Error('Error parsing json response from server : ' + e.Message);
       exit;
     end;
   end;

@@ -42,6 +42,7 @@ exports
 implementation
 
 uses
+  WinApi.ActiveX,
   Vcl.Graphics,
   DPM.IDE.Constants;
 
@@ -85,6 +86,8 @@ function InitWizard(const BorlandIDEServices : IBorlandIDEServices;
 var
   wizard : IOTAWizard;
 begin
+  CoInitializeEx(nil,COINIT_APARTMENTTHREADED);
+
   try
     wizard := CreateWizard(BorlandIDEServices);
     if wizard <> nil then

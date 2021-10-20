@@ -83,6 +83,7 @@ begin
   config := FConfigurationManager.LoadConfig(TPushOptions.Default.ConfigFile);
   if config = nil then
     exit(TExitCode.InitException);
+  FRepositoryManager.Initialize(config);
 
   //validate the source
   sourceConfig := config.Sources.Where(function(const item : ISourceConfig):boolean

@@ -100,7 +100,7 @@ type
   protected
     procedure ProjectSelectionChanged(Sender : TObject);
     procedure UpdateButtonState;
-  
+
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
 
@@ -111,7 +111,7 @@ type
     procedure ViewClosing;
     procedure ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
 
-    function SearchForPackagesAsync(const options: TSearchOptions): IAwaitable<IList<IPackageSearchResultItem>>;
+    function GetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string): IAwaitable<IPackageSearchResultItem>;
   public
     constructor Create(AOwner : TComponent); override;
   end;
@@ -122,6 +122,7 @@ implementation
 
 uses
   WinApi.ShellApi,
+  WinApi.ActiveX,
   DPM.IDE.Constants,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Utils.Strings,
@@ -141,25 +142,15 @@ end;
 
 procedure TGroupPackageDetailsFrame.cboVersionsChange(Sender: TObject);
 var
-  searchOptions : TSearchOptions;
-  package : IPackageSearchResultItem;
   sVersion : string;
 begin
-  searchOptions := FHost.GetSearchOptions;
-  searchOptions.SearchTerms := FPackageMetaData.Id;
-
   sVersion := cboVersions.Items[cboVersions.ItemIndex];
   if TStringUtils.StartsWith(sVersion, cLatestPrerelease, true) then
     Delete(sVersion, 1, Length(cLatestPrerelease))
   else if TStringUtils.StartsWith(sVersion, cLatestStable, true) then
     Delete(sVersion, 1, Length(cLatestStable));
 
-  searchOptions.Version := TPackageVersion.Parse(sVersion);
-  searchOptions.Prerelease := true;
-  searchOptions.Commercial := true;
-  searchOptions.Trial := true;
-
-  SearchForPackagesAsync(searchOptions)
+  GetPackageMetaDataAsync(FPackageMetaData.Id, FPackageMetaData.CompilerVersion, FPackageMetaData.Platform, sVersion)
   .OnException(
     procedure(const e : Exception)
     begin
@@ -178,15 +169,14 @@ begin
       FLogger.Debug('Cancelled searching for packages.');
     end)
   .Await(
-    procedure(const theResult : IList<IPackageSearchResultItem>)
+    procedure(const theResult : IPackageSearchResultItem)
     begin
       FRequestInFlight := false;
       //if the view is closing do not do anything else.
       if FClosing then
         exit;
       //        FLogger.Debug('Got search results.');
-      package := theResult.FirstOrDefault;
-      SetPackage(package, FIncludePreRelease);
+      SetPackage(theResult, FIncludePreRelease);
     end);
 
 end;
@@ -325,7 +315,8 @@ begin
   UpdateButtonState;
 end;
 
-function TGroupPackageDetailsFrame.SearchForPackagesAsync(const options: TSearchOptions): IAwaitable<IList<IPackageSearchResultItem>>;
+
+function TGroupPackageDetailsFrame.GetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string): IAwaitable<IPackageSearchResultItem>;
 var
   repoManager : IPackageRepositoryManager;
 begin
@@ -333,13 +324,21 @@ begin
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
   repoManager.Initialize(FConfiguration);
 
-  result := TAsync.Configure <IList<IPackageSearchResultItem>> (
-    function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
+  result := TAsync.Configure <IPackageSearchResultItem> (
+    function(const cancelToken : ICancellationToken) : IPackageSearchResultItem
     begin
-      result := repoManager.GetPackageFeed(cancelToken, options);
+      CoInitializeEx(nil, COINIT_APARTMENTTHREADED);
+      try
+        result := repoManager.GetPackageMetaData(cancelToken, id, version, compilerVersion, platform);
+      finally
+        CoUninitialize;
+      end;
+
       //simulating long running.
     end, FCancellationTokenSource.Token);
+
 end;
+
 
 procedure TGroupPackageDetailsFrame.SetPackage(const package: IPackageSearchResultItem; const preRelease : boolean);
 var
@@ -535,7 +534,12 @@ begin
   TAsync.Configure<IList<TPackageVersion>> (
     function(const cancelToken : ICancellationToken) : IList<TPackageVersion>
     begin
+      CoInitializeEx(nil, COINIT_APARTMENTTHREADED);
+      try
       result := repoManager.GetPackageVersions(cancelToken, IDECompilerVersion, FCurrentPlatform, FPackageMetaData.Id, FIncludePrerelease);
+      finally
+        CoUninitialize;
+      end;
     end, FCancellationTokenSource.Token)
   .OnException(
     procedure(const e : Exception)

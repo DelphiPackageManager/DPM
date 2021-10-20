@@ -57,7 +57,7 @@ type
     function DoList(searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
     function DoExactList(const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const version : string) : IList<string>;
 
-    function DoGetPackageFeedFiles(const options : TSearchOptions; searchTerm : string) : IList<string>;
+    function DoGetPackageFeedFiles(const searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
     function DoGetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const files : IList<string>) : IList<IPackageSearchResultItem>;
 
 
@@ -71,10 +71,9 @@ type
 
     function GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResultItem;
 
-    //IPackageRepository
 
     function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const preRelease : boolean) : IList<TPackageVersion>; overload;
-    function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageSearchResultItem>;
+    function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
     function GetPackageIcon(const cancelToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
 
     //commands
@@ -286,16 +285,18 @@ begin
 end;
 
 
-function TDirectoryPackageRepository.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageSearchResultItem>;
+function TDirectoryPackageRepository.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
 var
   searchTerms : TArray<string>;
   i : integer;
-  //  repoResults : IList<IPackageSearchResultItem>;
+  results : IList<IPackageSearchResultItem>;
   searchFiles : IList<string>;
   allFiles : IList<string>;
   distinctFiles : IEnumerable<string>;
+  take : integer;
 begin
-  result := TCollections.CreateList<IPackageSearchResultItem>;
+  result := TDPMPackageSearchResult.Create(options.Skip,0);
+
   if options.CompilerVersion = TCompilerVersion.UnknownVersion then
     raise EArgumentException.Create('Compiler version must be set');
 
@@ -313,7 +314,7 @@ begin
   begin
     if cancelToken.IsCancelled then
       exit;
-    allFiles.AddRange(DoGetPackageFeedFiles(options, searchTerms[i]));
+    allFiles.AddRange(DoGetPackageFeedFiles(searchTerms[i], compilerVersion, platform));
   end;
 
   distinctFiles := TDistinctIterator < string > .Create(allFiles, TStringComparer.OrdinalIgnoreCase);
@@ -323,8 +324,13 @@ begin
     distinctFiles := distinctFiles.Take(options.Take);
   searchFiles := TCollections.CreateList<string>(distinctFiles);
 
-  result := DoGetPackageFeed(cancelToken, options, searchFiles);
+  results := DoGetPackageFeed(cancelToken, options, searchFiles);
 
+  take := options.Take;
+  if take = 0 then
+    take := MaxInt;
+
+  result.Results.AddRange( results.Skip(options.Skip).Take(take));
 
 end;
 
@@ -540,42 +546,18 @@ end;
 
 
 
-function TDirectoryPackageRepository.DoGetPackageFeedFiles(const options : TSearchOptions; searchTerm : string) : IList<string>;
+function TDirectoryPackageRepository.DoGetPackageFeedFiles(const searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
 var
   files : IList<string>;
-  platform : TDPMPlatform;
-  platformSearchTerm : string;
+  query : string;
 begin
   result := TCollections.CreateList<string>;
-  if not options.Exact then
-  begin
-    if searchTerm <> '*' then
-      searchTerm := '*' + searchTerm + '*';
-  end;
-  searchTerm := searchTerm + '-' + CompilerVersionToSearchPart(options.CompilerVersion);
-  if options.Platforms = [] then
-  begin
-    if options.Version.IsEmpty then
-      searchTerm := searchTerm + '-*-*' + cPackageFileExt
-    else
-      searchTerm := searchTerm + '-*-' + options.Version.ToStringNoMeta + cPackageFileExt;
-
-    result := TDirectoryUtils.GetFiles(SourceUri, searchTerm);
-  end
-  else
-  begin
-    for platform in options.Platforms do
-    begin
-      platformSearchTerm := searchTerm + '-' + DPMPlatformToString(platform) + '-';
-      if options.Version.IsEmpty then
-        platformSearchTerm := platformSearchTerm + '*' + cPackageFileExt
-      else
-        platformSearchTerm := platformSearchTerm + options.Version.ToStringNoMeta + cPackageFileExt;
-
-      files := TDirectoryUtils.GetFiles(SourceUri, platformSearchTerm);
-      result.AddRange(files);
-    end;
-  end;
+  query := searchTerm;
+  if query <> '*' then
+    query := '*' + query + '*';
+  query := query + '-' + CompilerVersionToSearchPart(compilerVersion) + '-' + DPMPlatformToString(platform) + '-'  + '*' + cPackageFileExt;
+  files := TDirectoryUtils.GetFiles(SourceUri, query);
+  result.AddRange(files);
 
 end;
 

@@ -64,7 +64,7 @@ type
 
     //UI specific stuff
     //TODO : Implement skip/take!
-    function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageSearchResultItem>;
+    function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
 
 
     function GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IList<IPackageId>) : IList<IPackageSearchResultItem>;
@@ -97,7 +97,8 @@ uses
   Spring.Collections.Extensions,
   VSoft.URI,
   DPM.Core.Constants,
-  DPM.Core.Utils.System;
+  DPM.Core.Utils.System,
+  DPM.Core.Package.SearchResults;
 
 { TRespositoryManager }
 
@@ -143,7 +144,7 @@ function TPackageRepositoryManager.GetInstalledPackageFeed(const cancelToken : I
 var
   searchOptions : TSearchOptions;
   packageId : IPackageId;
-  packageResults : IList<IPackageSearchResultItem>;
+  packageResults : IPackageSearchResult;
   item : IPackageSearchResultItem;
   latestVersions : IDictionary<string, TPackageVersion>;
   latestVersion : TPackageVersion;
@@ -186,31 +187,31 @@ begin
     searchOptions.Platforms := [packageId.Platform];
     searchOptions.Exact := true;
 
-    packageResults := GetPackageFeed(cancelToken, searchOptions);
+    packageResults := GetPackageFeed(cancelToken, searchOptions, options.CompilerVersion, platform);
 
-    for item in packageResults do
+    for item in packageResults.Results do
     begin
       item.Installed := true;
 //      item.InstalledVersion := packageId.Version.ToStringNoMeta;
       if latestVersions.TryGetValue(item.Id, latestVersion) then
         item.LatestVersion := latestVersion.ToStringNoMeta;
     end;
-    result.AddRange(packageResults);
+    result.AddRange(packageResults.Results);
   end;
 end;
 
 
-function TPackageRepositoryManager.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageSearchResultItem>;
+function TPackageRepositoryManager.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
 var
   repo : IPackageRepository;
   sources : TStringList;
-  searchResult : IList<IPackageSearchResultItem>;
+  searchResult : IPackageSearchResult;
   allResults : IList<IPackageSearchResultItem>;
   distinctResults : IEnumerable<IPackageSearchResultItem>;
   comparer : IEqualityComparer<IPackageSearchResultItem>;
 begin
   Assert(FConfiguration <> nil);
-  result := TCollections.CreateList<IPackageSearchResultItem>;
+  result := TDPMPackageSearchResult.Create(options.Skip, 0);
 
   if not UpdateRepositories then
   begin
@@ -237,8 +238,15 @@ begin
         if sources.IndexOf(repo.Name) = -1 then
           continue;
       end;
-      searchResult := repo.GetPackageFeed(cancelToken, options);
-      allResults.AddRange(searchResult);
+      searchResult := repo.GetPackageFeed(cancelToken, options, compilerVersion, platform);
+      if options.Take > 0 then
+      begin
+        if allResults.Count < options.Take then
+          allResults.AddRange(searchResult.Results);
+      end
+      else
+        allResults.AddRange(searchResult.Results);
+      Result.TotalCount := Result.TotalCount + searchResult.TotalCount;
     end;
   finally
     if sources <> nil then
@@ -247,7 +255,7 @@ begin
   comparer := TPackageSearchResultItemComparer.Create;
 
   distinctResults := TDistinctIterator<IPackageSearchResultItem>.Create(allResults, comparer);
-  result.AddRange(distinctResults);
+  result.Results.AddRange(distinctResults);
 
 
 end;
@@ -626,17 +634,18 @@ begin
   else
     packages.AddRange(searchResult);
 
-  if (options.Skip > 0) or (options.Take > 0) then
-  begin
-    distinctResults := packages;
-    if options.Skip > 0 then
-      distinctResults := distinctResults.Skip(options.Skip);
-    if options.Take > 0 then
-      distinctResults := distinctResults.Take(options.Take);
-
-    result.AddRange(distinctResults);
-  end
-  else
+    //skip and take are not working because of how we are rolling up the results.
+//  if (options.Skip > 0) or (options.Take > 0) then
+//  begin
+//    distinctResults := packages;
+//    if options.Skip > 0 then
+//      distinctResults := distinctResults.Skip(options.Skip);
+//    if options.Take > 0 then
+//      distinctResults := distinctResults.Take(options.Take);
+//
+//    result.AddRange(distinctResults);
+//  end
+//  else
     result.AddRange(packages);
 end;
 

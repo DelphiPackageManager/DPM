@@ -120,17 +120,14 @@ type
 
 
     function SearchForPackagesAsync(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;overload;
-//    function SearchForPackages(const options : TSearchOptions) : IList<IPackageSearchResultItem>;overload;
 
 
-    //IPackageSearcher
-    function GetSearchOptions : TSearchOptions;
+    //IDetailsHost
     procedure SaveBeforeInstall;
     procedure PackageInstalled(const package : IPackageSearchResultItem);
     procedure PackageUninstalled(const package : IPackageSearchResultItem);
     function GetPackageReferences : IGraphNode;
 
-    //IPackageSearcher
 
     function IsProjectGroup : boolean;virtual;
     procedure TabChanged(const tab : TDPMCurrentTab);
@@ -208,6 +205,7 @@ implementation
 
 uses
   Winapi.Windows,
+  WinApi.ActiveX,
   Xml.XMLIntf,
   System.Diagnostics,
   System.SysUtils,
@@ -532,7 +530,7 @@ begin
   else
     lProjectFile := FProject.FileName;
 
-  result := TAsync.Configure < IList<IPackageSearchResultItem> > (
+  result := TAsync.Configure<IList<IPackageSearchResultItem>> (
     function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
     var
       filter : string;
@@ -585,19 +583,24 @@ begin
       packageRef : IGraphNode;
       item : IPackageSearchResultItem;
     begin
-      result := TCollections.CreateList<IPackageSearchResultItem>;
-      FLogger.Debug('DPMIDE : Got Installed package references, fetching metadata...');
-      result := repoManager.GetInstalledPackageFeed(cancelToken, options, GetPackageIdsFromReferences(FCurrentPlatform));
-      for item in result do
-      begin
-        if FPackageReferences <> nil then
+      CoInitialize(nil);
+      try
+        result := TCollections.CreateList<IPackageSearchResultItem>;
+        FLogger.Debug('DPMIDE : Got Installed package references, fetching metadata...');
+        result := repoManager.GetInstalledPackageFeed(cancelToken, options, GetPackageIdsFromReferences(FCurrentPlatform));
+        for item in result do
         begin
-          packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
-          if packageRef <> nil then
-            item.IsTransitive := packageRef.IsTransitive;
+          if FPackageReferences <> nil then
+          begin
+            packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
+            if packageRef <> nil then
+              item.IsTransitive := packageRef.IsTransitive;
+          end;
         end;
+        FLogger.Debug('DPMIDE : Got Installed package metadata.');
+      finally
+        CoUninitialize;
       end;
-      FLogger.Debug('DPMIDE : Got Installed package metadata.');
 
     end, FCancelTokenSource.Token);
 end;
@@ -644,11 +647,6 @@ end;
 function TDPMBaseEditViewFrame.GetPackageReferences: IGraphNode;
 begin
   result := FPackageReferences;
-end;
-
-function TDPMBaseEditViewFrame.GetSearchOptions: TSearchOptions;
-begin
-  result := FSearchOptions.Clone;
 end;
 
 function TDPMBaseEditViewFrame.GetUpdatedPackages: IAwaitable<IList<IPackageSearchResultItem>>;
@@ -1118,7 +1116,13 @@ begin
   result := TAsync.Configure <IList<IPackageSearchResultItem>> (
     function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
     begin
-      result := repoManager.GetPackageFeed(cancelToken, options);
+      CoInitialize(nil);
+      try
+        //just return the list for now.. but we need to rework for skip/take
+        result := repoManager.GetPackageFeed(cancelToken, options, IDECompilerVersion, FCurrentPlatform).Results;
+      finally
+        CoUninitialize;
+      end;
     end, FCancelTokenSource.Token);
 end;
 

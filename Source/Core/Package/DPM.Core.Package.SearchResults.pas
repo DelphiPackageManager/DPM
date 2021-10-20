@@ -13,7 +13,6 @@ type
   private
     FIsError : boolean;
     FAuthors : string;
-    FOwners : string;
     FCopyright : string;
     FDependencies : IList<IPackageDependency>;
     FDescription : string;
@@ -43,7 +42,6 @@ type
     FPublishedDate : string;
   protected
     function GetAuthors : string;
-    function GetOwners : string;
     function GetCopyright : string;
     function GetDependencies : IList<IPackageDependency>;
     function GetDescription : string;
@@ -85,9 +83,6 @@ type
     procedure SetLatestVersion(const value : string);
     procedure SetLatestStableVersion(const value : string);
     procedure SetIsTransitive(const value : Boolean);
-
-
-
     constructor CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
     constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata);
     constructor CreateFromError(const id : string; const version : TPackageVersion; const errorDescription : string);
@@ -97,9 +92,26 @@ type
     class function FromError(const id : string; const version : TPackageVersion; const errorDescription : string) : IPackageSearchResultItem;
   end;
 
+  TDPMPackageSearchResult = class(TInterfacedObject, IPackageSearchResult)
+  private
+    FSkip : Int64;
+    FTotalCount : Int64;
+    FResults : IList<IPackageSearchResultItem>;
+  protected
+    function GetResults: IList<IPackageSearchResultItem>;
+    function GetTotalCount: Int64;   
+    function GetSkip: Int64;   
+    procedure SetSkip(const value : Int64);
+    procedure SetTotalCount(const value : Int64);
+  public
+    constructor Create(const skip : Int64; const total : Int64);
+  end;
+  
 
 implementation
 
+uses
+  System.SysUtils;
 
 { TDPMPackageSearchResultItem }
 
@@ -114,6 +126,39 @@ end;
 constructor TDPMPackageSearchResultItem.CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
 begin
   FDependencies := TCollections.CreateList<IPackageDependency>;
+  FSourceName := sourceName;
+  FCompilerVersion := StringToCompilerVersion(jsonObject.S['compiler']);
+  if FCompilerVersion = TCompilerVersion.UnknownVersion then
+    raise EArgumentOutOfRangeException.Create('Invalid compiler version returned from server : ' + jsonObject.S['compiler']);
+
+  FPlatform := StringToDPMPlatform(jsonObject.S['platform']);
+  if FPlatform = TDPMPlatform.UnknownPlatform then
+    raise EArgumentOutOfRangeException.Create('Invalid platform returned from server : ' + jsonObject.S['platform']);
+
+  FId               := jsonObject.S['id'];
+  FVersion          := jsonObject.S['version'];
+  
+  FAuthors          := jsonObject.S['authors'];
+  FCopyright        := jsonObject.S['copyright'];
+  FDescription      := jsonObject.S['description'];
+  FIcon             := jsonObject.S['icon'];
+  FIsCommercial     := jsonObject.B['isCommercial'];
+  FIsTrial          := jsonObject.B['isTrial'];
+  FLicense          := jsonObject.S['license'];
+  FProjectUrl       := jsonObject.S['projectUrl'];
+  FRepositoryUrl    := jsonObject.S['repositoryUrl'];
+  FRepositoryType   := jsonObject.S['repositoryType'];
+  FRepositoryBranch := jsonObject.S['repositoryBranch'];
+  FRepositoryCommit := jsonObject.S['repositoryCommit'];
+  FReportUrl        := jsonObject.S['reportUrl'];
+  FTags             := jsonObject.S['tags'];
+
+  FDownloadCount    := jsonObject.L['totalDownloads'];
+  FLatestVersion    := jsonObject.S['latestVersion'];
+  FLatestStableVersion := jsonObject.S['latestStableVersion'];
+  FIsReservedPrefix := jsonObject.B['isReservedPrefix'];
+    
+    
 
   //TODO : implement this;
 end;
@@ -126,7 +171,6 @@ begin
   FDependencies := TCollections.CreateList<IPackageDependency>;
   FDependencies.AddRange(metaData.Dependencies);
   FAuthors := metaData.Authors;
-  FOwners := metaData.Authors;
   FCopyright := metaData.Copyright;
   FDescription := metaData.Description;
   FIcon := metaData.Icon;
@@ -141,7 +185,7 @@ begin
   FRepositoryCommit := metaData.RepositoryCommit;
   FTags := metaData.Tags;
   FVersion := metaData.Version.ToStringNoMeta;
-  FDownloadCount := 123456; //-1; //indicates not set;
+  FDownloadCount := -1; //indicates not set;
   FIsReservedPrefix := false;
 end;
 
@@ -246,10 +290,6 @@ begin
   result := FLicense;
 end;
 
-function TDPMPackageSearchResultItem.GetOwners : string;
-begin
-  result := FOwners;
-end;
 
 function TDPMPackageSearchResultItem.GetPlatform : TDPMPlatform;
 begin
@@ -361,6 +401,40 @@ end;
 procedure TDPMPackageSearchResultItem.SetVersion(const value: string);
 begin
   FVersion := value;
+end;
+
+{ TDPMPackageSearchResult }
+
+constructor TDPMPackageSearchResult.Create(const skip : Int64; const total: Int64);
+begin
+  FSkip := skip;
+  FTotalCount := total;
+  FResults := TCollections.CreateList<IPackageSearchResultItem>;
+end;
+
+function TDPMPackageSearchResult.GetResults: IList<IPackageSearchResultItem>;
+begin
+  result := FResults;
+end;
+
+function TDPMPackageSearchResult.GetSkip: Int64;
+begin
+  Result := FSkip;
+end;
+
+function TDPMPackageSearchResult.GetTotalCount: Int64;
+begin
+  result := FTotalCount;
+end;
+
+procedure TDPMPackageSearchResult.SetSkip(const value: Int64);
+begin
+  FSkip := value;
+end;
+
+procedure TDPMPackageSearchResult.SetTotalCount(const value: Int64);
+begin
+  FTotalCount := value;
 end;
 
 end.

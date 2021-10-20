@@ -94,7 +94,7 @@ type
   protected
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
-    function SearchForPackagesAsync(const options: TSearchOptions): IAwaitable<IList<IPackageSearchResultItem>>;
+//    function SearchForPackagesAsync(const options: TSearchOptions): IAwaitable<IList<IPackageSearchResultItem>>;
 
     function GetPackageMetaDataAsync(const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const version : string) : IAwaitable<IPackageSearchResultItem>;
 
@@ -264,22 +264,13 @@ end;
 
 procedure TPackageDetailsFrame.cboVersionsChange(Sender : TObject);
 var
-  searchOptions : TSearchOptions;
   sVersion : string;
 begin
-  searchOptions := FHost.GetSearchOptions;
-  searchOptions.SearchTerms := FPackageMetaData.Id;
-
   sVersion := cboVersions.Items[cboVersions.ItemIndex];
   if TStringUtils.StartsWith(sVersion, cLatestPrerelease, true) then
     Delete(sVersion, 1, Length(cLatestPrerelease))
   else if TStringUtils.StartsWith(sVersion, cLatestStable, true) then
     Delete(sVersion, 1, Length(cLatestStable));
-
-  searchOptions.Version := TPackageVersion.Parse(sVersion);
-  searchOptions.Prerelease := true;
-  searchOptions.Commercial := true;
-  searchOptions.Trial := true;
 
   GetPackageMetaDataAsync(FPackageMetaData.Id, FPackageMetaData.CompilerVersion, FPackageMetaData.Platform, sVersion)
   .OnException(
@@ -403,7 +394,6 @@ begin
 end;
 
 
-
 procedure TPackageDetailsFrame.Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProject);
 begin
   FContainer := container;
@@ -413,22 +403,6 @@ begin
   FHost := host;
   FProjectFile := projectOrGroup.FileName;
   SetPackage(nil, false);
-end;
-
-function TPackageDetailsFrame.SearchForPackagesAsync(const options: TSearchOptions): IAwaitable<IList<IPackageSearchResultItem>>;
-var
-  repoManager : IPackageRepositoryManager;
-begin
-  //local for capture
-  repoManager := FContainer.Resolve<IPackageRepositoryManager>;
-  repoManager.Initialize(FConfiguration);
-
-  result := TAsync.Configure <IList<IPackageSearchResultItem>> (
-    function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
-    begin
-      result := repoManager.GetPackageFeed(cancelToken, options);
-      //simulating long running.
-    end, FCancellationTokenSource.Token);
 end;
 
 

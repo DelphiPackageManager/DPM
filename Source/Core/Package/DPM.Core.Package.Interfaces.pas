@@ -146,7 +146,6 @@ type
 
     function GetDescription : string;
     function GetAuthors : string;
-    function GetOwners : string;
     function GetProjectUrl : string;
     function GetReportUrl : string;
     function GetRepositoryUrl : string;
@@ -184,7 +183,6 @@ type
     property Version : string read GetVersion write SetVersion;
     property Description : string read GetDescription;
     property Authors : string read GetAuthors;
-    property Owners : string read GetOwners;
     property ProjectUrl : string read GetProjectUrl;
     property RepositoryUrl : string read GetRepositoryUrl;
     property RepositoryType   : string read GetRepositoryType write SetRepositoryType;
@@ -218,6 +216,21 @@ type
     property SourceName : string read GetSourceName;
   end;
 
+  IPackageSearchResult = interface
+  ['{547DDC6A-4A5F-429C-8A00-1B8FA4BA6D69}']
+    function GetTotalCount : Int64;
+    function GetSkip : Int64;
+    function GetResults : IList<IPackageSearchResultItem>;
+
+    procedure SetSkip(const value : Int64);
+    procedure SetTotalCount(const value : Int64);
+
+
+    property Skip : Int64 read GetSkip write SetSkip;
+    property TotalCount : Int64 read GetTotalCount write SetTotalCount;
+    property Results : IList<IPackageSearchResultItem> read GetResults;
+  end;
+
 
   TPackageIconKind = (ikSvg, ikPng);
 
@@ -230,6 +243,7 @@ type
     property Stream : TStream read GetStream write SetStream;
   end;
 
+  //note : only compares Id
 
   TPackageInfoComparer = class(TInterfacedObject, IEqualityComparer<IPackageInfo>)
   protected
@@ -237,6 +251,7 @@ type
     function GetHashCode(const Value : IPackageInfo) : Integer; reintroduce;
   end;
 
+  //note : only compares Id
   TPackageSearchResultItemComparer = class(TInterfacedObject, IEqualityComparer<IPackageSearchResultItem>)
   protected
     function Equals(const Left, Right : IPackageSearchResultItem) : Boolean; reintroduce;
