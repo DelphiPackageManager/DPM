@@ -641,7 +641,6 @@ end;
 function TPackageInstaller.DoCachePackage(const cancellationToken : ICancellationToken; const Options: TCacheOptions; const platform: TDPMPlatform): boolean;
 var
   packageIdentity: IPackageIdentity;
-  searchResult: IList<IPackageIdentity>;
   packageFileName: string;
 begin
   result := false;
@@ -651,8 +650,7 @@ begin
   else
   begin
     // no version specified, so we need to get the latest version available;
-    searchResult := FRepositoryManager.List(cancellationToken, Options);
-    packageIdentity := searchResult.FirstOrDefault;
+    packageIdentity := FRepositoryManager.Find(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform);
     if packageIdentity = nil then
     begin
       FLogger.Error('Package [' + Options.packageId + '] for platform [' + DPMPlatformToString(platform) + '] not found on any sources');
@@ -795,8 +793,8 @@ begin
   else
   begin
     // no version specified, so we need to get the latest version available;
-    searchResult := FRepositoryManager.List(cancellationToken, Options);
-    newPackageIdentity := searchResult.FirstOrDefault;
+    newPackageIdentity := FRepositoryManager.Find(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform);
+
     if newPackageIdentity = nil then
     begin
       FLogger.Error('Package [' + Options.packageId + '] for platform [' + DPMPlatformToString(platform) + '] not found on any sources');

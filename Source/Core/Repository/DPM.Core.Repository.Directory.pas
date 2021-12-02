@@ -63,6 +63,9 @@ type
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageMetadata : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
 
+    function Find(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform) : IPackageIdentity;
+
+
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo; overload;
@@ -78,7 +81,7 @@ type
 
     //commands
     function Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions): Boolean;
-    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>; overload;
+    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>; overload;
 
 
   public
@@ -103,7 +106,8 @@ uses
   DPM.Core.Utils.Strings,
   DPM.Core.Utils.Path,
   DPM.Core.Utils.Directory,
-  DPM.Core.Package.SearchResults;
+  DPM.Core.Package.SearchResults,
+  DPM.Core.Package.ListItem;
 
 { TDirectoryPackageRespository }
 
@@ -167,6 +171,11 @@ begin
 end;
 
 
+
+function TDirectoryPackageRepository.Find(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform): IPackageIdentity;
+begin
+
+end;
 
 function TDirectoryPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
 var
@@ -804,7 +813,7 @@ begin
   //result.AddRange(TEnumerable.Distinct<string>(fileList, TStringComparer.OrdinalIgnoreCase ));
 end;
 
-function TDirectoryPackageRepository.List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>;
+function TDirectoryPackageRepository.List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>;
 var
   searchTerms : TArray<string>;
   searchFiles : IList<string>;
@@ -812,7 +821,7 @@ var
   distinctFiles : IEnumerable<string>;
   i : integer;
   platform : TDPMPlatform;
-  info : IPackageIdentity;
+  info : IPackageListItem;
   searchRegEx : string;
   regex : TRegEx;
   packageFile : string;
@@ -822,7 +831,7 @@ var
   version : string;
   packageVersion : TPackageVersion;
 begin
-  result := TCollections.CreateList<IPackageIdentity>;
+  result := TCollections.CreateList<IPackageListItem>;
   if options.SearchTerms <> '' then
     searchTerms := TStringUtils.SplitStr(Trim(options.SearchTerms), ' ');
   //need at least 1 search term, if there are none then search for *.
@@ -836,6 +845,9 @@ begin
 
   for i := 0 to Length(searchTerms) - 1 do
   begin
+    if cancellationToken.IsCancelled then
+      exit;
+
     if options.Platforms = [] then
     begin
       if options.Exact then
@@ -848,6 +860,9 @@ begin
     begin
       for platform in options.Platforms do
       begin
+        if cancellationToken.IsCancelled then
+          exit;
+
         if options.Exact then
           searchFiles := DoExactList(searchTerms[i], options.CompilerVersion, platform, options.Version.ToStringNoMeta)
         else
@@ -865,7 +880,6 @@ begin
     distinctFiles := distinctFiles.Take(options.Take);
   searchFiles.Clear;
   searchFiles.AddRange(distinctFiles);
-
 
   //do we really need to do a regex check here?
   searchRegEx := GetSearchRegex(options.CompilerVersion, options.Platforms, options.Version.ToStringNoMeta);
@@ -888,8 +902,10 @@ begin
         if not packageVersion.IsStable then
           continue;
       //not using the trycreate here as we need a specific regex.
-      info := TPackageIdentity.Create(Name, id, packageVersion, cv, platform);
-      result.Add(info);
+//      info := TPackageIdentity.Create(Name, id, packageVersion, cv, platform);
+  //    result.Add(info);
+
+
     end;
   end;
 end;

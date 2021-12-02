@@ -70,6 +70,9 @@ type
     function GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IList<IPackageId>) : IList<IPackageSearchResultItem>;
 
 
+    function Find(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform) : IPackageIdentity;
+
+
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
@@ -82,7 +85,7 @@ type
 
     //commands
     function Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions) : Boolean;
-    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>;
+    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>;
 
   public
     constructor Create(const logger : ILogger; const repoFactory : IPackageRepositoryFactory);
@@ -138,6 +141,11 @@ begin
         exit;
     end;
   end;
+end;
+
+function TPackageRepositoryManager.Find(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform): IPackageIdentity;
+begin
+
 end;
 
 function TPackageRepositoryManager.GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IList<IPackageId>) : IList<IPackageSearchResultItem>;
@@ -524,21 +532,21 @@ begin
   result := UpdateRepositories;
 end;
 
-function TPackageRepositoryManager.List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageIdentity>;
+function TPackageRepositoryManager.List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>;
 var
   repo : IPackageRepository;
-  info, prevInfo : IPackageIdentity;
+  info, prevInfo : IPackageListItem;
 
-  searchResult : IList<IPackageIdentity>;
-  unfilteredResults : IList<IPackageIdentity>;
-  distinctResults : IEnumerable<IPackageIdentity>;
-  sortFunc : TComparison<IPackageIdentity>;
-  packages : IList<IPackageIdentity>;
+  searchResult : IList<IPackageListItem>;
+  unfilteredResults : IList<IPackageListItem>;
+  distinctResults : IEnumerable<IPackageListItem>;
+  sortFunc : TComparison<IPackageListItem>;
+  packages : IList<IPackageListItem>;
   sources : TStringList;
 begin
   Assert(FConfiguration <> nil);
 
-  result := TCollections.CreateList<IPackageIdentity>;
+  result := TCollections.CreateList<IPackageListItem>;
 
   if not UpdateRepositories then
   begin
@@ -555,9 +563,9 @@ begin
   else
     sources := nil;
 
-  unfilteredResults := TCollections.CreateList<IPackageIdentity>;
+  unfilteredResults := TCollections.CreateList<IPackageListItem>;
   //create the list here as if there are no repos it will be nil.
-  searchResult := TCollections.CreateList<IPackageIdentity>;
+  searchResult := TCollections.CreateList<IPackageListItem>;
 
   try
     for repo in FRepositories do
@@ -579,7 +587,7 @@ begin
   if cancellationToken.IsCancelled then
     exit;
 
-  sortFunc := function(const Left, Right : IPackageIdentity) : Integer
+  sortFunc := function(const Left, Right : IPackageListItem) : Integer
   begin
     result := CompareText(left.Id, right.Id);
     if result = 0 then
@@ -588,50 +596,50 @@ begin
       if result = 0 then
       begin
         result := Ord(left.CompilerVersion) - Ord(right.CompilerVersion);
-        if result = 0 then
-        begin
-          result := Ord(left.Platform) - Ord(right.Platform);
-        end;
+//        if result = 0 then
+//        begin
+//          result := Ord(left.Platform) - Ord(right.Platform);
+//        end;
       end;
     end;
   end;
 
   //what does this do? if we don't provide a comparer?
-  distinctResults := TDistinctIterator<IPackageIdentity>.Create(unfilteredResults, nil);
+  distinctResults := TDistinctIterator<IPackageListItem>.Create(unfilteredResults, nil);
   searchResult.Clear;
   searchResult.AddRange(distinctResults);
 
   //Sort by id, version, platform.
   searchResult.Sort(sortFunc);
 
-  packages := TCollections.CreateList<IPackageIdentity>;
+  packages := TCollections.CreateList<IPackageListItem>;
 
-  if not options.AllVersions then
-  begin
-    prevInfo := nil;
-    for info in searchResult do
-    begin
-      if cancellationToken.IsCancelled then
-        exit;
-
-      if (prevInfo = nil) or (info.id <> prevInfo.id) then
-      begin
-        prevInfo := info;
-        packages.Add(info);
-        continue;
-      end;
-      //if it's the same id, then compilerversion or platform must be different
-      if (info.id = prevInfo.id) then
-      begin
-        if (info.Version = prevInfo.Version) and ((info.CompilerVersion <> prevInfo.CompilerVersion) or (info.Platform <> prevInfo.Platform)) then
-        begin
-          prevInfo := info;
-          packages.Add(info);
-        end;
-      end;
-    end;
-  end
-  else
+//  if not options.AllVersions then
+//  begin
+//    prevInfo := nil;
+//    for info in searchResult do
+//    begin
+//      if cancellationToken.IsCancelled then
+//        exit;
+//
+//      if (prevInfo = nil) or (info.id <> prevInfo.id) then
+//      begin
+//        prevInfo := info;
+//        packages.Add(info);
+//        continue;
+//      end;
+//      //if it's the same id, then compilerversion or platform must be different
+//      if (info.id = prevInfo.id) then
+//      begin
+//        if (info.Version = prevInfo.Version) and ((info.CompilerVersion <> prevInfo.CompilerVersion)) {or (info.Platform <> prevInfo.Platform))} then
+//        begin
+//          prevInfo := info;
+//          packages.Add(info);
+//        end;
+//      end;
+//    end;
+//  end
+//  else
     packages.AddRange(searchResult);
 
     //skip and take are not working because of how we are rolling up the results.

@@ -175,7 +175,8 @@ uses
   DPM.Core.Package.Installer.Interfaces in 'Core\Package\DPM.Core.Package.Installer.Interfaces.pas',
   DPM.Console.Command.Info in 'Cmdline\Commands\DPM.Console.Command.Info.pas',
   DPM.Core.Options.Info in 'Core\Options\DPM.Core.Options.Info.pas',
-  DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas';
+  DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas',
+  DPM.Core.Package.ListItem in 'Core\Package\DPM.Core.Package.ListItem.pas';
 
 begin
   CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml

@@ -83,6 +83,7 @@ implementation
 function TSearchOptions.Clone : TSearchOptions;
 begin
   result := TSearchOptions.CreateClone(Self);
+  result.FUseSource := FUseSource;
 end;
 
 constructor TSearchOptions.Create;
@@ -109,6 +110,7 @@ begin
   FAllVersions := original.FAllVersions;
   FPrerelease := original.FPrerelease;
   FIncludeDelisted := original.FIncludeDelisted;
+  FUseSource := original.UseSource;
 end;
 
 end.

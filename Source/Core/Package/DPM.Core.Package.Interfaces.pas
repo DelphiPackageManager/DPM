@@ -243,6 +243,20 @@ type
     property Stream : TStream read GetStream write SetStream;
   end;
 
+  IPackageListItem = interface
+  ['{649F91AF-95F9-47A2-99A3-30BF68844E6B}']
+    function GetId : string;
+    function GetVersion : TPackageVersion;
+    function GetPlatforms : string;
+    function GetCompilerVersion : TCompilerVersion;
+
+    property Id : string read GetId;
+    property CompilerVersion : TCompilerVersion read GetCompilerVersion;
+    property Version : TPackageVersion read GetVersion;
+    property Platforms : string read GetPlatforms;
+  end;
+
+
   //note : only compares Id
 
   TPackageInfoComparer = class(TInterfacedObject, IEqualityComparer<IPackageInfo>)

@@ -73,7 +73,6 @@ uses
 function TInstallOptions.Clone : TInstallOptions;
 begin
   result := TInstallOptions.CreateClone(self);
-
 end;
 
 constructor TInstallOptions.Create;
