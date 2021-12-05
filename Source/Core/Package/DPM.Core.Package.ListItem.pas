@@ -20,6 +20,12 @@ type
     function GetId: string;
     function GetPlatforms: string;
     function GetVersion: TPackageVersion;
+
+    procedure SetPlatforms(const value : string);
+    function IsSamePackageVersion(const item : IPackageListItem) : Boolean;
+    function IsSamePackageId(const item : IPackageListItem) : boolean;
+    function MergeWith(const item : IPackageListItem) : IPackageListItem;
+
   public
     constructor Create(const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platforms : string);overload;
     constructor Create(const jsonObj : TJsonObject);overload;
@@ -29,7 +35,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  System.Classes;
 
 { TPackageListItem }
 
@@ -79,6 +86,39 @@ end;
 function TPackageListItem.GetVersion: TPackageVersion;
 begin
   result := FVersion;
+end;
+
+function TPackageListItem.IsSamePackageId(const item: IPackageListItem): boolean;
+begin
+  result := (FCompilerVersion = item.CompilerVersion) and (FId = item.Id);
+end;
+
+function TPackageListItem.IsSamePackageVersion(const item: IPackageListItem): Boolean;
+begin
+  result := (FCompilerVersion = item.CompilerVersion) and (FId = item.Id) and (FVersion = item.Version);
+end;
+
+function TPackageListItem.MergeWith(const item: IPackageListItem): IPackageListItem;
+var
+  sPlatforms : string;
+  sList : TStringList;
+begin
+  Assert(IsSamePackageVersion(item));
+  sList := TStringList.Create(TDuplicates.dupIgnore,true, false);
+  try
+    sList.Delimiter := ',';
+    sList.DelimitedText := FPlatforms + ',' + item.Platforms;
+    result := TPackageListItem.Create(FId, FCompilerVersion, FVersion, sList.DelimitedText);
+  finally
+    sList.Free;
+  end;
+
+
+end;
+
+procedure TPackageListItem.SetPlatforms(const value: string);
+begin
+  FPlatforms := value;
 end;
 
 class function TPackageListItem.TryLoadFromJson(const logger: ILogger; const jsonObj: TJsonObject; out listItem : IPackageListItem): boolean;

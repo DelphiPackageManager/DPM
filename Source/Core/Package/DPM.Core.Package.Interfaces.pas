@@ -249,11 +249,15 @@ type
     function GetVersion : TPackageVersion;
     function GetPlatforms : string;
     function GetCompilerVersion : TCompilerVersion;
+    procedure SetPlatforms(const value : string);
+    function IsSamePackageVersion(const item : IPackageListItem) : Boolean;
+    function IsSamePackageId(const item : IPackageListItem) : boolean;
+    function MergeWith(const item : IPackageListItem) : IPackageListItem;
 
     property Id : string read GetId;
     property CompilerVersion : TCompilerVersion read GetCompilerVersion;
     property Version : TPackageVersion read GetVersion;
-    property Platforms : string read GetPlatforms;
+    property Platforms : string read GetPlatforms write SetPlatforms;
   end;
 
 
@@ -271,6 +275,14 @@ type
     function Equals(const Left, Right : IPackageSearchResultItem) : Boolean; reintroduce;
     function GetHashCode(const Value : IPackageSearchResultItem) : Integer; reintroduce;
   end;
+
+  TPackageListItemEqualityComparer = class(TInterfacedObject, IEqualityComparer<IPackageListItem>)
+  protected
+    function Equals(const Left, Right : IPackageListItem) : Boolean; reintroduce;
+    function GetHashCode(const Value : IPackageListItem) : Integer; reintroduce;
+  end;
+
+
 
 implementation
 
@@ -324,6 +336,29 @@ begin
   Result := BobJenkinsHash(PChar(s)^, SizeOf(Char) * Length(s), 0);
   {$IFEND}
 
+end;
+
+{ TPackageListItemComparer }
+
+
+{ TPackageListItemComparer }
+
+
+function TPackageListItemEqualityComparer.Equals(const Left, Right: IPackageListItem): Boolean;
+begin
+  result := (Left.Id = Right.Id) and (left.CompilerVersion = right.CompilerVersion) and (left.Version = right.Version);// and (left.Platforms = right.Platforms);
+end;
+
+function TPackageListItemEqualityComparer.GetHashCode(const Value: IPackageListItem): Integer;
+var
+  s : string;
+begin
+  s := Value.Id + CompilerToString(value.CompilerVersion) + Value.Version.ToStringNoMeta + Value.Platforms;
+  {$IF CompilerVersion >= 29.0}
+  Result := System.Hash.THashBobJenkins.GetHashValue(s);
+  {$ELSE}
+  Result := BobJenkinsHash(PChar(s)^, SizeOf(Char) * Length(s), 0);
+  {$IFEND}
 end;
 
 end.

@@ -743,6 +743,13 @@ begin
   if options.Platforms  <> [] then
     request.WithParameter('platforms',  DPMPlatformsToString(options.Platforms));
 
+  if options.Skip <> 0 then
+    request.WithParameter('skip', IntToStr(options.Skip));
+
+  if options.Take <> 0 then
+    request.WithParameter('take', IntToStr(options.Take));
+
+
   try
     response := request.Get(cancellationToken);
   except

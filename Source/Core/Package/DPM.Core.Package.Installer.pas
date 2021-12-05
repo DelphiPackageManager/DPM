@@ -731,7 +731,6 @@ function TPackageInstaller.DoInstallPackage(const cancellationToken : ICancellat
                                             const context: IPackageInstallerContext): boolean;
 var
   newPackageIdentity: IPackageIdentity;
-  searchResult: IList<IPackageIdentity>;
   packageFileName: string;
   packageInfo: IPackageInfo; // includes dependencies;
   existingPackageRef: IGraphNode;

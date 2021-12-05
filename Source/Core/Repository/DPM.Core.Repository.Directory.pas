@@ -326,7 +326,7 @@ begin
     allFiles.AddRange(DoGetPackageFeedFiles(searchTerms[i], compilerVersion, platform));
   end;
 
-  distinctFiles := TDistinctIterator < string > .Create(allFiles, TStringComparer.OrdinalIgnoreCase);
+  distinctFiles := TDistinctIterator<string>.Create(allFiles, TStringComparer.OrdinalIgnoreCase);
   if options.Skip > 0 then
     distinctFiles := distinctFiles.Skip(options.Skip);
   if options.Take > 0 then
@@ -818,10 +818,8 @@ var
   searchTerms : TArray<string>;
   searchFiles : IList<string>;
   allFiles : IList<string>;
-  distinctFiles : IEnumerable<string>;
   i : integer;
   platform : TDPMPlatform;
-  info : IPackageListItem;
   searchRegEx : string;
   regex : TRegEx;
   packageFile : string;
@@ -830,6 +828,20 @@ var
   cv : TCompilerVersion;
   version : string;
   packageVersion : TPackageVersion;
+
+  currentCompiler : TCompilerVersion;
+  currentId : string;
+  currentVersion : TPackageVersion;
+  platforms : TDPMPlatforms;
+  newItem : IPackageListItem;
+  bIsLast : boolean;
+
+  procedure AddCurrent;
+  begin
+    newItem := TPackageListItem.Create(currentId,currentCompiler, currentVersion, DPMPlatformsToString(platforms));
+    result.Add(newItem);
+  end;
+
 begin
   result := TCollections.CreateList<IPackageListItem>;
   if options.SearchTerms <> '' then
@@ -872,23 +884,24 @@ begin
     end;
   end;
 
-  //dedupe
-  distinctFiles := TDistinctIterator<string>.Create(allFiles, TStringComparer.OrdinalIgnoreCase);
-  if options.Skip > 0 then
-    distinctFiles := distinctFiles.Skip(options.Skip);
-  if options.Take > 0 then
-    distinctFiles := distinctFiles.Take(options.Take);
-  searchFiles.Clear;
-  searchFiles.AddRange(distinctFiles);
+  //remove the path from the files
+  for i := 0 to allFiles.Count -1 do
+    allFiles[i] := ChangeFileExt(ExtractFileName(allFiles[i]), '');
+
+  allFiles.Sort;
 
   //do we really need to do a regex check here?
   searchRegEx := GetSearchRegex(options.CompilerVersion, options.Platforms, options.Version.ToStringNoMeta);
   regex := TRegEx.Create(searchRegEx, [roIgnoreCase]);
-  for i := 0 to searchFiles.Count - 1 do
+  currentId := '';
+  currentVersion := TPackageVersion.Empty;
+  currentCompiler := TCompilerVersion.UnknownVersion;
+  platforms := [];
+  for i := 0 to allFiles.Count - 1 do
   begin
+    bIsLast := i = allFiles.Count -1;
     //ensure that the files returned are actually packages
-
-    packageFile := ChangeFileExt(ExtractFileName(searchFiles[i]), '');
+    packageFile := allFiles[i];
     match := regex.Match(packageFile);
     if match.Success then
     begin
@@ -896,11 +909,58 @@ begin
       cv := StringToCompilerVersion(match.Groups[2].Value);
       platform := StringToDPMPlatform(match.Groups[3].Value);
       version := match.Groups[4].Value;
+
       if not TPackageVersion.TryParse(version, packageVersion) then
         continue;
+
       if not options.Prerelease then
         if not packageVersion.IsStable then
           continue;
+      //if the id, compiler or version change then start a new listitem - same if it's the last entry in the list.
+      if (id <> currentId) or (cv <> currentCompiler) or (packageVersion <> currentVersion) or bIsLast then
+      begin
+        //higher version, start again
+        if (id = currentId) and (cv = currentCompiler) and (packageVersion <> currentVersion) then
+        begin
+          //lower version, just ignore it.
+          if packageVersion < currentVersion then
+          begin
+            if bIsLast then
+              AddCurrent;
+            continue;
+          end;
+
+          //higher version, start again.
+          currentId := id;
+          currentCompiler := cv;
+          currentVersion := packageVersion;
+          platforms := [platform];
+          if bIsLast then
+            AddCurrent;
+          continue;
+        end;
+        // a new package, so record the last one if we had one.
+        if (currentId <> '') and (currentCompiler <> TCompilerVersion.UnknownVersion) then
+        begin
+          if bIsLast then
+             Include(platforms, platform);
+          AddCurrent;
+        end;
+
+        currentId := id;
+        currentCompiler := cv;
+        currentVersion := packageVersion;
+        platforms := [platform];
+      end
+      else
+      begin
+        Include(platforms, platform);
+        if bIsLast then
+         AddCurrent;
+      end;
+
+
+
       //not using the trycreate here as we need a specific regex.
 //      info := TPackageIdentity.Create(Name, id, packageVersion, cv, platform);
   //    result.Add(info);

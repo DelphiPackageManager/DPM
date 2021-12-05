@@ -535,7 +535,6 @@ end;
 function TPackageRepositoryManager.List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>;
 var
   repo : IPackageRepository;
-  info, prevInfo : IPackageListItem;
 
   searchResult : IList<IPackageListItem>;
   unfilteredResults : IList<IPackageListItem>;
@@ -543,6 +542,12 @@ var
   sortFunc : TComparison<IPackageListItem>;
   packages : IList<IPackageListItem>;
   sources : TStringList;
+  item, currentItem : IPackageListItem;
+  i : integer;
+
+  currentCompiler : TCompilerVersion;
+  currentId : string;
+  currentVersion : TPackageVersion;
 begin
   Assert(FConfiguration <> nil);
 
@@ -592,55 +597,55 @@ begin
     result := CompareText(left.Id, right.Id);
     if result = 0 then
     begin
-      result := right.Version.CompareTo(left.Version);
+      result := Ord(left.CompilerVersion) - Ord(right.CompilerVersion);
       if result = 0 then
       begin
-        result := Ord(left.CompilerVersion) - Ord(right.CompilerVersion);
-//        if result = 0 then
-//        begin
-//          result := Ord(left.Platform) - Ord(right.Platform);
-//        end;
+        result := right.Version.CompareTo(left.Version);
+        if result = 0 then
+          result := CompareText(left.Platforms, right.Platforms);
       end;
     end;
   end;
 
-  //what does this do? if we don't provide a comparer?
-  distinctResults := TDistinctIterator<IPackageListItem>.Create(unfilteredResults, nil);
+  unfilteredResults.Sort(sortFunc);
   searchResult.Clear;
-  searchResult.AddRange(distinctResults);
+
+  //we need to dedupe here.
+  currentItem := nil;
+  for i := 0 to unfilteredResults.Count -1  do
+  begin
+    item := unfilteredResults[i];
+    if (currentItem <> nil) then
+    begin
+      if currentItem.IsSamePackageVersion(item) then
+        currentItem := currentItem.MergeWith(item)
+      else if currentItem.IsSamePackageId(item) then
+      begin
+        //not the same version but same compiler/packageid, so take highest version
+        if item.Version > currentItem.Version then
+          currentItem := item;
+      end
+      else
+      begin //different package or compiler verison.
+        searchResult.Add(currentItem);
+        currentItem := item;
+      end;
+    end
+    else
+      currentItem := item;
+  end;
+  searchResult.Add(currentItem);
+
+
+
+//  //what does this do? if we don't provide a comparer?
+//  distinctResults := TEnumerable.Distinct<IPackageListItem>(unfilteredResults, TPackageListItemEqualityComparer.Create );
+//
+//  searchResult.AddRange(distinctResults);
 
   //Sort by id, version, platform.
   searchResult.Sort(sortFunc);
 
-  packages := TCollections.CreateList<IPackageListItem>;
-
-//  if not options.AllVersions then
-//  begin
-//    prevInfo := nil;
-//    for info in searchResult do
-//    begin
-//      if cancellationToken.IsCancelled then
-//        exit;
-//
-//      if (prevInfo = nil) or (info.id <> prevInfo.id) then
-//      begin
-//        prevInfo := info;
-//        packages.Add(info);
-//        continue;
-//      end;
-//      //if it's the same id, then compilerversion or platform must be different
-//      if (info.id = prevInfo.id) then
-//      begin
-//        if (info.Version = prevInfo.Version) and ((info.CompilerVersion <> prevInfo.CompilerVersion)) {or (info.Platform <> prevInfo.Platform))} then
-//        begin
-//          prevInfo := info;
-//          packages.Add(info);
-//        end;
-//      end;
-//    end;
-//  end
-//  else
-    packages.AddRange(searchResult);
 
     //skip and take are not working because of how we are rolling up the results.
 //  if (options.Skip > 0) or (options.Take > 0) then
@@ -654,7 +659,7 @@ begin
 //    result.AddRange(distinctResults);
 //  end
 //  else
-    result.AddRange(packages);
+    result.AddRange(searchResult);
 end;
 
 function TPackageRepositoryManager.Push(const cancellationToken: ICancellationToken; const pushOptions: TPushOptions): Boolean;

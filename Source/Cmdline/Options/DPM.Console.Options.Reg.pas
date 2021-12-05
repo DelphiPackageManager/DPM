@@ -280,13 +280,6 @@ begin
     end);
   option.AllowMultiple := true;
 
-  option := cmd.RegisterOption<boolean>('allVersions','a','List all versions of a package. By default, only the latest package version is displayed.',
-    procedure(const value : boolean)
-    begin
-      TListOptions.Default.AllVersions := value;
-    end);
-  option.HasValue := false;
-
   option := cmd.RegisterOption<boolean>('exact','e','Search for exact package id match.',
     procedure(const value : boolean)
     begin

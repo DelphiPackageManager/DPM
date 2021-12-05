@@ -42,7 +42,6 @@ type
     FCompilerVersion : TCompilerVersion;
     FPlatforms : TDPMPlatforms;
     FVersion : TPackageVersion;
-    FAllVersions : boolean;
     FPrerelease : boolean;
     FCommercial : boolean;
     FTrial : boolean;
@@ -56,7 +55,6 @@ type
   public
     constructor Create; override;
     function Clone : TSearchOptions; virtual;
-    property AllVersions : boolean read FAllVersions write FAllVersions;
     property Prerelease : boolean read FPrerelease write FPrerelease;
     property Commercial : boolean read FCommercial write FCommercial;
     property Trial : boolean read FTrial write FTrial;
@@ -107,7 +105,6 @@ begin
   FCompilerVersion := original.FCompilerVersion;
   FPlatforms := original.FPlatforms;
   FVersion := original.FVersion;
-  FAllVersions := original.FAllVersions;
   FPrerelease := original.FPrerelease;
   FIncludeDelisted := original.FIncludeDelisted;
   FUseSource := original.UseSource;
