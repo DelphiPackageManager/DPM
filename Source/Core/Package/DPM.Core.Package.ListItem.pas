@@ -100,7 +100,6 @@ end;
 
 function TPackageListItem.MergeWith(const item: IPackageListItem): IPackageListItem;
 var
-  sPlatforms : string;
   sList : TStringList;
 begin
   Assert(IsSamePackageVersion(item));
@@ -112,8 +111,6 @@ begin
   finally
     sList.Free;
   end;
-
-
 end;
 
 procedure TPackageListItem.SetPlatforms(const value: string);

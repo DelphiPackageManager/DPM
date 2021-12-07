@@ -292,6 +292,7 @@ begin
   FDependencies := TCollections.CreateList<IPackageDependency>;
   if jsonObj.Contains('dependencies') then
   begin
+
     depArr := jsonObj.A['dependencies'];
     for i := 0 to depArr.Count -1 do
     begin

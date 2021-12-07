@@ -411,7 +411,7 @@ begin
       result := '['
     else
       result := '(';
-    result := result + FMinVersion.ToString + ', ' + FMaxVersion.ToString;
+    result := result + FMinVersion.ToString + ',' + FMaxVersion.ToString;
     if FMaxVersionIsInclusive then
       result := result + ']'
     else

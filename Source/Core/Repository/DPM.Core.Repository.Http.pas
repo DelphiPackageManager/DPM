@@ -53,7 +53,7 @@ type
 
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : Boolean;
-    function Find(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform) : IPackageIdentity;
+    function Find(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform; const includePrerelease : boolean) : IPackageIdentity;
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
     function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const preRelease : boolean) : IList<TPackageVersion>;
@@ -90,6 +90,23 @@ uses
   DPM.Core.Sources.ServiceIndex,
   DPM.Core.Package.ListItem;
 
+function GetBaseUri(const uri : IUri) : string;
+begin
+  result := uri.Scheme + '://' + uri.Host;
+  if uri.Scheme = 'http' then
+  begin
+    if uri.Port <> 80 then
+       result := result + ':' + IntToStr(uri.Port);
+  end
+  else if uri.Scheme = 'https' then
+  begin
+    if uri.Port <> 443 then
+       result := result + ':' + IntToStr(uri.Port);
+  end;
+
+end;
+
+
 { TDPMServerPackageRepository }
 
 constructor TDPMServerPackageRepository.Create(const logger : ILogger);
@@ -123,7 +140,7 @@ begin
 
   httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
 
-  request := httpClient.CreateRequest(path);;
+  request := httpClient.CreateRequest(path);
 
   destFile := IncludeTrailingPathDelimiter(localFolder) + packageIdentity.ToString + cPackageFileExt;
 
@@ -153,8 +170,80 @@ begin
 end;
 
 
-function TDPMServerPackageRepository.Find(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform): IPackageIdentity;
+function TDPMServerPackageRepository.Find(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean): IPackageIdentity;
+var
+  httpClient : IHttpClient;
+  request : TRequest;
+  response : IHttpResponse;
+  serviceIndex : IServiceIndex;
+  serviceItem : IServiceIndexItem;
+  jsonObj : TJsonObject;
 begin
+  result := nil;
+  serviceIndex := GetServiceIndex(cancellationToken);
+  if serviceIndex = nil then
+    exit;
+
+  serviceItem := serviceIndex.FindItem('PackageFind');
+  if serviceItem = nil then
+  begin
+    Logger.Error('Unabled to determine PackageDownload resource from Service Index');
+    exit;
+  end;
+  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+
+  request := httpClient.CreateRequest('')
+            .WithAccept('application/json')
+            .WithParameter('id', id)
+            .WithParameter('compiler', CompilerToString(compilerVersion))
+            .WithParameter('platform', DPMPlatformToString(platform));
+
+  if not version.IsEmpty then
+    request.WithParameter('version', version.ToStringNoMeta)
+  else if includePrerelease then
+       request.WithParameter('prerel', LowerCase(BoolToStr(includePrerelease, true)));
+
+  try
+    response := request.Get(cancellationToken);
+  except
+    on ex : Exception do
+    begin
+      Logger.Error('Error finding package identity from server : ' + ex.Message);
+      exit;
+    end;
+  end;
+
+  //if the package or package version is not on the server this is fine
+  if response.StatusCode = 404 then
+    exit;
+
+  if response.StatusCode <> 200 then
+  begin
+    Logger.Error('Error fetching list from server : ' + response.ErrorMessage);
+    exit;
+  end;
+
+  if response.ContentLength = 0 then
+  begin
+    Logger.Verbose('Server returned no content');
+    exit;
+  end;
+
+  try
+    jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+  except
+    on e : Exception do
+    begin
+      Logger.Error('Error parsing json response from server : ' + e.Message);
+      exit;
+    end;
+  end;
+  try
+    TPackageIdentity.TryLoadFromJson(Logger, jsonObj, Self.Name, Result);
+  finally
+    jsonObj.Free;
+  end;
+
 
 end;
 
@@ -165,22 +254,12 @@ var
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
-  path : string;
   jsonObj : TJsonObject;
   jsonArr : TJsonArray;
   itemObj : TJsonObject;
   i: Integer;
 
   resultItem : IPackageSearchResultItem;
-
-  procedure AddToPath(const value : string);
-  begin
-    if path = '' then
-      path := '?' + value
-    else
-      path := path + '&' + value;
-  end;
-
 begin
   Result := TDPMPackageSearchResult.Create(options.Skip, 0);
   serviceIndex := GetServiceIndex(cancelToken);
@@ -194,21 +273,22 @@ begin
     exit;
   end;
 
-  if options.SearchTerms <> '' then
-    AddToPath('q=' + Trim(options.SearchTerms));
-
-  AddToPath('compiler=' + CompilerToString(compilerVersion));
-  AddToPath('platform=' + DPMPlatformToString(platform));
-
-  if options.Skip <> 0 then
-    AddToPath('skip=' + IntToStr(options.Skip));
-
-  if options.Take <> 0 then
-    AddToPath('take=' + IntToStr(options.Take));
-
   httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
 
-  request := httpClient.CreateRequest(path);
+  request := httpClient.CreateRequest('')
+    .WithAccept('application/json');
+
+  if options.SearchTerms <> '' then
+    request.WithParameter('q', Trim(options.SearchTerms));
+
+  request.WithParameter('compiler', CompilerToString(compilerVersion));
+  request.WithParameter('platform', DPMPlatformToString(platform));
+
+  if options.Skip <> 0 then
+    request.WithParameter('skip', IntToStr(options.Skip));
+
+  if options.Take <> 0 then
+    request.WithParameter('take', IntToStr(options.Take));
 
   try
     response := request.Get(cancelToken);
@@ -228,7 +308,7 @@ begin
 
   if response.ContentLength = 0 then
   begin
-    Logger.Verbose('Server returned no content for icon');
+    Logger.Verbose('Server returned no content');
     exit;
   end;
 
@@ -242,22 +322,23 @@ begin
     end;
   end;
 
-  Result.TotalCount := jsonObj.I['totalHits'];
+  try
+    Result.TotalCount := jsonObj.I['totalHits'];
 
-  if jsonObj.Contains('results') then
-  begin
-    jsonArr := jsonObj.A['results'];
-    for i := 0 to jsonArr.Count -1 do
+    if jsonObj.Contains('results') then
     begin
-      itemObj := jsonArr.O[i];
-      resultItem := TDPMPackageSearchResultItem.FromJson(Name, itemObj);
-      Result.Results.Add(resultItem);
+      jsonArr := jsonObj.A['results'];
+      for i := 0 to jsonArr.Count -1 do
+      begin
+        itemObj := jsonArr.O[i];
+        resultItem := TDPMPackageSearchResultItem.FromJson(Name, itemObj);
+        Result.Results.Add(resultItem);
+      end;
+
     end;
-
+  finally
+    jsonObj.Free;
   end;
-
-
-
 
 end;
 
@@ -554,6 +635,8 @@ var
   versionObj : TJsonObject;
   i: Integer;
   packageInfo : IPackageInfo;
+  uri : IUri;
+
 begin
   result := TCollections.CreateList<IPackageInfo>;
 
@@ -567,12 +650,19 @@ begin
     Logger.Error('Unabled to determine PackageVersionsWithDeps resource from Service Index');
     exit;
   end;
-  path := Format('/%s/%s/%s/%s/versionswithdependencies?includePrerelease=', [id, CompilerToString(compilerVersion), DPMPlatformToString(platform), versionRange.ToString, Lowercase(BoolToStr(preRelease, true))]);
+  uri := TUriFactory.Parse(serviceItem.ResourceUrl);
+
+  path := Format('%s/%s/%s/%s/versionswithdependencies', [uri.AbsolutePath, id, CompilerToString(compilerVersion), DPMPlatformToString(platform)]);
 
 
-  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+
+  httpClient := THttpClientFactory.CreateClient(GetBaseUri(uri));
 
   request := httpClient.CreateRequest(path);
+  request.WithAccept('application/json')
+          //parameters can't have spaces.. winhttp will report invalid header!
+         .WithParameter('versionRange', StringReplace(versionRange.ToString, ' ', '', [rfReplaceAll]))
+         .WithParameter('prerel', Lowercase(BoolToStr(preRelease, true)));
 
   try
     response := request.Get(cancellationToken);
@@ -620,21 +710,6 @@ begin
     end));
 end;
 
-function GetBaseUri(const uri : IUri) : string;
-begin
-  result := uri.Scheme + '://' + uri.Host;
-  if uri.Scheme = 'http' then
-  begin
-    if uri.Port <> 80 then
-       result := result + ':' + IntToStr(uri.Port);
-  end
-  else if uri.Scheme = 'https' then
-  begin
-    if uri.Port <> 443 then
-       result := result + ':' + IntToStr(uri.Port);
-  end;
-
-end;
 
 
 function TDPMServerPackageRepository.GetServiceIndex(const cancellationToken: ICancellationToken): IServiceIndex;
@@ -799,6 +874,7 @@ var
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
+  uri : IUri;
 begin
   result := false;
   if pushOptions.ApiKey = '' then
@@ -829,8 +905,11 @@ begin
     exit;
   end;
 
-  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
-  request := httpClient.CreateRequest('');
+  uri := TUriFactory.Parse(serviceItem.ResourceUrl);
+
+  //todo: Add BaseUri to Uri class
+  httpClient := THttpClientFactory.CreateClient(GetBaseUri(uri));
+  request := httpClient.CreateRequest(uri.AbsolutePath);
 
   request.WithHeader('X-ApiKey', pushOptions.ApiKey);
 

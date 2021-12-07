@@ -116,7 +116,11 @@ var
   jsonObj : TJsonObject;
 begin
   jsonObj := TJsonObject.Parse(jsonString) as TJsonObject;
-  result := LoadFromJson(jsonObj);
+  try
+    result := LoadFromJson(jsonObj);
+  finally
+    jsonObj.Free;
+  end;
 end;
 
 end.

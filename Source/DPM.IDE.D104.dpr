@@ -178,7 +178,8 @@ uses
   DPM.IDE.Details.Interfaces in 'IDE\EditorView\DPM.IDE.Details.Interfaces.pas',
   DPM.IDE.GroupEditorViewFrame in 'IDE\EditorView\DPM.IDE.GroupEditorViewFrame.pas' {DPMGroupEditViewFrame: TFrame},
   DPM.IDE.GroupPackageDetailsFrame in 'IDE\EditorView\DPM.IDE.GroupPackageDetailsFrame.pas' {GroupPackageDetailsFrame: TFrame},
-  DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas';
+  DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas',
+  DPM.Core.Package.ListItem in 'Core\Package\DPM.Core.Package.ListItem.pas';
 
 {$R *.res}
 

@@ -63,7 +63,7 @@ type
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageMetadata : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
 
-    function Find(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform) : IPackageIdentity;
+    function Find(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform; const includePrerelease : boolean) : IPackageIdentity;
 
 
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
@@ -172,8 +172,60 @@ end;
 
 
 
-function TDirectoryPackageRepository.Find(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform): IPackageIdentity;
+function TDirectoryPackageRepository.Find(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean): IPackageIdentity;
+var
+  searchFiles : IList<string>;
+  regex : TRegEx;
+  searchRegex : string;
+  packageFile : string;
+  match : TMatch;
+  i : integer;
+  maxVersion : TPackageVersion;
+  packageVersion : TPackageVersion;
+  maxVersionFile : string;
 begin
+  result := nil;
+  if version.IsEmpty then
+    searchFiles := DoExactList(id, compilerVersion, platform, '')
+  else
+    searchFiles := DoExactList(id, compilerVersion, platform, version.ToStringNoMeta);
+
+  searchRegEx := GetSearchRegex(compilerVersion, [], '');
+  regex := TRegEx.Create(searchRegEx, [roIgnoreCase]);
+  maxVersion := TPackageVersion.Empty;
+  for i := 0 to searchFiles.Count - 1 do
+  begin
+    packageFile := searchFiles[i];
+    //ensure that the files returned are actually packages
+    packageFile := ChangeFileExt(ExtractFileName(packageFile), '');
+    match := regex.Match(packageFile);
+    if match.Success then
+    begin
+      if not TPackageVersion.TryParse(match.Groups[4].Value, packageVersion) then
+        continue;
+
+      if (not includePrerelease) and (not packageVersion.IsStable)  then
+        continue;
+      //if we wanted a specific version, then we have found it.
+      if not version.IsEmpty then
+      begin
+        maxVersionFile := packageFile;
+        maxVersion := version;
+        Break;
+      end;
+
+
+      if packageVersion > maxVersion then
+      begin
+        maxVersion := packageVersion;
+        maxVersionFile := packageFile;
+      end;
+    end;
+  end;
+
+  if maxVersion.IsEmpty then
+    exit;
+  result := TPackageIdentity.Create(Self.Name, id, maxVersion, compilerVersion, platform);
 
 end;
 
@@ -958,14 +1010,6 @@ begin
         if bIsLast then
          AddCurrent;
       end;
-
-
-
-      //not using the trycreate here as we need a specific regex.
-//      info := TPackageIdentity.Create(Name, id, packageVersion, cv, platform);
-  //    result.Add(info);
-
-
     end;
   end;
 end;

@@ -650,7 +650,7 @@ begin
   else
   begin
     // no version specified, so we need to get the latest version available;
-    packageIdentity := FRepositoryManager.Find(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform);
+    packageIdentity := FRepositoryManager.Find(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform, Options.PreRelease, options.Sources);
     if packageIdentity = nil then
     begin
       FLogger.Error('Package [' + Options.packageId + '] for platform [' + DPMPlatformToString(platform) + '] not found on any sources');
@@ -792,7 +792,7 @@ begin
   else
   begin
     // no version specified, so we need to get the latest version available;
-    newPackageIdentity := FRepositoryManager.Find(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform);
+    newPackageIdentity := FRepositoryManager.Find(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform, Options.PreRelease, options.Sources);
 
     if newPackageIdentity = nil then
     begin

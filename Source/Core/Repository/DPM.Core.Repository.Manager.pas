@@ -70,7 +70,7 @@ type
     function GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IList<IPackageId>) : IList<IPackageSearchResultItem>;
 
 
-    function Find(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform) : IPackageIdentity;
+    function Find(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform; const includePrerelease : boolean; const sources : string) : IPackageIdentity;
 
 
 
@@ -143,8 +143,70 @@ begin
   end;
 end;
 
-function TPackageRepositoryManager.Find(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform): IPackageIdentity;
+function TPackageRepositoryManager.Find(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean; const sources : string): IPackageIdentity;
+var
+  repo : IPackageRepository;
+  sourcesList : TStringList;
+//  i : integer;
+  packages : IList<IPackageIdentity>;
+  package : IPackageIdentity;
+  currentPackage : IPackageIdentity;
+
 begin
+  Assert(FConfiguration <> nil);
+
+  if not UpdateRepositories then
+  begin
+    FLogger.Error('Unabled to search, error loading repositories');
+    exit;
+  end;
+
+  if sources <> '' then
+  begin
+    sourcesList := TStringList.Create;
+    sourcesList.Delimiter := ',';
+    sourcesList.DelimitedText := sources;
+  end
+  else
+    sourcesList := nil;
+
+  packages := TCollections.CreateList<IPackageIdentity>;
+  try
+    for repo in FRepositories do
+    begin
+      if cancellationToken.IsCancelled then
+        exit;
+      if sourcesList <> nil then
+      begin
+        if sourcesList.IndexOf(repo.Name) = -1 then
+          continue;
+      end;
+      package := repo.Find(cancellationToken, id, compilerVersion, version, platform, includePrerelease);
+      if cancellationToken.IsCancelled then
+        exit;
+
+      if package <> nil then
+      begin
+        //if version is empty then we want the latest version - so that's what we have, we're done.
+        if version.IsEmpty then
+          exit(package);
+        if currentPackage <> nil then
+        begin
+          if package.Version > currentPackage.Version then
+            currentPackage := package;
+        end
+        else
+          currentPackage := package;
+      end;
+
+      result := currentPackage;
+    end;
+  finally
+    if sourcesList <> nil then
+      sourcesList.Free;
+  end;
+
+
 
 end;
 
@@ -538,16 +600,10 @@ var
 
   searchResult : IList<IPackageListItem>;
   unfilteredResults : IList<IPackageListItem>;
-  distinctResults : IEnumerable<IPackageListItem>;
   sortFunc : TComparison<IPackageListItem>;
-  packages : IList<IPackageListItem>;
   sources : TStringList;
   item, currentItem : IPackageListItem;
   i : integer;
-
-  currentCompiler : TCompilerVersion;
-  currentId : string;
-  currentVersion : TPackageVersion;
 begin
   Assert(FConfiguration <> nil);
 

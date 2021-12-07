@@ -125,7 +125,8 @@ uses
   DPM.Core.Utils.Files in 'Core\Utils\DPM.Core.Utils.Files.pas',
   DPM.Core.Tests.PathUtils in 'Tests\DPM.Core.Tests.PathUtils.pas',
   DPM.Core.Package.Installer.Interfaces in 'Core\Package\DPM.Core.Package.Installer.Interfaces.pas',
-  DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas';
+  DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas',
+  DPM.Core.Package.ListItem in 'Core\Package\DPM.Core.Package.ListItem.pas';
 
 var
   runner : ITestRunner;
