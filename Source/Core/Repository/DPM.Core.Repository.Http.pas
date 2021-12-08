@@ -291,6 +291,10 @@ begin
   request.WithParameter('compiler', CompilerToString(compilerVersion));
   request.WithParameter('platform', DPMPlatformToString(platform));
 
+  if options.Prerelease then
+    request.WithParameter('prerel', 'true');
+
+
   if options.Skip <> 0 then
     request.WithParameter('skip', IntToStr(options.Skip));
 
