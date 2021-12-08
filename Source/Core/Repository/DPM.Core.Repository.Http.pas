@@ -90,21 +90,21 @@ uses
   DPM.Core.Sources.ServiceIndex,
   DPM.Core.Package.ListItem;
 
-function GetBaseUri(const uri : IUri) : string;
-begin
-  result := uri.Scheme + '://' + uri.Host;
-  if uri.Scheme = 'http' then
-  begin
-    if uri.Port <> 80 then
-       result := result + ':' + IntToStr(uri.Port);
-  end
-  else if uri.Scheme = 'https' then
-  begin
-    if uri.Port <> 443 then
-       result := result + ':' + IntToStr(uri.Port);
-  end;
-
-end;
+//function GetBaseUri(const uri : IUri) : string;
+//begin
+//  result := uri.Scheme + '://' + uri.Host;
+//  if uri.Scheme = 'http' then
+//  begin
+//    if uri.Port <> 80 then
+//       result := result + ':' + IntToStr(uri.Port);
+//  end
+//  else if uri.Scheme = 'https' then
+//  begin
+//    if uri.Port <> 443 then
+//       result := result + ':' + IntToStr(uri.Port);
+//  end;
+//
+//end;
 
 
 { TDPMServerPackageRepository }
@@ -124,6 +124,7 @@ var
   serviceItem : IServiceIndexItem;
   path : string;
   destFile : string;
+  uri : IUri;
 begin
   result := false;
   serviceIndex := GetServiceIndex(cancellationToken);
@@ -136,9 +137,12 @@ begin
     Logger.Error('Unabled to determine PackageDownload resource from Service Index');
     exit;
   end;
-  path := Format('%s/%s/%s/%s/dpkg', [packageIdentity.Id, CompilerToString(packageIdentity.CompilerVersion), DPMPlatformToString(packageIdentity.Platform),packageIdentity.Version.ToStringNoMeta]);
 
-  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+  uri := TUriFactory.Parse(serviceItem.ResourceUrl);
+
+  path := Format('%s/%s/%s/%s/%s/dpkg', [uri.AbsolutePath, packageIdentity.Id, CompilerToString(packageIdentity.CompilerVersion), DPMPlatformToString(packageIdentity.Platform),packageIdentity.Version.ToStringNoMeta]);
+
+  httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
   request := httpClient.CreateRequest(path);
 
@@ -164,9 +168,6 @@ begin
 
   fileName := destFile;
   result := true;
-
-
-
 end;
 
 
@@ -178,6 +179,7 @@ var
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
   jsonObj : TJsonObject;
+  uri : IUri;
 begin
   result := nil;
   serviceIndex := GetServiceIndex(cancellationToken);
@@ -190,9 +192,12 @@ begin
     Logger.Error('Unabled to determine PackageDownload resource from Service Index');
     exit;
   end;
-  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+  uri := TUriFactory.Parse(serviceItem.ResourceUrl);
 
-  request := httpClient.CreateRequest('')
+
+  httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
+
+  request := httpClient.CreateRequest(uri.AbsolutePath)
             .WithAccept('application/json')
             .WithParameter('id', id)
             .WithParameter('compiler', CompilerToString(compilerVersion))
@@ -258,7 +263,7 @@ var
   jsonArr : TJsonArray;
   itemObj : TJsonObject;
   i: Integer;
-
+  uri : IUri;
   resultItem : IPackageSearchResultItem;
 begin
   Result := TDPMPackageSearchResult.Create(options.Skip, 0);
@@ -273,9 +278,11 @@ begin
     exit;
   end;
 
-  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+  uri := TUriFactory.Parse(serviceItem.ResourceUrl);
 
-  request := httpClient.CreateRequest('')
+  httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
+
+  request := httpClient.CreateRequest(uri.AbsolutePath)
     .WithAccept('application/json');
 
   if options.SearchTerms <> '' then
@@ -302,7 +309,7 @@ begin
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching list from server : ' + response.ErrorMessage);
+    Logger.Error('Error fetching search result from server : ' + response.ErrorMessage);
     exit;
   end;
 
@@ -325,7 +332,7 @@ begin
   try
     Result.TotalCount := jsonObj.I['totalHits'];
 
-    if jsonObj.Contains('results') then
+    if jsonObj.Contains('results') and (not jsonObj.IsNull('results')) then
     begin
       jsonArr := jsonObj.A['results'];
       for i := 0 to jsonArr.Count -1 do
@@ -351,6 +358,7 @@ var
   serviceItem : IServiceIndexItem;
   path : string;
   stream : TMemoryStream;
+  uri : IUri;
 begin
   result := nil;
   serviceIndex := GetServiceIndex(cancelToken);
@@ -363,9 +371,10 @@ begin
     Logger.Error('Unabled to determine PackageDownload resource from Service Index');
     exit;
   end;
-  path := Format('/%s/%s/%s/%s/icon', [packageId, CompilerToString(compilerVersion), DPMPlatformToString(platform),packageVersion]);
+  uri := TUriFactory.Parse(serviceItem.ResourceUrl);
+  path := Format('%s/%s/%s/%s/%s/icon', [uri.AbsolutePath, packageId, CompilerToString(compilerVersion), DPMPlatformToString(platform),packageVersion]);
 
-  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+  httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
   request := httpClient.CreateRequest(path);
 
@@ -417,6 +426,7 @@ var
   serviceItem : IServiceIndexItem;
   path : string;
   jsonObj : TJsonObject;
+  uri : IUri;
 begin
   result := nil;
 
@@ -430,9 +440,12 @@ begin
     Logger.Error('Unabled to determine PackageInfo resource from Service Index');
     exit;
   end;
-  path := Format('/%s/%s/%s/%s/dspec', [packageId.Id, CompilerToString(packageId.CompilerVersion), DPMPlatformToString(packageId.Platform), packageId.Version.ToStringNoMeta]);
 
-  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+  uri := TUriFactory.Parse(serviceItem.ResourceUrl);
+
+  path := Format('%s/%s/%s/%s/%s/dspec', [uri.AbsolutePath, packageId.Id, CompilerToString(packageId.CompilerVersion), DPMPlatformToString(packageId.Platform), packageId.Version.ToStringNoMeta]);
+
+  httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
   request := httpClient.CreateRequest(path);
 
@@ -493,6 +506,7 @@ var
   serviceItem : IServiceIndexItem;
   path : string;
   jsonObj : TJsonObject;
+  uri : IUri;
 begin
   result := nil;
   serviceIndex := GetServiceIndex(cancellationToken);
@@ -505,9 +519,11 @@ begin
     Logger.Error('Unabled to determine PackageMetadata resource from Service Index');
     exit;
   end;
-  path := Format('/%s/%s/%s/%s/info', [packageId, CompilerToString(compilerVersion), DPMPlatformToString(platform), packageVersion]);
+  uri := TUriFactory.Parse(serviceItem.ResourceUrl);
 
-  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+  path := Format('%s/%s/%s/%s/%s/info', [uri.AbsolutePath, packageId, CompilerToString(compilerVersion), DPMPlatformToString(platform), packageVersion]);
+
+  httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
   request := httpClient.CreateRequest(path);
 
@@ -561,6 +577,7 @@ var
   i : integer;
   sVersion : string;
   packageVersion : TPackageVersion;
+  uri : IUri;
 begin
   result := TCollections.CreateList<TPackageVersion>;
   serviceIndex := GetServiceIndex(cancellationToken);
@@ -573,10 +590,12 @@ begin
     Logger.Error('Unabled to determine PackageVersions resource from Service Index');
     exit;
   end;
-  path := Format('/%s/%s/%s/versions?includePrerelease=', [id, CompilerToString(compilerVersion), DPMPlatformToString(platform), Lowercase(BoolToStr(preRelease, true))]);
+  uri := TUriFactory.Parse(serviceItem.ResourceUrl);
+
+  path := Format('%s/%s/%s/%s/versions?includePrerelease=', [uri.AbsolutePath, id, CompilerToString(compilerVersion), DPMPlatformToString(platform), Lowercase(BoolToStr(preRelease, true))]);
 
 
-  httpClient := THttpClientFactory.CreateClient(serviceItem.ResourceUrl);
+  httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
   request := httpClient.CreateRequest(path);
 
@@ -655,8 +674,7 @@ begin
   path := Format('%s/%s/%s/%s/versionswithdependencies', [uri.AbsolutePath, id, CompilerToString(compilerVersion), DPMPlatformToString(platform)]);
 
 
-
-  httpClient := THttpClientFactory.CreateClient(GetBaseUri(uri));
+  httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
   request := httpClient.CreateRequest(path);
   request.WithAccept('application/json')
@@ -718,25 +736,11 @@ var
   request : TRequest;
   response : IHttpResponse;
   uri : IUri;
-  sBase : string;
 begin
   result := nil;
   uri := TUriFactory.Parse(self.SourceUri);
 
-  sBase := uri.Scheme + '://' + uri.Host;
-  if uri.Scheme = 'http' then
-  begin
-    if uri.Port <> 80 then
-       sBase := sBase + ':' + IntToStr(uri.Port);
-  end
-  else if uri.Scheme = 'https' then
-  begin
-    if uri.Port <> 443 then
-       sBase := sBase + ':' + IntToStr(uri.Port);
-  end;
-
-
-  httpClient := THttpClientFactory.CreateClient(sBase);
+  httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
   request := httpClient.CreateRequest(uri.AbsolutePath)
             .WithAccept('application/json');
   try
@@ -766,7 +770,6 @@ var
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
-  baseUri : string;
   uri : IUri;
   jsonObj : TJsonObject;
   jsonArr : TJsonArray;
@@ -792,10 +795,7 @@ begin
 
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
 
-  baseUri := GetBaseUri(uri);
-
-
-  httpClient := THttpClientFactory.CreateClient(baseUri);
+  httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
   request := httpClient.CreateRequest(uri.AbsolutePath)
             .WithAccept('application/json');
@@ -908,7 +908,7 @@ begin
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
 
   //todo: Add BaseUri to Uri class
-  httpClient := THttpClientFactory.CreateClient(GetBaseUri(uri));
+  httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
   request := httpClient.CreateRequest(uri.AbsolutePath);
 
   request.WithHeader('X-ApiKey', pushOptions.ApiKey);

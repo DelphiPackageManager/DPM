@@ -437,5 +437,8 @@ begin
   FTotalCount := value;
 end;
 
+
+initialization
+ JsonSerializationConfig.NullConvertsToValueTypes := true;
 end.
 

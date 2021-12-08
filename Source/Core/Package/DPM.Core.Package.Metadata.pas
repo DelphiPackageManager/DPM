@@ -290,9 +290,9 @@ var
 begin
   inherited Create(sourceName, jsonObj);
   FDependencies := TCollections.CreateList<IPackageDependency>;
-  if jsonObj.Contains('dependencies') then
+  //check for isnull is needed due to jd barfing on nulls
+  if jsonObj.Contains('dependencies') and (not jsonObj.IsNull('dependencies')) then
   begin
-
     depArr := jsonObj.A['dependencies'];
     for i := 0 to depArr.Count -1 do
     begin
@@ -664,5 +664,8 @@ begin
   result := FId + '-' + CompilerToString(FCompilerVersion) + '-' + DPMPlatformToString(FPlatform) + '-' + FVersion.ToStringNoMeta;
 end;
 
+
+//initialization
+//  JsonSerializationConfig.NullConvertsToValueTypes := true;
 end.
 

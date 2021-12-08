@@ -118,6 +118,12 @@ var
   repo : IPackageRepository;
 begin
   result := false;
+  if not UpdateRepositories then
+  begin
+    FLogger.Error('Unabled to get package versions, error loading repositories');
+    exit;
+  end;
+
   if packageIdentity.SourceName <> '' then
   begin
     repo := GetRepositoryByName(packageIdentity.SourceName);
@@ -426,10 +432,15 @@ var
   distinctResults : IEnumerable<TPackageVersion>;
   comparer : IEqualityComparer<TPackageVersion>;
 begin
-  Assert(FConfiguration <> nil);
   result := TCollections.CreateList<TPackageVersion>;
-  unfilteredResults := TCollections.CreateList<TPackageVersion>;
+  Assert(FConfiguration <> nil);
+  if not UpdateRepositories then
+  begin
+    FLogger.Error('Unabled to get package versions, error loading repositories');
+    exit;
+  end;
 
+  unfilteredResults := TCollections.CreateList<TPackageVersion>;
 
   if compilerVersion = TCompilerVersion.UnknownVersion then
   begin
@@ -440,13 +451,6 @@ begin
   if platform = TDPMPlatform.UnknownPlatform then
   begin
     FLogger.Error('Unabled to search, no platform specified');
-    exit;
-  end;
-
-
-  if not UpdateRepositories then
-  begin
-    FLogger.Error('Unabled to get package versions, error loading repositories');
     exit;
   end;
 
@@ -690,32 +694,12 @@ begin
     else
       currentItem := item;
   end;
-  searchResult.Add(currentItem);
-
-
-
-//  //what does this do? if we don't provide a comparer?
-//  distinctResults := TEnumerable.Distinct<IPackageListItem>(unfilteredResults, TPackageListItemEqualityComparer.Create );
-//
-//  searchResult.AddRange(distinctResults);
+  if currentItem <> nil then
+    searchResult.Add(currentItem);
 
   //Sort by id, version, platform.
   searchResult.Sort(sortFunc);
-
-
-    //skip and take are not working because of how we are rolling up the results.
-//  if (options.Skip > 0) or (options.Take > 0) then
-//  begin
-//    distinctResults := packages;
-//    if options.Skip > 0 then
-//      distinctResults := distinctResults.Skip(options.Skip);
-//    if options.Take > 0 then
-//      distinctResults := distinctResults.Take(options.Take);
-//
-//    result.AddRange(distinctResults);
-//  end
-//  else
-    result.AddRange(searchResult);
+  result.AddRange(searchResult);
 end;
 
 function TPackageRepositoryManager.Push(const cancellationToken: ICancellationToken; const pushOptions: TPushOptions): Boolean;
