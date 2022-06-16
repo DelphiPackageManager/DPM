@@ -66,6 +66,7 @@ type
     FCompilerVersion : TCompilerVersion;
     FProjectFile : string;
   protected
+    procedure RecursiveClone(const originalNode : IGraphNode; const newParent : IGraphNode);
     procedure AddExistingNode(const id : string; const node : IGraphNode);
     function AddPackageChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
     function FindFirstNode(const id : string) : IGraphNode;
@@ -83,6 +84,7 @@ type
     function GetCompilerVersion : TCompilerVersion;
     function GetIsTransitive : boolean;
     function GetProjectFile: string;
+    procedure SetParent(const value : IGraphNode);
     procedure SetProjectFile(const value: string);
 
     procedure SetBplPath(const value : string);
@@ -99,6 +101,8 @@ type
     function GetUseSource: Boolean;
     procedure SetUseSource(const value: Boolean);
     function ToIdVersionString: string;
+    function Clone : IGraphNode;
+
   public
     constructor Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const selectedOn : TVersionRange; const useSource : boolean);
     constructor CreateRoot(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform);
@@ -117,7 +121,7 @@ uses
 
 procedure TGraphNode.AddExistingNode(const id: string; const node: IGraphNode);
 begin
-  FChildNodes[LowerCase(id)] := node;
+  FChildNodes[LowerCase(id)] := node; //
 end;
 
 function TGraphNode.AddPackageChildNode(const id: string; const version: TPackageVersion; const selectedOn: TVersionRange): IGraphNode;
@@ -174,6 +178,13 @@ begin
         res := pair.Value.AreEqual(otherChildNode, childDepth);
     end);
   result := res;
+
+end;
+
+function TGraphNode.Clone: IGraphNode;
+begin
+  result := nil;
+  //TODO : Recursive clone.
 
 end;
 
@@ -353,6 +364,18 @@ begin
   result := FId = cRootNode;
 end;
 
+procedure TGraphNode.RecursiveClone(const originalNode, newParent: IGraphNode);
+var
+  newChild : IGraphNode;
+  i: Integer;
+begin
+  originalNode.ChildNodes.ForEach(
+    procedure(const oldChild : IGraphNode)
+    begin
+      newChild := oldChild.Clone;
+      newParent.AddExistingNode(newChild.Id, newChild);
+    end);
+end;
 
 function TGraphNode.RemoveNode(const node : IGraphNode) : boolean;
 var
@@ -378,6 +401,15 @@ end;
 procedure TGraphNode.SetLibPath(const value: string);
 begin
   FLibPath := value;
+end;
+
+procedure TGraphNode.SetParent(const value: IGraphNode);
+begin
+  {$IFDEF USEWEAK}
+  FParent := value;
+  {$ELSE}
+  FParent := Pointer(value);
+  {$ENDIF}
 end;
 
 procedure TGraphNode.SetProjectFile(const value: string);

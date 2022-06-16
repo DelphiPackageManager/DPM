@@ -57,6 +57,8 @@ type
     function GetName : string;
     function GetSource : string;
     procedure Configure(const source : ISourceConfig);
+    function GetEnabled : boolean;
+    procedure SetEnabled(const value : boolean);
     //above implemented in base class
 
 
@@ -83,9 +85,11 @@ type
     function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>; overload;
 
 
+    property Enabled : boolean read GetEnabled write SetEnabled;
     property Name : string read GetName;
     property Source : string read GetSource;
     property RepositoryType : TSourceType read GetRepositoryType;
+
   end;
 
   IPackageRepositoryFactory = interface

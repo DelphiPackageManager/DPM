@@ -75,8 +75,6 @@ type
 
     [Test]
     procedure Will_Fail_On_Invalid_Float;
-
-
   end;
 
 implementation

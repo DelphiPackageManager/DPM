@@ -140,6 +140,8 @@ begin
   begin
     for repo in FRepositories do
     begin
+      if not repo.Enabled then
+        continue;
       if cancellationToken.IsCancelled then
         exit;
       result := repo.DownloadPackage(cancellationToken, packageIdentity, localFolder, fileName) or result;
@@ -182,6 +184,9 @@ begin
     begin
       if cancellationToken.IsCancelled then
         exit;
+      if not repo.Enabled then
+        continue;
+
       if sourcesList <> nil then
       begin
         if sourcesList.IndexOf(repo.Name) = -1 then
@@ -309,6 +314,12 @@ begin
   try
     for repo in FRepositories do
     begin
+      if cancelToken.IsCancelled then
+        exit;
+      if not repo.Enabled then
+        continue;
+
+
       if sources <> nil then
       begin
         if sources.IndexOf(repo.Name) = -1 then
@@ -379,6 +390,11 @@ begin
 
   for repo in FRepositories do
   begin
+    if cancellationToken.IsCancelled then
+      exit;
+    if not repo.Enabled then
+      continue;
+
     result := repo.GetPackageInfo(cancellationToken, packageId);
     if result <> nil then
       exit;
@@ -415,10 +431,13 @@ begin
 
   for repo in FRepositories do
   begin
+    if cancellationToken.IsCancelled then
+      exit;
+    if not repo.Enabled then
+      continue;
+
     result := repo.GetPackageMetaData(cancellationToken, packageId, packageVersion, compilerVersion, platform);
     if result <> nil then
-      exit;
-    if cancellationToken.IsCancelled then
       exit;
   end;
 end;
@@ -459,6 +478,8 @@ begin
   begin
     if cancellationToken.IsCancelled then
       exit;
+    if not repo.Enabled then
+      continue;
 
     searchResult := repo.GetPackageVersions(cancellationToken, packageId, compilerVersion, platform, includePrerelease);
     unfilteredResults.AddRange(searchResult);
@@ -491,6 +512,8 @@ begin
   begin
     if cancellationToken.IsCancelled then
       exit;
+    if not repo.Enabled then
+      continue;
 
     repoResult := repo.GetPackageLatestVersions(cancellationToken, installedPackages, platform, compilerVersion, preRelease);
     if cancellationToken.IsCancelled then
@@ -554,6 +577,8 @@ begin
   begin
     if cancellationToken.IsCancelled then
       exit;
+    if not repo.Enabled then
+      continue;
 
     searchResult := repo.GetPackageVersionsWithDependencies(cancellationToken, packageId, compilerVersion, platform, versionRange, includePrerelease);
     unfilteredResults.AddRange(searchResult);
@@ -635,6 +660,11 @@ begin
   try
     for repo in FRepositories do
     begin
+      if cancellationToken.IsCancelled then
+        exit;
+      if not repo.Enabled then
+        continue;
+
       if sources <> nil then
       begin
         if sources.IndexOf(repo.Name) = -1 then
@@ -729,6 +759,12 @@ begin
     exit;
   end;
 
+  if not repo.Enabled then
+  begin
+    FLogger.Error('Source not enabled : ' + pushOptions.Source);
+    exit;
+  end;
+
   result := repo.Push(cancellationToken, pushOptions);
 
 
@@ -740,29 +776,43 @@ var
   error : string;
   source : ISourceConfig;
   repo : IPackageRepository;
+  i : integer;
 begin
   result := false;
-  FRepositories.Clear;
+
+  //update and remove
+  for i := FRepositories.Count -1 downto 0 do
+  begin
+    repo := FRepositories[i];
+    source := FConfiguration.GetSourceByName(repo.Name);
+    if source <> nil then
+      repo.Configure(source)
+    else
+      FRepositories.Remove(repo);
+  end;
+
+  //add missing repos.
   for source in FConfiguration.Sources do
   begin
-    if not source.IsEnabled then
-      continue;
-
-    if not TUriFactory.TryParseWithError(source.Source, false, uri, error) then
+    repo := GetRepositoryByName(source.Name);
+    if repo = nil then
     begin
-      FLogger.Error('Invalid source uri : ' + source.Source);
-      exit;
-    end;
+      if not TUriFactory.TryParseWithError(source.Source, false, uri, error) then
+      begin
+        FLogger.Error('Invalid source uri : ' + source.Source);
+        exit;
+      end;
 
-    if not MatchText(uri.Scheme, ['file', 'http', 'https']) then
-    begin
-      FLogger.Error('Invalid source uri scheme : ' + uri.Scheme);
-      exit;
-    end;
+      if not MatchText(uri.Scheme, ['file', 'http', 'https']) then
+      begin
+        FLogger.Error('Invalid source uri scheme : ' + uri.Scheme);
+        exit;
+      end;
 
-    repo := FRepoFactory.CreateRepository(source.SourceType);
-    repo.Configure(source);
-    FRepositories.Add(repo);
+      repo := FRepoFactory.CreateRepository(source.SourceType);
+      repo.Configure(source);
+      FRepositories.Add(repo);
+    end;
   end;
   result := true;
 end;

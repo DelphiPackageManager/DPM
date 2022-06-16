@@ -105,7 +105,7 @@ begin
   Container.RegisterType<ISourcesManager, TSourcesManager>;
 
   Container.RegisterType<IPackageRepositoryFactory, TPackageRepositoryFactory>;
-  Container.RegisterType<IPackageRepositoryManager, TPackageRepositoryManager>;
+  Container.RegisterType<IPackageRepositoryManager, TPackageRepositoryManager>().AsSingleton();
 
   Container.RegisterType<IPackageRepository, TDirectoryPackageRepository>(TEnumUtils.EnumToString<TSourceType>(TSourceType.Folder));
   Container.RegisterType<IPackageRepository, TDPMServerPackageRepository>(TEnumUtils.EnumToString<TSourceType>(TSourceType.DPMServer));

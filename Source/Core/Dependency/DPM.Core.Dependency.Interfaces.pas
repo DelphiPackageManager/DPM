@@ -49,6 +49,7 @@ type
     ['{20055C26-8E63-4936-8249-ACF8514A37E7}']
     function GetId : string;
     function GetParent : IGraphNode;
+    procedure SetParent(const value : IGraphNode);
     function GetVersion : TPackageVersion;
     procedure SetVersion(const value : TPackageVersion);
 
@@ -81,6 +82,8 @@ type
     /// </summary>
     function FindChild(const id : string) : IGraphNode;
 
+    function Clone : IGraphNode;
+
     //removes any child with id recursively (and it's children)
     function RemoveNode(const node : IGraphNode) : boolean;
     function IsRoot : boolean;
@@ -88,6 +91,7 @@ type
     procedure VisitDFS(const visitor : TNodeVisitProc);
 
     function ToIdVersionString : string;
+
     //used by BOM check
     function AreEqual(const otherNode : IGraphNode; const depth : integer = 1) : boolean;
 

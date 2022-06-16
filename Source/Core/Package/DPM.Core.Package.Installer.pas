@@ -77,7 +77,7 @@ type
     function GetCompilerVersionFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration) : boolean;
 
     function CompilePackage(const cancellationToken: ICancellationToken; const Compiler: ICompiler; const packageInfo: IPackageInfo; const graphNode: IGraphNode;
-                            const packageSpec: IPackageSpec;  const force: boolean): boolean;
+                            const packageSpec: IPackageSpec;  const force: boolean; const forceDebug : boolean): boolean;
 
     function BuildDependencies(const cancellationToken: ICancellationToken; const packageCompiler: ICompiler; const projectPackageGraph: IGraphNode;
                                const packagesToCompile: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>; packageSpecs: IDictionary<string, IPackageSpec>;
@@ -273,7 +273,7 @@ begin
 end;
 
 function TPackageInstaller.CompilePackage(const cancellationToken : ICancellationToken; const Compiler: ICompiler; const packageInfo: IPackageInfo; const graphNode: IGraphNode;
-                                          const packageSpec: IPackageSpec; const force: boolean): boolean;
+                                          const packageSpec: IPackageSpec; const force: boolean; const forceDebug : boolean): boolean;
 var
   buildEntry: ISpecBuildEntry;
   packagePath: string;
@@ -283,6 +283,7 @@ var
   bomNode: IGraphNode;
   bomFile: string;
   childSearchPath: string;
+  configuration : string;
 
   procedure DoCopyFiles(const entry: ISpecBuildEntry);
   var
@@ -377,8 +378,12 @@ begin
     // only have one copy of the design package installed we need to check if
     // it has already been installed via another platform.
 
-    if buildEntry.DesignOnly and (packageInfo.platform <> TDPMPlatform.Win32)
-    then
+    if forceDebug then
+      configuration := 'Debug'
+    else
+      configuration := buildEntry.Config;
+
+    if buildEntry.DesignOnly and (packageInfo.platform <> TDPMPlatform.Win32)  then
     begin
       Compiler.BPLOutputDir := TPath.Combine(packagePath,
         buildEntry.BPLOutputDir);
@@ -412,7 +417,8 @@ begin
         Compiler.SetSearchPaths(nil);
 
       FLogger.Information('Building project [' + projectFile + '] for design time...');
-      result := Compiler.BuildProject(cancellationToken, projectFile, buildEntry.config, packageInfo.Version, true);
+
+      result := Compiler.BuildProject(cancellationToken, projectFile, configuration, packageInfo.Version, true);
       if result then
         FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
       else
@@ -450,7 +456,7 @@ begin
       else
         Compiler.SetSearchPaths(nil);
 
-      result := Compiler.BuildProject(cancellationToken, projectFile, buildEntry.config, packageInfo.Version);
+      result := Compiler.BuildProject(cancellationToken, projectFile, configuration, packageInfo.Version);
       if result then
         FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
       else
@@ -1079,8 +1085,7 @@ begin
         if Spec.TargetPlatform.BuildEntries.Any then
         begin
           // we need to build the package.
-          if not CompilePackage(cancellationToken, packageCompiler, pkgInfo,
-            node, Spec, forceCompile) then
+          if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, node, Spec, forceCompile, Options.DebugMode) then
           begin
             if cancellationToken.IsCancelled then
               raise Exception.Create('Compiling package [' +

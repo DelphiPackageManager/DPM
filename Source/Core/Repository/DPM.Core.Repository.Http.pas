@@ -47,7 +47,9 @@ uses
 type
   TDPMServerPackageRepository = class(TBaseRepository, IPackageRepository)
   private
+    FServiceIndex : IServiceIndex;
   protected
+    procedure Configure(const source : ISourceConfig); override;
     function GetServiceIndex(const cancellationToken : ICancellationToken) : IServiceIndex;
 
 
@@ -90,6 +92,12 @@ uses
   DPM.Core.Sources.ServiceIndex,
   DPM.Core.Package.ListItem;
 
+
+const
+  cPreReleaseParam = 'prerel';
+  cCommercialParam = 'commercial';
+  cTrialParam      = 'trial';
+
 //function GetBaseUri(const uri : IUri) : string;
 //begin
 //  result := uri.Scheme + '://' + uri.Host;
@@ -108,6 +116,14 @@ uses
 
 
 { TDPMServerPackageRepository }
+
+procedure TDPMServerPackageRepository.Configure(const source: ISourceConfig);
+begin
+  //if the uri changes service index will be invalid.
+  if source.Source <> Self.SourceUri then
+    FServiceIndex := nil;
+  inherited;
+end;
 
 constructor TDPMServerPackageRepository.Create(const logger : ILogger);
 begin
@@ -206,7 +222,7 @@ begin
   if not version.IsEmpty then
     request.WithParameter('version', version.ToStringNoMeta)
   else if includePrerelease then
-       request.WithParameter('prerel', LowerCase(BoolToStr(includePrerelease, true)));
+       request.WithParameter(cPreReleaseParam, LowerCase(BoolToStr(includePrerelease, true)));
 
   try
     response := request.Get(cancellationToken);
@@ -290,9 +306,9 @@ begin
 
   request.WithParameter('compiler', CompilerToString(compilerVersion));
   request.WithParameter('platform', DPMPlatformToString(platform));
-
-  if options.Prerelease then
-    request.WithParameter('prerel', 'true');
+  request.WithParameter(cPreReleaseParam, BoolToStr(options.Prerelease, true));
+  request.WithParameter(cCommercialParam, BoolToStr(options.Commercial, true));
+  request.WithParameter(cTrialParam, BoolToStr(options.Trial, true));
 
 
   if options.Skip <> 0 then
@@ -491,10 +507,20 @@ begin
 
 end;
 
-function TDPMServerPackageRepository.GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion;
-  const preRelease: Boolean): IDictionary<string, TPackageVersion>;
+function TDPMServerPackageRepository.GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion; const preRelease: Boolean): IDictionary<string, TPackageVersion>;
+var
+  httpClient : IHttpClient;
+  request : TRequest;
+  response : IHttpResponse;
+  serviceIndex : IServiceIndex;
+  serviceItem : IServiceIndexItem;
+  path : string;
+  jsonObj : TJsonObject;
+  uri : IUri;
 begin
   result := TCollections.CreateDictionary<string, TPackageVersion>;
+
+
 end;
 
 
@@ -596,13 +622,12 @@ begin
   end;
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
 
-  path := Format('%s/%s/%s/%s/versions?includePrerelease=', [uri.AbsolutePath, id, CompilerToString(compilerVersion), DPMPlatformToString(platform), Lowercase(BoolToStr(preRelease, true))]);
-
+  path := Format('%s/%s/%s/%s/versions', [uri.AbsolutePath, id, CompilerToString(compilerVersion), DPMPlatformToString(platform)]);
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
-  request := httpClient.CreateRequest(path);
-
+  request := httpClient.CreateRequest(path)
+    .WithParameter(cPreReleaseParam, Lowercase(BoolToStr(preRelease, true)));
 
   try
     response := request.Get(cancellationToken);
@@ -741,7 +766,9 @@ var
   response : IHttpResponse;
   uri : IUri;
 begin
-  result := nil;
+  result := FServiceIndex;
+  if result <> nil then
+    exit;
   uri := TUriFactory.Parse(self.SourceUri);
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
@@ -758,6 +785,7 @@ begin
       exit;
     end;
     result := TServiceIndex.LoadFromString(response.Response);
+    FServiceIndex := result;
   except
     on e : Exception do
     begin

@@ -55,6 +55,8 @@ type
   protected
     procedure Initialize(const config: IConfiguration);
 
+    function ValidateDependencyGraph(const cancellationToken : ICancellationToken; var dependencyGraph : IGraphNode) : boolean;
+
     function DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;  const includePrerelease : boolean; const context : IResolverContext) : boolean;
 
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; out resolved : IList<IPackageInfo>) : boolean;
@@ -314,6 +316,10 @@ var
 begin
   Assert(FConfiguration <> nil, 'config is nil, Initialize has not been called');
 
+  //TODO : First validate that there are no conflicts in the graph.. if there are remove them and let the resolver deal with it?
+
+
+
   //TODO : We need to check the project references against the resolutions because the context only pushes packages with dependencies onto the queue
   errorCount := 0;
   for packageRef in projectReferences do
@@ -345,7 +351,15 @@ var
   resolution : IResolution;
   errorCount : integer;
 begin
+  Assert(dependencyGraph <> nil, 'nil dependency graph provided to ResolveForRestore');
   Assert(FConfiguration <> nil, 'config is nil, Initialize has not been called');
+
+  //TODO : First validate that there are no conflicts in the existing graph.. if there are remove them and let the resolver deal with it?
+
+
+
+
+
   errorCount := 0;
   for packageRef in projectReferences do
   begin
@@ -369,6 +383,35 @@ begin
   result := result and (errorCount = 0);
 end;
 
+
+function TDependencyResolver.ValidateDependencyGraph(const cancellationToken: ICancellationToken; var dependencyGraph: IGraphNode): boolean;
+var
+  resolvedPackages: IDictionary<string, TPackageVersion>;
+begin
+  result := true;
+
+  resolvedPackages := TCollections.CreateDictionary<string, TPackageVersion>;
+
+  //check for conflicts in the graph. If there are any then log the conflicts and remove them so restore can repair the graph.
+  dependencyGraph.VisitDFS(
+    procedure(const node: IGraphNode)
+    var
+      pkgVersion : TPackageVersion;
+    begin
+      if resolvedPackages.TryGetValue(LowerCase(node.Id), pkgVersion) then
+      begin
+
+
+      end
+      else
+      begin
+
+      end;
+
+    end);
+
+
+end;
 
 end.
 

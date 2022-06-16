@@ -50,12 +50,15 @@ type
     FUserName : string;
     FPassword : string;
     FRepositoryType : TSourceType;
+    FEnabled : boolean;
   protected
     //IPackageRepository;
     function GetRepositoryType : TSourceType;
     function GetName : string;
     function GetSource : string;
     procedure Configure(const source : ISourceConfig); virtual;
+    function GetEnabled : boolean;
+    procedure SetEnabled(const value : boolean);
 
     //exposing these for descendants
     property Logger : ILogger read FLogger;
@@ -80,6 +83,11 @@ begin
   FLogger := logger;
 end;
 
+function TBaseRepository.GetEnabled: boolean;
+begin
+  result := FEnabled;
+end;
+
 function TBaseRepository.GetName : string;
 begin
   result := FName;
@@ -95,6 +103,11 @@ begin
   result := FSourceUri;
 end;
 
+procedure TBaseRepository.SetEnabled(const value: boolean);
+begin
+  FEnabled := value;
+end;
+
 procedure TBaseRepository.Configure(const source : ISourceConfig);
 begin
   FName := source.Name;
@@ -102,6 +115,7 @@ begin
   FUserName := source.UserName;
   FPassword := source.Password;
   FRepositoryType := source.SourceType;
+  FEnabled := source.IsEnabled;
 end;
 
 end.

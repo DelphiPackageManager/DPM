@@ -483,7 +483,10 @@ begin
 
   //override the values with values from the template.
   for i := 0 to targetPlatform.Variables.Count -1 do
-    list.Values[targetPlatform.Variables.Names[i]] := targetPlatform.Variables.ValueFromIndex[i];
+  begin
+    list.Values[targetPlatform.Variables.Names[i]] := '';
+    list.Add(targetPlatform.Variables.Names[i] + '=' + targetPlatform.Variables.ValueFromIndex[i]);
+  end;
 
 
   //apply external props passed in on command line.

@@ -76,6 +76,7 @@ type
     function GetIsDefaultPackageCacheLocation : boolean;
     procedure AddDefaultSources;
 
+    function GetSourceByName(const name : string) : ISourceConfig;
     function GetSources : IList<ISourceConfig>;
     function GetFileName : string;
     procedure SetFileName(const value : string);

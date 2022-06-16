@@ -48,6 +48,7 @@ type
     FIncludeDelisted : boolean;
     FForce : boolean;
     FUseSource : boolean;
+    FDebugMode : boolean;
   protected
     FExact : boolean;
     constructor CreateClone(const original : TSearchOptions); reintroduce;
@@ -71,6 +72,7 @@ type
     property Exact : boolean read FExact write FExact; //search term is a package id.
     property Force : boolean read FForce write FForce; //needed by the package installer.
     property UseSource : boolean read FUseSource write FUseSource; //only used by install but we need it here.
+    property DebugMode : boolean read FDebugMode write FDebugMode;
 
   end;
 
@@ -108,6 +110,7 @@ begin
   FPrerelease := original.FPrerelease;
   FIncludeDelisted := original.FIncludeDelisted;
   FUseSource := original.UseSource;
+  FDebugMode := original.DebugMode;
 end;
 
 end.

@@ -92,6 +92,7 @@ type
     procedure SetPackageCacheLocation(const value : string);
     function GetIsDefaultPackageCacheLocation : Boolean;
     procedure AddDefaultSources;
+    function GetSourceByName(const name : string) : ISourceConfig;
 
     function LoadFromFile(const fileName : string) : boolean;
     function SaveToFile(const fileName : string) : boolean;
@@ -337,6 +338,18 @@ end;
 function TConfiguration.GetPackageCacheLocation : string;
 begin
   result := FPackageCacheLocation;
+end;
+
+function TConfiguration.GetSourceByName(const name: string): ISourceConfig;
+var
+  sourceConfig : ISourceConfig;
+begin
+  result := nil;
+  for sourceConfig in FSources do
+  begin
+    if SameText(sourceConfig.Name, name) then
+      exit(sourceConfig);
+  end;
 end;
 
 function TConfiguration.GetSources : IList<ISourceConfig>;

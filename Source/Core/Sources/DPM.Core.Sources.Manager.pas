@@ -48,6 +48,7 @@ type
     function UpdateSource(const options : TSourcesOptions) : Boolean;
   public
     constructor Create(const logger : ILogger; const configManager : IConfigurationManager); reintroduce;
+
   end;
 
 implementation

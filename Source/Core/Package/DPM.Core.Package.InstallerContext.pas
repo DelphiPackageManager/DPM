@@ -13,7 +13,6 @@ uses
 type
   TCorePackageInstallerContext = class(TInterfacedObject, IPackageInstallerContext)
   private
-
     FProjectGraphs : IDictionary<string, IDictionary<TDPMPlatform, IGraphNode>>;
     FProjectResolutions : IDictionary<string, IDictionary<TDPMPlatform, IList<IResolution>>>;
   protected

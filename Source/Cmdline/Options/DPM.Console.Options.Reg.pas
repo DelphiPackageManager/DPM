@@ -245,6 +245,12 @@ begin
     end);
   option.HasValue := false;
 
+  option := cmd.RegisterOption<boolean>('debugMode','dm', 'Compile Debug configuration.',
+  procedure(const value : boolean)
+    begin
+      TInstallOptions.Default.DebugMode := value;
+    end);
+  option.HasValue := false;
 
   cmd.Examples.Add('install VSoft.CommandLine');
   cmd.Examples.Add('install VSoft.CommandLine -version=1.0.1 c:\myprojects\project1.dproj');
@@ -580,6 +586,14 @@ begin
       if TRestoreOptions.Default.CompilerVersion = TCompilerVersion.UnknownVersion then
         raise EArgumentException.Create('Invalid compiler version : ' + value);
     end);
+
+  option := cmd.RegisterOption<boolean>('debugMode','dm', 'Compile Debug configuration.',
+  procedure(const value : boolean)
+    begin
+      TRestoreOptions.Default.DebugMode := value;
+    end);
+  option.HasValue := false;
+
 
 
 

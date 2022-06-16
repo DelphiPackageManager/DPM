@@ -262,12 +262,12 @@ begin
   if sTemplate <> '' then
     FTemplateName := sTemplate;
 
-
-  if jsonObject.Contains('variables') then
+  variablesObj := jsonObject.ExtractObject('variables');
+  if variablesObj <> nil then
   begin
-    variablesObj := jsonObject.O['variables'];
     for i := 0 to variablesObj.Count -1 do
       FVariables.Add(variablesObj.Names[i] + '=' + variablesObj.Values[variablesObj.Names[i]].Value );
+    variablesObj.Free;
   end;
 
   result := inherited LoadFromJson(jsonObject) and result;
