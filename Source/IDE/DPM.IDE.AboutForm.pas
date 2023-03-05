@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -42,11 +42,11 @@ type
     Label4 : TLabel;
     lblVersion: TLabel;
     procedure githubLinkLabelLinkClick(Sender : TObject; const Link : string; LinkType : TSysLinkType);
-    procedure FormCreate(Sender: TObject);
   private
     { Private declarations }
   public
     { Public declarations }
+    constructor Create(AOwner : TComponent);override;
   end;
 
 var
@@ -56,12 +56,23 @@ implementation
 
 uses
   Winapi.ShellAPI,
+  ToolsApi,
   DPM.Core.Utils.System;
+
+{$I DPMIDE.inc}
 
 {$R *.dfm}
 
-procedure TDPMAboutForm.FormCreate(Sender: TObject);
+constructor TDPMAboutForm.Create(AOwner: TComponent);
 begin
+  inherited;
+  {$IFDEF STYLEELEMENTS}
+  StyleElements := [seFont, seClient, seBorder];
+  {$ENDIF}
+  {$IFDEF THEMESERVICES}
+  (BorlandIDEServices as IOTAIDEThemingServices).ApplyTheme(Self);
+  {$ENDIF}
+
   lblVersion.Caption := lblVersion.Caption + TSystemUtils.GetVersionString;
 end;
 

@@ -51,7 +51,7 @@ type
     FProjectFile : string;
     FMainSource : string;
     FProjectVersion : string;
-    FPackageRefences : IDictionary<TDPMPlatform, IGraphNode>;
+    FPackageRefences : IDictionary<TDPMPlatform, IPackageReference>;
     FFileName : string;
     FAppType : TAppType;
     FConfigurations : IDictionary<string, IProjectConfiguration>;
@@ -88,8 +88,8 @@ type
     function EnsureBaseSearchPath : boolean;
 
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string> ; const packageCacheLocation : string) : boolean;
-    procedure UpdatePackageReferences(const dependencyGraph : IGraphNode; const platform : TDPMPlatform);
-    function GetPackageReferences(const platform : TDPMPlatform) : IGraphNode;
+    procedure UpdatePackageReferences(const dependencyGraph : IPackageReference; const platform : TDPMPlatform);
+    function GetPackageReferences(const platform : TDPMPlatform) : IPackageReference;
     function GetConfigNames: IReadOnlyList<string>;
   public
     constructor Create(const logger : ILogger; const config : IConfiguration; const compilerVersion : TCompilerVersion);
@@ -195,12 +195,12 @@ begin
   FConfig := config;
   FCompiler := compilerVersion;
   FPlatforms := [];
-  FPackageRefences := TCollections.CreateDictionary<TDPMPlatform, IGraphNode>;
+  FPackageRefences := TCollections.CreateDictionary<TDPMPlatform, IPackageReference>;
   FConfigurations := TCollections.CreateDictionary <string, IProjectConfiguration> ;
   FConfigNames := TCollections.CreateList<string>;
 end;
 
-function TProjectEditor.GetPackageReferences(const platform : TDPMPlatform) : IGraphNode;
+function TProjectEditor.GetPackageReferences(const platform : TDPMPlatform) : IPackageReference;
 begin
   result := nil;
   FPackageRefences.TryGetValue(platform,Result);
@@ -547,7 +547,7 @@ end;
 
 function TProjectEditor.LoadPackageRefences : boolean;
 
-  procedure ReadPackageReferences(const parentReference : IGraphNode; const parentElement : IXMLDOMElement);
+  procedure ReadPackageReferences(const parentReference : IPackageReference; const parentElement : IXMLDOMElement);
   var
     isTransitive : boolean;
     packageNodes : IXMLDOMNodeList;
@@ -561,12 +561,12 @@ function TProjectEditor.LoadPackageRefences : boolean;
     platform : TDPMPlatform;
     sRange : string;
     range : TVersionRange;
-    dupCheckNode : IGraphNode;
+    dupCheckReference : IPackageReference;
     sXPath : string;
     useSource : boolean;
     sUseSource : string;
-    newNode : IGraphNode;
-    rootNode : IGraphNode;
+    newNode : IPackageReference;
+    rootNode : IPackageReference;
   begin
     isTransitive := parentReference <> nil;
     if isTransitive then
@@ -580,12 +580,14 @@ function TProjectEditor.LoadPackageRefences : boolean;
       for i := 0 to packageNodes.length - 1 do
       begin
         rootNode := nil;
+        id := '';
+        sVersion := '';
+        sPlatform := '';
+        sUseSource := '';
         packageElement := packageNodes.item[i] as IXMLDOMElement;
         if packageElement.getAttributeNode('id') <> nil then
-        begin
           id := packageElement.getAttribute('id');
-        end
-        else
+        if id = '' then
         begin
           FLogger.Error('Invalid package reference detected in project, missing required [id] attribute');
           result := false;
@@ -593,19 +595,17 @@ function TProjectEditor.LoadPackageRefences : boolean;
         end;
 
         if packageElement.getAttributeNode('version') <> nil then
-        begin
           sVersion := packageElement.getAttribute('version');
-          if not TPackageVErsion.TryParseWithError(sVersion, version, error) then
-          begin
-            FLogger.Error('Invalid package reference detected in project, [version] attribute is not valid');
-            FLogger.Error(' ' + error);
-            result := false;
-            exit;
-          end;
-        end
-        else
+        if sVersion = '' then
         begin
           FLogger.Error('Invalid package reference detected in project, missing required [version] attribute');
+          result := false;
+           exit;
+        end;
+        if not TPackageVErsion.TryParseWithError(sVersion, version, error) then
+        begin
+          FLogger.Error('Invalid package reference detected in project, [version] attribute is not valid');
+          FLogger.Error(' ' + error);
           result := false;
           exit;
         end;
@@ -644,7 +644,7 @@ function TProjectEditor.LoadPackageRefences : boolean;
 
         if not FPackageRefences.TryGetValue(platform, rootNode) then
         begin
-          rootNode := TGraphNode.CreateRoot(FCompiler,platform);
+          rootNode := TPackageReference.CreateRoot(FCompiler,platform);
           FPackageRefences[platform] := rootNode;
         end;
 
@@ -653,11 +653,11 @@ function TProjectEditor.LoadPackageRefences : boolean;
 
         //check for duplicate references
         if isTransitive then
-          dupCheckNode := parentReference
+          dupCheckReference := parentReference
         else
-          dupCheckNode := rootNode;
+          dupCheckReference := rootNode;
 
-        if dupCheckNode.FindChild(id) <> nil then
+        if dupCheckReference.FindDependency(id) <> nil then
         begin
           if parentReference <> nil then
             raise Exception.Create('Duplicate package reference for package [' + id + '  ' + DPMPlatformToString(platform) + '] under [' + parentReference.Id + ']')
@@ -691,12 +691,12 @@ function TProjectEditor.LoadPackageRefences : boolean;
         end;
         if isTransitive then
         begin
-          newNode  := parentReference.AddPackageChildNode(id, version, range);
+          newNode  := parentReference.AddPackageDependency(id, version, range);
           newNode.UseSource := useSource;
         end
         else
         begin
-          newNode := rootNode.AddPackageChildNode(id, version, TVersionRange.Empty);
+          newNode := rootNode.AddPackageDependency(id, version, TVersionRange.Empty);
           newNode.UseSource := useSource;
         end;
         ReadPackageReferences(newNode, packageElement);
@@ -862,18 +862,18 @@ begin
 
 end;
 
-procedure TProjectEditor.UpdatePackageReferences(const dependencyGraph : IGraphNode; const platform : TDPMPlatform);
+procedure TProjectEditor.UpdatePackageReferences(const dependencyGraph : IPackageReference; const platform : TDPMPlatform);
 var
   projectExtensionsElement : IXMLDOMElement;
   dpmElement : IXMLDOMElement;
   packageReferenceElements : IXMLDOMNodeList;
   i : integer;
-  topLevelNode : IGraphNode;
+  topLevelReference : IPackageReference;
 
-  procedure WritePackageReference(const parentElement : IXMLDOMElement; const packageReference : IGraphNode);
+  procedure WritePackageReference(const parentElement : IXMLDOMElement; const packageReference : IPackageReference);
   var
     packageReferenceElement : IXMLDOMElement;
-    childNode : IGraphNode;
+    dependency : IPackageReference;
   begin
     packageReferenceElement := FProjectXML.createNode(NODE_ELEMENT, 'PackageReference', msbuildNamespace) as IXMLDOMElement;
     packageReferenceElement.setAttribute('id', packageReference.Id);
@@ -884,10 +884,10 @@ var
     if packageReference.UseSource then
       packageReferenceElement.setAttribute('useSource', 'true');
     parentElement.appendChild(packageReferenceElement);
-    if packageReference.HasChildren then
+    if packageReference.HasDependencies then
     begin
-      for childNode in packageReference.ChildNodes do
-        WritePackageReference(packageReferenceElement, childNode);
+      for dependency in packageReference.Dependencies do
+        WritePackageReference(packageReferenceElement, dependency);
     end;
   end;
 
@@ -913,8 +913,8 @@ begin
       dpmElement.removeChild(packageReferenceElements.item[i]);
   end;
 
-  for topLevelNode in dependencyGraph.ChildNodes do
-    WritePackageReference(dpmElement, topLevelNode);
+  for topLevelReference in dependencyGraph.Dependencies do
+    WritePackageReference(dpmElement, topLevelReference);
 
 end;
 

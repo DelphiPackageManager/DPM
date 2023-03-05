@@ -32,7 +32,6 @@ uses
   System.Generics.Defaults,
   Spring.Collections,
   VSoft.Awaitable,
-  SVGInterfaces,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
   DPM.Core.Logging,

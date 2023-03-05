@@ -32,7 +32,7 @@ uses
   DPM.Console.ExitCodes,
   DPM.Core.Logging,
   Spring.Container,
-  VSoft.Awaitable;
+  VSoft.CancellationToken;
 
 type
   TDPMConsoleApplication = class

@@ -33,7 +33,7 @@ uses
   DPM.Core.Logging,
   DPM.Console.ExitCodes,
   DPM.Console.Command,
-  VSoft.Awaitable;
+  VSoft.CancellationToken;
 
 type
   TBaseCommand = class(TInterfacedObject, ICommandHandler)

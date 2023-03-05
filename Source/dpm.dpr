@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -78,7 +78,6 @@ uses
   DPM.Core.Dependency.Context in 'Core\Dependency\DPM.Core.Dependency.Context.pas',
   DPM.Core.Dependency.Graph in 'Core\Dependency\DPM.Core.Dependency.Graph.pas',
   DPM.Core.Dependency.Interfaces in 'Core\Dependency\DPM.Core.Dependency.Interfaces.pas',
-  DPM.Core.Dependency.LockFile in 'Core\Dependency\DPM.Core.Dependency.LockFile.pas',
   DPM.Core.Dependency.Resolution in 'Core\Dependency\DPM.Core.Dependency.Resolution.pas',
   DPM.Core.Dependency.Resolver in 'Core\Dependency\DPM.Core.Dependency.Resolver.pas',
   DPM.Core.Dependency.Version in 'Core\Dependency\DPM.Core.Dependency.Version.pas',
@@ -101,7 +100,6 @@ uses
   DPM.Core.Package.InstallerContext in 'Core\Package\DPM.Core.Package.InstallerContext.pas',
   DPM.Core.Package.Interfaces in 'Core\Package\DPM.Core.Package.Interfaces.pas',
   DPM.Core.Package.Metadata in 'Core\Package\DPM.Core.Package.Metadata.pas',
-  DPM.Core.Package.SearchPath in 'Core\Package\DPM.Core.Package.SearchPath.pas',
   DPM.Core.Package.SearchResults in 'Core\Package\DPM.Core.Package.SearchResults.pas',
   DPM.Core.Packaging.Archive in 'Core\Packaging\DPM.Core.Packaging.Archive.pas',
   DPM.Core.Packaging.Archive.Reader in 'Core\Packaging\DPM.Core.Packaging.Archive.Reader.pas',
@@ -153,21 +151,6 @@ uses
   DPM.Core.Init in 'Core\DPM.Core.Init.pas',
   DPM.Core.TargetPlatform in 'Core\DPM.Core.TargetPlatform.pas',
   DPM.Core.Types in 'Core\DPM.Core.Types.pas',
-  SVGInterfaces in 'SVG\SVGInterfaces.pas',
-  SVGBase64 in 'SVG\SVGBase64.pas',
-  SVGParse in 'SVG\SVGParse.pas',
-  SVG in 'SVG\SVG.pas',
-  SVGStyle in 'SVG\SVGStyle.pas',
-  SVGCommon in 'SVG\SVGCommon.pas',
-  SVGTypes in 'SVG\SVGTypes.pas',
-  SVGPath in 'SVG\SVGPath.pas',
-  XmlLite in 'SVG\XmlLite.pas',
-  SVGPaint in 'SVG\SVGPaint.pas',
-  PasSVGFactory in 'SVG\PasSVGFactory.pas',
-  GDIPKerning in 'SVG\GDIPKerning.pas',
-  GDIPOBJ2 in 'SVG\GDIPOBJ2.pas',
-  GDIPPathText in 'SVG\GDIPPathText.pas',
-  SVGColor in 'SVG\SVGColor.pas',
   DPM.Core.Package.Icon in 'Core\Package\DPM.Core.Package.Icon.pas',
   DPM.Core.Compiler.BOM in 'Core\Compiler\DPM.Core.Compiler.BOM.pas',
   DPM.Core.Compiler.ProjectSettings in 'Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas',
@@ -176,7 +159,8 @@ uses
   DPM.Console.Command.Info in 'Cmdline\Commands\DPM.Console.Command.Info.pas',
   DPM.Core.Options.Info in 'Core\Options\DPM.Core.Options.Info.pas',
   DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas',
-  DPM.Core.Package.ListItem in 'Core\Package\DPM.Core.Package.ListItem.pas';
+  DPM.Core.Package.ListItem in 'Core\Package\DPM.Core.Package.ListItem.pas',
+  VSoft.AntPatterns in '..\..\..\VSoftTechnologies\VSoft.AntPatterns\source\VSoft.AntPatterns.pas';
 
 begin
   CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml

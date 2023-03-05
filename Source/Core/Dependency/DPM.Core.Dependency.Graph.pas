@@ -45,16 +45,16 @@ uses
 {$IFEND}
 
 type
-  TGraphNode = class(TInterfacedObject, IGraphNode)
+  TPackageReference = class(TInterfacedObject, IPackageReference)
   private
     {$IFDEF USEWEAK}
     [weak]
-    FParent : IGraphNode;
+    FParent : IPackageReference;
     {$ELSE}
     FParent : Pointer;
     {$ENDIF}
 
-    FChildNodes : IDictionary<string, IGraphNode>;
+    FDependencies : IDictionary<string, IPackageReference>;
     FId : string;
     FVersion : TPackageVersion;
     FPlatform : TDPMPlatform;
@@ -66,15 +66,15 @@ type
     FCompilerVersion : TCompilerVersion;
     FProjectFile : string;
   protected
-    procedure RecursiveClone(const originalNode : IGraphNode; const newParent : IGraphNode);
-    procedure AddExistingNode(const id : string; const node : IGraphNode);
-    function AddPackageChildNode(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IGraphNode;
-    function FindFirstNode(const id : string) : IGraphNode;
-    function FindNodes(const id : string) : IList<IGraphNode>;
-    function FindChild(const id : string) : IGraphNode;
-    function GetChildNodes : IEnumerable<IGraphNode>;
+    procedure RecursiveClone(const originalReference : IPackageReference; const newParent : IPackageReference);
+    procedure AddExistingReference(const id : string; const packageReference : IPackageReference);
+    function AddPackageDependency(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IPackageReference;
+    function FindFirstPackageReference(const id : string) : IPackageReference;
+    function FindPackageReferences(const id : string) : IList<IPackageReference>;
+    function FindDependency(const id : string) : IPackageReference;
+    function GetDependencies : IEnumerable<IPackageReference>;
     function GetId : string;
-    function GetParent : IGraphNode;
+    function GetParent : IPackageReference;
     function GetSelectedOn : TVersionRange;
     function GetVersion : TPackageVersion;
     function GetSearchPaths : IList<string>;
@@ -84,7 +84,7 @@ type
     function GetCompilerVersion : TCompilerVersion;
     function GetIsTransitive : boolean;
     function GetProjectFile: string;
-    procedure SetParent(const value : IGraphNode);
+    procedure SetParent(const value : IPackageReference);
     procedure SetProjectFile(const value: string);
 
     procedure SetBplPath(const value : string);
@@ -92,19 +92,19 @@ type
     function GetPlatform : TDPMPlatform;
     procedure SetVersion(const value : TPackageVersion);
     procedure SetSelectedOn(const value : TVersionRange);
-    function RemoveNode(const node : IGraphNode) : boolean;
+    function RemovePackageReference(const packageReference : IPackageReference) : boolean;
     function IsRoot : boolean;
-    function HasChildren : boolean;
+    function HasDependencies : boolean;
     procedure VisitDFS(const visitor : TNodeVisitProc);
 
-    function AreEqual(const otherNode : IGraphNode; const depth : integer = 1) : boolean;
+    function AreEqual(const otherPackageReference : IPackageReference; const depth : integer = 1) : boolean;
     function GetUseSource: Boolean;
     procedure SetUseSource(const value: Boolean);
     function ToIdVersionString: string;
-    function Clone : IGraphNode;
+    function Clone : IPackageReference;
 
   public
-    constructor Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const selectedOn : TVersionRange; const useSource : boolean);
+    constructor Create(const parent : IPackageReference; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const selectedOn : TVersionRange; const useSource : boolean);
     constructor CreateRoot(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform);
     destructor Destroy;override;
 
@@ -117,19 +117,19 @@ uses
   System.SysUtils,
   DPM.Core.Constants;
 
-{ TGraphNode }
+{ TPackageReference }
 
-procedure TGraphNode.AddExistingNode(const id: string; const node: IGraphNode);
+procedure TPackageReference.AddExistingReference(const id: string; const packageReference: IPackageReference);
 begin
-  FChildNodes[LowerCase(id)] := node; //
+  FDependencies[LowerCase(id)] := packageReference; //
 end;
 
-function TGraphNode.AddPackageChildNode(const id: string; const version: TPackageVersion; const selectedOn: TVersionRange): IGraphNode;
+function TPackageReference.AddPackageDependency(const id: string; const version: TPackageVersion; const selectedOn: TVersionRange): IPackageReference;
 var
-  parent : IGraphNode;
+  parent : IPackageReference;
 begin
   //make sure we are not doing something stupid
-  if FChildNodes.ContainsKey(LowerCase(id)) then
+  if FDependencies.ContainsKey(LowerCase(id)) then
     raise Exception.Create('Duplicate package reference ' + FId + '->' + id);
 
   //then  check for a cyclic dependency.
@@ -142,53 +142,53 @@ begin
     parent := parent.Parent;
   end;
 
-  result := TGraphNode.Create(self, id, version, FPlatform, FCompilerVersion, selectedOn,  FUseSource);
-  FChildNodes.Add(LowerCase(id), result);
+  result := TPackageReference.Create(self, id, version, FPlatform, FCompilerVersion, selectedOn,  FUseSource);
+  FDependencies.Add(LowerCase(id), result);
 
 end;
 
-function TGraphNode.AreEqual(const otherNode: IGraphNode; const depth: integer): boolean;
+function TPackageReference.AreEqual(const otherPackageReference: IPackageReference; const depth: integer): boolean;
 var
-  childDepth : integer;
+  dependencyDepth : integer;
   res : boolean;
 begin
-  result := SameText(FId, otherNode.Id);
-  result := result and (Self.FVersion = otherNode.Version);
-  
+  result := SameText(FId, otherPackageReference.Id);
+  result := result and (Self.FVersion = otherPackageReference.Version);
+
   if (not result) or (depth = 0)  then
     exit;
 
-  result := HasChildren = otherNode.HasChildren;
+  result := HasDependencies = otherPackageReference.HasDependencies;
   if not result then
     exit;
 
-  childDepth := depth -1;
+  dependencyDepth := depth -1;
   res := true;
 
-  FChildNodes.ForEach(
-    procedure(const pair : TPair<string, IGraphNode>)
+  FDependencies.ForEach(
+    procedure(const pair : TPair<string, IPackageReference>)
     var
-      otherChildNode : IGraphNode;
+      otherDependency : IPackageReference;
     begin
       if not res then
         exit;
-      otherChildNode := otherNode.FindChild(pair.Value.Id);
-      res := otherChildNode <> nil;
+      otherDependency := otherPackageReference.FindDependency(pair.Value.Id);
+      res := otherDependency <> nil;
       if res then
-        res := pair.Value.AreEqual(otherChildNode, childDepth);
+        res := pair.Value.AreEqual(otherDependency, dependencyDepth);
     end);
   result := res;
 
 end;
 
-function TGraphNode.Clone: IGraphNode;
+function TPackageReference.Clone: IPackageReference;
 begin
   result := nil;
   //TODO : Recursive clone.
 
 end;
 
-constructor TGraphNode.Create(const parent : IGraphNode; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const selectedOn : TVersionRange; const useSource : boolean);
+constructor TPackageReference.Create(const parent : IPackageReference; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const selectedOn : TVersionRange; const useSource : boolean);
 begin
   FSearchPaths := TCollections.CreateList<string>;
   if parent <> nil then
@@ -207,7 +207,7 @@ begin
   FPlatform := platform;
   FSelectedOn := selectedOn;
   FUseSource := useSource;
-  FChildNodes := TCollections.CreateSortedDictionary<string, IGraphNode>();
+  FDependencies := TCollections.CreateSortedDictionary<string, IPackageReference>();
   if FParent <> nil then
     FCompilerVersion := parent.CompilerVersion
   else
@@ -215,31 +215,31 @@ begin
 
 end;
 
-constructor TGraphNode.CreateRoot(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform);
+constructor TPackageReference.CreateRoot(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform);
 begin
   Create(nil, cRootNode, TPackageVersion.Empty, platform, compilerVersion, TVersionRange.Empty, false);
 end;
 
-destructor TGraphNode.Destroy;
+destructor TPackageReference.Destroy;
 begin
   inherited;
 end;
 
-function TGraphNode.FindChild(const id : string) : IGraphNode;
+function TPackageReference.FindDependency(const id : string) : IPackageReference;
 begin
   result := nil;
-  FChildNodes.TryGetValue(LowerCase(id), result)
+  FDependencies.TryGetValue(LowerCase(id), result)
 end;
 
 //non recursive breadth first search.
-function TGraphNode.FindFirstNode(const id : string) : IGraphNode;
+function TPackageReference.FindFirstPackageReference(const id : string) : IPackageReference;
 var
-  queue : IQueue<IGraphNode>;
-  currentNode : IGraphNode;
-  childNode : IGraphNode;
+  queue : IQueue<IPackageReference>;
+  currentNode : IPackageReference;
+  dependency : IPackageReference;
 begin
   result := nil;
-  queue := TCollections.CreateQueue<IGraphNode>;
+  queue := TCollections.CreateQueue<IPackageReference>;
   queue.Enqueue(Self);
   while queue.Any do
   begin
@@ -249,161 +249,160 @@ begin
       result := currentNode;
       exit;
     end;
-    for childNode in currentNode.ChildNodes do
+    for dependency in currentNode.Dependencies do
     begin
       if SameText(currentNode.Id, id) then
       begin
-        result := childNode;
+        result := dependency;
         exit;
       end;
-      queue.Enqueue(childNode);
+      queue.Enqueue(dependency);
     end;
   end;
 end;
 
-function TGraphNode.FindNodes(const id : string) : IList<IGraphNode>;
+function TPackageReference.FindPackageReferences(const id : string) : IList<IPackageReference>;
 var
-  list : IList<IGraphNode>;
+  list : IList<IPackageReference>;
 begin
-  result := TCollections.CreateList<IGraphNode>;
+  result := TCollections.CreateList<IPackageReference>;
   list := result;
-  VisitDFS(procedure(const node : IGraphNode)
+  VisitDFS(procedure(const node : IPackageReference)
     begin
       if SameText(id, node.Id) then
         list.Add(node);
     end);
 end;
 
-function TGraphNode.GetBplPath: string;
+function TPackageReference.GetBplPath: string;
 begin
   result := FBplPath;
 end;
 
-function TGraphNode.GetChildNodes : IEnumerable<IGraphNode>;
+function TPackageReference.GetDependencies : IEnumerable<IPackageReference>;
 begin
-  result := FChildNodes.Values;
+  result := FDependencies.Values;
 end;
 
 
-function TGraphNode.GetCompilerVersion: TCompilerVersion;
+function TPackageReference.GetCompilerVersion: TCompilerVersion;
 begin
   result := FCompilerVersion;
 end;
 
-function TGraphNode.GetId : string;
+function TPackageReference.GetId : string;
 begin
   result := FId;
 end;
 
-function TGraphNode.GetIsTransitive: boolean;
+function TPackageReference.GetIsTransitive: boolean;
 begin
- result := (FParent <> nil) and (not {$IFDEF USEWEAK} FParent.IsRoot {$ELSE} IGraphNode(FParent).IsRoot{$ENDIF});
+ result := (FParent <> nil) and (not {$IFDEF USEWEAK} FParent.IsRoot {$ELSE} IPackageReference(FParent).IsRoot{$ENDIF});
 end;
 
 
-function TGraphNode.GetLibPath: string;
+function TPackageReference.GetLibPath: string;
 begin
   result := FLibPath;
 end;
 
-function TGraphNode.GetParent : IGraphNode;
+function TPackageReference.GetParent : IPackageReference;
 begin
   //easier to debug this way
   if FParent <> nil then
-    result := {$IFDEF USEWEAK} FParent {$ELSE} IGraphNode(FParent) {$ENDIF}
+    result := {$IFDEF USEWEAK} FParent {$ELSE} IPackageReference(FParent) {$ENDIF}
   else
     result := nil;
 end;
 
-function TGraphNode.GetPlatform: TDPMPlatform;
+function TPackageReference.GetPlatform: TDPMPlatform;
 begin
   result := FPlatform;
 end;
 
-function TGraphNode.GetProjectFile: string;
+function TPackageReference.GetProjectFile: string;
 begin
   if IsRoot then
     result := FProjectFile
   else if FParent <> nil then
-    result :=  {$IFDEF USEWEAK} FParent.ProjectFile {$ELSE} IGraphNode(FParent).ProjectFile{$ENDIF}
+    result :=  {$IFDEF USEWEAK} FParent.ProjectFile {$ELSE} IPackageReference(FParent).ProjectFile{$ENDIF}
   else
     result := '';
 end;
 
-function TGraphNode.GetSearchPaths: IList<string>;
+function TPackageReference.GetSearchPaths: IList<string>;
 begin
   result := FSearchPaths;
 end;
 
-function TGraphNode.GetSelectedOn : TVersionRange;
+function TPackageReference.GetSelectedOn : TVersionRange;
 begin
   result := FSelectedOn;
 end;
 
-function TGraphNode.GetVersion : TPackageVersion;
+function TPackageReference.GetVersion : TPackageVersion;
 begin
   result := FVersion;
 end;
 
-function TGraphNode.GetUseSource: Boolean;
+function TPackageReference.GetUseSource: Boolean;
 var
-  parent : IGraphNode;
+  parent : IPackageReference;
 begin
   parent := GetParent;
   //if the parent is using the source then we should too.
   result := FUseSource or ((parent <> nil) and parent.UseSource);
 end;
 
-function TGraphNode.HasChildren : boolean;
+function TPackageReference.HasDependencies : boolean;
 begin
-  result := FChildNodes.Any;
+  result := FDependencies.Any;
 end;
 
-function TGraphNode.IsRoot : boolean;
+function TPackageReference.IsRoot : boolean;
 begin
   result := FId = cRootNode;
 end;
 
-procedure TGraphNode.RecursiveClone(const originalNode, newParent: IGraphNode);
+procedure TPackageReference.RecursiveClone(const originalReference, newParent: IPackageReference);
 var
-  newChild : IGraphNode;
-  i: Integer;
+  newChild : IPackageReference;
 begin
-  originalNode.ChildNodes.ForEach(
-    procedure(const oldChild : IGraphNode)
+  originalReference.Dependencies.ForEach(
+    procedure(const oldChild : IPackageReference)
     begin
       newChild := oldChild.Clone;
-      newParent.AddExistingNode(newChild.Id, newChild);
+      newParent.AddExistingReference(newChild.Id, newChild);
     end);
 end;
 
-function TGraphNode.RemoveNode(const node : IGraphNode) : boolean;
+function TPackageReference.RemovePackageReference(const packageReference : IPackageReference) : boolean;
 var
-  childNode : IGraphNode;
+  dependency : IPackageReference;
 begin
-  result := FChildNodes.ContainsValue(node);
+  result := FDependencies.ContainsValue(packageReference);
   if result then
-    FChildNodes.Remove(LowerCase(node.Id))
+    FDependencies.Remove(LowerCase(packageReference.Id))
   else
-    for childNode in FChildNodes.Values do
+    for dependency in FDependencies.Values do
     begin
-      result := childNode.RemoveNode(node);
+      result := dependency.RemovePackageReference(packageReference);
       if result then
         exit;
     end;
 end;
 
-procedure TGraphNode.SetBplPath(const value: string);
+procedure TPackageReference.SetBplPath(const value: string);
 begin
   FBplPath := value;
 end;
 
-procedure TGraphNode.SetLibPath(const value: string);
+procedure TPackageReference.SetLibPath(const value: string);
 begin
   FLibPath := value;
 end;
 
-procedure TGraphNode.SetParent(const value: IGraphNode);
+procedure TPackageReference.SetParent(const value: IPackageReference);
 begin
   {$IFDEF USEWEAK}
   FParent := value;
@@ -412,39 +411,39 @@ begin
   {$ENDIF}
 end;
 
-procedure TGraphNode.SetProjectFile(const value: string);
+procedure TPackageReference.SetProjectFile(const value: string);
 begin
   if IsRoot then
     FProjectFile := value;
 end;
 
-procedure TGraphNode.SetSelectedOn(const value : TVersionRange);
+procedure TPackageReference.SetSelectedOn(const value : TVersionRange);
 begin
   FSelectedOn := value;
 end;
 
-procedure TGraphNode.SetVersion(const value : TPackageVersion);
+procedure TPackageReference.SetVersion(const value : TPackageVersion);
 begin
   FVersion := value;
 end;
 
-procedure TGraphNode.SetUseSource(const value: Boolean);
+procedure TPackageReference.SetUseSource(const value: Boolean);
 begin
   FUseSource := value;
 end;
 
-function TGraphNode.ToIdVersionString: string;
+function TPackageReference.ToIdVersionString: string;
 begin
   result := FId +' [' + FVersion.ToStringNoMeta + ']';
 end;
 
 
-procedure TGraphNode.VisitDFS(const visitor : TNodeVisitProc);
+procedure TPackageReference.VisitDFS(const visitor : TNodeVisitProc);
 var
-  childNode : IGraphNode;
+  dependency : IPackageReference;
 begin
-  for childNode in FChildNodes.Values do
-    childNode.VisitDFS(visitor);
+  for dependency in FDependencies.Values do
+    dependency.VisitDFS(visitor);
   //don't visit the root node as it's just a container
   if not self.IsRoot then
     visitor(self);

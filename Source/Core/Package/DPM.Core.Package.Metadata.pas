@@ -95,7 +95,7 @@ type
     FIsTrial : Boolean;
     FLicense : string;
     FTags : string;
-    FSearchPaths : IList<IPackageSearchPath>;
+    FSearchPaths : IList<string>;
     FProjectUrl : string;
     FRepositoryUrl : string;
     FRepositoryType : string;
@@ -110,7 +110,7 @@ type
     function GetIsTrial : Boolean;
     function GetLicense : string;
     function GetTags : string;
-    function GetSearchPaths : IList<IPackageSearchPath>;
+    function GetSearchPaths : IList<string>;
     function GetProjectUrl : string;
     function GetRepositoryUrl: string;
     function GetRepositoryType : string;
@@ -142,7 +142,6 @@ implementation
 uses
   DPM.Core.Constants,
   DPM.Core.Spec.Reader,
-  DPM.Core.Package.SearchPath,
   DPM.Core.Package.Dependency,
   System.SysUtils,
   System.RegularExpressions,
@@ -350,10 +349,9 @@ end;
 constructor TPackageMetadata.Create(const sourceName : string; const spec : IPackageSpec);
 var
   specSearchPath : ISpecSearchPath;
-  searchPath : IPackageSearchPath;
 begin
   inherited Create(sourceName, spec);
-  FSearchPaths := TCollections.CreateList<IPackageSearchPath>;
+  FSearchPaths := TCollections.CreateList<string>;
   FAuthors := spec.MetaData.Authors;
   FCopyright := spec.MetaData.Copyright;
   FDescription := spec.MetaData.Description;
@@ -370,10 +368,7 @@ begin
   FRepositoryCommit := spec.MetaData.RepositoryCommit;
 
   for specSearchPath in spec.TargetPlatform.SearchPaths do
-  begin
-    searchPath := TPackageSearchPath.Create(specSearchPath.Path);
-    FSearchPaths.Add(searchPath);
-  end;
+    FSearchPaths.Add(specSearchPath.Path);
 end;
 
 
@@ -382,10 +377,9 @@ var
   searchPaths : string;
   sList : TStringList;
   i: Integer;
-  searchPath : IPackageSearchPath;
 begin
   inherited Create(sourceName, jsonObj);
-  FSearchPaths := TCollections.CreateList<IPackageSearchPath>;
+  FSearchPaths := TCollections.CreateList<string>;
 
   FAuthors        := jsonObj.S['authors'];;
   FCopyright      := jsonObj.S['copyright'];
@@ -411,10 +405,7 @@ begin
       sList.Delimiter := ';';
       sList.DelimitedText := searchPaths;
       for i := 0 to sList.Count -1 do
-      begin
-        searchPath := TPackageSearchPath.Create(sList.Strings[i]);
-        FSearchPaths.Add(searchPath);
-      end;
+        FSearchPaths.Add(sList.Strings[i]);
     finally
       sList.Free;
     end;
@@ -486,7 +477,7 @@ begin
   result := FRepositoryUrl;
 end;
 
-function TPackageMetadata.GetSearchPaths : IList<IPackageSearchPath>;
+function TPackageMetadata.GetSearchPaths : IList<string>;
 begin
   result := FSearchPaths;
 end;

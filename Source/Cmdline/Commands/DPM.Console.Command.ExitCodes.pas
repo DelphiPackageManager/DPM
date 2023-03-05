@@ -29,7 +29,7 @@ unit DPM.Console.Command.ExitCodes;
 interface
 
 uses
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   DPM.Console.Writer,
   DPM.Console.ExitCodes,
   DPM.Console.Command;

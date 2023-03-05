@@ -54,7 +54,7 @@ type
     procedure AddPackageVersions(const packageId : string; const versions : IList<IPackageInfo>);
     procedure RemovePackageVersion(const packageId : string; const version : IPackageInfo);
     function GetResolvedPackages : IList<IPackageInfo>;
-    function BuildDependencyGraph : IGraphNode;
+    function BuildDependencyGraph : IPackageReference;
     function ProjectFile : string;
   end;
 
@@ -84,7 +84,7 @@ type
     procedure AddPackageVersions(const packageId : string; const versions : IList<IPackageInfo>);
     procedure RemovePackageVersion(const packageId : string; const version : IPackageInfo);
     function GetResolvedPackages : IList<IPackageInfo>;
-    function BuildDependencyGraph : IGraphNode;
+    function BuildDependencyGraph : IPackageReference;
     function ProjectFile : string;
   public
     constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>);overload;
@@ -119,29 +119,29 @@ begin
   result := FOpenRequirements.Any;
 end;
 
-function TResolverContext.BuildDependencyGraph : IGraphNode;
+function TResolverContext.BuildDependencyGraph : IPackageReference;
 var
   toplevelPackages : TArray<IResolution>;
   topLevelPackage : IResolution;
 
-  procedure AddNode(const parentNode : IGraphNode; const package : IPackageInfo; const versionRange : TVersionRange);
+  procedure AddNode(const parent : IPackageReference; const package : IPackageInfo; const versionRange : TVersionRange);
   var
     resolution : IResolution;
     dependency : IPackageDependency;
-    childNode : IGraphNode;
+    dependencyReference : IPackageReference;
   begin
-    childNode := parentNode.AddPackageChildNode(package.Id, package.Version, versionRange);
-    childNode.UseSource := package.UseSource;
+    dependencyReference := parent.AddPackageDependency(package.Id, package.Version, versionRange);
+    dependencyReference.UseSource := package.UseSource;
     for dependency in package.Dependencies do
     begin
-      if not TryGetResolution(dependency.Id,parentNode.Id, resolution) then
+      if not TryGetResolution(dependency.Id, parent.Id, resolution) then
         raise Exception.Create('Didn''t find a resolution for package [' + dependency.id + ']');
-      AddNode(childNode, resolution.Package, resolution.VersionRange);
+      AddNode(dependencyReference, resolution.Package, resolution.VersionRange);
     end;
   end;
 
 begin
-  result := TGraphNode.CreateRoot(FCompilerVersion, FPlatform);
+  result := TPackageReference.CreateRoot(FCompilerVersion, FPlatform);
   toplevelPackages := FResolved.Values.Where(function(const value : IResolution) : boolean
     begin
       result := value.ParentId = cRootNode;

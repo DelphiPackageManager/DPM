@@ -1,0 +1,195 @@
+{
+	"definitionSchemaVersion": 0,
+	"name" : "DPM.IDE",
+	"packagesFolder": ".\\experts",
+	"projectGUID": "{8FF7EA44-009F-4370-BDA2-3C30D26F6FC9}",
+	"frameworkType" : "VCL",
+	"projectType" : "DLL",
+	"targetPlatforms" : [
+		{
+		  "compiler" : "XE2",
+		  "platforms" : "Win32",
+		  "template" : "default"
+		},
+		{
+		  "compiler" : "XE3",
+		  "platforms" : "Win32",
+		  "template" : "default"
+		},
+		{
+		  "compiler" : "XE4",
+		  "platforms" : "Win32",
+		  "template" : "default"
+		},
+		{
+		  "compiler" : "XE5",
+		  "platforms" : "Win32",
+		  "template" : "default"
+		},
+		{
+		  "compiler" : "XE6",
+		  "platforms" : "Win32",
+		  "template" : "default"
+		},
+		{
+		  "compiler" : "XE7",
+		  "platforms" : "Win32",
+		  "template" : "default"
+		},
+		{
+		  "compiler" : "XE8",
+		  "platforms" : "Win32",
+		  "template" : "default"
+		},
+		{
+		  "compiler" : "D10.0",
+		  "platforms" : "Win32",
+		  "template" : "default"
+		},
+		{
+		  "compiler" : "D10.1",
+		  "platforms" : "Win32",
+		  "template" : "default"
+		},
+		{
+		  "compiler" : "D10.2",
+		  "platforms" : "Win32",
+		  "template" : "default"
+		},
+		{
+		  "compiler" : "D10.3",
+		  "platforms" : "Win32",
+		  "template" : "default"
+		},
+		{
+		  "compiler" : "D10.4",
+		  "platforms" : "Win32",
+		  "template" : "default"
+		},
+		{
+		  "compiler" : "D11",
+		  "platforms" : "Win32",
+		  "template" : "default"
+		}
+
+	],
+	"templates" : [
+		{   
+			"name" : "default",
+			"mainSourceTemplate" : "%name%.%CompilerNoPoint%",
+			"libSuffix" : "%CompilerNoPoint%.dll",
+			"folderNameTemplate": "Rad Studio %Compiler% %CompilerCodeName%",		
+			"descriptionTemplate": "DPM IDE Plugin for Delphi %Compiler%",
+			"files" : [
+			  "System.SysUtils",
+			  "System.Classes",
+			  "..\\..\\SVG\\*.pas",
+			  "..\\..\\Core\\**\\*.pas",
+			  "..\\..\\Controls\\**\\*.pas",
+			  "..\\..\\IDE\\**\\*.pas",
+			  "..\\..\\IDE\\DPM.IDE.AboutForm.pas={DPMAboutForm}",
+			  "..\\..\\IDE\\DPM.IDE.AddInOptionsHostForm.pas={DPMOptionsHostForm}",
+			  "..\\..\\IDE\\EditorView\\DPM.IDE.EditorViewFrame.pas={DPMEditViewFrame: TFrame}",
+			  "..\\..\\IDE\\EditorView\\DPM.IDE.PackageDetailsFrame.pas={PackageDetailsFrame: TFrame}",
+			  "..\\..\\IDE\\EditorView\\DPM.IDE.SearchBarFrame.pas={DPMSearchBarFrame: TFrame}",
+			  "..\\..\\IDE\\Logging\\DPM.IDE.MessageForm.pas={DPMMessageForm}",
+			  "..\\..\\IDE\\EditorView\\DPM.IDE.BaseEditViewFrame.pas={DPMBaseEditViewFrame: TFrame}",
+			  "..\\..\\IDE\\EditorView\\DPM.IDE.GroupEditorViewFrame.pas={DPMGroupEditViewFrame: TFrame}",
+			  "..\\..\\IDE\\EditorView\\DPM.IDE.GroupPackageDetailsFrame.pas={GroupPackageDetailsFrame: TFrame}"
+			],
+			"requires" : [
+				"rtl",
+				"vcl",
+				"designide"
+			],
+			"dpkOptions": [
+				"{$R *.dres}"
+			],
+			"code": [
+				"{$R *.res}",
+				"begin",
+				"end."
+			],
+			"dpm" : [
+				{ 
+					"id": "Spring4D.Core",
+					"version" : "2.0.0-dev14",
+					"platform": "Win32",
+					"deps": [
+						{
+							"id": "Spring4D.Base",
+							"version" : "2.0.0-dev14",
+							"platform": "Win32"
+						}
+					]
+				},
+				{
+					"id" : "Spring4D.Extensions",
+					"version" : "2.0.0-dev14",
+					"platform": "Win32",
+					"deps" : [
+						{
+							"id": "Spring4D.Base",
+							"version" : "2.0.0-dev14",
+							"platform": "Win32"
+						}				
+					]
+				},
+				{
+					"id" : "VSoft.AntPatterns",
+					"version" : "0.1.3",
+					"platform": "Win32"
+				},
+				{
+					"id" : "VSoft.Awaitable",
+					"version" : "0.2.2",
+					"platform": "Win32",
+					"deps" : [
+						{
+							"id": "Gabr42.OmniThreadLibrary",
+							"version" : "3.7.8",
+							"platform": "Win32"
+						},
+						{
+							"id": "VSoft.CancellationToken",
+							"version" : "0.0.4",						
+							"platform": "Win32"
+						}
+					]
+				},
+				{
+					"id" : "VSoft.HttpClient",
+					"version" : "0.2.2",
+					"platform": "Win32",
+					"deps" : [
+						{
+							"id": "VSoft.Uri",
+							"version" : "0.3.0",
+							"platform": "Win32"
+						},
+						{
+							"id": "VSoft.CancellationToken",
+							"version" : "0.0.4",						
+							"platform": "Win32"
+						}
+					]					
+				},
+				{
+					"id" : "VSoft.JsonDataObjects",
+					"version" : "0.1.3",
+					"platform": "Win32"
+				},
+				{
+					"id" : "VSoft.SemanticVersion",
+					"version" : "0.2.3",
+					"platform": "Win32"
+				},
+				{
+					"id" : "VSoft.VirtualListView",
+					"version" : "0.3.0-rc9",
+					"platform": "Win32"
+				}
+			]
+		}
+	]
+}

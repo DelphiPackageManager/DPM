@@ -13,12 +13,10 @@ uses
 type
   TCorePackageInstallerContext = class(TInterfacedObject, IPackageInstallerContext)
   private
-    FProjectGraphs : IDictionary<string, IDictionary<TDPMPlatform, IGraphNode>>;
+    FProjectGraphs : IDictionary<string, IDictionary<TDPMPlatform, IPackageReference>>;
     FProjectResolutions : IDictionary<string, IDictionary<TDPMPlatform, IList<IResolution>>>;
   protected
     FLogger : ILogger;
-    procedure StartProject(const projectFile: string; const platform : TDPMPlatform);virtual;
-    procedure EndProject(const projectFile: string; const platform : TDPMPlatform);virtual;
 
 
     function RegisterDesignPackage(const platform : TDPMPlatform; const packageFile : string; const dependsOn : IList<string>; out errorMessage : string) : boolean;virtual;
@@ -26,7 +24,7 @@ type
 
     procedure RemoveProject(const projectFile : string);virtual;
 
-    procedure RecordGraph(const projectFile: string; const platform : TDPMPlatform; const graph: IGraphNode; const resolutions : TArray<IResolution>);virtual;
+    procedure RecordGraph(const projectFile: string; const platform : TDPMPlatform; const graph: IPackageReference; const resolutions : TArray<IResolution>);virtual;
 
     //search other projects in the project group to see if they have resolved the package.
     function FindPackageResolution(const currentProjectFile: string; const packageId : string; const platform : TDPMPlatform) : IResolution;
@@ -57,19 +55,8 @@ end;
 constructor TCorePackageInstallerContext.Create(const logger : ILogger);
 begin
   FLogger := Logger;
-  FProjectGraphs := TCollections.CreateDictionary<string, IDictionary<TDPMPlatform, IGraphNode>>;
+  FProjectGraphs := TCollections.CreateDictionary<string, IDictionary<TDPMPlatform, IPackageReference>>;
   FProjectResolutions := TCollections.CreateDictionary<string, IDictionary<TDPMPlatform, IList<IResolution>>>;
-end;
-
-procedure TCorePackageInstallerContext.StartProject(const projectFile: string; const platform : TDPMPlatform);
-begin
-
-end;
-
-
-procedure TCorePackageInstallerContext.EndProject(const projectFile: string; const platform : TDPMPlatform);
-begin
-
 end;
 
 
@@ -104,14 +91,14 @@ begin
   result := false;
 end;
 
-procedure TCorePackageInstallerContext.RecordGraph(const projectFile: string; const platform : TDPMPlatform; const graph: IGraphNode; const resolutions : TArray<IResolution>);
+procedure TCorePackageInstallerContext.RecordGraph(const projectFile: string; const platform : TDPMPlatform; const graph: IPackageReference; const resolutions : TArray<IResolution>);
 var
-  projectPlatformEntry : IDictionary<TDPMPlatform, IGraphNode>;
+  projectPlatformEntry : IDictionary<TDPMPlatform, IPackageReference>;
   resolutionPlatformEntry : IDictionary<TDPMPlatform, IList<IResolution>>;
 begin
   if not FProjectGraphs.TryGetValue(LowerCase(projectFile), projectPlatformEntry) then
   begin
-    projectPlatformEntry := TCollections.CreateDictionary<TDPMPlatform, IGraphNode>;
+    projectPlatformEntry := TCollections.CreateDictionary<TDPMPlatform, IPackageReference>;
     FProjectGraphs[LowerCase(projectFile)] := projectPlatformEntry;
   end;
   projectPlatformEntry[platform] := graph;

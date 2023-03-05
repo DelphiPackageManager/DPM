@@ -38,15 +38,15 @@ object DPMOptionsFrame: TDPMOptionsFrame
         object lblPackageSources: TLabel
           Left = 16
           Top = 61
-          Width = 108
-          Height = 13
+          Width = 120
+          Height = 15
           Caption = ' DPM Package Sources'
         end
         object Label3: TLabel
-          Left = 16
+          Left = 7
           Top = 12
-          Width = 109
-          Height = 13
+          Width = 118
+          Height = 15
           Alignment = taRightJustify
           Caption = 'Package cache folder :'
         end
@@ -120,36 +120,36 @@ object DPMOptionsFrame: TDPMOptionsFrame
         object Label1: TLabel
           Left = 24
           Top = 6
-          Width = 70
-          Height = 13
+          Width = 77
+          Height = 15
           Caption = 'Source Name :'
         end
         object Label2: TLabel
           Left = 24
           Top = 49
-          Width = 94
-          Height = 13
+          Width = 101
+          Height = 15
           Caption = 'Source Path or Uri :'
         end
         object Label5: TLabel
           Left = 24
           Top = 97
-          Width = 92
-          Height = 13
+          Width = 100
+          Height = 15
           Caption = 'Source UserName :'
         end
         object Label6: TLabel
           Left = 24
           Top = 145
-          Width = 158
-          Height = 13
+          Width = 170
+          Height = 15
           Caption = 'Source Password/Access Token :'
         end
         object Label8: TLabel
           Left = 481
           Top = 6
-          Width = 67
-          Height = 13
+          Width = 69
+          Height = 15
           Caption = 'Source Type :'
         end
         object txtName: TEdit
@@ -193,7 +193,7 @@ object DPMOptionsFrame: TDPMOptionsFrame
           Left = 480
           Top = 22
           Width = 171
-          Height = 21
+          Height = 23
           Style = csDropDownList
           ItemIndex = 0
           TabOrder = 4
@@ -259,7 +259,6 @@ object DPMOptionsFrame: TDPMOptionsFrame
       Margins.Bottom = 0
       Caption = ' IDE Options '
       ImageIndex = 1
-      ExplicitLeft = 0
       object pnlIDEOptions: TPanel
         Left = 0
         Top = 0
@@ -273,36 +272,36 @@ object DPMOptionsFrame: TDPMOptionsFrame
         object Label4: TLabel
           Left = 24
           Top = 24
-          Width = 65
-          Height = 13
+          Width = 74
+          Height = 15
           Caption = 'Logging Level'
         end
         object Label7: TLabel
           Left = 24
           Top = 88
-          Width = 95
-          Height = 13
+          Width = 104
+          Height = 15
           Caption = 'Show Log View for :'
         end
         object Label9: TLabel
           Left = 264
           Top = 131
-          Width = 132
-          Height = 13
+          Width = 144
+          Height = 15
           Caption = 'Auto Close Delay (seconds)'
         end
         object Label10: TLabel
           Left = 24
           Top = 196
-          Width = 79
-          Height = 13
+          Width = 87
+          Height = 15
           Caption = 'Project Manager'
         end
         object Label11: TLabel
           Left = 56
           Top = 238
-          Width = 239
-          Height = 13
+          Width = 259
+          Height = 15
           Caption = 'Experimental - very slow for large project groups.'
           Enabled = False
         end
@@ -353,7 +352,7 @@ object DPMOptionsFrame: TDPMOptionsFrame
           Left = 24
           Top = 43
           Width = 145
-          Height = 21
+          Height = 23
           Style = csDropDownList
           ItemIndex = 1
           TabOrder = 5

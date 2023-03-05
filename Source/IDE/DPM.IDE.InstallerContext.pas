@@ -14,8 +14,6 @@ type
   TDPMIDEPackageInstallerContext = class(TCorePackageInstallerContext, IPackageInstallerContext)
   private
   protected
-    procedure StartProject(const projectFile: string; const platform: TDPMPlatform);override;
-    procedure EndProject(const projectFile: string; const platform: TDPMPlatform);override;
     function IsDesignPackageInstalled(const packageName: string; out platform : TDPMPlatform; out project : string): Boolean;override;
     function RegisterDesignPackage(const platform: TDPMPlatform; const packageFile: string; const dependsOn: IList<string>; out errorMessage : string) : boolean;override;
     procedure Clear;override;
@@ -33,10 +31,6 @@ begin
 
 end;
 
-procedure TDPMIDEPackageInstallerContext.EndProject( const projectFile: string; const platform: TDPMPlatform);
-begin
-
-end;
 
 function TDPMIDEPackageInstallerContext.IsDesignPackageInstalled(const packageName: string; out platform : TDPMPlatform; out project : string): Boolean;
 begin
@@ -51,11 +45,6 @@ end;
 procedure TDPMIDEPackageInstallerContext.Clear;
 begin
   inherited;
-end;
-
-procedure TDPMIDEPackageInstallerContext.StartProject(const projectFile: string; const platform: TDPMPlatform);
-begin
-
 end;
 
 end.

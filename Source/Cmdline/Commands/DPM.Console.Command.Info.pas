@@ -28,7 +28,7 @@ unit DPM.Console.Command.Info;
 
 interface
 uses
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   DPM.Console.Writer,
   DPM.Console.ExitCodes,
   DPM.Console.Command,

@@ -59,7 +59,9 @@ inherited DPMGroupEditViewFrame: TDPMGroupEditViewFrame
               ExplicitWidth = 410
               inherited txtInstalledVersion: TEdit
                 Width = 250
+                Height = 23
                 ExplicitWidth = 250
+                ExplicitHeight = 23
               end
               inherited btnUninstall: TButton
                 Left = 331

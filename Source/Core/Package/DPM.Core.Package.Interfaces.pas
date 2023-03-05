@@ -89,14 +89,6 @@ type
     property UseSource : boolean read GetUseSource write SetUseSource;
   end;
 
-  IPackageSearchPath = interface
-    ['{55B09D0C-01E4-4FF3-977F-98A1A57B62B1}']
-    function GetPath : string;
-
-    property Path : string read GetPath;
-  end;
-
-
   //full package metadata.
   IPackageMetadata = interface(IPackageInfo)
     ['{0C39A81D-63FF-4939-A74A-4BFE29724168}']
@@ -109,7 +101,7 @@ type
     function GetIsTrial : boolean;
     function GetIsCommercial : boolean;
     function GetProjectUrl : string;
-    function GetSearchPaths : IList<IPackageSearchPath>;
+    function GetSearchPaths : IList<string>;
     function GetRepositoryUrl : string;
     function GetRepositoryType : string;
     function GetRepositoryBranch : string;
@@ -129,8 +121,7 @@ type
     property RepositoryBranch : string read GetRepositoryBranch;
     property RepositoryCommit : string read GetRepositoryCommit;
 
-    //TODO : We may be able t remove this as the only place it's use will probably be getting the full spec file.
-    property SearchPaths : IList<IPackageSearchPath>read GetSearchPaths;
+    property SearchPaths : IList<string>read GetSearchPaths;
   end;
 
   //this is what is returned from a package feed for the UI.

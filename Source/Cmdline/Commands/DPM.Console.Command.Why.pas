@@ -28,11 +28,11 @@ unit DPM.Console.Command.Why;
 
 interface
 
-//TODO : Why command to explain a dependency. Just use the lock file to present a clear explaination
+//TODO : Why command to explain a dependency. Just use the graph to present a clear explaination
 //https://theimowski.com/blog/2016/10-30-paket-why-command/index.html
 
 uses
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   DPM.Console.ExitCodes,
   DPM.Console.Command,
   DPM.Console.Command.Base;

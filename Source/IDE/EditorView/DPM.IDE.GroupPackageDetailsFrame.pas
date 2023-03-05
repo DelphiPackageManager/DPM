@@ -344,9 +344,9 @@ procedure TGroupPackageDetailsFrame.SetPackage(const package: IPackageSearchResu
 var
   logo : IPackageIconImage;
   graphic : TGraphic;
-  packageRefs : IGraphNode;
-  projectRefs : IGraphNode;
-  projectRef : IGraphNode;
+  packageRefs : IPackageReference;
+  projectRefs : IPackageReference;
+  projectRef : IPackageReference;
   i: Integer;
   sValue : string;
 begin
@@ -427,9 +427,9 @@ begin
         if packageRefs <> nil then
         begin
           projectRef := nil;
-          projectRefs := packageRefs.FindChild(LowerCase(FProjectsGrid.ProjectName[i]));
+          projectRefs := packageRefs.FindDependency(LowerCase(FProjectsGrid.ProjectName[i]));
           if projectRefs <> nil then
-            projectRef := projectRefs.FindChild(package.Id);
+            projectRef := projectRefs.FindDependency(package.Id);
         end;
 
         if projectRef <> nil then

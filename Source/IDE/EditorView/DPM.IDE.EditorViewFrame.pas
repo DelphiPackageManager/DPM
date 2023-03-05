@@ -81,7 +81,7 @@ type
     //to install controls before they can work in this.
     procedure CreateControls(AOwner : TComponent);override;
     function GetPackageDetailsView : IPackageDetailsView;override;
-    function DoGetPackageReferences : IGraphNode;override;
+    function DoGetPackageReferences : IPackageReference;override;
 
   public
     constructor Create(AOwner : TComponent); override;
@@ -146,7 +146,7 @@ end;
 
 
 
-function TDPMEditViewFrame.DoGetPackageReferences: IGraphNode;
+function TDPMEditViewFrame.DoGetPackageReferences: IPackageReference;
 var
   projectEditor : IProjectEditor;
 begin

@@ -29,7 +29,7 @@ unit DPM.Console.Command.Sources;
 interface
 
 uses
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Logging,
   DPM.Console.ExitCodes,

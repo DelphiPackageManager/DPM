@@ -512,7 +512,7 @@ var
   dpmChildren : IInterfaceList;
   platformSortedList : TStringList;
   i : integer;
-  platformPackageReferences : IGraphNode;
+  platformPackageReferences : IPackageReference;
 
   function FindProject : IOTAProject;
   var
@@ -553,25 +553,25 @@ var
   end;
 
 
-  procedure AddPlatform(const pf : TDPMPlatform; const PackageReferences : IGraphNode);
+  procedure AddPlatform(const pf : TDPMPlatform; const PackageReferences : IPackageReference);
   var
     platformContainer : TProjectTreeContainer;
-    packageRef : IGraphNode;
+    packageRef : IPackageReference;
 
-    procedure AddPackage(const parentContainer : TProjectTreeContainer; const packageReference : IGraphNode; const children : IInterfaceList);
+    procedure AddPackage(const parentContainer : TProjectTreeContainer; const packageReference : IPackageReference; const children : IInterfaceList);
     var
       packageRefContainer : TProjectTreeContainer;
-      depRef : IGraphNode;
+      depRef : IPackageReference;
     begin
       packageRefContainer := TProjectTreeContainer.CreateNewContainer(parentContainer, packageReference.ToIdVersionString,cDPMContainer);
       packageRefContainer.ImageIndex := -1;
       AddChildContainer(parentContainer, packageRefContainer);
       children.Add(packageRefContainer);
 
-      if packageReference.HasChildren then
+      if packageReference.HasDependencies then
       begin
         packageRefContainer.Children := TInterfaceList.Create;
-        for depRef in packageReference.ChildNodes do
+        for depRef in packageReference.Dependencies do
         begin
           AddPackage(packageRefContainer, depRef, packageRefContainer.Children);
         end;
@@ -584,12 +584,12 @@ var
     AddChildContainer(dpmContainer, platformContainer);
     dpmChildren.Add(platformContainer);
 
-    if PackageReferences.HasChildren then
+    if PackageReferences.HasDependencies then
     begin
       platformContainer.Children := TInterfaceList.Create;
 
       //using for loop rather the enumerator for per reasons.
-      for packageRef in PackageReferences.ChildNodes do
+      for packageRef in PackageReferences.Dependencies do
       begin
         if packageRef.Platform <> pf then
           continue;

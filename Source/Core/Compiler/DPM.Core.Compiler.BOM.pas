@@ -36,8 +36,8 @@ uses
 type
   TBOMFile = class
   public
-    class function LoadFromFile(const logger : ILogger; const fileName : string) : IGraphNode;
-    class function SaveToFile(const logger : ILogger; const fileName : string; const graphNode : IGraphNode) : boolean;
+    class function LoadFromFile(const logger : ILogger; const fileName : string) : IPackageReference;
+    class function SaveToFile(const logger : ILogger; const fileName : string; const packageReference : IPackageReference) : boolean;
   end;
 
 
@@ -57,7 +57,7 @@ const
 
 { TBOMFile }
 
-class function TBOMFile.LoadFromFile(const logger : ILogger; const fileName: string): IGraphNode;
+class function TBOMFile.LoadFromFile(const logger : ILogger; const fileName: string): IPackageReference;
 var
   jsonObj : TJsonObject;
   depArray : TJsonArray;
@@ -82,7 +82,7 @@ begin
       platform := StringToDPMPlatform(jsonObj.S['platform']);
 
       //we don't need the compiler version for this - if that changes we will need to pass it it.
-      result := TGraphNode.Create(nil,sId, version, platform, TCompilerVersion.UnknownVersion, TVersionRange.Empty,false);
+      result := TPackageReference.Create(nil,sId, version, platform, TCompilerVersion.UnknownVersion, TVersionRange.Empty,false);
 
       if jsonObj.Contains('dependencies') then
       begin
@@ -92,7 +92,7 @@ begin
           sId := depArray.Values[i].S['id'];
           sVersion := depArray.Values[i].S['version'];
           version := TPackageVersion.Parse(sVersion);
-          result.AddPackageChildNode(sId,version, TVersionRange.Empty);
+          result.AddPackageDependency(sId,version, TVersionRange.Empty);
         end;
       end;
     finally
@@ -108,7 +108,7 @@ begin
 
 end;
 
-class function TBOMFile.SaveToFile(const logger : ILogger; const fileName: string; const graphNode: IGraphNode): boolean;
+class function TBOMFile.SaveToFile(const logger : ILogger; const fileName: string; const packageReference : IPackageReference): boolean;
 var
   jsonObj : TJsonObject;
 
@@ -116,19 +116,19 @@ begin
   jsonObj := TJsonObject.Create;
   try
     try
-      jsonObj.S['id'] := graphNode.Id;
-      jsonObj.S['version'] := graphNode.Version.ToStringNoMeta;
-      jsonObj.S['platform'] := DPMPlatformToString(graphNode.Platform);
-      if graphNode.HasChildren then
+      jsonObj.S['id'] := packageReference.Id;
+      jsonObj.S['version'] := packageReference.Version.ToStringNoMeta;
+      jsonObj.S['platform'] := DPMPlatformToString(packageReference.Platform);
+      if packageReference.HasDependencies then
       begin
-        graphNode.ChildNodes.ForEach(
-          procedure(const childNode : IGraphNode)
+        packageReference.Dependencies.ForEach(
+          procedure(const dependency : IPackageReference)
           var
             depObj : TJsonObject;
           begin
             depObj := jsonObj.A['dependencies'].AddObject;
-            depObj.S['id'] := childNode.Id;
-            depObj.S['version'] := childNode.Version.ToStringNoMeta;
+            depObj.S['id'] := dependency.Id;
+            depObj.S['version'] := dependency.Version.ToStringNoMeta;
           end);
       end;
       jsonObj.SaveToFile(fileName, false, TEncoding.UTF8);

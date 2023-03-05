@@ -1,8 +1,8 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright � 2019 Vincent Parrett and contributors               }
+{           Copyright © 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -53,15 +53,15 @@ type
     FStopwatch : TStopWatch;
     FConfiguration : IConfiguration;
   protected
-    procedure Initialize(const config: IConfiguration);
+    function Initialize(const config: IConfiguration) : boolean;
 
-    function ValidateDependencyGraph(const cancellationToken : ICancellationToken; var dependencyGraph : IGraphNode) : boolean;
+    function ValidateDependencyGraph(const cancellationToken : ICancellationToken; var dependencyGraph : IPackageReference) : boolean;
 
     function DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;  const includePrerelease : boolean; const context : IResolverContext) : boolean;
 
-    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
 
-    function ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
 
   public
     constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageInstallerContext : IPackageInstallerContext);
@@ -300,14 +300,14 @@ begin
 
 end;
 
-procedure TDependencyResolver.Initialize(const config: IConfiguration);
+function TDependencyResolver.Initialize(const config: IConfiguration) : boolean;
 begin
   Assert(config <> nil);
   FConfiguration := config;
-  FRepositoryManager.Initialize(config);
+  result :=FRepositoryManager.Initialize(config);
 end;
 
-function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; out resolved : IList<IPackageInfo>) : boolean;
+function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
 var
   context : IResolverContext;
   packageRef : TProjectReference;
@@ -344,7 +344,7 @@ end;
 
 //This is all wrong. What it should do is just validate the project references and ensure it's correct, not go off and resolve dependencies
 //which might change the dependecy versions. We only want to change the graph if it's wrong.
-function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IGraphNode; out resolved : IList<IPackageInfo>) : boolean;
+function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
 var
   context : IResolverContext;
   packageRef : TProjectReference;
@@ -358,17 +358,18 @@ begin
 
 
 
-
-
   errorCount := 0;
+
+  //first check if the packages are already resolved in the project group.
   for packageRef in projectReferences do
   begin
     resolution := FPackageInstallerContext.FindPackageResolution(projectFile,packageRef.Package.Id, platform);
+    //if resolved, check if they are compatible.
     if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Package.Version)) then
     begin
       FLogger.Error('Package project group conflict : ' + packageRef.Package.Id + '-' + resolution.Package.Version.ToString + ' in project : ' + resolution.Project + ' does not satisfy ' + packageRef.Package.Version.ToString  );
       Inc(errorCount)
-     // exit;
+     // exit; //don't exit, we still want to resolve what we can.
     end;
   end;
   context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, compilerVersion,  platform, projectReferences);
@@ -384,7 +385,7 @@ begin
 end;
 
 
-function TDependencyResolver.ValidateDependencyGraph(const cancellationToken: ICancellationToken; var dependencyGraph: IGraphNode): boolean;
+function TDependencyResolver.ValidateDependencyGraph(const cancellationToken: ICancellationToken; var dependencyGraph: IPackageReference): boolean;
 var
   resolvedPackages: IDictionary<string, TPackageVersion>;
 begin
@@ -394,7 +395,7 @@ begin
 
   //check for conflicts in the graph. If there are any then log the conflicts and remove them so restore can repair the graph.
   dependencyGraph.VisitDFS(
-    procedure(const node: IGraphNode)
+    procedure(const node: IPackageReference)
     var
       pkgVersion : TPackageVersion;
     begin

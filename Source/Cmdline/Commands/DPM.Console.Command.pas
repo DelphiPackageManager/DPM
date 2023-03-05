@@ -30,9 +30,9 @@ interface
 
 uses
   Spring.Container.Common,
+  VSoft.CancellationToken,
   DPM.Console.Types,
-  DPM.Console.ExitCodes,
-  VSoft.Awaitable;
+  DPM.Console.ExitCodes;
 
 type
   ICommandHandler = interface

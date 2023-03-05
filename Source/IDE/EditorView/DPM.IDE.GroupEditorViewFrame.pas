@@ -31,7 +31,7 @@ type
   protected
     function IsProjectGroup : boolean;override;
     function GetPackageDetailsView : IPackageDetailsView;override;
-    function DoGetPackageReferences : IGraphNode;override;
+    function DoGetPackageReferences : IPackageReference;override;
     procedure ConfigureSearchBar;override;
   public
     constructor Create(AOwner : TComponent); override;
@@ -103,27 +103,27 @@ begin
   result := PackageDetailsFrame as IPackageDetailsView;
 end;
 
-function TDPMGroupEditViewFrame.DoGetPackageReferences: IGraphNode;
+function TDPMGroupEditViewFrame.DoGetPackageReferences: IPackageReference;
 var
   projectEditor : IProjectEditor;
   proj : IOTAProject;
   i : integer;
-  node : IGraphNode;
+  packageReference : IPackageReference;
   sProjectId : string;
 begin
   projectEditor := TProjectEditor.Create(Logger, Configuration, IDECompilerVersion);
-  result := TGraphNode.CreateRoot(IDECompilerVersion, CurrentPlatform);
+  result := TPackageReference.CreateRoot(IDECompilerVersion, CurrentPlatform);
 
   for i := 0 to ProjectGroup.ProjectCount -1 do
   begin
     proj := ProjectGroup.Projects[i];
     sProjectId := proj.FileName;
     projectEditor.LoadProject(sProjectId);
-    node := projectEditor.GetPackageReferences(CurrentPlatform); //NOTE : Can return nil. Will change internals to return empty root node.
-    if node <> nil then
+    packageReference := projectEditor.GetPackageReferences(CurrentPlatform); //NOTE : Can return nil. Will change internals to return empty root node.
+    if packageReference <> nil then
     begin
       sProjectId := ChangeFileExt(ExtractFileName(sProjectId), '');
-      Result.AddExistingNode(LowerCase(sProjectId), node);
+      Result.AddExistingReference(LowerCase(sProjectId), packageReference);
     end;
   end;
 

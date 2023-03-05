@@ -36,14 +36,14 @@ uses
   //NOTE: The IDE keeps adding this again below, if it happens edit the file outside the IDE.
 //  System.Actions,
   {$IFEND}
-  {$IF CompilerVersion >= 29.0 } //XE3 up
-  System.ImageList,
+  {$IF CompilerVersion < 29.0 } //XE2 dowm
+  ImageList,
   {$IFEND}
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ActnList, Vcl.ImgList, Vcl.CheckLst,
   Vcl.Buttons, Vcl.ComCtrls, Vcl.ExtCtrls, Vcl.StdCtrls,
   DPM.Core.Logging,
   DPM.Core.Configuration.Interfaces,
-  DPM.IDE.Options, Vcl.Samples.Spin;
+  DPM.IDE.Options, Vcl.Samples.Spin, System.ImageList, System.Actions;
 
 {$WARN SYMBOL_PLATFORM OFF}
 type

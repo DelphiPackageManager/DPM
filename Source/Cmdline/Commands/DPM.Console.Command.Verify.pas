@@ -29,7 +29,7 @@ unit DPM.Console.Command.Verify;
 interface
 
 uses
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   DPM.Console.ExitCodes,
   DPM.Console.Command.Base;
 

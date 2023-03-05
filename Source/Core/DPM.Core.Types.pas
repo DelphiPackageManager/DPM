@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -261,9 +261,6 @@ begin
   else
     result := GetEnumName(TypeInfo(TDPMPlatform), ord(value));
   end;
-
-
-
 end;
 
 function DPMPlatformToBDString(const value : TDPMPlatform) : string;
@@ -475,11 +472,6 @@ begin
             result := true; //ambigous could be 10.1 Update 1 and Delphi 10.2
             versions := '10.1 Update 1 / 10.2';
           end;
-//          8 : //not confirmed.
-//          begin
-//            result := true; //ambigous could be 10.3.x or Delphi 10.4
-//            versions := '10.3 / 10.2';
-//          end;
         end;
       end;
   end;
@@ -547,12 +539,14 @@ begin
       begin
         case minor of
           0..2 : result := TCompilerVersion.RS10_4;
-          else //.3 is 11.0
+          else //.3 is 11.0, .4 is ll.1, .5 is 11.2/3
             result := TCompilerVersion.RS11_0;
           end;
         end;
 
     end;
+  else
+    raise EArgumentOutOfRangeException.Create('Unknown project version');
   end;
 end;
 

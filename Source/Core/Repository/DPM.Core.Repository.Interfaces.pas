@@ -31,7 +31,6 @@ interface
 uses
   Spring.Collections,
   VSoft.Awaitable,
-  SVGInterfaces,
   DPM.Core.Types,
   DPM.Core.Sources.Types,
   DPM.Core.Dependency.Version,

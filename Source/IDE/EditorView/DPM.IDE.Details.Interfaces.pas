@@ -28,7 +28,7 @@ type
   IDetailsHost = interface
     ['{4FBB9E7E-886A-4B7D-89FF-FA5DBC9D93FD}']
 
-    function GetPackageReferences : IGraphNode;
+    function GetPackageReferences : IPackageReference;
     procedure SaveBeforeInstall;
     procedure PackageInstalled(const package : IPackageSearchResultItem);
     procedure PackageUninstalled(const package : IPackageSearchResultItem);

@@ -29,7 +29,7 @@ unit DPM.Console.Command.Pack;
 interface
 
 uses
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   Spring.Container.Common,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Logging,

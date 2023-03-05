@@ -75,9 +75,9 @@ type
     procedure Reset;
 
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string>; const packageCacheLocation : string) : boolean;
-    procedure UpdatePackageReferences(const dependencyGraph : IGraphNode; const platform : TDPMPlatform);
+    procedure UpdatePackageReferences(const dependencyGraph : IPackageReference; const platform : TDPMPlatform);
 
-    function GetPackageReferences(const platform : TDPMPlatform) : IGraphNode;
+    function GetPackageReferences(const platform : TDPMPlatform) : IPackageReference;
     function GetProjectConfiguration(const name : string; const platform : TDPMPlatform) : IProjectConfiguration;
     function GetConfigNames : IReadOnlyList<string>;
 

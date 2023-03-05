@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -508,15 +508,15 @@ begin
 end;
 
 function TDPMServerPackageRepository.GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion; const preRelease: Boolean): IDictionary<string, TPackageVersion>;
-var
-  httpClient : IHttpClient;
-  request : TRequest;
-  response : IHttpResponse;
-  serviceIndex : IServiceIndex;
-  serviceItem : IServiceIndexItem;
-  path : string;
-  jsonObj : TJsonObject;
-  uri : IUri;
+//var
+//  httpClient : IHttpClient;
+//  request : TRequest;
+//  response : IHttpResponse;
+//  serviceIndex : IServiceIndex;
+//  serviceItem : IServiceIndexItem;
+//  path : string;
+//  jsonObj : TJsonObject;
+//  uri : IUri;
 begin
   result := TCollections.CreateDictionary<string, TPackageVersion>;
 
@@ -772,8 +772,8 @@ begin
   uri := TUriFactory.Parse(self.SourceUri);
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
-  request := httpClient.CreateRequest(uri.AbsolutePath)
-            .WithAccept('application/json');
+  request := httpClient.CreateRequest(uri.AbsolutePath);
+//            .WithAccept('application/json');
   try
     response := request.Get(cancellationToken);
     if response.StatusCode <> 200 then

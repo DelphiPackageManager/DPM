@@ -29,7 +29,7 @@ unit DPM.Console.Command.Push;
 interface
 
 uses
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   DPM.Console.ExitCodes,
   DPM.Console.Command.Base,
   DPM.Core.Configuration.Interfaces,

@@ -13,13 +13,9 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
-          legalcopyright = "© 2019 -2021 Vincent Parrett and Contributors"
-          linkproductversion = false
-          minorversion = 1
           name = DPMVersion
-          productname = "DPM Package Manager"
+          productversion = 0.0.0.0
           productversionstring = 0.1.10-alpha
-          releaseversion = 10
         end
       end
       action.propertyset.setvalues
@@ -452,9 +448,7 @@ begin
         action.target.execute
         begin
           actionlistid = {CD2E679B-668B-4181-B51E-32647A974CED}
-          failifactionlistempty = false
           id = {F48903DA-1B21-46BE-9DBB-F5EBF27F6108}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -478,9 +472,8 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] XE2"
-          failifactionlistempty = false
+          enabled = false
           id = {E18926BA-E666-419A-9D6F-C51CA9EE782F}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -499,9 +492,8 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] XE3"
-          failifactionlistempty = false
+          enabled = false
           id = {2CF3AEA0-9248-4729-8141-BB48ED280D44}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -520,9 +512,8 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] XE4"
-          failifactionlistempty = false
+          enabled = false
           id = {CD8E6AAE-D083-479B-A611-4420C36F97DF}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -541,9 +532,8 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] XE5"
-          failifactionlistempty = false
+          enabled = false
           id = {B13232A7-8656-417C-BD5F-C30E531F145D}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -562,9 +552,8 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] XE6"
-          failifactionlistempty = false
+          enabled = false
           id = {1DF7D7D0-75AC-46F2-A029-BCF72F6A55BB}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -583,9 +572,8 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] XE7"
-          failifactionlistempty = false
+          enabled = false
           id = {CD063CBA-E2A0-41AF-A5F7-BB1B2761C7F8}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -604,9 +592,8 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] XE8"
-          failifactionlistempty = false
+          enabled = false
           id = {1487745C-9D1E-4CDC-9A2F-CE806907A044}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -625,9 +612,8 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] 10.0 Seattle"
-          failifactionlistempty = false
+          enabled = false
           id = {F5B4093C-AA0A-4AE2-93C7-CEF205E59FC8}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -646,9 +632,8 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] 10.1 Berlin"
-          failifactionlistempty = false
+          enabled = false
           id = {677BEFF9-7E75-4E78-B109-45F058B81596}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -667,9 +652,8 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] 10.2 Tokyo"
-          failifactionlistempty = false
+          enabled = false
           id = {68C01FBE-D970-43C1-BBE0-06900CE906FD}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -688,9 +672,8 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] 10.3 Rio"
-          failifactionlistempty = false
+          enabled = false
           id = {0E2307E8-90DE-4B65-BFD4-0C72BFC0EB32}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -709,9 +692,8 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] 10.4 Sydney"
-          failifactionlistempty = false
+          enabled = false
           id = {BAE83770-9957-4993-8537-17CD779D2852}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -730,9 +712,7 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] 11 Alexandria"
-          failifactionlistempty = false
           id = {418A387E-DF1B-4F4B-8815-500E563C96EA}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -798,9 +778,7 @@ begin
         action.target.execute
         begin
           actionlistid = {CD2E679B-668B-4181-B51E-32647A974CED}
-          failifactionlistempty = false
           id = {59923895-F98A-4386-AEE4-30A7608338D0}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
@@ -1061,9 +1039,7 @@ begin
         action.target.execute
         begin
           actionlistid = {CD2E679B-668B-4181-B51E-32647A974CED}
-          failifactionlistempty = false
           id = {A6B3126A-905F-45F8-B3E3-B78EDA218F63}
-          resetdependencychain = false
           target.argvalues
           begin
             target.argvalue
