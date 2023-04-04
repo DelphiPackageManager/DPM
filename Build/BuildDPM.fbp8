@@ -472,7 +472,6 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] XE2"
-          enabled = false
           id = {E18926BA-E666-419A-9D6F-C51CA9EE782F}
           target.argvalues
           begin
@@ -492,7 +491,6 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] XE3"
-          enabled = false
           id = {2CF3AEA0-9248-4729-8141-BB48ED280D44}
           target.argvalues
           begin
@@ -512,7 +510,6 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] XE4"
-          enabled = false
           id = {CD8E6AAE-D083-479B-A611-4420C36F97DF}
           target.argvalues
           begin
@@ -532,7 +529,6 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] XE5"
-          enabled = false
           id = {B13232A7-8656-417C-BD5F-C30E531F145D}
           target.argvalues
           begin
@@ -552,7 +548,6 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] XE6"
-          enabled = false
           id = {1DF7D7D0-75AC-46F2-A029-BCF72F6A55BB}
           target.argvalues
           begin
@@ -572,7 +567,6 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] XE7"
-          enabled = false
           id = {CD063CBA-E2A0-41AF-A5F7-BB1B2761C7F8}
           target.argvalues
           begin
@@ -592,7 +586,6 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] XE8"
-          enabled = false
           id = {1487745C-9D1E-4CDC-9A2F-CE806907A044}
           target.argvalues
           begin
@@ -612,7 +605,6 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] 10.0 Seattle"
-          enabled = false
           id = {F5B4093C-AA0A-4AE2-93C7-CEF205E59FC8}
           target.argvalues
           begin
@@ -632,7 +624,6 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] 10.1 Berlin"
-          enabled = false
           id = {677BEFF9-7E75-4E78-B109-45F058B81596}
           target.argvalues
           begin
@@ -652,7 +643,6 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] 10.2 Tokyo"
-          enabled = false
           id = {68C01FBE-D970-43C1-BBE0-06900CE906FD}
           target.argvalues
           begin
@@ -672,7 +662,6 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] 10.3 Rio"
-          enabled = false
           id = {0E2307E8-90DE-4B65-BFD4-0C72BFC0EB32}
           target.argvalues
           begin
@@ -692,7 +681,6 @@ begin
         begin
           actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
           description = "Run Target [ BuildForCompiler ] 10.4 Sydney"
-          enabled = false
           id = {BAE83770-9957-4993-8537-17CD779D2852}
           target.argvalues
           begin
