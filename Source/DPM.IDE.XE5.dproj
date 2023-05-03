@@ -121,7 +121,6 @@
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Context.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Graph.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Interfaces.pas"/>
-        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.LockFile.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Resolution.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Resolver.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Version.pas"/>
@@ -130,7 +129,6 @@
         <DCCReference Include="Core\Options\DPM.Core.Options.Cache.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Common.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Config.pas"/>
-        <DCCReference Include="Core\Options\DPM.Core.Options.Feed.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Install.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.List.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Pack.pas"/>
@@ -145,7 +143,6 @@
         <DCCReference Include="Core\Package\DPM.Core.Package.InstallerContext.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Interfaces.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Metadata.pas"/>
-        <DCCReference Include="Core\Package\DPM.Core.Package.SearchPath.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.SearchResults.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.Reader.pas"/>
@@ -158,19 +155,13 @@
         <DCCReference Include="Core\Project\DPM.Core.Project.GroupProjReader.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Interfaces.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Base.pas"/>
-        <DCCReference Include="Core\Repository\DPM.Core.Repository.BaseGithub.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Directory.pas"/>
-        <DCCReference Include="Core\Repository\DPM.Core.Repository.DNGithub.pas"/>
-        <DCCReference Include="Core\Repository\DPM.Core.Repository.DPMGithub.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Factory.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Http.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Interfaces.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Manager.pas"/>
-        <DCCReference Include="Core\Sources\DPM.Core.Sources.ClientFactory.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Interfaces.pas"/>
-        <DCCReference Include="Core\Sources\DPM.Core.Sources.LocalClient.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Manager.pas"/>
-        <DCCReference Include="Core\Sources\DPM.Core.Sources.RemoteClient.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Types.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.BPLEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
@@ -219,12 +210,14 @@
         <DCCReference Include="IDE\DPM.IDE.AddInOptions.pas"/>
         <DCCReference Include="IDE\DPM.IDE.AddInOptionsFrame.pas">
             <Form>DPMOptionsFrame</Form>
+            <FormType>dfm</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
         <DCCReference Include="Controls\DPM.Controls.ButtonedEdit.pas"/>
         <DCCReference Include="Controls\DPM.Controls.AutoComplete.pas"/>
         <DCCReference Include="IDE\DPM.IDE.AboutForm.pas">
             <Form>DPMAboutForm</Form>
+            <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="IDE\DPM.IDE.Types.pas"/>
         <DCCReference Include="Controls\DPM.Controls.GroupButton.pas"/>
@@ -269,42 +262,11 @@
             <Form>DPMBaseEditViewFrame</Form>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.Details.Interfaces.pas"/>
         <DCCReference Include="IDE\EditorView\DPM.IDE.GroupEditorViewFrame.pas">
             <Form>DPMGroupEditViewFrame</Form>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
-        <RcItem Include="images\dpm.bmp">
-            <ResourceType>BITMAP</ResourceType>
-            <ResourceId>DPMIDELOGO</ResourceId>
-        </RcItem>
-        <RcItem Include="images\dpm16.bmp">
-            <ResourceType>BITMAP</ResourceType>
-            <ResourceId>DPMIDELOGO_16</ResourceId>
-        </RcItem>
-        <RcItem Include="images\platform-win32.bmp">
-            <ResourceType>BITMAP</ResourceType>
-            <ResourceId>PLATFORM_WIN32</ResourceId>
-        </RcItem>
-        <RcItem Include="images\platform_andriod.bmp">
-            <ResourceType>BITMAP</ResourceType>
-            <ResourceId>PLATFORM_ANDRIOD</ResourceId>
-        </RcItem>
-        <RcItem Include="images\platform_ios.bmp">
-            <ResourceType>BITMAP</ResourceType>
-            <ResourceId>PLATFORM_IOS</ResourceId>
-        </RcItem>
-        <RcItem Include="images\platform_linux.bmp">
-            <ResourceType>BITMAP</ResourceType>
-            <ResourceId>PLATFORM_LINUX</ResourceId>
-        </RcItem>
-        <RcItem Include="images\platform_macos.bmp">
-            <ResourceType>BITMAP</ResourceType>
-            <ResourceId>PLATFORM_MACOS</ResourceId>
-        </RcItem>
-        <RcItem Include="images\platform-win64.bmp">
-            <ResourceType>BITMAP</ResourceType>
-            <ResourceId>PLATFORM_WIN64</ResourceId>
-        </RcItem>
         <BuildConfiguration Include="Debug">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
@@ -361,23 +323,23 @@
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>
-            <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.0-dev8">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev8" range="[2.0.0-dev8,]"/>
+            <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.0-rc.1">
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-rc.1" range="2.0.0-rc.1"/>
             </PackageReference>
-            <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.0-dev8">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-dev8" range="[2.0.0-dev8,]"/>
+            <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.0-rc.1">
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-rc.1" range="2.0.0-rc.1"/>
             </PackageReference>
-            <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.1.2"/>
+            <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.1.3"/>
             <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.2.2">
                 <PackageReference id="Gabr42.OmniThreadLibrary" platform="Win32" version="3.7.8" range="[3.7.8,]"/>
                 <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.4" range="[0.0.4,]"/>
             </PackageReference>
-            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.5.0">
+            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.9.0-alpha.6">
                 <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.4" range="[0.0.4,]"/>
+                <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.0" range="[0.3.0,]"/>
             </PackageReference>
             <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.1.3"/>
             <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.3"/>
-            <PackageReference id="VSoft.Uri" platform="Win32" version="0.1.3"/>
             <PackageReference id="VSoft.VirtualListView" platform="Win32" version="0.3.0-rc9"/>
         </DPM>
     </ProjectExtensions>

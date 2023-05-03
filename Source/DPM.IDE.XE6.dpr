@@ -26,7 +26,7 @@
 
 library DPM.IDE.XE6;
 
-{$R *.dres}
+
 
 uses
   System.SysUtils,
@@ -59,7 +59,6 @@ uses
   DPM.Core.Dependency.Context in 'Core\Dependency\DPM.Core.Dependency.Context.pas',
   DPM.Core.Dependency.Graph in 'Core\Dependency\DPM.Core.Dependency.Graph.pas',
   DPM.Core.Dependency.Interfaces in 'Core\Dependency\DPM.Core.Dependency.Interfaces.pas',
-  DPM.Core.Dependency.LockFile in 'Core\Dependency\DPM.Core.Dependency.LockFile.pas',
   DPM.Core.Dependency.Resolution in 'Core\Dependency\DPM.Core.Dependency.Resolution.pas',
   DPM.Core.Dependency.Resolver in 'Core\Dependency\DPM.Core.Dependency.Resolver.pas',
   DPM.Core.Dependency.Version in 'Core\Dependency\DPM.Core.Dependency.Version.pas',
@@ -82,7 +81,6 @@ uses
   DPM.Core.Package.InstallerContext in 'Core\Package\DPM.Core.Package.InstallerContext.pas',
   DPM.Core.Package.Interfaces in 'Core\Package\DPM.Core.Package.Interfaces.pas',
   DPM.Core.Package.Metadata in 'Core\Package\DPM.Core.Package.Metadata.pas',
-  DPM.Core.Package.SearchPath in 'Core\Package\DPM.Core.Package.SearchPath.pas',
   DPM.Core.Package.SearchResults in 'Core\Package\DPM.Core.Package.SearchResults.pas',
   DPM.Core.Packaging.Archive in 'Core\Packaging\DPM.Core.Packaging.Archive.pas',
   DPM.Core.Packaging.Archive.Reader in 'Core\Packaging\DPM.Core.Packaging.Archive.Reader.pas',
@@ -178,7 +176,8 @@ uses
   DPM.IDE.Details.Interfaces in 'IDE\EditorView\DPM.IDE.Details.Interfaces.pas',
   DPM.IDE.GroupEditorViewFrame in 'IDE\EditorView\DPM.IDE.GroupEditorViewFrame.pas' {DPMGroupEditViewFrame: TFrame},
   DPM.IDE.GroupPackageDetailsFrame in 'IDE\EditorView\DPM.IDE.GroupPackageDetailsFrame.pas' {GroupPackageDetailsFrame: TFrame},
-  DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas';
+  DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas',
+  DPM.Core.Package.ListItem in 'Core\Package\DPM.Core.Package.ListItem.pas';
 
 {$R *.res}
 

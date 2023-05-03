@@ -26,7 +26,7 @@
 
 library DPM.IDE.D110;
 
-{$R *.dres}
+
 
 uses
   System.SysUtils,

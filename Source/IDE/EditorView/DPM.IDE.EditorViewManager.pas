@@ -127,7 +127,7 @@ begin
   imageList := TImageList.Create(nil);
   bmp := TBitmap.Create;
   try
-    bmp.LoadFromResourceName(HInstance, 'DPMIDELOGO_16');
+    bmp.LoadFromResourceName(HInstance, 'DPMLOGOBMP_16');
     imageList.AddMasked(bmp, clFuchsia);
     FImageIndex := vs.AddImages(imageList, 'DPM');
   finally

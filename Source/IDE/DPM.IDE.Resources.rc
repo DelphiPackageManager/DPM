@@ -1,1 +1,22 @@
+//wizard splash
+DPMIDELOGO BITMAP "..\\images\\dpm.bmp"
+
+//packagelist default icon
 DPM_ICON_MISSING_SVG RCDATA "..\\images\\dpm-large.svg"
+
+// 10.4 and earlier project tree
+DPMLOGOBMP_16 BITMAP "..\\images\\dpm16.bmp"
+PLATFORM_WIN32 BITMAP "..\\images\\platform-win32.bmp"
+PLATFORM_MACOS BITMAP "..\\images\\platform_macos.bmp"
+PLATFORM_ANDRIOD BITMAP "..\\images\\platform_andriod.bmp"
+PLATFORM_IOS BITMAP "..\\images\\platform_ios.bmp"
+PLATFORM_LINUX BITMAP "..\\images\\platform_linux.bmp"
+
+//11.x and later project tree
+//we use the IDE's own images for platforms
+DPMLOGO RCDATA "..\\images\\dpm_24.png"
+DPMLOGO_16 RCDATA "..\\images\\dpm_16.png"
+DPMLOGO_24 RCDATA "..\\images\\dpm_24.png"
+DPMLOGO_32 RCDATA "..\\images\\dpm_32.png"
+DPMLOGO_48 RCDATA "..\\images\\dpm_48.png"
+

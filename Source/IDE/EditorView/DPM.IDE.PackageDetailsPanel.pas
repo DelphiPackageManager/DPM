@@ -21,11 +21,17 @@ type
   TDetailElement = (deNone, deLicense, deProjectUrl, deReportUrl, deRepositoryUrl, deTags);
   TDetailElements = set of TDetailElement;
   TDetailsLayout = record
+    PaddingX : integer;
+    PaddingY : integer;
+    VersionPadding : integer;
+
+
     VersionLabelRect : TRect;
     VersionRect : TRect;
 
     DescriptionLabelRect : TRect;
     DescriptionRect : TRect;
+    DescriptionHeight : integer;
 
     AuthorsLabelRect : TRect;
     AuthorsRect : TRect;
@@ -56,7 +62,9 @@ type
 
     LayoutHeight : integer;
 
+    procedure ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND});
     procedure Update(const ACanvas : TCanvas; const AControl : TPackageDetailsPanel; const package : IPackageSearchResultItem; const optionalElements : TDetailElements);
+    constructor Create(dummy : integer);
   end;
 
   TUriClickEvent = procedure(Sender : TObject; const uri : string; const element : TDetailElement) of object;
@@ -78,6 +86,8 @@ type
     procedure MouseDown(Button : TMouseButton; Shift : TShiftState; X : Integer; Y : Integer); override;
     procedure MouseMove(Shift : TShiftState; X : Integer; Y : Integer); override;
     procedure CMMouseLeave(var Msg : TMessage); message CM_MouseLeave;
+    procedure ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND}); override;
+
   public
     constructor Create(AOwner : TComponent); override;
     procedure SetDetails(const package : IPackageSearchResultItem);
@@ -111,6 +121,15 @@ uses
 { TPackageDetailsPanel }
 
 
+procedure TPackageDetailsPanel.ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND});
+begin
+  inherited;
+  //for some reason this is not happening in D11.x
+  Canvas.Font.Height := MulDiv(Canvas.Font.Height, M, D );
+  FLayout.ChangeScale(M, D,{$IF CompilerVersion > 33}isDpiChange{$IFEND} );
+  UpdateLayout;
+end;
+
 procedure TPackageDetailsPanel.CMMouseLeave(var Msg : TMessage);
 begin
   if FHitElement <> deNone then
@@ -126,9 +145,11 @@ begin
   inherited;
   DoubleBuffered := true;
   ParentColor := false;
+  ParentFont := true;
   {$IFDEF STYLEELEMENTS}
-  StyleElements := [seFont];
+  StyleElements := [seFont,seClient];
   {$ENDIF}
+  FLayout := TDetailsLayout.Create(0);
 end;
 
 function TPackageDetailsPanel.HitTest(const pt : TPoint) : TDetailElement;
@@ -426,6 +447,22 @@ end;
 { TDetailsLayout }
 
 
+procedure TDetailsLayout.ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND});
+begin
+  VersionPadding := MulDiv(VersionPadding, M, D);
+  PaddingX := MulDiv(PaddingX, M, D);
+  PaddingY := MulDiv(PaddingY, M, D);
+  DescriptionHeight := MulDiv(DescriptionHeight, M, D);
+end;
+
+constructor TDetailsLayout.Create(dummy: integer);
+begin
+  VersionPadding := 6;
+  PaddingX := 6;
+  PaddingY := 4;
+  DescriptionHeight := 5000;
+end;
+
 procedure TDetailsLayout.Update(const ACanvas : TCanvas; const AControl : TPackageDetailsPanel; const package : IPackageSearchResultItem; const optionalElements : TDetailElements);
 var
   textSize : TSize;
@@ -436,7 +473,8 @@ begin
   if package = nil then
     exit;
   clientRect := AControl.ClientRect;
-  InflateRect(clientRect, -6, -4);
+
+  InflateRect(clientRect, -PaddingX, -PaddingY);
   //we are going to calc this anyway
   clientRect.Height := 1000;
 
@@ -450,7 +488,7 @@ begin
 
   DescriptionRect := clientRect;
   DescriptionRect.Top := DescriptionLabelRect.Bottom + textSize.cy;
-  DescriptionRect.Bottom := DescriptionRect.Top + 5000;
+  DescriptionRect.Bottom := DescriptionRect.Top + DescriptionHeight;
   DrawText(ACanvas.Handle, package.Description, Length(package.Description), DescriptionRect, DT_LEFT + DT_CALCRECT + DT_WORDBREAK);
 
   VersionLabelRect.Top := DescriptionRect.Bottom + textSize.cy;
@@ -460,7 +498,7 @@ begin
 
 
   VersionRect.Top := VersionLabelRect.Top;
-  VersionRect.Left := VersionLabelRect.Right + 6;
+  VersionRect.Left := VersionLabelRect.Right + VersionPadding;
   VersionRect.Right := clientRect.Right;
   VersionRect.Height := textSize.cy;
   DrawText(ACanvas.Handle, package.Version, Length(package.Version), VersionRect, DT_LEFT + DT_CALCRECT + DT_WORDBREAK);
@@ -598,7 +636,7 @@ begin
     DependRect.Right := clientRect.Right;
     count := 0;
     //work out the height;
-    Inc(count, 2);
+    Inc(count, PaddingY div 2);
     Inc(count, package.Dependencies.Count * 2);
     DependRect.Height := count * textSize.cy;
   end

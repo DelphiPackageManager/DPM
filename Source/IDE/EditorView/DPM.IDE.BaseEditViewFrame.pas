@@ -119,6 +119,8 @@ type
     FUpdates : IList<IPackageSearchResultItem>;
 
 
+
+
     function SearchForPackagesAsync(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;overload;
 
 
@@ -173,6 +175,10 @@ type
     procedure CreateControls(AOwner : TComponent);virtual;
 
     procedure ConfigureSearchBar;virtual;
+
+    procedure ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND} ); override;
+
+
 
     //these are used in the descendants
     property PackageDetailsView : IPackageDetailsView read GetPackageDetailsView;
@@ -258,6 +264,13 @@ end;
 
 
 { TDPMBaseEditViewFrame }
+
+procedure TDPMBaseEditViewFrame.ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND} );
+begin
+ // FScrollList.ChangeScale(M, D, {$IF CompilerVersion > 33}isDpiChange{$IFEND});
+  inherited;
+
+end;
 
 procedure TDPMBaseEditViewFrame.Closing;
 begin

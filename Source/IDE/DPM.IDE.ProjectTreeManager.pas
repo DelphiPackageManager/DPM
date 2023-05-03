@@ -125,6 +125,10 @@ uses
   Vcl.ImgList,
   Vcl.Graphics,
   Vcl.Forms,
+  {$IF CompilerVersion >= 35.0}
+  Vcl.ImageCollection,
+  Vcl.VirtualImageList,
+  {$IFEND}
   DPM.Core.Constants,
   DPM.Core.Logging,
   DPM.Core.Options.Common,
@@ -261,44 +265,44 @@ end;
 
 function TDPMProjectTreeManager.EnsureProjectTree : boolean;
 var
- bitmap : TBitmap;
 
 // i: Integer;
  platform : TDPMPlatform;
- imageList : TCustomImageList;
+ {$IF CompilerVersion >= 35.0}
+ imageCollection : TImageCollection;
+ imageList : TVirtualImageList;
+ {$ELSE}
+ bitmap : TBitmap;
+ imageList : TCustomImageList; 
+ {$IFEND}
 begin
   if FVSTProxy <> nil then
     exit(true);
 
   result := false;
- //TODO : control name and class discovered via IDE Explorer https://www.davidghoyle.co.uk/WordPress - need to check it's the same for all supported versions of the IDE
+ //control name and class discovered via IDE Explorer https://www.davidghoyle.co.uk/WordPress - need to check it's the same for each new IDE version
   if FVSTProxy = nil then
   begin
     FProjectTreeInstance := FindIDEControl('TVirtualStringTree', 'ProjectTree2');
     if FProjectTreeInstance <> nil then
     begin
       FVSTProxy := TVirtualStringTreeProxy.Create(FProjectTreeInstance, FLogger);
+       {$IF CompilerVersion < 35.0}
       imageList := FVSTProxy.Images;
+      {$ELSE}
+      imageList := TVirtualImageList(FVSTProxy.Images);
+      {$IFEND}
 
-      //peeking at the images to work out indexes
-//      for i := imageList.Count-1 downto imageList.Count-15  do
-//      begin
-//       bitmap:= TBitmap.Create;
-//       try
-//         imageList.GetBitmap(i, bitmap);
-//         bitmap.SaveToFile('c:\temp\project-tree' + IntToStr(i) + '.bmp');
-//       finally
-//         bitmap.Free;
-//       end;
-//      end;
       for platform := Low(TDPMPlatform) to High(TDPMPlatform) do
         FPlatformImageIndexes[platform] := -1;
 
-
       Result := true;
+      {$IF CompilerVersion < 35.0}
+      //10.4 and earlier
+      
       bitmap := TBitmap.Create;
       try
-        bitmap.LoadFromResourceName(HInstance, 'DPMIDELOGO_16');
+        bitmap.LoadFromResourceName(HInstance, 'DPMOGOBMP_16');
         FDPMImageIndex := imageList.AddMasked(bitmap, clFuchsia);
         bitmap.LoadFromResourceName(HInstance, 'PLATFORM_WIN32');
         FPlatformImageIndexes[TDPMPlatform.Win32] := imageList.AddMasked(bitmap, clFuchsia);
@@ -324,8 +328,33 @@ begin
       finally
         bitmap.Free;
       end;
+      {$ELSE}
+      //11.x and later uses an imagecollection so it's easy to lookup the built in images and use those.
+      //just need to add our logo image to the collection and then the image list.
+      imageCollection :=  TImageCollection(TVirtualImageList(imageList).ImageCollection);
+      imageCollection.Add('DPM\DPMLOGO', HInstance, 'DPMLOGO', ['_16','_24','_32']);
+      imageList.Add('DPM\DPMLOGO','DPM\DPMLOGO');
+      FDPMImageIndex := imageList.GetIndexByName('DPM\DPMLOGO');
 
+      FPlatformImageIndexes[TDPMPlatform.Win32] := imageList.GetIndexByName('Platforms\PlatformWindows');
+      FPlatformImageIndexes[TDPMPlatform.Win64] := FPlatformImageIndexes[TDPMPlatform.Win32];
 
+      FPlatformImageIndexes[TDPMPlatform.OSX32] := imageList.GetIndexByName('Platforms\PlatformMacOS');
+      FPlatformImageIndexes[TDPMPlatform.OSX64] := FPlatformImageIndexes[TDPMPlatform.OSX32];
+
+      FPlatformImageIndexes[TDPMPlatform.AndroidArm32] := imageList.GetIndexByName('Platforms\PlatformAndroid');
+      FPlatformImageIndexes[TDPMPlatform.AndroidArm64] := FPlatformImageIndexes[TDPMPlatform.AndroidArm32];
+      FPlatformImageIndexes[TDPMPlatform.AndroidIntel32] := FPlatformImageIndexes[TDPMPlatform.AndroidArm32];
+      FPlatformImageIndexes[TDPMPlatform.AndroidIntel64] := FPlatformImageIndexes[TDPMPlatform.AndroidArm32];
+
+      FPlatformImageIndexes[TDPMPlatform.iOS32] := imageList.GetIndexByName('Platforms\PlatformiOS');
+      FPlatformImageIndexes[TDPMPlatform.iOS64] := FPlatformImageIndexes[TDPMPlatform.iOS32];
+
+      FPlatformImageIndexes[TDPMPlatform.LinuxIntel32] := imageList.GetIndexByName('Platforms\PlatformLinux');
+      FPlatformImageIndexes[TDPMPlatform.LinuxIntel64] := FPlatformImageIndexes[TDPMPlatform.LinuxIntel32];
+      FPlatformImageIndexes[TDPMPlatform.LinuxArm32] := FPlatformImageIndexes[TDPMPlatform.LinuxIntel32];
+      FPlatformImageIndexes[TDPMPlatform.LinuxArm64] := FPlatformImageIndexes[TDPMPlatform.LinuxIntel32];
+      {$IFEND}
     end;
   end;
 end;
