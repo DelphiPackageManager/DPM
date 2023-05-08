@@ -159,7 +159,7 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
           Left = 69
           Top = 8
           Width = 276
-          Height = 21
+          Height = 23
           Anchors = [akLeft, akTop, akRight]
           Enabled = False
           TabOrder = 0

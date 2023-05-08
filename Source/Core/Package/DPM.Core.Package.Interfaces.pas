@@ -125,12 +125,11 @@ type
   end;
 
   //this is what is returned from a package feed for the UI.
-  //note for version we are using strings to improve performance
   IPackageSearchResultItem = interface
     ['{8EB6EA16-3708-41F7-93A2-FE56EB75510B}']
     function GetSourceName : string;
     function GetId : string;
-    function GetVersion : string;
+    function GetVersion : TPackageVersion;
     function GetPlatform : TDPMPlatform;
     function GetCompilerVersion : TCompilerVersion;
     function GetDependencies : IList<IPackageDependency>;
@@ -152,16 +151,18 @@ type
     function GetIsCommercial : boolean;
     function GetDownloadCount : Int64;
     function GetInstalled : boolean;
-    function GetLatestVersion : string;
-    function GetLatestStableVersion : string;
+    function GetLatestVersion : TPackageVersion;
+    function GetLatestStableVersion : TPackageVersion;
     function GetIsError : boolean;
     function GetIsReservedPrefix : boolean;
     function GetIsTransitive : boolean;
+    function GetIsLatestVersion : boolean;
+    function GetIsLatestStableVersion : boolean;
 
-    procedure SetVersion(const value : string);
+    procedure SetVersion(const value : TPackageVersion);
     procedure SetInstalled(const value : boolean);
-    procedure SetLatestVersion(const value : string);
-    procedure SetLatestStableVersion(const value : string);
+    procedure SetLatestVersion(const value : TPackageVersion);
+    procedure SetLatestStableVersion(const value : TPackageVersion);
     procedure SetReportUrl(const value : string);
     procedure SetRepositoryUrl(const value : string);
     procedure SetRepositoryType(const value : string);
@@ -171,7 +172,7 @@ type
     procedure SetIsTransitive(const value : boolean);
 
     property Id : string read GetId;
-    property Version : string read GetVersion write SetVersion;
+    property Version : TPackageVersion read GetVersion write SetVersion;
     property Description : string read GetDescription;
     property Authors : string read GetAuthors;
     property ProjectUrl : string read GetProjectUrl;
@@ -197,8 +198,10 @@ type
 
     //these are for use by the UI, it's not returned.
     property Installed : boolean read GetInstalled write SetInstalled;
-    property LatestVersion : string read GetLatestVersion write SetLatestVersion;
-    property LatestStableVersion : string read GetLatestStableVersion write SetLatestStableVersion;
+    property LatestVersion : TPackageVersion read GetLatestVersion write SetLatestVersion;
+    property LatestStableVersion : TPackageVersion read GetLatestStableVersion write SetLatestStableVersion;
+    property IsLatestVersion : boolean read GetIsLatestVersion;
+    property IsLatestStableVersion : boolean read GetIsLatestStableVersion;
     property IsTransitive : boolean read GetIsTransitive write SetIsTransitive;
     property ReportUrl : string read GetProjectUrl write SetReportUrl;
     property PublishedDate : string read GetPublishedDate write SetPublishedDate; //TODO : what format should this be - see repos

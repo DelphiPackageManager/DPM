@@ -140,7 +140,7 @@ object PackageDetailsFrame: TPackageDetailsFrame
         Left = 69
         Top = 8
         Width = 276
-        Height = 21
+        Height = 23
         Anchors = [akLeft, akTop, akRight]
         Enabled = False
         TabOrder = 0
@@ -193,7 +193,9 @@ object PackageDetailsFrame: TPackageDetailsFrame
         Anchors = [akLeft, akTop, akRight]
         TabOrder = 0
         OnChange = cboVersionsChange
+        OnCloseUp = cboVersionsCloseUp
         OnDrawItem = cboVersionsDrawItem
+        OnDropDown = cboVersionsDropDown
         OnMeasureItem = cboVersionsMeasureItem
       end
       object btnInstallOrUpdate: TButton

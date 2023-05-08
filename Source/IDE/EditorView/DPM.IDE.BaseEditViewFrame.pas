@@ -49,7 +49,7 @@ type
     IconRect : TRect;
     TitleRect : TRect;
     VersionRect : TRect;
-    InstalledVersionRect : TRect;
+    LatestVersionRect : TRect;
     DescriptionRect : TRect;
     procedure Update(const ACanvas : TCanvas; const rowRect : TRect; const showSelect : Boolean);
   end;
@@ -115,6 +115,8 @@ type
     //directly installed packages, might be fitered.
     FInstalledPackages : IList<IPackageSearchResultItem>;
     FSearchResultPackages : IList<IPackageSearchResultItem>;
+
+    //not currently implemented.
     FConflictPackages : IList<IPackageSearchResultItem>;
     FUpdates : IList<IPackageSearchResultItem>;
 
@@ -126,7 +128,7 @@ type
 
     //IDetailsHost
     procedure SaveBeforeInstall;
-    procedure PackageInstalled(const package : IPackageSearchResultItem);
+    procedure PackageInstalled(const package : IPackageSearchResultItem; const isUpdate : boolean);
     procedure PackageUninstalled(const package : IPackageSearchResultItem);
     function GetPackageReferences : IPackageReference;
 
@@ -590,17 +592,19 @@ begin
   if not IsProjectGroup then
     options.Platforms := [FCurrentPlatform];
 
-  result := TAsync.Configure < IList<IPackageSearchResultItem> > (
+  result := TAsync.Configure<IList<IPackageSearchResultItem>> (
     function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
     var
       packageRef : IPackageReference;
       item : IPackageSearchResultItem;
+      packageIds : IList<IPackageId>;
     begin
       CoInitialize(nil);
       try
         result := TCollections.CreateList<IPackageSearchResultItem>;
         FLogger.Debug('DPMIDE : Got Installed package references, fetching metadata...');
-        result := repoManager.GetInstalledPackageFeed(cancelToken, options, GetPackageIdsFromReferences(FCurrentPlatform));
+        packageIds := GetPackageIdsFromReferences(FCurrentPlatform);
+        result := repoManager.GetInstalledPackageFeed(cancelToken, options, packageIds);
         for item in result do
         begin
           if FPackageReferences <> nil then
@@ -608,6 +612,7 @@ begin
             packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
             if packageRef <> nil then
               item.IsTransitive := packageRef.IsTransitive;
+            item.Version := packageRef.Version;
           end;
         end;
         FLogger.Debug('DPMIDE : Got Installed package metadata.');
@@ -698,52 +703,71 @@ begin
 
 end;
 
-procedure TDPMBaseEditViewFrame.PackageInstalled(const package: IPackageSearchResultItem);
+procedure TDPMBaseEditViewFrame.PackageInstalled(const package: IPackageSearchResultItem; const isUpdate : boolean);
 var
   packageSearchResult : IPackageSearchResultItem;
+  previouslyInstalled : IPackageSearchResultItem;
 begin
-  package.Installed := true;
+//  package.Installed := true;
+
+
   //package.InstalledVersion := package.Version;
   FAllInstalledPackages := nil;
   FInstalledPackages := nil;
+  FSearchResultPackages := nil;
+  FPackageReferences := DoGetPackageReferences;
+  //really we should just refresh here.
+  FButtonBar.SetCurrentTab(TDPMCurrentTab.Installed);
+  SwitchTabs(TDPMCurrentTab.Installed, true);
+  exit;
 
   //if it's in the search results, update the installed version.
   if FSearchResultPackages <> nil then
   begin
+    //if it's an update, then we need to mark the previously installed version as not installed!
+    if isUpdate then
+    begin
+      previouslyInstalled := FSearchResultPackages.FirstOrDefault(
+        function(const value : IPackageSearchResultItem) : boolean
+        begin
+          result := SameText(value.Id,  package.Id)
+        end);
+      if packageSearchResult <> nil then
+        packageSearchResult.Installed := false;
+    end;
+
+
     packageSearchResult := FSearchResultPackages.FirstOrDefault(
       function(const value : IPackageSearchResultItem) : boolean
       begin
         result := SameText(value.Id,  package.Id) and (value.Version = package.Version);
       end);
-
     if packageSearchResult <> nil then
-    begin
       packageSearchResult.Installed := true;
-      //packageSearchResult.InstalledVersion := package.Version;
-    end;
   end;
 
-  if FAllInstalledPackages = nil then
-  begin
-    FAllInstalledPackages :=
-    TCollections.CreateList<IPackageSearchResultItem>;
-    FAllInstalledPackages.Add(package);
-  end
-  else
-  begin
-    packageSearchResult := FAllInstalledPackages.FirstOrDefault(
-      function(const value : IPackageSearchResultItem) : boolean
-      begin
-        result := SameText(value.Id, package.Id) and (value.Version = package.Version);
-      end);
-    if packageSearchResult <> nil then
-    begin
-      packageSearchResult.Installed := true;
-      //packageSearchResult.InstalledVersion := package.Version;
-    end
-    else
-      FAllInstalledPackages.Add(packageSearchResult);
-  end;
+  //
+//
+//  if FAllInstalledPackages = nil then
+//  begin
+    FAllInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>;
+//    FAllInstalledPackages.Add(package);
+//  end
+//  else
+//  begin
+//    packageSearchResult := FAllInstalledPackages.FirstOrDefault(
+//      function(const value : IPackageSearchResultItem) : boolean
+//      begin
+//        result := SameText(value.Id, package.Id) and (value.Version = package.Version);
+//      end);
+//    if packageSearchResult <> nil then
+//    begin
+//      packageSearchResult.Installed := true;
+//      //packageSearchResult.InstalledVersion := package.Version;
+//    end
+//    else
+//      FAllInstalledPackages.Add(packageSearchResult);
+//  end;
   if FCurrentTab = TDPMCurrentTab.Installed then
     FilterAndLoadInstalledPackages(FSearchOptions.SearchTerms);
 
@@ -849,7 +873,7 @@ begin
 
   //local for capture for use in the anonymous methods below.
   id := package.Id;
-  version := package.Version;
+  version := package.Version.ToStringNoMeta;
   source := package.SourceName;
   FLogger.Debug('DPMIDE : Requesting icon for [' + id + '.' + version + ']');
 
@@ -908,6 +932,7 @@ var
   item : IPackageSearchResultItem;
   list : IList<IPackageSearchResultItem>;
 begin
+  //
   list := CurrentList;
   if list = nil then
   begin
@@ -919,7 +944,7 @@ begin
   if (newRowIndex >= 0) and (newRowIndex < list.Count) then
     item := list[newRowIndex];
 
-  PackageDetailsView.SetPackage(item, FSearchOptions.Prerelease);
+  PackageDetailsView.SetPackage(item, FSearchOptions.Prerelease, true);
 end;
 
 procedure TDPMBaseEditViewFrame.ScrollListPaintNoRows(const Sender: TObject; const ACanvas: TCanvas; const paintRect: TRect);
@@ -1012,7 +1037,6 @@ begin
     icon.PaintTo(ACanvas, FRowLayout.IconRect);
 
     //TODO : this all feels super hacky, revisit when IDE supports high dpi/scaling.
-
     //make text of different font sizes align correctly.
     oldTextAlign := SetTextAlign(ACanvas.Handle, TA_BASELINE);
     fontSize := ACanvas.Font.Size;
@@ -1070,33 +1094,60 @@ begin
       SetTextAlign(ACanvas.Handle, oldTextAlign);
     end;
 
-    //version
-//    if item.Installed and (item.Version <> item.InstalledVersion) then
-//      title := item.InstalledVersion
-//    else
-    title := item.Version;
-    ACanvas.TextRect(FRowLayout.VersionRect, title, [tfSingleLine, tfVerticalCenter, tfRight]);
+    //Rules. On any tab - if the item is install, then the top version is the installed version.
+    //if there is a newer version available then that is displayed under it.
+    //if include pre-release is checked, then use that if it is newer than the latest stable.
+
+
 
     if item.Installed then
     begin
+      //installed version
+      title := item.Version.ToStringNoMeta;
+      ACanvas.TextRect(FRowLayout.VersionRect, title, [tfSingleLine, tfVerticalCenter, tfRight]);
       title := '';
       if FSearchOptions.Prerelease then
       begin
-        if (item.Version <> item.LatestVersion) then
-          title := item.LatestVersion;
+
+        if (item.LatestVersion > item.LatestStableVersion) then
+        begin
+          if item.LatestVersion > item.Version then
+            title := item.LatestVersion.ToStringNoMeta
+        end
+        else
+        begin
+          if item.LatestStableVersion > item.Version then
+          title := item.LatestStableVersion.ToStringNoMeta;
+        end;
       end
       else
       begin
-        if (item.Version <> item.LatestStableVersion) then
-          title := item.LatestStableVersion;
+        if (item.Version < item.LatestStableVersion) then
+          title := item.LatestStableVersion.ToStringNoMeta
       end;
       if title <> '' then
-        ACanvas.TextRect(FRowLayout.InstalledVersionRect, title, [tfSingleLine, tfVerticalCenter, tfRight]);
+        ACanvas.TextRect(FRowLayout.LatestVersionRect, title, [tfSingleLine, tfVerticalCenter, tfRight]);
+    end
+    else
+    begin
+      title := '';
+     if FSearchOptions.Prerelease then
+      begin
+        if item.LatestVersion > item.LatestStableVersion then
+          title := item.LatestVersion.ToStringNoMeta
+        else
+          title := item.LatestStableVersion.ToStringNoMeta;
+      end
+      else
+        title := item.LatestStableVersion.ToStringNoMeta;
+      if title <> '' then
+        ACanvas.TextRect(FRowLayout.VersionRect, title, [tfSingleLine, tfVerticalCenter, tfRight]);
     end;
 
     //description
     title := item.Description;
     ACanvas.TextRect(FRowLayout.DescriptionRect, title, [tfEndEllipsis, tfWordBreak]);
+
 
     if (state in [rsFocusedSelected, rsSelected]) then
     begin
@@ -1298,8 +1349,8 @@ begin
           item.Installed := (packageRef <> nil) and (not packageRef.IsTransitive);
           if item.Installed then
           begin
-            item.LatestVersion := item.Version;
-            item.Version := packageRef.Version.ToStringNoMeta;
+            //item.LatestVersion := item.Version;
+            item.Version := packageRef.Version;
           end;
         end;
 
@@ -1465,12 +1516,12 @@ begin
     //TODO : Figure out a better way to ensure this will be correct
     VersionRect.Left := rowRect.Right - ACanvas.TextExtent('1.100.100-aplha123aaaaa').Width - 10;
 
-    InstalledVersionRect.Top := VersionRect.Bottom + 10;
-    InstalledVersionRect.Right := rowRect.Right - 50;
-    InstalledVersionRect.Height := Abs(ACanvas.Font.Height) + 10;
+    LatestVersionRect.Top := VersionRect.Bottom + 10;
+    LatestVersionRect.Right := rowRect.Right - 50;
+    LatestVersionRect.Height := Abs(ACanvas.Font.Height) + 10;
 
     //TODO : Figure out a better way to ensure this will be correct
-    InstalledVersionRect.Left := VersionRect.Left;
+    LatestVersionRect.Left := VersionRect.Left;
 
     TitleRect.Top := IconRect.Top;
     TitleRect.Height := Abs(ACanvas.Font.Height) * 2;
@@ -1492,8 +1543,8 @@ begin
     VersionRect.Top := IconRect.Top;
     VersionRect.Height := Abs(ACanvas.Font.Height) + 10;
 
-    InstalledVersionRect.Top := VersionRect.Bottom + 10;
-    InstalledVersionRect.Height := Abs(ACanvas.Font.Height) + 10;
+    LatestVersionRect.Top := VersionRect.Bottom + 10;
+    LatestVersionRect.Height := Abs(ACanvas.Font.Height) + 10;
 
     TitleRect.Top := IconRect.Top;
     TitleRect.Height := Abs(ACanvas.Font.Height) * 2;

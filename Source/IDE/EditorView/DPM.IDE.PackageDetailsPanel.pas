@@ -23,6 +23,7 @@ type
   TDetailsLayout = record
     PaddingX : integer;
     PaddingY : integer;
+    LineSpacing : integer;
     VersionPadding : integer;
 
 
@@ -54,6 +55,7 @@ type
 
     TagsLabelRect : TRect;
     TagsRect : TRect;
+    Tags : string;
 
     DependLabelRect : TRect;
 
@@ -61,6 +63,8 @@ type
 
 
     LayoutHeight : integer;
+
+
 
     procedure ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND});
     procedure Update(const ACanvas : TCanvas; const AControl : TPackageDetailsPanel; const package : IPackageSearchResultItem; const optionalElements : TDetailElements);
@@ -77,6 +81,7 @@ type
     FUpdating : boolean;
     FOnUriClickEvent : TUriClickEvent;
     FPackage : IPackageSearchResultItem;
+    FTags : string;
   protected
     procedure UpdateLayout;
     procedure Paint; override;
@@ -275,7 +280,7 @@ begin
   DrawText(Canvas.Handle, 'Version :', Length('Version :'), FLayout.VersionLabelRect, DT_LEFT);
 
   Canvas.Font.Style := [];
-  DrawText(Canvas.Handle, FPackage.Version, Length(FPackage.Version), FLayout.VersionRect, DT_LEFT + DT_WORDBREAK);
+  DrawText(Canvas.Handle, FPackage.Version.ToStringNoMeta, Length(FPackage.Version.ToStringNoMeta), FLayout.VersionRect, DT_LEFT + DT_WORDBREAK);
 
   Canvas.Font.Style := [fsBold];
   DrawText(Canvas.Handle, 'Authors :', Length('Authors :'), FLayout.AuthorsLabelRect, DT_LEFT);
@@ -345,12 +350,13 @@ begin
   DrawText(Canvas.Handle, FPackage.RepositoryUrl, Length(FPackage.RepositoryUrl), FLayout.RepositoryUrlRect, DT_LEFT + DT_WORDBREAK);
   Canvas.Font.Color := fontColor;
 
-
-  Canvas.Font.Style := [fsBold];
-  DrawText(Canvas.Handle, 'Tags :', Length('Tags :'), FLayout.TagsLabelRect, DT_LEFT);
-
-  Canvas.Font.Style := [];
-  DrawText(Canvas.Handle, FPackage.Tags, Length(FPackage.Tags), FLayout.TagsRect, DT_LEFT + DT_WORDBREAK);
+  if (deTags in FOptionalElements) then
+  begin
+    Canvas.Font.Style := [fsBold];
+    DrawText(Canvas.Handle, 'Tags :', Length('Tags :'), FLayout.TagsLabelRect, DT_LEFT);
+    Canvas.Font.Style := [];
+    DrawText(Canvas.Handle, FLayout.Tags, Length(FLayout.Tags), FLayout.TagsRect, DT_LEFT + DT_WORDBREAK);
+  end;
 
   //draw dependencies
   Canvas.Font.Style := [fsBold];
@@ -452,6 +458,7 @@ begin
   VersionPadding := MulDiv(VersionPadding, M, D);
   PaddingX := MulDiv(PaddingX, M, D);
   PaddingY := MulDiv(PaddingY, M, D);
+  LineSpacing := MulDiv(LineSpacing, M, D);
   DescriptionHeight := MulDiv(DescriptionHeight, M, D);
 end;
 
@@ -460,6 +467,7 @@ begin
   VersionPadding := 6;
   PaddingX := 6;
   PaddingY := 4;
+  LineSpacing := 6;
   DescriptionHeight := 5000;
 end;
 
@@ -469,6 +477,11 @@ var
   clientRect : TRect;
   bottom : integer;
   count : integer;
+
+  tagsArr : TArray<string>;
+  sTags : string;
+  i : integer;
+
 begin
   if package = nil then
     exit;
@@ -491,7 +504,7 @@ begin
   DescriptionRect.Bottom := DescriptionRect.Top + DescriptionHeight;
   DrawText(ACanvas.Handle, package.Description, Length(package.Description), DescriptionRect, DT_LEFT + DT_CALCRECT + DT_WORDBREAK);
 
-  VersionLabelRect.Top := DescriptionRect.Bottom + textSize.cy;
+  VersionLabelRect.Top := DescriptionRect.Bottom + LineSpacing;
   VersionLabelRect.Left := ClientRect.Left;
   VersionLabelRect.Width := textSize.cx;
   VersionLabelRect.Height := textSize.cy;
@@ -501,9 +514,9 @@ begin
   VersionRect.Left := VersionLabelRect.Right + VersionPadding;
   VersionRect.Right := clientRect.Right;
   VersionRect.Height := textSize.cy;
-  DrawText(ACanvas.Handle, package.Version, Length(package.Version), VersionRect, DT_LEFT + DT_CALCRECT + DT_WORDBREAK);
+  DrawText(ACanvas.Handle, package.Version.ToStringNoMeta, Length(package.Version.ToStringNoMeta), VersionRect, DT_LEFT + DT_CALCRECT + DT_WORDBREAK);
 
-  AuthorsLabelRect.Top := VersionRect.Bottom + textSize.cy;
+  AuthorsLabelRect.Top := VersionRect.Bottom + LineSpacing;
   AuthorsLabelRect.Left := clientRect.Left;
   AuthorsLabelRect.Width := textSize.cx;
   AuthorsLabelRect.Height := textSize.cy;
@@ -518,7 +531,7 @@ begin
 
   if (deLicense in optionalElements) then
   begin
-    LicenseLabelRect.Top := bottom + textSize.cy;
+    LicenseLabelRect.Top := bottom + LineSpacing;
     LicenseLabelRect.Left := clientRect.Left;
     LicenseLabelRect.Width := textSize.cx;
     LicenseLabelRect.Height := textSize.cy;
@@ -535,7 +548,7 @@ begin
   end;
 
 
-  PublishDateLabelRect.Top := bottom + textSize.cy;
+  PublishDateLabelRect.Top := bottom + LineSpacing;
   PublishDateLabelRect.Left := clientRect.Left;
   PublishDateLabelRect.Width := textSize.cx;
   PublishDateLabelRect.Height := textSize.cy;
@@ -550,7 +563,7 @@ begin
   if (deProjectUrl in optionalElements) then
   begin
 
-    ProjectUrlLabelRect.Top := bottom + textSize.cy;
+    ProjectUrlLabelRect.Top := bottom + LineSpacing;
     ProjectUrlLabelRect.Left := clientRect.Left;
     ProjectUrlLabelRect.Width := textSize.cx;
     ProjectUrlLabelRect.Height := textSize.cy;
@@ -569,7 +582,7 @@ begin
   if (deReportUrl in optionalElements) then
   begin
 
-    ReportUrlLabelRect.Top := bottom + textSize.cy;
+    ReportUrlLabelRect.Top := bottom + LineSpacing;
     ReportUrlLabelRect.Left := clientRect.Left;
     ReportUrlLabelRect.Width := textSize.cx;
     ReportUrlLabelRect.Height := textSize.cy;
@@ -589,7 +602,7 @@ begin
   if (deRepositoryUrl in optionalElements) then
   begin
 
-    RepositoryUrlLabelRect.Top := bottom + textSize.cy;
+    RepositoryUrlLabelRect.Top := bottom + LineSpacing;
     RepositoryUrlLabelRect.Left := clientRect.Left;
     RepositoryUrlLabelRect.Width := textSize.cx;
     RepositoryUrlLabelRect.Height := textSize.cy;
@@ -607,31 +620,43 @@ begin
   end;
 
 
-
-  TagsLabelRect.Top := bottom + textSize.cy;
-  TagsLabelRect.Left := clientRect.Left;
-  TagsLabelRect.Width := textSize.cx;
-  TagsLabelRect.Height := textSize.cy;
-
-
-  TagsRect.Top := TagsLabelRect.Top;
-  TagsRect.Left := VersionRect.Left;
-  TagsRect.Right := clientRect.Right;
-  TagsRect.Height := textSize.cy;
-  //drawtext doesn't wrap text without breaks and the windows api does not have any such functionalty;
-  //TODO : Write a function to calc and split into lines
-  DrawText(ACanvas.Handle, package.Tags, Length(package.Tags), TagsRect, DT_LEFT + DT_CALCRECT);
-  bottom := TagsRect.Bottom;
+  if (deTags in optionalElements) then
+  begin
+    TagsLabelRect.Top := bottom + LineSpacing;
+    TagsLabelRect.Left := clientRect.Left;
+    TagsLabelRect.Width := textSize.cx;
+    TagsLabelRect.Height := textSize.cy;
 
 
-  DependLabelRect.Top := bottom + textSize.cy;
+    TagsRect.Top := TagsLabelRect.Top;
+    TagsRect.Left := VersionRect.Left;
+    TagsRect.Right := clientRect.Right;
+    TagsRect.Height := textSize.cy;
+
+    //drawtext doesn't wrap text without breaks and the windows api does not have any such functionalty;
+    //TODO : Write a function to calc and split into lines
+
+    Tags := '';
+    tagsArr := TStringUtils.SplitStr(package.Tags, ' ', TSplitStringOptions.ExcludeEmpty);
+    for i := 0 to Length(tagsArr) -1 do
+    begin
+      if Tags <> '' then
+        Tags := Tags + ', ' ;
+      Tags := Tags + tagsArr[i];
+    end;
+    DrawText(ACanvas.Handle, Tags, Length(Tags), TagsRect, DT_LEFT + DT_CALCRECT);
+    bottom := TagsRect.Bottom;
+  end;
+
+
+  DependLabelRect.Top := bottom + LineSpacing;
   DependLabelRect.Left := clientRect.Left;
   DependLabelRect.Width := textSize.cx;
   DependLabelRect.Height := textSize.cy;
 
   if package.Dependencies.Any then
   begin
-    DependRect.Top := DependLabelRect.Bottom + textSize.cy;
+    DependRect.Top := DependLabelRect.Bottom + LineSpacing;
     DependRect.Left := DependLabelRect.Left;
     DependRect.Right := clientRect.Right;
     count := 0;
@@ -643,7 +668,7 @@ begin
   else
   begin
     //single line, no dependencies
-    DependRect.Top := DependLabelRect.Bottom + textSize.cy;
+    DependRect.Top := DependLabelRect.Bottom + LineSpacing;
     DependRect.Left := DependLabelRect.Left;
     DependRect.Right := clientRect.Right;
     DependRect.Height := textSize.cy;

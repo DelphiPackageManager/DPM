@@ -326,13 +326,13 @@ end;
 
 function TDirectoryPackageRepository.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
 var
-  packagFileName : string;
+  packageFileName : string;
   readSpecFunc : TReadSpecFunc;
 begin
   result := nil;
-  packagFileName := Format('%s-%s-%s-%s.dpkg', [packageId.Id, CompilerToString(packageId.CompilerVersion), DPMPlatformToString(packageId.Platform), packageId.Version.ToStringNoMeta]);
-  packagFileName := IncludeTrailingPathDelimiter(SourceUri) + packagFileName;
-  if not FileExists(packagFileName) then
+  packageFileName := Format('%s-%s-%s-%s.dpkg', [packageId.Id, CompilerToString(packageId.CompilerVersion), DPMPlatformToString(packageId.Platform), packageId.Version.ToStringNoMeta]);
+  packageFileName := IncludeTrailingPathDelimiter(SourceUri) + packageFileName;
+  if not FileExists(packageFileName) then
     exit;
   if cancellationToken.IsCancelled then
     exit;
@@ -342,7 +342,7 @@ begin
                     result := TPackageInfo.CreateFromSpec(name, spec);
                   end;
 
-  result := DoGetPackageMetaData(cancellationToken, packagFileName, readSpecFunc) as IPackageInfo;
+  result := DoGetPackageMetaData(cancellationToken, packageFileName, readSpecFunc) as IPackageInfo;
 end;
 
 
@@ -452,9 +452,11 @@ end;
 
 
 
-function TDirectoryPackageRepository.GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageSearchResultItem;
+function TDirectoryPackageRepository.GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform): IPackageSearchResultItem;
 var
   packageFileName : string;
+  readSpecFunc : TReadSpecFunc;
+  metaData : IPackageMetadata;
 begin
   result := nil;
   packageFileName := Format('%s-%s-%s-%s.dpkg', [packageId, CompilerToString(compilerVersion), DPMPlatformToString(platform), packageVersion]);
@@ -464,7 +466,14 @@ begin
   if cancellationToken.IsCancelled then
     exit;
 
-//  result := nil;// DoGetPackageMetaData(cancellationToken, packageFileName);
+  readSpecFunc := function (const name : string; const spec : IPackageSpec) : IInterface
+                  begin
+                    result := TPackageMetadata.CreateFromSpec(name, spec);
+                  end;
+
+  metaData := DoGetPackageMetaData(cancellationToken, packageFileName, readSpecFunc) as IPackageMetaData;
+  if metaData <> nil then
+    result := TDPMPackageSearchResultItem.FromMetaData(name, metaData);
 
 end;
 
@@ -731,8 +740,8 @@ begin
     if packageMetadata <> nil then
     begin
       resultItem := TDPMPackageSearchResultItem.FromMetaData(Self.Name, packageMetadata);
-      resultItem.LatestVersion := find.LatestVersion.ToStringNoMeta;
-      resultItem.LatestStableVersion := find.LatestStableVersion.ToStringNoMeta;
+      resultItem.LatestVersion := find.LatestVersion;
+      resultItem.LatestStableVersion := find.LatestStableVersion;
       result.Add(resultItem);
     end;
   end;

@@ -232,8 +232,10 @@ var
   platform : TDPMPlatform;
 begin
   Assert(FConfiguration <> nil);
-  result := TCollections.CreateList<IPackageSearchResultItem>;
+  Assert(installedPackages <> nil);
 
+  result := TCollections.CreateList<IPackageSearchResultItem>;
+  //nothing to do so justr return empty list.
   if not installedPackages.Any then
     exit;
 
@@ -257,7 +259,6 @@ begin
 
   //TODO : This will be really inefficient/slow when using http
   //refactor to make single request to repositories.
-//  packageId := installedPackages.FirstOrDefault;
   for packageId in installedPackages do
   begin
     searchOptions := options.Clone;
@@ -272,9 +273,8 @@ begin
     for item in packageResults.Results do
     begin
       item.Installed := true;
-//      item.InstalledVersion := packageId.Version.ToStringNoMeta;
       if latestVersions.TryGetValue(item.Id, latestVersion) then
-        item.LatestVersion := latestVersion.ToStringNoMeta;
+        item.LatestVersion := latestVersion;
     end;
     result.AddRange(packageResults.Results);
   end;

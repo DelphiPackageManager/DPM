@@ -58,6 +58,7 @@ type
     procedure SetShowConflictsTab(const Value: boolean);
     function GetShowConflictsButton: boolean;
 
+
     procedure DoTabChanged(Sender : TObject);
     procedure LayoutButtons;
     procedure ChangeScale(M: Integer; D: Integer{$if CompilerVersion >= 31}; isDpiChange: Boolean{$ifend}); override;
@@ -70,6 +71,7 @@ type
       {$LEGACYIFEND ON}
     property StyleElements;
     {$IFEND}
+    procedure SetCurrentTab(const tab : TDPMCurrentTab);
 
 
     property OnTabChanged : TDPMTabChangedEvent read FOnTabChanged write FOnTabChanged;
@@ -174,6 +176,16 @@ begin
   FConflictsButton.Visible := false;
   FConflictsButton.Parent := Self;
 
+end;
+
+procedure TDPMButtonBar.SetCurrentTab(const tab: TDPMCurrentTab);
+begin
+  case tab of
+    TDPMCurrentTab.Search   : FSearchButton.Active := true;
+    TDPMCurrentTab.Installed: FInstalledButton.Active := true ;
+    TDPMCurrentTab.Updates  : FUpdatesButton.Active := true;
+    TDPMCurrentTab.Conflicts: FConflictsButton.Active := true;
+  end;
 end;
 
 procedure TDPMButtonBar.SetShowConflictsTab(const Value: boolean);

@@ -6,6 +6,7 @@ uses
   Spring.Collections,
   JsonDataObjects,
   DPM.Core.Types,
+  DPM.Core.Spec.Interfaces,
   DPM.Core.Package.Interfaces;
 
 type
@@ -31,12 +32,13 @@ type
     FRepositoryCommit : string;
     FReportUrl : string;
     FTags : string;
-    FVersion : string;
+
+    FVersion : TPackageVersion;
+    FLatestVersion : TPackageVersion;
+    FLatestStableVersion : TPackageVersion;
 
     FDownloadCount : Int64;
     FInstalled : boolean;
-    FLatestVersion : string;
-    FLatestStableVersion : string;
     FIsReservedPrefix : boolean;
     FSourceName : string;
     FPublishedDate : string;
@@ -51,8 +53,8 @@ type
     function GetPublishedDate : string;
     function GetReportUrl : string;
     function GetInstalled : Boolean;
-    function GetLatestVersion : string;
-    function GetLatestStableVersion : string;
+    function GetLatestVersion : TPackageVersion;
+    function GetLatestStableVersion : TPackageVersion;
     function GetIsReservedPrefix : Boolean;
 
     function GetIsCommercial : Boolean;
@@ -66,13 +68,16 @@ type
     function GetRepositoryBranch : string;
     function GetRepositoryCommit : string;
     function GetTags : string;
-    function GetVersion : string;
+    function GetVersion : TPackageVersion;
     function GetDownloadCount : Int64;
     function GetSourceName : string;
     function GetIsError : boolean;
     function GetIsTransitive : Boolean;
+    function GetIsLatestVersion : boolean;
+    function GetIsLatestStableVersion : boolean;
+    function GetIsStableVersion : boolean;
 
-    procedure SetVersion(const value : string);
+    procedure SetVersion(const value : TPackageVersion);
     procedure SetPublishedDate(const value : string);
     procedure SetRepositoryUrl(const value : string);
     procedure SetRepositoryType(const value : string);
@@ -80,12 +85,13 @@ type
     procedure SetRepositoryCommit(const value : string);
     procedure SetReportUrl(const value : string);
     procedure SetInstalled(const value : Boolean);
-    procedure SetLatestVersion(const value : string);
-    procedure SetLatestStableVersion(const value : string);
+    procedure SetLatestVersion(const value : TPackageVersion);
+    procedure SetLatestStableVersion(const value : TPackageVersion);
     procedure SetIsTransitive(const value : Boolean);
     constructor CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
     constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata);
     constructor CreateFromError(const id : string; const version : TPackageVersion; const errorDescription : string);
+
   public
     class function FromJson(const sourceName : string; const jsonObject : TJsonObject) : IPackageSearchResultItem;
     class function FromMetaData(const sourceName : string; const metaData : IPackageMetadata) : IPackageSearchResultItem;
@@ -99,14 +105,14 @@ type
     FResults : IList<IPackageSearchResultItem>;
   protected
     function GetResults: IList<IPackageSearchResultItem>;
-    function GetTotalCount: Int64;   
-    function GetSkip: Int64;   
+    function GetTotalCount: Int64;
+    function GetSkip: Int64;
     procedure SetSkip(const value : Int64);
     procedure SetTotalCount(const value : Int64);
   public
     constructor Create(const skip : Int64; const total : Int64);
   end;
-  
+
 
 implementation
 
@@ -119,7 +125,7 @@ constructor TDPMPackageSearchResultItem.CreateFromError(const id : string; const
 begin
   FIsError := true;
   FId := id;
-  FVersion := version.ToString;
+  FVersion := version;
   FDescription := errorDescription;
 end;
 
@@ -136,8 +142,8 @@ begin
     raise EArgumentOutOfRangeException.Create('Invalid platform returned from server : ' + jsonObject.S['platform']);
 
   FId               := jsonObject.S['id'];
-  FVersion          := jsonObject.S['version'];
-  
+  FVersion          := TPackageVersion.Parse(jsonObject.S['version']);
+
   FAuthors          := jsonObject.S['authors'];
   FCopyright        := jsonObject.S['copyright'];
   FDescription      := jsonObject.S['description'];
@@ -154,13 +160,11 @@ begin
   FTags             := jsonObject.S['tags'];
 
   FDownloadCount    := jsonObject.L['totalDownloads'];
-  FLatestVersion    := jsonObject.S['latestVersion'];
-  FLatestStableVersion := jsonObject.S['latestStableVersion'];
-  FIsReservedPrefix := jsonObject.B['isReservedPrefix'];
-    
-    
 
-  //TODO : implement this;
+  FLatestVersion    := TPackageVersion.Parse(jsonObject.S['latestVersion']);
+  FLatestStableVersion := TPackageVersion.Parse(jsonObject.S['latestStableVersion']);
+  FIsReservedPrefix := jsonObject.B['isReservedPrefix'];
+
 end;
 
 constructor TDPMPackageSearchResultItem.CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata);
@@ -184,7 +188,7 @@ begin
   FRepositoryBranch := metaData.RepositoryBranch;
   FRepositoryCommit := metaData.RepositoryCommit;
   FTags := metaData.Tags;
-  FVersion := metaData.Version.ToStringNoMeta;
+  FVersion := metaData.Version;
   FDownloadCount := -1; //indicates not set;
   FIsReservedPrefix := false;
 end;
@@ -260,9 +264,24 @@ begin
   result := FIsError;
 end;
 
+function TDPMPackageSearchResultItem.GetIsLatestStableVersion: boolean;
+begin
+  result := FVersion = FLatestStableVersion;
+end;
+
+function TDPMPackageSearchResultItem.GetIsLatestVersion: boolean;
+begin
+  result := FVersion = FLatestVersion;
+end;
+
 function TDPMPackageSearchResultItem.GetIsReservedPrefix : Boolean;
 begin
   result := FIsReservedPrefix;
+end;
+
+function TDPMPackageSearchResultItem.GetIsStableVersion: boolean;
+begin
+  result := FVersion.IsStable;
 end;
 
 function TDPMPackageSearchResultItem.GetIsTransitive : Boolean;
@@ -275,12 +294,12 @@ begin
   result := FIsTrial;
 end;
 
-function TDPMPackageSearchResultItem.GetLatestStableVersion: string;
+function TDPMPackageSearchResultItem.GetLatestStableVersion: TPackageVersion;
 begin
   result := FLatestStableVersion;
 end;
 
-function TDPMPackageSearchResultItem.GetLatestVersion: string;
+function TDPMPackageSearchResultItem.GetLatestVersion: TPackageVersion;
 begin
   result := FLatestVersion;
 end;
@@ -341,7 +360,7 @@ begin
   result := FTags;
 end;
 
-function TDPMPackageSearchResultItem.GetVersion : string;
+function TDPMPackageSearchResultItem.GetVersion : TPackageVersion;
 begin
   result := FVersion;
 end;
@@ -358,12 +377,12 @@ begin
   FIsTransitive := value;
 end;
 
-procedure TDPMPackageSearchResultItem.SetLatestStableVersion(const value: string);
+procedure TDPMPackageSearchResultItem.SetLatestStableVersion(const value: TPackageVersion);
 begin
   FLatestStableVersion := value;
 end;
 
-procedure TDPMPackageSearchResultItem.SetLatestVersion(const value: string);
+procedure TDPMPackageSearchResultItem.SetLatestVersion(const value: TPackageVersion);
 begin
   FLatestVersion := value;
 end;
@@ -398,7 +417,7 @@ begin
   FRepositoryUrl := value;
 end;
 
-procedure TDPMPackageSearchResultItem.SetVersion(const value: string);
+procedure TDPMPackageSearchResultItem.SetVersion(const value: TPackageVersion);
 begin
   FVersion := value;
 end;
