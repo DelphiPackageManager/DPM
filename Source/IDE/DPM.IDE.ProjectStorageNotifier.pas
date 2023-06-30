@@ -36,6 +36,9 @@ uses
   DPM.IDE.Logger,
   DPM.IDE.ProjectController;
 
+
+  // Note while most of the work is done in the IDENotifier - that doesn't fire for
+  // external modifications - this one does - so we need both.
 type
   TDPMProjectStorageNotifier = class(TModuleNotifierObject, IOTAProjectFileStorageNotifier)
   private
@@ -58,6 +61,7 @@ implementation
 uses
   Vcl.Forms,
   System.SysUtils,
+  DPM.Core.Utils.System,
   DPM.Core.Utils.Path;
 
 { TDPMProjectStorageNotifier }
@@ -73,7 +77,7 @@ procedure TDPMProjectStorageNotifier.CreatingProject(const ProjectOrGroup : IOTA
 begin
   if not (ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
     exit;
-  FProjectController.ProjectLoaded(ProjectOrGroup.FileName);
+  FProjectController.ProjectCreating(ProjectOrGroup.FileName);
 end;
 
 destructor TDPMProjectStorageNotifier.Destroy;
@@ -99,25 +103,33 @@ procedure TDPMProjectStorageNotifier.ProjectClosing(const ProjectOrGroup : IOTAM
 var
   ext : string;
 begin
-  FLogger.Debug('Storage Project Closing : ' + ProjectOrGroup.FileName);
+  FLogger.Debug('TDPMProjectStorageNotifier - ProjectClosing : ' + ProjectOrGroup.FileName);
+  TSystemUtils.OutputDebugString('TDPMProjectStorageNotifier - ProjectClosing : ' + ProjectOrGroup.FileName);
   ext := ExtractFileExt(ProjectOrGroup.FileName);
 
-  if not ((ext = '.dproj') or (ext = '.groupproj')) then
-    exit;
-  FProjectController.ProjectClosing(ProjectOrGroup.FileName);
+  if (ext = '.dproj') then
+    FProjectController.ProjectClosing(ProjectOrGroup.FileName)
+  else if (ext = '.groupproj') then
+    FProjectController.ProjectGroupClosed;
 end;
 
 procedure TDPMProjectStorageNotifier.ProjectLoaded(const ProjectOrGroup : IOTAModule; const Node : IXMLNode);
 begin
-  FLogger.Debug('Storage Project Loaded : ' + ProjectOrGroup.FileName);
+  FLogger.Debug('TDPMProjectStorageNotifier - ProjectLoaded : ' + ProjectOrGroup.FileName);
+  TSystemUtils.OutputDebugString('TDPMProjectStorageNotifier - ProjectLoaded : ' + ProjectOrGroup.FileName);
+
 //doesn't seem to get called with the project group?
   if not (ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
     exit;
+
   FProjectController.ProjectLoaded(ProjectOrGroup.FileName);
 end;
 
 procedure TDPMProjectStorageNotifier.ProjectSaving(const ProjectOrGroup : IOTAModule; const Node : IXMLNode);
 begin
+  FLogger.Debug('TDPMProjectStorageNotifier - ProjectSaving : ' + ProjectOrGroup.FileName);
+  TSystemUtils.OutputDebugString('TDPMProjectStorageNotifier - ProjectSaving : ' + ProjectOrGroup.FileName);
+
   if not (ExtractFileExt(ProjectOrGroup.FileName) = '.dproj') then
     exit;
   FProjectController.ProjectSaving(ProjectOrGroup.FileName);

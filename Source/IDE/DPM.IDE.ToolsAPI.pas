@@ -3,27 +3,46 @@ unit DPM.IDE.ToolsAPI;
 interface
 
 uses
+  ToolsApi,
   System.Classes,
   Vcl.Forms;
 
 type
   TToolsApiUtils = class
     class procedure RegisterFormClassForTheming(const AFormClass : TCustomFormClass; const Component : TComponent = nil);static;
+    class function FindProjectInGroup(const projectGroup : IOTAProjectGroup; const projectName : string) : IOTAProject;
   end;
 
 implementation
 
 uses
-  System.SysUtils,
-  ToolsAPI;
+  System.SysUtils;
 
 { TToolsApiUtils }
-
-
 
 {$IF CompilerVersion >= 24.0} //XE3
 {$LEGACYIFEND ON}
 {$IFEND}
+
+class function TToolsApiUtils.FindProjectInGroup(const projectGroup: IOTAProjectGroup; const projectName: string): IOTAProject;
+{$IF CompilerVersion < 24.0}  //XE3
+var
+  i : integer;
+{$IFEND}
+begin
+  result := nil;
+  if projectGroup = nil then
+    exit;
+{$IF CompilerVersion < 24.0}  //XE3
+  for i := 0 to projectGroup.ProjectCount -1 do
+  begin
+    if SameText(projectGroup.Projects[i].FileName, projectName) then
+      exit(projectGroup.Projects[i]);
+  end;
+{$ELSE}
+  result := projectGroup.FindProject(projectName);
+{$IFEND}
+end;
 
 class procedure TToolsApiUtils.RegisterFormClassForTheming(const AFormClass: TCustomFormClass; const Component: TComponent);
 

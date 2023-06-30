@@ -47,32 +47,33 @@ uses
   DPM.IDE.PackageDetailsPanel,
   DPM.IDE.IconCache,
   DPM.IDE.Types,
-  DPM.Controls.VersionGrid;
+  DPM.Controls.VersionGrid, Vcl.Buttons;
 
 {$I ..\DPMIDE.inc}
 
 
 type
-  TGroupPackageDetailsFrame = class(TFrame, IPackageDetailsView)
+  TGroupPackageDetailsFrame = class(TFrame)
     sbPackageDetails: TScrollBox;
     pnlPackageId: TPanel;
     lblPackageId: TLabel;
     imgPackageLogo: TImage;
-    pnlInstalled: TPanel;
-    Label1: TLabel;
-    txtInstalledVersion: TEdit;
-    btnUninstall: TButton;
     pnlVersion: TPanel;
     lblVersionTitle: TLabel;
     cboVersions: TComboBox;
-    btnInstall: TButton;
     pnlGridHost: TPanel;
     DetailsSplitter: TSplitter;
+    SpeedButton1: TSpeedButton;
+    SpeedButton2: TSpeedButton;
+    ComboBox1: TComboBox;
+    Label1: TLabel;
     procedure cboVersionsMeasureItem(Control: TWinControl; Index: Integer; var Height: Integer);
     procedure cboVersionsDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
     procedure cboVersionsChange(Sender: TObject);
     procedure btnUninstallClick(Sender: TObject);
     procedure btnInstallClick(Sender: TObject);
+    procedure cboVersionsCloseUp(Sender: TObject);
+    procedure cboVersionsDropDown(Sender: TObject);
   private
     FContainer : TContainer;
     FIconCache : TDPMIconCache;
@@ -91,10 +92,9 @@ type
     FIncludePreRelease : boolean;
     FPackageInstalledVersion : string;
     FPackageId : string;
-//    FProjectFile : string;
     FProjectGroup : IOTAProjectGroup;
-
     FCurrentPlatform : TDPMPlatform;
+    FDropdownOpen : boolean;
 
     FIDEStyleServices : TCustomStyleServices;
   protected
@@ -104,16 +104,17 @@ type
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
 
-    procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProject);
+    function GetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string): IAwaitable<IPackageSearchResultItem>;
+  public
+    constructor Create(AOwner : TComponent); override;
+    procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProjectGroup);
     procedure Configure(const value : TDPMCurrentTab; const preRelease : boolean);
     procedure SetPackage(const package : IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
     procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;
     procedure ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
+    procedure ProjectReloaded;
 
-    function GetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string): IAwaitable<IPackageSearchResultItem>;
-  public
-    constructor Create(AOwner : TComponent); override;
   end;
 
 implementation
@@ -181,6 +182,11 @@ begin
 
 end;
 
+procedure TGroupPackageDetailsFrame.cboVersionsCloseUp(Sender: TObject);
+begin
+  FDropdownOpen := false;
+end;
+
 procedure TGroupPackageDetailsFrame.cboVersionsDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
 begin
   cboVersions.Canvas.FillRect(Rect);
@@ -188,15 +194,25 @@ begin
   if (cboVersions.Items.Count = 0) or (index < 0) then
     exit;
 
+  cboVersions.Canvas.Font.Style := [];
+
+
   if odComboBoxEdit in State then
     cboVersions.Canvas.TextOut(Rect.Left + 1, Rect.Top + 1, cboVersions.Items[Index]) //Visual state of the text in the edit control
   else
+  begin
+    if FDropdownOpen and (Index > 0) then
+    begin
+      if SameText(FPackageInstalledVersion, cboVersions.Items[index]) then
+        cboVersions.Canvas.Font.Style := [TFontStyle.fsBold];
+    end;
     cboVersions.Canvas.TextOut(Rect.Left + 2, Rect.Top, cboVersions.Items[Index]); //Visual state of the text(items) in the deployed list
-
+  end;
 
   if odComboBoxEdit in State then
     exit;
 
+  //draw underline.
   if Integer(cboVersions.Items.Objects[index]) <> 0 then
   begin
     cboVersions.Canvas.Pen.Color := clGray;
@@ -204,6 +220,11 @@ begin
     cboVersions.Canvas.LineTo(Rect.Right, Rect.Bottom - 1);
   end;
 
+end;
+
+procedure TGroupPackageDetailsFrame.cboVersionsDropDown(Sender: TObject);
+begin
+  FDropdownOpen := true;
 end;
 
 procedure TGroupPackageDetailsFrame.cboVersionsMeasureItem(Control: TWinControl; Index: Integer; var Height: Integer);
@@ -275,7 +296,7 @@ begin
 end;
 
 
-procedure TGroupPackageDetailsFrame.Init(const container: TContainer; const iconCache: TDPMIconCache; const config: IConfiguration; const host: IDetailsHost; const projectOrGroup : IOTAProject);
+procedure TGroupPackageDetailsFrame.Init(const container: TContainer; const iconCache: TDPMIconCache; const config: IConfiguration; const host: IDetailsHost; const projectOrGroup : IOTAProjectGroup);
 var
   i: Integer;
   sProject : string;
@@ -289,6 +310,8 @@ begin
   SetPackage(nil, FIncludePreRelease);
 
   FProjectGroup := projectOrGroup as IOTAProjectGroup;
+  ProjectReloaded; //loadGrid;
+
   FProjectsGrid.BeginUpdate;
   for i := 0 to FProjectGroup.ProjectCount -1 do
   begin
@@ -308,6 +331,21 @@ begin
     deTags : ;
   end;
 
+end;
+
+procedure TGroupPackageDetailsFrame.ProjectReloaded;
+var
+  i : integer;
+  sProject : string;
+begin
+  FProjectsGrid.BeginUpdate;
+  FProjectsGrid.Clear;
+  for i := 0 to FProjectGroup.ProjectCount -1 do
+  begin
+    sProject := ChangeFileExt(ExtractFileName(FProjectGroup.Projects[i].FileName), '');
+    FProjectsGrid.AddProject(sProject, '' );
+  end;
+  FProjectsGrid.EndUpdate;
 end;
 
 procedure TGroupPackageDetailsFrame.ProjectSelectionChanged(Sender: TObject);
@@ -348,12 +386,11 @@ var
   projectRefs : IPackageReference;
   projectRef : IPackageReference;
   i: Integer;
-  sValue : string;
 begin
+  FIncludePreRelease := preRelease;
   FVersionsDelayTimer.Enabled := false;
   if FRequestInFlight then
     FCancellationTokenSource.Cancel;
-
   FPackageMetaData := package;
 
   if package <> nil then
@@ -371,7 +408,6 @@ begin
       //same id, so we might just be displaying a new version.
       //since we're just getting the item from the feed rather than the project
       //it won't have installed or installed version set.
-      //package.InstalledVersion := FPackageInstalledVersion;
       if package.Installed then
         FPackageInstalledVersion := package.Version.ToStringNoMeta
       else if package.Version.ToStringNoMeta = FPackageInstalledVersion then
@@ -411,10 +447,6 @@ begin
       TDPMCurrentTab.Conflicts : ;
     end;
 
-    if FPackageInstalledVersion <> '' then
-      txtInstalledVersion.Text := FPackageInstalledVersion
-    else
-      txtInstalledVersion.Text := 'Not installed';
     UpdateButtonState;
     //btnInstallOrUpdate.Enabled := ((not FPackageMetaData.Installed) or (FPackageMetaData.LatestVersion <> FPackageMetaData.Version)) and FProjectsGrid.HasCheckedProjects;
 
@@ -423,9 +455,9 @@ begin
     packageRefs := FHost.GetPackageReferences;
 
     FProjectsGrid.BeginUpdate;
-    FProjectsGrid.PackageVersion := package.Version.ToStringNoMeta;
+    FProjectsGrid.PackageVersion := package.Version;
     try
-      for i := 0 to FProjectsGrid.Count -1 do
+      for i := 0 to FProjectsGrid.RowCount -1 do
       begin
         if packageRefs <> nil then
         begin
@@ -436,10 +468,9 @@ begin
         end;
 
         if projectRef <> nil then
-          sValue := projectRef.Version.ToStringNoMeta
+          FProjectsGrid.ProjectVersion[i] := projectRef.Version
         else
-          sValue := '';
-        FProjectsGrid.ProjectVersion[i] := sValue;
+          FProjectsGrid.ProjectVersion[i] := TPackageVersion.Empty;
       end;
     finally
       FProjectsGrid.EndUpdate;
@@ -485,8 +516,6 @@ begin
   pnlPackageId.StyleElements := [seFont];
   pnlPackageId.Color := sbPackageDetails.Color;
 
-  pnlInstalled.StyleElements := [seFont];
-  pnlInstalled.Color := sbPackageDetails.Color;
 
   pnlVersion.StyleElements := [seFont];
   pnlVersion.Color := sbPackageDetails.Color;
@@ -510,8 +539,7 @@ end;
 
 procedure TGroupPackageDetailsFrame.UpdateButtonState;
 begin
-  btnUninstall.Enabled := (FPackageMetaData <> nil) and (FPackageMetaData.Installed) and FProjectsGrid.HasCheckedProjects;
-  btnInstall.Enabled := (FPackageMetaData <> nil) and ((not FPackageMetaData.Installed) or (FPackageMetaData.LatestVersion <> FPackageMetaData.Version)) and FProjectsGrid.HasCheckedProjects ;
+  //btnInstall.Enabled := (FPackageMetaData <> nil) and ((not FPackageMetaData.Installed) or (FPackageMetaData.LatestVersion <> FPackageMetaData.Version)) and FProjectsGrid.HasCheckedProjects ;
 end;
 
 procedure TGroupPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);
@@ -647,7 +675,7 @@ begin
 //          else if TStringUtils.StartsWith(sVersion, cLatestStable, true) then
 //            Delete(sVersion, 1, Length(cLatestStable));
 
-          btnInstall.Enabled := {(sVersion <> sInstalledVersion) and } FProjectsGrid.HasCheckedProjects;
+          //btnInstall.Enabled := {(sVersion <> sInstalledVersion) and } FProjectsGrid.HasCheckedProjects;
         end
         else
         begin
@@ -660,7 +688,7 @@ begin
             cboVersions.Items.Add(sInstalledVersion);
             cboVersions.ItemIndex := 0;
           end;
-          btnInstall.Enabled := false;
+          //btnInstall.Enabled := false;
         end;
       finally
         cboVersions.Items.EndUpdate;

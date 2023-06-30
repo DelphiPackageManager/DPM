@@ -77,6 +77,7 @@ constructor TDPMOptionsHostForm.Create(AOwner : TComponent; const configManager 
 begin
   inherited Create(AOwner);
   {$IFDEF STYLEELEMENTS}
+  //earlier versions of the IDE strip these from the dfm
   StyleElements := [seFont, seClient, seBorder];
   {$ENDIF}
   {$IFDEF THEMESERVICES}

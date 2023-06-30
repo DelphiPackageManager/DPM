@@ -10,74 +10,65 @@ inherited DPMGroupEditViewFrame: TDPMGroupEditViewFrame
     ExplicitWidth = 1095
     ExplicitHeight = 670
     inherited Splitter2: TSplitter
-      Left = 677
+      Left = 587
       Height = 670
       ExplicitLeft = 216
       ExplicitHeight = 341
     end
     inherited PackageListPanel: TPanel
-      Width = 677
+      Width = 587
       Height = 670
-      ExplicitWidth = 677
+      ExplicitWidth = 587
       ExplicitHeight = 670
     end
     inherited DetailPanel: TPanel
-      Left = 685
+      Left = 595
       Height = 670
-      ExplicitLeft = 685
+      ExplicitLeft = 595
       ExplicitHeight = 670
       inline PackageDetailsFrame: TGroupPackageDetailsFrame
         Left = 0
         Top = 0
-        Width = 410
+        Width = 500
         Height = 670
         Align = alClient
         Color = clBtnFace
         ParentBackground = False
         ParentColor = False
         TabOrder = 0
-        ExplicitWidth = 410
+        ExplicitWidth = 500
         ExplicitHeight = 670
         inherited sbPackageDetails: TScrollBox
-          Width = 410
+          Width = 500
           Height = 670
-          ExplicitWidth = 410
+          ExplicitWidth = 500
           ExplicitHeight = 670
           inherited DetailsSplitter: TSplitter
-            Width = 410
+            Width = 500
             ExplicitWidth = 410
           end
           inherited pnlPackageId: TPanel
-            Width = 410
-            ExplicitWidth = 410
+            Width = 500
+            ExplicitWidth = 500
           end
           inherited pnlGridHost: TPanel
-            Width = 410
-            ExplicitWidth = 410
-            inherited pnlInstalled: TPanel
-              Width = 410
-              ExplicitWidth = 410
-              inherited txtInstalledVersion: TEdit
-                Width = 250
-                Height = 23
-                ExplicitWidth = 250
-                ExplicitHeight = 23
-              end
-              inherited btnUninstall: TButton
-                Left = 331
-                ExplicitLeft = 331
-              end
-            end
+            Width = 500
             inherited pnlVersion: TPanel
-              Width = 410
-              ExplicitWidth = 410
-              inherited cboVersions: TComboBox
-                Width = 250
-                ExplicitWidth = 250
+              Width = 500
+              ExplicitWidth = 500
+              inherited SpeedButton1: TSpeedButton
+                Left = 467
               end
-              inherited btnInstall: TButton
-                Left = 331
-                ExplicitLeft = 331
+              inherited SpeedButton2: TSpeedButton
+                Left = 431
+              end
+              inherited Label1: TLabel
+                Left = 236
+                ExplicitLeft = 236
+              end
+              inherited ComboBox1: TComboBox
+                Left = 278
+                ExplicitLeft = 278
               end
             end
           end

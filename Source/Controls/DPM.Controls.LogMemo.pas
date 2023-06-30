@@ -892,9 +892,9 @@ end;
 
 procedure TLogMemo.Loaded;
 begin
-  inherited;
   // Set the bmp to the size of the control.
   FPaintBmp.SetSize(Width, Height);
+  inherited;
 
 end;
 
@@ -997,23 +997,37 @@ begin
     FPaintBmp.SetSize(NewWidth, NewHeight);
   end;
 
+  UpdateVisibleRows;
+
   if FMaxWidth <= ClientWidth then
     FHScrollPos := 0
   else if FHScrollPos > (FMaxWidth - ClientWidth) then
     FHScrollPos := FMaxWidth - ClientWidth;
 
+  if FVisibleRows > RowCount then
+  begin
+    FTopRow := 0;
+    FVScrollPos := 0;
+  end
+  else if (RowCount - FTopRow + 1) < FVisibleRows then
+  begin
+    FTopRow := RowCount - FVisibleRows;
+  end;
 
   if (RowCount > 0) and (FCurrentRow > -1) then
+  begin
     if not RowInView(FCurrentRow) then
       ScrollInView(FCurrentRow, false);
 
-  Refresh;
+  end;
+//  Refresh;
   UpdateScrollBars;
+  Invalidate;
 
 //  //force repainting scrollbars
 //  if sfHandleMessages in StyleServices.Flags then
 //    SendMessage(Handle, WM_NCPAINT, 0, 0);
-  //inherited;
+  inherited;
 end;
 
 function TLogMemo.RowInView(const row: integer): boolean;
@@ -1079,9 +1093,10 @@ begin
     FTopRow := 0;
 
   FVScrollPos := FTopRow;
-  Update;
+//  Update;
   if updateSBs then
     UpdateScrollBars;
+  Invalidate;
 
 end;
 
@@ -1132,7 +1147,7 @@ var
   rowState : TPaintRowState;
 begin
   row := FTopRow + GetRowFromY(Y);
-  if row <> FHoverRow then
+  if (row <> FHoverRow) and (row < FItems.Count) then
   begin
     oldHoverRow := FHoverRow;
     FHoverRow := row;

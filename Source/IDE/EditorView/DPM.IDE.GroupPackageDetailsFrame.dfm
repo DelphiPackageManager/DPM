@@ -1,7 +1,7 @@
 object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
   Left = 0
   Top = 0
-  Width = 436
+  Width = 614
   Height = 523
   Color = clBtnFace
   ParentBackground = False
@@ -10,7 +10,7 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
   object sbPackageDetails: TScrollBox
     Left = 0
     Top = 0
-    Width = 436
+    Width = 614
     Height = 523
     VertScrollBar.Smooth = True
     VertScrollBar.Tracking = True
@@ -24,18 +24,20 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
     TabOrder = 0
     object DetailsSplitter: TSplitter
       Left = 0
-      Top = 369
-      Width = 436
+      Top = 361
+      Width = 614
       Height = 4
       Cursor = crVSplit
       Align = alTop
       ResizeStyle = rsUpdate
+      ExplicitTop = 369
+      ExplicitWidth = 436
     end
     object pnlPackageId: TPanel
       Left = 0
       Top = 0
-      Width = 436
-      Height = 57
+      Width = 614
+      Height = 49
       Align = alTop
       BevelOuter = bvNone
       Caption = 'pnlPackageId'
@@ -119,111 +121,98 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
     end
     object pnlGridHost: TPanel
       Left = 0
-      Top = 57
-      Width = 436
+      Top = 49
+      Width = 614
       Height = 312
       Align = alTop
       BevelOuter = bvNone
       Caption = 'pnlGridHost'
       ShowCaption = False
       TabOrder = 1
-      object pnlInstalled: TPanel
-        Left = 0
-        Top = 243
-        Width = 436
-        Height = 35
-        Align = alBottom
-        BevelOuter = bvNone
-        Caption = 'pnlInstalled'
-        ParentBackground = False
-        ParentColor = True
-        ShowCaption = False
-        TabOrder = 0
-        DesignSize = (
-          436
-          35)
-        object Label1: TLabel
-          Left = 6
-          Top = 11
-          Width = 56
-          Height = 13
-          Caption = 'Installed :'
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -11
-          Font.Name = 'Tahoma'
-          Font.Style = [fsBold]
-          ParentFont = False
-        end
-        object txtInstalledVersion: TEdit
-          Left = 69
-          Top = 8
-          Width = 276
-          Height = 23
-          Anchors = [akLeft, akTop, akRight]
-          Enabled = False
-          TabOrder = 0
-        end
-        object btnUninstall: TButton
-          Left = 357
-          Top = 6
-          Width = 75
-          Height = 25
-          Anchors = [akTop, akRight]
-          Caption = 'Uninstall'
-          TabOrder = 1
-          OnClick = btnUninstallClick
-        end
-      end
       object pnlVersion: TPanel
         Left = 0
-        Top = 278
-        Width = 436
+        Top = 0
+        Width = 614
         Height = 34
-        Align = alBottom
+        Align = alTop
         BevelOuter = bvNone
         Caption = 'Panel1'
         ParentBackground = False
         ParentColor = True
         ShowCaption = False
-        TabOrder = 1
+        TabOrder = 0
         DesignSize = (
-          436
+          614
           34)
         object lblVersionTitle: TLabel
-          Left = 6
-          Top = 9
-          Width = 48
-          Height = 13
+          Left = 19
+          Top = 10
+          Width = 44
+          Height = 15
+          Alignment = taRightJustify
           Caption = 'Version :'
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -11
-          Font.Name = 'Tahoma'
-          Font.Style = [fsBold]
-          ParentFont = False
+        end
+        object SpeedButton1: TSpeedButton
+          AlignWithMargins = True
+          Left = 581
+          Top = 3
+          Width = 28
+          Height = 28
+          Margins.Right = 5
+          Align = alRight
+          Caption = 'I'
+          ExplicitLeft = 408
+        end
+        object SpeedButton2: TSpeedButton
+          AlignWithMargins = True
+          Left = 545
+          Top = 3
+          Width = 28
+          Height = 28
+          Margins.Right = 5
+          Align = alRight
+          Caption = 'U'
+          ExplicitLeft = 376
+        end
+        object Label1: TLabel
+          AlignWithMargins = True
+          Left = 350
+          Top = 10
+          Width = 36
+          Height = 14
+          Margins.Top = 10
+          Margins.Bottom = 10
+          Align = alRight
+          Alignment = taRightJustify
+          Caption = 'Source'
+          ExplicitHeight = 15
         end
         object cboVersions: TComboBox
+          AlignWithMargins = True
           Left = 69
           Top = 6
-          Width = 276
+          Width = 260
           Height = 22
           Style = csOwnerDrawVariable
           Anchors = [akLeft, akTop, akRight]
           TabOrder = 0
           OnChange = cboVersionsChange
+          OnCloseUp = cboVersionsCloseUp
           OnDrawItem = cboVersionsDrawItem
+          OnDropDown = cboVersionsDropDown
           OnMeasureItem = cboVersionsMeasureItem
         end
-        object btnInstall: TButton
-          Left = 357
+        object ComboBox1: TComboBox
+          AlignWithMargins = True
+          Left = 392
           Top = 5
-          Width = 75
-          Height = 25
-          Anchors = [akTop, akRight]
-          Caption = 'Install'
+          Width = 145
+          Height = 23
+          Margins.Top = 5
+          Margins.Right = 5
+          Align = alRight
           TabOrder = 1
-          OnClick = btnInstallClick
+          Text = 'ComboBox1'
         end
       end
     end

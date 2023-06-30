@@ -42,6 +42,7 @@ type
     procedure SetPackage(const package : IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
     procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;
+    procedure ProjectReloaded;
     procedure ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
   end;
 

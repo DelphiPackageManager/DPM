@@ -52,9 +52,10 @@ uses
 type
   IDPMProjectTreeManager = interface
   ['{F0BA2907-E337-4591-8E16-FB684AE2E19B}']
-    procedure NotifyEndLoading();
-    procedure NotifyProjectLoaded(const fileName : string);
-    procedure NotifyProjectClosed(const fileName : string);
+    procedure EndLoading();
+    procedure ProjectLoaded(const fileName : string);
+    procedure ProjectClosed(const fileName : string);
+    procedure ProjectGroupClosed;
   end;
 
 const
@@ -83,10 +84,10 @@ type
 
   //procedure DumpInterfaces(AClass: TClass);
   protected
-    procedure NotifyProjectLoaded(const fileName : string);
-    procedure NotifyProjectClosed(const fileName : string);
-    procedure NotifyEndLoading();
-
+    procedure ProjectLoaded(const fileName : string);
+    procedure ProjectClosed(const fileName : string);
+    procedure EndLoading;
+    procedure ProjectGroupClosed;
 
     procedure WndProc(var msg: TMessage);
 
@@ -467,7 +468,7 @@ begin
   end;
 end;
 
-procedure TDPMProjectTreeManager.NotifyEndLoading;
+procedure TDPMProjectTreeManager.EndLoading;
 begin
   if not FOptions.AddDPMToProjectTree then
     exit;
@@ -475,7 +476,7 @@ begin
   PostMessage(FWindowHandle, WM_PROJECTLOADED, 0,0);
 end;
 
-procedure TDPMProjectTreeManager.NotifyProjectClosed(const fileName: string);
+procedure TDPMProjectTreeManager.ProjectClosed(const fileName: string);
 //var
 //  projectContainer : TProjectTreeContainer;
 begin
@@ -493,13 +494,18 @@ begin
 //  end;
 end;
 
-procedure TDPMProjectTreeManager.NotifyProjectLoaded(const fileName: string);
+procedure TDPMProjectTreeManager.ProjectLoaded(const fileName: string);
 begin
   if not FOptions.AddDPMToProjectTree then
     exit;
   //The project tree nodes do not seem to have been added at this stage
   //just enqueue the project, and we'll deal with it when all projects are loaded.
   FProjectLoadList.Enqueue(fileName);
+end;
+
+procedure TDPMProjectTreeManager.ProjectGroupClosed;
+begin
+  FNodeCache.Clear;
 end;
 
 function TDPMProjectTreeManager.TryGetContainerTreeNode(const container: TProjectTreeContainer; out containerNode: PVirtualNode): boolean;

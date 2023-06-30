@@ -32,8 +32,15 @@ type
     function GetAddDPMToProjectTree : boolean;
     procedure SetAddDPMToProjectTree(const value : boolean);
 
+    function GetLogWindowWidth : integer;
+    procedure SetLogWindowWidth(const value : integer);
+    function GetLogWindowHeight : integer;
+    procedure SetLogWindowHeight(const value : integer);
 
     property LogVerbosity : TVerbosity read GetLogVerbosity write SetLogVebosity;
+    property LogWindowWidth : integer read GetLogWindowWidth write SetLogWindowWidth;
+    property LogWindowHeight : integer read GetLogWindowHeight write SetLogWindowHeight;
+
     property ShowLogForRestore : boolean read GetShowLogForRestore write SetShowLogForRestore;
     property ShowLogForInstall : boolean read GetShowLogForInstall write SetShowLogForInstall;
     property ShowLogForUninstall : boolean read GetShowLogForUninstall write SetShowLogForUninstall;
@@ -56,6 +63,8 @@ type
     FAutoCloseOnSuccess : boolean;
     FAutoCloseLogDelaySeconds : integer;
     FAddDPMToProjectTree : boolean;
+    FLogWindowWidth : integer;
+    FLogWindowHeight : integer;
   protected
     function LoadFromJson(const jsonObj : TJsonObject) : boolean;
     function SaveToJson(const parentObj : TJsonObject) : boolean;
@@ -85,6 +94,11 @@ type
 
     function GetAddDPMToProjectTree : boolean;
     procedure SetAddDPMToProjectTree(const value : boolean);
+
+    function GetLogWindowWidth : integer;
+    procedure SetLogWindowWidth(const value : integer);
+    function GetLogWindowHeight : integer;
+    procedure SetLogWindowHeight(const value : integer);
 
 
   public
@@ -116,6 +130,8 @@ begin
   FAutoCloseOnSuccess := true;
   FAutoCloseLogDelaySeconds := 3;
   FAddDPMToProjectTree := true;
+  FLogWindowWidth := 800;
+  FLogWindowHeight := 500;
 end;
 
 function TDPMIDEOptions.GetAddDPMToProjectTree: boolean;
@@ -138,6 +154,16 @@ begin
   result := FVerbosity;
 end;
 
+
+function TDPMIDEOptions.GetLogWindowHeight: integer;
+begin
+  result := FLogWindowHeight;
+end;
+
+function TDPMIDEOptions.GetLogWindowWidth: integer;
+begin
+  result := FLogWindowWidth
+end;
 
 function TDPMIDEOptions.GetOptionsFileName: string;
 begin
@@ -219,6 +245,11 @@ begin
   if jsonObj.Contains('addtoprojecttree') then
     FAddDPMToProjectTree := jsonObj.B['addtoprojecttree'];
 
+  if jsonObj.Contains('logwindowwidth') then
+    FLogWindowWidth := jsonObj.I['logwindowwidth'];
+
+  if jsonObj.Contains('logwindowheight') then
+    FLogWindowHeight := jsonObj.I['logwindowheight'];
 
 end;
 
@@ -260,6 +291,9 @@ begin
   parentObj.B['autocloselogonsuccess'] := FAutoCloseOnSuccess;
   parentObj.I['autocloselogdelayseconds'] := FAutoCloseLogDelaySeconds;
   parentObj.B['addtoprojecttree'] := FAddDPMToProjectTree;
+  parentObj.I['logwindowwidth'] := FLogWindowWidth;
+  parentObj.I['logwindowheight'] := FLogWindowHeight;
+
   result := true;
 end;
 
@@ -283,6 +317,16 @@ end;
 procedure TDPMIDEOptions.SetLogVebosity(const value: TVerbosity);
 begin
   FVerbosity := value;
+end;
+
+procedure TDPMIDEOptions.SetLogWindowHeight(const value: integer);
+begin
+  FLogWindowHeight := value;
+end;
+
+procedure TDPMIDEOptions.SetLogWindowWidth(const value: integer);
+begin
+  FLogWindowWidth := value;
 end;
 
 procedure TDPMIDEOptions.SetShowLogForInstall(const value: boolean);

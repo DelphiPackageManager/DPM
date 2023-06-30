@@ -34,13 +34,17 @@ uses
   VCL.Forms,
   Spring.Container,
   DPM.IDE.ProjectTreeManager,
-  DPM.IDE.BaseEditViewFrame;
+  DPM.IDE.BaseEditViewFrame,
+  DPM.IDE.EditorViewFrame2;
 
 type
   IDPMEditorView = interface
     ['{1DF76A55-76AC-4789-A35A-CA025583356A}']
-    procedure Reloaded;
+    procedure ProjectChanged;
+    procedure ProjectClosed(const projectName : string);
+    procedure ProjectLoaded(const projectName : string);
     procedure ThemeChanged;
+    procedure FilterToProject(const projectGroup : IOTAProjectGroup; const project : IOTAProject);
   end;
 
   TDPMEditorView = class(TInterfacedObject, INTACustomEditorView, INTACustomEditorView150, IDPMEditorView)
@@ -48,16 +52,19 @@ type
     FContainer : TContainer;
     FProject : IOTAProject;
     FProjectGroup : IOTAProjectGroup;
-    FIsProjectGroup : boolean;
-    FFrame : TDPMBaseEditViewFrame;
+    FFrame : TDPMEditViewFrame2;
     FImageIndex : integer;
     FCaption : string;
     FProjectTreeManager : IDPMProjectTreeManager;
     FIdentifier : string;
   protected
     //IDPMEditorView
-    procedure Reloaded;
+    procedure ProjectChanged;
     procedure ThemeChanged;
+    procedure ProjectClosed(const projectName : string);
+    procedure ProjectLoaded(const projectName : string);
+    procedure FilterToProject(const projectGroup : IOTAProjectGroup; const project : IOTAProject);
+
 
     function CloneEditorView : INTACustomEditorView;
     procedure CloseAllCalled(var ShouldClose : Boolean);
@@ -77,7 +84,7 @@ type
     function GetTabHintText : string;
     procedure Close(var Allowed : Boolean);
   public
-    constructor Create(const container : TContainer; const project : IOTAProject; const imageIndex : integer; const projectTreeManager : IDPMProjectTreeManager);
+    constructor Create(const container : TContainer; const projectGroup : IOTAProjectGroup; const project : IOTAProject; const imageIndex : integer; const projectTreeManager : IDPMProjectTreeManager);
     destructor Destroy;override;
   end;
 
@@ -85,6 +92,7 @@ implementation
 
 uses
   System.SysUtils,
+  DPM.Core.Utils.System,
   DPM.IDE.EditorViewFrame,
   DPM.IDE.GroupEditorViewFrame;
 
@@ -97,37 +105,41 @@ end;
 
 procedure TDPMEditorView.Close(var Allowed : Boolean);
 begin
-  Allowed := true;
-  FFrame.Closing;
-  FFrame := nil;
+  Allowed := FFrame.CanCloseView;
+  if Allowed then
+  begin
+    FFrame.Closing;
+    FFrame := nil;
+  end;
 end;
 
 procedure TDPMEditorView.CloseAllCalled(var ShouldClose : Boolean);
 begin
   //doesn't seem to get called???
-  ShouldClose := true;
-  FFrame.Closing;
+  ShouldClose := FFrame.CanCloseView;
+  if ShouldClose then
+  begin
+    FFrame.Closing;
+    FFrame := nil;
+  end;
 end;
 
-constructor TDPMEditorView.Create(const container : TContainer; const project : IOTAProject; const imageIndex : integer; const projectTreeManager : IDPMProjectTreeManager);
+constructor TDPMEditorView.Create(const container : TContainer; const projectGroup : IOTAProjectGroup; const project : IOTAProject; const imageIndex : integer; const projectTreeManager : IDPMProjectTreeManager);
 begin
   FContainer := container;
-  FProject := project;
+  FProjectGroup := projectGroup;
+  FProject := project; //can be nil
   FImageIndex := imageIndex;
   FProjectTreeManager := projectTreeManager;
-  FProjectGroup := nil;
-  FIsProjectGroup := Supports(FProject, IOTAProjectGroup, FProjectGroup);
-  if FIsProjectGroup then
-    FCaption := 'DPM : ProjectGroup'
-  else
-    FCaption := 'DPM : ' + ChangeFileExt(ExtractFileName(FProject.FileName), '');
+  FCaption := 'DPM';
+  Assert(FProjectGroup <> nil);
+//  if FProjectGroup <> nil then
+//    FIdentifier := 'DPM_GROUP_VIEW_' + ChangeFileExt(ExtractFileName(FProjectGroup.FileName), '')
+//  else
+//    FIdentifier := 'DPM_VIEW_' + ChangeFileExt(ExtractFileName(FProject.FileName), '');
+//   FIdentifier := StringReplace(FIdentifier, '.', '_', [rfReplaceAll]);
 
-  if FProjectGroup <> nil then
-    FIdentifier := 'DPM_GROUP_VIEW_' + ChangeFileExt(ExtractFileName(FProjectGroup.FileName), '')
-  else
-     FIdentifier := 'DPM_VIEW_' + ChangeFileExt(ExtractFileName(FProject.FileName), '');
-   FIdentifier := StringReplace(FIdentifier, '.', '_', [rfReplaceAll]);
-
+  FIdentifier := 'DPM_EDITOR_VIEW'; //we only have 1 view now
 end;
 
 procedure TDPMEditorView.DeselectView;
@@ -147,11 +159,27 @@ begin
   result := false;
 end;
 
+
+procedure TDPMEditorView.FilterToProject(const projectGroup : IOTAProjectGroup; const project : IOTAProject);
+var
+  sFileName : string;
+begin
+  FProjectGroup := projectGroup;
+  FProject := project;
+  if FFrame <> nil then
+  begin
+    if project <> nil then
+      sFileName := project.FileName;
+    FFrame.FilterToProject(sFileName);
+  end;
+
+end;
+
 procedure TDPMEditorView.FrameCreated(AFrame : TCustomFrame);
 begin
-  FFrame := TDPMBaseEditViewFrame(AFrame);
+  FFrame := TDPMEditViewFrame2(AFrame);
   FFrame.Name := GetViewIdentifier;
-  FFrame.Configure(FProject, FContainer, FProjectTreeManager);
+  FFrame.Configure(FProjectGroup, FProject, FContainer, FProjectTreeManager);
 end;
 
 function TDPMEditorView.GetCanCloneView : Boolean;
@@ -176,10 +204,7 @@ end;
 
 function TDPMEditorView.GetFrameClass : TCustomFrameClass;
 begin
-  if FIsProjectGroup then
-    result := TDPMGroupEditViewFrame
-  else
-    result := TDPMEditViewFrame;
+    result := TDPMEditViewFrame2;
 end;
 
 function TDPMEditorView.GetImageIndex : Integer;
@@ -197,16 +222,27 @@ begin
   result := FIdentifier;
 end;
 
-procedure TDPMEditorView.Reloaded;
+procedure TDPMEditorView.ProjectChanged;
 begin
   if FFrame <> nil then
-    FFrame.ProjectReloaded;
+    FFrame.ProjectChanged;
+end;
+
+procedure TDPMEditorView.ProjectClosed(const projectName: string);
+begin
+  if FFrame <> nil then
+    FFrame.ProjectClosed(projectName);
+end;
+
+procedure TDPMEditorView.ProjectLoaded(const projectName: string);
+begin
+  if FFrame <> nil then
+    FFrame.ProjectLoaded(projectName);
 end;
 
 procedure TDPMEditorView.SelectView;
 begin
-  //Note : For some reason this is getting called twice in XE7 for each selection.
-  //TODO : Check if it's the same in other IDE versions
+  //Note : For some reason this is getting called twice each time the view is selected.
   if FFrame <> nil then
     FFrame.ViewSelected;
 end;

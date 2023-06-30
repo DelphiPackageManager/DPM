@@ -103,6 +103,7 @@ type
 
   public
     constructor Create(AOwner : TComponent); override;
+    procedure ProjectReloaded;
     procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProject);
     procedure Configure(const value : TDPMCurrentTab; const preRelease : boolean);
     procedure SetPackage(const package : IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
@@ -467,6 +468,11 @@ begin
 end;
 
 
+procedure TPackageDetailsFrame.ProjectReloaded;
+begin
+
+end;
+
 procedure TPackageDetailsFrame.SetPackage(const package : IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean);
 var
   logo : IPackageIconImage;
@@ -477,6 +483,7 @@ begin
   if FRequestInFlight then
     FCancellationTokenSource.Cancel;
   FPackageMetaData := package;
+
   if package <> nil then
   begin
     if (package.Id <> FPackageId) then

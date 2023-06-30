@@ -45,7 +45,7 @@ type
     procedure Destroyed;
     procedure Modified;
 
-    procedure OnManagePackages(Sender : TObject);
+    //procedure OnManagePackages(Sender : TObject);
 
   public
     constructor Create(const editorViewManager : IDPMEditorViewManager);
@@ -53,8 +53,8 @@ type
 
   TDPMProjectMenu = class(TInterfacedObject, IOTANotifier, IOTALocalMenu, IOTAProjectManagerMenu)
   private
-    FOnClick : TNotifyEvent;
     FProject : IOTAProject;
+    FProjectGroup : IOTAProjectGroup;
     FEditorViewManager : IDPMEditorViewManager;
   protected
     //IOTANotifier
@@ -86,7 +86,7 @@ type
     function PreExecute(const MenuContextList : IInterfaceList) : Boolean;
     procedure SetIsMultiSelectable(Value : Boolean);
   public
-    constructor Create(const handler : TNotifyEvent; const project : IOTAProject; const editorViewManager : IDPMEditorViewManager);
+    constructor Create(const projectGroup : IOTAProjectGroup; const project : IOTAProject; const editorViewManager : IDPMEditorViewManager);
 
   end;
 
@@ -105,11 +105,20 @@ uses
 procedure TDPMProjectMenuNotifier.AddMenu(const Project : IOTAProject; const IdentList : TStrings; const ProjectManagerMenuList : IInterfaceList; IsMultiSelect : Boolean);
 var
   menu : IOTAProjectManagerMenu;
+  projectGroup : IOTAProjectGroup;
+  proj : IOTAProject;
 begin
   //TODO : Uncomment section below when project groups are supported.
   if Assigned(Project) and ((IdentList.IndexOf(cDPMContainer) <> -1) or (IdentList.IndexOf(sProjectContainer) <> -1) or (IdentList.IndexOf(sProjectGroupContainer) <> -1) ) then
   begin
-    menu := TDPMProjectMenu.Create(Self.OnManagePackages, Project, FEditorViewManager);
+    proj := Project;
+    if (proj <> nil) and Supports(proj, IOTAProjectGroup, projectGroup) then
+      proj := nil
+    else
+      projectGroup := (BorlandIDEServices as IOTAModuleServices).MainProjectGroup;
+    Assert(projectGroup <> nil);
+
+    menu := TDPMProjectMenu.Create(projectGroup, proj, FEditorViewManager);
     ProjectManagerMenuList.Add(menu);
   end;
 end;
@@ -140,10 +149,6 @@ begin
 
 end;
 
-procedure TDPMProjectMenuNotifier.OnManagePackages(Sender : TObject);
-begin
-
-end;
 
 { TDPMProjectMenu }
 
@@ -157,11 +162,12 @@ begin
 
 end;
 
-constructor TDPMProjectMenu.Create(const handler : TNotifyEvent; const project : IOTAProject; const editorViewManager : IDPMEditorViewManager);
+constructor TDPMProjectMenu.Create(const projectGroup : IOTAProjectGroup; const project : IOTAProject; const editorViewManager : IDPMEditorViewManager);
 begin
-  FOnClick := handler;
+  FProjectGroup := projectGroup;
   FProject := project;
   FEditorViewManager := editorViewManager;
+  Assert(FProjectGroup <> nil);
 end;
 
 procedure TDPMProjectMenu.Destroyed;
@@ -173,18 +179,15 @@ end;
 
 procedure TDPMProjectMenu.Execute(const MenuContextList : IInterfaceList);
 begin
-  if FProject <> nil then
-    FEditorViewManager.ShowViewForProject(FProject);
+  FEditorViewManager.ShowViewForProject(FProjectGroup, FProject);
 end;
 
 function TDPMProjectMenu.GetCaption : string;
-var
-  pg : IOTAProjectGroup;
 begin
-  if Supports(FProject, IOTAProjectGroup, pg) then
-    result := 'Manage DPM Packages for Project Group'
+  if FProject <> nil then
+    result := Format('Manage DPM Packages : %s', [ExtractFileName(FProject.FileName)])
   else
-    result := Format('Manage DPM Packages : %s', [ExtractFileName(FProject.FileName)]);
+    result := 'Manage DPM Packages for Project Group';
 end;
 
 function TDPMProjectMenu.GetChecked : Boolean;
@@ -195,7 +198,7 @@ end;
 function TDPMProjectMenu.GetEnabled : Boolean;
 begin
   //since we may need to work directly with the file, it must have been saved before we can manage packages.
-  result := FileExists(FProject.FileName);
+  result := true;// FileExists(FProject.FileName);
 end;
 
 function TDPMProjectMenu.GetHelpContext : Integer;

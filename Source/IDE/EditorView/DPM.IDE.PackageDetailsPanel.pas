@@ -26,7 +26,6 @@ type
     LineSpacing : integer;
     VersionPadding : integer;
 
-
     VersionLabelRect : TRect;
     VersionRect : TRect;
 
@@ -52,19 +51,14 @@ type
     RepositoryUrlLabelRect : TRect;
     RepositoryUrlRect : TRect;
 
-
     TagsLabelRect : TRect;
     TagsRect : TRect;
     Tags : string;
 
     DependLabelRect : TRect;
-
     DependRect : TRect;
 
-
     LayoutHeight : integer;
-
-
 
     procedure ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND});
     procedure Update(const ACanvas : TCanvas; const AControl : TPackageDetailsPanel; const package : IPackageSearchResultItem; const optionalElements : TDetailElements);
@@ -81,7 +75,6 @@ type
     FUpdating : boolean;
     FOnUriClickEvent : TUriClickEvent;
     FPackage : IPackageSearchResultItem;
-    FTags : string;
   protected
     procedure UpdateLayout;
     procedure Paint; override;
@@ -479,7 +472,6 @@ var
   count : integer;
 
   tagsArr : TArray<string>;
-  sTags : string;
   i : integer;
 
 begin

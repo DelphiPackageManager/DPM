@@ -12,7 +12,10 @@ uses
   Vcl.ActnList,
   Vcl.ExtCtrls,
   VSoft.Awaitable,
-  DPM.Controls.LogMemo, ToolsAPI;
+  DPM.IDE.Options,
+  DPM.Controls.LogMemo,
+  ToolsAPI,
+  System.Actions;
 
 {$I ..\DPMIDE.inc}
 
@@ -36,6 +39,7 @@ type
     procedure lblDontCloseLinkClick(Sender: TObject; const Link: string;
       LinkType: TSysLinkType);
   private
+    FOptions : IDPMIDEOptions;
     FLogMemo : TLogMemo;
     FCancellationTokenSource : ICancellationTokenSource;
     FCloseDelayInSeconds : integer;
@@ -59,7 +63,7 @@ type
 
 
   public
-    constructor Create(AOwner : TComponent);override;
+    constructor Create(AOwner : TComponent; const options : IDPMIDEOptions);reintroduce;
     destructor Destroy; override;
 
     procedure Debug(const data : string);
@@ -76,9 +80,6 @@ type
     property CancellationTokenSource : ICancellationTokenSource read FCancellationTokenSource write SetCancellationTokenSource;
     property CloseDelayInSeconds : integer read FCloseDelayInSeconds write SetCloseDelayInSeconds;
   end;
-
-var
-  DPMMessageForm: TDPMMessageForm;
 
 implementation
 
@@ -181,14 +182,17 @@ begin
   inherited;
 end;
 
-constructor TDPMMessageForm.Create(AOwner: TComponent);
+constructor TDPMMessageForm.Create(AOwner: TComponent; const options : IDPMIDEOptions);
 var
   {$IFDEF THEMESERVICES}
   ideThemeSvc : IOTAIDEThemingServices;
   {$ENDIF}
   IDEStyleServices : TCustomStyleServices;
 begin
-  inherited;
+  inherited Create(AOwner);
+  FOptions := options;
+  Self.Width := FOptions.LogWindowWidth;
+  Self.Height := FOptions.LogWindowHeight;
   {$IFDEF STYLEELEMENTS}
   StyleElements := [seFont, seClient, seBorder];
   {$ENDIF}
@@ -248,6 +252,10 @@ var
   ideThemeSvc : IOTAIDEThemingServices;
   {$ENDIF}
 begin
+  FOptions.LogWindowWidth := Self.Width;
+  FOptions.LogWindowHeight := Self.Height;
+  FOptions.SaveToFile();
+
   {$IFDEF THEMESERVICES}
   ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
   ideThemeSvc.RemoveNotifier(FNotifierId);

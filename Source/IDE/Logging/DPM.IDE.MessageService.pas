@@ -3,6 +3,7 @@ unit DPM.IDE.MessageService;
 interface
 
 uses
+  Vcl.Forms,
   VSoft.Awaitable,
   DPM.IDE.MessageForm,
   DPM.IDE.Options;
@@ -46,7 +47,6 @@ type
     procedure HideMessageWindow;
     procedure ShowMessageWindow;
     procedure Shutdown;
-
     procedure TaskStarted(const cancellationTokenSource : ICancellationTokenSource; const task : TMessageTask);
     procedure TaskDone(const success : boolean);
 
@@ -71,7 +71,6 @@ type
 implementation
 
 uses
-  Vcl.Forms,
   System.SysUtils;
 
 { TDPMMessageService }
@@ -100,6 +99,9 @@ destructor TDPMIDEMessageService.Destroy;
 begin
   if FMessageForm <> nil then
   begin
+    FOptions.LogWindowWidth := FMessageForm.Width;
+    FOptions.LogWindowHeight := FMessageForm.Height;
+    FOptions.SaveToFile();
     FMessageForm.Parent := nil;
     FMessageForm.Free;
   end;
@@ -110,11 +112,12 @@ procedure TDPMIDEMessageService.EnsureMessageForm;
 begin
   if FMessageForm = nil then
   begin
-    FMessageForm := TDPMMessageForm.Create(nil);
+    FMessageForm := TDPMMessageForm.Create(nil, FOptions);
     FMessageForm.Parent := Application.MainForm;
   end;
   FMessageForm.CancellationTokenSource := FCancellationTokenSource;
   FMessageForm.CloseDelayInSeconds := FOptions.AutoCloseLogDelaySeconds;
+
 end;
 
 procedure TDPMIDEMessageService.Error(const data: string);
@@ -142,6 +145,7 @@ begin
   if FMessageForm <> nil then
     FMessageForm.NewLine;
 end;
+
 
 function TDPMIDEMessageService.CanHandleMessages: boolean;
 begin
@@ -197,11 +201,13 @@ end;
 
 procedure TDPMIDEMessageService.TaskStarted(const cancellationTokenSource: ICancellationTokenSource; const task : TMessageTask);
 begin
-  FCancellationTokenSource := cancellationTokenSource;
-  FCurrentTask := task;
-  EnsureMessageForm;
-  FMessageForm.Clear;
-
+  if FCurrentTask <> task then
+  begin
+    FCancellationTokenSource := cancellationTokenSource;
+    FCurrentTask := task;
+    EnsureMessageForm;
+    FMessageForm.Clear;
+  end;
 
   case task of
     mtNone :

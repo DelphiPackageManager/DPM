@@ -12,11 +12,12 @@ uses
   DPM.IDE.Types,
   DPM.IDE.Logger,
   DPM.IDE.Options,
-  DPM.Controls.ButtonedEdit;
+  DPM.Controls.ButtonedEdit, System.ImageList;
 
 type
   TConfigChangedEvent = procedure(const configuration : IConfiguration) of object;
   TPlatformChangedEvent = procedure(const newPlatform : TDPMPlatform) of object;
+  TProjectSelectedEvent = procedure(const projectFile : string) of object;
   TSearchEvent = procedure(const searchText : string; const searchOptions : TDPMSearchOptions; const source : string; const platform : TDPMPlatform; const refresh : boolean) of object;
 
   TDPMSearchBarFrame = class(TFrame)
@@ -35,6 +36,7 @@ type
     lblProject: TLabel;
     lblSources: TLabel;
     txtSearch: TButtonedEdit;
+    cboProjects: TComboBox;
     procedure txtSearchChange(Sender: TObject);
     procedure txtSearchRightButtonClick(Sender: TObject);
     procedure DebounceTimerTimer(Sender: TObject);
@@ -65,6 +67,7 @@ type
     FOnSearchEvent : TSearchEvent;
     FOnConfigChanged : TConfigChangedEvent;
     FOnPlatformChangedEvent : TPlatformChangedEvent;
+    FOnProjectSelected : TProjectSelectedEvent;
 
     function GetSearchText: string;
     function GetIncludePreRelease: boolean;
@@ -75,11 +78,12 @@ type
     procedure AddDefaultSearchHistory;
 
     procedure ReloadSourcesCombo;
+
     procedure DoSearchEvent(const refresh : boolean);
-    procedure Loaded; override;
-
     procedure DoPlatformChangedEvent(const newPlatform : TDPMPlatform);
+    procedure DoProjectSelected(const value : string);
 
+    procedure Loaded; override;
   public
     constructor Create(AOwner : TComponent);override;
     procedure Configure(const logger : IDPMIDELogger; const ideOptions : IDPMIDEOptions; const config : IConfiguration; const configurationManager : IConfigurationManager; const configFile : string; const platforms : TDPMPlatforms);overload;
@@ -88,7 +92,6 @@ type
     procedure SetPlatform(const platform : TDPMPlatform);
     function GetPlatform : TDPMPlatform;
     procedure ThemeChanged(const ideStyleServices : TCustomStyleServices);
-
 
     property Caption : string read GetCaption write SetCaption;
     property HasSources : boolean read FHasSources;
@@ -100,6 +103,7 @@ type
     property OnConfigChanged : TConfigChangedEvent read FOnConfigChanged write FOnConfigChanged;
     property OnSearch : TSearchEvent read FOnSearchEvent write FOnSearchEvent;
     property OnPlatformChanged : TPlatformChangedEvent read FOnPlatformChangedEvent write FOnPlatformChangedEvent;
+    property OnProjectSelected : TProjectSelectedEvent read FOnProjectSelected write FOnProjectSelected;
 
   end;
 
@@ -291,6 +295,12 @@ begin
     FOnPlatformChangedEvent(newPlatform);
 end;
 
+procedure TDPMSearchBarFrame.DoProjectSelected(const value: string);
+begin
+  if Assigned(FOnProjectSelected) then
+    FOnProjectSelected(value);
+end;
+
 procedure TDPMSearchBarFrame.DoSearchEvent(const refresh : boolean);
 var
   options : TDPMSearchOptions;
@@ -400,7 +410,7 @@ end;
 
 procedure TDPMSearchBarFrame.SetCaption(const Value: string);
 begin
-  lblProject.Caption := value;
+//  lblProject.Caption := value;
 end;
 
 procedure TDPMSearchBarFrame.SetPlatform(const platform: TDPMPlatform);

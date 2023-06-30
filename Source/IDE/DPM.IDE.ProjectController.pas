@@ -17,9 +17,10 @@ type
   IDPMIDEProjectController = interface
   ['{860448A2-1015-44A7-B051-0D29692B9986}']
     //IDENotifier
-    procedure FileOpening(const fileName : string);
-    procedure FileOpened(const fileName : string);
-    procedure FileClosed(const fileName : string);
+    procedure ProjectOpening(const fileName : string); //does restore!
+    procedure ProjectClosed(const fileName : string);
+
+    procedure ProjectGroupClosed;
 
     //StorageNotifier
     procedure ProjectCreating(const fileName : string);
@@ -32,6 +33,8 @@ type
 
   end;
 
+  // The Project controller is used to receive notifications from the IDE and funnel
+  // them to the various parts of the IDE integration - views, project tree etc.
 
   TDPMIDEProjectController = class(TInterfacedObject, IDPMIDEProjectController)
   private
@@ -45,9 +48,11 @@ type
     FLastResult : boolean;
   protected
     //from IDENotifier
-    procedure FileOpening(const fileName : string);
-    procedure FileOpened(const fileName : string);
-    procedure FileClosed(const fileName : string);
+    procedure ProjectOpening(const fileName : string);
+    procedure ProjectClosed(const fileName : string);
+    procedure ProjectGroupClosed;
+
+
 
     procedure BeginLoading(const mode : TProjectMode);
     procedure EndLoading(const mode : TProjectMode);
@@ -82,7 +87,6 @@ begin
   FCancellationTokenSource.Reset;
   FLastResult := true;
   FContext.Clear;
-  FLogger.StartRestore(FCancellationTokenSource);
 end;
 
 constructor TDPMIDEProjectController.Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager;
@@ -108,62 +112,63 @@ end;
 
 procedure TDPMIDEProjectController.EndLoading(const mode: TProjectMode);
 begin
-//  FLogger.Debug('ProjectController.EndLoading : ' + GetEnumName(TypeInfo(TProjectMode),Ord(mode)));
+  FLogger.Debug('ProjectController.EndLoading : ' + GetEnumName(TypeInfo(TProjectMode),Ord(mode)));
   FProjectMode := pmNone;
   FLogger.EndRestore(FLastResult);
-  FProjectTreeManager.NotifyEndLoading;
+  FProjectTreeManager.EndLoading;
 end;
 
-procedure TDPMIDEProjectController.FileClosed(const fileName: string);
+procedure TDPMIDEProjectController.ProjectClosed(const fileName: string);
 begin
-//  FLogger.Debug('ProjectController.FileClosed : ' + fileName);
-  FProjectTreeManager.NotifyProjectClosed(FileName);
+  FLogger.Debug('ProjectController.ProjectClosed : ' + fileName);
+  FProjectTreeManager.ProjectClosed(FileName);
   FEditorViewManager.ProjectClosed(FileName);
   FContext.RemoveProject(fileName);
 end;
 
-procedure TDPMIDEProjectController.FileOpened(const fileName: string);
-begin
-  //FLogger.Debug('ProjectController.FileOpened : ' + fileName);
-  //using projectloaded as it fires later.
-end;
 
-procedure TDPMIDEProjectController.FileOpening(const fileName: string);
+procedure TDPMIDEProjectController.ProjectOpening(const fileName: string);
 begin
-//  FLogger.Debug('ProjectController.FileOpening : ' + fileName);
+  FLogger.Debug('ProjectController.ProjectOpening : ' + fileName);
   RestoreProject(fileName);
 end;
 
 procedure TDPMIDEProjectController.ProjectClosing(const fileName: string);
 begin
-//  FLogger.Debug('ProjectController.ProjectClosing : ' + fileName);
+  FLogger.Debug('ProjectController.ProjectClosing : ' + fileName);
 // using FileClosing as it fires earlier
 end;
 
 procedure TDPMIDEProjectController.ProjectCreating(const fileName: string);
 begin
-//  FLogger.Debug('ProjectController.ProjectCreating : ' + fileName);
+  FLogger.Debug('ProjectController.ProjectCreating : ' + fileName);
+  ProjectLoaded(fileName);
 end;
 
+
+procedure TDPMIDEProjectController.ProjectGroupClosed;
+begin
+  FProjectTreeManager.ProjectGroupClosed;
+  FEditorViewManager.ProjectGroupClosed;
+end;
 
 procedure TDPMIDEProjectController.ProjectLoaded(const fileName: string);
 begin
   FLogger.Debug('ProjectController.ProjectLoaded : ' + fileName);
   //queue the project for loading in the tree.
-  FProjectTreeManager.NotifyProjectLoaded(fileName);
+  FProjectTreeManager.ProjectLoaded(fileName);
 
   //this will be pmNone when reloading after external edit
   if FProjectMode = pmNone then
   begin
-    FProjectTreeManager.NotifyEndLoading;
+    FProjectTreeManager.EndLoading; //force tree update
     FEditorViewManager.ProjectLoaded(fileName);
   end;
-  FLogger.EndProject(fileName);
 end;
 
 procedure TDPMIDEProjectController.ProjectSaving(const fileName: string);
 begin
-//  FLogger.Debug('ProjectController.ProjectSaving : ' + fileName);
+  FLogger.Debug('ProjectController.ProjectSaving : ' + fileName);
 // not sure we need to do anything.
 end;
 
@@ -171,6 +176,8 @@ procedure TDPMIDEProjectController.RestoreProject(const fileName: string);
 var
   options : TRestoreOptions;
 begin
+  FLogger.Debug('ProjectController.RestoreProject : ' + fileName);
+
   if FCancellationTokenSource.Token.IsCancelled then
     exit;
   options := TRestoreOptions.Create;
@@ -178,10 +185,8 @@ begin
   options.ProjectPath := fileName;
   options.Validate(FLogger);
   options.CompilerVersion := IDECompilerVersion;
-
-  FLogger.StartProject(FileName);
+  FLogger.StartRestore(FCancellationTokenSource);
   FLastResult := FLastResult and FPackageInstaller.Restore(FCancellationTokenSource.Token, options, FContext);
-  FLogger.EndProject(fileName);
 end;
 
 

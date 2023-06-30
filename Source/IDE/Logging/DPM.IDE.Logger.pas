@@ -43,13 +43,13 @@ type
 
     procedure StartRestore(const cancellationTokenSource : ICancellationTokenSource);
     procedure EndRestore(const success  : boolean);
+
     procedure StartInstall(const cancellationTokenSource : ICancellationTokenSource);
     procedure EndInstall(const success  : boolean);
+
     procedure StartUnInstall(const cancellationTokenSource : ICancellationTokenSource);
     procedure EndUnInstall(const success  : boolean);
 
-    procedure StartProject(const fileName : string; const msg : string = '');
-    procedure EndProject(const fileName : string; const msg : string = '');
   end;
 
   TDPMIDELogger = class(TInterfacedObject, IDPMIDELogger, ILogger )
@@ -60,6 +60,7 @@ type
     {$ENDIF}
     FVerbosity : TVerbosity;
     FDPMMessageService : IDPMIDEMessageService;
+
   protected
     procedure Debug(const data : string);
     procedure Error(const data : string);
@@ -129,9 +130,9 @@ begin
   if (FVerbosity < TVerbosity.Debug) then
     exit;
 {$IFDEF DEBUG}
-  FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
+  FMessageServices.AddToolMessage('', 'DEBUG: ' + data, '', 0, 0, nil, lineRef, FMessageGroup);
 {$ENDIF}
-  FDPMMessageService.Debug(data);
+  FDPMMessageService.Debug('DEBUG: ' + data);
 end;
 
 destructor TDPMIDELogger.Destroy;
@@ -150,12 +151,12 @@ end;
 
 procedure TDPMIDELogger.EndProject(const fileName : string; const msg : string);
 {$IFDEF DEBUG}
-//var
-//  lineRef : Pointer;
+var
+  lineRef : Pointer;
 {$ENDIF}
 begin
 {$IFDEF DEBUG}
-//  FMessageServices.AddToolMessage(fileName, 'Done.' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
+  FMessageServices.AddToolMessage(fileName, 'Done.' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
 {$ENDIF}
 end;
 
@@ -236,11 +237,11 @@ begin
 end;
 
 procedure TDPMIDELogger.StartProject(const fileName : string; const msg : string);
-//var
-//  lineRef : Pointer;
+var
+  lineRef : Pointer;
 begin
 {$IFDEF DEBUG}
-  ////FMessageServices.AddToolMessage(fileName, 'Restoring packages...' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
+  FMessageServices.AddToolMessage(fileName, 'Restoring packages...' + msg, '', 0, 0, nil, lineRef, FMessageGroup);
 {$ENDIF}
 end;
 

@@ -69,6 +69,8 @@ type
     FButtonBar : TDPMButtonBar;
     FSearchBar : TDPMSearchBarFrame;
     FScrollList : TVSoftVirtualListView;
+
+
     //controls
 
     //contains layout rects for the list view
@@ -204,7 +206,7 @@ type
     procedure ViewSelected;virtual;
     procedure ViewDeselected;virtual;
     procedure Closing;virtual;
-    procedure ProjectReloaded;virtual;
+    procedure ProjectChanged;virtual;
     procedure ThemeChanged;virtual;
   end;
 
@@ -415,7 +417,7 @@ begin
   FScrollList.BevelOuter := bvNone;
   FScrollList.BevelInner := bvNone;
   FScrollList.BevelKind := bkNone;
-  FScrollList.RowHeight := 75;
+  FScrollList.RowHeight := 55;
   FScrollList.RowCount := 0;
   FScrollList.OnPaintRow := Self.ScrollListPaintRow;
   FScrollList.OnPaintNoRows := Self.ScrollListPaintNoRows;
@@ -775,7 +777,7 @@ begin
   FProject.Refresh(true);
 
   //force the project tree to update after installing package.
-  FProjectTreeManager.NotifyEndLoading();
+  FProjectTreeManager.EndLoading();
 end;
 
 procedure TDPMBaseEditViewFrame.PackageUninstalled(const package: IPackageSearchResultItem);
@@ -824,7 +826,7 @@ begin
   //Tell the IDE to reload the project
   FProject.Refresh(true);
   //force the project tree to update after installing package.
-  FProjectTreeManager.NotifyEndLoading();
+  FProjectTreeManager.EndLoading();
 end;
 
 procedure TDPMBaseEditViewFrame.platformChangeDetectTimerTimer(Sender: TObject);
@@ -844,10 +846,11 @@ begin
   platformChangeDetectTimer.Enabled := true;
 end;
 
-procedure TDPMBaseEditViewFrame.ProjectReloaded;
+procedure TDPMBaseEditViewFrame.ProjectChanged;
 begin
   FLogger.Debug('DPMIDE : EditViewReloaded');
   FCurrentPlatform := TDPMPlatform.UnknownPlatform; //force a reload
+  PackageDetailsView.ProjectReloaded;
   if not IsProjectGroup then
     platformChangeDetectTimerTimer(platformChangeDetectTimer)
   else

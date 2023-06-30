@@ -21,7 +21,7 @@ object DPMBaseEditViewFrame: TDPMBaseEditViewFrame
     ShowCaption = False
     TabOrder = 0
     object Splitter2: TSplitter
-      Left = 592
+      Left = 502
       Top = 0
       Width = 8
       Height = 581
@@ -34,7 +34,7 @@ object DPMBaseEditViewFrame: TDPMBaseEditViewFrame
     object PackageListPanel: TPanel
       Left = 0
       Top = 0
-      Width = 592
+      Width = 502
       Height = 581
       Align = alClient
       BevelEdges = [beRight]
@@ -46,9 +46,9 @@ object DPMBaseEditViewFrame: TDPMBaseEditViewFrame
       TabOrder = 0
     end
     object DetailPanel: TPanel
-      Left = 600
+      Left = 510
       Top = 0
-      Width = 410
+      Width = 500
       Height = 581
       Align = alRight
       BevelEdges = [beRight]

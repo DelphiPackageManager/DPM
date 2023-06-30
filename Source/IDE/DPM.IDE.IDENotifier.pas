@@ -38,6 +38,11 @@ uses
   {$LEGACYIFEND ON}
 {$IFEND}
 
+// The IDE notifier is used to receive notifications from the IDE and pass them
+// to the ProjectController. Note that the file notifications are not fired when
+// the IDE reloads due to external modifications (including by us) - so we still'
+// need the StorageNotifier
+
 type
   TDPMIDENotifier = class(TInterfacedObject, IOTANotifier, IOTAIDENotifier)
   private
@@ -70,6 +75,7 @@ implementation
 uses
   System.SysUtils,
   DPM.Core.Utils.Path,
+  DPM.Core.Utils.System,
   DPM.Core.Project.Interfaces,
   DPM.Core.Project.GroupProjReader;
 
@@ -118,8 +124,6 @@ var
   ext : string;
 begin
   result := false;
-//  FLogger.Clear;
-//  FLogger.StartRestore(FCam;
   FGroupProjects.Clear;
   groupReader := TGroupProjectReader.Create(FLogger);
   if groupReader.LoadGroupProj(fileName) then
@@ -148,13 +152,15 @@ var
   ext : string;
 begin
   ext := ExtractFileExt(FileName);
+  //we only care about the project and project group files, ignoring all other notifications.
   if not (SameText(ext, '.dproj') or SameText(ext, '.groupproj')) then
     exit;
 
   case NotifyCode of
     ofnFileOpening :
       begin
-        FLogger.Debug('IDE File Opening ' + FileName);
+        FLogger.Debug('TDPMIDENotifier ofnFileOpening : ' + FileName);
+        TSystemUtils.OutputDebugString('TDPMIDENotifier ofnFileOpening : ' + FileName);
 
         {$IF CompilerVersion < 34.0}
         {
@@ -192,24 +198,28 @@ begin
           end;
           exit;
         end
-        else if not FLoadingGroup then
+        else if not FLoadingGroup then //we are loading a single project that is not part of a project group.
           FProjectController.BeginLoading(TProjectMode.pmSingle);
         {$ELSE}
         //10.4 adds ofnBeginProjectGroupOpen, ofnEndProjectGroupOpen, ofnBeginProjectGroupClose, ofnEndProjectGroupClose
+        //so we will use those for the project group.
         if (ext = '.groupproj') then
           exit;
         if not FLoadingGroup then
           FProjectController.BeginLoading(TProjectMode.pmSingle);
         {$IFEND}
 
-        FProjectController.FileOpening(FileName);
+        if FileExists(FileName) then
+          FProjectController.ProjectOpening(FileName);
 
       end;
     ofnFileOpened :
       begin
+        //make sire we ignore the groupproj here.
         if ext <> '.dproj' then
           exit;
-
+        FLogger.Debug('TDPMIDENotifier ofnFileOpened ' + FileName);
+        TSystemUtils.OutputDebugString('TDPMIDENotifier ofnFileOpened : ' + FileName);
         {$IF CompilerVersion < 34.0}
         if FLoadingGroup then
         begin
@@ -230,14 +240,21 @@ begin
       end;
     ofnFileClosing :
       begin
-        FLogger.Clear;
-        FProjectController.FileClosed(FileName);
+        FLogger.Debug('TDPMIDENotifier ofnFileClosing ' + FileName);
+        TSystemUtils.OutputDebugString('TDPMIDENotifier ofnFileClosing : ' + FileName);
+        if (ext = '.dproj') then
+          FProjectController.ProjectClosed(FileName)
+        else
+          FProjectController.ProjectGroupClosed;
       end;
     {$IF CompilerVersion >= 34.0 }
-    //10.4
+    //10.4 or later
     ofnBeginProjectGroupOpen :
     begin
-      FLogger.Debug('IDE ofnBeginProjectGroupOpen ' + FileName);
+      FLogger.Debug('TDPMIDENotifier ofnBeginProjectGroupOpen ' + FileName);
+      TSystemUtils.OutputDebugString('TDPMIDENotifier ofnBeginProjectGroupOpen : ' + FileName);
+
+      //if the project file doesn't exist, it's a temporary file and a single project is about to be opened.
       if not FileExists(FileName) then
         exit;
 
@@ -246,7 +263,8 @@ begin
     end;
     ofnEndProjectGroupOpen :
     begin
-      FLogger.Debug('IDE ofnEndProjectGroupOpen ' + FileName);
+      FLogger.Debug('TDPMIDENotifier ofnEndProjectGroupOpen ' + FileName);
+      TSystemUtils.OutputDebugString('TDPMIDENotifier ofnEndProjectGroupOpen : ' + FileName);
       if not FileExists(FileName) then
         exit;
 
@@ -255,12 +273,16 @@ begin
     end;
     ofnBeginProjectGroupClose :
     begin
-      //this will dupe the fileclosing on later versions - doesn't matter as we handle it
-      FProjectController.FileClosed(FileName);
-      FLogger.Clear;
+      FLogger.Debug('TDPMIDENotifier ofnBeginProjectGroupClose ' + FileName);
+      TSystemUtils.OutputDebugString('TDPMIDENotifier ofnBeginProjectGroupClose : ' + FileName);
+
+      FProjectController.ProjectGroupClosed;
+//      FLogger.Clear;
     end;
     ofnEndProjectGroupClose :
     begin
+      TSystemUtils.OutputDebugString('TDPMIDENotifier ofnEndProjectGroupClose : ' + FileName);
+      FLogger.Debug('TDPMIDENotifier ofnEndProjectGroupClose ' + FileName);
     end;
     {$IFEND}
 
@@ -273,7 +295,7 @@ end;
 
 procedure TDPMIDENotifier.Modified;
 begin
-
+  FLogger.Debug('TDPMIDENotifier.Modified');
 end;
 
 end.

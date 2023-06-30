@@ -20,14 +20,16 @@ uses
   DPM.Core.Dependency.Interfaces,
   DPM.IDE.Details.Interfaces,
   DPM.IDE.ProjectTreeManager,
+  DPM.IDE.Logger,
   DPM.IDE.BaseEditViewFrame, Vcl.ExtCtrls, DPM.IDE.GroupPackageDetailsFrame;
 
 {$I ..\DPMIDE.inc}
 
 type
-  TDPMGroupEditViewFrame = class(TDPMBaseEditViewFrame)
+  TDPMGroupEditViewFrame = class(TDPMBaseEditViewFrame, IDetailsHost)
     PackageDetailsFrame: TGroupPackageDetailsFrame;
   private
+    FLogger : IDPMIDELogger;
   protected
     function IsProjectGroup : boolean;override;
     function GetPackageDetailsView : IPackageDetailsView;override;
@@ -39,7 +41,7 @@ type
     procedure ViewSelected;override;
     procedure ViewDeselected;override;
     procedure Closing;override;
-    procedure ProjectReloaded;override;
+    procedure ProjectChanged;override;
     procedure ThemeChanged;override;
   end;
 
@@ -65,6 +67,7 @@ end;
 procedure TDPMGroupEditViewFrame.Configure(const projectOrGroup: IOTAProject; const container: TContainer; const projectTreeManager: IDPMProjectTreeManager);
 begin
   inherited;
+  FLogger := container.Resolve<IDPMIDELogger>;
   //CurrentPlatform := SearchBar.Platform;
 end;
 
@@ -134,10 +137,12 @@ begin
   result := true;
 end;
 
-procedure TDPMGroupEditViewFrame.ProjectReloaded;
+procedure TDPMGroupEditViewFrame.ProjectChanged;
 begin
-//  inherited;
-ConfigureSearchBar;
+  inherited;
+  FLogger.Debug('DPMGroupEditViewFrame.ProjectReloaded');
+//  DoPlatformChange(SearchBar.Platform);
+// ConfigureSearchBar;
 
 end;
 

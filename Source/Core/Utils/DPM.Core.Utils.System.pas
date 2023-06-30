@@ -35,6 +35,7 @@ type
     class function GetEnvironmentVariableDef(const name : string; const default : string = '') : string;
     class function GetVersionString: string;
     class procedure GetResourceVersionNumbers(out AMajor, AMinor, ARelease, ABuild: Integer);
+    class procedure OutputDebugString(const value : string);
   end;
 
 implementation
@@ -105,6 +106,13 @@ var
 begin
   GetResourceVersionNumbers(Major,Minor,Release,Build);
   result := Format('%d.%d.%d.%d',[Major,Minor,Release,Build]);
+end;
+
+class procedure TSystemUtils.OutputDebugString(const value: string);
+begin
+  {$IFDEF DEBUG}
+  WinApi.Windows.OutputDebugString(PWideChar(value));
+  {$ENDIF}
 end;
 
 end.

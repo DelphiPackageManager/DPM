@@ -1,7 +1,7 @@
 object DPMSearchBarFrame: TDPMSearchBarFrame
   Left = 0
   Top = 0
-  Width = 767
+  Width = 930
   Height = 67
   DoubleBuffered = True
   Color = clBtnFace
@@ -12,7 +12,7 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
   object Panel1: TPanel
     Left = 0
     Top = 0
-    Width = 767
+    Width = 930
     Height = 67
     Align = alClient
     BevelOuter = bvNone
@@ -20,17 +20,18 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
     ShowCaption = False
     TabOrder = 0
     DesignSize = (
-      767
+      930
       67)
     object lblPlatform: TLabel
-      Left = 539
+      Left = 697
       Top = 12
-      Width = 47
-      Height = 13
+      Width = 52
+      Height = 15
       Alignment = taRightJustify
       Anchors = [akTop, akRight]
       Caption = 'Platform :'
       Visible = False
+      ExplicitLeft = 534
     end
     object lblProject: TLabel
       Left = 360
@@ -46,13 +47,14 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       ParentFont = False
     end
     object lblSources: TLabel
-      Left = 498
+      Left = 655
       Top = 40
-      Width = 88
-      Height = 13
+      Width = 94
+      Height = 15
       Alignment = taRightJustify
       Anchors = [akTop, akRight]
       Caption = 'Package Sources :'
+      ExplicitLeft = 492
     end
     object btnAbout: TButton
       Left = 316
@@ -91,10 +93,10 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       OnClick = btnSettingsClick
     end
     object cbPlatforms: TComboBox
-      Left = 592
+      Left = 755
       Top = 9
       Width = 160
-      Height = 21
+      Height = 23
       Style = csDropDownList
       Anchors = [akTop, akRight]
       TabOrder = 3
@@ -102,10 +104,10 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       OnChange = cbPlatformsChange
     end
     object cbSources: TComboBox
-      Left = 592
+      Left = 755
       Top = 37
       Width = 160
-      Height = 21
+      Height = 23
       Style = csDropDownList
       Anchors = [akTop, akRight]
       ItemIndex = 0
@@ -151,7 +153,7 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       Left = 8
       Top = 9
       Width = 241
-      Height = 21
+      Height = 23
       Images = DPMEditorViewImages
       LeftButton.Enabled = False
       ParentShowHint = False
@@ -166,12 +168,20 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       OnKeyDown = txtSearchKeyDown
       OnRightButtonClick = txtSearchRightButtonClick
     end
+    object cboProjects: TComboBox
+      Left = 496
+      Top = 9
+      Width = 145
+      Height = 23
+      TabOrder = 9
+      Text = 'cboProjects'
+    end
   end
   object DPMEditorViewImages: TImageList
     ColorDepth = cd32Bit
     Left = 712
     Bitmap = {
-      494C010107000900080010001000FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
+      494C010107000900040010001000FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000400000002000000001002000000000000020
       0000000000000000000000000000000000000000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000000000
