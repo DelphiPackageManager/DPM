@@ -61,14 +61,14 @@ type
     FLoading : boolean;
     FPlatforms : TDPMPlatforms;
     FPlatform  : TDPMPlatform;
-    FIsGroup   : boolean;
+    FProjects  : TStringList;
 
     //events
     FOnSearchEvent : TSearchEvent;
     FOnConfigChanged : TConfigChangedEvent;
     FOnPlatformChangedEvent : TPlatformChangedEvent;
     FOnProjectSelected : TProjectSelectedEvent;
-
+    FOnFocusList : TNotifyEvent;
     function GetSearchText: string;
     function GetIncludePreRelease: boolean;
 
@@ -86,8 +86,8 @@ type
     procedure Loaded; override;
   public
     constructor Create(AOwner : TComponent);override;
-    procedure Configure(const logger : IDPMIDELogger; const ideOptions : IDPMIDEOptions; const config : IConfiguration; const configurationManager : IConfigurationManager; const configFile : string; const platforms : TDPMPlatforms);overload;
-    procedure Configure(const logger : IDPMIDELogger; const ideOptions : IDPMIDEOptions; const config : IConfiguration; const configurationManager : IConfigurationManager; const configFile : string; const platform : TDPMPlatform);overload;
+    destructor Destroy;override;
+    procedure Configure(const logger : IDPMIDELogger; const ideOptions : IDPMIDEOptions; const config : IConfiguration; const configurationManager : IConfigurationManager; const configFile : string; const platforms : TDPMPlatforms);
     procedure ConfigureForTab(const currentTab : TDPMCurrentTab);
     procedure SetPlatform(const platform : TDPMPlatform);
     function GetPlatform : TDPMPlatform;
@@ -104,7 +104,7 @@ type
     property OnSearch : TSearchEvent read FOnSearchEvent write FOnSearchEvent;
     property OnPlatformChanged : TPlatformChangedEvent read FOnPlatformChangedEvent write FOnPlatformChangedEvent;
     property OnProjectSelected : TProjectSelectedEvent read FOnProjectSelected write FOnProjectSelected;
-
+    property OnFocusList : TNotifyEvent read FOnFocusList write FOnFocusList;
   end;
 
 implementation
@@ -212,7 +212,6 @@ begin
   FConfiguration := config;
   FConfigurationManager := configurationManager;
   FConfigFile := configFile;
-  FIsGroup := True;
   FPlatforms := platforms;
   ReloadSourcesCombo;
   lblPlatform.Visible := true;
@@ -227,15 +226,6 @@ begin
 
 end;
 
-procedure TDPMSearchBarFrame.Configure(const logger: IDPMIDELogger; const ideOptions: IDPMIDEOptions; const config: IConfiguration; const configurationManager: IConfigurationManager; const configFile: string;
-                                       const platform: TDPMPlatform);
-begin
-  Configure(logger, ideOptions, config, configurationManager, configFile, [platform]);
-  FIsGroup := false;
-  FPlatform := platform;
-  lblPlatform.Visible := false;
-  cbPlatforms.Visible := false;
-end;
 
 procedure TDPMSearchBarFrame.ConfigureForTab(const currentTab: TDPMCurrentTab);
 begin
@@ -254,6 +244,8 @@ end;
 constructor TDPMSearchBarFrame.Create(AOwner: TComponent);
 begin
   inherited;
+  FProjects := TStringList.Create;
+
   ParentColor := false;
   ParentBackground := false;
 
@@ -267,9 +259,9 @@ begin
   Align := alTop;
 
   txtSearch.ACEnabled := true;
-  txtSearch.ACOptions := [acAutoAppend, acAutoSuggest, acUseArrowKey];
+  txtSearch.ACOptions := [acAutoAppend, acAutoSuggest{, acUseArrowKey}];
   txtSearch.ACSource := acsList;
-  
+
   FSearchHistFile := TConfigUtils.GetDefaultDMPFolder + '\' + cDMPSearchHistoryFile;
   if FileExists(FSearchHistFile) then
     txtSearch.ACStrings.LoadFromFile(FSearchHistFile)
@@ -285,6 +277,12 @@ procedure TDPMSearchBarFrame.DebounceTimerTimer(Sender: TObject);
 begin
   DebounceTimer.Enabled := false;
   DoSearchEvent(true);
+end;
+
+destructor TDPMSearchBarFrame.Destroy;
+begin
+  FProjects.Free;
+  inherited;
 end;
 
 procedure TDPMSearchBarFrame.DoPlatformChangedEvent(const newPlatform: TDPMPlatform);
@@ -322,10 +320,7 @@ begin
     else
       source := 'All';
 
-    if FIsGroup then
-      platform := StringToDPMPlatform(cbPlatforms.Items[cbPlatforms.ItemIndex])
-    else
-      platform := FPlatform;
+    platform := StringToDPMPlatform(cbPlatforms.Items[cbPlatforms.ItemIndex]);
     FOnSearchEvent(txtSearch.Text, options, source, platform, refresh);
   end;
 end;
@@ -450,12 +445,22 @@ begin
           //ignore the error, not much we can do?
           //perhaps log it?
         end;
+        DebounceTimerTimer(DebounceTimer);
       end;
     VK_ESCAPE :
       begin
         txtSearch.Text := '';
         DebounceTimerTimer(DebounceTimer);
-      end
+      end;
+    VK_DOWN :
+    begin
+      //send focus to list
+      if Assigned(FOnFocusList) then
+      begin
+        FOnFocusList(self);
+        Key := 0;
+      end;
+    end
   else
     DebounceTimer.Enabled := true;
   end;
@@ -466,5 +471,6 @@ begin
   txtSearch.Text := '';
   DoSearchEvent(true);
 end;
+
 
 end.

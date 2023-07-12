@@ -59,7 +59,8 @@ type
     RS10_2,
     RS10_3,
     RS10_4,
-    RS11_0
+    RS11_0,
+    RS12_0
     );
 
   TCompilerVersions = set of TCompilerVersion;
@@ -313,6 +314,8 @@ begin
         TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
     TCompilerVersion.RS11_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSXARM64, TDPMPlatform.OSX64, TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32,
         TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
+    TCompilerVersion.RS12_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSXARM64, TDPMPlatform.OSX64, TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32,
+        TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
   else
     raise Exception.Create('AllPlatforms is missing for : ' + CompilerToString(compiler));
   end;
@@ -326,7 +329,8 @@ begin
     TCompilerVersion.RS10_2 : result := 'Tokyo';
     TCompilerVersion.RS10_3 : result := 'Rio';
     TCompilerVersion.RS10_4 : result := 'Sydney';
-    TCompilerVersion.RS11_0   : result := 'Alexandria';
+    TCompilerVersion.RS11_0 : result := 'Alexandria';
+    TCompilerVersion.RS12_0 : result := 'Dunno';
   else
     result := '';
   end;
@@ -361,6 +365,7 @@ begin
     TCompilerVersion.RS10_3 : result := '260';
     TCompilerVersion.RS10_4 : result := '270';
     TCompilerVersion.RS11_0 : result := '280';
+    TCompilerVersion.RS12_0 : result := '290';
   else
     raise Exception.Create('LibSuffix is missing for : ' + CompilerToString(compiler));
   end;
@@ -383,6 +388,7 @@ begin
     TCompilerVersion.RS10_3 : result := '20.0';
     TCompilerVersion.RS10_4 : result := '21.0';
     TCompilerVersion.RS11_0 : result := '22.0';
+    TCompilerVersion.RS12_0 : result := '23.0';
   else
     raise Exception.Create('BDSVersion is missing for : ' + CompilerToString(compiler));
   end;
@@ -392,6 +398,8 @@ end;
 function CompilerToCompilerVersionIntStr(const compiler : TCompilerVersion) : string;
 begin
   case compiler of
+    //2010 = 21
+    //XE = 22
     TCompilerVersion.RSXE2  : result := '23';
     TCompilerVersion.RSXE3  : result := '24';
     TCompilerVersion.RSXE4  : result := '25';
@@ -405,6 +413,7 @@ begin
     TCompilerVersion.RS10_3 : result := '33';
     TCompilerVersion.RS10_4 : result := '34';
     TCompilerVersion.RS11_0 : result := '35';
+    TCompilerVersion.RS12_0 : result := '36';
   else
     raise Exception.Create('BDSVersion is missing for : ' + CompilerToString(compiler));
   end;
@@ -543,8 +552,8 @@ begin
             result := TCompilerVersion.RS11_0;
           end;
         end;
-
     end;
+    24 : result := TCompilerVersion.RS12_0;
   else
     raise EArgumentOutOfRangeException.Create('Unknown project version');
   end;

@@ -320,6 +320,7 @@
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
         <DCCReference Include="IDE\DPM.IDE.ProjectNotifier.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.ActivityIndicator.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

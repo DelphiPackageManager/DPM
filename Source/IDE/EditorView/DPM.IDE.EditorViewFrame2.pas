@@ -1,4 +1,4 @@
-unit DPM.IDE.EditorViewFrame2;
+﻿unit DPM.IDE.EditorViewFrame2;
 
 interface
 
@@ -8,6 +8,7 @@ uses
   System.SysUtils,
   System.Variants,
   System.Classes,
+  System.SyncObjs,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ImgList,
   Vcl.ComCtrls, Vcl.ExtCtrls, Vcl.Menus, SVGInterfaces,
   Vcl.Themes,
@@ -33,6 +34,7 @@ uses
   DPM.Controls.VersionGrid,
   DPM.IDE.SearchBarFrame,
   DPM.IDE.Details.Interfaces,
+  DPM.IDE.ActivityIndicator,
   {$IF CompilerVersion >= 24.0 }
   {$LEGACYIFEND ON}
   System.Actions,
@@ -46,17 +48,22 @@ uses
 
 {$I '..\DPMIDE.inc'}
 
+
+const
+  bulletChar : Char = '•';
+
+
 type
   TPackageRowKind = (rkInstalledHeader, rkImplicitHeader, rkAvailableHeader,rkInstalledPackage, rkImplicitPackage, rkAvailablePackage, rkUnknown);
 
   TRowLayout = record
-    RowWidth : integer;
     IconRect : TRect;
     TitleRect : TRect;
-    VersionRect : TRect;
     LatestVersionRect : TRect;
-    DescriptionRect : TRect;
+    IconSize : integer;
+    Margin : integer;
     procedure Update(const ACanvas : TCanvas; const rowRect : TRect; const rowKind : TPackageRowKind);
+    constructor Create(const margin : integer; const iconSize : integer);
   end;
 
 
@@ -68,7 +75,9 @@ type
     DetailPanel: TPanel;
     platformChangeDetectTimer: TTimer;
     PackageDetailsFrame: TGroupPackageDetailsFrame;
+    ActivityTimer: TTimer;
     procedure platformChangeDetectTimerTimer(Sender: TObject);
+    procedure ActivityTimerTimer(Sender: TObject);
   private
     FIDEStyleServices : TCustomStyleServices;
 
@@ -80,12 +89,6 @@ type
 
     //contains layout rects for the list view
     FRowLayout : TRowLayout;
-
-    //temp
-    FInstalledCount : Int64;
-    FImplicitCount : Int64;
-    FAvailableCount : Int64;
-    FRowCount : Int64;
 
     FInstalledHeaderRowIdx : Int64;
     FImplicitHeaderRowIdx : Int64;
@@ -102,13 +105,12 @@ type
 
     //request stuff
     FCancelTokenSource : ICancellationTokenSource;
-    FRequestInFlight : boolean;
+    FRequestsInFlight : integer;
     FClosing : boolean;
 
     //Project group should never be nil?
     FProjectGroup : IOTAProjectGroup;
-
-    FProject : IOTAProject;
+    FSelectedProject : string;
 
 
     FIconCache : TDPMIconCache;
@@ -122,18 +124,42 @@ type
 
     FPackageReferences : IPackageReference;
 
+    FRowCount : Int64;
+    //all installed packages, direct and transitive
+    FAllInstalledPackages : IList<IPackageSearchResultItem>;
+    //directly installed packages, might be fitered.
+    FInstalledPackages : IList<IPackageSearchResultItem>;
+    //implicitly installled
+    FImplicitPackages : IList<IPackageSearchResultItem>;
+    FAvailablePackages : IList<IPackageSearchResultItem>;
+
+    FInstalledActivity : TActivityIndicator;
+    FImplicitActivity  : TActivityIndicator;
+    FAvailableActivity : TActivityIndicator;
+
 
     //true when we first load the view
     FFirstView : boolean;
+
+    FLock : TCriticalSection;
   protected
+    procedure CheckTimerEnabled;
+
     //IDetailsHost
     procedure SaveBeforeInstall;
     procedure PackageInstalled(const package : IPackageSearchResultItem; const isUpdate : boolean);
     procedure PackageUninstalled(const package : IPackageSearchResultItem);
     function GetPackageReferences : IPackageReference;
-
+    function GetPackageIdsFromReferences(const platform: TDPMPlatform): IList<IPackageId>;
     procedure RequestPackageIcon(const index : integer; const package : IPackageSearchResultItem);
 
+    function GetInstalledPackagesAsync: IAwaitable<IList<IPackageSearchResultItem>>;
+    function SearchForPackagesAsync(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;
+    procedure FilterInstalledPackages(const searchTxt: string);
+
+    function GetInstalledCount : Int64;
+    function GetImplicitCount : Int64;
+    function GetAvailableCount : Int64;
 
     //Create Ui elements at runtime - uses controls that are not installed, saves dev needing
     //to install controls before they can work in this.
@@ -145,6 +171,8 @@ type
     procedure SearchBarSettingsChanged(const configuration : IConfiguration);
     procedure SearchBarPlatformChanged(const newPlatform : TDPMPlatform);
     procedure SearchBarOnSearch(const searchText : string; const searchOptions : TDPMSearchOptions; const source : string; const platform : TDPMPlatform; const refresh : boolean);
+    procedure SearchBarProjectSelected(const projectFile : string);
+    procedure SearchBarOnFocustList(sender : TObject);
 
     //scrolllist evernts
     procedure ScrollListPaintRow(const Sender : TObject; const ACanvas : TCanvas; const itemRect : TRect; const index : Int64; const state : TPaintRowState);
@@ -157,6 +185,7 @@ type
 
     function GetRowKind(const index : Int64) : TPackageRowKind;
     procedure CalculateIndexes;
+    procedure ChangeScale(M: Integer; D: Integer; isDpiChange: Boolean); override;
 
   public
     constructor Create(AOwner : TComponent); override;
@@ -173,6 +202,7 @@ type
     procedure FilterToGroup;
     procedure FilterToProject(const projectName : string);
     function CanCloseView : boolean;
+
   end;
 
 implementation
@@ -181,50 +211,118 @@ implementation
 
 uses
   System.Diagnostics,
+  WinApi.ActiveX,
   DPM.Core.Constants,
   DPM.Core.Options.Common,
   DPM.Core.Utils.Config,
   DPM.Core.Utils.Numbers,
   DPM.Core.Utils.Strings,
+  DPM.Core.Utils.System,
   DPM.Core.Project.Editor,
   DPM.Core.Package.Icon,
   DPM.Core.Package.SearchResults,
   DPM.Core.Repository.Interfaces,
+  DPM.IDE.ToolsAPI,
   DPM.IDE.AboutForm,
   DPM.IDE.AddInOptionsHostForm,
   DPM.Core.Dependency.Graph;
 
 
-{ TDPMEditViewFrame2 }
+type
+  TFilterProc = procedure(const searchTxt : string) of object;
 
-procedure TDPMEditViewFrame2.CalculateIndexes;
+
+function FindPackageRef(const references : IPackageReference; const platform : TDPMPlatform; const searchItem : IPackageSearchResultItem) : IPackageReference;
+var
+  ref : IPackageReference;
 begin
-  FInstalledHeaderRowIdx := 0;
-  if FImplicitCount > 0 then
+  result := nil;
+  if (references = nil) or (not references.HasDependencies) then
+    exit;
+
+  //breadth first search!
+  for ref in references.Dependencies do
   begin
-    FImplicitHeaderRowIdx := FInstalledHeaderRowIdx + FInstalledCount + 1;
-    FAvailableHeaderRowIdx := FImplicitHeaderRowIdx + FImplicitCount + 1;
-  end
-  else
-  begin
-    FImplicitHeaderRowIdx := -1;
-    FAvailableHeaderRowIdx := FInstalledHeaderRowIdx + FInstalledCount + 1;
+    if ref.Platform <> platform then
+      continue;
+
+    if SameText(ref.Id, searchItem.Id) then
+      Exit(ref);
   end;
 
-  FRowCount := 1 + FInstalledCount;
-  //only show implict header if there are any packages
-  if FImplicitCount > 0 then
-    FRowCount := FRowCount + 1 + FImplicitCount;
+  for ref in references.Dependencies do
+  begin
+    if ref.Platform <> platform then
+      continue;
+    //depth search
+    if ref.HasDependencies then
+    begin
+      result := FindPackageRef(ref, platform, searchItem);
+      if result <> nil then
+        Exit(result);
+    end;
+  end;
+end;
 
-  //always show available header
-  FRowCount := FRowCount + 1 + FAvailableCount;
 
+{ TDPMEditViewFrame2 }
+
+procedure TDPMEditViewFrame2.ActivityTimerTimer(Sender: TObject);
+begin
+  ActivityTimer.Enabled := false;
+  if FInstalledActivity.IsActive then
+  begin
+    FInstalledActivity.Step;
+    FScrollList.InvalidateRow(FInstalledHeaderRowIdx);
+  end;
+  if FImplicitActivity.IsActive then
+  begin
+    FImplicitActivity.Step;
+    FScrollList.InvalidateRow(FImplicitHeaderRowIdx);
+  end;
+  if FAvailableActivity.IsActive then
+  begin
+    FAvailableActivity.Step;
+    FScrollList.InvalidateRow(FAvailableHeaderRowIdx);
+  end;
+  ActivityTimer.Enabled := FInstalledActivity.IsActive or FImplicitActivity.IsActive or FAvailableActivity.IsActive;
+end;
+
+procedure TDPMEditViewFrame2.CalculateIndexes;
+var
+  installedCount : Int64;
+  implicitCount : Int64;
+  availableCount : Int64;
+begin
+  FInstalledHeaderRowIdx := 0;
+  installedCount := GetInstalledCount;
+  implicitCount := GetImplicitCount;
+  availableCount := GetAvailableCount;
+
+  FImplicitHeaderRowIdx := FInstalledHeaderRowIdx + installedCount + 1;
+  FAvailableHeaderRowIdx := FImplicitHeaderRowIdx + implicitCount + 1;
+
+  FRowCount := 1 + installedCount;
+  FRowCount := FRowCount + 1 + implicitCount;
+  FRowCount := FRowCount + 1 + availableCount;
   FScrollList.RowCount := FRowCount;
 end;
 
 function TDPMEditViewFrame2.CanCloseView: boolean;
 begin
   result := true; //TODO : Block closing while busy installing/removing packages.
+end;
+
+procedure TDPMEditViewFrame2.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+begin
+  FRowLayout.IconSize := MulDiv(FRowLayout.IconSize, M, D);
+  FRowLayout.Margin := MulDiv(FRowLayout.Margin, M, D);
+  inherited;
+end;
+
+procedure TDPMEditViewFrame2.CheckTimerEnabled;
+begin
+
 end;
 
 procedure TDPMEditViewFrame2.Closing;
@@ -235,7 +333,7 @@ begin
   FCancelTokenSource.Cancel;
   //allow the cancellation to happen.
   //if we don't do this we will get an excepion in the await or cancellation callbacks
-  while FRequestInFlight do
+  while FRequestsInFlight > 0 do
     Application.ProcessMessages;
 
 end;
@@ -247,7 +345,10 @@ begin
   FContainer := container;
   FProjectTreeManager := projectTreeManager;
   FProjectGroup := projectGroup;
-  FProject := project;
+  if project <> nil then
+    FSelectedProject := project.FileName
+  else
+    FSelectedProject := '';
 
   FLogger := FContainer.Resolve<IDPMIDELogger>;
   FDPMIDEOptions := FContainer.Resolve<IDPMIDEOptions>;
@@ -277,9 +378,6 @@ begin
   PackageDetailsFrame.Init(FContainer, FIconCache, FConfiguration, Self, projectGroup);
 
   //testing
-  FInstalledCount := 1;
-  FImplicitCount := 3;
-  FAvailableCount := 50;
   CalculateIndexes;
 end;
 
@@ -307,7 +405,6 @@ begin
     begin
       //what can we do? unsaved project, will probably have a name so this shouldn't happen?
 
-
     end;
   end;
 
@@ -323,7 +420,9 @@ var
 begin
   inherited;
   FIconCache := TDPMIconCache.Create;
-  //not published in older versions, so get removed when we edit in older versions.
+  FRowLayout := TRowLayout.Create(10, 24);
+  FLock := TCriticalSection.Create;
+ //not published in older versions, so get removed when we edit in older versions.
   {$IFDEF STYLEELEMENTS}
   StyleElements := [seFont, seClient, seBorder];
   {$ENDIF}
@@ -337,6 +436,15 @@ begin
   FIDEStyleServices := Vcl.Themes.StyleServices;
   {$ENDIF}
 
+  //reset the activity indicators
+  FInstalledActivity.Stop;
+  FImplicitActivity.Stop;
+  FAvailableActivity.Stop;
+
+  FAllInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>;
+  FInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>;
+  FImplicitPackages := TCollections.CreateList<IPackageSearchResultItem>;
+  FAvailablePackages := TCollections.CreateList<IPackageSearchResultItem>;
 
   CreateControls(AOwner);
   ThemeChanged;
@@ -349,11 +457,10 @@ begin
 
   FSearchSkip := 0;
   FSearchTake := 0;
-  FRowLayout.RowWidth := -1;
 
   FCurrentTab := TDPMCurrentTab.Installed;
   FCancelTokenSource := TCancellationTokenSourceFactory.Create;
-  FRequestInFlight := false;
+  FRequestsInFlight := 0;
   FCurrentPlatform := TDPMPlatform.UnknownPlatform;
 
   PackageDetailsFrame.Configure(FCurrentTab, FSearchBar.IncludePrerelease);
@@ -370,6 +477,8 @@ begin
   FSearchBar.OnSearch := Self.SearchBarOnSearch;
   FSearchBar.OnConfigChanged := Self.SearchBarSettingsChanged;
   FSearchBar.OnPlatformChanged := Self.SearchBarPlatformChanged;
+  FSearchBar.OnProjectSelected := Self.SearchBarProjectSelected;
+  FSearchBar.OnFocusList := Self.SearchBarOnFocustList;
   FSearchBar.Parent := Self;
 
   FScrollList := TVSoftVirtualListView.Create(Self);
@@ -382,12 +491,13 @@ begin
   FScrollList.BevelOuter := bvNone;
   FScrollList.BevelInner := bvNone;
   FScrollList.BevelKind := bkNone;
-  FScrollList.RowHeight := 32;
+  FScrollList.RowHeight := 32; //the control will scale this for dpi
   FScrollList.RowCount := 0;
   FScrollList.OnPaintRow := Self.ScrollListPaintRow;
   FScrollList.OnPaintNoRows := Self.ScrollListPaintNoRows;
   FScrollList.OnRowChange := Self.ScrollListChangeRow;
   FScrollList.OnBeforeRowChangeEvent := Self.ScrollListBeforeChangeRow;
+
 
   FScrollList.Constraints.MinWidth := 400;
   FScrollList.DoubleBuffered := false;
@@ -408,22 +518,175 @@ begin
   if FLogger <> nil then
     FLogger.Debug('DPMIDE : View Destroying');
 
+  FLock.Free;
   inherited;
 end;
 
+
+procedure TDPMEditViewFrame2.FilterInstalledPackages(const searchTxt: string);
+var
+  installed : IList<IPackageSearchResultItem>;
+  implicit : IList<IPackageSearchResultItem>;
+begin
+  installed := TCollections.CreateList<IPackageSearchResultItem>(FAllInstalledPackages.Where(
+    function(const pkg : IPackageSearchResultItem) : boolean
+    begin
+      result := not pkg.IsTransitive;
+      if result and (searchTxt <> '') then
+      begin
+        result := TStringUtils.Contains(pkg.Id, searchTxt, true);
+      end;
+    end));
+  implicit := TCollections.CreateList<IPackageSearchResultItem>(FAllInstalledPackages.Where(
+    function(const pkg : IPackageSearchResultItem) : boolean
+    begin
+      result := pkg.IsTransitive;
+      if result and (searchTxt <> '') then
+      begin
+        result := TStringUtils.Contains(pkg.Id, searchTxt, true);
+      end;
+    end));
+    FInstalledPackages := installed;
+    FImplicitPackages := implicit;
+
+//  LoadList(FInstalledPackages);
+end;
+
+
+
 procedure TDPMEditViewFrame2.DoPlatformChange(const newPlatform: TDPMPlatform);
+var
+  searchTxt : string;
+  filterProc : TFilterProc;
 begin
   if FCurrentPlatform <> newPlatform then
   begin
     FCurrentPlatform := newPlatform;
     FPackageReferences := GetPackageReferences;
+    FScrollList.CurrentRow := -1;
+//    FLock.Acquire;
+//    try
+////      FScrollList.RowCount := 0; //stop it from trying to paint using invalid lists.
+//      //force refresh as we always need to update the installed packages.
+//      FAllInstalledPackages := nil;
+//      FInstalledPackages := nil;
+//      FImplicitPackages := nil;
+//      FAvailablePackages := nil;
+//      CalculateIndexes;
+//    finally
+//      FLock.Release;
+//    end;
+
 
     PackageDetailsFrame.SetPlatform(FCurrentPlatform);
     PackageDetailsFrame.SetPackage(nil, FSearchOptions.Prerelease);
     FSearchBar.SetPlatform(FCurrentPlatform);
     FSearchOptions.Platforms := [FCurrentPlatform];
-    FScrollList.CurrentRow := -1;
-    //clear scroll list and fetch again.
+    filterProc := FilterInstalledPackages;
+    searchTxt := FSearchOptions.SearchTerms;
+    FLogger.Debug('DPMIDE : Getting Installed Packages..');
+    FInstalledActivity.Step;
+    FScrollList.InvalidateRow(FInstalledHeaderRowIdx);
+    FImplicitActivity.Step;
+    FScrollList.InvalidateRow(FImplicitHeaderRowIdx);
+    ActivityTimer.Enabled := true;
+
+    GetInstalledPackagesAsync
+    .OnException(
+      procedure(const e : Exception)
+      begin
+        Dec(FRequestsInFlight);
+        if FClosing then
+          exit;
+        FLogger.Error(e.Message);
+      end)
+    .OnCancellation(
+      procedure
+      begin
+        Dec(FRequestsInFlight);
+        //if the view is closing do not do anything else.
+        if FClosing then
+          exit;
+        FLogger.Debug('DPMIDE : Cancelled getting installed packages.');
+      end)
+    .Await(
+      procedure(const theResult : IList<IPackageSearchResultItem>)
+      begin
+        Dec(FRequestsInFlight);
+        FInstalledActivity.Stop;
+        FImplicitActivity.Stop;
+
+        //if the view is closing do not do anything else.
+        if FClosing then
+          exit;
+        FLogger.Debug('DPMIDE : Got installed packages.');
+
+        FLock.Acquire;
+        try
+          FAllInstalledPackages := theResult;
+          filterProc(searchTxt);
+          CalculateIndexes;
+          FScrollList.Invalidate;
+        finally
+          FLock.Release;
+        end;
+      end);
+    Inc(FRequestsInFlight);
+
+    FAvailableActivity.Step;
+    FScrollList.InvalidateRow(FAvailableHeaderRowIdx);
+    ActivityTimer.Enabled := true;
+    SearchForPackagesAsync(FSearchOptions)
+    .OnException(
+      procedure(const e : Exception)
+      begin
+        Dec(FRequestsInFlight);
+        if FClosing then
+          exit;
+        FLogger.Error(e.Message);
+      end)
+    .OnCancellation(
+      procedure
+      begin
+        Dec(FRequestsInFlight);
+        //if the view is closing do not do anything else.
+        if FClosing then
+          exit;
+        FLogger.Debug('DPMIDE : Cancelled searching for packages.');
+      end)
+    .Await(
+      procedure(const theResult : IList<IPackageSearchResultItem>)
+//      var
+//        item : IPackageSearchResultItem;
+//        packageRef : IPackageReference;
+      begin
+        Dec(FRequestsInFlight);
+        //if the view is closing do not do anything else.
+        if FClosing then
+          exit;
+        FLogger.Debug('DPMIDE : Got search results.');
+        FAvailableActivity.Stop;
+        FLock.Acquire;
+        try
+          FAvailablePackages := theResult;
+          CalculateIndexes;
+          FScrollList.Invalidate;
+        finally
+          FLock.Release;
+        end;
+
+//        for item in FAvailablePackages do
+//        begin
+//          packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
+//          item.Installed := (packageRef <> nil) and (not packageRef.IsTransitive);
+//          if item.Installed then
+//          begin
+//            //item.LatestVersion := item.Version;
+//            item.Version := packageRef.Version;
+//          end;
+//        end;
+      end);
+      Inc(FRequestsInFlight);
 
   end;
 
@@ -439,36 +702,68 @@ begin
 
 end;
 
+function TDPMEditViewFrame2.GetPackageIdsFromReferences(const platform: TDPMPlatform): IList<IPackageId>;
+var
+  lookup : IDictionary<string, IPackageId>;
+  packageRef : IPackageReference;
+  existing : IPackageId;
+
+  procedure AddPackageIds(const value : IPackageReference);
+  var
+    childRef : IPackageReference;
+  begin
+    if not (value.Platform = platform) then
+      exit;
+
+    if lookup.TryGetValue(Lowercase(value.Id), existing) then
+    begin
+      //add the highest version - with project groups there could be more than 1 version
+      if existing.Version < value.Version then
+        lookup[Lowercase(value.Id)] := value;
+    end
+    else
+      lookup[Lowercase(value.Id)] := value;
+
+    for childRef in value.Dependencies do
+      AddPackageIds(childRef);
+  end;
+
+begin
+  lookup := TCollections.CreateDictionary < string, IPackageId > ;
+  result := TCollections.CreateList<IPackageId>;
+  if FPackageReferences <> nil then
+  begin
+    for packageRef in FPackageReferences.Dependencies do
+    begin
+      AddPackageIds(packageRef);
+    end;
+    result.AddRange(lookup.Values);
+  end;
+end;
+
+
 function TDPMEditViewFrame2.GetPackageReferences: IPackageReference;
 var
   projectEditor : IProjectEditor;
   proj : IOTAProject;
   i : integer;
   packageReference : IPackageReference;
-  sProjectId : string;
+  sProjectFileName : string;
 begin
   projectEditor := TProjectEditor.Create(FLogger, FConfiguration, IDECompilerVersion);
   result := TPackageReference.CreateRoot(IDECompilerVersion, FCurrentPlatform);
-
-  if FProject <> nil then
+  Assert(FProjectGroup <> nil);
+  for i := 0 to FProjectGroup.ProjectCount -1 do
   begin
-    projectEditor.LoadProject(FProject.FileName);
-    result := projectEditor.GetPackageReferences(FCurrentPlatform); //NOTE : Can return nil. Will change internals to return empty root node.
-  end
-  else
-  begin
+    proj := FProjectGroup.Projects[i];
+    sProjectFileName := proj.FileName;
 
-    for i := 0 to FProjectGroup.ProjectCount -1 do
+    projectEditor.LoadProject(sProjectFileName);
+    packageReference := projectEditor.GetPackageReferences(FCurrentPlatform); //NOTE : Can return nil. Will change internals to return empty root node.
+    if packageReference <> nil then
     begin
-      proj := FProjectGroup.Projects[i];
-      sProjectId := proj.FileName;
-      projectEditor.LoadProject(sProjectId);
-      packageReference := projectEditor.GetPackageReferences(FCurrentPlatform); //NOTE : Can return nil. Will change internals to return empty root node.
-      if packageReference <> nil then
-      begin
-        sProjectId := ChangeFileExt(ExtractFileName(sProjectId), '');
-        Result.AddExistingReference(LowerCase(sProjectId), packageReference);
-      end;
+      sProjectFileName := ChangeFileExt(ExtractFileName(sProjectFileName), '');
+      Result.AddExistingReference(LowerCase(sProjectFileName), packageReference);
     end;
   end;
 
@@ -477,21 +772,27 @@ end;
 function TDPMEditViewFrame2.GetRowKind(const index : Int64): TPackageRowKind;
 begin
   if index = 0 then
-    exit(rkInstalledHeader)
-  else if (FImplicitHeaderRowIdx > 0) and (index < FImplicitHeaderRowIdx) then
-    result := rkInstalledPackage
-  else if (index > FImplicitHeaderRowIdx) and (index < FAvailableHeaderRowIdx) then
-    result := rkInstalledPackage
-  else if (index = FImplicitHeaderRowIdx) and (FImplicitHeaderRowIdx > 0)  then
+    result := rkInstalledHeader //row 0 is always installed header
+  else if  (index = FImplicitHeaderRowIdx) then
     result := rkImplicitHeader
-  else if (index < FAvailableHeaderRowIdx) and (FImplicitHeaderRowIdx > 0) then
-    result := rkImplicitPackage
-  else if index = FAvailableHeaderRowIdx then
+  else if (index = FAvailableHeaderRowIdx) then
     result := rkAvailableHeader
+  else if (index > FInstalledHeaderRowIdx) and (index < FImplicitHeaderRowIdx) then
+    result := rkInstalledPackage
+  else if (index > FImplicitHeaderRowIdx) and  (index < FAvailableHeaderRowIdx) then
+    result := rkImplicitPackage
   else if index > FAvailableHeaderRowIdx then
     result := rkAvailablePackage
   else
     result := rkUnknown;
+end;
+
+function TDPMEditViewFrame2.GetAvailableCount: Int64;
+begin
+  if FAvailablePackages <> nil then
+    result := FAvailablePackages.Count
+  else
+    result := 0;
 end;
 
 procedure TDPMEditViewFrame2.PackageInstalled(const package: IPackageSearchResultItem; const isUpdate: boolean);
@@ -507,16 +808,21 @@ end;
 procedure TDPMEditViewFrame2.platformChangeDetectTimerTimer(Sender: TObject);
 var
   projectPlatform : TDPMPlatform;
+  project : IOTAProject;
 begin
   // since the tools api provides no notifications about active platform change
   // we have to resort to this ugly hack.
   platformChangeDetectTimer.Enabled := false;
-  if FProject <> nil then
+  if FSelectedProject <> '' then
   begin
-    projectPlatform := ProjectPlatformToDPMPlatform(FProject.CurrentPlatform);
-    if projectPlatform = TDPMPlatform.UnknownPlatform then
-      raise Exception.Create('FProject.CurrentPlatform : ' + FProject.CurrentPlatform);
-    DoPlatformChange(projectPlatform);
+    project := TToolsApiUtils.FindProjectInGroup(FProjectGroup, FSelectedProject);
+    if project <> nil then
+    begin
+      projectPlatform := ProjectPlatformToDPMPlatform(project.CurrentPlatform);
+      if projectPlatform = TDPMPlatform.UnknownPlatform then
+        raise Exception.Create('FProject.CurrentPlatform : ' + project.CurrentPlatform);
+      DoPlatformChange(projectPlatform);
+    end;
   end;
   platformChangeDetectTimer.Enabled := true;
 end;
@@ -547,14 +853,107 @@ end;
 
 procedure TDPMEditViewFrame2.ProjectClosed(const projectName: string);
 begin
-
+  TSystemUtils.OutputDebugString('TDPMEditViewFrame2.ProjectClosed : ' + projectName);
 
 end;
 
 procedure TDPMEditViewFrame2.ProjectLoaded(const projectName: string);
 begin
+  TSystemUtils.OutputDebugString('TDPMEditViewFrame2.ProjectLoaded : ' + projectName);
+end;
+
+
+
+function TDPMEditViewFrame2.GetImplicitCount: Int64;
+begin
+  if FImplicitPackages <> nil then
+    result := FImplicitPackages.Count
+  else
+    result := 0;
+end;
+
+function TDPMEditViewFrame2.GetInstalledCount: Int64;
+begin
+  if FInstalledPackages <> nil then
+    result := FInstalledPackages.Count
+  else
+    result := 0;
 
 end;
+
+function TDPMEditViewFrame2.GetInstalledPackagesAsync: IAwaitable<IList<IPackageSearchResultItem>>;
+var
+  lProjectFile : string;
+  repoManager : IPackageRepositoryManager;
+  options : TSearchOptions;
+begin
+  //local for capture
+  lProjectFile := FProjectGroup.FileName;
+
+  repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+  repoManager.Initialize(FConfiguration);
+
+  options := FSearchOptions.Clone;
+  //we want all packages for installed as we don't know what types we might have
+  options.Prerelease := true;
+  options.Commercial := true;
+  options.Trial := true;
+
+  options.Platforms := [FCurrentPlatform];
+
+  result := TAsync.Configure<IList<IPackageSearchResultItem>> (
+    function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
+    var
+      packageRef : IPackageReference;
+      item : IPackageSearchResultItem;
+      packageIds : IList<IPackageId>;
+    begin
+      CoInitialize(nil);
+      try
+        result := TCollections.CreateList<IPackageSearchResultItem>;
+        FLogger.Debug('DPMIDE : Got Installed package references, fetching metadata...');
+        packageIds := GetPackageIdsFromReferences(FCurrentPlatform);
+        result := repoManager.GetInstalledPackageFeed(cancelToken, options, packageIds);
+        for item in result do
+        begin
+          if FPackageReferences <> nil then
+          begin
+            packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
+            if packageRef <> nil then
+              item.IsTransitive := packageRef.IsTransitive;
+            item.Version := packageRef.Version;
+          end;
+        end;
+        FLogger.Debug('DPMIDE : Got Installed package metadata.');
+      finally
+        CoUninitialize;
+      end;
+
+    end, FCancelTokenSource.Token);
+end;
+
+function TDPMEditViewFrame2.SearchForPackagesAsync(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;
+var
+  repoManager : IPackageRepositoryManager;
+begin
+  //local for capture
+  repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+  repoManager.Initialize(FConfiguration);
+
+  result := TAsync.Configure <IList<IPackageSearchResultItem>> (
+    function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
+    begin
+      CoInitialize(nil);
+      try
+        //just return the list for now.. but we need to rework for skip/take
+        result := repoManager.GetPackageFeed(cancelToken, options, IDECompilerVersion, FCurrentPlatform).Results;
+      finally
+        CoUninitialize;
+      end;
+    end, FCancelTokenSource.Token);
+end;
+
+
 
 procedure TDPMEditViewFrame2.RequestPackageIcon(const index: integer; const package: IPackageSearchResultItem);
 var
@@ -617,6 +1016,7 @@ begin
       if icon <> nil then
         FLogger.Debug('DPMIDE : Got icon for [' + id + '.' + version + '] in ' + IntToStr(stopWatch.ElapsedMilliseconds) + 'ms');
       if icon <> nil then
+//        FScrollList.InvalidateRow(index);
         //TODO : Instead request repaint of row.
         FScrollList.Invalidate;
     end);
@@ -636,14 +1036,16 @@ begin
   case rowKind of
     rkInstalledHeader:
     begin
-        if FInstalledCount > 0 then
+        if GetInstalledCount > 0 then
           newRowIndex := 1
-        else if FAvailableCount > 0 then
+        else if GetImplicitCount > 0 then
+          newRowIndex  := FImplicitHeaderRowIdx + 1
+        else if GetAvailableCount > 0 then
           newRowIndex := FAvailableHeaderRowIdx + 1;
     end;
     rkImplicitHeader:
     begin
-       if FImplicitCount > 0 then
+       if GetImplicitCount > 0 then
        begin
         if direction = TScrollDirection.sdDown then
           newRowIndex := FImplicitHeaderRowIdx + 1
@@ -653,13 +1055,13 @@ begin
     end;
     rkAvailableHeader:
     begin
-      if FAvailableCount > 0 then
+      if GetAvailableCount > 0 then
       begin
         if direction = TScrollDirection.sdDown then
           newRowIndex := FAvailableHeaderRowIdx + 1
         else
         begin
-          if (FInstalledCount > 0) then
+          if (GetInstalledCount > 0) then
             newRowIndex := FAvailableHeaderRowIdx - 1
           else
             newRowIndex := FAvailableHeaderRowIdx + 1;
@@ -702,29 +1104,37 @@ procedure TDPMEditViewFrame2.ScrollListPaintRow(const Sender: TObject;  const AC
 var
   rowKind : TPackageRowKind;
   item : IPackageSearchResultItem;
-  list : IList<IPackageSearchResultItem>;
-  titleRect : TRect;
-  reservedRect : TRect;
   title : string;
-  fontSize : integer;
+  version : string;
+  latestVersion : string;
+  latestIsPrerelease : boolean;
   backgroundColor : TColor;
-  //  foregroundColor : TColor;
+  borderColor : TColor;
+  underlineRect : TRect;
   icon : IPackageIconImage;
-  extent : TSize;
-  oldTextAlign : UINT;
-  focusRect : TRect;
+  packageIdx : Int64;
+  package : IPackageSearchResultItem;
+
 begin
   rowKind := GetRowKind(index);
   backgroundColor := FIDEStyleServices.GetSystemColor(clWindow);
-
+  borderColor := FIDEStyleServices.GetSystemColor(clBtnShadow);
   case rowKind of
     rkInstalledHeader,
     rkImplicitHeader,
     rkAvailableHeader:
     begin
       backgroundColor := FIDEStyleServices.GetSystemColor(clBtnFace);
+      //havent found a good combo yet for focused/unfocused that works for all themes
+//      if FScrollList.Focused then
+//        borderColor := FIDEStyleServices.GetSystemColor(clBtnHighlight)
+//      else
+        borderColor := FIDEStyleServices.GetSystemColor(clBtnShadow);
+
       ACanvas.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
       ACanvas.Font.Style := ACanvas.Font.Style + [fsBold];
+      underLineRect := itemRect;
+      underlineRect.Top := underlineRect.Bottom - 3; //todo scale for dpi.
     end;
     rkInstalledPackage,
     rkImplicitPackage,
@@ -759,11 +1169,19 @@ begin
   ACanvas.Brush.Color := backgroundColor;
   ACanvas.FillRect(itemRect);
 
+  //header row underline/separator
+  if rowKind in [rkInstalledHeader, rkImplicitHeader, rkAvailableHeader] then
+  begin
+    ACanvas.Brush.Color := borderColor;
+    ACanvas.FillRect(underlineRect);
+    ACanvas.Brush.Color := backgroundColor;
+  end;
+
+
   icon := nil;
 
   if rowKind in [rkInstalledPackage, rkImplicitPackage, rkAvailablePackage] then
   begin
-
     if (item <> nil) and (item.Icon <> '') then
     begin
       //first query will add nil to avoid multiple requests
@@ -782,59 +1200,123 @@ begin
       icon.PaintTo(ACanvas, FRowLayout.IconRect);
   end;
 
-
-
-
-  //make text of different font sizes align correctly.
-  oldTextAlign := SetTextAlign(ACanvas.Handle, TA_BASELINE);
-  fontSize := ACanvas.Font.Size;
-  titleRect := FRowLayout.TitleRect;
+  latestVersion := '';
+  latestIsPrerelease := false;
   try
     case rowKind of
       rkInstalledHeader:
       begin
-        title := 'Installed Packages in group : ' + IntToStr(FInstalledCount);
-
+        title := 'Installed Packages in group : ';
+        if FInstalledActivity.IsActive then
+          title := title  + FInstalledActivity.CurrentFrame
+        else
+          title := title + IntToStr(GetInstalledCount);
       end;
       rkImplicitHeader:
       begin
-        title := 'Implicitly Installed Packages in group : ' + IntToStr(FImplicitCount);
-
+        title := 'Implicitly Installed Packages in group : ';
+        if FImplicitActivity.IsActive then
+          title := title + FImplicitActivity.CurrentFrame
+        else
+          title := title +IntToStr(GetImplicitCount);
       end;
       rkAvailableHeader:
       begin
-        title := 'Available Packages : ' + IntToStr(FAvailableCount);
+        title := 'Available Packages : ';
+        if FAvailableActivity.IsActive then
+          title := title + FAvailableActivity.CurrentFrame
+        else
+          title := title + IntToStr(GetAvailableCount);
       end;
       rkInstalledPackage:
       begin
-        title := 'Installed Package ' + IntToStr(index - FInstalledHeaderRowIdx);
-
+        packageIdx := index - FInstalledHeaderRowIdx -1;
+        package := FInstalledPackages[packageIdx];
+        if package = nil then
+          exit;
+        title := package.Id;
+        version := ' ' + bulletChar + ' ' + package.Version.ToStringNoMeta;
+        if FSearchOptions.Prerelease then
+        begin
+          if package.Version <> package.LatestVersion then
+          begin
+            latestVersion := package.LatestVersion.ToStringNoMeta;
+            latestIsPrerelease := not package.LatestVersion.IsStable;
+          end;
+        end
+        else
+        begin
+          if package.Version <> package.LatestStableVersion then
+            latestVersion := package.LatestStableVersion.ToStringNoMeta;
+        end;
       end;
       rkImplicitPackage:
       begin
-        title := 'Implicit Package ' + IntToStr(index - FImplicitHeaderRowIdx);
+        packageIdx := index - FImplicitHeaderRowIdx -1;
+        package := FImplicitPackages[packageIdx];
+        if package = nil then
+          exit;
 
+        title := package.Id;
+        version := ' ' + bulletChar + ' (' + package.Version.ToStringNoMeta + ')';
+        if FSearchOptions.Prerelease then
+        begin
+          if package.Version <> package.LatestVersion then
+          begin
+            latestVersion := package.LatestVersion.ToStringNoMeta;
+            latestIsPrerelease := not package.LatestVersion.IsStable;
+          end;
+        end
+        else
+        begin
+          if package.Version <> package.LatestStableVersion then
+          begin
+            latestVersion := package.LatestStableVersion.ToStringNoMeta;
+            latestIsPrerelease := false;
+          end;
+        end;
       end;
       rkAvailablePackage:
       begin
-        title := 'Available Package ' + IntToStr(index - FAvailableHeaderRowIdx);
+        packageIdx := index - FAvailableHeaderRowIdx -1;
+        if packageIdx >= 0 then
+        begin
+          package := FAvailablePackages[packageIdx];
+          if package = nil then
+            exit;
+
+          title := package.Id;
+          if FSearchOptions.Prerelease then
+          begin
+            latestVersion :=  package.LatestVersion.ToStringNoMeta;
+            latestIsPrerelease := not package.LatestVersion.IsStable;
+          end
+          else
+            latestVersion :=  package.LatestStableVersion.ToStringNoMeta;
+        end;
       end;
       rkUnknown :
       begin
 
       end;
     end;
-    extent := ACanvas.TextExtent(title);
-    ExtTextOut(ACanvas.Handle, titleRect.Left, titleRect.Bottom - 6, ETO_CLIPPED, titleRect, title, Length(title), nil);
+    title := title + version;
 
+    DrawText(ACanvas.Handle, PChar(title),Length(title), FRowLayout.TitleRect, DT_SINGLELINE + DT_LEFT + DT_VCENTER );
+    if latestVersion <> '' then
+    begin
+      ACanvas.Font.Style := ACanvas.Font.Style + [fsBold];
+      if latestIsPrerelease then
+        ACanvas.Font.Color := $006464FA// $0F2CAB
+      else
+        ACanvas.Font.Color := $E2A428;
+      DrawText(ACanvas.Handle, PChar(latestVersion),Length(latestVersion), FRowLayout.LatestVersionRect, DT_SINGLELINE + DT_RIGHT + DT_VCENTER );
+    end;
 
 
   finally
     //this is important
-    SetTextAlign(ACanvas.Handle, oldTextAlign);
-    ACanvas.Font.Size := fontSize;
     ACanvas.Font.Style := ACanvas.Font.Style - [fsBold];
-
   end;
 
 
@@ -842,14 +1324,48 @@ begin
 
 end;
 
+procedure TDPMEditViewFrame2.SearchBarOnFocustList(sender: TObject);
+begin
+  FScrollList.SetFocus;
+  if (FInstalledPackages <> nil) and (FInstalledPackages.Count > 0) then
+    FScrollList.CurrentRow := 1
+  else if (FAvailablePackages <> nil) and (FAvailablePackages.Count > 0) then
+    FScrollList.CurrentRow := FAvailableHeaderRowIdx + 1;
+
+end;
+
 procedure TDPMEditViewFrame2.SearchBarOnSearch(const searchText: string;  const searchOptions: TDPMSearchOptions; const source: string; const platform: TDPMPlatform; const refresh: boolean);
 begin
+  //
+  FCurrentPlatform := TDPMPlatform.UnknownPlatform; //force DoPlatform to do something.
+
+  FSearchOptions.Platforms := [platform];
+  FSearchOptions.Prerelease := TDPMSearchOption.IncludePrerelease in searchOptions;
+  FSearchOptions.Commercial := TDPMSearchOption.IncludeCommercial in searchOptions;
+  FSearchOptions.Trial      := TDPMSearchOption.IncludeTrial in searchOptions;
+  FSearchOptions.SearchTerms := Trim(searchText);
+  if source <> 'All' then
+    FSearchOptions.Sources := source
+  else
+    FSearchOptions.Sources := '';
+
+  DoPlatformChange(platform);
 
 end;
 
 procedure TDPMEditViewFrame2.SearchBarPlatformChanged(const newPlatform: TDPMPlatform);
 begin
+  DoPlatformChange(newPlatform)
+end;
 
+procedure TDPMEditViewFrame2.SearchBarProjectSelected(const projectFile: string);
+var
+  platform : TDPMPlatform;
+begin
+  FSelectedProject := projectFile;
+  platform := FCurrentPlatform;
+  FCurrentPlatform := TDPMPlatform.UnknownPlatform;
+  DoPlatformChange(platform);
 end;
 
 procedure TDPMEditViewFrame2.SearchBarSettingsChanged(const configuration: IConfiguration);
@@ -913,69 +1429,36 @@ end;
 
 { TRowLayout }
 
-procedure TRowLayout.Update(const ACanvas: TCanvas; const rowRect: TRect; const rowKind : TPackageRowKind);
-var
-  bUpdateLayout : boolean;
+
+constructor TRowLayout.Create(const margin : integer; const iconSize : integer);
 begin
-  bUpdateLayout := rowRect.Width <> RowWidth;
-  if bUpdateLayout then
-  begin
-    IconRect.Top := rowRect.Top + ((rowRect.Height - 24) div 2); //center vertically
-    IconRect.Left := rowRect.Left + 10;  //TODO : These margins etc need to be scaled with dpi!
-    IconRect.Width := 24;
-    IconRect.Height := 24;
+  Self.Margin := margin;
+  Self.IconSize := iconSize;
+end;
 
-    VersionRect.Top := IconRect.Top;
-    VersionRect.Right := rowRect.Right - 50;
-    VersionRect.Height := Abs(ACanvas.Font.Height) + 10;
+procedure TRowLayout.Update(const ACanvas: TCanvas; const rowRect: TRect; const rowKind : TPackageRowKind);
+begin
+  IconRect.Top := rowRect.Top + ((rowRect.Height - IconSize) div 2); //center vertically
+  IconRect.Left := rowRect.Left + Margin;  //TODO : These margins etc need to be scaled with dpi!
+  IconRect.Width := IconSize;
+  IconRect.Height := IconSize;
 
-    //TODO : Figure out a better way to ensure this will be correct
-    VersionRect.Left := rowRect.Right - ACanvas.TextExtent('1.100.100-aplha123aaaaa').Width - 10;
+  LatestVersionRect.Top := rowRect.Top;
+  LatestVersionRect.Right := rowRect.Right - Margin;
+  LatestVersionRect.Height := rowRect.Height;// Abs(ACanvas.Font.Height) + Margin;
+  LatestVersionRect.Left := rowRect.Right - ACanvas.TextExtent('100.100.100-aplha123aaaaa').Width - Margin;
 
-    LatestVersionRect.Top := VersionRect.Bottom + 10;
-    LatestVersionRect.Right := rowRect.Right - 50;
-    LatestVersionRect.Height := Abs(ACanvas.Font.Height) + 10;
 
-    //TODO : Figure out a better way to ensure this will be correct
-    LatestVersionRect.Left := VersionRect.Left;
-
-    TitleRect.Top := IconRect.Top;
-    TitleRect.Height := Abs(ACanvas.Font.Height) * 2;
-    if rowKind in [rkInstalledPackage, rkImplicitPackage, rkAvailablePackage] then
-      TitleRect.Left := rowRect.Left + 10 + iconRect.Width + 10
-    else
-      TitleRect.Left := rowRect.Left + 10;
-    TitleRect.Right := VersionRect.Left - 5;
-    DescriptionRect.Top := TitleRect.Bottom + 4;
-    DescriptionRect.Left := TitleRect.Left;
-    DescriptionRect.Bottom := rowRect.Bottom - 6;
-    DescriptionRect.Right := VersionRect.Left - 5;
-
-    RowWidth := rowRect.Width;
-  end
+  TitleRect := rowRect;
+  if rowKind in [rkInstalledPackage, rkImplicitPackage, rkAvailablePackage] then
+    TitleRect.Left := rowRect.Left + Margin + iconRect.Width + Margin
   else
-  begin
-    //just update top and bottom of rects.
-    IconRect.Top := rowRect.Top + 2;
-    IconRect.Height := 24;
+    TitleRect.Left := rowRect.Left + Margin;
 
-    if rowKind in [rkInstalledPackage, rkImplicitPackage, rkAvailablePackage] then
-      TitleRect.Left := rowRect.Left + 10 + iconRect.Width + 10
-    else
-      TitleRect.Left := rowRect.Left + 10;
-
-    VersionRect.Top := IconRect.Top;
-    VersionRect.Height := Abs(ACanvas.Font.Height) + 10;
-
-    LatestVersionRect.Top := VersionRect.Bottom + 10;
-    LatestVersionRect.Height := Abs(ACanvas.Font.Height) + 10;
-
-    TitleRect.Top := IconRect.Top;
-    TitleRect.Height := Abs(ACanvas.Font.Height) * 2;
-    DescriptionRect.Top := TitleRect.Bottom + 4;
-    DescriptionRect.Bottom := rowRect.Bottom - 5;
-  end;
+  TitleRect.Right := LatestVersionRect.Left - Margin div 2;
 
 end;
+
+
 
 end.

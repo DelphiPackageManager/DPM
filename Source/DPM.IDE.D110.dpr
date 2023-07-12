@@ -179,7 +179,8 @@ uses
   DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas',
   DPM.Core.Package.ListItem in 'Core\Package\DPM.Core.Package.ListItem.pas',
   DPM.IDE.EditorViewFrame2 in 'IDE\EditorView\DPM.IDE.EditorViewFrame2.pas' {DPMEditViewFrame2: TFrame},
-  DPM.IDE.ProjectNotifier in 'IDE\DPM.IDE.ProjectNotifier.pas';
+  DPM.IDE.ProjectNotifier in 'IDE\DPM.IDE.ProjectNotifier.pas',
+  DPM.IDE.ActivityIndicator in 'IDE\EditorView\DPM.IDE.ActivityIndicator.pas';
 
 {$R *.res}
 

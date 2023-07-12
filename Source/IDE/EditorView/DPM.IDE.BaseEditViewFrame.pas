@@ -340,7 +340,8 @@ end;
 
 procedure TDPMBaseEditViewFrame.ConfigureSearchBar;
 begin
-  FSearchBar.Configure(FLogger, FDPMIDEOptions, FConfiguration,FConfigurationManager, FSearchOptions.ConfigFile, FCurrentPlatform);
+//commented due to refactoring.
+  //FSearchBar.Configure(FLogger, FDPMIDEOptions, FConfiguration,FConfigurationManager, FSearchOptions.ConfigFile, FCurrentPlatform);
 end;
 
 constructor TDPMBaseEditViewFrame.Create(AOwner: TComponent);

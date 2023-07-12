@@ -127,7 +127,6 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       Height = 20
       Caption = 'Include Commercial'
       TabOrder = 5
-      Visible = False
       OnClick = chkIncludeCommercialClick
     end
     object chkIncludePrerelease: TCheckBox
@@ -146,7 +145,6 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       Height = 20
       Caption = 'Include Trials'
       TabOrder = 7
-      Visible = False
       OnClick = chkIncludeTrialClick
     end
     object txtSearch: TButtonedEdit

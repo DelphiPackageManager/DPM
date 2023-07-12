@@ -122,4 +122,11 @@ object DPMEditViewFrame2: TDPMEditViewFrame2
     Left = 318
     Top = 408
   end
+  object ActivityTimer: TTimer
+    Enabled = False
+    Interval = 350
+    OnTimer = ActivityTimerTimer
+    Left = 320
+    Top = 480
+  end
 end

@@ -11,7 +11,7 @@ uses
 //source : https://stackoverflow.com/questions/11615336/is-it-possible-to-add-a-history-list-dropdown-to-delphis-tbuttonededit
 
 type
-  TACOption = (acAutoAppend, acAutoSuggest, acUseArrowKey, acSearch, acFilterPrefixes, acUseTab, acRtlReading, acWordFilter, acNoPrefixFiltering);
+  TACOption = (acAutoAppend, acAutoSuggest, {acUseArrowKey, } acSearch, acFilterPrefixes, acUseTab, acRtlReading, acWordFilter, acNoPrefixFiltering);
   TACOptions = set of TACOption;
 
   TACSource = (acsList, acsHistory, acsMRU, acsShell);
@@ -59,7 +59,7 @@ begin
 
   FACList := TEnumString.Create;
   FACEnabled := True;
-  FACOptions := [acAutoAppend, acAutoSuggest, acUseArrowKey];
+  FACOptions := [acAutoAppend, acAutoSuggest{, acUseArrowKey}];
 
 end;
 
@@ -129,7 +129,7 @@ procedure TButtonedEdit.SetACOptions(const Value : TACOptions);
 const
   Options : array[TACOption] of integer = (ACO_AUTOAPPEND,
     ACO_AUTOSUGGEST,
-    ACO_UPDOWNKEYDROPSLIST,
+    //ACO_UPDOWNKEYDROPSLIST,
     ACO_SEARCH,
     ACO_FILTERPREFIXES,
     ACO_USETAB,
