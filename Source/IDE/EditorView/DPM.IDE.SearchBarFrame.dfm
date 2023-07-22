@@ -33,19 +33,6 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       Visible = False
       ExplicitLeft = 534
     end
-    object lblProject: TLabel
-      Left = 360
-      Top = 9
-      Width = 117
-      Height = 23
-      Caption = 'THE PROJECT'
-      Font.Charset = DEFAULT_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -19
-      Font.Name = 'Tahoma'
-      Font.Style = []
-      ParentFont = False
-    end
     object lblSources: TLabel
       Left = 655
       Top = 40
@@ -100,7 +87,6 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       Style = csDropDownList
       Anchors = [akTop, akRight]
       TabOrder = 3
-      Visible = False
       OnChange = cbPlatformsChange
     end
     object cbSources: TComboBox
@@ -165,14 +151,6 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       OnChange = txtSearchChange
       OnKeyDown = txtSearchKeyDown
       OnRightButtonClick = txtSearchRightButtonClick
-    end
-    object cboProjects: TComboBox
-      Left = 496
-      Top = 9
-      Width = 145
-      Height = 23
-      TabOrder = 9
-      Text = 'cboProjects'
     end
   end
   object DPMEditorViewImages: TImageList

@@ -60,8 +60,8 @@ type
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
     function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const preRelease : boolean) : IList<TPackageVersion>;
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
-    function GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion;
-      const preRelease: Boolean): IDictionary<string, TPackageVersion>;
+
+    function GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageLatestVersionInfo>;
 
     function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>; overload;
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
@@ -507,7 +507,7 @@ begin
 
 end;
 
-function TDPMServerPackageRepository.GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion; const preRelease: Boolean): IDictionary<string, TPackageVersion>;
+function TDPMServerPackageRepository.GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageLatestVersionInfo>;
 //var
 //  httpClient : IHttpClient;
 //  request : TRequest;
@@ -518,7 +518,7 @@ function TDPMServerPackageRepository.GetPackageLatestVersions(const cancellation
 //  jsonObj : TJsonObject;
 //  uri : IUri;
 begin
-  result := TCollections.CreateDictionary<string, TPackageVersion>;
+  result := TCollections.CreateDictionary<string, IPackageLatestVersionInfo>;
 
 
 end;

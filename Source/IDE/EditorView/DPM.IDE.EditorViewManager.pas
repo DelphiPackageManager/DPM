@@ -212,7 +212,7 @@ begin
   if FEditorView = nil then
     FEditorView := TDPMEditorView.Create(FContainer, projectGroup, project, FImageIndex, FProjectTreeManager) as INTACustomEditorView;
 
-  (FEditorView as IDPMEditorView).FilterToProject(projectGroup, project);
+//  (FEditorView as IDPMEditorView).FilterToProject(projectGroup, project);
 
   if FEditorViewServices <> nil then
     FEditorViewServices.ShowEditorView(FEditorView);

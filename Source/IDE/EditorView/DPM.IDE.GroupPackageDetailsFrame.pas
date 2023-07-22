@@ -78,11 +78,11 @@ type
     FContainer : TContainer;
     FIconCache : TDPMIconCache;
     FHost : IDetailsHost;
+
     FPackageMetaData : IPackageSearchResultItem;
     FProjectsGrid : TVersionGrid;
     FDetailsPanel : TPackageDetailsPanel;
 
-    FCurrentTab : TDPMCurrentTab;
     FCancellationTokenSource : ICancellationTokenSource;
     FRequestInFlight : boolean;
     FVersionsDelayTimer : TTimer;
@@ -91,7 +91,6 @@ type
     FClosing : boolean;
     FIncludePreRelease : boolean;
     FPackageInstalledVersion : string;
-    FPackageId : string;
     FProjectGroup : IOTAProjectGroup;
     FCurrentPlatform : TDPMPlatform;
     FDropdownOpen : boolean;
@@ -108,7 +107,6 @@ type
   public
     constructor Create(AOwner : TComponent); override;
     procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProjectGroup);
-    procedure Configure(const value : TDPMCurrentTab; const preRelease : boolean);
     procedure SetPackage(const package : IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
     procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;
@@ -235,20 +233,6 @@ begin
     Inc(Height, 4);
 end;
 
-procedure TGroupPackageDetailsFrame.Configure(const value: TDPMCurrentTab; const preRelease: boolean);
-begin
-  if (FCurrentTab <> value) or (FIncludePreRelease <> preRelease) then
-  begin
-    FPackageMetaData := nil;
-    FPackageId := '';
-    FDetailsPanel.SetDetails(nil);
-    FCurrentTab := value;
-    FIncludePreRelease := preRelease;
-    SetPackage(nil, FIncludePreRelease );
-  end;
-
-end;
-
 constructor TGroupPackageDetailsFrame.Create(AOwner: TComponent);
 begin
   inherited;
@@ -268,6 +252,7 @@ begin
   FProjectsGrid.Height := 300;
   FProjectsGrid.ParentColor := false;
   FProjectsGrid.ParentBackground := false;
+  FProjectsGrid.ParentFont := true;
   FProjectsGrid.DoubleBuffered := true;
   FProjectsGrid.OnSelectionChanged := Self.ProjectSelectionChanged;
 
@@ -306,13 +291,13 @@ begin
   FConfiguration := config;
   FLogger := FContainer.Resolve<IDPMIDELogger>;
   FHost := host;
-//  FProjectFile := projectOrGroup.FileName;
   SetPackage(nil, FIncludePreRelease);
 
   FProjectGroup := projectOrGroup as IOTAProjectGroup;
   ProjectReloaded; //loadGrid;
 
   FProjectsGrid.BeginUpdate;
+  FProjectsGrid.Clear;
   for i := 0 to FProjectGroup.ProjectCount -1 do
   begin
     sProject := ChangeFileExt(ExtractFileName(FProjectGroup.Projects[i].FileName), '');
@@ -395,24 +380,24 @@ begin
 
   if package <> nil then
   begin
-    if (package.Id <> FPackageId) then
-    begin
-      FPackageId := package.Id;
-      if package.Installed then
-        FPackageInstalledVersion := package.Version.ToStringNoMeta
-      else
-        FPackageInstalledVersion := '';
-    end
-    else
-    begin
-      //same id, so we might just be displaying a new version.
-      //since we're just getting the item from the feed rather than the project
-      //it won't have installed or installed version set.
-      if package.Installed then
-        FPackageInstalledVersion := package.Version.ToStringNoMeta
-      else if package.Version.ToStringNoMeta = FPackageInstalledVersion then
-          package.Installed := true;
-    end;
+//    if (package.Id <> FPackageId) then
+//    begin
+//      FPackageId := package.Id;
+//      if package.Installed then
+//        FPackageInstalledVersion := package.Version.ToStringNoMeta
+//      else
+//        FPackageInstalledVersion := '';
+//    end
+//    else
+//    begin
+//      //same id, so we might just be displaying a new version.
+//      //since we're just getting the item from the feed rather than the project
+//      //it won't have installed or installed version set.
+//      if package.Installed then
+//        FPackageInstalledVersion := package.Version.ToStringNoMeta
+//      else if package.Version.ToStringNoMeta = FPackageInstalledVersion then
+//          package.Installed := true;
+//    end;
 
     lblPackageId.Caption := package.Id;
     logo := FIconCache.Request(package.Id);
@@ -430,22 +415,6 @@ begin
     end
     else
       imgPackageLogo.Visible := false;
-
-    case FCurrentTab of
-      TDPMCurrentTab.Search :
-        begin
-//          pnlInstalled.Visible := FPackageInstalledVersion <> '';
-        end;
-      TDPMCurrentTab.Installed :
-        begin
-  //        pnlInstalled.Visible := true;
-        end;
-      TDPMCurrentTab.Updates :
-        begin
-    //      pnlInstalled.Visible := true;
-        end;
-      TDPMCurrentTab.Conflicts : ;
-    end;
 
     UpdateButtonState;
     //btnInstallOrUpdate.Enabled := ((not FPackageMetaData.Installed) or (FPackageMetaData.LatestVersion <> FPackageMetaData.Version)) and FProjectsGrid.HasCheckedProjects;
@@ -546,8 +515,6 @@ procedure TGroupPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);
 var
   versions : IList<TPackageVersion>;
   repoManager : IPackageRepositoryManager;
-  lStable : string;
-  lPre : string;
   sInstalledVersion : string;
 begin
   FVersionsDelayTimer.Enabled := false;
@@ -566,6 +533,7 @@ begin
   TAsync.Configure<IList<TPackageVersion>> (
     function(const cancelToken : ICancellationToken) : IList<TPackageVersion>
     begin
+      //need this for the http api/
       CoInitializeEx(nil, COINIT_APARTMENTTHREADED);
       try
       result := repoManager.GetPackageVersions(cancelToken, IDECompilerVersion, FCurrentPlatform, FPackageMetaData.Id, FIncludePrerelease);
@@ -594,8 +562,6 @@ begin
     procedure(const theResult : IList<TPackageVersion>)
     var
       version : TPackageVersion;
-       latestPreRelease : TPackageVersion;
-      latestStable : TPackageVersion;
     begin
       FRequestInFlight := false;
       //if the view is closing do not do anything else.
@@ -609,73 +575,9 @@ begin
 
         if versions.Any then
         begin
-          if FIncludePreRelease then
-          begin
-            //get the latest pre-release
-            latestPreRelease := versions.FirstOrDefault(
-              function(const value : TPackageVersion) : boolean
-              begin
-                result := not value.IsStable;
-              end);
-
-            if not latestPreRelease.IsEmpty then
-            begin
-              if not SameText(sInstalledVersion, latestPreRelease.ToStringNoMeta) then
-                lPre := cLatestPrerelease + latestPreRelease.ToStringNoMeta;
-            end;
-          end;
-          //get the latest stable
-          latestStable := versions.FirstOrDefault(
-            function(const value : TPackageVersion) : boolean
-            begin
-              result := value.IsStable;
-            end);
-          if not latestStable.IsEmpty then
-          begin
-            //don't show latest stable if that is the installed version
-            if not SameText(sInstalledVersion, latestStable.ToStringNoMeta)  then
-              lStable := cLatestStable + latestStable.ToStringNoMeta;
-          end;
-          if (lStable <> '') and (lPre <> '') then
-          begin
-            if (sInstalledVersion <> '') then
-              cboVersions.Items.Add(sInstalledVersion);
-            cboVersions.Items.Add(lPre);
-            cboVersions.Items.AddObject(lStable, TObject(1));
-          end
-          else if lStable <> '' then
-          begin
-            if (sInstalledVersion <> '') then
-              cboVersions.Items.Add(sInstalledVersion);
-            cboVersions.Items.AddObject(lStable, TObject(1));
-          end
-          else if lPre <> '' then
-          begin
-            if (sInstalledVersion <> '') then
-              cboVersions.Items.Add(sInstalledVersion);
-            cboVersions.Items.AddObject(lPre, TObject(1));
-          end
-          else
-          begin
-            if (sInstalledVersion <> '') then
-              cboVersions.Items.AddObject(sInstalledVersion, TObject(1));
-          end;
-
           for version in versions do
             cboVersions.Items.Add(version.ToStringNoMeta);
-
-          if FCurrentTab = TDPMCurrentTab.Installed then
-            cboVersions.ItemIndex := cboVersions.Items.IndexOf(sInstalledVersion)
-          else
-            cboVersions.ItemIndex := 0;
-
-//          sVersion := cboVersions.Items[cboVersions.ItemIndex];
-//          if TStringUtils.StartsWith(sVersion, cLatestPrerelease, true) then
-//            Delete(sVersion, 1, Length(cLatestPrerelease))
-//          else if TStringUtils.StartsWith(sVersion, cLatestStable, true) then
-//            Delete(sVersion, 1, Length(cLatestStable));
-
-          //btnInstall.Enabled := {(sVersion <> sInstalledVersion) and } FProjectsGrid.HasCheckedProjects;
+          cboVersions.ItemIndex := cboVersions.Items.IndexOf(sInstalledVersion)
         end
         else
         begin

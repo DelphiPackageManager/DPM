@@ -89,6 +89,9 @@ object DPMEditViewFrame2: TDPMEditViewFrame2
             inherited pnlVersion: TPanel
               Width = 500
               ExplicitWidth = 500
+              DesignSize = (
+                500
+                33)
               inherited SpeedButton1: TSpeedButton
                 Left = 467
                 ExplicitLeft = 467

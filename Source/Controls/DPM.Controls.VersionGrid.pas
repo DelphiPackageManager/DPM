@@ -187,7 +187,7 @@ type
     procedure BeginUpdate;
     procedure EndUpdate;
 
-
+    procedure ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND} ); override;
     procedure Clear;
     procedure AddProject(const project : string; const version : string);
 
@@ -222,6 +222,7 @@ type
     property Height default 100;
     property ParentBackground;
     property ParentColor;
+    property ParentFont;
     {$IF CompilerVersion >= 24.0}
       {$LEGACYIFEND ON}
     property StyleElements;
@@ -258,6 +259,17 @@ end;
 procedure TVersionGrid.BeginUpdate;
 begin
   Inc(FUpdateCount);
+end;
+
+procedure TVersionGrid.ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND} );
+begin
+  inherited;
+  FRowHeight := MulDiv(FRowHeight, M, D);
+  //for some reason this is not happening in D11.x
+  Canvas.Font.Height := MulDiv(Canvas.Font.Height, M, D );
+//  FPaintBmp.Canvas.Font := Self.Font;
+  UpdateVisibleRows;
+
 end;
 
 procedure TVersionGrid.Clear;
@@ -811,11 +823,11 @@ begin
 
   project := FRows.Items[index];
 
-  if (state in [rsFocusedSelected, rsFocusedHot, rsHot]) then
+  if (state in [rsSelected, rsFocusedSelected, rsFocusedHot, rsHot]) then
     begin
-      backgroundColor := FStyleServices.GetSystemColor(clHighlight);
+      backgroundColor := FStyleServices.GetSystemColor(clBtnHighlight);
       fontColor := FStyleServices.GetSystemColor(clHighlightText);
-      LDetails := StyleServices.GetElementDetails(tlListItemHot);
+      LDetails := StyleServices.GetElementDetails(tlListItemSelected);
     end
     else
     begin
@@ -1075,6 +1087,7 @@ begin
       FRows[FCurrentRow].Checked := not FRows[FCurrentRow].Checked;
       UpdateCheckedCount(FRows[FCurrentRow].Checked);
       DoSelectionChanged;
+      Invalidate;
     end;
     htColumn0:
     begin
@@ -1130,10 +1143,6 @@ var
   r : TRect;
   row : integer;
   oldHit : THitElement;
-  headerBorderColor : TColor;
-  column : integer;
-  lineX : integer;
-  i : integer;
 begin
   oldHit := FHitElement;
   FHitElement := htRow;
@@ -1196,8 +1205,7 @@ begin
 end;
 
 
-procedure TVersionGrid.MouseUp(Button: TMouseButton; Shift: TShiftState; X,
-  Y: Integer);
+procedure TVersionGrid.MouseUp(Button: TMouseButton; Shift: TShiftState; X,  Y: Integer);
 begin
   if FMouseCaptured then
   begin
@@ -1377,6 +1385,7 @@ begin
   end;
 
   UpdateColumns;
+  UpdateVisibleRows;
   UpdateScrollBars;
 
   if (RowCount > 0) and (FCurrentRow > -1) then
@@ -1712,8 +1721,6 @@ end;
 procedure TVersionGrid.WMSize(var Message: TWMSize);
 begin
   inherited;
-  //doing this in resize now, as it sometimes gets called not from here.
-
   //force repaint during resizing rather than just after.
   RedrawWindow(Handle, nil, 0, RDW_ERASE or RDW_INVALIDATE or RDW_UPDATENOW);
   //Repaint;

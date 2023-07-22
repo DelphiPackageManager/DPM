@@ -79,7 +79,6 @@ type
     FHost : IDetailsHost;
     FPackageMetaData : IPackageSearchResultItem;
     FDetailsPanel : TPackageDetailsPanel;
-    FCurrentTab : TDPMCurrentTab;
     FCancellationTokenSource : ICancellationTokenSource;
     FRequestInFlight : boolean;
     FVersionsDelayTimer : TTimer;
@@ -105,7 +104,7 @@ type
     constructor Create(AOwner : TComponent); override;
     procedure ProjectReloaded;
     procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProject);
-    procedure Configure(const value : TDPMCurrentTab; const preRelease : boolean);
+    procedure Configure(const preRelease : boolean);
     procedure SetPackage(const package : IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
     procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;
@@ -367,32 +366,14 @@ begin
     Inc(Height, 4);
 end;
 
-procedure TPackageDetailsFrame.Configure(const value : TDPMCurrentTab; const preRelease : boolean);
+procedure TPackageDetailsFrame.Configure(const preRelease : boolean);
 begin
-  if (FCurrentTab <> value) or (FIncludePreRelease <> preRelease) then
+  if (FIncludePreRelease <> preRelease) then
   begin
     FPackageMetaData := nil;
     FPackageId := '';
     FDetailsPanel.SetDetails(nil);
-    FCurrentTab := value;
     FIncludePreRelease := preRelease;
-    case FCurrentTab of
-      TDPMCurrentTab.Installed :
-        begin
-          btnInstallOrUpdate.Caption := 'Update';
-        end;
-      TDPMCurrentTab.Updates :
-        begin
-          btnInstallOrUpdate.Caption := 'Update';
-
-        end;
-      TDPMCurrentTab.Search :
-        begin
-          btnInstallOrUpdate.Caption := 'Install';
-
-        end;
-      TDPMCurrentTab.Conflicts : ;
-    end;
 //    SetPackage(nil, FIncludePreRelease);
   end;
 
@@ -522,31 +503,6 @@ begin
     else
       imgPackageLogo.Visible := false;
 
-    case FCurrentTab of
-      TDPMCurrentTab.Search :
-        begin
-          pnlInstalled.Visible := FPackageInstalledVersion <> '';
-          if pnlInstalled.Visible then
-          begin
-            btnInstallOrUpdate.Caption := 'Update'
-          end
-          else
-          begin
-            btnInstallOrUpdate.Caption := 'Install';
-          end;
-        end;
-      TDPMCurrentTab.Installed :
-        begin
-          pnlInstalled.Visible := true;
-          btnInstallOrUpdate.Caption := 'Update';
-        end;
-      TDPMCurrentTab.Updates :
-        begin
-          pnlInstalled.Visible := true;
-          btnInstallOrUpdate.Caption := 'Update';
-        end;
-      TDPMCurrentTab.Conflicts : ;
-    end;
 
     if FPackageInstalledVersion <> '' then
       txtInstalledVersion.Text := FPackageInstalledVersion
@@ -736,10 +692,7 @@ begin
           for version in versions do
             cboVersions.Items.Add(version.ToStringNoMeta);
 
-          if FCurrentTab = TDPMCurrentTab.Installed then
-            cboVersions.ItemIndex := cboVersions.Items.IndexOf(sInstalledVersion)
-          else
-            cboVersions.ItemIndex := 0;
+          cboVersions.ItemIndex := cboVersions.Items.IndexOf(sInstalledVersion);
 
           sVersion := cboVersions.Items[cboVersions.ItemIndex];
           if TStringUtils.StartsWith(sVersion, cLatestPrerelease, true) then

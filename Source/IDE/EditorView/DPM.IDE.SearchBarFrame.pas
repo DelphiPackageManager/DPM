@@ -33,10 +33,8 @@ type
     chkIncludePrerelease: TCheckBox;
     chkIncludeTrial: TCheckBox;
     lblPlatform: TLabel;
-    lblProject: TLabel;
     lblSources: TLabel;
     txtSearch: TButtonedEdit;
-    cboProjects: TComboBox;
     procedure txtSearchChange(Sender: TObject);
     procedure txtSearchRightButtonClick(Sender: TObject);
     procedure DebounceTimerTimer(Sender: TObject);
@@ -62,7 +60,6 @@ type
     FPlatforms : TDPMPlatforms;
     FPlatform  : TDPMPlatform;
     FProjects  : TStringList;
-
     //events
     FOnSearchEvent : TSearchEvent;
     FOnConfigChanged : TConfigChangedEvent;
@@ -73,8 +70,6 @@ type
     function GetIncludePreRelease: boolean;
 
   protected
-    function GetCaption: string;
-    procedure SetCaption(const Value: string);
     procedure AddDefaultSearchHistory;
 
     procedure ReloadSourcesCombo;
@@ -87,13 +82,15 @@ type
   public
     constructor Create(AOwner : TComponent);override;
     destructor Destroy;override;
-    procedure Configure(const logger : IDPMIDELogger; const ideOptions : IDPMIDEOptions; const config : IConfiguration; const configurationManager : IConfigurationManager; const configFile : string; const platforms : TDPMPlatforms);
-    procedure ConfigureForTab(const currentTab : TDPMCurrentTab);
+    procedure Configure(const logger : IDPMIDELogger; const ideOptions : IDPMIDEOptions; const config : IConfiguration; const configurationManager : IConfigurationManager; const configFile : string;
+                        const platforms : TDPMPlatforms);
+    procedure UpdatePlatforms(const platforms : TDPMPlatforms);
+
     procedure SetPlatform(const platform : TDPMPlatform);
+
     function GetPlatform : TDPMPlatform;
     procedure ThemeChanged(const ideStyleServices : TCustomStyleServices);
 
-    property Caption : string read GetCaption write SetCaption;
     property HasSources : boolean read FHasSources;
     property SearchText : string read GetSearchText;
     property IncludePrerelease : boolean read GetIncludePreRelease;
@@ -202,9 +199,8 @@ begin
   DoSearchEvent(true);
 end;
 
-procedure TDPMSearchBarFrame.Configure(const logger: IDPMIDELogger; const ideOptions: IDPMIDEOptions; const config : IConfiguration; const configurationManager: IConfigurationManager; const configFile : string; const platforms : TDPMPlatforms);
-var
-  platform : TDPMPlatform;
+procedure TDPMSearchBarFrame.Configure(const logger: IDPMIDELogger; const ideOptions: IDPMIDEOptions; const config : IConfiguration; const configurationManager: IConfigurationManager; const configFile : string;
+                                       const platforms : TDPMPlatforms);
 begin
   FLoading := true;
   FLogger := logger;
@@ -216,29 +212,8 @@ begin
   ReloadSourcesCombo;
   lblPlatform.Visible := true;
 
-  for platform in FPlatforms do
-  begin
-    cbPlatforms.Items.Add(DPMPlatformToString(platform));
-  end;
-  cbPlatforms.Visible := true;
-  cbPlatforms.ItemIndex := 0;
+  UpdatePlatforms(FPlatforms);
   FLoading := false;
-
-end;
-
-
-procedure TDPMSearchBarFrame.ConfigureForTab(const currentTab: TDPMCurrentTab);
-begin
-  case currentTab of
-    TDPMCurrentTab.Search:
-    begin
-      chkIncludeCommercial.Visible := true;
-      chkIncludeTrial.Visible := true;
-    end;
-  else
-    chkIncludeCommercial.Visible := false;
-    chkIncludeTrial.Visible := false;
-  end;
 end;
 
 constructor TDPMSearchBarFrame.Create(AOwner: TComponent);
@@ -276,7 +251,7 @@ end;
 procedure TDPMSearchBarFrame.DebounceTimerTimer(Sender: TObject);
 begin
   DebounceTimer.Enabled := false;
-  DoSearchEvent(true);
+  DoSearchEvent(false);
 end;
 
 destructor TDPMSearchBarFrame.Destroy;
@@ -325,10 +300,7 @@ begin
   end;
 end;
 
-function TDPMSearchBarFrame.GetCaption: string;
-begin
-  result := lblProject.Caption;
-end;
+
 
 function TDPMSearchBarFrame.GetIncludePreRelease: boolean;
 begin
@@ -403,10 +375,6 @@ begin
 
 end;
 
-procedure TDPMSearchBarFrame.SetCaption(const Value: string);
-begin
-//  lblProject.Caption := value;
-end;
 
 procedure TDPMSearchBarFrame.SetPlatform(const platform: TDPMPlatform);
 begin
@@ -449,8 +417,11 @@ begin
       end;
     VK_ESCAPE :
       begin
-        txtSearch.Text := '';
-        DebounceTimerTimer(DebounceTimer);
+        if txtSearch.Text <> '' then
+        begin
+          txtSearch.Text := '';
+          DebounceTimerTimer(DebounceTimer);
+        end;
       end;
     VK_DOWN :
     begin
@@ -472,5 +443,31 @@ begin
   DoSearchEvent(true);
 end;
 
+
+procedure TDPMSearchBarFrame.UpdatePlatforms(const platforms: TDPMPlatforms);
+var
+  platform : TDPMPlatform;
+  currentPlatform : TDPMPlatform;
+  i : integer;
+begin
+  //preserve the currently selected platform
+  if cbPlatforms.Items.Count > 0 then
+    currentPlatform := TDPMPlatform(Integer(cbPlatforms.Items.Objects[cbPlatforms.ItemIndex]))
+  else
+    currentPlatform := TDPMPlatform.UnknownPlatform;
+
+  cbPlatforms.Items.Clear;
+  for platform in FPlatforms do
+    cbPlatforms.Items.AddObject(DPMPlatformToString(platform), TObject(Ord(platform)));
+
+  i := 0;
+  if currentPlatform <> TDPMPlatform.UnknownPlatform then
+    i := cbPlatforms.Items.IndexOfObject(TObject(Ord(currentPlatform)));
+  if cbPlatforms.Items.Count > 0 then
+    cbPlatforms.ItemIndex := i;
+
+
+
+end;
 
 end.

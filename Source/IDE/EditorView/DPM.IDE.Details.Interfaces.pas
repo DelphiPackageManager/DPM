@@ -38,7 +38,6 @@ type
   IPackageDetailsView = interface
   ['{B4B48A9A-D04A-4316-B3FB-B03E4BD763F3}']
     procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProject);
-    procedure Configure(const value : TDPMCurrentTab; const preRelease : boolean);
     procedure SetPackage(const package : IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
     procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;

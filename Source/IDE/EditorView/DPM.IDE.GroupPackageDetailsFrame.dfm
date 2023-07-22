@@ -133,7 +133,7 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
         Left = 0
         Top = 0
         Width = 614
-        Height = 34
+        Height = 33
         Align = alTop
         BevelOuter = bvNone
         Caption = 'Panel1'
@@ -143,7 +143,7 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
         TabOrder = 0
         DesignSize = (
           614
-          34)
+          33)
         object lblVersionTitle: TLabel
           Left = 19
           Top = 10
@@ -157,29 +157,31 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
           Left = 581
           Top = 3
           Width = 28
-          Height = 28
+          Height = 27
           Margins.Right = 5
           Align = alRight
           Caption = 'I'
           ExplicitLeft = 408
+          ExplicitHeight = 28
         end
         object SpeedButton2: TSpeedButton
           AlignWithMargins = True
           Left = 545
           Top = 3
           Width = 28
-          Height = 28
+          Height = 27
           Margins.Right = 5
           Align = alRight
           Caption = 'U'
           ExplicitLeft = 376
+          ExplicitHeight = 28
         end
         object Label1: TLabel
           AlignWithMargins = True
           Left = 350
           Top = 10
           Width = 36
-          Height = 14
+          Height = 13
           Margins.Top = 10
           Margins.Bottom = 10
           Align = alRight

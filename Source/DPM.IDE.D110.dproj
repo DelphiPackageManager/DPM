@@ -276,17 +276,7 @@
         <DCCReference Include="IDE\Logging\DPM.IDE.Logger.pas"/>
         <DCCReference Include="IDE\DPM.IDE.InstallerContext.pas"/>
         <DCCReference Include="IDE\EditorView\DPM.IDE.EditorView.pas"/>
-        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorViewFrame.pas">
-            <Form>DPMEditViewFrame</Form>
-            <FormType>dfm</FormType>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
         <DCCReference Include="IDE\EditorView\DPM.IDE.EditorViewManager.pas"/>
-        <DCCReference Include="IDE\EditorView\DPM.IDE.PackageDetailsFrame.pas">
-            <Form>PackageDetailsFrame</Form>
-            <FormType>dfm</FormType>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
         <DCCReference Include="IDE\EditorView\DPM.IDE.PackageDetailsPanel.pas"/>
         <DCCReference Include="IDE\EditorView\DPM.IDE.SearchBarFrame.pas">
             <Form>DPMSearchBarFrame</Form>
@@ -297,17 +287,8 @@
             <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="IDE\Logging\DPM.IDE.MessageService.pas"/>
-        <DCCReference Include="Controls\DPM.Controls.ButtonBar.pas"/>
         <DCCReference Include="IDE\DPM.IDE.ToolsAPI.pas"/>
-        <DCCReference Include="IDE\EditorView\DPM.IDE.BaseEditViewFrame.pas">
-            <Form>DPMBaseEditViewFrame</Form>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
         <DCCReference Include="IDE\EditorView\DPM.IDE.Details.Interfaces.pas"/>
-        <DCCReference Include="IDE\EditorView\DPM.IDE.GroupEditorViewFrame.pas">
-            <Form>DPMGroupEditViewFrame</Form>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
         <DCCReference Include="IDE\EditorView\DPM.IDE.GroupPackageDetailsFrame.pas">
             <Form>GroupPackageDetailsFrame</Form>
             <FormType>dfm</FormType>
@@ -321,6 +302,7 @@
         </DCCReference>
         <DCCReference Include="IDE\DPM.IDE.ProjectNotifier.pas"/>
         <DCCReference Include="IDE\EditorView\DPM.IDE.ActivityIndicator.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

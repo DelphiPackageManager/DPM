@@ -42,8 +42,6 @@ type
 
   TDPMEditViewMode = (vmProject, vmGroup);
 
-  TDPMCurrentTab = (Search, Installed, Updates, Conflicts);
-
   TDPMSearchOption = (IncludePrerelease, IncludeCommercial, IncludeTrial);
 
   TDPMSearchOptions = set of TDPMSearchOption;

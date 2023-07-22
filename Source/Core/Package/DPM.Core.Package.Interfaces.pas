@@ -254,6 +254,18 @@ type
     property Platforms : string read GetPlatforms write SetPlatforms;
   end;
 
+  IPackageLatestVersionInfo = interface
+  ['{F157D248-248E-42C2-82E6-931423A5D1B0}']
+    function GetId : string;
+    function GetLatestStableVersion : TPackageVersion;
+    function GetLatestVersion : TPackageVersion;
+    procedure SetLatestStableVersion(const value : TPackageVersion);
+    procedure SetLatestVersion(const value : TPackageVersion);
+
+    property Id : string read GetId;
+    property LatestStableVersion : TPackageVersion read GetLatestStableVersion write SetLatestStableVersion;
+    property LatestVersion : TPackageVersion read GetLatestVersion write SetLatestVersion;
+  end;
 
   //note : only compares Id
 

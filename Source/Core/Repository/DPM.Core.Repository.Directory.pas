@@ -70,7 +70,7 @@ type
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo; overload;
 
-    function GetPackageLatestVersions(const cancellationToken : ICancellationToken; const ids : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const preRelease : boolean) : IDictionary<string, TPackageVersion>;
+    function GetPackageLatestVersions(const cancellationToken : ICancellationToken; const ids : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : IDictionary<string, IPackageLatestVersionInfo>;
 
     function GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResultItem;
 
@@ -107,7 +107,7 @@ uses
   DPM.Core.Utils.Path,
   DPM.Core.Utils.Directory,
   DPM.Core.Package.SearchResults,
-  DPM.Core.Package.ListItem;
+  DPM.Core.Package.ListItem, DPM.Core.Package.PackageLatestVersionInfo;
 
 { TDirectoryPackageRespository }
 
@@ -354,7 +354,7 @@ var
   searchFiles : IList<string>;
   allFiles : IList<string>;
   distinctFiles : IEnumerable<string>;
-  take : integer;
+//  take : integer;
 begin
   result := TDPMPackageSearchResult.Create(options.Skip,0);
 
@@ -379,25 +379,20 @@ begin
   end;
 
   distinctFiles := TDistinctIterator<string>.Create(allFiles, TStringComparer.OrdinalIgnoreCase);
-  if options.Skip > 0 then
-    distinctFiles := distinctFiles.Skip(options.Skip);
-  if options.Take > 0 then
-    distinctFiles := distinctFiles.Take(options.Take);
+//  if options.Skip > 0 then
+//    distinctFiles := distinctFiles.Skip(options.Skip);
+//  if options.Take > 0 then
+//    distinctFiles := distinctFiles.Take(options.Take);
   searchFiles := TCollections.CreateList<string>(distinctFiles);
 
   results := DoGetPackageFeed(cancelToken, options, searchFiles);
-
-  take := options.Take;
-  if take = 0 then
-    take := MaxInt;
-
-  result.Results.AddRange( results.Skip(options.Skip).Take(take));
+  result.Results.AddRange(results);
 
 end;
 
 
 
-function TDirectoryPackageRepository.GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion; const preRelease: boolean): IDictionary<string, TPackageVersion>;
+function TDirectoryPackageRepository.GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageLatestVersionInfo>;
 var
   i : integer;
   j : integer;
@@ -408,9 +403,11 @@ var
   packageFile : string;
   match : TMatch;
   packageVersion : TPackageVersion;
-  highestVersion : TPackageVersion;
+  latestVersion  : TPackageVersion;
+  latestStableVersion : TPackageVersion;
+  info : IPackageLatestVersionInfo;
 begin
-  result := TCollections.CreateDictionary<string, TPackageVersion>;
+  result := TCollections.CreateDictionary<string, IPackageLatestVersionInfo>;
 
   searchRegEx := GetSearchRegex(compilerVersion, [], '');
   regex := TRegEx.Create(searchRegEx, [roIgnoreCase]);
@@ -419,6 +416,8 @@ begin
   begin
     id := ids.Items[i].Id;
     searchFiles := DoExactList(id, compilerVersion, platform, '');
+    latestVersion := TPackageVersion.Empty;
+    latestStableVersion := TPackageVersion.Empty;
     for j := 0 to searchFiles.Count -1 do
     begin
       packageFile := ChangeFileExt(ExtractFileName(searchFiles[j]), '');
@@ -428,23 +427,17 @@ begin
         if not TPackageVersion.TryParse(match.Groups[4].Value, packageVersion) then
           continue;
 
-        if ids.Items[i].Version.IsStable then
-          if (not preRelease) and (not packageVersion.IsStable)  then
-            continue;
+        if packageVersion > latestVersion then
+          latestVersion := packageVersion;
 
-        if result.TryGetValue(id, highestVersion) then
-        begin
-          if packageVersion > highestVersion then
-          begin
-            highestVersion := packageVersion;
-            result[id] := highestVersion;
-          end;
-        end
-        else
-        begin
-          highestVersion := packageVersion;
-          result[id] := highestVersion;
-        end;
+        if packageVersion.IsStable and (packageVersion > latestStableVersion) then
+          latestStableVersion := packageVersion;
+      end;
+      //if latestVersion is empt then we didn't find any files!
+      if not latestVersion.IsEmpty then
+      begin
+        info := TDPMPackageLatestVersionInfo.Create(id,latestStableVersion, latestVersion);
+        result[id] := info;
       end;
     end;
   end;

@@ -160,7 +160,8 @@ uses
   DPM.Core.Options.Info in 'Core\Options\DPM.Core.Options.Info.pas',
   DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas',
   DPM.Core.Package.ListItem in 'Core\Package\DPM.Core.Package.ListItem.pas',
-  VSoft.AntPatterns in '..\..\..\VSoftTechnologies\VSoft.AntPatterns\source\VSoft.AntPatterns.pas';
+  VSoft.AntPatterns in '..\..\..\VSoftTechnologies\VSoft.AntPatterns\source\VSoft.AntPatterns.pas',
+  DPM.Core.Package.PackageLatestVersionInfo in 'Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas';
 
 begin
   CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml

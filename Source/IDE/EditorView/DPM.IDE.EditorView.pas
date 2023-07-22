@@ -34,7 +34,6 @@ uses
   VCL.Forms,
   Spring.Container,
   DPM.IDE.ProjectTreeManager,
-  DPM.IDE.BaseEditViewFrame,
   DPM.IDE.EditorViewFrame2;
 
 type
@@ -44,7 +43,7 @@ type
     procedure ProjectClosed(const projectName : string);
     procedure ProjectLoaded(const projectName : string);
     procedure ThemeChanged;
-    procedure FilterToProject(const projectGroup : IOTAProjectGroup; const project : IOTAProject);
+//    procedure FilterToProject(const projectGroup : IOTAProjectGroup; const project : IOTAProject);
   end;
 
   TDPMEditorView = class(TInterfacedObject, INTACustomEditorView, INTACustomEditorView150, IDPMEditorView)
@@ -63,7 +62,7 @@ type
     procedure ThemeChanged;
     procedure ProjectClosed(const projectName : string);
     procedure ProjectLoaded(const projectName : string);
-    procedure FilterToProject(const projectGroup : IOTAProjectGroup; const project : IOTAProject);
+//    procedure FilterToProject(const projectGroup : IOTAProjectGroup; const project : IOTAProject);
 
 
     function CloneEditorView : INTACustomEditorView;
@@ -92,9 +91,7 @@ implementation
 
 uses
   System.SysUtils,
-  DPM.Core.Utils.System,
-  DPM.IDE.EditorViewFrame,
-  DPM.IDE.GroupEditorViewFrame;
+  DPM.Core.Utils.System;
 
 { TDPMEditorView }
 
@@ -160,20 +157,20 @@ begin
 end;
 
 
-procedure TDPMEditorView.FilterToProject(const projectGroup : IOTAProjectGroup; const project : IOTAProject);
-var
-  sFileName : string;
-begin
-  FProjectGroup := projectGroup;
-  FProject := project;
-  if FFrame <> nil then
-  begin
-    if project <> nil then
-      sFileName := project.FileName;
-    FFrame.FilterToProject(sFileName);
-  end;
-
-end;
+//procedure TDPMEditorView.FilterToProject(const projectGroup : IOTAProjectGroup; const project : IOTAProject);
+//var
+//  sFileName : string;
+//begin
+//  FProjectGroup := projectGroup;
+//  FProject := project;
+//  if FFrame <> nil then
+//  begin
+//    if project <> nil then
+//      sFileName := project.FileName;
+//    FFrame.FilterToProject(sFileName);
+//  end;
+//
+//end;
 
 procedure TDPMEditorView.FrameCreated(AFrame : TCustomFrame);
 begin

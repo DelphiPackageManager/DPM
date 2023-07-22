@@ -13,7 +13,6 @@ uses
   Vcl.ComCtrls, Vcl.ExtCtrls, Vcl.Menus, SVGInterfaces,
   Vcl.Themes,
   DPM.Controls.ButtonedEdit,
-  DPM.Controls.ButtonBar,
   VSoftVirtualListView,
   ToolsApi,
   Spring.Collections,
@@ -84,7 +83,6 @@ type
     //controls
     FSearchBar : TDPMSearchBarFrame;
     FScrollList : TVSoftVirtualListView;
-    FProjectsGrid : TVersionGrid;
     //controls
 
     //contains layout rects for the list view
@@ -110,13 +108,13 @@ type
 
     //Project group should never be nil?
     FProjectGroup : IOTAProjectGroup;
+    FProject : IOTAProject;
     FSelectedProject : string;
 
 
     FIconCache : TDPMIconCache;
     FDPMIDEOptions : IDPMIDEOptions;
     FCurrentPlatform : TDPMPlatform;
-    FCurrentTab : TDPMCurrentTab;
 
     FSearchOptions : TSearchOptions;
     FSearchSkip : integer;
@@ -166,6 +164,7 @@ type
     procedure CreateControls(AOwner : TComponent);virtual;
     procedure ConfigureSearchBar;
 
+    function GetPlatforms : TDPMPlatforms;
 
     //callbacks from the searchbar
     procedure SearchBarSettingsChanged(const configuration : IConfiguration);
@@ -181,7 +180,7 @@ type
     procedure ScrollListBeforeChangeRow(const Sender : TObject; const currentRowIndex : Int64; const direction : TScrollDirection; const delta : Int64; var newRowIndex : Int64);
 
 
-    procedure DoPlatformChange(const newPlatform : TDPMPlatform);
+    procedure DoPlatformChange(const newPlatform : TDPMPlatform; const refresh : boolean);
 
     function GetRowKind(const index : Int64) : TPackageRowKind;
     procedure CalculateIndexes;
@@ -199,8 +198,6 @@ type
     procedure ProjectClosed(const projectName : string);
     procedure ProjectLoaded(const projectName : string);
     procedure ThemeChanged;
-    procedure FilterToGroup;
-    procedure FilterToProject(const projectName : string);
     function CanCloseView : boolean;
 
   end;
@@ -345,6 +342,7 @@ begin
   FContainer := container;
   FProjectTreeManager := projectTreeManager;
   FProjectGroup := projectGroup;
+  FProject := project;
   if project <> nil then
     FSelectedProject := project.FileName
   else
@@ -368,11 +366,6 @@ begin
   FConfigurationManager.EnsureDefaultConfig;
   FConfiguration := FConfigurationManager.LoadConfig(FSearchOptions.ConfigFile);
 
-//  if not IsProjectGroup then
-//    platformChangeDetectTimerTimer(platformChangeDetectTimer);
-
-  //TODO : for project group configure with platforms enabled in project.
-
   ConfigureSearchBar;
 
   PackageDetailsFrame.Init(FContainer, FIconCache, FConfiguration, Self, projectGroup);
@@ -384,32 +377,9 @@ end;
 procedure TDPMEditViewFrame2.ConfigureSearchBar;
 var
   platforms : TDPMPlatforms;
-  i : integer;
-  projectEditor : IProjectEditor;
 begin
-  //it would be nice to use the open tools api to do this, but so far
-  // - Project.SupportedPlatforms returns all platforms, whether they are enabled for the project or not
-  // - BuildConfig.Platforms is empty.
-
-  //doing it this way is not ideal, as it requires that the project has been saved after a platform was added.
-  projectEditor := TProjectEditor.Create(FLogger, FConfiguration, IDECompilerVersion);
-  platforms := [];//TDPMPlatform.Win32,TDPMPlatform.Win64, TDPMPlatform.OSX32];
-  for i := 0 to FProjectGroup.ProjectCount -1 do
-  begin
-    if FProjectGroup.Projects[i].FileName <> '' then
-    begin
-      projectEditor.LoadProject(FProjectGroup.Projects[i].FileName, [TProjectElement.Platforms]);
-      platforms := platforms + projectEditor.Platforms;
-    end
-    else
-    begin
-      //what can we do? unsaved project, will probably have a name so this shouldn't happen?
-
-    end;
-  end;
-
+  platforms := GetPlatforms;
   FSearchBar.Configure(FLogger, FDPMIDEOptions, FConfiguration, FConfigurationManager, FSearchOptions.ConfigFile, platforms);
-
 end;
 
 constructor TDPMEditViewFrame2.Create(AOwner: TComponent);
@@ -458,12 +428,11 @@ begin
   FSearchSkip := 0;
   FSearchTake := 0;
 
-  FCurrentTab := TDPMCurrentTab.Installed;
   FCancelTokenSource := TCancellationTokenSourceFactory.Create;
   FRequestsInFlight := 0;
   FCurrentPlatform := TDPMPlatform.UnknownPlatform;
 
-  PackageDetailsFrame.Configure(FCurrentTab, FSearchBar.IncludePrerelease);
+//  PackageDetailsFrame.Configure(FCurrentTab, FSearchBar.IncludePrerelease);
 
 end;
 
@@ -554,29 +523,18 @@ end;
 
 
 
-procedure TDPMEditViewFrame2.DoPlatformChange(const newPlatform: TDPMPlatform);
+procedure TDPMEditViewFrame2.DoPlatformChange(const newPlatform: TDPMPlatform; const refresh : boolean);
 var
   searchTxt : string;
   filterProc : TFilterProc;
 begin
+  //note refresh only ever applies to the installed packages, we always fetch the available packages.
+
   if FCurrentPlatform <> newPlatform then
   begin
     FCurrentPlatform := newPlatform;
     FPackageReferences := GetPackageReferences;
     FScrollList.CurrentRow := -1;
-//    FLock.Acquire;
-//    try
-////      FScrollList.RowCount := 0; //stop it from trying to paint using invalid lists.
-//      //force refresh as we always need to update the installed packages.
-//      FAllInstalledPackages := nil;
-//      FInstalledPackages := nil;
-//      FImplicitPackages := nil;
-//      FAvailablePackages := nil;
-//      CalculateIndexes;
-//    finally
-//      FLock.Release;
-//    end;
-
 
     PackageDetailsFrame.SetPlatform(FCurrentPlatform);
     PackageDetailsFrame.SetPackage(nil, FSearchOptions.Prerelease);
@@ -590,7 +548,31 @@ begin
     FImplicitActivity.Step;
     FScrollList.InvalidateRow(FImplicitHeaderRowIdx);
     ActivityTimer.Enabled := true;
+    if FRequestsInFlight > 0 then
+      FCancelTokenSource.Cancel;
 
+    while FRequestsInFlight > 0 do
+      Application.ProcessMessages;
+
+    FCancelTokenSource.Reset;
+
+
+
+    if (not refresh) and (FAllInstalledPackages <> nil) and (FAllInstalledPackages.Count > 0) then
+    begin
+      FLock.Acquire;
+      try
+        FilterInstalledPackages(searchTxt);
+        Dec(FRequestsInFlight);
+        CalculateIndexes;
+        FInstalledActivity.Stop;
+        FImplicitActivity.Stop;
+        FScrollList.Invalidate;
+      finally
+        FLock.Release;
+      end;
+    end
+    else
     GetInstalledPackagesAsync
     .OnException(
       procedure(const e : Exception)
@@ -636,6 +618,7 @@ begin
     FAvailableActivity.Step;
     FScrollList.InvalidateRow(FAvailableHeaderRowIdx);
     ActivityTimer.Enabled := true;
+//    FSearchOptions.Take := 3;
     SearchForPackagesAsync(FSearchOptions)
     .OnException(
       procedure(const e : Exception)
@@ -656,9 +639,10 @@ begin
       end)
     .Await(
       procedure(const theResult : IList<IPackageSearchResultItem>)
-//      var
-//        item : IPackageSearchResultItem;
-//        packageRef : IPackageReference;
+      var
+        item : IPackageSearchResultItem;
+        packageRef : IPackageReference;
+        toRemove : IList<IPackageSearchResultItem>;
       begin
         Dec(FRequestsInFlight);
         //if the view is closing do not do anything else.
@@ -666,6 +650,17 @@ begin
           exit;
         FLogger.Debug('DPMIDE : Got search results.');
         FAvailableActivity.Stop;
+        toRemove := TCollections.CreateList<IPackageSearchResultItem>;
+        //some of the available packages may already be installed, so we need to check for that.
+        for item in theResult do
+        begin
+          packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
+          if packageRef <> nil then
+            toRemove.Add(item);
+        end;
+        if toRemove.Any then
+          theResult.RemoveRange(toRemove);
+
         FLock.Acquire;
         try
           FAvailablePackages := theResult;
@@ -675,16 +670,7 @@ begin
           FLock.Release;
         end;
 
-//        for item in FAvailablePackages do
-//        begin
-//          packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
-//          item.Installed := (packageRef <> nil) and (not packageRef.IsTransitive);
-//          if item.Installed then
-//          begin
-//            //item.LatestVersion := item.Version;
-//            item.Version := packageRef.Version;
-//          end;
-//        end;
+
       end);
       Inc(FRequestsInFlight);
 
@@ -692,15 +678,6 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame2.FilterToGroup;
-begin
-
-end;
-
-procedure TDPMEditViewFrame2.FilterToProject(const projectName: string);
-begin
-
-end;
 
 function TDPMEditViewFrame2.GetPackageIdsFromReferences(const platform: TDPMPlatform): IList<IPackageId>;
 var
@@ -715,14 +692,17 @@ var
     if not (value.Platform = platform) then
       exit;
 
-    if lookup.TryGetValue(Lowercase(value.Id), existing) then
+    if (value.Id <> cRootNode ) then
     begin
-      //add the highest version - with project groups there could be more than 1 version
-      if existing.Version < value.Version then
+      if lookup.TryGetValue(Lowercase(value.Id), existing) then
+      begin
+        //add the highest version - with project groups there could be more than 1 version
+        if existing.Version < value.Version then
+          lookup[Lowercase(value.Id)] := value;
+      end
+      else
         lookup[Lowercase(value.Id)] := value;
-    end
-    else
-      lookup[Lowercase(value.Id)] := value;
+    end;
 
     for childRef in value.Dependencies do
       AddPackageIds(childRef);
@@ -764,6 +744,33 @@ begin
     begin
       sProjectFileName := ChangeFileExt(ExtractFileName(sProjectFileName), '');
       Result.AddExistingReference(LowerCase(sProjectFileName), packageReference);
+    end;
+  end;
+
+end;
+
+function TDPMEditViewFrame2.GetPlatforms: TDPMPlatforms;
+var
+  i : integer;
+  projectEditor : IProjectEditor;
+begin
+  result := [];
+  //it would be nice to use the open tools api to do this, but so far
+  // - Project.SupportedPlatforms returns all platforms, whether they are enabled for the project or not
+  // - BuildConfig.Platforms is empty.
+
+  //doing it this way is not ideal, as it requires that the project has been saved after a platform was added.
+  projectEditor := TProjectEditor.Create(FLogger, FConfiguration, IDECompilerVersion);
+  for i := 0 to FProjectGroup.ProjectCount -1 do
+  begin
+    if FProjectGroup.Projects[i].FileName <> '' then
+    begin
+      projectEditor.LoadProject(FProjectGroup.Projects[i].FileName, [TProjectElement.Platforms]);
+      result := result + projectEditor.Platforms;
+    end
+    else
+    begin
+      //what can we do? unsaved project, will probably have a name so this shouldn't happen?
     end;
   end;
 
@@ -821,7 +828,7 @@ begin
       projectPlatform := ProjectPlatformToDPMPlatform(project.CurrentPlatform);
       if projectPlatform = TDPMPlatform.UnknownPlatform then
         raise Exception.Create('FProject.CurrentPlatform : ' + project.CurrentPlatform);
-      DoPlatformChange(projectPlatform);
+      DoPlatformChange(projectPlatform, true);
     end;
   end;
   platformChangeDetectTimer.Enabled := true;
@@ -829,32 +836,25 @@ end;
 
 procedure TDPMEditViewFrame2.ProjectChanged;
 var
-  i : integer;
-  sProject : string;
+  platforms : TDPMPlatforms;
 begin
   FLogger.Debug('DPMIDE : EditViewReloaded');
   FCurrentPlatform := TDPMPlatform.UnknownPlatform; //force a reload
   PackageDetailsFrame.ProjectReloaded;
 
-  FProjectsGrid.BeginUpdate;
-  FProjectsGrid.Clear;
-  for i := 0 to FProjectGroup.ProjectCount -1 do
-  begin
-    sProject := ChangeFileExt(ExtractFileName(FProjectGroup.Projects[i].FileName), '');
-    FProjectsGrid.AddProject(sProject, '' );
-  end;
-  FProjectsGrid.EndUpdate;
-//  if not IsProjectGroup then
-//    platformChangeDetectTimerTimer(platformChangeDetectTimer)
-//  else
-  DoPlatformChange(FSearchBar.Platform);
+  //need to update searchbar platforms etc.
+
+  platforms := GetPlatforms;
+  FSearchBar.UpdatePlatforms(platforms);
+
+  DoPlatformChange(FSearchBar.Platform, true);
 
 end;
 
 procedure TDPMEditViewFrame2.ProjectClosed(const projectName: string);
 begin
   TSystemUtils.OutputDebugString('TDPMEditViewFrame2.ProjectClosed : ' + projectName);
-
+  ProjectChanged;
 end;
 
 procedure TDPMEditViewFrame2.ProjectLoaded(const projectName: string);
@@ -922,6 +922,7 @@ begin
             if packageRef <> nil then
               item.IsTransitive := packageRef.IsTransitive;
             item.Version := packageRef.Version;
+            item.Installed := true;
           end;
         end;
         FLogger.Debug('DPMIDE : Got Installed package metadata.');
@@ -935,18 +936,25 @@ end;
 function TDPMEditViewFrame2.SearchForPackagesAsync(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;
 var
   repoManager : IPackageRepositoryManager;
+  searchOptions : TSearchOptions;
 begin
   //local for capture
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
   repoManager.Initialize(FConfiguration);
-
+  searchOptions := options.Clone;
+  searchOptions.Take := 100;
   result := TAsync.Configure <IList<IPackageSearchResultItem>> (
     function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
     begin
       CoInitialize(nil);
       try
+        //Sleep(200);
+        if cancelToken.IsCancelled then
+          exit(nil);
+//        Sleep(200);
         //just return the list for now.. but we need to rework for skip/take
-        result := repoManager.GetPackageFeed(cancelToken, options, IDECompilerVersion, FCurrentPlatform).Results;
+        result := repoManager.GetPackageFeed(cancelToken, searchOptions, IDECompilerVersion, FCurrentPlatform).Results;
+
       finally
         CoUninitialize;
       end;
@@ -1081,18 +1089,34 @@ end;
 procedure TDPMEditViewFrame2.ScrollListChangeRow(const Sender: TObject;  const newRowIndex: Int64; const direction: TScrollDirection;  const delta: Int64);
 var
   rowKind : TPackageRowKind;
+  item : IPackageSearchResultItem;
 begin
-  //figure out which package will be current and set the details.
+  //find the selected package in the list and update the package details view on the right.
+  item := nil;
+
   rowKind := GetRowKind(newRowIndex);
   case rowKind of
-    rkInstalledHeader: ;
+    rkInstalledHeader:;
     rkImplicitHeader: ;
     rkAvailableHeader: ;
-    rkInstalledPackage: ;
-    rkImplicitPackage: ;
-    rkAvailablePackage: ;
+    rkInstalledPackage:
+    begin
+      if FInstalledPackages <> nil then
+        item := FInstalledPackages[newRowIndex -1];
+    end;
+    rkImplicitPackage:
+    begin
+      if FImplicitPackages <> nil then
+        item := FImplicitPackages[newRowIndex - FImplicitHeaderRowIdx -1];
+    end;
+    rkAvailablePackage:
+    begin
+      if FAvailablePackages <> nil then
+      item := FAvailablePackages[newRowIndex - FAvailableHeaderRowIdx  -1 ];
+    end;
     rkUnknown: ;
   end;
+  PackageDetailsFrame.SetPackage(item, FSearchOptions.Prerelease, true);
 end;
 
 procedure TDPMEditViewFrame2.ScrollListPaintNoRows(const Sender: TObject;  const ACanvas: TCanvas; const paintRect: TRect);
@@ -1222,7 +1246,12 @@ begin
       end;
       rkAvailableHeader:
       begin
-        title := 'Available Packages : ';
+        title := 'Available Packages';
+        if FSearchOptions.SearchTerms = '' then
+          title := title + ' (top 100) : '
+        else
+          title := title + ' : ';
+
         if FAvailableActivity.IsActive then
           title := title + FAvailableActivity.CurrentFrame
         else
@@ -1286,6 +1315,7 @@ begin
             exit;
 
           title := package.Id;
+
           if FSearchOptions.Prerelease then
           begin
             latestVersion :=  package.LatestVersion.ToStringNoMeta;
@@ -1349,13 +1379,13 @@ begin
   else
     FSearchOptions.Sources := '';
 
-  DoPlatformChange(platform);
+  DoPlatformChange(platform, refresh);
 
 end;
 
 procedure TDPMEditViewFrame2.SearchBarPlatformChanged(const newPlatform: TDPMPlatform);
 begin
-  DoPlatformChange(newPlatform)
+  DoPlatformChange(newPlatform, true);
 end;
 
 procedure TDPMEditViewFrame2.SearchBarProjectSelected(const projectFile: string);
@@ -1365,7 +1395,7 @@ begin
   FSelectedProject := projectFile;
   platform := FCurrentPlatform;
   FCurrentPlatform := TDPMPlatform.UnknownPlatform;
-  DoPlatformChange(platform);
+  DoPlatformChange(platform, true);
 end;
 
 procedure TDPMEditViewFrame2.SearchBarSettingsChanged(const configuration: IConfiguration);
@@ -1415,14 +1445,11 @@ procedure TDPMEditViewFrame2.ViewSelected;
 begin
   FLogger.Debug('DPMIDE : View Selected');
   //For some reason this get's called twice for each time the view is selected.
-//  if not IsProjectGroup then
-    platformChangeDetectTimer.Enabled := true;
-  //The first time the view is opened we want to switch to the installed packages tab
+  platformChangeDetectTimer.Enabled := true;
   if FFirstView then
   begin
     FFirstView := false;
-//    if IsProjectGroup then
-      DoPlatformChange(FSearchBar.Platform);
+    DoPlatformChange(FSearchBar.Platform, true);
   end;
 
 end;
