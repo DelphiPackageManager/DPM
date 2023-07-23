@@ -160,7 +160,9 @@ begin
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
-  request := httpClient.CreateRequest(path);
+  request := httpClient.CreateRequest(path)
+              .WithHeader(cUserAgentHeader,cDPMUserAgent);
+
 
   destFile := IncludeTrailingPathDelimiter(localFolder) + packageIdentity.ToString + cPackageFileExt;
 
@@ -214,6 +216,7 @@ begin
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
   request := httpClient.CreateRequest(uri.AbsolutePath)
+            .WithHeader(cUserAgentHeader,cDPMUserAgent)
             .WithAccept('application/json')
             .WithParameter('id', id)
             .WithParameter('compiler', CompilerToString(compilerVersion))
@@ -299,7 +302,8 @@ begin
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
   request := httpClient.CreateRequest(uri.AbsolutePath)
-    .WithAccept('application/json');
+                        .WithHeader(cUserAgentHeader,cDPMUserAgent)
+                        .WithAccept('application/json');
 
   if options.SearchTerms <> '' then
     request.WithParameter('q', Trim(options.SearchTerms));
@@ -396,8 +400,8 @@ begin
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
-  request := httpClient.CreateRequest(path);
-
+  request := httpClient.CreateRequest(path)
+                       .WithHeader(cUserAgentHeader,cDPMUserAgent);
   try
     response := request.Get(cancelToken);
   except
@@ -467,8 +471,8 @@ begin
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
-  request := httpClient.CreateRequest(path);
-
+  request := httpClient.CreateRequest(path)
+             .WithHeader(cUserAgentHeader,cDPMUserAgent);
   try
     response := request.Get(cancellationToken);
   except
@@ -555,7 +559,8 @@ begin
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
-  request := httpClient.CreateRequest(path);
+  request := httpClient.CreateRequest(path)
+                        .WithHeader(cUserAgentHeader,cDPMUserAgent);
 
   try
     response := request.Get(cancellationToken);
@@ -627,7 +632,8 @@ begin
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
   request := httpClient.CreateRequest(path)
-    .WithParameter(cPreReleaseParam, Lowercase(BoolToStr(preRelease, true)));
+                       .WithHeader(cUserAgentHeader,cDPMUserAgent)
+                       .WithParameter(cPreReleaseParam, Lowercase(BoolToStr(preRelease, true)));
 
   try
     response := request.Get(cancellationToken);
@@ -705,11 +711,12 @@ begin
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
-  request := httpClient.CreateRequest(path);
-  request.WithAccept('application/json')
-          //parameters can't have spaces.. winhttp will report invalid header!
-         .WithParameter('versionRange', StringReplace(versionRange.ToString, ' ', '', [rfReplaceAll]))
-         .WithParameter('prerel', Lowercase(BoolToStr(preRelease, true)));
+  request := httpClient.CreateRequest(path)
+             .WithHeader(cUserAgentHeader,cDPMUserAgent)
+             .WithAccept('application/json')
+              //parameters can't have spaces.. winhttp will report invalid header!
+             .WithParameter('versionRange', StringReplace(versionRange.ToString, ' ', '', [rfReplaceAll]))
+             .WithParameter('prerel', Lowercase(BoolToStr(preRelease, true)));
 
   try
     response := request.Get(cancellationToken);
@@ -772,8 +779,8 @@ begin
   uri := TUriFactory.Parse(self.SourceUri);
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
-  request := httpClient.CreateRequest(uri.AbsolutePath);
-//            .WithAccept('application/json');
+  request := httpClient.CreateRequest(uri.AbsolutePath)
+              .WithHeader(cUserAgentHeader,cDPMUserAgent);
   try
     response := request.Get(cancellationToken);
     if response.StatusCode <> 200 then
@@ -830,7 +837,8 @@ begin
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
   request := httpClient.CreateRequest(uri.AbsolutePath)
-            .WithAccept('application/json');
+                        .WithHeader(cUserAgentHeader,cDPMUserAgent)
+                        .WithAccept('application/json');
 
   if options.SearchTerms <> '' then
     request.WithParameter('q', options.SearchTerms);
@@ -941,7 +949,8 @@ begin
 
   //todo: Add BaseUri to Uri class
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
-  request := httpClient.CreateRequest(uri.AbsolutePath);
+  request := httpClient.CreateRequest(uri.AbsolutePath)
+                        .WithHeader(cUserAgentHeader,cDPMUserAgent);
 
   request.WithHeader('X-ApiKey', pushOptions.ApiKey);
 
