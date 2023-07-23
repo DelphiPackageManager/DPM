@@ -77,7 +77,8 @@ const
 
   cGroupNode = 'group-node';
   cRootNode = 'root-node';
-
+  cUserAgentHeader = 'User-Agent';
+  cDPMUserAgent = 'DPM ' + cDPMClientVersion;
 
 implementation
 
