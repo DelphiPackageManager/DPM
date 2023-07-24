@@ -90,7 +90,7 @@ type
     FLogger : IDPMIDELogger;
     FClosing : boolean;
     FIncludePreRelease : boolean;
-    FPackageInstalledVersion : string;
+    FPackageInstalledVersion : TPackageVersion;
     FProjectGroup : IOTAProjectGroup;
     FCurrentPlatform : TDPMPlatform;
     FDropdownOpen : boolean;
@@ -99,9 +99,14 @@ type
   protected
     procedure ProjectSelectionChanged(Sender : TObject);
     procedure UpdateButtonState;
+    procedure SetPackageLogo(const id : string);
+
+    function GetReferenceVersion : TPackageVersion;
 
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
+
+    procedure DoGetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string);
 
     function GetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string): IAwaitable<IPackageSearchResultItem>;
   public
@@ -139,17 +144,9 @@ begin
 //
 end;
 
-procedure TGroupPackageDetailsFrame.cboVersionsChange(Sender: TObject);
-var
-  sVersion : string;
+procedure TGroupPackageDetailsFrame.DoGetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string);
 begin
-  sVersion := cboVersions.Items[cboVersions.ItemIndex];
-  if TStringUtils.StartsWith(sVersion, cLatestPrerelease, true) then
-    Delete(sVersion, 1, Length(cLatestPrerelease))
-  else if TStringUtils.StartsWith(sVersion, cLatestStable, true) then
-    Delete(sVersion, 1, Length(cLatestStable));
-
-  GetPackageMetaDataAsync(FPackageMetaData.Id, FPackageMetaData.CompilerVersion, FPackageMetaData.Platform, sVersion)
+  GetPackageMetaDataAsync(id, compilerVersion, platform, version)
   .OnException(
     procedure(const e : Exception)
     begin
@@ -174,10 +171,20 @@ begin
       //if the view is closing do not do anything else.
       if FClosing then
         exit;
+      FDetailsPanel.SetDetails(theResult);
       //        FLogger.Debug('Got search results.');
-      SetPackage(theResult, FIncludePreRelease, false);
+      //SetPackage(theResult, FIncludePreRelease, false);
     end);
 
+end;
+
+
+procedure TGroupPackageDetailsFrame.cboVersionsChange(Sender: TObject);
+var
+  sVersion : string;
+begin
+  sVersion := cboVersions.Items[cboVersions.ItemIndex];
+  DoGetPackageMetaDataAsync(FPackageMetaData.Id, FPackageMetaData.CompilerVersion, FPackageMetaData.Platform, sVersion);
 end;
 
 procedure TGroupPackageDetailsFrame.cboVersionsCloseUp(Sender: TObject);
@@ -186,6 +193,8 @@ begin
 end;
 
 procedure TGroupPackageDetailsFrame.cboVersionsDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
+var
+  sInstalledVersion : string;
 begin
   cboVersions.Canvas.FillRect(Rect);
 
@@ -194,6 +203,7 @@ begin
 
   cboVersions.Canvas.Font.Style := [];
 
+  sInstalledVersion := FPackageInstalledVersion.ToStringNoMeta;
 
   if odComboBoxEdit in State then
     cboVersions.Canvas.TextOut(Rect.Left + 1, Rect.Top + 1, cboVersions.Items[Index]) //Visual state of the text in the edit control
@@ -201,7 +211,7 @@ begin
   begin
     if FDropdownOpen and (Index > 0) then
     begin
-      if SameText(FPackageInstalledVersion, cboVersions.Items[index]) then
+      if SameText(sInstalledVersion, cboVersions.Items[index]) then
         cboVersions.Canvas.Font.Style := [TFontStyle.fsBold];
     end;
     cboVersions.Canvas.TextOut(Rect.Left + 2, Rect.Top, cboVersions.Items[Index]); //Visual state of the text(items) in the deployed list
@@ -363,68 +373,54 @@ begin
 end;
 
 
+function TGroupPackageDetailsFrame.GetReferenceVersion: TPackageVersion;
+var
+  latestVersion : TPackageVersion;
+begin
+  if FIncludePreRelease then
+    latestVersion := FPackageMetaData.LatestVersion
+  else
+    latestVersion := FPackageMetaData.LatestStableVersion;
+
+  if latestVersion > FPackageMetaData.Version then
+    result := latestVersion
+  else
+    result := FPackageMetaData.Version;
+
+
+end;
+
 procedure TGroupPackageDetailsFrame.SetPackage(const package: IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
 var
-  logo : IPackageIconImage;
-  graphic : TGraphic;
   packageRefs : IPackageReference;
   projectRefs : IPackageReference;
   projectRef : IPackageReference;
   i: Integer;
+  referenceVersion : TPackageVersion;
 begin
   FIncludePreRelease := preRelease;
   FVersionsDelayTimer.Enabled := false;
   if FRequestInFlight then
     FCancellationTokenSource.Cancel;
+
   FPackageMetaData := package;
 
   if package <> nil then
   begin
-//    if (package.Id <> FPackageId) then
-//    begin
-//      FPackageId := package.Id;
-//      if package.Installed then
-//        FPackageInstalledVersion := package.Version.ToStringNoMeta
-//      else
-//        FPackageInstalledVersion := '';
-//    end
-//    else
-//    begin
-//      //same id, so we might just be displaying a new version.
-//      //since we're just getting the item from the feed rather than the project
-//      //it won't have installed or installed version set.
-//      if package.Installed then
-//        FPackageInstalledVersion := package.Version.ToStringNoMeta
-//      else if package.Version.ToStringNoMeta = FPackageInstalledVersion then
-//          package.Installed := true;
-//    end;
-
+    FPackageInstalledVersion := package.Version;
     lblPackageId.Caption := package.Id;
-    logo := FIconCache.Request(package.Id);
-    if logo = nil then
-      logo := FIconCache.Request('missing_icon');
-    if logo <> nil then
-    begin
-      graphic := logo.ToGraphic;
-      try
-        imgPackageLogo.Picture.Assign(graphic);
-        imgPackageLogo.Visible := true;
-      finally
-        graphic.Free;
-      end;
-    end
-    else
-      imgPackageLogo.Visible := false;
-
-    UpdateButtonState;
+    SetPackageLogo(package.Id);
+//    UpdateButtonState;
     //btnInstallOrUpdate.Enabled := ((not FPackageMetaData.Installed) or (FPackageMetaData.LatestVersion <> FPackageMetaData.Version)) and FProjectsGrid.HasCheckedProjects;
 
     sbPackageDetails.Visible := true;
 
     packageRefs := FHost.GetPackageReferences;
 
+    referenceVersion := GetReferenceVersion;
+
     FProjectsGrid.BeginUpdate;
-    FProjectsGrid.PackageVersion := package.Version;
+    FProjectsGrid.PackageVersion := referenceVersion;
     try
       for i := 0 to FProjectsGrid.RowCount -1 do
       begin
@@ -444,19 +440,42 @@ begin
     finally
       FProjectsGrid.EndUpdate;
     end;
+
     if fetchVersions then
       FVersionsDelayTimer.Enabled := true;
+    if referenceVersion <> FPackageMetaData.Version then
+      DoGetPackageMetaDataAsync(FPackageMetaData.Id, FPackageMetaData.CompilerVersion, FPackageMetaData.Platform, referenceVersion.ToStringNoMeta)
+    else
+      FDetailsPanel.SetDetails(FPackageMetaData);
   end
   else
   begin
+    FPackageInstalledVersion := TPackageVersion.Empty;
     sbPackageDetails.Visible := false;
     cboVersions.Clear;
-    //    pnlPackageId.Visible := false;
-    //    pnlInstalled.Visible := false;
-    //    pnlVErsion.Visible := false;
   end;
+end;
 
-  FDetailsPanel.SetDetails(package);
+procedure TGroupPackageDetailsFrame.SetPackageLogo(const id: string);
+var
+  logo : IPackageIconImage;
+  graphic : TGraphic;
+begin
+    logo := FIconCache.Request(id);
+    if logo = nil then
+      logo := FIconCache.Request('missing_icon');
+    if logo <> nil then
+    begin
+      graphic := logo.ToGraphic;
+      try
+        imgPackageLogo.Picture.Assign(graphic);
+        imgPackageLogo.Visible := true;
+      finally
+        graphic.Free;
+      end;
+    end
+    else
+      imgPackageLogo.Visible := false;
 end;
 
 procedure TGroupPackageDetailsFrame.SetPlatform(const platform: TDPMPlatform);
@@ -515,7 +534,7 @@ procedure TGroupPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);
 var
   versions : IList<TPackageVersion>;
   repoManager : IPackageRepositoryManager;
-  sInstalledVersion : string;
+  sReferenceVersion : string;
 begin
   FVersionsDelayTimer.Enabled := false;
   if FRequestInFlight then
@@ -528,7 +547,7 @@ begin
   repoManager := FContainer.Resolve<IPackageRepositoryManager>;
   repoManager.Initialize(FConfiguration);
 
-  sInstalledVersion := FPackageInstalledVersion;
+  sReferenceVersion := GetReferenceVersion.ToStringNoMeta;
 
   TAsync.Configure<IList<TPackageVersion>> (
     function(const cancelToken : ICancellationToken) : IList<TPackageVersion>
@@ -577,17 +596,17 @@ begin
         begin
           for version in versions do
             cboVersions.Items.Add(version.ToStringNoMeta);
-          cboVersions.ItemIndex := cboVersions.Items.IndexOf(sInstalledVersion)
+          cboVersions.ItemIndex := cboVersions.Items.IndexOf(sReferenceVersion);
         end
         else
         begin
           //no versions returned
           //this can happen if there is only 1 version and its prerelease and
           //prerlease not checked.
-          //in this case we will just add the installed version
-          if sInstalledVersion <> '' then
+          //in this case we will just add the reference version
+          if sReferenceVersion <> '' then
           begin
-            cboVersions.Items.Add(sInstalledVersion);
+            cboVersions.Items.Add(sReferenceVersion);
             cboVersions.ItemIndex := 0;
           end;
           //btnInstall.Enabled := false;

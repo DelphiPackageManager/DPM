@@ -40,9 +40,6 @@ const
   dDPMPackageContainer = 'DPMPackageContainer';
   cDPMPlatformContainer = 'DPMPlatformContainer';
 
-  cLatestStable = 'Latest stable ';
-  cLatestPrerelease = 'Latest prerelease ';
-
 
 implementation
 
