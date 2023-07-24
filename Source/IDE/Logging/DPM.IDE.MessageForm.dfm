@@ -13,11 +13,13 @@ object DPMMessageForm: TDPMMessageForm
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
+  OldCreateOrder = True
   Position = poMainFormCenter
   OnHide = FormHide
   DesignSize = (
     879
     425)
+  PixelsPerInch = 96
   TextHeight = 13
   object lblClosing: TLabel
     Left = 144

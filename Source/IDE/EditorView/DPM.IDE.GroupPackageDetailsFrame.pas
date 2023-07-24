@@ -28,6 +28,9 @@ unit DPM.IDE.GroupPackageDetailsFrame;
 
 interface
 
+{$I ..\DPMIDE.inc}
+
+
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
@@ -47,9 +50,14 @@ uses
   DPM.IDE.PackageDetailsPanel,
   DPM.IDE.IconCache,
   DPM.IDE.Types,
+  Vcl.ImgList,
+  {$IF CompilerVersion >= 33.0 }
+  Vcl.VirtualImageList,
+  Vcl.ImageCollection,
+  {$IFEND}
+
   DPM.Controls.VersionGrid, Vcl.Buttons;
 
-{$I ..\DPMIDE.inc}
 
 
 type
@@ -63,40 +71,58 @@ type
     cboVersions: TComboBox;
     pnlGridHost: TPanel;
     DetailsSplitter: TSplitter;
-    SpeedButton1: TSpeedButton;
-    SpeedButton2: TSpeedButton;
-    ComboBox1: TComboBox;
-    Label1: TLabel;
+    btnInstallAll: TSpeedButton;
+    btnUpgradeAll: TSpeedButton;
+    btnUninstallAll: TSpeedButton;
     procedure cboVersionsMeasureItem(Control: TWinControl; Index: Integer; var Height: Integer);
     procedure cboVersionsDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
     procedure cboVersionsChange(Sender: TObject);
-    procedure btnUninstallClick(Sender: TObject);
-    procedure btnInstallClick(Sender: TObject);
     procedure cboVersionsCloseUp(Sender: TObject);
     procedure cboVersionsDropDown(Sender: TObject);
+    procedure btnInstallAllClick(Sender: TObject);
+    procedure btnUpgradeAllClick(Sender: TObject);
+    procedure btnUninstallAllClick(Sender: TObject);
   private
+    //controls
+    FProjectsGrid : TVersionGrid;
+    FDetailsPanel : TPackageDetailsPanel;
+    //controls
+
+    {$IF CompilerVersion > 33.0 }
+    FImageList : TVirtualImageList;
+    FImageCollection : TImageCollection;
+    {$ELSE}
+    FImageList : TImageList;
+    FUpgradeBmp : TBitmap;
+    FDowngradeBmp : TBitmap;
+    {$IFEND}
+
+
+    FConfiguration : IConfiguration;
     FContainer : TContainer;
     FIconCache : TDPMIconCache;
     FHost : IDetailsHost;
+    FLogger : IDPMIDELogger;
+    FProjectGroup : IOTAProjectGroup;
+    FIDEStyleServices : TCustomStyleServices;
 
     FPackageMetaData : IPackageSearchResultItem;
-    FProjectsGrid : TVersionGrid;
-    FDetailsPanel : TPackageDetailsPanel;
+    FInstalledVersion : TPackageVersion;
+    FSelectedVersion : TPackageVersion;
 
     FCancellationTokenSource : ICancellationTokenSource;
     FRequestInFlight : boolean;
     FVersionsDelayTimer : TTimer;
-    FConfiguration : IConfiguration;
-    FLogger : IDPMIDELogger;
+
     FClosing : boolean;
     FIncludePreRelease : boolean;
-    FPackageInstalledVersion : TPackageVersion;
-    FProjectGroup : IOTAProjectGroup;
     FCurrentPlatform : TDPMPlatform;
     FDropdownOpen : boolean;
 
-    FIDEStyleServices : TCustomStyleServices;
   protected
+    procedure LoadImages;
+    procedure AssignImages;
+
     procedure ProjectSelectionChanged(Sender : TObject);
     procedure UpdateButtonState;
     procedure SetPackageLogo(const id : string);
@@ -109,8 +135,10 @@ type
     procedure DoGetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string);
 
     function GetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string): IAwaitable<IPackageSearchResultItem>;
+    procedure ChangeScale(M: Integer; D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND}); override;
   public
     constructor Create(AOwner : TComponent); override;
+    destructor Destroy;override;
     procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProjectGroup);
     procedure SetPackage(const package : IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
     procedure SetPlatform(const platform : TDPMPlatform);
@@ -127,6 +155,7 @@ implementation
 uses
   WinApi.ShellApi,
   WinApi.ActiveX,
+  WinApi.CommCtrl,
   DPM.IDE.Constants,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Utils.Strings,
@@ -134,14 +163,29 @@ uses
 
 { TGroupPackageDetailsFrame }
 
-procedure TGroupPackageDetailsFrame.btnInstallClick(Sender: TObject);
+procedure TGroupPackageDetailsFrame.btnInstallAllClick(Sender: TObject);
 begin
-//
+  ShowMessage('Install');
 end;
 
-procedure TGroupPackageDetailsFrame.btnUninstallClick(Sender: TObject);
+procedure TGroupPackageDetailsFrame.btnUninstallAllClick(Sender: TObject);
 begin
-//
+  ShowMessage('Remove');
+end;
+
+procedure TGroupPackageDetailsFrame.btnUpgradeAllClick(Sender: TObject);
+begin
+  ShowMessage('Upgrade');
+end;
+
+destructor TGroupPackageDetailsFrame.Destroy;
+begin
+  {$IF CompilerVersion < 34.0}    
+  FUpgradeBmp.Free;
+  FDowngradeBmp.Free;
+  {$IFEND}
+
+  inherited;
 end;
 
 procedure TGroupPackageDetailsFrame.DoGetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string);
@@ -172,8 +216,8 @@ begin
       if FClosing then
         exit;
       FDetailsPanel.SetDetails(theResult);
-      //        FLogger.Debug('Got search results.');
-      //SetPackage(theResult, FIncludePreRelease, false);
+      FSelectedVersion := theResult.Version;
+      UpdateButtonState;
     end);
 
 end;
@@ -203,7 +247,7 @@ begin
 
   cboVersions.Canvas.Font.Style := [];
 
-  sInstalledVersion := FPackageInstalledVersion.ToStringNoMeta;
+  sInstalledVersion := FInstalledVersion.ToStringNoMeta;
 
   if odComboBoxEdit in State then
     cboVersions.Canvas.TextOut(Rect.Left + 1, Rect.Top + 1, cboVersions.Items[Index]) //Visual state of the text in the edit control
@@ -241,6 +285,13 @@ begin
     exit;
   if cboVersions.Items.Objects[index] <> nil then
     Inc(Height, 4);
+end;
+
+procedure TGroupPackageDetailsFrame.ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND});
+begin
+  inherited;
+
+
 end;
 
 constructor TGroupPackageDetailsFrame.Create(AOwner: TComponent);
@@ -285,7 +336,32 @@ begin
   FVersionsDelayTimer.OnTimer := VersionsDelayTimerEvent;
   FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
 
+
+  {$IF CompilerVersion > 33.0 } //10.3 or later
+  FImageList := TVirtualImageList.Create(Self);
+  FImageCollection := TImageCollection.Create(Self);
+  {$ELSE}
+  FUpgradeBmp := TBitmap.Create;
+  FDowngradeBmp := TBitmap.Create;
+  FImageList := TImageList.Create(Self);
+  {$IFEND}
+  FImageList.Width := 16;
+  FImageList.Height := 16;
+
+  
+  LoadImages;
+  AssignImages;
+  FProjectsGrid.ImageList := FImageList;
+
+  btnInstallAll.Caption := '';
+  btnUpgradeAll.Caption := '';
+  btnUninstallAll.Caption := '';
+
+  SetPackage(nil,false);
+
 //  ThemeChanged;
+
+
 
 
 end;
@@ -314,6 +390,127 @@ begin
     FProjectsGrid.AddProject(sProject, '' );
   end;
   FProjectsGrid.EndUpdate;
+end;
+
+procedure TGroupPackageDetailsFrame.AssignImages;
+{$IF CompilerVersion < 34.0}
+var
+  bmp : TBitmap;
+{$IFEND}
+begin
+  {$IF CompilerVersion < 34.0}
+
+  bmp := TBitmap.Create;
+  try
+    bmp.SetSize(16,16);
+    FImageList.GetBitmap(0, bmp); //Add
+    btnInstallAll.Glyph.Assign(bmp);
+    bmp.SetSize(0,0);
+    bmp.SetSize(16,16);
+    FImageList.GetBitmap(1, bmp); //remove
+    btnUninstallAll.Glyph.Assign(bmp);
+    FUpgradeBmp.SetSize(16,16);
+    FImageList.GetBitmap(2, FUpgradeBmp); //upgrade
+    btnUpgradeAll.Glyph.Assign(FUpgradeBmp);
+    FDowngradeBmp.SetSize(16,16);
+    FImageList.GetBitmap(3, FDowngradeBmp); //upgrade
+  finally
+    bmp.Free;
+  end;
+  {$ELSE}
+    btnInstallAll.Images := FImageList;
+    btnInstallAll.ImageIndex := 0;
+
+    btnUpgradeAll.Images := FImageList;
+    btnUpgradeAll.ImageIndex := 2;
+
+    btnUninstallAll.Images := FImageList;
+    btnUninstallAll.ImageIndex := 1;
+
+  {$IFEND}
+
+end;
+
+procedure TGroupPackageDetailsFrame.LoadImages;
+const
+  suffixes : array[0..3] of string = ('_16', '_24', '_32','_48');
+
+{$IF CompilerVersion = 33.0 } //10.3
+//  procedure AddImageItem(AName: String; AInstance: THandle; const AResourceName: String; ASuffixes: array of string);
+//  var
+//    item : TImageCollectionItem;
+//    sourceItem : TImageCollectionSourceItem;
+//    suffix : string;
+//    bmp: TBitmap;
+//    png : TPngImage;
+//    resStream : TResourceStream;
+//  begin
+//    item := FImageCollection.Images.Add;
+//    item.Name := AName;
+//
+//    for suffix in ASuffixes do
+//    begin
+//      resStream := TResourceStream.Create(AInstance, AResourceName + suffix, RT_RCDATA);
+//      try
+//        sourceItem :=item.SourceImages.Add;
+//        sourceItem.Image.Transparent := true;
+//        sourceItem.Image.LoadFromStream(resStream);
+//      finally
+//        resStream.Free;
+//      end;
+//    end;
+//    item.CheckSources;
+//  end;
+{$IFEND}
+
+{$IF CompilerVersion < 34.0} //10.2 or earlier
+
+  procedure AddImage(const AResourceName : string);
+  var
+    png : TPngImage;
+    bmp: TBitmap;
+  begin
+    png := TPngImage.Create;
+    bmp:=TBitmap.Create;
+    try
+      png.LoadFromResourceName(HInstance, AResourceName);
+      png.AssignTo(bmp);
+      bmp.AlphaFormat:=afIgnored;
+      ImageList_Add(FImageList.Handle, bmp.Handle, 0);
+    finally
+      bmp.Free;
+      png.Free;
+    end;
+  end;
+
+{$IFEND}
+
+
+begin
+  {$IF CompilerVersion < 34.0} //10.2 or earlier
+    AddImage('ADD_PACKAGE_16');
+    AddImage('REMOVE_PACKAGE_16');
+    AddImage('UPGRADE_PACKAGE_16');
+    AddImage('DOWNGRADE_PACKAGE_16');
+
+//  {$ELSEIF CompilerVersion = 33.0 } //10.3
+//    //10.3 TImageCollection was pretty basic and hard to use.
+//    AddImageItem('add',HInstance,'ADD_PACKAGE', suffixes);
+//    AddImageItem('remove',HInstance,'REMOVE_PACKAGE', suffixes);
+//    AddImageItem('upgrade',HInstance,'UPGRADE_PACKAGE', suffixes);
+//    AddImageItem('downgrade',HInstance,'DOWNGRADE_PACKAGE', suffixes);
+//    FImageList.AutoFill := true;
+//    FImageList.ImageCollection := FImageCollection;
+//
+//  {$ELSEIF CompilerVersion > 33.0}
+  {$ELSE}
+    FImageCollection.Add('add',HInstance,'ADD_PACKAGE', suffixes);
+    FImageCollection.Add('remove',HInstance,'REMOVE_PACKAGE', suffixes);
+    FImageCollection.Add('upgrade',HInstance,'UPGRADE_PACKAGE', suffixes);
+    FImageCollection.Add('downgrade',HInstance,'DOWNGRADE_PACKAGE', suffixes);
+    FImageList.AutoFill := true;
+    FImageList.ImageCollection := FImageCollection;
+  {$IFEND}
 end;
 
 procedure TGroupPackageDetailsFrame.OnDetailsUriClick(Sender: TObject; const uri: string; const element: TDetailElement);
@@ -377,6 +574,9 @@ function TGroupPackageDetailsFrame.GetReferenceVersion: TPackageVersion;
 var
   latestVersion : TPackageVersion;
 begin
+  if FPackageMetaData = nil then
+    exit(TPackageVersion.Empty);
+
   if FIncludePreRelease then
     latestVersion := FPackageMetaData.LatestVersion
   else
@@ -396,18 +596,22 @@ var
   projectRefs : IPackageReference;
   projectRef : IPackageReference;
   i: Integer;
-  referenceVersion : TPackageVersion;
 begin
   FIncludePreRelease := preRelease;
   FVersionsDelayTimer.Enabled := false;
   if FRequestInFlight then
     FCancellationTokenSource.Cancel;
+  //todo - should we wait here?
 
   FPackageMetaData := package;
 
   if package <> nil then
   begin
-    FPackageInstalledVersion := package.Version;
+    if package.Installed then
+      FInstalledVersion := package.Version
+    else
+      FInstalledVersion := TPackageVersion.Empty;
+
     lblPackageId.Caption := package.Id;
     SetPackageLogo(package.Id);
 //    UpdateButtonState;
@@ -417,10 +621,10 @@ begin
 
     packageRefs := FHost.GetPackageReferences;
 
-    referenceVersion := GetReferenceVersion;
+    FSelectedVersion := GetReferenceVersion;
 
     FProjectsGrid.BeginUpdate;
-    FProjectsGrid.PackageVersion := referenceVersion;
+    FProjectsGrid.PackageVersion := FSelectedVersion;
     try
       for i := 0 to FProjectsGrid.RowCount -1 do
       begin
@@ -443,17 +647,18 @@ begin
 
     if fetchVersions then
       FVersionsDelayTimer.Enabled := true;
-    if referenceVersion <> FPackageMetaData.Version then
-      DoGetPackageMetaDataAsync(FPackageMetaData.Id, FPackageMetaData.CompilerVersion, FPackageMetaData.Platform, referenceVersion.ToStringNoMeta)
+    if FSelectedVersion <> FPackageMetaData.Version then
+      DoGetPackageMetaDataAsync(FPackageMetaData.Id, FPackageMetaData.CompilerVersion, FPackageMetaData.Platform, FSelectedVersion.ToStringNoMeta)
     else
       FDetailsPanel.SetDetails(FPackageMetaData);
   end
   else
   begin
-    FPackageInstalledVersion := TPackageVersion.Empty;
+    FInstalledVersion := TPackageVersion.Empty;
     sbPackageDetails.Visible := false;
     cboVersions.Clear;
   end;
+  UpdateButtonState;
 end;
 
 procedure TGroupPackageDetailsFrame.SetPackageLogo(const id: string);
@@ -526,8 +731,46 @@ begin
 end;
 
 procedure TGroupPackageDetailsFrame.UpdateButtonState;
+var
+  referenceVersion : TPackageVersion;
 begin
-  //btnInstall.Enabled := (FPackageMetaData <> nil) and ((not FPackageMetaData.Installed) or (FPackageMetaData.LatestVersion <> FPackageMetaData.Version)) and FProjectsGrid.HasCheckedProjects ;
+  referenceVersion := GetReferenceVersion;
+  btnInstallAll.Enabled := FPackageMetaData <> nil;
+  btnUpgradeAll.Enabled := (FInstalledVersion <> TPackageVersion.Empty) and  (FSelectedVersion <> FInstalledVersion);
+  btnUninstallAll.Enabled := FInstalledVersion <> TPackageVersion.Empty;
+
+  {$IF CompilerVersion < 34.0}
+    if FSelectedVersion = FInstalledVersion then
+    begin
+      btnUpgradeAll.Glyph.FreeImage;
+    end
+    else  if FSelectedVersion > FInstalledVersion then
+    begin
+      btnUpgradeAll.Glyph.Assign(FUpgradeBmp);
+      btnUpgradeAll.Hint := 'Upgrade package in all projects';
+    end
+    else
+    begin
+      btnUpgradeAll.Glyph.Assign(FDowngradeBmp);
+      btnUpgradeAll.Hint := 'Downgrade package in all projects';
+    end;
+  {$ELSE}
+    if FSelectedVersion = FInstalledVersion then
+    begin
+      btnUpgradeAll.ImageIndex := -1;
+    end
+    else if FSelectedVersion > FInstalledVersion then
+    begin
+      btnUpgradeAll.ImageIndex := 2;
+      btnUpgradeAll.Hint := 'Upgrade package in all projects';
+    end
+    else
+    begin
+      btnUpgradeAll.ImageIndex := 3;
+      btnUpgradeAll.Hint := 'Downgrade package in all projects';
+    end;
+  {$IFEND}
+
 end;
 
 procedure TGroupPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);

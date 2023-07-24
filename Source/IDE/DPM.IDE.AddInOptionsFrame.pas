@@ -29,21 +29,21 @@ unit DPM.IDE.AddInOptionsFrame;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages,
-  System.Variants, System.Classes,
-  {$IF CompilerVersion >= 24.0 } //XE3 up
+  Winapi.Windows,
+  Winapi.Messages,
+  System.Variants,
+  System.Classes,
+  {$IF CompilerVersion > 28.0 } //XE3 up
   {$LEGACYIFEND ON}
   //NOTE: The IDE keeps adding this again below, if it happens edit the file outside the IDE.
 //  System.Actions,
+  System.ImageList,
   {$IFEND}
-  {$IF CompilerVersion < 29.0 } //XE2 dowm
-  ImageList,
-  {$IFEND}
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ActnList, Vcl.ImgList, Vcl.CheckLst,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.CheckLst,
   Vcl.Buttons, Vcl.ComCtrls, Vcl.ExtCtrls, Vcl.StdCtrls,
   DPM.Core.Logging,
   DPM.Core.Configuration.Interfaces,
-  DPM.IDE.Options, Vcl.Samples.Spin, System.ImageList, System.Actions;
+  DPM.IDE.Options, Vcl.Samples.Spin, Vcl.ImgList, Vcl.ActnList, System.Actions;
 
 {$WARN SYMBOL_PLATFORM OFF}
 type

@@ -20,3 +20,25 @@ DPMLOGO_24 RCDATA "..\\images\\dpm_24.png"
 DPMLOGO_32 RCDATA "..\\images\\dpm_32.png"
 DPMLOGO_48 RCDATA "..\\images\\dpm_48.png"
 
+
+ADD_PACKAGE_16 RCDATA "..\\images\\add_16px.png"
+ADD_PACKAGE_24 RCDATA "..\\images\\add_24px.png"
+ADD_PACKAGE_32 RCDATA "..\\images\\add_32px.png"
+ADD_PACKAGE_48 RCDATA "..\\images\\add_48px.png"
+
+REMOVE_PACKAGE_16 RCDATA "..\\images\\remove_16px.png"
+REMOVE_PACKAGE_24 RCDATA "..\\images\\remove_24px.png"
+REMOVE_PACKAGE_32 RCDATA "..\\images\\remove_32px.png"
+REMOVE_PACKAGE_48 RCDATA "..\\images\\remove_48px.png"
+
+UPGRADE_PACKAGE_16 RCDATA "..\\images\\upgrade_16px.png"
+UPGRADE_PACKAGE_24 RCDATA "..\\images\\upgrade_24px.png"
+UPGRADE_PACKAGE_32 RCDATA "..\\images\\upgrade_32px.png"
+UPGRADE_PACKAGE_48 RCDATA "..\\images\\upgrade_48px.png"
+
+DOWNGRADE_PACKAGE_16 RCDATA "..\\images\\downgrade_16px.png"
+DOWNGRADE_PACKAGE_24 RCDATA "..\\images\\downgrade_24px.png"
+DOWNGRADE_PACKAGE_32 RCDATA "..\\images\\downgrade_32px.png"
+DOWNGRADE_PACKAGE_48 RCDATA "..\\images\\downgrade_48px.png"
+
+

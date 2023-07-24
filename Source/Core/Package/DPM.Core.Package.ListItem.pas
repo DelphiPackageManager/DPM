@@ -103,7 +103,10 @@ var
   sList : TStringList;
 begin
   Assert(IsSamePackageVersion(item));
-  sList := TStringList.Create(TDuplicates.dupIgnore,true, false);
+  sList := TStringList.Create;
+  sList.Duplicates := TDuplicates.dupIgnore;
+  sList.Sorted := true;
+  sList.CaseSensitive := false;
   try
     sList.Delimiter := ',';
     sList.DelimitedText := FPlatforms + ',' + item.Platforms;

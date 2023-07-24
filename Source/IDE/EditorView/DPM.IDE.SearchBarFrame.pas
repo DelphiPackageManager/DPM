@@ -12,7 +12,11 @@ uses
   DPM.IDE.Types,
   DPM.IDE.Logger,
   DPM.IDE.Options,
-  DPM.Controls.ButtonedEdit, System.ImageList;
+  DPM.Controls.ButtonedEdit
+  {$IF CompilerVersion >= 33.0 }
+   ,System.ImageList
+  {$IFEND}
+   ;
 
 type
   TConfigChangedEvent = procedure(const configuration : IConfiguration) of object;

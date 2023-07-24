@@ -14,8 +14,7 @@ uses
   VSoft.Awaitable,
   DPM.IDE.Options,
   DPM.Controls.LogMemo,
-  ToolsAPI,
-  System.Actions;
+  ToolsAPI;
 
 {$I ..\DPMIDE.inc}
 

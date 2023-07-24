@@ -40,6 +40,7 @@ uses
   Vcl.Graphics,
   Vcl.Styles,
   Vcl.Themes,
+  Vcl.ImgList,
   DPM.Core.Types;
 
 //A control to show the list of projects and the package version installed when working with project groups.
@@ -100,6 +101,9 @@ type
     FPackageVersion: TPackageVersion;
 
     FSelectionChangedEvent : TNotifyEvent;
+
+    FImageList : TCustomImageList;
+    procedure SetImageList(const Value: TCustomImageList);
 
   protected
     function GetHasCheckedProjects : boolean;
@@ -195,6 +199,7 @@ type
     property TopRow : Integer read FTopRow;
 
     property HasCheckedProjects : boolean read GetHasCheckedProjects;
+    property ImageList : TCustomImageList read FImageList write SetImageList;
     property ProjectChecked[index : integer] : boolean read GetProjectChecked write SetProjectChecked;
     property ProjectName[index : integer] : string read GetProjectName;
     property ProjectVersion[index : integer] : TPackageVersion read GetProjectVersion write SetProjectVersion;
@@ -1468,6 +1473,11 @@ begin
     FBorderStyle := Value;
     RecreateWnd;
   end;
+end;
+
+procedure TVersionGrid.SetImageList(const Value: TCustomImageList);
+begin
+  FImageList := Value;
 end;
 
 procedure TVersionGrid.SetPackageVersion(const Value: TPackageVersion);

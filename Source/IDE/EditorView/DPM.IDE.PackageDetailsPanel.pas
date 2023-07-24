@@ -124,7 +124,7 @@ begin
   inherited;
   //for some reason this is not happening in D11.x
   Canvas.Font.Height := MulDiv(Canvas.Font.Height, M, D );
-  FLayout.ChangeScale(M, D,{$IF CompilerVersion > 33}isDpiChange{$IFEND} );
+  FLayout.ChangeScale(M, D{$IF CompilerVersion > 33}, isDpiChange{$IFEND} );
   UpdateLayout;
 end;
 

@@ -141,9 +141,6 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
         ParentColor = True
         ShowCaption = False
         TabOrder = 0
-        DesignSize = (
-          614
-          33)
         object lblVersionTitle: TLabel
           Left = 19
           Top = 10
@@ -152,42 +149,52 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
           Alignment = taRightJustify
           Caption = 'Version :'
         end
-        object SpeedButton1: TSpeedButton
+        object btnInstallAll: TSpeedButton
           AlignWithMargins = True
-          Left = 581
+          Left = 509
           Top = 3
           Width = 28
           Height = 27
+          Hint = 'Install in all projects'
           Margins.Right = 5
           Align = alRight
-          Caption = 'I'
-          ExplicitLeft = 408
-          ExplicitHeight = 28
+          Anchors = [akTop, akRight]
+          Caption = '+'
+          Flat = True
+          OnClick = btnInstallAllClick
+          ExplicitTop = 6
         end
-        object SpeedButton2: TSpeedButton
+        object btnUpgradeAll: TSpeedButton
           AlignWithMargins = True
           Left = 545
           Top = 3
           Width = 28
           Height = 27
+          Hint = 'Upgrade in all projects'
           Margins.Right = 5
           Align = alRight
+          Anchors = [akTop, akRight]
           Caption = 'U'
+          Flat = True
+          OnClick = btnUpgradeAllClick
           ExplicitLeft = 376
           ExplicitHeight = 28
         end
-        object Label1: TLabel
+        object btnUninstallAll: TSpeedButton
           AlignWithMargins = True
-          Left = 350
-          Top = 10
-          Width = 36
-          Height = 13
-          Margins.Top = 10
-          Margins.Bottom = 10
+          Left = 581
+          Top = 3
+          Width = 28
+          Height = 27
+          Hint = 'Remove from all projects'
+          Margins.Right = 5
           Align = alRight
-          Alignment = taRightJustify
-          Caption = 'Source'
-          ExplicitHeight = 15
+          Anchors = [akTop, akRight]
+          Caption = '-'
+          Flat = True
+          OnClick = btnUninstallAllClick
+          ExplicitLeft = 586
+          ExplicitTop = 6
         end
         object cboVersions: TComboBox
           AlignWithMargins = True
@@ -196,25 +203,12 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
           Width = 260
           Height = 22
           Style = csOwnerDrawVariable
-          Anchors = [akLeft, akTop, akRight]
           TabOrder = 0
           OnChange = cboVersionsChange
           OnCloseUp = cboVersionsCloseUp
           OnDrawItem = cboVersionsDrawItem
           OnDropDown = cboVersionsDropDown
           OnMeasureItem = cboVersionsMeasureItem
-        end
-        object ComboBox1: TComboBox
-          AlignWithMargins = True
-          Left = 392
-          Top = 5
-          Width = 145
-          Height = 23
-          Margins.Top = 5
-          Margins.Right = 5
-          Align = alRight
-          TabOrder = 1
-          Text = 'ComboBox1'
         end
       end
     end

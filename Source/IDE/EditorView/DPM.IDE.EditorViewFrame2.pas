@@ -184,7 +184,7 @@ type
 
     function GetRowKind(const index : Int64) : TPackageRowKind;
     procedure CalculateIndexes;
-    procedure ChangeScale(M: Integer; D: Integer; isDpiChange: Boolean); override;
+    procedure ChangeScale(M: Integer; D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND}); override;
 
   public
     constructor Create(AOwner : TComponent); override;
@@ -310,7 +310,7 @@ begin
   result := true; //TODO : Block closing while busy installing/removing packages.
 end;
 
-procedure TDPMEditViewFrame2.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+procedure TDPMEditViewFrame2.ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND});
 begin
   FRowLayout.IconSize := MulDiv(FRowLayout.IconSize, M, D);
   FRowLayout.Margin := MulDiv(FRowLayout.Margin, M, D);

@@ -20,7 +20,7 @@ type
 
 implementation
 
-const activityIndicatorFrames : Array of string =[
+const activityIndicatorFrames : Array[0..7] of string = (
 			'⣷',
 			'⣯',
 			'⣟',
@@ -29,7 +29,7 @@ const activityIndicatorFrames : Array of string =[
 			'⣻',
 			'⣽',
 			'⣾'
-		];
+		);
 
 { TActivityIndicator }
 

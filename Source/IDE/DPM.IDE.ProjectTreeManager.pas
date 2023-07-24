@@ -303,11 +303,11 @@ begin
       
       bitmap := TBitmap.Create;
       try
-        bitmap.LoadFromResourceName(HInstance, 'DPMOGOBMP_16');
+        bitmap.LoadFromResourceName(HInstance, 'DPMLOGOBMP_16');
         FDPMImageIndex := imageList.AddMasked(bitmap, clFuchsia);
         bitmap.LoadFromResourceName(HInstance, 'PLATFORM_WIN32');
         FPlatformImageIndexes[TDPMPlatform.Win32] := imageList.AddMasked(bitmap, clFuchsia);
-        bitmap.LoadFromResourceName(HInstance, 'PLATFORM_WIN64');
+        bitmap.LoadFromResourceName(HInstance, 'PLATFORM_WIN32'); //same for win32/64
         FPlatformImageIndexes[TDPMPlatform.Win64] := imageList.AddMasked(bitmap, clFuchsia);
         bitmap.LoadFromResourceName(HInstance, 'PLATFORM_MACOS');
         FPlatformImageIndexes[TDPMPlatform.OSX32] := imageList.AddMasked(bitmap, clFuchsia);

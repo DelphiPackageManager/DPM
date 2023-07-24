@@ -584,6 +584,7 @@ function TProjectEditor.LoadPackageRefences : boolean;
         sVersion := '';
         sPlatform := '';
         sUseSource := '';
+
         packageElement := packageNodes.item[i] as IXMLDOMElement;
         if packageElement.getAttributeNode('id') <> nil then
           id := packageElement.getAttribute('id');

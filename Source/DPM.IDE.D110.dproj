@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectVersion>19.5</ProjectVersion>
@@ -14,7 +14,7 @@
         <DPMCompiler>11.0</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.Uri\0.3.0\lib;$(DPM)\VSoft.CancellationToken\0.0.4\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\Spring4D.Base\2.0.0-rc.1\lib;$(DPM)\VSoft.VirtualListView\0.3.0-rc9\lib;$(DPM)\VSoft.SemanticVersion\0.2.3\lib;$(DPM)\VSoft.JsonDataObjects\0.1.3\lib;$(DPM)\VSoft.HttpClient\0.9.0-alpha.6\lib;$(DPM)\VSoft.Awaitable\0.2.2\lib;$(DPM)\VSoft.AntPatterns\0.1.3\lib;$(DPM)\Spring4D.Extensions\2.0.0-rc.1\lib;$(DPM)\Spring4D.Core\2.0.0-rc.1\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.Uri\0.3.0\lib;$(DPM)\VSoft.CancellationToken\0.0.4\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\Spring4D.Base\2.0.0-rc.1\lib;$(DPM)\VSoft.VirtualListView\0.4.0\lib;$(DPM)\VSoft.SemanticVersion\0.2.3\lib;$(DPM)\VSoft.JsonDataObjects\0.1.3\lib;$(DPM)\VSoft.HttpClient\0.9.0-alpha.8\lib;$(DPM)\VSoft.Awaitable\0.3.0\lib;$(DPM)\VSoft.AntPatterns\0.1.3\lib;$(DPM)\Spring4D.Extensions\2.0.0-rc.1\lib;$(DPM)\Spring4D.Core\2.0.0-rc.1\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -63,7 +63,7 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
         <GenDll>true</GenDll>
-        <DCC_UnitSearchPath>I:\Github\VSoftTechnologies\VSoft.VirtualListView\Source;$(DPMSearch);$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>$(DPMSearch);I:\Github\VSoftTechnologies\VSoft.VirtualListView\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <DCC_UsePackage>designide;rtl;vcl;$(DCC_UsePackage)</DCC_UsePackage>
         <UsePackages>true</UsePackages>
         <VerInfo_Locale>3081</VerInfo_Locale>
@@ -1182,17 +1182,17 @@
                 <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-rc.1" range="2.0.0-rc.1"/>
             </PackageReference>
             <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.1.3"/>
-            <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.2.2">
+            <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.3.0">
                 <PackageReference id="Gabr42.OmniThreadLibrary" platform="Win32" version="3.7.8" range="[3.7.8,]"/>
                 <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.4" range="[0.0.4,]"/>
             </PackageReference>
-            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.9.0-alpha.6">
+            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.9.0-alpha.8">
                 <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.4" range="[0.0.4,]"/>
                 <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.0" range="[0.3.0,]"/>
             </PackageReference>
             <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.1.3"/>
             <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.3"/>
-            <PackageReference id="VSoft.VirtualListView" platform="Win32" version="0.3.0-rc9"/>
+            <PackageReference id="VSoft.VirtualListView" platform="Win32" version="0.4.0"/>
         </DPM>
     </ProjectExtensions>
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>
