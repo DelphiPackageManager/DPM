@@ -82,24 +82,24 @@ object DPMEditViewFrame2: TDPMEditViewFrame2
           inherited pnlPackageId: TPanel
             Width = 500
             ExplicitWidth = 500
-            inherited lblPackageId: TLabel
-              Left = 236
-              ExplicitLeft = 236
-            end
           end
           inherited pnlGridHost: TPanel
             Width = 500
             ExplicitWidth = 500
             inherited pnlVersion: TPanel
               Width = 500
+              ExplicitWidth = 500
               inherited btnInstallAll: TSpeedButton
-                Left = 467
+                Left = 395
+                ExplicitLeft = 395
               end
               inherited btnUpgradeAll: TSpeedButton
                 Left = 431
+                ExplicitLeft = 431
               end
               inherited btnUninstallAll: TSpeedButton
-                Left = 395
+                Left = 467
+                ExplicitLeft = 467
               end
             end
           end

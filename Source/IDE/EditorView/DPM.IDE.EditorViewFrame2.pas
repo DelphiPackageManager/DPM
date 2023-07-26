@@ -728,7 +728,6 @@ var
   proj : IOTAProject;
   i : integer;
   packageReference : IPackageReference;
-  sProjectFileName : string;
 begin
   projectEditor := TProjectEditor.Create(FLogger, FConfiguration, IDECompilerVersion);
   result := TPackageReference.CreateRoot(IDECompilerVersion, FCurrentPlatform);
@@ -736,17 +735,11 @@ begin
   for i := 0 to FProjectGroup.ProjectCount -1 do
   begin
     proj := FProjectGroup.Projects[i];
-    sProjectFileName := proj.FileName;
-
-    projectEditor.LoadProject(sProjectFileName);
+    projectEditor.LoadProject(proj.FileName);
     packageReference := projectEditor.GetPackageReferences(FCurrentPlatform); //NOTE : Can return nil. Will change internals to return empty root node.
     if packageReference <> nil then
-    begin
-      sProjectFileName := ChangeFileExt(ExtractFileName(sProjectFileName), '');
-      Result.AddExistingReference(LowerCase(sProjectFileName), packageReference);
-    end;
+      Result.AddExistingReference(LowerCase(proj.FileName), packageReference);
   end;
-
 end;
 
 function TDPMEditViewFrame2.GetPlatforms: TDPMPlatforms;
@@ -951,10 +944,7 @@ begin
         //Sleep(200);
         if cancelToken.IsCancelled then
           exit(nil);
-//        Sleep(200);
-        //just return the list for now.. but we need to rework for skip/take
         result := repoManager.GetPackageFeed(cancelToken, searchOptions, IDECompilerVersion, FCurrentPlatform).Results;
-
       finally
         CoUninitialize;
       end;

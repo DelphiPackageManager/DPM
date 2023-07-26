@@ -59,15 +59,18 @@ type
 
   TVersionGridRow = class
     ProjectName : string;
-    Checked : boolean;
     InstalledVersion : TPackageVersion;
   end;
 
 
   TVersionGridPaintRowState = (rsNormal, rsHot, rsSelected, rsFocusedNormal, rsFocusedHot, rsFocusedSelected);
 
-  THitElement = (htRow, htCheckBox, htColumn0, htColumn1, htColumn2, htColumn3, htColumn4 );
+  THitElement = (htRow, htColumnProject, htColumnInstalleVer, htColumnInstall, htColumnUpDn, htColumnRemove, htRowInstall, htRowUpDn, htRowRemove  );
 
+  TOnInstallEvent = procedure(const project : string) of object;
+  TOnUnInstallEvent = procedure(const project : string) of object;
+  TOnUpgradeEvent = procedure(const project : string) of object;
+  TOnDowngradeEvent = procedure(const project : string) of object;
 
   TVersionGrid = class(TCustomControl)
   private
@@ -89,11 +92,9 @@ type
     FVisibleRows : integer; //number of rows we can see
     FSelectableRows : integer;
 
-    FStyleServices : TCustomStyleServices;
+    FIDEStyleServices : TCustomStyleServices;
 
-    FCheckAll   : boolean;
     FHitElement : THitElement;
-    FMouseCaptured : boolean;
 
     FUpdateCount : integer;
 
@@ -103,12 +104,17 @@ type
     FSelectionChangedEvent : TNotifyEvent;
 
     FImageList : TCustomImageList;
+
+    //events
+    FOnInstallEvent : TOnInstallEvent;
+    FOnUnInstallEvent : TOnUnInstallEvent;
+    FOnUpgradeEvent : TOnUpgradeEvent;
+    FOnDowngradeEvent : TOnDowngradeEvent;
+
+
     procedure SetImageList(const Value: TCustomImageList);
 
   protected
-    function GetHasCheckedProjects : boolean;
-    function GetProjectChecked(index : integer) : boolean;
-    procedure SetProjectChecked(index : integer; value : boolean);
     function GetProjectName(index: integer): string;
     function GetRowCount : integer;
     procedure SetPackageVersion(const value : TPackageVersion);
@@ -143,6 +149,8 @@ type
     procedure Resize; override;
     procedure Paint;override;
     procedure DoPaintRow(const index : integer; const state : TVersionGridPaintRowState; const copyCanvas : boolean = true);
+
+    function GetButtonEnabled(const index : integer; const element : THitElement) : boolean;
 
     procedure UpdateScrollBars;
     procedure UpdateColumns;
@@ -198,9 +206,7 @@ type
     property CurrentRow : Integer read FCurrentRow;
     property TopRow : Integer read FTopRow;
 
-    property HasCheckedProjects : boolean read GetHasCheckedProjects;
     property ImageList : TCustomImageList read FImageList write SetImageList;
-    property ProjectChecked[index : integer] : boolean read GetProjectChecked write SetProjectChecked;
     property ProjectName[index : integer] : string read GetProjectName;
     property ProjectVersion[index : integer] : TPackageVersion read GetProjectVersion write SetProjectVersion;
 
@@ -210,7 +216,7 @@ type
     property OnSelectionChanged : TNotifyEvent read FSelectionChangedEvent write FSelectionChangedEvent;
 
     //exposing this here so the IDE plugin can set this.
-    property StyleServices : TCustomStyleServices read FStyleServices write SetStyleServices;
+    property StyleServices : TCustomStyleServices read FIDEStyleServices write SetStyleServices;
   published
     property Align;
     property Anchors;
@@ -237,14 +243,18 @@ type
     property Width default 100;
     property Visible;
     property RowHeight : integer read FRowHeight write SetRowHeight default 24;
-
-
+    property OnInstallEvent : TOnInstallEvent read FOnInstallEvent write FOnInstallEvent;
+    property OnUnInstallEvent : TOnUnInstallEvent read FOnUnInstallEvent write FOnUnInstallEvent;
+    property OnUpgradeEvent : TOnUpgradeEvent read FOnUpgradeEvent write FOnUpgradeEvent;
+    property OnDowngradeEvent : TOnDowngradeEvent read FOnDowngradeEvent write FOnDowngradeEvent;
   end;
 
 implementation
 
 uses
   System.Math,
+  System.SysUtils,
+  Vcl.Dialogs,
   DPM.Core.Utils.Strings;
 
 { TVersionGrid }
@@ -255,7 +265,6 @@ var
 begin
   newProject := TVersionGridRow.Create;
   newProject.ProjectName := project;
-  newProject.Checked := false;
   newProject.InstalledVersion := TPackageVersion.Empty;
   FRows.Add(newProject);
   RowsChanged(Self);
@@ -307,7 +316,7 @@ var
   oldHoverRow : integer;
   rowState : TVersionGridPaintRowState;
 begin
-  if FHitElement in [htRow, htCheckBox] then
+  if FHitElement in [htRow] then
   begin
     oldHoverRow := FHoverRow;
     FHoverRow := -1;
@@ -337,7 +346,23 @@ begin
   FRowHeight := 24;
   Color := clWindow;
 
-  FStyleServices := Vcl.Themes.StyleServices;
+ //not published in older versions, so get removed when we edit in older versions.
+  {$IFDEF STYLEELEMENTS}
+  StyleElements := [seFont, seClient, seBorder];
+  {$ENDIF}
+
+  //IOTAIDEThemingServices added in 10.2
+  {$IFDEF THEMESERVICES}
+  ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
+  ideThemeSvc.ApplyTheme(Self);
+  FIDEStyleServices := ideThemeSvc.StyleServices;
+  {$ELSE}
+  FIDEStyleServices := Vcl.Themes.StyleServices;
+  {$ENDIF}
+
+
+
+
 
   FRows := TObjectList<TVersionGridRow>.Create(true);
 
@@ -800,18 +825,35 @@ var
   destRect : TRect;
   i: Integer;
   colRect : TRect;
+  imgRect : TRect;
+  btnRect : TRect;
   txt : string;
   LCanvas : TCanvas;
 
   backgroundColor : TColor;
   fontColor : TColor;
+  btnColor : TColor;
 
-  chkRect : TRect;
-  ckkSize : TSize;
-  LDetails  : TThemedElementDetails;
-  LCheckDetails : TThemedElementDetails;
-  bChecked : boolean;
   project : TVersionGridRow;
+
+  procedure CenterRect(const outerRect : TRect; var innerRect : TRect);
+  var
+    iw, ih : Integer;
+  begin
+    iw := innerRect.Width;
+    ih := innerRect.Height;
+    innerRect.Left := outerRect.Left + ((outerRect.Width - innerRect.Width) div 2);
+    innerRect.Top := outerRect.Top + ((outerRect.Height - innerRect.Height) div 2);
+    innerRect.Width := iw;
+    innerRect.Height := ih;
+  end;
+
+  procedure DrawButton;
+  begin
+    LCanvas.Brush.Color := btnColor;
+    LCanvas.Pen.Color := btnColor;
+    LCanvas.RoundRect(btnRect,2,2);
+  end;
 
 begin
   if not HandleAllocated then
@@ -829,27 +871,31 @@ begin
   project := FRows.Items[index];
 
   if (state in [rsSelected, rsFocusedSelected, rsFocusedHot, rsHot]) then
-    begin
-      backgroundColor := FStyleServices.GetSystemColor(clBtnHighlight);
-      fontColor := FStyleServices.GetSystemColor(clHighlightText);
-      LDetails := StyleServices.GetElementDetails(tlListItemSelected);
-    end
+  begin
+    {$IF CompilerVersion < 32.0}
+    backgroundColor := $00FFF0E9;
+    fontcolor := FIDEStyleServices.GetSystemColor(clWindowText);
+    {$ELSE}
+    if state = TVersionGridPaintRowState.rsFocusedSelected then
+      backgroundColor := FIDEStyleServices.GetSystemColor(clBtnHighlight)
     else
-    begin
-      backgroundColor := FStyleServices.GetSystemColor(clWindow);
-      fontColor := FStyleServices.GetSystemColor(clWindowText);
-      LDetails := FStyleServices.GetElementDetails(tlListItemNormal);
-    end;
+      backgroundColor := FIDEStyleServices.GetSystemColor(clBtnShadow);
+    fontcolor := FIDEStyleServices.GetSystemColor(clHighlightText);
+    {$IFEND}
+  end
+  else
+  begin
+    backgroundColor := FIDEStyleServices.GetSystemColor(clWindow);
+    fontColor := FIDEStyleServices.GetSystemColor(clWindowText);
+  end;
 
+  btnColor := FIDEStyleServices.GetSystemColor(clBtnFace);
   LCanvas.Brush.Color := backgroundColor;
   LCanvas.Font.Color := fontColor;
   LCanvas.FillRect(rowRect);
 
   LCanvas.Brush.Style := bsClear;
 
-  bChecked := project.Checked;
-
-//  versions := TStringUtils.SplitStr(FProjects.ValueFromIndex[index],'|', TSplitStringOptions.None);
 
   for i := 0 to 4 do
   begin
@@ -857,49 +903,27 @@ begin
     colRect.Top := rowRect.Top;
     colRect.Bottom := rowRect.Bottom;
     colRect.Inflate(-5, 0);
-
+    imgRect := TRect.Create(0,0,FImageList.Width, FImageList.Height);
+    CenterRect(colRect, imgRect);
+    btnRect := imgRect;
+    btnRect.Inflate(3,3);
+    txt := '';
     case i of
-      0 : //draw checkbox.
+      0 : //project
       begin
-        chkRect := colRect;
-        ckkSize.cx := GetSystemMetrics(SM_CXMENUCHECK);
-        ckkSize.cy := GetSystemMetrics(SM_CYMENUCHECK);
-        chkRect.Top := colRect.Top +  (colRect.Height - ckkSize.cy) div 2;
-        chkRect.Bottom := chkRect.Top + ckkSize.cy;
-
-        chkRect.Left   :=  colRect.Left +  (colRect.Width - ckkSize.cx) div 2;;
-        chkRect.Right  := chkRect.Left + ckkSize.cx;
-
-        if bChecked then
-        begin
-          if (state in [rsFocusedSelected, rsFocusedHot, rsHot]) then
-            LCheckDetails := FStyleServices.GetElementDetails(tbCheckBoxCheckedHot)
-          else
-            LCheckDetails := FStyleServices.GetElementDetails(tbCheckBoxCheckedNormal);
-        end
-        else
-        begin
-          if (state in [rsFocusedSelected, rsFocusedHot, rsHot]) then
-            LCheckDetails := FStyleServices.GetElementDetails(tbCheckBoxUnCheckedHot)
-          else
-            LCheckDetails := FStyleServices.GetElementDetails(tbCheckBoxUnCheckedNormal);
-        end;
-
-        FStyleServices.DrawElement(LCanvas.Handle, LCheckDetails, chkRect);
+        txt := ChangeFileExt(ExtractFileName(project.ProjectName),'');
       end;
-      1 : //project
-      begin
-        txt := project.ProjectName;
-        LCanvas.Brush.Style := bsClear;
-        FStyleServices.DrawText(LCanvas.Handle, LDetails, txt, colRect, [tfLeft, tfSingleLine, tfVerticalCenter, tfEndEllipsis]);
-      end;
-      2 : //installed version
+      1 : //installed version
       begin
         if not project.InstalledVersion.IsEmpty then
-        begin
           txt := project.InstalledVersion.ToStringNoMeta;
-          LCanvas.Brush.Style := bsClear;
-          FStyleServices.DrawText(LCanvas.Handle, LDetails, txt, colRect, [tfLeft, tfSingleLine, tfVerticalCenter, tfEndEllipsis]);
+      end;
+      2 : //add
+      begin
+        if project.InstalledVersion.IsEmpty then
+        begin
+          DrawButton;
+          FImageList.Draw(LCanvas, imgRect.Left, imgRect.Top, 0,  TDrawingStyle.dsTransparent, TImageType.itImage, true );
         end;
       end;
       3 :  //upgrade/downgrade
@@ -909,26 +933,28 @@ begin
 
         if (not project.InstalledVersion.IsEmpty)  then //a version is installed already
         begin
-          LCanvas.Brush.Style := bsClear;
           if FPackageVersion = project.InstalledVersion then
             continue;
+          DrawButton;
+
           if FPackageVersion > project.InstalledVersion then
-            txt := 'up'
+            FImageList.Draw(LCanvas, imgRect.Left, imgRect.Top, 2, TDrawingStyle.dsTransparent, TImageType.itImage, true )
           else
-            txt := 'dn';
-          FStyleServices.DrawText(LCanvas.Handle, LDetails, txt, colRect, [tfLeft, tfSingleLine, tfVerticalCenter, tfEndEllipsis]);
+            FImageList.Draw(LCanvas, imgRect.Left, imgRect.Top, 3, TDrawingStyle.dsTransparent, TImageType.itImage, true );
         end;
       end;
       4 :
       begin
-        if project.InstalledVersion.IsEmpty then
-          txt := '+'
-        else
-          txt := '-';
-        LCanvas.Brush.Style := bsClear;
-        FStyleServices.DrawText(LCanvas.Handle, LDetails, txt, colRect, [tfLeft, tfSingleLine, tfVerticalCenter, tfEndEllipsis]);
+        if not project.InstalledVersion.IsEmpty then
+        begin
+          DrawButton;
+          FImageList.Draw(LCanvas, imgRect.Left, imgRect.Top, 1, TDrawingStyle.dsTransparent, TImageType.itImage, true );
+        end;
       end;
     end;
+    if txt <> '' then
+      DrawText(LCanvas.Handle, PChar(txt),Length(txt), colRect, DT_SINGLELINE + DT_LEFT + DT_VCENTER );
+
   end;
   destRect := rowRect;
 
@@ -975,18 +1001,38 @@ begin
 end;
 
 
-function TVersionGrid.GetHasCheckedProjects: boolean;
+function TVersionGrid.GetButtonEnabled(const index: integer; const element: THitElement): boolean;
+var
+  row : TVersionGridRow;
 begin
-  result := FCheckedCount > 0;
+  result := false;
+  if (index >= 0) and (index < FRows.Count)  then
+  begin
+    row := FRows[index];
+    case element of
+      htRowInstall:
+      begin
+        result := row.InstalledVersion.IsEmpty;
+      end;
+      htRowUpDn:
+      begin
+        if FPackageVersion.IsEmpty or row.InstalledVersion.IsEmpty then
+          exit;
+
+        if (not row.InstalledVersion.IsEmpty) then
+        begin
+          result := FPackageVersion <> row.InstalledVersion;
+        end;
+      end;
+      htRowRemove:
+      begin
+        result := not row.InstalledVersion.IsEmpty;
+      end;
+    end;
+  end;
+
 end;
 
-function TVersionGrid.GetProjectChecked(index: integer): boolean;
-begin
-  if (index >= 0) and (index < FRows.Count) then
-    result := FRows[index].Checked
-  else
-    result := false;
-end;
 
 function TVersionGrid.GetProjectName(index: integer): string;
 begin
@@ -1076,67 +1122,20 @@ end;
 procedure TVersionGrid.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
   row : Integer;
-  i: Integer;
 begin
   inherited;
-  SetFocus;
-  row := GetRowFromY(Y);
-
-  case FHitElement of
-    htRow: ;
-    htCheckBox:
-    begin
-      if RowCount = 0 then
-        exit;
-      FCurrentRow := FTopRow + row ;
-      FRows[FCurrentRow].Checked := not FRows[FCurrentRow].Checked;
-      UpdateCheckedCount(FRows[FCurrentRow].Checked);
-      DoSelectionChanged;
-      Invalidate;
-    end;
-    htColumn0:
-    begin
-      FCheckAll := not FCheckAll;
-      for i := 0 to FRows.Count -1 do
-        FRows[i].Checked := FCheckAll;
-      if FCheckAll then
-        FCheckedCount := FRows.Count
-      else
-        FCheckedCount := 0;
-      Invalidate;
-      DoSelectionChanged;
-      exit;
-    end;
-    htColumn1:
-    begin
-      //sort by project name.
-    end;
-    htColumn2:
-    begin
-      //sort by version.
-
-    end;
-    htColumn3:
-    begin
-      //sort by installed version.
-
-    end;
-  end;
-
   if RowCount = 0 then
     exit;
 
+  SetFocus;
+  row := GetRowFromY(Y);
 
   if (row > FVisibleRows) or (row >= RowCount) then
     exit;
 
   if FTopRow + row <> FCurrentRow then
   begin
-//    oldRow := FCurrentRow;
     FCurrentRow := FTopRow + row;
-
-
-//    DoRowChanged(oldRow);
     Invalidate;
     UpdateScrollBars;
   end;
@@ -1153,53 +1152,32 @@ begin
   FHitElement := htRow;
   row := GetRowFromY(Y);
   try
-    if Y < FRowHeight then
+    if Y > FRowHeight then
     begin
-      //check the headers
-      //get the column header
-      r := FColumns[0].GetBounds;
-      if r.Contains(Point(X, 2)) then
-      begin
-        FHitElement := htColumn0;
-        exit;
-      end;
-
-      r := FColumns[1].GetBounds;
-      if r.Contains(Point(X, 2)) then
-      begin
-        FHitElement := htColumn1;
-        exit;
-      end;
       r := FColumns[2].GetBounds;
-      if r.Contains(Point(X, 2)) then
+      r.Offset(0, (row + 1) * FRowHeight);
+      if r.Contains(Point(X, Y)) then
       begin
-        FHitElement := htColumn2;
+        FHitElement := htRowInstall;
         exit;
       end;
 
       r := FColumns[3].GetBounds;
-      if r.Contains(Point(X, 2)) then
+      r.Offset(0, (row + 1) * FRowHeight);
+      if r.Contains(Point(X, Y)) then
       begin
-        FHitElement := htColumn3;
+        FHitElement := htRowUpDn;
         exit;
       end;
 
       r := FColumns[4].GetBounds;
-      if r.Contains(Point(X, 2)) then
-      begin
-        FHitElement := htColumn3;
-        exit;
-      end;
-    end
-    else
-    begin
-      //only check the checkbox for the row.
-      r := FColumns[0].GetBounds;
       r.Offset(0, (row + 1) * FRowHeight);
       if r.Contains(Point(X, Y)) then
-        FHitElement := htCheckBox
-      else
-        FHitElement := htRow;
+      begin
+        FHitElement := htRowRemove;
+        exit;
+      end;
+      FHitElement := htRow;
     end;
   finally
     if FHitElement <> oldHit then
@@ -1212,17 +1190,46 @@ end;
 
 procedure TVersionGrid.MouseUp(Button: TMouseButton; Shift: TShiftState; X,  Y: Integer);
 begin
-  if FMouseCaptured then
-  begin
-    ReleaseCapture;
-    FMouseCaptured := false;
-    Resize;
+  case FHitElement of
+    htRowInstall :
+    begin
+      if Assigned(FOnInstallEvent) then
+      begin
+        if GetButtonEnabled(FCurrentRow, FHitElement) then
+          FOnInstallEvent(FRows[FCurrentRow].ProjectName);
+      end;
+    end;
+    htRowUpDn :
+    begin
+      if GetButtonEnabled(FCurrentRow, FHitElement) then
+      begin
+         if FPackageVersion > FRows[FCurrentRow].InstalledVersion then
+         begin
+          if Assigned(FOnUpgradeEvent) then
+            FOnUpgradeEvent(FRows[FCurrentRow].ProjectName);
+         end
+         else
+         begin
+          if Assigned(FOnDowngradeEvent) then
+            FOnDowngradeEvent(FRows[FCurrentRow].ProjectName);
+         end;
+      end;
+
+    end;
+    htRowRemove :
+    begin
+      if Assigned(FOnUnInstallEvent) then
+      begin
+        if GetButtonEnabled(FCurrentRow, FHitElement) then
+          FOnUnInstallEvent(FRows[FCurrentRow].ProjectName);
+      end;
+    end;
   end;
   inherited;
 end;
 
 const
-  hightLightElements : array[0..3] of THitElement = (htColumn0,htColumn1,htColumn2, htColumn3);
+  hightLightElements : array[0..4] of THitElement = (htColumnProject,htColumnInstalleVer,htColumnInstall, htColumnUpDn,htColumnRemove);
 
 procedure TVersionGrid.Paint;
 var
@@ -1236,38 +1243,34 @@ var
   i: Integer;
   rowIdx : integer;
   rowState : TVersionGridPaintRowState;
-
-  LCheckDetails : TThemedElementDetails;
-  chkRect : TRect;
-  ckkSize : TSize;
 begin
   LCanvas := FPaintBmp.Canvas;
   LCanvas.Font.Assign(Self.Font);
 
-  if FStyleServices.Enabled {$IF CompilerVersion >= 24.0} and (seClient in StyleElements) {$IFEND} then
+  if FIDEStyleServices.Enabled {$IF CompilerVersion >= 24.0} and (seClient in StyleElements) {$IFEND} then
   begin
     //client
-    backgroundColor := FStyleServices.GetSystemColor(clWindow);
+    backgroundColor := FIDEStyleServices.GetSystemColor(clWindow);
 
     //header
     //TODO : When running in the IDE we will need to tweak this!
-    if FStyleServices.Name = 'Windows' then
+    if FIDEStyleServices.Name = 'Windows' then
     begin
-      HeaderTextColor := FStyleServices.GetStyleFontColor(sfHeaderSectionTextNormal);
-      FStyleServices.GetElementColor(FStyleServices.GetElementDetails(tgFixedCellNormal), ecBorderColor, HeaderBorderColor);
-      FStyleServices.GetElementColor(FStyleServices.GetElementDetails(tgFixedCellNormal ), ecFillColor, HeaderBackgroundColor);
-      //FStyleServices.GetElementColor(FStyleServices.GetElementDetails(tbPushButtonHot ), ecShadowColor, columnHightlightColor);
-      columnHightlightColor := FStyleServices.GetSystemColor(clBtnShadow);
+      HeaderTextColor := FIDEStyleServices.GetStyleFontColor(sfHeaderSectionTextNormal);
+      FIDEStyleServices.GetElementColor(FIDEStyleServices.GetElementDetails(tgFixedCellNormal), ecBorderColor, HeaderBorderColor);
+      FIDEStyleServices.GetElementColor(FIDEStyleServices.GetElementDetails(tgFixedCellNormal ), ecFillColor, HeaderBackgroundColor);
+      //FIDEStyleServices.GetElementColor(FIDEStyleServices.GetElementDetails(tbPushButtonHot ), ecShadowColor, columnHightlightColor);
+      columnHightlightColor := FIDEStyleServices.GetSystemColor(clBtnShadow);
 
     end
     else
     begin
-      HeaderTextColor := FStyleServices.GetSystemColor(clBtnText);
+      HeaderTextColor := FIDEStyleServices.GetSystemColor(clBtnText);
 
-      FStyleServices.GetElementColor(FStyleServices.GetElementDetails(tgClassicFixedCellNormal), ecBorderColor, HeaderBorderColor);
-      FStyleServices.GetElementColor(FStyleServices.GetElementDetails(tgClassicFixedCellNormal ), ecFillColor, HeaderBackgroundColor);
-      FStyleServices.GetElementColor(FStyleServices.GetElementDetails(tgClassicFixedCellHot ), ecFillColor, columnHightlightColor);
-      //FStyleServices.GetElementColor(FStyleServices.GetElementDetails(tbPushButtonNormal ), ecTextColor, HeaderTextColor);
+      FIDEStyleServices.GetElementColor(FIDEStyleServices.GetElementDetails(tgClassicFixedCellNormal), ecBorderColor, HeaderBorderColor);
+      FIDEStyleServices.GetElementColor(FIDEStyleServices.GetElementDetails(tgClassicFixedCellNormal ), ecFillColor, HeaderBackgroundColor);
+      FIDEStyleServices.GetElementColor(FIDEStyleServices.GetElementDetails(tgClassicFixedCellHot ), ecFillColor, columnHightlightColor);
+      //FIDEStyleServices.GetElementColor(FIDEStyleServices.GetElementDetails(tbPushButtonNormal ), ecTextColor, HeaderTextColor);
     end;
   end
   else
@@ -1299,38 +1302,11 @@ begin
   r := FColumns[0].GetBounds;
   InflateRect(r,-1,-1);
 
-  chkRect := r;
-  ckkSize.cx := GetSystemMetrics(SM_CXMENUCHECK);
-  ckkSize.cy := GetSystemMetrics(SM_CYMENUCHECK);
-  chkRect.Top := r.Top +  (r.Height - ckkSize.cy) div 2;
-  chkRect.Bottom := chkRect.Top + ckkSize.cy;
-
-  chkRect.Left   :=  r.Left +  (r.Width - ckkSize.cx) div 2;
-  chkRect.Right  := chkRect.Left + ckkSize.cx;
-
-  if FCheckAll then
-  begin
-    if FHitElement = htColumn0 then
-      LCheckDetails := FStyleServices.GetElementDetails(tbCheckBoxCheckedHot)
-    else
-      LCheckDetails := FStyleServices.GetElementDetails(tbCheckBoxCheckedNormal);
-  end
-  else
-  begin
-    if FHitElement = htColumn0 then
-      LCheckDetails := FStyleServices.GetElementDetails(tbCheckBoxUnCheckedHot)
-    else
-      LCheckDetails := FStyleServices.GetElementDetails(tbCheckBoxUnCheckedNormal);
-  end;
-
-  //this seems to alter font colors
-  FStyleServices.DrawElement(LCanvas.Handle, LCheckDetails, chkRect);
-
   LCanvas.Brush.Style := bsClear;
   LCanvas.Font.Assign(Canvas.Font);
   LCanvas.Font.Color := HeaderTextColor;
 
-  for i := 1 to 3 do
+  for i := 0 to 4 do
   begin
     if FHitElement = hightLightElements[i] then
     begin
@@ -1401,7 +1377,7 @@ begin
   //RedrawWindow(Handle, nil, 0, RDW_ERASE or RDW_INVALIDATE or RDW_UPDATENOW);
 
   //force repainting scrollbars
-  if sfHandleMessages in FStyleServices.Flags then
+  if sfHandleMessages in FIDEStyleServices.Flags then
     SendMessage(Handle, WM_NCPAINT, 0, 0);
   inherited;
 end;
@@ -1486,22 +1462,6 @@ begin
   Invalidate;
 end;
 
-procedure TVersionGrid.SetProjectChecked(index: integer; value: boolean);
-var
-  oldValue : boolean;
-begin
-  if (index >= 0) and (index < FRows.Count) then
-  begin
-    oldValue := FRows[index].Checked;
-    if oldValue <> value then
-    begin
-      FRows[index].Checked := value;
-      UpdateCheckedCount(value);
-      DoSelectionChanged;
-    end;
-  end;
-
-end;
 
 procedure TVersionGrid.SetProjectVersion(index: integer; const Value: TPackageVersion);
 begin
@@ -1521,7 +1481,7 @@ end;
 
 procedure TVersionGrid.SetStyleServices(const Value: TCustomStyleServices);
 begin
-  FStyleServices := Value;
+  FIDEStyleServices := Value;
   Invalidate;
 end;
 
@@ -1537,38 +1497,38 @@ end;
 
 procedure TVersionGrid.UpdateColumns;
 begin
-  //checkbox
-  FColumns[0].Index := 0;
-  FColumns[0].Title := '';
-  FColumns[0].Width := 25;
-  FColumns[0].Left  := 0;
-  FColumns[0].Height := FRowHeight;
-
-  //install/remove button
-  FColumns[4].Index := 4;
+  //remove button
+  FColumns[4].Index := 3;
   FColumns[4].Title := '';
   FColumns[4].Width := 32;
   FColumns[4].Left  := Self.Width - FColumns[4].Width - 1;
   FColumns[4].Height := FRowHeight;
 
-  //upgrade/downgrade button
+  //upgrade/downgrade
   FColumns[3].Index := 3;
   FColumns[3].Title := '';
   FColumns[3].Width := 32;
   FColumns[3].Left  := FColumns[4].Left - FColumns[3].Width - 1;
   FColumns[3].Height := FRowHeight;
 
+  //install
   FColumns[2].Index := 2;
-  FColumns[2].Title := 'Installed';
-  FColumns[2].Width := 120;
-  FColumns[2].Left  := FColumns[3].Left - FColumns[2].Width -1 ;
+  FColumns[2].Title := '';
+  FColumns[2].Width := 32;
+  FColumns[2].Left  := FColumns[3].Left - FColumns[2].Width - 1;
   FColumns[2].Height := FRowHeight;
 
   FColumns[1].Index := 1;
-  FColumns[1].Title := 'Project';
-  FColumns[1].Left  := FColumns[0].Left + FColumns[0].Width + 1;
-  FColumns[1].Width := FColumns[2].Left - (FColumns[0].Left + FColumns[0].Width) ;
+  FColumns[1].Title := 'Installed';
+  FColumns[1].Width := 120;
+  FColumns[1].Left  := FColumns[2].Left - FColumns[1].Width -1 ;
   FColumns[1].Height := FRowHeight;
+
+  FColumns[0].Index := 0;
+  FColumns[0].Title := 'Project';
+  FColumns[0].Left  := 0;
+  FColumns[0].Width := FColumns[1].Left - 2;
+  FColumns[0].Height := FRowHeight;
 end;
 
 procedure TVersionGrid.UpdateHoverRow(const X, Y: integer);

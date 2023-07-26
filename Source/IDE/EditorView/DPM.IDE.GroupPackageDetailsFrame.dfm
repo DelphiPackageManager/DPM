@@ -142,8 +142,8 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
         ShowCaption = False
         TabOrder = 0
         object lblVersionTitle: TLabel
-          Left = 19
-          Top = 10
+          Left = 6
+          Top = 9
           Width = 44
           Height = 15
           Alignment = taRightJustify
@@ -198,7 +198,7 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
         end
         object cboVersions: TComboBox
           AlignWithMargins = True
-          Left = 69
+          Left = 61
           Top = 6
           Width = 260
           Height = 22

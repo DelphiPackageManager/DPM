@@ -136,6 +136,13 @@ type
 
     function GetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string): IAwaitable<IPackageSearchResultItem>;
     procedure ChangeScale(M: Integer; D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND}); override;
+
+    procedure VersionGridOnInstallEvent(const project : string);
+    procedure VersionGridOnUnInstallEvent(const project : string);
+    procedure VersionGridOnUpgradeEvent(const project : string);
+    procedure VersionGridOnDowngradeEvent(const project : string);
+
+
   public
     constructor Create(AOwner : TComponent); override;
     destructor Destroy;override;
@@ -226,8 +233,11 @@ end;
 procedure TGroupPackageDetailsFrame.cboVersionsChange(Sender: TObject);
 var
   sVersion : string;
+  packageVer : TPackageVersion;
 begin
   sVersion := cboVersions.Items[cboVersions.ItemIndex];
+  packageVer := TPackageVersion.Parse(sVersion);
+  FProjectsGrid.PackageVersion := packageVer;
   DoGetPackageMetaDataAsync(FPackageMetaData.Id, FPackageMetaData.CompilerVersion, FPackageMetaData.Platform, sVersion);
 end;
 
@@ -316,6 +326,10 @@ begin
   FProjectsGrid.ParentFont := true;
   FProjectsGrid.DoubleBuffered := true;
   FProjectsGrid.OnSelectionChanged := Self.ProjectSelectionChanged;
+  FProjectsGrid.OnInstallEvent := Self.VersionGridOnInstallEvent;
+  FProjectsGrid.OnUnInstallEvent := Self.VersionGridOnUnInstallEvent;
+  FProjectsGrid.OnUpgradeEvent := Self.VersionGridOnUpgradeEvent;
+  FProjectsGrid.OnDowngradeEvent := Self.VersionGridOnDowngradeEvent;
 
   FProjectsGrid.Parent := pnlGridHost;
 
@@ -345,6 +359,8 @@ begin
   FDowngradeBmp := TBitmap.Create;
   FImageList := TImageList.Create(Self);
   {$IFEND}
+  FImageList.ColorDepth := cd32Bit;
+  FImageList.DrawingStyle := dsTransparent; 
   FImageList.Width := 16;
   FImageList.Height := 16;
 
@@ -370,7 +386,6 @@ end;
 procedure TGroupPackageDetailsFrame.Init(const container: TContainer; const iconCache: TDPMIconCache; const config: IConfiguration; const host: IDetailsHost; const projectOrGroup : IOTAProjectGroup);
 var
   i: Integer;
-  sProject : string;
 begin
   FContainer := container;
   FIconCache := iconCache;
@@ -385,10 +400,7 @@ begin
   FProjectsGrid.BeginUpdate;
   FProjectsGrid.Clear;
   for i := 0 to FProjectGroup.ProjectCount -1 do
-  begin
-    sProject := ChangeFileExt(ExtractFileName(FProjectGroup.Projects[i].FileName), '');
-    FProjectsGrid.AddProject(sProject, '' );
-  end;
+    FProjectsGrid.AddProject(FProjectGroup.Projects[i].FileName, '' );
   FProjectsGrid.EndUpdate;
 end;
 
@@ -614,8 +626,6 @@ begin
 
     lblPackageId.Caption := package.Id;
     SetPackageLogo(package.Id);
-//    UpdateButtonState;
-    //btnInstallOrUpdate.Enabled := ((not FPackageMetaData.Installed) or (FPackageMetaData.LatestVersion <> FPackageMetaData.Version)) and FProjectsGrid.HasCheckedProjects;
 
     sbPackageDetails.Visible := true;
 
@@ -742,7 +752,7 @@ begin
   {$IF CompilerVersion < 34.0}
     if FSelectedVersion = FInstalledVersion then
     begin
-      btnUpgradeAll.Glyph.FreeImage;
+      btnUpgradeAll.Glyph.Assign(nil);
     end
     else  if FSelectedVersion > FInstalledVersion then
     begin
@@ -771,6 +781,26 @@ begin
     end;
   {$IFEND}
 
+end;
+
+procedure TGroupPackageDetailsFrame.VersionGridOnDowngradeEvent(const project: string);
+begin
+  ShowMessage('Downgrade : ' + project);
+end;
+
+procedure TGroupPackageDetailsFrame.VersionGridOnInstallEvent(const project: string);
+begin
+  ShowMessage('Install : ' + project);
+end;
+
+procedure TGroupPackageDetailsFrame.VersionGridOnUnInstallEvent(const project: string);
+begin
+  ShowMessage('uninstall : ' + project);
+end;
+
+procedure TGroupPackageDetailsFrame.VersionGridOnUpgradeEvent(const project: string);
+begin
+  ShowMessage('upgrade : ' + project);
 end;
 
 procedure TGroupPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);

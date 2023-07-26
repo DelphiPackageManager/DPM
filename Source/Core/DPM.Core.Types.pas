@@ -553,7 +553,7 @@ begin
           end;
         end;
     end;
-    24 : result := TCompilerVersion.RS12_0;
+    20 : result := TCompilerVersion.RS12_0;
   else
     raise EArgumentOutOfRangeException.Create('Unknown project version');
   end;
