@@ -281,9 +281,9 @@ begin
     exit(true);
 
   result := false;
- //control name and class discovered via IDE Explorer https://www.davidghoyle.co.uk/WordPress - need to check it's the same for each new IDE version
   if FVSTProxy = nil then
   begin
+   //control name and class discovered via IDE Explorer https://www.davidghoyle.co.uk/WordPress - need to check it's the same for each new IDE version
     FProjectTreeInstance := FindIDEControl('TVirtualStringTree', 'ProjectTree2');
     if FProjectTreeInstance <> nil then
     begin

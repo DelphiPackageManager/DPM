@@ -46,6 +46,8 @@ uses
   DPM.Core.Logging,
   DPM.IDE.Logger,
   DPM.Core.Options.Search,
+  DPM.Core.Options.Install,
+  DPM.Core.Options.UnInstall,
   DPM.IDE.Details.Interfaces,
   DPM.IDE.PackageDetailsPanel,
   DPM.IDE.IconCache,
@@ -74,7 +76,6 @@ type
     btnInstallAll: TSpeedButton;
     btnUpgradeAll: TSpeedButton;
     btnUninstallAll: TSpeedButton;
-    procedure cboVersionsMeasureItem(Control: TWinControl; Index: Integer; var Height: Integer);
     procedure cboVersionsDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
     procedure cboVersionsChange(Sender: TObject);
     procedure cboVersionsCloseUp(Sender: TObject);
@@ -134,6 +135,10 @@ type
 
     procedure DoGetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string);
 
+    procedure ReloadProjectGrid(const packageId : string);
+    procedure DoPackageUninstall(options : TUnInstallOptions);
+    procedure DoPackageInstall(options : TInstallOptions; const isUpdate : boolean);
+
     function GetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string): IAwaitable<IPackageSearchResultItem>;
     procedure ChangeScale(M: Integer; D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND}); override;
 
@@ -166,23 +171,62 @@ uses
   DPM.IDE.Constants,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Utils.Strings,
-  DPM.Core.Dependency.Interfaces;
-
+  DPM.Core.Dependency.Interfaces,
+  DPM.Core.Package.Installer.Interfaces;
 { TGroupPackageDetailsFrame }
 
 procedure TGroupPackageDetailsFrame.btnInstallAllClick(Sender: TObject);
+var
+  options : TInstallOptions;
 begin
-  ShowMessage('Install');
+  options := TInstallOptions.Create;
+  options.ConfigFile := FConfiguration.FileName;
+  options.PackageId := FPackageMetaData.Id;
+  options.Version := FSelectedVersion;
+  //options.ProjectPath := FProjectGroup.FileName;
+  options.Projects := FProjectsGrid.GetNotInstalledProjects;
+  options.Platforms := [FPackageMetaData.Platform];
+  options.Prerelease := FIncludePreRelease;
+  options.CompilerVersion := IDECompilerVersion;
+//  options.Force := true; //might already be installed in some projects
+  DoPackageInstall(options, false);
 end;
 
 procedure TGroupPackageDetailsFrame.btnUninstallAllClick(Sender: TObject);
+var
+  options : TUnInstallOptions;
 begin
-  ShowMessage('Remove');
+  options := TUnInstallOptions.Create;
+  options.ConfigFile := FConfiguration.FileName;
+  options.PackageId := FPackageMetaData.Id;
+  options.Version := FPackageMetaData.Version;
+//  options.ProjectPath := FProjectGroup.FileName;
+  options.Projects := FProjectsGrid.GetInstalledProjects;
+  options.Platforms := [FPackageMetaData.Platform];
+  options.CompilerVersion := IDECompilerVersion;
+
+  //TODO : this might cause errors if the packages isn't in a project.
+  DoPackageUninstall(options);
+
 end;
 
 procedure TGroupPackageDetailsFrame.btnUpgradeAllClick(Sender: TObject);
+var
+  options : TInstallOptions;
 begin
-  ShowMessage('Upgrade');
+  options := TInstallOptions.Create;
+  options.ConfigFile := FConfiguration.FileName;
+  options.PackageId := FPackageMetaData.Id;
+  options.Version := FSelectedVersion;
+//  options.ProjectPath := FProjectGroup.FileName;
+  options.Projects := FProjectsGrid.GetInstalledProjects;
+
+  options.Platforms := [FPackageMetaData.Platform];
+  options.Prerelease := FIncludePreRelease;
+  options.CompilerVersion := IDECompilerVersion;
+  options.Force := true; //might already be installed in some projects
+  DoPackageInstall(options, true);
+
 end;
 
 destructor TGroupPackageDetailsFrame.Destroy;
@@ -230,6 +274,104 @@ begin
 end;
 
 
+procedure TGroupPackageDetailsFrame.DoPackageInstall(options: TInstallOptions; const isUpdate : boolean);
+var
+  packageInstaller : IPackageInstaller;
+  installResult : boolean;
+  context : IPackageInstallerContext;
+  sPlatform : string;
+  packageMetadata : IPackageSearchResultItem;
+begin
+  installResult := false;
+  try
+    if FRequestInFlight then
+      FCancellationTokenSource.Cancel;
+
+    while FRequestInFlight do
+      Application.ProcessMessages;
+    FCancellationTokenSource.Reset;
+    FLogger.Clear;
+    FLogger.StartInstall(FCancellationTokenSource);
+    FHost.SaveBeforeInstall;
+
+    packageInstaller := FContainer.Resolve<IPackageInstaller>;
+    context := FContainer.Resolve<IPackageInstallerContext>;
+    installResult := packageInstaller.Install(FCancellationTokenSource.Token, options, context);
+    if installResult then
+    begin
+      packageMetadata := FPackageMetaData;
+      packageMetadata.Installed := true;
+      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FInstalledVersion.ToStringNoMeta + ' [' + sPlatform + '] installed.');
+      FHost.PackageInstalled(packageMetadata, isUpdate); //sets package to nil
+      FInstalledVersion := options.Version;
+      FPackageMetaData := packageMetadata;
+      ReloadProjectGrid(packageMetaData.Id);
+      SetPackage(packageMetadata, FIncludePreRelease, true);
+    end
+    else
+      FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FInstalledVersion.ToStringNoMeta + ' [' + sPlatform + '] did not install.');
+
+
+  finally
+    FLogger.EndInstall(installResult);
+  end;
+
+end;
+
+procedure TGroupPackageDetailsFrame.DoPackageUninstall(options: TUnInstallOptions);
+var
+  packageInstaller : IPackageInstaller;
+  context : IPackageInstallerContext;
+  uninstallResult : boolean;
+  sPlatform : string;
+  packageMetaData : IPackageSearchResultItem;
+  hasAnyInstalled : boolean;
+begin
+  uninstallResult := false;
+  try
+    if FRequestInFlight then
+      FCancellationTokenSource.Cancel;
+
+    while FRequestInFlight do
+      Application.ProcessMessages;
+    FCancellationTokenSource.Reset;
+    FLogger.Clear;
+    FLogger.StartUnInstall(FCancellationTokenSource);
+    FHost.SaveBeforeInstall;
+
+    sPlatform := DPMPlatformToString(FPackageMetaData.Platform);
+    FLogger.Information('UnInstalling package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version.ToStringNoMeta + ' [' + sPlatform + ']');
+    packageInstaller := FContainer.Resolve<IPackageInstaller>;
+    context := FContainer.Resolve<IPackageInstallerContext>;
+    uninstallResult := packageInstaller.UnInstall(FCancellationTokenSource.Token, options, context);
+    if uninstallResult then
+    begin
+      packageMetaData := FPackageMetaData;
+      FLogger.Information('Package ' + packageMetaData.Id + ' - ' + packageMetaData.Version.ToStringNoMeta + ' [' + sPlatform + '] uninstalled.');
+      FHost.PackageUninstalled(FPackageMetaData);
+      ReloadProjectGrid(packageMetaData.Id);
+
+      if FProjectsGrid.HasAnyInstalled then
+      begin
+        FInstalledVersion := options.Version;
+        packageMetaData.Installed := true;
+        SetPackage(packageMetaData, FIncludePreRelease, false);
+      end
+      else
+      begin
+        FInstalledVersion := options.Version;
+        SetPackage(nil, FIncludePreRelease);
+      end;
+    end
+    else
+      FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version.ToStringNoMeta + ' [' + sPlatform + '] did not uninstall.');
+
+  finally
+    FLogger.EndUnInstall(uninstallResult);
+
+  end;
+end;
+
 procedure TGroupPackageDetailsFrame.cboVersionsChange(Sender: TObject);
 var
   sVersion : string;
@@ -263,7 +405,7 @@ begin
     cboVersions.Canvas.TextOut(Rect.Left + 1, Rect.Top + 1, cboVersions.Items[Index]) //Visual state of the text in the edit control
   else
   begin
-    if FDropdownOpen and (Index > 0) then
+    if FDropdownOpen {and (Index > 0)} then
     begin
       if SameText(sInstalledVersion, cboVersions.Items[index]) then
         cboVersions.Canvas.Font.Style := [TFontStyle.fsBold];
@@ -271,30 +413,11 @@ begin
     cboVersions.Canvas.TextOut(Rect.Left + 2, Rect.Top, cboVersions.Items[Index]); //Visual state of the text(items) in the deployed list
   end;
 
-  if odComboBoxEdit in State then
-    exit;
-
-  //draw underline.
-  if Integer(cboVersions.Items.Objects[index]) <> 0 then
-  begin
-    cboVersions.Canvas.Pen.Color := clGray;
-    cboVersions.Canvas.MoveTo(Rect.Left, Rect.Bottom - 1);
-    cboVersions.Canvas.LineTo(Rect.Right, Rect.Bottom - 1);
-  end;
-
 end;
 
 procedure TGroupPackageDetailsFrame.cboVersionsDropDown(Sender: TObject);
 begin
   FDropdownOpen := true;
-end;
-
-procedure TGroupPackageDetailsFrame.cboVersionsMeasureItem(Control: TWinControl; Index: Integer; var Height: Integer);
-begin
-  if (cboVersions.Items.Count = 0) or (index < 0) then
-    exit;
-  if cboVersions.Items.Objects[index] <> nil then
-    Inc(Height, 4);
 end;
 
 procedure TGroupPackageDetailsFrame.ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND});
@@ -540,15 +663,11 @@ end;
 procedure TGroupPackageDetailsFrame.ProjectReloaded;
 var
   i : integer;
-  sProject : string;
 begin
   FProjectsGrid.BeginUpdate;
   FProjectsGrid.Clear;
   for i := 0 to FProjectGroup.ProjectCount -1 do
-  begin
-    sProject := ChangeFileExt(ExtractFileName(FProjectGroup.Projects[i].FileName), '');
-    FProjectsGrid.AddProject(sProject, '' );
-  end;
+    FProjectsGrid.AddProject(FProjectGroup.Projects[i].FileName, '');
   FProjectsGrid.EndUpdate;
 end;
 
@@ -557,6 +676,38 @@ begin
   UpdateButtonState;
 end;
 
+
+procedure TGroupPackageDetailsFrame.ReloadProjectGrid(const packageId : string);
+var
+  i: Integer;
+  packageRefs : IPackageReference;
+  projectRefs : IPackageReference;
+  projectRef : IPackageReference;
+begin
+  packageRefs := FHost.GetPackageReferences;
+  FProjectsGrid.BeginUpdate;
+  try
+    FProjectsGrid.Clear;
+    for i := 0 to FProjectGroup.ProjectCount -1 do
+    begin
+      FProjectsGrid.AddProject(FProjectGroup.Projects[i].FileName, '');
+      if packageRefs <> nil then
+      begin
+        projectRef := nil;
+        projectRefs := packageRefs.FindDependency(LowerCase(FProjectGroup.Projects[i].FileName));
+        if projectRefs <> nil then
+          projectRef := projectRefs.FindDependency(packageId);
+      end;
+
+      if projectRef <> nil then
+        FProjectsGrid.ProjectVersion[i] := projectRef.Version
+      else
+        FProjectsGrid.ProjectVersion[i] := TPackageVersion.Empty;
+    end;
+  finally
+    FProjectsGrid.EndUpdate;
+  end;
+end;
 
 function TGroupPackageDetailsFrame.GetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string): IAwaitable<IPackageSearchResultItem>;
 var
@@ -784,23 +935,68 @@ begin
 end;
 
 procedure TGroupPackageDetailsFrame.VersionGridOnDowngradeEvent(const project: string);
+var
+  options : TInstallOptions;
 begin
-  ShowMessage('Downgrade : ' + project);
+  options := TInstallOptions.Create;
+  options.ConfigFile := FConfiguration.FileName;
+  options.PackageId := FPackageMetaData.Id;
+  options.Version := FSelectedVersion;
+  options.ProjectPath := project;
+  options.Platforms := [FPackageMetaData.Platform];
+  options.Prerelease := FIncludePreRelease;
+  options.CompilerVersion := IDECompilerVersion;
+  options.Force := true;
+  DoPackageInstall(options, true);
 end;
 
 procedure TGroupPackageDetailsFrame.VersionGridOnInstallEvent(const project: string);
+var
+  options : TInstallOptions;
 begin
-  ShowMessage('Install : ' + project);
+  options := TInstallOptions.Create;
+  options.ConfigFile := FConfiguration.FileName;
+  options.PackageId := FPackageMetaData.Id;
+  options.Version := FSelectedVersion;
+  options.ProjectPath := project;
+  options.Platforms := [FPackageMetaData.Platform];
+  options.Prerelease := FIncludePreRelease;
+  options.CompilerVersion := IDECompilerVersion;
+  DoPackageInstall(options, false);
+  //call common function
+
 end;
 
 procedure TGroupPackageDetailsFrame.VersionGridOnUnInstallEvent(const project: string);
+var
+  options : TUnInstallOptions;
 begin
-  ShowMessage('uninstall : ' + project);
+  options := TUnInstallOptions.Create;
+  options.ConfigFile := FConfiguration.FileName;
+  options.PackageId := FPackageMetaData.Id;
+  options.Version := FPackageMetaData.Version;
+  options.ProjectPath := project;
+  options.Platforms := [FPackageMetaData.Platform];
+  options.CompilerVersion := IDECompilerVersion;
+
+  DoPackageUninstall(options);
 end;
 
 procedure TGroupPackageDetailsFrame.VersionGridOnUpgradeEvent(const project: string);
+var
+  options : TInstallOptions;
 begin
-  ShowMessage('upgrade : ' + project);
+  options := TInstallOptions.Create;
+  options.ConfigFile := FConfiguration.FileName;
+  options.PackageId := FPackageMetaData.Id;
+  options.Version := FSelectedVersion;
+  options.ProjectPath := project;
+  options.Platforms := [FPackageMetaData.Platform];
+  options.Prerelease := FIncludePreRelease;
+  options.CompilerVersion := IDECompilerVersion;
+  options.Force := true; //changing the installed version, so we need to force it
+  DoPackageInstall(options, true);
+  //call common function
 end;
 
 procedure TGroupPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);

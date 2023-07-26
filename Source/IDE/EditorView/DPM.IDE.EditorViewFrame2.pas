@@ -129,7 +129,10 @@ type
     FInstalledPackages : IList<IPackageSearchResultItem>;
     //implicitly installled
     FImplicitPackages : IList<IPackageSearchResultItem>;
+    //packages found by searching
     FAvailablePackages : IList<IPackageSearchResultItem>;
+
+    FCurrentPackage : IPackageSearchResultItem;
 
     FInstalledActivity : TActivityIndicator;
     FImplicitActivity  : TActivityIndicator;
@@ -432,7 +435,6 @@ begin
   FRequestsInFlight := 0;
   FCurrentPlatform := TDPMPlatform.UnknownPlatform;
 
-//  PackageDetailsFrame.Configure(FCurrentTab, FSearchBar.IncludePrerelease);
 
 end;
 
@@ -529,6 +531,7 @@ var
   filterProc : TFilterProc;
 begin
   //note refresh only ever applies to the installed packages, we always fetch the available packages.
+  FLogger.Debug('DPMIDE : DoPlatformChange');
 
   if FCurrentPlatform <> newPlatform then
   begin
@@ -537,7 +540,7 @@ begin
     FScrollList.CurrentRow := -1;
 
     PackageDetailsFrame.SetPlatform(FCurrentPlatform);
-    PackageDetailsFrame.SetPackage(nil, FSearchOptions.Prerelease);
+    //TODO : Can we maintain the currently selected package?
     FSearchBar.SetPlatform(FCurrentPlatform);
     FSearchOptions.Platforms := [FCurrentPlatform];
     filterProc := FilterInstalledPackages;
@@ -548,8 +551,8 @@ begin
     FImplicitActivity.Step;
     FScrollList.InvalidateRow(FImplicitHeaderRowIdx);
     ActivityTimer.Enabled := true;
-    if FRequestsInFlight > 0 then
-      FCancelTokenSource.Cancel;
+//    if FRequestsInFlight > 0 then
+//      FCancelTokenSource.Cancel;
 
     while FRequestsInFlight > 0 do
       Application.ProcessMessages;
@@ -796,13 +799,33 @@ begin
 end;
 
 procedure TDPMEditViewFrame2.PackageInstalled(const package: IPackageSearchResultItem; const isUpdate: boolean);
+var
+  platform : TDPMPlatform;
 begin
-
+  //Tell the IDE to reload the project as we have just modified it on disk.
+  FProjectGroup.Refresh(false);
+  //force the project tree to update after installing package.
+  //FProjectTreeManager.EndLoading();
+//  platform := FCurrentPlatform;
+//  FCurrentPlatform := TDPMPlatform.UnknownPlatform;
+  FLogger.Debug('DPMIDE : PackageInstalled');
+//  DoPlatformChange(platform, true);
+//  PackageDetailsFrame.ProjectReloaded;
 end;
 
 procedure TDPMEditViewFrame2.PackageUninstalled(const package: IPackageSearchResultItem);
+var
+  platform : TDPMPlatform;
 begin
-
+  //Tell the IDE to reload the project as we have just modified it on disk.
+  FProjectGroup.Refresh(false);
+  //force the project tree to update after installing package.
+  //FProjectTreeManager.EndLoading();
+//  platform := FCurrentPlatform;
+//  FCurrentPlatform := TDPMPlatform.UnknownPlatform;
+  FLogger.Debug('DPMIDE : PackageUnInstalled');
+  //DoPlatformChange(platform, true);
+//  PackageDetailsFrame.ProjectReloaded;
 end;
 
 procedure TDPMEditViewFrame2.platformChangeDetectTimerTimer(Sender: TObject);
@@ -821,6 +844,7 @@ begin
       projectPlatform := ProjectPlatformToDPMPlatform(project.CurrentPlatform);
       if projectPlatform = TDPMPlatform.UnknownPlatform then
         raise Exception.Create('FProject.CurrentPlatform : ' + project.CurrentPlatform);
+      FLogger.Debug('DPMIDE : platformChangeDetectTimerTimer');
       DoPlatformChange(projectPlatform, true);
     end;
   end;
@@ -831,7 +855,7 @@ procedure TDPMEditViewFrame2.ProjectChanged;
 var
   platforms : TDPMPlatforms;
 begin
-  FLogger.Debug('DPMIDE : EditViewReloaded');
+  FLogger.Debug('DPMIDE : ProjectChanged');
   FCurrentPlatform := TDPMPlatform.UnknownPlatform; //force a reload
   PackageDetailsFrame.ProjectReloaded;
 
@@ -845,9 +869,19 @@ begin
 end;
 
 procedure TDPMEditViewFrame2.ProjectClosed(const projectName: string);
+var
+  platforms : TDPMPlatforms;
 begin
   TSystemUtils.OutputDebugString('TDPMEditViewFrame2.ProjectClosed : ' + projectName);
-  ProjectChanged;
+  FLogger.Debug('DPMIDE : ProjectClosed');
+  FCurrentPlatform := TDPMPlatform.UnknownPlatform; //force a reload
+  PackageDetailsFrame.ProjectReloaded;
+
+  //need to update searchbar platforms etc.
+
+  platforms := GetPlatforms;
+  FSearchBar.UpdatePlatforms(platforms);
+//  DoPlatformChange(FSearchBar.Platform, true);
 end;
 
 procedure TDPMEditViewFrame2.ProjectLoaded(const projectName: string);
@@ -918,6 +952,12 @@ begin
             item.Installed := true;
           end;
         end;
+        result.Sort(function(const Left, Right : IPackageSearchResultItem) : Integer
+          begin
+            result := CompareStr(Left.Id, Right.Id);
+          end);
+
+
         FLogger.Debug('DPMIDE : Got Installed package metadata.');
       finally
         CoUninitialize;
@@ -1106,7 +1146,8 @@ begin
     end;
     rkUnknown: ;
   end;
-  PackageDetailsFrame.SetPackage(item, FSearchOptions.Prerelease, true);
+  FCurrentPackage := item;
+  PackageDetailsFrame.SetPackage(FCurrentPackage, FSearchOptions.Prerelease, true);
 end;
 
 procedure TDPMEditViewFrame2.ScrollListPaintNoRows(const Sender: TObject;  const ACanvas: TCanvas; const paintRect: TRect);

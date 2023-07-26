@@ -181,7 +181,6 @@ begin
     else
     begin
       //if it's not the project group being closed then just notify the view
-//       (FEditorView as IDPMEditorView).ProjectChanged; //remove
        (FEditorView as IDPMEditorView).ProjectClosed(projectFile);
     end;
   end;

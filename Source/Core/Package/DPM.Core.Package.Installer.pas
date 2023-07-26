@@ -1337,8 +1337,11 @@ begin
     if config = nil then
       exit;
 
-
-    if FileExists(Options.ProjectPath) then
+    if Length(options.Projects) > 0 then
+    begin
+      projectFiles := options.Projects;
+    end
+    else if FileExists(Options.ProjectPath) then
     begin
       if ExtractFileExt(Options.ProjectPath) = '.groupproj' then
       begin
@@ -1439,6 +1442,7 @@ begin
   begin
     if cancellationToken.IsCancelled then
       exit;
+    projectFile := projectFiles[i];
     if TPathUtils.IsRelativePath(projectFile) then
     begin
       projectFile := TPath.Combine(GetCurrentDir, projectFile);
@@ -1461,7 +1465,7 @@ begin
   begin
     if cancellationToken.IsCancelled then
       exit;
-    projectFile := projectFiles[0];
+    projectFile := projectFiles[i];
     if TPathUtils.IsRelativePath(projectFile) then
     begin
       projectFile := TPath.Combine(GetCurrentDir, projectFile);
@@ -1697,7 +1701,11 @@ begin
     exit;
   end;
 
-  if FileExists(Options.ProjectPath) then
+  if Length(options.Projects) > 0 then
+  begin
+    projectFiles := options.Projects;
+  end
+  else if FileExists(Options.ProjectPath) then
   begin
     // TODO : If we are using a groupProj then we shouldn't allow different versions of a package in different projects
     // need to work out how to detect this.

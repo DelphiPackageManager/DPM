@@ -41,6 +41,7 @@ type
     FVersionString : string;
     FNoCache : boolean;
     FProjectPath : string;
+    FProjects : TArray<string>;
     FFloat : boolean;
     class var
       FDefault : TInstallOptions;
@@ -58,6 +59,7 @@ type
     property PackageId : string read GetPackageId write SetPackageId;
     property PackageFile : string read FPackageFile write FPackageFile;
     property ProjectPath : string read FProjectPath write FProjectPath;
+    property Projects : TArray<string> read FProjects write FProjects;
     property VersionString : string read FVersionString write FVersionString;
   end;
 
@@ -106,6 +108,7 @@ procedure TInstallOptions.SetPackageId(const Value : string);
 begin
   SearchTerms := value;
 end;
+
 
 function TInstallOptions.Validate(const logger : ILogger) : Boolean;
 var
@@ -159,7 +162,7 @@ begin
     Self.Version := theVersion;
   end;
 
-  if FProjectPath = '' then
+  if (FProjectPath = '') and (Length(FProjects) = 0) then
   begin
     Logger.Error('Project path cannot be empty, must either be a directory or project file.');
     result := false;

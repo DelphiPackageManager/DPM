@@ -36,6 +36,7 @@ type
   TUninstallOptions = class(TSearchOptions)
   private
     FProjectPath : string;
+    FProjects : TArray<string>;
     class var
       FDefault : TUninstallOptions;
   protected
@@ -51,6 +52,7 @@ type
 
     property PackageId : string read GetPackageId write SetPackageId;
     property ProjectPath : string read FProjectPath write FProjectPath;
+    property Projects : TArray<string> read FProjects write FProjects;
   end;
 
 implementation
@@ -94,7 +96,7 @@ begin
   //must call inherited
   result := inherited Validate(logger);
 
-  if FProjectPath = '' then
+  if (FProjectPath = '') and (Length(FProjects) = 0) then
   begin
     Logger.Error('Project path cannot be empty, must either be a directory or project file.');
     result := false;

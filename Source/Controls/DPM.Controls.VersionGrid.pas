@@ -98,7 +98,6 @@ type
 
     FUpdateCount : integer;
 
-    FCheckedCount : integer;
     FPackageVersion: TPackageVersion;
 
     FSelectionChangedEvent : TNotifyEvent;
@@ -185,10 +184,9 @@ type
     procedure MouseMove(Shift: TShiftState; X: Integer; Y: Integer); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
 
-    procedure UpdateCheckedCount(const checked : boolean);
-
     procedure DoSelectionChanged;
 
+    function GetHasAnyInstalled : boolean;
 
   public
     constructor Create(AOwner : TComponent);override;
@@ -202,10 +200,12 @@ type
     procedure ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND} ); override;
     procedure Clear;
     procedure AddProject(const project : string; const version : string);
-
+    function GetInstalledProjects : TArray<string>;
+    function GetNotInstalledProjects : TArray<string>;
     property CurrentRow : Integer read FCurrentRow;
     property TopRow : Integer read FTopRow;
 
+    property HasAnyInstalled : boolean read GetHasAnyInstalled;
     property ImageList : TCustomImageList read FImageList write SetImageList;
     property ProjectName[index : integer] : string read GetProjectName;
     property ProjectVersion[index : integer] : TPackageVersion read GetProjectVersion write SetProjectVersion;
@@ -289,7 +289,6 @@ end;
 procedure TVersionGrid.Clear;
 begin
   FRows.Clear;
-  FCheckedCount := 0;
 end;
 
 procedure TVersionGrid.CMEnter(var Message: TCMEnter);
@@ -380,8 +379,6 @@ begin
 
   FVScrollPos := 0;
   FHScrollPos := 0;
-
-  FCheckedCount := 0;
 
 end;
 
@@ -1032,7 +1029,56 @@ begin
   end;
 
 end;
+function TVersionGrid.GetHasAnyInstalled: boolean;
+var
+  i : integer;
+begin
+  result := false;
+  for i := 0 to FRows.Count -1 do
+  begin
+    if not FRows[i].InstalledVersion.IsEmpty then
+      exit(true);
+  end;
+end;
 
+function TVersionGrid.GetNotInstalledProjects: TArray<string>;
+var
+  list : TList<string>;
+  i : integer;
+begin
+  result := [];
+  list := TList<string>.Create;
+  try
+    for i := 0 to FRows.Count -1 do
+    begin
+      if FRows[i].InstalledVersion.IsEmpty then
+        list.Add(FRows[i].ProjectName);
+    end;
+  finally
+    result := list.ToArray;
+    list.Free;
+  end;
+end;
+
+function TVersionGrid.GetInstalledProjects: TArray<string>;
+var
+  list : TList<string>;
+  i : integer;
+begin
+  result := [];
+  list := TList<string>.Create;
+  try
+    for i := 0 to FRows.Count -1 do
+    begin
+      if not FRows[i].InstalledVersion.IsEmpty then
+        list.Add(FRows[i].ProjectName);
+    end;
+  finally
+    result := list.ToArray;
+    list.Free;
+  end;
+
+end;
 
 function TVersionGrid.GetProjectName(index: integer): string;
 begin
@@ -1485,15 +1531,7 @@ begin
   Invalidate;
 end;
 
-procedure TVersionGrid.UpdateCheckedCount(const checked: boolean);
-begin
-  if checked then
-    Inc(FCheckedCount)
-  else
-    Dec(FCheckedCount);
-  if FCheckedCount < 0 then
-    FCheckedCount := 0;  
-end;
+
 
 procedure TVersionGrid.UpdateColumns;
 begin

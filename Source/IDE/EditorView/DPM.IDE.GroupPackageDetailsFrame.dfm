@@ -208,7 +208,6 @@ object GroupPackageDetailsFrame: TGroupPackageDetailsFrame
           OnCloseUp = cboVersionsCloseUp
           OnDrawItem = cboVersionsDrawItem
           OnDropDown = cboVersionsDropDown
-          OnMeasureItem = cboVersionsMeasureItem
         end
       end
     end
