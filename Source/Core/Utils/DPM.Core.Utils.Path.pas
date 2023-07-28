@@ -282,8 +282,10 @@ begin
   begin
     if isUnc then
       basePath := '\\' + basePath;
-    if not StartsWith(result, basePath) then
-      exit(path);
+      //TODO : this is bogus, because a ..\ could change this
+      // it was added for copylocal so need to test that.
+//    if not StartsWith(result, basePath) then
+//      exit(path);
   end;
 end;
 
