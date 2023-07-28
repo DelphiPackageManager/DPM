@@ -960,16 +960,7 @@ function TPackageInstaller.DoUninstallFromProject(const cancellationToken : ICan
 var
   projectPackageGraph: IPackageReference;
   foundReference: IPackageReference;
-  packageSpecs: IDictionary<string, IPackageSpec>;
-  projectReferences: IList<TProjectReference>;
-  resolvedPackages: IList<IPackageInfo>;
-  packagesToCompile: IList<IPackageInfo>;
-  compiledPackages: IList<IPackageInfo>;
-  packageSearchPaths: IList<string>;
-  packageCompiler: ICompiler;
-  seenPackages: IDictionary<string, IPackageInfo>;
 begin
-  result := false;
   projectPackageGraph := projectEditor.GetPackageReferences(platform);
   // can return nil
   // if there is no project package graph then there is nothing to do.
@@ -988,53 +979,24 @@ begin
     exit(true);
   end;
 
-  projectPackageGraph.RemovePackageReference(foundReference);
+  //remove the node from the graph
+  projectPackageGraph.RemoveTopLevelPackageReference(foundReference.Id);
 
-  seenPackages := TCollections.CreateDictionary<string, IPackageInfo>;
-  projectReferences := TCollections.CreateList<TProjectReference>;
+  //TODO : Context - Remove Design Packages if no longer referenced.
 
-  // TODO : Can packagerefs be replaced by just adding the info to the nodes?
-  if not CreateProjectRefs(cancellationToken, projectPackageGraph, seenPackages, projectReferences) then
-    exit;
-
-  if not FDependencyResolver.ResolveForRestore(cancellationToken, Options.CompilerVersion, platform, projectFile, Options, projectReferences, projectPackageGraph, resolvedPackages) then
-  begin
-    FLogger.Error('Resolver failed!');
-    // projectEditor.UpdatePackageReferences(projectPackageGraph, platform);
-    // projectEditor.SaveProject();
-     exit;
-  end;
-
-  if resolvedPackages = nil then
-  begin
-    FLogger.Error('Resolver returned no packages!');
-    exit;
-  end;
-
-  // downloads the package files to the cache if they are not already there and
-  // returns the deserialized dspec as we need it for search paths and
-  if not DownloadPackages(cancellationToken, resolvedPackages, packageSpecs) then
-    exit;
-
-  compiledPackages := TCollections.CreateList<IPackageInfo>;
-  packagesToCompile := TCollections.CreateList<IPackageInfo>(resolvedPackages);
-  packageSearchPaths := TCollections.CreateList<string>;
-  packageCompiler := FCompilerFactory.CreateCompiler(Options.compilerVersion, platform);
-
-  // even though we are just uninstalling a package here.. we still need to run the compiliation stage to collect paths
-  // it will mostly be a no-op as everyhing is likely already compiled.
-  if not BuildDependencies(cancellationToken, packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs, Options) then
-    exit;
-
-  if not CollectSearchPaths(projectPackageGraph, resolvedPackages, compiledPackages, projectEditor.compilerVersion, platform, packageSearchPaths) then
-    exit;
-
-  if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
-    exit;
+  //now work out which search paths we can remove;
+  //walk the package reference tree and check transient dependencies
+  foundReference.VisitDFS(
+      procedure(const node: IPackageReference)
+      begin
+        //if there is no other transient dependency then we can remove
+        //from the search path.
+        if not projectPackageGraph.HasAnyDependency(node.Id) then
+            projectEditor.RemoveFromSearchPath(platform, node.Id);
+      end);
 
   projectEditor.UpdatePackageReferences(projectPackageGraph, platform);
   result := projectEditor.SaveProject();
-
 end;
 
 function TPackageInstaller.BuildDependencies(const cancellationToken : ICancellationToken; const packageCompiler: ICompiler; const projectPackageGraph: IPackageReference;

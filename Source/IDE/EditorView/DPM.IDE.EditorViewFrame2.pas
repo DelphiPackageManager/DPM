@@ -532,7 +532,7 @@ var
 begin
   //note refresh only ever applies to the installed packages, we always fetch the available packages.
   FLogger.Debug('DPMIDE : DoPlatformChange');
-
+  TSystemUtils.OutputDebugString('TDPMEditViewFrame2.DoPlatformChange');
   if FCurrentPlatform <> newPlatform then
   begin
     FCurrentPlatform := newPlatform;
@@ -799,8 +799,8 @@ begin
 end;
 
 procedure TDPMEditViewFrame2.PackageInstalled(const package: IPackageSearchResultItem; const isUpdate: boolean);
-var
-  platform : TDPMPlatform;
+//var
+//  platform : TDPMPlatform;
 begin
   //Tell the IDE to reload the project as we have just modified it on disk.
   FProjectGroup.Refresh(false);
@@ -814,8 +814,8 @@ begin
 end;
 
 procedure TDPMEditViewFrame2.PackageUninstalled(const package: IPackageSearchResultItem);
-var
-  platform : TDPMPlatform;
+//var
+//  platform : TDPMPlatform;
 begin
   //Tell the IDE to reload the project as we have just modified it on disk.
   FProjectGroup.Refresh(false);
@@ -845,10 +845,11 @@ begin
       if projectPlatform = TDPMPlatform.UnknownPlatform then
         raise Exception.Create('FProject.CurrentPlatform : ' + project.CurrentPlatform);
       FLogger.Debug('DPMIDE : platformChangeDetectTimerTimer');
-      DoPlatformChange(projectPlatform, true);
+
+//      DoPlatformChange(projectPlatform, true);
     end;
   end;
-  platformChangeDetectTimer.Enabled := true;
+  //platformChangeDetectTimer.Enabled := true;
 end;
 
 procedure TDPMEditViewFrame2.ProjectChanged;
@@ -1468,7 +1469,7 @@ procedure TDPMEditViewFrame2.ViewDeselected;
 begin
   // The view tab was deselected.
   FLogger.Debug('DPMIDE : View Deselected');
-  platformChangeDetectTimer.Enabled := false;
+//  platformChangeDetectTimer.Enabled := false;
   FFirstView := true;
 end;
 
@@ -1476,7 +1477,7 @@ procedure TDPMEditViewFrame2.ViewSelected;
 begin
   FLogger.Debug('DPMIDE : View Selected');
   //For some reason this get's called twice for each time the view is selected.
-  platformChangeDetectTimer.Enabled := true;
+//  platformChangeDetectTimer.Enabled := true;
   if FFirstView then
   begin
     FFirstView := false;

@@ -87,6 +87,7 @@ type
     function GetDPMPropertyGroup : IXMLDOMElement;
     function EnsureBaseSearchPath : boolean;
 
+    procedure RemoveFromSearchPath(const platform : TDPMPlatform; const packageId : string);
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string> ; const packageCacheLocation : string) : boolean;
     procedure UpdatePackageReferences(const dependencyGraph : IPackageReference; const platform : TDPMPlatform);
     function GetPackageReferences(const platform : TDPMPlatform) : IPackageReference;
@@ -100,6 +101,7 @@ implementation
 uses
   System.Classes,
   System.SysUtils,
+  System.StrUtils,
   DPM.Core.Constants,
   DPM.Core.Utils.Xml,
   DPM.Core.Dependency.Version,
@@ -808,6 +810,52 @@ begin
   end
   else
     FLogger.Error('ProjectVersion element not found, unable to determine Compiler version');
+end;
+
+procedure TProjectEditor.RemoveFromSearchPath(const platform: TDPMPlatform; const packageId: string);
+var
+  dpmGroup : IXMLDOMElement;
+  dpmSearchElement : IXMLDOMElement;
+  condition : string;
+  searchPathPrefix : string;
+  sList : TStringList;
+  i : integer;
+begin
+  dpmGroup := GetDPMPropertyGroup;
+  if dpmGroup = nil then
+  begin
+    FLogger.Error('Unabled to find or create PropertyGroup for DPM in the project file');
+    exit;
+  end;
+
+  condition := '''$(Platform)''==''' + DPMPlatformToBDString(platform) + '''';
+
+  dpmSearchElement := dpmGroup.selectSingleNode('x:DPMSearch[@Condition = "' + condition + '"]') as IXMLDOMElement;
+
+  //not found..
+  if dpmSearchElement = nil then
+    exit;
+
+  searchPathPrefix := '$(DPM)\' + packageId + '\';
+
+  sList := TStringList.Create;
+  try
+    sList.Delimiter := ';';
+    sList.DelimitedText := dpmSearchElement.text;
+
+    for i := sList.Count -1  downto 0 do
+    begin
+      // if there is a trailing delimeter we end up with an empty entry which we do not want
+      if StartsText(searchPathPrefix, sList.Strings[i]) or (sList.Strings[i] = '') then
+      begin
+        sList.Delete(i);
+      end;
+    end;
+    dpmSearchElement.text := sList.DelimitedText;
+
+  finally
+    sList.Free;
+  end;
 end;
 
 procedure TProjectEditor.Reset;

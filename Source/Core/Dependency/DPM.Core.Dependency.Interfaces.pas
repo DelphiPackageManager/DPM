@@ -81,11 +81,14 @@ type
     /// <summary> Searches this reference only
     /// </summary>
     function FindDependency(const id : string) : IPackageReference;
-
+    function HasTopLevelDependency(const id : string) : boolean;
+    function HasAnyDependency(const id : string) : boolean;
     function Clone : IPackageReference;
 
     //removes any child with id recursively (and it's children)
     function RemovePackageReference(const packageReference : IPackageReference) : boolean;
+    function RemoveTopLevelPackageReference(const id : string) : boolean;
+
     function IsRoot : boolean;
     function HasDependencies : boolean;
     procedure VisitDFS(const visitor : TNodeVisitProc);

@@ -325,7 +325,6 @@ var
   uninstallResult : boolean;
   sPlatform : string;
   packageMetaData : IPackageSearchResultItem;
-  hasAnyInstalled : boolean;
 begin
   uninstallResult := false;
   try

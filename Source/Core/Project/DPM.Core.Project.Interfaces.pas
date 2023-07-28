@@ -74,6 +74,8 @@ type
     function LoadProject(const filename : string; const elements : TProjectElements = [TProjectElement.All]) : boolean;
     procedure Reset;
 
+    procedure RemoveFromSearchPath(const platform : TDPMPlatform; const packageId : string);
+
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string>; const packageCacheLocation : string) : boolean;
     procedure UpdatePackageReferences(const dependencyGraph : IPackageReference; const platform : TDPMPlatform);
 

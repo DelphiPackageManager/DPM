@@ -72,6 +72,12 @@ type
     function FindFirstPackageReference(const id : string) : IPackageReference;
     function FindPackageReferences(const id : string) : IList<IPackageReference>;
     function FindDependency(const id : string) : IPackageReference;
+    function HasTopLevelDependency(const id : string) : boolean;
+    function HasAnyDependency(const id : string) : boolean;
+    function RemoveTopLevelPackageReference(const id : string) : boolean;
+    function RemovePackageReference(const packageReference : IPackageReference) : boolean;
+
+
     function GetDependencies : IEnumerable<IPackageReference>;
     function GetId : string;
     function GetParent : IPackageReference;
@@ -92,7 +98,6 @@ type
     function GetPlatform : TDPMPlatform;
     procedure SetVersion(const value : TPackageVersion);
     procedure SetSelectedOn(const value : TVersionRange);
-    function RemovePackageReference(const packageReference : IPackageReference) : boolean;
     function IsRoot : boolean;
     function HasDependencies : boolean;
     procedure VisitDFS(const visitor : TNodeVisitProc);
@@ -354,9 +359,22 @@ begin
   result := FUseSource or ((parent <> nil) and parent.UseSource);
 end;
 
+function TPackageReference.HasAnyDependency(const id: string): boolean;
+var
+  packageRef : IPackageReference;
+begin
+  packageRef := FindFirstPackageReference(id);
+  result := packageRef <> nil;
+end;
+
 function TPackageReference.HasDependencies : boolean;
 begin
   result := FDependencies.Any;
+end;
+
+function TPackageReference.HasTopLevelDependency(const id: string): boolean;
+begin
+  result := FDependencies.ContainsKey(LowerCase(id));
 end;
 
 function TPackageReference.IsRoot : boolean;
@@ -374,6 +392,13 @@ begin
       newChild := oldChild.Clone;
       newParent.AddExistingReference(newChild.Id, newChild);
     end);
+end;
+
+function TPackageReference.RemoveTopLevelPackageReference(const id : string) : boolean;
+begin
+  result := FDependencies.ContainsKey(LowerCase(id));
+  if result then
+    FDependencies.Remove(LowerCase(id));
 end;
 
 function TPackageReference.RemovePackageReference(const packageReference : IPackageReference) : boolean;
