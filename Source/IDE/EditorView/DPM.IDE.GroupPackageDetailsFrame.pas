@@ -54,6 +54,7 @@ uses
   DPM.IDE.Types,
   Vcl.ImgList,
   {$IF CompilerVersion >= 33.0 }
+  {$LEGACYIFEND ON}
   Vcl.VirtualImageList,
   Vcl.ImageCollection,
   {$IFEND}
