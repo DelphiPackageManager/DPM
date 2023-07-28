@@ -1046,7 +1046,8 @@ var
   list : TList<string>;
   i : integer;
 begin
-  result := [];
+  SetLength(result, 0);
+//  result := [];
   list := TList<string>.Create;
   try
     for i := 0 to FRows.Count -1 do
@@ -1065,7 +1066,8 @@ var
   list : TList<string>;
   i : integer;
 begin
-  result := [];
+  SetLength(result, 0);
+//  result := [];
   list := TList<string>.Create;
   try
     for i := 0 to FRows.Count -1 do
