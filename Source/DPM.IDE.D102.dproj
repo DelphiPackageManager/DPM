@@ -266,7 +266,7 @@
         </DCCReference>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.ServiceIndex.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.ListItem.pas"/>
-        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorViewFrame2.pas">
+        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorViewFrame.pas">
             <Form>DPMEditViewFrame2</Form>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>

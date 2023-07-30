@@ -307,7 +307,7 @@ begin
           terminateontimeout = true
           timeoutlength = 2
           as.projectpath = %SRC_ROOT%\\dpm.dproj
-          as.compilerversion = 10.4
+          as.compilerversion = 11.0
           as.verbosity = Debug
           as.nobanner = True
         end
@@ -325,7 +325,7 @@ begin
           compileridl = true
           configname = Release
           debugversionnumbers = false
-          delphiversion = Delphi10_4
+          delphiversion = Delphi11
           enabletimeout = false
           eurekalogverboselogging = false
           frameworktype = VCL
