@@ -1,4 +1,4 @@
-object DPMEditViewFrame2: TDPMEditViewFrame2
+object DPMEditViewFrame: TDPMEditViewFrame
   Left = 0
   Top = 0
   Width = 1010

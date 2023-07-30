@@ -1,4 +1,4 @@
-﻿unit DPM.IDE.EditorViewFrame2;
+﻿unit DPM.IDE.EditorViewFrame;
 
 interface
 
@@ -67,7 +67,7 @@ type
 
 
 
-  TDPMEditViewFrame2 = class(TFrame, IDetailsHost)
+  TDPMEditViewFrame = class(TFrame, IDetailsHost)
     ContentPanel : TPanel;
     Splitter2 : TSplitter;
     PackageListPanel : TPanel;
@@ -270,7 +270,7 @@ end;
 
 { TDPMEditViewFrame2 }
 
-procedure TDPMEditViewFrame2.ActivityTimerTimer(Sender: TObject);
+procedure TDPMEditViewFrame.ActivityTimerTimer(Sender: TObject);
 begin
   ActivityTimer.Enabled := false;
   if FInstalledActivity.IsActive then
@@ -291,7 +291,7 @@ begin
   ActivityTimer.Enabled := FInstalledActivity.IsActive or FImplicitActivity.IsActive or FAvailableActivity.IsActive;
 end;
 
-procedure TDPMEditViewFrame2.CalculateIndexes;
+procedure TDPMEditViewFrame.CalculateIndexes;
 var
   installedCount : Int64;
   implicitCount : Int64;
@@ -311,24 +311,24 @@ begin
   FScrollList.RowCount := FRowCount;
 end;
 
-function TDPMEditViewFrame2.CanCloseView: boolean;
+function TDPMEditViewFrame.CanCloseView: boolean;
 begin
   result := true; //TODO : Block closing while busy installing/removing packages.
 end;
 
-procedure TDPMEditViewFrame2.ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND});
+procedure TDPMEditViewFrame.ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND});
 begin
   FRowLayout.IconSize := MulDiv(FRowLayout.IconSize, M, D);
   FRowLayout.Margin := MulDiv(FRowLayout.Margin, M, D);
   inherited;
 end;
 
-procedure TDPMEditViewFrame2.CheckTimerEnabled;
+procedure TDPMEditViewFrame.CheckTimerEnabled;
 begin
 
 end;
 
-procedure TDPMEditViewFrame2.Closing;
+procedure TDPMEditViewFrame.Closing;
 begin
   FClosing := true;
   PackageDetailsFrame.ViewClosing;
@@ -341,7 +341,7 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame2.Configure(const projectGroup : IOTAProjectGroup; const project : IOTAProject; const container: TContainer;  const projectTreeManager: IDPMProjectTreeManager);
+procedure TDPMEditViewFrame.Configure(const projectGroup : IOTAProjectGroup; const project : IOTAProject; const container: TContainer;  const projectTreeManager: IDPMProjectTreeManager);
 var
   sConfigFile : string;
 begin
@@ -380,7 +380,7 @@ begin
   CalculateIndexes;
 end;
 
-procedure TDPMEditViewFrame2.ConfigureSearchBar;
+procedure TDPMEditViewFrame.ConfigureSearchBar;
 var
   platforms : TDPMPlatforms;
 begin
@@ -388,7 +388,7 @@ begin
   FSearchBar.Configure(FLogger, FDPMIDEOptions, FConfiguration, FConfigurationManager, FSearchOptions.ConfigFile, platforms);
 end;
 
-constructor TDPMEditViewFrame2.Create(AOwner: TComponent);
+constructor TDPMEditViewFrame.Create(AOwner: TComponent);
 {$IFDEF THEMESERVICES}
 var
   ideThemeSvc : IOTAIDEThemingServices;
@@ -441,7 +441,7 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame2.CreateControls(AOwner: TComponent);
+procedure TDPMEditViewFrame.CreateControls(AOwner: TComponent);
 begin
 
 
@@ -485,7 +485,7 @@ begin
 
 end;
 
-destructor TDPMEditViewFrame2.Destroy;
+destructor TDPMEditViewFrame.Destroy;
 begin
   FSearchOptions.Free;
   FIconCache.Free;
@@ -497,7 +497,7 @@ begin
 end;
 
 
-procedure TDPMEditViewFrame2.FilterInstalledPackages(const searchTxt: string);
+procedure TDPMEditViewFrame.FilterInstalledPackages(const searchTxt: string);
 var
   installed : IList<IPackageSearchResultItem>;
   implicit : IList<IPackageSearchResultItem>;
@@ -528,7 +528,7 @@ end;
 
 
 
-procedure TDPMEditViewFrame2.DoPlatformChange(const newPlatform: TDPMPlatform; const refresh : boolean);
+procedure TDPMEditViewFrame.DoPlatformChange(const newPlatform: TDPMPlatform; const refresh : boolean);
 var
   searchTxt : string;
   filterProc : TFilterProc;
@@ -685,7 +685,7 @@ begin
 end;
 
 
-function TDPMEditViewFrame2.GetPackageIdsFromReferences(const platform: TDPMPlatform): IList<IPackageId>;
+function TDPMEditViewFrame.GetPackageIdsFromReferences(const platform: TDPMPlatform): IList<IPackageId>;
 var
   lookup : IDictionary<string, IPackageId>;
   packageRef : IPackageReference;
@@ -728,7 +728,7 @@ begin
 end;
 
 
-function TDPMEditViewFrame2.GetPackageReferences: IPackageReference;
+function TDPMEditViewFrame.GetPackageReferences: IPackageReference;
 var
   projectEditor : IProjectEditor;
   proj : IOTAProject;
@@ -748,7 +748,7 @@ begin
   end;
 end;
 
-function TDPMEditViewFrame2.GetPlatforms: TDPMPlatforms;
+function TDPMEditViewFrame.GetPlatforms: TDPMPlatforms;
 var
   i : integer;
   projectEditor : IProjectEditor;
@@ -775,7 +775,7 @@ begin
 
 end;
 
-function TDPMEditViewFrame2.GetRowKind(const index : Int64): TPackageRowKind;
+function TDPMEditViewFrame.GetRowKind(const index : Int64): TPackageRowKind;
 begin
   if index = 0 then
     result := rkInstalledHeader //row 0 is always installed header
@@ -793,7 +793,7 @@ begin
     result := rkUnknown;
 end;
 
-function TDPMEditViewFrame2.GetAvailableCount: Int64;
+function TDPMEditViewFrame.GetAvailableCount: Int64;
 begin
   if FAvailablePackages <> nil then
     result := FAvailablePackages.Count
@@ -801,7 +801,7 @@ begin
     result := 0;
 end;
 
-procedure TDPMEditViewFrame2.PackageInstalled(const package: IPackageSearchResultItem; const isUpdate: boolean);
+procedure TDPMEditViewFrame.PackageInstalled(const package: IPackageSearchResultItem; const isUpdate: boolean);
 //var
 //  platform : TDPMPlatform;
 begin
@@ -816,7 +816,7 @@ begin
 //  PackageDetailsFrame.ProjectReloaded;
 end;
 
-procedure TDPMEditViewFrame2.PackageUninstalled(const package: IPackageSearchResultItem);
+procedure TDPMEditViewFrame.PackageUninstalled(const package: IPackageSearchResultItem);
 //var
 //  platform : TDPMPlatform;
 begin
@@ -831,7 +831,7 @@ begin
 //  PackageDetailsFrame.ProjectReloaded;
 end;
 
-procedure TDPMEditViewFrame2.platformChangeDetectTimerTimer(Sender: TObject);
+procedure TDPMEditViewFrame.platformChangeDetectTimerTimer(Sender: TObject);
 var
   projectPlatform : TDPMPlatform;
   project : IOTAProject;
@@ -855,7 +855,7 @@ begin
   //platformChangeDetectTimer.Enabled := true;
 end;
 
-procedure TDPMEditViewFrame2.ProjectChanged;
+procedure TDPMEditViewFrame.ProjectChanged;
 var
   platforms : TDPMPlatforms;
 begin
@@ -872,7 +872,7 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame2.ProjectClosed(const projectName: string);
+procedure TDPMEditViewFrame.ProjectClosed(const projectName: string);
 var
   platforms : TDPMPlatforms;
 begin
@@ -888,14 +888,14 @@ begin
 //  DoPlatformChange(FSearchBar.Platform, true);
 end;
 
-procedure TDPMEditViewFrame2.ProjectLoaded(const projectName: string);
+procedure TDPMEditViewFrame.ProjectLoaded(const projectName: string);
 begin
   TSystemUtils.OutputDebugString('TDPMEditViewFrame2.ProjectLoaded : ' + projectName);
 end;
 
 
 
-function TDPMEditViewFrame2.GetImplicitCount: Int64;
+function TDPMEditViewFrame.GetImplicitCount: Int64;
 begin
   if FImplicitPackages <> nil then
     result := FImplicitPackages.Count
@@ -903,7 +903,7 @@ begin
     result := 0;
 end;
 
-function TDPMEditViewFrame2.GetInstalledCount: Int64;
+function TDPMEditViewFrame.GetInstalledCount: Int64;
 begin
   if FInstalledPackages <> nil then
     result := FInstalledPackages.Count
@@ -912,7 +912,7 @@ begin
 
 end;
 
-function TDPMEditViewFrame2.GetInstalledPackagesAsync: IAwaitable<IList<IPackageSearchResultItem>>;
+function TDPMEditViewFrame.GetInstalledPackagesAsync: IAwaitable<IList<IPackageSearchResultItem>>;
 var
   lProjectFile : string;
   repoManager : IPackageRepositoryManager;
@@ -981,7 +981,7 @@ begin
     end, FCancelTokenSource.Token);
 end;
 
-function TDPMEditViewFrame2.SearchForPackagesAsync(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;
+function TDPMEditViewFrame.SearchForPackagesAsync(const options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;
 var
   repoManager : IPackageRepositoryManager;
   searchOptions : TSearchOptions;
@@ -1008,7 +1008,7 @@ end;
 
 
 
-procedure TDPMEditViewFrame2.RequestPackageIcon(const index: integer; const package: IPackageSearchResultItem);
+procedure TDPMEditViewFrame.RequestPackageIcon(const index: integer; const package: IPackageSearchResultItem);
 var
   platform : TDPMPlatform;
   id : string;
@@ -1075,12 +1075,12 @@ begin
     end);
 end;
 
-procedure TDPMEditViewFrame2.SaveBeforeInstall;
+procedure TDPMEditViewFrame.SaveBeforeInstall;
 begin
 
 end;
 
-procedure TDPMEditViewFrame2.ScrollListBeforeChangeRow(const Sender: TObject; const currentRowIndex: Int64; const direction: TScrollDirection; const delta: Int64; var newRowIndex: Int64);
+procedure TDPMEditViewFrame.ScrollListBeforeChangeRow(const Sender: TObject; const currentRowIndex: Int64; const direction: TScrollDirection; const delta: Int64; var newRowIndex: Int64);
 var
   rowKind : TPackageRowKind;
 begin
@@ -1131,7 +1131,7 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame2.ScrollListChangeRow(const Sender: TObject;  const newRowIndex: Int64; const direction: TScrollDirection;  const delta: Int64);
+procedure TDPMEditViewFrame.ScrollListChangeRow(const Sender: TObject;  const newRowIndex: Int64; const direction: TScrollDirection;  const delta: Int64);
 var
   rowKind : TPackageRowKind;
   item : IPackageSearchResultItem;
@@ -1165,12 +1165,12 @@ begin
   PackageDetailsFrame.SetPackage(FCurrentPackage, FSearchOptions.Prerelease, true);
 end;
 
-procedure TDPMEditViewFrame2.ScrollListPaintNoRows(const Sender: TObject;  const ACanvas: TCanvas; const paintRect: TRect);
+procedure TDPMEditViewFrame.ScrollListPaintNoRows(const Sender: TObject;  const ACanvas: TCanvas; const paintRect: TRect);
 begin
 
 end;
 
-procedure TDPMEditViewFrame2.ScrollListPaintRow(const Sender: TObject;  const ACanvas: TCanvas; const itemRect: TRect; const index: Int64;  const state: TPaintRowState);
+procedure TDPMEditViewFrame.ScrollListPaintRow(const Sender: TObject;  const ACanvas: TCanvas; const itemRect: TRect; const index: Int64;  const state: TPaintRowState);
 var
   rowKind : TPackageRowKind;
   item : IPackageSearchResultItem;
@@ -1400,7 +1400,7 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame2.SearchBarOnFocustList(sender: TObject);
+procedure TDPMEditViewFrame.SearchBarOnFocustList(sender: TObject);
 begin
   FScrollList.SetFocus;
   if (FInstalledPackages <> nil) and (FInstalledPackages.Count > 0) then
@@ -1410,7 +1410,7 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame2.SearchBarOnSearch(const searchText: string;  const searchOptions: TDPMSearchOptions; const source: string; const platform: TDPMPlatform; const refresh: boolean);
+procedure TDPMEditViewFrame.SearchBarOnSearch(const searchText: string;  const searchOptions: TDPMSearchOptions; const source: string; const platform: TDPMPlatform; const refresh: boolean);
 begin
   //
   FCurrentPlatform := TDPMPlatform.UnknownPlatform; //force DoPlatform to do something.
@@ -1429,12 +1429,12 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame2.SearchBarPlatformChanged(const newPlatform: TDPMPlatform);
+procedure TDPMEditViewFrame.SearchBarPlatformChanged(const newPlatform: TDPMPlatform);
 begin
   DoPlatformChange(newPlatform, true);
 end;
 
-procedure TDPMEditViewFrame2.SearchBarProjectSelected(const projectFile: string);
+procedure TDPMEditViewFrame.SearchBarProjectSelected(const projectFile: string);
 var
   platform : TDPMPlatform;
 begin
@@ -1444,12 +1444,12 @@ begin
   DoPlatformChange(platform, true);
 end;
 
-procedure TDPMEditViewFrame2.SearchBarSettingsChanged(const configuration: IConfiguration);
+procedure TDPMEditViewFrame.SearchBarSettingsChanged(const configuration: IConfiguration);
 begin
 
 end;
 
-procedure TDPMEditViewFrame2.ThemeChanged;
+procedure TDPMEditViewFrame.ThemeChanged;
 {$IF CompilerVersion >=32.0}
 var
   ideThemeSvc : IOTAIDEThemingServices;
@@ -1479,7 +1479,7 @@ begin
   PackageDetailsFrame.ThemeChanged(FIDEStyleServices {$IFDEF THEMESERVICES}, ideThemeSvc {$ENDIF}) ;
 end;
 
-procedure TDPMEditViewFrame2.ViewDeselected;
+procedure TDPMEditViewFrame.ViewDeselected;
 begin
   // The view tab was deselected.
   FLogger.Debug('DPMIDE : View Deselected');
@@ -1487,7 +1487,7 @@ begin
   FFirstView := true;
 end;
 
-procedure TDPMEditViewFrame2.ViewSelected;
+procedure TDPMEditViewFrame.ViewSelected;
 begin
   FLogger.Debug('DPMIDE : View Selected');
   //For some reason this get's called twice for each time the view is selected.

@@ -34,7 +34,7 @@ uses
   VCL.Forms,
   Spring.Container,
   DPM.IDE.ProjectTreeManager,
-  DPM.IDE.EditorViewFrame2;
+  DPM.IDE.EditorViewFrame;
 
 type
   IDPMEditorView = interface
@@ -51,7 +51,7 @@ type
     FContainer : TContainer;
     FProject : IOTAProject;
     FProjectGroup : IOTAProjectGroup;
-    FFrame : TDPMEditViewFrame2;
+    FFrame : TDPMEditViewFrame;
     FImageIndex : integer;
     FCaption : string;
     FProjectTreeManager : IDPMProjectTreeManager;
@@ -174,7 +174,7 @@ end;
 
 procedure TDPMEditorView.FrameCreated(AFrame : TCustomFrame);
 begin
-  FFrame := TDPMEditViewFrame2(AFrame);
+  FFrame := TDPMEditViewFrame(AFrame);
   FFrame.Name := GetViewIdentifier;
   FFrame.Configure(FProjectGroup, FProject, FContainer, FProjectTreeManager);
 end;
@@ -201,7 +201,7 @@ end;
 
 function TDPMEditorView.GetFrameClass : TCustomFrameClass;
 begin
-    result := TDPMEditViewFrame2;
+    result := TDPMEditViewFrame;
 end;
 
 function TDPMEditorView.GetImageIndex : Integer;
