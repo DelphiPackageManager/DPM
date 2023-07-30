@@ -93,7 +93,7 @@ type
 
     function IsSubsetOrEqualTo(const possibleSuperset : TVersionRange) : boolean;
 
-    function TryGetOverlappingVersion(const otherVersion : TVersionRange; out overlappingVersion : TVersionRange) : boolean;
+    function TryGetIntersectingRange(const otherVersion : TVersionRange; out intersectingRange : TVersionRange) : boolean;
 
     function ToString : string;
     function ToDisplayString : string;
@@ -419,7 +419,7 @@ begin
   end;
 end;
 
-function TVersionRange.TryGetOverlappingVersion(const otherVersion : TVersionRange; out overlappingVersion : TVersionRange) : boolean;
+function TVersionRange.TryGetIntersectingRange(const otherVersion : TVersionRange; out intersectingRange : TVersionRange) : boolean;
 var
   left : TVersionRange;
   right : TVersionRange;
@@ -427,7 +427,7 @@ var
   max : TPackageVersion;
 begin
   result := false;
-  overlappingVersion := TVersionRange.Empty;
+  intersectingRange := TVersionRange.Empty;
   //normalize to make life simpler.
   left := Self.Clone(true);
   right := otherVersion.Clone(true);
@@ -447,7 +447,7 @@ begin
     if not right.IsSatisfiedBy(max) then
       exit;
   end;
-  overlappingVersion := TVersionRange.Create('', min, true, max, true);
+  intersectingRange := TVersionRange.Create('', min, true, max, true);
   result := true;
 end;
 

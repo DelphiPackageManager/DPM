@@ -232,7 +232,8 @@ type
   TFilterProc = procedure(const searchTxt : string) of object;
 
 
-function FindPackageRef(const references : IPackageReference; const platform : TDPMPlatform; const searchItem : IPackageSearchResultItem) : IPackageReference;
+
+function FindPackageRef(const references : IPackageReference; const platform : TDPMPlatform; const searchItem : IPackageSearchResultItem; const topLevelOnly : boolean) : IPackageReference;
 var
   ref : IPackageReference;
 begin
@@ -249,6 +250,8 @@ begin
     if SameText(ref.Id, searchItem.Id) then
       Exit(ref);
   end;
+  if topLevelOnly then
+    exit;
 
   for ref in references.Dependencies do
   begin
@@ -257,7 +260,7 @@ begin
     //depth search
     if ref.HasDependencies then
     begin
-      result := FindPackageRef(ref, platform, searchItem);
+      result := FindPackageRef(ref, platform, searchItem, false);
       if result <> nil then
         Exit(result);
     end;
@@ -657,7 +660,7 @@ begin
         //some of the available packages may already be installed, so we need to check for that.
         for item in theResult do
         begin
-          packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
+          packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item, false);
           if packageRef <> nil then
             toRemove.Add(item);
         end;
@@ -686,11 +689,11 @@ function TDPMEditViewFrame2.GetPackageIdsFromReferences(const platform: TDPMPlat
 var
   lookup : IDictionary<string, IPackageId>;
   packageRef : IPackageReference;
-  existing : IPackageId;
 
   procedure AddPackageIds(const value : IPackageReference);
   var
     childRef : IPackageReference;
+    existing : IPackageId;
   begin
     if not (value.Platform = platform) then
       exit;
@@ -946,11 +949,22 @@ begin
         begin
           if FPackageReferences <> nil then
           begin
-            packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item);
+            packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item, true);
+            if packageRef <> nil then //top level reference
+            begin
+              item.IsTransitive := false;
+            end
+            else //not found as a top level reference
+            begin
+              packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item, false);
+              if packageRef <> nil then
+                item.IsTransitive := packageRef.IsTransitive;
+            end;
             if packageRef <> nil then
-              item.IsTransitive := packageRef.IsTransitive;
-            item.Version := packageRef.Version;
-            item.Installed := true;
+            begin
+              item.Version := packageRef.Version;
+              item.Installed := true;
+            end;
           end;
         end;
         result.Sort(function(const Left, Right : IPackageSearchResultItem) : Integer

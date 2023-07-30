@@ -128,11 +128,12 @@ var
   dependency : IPackageDependency;
   resolution : IResolution;
   parentResolution : IResolution;
-  overlappingRange : TVersionRange;
+  intersectingRange : TVersionRange;
   versions : IList<IPackageInfo>;
   version : IPackageInfo;
   selected : boolean;
   choices : integer;
+  preRelease : boolean;
 begin
   FStopwatch.Reset;
   FStopwatch.Start;
@@ -146,6 +147,9 @@ begin
     if not currentPackage.Dependencies.Any then
       continue;
 
+    //if the current package is pre-release then we need to include them in the versions we get below.
+    preRelease := includePrerelease or (not currentPackage.Version.IsStable);
+
     //Sort the dependencies by the width of the dependency's versionrange (smaller the better)
     //the idea is to fail as quickly as possible, the less work we do the better
     currentPackage.Dependencies.Sort(TComparer<IPackageDependency>.Construct(SortDependencies));
@@ -156,7 +160,7 @@ begin
       //first see if we have resolved this package already. That may be in this project, or another project in the group.
       if context.TryGetResolution(dependency.Id, currentPackage.Id, resolution) then
       begin
-        //check if the dependency range satisfies the already resolved version
+        //check if the dependency range is satisfied by already resolved version
         if not dependency.VersionRange.IsSatisfiedBy(resolution.Package.Version) then
         begin
           FLogger.Information('       conflict - selected version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
@@ -168,7 +172,7 @@ begin
             //record conflicts here in the context so we can show the user and then continue.. that way we can show the user rather than bombing on the first go?
             exit;
           end
-          else if resolution.ParentId = cRootNode then //if it's a top level package then the version is not negotiable.
+          else if resolution.IsTopLevel then //if it's a top level package then the version is not negotiable.
           begin
             FLogger.Error('Package conflict - selected version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
             exit;
@@ -176,11 +180,11 @@ begin
 
           FLogger.Verbose('Attempting to find overalapping versionrange with dependency and earlier resolution');
           //see if we can reduce to an overlapping versionrange that satisfies both
-          if resolution.VersionRange.TryGetOverlappingVersion(dependency.VersionRange, overlappingRange) then
+          if resolution.VersionRange.TryGetIntersectingRange(dependency.VersionRange, intersectingRange) then
           begin
-            //resolution.Dependency.Version := overlappingRange;
-            dependency.VersionRange := overlappingRange;
-            FLogger.Debug('       overlapping range found : ' + dependency.Id + '-' + overlappingRange.ToString);
+            //resolution.Dependency.Version := intersectingRange;
+            dependency.VersionRange := intersectingRange;
+            FLogger.Debug('       overlapping range found : ' + dependency.Id + '-' + intersectingRange.ToString);
           end
           else
           begin
@@ -226,9 +230,8 @@ begin
         begin
           //passing in the version range to filter the results - not sure if this is valid.. do we need all versions?
           //I suspect it may result in more failures
-          versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, platform, dependency.Id, dependency.VersionRange,
-                                                                            includePrerelease);
-          if versions.Any then
+          versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, platform, dependency.Id, dependency.VersionRange, preRelease);
+          if versions.Any then //cache the versions in the context in case we need them again
             context.AddPackageVersions(dependency.Id, versions);
         end;
 
@@ -307,7 +310,10 @@ begin
   result :=FRepositoryManager.Initialize(config);
 end;
 
-function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
+function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;
+                                               const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo;
+                                               const projectReferences : IList<TProjectReference>; var dependencyGraph : IPackageReference;
+                                               out resolved : IList<IPackageInfo>) : boolean;
 var
   context : IResolverContext;
   packageRef : TProjectReference;
@@ -316,11 +322,6 @@ var
 begin
   Assert(FConfiguration <> nil, 'config is nil, Initialize has not been called');
 
-  //TODO : First validate that there are no conflicts in the graph.. if there are remove them and let the resolver deal with it?
-
-
-
-  //TODO : We need to check the project references against the resolutions because the context only pushes packages with dependencies onto the queue
   errorCount := 0;
   for packageRef in projectReferences do
   begin
@@ -344,7 +345,9 @@ end;
 
 //This is all wrong. What it should do is just validate the project references and ensure it's correct, not go off and resolve dependencies
 //which might change the dependecy versions. We only want to change the graph if it's wrong.
-function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
+function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;
+                                               const projectFile : string; const options : TSearchOptions; const projectReferences : IList<TProjectReference>;
+                                               var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
 var
   context : IResolverContext;
   packageRef : TProjectReference;
@@ -373,9 +376,6 @@ begin
     end;
   end;
   context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, compilerVersion,  platform, projectReferences);
-
-  //we always need to look at pre-release packages for restore as the project may be using them.
-  options.Prerelease := true;
 
   result := DoResolve(cancellationToken, compilerVersion,  platform, options.Prerelease, context);
   resolved := context.GetResolvedPackages;

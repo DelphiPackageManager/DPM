@@ -151,7 +151,6 @@ uses
   DPM.Controls.AutoComplete in 'Controls\DPM.Controls.AutoComplete.pas',
   DPM.IDE.AboutForm in 'IDE\DPM.IDE.AboutForm.pas' {DPMAboutForm},
   DPM.IDE.Types in 'IDE\DPM.IDE.Types.pas',
-  DPM.Controls.GroupButton in 'Controls\DPM.Controls.GroupButton.pas',
   DPM.IDE.AddInOptionsHostForm in 'IDE\DPM.IDE.AddInOptionsHostForm.pas' {DPMOptionsHostForm},
   DPM.IDE.IconCache in 'IDE\DPM.IDE.IconCache.pas',
   DPM.IDE.VSTProxy in 'IDE\DPM.IDE.VSTProxy.pas',

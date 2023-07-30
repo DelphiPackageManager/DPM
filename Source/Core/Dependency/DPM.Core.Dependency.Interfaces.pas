@@ -121,9 +121,11 @@ type
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
     function GetProject : string;
+    function GetIsTopLevel : boolean;
 
     function Clone(const parentId : string) : IResolution;
 
+    property IsTopLevel : boolean read GetIsTopLevel;
     property Package : IPackageInfo read GetPackage;
     property VersionRange : TVersionRange read GetVersionRange write SetVersionRange;
     property ParentId : string read GetParentId;

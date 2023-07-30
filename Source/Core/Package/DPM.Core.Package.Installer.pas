@@ -628,10 +628,8 @@ end;
 function TPackageInstaller.GetPackageInfo(const cancellationToken: ICancellationToken; const packageId: IPackageId): IPackageInfo;
 begin
   result := FPackageCache.GetPackageInfo(cancellationToken, packageId);
-  // faster
   if result = nil then
     result := FRepositoryManager.GetPackageInfo(cancellationToken, packageId);
-  // slower
 end;
 
 function TPackageInstaller.DoCachePackage(const cancellationToken : ICancellationToken; const Options: TCacheOptions; const platform: TDPMPlatform): boolean;
@@ -675,6 +673,7 @@ begin
   result := true;
 end;
 
+//convert the dependency graph to a flat list, with the packageinfo (which has dependencies).
 function TPackageInstaller.CreateProjectRefs(const cancellationToken : ICancellationToken; const rootnode: IPackageReference; const seenPackages: IDictionary<string, IPackageInfo>;
                                              const projectReferences: IList<TProjectReference>): boolean;
 var
@@ -1482,8 +1481,7 @@ begin
           // sysutils.IsRelativePath returns false with paths starting with .\
           if TPathUtils.IsRelativePath(projectList[i]) then
             // TPath.Combine really should do this but it doesn't
-            projectList[i] := TPathUtils.CompressRelativePath(projectRoot,
-              projectList[i])
+            projectList[i] := TPathUtils.CompressRelativePath(projectRoot, projectList[i])
         end;
         projectFiles := projectList.ToArray;
       end

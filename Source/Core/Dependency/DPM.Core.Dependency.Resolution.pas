@@ -44,6 +44,7 @@ type
     FVersionRange : TVersionRange;
     FProject : string;
   protected
+    function GetIsTopLevel : boolean;
     function GetPackage : IPackageInfo;
     function GetParentId : string;
     function GetProject : string;
@@ -57,7 +58,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Constants;
 
 { TResolution }
 
@@ -76,6 +78,11 @@ begin
   FProject := project;
 end;
 
+
+function TResolution.GetIsTopLevel: boolean;
+begin
+  result := FParentId = cRootNode;
+end;
 
 function TResolution.GetPackage : IPackageInfo;
 begin

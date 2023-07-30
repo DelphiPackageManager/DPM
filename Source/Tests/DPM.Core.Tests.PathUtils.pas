@@ -23,6 +23,10 @@ type
     [TestCase('UNCBase4', '\\test\,\foo\..\bar,\\test\bar')]
     [TestCase('Rooted', 'c:\test\,foo\..\bar,c:\test\bar')]
     procedure TestCompressRelativePathWithBase(const base, input, expected : string);
+
+    [Test]
+    procedure TestIsRelativePath;
+
   end;
 
 implementation
@@ -47,6 +51,20 @@ var
 begin
   actual := TPathUtils.CompressRelativePath(Trim(base), Trim(input));
   Assert.AreEqual(Trim(expected), actual);
+end;
+
+function IsRelativePath2(const Path: string): Boolean;
+var
+  L: Integer;
+begin
+  L := Length(Path);
+  Result := (L > 0) and (Path[1] <> PathDelim)
+    {$IFDEF MSWINDOWS}and (L > 1) and (Path[2] <> ':'){$ENDIF MSWINDOWS};
+end;
+
+procedure TPathUtilsTests.TestIsRelativePath;
+begin
+  Assert.IsTrue((IsRelativePath2('\\..\test')));
 end;
 
 initialization

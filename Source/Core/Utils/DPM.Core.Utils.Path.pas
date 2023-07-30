@@ -299,7 +299,9 @@ end;
 
 class function TPathUtils.IsRelativePath(const value : string) : boolean;
 begin
-  result := (not TPath.IsUNCPath(value) and TStringUtils.StartsWith(value, '.\')) or System.SysUtils.IsRelativePath(value);
+//why did we need this. System.SysUtils.IsRelativePath seems to work for XE2+
+//  result := (not TPath.IsUNCPath(value) and TStringUtils.StartsWith(value, '.\')) or System.SysUtils.IsRelativePath(value);
+  result := System.SysUtils.IsRelativePath(value);
 end;
 
 class function TPathUtils.QuotePath(const value: string; const force : boolean = false): string;

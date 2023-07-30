@@ -13,9 +13,13 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
+          legalcopyright = "© 2019 -2021 Vincent Parrett and Contributors"
+          linkproductversion = false
+          minorversion = 1
           name = DPMVersion
-          productversion = 0.0.0.0
+          productname = "DPM Package Manager"
           productversionstring = 0.1.10-alpha
+          releaseversion = 10
         end
       end
       action.propertyset.setvalues
@@ -99,7 +103,7 @@ begin
       end
       action.group
       begin
-        description = "Build Tests - 10.4"
+        description = "Build Tests - 11.0"
         id = {6BFDB7C5-1968-4220-9E27-9899822374AA}
         action.continua.set-buildstatus
         begin
@@ -126,7 +130,7 @@ begin
           terminateontimeout = true
           timeoutlength = 2
           as.projectpath = %SRC_ROOT%\\DPM.Core.Tests.dproj
-          as.compilerversion = 10.4
+          as.compilerversion = 11.0
           as.verbosity = Debug
           as.nobanner = True
         end
@@ -144,7 +148,7 @@ begin
           compileridl = true
           configname = Release
           debugversionnumbers = false
-          delphiversion = Delphi10_4
+          delphiversion = Delphi11
           enabletimeout = false
           eurekalogverboselogging = false
           frameworktype = VCL

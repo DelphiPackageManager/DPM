@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectVersion>19.5</ProjectVersion>
@@ -262,7 +262,6 @@
             <Form>DPMAboutForm</Form>
         </DCCReference>
         <DCCReference Include="IDE\DPM.IDE.Types.pas"/>
-        <DCCReference Include="Controls\DPM.Controls.GroupButton.pas"/>
         <DCCReference Include="IDE\DPM.IDE.AddInOptionsHostForm.pas">
             <Form>DPMOptionsHostForm</Form>
             <FormType>dfm</FormType>
