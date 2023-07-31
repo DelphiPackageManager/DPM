@@ -7,15 +7,24 @@ begin
     targetid = {690B669B-13D0-48EC-AA58-B4191B4E9711}
     rootaction
     begin
+      action.variables.logvalues
+      begin
+        failifnotdefined = true
+        id = {C91D1102-DD91-48F7-892A-ABBC41C474CB}
+        logallvariables = true
+      end
       action.propertyset.define
       begin
         id = {3436CDF6-12A6-48A9-B064-0EC65D055F94}
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
+          legalcopyright = "© 2019 -2021 Vincent Parrett and Contributors"
+          linkproductversion = false
+          minorversion = 2
           name = DPMVersion
-          productversion = 0.0.0.0
-          productversionstring = 0.2.50-alpha
+          productname = "DPM Package Manager"
+          productversionstring = 0.2.0-alpha
         end
       end
       action.propertyset.setvalues
@@ -347,7 +356,7 @@ begin
           platformsdktype = ProjectSDK
           projectfile = %SRC_ROOT%\\dpm.dpr
           regenerateresource = true
-          releaseversion = 50
+          releaseversion = 0
           resourcecompilertype = rcBorland
           ridloutputsamefolder = true
           startingdir = %SRC_ROOT%\\
@@ -363,7 +372,7 @@ begin
           verboseoutput = false
           versioninfokeys = "LegalCopyright\=© 2019 -2021 Vincent Parrett and Contributors" +
                             "ProductName\=DPM Package Manager" +
-                            "ProductVersion\=0.2.50-alpha" +
+                            "ProductVersion\=0.2.0-alpha" +
                             ""
           versioninfopropertysetname = DPMVersion
           warningsaserror = false
@@ -878,7 +887,7 @@ begin
         platformsdktype = ProjectSDK
         projectfile = %SRC_ROOT%\\%ProjectFile%
         regenerateresource = true
-        releaseversion = 50
+        releaseversion = 0
         resourcecompilertype = rcBorland
         ridloutputsamefolder = true
         startingdir = %SRC_ROOT%\\
@@ -894,7 +903,7 @@ begin
         verboseoutput = false
         versioninfokeys = "LegalCopyright\=© 2019 -2021 Vincent Parrett and Contributors" +
                           "ProductName\=DPM Package Manager" +
-                          "ProductVersion\=0.2.50-alpha" +
+                          "ProductVersion\=0.2.0-alpha" +
                           ""
         versioninfopropertysetname = DPMVersion
         warningsaserror = false
