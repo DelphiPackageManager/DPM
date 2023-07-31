@@ -42,7 +42,7 @@ uses
   System.ImageList,
   {$IFEND}
   Vcl.ActnList,
-  DPM.IDE.GroupPackageDetailsFrame;
+  DPM.IDE.PackageDetailsFrame;
 
 
 {$I '..\DPMIDE.inc'}
@@ -73,7 +73,7 @@ type
     PackageListPanel : TPanel;
     DetailPanel: TPanel;
     platformChangeDetectTimer: TTimer;
-    PackageDetailsFrame: TGroupPackageDetailsFrame;
+    PackageDetailsFrame: TPackageDetailsFrame;
     ActivityTimer: TTimer;
     procedure platformChangeDetectTimerTimer(Sender: TObject);
     procedure ActivityTimerTimer(Sender: TObject);

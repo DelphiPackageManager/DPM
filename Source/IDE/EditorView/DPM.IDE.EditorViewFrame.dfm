@@ -58,7 +58,7 @@ object DPMEditViewFrame: TDPMEditViewFrame
       ParentColor = True
       ShowCaption = False
       TabOrder = 1
-      inline PackageDetailsFrame: TGroupPackageDetailsFrame
+      inline PackageDetailsFrame: TPackageDetailsFrame
         Left = 0
         Top = 0
         Width = 500
