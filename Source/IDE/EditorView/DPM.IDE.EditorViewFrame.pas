@@ -75,8 +75,10 @@ type
     platformChangeDetectTimer: TTimer;
     PackageDetailsFrame: TPackageDetailsFrame;
     ActivityTimer: TTimer;
+    DebounceTimer: TTimer;
     procedure platformChangeDetectTimerTimer(Sender: TObject);
     procedure ActivityTimerTimer(Sender: TObject);
+    procedure DebounceTimerTimer(Sender: TObject);
   private
     FIDEStyleServices : TCustomStyleServices;
 
@@ -483,6 +485,12 @@ begin
 
 
 
+end;
+
+procedure TDPMEditViewFrame.DebounceTimerTimer(Sender: TObject);
+begin
+  DebounceTimer.Enabled := false;
+  PackageDetailsFrame.SetPackage(FCurrentPackage, FSearchOptions.Prerelease, true);
 end;
 
 destructor TDPMEditViewFrame.Destroy;
@@ -1138,7 +1146,7 @@ var
 begin
   //find the selected package in the list and update the package details view on the right.
   item := nil;
-
+  DebounceTimer.Enabled := false;
   rowKind := GetRowKind(newRowIndex);
   case rowKind of
     rkInstalledHeader:;
@@ -1162,7 +1170,10 @@ begin
     rkUnknown: ;
   end;
   FCurrentPackage := item;
-  PackageDetailsFrame.SetPackage(FCurrentPackage, FSearchOptions.Prerelease, true);
+  if FCurrentPackage <> nil then
+      DebounceTimer.Enabled := true
+  else
+    PackageDetailsFrame.SetPackage(FCurrentPackage, FSearchOptions.Prerelease, true);
 end;
 
 procedure TDPMEditViewFrame.ScrollListPaintNoRows(const Sender: TObject;  const ACanvas: TCanvas; const paintRect: TRect);

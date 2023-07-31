@@ -335,6 +335,9 @@ begin
       imageCollection :=  TImageCollection(TVirtualImageList(imageList).ImageCollection);
       imageCollection.Add('DPM\DPMLOGO', HInstance, 'DPMLOGO', ['_16','_24','_32']);
       imageList.Add('DPM\DPMLOGO','DPM\DPMLOGO');
+
+      //TODO : This sometimes doesn't work and we end up with the wrong icon. Only seems to happen'
+      // when loading large project groups.
       FDPMImageIndex := imageList.GetIndexByName('DPM\DPMLOGO');
 
       FPlatformImageIndexes[TDPMPlatform.Win32] := imageList.GetIndexByName('Platforms\PlatformWindows');
