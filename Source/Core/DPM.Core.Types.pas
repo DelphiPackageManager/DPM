@@ -89,6 +89,11 @@ type
 
   TDPMPlatforms = set of TDPMPlatform;
 
+  TDPMUIFrameworkType = (
+    None,
+    VCL,
+    FMX
+    );
 
   TConstProc<T> = reference to procedure(const Arg1 : T);
   TConstProc<T1, T2> = reference to procedure(const Arg1 : T1; const Arg2 : T2);
@@ -136,6 +141,9 @@ function IsAmbigousProjectVersion(const value : string; var versions : string) :
 function ProjectPlatformToDPMPlatform(const value : string) : TDPMPlatform;
 
 function AllPlatforms(const compiler : TCompilerVersion) : TDPMPlatforms;
+
+function StringToUIFrameworkType(const value : string) : TDPMUIFrameworkType;
+function UIFrameworkTypeToString(const value : TDPMUIFrameworkType) : string;
 
 implementation
 
@@ -202,6 +210,22 @@ end;
 function IsValidPlatformString(const value : string) : boolean;
 begin
   result := StringToDPMPlatform(value) <> TDPMPlatform.UnknownPlatform;
+end;
+
+function StringToUIFrameworkType(const value : string) : TDPMUIFrameworkType;
+var
+  iValue : integer;
+begin
+  iValue := GetEnumValue(typeInfo(TDPMUIFrameworkType), value);
+  if iValue = -1 then
+    result := TDPMUIFrameworkType.None
+  else
+    result := TDPMUIFrameworkType(iValue);
+end;
+
+function UIFrameworkTypeToString(const value : TDPMUIFrameworkType) : string;
+begin
+  result := GetEnumName(TypeInfo(TDPMUIFrameworkType), ord(value));
 end;
 
 function CompilerToString(const value : TCompilerVersion) : string;

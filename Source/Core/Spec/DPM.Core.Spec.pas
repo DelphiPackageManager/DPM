@@ -600,6 +600,7 @@ begin
 
     metaDataObj['isTrial'] := LowerCase(BoolToStr(FMetaData.IsTrial, true));
     metaDataObj['isCommercial'] := LowerCase(BoolToStr(FMetaData.IsCommercial, true));
+    metaDataObj['uiFramework'] := UIFrameworkTypeToString(FMetaData.UIFrameworkType);
 
     targetPlatformObject := Obj.A['targetPlatforms'].AddObject;
     targetPlatformObject['compiler'] := CompilerToString(targetPlatform.Compiler);

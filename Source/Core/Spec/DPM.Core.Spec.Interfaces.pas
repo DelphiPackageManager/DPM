@@ -88,6 +88,7 @@ type
     function GetIsTrial : boolean;
     function GetIsCommercial : boolean;
     function GetReadMe : string;
+    function GetUIFrameworkType : TDPMUIFrameworkType;
 
     procedure SetVersion(const value : TPackageVersion);
     procedure SetId(const value : string);
@@ -106,6 +107,8 @@ type
     procedure SetIsTrial(const value : boolean);
     procedure SetIsCommercial(const value : boolean);
     procedure SetReadMe(const value : string);
+    procedure SetUIFrameworkType(const value : TDPMUIFrameworkType);
+
 
     property Id : string read GetId write SetId;
     property Version : TPackageVersion read GetVersion write SetVersion;
@@ -124,6 +127,8 @@ type
     property IsTrial : boolean read GetIsTrial write SetIsTrial;
     property IsCommercial : boolean read GetIsCommercial write SetIsCommercial;
     property ReadMe : string read GetReadMe write SetReadMe;
+    property UIFrameworkType : TDPMUIFrameworkType read  GetUIFrameworkType write SetUIFrameworkType;
+
   end;
 
   ISpecFileEntry = interface(ISpecNode)

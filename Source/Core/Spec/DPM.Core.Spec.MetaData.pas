@@ -57,6 +57,7 @@ type
     FIsTrial : boolean;
     FIsCommercial : boolean;
     FReadme : string;
+    FUIFrameworkType : TDPMUIFrameworkType;
   protected
     function GetVersion : TPackageVersion;
     function GetId : string;
@@ -75,6 +76,8 @@ type
     function GetIsTrial : boolean;
     function GetIsCommercial : boolean;
     function GetReadMe : string;
+    function GetUIFrameworkType: TDPMUIFrameworkType;
+
 
     procedure SetId(const value : string);
     procedure SetDescription(const value : string);
@@ -93,7 +96,10 @@ type
     procedure SetIsCommercial(const value : boolean);
     procedure SetVersion(const value : TPackageVersion);
     procedure SetReadMe(const value : string);
+    procedure SetUIFrameworkType(const value: TDPMUIFrameworkType);
+
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
+
   public
     constructor Create(const logger : ILogger); override;
 
@@ -111,6 +117,7 @@ constructor TSpecMetaData.Create(const logger : ILogger);
 begin
   inherited Create(logger);
   FVersion := TPackageVersion.Empty;
+  FUIFrameworkType := TDPMUIFrameworkType.None;
 end;
 
 function TSpecMetaData.GetAuthors : string;
@@ -195,6 +202,11 @@ begin
   result := FTags;
 end;
 
+function TSpecMetaData.GetUIFrameworkType: TDPMUIFrameworkType;
+begin
+  result := FUIFrameworkType;
+end;
+
 function TSpecMetaData.GetVersion : TPackageVersion;
 begin
   result := FVersion;
@@ -205,6 +217,7 @@ function TSpecMetaData.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var
   sVersion : string;
   sError : string;
+  sUI : string;
 begin
   result := true;
   FId := jsonObject.S['id'];
@@ -255,6 +268,10 @@ begin
   FTags := jsonObject.S['tags'];
   FIsTrial := jsonObject.B['isTrial'];
   FIsCommercial := jsonObject.B['isCommercial'];
+  sUI := jsonObject.S['uiFramework'];
+  if sUI <> '' then
+    FUIFrameworkType := StringToUIFrameworkType(sUI);
+
 end;
 
 
@@ -336,6 +353,11 @@ end;
 procedure TSpecMetaData.SetTags(const value : string);
 begin
   FTags := value;
+end;
+
+procedure TSpecMetaData.SetUIFrameworkType(const value: TDPMUIFrameworkType);
+begin
+  FUIFrameworkType := value;
 end;
 
 procedure TSpecMetaData.SetVersion(const value : TPackageVersion);
