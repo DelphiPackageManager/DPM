@@ -79,6 +79,8 @@ type
     FColumns : TArray<TVersionGridColumn>;
     FRows : TObjectList<TVersionGridRow>;
 
+    FColumnWidths : TArray<integer>;
+
     FPaintBmp : TBitmap;
 
     FRowHeight : integer;
@@ -88,6 +90,8 @@ type
     FUpdating : boolean;
     FVScrollPos : integer;
     FHScrollPos : integer;
+    FVertSBVisible : boolean;
+    FVertSBWidth : integer;
 
     FVisibleRows : integer; //number of rows we can see
     FSelectableRows : integer;
@@ -282,6 +286,12 @@ begin
   //for some reason this is not happening in D11.x
   Canvas.Font.Height := MulDiv(Canvas.Font.Height, M, D );
 //  FPaintBmp.Canvas.Font := Self.Font;
+
+  FColumnWidths[1] := MulDiv(FColumnWidths[1], M, D);
+  FColumnWidths[2] := MulDiv(FColumnWidths[2], M, D);
+  FColumnWidths[3] := MulDiv(FColumnWidths[3] , M, D);
+  FColumnWidths[4] := MulDiv(FColumnWidths[4] , M, D);
+  UpdateColumns;
   UpdateVisibleRows;
 
 end;
@@ -335,6 +345,11 @@ begin
   inherited;
 end;
 
+const
+  cDefaultColumnWidth = 32;
+  cInstalledColumnWidth = 120;
+
+
 constructor TVersionGrid.Create(AOwner: TComponent);
 begin
   inherited;
@@ -359,13 +374,18 @@ begin
   FIDEStyleServices := Vcl.Themes.StyleServices;
   {$ENDIF}
 
-
-
-
-
   FRows := TObjectList<TVersionGridRow>.Create(true);
 
   SetLength(FColumns, 5);
+  SetLength(FColumnWidths, 5);
+
+  //col 0 takes up the rest of the space
+  FColumnWidths[1] := cInstalledColumnWidth;
+  FColumnWidths[2] := cDefaultColumnWidth;
+  FColumnWidths[3] := cDefaultColumnWidth;
+  FColumnWidths[4] := cDefaultColumnWidth;
+  FVertSBWidth := 0;
+
   UpdateColumns;
 
   ControlStyle := [csDoubleClicks, csCaptureMouse, csDisplayDragImage, csClickEvents, csPannable];
@@ -854,6 +874,12 @@ var
 
 begin
   if not HandleAllocated then
+    exit;
+
+  if FRows.Count = 0 then
+    exit;
+
+  if (index  < 0) or (index > FRows.Count -1) then
     exit;
 
   LCanvas := FPaintBmp.Canvas;
@@ -1413,6 +1439,8 @@ begin
     FPaintBmp.SetSize(NewWidth, NewHeight);
   end;
 
+  FHoverRow := -1;
+
   UpdateColumns;
   UpdateVisibleRows;
   UpdateScrollBars;
@@ -1535,32 +1563,37 @@ end;
 
 
 
+
+
 procedure TVersionGrid.UpdateColumns;
 begin
   //remove button
-  FColumns[4].Index := 3;
+  FColumns[4].Index := 4;
   FColumns[4].Title := '';
-  FColumns[4].Width := 32;
+  FColumns[4].Width := FColumnWidths[4];
   FColumns[4].Left  := Self.Width - FColumns[4].Width - 1;
   FColumns[4].Height := FRowHeight;
+
+  if FVertSBVisible then
+    FColumns[4].Left := FColumns[4].Left - FVertSBWidth;  //TODO : SB Width
 
   //upgrade/downgrade
   FColumns[3].Index := 3;
   FColumns[3].Title := '';
-  FColumns[3].Width := 32;
+  FColumns[3].Width := FColumnWidths[3];
   FColumns[3].Left  := FColumns[4].Left - FColumns[3].Width - 1;
   FColumns[3].Height := FRowHeight;
 
   //install
   FColumns[2].Index := 2;
   FColumns[2].Title := '';
-  FColumns[2].Width := 32;
+  FColumns[2].Width := FColumnWidths[2];
   FColumns[2].Left  := FColumns[3].Left - FColumns[2].Width - 1;
   FColumns[2].Height := FRowHeight;
 
   FColumns[1].Index := 1;
   FColumns[1].Title := 'Installed';
-  FColumns[1].Width := 120;
+  FColumns[1].Width := FColumnWidths[1];
   FColumns[1].Left  := FColumns[2].Left - FColumns[1].Width -1 ;
   FColumns[1].Height := FRowHeight;
 
@@ -1607,19 +1640,23 @@ begin
   sbInfo.nMin := 0;
 
   //Note : this may trigger a resize if the visibility changes
-  if RowCount <= FSelectableRows  then
+  if RowCount < FSelectableRows + 1  then
   begin
     sbInfo.nMax := 0;
     sbInfo.nPage := 0;
     sbInfo.nPos := 0;
+    FVertSBVisible := false;
     SetScrollInfo(Handle, SB_VERT, sbInfo, True);
+    FVertSBWidth :=  0
   end
   else
   begin
     sbInfo.nMax := Max(RowCount -1, 0);
     sbInfo.nPage := Min(FSelectableRows, RowCount -1);
     sbInfo.nPos := Min(FVScrollPos, RowCount -1) ;
+    FVertSBVisible := true;
     SetScrollInfo(Handle, SB_VERT, sbInfo, True);
+    FVertSBWidth :=  GetSystemMetrics(SM_CXHSCROLL);
   end;
 
   sbInfo.cbSize := SizeOf(TScrollInfo);
