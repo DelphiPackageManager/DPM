@@ -113,14 +113,16 @@ begin
             begin
               FLogger.Error('Unable to find install location for compiler [' + CompilerToString(compilerVersion) + ']');
               FFound[compilerVersion] := TStatus.notfound;
-              exit;
+              raise Exception.Create('Unable to find install location for compiler [' + CompilerToString(compilerVersion) + ']');
+//              exit;
             end;
           end
           else
           begin
             FLogger.Error('Unable to find install location for compiler [' + CompilerToString(compilerVersion) + ']');
             FFound[compilerVersion] := TStatus.notfound;
-            exit;
+            raise Exception.Create('Unable to find install location for compiler [' + CompilerToString(compilerVersion) + ']');
+  //          exit;
           end;
         finally
           reg.Free;

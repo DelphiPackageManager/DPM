@@ -192,7 +192,7 @@ begin
   //I don't like this... but it will do for a start.
 
   result := 'call "' + FEnv.GetRsVarsFilePath(FCompilerVersion) + '"';
-  result := result + '& msbuild "' + projectfile + '" ' + GetMSBuildParameters(configName, packageVersion);
+  result := result + ' & msbuild "' + projectfile + '" ' + GetMSBuildParameters(configName, packageVersion);
   result := ' cmd /c ' + result + ' > ' + FCompilerLogFile;
 end;
 
@@ -264,7 +264,7 @@ begin
 
   result := result + ' /p:DCC_UnitSearchPath=' +  GetProjectSearchPath(configName);
 
- // result := result +  ' /v:diag';
+  //result := result +  ' /v:diag';
  end;
 
 
