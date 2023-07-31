@@ -126,8 +126,8 @@ begin
   end;
 
   env := TEnvironmentBlockFactory.Create(nil, true);
-  //THE IDE set these, which makes it difficult to debug the command line version.
   {$IFDEF DEBUG}
+  //THE IDE set these, which makes it difficult to debug the command line version.
   env.RemoveVariable('BDS');
   env.RemoveVariable('BDSLIB');
   env.RemoveVariable('BDSINCLUDE');
@@ -152,6 +152,7 @@ begin
   begin
     if not result then
     begin
+      FLogger.Error('Package compilation failed.');
       FCompilerOutput.LoadFromFile(FCompilerLogFile);
       //TODO : This should be logged as an error, but then you would get a wall of red text which is hard to read.
       FLogger.Information(FCompilerOutput.Text);

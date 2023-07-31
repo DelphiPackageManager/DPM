@@ -1004,6 +1004,7 @@ var
   versions : IList<TPackageVersion>;
   repoManager : IPackageRepositoryManager;
   sReferenceVersion : string;
+  includePreRelease : boolean;
 begin
   FVersionsDelayTimer.Enabled := false;
   if FRequestInFlight then
@@ -1018,13 +1019,15 @@ begin
 
   sReferenceVersion := GetReferenceVersion.ToStringNoMeta;
 
+  includePreRelease := FIncludePreRelease or (not FPackageMetaData.Version.IsStable);
+
   TAsync.Configure<IList<TPackageVersion>> (
     function(const cancelToken : ICancellationToken) : IList<TPackageVersion>
     begin
       //need this for the http api/
       CoInitializeEx(nil, COINIT_APARTMENTTHREADED);
       try
-      result := repoManager.GetPackageVersions(cancelToken, IDECompilerVersion, FCurrentPlatform, FPackageMetaData.Id, FIncludePrerelease);
+      result := repoManager.GetPackageVersions(cancelToken, IDECompilerVersion, FCurrentPlatform, FPackageMetaData.Id, includePreRelease);
       finally
         CoUninitialize;
       end;

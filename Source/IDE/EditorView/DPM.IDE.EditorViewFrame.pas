@@ -1186,6 +1186,9 @@ var
   package : IPackageSearchResultItem;
 
 begin
+  if (index < 0) or (index > FRowCount -1) then
+    exit;
+
   rowKind := GetRowKind(index);
   backgroundColor := FIDEStyleServices.GetSystemColor(clWindow);
   borderColor := FIDEStyleServices.GetSystemColor(clBtnShadow);
@@ -1322,7 +1325,12 @@ begin
         else
         begin
           if package.Version <> package.LatestStableVersion then
-            latestVersion := package.LatestStableVersion.ToStringNoMeta;
+          begin
+            // the installed version may be a pre-release version that
+            // is later than the latest stable version so check first!
+            if package.LatestStableVersion > package.Version then
+              latestVersion := package.LatestStableVersion.ToStringNoMeta;
+          end;
         end;
       end;
       rkImplicitPackage:
