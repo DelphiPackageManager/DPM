@@ -170,7 +170,7 @@ uses
   DPM.IDE.MessageService in 'IDE\Logging\DPM.IDE.MessageService.pas',
   DPM.IDE.ToolsAPI in 'IDE\DPM.IDE.ToolsAPI.pas',
   DPM.IDE.Details.Interfaces in 'IDE\EditorView\DPM.IDE.Details.Interfaces.pas',
-  DPM.IDE.GroupPackageDetailsFrame in 'IDE\EditorView\DPM.IDE.GroupPackageDetailsFrame.pas' {GroupPackageDetailsFrame: TFrame},
+  DPM.IDE.PackageDetailsFrame in 'IDE\EditorView\DPM.IDE.PackageDetailsFrame.pas' {PackageDetailsFrame: TFrame},
   DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas',
   DPM.Core.Package.ListItem in 'Core\Package\DPM.Core.Package.ListItem.pas',
   DPM.IDE.EditorViewFrame in 'IDE\EditorView\DPM.IDE.EditorViewFrame.pas' {DPMEditViewFrame: TFrame},

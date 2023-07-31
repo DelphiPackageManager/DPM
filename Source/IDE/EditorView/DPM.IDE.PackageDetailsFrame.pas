@@ -24,7 +24,7 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.IDE.GroupPackageDetailsFrame;
+unit DPM.IDE.PackageDetailsFrame;
 
 interface
 
@@ -64,7 +64,7 @@ uses
 
 
 type
-  TGroupPackageDetailsFrame = class(TFrame)
+  TPackageDetailsFrame = class(TFrame)
     sbPackageDetails: TScrollBox;
     pnlPackageId: TPanel;
     lblPackageId: TLabel;
@@ -176,7 +176,7 @@ uses
   DPM.Core.Package.Installer.Interfaces;
 { TGroupPackageDetailsFrame }
 
-procedure TGroupPackageDetailsFrame.btnInstallAllClick(Sender: TObject);
+procedure TPackageDetailsFrame.btnInstallAllClick(Sender: TObject);
 var
   options : TInstallOptions;
 begin
@@ -193,7 +193,7 @@ begin
   DoPackageInstall(options, false);
 end;
 
-procedure TGroupPackageDetailsFrame.btnUninstallAllClick(Sender: TObject);
+procedure TPackageDetailsFrame.btnUninstallAllClick(Sender: TObject);
 var
   options : TUnInstallOptions;
 begin
@@ -211,7 +211,7 @@ begin
 
 end;
 
-procedure TGroupPackageDetailsFrame.btnUpgradeAllClick(Sender: TObject);
+procedure TPackageDetailsFrame.btnUpgradeAllClick(Sender: TObject);
 var
   options : TInstallOptions;
 begin
@@ -230,7 +230,7 @@ begin
 
 end;
 
-destructor TGroupPackageDetailsFrame.Destroy;
+destructor TPackageDetailsFrame.Destroy;
 begin
   {$IF CompilerVersion < 34.0}    
   FUpgradeBmp.Free;
@@ -240,7 +240,7 @@ begin
   inherited;
 end;
 
-procedure TGroupPackageDetailsFrame.DoGetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string);
+procedure TPackageDetailsFrame.DoGetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string);
 begin
   GetPackageMetaDataAsync(id, compilerVersion, platform, version)
   .OnException(
@@ -275,7 +275,7 @@ begin
 end;
 
 
-procedure TGroupPackageDetailsFrame.DoPackageInstall(options: TInstallOptions; const isUpdate : boolean);
+procedure TPackageDetailsFrame.DoPackageInstall(options: TInstallOptions; const isUpdate : boolean);
 var
   packageInstaller : IPackageInstaller;
   installResult : boolean;
@@ -319,7 +319,7 @@ begin
 
 end;
 
-procedure TGroupPackageDetailsFrame.DoPackageUninstall(options: TUnInstallOptions);
+procedure TPackageDetailsFrame.DoPackageUninstall(options: TUnInstallOptions);
 var
   packageInstaller : IPackageInstaller;
   context : IPackageInstallerContext;
@@ -372,7 +372,7 @@ begin
   end;
 end;
 
-procedure TGroupPackageDetailsFrame.cboVersionsChange(Sender: TObject);
+procedure TPackageDetailsFrame.cboVersionsChange(Sender: TObject);
 var
   sVersion : string;
   packageVer : TPackageVersion;
@@ -383,12 +383,12 @@ begin
   DoGetPackageMetaDataAsync(FPackageMetaData.Id, FPackageMetaData.CompilerVersion, FPackageMetaData.Platform, sVersion);
 end;
 
-procedure TGroupPackageDetailsFrame.cboVersionsCloseUp(Sender: TObject);
+procedure TPackageDetailsFrame.cboVersionsCloseUp(Sender: TObject);
 begin
   FDropdownOpen := false;
 end;
 
-procedure TGroupPackageDetailsFrame.cboVersionsDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
+procedure TPackageDetailsFrame.cboVersionsDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
 var
   sInstalledVersion : string;
 begin
@@ -415,19 +415,19 @@ begin
 
 end;
 
-procedure TGroupPackageDetailsFrame.cboVersionsDropDown(Sender: TObject);
+procedure TPackageDetailsFrame.cboVersionsDropDown(Sender: TObject);
 begin
   FDropdownOpen := true;
 end;
 
-procedure TGroupPackageDetailsFrame.ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND});
+procedure TPackageDetailsFrame.ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND});
 begin
   inherited;
 
 
 end;
 
-constructor TGroupPackageDetailsFrame.Create(AOwner: TComponent);
+constructor TPackageDetailsFrame.Create(AOwner: TComponent);
 begin
   inherited;
   //not published in older versions, so get removed when we edit in older versions.
@@ -506,7 +506,7 @@ begin
 end;
 
 
-procedure TGroupPackageDetailsFrame.Init(const container: TContainer; const iconCache: TDPMIconCache; const config: IConfiguration; const host: IDetailsHost; const projectOrGroup : IOTAProjectGroup);
+procedure TPackageDetailsFrame.Init(const container: TContainer; const iconCache: TDPMIconCache; const config: IConfiguration; const host: IDetailsHost; const projectOrGroup : IOTAProjectGroup);
 var
   i: Integer;
 begin
@@ -527,7 +527,7 @@ begin
   FProjectsGrid.EndUpdate;
 end;
 
-procedure TGroupPackageDetailsFrame.AssignImages;
+procedure TPackageDetailsFrame.AssignImages;
 {$IF CompilerVersion < 34.0}
 var
   bmp : TBitmap;
@@ -566,7 +566,7 @@ begin
 
 end;
 
-procedure TGroupPackageDetailsFrame.LoadImages;
+procedure TPackageDetailsFrame.LoadImages;
 const
   suffixes : array[0..3] of string = ('_16', '_24', '_32','_48');
 
@@ -648,7 +648,7 @@ begin
   {$IFEND}
 end;
 
-procedure TGroupPackageDetailsFrame.OnDetailsUriClick(Sender: TObject; const uri: string; const element: TDetailElement);
+procedure TPackageDetailsFrame.OnDetailsUriClick(Sender: TObject; const uri: string; const element: TDetailElement);
 begin
   case element of
     deNone : ;
@@ -660,7 +660,7 @@ begin
 
 end;
 
-procedure TGroupPackageDetailsFrame.ProjectReloaded;
+procedure TPackageDetailsFrame.ProjectReloaded;
 var
   i : integer;
 begin
@@ -671,13 +671,13 @@ begin
   FProjectsGrid.EndUpdate;
 end;
 
-procedure TGroupPackageDetailsFrame.ProjectSelectionChanged(Sender: TObject);
+procedure TPackageDetailsFrame.ProjectSelectionChanged(Sender: TObject);
 begin
   UpdateButtonState;
 end;
 
 
-procedure TGroupPackageDetailsFrame.ReloadProjectGrid(const packageId : string);
+procedure TPackageDetailsFrame.ReloadProjectGrid(const packageId : string);
 var
   i: Integer;
   packageRefs : IPackageReference;
@@ -709,7 +709,7 @@ begin
   end;
 end;
 
-function TGroupPackageDetailsFrame.GetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string): IAwaitable<IPackageSearchResultItem>;
+function TPackageDetailsFrame.GetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string): IAwaitable<IPackageSearchResultItem>;
 var
   repoManager : IPackageRepositoryManager;
 begin
@@ -733,7 +733,7 @@ begin
 end;
 
 
-function TGroupPackageDetailsFrame.GetReferenceVersion: TPackageVersion;
+function TPackageDetailsFrame.GetReferenceVersion: TPackageVersion;
 var
   latestVersion : TPackageVersion;
 begin
@@ -753,7 +753,7 @@ begin
 
 end;
 
-procedure TGroupPackageDetailsFrame.SetPackage(const package: IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
+procedure TPackageDetailsFrame.SetPackage(const package: IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
 var
   packageRefs : IPackageReference;
   projectRefs : IPackageReference;
@@ -822,7 +822,7 @@ begin
   UpdateButtonState;
 end;
 
-procedure TGroupPackageDetailsFrame.SetPackageLogo(const id: string);
+procedure TPackageDetailsFrame.SetPackageLogo(const id: string);
 var
   logo : IPackageIconImage;
   graphic : TGraphic;
@@ -844,12 +844,12 @@ begin
       imgPackageLogo.Visible := false;
 end;
 
-procedure TGroupPackageDetailsFrame.SetPlatform(const platform: TDPMPlatform);
+procedure TPackageDetailsFrame.SetPlatform(const platform: TDPMPlatform);
 begin
   FCurrentPlatform := platform;
 end;
 
-procedure TGroupPackageDetailsFrame.ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
+procedure TPackageDetailsFrame.ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
 begin
   {$IFDEF THEMESERVICES}
   FIDEStyleServices := StyleServices;
@@ -891,7 +891,7 @@ begin
 
 end;
 
-procedure TGroupPackageDetailsFrame.UpdateButtonState;
+procedure TPackageDetailsFrame.UpdateButtonState;
 var
   referenceVersion : TPackageVersion;
 begin
@@ -934,7 +934,7 @@ begin
 
 end;
 
-procedure TGroupPackageDetailsFrame.VersionGridOnDowngradeEvent(const project: string);
+procedure TPackageDetailsFrame.VersionGridOnDowngradeEvent(const project: string);
 var
   options : TInstallOptions;
 begin
@@ -950,7 +950,7 @@ begin
   DoPackageInstall(options, true);
 end;
 
-procedure TGroupPackageDetailsFrame.VersionGridOnInstallEvent(const project: string);
+procedure TPackageDetailsFrame.VersionGridOnInstallEvent(const project: string);
 var
   options : TInstallOptions;
 begin
@@ -967,7 +967,7 @@ begin
 
 end;
 
-procedure TGroupPackageDetailsFrame.VersionGridOnUnInstallEvent(const project: string);
+procedure TPackageDetailsFrame.VersionGridOnUnInstallEvent(const project: string);
 var
   options : TUnInstallOptions;
 begin
@@ -982,7 +982,7 @@ begin
   DoPackageUninstall(options);
 end;
 
-procedure TGroupPackageDetailsFrame.VersionGridOnUpgradeEvent(const project: string);
+procedure TPackageDetailsFrame.VersionGridOnUpgradeEvent(const project: string);
 var
   options : TInstallOptions;
 begin
@@ -999,7 +999,7 @@ begin
   //call common function
 end;
 
-procedure TGroupPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);
+procedure TPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);
 var
   versions : IList<TPackageVersion>;
   repoManager : IPackageRepositoryManager;
@@ -1088,7 +1088,7 @@ begin
 
 end;
 
-procedure TGroupPackageDetailsFrame.ViewClosing;
+procedure TPackageDetailsFrame.ViewClosing;
 begin
   FClosing := true;
   FHost := nil;

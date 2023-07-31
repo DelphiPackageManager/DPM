@@ -247,8 +247,8 @@
         <DCCReference Include="IDE\Logging\DPM.IDE.MessageService.pas"/>
         <DCCReference Include="IDE\DPM.IDE.ToolsAPI.pas"/>
         <DCCReference Include="IDE\EditorView\DPM.IDE.Details.Interfaces.pas"/>
-        <DCCReference Include="IDE\EditorView\DPM.IDE.GroupPackageDetailsFrame.pas">
-            <Form>GroupPackageDetailsFrame</Form>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.PackageDetailsFrame.pas">
+            <Form>PackageDetailsFrame</Form>
             <FormType>dfm</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>

@@ -159,7 +159,7 @@ contains
   DPM.IDE.EditorViewManager in '..\..\IDE\EditorView\DPM.IDE.EditorViewManager.pas',
   DPM.IDE.GroupEditorView in '..\..\IDE\EditorView\DPM.IDE.GroupEditorView.pas',
   DPM.IDE.GroupEditorViewFrame in '..\..\IDE\EditorView\DPM.IDE.GroupEditorViewFrame.pas',
-  DPM.IDE.GroupPackageDetailsFrame in '..\..\IDE\EditorView\DPM.IDE.GroupPackageDetailsFrame.pas',
+  DPM.IDE.PackageDetailsFrame in '..\..\IDE\EditorView\DPM.IDE.PackageDetailsFrame.pas',
   DPM.IDE.PackageDetailsFrame in '..\..\IDE\EditorView\DPM.IDE.PackageDetailsFrame.pas',
   DPM.IDE.PackageDetailsPanel in '..\..\IDE\EditorView\DPM.IDE.PackageDetailsPanel.pas',
   DPM.IDE.SearchBarFrame in '..\..\IDE\EditorView\DPM.IDE.SearchBarFrame.pas',
@@ -175,5 +175,5 @@ contains
   DPM.IDE.MessageForm in '..\..\IDE\Logging\DPM.IDE.MessageForm.pas' {DPMMessageForm},
   DPM.IDE.BaseEditViewFrame in '..\..\IDE\EditorView\DPM.IDE.BaseEditViewFrame.pas' {DPMBaseEditViewFrame: TFrame},
   DPM.IDE.GroupEditorViewFrame in '..\..\IDE\EditorView\DPM.IDE.GroupEditorViewFrame.pas' {DPMGroupEditViewFrame: TFrame},
-  DPM.IDE.GroupPackageDetailsFrame in '..\..\IDE\EditorView\DPM.IDE.GroupPackageDetailsFrame.pas' {GroupPackageDetailsFrame: TFrame};
+  DPM.IDE.PackageDetailsFrame in '..\..\IDE\EditorView\DPM.IDE.PackageDetailsFrame.pas' {PackageDetailsFrame: TFrame};
 
