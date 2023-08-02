@@ -184,12 +184,12 @@ begin
   options.ConfigFile := FConfiguration.FileName;
   options.PackageId := FPackageMetaData.Id;
   options.Version := FSelectedVersion;
-  //options.ProjectPath := FProjectGroup.FileName;
+  //only install in projects it's not installed in already
   options.Projects := FProjectsGrid.GetNotInstalledProjects;
   options.Platforms := [FPackageMetaData.Platform];
   options.Prerelease := FIncludePreRelease;
   options.CompilerVersion := IDECompilerVersion;
-//  options.Force := true; //might already be installed in some projects
+
   DoPackageInstall(options, false);
 end;
 
@@ -201,14 +201,12 @@ begin
   options.ConfigFile := FConfiguration.FileName;
   options.PackageId := FPackageMetaData.Id;
   options.Version := FPackageMetaData.Version;
-//  options.ProjectPath := FProjectGroup.FileName;
+  //only attempt to uninstall from projects it's actually installed in.
   options.Projects := FProjectsGrid.GetInstalledProjects;
   options.Platforms := [FPackageMetaData.Platform];
   options.CompilerVersion := IDECompilerVersion;
 
-  //TODO : this might cause errors if the packages isn't in a project.
   DoPackageUninstall(options);
-
 end;
 
 procedure TPackageDetailsFrame.btnUpgradeAllClick(Sender: TObject);
@@ -219,15 +217,14 @@ begin
   options.ConfigFile := FConfiguration.FileName;
   options.PackageId := FPackageMetaData.Id;
   options.Version := FSelectedVersion;
-//  options.ProjectPath := FProjectGroup.FileName;
+  //only upgrade/downgrade in projects it's actually ibstalled in.
   options.Projects := FProjectsGrid.GetInstalledProjects;
-
   options.Platforms := [FPackageMetaData.Platform];
   options.Prerelease := FIncludePreRelease;
   options.CompilerVersion := IDECompilerVersion;
-  options.Force := true; //might already be installed in some projects
-  DoPackageInstall(options, true);
+  options.Force := true; //always need force to re-install/upgrade/downgrade.
 
+  DoPackageInstall(options, true);
 end;
 
 destructor TPackageDetailsFrame.Destroy;
