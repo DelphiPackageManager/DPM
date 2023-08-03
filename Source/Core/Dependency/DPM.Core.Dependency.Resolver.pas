@@ -106,7 +106,7 @@ end;
 /// dependency range and the one already resolved. If found then it will undo the previous resolution and push it back on
 /// the stack to be redone with the overlapping range. If not then we have an unresolvable conflict and exit.
 ///
-/// Note that top level (non transient) dependencies always win out in conflicts with transient dependencies.
+/// Note that top level (non transitive) dependencies always win out in conflicts with transient dependencies.
 /// A small optimisation is to sort the dependencies by the width of their dependency version range and
 /// process them from small to large. The idea there is to fail as early as possible.
 ///
@@ -211,7 +211,7 @@ begin
           end
           else
             FLogger.Information('            selected : ' + dependency.Id + '.' + resolution.Package.Version.ToString);
-          //in the case where we are promoting a transient to a direct dependency, we need a range.
+          //in the case where we are promoting a transitive to a direct dependency, we need a range.
           //the direct will not have a range so we convert the version to a range.
           if resolution.VersionRange.IsEmpty then
             resolution.VersionRange := TVersionRange.Create(resolution.Package.Version);
@@ -325,7 +325,7 @@ begin
   errorCount := 0;
   for packageRef in projectReferences do
   begin
-    resolution := FPackageInstallerContext.FindPackageResolution(projectFile,packageRef.Package.Id, platform);
+    resolution := FPackageInstallerContext.FindPackageResolution(projectFile, platform, packageRef.Package.Id);
     if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Package.Version)) then
     begin
       FLogger.Error('Package project group conflict : ' + packageRef.Package.Id + '-' + resolution.Package.Version.ToString + ' in project : ' + resolution.Project + ' does not satisfy ' + packageRef.Package.Version.ToString  );
@@ -338,7 +338,8 @@ begin
   result := DoResolve(cancellationToken, compilerVersion, platform, options.Prerelease, context);
   resolved := context.GetResolvedPackages;
   dependencyGraph := context.BuildDependencyGraph;
-  FPackageInstallerContext.RecordGraph(projectFile, platform, dependencyGraph, context.GetResolutions);
+  //record the resolutions so they can be applied to other projects in the group
+  FPackageInstallerContext.RecordResolutions(projectFile, platform, context.GetResolutions);
   result := result and (errorCount = 0);
 end;
 
@@ -359,14 +360,12 @@ begin
 
   //TODO : First validate that there are no conflicts in the existing graph.. if there are remove them and let the resolver deal with it?
 
-
-
   errorCount := 0;
 
   //first check if the packages are already resolved in the project group.
   for packageRef in projectReferences do
   begin
-    resolution := FPackageInstallerContext.FindPackageResolution(projectFile,packageRef.Package.Id, platform);
+    resolution := FPackageInstallerContext.FindPackageResolution(projectFile, platform, packageRef.Package.Id);
     //if resolved, check if they are compatible.
     if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Package.Version)) then
     begin
@@ -380,7 +379,8 @@ begin
   result := DoResolve(cancellationToken, compilerVersion,  platform, options.Prerelease, context);
   resolved := context.GetResolvedPackages;
   dependencyGraph := context.BuildDependencyGraph;
-  FPackageInstallerContext.RecordGraph(projectFile, platform, dependencyGraph, context.GetResolutions);
+  //record the resolutions so they can be applied to other projects in the group
+  FPackageInstallerContext.RecordResolutions(projectFile, platform, context.GetResolutions);
   result := result and (errorCount = 0);
 end;
 

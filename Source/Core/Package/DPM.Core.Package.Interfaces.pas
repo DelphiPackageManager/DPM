@@ -125,13 +125,9 @@ type
   end;
 
   //this is what is returned from a package feed for the UI.
-  IPackageSearchResultItem = interface
+  IPackageSearchResultItem = interface(IPackageId)
     ['{8EB6EA16-3708-41F7-93A2-FE56EB75510B}']
     function GetSourceName : string;
-    function GetId : string;
-    function GetVersion : TPackageVersion;
-    function GetPlatform : TDPMPlatform;
-    function GetCompilerVersion : TCompilerVersion;
     function GetDependencies : IList<IPackageDependency>;
 
     function GetDescription : string;
@@ -158,6 +154,7 @@ type
     function GetIsTransitive : boolean;
     function GetIsLatestVersion : boolean;
     function GetIsLatestStableVersion : boolean;
+    function GetVersionRange : TVersionRange;
 
     procedure SetVersion(const value : TPackageVersion);
     procedure SetInstalled(const value : boolean);
@@ -170,9 +167,11 @@ type
     procedure SetRepositoryCommit(const value : string);
     procedure SetPublishedDate(const value : string);
     procedure SetIsTransitive(const value : boolean);
+    procedure SetVersionRange(const value : TVersionRange);
 
-    property Id : string read GetId;
+    //reintroducing here to make it settable.
     property Version : TPackageVersion read GetVersion write SetVersion;
+
     property Description : string read GetDescription;
     property Authors : string read GetAuthors;
     property ProjectUrl : string read GetProjectUrl;
@@ -185,8 +184,6 @@ type
     property Copyright : string read GetCopyright;
     property Tags : string read GetTags;
 
-    property Platform : TDPMPlatform read GetPlatform;
-    property CompilerVersion : TCompilerVersion read GetCompilerVersion;
     property Dependencies : IList<IPackageDependency>read GetDependencies;
 
     //only returned from server feeds.
@@ -203,6 +200,7 @@ type
     property IsLatestVersion : boolean read GetIsLatestVersion;
     property IsLatestStableVersion : boolean read GetIsLatestStableVersion;
     property IsTransitive : boolean read GetIsTransitive write SetIsTransitive;
+    property VersionRange : TVersionRange read GetVersionRange write SetVersionRange;
     property ReportUrl : string read GetProjectUrl write SetReportUrl;
     property PublishedDate : string read GetPublishedDate write SetPublishedDate; //TODO : what format should this be - see repos
     property IsError : boolean read GetIsError;

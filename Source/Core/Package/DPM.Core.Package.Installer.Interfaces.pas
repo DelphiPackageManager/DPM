@@ -38,7 +38,8 @@ uses
   DPM.Core.Options.Uninstall,
   DPM.Core.Options.Restore,
   DPM.Core.Package.Interfaces,
-  DPM.Core.Dependency.Interfaces;
+  DPM.Core.Dependency.Interfaces,
+  DPM.Core.Spec.Interfaces;
 
 
 type
@@ -60,18 +61,22 @@ type
   //design-time packages to install etc.
   IPackageInstallerContext = interface
     ['{8FD229A2-FE7B-4315-84B2-FF18B78C76DC}']
-    //called from the project controller in the IDE
+    //called from the project controller in the IDE when starting loading. This is probably wrong!
     procedure Clear;
-    //This is need to clear the context data when a project is closed.
+
+    //called from the ProjectController when a project is closed.
     procedure RemoveProject(const projectFile : string);
 
-    //register a bpl for install into the IDE.
-    function RegisterDesignPackage(const platform : TDPMPlatform; const packageFile : string; const dependsOn : IList<string>; out errorMessage : string) : boolean;
+    //called from the package installer during install/restore
+    procedure RecordGraph(const projectFile : string; const platform : TDPMPlatform; const graph : IPackageReference);
 
-    function IsDesignPackageInstalled(const packageName : string; out platform : TDPMPlatform; out project : string) : boolean;
+    //called from the package installer during install/restore
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;
 
-    procedure RecordGraph(const projectFile : string; const platform : TDPMPlatform; const graph : IPackageReference; const resolutions : TArray<IResolution>);
-    function FindPackageResolution(const currentProjectFile: string; const packageId : string; const platform : TDPMPlatform) : IResolution;
+
+    //calle from the dependency resolver.
+    procedure RecordResolutions(const projectFile: string; const platform : TDPMPlatform; const resolutions : TArray<IResolution>);
+    function FindPackageResolution(const projectFile: string; const platform : TDPMPlatform; const packageId : string ) : IResolution;
 
   end;
 

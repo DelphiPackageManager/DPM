@@ -878,11 +878,13 @@ begin
         for bplEntry in targetPlatform.RuntimeFiles do
         begin
           bplEntry.Source := Trim(regEx.Replace(bplEntry.Source, evaluator));
+          bplEntry.BuildId := Trim(regEx.Replace(bplEntry.BuildId, evaluator));
         end;
 
         for bplEntry in targetPlatform.DesignFiles do
         begin
           bplEntry.Source := Trim(regEx.Replace(bplEntry.Source, evaluator));
+          bplEntry.BuildId := Trim(regEx.Replace(bplEntry.BuildId, evaluator));
         end;
 
         for buildEntry in targetPlatform.BuildEntries do

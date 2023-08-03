@@ -299,6 +299,7 @@ begin
     begin
       packageMetadata := FPackageMetaData;
       packageMetadata.Installed := true;
+      packageMetadata.IsTransitive := false;
       FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FInstalledVersion.ToStringNoMeta + ' [' + sPlatform + '] installed.');
       FHost.PackageInstalled(packageMetadata, isUpdate); //sets package to nil
       FInstalledVersion := options.Version;
@@ -998,7 +999,6 @@ end;
 
 procedure TPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);
 var
-  versions : IList<TPackageVersion>;
   repoManager : IPackageRepositoryManager;
   sReferenceVersion : string;
   includePreRelease : boolean;
@@ -1047,7 +1047,7 @@ begin
       FLogger.Debug('Cancelled getting package versions.');
     end)
   .Await(
-    procedure(const theResult : IList<TPackageVersion>)
+    procedure(const versions : IList<TPackageVersion>)
     var
       version : TPackageVersion;
     begin
@@ -1055,7 +1055,6 @@ begin
       //if the view is closing do not do anything else.
       if FClosing then
         exit;
-      versions := theResult;
       FLogger.Debug('Got package versions .');
       cboVersions.Items.BeginUpdate;
       try
@@ -1064,7 +1063,15 @@ begin
         if versions.Any then
         begin
           for version in versions do
-            cboVersions.Items.Add(version.ToStringNoMeta);
+          begin
+            if FPackageMetaData.IsTransitive then
+            begin
+              if FPackageMetaData.VersionRange.IsSatisfiedBy(version) then
+                cboVersions.Items.Add(version.ToStringNoMeta);
+            end
+            else
+              cboVersions.Items.Add(version.ToStringNoMeta);
+          end;
           cboVersions.ItemIndex := cboVersions.Items.IndexOf(sReferenceVersion);
         end
         else

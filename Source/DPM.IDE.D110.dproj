@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectVersion>19.5</ProjectVersion>
@@ -302,6 +302,7 @@
         <DCCReference Include="IDE\DPM.IDE.ProjectNotifier.pas"/>
         <DCCReference Include="IDE\EditorView\DPM.IDE.ActivityIndicator.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.DesignManager.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -339,7 +340,6 @@
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="..\Output\DPM_IDE_D110.dll" Configuration="Debug" Class="ProjectOutput"/>
                 <DeployFile LocalName="..\Output\DPM_IDE_D110.dll" Configuration="Debug" Class="ProjectOutput"/>
                 <DeployClass Name="AdditionalDebugSymbols">
                     <Platform Name="iOSSimulator">

@@ -284,7 +284,7 @@ function TResolverContext.TryGetResolution(const packageId : string; const paren
     for i := 0 to res.package.Dependencies.Count -1 do
     begin
       id := res.package.Dependencies[i].Id;
-      childRes := FPackageInstallerContext.FindPackageResolution(FProjectFile, id , FPlatform);
+      childRes := FPackageInstallerContext.FindPackageResolution(FProjectFile,  FPlatform, id);
       if childRes <> nil then
       begin
         FResolved[Lowercase(id)] := childRes;//.Clone(FProjectFile); //should we be cloning here?
@@ -299,7 +299,7 @@ begin
   if not result then
   begin
     //check if it was resolved in another project in the group
-    resolution := FPackageInstallerContext.FindPackageResolution(FProjectFile, packageId, FPlatform);
+    resolution := FPackageInstallerContext.FindPackageResolution(FProjectFile, FPlatform, packageId);
     result := resolution <> nil;
     if resolution <> nil then
     begin

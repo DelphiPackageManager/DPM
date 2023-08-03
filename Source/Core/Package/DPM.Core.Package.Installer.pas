@@ -31,7 +31,7 @@ unit DPM.Core.Package.Installer;
 interface
 
 uses
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Logging,
@@ -86,6 +86,8 @@ type
 
     function CopyLocal(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>;
                        const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
+
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;
 
     function DoRestoreProjectForPlatform(const cancellationToken: ICancellationToken; const Options: TRestoreOptions; const projectFile: string; const projectEditor: IProjectEditor;
                               const platform: TDPMPlatform; const config: IConfiguration; const context: IPackageInstallerContext): boolean;
@@ -843,6 +845,8 @@ begin
     exit(false);
   end;
 
+  FContext.RecordGraph(projectFile, platform, projectPackageGraph);
+
   // get the package we were installing.
   packageInfo := resolvedPackages.FirstOrDefault(
     function(const info: IPackageInfo): boolean
@@ -857,7 +861,7 @@ begin
   end;
 
   // downloads the package files to the cache if they are not already there and
-  // returns the deserialized dspec as we need it for search paths and
+  // returns the deserialized dspec as we need it for search paths and design
   if not DownloadPackages(cancellationToken, resolvedPackages, packageSpecs) then
     exit;
 
@@ -874,6 +878,9 @@ begin
 
   if not CopyLocal(cancellationToken, resolvedPackages, packageSpecs,
     projectEditor, platform) then
+    exit;
+
+  if not InstallDesignPackages(cancellationToken,  projectFile, packageSpecs) then
     exit;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths,
@@ -925,6 +932,8 @@ begin
     exit(false);
   end;
 
+  FContext.RecordGraph(projectFile, platform, projectPackageGraph);
+
   // downloads the package files to the cache if they are not already there and
   // returns the deserialized dspec as we need it for search paths and
   if not DownloadPackages(cancellationToken, resolvedPackages, packageSpecs) then
@@ -942,6 +951,9 @@ begin
     exit;
 
   if not CopyLocal(cancellationToken, resolvedPackages, packageSpecs, projectEditor, platform) then
+    exit;
+
+  if not InstallDesignPackages(cancellationToken, projectFile, packageSpecs) then
     exit;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
@@ -983,16 +995,21 @@ begin
 
   //TODO : Context - Remove Design Packages if no longer referenced.
 
+  //TODO : Tell contect to upgrade graph.
+//  FContext.PackageGraphTrimmed(projectFile, platform, projectPackageGraph)
+
+
   //now work out which search paths we can remove;
-  //walk the package reference tree and check transient dependencies
+  //walk the package reference tree and check transitive dependencies
   foundReference.VisitDFS(
       procedure(const node: IPackageReference)
       begin
-        //if there is no other transient dependency then we can remove
+        //if there is no other transitive dependency then we can remove
         //from the search path.
         if not projectPackageGraph.HasAnyDependency(node.Id) then
             projectEditor.RemoveFromSearchPath(platform, node.Id);
       end);
+
 
   projectEditor.UpdatePackageReferences(projectPackageGraph, platform);
   result := projectEditor.SaveProject();
@@ -1001,6 +1018,7 @@ end;
 function TPackageInstaller.BuildDependencies(const cancellationToken : ICancellationToken; const packageCompiler: ICompiler; const projectPackageGraph: IPackageReference;
                                              const packagesToCompile: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
                                              packageSpecs: IDictionary<string, IPackageSpec>; const Options: TSearchOptions): boolean;
+
 begin
   result := false;
   try
@@ -1057,11 +1075,6 @@ begin
                 otherNode.LibPath := packageReference.LibPath;
                 otherNode.BplPath := packageReference.BplPath;
               end);
-        end;
-
-        if Spec.TargetPlatform.DesignFiles.Any then
-        begin
-          // we have design time packages to install.
         end;
       end);
     result := true;
@@ -1370,6 +1383,11 @@ begin
     end;
   end;
 
+end;
+
+function TPackageInstaller.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
+begin
+  result := FContext.InstallDesignPackages(cancellationToken, projectFile, packageSpecs);
 end;
 
 function TPackageInstaller.InstallPackageFromFile(const cancellationToken : ICancellationToken; const Options: TInstallOptions;const projectFiles: TArray<string>;

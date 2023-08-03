@@ -4,47 +4,55 @@ interface
 
 uses
   Spring.Collections,
+  VSoft.CancellationToken,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Dependency.Interfaces,
   DPM.Core.Package.Installer.Interfaces,
-  DPM.Core.Package.InstallerContext;
-type
+  DPM.Core.Package.InstallerContext,
+  DPM.Core.Spec.Interfaces,
+  DPM.IDE.DesignManager;
 
+type
   TDPMIDEPackageInstallerContext = class(TCorePackageInstallerContext, IPackageInstallerContext)
   private
+    FDesignManager : IDPMIDEDesignManager;
   protected
-    function IsDesignPackageInstalled(const packageName: string; out platform : TDPMPlatform; out project : string): Boolean;override;
-    function RegisterDesignPackage(const platform: TDPMPlatform; const packageFile: string; const dependsOn: IList<string>; out errorMessage : string) : boolean;override;
     procedure Clear;override;
+    procedure RemoveProject(const projectFile : string);override;
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;override;
   public
-    constructor Create(const logger : ILogger);override;
+    constructor Create(const logger : ILogger; const designManager : IDPMIDEDesignManager);reintroduce;
   end;
 
 implementation
 
 { TDPMIDEPackageInstallerContext }
 
-constructor TDPMIDEPackageInstallerContext.Create(const logger: ILogger);
+constructor TDPMIDEPackageInstallerContext.Create(const logger: ILogger; const designManager : IDPMIDEDesignManager);
 begin
   inherited Create(logger);
+  FDesignManager := designManager;
 
 end;
 
 
-function TDPMIDEPackageInstallerContext.IsDesignPackageInstalled(const packageName: string; out platform : TDPMPlatform; out project : string): Boolean;
+function TDPMIDEPackageInstallerContext.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
 begin
-  result := false;
+  result := true;
+
 end;
 
-function TDPMIDEPackageInstallerContext.RegisterDesignPackage(const platform: TDPMPlatform; const packageFile: string; const dependsOn: IList<string>; out errorMessage : string) : boolean;
+procedure TDPMIDEPackageInstallerContext.RemoveProject(const projectFile: string);
 begin
-  result := false;
+  inherited;
+  //unstall any unused design time packages.
 end;
 
 procedure TDPMIDEPackageInstallerContext.Clear;
 begin
   inherited;
+  //uninstall any design time packages.
 end;
 
 end.

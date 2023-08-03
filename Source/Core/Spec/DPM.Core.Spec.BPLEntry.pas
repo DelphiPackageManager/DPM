@@ -49,6 +49,7 @@ type
     function GetCopyLocal : Boolean;
     function GetInstall : Boolean;
     function GetBuildId : string;
+    procedure SetBuildId(const value : string);
     function Clone : ISpecBPLEntry; overload;
     constructor CreateClone(const logger : ILogger; const src : string; const buildId : string; const copyLocal, install : boolean); reintroduce;
   public
@@ -116,6 +117,11 @@ begin
   FBuildId := jsonObject.S['buildId'];
 end;
 
+
+procedure TSpecBPLEntry.SetBuildId(const value: string);
+begin
+  FBuildId := value;
+end;
 
 procedure TSpecBPLEntry.SetSource(const value: string);
 begin

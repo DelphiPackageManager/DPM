@@ -6,6 +6,7 @@ uses
   Spring.Collections,
   JsonDataObjects,
   DPM.Core.Types,
+  DPM.Core.Dependency.Version,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Package.Interfaces;
 
@@ -36,6 +37,9 @@ type
     FVersion : TPackageVersion;
     FLatestVersion : TPackageVersion;
     FLatestStableVersion : TPackageVersion;
+    FVersionRange : TVersionRange;
+
+
 
     FDownloadCount : Int64;
     FInstalled : boolean;
@@ -76,6 +80,9 @@ type
     function GetIsLatestVersion : boolean;
     function GetIsLatestStableVersion : boolean;
     function GetIsStableVersion : boolean;
+    function GetVersionRange : TVersionRange;
+
+    function ToIdVersionString : string;
 
     procedure SetVersion(const value : TPackageVersion);
     procedure SetPublishedDate(const value : string);
@@ -88,6 +95,7 @@ type
     procedure SetLatestVersion(const value : TPackageVersion);
     procedure SetLatestStableVersion(const value : TPackageVersion);
     procedure SetIsTransitive(const value : Boolean);
+    procedure SetVersionRange(const value : TVersionRange);
     constructor CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
     constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata);
     constructor CreateFromError(const id : string; const version : TPackageVersion; const errorDescription : string);
@@ -127,6 +135,7 @@ begin
   FId := id;
   FVersion := version;
   FDescription := errorDescription;
+  FVersionRange := TVersionRange.Empty;
 end;
 
 constructor TDPMPackageSearchResultItem.CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
@@ -164,6 +173,8 @@ begin
   FLatestVersion    := TPackageVersion.Parse(jsonObject.S['latestVersion']);
   FLatestStableVersion := TPackageVersion.Parse(jsonObject.S['latestStableVersion']);
   FIsReservedPrefix := jsonObject.B['isReservedPrefix'];
+  FVersionRange := TVersionRange.Empty;
+
 
 end;
 
@@ -191,6 +202,7 @@ begin
   FVersion := metaData.Version;
   FDownloadCount := -1; //indicates not set;
   FIsReservedPrefix := false;
+  FVersionRange := TVersionRange.Empty;
 end;
 
 class function TDPMPackageSearchResultItem.FromError(const id : string; const version : TPackageVersion; const errorDescription : string) : IPackageSearchResultItem;
@@ -366,6 +378,11 @@ begin
 end;
 
 
+function TDPMPackageSearchResultItem.GetVersionRange: TVersionRange;
+begin
+  result := FVersionRange;
+end;
+
 procedure TDPMPackageSearchResultItem.SetInstalled(const value : Boolean);
 begin
   FInstalled := value;
@@ -420,6 +437,16 @@ end;
 procedure TDPMPackageSearchResultItem.SetVersion(const value: TPackageVersion);
 begin
   FVersion := value;
+end;
+
+procedure TDPMPackageSearchResultItem.SetVersionRange(const value: TVersionRange);
+begin
+  FVersionRange := value;
+end;
+
+function TDPMPackageSearchResultItem.ToIdVersionString: string;
+begin
+  result := FId + ' [' + FVersion.ToStringNoMeta + ']';
 end;
 
 { TDPMPackageSearchResult }

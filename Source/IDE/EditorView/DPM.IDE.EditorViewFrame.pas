@@ -218,6 +218,7 @@ uses
   DPM.Core.Options.Common,
   DPM.Core.Utils.Config,
   DPM.Core.Utils.Numbers,
+  DPM.Core.Utils.Path,
   DPM.Core.Utils.Strings,
   DPM.Core.Utils.System,
   DPM.Core.Project.Editor,
@@ -235,34 +236,61 @@ type
 
 
 
-function FindPackageRef(const references : IPackageReference; const platform : TDPMPlatform; const searchItem : IPackageSearchResultItem; const topLevelOnly : boolean) : IPackageReference;
+function FindPackageRef(const node : IPackageReference; const platform : TDPMPlatform; const searchId : string; const topLevelOnly : boolean) : IPackageReference;
 var
-  ref : IPackageReference;
+  reference : IPackageReference;
+  dependencies : TArray<IPackageReference>;
 begin
   result := nil;
-  if (references = nil) or (not references.HasDependencies) then
+  if (node = nil) or (not node.HasDependencies) then
     exit;
 
-  //breadth first search!
-  for ref in references.Dependencies do
+  //when we search the project node we need to actually look at it's children, otherwise we will not find dependencies.
+  //the FPackageRefences passed in will be a root, as will the project nodes, so this will recurse twice for each external call.
+  if node.IsRoot then
   begin
-    if ref.Platform <> platform then
-      continue;
+    //1st time through, these will be the project nodes
+    //2nd time through, these will be top level dependencies.
+    dependencies := node.Dependencies.ToArray; //trying to make the debugger work here
+    for reference in dependencies do
+    begin
+      if SameText(reference.Id, searchId) then
+          Exit(reference);
 
-    if SameText(ref.Id, searchItem.Id) then
-      Exit(ref);
+      result := FindPackageRef(reference, platform, searchId, topLevelOnly);
+      if result <> nil then
+        exit;
+    end;
+    exit;
   end;
+
+  if SameText(node.Id, searchId) then
+      Exit(node);
+
   if topLevelOnly then
     exit;
 
-  for ref in references.Dependencies do
+  dependencies := node.Dependencies.ToArray;
+  //breadth first search!
+  for reference in dependencies do
   begin
-    if ref.Platform <> platform then
+    if reference.Platform <> platform then
+      continue;
+
+    if SameText(reference.Id, searchId) then
+      Exit(reference);
+  end;
+
+  //depth
+
+  for reference in node.Dependencies do
+  begin
+    if reference.Platform <> platform then
       continue;
     //depth search
-    if ref.HasDependencies then
+    if reference.HasDependencies then
     begin
-      result := FindPackageRef(ref, platform, searchItem, false);
+      result := FindPackageRef(reference, platform, searchId, false);
       if result <> nil then
         Exit(result);
     end;
@@ -661,14 +689,18 @@ begin
         Dec(FRequestsInFlight);
         //if the view is closing do not do anything else.
         if FClosing then
+        begin
+          FAvailableActivity.Stop;
           exit;
+        end;
+
         FLogger.Debug('DPMIDE : Got search results.');
         FAvailableActivity.Stop;
         toRemove := TCollections.CreateList<IPackageSearchResultItem>;
         //some of the available packages may already be installed, so we need to check for that.
         for item in theResult do
         begin
-          packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item, false);
+          packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item.id, false);
           if packageRef <> nil then
             toRemove.Add(item);
         end;
@@ -742,17 +774,30 @@ var
   proj : IOTAProject;
   i : integer;
   packageReference : IPackageReference;
+  projectFile : string;
+  basePath : string;
 begin
   projectEditor := TProjectEditor.Create(FLogger, FConfiguration, IDECompilerVersion);
   result := TPackageReference.CreateRoot(IDECompilerVersion, FCurrentPlatform);
   Assert(FProjectGroup <> nil);
+  basePath := FProjectGroup.FileName;
+  //unsaved project group still seems to have a file name.
+  if FileExists(basePath) then
+    basePath := ExtractFilePath(basePath)
+  else
+    basePath := '';
   for i := 0 to FProjectGroup.ProjectCount -1 do
   begin
     proj := FProjectGroup.Projects[i];
-    projectEditor.LoadProject(proj.FileName);
+    projectFile := proj.FileName;
+    if basePath <> '' then
+      projectFile := TPathUtils.CompressRelativePath(basePath,projectFile);
+
+    projectEditor.LoadProject(projectFile);
+
     packageReference := projectEditor.GetPackageReferences(FCurrentPlatform); //NOTE : Can return nil. Will change internals to return empty root node.
     if packageReference <> nil then
-      Result.AddExistingReference(LowerCase(proj.FileName), packageReference);
+      Result.AddExistingReference(LowerCase(projectFile), packageReference);
   end;
 end;
 
@@ -955,18 +1000,33 @@ begin
         result := repoManager.GetInstalledPackageFeed(cancelToken, options, packageIds);
         for item in result do
         begin
+          TSystemUtils.OutputDebugString('Processing installed package : ' + item.Id);
           if FPackageReferences <> nil then
           begin
-            packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item, true);
+            TSystemUtils.OutputDebugString('finding package ref : ' + item.id);
+            packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item.id, true);
             if packageRef <> nil then //top level reference
             begin
+              TSystemUtils.OutputDebugString('Top level package ref found for ' + item.Id);
               item.IsTransitive := false;
             end
-            else //not found as a top level reference
+            else //not found as a top level reference so check for transitive reference
             begin
-              packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item, false);
+              TSystemUtils.OutputDebugString('Package ref not found for ' + item.Id + ' - trying dependencies');
+              packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item.id, false);
               if packageRef <> nil then
+              begin
+                TSystemUtils.OutputDebugString('Found package ref for ' + item.Id + ' isTransitive : ' + BoolToStr(packageRef.IsTransitive,true));
                 item.IsTransitive := packageRef.IsTransitive;
+                if item.IsTransitive then
+                  item.VersionRange := packageRef.SelectedOn;
+              end
+              else
+              begin
+                item.IsTransitive := false;
+                TSystemUtils.OutputDebugString('No package ref for ' + item.Id );
+
+              end;
             end;
             if packageRef <> nil then
             begin

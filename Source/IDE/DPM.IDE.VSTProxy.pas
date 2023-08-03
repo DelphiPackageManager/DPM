@@ -170,6 +170,7 @@ var
   param : TValue;
 begin
   rttiMethodEntry := GetMethodEntry('DeleteChildren');
+  Assert(Length(rttiMethodEntry.params) = 2,'params length is not 2');
   TValue.Make(@parentNode, rttiMethodEntry.params[0].ParamType.Handle, param);
   rttiMethodEntry.rttiMethod.Invoke(FTreeInstance, [param, true]);
 end;

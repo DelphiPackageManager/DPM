@@ -157,13 +157,14 @@ type
     function GetCopyLocal : boolean;
     function GetInstall : boolean;
     function GetBuildId : string;
-    procedure SetSource(const value : string);
 
+    procedure SetSource(const value : string);
+    procedure SetBuildId(const value : string);
     function Clone : ISpecBPLEntry;
     property Source : string read GetSource write SetSource;
     property CopyLocal : boolean read GetCopyLocal; //ignored for design
     property Install : boolean read GetInstall; //ignored for runtime
-    property BuildId : string read GetBuildId;
+    property BuildId : string read GetBuildId write SetBuildId;
   end;
 
   ISpecSearchPath = interface(ISpecNode)

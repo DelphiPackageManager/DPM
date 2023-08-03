@@ -634,7 +634,7 @@ function TProjectEditor.LoadPackageRefences : boolean;
           exit;
         end;
 
-        //if the parent reference is using source then we must use source for transient references.
+        //if the parent reference is using source then we must use source for Transitive references.
         if (parentReference <> nil) and parentReference.UseSource then
           useSource := true
         else if packageElement.getAttributeNode('useSource') <> nil then
@@ -650,9 +650,6 @@ function TProjectEditor.LoadPackageRefences : boolean;
           rootNode := TPackageReference.CreateRoot(FCompiler,platform);
           FPackageRefences[platform] := rootNode;
         end;
-
-
-
 
         //check for duplicate references
         if isTransitive then

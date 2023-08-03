@@ -175,7 +175,8 @@ uses
   DPM.IDE.EditorViewFrame in 'IDE\EditorView\DPM.IDE.EditorViewFrame.pas' {DPMEditViewFrame2: TFrame},
   DPM.IDE.ProjectNotifier in 'IDE\DPM.IDE.ProjectNotifier.pas',
   DPM.IDE.ActivityIndicator in 'IDE\EditorView\DPM.IDE.ActivityIndicator.pas',
-  DPM.Core.Package.PackageLatestVersionInfo in 'Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas';
+  DPM.Core.Package.PackageLatestVersionInfo in 'Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas',
+  DPM.IDE.DesignManager in 'IDE\DPM.IDE.DesignManager.pas';
 
 {$R *.res}
 

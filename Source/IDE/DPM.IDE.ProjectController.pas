@@ -43,7 +43,7 @@ type
     FProjectTreeManager : IDPMProjectTreeManager;
     FProjectMode : TProjectMode;
     FPackageInstaller : IPackageInstaller;
-    FContext : IPackageInstallerContext;
+    FInstallerContext : IPackageInstallerContext;
     FCancellationTokenSource : ICancellationTokenSource;
     FLastResult : boolean;
   protected
@@ -51,8 +51,6 @@ type
     procedure ProjectOpening(const fileName : string);
     procedure ProjectClosed(const fileName : string);
     procedure ProjectGroupClosed;
-
-
 
     procedure BeginLoading(const mode : TProjectMode);
     procedure EndLoading(const mode : TProjectMode);
@@ -86,7 +84,7 @@ begin
   FLogger.Debug('ProjectController.BeginLoading : ' + GetEnumName(TypeInfo(TProjectMode),Ord(mode)));
   FCancellationTokenSource.Reset;
   FLastResult := true;
-  FContext.Clear;
+  FInstallerContext.Clear;
 end;
 
 constructor TDPMIDEProjectController.Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager;
@@ -99,7 +97,7 @@ begin
   FEditorViewManager := editorViewManager;
   FProjectTreeManager := projectTreeManager;
   FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
-  FContext := context;
+  FInstallerContext := context;
 end;
 
 destructor TDPMIDEProjectController.Destroy;
@@ -123,7 +121,7 @@ begin
   FLogger.Debug('ProjectController.ProjectClosed : ' + fileName);
   FProjectTreeManager.ProjectClosed(FileName);
   FEditorViewManager.ProjectClosed(FileName);
-  FContext.RemoveProject(fileName);
+  FInstallerContext.RemoveProject(fileName);
 end;
 
 
@@ -186,7 +184,7 @@ begin
   options.Validate(FLogger);
   options.CompilerVersion := IDECompilerVersion;
   FLogger.StartRestore(FCancellationTokenSource);
-  FLastResult := FLastResult and FPackageInstaller.Restore(FCancellationTokenSource.Token, options, FContext);
+  FLastResult := FLastResult and FPackageInstaller.Restore(FCancellationTokenSource.Token, options, FInstallerContext);
 end;
 
 
