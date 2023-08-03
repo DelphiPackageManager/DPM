@@ -171,7 +171,7 @@ begin
   result := nil;
   if not EnsurePackage(packageId) then
   begin
-    FLogger.Error('Package metadata file [' + metaDataFile + '] not found in cache.');
+    FLogger.Error('Package metadata file [' + packageId.ToString + '] not found in cache.');
     exit;
   end;
   packageFolder := GetPackagePath(packageId);
