@@ -35,7 +35,10 @@ constructor TDPMIDEDesignManager.Create;
 var
   i: Integer;
 begin
-  FPaths := TStringList.Create(TDuplicates.dupIgnore, false, false);
+  FPaths := TStringList.Create;
+  FPaths.Duplicates := TDuplicates.dupIgnore;
+  FPaths.CaseSensitive := false;
+  FPaths.Sorted := false;
   FPaths.Delimiter := ';';
   FPaths.DelimitedText := GetEnvironmentVariable('PATH');
   for i := 0 to FPaths.Count -1 do
