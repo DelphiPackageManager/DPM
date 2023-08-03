@@ -151,7 +151,6 @@ uses
   DPM.Controls.AutoComplete in 'Controls\DPM.Controls.AutoComplete.pas',
   DPM.IDE.AboutForm in 'IDE\DPM.IDE.AboutForm.pas' {DPMAboutForm},
   DPM.IDE.Types in 'IDE\DPM.IDE.Types.pas',
-  DPM.Controls.GroupButton in 'Controls\DPM.Controls.GroupButton.pas',
   DPM.IDE.AddInOptionsHostForm in 'IDE\DPM.IDE.AddInOptionsHostForm.pas' {DPMOptionsHostForm},
   DPM.IDE.IconCache in 'IDE\DPM.IDE.IconCache.pas',
   DPM.IDE.VSTProxy in 'IDE\DPM.IDE.VSTProxy.pas',
@@ -176,7 +175,8 @@ uses
   DPM.IDE.EditorViewFrame in 'IDE\EditorView\DPM.IDE.EditorViewFrame.pas' {DPMEditViewFrame: TFrame},
   DPM.IDE.ProjectNotifier in 'IDE\DPM.IDE.ProjectNotifier.pas',
   DPM.IDE.ActivityIndicator in 'IDE\EditorView\DPM.IDE.ActivityIndicator.pas',
-  DPM.Core.Package.PackageLatestVersionInfo in 'Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas';
+  DPM.Core.Package.PackageLatestVersionInfo in 'Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas',
+  DPM.IDE.DesignManager in 'IDE\DPM.IDE.DesignManager.pas';
 
 {$R *.res}
 
