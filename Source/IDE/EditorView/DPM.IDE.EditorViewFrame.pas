@@ -24,6 +24,7 @@ uses
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Options.Search,
   DPM.Core.Package.Interfaces,
+  DPM.Core.Repository.Interfaces,
   DPM.Core.Project.Interfaces,
   DPM.IDE.Types,
   DPM.IDE.IconCache,
@@ -34,10 +35,7 @@ uses
   DPM.IDE.SearchBarFrame,
   DPM.IDE.Details.Interfaces,
   DPM.IDE.ActivityIndicator,
-  {$IF CompilerVersion >= 24.0 }
-  {$LEGACYIFEND ON}
   System.Actions,
-  {$IFEND}
   {$IF CompilerVersion >= 30.0 }
   System.ImageList,
   {$IFEND}
@@ -75,10 +73,8 @@ type
     platformChangeDetectTimer: TTimer;
     PackageDetailsFrame: TPackageDetailsFrame;
     ActivityTimer: TTimer;
-    DebounceTimer: TTimer;
     procedure platformChangeDetectTimerTimer(Sender: TObject);
     procedure ActivityTimerTimer(Sender: TObject);
-    procedure DebounceTimerTimer(Sender: TObject);
   private
     FIDEStyleServices : TCustomStyleServices;
 
@@ -94,12 +90,14 @@ type
     FImplicitHeaderRowIdx : Int64;
     FAvailableHeaderRowIdx : Int64;
 
+    FInstallingProjectCount : integer;
+
 
     //dpm core stuff
-    FContainer : TContainer;
     FLogger : IDPMIDELogger;
     FProjectTreeManager : IDPMProjectTreeManager;
     FConfigurationManager : IConfigurationManager;
+    FRepositoryManager : IPackageRepositoryManager;
     FConfiguration : IConfiguration;
     FConfigIsLocal : boolean;
 
@@ -150,8 +148,11 @@ type
 
     //IDetailsHost
     procedure SaveBeforeInstall;
-    procedure PackageInstalled(const package : IPackageSearchResultItem; const isUpdate : boolean);
-    procedure PackageUninstalled(const package : IPackageSearchResultItem);
+    procedure PackageInstalled;
+    procedure BeginInstall(const projectCount : integer);
+    procedure EndInstall;
+
+
     function GetPackageReferences : IPackageReference;
     function GetPackageIdsFromReferences(const platform: TDPMPlatform): IList<IPackageId>;
     procedure RequestPackageIcon(const index : integer; const package : IPackageSearchResultItem);
@@ -224,7 +225,6 @@ uses
   DPM.Core.Project.Editor,
   DPM.Core.Package.Icon,
   DPM.Core.Package.SearchResults,
-  DPM.Core.Repository.Interfaces,
   DPM.IDE.ToolsAPI,
   DPM.IDE.AboutForm,
   DPM.IDE.AddInOptionsHostForm,
@@ -303,6 +303,9 @@ end;
 procedure TDPMEditViewFrame.ActivityTimerTimer(Sender: TObject);
 begin
   ActivityTimer.Enabled := false;
+  if FClosing then
+    exit;
+
   if FInstalledActivity.IsActive then
   begin
     FInstalledActivity.Step;
@@ -319,6 +322,12 @@ begin
     FScrollList.InvalidateRow(FAvailableHeaderRowIdx);
   end;
   ActivityTimer.Enabled := FInstalledActivity.IsActive or FImplicitActivity.IsActive or FAvailableActivity.IsActive;
+end;
+
+procedure TDPMEditViewFrame.BeginInstall(const projectCount : integer);
+begin
+  FInstallingProjectCount := projectCount;
+  TSystemUtils.OutputDebugString('BeginInstall : ' + intToStr(projectCount));
 end;
 
 procedure TDPMEditViewFrame.CalculateIndexes;
@@ -375,7 +384,6 @@ procedure TDPMEditViewFrame.Configure(const projectGroup : IOTAProjectGroup; con
 var
   sConfigFile : string;
 begin
-  FContainer := container;
   FProjectTreeManager := projectTreeManager;
   FProjectGroup := projectGroup;
   FProject := project;
@@ -384,8 +392,8 @@ begin
   else
     FSelectedProject := '';
 
-  FLogger := FContainer.Resolve<IDPMIDELogger>;
-  FDPMIDEOptions := FContainer.Resolve<IDPMIDEOptions>;
+  FLogger := container.Resolve<IDPMIDELogger>;
+  FDPMIDEOptions := container.Resolve<IDPMIDEOptions>;
   //if there is a project specific config file then that is what we should use.
   sConfigFile := IncludeTrailingPathDelimiter(ExtractFilePath(projectGroup.FileName)) + cDPMConfigFileName;
   if FileExists(sConfigFile) then
@@ -398,13 +406,15 @@ begin
   FSearchOptions.ApplyCommon(TCommonOptions.Default);
 
   //load our dpm configuration
-  FConfigurationManager := FContainer.Resolve<IConfigurationManager>;
+  FConfigurationManager := container.Resolve<IConfigurationManager>;
   FConfigurationManager.EnsureDefaultConfig;
   FConfiguration := FConfigurationManager.LoadConfig(FSearchOptions.ConfigFile);
 
+  FRepositoryManager := container.Resolve<IPackageRepositoryManager>;
+
   ConfigureSearchBar;
 
-  PackageDetailsFrame.Init(FContainer, FIconCache, FConfiguration, Self, projectGroup);
+  PackageDetailsFrame.Init(container, FIconCache, FConfiguration, Self, projectGroup);
 
   //testing
   CalculateIndexes;
@@ -422,9 +432,26 @@ constructor TDPMEditViewFrame.Create(AOwner: TComponent);
 {$IFDEF THEMESERVICES}
 var
   ideThemeSvc : IOTAIDEThemingServices;
-  {$ENDIF}
+{$ENDIF}
 begin
   inherited;
+  FSearchOptions := TSearchOptions.Create;
+  FAllInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>;
+  FInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>;
+  FImplicitPackages := TCollections.CreateList<IPackageSearchResultItem>;
+  FAvailablePackages := TCollections.CreateList<IPackageSearchResultItem>;
+
+  //hard code our compiler version here since when we are running in the IDE we are only working with the IDE version
+  FSearchOptions.CompilerVersion := IDECompilerVersion;
+
+  FSearchSkip := 0;
+  FSearchTake := 0;
+  FFirstView := true;
+  FRequestsInFlight := 0;
+
+  FCancelTokenSource := TCancellationTokenSourceFactory.Create;
+  FCurrentPlatform := TDPMPlatform.UnknownPlatform;
+
   FIconCache := TDPMIconCache.Create;
   FRowLayout := TRowLayout.Create(10, 24);
   FLock := TCriticalSection.Create;
@@ -447,26 +474,12 @@ begin
   FImplicitActivity.Stop;
   FAvailableActivity.Stop;
 
-  FAllInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>;
-  FInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>;
-  FImplicitPackages := TCollections.CreateList<IPackageSearchResultItem>;
-  FAvailablePackages := TCollections.CreateList<IPackageSearchResultItem>;
 
   CreateControls(AOwner);
   ThemeChanged;
 
-  FFirstView := true;
 
-  FSearchOptions := TSearchOptions.Create;
-  //hard code our compiler version here since when we are running in the IDE we are only working with the IDE version
-  FSearchOptions.CompilerVersion := IDECompilerVersion;
 
-  FSearchSkip := 0;
-  FSearchTake := 0;
-
-  FCancelTokenSource := TCancellationTokenSourceFactory.Create;
-  FRequestsInFlight := 0;
-  FCurrentPlatform := TDPMPlatform.UnknownPlatform;
 
 
 end;
@@ -513,12 +526,6 @@ begin
 
 
 
-end;
-
-procedure TDPMEditViewFrame.DebounceTimerTimer(Sender: TObject);
-begin
-  DebounceTimer.Enabled := false;
-  PackageDetailsFrame.SetPackage(FCurrentPackage, FSearchOptions.Prerelease, true);
 end;
 
 destructor TDPMEditViewFrame.Destroy;
@@ -569,6 +576,9 @@ var
   searchTxt : string;
   filterProc : TFilterProc;
 begin
+  if FClosing then
+    exit;
+
   //note refresh only ever applies to the installed packages, we always fetch the available packages.
   FLogger.Debug('DPMIDE : DoPlatformChange');
   TSystemUtils.OutputDebugString('TDPMEditViewFrame2.DoPlatformChange');
@@ -660,7 +670,7 @@ begin
     FAvailableActivity.Step;
     FScrollList.InvalidateRow(FAvailableHeaderRowIdx);
     ActivityTimer.Enabled := true;
-//    FSearchOptions.Take := 3;
+
     SearchForPackagesAsync(FSearchOptions)
     .OnException(
       procedure(const e : Exception)
@@ -724,6 +734,17 @@ begin
 
 end;
 
+
+procedure TDPMEditViewFrame.EndInstall;
+begin
+  TSystemUtils.OutputDebugString('TDPMEditViewFrame.EndInstall');
+  if FInstallingProjectCount <> 0 then
+  begin
+    //just in case the change notifier doesn't fire for every project.
+    FInstallingProjectCount := 0;
+    ProjectChanged;
+  end;
+end;
 
 function TDPMEditViewFrame.GetPackageIdsFromReferences(const platform: TDPMPlatform): IList<IPackageId>;
 var
@@ -795,7 +816,7 @@ begin
 
     projectEditor.LoadProject(projectFile);
 
-    packageReference := projectEditor.GetPackageReferences(FCurrentPlatform); //NOTE : Can return nil. Will change internals to return empty root node.
+    packageReference := projectEditor.GetPackageReferences(FCurrentPlatform);
     if packageReference <> nil then
       Result.AddExistingReference(LowerCase(projectFile), packageReference);
   end;
@@ -846,42 +867,18 @@ begin
     result := rkUnknown;
 end;
 
+procedure TDPMEditViewFrame.PackageInstalled;
+begin
+  //Tell the IDE to reload the project as we have just modified it on disk.
+  FProjectGroup.Refresh(false);
+end;
+
 function TDPMEditViewFrame.GetAvailableCount: Int64;
 begin
   if FAvailablePackages <> nil then
     result := FAvailablePackages.Count
   else
     result := 0;
-end;
-
-procedure TDPMEditViewFrame.PackageInstalled(const package: IPackageSearchResultItem; const isUpdate: boolean);
-//var
-//  platform : TDPMPlatform;
-begin
-  //Tell the IDE to reload the project as we have just modified it on disk.
-  FProjectGroup.Refresh(false);
-  //force the project tree to update after installing package.
-  //FProjectTreeManager.EndLoading();
-//  platform := FCurrentPlatform;
-//  FCurrentPlatform := TDPMPlatform.UnknownPlatform;
-  FLogger.Debug('DPMIDE : PackageInstalled');
-//  DoPlatformChange(platform, true);
-//  PackageDetailsFrame.ProjectReloaded;
-end;
-
-procedure TDPMEditViewFrame.PackageUninstalled(const package: IPackageSearchResultItem);
-//var
-//  platform : TDPMPlatform;
-begin
-  //Tell the IDE to reload the project as we have just modified it on disk.
-  FProjectGroup.Refresh(false);
-  //force the project tree to update after installing package.
-  //FProjectTreeManager.EndLoading();
-//  platform := FCurrentPlatform;
-//  FCurrentPlatform := TDPMPlatform.UnknownPlatform;
-  FLogger.Debug('DPMIDE : PackageUnInstalled');
-  //DoPlatformChange(platform, true);
-//  PackageDetailsFrame.ProjectReloaded;
 end;
 
 procedure TDPMEditViewFrame.platformChangeDetectTimerTimer(Sender: TObject);
@@ -913,6 +910,23 @@ var
   platforms : TDPMPlatforms;
 begin
   FLogger.Debug('DPMIDE : ProjectChanged');
+
+  //The problem here is that the change notifier fires for each project changed
+  //so if we install a package into every project in a group, it will fire for
+  //every project and then we end up here.
+  //the notifications are outside our control. We need to know when they are done
+  //so we count down the number of times it fires. This might be problematic if
+  //for some reason the notifier doesn't fire for a project. We reset it in EndInstall
+  //just in case.
+
+  if FInstallingProjectCount > 0 then
+  begin
+    Dec(FInstallingProjectCount);
+    TSystemUtils.OutputDebugString('ProjectChanged : ' + intToStr(FInstallingProjectCount));
+    if FInstallingProjectCount > 0 then
+      exit;
+  end;
+
   FCurrentPlatform := TDPMPlatform.UnknownPlatform; //force a reload
   PackageDetailsFrame.ProjectReloaded;
 
@@ -934,8 +948,6 @@ begin
   FCurrentPlatform := TDPMPlatform.UnknownPlatform; //force a reload
   PackageDetailsFrame.ProjectReloaded;
 
-  //need to update searchbar platforms etc.
-
   platforms := GetPlatforms;
   FSearchBar.UpdatePlatforms(platforms);
 //  DoPlatformChange(FSearchBar.Platform, true);
@@ -943,7 +955,7 @@ end;
 
 procedure TDPMEditViewFrame.ProjectLoaded(const projectName: string);
 begin
-  TSystemUtils.OutputDebugString('TDPMEditViewFrame2.ProjectLoaded : ' + projectName);
+//  TSystemUtils.OutputDebugString('TDPMEditViewFrame2.ProjectLoaded : ' + projectName);
 end;
 
 
@@ -974,11 +986,11 @@ begin
   //local for capture
   lProjectFile := FProjectGroup.FileName;
 
-  repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+  repoManager := FRepositoryManager;
   repoManager.Initialize(FConfiguration);
 
   options := FSearchOptions.Clone;
-  //we want all packages for installed as we don't know what types we might have
+  //don't filter for installed packages, we want them all
   options.Prerelease := true;
   options.Commercial := true;
   options.Trial := true;
@@ -1000,23 +1012,18 @@ begin
         result := repoManager.GetInstalledPackageFeed(cancelToken, options, packageIds);
         for item in result do
         begin
-          TSystemUtils.OutputDebugString('Processing installed package : ' + item.Id);
           if FPackageReferences <> nil then
           begin
-            TSystemUtils.OutputDebugString('finding package ref : ' + item.id);
             packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item.id, true);
             if packageRef <> nil then //top level reference
             begin
-              TSystemUtils.OutputDebugString('Top level package ref found for ' + item.Id);
               item.IsTransitive := false;
             end
             else //not found as a top level reference so check for transitive reference
             begin
-              TSystemUtils.OutputDebugString('Package ref not found for ' + item.Id + ' - trying dependencies');
               packageRef := FindPackageRef(FPackageReferences, FCurrentPlatform, item.id, false);
               if packageRef <> nil then
               begin
-                TSystemUtils.OutputDebugString('Found package ref for ' + item.Id + ' isTransitive : ' + BoolToStr(packageRef.IsTransitive,true));
                 item.IsTransitive := packageRef.IsTransitive;
                 if item.IsTransitive then
                   item.VersionRange := packageRef.SelectedOn;
@@ -1024,8 +1031,6 @@ begin
               else
               begin
                 item.IsTransitive := false;
-                TSystemUtils.OutputDebugString('No package ref for ' + item.Id );
-
               end;
             end;
             if packageRef <> nil then
@@ -1055,7 +1060,7 @@ var
   searchOptions : TSearchOptions;
 begin
   //local for capture
-  repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+  repoManager := FRepositoryManager;
   repoManager.Initialize(FConfiguration);
   searchOptions := options.Clone;
   searchOptions.Take := 100;
@@ -1099,7 +1104,7 @@ begin
   source := package.SourceName;
   FLogger.Debug('DPMIDE : Requesting icon for [' + id + '.' + version + ']');
 
-  repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+  repoManager := FRepositoryManager;
   repoManager.Initialize(FConfiguration);
 
   TAsync.Configure<IPackageIcon>(
@@ -1145,7 +1150,7 @@ end;
 
 procedure TDPMEditViewFrame.SaveBeforeInstall;
 begin
-
+//  FProjectGroup.Save(false, true);
 end;
 
 procedure TDPMEditViewFrame.ScrollListBeforeChangeRow(const Sender: TObject; const currentRowIndex: Int64; const direction: TScrollDirection; const delta: Int64; var newRowIndex: Int64);
@@ -1204,9 +1209,11 @@ var
   rowKind : TPackageRowKind;
   item : IPackageSearchResultItem;
 begin
+  if FClosing then
+    exit;
+
   //find the selected package in the list and update the package details view on the right.
   item := nil;
-  DebounceTimer.Enabled := false;
   rowKind := GetRowKind(newRowIndex);
   case rowKind of
     rkInstalledHeader:;
@@ -1230,10 +1237,7 @@ begin
     rkUnknown: ;
   end;
   FCurrentPackage := item;
-  if FCurrentPackage <> nil then
-      DebounceTimer.Enabled := true
-  else
-    PackageDetailsFrame.SetPackage(FCurrentPackage, FSearchOptions.Prerelease, true);
+  PackageDetailsFrame.SetPackage(FCurrentPackage, FSearchOptions.Prerelease, true);
 end;
 
 procedure TDPMEditViewFrame.ScrollListPaintNoRows(const Sender: TObject;  const ACanvas: TCanvas; const paintRect: TRect);
@@ -1574,9 +1578,9 @@ begin
   if FFirstView then
   begin
     FFirstView := false;
+    Application.ProcessMessages; //allow the frame to paint
     DoPlatformChange(FSearchBar.Platform, true);
   end;
-
 end;
 
 { TRowLayout }

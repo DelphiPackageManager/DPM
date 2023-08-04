@@ -760,10 +760,10 @@ begin
   if (existingPackageRef <> nil) then
   begin
     // if it's installed already and we're not forcing it to install then we're done.
-    if (not Options.force) and (not existingPackageRef.IsTransitive) then
+    if (not (Options.force or Options.IsUpgrade)) and (not existingPackageRef.IsTransitive) then
     begin
       // Note this error won't show from the IDE as we always force install from the IDE.
-      FLogger.Error('Package [' + Options.packageId +  '] is already installed. Use option -force to force reinstall.');
+      FLogger.Error('Package [' + Options.packageId +  '] is already installed. Use option -force to force reinstall, or -upgrade to install a different version.');
       exit;
     end;
     // remove it so we can force resolution to happen later.

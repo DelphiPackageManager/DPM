@@ -14,7 +14,7 @@ uses
   VSoft.Awaitable,
   DPM.IDE.Options,
   DPM.Controls.LogMemo,
-  ToolsAPI;
+  ToolsAPI, System.Actions;
 
 {$I ..\DPMIDE.inc}
 
@@ -43,6 +43,7 @@ type
     FCancellationTokenSource : ICancellationTokenSource;
     FCloseDelayInSeconds : integer;
     FCurrentCloseDelay : integer;
+    FStopwatch : TStopwatch;
     {$IFDEF THEMESERVICES}
     FNotifierId : integer;
     {$ENDIF}
@@ -60,6 +61,7 @@ type
     procedure Destroyed;
     procedure Modified;
 
+    procedure ProcessMessages;
 
   public
     constructor Create(AOwner : TComponent; const options : IDPMIDEOptions);reintroduce;
@@ -222,6 +224,8 @@ begin
 
   FCloseDelayInSeconds := 3;
   FCurrentCloseDelay := FCloseDelayInSeconds;
+
+  FStopwatch := TStopwatch.Create;
 end;
 
 procedure TDPMMessageForm.CreateParams(var Params: TCreateParams);
@@ -233,6 +237,7 @@ end;
 procedure TDPMMessageForm.Debug(const data: string);
 begin
   FLogMemo.AddRow(data, TLogMessageType.mtDebug);
+  Self.ProcessMessages;
 end;
 
 procedure TDPMMessageForm.DelayHide;
@@ -270,6 +275,7 @@ end;
 procedure TDPMMessageForm.Error(const data: string);
 begin
   FLogMemo.AddRow(data, TLogMessageType.mtError);
+  Self.ProcessMessages;
 end;
 
 
@@ -284,6 +290,7 @@ begin
     FLogMemo.AddRow(data, TLogMessageType.mtImportantInformation)
   else
     FLogMemo.AddRow(data, TLogMessageType.mtInformation);
+  Self.ProcessMessages;
 end;
 
 procedure TDPMMessageForm.lblDontCloseLinkClick(Sender: TObject; const Link: string; LinkType: TSysLinkType);
@@ -302,6 +309,27 @@ end;
 procedure TDPMMessageForm.NewLine;
 begin
   FLogMemo.AddRow('',mtInformation);
+  Self.ProcessMessages;
+end;
+
+// We need this here because the core doesn't know it's running in a ui
+// so it does not allow messages to pump, so the IDE can appear hung.
+// We don't want to this to call  application.processmessages too
+// often as it will slow things down.
+procedure TDPMMessageForm.ProcessMessages;
+begin
+  if not FStopwatch.IsRunning then
+  begin
+    FStopwatch.Start;
+    Application.ProcessMessages;
+  end
+  else if FStopwatch.ElapsedMilliseconds > 100 then
+  begin
+    FStopwatch.Stop;
+    Application.ProcessMessages;
+    FStopwatch.Reset;
+    FStopwatch.Start;
+  end;
 end;
 
 procedure TDPMMessageForm.SetCancellationTokenSource(const Value: ICancellationTokenSource);
@@ -322,6 +350,7 @@ begin
     FLogMemo.AddRow(data, TLogMessageType.mtImportantSuccess)
   else
     FLogMemo.AddRow(data, TLogMessageType.mtSuccess);
+  Self.ProcessMessages;
 end;
 
 procedure TDPMMessageForm.Verbose(const data: string;  const important: Boolean);
@@ -330,6 +359,7 @@ begin
     FLogMemo.AddRow(data, TLogMessageType.mtImportantVerbose)
   else
     FLogMemo.AddRow(data, TLogMessageType.mtVerbose);
+  Self.ProcessMessages;
 end;
 
 procedure TDPMMessageForm.Warning(const data: string; const important: Boolean);
@@ -338,6 +368,7 @@ begin
     FLogMemo.AddRow(data, TLogMessageType.mtImportantWarning)
   else
     FLogMemo.AddRow(data, TLogMessageType.mtWarning);
+  Self.ProcessMessages;
 end;
 
 initialization

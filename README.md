@@ -31,7 +31,7 @@ The command line documentation can be found [here](./docs/commands.md).
 
 ## Is DPM integrated into the Delphi IDE
 
-Not yet but it is planned. If you are a wiz with the open tools api and want to contribute then let us know.
+Yes, the installer available under the releases section includes IDE plugins for XE2-11.3
 
 ## Is there a central package source
 
@@ -39,10 +39,13 @@ Not yet but it is planned. At the moment, only local folder based [sources](./do
 
 ## Is my old version of Delphi supported
 
-Maybe, [see here](./docs/compiler-versions.md) for supported compiler versions. All target [platforms](./docs/platforms.md) for supported compiler versions are supported.
+Delphi XE2-11.3 are currently supported.
+
+All target [platforms](./docs/platforms.md) for supported compiler versions are supported.
 
 ## What about C++ Builder or FPC
 
+Whilst we would like to support C++Builder, we would need some help - we're delphi people.
 [see here](./docs/compiler-versions.md)
 
 ## Does it support design-time components

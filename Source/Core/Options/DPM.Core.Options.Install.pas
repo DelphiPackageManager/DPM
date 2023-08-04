@@ -43,6 +43,7 @@ type
     FProjectPath : string;
     FProjects : TArray<string>;
     FFloat : boolean;
+    FIsUpgrade : boolean;
     class var
       FDefault : TInstallOptions;
   protected
@@ -55,7 +56,7 @@ type
     constructor Create; override;
     function Validate(const logger : ILogger) : Boolean; override;
     function Clone : TInstallOptions; reintroduce;
-
+    property IsUpgrade : boolean read FIsUpgrade write FIsUpgrade;
     property PackageId : string read GetPackageId write SetPackageId;
     property PackageFile : string read FPackageFile write FPackageFile;
     property ProjectPath : string read FProjectPath write FProjectPath;
@@ -92,6 +93,7 @@ begin
   FProjectPath := original.FProjectPath;
   FFloat := original.FFloat;
   Force := original.Force;
+  FIsUpgrade := original.IsUpgrade;
 end;
 
 class constructor TInstallOptions.CreateDefault;

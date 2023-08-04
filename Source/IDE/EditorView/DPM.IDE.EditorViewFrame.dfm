@@ -121,11 +121,4 @@ object DPMEditViewFrame: TDPMEditViewFrame
     Left = 320
     Top = 480
   end
-  object DebounceTimer: TTimer
-    Enabled = False
-    Interval = 100
-    OnTimer = DebounceTimerTimer
-    Left = 312
-    Top = 280
-  end
 end

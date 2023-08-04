@@ -43,6 +43,8 @@ uses
   DPM.Core.Types,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Package.Interfaces,
+  DPM.Core.Package.Installer.Interfaces,
+  DPM.Core.Repository.Interfaces,
   DPM.Core.Logging,
   DPM.IDE.Logger,
   DPM.Core.Options.Search,
@@ -53,14 +55,11 @@ uses
   DPM.IDE.IconCache,
   DPM.IDE.Types,
   Vcl.ImgList,
-  {$IF CompilerVersion >= 33.0 }
-  {$LEGACYIFEND ON}
+  {$IFDEF USEIMAGECOLLECTION}
   Vcl.VirtualImageList,
   Vcl.ImageCollection,
-  {$IFEND}
-
+  {$ENDIF}
   DPM.Controls.VersionGrid, Vcl.Buttons;
-
 
 
 type
@@ -77,6 +76,7 @@ type
     btnInstallAll: TSpeedButton;
     btnUpgradeAll: TSpeedButton;
     btnUninstallAll: TSpeedButton;
+    DebounceTimer: TTimer;
     procedure cboVersionsDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
     procedure cboVersionsChange(Sender: TObject);
     procedure cboVersionsCloseUp(Sender: TObject);
@@ -84,27 +84,30 @@ type
     procedure btnInstallAllClick(Sender: TObject);
     procedure btnUpgradeAllClick(Sender: TObject);
     procedure btnUninstallAllClick(Sender: TObject);
+    procedure DebounceTimerTimer(Sender: TObject);
   private
     //controls
     FProjectsGrid : TVersionGrid;
     FDetailsPanel : TPackageDetailsPanel;
     //controls
 
-    {$IF CompilerVersion > 33.0 }
+    {$IFDEF USEIMAGECOLLECTION }
     FImageList : TVirtualImageList;
     FImageCollection : TImageCollection;
     {$ELSE}
     FImageList : TImageList;
     FUpgradeBmp : TBitmap;
     FDowngradeBmp : TBitmap;
-    {$IFEND}
-
+    {$ENDIF}
 
     FConfiguration : IConfiguration;
-    FContainer : TContainer;
     FIconCache : TDPMIconCache;
     FHost : IDetailsHost;
     FLogger : IDPMIDELogger;
+    FPackageInstaller : IPackageInstaller;
+    FInstallerContext :IPackageInstallerContext;
+    FRespositoryManager : IPackageRepositoryManager;
+
     FProjectGroup : IOTAProjectGroup;
     FIDEStyleServices : TCustomStyleServices;
 
@@ -121,6 +124,8 @@ type
     FCurrentPlatform : TDPMPlatform;
     FDropdownOpen : boolean;
 
+    FFetchVersions : boolean;
+
   protected
     procedure LoadImages;
     procedure AssignImages;
@@ -136,7 +141,7 @@ type
 
     procedure DoGetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string);
 
-    procedure ReloadProjectGrid(const packageId : string);
+    procedure UpdateProjectPackageVersions(const packageId : string);
     procedure DoPackageUninstall(options : TUnInstallOptions);
     procedure DoPackageInstall(options : TInstallOptions; const isUpdate : boolean);
 
@@ -152,7 +157,7 @@ type
   public
     constructor Create(AOwner : TComponent); override;
     destructor Destroy;override;
-    procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectOrGroup : IOTAProjectGroup);
+    procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectGroup : IOTAProjectGroup);
     procedure SetPackage(const package : IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
     procedure SetPlatform(const platform : TDPMPlatform);
     procedure ViewClosing;
@@ -170,10 +175,9 @@ uses
   WinApi.ActiveX,
   WinApi.CommCtrl,
   DPM.IDE.Constants,
-  DPM.Core.Repository.Interfaces,
   DPM.Core.Utils.Strings,
-  DPM.Core.Dependency.Interfaces,
-  DPM.Core.Package.Installer.Interfaces;
+  DPM.Core.Utils.System,
+  DPM.Core.Dependency.Interfaces;
 { TGroupPackageDetailsFrame }
 
 procedure TPackageDetailsFrame.btnInstallAllClick(Sender: TObject);
@@ -222,17 +226,37 @@ begin
   options.Platforms := [FPackageMetaData.Platform];
   options.Prerelease := FIncludePreRelease;
   options.CompilerVersion := IDECompilerVersion;
-  options.Force := true; //always need force to re-install/upgrade/downgrade.
+  options.IsUpgrade := true;
 
   DoPackageInstall(options, true);
 end;
 
+procedure TPackageDetailsFrame.DebounceTimerTimer(Sender: TObject);
+var
+  package : IPackageSearchResultItem;
+begin
+  DebounceTimer.Enabled := false;
+  package := FPackageMetaData; //take a local reference to stop rug being pulled
+  if package = nil then
+    exit;
+
+  UpdateProjectPackageVersions(package.Id);
+  FProjectsGrid.Enabled := true;
+  if FFetchVersions then
+    FVersionsDelayTimer.Enabled := true;
+  if FSelectedVersion <> package.Version then
+    DoGetPackageMetaDataAsync(package.Id, package.CompilerVersion, package.Platform, FSelectedVersion.ToStringNoMeta)
+  else
+    FDetailsPanel.SetDetails(FPackageMetaData);
+
+end;
+
 destructor TPackageDetailsFrame.Destroy;
 begin
-  {$IF CompilerVersion < 34.0}    
+  {$IFNDEF USEIMAGECOLLECTION}
   FUpgradeBmp.Free;
   FDowngradeBmp.Free;
-  {$IFEND}
+  {$ENDIF}
 
   inherited;
 end;
@@ -274,11 +298,10 @@ end;
 
 procedure TPackageDetailsFrame.DoPackageInstall(options: TInstallOptions; const isUpdate : boolean);
 var
-  packageInstaller : IPackageInstaller;
   installResult : boolean;
-  context : IPackageInstallerContext;
   sPlatform : string;
   packageMetadata : IPackageSearchResultItem;
+  projectCount : integer;
 begin
   installResult := false;
   try
@@ -290,22 +313,24 @@ begin
     FCancellationTokenSource.Reset;
     FLogger.Clear;
     FLogger.StartInstall(FCancellationTokenSource);
-    FHost.SaveBeforeInstall;
+    projectCount := Length(options.Projects);
+    if projectCount = 0 then
+      projectCount := 1;
+    FHost.BeginInstall(projectCount);
 
-    packageInstaller := FContainer.Resolve<IPackageInstaller>;
-    context := FContainer.Resolve<IPackageInstallerContext>;
-    installResult := packageInstaller.Install(FCancellationTokenSource.Token, options, context);
+    installResult := FPackageInstaller.Install(FCancellationTokenSource.Token, options, FInstallerContext);
     if installResult then
     begin
       packageMetadata := FPackageMetaData;
       packageMetadata.Installed := true;
       packageMetadata.IsTransitive := false;
-      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FInstalledVersion.ToStringNoMeta + ' [' + sPlatform + '] installed.');
-      FHost.PackageInstalled(packageMetadata, isUpdate); //sets package to nil
+      FHost.PackageInstalled;
+      UpdateProjectPackageVersions(packageMetaData.Id);
+      SetPackage(packageMetadata, FIncludePreRelease, true);
       FInstalledVersion := options.Version;
       FPackageMetaData := packageMetadata;
-      ReloadProjectGrid(packageMetaData.Id);
-      SetPackage(packageMetadata, FIncludePreRelease, true);
+      sPlatform := DPMPlatformToString(FPackageMetaData.Platform);
+      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FInstalledVersion.ToStringNoMeta + ' [' + sPlatform + '] installed.');
     end
     else
       FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FInstalledVersion.ToStringNoMeta + ' [' + sPlatform + '] did not install.');
@@ -313,17 +338,17 @@ begin
 
   finally
     FLogger.EndInstall(installResult);
+    FHost.EndInstall;
   end;
 
 end;
 
 procedure TPackageDetailsFrame.DoPackageUninstall(options: TUnInstallOptions);
 var
-  packageInstaller : IPackageInstaller;
-  context : IPackageInstallerContext;
   uninstallResult : boolean;
   sPlatform : string;
   packageMetaData : IPackageSearchResultItem;
+  projectCount : integer;
 begin
   uninstallResult := false;
   try
@@ -335,19 +360,20 @@ begin
     FCancellationTokenSource.Reset;
     FLogger.Clear;
     FLogger.StartUnInstall(FCancellationTokenSource);
-    FHost.SaveBeforeInstall;
+    projectCount := Length(options.Projects);
+    if projectCount = 0 then
+      projectCount := 1;
+    FHost.BeginInstall(projectCount);
 
     sPlatform := DPMPlatformToString(FPackageMetaData.Platform);
     FLogger.Information('UnInstalling package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version.ToStringNoMeta + ' [' + sPlatform + ']');
-    packageInstaller := FContainer.Resolve<IPackageInstaller>;
-    context := FContainer.Resolve<IPackageInstallerContext>;
-    uninstallResult := packageInstaller.UnInstall(FCancellationTokenSource.Token, options, context);
+    uninstallResult := FPackageInstaller.UnInstall(FCancellationTokenSource.Token, options, FInstallerContext);
     if uninstallResult then
     begin
       packageMetaData := FPackageMetaData;
       FLogger.Information('Package ' + packageMetaData.Id + ' - ' + packageMetaData.Version.ToStringNoMeta + ' [' + sPlatform + '] uninstalled.');
-      FHost.PackageUninstalled(FPackageMetaData);
-      ReloadProjectGrid(packageMetaData.Id);
+      FHost.PackageInstalled;
+      UpdateProjectPackageVersions(packageMetaData.Id);
 
       if FProjectsGrid.HasAnyInstalled then
       begin
@@ -366,7 +392,7 @@ begin
 
   finally
     FLogger.EndUnInstall(uninstallResult);
-
+    FHost.EndInstall;
   end;
 end;
 
@@ -421,14 +447,13 @@ end;
 procedure TPackageDetailsFrame.ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND});
 begin
   inherited;
-
-
+  //scaling seems to be working ok without manual intervention here
 end;
 
 constructor TPackageDetailsFrame.Create(AOwner: TComponent);
 begin
   inherited;
-  //not published in older versions, so get removed when we edit in older versions.
+  //not published in older versions, so gets removed when we edit in older versions.
   {$IFDEF STYLEELEMENTS}
   StyleElements := [seFont];
   {$ENDIF}
@@ -451,7 +476,7 @@ begin
   FProjectsGrid.OnUnInstallEvent := Self.VersionGridOnUnInstallEvent;
   FProjectsGrid.OnUpgradeEvent := Self.VersionGridOnUpgradeEvent;
   FProjectsGrid.OnDowngradeEvent := Self.VersionGridOnDowngradeEvent;
-
+  FProjectsGrid.Enabled := false;
   FProjectsGrid.Parent := pnlGridHost;
 
   FDetailsPanel := TPackageDetailsPanel.Create(AOwner);
@@ -466,20 +491,20 @@ begin
 
   FCurrentPlatform := TDPMPlatform.UnknownPlatform;
   FVersionsDelayTimer := TTimer.Create(AOwner);
-  FVersionsDelayTimer.Interval := 200;
+  FVersionsDelayTimer.Interval := 100;
   FVersionsDelayTimer.Enabled := false;
   FVersionsDelayTimer.OnTimer := VersionsDelayTimerEvent;
   FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
 
 
-  {$IF CompilerVersion > 33.0 } //10.3 or later
+  {$IFDEF USEIMAGECOLLECTION } //10.4 or later
   FImageList := TVirtualImageList.Create(Self);
   FImageCollection := TImageCollection.Create(Self);
   {$ELSE}
   FUpgradeBmp := TBitmap.Create;
   FDowngradeBmp := TBitmap.Create;
   FImageList := TImageList.Create(Self);
-  {$IFEND}
+  {$ENDIF}
   FImageList.ColorDepth := cd32Bit;
   FImageList.DrawingStyle := dsTransparent; 
   FImageList.Width := 16;
@@ -504,35 +529,29 @@ begin
 end;
 
 
-procedure TPackageDetailsFrame.Init(const container: TContainer; const iconCache: TDPMIconCache; const config: IConfiguration; const host: IDetailsHost; const projectOrGroup : IOTAProjectGroup);
-var
-  i: Integer;
+procedure TPackageDetailsFrame.Init(const container: TContainer; const iconCache: TDPMIconCache; const config: IConfiguration; const host: IDetailsHost; const projectGroup : IOTAProjectGroup);
 begin
-  FContainer := container;
   FIconCache := iconCache;
   FConfiguration := config;
-  FLogger := FContainer.Resolve<IDPMIDELogger>;
+  FLogger := container.Resolve<IDPMIDELogger>;
+  FPackageInstaller := container.Resolve<IPackageInstaller>;
+  FInstallerContext := container.Resolve<IPackageInstallerContext>;
+  FRespositoryManager := container.Resolve<IPackageRepositoryManager>;
+
   FHost := host;
   SetPackage(nil, FIncludePreRelease);
 
-  FProjectGroup := projectOrGroup as IOTAProjectGroup;
-  ProjectReloaded; //loadGrid;
-
-  FProjectsGrid.BeginUpdate;
-  FProjectsGrid.Clear;
-  for i := 0 to FProjectGroup.ProjectCount -1 do
-    FProjectsGrid.AddProject(FProjectGroup.Projects[i].FileName, '' );
-  FProjectsGrid.EndUpdate;
+  FProjectGroup := projectGroup;
+  ProjectReloaded; //loads the project Grid;
 end;
 
 procedure TPackageDetailsFrame.AssignImages;
-{$IF CompilerVersion < 34.0}
+{$IFNDEF USEIMAGECOLLECTION}
 var
   bmp : TBitmap;
-{$IFEND}
+{$ENDIF}
 begin
-  {$IF CompilerVersion < 34.0}
-
+  {$IFNDEF USEIMAGECOLLECTION}
   bmp := TBitmap.Create;
   try
     bmp.SetSize(16,16);
@@ -560,7 +579,7 @@ begin
     btnUninstallAll.Images := FImageList;
     btnUninstallAll.ImageIndex := 1;
 
-  {$IFEND}
+  {$ENDIF}
 
 end;
 
@@ -675,7 +694,7 @@ begin
 end;
 
 
-procedure TPackageDetailsFrame.ReloadProjectGrid(const packageId : string);
+procedure TPackageDetailsFrame.UpdateProjectPackageVersions(const packageId : string);
 var
   i: Integer;
   packageRefs : IPackageReference;
@@ -685,16 +704,15 @@ begin
   packageRefs := FHost.GetPackageReferences;
   FProjectsGrid.BeginUpdate;
   try
-    FProjectsGrid.Clear;
-    for i := 0 to FProjectGroup.ProjectCount -1 do
+    FProjectsGrid.PackageVersion := FSelectedVersion;
+    for i := 0 to FProjectsGrid.RowCount -1 do
     begin
-      FProjectsGrid.AddProject(FProjectGroup.Projects[i].FileName, '');
       if packageRefs <> nil then
       begin
         projectRef := nil;
         projectRefs := packageRefs.FindDependency(LowerCase(FProjectGroup.Projects[i].FileName));
         if projectRefs <> nil then
-          projectRef := projectRefs.FindDependency(packageId);
+          projectRef := projectRefs.FindDependency(LowerCase(packageId));
       end;
 
       if projectRef <> nil then
@@ -712,7 +730,7 @@ var
   repoManager : IPackageRepositoryManager;
 begin
   //local for capture
-  repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+  repoManager := FRespositoryManager;
   repoManager.Initialize(FConfiguration);
 
   result := TAsync.Configure <IPackageSearchResultItem> (
@@ -753,69 +771,70 @@ end;
 
 procedure TPackageDetailsFrame.SetPackage(const package: IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
 var
-  packageRefs : IPackageReference;
-  projectRefs : IPackageReference;
-  projectRef : IPackageReference;
   i: Integer;
+  wasNil : boolean;
 begin
   FIncludePreRelease := preRelease;
+  DebounceTimer.Enabled := false;
   FVersionsDelayTimer.Enabled := false;
   if FRequestInFlight then
     FCancellationTokenSource.Cancel;
   //todo - should we wait here?
 
+  wasNil := FPackageMetaData = nil;
   FPackageMetaData := package;
-
+  FFetchVersions := fetchVersions;
   if package <> nil then
   begin
     if package.Installed then
       FInstalledVersion := package.Version
     else
       FInstalledVersion := TPackageVersion.Empty;
+    FSelectedVersion := GetReferenceVersion;
 
     lblPackageId.Caption := package.Id;
     SetPackageLogo(package.Id);
-
+    cboVersions.Enabled := true;
+    imgPackageLogo.Visible := true;
+    lblPackageId.Visible := true;
+    lblVersionTitle.Visible := true;
+    cboVersions.Enabled := true;
+    cboVersions.Visible := true;
+    FProjectsGrid.Visible := true;
     sbPackageDetails.Visible := true;
+    Application.ProcessMessages;
+    //if we had no package before then update immediately
+    if wasNil then
+      DebounceTimerTimer(DebounceTimer)
+    else //otherwise debounce as we may be scrolling.
+      DebounceTimer.Enabled := true;
 
-    packageRefs := FHost.GetPackageReferences;
-
-    FSelectedVersion := GetReferenceVersion;
-
-    FProjectsGrid.BeginUpdate;
-    FProjectsGrid.PackageVersion := FSelectedVersion;
-    try
-      for i := 0 to FProjectsGrid.RowCount -1 do
-      begin
-        if packageRefs <> nil then
-        begin
-          projectRef := nil;
-          projectRefs := packageRefs.FindDependency(LowerCase(FProjectsGrid.ProjectName[i]));
-          if projectRefs <> nil then
-            projectRef := projectRefs.FindDependency(package.Id);
-        end;
-
-        if projectRef <> nil then
-          FProjectsGrid.ProjectVersion[i] := projectRef.Version
-        else
-          FProjectsGrid.ProjectVersion[i] := TPackageVersion.Empty;
-      end;
-    finally
-      FProjectsGrid.EndUpdate;
-    end;
-
-    if fetchVersions then
-      FVersionsDelayTimer.Enabled := true;
-    if FSelectedVersion <> FPackageMetaData.Version then
-      DoGetPackageMetaDataAsync(FPackageMetaData.Id, FPackageMetaData.CompilerVersion, FPackageMetaData.Platform, FSelectedVersion.ToStringNoMeta)
-    else
-      FDetailsPanel.SetDetails(FPackageMetaData);
   end
   else
   begin
     FInstalledVersion := TPackageVersion.Empty;
-    sbPackageDetails.Visible := false;
+    FSelectedVersion := TPackageVersion.Empty;
+    FProjectsGrid.BeginUpdate;
+    try
+      FProjectsGrid.Enabled := false;
+      for i := 0 to FProjectsGrid.RowCount  -1 do
+        FProjectsGrid.ProjectVersion[i] := TPackageVersion.Empty;
+      FProjectsGrid.PackageVersion := TPackageVersion.Empty;
+    finally
+      FProjectsGrid.EndUpdate;
+    end;
+    FDetailsPanel.SetDetails(nil);
+//    SetPackageLogo('');
     cboVersions.Clear;
+    lblPackageId.Caption := '';
+
+    imgPackageLogo.Visible := false;
+    lblPackageId.Visible := false;
+    cboVersions.Enabled := false;
+    lblVersionTitle.Visible := false;
+    cboVersions.Visible := false;
+    FProjectsGrid.Visible := false;
+    sbPackageDetails.Visible := false;
   end;
   UpdateButtonState;
 end;
@@ -825,21 +844,24 @@ var
   logo : IPackageIconImage;
   graphic : TGraphic;
 begin
-    logo := FIconCache.Request(id);
-    if logo = nil then
-      logo := FIconCache.Request('missing_icon');
-    if logo <> nil then
-    begin
-      graphic := logo.ToGraphic;
-      try
-        imgPackageLogo.Picture.Assign(graphic);
-        imgPackageLogo.Visible := true;
-      finally
-        graphic.Free;
-      end;
-    end
-    else
-      imgPackageLogo.Visible := false;
+  if FIconCache = nil then
+    exit;
+
+  logo := FIconCache.Request(id);
+  if logo = nil then
+    logo := FIconCache.Request('missing_icon');
+  if logo <> nil then
+  begin
+    graphic := logo.ToGraphic;
+    try
+      imgPackageLogo.Picture.Assign(graphic);
+      imgPackageLogo.Visible := true;
+    finally
+      graphic.Free;
+    end;
+  end
+  else
+    imgPackageLogo.Visible := false;
 end;
 
 procedure TPackageDetailsFrame.SetPlatform(const platform: TDPMPlatform);
@@ -893,12 +915,30 @@ procedure TPackageDetailsFrame.UpdateButtonState;
 var
   referenceVersion : TPackageVersion;
 begin
+  if FPackageMetaData = nil then
+  begin
+    btnInstallAll.Enabled := false;
+    btnUpgradeAll.Enabled := false;
+    btnUninstallAll.Enabled := false;
+
+    btnInstallAll.Visible := false;
+    btnUpgradeAll.Visible := false;
+    btnUninstallAll.Visible := false;
+    exit;
+  end
+  else
+  begin
+    btnUninstallAll.Visible := true;
+    btnUpgradeAll.Visible := true;
+    btnInstallAll.Visible := true;
+  end;
+
   referenceVersion := GetReferenceVersion;
   btnInstallAll.Enabled := FPackageMetaData <> nil;
-  btnUpgradeAll.Enabled := (FInstalledVersion <> TPackageVersion.Empty) and  (FSelectedVersion <> FInstalledVersion);
-  btnUninstallAll.Enabled := FInstalledVersion <> TPackageVersion.Empty;
+  btnUpgradeAll.Enabled := (FPackageMetaData <> nil) and (FInstalledVersion <> TPackageVersion.Empty) and  (FSelectedVersion <> FInstalledVersion);
+  btnUninstallAll.Enabled := (FPackageMetaData <> nil) and (FInstalledVersion <> TPackageVersion.Empty);
 
-  {$IF CompilerVersion < 34.0}
+  {$IFNDEF USEIMAGECOLLECTION}
     if FSelectedVersion = FInstalledVersion then
     begin
       btnUpgradeAll.Glyph.Assign(nil);
@@ -928,7 +968,7 @@ begin
       btnUpgradeAll.ImageIndex := 3;
       btnUpgradeAll.Hint := 'Downgrade package in all projects';
     end;
-  {$IFEND}
+  {$ENDIF}
 
 end;
 
@@ -992,7 +1032,7 @@ begin
   options.Platforms := [FPackageMetaData.Platform];
   options.Prerelease := FIncludePreRelease;
   options.CompilerVersion := IDECompilerVersion;
-  options.Force := true; //changing the installed version, so we need to force it
+  options.IsUpgrade := true; //changing the installed version
   DoPackageInstall(options, true);
   //call common function
 end;
@@ -1011,7 +1051,7 @@ begin
   FCancellationTokenSource.Reset;
 
   cboVersions.Clear;
-  repoManager := FContainer.Resolve<IPackageRepositoryManager>;
+  repoManager := FRespositoryManager; //local for capture
   repoManager.Initialize(FConfiguration);
 
   sReferenceVersion := GetReferenceVersion.ToStringNoMeta;
@@ -1024,7 +1064,7 @@ begin
       //need this for the http api/
       CoInitializeEx(nil, COINIT_APARTMENTTHREADED);
       try
-      result := repoManager.GetPackageVersions(cancelToken, IDECompilerVersion, FCurrentPlatform, FPackageMetaData.Id, includePreRelease);
+        result := repoManager.GetPackageVersions(cancelToken, IDECompilerVersion, FCurrentPlatform, FPackageMetaData.Id, includePreRelease);
       finally
         CoUninitialize;
       end;
@@ -1103,4 +1143,3 @@ begin
 end;
 
 end.
-

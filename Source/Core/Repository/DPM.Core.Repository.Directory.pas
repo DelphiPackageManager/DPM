@@ -597,7 +597,7 @@ begin
   try
     fileList := TDirectoryUtils.GetFiles(SourceUri, searchTerm);
     //dedupe
-    result.AddRange(TEnumerable.Distinct<string>(fileList, TStringComparer.OrdinalIgnoreCase));
+    result.AddRange(fileList.Distinct(TStringComparer.OrdinalIgnoreCase));
   except
     on e : Exception do
     begin

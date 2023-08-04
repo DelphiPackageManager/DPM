@@ -192,11 +192,14 @@ type
 
     function GetHasAnyInstalled : boolean;
 
+
+
   public
     constructor Create(AOwner : TComponent);override;
     destructor Destroy;override;
     class constructor Create;
     class destructor Destroy;
+    procedure Invalidate; override;
 
     procedure BeginUpdate;
     procedure EndUpdate;
@@ -1175,6 +1178,13 @@ begin
     result := FVisibleRows -1;
 end;
 
+procedure TVersionGrid.Invalidate;
+begin
+  if FUpdateCount = 0 then
+    inherited;
+
+end;
+
 function TVersionGrid.IsAtEnd: boolean;
 begin
   result := FVScrollPos = RowCount - FSelectableRows;
@@ -1198,6 +1208,9 @@ var
   row : Integer;
 begin
   inherited;
+  if not Enabled then
+    exit;
+
   if RowCount = 0 then
     exit;
 
@@ -1264,6 +1277,9 @@ end;
 
 procedure TVersionGrid.MouseUp(Button: TMouseButton; Shift: TShiftState; X,  Y: Integer);
 begin
+  if not Enabled then
+    exit;
+
   case FHitElement of
     htRowInstall :
     begin
@@ -1330,7 +1346,11 @@ begin
     //TODO : When running in the IDE we will need to tweak this!
     if FIDEStyleServices.Name = 'Windows' then
     begin
-      HeaderTextColor := FIDEStyleServices.GetStyleFontColor(sfHeaderSectionTextNormal);
+      if Enabled then
+        HeaderTextColor := FIDEStyleServices.GetStyleFontColor(sfHeaderSectionTextNormal)
+      else
+        HeaderTextColor := FIDEStyleServices.GetStyleFontColor(sfHeaderSectionTextDisabled);
+
       FIDEStyleServices.GetElementColor(FIDEStyleServices.GetElementDetails(tgFixedCellNormal), ecBorderColor, HeaderBorderColor);
       FIDEStyleServices.GetElementColor(FIDEStyleServices.GetElementDetails(tgFixedCellNormal ), ecFillColor, HeaderBackgroundColor);
       //FIDEStyleServices.GetElementColor(FIDEStyleServices.GetElementDetails(tbPushButtonHot ), ecShadowColor, columnHightlightColor);
@@ -1339,7 +1359,10 @@ begin
     end
     else
     begin
-      HeaderTextColor := FIDEStyleServices.GetSystemColor(clBtnText);
+      if Enabled then
+        HeaderTextColor := FIDEStyleServices.GetSystemColor(clBtnText)
+      else
+        HeaderTextColor := FIDEStyleServices.GetSystemColor(clBtnShadow);
 
       FIDEStyleServices.GetElementColor(FIDEStyleServices.GetElementDetails(tgClassicFixedCellNormal), ecBorderColor, HeaderBorderColor);
       FIDEStyleServices.GetElementColor(FIDEStyleServices.GetElementDetails(tgClassicFixedCellNormal ), ecFillColor, HeaderBackgroundColor);
@@ -1354,7 +1377,11 @@ begin
     //header
     HeaderBackgroundColor := clBtnFace;
     HeaderBorderColor := clWindowFrame;
-    HeaderTextColor := clWindowText;
+    if Enabled then
+      HeaderTextColor := clWindowText
+    else
+      HeaderTextColor := clBtnShadow;
+
     columnHightlightColor := clBtnShadow;
   end;
 
@@ -1400,17 +1427,19 @@ begin
     end;
   end;
 
-
-  //paint all visible rows
-  for i := 0 to FVisibleRows - 1 do
+  if Enabled then
   begin
-    rowIdx := FTopRow + i;
-    if rowIdx >= RowCount then
-      break;
-    rowState := GetRowPaintState(rowIdx);
-    DoPaintRow(rowIdx, rowState, false);
-  end;
+    //paint all visible rows
+    for i := 0 to FVisibleRows - 1 do
+    begin
+      rowIdx := FTopRow + i;
+      if rowIdx >= RowCount then
+        break;
+      rowState := GetRowPaintState(rowIdx);
+      DoPaintRow(rowIdx, rowState, false);
+    end;
 
+  end;
   r := ClientRect;
   OffsetRect(r, FHScrollPos,0);
 
@@ -1441,9 +1470,9 @@ begin
 
   FHoverRow := -1;
 
-  UpdateColumns;
   UpdateVisibleRows;
   UpdateScrollBars;
+  UpdateColumns;
 
   if (RowCount > 0) and (FCurrentRow > -1) then
     if not RowInView(FCurrentRow) then
@@ -1689,7 +1718,7 @@ begin
   FUpdating := true;
   if HandleAllocated then
   begin
-    FVisibleRows :=  ClientHeight div RowHeight;
+    FVisibleRows :=  ClientHeight div RowHeight - 1;
     FSelectableRows := Min(FVisibleRows, RowCount); //the number of full rows
     if (RowCount > FVisibleRows) and (ClientHeight mod RowHeight > 0) then
     begin

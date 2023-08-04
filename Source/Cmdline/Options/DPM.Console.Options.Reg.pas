@@ -238,6 +238,14 @@ begin
     end);
   option.HasValue := false;
 
+  option := cmd.RegisterOption<boolean>('upgrade','', 'Set when installing a different version',
+   procedure(const value : boolean)
+    begin
+      TInstallOptions.Default.IsUpgrade := value;
+    end);
+  option.HasValue := false;
+
+
   option := cmd.RegisterOption<boolean>('useSource','us', 'Reference package source rather than compiling it.',
    procedure(const value : boolean)
     begin

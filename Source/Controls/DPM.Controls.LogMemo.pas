@@ -307,7 +307,7 @@ begin
   FBorderStyle := bsSingle;
 
 
-  ControlStyle := [csDoubleClicks, csCaptureMouse, csDisplayDragImage, csClickEvents, csPannable];
+  ControlStyle := [csCaptureMouse, csClickEvents, csPannable];
   FVScrollPos := 0;
   FHoverRow := -1;
   FCurrentRow := -1;
@@ -969,7 +969,8 @@ begin
 
   r := ClientRect;
   OffsetRect(r, FHScrollPos,0);
-  BitBlt(Canvas.Handle,0,0,r.Width, r.Height, FPaintBmp.Canvas.Handle,r.Left, r.Top,SRCCOPY);
+
+  BitBlt(Canvas.Handle,0,0,r.Width, r.Height, FPaintBmp.Canvas.Handle,r.Left, r.Top, SRCCOPY);
 //  Canvas.CopyRect(ClientRect, FPaintBmp.Canvas, r); //uses strechblt
 
 end;

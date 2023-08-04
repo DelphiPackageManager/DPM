@@ -212,4 +212,11 @@ object PackageDetailsFrame: TPackageDetailsFrame
       end
     end
   end
+  object DebounceTimer: TTimer
+    Enabled = False
+    Interval = 200
+    OnTimer = DebounceTimerTimer
+    Left = 344
+    Top = 209
+  end
 end

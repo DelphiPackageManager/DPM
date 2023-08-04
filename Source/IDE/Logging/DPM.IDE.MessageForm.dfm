@@ -13,13 +13,11 @@ object DPMMessageForm: TDPMMessageForm
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
-  OldCreateOrder = True
   Position = poMainFormCenter
   OnHide = FormHide
   DesignSize = (
     879
     425)
-  PixelsPerInch = 96
   TextHeight = 13
   object lblClosing: TLabel
     Left = 144
@@ -31,14 +29,14 @@ object DPMMessageForm: TDPMMessageForm
     Visible = False
   end
   object btnCancel: TButton
-    Left = 766
+    Left = 762
     Top = 388
     Width = 89
     Height = 28
     Action = actCanCancel
     Anchors = [akRight, akBottom]
     TabOrder = 0
-    ExplicitLeft = 762
+    ExplicitLeft = 758
     ExplicitTop = 387
   end
   object btnCopy: TButton
@@ -52,7 +50,7 @@ object DPMMessageForm: TDPMMessageForm
     ExplicitTop = 387
   end
   object btnClose: TButton
-    Left = 660
+    Left = 656
     Top = 389
     Width = 89
     Height = 28
@@ -60,7 +58,7 @@ object DPMMessageForm: TDPMMessageForm
     Caption = 'Close'
     TabOrder = 1
     OnClick = btnCloseClick
-    ExplicitLeft = 656
+    ExplicitLeft = 652
     ExplicitTop = 388
   end
   object lblDontClose: TLinkLabel

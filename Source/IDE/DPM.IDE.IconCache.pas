@@ -147,6 +147,8 @@ end;
 function TDPMIconCache.Request(const id : string) : IPackageIconImage;
 begin
   result := nil;
+  if id = '' then
+    exit;
   MonitorEnter(FLock);
   try
     if FIcons.ContainsKey(LowerCase(id)) then

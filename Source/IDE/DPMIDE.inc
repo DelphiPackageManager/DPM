@@ -18,4 +18,7 @@
 //  {$IFEND}
 {$IFEND}
 
+{$IF CompilerVersion > 33.0} //10.4 or later
+    {$DEFINE USEIMAGECOLLECTION}
+{$IFEND}
 

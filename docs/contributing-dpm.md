@@ -11,40 +11,60 @@ We make extensive use of Spring4D for Dependency Injection and collections. Make
 - Use interfaces where possible and only expose what is needed.
 - Use unit namespaces, but avoid prefixes or name-spacing of types where possible (makes for simpler renaming).
 - Since we're targeting multiple compiler versions, avoid new language features or RTL features.
-- Do not add/use new external libraries before checking with the team. Whilst using libraries is unavoidable, we would like to keep the dependencies as low as possible. Many of the libraries listed below were created for this project.
+- Do not add/use new external libraries before checking with the team. Whilst using libraries is unavoidable, we would like to keep the dependencies as low as possible. Many of the libraries listed below were created specifically for this project.
 
 ## Building DPM
 
 DPM uses the following external libs
 
-[VSoft.AntPatterns](https://github.com/VSoftTechnologies/VSoft.AntPatterns)
+[Spring4D.Base](https://github.com/VSoftTechnologies/Spring4DMirror/releases)
 
-[VSoft.Uri](https://github.com/VSoftTechnologies/VSoft.Uri)
+[Spring4D.Core](https://github.com/VSoftTechnologies/Spring4DMirror/releases)
 
-[VSoft.CommandLineParser](https://github.com/VSoftTechnologies/VSoft.CommandLineParser)
+[Spring4D.Extensions](https://github.com/VSoftTechnologies/Spring4DMirror/releases)
 
-[VSoft.SemanticVersion](https://github.com/VSoftTechnologies/VSoft.SemanticVersion)
+[VSoft.AntPatterns](https://github.com/VSoftTechnologies/VSoft.AntPatterns/releases)
 
-[JsonDataObjects](https://github.com/ahausladen/JsonDataObjects)
+[VSoft.Awaitable](https://github.com/VSoftTechnologies/VSoft.Awaitable/releases)
 
-[Spring4D](https://bitbucket.org/sglienke/spring4d)
+[VSoft.CancellationToken](https://github.com/VSoftTechnologies/VSoft.CancellationToken/releases)
 
-Clone these repos to your machine, then add Symlinks in the Source\Libs folder for each one
+[VSoft.CommandLineParser](https://github.com/VSoftTechnologies/VSoft.CommandLineParser/releases)
 
-e.g (adjust paths accordingly)
+[VSoft.DUnitX](https://github.com/VSoftTechnologies/DUnitX/releases)
 
-```cli
-mklink /D Spring4D i:\bitbucket\spring4d
-mklink /D VSoft.AntPatterns i:\github\VSoft.AntPatterns
-....
-```
+[VSoft.HttpClient](https://github.com/VSoftTechnologies/VSoft.HttpClient/releases)
 
-These will be eventually pulled in as packages, but for now, till we are stable we're going old school!
+[VSoft.JsonDataObjects](https://github.com/ahausladen/JsonDataObjects/releases)
 
-There are some test packages in the TestPackages Folder and a batch file to generate them - need to specify an output folder (ie your feed folder) as a parameter, e.g
+[VSoft.SemanticVersion](https://github.com/VSoftTechnologies/VSoft.SemanticVersion/releases)
 
-`GeneratePackages C:\DPMFeed`
+[VSoft.VirtualListView](https://github.com/VSoftTechnologies/VSoft.VirtualListView/releases)
 
-Then you need to add the feed as a source
+[VSoft.Uri](https://github.com/VSoftTechnologies/VSoft.Uri/releases)
+
+[Gabr42.OmniThreadLibrary](https://github.com/VSoftTechnologies/OmniThreadLibrary/releases)
+
+Download the dpkg files from the releases tab on the above projects, into a single folder.
+
+DPM uses dpm itself to build (dogfood). The simplest way to get up and running is install a build from the releases tab
+
+Then add the folder you downloaded the packages to as a package source
 
 `dpm sources add -name=local -source=c:\DPMFeed`
+
+You should now be able to load the dpm projects - there are IDE plugin projects for XE2-11.3, the unit tests and the command line are developed with 11.3.
+
+The dpm IDE plugin will restore the packages automatically when you load the project and you should be able to build without issue.
+
+For debugging the IDE plugin dll, set the host application to the Delphi IDE version you are using (eg. E:\Emb\Studio\22.0\bin\bds.exe) and in the parameters to -rDPMTesting
+
+This will start an new IDE instance, with a clean registry. Do this once, then open regedit to
+
+`HKEY_CURRENT_USER\Software\Embarcadero\DPMTesting\22.0\Experts`
+
+and add a string value pointing to the dll you just build
+
+eg. `I:\Github\DelphiPackageManager\DPMMaster\Output\DPM.IDE.D110.dll`
+
+Then try debugging again - this time the new IDE instanced should load the plugin (you will see the logo on the splash screen).

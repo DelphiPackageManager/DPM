@@ -29,10 +29,10 @@ type
     ['{4FBB9E7E-886A-4B7D-89FF-FA5DBC9D93FD}']
 
     function GetPackageReferences : IPackageReference;
-    //tell the IDE to saveall before installing or updating packages.
-    procedure SaveBeforeInstall;
-    procedure PackageInstalled(const package : IPackageSearchResultItem; const isUpdate : boolean);
-    procedure PackageUninstalled(const package : IPackageSearchResultItem);
+    procedure BeginInstall(const projectCount : integer);
+    procedure PackageInstalled;
+    procedure EndInstall;
+
   end;
 
   IPackageDetailsView = interface

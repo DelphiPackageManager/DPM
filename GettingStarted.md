@@ -51,10 +51,8 @@ https://github.com/VSoftTechnologies/VSoft.WeakReferences/releases
 https://github.com/VSoftTechnologies/Spring4DMirror
 
 Once you have some packages, you can either install packages from the command line, or using the IDE plugin. The IDE plugin adds a DPM node to each project in the project tree,
-and a right click menu to "Manage DPM Packages". The DPM package view will open docked in the IDE code window, opened on the Installed tab. To add packages, switch to the search
-tab, search or click on the package you want to install, and in the package details panel on the right, click on install. If there are multiple package versions, you can chose
-which version to install. If you think a package is missing, it may be a pre-release package, in which case check the "Include Prerelease" checkbox under the search box - the list
-will refresh. Some of the above packages are still prerelease.
+and a right click menu to "Manage DPM Packages". The DPM package view will open docked in the IDE code window, and show the list of installed packages, plus the first 100 packages
+from the package sources. When you click on a package, the details on the right side of the view will show the package information and the projects which have the package installed.
 
 Note that your dproj will be modified by installing packages.
 
@@ -69,7 +67,8 @@ The rest of this post is for people that want to compile or contribute or create
 
 ### Creating packages
 
-Create a dspec file - see the dspec files in the ThirdParty folder or the github projects linked above for examples. The docs are out a bit of date so use the source if you need a reference (Source\Core\Spec). I will endeavor to update the docs over the next week or two. If you get stuck just email me or create a github issue.
+Create a dspec file - see the dspec files in the github projects linked above for examples. The docs are out a bit of date so use the source if you need a reference (Source\Core\Spec). If you get stuck just create a github issue.
+
 To generate the packages you need to run
 
 `dpm pack My.Package.dspec -o=c:\mypackagefolder`
@@ -78,64 +77,4 @@ That will generate 1 file per compiler/platform combination.
 
 ### Building DPM
 
-DPM is bootstrapped, so you need DPM to build dpm!
-
-dpm.dproj requires these packages :
-
-VSoft.JsonDataObjects 
-Spring4D.Core 
-Spring4D.Base 
-Spring4D.Extensions
-
-VSoft.AntPatterns
-VSoft.Awaitable
-Gabr42.OmniThreadLibrary
-VSoft.CancellationToken
-VSoft.CommandLine
-VSoft.HttpClient
-VSoft.SemanticVersion
-VSoft.Uri
-
-DPM.IDE.XXX.dproj requires these packages :
-
-VSoft.JsonDataObjects
-Spring4D.Core
-Spring4D.Base
-Spring4D.Extensions
-VSoft.AntPatterns
-VSoft.Awaitable
-Gabr42.OmniThreadLibrary
-VSoft.CancellationToken
-VSoft.HttpClient
-VSoft.SemanticVersion
-VSoft.Uri
-VSoft.VirtualListView
-
-Some projects do not yet have dpm packages available, for those you will need to pack them yourself. The dspec files for these are in the thirdparty folder Copy the dspec file to the local repo folder
-
-https://github.com/gabr42/OmniThreadLibrary
-
-open a command prompt in the repo folder and run
-
-dpm pack Gabr42.OmniThreadLibrary.dspec -o=c:\yourpackagefolder
-
-If you have a package source configured and the IDE plugin installed, it should restore the packages when you load the project. Note that errors in the IDE plugin are not obvious, on some versions of the IDE it does not show the messages view when it should.
-
-You can also restore the packages from the command line (assuming you are in the source folder on the command prompt)
-
-dpm restore .\dpm-104.groupproj -compiler=10.4
-
-Debugging the IDE plugin should be done using runtime parameters : -rDPM
-Host executable should be the same version of bds.exe that you are using to compile with. If you try use a different bds.exe version to debug, it won't be pretty!
-
-Note the -r parameter creates a new registry hive for the IDE, so you may find not all your settings etc are quite there.
-
-Debugging an IDE plugin is painful, waiting for the IDE to load etc. If you are working on a core feature debugging is best done using the command line projects.
-
-I do not recommend doing dev work on this project using anything earlier than 10.1 Berlin, due to the compiler performance issues with generics (XE2/3/4 struggle with spring4d).
-
-### Contributing
-
-If you think you can contribute, create an issue on github and describe the area or feature you would like to work on. Don't just go and create a massive pull request and expect it to be merged! After some discussion to ensure we are all on the same page, we'll invite a pull request. Keep PR's as small and isolated as you can, that will make it easier to merge later.
-
-If you have any ideas to contribute, create an issue on github.
+See [Contributing](/contributing-dpm.md)
