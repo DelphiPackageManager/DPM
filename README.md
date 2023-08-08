@@ -35,7 +35,7 @@ Yes, the installer available under the releases section includes IDE plugins for
 
 ## Is there a central package source
 
-Not yet but it is planned. At the moment, only local folder based [sources](https://docs.delphi.dev/concepts/) are supported. The client code architecture has a provision for HTTP based sources in the future, however right now we are focused on nailing down the package format, dependency resolution, installation, updating packages etc.
+Not yet but it is planned. At the moment, only local folder based [sources](https://docs.delphi.dev/concepts/package-sources.html) are supported. The client code architecture has a provision for HTTP based sources in the future, however right now we are focused on nailing down the package format, dependency resolution, installation, updating packages etc.
 
 ## Is my old version of Delphi supported
 
