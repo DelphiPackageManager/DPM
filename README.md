@@ -25,9 +25,9 @@ DPM is still in development, so not all functionality is ready yet. At this time
 
 ## How do I use it
 
-See [getting started](./GettingStarted.md).
+See [getting started](https://docs.delphi.dev/getting-started/installing.html).
 
-The command line documentation can be found [here](./docs/commands.md).
+The command line documentation can be found [here](https://docs.delphi.dev/commands/commands.html).
 
 ## Is DPM integrated into the Delphi IDE
 
@@ -35,18 +35,18 @@ Yes, the installer available under the releases section includes IDE plugins for
 
 ## Is there a central package source
 
-Not yet but it is planned. At the moment, only local folder based [sources](./docs/concepts/sources.md) are supported. The client code architecture has a provision for HTTP based sources in the future, however right now we are focused on nailing down the package format, dependency resolution, installation, updating packages etc.
+Not yet but it is planned. At the moment, only local folder based [sources](https://docs.delphi.dev/concepts/) are supported. The client code architecture has a provision for HTTP based sources in the future, however right now we are focused on nailing down the package format, dependency resolution, installation, updating packages etc.
 
 ## Is my old version of Delphi supported
 
 Delphi XE2-11.3 are currently supported.
 
-All target [platforms](./docs/platforms.md) for supported compiler versions are supported.
+All target [platforms](https://docs.delphi.dev/platforms.html) for supported compiler versions are supported.
 
 ## What about C++ Builder or FPC
 
 Whilst we would like to support C++Builder, we would need some help - we're delphi people.
-[see here](./docs/compiler-versions.md)
+[see here](https://docs.delphi.dev/compiler-versions.html)
 
 ## Does it support design-time components
 
@@ -54,8 +54,8 @@ Not yet, but that is being worked on.
 
 ## How does it work
 
-See [this page](./docs/concepts/how-it-works.md)
+See [this page](https://docs.delphi.dev/concepts/how-it-works.html)
 
 ## Can I help
 
-Yep, see [Contributing to DPM](./docs/contributing-dpm.md).
+Yep, see [Contributing to DPM](https://docs.delphi.dev/contributing.html).
