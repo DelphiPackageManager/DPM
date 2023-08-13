@@ -50,7 +50,7 @@ type
     function GetInstall : Boolean;
     function GetBuildId : string;
     procedure SetBuildId(const value : string);
-    function Clone : ISpecBPLEntry; overload;
+    function Clone : ISpecBPLEntry;
     constructor CreateClone(const logger : ILogger; const src : string; const buildId : string; const copyLocal, install : boolean); reintroduce;
   public
     constructor Create(const logger : ILogger); override;

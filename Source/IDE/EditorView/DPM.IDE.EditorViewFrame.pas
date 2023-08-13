@@ -321,6 +321,8 @@ begin
     FAvailableActivity.Step;
     FScrollList.InvalidateRow(FAvailableHeaderRowIdx);
   end;
+  if FClosing then
+    exit;
   ActivityTimer.Enabled := FInstalledActivity.IsActive or FImplicitActivity.IsActive or FAvailableActivity.IsActive;
 end;
 
@@ -368,6 +370,8 @@ begin
 end;
 
 procedure TDPMEditViewFrame.Closing;
+var
+  count : integer;
 begin
   FClosing := true;
   PackageDetailsFrame.ViewClosing;
@@ -375,8 +379,12 @@ begin
   FCancelTokenSource.Cancel;
   //allow the cancellation to happen.
   //if we don't do this we will get an excepion in the await or cancellation callbacks
-  while FRequestsInFlight > 0 do
+  count := 0;
+  while (FRequestsInFlight > 0) and (count < 10) do
+  begin
     Application.ProcessMessages;
+    Inc(count);
+  end;
 
 end;
 
@@ -575,6 +583,7 @@ procedure TDPMEditViewFrame.DoPlatformChange(const newPlatform: TDPMPlatform; co
 var
   searchTxt : string;
   filterProc : TFilterProc;
+  count : integer;
 begin
   if FClosing then
     exit;
@@ -594,17 +603,22 @@ begin
     FSearchOptions.Platforms := [FCurrentPlatform];
     filterProc := FilterInstalledPackages;
     searchTxt := FSearchOptions.SearchTerms;
-    FLogger.Debug('DPMIDE : Getting Installed Packages..');
     FInstalledActivity.Step;
     FScrollList.InvalidateRow(FInstalledHeaderRowIdx);
     FImplicitActivity.Step;
     FScrollList.InvalidateRow(FImplicitHeaderRowIdx);
     ActivityTimer.Enabled := true;
-//    if FRequestsInFlight > 0 then
-//      FCancelTokenSource.Cancel;
 
-    while FRequestsInFlight > 0 do
+    if FRequestsInFlight > 0 then
+      FCancelTokenSource.Cancel;
+
+    count := 0;
+    while ((FRequestsInFlight > 0) and (count < 10)) do
+    begin
+//      TSystemUtils.OutputDebugString('TDPMEditViewFrame2.DoPlatformChange - requests in flight : ' + IntToStr(FRequestsInFlight));
+      Inc(count);
       Application.ProcessMessages;
+    end;
 
     FCancelTokenSource.Reset;
 
@@ -678,12 +692,14 @@ begin
         Dec(FRequestsInFlight);
         if FClosing then
           exit;
+        FAvailableActivity.Stop;
         FLogger.Error(e.Message);
       end)
     .OnCancellation(
       procedure
       begin
         Dec(FRequestsInFlight);
+        FAvailableActivity.Stop;
         //if the view is closing do not do anything else.
         if FClosing then
           exit;
@@ -697,15 +713,12 @@ begin
         toRemove : IList<IPackageSearchResultItem>;
       begin
         Dec(FRequestsInFlight);
+        FAvailableActivity.Stop;
         //if the view is closing do not do anything else.
         if FClosing then
-        begin
-          FAvailableActivity.Stop;
           exit;
-        end;
 
         FLogger.Debug('DPMIDE : Got search results.');
-        FAvailableActivity.Stop;
         toRemove := TCollections.CreateList<IPackageSearchResultItem>;
         //some of the available packages may already be installed, so we need to check for that.
         for item in theResult do

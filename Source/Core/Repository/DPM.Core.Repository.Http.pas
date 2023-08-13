@@ -55,16 +55,17 @@ type
 
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : Boolean;
-    function Find(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform; const includePrerelease : boolean) : IPackageIdentity;
+    function FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform; const includePrerelease : boolean) : IPackageIdentity;
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
     function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const preRelease : boolean) : IList<TPackageVersion>;
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
 
-    function GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageLatestVersionInfo>;
-
     function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>; overload;
-    function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
+    function GetPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
+    function GetPackageFeedByIds(const cancellationToken : ICancellationToken;  const ids : IList<IPackageId>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) :  IPackageSearchResult;
+
+
     function GetPackageIcon(const cancelToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
     function GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageSearchResultItem;
 
@@ -85,6 +86,8 @@ uses
   JsonDataObjects,
   VSoft.HttpClient,
   VSoft.URI,
+  DPM.Core.Spec.Interfaces,
+  DPM.Core.Spec,
   DPM.Core.Package.Icon,
   DPM.Core.Constants,
   DPM.Core.Package.Metadata,
@@ -167,7 +170,7 @@ begin
   destFile := IncludeTrailingPathDelimiter(localFolder) + packageIdentity.ToString + cPackageFileExt;
 
   request.SaveAsFile := destFile;
-
+  Logger.Information('GET ' + uri.BaseUriString + path);
   try
     response := request.Get(cancellationToken);
   except
@@ -183,13 +186,14 @@ begin
     Logger.Error('Error fetching downloading package from server : ' + response.ErrorMessage);
     exit;
   end;
+  Logger.Information('OK ' + uri.BaseUriString + path);
 
   fileName := destFile;
   result := true;
 end;
 
 
-function TDPMServerPackageRepository.Find(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean): IPackageIdentity;
+function TDPMServerPackageRepository.FindLatestVersion(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean): IPackageIdentity;
 var
   httpClient : IHttpClient;
   request : TRequest;
@@ -228,6 +232,7 @@ begin
        request.WithParameter(cPreReleaseParam, LowerCase(BoolToStr(includePrerelease, true)));
 
   try
+    Logger.Information('GET ' + uri.BaseUriString);
     response := request.Get(cancellationToken);
   except
     on ex : Exception do
@@ -239,7 +244,10 @@ begin
 
   //if the package or package version is not on the server this is fine
   if response.StatusCode = 404 then
+  begin
+    Logger.Information('NOTFOUND ' + uri.BaseUriString);
     exit;
+  end;
 
   if response.StatusCode <> 200 then
   begin
@@ -252,6 +260,7 @@ begin
     Logger.Verbose('Server returned no content');
     exit;
   end;
+  Logger.Information('OK ' + uri.BaseUriString);
 
   try
     jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
@@ -271,7 +280,7 @@ begin
 
 end;
 
-function TDPMServerPackageRepository.GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
+function TDPMServerPackageRepository.GetPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
 var
   httpClient : IHttpClient;
   request : TRequest;
@@ -286,7 +295,7 @@ var
   resultItem : IPackageSearchResultItem;
 begin
   Result := TDPMPackageSearchResult.Create(options.Skip, 0);
-  serviceIndex := GetServiceIndex(cancelToken);
+  serviceIndex := GetServiceIndex(cancellationToken);
   if serviceIndex = nil then
     exit;
 
@@ -322,7 +331,7 @@ begin
     request.WithParameter('take', IntToStr(options.Take));
 
   try
-    response := request.Get(cancelToken);
+    response := request.Get(cancellationToken);
   except
     on ex : Exception do
     begin
@@ -361,6 +370,119 @@ begin
       jsonArr := jsonObj.A['results'];
       for i := 0 to jsonArr.Count -1 do
       begin
+        if cancellationToken.IsCancelled then
+          exit;
+        itemObj := jsonArr.O[i];
+        resultItem := TDPMPackageSearchResultItem.FromJson(Name, itemObj);
+        Result.Results.Add(resultItem);
+      end;
+
+    end;
+  finally
+    jsonObj.Free;
+  end;
+
+end;
+
+function TDPMServerPackageRepository.GetPackageFeedByIds(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const compilerVersion: TCompilerVersion;
+  const platform: TDPMPlatform): IPackageSearchResult;
+var
+  httpClient : IHttpClient;
+  request : TRequest;
+  response : IHttpResponse;
+  serviceIndex : IServiceIndex;
+  serviceItem : IServiceIndexItem;
+  uri : IUri;
+  jsonObj : TJsonObject;
+  itemObj : TJsonObject;
+  idArray : TJsonArray;
+  jsonArr : TJsonArray;
+  sBody : string;
+  jsonId : TJsonObject;
+  i: Integer;
+  resultItem : IPackageSearchResultItem;
+begin
+  Result := TDPMPackageSearchResult.Create(0, 0);
+  serviceIndex := GetServiceIndex(cancellationToken);
+  if serviceIndex = nil then
+    exit;
+  serviceItem := serviceIndex.FindItem('PackageSearchIds');
+  if serviceItem = nil then
+  begin
+    Logger.Error('Unabled to determine PackageSearchIds resource from Service Index');
+    exit;
+  end;
+  uri := TUriFactory.Parse(serviceItem.ResourceUrl);
+
+  httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
+
+  jsonObj := TJsonObject.Create;
+  try
+    jsonObj.S['compiler'] := CompilerToString(compilerVersion);
+    jsonObj.S['platform'] := DPMPlatformToString(platform);
+    idArray := jsonObj.A['packageids'];
+
+    for i := 0 to ids.Count -1 do
+    begin
+      jsonId := idArray.AddObject;
+      jsonId.S['id'] := ids.Items[i].Id;
+      jsonId.S['version'] := ids.Items[i].Version.ToStringNoMeta();
+    end;
+    sBody := jsonObj.ToJSON(false);
+  finally
+    jsonObj.Free;
+  end;
+
+  request := httpClient.CreateRequest(uri.AbsolutePath)
+          .WithHeader(cUserAgentHeader,cDPMUserAgent)
+          .WithBody(sBody, TEncoding.UTF8)
+          .WithContentType('application/json');
+
+  try
+    Logger.Information('POST ' + uri.ToString);
+    response := request.Post(cancellationToken);
+  except
+    on ex : Exception do
+    begin
+      Logger.Error('Error fetching list from server : ' + ex.Message);
+      exit;
+    end;
+  end;
+
+  if response.StatusCode <> 200 then
+  begin
+    Logger.Error('Error fetching search result from server : ' + response.ErrorMessage);
+    exit;
+  end;
+
+  if response.ContentLength = 0 then
+  begin
+    Logger.Verbose('Server returned no content');
+    exit;
+  end;
+  Logger.Information('OK ' + uri.ToString);
+
+  try
+    jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+  except
+    on e : Exception do
+    begin
+      Logger.Error('Error parsing json response from server : ' + e.Message);
+      exit;
+    end;
+  end;
+
+  try
+    Result.TotalCount := jsonObj.I['totalHits'];
+
+    if jsonObj.Contains('results') and (not jsonObj.IsNull('results')) then
+    begin
+      jsonArr := jsonObj.A['results'];
+      for i := 0 to jsonArr.Count -1 do
+      begin
+        if cancellationToken.IsCancelled then
+          exit;
+
         itemObj := jsonArr.O[i];
         resultItem := TDPMPackageSearchResultItem.FromJson(Name, itemObj);
         Result.Results.Add(resultItem);
@@ -451,6 +573,7 @@ var
   path : string;
   jsonObj : TJsonObject;
   uri : IUri;
+  spec : IPackageSpec;
 begin
   result := nil;
 
@@ -472,8 +595,10 @@ begin
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
   request := httpClient.CreateRequest(path)
-             .WithHeader(cUserAgentHeader,cDPMUserAgent);
+             .WithHeader(cUserAgentHeader,cDPMUserAgent)
+             .WithHeader(cAcceptHeader, 'application/json');
   try
+    Logger.Information('GET ' + uri.BaseUriString + path);
     response := request.Get(cancellationToken);
   except
     on ex : Exception do
@@ -489,6 +614,13 @@ begin
     exit;
   end;
 
+  if response.ContentLength = 0 then
+  begin
+    Logger.Error('Server returned empty dspec from : ' + uri.BaseUriString + path);
+    exit;
+  end;
+  Logger.Information('OK ' + uri.BaseUriString + path);
+
   try
     jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
   except
@@ -500,7 +632,13 @@ begin
   end;
 
   try
-    result := TPackageMetadata.Create(Name, jsonObj);
+    spec := TSpec.Create(Logger,'');
+    if not spec.LoadFromJson(jsonObj) then
+    begin
+      Logger.Error('Http Repository : Error reading dspec');
+      exit;
+    end;
+    result := TPackageInfo.CreateFromSpec(Self.Name, spec);
   except
     on e : Exception do
     begin
@@ -511,26 +649,10 @@ begin
 
 end;
 
-function TDPMServerPackageRepository.GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageLatestVersionInfo>;
-//var
-//  httpClient : IHttpClient;
-//  request : TRequest;
-//  response : IHttpResponse;
-//  serviceIndex : IServiceIndex;
-//  serviceItem : IServiceIndexItem;
-//  path : string;
-//  jsonObj : TJsonObject;
-//  uri : IUri;
-begin
-  result := TCollections.CreateDictionary<string, IPackageLatestVersionInfo>;
-
-
-end;
-
 
 //Note - we are downloading the dpspec file here rather than hitting the database with the /info endpoint.
 //since the dpsec will be on the CDN - this will be less load on the db.
-//TODO : profile CD response times vs hitting the server.
+//TODO : profile CDN response times vs hitting the server.
 function TDPMServerPackageRepository.GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageSearchResultItem;
 var
   httpClient : IHttpClient;
@@ -561,6 +683,7 @@ begin
 
   request := httpClient.CreateRequest(path)
                         .WithHeader(cUserAgentHeader,cDPMUserAgent);
+  Logger.Information('GET ' + uri.BaseUriString + path);
 
   try
     response := request.Get(cancellationToken);
@@ -577,6 +700,7 @@ begin
     Logger.Error('Error fetching packageinfo from server : ' + response.ErrorMessage);
     exit;
   end;
+  Logger.Information('OK ' + uri.BaseUriString + path);
 
   try
     jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
@@ -590,6 +714,7 @@ begin
 
   try
     result := TDPMPackageSearchResultItem.FromJson(Name, jsonObj);
+    Logger.Information('OK ' + uri.BaseUriString + path);
   except
     on e : Exception do
     begin
@@ -636,6 +761,7 @@ begin
                        .WithParameter(cPreReleaseParam, Lowercase(BoolToStr(preRelease, true)));
 
   try
+    Logger.Information('GET ' + uri.BaseUriString + path);
     response := request.Get(cancellationToken);
   except
     on ex : Exception do
@@ -650,6 +776,7 @@ begin
     Logger.Error('Error fetching versions from server : ' + response.ErrorMessage);
     exit;
   end;
+  Logger.Information('OK ' + uri.BaseUriString + path);
 
   try
     jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
@@ -719,6 +846,7 @@ begin
              .WithParameter('prerel', Lowercase(BoolToStr(preRelease, true)));
 
   try
+    Logger.Information('GET ' + uri.BaseUriString + path);
     response := request.Get(cancellationToken);
   except
     on ex : Exception do
@@ -733,6 +861,7 @@ begin
     Logger.Error('Error fetching packageinfo from server : ' + response.ErrorMessage);
     exit;
   end;
+  Logger.Information('OK ' + uri.BaseUriString + path);
 
   try
     jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;

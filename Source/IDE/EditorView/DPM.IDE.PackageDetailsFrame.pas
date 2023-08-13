@@ -33,6 +33,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  System.Diagnostics,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
   Vcl.Themes,
   Vcl.StdCtrls, Vcl.Imaging.pngimage, Vcl.ExtCtrls,
@@ -47,6 +48,7 @@ uses
   DPM.Core.Repository.Interfaces,
   DPM.Core.Logging,
   DPM.IDE.Logger,
+  DPM.Core.Cache.Interfaces,
   DPM.Core.Options.Search,
   DPM.Core.Options.Install,
   DPM.Core.Options.UnInstall,
@@ -101,6 +103,7 @@ type
     {$ENDIF}
 
     FConfiguration : IConfiguration;
+    FPackageCache : IPackageCache;
     FIconCache : TDPMIconCache;
     FHost : IDetailsHost;
     FLogger : IDPMIDELogger;
@@ -126,6 +129,8 @@ type
 
     FFetchVersions : boolean;
 
+    FVersionsCache : IDictionary<string, IList<TPackageVersion>>;
+    FVersionsCacheUdate : TStopWatch;
   protected
     procedure LoadImages;
     procedure AssignImages;
@@ -139,19 +144,25 @@ type
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
 
-    procedure DoGetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string);
+    procedure DoGetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform);
 
     procedure UpdateProjectPackageVersions(const packageId : string);
     procedure DoPackageUninstall(options : TUnInstallOptions);
     procedure DoPackageInstall(options : TInstallOptions; const isUpdate : boolean);
 
-    function GetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string): IAwaitable<IPackageSearchResultItem>;
+    function GetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IAwaitable<IPackageSearchResultItem>;
     procedure ChangeScale(M: Integer; D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND}); override;
 
     procedure VersionGridOnInstallEvent(const project : string);
     procedure VersionGridOnUnInstallEvent(const project : string);
     procedure VersionGridOnUpgradeEvent(const project : string);
     procedure VersionGridOnDowngradeEvent(const project : string);
+
+    procedure DoUpdateVersions(const sReferenceVersion : string; const versions : IList<TPackageVersion>);
+
+    //versions cache
+    function TryGetCachedVersions(const Id : string; const includePrerelease : boolean; out versions : IList<TPackageVersion>) : boolean;
+    procedure UpdateVersionsCache(const id : string; const includePrerelease : boolean; const versions : IList<TPackageVersion>);
 
 
   public
@@ -177,6 +188,8 @@ uses
   DPM.IDE.Constants,
   DPM.Core.Utils.Strings,
   DPM.Core.Utils.System,
+  DPM.Core.Package.Metadata,
+  DPM.Core.Package.SearchResults,
   DPM.Core.Dependency.Interfaces;
 { TGroupPackageDetailsFrame }
 
@@ -245,7 +258,7 @@ begin
   if FFetchVersions then
     FVersionsDelayTimer.Enabled := true;
   if FSelectedVersion <> package.Version then
-    DoGetPackageMetaDataAsync(package.Id, package.CompilerVersion, package.Platform, FSelectedVersion.ToStringNoMeta)
+    DoGetPackageMetaDataAsync(package.Id, FSelectedVersion.ToStringNoMeta, package.CompilerVersion, package.Platform)
   else
     FDetailsPanel.SetDetails(FPackageMetaData);
 
@@ -261,9 +274,27 @@ begin
   inherited;
 end;
 
-procedure TPackageDetailsFrame.DoGetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string);
+procedure TPackageDetailsFrame.DoGetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform);
+var
+  metaData : IPackageMetadata;
+  packageId : IPackageId;
+  packageVersion : TPackageVersion;
+  item : IPackageSearchResultItem ;
 begin
-  GetPackageMetaDataAsync(id, compilerVersion, platform, version)
+  //try and get it from the cache first rather than going to the repo.
+  packageVersion := TPackageVersion.Parse(version);
+  packageId := TPackageId.Create(id, packageVersion, compilerVersion, platform);
+  metaData :=  FPackageCache.GetPackageMetadata(packageId);
+  if metaData <> nil then
+  begin
+    item := TDPMPackageSearchResultItem.FromMetaData('cache',metaData);
+    FDetailsPanel.SetDetails(item);
+    FSelectedVersion := item.Version;
+    UpdateButtonState;
+    exit;
+  end;
+  //didn't find it in the cache so fire off a task to get it from the repo.
+  GetPackageMetaDataAsync(id, version, compilerVersion, platform)
   .OnException(
     procedure(const e : Exception)
     begin
@@ -404,7 +435,7 @@ begin
   sVersion := cboVersions.Items[cboVersions.ItemIndex];
   packageVer := TPackageVersion.Parse(sVersion);
   FProjectsGrid.PackageVersion := packageVer;
-  DoGetPackageMetaDataAsync(FPackageMetaData.Id, FPackageMetaData.CompilerVersion, FPackageMetaData.Platform, sVersion);
+  DoGetPackageMetaDataAsync(FPackageMetaData.Id, sVersion, FPackageMetaData.CompilerVersion, FPackageMetaData.Platform);
 end;
 
 procedure TPackageDetailsFrame.cboVersionsCloseUp(Sender: TObject);
@@ -510,7 +541,7 @@ begin
   FImageList.Width := 16;
   FImageList.Height := 16;
 
-  
+
   LoadImages;
   AssignImages;
   FProjectsGrid.ImageList := FImageList;
@@ -519,6 +550,8 @@ begin
   btnUpgradeAll.Caption := '';
   btnUninstallAll.Caption := '';
 
+  FVersionsCache := TCollections.CreateDictionary<string, IList<TPackageVersion>>;
+  FVersionsCacheUdate := TStopWatch.Create;
   SetPackage(nil,false);
 
 //  ThemeChanged;
@@ -537,7 +570,7 @@ begin
   FPackageInstaller := container.Resolve<IPackageInstaller>;
   FInstallerContext := container.Resolve<IPackageInstallerContext>;
   FRespositoryManager := container.Resolve<IPackageRepositoryManager>;
-
+  FPackageCache := container.Resolve<IPackageCache>;
   FHost := host;
   SetPackage(nil, FIncludePreRelease);
 
@@ -725,10 +758,14 @@ begin
   end;
 end;
 
-function TPackageDetailsFrame.GetPackageMetaDataAsync(const id: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const version: string): IAwaitable<IPackageSearchResultItem>;
+function TPackageDetailsFrame.GetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IAwaitable<IPackageSearchResultItem>;
 var
   repoManager : IPackageRepositoryManager;
 begin
+
+  //TODO: can we get from the package cache here???
+
+
   //local for capture
   repoManager := FRespositoryManager;
   repoManager.Initialize(FConfiguration);
@@ -911,6 +948,24 @@ begin
 
 end;
 
+function TPackageDetailsFrame.TryGetCachedVersions(const Id: string;  const includePrerelease : boolean; out versions: IList<TPackageVersion>): boolean;
+begin
+  result := false;
+  if FVersionsCacheUdate.IsRunning and (FVersionsCacheUdate.Elapsed.Seconds > 60) then
+  begin
+    FVersionsCache.Clear;
+    FVersionsCacheUdate.Reset;
+    FVersionsCacheUdate.Start;
+    exit;
+  end
+  else
+  begin
+    result := FVersionsCache.TryGetValue(LowerCase(id + '-' + BoolToStr(includePrerelease,true)), versions);
+    FVersionsCacheUdate.Start;
+  end;
+
+end;
+
 procedure TPackageDetailsFrame.UpdateButtonState;
 var
   referenceVersion : TPackageVersion;
@@ -970,6 +1025,18 @@ begin
     end;
   {$ENDIF}
 
+end;
+
+procedure TPackageDetailsFrame.UpdateVersionsCache(const id: string; const includePrerelease : boolean; const versions: IList<TPackageVersion>);
+begin
+  FVersionsCacheUdate.Stop;
+  if FVersionsCacheUdate.Elapsed.Seconds > 120 then
+  begin
+    FVersionsCache.Clear;
+    FVersionsCacheUdate.Reset;
+  end;
+  FVersionsCache[LowerCase(id + '-' + BoolToStr(includePrerelease,true))] := versions;
+  FVersionsCacheUdate.Start;
 end;
 
 procedure TPackageDetailsFrame.VersionGridOnDowngradeEvent(const project: string);
@@ -1037,11 +1104,55 @@ begin
   //call common function
 end;
 
+procedure TPackageDetailsFrame.DoUpdateVersions(const sReferenceVersion : string; const versions : IList<TPackageVersion>);
+  var
+    version : TPackageVersion;
+begin
+  cboVersions.Items.BeginUpdate;
+  try
+    cboVersions.Clear;
+
+    if versions.Any then
+    begin
+      for version in versions do
+      begin
+        if FPackageMetaData.IsTransitive then
+        begin
+          if FPackageMetaData.VersionRange.IsSatisfiedBy(version) then
+            cboVersions.Items.Add(version.ToStringNoMeta);
+        end
+        else
+          cboVersions.Items.Add(version.ToStringNoMeta);
+      end;
+      cboVersions.ItemIndex := cboVersions.Items.IndexOf(sReferenceVersion);
+    end
+    else
+    begin
+      //no versions returned
+      //this can happen if there is only 1 version and its prerelease and
+      //prerlease not checked.
+      //in this case we will just add the reference version
+      if sReferenceVersion <> '' then
+      begin
+        cboVersions.Items.Add(sReferenceVersion);
+        cboVersions.ItemIndex := 0;
+      end;
+      //btnInstall.Enabled := false;
+    end;
+  finally
+    cboVersions.Items.EndUpdate;
+  end;
+end;
+
+
 procedure TPackageDetailsFrame.VersionsDelayTimerEvent(Sender: TObject);
 var
   repoManager : IPackageRepositoryManager;
   sReferenceVersion : string;
   includePreRelease : boolean;
+  cachedVersions : IList<TPackageVersion>;
+
+
 begin
   FVersionsDelayTimer.Enabled := false;
   if FRequestInFlight then
@@ -1051,12 +1162,23 @@ begin
   FCancellationTokenSource.Reset;
 
   cboVersions.Clear;
-  repoManager := FRespositoryManager; //local for capture
-  repoManager.Initialize(FConfiguration);
 
   sReferenceVersion := GetReferenceVersion.ToStringNoMeta;
 
   includePreRelease := FIncludePreRelease or (not FPackageMetaData.Version.IsStable);
+
+  //avoid going to the repo for the info all the time, new versions are not published
+  //that often so we can afford to cache the info.
+  if TryGetCachedVersions(FPackageMetaData.Id, includePreRelease, cachedVersions ) then
+  begin
+    DoUpdateVersions(sReferenceVersion, cachedVersions);
+    exit;
+  end;
+
+
+  repoManager := FRespositoryManager; //local for capture
+  repoManager.Initialize(FConfiguration);
+
 
   TAsync.Configure<IList<TPackageVersion>> (
     function(const cancelToken : ICancellationToken) : IList<TPackageVersion>
@@ -1088,49 +1210,14 @@ begin
     end)
   .Await(
     procedure(const versions : IList<TPackageVersion>)
-    var
-      version : TPackageVersion;
     begin
       FRequestInFlight := false;
       //if the view is closing do not do anything else.
       if FClosing then
         exit;
       FLogger.Debug('Got package versions .');
-      cboVersions.Items.BeginUpdate;
-      try
-        cboVersions.Clear;
-
-        if versions.Any then
-        begin
-          for version in versions do
-          begin
-            if FPackageMetaData.IsTransitive then
-            begin
-              if FPackageMetaData.VersionRange.IsSatisfiedBy(version) then
-                cboVersions.Items.Add(version.ToStringNoMeta);
-            end
-            else
-              cboVersions.Items.Add(version.ToStringNoMeta);
-          end;
-          cboVersions.ItemIndex := cboVersions.Items.IndexOf(sReferenceVersion);
-        end
-        else
-        begin
-          //no versions returned
-          //this can happen if there is only 1 version and its prerelease and
-          //prerlease not checked.
-          //in this case we will just add the reference version
-          if sReferenceVersion <> '' then
-          begin
-            cboVersions.Items.Add(sReferenceVersion);
-            cboVersions.ItemIndex := 0;
-          end;
-          //btnInstall.Enabled := false;
-        end;
-      finally
-        cboVersions.Items.EndUpdate;
-      end;
-
+      UpdateVersionsCache(FPackageMetaData.Id, includePreRelease, versions);
+      DoUpdateVersions(sReferenceVersion, versions);
     end);
 
 end;

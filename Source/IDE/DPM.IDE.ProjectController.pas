@@ -148,6 +148,7 @@ procedure TDPMIDEProjectController.ProjectGroupClosed;
 begin
   FProjectTreeManager.ProjectGroupClosed;
   FEditorViewManager.ProjectGroupClosed;
+  FInstallerContext.Clear;
 end;
 
 procedure TDPMIDEProjectController.ProjectLoaded(const fileName: string);

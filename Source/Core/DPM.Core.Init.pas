@@ -110,7 +110,7 @@ begin
   Container.RegisterType<IPackageRepository, TDirectoryPackageRepository>(TEnumUtils.EnumToString<TSourceType>(TSourceType.Folder));
   Container.RegisterType<IPackageRepository, TDPMServerPackageRepository>(TEnumUtils.EnumToString<TSourceType>(TSourceType.DPMServer));
 
-  Container.RegisterType<IPackageCache, TPackageCache>;
+  Container.RegisterType<IPackageCache, TPackageCache>.AsSingleton();
 
   Container.RegisterType<IDependencyResolver, TDependencyResolver>;
 

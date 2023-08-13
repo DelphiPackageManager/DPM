@@ -52,7 +52,7 @@ type
     function Initialize(const configuration : IConfiguration) : boolean;
     function HasSources: Boolean;
 
-    function InternalGetLatestVersions(const cancellationToken : ICancellationToken; const installedPackages : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : IDictionary<string, IPackageLatestVersionInfo>;
+//    function InternalGetLatestVersions(const cancellationToken : ICancellationToken; const installedPackages : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : IDictionary<string, IPackageLatestVersionInfo>;
 
 
     function GetRepositories : IList<IPackageRepository>;
@@ -64,18 +64,17 @@ type
     //UI specific stuff
     //TODO : Implement skip/take!
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
-
-
     function GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IList<IPackageId>) : IList<IPackageSearchResultItem>;
+    //
+    function GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResultItem;
 
 
-    function Find(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform; const includePrerelease : boolean; const sources : string) : IPackageIdentity;
+    function FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform; const includePrerelease : boolean; const sources : string) : IPackageIdentity;
 
 
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
-    function GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResultItem;
     function GetPackageIcon(const cancelToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
     function GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const packageId : string; const includePrerelease : boolean) : IList<TPackageVersion>; overload;
 
@@ -116,6 +115,7 @@ function TPackageRepositoryManager.DownloadPackage(const cancellationToken : ICa
 var
   repo : IPackageRepository;
 begin
+  FLogger.Debug('TPackageRepositoryManager.DownloadPackage');
   result := false;
   if not UpdateRepositories then
   begin
@@ -132,7 +132,7 @@ begin
 
       exit;
     end;
-    FLogger.Information('Downloading package [' + packageIdentity.ToString + '] from [' + repo.Source + ']');
+    //FLogger.Information('Downloading package [' + packageIdentity.ToString + '] from [' + repo.Name + ']');
     result := repo.DownloadPackage(cancellationToken, packageIdentity, localFolder, fileName);
   end
   else
@@ -150,7 +150,7 @@ begin
   end;
 end;
 
-function TPackageRepositoryManager.Find(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean; const sources : string): IPackageIdentity;
+function TPackageRepositoryManager.FindLatestVersion(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean; const sources : string): IPackageIdentity;
 var
   repo : IPackageRepository;
   sourcesList : TStringList;
@@ -191,7 +191,7 @@ begin
         if sourcesList.IndexOf(repo.Name) = -1 then
           continue;
       end;
-      package := repo.Find(cancellationToken, id, compilerVersion, version, platform, includePrerelease);
+      package := repo.FindLatestVersion(cancellationToken, id, compilerVersion, version, platform, includePrerelease);
       if cancellationToken.IsCancelled then
         exit;
 
@@ -222,18 +222,16 @@ end;
 
 function TPackageRepositoryManager.GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IList<IPackageId>) : IList<IPackageSearchResultItem>;
 var
-  searchOptions : TSearchOptions;
-  packageId : IPackageId;
   packageResults : IPackageSearchResult;
-  item : IPackageSearchResultItem;
-  latestVersions : IDictionary<string, IPackageLatestVersionInfo>;
-  latestVersion : IPackageLatestVersionInfo;
-  ids : IList<string>;
+  packages : IDictionary<string, IPackageSearchResultItem>;
+  package : IPackageSearchResultItem;
   platform : TDPMPlatform;
+  repo : IPackageRepository;
+  i : integer;
+  id : string;
 begin
   Assert(FConfiguration <> nil);
   Assert(installedPackages <> nil);
-
   result := TCollections.CreateList<IPackageSearchResultItem>;
   //nothing to do so justr return empty list.
   if not installedPackages.Any then
@@ -245,43 +243,52 @@ begin
     exit;
   end;
 
-  ids := TCollections.CreateList<string>;
+  if installedPackages.Count = 0 then
+    exit;
 
-  installedPackages.ForEach(
-    procedure(const item : IPackageId)
+  packages := TCollections.CreateDictionary<string, IPackageSearchResultItem>;
+    
+  //always going to be all the same platform
+  platform := installedPackages[0].Platform;
+
+
+  //loop through enabled repo and get the feed.. then combine to get latest versions
+  for repo in FRepositories do
+  begin
+    if not repo.Enabled then
+      continue;
+    if cancelToken.IsCancelled then
+      exit;
+      
+    packageResults := repo.GetPackageFeedByIds(cancelToken, installedPackages, options.CompilerVersion, platform ); 
+    for i := 0 to packageResults.Results.Count -1 do
     begin
-      ids.Add(item.Id);
+      if cancelToken.IsCancelled then
+        exit;
+
+      id := LowerCase(packageResults.Results[i].Id);
+      if packages.ContainsKey(id) then
+      begin
+        package := packages.Extract(id);
+        //if we already have this package from another repo then compare versions
+        if packageResults.Results[i].LatestVersion > package.LatestVersion then
+          package.LatestVersion := packageResults.Results[i].LatestVersion;
+        if packageResults.Results[i].LatestStableVersion > package.LatestStableVersion then
+          package.LatestStableVersion := packageResults.Results[i].LatestStableVersion;
+      end
+      else
+        packages[id] := packageResults.Results[i];
+    end;
+  end;
+
+  result := TCollections.CreateList<IPackageSearchResultItem>;
+  result.AddRange(packages.Values);
+  result.Sort(
+    function(const left, right : IPackageSearchResultItem) : integer
+    begin
+      result := CompareText(left.Id, right.id);
     end);
 
-  platform := installedPackages.First.Platform;
-
-  latestVersions := InternalGetLatestVersions(cancelToken, installedPackages, platform, options.CompilerVersion);
-
-  //TODO : This will be really inefficient/slow when using http
-  //refactor to make single request to repositories.
-  for packageId in installedPackages do
-  begin
-    searchOptions := options.Clone;
-    searchOptions.SearchTerms := packageId.Id;
-    searchOptions.Version := packageId.Version;
-    searchOptions.CompilerVersion := packageId.CompilerVersion;
-    searchOptions.Platforms := [packageId.Platform];
-    searchOptions.Exact := true;
-
-    //TODO : THIS IS NUTS - we should get the package metadata - this is wasteful as it only ever returns 1 result.
-    packageResults := GetPackageFeed(cancelToken, searchOptions, options.CompilerVersion, platform);
-
-    for item in packageResults.Results do
-    begin
-      item.Installed := true;
-      if latestVersions.TryGetValue(item.Id, latestVersion) then
-      begin
-        item.LatestVersion := latestVersion.LatestVersion;
-        item.LatestStableVersion := latestVersion.LatestStableVersion;
-      end;
-    end;
-    result.AddRange(packageResults.Results);
-  end;
 end;
 
 
@@ -294,6 +301,8 @@ var
   distinctResults : IEnumerable<IPackageSearchResultItem>;
   comparer : IEqualityComparer<IPackageSearchResultItem>;
 begin
+  FLogger.Debug('TPackageRepositoryManager.GetPackageFeed');
+
   Assert(FConfiguration <> nil);
   result := TDPMPackageSearchResult.Create(options.Skip, 0);
 
@@ -328,7 +337,6 @@ begin
       end;
       searchResult := repo.GetPackageFeed(cancelToken, options, compilerVersion, platform);
       allResults.AddRange(searchResult.Results);
-//      Result.TotalCount := Result.TotalCount + searchResult.TotalCount;
 
 
     end;
@@ -343,6 +351,11 @@ begin
     distinctResults := distinctResults.Take(options.Take);
   result.Results.AddRange(distinctResults);
   result.TotalCount := result.Results.Count;
+  result.Results.Sort(
+    function(const Left, Right : IPackageSearchResultItem) : integer
+    begin
+      result := CompareText(Left.Id, Right.Id);
+    end);
 
 
 end;
@@ -352,6 +365,7 @@ function TPackageRepositoryManager.GetPackageIcon(const cancelToken : ICancellat
 var
   repo : IPackageRepository;
 begin
+  FLogger.Debug('TPackageRepositoryManager.GetPackageIcon');
   Assert(FConfiguration <> nil);
   result := nil;
 
@@ -379,6 +393,7 @@ function TPackageRepositoryManager.GetPackageInfo(const cancellationToken : ICan
 var
   repo : IPackageRepository;
 begin
+  FLogger.Debug('TPackageRepositoryManager.GetPackageInfo');
   result := nil;
   Assert(FConfiguration <> nil);
 
@@ -408,14 +423,10 @@ function TPackageRepositoryManager.GetPackageMetaData(const cancellationToken: I
 var
   repo : IPackageRepository;
 begin
+  FLogger.Debug('TPackageRepositoryManager.GetPackageMetaData');
   result := nil;
   Assert(FConfiguration <> nil);
 
-  if not UpdateRepositories then
-  begin
-    FLogger.Error('Unabled to search, error loading repositories');
-    exit;
-  end;
 
   if compilerVersion = TCompilerVersion.UnknownVersion then
   begin
@@ -429,6 +440,13 @@ begin
     exit;
   end;
 
+  if not UpdateRepositories then
+  begin
+    FLogger.Error('Unabled to search, error loading repositories');
+    exit;
+  end;
+
+  
   for repo in FRepositories do
   begin
     if cancellationToken.IsCancelled then
@@ -451,6 +469,7 @@ var
   distinctResults : IEnumerable<TPackageVersion>;
   comparer : IEqualityComparer<TPackageVersion>;
 begin
+  FLogger.Debug('TPackageRepositoryManager.GetPackageVersions');
   result := TCollections.CreateList<TPackageVersion>;
   Assert(FConfiguration <> nil);
   if not UpdateRepositories then
@@ -498,48 +517,48 @@ begin
     end);
 end;
 
-function TPackageRepositoryManager.InternalGetLatestVersions(const cancellationToken : ICancellationToken; const installedPackages : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : IDictionary<string, IPackageLatestVersionInfo>;
-var
-  repo : IPackageRepository;
-  repoResult : IDictionary<string, IPackageLatestVersionInfo>;
-  i: Integer;
-  repoVersion : IPackageLatestVersionInfo;
-  resultVersion : IPackageLatestVersionInfo;
-begin
-  result := TCollections.CreateDictionary<string, IPackageLatestVersionInfo>;
-
-  for repo in FRepositories do
-  begin
-    if cancellationToken.IsCancelled then
-      exit;
-    if not repo.Enabled then
-      continue;
-
-    repoResult := repo.GetPackageLatestVersions(cancellationToken, installedPackages, platform, compilerVersion);
-    if cancellationToken.IsCancelled then
-      exit;
-
-    if repoResult.Any then
-    begin
-      for i := 0 to installedPackages.Count -1 do
-      begin
-        if repoResult.TryGetValue(installedPackages.Items[i].Id, repoVersion) then
-        begin
-          if result.TryExtract(installedPackages.Items[i].Id, resultVersion) then
-          begin
-            if repoVersion.LatestVersion > resultVersion.LatestVersion then
-              resultVersion.LatestVersion := repoVersion.LatestVersion;
-            if repoVersion.LatestStableVersion > resultVersion.LatestStableVersion then
-              resultVersion.LatestStableVersion := repoVersion.LatestStableVersion;
-          end
-          else
-            result[installedPackages.Items[i].Id] := repoVersion
-        end;
-      end;
-    end;
-  end;
-
-end;
+//function TPackageRepositoryManager.InternalGetLatestVersions(const cancellationToken : ICancellationToken; const installedPackages : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : IDictionary<string, IPackageLatestVersionInfo>;
+//var
+//  repo : IPackageRepository;
+//  repoResult : IDictionary<string, IPackageLatestVersionInfo>;
+//  i: Integer;
+//  repoVersion : IPackageLatestVersionInfo;
+//  resultVersion : IPackageLatestVersionInfo;
+//begin
+//  result := TCollections.CreateDictionary<string, IPackageLatestVersionInfo>;
+//
+//  for repo in FRepositories do
+//  begin
+//    if cancellationToken.IsCancelled then
+//      exit;
+//    if not repo.Enabled then
+//      continue;
+//
+//    repoResult := repo.GetPackageLatestVersions(cancellationToken, installedPackages, platform, compilerVersion);
+//    if cancellationToken.IsCancelled then
+//      exit;
+//
+//    if repoResult.Any then
+//    begin
+//      for i := 0 to installedPackages.Count -1 do
+//      begin
+//        if repoResult.TryGetValue(installedPackages.Items[i].Id, repoVersion) then
+//        begin
+//          if result.TryExtract(installedPackages.Items[i].Id, resultVersion) then
+//          begin
+//            if repoVersion.LatestVersion > resultVersion.LatestVersion then
+//              resultVersion.LatestVersion := repoVersion.LatestVersion;
+//            if repoVersion.LatestStableVersion > resultVersion.LatestStableVersion then
+//              resultVersion.LatestStableVersion := repoVersion.LatestStableVersion;
+//          end
+//          else
+//            result[installedPackages.Items[i].Id] := repoVersion
+//        end;
+//      end;
+//    end;
+//  end;
+//
+//end;
 
 
 function TPackageRepositoryManager.GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
@@ -552,6 +571,7 @@ var
   distinctResults : IEnumerable<IPackageInfo>;
   comparer : IEqualityComparer<IPackageInfo>;
 begin
+  FLogger.Debug('TPackageRepositoryManager.GetPackageVersionsWithDependencies');
   result := TCollections.CreateList<IPackageInfo>;
   unfilteredResults := TCollections.CreateList<IPackageInfo>;
   Assert(FConfiguration <> nil);
@@ -780,6 +800,7 @@ var
   repo : IPackageRepository;
   i : integer;
 begin
+  //FLogger.Debug('TPackageRepositoryManager.UpdateRepositories');
   result := false;
 
   //update and remove

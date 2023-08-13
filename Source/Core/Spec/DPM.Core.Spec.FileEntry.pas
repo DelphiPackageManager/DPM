@@ -56,7 +56,7 @@ type
     function GetIgnore : boolean;
 
     constructor CreateClone(const logger : ILogger; const src : string; const dest : string; const exclude : IList<string>; const flatten : boolean; const ignore : boolean); virtual;
-    function Clone : ISpecFileEntry; overload;
+    function Clone : ISpecFileEntry;
   public
     constructor Create(const logger : ILogger); override;
 

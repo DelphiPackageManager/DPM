@@ -251,12 +251,10 @@ begin
       packageMetadata := FPackageCache.GetPackageMetadata(packageInfo);
       if packageMetadata = nil then
       begin
-        FLogger.Error('Unable to get metadata for package ' +
-          packageInfo.ToString);
+        FLogger.Error('Unable to get metadata for package ' + packageInfo.ToString);
         exit(false);
       end;
-      packageBasePath := packageMetadata.Id + PathDelim +
-        packageMetadata.Version.ToStringNoMeta + PathDelim;
+      packageBasePath := packageMetadata.Id + PathDelim + packageMetadata.Version.ToStringNoMeta + PathDelim;
 
       for packageSearchPath in packageMetadata.searchPaths do
         searchPaths.Add(packageBasePath + packageSearchPath);
@@ -646,7 +644,7 @@ begin
   else
   begin
     // no version specified, so we need to get the latest version available;
-    packageIdentity := FRepositoryManager.Find(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform, Options.PreRelease, options.Sources);
+    packageIdentity := FRepositoryManager.FindLatestVersion(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform, Options.PreRelease, options.Sources);
     if packageIdentity = nil then
     begin
       FLogger.Error('Package [' + Options.packageId + '] for platform [' + DPMPlatformToString(platform) + '] not found on any sources');
@@ -789,7 +787,7 @@ begin
   else
   begin
     // no version specified, so we need to get the latest version available;
-    newPackageIdentity := FRepositoryManager.Find(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform, Options.PreRelease, options.Sources);
+    newPackageIdentity := FRepositoryManager.FindLatestVersion(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform, Options.PreRelease, options.Sources);
 
     if newPackageIdentity = nil then
     begin
@@ -1469,8 +1467,11 @@ var
   projectList: IList<string>;
   i: integer;
   projectRoot: string;
+  stopwatch : TStopwatch;
 begin
   result := false;
+  stopwatch := TStopwatch.Create;
+  stopwatch.Start;
   try
     config := Init(Options);
     //logged in init
@@ -1543,6 +1544,13 @@ begin
       // order is important so we avoid shortcut boolean eval
       result := RestoreProject(cancellationToken, Options, projectFile, config, context) and result;
     end;
+    stopwatch.Stop;
+    if result then
+      FLogger.Success('Restore succeeded in [' + IntToStr(stopwatch.ElapsedMilliseconds) + '] ms', true)
+    else
+      FLogger.Error('Restore failed in [' + IntToStr(stopwatch.ElapsedMilliseconds) + '] ms');
+
+
   except
     on e: Exception do
     begin

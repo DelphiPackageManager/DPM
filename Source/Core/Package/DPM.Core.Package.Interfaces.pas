@@ -124,7 +124,7 @@ type
     property SearchPaths : IList<string>read GetSearchPaths;
   end;
 
-  //this is what is returned from a package feed for the UI.
+  //this is what is returned from a package repository for the UI.
   IPackageSearchResultItem = interface(IPackageId)
     ['{8EB6EA16-3708-41F7-93A2-FE56EB75510B}']
     function GetSourceName : string;

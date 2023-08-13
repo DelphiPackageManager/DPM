@@ -171,7 +171,11 @@ begin
   FDownloadCount    := jsonObject.L['totalDownloads'];
 
   FLatestVersion    := TPackageVersion.Parse(jsonObject.S['latestVersion']);
-  FLatestStableVersion := TPackageVersion.Parse(jsonObject.S['latestStableVersion']);
+
+  if jsonObject.Contains('latestStableVersion') and ( not jsonObject.IsNull('latestStableVersion')  )then
+    FLatestStableVersion := TPackageVersion.Parse(jsonObject.S['latestStableVersion'])
+  else
+    FLatestStableVersion := TPackageVersion.Empty;
   FIsReservedPrefix := jsonObject.B['isReservedPrefix'];
   FVersionRange := TVersionRange.Empty;
 
