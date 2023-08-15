@@ -765,7 +765,7 @@ begin
       exit;
     end;
     // remove it so we can force resolution to happen later.
-    projectPackageGraph.RemovePackageReference(existingPackageRef);
+    projectPackageGraph.RemoveTopLevelPackageReference(existingPackageRef.Id);
     existingPackageRef := nil; // we no longer need it.
   end;
 
