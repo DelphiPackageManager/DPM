@@ -225,12 +225,11 @@ begin
             .WithParameter('id', id)
             .WithParameter('compiler', CompilerToString(compilerVersion))
             .WithParameter('platform', DPMPlatformToString(platform));
-
+  //this looks odd but if we specify a version then we want that version only!
   if not version.IsEmpty then
     request.WithParameter('version', version.ToStringNoMeta)
   else if includePrerelease then
-       request.WithParameter(cPreReleaseParam, LowerCase(BoolToStr(includePrerelease, true)));
-
+    request.WithParameter(cPreReleaseParam, LowerCase(BoolToStr(includePrerelease, true)));
   try
     Logger.Information('GET ' + uri.BaseUriString);
     response := request.Get(cancellationToken);
