@@ -7,16 +7,15 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
   Vcl.ImgList, Vcl.StdCtrls, Vcl.ExtCtrls,
   Vcl.Themes,
+  {$IF CompilerVersion >= 30.0 }
+  System.ImageList,
+  {$IFEND}
   DPM.Core.Types,
   DPM.Core.Configuration.Interfaces,
   DPM.IDE.Types,
   DPM.IDE.Logger,
   DPM.IDE.Options,
-  DPM.Controls.ButtonedEdit
-  {$IF CompilerVersion >= 33.0 }
-   ,System.ImageList
-  {$IFEND}
-   ;
+  DPM.Controls.ButtonedEdit;
 
 type
   TConfigChangedEvent = procedure(const configuration : IConfiguration) of object;
@@ -68,7 +67,6 @@ type
     FOnSearchEvent : TSearchEvent;
     FOnConfigChanged : TConfigChangedEvent;
     FOnPlatformChangedEvent : TPlatformChangedEvent;
-    FOnProjectSelected : TProjectSelectedEvent;
     FOnFocusList : TNotifyEvent;
     function GetSearchText: string;
     function GetIncludePreRelease: boolean;
@@ -80,7 +78,6 @@ type
 
     procedure DoSearchEvent(const refresh : boolean);
     procedure DoPlatformChangedEvent(const newPlatform : TDPMPlatform);
-    procedure DoProjectSelected(const value : string);
 
     procedure Loaded; override;
   public
@@ -104,7 +101,6 @@ type
     property OnConfigChanged : TConfigChangedEvent read FOnConfigChanged write FOnConfigChanged;
     property OnSearch : TSearchEvent read FOnSearchEvent write FOnSearchEvent;
     property OnPlatformChanged : TPlatformChangedEvent read FOnPlatformChangedEvent write FOnPlatformChangedEvent;
-    property OnProjectSelected : TProjectSelectedEvent read FOnProjectSelected write FOnProjectSelected;
     property OnFocusList : TNotifyEvent read FOnFocusList write FOnFocusList;
   end;
 
@@ -272,11 +268,6 @@ begin
     FOnPlatformChangedEvent(newPlatform);
 end;
 
-procedure TDPMSearchBarFrame.DoProjectSelected(const value: string);
-begin
-  if Assigned(FOnProjectSelected) then
-    FOnProjectSelected(value);
-end;
 
 procedure TDPMSearchBarFrame.DoSearchEvent(const refresh : boolean);
 var

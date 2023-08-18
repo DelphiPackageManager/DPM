@@ -130,6 +130,7 @@ type
     FFetchVersions : boolean;
 
     FVersionsCache : IDictionary<string, IList<TPackageVersion>>;
+    FMetaDataCache : IDictionary<string, IPackageSearchResultItem>;
     FVersionsCacheUdate : TStopWatch;
   protected
     procedure LoadImages;
@@ -280,19 +281,29 @@ var
   packageId : IPackageId;
   packageVersion : TPackageVersion;
   item : IPackageSearchResultItem ;
+  key : string;
 begin
+  key := LowerCase(id) + '-' + LowerCase(version);
   //try and get it from the cache first rather than going to the repo.
-  packageVersion := TPackageVersion.Parse(version);
-  packageId := TPackageId.Create(id, packageVersion, compilerVersion, platform);
-  metaData :=  FPackageCache.GetPackageMetadata(packageId);
-  if metaData <> nil then
+  if not FMetaDataCache.TryGetValue(key, item) then
   begin
-    item := TDPMPackageSearchResultItem.FromMetaData('cache',metaData);
+    packageVersion := TPackageVersion.Parse(version);
+    packageId := TPackageId.Create(id, packageVersion, compilerVersion, platform);
+    metaData :=  FPackageCache.GetPackageMetadata(packageId);
+    if metaData <> nil then
+    begin
+      item := TDPMPackageSearchResultItem.FromMetaData('cache',metaData);
+      FMetaDataCache[key] := item;
+    end;
+  end;
+  if item <> nil then
+  begin
     FDetailsPanel.SetDetails(item);
     FSelectedVersion := item.Version;
     UpdateButtonState;
     exit;
   end;
+
   //didn't find it in the cache so fire off a task to get it from the repo.
   GetPackageMetaDataAsync(id, version, compilerVersion, platform)
   .OnException(
@@ -319,6 +330,8 @@ begin
       //if the view is closing do not do anything else.
       if FClosing then
         exit;
+      key := LowerCase(theResult.id) + '-' + LowerCase(theResult.version.ToStringNoMeta);
+      FMetaDataCache[key] := theResult;
       FDetailsPanel.SetDetails(theResult);
       FSelectedVersion := theResult.Version;
       UpdateButtonState;
@@ -537,7 +550,7 @@ begin
   FImageList := TImageList.Create(Self);
   {$ENDIF}
   FImageList.ColorDepth := cd32Bit;
-  FImageList.DrawingStyle := dsTransparent; 
+  FImageList.DrawingStyle := dsTransparent;
   FImageList.Width := 16;
   FImageList.Height := 16;
 
@@ -552,6 +565,7 @@ begin
 
   FVersionsCache := TCollections.CreateDictionary<string, IList<TPackageVersion>>;
   FVersionsCacheUdate := TStopWatch.Create;
+  FMetaDataCache := TCollections.CreateDictionary<string, IPackageSearchResultItem>;
   SetPackage(nil,false);
 
 //  ThemeChanged;
@@ -817,6 +831,8 @@ begin
   if FRequestInFlight then
     FCancellationTokenSource.Cancel;
   //todo - should we wait here?
+
+  FMetaDataCache.Clear;
 
   wasNil := FPackageMetaData = nil;
   FPackageMetaData := package;

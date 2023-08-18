@@ -176,7 +176,6 @@ type
     procedure SearchBarSettingsChanged(const configuration : IConfiguration);
     procedure SearchBarPlatformChanged(const newPlatform : TDPMPlatform);
     procedure SearchBarOnSearch(const searchText : string; const searchOptions : TDPMSearchOptions; const source : string; const platform : TDPMPlatform; const refresh : boolean);
-    procedure SearchBarProjectSelected(const projectFile : string);
     procedure SearchBarOnFocustList(sender : TObject);
 
     //scrolllist evernts
@@ -186,7 +185,7 @@ type
     procedure ScrollListBeforeChangeRow(const Sender : TObject; const currentRowIndex : Int64; const direction : TScrollDirection; const delta : Int64; var newRowIndex : Int64);
 
 
-    procedure DoPlatformChange(const newPlatform : TDPMPlatform; const refresh : boolean);
+    procedure DoPlatformChange(const newPlatform : TDPMPlatform; const refresh : boolean; const refreshInstalled : boolean);
 
     function GetRowKind(const index : Int64) : TPackageRowKind;
     procedure CalculateIndexes;
@@ -502,7 +501,6 @@ begin
   FSearchBar.OnSearch := Self.SearchBarOnSearch;
   FSearchBar.OnConfigChanged := Self.SearchBarSettingsChanged;
   FSearchBar.OnPlatformChanged := Self.SearchBarPlatformChanged;
-  FSearchBar.OnProjectSelected := Self.SearchBarProjectSelected;
   FSearchBar.OnFocusList := Self.SearchBarOnFocustList;
   FSearchBar.Parent := Self;
 
@@ -579,7 +577,7 @@ end;
 
 
 
-procedure TDPMEditViewFrame.DoPlatformChange(const newPlatform: TDPMPlatform; const refresh : boolean);
+procedure TDPMEditViewFrame.DoPlatformChange(const newPlatform: TDPMPlatform; const refresh : boolean; const refreshInstalled : boolean);
 var
   searchTxt : string;
   filterProc : TFilterProc;
@@ -622,9 +620,7 @@ begin
 
     FCancelTokenSource.Reset;
 
-
-
-    if (not refresh) and (FAllInstalledPackages <> nil) and (FAllInstalledPackages.Count > 0) then
+    if (not refreshInstalled) and (FAllInstalledPackages <> nil) and (FAllInstalledPackages.Count > 0) then
     begin
       FLock.Acquire;
       try
@@ -948,7 +944,7 @@ begin
   platforms := GetPlatforms;
   FSearchBar.UpdatePlatforms(platforms);
 
-  DoPlatformChange(FSearchBar.Platform, true);
+  DoPlatformChange(FSearchBar.Platform, true, true);
 
 end;
 
@@ -1521,24 +1517,15 @@ begin
   else
     FSearchOptions.Sources := '';
 
-  DoPlatformChange(platform, refresh);
+  DoPlatformChange(platform, refresh, false);
 
 end;
 
 procedure TDPMEditViewFrame.SearchBarPlatformChanged(const newPlatform: TDPMPlatform);
 begin
-  DoPlatformChange(newPlatform, true);
+  DoPlatformChange(newPlatform, true, true);
 end;
 
-procedure TDPMEditViewFrame.SearchBarProjectSelected(const projectFile: string);
-var
-  platform : TDPMPlatform;
-begin
-  FSelectedProject := projectFile;
-  platform := FCurrentPlatform;
-  FCurrentPlatform := TDPMPlatform.UnknownPlatform;
-  DoPlatformChange(platform, true);
-end;
 
 procedure TDPMEditViewFrame.SearchBarSettingsChanged(const configuration: IConfiguration);
 begin
@@ -1592,7 +1579,7 @@ begin
   begin
     FFirstView := false;
     Application.ProcessMessages; //allow the frame to paint
-    DoPlatformChange(FSearchBar.Platform, true);
+    DoPlatformChange(FSearchBar.Platform, true, true);
   end;
 end;
 

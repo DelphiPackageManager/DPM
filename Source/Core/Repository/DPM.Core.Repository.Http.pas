@@ -318,9 +318,9 @@ begin
 
   request.WithParameter('compiler', CompilerToString(compilerVersion));
   request.WithParameter('platform', DPMPlatformToString(platform));
-  request.WithParameter(cPreReleaseParam, BoolToStr(options.Prerelease, true));
-  request.WithParameter(cCommercialParam, BoolToStr(options.Commercial, true));
-  request.WithParameter(cTrialParam, BoolToStr(options.Trial, true));
+  request.WithParameter(cPreReleaseParam, LowerCase(BoolToStr(options.Prerelease, true)));
+  request.WithParameter(cCommercialParam, LowerCase(BoolToStr(options.Commercial, true)));
+  request.WithParameter(cTrialParam, LowerCase(BoolToStr(options.Trial, true)));
 
 
   if options.Skip <> 0 then

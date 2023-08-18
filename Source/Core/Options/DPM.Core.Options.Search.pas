@@ -111,6 +111,8 @@ begin
   FIncludeDelisted := original.FIncludeDelisted;
   FUseSource := original.UseSource;
   FDebugMode := original.DebugMode;
+  FTrial := original.Trial;
+  FCommercial := original.Commercial;
 end;
 
 end.
