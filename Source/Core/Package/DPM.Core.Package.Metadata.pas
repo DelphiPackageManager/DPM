@@ -297,12 +297,11 @@ begin
     begin
       depId := depArr.O[i].S['packageId'];
       depVersion := depArr.O[i].S['versionRange'];
-    end;
-
-    if TVersionRange.TryParse(depVersion, range) then
-    begin
-      dependency := TPackageDependency.Create(depId, range, FPlatform);
-      FDependencies.Add(dependency);
+      if TVersionRange.TryParse(depVersion, range) then
+      begin
+        dependency := TPackageDependency.Create(depId, range, FPlatform);
+        FDependencies.Add(dependency);
+      end;
     end;
   end;
 

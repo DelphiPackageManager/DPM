@@ -125,7 +125,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Package.Dependency;
 
 { TDPMPackageSearchResultItem }
 
@@ -139,8 +140,14 @@ begin
 end;
 
 constructor TDPMPackageSearchResultItem.CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
+var
+  depArr : TJsonArray;
+  depId : string;
+  depVersion : string;
+  i: Integer;
+  range : TVersionRange;
+  dependency : IPackageDependency;
 begin
-  FDependencies := TCollections.CreateList<IPackageDependency>;
   FSourceName := sourceName;
   FCompilerVersion := StringToCompilerVersion(jsonObject.S['compiler']);
   if FCompilerVersion = TCompilerVersion.UnknownVersion then
@@ -149,6 +156,8 @@ begin
   FPlatform := StringToDPMPlatform(jsonObject.S['platform']);
   if FPlatform = TDPMPlatform.UnknownPlatform then
     raise EArgumentOutOfRangeException.Create('Invalid platform returned from server : ' + jsonObject.S['platform']);
+
+  FDependencies := TCollections.CreateList<IPackageDependency>;
 
   FId               := jsonObject.S['id'];
   FVersion          := TPackageVersion.Parse(jsonObject.S['version']);
@@ -178,6 +187,22 @@ begin
     FLatestStableVersion := TPackageVersion.Empty;
   FIsReservedPrefix := jsonObject.B['isReservedPrefix'];
   FVersionRange := TVersionRange.Empty;
+
+  if jsonObject.Contains('dependencies') and (not jsonObject.IsNull('dependencies')) then
+  begin
+    depArr := jsonObject.A['dependencies'];
+    for i := 0 to depArr.Count -1 do
+    begin
+      depId := depArr.O[i].S['packageId'];
+      depVersion := depArr.O[i].S['versionRange'];
+
+      if TVersionRange.TryParse(depVersion, range) then
+      begin
+        dependency := TPackageDependency.Create(depId, range, FPlatform);
+        FDependencies.Add(dependency);
+      end;
+    end;
+  end;
 
 
 end;
