@@ -12,7 +12,9 @@ object DPMOptionsHostForm: TDPMOptionsHostForm
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
+  OldCreateOrder = True
   Position = poOwnerFormCenter
+  PixelsPerInch = 96
   TextHeight = 13
   inline DPMOptionsFrame: TDPMOptionsFrame
     Left = 0
@@ -27,130 +29,51 @@ object DPMOptionsHostForm: TDPMOptionsHostForm
     ExplicitWidth = 720
     inherited pgOptions: TPageControl
       Width = 720
-      ExplicitWidth = 716
-      ExplicitHeight = 503
+      ExplicitWidth = 720
       inherited tsSources: TTabSheet
+        ExplicitLeft = 4
+        ExplicitTop = 30
         ExplicitWidth = 712
+        ExplicitHeight = 470
         inherited Panel1: TPanel
           Width = 712
-          ExplicitWidth = 708
-          inherited lblPackageSources: TLabel
-            Width = 108
-            Height = 13
-            ExplicitWidth = 108
-            ExplicitHeight = 13
-          end
-          inherited Label3: TLabel
-            Left = 16
-            Width = 109
-            Height = 13
-            ExplicitLeft = 16
-            ExplicitWidth = 109
-            ExplicitHeight = 13
-          end
-          inherited SpeedButton1: TSpeedButton
+          ExplicitWidth = 712
+          inherited btnAdd: TSpeedButton
             Left = 475
+            ExplicitLeft = 475
           end
-          inherited SpeedButton2: TSpeedButton
+          inherited btnRemove: TSpeedButton
             Left = 520
+            ExplicitLeft = 520
           end
-          inherited SpeedButton3: TSpeedButton
+          inherited btnUp: TSpeedButton
             Left = 565
+            ExplicitLeft = 565
           end
-          inherited SpeedButton4: TSpeedButton
+          inherited btnDown: TSpeedButton
             Left = 610
+            ExplicitLeft = 610
           end
         end
         inherited Panel2: TPanel
           Width = 712
-          ExplicitTop = 258
-          ExplicitWidth = 708
-          inherited Label1: TLabel
-            Width = 70
-            Height = 13
-            ExplicitWidth = 70
-            ExplicitHeight = 13
-          end
-          inherited Label2: TLabel
-            Width = 94
-            Height = 13
-            ExplicitWidth = 94
-            ExplicitHeight = 13
-          end
-          inherited Label5: TLabel
-            Width = 92
-            Height = 13
-            ExplicitWidth = 92
-            ExplicitHeight = 13
-          end
-          inherited Label6: TLabel
-            Width = 158
-            Height = 13
-            ExplicitWidth = 158
-            ExplicitHeight = 13
-          end
-          inherited Label8: TLabel
-            Width = 67
-            Height = 13
-            ExplicitWidth = 67
-            ExplicitHeight = 13
-          end
-          inherited cboSourceType: TComboBox
-            Height = 21
-            ExplicitHeight = 21
-          end
+          ExplicitWidth = 712
         end
         inherited Panel3: TPanel
           Width = 712
-          ExplicitWidth = 708
-          ExplicitHeight = 169
+          ExplicitWidth = 712
           inherited lvSources: TListView
             Width = 712
             ParentColor = True
-            ExplicitWidth = 708
-            ExplicitHeight = 169
+            ExplicitWidth = 712
           end
         end
       end
       inherited tsIDEOptions: TTabSheet
-        ExplicitWidth = 712
-        inherited pnlIDEOptions: TPanel
-          Width = 712
-          inherited Label4: TLabel
-            Width = 65
-            Height = 13
-            ExplicitWidth = 65
-            ExplicitHeight = 13
-          end
-          inherited Label7: TLabel
-            Width = 95
-            Height = 13
-            ExplicitWidth = 95
-            ExplicitHeight = 13
-          end
-          inherited Label9: TLabel
-            Width = 132
-            Height = 13
-            ExplicitWidth = 132
-            ExplicitHeight = 13
-          end
-          inherited Label10: TLabel
-            Width = 79
-            Height = 13
-            ExplicitWidth = 79
-            ExplicitHeight = 13
-          end
-          inherited Label11: TLabel
-            Width = 239
-            Height = 13
-            ExplicitWidth = 239
-            ExplicitHeight = 13
-          end
-          inherited cboLogLevel: TComboBox
-            Height = 21
-            ExplicitHeight = 21
-          end
-        end
+        ExplicitLeft = 4
+        ExplicitTop = 30
+        ExplicitWidth = 660
+        ExplicitHeight = 470
       end
     end
   end
@@ -165,8 +88,6 @@ object DPMOptionsHostForm: TDPMOptionsHostForm
     ParentColor = True
     ShowCaption = False
     TabOrder = 1
-    ExplicitTop = 503
-    ExplicitWidth = 716
     object btnCancel: TButton
       Left = 629
       Top = 6

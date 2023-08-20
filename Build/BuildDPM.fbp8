@@ -834,7 +834,7 @@ begin
         terminateontimeout = true
         timeoutlength = 2
         as.projectpath = %SRC_ROOT%\\%ProjectFile%oj
-        as.compilerversion = 11
+        as.compilerversion = XE7
         as.verbosity = Debug
         as.nobanner = True
         action.script
@@ -862,7 +862,7 @@ begin
         compileridl = true
         configname = Release
         debugversionnumbers = false
-        delphiversion = Delphi11
+        delphiversion = DelphiXE7
         enabletimeout = false
         eurekalogverboselogging = false
         frameworktype = VCL

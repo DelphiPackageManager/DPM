@@ -36,7 +36,7 @@ uses
   System.Diagnostics,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
   Vcl.Themes,
-  Vcl.StdCtrls, Vcl.Imaging.pngimage, Vcl.ExtCtrls,
+  Vcl.StdCtrls,  Vcl.ExtCtrls,
   ToolsApi,
   Spring.Container,
   Spring.Collections,
@@ -59,9 +59,8 @@ uses
   Vcl.ImgList,
   {$IFDEF USEIMAGECOLLECTION}
   Vcl.VirtualImageList,
-  Vcl.ImageCollection,
   {$ENDIF}
-  DPM.Controls.VersionGrid, Vcl.Buttons;
+  DPM.Controls.VersionGrid, Vcl.Buttons, Vcl.Imaging.pngimage;
 
 
 type
@@ -95,7 +94,6 @@ type
 
     {$IFDEF USEIMAGECOLLECTION }
     FImageList : TVirtualImageList;
-    FImageCollection : TImageCollection;
     {$ELSE}
     FImageList : TImageList;
     FUpgradeBmp : TBitmap;
@@ -133,7 +131,6 @@ type
     FMetaDataCache : IDictionary<string, IPackageSearchResultItem>;
     FVersionsCacheUdate : TStopWatch;
   protected
-    procedure LoadImages;
     procedure AssignImages;
 
     procedure ProjectSelectionChanged(Sender : TObject);
@@ -166,8 +163,10 @@ type
     procedure UpdateVersionsCache(const id : string; const includePrerelease : boolean; const versions : IList<TPackageVersion>);
 
 
+    procedure SetImageList(const value :  {$IFDEF USEIMAGECOLLECTION} TVirtualImageList {$ELSE} TImageList {$ENDIF});
+
   public
-    constructor Create(AOwner : TComponent); override;
+    constructor Create(AOwner : TComponent);override;
     destructor Destroy;override;
     procedure Init(const container : TContainer; const iconCache : TDPMIconCache; const config : IConfiguration; const host : IDetailsHost; const projectGroup : IOTAProjectGroup);
     procedure SetPackage(const package : IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
@@ -175,6 +174,9 @@ type
     procedure ViewClosing;
     procedure ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
     procedure ProjectReloaded;
+
+
+    property ImageList : {$IFDEF USEIMAGECOLLECTION} TVirtualImageList {$ELSE} TImageList {$ENDIF} read FImageList write SetImageList;
 
   end;
 
@@ -494,9 +496,9 @@ begin
   //scaling seems to be working ok without manual intervention here
 end;
 
-constructor TPackageDetailsFrame.Create(AOwner: TComponent);
+constructor TPackageDetailsFrame.Create(AOwner : TComponent);
 begin
-  inherited;
+  inherited Create(AOwner);
   //not published in older versions, so gets removed when we edit in older versions.
   {$IFDEF STYLEELEMENTS}
   StyleElements := [seFont];
@@ -541,23 +543,16 @@ begin
   FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
 
 
-  {$IFDEF USEIMAGECOLLECTION } //10.4 or later
-  FImageList := TVirtualImageList.Create(Self);
-  FImageCollection := TImageCollection.Create(Self);
-  {$ELSE}
+  {$IFNDEF USEIMAGECOLLECTION } //10.4 or later
   FUpgradeBmp := TBitmap.Create;
   FDowngradeBmp := TBitmap.Create;
-  FImageList := TImageList.Create(Self);
   {$ENDIF}
-  FImageList.ColorDepth := cd32Bit;
-  FImageList.DrawingStyle := dsTransparent;
-  FImageList.Width := 16;
-  FImageList.Height := 16;
 
 
-  LoadImages;
-  AssignImages;
-  FProjectsGrid.ImageList := FImageList;
+//  moved to editorviewframe
+//  LoadImages;
+//  AssignImages;
+//  FProjectsGrid.ImageList := FImageList;
 
   btnInstallAll.Caption := '';
   btnUpgradeAll.Caption := '';
@@ -630,87 +625,6 @@ begin
 
 end;
 
-procedure TPackageDetailsFrame.LoadImages;
-const
-  suffixes : array[0..3] of string = ('_16', '_24', '_32','_48');
-
-{$IF CompilerVersion = 33.0 } //10.3
-//  procedure AddImageItem(AName: String; AInstance: THandle; const AResourceName: String; ASuffixes: array of string);
-//  var
-//    item : TImageCollectionItem;
-//    sourceItem : TImageCollectionSourceItem;
-//    suffix : string;
-//    bmp: TBitmap;
-//    png : TPngImage;
-//    resStream : TResourceStream;
-//  begin
-//    item := FImageCollection.Images.Add;
-//    item.Name := AName;
-//
-//    for suffix in ASuffixes do
-//    begin
-//      resStream := TResourceStream.Create(AInstance, AResourceName + suffix, RT_RCDATA);
-//      try
-//        sourceItem :=item.SourceImages.Add;
-//        sourceItem.Image.Transparent := true;
-//        sourceItem.Image.LoadFromStream(resStream);
-//      finally
-//        resStream.Free;
-//      end;
-//    end;
-//    item.CheckSources;
-//  end;
-{$IFEND}
-
-{$IF CompilerVersion < 34.0} //10.2 or earlier
-
-  procedure AddImage(const AResourceName : string);
-  var
-    png : TPngImage;
-    bmp: TBitmap;
-  begin
-    png := TPngImage.Create;
-    bmp:=TBitmap.Create;
-    try
-      png.LoadFromResourceName(HInstance, AResourceName);
-      png.AssignTo(bmp);
-      bmp.AlphaFormat:=afIgnored;
-      ImageList_Add(FImageList.Handle, bmp.Handle, 0);
-    finally
-      bmp.Free;
-      png.Free;
-    end;
-  end;
-
-{$IFEND}
-
-
-begin
-  {$IF CompilerVersion < 34.0} //10.2 or earlier
-    AddImage('ADD_PACKAGE_16');
-    AddImage('REMOVE_PACKAGE_16');
-    AddImage('UPGRADE_PACKAGE_16');
-    AddImage('DOWNGRADE_PACKAGE_16');
-
-//  {$ELSEIF CompilerVersion = 33.0 } //10.3
-//    //10.3 TImageCollection was pretty basic and hard to use.
-//    AddImageItem('add',HInstance,'ADD_PACKAGE', suffixes);
-//    AddImageItem('remove',HInstance,'REMOVE_PACKAGE', suffixes);
-//    AddImageItem('upgrade',HInstance,'UPGRADE_PACKAGE', suffixes);
-//    AddImageItem('downgrade',HInstance,'DOWNGRADE_PACKAGE', suffixes);
-//    FImageList.AutoFill := true;
-//    FImageList.ImageCollection := FImageCollection;
-//
-//  {$ELSEIF CompilerVersion > 33.0}
-  {$ELSE}
-    FImageCollection.Add('add',HInstance,'ADD_PACKAGE', suffixes);
-    FImageCollection.Add('remove',HInstance,'REMOVE_PACKAGE', suffixes);
-    FImageCollection.Add('upgrade',HInstance,'UPGRADE_PACKAGE', suffixes);
-    FImageCollection.Add('downgrade',HInstance,'DOWNGRADE_PACKAGE', suffixes);
-    FImageList.AutoFill := true;
-    FImageList.ImageCollection := FImageCollection;
-  {$IFEND}
-end;
 
 procedure TPackageDetailsFrame.OnDetailsUriClick(Sender: TObject; const uri: string; const element: TDetailElement);
 begin
@@ -817,6 +731,15 @@ begin
   else
     result := FPackageMetaData.Version;
 
+
+end;
+
+procedure TPackageDetailsFrame.SetImageList(const value :  {$IFDEF USEIMAGECOLLECTION} TVirtualImageList {$ELSE} TImageList {$ENDIF});
+begin
+  FImageList := value;
+  FProjectsGrid.ImageList := FImageList;
+  if FImageList <> nil then
+    AssignImages;
 
 end;
 

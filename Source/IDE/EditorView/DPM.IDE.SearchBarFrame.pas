@@ -2,14 +2,19 @@ unit DPM.IDE.SearchBarFrame;
 
 interface
 
+{$I ..\DPMIDE.inc}
+
+
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  System.ImageList,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
   Vcl.ImgList, Vcl.StdCtrls, Vcl.ExtCtrls,
   Vcl.Themes,
-  {$IF CompilerVersion >= 30.0 }
-  System.ImageList,
-  {$IFEND}
+  {$IFDEF USEIMAGECOLLECTION}
+  Vcl.VirtualImageList,
+  {$ENDIF}
+
   DPM.Core.Types,
   DPM.Core.Configuration.Interfaces,
   DPM.IDE.Types,
@@ -68,6 +73,14 @@ type
     FOnConfigChanged : TConfigChangedEvent;
     FOnPlatformChangedEvent : TPlatformChangedEvent;
     FOnFocusList : TNotifyEvent;
+
+    {$IFDEF USEIMAGECOLLECTION }
+    FImageList : TVirtualImageList;
+    {$ELSE}
+    FImageList : TImageList;
+    {$ENDIF}
+
+
     function GetSearchText: string;
     function GetIncludePreRelease: boolean;
 
@@ -80,6 +93,8 @@ type
     procedure DoPlatformChangedEvent(const newPlatform : TDPMPlatform);
 
     procedure Loaded; override;
+    procedure SetImageList(const value :  {$IFDEF USEIMAGECOLLECTION} TVirtualImageList {$ELSE} TImageList {$ENDIF});
+
   public
     constructor Create(AOwner : TComponent);override;
     destructor Destroy;override;
@@ -102,6 +117,8 @@ type
     property OnSearch : TSearchEvent read FOnSearchEvent write FOnSearchEvent;
     property OnPlatformChanged : TPlatformChangedEvent read FOnPlatformChangedEvent write FOnPlatformChangedEvent;
     property OnFocusList : TNotifyEvent read FOnFocusList write FOnFocusList;
+    property ImageList : {$IFDEF USEIMAGECOLLECTION} TVirtualImageList {$ELSE} TImageList {$ENDIF} read FImageList write SetImageList;
+
   end;
 
 implementation
@@ -227,8 +244,7 @@ begin
   //not published in older versions, so get removed when we edit in older versions.
   {$IFDEF STYLEELEMENTS}
   StyleElements := [seFont];
-  chkIncludePrerelease.StyleElements := StyleElements := [seFont,seClient, seBorder];
-
+  chkIncludePrerelease.StyleElements :=  [seFont,seClient, seBorder];
   {$ENDIF}
 
   Align := alTop;
@@ -370,6 +386,25 @@ begin
 
 end;
 
+
+procedure TDPMSearchBarFrame.SetImageList(const value :  {$IFDEF USEIMAGECOLLECTION} TVirtualImageList {$ELSE} TImageList {$ENDIF});
+begin
+  FImageList := value;
+  if FImageList <> nil then
+  begin
+//    txtSearch.RightButton.DisabledImageIndex = 0
+    txtSearch.RightButton.ImageIndex := 7;
+    txtSearch.RightButton.HotImageIndex := 8;
+    txtSearch.Images := FImageList;
+    btnRefresh.ImageIndex := 4;
+    btnRefresh.Images := FImageList;
+    btnSettings.ImageIndex := 6;
+    btnSettings.Images := FImageList;
+    btnAbout.ImageIndex := 5;
+    btnAbout.Images := FImageList;
+
+  end;
+end;
 
 procedure TDPMSearchBarFrame.SetPlatform(const platform: TDPMPlatform);
 begin

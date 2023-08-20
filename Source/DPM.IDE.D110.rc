@@ -18,7 +18,7 @@ BEGIN
               VALUE "LegalCopyright", "© 2019 -2021 Vincent Parrett and Contributors\0"
               VALUE "ProductName", "DPM Package Manager\0"
               VALUE "ProductVersion", "0.2.0-alpha\0"
-              VALUE "CompileDate", "Tuesday, 15 August 2023 1:32 PM\0"
+              VALUE "CompileDate", "Sunday, 20 August 2023 11:57 AM\0"
               VALUE "FileVersion", "0.2.0.0\0"
          END
     END

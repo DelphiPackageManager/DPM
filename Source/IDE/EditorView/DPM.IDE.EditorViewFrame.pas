@@ -2,6 +2,9 @@
 
 interface
 
+{$I '..\DPMIDE.inc'}
+
+
 uses
   Winapi.Windows,
   Winapi.Messages,
@@ -36,14 +39,15 @@ uses
   DPM.IDE.Details.Interfaces,
   DPM.IDE.ActivityIndicator,
   System.Actions,
-  {$IF CompilerVersion >= 30.0 }
+  {$IFDEF USEIMAGECOLLECTION}
+  Vcl.VirtualImageList,
+  Vcl.ImageCollection,
+  {$ELSE}
+  Vcl.Imaging.pngimage,
+  {$ENDIF}
   System.ImageList,
-  {$IFEND}
   Vcl.ActnList,
   DPM.IDE.PackageDetailsFrame;
-
-
-{$I '..\DPMIDE.inc'}
 
 
 const
@@ -82,6 +86,14 @@ type
     FSearchBar : TDPMSearchBarFrame;
     FScrollList : TVSoftVirtualListView;
     //controls
+
+    {$IFDEF USEIMAGECOLLECTION }
+    FImageList : TVirtualImageList;
+    FImageCollection : TImageCollection;
+    {$ELSE}
+    FImageList : TImageList;
+    {$ENDIF}
+
 
     //contains layout rects for the list view
     FRowLayout : TRowLayout;
@@ -191,6 +203,7 @@ type
     procedure CalculateIndexes;
     procedure ChangeScale(M: Integer; D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND}); override;
 
+    procedure LoadImages;
   public
     constructor Create(AOwner : TComponent); override;
     destructor Destroy; override;
@@ -214,6 +227,7 @@ implementation
 uses
   System.Diagnostics,
   WinApi.ActiveX,
+  Winapi.CommCtrl,
   DPM.Core.Constants,
   DPM.Core.Options.Common,
   DPM.Core.Utils.Config,
@@ -481,7 +495,19 @@ begin
   FImplicitActivity.Stop;
   FAvailableActivity.Stop;
 
+  {$IFDEF USEIMAGECOLLECTION } //10.4 or later
+  FImageList := TVirtualImageList.Create(Self);
+  FImageCollection := TImageCollection.Create(Self);
+  {$ELSE}
+  FImageList := TImageList.Create(Self);
+  {$ENDIF}
+  FImageList.ColorDepth := cd32Bit;
+  FImageList.DrawingStyle := dsTransparent;
+  FImageList.Width := 16;
+  FImageList.Height := 16;
 
+  LoadImages;
+  PackageDetailsFrame.ImageList := FImageList;
   CreateControls(AOwner);
   ThemeChanged;
 
@@ -502,6 +528,7 @@ begin
   FSearchBar.OnConfigChanged := Self.SearchBarSettingsChanged;
   FSearchBar.OnPlatformChanged := Self.SearchBarPlatformChanged;
   FSearchBar.OnFocusList := Self.SearchBarOnFocustList;
+  FSearchBar.ImageList := FImageList;
   FSearchBar.Parent := Self;
 
   FScrollList := TVSoftVirtualListView.Create(Self);
@@ -874,6 +901,60 @@ begin
     result := rkAvailablePackage
   else
     result := rkUnknown;
+end;
+
+procedure TDPMEditViewFrame.LoadImages;
+const
+  suffixes : array[0..3] of string = ('_16', '_24', '_32','_48');
+
+{$IFNDEF USEIMAGECOLLECTION} //10.2 or earlier
+
+  procedure AddImage(const AResourceName : string);
+  var
+    png : TPngImage;
+    bmp: TBitmap;
+  begin
+    png := TPngImage.Create;
+    bmp:=TBitmap.Create;
+    try
+      png.LoadFromResourceName(HInstance, AResourceName);
+      png.AssignTo(bmp);
+      bmp.AlphaFormat:=afIgnored;
+      ImageList_Add(FImageList.Handle, bmp.Handle, 0);
+    finally
+      bmp.Free;
+      png.Free;
+    end;
+  end;
+
+{$ENDIF}
+
+
+begin
+  {$IFNDEF USEIMAGECOLLECTION} //10.2 or earlier
+    AddImage('ADD_PACKAGE_16');
+    AddImage('REMOVE_PACKAGE_16');
+    AddImage('UPGRADE_PACKAGE_16');
+    AddImage('DOWNGRADE_PACKAGE_16');
+    AddImage('REFRESH_16');
+    AddImage('INFO_16');
+    AddImage('SETTINGS_16');
+    AddImage('CANCEL_16');
+    AddImage('CANCEL_HOT_16');
+  {$ELSE}
+    FImageCollection.Add('add',HInstance,'ADD_PACKAGE', suffixes);
+    FImageCollection.Add('remove',HInstance,'REMOVE_PACKAGE', suffixes);
+    FImageCollection.Add('upgrade',HInstance,'UPGRADE_PACKAGE', suffixes);
+    FImageCollection.Add('downgrade',HInstance,'DOWNGRADE_PACKAGE', suffixes);
+    FImageCollection.Add('refresh',HInstance,'REFRESH', suffixes);
+    FImageCollection.Add('info',HInstance,'INFO', suffixes);
+    FImageCollection.Add('settings',HInstance,'SETTINGS', suffixes);
+    FImageCollection.Add('cancel',HInstance,'CANCEL', suffixes);
+    FImageCollection.Add('cancel_hot',HInstance,'CANCEL_HOT', suffixes);
+    FImageList.AutoFill := true;
+    FImageList.ImageCollection := FImageCollection;
+  {$ENDIF}
+
 end;
 
 procedure TDPMEditViewFrame.PackageInstalled;

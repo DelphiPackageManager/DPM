@@ -136,7 +136,7 @@ begin
   env.RemoveVariable('PLATFORM');
   //envoptions causes problems on our build machines, haven't figured out why yet.
   env.AddOrSet('ImportEnvOptions','false');
-  FLogger.Verbose('Compler - cmdline : ' + commandLine,false);
+  FLogger.Debug('Compler - cmdline : ' + commandLine);
   try
     result := TProcess.Execute2(cancellationToken, 'cmd.exe', commandLine,'',env) = 0;
   except
@@ -309,8 +309,9 @@ begin
   if s <> '' then
     result := s + ';' + result;
 
-  result := TPathUtils.QuotePath(result, true);
+  FLogger.Debug('SearchPath : ' + result);
 
+  result := TPathUtils.QuotePath(result, true);
 end;
 
 function TMSBuildCompiler.GetSearchPaths : IList<string>;

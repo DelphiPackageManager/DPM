@@ -41,4 +41,42 @@ DOWNGRADE_PACKAGE_24 RCDATA "..\\images\\downgrade_24px.png"
 DOWNGRADE_PACKAGE_32 RCDATA "..\\images\\downgrade_32px.png"
 DOWNGRADE_PACKAGE_48 RCDATA "..\\images\\downgrade_48px.png"
 
+SETTINGS_16 RCDATA "..\\images\\settings_16px.png"
+SETTINGS_24 RCDATA "..\\images\\settings_24px.png"
+SETTINGS_32 RCDATA "..\\images\\settings_32px.png"
+SETTINGS_48 RCDATA "..\\images\\settings_48px.png"
 
+REFRESH_16 RCDATA "..\\images\\refresh_16px.png"
+REFRESH_24 RCDATA "..\\images\\refresh_24px.png"
+REFRESH_32 RCDATA "..\\images\\refresh_32px.png"
+REFRESH_48 RCDATA "..\\images\\refresh_48px.png"
+
+INFO_16 RCDATA "..\\images\\info_16px.png"
+INFO_24 RCDATA "..\\images\\info_24px.png"
+INFO_32 RCDATA "..\\images\\info_32px.png"
+INFO_48 RCDATA "..\\images\\info_48px.png"
+
+CANCEL_16 RCDATA "..\\images\\cancel_16px.png"
+CANCEL_24 RCDATA "..\\images\\cancel_24px.png"
+CANCEL_32 RCDATA "..\\images\\cancel_32px.png"
+CANCEL_48 RCDATA "..\\images\\cancel_48px.png"
+
+CANCEL_HOT_16 RCDATA "..\\images\\cancel_hot_16px.png"
+CANCEL_HOT_24 RCDATA "..\\images\\cancel_hot_24px.png"
+CANCEL_HOT_32 RCDATA "..\\images\\cancel_hot_32px.png"
+CANCEL_HOT_48 RCDATA "..\\images\\cancel_hot_48px.png"
+
+MOVE_UP_16 RCDATA "..\\images\\move-up_16px.png"
+MOVE_UP_24 RCDATA "..\\images\\move-up_24px.png"
+MOVE_UP_32 RCDATA "..\\images\\move-up_32px.png"
+MOVE_UP_48 RCDATA "..\\images\\move-up_48px.png"
+
+MOVE_DOWN_16 RCDATA "..\\images\\move-down_16px.png"
+MOVE_DOWN_24 RCDATA "..\\images\\move-down_24px.png"
+MOVE_DOWN_32 RCDATA "..\\images\\move-down_32px.png"
+MOVE_DOWN_48 RCDATA "..\\images\\move-down_48px.png"
+
+OPEN_16 RCDATA "..\\images\\open_16px.png"
+OPEN_24 RCDATA "..\\images\\open_24px.png"
+OPEN_32 RCDATA "..\\images\\open_32px.png"
+OPEN_48 RCDATA "..\\images\\open_48px.png"

@@ -28,29 +28,30 @@ unit DPM.IDE.AddInOptionsFrame;
 
 interface
 
+{$I 'DPMIDE.inc'}
+
 uses
   Winapi.Windows,
   Winapi.Messages,
   System.Variants,
   System.Classes,
-  {$IF CompilerVersion > 28.0 } //XE3 up
-  {$LEGACYIFEND ON}
-  //NOTE: The IDE keeps adding this again below, if it happens edit the file outside the IDE.
-//  System.Actions,
-  System.ImageList,
-  {$IFEND}
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.CheckLst,
   Vcl.Buttons, Vcl.ComCtrls, Vcl.ExtCtrls, Vcl.StdCtrls,
+  {$IFDEF USEIMAGECOLLECTION }
+  Vcl.VirtualImageList,
+  Vcl.ImageCollection,
+  {$ELSE}
+  Vcl.Imaging.pngimage,
+  {$ENDIF}
   DPM.Core.Logging,
   DPM.Core.Configuration.Interfaces,
-  DPM.IDE.Options, Vcl.Samples.Spin, Vcl.ImgList, Vcl.ActnList, System.Actions;
+  DPM.IDE.Options, Vcl.Samples.Spin, Vcl.ImgList, Vcl.ActnList, System.Actions, System.ImageList;
 
 {$WARN SYMBOL_PLATFORM OFF}
 type
   TDPMOptionsFrame = class(TFrame)
     Panel1 : TPanel;
     dpmOptionsActionList : TActionList;
-    dpmOptionsImageList : TImageList;
     Panel2 : TPanel;
     Panel3 : TPanel;
     lvSources : TListView;
@@ -65,10 +66,10 @@ type
     actRemoveSource : TAction;
     actMoveSourceUp : TAction;
     actMoveSourceDown : TAction;
-    SpeedButton1 : TSpeedButton;
-    SpeedButton2 : TSpeedButton;
-    SpeedButton3 : TSpeedButton;
-    SpeedButton4 : TSpeedButton;
+    btnAdd: TSpeedButton;
+    btnRemove: TSpeedButton;
+    btnUp: TSpeedButton;
+    btnDown: TSpeedButton;
     Label5 : TLabel;
     Label6 : TLabel;
     txtUserName : TEdit;
@@ -113,8 +114,17 @@ type
     FConfiguration : IConfiguration;
     FLogger : ILogger;
     FIDEOptions : IDPMIDEOptions;
-    procedure ExchangeItems(const a, b : Integer);
+
+    {$IFDEF USEIMAGECOLLECTION }
+    FImageList : TVirtualImageList;
+    FImageCollection : TImageCollection;
+    {$ELSE}
+    FImageList : TImageList;
+    {$ENDIF}
+
   protected
+    procedure ExchangeItems(const a, b : Integer);
+    procedure LoadImages;
   public
     constructor Create(AOwner : TComponent); override;
     destructor Destroy; override;
@@ -130,6 +140,7 @@ type
 implementation
 
 uses
+  Winapi.CommCtrl,
   System.SysUtils,
   System.TypInfo,
   VSoft.Uri,
@@ -235,7 +246,16 @@ end;
 constructor TDPMOptionsFrame.Create(AOwner : TComponent);
 begin
   inherited;
+  {$IFDEF USEIMAGECOLLECTION } //10.4 or later
+  FImageList := TVirtualImageList.Create(Self);
+  FImageCollection := TImageCollection.Create(Self);
+  {$ELSE}
+  FImageList := TImageList.Create(Self);
+  {$ENDIF}
+
   pgOptions.ActivePageIndex := 0;
+
+  LoadImages;
 end;
 
 destructor TDPMOptionsFrame.Destroy;
@@ -501,6 +521,108 @@ begin
     sErrorMessage := 'DPM Package Manage Options Validation Errors:' + #13#10#13#10 + sErrorMessage;
     ShowMessage(sErrorMessage);
   end;
+
+end;
+
+procedure TDPMOptionsFrame.LoadImages;
+const
+  suffixes : array[0..3] of string = ('_16', '_24', '_32','_48');
+
+{$IFNDEF USEBUTTONIMAGELIST}
+var
+  tmpBmp : TBitmap;
+{$ENDIF}
+
+
+{$IF CompilerVersion < 34.0} //10.2 or earlier
+
+  procedure AddImage(const AResourceName : string);
+  var
+    png : TPngImage;
+    bmp: TBitmap;
+  begin
+    png := TPngImage.Create;
+    bmp:=TBitmap.Create;
+    try
+      png.LoadFromResourceName(HInstance, AResourceName);
+      png.AssignTo(bmp);
+      bmp.AlphaFormat:=afIgnored;
+      ImageList_Add(FImageList.Handle, bmp.Handle, 0);
+    finally
+      bmp.Free;
+      png.Free;
+    end;
+  end;
+
+{$IFEND}
+
+
+begin
+
+  {$IFNDEF USEIMAGECOLLECTION} //10.2 or earlier
+    AddImage('ADD_PACKAGE_16');
+    AddImage('REMOVE_PACKAGE_16');
+    AddImage('MOVE_UP_16');
+    AddImage('MOVE_DOWN_16');
+    AddImage('OPEN_16');
+  {$ELSE}
+    FImageCollection.Add('add',HInstance,'ADD_PACKAGE', suffixes);
+    FImageCollection.Add('remove',HInstance,'REMOVE_PACKAGE', suffixes);
+    FImageCollection.Add('move_up',HInstance,'MOVE_UP', suffixes);
+    FImageCollection.Add('move_down',HInstance,'MOVE_DOWN', suffixes);
+    FImageCollection.Add('open',HInstance,'OPEN', suffixes);
+    FImageList.AutoFill := true;
+    FImageList.PreserveItems := true;
+    FImageList.ImageCollection := FImageCollection;
+  {$ENDIF}
+
+  actAddSource.ImageIndex := 0;
+  actRemoveSource.ImageIndex := 1;
+  actMoveSourceUp.ImageIndex := 2;
+  actMoveSourceDown.Index := 3;
+  dpmOptionsActionList.Images := FImageList;
+
+  txtPackageCacheLocation.RightButton.ImageIndex := 4;
+  txtPackageCacheLocation.Images := FImageList;
+  btnAdd.Caption := '';
+  btnRemove.Caption := '';
+  btnUp.Caption := '';
+  btnDown.Caption := '';
+
+  {$IFDEF USEBUTTONIMAGELIST}
+  btnAdd.ImageIndex := 0;
+  btnAdd.Images := FImageList;
+
+  btnRemove.ImageIndex := 1;
+  btnRemove.Images := FImageList;
+
+  btnUp.ImageIndex := 2;
+  btnUp.Images := FImageList;
+
+  btnDown.ImageIndex := 3;
+  btnDown.Images := FImageList;
+  {$ELSE}
+  tmpBmp := TBitmap.Create;
+  try
+    tmpBmp.SetSize(16,16);
+    FImageList.GetBitmap(0, tmpBmp); //Add
+    btnAdd.Glyph.Assign(tmpBmp);
+    tmpBmp.SetSize(0,0); //clear it
+    tmpBmp.SetSize(16,16);
+    FImageList.GetBitmap(1, tmpBmp); //remove
+    btnRemove.Glyph.Assign(tmpBmp);
+    tmpBmp.SetSize(0,0);
+    tmpBmp.SetSize(16,16);
+    FImageList.GetBitmap(2, tmpBmp); //up
+    btnUp.Glyph.Assign(tmpBmp);
+    tmpBmp.SetSize(0,0);
+    tmpBmp.SetSize(16,16);
+    FImageList.GetBitmap(3, tmpBmp); //down
+    btnDown.Glyph.Assign(tmpBmp);
+  finally
+    tmpBmp.Free;
+  end;
+  {$ENDIF}
 
 end;
 

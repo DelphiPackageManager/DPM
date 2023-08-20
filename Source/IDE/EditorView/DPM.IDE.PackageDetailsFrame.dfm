@@ -142,10 +142,10 @@ object PackageDetailsFrame: TPackageDetailsFrame
         ShowCaption = False
         TabOrder = 0
         object lblVersionTitle: TLabel
-          Left = 6
+          Left = 8
           Top = 9
-          Width = 44
-          Height = 15
+          Width = 42
+          Height = 13
           Alignment = taRightJustify
           Caption = 'Version :'
         end

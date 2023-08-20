@@ -1,0 +1,21 @@
+﻿project
+begin
+  projectid = {35C56D29-C526-4D0E-A924-73D02F70A543}
+  target
+  begin
+    name = Default
+    targetid = {AA28D6E0-5F48-4822-B1C3-9DC2E89EBFD2}
+    rootaction
+    begin
+      action.brcc32.execute
+      begin
+        compilerversion = 28
+        enablembcs = false
+        id = {DEDCDEEC-8086-4513-80DB-098EBFF56B12}
+        rescompiler = rc
+        scriptfile = I:\\Github\\DelphiPackageManager\\DPMMaster\\Source\\IDE\\DPM.IDE.Resources.rc
+        verboseoutput = true
+      end
+    end
+  end
+end
