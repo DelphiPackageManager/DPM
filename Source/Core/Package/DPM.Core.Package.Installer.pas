@@ -1055,11 +1055,9 @@ begin
           if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, packageReference, Spec, forceCompile, Options.DebugMode) then
           begin
             if cancellationToken.IsCancelled then
-              raise Exception.Create('Compiling package [' +
-                pkgInfo.ToIdVersionString + '] cancelled.')
+              raise Exception.Create('Compiling package [' + pkgInfo.ToIdVersionString + '] cancelled.')
             else
-              raise Exception.Create('Compiling package [' +
-                pkgInfo.ToIdVersionString + '] failed.');
+              raise Exception.Create('Compiling package [' +  pkgInfo.ToIdVersionString + '] failed.');
           end;
           compiledPackages.Add(pkgInfo);
           // compiling updates the node searchpaths and libpath, so just copy to any same package nodes
@@ -1385,6 +1383,7 @@ end;
 
 function TPackageInstaller.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
 begin
+  //Note : we delegate this to the context as this is a no-op in the command line tool, the IDE plugin provides it's own context implementation.
   result := FContext.InstallDesignPackages(cancellationToken, projectFile, packageSpecs);
 end;
 
