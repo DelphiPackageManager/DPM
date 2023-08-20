@@ -312,7 +312,7 @@ procedure TConfiguration.AddDefaultSources;
 var
   source : ISourceConfig;
 begin
-  source := TSourceConfig.Create('DPM', 'https://delphipm.org/api/v1/index.json', TSourceType.DPMServer, '', '', true);
+  source := TSourceConfig.Create('DPM', 'https://delphi.dev/api/v1/index.json', TSourceType.DPMServer, '', '', true);
   FSources.Add(source);
 end;
 
