@@ -52,30 +52,36 @@ type
     function UnInstall(const cancellationToken : ICancellationToken; const options : TUnInstallOptions; const context : IPackageInstallerContext) : boolean;
     function Restore(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const context : IPackageInstallerContext) : boolean;
     function Cache(const cancellationToken : ICancellationToken; const options : TCacheOptions) : boolean;
-    //function Remove(const cancellationToken : ICancellationToken; const options : TUninstallOptions) : boolean;
     function Context : IPackageInstallerContext;
   end;
 
-  //used to collect and detect package conflicts when working with multiple projects.
-  //will also be used to collect build instructions and
-  //design-time packages to install etc.
+  ///<summary> The installer context is use to collect package resolutions and detect
+  ///  package conflicts across projects in a project group.
+  ///  It is alos used to manage installing/uninstalling design time packages in the IDE.
+  ///  The IDE plugin provides it's own implementation of this interface so the core
+  ///  version can avoid doing design time stuff (methods do nothing).
+  ///</summary>
   IPackageInstallerContext = interface
     ['{8FD229A2-FE7B-4315-84B2-FF18B78C76DC}']
     //called from the project controller in the IDE when starting loading. This is probably wrong!
     procedure Clear;
 
-    //called from the ProjectController when a project is closed.
+    ///<summary>called from the ProjectController when a project is closed.</summary>
     procedure RemoveProject(const projectFile : string);
 
-    //called from the package installer during install/restore
+    ///<summary>called from the package installer during install/restore</summary>
     procedure RecordGraph(const projectFile : string; const platform : TDPMPlatform; const graph : IPackageReference);
 
-    //called from the package installer during install/restore
+    ///<summary> called from the package installer during install/restore - to install design time packages. See IDE implementation</summary>
     function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;
 
 
-    //calle from the dependency resolver.
+    ///<summary> Called from the dependency resolver to record package resolutions, so we can detect conflicts in other projects
+    ///  in the project group.
+    ///</summary>
     procedure RecordResolutions(const projectFile: string; const platform : TDPMPlatform; const resolutions : TArray<IResolution>);
+    ///<summary> Check for an existing package resolution in already loaded projects in the group.
+    ///</summary>
     function FindPackageResolution(const projectFile: string; const platform : TDPMPlatform; const packageId : string ) : IResolution;
 
   end;

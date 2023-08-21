@@ -29,11 +29,12 @@ type
     //called when package uninstalled
     procedure PackageGraphPruned(const projectFile : string; const platform : TDPMPlatform; const graph : IPackageReference);virtual;
 
+    //this is a no-op here, look at the IDE installer context to see how this is implemented.
     function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;virtual;
 
-
-    //search other projects in the project group to see if they have resolved the package.
+    //record package resoltions for a project, so we can detect conflicts
     procedure RecordResolutions(const projectFile: string; const platform : TDPMPlatform; const resolutions : TArray<IResolution>);
+    //search other projects in the project group to see if they have resolved the package.
     function FindPackageResolution(const projectFile: string; const platform : TDPMPlatform; const packageId : string ) : IResolution;
 
     procedure Clear;virtual;
