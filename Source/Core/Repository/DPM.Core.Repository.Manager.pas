@@ -269,7 +269,7 @@ begin
       id := LowerCase(packageResults.Results[i].Id);
       if packages.ContainsKey(id) then
       begin
-        package := packages.Extract(id);
+        package := packages[id]; //don't use extract!
         //if we already have this package from another repo then compare versions
         if packageResults.Results[i].LatestVersion > package.LatestVersion then
           package.LatestVersion := packageResults.Results[i].LatestVersion;
