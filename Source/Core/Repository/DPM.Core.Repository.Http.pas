@@ -435,7 +435,7 @@ begin
   request := httpClient.CreateRequest(uri.AbsolutePath)
           .WithHeader(cUserAgentHeader,cDPMUserAgent)
           .WithBody(sBody, TEncoding.UTF8)
-          .WithContentType('application/json');
+          .WithContentType('application/json', 'utf-8');
 
   try
     Logger.Information('POST ' + uri.ToString);
@@ -447,6 +447,7 @@ begin
       exit;
     end;
   end;
+
 
   if response.StatusCode <> 200 then
   begin
