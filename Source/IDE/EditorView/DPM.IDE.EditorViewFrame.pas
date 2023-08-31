@@ -185,7 +185,7 @@ type
     function GetPlatforms : TDPMPlatforms;
 
     //callbacks from the searchbar
-    procedure SearchBarSettingsChanged(const configuration : IConfiguration);
+    procedure SearchBarConfigChanged(const configuration : IConfiguration);
     procedure SearchBarPlatformChanged(const newPlatform : TDPMPlatform);
     procedure SearchBarOnSearch(const searchText : string; const searchOptions : TDPMSearchOptions; const source : string; const platform : TDPMPlatform; const refresh : boolean);
     procedure SearchBarOnFocustList(sender : TObject);
@@ -525,7 +525,7 @@ begin
   //important to make it appear below the button bar
   FSearchBar.Top := 0;
   FSearchBar.OnSearch := Self.SearchBarOnSearch;
-  FSearchBar.OnConfigChanged := Self.SearchBarSettingsChanged;
+  FSearchBar.OnConfigChanged := Self.SearchBarConfigChanged;
   FSearchBar.OnPlatformChanged := Self.SearchBarPlatformChanged;
   FSearchBar.OnFocusList := Self.SearchBarOnFocustList;
   FSearchBar.ImageList := FImageList;
@@ -646,6 +646,14 @@ begin
     end;
 
     FCancelTokenSource.Reset;
+
+    FAvailablePackages.Clear;
+    if refreshInstalled then
+    begin
+      FAllInstalledPackages.Clear;
+      FInstalledPackages.Clear;
+      FImplicitPackages.Clear;
+    end;
 
     if (not refreshInstalled) and (FAllInstalledPackages <> nil) and (FAllInstalledPackages.Count > 0) then
     begin
@@ -1072,6 +1080,7 @@ var
   lProjectFile : string;
   repoManager : IPackageRepositoryManager;
   options : TSearchOptions;
+  searchResultItem : IPackageSearchResultItem;
 begin
   //local for capture
   lProjectFile := FProjectGroup.FileName;
@@ -1093,6 +1102,8 @@ begin
       packageRef : IPackageReference;
       item : IPackageSearchResultItem;
       packageIds : IList<IPackageId>;
+      pkg : IPackageId;
+    I: Integer;
     begin
       CoInitialize(nil);
       try
@@ -1128,8 +1139,34 @@ begin
               item.Version := packageRef.Version;
               item.Installed := true;
             end;
+
+          end;
+          //remove from the list so we can tell if we got them all in the end.
+          pkg := packageIds.Where(
+              function(const value : IPackageId) : boolean
+              begin
+                result := SameText(value.Id, item.Id);
+              end).FirstOrDefault;
+          if pkg <> nil then
+            packageIds.Remove(pkg);
+        end;
+
+        //if there are any left that means we didn't get the searchresultitem for it from the repos
+        if packageIds.Count > 0 then
+        begin
+          //we just fake them so there is something for the list?
+          for I := 0 to packageIds.Count -1 do
+          begin
+            pkg := packageIds[i];
+            //Can we get these from the packagecache?
+
+
+            //TODO : We should probably flag these in the list to show there is a problem!
+            searchResultItem := TDPMPackageSearchResultItem.FromError(pkg.Id, pkg.Version, options.CompilerVersion, FCurrentPlatform, 'Package not found on enabled sources' );
+            Result.Add(searchResultItem)
           end;
         end;
+
         result.Sort(function(const Left, Right : IPackageSearchResultItem) : Integer
           begin
             result := CompareStr(Left.Id, Right.Id);
@@ -1608,9 +1645,11 @@ begin
 end;
 
 
-procedure TDPMEditViewFrame.SearchBarSettingsChanged(const configuration: IConfiguration);
+procedure TDPMEditViewFrame.SearchBarConfigChanged(const configuration: IConfiguration);
 begin
-
+  FCurrentPlatform := TDPMPlatform.UnknownPlatform; //force a reload
+  FConfiguration := configuration;
+  DoPlatformChange(FSearchBar.Platform, true, true);
 end;
 
 procedure TDPMEditViewFrame.ThemeChanged;

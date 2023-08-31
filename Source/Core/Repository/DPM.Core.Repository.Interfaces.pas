@@ -84,7 +84,7 @@ type
 
     //commands
     function Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions) : Boolean;
-    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>; overload;
+    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>;
 
 
     property Enabled : boolean read GetEnabled write SetEnabled;

@@ -182,9 +182,6 @@ begin
     //Trigger onconfigchanged
     if Assigned(FOnConfigChanged) then
       FOnConfigChanged(FConfiguration);
-//
-//    PackageDetailsFrame.Init(FContainer, FIconCache, FConfiguration, Self, FProject.FileName);
-//    //populate the sources combo.
   end;
 
 end;

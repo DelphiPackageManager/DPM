@@ -98,12 +98,12 @@ type
     procedure SetVersionRange(const value : TVersionRange);
     constructor CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
     constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata);
-    constructor CreateFromError(const id : string; const version : TPackageVersion; const errorDescription : string);
+    constructor CreateFromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const platform : TDPMPlatform; const errorDescription : string);
 
   public
     class function FromJson(const sourceName : string; const jsonObject : TJsonObject) : IPackageSearchResultItem;
     class function FromMetaData(const sourceName : string; const metaData : IPackageMetadata) : IPackageSearchResultItem;
-    class function FromError(const id : string; const version : TPackageVersion; const errorDescription : string) : IPackageSearchResultItem;
+    class function FromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const platform : TDPMPlatform; const errorDescription : string) : IPackageSearchResultItem;
   end;
 
   TDPMPackageSearchResult = class(TInterfacedObject, IPackageSearchResult)
@@ -130,12 +130,16 @@ uses
 
 { TDPMPackageSearchResultItem }
 
-constructor TDPMPackageSearchResultItem.CreateFromError(const id : string; const version : TPackageVersion; const errorDescription : string);
+constructor TDPMPackageSearchResultItem.CreateFromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const platform : TDPMPlatform; const errorDescription : string);
 begin
   FIsError := true;
   FId := id;
   FVersion := version;
   FDescription := errorDescription;
+  FCompilerVersion := compiler;
+  FPlatform := platform;
+  FLatestVersion := version;
+  FLatestStableVersion := version;
   FVersionRange := TVersionRange.Empty;
 end;
 
@@ -234,9 +238,9 @@ begin
   FVersionRange := TVersionRange.Empty;
 end;
 
-class function TDPMPackageSearchResultItem.FromError(const id : string; const version : TPackageVersion; const errorDescription : string) : IPackageSearchResultItem;
+class function TDPMPackageSearchResultItem.FromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const platform : TDPMPlatform; const errorDescription : string) : IPackageSearchResultItem;
 begin
-  result := TDPMPackageSearchResultItem.CreateFromError(id, version, errorDescription);
+  result := TDPMPackageSearchResultItem.CreateFromError(id, version, compiler, platform, errorDescription);
 end;
 
 class function TDPMPackageSearchResultItem.FromJson(const sourceName : string; const jsonObject : TJsonObject) : IPackageSearchResultItem;

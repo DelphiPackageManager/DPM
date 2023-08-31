@@ -42,10 +42,11 @@ uses
   DPM.Core.Options.Restore;
 
 type
-  //minimum info needed to identify package
-  //need to make more of the api use this rather than the derived interfaces.
-  //Note this only has info we can get from the package filename!
-  //represents the core package identity - id, version, compiler, platform
+  ///<summary>IPackageId has minimum info needed to identify package
+  /// Note this only has info we can get from the package filename!
+  /// represents the core package identity - id, version, compiler, platform
+  /// </summary>
+
   IPackageId = interface
     ['{35FABD79-3880-4F46-9D70-AA19AAE44565}']
     function GetId : string;
@@ -60,13 +61,14 @@ type
     property Platform : TDPMPlatform read GetPlatform;
   end;
 
-  //packageid plus sourcename
+  /// <summary>packageid plus sourcename </summary>
   IPackageIdentity = interface(IPackageId)
     ['{E9E49A25-3ECA-4380-BB75-AC9E29725BEE}']
     function GetSourceName : string;
     property SourceName : string read GetSourceName;
   end;
 
+  ///<summary>A package dependency and the versionrange it was selected on.</summary>
   IPackageDependency = interface
     ['{E3576B9F-2CD5-415F-81D7-9E01AA74C9DB}']
     function GetId : string;
@@ -77,7 +79,7 @@ type
     property VersionRange : TVersionRange read GetVersionRange write SetVersionRange;
   end;
 
-  //identity plus dependencies. used when resolving.
+  ///<summary> PackageIdentity plus dependencies. used when resolving.</summary>
   IPackageInfo = interface(IPackageIdentity)
     ['{5672DB4A-40BC-45E0-857C-39117D03C322}']
     function GetDependencies : IList<IPackageDependency>;
@@ -89,7 +91,7 @@ type
     property UseSource : boolean read GetUseSource write SetUseSource;
   end;
 
-  //full package metadata.
+  ///<summary>Package Info plus metadata</summary>
   IPackageMetadata = interface(IPackageInfo)
     ['{0C39A81D-63FF-4939-A74A-4BFE29724168}']
     function GetDescription : string;
@@ -124,7 +126,7 @@ type
     property SearchPaths : IList<string>read GetSearchPaths;
   end;
 
-  //this is what is returned from a package repository for the UI.
+  ///<summary>This is what is returned from a package repository for the ui </summary>
   IPackageSearchResultItem = interface(IPackageId)
     ['{8EB6EA16-3708-41F7-93A2-FE56EB75510B}']
     function GetSourceName : string;
@@ -193,7 +195,7 @@ type
     //returns -1 if not set.
     property Downloads : Int64 read GetDownloadCount;
 
-    //these are for use by the UI, it's not returned.
+    //these are for use by the UI, not returned.
     property Installed : boolean read GetInstalled write SetInstalled;
     property LatestVersion : TPackageVersion read GetLatestVersion write SetLatestVersion;
     property LatestStableVersion : TPackageVersion read GetLatestStableVersion write SetLatestStableVersion;
@@ -208,6 +210,7 @@ type
     property SourceName : string read GetSourceName;
   end;
 
+  //List of search result items
   IPackageSearchResult = interface
   ['{547DDC6A-4A5F-429C-8A00-1B8FA4BA6D69}']
     function GetTotalCount : Int64;
@@ -226,6 +229,8 @@ type
 
   TPackageIconKind = (ikSvg, ikPng);
 
+  /// <summary>Container for an icon returned from a repository
+  ///
   IPackageIcon = interface
     ['{FB87A9AD-B114-4D1D-9AF5-1BD50FE17842}']
     function GetKind : TPackageIconKind;
