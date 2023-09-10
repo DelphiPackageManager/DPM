@@ -177,6 +177,7 @@ begin
   else
     sourcesList := nil;
 
+  currentPackage := nil;
   packages := TCollections.CreateList<IPackageIdentity>;
   try
     for repo in FRepositories do
@@ -197,9 +198,12 @@ begin
 
       if package <> nil then
       begin
-        //if version is empty then we want the latest version - so that's what we have, we're done.
-        if version.IsEmpty then
-          exit(package);
+
+        if not version.IsEmpty then
+        begin
+          if package.Version = version then //we found what we are looking for
+            exit(package);
+        end;
         if currentPackage <> nil then
         begin
           if package.Version > currentPackage.Version then
