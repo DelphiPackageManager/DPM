@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -206,12 +206,18 @@ begin
     if spec.MetaData.Icon <> '' then
       FArchiveWriter.AddIcon(spec.MetaData.Icon);
 
+    if spec.MetaData.ReadMe <> '' then
+      FArchiveWriter.AddFile(spec.MetaData.ReadMe);
+
     sStream := TStringStream.Create(sManifest, TEncoding.UTF8);
     try
       FArchiveWriter.WriteMetaDataFile(sStream);
     finally
       sStream.Free;
     end;
+
+
+
     antPattern := TAntPattern.Create(basePath);
 
     for fileEntry in targetPlatform.SourceFiles do
