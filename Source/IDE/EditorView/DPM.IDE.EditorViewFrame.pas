@@ -1375,7 +1375,6 @@ end;
 procedure TDPMEditViewFrame.ScrollListPaintRow(const Sender: TObject;  const ACanvas: TCanvas; const itemRect: TRect; const index: Int64;  const state: TPaintRowState);
 var
   rowKind : TPackageRowKind;
-  item : IPackageSearchResultItem;
   title : string;
   version : string;
   latestVersion : string;
@@ -1450,29 +1449,6 @@ begin
     ACanvas.Brush.Color := borderColor;
     ACanvas.FillRect(underlineRect);
     ACanvas.Brush.Color := backgroundColor;
-  end;
-
-
-  icon := nil;
-
-  if rowKind in [rkInstalledPackage, rkImplicitPackage, rkAvailablePackage] then
-  begin
-    if (item <> nil) and (item.Icon <> '') then
-    begin
-      //first query will add nil to avoid multiple requests
-      if not FIconCache.Query(item.Id) then
-        //fetch the icon async
-        RequestPackageIcon(index, item)
-      else
-        //this might return nil if the request hasn't completed
-        //or it failed to find the icon.
-        icon := FIconCache.Request(item.Id);
-    end;
-
-    if icon = nil then
-      icon := FIconCache.Request('missing_icon');
-    if icon <> nil then
-      icon.PaintTo(ACanvas, FRowLayout.IconRect);
   end;
 
   latestVersion := '';
@@ -1598,6 +1574,29 @@ begin
         ACanvas.Font.Color := $E2A428;
       DrawText(ACanvas.Handle, PChar(latestVersion),Length(latestVersion), FRowLayout.LatestVersionRect, DT_SINGLELINE + DT_RIGHT + DT_VCENTER );
     end;
+
+    icon := nil;
+
+    if rowKind in [rkInstalledPackage, rkImplicitPackage, rkAvailablePackage] then
+    begin
+      if (package <> nil) and (package.Icon <> '') then
+      begin
+        //first query will add nil to avoid multiple requests
+        if not FIconCache.Query(package.Id) then
+          //fetch the icon async
+          RequestPackageIcon(index, package)
+        else
+          //this might return nil if the request hasn't completed
+          //or it failed to find the icon.
+          icon := FIconCache.Request(package.Id);
+      end;
+
+      if icon = nil then
+        icon := FIconCache.Request('missing_icon');
+      if icon <> nil then
+        icon.PaintTo(ACanvas, FRowLayout.IconRect);
+    end;
+
 
 
   finally
