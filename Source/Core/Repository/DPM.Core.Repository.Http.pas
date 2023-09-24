@@ -550,6 +550,7 @@ begin
   if SameText(response.ContentType, 'image/png') then
   begin
     stream := TMemoryStream.Create;
+    response.ResponseStream.Seek(0, soFromBeginning);
     stream.CopyFrom(response.ResponseStream,response.ContentLength);
     result := CreatePackageIcon(TPackageIconKind.ikPng, stream);
   end
