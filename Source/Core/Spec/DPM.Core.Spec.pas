@@ -579,6 +579,10 @@ begin
 
     if FMetaData.License <> '' then
       metaDataObj['license'] := FMetaData.License;
+
+    metaDataObj['licenseType'] := LicenseTypeTypeToString(FMetaData.LicenseType);
+
+
     if FMetaData.Icon <> '' then
     begin
       //ensure consistent icon file name to make it easier to extract later.

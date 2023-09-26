@@ -95,6 +95,11 @@ type
     FMX
     );
 
+  TDPMLicenseType = (
+    SPDX,
+    LicenseFile
+  );
+
   TConstProc<T> = reference to procedure(const Arg1 : T);
   TConstProc<T1, T2> = reference to procedure(const Arg1 : T1; const Arg2 : T2);
   TConstProc<T1, T2, T3> = reference to procedure(const Arg1 : T1; const Arg2 : T2; const Arg3 : T3);
@@ -144,6 +149,11 @@ function AllPlatforms(const compiler : TCompilerVersion) : TDPMPlatforms;
 
 function StringToUIFrameworkType(const value : string) : TDPMUIFrameworkType;
 function UIFrameworkTypeToString(const value : TDPMUIFrameworkType) : string;
+
+function StringToLicenseType(const value : string) : TDPMLicenseType;
+function LicenseTypeTypeToString(const value : TDPMLicenseType) : string;
+
+
 
 implementation
 
@@ -227,6 +237,23 @@ function UIFrameworkTypeToString(const value : TDPMUIFrameworkType) : string;
 begin
   result := GetEnumName(TypeInfo(TDPMUIFrameworkType), ord(value));
 end;
+
+function StringToLicenseType(const value : string) : TDPMLicenseType;
+var
+  iValue : integer;
+begin
+  iValue := GetEnumValue(typeInfo(TDPMUIFrameworkType), value);
+  if iValue = -1 then
+    result := TDPMLicenseType.SPDX
+  else
+    result := TDPMLicenseType(iValue);
+end;
+
+function LicenseTypeTypeToString(const value : TDPMLicenseType) : string;
+begin
+  result := GetEnumName(TypeInfo(TDPMLicenseType), ord(value));
+end;
+
 
 function CompilerToString(const value : TCompilerVersion) : string;
 begin

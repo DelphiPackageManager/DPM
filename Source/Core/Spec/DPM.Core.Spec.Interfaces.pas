@@ -82,6 +82,7 @@ type
     function GetRepositoryCommit : string;
     function GetReleaseNotes : string;
     function GetLicense : string;
+    function GetLicenseType : TDPMLicenseType;
     function GetIcon : string;
     function GetCopyright : string;
     function GetTags : string;
@@ -101,6 +102,7 @@ type
     procedure SetRepositoryCommit(const value : string);
     procedure SetReleaseNotes(const value : string);
     procedure SetLicense(const value : string);
+    procedure SetLicenseType(const value : TDPMLicenseType);
     procedure SetIcon(const value : string);
     procedure SetCopyright(const value : string);
     procedure SetTags(const value : string);
@@ -121,6 +123,7 @@ type
     property RepositoryCommit : string read GetRepositoryCommit write SetRepositoryCommit;
     property ReleaseNotes     : string read GetReleaseNotes write SetReleaseNotes;
     property License : string read GetLicense write SetLicense;
+    property LicenseType : TDPMLicenseType read GetLicenseType write SetLicenseType;
     property Icon : string read GetIcon write SetIcon;
     property Copyright : string read GetCopyright write SetCopyright;
     property Tags : string read GetTags write SetTags;
