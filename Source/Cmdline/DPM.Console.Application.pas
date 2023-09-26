@@ -85,20 +85,25 @@ end;
 ///
 class procedure TDPMConsoleApplication.CloseEvent;
 begin
-  FLogger.Information('Close Detected.');
+  if FLogger <> nil then
+    FLogger.Information('Close Detected.');
 
 end;
 
 class procedure TDPMConsoleApplication.CtrlBreakPressed;
 begin
-  FLogger.Information('Ctrl-Break detected.');
-  FCancellationTokenSource.Cancel;
+  if FLogger <> nil then
+    FLogger.Information('Ctrl-Break detected.');
+  if FLogger <> nil then
+    FCancellationTokenSource.Cancel;
 end;
 
 class procedure TDPMConsoleApplication.CtrlCPressed;
 begin
-  FLogger.Information('Ctrl-C detected.');
-  FCancellationTokenSource.Cancel;
+  if FLogger <> nil then
+    FLogger.Information('Ctrl-C detected.');
+  if FCancellationTokenSource <> nil then
+    FCancellationTokenSource.Cancel;
 end;
 
 class function TDPMConsoleApplication.InitContainer : TExitCode;
