@@ -14,7 +14,7 @@
         <DPMCompiler>11.0</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.Uri\0.3.0\lib;$(DPM)\VSoft.CancellationToken\0.0.4\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\Spring4D.Base\2.0.0-rc.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.3\lib;$(DPM)\VSoft.JsonDataObjects\0.1.3\lib;$(DPM)\VSoft.HttpClient\0.9.4-beta.1\lib;$(DPM)\VSoft.CommandLine\0.1.4\lib;$(DPM)\VSoft.Awaitable\0.3.0\lib;$(DPM)\VSoft.AntPatterns\0.1.3\lib;$(DPM)\Spring4D.Extensions\2.0.0-rc.2\lib;$(DPM)\Spring4D.Core\2.0.0-rc.2\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.1.1\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\Spring4D.Base\2.0.0-rc.2\lib;$(DPM)\VSoft.Uri\0.3.1\lib;$(DPM)\VSoft.SemanticVersion\0.2.4\lib;$(DPM)\VSoft.JsonDataObjects\0.2.0\lib;$(DPM)\VSoft.HttpClient\0.10.4-beta.3\lib;$(DPM)\VSoft.CommandLine\0.1.5\lib;$(DPM)\VSoft.Awaitable\0.4.1\lib;$(DPM)\VSoft.AntPatterns\0.1.5\lib;$(DPM)\Spring4D.Extensions\2.0.0-rc.2\lib;$(DPM)\Spring4D.Core\2.0.0-rc.2\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -152,10 +152,11 @@
         <Cfg_2>true</Cfg_2>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <Debugger_CWD>I:\Github\VSoftTechnologies\VSoft.HttpClient\Tests</Debugger_CWD>
-        <Debugger_RunParams>install VSoft.Awaitable -upgrade .\VSoft.HttpClient.Tests.dproj</Debugger_RunParams>
+        <Debugger_CWD>I:\Github\DelphiPackageManager\DPMMaster\Source</Debugger_CWD>
+        <Debugger_RunParams>install VSoft.AntPatterns .\dpm.dproj -upgrade -v=debug</Debugger_RunParams>
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
         <Debugger_EnvVars>DPMPACKAGECACHE=c:\temp\packagecache;$(Debugger_EnvVars)</Debugger_EnvVars>
+        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
         <Debugger_RunParams>pack I:\Github\VSoftTechnologies\VSoft.AntPatterns\VSoft.AntPatterns.dspec -OutputFolder=c:\temp -basepath=. -minclientversion=1.0</Debugger_RunParams>
@@ -312,10 +313,12 @@
                     <Source Name="MainSource">dpm.dpr</Source>
                 </Source>
                 <Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\bcboffice2k270.bpl">Embarcadero C++Builder Office 2000 Servers Package</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\bcbofficexp270.bpl">Embarcadero C++Builder Office XP Servers Package</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k270.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp270.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\bcboffice2k280.bpl">Embarcadero C++Builder Office 2000 Servers Package</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\bcbofficexp280.bpl">Embarcadero C++Builder Office XP Servers Package</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dclIPIndyImpl280.bpl">IP Abstraction Indy Implementation Design Time</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dclemsedge280.bpl">Embarcadero RAD Server Edge Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k280.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp280.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
                 </Excluded_Packages>
             </Delphi.Personality>
             <Platforms>
@@ -1087,18 +1090,19 @@
             <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.0-rc.2">
                 <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.0-rc.2" range="2.0.0-rc.2"/>
             </PackageReference>
-            <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.1.3"/>
-            <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.3.0">
+            <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.1.5"/>
+            <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.4.1">
                 <PackageReference id="Gabr42.OmniThreadLibrary" platform="Win32" version="3.7.8" range="[3.7.8,]"/>
-                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.4" range="[0.0.4,]"/>
+                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.1.1" range="[0.1.1,]"/>
             </PackageReference>
-            <PackageReference id="VSoft.CommandLine" platform="Win32" version="0.1.4"/>
-            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.9.4-beta.1">
-                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.4" range="[0.0.4,]"/>
-                <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.0" range="[0.3.0,]"/>
+            <PackageReference id="VSoft.CommandLine" platform="Win32" version="0.1.5"/>
+            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.10.4-beta.3">
+                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.1.1" range="[0.1.1,]"/>
+                <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.1" range="0.3.1"/>
             </PackageReference>
-            <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.1.3"/>
-            <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.3"/>
+            <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.2.0"/>
+            <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.4"/>
+            <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.1"/>
         </DPM>
     </ProjectExtensions>
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>
