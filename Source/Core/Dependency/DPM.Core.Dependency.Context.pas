@@ -41,7 +41,7 @@ uses
 type
   IResolverContext = interface
     ['{B97E7843-4C13-490A-A776-DFAC1BC60A0D}']
-    procedure RecordNoGood(const bad : IPackageInfo);
+    function RecordNoGood(const bad : IPackageInfo) : boolean;
     function IsNoGood(const package : IPackageInfo) : boolean;
     procedure RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
     function TryGetResolution(const packageId : string; const parentId : string; out resolution : IResolution) : boolean;
@@ -70,7 +70,7 @@ type
     FProjectFile : string;
     FPackageInstallerContext : IPackageInstallerContext;
   protected
-    procedure RecordNoGood(const bad : IPackageInfo);
+    function RecordNoGood(const bad : IPackageInfo) : boolean;
     function IsNoGood(const package : IPackageInfo) : boolean;
 
     procedure RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
@@ -235,16 +235,17 @@ begin
   result := FProjectFile;
 end;
 
-procedure TResolverContext.RecordNoGood(const bad : IPackageInfo);
+function TResolverContext.RecordNoGood(const bad : IPackageInfo) : boolean;
 var
-  dict : IDictionary<TPackageVersion, byte>;
+  dict : IDictionary<TPackageVersion, byte>; //should probably use a ISet
 begin
   if not FNoGoods.TryGetValue(LowerCase(bad.Id), dict) then
   begin
     dict := TCollections.CreateDictionary<TPackageVersion, byte>;
     FNoGoods.Add(LowerCase(bad.Id), dict);
   end;
-  dict.Add(bad.Version, 0);
+  result := dict.ContainsKey(bad.Version);
+  dict[bad.Version] := 0;
 end;
 
 procedure TResolverContext.RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);

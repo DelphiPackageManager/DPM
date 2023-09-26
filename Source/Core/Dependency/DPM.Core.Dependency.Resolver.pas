@@ -189,7 +189,12 @@ begin
           else
           begin
             //record the resolved version as no good, so we don't try it again
-            context.RecordNoGood(resolution.Package);
+            if context.RecordNoGood(resolution.Package) then
+            begin
+              //we have been here before - time to bail out;
+              FLogger.Error('Unable to resilve conflict - selected version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
+              exit;
+            end;
             //backtrack the package/version that got us here in the first place
             //not 100% sure this is correct here. More testing needed.
             if context.TryGetResolution(resolution.ParentId, '', parentResolution) then
