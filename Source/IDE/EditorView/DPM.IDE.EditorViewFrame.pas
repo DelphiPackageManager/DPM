@@ -1487,60 +1487,66 @@ begin
       rkInstalledPackage:
       begin
         packageIdx := index - FInstalledHeaderRowIdx -1;
-        package := FInstalledPackages[packageIdx];
-        if package = nil then
-          exit;
-        title := package.Id;
-        version := ' ' + bulletChar + ' ' + package.Version.ToStringNoMeta;
-        if FSearchOptions.Prerelease then
+        if (packageIdx >= 0) and (packageIdx < FInstalledPackages.Count) then
         begin
-          if package.Version <> package.LatestVersion then
+          package := FInstalledPackages[packageIdx];
+          if package = nil then
+            exit;
+          title := package.Id;
+          version := ' ' + bulletChar + ' ' + package.Version.ToStringNoMeta;
+          if FSearchOptions.Prerelease then
           begin
-            latestVersion := package.LatestVersion.ToStringNoMeta;
-            latestIsPrerelease := not package.LatestVersion.IsStable;
-          end;
-        end
-        else
-        begin
-          if package.Version <> package.LatestStableVersion then
+            if package.Version <> package.LatestVersion then
+            begin
+              latestVersion := package.LatestVersion.ToStringNoMeta;
+              latestIsPrerelease := not package.LatestVersion.IsStable;
+            end;
+          end
+          else
           begin
-            // the installed version may be a pre-release version that
-            // is later than the latest stable version so check first!
-            if package.LatestStableVersion > package.Version then
-              latestVersion := package.LatestStableVersion.ToStringNoMeta;
+            if package.Version <> package.LatestStableVersion then
+            begin
+              // the installed version may be a pre-release version that
+              // is later than the latest stable version so check first!
+              if package.LatestStableVersion > package.Version then
+                latestVersion := package.LatestStableVersion.ToStringNoMeta;
+            end;
           end;
         end;
       end;
       rkImplicitPackage:
       begin
         packageIdx := index - FImplicitHeaderRowIdx -1;
-        package := FImplicitPackages[packageIdx];
-        if package = nil then
+        if (packageIdx >= 0) and (packageIdx < FImplicitPackages.Count) then
+        begin
+          package := FImplicitPackages[packageIdx];
+          if package = nil then
           exit;
 
-        title := package.Id;
-        version := ' ' + bulletChar + ' (' + package.Version.ToStringNoMeta + ')';
-        if FSearchOptions.Prerelease then
-        begin
-          if package.Version <> package.LatestVersion then
+          title := package.Id;
+          version := ' ' + bulletChar + ' (' + package.Version.ToStringNoMeta + ')';
+          if FSearchOptions.Prerelease then
           begin
-            latestVersion := package.LatestVersion.ToStringNoMeta;
-            latestIsPrerelease := not package.LatestVersion.IsStable;
-          end;
-        end
-        else
-        begin
-          if package.Version <> package.LatestStableVersion then
+            if package.Version <> package.LatestVersion then
+            begin
+              latestVersion := package.LatestVersion.ToStringNoMeta;
+              latestIsPrerelease := not package.LatestVersion.IsStable;
+            end;
+          end
+          else
           begin
-            latestVersion := package.LatestStableVersion.ToStringNoMeta;
-            latestIsPrerelease := false;
+            if package.Version <> package.LatestStableVersion then
+            begin
+              latestVersion := package.LatestStableVersion.ToStringNoMeta;
+              latestIsPrerelease := false;
+            end;
           end;
         end;
       end;
       rkAvailablePackage:
       begin
         packageIdx := index - FAvailableHeaderRowIdx -1;
-        if packageIdx >= 0 then
+        if (packageIdx >= 0) and (packageIdx < FAvailablePackages.Count) then
         begin
           package := FAvailablePackages[packageIdx];
           if package = nil then
