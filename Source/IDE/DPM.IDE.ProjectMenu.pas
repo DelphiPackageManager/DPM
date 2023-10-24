@@ -223,7 +223,7 @@ end;
 
 function TDPMProjectMenu.GetPosition : Integer;
 begin
-  result := pmmpCompile;
+  result := pmmpBuildSection + 1;
 end;
 
 function TDPMProjectMenu.GetVerb : string;

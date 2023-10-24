@@ -64,7 +64,8 @@ end;
 
 procedure TPathUtilsTests.TestIsRelativePath;
 begin
-  Assert.IsTrue((IsRelativePath2('\\..\test')));
+//  Assert.IsTrue((IsRelativePath2('\\..\test')));
+    Assert.IsFalse((TPathUtils.IsRelativePath('\\..\test')));
 end;
 
 initialization
