@@ -92,7 +92,7 @@ begin
             begin
               target.argvalue
               begin
-                value = %ProductName%
+                value = DPM
                 variablename = AppName
               end
               target.argvalue
