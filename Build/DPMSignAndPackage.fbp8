@@ -275,6 +275,8 @@ begin
           terminateontimeout = true
           timeoutlength = 2
           as.variablename = CodeSigning
+          as.verbose = False
+          as.failbuildonerror = False
         end
         action.group
         begin
@@ -293,7 +295,7 @@ begin
             failifnoiterations = false
             fbvariable = L_SignAuth
             id = {E85064C8-2C96-4AE0-9E28-24068D229240}
-            listofitems = "%TimestampAuth%" +
+            listofitems = "%TimestampServers%" +
                           ""
             listseparator = lsCRLF
             separatorchar = ,
