@@ -44,6 +44,12 @@ begin
               item = *.exe
               recurse = true
             end
+            fileset.pattern
+            begin
+              includedattributes = FilesOnly
+              item = *.dll
+              recurse = false
+            end
           end
           fileset.patternlist
           begin
@@ -54,36 +60,46 @@ begin
           end
         end
       end
-      action.file.iterator
+      action.group
       begin
-        failifnoiterations = false
-        fbvariable = CurrentExe
-        filesetname = Executables
-        filesetrefreshaftereach = false
-        filesetrefreshbefore = false
-        findanyfile = false
-        id = {D19DCD62-2D7D-4B82-94EA-6E83035979CF}
-        includedattributes = FilesOnly
-        includefilepath = true
-        includerelativepath = false
-        recurse = false
-        strictextensionmatch = false
-        usefileset = true
-        action.target.execute
+        id = {931910F9-5F08-4251-8A68-34DD9070A6A4}
+        variable
         begin
-          actionlistid = {E17C5BCE-0FF6-400D-BD7F-69EF187AE8AB}
-          id = {EC255DBF-2398-437B-B427-B1B977B92CDA}
-          target.argvalues
+          name = CurrentFile
+          variablescope = vtLocal
+          variabletype = btString
+        end
+        action.file.iterator
+        begin
+          failifnoiterations = false
+          fbvariable = CurrentFile
+          filesetname = Executables
+          filesetrefreshaftereach = false
+          filesetrefreshbefore = false
+          findanyfile = false
+          id = {D19DCD62-2D7D-4B82-94EA-6E83035979CF}
+          includedattributes = FilesOnly
+          includefilepath = true
+          includerelativepath = false
+          recurse = false
+          strictextensionmatch = false
+          usefileset = true
+          action.target.execute
           begin
-            target.argvalue
+            actionlistid = {E17C5BCE-0FF6-400D-BD7F-69EF187AE8AB}
+            id = {EC255DBF-2398-437B-B427-B1B977B92CDA}
+            target.argvalues
             begin
-              value = %ProductName%
-              variablename = AppName
-            end
-            target.argvalue
-            begin
-              value = %CurrentExe%
-              variablename = FileToSign
+              target.argvalue
+              begin
+                value = %ProductName%
+                variablename = AppName
+              end
+              target.argvalue
+              begin
+                value = %CurrentFile%
+                variablename = FileToSign
+              end
             end
           end
         end
