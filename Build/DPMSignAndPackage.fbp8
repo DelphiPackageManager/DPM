@@ -1,0 +1,429 @@
+﻿project
+begin
+  projectid = {18FE41E9-867C-47A6-B354-90BF97F84A2A}
+  target
+  begin
+    name = Default
+    targetid = {1B177C2E-8BF1-47AD-AD15-400D6A0EBBA6}
+    rootaction
+    begin
+      action.variable.set
+      begin
+        applytoexisting = false
+        doexpandexpression = true
+        forcetype = ftString
+        id = {0261FBFA-CC08-49C1-A2A2-6D1AC2BFE4B2}
+        modifier = smNone
+        newvalue = "http://timestamp.digicert.com" +
+                   "http://timestamp.comodoca.com/authenticode" +
+                   "http://tsa.starfieldtech.com/" +
+                   "http://www.trustcenter.de/codesigning/timestamp"
+        variablename = TimeStampServers
+      end
+      action.fileset.define
+      begin
+        failifnofiles = false
+        filesetname = Executables
+        id = {3485C1AD-4A1D-4DEA-AA29-A6B8D55E77E3}
+        includedatesizeinlog = true
+        fileset
+        begin
+          basedirectory = %OutputBase%
+          name = Executables
+          outputquoting = qtNone
+          outputseparator = spNone
+          recursehiddensystem = false
+          sortascending = true
+          sortby = fsNone
+          fileset.patternlist
+          begin
+            name = PATTERNLIST
+            fileset.pattern
+            begin
+              includedattributes = FilesOnly
+              item = *.exe
+              recurse = true
+            end
+          end
+          fileset.patternlist
+          begin
+            name = EXCLUDEPATTERNLIST
+          end
+          fileset.filterlist
+          begin
+          end
+        end
+      end
+      action.file.iterator
+      begin
+        failifnoiterations = false
+        fbvariable = CurrentExe
+        filesetname = Executables
+        filesetrefreshaftereach = false
+        filesetrefreshbefore = false
+        findanyfile = false
+        id = {D19DCD62-2D7D-4B82-94EA-6E83035979CF}
+        includedattributes = FilesOnly
+        includefilepath = true
+        includerelativepath = false
+        recurse = false
+        strictextensionmatch = false
+        usefileset = true
+        action.target.execute
+        begin
+          actionlistid = {E17C5BCE-0FF6-400D-BD7F-69EF187AE8AB}
+          id = {EC255DBF-2398-437B-B427-B1B977B92CDA}
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = %ProductName%
+              variablename = AppName
+            end
+            target.argvalue
+            begin
+              value = %CurrentExe%
+              variablename = FileToSign
+            end
+          end
+        end
+      end
+      action.group
+      begin
+        description = "Build and Sign Installer"
+        id = {8BC22F2F-A39C-4569-80A3-58D9B9002F70}
+        variable
+        begin
+          name = BinaryFileName
+          variablescope = vtLocal
+          variabletype = btString
+        end
+        action.continua.set-buildstatus
+        begin
+          actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
+          customactionname = "Continua CI - Set Build Status"
+          enabletimeout = false
+          id = {30DD5AB4-4BFA-4FF0-B089-4B7843DCCAE9}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 1
+          as.status = "Building Installer"
+          as.verbose = False
+          as.failbuildonerror = False
+        end
+        action.innosetup.execute
+        begin
+          definitions = "MyAppVersion\=%DPMVersion%" +
+                        "OutputFileName\=DPMSetup-%SemVer%" +
+                        ""
+          id = {C15B227C-D329-4868-A722-4680FC9AB686}
+          innoversion = Inno6
+          scriptfile = %FBPROJECTDIR%\\DPMInstaller.iss
+          showprogress = true
+          unicode = true
+          usecommandline = true
+          usepreprocessor = true
+        end
+        action.variable.set
+        begin
+          applytoexisting = false
+          doexpandexpression = true
+          forcetype = ftString
+          id = {0ACB8E17-B0B9-4250-AA0C-ADCE09D841D9}
+          modifier = smNone
+          newvalue = %FBPROJECTDIR%\\Output\\DPMSetup-%SemVer%.exe
+          variablename = BinaryFileName
+        end
+        action.target.execute
+        begin
+          actionlistid = {E17C5BCE-0FF6-400D-BD7F-69EF187AE8AB}
+          id = {7769F5CE-4353-4EAD-A660-E58A59885B19}
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = "DPM Installer"
+              variablename = AppName
+            end
+            target.argvalue
+            begin
+              value = %BinaryFileName%
+              variablename = FileToSign
+            end
+          end
+        end
+      end
+    end
+  end
+  target
+  begin
+    name = SignTool
+    targetid = {E17C5BCE-0FF6-400D-BD7F-69EF187AE8AB}
+    target.arg
+    begin
+      displayorder = 0
+      name = AppName
+    end
+    target.arg
+    begin
+      displayorder = 0
+      name = FileToSign
+    end
+    rootaction
+    begin
+      action.group
+      begin
+        id = {F9EACA11-699F-4FAF-A378-0F466CB4D208}
+        variable
+        begin
+          name = L_SignAuth
+          variablescope = vtLocal
+          variabletype = btString
+        end
+        action.continua.set-buildstatus
+        begin
+          actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
+          customactionname = "Continua CI - Set Build Status"
+          enabletimeout = false
+          id = {829F46A4-2154-47F3-A461-445571703332}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 2
+          as.status = "Signing %FileToSign%"
+          as.verbose = False
+          as.failbuildonerror = False
+        end
+        action.continua.set-server-variable
+        begin
+          actiontypeid = {77F4DF21-5763-4EB8-BAA8-5D0BD57D1768}
+          customactionname = "Continua CI - Set Server Variable"
+          enabletimeout = false
+          id = {E1C27DD1-A9FA-4B02-97EB-8A70820C233C}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 2
+          as.variablename = CodeSigning
+          as.value = "Build '$Build.Version$' for configuration '$Configuration.Name$' of project '$Project.Name$ is holding a lock on code signing"
+          as.skipifnotdefined = False
+          as.verbose = False
+          as.failbuildonerror = False
+          as.truncatedvariablename = CodeSigning
+          as.keepbuildwritelock = True
+          as.updatebuildvariable = True
+          as.expand = True
+          as.updateagentvariable = True
+        end
+        action.signtool.sign
+        begin
+          actiontypeid = {B89C6983-0697-40BB-BD5A-E74525AFFA5B}
+          customactionname = "Signtool Sign Files"
+          enabletimeout = false
+          id = {22A7E5E9-3341-45C0-BBEB-A45B305DB4DF}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 2
+          as.isverbose = False
+          as.isdescription = True
+          as.description = %AppName%
+          as.isurldescription = True
+          as.urldescription = https://docs.delphi.dev
+          as.istimestampservice = False
+          as.isautoselect = False
+          as.iscomputerstore = False
+          as.isenhancedkeyusage = False
+          as.certificate = %CertificatesDir%\\%CertificateFile%
+          as.cspprovider = "eToken Base Cryptographic Provider"
+          as.privatekeycontainer = [{{%PrivateKeyPassword%}}]\=%PrivateKeyContainerName%
+          as.selecteditems = %FileToSign%
+          as.usefilelist = True
+          as.usefileset = False
+          as.generatepagehash = False
+          as.hashalgorithm = "SHA256" +
+                             ""
+          as.isrfc3161timestampservice = False
+          as.appendsignature = False
+          as.addsignature = False
+        end
+        action.continua.release.variablelock
+        begin
+          actiontypeid = {10376CF1-E576-4026-B36D-F1D3158FEFED}
+          customactionname = "Continua CI - Release Variable Lock"
+          enabletimeout = false
+          id = {4DFD524D-773D-4459-96AC-486FED78560C}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 2
+          as.variablename = CodeSigning
+        end
+        action.group
+        begin
+          id = {EAB59E5B-A8AC-4F3B-B53C-43F0963593C6}
+          maxretryattempts = 3
+          retrypauseinterval = 200
+          variable
+          begin
+            defaultvalue = false
+            name = L_LoopFailed
+            variablescope = vtLocal
+            variabletype = btBoolean
+          end
+          action.list.iterator
+          begin
+            failifnoiterations = false
+            fbvariable = L_SignAuth
+            id = {E85064C8-2C96-4AE0-9E28-24068D229240}
+            listofitems = "%TimestampAuth%" +
+                          ""
+            listseparator = lsCRLF
+            separatorchar = ,
+            skipblanklines = true
+            action.continua.set-buildstatus
+            begin
+              actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
+              customactionname = "Continua CI - Set Build Status"
+              enabletimeout = false
+              id = {E4AC7F3D-AA9C-4709-9B22-1BE68E649B76}
+              impersonateusenetcredonly = false
+              impersonateuser = false
+              terminateontimeout = true
+              timeoutlength = 1
+              as.status = "Timestamping  %FileToSign%"
+              as.verbose = False
+              as.failbuildonerror = False
+            end
+            action.signtool.timestamp
+            begin
+              actiontypeid = {F0DD1ECE-A455-4A8B-988A-9E61B823E5EF}
+              customactionname = "Signtool Timestamp Files"
+              enabletimeout = false
+              id = {857C357E-4A80-4887-A520-25AD02853BC0}
+              ignorefailure = true
+              impersonateusenetcredonly = false
+              impersonateuser = false
+              maxretryattempts = 3
+              retrypauseinterval = 3000
+              terminateontimeout = true
+              timeoutlength = 2
+              as.selecteditems = %FileToSign%
+              as.timestampurl = %L_SignAuth%
+              as.isverbose = False
+              as.usefilelist = True
+              as.usefileset = False
+              as.userfc3161 = False
+              as.signatureindex = 0
+            end
+            action.if.prevfailed
+            begin
+              id = {0E488B62-3A2C-4001-BBA3-7F2B6BD3953A}
+              action.variable.set
+              begin
+                applytoexisting = false
+                doexpandexpression = true
+                forcetype = ftBoolean
+                id = {B7B98A95-9E55-4D83-8AA1-67457D763428}
+                modifier = smNone
+                newvalue = true
+                variablename = L_LoopFailed
+              end
+            end
+            action.else
+            begin
+              id = {E480D8B2-855E-42DD-AC3B-1C1EDE57D07D}
+              action.variable.set
+              begin
+                applytoexisting = false
+                doexpandexpression = true
+                forcetype = ftBoolean
+                id = {24589F7A-D686-41CF-B77A-324CD1636F34}
+                modifier = smNone
+                newvalue = false
+                variablename = L_LoopFailed
+              end
+              action.loop.exit
+              begin
+                id = {8D4F72DD-61D2-4FAC-8661-2DEEFAA0DC79}
+              end
+            end
+          end
+          action.ifthen
+          begin
+            expandactionlogtitle = false
+            id = {7646BB66-744B-4001-ABE6-A0B64EAEE9C2}
+            lhsstoragestring = "%L_LoopFailed%" +
+                               ""
+            operatorsstoragestring = "\=" +
+                                     ""
+            resultinlogtitle = true
+            rhsstoragestring = "true" +
+                               ""
+            shortcircuitevaluation = true
+            termjoiner = jwOr
+            action.raise
+            begin
+              exceptionmessage = "Signtool timestamp failed."
+              id = {48A53528-F7CA-4377-9AB5-5DC783125490}
+            end
+          end
+        end
+      end
+      action.continua.set-buildstatus
+      begin
+        actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
+        customactionname = "Continua CI - Set Build Status"
+        enabletimeout = false
+        id = {89DAEA1D-88D2-4D82-B806-137FC08B1186}
+        impersonateusenetcredonly = false
+        impersonateuser = false
+        terminateontimeout = true
+        timeoutlength = 1
+        as.status = "Verifying Signatures for  %FileToSign%"
+        as.verbose = False
+        as.failbuildonerror = False
+      end
+      action.signtool.verify
+      begin
+        actiontypeid = {9126FEAA-33D6-4867-87DC-D993F56A18D6}
+        customactionname = "Signtool Verify Digital Signatures"
+        enabletimeout = false
+        id = {DA9D9532-8F38-4AE0-AE11-0F86D7129645}
+        impersonateusenetcredonly = false
+        impersonateuser = false
+        terminateontimeout = true
+        timeoutlength = 2
+        as.selecteditems = %FileToSign%
+        as.isallmethods = True
+        as.isdefaultcatalogdatabase = False
+        as.issystemcomponentdatabase = False
+        as.isdefaultauthpolicy = True
+        as.istimestampwarning = False
+        as.isverbose = True
+        as.usefilelist = True
+        as.usefileset = False
+      end
+    end
+  end
+  variable
+  begin
+    groupname = CodeSigning
+    name = CertificatesFolder
+    variablescope = vtProject
+    variabletype = btString
+  end
+  variable
+  begin
+    name = OutputBase
+    variablescope = vtProject
+  end
+  variable
+  begin
+    groupname = CodeSigning
+    name = TimestampServers
+    variablescope = vtProject
+    variabletype = btString
+  end
+end
