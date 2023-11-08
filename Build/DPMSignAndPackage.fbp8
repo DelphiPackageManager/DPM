@@ -417,6 +417,14 @@ begin
   end
   variable
   begin
+    defaultvalue = VSoft-Digicert-4-Sept-2026.cer
+    groupname = CodeSigning
+    name = CertificateFile
+    variablescope = vtProject
+    variabletype = btString
+  end
+  variable
+  begin
     groupname = CodeSigning
     name = CertificatesDir
     variablescope = vtProject
@@ -448,6 +456,19 @@ begin
     defaultvalue = -alpha
     groupname = VersionInfo
     name = PRERELEASE_LABEL
+    variablescope = vtProject
+    variabletype = btString
+  end
+  variable
+  begin
+    groupname = CodeSigning
+    name = PrivateKeyContainerName
+    variablescope = vtProject
+  end
+  variable
+  begin
+    groupname = CodeSigning
+    name = PrivateKeyPassword
     variablescope = vtProject
     variabletype = btString
   end
