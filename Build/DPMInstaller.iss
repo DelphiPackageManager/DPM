@@ -53,13 +53,13 @@ Name: XE5; Description: Delphi XE5 IDE Support; Types: full; check: IsDelphiInst
 Name: XE6; Description: Delphi XE6 IDE Support; Types: full; check: IsDelphiInstalled('14.0');
 Name: XE7; Description: Delphi XE7 IDE Support; Types: full; check: IsDelphiInstalled('15.0');
 Name: XE8; Description: Delphi XE8 IDE Support; Types: full; check: IsDelphiInstalled('16.0');
-Name: 10.0 Seattle; Description: Delphi 10.0 IDE Support; Types: full; check: IsDelphiInstalled('17.0');
-Name: 10.1 Berlin;  Description: Delphi 10.1 IDE Support; Types: full; check: IsDelphiInstalled('18.0');
-Name: 10.2 Tokyo;   Description: Delphi 10.2 IDE Support; Types: full; check: IsDelphiInstalled('19.0');
-Name: 10.3 Rio;     Description: Delphi 10.3 IDE Support; Types: full; check: IsDelphiInstalled('20.0');
-Name: 10.4 Sydney;  Description: Delphi 10.4 IDE Support; Types: full; check: IsDelphiInstalled('21.0');
-Name: 11.0 Alexandria;  Description: Delphi 11 IDE Support; Types: full; check: IsDelphiInstalled('22.0');
-Name: 12.0 Athens;  Description: Delphi 12 IDE Support; Types: full; check: IsDelphiInstalled('23.0');
+Name: Seattle 10.0; Description: Delphi 10.0 IDE Support; Types: full; check: IsDelphiInstalled('17.0');
+Name: Berlin 10.1;  Description: Delphi 10.1 IDE Support; Types: full; check: IsDelphiInstalled('18.0');
+Name: Tokyo 10.2;   Description: Delphi 10.2 IDE Support; Types: full; check: IsDelphiInstalled('19.0');
+Name: Rio 10.3;     Description: Delphi 10.3 IDE Support; Types: full; check: IsDelphiInstalled('20.0');
+Name: Sydney 10.4;  Description: Delphi 10.4 IDE Support; Types: full; check: IsDelphiInstalled('21.0');
+Name: Alexandria 11.0;  Description: Delphi 11 IDE Support; Types: full; check: IsDelphiInstalled('22.0');
+Name: Athens 12.0;  Description: Delphi 12 IDE Support; Types: full; check: IsDelphiInstalled('23.0');
 
 
 [Tasks]
@@ -76,13 +76,13 @@ Source: "..\Output\DPM.IDE.XE6.dll"; DestDir: "{app}"; Flags: ignoreversion; Com
 Source: "..\Output\DPM.IDE.XE7.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : XE7
 Source: "..\Output\DPM.IDE.XE8.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : XE8
 
-Source: "..\Output\DPM.IDE.D100.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : 10.0 Seattle
-Source: "..\Output\DPM.IDE.D101.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : 10.1 Berlin
-Source: "..\Output\DPM.IDE.D102.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : 10.2 Tokyo
-Source: "..\Output\DPM.IDE.D103.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : 10.3 Rio
-Source: "..\Output\DPM.IDE.D104.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : 10.4 Sydney
-Source: "..\Output\DPM.IDE.D110.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : 11.0 Alexandria
-Source: "..\Output\DPM.IDE.D120.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : 12.0 Athens
+Source: "..\Output\DPM.IDE.D100.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Seattle 10.0
+Source: "..\Output\DPM.IDE.D101.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Berlin 10.1
+Source: "..\Output\DPM.IDE.D102.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Tokyo 10.2
+Source: "..\Output\DPM.IDE.D103.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Rio 10.3
+Source: "..\Output\DPM.IDE.D104.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Sydney 10.4
+Source: "..\Output\DPM.IDE.D110.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Alexandria 11.0
+Source: "..\Output\DPM.IDE.D120.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Athens 12.0
 
 [Registry]
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\9.0\Experts";  ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.XE2.dll"; Components: XE2; Flags: uninsdeletevalue
@@ -93,13 +93,13 @@ Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\14.0\Experts"; ValueType: string; 
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\15.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.XE7.dll"; Components: XE7; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\16.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.XE8.dll"; Components: XE8; Flags: uninsdeletevalue
 
-Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\17.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D100.dll"; Components: 10.0 Seattle; Flags: uninsdeletevalue
-Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\18.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D101.dll"; Components: 10.1 Berlin;  Flags: uninsdeletevalue
-Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\19.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D102.dll"; Components: 10.2 Tokyo;   Flags: uninsdeletevalue
-Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\20.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D103.dll"; Components: 10.3 Rio;     Flags: uninsdeletevalue
-Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\21.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D104.dll"; Components: 10.4 Sydney;  Flags: uninsdeletevalue
-Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\22.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D110.dll"; Components: 11.0 Alexandria;  Flags: uninsdeletevalue
-Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\23.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D120.dll"; Components: 12.0 Athens;  Flags: uninsdeletevalue
+Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\17.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D100.dll"; Components: Seattle 10.0; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\18.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D101.dll"; Components: Berlin 10.1;  Flags: uninsdeletevalue
+Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\19.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D102.dll"; Components: Tokyo 10.2;   Flags: uninsdeletevalue
+Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\20.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D103.dll"; Components: Rio 10.3;     Flags: uninsdeletevalue
+Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\21.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D104.dll"; Components: Sydney 10.4;  Flags: uninsdeletevalue
+Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\22.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D110.dll"; Components: Alexandria 11.0;  Flags: uninsdeletevalue
+Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\23.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D120.dll"; Components: Athens 12.0;  Flags: uninsdeletevalue
 
 [Code]
 
