@@ -20,6 +20,80 @@ begin
                    "http://www.trustcenter.de/codesigning/timestamp"
         variablename = TimeStampServers
       end
+      action.propertyset.define
+      begin
+        id = {EDD14864-D8F1-4691-8B8F-6C3E4EDDF1CF}
+        propertysetname = DPMVersion
+        propertyset.win32.info
+        begin
+          name = DPMVersion
+          productversion = 0.0.0.0
+          productversionstring = 0.2.0-alpha
+        end
+      end
+      action.propertyset.setvalues
+      begin
+        id = {7E5B4278-B7D0-4946-A945-6CE96AF6BA82}
+        propertysetname = DPMVersion
+        setvaluesto = "" +
+                      "" +
+                      "%BUILD_VERSION%" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "true" +
+                      "" +
+                      "© 2019 -2023 Vincent Parrett and Contributors" +
+                      "" +
+                      "false" +
+                      "%MAJOR_VERSION%" +
+                      "%MINOR_VERSION%" +
+                      "" +
+                      "DPM Package Manager" +
+                      "" +
+                      "%PRODUCTVERSION%" +
+                      "%RELEASE_VERSION%" +
+                      "" +
+                      ""
+        valuestoset = "AutoUpdateFileVersionString\=0" +
+                      "AutoUpdateProductVersionString\=0" +
+                      "BuildVersion\=-1" +
+                      "CompanyName\=0" +
+                      "CompileDate\=0" +
+                      "FileDescription\=0" +
+                      "FileFlagDebug\=0" +
+                      "FileFlagPreRelease\=0" +
+                      "FileFlagPrivate\=0" +
+                      "FileFlagSpecial\=0" +
+                      "FileSubType\=0" +
+                      "FileTypeDLL\=0" +
+                      "FileTypeDRV\=0" +
+                      "FileTypeVXD\=0" +
+                      "FileVersionString\=0" +
+                      "IncludeCompileDate\=-1" +
+                      "InternalName\=0" +
+                      "LegalCopyright\=-1" +
+                      "LegalTrademarks\=0" +
+                      "LinkProductVersion\=-1" +
+                      "MajorVersion\=-1" +
+                      "MinorVersion\=-1" +
+                      "OriginalFilename\=0" +
+                      "ProductName\=-1" +
+                      "ProductVersion\=0" +
+                      "ProductVersionString\=-1" +
+                      "ReleaseVersion\=-1" +
+                      "SpecialBuildDetails\=0" +
+                      ""
+      end
       action.fileset.define
       begin
         failifnofiles = false
