@@ -409,6 +409,14 @@ begin
   end
   variable
   begin
+    defaultvalue = 0
+    groupname = VersionInfo
+    name = BUILD_VERSION
+    variablescope = vtProject
+    variabletype = btInteger
+  end
+  variable
+  begin
     groupname = CodeSigning
     name = CertificatesFolder
     variablescope = vtProject
@@ -416,8 +424,56 @@ begin
   end
   variable
   begin
+    defaultvalue = 0
+    groupname = VersionInfo
+    name = MAJOR_VERSION
+    variablescope = vtProject
+    variabletype = btInteger
+  end
+  variable
+  begin
+    defaultvalue = 2
+    groupname = VersionInfo
+    name = MINOR_VERSION
+    variablescope = vtProject
+    variabletype = btInteger
+  end
+  variable
+  begin
     name = OutputBase
     variablescope = vtProject
+  end
+  variable
+  begin
+    defaultvalue = -alpha
+    groupname = VersionInfo
+    name = PRERELEASE_LABEL
+    variablescope = vtProject
+    variabletype = btString
+  end
+  variable
+  begin
+    defaultvalue = %MAJOR_VERSION%.%MINOR_VERSION%.%RELEASE_VERSION%%PRERELEASE_LABEL%
+    groupname = VersionInfo
+    name = PRODUCTVERSION
+    variablescope = vtProject
+    variabletype = btString
+  end
+  variable
+  begin
+    defaultvalue = 0
+    groupname = VersionInfo
+    name = RELEASE_VERSION
+    variablescope = vtProject
+    variabletype = btInteger
+  end
+  variable
+  begin
+    defaultvalue = %MAJOR_VERSION%.%MINOR_VERSION%.%RELEASE_VERSION%%PRERELEASE_LABEL%
+    groupname = VersionInfo
+    name = SemVer
+    variablescope = vtProject
+    variabletype = btString
   end
   variable
   begin
