@@ -418,7 +418,7 @@ begin
   variable
   begin
     groupname = CodeSigning
-    name = CertificatesFolder
+    name = CertificatesDir
     variablescope = vtProject
     variabletype = btString
   end
