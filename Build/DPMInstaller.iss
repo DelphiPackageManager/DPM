@@ -6,7 +6,7 @@
   #define MyAppVersion "0.1.10-alpha"
 #endif
 #define MyAppPublisher "The Delphi Package Manager Project"
-#define HelpURL "https://docs.delphipm.org"
+#define HelpURL "https://docs.delphi.dev"
 #define SupportURL "https://github.com/DelphiPackageManager/DPM/issues"
 #define UpdatesURL "https://github.com/DelphiPackageManager/DPM/releases"
 #ifndef OutputFileName
