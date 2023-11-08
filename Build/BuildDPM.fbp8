@@ -23,6 +23,7 @@ begin
           linkproductversion = false
           minorversion = 2
           name = DPMVersion
+          productversion = 0.0.0.0
           productname = "DPM Package Manager"
           productversionstring = 0.2.0-alpha
         end
@@ -724,6 +725,25 @@ begin
             end
           end
         end
+        action.target.execute
+        begin
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] 12 Athens"
+          id = {B0D00EF5-7DC4-4758-9FDB-5B6FFA789A5D}
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = Delphi12
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.D120.dpr
+              variablename = ProjectFile
+            end
+          end
+        end
       end
       action.group
       begin
@@ -1084,14 +1104,35 @@ begin
           actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
           customactionname = "Continua CI - Set Build Status"
           enabletimeout = false
-          id = {1F924697-2245-48C5-ABAE-1F321790274B}
+          id = {CC1E79AD-D706-4385-A229-275CB8988BB2}
           impersonateusenetcredonly = false
           impersonateuser = false
           terminateontimeout = true
-          timeoutlength = 1
+          timeoutlength = 2
           as.status = "Signing %FileToSign%"
           as.verbose = False
           as.failbuildonerror = False
+        end
+        action.continua.set-server-variable
+        begin
+          actiontypeid = {77F4DF21-5763-4EB8-BAA8-5D0BD57D1768}
+          customactionname = "Continua CI - Set Server Variable"
+          enabletimeout = false
+          id = {35CDAA85-5B20-49A9-89F6-000EB97D3216}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 2
+          as.variablename = CodeSigning
+          as.value = "Build '$Build.Version$' for configuration '$Configuration.Name$' of project '$Project.Name$ is holding a lock on code signing"
+          as.skipifnotdefined = False
+          as.verbose = False
+          as.failbuildonerror = False
+          as.truncatedvariablename = CodeSigning
+          as.keepbuildwritelock = True
+          as.updatebuildvariable = True
+          as.expand = True
+          as.updateagentvariable = True
         end
         action.signtool.sign
         begin
@@ -1107,13 +1148,14 @@ begin
           as.isdescription = True
           as.description = %AppName%
           as.isurldescription = True
-          as.urldescription = https://docs.delphipm.org
+          as.urldescription = https://docs.delphi.dev
           as.istimestampservice = False
           as.isautoselect = False
           as.iscomputerstore = False
           as.isenhancedkeyusage = False
-          as.certificate = %File_VSoftPFX%
-          as.token = xwfsnevqoCqqAh6vHUQ\=
+          as.certificate = %CertificatesDir%\\%CertificateFile%
+          as.cspprovider = "eToken Base Cryptographic Provider"
+          as.privatekeycontainer = [{{%PrivateKeyPassword%}}]\=%PrivateKeyContainerName%
           as.selecteditems = %FileToSign%
           as.usefilelist = True
           as.usefileset = False
@@ -1123,6 +1165,18 @@ begin
           as.isrfc3161timestampservice = False
           as.appendsignature = False
           as.addsignature = False
+        end
+        action.continua.release.variablelock
+        begin
+          actiontypeid = {10376CF1-E576-4026-B36D-F1D3158FEFED}
+          customactionname = "Continua CI - Release Variable Lock"
+          enabletimeout = false
+          id = {7DA95967-A3E3-48C4-8742-8B2AEF8DF171}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 2
+          as.variablename = CodeSigning
         end
         action.group
         begin
@@ -1281,9 +1335,17 @@ begin
   end
   variable
   begin
-    defaultvalue = %VSOFTPFX%
-    groupname = Signing
-    name = File_VSoftPFX
+    defaultvalue = VSoft-Digicert-4-Sept-2026.cer
+    groupname = CodeSigning
+    name = CertificateFile
+    variablescope = vtProject
+    variabletype = btString
+  end
+  variable
+  begin
+    defaultvalue = %RootDir%\\Certificates
+    groupname = CodeSigning
+    name = CertificatesDir
     variablescope = vtProject
     variabletype = btString
   end
@@ -1314,16 +1376,23 @@ begin
   end
   variable
   begin
-    defaultvalue = %VSOFTPFX-PWD%
-    groupname = Signing
-    name = PFXPWD
-    variablescope = vtProject
-  end
-  variable
-  begin
     defaultvalue = -alpha
     groupname = VersionInfo
     name = PRERELEASE_LABEL
+    variablescope = vtProject
+    variabletype = btString
+  end
+  variable
+  begin
+    groupname = CodeSigning
+    name = PrivateKeyContainerName
+    variablescope = vtProject
+    variabletype = btString
+  end
+  variable
+  begin
+    groupname = CodeSigning
+    name = PrivateKeyPassword
     variablescope = vtProject
     variabletype = btString
   end
@@ -1369,7 +1438,7 @@ begin
   end
   variable
   begin
-    groupname = Signing
+    groupname = CodeSigning
     name = TimestampAuth
     variablescope = vtProject
     variabletype = btString
