@@ -745,6 +745,7 @@ begin
       action.group
       begin
         description = "Build and Sign Installer"
+        enabled = false
         id = {15729DB8-9AAA-45CE-9CBA-E64417B605C4}
         variable
         begin
