@@ -186,8 +186,14 @@ begin
   sValue := StringReplace(sValue, '.', '_', [rfReplaceAll]);
 
   //we changed it to include the _0 - some packages might not have that.
-  if sValue = 'RS11' then
-    sValue := 'RS11_0';
+//  if sValue = 'RS11' then
+//    sValue := 'RS11_0';
+
+  if not TStringUtils.Contains(sValue,'XE') then
+    if not TStringUtils.Contains(sValue, '_') then
+      sValue := sValue + '_0';
+
+
 
   iValue := GetEnumValue(typeInfo(TCompilerVersion), sValue);
 
