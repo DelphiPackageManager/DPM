@@ -285,27 +285,6 @@ begin
           as.verbose = False
           as.failbuildonerror = False
         end
-        action.continua.set-server-variable
-        begin
-          actiontypeid = {77F4DF21-5763-4EB8-BAA8-5D0BD57D1768}
-          customactionname = "Continua CI - Set Server Variable"
-          enabletimeout = false
-          id = {E1C27DD1-A9FA-4B02-97EB-8A70820C233C}
-          impersonateusenetcredonly = false
-          impersonateuser = false
-          terminateontimeout = true
-          timeoutlength = 2
-          as.variablename = CodeSigning
-          as.value = "Build '$Build.Version$' for configuration '$Configuration.Name$' of project '$Project.Name$ is holding a lock on code signing"
-          as.skipifnotdefined = False
-          as.verbose = False
-          as.failbuildonerror = False
-          as.truncatedvariablename = CodeSigning
-          as.keepbuildwritelock = True
-          as.updatebuildvariable = True
-          as.expand = True
-          as.updateagentvariable = True
-        end
         action.signtool.sign
         begin
           actiontypeid = {B89C6983-0697-40BB-BD5A-E74525AFFA5B}
@@ -337,20 +316,6 @@ begin
           as.isrfc3161timestampservice = False
           as.appendsignature = False
           as.addsignature = False
-        end
-        action.continua.release.variablelock
-        begin
-          actiontypeid = {10376CF1-E576-4026-B36D-F1D3158FEFED}
-          customactionname = "Continua CI - Release Variable Lock"
-          enabletimeout = false
-          id = {4DFD524D-773D-4459-96AC-486FED78560C}
-          impersonateusenetcredonly = false
-          impersonateuser = false
-          terminateontimeout = true
-          timeoutlength = 2
-          as.variablename = CodeSigning
-          as.verbose = False
-          as.failbuildonerror = False
         end
         action.group
         begin
