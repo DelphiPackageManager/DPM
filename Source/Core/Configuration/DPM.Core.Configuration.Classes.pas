@@ -367,6 +367,9 @@ begin
     jsonObj := TJsonObject.ParseFromFile(fileName) as TJsonObject;
     try
       Result := LoadFromJson(jsonObj);
+      if not FSources.Any then
+        AddDefaultSources;
+
       FFileName := fileName;
     finally
       jsonObj.Free;

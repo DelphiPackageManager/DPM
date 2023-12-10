@@ -1267,7 +1267,7 @@ begin
     exit
   else if not Options.IsValid then
     exit;
-
+  FConfigurationManager.EnsureDefaultConfig;
   result := FConfigurationManager.LoadConfig(Options.ConfigFile);
   if result = nil then
     exit;

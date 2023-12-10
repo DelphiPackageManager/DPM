@@ -71,6 +71,9 @@ begin
   if FileExists(sDefaultConfigFile) then
   begin
     config := LoadConfig(sDefaultConfigFile); //this will log errors
+    if ((config <> nil) and (not config.Sources.Any)) then
+      config.AddDefaultSources;
+
     result := config <> nil;
     if not result then
       FLogger.Error('Unable to load the default config  file : ' + cDefaultConfigFile);
@@ -98,11 +101,14 @@ begin
 end;
 
 function TConfigurationManager.NewConfig : IConfiguration;
+
 begin
   result := TConfiguration.Create(FLogger);
+  result.AddDefaultSources;
   result.PackageCacheLocation := GetEnvironmentVariable(cDPMPackageCacheEnviromentVar);
   if result.PackageCacheLocation = '' then
     result.PackageCacheLocation := TSystemUtils.ExpandEnvironmentStrings(cDefaultPackageCache);
+
 end;
 
 function TConfigurationManager.SaveConfig(const configuration : IConfiguration; const fileName : string) : Boolean;
