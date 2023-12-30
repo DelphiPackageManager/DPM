@@ -264,7 +264,7 @@ end;
 function CompilerToString(const value : TCompilerVersion) : string;
 begin
   result := GetEnumName(TypeInfo(TCompilerVersion), ord(value));
-  if result.StartsWith('RS') then
+  if TStringUtils.StartsWith(result,'RS') then
     Delete(result, 1, 2); // remove RS
   result := StringReplace(result, '_', '.', [rfReplaceAll]);
 end;
