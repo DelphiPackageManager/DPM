@@ -14,7 +14,7 @@
         <DPMCompiler>10.3</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.9\lib;$(DPM)\VSoft.VirtualListView\0.4.4\lib;$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.2.1\lib;$(DPM)\VSoft.HttpClient\0.10.5-beta.4\lib;$(DPM)\VSoft.Awaitable\0.5.0\lib;$(DPM)\VSoft.AntPatterns\0.1.7\lib;$(DPM)\Spring4D.Extensions\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\Spring4D.Base\2.0.1\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.9\lib;$(DPM)\VSoft.VirtualListView\0.4.4\lib;$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.2.1\lib;$(DPM)\VSoft.HttpClient\0.11.0-beta.9\lib;$(DPM)\VSoft.Awaitable\0.5.0\lib;$(DPM)\VSoft.AntPatterns\0.1.7\lib;$(DPM)\Spring4D.Extensions\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\Spring4D.Base\2.0.1\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -1205,7 +1205,7 @@
                 <PackageReference id="Gabr42.OmniThreadLibrary" platform="Win32" version="3.7.9" range="[3.7.9,]"/>
                 <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.1.2" range="[0.1.2,]"/>
             </PackageReference>
-            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.10.5-beta.4">
+            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.11.0-beta.9">
                 <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.1.2" range="[0.1.2,]"/>
                 <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.2" range="0.3.2"/>
             </PackageReference>

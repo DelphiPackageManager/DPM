@@ -910,8 +910,9 @@ begin
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
   request := httpClient.CreateRequest(uri.AbsolutePath)
-              .WithHeader(cUserAgentHeader,cDPMUserAgent);
+              .WithHeader(cUserAgentHeader,cDPMUserAgent).WithAccept('application/json');
   try
+//    Logger.Debug('getting service Index ' + self.SourceUri);
     response := request.Get(cancellationToken);
     if response.StatusCode <> 200 then
     begin
@@ -927,6 +928,9 @@ begin
     on e : Exception do
     begin
       Logger.Error('Error parsing serviceindex json : ' + e.Message);
+      Logger.Error(e.ClassName);
+      if e.InnerException <> nil then
+        Logger.Error(e.InnerException.Message);
       exit;
     end;
   end;
