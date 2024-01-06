@@ -87,6 +87,7 @@ type
     function FindTemplate(const name : string) : ISpecTemplate;
     function NewTemplate(const name : string) : ISpecTemplate;
     procedure RenameTemplate(const currentTemplateName: string; const NewTemplateName:string);
+    procedure DeleteTemplate(const templateName: string);
   public
     constructor Create(const logger : ILogger; const fileName : string); reintroduce;
   end;
@@ -409,6 +410,20 @@ begin
   FMetaData := TSpecMetaData.Create(logger);
   FTargetPlatforms := TCollections.CreateList<ISpecTargetPlatform>;
   FTemplates := TCollections.CreateList<ISpecTemplate>;
+end;
+
+procedure TSpec.DeleteTemplate(const templateName: string);
+var
+  i: Integer;
+begin
+  for i := 0 to FTemplates.Count - 1 do
+  begin
+    if SameText(FTemplates[i].Name, templateName) then
+    begin
+      FTemplates.Delete(i);
+      Exit;
+    end;
+  end;
 end;
 
 function TSpec.ExpandTargetPlatforms : boolean;
@@ -835,15 +850,13 @@ end;
 
 procedure TSpec.RenameTemplate(const currentTemplateName, NewTemplateName: string);
 var
-  template : ISpecTemplate;
+  currentTemplate : ISpecTemplate;
 begin
-  template := FindTemplate(currentTemplateName);
-  if not Assigned(template) then
+  currentTemplate := FindTemplate(currentTemplateName);
+  if not Assigned(currentTemplate) then
     raise Exception.Create('Template not found');
 
-  template.Name := NewTemplateName;
-
-
+  currentTemplate.Name := NewTemplateName;
 end;
 
 function TSpec.ReplaceTokens(const version : TPackageVersion; const properties : TStringList) : boolean;

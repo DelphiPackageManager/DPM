@@ -305,6 +305,7 @@ type
     function FindTemplate(const name : string) : ISpecTemplate;
     function NewTemplate(const name: string): ISpecTemplate;
     procedure RenameTemplate(const currentTemplateName: string; const NewTemplateName:string);
+    procedure DeleteTemplate(const templateName: string);
 
     property MetaData : ISpecMetaData read GetMetaData;
     property TargetPlatforms : IList<ISpecTargetPlatform>read GetTargetPlatforms;
