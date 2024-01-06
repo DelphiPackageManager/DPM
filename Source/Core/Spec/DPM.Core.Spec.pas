@@ -83,7 +83,9 @@ type
 
     function LoadTargetPlatformsFromJson(const targetPlatformsArray : TJsonArray) : boolean;
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
+    function ToJSON: string; override;
 
+    // Template functions
     function FindTemplate(const name : string) : ISpecTemplate;
     function NewTemplate(const name : string) : ISpecTemplate;
     procedure RenameTemplate(const currentTemplateName: string; const NewTemplateName:string);
@@ -100,6 +102,7 @@ uses
   DPM.Core.Dependency.Version,
   DPM.Core.Spec.MetaData,
   DPM.Core.Spec.Template,
+  DPM.Core.Spec.FileEntry,
   DPM.Core.Spec.TargetPlatform,
   DPM.Core.Utils.Strings;
 
@@ -961,6 +964,22 @@ begin
 
   end;
 
+end;
+
+function TSpec.ToJSON: string;
+var
+  json : TJsonObject;
+begin
+  json := TJsonObject.Create;
+  try
+    json.O['metadata'] := TJsonObject.Parse(FMetaData.ToJSON) as TJsonObject;
+    json.A['targetPlatforms'] := LoadObjectList(FTargetPlatforms as IList<ISpecNode>);
+    json.A['templates'] := LoadObjectList(FTemplates as IList<ISpecNode>);
+
+    Result := json.ToJSON(False);
+  finally
+    FreeAndNil(json);
+  end;
 end;
 
 function TSpec.TokenMatchEvaluator(const match : TMatch) : string;

@@ -59,7 +59,7 @@ type
     function Clone : ISpecFileEntry;
   public
     constructor Create(const logger : ILogger); override;
-
+    function ToJson: string; override;
   end;
 
 implementation
@@ -157,6 +157,24 @@ end;
 procedure TSpecFileEntry.SetSource(const value : string);
 begin
   FSource := value;
+end;
+
+function TSpecFileEntry.ToJson: string;
+var
+  json : TJSONObject;
+begin
+  json := TJSONObject.Create;
+  try
+    json.S['src'] := FSource;
+    json.S['dest'] := FDestination;
+    if FFlatten then
+      json.B['flatten'] := FFlatten;
+    if FIgnore then
+      json.B['ignore'] := FIgnore;
+    Result := json.ToJSON;
+  finally
+    FreeAndNil(json);
+  end;
 end;
 
 procedure TSpecFileEntry.SetDestination(const value : string);

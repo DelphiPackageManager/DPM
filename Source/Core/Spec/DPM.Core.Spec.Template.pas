@@ -49,12 +49,13 @@ type
 
   public
     constructor Create(const logger : ILogger); override;
-
+    function ToJSON: string; override;
   end;
 
 implementation
 
 uses
+  System.SysUtils,
   DPM.Core.Spec.Dependency,
   DPM.Core.Spec.DependencyGroup;
 
@@ -99,6 +100,25 @@ end;
 procedure TSpecTemplate.SetName(templateName: string);
 begin
   FName := templateName;
+end;
+
+function TSpecTemplate.ToJSON: string;
+var
+  json : TJsonObject;
+begin
+  json := TJsonObject.Create;
+  try
+    json.s['name'] := FName;
+
+    json.A['source'] := LoadObjectList(FSourceFiles as IList<ISpecNode>);
+    json.A['searchPaths'] := LoadObjectList(FSearchPaths as IList<ISpecNode>);
+    json.A['build'] := LoadObjectList(FBuildEntries as IList<ISpecNode>);
+    json.A['runtime'] := LoadObjectList(FRuntimeFiles as IList<ISpecNode>);
+
+    Result := json.ToJSON(True);
+  finally
+    FreeAndNil(json);
+  end;
 end;
 
 end.

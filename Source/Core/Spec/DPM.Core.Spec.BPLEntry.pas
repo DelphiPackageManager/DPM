@@ -54,6 +54,7 @@ type
     constructor CreateClone(const logger : ILogger; const src : string; const buildId : string; const copyLocal, install : boolean); reintroduce;
   public
     constructor Create(const logger : ILogger); override;
+    function ToJSON : string;
   end;
 
 implementation
@@ -126,6 +127,22 @@ end;
 procedure TSpecBPLEntry.SetSource(const value: string);
 begin
   FSource := value;
+end;
+
+function TSpecBPLEntry.ToJSON: string;
+var
+  json : TJSONObject;
+begin
+  json := TJSONObject.Create;
+  try
+    json.S['buildId'] := FBuildId;
+    json.S['src'] := FSource;
+    if FCopyLocal then
+      json.B['copyLocal'] := FCopyLocal;
+    Result := json.ToJSON;
+  finally
+    FreeAndNil(json);
+  end;
 end;
 
 end.

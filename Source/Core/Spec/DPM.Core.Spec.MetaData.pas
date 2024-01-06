@@ -102,6 +102,7 @@ type
     procedure SetUIFrameworkType(const value: TDPMUIFrameworkType);
 
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
+    function ToJSON : string; override;
 
   public
     constructor Create(const logger : ILogger); override;
@@ -380,6 +381,33 @@ end;
 procedure TSpecMetaData.SetVersion(const value : TPackageVersion);
 begin
   FVersion := value;
+end;
+
+function TSpecMetaData.ToJSON: string;
+var
+  json : TJSONObject;
+begin
+  json := TJSONObject.Create;
+  try
+    json.S['id'] := FId;
+    json.S['version'] := FVersion.ToString;
+    json.S['description'] := FDescription;
+    json.S['icon'] := FIcon;
+    json.S['authors'] := FAuthors;
+    json.S['projectUrl'] := FProjectUrl;
+    json.S['repositoryUrl'] := FRepositoryUrl;
+    json.S['license'] := FLicense;
+    json.S['copyright'] := FCopyright;
+    json.S['tags'] := FTags;
+    if FIsTrial then
+      json.B['istrial'] := FIsTrial;
+    if FIsCommercial then
+      json.b['iscommercial'] := FIsCommercial;
+
+    Result := json.ToJSON;
+  finally
+    FreeAndNil(json);
+  end;
 end;
 
 end.

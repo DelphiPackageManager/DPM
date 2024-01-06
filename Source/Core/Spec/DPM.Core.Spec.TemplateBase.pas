@@ -79,7 +79,6 @@ type
     function FindOtherFileBySrc(const src : string) : ISpecFileEntry;
     function FindBuildEntryById(const id : string) : ISpecBuildEntry;
 
-
     //    function LoadCollection(const rootElement : IXMLDOMElement; const collectionPath : string; const nodeClass : TSpecNodeClass; const action : TConstProc<ISpecNode>) : boolean;
 
     function LoadDependenciesFromJson(const dependenciesArray : TJsonArray) : Boolean;
@@ -92,7 +91,6 @@ type
     function LoadBuildEntriesFromJson(const buildArray : TJsonArray) : Boolean;
 
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
-
 
     constructor CreateClone(const logger : ILogger; const deps : IList<ISpecDependency>; const design, runtime : IList<ISpecBPLEntry>;
       const source, lib, files : IList<ISpecFileEntry>; const search : IList<ISpecSearchPath>);
@@ -434,7 +432,6 @@ begin
     end);
 end;
 
-
 function TSpecTemplateBase.LoadSearchPathsFromJson(const searchPathsArray : TJsonArray) : Boolean;
 var
   i : integer;
@@ -492,7 +489,6 @@ begin
       FSourceFiles.Add(value as ISpecFileEntry);
     end);
 end;
-
 
 function TSpecTemplateBase.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var

@@ -30,6 +30,7 @@ unit DPM.Core.Spec.Node;
 interface
 
 uses
+  Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Logging,
   JsonDataObjects,
@@ -43,7 +44,9 @@ type
   protected
     property Logger : ILogger read FLogger;
     function LoadFromJson(const jsonObject : TJsonObject) : boolean; virtual; abstract;
+    function ToJSON: string; virtual; abstract;
     function LoadJsonCollection(const collection : TJSonArray; const nodeClass : TSpecNodeClass; const action : TConstProc<IInterface>) : boolean;
+    function LoadObjectList(list: Spring.Collections.IList<ISpecNode>): TJsonArray;
   public
     constructor Create(const logger : ILogger); virtual;
   end;
@@ -75,6 +78,19 @@ begin
     obj := collection.O[i];
     item.LoadFromJson(obj);
     action(item);
+  end;
+end;
+
+function TSpecNode.LoadObjectList(list: Spring.Collections.IList<ISpecNode>): TJsonArray;
+var
+  i: Integer;
+  json : TJSONObject;
+begin
+  Result := TJsonArray.Create;
+  for i := 0 to list.Count - 1 do
+  begin
+    json := TJsonObject.Parse(list[i].ToJson) as TJsonObject;
+    Result.Add(json);
   end;
 end;
 

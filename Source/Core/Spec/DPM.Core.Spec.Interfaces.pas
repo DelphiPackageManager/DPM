@@ -44,6 +44,8 @@ type
   ISpecNode = interface
     ['{AD47A3ED-591B-4E47-94F2-7EC136182202}']
     function LoadFromJson(const jsonObject : TJsonObject) : boolean;
+    function LoadObjectList(list: Spring.Collections.IList<ISpecNode>): TJsonArray;
+    function ToJSON: string;
   end;
 
   ISpecDependency = interface(ISpecNode)
@@ -264,7 +266,6 @@ type
     function FindSourceFileBySrc(const src : string) : ISpecFileEntry;
     function FindOtherFileBySrc(const src : string) : ISpecFileEntry;
     function FindBuildEntryById(const id : string) : ISpecBuildEntry;
-
 
     property LibFiles : IList<ISpecFileEntry>read GetLibFiles;
     property SourceFiles : IList<ISpecFileEntry>read GetSourceFiles;

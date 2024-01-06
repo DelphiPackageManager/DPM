@@ -54,6 +54,7 @@ type
 
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function CloneForPlatform(const platform : TDPMPlatform) : ISpecTargetPlatform;
+    function ToJSON: string; override;
   public
     constructor Create(const logger : ILogger); override;
     constructor CreateReducedClone(const logger : ILogger; const targetPlatform : ISpecTargetPlatform; const platform : TDPMPlatform; const variables : TStrings);
@@ -271,6 +272,31 @@ begin
   end;
 
   result := inherited LoadFromJson(jsonObject) and result;
+end;
+
+function TSpecTargetPlatform.ToJSON: string;
+var
+  json : TJSONObject;
+  platformList : string;
+  i: Integer;
+begin
+  json := TJSONObject.Create;
+  try
+    json.S['compiler'] := CompilerToString(FCompiler);
+    platformList := '';
+    for i := 0 to High(FPlatforms) do
+    begin
+      if platformList.IsEmpty then
+        platformList := DPMPlatformToString(FPlatforms[i])
+      else
+        platformList := platformList + ', ' + DPMPlatformToString(FPlatforms[i]);
+    end;
+    json.S['platforms'] := platformList;
+    json.S['template'] := FTemplateName;
+    Result := json.ToJSON;
+  finally
+    FreeAndNil(json);
+  end;
 end;
 
 end.

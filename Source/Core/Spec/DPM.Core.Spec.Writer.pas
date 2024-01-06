@@ -12,28 +12,39 @@ type
   TPackageSpecWriter = class(TInterfacedObject, IPackageSpecWriter)
   private
     FLogger : ILogger;
+    FSpec : IPackageSpec;
   protected
     function CreateSpecFile(const options : TSpecOptions) : Boolean;
   public
-    constructor Create(const logger : ILogger);
+    constructor Create(const logger : ILogger; spec: IPackageSpec);
+    procedure SaveToFile(filename: string);
   end;
 
 implementation
 
 uses
+  System.IOUtils,
+  JSONDataObjects,
   DPM.Core.Project.Interfaces;
 
 { TPackageSpecWriter }
 
-constructor TPackageSpecWriter.Create(const logger : ILogger);
+constructor TPackageSpecWriter.Create(const logger : ILogger; spec: IPackageSpec);
 begin
   FLogger := logger;
+  FSpec := spec;
 end;
 
 function TPackageSpecWriter.CreateSpecFile(const options : TSpecOptions) : Boolean;
 begin
   result := false;
 
+end;
+
+procedure TPackageSpecWriter.SaveToFile(filename: string);
+begin
+  JsonSerializationConfig.IndentChar := ' ';
+  TFile.WriteAllText(Filename, Fspec.ToJson);
 end;
 
 end.
