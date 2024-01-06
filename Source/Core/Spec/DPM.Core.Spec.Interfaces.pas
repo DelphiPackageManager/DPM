@@ -270,7 +270,8 @@ type
   ISpecTemplate = interface(ISpecTemplateBase)
     ['{FB9EE9B8-E77B-4E45-A838-E1C9C9947CFB}']
     function GetName : string;
-    property Name : string read GetName;
+    procedure SetName(templateName: string);
+    property Name : string read GetName write SetName;
   end;
 
 
@@ -301,6 +302,9 @@ type
     //builds out the full spec
     function PreProcess(const version : TPackageVersion; const properties : TStringList) : boolean;
     function GenerateManifestJson(const version : TPackageVersion; const targetPlatform : ISpecTargetPlatform) : string;
+    function FindTemplate(const name : string) : ISpecTemplate;
+    function NewTemplate(const name: string): ISpecTemplate;
+    procedure RenameTemplate(const currentTemplateName: string; const NewTemplateName:string);
 
     property MetaData : ISpecMetaData read GetMetaData;
     property TargetPlatforms : IList<ISpecTargetPlatform>read GetTargetPlatforms;

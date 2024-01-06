@@ -85,6 +85,8 @@ type
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
 
     function FindTemplate(const name : string) : ISpecTemplate;
+    function NewTemplate(const name : string) : ISpecTemplate;
+    procedure RenameTemplate(const currentTemplateName: string; const NewTemplateName:string);
   public
     constructor Create(const logger : ILogger; const fileName : string); reintroduce;
   end;
@@ -801,6 +803,20 @@ begin
   end;
 end;
 
+
+function TSpec.NewTemplate(const name: string): ISpecTemplate;
+var
+  itemplate : ISpecTemplate;
+begin
+  if FindTemplate(name) <> nil then
+    raise Exception.Create('Template name already exists');
+
+  itemplate := TSpecTemplate.Create(Logger);
+  itemplate.Name := name;
+
+  GetTemplates.Add(itemplate);
+end;
+
 function TSpec.PreProcess(const version : TPackageVersion; const properties : TStringList) : boolean;
 begin
   result := false;
@@ -815,6 +831,19 @@ begin
     exit;
 
   result := true;
+end;
+
+procedure TSpec.RenameTemplate(const currentTemplateName, NewTemplateName: string);
+var
+  template : ISpecTemplate;
+begin
+  template := FindTemplate(currentTemplateName);
+  if not Assigned(template) then
+    raise Exception.Create('Template not found');
+
+  template.Name := NewTemplateName;
+
+
 end;
 
 function TSpec.ReplaceTokens(const version : TPackageVersion; const properties : TStringList) : boolean;

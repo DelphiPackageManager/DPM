@@ -41,6 +41,7 @@ type
     FName : string;
   protected
     function GetName : string;
+    procedure SetName(templateName: string);
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function AllowDependencyGroups : Boolean; override;
     function AllowSearchPathGroups : Boolean; override;
@@ -93,6 +94,11 @@ begin
   Logger.Debug('[template] name : ' + FName);
 
   result := inherited LoadFromJson(jsonObject) and result;
+end;
+
+procedure TSpecTemplate.SetName(templateName: string);
+begin
+  FName := templateName;
 end;
 
 end.
