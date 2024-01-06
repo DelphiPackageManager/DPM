@@ -139,6 +139,8 @@ begin
     json.S['src'] := FSource;
     if FCopyLocal then
       json.B['copyLocal'] := FCopyLocal;
+    if FInstall then
+      json.B['install'] := FInstall;
     Result := json.ToJSON;
   finally
     FreeAndNil(json);

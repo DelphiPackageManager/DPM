@@ -277,8 +277,10 @@ end;
 function TSpecTargetPlatform.ToJSON: string;
 var
   json : TJSONObject;
+  jsonVariables : TJSONObject;
   platformList : string;
   i: Integer;
+  j: Integer;
 begin
   json := TJSONObject.Create;
   try
@@ -293,6 +295,15 @@ begin
     end;
     json.S['platforms'] := platformList;
     json.S['template'] := FTemplateName;
+    if FVariables.Count > 0 then
+    begin
+      jsonVariables := TJSONObject.Create;
+      for j := 0 to FVariables.Count - 1 do
+      begin
+        jsonVariables.S[FVariables.Names[j]] := FVariables.ValueFromIndex[j];
+      end;
+      json.O['variables'] := jsonVariables;
+    end;
     Result := json.ToJSON;
   finally
     FreeAndNil(json);

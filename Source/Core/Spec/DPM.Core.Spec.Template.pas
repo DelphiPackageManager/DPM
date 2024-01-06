@@ -113,6 +113,7 @@ begin
     json.A['source'] := LoadObjectList(FSourceFiles as IList<ISpecNode>);
     json.A['searchPaths'] := LoadObjectList(FSearchPaths as IList<ISpecNode>);
     json.A['build'] := LoadObjectList(FBuildEntries as IList<ISpecNode>);
+    json.A['design'] := LoadObjectList(FDesignFiles as IList<ISpecNode>);
     json.A['runtime'] := LoadObjectList(FRuntimeFiles as IList<ISpecNode>);
 
     Result := json.ToJSON(True);
