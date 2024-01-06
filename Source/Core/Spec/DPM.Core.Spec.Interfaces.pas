@@ -246,6 +246,15 @@ type
     function GetSearchPaths : IList<ISpecSearchPath>;
     function GetBuildEntries : IList<ISpecBuildEntry>;
 
+    function NewSource(const src: string): ISpecFileEntry;
+    function NewLib(const src: string): ISpecFileEntry;
+    function NewFiles(const src: string): ISpecFileEntry;
+    function NewSearchPath(const path : string) : ISpecSearchPath;
+    function NewRuntimeBplBySrc(const src : string) : ISpecBPLEntry;
+    function NewDesignBplBySrc(const src : string) : ISpecBPLEntry;
+    function NewBuildEntryById(const id : string) : ISpecBuildEntry;
+
+
     function FindDependencyById(const id : string) : ISpecDependency;
     function FindDependencyGroupByTargetPlatform(const targetPlatform : TTargetPlatform) : ISpecDependencyGroup;
     function FindSearchPathByPath(const path : string) : ISpecSearchPath;

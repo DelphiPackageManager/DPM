@@ -61,6 +61,14 @@ type
     function GetSearchPaths : IList<ISpecSearchPath>;
     function GetBuildEntries : IList<ISpecBuildEntry>;
 
+    function NewSource(const src: string): ISpecFileEntry;
+    function NewLib(const src: string): ISpecFileEntry;
+    function NewFiles(const src: string): ISpecFileEntry;
+    function NewSearchPath(const path : string) : ISpecSearchPath;
+    function NewRuntimeBplBySrc(const src : string) : ISpecBPLEntry;
+    function NewDesignBplBySrc(const src : string) : ISpecBPLEntry;
+    function NewBuildEntryById(const id : string) : ISpecBuildEntry;
+
     function FindDependencyById(const id : string) : ISpecDependency;
     function FindDependencyGroupByTargetPlatform(const targetPlatform : TTargetPlatform) : ISpecDependencyGroup;
     function FindSearchPathByPath(const path : string) : ISpecSearchPath;
@@ -146,6 +154,70 @@ begin
   FSearchPaths.AddRange(search);
 
 end;
+
+function TSpecTemplateBase.NewSource(const src: string): ISpecFileEntry;
+var
+  sourceFilesEntry : ISpecFileEntry;
+begin
+  sourceFilesEntry := TSpecFileEntry.Create(Logger);
+  sourceFilesEntry.Source := src;
+  FSourceFiles.Add(sourceFilesEntry);
+end;
+
+function TSpecTemplateBase.NewLib(const src: string): ISpecFileEntry;
+var
+  sourceFilesEntry : ISpecFileEntry;
+begin
+  sourceFilesEntry := TSpecFileEntry.Create(Logger);
+  sourceFilesEntry.Source := src;
+  FLibFiles.Add(sourceFilesEntry);
+end;
+
+function TSpecTemplateBase.NewFiles(const src: string): ISpecFileEntry;
+var
+  sourceFilesEntry : ISpecFileEntry;
+begin
+  sourceFilesEntry := TSpecFileEntry.Create(Logger);
+  sourceFilesEntry.Source := src;
+  FFiles.Add(sourceFilesEntry);
+end;
+
+function TSpecTemplateBase.NewSearchPath(const path : string) : ISpecSearchPath;
+var
+  sourceFilesEntry : ISpecSearchPath;
+begin
+  sourceFilesEntry := TSpecSearchPath.Create(Logger);
+  sourceFilesEntry.Path := path;
+  FSearchPaths.Add(sourceFilesEntry);
+end;
+
+function TSpecTemplateBase.NewRuntimeBplBySrc(const src : string) : ISpecBPLEntry;
+var
+  runtimeBPLFilesEntry : ISpecBPLEntry;
+begin
+  runtimeBPLFilesEntry := TSpecBPLEntry.Create(Logger);
+  runtimeBPLFilesEntry.Source := src;
+  FRuntimeFiles.Add(runtimeBPLFilesEntry);
+end;
+
+function TSpecTemplateBase.NewDesignBplBySrc(const src : string) : ISpecBPLEntry;
+var
+  designFilesEntry : ISpecBPLEntry;
+begin
+  designFilesEntry := TSpecBPLEntry.Create(Logger);
+  designFilesEntry.Source := src;
+  FDesignFiles.Add(designFilesEntry);
+end;
+
+function TSpecTemplateBase.NewBuildEntryById(const id : string) : ISpecBuildEntry;
+var
+  buildEntry : ISpecBuildEntry;
+begin
+  buildEntry := TSpecBuildEntry.Create(Logger);
+  buildEntry.id := id;
+  FBuildEntries.Add(buildEntry);
+end;
+
 
 function TSpecTemplateBase.FindBuildEntryById(const id : string) : ISpecBuildEntry;
 begin
