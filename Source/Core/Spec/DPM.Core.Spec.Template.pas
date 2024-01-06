@@ -109,12 +109,17 @@ begin
   json := TJsonObject.Create;
   try
     json.s['name'] := FName;
+    if FDependencies.Count > 0 then
+      json.A['dependencies'] := LoadObjectList(FDependencies as IList<ISpecNode>);
 
     json.A['source'] := LoadObjectList(FSourceFiles as IList<ISpecNode>);
     json.A['searchPaths'] := LoadObjectList(FSearchPaths as IList<ISpecNode>);
-    json.A['build'] := LoadObjectList(FBuildEntries as IList<ISpecNode>);
-    json.A['design'] := LoadObjectList(FDesignFiles as IList<ISpecNode>);
-    json.A['runtime'] := LoadObjectList(FRuntimeFiles as IList<ISpecNode>);
+    if FBuildEntries.Count > 0 then
+      json.A['build'] := LoadObjectList(FBuildEntries as IList<ISpecNode>);
+    if FDesignFiles.Count > 0 then
+      json.A['design'] := LoadObjectList(FDesignFiles as IList<ISpecNode>);
+    if FRuntimeFiles.Count > 0 then
+      json.A['runtime'] := LoadObjectList(FRuntimeFiles as IList<ISpecNode>);
 
     Result := json.ToJSON(True);
   finally

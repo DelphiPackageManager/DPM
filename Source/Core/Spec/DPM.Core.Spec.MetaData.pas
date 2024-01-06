@@ -392,7 +392,8 @@ begin
     json.S['id'] := FId;
     json.S['version'] := FVersion.ToString;
     json.S['description'] := FDescription;
-    json.S['icon'] := FIcon;
+    if Length(FIcon) > 0 then
+      json.S['icon'] := FIcon;
     json.S['authors'] := FAuthors;
     json.S['projectUrl'] := FProjectUrl;
     json.S['repositoryUrl'] := FRepositoryUrl;
