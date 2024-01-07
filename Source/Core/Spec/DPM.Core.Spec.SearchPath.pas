@@ -46,7 +46,7 @@ type
     function IsGroup : Boolean; virtual;
     function Clone : ISpecSearchPath; virtual;
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
-    function ToJSon: string; override;
+    function ToJSON: string; override;
 
     constructor CreateClone(const logger : ILogger; const path : string);
   public

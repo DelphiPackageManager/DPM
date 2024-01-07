@@ -51,6 +51,7 @@ type
     function GetDestination : string;
     function GetExclude : IList<string>;
     function GetFlatten : Boolean;
+    procedure SetFlatten(value: Boolean);
     procedure SetSource(const value : string);
     procedure SetDestination(const value : string);
     function GetIgnore : boolean;
@@ -59,7 +60,7 @@ type
     function Clone : ISpecFileEntry;
   public
     constructor Create(const logger : ILogger); override;
-    function ToJson: string; override;
+    function ToJSON: string; override;
   end;
 
 implementation
@@ -180,6 +181,11 @@ end;
 procedure TSpecFileEntry.SetDestination(const value : string);
 begin
   FDestination := value;
+end;
+
+procedure TSpecFileEntry.SetFlatten(value: Boolean);
+begin
+  FFlatten := value;
 end;
 
 end.

@@ -75,6 +75,7 @@ type
     function GetCopyFiles: IList<ISpecCopyEntry>;
 
     procedure SetProject(const value : string);
+    procedure SetConfig(const value: string);
     procedure SetLibOutputDir(const value : string);
     procedure SetBplOutputDir(const value : string);
     procedure SetId(const value : string);
@@ -231,6 +232,11 @@ begin
   FBuildForDesign := value;
 end;
 
+
+procedure TSpecBuildEntry.SetConfig(const value: string);
+begin
+  FConfig := value;
+end;
 
 procedure TSpecBuildEntry.SetDesignOnly(const value: boolean);
 begin

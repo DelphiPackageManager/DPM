@@ -90,6 +90,7 @@ type
     function NewTemplate(const name : string) : ISpecTemplate;
     procedure RenameTemplate(const currentTemplateName: string; const NewTemplateName:string);
     procedure DeleteTemplate(const templateName: string);
+    function DuplicateTemplate(const sourceTemplate: ISpecTemplate; const newTemplateName: string): ISpecTemplate;
   public
     constructor Create(const logger : ILogger; const fileName : string); reintroduce;
   end;
@@ -427,6 +428,11 @@ begin
       Exit;
     end;
   end;
+end;
+
+function TSpec.DuplicateTemplate(const sourceTemplate: ISpecTemplate; const newTemplateName: string): ISpecTemplate;
+begin
+{ TODO -oGS : Implement this function }
 end;
 
 function TSpec.ExpandTargetPlatforms : boolean;

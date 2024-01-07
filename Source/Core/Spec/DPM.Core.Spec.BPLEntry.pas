@@ -48,6 +48,8 @@ type
     procedure SetSource(const value : string);
     function GetCopyLocal : Boolean;
     function GetInstall : Boolean;
+    procedure SetCopyLocal(const value : Boolean);
+    procedure SetInstall(const value : Boolean);
     function GetBuildId : string;
     procedure SetBuildId(const value : string);
     function Clone : ISpecBPLEntry;
@@ -122,6 +124,16 @@ end;
 procedure TSpecBPLEntry.SetBuildId(const value: string);
 begin
   FBuildId := value;
+end;
+
+procedure TSpecBPLEntry.SetCopyLocal(const value: Boolean);
+begin
+  FCopyLocal := value;
+end;
+
+procedure TSpecBPLEntry.SetInstall(const value: Boolean);
+begin
+  FInstall := value;
 end;
 
 procedure TSpecBPLEntry.SetSource(const value: string);

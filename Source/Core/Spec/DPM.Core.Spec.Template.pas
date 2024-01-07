@@ -46,10 +46,10 @@ type
     function AllowDependencyGroups : Boolean; override;
     function AllowSearchPathGroups : Boolean; override;
     function IsTemplate : Boolean; override;
-
+    function ToJSON: string; override;
   public
     constructor Create(const logger : ILogger); override;
-    function ToJSON: string; override;
+
   end;
 
 implementation
