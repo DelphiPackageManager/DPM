@@ -35,17 +35,17 @@ uses
   DPM.Core.Spec.Node;
 
 type
+  //Files that need to be copied to the lib folder after compilation - typically dfm and res files
   TSpecCopyEntry = class(TSpecNode, ISpecCopyEntry)
   private
     FSource : string;
     FFlatten : boolean;
-
-
   protected
     function GetSource : string;
     function GetFlatten : boolean;
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function Clone : ISpecCopyEntry;
+    function ToJSON: string; override;
   public
     constructor CreateClone(const logger : ILogger; const source : string; const flatten : boolean); reintroduce;
   public
@@ -314,6 +314,20 @@ begin
     result := false;
   end;
   FFlatten := jsonObject.B['flatten'];
+end;
+
+function TSpecCopyEntry.ToJSON: string;
+var
+  json : TJSONObject;
+begin
+  json := TJSONObject.Create;
+  try
+    json.S['src'] := FSource;
+    json.B['flatten'] := FFlatten;
+    Result := json.ToJSON;
+  finally
+    FreeAndNil(json);
+  end;
 end;
 
 end.
