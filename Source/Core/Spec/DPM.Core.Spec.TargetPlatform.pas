@@ -319,7 +319,7 @@ begin
     platformList := '';
     for i := 0 to High(FPlatforms) do
     begin
-      if platformList.IsEmpty then
+      if platformList = '' then
         platformList := DPMPlatformToString(FPlatforms[i])
       else
         platformList := platformList + ', ' + DPMPlatformToString(FPlatforms[i]);
