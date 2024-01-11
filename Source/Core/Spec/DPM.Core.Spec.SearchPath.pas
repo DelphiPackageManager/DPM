@@ -46,6 +46,7 @@ type
     function IsGroup : Boolean; virtual;
     function Clone : ISpecSearchPath; virtual;
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
+    function ToJSON: string; override;
 
     constructor CreateClone(const logger : ILogger; const path : string);
   public
@@ -106,6 +107,19 @@ end;
 procedure TSpecSearchPath.SetPath(const value : string);
 begin
   FPath := value;
+end;
+
+function TSpecSearchPath.ToJSon: string;
+var
+  json : TJsonObject;
+begin
+  json := TJsonObject.Create;
+  try
+    json.S['path'] := FPath;
+    Result := json.ToJSON;
+  finally
+    FreeAndNil(json);
+  end;
 end;
 
 end.

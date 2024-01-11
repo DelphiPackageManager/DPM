@@ -75,6 +75,7 @@ type
     function GetCopyFiles: IList<ISpecCopyEntry>;
 
     procedure SetProject(const value : string);
+    procedure SetConfig(const value: string);
     procedure SetLibOutputDir(const value : string);
     procedure SetBplOutputDir(const value : string);
     procedure SetId(const value : string);
@@ -83,6 +84,7 @@ type
 
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function Clone : ISpecBuildEntry;
+    function ToJSON: string; override;
 
   public
     constructor CreateClone(const logger : ILogger; const id, project, config, bpldir, libdir : string; const designOnly : boolean; const buildForDesign : boolean; const copyFiles : IList<ISpecCopyEntry>); reintroduce;
@@ -92,6 +94,9 @@ type
   end;
 
 implementation
+
+uses
+  System.SysUtils;
 
 { TSpecBuildEntry }
 
@@ -228,6 +233,11 @@ begin
 end;
 
 
+procedure TSpecBuildEntry.SetConfig(const value: string);
+begin
+  FConfig := value;
+end;
+
 procedure TSpecBuildEntry.SetDesignOnly(const value: boolean);
 begin
   FDesignOnly := value;
@@ -241,6 +251,27 @@ end;
 procedure TSpecBuildEntry.SetProject(const value : string);
 begin
   FProject := value;
+end;
+
+function TSpecBuildEntry.ToJSON: string;
+var
+  json : TJSONObject;
+begin
+  json := TJSONObject.Create;
+  try
+    json.S['id'] := FId;
+    json.S['project'] := FProject;
+    if FDesignOnly then
+      json.B['designOnly'] := FDesignOnly;
+    json.S['config'] := FConfig;
+
+    if FBuildForDesign then
+      json.B['buildForDesign'] := FBuildForDesign;
+
+    Result := json.ToJSON;
+  finally
+    FreeAndNil(json);
+  end;
 end;
 
 { TSpecCopyEntry }

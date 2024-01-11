@@ -61,6 +61,24 @@ type
     function GetSearchPaths : IList<ISpecSearchPath>;
     function GetBuildEntries : IList<ISpecBuildEntry>;
 
+    function NewSource(const src: string): ISpecFileEntry;
+    function NewLib(const src: string): ISpecFileEntry;
+    function NewFiles(const src: string): ISpecFileEntry;
+    function NewSearchPath(const path : string) : ISpecSearchPath;
+    function NewRuntimeBplBySrc(const src : string) : ISpecBPLEntry;
+    function NewDesignBplBySrc(const src : string) : ISpecBPLEntry;
+    function NewBuildEntryById(const id : string) : ISpecBuildEntry;
+    function NewDependencyById(const id : string) : ISpecDependency;
+
+    procedure DeleteSource(const src: string);
+    procedure DeleteLib(const src: string);
+    procedure DeleteFiles(const src: string);
+    procedure DeleteSearchPath(const path : string);
+    procedure DeleteRuntimeBplBySrc(const src : string);
+    procedure DeleteDesignBplBySrc(const src : string);
+    procedure DeleteBuildEntryById(const src : string);
+    procedure DeleteDependencyById(const id : string);
+
     function FindDependencyById(const id : string) : ISpecDependency;
     function FindDependencyGroupByTargetPlatform(const targetPlatform : TTargetPlatform) : ISpecDependencyGroup;
     function FindSearchPathByPath(const path : string) : ISpecSearchPath;
@@ -70,7 +88,6 @@ type
     function FindSourceFileBySrc(const src : string) : ISpecFileEntry;
     function FindOtherFileBySrc(const src : string) : ISpecFileEntry;
     function FindBuildEntryById(const id : string) : ISpecBuildEntry;
-
 
     //    function LoadCollection(const rootElement : IXMLDOMElement; const collectionPath : string; const nodeClass : TSpecNodeClass; const action : TConstProc<ISpecNode>) : boolean;
 
@@ -85,7 +102,6 @@ type
 
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
 
-
     constructor CreateClone(const logger : ILogger; const deps : IList<ISpecDependency>; const design, runtime : IList<ISpecBPLEntry>;
       const source, lib, files : IList<ISpecFileEntry>; const search : IList<ISpecSearchPath>);
   public
@@ -93,7 +109,6 @@ type
 
 
   end;
-
 
 
 implementation
@@ -146,6 +161,151 @@ begin
   FSearchPaths.AddRange(search);
 
 end;
+
+procedure TSpecTemplateBase.DeleteBuildEntryById(const src: string);
+var
+  build : ISpecBuildEntry;
+begin
+  build := FindBuildEntryById(src);
+  FBuildEntries.Remove(build);
+end;
+
+procedure TSpecTemplateBase.DeleteDependencyById(const id: string);
+var
+  dependency : ISpecDependency;
+begin
+  dependency := Self.FindDependencyById(id);
+  FDependencies.Remove(dependency);
+end;
+
+procedure TSpecTemplateBase.DeleteDesignBplBySrc(const src: string);
+var
+  design : ISpecBPLEntry;
+begin
+  design := FindDesignBplBySrc(src);
+  FDesignFiles.Remove(design);
+end;
+
+procedure TSpecTemplateBase.DeleteFiles(const src: string);
+var
+  fileEntry : ISpecFileEntry;
+begin
+  fileEntry := FindOtherFileBySrc(src);
+  FFiles.Remove(fileEntry);
+end;
+
+procedure TSpecTemplateBase.DeleteLib(const src: string);
+var
+  fileEntry : ISpecFileEntry;
+begin
+  fileEntry := FindLibFileBySrc(src);
+  FLibFiles.Remove(fileEntry);
+end;
+
+procedure TSpecTemplateBase.DeleteRuntimeBplBySrc(const src: string);
+var
+  fileEntry : ISpecBPLEntry;
+begin
+  fileEntry := FindRuntimeBplBySrc(src);
+  FRuntimeFiles.Remove(fileEntry);
+end;
+
+procedure TSpecTemplateBase.DeleteSearchPath(const path: string);
+var
+  searchPath : ISpecSearchPath;
+begin
+  searchPath := FindSearchPathByPath(path);
+  FSearchPaths.Remove(searchPath);
+end;
+
+procedure TSpecTemplateBase.DeleteSource(const src: string);
+var
+  source : ISpecFileEntry;
+begin
+  source := FindSourceFileBySrc(src);
+  FSourceFiles.Remove(source);
+end;
+
+function TSpecTemplateBase.NewSource(const src: string): ISpecFileEntry;
+var
+  sourceFilesEntry : ISpecFileEntry;
+begin
+  sourceFilesEntry := TSpecFileEntry.Create(Logger);
+  sourceFilesEntry.Source := src;
+  FSourceFiles.Add(sourceFilesEntry);
+  Result := sourceFilesEntry;
+end;
+
+function TSpecTemplateBase.NewLib(const src: string): ISpecFileEntry;
+var
+  sourceFilesEntry : ISpecFileEntry;
+begin
+  sourceFilesEntry := TSpecFileEntry.Create(Logger);
+  sourceFilesEntry.Source := src;
+  FLibFiles.Add(sourceFilesEntry);
+  Result := sourceFilesEntry;
+end;
+
+function TSpecTemplateBase.NewFiles(const src: string): ISpecFileEntry;
+var
+  sourceFilesEntry : ISpecFileEntry;
+begin
+  sourceFilesEntry := TSpecFileEntry.Create(Logger);
+  sourceFilesEntry.Source := src;
+  FFiles.Add(sourceFilesEntry);
+  Result := sourceFilesEntry;
+end;
+
+function TSpecTemplateBase.NewSearchPath(const path : string) : ISpecSearchPath;
+var
+  searchPath : ISpecSearchPath;
+begin
+  searchPath := TSpecSearchPath.Create(Logger);
+  searchPath.Path := path;
+  FSearchPaths.Add(searchPath);
+  Result := searchPath;
+end;
+
+function TSpecTemplateBase.NewRuntimeBplBySrc(const src : string) : ISpecBPLEntry;
+var
+  runtimeBPLFilesEntry : ISpecBPLEntry;
+begin
+  runtimeBPLFilesEntry := TSpecBPLEntry.Create(Logger);
+  runtimeBPLFilesEntry.Source := src;
+  FRuntimeFiles.Add(runtimeBPLFilesEntry);
+  Result := runtimeBPLFilesEntry;
+end;
+
+function TSpecTemplateBase.NewDependencyById(const id: string): ISpecDependency;
+var
+  dependency : ISpecDependency;
+begin
+  dependency := TSpecDependency.Create(Logger);
+  dependency.Id := id;
+  FDependencies.Add(dependency);
+  Result := dependency;
+end;
+
+function TSpecTemplateBase.NewDesignBplBySrc(const src : string) : ISpecBPLEntry;
+var
+  designFilesEntry : ISpecBPLEntry;
+begin
+  designFilesEntry := TSpecBPLEntry.Create(Logger);
+  designFilesEntry.Source := src;
+  FDesignFiles.Add(designFilesEntry);
+  Result := designFilesEntry;
+end;
+
+function TSpecTemplateBase.NewBuildEntryById(const id : string) : ISpecBuildEntry;
+var
+  buildEntry : ISpecBuildEntry;
+begin
+  buildEntry := TSpecBuildEntry.Create(Logger);
+  buildEntry.id := id;
+  FBuildEntries.Add(buildEntry);
+  Result := buildEntry;
+end;
+
 
 function TSpecTemplateBase.FindBuildEntryById(const id : string) : ISpecBuildEntry;
 begin
@@ -362,7 +522,6 @@ begin
     end);
 end;
 
-
 function TSpecTemplateBase.LoadSearchPathsFromJson(const searchPathsArray : TJsonArray) : Boolean;
 var
   i : integer;
@@ -420,7 +579,6 @@ begin
       FSourceFiles.Add(value as ISpecFileEntry);
     end);
 end;
-
 
 function TSpecTemplateBase.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var

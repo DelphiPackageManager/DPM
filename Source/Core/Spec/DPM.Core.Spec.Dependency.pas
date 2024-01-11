@@ -43,6 +43,7 @@ type
     FVersionString : string;
   protected
     function GetId : string;
+    procedure SetId(Id: string);
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
     function GetVersionString : string;
@@ -50,6 +51,7 @@ type
     function IsGroup : Boolean; virtual;
     constructor CreateClone(const logger : ILogger; const id : string; const version : TVersionRange; const versionString : string);
     function Clone : ISpecDependency; virtual;
+    function ToJSON: string; override;
   public
     constructor Create(const logger : ILogger); override;
   end;
@@ -57,6 +59,7 @@ type
 implementation
 
 uses
+  System.SysUtils,
   VSoft.SemanticVersion,
   DPM.Core.Packaging.IdValidator;
 
@@ -135,9 +138,28 @@ begin
 
 end;
 
+procedure TSpecDependency.SetId(Id: string);
+begin
+  FId := Id;
+end;
+
 procedure TSpecDependency.SetVersionRange(const value : TVersionRange);
 begin
   FVersion := value;
+end;
+
+function TSpecDependency.ToJSON: string;
+var
+  json : TJsonObject;
+begin
+  json := TJsonObject.Create;
+  try
+    json.S['id'] := FId;
+    json.S['version'] := FVersion.ToString;
+    Result := json.ToJSON;
+  finally
+    FreeAndNil(json);
+  end;
 end;
 
 end.

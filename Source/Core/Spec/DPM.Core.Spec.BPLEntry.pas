@@ -48,12 +48,15 @@ type
     procedure SetSource(const value : string);
     function GetCopyLocal : Boolean;
     function GetInstall : Boolean;
+    procedure SetCopyLocal(const value : Boolean);
+    procedure SetInstall(const value : Boolean);
     function GetBuildId : string;
     procedure SetBuildId(const value : string);
     function Clone : ISpecBPLEntry;
     constructor CreateClone(const logger : ILogger; const src : string; const buildId : string; const copyLocal, install : boolean); reintroduce;
   public
     constructor Create(const logger : ILogger); override;
+    function ToJSON : string; override;
   end;
 
 implementation
@@ -123,9 +126,37 @@ begin
   FBuildId := value;
 end;
 
+procedure TSpecBPLEntry.SetCopyLocal(const value: Boolean);
+begin
+  FCopyLocal := value;
+end;
+
+procedure TSpecBPLEntry.SetInstall(const value: Boolean);
+begin
+  FInstall := value;
+end;
+
 procedure TSpecBPLEntry.SetSource(const value: string);
 begin
   FSource := value;
+end;
+
+function TSpecBPLEntry.ToJSON: string;
+var
+  json : TJSONObject;
+begin
+  json := TJSONObject.Create;
+  try
+    json.S['buildId'] := FBuildId;
+    json.S['src'] := FSource;
+    if FCopyLocal then
+      json.B['copyLocal'] := FCopyLocal;
+    if FInstall then
+      json.B['install'] := FInstall;
+    Result := json.ToJSON;
+  finally
+    FreeAndNil(json);
+  end;
 end;
 
 end.

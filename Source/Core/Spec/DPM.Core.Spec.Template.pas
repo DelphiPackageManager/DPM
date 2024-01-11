@@ -41,11 +41,12 @@ type
     FName : string;
   protected
     function GetName : string;
+    procedure SetName(templateName: string);
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function AllowDependencyGroups : Boolean; override;
     function AllowSearchPathGroups : Boolean; override;
     function IsTemplate : Boolean; override;
-
+    function ToJSON: string; override;
   public
     constructor Create(const logger : ILogger); override;
 
@@ -54,6 +55,7 @@ type
 implementation
 
 uses
+  System.SysUtils,
   DPM.Core.Spec.Dependency,
   DPM.Core.Spec.DependencyGroup;
 
@@ -93,6 +95,37 @@ begin
   Logger.Debug('[template] name : ' + FName);
 
   result := inherited LoadFromJson(jsonObject) and result;
+end;
+
+procedure TSpecTemplate.SetName(templateName: string);
+begin
+  FName := templateName;
+end;
+
+function TSpecTemplate.ToJSON: string;
+var
+  json : TJsonObject;
+begin
+  json := TJsonObject.Create;
+  try
+    json.s['name'] := FName;
+    if FDependencies.Count > 0 then
+      json.A['dependencies'] := LoadObjectList(FDependencies as IList<ISpecNode>);
+
+    json.A['source'] := LoadObjectList(FSourceFiles as IList<ISpecNode>);
+    json.A['searchPaths'] := LoadObjectList(FSearchPaths as IList<ISpecNode>);
+    if FBuildEntries.Count > 0 then
+      json.A['build'] := LoadObjectList(FBuildEntries as IList<ISpecNode>);
+    if FDesignFiles.Count > 0 then
+      json.A['design'] := LoadObjectList(FDesignFiles as IList<ISpecNode>);
+    if FRuntimeFiles.Count > 0 then
+      json.A['runtime'] := LoadObjectList(FRuntimeFiles as IList<ISpecNode>);
+    if FFiles.Count > 0 then
+      json.A['files'] := LoadObjectList(FFiles as IList<ISpecNode>);
+    Result := json.ToJSON(True);
+  finally
+    FreeAndNil(json);
+  end;
 end;
 
 end.

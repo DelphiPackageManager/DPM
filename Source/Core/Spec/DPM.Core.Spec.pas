@@ -83,8 +83,14 @@ type
 
     function LoadTargetPlatformsFromJson(const targetPlatformsArray : TJsonArray) : boolean;
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
+    function ToJSON: string; override;
 
+    // Template functions
     function FindTemplate(const name : string) : ISpecTemplate;
+    function NewTemplate(const name : string) : ISpecTemplate;
+    procedure RenameTemplate(const currentTemplateName: string; const NewTemplateName:string);
+    procedure DeleteTemplate(const templateName: string);
+    function DuplicateTemplate(const sourceTemplate: ISpecTemplate; const newTemplateName: string): ISpecTemplate;
   public
     constructor Create(const logger : ILogger; const fileName : string); reintroduce;
   end;
@@ -97,6 +103,7 @@ uses
   DPM.Core.Dependency.Version,
   DPM.Core.Spec.MetaData,
   DPM.Core.Spec.Template,
+  DPM.Core.Spec.FileEntry,
   DPM.Core.Spec.TargetPlatform,
   DPM.Core.Utils.Strings;
 
@@ -407,6 +414,62 @@ begin
   FMetaData := TSpecMetaData.Create(logger);
   FTargetPlatforms := TCollections.CreateList<ISpecTargetPlatform>;
   FTemplates := TCollections.CreateList<ISpecTemplate>;
+end;
+
+procedure TSpec.DeleteTemplate(const templateName: string);
+var
+  i: Integer;
+begin
+  for i := 0 to FTemplates.Count - 1 do
+  begin
+    if SameText(FTemplates[i].Name, templateName) then
+    begin
+      FTemplates.Delete(i);
+      Exit;
+    end;
+  end;
+end;
+
+function TSpec.DuplicateTemplate(const sourceTemplate: ISpecTemplate; const newTemplateName: string): ISpecTemplate;
+var
+  template : ISpecTemplate;
+  I: Integer;
+begin
+  template := TSpecTemplate.Create(Logger);
+  for I := 0 to sourceTemplate.Dependencies.Count - 1 do
+  begin
+    template.Dependencies.Add(sourceTemplate.Dependencies[i].Clone);
+  end;
+  for I := 0 to sourceTemplate.DesignFiles.Count - 1 do
+  begin
+    template.DesignFiles.Add(sourceTemplate.DesignFiles[i].Clone);
+  end;
+  for I := 0 to sourceTemplate.Files.Count - 1 do
+  begin
+    template.Files.Add(sourceTemplate.Files[i].Clone);
+  end;
+  for I := 0 to sourceTemplate.LibFiles.Count - 1 do
+  begin
+    template.LibFiles.Add(sourceTemplate.LibFiles[i].Clone);
+  end;
+  for I := 0 to sourceTemplate.RuntimeFiles.Count - 1 do
+  begin
+    template.RuntimeFiles.Add(sourceTemplate.RuntimeFiles[i].Clone);
+  end;
+  for I := 0 to sourceTemplate.SourceFiles.Count - 1 do
+  begin
+    template.SourceFiles.Add(sourceTemplate.SourceFiles[i].Clone);
+  end;
+  for I := 0 to sourceTemplate.SearchPaths.Count - 1 do
+  begin
+    template.SearchPaths.Add(sourceTemplate.SearchPaths[i].Clone);
+  end;
+  for I := 0 to sourceTemplate.SearchPaths.Count - 1 do
+  begin
+    template.SearchPaths.Add(sourceTemplate.SearchPaths[i].Clone);
+  end;
+  template.Name := newTemplateName;
+  FTemplates.Add(template);
 end;
 
 function TSpec.ExpandTargetPlatforms : boolean;
@@ -801,6 +864,20 @@ begin
   end;
 end;
 
+
+function TSpec.NewTemplate(const name: string): ISpecTemplate;
+var
+  itemplate : ISpecTemplate;
+begin
+  if FindTemplate(name) <> nil then
+    raise Exception.Create('Template name already exists');
+
+  itemplate := TSpecTemplate.Create(Logger);
+  itemplate.Name := name;
+
+  GetTemplates.Add(itemplate);
+end;
+
 function TSpec.PreProcess(const version : TPackageVersion; const properties : TStringList) : boolean;
 begin
   result := false;
@@ -815,6 +892,17 @@ begin
     exit;
 
   result := true;
+end;
+
+procedure TSpec.RenameTemplate(const currentTemplateName, NewTemplateName: string);
+var
+  currentTemplate : ISpecTemplate;
+begin
+  currentTemplate := FindTemplate(currentTemplateName);
+  if not Assigned(currentTemplate) then
+    raise Exception.Create('Template not found');
+
+  currentTemplate.Name := NewTemplateName;
 end;
 
 function TSpec.ReplaceTokens(const version : TPackageVersion; const properties : TStringList) : boolean;
@@ -919,6 +1007,22 @@ begin
 
   end;
 
+end;
+
+function TSpec.ToJSON: string;
+var
+  json : TJsonObject;
+begin
+  json := TJsonObject.Create;
+  try
+    json.O['metadata'] := TJsonObject.Parse(FMetaData.ToJSON) as TJsonObject;
+    json.A['targetPlatforms'] := LoadObjectList(FTargetPlatforms as IList<ISpecNode>);
+    json.A['templates'] := LoadObjectList(FTemplates as IList<ISpecNode>);
+
+    Result := json.ToJSON(False);
+  finally
+    FreeAndNil(json);
+  end;
 end;
 
 function TSpec.TokenMatchEvaluator(const match : TMatch) : string;
