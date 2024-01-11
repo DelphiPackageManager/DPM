@@ -260,7 +260,7 @@
         <DCCReference Include="IDE\DPM.IDE.ProjectNotifier.pas"/>
         <DCCReference Include="IDE\EditorView\DPM.IDE.ActivityIndicator.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas"/>
-        <DCCReference Include="IDE\DPM.IDE.DesignManager.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.PathManager.pas"/>
         <DCCReference Include="IDE\Compatibility\System.ImageList.pas"/>
         <BuildConfiguration Include="Debug">
             <Key>Cfg_2</Key>

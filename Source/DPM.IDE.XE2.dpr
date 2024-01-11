@@ -176,7 +176,7 @@ uses
   DPM.IDE.ProjectNotifier in 'IDE\DPM.IDE.ProjectNotifier.pas',
   DPM.IDE.ActivityIndicator in 'IDE\EditorView\DPM.IDE.ActivityIndicator.pas',
   DPM.Core.Package.PackageLatestVersionInfo in 'Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas',
-  DPM.IDE.DesignManager in 'IDE\DPM.IDE.DesignManager.pas',
+  DPM.IDE.PathManager in 'IDE\DPM.IDE.PathManager.pas',
   System.Actions in 'IDE\Compatibility\System.Actions.pas',
   System.ImageList in 'IDE\Compatibility\System.ImageList.pas';
 
