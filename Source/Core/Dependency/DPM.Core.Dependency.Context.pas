@@ -61,7 +61,7 @@ type
   TResolverContext = class(TInterfacedObject, IResolverContext)
   private
     FLogger : ILogger;
-    FNoGoods : IDictionary<string, IDictionary<TPackageVersion, byte>>;
+    FNoGoods : IDictionary<string, ISet<TPackageVersion>>;
     FResolved : IDictionary<string, IResolution>;
     FOpenRequirements : IQueue<IPackageInfo>;
     FVersionCache : IDictionary<string, IList<IPackageInfo>>;
@@ -160,7 +160,7 @@ begin
   FLogger := logger;
   FPackageInstallerContext := packageInstallerContext;
   FProjectFile := projectFile;
-  FNoGoods := TCollections.CreateDictionary<string, IDictionary<TPackageVersion, byte>>;
+  FNoGoods := TCollections.CreateDictionary<string, ISet<TPackageVersion>>;
   FResolved := TCollections.CreateDictionary<string, IResolution>;
   FOpenRequirements := TCollections.CreateQueue<IPackageInfo>;
   FVersionCache := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
@@ -212,12 +212,12 @@ end;
 
 function TResolverContext.IsNoGood(const package : IPackageInfo) : boolean;
 var
-  dict : IDictionary<TPackageVersion, byte>;
+  nogoods : ISet<TPackageVersion>;
 begin
   result := false;
-  if FNoGoods.TryGetValue(LowerCase(package.Id), dict) then
+  if FNoGoods.TryGetValue(LowerCase(package.Id), nogoods) then
   begin
-    if dict.ContainsKey(package.Version) then
+    if nogoods.Contains(package.Version) then
       result := true;
   end;
 end;
@@ -237,15 +237,16 @@ end;
 
 function TResolverContext.RecordNoGood(const bad : IPackageInfo) : boolean;
 var
-  dict : IDictionary<TPackageVersion, byte>; //should probably use a ISet
+  nogoods : ISet<TPackageVersion>;
 begin
-  if not FNoGoods.TryGetValue(LowerCase(bad.Id), dict) then
+  if not FNoGoods.TryGetValue(LowerCase(bad.Id), nogoods) then
   begin
-    dict := TCollections.CreateDictionary<TPackageVersion, byte>;
-    FNoGoods.Add(LowerCase(bad.Id), dict);
+    nogoods := TCollections.CreateSet<TPackageVersion>;
+    FNoGoods.Add(LowerCase(bad.Id), nogoods);
   end;
-  result := dict.ContainsKey(bad.Version);
-  dict[bad.Version] := 0;
+  result := nogoods.Contains(bad.Version);
+  if not result then
+    nogoods.add(bad.Version);
 end;
 
 procedure TResolverContext.RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
