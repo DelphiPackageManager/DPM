@@ -73,7 +73,7 @@ type
     procedure RecordGraph(const projectFile : string; const platform : TDPMPlatform; const graph : IPackageReference);
 
     ///<summary> called from the package installer during install/restore - to install design time packages. See IDE implementation</summary>
-    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;
 
 
     ///<summary> Called from the dependency resolver to record package resolutions, so we can detect conflicts in other projects
@@ -83,6 +83,9 @@ type
     ///<summary> Check for an existing package resolution in already loaded projects in the group.
     ///</summary>
     function FindPackageResolution(const projectFile: string; const platform : TDPMPlatform; const packageId : string ) : IResolution;
+
+    //remove an existing resolution - need to do this when upgrading a package.
+    procedure RemoveResolution(const platform : TDPMPlatform; const packageId : string);
 
   end;
 

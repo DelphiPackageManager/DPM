@@ -71,31 +71,66 @@ type
     function GetIsTransitive : boolean;
     function GetProjectFile : string;
 
+    //these will be added when we read the package manifest
+//    procedure AddDesignBPL(const platform : TDPMPlatform; const bplFile : string);
+//
+//    //returns true if we have already loaded the bpls
+//    function GetDesignBPLsLoaded(platform : TDPMPlatform) : boolean;
+//
+//    procedure SetDesignBPLsLoaded(platform : TDPMPlatform; const value : boolean);
+//
+//    function GetDesignBPLs(platform : TDPMPlatform) : IList<string>;
+
     function AddPackageDependency(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IPackageReference;
+
     procedure AddExistingReference(const id : string; const packageReference : IPackageReference);
-    ///
-    /// Breadth first search
+    /// <summary>
+    /// Finds the first reference to a package [id] using a breadth first search
+    ///  </summary>
     function FindFirstPackageReference(const id : string) : IPackageReference;
+
+    /// <summary>
+    /// Finds all references to a package [id] using a breadth first search
+    ///  </summary>
     function FindPackageReferences(const id : string) : IList<IPackageReference>;
 
-    /// <summary> Searches this reference only
+    /// <summary>
+    ///  Find a non transitive dependency
     /// </summary>
-    function FindDependency(const id : string) : IPackageReference;
+    function FindTopLevelDependency(const id : string) : IPackageReference;
+
+    /// <summary>
+    /// Returns true if node has a top level dependency on [id]
+    /// </summary>
     function HasTopLevelDependency(const id : string) : boolean;
+
+    /// <summary>
+    /// Returns true if we have a dependency on [id] at any level in the graph
+    /// </summary>
     function HasAnyDependency(const id : string) : boolean;
+
     function Clone : IPackageReference;
 
-    //removes any child with id recursively (and it's children)
+    /// <summary>
+    /// removes any child with id recursively (and it's children)
+    /// </summary>
     function RemovePackageReference(const packageReference : IPackageReference) : boolean;
     function RemoveTopLevelPackageReference(const id : string) : boolean;
 
     function IsRoot : boolean;
     function HasDependencies : boolean;
+
+    /// <summary>
+    /// Visits child nodes in depth first mode and calls the visitor proc with each node
+    /// </summary>
     procedure VisitDFS(const visitor : TNodeVisitProc);
 
     function ToIdVersionString : string;
 
-    //used by BOM check
+    /// <summary>
+    ///  Compares nodes including their children
+    ///  used by BOM check
+    /// </summary>
     function AreEqual(const otherPackageReference : IPackageReference; const depth : integer = 1) : boolean;
 
     property Id : string read GetId;
@@ -111,6 +146,13 @@ type
     property SearchPaths : IList<string> read GetSearchPaths;
     property LibPath : string read GetLibPath write SetLibPath;
     property BplPath : string read GetBplPath write SetBplPath;
+
+
+    //design support
+//    property DesignBpls[platform : TDPMPlatform] : IList<string> read GetDesignBPLs;
+//
+//    property DesignBplsLoaded[platform : TDPMPlatform] : boolean read GetDesignBplsLoaded write SetDesignBplsLoaded;
+
   end;
 
 

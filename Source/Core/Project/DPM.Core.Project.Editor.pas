@@ -657,7 +657,7 @@ function TProjectEditor.LoadPackageRefences : boolean;
         else
           dupCheckReference := rootNode;
 
-        if dupCheckReference.FindDependency(id) <> nil then
+        if dupCheckReference.FindTopLevelDependency(id) <> nil then
         begin
           if parentReference <> nil then
             raise Exception.Create('Duplicate package reference for package [' + id + '  ' + DPMPlatformToString(platform) + '] under [' + parentReference.Id + ']')

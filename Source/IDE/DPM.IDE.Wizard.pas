@@ -90,7 +90,7 @@ uses
   DPM.IDE.AddInOptions,
   DPM.IDE.Options,
   DPM.IDE.InstallerContext,
-  DPM.IDE.DesignManager;
+  DPM.IDE.PathManager;
 
 {$R DPM.IDE.Resources.res}
 { TDPMWizard }
@@ -105,7 +105,7 @@ begin
     FContainer.RegisterType<IDPMProjectTreeManager, TDPMProjectTreeManager>.AsSingleton();
     FContainer.RegisterType<IDPMEditorViewManager, TDPMEditorViewManager>.AsSingleton();
     FContainer.RegisterType<IDPMIDEProjectController,TDPMIDEProjectController>.AsSingleton();
-    FContainer.RegisterType<IDPMIDEDesignManager,TDPMIDEDesignManager>.AsSingleton();
+    FContainer.RegisterType<IDPMIDEPathManager,TDPMIDEPathManager>.AsSingleton();
 
     DPM.Core.Init.InitCore(FContainer,
       //replaces core registration of the IPackageInstallerContext implementation

@@ -323,7 +323,7 @@ begin
     FStopwatch.Start;
     Application.ProcessMessages;
   end
-  else if FStopwatch.ElapsedMilliseconds > 100 then
+  else if FStopwatch.ElapsedMilliseconds > 50 then
   begin
     FStopwatch.Stop;
     Application.ProcessMessages;

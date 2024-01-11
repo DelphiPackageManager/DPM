@@ -87,7 +87,7 @@ type
     function CopyLocal(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>;
                        const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
 
-    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;
 
     function DoRestoreProjectForPlatform(const cancellationToken: ICancellationToken; const Options: TRestoreOptions; const projectFile: string; const projectEditor: IProjectEditor;
                               const platform: TDPMPlatform; const config: IConfiguration; const context: IPackageInstallerContext): boolean;
@@ -459,15 +459,13 @@ begin
       end;
       FLogger.NewLine;
 
-      if buildEntry.BuildForDesign and (Compiler.platform <> TDPMPlatform.Win32)
-      then
+      if buildEntry.BuildForDesign and (Compiler.platform <> TDPMPlatform.Win32)  then
       begin
         FLogger.Information('Building project [' + projectFile + '] for design time support...');
         // if buildForDesign is true, then it means the design time bpl's also reference
         // this bpl, so if the platform isn't win32 then we need to build it for win32
         Compiler.BPLOutputDir := TPath.Combine(Compiler.BPLOutputDir, 'win32');
         Compiler.LibOutputDir := TPath.Combine(Compiler.LibOutputDir, 'win32');
-
         if packageReference.HasDependencies then
         begin
           searchPaths := TCollections.CreateList<string>;
@@ -754,7 +752,7 @@ begin
     projectPackageGraph := TPackageReference.CreateRoot(Options.compilerVersion, platform);
 
   // see if it's already installed.
-  existingPackageRef := projectPackageGraph.FindDependency(Options.packageId);
+  existingPackageRef := projectPackageGraph.FindTopLevelDependency(Options.packageId);
   if (existingPackageRef <> nil) then
   begin
     // if it's installed already and we're not forcing it to install then we're done.
@@ -783,7 +781,7 @@ begin
   // if the user specified a version, either the on the command line or via a file then we will use that
   if not Options.Version.IsEmpty then
     // sourceName will be empty if we are installing the package from a file
-    newPackageIdentity := TPackageIdentity.Create('', Options.packageId,  Options.Version, Options.compilerVersion, platform)
+    newPackageIdentity := TPackageIdentity.Create(options.Sources, Options.packageId,  Options.Version, Options.compilerVersion, platform)
   else
   begin
     // no version specified, so we need to get the latest version available;
@@ -878,7 +876,7 @@ begin
     projectEditor, platform) then
     exit;
 
-  if not InstallDesignPackages(cancellationToken,  projectFile, packageSpecs) then
+  if not InstallDesignPackages(cancellationToken,  projectFile, platform, packageSpecs) then
     exit;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths,
@@ -951,7 +949,7 @@ begin
   if not CopyLocal(cancellationToken, resolvedPackages, packageSpecs, projectEditor, platform) then
     exit;
 
-  if not InstallDesignPackages(cancellationToken, projectFile, packageSpecs) then
+  if not InstallDesignPackages(cancellationToken, projectFile, platform, packageSpecs) then
     exit;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
@@ -979,7 +977,7 @@ begin
     exit(true);
   end;
 
-  foundReference := projectPackageGraph.FindDependency(Options.packageId);
+  foundReference := projectPackageGraph.FindTopLevelDependency(Options.packageId);
 
   if foundReference = nil then
   begin
@@ -1381,10 +1379,10 @@ begin
 
 end;
 
-function TPackageInstaller.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
+function TPackageInstaller.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
 begin
   //Note : we delegate this to the context as this is a no-op in the command line tool, the IDE plugin provides it's own context implementation.
-  result := FContext.InstallDesignPackages(cancellationToken, projectFile, packageSpecs);
+  result := FContext.InstallDesignPackages(cancellationToken, projectFile, platform, packageSpecs);
 end;
 
 function TPackageInstaller.InstallPackageFromFile(const cancellationToken : ICancellationToken; const Options: TInstallOptions;const projectFiles: TArray<string>;

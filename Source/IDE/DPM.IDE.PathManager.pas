@@ -1,4 +1,4 @@
-unit DPM.IDE.DesignManager;
+unit DPM.IDE.PathManager;
 
 interface
 
@@ -6,12 +6,13 @@ uses
   System.Classes;
 
 type
-  IDPMIDEDesignManager = interface
+  IDPMIDEPathManager = interface
   ['{31ADC6E0-7B8E-4203-A635-7D02FC4C0FC7}']
-
+    procedure RemovePath(const APath : string);
+    procedure EnsurePath(const APath: string);
   end;
 
-  TDPMIDEDesignManager = class(TInterfacedObject, IDPMIDEDesignManager)
+  TDPMIDEPathManager = class(TInterfacedObject, IDPMIDEPathManager)
   private
     FPaths : TStringList;
   protected
@@ -29,9 +30,9 @@ uses
   System.SysUtils,
   System.StrUtils;
 
-{ TDPMIDEDesignManager }
+{ TDPMIDEPathManager }
 
-constructor TDPMIDEDesignManager.Create;
+constructor TDPMIDEPathManager.Create;
 var
   i: Integer;
 begin
@@ -46,7 +47,7 @@ begin
                                      // that were there on startup.
 end;
 
-destructor TDPMIDEDesignManager.Destroy;
+destructor TDPMIDEPathManager.Destroy;
 begin
   FPaths.Free;
   inherited;
@@ -58,7 +59,7 @@ begin
   WinApi.Windows.SetEnvironmentVariable(PChar(Name), PChar(Value));
 end;
 
-procedure TDPMIDEDesignManager.EnsurePath(const APath: string);
+procedure TDPMIDEPathManager.EnsurePath(const APath: string);
 var
   i : integer;
   count : integer;
@@ -78,7 +79,7 @@ begin
   end;
 end;
 
-procedure TDPMIDEDesignManager.RemovePath(const APath: string);
+procedure TDPMIDEPathManager.RemovePath(const APath: string);
 var
   i : integer;
   count : integer;

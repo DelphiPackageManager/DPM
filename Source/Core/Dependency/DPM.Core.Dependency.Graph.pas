@@ -65,13 +65,17 @@ type
     FBplPath : string;
     FCompilerVersion : TCompilerVersion;
     FProjectFile : string;
+
+    FDesignBpls : IDictionary<TDPMPlatform, IList<string>>;
+//    FDesignBplsLoaded : array[TDPMPlatform] of boolean;
+
   protected
     procedure RecursiveClone(const originalReference : IPackageReference; const newParent : IPackageReference);
     procedure AddExistingReference(const id : string; const packageReference : IPackageReference);
     function AddPackageDependency(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IPackageReference;
     function FindFirstPackageReference(const id : string) : IPackageReference;
     function FindPackageReferences(const id : string) : IList<IPackageReference>;
-    function FindDependency(const id : string) : IPackageReference;
+    function FindTopLevelDependency(const id : string) : IPackageReference;
     function HasTopLevelDependency(const id : string) : boolean;
     function HasAnyDependency(const id : string) : boolean;
     function RemoveTopLevelPackageReference(const id : string) : boolean;
@@ -177,7 +181,7 @@ begin
     begin
       if not res then
         exit;
-      otherDependency := otherPackageReference.FindDependency(pair.Value.Id);
+      otherDependency := otherPackageReference.FindTopLevelDependency(pair.Value.Id);
       res := otherDependency <> nil;
       if res then
         res := pair.Value.AreEqual(otherDependency, dependencyDepth);
@@ -218,6 +222,8 @@ begin
   else
     FCompilerVersion := compilerVersion;
 
+  FDesignBpls := TCollections.CreateDictionary<TDPMPlatform, IList<string>>;
+
 end;
 
 constructor TPackageReference.CreateRoot(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform);
@@ -230,7 +236,7 @@ begin
   inherited;
 end;
 
-function TPackageReference.FindDependency(const id : string) : IPackageReference;
+function TPackageReference.FindTopLevelDependency(const id : string) : IPackageReference;
 begin
   result := nil;
   FDependencies.TryGetValue(LowerCase(id), result)

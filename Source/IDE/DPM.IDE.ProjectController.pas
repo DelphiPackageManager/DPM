@@ -84,7 +84,7 @@ begin
   FLogger.Debug('ProjectController.BeginLoading : ' + GetEnumName(TypeInfo(TProjectMode),Ord(mode)));
   FCancellationTokenSource.Reset;
   FLastResult := true;
-  FInstallerContext.Clear;
+//  FInstallerContext.Clear; //should really only do this on closing
 end;
 
 constructor TDPMIDEProjectController.Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager;

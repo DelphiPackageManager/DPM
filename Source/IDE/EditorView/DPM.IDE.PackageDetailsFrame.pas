@@ -671,9 +671,9 @@ begin
       if packageRefs <> nil then
       begin
         projectRef := nil;
-        projectRefs := packageRefs.FindDependency(LowerCase(FProjectGroup.Projects[i].FileName));
+        projectRefs := packageRefs.FindTopLevelDependency(LowerCase(FProjectGroup.Projects[i].FileName));
         if projectRefs <> nil then
-          projectRef := projectRefs.FindDependency(LowerCase(packageId));
+          projectRef := projectRefs.FindTopLevelDependency(LowerCase(packageId));
       end;
 
       if projectRef <> nil then
@@ -1006,8 +1006,8 @@ begin
   options.Platforms := [FPackageMetaData.Platform];
   options.Prerelease := FIncludePreRelease;
   options.CompilerVersion := IDECompilerVersion;
+  options.Sources := FPackageMetaData.SourceName;
   DoPackageInstall(options, false);
-  //call common function
 
 end;
 
