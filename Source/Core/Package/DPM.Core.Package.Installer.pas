@@ -1092,7 +1092,7 @@ var
 begin
   result := false;
   packageSpecs := TCollections.CreateDictionary<string, IPackageSpec>;
-
+  //TODO : Download in parallel
   for packageInfo in resolvedPackages do
   begin
     if cancellationToken.IsCancelled then
