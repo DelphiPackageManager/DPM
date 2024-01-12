@@ -47,6 +47,9 @@ type
     function AllowSearchPathGroups : Boolean; override;
     function IsTemplate : Boolean; override;
     function ToJSON: string; override;
+
+    function Clone : ISpecTemplate;
+
   public
     constructor Create(const logger : ILogger); override;
 
@@ -69,6 +72,11 @@ end;
 function TSpecTemplate.AllowSearchPathGroups : Boolean;
 begin
   result := true;
+end;
+
+function TSpecTemplate.Clone: ISpecTemplate;
+begin
+  result := TSpecTemplate.CreateClone(Logger,Self.Dependencies,Self.DesignFiles,Self.RuntimeFiles,Self.SourceFiles,Self.LibFiles,Self.Files,Self.SearchPaths);
 end;
 
 constructor TSpecTemplate.Create(const logger : ILogger);

@@ -2,7 +2,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
   Left = 0
   Top = 0
   Caption = '.dspec Creator'
-  ClientHeight = 441
+  ClientHeight = 506
   ClientWidth = 871
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -20,10 +20,11 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Left = 0
     Top = 0
     Width = 871
-    Height = 441
-    ActivePage = tsTemplates
+    Height = 506
+    ActivePage = tsInfo
     Align = alClient
     TabOrder = 0
+    ExplicitHeight = 441
     object tsInfo: TTabSheet
       Caption = 'Package Info'
       object lblId: TLabel
@@ -35,52 +36,106 @@ object DSpecCreatorForm: TDSpecCreatorForm
       end
       object lblVersion: TLabel
         Left = 42
-        Top = 61
+        Top = 79
         Width = 41
         Height = 15
         Caption = 'Version:'
       end
       object lblDescription: TLabel
         Left = 20
-        Top = 99
+        Top = 129
         Width = 63
         Height = 15
         Caption = 'Description:'
       end
       object lblProjectURL: TLabel
         Left = 19
-        Top = 226
+        Top = 267
         Width = 64
         Height = 15
         Caption = 'Project URL:'
       end
       object lblRepositoryURL: TLabel
         Left = 0
-        Top = 255
+        Top = 296
         Width = 83
         Height = 15
         Caption = 'Repository URL:'
       end
       object lblLicense: TLabel
         Left = 41
-        Top = 287
+        Top = 328
         Width = 42
         Height = 15
         Caption = 'License:'
       end
       object lblTags: TLabel
         Left = 57
-        Top = 327
+        Top = 377
         Width = 26
         Height = 15
         Caption = 'Tags:'
       end
       object lblAuthor: TLabel
         Left = 41
-        Top = 194
+        Top = 235
         Width = 40
         Height = 15
         Caption = 'Author:'
+      end
+      object lblSPDX: TLabel
+        Left = 89
+        Top = 353
+        Width = 120
+        Height = 15
+        Hint = 'https://spdx.org/licenses'
+        Caption = 'SPDX License Identifier'
+        Color = clBtnFace
+        Enabled = False
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = 12940065
+        Font.Height = -12
+        Font.Name = 'Segoe UI'
+        Font.Style = []
+        ParentColor = False
+        ParentFont = False
+        ParentShowHint = False
+        ShowHint = True
+        StyleElements = [seClient, seBorder]
+        OnClick = UriLabelClick
+        OnMouseEnter = UriLabelMouseEnter
+        OnMouseLeave = UriLabelMouseLeave
+      end
+      object Label4: TLabel
+        Left = 89
+        Top = 403
+        Width = 125
+        Height = 15
+        Caption = 'Comma separated tags '
+        Enabled = False
+      end
+      object lblPackageId: TLabel
+        Left = 88
+        Top = 55
+        Width = 363
+        Height = 15
+        Caption = 
+          'Package Id in the format Org/User . PackageName - e.g VSoft.DUni' +
+          'tX'
+        Enabled = False
+      end
+      object Label5: TLabel
+        Left = 89
+        Top = 104
+        Width = 258
+        Height = 15
+        Hint = 'https://semver.org/'
+        Caption = 'Package version using Semantic Version notation'
+        Enabled = False
+        StyleElements = [seClient, seBorder]
+        OnClick = UriLabelClick
+        OnMouseEnter = UriLabelMouseEnter
+        OnMouseLeave = UriLabelMouseLeave
       end
       object edtId: TEdit
         Left = 89
@@ -88,12 +143,11 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Width = 376
         Height = 23
         TabOrder = 0
-        Text = 'edtId'
         OnChange = edtIdChange
       end
       object edtVersion: TEdit
         Left = 89
-        Top = 58
+        Top = 76
         Width = 376
         Height = 23
         TabOrder = 1
@@ -101,17 +155,15 @@ object DSpecCreatorForm: TDSpecCreatorForm
       end
       object mmoDescription: TMemo
         Left = 89
-        Top = 96
+        Top = 126
         Width = 376
         Height = 89
-        Lines.Strings = (
-          'mmoDescription')
         TabOrder = 2
         OnChange = mmoDescriptionChange
       end
       object edtProjectURL: TEdit
         Left = 89
-        Top = 223
+        Top = 264
         Width = 376
         Height = 23
         TabOrder = 3
@@ -119,7 +171,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
       end
       object edtRepositoryURL: TEdit
         Left = 89
-        Top = 252
+        Top = 293
         Width = 376
         Height = 23
         TabOrder = 4
@@ -127,11 +179,10 @@ object DSpecCreatorForm: TDSpecCreatorForm
       end
       object cboLicense: TComboBox
         Left = 89
-        Top = 284
+        Top = 325
         Width = 376
         Height = 23
         TabOrder = 5
-        Text = 'cboLicense'
         OnChange = cboLicenseChange
         Items.Strings = (
           'Apache 2.0'
@@ -150,7 +201,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
       end
       object edtTags: TEdit
         Left = 89
-        Top = 324
+        Top = 374
         Width = 376
         Height = 23
         TabOrder = 6
@@ -158,7 +209,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
       end
       object edtAuthor: TEdit
         Left = 89
-        Top = 191
+        Top = 232
         Width = 376
         Height = 23
         TabOrder = 7
@@ -266,7 +317,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
       ImageIndex = 2
       DesignSize = (
         863
-        411)
+        476)
       object lblTemplateView: TLabel
         Left = 3
         Top = 36
@@ -274,9 +325,17 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Height = 15
         Caption = 'Template View'
       end
+      object Label3: TLabel
+        Left = 3
+        Top = 324
+        Width = 161
+        Height = 15
+        Caption = 'Right click to add/delete items'
+        Enabled = False
+      end
       object btnAddTemplate: TButton
         Left = 3
-        Top = 328
+        Top = 345
         Width = 86
         Height = 25
         Caption = 'Add Template'
@@ -285,12 +344,11 @@ object DSpecCreatorForm: TDSpecCreatorForm
       end
       object btnDeleteTemplate: TButton
         Left = 95
-        Top = 328
+        Top = 345
         Width = 98
         Height = 25
-        Caption = 'Delete Template'
+        Action = actDeleteTemplate
         TabOrder = 1
-        OnClick = btnDeleteTemplateClick
       end
       object tvTemplates: TTreeView
         Left = 3
@@ -300,11 +358,13 @@ object DSpecCreatorForm: TDSpecCreatorForm
         AutoExpand = True
         DoubleBuffered = True
         HideSelection = False
+        HotTrack = True
         Images = ImageList1
         Indent = 19
         ParentDoubleBuffered = False
         PopupMenu = PopupMenu
         RightClickSelect = True
+        RowSelect = True
         TabOrder = 2
         OnChange = tvTemplatesChange
         OnCollapsing = tvTemplatesCollapsing
@@ -316,23 +376,25 @@ object DSpecCreatorForm: TDSpecCreatorForm
       object CardPanel: TCardPanel
         Left = 328
         Top = 3
-        Width = 532
-        Height = 342
+        Width = 528
+        Height = 407
         Anchors = [akLeft, akTop, akRight, akBottom]
         ActiveCard = crdSource
         Caption = 'CardPanel'
         TabOrder = 3
+        ExplicitHeight = 342
         object crdSource: TCard
           Left = 1
           Top = 1
-          Width = 530
-          Height = 340
+          Width = 526
+          Height = 405
           Caption = 'crdSource'
           CardIndex = 0
           TabOrder = 0
+          ExplicitHeight = 340
           DesignSize = (
-            530
-            340)
+            526
+            405)
           object lblSrc: TLabel
             Left = 48
             Top = 48
@@ -350,7 +412,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtFileEntrySource: TEdit
             Left = 74
             Top = 45
-            Width = 376
+            Width = 372
             Height = 23
             CustomHint = BalloonHint1
             Anchors = [akLeft, akTop, akRight]
@@ -371,7 +433,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtFileEntryDest: TEdit
             Left = 73
             Top = 97
-            Width = 376
+            Width = 372
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
@@ -383,7 +445,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object lbFileEntryExclude: TListBox
             Left = 74
             Top = 126
-            Width = 376
+            Width = 372
             Height = 97
             Anchors = [akLeft, akTop, akRight]
             ItemHeight = 15
@@ -411,11 +473,12 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdSearchPaths: TCard
           Left = 1
           Top = 1
-          Width = 530
-          Height = 340
+          Width = 526
+          Height = 405
           Caption = 'crdSearchPaths'
           CardIndex = 1
           TabOrder = 1
+          ExplicitHeight = 340
           object lblSearchPaths: TLabel
             Left = 64
             Top = 32
@@ -436,14 +499,15 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdBuild: TCard
           Left = 1
           Top = 1
-          Width = 530
-          Height = 340
+          Width = 526
+          Height = 405
           Caption = 'crdBuild'
           CardIndex = 2
           TabOrder = 2
+          ExplicitHeight = 340
           DesignSize = (
-            530
-            340)
+            526
+            405)
           object lblBuild: TLabel
             Left = 40
             Top = 16
@@ -475,7 +539,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtBuildId: TEdit
             Left = 96
             Top = 45
-            Width = 417
+            Width = 413
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             TabOrder = 0
@@ -485,7 +549,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtProject: TEdit
             Left = 96
             Top = 74
-            Width = 417
+            Width = 413
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
@@ -497,7 +561,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtConfiguration: TEdit
             Left = 96
             Top = 103
-            Width = 417
+            Width = 413
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
@@ -529,14 +593,15 @@ object DSpecCreatorForm: TDSpecCreatorForm
           AlignWithMargins = True
           Left = 4
           Top = 4
-          Width = 524
-          Height = 334
+          Width = 520
+          Height = 399
           Caption = 'crdRuntime'
           CardIndex = 3
           TabOrder = 3
+          ExplicitHeight = 334
           DesignSize = (
-            524
-            334)
+            520
+            399)
           object lblRuntime: TLabel
             Left = 64
             Top = 32
@@ -561,7 +626,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtBPLEntryBuildId: TEdit
             Left = 86
             Top = 69
-            Width = 419
+            Width = 415
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             TabOrder = 0
@@ -570,7 +635,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtBPLEntrySrc: TEdit
             Left = 86
             Top = 109
-            Width = 419
+            Width = 415
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
@@ -600,14 +665,15 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdDependencies: TCard
           Left = 1
           Top = 1
-          Width = 530
-          Height = 340
+          Width = 526
+          Height = 405
           Caption = 'crdDependencies'
           CardIndex = 4
           TabOrder = 4
+          ExplicitHeight = 340
           DesignSize = (
-            530
-            340)
+            526
+            405)
           object Label1: TLabel
             Left = 48
             Top = 85
@@ -625,7 +691,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtDependencyId: TEdit
             Left = 104
             Top = 53
-            Width = 417
+            Width = 413
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             TabOrder = 0
@@ -635,7 +701,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtDependencyVersion: TEdit
             Left = 104
             Top = 82
-            Width = 417
+            Width = 413
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
@@ -648,11 +714,12 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdTemplates: TCard
           Left = 1
           Top = 1
-          Width = 530
-          Height = 340
+          Width = 526
+          Height = 405
           Caption = 'crdTemplates'
-          CardIndex = 6
-          TabOrder = 6
+          CardIndex = 5
+          TabOrder = 5
+          ExplicitHeight = 340
           object lblTemplateName: TLabel
             Left = 72
             Top = 40
@@ -672,12 +739,11 @@ object DSpecCreatorForm: TDSpecCreatorForm
       end
       object btnDuplicateTemplate: TButton
         Left = 200
-        Top = 328
+        Top = 345
         Width = 122
         Height = 25
-        Caption = 'Duplicate Template'
+        Action = actDuplicateTemplate
         TabOrder = 4
-        OnClick = btnDuplicateTemplateClick
       end
     end
     object tsGenerate: TTabSheet
@@ -687,7 +753,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Left = 0
         Top = 0
         Width = 863
-        Height = 411
+        Height = 476
         Align = alClient
         Caption = 'GridPanel1'
         ColumnCollection = <
@@ -713,13 +779,15 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Value = 83.333333333333330000
           end>
         TabOrder = 0
+        ExplicitHeight = 411
         object Panel1: TPanel
           Left = 1
           Top = 1
           Width = 861
-          Height = 68
+          Height = 79
           Align = alClient
           TabOrder = 0
+          ExplicitHeight = 68
           object Label2: TLabel
             Left = 136
             Top = 24
@@ -747,13 +815,15 @@ object DSpecCreatorForm: TDSpecCreatorForm
         end
         object Memo1: TMemo
           Left = 1
-          Top = 69
+          Top = 80
           Width = 861
-          Height = 341
+          Height = 395
           Align = alClient
           ReadOnly = True
           ScrollBars = ssBoth
           TabOrder = 1
+          ExplicitTop = 69
+          ExplicitHeight = 341
         end
       end
     end
@@ -764,14 +834,15 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Left = 0
         Top = 0
         Width = 863
-        Height = 411
+        Height = 476
         Align = alClient
         TabOrder = 0
+        ExplicitHeight = 411
       end
     end
   end
   object MainMenu: TMainMenu
-    Left = 44
+    Left = 604
     Top = 386
     object File1: TMenuItem
       Caption = '&File'
@@ -819,26 +890,26 @@ object DSpecCreatorForm: TDSpecCreatorForm
   object OpenDialog: TOpenDialog
     DefaultExt = '*.dspec'
     Filter = 'Delphi Package Manager Spec Files|*.dspec'
-    Left = 372
-    Top = 370
+    Left = 780
+    Top = 386
   end
   object SaveDialog: TSaveDialog
     DefaultExt = '*.dspec'
     Filter = 'Delphi Package Manager Spec Files|*.dspec'
-    Left = 460
-    Top = 362
+    Left = 732
+    Top = 386
   end
   object PopupMenu: TPopupMenu
-    Left = 84
-    Top = 122
+    Left = 604
+    Top = 346
   end
   object BalloonHint1: TBalloonHint
-    Left = 389
-    Top = 286
+    Left = 757
+    Top = 310
   end
   object ImageList1: TImageList
-    Left = 405
-    Top = 214
+    Left = 757
+    Top = 262
     Bitmap = {
       494C010107000800040010001000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000400000002000000001002000000000000020
@@ -1110,5 +1181,20 @@ object DSpecCreatorForm: TDSpecCreatorForm
       003FC4F3C7E30001007FFE07E7E7000100C0FF0FF7EF0001FFC0FF0FFFFF0001
       FFC0FF0FFFFF01FFFFC0FFFFFFFF83FF00000000000000000000000000000000
       000000000000}
+  end
+  object ActionList1: TActionList
+    OnUpdate = ActionList1Update
+    Left = 672
+    Top = 384
+    object actDeleteTemplate: TAction
+      Category = 'Templates'
+      Caption = 'Delete Template'
+      OnExecute = actDeleteTemplateExecute
+    end
+    object actDuplicateTemplate: TAction
+      Category = 'Templates'
+      Caption = 'Duplicate Template'
+      OnExecute = actDuplicateTemplateExecute
+    end
   end
 end

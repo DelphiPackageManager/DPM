@@ -48,7 +48,7 @@ type
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
 
     function IsGroup : Boolean; override;
-    function Clone : ISpecDependency; override;
+    function Clone : ISpecDependencyGroup; reintroduce;
     constructor CreateClone(const logger : ILogger; const targetPlatform : TTargetPlatform; const dependencies : IList<ISpecDependency>);
   public
     constructor Create(const logger : ILogger); override;
@@ -62,7 +62,7 @@ uses
 
 { TSpecDependencyGroup }
 
-function TSpecDependencyGroup.Clone : ISpecDependency;
+function TSpecDependencyGroup.Clone : ISpecDependencyGroup;
 var
   dependencies : IList<ISpecDependency>;
   dep : ISpecDependency;

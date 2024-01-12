@@ -29,7 +29,7 @@ uses
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
   DPM.Creator.TemplateTreeNode,
-  DPM.Creator.Dspec.FileHandler
+  DPM.Creator.Dspec.FileHandler, System.Actions, Vcl.ActnList
   ;
 
 type
@@ -131,13 +131,19 @@ type
     Memo2: TMemo;
     chkInstall: TCheckBox;
     VariablesList: TValueListEditor;
+    ActionList1: TActionList;
+    actDeleteTemplate: TAction;
+    actDuplicateTemplate: TAction;
+    Label3: TLabel;
+    lblSPDX: TLabel;
+    Label4: TLabel;
+    lblPackageId: TLabel;
+    Label5: TLabel;
     procedure FormDestroy(Sender: TObject);
     procedure btnAddExcludeClick(Sender: TObject);
     procedure btnAddTemplateClick(Sender: TObject);
     procedure btnBuildPackagesClick(Sender: TObject);
     procedure btnDeleteExcludeClick(Sender: TObject);
-    procedure btnDeleteTemplateClick(Sender: TObject);
-    procedure btnDuplicateTemplateClick(Sender: TObject);
     procedure cboLicenseChange(Sender: TObject);
     procedure cboTemplateChange(Sender: TObject);
     procedure chkBuildForDesignClick(Sender: TObject);
@@ -200,6 +206,13 @@ type
     procedure tvTemplatesEdited(Sender: TObject; Node: TTreeNode; var S: string);
     procedure tvTemplatesEditing(Sender: TObject; Node: TTreeNode; var AllowEdit: Boolean);
     procedure VariablesListStringsChange(Sender: TObject);
+    procedure actDuplicateTemplateExecute(Sender: TObject);
+    procedure ActionList1Update(Action: TBasicAction; var Handled: Boolean);
+    procedure actDeleteTemplateExecute(Sender: TObject);
+    procedure lblSPDXClick(Sender: TObject);
+    procedure UriLabelClick(Sender: TObject);
+    procedure UriLabelMouseEnter(Sender: TObject);
+    procedure UriLabelMouseLeave(Sender: TObject);
   private
     { Private declarations }
     FtmpFilename : string;
@@ -209,6 +222,11 @@ type
     FSavefilename : string;
     FLogger: ILogger;
     FInVariableUpdate: Boolean;
+
+  protected
+
+
+    procedure LoadTemplate(const template: ISpecTemplate);
     procedure LoadTemplates;
     procedure EnableDisablePlatform(compilerVersion : TCompilerVersion);
     function ReplaceVars(inputStr: String; compiler: TCompilerVersion): string;
@@ -219,6 +237,9 @@ type
     procedure AddBPLNode(node: TTemplateTreeNode; template: ISpecTemplate; fileList: IList<ISpecBPLEntry>; nodeName: string);
     procedure AddDependencyNode(node: TTemplateTreeNode; template: ISpecTemplate);
     procedure UpdatePlatformCheckListbox(vplatform: ISpecTargetPlatform; platformName: string; platformListboxName: string = '');
+
+    procedure UriClick(const uri : string);
+
   public
     { Public declarations }
     procedure LoadDspecStructure;
@@ -236,6 +257,7 @@ implementation
 uses
   System.UITypes,
   System.IOUtils,
+  WinApi.ShellAPI,
   DPM.Core.Dependency.Version,
   DPM.Creator.TemplateForm,
   DPM.Creator.FileForm,
@@ -248,6 +270,10 @@ uses
   DPM.Creator.Dspec.Replacer
   ;
 
+
+const
+  cToolName = 'DPM dspec Creator';
+  cNewTemplate = 'Create New Template...';
 
 procedure TDSpecCreatorForm.btnDeleteExcludeClick(Sender: TObject);
 var
@@ -337,34 +363,6 @@ begin
   FtmpFilename := '';
 end;
 
-procedure TDSpecCreatorForm.btnDeleteTemplateClick(Sender: TObject);
-var
-  templateName: string;
-begin
-  if not Assigned(tvTemplates.Selected) then
-    raise Exception.Create('Select Template to delete');
-  templateName := (tvTemplates.Selected as TTemplateTreeNode).Template.Name;
-  FOpenFile.DeleteTemplate(templateName);
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.btnDuplicateTemplateClick(Sender: TObject);
-var
-  newTemplateName : string;
-  sourceTemplate : ISpecTemplate;
-begin
-  if not Assigned(tvTemplates.Selected) then
-    Exit;
-
-  sourceTemplate := (tvTemplates.Selected as TTemplateTreeNode).Template;
-  newTemplateName := sourceTemplate.name + Random(100).ToString;
-  if not FOpenFile.DoesTemplateExist(newTemplateName) then
-  begin
-    FOpenFile.DuplicateTemplate(sourceTemplate, newTemplateName);
-  end;
-  LoadTemplates;
-end;
-
 procedure TDSpecCreatorForm.cboLicenseChange(Sender: TObject);
 begin
   FOpenFile.spec.metadata.license := cboLicense.Text;
@@ -376,7 +374,7 @@ var
   vPlatform : ISpecTargetPlatform;
 begin
   templateName := cboTemplate.Items[cboTemplate.ItemIndex];
-  if templateName = 'Create New Template...' then
+  if templateName = cNewTemplate then
   begin
     PageControl.ActivePage := tsTemplates;
     btnAddTemplateClick(Sender);
@@ -668,7 +666,7 @@ end;
 
 function TDSpecCreatorForm.AddRootTemplateNode(template: ISpecTemplate): TTemplateTreeNode;
 begin
-  cboTemplate.Items.Add(template.name);
+  cboTemplate.Items.Insert(cboTemplate.Items.Count -1,template.name);
   Result := tvTemplates.Items.Add(nil, template.name) as TTemplateTreeNode;
   Result.NodeType := ntTemplateHeading;
   Result.Template := template;
@@ -792,7 +790,7 @@ begin
   nodeBuild.NodeType := ntBuildHeading;
   nodeBuild.OnNewText := 'Add Build Item';
   nodeBuild.OnNewClick := PopupAddBuildItem;
-  nodeBuild.OnDeleteText := 'Delete Source Item';
+  nodeBuild.OnDeleteText := 'Delete Build Item';
   nodeBuild.OnDeleteClick := PopupDeleteBuildItem;
   for j := 0 to template.BuildEntries.Count - 1 do
   begin
@@ -805,6 +803,56 @@ begin
   end;
 end;
 
+
+procedure TDSpecCreatorForm.actDeleteTemplateExecute(Sender: TObject);
+var
+  templateName: string;
+  selectedNode : TTemplateTreeNode;
+  i : integer;
+begin
+  selectedNode := tvTemplates.Selected as TTemplateTreeNode;
+  if not Assigned(selectedNode) then
+    raise Exception.Create('Select Template to delete');
+  templateName := selectedNode.Template.Name;
+  FOpenFile.DeleteTemplate(templateName);
+
+  if selectedNode.NodeType = ntTemplateHeading then
+    selectedNode.Delete
+  else
+  begin
+    while ((selectedNode <> nil) and ( selectedNode.NodeType <> ntTemplateHeading)) do
+      selectedNode := selectedNode.Parent as TTemplateTreeNode;
+    if selectedNode <> nil then
+      selectedNode.Delete;
+  end;
+
+  i := cboTemplate.Items.IndexOf(templateName);
+  if i <> -1 then
+    cboTemplate.Items.Delete(i);
+end;
+
+procedure TDSpecCreatorForm.actDuplicateTemplateExecute(Sender: TObject);
+var
+  newTemplateName : string;
+  sourceTemplate : ISpecTemplate;
+  newTemplate : ISpecTemplate;
+begin
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+
+  sourceTemplate := (tvTemplates.Selected as TTemplateTreeNode).Template;
+  newTemplateName := FOpenFile.GetNewTemplateName(sourceTemplate.name);
+  newTemplate := sourceTemplate.Clone;
+  newTemplate.Name := newTemplateName;
+
+  LoadTemplate(newTemplate);
+end;
+
+procedure TDSpecCreatorForm.ActionList1Update(Action: TBasicAction; var Handled: Boolean);
+begin
+  actDuplicateTemplate.Enabled := tvTemplates.Selected <> nil;
+  actDeleteTemplate.Enabled := tvTemplates.Selected <> nil;
+end;
 
 procedure TDSpecCreatorForm.AddBPLNode(node: TTemplateTreeNode; template: ISpecTemplate; fileList: IList<ISpecBPLEntry>; nodeName: string);
 var
@@ -894,18 +942,10 @@ begin
   end;
 end;
 
-
-procedure TDSpecCreatorForm.LoadTemplates;
+procedure TDSpecCreatorForm.LoadTemplate(const template: ISpecTemplate);
 var
   node: TTemplateTreeNode;
-  i : Integer;
-  template: ISpecTemplate;
 begin
-  tvTemplates.Items.Clear;
-  cboTemplate.Clear;
-  for i := 0 to FOpenFile.spec.templates.Count - 1 do
-  begin
-    template := FOpenFile.spec.templates[i];
     node := AddRootTemplateNode(template);
 
     AddFileEntryNode(node, template, template.SourceFiles, 'Source');
@@ -916,10 +956,25 @@ begin
     AddBPLNode(node, template, template.DesignFiles, 'Design');
     AddBPLNode(node, template, template.RuntimeFiles, 'Runtime');
     AddDependencyNode(node, template);
-
     node.Expand(True);
+
+end;
+
+procedure TDSpecCreatorForm.LoadTemplates;
+var
+  i : Integer;
+  template: ISpecTemplate;
+begin
+  tvTemplates.Items.Clear;
+  cboTemplate.Clear;
+  cboTemplate.Items.Add(cNewTemplate);
+
+  for i := 0 to FOpenFile.spec.templates.Count - 1 do
+  begin
+    template := FOpenFile.spec.templates[i];
+    LoadTemplate(template);
   end;
-  cboTemplate.Items.Add('Create New Template...');
+
 end;
 
 procedure TDSpecCreatorForm.edtIdChange(Sender: TObject);
@@ -1066,12 +1121,17 @@ begin
   FtmpFilename := '';
   PageControl.ActivePage := tsInfo;
   edtDependencyVersion.Text := '';
-  Caption := 'Untitled - dspec Creator';
+  Caption := 'Untitled - ' + cToolName;
 end;
 
 procedure TDSpecCreatorForm.FormDestroy(Sender: TObject);
 begin
   FreeAndNil(FDosCommand);
+end;
+
+procedure TDSpecCreatorForm.lblSPDXClick(Sender: TObject);
+begin
+  UriClick('https://spdx.org/licenses/');
 end;
 
 procedure TDSpecCreatorForm.LoadDspecStructure;
@@ -1134,6 +1194,42 @@ begin
     j := clbPlatforms.Items.IndexOf(platformListboxName);
     if j >= 0 then
       clbPlatforms.Checked[j] := j >= 0;
+  end;
+end;
+
+procedure TDSpecCreatorForm.UriClick(const uri: string);
+begin
+  ShellExecute(Application.Handle, 'open', PChar(uri), nil, nil, SW_SHOWNORMAL);
+end;
+
+procedure TDSpecCreatorForm.UriLabelClick(Sender: TObject);
+var
+  lbl : TLabel;
+begin
+  lbl := Sender as TLabel;
+  if ((lbl <> nil) and lbl.Hint.StartsWith('https'))  then
+    UriClick(lbl.Hint);
+end;
+
+procedure TDSpecCreatorForm.UriLabelMouseEnter(Sender: TObject);
+begin
+  with (Sender As TLabel) do
+  begin
+    Font.Style := lblSPDX.Font.Style + [fsUnderline];
+    Font.Color := $00C57321;
+    Enabled := true;
+    Cursor := crHandPoint;
+  end;
+
+end;
+
+procedure TDSpecCreatorForm.UriLabelMouseLeave(Sender: TObject);
+begin
+  with (Sender As TLabel) do
+  begin
+    Font.Style := lblSPDX.Font.Style - [fsUnderline];
+    Enabled := false;
+    Cursor := crDefault;
   end;
 end;
 
@@ -1228,7 +1324,7 @@ begin
     dspecFilename := OpenDialog.FileName;
     FOpenFile.LoadFromFile( dspecFilename);
     FSavefilename := dspecFilename;
-    Caption := dspecFilename + ' - dspec Creator';
+    Caption := dspecFilename + ' - ' + cToolName;
     LoadDspecStructure;
   end;
 end;

@@ -94,6 +94,7 @@ type
     function GetReadMe : string;
     function GetUIFrameworkType : TDPMUIFrameworkType;
 
+
     procedure SetVersion(const value : TPackageVersion);
     procedure SetId(const value : string);
     procedure SetDescription(const value : string);
@@ -296,6 +297,9 @@ type
     ['{FB9EE9B8-E77B-4E45-A838-E1C9C9947CFB}']
     function GetName : string;
     procedure SetName(templateName: string);
+
+    function Clone : ISpecTemplate;
+
     property Name : string read GetName write SetName;
   end;
 

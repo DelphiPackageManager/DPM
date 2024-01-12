@@ -23,6 +23,7 @@ type
     procedure DeleteTemplate(const templateName: string);
     function DuplicateTemplate(const sourceTemplate: ISpecTemplate; const newTemplateName: string): ISpecTemplate;
     function DoesTemplateExist(const templateName: string): Boolean;
+    function GetNewTemplateName(const sourceName : string) : string;
     function GetTemplate(const templateName: string): ISpecTemplate;
     function GetPlatform(const compiler: string): ISpecTargetPlatform;
     function AddCompiler(const compiler: string): ISpecTargetPlatform;
@@ -126,6 +127,13 @@ begin
       Exit;
     end;
   end;
+end;
+
+function TDSpecFile.GetNewTemplateName(const sourceName: string): string;
+begin
+  result := sourceName + Random(100).ToString;
+  while DoesTemplateExist(Result) do
+    result := sourceName + Random(100).ToString;
 end;
 
 function TDSpecFile.GetPlatform(const compiler: string): ISpecTargetPlatform;

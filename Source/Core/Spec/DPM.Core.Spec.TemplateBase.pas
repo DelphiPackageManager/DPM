@@ -106,7 +106,14 @@ type
       const source, lib, files : IList<ISpecFileEntry>; const search : IList<ISpecSearchPath>);
   public
     constructor Create(const logger : ILogger); override;
-
+    property LibFiles : IList<ISpecFileEntry>read GetLibFiles;
+    property SourceFiles : IList<ISpecFileEntry>read GetSourceFiles;
+    property Files : IList<ISpecFileEntry>read GetFiles;
+    property RuntimeFiles : IList<ISpecBPLEntry>read GetRuntimeFiles;
+    property DesignFiles : IList<ISpecBPLEntry> read GetDesignFiles;
+    property Dependencies : IList<ISpecDependency>read GetDependencies;
+    property SearchPaths : IList<ISpecSearchPath>read GetSearchPaths;
+    property BuildEntries : IList<ISpecBuildEntry>read GetBuildEntries;
 
   end;
 
