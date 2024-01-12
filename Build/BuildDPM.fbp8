@@ -19,8 +19,11 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
+          legalcopyright = "© 2019 -2021 Vincent Parrett and Contributors"
+          linkproductversion = false
+          minorversion = 2
           name = DPMVersion
-          productversion = 0.0.0.0
+          productname = "DPM IDE Support for DelphiXE4"
           productversionstring = 0.2.0-alpha
         end
       end
@@ -45,7 +48,7 @@ begin
                       "" +
                       "true" +
                       "" +
-                      "© 2019 -2021 Vincent Parrett and Contributors" +
+                      "© 2019 -2024 Vincent Parrett and Contributors" +
                       "" +
                       "false" +
                       "%MAJOR_VERSION%" +
@@ -276,7 +279,7 @@ begin
       end
       action.group
       begin
-        description = "Build and Sign Command Line tool"
+        description = "Command Line tool"
         id = {9D926B94-DB4D-4514-91FE-043A81C3276B}
         variable
         begin
@@ -456,6 +459,266 @@ begin
           actionlistid = {CD2E679B-668B-4181-B51E-32647A974CED}
           enabled = false
           id = {F48903DA-1B21-46BE-9DBB-F5EBF27F6108}
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = "DPM CommandLine"
+              variablename = AppName
+            end
+            target.argvalue
+            begin
+              value = %BinaryFileName%
+              variablename = FileToSign
+            end
+          end
+        end
+      end
+      action.group
+      begin
+        description = "Command DSpecCreator"
+        id = {6107D82E-ADC3-4635-AE9C-F06739F2ACC4}
+        variable
+        begin
+          name = BinaryFileName
+          variablescope = vtLocal
+          variabletype = btString
+        end
+        action.continua.set-buildstatus
+        begin
+          actiontypeid = {4C731FDD-33BB-486E-9A30-27A7A26E3C92}
+          customactionname = "Continua CI - Set Build Status"
+          enabletimeout = false
+          id = {1E27A86E-5FE5-4AA2-A51B-7B2B00AE22E5}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 1
+          as.status = "Building DSpecCreator"
+          as.verbose = False
+          as.failbuildonerror = False
+        end
+        action.propertyset.setvalues
+        begin
+          id = {710A2047-403F-4CEB-9FDE-DA5509A4E713}
+          propertysetname = DPMVersion
+          setvaluesto = "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "DSpec Creator for DPM Package Manager" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        ""
+          valuestoset = "AutoUpdateFileVersionString\=0" +
+                        "AutoUpdateProductVersionString\=0" +
+                        "BuildVersion\=0" +
+                        "CompanyName\=0" +
+                        "CompileDate\=0" +
+                        "FileDescription\=0" +
+                        "FileFlagDebug\=0" +
+                        "FileFlagPreRelease\=0" +
+                        "FileFlagPrivate\=0" +
+                        "FileFlagSpecial\=0" +
+                        "FileSubType\=0" +
+                        "FileTypeDLL\=0" +
+                        "FileTypeDRV\=0" +
+                        "FileTypeVXD\=0" +
+                        "FileVersionString\=0" +
+                        "IncludeCompileDate\=0" +
+                        "InternalName\=0" +
+                        "LegalCopyright\=0" +
+                        "LegalTrademarks\=0" +
+                        "LinkProductVersion\=0" +
+                        "MajorVersion\=0" +
+                        "MinorVersion\=0" +
+                        "OriginalFilename\=0" +
+                        "ProductName\=-1" +
+                        "ProductVersion\=0" +
+                        "ProductVersionString\=0" +
+                        "ReleaseVersion\=0" +
+                        "SpecialBuildDetails\=0" +
+                        ""
+        end
+        action.dpm.restore
+        begin
+          actiontypeid = {17B8180A-B96F-4BA3-BCA1-E2FD9132113C}
+          customactionname = "DPM Restore"
+          enabletimeout = false
+          id = {DE8622C0-7D68-4097-ADCB-7B17E1618311}
+          impersonateusenetcredonly = false
+          impersonateuser = false
+          terminateontimeout = true
+          timeoutlength = 2
+          as.projectpath = %SRC_ROOT%\\DSpecCreator\\DspecCreator.dproj
+          as.compilerversion = 11.0
+          as.verbosity = Debug
+          as.nobanner = True
+        end
+        action.delphi.build
+        begin
+          allowimplicitimport = true
+          alwaysuseconditionalsfromdof = false
+          autoincbuild = false
+          autoupdatefileversion = true
+          autoupdateproductversion = true
+          buildall = true
+          buildversion = 0
+          codepage = 1252
+          compileprojectresources = false
+          compileridl = true
+          configname = Release
+          debugversionnumbers = false
+          delphiversion = Delphi11
+          enabletimeout = false
+          eurekalogverboselogging = false
+          frameworktype = VCL
+          hintsaserror = false
+          iconfile = %SRC_ROOT%\\images\\dpm.ico
+          id = {9114D753-AA55-41C7-8FB7-2634FB9C7F08}
+          includecompiledate = true
+          includemanifest = true
+          includeverinfo = true
+          isdebug = false
+          isdll = false
+          isprerelease = false
+          isprivate = false
+          isspecial = false
+          keepcfg = true
+          linkproductversiontofileversion = false
+          locale = 3081
+          majorversion = 0
+          manifestfile = %SRC_ROOT%\\dpmManifest.xml
+          minorversion = 2
+          noconfig = false
+          platform = Win32
+          platformsdktype = ProjectSDK
+          projectfile = %SRC_ROOT%\\DSpecCreator\\DspecCreator.dpr
+          regenerateresource = true
+          releaseversion = 0
+          resourcecompilertype = rcBorland
+          ridloutputsamefolder = true
+          startingdir = %SRC_ROOT%\\DSpecCreator
+          timeoutlength = 1
+          updatedoffile = false
+          updatepackagesource = false
+          updateversioninfokeys = false
+          useeurekalogcompiler = false
+          usefastdcccompiler = false
+          useprojectsettings = []
+          usepropertyset = true
+          useversionfromdof = false
+          verboseoutput = false
+          versioninfokeys = "LegalCopyright\=© 2019 -2021 Vincent Parrett and Contributors" +
+                            "ProductName\=DPM Package Manager" +
+                            "ProductVersion\=0.2.0-alpha" +
+                            ""
+          versioninfopropertysetname = DPMVersion
+          warningsaserror = false
+          workaroundd5bug = false
+          action.script
+          begin
+            name = Condition
+            script >
+            beginscript
+              !FBVariables.RESTORE_ONLY
+            endscript
+            scriptlanguage = JavaScript
+          end
+          delphi.compileroptions
+          begin
+            alwaysuseconditionalsfromdof = false
+            alwaysusedelphilibrarypath = true
+            alwaysusedofsearchpath = true
+            assertions = true
+            assignableconst = false
+            booleval = false
+            compilerwarnings = "-w-UNSAFE_TYPE\=0" +
+                               "-w-UNSAFE_CODE\=0" +
+                               "-w-UNSAFE_CAST\=0" +
+                               ""
+            conditionals = RELEASE
+            consoleapp = false
+            debuginfo = false
+            definitionsonly = false
+            emitruntimetypeinformation = false
+            exportallsymbols = false
+            extendedsyntax = true
+            externaltd32 = false
+            frameworktype = None
+            generatedocumentation = false
+            generatehpp = false
+            hugestrings = true
+            imagebase = 4194304
+            includenamespaces = false
+            includeremotesymbols = false
+            includetd32 = false
+            inlining = inOn
+            iochecking = true
+            librarypath = E:\\Emb\\Studio\\20.0\\lib\\win32\\release;E:\\Emb\\Studio\\20.0\\Imports;C:\\Users\\Public\\Documents\\Embarcadero\\Studio\\20.0\\Dcp;E:\\Emb\\Studio\\20.0\\include;I:\\FBAT_HG_LIBS8\\madCollection\\madExcept\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\Plugins\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madBasic\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madDisAsm\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madRemote\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madKernel\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madSecurity\\BDS20\\win32;I:\\FBAT_HG_LIBS8\\madCollection\\madShell\\BDS20\\win32
+            linkeroutput = 0
+            localsymbols = false
+            mapfile = 0
+            maxstacksize = 1048576
+            minstacksize = 16384
+            namespaceprefixes = System;Xml;Data;Datasnap;Web;Soap;Winapi;System.Win;Data.Win;Web.Win;Soap.Win;Bde;
+            openstrings = true
+            optimisation = true
+            outputdir = %OUTPUT_DIR%
+            overflowchecking = false
+            packages = rtl
+            rangechecking = false
+            recordfieldalign = fa8
+            referenceinfo = false
+            safedivide = false
+            searchpath = $(DPMSearch)
+            showhints = true
+            showwarnings = true
+            stackframes = false
+            stringchecks = true
+            typedpointers = false
+            unitaliases = WinTypes\=Windows;WinProcs\=Windows;DbiTypes\=BDE;DbiProcs\=BDE;DbiErrs\=BDE
+            usedebugdcu = false
+            usepackages = false
+            varstringchecks = true
+          end
+        end
+        action.variable.set
+        begin
+          applytoexisting = false
+          doexpandexpression = true
+          forcetype = ftString
+          id = {34EFE879-0B1F-44A3-B207-067145537088}
+          modifier = smNone
+          newvalue = %OUTPUT_DIR%\\dpm.exe
+          variablename = BinaryFileName
+        end
+        action.target.execute
+        begin
+          actionlistid = {CD2E679B-668B-4181-B51E-32647A974CED}
+          enabled = false
+          id = {629721F4-FCBC-48C0-A40F-C3044F8A27F7}
           target.argvalues
           begin
             target.argvalue
@@ -841,6 +1104,69 @@ begin
         as.verbose = False
         as.failbuildonerror = False
       end
+      action.propertyset.setvalues
+      begin
+        id = {E670700D-E5DF-4F16-A9C3-9DED19ECF91E}
+        propertysetname = DPMVersion
+        setvaluesto = "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      "DPM IDE Support for %CompilerVersion%" +
+                      "" +
+                      "" +
+                      "" +
+                      "" +
+                      ""
+        valuestoset = "AutoUpdateFileVersionString\=0" +
+                      "AutoUpdateProductVersionString\=0" +
+                      "BuildVersion\=0" +
+                      "CompanyName\=0" +
+                      "CompileDate\=0" +
+                      "FileDescription\=0" +
+                      "FileFlagDebug\=0" +
+                      "FileFlagPreRelease\=0" +
+                      "FileFlagPrivate\=0" +
+                      "FileFlagSpecial\=0" +
+                      "FileSubType\=0" +
+                      "FileTypeDLL\=0" +
+                      "FileTypeDRV\=0" +
+                      "FileTypeVXD\=0" +
+                      "FileVersionString\=0" +
+                      "IncludeCompileDate\=0" +
+                      "InternalName\=0" +
+                      "LegalCopyright\=0" +
+                      "LegalTrademarks\=0" +
+                      "LinkProductVersion\=0" +
+                      "MajorVersion\=0" +
+                      "MinorVersion\=0" +
+                      "OriginalFilename\=0" +
+                      "ProductName\=-1" +
+                      "ProductVersion\=0" +
+                      "ProductVersionString\=0" +
+                      "ReleaseVersion\=0" +
+                      "SpecialBuildDetails\=0" +
+                      ""
+      end
       action.dpm.restore
       begin
         actiontypeid = {17B8180A-B96F-4BA3-BCA1-E2FD9132113C}
@@ -852,7 +1178,7 @@ begin
         terminateontimeout = true
         timeoutlength = 2
         as.projectpath = %SRC_ROOT%\\%ProjectFile%oj
-        as.compilerversion = XE7
+        as.compilerversion = XE4
         as.verbosity = Debug
         as.nobanner = True
         action.script
@@ -880,7 +1206,7 @@ begin
         compileridl = true
         configname = Release
         debugversionnumbers = false
-        delphiversion = DelphiXE7
+        delphiversion = DelphiXE4
         enabletimeout = false
         eurekalogverboselogging = false
         frameworktype = VCL
@@ -920,7 +1246,7 @@ begin
         useversionfromdof = false
         verboseoutput = false
         versioninfokeys = "LegalCopyright\=© 2019 -2021 Vincent Parrett and Contributors" +
-                          "ProductName\=DPM Package Manager" +
+                          "ProductName\=DPM IDE Support for DelphiXE4" +
                           "ProductVersion\=0.2.0-alpha" +
                           ""
         versioninfopropertysetname = DPMVersion
@@ -1176,6 +1502,8 @@ begin
           terminateontimeout = true
           timeoutlength = 2
           as.variablename = CodeSigning
+          as.verbose = False
+          as.failbuildonerror = False
         end
         action.group
         begin
@@ -1342,7 +1670,6 @@ begin
   end
   variable
   begin
-    defaultvalue = %RootDir%\\Certificates
     groupname = CodeSigning
     name = CertificatesDir
     variablescope = vtProject

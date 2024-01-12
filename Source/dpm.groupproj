@@ -12,6 +12,9 @@
         <Projects Include="DPM.IDE.D110.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="DSpecCreator\DspecCreator.dproj">
+            <Dependencies/>
+        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -47,14 +50,23 @@
     <Target Name="DPM_IDE_D110:Make">
         <MSBuild Projects="DPM.IDE.D110.dproj" Targets="Make"/>
     </Target>
+    <Target Name="DspecCreator">
+        <MSBuild Projects="DSpecCreator\DspecCreator.dproj"/>
+    </Target>
+    <Target Name="DspecCreator:Clean">
+        <MSBuild Projects="DSpecCreator\DspecCreator.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="DspecCreator:Make">
+        <MSBuild Projects="DSpecCreator\DspecCreator.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="DPM_Core_Tests;dpm;DPM_IDE_D110"/>
+        <CallTarget Targets="DPM_Core_Tests;dpm;DPM_IDE_D110;DspecCreator"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="DPM_Core_Tests:Clean;dpm:Clean;DPM_IDE_D110:Clean"/>
+        <CallTarget Targets="DPM_Core_Tests:Clean;dpm:Clean;DPM_IDE_D110:Clean;DspecCreator:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="DPM_Core_Tests:Make;dpm:Make;DPM_IDE_D110:Make"/>
+        <CallTarget Targets="DPM_Core_Tests:Make;dpm:Make;DPM_IDE_D110:Make;DspecCreator:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

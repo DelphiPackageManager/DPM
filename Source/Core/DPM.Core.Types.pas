@@ -388,7 +388,7 @@ begin
     TCompilerVersion.RS10_3 : result := 'Rio';
     TCompilerVersion.RS10_4 : result := 'Sydney';
     TCompilerVersion.RS11_0 : result := 'Alexandria';
-    TCompilerVersion.RS12_0 : result := ''; //going without code names from now on.
+    TCompilerVersion.RS12_0 : result := 'Athens'; //going without code names from now on.
   else
     result := '';
   end;

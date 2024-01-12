@@ -1,3 +1,4 @@
+MAINICON ICON "I:\\Github\\DelphiPackageManager\\DPMMaster\\Source\\images\\dpm.ico"
 /*
 Include manifest xml for XP/Vista
 */
@@ -15,10 +16,10 @@ BEGIN
     BEGIN
          BLOCK "0C0904E4"
          BEGIN
-              VALUE "LegalCopyright", "© 2019 -2021 Vincent Parrett and Contributors\0"
-              VALUE "ProductName", "DPM Package Manager\0"
+              VALUE "LegalCopyright", "© 2019 -2024 Vincent Parrett and Contributors\0"
+              VALUE "ProductName", "DSpec Creator for DPM Package Manager\0"
               VALUE "ProductVersion", "0.2.0-alpha\0"
-              VALUE "CompileDate", "Friday, 12 January 2024 11:28 AM\0"
+              VALUE "CompileDate", "Friday, 12 January 2024 11:51 AM\0"
               VALUE "FileVersion", "0.2.0.0\0"
          END
     END

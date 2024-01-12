@@ -68,6 +68,7 @@ Name: AddToPath; Description: "Add dpm folder to PATH Environment variable"; Gro
 
 [Files]
 Source: "..\Output\dpm.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\Output\DSpecCreator.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\Output\DPM.IDE.XE2.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : XE2
 Source: "..\Output\DPM.IDE.XE3.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : XE3
 Source: "..\Output\DPM.IDE.XE4.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : XE4
