@@ -19,8 +19,7 @@ uses
   DPM.IDE.AddInOptionsFrame,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Configuration.Manager,
-  DPM.IDE.Options,
-  DPM.Creator.FakeIDEOptions
+  DPM.IDE.Options
   ;
 
 type
@@ -52,7 +51,8 @@ constructor TOptionsForm.Create(AOwner: TComponent; logger: ILogger);
 begin
   inherited Create(AOwner);
   FLogger := logger;
-  FIDEOptions := TFakeIDE.Create;
+  FIDEOptions := TDPMIDEOptions.Create;
+  FIDEOptions.LoadFromFile();
 end;
 
 procedure TOptionsForm.btnCancelClick(Sender: TObject);

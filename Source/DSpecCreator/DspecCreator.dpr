@@ -108,12 +108,11 @@ uses
   DPM.Core.Package.ListItem in '..\Core\Package\DPM.Core.Package.ListItem.pas',
   DPM.Core.Package.PackageLatestVersionInfo in '..\Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas',
   DPM.IDE.AddInOptionsFrame in '..\IDE\DPM.IDE.AddInOptionsFrame.pas' {DPMOptionsFrame: TFrame},
-  DPM.IDE.Options in '..\IDE\Options\DPM.IDE.Options.pas',
   DPM.IDE.Types in '..\IDE\DPM.IDE.Types.pas',
   DPM.Creator.Logger in 'DPM.Creator.Logger.pas',
   DPM.Creator.TemplateTreeNode in 'DPM.Creator.TemplateTreeNode.pas',
-  DPM.Creator.FakeIDEOptions in 'DPM.Creator.FakeIDEOptions.pas',
-  DPM.Creator.BuildForm in 'DPM.Creator.BuildForm.pas' {BuildForm};
+  DPM.Creator.BuildForm in 'DPM.Creator.BuildForm.pas' {BuildForm},
+  DPM.IDE.Options in '..\IDE\Options\DPM.IDE.Options.pas';
 
 {$R *.res}
 

@@ -32,14 +32,7 @@ object OptionsForm: TOptionsForm
         ExplicitHeight = 429
         inherited Panel1: TPanel
           Width = 851
-          StyleElements = [seFont, seClient, seBorder]
           ExplicitWidth = 851
-          inherited lblPackageSources: TLabel
-            StyleElements = [seFont, seClient, seBorder]
-          end
-          inherited Label3: TLabel
-            StyleElements = [seFont, seClient, seBorder]
-          end
           inherited btnAdd: TSpeedButton
             Left = 668
             ExplicitLeft = 668
@@ -56,51 +49,16 @@ object OptionsForm: TOptionsForm
             Left = 805
             ExplicitLeft = 805
           end
-          inherited txtPackageCacheLocation: TButtonedEdit
-            StyleElements = [seFont, seClient, seBorder]
-          end
         end
         inherited Panel2: TPanel
           Top = 218
           Width = 851
-          StyleElements = [seFont, seClient, seBorder]
           ExplicitTop = 218
           ExplicitWidth = 851
-          inherited Label1: TLabel
-            StyleElements = [seFont, seClient, seBorder]
-          end
-          inherited Label2: TLabel
-            StyleElements = [seFont, seClient, seBorder]
-          end
-          inherited Label5: TLabel
-            StyleElements = [seFont, seClient, seBorder]
-          end
-          inherited Label6: TLabel
-            StyleElements = [seFont, seClient, seBorder]
-          end
-          inherited Label8: TLabel
-            StyleElements = [seFont, seClient, seBorder]
-          end
-          inherited txtName: TEdit
-            StyleElements = [seFont, seClient, seBorder]
-          end
-          inherited txtUri: TButtonedEdit
-            StyleElements = [seFont, seClient, seBorder]
-          end
-          inherited txtUserName: TEdit
-            StyleElements = [seFont, seClient, seBorder]
-          end
-          inherited txtPassword: TEdit
-            StyleElements = [seFont, seClient, seBorder]
-          end
-          inherited cboSourceType: TComboBox
-            StyleElements = [seFont, seClient, seBorder]
-          end
         end
         inherited Panel3: TPanel
           Width = 851
           Height = 129
-          StyleElements = [seFont, seClient, seBorder]
           ExplicitWidth = 851
           ExplicitHeight = 129
           inherited lvSources: TListView
@@ -113,29 +71,9 @@ object OptionsForm: TOptionsForm
       end
       inherited tsIDEOptions: TTabSheet
         inherited pnlIDEOptions: TPanel
-          StyleElements = [seFont, seClient, seBorder]
-          inherited Label4: TLabel
-            StyleElements = [seFont, seClient, seBorder]
-          end
-          inherited Label7: TLabel
-            StyleElements = [seFont, seClient, seBorder]
-          end
-          inherited Label9: TLabel
-            StyleElements = [seFont, seClient, seBorder]
-          end
-          inherited Label10: TLabel
-            StyleElements = [seFont, seClient, seBorder]
-          end
-          inherited Label11: TLabel
-            StyleElements = [seFont, seClient, seBorder]
-          end
           inherited spAutoCloseDelay: TSpinEdit
             Height = 24
-            StyleElements = [seFont, seClient, seBorder]
             ExplicitHeight = 24
-          end
-          inherited cboLogLevel: TComboBox
-            StyleElements = [seFont, seClient, seBorder]
           end
         end
       end
