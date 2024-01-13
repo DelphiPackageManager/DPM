@@ -129,6 +129,7 @@ function IsValidPlatformString(const value : string) : boolean;
 function DPMPlatformToString(const value : TDPMPlatform) : string;
 function DPMPlatformToDisplayString(const value : TDPMPlatform) : string;
 function DPMPlatformToBDString(const value : TDPMPlatform) : string;
+function DPMPlatformBitness(const value : TDPMPlatform) : string;
 
 function DPMPlatformsToString(const value : TDPMPlatforms; const sep : string = ',') : string;
 
@@ -330,6 +331,16 @@ begin
   else
     result := GetEnumName(TypeInfo(TDPMPlatform), ord(value));
   end;
+end;
+
+
+function DPMPlatformBitness(const value : TDPMPlatform) : string;
+begin
+  Result := '';
+  if Pos('32', DPMPlatformToDisplayString(value)) > 0 then
+    Result := '32'
+  else if Pos('64', DPMPlatformToDisplayString(value)) > 0 then
+    Result := '64';
 end;
 
 
