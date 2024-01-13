@@ -1259,7 +1259,7 @@ begin
   with (Sender As TLabel) do
   begin
     Font.Style := lblSPDX.Font.Style + [fsUnderline];
-    Font.Color := $00C57321;
+//    Font.Color := $00C57321;
     Enabled := true;
     Cursor := crHandPoint;
   end;
@@ -1271,7 +1271,7 @@ begin
   with (Sender As TLabel) do
   begin
     Font.Style := lblSPDX.Font.Style - [fsUnderline];
-    Enabled := false;
+//    Enabled := false;
     Cursor := crDefault;
   end;
 end;

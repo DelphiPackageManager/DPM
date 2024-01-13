@@ -92,7 +92,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Hint = 'https://spdx.org/licenses'
         Caption = 'SPDX License Identifier'
         Color = clBtnFace
-        Enabled = False
         Font.Charset = DEFAULT_CHARSET
         Font.Color = 12940065
         Font.Height = -12
