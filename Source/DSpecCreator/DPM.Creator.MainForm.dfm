@@ -24,7 +24,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
     ActivePage = tsInfo
     Align = alClient
     TabOrder = 0
-    ExplicitHeight = 441
+    ExplicitWidth = 867
+    ExplicitHeight = 505
     object tsInfo: TTabSheet
       Caption = 'Package Info'
       object lblId: TLabel
@@ -382,7 +383,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         ActiveCard = crdSource
         Caption = 'CardPanel'
         TabOrder = 3
-        ExplicitHeight = 342
         object crdSource: TCard
           Left = 1
           Top = 1
@@ -391,7 +391,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'crdSource'
           CardIndex = 0
           TabOrder = 0
-          ExplicitHeight = 340
           DesignSize = (
             526
             405)
@@ -478,7 +477,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'crdSearchPaths'
           CardIndex = 1
           TabOrder = 1
-          ExplicitHeight = 340
           object lblSearchPaths: TLabel
             Left = 64
             Top = 32
@@ -504,7 +502,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'crdBuild'
           CardIndex = 2
           TabOrder = 2
-          ExplicitHeight = 340
           DesignSize = (
             526
             405)
@@ -598,7 +595,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'crdRuntime'
           CardIndex = 3
           TabOrder = 3
-          ExplicitHeight = 334
           DesignSize = (
             520
             399)
@@ -670,7 +666,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'crdDependencies'
           CardIndex = 4
           TabOrder = 4
-          ExplicitHeight = 340
           DesignSize = (
             526
             405)
@@ -719,7 +714,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'crdTemplates'
           CardIndex = 5
           TabOrder = 5
-          ExplicitHeight = 340
           object lblTemplateName: TLabel
             Left = 72
             Top = 40
@@ -779,7 +773,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Value = 83.333333333333330000
           end>
         TabOrder = 0
-        ExplicitHeight = 411
         object Panel1: TPanel
           Left = 1
           Top = 1
@@ -787,7 +780,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Height = 79
           Align = alClient
           TabOrder = 0
-          ExplicitHeight = 68
           object Label2: TLabel
             Left = 136
             Top = 24
@@ -822,8 +814,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           ReadOnly = True
           ScrollBars = ssBoth
           TabOrder = 1
-          ExplicitTop = 69
-          ExplicitHeight = 341
         end
       end
     end
@@ -837,7 +827,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Height = 476
         Align = alClient
         TabOrder = 0
-        ExplicitHeight = 411
       end
     end
   end

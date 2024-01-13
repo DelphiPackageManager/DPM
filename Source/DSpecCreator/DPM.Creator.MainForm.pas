@@ -222,7 +222,7 @@ type
     FSavefilename : string;
     FLogger: ILogger;
     FInVariableUpdate: Boolean;
-
+    FSPDXList : TStringList;
   protected
 
 
@@ -240,11 +240,14 @@ type
 
     procedure UriClick(const uri : string);
 
-  public
-    { Public declarations }
+    procedure LoadSPDXList;
     procedure LoadDspecStructure;
     procedure SaveDspecStructure(const filename: string);
+
     function SelectedPlatform: ISpecTargetPlatform;
+
+  public
+    { Public declarations }
   end;
 
 var
@@ -366,6 +369,26 @@ end;
 procedure TDSpecCreatorForm.cboLicenseChange(Sender: TObject);
 begin
   FOpenFile.spec.metadata.license := cboLicense.Text;
+  var i := FSPDXList.IndexOfName(cboLicense.Text);
+  if i <> -1 then
+  begin
+    var data := FSPDXList.ValueFromIndex[i];
+    var items := data.Split([',']);
+    if Length(items) <> 2 then //just in case the txt file is messed up.
+    begin
+      lblSPDX.Visible := false;
+      exit;
+    end;
+
+    lblSPDX.Caption := items[0];
+    lblSPDX.Hint := items[1];
+    lblSPDX.Visible := true;
+  end
+  else
+  begin
+    lblSPDX.Visible := false;
+
+  end;
 end;
 
 procedure TDSpecCreatorForm.cboTemplateChange(Sender: TObject);
@@ -1116,6 +1139,8 @@ begin
   FDosCommand := TDosCommand.Create(nil);
   FDosCommand.OnNewLine := DosCommandNewLine;
   FDosCommand.OnTerminated := DosCommandTerminated;
+  FSPDXList := TStringList.Create;
+  LoadSPDXList;
   LoadDspecStructure;
   FSavefilename := '';
   FtmpFilename := '';
@@ -1126,6 +1151,7 @@ end;
 
 procedure TDSpecCreatorForm.FormDestroy(Sender: TObject);
 begin
+  FSPDXList.Free;
   FreeAndNil(FDosCommand);
 end;
 
@@ -1163,6 +1189,23 @@ begin
   end;
 
   LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.LoadSPDXList;
+var
+  Stream: TResourceStream;
+begin
+  Stream := TResourceStream.Create(HInstance, 'SPDX', RT_RCDATA);
+  try
+    FSPDXList.LoadFromStream(Stream);
+    cboLicense.Items.Clear;
+    for var i := 0 to  FSPDXList.Count -1  do
+      cboLicense.Items.Add(FSPDXList.Names[i]);
+
+  finally
+    Stream.Free;
+  end;
+
 end;
 
 procedure TDSpecCreatorForm.SaveDspecStructure(const filename: string);

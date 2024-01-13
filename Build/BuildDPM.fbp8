@@ -19,11 +19,11 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
-          legalcopyright = "© 2019 -2021 Vincent Parrett and Contributors"
+          legalcopyright = "© 2019 -2024 Vincent Parrett and Contributors"
           linkproductversion = false
           minorversion = 2
           name = DPMVersion
-          productname = "DPM IDE Support for DelphiXE4"
+          productname = "DSpec Creator for DPM Package Manager"
           productversionstring = 0.2.0-alpha
         end
       end
@@ -370,7 +370,7 @@ begin
           usepropertyset = true
           useversionfromdof = false
           verboseoutput = false
-          versioninfokeys = "LegalCopyright\=© 2019 -2021 Vincent Parrett and Contributors" +
+          versioninfokeys = "LegalCopyright\=© 2019 -2024 Vincent Parrett and Contributors" +
                             "ProductName\=DPM Package Manager" +
                             "ProductVersion\=0.2.0-alpha" +
                             ""
@@ -448,6 +448,7 @@ begin
         begin
           applytoexisting = false
           doexpandexpression = true
+          enabled = false
           forcetype = ftString
           id = {7E4C7689-1B92-4362-A178-AE9107CA70C4}
           modifier = smNone
@@ -476,7 +477,7 @@ begin
       end
       action.group
       begin
-        description = "Command DSpecCreator"
+        description = DSpecCreator
         id = {6107D82E-ADC3-4635-AE9C-F06739F2ACC4}
         variable
         begin
@@ -586,7 +587,7 @@ begin
           buildall = true
           buildversion = 0
           codepage = 1252
-          compileprojectresources = false
+          compileprojectresources = true
           compileridl = true
           configname = Release
           debugversionnumbers = false
@@ -630,8 +631,8 @@ begin
           usepropertyset = true
           useversionfromdof = false
           verboseoutput = false
-          versioninfokeys = "LegalCopyright\=© 2019 -2021 Vincent Parrett and Contributors" +
-                            "ProductName\=DPM Package Manager" +
+          versioninfokeys = "LegalCopyright\=© 2019 -2024 Vincent Parrett and Contributors" +
+                            "ProductName\=DSpec Creator for DPM Package Manager" +
                             "ProductVersion\=0.2.0-alpha" +
                             ""
           versioninfopropertysetname = DPMVersion
@@ -708,6 +709,7 @@ begin
         begin
           applytoexisting = false
           doexpandexpression = true
+          enabled = false
           forcetype = ftString
           id = {34EFE879-0B1F-44A3-B207-067145537088}
           modifier = smNone
