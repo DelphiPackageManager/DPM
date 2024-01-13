@@ -128,6 +128,8 @@ begin
       json.A['design'] := LoadObjectList(FDesignFiles as IList<ISpecNode>);
     if FRuntimeFiles.Count > 0 then
       json.A['runtime'] := LoadObjectList(FRuntimeFiles as IList<ISpecNode>);
+    if FLibFiles.Count > 0 then
+      json.A['lib'] := LoadObjectList(FLibFiles as IList<ISpecNode>);
     if FFiles.Count > 0 then
       json.A['files'] := LoadObjectList(FFiles as IList<ISpecNode>);
     Result := json.ToJSON(True);
