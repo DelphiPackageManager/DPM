@@ -29,7 +29,7 @@ uses
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
   DPM.Creator.TemplateTreeNode,
-  DPM.Creator.Dspec.FileHandler, System.Actions, Vcl.ActnList
+  DPM.Creator.Dspec.FileHandler, System.Actions, Vcl.ActnList, Vcl.ToolWin, Vcl.ActnMan, Vcl.ActnCtrls
   ;
 
 type
@@ -59,11 +59,8 @@ type
     miOpen: TMenuItem;
     miSave: TMenuItem;
     miSaveAs: TMenuItem;
-    miPrint: TMenuItem;
-    miPrintSetup: TMenuItem;
     miExit: TMenuItem;
     N1: TMenuItem;
-    N2: TMenuItem;
     cboTemplate: TComboBox;
     clbPlatforms: TCheckListBox;
     lblTemplate: TLabel;
@@ -139,6 +136,26 @@ type
     Label4: TLabel;
     lblPackageId: TLabel;
     Label5: TLabel;
+    actAddBuildItem: TAction;
+    actFileOpen: TAction;
+    actFileSave: TAction;
+    actFileSaveAs: TAction;
+    actFileNew: TAction;
+    actDeleteBuildItem: TAction;
+    actAddRuntimeItem: TAction;
+    actDeleteRuntimeItem: TAction;
+    actAddDesignItem: TAction;
+    actDeleteDesignItem: TAction;
+    actAddSourceItem: TAction;
+    actAddFileItem: TAction;
+    actDeleteSourceItem: TAction;
+    actDeleteFileItem: TAction;
+    actAddLibItem: TAction;
+    actDeleteLibItem: TAction;
+    actAddSearchPath: TAction;
+    actDeleteSearchPath: TAction;
+    actAddDependency: TAction;
+    actDeleteDependency: TAction;
     procedure FormDestroy(Sender: TObject);
     procedure btnAddExcludeClick(Sender: TObject);
     procedure btnAddTemplateClick(Sender: TObject);
@@ -187,22 +204,6 @@ type
     procedure tvTemplatesCollapsing(Sender: TObject; Node: TTreeNode; var AllowCollapse: Boolean);
     procedure tvTemplatesContextPopup(Sender: TObject; MousePos: TPoint; var Handled: Boolean);
     procedure tvTemplatesCreateNodeClass(Sender: TCustomTreeView; var NodeClass: TTreeNodeClass);
-    procedure PopupAddBuildItem(Sender: TObject);
-    procedure PopupDeleteBuildItem(Sender: TObject);
-    procedure PopupAddRuntimeItem(Sender: TObject);
-    procedure PopupDeleteRuntimeItem(Sender: TObject);
-    procedure PopupAddDesignItem(Sender: TObject);
-    procedure PopupDeleteDesignItem(Sender: TObject);
-    procedure PopupAddSourceItem(Sender: TObject);
-    procedure PopupDeleteSourceItem(Sender: TObject);
-    procedure PopupAddFileItem(Sender: TObject);
-    procedure PopupDeleteFileItem(Sender: TObject);
-    procedure PopupAddLibItem(Sender: TObject);
-    procedure PopupDeleteLibItem(Sender: TObject);
-    procedure PopupAddSearchPathItem(Sender: TObject);
-    procedure PopupDeleteSearchPathItem(Sender: TObject);
-    procedure PopupAddDependencyItem(Sender: TObject);
-    procedure PopupDeleteDependencyItem(Sender: TObject);
     procedure tvTemplatesEdited(Sender: TObject; Node: TTreeNode; var S: string);
     procedure tvTemplatesEditing(Sender: TObject; Node: TTreeNode; var AllowEdit: Boolean);
     procedure VariablesListStringsChange(Sender: TObject);
@@ -213,6 +214,26 @@ type
     procedure UriLabelClick(Sender: TObject);
     procedure UriLabelMouseEnter(Sender: TObject);
     procedure UriLabelMouseLeave(Sender: TObject);
+    procedure actAddBuildItemExecute(Sender: TObject);
+    procedure actDeleteBuildItemExecute(Sender: TObject);
+    procedure actAddDependencyExecute(Sender: TObject);
+    procedure actDeleteDependencyExecute(Sender: TObject);
+    procedure actAddDesignItemExecute(Sender: TObject);
+    procedure actDeleteDesignItemExecute(Sender: TObject);
+    procedure actAddFileItemExecute(Sender: TObject);
+    procedure actDeleteFileItemExecute(Sender: TObject);
+    procedure actAddLibItemExecute(Sender: TObject);
+    procedure actDeleteLibItemExecute(Sender: TObject);
+    procedure actFileOpenExecute(Sender: TObject);
+    procedure actFileSaveExecute(Sender: TObject);
+    procedure actFileSaveAsExecute(Sender: TObject);
+    procedure actFileNewExecute(Sender: TObject);
+    procedure actAddRuntimeItemExecute(Sender: TObject);
+    procedure actDeleteRuntimeItemExecute(Sender: TObject);
+    procedure actAddSearchPathExecute(Sender: TObject);
+    procedure actDeleteSearchPathExecute(Sender: TObject);
+    procedure actAddSourceItemExecute(Sender: TObject);
+    procedure actDeleteSourceItemExecute(Sender: TObject);
   private
     { Private declarations }
     FtmpFilename : string;
@@ -705,39 +726,32 @@ var
   j: Integer;
   iconIndex : Integer;
   lNodeType : TNodeType;
-  lOnNewText : string;
-  lOnDeleteText : string;
-  lOnNewClick : TNotifyEvent;
-  lOnDeleteClick : TNotifyEvent;
+  lAddAction : TAction;
+  lDeleteAction : TAction;
 begin
-  lOnNewClick := nil;
-  lOnDeleteClick := nil;
   if NodeName = 'Source' then
   begin
     iconIndex := 2;
     lNodeType := ntSourceHeading;
-    lOnNewText := 'Add Source Item';
-    lOnNewClick := PopupAddSourceItem;
-    lOnDeleteText := 'Delete Source Item';
-    lOnDeleteClick := PopupDeleteSourceItem;
+
+    lAddAction := actAddSourceItem;
+    lDeleteAction := actDeleteSourceItem;
+
   end
   else if NodeName = 'Files' then
   begin
     iconIndex := 2;
     lNodeType := ntFileHeading;
-    lOnNewText := 'Add File Item';
-    lOnNewClick := PopupAddFileItem;
-    lOnDeleteText := 'Delete File Item';
-    lOnDeleteClick := PopupDeleteFileItem;
+
+    lAddAction := actAddFileItem;
+    lDeleteAction := actDeleteFileItem;
   end
   else if NodeName = 'Lib' then
   begin
     iconIndex := 2;
     lNodeType := ntLibHeading;
-    lOnNewText := 'Add Library Item';
-    lOnNewClick := PopupAddLibItem;
-    lOnDeleteText := 'Delete Library Item';
-    lOnDeleteClick := PopupDeleteLibItem;
+    lAddAction := actAddLibItem;
+    lDeleteAction := actDeleteLibItem;
   end
   else
     raise Exception.Create('nodeName must be either Source, Files or Lib. Was [' + NodeName + ']');
@@ -747,10 +761,11 @@ begin
   nodeSource.NodeType := lNodeType;
   nodeSource.ImageIndex := iconIndex;
   nodeSource.SelectedIndex := iconIndex;
-  nodeSource.OnNewText := lOnNewText;
-  nodeSource.OnNewClick := lOnNewClick;
-  nodeSource.OnDeleteText := lOnDeleteText;
-  nodeSource.OnDeleteClick := lOnDeleteClick;
+
+  
+  nodeSource.AddAction := lAddAction;
+  nodeSource.DeleteAction := lDeleteAction;
+
   for j := 0 to fileList.Count - 1 do
   begin
     sourceNode := tvTemplates.Items.AddChild(nodeSource, fileList[j].Source) as TTemplateTreeNode;
@@ -784,10 +799,11 @@ begin
   nodeSearchPath.ImageIndex := 3;
   nodeSearchPath.SelectedIndex := 3;
   nodeSearchPath.NodeType := ntSeachPathHeading;
-  nodeSearchPath.OnNewText := 'Add SearchPath Item';
-  nodeSearchPath.OnNewClick := PopupAddSearchPathItem;
-  nodeSearchPath.OnDeleteText := 'Delete SearchPath Item';
-  nodeSearchPath.OnDeleteClick := PopupDeleteSearchPathItem;
+
+  nodeSearchPath.AddAction := actAddSearchPath;
+  nodeSearchPath.DeleteAction := actDeleteSearchPath;
+
+
 
   for j := 0 to template.searchPaths.Count - 1 do
   begin
@@ -811,10 +827,10 @@ begin
   nodeBuild.ImageIndex := 0;
   nodeBuild.SelectedIndex := 0;
   nodeBuild.NodeType := ntBuildHeading;
-  nodeBuild.OnNewText := 'Add Build Item';
-  nodeBuild.OnNewClick := PopupAddBuildItem;
-  nodeBuild.OnDeleteText := 'Delete Build Item';
-  nodeBuild.OnDeleteClick := PopupDeleteBuildItem;
+
+  nodeBuild.AddAction := actAddBuildItem;
+  nodeBuild.DeleteAction := actDeleteBuildItem;
+
   for j := 0 to template.BuildEntries.Count - 1 do
   begin
     buildNode := tvTemplates.Items.AddChild(nodeBuild, template.BuildEntries[j].id) as TTemplateTreeNode;
@@ -826,6 +842,285 @@ begin
   end;
 end;
 
+
+procedure TDSpecCreatorForm.actAddBuildItemExecute(Sender: TObject);
+var
+  buildId : string;
+  BuildForm: TBuildForm;
+  build : ISpecBuildEntry;
+begin
+  BuildForm := TBuildForm.Create(nil);
+  try
+    BuildForm.edtBuildId.Text := 'default';
+
+    if BuildForm.ShowModal =  mrCancel then
+      Exit;
+    buildId := BuildForm.edtBuildId.Text;
+    if buildId.IsEmpty then
+      Exit;
+    build := FTemplate.NewBuildEntryById(buildId);
+    build.project := BuildForm.edtProject.Text;
+  finally
+    FreeAndNil(BuildForm);
+  end;
+  LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.actAddDependencyExecute(Sender: TObject);
+var
+  dependancyId : string;
+  DependencyForm: TDependencyForm;
+  dependency : ISpecDependency;
+  ver : TVersionRange;
+begin
+  DependencyForm := TDependencyForm.Create(nil);
+  try
+    DependencyForm.edtDependencyId.Text := 'default';
+
+    if DependencyForm.ShowModal =  mrCancel then
+      Exit;
+    dependancyId := DependencyForm.edtDependencyId.Text;
+    if dependancyId.IsEmpty then
+      Exit;
+    dependency := FTemplate.NewDependencyById(dependancyId);
+    if length(DependencyForm.edtVersion.Text) > 0 then
+    begin
+       if TVersionRange.TryParse(DependencyForm.edtVersion.Text, ver) then
+       begin
+         dependency.version := ver;
+       end;
+    end;
+  finally
+    FreeAndNil(DependencyForm);
+  end;
+  LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.actAddDesignItemExecute(Sender: TObject);
+var
+  designBuidId : string;
+  DesignForm: TBplForm;
+  design : ISpecBPLEntry;
+begin
+  DesignForm := TBplForm.Create(nil);
+  try
+    DesignForm.edtBuildId.Text := 'buildId';
+
+    if DesignForm.ShowModal =  mrCancel then
+      Exit;
+    designBuidId := DesignForm.edtBuildId.Text;
+    if designBuidId.IsEmpty then
+      Exit;
+    design := FTemplate.NewDesignBplBySrc(DesignForm.edtSource.Text);
+    design.buildId := DesignForm.edtBuildId.Text;
+    design.Source := DesignForm.edtSource.Text;
+    design.install := DesignForm.chkInstall.Checked;
+  finally
+    FreeAndNil(DesignForm);
+  end;
+  LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.actAddFileItemExecute(Sender: TObject);
+var
+  SourceSrc : string;
+  FileForm: TSourceForm;
+  FileEntry : ISpecFileEntry;
+begin
+  FileForm := TSourceForm.Create(nil);
+  try
+      FileForm.edtSource.Text := 'default';
+
+    if FileForm.ShowModal =  mrCancel then
+      Exit;
+    SourceSrc := FileForm.edtSource.Text;
+    if SourceSrc.IsEmpty then
+      Exit;
+    FileEntry := FTemplate.NewFiles(SourceSrc);
+    FileEntry.flatten := FileForm.chkFlatten.Checked;
+    FileEntry.Destination := FileForm.edtDest.Text;
+  finally
+    FreeAndNil(FileForm);
+  end;
+  LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.actAddLibItemExecute(Sender: TObject);
+var
+  SourceSrc : string;
+  LibForm: TSourceForm;
+  LibEntry : ISpecFileEntry;
+begin
+  LibForm := TSourceForm.Create(nil);
+  try
+    LibForm.edtSource.Text := 'default';
+
+    if LibForm.ShowModal =  mrCancel then
+      Exit;
+    SourceSrc := LibForm.edtSource.Text;
+    if SourceSrc.IsEmpty then
+      Exit;
+    LibEntry := FTemplate.NewLib(SourceSrc);
+    LibEntry.flatten := LibForm.chkFlatten.Checked;
+    LibEntry.Destination := LibForm.edtDest.Text;
+  finally
+    FreeAndNil(LibForm);
+  end;
+  LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.actAddRuntimeItemExecute(Sender: TObject);
+var
+  runtimeBuildId : string;
+  RuntimeForm: TBplForm;
+  runtime : ISpecBPLEntry;
+begin
+  RuntimeForm := TBplForm.Create(nil);
+  try
+    RuntimeForm.edtBuildId.Text := 'default';
+
+    if RuntimeForm.ShowModal =  mrCancel then
+      Exit;
+    runtimeBuildId := RuntimeForm.edtBuildId.Text;
+    if runtimeBuildId.IsEmpty then
+      Exit;
+    runtime := FTemplate.NewRuntimeBplBySrc(RuntimeForm.edtSource.Text);
+    runtime.Source := RuntimeForm.edtSource.Text;
+    runtime.BuildId := runtimeBuildId;
+    runtime.copyLocal := RuntimeForm.chkCopyLocal.Checked;
+  finally
+    FreeAndNil(RuntimeForm);
+  end;
+  LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.actAddSearchPathExecute(Sender: TObject);
+var
+  searchPathStr : string;
+  SearchPathForm: TSearchPathForm;
+  searchPath : ISpecSearchPath;
+begin
+  SearchPathForm := TSearchPathForm.Create(nil);
+  try
+      SearchPathForm.edtSearchPath.Text := 'default';
+
+    if SearchPathForm.ShowModal =  mrCancel then
+      Exit;
+    searchPathStr := SearchPathForm.edtSearchPath.Text;
+    if searchPathStr.IsEmpty then
+      Exit;
+    searchPath := FTemplate.NewSearchPath(searchPathStr);
+  finally
+    FreeAndNil(SearchPathForm);
+  end;
+  LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.actAddSourceItemExecute(Sender: TObject);
+var
+  SourceSrc : string;
+  SourceForm: TSourceForm;
+  source : ISpecFileEntry;
+begin
+  SourceForm := TSourceForm.Create(nil);
+  try
+      SourceForm.edtSource.Text := 'default';
+
+    if SourceForm.ShowModal =  mrCancel then
+      Exit;
+    SourceSrc := SourceForm.edtSource.Text;
+    if SourceSrc.IsEmpty then
+      Exit;
+
+    source := FTemplate.NewSource(SourceSrc);
+    source.flatten := SourceForm.chkFlatten.Checked;
+    source.Destination := SourceForm.edtDest.Text;
+  finally
+    FreeAndNil(SourceForm);
+  end;
+  LoadTemplates;
+
+end;
+
+procedure TDSpecCreatorForm.actDeleteBuildItemExecute(Sender: TObject);
+var
+  selectedNode : TTemplateTreeNode;
+begin
+  selectedNode := tvTemplates.Selected as TTemplateTreeNode;
+  if selectedNode <> nil then
+    selectedNode.DeleteBuild;
+  LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.actDeleteDependencyExecute(Sender: TObject);
+var
+  selectedNode : TTemplateTreeNode;
+begin
+  selectedNode := tvTemplates.Selected as TTemplateTreeNode;
+  if selectedNode <> nil then
+    selectedNode.DeleteDependency;
+  LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.actDeleteDesignItemExecute(Sender: TObject);
+var
+  selectedNode : TTemplateTreeNode;
+begin
+  selectedNode := tvTemplates.Selected as TTemplateTreeNode;
+  if selectedNode <> nil then
+    selectedNode.DeleteDesign;
+  LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.actDeleteFileItemExecute(Sender: TObject);
+var
+  selectedNode : TTemplateTreeNode;
+begin
+  selectedNode := tvTemplates.Selected as TTemplateTreeNode;
+  if selectedNode <> nil then
+    selectedNode.DeleteFileEntry;
+  LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.actDeleteLibItemExecute(Sender: TObject);
+var
+  selectedNode : TTemplateTreeNode;
+begin
+  selectedNode := tvTemplates.Selected as TTemplateTreeNode;
+  if selectedNode <> nil then
+    selectedNode.DeleteLibEntry;
+  LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.actDeleteRuntimeItemExecute(Sender: TObject);
+var
+  selectedNode : TTemplateTreeNode;
+begin
+  selectedNode := tvTemplates.Selected as TTemplateTreeNode;
+  if selectedNode <> nil then
+    selectedNode.DeleteRuntime;
+  LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.actDeleteSearchPathExecute(Sender: TObject);
+var
+  selectedNode : TTemplateTreeNode;
+begin
+  selectedNode := tvTemplates.Selected as TTemplateTreeNode;
+  if selectedNode <> nil then
+    selectedNode.DeleteSearchPath;
+  LoadTemplates;
+end;
+
+procedure TDSpecCreatorForm.actDeleteSourceItemExecute(Sender: TObject);
+var
+  selectedNode : TTemplateTreeNode;
+begin
+  selectedNode := tvTemplates.Selected as TTemplateTreeNode;
+  if selectedNode <> nil then
+    selectedNode.DeleteSource;
+  LoadTemplates;
+end;
 
 procedure TDSpecCreatorForm.actDeleteTemplateExecute(Sender: TObject);
 var
@@ -871,10 +1166,90 @@ begin
   LoadTemplate(newTemplate);
 end;
 
-procedure TDSpecCreatorForm.ActionList1Update(Action: TBasicAction; var Handled: Boolean);
+procedure TDSpecCreatorForm.actFileNewExecute(Sender: TObject);
 begin
-  actDuplicateTemplate.Enabled := tvTemplates.Selected <> nil;
-  actDeleteTemplate.Enabled := tvTemplates.Selected <> nil;
+  FreeAndNil(FOpenFile);
+  FOpenFile := TDSpecFile.Create(FLogger);
+  FSavefilename := '';
+  Caption := 'Untitled - dspec Creator';
+  LoadDspecStructure;
+end;
+
+procedure TDSpecCreatorForm.actFileOpenExecute(Sender: TObject);
+var
+  dspecFilename : string;
+begin
+  if OpenDialog.Execute then
+  begin
+    dspecFilename := OpenDialog.FileName;
+    FOpenFile.LoadFromFile( dspecFilename);
+    FSavefilename := dspecFilename;
+    Caption := dspecFilename + ' - ' + cToolName;
+    LoadDspecStructure;
+  end;
+end;
+
+procedure TDSpecCreatorForm.actFileSaveAsExecute(Sender: TObject);
+begin
+  if SaveDialog.Execute then
+  begin
+    SaveDspecStructure(SaveDialog.Filename);
+  end;
+end;
+
+procedure TDSpecCreatorForm.actFileSaveExecute(Sender: TObject);
+begin
+  if FSavefilename.IsEmpty then
+  begin
+    if SaveDialog.Execute then
+    begin
+      SaveDspecStructure(SaveDialog.Filename);
+    end;
+  end
+  else
+  begin
+    SaveDspecStructure(FSavefilename);
+  end;
+end;
+
+procedure TDSpecCreatorForm.ActionList1Update(Action: TBasicAction; var Handled: Boolean);
+var
+  selectedNode : TTemplateTreeNode;
+  hasNode : boolean;
+begin
+  selectedNode := tvTemplates.Selected as TTemplateTreeNode;
+  hasNode := selectedNode <> nil;
+
+  actDuplicateTemplate.Enabled := hasNode;
+  actDeleteTemplate.Enabled := hasNode;
+
+  actAddBuildItem.Enabled := hasNode and (selectedNode.IsBuildHeading or selectedNode.IsBuild);
+  actDeleteBuildItem.Enabled := hasNode and selectedNode.IsBuild;
+
+  actAddDependency.Enabled := hasNode and (selectedNode.IsDependencyHeading or selectedNode.IsDependency);
+  actDeleteDependency.Enabled := hasNode and selectedNode.IsDependency;
+
+  actAddDesignItem.Enabled := hasNode and (selectedNode.IsDesignHeading or selectedNode.IsDesign);
+  actDeleteDesignItem.Enabled := hasNode and selectedNode.IsDesign;
+
+  actAddFileItem.Enabled := hasNode and (selectedNode.IsFileEntryHeading or selectedNode.IsFileEntry);
+  actDeleteFileItem.Enabled := hasNode and selectedNode.IsFileEntry;
+
+  actAddLibItem.Enabled := hasNode and (selectedNode.IsLibEntryHeading or selectedNode.IsLibEntry);
+  actDeleteLibItem.Enabled := hasNode and selectedNode.IsLibEntry;
+
+  actAddRuntimeItem.Enabled := hasNode and (selectedNode.IsRuntimeHeading or selectedNode.IsRuntime);
+  actDeleteRuntimeItem.Enabled := hasNode and selectedNode.IsRuntime;
+
+  actAddDependency.Enabled := hasNode and (selectedNode.IsDependencyHeading or selectedNode.IsDependency);
+  actDeleteDependency.Enabled := hasNode and selectedNode.IsDependency;
+
+  actAddSearchPath.Enabled := hasNode and (selectedNode.IsSearchPathHeading or selectedNode.IsSearchPath);
+  actDeleteSearchPath.Enabled := hasNode and selectedNode.IsSearchPath;
+
+  actAddSourceItem.Enabled := hasNode and (selectedNode.IsSourceHeading or selectedNode.IsSearchPath);
+  actDeleteSourceItem.Enabled := hasNode and selectedNode.IsSource;
+
 end;
 
 procedure TDSpecCreatorForm.AddBPLNode(node: TTemplateTreeNode; template: ISpecTemplate; fileList: IList<ISpecBPLEntry>; nodeName: string);
@@ -884,42 +1259,38 @@ var
   j: Integer;
   iconIndex : Integer;
   lNodeType : TNodeType;
-  lOnNewText : string;
-  lOnDeleteText : string;
-  lOnNewClick : TNotifyEvent;
-  lOnDeleteClick : TNotifyEvent;
+  lAddAction : TAction;
+  lDeleteAction : TAction;
 begin
   if nodeName = 'Design' then
   begin
     iconIndex := 6;
     lNodeType := ntDesignHeading;
-    lOnNewText := 'Add Design Item';
-    lOnNewClick := PopupAddDesignItem;
-    lOnDeleteText := 'Delete Design Item';
-    lOnDeleteClick := PopupDeleteDesignItem;
+
+    lAddAction := actAddDesignItem;
+    lDeleteAction := actDeleteDesignItem;
+
   end
   else if nodeName = 'Runtime'  then
   begin
     iconIndex := 1;
     lNodeType := ntRuntimeHeading;
-    lOnNewText := 'Add Runtime Item';
-    lOnNewClick := PopupAddRuntimeItem;
-    lOnDeleteText := 'Delete Runtime Item';
-    lOnDeleteClick := PopupDeleteRuntimeItem;
+
+    lAddAction := actAddRuntimeItem;
+    lDeleteAction := actDeleteRuntimeItem;
   end
   else
     raise Exception.Create('Nodetype must be either Design or Runtime - was [' + nodeName + ']');
-
 
   nodeDesign := tvTemplates.Items.AddChild(node, nodeName) as TTemplateTreeNode;
   nodeDesign.Template := template;
   nodeDesign.NodeType := lNodeType;
   nodeDesign.ImageIndex := iconIndex;
   nodeDesign.SelectedIndex := iconIndex;
-  nodeDesign.OnNewText := lOnNewText;
-  nodeDesign.OnNewClick := lOnNewClick;
-  nodeDesign.OnDeleteText := lOnDeleteText;
-  nodeDesign.OnDeleteClick := lOnDeleteClick;
+
+  nodeDesign.AddAction := lAddAction;
+  nodeDesign.DeleteAction := lDeleteAction;
+
   for j := 0 to fileList.Count - 1 do
   begin
     designNode := tvTemplates.Items.AddChild(nodeDesign, fileList[j].BuildId) as TTemplateTreeNode;
@@ -949,10 +1320,9 @@ begin
   nodeDependency.ImageIndex := 4;
   nodeDependency.SelectedIndex := 4;
   nodeDependency.NodeType := ntDependencyHeading;
-  nodeDependency.OnNewText := 'Add Dependency Item';
-  nodeDependency.OnNewClick := PopupAddDependencyItem;
-  nodeDependency.OnDeleteText := 'Delete Dependency Item';
-  nodeDependency.OnDeleteClick := PopupDeleteDependencyItem;
+
+  nodeDependency.AddAction := actAddDependency;
+  nodeDependency.DeleteAction := actDeleteDependency;
 
   for j := 0 to template.dependencies.Count - 1 do
   begin
@@ -1413,253 +1783,6 @@ begin
   FOpenFile.spec.metadata.description := mmoDescription.Text;
 end;
 
-procedure TDSpecCreatorForm.PopupAddBuildItem(Sender: TObject);
-var
-  buildId : string;
-  BuildForm: TBuildForm;
-  build : ISpecBuildEntry;
-begin
-  BuildForm := TBuildForm.Create(nil);
-  try
-    BuildForm.edtBuildId.Text := 'default';
-
-    if BuildForm.ShowModal =  mrCancel then
-      Exit;
-    buildId := BuildForm.edtBuildId.Text;
-    if buildId.IsEmpty then
-      Exit;
-    build := FTemplate.NewBuildEntryById(buildId);
-    build.project := BuildForm.edtProject.Text;
-  finally
-    FreeAndNil(BuildForm);
-  end;
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.PopupAddDependencyItem(Sender: TObject);
-var
-  dependancyId : string;
-  DependencyForm: TDependencyForm;
-  dependency : ISpecDependency;
-  ver : TVersionRange;
-begin
-  DependencyForm := TDependencyForm.Create(nil);
-  try
-    DependencyForm.edtDependencyId.Text := 'default';
-
-    if DependencyForm.ShowModal =  mrCancel then
-      Exit;
-    dependancyId := DependencyForm.edtDependencyId.Text;
-    if dependancyId.IsEmpty then
-      Exit;
-    dependency := FTemplate.NewDependencyById(dependancyId);
-    if length(DependencyForm.edtVersion.Text) > 0 then
-    begin
-       if TVersionRange.TryParse(DependencyForm.edtVersion.Text, ver) then
-       begin
-         dependency.version := ver;
-       end;
-    end;
-  finally
-    FreeAndNil(DependencyForm);
-  end;
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.PopupAddDesignItem(Sender: TObject);
-var
-  designBuidId : string;
-  DesignForm: TBplForm;
-  design : ISpecBPLEntry;
-begin
-  DesignForm := TBplForm.Create(nil);
-  try
-    DesignForm.edtBuildId.Text := 'buildId';
-
-    if DesignForm.ShowModal =  mrCancel then
-      Exit;
-    designBuidId := DesignForm.edtBuildId.Text;
-    if designBuidId.IsEmpty then
-      Exit;
-    design := FTemplate.NewDesignBplBySrc(DesignForm.edtSource.Text);
-    design.buildId := DesignForm.edtBuildId.Text;
-    design.Source := DesignForm.edtSource.Text;
-    design.install := DesignForm.chkInstall.Checked;
-  finally
-    FreeAndNil(DesignForm);
-  end;
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.PopupAddRuntimeItem(Sender: TObject);
-var
-  runtimeBuildId : string;
-  RuntimeForm: TBplForm;
-  runtime : ISpecBPLEntry;
-begin
-  RuntimeForm := TBplForm.Create(nil);
-  try
-    RuntimeForm.edtBuildId.Text := 'default';
-
-    if RuntimeForm.ShowModal =  mrCancel then
-      Exit;
-    runtimeBuildId := RuntimeForm.edtBuildId.Text;
-    if runtimeBuildId.IsEmpty then
-      Exit;
-    runtime := FTemplate.NewRuntimeBplBySrc(RuntimeForm.edtSource.Text);
-    runtime.Source := RuntimeForm.edtSource.Text;
-    runtime.BuildId := runtimeBuildId;
-    runtime.copyLocal := RuntimeForm.chkCopyLocal.Checked;
-  finally
-    FreeAndNil(RuntimeForm);
-  end;
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.PopupAddSearchPathItem(Sender: TObject);
-var
-  searchPathStr : string;
-  SearchPathForm: TSearchPathForm;
-  searchPath : ISpecSearchPath;
-begin
-  SearchPathForm := TSearchPathForm.Create(nil);
-  try
-      SearchPathForm.edtSearchPath.Text := 'default';
-
-    if SearchPathForm.ShowModal =  mrCancel then
-      Exit;
-    searchPathStr := SearchPathForm.edtSearchPath.Text;
-    if searchPathStr.IsEmpty then
-      Exit;
-    searchPath := FTemplate.NewSearchPath(searchPathStr);
-  finally
-    FreeAndNil(SearchPathForm);
-  end;
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.PopupAddSourceItem(Sender: TObject);
-var
-  SourceSrc : string;
-  SourceForm: TSourceForm;
-  source : ISpecFileEntry;
-begin
-  SourceForm := TSourceForm.Create(nil);
-  try
-      SourceForm.edtSource.Text := 'default';
-
-    if SourceForm.ShowModal =  mrCancel then
-      Exit;
-    SourceSrc := SourceForm.edtSource.Text;
-    if SourceSrc.IsEmpty then
-      Exit;
-
-    source := FTemplate.NewSource(SourceSrc);
-    source.flatten := SourceForm.chkFlatten.Checked;
-    source.Destination := SourceForm.edtDest.Text;
-  finally
-    FreeAndNil(SourceForm);
-  end;
-  LoadTemplates;
-end;
-
-
-procedure TDSpecCreatorForm.PopupAddFileItem(Sender: TObject);
-var
-  SourceSrc : string;
-  FileForm: TSourceForm;
-  FileEntry : ISpecFileEntry;
-begin
-  FileForm := TSourceForm.Create(nil);
-  try
-      FileForm.edtSource.Text := 'default';
-
-    if FileForm.ShowModal =  mrCancel then
-      Exit;
-    SourceSrc := FileForm.edtSource.Text;
-    if SourceSrc.IsEmpty then
-      Exit;
-    FileEntry := FTemplate.NewFiles(SourceSrc);
-    FileEntry.flatten := FileForm.chkFlatten.Checked;
-    FileEntry.Destination := FileForm.edtDest.Text;
-  finally
-    FreeAndNil(FileForm);
-  end;
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.PopupAddLibItem(Sender: TObject);
-var
-  SourceSrc : string;
-  LibForm: TSourceForm;
-  LibEntry : ISpecFileEntry;
-begin
-  LibForm := TSourceForm.Create(nil);
-  try
-      LibForm.edtSource.Text := 'default';
-
-    if LibForm.ShowModal =  mrCancel then
-      Exit;
-    SourceSrc := LibForm.edtSource.Text;
-    if SourceSrc.IsEmpty then
-      Exit;
-    LibEntry := FTemplate.NewLib(SourceSrc);
-    LibEntry.flatten := LibForm.chkFlatten.Checked;
-    LibEntry.Destination := LibForm.edtDest.Text;
-  finally
-    FreeAndNil(LibForm);
-  end;
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.PopupDeleteBuildItem(Sender: TObject);
-begin
-  (tvTemplates.Selected as TTemplateTreeNode).DeleteBuild;
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.PopupDeleteDependencyItem(Sender: TObject);
-begin
-  (tvTemplates.Selected as TTemplateTreeNode).DeleteDependency;
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.PopupDeleteDesignItem(Sender: TObject);
-begin
-  (tvTemplates.Selected as TTemplateTreeNode).DeleteDesign;
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.PopupDeleteRuntimeItem(Sender: TObject);
-begin
-  (tvTemplates.Selected as TTemplateTreeNode).DeleteRuntime;
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.PopupDeleteSearchPathItem(Sender: TObject);
-begin
-  (tvTemplates.Selected as TTemplateTreeNode).DeleteSearchPath;
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.PopupDeleteSourceItem(Sender: TObject);
-begin
-  (tvTemplates.Selected as TTemplateTreeNode).DeleteSource;
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.PopupDeleteFileItem(Sender: TObject);
-begin
-  (tvTemplates.Selected as TTemplateTreeNode).DeleteFileEntry;
-  LoadTemplates;
-end;
-
-procedure TDSpecCreatorForm.PopupDeleteLibItem(Sender: TObject);
-begin
-  (tvTemplates.Selected as TTemplateTreeNode).DeleteLibEntry;
-  LoadTemplates;
-end;
-
 procedure TDSpecCreatorForm.tvTemplatesChange(Sender: TObject; Node: TTreeNode);
 var
   lNode: TTemplateTreeNode;
@@ -1687,6 +1810,13 @@ begin
   end
   else if lNode.IsRuntimeHeading then
   begin
+    lblRuntime.Caption := 'Runtime';
+    CardPanel.ActiveCard := crdRuntimeOrDesignBpl;
+    CardPanel.Visible := False;
+  end
+  else if lNode.IsDesignHeading then
+  begin
+    lblRuntime.Caption := 'Design';
     CardPanel.ActiveCard := crdRuntimeOrDesignBpl;
     CardPanel.Visible := False;
   end
@@ -1711,6 +1841,7 @@ begin
         CardPanel.Visible := True;
         CardPanel.ActiveCard := crdSearchPaths;
       end;
+
       if lNodeParent.IsSourceHeading or
          lNodeParent.IsFileEntryHeading or
          lNodeParent.IsLibEntryHeading then
@@ -1738,6 +1869,10 @@ begin
       end;
       if lNodeParent.IsRuntimeHeading or lNodeParent.IsDesignHeading then
       begin
+        if lNodeParent.IsRuntime then
+          lblRuntime.Caption := 'Runtime'
+        else
+          lblRuntime.Caption := 'Design';
         CardPanel.Visible := True;
         CardPanel.ActiveCard := crdRuntimeOrDesignBpl;
         edtBPLEntryBuildId.Text := lNode.bplEntry.buildId;
@@ -1782,6 +1917,9 @@ begin
 
     tvTemplates.PopupMenu.Items.Clear;
     node := tvTemplates.GetNodeAt(MousePos.X, MousePos.Y) as TTemplateTreeNode;
+    if node = nil then
+      exit;
+    tvTemplates.Selected := node;
     FTemplate := nil;
 
     if Assigned(node.Template) then
@@ -1789,13 +1927,20 @@ begin
 
     categoryNode := node.CategoryNode;
     item := TMenuItem.Create(PopupMenu);
-    item.Caption := categoryNode.OnNewText;
-    item.OnClick := categoryNode.OnNewClick;
+
+    item.Action :=  categoryNode.AddAction;
+
+//    item.Caption := categoryNode.OnNewText;
+//    item.OnClick := categoryNode.OnNewClick;
+
     tvTemplates.PopupMenu.Items.Add(item);
 
     item := TMenuItem.Create(PopupMenu);
-    item.Caption := categoryNode.OnDeleteText;
-    item.OnClick := categoryNode.OnDeleteClick;
+    item.Action :=  categoryNode.DeleteAction;
+
+    //item.Caption := categoryNode.OnDeleteText;
+    //item.OnClick := categoryNode.OnDeleteClick;
+
     tvTemplates.PopupMenu.Items.Add(item);
 
     tvTemplates.PopupMenu.Popup(localPos.X, localPos.Y);

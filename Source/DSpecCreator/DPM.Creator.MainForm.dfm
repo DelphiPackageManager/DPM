@@ -21,7 +21,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Top = 0
     Width = 871
     Height = 506
-    ActivePage = tsInfo
+    ActivePage = tsTemplates
     Align = alClient
     TabOrder = 0
     ExplicitWidth = 867
@@ -131,7 +131,12 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Height = 15
         Hint = 'https://semver.org/'
         Caption = 'Package version using Semantic Version notation'
-        Enabled = False
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = 12940065
+        Font.Height = -12
+        Font.Name = 'Segoe UI'
+        Font.Style = []
+        ParentFont = False
         StyleElements = [seClient, seBorder]
         OnClick = UriLabelClick
         OnMouseEnter = UriLabelMouseEnter
@@ -379,7 +384,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Width = 528
         Height = 407
         Anchors = [akLeft, akTop, akRight, akBottom]
-        ActiveCard = crdSource
+        ActiveCard = crdRuntimeOrDesignBpl
         Caption = 'CardPanel'
         TabOrder = 3
         object crdSource: TCard
@@ -830,7 +835,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
     end
   end
   object MainMenu: TMainMenu
-    Left = 604
+    Left = 508
     Top = 386
     object File1: TMenuItem
       Caption = '&File'
@@ -853,15 +858,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Caption = 'Save &As...'
         OnClick = miSaveAsClick
       end
-      object N2: TMenuItem
-        Caption = '-'
-      end
-      object miPrint: TMenuItem
-        Caption = '&Print...'
-      end
-      object miPrintSetup: TMenuItem
-        Caption = 'P&rint Setup...'
-      end
       object N1: TMenuItem
         Caption = '-'
       end
@@ -878,26 +874,26 @@ object DSpecCreatorForm: TDSpecCreatorForm
   object OpenDialog: TOpenDialog
     DefaultExt = '*.dspec'
     Filter = 'Delphi Package Manager Spec Files|*.dspec'
-    Left = 780
+    Left = 812
     Top = 386
   end
   object SaveDialog: TSaveDialog
     DefaultExt = '*.dspec'
     Filter = 'Delphi Package Manager Spec Files|*.dspec'
-    Left = 732
+    Left = 740
     Top = 386
   end
   object PopupMenu: TPopupMenu
-    Left = 604
-    Top = 346
+    Left = 588
+    Top = 386
   end
   object BalloonHint1: TBalloonHint
     Left = 757
     Top = 310
   end
   object ImageList1: TImageList
-    Left = 757
-    Top = 262
+    Left = 693
+    Top = 310
     Bitmap = {
       494C010107000800040010001000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000400000002000000001002000000000000020
@@ -1183,6 +1179,110 @@ object DSpecCreatorForm: TDSpecCreatorForm
       Category = 'Templates'
       Caption = 'Duplicate Template'
       OnExecute = actDuplicateTemplateExecute
+    end
+    object actAddBuildItem: TAction
+      Category = 'Build'
+      Caption = 'Add Build Item'
+      OnExecute = actAddBuildItemExecute
+    end
+    object actFileOpen: TAction
+      Category = 'Menu'
+      Caption = '&Open..'
+      ShortCut = 16463
+      OnExecute = actFileOpenExecute
+    end
+    object actFileSave: TAction
+      Category = 'Menu'
+      Caption = 'Save'
+      ShortCut = 16467
+      OnExecute = actFileSaveExecute
+    end
+    object actFileSaveAs: TAction
+      Category = 'Menu'
+      Caption = 'Save &As..'
+      ShortCut = 24659
+      OnExecute = actFileSaveAsExecute
+    end
+    object actFileNew: TAction
+      Category = 'Menu'
+      Caption = '&New'
+      ShortCut = 16462
+      OnExecute = actFileNewExecute
+    end
+    object actDeleteBuildItem: TAction
+      Category = 'Build'
+      Caption = 'Delect Build Item'
+      OnExecute = actDeleteBuildItemExecute
+    end
+    object actAddRuntimeItem: TAction
+      Category = 'Runtime'
+      Caption = 'Add Runtime Item'
+      OnExecute = actAddRuntimeItemExecute
+    end
+    object actDeleteRuntimeItem: TAction
+      Category = 'Runtime'
+      Caption = 'Delete Runtime Item'
+      OnExecute = actDeleteRuntimeItemExecute
+    end
+    object actAddDesignItem: TAction
+      Category = 'Design'
+      Caption = 'Add Design Item'
+      OnExecute = actAddDesignItemExecute
+    end
+    object actDeleteDesignItem: TAction
+      Category = 'Design'
+      Caption = 'Delete Design Item'
+      OnExecute = actDeleteDesignItemExecute
+    end
+    object actAddSourceItem: TAction
+      Category = 'Source'
+      Caption = 'Add Source Item'
+      OnExecute = actAddSourceItemExecute
+    end
+    object actAddFileItem: TAction
+      Category = 'File'
+      Caption = 'Add File Item'
+      OnExecute = actAddFileItemExecute
+    end
+    object actDeleteSourceItem: TAction
+      Category = 'Source'
+      Caption = 'Delete Source Item'
+      OnExecute = actDeleteSourceItemExecute
+    end
+    object actDeleteFileItem: TAction
+      Category = 'File'
+      Caption = 'Delete File Item'
+      OnExecute = actDeleteFileItemExecute
+    end
+    object actAddLibItem: TAction
+      Category = 'Lib'
+      Caption = 'Add Lib ITem'
+      OnExecute = actAddLibItemExecute
+    end
+    object actDeleteLibItem: TAction
+      Category = 'Lib'
+      Caption = 'Delete Lib Item'
+      OnExecute = actDeleteLibItemExecute
+    end
+    object actAddSearchPath: TAction
+      Category = 'SearchPath'
+      Caption = 'Add Search Path'
+      OnExecute = actAddSearchPathExecute
+    end
+    object actDeleteSearchPath: TAction
+      Category = 'SearchPath'
+      Caption = 'Delete Search Path'
+      OnExecute = actDeleteSearchPathExecute
+    end
+    object actAddDependency: TAction
+      Category = 'Dependency'
+      Caption = 'Add Dependency'
+      OnExecute = actAddDependencyExecute
+    end
+    object actDeleteDependency: TAction
+      Category = 'Dependency'
+      Caption = 'Delete Dependency'
+      OnExecute = actDeleteDependencyExecute
     end
   end
 end

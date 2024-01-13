@@ -6,6 +6,7 @@ uses
   System.Classes,
   System.SysUtils,
   Vcl.ComCtrls,
+  Vcl.ActnList,
   DPM.Core.Spec.Interfaces;
 
 type
@@ -20,10 +21,8 @@ type
   TTemplateTreeNode = class (TTreeNode)
   public
     NodeType : TNodeType;
-    OnNewText : string;
-    OnNewClick : TNotifyEvent;
-    OnDeleteText : string;
-    OnDeleteClick : TNotifyEvent;
+    AddAction : TAction;
+    DeleteAction : TAction;
 
     TemplateHeading: Boolean;
     Template: ISpecTemplate;
