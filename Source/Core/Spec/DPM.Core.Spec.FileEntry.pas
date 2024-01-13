@@ -163,6 +163,8 @@ end;
 function TSpecFileEntry.ToJson: string;
 var
   json : TJSONObject;
+  jsonArray : TJsonArray;
+  I: Integer;
 begin
   json := TJSONObject.Create;
   try
@@ -172,6 +174,16 @@ begin
       json.B['flatten'] := FFlatten;
     if FIgnore then
       json.B['ignore'] := FIgnore;
+
+    if FExclude.Count > 0 then
+    begin
+      jsonArray := TJsonArray.Create;
+      for I := 0 to FExclude.Count - 1 do
+      begin
+        jsonArray.Add(FExclude[i]);
+      end;
+      json.A['exclude'] := jsonArray;
+    end;
     Result := json.ToJSON;
   finally
     FreeAndNil(json);
