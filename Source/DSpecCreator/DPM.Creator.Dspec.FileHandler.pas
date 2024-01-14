@@ -170,6 +170,7 @@ var
 begin
   writer := TPackageSpecWriter.Create(FLogger, spec);
   writer.SaveToFile(filename);
+  FFilename := Filename;
 end;
 
 function TDSpecFile.WorkingDir: string;

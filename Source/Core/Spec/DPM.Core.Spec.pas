@@ -540,6 +540,8 @@ begin
   list.Add('compilerVersion=' + CompilerToCompilerVersionIntStr(targetPlatform.Compiler));
   list.Add('libSuffix=' + CompilerToLibSuffix(targetPlatform.Compiler));
   list.Add('bdsVersion=' + CompilerToBDSVersion(targetPlatform.Compiler));
+  list.Add('bitness=' + DPMPlatformBitness(targetPlatform.Platforms[0]));
+
 
   if targetPlatform.Variables.Count = 0 then
     exit;

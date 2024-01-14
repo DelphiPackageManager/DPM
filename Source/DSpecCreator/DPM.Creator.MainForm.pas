@@ -519,7 +519,7 @@ begin
   UpdatePlatformCheckListbox(vplatform, 'Android');
   UpdatePlatformCheckListbox(vplatform, 'Android64');
   UpdatePlatformCheckListbox(vplatform, 'LinuxIntel64', 'Linux');
-  UpdatePlatformCheckListbox(vplatform, 'iOS64');
+  UpdatePlatformCheckListbox(vplatform, 'iOS64', 'IOS');
   UpdatePlatformCheckListbox(vplatform, 'OSX64');
 
   FInVariableUpdate := True;
@@ -581,7 +581,9 @@ begin
     begin
       platformString := clbPlatforms.Items[i];
       if platformString = 'Linux' then
-        platformString := 'Linux64';
+        platformString := 'Linux64'
+      else if platformString = 'IOS' then
+        platformString := 'IOS64';
       dpmPlatform := StringToDPMPlatform(platformString);
       if dpmPlatform = TDPMPlatform.UnknownPlatform then
         continue;
@@ -597,7 +599,9 @@ begin
       continue;
     platformString := clbPlatforms.Items[i];
     if platformString = 'Linux' then
-      platformString := 'Linux64';
+      platformString := 'Linux64'
+    else if platformString = 'IOS' then
+      platformString := 'IOS64';
     dpmPlatform := StringToDPMPlatform(platformString);
 
     if dpmPlatform = TDPMPlatform.UnknownPlatform then

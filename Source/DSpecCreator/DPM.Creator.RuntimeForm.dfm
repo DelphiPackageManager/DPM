@@ -28,7 +28,7 @@ object BplForm: TBplForm
     Top = 48
     Width = 43
     Height = 15
-    Caption = 'Biuld Id:'
+    Caption = 'Build Id:'
   end
   object btnCancel: TButton
     Left = 332
