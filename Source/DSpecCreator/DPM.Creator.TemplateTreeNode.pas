@@ -60,6 +60,8 @@ type
     procedure DeleteSearchPath;
     procedure DeleteDependency;
 
+    procedure DeleteEntry;
+
   end;
 
 implementation
@@ -94,6 +96,22 @@ begin
     raise Exception.Create('Node is not of type Design');
 
   Template.DeleteDesignBplBySrc(bplEntry.Source);
+end;
+
+procedure TTemplateTreeNode.DeleteEntry;
+begin
+  case NodeType of
+    ntBuild: DeleteBuild;
+    ntDesign: DeleteDesign;
+    ntRuntime: DeleteRuntime;
+    ntSource: DeleteSource;
+    ntFile: DeleteFileEntry;
+    ntLib: DeleteLibEntry;
+    ntSeachPath: DeleteSearchPath;
+    ntDependency: DeleteDependency;
+  else
+    raise Exception.Create('DeleteEntry called on non entry node');
+  end;
 end;
 
 procedure TTemplateTreeNode.DeleteFileEntry;

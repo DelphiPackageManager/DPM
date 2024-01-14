@@ -868,16 +868,14 @@ end;
 
 
 function TSpec.NewTemplate(const name: string): ISpecTemplate;
-var
-  itemplate : ISpecTemplate;
 begin
   if FindTemplate(name) <> nil then
     raise Exception.Create('Template name already exists');
 
-  itemplate := TSpecTemplate.Create(Logger);
-  itemplate.Name := name;
+  result := TSpecTemplate.Create(Logger);
+  result.Name := name;
 
-  GetTemplates.Add(itemplate);
+  GetTemplates.Add(result);
 end;
 
 function TSpec.PreProcess(const version : TPackageVersion; const properties : TStringList) : boolean;
