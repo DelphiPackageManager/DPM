@@ -175,7 +175,7 @@ end;
 
 function TDSpecFile.WorkingDir: string;
 begin
-  Result := TPath.GetDirectoryName(FFilename);
+  Result := IncludeTrailingPathDelimiter(TPath.GetDirectoryName(FFilename));
 end;
 
 end.

@@ -64,3 +64,5 @@ Source/dpm.used
 *.used
 *.cfg
 Source/IDE/EditorView/__recovery
+Packages
+Source/DSpecCreator/__recovery
