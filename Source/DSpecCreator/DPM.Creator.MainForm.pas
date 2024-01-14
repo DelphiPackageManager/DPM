@@ -21,7 +21,14 @@ uses
   Vcl.WinXPanels,
   Vcl.ExtCtrls,
   Vcl.Grids,
+  Vcl.ExtDlgs,
+  Vcl.Imaging.pngimage,
   Vcl.ValEdit,
+  Vcl.ActnList,
+  Vcl.ToolWin,
+  Vcl.ActnMan,
+  Vcl.ActnCtrls,
+  System.Actions,
   System.RegularExpressions,
   Spring.Collections,
   DosCommand,
@@ -29,7 +36,7 @@ uses
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
   DPM.Creator.TemplateTreeNode,
-  DPM.Creator.Dspec.FileHandler, System.Actions, Vcl.ActnList, Vcl.ToolWin, Vcl.ActnMan, Vcl.ActnCtrls
+  DPM.Creator.Dspec.FileHandler
   ;
 
 type
@@ -156,6 +163,9 @@ type
     actDeleteSearchPath: TAction;
     actAddDependency: TAction;
     actDeleteDependency: TAction;
+    OpenPictureDialog1: TOpenPictureDialog;
+    pnlIcon: TPanel;
+    ImgIcon: TImage;
     crdBuildHeading: TCard;
     lblBuildHeading: TLabel;
     lblBuildDescription: TLabel;
@@ -262,6 +272,7 @@ type
     procedure actDeleteSearchPathExecute(Sender: TObject);
     procedure actAddSourceItemExecute(Sender: TObject);
     procedure actDeleteSourceItemExecute(Sender: TObject);
+    procedure ImgIconClick(Sender: TObject);
   private
     { Private declarations }
     FtmpFilename : string;
@@ -1750,6 +1761,11 @@ begin
   edtAuthor.Text := FOpenFile.spec.MetaData.Authors;
   cboLicense.Text := FOpenFile.spec.MetaData.License;
   edtTags.Text := FOpenFile.spec.MetaData.Tags;
+  if Length(FOpenFile.spec.MetaData.Icon) > 0 then
+  begin
+    ImgIcon.Picture.LoadFromFile(TPath.Combine(FOpenFile.WorkingDir, FOpenFile.spec.MetaData.Icon));
+  end;
+
   cboTemplate.Text := '';
 
   CardPanel.Visible := False;
@@ -1958,6 +1974,24 @@ begin
   end
   else
     CanClose := True; // No changes were made, so it's okay to close
+end;
+
+procedure TDSpecCreatorForm.ImgIconClick(Sender: TObject);
+var
+  relativePath : string;
+begin
+  if Length(FSavefilename) = 0 then
+  begin
+    ShowMessage('Save dspec file before adding the icon');
+    Exit;
+  end;
+
+  if OpenPictureDialog1.Execute then
+  begin
+    ImgIcon.Picture.LoadFromFile(OpenPictureDialog1.FileName);
+    relativePath := ExtractRelativePath(FOpenFile.WorkingDir, OpenPictureDialog1.FileName);
+    FOpenFile.spec.MetaData.Icon := relativePath;
+  end;
 end;
 
 procedure TDSpecCreatorForm.miNewClick(Sender: TObject);

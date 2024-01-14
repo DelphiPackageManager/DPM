@@ -220,6 +220,27 @@ object DSpecCreatorForm: TDSpecCreatorForm
         TabOrder = 7
         OnChange = edtAuthorChange
       end
+      object pnlIcon: TPanel
+        Left = 488
+        Top = 23
+        Width = 128
+        Height = 128
+        BevelKind = bkFlat
+        Caption = 'Select Icon...'
+        TabOrder = 8
+        object ImgIcon: TImage
+          Left = 1
+          Top = 1
+          Width = 122
+          Height = 122
+          Align = alClient
+          Center = True
+          Proportional = True
+          Stretch = True
+          OnClick = ImgIconClick
+          ExplicitTop = 4
+        end
+      end
     end
     object tsPlatforms: TTabSheet
       Caption = 'Platforms'
@@ -1565,5 +1586,12 @@ object DSpecCreatorForm: TDSpecCreatorForm
       Caption = 'Delete Dependency'
       OnExecute = actDeleteDependencyExecute
     end
+  end
+  object OpenPictureDialog1: TOpenPictureDialog
+    Filter = 
+      'All (*.svg, *.png)|*.svg; *.png|Scalable Vector Graphics (*.svg)' +
+      '|*.svg|Portable Network Graphics (*.png)|*.png'
+    Left = 740
+    Top = 226
   end
 end
