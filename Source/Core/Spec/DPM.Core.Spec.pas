@@ -541,7 +541,10 @@ begin
   list.Add('libSuffix=' + CompilerToLibSuffix(targetPlatform.Compiler));
   list.Add('bdsVersion=' + CompilerToBDSVersion(targetPlatform.Compiler));
   list.Add('bitness=' + DPMPlatformBitness(targetPlatform.Platforms[0]));
-
+  if DPMPlatformBitness(targetPlatform.Platforms[0]) = '64' then
+    list.Add('bitness64Only=' + DPMPlatformBitness(targetPlatform.Platforms[0]))
+  else
+    list.Add('bitness64Only=');
 
   if targetPlatform.Variables.Count = 0 then
     exit;
