@@ -1,8 +1,8 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright � 2019 Vincent Parrett and contributors               }
+{           Copyright © 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -56,9 +56,10 @@ implementation
 
 uses
   Winapi.ShellAPI,
+{$IFNDEF CREATOR}
   ToolsApi,
+{$ENDIF}
   DPM.Core.Utils.System;
-
 {$I DPMIDE.inc}
 
 {$R *.dfm}
@@ -66,12 +67,14 @@ uses
 constructor TDPMAboutForm.Create(AOwner: TComponent);
 begin
   inherited;
+{$IFNDEF CREATOR}
   {$IFDEF STYLEELEMENTS}
   StyleElements := [seFont, seClient, seBorder];
   {$ENDIF}
   {$IFDEF THEMESERVICES}
   (BorlandIDEServices as IOTAIDEThemingServices).ApplyTheme(Self);
   {$ENDIF}
+{$ENDIF}
 
   lblVersion.Caption := lblVersion.Caption + TSystemUtils.GetVersionString;
 end;

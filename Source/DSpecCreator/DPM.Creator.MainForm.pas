@@ -195,6 +195,10 @@ type
     Label9: TLabel;
     Label10: TLabel;
     Label11: TLabel;
+    Help1: TMenuItem;
+    CreatingPackages1: TMenuItem;
+    N2: TMenuItem;
+    About1: TMenuItem;
     procedure FormDestroy(Sender: TObject);
     procedure btnAddExcludeClick(Sender: TObject);
     procedure btnAddTemplateClick(Sender: TObject);
@@ -273,6 +277,8 @@ type
     procedure actAddSourceItemExecute(Sender: TObject);
     procedure actDeleteSourceItemExecute(Sender: TObject);
     procedure ImgIconClick(Sender: TObject);
+    procedure CreatingPackages1Click(Sender: TObject);
+    procedure About1Click(Sender: TObject);
   private
     { Private declarations }
     FtmpFilename : string;
@@ -356,7 +362,8 @@ uses
   DPM.Creator.OptionsForm,
   DPM.Creator.DependencyForm,
   DPM.Creator.Logger,
-  DPM.Creator.Dspec.Replacer
+  DPM.Creator.Dspec.Replacer,
+  DPM.IDE.AboutForm
   ;
 
 
@@ -696,6 +703,11 @@ begin
   vPlatform.platforms := newPlatforms;
 end;
 
+procedure TDSpecCreatorForm.CreatingPackages1Click(Sender: TObject);
+begin
+  UriClick('https://docs.delphi.dev/getting-started/creating-packages.html');
+end;
+
 procedure TDSpecCreatorForm.edtAuthorChange(Sender: TObject);
 begin
   FOpenFile.spec.metadata.authors := edtAuthor.Text;
@@ -962,6 +974,18 @@ begin
   end;
 end;
 
+
+procedure TDSpecCreatorForm.About1Click(Sender: TObject);
+var
+  aboutForm : TDPMAboutForm;
+begin
+  aboutForm := TDPMAboutForm.Create(nil);
+  try
+    aboutForm.ShowModal;
+  finally
+    aboutForm.Free;
+  end;
+end;
 
 procedure TDSpecCreatorForm.actAddBuildItemExecute(Sender: TObject);
 var
@@ -1697,7 +1721,6 @@ end;
 procedure TDSpecCreatorForm.edtTemplateNameChange(Sender: TObject);
 var
  templateName : string;
- template : ISpecTemplate;
  templateNode : TTemplateTreeNode;
 begin
   if Assigned(tvTemplates.Selected) then
@@ -1710,8 +1733,6 @@ begin
     templateNode.Text := edtTemplateName.Text;
     FOpenFile.spec.RenameTemplate(templateName, edtTemplateName.Text);
   end;
-
-  //LoadTemplates;
 end;
 
 procedure TDSpecCreatorForm.edtVersionChange(Sender: TObject);

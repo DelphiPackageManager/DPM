@@ -19,11 +19,8 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
-          legalcopyright = "© 2019 -2024 Vincent Parrett and Contributors"
-          linkproductversion = false
-          minorversion = 2
           name = DPMVersion
-          productname = "DSpec Creator for DPM Package Manager"
+          productversion = 0.0.0.0
           productversionstring = 0.2.0-alpha
         end
       end
@@ -580,7 +577,7 @@ begin
         action.delphi.build
         begin
           allowimplicitimport = true
-          alwaysuseconditionalsfromdof = false
+          alwaysuseconditionalsfromdof = true
           autoincbuild = false
           autoupdatefileversion = true
           autoupdateproductversion = true
@@ -649,7 +646,7 @@ begin
           end
           delphi.compileroptions
           begin
-            alwaysuseconditionalsfromdof = false
+            alwaysuseconditionalsfromdof = true
             alwaysusedelphilibrarypath = true
             alwaysusedofsearchpath = true
             assertions = true
@@ -659,7 +656,7 @@ begin
                                "-w-UNSAFE_CODE\=0" +
                                "-w-UNSAFE_CAST\=0" +
                                ""
-            conditionals = RELEASE
+            conditionals = RELEASE;CREATOR
             consoleapp = false
             debuginfo = false
             definitionsonly = false

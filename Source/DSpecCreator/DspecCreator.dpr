@@ -112,7 +112,8 @@ uses
   DPM.Creator.Logger in 'DPM.Creator.Logger.pas',
   DPM.Creator.TemplateTreeNode in 'DPM.Creator.TemplateTreeNode.pas',
   DPM.Creator.BuildForm in 'DPM.Creator.BuildForm.pas' {BuildForm},
-  DPM.IDE.Options in '..\IDE\Options\DPM.IDE.Options.pas';
+  DPM.IDE.Options in '..\IDE\Options\DPM.IDE.Options.pas',
+  DPM.IDE.AboutForm in '..\IDE\DPM.IDE.AboutForm.pas' {DPMAboutForm};
 
 {$R *.res}
 
@@ -120,5 +121,6 @@ begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
   Application.CreateForm(TDSpecCreatorForm, DSpecCreatorForm);
+  Application.CreateForm(TDPMAboutForm, DPMAboutForm);
   Application.Run;
 end.
