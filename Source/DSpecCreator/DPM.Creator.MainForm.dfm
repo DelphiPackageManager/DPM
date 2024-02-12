@@ -109,9 +109,9 @@ object DSpecCreatorForm: TDSpecCreatorForm
       object Label4: TLabel
         Left = 89
         Top = 403
-        Width = 125
+        Width = 113
         Height = 15
-        Caption = 'Comma separated tags '
+        Caption = 'Space separated tags '
         Enabled = False
       end
       object lblPackageId: TLabel
@@ -408,8 +408,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         ActiveCard = crdRuntimeOrDesignBpl
         Caption = 'CardPanel'
         TabOrder = 3
-        ExplicitWidth = 520
-        ExplicitHeight = 386
         object crdSource: TCard
           Left = 1
           Top = 1
@@ -643,8 +641,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Runtime Or DesignTime'
           CardIndex = 3
           TabOrder = 3
-          ExplicitWidth = 512
-          ExplicitHeight = 378
           DesignSize = (
             516
             379)
@@ -678,7 +674,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             TabOrder = 3
-            ExplicitWidth = 407
           end
           object edtBPLEntrySrc: TEdit
             Left = 62
@@ -690,7 +685,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             ShowHint = True
             TabOrder = 0
             OnChange = edtBPLEntrySrcChange
-            ExplicitWidth = 407
           end
           object chkCopyLocal: TCheckBox
             Left = 62
