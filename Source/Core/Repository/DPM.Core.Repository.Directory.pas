@@ -37,21 +37,21 @@ uses
   DPM.Core.Logging,
   DPM.Core.Options.Search,
   DPM.Core.Options.Push,
-  DPM.Core.Spec.Interfaces,
+  DPM.Core.Manifest.Interfaces,
   DPM.Core.Package.Interfaces,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Repository.Base;
 
 type
-  TReadSpecFunc = reference to function(const name : string; const spec : IPackageSpec) : IInterface;
+  TReadManifestFunc = reference to function(const name : string; const manifest : IPackageManifest) : IInterface;
 
   TDirectoryPackageRepository = class(TBaseRepository, IPackageRepository)
   private
     FPermissionsChecked : boolean;
     FIsWritable : boolean;
   protected
-    function DoGetPackageMetaData(const cancellationToken : ICancellationToken; const fileName : string; const readSpecFunc : TReadSpecFunc) : IInterface;
+    function DoGetPackageMetaData(const cancellationToken : ICancellationToken; const fileName : string; const readManifestFunc : TReadManifestFunc) : IInterface;
 
 
     function DoList(searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
@@ -68,9 +68,9 @@ type
 
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
 
-    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo; overload;
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo; overload;
 
-//    function GetPackageLatestVersions(const cancellationToken : ICancellationToken; const ids : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : IDictionary<string, IPackageLatestVersionInfo>;
+//    function GetPackageLatestVersions(const cancellationToken : ICancellationToken; const ids : IList<IPackageIdentity>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : IDictionary<string, IPackageLatestVersionInfo>;
 
     function GetPackageLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageLatestVersionInfo;
 
@@ -81,7 +81,7 @@ type
 
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
 
-    function GetPackageFeedByIds(const cancellationToken : ICancellationToken;  const ids : IList<IPackageId>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) :  IPackageSearchResult;
+    function GetPackageFeedByIds(const cancellationToken : ICancellationToken;  const ids : IList<IPackageIdentity>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) :  IPackageSearchResult;
 
 
     function GetPackageIcon(const cancelToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
@@ -107,9 +107,9 @@ uses
   System.Zip,
   Spring.Collections.Extensions,
   DPM.Core.Constants,
-  DPM.Core.Package.Metadata,
+  DPM.Core.Package.Classes,
   DPM.Core.Package.Icon,
-  DPM.Core.Spec.Reader,
+  DPM.Core.Manifest.Reader,
   DPM.Core.Utils.Strings,
   DPM.Core.Utils.Path,
   DPM.Core.Utils.Directory,
@@ -333,10 +333,10 @@ begin
   end;
 end;
 
-function TDirectoryPackageRepository.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
+function TDirectoryPackageRepository.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
 var
   packageFileName : string;
-  readSpecFunc : TReadSpecFunc;
+  readManifestFunc : TReadManifestFunc;
 begin
   result := nil;
   packageFileName := Format('%s-%s-%s-%s.dpkg', [packageId.Id, CompilerToString(packageId.CompilerVersion), DPMPlatformToString(packageId.Platform), packageId.Version.ToStringNoMeta]);
@@ -347,12 +347,12 @@ begin
   if cancellationToken.IsCancelled then
     exit;
 
-  readSpecFunc := function (const name : string; const spec : IPackageSpec) : IInterface
+  readManifestFunc := function (const name : string; const manifest : IPackageManifest) : IInterface
                   begin
-                    result := TPackageInfo.CreateFromSpec(name, spec);
+                    result := TPackageInfo.CreateFromManifest(name, manifest);
                   end;
 
-  result := DoGetPackageMetaData(cancellationToken, packageFileName, readSpecFunc) as IPackageInfo;
+  result := DoGetPackageMetaData(cancellationToken, packageFileName, readManifestFunc) as IPackageInfo;
 end;
 
 
@@ -442,10 +442,10 @@ begin
     result:= TDPMPackageLatestVersionInfo.Create(id,latestStableVersion, latestVersion);
 end;
 
-function TDirectoryPackageRepository.GetPackageFeedByIds(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const compilerVersion: TCompilerVersion;
+function TDirectoryPackageRepository.GetPackageFeedByIds(const cancellationToken: ICancellationToken; const ids: IList<IPackageIdentity>; const compilerVersion: TCompilerVersion;
   const platform: TDPMPlatform): IPackageSearchResult;
 var
-  item : IPackageId;
+  item : IPackageIdentity;
   metaData : IPackageSearchResultItem;
   latestVersionInfo : IPackageLatestVersionInfo;
 begin
@@ -524,7 +524,7 @@ end;
 function TDirectoryPackageRepository.GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform): IPackageSearchResultItem;
 var
   packageFileName : string;
-  readSpecFunc : TReadSpecFunc;
+  readManifestFunc : TReadManifestFunc;
   metaData : IPackageMetadata;
 begin
   result := nil;
@@ -535,12 +535,12 @@ begin
   if cancellationToken.IsCancelled then
     exit;
 
-  readSpecFunc := function (const name : string; const spec : IPackageSpec) : IInterface
+  readManifestFunc := function (const name : string; const manifest : IPackageManifest) : IInterface
                   begin
-                    result := TPackageMetadata.CreateFromSpec(name, spec);
+                    result := TPackageMetadata.CreateFromManifest(name, manifest);
                   end;
 
-  metaData := DoGetPackageMetaData(cancellationToken, packageFileName, readSpecFunc) as IPackageMetaData;
+  metaData := DoGetPackageMetaData(cancellationToken, packageFileName, readManifestFunc) as IPackageMetaData;
   if metaData <> nil then
     result := TDPMPackageSearchResultItem.FromMetaData(name, metaData);
 
@@ -593,7 +593,7 @@ var
   i : integer;
   packageVersion : TPackageVersion;
   packageInfo : IPackageInfo;
-  readSpecFunc : TReadSpecFunc;
+  readManifestFunc : TReadManifestFunc;
 begin
   result := TCollections.CreateList<IPackageInfo>;
 
@@ -603,9 +603,9 @@ begin
   regex := TRegEx.Create(searchRegEx, [roIgnoreCase]);
 
 
-  readSpecFunc := function (const name : string; const spec : IPackageSpec) : IInterface
+  readManifestFunc := function (const name : string; const manifest : IPackageManifest) : IInterface
                   begin
-                    result := TPackageInfo.CreateFromSpec(name, spec);
+                    result := TPackageInfo.CreateFromManifest(name, manifest);
                   end;
 
   for i := 0 to searchFiles.Count - 1 do
@@ -626,7 +626,7 @@ begin
         if not packageVersion.IsStable then
           continue;
 
-      packageInfo := DoGetPackageMetadata(cancellationToken, searchFiles[i], readSpecFunc) as IPackageInfo;
+      packageInfo := DoGetPackageMetadata(cancellationToken, searchFiles[i], readManifestFunc) as IPackageInfo;
       result.Add(packageInfo);
     end;
   end;
@@ -727,7 +727,7 @@ var
   packageMetaData : IPackageMetadata;
   resultItem : IPackageSearchResultItem;
 
-  readSpecFunc : TReadSpecFunc;
+  readManifestFunc : TReadManifestFunc;
 
 begin
   Logger.Debug('TDirectoryPackageRepository.DoGetPackageFeed');
@@ -785,9 +785,9 @@ begin
     end;
   end;
 
-  readSpecFunc := function (const name : string; const spec : IPackageSpec) : IInterface
+  readManifestFunc := function (const name : string; const manifest : IPackageManifest) : IInterface
                   begin
-                    result := TPackageMetadata.CreateFromSpec(name, spec);
+                    result := TPackageMetadata.CreateFromManifest(name, manifest);
                   end;
 
   //now we can use the info collected above to build actual results.
@@ -806,7 +806,7 @@ begin
     if not FileExists(packageFileName) then
       exit;
 
-    packageMetadata := DoGetPackageMetaData(cancelToken, packageFileName, readSpecFunc) as IPackageMetadata;
+    packageMetadata := DoGetPackageMetaData(cancelToken, packageFileName, readManifestFunc) as IPackageMetadata;
 
     if packageMetadata <> nil then
     begin
@@ -818,13 +818,13 @@ begin
   end;
 end;
 
-function TDirectoryPackageRepository.DoGetPackageMetaData(const cancellationToken : ICancellationToken; const fileName : string; const readSpecFunc : TReadSpecFunc) : IInterface;
+function TDirectoryPackageRepository.DoGetPackageMetaData(const cancellationToken : ICancellationToken; const fileName : string; const readManifestFunc : TReadManifestFunc) : IInterface;
 var
   zipFile : TZipFile;
   metaBytes : TBytes;
   metaString : string;
-  spec : IPackageSpec;
-  reader : IPackageSpecReader;
+  manifest : IPackageManifest;
+  reader : IPackageManifestReader;
   extractedFile : string;
   svgIconFileName : string;
   pngIconFileName : string;
@@ -833,16 +833,16 @@ var
 begin
   Logger.Debug('TDirectoryPackageRepository.DoGetPackageMetaData');
   result := nil;
-  reader := TPackageSpecReader.Create(Logger);
+  reader := TPackageManifestReader.Create(Logger);
 
-  //first see if the spec has been extracted already.
+  //first see if the manifest has been extracted already.
   extractedFile := ChangeFileExt(fileName, '.dspec');
   if FileExists(extractedFile) then
   begin
-    spec := reader.ReadSpec(extractedFile);
-    if spec <> nil then
+    manifest := reader.ReadManifest(extractedFile);
+    if manifest <> nil then
     begin
-      result := TPackageMetadata.CreateFromSpec(Name, spec);
+      result := TPackageMetadata.CreateFromManifest(Name, manifest);
       exit;
     end;
   end;
@@ -853,7 +853,10 @@ begin
   try
     try
       zipFile.Open(fileName, TZipMode.zmRead);
-      zipFile.Read(cPackageMetaFile, metaBytes);
+      if zipFile.IndexOf(cPackageManifestFile) <> -1 then
+        zipFile.Read(cPackageManifestFile, metaBytes)
+      else
+        zipFile.Read(cOldPackageManifestFile, metaBytes);
 
       //we will take this opportunity to extract the icon file here
       //for later use.
@@ -892,10 +895,10 @@ begin
   end;
   //doing this outside the try/finally to avoid locking the package for too long.
   metaString := TEncoding.UTF8.GetString(metaBytes);
-  spec := reader.ReadSpecString(metaString);
-  if spec = nil then
+  manifest := reader.ReadManifestString(metaString);
+  if manifest = nil then
     exit;
-  result := readSpecFunc(name, spec);
+  result := readManifestFunc(name, manifest);
   if not FPermissionsChecked then
   begin
     FIsWritable := TDirectoryUtils.IsDirectoryWriteable(ExtractFilePath(fileName));

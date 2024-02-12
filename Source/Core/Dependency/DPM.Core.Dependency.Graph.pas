@@ -94,6 +94,7 @@ type
     function GetCompilerVersion : TCompilerVersion;
     function GetIsTransitive : boolean;
     function GetProjectFile: string;
+    function GetSourceName : string;
     procedure SetParent(const value : IPackageReference);
     procedure SetProjectFile(const value: string);
 
@@ -349,6 +350,11 @@ end;
 function TPackageReference.GetSelectedOn : TVersionRange;
 begin
   result := FSelectedOn;
+end;
+
+function TPackageReference.GetSourceName: string;
+begin
+  result := '';
 end;
 
 function TPackageReference.GetVersion : TPackageVersion;

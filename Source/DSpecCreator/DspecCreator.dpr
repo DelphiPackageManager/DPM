@@ -50,7 +50,7 @@ uses
   DPM.Core.Package.Installer in '..\Core\Package\DPM.Core.Package.Installer.pas',
   DPM.Core.Package.InstallerContext in '..\Core\Package\DPM.Core.Package.InstallerContext.pas',
   DPM.Core.Package.Interfaces in '..\Core\Package\DPM.Core.Package.Interfaces.pas',
-  DPM.Core.Package.Metadata in '..\Core\Package\DPM.Core.Package.Metadata.pas',
+  DPM.Core.Package.Classes in '..\Core\Package\DPM.Core.Package.Classes.pas',
   DPM.Core.Package.SearchResults in '..\Core\Package\DPM.Core.Package.SearchResults.pas',
   DPM.Core.Packaging.Archive in '..\Core\Packaging\DPM.Core.Packaging.Archive.pas',
   DPM.Core.Packaging.Archive.Reader in '..\Core\Packaging\DPM.Core.Packaging.Archive.Reader.pas',
@@ -113,7 +113,10 @@ uses
   DPM.Creator.TemplateTreeNode in 'DPM.Creator.TemplateTreeNode.pas',
   DPM.Creator.BuildForm in 'DPM.Creator.BuildForm.pas' {BuildForm},
   DPM.IDE.Options in '..\IDE\Options\DPM.IDE.Options.pas',
-  DPM.IDE.AboutForm in '..\IDE\DPM.IDE.AboutForm.pas' {DPMAboutForm};
+  DPM.IDE.AboutForm in '..\IDE\DPM.IDE.AboutForm.pas' {DPMAboutForm},
+  DPM.Core.Manifest.Interfaces in '..\Core\Manifest\DPM.Core.Manifest.Interfaces.pas',
+  DPM.Core.Manifest in '..\Core\Manifest\DPM.Core.Manifest.pas',
+  DPM.Core.Manifest.Reader in '..\Core\Manifest\DPM.Core.Manifest.Reader.pas';
 
 {$R *.res}
 

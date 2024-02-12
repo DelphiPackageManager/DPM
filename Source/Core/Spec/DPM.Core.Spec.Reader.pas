@@ -44,7 +44,6 @@ type
   protected
     function ReadSpec(const fileName : string) : IPackageSpec; overload;
     function ReadSpec(const stream : TStream) : IPackageSpec; overload;
-    function ReadSpecString(const specString : string) : IPackageSpec;
   public
     constructor Create(const logger : ILogger);
   end;
@@ -108,32 +107,6 @@ begin
   raise ENotImplemented.Create('ReadSpec from stream not implemented');
 end;
 
-function TPackageSpecReader.ReadSpecString(const specString : string) : IPackageSpec;
-var
-  jsonObj : TJsonObject;
-begin
-  result := nil;
-  if specString = '' then
-  begin
-    FLogger.Error('Spec string is empty!');
-    exit;
-  end;
-
-  try
-    jsonObj := TJsonObject.Parse(specString) as TJsonObject;
-    try
-      Result := InternalReadPackageSpecJson('', jsonObj);
-    finally
-      jsonObj.Free;
-    end;
-  except
-    on e : Exception do
-    begin
-      FLogger.Error('Error parsing spec json : ' + e.Message);
-      exit;
-    end;
-  end;
-end;
 
 end.
 

@@ -363,10 +363,25 @@ function TSpec.ApplyTemplates : Boolean;
 var
   template : ISpecTemplate;
   targetPlatform : ISpecTargetPlatform;
+  error : boolean;
 begin
   result := true;
+  error := false;
   Logger.Information('Applying templates..');
-  //if any targetPlatforms reference a template
+  //if any targetPlatforms are missing a template then exit
+  FTargetPlatforms.ForEach(
+    procedure(const item : ISpecTargetPlatform)
+    begin
+      if item.TemplateName = '' then
+      begin
+        error := true;
+        Logger.Error('TargetPlatform ' + item.ToString);
+      end;
+    end);
+
+  if error then
+    exit(false);
+
   if not FTargetPlatforms.Any(function(const item : ISpecTargetPlatform) : boolean
     begin
       result := item.TemplateName <> '';

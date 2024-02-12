@@ -214,13 +214,13 @@ end;
 
 function TPackageArchiveWriter.WriteMetaDataFile(const fileName : string) : boolean;
 begin
-  FZipFile.Add(fileName, cPackageMetaFile);
+  FZipFile.Add(fileName, cPackageManifestFile);
   result := true;
 end;
 
 function TPackageArchiveWriter.WriteMetaDataFile(const stream : TStream) : Boolean;
 begin
-  FZipFile.Add(stream, cPackageMetaFile);
+  FZipFile.Add(stream, cPackageManifestFile);
   result := true;
 end;
 

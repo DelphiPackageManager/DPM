@@ -10,7 +10,7 @@ uses
   DPM.Core.Package.Interfaces,
   DPM.Core.Dependency.Interfaces,
   DPM.Core.Package.Installer.Interfaces,
-  DPM.Core.Spec.Interfaces;
+  DPM.Core.Manifest.Interfaces;
 
 type
   TCorePackageInstallerContext = class(TInterfacedObject, IPackageInstallerContext)
@@ -32,7 +32,7 @@ type
     procedure PackageGraphPruned(const projectFile : string; const platform : TDPMPlatform; const graph : IPackageReference);virtual;
 
     //this is a no-op here, look at the IDE installer context to see how this is implemented.
-    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;virtual;
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests : IDictionary<string, IPackageManifest>) : boolean;virtual;
 
     //record package resoltions for a project, so we can detect conflicts
     procedure RecordResolutions(const projectFile: string; const platform : TDPMPlatform; const resolutions : TArray<IResolution>);
@@ -110,7 +110,7 @@ begin
   projectPlatformEntry.TryExtract(platform, result);
 end;
 
-function TCorePackageInstallerContext.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
+function TCorePackageInstallerContext.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests : IDictionary<string, IPackageManifest>): boolean;
 begin
   result := true; //this is only needed for the IDE context
 end;

@@ -32,7 +32,7 @@ uses
   VSoft.Awaitable,
   DPM.Core.Types,
   DPM.Core.Package.Interfaces,
-  DPM.Core.Spec.Interfaces;
+  DPM.Core.Manifest.Interfaces;
 
 
 type
@@ -45,26 +45,26 @@ type
     function Clean : boolean;
 
     // creates the folder where the package would reside and returns the path.
-    function CreatePackagePath(const packageId : IPackageId) : string;
+    function CreatePackagePath(const packageId : IPackageIdentity) : string;
 
-    function GetPackagePath(const packageId : IPackageId) : string;overload;
+    function GetPackagePath(const packageId : IPackageIdentity) : string;overload;
     function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : string;overload;
 
 
     //checks if the package is present as a folder, if not there but the file is
     //then it will call InstallPackage to extract it.
-    function EnsurePackage(const packageId : IPackageId) : boolean;
+    function EnsurePackage(const packageId : IPackageIdentity) : boolean;
 
     function InstallPackageFromFile(const packageFileName : string; const saveFile : boolean) : boolean;
 
     //gets the package info with dependencies. Calls EnsurePackage.
-    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
 
     //gets the full package metadata including search paths.
-    function GetPackageMetadata(const packageId : IPackageId) : IPackageMetadata;
+    function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
 
-    //gets the deserialized dspec file for the package.
-    function GetPackageSpec(const packageId : IPackageId) : IPackageSpec;
+    //gets the deserialized manifest file for the package.
+    function GetPackageManifest(const packageId : IPackageIdentity) : IPackageManifest;
 
     property Location : string read GetLocation write SetLocation;
     property PackagesFolder : string read GetPackagesFolder;

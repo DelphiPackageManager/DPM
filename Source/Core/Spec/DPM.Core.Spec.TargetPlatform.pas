@@ -38,6 +38,9 @@ uses
   DPM.Core.Spec.TemplateBase,
   DPM.Core.Spec.Interfaces;
 
+
+//NOTE: TSpecTargetPlatform descends from TSpecTemplateBase because we need this when we apply the templates during pack.
+// and also when we load the package spec in the IDE for dependencies.
 type
   TSpecTargetPlatform = class(TSpecTemplateBase, ISpecTargetPlatform)
   private
@@ -62,6 +65,7 @@ type
     constructor Create(const logger : ILogger); override;
     constructor CreateReducedClone(const logger : ILogger; const targetPlatform : ISpecTargetPlatform; const platform : TDPMPlatform; const variables : TStrings);
     destructor Destroy;override;
+    function ToString : string;override;
     function PlatformContains(platformName:string): Boolean;
   end;
 
@@ -198,7 +202,6 @@ var
   platform : TDPMPlatform;
   platformList : IList<TDPMPlatform>;
   sCompiler : string;
-  sTemplate : string;
 
   variablesObj : TJsonObject;
   i: Integer;
@@ -262,11 +265,7 @@ begin
       result := false;
     end;
   end;
-
-  sTemplate := jsonObject.S['template'];
-  if sTemplate <> '' then
-    FTemplateName := sTemplate;
-
+  FTemplateName := jsonObject.S['template'];
   variablesObj := jsonObject.ExtractObject('variables');
   if variablesObj <> nil then
   begin
@@ -274,7 +273,6 @@ begin
       FVariables.Add(variablesObj.Names[i] + '=' + variablesObj.Values[variablesObj.Names[i]].Value );
     variablesObj.Free;
   end;
-
   result := inherited LoadFromJson(jsonObject) and result;
 end;
 
@@ -339,6 +337,11 @@ begin
   finally
     FreeAndNil(json);
   end;
+end;
+
+function TSpecTargetPlatform.ToString: string;
+begin
+  result := CompilerToString(FCompiler);
 end;
 
 end.

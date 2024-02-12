@@ -50,6 +50,9 @@ uses
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec,
   DPM.Core.Spec.Reader,
+  DPM.Core.Manifest.Interfaces,
+  DPM.Core.Manifest,
+  DPM.Core.Manifest.Reader,
   DPM.Core.Package.Interfaces,
   DPM.Core.Package.Installer.Interfaces,
   DPM.Core.Package.Installer,
@@ -84,6 +87,8 @@ begin
   Container.RegisterType<IPackageWriter, TPackageWriter>;
 
   Container.RegisterType<IPackageSpecReader, TPackageSpecReader>;
+
+  Container.RegisterType<IPackageManifestReader, TPackageManifestReader>;
 
   Container.RegisterType<ICompilerEnvironmentProvider, TCompilerEnvironmentProvider>;
   Container.RegisterType<ICompilerFactory, TCompilerFactory>().AsSingleton();

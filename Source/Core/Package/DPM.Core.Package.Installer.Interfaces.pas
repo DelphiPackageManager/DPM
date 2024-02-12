@@ -39,7 +39,7 @@ uses
   DPM.Core.Options.Restore,
   DPM.Core.Package.Interfaces,
   DPM.Core.Dependency.Interfaces,
-  DPM.Core.Spec.Interfaces;
+  DPM.Core.Manifest.Interfaces;
 
 
 type
@@ -73,7 +73,7 @@ type
     procedure RecordGraph(const projectFile : string; const platform : TDPMPlatform; const graph : IPackageReference);
 
     ///<summary> called from the package installer during install/restore - to install design time packages. See IDE implementation</summary>
-    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests : IDictionary<string, IPackageManifest>) : boolean;
 
 
     ///<summary> Called from the dependency resolver to record package resolutions, so we can detect conflicts in other projects

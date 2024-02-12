@@ -45,7 +45,7 @@ type
   TNodeVisitProc = reference to procedure(const packageReference : IPackageReference);
 
   //a directed asyclic graph (DAG).
-  IPackageReference = interface(IPackageId)
+  IPackageReference = interface(IPackageIdentity)
     ['{20055C26-8E63-4936-8249-ACF8514A37E7}']
     function GetId : string;
     function GetParent : IPackageReference;

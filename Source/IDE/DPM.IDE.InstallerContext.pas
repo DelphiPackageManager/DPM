@@ -10,7 +10,7 @@ uses
   DPM.Core.Dependency.Interfaces,
   DPM.Core.Package.Installer.Interfaces,
   DPM.Core.Package.InstallerContext,
-  DPM.Core.Spec.Interfaces,
+  DPM.Core.Manifest.Interfaces,
   DPM.IDE.PathManager;
 
 type
@@ -20,7 +20,7 @@ type
   protected
     procedure Clear;override;
     procedure RemoveProject(const projectFile : string);override;
-    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;override;
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests: IDictionary<string, IPackageManifest>) : boolean;override;
   public
     constructor Create(const logger : ILogger; const pathManager : IDPMIDEPathManager);reintroduce;
   end;
@@ -40,7 +40,7 @@ begin
 end;
 
 
-function TDPMIDEPackageInstallerContext.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
+function TDPMIDEPackageInstallerContext.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests: IDictionary<string, IPackageManifest>): boolean;
 var
   projectGraph : IPackageReference;
 begin

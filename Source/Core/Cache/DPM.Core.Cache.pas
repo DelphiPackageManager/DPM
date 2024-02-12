@@ -34,41 +34,41 @@ uses
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
   DPM.Core.Cache.Interfaces,
-  DPM.Core.Spec.Interfaces;
+  DPM.Core.Manifest.Interfaces;
 
 type
   TPackageCache = class(TInterfacedObject, IPackageCache)
   private
     FLogger : ILogger;
-    FSpecReader : IPackageSpecReader;
+    FManifestReader : IPackageManifestReader;
     FLocation : string;
   protected
     procedure SetLocation(const value : string);
     function GetLocation : string;
     function GetPackagesFolder : string;
 
-    function CachePackage(const packageId : IPackageId; const saveFile : Boolean) : Boolean;
+    function CachePackage(const packageId : IPackageIdentity; const saveFile : Boolean) : Boolean;
     function Clean : Boolean;
-    function CreatePackagePath(const packageId : IPackageId) : string;
+    function CreatePackagePath(const packageId : IPackageIdentity) : string;
 
-    function GetPackagePath(const packageId : IPackageId) : string; overload;
+    function GetPackagePath(const packageId : IPackageIdentity) : string; overload;
     function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : string;overload;
 
-    function EnsurePackage(const packageId : IPackageId) : Boolean;
+    function EnsurePackage(const packageId : IPackageIdentity) : Boolean;
 
-    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
+    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
 
-    function GetPackageMetadata(const packageId : IPackageId) : IPackageMetadata;
+    function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
 
-    function GetPackageSpec(const packageId : IPackageId) : IPackageSpec;
+    function GetPackageManifest(const packageId : IPackageIdentity) : IPackageManifest;
 
 
-//    function InstallPackage(const packageId : IPackageId; const saveFile : boolean; const source : string = '') : boolean;
+//    function InstallPackage(const packageId : IPackageIdentity; const saveFile : boolean; const source : string = '') : boolean;
 
     function InstallPackageFromFile(const packageFileName : string; const saveFile : boolean) : boolean;
 
   public
-    constructor Create(const logger : ILogger; const specReader : IPackageSpecReader);
+    constructor Create(const logger : ILogger; const manifestReader : IPackageManifestReader);
   end;
 
 implementation
@@ -79,12 +79,12 @@ uses
   System.Zip,
   System.RegularExpressions,
   DPM.Core.Constants,
-  DPM.Core.Package.Metadata,
+  DPM.Core.Package.Classes,
   DPM.Core.Utils.Strings;
 
 { TPackageCache }
 
-function TPackageCache.CachePackage(const packageId : IPackageId; const saveFile : Boolean) : Boolean;
+function TPackageCache.CachePackage(const packageId : IPackageIdentity; const saveFile : Boolean) : Boolean;
 begin
   result := false;
 end;
@@ -94,13 +94,13 @@ begin
   result := false;
 end;
 
-constructor TPackageCache.Create(const logger : ILogger; const specReader : IPackageSpecReader);
+constructor TPackageCache.Create(const logger : ILogger; const manifestReader : IPackageManifestReader);
 begin
   FLogger := logger;
-  FSpecReader := specReader;
+  FManifestReader := manifestReader;
 end;
 
-function TPackageCache.CreatePackagePath(const packageId : IPackageId) : string;
+function TPackageCache.CreatePackagePath(const packageId : IPackageIdentity) : string;
 begin
   result := GetPackagePath(packageId);
   if not ForceDirectories(result) then
@@ -115,36 +115,40 @@ begin
   result := FLocation;
 end;
 
-function TPackageCache.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageId) : IPackageInfo;
+function TPackageCache.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
 var
   packageFolder : string;
   metaDataFile : string;
-  spec : IPackageSpec;
+  manifest : IPackageManifest;
 begin
   result := nil;
   packageFolder := GetPackagePath(packageId);
   if not DirectoryExists(packageFolder) then
     exit;
-  metaDataFile := IncludeTrailingPathDelimiter(packageFolder) + cPackageMetaFile;
+  metaDataFile := IncludeTrailingPathDelimiter(packageFolder) + cPackageManifestFile;
   if not FileExists(metaDataFile) then
   begin
-    FLogger.Debug('Package metadata file [' + metaDataFile + '] not found in cache.');
-    exit;
+    metaDataFile := IncludeTrailingPathDelimiter(packageFolder) + cOldPackageManifestFile;
+    if not FileExists(metaDataFile) then
+    begin
+      FLogger.Debug('Package metadata file [' + metaDataFile + '] not found in cache.');
+      exit;
+    end;
   end;
-  spec := FSpecReader.ReadSpec(metaDataFile);
-  if spec = nil then
+  manifest := FManifestReader.ReadManifest(metaDataFile);
+  if manifest = nil then
     exit;
-  Result := TPackageInfo.CreateFromSpec('', spec);
+  Result := TPackageInfo.CreateFromManifest('', manifest);
 end;
 
-function TPackageCache.GetPackageMetadata(const packageId : IPackageId) : IPackageMetadata;
+function TPackageCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
 var
-  spec : IPackageSpec;
+  manifest : IPackageManifest;
 begin
-  spec := GetPackageSpec(packageId);
-  if spec = nil then
+  manifest := GetPackageManifest(packageId);
+  if manifest = nil then
     exit;
-  Result := TPackageMetadata.CreateFromSpec('', spec);
+  Result := TPackageMetadata.CreateFromManifest('', manifest);
 end;
 
 function TPackageCache.GetPackagePath(const id: string; const version: string; const compilerVersion : TCompilerVersion;const platform: TDPMPlatform): string;
@@ -152,7 +156,7 @@ begin
   result := GetPackagesFolder + PathDelim + CompilerToString(compilerVersion) + PathDelim + DPMPlatformToString(platform) + PathDelim + Id + PathDelim + Version;
 end;
 
-function TPackageCache.GetPackagePath(const packageId : IPackageId) : string;
+function TPackageCache.GetPackagePath(const packageId : IPackageIdentity) : string;
 begin
   result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim + DPMPlatformToString(packageId.platform) + PathDelim + packageId.Id + PathDelim + packageId.Version.ToStringNoMeta;
 end;
@@ -163,7 +167,7 @@ begin
   result := TPath.GetFullPath(FLocation)
 end;
 
-function TPackageCache.GetPackageSpec(const packageId: IPackageId): IPackageSpec;
+function TPackageCache.GetPackageManifest(const packageId: IPackageIdentity): IPackageManifest;
 var
   packageFolder : string;
   metaDataFile : string;
@@ -177,23 +181,28 @@ begin
   packageFolder := GetPackagePath(packageId);
   if not DirectoryExists(packageFolder) then
     exit;
-  metaDataFile := IncludeTrailingPathDelimiter(packageFolder) + cPackageMetaFile;
+  metaDataFile := IncludeTrailingPathDelimiter(packageFolder) + cPackageManifestFile;
   if not FileExists(metaDataFile) then
   begin
-    FLogger.Debug('Package metadata file [' + metaDataFile + '] not found in cache.');
-    exit;
+    metaDataFile := IncludeTrailingPathDelimiter(packageFolder) + cOldPackageManifestFile;
+    if not FileExists(metaDataFile) then
+    begin
+      FLogger.Debug('Package metadata file [' + metaDataFile + '] not found in cache.');
+      exit;
+    end;
   end;
-  result := FSpecReader.ReadSpec(metaDataFile);
+  result := FManifestReader.ReadManifest(metaDataFile);
 end;
 
-function TPackageCache.EnsurePackage(const packageId : IPackageId) : Boolean;
+function TPackageCache.EnsurePackage(const packageId : IPackageIdentity) : Boolean;
 var
   packageFileName : string;
   packagesFolder : string;
 begin
   //check if we have a package folder and manifest.
   packageFileName := GetPackagePath(packageId);
-  result := DirectoryExists(packageFileName) and FileExists(IncludeTrailingPathDelimiter(packageFileName) + cPackageMetaFile);
+  result := DirectoryExists(packageFileName);
+  result := result and (FileExists(IncludeTrailingPathDelimiter(packageFileName) + cPackageManifestFile) or FileExists(IncludeTrailingPathDelimiter(packageFileName) + cOldPackageManifestFile));
   if not result then
   begin
     packagesFolder := GetPackagesFolder;
@@ -260,10 +269,11 @@ begin
 
   try
     TZipFile.ExtractZipFile(packageFilePath, packageFolder);
-    result := FileExists(IncludeTrailingPathDelimiter(packageFolder) + cPackageMetaFile);
+    result := FileExists(IncludeTrailingPathDelimiter(packageFolder) + cPackageManifestFile);
+    if not result then
+      result := FileExists(IncludeTrailingPathDelimiter(packageFolder) + cOldPackageManifestFile);
     if result then
       FLogger.Verbose('Package  [' + packageFilePath + '] added to cache.');
-    //TODO : extract icon and readme
 
   except
     on e : exception do

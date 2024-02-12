@@ -166,7 +166,7 @@ type
 
 
     function GetPackageReferences : IPackageReference;
-    function GetPackageIdsFromReferences(const platform: TDPMPlatform): IList<IPackageId>;
+    function GetPackageIdsFromReferences(const platform: TDPMPlatform): IList<IPackageIdentity>;
     procedure RequestPackageIcon(const index : integer; const package : IPackageSearchResultItem);
 
     function GetInstalledPackagesAsync: IAwaitable<IList<IPackageSearchResultItem>>;
@@ -790,15 +790,15 @@ begin
   end;
 end;
 
-function TDPMEditViewFrame.GetPackageIdsFromReferences(const platform: TDPMPlatform): IList<IPackageId>;
+function TDPMEditViewFrame.GetPackageIdsFromReferences(const platform: TDPMPlatform): IList<IPackageIdentity>;
 var
-  lookup : IDictionary<string, IPackageId>;
+  lookup : IDictionary<string, IPackageIdentity>;
   packageRef : IPackageReference;
 
   procedure AddPackageIds(const value : IPackageReference);
   var
     childRef : IPackageReference;
-    existing : IPackageId;
+    existing : IPackageIdentity;
   begin
     if not (value.Platform = platform) then
       exit;
@@ -820,8 +820,8 @@ var
   end;
 
 begin
-  lookup := TCollections.CreateDictionary < string, IPackageId > ;
-  result := TCollections.CreateList<IPackageId>;
+  lookup := TCollections.CreateDictionary<string, IPackageIdentity> ;
+  result := TCollections.CreateList<IPackageIdentity>;
   if FPackageReferences <> nil then
   begin
     for packageRef in FPackageReferences.Dependencies do
@@ -1101,8 +1101,8 @@ begin
     var
       packageRef : IPackageReference;
       item : IPackageSearchResultItem;
-      packageIds : IList<IPackageId>;
-      pkg : IPackageId;
+      packageIds : IList<IPackageIdentity>;
+      pkg : IPackageIdentity;
     I: Integer;
     begin
       CoInitialize(nil);
@@ -1143,7 +1143,7 @@ begin
           end;
           //remove from the list so we can tell if we got them all in the end.
           pkg := packageIds.Where(
-              function(const value : IPackageId) : boolean
+              function(const value : IPackageIdentity) : boolean
               begin
                 result := SameText(value.Id, item.Id);
               end).FirstOrDefault;

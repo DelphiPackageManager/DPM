@@ -24,7 +24,7 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.Core.Package.Metadata;
+unit DPM.Core.Package.Classes;
 
 interface
 
@@ -35,42 +35,37 @@ uses
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
   DPM.Core.Dependency.Version,
-  DPM.Core.Spec.Interfaces;
+  DPM.Core.Spec.Interfaces,
+  DPM.Core.Manifest.Interfaces;
 
 type
-  TPackageId = class(TInterfacedObject, IPackageId)
+  TPackageIdentity = class(TInterfacedObject, IPackageIdentity)
   private
     FCompilerVersion : TCompilerVersion;
     FId : string;
     FPlatform : TDPMPlatform;
     FVersion : TPackageVersion;
+    FSourceName : string;
   protected
     function GetCompilerVersion : TCompilerVersion;
     function GetId : string;
     function GetPlatform : TDPMPlatform;
     function GetVersion : TPackageVersion;
     function ToIdVersionString : string; virtual;
-  public
-    constructor Create(const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform); overload; virtual;
-    function ToString : string; override;
-  end;
-
-
-  TPackageIdentity = class(TPackageId, IPackageIdentity, IPackageId)
-  private
-    FSourceName : string;
-  protected
     function GetSourceName : string;
+    constructor Create(const sourceName : string; const manifest : IPackageManifest); overload;virtual;
     constructor Create(const sourceName : string; const spec : IPackageSpec); overload; virtual;
     constructor Create(const sourceName : string; const jsonObj : TJsonObject);overload;virtual;
+
   public
     constructor Create(const sourceName : string; const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform); overload; virtual;
     class function TryCreateFromString(const logger : ILogger; const value : string; const source : string; out packageIdentity : IPackageIdentity) : boolean;
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageIdentity;
     class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageIdentity : IPackageIdentity) : boolean;
+    function ToString : string; override;
   end;
 
-  TPackageInfo = class(TPackageIdentity, IPackageInfo, IPackageIdentity, IPackageId)
+  TPackageInfo = class(TPackageIdentity, IPackageInfo, IPackageIdentity)
   private
     FDependencies : IList<IPackageDependency>;
     FUseSource : boolean;
@@ -78,14 +73,16 @@ type
     function GetDependencies : IList<IPackageDependency>;
     function GetUseSource : boolean;
     procedure SetUseSource(const value : boolean);
+    constructor Create(const sourceName : string; const manifest : IPackageManifest); override;
     constructor Create(const sourceName : string; const spec : IPackageSpec); override;
     constructor Create(const sourceName : string; const jsonObj : TJsonObject);override;
   public
+    class function CreateFromManifest(const sourceName : string; const manifest : IPackageManifest) : IPackageInfo;
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageInfo;
     class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageInfo : IPackageInfo) : boolean;
   end;
 
-  TPackageMetadata = class(TPackageInfo, IPackageMetadata, IPackageInfo, IPackageIdentity, IPackageId)
+  TPackageMetadata = class(TPackageInfo, IPackageMetadata, IPackageInfo, IPackageIdentity)
   private
     FAuthors : string;
     FCopyright : string;
@@ -117,9 +114,11 @@ type
     function GetRepositoryBranch : string;
     function GetRepositoryCommit : string;
     constructor Create(const sourceName : string; const spec : IPackageSpec); override;
+    constructor Create(const sourceName : string; const manifest : IPackageManifest); override;
   public
     constructor Create(const sourceName : string; const jsonObj : TJsonObject); override;
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageMetadata;
+    class function CreateFromManifest(const sourceName : string; const manifest : IPackageManifest) : IPackageMetadata;
     class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageMetadata : IPackageMetadata) : boolean;
   end;
 
@@ -135,13 +134,12 @@ type
   end;
 
 
-  //  TPackageMetadataComparer = class
-
 implementation
 
 uses
   DPM.Core.Constants,
-  DPM.Core.Spec.Reader,
+//  DPM.Core.Spec.Reader,
+  DPM.Core.Manifest.Reader,
   DPM.Core.Package.Dependency,
   System.SysUtils,
   System.RegularExpressions,
@@ -173,15 +171,24 @@ begin
   if not TPackageVersion.TryParse(stmp, packageVersion) then
     raise Exception.Create('Version is not a valid version [' + stmp + ']');
 
-  inherited Create(id, packageVersion, cv, platform);
-  FSourceName := sourceName;
+
+  Create(sourceName,  id, packageVersion, cv, platform);
 
 
 end;
 
 constructor TPackageIdentity.Create(const sourceName : string; const id: string; const version: TPackageVersion; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform);
 begin
-  inherited Create(id, version, compilerVersion, platform);
+  FId := id;
+  FVersion := version;
+  FCompilerVersion := compilerVersion;
+  FPlatform := platform;
+  FSourceName := sourceName;
+end;
+
+constructor TPackageIdentity.Create(const sourceName: string; const manifest: IPackageManifest);
+begin
+  Create(sourceName, manifest.MetaData.Id, manifest.MetaData.Version, manifest.TargetPlatform.Compiler, manifest.TargetPlatform.Platforms[0]);
   FSourceName := sourceName;
 end;
 
@@ -192,7 +199,7 @@ end;
 
 constructor TPackageIdentity.Create(const sourceName : string; const spec : IPackageSpec);
 begin
-  inherited Create(spec.MetaData.Id, spec.MetaData.Version, spec.TargetPlatform.Compiler, spec.TargetPlatform.Platforms[0]);
+  Create(sourceName, spec.MetaData.Id, spec.MetaData.Version, spec.TargetPlatform.Compiler, spec.TargetPlatform.Platforms[0]);
   FSourceName := sourceName;
 end;
 
@@ -307,6 +314,27 @@ begin
 
 end;
 
+constructor TPackageInfo.Create(const sourceName: string; const manifest: IPackageManifest);
+var
+  dep : ISpecDependency;
+  newDep : IPackageDependency;
+begin
+  inherited Create(sourceName, manifest);
+  FDependencies := TCollections.CreateList<IPackageDependency>;
+
+  for dep in manifest.TargetPlatform.Dependencies do
+  begin
+    newDep := TPackageDependency.Create(dep.Id, dep.Version, FPlatform);
+    FDependencies.Add(newDep);
+  end;
+
+end;
+
+class function TPackageInfo.CreateFromManifest(const sourceName: string; const manifest : IPackageManifest): IPackageInfo;
+begin
+  result := TPackageInfo.Create(sourceName, manifest);
+end;
+
 class function TPackageInfo.CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageInfo;
 begin
   result := TPackageInfo.Create(sourceName, spec);
@@ -336,6 +364,7 @@ begin
   except
     on e : Exception do
     begin
+      packageInfo := nil;
       logger.Error(e.Message);
       exit;
     end;
@@ -369,6 +398,32 @@ begin
   for specSearchPath in spec.TargetPlatform.SearchPaths do
     FSearchPaths.Add(specSearchPath.Path);
 end;
+
+constructor TPackageMetadata.Create(const sourceName : string; const manifest : IPackageManifest);
+var
+  specSearchPath : ISpecSearchPath;
+begin
+  inherited Create(sourceName, manifest);
+  FSearchPaths := TCollections.CreateList<string>;
+  FAuthors := manifest.MetaData.Authors;
+  FCopyright := manifest.MetaData.Copyright;
+  FDescription := manifest.MetaData.Description;
+  FIcon := manifest.MetaData.Icon;
+  FIsCommercial := manifest.MetaData.IsCommercial;
+  FIsTrial := manifest.MetaData.IsTrial;
+  FLicense := manifest.MetaData.License;
+  FProjectUrl := manifest.MetaData.ProjectUrl;
+  FTags := manifest.MetaData.Tags;
+  FProjectUrl := manifest.MetaData.ProjectUrl;
+  FRepositoryUrl := manifest.MetaData.RepositoryUrl;
+  FRepositoryType := manifest.MetaData.RepositoryType;
+  FRepositoryBranch := manifest.MetaData.RepositoryBranch;
+  FRepositoryCommit := manifest.MetaData.RepositoryCommit;
+
+  for specSearchPath in manifest.TargetPlatform.SearchPaths do
+    FSearchPaths.Add(specSearchPath.Path);
+end;
+
 
 
 constructor TPackageMetadata.Create(const sourceName: string; const jsonObj: TJsonObject);
@@ -409,6 +464,11 @@ begin
       sList.Free;
     end;
   end;
+end;
+
+class function TPackageMetadata.CreateFromManifest(const sourceName: string; const manifest : IPackageManifest): IPackageMetadata;
+begin
+  result := TPackageMetadata.Create(sourceName, manifest );
 end;
 
 class function TPackageMetadata.CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageMetadata;
@@ -550,15 +610,18 @@ var
   zipFile : TZipFile;
   metaBytes : TBytes;
   metaString : string;
-  spec : IPackageSpec;
-  reader : IPackageSpecReader;
+  manifest : IPackageManifest;
+  reader : IPackageManifestReader;
 begin
   result := false;
   zipFile := TZipFile.Create;
   try
     try
       zipFile.Open(fileName, TZipMode.zmRead);
-      zipFile.Read(cPackageMetaFile, metaBytes);
+      if zipFile.IndexOf(cPackageManifestFile) <> -1 then
+        zipFile.Read(cPackageManifestFile, metaBytes)
+      else
+        zipFile.Read(cOldPackageManifestFile, metaBytes)
     except
       on e : Exception do
       begin
@@ -571,11 +634,11 @@ begin
   end;
   //doing this outside the try/finally to avoid locking the package for too long.
   metaString := TEncoding.UTF8.GetString(metaBytes);
-  reader := TPackageSpecReader.Create(Logger);
-  spec := reader.ReadSpecString(metaString);
-  if spec = nil then
+  reader := TPackageManifestReader.Create(Logger);
+  manifest := reader.ReadManifestString(metaString);
+  if manifest = nil then
     exit;
-  info := TPackageMetadata.CreateFromSpec(source, spec);
+  info := TPackageMetadata.CreateFromManifest(source, manifest);
   result := true;
 
 end;
@@ -585,15 +648,18 @@ var
   zipFile : TZipFile;
   metaBytes : TBytes;
   metaString : string;
-  spec : IPackageSpec;
-  reader : IPackageSpecReader;
+  manifest : IPackageManifest;
+  reader : IPackageManifestReader;
 begin
   result := false;
   zipFile := TZipFile.Create;
   try
     try
       zipFile.Open(fileName, TZipMode.zmRead);
-      zipFile.Read(cPackageMetaFile, metaBytes);
+      if zipFile.IndexOf(cPackageManifestFile) <> -1 then
+        zipFile.Read(cPackageManifestFile, metaBytes)
+      else
+        zipFile.Read(cOldPackageManifestFile, metaBytes);
     except
       on e : Exception do
       begin
@@ -606,50 +672,43 @@ begin
   end;
   //doing this outside the try/finally to avoid locking the package for too long.
   metaString := TEncoding.UTF8.GetString(metaBytes);
-  reader := TPackageSpecReader.Create(Logger);
-  spec := reader.ReadSpecString(metaString);
-  if spec = nil then
+  reader := TPackageManifestReader.Create(Logger);
+  manifest := reader.ReadManifestString(metaString);
+  if manifest = nil then
     exit;
-  metadata := TPackageMetadata.CreateFromSpec(source, spec);
+  metadata := TPackageMetadata.CreateFromManifest(source, manifest);
   result := true;
 end;
 
 { TPackageId }
 
-constructor TPackageId.Create(const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform);
-begin
-  FId := id;
-  FVersion := version;
-  FCompilerVersion := compilerVersion;
-  FPlatform := platform;
-end;
 
-function TPackageId.GetCompilerVersion : TCompilerVersion;
+function TPackageIdentity.GetCompilerVersion : TCompilerVersion;
 begin
   result := FCompilerVersion;
 end;
 
-function TPackageId.GetId : string;
+function TPackageIdentity.GetId : string;
 begin
   result := FId;
 end;
 
-function TPackageId.GetPlatform : TDPMPlatform;
+function TPackageIdentity.GetPlatform : TDPMPlatform;
 begin
   result := FPlatform;
 end;
 
-function TPackageId.GetVersion : TPackageVersion;
+function TPackageIdentity.GetVersion : TPackageVersion;
 begin
   result := FVersion;
 end;
 
-function TPackageId.ToIdVersionString : string;
+function TPackageIdentity.ToIdVersionString : string;
 begin
   result := FId + ' [' + FVersion.ToStringNoMeta + ']';
 end;
 
-function TPackageId.ToString : string;
+function TPackageIdentity.ToString : string;
 begin
   result := FId + '-' + CompilerToString(FCompilerVersion) + '-' + DPMPlatformToString(FPlatform) + '-' + FVersion.ToStringNoMeta;
 end;

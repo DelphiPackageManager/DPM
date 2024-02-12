@@ -45,9 +45,11 @@ type
   ///<summary>IPackageId has minimum info needed to identify package
   /// Note this only has info we can get from the package filename!
   /// represents the core package identity - id, version, compiler, platform
+  ///  + sourceName (optional).
   /// </summary>
 
-  IPackageId = interface
+  /// <summary>packageid plus sourcename </summary>
+  IPackageIdentity = interface
     ['{35FABD79-3880-4F46-9D70-AA19AAE44565}']
     function GetId : string;
     function GetVersion : TPackageVersion;
@@ -55,16 +57,11 @@ type
     function GetPlatform : TDPMPlatform;
     function ToString : string;
     function ToIdVersionString : string;
+    function GetSourceName : string;
     property Id : string read GetId;
     property Version : TPackageVersion read GetVersion;
     property CompilerVersion : TCompilerVersion read GetCompilerVersion;
     property Platform : TDPMPlatform read GetPlatform;
-  end;
-
-  /// <summary>packageid plus sourcename </summary>
-  IPackageIdentity = interface(IPackageId)
-    ['{E9E49A25-3ECA-4380-BB75-AC9E29725BEE}']
-    function GetSourceName : string;
     property SourceName : string read GetSourceName;
   end;
 
@@ -122,12 +119,11 @@ type
     property RepositoryType   : string read GetRepositoryType;
     property RepositoryBranch : string read GetRepositoryBranch;
     property RepositoryCommit : string read GetRepositoryCommit;
-
-    property SearchPaths : IList<string>read GetSearchPaths;
+    property SearchPaths : IList<string> read GetSearchPaths;
   end;
 
   ///<summary>This is what is returned from a package repository for the ui </summary>
-  IPackageSearchResultItem = interface(IPackageId)
+  IPackageSearchResultItem = interface(IPackageIdentity)
     ['{8EB6EA16-3708-41F7-93A2-FE56EB75510B}']
     function GetSourceName : string;
     function GetDependencies : IList<IPackageDependency>;

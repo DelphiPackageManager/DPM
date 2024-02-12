@@ -166,7 +166,7 @@ end;
 
 procedure TDSpecFile.SaveToFile(const filename: string);
 var
-  writer : TPackageSpecWriter;
+  writer : IPackageSpecWriter;
 begin
   writer := TPackageSpecWriter.Create(FLogger, spec);
   writer.SaveToFile(filename);

@@ -14,7 +14,6 @@ type
     FLogger : ILogger;
     FSpec : IPackageSpec;
   protected
-    function CreateSpecFile(const options : TSpecOptions) : Boolean;
   public
     constructor Create(const logger : ILogger; spec: IPackageSpec);
     procedure SaveToFile(filename: string);
@@ -33,12 +32,6 @@ constructor TPackageSpecWriter.Create(const logger : ILogger; spec: IPackageSpec
 begin
   FLogger := logger;
   FSpec := spec;
-end;
-
-function TPackageSpecWriter.CreateSpecFile(const options : TSpecOptions) : Boolean;
-begin
-  result := false;
-
 end;
 
 procedure TPackageSpecWriter.SaveToFile(filename: string);

@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectVersion>19.5</ProjectVersion>
@@ -186,7 +186,7 @@
         <DCCReference Include="Core\Package\DPM.Core.Package.Installer.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.InstallerContext.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Interfaces.pas"/>
-        <DCCReference Include="Core\Package\DPM.Core.Package.Metadata.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Classes.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.SearchResults.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.Reader.pas"/>
@@ -303,6 +303,9 @@
         <DCCReference Include="IDE\EditorView\DPM.IDE.ActivityIndicator.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas"/>
         <DCCReference Include="IDE\DPM.IDE.PathManager.pas"/>
+        <DCCReference Include="Core\Manifest\DPM.Core.Manifest.Interfaces.pas"/>
+        <DCCReference Include="Core\Manifest\DPM.Core.Manifest.pas"/>
+        <DCCReference Include="Core\Manifest\DPM.Core.Manifest.Reader.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

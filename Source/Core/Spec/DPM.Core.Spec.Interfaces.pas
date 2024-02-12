@@ -44,7 +44,7 @@ type
   ISpecNode = interface
     ['{AD47A3ED-591B-4E47-94F2-7EC136182202}']
     function LoadFromJson(const jsonObject : TJsonObject) : boolean;
-    function LoadObjectList(list: Spring.Collections.IList<ISpecNode>): TJsonArray;
+    function LoadObjectList(list: IList<ISpecNode>): TJsonArray;
     function ToJSON: string;
   end;
 
@@ -316,6 +316,7 @@ type
 
     function CloneForPlatform(const platform : TDPMPlatform) : ISpecTargetPlatform;
     function PlatformContains(platformName:string): Boolean;
+    function ToString : string;
 
     property Compiler : TCompilerVersion read GetCompiler write SetCompiler;
     property Platforms : TArray<TDPMPlatform> read GetPlatforms write SetPlatforms;
@@ -352,12 +353,11 @@ type
   IPackageSpecReader = interface
     ['{8A20F825-8DCA-4784-BDBD-8F91A651BA72}']
     function ReadSpec(const fileName : string) : IPackageSpec;
-    function ReadSpecString(const specString : string) : IPackageSpec;
   end;
 
   IPackageSpecWriter = interface
     ['{F3370E25-2E9D-4353-9985-95C75D35D68E}']
-    function CreateSpecFile(const options : TSpecOptions) : boolean;
+    procedure SaveToFile(filename: string);
   end;
 
 

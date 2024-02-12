@@ -1,28 +1,28 @@
-{ *************************************************************************** }
-{ }
-{ Delphi Package Manager - DPM }
-{ }
-{ Copyright © 2019 Vincent Parrett and contributors }
-{ }
-{ vincent@finalbuilder.com }
-{ https://www.finalbuilder.com }
-{ }
-{ }
-{ *************************************************************************** }
-{ }
-{ Licensed under the Apache License, Version 2.0 (the "License"); }
-{ you may not use this file except in compliance with the License. }
-{ You may obtain a copy of the License at }
-{ }
-{ http://www.apache.org/licenses/LICENSE-2.0 }
-{ }
-{ Unless required by applicable law or agreed to in writing, software }
-{ distributed under the License is distributed on an "AS IS" BASIS, }
-{ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. }
-{ See the License for the specific language governing permissions and }
-{ limitations under the License. }
-{ }
-{ *************************************************************************** }
+{***************************************************************************}
+{                                                                           }
+{           Delphi Package Manager - DPM                                    }
+{                                                                           }
+{           Copyright © 2019 Vincent Parrett and contributors               }
+{                                                                           }
+{           vincent@finalbuilder.com                                        }
+{           https://www.finalbuilder.com                                    }
+{                                                                           }
+{                                                                           }
+{***************************************************************************}
+{                                                                           }
+{  Licensed under the Apache License, Version 2.0 (the "License");          }
+{  you may not use this file except in compliance with the License.         }
+{  You may obtain a copy of the License at                                  }
+{                                                                           }
+{      http://www.apache.org/licenses/LICENSE-2.0                           }
+{                                                                           }
+{  Unless required by applicable law or agreed to in writing, software      }
+{  distributed under the License is distributed on an "AS IS" BASIS,        }
+{  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. }
+{  See the License for the specific language governing permissions and      }
+{  limitations under the License.                                           }
+{                                                                           }
+{***************************************************************************}
 
 unit DPM.Core.Package.Installer;
 
@@ -44,6 +44,7 @@ uses
   DPM.Core.Options.Restore,
   DPM.Core.Project.Interfaces,
   DPM.Core.Spec.Interfaces,
+  DPM.Core.Manifest.Interfaces,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Cache.Interfaces,
@@ -62,32 +63,32 @@ type
     FCompilerFactory: ICompilerFactory;
   protected
     function Init(const options : TSearchOptions) : IConfiguration;
-    function GetPackageInfo(const cancellationToken: ICancellationToken; const packageId: IPackageId): IPackageInfo;
+    function GetPackageInfo(const cancellationToken: ICancellationToken; const packageId: IPackageIdentity): IPackageInfo;
     function CreateProjectRefs(const cancellationToken: ICancellationToken; const rootnode: IPackageReference; const seenPackages: IDictionary<string, IPackageInfo>;
                                 const projectReferences: IList<TProjectReference>): boolean;
 
     function CollectSearchPaths(const packageGraph: IPackageReference; const resolvedPackages: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
                                 const compilerVersion: TCompilerVersion; const platform: TDPMPlatform;  const searchPaths: IList<string>): boolean;
 
-    procedure GenerateSearchPaths(const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; packageSpec: IPackageSpec; const searchPaths: IList<string>);
+    procedure GenerateSearchPaths(const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; packageSpec: IPackageManifest; const searchPaths: IList<string>);
 
-    function DownloadPackages(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; var packageSpecs: IDictionary<string, IPackageSpec>): boolean;
+    function DownloadPackages(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; var packageManifests: IDictionary<string, IPackageManifest>): boolean;
 
     function CollectPlatformsFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration) : boolean;
 
     function GetCompilerVersionFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration) : boolean;
 
     function CompilePackage(const cancellationToken: ICancellationToken; const Compiler: ICompiler; const packageInfo: IPackageInfo; const packageReference: IPackageReference;
-                            const packageSpec: IPackageSpec;  const force: boolean; const forceDebug : boolean): boolean;
+                            const packageSpec: IPackageManifest;  const force: boolean; const forceDebug : boolean): boolean;
 
     function BuildDependencies(const cancellationToken: ICancellationToken; const packageCompiler: ICompiler; const projectPackageGraph: IPackageReference;
-                               const packagesToCompile: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>; packageSpecs: IDictionary<string, IPackageSpec>;
+                               const packagesToCompile: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>; packageManifests: IDictionary<string, IPackageManifest>;
                                const Options: TSearchOptions): boolean;
 
-    function CopyLocal(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>;
+    function CopyLocal(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageManifest>;
                        const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
 
-    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests: IDictionary<string, IPackageManifest>) : boolean;
 
     function DoRestoreProjectForPlatform(const cancellationToken: ICancellationToken; const Options: TRestoreOptions; const projectFile: string; const projectEditor: IProjectEditor;
                               const platform: TDPMPlatform; const config: IConfiguration; const context: IPackageInstallerContext): boolean;
@@ -159,7 +160,7 @@ uses
   DPM.Core.Options.List,
   DPM.Core.Dependency.Graph,
   DPM.Core.Dependency.Version,
-  DPM.Core.Package.Metadata,
+  DPM.Core.Package.Classes,
   DPM.Core.Spec.Reader,
   DPM.Core.Package.InstallerContext;
 
@@ -240,8 +241,8 @@ begin
   resolvedPackages.Reverse;
   for packageInfo in resolvedPackages do
   begin
-    if (not packageInfo.UseSource) and compiledPackages.Contains(packageInfo)
-    then
+    //if we have already compiled the package and we are not using the source directly, use the compiled dcus
+    if (not packageInfo.UseSource) and compiledPackages.Contains(packageInfo)  then
     begin
       packageBasePath := packageInfo.Id + PathDelim +  packageInfo.Version.ToStringNoMeta + PathDelim;
       searchPaths.Add(packageBasePath + 'lib');
@@ -263,7 +264,7 @@ begin
 end;
 
 function TPackageInstaller.CompilePackage(const cancellationToken : ICancellationToken; const Compiler: ICompiler; const packageInfo: IPackageInfo; const packageReference: IPackageReference;
-                                          const packageSpec: IPackageSpec; const force: boolean; const forceDebug : boolean): boolean;
+                                          const packageSpec: IPackageManifest; const force: boolean; const forceDebug : boolean): boolean;
 var
   buildEntry: ISpecBuildEntry;
   packagePath: string;
@@ -510,12 +511,12 @@ begin
   result := FContext;
 end;
 
-function TPackageInstaller.CopyLocal(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>;
+function TPackageInstaller.CopyLocal(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageManifest>;
                                      const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
 var
   configName: string;
   projectConfig: IProjectConfiguration;
-  packageSpec: IPackageSpec;
+  packageSpec: IPackageManifest;
   resolvedPackage: IPackageInfo;
   configNames: IReadOnlyList<string>;
   outputDir: string;
@@ -533,7 +534,7 @@ begin
 
   for resolvedPackage in resolvedPackages do
   begin
-    packageSpec := packageSpecs[LowerCase(resolvedPackage.Id)];
+    packageSpec := packageManifests[LowerCase(resolvedPackage.Id)];
     Assert(packageSpec <> nil);
     // FLogger.Debug('Copylocal for package [' + resolvedPackage.Id + ']');
 
@@ -623,7 +624,7 @@ begin
   FCompilerFactory := compilerFactory;
 end;
 
-function TPackageInstaller.GetPackageInfo(const cancellationToken: ICancellationToken; const packageId: IPackageId): IPackageInfo;
+function TPackageInstaller.GetPackageInfo(const cancellationToken: ICancellationToken; const packageId: IPackageIdentity): IPackageInfo;
 begin
   result := FPackageCache.GetPackageInfo(cancellationToken, packageId);
   if result = nil then
@@ -729,7 +730,7 @@ var
   existingPackageRef: IPackageReference;
   projectPackageGraph: IPackageReference;
 
-  packageSpecs: IDictionary<string, IPackageSpec>;
+  packageManifests: IDictionary<string, IPackageManifest>;
 
   projectReferences: IList<TProjectReference>;
 
@@ -858,7 +859,7 @@ begin
 
   // downloads the package files to the cache if they are not already there and
   // returns the deserialized dspec as we need it for search paths and design
-  if not DownloadPackages(cancellationToken, resolvedPackages, packageSpecs) then
+  if not DownloadPackages(cancellationToken, resolvedPackages, packageManifests) then
     exit;
 
   compiledPackages := TCollections.CreateList<IPackageInfo>;
@@ -866,21 +867,19 @@ begin
   packageSearchPaths := TCollections.CreateList<string>;
   packageCompiler := FCompilerFactory.CreateCompiler(Options.compilerVersion, platform);
 
-  if not BuildDependencies(cancellationToken, packageCompiler,  projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs, Options) then
+  if not BuildDependencies(cancellationToken, packageCompiler,  projectPackageGraph, packagesToCompile, compiledPackages, packageManifests, Options) then
     exit;
 
   if not CollectSearchPaths(projectPackageGraph, resolvedPackages, compiledPackages, projectEditor.compilerVersion, platform,  packageSearchPaths) then
     exit;
 
-  if not CopyLocal(cancellationToken, resolvedPackages, packageSpecs,
-    projectEditor, platform) then
+  if not CopyLocal(cancellationToken, resolvedPackages, packageManifests, projectEditor, platform) then
     exit;
 
-  if not InstallDesignPackages(cancellationToken,  projectFile, platform, packageSpecs) then
+  if not InstallDesignPackages(cancellationToken,  projectFile, platform, packageManifests) then
     exit;
 
-  if not projectEditor.AddSearchPaths(platform, packageSearchPaths,
-    config.PackageCacheLocation) then
+  if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
     exit;
 
   projectEditor.UpdatePackageReferences(projectPackageGraph, platform);
@@ -893,7 +892,7 @@ function TPackageInstaller.DoRestoreProjectForPlatform(const cancellationToken :
                                             const context: IPackageInstallerContext): boolean;
 var
   projectPackageGraph: IPackageReference;
-  packageSpecs: IDictionary<string, IPackageSpec>;
+  packageManifests: IDictionary<string, IPackageManifest>;
   projectReferences: IList<TProjectReference>;
   resolvedPackages: IList<IPackageInfo>;
   packagesToCompile: IList<IPackageInfo>;
@@ -932,7 +931,7 @@ begin
 
   // downloads the package files to the cache if they are not already there and
   // returns the deserialized dspec as we need it for search paths and
-  if not DownloadPackages(cancellationToken, resolvedPackages, packageSpecs) then
+  if not DownloadPackages(cancellationToken, resolvedPackages, packageManifests) then
     exit;
 
   compiledPackages := TCollections.CreateList<IPackageInfo>;
@@ -940,16 +939,16 @@ begin
   packageSearchPaths := TCollections.CreateList<string>;
   packageCompiler := FCompilerFactory.CreateCompiler(Options.compilerVersion, platform);
 
-  if not BuildDependencies(cancellationToken, packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs, Options) then
+  if not BuildDependencies(cancellationToken, packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageManifests, Options) then
     exit;
 
   if not CollectSearchPaths(projectPackageGraph, resolvedPackages, compiledPackages, projectEditor.compilerVersion, platform, packageSearchPaths) then
     exit;
 
-  if not CopyLocal(cancellationToken, resolvedPackages, packageSpecs, projectEditor, platform) then
+  if not CopyLocal(cancellationToken, resolvedPackages, packageManifests, projectEditor, platform) then
     exit;
 
-  if not InstallDesignPackages(cancellationToken, projectFile, platform, packageSpecs) then
+  if not InstallDesignPackages(cancellationToken, projectFile, platform, packageManifests) then
     exit;
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
@@ -1013,7 +1012,7 @@ end;
 
 function TPackageInstaller.BuildDependencies(const cancellationToken : ICancellationToken; const packageCompiler: ICompiler; const projectPackageGraph: IPackageReference;
                                              const packagesToCompile: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
-                                             packageSpecs: IDictionary<string, IPackageSpec>; const Options: TSearchOptions): boolean;
+                                             packageManifests: IDictionary<string, IPackageManifest>; const Options: TSearchOptions): boolean;
 
 begin
   result := false;
@@ -1023,7 +1022,7 @@ begin
       procedure(const packageReference: IPackageReference)
       var
         pkgInfo: IPackageInfo;
-        Spec: IPackageSpec;
+        Spec: IPackageManifest;
         otherNodes: IList<IPackageReference>;
         forceCompile: boolean;
       begin
@@ -1044,7 +1043,7 @@ begin
         // removing it so we don't process it again
         packagesToCompile.Remove(pkgInfo);
 
-        Spec := packageSpecs[LowerCase(packageReference.Id)];
+        Spec := packageManifests[LowerCase(packageReference.Id)];
         Assert(Spec <> nil);
 
         if Spec.TargetPlatform.BuildEntries.Any then
@@ -1084,14 +1083,14 @@ begin
 end;
 
 
-function TPackageInstaller.DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; var packageSpecs: IDictionary<string, IPackageSpec>): boolean;
+function TPackageInstaller.DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; var packageManifests: IDictionary<string, IPackageManifest>): boolean;
 var
   packageInfo: IPackageInfo;
   packageFileName: string;
-  Spec: IPackageSpec;
+  manifest: IPackageManifest;
 begin
   result := false;
-  packageSpecs := TCollections.CreateDictionary<string, IPackageSpec>;
+  packageManifests := TCollections.CreateDictionary<string, IPackageManifest>;
   //TODO : Download in parallel
   for packageInfo in resolvedPackages do
   begin
@@ -1115,10 +1114,10 @@ begin
       if cancellationToken.IsCancelled then
         exit;
     end;
-    if not packageSpecs.ContainsKey(LowerCase(packageInfo.Id)) then
+    if not packageManifests.ContainsKey(LowerCase(packageInfo.Id)) then
     begin
-      Spec := FPackageCache.GetPackageSpec(packageInfo);
-      packageSpecs[LowerCase(packageInfo.Id)] := Spec;
+      manifest := FPackageCache.GetPackageManifest(packageInfo);
+      packageManifests[LowerCase(packageInfo.Id)] := manifest;
     end;
 
   end;
@@ -1216,7 +1215,7 @@ begin
 
 end;
 
-procedure TPackageInstaller.GenerateSearchPaths(const compilerVersion : TCompilerVersion; const platform: TDPMPlatform; packageSpec: IPackageSpec; const searchPaths: IList<string>);
+procedure TPackageInstaller.GenerateSearchPaths(const compilerVersion : TCompilerVersion; const platform: TDPMPlatform; packageSpec: IPackageManifest; const searchPaths: IList<string>);
 var
   packageBasePath: string;
   packageSearchPath: ISpecSearchPath;
@@ -1379,10 +1378,10 @@ begin
 
 end;
 
-function TPackageInstaller.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
+function TPackageInstaller.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests: IDictionary<string, IPackageManifest>): boolean;
 begin
   //Note : we delegate this to the context as this is a no-op in the command line tool, the IDE plugin provides it's own context implementation.
-  result := FContext.InstallDesignPackages(cancellationToken, projectFile, platform, packageSpecs);
+  result := FContext.InstallDesignPackages(cancellationToken, projectFile, platform, packageManifests);
 end;
 
 function TPackageInstaller.InstallPackageFromFile(const cancellationToken : ICancellationToken; const Options: TInstallOptions;const projectFiles: TArray<string>;

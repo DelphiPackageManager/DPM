@@ -191,7 +191,7 @@ uses
   DPM.IDE.Constants,
   DPM.Core.Utils.Strings,
   DPM.Core.Utils.System,
-  DPM.Core.Package.Metadata,
+  DPM.Core.Package.Classes,
   DPM.Core.Package.SearchResults,
   DPM.Core.Dependency.Interfaces;
 { TGroupPackageDetailsFrame }
@@ -280,7 +280,7 @@ end;
 procedure TPackageDetailsFrame.DoGetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform);
 var
   metaData : IPackageMetadata;
-  packageId : IPackageId;
+  packageId : IPackageIdentity;
   packageVersion : TPackageVersion;
   item : IPackageSearchResultItem ;
   key : string;
@@ -290,7 +290,7 @@ begin
   if not FMetaDataCache.TryGetValue(key, item) then
   begin
     packageVersion := TPackageVersion.Parse(version);
-    packageId := TPackageId.Create(id, packageVersion, compilerVersion, platform);
+    packageId := TPackageIdentity.Create('', id, packageVersion, compilerVersion, platform);
     metaData :=  FPackageCache.GetPackageMetadata(packageId);
     if metaData <> nil then
     begin

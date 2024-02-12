@@ -34,8 +34,11 @@ const
   cLockFileExt = '.dpmlock';
   cPackageFileExt = '.dpkg';
   cPackageSpecExt = '.dspec';
+  cPackageManifestExt = '.manifest';
+
   //fixed filename for the package dspec so we can easily extract it
-  cPackageMetaFile = 'package' + cPackageSpecExt;
+  cOldPackageManifestFile = 'package' + cPackageSpecExt; //for older packages
+  cPackageManifestFile = 'package' + cPackageManifestExt;
   cIconFileSVG = 'icon.svg';
   cIconFilePNG = 'icon.png';
 
