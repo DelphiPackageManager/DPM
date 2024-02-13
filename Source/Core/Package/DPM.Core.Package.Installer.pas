@@ -363,7 +363,6 @@ begin
     projectFile := TPath.Combine(packagePath, buildEntry.Project);
     projectFile := TPathUtils.CompressRelativePath('', projectFile);
 
-
     // if it's a design time package then we need to do a lot more work.
     // design time packages are win32 (as the IDE is win32) - since we can
     // only have one copy of the design package installed we need to check if
@@ -376,10 +375,8 @@ begin
 
     if buildEntry.DesignOnly and (packageInfo.platform <> TDPMPlatform.Win32)  then
     begin
-      Compiler.BPLOutputDir := TPath.Combine(packagePath,
-        buildEntry.BPLOutputDir);
-      Compiler.LibOutputDir := TPath.Combine(packagePath,
-        buildEntry.LibOutputDir);
+      Compiler.BPLOutputDir := TPath.Combine(packagePath, buildEntry.BPLOutputDir);
+      Compiler.LibOutputDir := TPath.Combine(packagePath, buildEntry.LibOutputDir);
       Compiler.Configuration := buildEntry.config;
 
       if Compiler.platform <> TDPMPlatform.Win32 then
