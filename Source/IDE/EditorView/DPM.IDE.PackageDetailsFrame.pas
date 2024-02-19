@@ -671,9 +671,9 @@ begin
       if packageRefs <> nil then
       begin
         projectRef := nil;
-        projectRefs := packageRefs.FindTopLevelDependency(LowerCase(FProjectGroup.Projects[i].FileName));
+        projectRefs := packageRefs.FindTopLevelChild(LowerCase(FProjectGroup.Projects[i].FileName));
         if projectRefs <> nil then
-          projectRef := projectRefs.FindTopLevelDependency(LowerCase(packageId));
+          projectRef := projectRefs.FindTopLevelChild(LowerCase(packageId));
       end;
 
       if projectRef <> nil then

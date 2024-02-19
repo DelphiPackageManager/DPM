@@ -130,7 +130,7 @@ var
     dependency : IPackageDependency;
     dependencyReference : IPackageReference;
   begin
-    dependencyReference := parent.AddPackageDependency(package.Id, package.Version, versionRange);
+    dependencyReference := parent.AddChild(package.Id, package.Version, versionRange);
     dependencyReference.UseSource := package.UseSource;
     for dependency in package.Dependencies do
     begin
@@ -141,7 +141,7 @@ var
   end;
 
 begin
-  result := TPackageReference.CreateRoot(FCompilerVersion, FPlatform);
+  result := TGraphNode.CreateRoot(FCompilerVersion, FPlatform);
   toplevelPackages := FResolved.Values.Where(function(const value : IResolution) : boolean
     begin
       result := value.ParentId = cRootNode;
@@ -170,7 +170,7 @@ begin
     //don't add to the list of packages to resolve if it has no dependencies..
     if projectReference.Package.Dependencies.Any then
       PushRequirement(projectReference.Package);
-
+    //record the project reference as already resolved so that we do not change the version used.
     RecordResolution(projectReference.Package, projectReference.VersionRange, projectReference.ParentId);
   end;
 

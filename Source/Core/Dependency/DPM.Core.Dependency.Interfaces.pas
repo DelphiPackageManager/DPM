@@ -81,44 +81,48 @@ type
 //
 //    function GetDesignBPLs(platform : TDPMPlatform) : IList<string>;
 
-    function AddPackageDependency(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IPackageReference;
+    function AddChild(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IPackageReference;
 
-    procedure AddExistingReference(const id : string; const packageReference : IPackageReference);
+    procedure AddExistingChild(const id : string; const packageReference : IPackageReference);
     /// <summary>
     /// Finds the first reference to a package [id] using a breadth first search
     ///  </summary>
-    function FindFirstPackageReference(const id : string) : IPackageReference;
+    function FindFirstChild(const id : string) : IPackageReference;
 
     /// <summary>
     /// Finds all references to a package [id] using a breadth first search
     ///  </summary>
-    function FindPackageReferences(const id : string) : IList<IPackageReference>;
+    function FindChildren(const id : string) : IList<IPackageReference>;
 
     /// <summary>
     ///  Find a non transitive dependency
     /// </summary>
-    function FindTopLevelDependency(const id : string) : IPackageReference;
+    function FindTopLevelChild(const id : string) : IPackageReference;
 
     /// <summary>
     /// Returns true if node has a top level dependency on [id]
     /// </summary>
-    function HasTopLevelDependency(const id : string) : boolean;
+    function HasTopLevelChild(const id : string) : boolean;
 
     /// <summary>
     /// Returns true if we have a dependency on [id] at any level in the graph
     /// </summary>
-    function HasAnyDependency(const id : string) : boolean;
+    function HasAnyChild(const id : string) : boolean;
 
     function Clone : IPackageReference;
 
     /// <summary>
-    /// removes any child with id recursively (and it's children)
+    /// Removes any child with id recursively (and it's children)
     /// </summary>
-    function RemovePackageReference(const packageReference : IPackageReference) : boolean;
-    function RemoveTopLevelPackageReference(const id : string) : boolean;
+    function RemoveChild(const packageReference : IPackageReference) : boolean;
+
+    /// <summary>
+    /// Removes a top level dependency, returns true if removed
+    /// </summary>
+    function RemoveTopLevelChild(const id : string) : boolean;
 
     function IsRoot : boolean;
-    function HasDependencies : boolean;
+    function HasChildren : boolean;
 
     /// <summary>
     /// Visits child nodes in depth first mode and calls the visitor proc with each node
@@ -136,7 +140,7 @@ type
     property Id : string read GetId;
     property SelectedOn : TVersionRange read GetSelectedOn write SetSelectedOn;
     property IsTransitive : boolean read GetIsTransitive;
-    property Dependencies : IEnumerable<IPackageReference>read GetDependencies;
+    property Children : IEnumerable<IPackageReference>read GetDependencies;
     property Parent : IPackageReference read GetParent;
     property Platform : TDPMPlatform read GetPlatform;
     property UseSource : boolean read GetUseSource write SetUseSource;

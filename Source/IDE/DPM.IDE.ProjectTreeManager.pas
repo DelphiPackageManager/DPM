@@ -606,10 +606,10 @@ var
       AddChildContainer(parentContainer, packageRefContainer);
       children.Add(packageRefContainer);
 
-      if packageReference.HasDependencies then
+      if packageReference.HasChildren then
       begin
         packageRefContainer.Children := TInterfaceList.Create;
-        for depRef in packageReference.Dependencies do
+        for depRef in packageReference.Children do
         begin
           AddPackage(packageRefContainer, depRef, packageRefContainer.Children);
         end;
@@ -622,12 +622,12 @@ var
     AddChildContainer(dpmContainer, platformContainer);
     dpmChildren.Add(platformContainer);
 
-    if PackageReferences.HasDependencies then
+    if PackageReferences.HasChildren then
     begin
       platformContainer.Children := TInterfaceList.Create;
 
       //using for loop rather the enumerator for per reasons.
-      for packageRef in PackageReferences.Dependencies do
+      for packageRef in PackageReferences.Children do
       begin
         if packageRef.Platform <> pf then
           continue;

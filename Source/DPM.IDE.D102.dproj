@@ -155,7 +155,7 @@
         <DCCReference Include="Core\Package\DPM.Core.Package.Installer.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.InstallerContext.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Interfaces.pas"/>
-        <DCCReference Include="Core\Package\DPM.Core.Package.Metadata.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Classes.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.SearchResults.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.Reader.pas"/>
@@ -273,6 +273,9 @@
         <DCCReference Include="IDE\EditorView\DPM.IDE.ActivityIndicator.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas"/>
         <DCCReference Include="IDE\DPM.IDE.PathManager.pas"/>
+        <DCCReference Include="Core\Manifest\DPM.Core.Manifest.Interfaces.pas"/>
+        <DCCReference Include="Core\Manifest\DPM.Core.Manifest.pas"/>
+        <DCCReference Include="Core\Manifest\DPM.Core.Manifest.Reader.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

@@ -255,7 +255,7 @@ var
   dependencies : TArray<IPackageReference>;
 begin
   result := nil;
-  if (node = nil) or (not node.HasDependencies) then
+  if (node = nil) or (not node.HasChildren) then
     exit;
 
   //when we search the project node we need to actually look at it's children, otherwise we will not find dependencies.
@@ -264,7 +264,7 @@ begin
   begin
     //1st time through, these will be the project nodes
     //2nd time through, these will be top level dependencies.
-    dependencies := node.Dependencies.ToArray; //trying to make the debugger work here
+    dependencies := node.Children.ToArray; //trying to make the debugger work here
     for reference in dependencies do
     begin
       if SameText(reference.Id, searchId) then
@@ -283,7 +283,7 @@ begin
   if topLevelOnly then
     exit;
 
-  dependencies := node.Dependencies.ToArray;
+  dependencies := node.Children.ToArray;
   //breadth first search!
   for reference in dependencies do
   begin
@@ -296,12 +296,12 @@ begin
 
   //depth
 
-  for reference in node.Dependencies do
+  for reference in node.Children do
   begin
     if reference.Platform <> platform then
       continue;
     //depth search
-    if reference.HasDependencies then
+    if reference.HasChildren then
     begin
       result := FindPackageRef(reference, platform, searchId, false);
       if result <> nil then
@@ -815,7 +815,7 @@ var
         lookup[Lowercase(value.Id)] := value;
     end;
 
-    for childRef in value.Dependencies do
+    for childRef in value.Children do
       AddPackageIds(childRef);
   end;
 
@@ -824,7 +824,7 @@ begin
   result := TCollections.CreateList<IPackageIdentity>;
   if FPackageReferences <> nil then
   begin
-    for packageRef in FPackageReferences.Dependencies do
+    for packageRef in FPackageReferences.Children do
     begin
       AddPackageIds(packageRef);
     end;
@@ -843,7 +843,7 @@ var
   basePath : string;
 begin
   projectEditor := TProjectEditor.Create(FLogger, FConfiguration, IDECompilerVersion);
-  result := TPackageReference.CreateRoot(IDECompilerVersion, FCurrentPlatform);
+  result := TGraphNode.CreateRoot(IDECompilerVersion, FCurrentPlatform);
   Assert(FProjectGroup <> nil);
   basePath := FProjectGroup.FileName;
   //unsaved project group still seems to have a file name.
@@ -862,7 +862,7 @@ begin
 
     packageReference := projectEditor.GetPackageReferences(FCurrentPlatform);
     if packageReference <> nil then
-      Result.AddExistingReference(LowerCase(projectFile), packageReference);
+      Result.AddExistingChild(LowerCase(projectFile), packageReference);
   end;
 end;
 

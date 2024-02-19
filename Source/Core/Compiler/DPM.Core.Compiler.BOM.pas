@@ -82,7 +82,7 @@ begin
       platform := StringToDPMPlatform(jsonObj.S['platform']);
 
       //we don't need the compiler version for this - if that changes we will need to pass it it.
-      result := TPackageReference.Create(nil,sId, version, platform, TCompilerVersion.UnknownVersion, TVersionRange.Empty,false);
+      result := TGraphNode.Create(nil,sId, version, platform, TCompilerVersion.UnknownVersion, TVersionRange.Empty,false);
 
       if jsonObj.Contains('dependencies') then
       begin
@@ -92,7 +92,7 @@ begin
           sId := depArray.Values[i].S['id'];
           sVersion := depArray.Values[i].S['version'];
           version := TPackageVersion.Parse(sVersion);
-          result.AddPackageDependency(sId,version, TVersionRange.Empty);
+          result.AddChild(sId,version, TVersionRange.Empty);
         end;
       end;
     finally
@@ -119,9 +119,9 @@ begin
       jsonObj.S['id'] := packageReference.Id;
       jsonObj.S['version'] := packageReference.Version.ToStringNoMeta;
       jsonObj.S['platform'] := DPMPlatformToString(packageReference.Platform);
-      if packageReference.HasDependencies then
+      if packageReference.HasChildren then
       begin
-        packageReference.Dependencies.ForEach(
+        packageReference.Children.ForEach(
           procedure(const dependency : IPackageReference)
           var
             depObj : TJsonObject;

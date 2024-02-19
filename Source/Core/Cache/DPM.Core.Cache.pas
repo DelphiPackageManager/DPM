@@ -198,11 +198,17 @@ function TPackageCache.EnsurePackage(const packageId : IPackageIdentity) : Boole
 var
   packageFileName : string;
   packagesFolder : string;
+  manifestFile : string;
+  oldManifestFile : string;
 begin
   //check if we have a package folder and manifest.
   packageFileName := GetPackagePath(packageId);
   result := DirectoryExists(packageFileName);
-  result := result and (FileExists(IncludeTrailingPathDelimiter(packageFileName) + cPackageManifestFile) or FileExists(IncludeTrailingPathDelimiter(packageFileName) + cOldPackageManifestFile));
+
+  manifestFile := IncludeTrailingPathDelimiter(packageFileName) + cPackageManifestFile;
+  oldManifestFile := IncludeTrailingPathDelimiter(packageFileName) + cOldPackageManifestFile;
+
+  result := result and (FileExists(manifestFile) or FileExists(oldManifestFile));
   if not result then
   begin
     packagesFolder := GetPackagesFolder;

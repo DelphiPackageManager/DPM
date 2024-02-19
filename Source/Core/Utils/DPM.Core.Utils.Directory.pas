@@ -35,7 +35,7 @@ uses
 type
   TDirectoryUtils = record
     class function IsDirectoryWriteable(const directory : string) : boolean; static;
-    //this is about 30% faster than System.IUtils version
+    //this is about 30% faster than System.IO.Utils version
     class function GetFiles(const Path : string) : IList<string>; overload; inline; static;
     class function GetFiles(const Path, SearchPattern : string) : IList<string>; overload; inline; static;
     class function GetFiles(const Path, SearchPattern : string; const SearchOption : TSearchOption) : IList<string>; overload; static;

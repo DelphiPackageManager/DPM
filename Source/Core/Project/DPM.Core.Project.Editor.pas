@@ -647,7 +647,7 @@ function TProjectEditor.LoadPackageRefences : boolean;
 
         if not FPackageRefences.TryGetValue(platform, rootNode) then
         begin
-          rootNode := TPackageReference.CreateRoot(FCompiler,platform);
+          rootNode := TGraphNode.CreateRoot(FCompiler,platform);
           FPackageRefences[platform] := rootNode;
         end;
 
@@ -657,7 +657,7 @@ function TProjectEditor.LoadPackageRefences : boolean;
         else
           dupCheckReference := rootNode;
 
-        if dupCheckReference.FindTopLevelDependency(id) <> nil then
+        if dupCheckReference.FindTopLevelChild(id) <> nil then
         begin
           if parentReference <> nil then
             raise Exception.Create('Duplicate package reference for package [' + id + '  ' + DPMPlatformToString(platform) + '] under [' + parentReference.Id + ']')
@@ -691,12 +691,12 @@ function TProjectEditor.LoadPackageRefences : boolean;
         end;
         if isTransitive then
         begin
-          newNode  := parentReference.AddPackageDependency(id, version, range);
+          newNode  := parentReference.AddChild(id, version, range);
           newNode.UseSource := useSource;
         end
         else
         begin
-          newNode := rootNode.AddPackageDependency(id, version, TVersionRange.Empty);
+          newNode := rootNode.AddChild(id, version, TVersionRange.Empty);
           newNode.UseSource := useSource;
         end;
         ReadPackageReferences(newNode, packageElement);
@@ -930,9 +930,9 @@ var
     if packageReference.UseSource then
       packageReferenceElement.setAttribute('useSource', 'true');
     parentElement.appendChild(packageReferenceElement);
-    if packageReference.HasDependencies then
+    if packageReference.HasChildren then
     begin
-      for dependency in packageReference.Dependencies do
+      for dependency in packageReference.Children do
         WritePackageReference(packageReferenceElement, dependency);
     end;
   end;
@@ -959,7 +959,7 @@ begin
       dpmElement.removeChild(packageReferenceElements.item[i]);
   end;
 
-  for topLevelReference in dependencyGraph.Dependencies do
+  for topLevelReference in dependencyGraph.Children do
     WritePackageReference(dpmElement, topLevelReference);
 
 end;

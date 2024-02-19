@@ -140,6 +140,8 @@ begin
   FLogger.Verbose('Starting dependency resolution...');
   result := false;
 
+  //TODO : This has the potential to infinitely loop - need to provide a hard exit after a number of attempts.
+  //NOTE : we are only resolving dependencies here - the requirements on the stack are already deemed to be resolved.
   while context.AnyOpenRequrements do
   begin
     currentPackage := context.PopRequirement;
@@ -243,6 +245,7 @@ begin
         selected := false;
         for version in versions do
         begin
+          //skip versions we already know are no good.
           if context.IsNoGood(version) then
             continue;
           if dependency.VersionRange.IsSatisfiedBy(version.Version) then
@@ -255,7 +258,7 @@ begin
             break;
           end
           else
-            context.RecordNoGood(version); // so we don't try to use it again.
+            context.RecordNoGood(version); // doesn't satisfy the dependency version range - record so we don't try to use it again.
         end;
         if not selected then
         begin
@@ -285,7 +288,7 @@ begin
                 if (resolution.ParentId <> cRootNode) and context.TryGetResolution(resolution.ParentId, '', parentResolution) then
                 begin
                   FLogger.Debug('Backtracking to : ' + parentResolution.Package.Id + '-' + parentResolution.Package.Version.ToString);
-                  context.RemoveResolution(currentPackage.Id); //shouldn't this be the parentResolution.Pacakage???
+                  context.RemoveResolution(currentPackage.Id); //shouldn't this be the parentResolution.Package???
                   context.PushRequirement(parentResolution.Package);
                   break;
                 end;
@@ -328,6 +331,7 @@ begin
   Assert(FConfiguration <> nil, 'config is nil, Initialize has not been called');
 
   errorCount := 0;
+  //check for conflicts with already loaded projects
   for packageRef in projectReferences do
   begin
     resolution := FPackageInstallerContext.FindPackageResolution(projectFile, platform, packageRef.Package.Id);
