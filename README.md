@@ -39,7 +39,7 @@ Not yet but it is planned. At the moment, only local folder based [sources](http
 
 ## Is my old version of Delphi supported
 
-Delphi XE2-11.3 are currently supported.
+Delphi XE2-12.x are currently supported.
 
 All target [platforms](https://docs.delphi.dev/platforms.html) for supported compiler versions are supported.
 
