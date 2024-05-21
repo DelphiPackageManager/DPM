@@ -241,7 +241,7 @@ uses
   DPM.IDE.ToolsAPI,
   DPM.IDE.AboutForm,
   DPM.IDE.AddInOptionsHostForm,
-  DPM.Core.Dependency.Graph;
+  DPM.Core.Dependency.Reference;
 
 
 type
@@ -843,7 +843,7 @@ var
   basePath : string;
 begin
   projectEditor := TProjectEditor.Create(FLogger, FConfiguration, IDECompilerVersion);
-  result := TGraphNode.CreateRoot(IDECompilerVersion, FCurrentPlatform);
+  result := TPackageReference.CreateRoot(IDECompilerVersion, FCurrentPlatform);
   Assert(FProjectGroup <> nil);
   basePath := FProjectGroup.FileName;
   //unsaved project group still seems to have a file name.
@@ -1127,7 +1127,7 @@ begin
               begin
                 item.IsTransitive := packageRef.IsTransitive;
                 if item.IsTransitive then
-                  item.VersionRange := packageRef.SelectedOn;
+                  item.VersionRange := packageRef.VersionRange;
               end
               else
               begin

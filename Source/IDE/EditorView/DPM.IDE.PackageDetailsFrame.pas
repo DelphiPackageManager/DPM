@@ -363,7 +363,6 @@ begin
     if projectCount = 0 then
       projectCount := 1;
     FHost.BeginInstall(projectCount);
-
     installResult := FPackageInstaller.Install(FCancellationTokenSource.Token, options, FInstallerContext);
     if installResult then
     begin

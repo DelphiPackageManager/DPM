@@ -60,7 +60,7 @@ uses
   DPM.Core.Options.Spec in 'Core\Options\DPM.Core.Options.Spec.pas',
   DPM.Core.Options.UnInstall in 'Core\Options\DPM.Core.Options.UnInstall.pas',
   DPM.Core.Dependency.Context in 'Core\Dependency\DPM.Core.Dependency.Context.pas',
-  DPM.Core.Dependency.Graph in 'Core\Dependency\DPM.Core.Dependency.Graph.pas',
+  DPM.Core.Dependency.Reference in 'Core\Dependency\DPM.Core.Dependency.Reference.pas',
   DPM.Core.Dependency.Interfaces in 'Core\Dependency\DPM.Core.Dependency.Interfaces.pas',
   DPM.Core.Dependency.Resolution in 'Core\Dependency\DPM.Core.Dependency.Resolution.pas',
   DPM.Core.Dependency.Resolver in 'Core\Dependency\DPM.Core.Dependency.Resolver.pas',

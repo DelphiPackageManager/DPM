@@ -79,10 +79,10 @@ type
     ///<summary> Called from the dependency resolver to record package resolutions, so we can detect conflicts in other projects
     ///  in the project group.
     ///</summary>
-    procedure RecordResolutions(const projectFile: string; const platform : TDPMPlatform; const resolutions : TArray<IResolution>);
+    procedure RecordResolutions(const projectFile: string; const platform : TDPMPlatform; const resolutions : TArray<IResolvedPackage>);
     ///<summary> Check for an existing package resolution in already loaded projects in the group.
     ///</summary>
-    function FindPackageResolution(const projectFile: string; const platform : TDPMPlatform; const packageId : string ) : IResolution;
+    function FindPackageResolution(const projectFile: string; const platform : TDPMPlatform; const packageId : string ) : IResolvedPackage;
 
     //remove an existing resolution - need to do this when upgrading a package.
     procedure RemoveResolution(const platform : TDPMPlatform; const packageId : string);

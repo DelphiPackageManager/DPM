@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectVersion>19.5</ProjectVersion>
@@ -163,7 +163,7 @@
         <DCCReference Include="Core\Configuration\DPM.Core.Configuration.Interfaces.pas"/>
         <DCCReference Include="Core\Configuration\DPM.Core.Configuration.Manager.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Context.pas"/>
-        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Graph.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Reference.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Interfaces.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Resolution.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Resolver.pas"/>

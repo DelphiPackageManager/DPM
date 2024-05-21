@@ -174,6 +174,9 @@ begin
     end);
   option.Required := true;
 
+
+
+
   option := cmd.RegisterUnNamedOption<string>('The project to install into','projectPath',
     procedure(const value : string)
     begin
@@ -185,6 +188,14 @@ begin
     begin
       TInstallOptions.Default.VersionString := value;
     end);
+
+  option := cmd.RegisterOption<string>('group','g', 'The project group the projects belong to. Used to ensure package compatibility.',
+   procedure(const value : string)
+    begin
+      TInstallOptions.Default.ProjectGroup := value;
+    end);
+
+
 
   option := cmd.RegisterOption<string>('platforms','p', 'The platforms to install for (comma separated). Default is to install for all platforms the project targets.',
    procedure(const value : string)

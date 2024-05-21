@@ -27,7 +27,7 @@ uses
   DPM.Core.Configuration.Interfaces in '..\Core\Configuration\DPM.Core.Configuration.Interfaces.pas',
   DPM.Core.Configuration.Manager in '..\Core\Configuration\DPM.Core.Configuration.Manager.pas',
   DPM.Core.Dependency.Context in '..\Core\Dependency\DPM.Core.Dependency.Context.pas',
-  DPM.Core.Dependency.Graph in '..\Core\Dependency\DPM.Core.Dependency.Graph.pas',
+  DPM.Core.Dependency.Reference in '..\Core\Dependency\DPM.Core.Dependency.Reference.pas',
   DPM.Core.Dependency.Interfaces in '..\Core\Dependency\DPM.Core.Dependency.Interfaces.pas',
   DPM.Core.Dependency.Resolution in '..\Core\Dependency\DPM.Core.Dependency.Resolution.pas',
   DPM.Core.Dependency.Resolver in '..\Core\Dependency\DPM.Core.Dependency.Resolver.pas',

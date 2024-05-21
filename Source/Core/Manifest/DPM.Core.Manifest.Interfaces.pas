@@ -18,8 +18,6 @@ type
     function GetIsValid : boolean;
     function GetFileName : string;
     function LoadFromJson(const jsonObject : TJsonObject) : boolean;
-//    function LoadObjectList(list: IList<ISpecNode>): TJsonArray;
-
 
     property MetaData : ISpecMetaData read GetMetaData;
     property TargetPlatform : ISpecTargetPlatform read GetTargetPlatform;

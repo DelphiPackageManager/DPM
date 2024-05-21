@@ -42,6 +42,7 @@ type
     FNoCache : boolean;
     FProjectPath : string;
     FProjects : TArray<string>;
+    FProjectGroup : string;
     FFloat : boolean;
     FIsUpgrade : boolean;
     class var
@@ -61,6 +62,7 @@ type
     property PackageFile : string read FPackageFile write FPackageFile;
     property ProjectPath : string read FProjectPath write FProjectPath;
     property Projects : TArray<string> read FProjects write FProjects;
+    property ProjectGroup : string read FProjectGroup write FProjectGroup;
     property VersionString : string read FVersionString write FVersionString;
   end;
 

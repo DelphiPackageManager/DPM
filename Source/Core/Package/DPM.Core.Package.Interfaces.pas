@@ -42,13 +42,11 @@ uses
   DPM.Core.Options.Restore;
 
 type
-  ///<summary>IPackageId has minimum info needed to identify package
+  ///<summary>IPackageIdentity has minimum info needed to identify package
   /// Note this only has info we can get from the package filename!
   /// represents the core package identity - id, version, compiler, platform
-  ///  + sourceName (optional).
+  ///  + sourceName (optional, not part of the filename).
   /// </summary>
-
-  /// <summary>packageid plus sourcename </summary>
   IPackageIdentity = interface
     ['{35FABD79-3880-4F46-9D70-AA19AAE44565}']
     function GetId : string;

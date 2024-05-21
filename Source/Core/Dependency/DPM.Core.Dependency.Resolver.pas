@@ -59,9 +59,8 @@ type
 
     function DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;  const includePrerelease : boolean; const context : IResolverContext) : boolean;
 
-    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<TProjectReference>; var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
-
-    function ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<TProjectReference>; var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<IPackageReference>; var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
 
   public
     constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageInstallerContext : IPackageInstallerContext);
@@ -73,8 +72,7 @@ implementation
 uses
   System.SysUtils,
   Generics.Defaults,
-  DPM.Core.Constants,
-  DPM.Core.Dependency.Graph;
+  DPM.Core.Constants;
 
 { TDependencyResolver }
 
@@ -126,8 +124,8 @@ function TDependencyResolver.DoResolve(const cancellationToken : ICancellationTo
 var
   currentPackage : IPackageInfo;
   dependency : IPackageDependency;
-  resolution : IResolution;
-  parentResolution : IResolution;
+  resolution : IResolvedPackage;
+  parentResolution : IResolvedPackage;
   intersectingRange : TVersionRange;
   versions : IList<IPackageInfo>;
   version : IPackageInfo;
@@ -160,23 +158,23 @@ begin
     begin
       FLogger.Information('Resolving dependency : ' + currentPackage.Id + '.' + currentPackage.Version.ToStringNoMeta + '->' + dependency.Id + ' ' + dependency.VersionRange.ToString);
       //first see if we have resolved this package already. That may be in this project, or another project in the group.
-      if context.TryGetResolution(dependency.Id, currentPackage.Id, resolution) then
+      if context.TryGetResolvedPackage(dependency.Id, currentPackage.Id, resolution) then
       begin
         //check if the dependency range is satisfied by already resolved version
-        if not dependency.VersionRange.IsSatisfiedBy(resolution.Package.Version) then
+        if not dependency.VersionRange.IsSatisfiedBy(resolution.PackageInfo.Version) then
         begin
-          FLogger.Information('       conflict - selected version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
+          FLogger.Information('       conflict - selected version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
 
           //Check if the resolution comes from a different project, if so then record a project conflict but carry on?
-          if not SameText(resolution.Project, context.ProjectFile) then
+          if not SameText(resolution.ProjectFile, context.ProjectFile) then
           begin
-            FLogger.Error('Package project conflict - version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' in project : ' + resolution.Project + ' does not satisfy ' + dependency.VersionRange.ToString  );
+            FLogger.Error('Package project conflict - version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' in project : ' + resolution.ProjectFile + ' does not satisfy ' + dependency.VersionRange.ToString  );
             //record conflicts here in the context so we can show the user and then continue.. that way we can show the user rather than bombing on the first go?
             exit;
           end
           else if resolution.IsTopLevel then //if it's a top level package then the version is not negotiable.
           begin
-            FLogger.Error('Package conflict - selected version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
+            FLogger.Error('Package conflict - selected version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
             exit;
           end;
 
@@ -191,40 +189,40 @@ begin
           else
           begin
             //record the resolved version as no good, so we don't try it again
-            if context.RecordNoGood(resolution.Package) then
+            if context.RecordNoGood(resolution.PackageInfo) then
             begin
               //we have been here before - time to bail out;
-              FLogger.Error('Unable to resilve conflict - selected version : ' + dependency.Id + '-' + resolution.Package.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
+              FLogger.Error('Unable to resolve conflict - selected version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
               exit;
             end;
             //backtrack the package/version that got us here in the first place
             //not 100% sure this is correct here. More testing needed.
-            if context.TryGetResolution(resolution.ParentId, '', parentResolution) then
+            if context.TryGetResolvedPackage(resolution.ParentId, '', parentResolution) then
             begin
-              context.RecordNoGood(parentResolution.Package);
-              context.PushRequirement(parentResolution.Package);
+              context.RecordNoGood(parentResolution.PackageInfo);
+              context.PushRequirement(parentResolution.PackageInfo);
             end;
           end;
           //unresolve the dependency
-          context.RemoveResolution(dependency.Id);
+          context.RemoveResolvedPackage(dependency.Id);
           //try the current package again
           context.PushRequirement(currentPackage);
         end
         else
         begin
-          if resolution.Project <> context.ProjectFile then
+          if resolution.ProjectFile <> context.ProjectFile then
           begin
-            FLogger.Information('    resolved earlier : ' + dependency.Id + '.' + resolution.Package.Version.ToString);
+            FLogger.Information('    resolved earlier : ' + dependency.Id + '.' + resolution.PackageInfo.Version.ToString);
           end
           else
-            FLogger.Information('            selected : ' + dependency.Id + '.' + resolution.Package.Version.ToString);
+            FLogger.Information('            selected : ' + dependency.Id + '.' + resolution.PackageInfo.Version.ToString);
           //in the case where we are promoting a transitive to a direct dependency, we need a range.
           //the direct will not have a range so we convert the version to a range.
           if resolution.VersionRange.IsEmpty then
-            resolution.VersionRange := TVersionRange.Create(resolution.Package.Version);
+            resolution.VersionRange := TVersionRange.Create(resolution.PackageInfo.Version);
           //if the resolution came from another project, then we still need to deal with it's dependencies.
-          if resolution.Package.Dependencies.Any then
-            context.PushRequirement(resolution.Package);
+          if resolution.PackageInfo.Dependencies.Any then
+            context.PushRequirement(resolution.PackageInfo);
         end;
         //we're good.. this is resolved.
         continue;
@@ -239,7 +237,7 @@ begin
           //I suspect it may result in more failures
           versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, platform, dependency.Id, dependency.VersionRange, preRelease);
           if versions.Any then //cache the versions in the context in case we need them again
-            context.AddPackageVersions(dependency.Id, versions);
+            context.CachePackageVersions(dependency.Id, versions);
         end;
 
         selected := false;
@@ -282,14 +280,14 @@ begin
             if choices > 0 then
             begin
               //get the parent, and backtrack to it.
-              if context.TryGetResolution(currentPackage.Id, currentPackage.Id, resolution) then
+              if context.TryGetResolvedPackage(currentPackage.Id, currentPackage.Id, resolution) then
               begin
                 //can't backtrack to a root (direct dependency)
-                if (resolution.ParentId <> cRootNode) and context.TryGetResolution(resolution.ParentId, '', parentResolution) then
+                if (not resolution.IsTopLevel) and context.TryGetResolvedPackage(resolution.ParentId, '', parentResolution) then
                 begin
-                  FLogger.Debug('Backtracking to : ' + parentResolution.Package.Id + '-' + parentResolution.Package.Version.ToString);
-                  context.RemoveResolution(currentPackage.Id); //shouldn't this be the parentResolution.Package???
-                  context.PushRequirement(parentResolution.Package);
+                  FLogger.Debug('Backtracking to : ' + parentResolution.PackageInfo.Id + '-' + parentResolution.PackageInfo.Version.ToString);
+                  context.RemoveResolvedPackage(currentPackage.Id);
+                  context.PushRequirement(parentResolution.PackageInfo); //force the currentpackage dependencies to be re-evaluated.
                   break;
                 end;
               end;
@@ -320,12 +318,12 @@ end;
 
 function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;
                                                const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo;
-                                               const projectReferences : IList<TProjectReference>; var dependencyGraph : IPackageReference;
+                                               const projectReferences : IList<IPackageReference>; var dependencyGraph : IPackageReference;
                                                out resolved : IList<IPackageInfo>) : boolean;
 var
   context : IResolverContext;
-  packageRef : TProjectReference;
-  resolution : IResolution;
+  packageRef : IPackageReference;
+  resolution : IResolvedPackage;
   errorCount : integer;
 begin
   Assert(FConfiguration <> nil, 'config is nil, Initialize has not been called');
@@ -334,10 +332,10 @@ begin
   //check for conflicts with already loaded projects
   for packageRef in projectReferences do
   begin
-    resolution := FPackageInstallerContext.FindPackageResolution(projectFile, platform, packageRef.Package.Id);
-    if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Package.Version)) then
+    resolution := FPackageInstallerContext.FindPackageResolution(projectFile, platform, packageRef.Id);
+    if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Version)) then
     begin
-      FLogger.Error('Package project group conflict : ' + packageRef.Package.Id + '-' + resolution.Package.Version.ToString + ' in project : ' + resolution.Project + ' does not satisfy ' + packageRef.Package.Version.ToString  );
+      FLogger.Error('Package project group conflict : ' + packageRef.Id + '-' + resolution.PackageInfo.Version.ToString + ' in project : ' + resolution.ProjectFile + ' does not satisfy ' + packageRef.Version.ToString  );
       Inc(errorCount)
       //exit;
     end;
@@ -345,10 +343,10 @@ begin
   context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, newPackage, projectReferences);
 
   result := DoResolve(cancellationToken, compilerVersion, platform, options.Prerelease, context);
-  resolved := context.GetResolvedPackages;
+  resolved := context.GetResolvedPackageInfos;
   dependencyGraph := context.BuildDependencyGraph;
   //record the resolutions so they can be applied to other projects in the group
-  FPackageInstallerContext.RecordResolutions(projectFile, platform, context.GetResolutions);
+  FPackageInstallerContext.RecordResolutions(projectFile, platform, context.GetResolvedPackages);
   result := result and (errorCount = 0);
 end;
 
@@ -356,12 +354,12 @@ end;
 //This is all wrong. What it should do is just validate the project references and ensure it's correct, not go off and resolve dependencies
 //which might change the dependecy versions. We only want to change the graph if it's wrong.
 function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;
-                                               const projectFile : string; const options : TSearchOptions; const projectReferences : IList<TProjectReference>;
+                                               const projectFile : string; const options : TSearchOptions; const projectReferences : IList<IPackageReference>;
                                                var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
 var
   context : IResolverContext;
-  packageRef : TProjectReference;
-  resolution : IResolution;
+  packageRef : IPackageReference;
+  resolution : IResolvedPackage;
   errorCount : integer;
 begin
   Assert(dependencyGraph <> nil, 'nil dependency graph provided to ResolveForRestore');
@@ -374,11 +372,11 @@ begin
   //first check if the packages are already resolved in the project group.
   for packageRef in projectReferences do
   begin
-    resolution := FPackageInstallerContext.FindPackageResolution(projectFile, platform, packageRef.Package.Id);
+    resolution := FPackageInstallerContext.FindPackageResolution(projectFile, platform, packageRef.Id);
     //if resolved, check if they are compatible.
-    if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Package.Version)) then
+    if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Version)) then
     begin
-      FLogger.Error('Package project group conflict : ' + packageRef.Package.Id + '-' + resolution.Package.Version.ToString + ' in project : ' + resolution.Project + ' does not satisfy ' + packageRef.Package.Version.ToString  );
+      FLogger.Error('Package project group conflict : ' + packageRef.Id + '-' + resolution.PackageInfo.Version.ToString + ' in project : ' + resolution.ProjectFile + ' does not satisfy ' + packageRef.Version.ToString  );
       Inc(errorCount)
      // exit; //don't exit, we still want to resolve what we can.
     end;
@@ -386,14 +384,15 @@ begin
   context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, compilerVersion,  platform, projectReferences);
 
   result := DoResolve(cancellationToken, compilerVersion,  platform, options.Prerelease, context);
-  resolved := context.GetResolvedPackages;
+  resolved := context.GetResolvedPackageInfos;
   dependencyGraph := context.BuildDependencyGraph;
   //record the resolutions so they can be applied to other projects in the group
-  FPackageInstallerContext.RecordResolutions(projectFile, platform, context.GetResolutions);
+  FPackageInstallerContext.RecordResolutions(projectFile, platform, context.GetResolvedPackages);
   result := result and (errorCount = 0);
 end;
 
 
+//not called or functioning
 function TDependencyResolver.ValidateDependencyGraph(const cancellationToken: ICancellationToken; var dependencyGraph: IPackageReference): boolean;
 var
   resolvedPackages: IDictionary<string, TPackageVersion>;
@@ -408,6 +407,7 @@ begin
     var
       pkgVersion : TPackageVersion;
     begin
+
       if resolvedPackages.TryGetValue(LowerCase(node.Id), pkgVersion) then
       begin
 

@@ -37,7 +37,7 @@ uses
   DPM.Core.Dependency.Interfaces;
 
 type
-  TResolution = class(TInterfacedObject, IResolution)
+  TResolvedPackage = class(TInterfacedObject, IResolvedPackage)
   private
     FPackage : IPackageInfo;
     FParentId : string;
@@ -50,7 +50,7 @@ type
     function GetProject : string;
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
-    function Clone(const parentId : string) : IResolution;
+    function Clone(const parentId : string) : IResolvedPackage;
   public
     constructor Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
   end;
@@ -61,14 +61,14 @@ uses
   System.SysUtils,
   DPM.Core.Constants;
 
-{ TResolution }
+{ TResolvedPackage }
 
-function TResolution.Clone(const parentId: string): IResolution;
+function TResolvedPackage.Clone(const parentId: string): IResolvedPackage;
 begin
-  result := TResolution.Create(FPackage, FVersionRange, parentId, FProject);
+  result := TResolvedPackage.Create(FPackage, FVersionRange, parentId, FProject);
 end;
 
-constructor TResolution.Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
+constructor TResolvedPackage.Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
 begin
   FPackage := package;
   FVersionRange := range;
@@ -79,32 +79,32 @@ begin
 end;
 
 
-function TResolution.GetIsTopLevel: boolean;
+function TResolvedPackage.GetIsTopLevel: boolean;
 begin
   result := FParentId = cRootNode;
 end;
 
-function TResolution.GetPackage : IPackageInfo;
+function TResolvedPackage.GetPackage : IPackageInfo;
 begin
   result := FPackage;
 end;
 
-function TResolution.GetParentId : string;
+function TResolvedPackage.GetParentId : string;
 begin
   result := FParentId;
 end;
 
-function TResolution.GetProject: string;
+function TResolvedPackage.GetProject: string;
 begin
   result := FProject;
 end;
 
-function TResolution.GetVersionRange : TVersionRange;
+function TResolvedPackage.GetVersionRange : TVersionRange;
 begin
   result := FVersionRange;
 end;
 
-procedure TResolution.SetVersionRange(const value : TVersionRange);
+procedure TResolvedPackage.SetVersionRange(const value : TVersionRange);
 begin
   FVersionRange := value;
 end;

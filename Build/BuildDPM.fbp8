@@ -106,6 +106,7 @@ begin
       action.group
       begin
         description = "Build Tests - 11.0"
+        enabled = false
         id = {6BFDB7C5-1968-4220-9E27-9899822374AA}
         action.continua.set-buildstatus
         begin
@@ -277,6 +278,7 @@ begin
       action.group
       begin
         description = "Command Line tool"
+        enabled = false
         id = {9D926B94-DB4D-4514-91FE-043A81C3276B}
         variable
         begin
@@ -475,6 +477,7 @@ begin
       action.group
       begin
         description = DSpecCreator
+        enabled = false
         id = {6107D82E-ADC3-4635-AE9C-F06739F2ACC4}
         variable
         begin
@@ -736,6 +739,7 @@ begin
       action.group
       begin
         description = "Build IDE plugins"
+        enabled = false
         id = {DA4815C6-A7AB-47F6-9AB0-7899F6807657}
         action.target.execute
         begin
@@ -1007,7 +1011,6 @@ begin
       action.group
       begin
         description = "Build and Sign Installer"
-        enabled = false
         id = {15729DB8-9AAA-45CE-9CBA-E64417B605C4}
         variable
         begin
@@ -1034,12 +1037,14 @@ begin
           definitions = "MyAppVersion\=%DPMVersion%" +
                         "OutputFileName\=DPMSetup-%SemVer%" +
                         ""
+          enabletimeout = true
           id = {7CD98D00-B517-41B2-A9DC-37BA9C39D864}
           innoversion = Inno6
           scriptfile = %FBPROJECTDIR%\\DPMInstaller.iss
           showprogress = true
+          timeoutlength = 1
           unicode = true
-          usecommandline = true
+          usecommandline = false
           usepreprocessor = true
         end
         action.variable.set
@@ -1055,6 +1060,7 @@ begin
         action.target.execute
         begin
           actionlistid = {CD2E679B-668B-4181-B51E-32647A974CED}
+          enabled = false
           id = {59923895-F98A-4386-AEE4-30A7608338D0}
           target.argvalues
           begin

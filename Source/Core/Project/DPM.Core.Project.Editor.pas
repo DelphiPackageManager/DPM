@@ -105,7 +105,7 @@ uses
   DPM.Core.Constants,
   DPM.Core.Utils.Xml,
   DPM.Core.Dependency.Version,
-  DPM.Core.Dependency.Graph,
+  DPM.Core.Dependency.Reference,
 //  DPM.Core.Project.PackageReference,
   DPM.Core.Project.Configuration;
 
@@ -647,7 +647,7 @@ function TProjectEditor.LoadPackageRefences : boolean;
 
         if not FPackageRefences.TryGetValue(platform, rootNode) then
         begin
-          rootNode := TGraphNode.CreateRoot(FCompiler,platform);
+          rootNode := TPackageReference.CreateRoot(FCompiler,platform);
           FPackageRefences[platform] := rootNode;
         end;
 
@@ -925,8 +925,8 @@ var
     packageReferenceElement.setAttribute('id', packageReference.Id);
     packageReferenceElement.setAttribute('platform', DPMPlatformToBDString(packageReference.Platform));
     packageReferenceElement.setAttribute('version', packageReference.Version.ToStringNoMeta);
-    if not packageReference.SelectedOn.IsEmpty then
-      packageReferenceElement.setAttribute('range', packageReference.SelectedOn.ToString);
+    if not packageReference.VersionRange.IsEmpty then
+      packageReferenceElement.setAttribute('range', packageReference.VersionRange.ToString);
     if packageReference.UseSource then
       packageReferenceElement.setAttribute('useSource', 'true');
     parentElement.appendChild(packageReferenceElement);

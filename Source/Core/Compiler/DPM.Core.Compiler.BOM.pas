@@ -48,7 +48,7 @@ uses
   System.SysUtils,
   Spring.Collections,
   DPM.Core.Types,
-  DPM.Core.Dependency.Graph,
+  DPM.Core.Dependency.Reference,
   DPM.Core.Dependency.Version;
 
 const
@@ -82,7 +82,7 @@ begin
       platform := StringToDPMPlatform(jsonObj.S['platform']);
 
       //we don't need the compiler version for this - if that changes we will need to pass it it.
-      result := TGraphNode.Create(nil,sId, version, platform, TCompilerVersion.UnknownVersion, TVersionRange.Empty,false);
+      result := TPackageReference.Create(nil,sId, version, platform, TCompilerVersion.UnknownVersion, TVersionRange.Empty,false);
 
       if jsonObj.Contains('dependencies') then
       begin
