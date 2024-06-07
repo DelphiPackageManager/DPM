@@ -106,7 +106,6 @@ begin
       action.group
       begin
         description = "Build Tests - 11.0"
-        enabled = false
         id = {6BFDB7C5-1968-4220-9E27-9899822374AA}
         action.continua.set-buildstatus
         begin
@@ -278,7 +277,6 @@ begin
       action.group
       begin
         description = "Command Line tool"
-        enabled = false
         id = {9D926B94-DB4D-4514-91FE-043A81C3276B}
         variable
         begin
@@ -477,7 +475,6 @@ begin
       action.group
       begin
         description = DSpecCreator
-        enabled = false
         id = {6107D82E-ADC3-4635-AE9C-F06739F2ACC4}
         variable
         begin
@@ -739,7 +736,6 @@ begin
       action.group
       begin
         description = "Build IDE plugins"
-        enabled = false
         id = {DA4815C6-A7AB-47F6-9AB0-7899F6807657}
         action.target.execute
         begin
