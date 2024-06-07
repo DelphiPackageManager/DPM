@@ -18,7 +18,7 @@ BEGIN
               VALUE "LegalCopyright", "© 2019 -2024 Vincent Parrett and Contributors\0"
               VALUE "ProductName", "DPM IDE Support for Delphi11\0"
               VALUE "ProductVersion", "0.2.0-alpha\0"
-              VALUE "CompileDate", "Monday, 19 February 2024 5:31 PM\0"
+              VALUE "CompileDate", "Friday, 7 June 2024 11:43 AM\0"
               VALUE "FileVersion", "0.2.0.0\0"
          END
     END

@@ -132,7 +132,7 @@
         <DCCReference Include="Core\Configuration\DPM.Core.Configuration.Interfaces.pas"/>
         <DCCReference Include="Core\Configuration\DPM.Core.Configuration.Manager.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Context.pas"/>
-        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Graph.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Reference.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Interfaces.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Resolution.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Resolver.pas"/>
