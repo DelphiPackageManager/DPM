@@ -83,6 +83,7 @@ uses
   System.SysUtils,
   System.IOUtils,
   System.Classes,
+  System.Diagnostics,
   JsonDataObjects,
   VSoft.HttpClient,
   VSoft.URI,
@@ -144,6 +145,7 @@ var
   path : string;
   destFile : string;
   uri : IUri;
+  stopwatch : TStopwatch;
 begin
   result := false;
   serviceIndex := GetServiceIndex(cancellationToken);
@@ -166,27 +168,29 @@ begin
   request := httpClient.CreateRequest(path)
               .WithHeader(cUserAgentHeader,cDPMUserAgent);
 
-
+  ForceDirectories(localFolder);
   destFile := IncludeTrailingPathDelimiter(localFolder) + packageIdentity.ToString + cPackageFileExt;
 
   request.SaveAsFile := destFile;
+  stopwatch := TStopwatch.StartNew;
   Logger.Information('GET ' + uri.BaseUriString + path);
   try
     response := request.Get(cancellationToken);
   except
     on ex : Exception do
     begin
-      Logger.Error('Error fetching downloading package from server : ' + ex.Message);
+      Logger.Error('Error downloadingpackage from server : ' + ex.Message);
       exit;
     end;
   end;
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching downloading package from server : ' + response.ErrorMessage);
+    Logger.Error('Error downloading package from server : ' + response.ErrorMessage);
     exit;
   end;
-  Logger.Information('OK ' + uri.BaseUriString + path);
+  stopwatch.Stop;
+  Logger.Information('OK ' + uri.BaseUriString + path + ' [' + IntToStr(stopwatch.ElapsedMilliseconds) + 'ms]');
 
   fileName := destFile;
   result := true;
@@ -818,7 +822,7 @@ var
   i: Integer;
   packageInfo : IPackageInfo;
   uri : IUri;
-
+  stopwatch : TStopwatch;
 begin
   result := TCollections.CreateList<IPackageInfo>;
 
@@ -845,10 +849,11 @@ begin
               //parameters can't have spaces.. winhttp will report invalid header!
              .WithParameter('versionRange', StringReplace(versionRange.ToString, ' ', '', [rfReplaceAll]))
              .WithParameter('prerel', Lowercase(BoolToStr(preRelease, true)));
-
+  stopwatch := TStopwatch.StartNew;
   try
     Logger.Information('GET ' + uri.BaseUriString + path);
     response := request.Get(cancellationToken);
+    stopwatch.Stop;
   except
     on ex : Exception do
     begin
@@ -862,7 +867,7 @@ begin
     Logger.Error('Error fetching packageinfo from server : ' + response.ErrorMessage);
     exit;
   end;
-  Logger.Information('OK ' + uri.BaseUriString + path);
+  Logger.Information('OK ' + uri.BaseUriString + path + ' [' + IntTostr(stopwatch.ElapsedMilliseconds) + 'ms]');
 
   try
     jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
