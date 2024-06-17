@@ -727,7 +727,7 @@ var
     for dependency in rootnode.Children do
     begin
       if dependency.HasChildren then
-        result := result or DoCreateProjectRefs(cancellationToken, dependency);
+        result := DoCreateProjectRefs(cancellationToken, dependency);
       if not result then
         exit;
       if cancellationToken.IsCancelled then
