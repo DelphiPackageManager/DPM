@@ -227,7 +227,7 @@ uses
   System.Diagnostics,
   WinApi.ActiveX,
   Winapi.CommCtrl,
-  {$IF CompilerVersion > 33.0 }
+  {$IF CompilerVersion > 34.0 }
    BrandingAPI,
   {$IFEND}
   DPM.Core.Constants,
@@ -488,7 +488,7 @@ begin
 
   ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
   ideThemeSvc.ApplyTheme(Self);
-  {$IF CompilerVersion > 33.0 }
+  {$IF CompilerVersion > 34.0 }
   if TIDEThemeMetrics.Font.Enabled then
   begin
     Font.Assign( TIDEThemeMetrics.Font.GetFont );

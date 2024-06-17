@@ -111,7 +111,7 @@ uses
   System.UITypes,
   Vcl.Themes,
   Vcl.Forms,
-  {$IF CompilerVersion > 33.0 }
+  {$IF CompilerVersion > 34.0 }
    BrandingAPI,
   {$IFEND}
   Spring.Collections,
@@ -150,7 +150,7 @@ begin
   {$IFDEF STYLEELEMENTS}
   StyleElements := [seFont,seClient];
   {$ENDIF}
-  {$IF CompilerVersion > 33.0 }
+  {$IF CompilerVersion > 34.0 }
   if TIDEThemeMetrics.Font.Enabled then
   begin
     Font.Assign( TIDEThemeMetrics.Font.GetFont );

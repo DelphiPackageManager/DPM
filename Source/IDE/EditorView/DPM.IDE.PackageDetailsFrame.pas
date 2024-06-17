@@ -188,7 +188,7 @@ uses
   WinApi.ShellApi,
   WinApi.ActiveX,
   WinApi.CommCtrl,
-  {$IF CompilerVersion > 33.0 }
+  {$IF CompilerVersion > 34.0 }
    BrandingAPI,
   {$IFEND}
   DPM.IDE.Constants,
@@ -505,7 +505,7 @@ begin
   {$IFDEF STYLEELEMENTS}
   StyleElements := [seFont];
   {$ENDIF}
-  {$IF CompilerVersion > 33.0 }
+  {$IF CompilerVersion > 34.0 }
   if TIDEThemeMetrics.Font.Enabled then
   begin
     Font.Assign( TIDEThemeMetrics.Font.GetFont );
