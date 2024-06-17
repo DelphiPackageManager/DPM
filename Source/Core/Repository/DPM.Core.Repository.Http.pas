@@ -179,7 +179,7 @@ begin
   except
     on ex : Exception do
     begin
-      Logger.Error('Error downloadingpackage from server : ' + ex.Message);
+      Logger.Error('Error downloading package from server : ' + ex.Message);
       exit;
     end;
   end;
