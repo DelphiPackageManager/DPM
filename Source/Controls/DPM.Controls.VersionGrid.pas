@@ -287,7 +287,7 @@ begin
   inherited;
   FRowHeight := MulDiv(FRowHeight, M, D);
   //for some reason this is not happening in D11.x
-  Canvas.Font.Height := MulDiv(Canvas.Font.Height, M, D );
+//  Canvas.Font.Height := MulDiv(Canvas.Font.Height, M, D );
 //  FPaintBmp.Canvas.Font := Self.Font;
 
   FColumnWidths[1] := MulDiv(FColumnWidths[1], M, D);

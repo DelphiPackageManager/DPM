@@ -202,7 +202,6 @@ type
     function GetRowKind(const index : Int64) : TPackageRowKind;
     procedure CalculateIndexes;
     procedure ChangeScale(M: Integer; D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND}); override;
-
     procedure LoadImages;
   public
     constructor Create(AOwner : TComponent); override;
@@ -228,6 +227,9 @@ uses
   System.Diagnostics,
   WinApi.ActiveX,
   Winapi.CommCtrl,
+  {$IF CompilerVersion > 33.0 }
+   BrandingAPI,
+  {$IFEND}
   DPM.Core.Constants,
   DPM.Core.Options.Common,
   DPM.Core.Utils.Config,
@@ -483,9 +485,17 @@ begin
 
   //IOTAIDEThemingServices added in 10.2
   {$IFDEF THEMESERVICES}
+
   ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
   ideThemeSvc.ApplyTheme(Self);
-  FIDEStyleServices := ideThemeSvc.StyleServices;
+  {$IF CompilerVersion > 33.0 }
+  if TIDEThemeMetrics.Font.Enabled then
+  begin
+    Font.Assign( TIDEThemeMetrics.Font.GetFont );
+    TIDEThemeMetrics.Font.AdjustDPISize( Font, TIDEThemeMetrics.Font.Size, CurrentPPI );
+  end;
+  {$IFEND}
+    FIDEStyleServices := ideThemeSvc.StyleServices;
   {$ELSE}
   FIDEStyleServices := Vcl.Themes.StyleServices;
   {$ENDIF}

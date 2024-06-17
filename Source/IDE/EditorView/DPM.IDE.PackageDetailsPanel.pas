@@ -111,6 +111,9 @@ uses
   System.UITypes,
   Vcl.Themes,
   Vcl.Forms,
+  {$IF CompilerVersion > 33.0 }
+   BrandingAPI,
+  {$IFEND}
   Spring.Collections,
   VSoft.Uri,
   DPM.Core.Types,
@@ -123,7 +126,7 @@ procedure TPackageDetailsPanel.ChangeScale(M, D: Integer{$IF CompilerVersion > 3
 begin
   inherited;
   //for some reason this is not happening in D11.x
-  Canvas.Font.Height := MulDiv(Canvas.Font.Height, M, D );
+//  Canvas.Font.Height := MulDiv(Canvas.Font.Height, M, D );
   FLayout.ChangeScale(M, D{$IF CompilerVersion > 33}, isDpiChange{$IFEND} );
   UpdateLayout;
 end;
@@ -147,6 +150,13 @@ begin
   {$IFDEF STYLEELEMENTS}
   StyleElements := [seFont,seClient];
   {$ENDIF}
+  {$IF CompilerVersion > 33.0 }
+  if TIDEThemeMetrics.Font.Enabled then
+  begin
+    Font.Assign( TIDEThemeMetrics.Font.GetFont );
+    TIDEThemeMetrics.Font.AdjustDPISize( Font, TIDEThemeMetrics.Font.Size, CurrentPPI );
+  end;
+  {$IFEND}
   FLayout := TDetailsLayout.Create(0);
 end;
 

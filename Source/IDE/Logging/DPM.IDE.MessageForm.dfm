@@ -29,14 +29,14 @@ object DPMMessageForm: TDPMMessageForm
     Visible = False
   end
   object btnCancel: TButton
-    Left = 762
+    Left = 758
     Top = 388
     Width = 89
     Height = 28
     Action = actCanCancel
     Anchors = [akRight, akBottom]
     TabOrder = 0
-    ExplicitLeft = 758
+    ExplicitLeft = 754
     ExplicitTop = 387
   end
   object btnCopy: TButton
@@ -50,7 +50,7 @@ object DPMMessageForm: TDPMMessageForm
     ExplicitTop = 387
   end
   object btnClose: TButton
-    Left = 656
+    Left = 652
     Top = 389
     Width = 89
     Height = 28
@@ -58,7 +58,7 @@ object DPMMessageForm: TDPMMessageForm
     Caption = 'Close'
     TabOrder = 1
     OnClick = btnCloseClick
-    ExplicitLeft = 652
+    ExplicitLeft = 648
     ExplicitTop = 388
   end
   object lblDontClose: TLinkLabel
