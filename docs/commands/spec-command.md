@@ -1,1 +1,0 @@
-# spec command (DPM CLI)

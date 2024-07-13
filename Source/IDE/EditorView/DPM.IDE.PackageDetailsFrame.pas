@@ -188,6 +188,9 @@ uses
   WinApi.ShellApi,
   WinApi.ActiveX,
   WinApi.CommCtrl,
+  {$IF CompilerVersion > 34.0 }
+   BrandingAPI,
+  {$IFEND}
   DPM.IDE.Constants,
   DPM.Core.Utils.Strings,
   DPM.Core.Utils.System,
@@ -502,7 +505,13 @@ begin
   {$IFDEF STYLEELEMENTS}
   StyleElements := [seFont];
   {$ENDIF}
-
+  {$IF CompilerVersion > 34.0 }
+  if TIDEThemeMetrics.Font.Enabled then
+  begin
+    Font.Assign( TIDEThemeMetrics.Font.GetFont );
+    TIDEThemeMetrics.Font.AdjustDPISize( Font, TIDEThemeMetrics.Font.Size, CurrentPPI );
+  end;
+  {$IFEND}
   //trying to inject the grid and the splitter inside the design time controls.
   FProjectsGrid := TVersionGrid.Create(AOwner);
   FProjectsGrid.Margins.Left := 5;

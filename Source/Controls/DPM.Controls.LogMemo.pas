@@ -1129,6 +1129,7 @@ end;
 procedure TLogMemo.ChangeScale(M, D: Integer{$if CompilerVersion >= 31}; isDpiChange: Boolean{$ifend});
 begin
   FMaxWidth := MulDiv(FMaxWidth, M, D);
+  FRowHeight := MulDiv(FRowHeight, M, D);
   UpdateScrollBars;
   inherited;
 end;

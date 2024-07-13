@@ -220,6 +220,7 @@ begin
   FLogMemo.StyleServices := IDEStyleServices;
   FLogMemo.Clear;
   FLogMemo.Parent := Self;
+  FLogMemo.Font.Assign(Self.Font);
   Self.ActiveControl := btnCancel;
 
   FCloseDelayInSeconds := 3;

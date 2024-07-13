@@ -155,6 +155,16 @@ end;
 constructor TResolverContext.Create(const logger: ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const platform: TDPMPlatform; const projectReferences: IList<IPackageReference>);
 var
   projectReference : IPackageReference;
+
+  function IsProjectRef(const id : string) : boolean;
+  begin
+    result := projectReferences.Any(
+      function (const projectRef : IPackageReference) : boolean
+      begin
+           result := SameText(id, projectRef.Id);
+      end);
+  end;
+
 begin
   FCompilerVersion := compilerVersion;
   FPlatform := platform;
@@ -169,8 +179,12 @@ begin
   for projectReference in projectReferences do
   begin
     //don't add to the list of packages to resolve if it has no dependencies..
-    if projectReference.PackageInfo.Dependencies.Any then
+
+    //this is causing unnecessary work during restore.
+    //what we should be doing here is checking if there are any missing dependencies and only resolving them.
+    if projectReference.PackageInfo.Dependencies.Any and (not IsProjectRef(projectReference.Id))  then
       PushRequirement(projectReference.PackageInfo);
+
     //record the project reference as already resolved so that we do not change the version used.
     RecordResolution(projectReference.PackageInfo, projectReference.VersionRange, projectReference.ParentId);
   end;
