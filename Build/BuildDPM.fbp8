@@ -587,7 +587,7 @@ begin
           compileprojectresources = true
           compileridl = true
           configname = Release
-          customvclstyles = C:\\Users\\Public\\Documents\\Embarcadero\\Studio\\20.0\\Windows10.vsf
+          customvclstyles = C:\\Users\\Public\\Documents\\Embarcadero\\Studio\\22.0\\Windows10.vsf
           debugversionnumbers = false
           delphiversion = Delphi11
           enabletimeout = false
@@ -659,7 +659,7 @@ begin
                                ""
             conditionals = RELEASE;CREATOR
             consoleapp = false
-            customvclstyles = C:\\Users\\Public\\Documents\\Embarcadero\\Studio\\20.0\\Windows10.vsf
+            customvclstyles = C:\\Users\\Public\\Documents\\Embarcadero\\Studio\\22.0\\Windows10.vsf
             debuginfo = false
             definitionsonly = false
             emitruntimetypeinformation = false
