@@ -116,13 +116,16 @@ uses
   DPM.IDE.AboutForm in '..\IDE\DPM.IDE.AboutForm.pas' {DPMAboutForm},
   DPM.Core.Manifest.Interfaces in '..\Core\Manifest\DPM.Core.Manifest.Interfaces.pas',
   DPM.Core.Manifest in '..\Core\Manifest\DPM.Core.Manifest.pas',
-  DPM.Core.Manifest.Reader in '..\Core\Manifest\DPM.Core.Manifest.Reader.pas';
+  DPM.Core.Manifest.Reader in '..\Core\Manifest\DPM.Core.Manifest.Reader.pas',
+  Vcl.Themes,
+  Vcl.Styles;
 
 {$R *.res}
 
 begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
+  TStyleManager.TrySetStyle('Windows10');
   Application.CreateForm(TDSpecCreatorForm, DSpecCreatorForm);
   Application.CreateForm(TDPMAboutForm, DPMAboutForm);
   Application.Run;
