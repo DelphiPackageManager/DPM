@@ -10,6 +10,7 @@ object OptionsForm: TOptionsForm
   Font.Height = -12
   Font.Name = 'Segoe UI'
   Font.Style = []
+  Position = poMainFormCenter
   OnCreate = FormCreate
   OnShow = FormShow
   TextHeight = 15
@@ -25,14 +26,14 @@ object OptionsForm: TOptionsForm
     inherited pgOptions: TPageControl
       Width = 859
       Height = 463
-      ExplicitWidth = 859
-      ExplicitHeight = 463
+      ExplicitWidth = 855
+      ExplicitHeight = 462
       inherited tsSources: TTabSheet
         ExplicitWidth = 851
         ExplicitHeight = 429
         inherited Panel1: TPanel
           Width = 851
-          ExplicitWidth = 851
+          ExplicitWidth = 847
           inherited btnAdd: TSpeedButton
             Left = 668
             ExplicitLeft = 668
@@ -49,23 +50,46 @@ object OptionsForm: TOptionsForm
             Left = 805
             ExplicitLeft = 805
           end
+          inherited txtPackageCacheLocation: TButtonedEdit
+            Height = 23
+            ExplicitHeight = 23
+          end
         end
         inherited Panel2: TPanel
           Top = 218
           Width = 851
-          ExplicitTop = 218
-          ExplicitWidth = 851
+          ExplicitTop = 217
+          ExplicitWidth = 847
+          inherited txtName: TEdit
+            Height = 23
+            ExplicitHeight = 23
+          end
+          inherited txtUri: TButtonedEdit
+            Height = 23
+            ExplicitHeight = 23
+          end
+          inherited txtUserName: TEdit
+            Height = 23
+            ExplicitHeight = 23
+          end
+          inherited txtPassword: TEdit
+            Height = 23
+            ExplicitHeight = 23
+          end
+          inherited cboSourceType: TComboBox
+            ExplicitHeight = 23
+          end
         end
         inherited Panel3: TPanel
           Width = 851
           Height = 129
-          ExplicitWidth = 851
-          ExplicitHeight = 129
+          ExplicitWidth = 847
+          ExplicitHeight = 128
           inherited lvSources: TListView
             Width = 851
             Height = 129
-            ExplicitWidth = 851
-            ExplicitHeight = 129
+            ExplicitWidth = 847
+            ExplicitHeight = 128
           end
         end
       end
@@ -74,6 +98,9 @@ object OptionsForm: TOptionsForm
           inherited spAutoCloseDelay: TSpinEdit
             Height = 24
             ExplicitHeight = 24
+          end
+          inherited cboLogLevel: TComboBox
+            ExplicitHeight = 23
           end
         end
       end
@@ -86,9 +113,8 @@ object OptionsForm: TOptionsForm
     Height = 41
     Align = alBottom
     TabOrder = 1
-    ExplicitLeft = 688
-    ExplicitTop = 432
-    ExplicitWidth = 185
+    ExplicitTop = 462
+    ExplicitWidth = 855
     object btnCancel: TButton
       Left = 656
       Top = 6
