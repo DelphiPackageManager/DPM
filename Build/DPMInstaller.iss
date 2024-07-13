@@ -107,7 +107,7 @@ Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\23.0\Experts"; ValueType: string; 
 Name: startmenu; Description: Create &Start Menu Group;
 
 [Icons]
-Name: "{group}\DPM"; Filename: "{app}\DSpecCreator.exe"; WorkingDir: "{app}"; IconIndex: 0; Tasks: startmenu
+Name: "{group}\DSpec Creator"; Filename: "{app}\DSpecCreator.exe"; WorkingDir: "{app}"; IconIndex: 0; Tasks: startmenu
 
 [Code]
 
