@@ -27,6 +27,7 @@ AppSupportURL={#SupportURL}
 AppUpdatesURL={#UpdatesURL}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
+AlwaysUsePersonalGroup=yes
 DisableProgramGroupPage=yes
 DisableWelcomePage=no
 LicenseFile=..\LICENSE.txt
@@ -101,6 +102,12 @@ Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\20.0\Experts"; ValueType: string; 
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\21.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D104.dll"; Components: Sydney;  Flags: uninsdeletevalue
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\22.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D110.dll"; Components: Alexandria;  Flags: uninsdeletevalue
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\23.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D120.dll"; Components: Athens;  Flags: uninsdeletevalue
+
+[Tasks]
+Name: startmenu; Description: Create &Start Menu Group;
+
+[Icons]
+Name: "{group}\DPM"; Filename: "{app}\DSpecCreator.exe"; WorkingDir: "{app}"; IconIndex: 0; Tasks: startmenu
 
 [Code]
 
