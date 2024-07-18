@@ -81,6 +81,7 @@ type
     AndroidIntel64, //reserved for future use
     iOS32,
     iOS64, //reserved for future use
+    iOSSimulator,
     LinuxIntel32, //reserved for future use
     LinuxIntel64,
     LinuxArm32, //reserved for future use
@@ -368,23 +369,42 @@ begin
   result := [];
   case compiler of
     TCompilerVersion.RSXE2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32];
-    TCompilerVersion.RSXE3,
-    TCompilerVersion.RSXE4,
-    TCompilerVersion.RSXE5,
-    TCompilerVersion.RSXE6,
-    TCompilerVersion.RSXE7,
-    TCompilerVersion.RSXE8 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32];
+
+    TCompilerVersion.RSXE3 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32];
+
+    TCompilerVersion.RSXE4 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator];
+
+    TCompilerVersion.RSXE5 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator,
+                                        TDPMPlatform.AndroidArm32];
+
+    TCompilerVersion.RSXE6 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator,
+                                        TDPMPlatform.AndroidArm32];
+
+    TCompilerVersion.RSXE7 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator,
+                                        TDPMPlatform.AndroidArm32];
+
+    TCompilerVersion.RSXE8 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator,
+                                        TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32];
+
     TCompilerVersion.RS10_0,
-    TCompilerVersion.RS10_1 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32];
-    TCompilerVersion.RS10_2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64];
-    TCompilerVersion.RS10_3 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64,
-        TDPMPlatform.AndroidArm64, TDPMPlatform.OSX64];
-    TCompilerVersion.RS10_4 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX64, TDPMPlatform.iOS32, TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32,
-        TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
-    TCompilerVersion.RS11_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSXARM64, TDPMPlatform.OSX64, TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32,
-        TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
-    TCompilerVersion.RS12_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSXARM64, TDPMPlatform.OSX64, TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32,
-        TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
+    TCompilerVersion.RS10_1 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOS64,
+                                         TDPMPlatform.iOSSimulator, TDPMPlatform.AndroidArm32];
+
+    TCompilerVersion.RS10_2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOS64,
+                                         TDPMPlatform.iOSSimulator, TDPMPlatform.AndroidArm32];
+
+    TCompilerVersion.RS10_3 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.OSX64, TDPMPlatform.iOS32,
+                                         TDPMPlatform.iOS64, TDPMPlatform.iOSSimulator, TDPMPlatform.AndroidArm32, TDPMPlatform.AndroidArm64,
+                                         TDPMPlatform.LinuxIntel64];
+
+    TCompilerVersion.RS10_4 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX64, TDPMPlatform.iOS64, TDPMPlatform.iOSSimulator,
+                                         TDPMPlatform.AndroidArm32, TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
+
+    TCompilerVersion.RS11_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSXARM64, TDPMPlatform.OSX64, TDPMPlatform.iOS64,
+                                         TDPMPlatform.AndroidArm32, TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
+
+    TCompilerVersion.RS12_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSXARM64, TDPMPlatform.OSX64, TDPMPlatform.iOS64,
+                                         TDPMPlatform.AndroidArm32, TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
   else
     raise Exception.Create('AllPlatforms is missing for : ' + CompilerToString(compiler));
   end;
