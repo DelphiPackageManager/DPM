@@ -36,11 +36,13 @@ uses
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
   DPM.Creator.TemplateTreeNode,
-  DPM.Creator.Dspec.FileHandler
+  DPM.Creator.Dspec.FileHandler,
+  DPM.Creator.MRUService,
+  VSoft.Controls.Menus.MRU
   ;
 
 type
-  TDSpecCreatorForm = class(TForm)
+  TDSpecCreatorForm = class(TForm, IMRUSource)
     PageControl: TPageControl;
     tsInfo: TTabSheet;
     edtId: TEdit;
@@ -61,11 +63,11 @@ type
     clbCompilers: TCheckListBox;
     tsTemplates: TTabSheet;
     MainMenu: TMainMenu;
-    File1: TMenuItem;
+    mnuFile: TMenuItem;
     miNew: TMenuItem;
     miOpen: TMenuItem;
     miSave: TMenuItem;
-    miSaveAs: TMenuItem;
+    mnuSaveAs: TMenuItem;
     miExit: TMenuItem;
     N1: TMenuItem;
     cboTemplate: TComboBox;
@@ -199,6 +201,8 @@ type
     CreatingPackages1: TMenuItem;
     N2: TMenuItem;
     About1: TMenuItem;
+    actFileExit: TAction;
+    mnuFileOpenSep: TMenuItem;
     procedure FormDestroy(Sender: TObject);
     procedure btnAddExcludeClick(Sender: TObject);
     procedure btnAddTemplateClick(Sender: TObject);
@@ -234,14 +238,9 @@ type
     procedure edtTemplateNameChange(Sender: TObject);
     procedure edtVersionChange(Sender: TObject);
     procedure FormCreate(Sender: TObject);
-    procedure miExitClick(Sender: TObject);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure mmoDescriptionChange(Sender: TObject);
-    procedure miNewClick(Sender: TObject);
-    procedure miOpenClick(Sender: TObject);
     procedure miOptionsClick(Sender: TObject);
-    procedure miSaveAsClick(Sender: TObject);
-    procedure miSaveClick(Sender: TObject);
     procedure tvTemplatesChange(Sender: TObject; Node: TTreeNode);
     procedure tvTemplatesCollapsing(Sender: TObject; Node: TTreeNode; var AllowCollapse: Boolean);
     procedure tvTemplatesContextPopup(Sender: TObject; MousePos: TPoint; var Handled: Boolean);
@@ -279,6 +278,8 @@ type
     procedure ImgIconClick(Sender: TObject);
     procedure CreatingPackages1Click(Sender: TObject);
     procedure About1Click(Sender: TObject);
+    procedure actFileExitExecute(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
   private
     { Private declarations }
     FtmpFilename : string;
@@ -289,8 +290,21 @@ type
     FLogger: ILogger;
     FInVariableUpdate: Boolean;
     FSPDXList : TStringList;
+    FMRUMenu : TMRUMenu;
   protected
+    // IMRUSource
+    procedure MRUAdd(const filename : string);
+    function MRURemove(const filename : string): boolean;
+    procedure MRULoad(const list : TStrings);
+    procedure MRUSave(const list : TStrings);
+    function MRUCount: integer;
+    //IMRUSource
 
+    procedure MRUListClick(Sender: TObject; const Filename: string);
+
+    procedure OpenProject(const fileName : string);
+
+    procedure EnableControls(value : boolean);
     procedure DeleteSelectedEntry;
 
     function FindTemplateNode(const template: ISpecTemplate) : TTemplateTreeNode;
@@ -327,8 +341,6 @@ type
 
     function LoadDependency(const parentNode : TTemplateTreeNode; template: ISpecTemplate; const dependency : ISpecDependency) : TTemplateTreeNode;
     procedure LoadDependencies(const parentNode: TTemplateTreeNode; const template: ISpecTemplate);
-
-    procedure UpdatePlatformCheckListbox(const vplatform: ISpecTargetPlatform; const platformName: string; platformListboxName: string = '');
 
     procedure UriClick(const uri : string);
 
@@ -581,7 +593,13 @@ begin
   vplatform := FOpenFile.GetPlatform(clbCompilers.Items[clbCompilers.ItemIndex]);
   compilerVersion := StringToCompilerVersion(clbCompilers.Items[clbCompilers.ItemIndex]);
 
+  lblPlatform.Caption :=  clbCompilers.Items[clbCompilers.ItemIndex] +  ' - Platforms';
+  lblTemplate.Caption :=  clbCompilers.Items[clbCompilers.ItemIndex] +  ' - Template';
   EnableDisablePlatform(compilerVersion);
+
+  //these default to disabled until a compiler version is selected.
+  //if the compiler version is unchecked then the controls will be disabled.
+  EnableControls(clbCompilers.Checked[clbCompilers.ItemIndex]);
 
   if clbCompilers.Checked[clbCompilers.ItemIndex] and not Assigned(vplatform) then
   begin
@@ -603,14 +621,14 @@ begin
     Exit;
   end;
 
-  UpdatePlatformCheckListbox(vplatform, 'Win32');
-  UpdatePlatformCheckListbox(vplatform, 'Win64');
-  UpdatePlatformCheckListbox(vplatform, 'Android32', 'Android');
-  UpdatePlatformCheckListbox(vplatform, 'Android');
-  UpdatePlatformCheckListbox(vplatform, 'Android64');
-  UpdatePlatformCheckListbox(vplatform, 'LinuxIntel64', 'Linux');
-  UpdatePlatformCheckListbox(vplatform, 'iOS64', 'IOS');
-  UpdatePlatformCheckListbox(vplatform, 'OSX64');
+  for var platform in vPlatform.Platforms do
+  begin
+    var platformName := DPMPlatformToString(platform);
+    var i := clbPlatforms.Items.IndexOf(platformName);
+    if i <> -1 then
+      clbPlatforms.Checked[i] := true;
+  end;
+
 
   FInVariableUpdate := True;
   try
@@ -643,6 +661,9 @@ begin
   begin
     FOpenFile.DeleteCompiler(compiler);
   end;
+
+  
+  EnableControls(clbCompilers.Checked[clbCompilers.ItemIndex])
 end;
 
 procedure TDSpecCreatorForm.clbPlatformsClickCheck(Sender: TObject);
@@ -664,16 +685,15 @@ begin
 
   compiler := clbCompilers.Items[clbCompilers.ItemIndex];
   vPlatform := FOpenfile.GetPlatform(compiler);
+  if vPlatform = nil then
+    exit;
+
   platformCount := 0;
   for i := 0 to clbPlatforms.Count - 1 do
   begin
     if clbPlatforms.Checked[i] then
     begin
       platformString := clbPlatforms.Items[i];
-      if platformString = 'Linux' then
-        platformString := 'Linux64'
-      else if platformString = 'IOS' then
-        platformString := 'IOS64';
       dpmPlatform := StringToDPMPlatform(platformString);
       if dpmPlatform = TDPMPlatform.UnknownPlatform then
         continue;
@@ -688,10 +708,7 @@ begin
     if not clbPlatforms.Checked[i] then
       continue;
     platformString := clbPlatforms.Items[i];
-    if platformString = 'Linux' then
-      platformString := 'Linux64'
-    else if platformString = 'IOS' then
-      platformString := 'IOS64';
+
     dpmPlatform := StringToDPMPlatform(platformString);
 
     if dpmPlatform = TDPMPlatform.UnknownPlatform then
@@ -1387,10 +1404,16 @@ begin
 
 end;
 
+procedure TDSpecCreatorForm.actFileExitExecute(Sender: TObject);
+begin
+  Close;
+end;
+
 procedure TDSpecCreatorForm.actFileNewExecute(Sender: TObject);
 begin
   FreeAndNil(FOpenFile);
   FOpenFile := TDSpecFile.Create(FLogger);
+  FOpenfile.spec.NewTemplate('default');
   FSavefilename := '';
   Caption := 'Untitled - dspec Creator';
   LoadDspecStructure;
@@ -1403,10 +1426,7 @@ begin
   if OpenDialog.Execute then
   begin
     dspecFilename := OpenDialog.FileName;
-    FOpenFile.LoadFromFile( dspecFilename);
-    FSavefilename := dspecFilename;
-    Caption := dspecFilename + ' - ' + cToolName;
-    LoadDspecStructure;
+    OpenProject(dspecFilename);
   end;
 end;
 
@@ -1415,6 +1435,7 @@ begin
   if SaveDialog.Execute then
   begin
     SaveDspecStructure(SaveDialog.Filename);
+    MRUListService.Add(SaveDialog.Filename);
   end;
 end;
 
@@ -1742,9 +1763,13 @@ begin
 end;
 
 procedure TDSpecCreatorForm.FormCreate(Sender: TObject);
+var
+  idx : integer;
+
 begin
   FLogger := TDSpecLogger.Create(Memo2.Lines);
   FOpenFile := TDSpecFile.Create(FLogger);
+  FOpenFile.spec.NewTemplate('default');
   FDosCommand := TDosCommand.Create(nil);
   FDosCommand.OnNewLine := DosCommandNewLine;
   FDosCommand.OnTerminated := DosCommandTerminated;
@@ -1756,10 +1781,23 @@ begin
   PageControl.ActivePage := tsInfo;
   edtDependencyVersion.Text := '';
   Caption := 'Untitled - ' + cToolName;
+  idx := mnuFile.IndexOf(mnuFileOpenSep);
+  FMRUMenu := TMRUMenu.Create(Self);
+  FMRUMenu.Caption := 'Open Recent Project';
+  FMRUMenu.OnSelection := Self.MRUListClick;
+  FMRUMenu.HidePathExtension := true;
+  FMRUMenu.MaxItems := 10;
+  mnuFile.Insert(idx,FMRUMenu);
+  MRUListService.SetSource(Self);
+  MRUListService.LoadMRU;
+  FMRUMenu.Enabled := MRUListService.GetItemCount > 0;
+
+
 end;
 
 procedure TDSpecCreatorForm.FormDestroy(Sender: TObject);
 begin
+  MRUListService.SetSource(nil);
   FSPDXList.Free;
   FreeAndNil(FDosCommand);
 end;
@@ -1837,22 +1875,6 @@ begin
   Result := FOpenFile.GetPlatform(clbPlatforms.Items[clbPlatforms.ItemIndex]);
 end;
 
-procedure TDSpecCreatorForm.UpdatePlatformCheckListbox(const vplatform: ISpecTargetPlatform; const platformName: string; platformListboxName: string);
-var
-  j: Integer;
-begin
-  if Length(platformListboxName) = 0 then
-  begin
-    platformListboxName := platformName;
-  end;
-
-  if vplatform.PlatformContains(platformName) then
-  begin
-    j := clbPlatforms.Items.IndexOf(platformListboxName);
-    if j >= 0 then
-      clbPlatforms.Checked[j] := j >= 0;
-  end;
-end;
 
 procedure TDSpecCreatorForm.UriClick(const uri: string);
 begin
@@ -1890,6 +1912,15 @@ begin
   end;
 end;
 
+procedure TDSpecCreatorForm.EnableControls(value: boolean);
+begin
+  lblPlatform.Enabled := value;
+  clbPlatforms.Enabled := value;
+  lblTemplate.Enabled := value;
+  cboTemplate.Enabled := value;
+  VariablesList.Enabled := value;
+end;
+
 procedure TDSpecCreatorForm.EnableDisablePlatform(compilerVersion : TCompilerVersion);
 var
   DpmPlatforms : TDPMPlatforms;
@@ -1902,20 +1933,17 @@ begin
   for i := 0 to clbPlatforms.Count - 1 do
   begin
     platformString := clbPlatforms.Items[i];
-    if platformString.Equals('Linux') then
-      platformString := 'Linux64'
-    else if platformString.Equals('IOS') then
-      platformString := 'iOS64';
+//    if platformString.Equals('Linux') then
+//      platformString := 'Linux64'
+//    else if platformString.Equals('Andriod') then
+
+//    else if platformString.Equals('IOS') then
+//      platformString := 'iOS64';
 
     DpmPlatform := StringToDPMPlatform(platformString);
     clbPlatforms.ItemEnabled[i] := DpmPlatform in DpmPlatforms;
     clbPlatforms.Checked[i] := False;
   end;
-end;
-
-procedure TDSpecCreatorForm.miExitClick(Sender: TObject);
-begin
-  Close;
 end;
 
 function TDSpecCreatorForm.FindHeadingNode(const templateNode: TTemplateTreeNode; nodeType : TNodeType): TTemplateTreeNode;
@@ -1950,6 +1978,11 @@ begin
   end;
 
 
+end;
+
+procedure TDSpecCreatorForm.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  MRUListService.SaveMRU;
 end;
 
 procedure TDSpecCreatorForm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
@@ -2015,29 +2048,6 @@ begin
   end;
 end;
 
-procedure TDSpecCreatorForm.miNewClick(Sender: TObject);
-begin
-  FreeAndNil(FOpenFile);
-  FOpenFile := TDSpecFile.Create(FLogger);
-  FSavefilename := '';
-  Caption := 'Untitled - dspec Creator';
-  LoadDspecStructure;
-end;
-
-procedure TDSpecCreatorForm.miOpenClick(Sender: TObject);
-var
-  dspecFilename : string;
-begin
-  if OpenDialog.Execute then
-  begin
-    dspecFilename := OpenDialog.FileName;
-    FOpenFile.LoadFromFile( dspecFilename);
-    FSavefilename := dspecFilename;
-    Caption := dspecFilename + ' - ' + cToolName;
-    LoadDspecStructure;
-  end;
-end;
-
 procedure TDSpecCreatorForm.miOptionsClick(Sender: TObject);
 var
   OptionsForm : TOptionsForm;
@@ -2050,33 +2060,59 @@ begin
   end;
 end;
 
-procedure TDSpecCreatorForm.miSaveAsClick(Sender: TObject);
-begin
-  if SaveDialog.Execute then
-  begin
-    SaveDspecStructure(SaveDialog.Filename);
-  end;
-end;
-
-procedure TDSpecCreatorForm.miSaveClick(Sender: TObject);
-begin
-  if FSavefilename.IsEmpty then
-  begin
-    if SaveDialog.Execute then
-    begin
-      SaveDspecStructure(SaveDialog.Filename);
-    end;
-  end
-  else
-  begin
-    SaveDspecStructure(FSavefilename);
-  end;
-end;
-
-
 procedure TDSpecCreatorForm.mmoDescriptionChange(Sender: TObject);
 begin
   FOpenFile.spec.metadata.description := mmoDescription.Text;
+end;
+
+procedure TDSpecCreatorForm.MRUAdd(const filename: string);
+begin
+  FMRUMenu.Add(filename);
+  FMRUMenu.Enabled := true;
+end;
+
+function TDSpecCreatorForm.MRUCount: integer;
+begin
+  result := Cardinal(FMRUMenu.Count);
+end;
+
+procedure TDSpecCreatorForm.MRUListClick(Sender: TObject; const Filename: string);
+var
+  theError : string;
+begin
+  if FileExists(Filename) then
+    OpenProject(Filename)
+  else
+    MRURemove(Filename);
+end;
+
+procedure TDSpecCreatorForm.MRULoad(const list: TStrings);
+begin
+  FMRUMenu.LoadFromList(list);
+end;
+
+function TDSpecCreatorForm.MRURemove(const filename: string): boolean;
+begin
+  FMRUMenu.Remove(filename);
+  FMRUMenu.Enabled := MRUListService.GetItemCount > 0;
+  Result := true;
+end;
+
+procedure TDSpecCreatorForm.MRUSave(const list: TStrings);
+begin
+  FMRUMenu.SaveToList(list);
+end;
+
+
+procedure TDSpecCreatorForm.OpenProject(const fileName : string);
+var
+  dspecFilename : string;
+begin
+  FOpenFile.LoadFromFile(fileName);
+  FSavefilename := dspecFilename;
+  Caption := dspecFilename + ' - ' + cToolName;
+  LoadDspecStructure;
+  MRUListService.Add(fileName);
 end;
 
 procedure TDSpecCreatorForm.tvTemplatesChange(Sender: TObject; Node: TTreeNode);

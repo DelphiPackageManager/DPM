@@ -283,6 +283,8 @@
         <DCCReference Include="..\Core\Manifest\DPM.Core.Manifest.Interfaces.pas"/>
         <DCCReference Include="..\Core\Manifest\DPM.Core.Manifest.pas"/>
         <DCCReference Include="..\Core\Manifest\DPM.Core.Manifest.Reader.pas"/>
+        <DCCReference Include="DPM.Creator.MRUService.pas"/>
+        <DCCReference Include="Controls\VSoft.Controls.Menus.MRU.pas"/>
         <RcItem Include="..\images\add_16px.png">
             <ResourceType>RCDATA</ResourceType>
             <ResourceId>ADD_PACKAGE_16</ResourceId>

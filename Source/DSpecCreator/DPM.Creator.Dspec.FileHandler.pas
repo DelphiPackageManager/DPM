@@ -153,6 +153,7 @@ end;
 
 function TDSpecFile.IsModified: Boolean;
 begin
+  //TODO : This is wasteful - implement a modified flag.
   Result := not SameText(spec.ToJSON, FLoadedSpec.ToJSON);
 end;
 

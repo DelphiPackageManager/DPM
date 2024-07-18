@@ -12,6 +12,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
   Font.Style = []
   Menu = MainMenu
   Position = poScreenCenter
+  OnClose = FormClose
   OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
   OnDestroy = FormDestroy
@@ -21,7 +22,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Top = 0
     Width = 875
     Height = 507
-    ActivePage = tsInfo
+    ActivePage = tsTemplates
     Align = alClient
     TabOrder = 0
     ExplicitWidth = 871
@@ -247,30 +248,32 @@ object DSpecCreatorForm: TDSpecCreatorForm
       ImageIndex = 1
       object lblTemplate: TLabel
         Left = 256
-        Top = 203
+        Top = 252
         Width = 48
         Height = 15
         Caption = 'Template'
+        Enabled = False
       end
       object lblCompilers: TLabel
         Left = 72
-        Top = 27
-        Width = 54
+        Top = 7
+        Width = 95
         Height = 15
-        Caption = 'Compilers'
+        Caption = 'Compiler Versions'
       end
       object lblPlatform: TLabel
         Left = 256
-        Top = 27
+        Top = 7
         Width = 46
         Height = 15
         Caption = 'Platform'
+        Enabled = False
       end
       object clbCompilers: TCheckListBox
         Left = 72
-        Top = 48
+        Top = 28
         Width = 161
-        Height = 329
+        Height = 417
         ItemHeight = 17
         Items.Strings = (
           'XE2'
@@ -294,38 +297,45 @@ object DSpecCreatorForm: TDSpecCreatorForm
       end
       object cboTemplate: TComboBox
         Left = 256
-        Top = 224
+        Top = 273
         Width = 161
         Height = 23
         Style = csDropDownList
+        Enabled = False
         TabOrder = 1
         OnChange = cboTemplateChange
       end
       object clbPlatforms: TCheckListBox
         Left = 256
-        Top = 48
+        Top = 28
         Width = 161
-        Height = 137
+        Height = 218
         DoubleBuffered = True
+        Enabled = False
         ItemHeight = 17
         Items.Strings = (
           'Win32'
           'Win64'
-          'Linux'
+          'OSX32'
+          'OSX64'
+          'OSXARM64'
           'Android'
           'Android64'
-          'IOS'
-          'OSX64')
+          'iOS32'
+          'iOS64'
+          'iOSSimulator'
+          'LinuxIntel64')
         ParentDoubleBuffered = False
         TabOrder = 2
         OnClickCheck = clbPlatformsClickCheck
       end
       object VariablesList: TValueListEditor
         Left = 256
-        Top = 253
+        Top = 308
         Width = 297
-        Height = 145
+        Height = 137
         DoubleBuffered = True
+        Enabled = False
         KeyOptions = [keyEdit, keyAdd, keyDelete, keyUnique]
         ParentDoubleBuffered = False
         TabOrder = 3
@@ -402,22 +412,24 @@ object DSpecCreatorForm: TDSpecCreatorForm
       object CardPanel: TCardPanel
         Left = 328
         Top = 24
-        Width = 524
+        Width = 520
         Height = 387
         Anchors = [akLeft, akTop, akRight, akBottom]
         ActiveCard = crdRuntimeOrDesignBpl
         Caption = 'CardPanel'
         TabOrder = 3
+        ExplicitWidth = 516
+        ExplicitHeight = 386
         object crdSource: TCard
           Left = 1
           Top = 1
-          Width = 522
+          Width = 518
           Height = 385
           Caption = 'Source/Lib/File'
           CardIndex = 0
           TabOrder = 0
           DesignSize = (
-            522
+            518
             385)
           object lblSrc: TLabel
             Left = 16
@@ -450,7 +462,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtFileEntrySource: TEdit
             Left = 16
             Top = 61
-            Width = 368
+            Width = 364
             Height = 23
             CustomHint = BalloonHint1
             Anchors = [akLeft, akTop, akRight]
@@ -471,7 +483,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtFileEntryDest: TEdit
             Left = 16
             Top = 134
-            Width = 368
+            Width = 364
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
@@ -483,7 +495,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object lbFileEntryExclude: TListBox
             Left = 16
             Top = 182
-            Width = 368
+            Width = 364
             Height = 97
             Anchors = [akLeft, akTop, akRight]
             ItemHeight = 15
@@ -511,7 +523,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdSearchPathItem: TCard
           Left = 1
           Top = 1
-          Width = 522
+          Width = 518
           Height = 385
           Caption = 'SearchPath Item'
           CardIndex = 1
@@ -543,13 +555,13 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdBuild: TCard
           Left = 1
           Top = 1
-          Width = 522
+          Width = 518
           Height = 385
           Caption = 'Build Item'
           CardIndex = 2
           TabOrder = 2
           DesignSize = (
-            522
+            518
             385)
           object lblBuild: TLabel
             Left = 8
@@ -582,7 +594,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtBuildId: TEdit
             Left = 24
             Top = 56
-            Width = 409
+            Width = 405
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             TabOrder = 0
@@ -592,7 +604,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtProject: TEdit
             Left = 24
             Top = 106
-            Width = 409
+            Width = 405
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
@@ -604,7 +616,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtConfiguration: TEdit
             Left = 24
             Top = 156
-            Width = 409
+            Width = 405
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
@@ -636,13 +648,15 @@ object DSpecCreatorForm: TDSpecCreatorForm
           AlignWithMargins = True
           Left = 4
           Top = 4
-          Width = 516
+          Width = 512
           Height = 379
           Caption = 'Runtime Or DesignTime'
           CardIndex = 3
           TabOrder = 3
+          ExplicitWidth = 508
+          ExplicitHeight = 378
           DesignSize = (
-            516
+            512
             379)
           object lblRuntime: TLabel
             Left = 8
@@ -670,21 +684,23 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtBPLEntryBuildId: TEdit
             Left = 62
             Top = 112
-            Width = 411
+            Width = 407
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             TabOrder = 3
+            ExplicitWidth = 403
           end
           object edtBPLEntrySrc: TEdit
             Left = 62
             Top = 37
-            Width = 411
+            Width = 407
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
             ShowHint = True
             TabOrder = 0
             OnChange = edtBPLEntrySrcChange
+            ExplicitWidth = 403
           end
           object chkCopyLocal: TCheckBox
             Left = 62
@@ -708,13 +724,13 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdDependency: TCard
           Left = 1
           Top = 1
-          Width = 522
+          Width = 518
           Height = 385
           Caption = 'Dependency'
           CardIndex = 4
           TabOrder = 4
           DesignSize = (
-            522
+            518
             385)
           object Label1: TLabel
             Left = 16
@@ -740,7 +756,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtDependencyId: TEdit
             Left = 16
             Top = 61
-            Width = 400
+            Width = 396
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             TabOrder = 0
@@ -750,7 +766,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtDependencyVersion: TEdit
             Left = 16
             Top = 116
-            Width = 400
+            Width = 396
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
@@ -763,7 +779,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdTemplate: TCard
           Left = 1
           Top = 1
-          Width = 522
+          Width = 518
           Height = 385
           Caption = 'Templates'
           CardIndex = 5
@@ -794,7 +810,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdBuildHeading: TCard
           Left = 1
           Top = 1
-          Width = 522
+          Width = 518
           Height = 385
           Caption = 'Build Items Heading'
           CardIndex = 6
@@ -822,7 +838,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdSearchPathHeading: TCard
           Left = 1
           Top = 1
-          Width = 522
+          Width = 518
           Height = 385
           Caption = 'SearchPath Heading'
           CardIndex = 7
@@ -850,7 +866,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdSourceHeading: TCard
           Left = 1
           Top = 1
-          Width = 522
+          Width = 518
           Height = 385
           Caption = 'Source Items Heading'
           CardIndex = 8
@@ -876,7 +892,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdDependenciesHeading: TCard
           Left = 1
           Top = 1
-          Width = 522
+          Width = 518
           Height = 385
           Caption = 'Dependencies '
           CardIndex = 9
@@ -904,7 +920,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdLibEntriesHeading: TCard
           Left = 1
           Top = 1
-          Width = 522
+          Width = 518
           Height = 385
           Caption = 'Lib Entries Heading'
           CardIndex = 10
@@ -930,7 +946,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdFileEntriesHeading: TCard
           Left = 1
           Top = 1
-          Width = 522
+          Width = 518
           Height = 385
           Caption = 'File Entries Heading'
           CardIndex = 11
@@ -958,7 +974,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdDesignHeading: TCard
           Left = 1
           Top = 1
-          Width = 522
+          Width = 518
           Height = 385
           Caption = 'Design Heading'
           CardIndex = 12
@@ -986,7 +1002,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdRuntimeHeading: TCard
           Left = 1
           Top = 1
-          Width = 522
+          Width = 518
           Height = 385
           Caption = 'Runtime Heading'
           CardIndex = 13
@@ -1112,33 +1128,28 @@ object DSpecCreatorForm: TDSpecCreatorForm
   object MainMenu: TMainMenu
     Left = 508
     Top = 386
-    object File1: TMenuItem
+    object mnuFile: TMenuItem
       Caption = '&File'
       object miNew: TMenuItem
-        Caption = '&New'
-        ShortCut = 16462
-        OnClick = miNewClick
+        Action = actFileNew
       end
       object miOpen: TMenuItem
-        Caption = '&Open...'
-        ShortCut = 16463
-        OnClick = miOpenClick
+        Action = actFileOpen
+      end
+      object mnuFileOpenSep: TMenuItem
+        Caption = '-'
       end
       object miSave: TMenuItem
-        Caption = '&Save'
-        ShortCut = 16467
-        OnClick = miSaveClick
+        Action = actFileSave
       end
-      object miSaveAs: TMenuItem
-        Caption = 'Save &As...'
-        OnClick = miSaveAsClick
+      object mnuSaveAs: TMenuItem
+        Action = actFileSaveAs
       end
       object N1: TMenuItem
         Caption = '-'
       end
       object miExit: TMenuItem
-        Caption = 'E&xit'
-        OnClick = miExitClick
+        Action = actFileExit
       end
     end
     object miOptions: TMenuItem
@@ -1475,25 +1486,25 @@ object DSpecCreatorForm: TDSpecCreatorForm
       OnExecute = actAddBuildItemExecute
     end
     object actFileOpen: TAction
-      Category = 'Menu'
+      Category = 'File'
       Caption = '&Open..'
       ShortCut = 16463
       OnExecute = actFileOpenExecute
     end
     object actFileSave: TAction
-      Category = 'Menu'
+      Category = 'File'
       Caption = 'Save'
       ShortCut = 16467
       OnExecute = actFileSaveExecute
     end
     object actFileSaveAs: TAction
-      Category = 'Menu'
+      Category = 'File'
       Caption = 'Save &As..'
       ShortCut = 24659
       OnExecute = actFileSaveAsExecute
     end
     object actFileNew: TAction
-      Category = 'Menu'
+      Category = 'File'
       Caption = '&New'
       ShortCut = 16462
       OnExecute = actFileNewExecute
@@ -1572,6 +1583,11 @@ object DSpecCreatorForm: TDSpecCreatorForm
       Category = 'Dependency'
       Caption = 'Delete Dependency'
       OnExecute = actDeleteDependencyExecute
+    end
+    object actFileExit: TAction
+      Category = 'File'
+      Caption = 'E&xit'
+      OnExecute = actFileExitExecute
     end
   end
   object OpenPictureDialog1: TOpenPictureDialog

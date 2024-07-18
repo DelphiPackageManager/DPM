@@ -118,7 +118,9 @@ uses
   DPM.Core.Manifest in '..\Core\Manifest\DPM.Core.Manifest.pas',
   DPM.Core.Manifest.Reader in '..\Core\Manifest\DPM.Core.Manifest.Reader.pas',
   Vcl.Themes,
-  Vcl.Styles;
+  Vcl.Styles,
+  DPM.Creator.MRUService in 'DPM.Creator.MRUService.pas',
+  VSoft.Controls.Menus.MRU in 'Controls\VSoft.Controls.Menus.MRU.pas';
 
 {$R *.res}
 
