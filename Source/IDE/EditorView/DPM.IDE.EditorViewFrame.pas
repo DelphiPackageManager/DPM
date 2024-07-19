@@ -1580,6 +1580,11 @@ begin
     end;
     title := title + version;
 
+    if (package <> nil) and  package.IsError then
+      ACanvas.Font.Color := $006464FA// $0F2CAB
+    else
+      ACanvas.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
+
     DrawText(ACanvas.Handle, PChar(title),Length(title), FRowLayout.TitleRect, DT_SINGLELINE + DT_LEFT + DT_VCENTER );
     if latestVersion <> '' then
     begin

@@ -66,3 +66,4 @@ Source/dpm.used
 Source/IDE/EditorView/__recovery
 Packages
 Source/DSpecCreator/__recovery
+*.user

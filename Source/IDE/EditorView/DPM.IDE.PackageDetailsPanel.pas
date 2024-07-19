@@ -275,6 +275,10 @@ begin
   fontStyle := Canvas.Font.Style;
 
   Canvas.Font.Style := [fsBold];
+
+  if FPackage.IsError then
+    Canvas.Font.Color := $006464FA;
+
   DrawText(Canvas.Handle, 'Description', Length('Description'), FLayout.DescriptionLabelRect, DT_LEFT);
   Canvas.Font.Style := [];
   DrawText(Canvas.Handle, FPackage.Description, Length(FPackage.Description), FLayout.DescriptionRect, DT_LEFT + DT_WORDBREAK);
@@ -284,6 +288,12 @@ begin
 
   Canvas.Font.Style := [];
   DrawText(Canvas.Handle, FPackage.Version.ToStringNoMeta, Length(FPackage.Version.ToStringNoMeta), FLayout.VersionRect, DT_LEFT + DT_WORDBREAK);
+
+  if FPackage.IsError then
+  begin
+    Canvas.Font.Style := fontStyle;
+    exit;
+  end;
 
   Canvas.Font.Style := [fsBold];
   DrawText(Canvas.Handle, 'Authors :', Length('Authors :'), FLayout.AuthorsLabelRect, DT_LEFT);

@@ -28,7 +28,6 @@ object DPMEditViewFrame: TDPMEditViewFrame
       Align = alRight
       MinSize = 300
       ResizeStyle = rsUpdate
-      ExplicitLeft = 592
     end
     object PackageListPanel: TPanel
       Left = 0
@@ -68,38 +67,27 @@ object DPMEditViewFrame: TDPMEditViewFrame
         ParentBackground = False
         ParentColor = False
         TabOrder = 0
-        ExplicitWidth = 500
-        ExplicitHeight = 581
         inherited sbPackageDetails: TScrollBox
           Width = 500
           Height = 581
-          ExplicitWidth = 500
-          ExplicitHeight = 581
           inherited DetailsSplitter: TSplitter
             Width = 500
-            ExplicitWidth = 500
           end
           inherited pnlPackageId: TPanel
             Width = 500
-            ExplicitWidth = 500
           end
           inherited pnlGridHost: TPanel
             Width = 500
-            ExplicitWidth = 500
             inherited pnlVersion: TPanel
               Width = 500
-              ExplicitWidth = 500
               inherited btnInstallAll: TSpeedButton
                 Left = 395
-                ExplicitLeft = 395
               end
               inherited btnUpgradeAll: TSpeedButton
                 Left = 431
-                ExplicitLeft = 431
               end
               inherited btnUninstallAll: TSpeedButton
                 Left = 467
-                ExplicitLeft = 467
               end
             end
           end
