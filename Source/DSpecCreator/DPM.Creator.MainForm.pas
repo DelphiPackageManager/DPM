@@ -2084,8 +2084,6 @@ begin
 end;
 
 procedure TDSpecCreatorForm.MRUListClick(Sender: TObject; const Filename: string);
-var
-  theError : string;
 begin
   if FileExists(Filename) then
     OpenProject(Filename)

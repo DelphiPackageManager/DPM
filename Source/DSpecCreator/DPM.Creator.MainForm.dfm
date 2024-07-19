@@ -25,8 +25,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
     ActivePage = tsTemplates
     Align = alClient
     TabOrder = 0
-    ExplicitWidth = 871
-    ExplicitHeight = 506
     object tsInfo: TTabSheet
       Caption = 'Package Info'
       object lblId: TLabel
@@ -239,7 +237,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Proportional = True
           Stretch = True
           OnClick = ImgIconClick
-          ExplicitTop = 4
         end
       end
     end
@@ -418,8 +415,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         ActiveCard = crdRuntimeOrDesignBpl
         Caption = 'CardPanel'
         TabOrder = 3
-        ExplicitWidth = 516
-        ExplicitHeight = 386
         object crdSource: TCard
           Left = 1
           Top = 1
@@ -653,8 +648,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Runtime Or DesignTime'
           CardIndex = 3
           TabOrder = 3
-          ExplicitWidth = 508
-          ExplicitHeight = 378
           DesignSize = (
             512
             379)
@@ -688,7 +681,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             TabOrder = 3
-            ExplicitWidth = 403
           end
           object edtBPLEntrySrc: TEdit
             Left = 62
@@ -700,7 +692,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             ShowHint = True
             TabOrder = 0
             OnChange = edtBPLEntrySrcChange
-            ExplicitWidth = 403
           end
           object chkCopyLocal: TCheckBox
             Left = 62
