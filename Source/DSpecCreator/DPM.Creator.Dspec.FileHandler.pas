@@ -35,6 +35,7 @@ type
     function AsString: string;
     constructor Create(logger: ILogger);
     destructor Destroy; override;
+    property FileName : string read FFileName;
   end;
 
 

@@ -286,7 +286,6 @@ type
     FOpenFile : TDSpecFile;
     FDosCommand : TDosCommand;
     FTemplate : ISpecTemplate;
-    FSavefilename : string;
     FLogger: ILogger;
     FInVariableUpdate: Boolean;
     FSPDXList : TStringList;
@@ -300,7 +299,10 @@ type
     function MRUCount: integer;
     //IMRUSource
 
+
     procedure MRUListClick(Sender: TObject; const Filename: string);
+
+    procedure UpdateFormCaption(const value : string);
 
     procedure OpenProject(const fileName : string);
 
@@ -1414,8 +1416,7 @@ begin
   FreeAndNil(FOpenFile);
   FOpenFile := TDSpecFile.Create(FLogger);
   FOpenfile.spec.NewTemplate('default');
-  FSavefilename := '';
-  Caption := 'Untitled - dspec Creator';
+  UpdateFormCaption('');
   LoadDspecStructure;
 end;
 
@@ -1441,7 +1442,7 @@ end;
 
 procedure TDSpecCreatorForm.actFileSaveExecute(Sender: TObject);
 begin
-  if FSavefilename.IsEmpty then
+  if FOpenFile.FileName.IsEmpty then
   begin
     if SaveDialog.Execute then
     begin
@@ -1450,7 +1451,7 @@ begin
   end
   else
   begin
-    SaveDspecStructure(FSavefilename);
+    SaveDspecStructure(FOpenFile.FileName);
   end;
 end;
 
@@ -1776,11 +1777,10 @@ begin
   FSPDXList := TStringList.Create;
   LoadSPDXList;
   LoadDspecStructure;
-  FSavefilename := '';
   FtmpFilename := '';
   PageControl.ActivePage := tsInfo;
   edtDependencyVersion.Text := '';
-  Caption := 'Untitled - ' + cToolName;
+  UpdateFormCaption('');
   idx := mnuFile.IndexOf(mnuFileOpenSep);
   FMRUMenu := TMRUMenu.Create(Self);
   FMRUMenu.Caption := 'Open Recent Project';
@@ -1863,8 +1863,7 @@ end;
 procedure TDSpecCreatorForm.SaveDspecStructure(const filename: string);
 begin
   FOpenFile.SaveToFile(filename);
-  FSavefilename := Filename;
-  Caption := FSavefilename + ' - dspec Creator';
+  UpdateFormCaption(FOpenFile.FileName);
 end;
 
 function TDSpecCreatorForm.SelectedPlatform: ISpecTargetPlatform;
@@ -1875,6 +1874,14 @@ begin
   Result := FOpenFile.GetPlatform(clbPlatforms.Items[clbPlatforms.ItemIndex]);
 end;
 
+
+procedure TDSpecCreatorForm.UpdateFormCaption(const value: string);
+begin
+  if value.IsEmpty then
+    Caption := cToolName + ' - [Untitled]'
+  else
+    Caption := cToolName + ' - [' + value + ']';
+end;
 
 procedure TDSpecCreatorForm.UriClick(const uri: string);
 begin
@@ -1996,9 +2003,9 @@ begin
       mrYes:
         begin
           // Call your save function here
-          if not FSavefilename.IsEmpty then
+          if not FOpenFile.FileName.IsEmpty then
           begin
-            SaveDspecStructure(FSavefilename);
+            SaveDspecStructure(FOpenFile.FileName);
           end
           else
           begin
@@ -2034,7 +2041,7 @@ procedure TDSpecCreatorForm.ImgIconClick(Sender: TObject);
 var
   relativePath : string;
 begin
-  if Length(FSavefilename) = 0 then
+  if FOpenFile.FileName.IsEmpty then
   begin
     ShowMessage('Save dspec file before adding the icon');
     Exit;
@@ -2105,12 +2112,9 @@ end;
 
 
 procedure TDSpecCreatorForm.OpenProject(const fileName : string);
-var
-  dspecFilename : string;
 begin
   FOpenFile.LoadFromFile(fileName);
-  FSavefilename := dspecFilename;
-  Caption := dspecFilename + ' - ' + cToolName;
+  UpdateFormCaption(fileName);
   LoadDspecStructure;
   MRUListService.Add(fileName);
 end;
