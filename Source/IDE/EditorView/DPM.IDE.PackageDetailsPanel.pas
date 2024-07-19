@@ -367,7 +367,7 @@ begin
   Canvas.Font.Style := [];
 
   dependRect := FLayout.DependRect;
-  if FPackage.Dependencies.Any then
+  if (FPackage.Dependencies <> nil) and FPackage.Dependencies.Any then
   begin
     textSize := Canvas.TextExtent('Win32');
 
@@ -656,7 +656,7 @@ begin
   DependLabelRect.Width := textSize.cx;
   DependLabelRect.Height := textSize.cy;
 
-  if package.Dependencies.Any then
+  if (package.Dependencies <> nil) and package.Dependencies.Any then
   begin
     DependRect.Top := DependLabelRect.Bottom + LineSpacing;
     DependRect.Left := DependLabelRect.Left;
