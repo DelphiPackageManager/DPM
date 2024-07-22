@@ -146,7 +146,8 @@ begin
      list := TStringList.Create;
     try
       FSource.MRUSave(list);
-      for i := list.Count - 1 downto 0 do
+      iniFile.EraseSection('MRU');
+      for i := 0 to list.Count - 1 do
         iniFile.WriteString('MRU', IntToStr(i), list.Strings[i]);
     finally
       list.Free;
