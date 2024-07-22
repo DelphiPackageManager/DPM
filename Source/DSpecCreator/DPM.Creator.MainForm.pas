@@ -280,6 +280,8 @@ type
     procedure About1Click(Sender: TObject);
     procedure actFileExitExecute(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure edtVersionExit(Sender: TObject);
+    procedure edtPackageOutputPathExit(Sender: TObject);
   private
     { Private declarations }
     FtmpFilename : string;
@@ -366,6 +368,7 @@ implementation
 uses
   System.UITypes,
   System.IOUtils,
+  System.IniFiles,
   WinApi.ShellAPI,
   DPM.Core.Dependency.Version,
   DPM.Creator.TemplateForm,
@@ -459,7 +462,7 @@ begin
   FtmpFilename := ChangeFileExt(FtmpFilename, '.dspec');
   TFile.WriteAllText(FtmpFilename, FOpenFile.AsString);
   if DirectoryExists(edtPackageOutputPath.Text) then
-    FDosCommand.CommandLine := 'dpm pack ' + FtmpFilename + ' -o=' + edtPackageOutputPath.Text;
+    FDosCommand.CommandLine := 'dpm pack "' + FtmpFilename + '" -o=' + edtPackageOutputPath.Text;
   FDosCommand.Execute;
 end;
 
@@ -1645,6 +1648,19 @@ begin
   FOpenFile.spec.metadata.id := edtId.Text;
 end;
 
+procedure TDSpecCreatorForm.edtPackageOutputPathExit(Sender: TObject);
+var
+  iniFile : TIniFile;
+begin
+// save path to ini file.
+  iniFile := TIniFile.Create(MRUListService.GetIniFilePath);
+  try
+    iniFile.WriteString('Paths','PackageOutput',edtPackageOutputPath.Text);
+  finally
+    iniFile.Free;
+  end;
+end;
+
 procedure TDSpecCreatorForm.edtProjectChange(Sender: TObject);
 var
   str : string;
@@ -1758,6 +1774,17 @@ begin
 end;
 
 procedure TDSpecCreatorForm.edtVersionChange(Sender: TObject);
+var
+  version : TPackageVersion;
+begin
+  if length(edtVersion.Text) > 0 then
+  begin
+    if TPackageVersion.TryParse(edtVersion.Text, version) then
+      FOpenFile.spec.metadata.version := version;
+  end;
+end;
+
+procedure TDSpecCreatorForm.edtVersionExit(Sender: TObject);
 begin
   if length(edtVersion.Text) > 0 then
     FOpenFile.spec.metadata.version := TPackageVersion.Parse(edtVersion.Text);
@@ -1766,7 +1793,7 @@ end;
 procedure TDSpecCreatorForm.FormCreate(Sender: TObject);
 var
   idx : integer;
-
+  iniFile : TIniFile;
 begin
   FLogger := TDSpecLogger.Create(Memo2.Lines);
   FOpenFile := TDSpecFile.Create(FLogger);
@@ -1791,6 +1818,14 @@ begin
   MRUListService.SetSource(Self);
   MRUListService.LoadMRU;
   FMRUMenu.Enabled := MRUListService.GetItemCount > 0;
+
+  iniFile := TIniFile.Create(MRUListService.GetIniFilePath);
+  try
+    edtPackageOutputPath.Text := iniFile.ReadString('Paths','PackageOutput', '');
+
+  finally
+    iniFile.Free;
+  end;
 
 
 end;

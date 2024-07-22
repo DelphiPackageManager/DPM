@@ -24,6 +24,7 @@ type
     function Remove(const filename : string) : boolean;
     function GetItemCount: integer;
     procedure SetSource(const value : IMRUSource);
+    function GetIniFilePath : string;
   end;
 
 function MRUListService : IMRUListService;

@@ -2,8 +2,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
   Left = 0
   Top = 0
   Caption = '.dspec Creator'
-  ClientHeight = 507
-  ClientWidth = 875
+  ClientHeight = 506
+  ClientWidth = 871
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -20,9 +20,9 @@ object DSpecCreatorForm: TDSpecCreatorForm
   object PageControl: TPageControl
     Left = 0
     Top = 0
-    Width = 875
-    Height = 507
-    ActivePage = tsTemplates
+    Width = 871
+    Height = 506
+    ActivePage = tsGenerate
     Align = alClient
     TabOrder = 0
     object tsInfo: TTabSheet
@@ -156,6 +156,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Height = 23
         TabOrder = 1
         OnChange = edtVersionChange
+        OnExit = edtVersionExit
       end
       object mmoDescription: TMemo
         Left = 89
@@ -271,7 +272,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Top = 28
         Width = 161
         Height = 417
-        ItemHeight = 17
+        ItemHeight = 15
         Items.Strings = (
           'XE2'
           'XE3'
@@ -309,7 +310,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Height = 218
         DoubleBuffered = True
         Enabled = False
-        ItemHeight = 17
+        ItemHeight = 15
         Items.Strings = (
           'Win32'
           'Win64'
@@ -349,8 +350,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
       Caption = 'Templates'
       ImageIndex = 2
       DesignSize = (
-        867
-        477)
+        863
+        476)
       object lblTemplateView: TLabel
         Left = 3
         Top = 3
@@ -409,8 +410,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
       object CardPanel: TCardPanel
         Left = 328
         Top = 24
-        Width = 520
-        Height = 387
+        Width = 512
+        Height = 386
         Anchors = [akLeft, akTop, akRight, akBottom]
         ActiveCard = crdRuntimeOrDesignBpl
         Caption = 'CardPanel'
@@ -418,14 +419,14 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdSource: TCard
           Left = 1
           Top = 1
-          Width = 518
-          Height = 385
+          Width = 510
+          Height = 384
           Caption = 'Source/Lib/File'
           CardIndex = 0
           TabOrder = 0
           DesignSize = (
-            518
-            385)
+            510
+            384)
           object lblSrc: TLabel
             Left = 16
             Top = 40
@@ -457,7 +458,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtFileEntrySource: TEdit
             Left = 16
             Top = 61
-            Width = 364
+            Width = 348
             Height = 23
             CustomHint = BalloonHint1
             Anchors = [akLeft, akTop, akRight]
@@ -478,7 +479,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtFileEntryDest: TEdit
             Left = 16
             Top = 134
-            Width = 364
+            Width = 348
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
@@ -490,7 +491,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object lbFileEntryExclude: TListBox
             Left = 16
             Top = 182
-            Width = 364
+            Width = 348
             Height = 97
             Anchors = [akLeft, akTop, akRight]
             ItemHeight = 15
@@ -518,8 +519,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdSearchPathItem: TCard
           Left = 1
           Top = 1
-          Width = 518
-          Height = 385
+          Width = 510
+          Height = 384
           Caption = 'SearchPath Item'
           CardIndex = 1
           TabOrder = 1
@@ -550,14 +551,14 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdBuild: TCard
           Left = 1
           Top = 1
-          Width = 518
-          Height = 385
+          Width = 510
+          Height = 384
           Caption = 'Build Item'
           CardIndex = 2
           TabOrder = 2
           DesignSize = (
-            518
-            385)
+            510
+            384)
           object lblBuild: TLabel
             Left = 8
             Top = 8
@@ -589,7 +590,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtBuildId: TEdit
             Left = 24
             Top = 56
-            Width = 405
+            Width = 397
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             TabOrder = 0
@@ -599,7 +600,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtProject: TEdit
             Left = 24
             Top = 106
-            Width = 405
+            Width = 397
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
@@ -611,7 +612,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtConfiguration: TEdit
             Left = 24
             Top = 156
-            Width = 405
+            Width = 397
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
@@ -643,14 +644,14 @@ object DSpecCreatorForm: TDSpecCreatorForm
           AlignWithMargins = True
           Left = 4
           Top = 4
-          Width = 512
-          Height = 379
+          Width = 504
+          Height = 378
           Caption = 'Runtime Or DesignTime'
           CardIndex = 3
           TabOrder = 3
           DesignSize = (
-            512
-            379)
+            504
+            378)
           object lblRuntime: TLabel
             Left = 8
             Top = 8
@@ -677,7 +678,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtBPLEntryBuildId: TEdit
             Left = 62
             Top = 112
-            Width = 407
+            Width = 399
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             TabOrder = 3
@@ -685,7 +686,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtBPLEntrySrc: TEdit
             Left = 62
             Top = 37
-            Width = 407
+            Width = 399
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
@@ -715,14 +716,14 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdDependency: TCard
           Left = 1
           Top = 1
-          Width = 518
-          Height = 385
+          Width = 510
+          Height = 384
           Caption = 'Dependency'
           CardIndex = 4
           TabOrder = 4
           DesignSize = (
-            518
-            385)
+            510
+            384)
           object Label1: TLabel
             Left = 16
             Top = 95
@@ -747,7 +748,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtDependencyId: TEdit
             Left = 16
             Top = 61
-            Width = 396
+            Width = 388
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             TabOrder = 0
@@ -757,7 +758,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object edtDependencyVersion: TEdit
             Left = 16
             Top = 116
-            Width = 396
+            Width = 388
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
@@ -770,8 +771,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdTemplate: TCard
           Left = 1
           Top = 1
-          Width = 518
-          Height = 385
+          Width = 510
+          Height = 384
           Caption = 'Templates'
           CardIndex = 5
           TabOrder = 5
@@ -801,8 +802,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdBuildHeading: TCard
           Left = 1
           Top = 1
-          Width = 518
-          Height = 385
+          Width = 510
+          Height = 384
           Caption = 'Build Items Heading'
           CardIndex = 6
           TabOrder = 6
@@ -829,8 +830,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdSearchPathHeading: TCard
           Left = 1
           Top = 1
-          Width = 518
-          Height = 385
+          Width = 510
+          Height = 384
           Caption = 'SearchPath Heading'
           CardIndex = 7
           TabOrder = 7
@@ -857,8 +858,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdSourceHeading: TCard
           Left = 1
           Top = 1
-          Width = 518
-          Height = 385
+          Width = 510
+          Height = 384
           Caption = 'Source Items Heading'
           CardIndex = 8
           TabOrder = 8
@@ -883,8 +884,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdDependenciesHeading: TCard
           Left = 1
           Top = 1
-          Width = 518
-          Height = 385
+          Width = 510
+          Height = 384
           Caption = 'Dependencies '
           CardIndex = 9
           TabOrder = 9
@@ -911,8 +912,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdLibEntriesHeading: TCard
           Left = 1
           Top = 1
-          Width = 518
-          Height = 385
+          Width = 510
+          Height = 384
           Caption = 'Lib Entries Heading'
           CardIndex = 10
           TabOrder = 10
@@ -937,8 +938,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdFileEntriesHeading: TCard
           Left = 1
           Top = 1
-          Width = 518
-          Height = 385
+          Width = 510
+          Height = 384
           Caption = 'File Entries Heading'
           CardIndex = 11
           TabOrder = 11
@@ -965,8 +966,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdDesignHeading: TCard
           Left = 1
           Top = 1
-          Width = 518
-          Height = 385
+          Width = 510
+          Height = 384
           Caption = 'Design Heading'
           CardIndex = 12
           TabOrder = 12
@@ -993,8 +994,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object crdRuntimeHeading: TCard
           Left = 1
           Top = 1
-          Width = 518
-          Height = 385
+          Width = 510
+          Height = 384
           Caption = 'Runtime Heading'
           CardIndex = 13
           TabOrder = 13
@@ -1032,8 +1033,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
       object GridPanel1: TGridPanel
         Left = 0
         Top = 0
-        Width = 867
-        Height = 477
+        Width = 863
+        Height = 476
         Align = alClient
         Caption = 'GridPanel1'
         ColumnCollection = <
@@ -1062,7 +1063,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object Panel1: TPanel
           Left = 1
           Top = 1
-          Width = 865
+          Width = 861
           Height = 79
           Align = alClient
           TabOrder = 0
@@ -1088,14 +1089,14 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Width = 354
             Height = 23
             TabOrder = 1
-            Text = 'D:\Programming\components\DPM\Packages'
+            OnExit = edtPackageOutputPathExit
           end
         end
         object Memo1: TMemo
           Left = 1
           Top = 80
-          Width = 865
-          Height = 396
+          Width = 861
+          Height = 395
           Align = alClient
           ReadOnly = True
           ScrollBars = ssBoth
@@ -1109,8 +1110,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
       object Memo2: TMemo
         Left = 0
         Top = 0
-        Width = 867
-        Height = 477
+        Width = 863
+        Height = 476
         Align = alClient
         TabOrder = 0
       end
