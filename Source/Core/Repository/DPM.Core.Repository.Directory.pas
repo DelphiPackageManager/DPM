@@ -121,7 +121,7 @@ uses
 function GetSearchRegex(const compilerVersion : TCompilerVersion; const platforms : TDPMPlatforms; const version : string) : string;
 begin
   // ^(\w+\.\w+)\-([^\-]+)\-([^\-]+)\-(.*)$';
-  result := '^(\w+\.\w+)\-';
+  result := '^((?:\w+)(?:\.\w+)+)\-';
   if (compilerVersion > TCompilerVersion.UnknownVersion) then
     result := result + Format('(%s)\-', [CompilerToString(compilerVersion)])
   else
