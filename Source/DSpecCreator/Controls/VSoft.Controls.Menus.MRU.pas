@@ -56,32 +56,27 @@ var
   I: Integer;
 begin
   I := FMRUItems.IndexOf(value);
-  if I > -1 then
+  //in case there are dupes - happened once but wasn't able to replicate.
+  while I > -1 do
   begin
-    // If Filename is already in the MRU list, remove it/.
     FMRUItems.Delete(I);
-    FMRUItems.Insert(0, value);
-    A := TMRUMenuItem(Items[i]);
-    Remove(A);
-    Insert(0, A);
-    UpdateCaptions;
-  end
-  else
-  begin
-    // Add the new Filename, if it exceeds the MaxItems limit delete the bottom items
-    A := TMRUMenuItem.Create(Self);
-    A.FileName := value;
-    A.Hint := value;
-    A.OnClick := ClickHandler;
-    Insert(0, A);
-    FMRUItems.Insert(0, value);
-    while Count > FMaxItems do
-    begin
-      FMRUItems.Delete(Count - 1);
-      Items[Count - 1].Free;
-    end;
-    UpdateCaptions;
+    Items[i].Free;
+    i := FMRUItems.IndexOf(value);
   end;
+
+  // Add the new Filename, if it exceeds the MaxItems limit delete the bottom items
+  A := TMRUMenuItem.Create(Self);
+  A.FileName := value;
+  A.Hint := value;
+  A.OnClick := ClickHandler;
+  Insert(0, A);
+  FMRUItems.Insert(0, value);
+  while Count > FMaxItems do
+  begin
+    FMRUItems.Delete(Count - 1);
+    Items[Count - 1].Free;
+  end;
+  UpdateCaptions;
 end;
 
 procedure TMRUMenu.ClickHandler(Sender: TObject);
