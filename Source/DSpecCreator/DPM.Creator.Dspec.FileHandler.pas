@@ -28,7 +28,7 @@ type
     function GetPlatform(const compiler: string): ISpecTargetPlatform;
     function AddCompiler(const compiler: string): ISpecTargetPlatform;
     procedure DeleteCompiler(const compiler: string);
-    procedure LoadFromFile(const filename: string);
+    function LoadFromFile(const filename: string; var errorMessage : string) : boolean;
     procedure SaveToFile(const filename: string);
     function WorkingDir: string;
     function IsModified: Boolean;
@@ -154,15 +154,30 @@ end;
 
 function TDSpecFile.IsModified: Boolean;
 begin
-  //TODO : This is wasteful - implement a modified flag.
-  Result := not SameText(spec.ToJSON, FLoadedSpec.ToJSON);
+//TODO : This is wasteful - implement a modified flag.
+
+  if (spec <> nil) and (FLoadedSpec <> nil) then
+    Result := not SameText(spec.ToJSON, FLoadedSpec.ToJSON)
+  else
+    result := false;
 end;
 
-procedure TDSpecFile.LoadFromFile(const filename: string);
+function TDSpecFile.LoadFromFile(const filename: string; var errorMessage : string) : boolean;
 begin
+  result := true;
   FReader := TPackageSpecReader.Create(FLogger);
-  spec := FReader.ReadSpec(filename);
-  FLoadedSpec := FReader.ReadSpec(filename);
+  try
+    spec := FReader.ReadSpec(filename);
+    if (spec = nil) then
+      raise Exception.Create('Failed to load dspec');
+    FLoadedSpec := FReader.ReadSpec(filename);
+  except
+    on E : Exception do
+    begin
+      errorMessage := e.Message;
+      result := false;
+    end;
+  end;
   FFilename := Filename;
 end;
 
