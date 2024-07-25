@@ -1628,8 +1628,8 @@ begin
   result := Node;
 
   LoadSourceNodes(Node, template, template.SourceFiles);
-  LoadLibNodes(Node, template, template.Files);
-  LoadFileNodes(Node, template, template.LibFiles);
+  LoadLibNodes(Node, template, template.LibFiles);
+  LoadFileNodes(Node, template, template.Files);
 
   LoadSearchPathNodes(Node, template);
 
@@ -2224,6 +2224,7 @@ begin
         edtBPLEntryBuildId.Text := lNode.bplEntry.buildId;
         edtBPLEntrySrc.Text := lNode.bplEntry.Source;
         chkCopyLocal.Checked := lNode.bplEntry.copyLocal;
+        chkInstall.Checked := lNode.bplEntry.Install;
         CardPanel.ActiveCard := crdRuntimeOrDesignBpl;
       end;
     ntRuntime :
@@ -2231,6 +2232,7 @@ begin
         lblRuntime.Caption := 'Runtime Package (bpl)';
         edtBPLEntryBuildId.Text := lNode.bplEntry.buildId;
         edtBPLEntrySrc.Text := lNode.bplEntry.Source;
+        chkInstall.Checked := lNode.bplEntry.Install;
         chkCopyLocal.Checked := lNode.bplEntry.copyLocal;
         CardPanel.ActiveCard := crdRuntimeOrDesignBpl;
       end;
