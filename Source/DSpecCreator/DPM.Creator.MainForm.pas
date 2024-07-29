@@ -1540,24 +1540,26 @@ begin
   result.Template := template;
   result.ImageIndex := 6;
   result.SelectedIndex := 6;
+
+
 end;
 
 procedure TDSpecCreatorForm.LoadDesigntimeNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecBPLEntry>);
 var
-  runtimesNode : TTemplateTreeNode;
+  designtimeNode : TTemplateTreeNode;
   j : integer;
 begin
-  runtimesNode := tvTemplates.Items.AddChild(parentNode, 'Design') as TTemplateTreeNode;
-  runtimesNode.Template := template;
-  runtimesNode.NodeType := ntDesignHeading;
-  runtimesNode.ImageIndex := 6;
-  runtimesNode.SelectedIndex := 6;
+  designtimeNode := tvTemplates.Items.AddChild(parentNode, 'Design') as TTemplateTreeNode;
+  designtimeNode.Template := template;
+  designtimeNode.NodeType := ntDesignHeading;
+  designtimeNode.ImageIndex := 6;
+  designtimeNode.SelectedIndex := 6;
 
-  runtimesNode.AddAction := actAddDesignItem;
-  runtimesNode.DeleteAction := actDeleteDesignItem;
+  designtimeNode.AddAction := actAddDesignItem;
+  designtimeNode.DeleteAction := actDeleteDesignItem;
 
   for j := 0 to fileList.Count - 1 do
-    LoadRuntimeNode(runtimesNode, template, fileList[j]);
+    LoadDesigntimeNode(designtimeNode, template, fileList[j]);
 end;
 
 function TDSpecCreatorForm.LoadRuntimeNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const item : ISpecBPLEntry) : TTemplateTreeNode;
