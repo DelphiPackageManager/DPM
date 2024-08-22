@@ -954,7 +954,7 @@ begin
   else
   begin
     //remove existing nodes, we'll rewrite them below.
-    packageReferenceElements := dpmElement.selectNodes('x:PackageReference[@platform="' + DPMPlatformToString(platform) + '"]');
+    packageReferenceElements := dpmElement.selectNodes('x:PackageReference[@platform="' + DPMPlatformToBDString(platform) + '"]');
     for i := 0 to packageReferenceElements.length - 1 do
       dpmElement.removeChild(packageReferenceElements.item[i]);
   end;

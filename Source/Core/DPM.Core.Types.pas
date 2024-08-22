@@ -329,6 +329,7 @@ begin
   case value of
     TDPMPlatform.AndroidArm32 : result := 'Android';
     TDPMPlatform.AndroidArm64 : result := 'Android64';
+    TDPMPlatform.LinuxIntel64 : result := 'Linux64';
   else
     result := GetEnumName(TypeInfo(TDPMPlatform), ord(value));
   end;

@@ -153,12 +153,12 @@ end;
 
 function TPackageCache.GetPackagePath(const id: string; const version: string; const compilerVersion : TCompilerVersion;const platform: TDPMPlatform): string;
 begin
-  result := GetPackagesFolder + PathDelim + CompilerToString(compilerVersion) + PathDelim + DPMPlatformToString(platform) + PathDelim + Id + PathDelim + Version;
+  result := GetPackagesFolder + PathDelim + CompilerToString(compilerVersion) + PathDelim + DPMPlatformToBDString(platform) + PathDelim + Id + PathDelim + Version;
 end;
 
 function TPackageCache.GetPackagePath(const packageId : IPackageIdentity) : string;
 begin
-  result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim + DPMPlatformToString(packageId.platform) + PathDelim + packageId.Id + PathDelim + packageId.Version.ToStringNoMeta;
+  result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim + DPMPlatformToBDString(packageId.platform) + PathDelim + packageId.Id + PathDelim + packageId.Version.ToStringNoMeta;
 end;
 
 function TPackageCache.GetPackagesFolder : string;

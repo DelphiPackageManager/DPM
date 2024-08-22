@@ -1928,10 +1928,8 @@ begin
       exit(false);
 
     Options.platforms := [platform];
-    FLogger.Information('Uninstalling from project [' + projectFile + '] for ['
-      + DPMPlatformToString(platform) + ']', true);
-    platformResult := DoUninstallFromProject(cancellationToken, Options,
-      projectFile, projectEditor, platform, config, context);
+    FLogger.Information('Uninstalling from project [' + projectFile + '] for ['  + DPMPlatformToString(platform) + ']', true);
+    platformResult := DoUninstallFromProject(cancellationToken, Options, projectFile, projectEditor, platform, config, context);
     if not platformResult then
       FLogger.Error('Uninstall failed for ' + DPMPlatformToString(platform))
     else
