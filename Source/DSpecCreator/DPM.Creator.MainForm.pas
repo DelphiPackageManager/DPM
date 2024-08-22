@@ -299,6 +299,7 @@ type
     procedure actPlatformsSelectAllExecute(Sender : TObject);
     procedure actPlatformsDeselectAllExecute(Sender : TObject);
     procedure edtCopyrightChange(Sender : TObject);
+    procedure edtBPLEntryBuildIdChange(Sender: TObject);
   private
     { Private declarations }
     FtmpFilename : string;
@@ -1026,7 +1027,7 @@ var
 begin
   BuildForm := TBuildForm.Create(nil);
   try
-    BuildForm.edtBuildId.Text := 'default';
+//    BuildForm.edtBuildId.Text := 'default';
 
     if BuildForm.ShowModal = mrCancel then
       Exit;
@@ -1064,8 +1065,8 @@ var
 begin
   DependencyForm := TDependencyForm.Create(nil);
   try
-    DependencyForm.edtDependencyId.Text := 'default';
-    DependencyForm.edtVersion.Text := '1.0.0';
+//    DependencyForm.edtDependencyId.Text := 'default';
+//    DependencyForm.edtVersion.Text := '1.0.0';
 
     if DependencyForm.ShowModal = mrCancel then
       Exit;
@@ -1108,7 +1109,7 @@ var
 begin
   DesignForm := TBplForm.Create(nil);
   try
-    DesignForm.edtBuildId.Text := 'buildId';
+    //DesignForm.edtBuildId.Text := 'buildId';
 
     if DesignForm.ShowModal = mrCancel then
       Exit;
@@ -1147,7 +1148,8 @@ var
 begin
   FileForm := TSourceForm.Create(nil);
   try
-    FileForm.edtSource.Text := 'default';
+    FileForm.Caption := 'Add File entry';
+//    FileForm.edtSource.Text := 'default';
 
     if FileForm.ShowModal = mrCancel then
       Exit;
@@ -1184,7 +1186,8 @@ var
 begin
   LibForm := TSourceForm.Create(nil);
   try
-    LibForm.edtSource.Text := 'default';
+    LibForm.Caption := 'Add Lib Item';
+//    LibForm.edtSource.Text := 'default';
 
     if LibForm.ShowModal = mrCancel then
       Exit;
@@ -1221,7 +1224,7 @@ var
 begin
   RuntimeForm := TBplForm.Create(nil);
   try
-    RuntimeForm.edtBuildId.Text := 'default';
+//    RuntimeForm.edtBuildId.Text := 'default';
 
     if RuntimeForm.ShowModal = mrCancel then
       Exit;
@@ -1259,7 +1262,7 @@ var
 begin
   SearchPathForm := TSearchPathForm.Create(nil);
   try
-    SearchPathForm.edtSearchPath.Text := 'default';
+//    SearchPathForm.edtSearchPath.Text := 'default';
 
     if SearchPathForm.ShowModal = mrCancel then
       Exit;
@@ -1294,7 +1297,8 @@ var
 begin
   SourceForm := TSourceForm.Create(nil);
   try
-    SourceForm.edtSource.Text := 'default';
+    SourceForm.Caption := 'Add Source Item';
+//    SourceForm.edtSource.Text := 'default';
 
     if SourceForm.ShowModal = mrCancel then
       Exit;
@@ -1724,6 +1728,12 @@ end;
 function TDSpecCreatorForm.ReplaceVars(const inputStr : String; compiler : TCompilerVersion) : string;
 begin
   result := TClassReplacer.ReplaceVars(inputStr, compiler, FOpenFile.Spec);
+end;
+
+procedure TDSpecCreatorForm.edtBPLEntryBuildIdChange(Sender: TObject);
+begin
+  if Assigned(tvTemplates.Selected) then
+    (tvTemplates.Selected as TTemplateTreeNode).bplEntry.BuildId := edtBPLEntryBuildId.Text;
 end;
 
 procedure TDSpecCreatorForm.edtBPLEntrySrcChange(Sender : TObject);

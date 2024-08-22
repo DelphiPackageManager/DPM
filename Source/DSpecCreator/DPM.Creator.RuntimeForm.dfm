@@ -3,8 +3,8 @@ object BplForm: TBplForm
   Top = 0
   BorderStyle = bsDialog
   Caption = 'Runtime'
-  ClientHeight = 206
-  ClientWidth = 506
+  ClientHeight = 159
+  ClientWidth = 487
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -13,26 +13,26 @@ object BplForm: TBplForm
   Font.Style = []
   Position = poScreenCenter
   DesignSize = (
-    506
-    206)
+    487
+    159)
   TextHeight = 15
   object lblRuntimeSrc: TLabel
-    Left = 43
-    Top = 88
+    Left = 27
+    Top = 56
     Width = 19
     Height = 15
     Caption = 'Src:'
   end
   object lblRuntimeBuildId: TLabel
-    Left = 26
-    Top = 48
+    Left = 10
+    Top = 16
     Width = 43
     Height = 15
     Caption = 'Build Id:'
   end
   object btnCancel: TButton
-    Left = 332
-    Top = 152
+    Left = 316
+    Top = 120
     Width = 75
     Height = 25
     Cancel = True
@@ -41,8 +41,8 @@ object BplForm: TBplForm
     OnClick = btnCancelClick
   end
   object btnOk: TButton
-    Left = 413
-    Top = 152
+    Left = 397
+    Top = 120
     Width = 75
     Height = 25
     Caption = 'OK'
@@ -51,16 +51,16 @@ object BplForm: TBplForm
     OnClick = btnOkClick
   end
   object chkCopyLocal: TCheckBox
-    Left = 75
-    Top = 120
+    Left = 59
+    Top = 88
     Width = 97
     Height = 17
     Caption = 'Copy Local'
     TabOrder = 2
   end
   object edtSource: TEdit
-    Left = 75
-    Top = 85
+    Left = 59
+    Top = 53
     Width = 413
     Height = 23
     Anchors = [akLeft, akTop, akRight]
@@ -69,16 +69,16 @@ object BplForm: TBplForm
     TabOrder = 3
   end
   object edtBuildId: TEdit
-    Left = 75
-    Top = 45
+    Left = 59
+    Top = 13
     Width = 413
     Height = 23
     Anchors = [akLeft, akTop, akRight]
     TabOrder = 4
   end
   object chkInstall: TCheckBox
-    Left = 75
-    Top = 143
+    Left = 59
+    Top = 111
     Width = 97
     Height = 17
     Caption = 'Install In IDE'

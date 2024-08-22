@@ -2,9 +2,9 @@ object SearchPathForm: TSearchPathForm
   Left = 0
   Top = 0
   BorderStyle = bsDialog
-  Caption = 'SearchPathForm'
-  ClientHeight = 133
-  ClientWidth = 486
+  Caption = 'Search Path Entry'
+  ClientHeight = 103
+  ClientWidth = 487
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -13,19 +13,19 @@ object SearchPathForm: TSearchPathForm
   Font.Style = []
   Position = poScreenCenter
   DesignSize = (
-    486
-    133)
+    487
+    103)
   TextHeight = 15
   object lblRuntimeSrc: TLabel
-    Left = 34
-    Top = 32
-    Width = 19
+    Left = 23
+    Top = 16
+    Width = 30
     Height = 15
-    Caption = 'Src:'
+    Caption = 'Path :'
   end
   object btnCancel: TButton
     Left = 316
-    Top = 88
+    Top = 56
     Width = 75
     Height = 25
     Cancel = True
@@ -35,7 +35,7 @@ object SearchPathForm: TSearchPathForm
   end
   object btnOk: TButton
     Left = 397
-    Top = 88
+    Top = 56
     Width = 75
     Height = 25
     Caption = 'OK'
@@ -45,8 +45,8 @@ object SearchPathForm: TSearchPathForm
   end
   object edtSearchPath: TEdit
     Left = 59
-    Top = 29
-    Width = 413
+    Top = 13
+    Width = 414
     Height = 23
     Anchors = [akLeft, akTop, akRight]
     ParentShowHint = False

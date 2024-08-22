@@ -3,8 +3,8 @@ object SourceForm: TSourceForm
   Top = 0
   BorderStyle = bsDialog
   Caption = 'SourceForm'
-  ClientHeight = 178
-  ClientWidth = 464
+  ClientHeight = 147
+  ClientWidth = 487
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -13,26 +13,26 @@ object SourceForm: TSourceForm
   Font.Style = []
   Position = poScreenCenter
   DesignSize = (
-    464
-    178)
+    487
+    147)
   TextHeight = 15
   object lblSrc: TLabel
-    Left = 48
-    Top = 48
+    Left = 22
+    Top = 16
     Width = 19
     Height = 15
     Caption = 'Src:'
   end
   object lblDest: TLabel
-    Left = 41
-    Top = 100
+    Left = 14
+    Top = 69
     Width = 26
     Height = 15
     Caption = 'Dest:'
   end
   object btnCancel: TButton
-    Left = 287
-    Top = 136
+    Left = 323
+    Top = 114
     Width = 75
     Height = 25
     Cancel = True
@@ -41,8 +41,8 @@ object SourceForm: TSourceForm
     OnClick = btnCancelClick
   end
   object btnOk: TButton
-    Left = 368
-    Top = 136
+    Left = 404
+    Top = 114
     Width = 75
     Height = 25
     Caption = 'OK'
@@ -51,33 +51,31 @@ object SourceForm: TSourceForm
     OnClick = btnOkClick
   end
   object edtSource: TEdit
-    Left = 74
-    Top = 45
-    Width = 369
+    Left = 46
+    Top = 13
+    Width = 433
     Height = 23
     Anchors = [akLeft, akTop, akRight]
     ParentShowHint = False
     ShowHint = True
     TabOrder = 2
-    Text = 'edtSource'
   end
   object chkFlatten: TCheckBox
-    Left = 74
-    Top = 74
+    Left = 47
+    Top = 43
     Width = 97
     Height = 17
     Caption = 'Flatten'
     TabOrder = 3
   end
   object edtDest: TEdit
-    Left = 73
-    Top = 97
-    Width = 370
+    Left = 46
+    Top = 66
+    Width = 433
     Height = 23
     Anchors = [akLeft, akTop, akRight]
     ParentShowHint = False
     ShowHint = True
     TabOrder = 4
-    Text = 'Edit1'
   end
 end
