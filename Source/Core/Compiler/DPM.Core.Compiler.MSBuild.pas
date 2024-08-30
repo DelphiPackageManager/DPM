@@ -107,6 +107,7 @@ function TMSBuildCompiler.BuildProject(const cancellationToken : ICancellationTo
 var
   commandLine : string;
   env : IEnvironmentBlock;
+  i : integer;
 begin
   result := false;
   FBuildForDesign := forDesign;
@@ -154,8 +155,8 @@ begin
     begin
       FLogger.Error('Package compilation failed.');
       FCompilerOutput.LoadFromFile(FCompilerLogFile);
-      //TODO : This should be logged as an error, but then you would get a wall of red text which is hard to read.
-      FLogger.Information(FCompilerOutput.Text);
+      for i := 0 to FCompilerOutput.Count -1 do
+        FLogger.Information(FCompilerOutput.Strings[i]);
       FCompilerOutput.Clear;
     end;
     TFile.Delete(FCompilerLogFile);
