@@ -215,6 +215,7 @@ type
     btnAddTemplate : TButton;
     btnDeleteTemplate : TButton;
     btnDuplicateTemplate : TButton;
+    Splitter1: TSplitter;
     procedure FormDestroy(Sender : TObject);
     procedure btnAddExcludeClick(Sender : TObject);
     procedure btnAddTemplateClick(Sender : TObject);
