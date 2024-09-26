@@ -37,7 +37,7 @@ object SourceForm: TSourceForm
     Height = 25
     Cancel = True
     Caption = 'Cancel'
-    TabOrder = 0
+    TabOrder = 3
     OnClick = btnCancelClick
   end
   object btnOk: TButton
@@ -47,18 +47,18 @@ object SourceForm: TSourceForm
     Height = 25
     Caption = 'OK'
     Default = True
-    TabOrder = 1
+    TabOrder = 4
     OnClick = btnOkClick
   end
   object edtSource: TEdit
     Left = 46
     Top = 13
-    Width = 433
+    Width = 429
     Height = 23
     Anchors = [akLeft, akTop, akRight]
     ParentShowHint = False
     ShowHint = True
-    TabOrder = 2
+    TabOrder = 0
   end
   object chkFlatten: TCheckBox
     Left = 47
@@ -66,16 +66,16 @@ object SourceForm: TSourceForm
     Width = 97
     Height = 17
     Caption = 'Flatten'
-    TabOrder = 3
+    TabOrder = 1
   end
   object edtDest: TEdit
     Left = 46
     Top = 66
-    Width = 433
+    Width = 429
     Height = 23
     Anchors = [akLeft, akTop, akRight]
     ParentShowHint = False
     ShowHint = True
-    TabOrder = 4
+    TabOrder = 2
   end
 end

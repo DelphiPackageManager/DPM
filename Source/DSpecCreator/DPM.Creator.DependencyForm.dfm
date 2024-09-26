@@ -37,7 +37,7 @@ object DependencyForm: TDependencyForm
     Height = 25
     Cancel = True
     Caption = 'Cancel'
-    TabOrder = 0
+    TabOrder = 2
     OnClick = btnCancelClick
   end
   object btnOk: TButton
@@ -47,29 +47,29 @@ object DependencyForm: TDependencyForm
     Height = 25
     Caption = 'OK'
     Default = True
-    TabOrder = 1
+    TabOrder = 3
     OnClick = btnOkClick
   end
   object edtDependencyId: TEdit
     Left = 72
     Top = 13
-    Width = 398
+    Width = 394
     Height = 23
     Anchors = [akLeft, akTop, akRight]
     ParentShowHint = False
     ShowHint = False
-    TabOrder = 2
+    TabOrder = 0
     TextHint = 'e.g VSoft.DUnitX'
   end
   object edtVersion: TEdit
     Left = 72
     Top = 42
-    Width = 398
+    Width = 394
     Height = 23
     Anchors = [akLeft, akTop, akRight]
     ParentShowHint = False
     ShowHint = True
-    TabOrder = 3
+    TabOrder = 1
     TextHint = 'semver - e.g 1.2.0'
   end
 end

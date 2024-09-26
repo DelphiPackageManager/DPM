@@ -30,7 +30,7 @@ object SearchPathForm: TSearchPathForm
     Height = 25
     Cancel = True
     Caption = 'Cancel'
-    TabOrder = 0
+    TabOrder = 1
     OnClick = btnCancelClick
   end
   object btnOk: TButton
@@ -40,17 +40,17 @@ object SearchPathForm: TSearchPathForm
     Height = 25
     Caption = 'OK'
     Default = True
-    TabOrder = 1
+    TabOrder = 2
     OnClick = btnOkClick
   end
   object edtSearchPath: TEdit
     Left = 59
     Top = 13
-    Width = 414
+    Width = 410
     Height = 23
     Anchors = [akLeft, akTop, akRight]
     ParentShowHint = False
     ShowHint = True
-    TabOrder = 2
+    TabOrder = 0
   end
 end

@@ -37,7 +37,7 @@ object BplForm: TBplForm
     Height = 25
     Cancel = True
     Caption = 'Cancel'
-    TabOrder = 0
+    TabOrder = 4
     OnClick = btnCancelClick
   end
   object btnOk: TButton
@@ -47,7 +47,7 @@ object BplForm: TBplForm
     Height = 25
     Caption = 'OK'
     Default = True
-    TabOrder = 1
+    TabOrder = 5
     OnClick = btnOkClick
   end
   object chkCopyLocal: TCheckBox
@@ -66,7 +66,7 @@ object BplForm: TBplForm
     Anchors = [akLeft, akTop, akRight]
     ParentShowHint = False
     ShowHint = True
-    TabOrder = 3
+    TabOrder = 1
   end
   object edtBuildId: TEdit
     Left = 59
@@ -74,7 +74,7 @@ object BplForm: TBplForm
     Width = 413
     Height = 23
     Anchors = [akLeft, akTop, akRight]
-    TabOrder = 4
+    TabOrder = 0
   end
   object chkInstall: TCheckBox
     Left = 59
@@ -82,6 +82,6 @@ object BplForm: TBplForm
     Width = 97
     Height = 17
     Caption = 'Install In IDE'
-    TabOrder = 5
+    TabOrder = 3
   end
 end
