@@ -81,6 +81,7 @@ const
   cRootNode = 'root-node';
   cUserAgentHeader = 'User-Agent';
   cDPMUserAgent = 'DPM ' + cDPMClientVersion;
+  cClientVersionHeader = 'Client-Version';
 
 implementation
 
