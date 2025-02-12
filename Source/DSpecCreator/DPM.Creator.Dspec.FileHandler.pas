@@ -18,8 +18,9 @@ type
     FReader: IPackageSpecReader;
     FFilename : string;
     FLoadedSpec : IPackageSpec;
+    FPackageSpec : IPackageSpec;
+
   public
-    spec : IPackageSpec;
     procedure DeleteTemplate(const templateName: string);
     function DuplicateTemplate(const sourceTemplate: ISpecTemplate; const newTemplateName: string): ISpecTemplate;
     function DoesTemplateExist(const templateName: string): Boolean;
@@ -28,6 +29,7 @@ type
     function GetPlatform(const compiler: string): ISpecTargetPlatform;
     function AddCompiler(const compiler: string): ISpecTargetPlatform;
     procedure DeleteCompiler(const compiler: string);
+    procedure ClearCompilers;
     function LoadFromFile(const filename: string; var errorMessage : string) : boolean;
     procedure SaveToFile(const filename: string);
     function WorkingDir: string;
@@ -36,6 +38,7 @@ type
     constructor Create(logger: ILogger);
     destructor Destroy; override;
     property FileName : string read FFileName;
+    property PackageSpec : IPackageSpec read FPackageSpec;
   end;
 
 
@@ -56,44 +59,48 @@ uses
 { TDSpecFile }
 
 function TDSpecFile.AddCompiler(const compiler: string): ISpecTargetPlatform;
-var
-  vplatform : ISpecTargetPlatform;
 begin
   if Assigned(GetPlatform(compiler)) then
     raise Exception.Create('Platform already exists in file');
 
-  vplatform := TSpecTargetPlatform.Create(FLogger);
-  vplatform.Compiler := StringToCompilerVersion(compiler);
+  result := TSpecTargetPlatform.Create(FLogger);
+  result.Compiler := StringToCompilerVersion(compiler);
+  result.Platforms := [TDPMPlatform.Win32, TDPMPlatform.Win64];
 
-  spec.TargetPlatforms.Add(vplatform);
+  FPackageSpec.TargetPlatforms.Add(result);
 end;
 
 function TDSpecFile.AsString: string;
 begin
-  Result := spec.ToJSON;
+  Result := FPackageSpec.ToJSON;
+end;
+
+procedure TDSpecFile.ClearCompilers;
+begin
+  FPackageSpec.TargetPlatforms.Clear;
 end;
 
 constructor TDSpecFile.Create(logger: ILogger);
 begin
   FLogger := logger;
-  spec := TSpec.Create(FLogger, '');
+  FPackageSpec := TSpec.Create(FLogger, '');
   FLoadedSpec := TSpec.Create(FLogger, '');
 end;
 
 procedure TDSpecFile.DeleteTemplate(const templateName: string);
 begin
-  spec.DeleteTemplate(templateName);
+  FPackageSpec.DeleteTemplate(templateName);
 end;
 
 procedure TDSpecFile.DeleteCompiler(const compiler: string);
 var
   i : Integer;
 begin
-  for i := 0 to spec.TargetPlatforms.Count - 1 do
+  for i := 0 to FPackageSpec.TargetPlatforms.Count - 1 do
   begin
-    if SameText(CompilerToString(spec.TargetPlatforms[i].compiler), compiler) then
+    if SameText(CompilerToString(FPackageSpec.TargetPlatforms[i].compiler), compiler) then
     begin
-      spec.TargetPlatforms.Delete(i);
+      FPackageSpec.TargetPlatforms.Delete(i);
       Exit;
     end;
   end;
@@ -107,12 +114,12 @@ end;
 
 function TDSpecFile.DoesTemplateExist(const templateName: string): Boolean;
 begin
-  Result := Assigned(spec.FindTemplate(templateName));
+  Result := Assigned(FPackageSpec.FindTemplate(templateName));
 end;
 
 function TDSpecFile.DuplicateTemplate(const sourceTemplate: ISpecTemplate; const newTemplateName: string): ISpecTemplate;
 begin
-  Result := spec.DuplicateTemplate(sourceTemplate, NewTemplateName);
+  Result := FPackageSpec.DuplicateTemplate(sourceTemplate, NewTemplateName);
 end;
 
 function TDSpecFile.GetTemplate(const templateName: string): ISpecTemplate;
@@ -120,11 +127,11 @@ var
   i : Integer;
 begin
   Result := nil;
-  for i := 0 to spec.templates.Count - 1 do
+  for i := 0 to FPackageSpec.templates.Count - 1 do
   begin
-    if spec.templates[i].name = templateName then
+    if FPackageSpec.templates[i].name = templateName then
     begin
-      Result := spec.templates[i];
+      Result := FPackageSpec.templates[i];
       Exit;
     end;
   end;
@@ -142,11 +149,11 @@ var
   i: Integer;
 begin
   Result := nil;
-  for i := 0 to spec.targetPlatforms.Count - 1 do
+  for i := 0 to FPackageSpec.targetPlatforms.Count - 1 do
   begin
-    if spec.targetPlatforms[i].compiler = StringToCompilerVersion(compiler) then
+    if FPackageSpec.targetPlatforms[i].compiler = StringToCompilerVersion(compiler) then
     begin
-      Result := spec.targetPlatforms[i];
+      Result := FPackageSpec.targetPlatforms[i];
       Exit;
     end;
   end;
@@ -156,8 +163,8 @@ function TDSpecFile.IsModified: Boolean;
 begin
 //TODO : This is wasteful - implement a modified flag.
 
-  if (spec <> nil) and (FLoadedSpec <> nil) then
-    Result := not SameText(spec.ToJSON, FLoadedSpec.ToJSON)
+  if (FPackageSpec <> nil) and (FLoadedSpec <> nil) then
+    Result := not SameText(FPackageSpec.ToJSON, FLoadedSpec.ToJSON)
   else
     result := false;
 end;
@@ -167,8 +174,8 @@ begin
   result := true;
   FReader := TPackageSpecReader.Create(FLogger);
   try
-    spec := FReader.ReadSpec(filename);
-    if (spec = nil) then
+    FPackageSpec := FReader.ReadSpec(filename);
+    if (FPackageSpec = nil) then
       raise Exception.Create('Failed to load dspec');
     FLoadedSpec := FReader.ReadSpec(filename);
   except
@@ -185,7 +192,7 @@ procedure TDSpecFile.SaveToFile(const filename: string);
 var
   writer : IPackageSpecWriter;
 begin
-  writer := TPackageSpecWriter.Create(FLogger, spec);
+  writer := TPackageSpecWriter.Create(FLogger, FPackageSpec);
   writer.SaveToFile(filename);
   FFilename := Filename;
 end;

@@ -228,7 +228,6 @@ type
     procedure chkDesignInstallClick(Sender : TObject);
     procedure chkDesignOnlyClick(Sender : TObject);
     procedure clbCompilersClick(Sender : TObject);
-    procedure clbCompilersClickCheck(Sender : TObject);
     procedure clbPlatformsClickCheck(Sender : TObject);
     procedure DosCommandNewLine(ASender : TObject; const ANewLine : string; AOutputType : TOutputType);
     procedure DosCommandTerminated(Sender : TObject);
@@ -301,6 +300,7 @@ type
     procedure actPlatformsDeselectAllExecute(Sender : TObject);
     procedure edtCopyrightChange(Sender : TObject);
     procedure edtBPLEntryBuildIdChange(Sender: TObject);
+    procedure clbCompilersKeyPress(Sender: TObject; var Key: Char);
   private
     { Private declarations }
     FtmpFilename : string;
@@ -385,6 +385,7 @@ uses
   System.IOUtils,
   System.IniFiles,
   Winapi.ShellAPI,
+  DPM.Core.Constants,
   DPM.Core.dependency.Version,
   DPM.Creator.TemplateForm,
   DPM.Creator.FileForm,
@@ -460,7 +461,7 @@ begin
   finally
     FreeAndNil(TemplateForm);
   end;
-  newTemplate := FOpenFile.Spec.newTemplate(templateName);
+  newTemplate := FOpenFile.PackageSpec.newTemplate(templateName);
   templateNode := LoadTemplate(newTemplate);
   tvTemplates.Selected := templateNode;
 end;
@@ -508,7 +509,7 @@ end;
 
 procedure TDSpecCreatorForm.cboLicenseChange(Sender : TObject);
 begin
-  FOpenFile.Spec.metadata.license := cboLicense.Text;
+  FOpenFile.PackageSpec.metadata.license := cboLicense.Text;
   var  i := FSPDXList.IndexOfName(cboLicense.Text);
   if i <> -1 then
   begin
@@ -549,12 +550,13 @@ begin
     raise Exception.Create('Please select a compiler before trying to set the template');
   vPlatform := FOpenFile.GetPlatform(clbCompilers.Items[clbCompilers.ItemIndex]);
 
-  if not Assigned(vPlatform) then
-  begin
+  if vPlatform = nil then
     vPlatform := FOpenFile.AddCompiler(clbCompilers.Items[clbCompilers.ItemIndex]);
-  end;
+  if vPlatform = nil then
+    exit; //should never get here but have seen it, can't reproduce though.
+
   vPlatform.TemplateName := templateName;
-  cboTemplate.ItemIndex := cboTemplate.Items.IndexOf(templateName);
+  //cboTemplate.ItemIndex := cboTemplate.Items.IndexOf(templateName);
 end;
 
 procedure TDSpecCreatorForm.chkBuildForDesignClick(Sender : TObject);
@@ -591,9 +593,12 @@ end;
 
 procedure TDSpecCreatorForm.clbCompilersClick(Sender : TObject);
 var
-  j : integer;
   vPlatform : ISpecTargetPlatform;
   compilerVersion : TCompilerVersion;
+  platform : TDPMPlatform;
+  checked : boolean;
+  index : integer;
+  sDebug : string;
 begin
   FInVariableUpdate := true;
   try
@@ -601,49 +606,60 @@ begin
   finally
     FInVariableUpdate := false;
   end;
-  if clbCompilers.ItemIndex < 0 then
+  index := clbCompilers.ItemIndex;
+
+  sDebug := 'Index [' + IntToStr(index) + ']';
+
+  if index < 0 then
   begin
-    cboTemplate.ItemIndex := -1;
+    OutputDebugString(PChar(sDebug));
+  //  cboTemplate.ItemIndex := -1;
+    clbPlatforms.CheckAll(cbUnchecked);
+    EnableControls(false);
     Exit;
   end;
 
-  vPlatform := FOpenFile.GetPlatform(clbCompilers.Items[clbCompilers.ItemIndex]);
-  compilerVersion := StringToCompilerVersion(clbCompilers.Items[clbCompilers.ItemIndex]);
+  checked := clbCompilers.Checked[index];
+  sDebug := sDebug + ' Checked [' + BoolToStr(checked, true) + ']';
+  OutputDebugString(PChar(sDebug));
 
-  lblPlatform.Caption := clbCompilers.Items[clbCompilers.ItemIndex] + ' - Platforms';
-  lblTemplate.Caption := clbCompilers.Items[clbCompilers.ItemIndex] + ' - Template';
+  EnableControls(checked);
+
+  vPlatform := FOpenFile.GetPlatform(clbCompilers.Items[index]);
+  compilerVersion := StringToCompilerVersion(clbCompilers.Items[index]);
+
+  lblPlatform.Caption := clbCompilers.Items[index] + ' - Platforms';
+  lblTemplate.Caption := clbCompilers.Items[index] + ' - Template';
   EnableDisablePlatform(compilerVersion);
-
   // these default to disabled until a compiler version is selected.
   // if the compiler version is unchecked then the controls will be disabled.
-  EnableControls(clbCompilers.Checked[clbCompilers.ItemIndex]);
 
-  if clbCompilers.Checked[clbCompilers.ItemIndex] and not Assigned(vPlatform) then
-  begin
-    vPlatform := FOpenFile.AddCompiler(clbCompilers.Items[clbCompilers.ItemIndex]);
-  end;
+  clbPlatforms.CheckAll(cbUnchecked);
 
-  if Assigned(vPlatform) then
-  begin
-    for j := 0 to clbPlatforms.Count - 1 do
-    begin
-      clbPlatforms.Checked[j] := false;
-    end;
-    cboTemplate.ItemIndex := cboTemplate.Items.IndexOf(vPlatform.TemplateName);
-  end;
+  if checked and not Assigned(vPlatform) then
+    vPlatform := FOpenFile.AddCompiler(clbCompilers.Items[index]);
 
-  if not Assigned(vPlatform) then
+  if not checked then
+    FOpenFile.DeleteCompiler(clbCompilers.Items[index]);
+
+  if vPlatform = nil then
   begin
     cboTemplate.ItemIndex := -1;
     Exit;
   end;
 
-  for var platform in vPlatform.Platforms do
+  if checked then
   begin
-    var platformName := DPMPlatformToString(platform);
-    var i := clbPlatforms.Items.IndexOf(platformName);
-    if i <> -1 then
-      clbPlatforms.Checked[i] := true;
+    for platform in vPlatform.Platforms do
+    begin
+      var platformName := DPMPlatformToString(platform);
+      var i := clbPlatforms.Items.IndexOf(platformName);
+      if i <> -1 then
+        clbPlatforms.Checked[i] := true;
+    end;
+
+    if vPlatform.TemplateName = cUnset then
+      vPlatform.TemplateName := 'default';
   end;
 
   FInVariableUpdate := true;
@@ -660,25 +676,10 @@ begin
   cboTemplate.ItemIndex := cboTemplate.Items.IndexOf(vPlatform.TemplateName);
 end;
 
-procedure TDSpecCreatorForm.clbCompilersClickCheck(Sender : TObject);
-var
-  vPlatform : ISpecTargetPlatform;
-  compiler : string;
+procedure TDSpecCreatorForm.clbCompilersKeyPress(Sender: TObject; var Key: Char);
 begin
-  if clbCompilers.ItemIndex < 0 then
-    Exit;
-  compiler := clbCompilers.Items[clbCompilers.ItemIndex];
-  vPlatform := FOpenFile.GetPlatform(compiler);
-  if clbCompilers.Checked[clbCompilers.ItemIndex] and not Assigned(vPlatform) then
-  begin
-    vPlatform := FOpenFile.AddCompiler(compiler);
-  end
-  else if Assigned(vPlatform) and (clbCompilers.Checked[clbCompilers.ItemIndex] = false) then
-  begin
-    FOpenFile.DeleteCompiler(compiler);
-  end;
-
-  EnableControls(clbCompilers.Checked[clbCompilers.ItemIndex])
+  if Key = #32 then
+    clbCompilersClick(Sender);
 end;
 
 procedure TDSpecCreatorForm.clbPlatformsClickCheck(Sender : TObject);
@@ -742,7 +743,7 @@ end;
 
 procedure TDSpecCreatorForm.edtAuthorChange(Sender : TObject);
 begin
-  FOpenFile.Spec.metadata.authors := edtAuthor.Text;
+  FOpenFile.PackageSpec.metadata.authors := edtAuthor.Text;
 end;
 
 procedure TDSpecCreatorForm.edtBuildIdChange(Sender : TObject);
@@ -764,7 +765,7 @@ end;
 
 procedure TDSpecCreatorForm.edtCopyrightChange(Sender : TObject);
 begin
-  FOpenFile.Spec.metadata.Copyright := edtCopyright.Text;
+  FOpenFile.PackageSpec.metadata.Copyright := edtCopyright.Text;
 end;
 
 procedure TDSpecCreatorForm.edtDependencyIdChange(Sender : TObject);
@@ -1330,13 +1331,26 @@ end;
 
 procedure TDSpecCreatorForm.actCompilersDeselectAllExecute(Sender : TObject);
 begin
-  clbCompilers.CheckAll(TCheckBoxState.cbUnchecked);
+  FOpenFile.ClearCompilers;
+  clbCompilers.CheckAll(cbUnchecked);
+  clbCompilersClick(clbPlatforms);
 end;
 
 procedure TDSpecCreatorForm.actCompilersSelectAllExecute(Sender : TObject);
+var
+  i : integer;
+  vPlatform : ISpecTargetPlatform;
 begin
   clbCompilers.CheckAll(TCheckBoxState.cbChecked);
-  clbCompilersClick(clbCompilers);
+  for i := 0 to clbCompilers.Count -1 do
+  begin
+    vPlatform := FOpenFile.GetPlatform(clbCompilers.Items[i]);
+    if vPlatform = nil then
+      vPlatform := FOpenFile.AddCompiler(clbCompilers.Items[i]);
+    if vPlatform.TemplateName = cUnset then
+      vPlatform.TemplateName := 'default';
+  end;
+
 end;
 
 procedure TDSpecCreatorForm.actDeleteBuildItemExecute(Sender : TObject);
@@ -1423,7 +1437,7 @@ begin
 
   newTemplate := sourceTemplate.Clone;
   newTemplate.name := newTemplateName;
-  FOpenFile.Spec.Templates.Add(newTemplate);
+  FOpenFile.PackageSpec.Templates.Add(newTemplate);
 
   templateNode := LoadTemplate(newTemplate);
   tvTemplates.Selected := templateNode;
@@ -1439,8 +1453,10 @@ procedure TDSpecCreatorForm.actFileNewExecute(Sender : TObject);
 begin
   FreeAndNil(FOpenFile);
   FOpenFile := TDSpecFile.Create(FLogger);
-  FOpenFile.Spec.newTemplate('default');
+  FOpenFile.PackageSpec.newTemplate('default');
   UpdateFormCaption('');
+  EnableControls(false);
+  PageControl.ActivePageIndex :=  0;
   LoadDspecStructure;
 end;
 
@@ -1663,9 +1679,9 @@ begin
     cboTemplate.Clear;
     cboTemplate.Items.Add(cNewTemplate);
 
-    for i := 0 to FOpenFile.Spec.Templates.Count - 1 do
+    for i := 0 to FOpenFile.PackageSpec.Templates.Count - 1 do
     begin
-      template := FOpenFile.Spec.Templates[i];
+      template := FOpenFile.PackageSpec.Templates[i];
       if i = 0 then
         templateNode := LoadTemplate(template)
       else
@@ -1679,7 +1695,7 @@ end;
 
 procedure TDSpecCreatorForm.edtIdChange(Sender : TObject);
 begin
-  FOpenFile.Spec.metadata.id := edtId.Text;
+  FOpenFile.PackageSpec.metadata.id := edtId.Text;
 end;
 
 procedure TDSpecCreatorForm.edtPackageOutputPathExit(Sender : TObject);
@@ -1718,17 +1734,17 @@ end;
 
 procedure TDSpecCreatorForm.edtProjectURLChange(Sender : TObject);
 begin
-  FOpenFile.Spec.metadata.projectUrl := edtProjectURL.Text;
+  FOpenFile.PackageSpec.metadata.projectUrl := edtProjectURL.Text;
 end;
 
 procedure TDSpecCreatorForm.edtRepositoryURLChange(Sender : TObject);
 begin
-  FOpenFile.Spec.metadata.repositoryUrl := edtRepositoryURL.Text;
+  FOpenFile.PackageSpec.metadata.repositoryUrl := edtRepositoryURL.Text;
 end;
 
 function TDSpecCreatorForm.ReplaceVars(const inputStr : String; compiler : TCompilerVersion) : string;
 begin
-  result := TClassReplacer.ReplaceVars(inputStr, compiler, FOpenFile.Spec);
+  result := TClassReplacer.ReplaceVars(inputStr, compiler, FOpenFile.PackageSpec);
 end;
 
 procedure TDSpecCreatorForm.edtBPLEntryBuildIdChange(Sender: TObject);
@@ -1792,7 +1808,7 @@ end;
 
 procedure TDSpecCreatorForm.edtTagsChange(Sender : TObject);
 begin
-  FOpenFile.Spec.metadata.tags := edtTags.Text;
+  FOpenFile.PackageSpec.metadata.tags := edtTags.Text;
 end;
 
 procedure TDSpecCreatorForm.edtTemplateNameChange(Sender : TObject);
@@ -1808,7 +1824,7 @@ begin
       Exit;
 
     templateNode.Text := edtTemplateName.Text;
-    FOpenFile.Spec.RenameTemplate(templateName, edtTemplateName.Text);
+    FOpenFile.PackageSpec.RenameTemplate(templateName, edtTemplateName.Text);
   end;
 end;
 
@@ -1819,24 +1835,25 @@ begin
   if Length(edtVersion.Text) > 0 then
   begin
     if TPackageVersion.TryParse(edtVersion.Text, Version) then
-      FOpenFile.Spec.metadata.Version := Version;
+      FOpenFile.PackageSpec.metadata.Version := Version;
   end;
 end;
 
 procedure TDSpecCreatorForm.edtVersionExit(Sender : TObject);
 begin
   if Length(edtVersion.Text) > 0 then
-    FOpenFile.Spec.metadata.Version := TPackageVersion.Parse(edtVersion.Text);
+    FOpenFile.PackageSpec.metadata.Version := TPackageVersion.Parse(edtVersion.Text);
 end;
 
 procedure TDSpecCreatorForm.FormCreate(Sender : TObject);
 var
   idx : integer;
   iniFile : TIniFile;
+  cs : TControlStyle;
 begin
   FLogger := TDSpecLogger.Create(Memo2.Lines);
   FOpenFile := TDSpecFile.Create(FLogger);
-  FOpenFile.Spec.newTemplate('default');
+  FOpenFile.PackageSpec.newTemplate('default');
   FDosCommand := TDosCommand.Create(nil);
   FDosCommand.OnNewLine := DosCommandNewLine;
   FDosCommand.OnTerminated := DosCommandTerminated;
@@ -1857,6 +1874,11 @@ begin
   MRUListService.SetSource(Self);
   MRUListService.LoadMRU;
   FMRUMenu.Enabled := MRUListService.GetItemCount > 0;
+
+  //double clicks really mess with the state of the checkboxes.
+  cs := clbCompilers.ControlStyle;
+  Exclude(cs, csDoubleClicks);
+  clbCompilers.ControlStyle := cs;
 
   iniFile := TIniFile.Create(MRUListService.GetIniFilePath);
   try
@@ -1885,18 +1907,18 @@ var
   i : integer;
   j : integer;
 begin
-  edtId.Text := FOpenFile.Spec.metadata.id;
-  edtVersion.Text := FOpenFile.Spec.metadata.Version.ToString;
-  mmoDescription.Text := FOpenFile.Spec.metadata.Description;
-  edtProjectURL.Text := FOpenFile.Spec.metadata.projectUrl;
-  edtRepositoryURL.Text := FOpenFile.Spec.metadata.repositoryUrl;
-  edtAuthor.Text := FOpenFile.Spec.metadata.authors;
-  edtCopyright.Text := FOpenFile.Spec.metadata.Copyright;
-  cboLicense.Text := FOpenFile.Spec.metadata.license;
-  edtTags.Text := FOpenFile.Spec.metadata.tags;
-  if Length(FOpenFile.Spec.metadata.Icon) > 0 then
+  edtId.Text := FOpenFile.PackageSpec.metadata.id;
+  edtVersion.Text := FOpenFile.PackageSpec.metadata.Version.ToString;
+  mmoDescription.Text := FOpenFile.PackageSpec.metadata.Description;
+  edtProjectURL.Text := FOpenFile.PackageSpec.metadata.projectUrl;
+  edtRepositoryURL.Text := FOpenFile.PackageSpec.metadata.repositoryUrl;
+  edtAuthor.Text := FOpenFile.PackageSpec.metadata.authors;
+  edtCopyright.Text := FOpenFile.PackageSpec.metadata.Copyright;
+  cboLicense.Text := FOpenFile.PackageSpec.metadata.license;
+  edtTags.Text := FOpenFile.PackageSpec.metadata.tags;
+  if Length(FOpenFile.PackageSpec.metadata.Icon) > 0 then
   begin
-    ImgIcon.Picture.LoadFromFile(TPath.Combine(FOpenFile.WorkingDir, FOpenFile.Spec.metadata.Icon));
+    ImgIcon.Picture.LoadFromFile(TPath.Combine(FOpenFile.WorkingDir, FOpenFile.PackageSpec.metadata.Icon));
   end;
 
   cboTemplate.Text := '';
@@ -1907,9 +1929,9 @@ begin
     clbCompilers.Checked[j] := false;
   end;
 
-  for i := 0 to FOpenFile.Spec.targetPlatforms.Count - 1 do
+  for i := 0 to FOpenFile.PackageSpec.targetPlatforms.Count - 1 do
   begin
-    j := clbCompilers.Items.IndexOf(CompilerToString(FOpenFile.Spec.targetPlatforms[i].compiler));
+    j := clbCompilers.Items.IndexOf(CompilerToString(FOpenFile.PackageSpec.targetPlatforms[i].compiler));
     if j >= 0 then
       clbCompilers.Checked[j] := j >= 0;
   end;
@@ -2123,7 +2145,7 @@ begin
   begin
     ImgIcon.Picture.LoadFromFile(OpenPictureDialog1.filename);
     relativePath := ExtractRelativePath(FOpenFile.WorkingDir, OpenPictureDialog1.filename);
-    FOpenFile.Spec.metadata.Icon := relativePath;
+    FOpenFile.PackageSpec.metadata.Icon := relativePath;
   end;
 end;
 
@@ -2141,7 +2163,7 @@ end;
 
 procedure TDSpecCreatorForm.mmoDescriptionChange(Sender : TObject);
 begin
-  FOpenFile.Spec.metadata.Description := mmoDescription.Text;
+  FOpenFile.PackageSpec.metadata.Description := mmoDescription.Text;
 end;
 
 procedure TDSpecCreatorForm.MRUAdd(const filename : string);
@@ -2194,7 +2216,7 @@ begin
   begin
     // restore back to default if we fail to open dspec
     FOpenFile := TDSpecFile.Create(FLogger);
-    FOpenFile.Spec.newTemplate('default');
+    FOpenFile.PackageSpec.newTemplate('default');
     ShowMessage(errorMessage);
     PageControl.ActivePage := tsLogging;
   end;
@@ -2343,7 +2365,7 @@ end;
 
 procedure TDSpecCreatorForm.tvTemplatesEdited(Sender : TObject; Node : TTreeNode; var S : string);
 begin
-  FOpenFile.Spec.RenameTemplate(Node.Text, S);
+  FOpenFile.PackageSpec.RenameTemplate(Node.Text, S);
   edtTemplateName.Text := S;
 end;
 

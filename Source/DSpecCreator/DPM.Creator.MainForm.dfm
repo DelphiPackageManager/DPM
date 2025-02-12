@@ -22,7 +22,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Top = 0
     Width = 871
     Height = 506
-    ActivePage = tsTemplates
+    ActivePage = tsInfo
     Align = alClient
     TabOrder = 0
     object tsInfo: TTabSheet
@@ -76,9 +76,9 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Caption = 'License:'
       end
       object lblTags: TLabel
-        Left = 57
+        Left = 56
         Top = 400
-        Width = 26
+        Width = 27
         Height = 15
         Alignment = taRightJustify
         Caption = 'Tags:'
@@ -271,7 +271,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
       object lblTemplate: TLabel
         Left = 256
         Top = 252
-        Width = 48
+        Width = 49
         Height = 15
         Caption = 'Template'
         Enabled = False
@@ -315,8 +315,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         PopupMenu = pmCompilers
         TabOrder = 0
         OnClick = clbCompilersClick
-        OnClickCheck = clbCompilersClickCheck
-        OnDblClick = clbCompilersClick
+        OnKeyPress = clbCompilersKeyPress
       end
       object cboTemplate: TComboBox
         Left = 256
@@ -426,7 +425,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object Label10: TLabel
             Left = 16
             Top = 163
-            Width = 80
+            Width = 79
             Height = 15
             Caption = 'Excluded Items'
           end
@@ -754,7 +753,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object Label11: TLabel
             Left = 8
             Top = 8
-            Width = 48
+            Width = 49
             Height = 15
             Caption = 'Template'
           end
@@ -1001,7 +1000,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object lblTemplateView: TLabel
           Left = 3
           Top = 3
-          Width = 76
+          Width = 77
           Height = 15
           Caption = 'Template View'
         end

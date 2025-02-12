@@ -99,6 +99,7 @@ type
 implementation
 
 uses
+  System.Generics.Defaults,
   DPM.Core.Constants,
   DPM.Core.Dependency.Version,
   DPM.Core.Spec.MetaData,
@@ -427,8 +428,23 @@ begin
   inherited Create(logger);
   FFileName := fileName;
   FMetaData := TSpecMetaData.Create(logger);
-  FTargetPlatforms := TCollections.CreateList<ISpecTargetPlatform>;
-  FTemplates := TCollections.CreateList<ISpecTemplate>;
+  FTargetPlatforms := TCollections.CreateSortedList<ISpecTargetPlatform>(
+   function(const Left, Right: ISpecTargetPlatform): Integer
+   begin
+      if left.Compiler = right.Compiler then
+        result := 0
+      else if Left.Compiler > Right.Compiler then
+        result := 1
+      else
+        result := -1;
+   end
+  );
+  FTemplates := TCollections.CreateSortedList<ISpecTemplate>(
+   function(const Left, Right: ISpecTemplate): Integer
+   begin
+      result := CompareText(Left.Name, Right.Name);
+   end
+  );
 end;
 
 procedure TSpec.DeleteTemplate(const templateName: string);
