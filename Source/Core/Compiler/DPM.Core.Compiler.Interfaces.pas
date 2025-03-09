@@ -62,7 +62,7 @@ type
 
     function GetCompilerOutput : TStrings;
 
-    function BuildProject(const cancellationToken : ICancellationToken; const projectFile : string; const configName : string; const packageVersion : TPackageVersion; const forDesign : boolean = false) : boolean;
+    function BuildProject(const cancellationToken : ICancellationToken; const platform : TDPMPlatform; const projectFile : string; const configName : string; const packageVersion : TPackageVersion; const forDesign : boolean = false) : boolean;
 
     property CompilerVersion : TCompilerVersion read GetCompilerVersion;
     property Configuration : string read GetConfiguration write SetConfiguration;
@@ -77,7 +77,7 @@ type
   //inject
   ICompilerEnvironmentProvider = interface
     ['{54814318-551F-4F53-B0FB-66AC0E430DB7}']
-    function GetRsVarsFilePath(const compilerVersion : TCompilerVersion) : string;
+    function GetRsVarsFilePath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;
   end;
 
   //inject

@@ -36,6 +36,10 @@ type
     class function GetVersionString: string;
     class procedure GetResourceVersionNumbers(out AMajor, AMinor, ARelease, ABuild: Integer);
     class procedure OutputDebugString(const value : string);
+    class function Is64BitProcess : boolean;
+    class function IsIDEProcess : boolean;
+    class function Is64BitIDE : boolean;
+    class procedure SetIsIDE;
   end;
 
 implementation
@@ -43,6 +47,9 @@ implementation
 uses
   System.SysUtils,
   WinApi.Windows;
+
+var
+  _isIDE : boolean = false;
 
 { TSystemUtils }
 
@@ -113,6 +120,31 @@ begin
   {$IFDEF DEBUG}
   WinApi.Windows.OutputDebugString(PWideChar(value));
   {$ENDIF}
+end;
+
+class function TSystemUtils.Is64BitIDE: boolean;
+begin
+  result := _isIDE and Is64BitProcess;
+end;
+
+class function TSystemUtils.Is64BitProcess : boolean;
+begin
+  {$IFDEF WIN64}
+  result := true;
+  {$ELSE}
+  result := false;
+  {$ENDIF}
+end;
+
+class function TSystemUtils.IsIDEProcess: boolean;
+begin
+  result := _isIDE;
+end;
+
+
+class procedure TSystemUtils.SetIsIDE;
+begin
+  _isIDE := true;
 end;
 
 end.

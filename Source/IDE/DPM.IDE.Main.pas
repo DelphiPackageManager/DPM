@@ -44,6 +44,7 @@ implementation
 uses
   WinApi.ActiveX,
   Vcl.Graphics,
+  DPM.Core.Utils.System,
   DPM.IDE.Constants;
 
 var
@@ -52,6 +53,7 @@ var
 
 function CreateWizard(const BorlandIDEServices : IBorlandIDEServices) : IOTAWizard;
 begin
+  TSystemUtils.SetIsIDE; //so the core knows it's running in the IDE plugin. needed for design compile
   try
     result := TDPMWizard.Create;
     SplashImage := Vcl.Graphics.TBitmap.Create;

@@ -404,7 +404,7 @@ begin
 
       FLogger.Information('Building project [' + projectFile + '] for design time...');
 
-      result := Compiler.BuildProject(cancellationToken, projectFile, configuration, packageInfo.Version, true);
+      result := Compiler.BuildProject(cancellationToken, packageInfo.Platform, projectFile, configuration, packageInfo.Version, true);
       if result then
         FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
       else
@@ -442,7 +442,7 @@ begin
       else
         Compiler.SetSearchPaths(nil);
 
-      result := Compiler.BuildProject(cancellationToken, projectFile, configuration, packageInfo.Version);
+      result := Compiler.BuildProject(cancellationToken, packageInfo.Platform, projectFile, configuration, packageInfo.Version);
       if result then
         FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
       else
@@ -476,7 +476,7 @@ begin
         else
           Compiler.SetSearchPaths(nil);
 
-        result := Compiler.BuildProject(cancellationToken, projectFile, buildEntry.config, packageInfo.Version, true);
+        result := Compiler.BuildProject(cancellationToken, packageInfo.Platform, projectFile, buildEntry.config, packageInfo.Version, true);
         if result then
           FLogger.Success('Project [' + buildEntry.Project + '] Compiled for designtime Ok.')
         else

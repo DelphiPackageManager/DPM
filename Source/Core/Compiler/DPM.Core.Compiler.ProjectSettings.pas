@@ -5,6 +5,7 @@ interface
 uses
   System.Classes,
   DPM.Core.Types,
+  DPM.Core.Logging,
   DPM.Core.MSXML;
 
 type
@@ -15,6 +16,7 @@ type
 
   TDPMProjectSettingsLoader = class(TInterfacedObject, IProjectSettingsLoader)
   private
+    FLogger : ILogger;
     FConfigKeys : TStringList;
     FConfigParents : TStringList;
     FConfigName : string;
@@ -27,7 +29,7 @@ type
     function DoGetStringProperty(const configKey, propName, defaultValue: string): string;
     function GetSearchPath : string;
   public
-    constructor Create(const projectFile : string; const configName : string; const platform : TDPMPlatform);
+    constructor Create(const logger : ILogger; const projectFile : string; const configName : string; const platform : TDPMPlatform);
     destructor Destroy;override;
   end;
 
@@ -43,10 +45,12 @@ const
 
 { TDOMProjectSettingsLoader }
 
-constructor TDPMProjectSettingsLoader.Create(const projectFile, configName: string; const platform : TDPMPlatform);
+constructor TDPMProjectSettingsLoader.Create(const logger : ILogger; const projectFile, configName: string; const platform : TDPMPlatform);
 begin
+  FLogger := logger;
   FConfigName := configName;
   FXMLDoc := CoDOMDocument60.Create;
+  FLogger.Debug('Loading project xml');
   if not FXMLDoc.load(projectFile) then
     raise Exception.Create('Error loading dproj [' + projectFile + '] : '  + FXMLDoc.parseError.reason);
   (FXMLDoc as IXMLDOMDocument2).setProperty('SelectionLanguage', 'XPath');
@@ -56,6 +60,7 @@ begin
   FConfigParents := TStringList.Create;
   FPlatform := DPMPlatformToBDString(platform);
 
+  FLogger.Debug('Loading configs');
   LoadConfigs;
 end;
 
@@ -164,7 +169,10 @@ var
   sConfigKey : string;
 begin
   sConfigKey := FConfigKeys.Values[FConfigName];
-  result := DoGetStringProperty(sConfigKey, propName, defaultValue);
+  if sConfigKey <> '' then
+    result := DoGetStringProperty(sConfigKey, propName, defaultValue)
+  else
+    result := '';
 end;
 
 procedure TDPMProjectSettingsLoader.LoadConfigs;
@@ -182,7 +190,10 @@ begin
   //dproj files.. sometimes the intermediate configs are not present in the dproj
   //so we have to fudge things to make the tree correct.
   //TODO : find a neater way to do this.
+  FLogger.Debug('Loading project configs');
   configs := FXMLDoc.selectNodes('/def:Project/def:ItemGroup/def:BuildConfiguration');
+  FLogger.Debug('configs.length : ' + IntToStr(configs.length));
+
   if configs.length > 0 then
   begin
     for i := 0 to configs.length - 1 do
@@ -209,6 +220,7 @@ begin
       end;
     end;
   end;
+  FLogger.Debug('ConfigKeys.Count : ' + IntToStr(FConfigKeys.Count));
   for i := 0 to FConfigKeys.Count - 1 do
   begin
     sKey := FConfigKeys.ValueFromIndex[i];

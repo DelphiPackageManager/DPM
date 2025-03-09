@@ -1,13 +1,13 @@
 ﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
-        <ProjectVersion>20.1</ProjectVersion>
+        <ProjectVersion>20.3</ProjectVersion>
         <FrameworkType>VCL</FrameworkType>
         <MainSource>DPM.IDE.D120.dpr</MainSource>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
-        <TargetedPlatforms>1</TargetedPlatforms>
+        <TargetedPlatforms>3</TargetedPlatforms>
         <AppType>Library</AppType>
         <ProjectName Condition="'$(ProjectName)'==''">DPM.IDE.D120</ProjectName>
     </PropertyGroup>
@@ -16,6 +16,7 @@
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
         <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.10\lib;$(DPM)\VSoft.VirtualListView\0.4.4\lib;$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.2.1\lib;$(DPM)\VSoft.HttpClient\0.11.0-beta.10\lib;$(DPM)\VSoft.Awaitable\0.6.0\lib;$(DPM)\VSoft.AntPatterns\0.1.7\lib;$(DPM)\Spring4D.Extensions\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\Spring4D.Base\2.0.1\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.10\lib;$(DPM)\VSoft.VirtualListView\0.4.4\lib;$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.2.1\lib;$(DPM)\VSoft.HttpClient\0.11.0-beta.10\lib;$(DPM)\VSoft.Awaitable\0.6.0\lib;$(DPM)\VSoft.AntPatterns\0.1.7\lib;$(DPM)\Spring4D.Extensions\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\Spring4D.Base\2.0.1\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -37,6 +38,12 @@
     </PropertyGroup>
     <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_1)'=='true') or '$(Cfg_1_Win32)'!=''">
         <Cfg_1_Win32>true</Cfg_1_Win32>
+        <CfgParent>Cfg_1</CfgParent>
+        <Cfg_1>true</Cfg_1>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Cfg_1)'=='true') or '$(Cfg_1_Win64)'!=''">
+        <Cfg_1_Win64>true</Cfg_1_Win64>
         <CfgParent>Cfg_1</CfgParent>
         <Cfg_1>true</Cfg_1>
         <Base>true</Base>
@@ -74,9 +81,16 @@
         <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
-        <DCC_UsePackage>NxLayout6Run_d10.0;NxGridRun_d10.0;RaizeComponentsVclDb;fmx;dbrtl;IndySystem;RaizeComponentsVcl;bindcomp;xmlrtl;DbxCommonDriver;vclimg;IndyProtocols;NxCommonDsgn_d10.0;vclactnband;bindengine;vcldb;soaprtl;NxCommonRun_d10.0;vclie;NxGrid6Run_d10.0;vcltouch;CustomIPTransport;VclSmp;dsnap;NxGridDsgn_d10.0;IndyIPServer;fmxase;IndyCore;IndyIPCommon;inet;fmxobj;vclx;lmdrtdocking;NxStandard6Run_d10.0;dsnapxml;fmxdae;VirtualTreesR;lmdrtl;adortl;IndyIPClient;$(DCC_UsePackage)</DCC_UsePackage>
+        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;$(DCC_Namespace)</DCC_Namespace>
+        <BT_BuildType>Debug</BT_BuildType>
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <DCC_ExeOutput>..\Output64</DCC_ExeOutput>
+        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1)'!=''">
         <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
@@ -87,13 +101,17 @@
         <DCC_RemoteDebug>true</DCC_RemoteDebug>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
-        <Debugger_HostApplication>C:\Program Files (x86)\Embarcadero\Studio\23.0\bin\bds.exe</Debugger_HostApplication>
+        <Debugger_HostApplication>E:\emb\Studio\23.0\bin\bds.exe</Debugger_HostApplication>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <DCC_RemoteDebug>false</DCC_RemoteDebug>
         <Debugger_RunParams>-rDPMTesting</Debugger_RunParams>
         <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
         <DCC_DebugDCUs>false</DCC_DebugDCUs>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
+        <Debugger_HostApplication>E:\Emb\Studio\23.0\bin64\bds.exe</Debugger_HostApplication>
+        <Debugger_RunParams>-rDPMTesting</Debugger_RunParams>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
@@ -301,22 +319,14 @@
                     <Source Name="MainSource">DPM.IDE.D120.dpr</Source>
                 </Source>
                 <Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\bcboffice2k280.bpl">Embarcadero C++Builder Office 2000 Servers Package</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\bcbofficexp280.bpl">Embarcadero C++Builder Office XP Servers Package</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\dclIPIndyImpl280.bpl">IP Abstraction Indy Implementation Design Time</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\dclemsedge280.bpl">Embarcadero RAD Server Edge Components</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k280.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp280.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\bcboffice2k290.bpl">Embarcadero C++Builder Office 2000 Servers Package</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\bcbofficexp290.bpl">Embarcadero C++Builder Office XP Servers Package</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k290.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp290.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
                 </Excluded_Packages>
             </Delphi.Personality>
-            <Deployment Version="4">
+            <Deployment Version="5">
                 <DeployFile LocalName="..\Output\DPM.IDE.D110.dll" Configuration="Debug" Class="ProjectOutput"/>
-                <DeployFile LocalName="..\Output\DPM.IDE.D110.dll" Configuration="Debug" Class="ProjectOutput">
-                    <Platform Name="Win32">
-                        <RemoteName>DPM_IDE_D110.dll</RemoteName>
-                        <Overwrite>true</Overwrite>
-                    </Platform>
-                </DeployFile>
                 <DeployFile LocalName="..\Output\DPM_IDE_D110.dll" Configuration="Debug" Class="ProjectOutput"/>
                 <DeployClass Name="AdditionalDebugSymbols">
                     <Platform Name="iOSSimulator">
@@ -330,16 +340,6 @@
                         <Operation>0</Operation>
                     </Platform>
                 </DeployClass>
-                <DeployClass Name="AndroidClasses">
-                    <Platform Name="Android">
-                        <RemoteDir>classes</RemoteDir>
-                        <Operation>64</Operation>
-                    </Platform>
-                    <Platform Name="Android64">
-                        <RemoteDir>classes</RemoteDir>
-                        <Operation>64</Operation>
-                    </Platform>
-                </DeployClass>
                 <DeployClass Name="AndroidFileProvider">
                     <Platform Name="Android">
                         <RemoteDir>res\xml</RemoteDir>
@@ -347,12 +347,6 @@
                     </Platform>
                     <Platform Name="Android64">
                         <RemoteDir>res\xml</RemoteDir>
-                        <Operation>1</Operation>
-                    </Platform>
-                </DeployClass>
-                <DeployClass Name="AndroidGDBServer">
-                    <Platform Name="Android">
-                        <RemoteDir>library\lib\armeabi-v7a</RemoteDir>
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
@@ -445,6 +439,16 @@
                     </Platform>
                     <Platform Name="Android64">
                         <RemoteDir>res\values-v31</RemoteDir>
+                        <Operation>1</Operation>
+                    </Platform>
+                </DeployClass>
+                <DeployClass Name="AndroidSplashStylesV35">
+                    <Platform Name="Android">
+                        <RemoteDir>res\values-v35</RemoteDir>
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="Android64">
+                        <RemoteDir>res\values-v35</RemoteDir>
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
@@ -1278,7 +1282,7 @@
             </Deployment>
             <Platforms>
                 <Platform value="Win32">True</Platform>
-                <Platform value="Win64">False</Platform>
+                <Platform value="Win64">True</Platform>
             </Platforms>
             <ModelSupport>False</ModelSupport>
         </BorlandProject>
@@ -1304,6 +1308,26 @@
             <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.5"/>
             <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.2"/>
             <PackageReference id="VSoft.VirtualListView" platform="Win32" version="0.4.4"/>
+            <PackageReference id="Spring4D.Base" platform="Win64" version="2.0.1"/>
+            <PackageReference id="Spring4D.Core" platform="Win64" version="2.0.1">
+                <PackageReference id="Spring4D.Base" platform="Win64" version="2.0.1" range="2.0.1"/>
+            </PackageReference>
+            <PackageReference id="Spring4D.Extensions" platform="Win64" version="2.0.1">
+                <PackageReference id="Spring4D.Base" platform="Win64" version="2.0.1" range="2.0.1"/>
+            </PackageReference>
+            <PackageReference id="VSoft.AntPatterns" platform="Win64" version="0.1.7"/>
+            <PackageReference id="VSoft.Awaitable" platform="Win64" version="0.6.0">
+                <PackageReference id="Gabr42.OmniThreadLibrary" platform="Win64" version="3.7.10" range="[3.7.10,]"/>
+                <PackageReference id="VSoft.CancellationToken" platform="Win64" version="0.1.2" range="[0.1.2,]"/>
+            </PackageReference>
+            <PackageReference id="VSoft.HttpClient" platform="Win64" version="0.11.0-beta.10">
+                <PackageReference id="VSoft.CancellationToken" platform="Win64" version="0.1.2" range="[0.1.2,]"/>
+                <PackageReference id="VSoft.Uri" platform="Win64" version="0.3.2" range="0.3.2"/>
+            </PackageReference>
+            <PackageReference id="VSoft.JsonDataObjects" platform="Win64" version="0.2.1"/>
+            <PackageReference id="VSoft.SemanticVersion" platform="Win64" version="0.2.5"/>
+            <PackageReference id="VSoft.Uri" platform="Win64" version="0.3.2"/>
+            <PackageReference id="VSoft.VirtualListView" platform="Win64" version="0.4.4"/>
         </DPM>
     </ProjectExtensions>
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>

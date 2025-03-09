@@ -48,7 +48,7 @@ type
     FRsVarFiles : array[TCompilerVersion.UnknownVersion..TCompilerVersion.RS12_0] of string;
   protected
     function FoundCompilerInfo(const compilerVersion : TCompilerVersion) : Boolean;
-    function GetRsVarsFilePath(const compilerVersion : TCompilerVersion) : string;
+    function GetRsVarsFilePath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;
 
   public
     constructor Create(const logger : ILogger);
@@ -60,7 +60,8 @@ implementation
 uses
   System.Win.Registry,
   System.SysUtils,
-  WinApi.Windows;
+  WinApi.Windows,
+  DPM.Core.Utils.System;
 
 
 { TCompilerEnvironmentProvider }
@@ -80,7 +81,7 @@ begin
   result := FFound[compilerVersion] = TStatus.found;
 end;
 
-function TCompilerEnvironmentProvider.GetRsVarsFilePath(const compilerVersion : TCompilerVersion) : string;
+function TCompilerEnvironmentProvider.GetRsVarsFilePath(const platform : TDPMPlatform;  const compilerVersion : TCompilerVersion) : string;
 var
   bdsVersion                  : string;
   key                         : string;
@@ -100,15 +101,17 @@ begin
       begin
         bdsVersion := CompilerToBDSVersion(compilerVersion);
         key := 'Software\Embarcadero\BDS\%s';
-
         key := Format(key, [bdsVersion]);
 
         reg := TRegistry.Create(KEY_READ);
         try
-          reg.RootKey := HKEY_LOCAL_MACHINE;
+          reg.RootKey := HKEY_CURRENT_USER;
+          FLogger.Debug('Attempting to open ' + key);
           if reg.OpenKey(key, False) then
           begin
+            FLogger.Debug('Reading RootDir');
             rootDir := reg.ReadString('RootDir');
+            FLogger.Debug('RootDir : ' + rootDir);
             if rootDir = '' then
             begin
               FLogger.Error('Unable to find install location for compiler [' + CompilerToString(compilerVersion) + ']');
@@ -127,7 +130,10 @@ begin
         finally
           reg.Free;
         end;
-        FRsVarFiles[compilerVersion] := IncludeTrailingPathDelimiter(rootDir) + 'bin\rsvars.bat';
+        if TSystemUtils.Is64BitIDE then
+          FRsVarFiles[compilerVersion] := IncludeTrailingPathDelimiter(rootDir) + 'bin64\rsvars64.bat'
+        else
+          FRsVarFiles[compilerVersion] := IncludeTrailingPathDelimiter(rootDir) + 'bin\rsvars.bat';
         result := FRsVarFiles[compilerVersion];
         FFound[compilerVersion] := TStatus.found;
       end;
