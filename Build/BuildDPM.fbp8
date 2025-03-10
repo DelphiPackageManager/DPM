@@ -87,22 +87,6 @@ begin
                       "SpecialBuildDetails\=0" +
                       ""
       end
-      action.variable.set
-      begin
-        applytoexisting = false
-        doexpandexpression = false
-        expandactionlogtitle = false
-        forcetype = ftString
-        id = {89170321-B758-4743-A4EF-0C428531DB34}
-        modifier = smNone
-        newvalue = "http://timestamp.digicert.com" +
-                   "http://timestamp.comodoca.com/authenticode" +
-                   "http://timestamp.globalsign.com/?signature\=sha2" +
-                   "http://timestamp.sectigo.com" +
-                   "http://time.certum.pl" +
-                   "http://tsa.starfieldtech.com"
-        variablename = TimestampAuth
-      end
       action.group
       begin
         description = "Build Tests - 11.0"
