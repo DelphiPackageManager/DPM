@@ -23,7 +23,7 @@ begin
           linkproductversion = false
           minorversion = 2
           name = DPMVersion
-          productname = "DPM IDE Support for Delphi12"
+          productname = "DPM IDE Support for DelphiXE7"
           productversionstring = 0.2.0-alpha
         end
       end
@@ -1286,7 +1286,7 @@ begin
         terminateontimeout = true
         timeoutlength = 2
         as.projectpath = %SRC_ROOT%\\%ProjectFile%oj
-        as.compilerversion = 12
+        as.compilerversion = XE7
         as.verbosity = Debug
         as.nobanner = True
         action.script
@@ -1314,7 +1314,7 @@ begin
         compileridl = true
         configname = Release
         debugversionnumbers = false
-        delphiversion = Delphi12
+        delphiversion = DelphiXE7
         enabletimeout = false
         eurekalogverboselogging = false
         frameworktype = VCL
@@ -1335,7 +1335,7 @@ begin
         manifestfile = %SRC_ROOT%\\dpmManifest.xml
         minorversion = 2
         noconfig = false
-        platform = Win64
+        platform = Win32
         platformsdktype = ProjectSDK
         projectfile = %SRC_ROOT%\\%ProjectFile%
         regenerateresource = true
@@ -1354,7 +1354,7 @@ begin
         useversionfromdof = false
         verboseoutput = false
         versioninfokeys = "LegalCopyright\=© 2019 -2024 Vincent Parrett and Contributors" +
-                          "ProductName\=DPM IDE Support for Delphi12" +
+                          "ProductName\=DPM IDE Support for DelphiXE7" +
                           "ProductVersion\=0.2.0-alpha" +
                           ""
         versioninfopropertysetname = DPMVersion
@@ -1531,7 +1531,6 @@ begin
         apikey = %SignotaurAPIKey%
         contentdescription = "DPM command line"
         contentdescriptionurl = https://docs.delphi.dev
-        enabled = false
         enabletimeout = false
         expandimpersonationtoken = false
         filespecs = "%FileToSign%" +
@@ -1549,10 +1548,6 @@ begin
         timeoutlength = 2
         timestampserverurl = http://timestamp.sectigo.com
         useerrordialogmonitor = false
-      end
-      action.group
-      begin
-        id = {3248FFDC-AB6C-452A-999D-EE54ABFFF9A1}
       end
     end
   end
