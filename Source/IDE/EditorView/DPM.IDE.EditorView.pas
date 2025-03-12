@@ -43,7 +43,8 @@ type
     procedure ProjectClosed(const projectName : string);
     procedure ProjectLoaded(const projectName : string);
     procedure ThemeChanged;
-//    procedure FilterToProject(const projectGroup : IOTAProjectGroup; const project : IOTAProject);
+    procedure ActivePlatformChanged(const platform : string);
+    procedure FilterToProject(const project : IOTAProject);
   end;
 
   TDPMEditorView = class(TInterfacedObject, INTACustomEditorView, INTACustomEditorView150, IDPMEditorView)
@@ -62,8 +63,8 @@ type
     procedure ThemeChanged;
     procedure ProjectClosed(const projectName : string);
     procedure ProjectLoaded(const projectName : string);
-//    procedure FilterToProject(const projectGroup : IOTAProjectGroup; const project : IOTAProject);
-
+    procedure FilterToProject(const project : IOTAProject);
+    procedure ActivePlatformChanged(const platform : string);
 
     function CloneEditorView : INTACustomEditorView;
     procedure CloseAllCalled(var ShouldClose : Boolean);
@@ -94,6 +95,12 @@ uses
   DPM.Core.Utils.System;
 
 { TDPMEditorView }
+
+procedure TDPMEditorView.ActivePlatformChanged(const platform: string);
+begin
+  if FFrame <> nil then
+    FFrame.ActivePlatformChanged(platform);
+end;
 
 function TDPMEditorView.CloneEditorView : INTACustomEditorView;
 begin
@@ -130,12 +137,6 @@ begin
   FProjectTreeManager := projectTreeManager;
   FCaption := 'DPM';
   Assert(FProjectGroup <> nil);
-//  if FProjectGroup <> nil then
-//    FIdentifier := 'DPM_GROUP_VIEW_' + ChangeFileExt(ExtractFileName(FProjectGroup.FileName), '')
-//  else
-//    FIdentifier := 'DPM_VIEW_' + ChangeFileExt(ExtractFileName(FProject.FileName), '');
-//   FIdentifier := StringReplace(FIdentifier, '.', '_', [rfReplaceAll]);
-
   FIdentifier := 'DPM_EDITOR_VIEW'; //we only have 1 view now
 end;
 
@@ -157,20 +158,18 @@ begin
 end;
 
 
-//procedure TDPMEditorView.FilterToProject(const projectGroup : IOTAProjectGroup; const project : IOTAProject);
+procedure TDPMEditorView.FilterToProject(const project : IOTAProject);
 //var
 //  sFileName : string;
-//begin
+begin
 //  FProjectGroup := projectGroup;
-//  FProject := project;
-//  if FFrame <> nil then
-//  begin
-//    if project <> nil then
-//      sFileName := project.FileName;
-//    FFrame.FilterToProject(sFileName);
-//  end;
-//
-//end;
+  FProject := project;
+  if (FFrame <> nil) and (FProject <> nil) then
+  begin
+    FFrame.ConfigureForProject(FProject);
+  end;
+
+end;
 
 procedure TDPMEditorView.FrameCreated(AFrame : TCustomFrame);
 begin

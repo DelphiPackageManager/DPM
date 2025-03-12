@@ -23,20 +23,20 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       930
       67)
     object lblPlatform: TLabel
-      Left = 702
+      Left = 697
       Top = 12
-      Width = 47
-      Height = 13
+      Width = 52
+      Height = 15
       Alignment = taRightJustify
       Anchors = [akTop, akRight]
       Caption = 'Platform :'
       Visible = False
     end
     object lblSources: TLabel
-      Left = 661
+      Left = 655
       Top = 40
-      Width = 88
-      Height = 13
+      Width = 94
+      Height = 15
       Alignment = taRightJustify
       Anchors = [akTop, akRight]
       Caption = 'Package Sources :'
@@ -91,7 +91,7 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       Left = 755
       Top = 37
       Width = 160
-      Height = 21
+      Height = 23
       Style = csDropDownList
       Anchors = [akTop, akRight]
       ItemIndex = 0
@@ -155,7 +155,7 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
     ColorDepth = cd32Bit
     Left = 712
     Bitmap = {
-      494C010107000900080010001000FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
+      494C010107000900040010001000FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000400000002000000001002000000000000020
       0000000000000000000000000000000000000000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000000000

@@ -46,6 +46,8 @@ type
     procedure ProjectLoaded(const projectFile : string);
     procedure ProjectGroupClosed;
     procedure Destroyed;
+    procedure ActivePlatformChanged(const platform : string);
+    procedure ActiveProjectChanged(const project : IOTAProject);
   end;
 
   TDPMEditorViewManager = class(TInterfacedObject, IDPMEditorViewManager{$IF CompilerVersion >= 32.0}, INTAIDEThemingServicesNotifier{$IFEND})
@@ -62,6 +64,8 @@ type
     procedure ProjectGroupClosed;
     procedure ShowViewForProject(const projectGroup : IOTAProjectGroup; const project : IOTAProject);
     procedure Destroyed;
+    procedure ActivePlatformChanged(const platform : string);
+    procedure ActiveProjectChanged(const project : IOTAProject);
 
     //IOTANotifier
     procedure AfterSave;
@@ -89,6 +93,18 @@ uses
 
 
 { TDPMEditorViewManager }
+
+procedure TDPMEditorViewManager.ActivePlatformChanged(const platform: string);
+begin
+  if FEditorView <> nil then
+    (FEditorView as IDPMEditorView).ActivePlatformChanged(platform);
+end;
+
+procedure TDPMEditorViewManager.ActiveProjectChanged(const project: IOTAProject);
+begin
+  if FEditorView <> nil then
+    (FEditorView as IDPMEditorView).FilterToProject(project);
+end;
 
 procedure TDPMEditorViewManager.AfterSave;
 begin
@@ -209,9 +225,9 @@ end;
 procedure TDPMEditorViewManager.ShowViewForProject(const projectGroup : IOTAProjectGroup; const project : IOTAProject);
 begin
   if FEditorView = nil then
-    FEditorView := TDPMEditorView.Create(FContainer, projectGroup, project, FImageIndex, FProjectTreeManager) as INTACustomEditorView;
-
-//  (FEditorView as IDPMEditorView).FilterToProject(projectGroup, project);
+    FEditorView := TDPMEditorView.Create(FContainer, projectGroup, project, FImageIndex, FProjectTreeManager) as INTACustomEditorView
+  else
+    (FEditorView as IDPMEditorView).FilterToProject(project);
 
   if FEditorViewServices <> nil then
     FEditorViewServices.ShowEditorView(FEditorView);

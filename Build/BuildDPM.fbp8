@@ -19,8 +19,11 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
+          legalcopyright = "© 2019 -2024 Vincent Parrett and Contributors"
+          linkproductversion = false
+          minorversion = 2
           name = DPMVersion
-          productversion = 0.0.0.0
+          productname = "DPM IDE Support for Delphi12"
           productversionstring = 0.2.0-alpha
         end
       end
@@ -734,6 +737,11 @@ begin
             end
             target.argvalue
             begin
+              value = Win32
+              variablename = DelphiPlatform
+            end
+            target.argvalue
+            begin
               value = DPM.IDE.XE2.dpr
               variablename = ProjectFile
             end
@@ -750,6 +758,11 @@ begin
             begin
               value = DelphiXE3
               variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = Win32
+              variablename = DelphiPlatform
             end
             target.argvalue
             begin
@@ -772,6 +785,11 @@ begin
             end
             target.argvalue
             begin
+              value = Win32
+              variablename = DelphiPlatform
+            end
+            target.argvalue
+            begin
               value = DPM.IDE.XE4.dpr
               variablename = ProjectFile
             end
@@ -788,6 +806,11 @@ begin
             begin
               value = DelphiXE5
               variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = Win32
+              variablename = DelphiPlatform
             end
             target.argvalue
             begin
@@ -810,6 +833,11 @@ begin
             end
             target.argvalue
             begin
+              value = Win32
+              variablename = DelphiPlatform
+            end
+            target.argvalue
+            begin
               value = DPM.IDE.XE6.dpr
               variablename = ProjectFile
             end
@@ -826,6 +854,11 @@ begin
             begin
               value = DelphiXE7
               variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = Win32
+              variablename = DelphiPlatform
             end
             target.argvalue
             begin
@@ -848,6 +881,11 @@ begin
             end
             target.argvalue
             begin
+              value = Win32
+              variablename = DelphiPlatform
+            end
+            target.argvalue
+            begin
               value = DPM.IDE.XE8.dpr
               variablename = ProjectFile
             end
@@ -864,6 +902,11 @@ begin
             begin
               value = Delphi10Seattle
               variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = Win32
+              variablename = DelphiPlatform
             end
             target.argvalue
             begin
@@ -886,6 +929,11 @@ begin
             end
             target.argvalue
             begin
+              value = Win32
+              variablename = DelphiPlatform
+            end
+            target.argvalue
+            begin
               value = DPM.IDE.D101.dpr
               variablename = ProjectFile
             end
@@ -902,6 +950,11 @@ begin
             begin
               value = Delphi10Tokyo
               variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = Win32
+              variablename = DelphiPlatform
             end
             target.argvalue
             begin
@@ -924,6 +977,11 @@ begin
             end
             target.argvalue
             begin
+              value = Win32
+              variablename = DelphiPlatform
+            end
+            target.argvalue
+            begin
               value = DPM.IDE.D103.dpr
               variablename = ProjectFile
             end
@@ -943,6 +1001,11 @@ begin
             end
             target.argvalue
             begin
+              value = Win32
+              variablename = DelphiPlatform
+            end
+            target.argvalue
+            begin
               value = DPM.IDE.D104.dpr
               variablename = ProjectFile
             end
@@ -959,6 +1022,11 @@ begin
             begin
               value = Delphi11
               variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = Win32
+              variablename = DelphiPlatform
             end
             target.argvalue
             begin
@@ -1463,6 +1531,7 @@ begin
         apikey = %SignotaurAPIKey%
         contentdescription = "DPM command line"
         contentdescriptionurl = https://docs.delphi.dev
+        enabled = false
         enabletimeout = false
         expandimpersonationtoken = false
         filespecs = "%FileToSign%" +
@@ -1480,6 +1549,10 @@ begin
         timeoutlength = 2
         timestampserverurl = http://timestamp.sectigo.com
         useerrordialogmonitor = false
+      end
+      action.group
+      begin
+        id = {3248FFDC-AB6C-452A-999D-EE54ABFFF9A1}
       end
     end
   end

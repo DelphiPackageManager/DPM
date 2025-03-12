@@ -4,6 +4,7 @@ interface
 
 uses
   System.Classes,
+  ToolsApi,
   VSoft.CancellationToken,
   DPM.IDE.Logger,
   DPM.Core.Package.Interfaces,
@@ -31,6 +32,8 @@ type
     procedure BeginLoading(const mode : TProjectMode);
     procedure EndLoading(const mode : TProjectMode);
 
+    procedure ActivePlatformChanged(const platform : string);
+    procedure ActiveProjectChanged(const project : IOTAProject);
   end;
 
   // The Project controller is used to receive notifications from the IDE and funnel
@@ -62,6 +65,9 @@ type
     procedure ProjectSaving(const fileName : string);
 
     procedure RestoreProject(const fileName : string);
+    procedure ActivePlatformChanged(const platform : string);
+    procedure ActiveProjectChanged(const project : IOTAProject);
+
   public
     constructor Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager;
                        const projectTreeManager : IDPMProjectTreeManager; const context : IPackageInstallerContext);
@@ -77,6 +83,16 @@ uses
   DPM.IDE.Types;
 
 { TDPMIDEProjectController }
+
+procedure TDPMIDEProjectController.ActivePlatformChanged(const platform: string);
+begin
+  FEditorViewManager.ActivePlatformChanged(platform);
+end;
+
+procedure TDPMIDEProjectController.ActiveProjectChanged(const project: IOTAProject);
+begin
+  FEditorViewManager.ActiveProjectChanged(project);
+end;
 
 procedure TDPMIDEProjectController.BeginLoading(const mode: TProjectMode);
 begin

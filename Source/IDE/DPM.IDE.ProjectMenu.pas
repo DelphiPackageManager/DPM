@@ -108,15 +108,17 @@ var
   projectGroup : IOTAProjectGroup;
   proj : IOTAProject;
 begin
-  //TODO : Uncomment section below when project groups are supported.
   if Assigned(Project) and ((IdentList.IndexOf(cDPMContainer) <> -1) or (IdentList.IndexOf(sProjectContainer) <> -1) or (IdentList.IndexOf(sProjectGroupContainer) <> -1) ) then
   begin
     proj := Project;
+    projectGroup := nil;
     if (proj <> nil) and Supports(proj, IOTAProjectGroup, projectGroup) then
       proj := nil
     else
       projectGroup := (BorlandIDEServices as IOTAModuleServices).MainProjectGroup;
     Assert(projectGroup <> nil);
+    if proj = nil then
+     proj := projectGroup.ActiveProject;
 
     menu := TDPMProjectMenu.Create(projectGroup, proj, FEditorViewManager);
     ProjectManagerMenuList.Add(menu);

@@ -94,24 +94,24 @@ type
 
     procedure Loaded; override;
     procedure SetImageList(const value :  {$IFDEF USEIMAGECOLLECTION} TVirtualImageList {$ELSE} TImageList {$ENDIF});
+    function GetPlatform : TDPMPlatform;
+    procedure SetPlatform(const platform : TDPMPlatform);
 
   public
     constructor Create(AOwner : TComponent);override;
     destructor Destroy;override;
     procedure Configure(const logger : IDPMIDELogger; const ideOptions : IDPMIDEOptions; const config : IConfiguration; const configurationManager : IConfigurationManager; const configFile : string;
-                        const platforms : TDPMPlatforms);
+                        const platforms : TDPMPlatforms; const currentPlatform : TDPMPlatform);
     procedure UpdatePlatforms(const platforms : TDPMPlatforms);
 
-    procedure SetPlatform(const platform : TDPMPlatform);
 
-    function GetPlatform : TDPMPlatform;
     procedure ThemeChanged(const ideStyleServices : TCustomStyleServices);
 
     property HasSources : boolean read FHasSources;
     property SearchText : string read GetSearchText;
     property IncludePrerelease : boolean read GetIncludePreRelease;
 
-    property Platform : TDPMPlatform read GetPlatform;
+    property Platform : TDPMPlatform read GetPlatform write SetPlatform;
 
     property OnConfigChanged : TConfigChangedEvent read FOnConfigChanged write FOnConfigChanged;
     property OnSearch : TSearchEvent read FOnSearchEvent write FOnSearchEvent;
@@ -214,7 +214,7 @@ begin
 end;
 
 procedure TDPMSearchBarFrame.Configure(const logger: IDPMIDELogger; const ideOptions: IDPMIDEOptions; const config : IConfiguration; const configurationManager: IConfigurationManager; const configFile : string;
-                                       const platforms : TDPMPlatforms);
+                                       const platforms : TDPMPlatforms; const currentPlatform : TDPMPlatform);
 begin
   FLoading := true;
   FLogger := logger;
@@ -225,7 +225,7 @@ begin
   FPlatforms := platforms;
   ReloadSourcesCombo;
   lblPlatform.Visible := true;
-
+  FPlatform := currentPlatform;
   UpdatePlatforms(FPlatforms);
   FLoading := false;
 end;
@@ -404,8 +404,17 @@ begin
 end;
 
 procedure TDPMSearchBarFrame.SetPlatform(const platform: TDPMPlatform);
+var
+  i : integer;
 begin
   FPlatform := platform;
+  i := cbPlatforms.Items.IndexOfObject(TObject(Ord(FPlatform)));
+  if (cbPlatforms.Items.Count > 0) and (i <> -1) then
+  begin
+    cbPlatforms.ItemIndex := i;
+    cbPlatformsChange(cbPlatforms);
+  end;
+
 end;
 
 procedure TDPMSearchBarFrame.ThemeChanged(const ideStyleServices : TCustomStyleServices);
@@ -492,7 +501,6 @@ begin
     i := cbPlatforms.Items.IndexOfObject(TObject(Ord(currentPlatform)));
   if cbPlatforms.Items.Count > 0 then
     cbPlatforms.ItemIndex := i;
-
 
 
 end;

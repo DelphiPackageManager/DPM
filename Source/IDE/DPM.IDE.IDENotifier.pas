@@ -31,6 +31,7 @@ interface
 uses
   ToolsApi,
   Spring.Collections,
+  DPM.IDE.Types,
   DPM.IDE.Logger,
   DPM.IDE.ProjectController;
 
@@ -44,13 +45,13 @@ uses
 // need the StorageNotifier
 
 type
-  TDPMIDENotifier = class(TInterfacedObject, IOTANotifier, IOTAIDENotifier)
+  TDPMIDENotifier = class(TInterfacedObject, IOTANotifier, IOTAIDENotifier, IDPMIDENotifier)
   private
     FLogger : IDPMIDELogger;
     FLoadingGroup : boolean;
     FGroupProjects : IList<string>;
     FProjectController : IDPMIDEProjectController;
-
+    FProjectNotifiers : IDictionary<string, IOTAProjectNotifier>;
   protected
     //IOTANotifier
     procedure AfterSave;
@@ -65,6 +66,17 @@ type
     procedure FileNotification(NotifyCode : TOTAFileNotification; const FileName : string; var Cancel : Boolean);
 
     function LoadProjectGroup(const fileName : string) : boolean;
+
+    procedure AddProjectNotifier(const fileName : string);
+    procedure RemoveProjectNotifier(const fileName : string);
+
+
+    //IDPMIDENotifier;
+    procedure ProjectActivePlatformChanged(const platform : string);
+    procedure ProjectRenamed(const oldFileName : string; const newFileName : string);
+    procedure ActiveProjectChanged;
+
+
   public
     constructor Create(const logger : IDPMIDELogger; const projectController : IDPMIDEProjectController);
     destructor Destroy; override;
@@ -77,9 +89,37 @@ uses
   DPM.Core.Utils.Path,
   DPM.Core.Utils.System,
   DPM.Core.Project.Interfaces,
-  DPM.Core.Project.GroupProjReader;
+  DPM.Core.Project.GroupProjReader,
+  DPM.IDE.ProjectNotifier;
 
 { TDPMIDENotifier }
+
+procedure TDPMIDENotifier.ActiveProjectChanged;
+var
+  activeProject : IOTAProject;
+begin
+  activeProject := (BorlandIDEServices as IOTAModuleServices).GetActiveProject;
+  if activeProject <> nil then
+    FProjectController.ActiveProjectChanged(activeProject);
+
+end;
+
+procedure TDPMIDENotifier.AddProjectNotifier(const fileName: string);
+var
+  notifier : IOTAProjectNotifier;
+  Module: IOTAModule;
+  project : IOTAProject;
+begin
+  Module := (BorlandIDEServices as IOTAModuleServices).FindModule(FileName);
+  if Supports(Module,IOTAProject, project) then
+  begin
+    notifier := TDPMProjectNotifier.Create(FLogger, Self, fileName, project);
+    FProjectNotifiers.Add(LowerCase(fileName), notifier);
+
+    project.AddNotifier(notifier);
+
+  end;
+end;
 
 procedure TDPMIDENotifier.AfterCompile(Succeeded : Boolean);
 begin
@@ -100,9 +140,9 @@ end;
 constructor TDPMIDENotifier.Create(const logger : IDPMIDELogger; const projectController : IDPMIDEProjectController);
 begin
   FLogger := logger;
-  FGroupProjects := TCollections.CreateList < string > ;
+  FGroupProjects := TCollections.CreateList<string> ;
+  FProjectNotifiers := TCollections.CreateDictionary<string, IOTAProjectNotifier>;
   FProjectController := projectController;
-
 end;
 
 destructor TDPMIDENotifier.Destroy;
@@ -215,7 +255,6 @@ begin
       end;
     ofnFileOpened :
       begin
-        //make sire we ignore the groupproj here.
         if ext <> '.dproj' then
           exit;
         FLogger.Debug('TDPMIDENotifier ofnFileOpened ' + FileName);
@@ -236,6 +275,7 @@ begin
           if not FLoadingGroup then
             FProjectController.EndLoading(TProjectMode.pmSingle);
         {$IFEND}
+        AddProjectNotifier(FileName);
 
       end;
     ofnFileClosing :
@@ -246,7 +286,15 @@ begin
           FProjectController.ProjectClosed(FileName)
         else
           FProjectController.ProjectGroupClosed;
+        RemoveProjectNotifier(FileName);
       end;
+
+    ofnActiveProjectChanged :
+      begin
+        if not FLoadingGroup then
+          ActiveProjectChanged;
+      end;
+
     {$IF CompilerVersion >= 34.0 }
     //10.4 or later
     ofnBeginProjectGroupOpen :
@@ -269,7 +317,7 @@ begin
         exit;
 
       FProjectController.EndLoading(TProjectMode.pmGroup);
-      FLoadingGroup := true;
+      FLoadingGroup := false;
     end;
     ofnBeginProjectGroupClose :
     begin
@@ -295,7 +343,38 @@ end;
 
 procedure TDPMIDENotifier.Modified;
 begin
+  TSystemUtils.OutputDebugString('TDPMIDENotifier.Modified');
   FLogger.Debug('TDPMIDENotifier.Modified');
+end;
+
+procedure TDPMIDENotifier.ProjectActivePlatformChanged(const platform: string);
+begin
+  TSystemUtils.OutputDebugString('TDPMIDENotifier.ProjectActivePlatformChanged : ' + platform);
+  FProjectController.ActivePlatformChanged(platform);
+end;
+
+procedure TDPMIDENotifier.ProjectRenamed(const oldFileName, newFileName: string);
+var
+  key : string;
+  notifier : IOTAProjectNotifier;
+begin
+  key := LowerCase(oldFileName);
+  if FProjectNotifiers.TryExtract(key, notifier) then
+  begin
+    FProjectNotifiers.Remove(key);
+    key := LowerCase(newFileName);
+    FProjectNotifiers.Add(key, notifier);
+  end;
+end;
+
+procedure TDPMIDENotifier.RemoveProjectNotifier(const fileName: string);
+var
+  key : string;
+begin
+  key := LowerCase(fileName);
+  if FProjectNotifiers.ContainsKey(key) then
+    FProjectNotifiers.Remove(key);
+
 end;
 
 end.
