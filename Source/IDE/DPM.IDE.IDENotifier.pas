@@ -45,6 +45,12 @@ uses
 // need the StorageNotifier
 
 type
+  IDPMIDENotifier = interface
+  ['{E160109A-C7EA-4CE3-A49B-C91FD14B5E66}']
+    procedure ProjectActivePlatformChanged(const platform : string);
+    procedure ProjectRenamed(const oldFileName : string; const newFileName : string);
+  end;
+
   TDPMIDENotifier = class(TInterfacedObject, IOTANotifier, IOTAIDENotifier, IDPMIDENotifier)
   private
     FLogger : IDPMIDELogger;

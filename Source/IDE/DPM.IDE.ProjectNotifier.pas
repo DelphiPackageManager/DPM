@@ -13,7 +13,7 @@ type
   TDPMProjectNotifier = class(TInterfacedObject,IOTAProjectNotifier, IOTAModuleNotifier,IOTANotifier )
   private
     FLogger : IDPMIDELogger;
-    FIDENotifier : IDPMIDENotifier;
+    FIDENotifier : IInterface;
     FFileName : string;
     FProject : IOTAProject;
     FCurrentPlatform : string;
@@ -30,12 +30,13 @@ type
     procedure ModuleRenamed(const NewName: string);
     procedure IOTAProjectNotifier.ModuleRenamed = ModuleRenamedA;
   public
-    constructor Create(const logger : IDPMIDELogger; const ideNotifier : IDPMIDENotifier; const fileName : string; const project : IOTAProject);
+    constructor Create(const logger : IDPMIDELogger; const ideNotifier : IInterface; const fileName : string; const project : IOTAProject);
   end;
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.IDE.IDENotifier;
 
 { TDPMProjectNotifier }
 
@@ -54,9 +55,7 @@ begin
   result := true;
 end;
 
-constructor TDPMProjectNotifier.Create(const logger: IDPMIDELogger; const ideNotifier : IDPMIDENotifier; const fileName : string; const project : IOTAProject);
-var
-  activeProject : IOTAProject;
+constructor TDPMProjectNotifier.Create(const logger: IDPMIDELogger; const ideNotifier : IInterface; const fileName : string; const project : IOTAProject);
 begin
   FLogger := logger;
   FIDENotifier := ideNotifier;
@@ -76,7 +75,7 @@ begin
   if FCurrentPlatform <> FProject.CurrentPlatform then
   begin
     FCurrentPlatform := FProject.CurrentPlatform;
-    FIDENotifier.ProjectActivePlatformChanged(FCurrentPlatform);
+    (FIDENotifier as IDPMIDENotifier).ProjectActivePlatformChanged(FCurrentPlatform);
   end;
 end;
 
@@ -102,7 +101,7 @@ var
 begin
   oldFileName := FFileName;
   FFileName := NewName;
-  FIDENotifier.ProjectRenamed(oldFileName, newName);
+  (FIDENotifier as IDPMIDENotifier).ProjectRenamed(oldFileName, newName);
 end;
 
 end.
