@@ -19,11 +19,8 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
-          legalcopyright = "© 2019 -2024 Vincent Parrett and Contributors"
-          linkproductversion = false
-          minorversion = 2
           name = DPMVersion
-          productname = "DPM IDE Support for DelphiXE7"
+          productversion = 0.0.0.0
           productversionstring = 0.2.0-alpha
         end
       end
@@ -48,7 +45,7 @@ begin
                       "" +
                       "true" +
                       "" +
-                      "© 2019 -2024 Vincent Parrett and Contributors" +
+                      "© 2019 -2025 Vincent Parrett and Contributors" +
                       "" +
                       "false" +
                       "%MAJOR_VERSION%" +
@@ -285,6 +282,69 @@ begin
           as.status = "Building Command line tool"
           as.verbose = False
           as.failbuildonerror = False
+        end
+        action.propertyset.setvalues
+        begin
+          id = {F74911F7-03BD-4E1E-A3EE-949921EE932A}
+          propertysetname = DPMVersion
+          setvaluesto = "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        "DPM Package Manager Command Line Tool" +
+                        "" +
+                        "" +
+                        "" +
+                        "" +
+                        ""
+          valuestoset = "AutoUpdateFileVersionString\=0" +
+                        "AutoUpdateProductVersionString\=0" +
+                        "BuildVersion\=0" +
+                        "CompanyName\=0" +
+                        "CompileDate\=0" +
+                        "FileDescription\=0" +
+                        "FileFlagDebug\=0" +
+                        "FileFlagPreRelease\=0" +
+                        "FileFlagPrivate\=0" +
+                        "FileFlagSpecial\=0" +
+                        "FileSubType\=0" +
+                        "FileTypeDLL\=0" +
+                        "FileTypeDRV\=0" +
+                        "FileTypeVXD\=0" +
+                        "FileVersionString\=0" +
+                        "IncludeCompileDate\=0" +
+                        "InternalName\=0" +
+                        "LegalCopyright\=0" +
+                        "LegalTrademarks\=0" +
+                        "LinkProductVersion\=0" +
+                        "MajorVersion\=0" +
+                        "MinorVersion\=0" +
+                        "OriginalFilename\=0" +
+                        "ProductName\=-1" +
+                        "ProductVersion\=0" +
+                        "ProductVersionString\=0" +
+                        "ReleaseVersion\=0" +
+                        "SpecialBuildDetails\=0" +
+                        ""
         end
         action.dpm.restore
         begin
@@ -1497,7 +1557,7 @@ begin
           begin
             target.argvalue
             begin
-              value = "DPM IDE Plugin"
+              value = "DPM IDE Plugin for %CompilerVersion%"
               variablename = FileDescription
             end
             target.argvalue
@@ -1529,7 +1589,7 @@ begin
       action.signotaur.sign
       begin
         apikey = %SignotaurAPIKey%
-        contentdescription = "DPM command line"
+        contentdescription = %FileDescription%
         contentdescriptionurl = https://docs.delphi.dev
         enabletimeout = false
         expandimpersonationtoken = false
