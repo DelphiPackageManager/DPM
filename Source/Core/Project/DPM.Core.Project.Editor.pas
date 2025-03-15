@@ -422,7 +422,7 @@ var
   sUsePackages : string;
   newConfig : IProjectConfiguration;
 
-  function TryGetConfigValue(configKey : string; const platform : string; const elementName : string; out value : string) : boolean;
+  function TryGetConfigValue(const configKey : string; const platform : string; const elementName : string; out value : string) : boolean;
   var
     configElement : IXMLDOMElement;
     valueElement : IXMLDOMElement;

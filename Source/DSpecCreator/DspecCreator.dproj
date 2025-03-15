@@ -7,15 +7,11 @@
         <MainSource>DspecCreator.dpr</MainSource>
         <Platform Condition="'$(Platform)'==''">Win64</Platform>
         <ProjectGuid>{01A440DD-BB68-49A0-BDEA-3F4230B793DA}</ProjectGuid>
-        <ProjectVersion>19.5</ProjectVersion>
-        <TargetedPlatforms>3</TargetedPlatforms>
+        <ProjectName Condition="'$(ProjectName)'==''">DspecCreator</ProjectName>
+        <ProjectVersion>20.3</ProjectVersion>
+        <TargetedPlatforms>2</TargetedPlatforms>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
-        <Base>true</Base>
-    </PropertyGroup>
-    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Base)'=='true') or '$(Base_Win32)'!=''">
-        <Base_Win32>true</Base_Win32>
-        <CfgParent>Base</CfgParent>
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Base)'=='true') or '$(Base_Win64)'!=''">
@@ -28,12 +24,6 @@
         <CfgParent>Base</CfgParent>
         <Base>true</Base>
     </PropertyGroup>
-    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_1)'=='true') or '$(Cfg_1_Win32)'!=''">
-        <Cfg_1_Win32>true</Cfg_1_Win32>
-        <CfgParent>Cfg_1</CfgParent>
-        <Cfg_1>true</Cfg_1>
-        <Base>true</Base>
-    </PropertyGroup>
     <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Cfg_1)'=='true') or '$(Cfg_1_Win64)'!=''">
         <Cfg_1_Win64>true</Cfg_1_Win64>
         <CfgParent>Cfg_1</CfgParent>
@@ -43,12 +33,6 @@
     <PropertyGroup Condition="'$(Config)'=='Release' or '$(Cfg_2)'!=''">
         <Cfg_2>true</Cfg_2>
         <CfgParent>Base</CfgParent>
-        <Base>true</Base>
-    </PropertyGroup>
-    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_2)'=='true') or '$(Cfg_2_Win32)'!=''">
-        <Cfg_2_Win32>true</Cfg_2_Win32>
-        <CfgParent>Cfg_2</CfgParent>
-        <Cfg_2>true</Cfg_2>
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Cfg_2)'=='true') or '$(Cfg_2_Win64)'!=''">
@@ -69,14 +53,6 @@
         <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <VerInfo_Locale>3081</VerInfo_Locale>
     </PropertyGroup>
-    <PropertyGroup Condition="'$(Base_Win32)'!=''">
-        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
-        <BT_BuildType>Debug</BT_BuildType>
-        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
-        <DCC_UsePackage>JvNet;vclwinx;DataSnapServer;fmx;vclie;DbxCommonDriver;bindengine;IndyIPCommon;VCLRESTComponents;DBXMSSQLDriver;FireDACCommonODBC;emsclient;appanalytics;IndyProtocols;vclx;Skia.Package.RTL;dbxcds;vcledge;IcsCommonD12Run;FmxTeeUI;DBXFirebirdDriver;JvAppFrm;FireDACSqliteDriver;DbxClientDriver;JclVcl;soapmidas;TeeUI;Jcl;dbexpress;JvManagedThreads;IcsVclD12Run;inet;vcltouch;JvDB;FireDACDBXDriver;fmxdae;JvCustom;CustomIPTransport;FireDACMSSQLDriver;JvSystem;JvControls;PKIEDB29;JvCrypt;JvJans;JvMM;IndySystem;JvGlobus;JclContainers;JvPageComps;vclFireDAC;FireDACCommon;DataSnapServerMidas;FireDACODBCDriver;emsserverresource;DOSCommandDR;bindcompdbx;rtl;FireDACMySQLDriver;DBXSqliteDriver;TMSVCLUIPackPkgDXE15;DBXSybaseASEDriver;JvRuntimeDesign;JvXPCtrls;vclimg;DataSnapFireDAC;inetdbxpress;FireDAC;JvDocking;JvDlgs;xmlrtl;dsnap;JvCmp;FireDACDb2Driver;DBXOracleDriver;DBXInformixDriver;fmxobj;bindcompvclsmp;DataSnapNativeClient;DatasnapConnectorsFreePascal;emshosting;FireDACCommonDriver;IndyIPClient;bindcompvclwinx;emsedge;bindcompfmx;TMSVCLUIPackPkgExDXE15;JvBands;inetdb;FireDACASADriver;Tee;vclactnband;TMSVCLUIPackPkgXlsDXE15;fmxFireDAC;FireDACInfxDriver;DBXMySQLDriver;VclSmp;DataSnapCommon;AWSSDK;JvPascalInterpreter;EurekaLogCore;fmxase;JvPluginSystem;TMSVCLUIPackPkgWizDXE15;DBXOdbcDriver;JvTimeFramework;dbrtl;FireDACOracleDriver;Skia.Package.FMX;TeeDB;FireDACMSAccDriver;IcsFmxD12Run;DataSnapIndy10ServerTransport;JclDeveloperTools;PKIECtrl29;DataSnapConnectors;vcldsnap;DBXInterBaseDriver;FireDACMongoDBDriver;JvWizards;FireDACTDataDriver;Skia.Package.VCL;vcldb;SynEditDR;JvCore;bindcomp;IndyCore;RESTBackendComponents;AWSSDKFMX;FireDACADSDriver;AWSSDKVCL;RESTComponents;IndyIPServer;vcl;dsnapxml;adortl;dsnapcon;DataSnapClient;DataSnapProviderClient;JvDotNetCtrls;JvHMI;SMImportD12;FixInsight_12;DBXDb2Driver;emsclientfiredac;FireDACPgDriver;FireDACDSDriver;JvPrintPreview;tethering;JvStdCtrls;bindcompvcl;CloudService;DBXSybaseASADriver;FMXTee;soaprtl;soapserver;FireDACIBDriver;$(DCC_UsePackage)</DCC_UsePackage>
-        <Icon_MainIcon>..\images\dpm.ico</Icon_MainIcon>
-        <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
-    </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
         <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
         <BT_BuildType>Debug</BT_BuildType>
@@ -95,11 +71,6 @@
         <DCC_RangeChecking>true</DCC_RangeChecking>
         <DCC_RemoteDebug>true</DCC_RemoteDebug>
     </PropertyGroup>
-    <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
-        <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
-        <DCC_RemoteDebug>false</DCC_RemoteDebug>
-        <Icon_MainIcon>..\images\dpm.ico</Icon_MainIcon>
-    </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
         <Icon_MainIcon>..\images\dpm.ico</Icon_MainIcon>
@@ -110,19 +81,15 @@
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
         <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
     </PropertyGroup>
-    <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
-        <Icon_MainIcon>..\images\dpm.ico</Icon_MainIcon>
-    </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
     </PropertyGroup>
     <PropertyGroup>
-        <DPMCompiler>11.0</DPMCompiler>
+        <DPMCompiler>12.0</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Gabr42.OmniThreadLibrary\3.7.10\lib;$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.2.1\lib;$(DPM)\VSoft.HttpClient\0.11.0-beta.10\lib;$(DPM)\VSoft.DOSCommand\2023.8.0\lib;$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\VSoft.Awaitable\0.6.0\lib;$(DPM)\VSoft.AntPatterns\0.1.7\lib;$(DPM)\Spring4D.Extensions\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\Spring4D.Base\2.0.1\lib;</DPMSearch>
-        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Gabr42.OmniThreadLibrary\3.7.10\lib;$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.2.1\lib;$(DPM)\VSoft.HttpClient\0.11.0-beta.10\lib;$(DPM)\VSoft.DOSCommand\2023.8.0\lib;$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\VSoft.Awaitable\0.6.0\lib;$(DPM)\VSoft.AntPatterns\0.1.7\lib;$(DPM)\Spring4D.Extensions\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\Spring4D.Base\2.0.1\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'"/>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Gabr42.OmniThreadLibrary\3.7.10\lib;$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.2.1\lib;$(DPM)\VSoft.HttpClient\2.0.0\lib;$(DPM)\VSoft.DOSCommand\2023.8.0\lib;$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\VSoft.Awaitable\0.6.0\lib;$(DPM)\VSoft.AntPatterns\0.1.7\lib;$(DPM)\Spring4D.Extensions\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\Spring4D.Base\2.0.1\lib;</DPMSearch>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -381,33 +348,12 @@
                 <Excluded_Packages/>
             </Delphi.Personality>
             <Platforms>
-                <Platform value="Win32">True</Platform>
+                <Platform value="Win32">False</Platform>
                 <Platform value="Win64">True</Platform>
             </Platforms>
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>
-            <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.1"/>
-            <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.1">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.1" range="2.0.1"/>
-            </PackageReference>
-            <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.1">
-                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.1" range="2.0.1"/>
-            </PackageReference>
-            <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.1.7"/>
-            <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.6.0">
-                <PackageReference id="Gabr42.OmniThreadLibrary" platform="Win32" version="3.7.10" range="[3.7.10,]"/>
-                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.1.2" range="0.1.2"/>
-            </PackageReference>
-            <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.1.2"/>
-            <PackageReference id="VSoft.DOSCommand" platform="Win32" version="2023.8.0"/>
-            <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.11.0-beta.10">
-                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.1.2" range="0.1.2"/>
-                <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.2" range="0.3.2"/>
-            </PackageReference>
-            <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.2.1"/>
-            <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.5"/>
-            <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.2"/>
             <PackageReference id="Spring4D.Base" platform="Win64" version="2.0.1"/>
             <PackageReference id="Spring4D.Core" platform="Win64" version="2.0.1">
                 <PackageReference id="Spring4D.Base" platform="Win64" version="2.0.1" range="2.0.1"/>
@@ -422,7 +368,7 @@
             </PackageReference>
             <PackageReference id="VSoft.CancellationToken" platform="Win64" version="0.1.2"/>
             <PackageReference id="VSoft.DOSCommand" platform="Win64" version="2023.8.0"/>
-            <PackageReference id="VSoft.HttpClient" platform="Win64" version="0.11.0-beta.10">
+            <PackageReference id="VSoft.HttpClient" platform="Win64" version="2.0.0">
                 <PackageReference id="VSoft.CancellationToken" platform="Win64" version="0.1.2" range="0.1.2"/>
                 <PackageReference id="VSoft.Uri" platform="Win64" version="0.3.2" range="0.3.2"/>
             </PackageReference>

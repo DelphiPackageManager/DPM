@@ -24,7 +24,8 @@ type
     function LoadTargetPlatformFromJson(const targetPlatformsArray : TJsonArray) : boolean;
     function LoadFromJson(const jsonObject : TJsonObject) : boolean;
   public
-    constructor Create(const logger : ILogger; const fileName : string); reintroduce;
+    constructor Create(const logger : ILogger; const fileName : string);
+    destructor Destroy;override;
   end;
 
 implementation
@@ -37,9 +38,21 @@ uses
 
 constructor TPackageManifest.Create(const logger: ILogger; const fileName: string);
 begin
+  inherited Create;
   FLogger := logger;
   FFileName := fileName;
-  FMetaData := TSpecMetaData.Create(logger);
+  //FLogger.Debug('Creating manifest for : ' + FFileName);
+  FMetaData := TSpecMetaData.Create(logger) as ISpecMetaData;
+
+end;
+
+destructor TPackageManifest.Destroy;
+begin
+  FTargetPlatform := nil;
+  //FLogger.Debug('destroying manifest for : ' + FFileName);
+  FMetaData := nil;
+  FLogger := nil;
+  inherited;
 end;
 
 function TPackageManifest.GetFileName: string;

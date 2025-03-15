@@ -109,6 +109,7 @@ var
   commandLine : string;
   env : IEnvironmentBlock;
   i : integer;
+  exitCode : Cardinal;
 begin
 
   result := false;
@@ -141,7 +142,7 @@ begin
   env.AddOrSet('ImportEnvOptions','false');
   FLogger.Debug('Compler - cmdline : ' + commandLine);
   try
-    result := TProcess.Execute2(cancellationToken, 'cmd.exe', commandLine,'',env) = 0;
+    exitCode := TProcess.Execute2(cancellationToken, 'cmd.exe', commandLine,'',env);
   except
     on e : Exception do
     begin
@@ -149,13 +150,14 @@ begin
       exit;
     end;
   end;
-
+  result := exitCode = 0;
+  if not result then
+  FLogger.Error('Package compilation failed - exit code : ' + IntToStr(exitCode));
   //TODO : Doesn't give realtime feedback, remove when we have a CreateProcess version of TProcess.
   if TFile.Exists(FCompilerLogFile) then
   begin
     if not result then
     begin
-      FLogger.Error('Package compilation failed.');
       FCompilerOutput.LoadFromFile(FCompilerLogFile);
       for i := 0 to FCompilerOutput.Count -1 do
         FLogger.Information(FCompilerOutput.Strings[i]);

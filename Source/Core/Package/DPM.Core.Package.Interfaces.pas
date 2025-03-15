@@ -32,7 +32,7 @@ uses
   System.Classes,
   System.Generics.Defaults,
   Spring.Collections,
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
   DPM.Core.TargetPlatform,

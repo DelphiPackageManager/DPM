@@ -29,7 +29,7 @@ unit DPM.Core.Cache;
 interface
 
 uses
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
@@ -65,7 +65,7 @@ type
 
 //    function InstallPackage(const packageId : IPackageIdentity; const saveFile : boolean; const source : string = '') : boolean;
 
-    function InstallPackageFromFile(const packageFileName : string; const saveFile : boolean) : boolean;
+    function InstallPackageFromFile(const packageFileName : string) : boolean;
 
   public
     constructor Create(const logger : ILogger; const manifestReader : IPackageManifestReader);
@@ -80,6 +80,7 @@ uses
   System.RegularExpressions,
   DPM.Core.Constants,
   DPM.Core.Package.Classes,
+  DPM.Core.Utils.System,
   DPM.Core.Utils.Strings;
 
 { TPackageCache }
@@ -215,12 +216,12 @@ begin
     //ok, if we still have the file, try install it again.
     packageFileName := IncludeTrailingPathDelimiter(packagesFolder) + packageId.ToString + cPackageFileExt;
     if FileExists(packageFileName) then
-      result := InstallPackageFromFile(packageFileName, true)
+      result := InstallPackageFromFile(packageFileName)
   end;
 end;
 
 
-function TPackageCache.InstallPackageFromFile(const packageFileName : string; const saveFile : boolean) : boolean;
+function TPackageCache.InstallPackageFromFile(const packageFileName : string) : boolean;
 var
   packageFilePath : string;
   fileName : string;
@@ -228,7 +229,7 @@ var
   packageFolder : string;
 begin
   result := false;
-  //  FLogger.Debug('[PackageCache] installing from file : ' + packageFileName);
+  FLogger.Debug('[PackageCache] installing from file : ' + packageFileName);
   if not FileExists(packageFileName) then
   begin
     FLogger.Error('Package File [' + packageFileName + '] does not exist');
@@ -248,25 +249,24 @@ begin
 
   //creates the folder
   packageFolder := CreatePackagePath(packageIndentity);
+  FLogger.Debug('[PackageCache] PackageFolder  : ' + packageFolder);
 
-  if saveFile then
+  if (not TStringUtils.StartsWith(packageFileName, GetPackagesFolder)) then
   begin
-    if (not TStringUtils.StartsWith(packageFileName, GetPackagesFolder)) then
-    begin
-      packageFilePath := GetPackagesFolder + PathDelim + ExtractFileName(packageFileName);
-      try
-        TFile.Copy(packageFileName, packageFilePath, true);
-      except
-        on e : Exception do
-        begin
-          FLogger.Error('Unable to copy file [' + packageFileName + '] to the package cache');
-          FLogger.Error(e.Message);
-          exit;
-        end;
+    packageFilePath := GetPackagesFolder + PathDelim + ExtractFileName(packageFileName);
+    FLogger.Debug('[PackageCache] Copying Package file to   : ' + packageFilePath);
+
+    try
+      TFile.Copy(packageFileName, packageFilePath, true);
+    except
+      on e : Exception do
+      begin
+
+        FLogger.Error('Unable to copy file [' + packageFileName + '] to the package cache');
+        FLogger.Error(e.Message);
+        exit;
       end;
-    end
-    else
-      packageFilePath := packageFileName;
+    end;
   end
   else
     packageFilePath := packageFileName;
@@ -274,6 +274,7 @@ begin
   //work with packageFilePath now.
 
   try
+    FLogger.Debug('[PackageCache] Extracting Package file [' + packageFilePath + '] to : ' + packageFolder);
     TZipFile.ExtractZipFile(packageFilePath, packageFolder);
     result := FileExists(IncludeTrailingPathDelimiter(packageFolder) + cPackageManifestFile);
     if not result then
@@ -284,6 +285,7 @@ begin
   except
     on e : exception do
     begin
+       FLogger.Debug('[PackageCache] Error Extracting Package file : ' + e.Message);
        TDirectory.Delete(packageFolder, true); //just empties it but doesn't delete?
        if not RemoveDir(packageFolder) then
        begin

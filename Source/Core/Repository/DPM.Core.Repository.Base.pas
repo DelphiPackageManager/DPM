@@ -30,7 +30,7 @@ interface
 
 uses
   Generics.Defaults,
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Sources.Types,

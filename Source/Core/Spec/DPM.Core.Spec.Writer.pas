@@ -16,7 +16,7 @@ type
   protected
   public
     constructor Create(const logger : ILogger; spec: IPackageSpec);
-    procedure SaveToFile(filename: string);
+    procedure SaveToFile(const filename: string);
   end;
 
 implementation
@@ -34,7 +34,7 @@ begin
   FSpec := spec;
 end;
 
-procedure TPackageSpecWriter.SaveToFile(filename: string);
+procedure TPackageSpecWriter.SaveToFile(const filename: string);
 begin
   JsonSerializationConfig.IndentChar := ' ';
   TFile.WriteAllText(Filename, Fspec.ToJson);

@@ -29,7 +29,7 @@ unit DPM.Core.Sources.Interfaces;
 interface
 
 uses
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   Spring.Collections,
   DPM.Core.Sources.Types,
   DPM.Core.Options.Push,

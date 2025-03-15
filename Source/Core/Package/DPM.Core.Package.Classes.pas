@@ -77,6 +77,7 @@ type
     constructor Create(const sourceName : string; const spec : IPackageSpec); override;
     constructor Create(const sourceName : string; const jsonObj : TJsonObject);override;
   public
+    destructor Destroy;override;
     class function CreateFromManifest(const sourceName : string; const manifest : IPackageManifest) : IPackageInfo;
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageInfo;
     class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageInfo : IPackageInfo) : boolean;
@@ -117,6 +118,7 @@ type
     constructor Create(const sourceName : string; const manifest : IPackageManifest); override;
   public
     constructor Create(const sourceName : string; const jsonObj : TJsonObject); override;
+    destructor Destroy;override;
     class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageMetadata;
     class function CreateFromManifest(const sourceName : string; const manifest : IPackageManifest) : IPackageMetadata;
     class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageMetadata : IPackageMetadata) : boolean;
@@ -124,21 +126,12 @@ type
 
 
 
-  TPackageMetadataExtractor = class
-  public
-    //these will read the manifest
-    class function TryExtractFull(const logger : ILogger; const fileName : string; out metadata : IPackageMetadata; const source : string = '') : boolean;
-    class function TryExtractInfo(const logger : ILogger; const fileName : string; out info : IPackageInfo; const source : string = '') : boolean;
-    //this just parses the filename
-    class function TryExtractIdentity(const logger : ILogger; const fileName : string; out identity : IPackageIdentity; const source : string = '') : boolean;
-  end;
 
 
 implementation
 
 uses
   DPM.Core.Constants,
-//  DPM.Core.Spec.Reader,
   DPM.Core.Manifest.Reader,
   DPM.Core.Package.Dependency,
   System.SysUtils,
@@ -179,6 +172,7 @@ end;
 
 constructor TPackageIdentity.Create(const sourceName : string; const id: string; const version: TPackageVersion; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform);
 begin
+  inherited Create;
   FId := id;
   FVersion := version;
   FCompilerVersion := compilerVersion;
@@ -234,6 +228,7 @@ var
   packageVersion : TPackageVersion;
 begin
   result := false;
+  logger.Debug('TRegEx.Match : [' + value + '] regex : ' + cPackageFileRegex);
   match := TRegEx.Match(value, cPackageFileRegex, [roIgnoreCase]);
   if not match.Success then
   begin
@@ -281,7 +276,6 @@ begin
     newDep := TPackageDependency.Create(dep.Id, dep.Version, FPlatform);
     FDependencies.Add(newDep);
   end;
-
 end;
 
 
@@ -338,6 +332,12 @@ end;
 class function TPackageInfo.CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageInfo;
 begin
   result := TPackageInfo.Create(sourceName, spec);
+end;
+
+destructor TPackageInfo.Destroy;
+begin
+  FDependencies := nil;
+  inherited;
 end;
 
 function TPackageInfo.GetDependencies : IList<IPackageDependency>;
@@ -476,6 +476,12 @@ begin
   result := TPackageMetadata.Create(sourceName, spec);
 end;
 
+destructor TPackageMetadata.Destroy;
+begin
+  FSearchPaths := nil;
+  inherited;
+end;
+
 function TPackageMetadata.GetAuthors : string;
 begin
   result := FAuthors;
@@ -562,123 +568,6 @@ begin
   result := true;
 end;
 
-{ TPackageMetadataExtractor }
-
-class function TPackageMetadataExtractor.TryExtractIdentity(const logger : ILogger; const fileName : string; out identity : IPackageIdentity; const source : string) : boolean;
-var
-  match : TMatch;
-  id : string;
-  cv : TCompilerVersion;
-  platform : TDPMPlatform;
-  packageVersion : TPackageVersion;
-  value : string;
-begin
-  identity := nil;
-  value := ExtractFileName(fileName);
-  result := false;
-  match := TRegEx.Match(filename, cPackageFileRegex, [roIgnoreCase]);
-  if not match.Success then
-  begin
-    logger.Error('Package name is not a valid package [' + value + ']');
-    exit;
-  end;
-  id := match.Groups[1].Value;
-  cv := StringToCompilerVersion(match.Groups[2].Value);
-  if cv = TCompilerVersion.UnknownVersion then
-  begin
-    logger.Error('Compiler version segment is not a valid version [' + match.Groups[2].Value + ']');
-    exit;
-  end;
-  platform := StringToDPMPlatform(match.Groups[3].Value);
-  if platform = TDPMPlatform.UnknownPlatform then
-  begin
-    logger.Error('Platform segment is not a valid platform [' + match.Groups[3].Value + ']');
-    exit;
-  end;
-  if not TPackageVersion.TryParse(match.Groups[4].Value, packageVersion) then
-  begin
-    logger.Error('Version segment is not a valid version [' + match.Groups[4].Value + ']');
-    exit;
-  end;
-  //we dont' have a source.
-  identity := TPackageIdentity.Create(id, source, packageVersion, cv, platform);
-  result := true;
-end;
-
-class function TPackageMetadataExtractor.TryExtractInfo(const logger : ILogger; const fileName : string; out info : IPackageInfo; const source : string) : boolean;
-var
-  zipFile : TZipFile;
-  metaBytes : TBytes;
-  metaString : string;
-  manifest : IPackageManifest;
-  reader : IPackageManifestReader;
-begin
-  result := false;
-  zipFile := TZipFile.Create;
-  try
-    try
-      zipFile.Open(fileName, TZipMode.zmRead);
-      if zipFile.IndexOf(cPackageManifestFile) <> -1 then
-        zipFile.Read(cPackageManifestFile, metaBytes)
-      else
-        zipFile.Read(cOldPackageManifestFile, metaBytes)
-    except
-      on e : Exception do
-      begin
-        Logger.Error('Error opening package file [' + fileName + ']');
-        exit;
-      end;
-    end;
-  finally
-    zipFile.Free;
-  end;
-  //doing this outside the try/finally to avoid locking the package for too long.
-  metaString := TEncoding.UTF8.GetString(metaBytes);
-  reader := TPackageManifestReader.Create(Logger);
-  manifest := reader.ReadManifestString(metaString);
-  if manifest = nil then
-    exit;
-  info := TPackageMetadata.CreateFromManifest(source, manifest);
-  result := true;
-
-end;
-
-class function TPackageMetadataExtractor.TryExtractFull(const logger : ILogger; const fileName : string; out metadata : IPackageMetadata; const source : string = '') : boolean;
-var
-  zipFile : TZipFile;
-  metaBytes : TBytes;
-  metaString : string;
-  manifest : IPackageManifest;
-  reader : IPackageManifestReader;
-begin
-  result := false;
-  zipFile := TZipFile.Create;
-  try
-    try
-      zipFile.Open(fileName, TZipMode.zmRead);
-      if zipFile.IndexOf(cPackageManifestFile) <> -1 then
-        zipFile.Read(cPackageManifestFile, metaBytes)
-      else
-        zipFile.Read(cOldPackageManifestFile, metaBytes);
-    except
-      on e : Exception do
-      begin
-        Logger.Error('Error opening package file [' + fileName + ']');
-        exit;
-      end;
-    end;
-  finally
-    zipFile.Free;
-  end;
-  //doing this outside the try/finally to avoid locking the package for too long.
-  metaString := TEncoding.UTF8.GetString(metaBytes);
-  reader := TPackageManifestReader.Create(Logger);
-  manifest := reader.ReadManifestString(metaString);
-  if manifest = nil then
-    exit;
-  metadata := TPackageMetadata.CreateFromManifest(source, manifest);
-  result := true;
-end;
 
 { TPackageId }
 

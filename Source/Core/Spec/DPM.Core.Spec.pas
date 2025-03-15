@@ -463,44 +463,43 @@ end;
 
 function TSpec.DuplicateTemplate(const sourceTemplate: ISpecTemplate; const newTemplateName: string): ISpecTemplate;
 var
-  template : ISpecTemplate;
   I: Integer;
 begin
-  template := TSpecTemplate.Create(Logger);
+  result := TSpecTemplate.Create(Logger);
   for I := 0 to sourceTemplate.Dependencies.Count - 1 do
   begin
-    template.Dependencies.Add(sourceTemplate.Dependencies[i].Clone);
+    result.Dependencies.Add(sourceTemplate.Dependencies[i].Clone);
   end;
   for I := 0 to sourceTemplate.DesignFiles.Count - 1 do
   begin
-    template.DesignFiles.Add(sourceTemplate.DesignFiles[i].Clone);
+    result.DesignFiles.Add(sourceTemplate.DesignFiles[i].Clone);
   end;
   for I := 0 to sourceTemplate.Files.Count - 1 do
   begin
-    template.Files.Add(sourceTemplate.Files[i].Clone);
+    result.Files.Add(sourceTemplate.Files[i].Clone);
   end;
   for I := 0 to sourceTemplate.LibFiles.Count - 1 do
   begin
-    template.LibFiles.Add(sourceTemplate.LibFiles[i].Clone);
+    result.LibFiles.Add(sourceTemplate.LibFiles[i].Clone);
   end;
   for I := 0 to sourceTemplate.RuntimeFiles.Count - 1 do
   begin
-    template.RuntimeFiles.Add(sourceTemplate.RuntimeFiles[i].Clone);
+    result.RuntimeFiles.Add(sourceTemplate.RuntimeFiles[i].Clone);
   end;
   for I := 0 to sourceTemplate.SourceFiles.Count - 1 do
   begin
-    template.SourceFiles.Add(sourceTemplate.SourceFiles[i].Clone);
+    result.SourceFiles.Add(sourceTemplate.SourceFiles[i].Clone);
   end;
   for I := 0 to sourceTemplate.SearchPaths.Count - 1 do
   begin
-    template.SearchPaths.Add(sourceTemplate.SearchPaths[i].Clone);
+    result.SearchPaths.Add(sourceTemplate.SearchPaths[i].Clone);
   end;
   for I := 0 to sourceTemplate.SearchPaths.Count - 1 do
   begin
-    template.SearchPaths.Add(sourceTemplate.SearchPaths[i].Clone);
+    result.SearchPaths.Add(sourceTemplate.SearchPaths[i].Clone);
   end;
-  template.Name := newTemplateName;
-  FTemplates.Add(template);
+  result.Name := newTemplateName;
+  FTemplates.Add(result);
 end;
 
 function TSpec.ExpandTargetPlatforms : boolean;

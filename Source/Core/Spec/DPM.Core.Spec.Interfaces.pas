@@ -44,14 +44,14 @@ type
   ISpecNode = interface
     ['{AD47A3ED-591B-4E47-94F2-7EC136182202}']
     function LoadFromJson(const jsonObject : TJsonObject) : boolean;
-    function LoadObjectList(list: IList<ISpecNode>): TJsonArray;
+    function LoadObjectList(const list: IList<ISpecNode>): TJsonArray;
     function ToJSON: string;
   end;
 
   ISpecDependency = interface(ISpecNode)
     ['{6CE14888-54A8-459C-865E-E4B4628DB8C6}']
     function GetId : string;
-    procedure SetId(Id: string);
+    procedure SetId(const id: string);
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
     function GetVersionString : string;
@@ -296,7 +296,7 @@ type
   ISpecTemplate = interface(ISpecTemplateBase)
     ['{FB9EE9B8-E77B-4E45-A838-E1C9C9947CFB}']
     function GetName : string;
-    procedure SetName(templateName: string);
+    procedure SetName(const templateName: string);
 
     function Clone : ISpecTemplate;
 
@@ -307,15 +307,15 @@ type
   ISpecTargetPlatform = interface(ISpecTemplateBase)
     ['{43BE69CA-0C29-4147-806B-460FFF402A68}']
     function GetPlatforms : TArray<TDPMPlatform>;
-    procedure SetPlatforms(platforms: TArray<TDPMPlatform>);
+    procedure SetPlatforms(const platforms: TArray<TDPMPlatform>);
     function GetTemplateName : string;
-    procedure SetTemplateName(name: string);
+    procedure SetTemplateName(const name: string);
     function GetCompiler : TCompilerVersion;
     procedure SetCompiler(compiler: TCompilerVersion);
     function GetVariables : TStrings;
 
     function CloneForPlatform(const platform : TDPMPlatform) : ISpecTargetPlatform;
-    function PlatformContains(platformName:string): Boolean;
+    function PlatformContains(const platformName:string): Boolean;
     function ToString : string;
 
     property Compiler : TCompilerVersion read GetCompiler write SetCompiler;
@@ -357,7 +357,7 @@ type
 
   IPackageSpecWriter = interface
     ['{F3370E25-2E9D-4353-9985-95C75D35D68E}']
-    procedure SaveToFile(filename: string);
+    procedure SaveToFile(const filename: string);
   end;
 
 

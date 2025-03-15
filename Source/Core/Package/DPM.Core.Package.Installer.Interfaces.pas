@@ -30,7 +30,7 @@ interface
 
 uses
   Spring.Collections,
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   DPM.Core.Types,
   DPM.Core.TargetPlatform,
   DPM.Core.Options.Cache,

@@ -24,6 +24,8 @@
 {                                                                           }
 {***************************************************************************}
 
+// JCL_DEBUG_EXPERT_GENERATEJDBG OFF
+// JCL_DEBUG_EXPERT_INSERTJDBG OFF
 program dpm;
 
 {$APPTYPE CONSOLE}
@@ -31,6 +33,10 @@ program dpm;
 {$R *.res}
 
 uses
+{$IFDEF JCLDEBUG}
+  JclDebug,
+  JclHookExcept,
+{$ENDIF}
   System.SysUtils,
   System.Diagnostics,
   WinApi.ActiveX,
@@ -165,9 +171,28 @@ uses
   DPM.Core.Manifest in 'Core\Manifest\DPM.Core.Manifest.pas',
   DPM.Core.Manifest.Reader in 'Core\Manifest\DPM.Core.Manifest.Reader.pas';
 
+//var
+//  stacktrace : string;
+{$IFDEF JCLDEBUG}
+procedure LogException(ExceptObj: TObject; ExceptAddr: Pointer; OSException: Boolean);
+var
+  s : string;
 begin
+  Writeln(ExceptObj.ClassName, ': ', Exception(ExceptObj).Message);
+  s := TSystemUtils.GetStackTrace(Exception(ExceptObj), ExceptAddr);
+  Write(s);
+end;
+{$ENDIF}
+
+begin
+  //MESettings.BugReportFile := 'C:\Users\vincent.OFFICE\Documents\bugreport.txt';
   CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml
   try
+{$IFDEF JCLDEBUG}
+    JCLdebug.JclStackTrackingOptions:=[stStack, stRawMode];
+    JclHookExcept.JclAddExceptNotifier(LogException);
+    JclDebug.JclStartExceptionTracking;
+{$ENDIF}
     System.ExitCode := Ord(TDPMConsoleApplication.Run);
     {$IFDEF DEBUG}
       //if running under the debugger, pause so we can see the output!
@@ -178,7 +203,8 @@ begin
   except
     on E: Exception do
     begin
-      Writeln(E.ClassName, ': ', E.Message);
+//      stackTrace := TSystemUtils.GetStackTrace(e, ExceptAddr);
+//      Write(stackTrace);
       System.ExitCode := Ord(TExitCode.UnhandledException);
     {$IFDEF DEBUG}
       ReadLn;

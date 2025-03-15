@@ -53,6 +53,7 @@ type
     function Clone(const parentId : string) : IResolvedPackage;
   public
     constructor Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
+    destructor Destroy;override;
   end;
 
 implementation
@@ -70,6 +71,7 @@ end;
 
 constructor TResolvedPackage.Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
 begin
+  inherited Create;
   FPackage := package;
   FVersionRange := range;
   if FVersionRange.IsEmpty then
@@ -78,6 +80,12 @@ begin
   FProject := project;
 end;
 
+
+destructor TResolvedPackage.Destroy;
+begin
+  FPackage := nil;
+  inherited;
+end;
 
 function TResolvedPackage.GetIsTopLevel: boolean;
 begin

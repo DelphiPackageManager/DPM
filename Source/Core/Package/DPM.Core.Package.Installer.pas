@@ -69,9 +69,9 @@ type
     function CollectSearchPaths(const packageGraph: IPackageReference; const resolvedPackages: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
                                 const compilerVersion: TCompilerVersion; const platform: TDPMPlatform;  const searchPaths: IList<string>): boolean;
 
-    procedure GenerateSearchPaths(const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; packageSpec: IPackageManifest; const searchPaths: IList<string>);
+    procedure GenerateSearchPaths(const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const packageSpec: IPackageManifest; const searchPaths: IList<string>);
 
-    function DownloadPackages(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; var packageManifests: IDictionary<string, IPackageManifest>): boolean;
+    function DownloadPackages(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageManifest>): boolean;
 
     function CollectPlatformsFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration) : boolean;
 
@@ -81,8 +81,8 @@ type
                             const packageSpec: IPackageManifest;  const force: boolean; const forceDebug : boolean): boolean;
 
     function BuildDependencies(const cancellationToken: ICancellationToken; const packageCompiler: ICompiler; const projectPackageGraph: IPackageReference;
-                               const packagesToCompile: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>; packageManifests: IDictionary<string, IPackageManifest>;
-                               const Options: TSearchOptions): boolean;
+                               const packagesToCompile: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
+                               const packageManifests: IDictionary<string, IPackageManifest>; const Options: TSearchOptions): boolean;
 
     function CopyLocal(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageManifest>;
                        const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
@@ -658,7 +658,7 @@ begin
         FLogger.Error('Failed to download package [' + packageIdentity.ToString + ']');
       exit;
     end;
-    if not FPackageCache.InstallPackageFromFile(packageFileName, true) then
+    if not FPackageCache.InstallPackageFromFile(packageFileName) then
     begin
       FLogger.Error('Failed to cache package file [' + packageFileName + '] into the cache');
       exit;
@@ -828,7 +828,7 @@ begin
       FLogger.Error('Failed to download package [' + newPackageIdentity.ToString + ']');
       exit;
     end;
-    if not FPackageCache.InstallPackageFromFile(packageFileName, true) then
+    if not FPackageCache.InstallPackageFromFile(packageFileName) then
     begin
       FLogger.Error('Failed to install package file [' + packageFileName + '] into the cache');
       exit;
@@ -884,6 +884,7 @@ begin
     exit(false);
   end;
 
+  packageManifests := TCollections.CreateDictionary<string, IPackageManifest>;
   // downloads the package files to the cache if they are not already there and
   // returns the deserialized dspec as we need it for search paths and design
   if not DownloadPackages(cancellationToken, resolvedPackages, packageManifests) then
@@ -919,13 +920,13 @@ function TPackageInstaller.DoRestoreProjectForPlatform(const cancellationToken :
                                             const context: IPackageInstallerContext): boolean;
 var
   projectPackageGraph: IPackageReference;
-  packageManifests: IDictionary<string, IPackageManifest>;
   projectReferences: IList<IPackageReference>;
   resolvedPackages: IList<IPackageInfo>;
   packagesToCompile: IList<IPackageInfo>;
   compiledPackages: IList<IPackageInfo>;
   packageSearchPaths: IList<string>;
   packageCompiler: ICompiler;
+  packageManifests: IDictionary<string, IPackageManifest>; //TODO : Try rtl dictionary.
 begin
   result := false;
 
@@ -941,8 +942,12 @@ begin
   if not CreateProjectRefs(cancellationToken, projectPackageGraph, projectReferences) then
     exit;
 
+  projectPackageGraph := nil;
+
   if not FDependencyResolver.ResolveForRestore(cancellationToken, Options.CompilerVersion, platform, projectFile, Options, projectReferences, projectPackageGraph, resolvedPackages) then
     exit;
+
+  projectReferences := nil;
 
   // TODO : The code from here on is the same for install/uninstall/restore - refactor!!!
 
@@ -954,6 +959,7 @@ begin
 
   FContext.RecordGraph(projectFile, platform, projectPackageGraph);
 
+  packageManifests := TCollections.CreateDictionary<string, IPackageManifest>;
   // downloads the package files to the cache if they are not already there and
   // returns the deserialized dspec as we need it for search paths and
   if not DownloadPackages(cancellationToken, resolvedPackages, packageManifests) then
@@ -980,6 +986,16 @@ begin
     exit;
 
   projectEditor.UpdatePackageReferences(projectPackageGraph, platform);
+
+  //trying to get a better stack trace
+  packageManifests := nil;
+  projectPackageGraph := nil;
+  resolvedPackages := nil;
+  packagesToCompile := nil;
+  compiledPackages := nil;
+  packageSearchPaths := nil;
+  packageCompiler := nil;
+
   // TODO : need to detect if anything has actually changed and only save if it has.
   // saving triggers the IDE to reload (although we do work around that) - would be good to avoid.
   result := projectEditor.SaveProject();
@@ -1037,7 +1053,7 @@ end;
 
 function TPackageInstaller.BuildDependencies(const cancellationToken : ICancellationToken; const packageCompiler: ICompiler; const projectPackageGraph: IPackageReference;
                                              const packagesToCompile: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
-                                             packageManifests: IDictionary<string, IPackageManifest>; const Options: TSearchOptions): boolean;
+                                             const packageManifests: IDictionary<string, IPackageManifest>; const Options: TSearchOptions): boolean;
 
 begin
   result := false;
@@ -1108,14 +1124,13 @@ begin
 end;
 
 
-function TPackageInstaller.DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; var packageManifests: IDictionary<string, IPackageManifest>): boolean;
+function TPackageInstaller.DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageManifest>): boolean;
 var
   packageInfo: IPackageInfo;
   packageFileName: string;
   manifest: IPackageManifest;
 begin
   result := false;
-  packageManifests := TCollections.CreateDictionary<string, IPackageManifest>;
   //TODO : Download in parallel
   for packageInfo in resolvedPackages do
   begin
@@ -1127,11 +1142,10 @@ begin
       // not in the cache, so we need to get it from the the repository
       if not FRepositoryManager.DownloadPackage(cancellationToken, packageInfo, FPackageCache.PackagesFolder, packageFileName) then
       begin
-        FLogger.Error('Failed to download package [' +
-          packageInfo.ToString + ']');
+        FLogger.Error('Failed to download package [' + packageInfo.ToString + ']');
         exit;
       end;
-      if not FPackageCache.InstallPackageFromFile(packageFileName, true) then
+      if not FPackageCache.InstallPackageFromFile(packageFileName) then
       begin
         FLogger.Error('Failed to install package file [' + packageFileName + '] into the cache');
         exit;
@@ -1142,6 +1156,7 @@ begin
     if not packageManifests.ContainsKey(LowerCase(packageInfo.Id)) then
     begin
       manifest := FPackageCache.GetPackageManifest(packageInfo);
+      Assert(manifest <> nil);
       packageManifests[LowerCase(packageInfo.Id)] := manifest;
     end;
 
@@ -1228,14 +1243,14 @@ begin
 
 end;
 
-procedure TPackageInstaller.GenerateSearchPaths(const compilerVersion : TCompilerVersion; const platform: TDPMPlatform; packageSpec: IPackageManifest; const searchPaths: IList<string>);
+procedure TPackageInstaller.GenerateSearchPaths(const compilerVersion : TCompilerVersion; const platform: TDPMPlatform; const packageSpec: IPackageManifest; const searchPaths: IList<string>);
 var
   packageBasePath: string;
   packageSearchPath: ISpecSearchPath;
 begin
   packageBasePath := packageSpec.Metadata.Id + PathDelim + packageSpec.Metadata.Version.ToStringNoMeta + PathDelim;
 
-  for packageSearchPath in packageSpec.TargetPlatform.searchPaths do
+  for packageSearchPath in packageSpec.TargetPlatform.SearchPaths do
     searchPaths.Add(packageBasePath + packageSearchPath.Path);
 end;
 
@@ -1430,7 +1445,7 @@ var
   packageIdentity: IPackageIdentity;
 begin
   // get the package into the cache first then just install as normal
-  result := FPackageCache.InstallPackageFromFile(Options.PackageFile, true);
+  result := FPackageCache.InstallPackageFromFile(Options.PackageFile);
   if not result then
     exit;
 

@@ -31,7 +31,7 @@ interface
 uses
   Spring.Collections,
   System.Diagnostics,
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
@@ -55,12 +55,12 @@ type
   protected
     function Initialize(const config: IConfiguration) : boolean;
 
-    function ValidateDependencyGraph(const cancellationToken : ICancellationToken; var dependencyGraph : IPackageReference) : boolean;
+//    function ValidateDependencyGraph(const cancellationToken : ICancellationToken; var dependencyGraph : IPackageReference) : boolean;
 
     function DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;  const includePrerelease : boolean; const context : IResolverContext) : boolean;
 
-    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
-    function ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<IPackageReference>; var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
 
   public
     constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageInstallerContext : IPackageInstallerContext);
@@ -318,7 +318,7 @@ end;
 
 function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;
                                                const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo;
-                                               const projectReferences : IList<IPackageReference>; var dependencyGraph : IPackageReference;
+                                               const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference;
                                                out resolved : IList<IPackageInfo>) : boolean;
 var
   context : IResolverContext;
@@ -355,14 +355,13 @@ end;
 //which might change the dependecy versions. We only want to change the graph if it's wrong.
 function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;
                                                const projectFile : string; const options : TSearchOptions; const projectReferences : IList<IPackageReference>;
-                                               var dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
+                                               out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
 var
   context : IResolverContext;
   packageRef : IPackageReference;
   resolution : IResolvedPackage;
   errorCount : integer;
 begin
-  Assert(dependencyGraph <> nil, 'nil dependency graph provided to ResolveForRestore');
   Assert(FConfiguration <> nil, 'config is nil, Initialize has not been called');
 
   //TODO : First validate that there are no conflicts in the existing graph.. if there are remove them and let the resolver deal with it?
@@ -393,35 +392,35 @@ end;
 
 
 //not called or functioning
-function TDependencyResolver.ValidateDependencyGraph(const cancellationToken: ICancellationToken; var dependencyGraph: IPackageReference): boolean;
-var
-  resolvedPackages: IDictionary<string, TPackageVersion>;
-begin
-  result := true;
-
-  resolvedPackages := TCollections.CreateDictionary<string, TPackageVersion>;
-
-  //check for conflicts in the graph. If there are any then log the conflicts and remove them so restore can repair the graph.
-  dependencyGraph.VisitDFS(
-    procedure(const node: IPackageReference)
-    var
-      pkgVersion : TPackageVersion;
-    begin
-
-      if resolvedPackages.TryGetValue(LowerCase(node.Id), pkgVersion) then
-      begin
-
-
-      end
-      else
-      begin
-
-      end;
-
-    end);
-
-
-end;
+//function TDependencyResolver.ValidateDependencyGraph(const cancellationToken: ICancellationToken; var dependencyGraph: IPackageReference): boolean;
+//var
+//  resolvedPackages: IDictionary<string, TPackageVersion>;
+//begin
+//  result := true;
+//
+//  resolvedPackages := TCollections.CreateDictionary<string, TPackageVersion>;
+//
+//  //check for conflicts in the graph. If there are any then log the conflicts and remove them so restore can repair the graph.
+//  dependencyGraph.VisitDFS(
+//    procedure(const node: IPackageReference)
+//    var
+//      pkgVersion : TPackageVersion;
+//    begin
+//
+//      if resolvedPackages.TryGetValue(LowerCase(node.Id), pkgVersion) then
+//      begin
+//
+//
+//      end
+//      else
+//      begin
+//
+//      end;
+//
+//    end);
+//
+//
+//end;
 
 end.
 

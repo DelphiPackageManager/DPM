@@ -29,7 +29,7 @@ unit DPM.Core.Cache.Interfaces;
 interface
 
 uses
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   DPM.Core.Types,
   DPM.Core.Package.Interfaces,
   DPM.Core.Manifest.Interfaces;
@@ -55,7 +55,7 @@ type
     //then it will call InstallPackage to extract it.
     function EnsurePackage(const packageId : IPackageIdentity) : boolean;
 
-    function InstallPackageFromFile(const packageFileName : string; const saveFile : boolean) : boolean;
+    function InstallPackageFromFile(const packageFileName : string) : boolean;
 
     //gets the package info with dependencies. Calls EnsurePackage.
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;

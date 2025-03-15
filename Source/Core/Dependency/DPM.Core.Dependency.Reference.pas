@@ -30,6 +30,7 @@ interface
 
 uses
   System.Classes,
+  Spring,
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Logging,
@@ -41,19 +42,11 @@ uses
   {$LEGACYIFEND ON}
 {$IFEND}
 
-{$IF CompilerVersion >= 31.0 }
-  {$DEFINE USEWEAK}
-{$IFEND}
 
 type
   TPackageReference = class(TInterfacedObject, IPackageReference)
   private
-    {$IFDEF USEWEAK}
-    [weak]
-    FParent : IPackageReference;
-    {$ELSE}
-    FParent : Pointer;
-    {$ENDIF}
+    FParent : Weak<IPackageReference>;
 
     FDependencies : IDictionary<string, IPackageReference>;
     FId : string;
@@ -213,17 +206,7 @@ begin
   FDependencies := TCollections.CreateSortedDictionary<string, IPackageReference>();
   FDesignBpls := TCollections.CreateDictionary<TDPMPlatform, IList<string>>;
 
-  if parent <> nil then
-  begin
-    {$IFDEF USEWEAK}
-    FParent := parent;
-    {$ELSE}
-    FParent := Pointer(parent);
-    {$ENDIF}
-  end
-  else
-    FParent := nil;
-
+  FParent := parent;
   FId := id;
   FVersion := version;
   FPlatform := platform;
@@ -246,6 +229,13 @@ end;
 
 destructor TPackageReference.Destroy;
 begin
+  //not strictly needed but chasing an av.
+  FParent := nil;
+  FSearchPaths := nil;
+  FDependencies.Clear;
+  FDependencies := nil;
+  FDesignBpls := nil;
+
   inherited;
 end;
 
@@ -289,13 +279,13 @@ function TPackageReference.FindChildren(const id : string) : IList<IPackageRefer
 var
   list : IList<IPackageReference>;
 begin
-  result := TCollections.CreateList<IPackageReference>;
-  list := result;
+  list := TCollections.CreateList<IPackageReference>;
   VisitDFS(procedure(const node : IPackageReference)
     begin
       if SameText(id, node.Id) then
         list.Add(node);
     end);
+  result := list;
 end;
 
 function TPackageReference.GetBplPath: string;
@@ -328,8 +318,11 @@ begin
 end;
 
 function TPackageReference.GetIsTransitive: boolean;
+var
+  lParent : IPackageReference;
 begin
- result := (FParent <> nil) and (not {$IFDEF USEWEAK} FParent.IsRoot {$ELSE} IPackageReference(FParent).IsRoot{$ENDIF});
+ lParent := FParent;
+ result := (LParent <> nil) and (not LParent.IsRoot);
 end;
 
 
@@ -346,8 +339,8 @@ end;
 function TPackageReference.GetParent : IPackageReference;
 begin
   //easier to debug this way
-  if FParent <> nil then
-    result := {$IFDEF USEWEAK} FParent {$ELSE} IPackageReference(FParent) {$ENDIF}
+  if FParent.IsAlive then
+    result := FParent.Target
   else
     result := nil;
 end;
@@ -372,8 +365,8 @@ function TPackageReference.GetProjectFile: string;
 begin
   if IsRoot then
     result := FProjectFile
-  else if FParent <> nil then
-    result :=  {$IFDEF USEWEAK} FParent.ProjectFile {$ELSE} IPackageReference(FParent).ProjectFile{$ENDIF}
+  else if FParent.IsAlive then
+    result :=  FParent.Target.ProjectFile
   else
     result := '';
 end;
@@ -482,11 +475,7 @@ end;
 
 procedure TPackageReference.SetParent(const value: IPackageReference);
 begin
-  {$IFDEF USEWEAK}
   FParent := value;
-  {$ELSE}
-  FParent := Pointer(value);
-  {$ENDIF}
 end;
 
 procedure TPackageReference.SetProjectFile(const value: string);

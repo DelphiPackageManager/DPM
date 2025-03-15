@@ -14,7 +14,7 @@
         <DPMCompiler>11.0</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.0.4\lib;$(DPM)\VSoft.HttpClient\0.5.0\lib;$(DPM)\VSoft.JsonDataObjects\0.2.1\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.0.4\lib;$(DPM)\VSoft.HttpClient\0.5.0\lib;$(DPM)\VSoft.JsonDataObjects\0.3.0\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -1002,7 +1002,7 @@
             <PackageReference id="VSoft.HttpClient" platform="Win32" version="0.5.0">
                 <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.0.4" range="[0.0.4,]"/>
             </PackageReference>
-            <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.2.1"/>
+            <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.3.0"/>
         </DPM>
     </ProjectExtensions>
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>

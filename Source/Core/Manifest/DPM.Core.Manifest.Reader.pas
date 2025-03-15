@@ -65,6 +65,7 @@ begin
   except
     on e : Exception do
     begin
+      result := nil;
       FLogger.Error('Error parsing package manifest json : ' + e.Message);
       exit;
     end;

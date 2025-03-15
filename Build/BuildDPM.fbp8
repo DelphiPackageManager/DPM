@@ -19,8 +19,11 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
+          legalcopyright = "© 2019 -2025 Vincent Parrett and Contributors"
+          linkproductversion = false
+          minorversion = 2
           name = DPMVersion
-          productversion = 0.0.0.0
+          productname = "DPM IDE Support for Delphi12"
           productversionstring = 0.2.0-alpha
         end
       end
@@ -89,7 +92,7 @@ begin
       end
       action.group
       begin
-        description = "Build Tests - 11.0"
+        description = "Build Tests - 12.0"
         id = {6BFDB7C5-1968-4220-9E27-9899822374AA}
         action.continua.set-buildstatus
         begin
@@ -117,7 +120,7 @@ begin
           terminateontimeout = true
           timeoutlength = 2
           as.projectpath = %SRC_ROOT%\\DPM.Core.Tests.dproj
-          as.compilerversion = 11.0
+          as.compilerversion = 12.0
           as.verbosity = Debug
           as.nobanner = True
         end
@@ -135,7 +138,7 @@ begin
           compileridl = true
           configname = Release
           debugversionnumbers = false
-          delphiversion = Delphi11
+          delphiversion = Delphi12
           enabletimeout = false
           eurekalogverboselogging = false
           frameworktype = VCL
@@ -357,7 +360,7 @@ begin
           terminateontimeout = true
           timeoutlength = 2
           as.projectpath = %SRC_ROOT%\\dpm.dproj
-          as.compilerversion = 11.0
+          as.compilerversion = 12.0
           as.verbosity = Debug
           as.nobanner = True
         end
@@ -375,7 +378,7 @@ begin
           compileridl = true
           configname = Release
           debugversionnumbers = false
-          delphiversion = Delphi11
+          delphiversion = Delphi12
           enabletimeout = false
           eurekalogverboselogging = false
           frameworktype = VCL
@@ -415,8 +418,8 @@ begin
           usepropertyset = true
           useversionfromdof = false
           verboseoutput = false
-          versioninfokeys = "LegalCopyright\=© 2019 -2024 Vincent Parrett and Contributors" +
-                            "ProductName\=DPM Package Manager" +
+          versioninfokeys = "LegalCopyright\=© 2019 -2025 Vincent Parrett and Contributors" +
+                            "ProductName\=DPM Package Manager Command Line Tool" +
                             "ProductVersion\=0.2.0-alpha" +
                             ""
           versioninfopropertysetname = DPMVersion
@@ -616,7 +619,7 @@ begin
           terminateontimeout = true
           timeoutlength = 2
           as.projectpath = %SRC_ROOT%\\DSpecCreator\\DspecCreator.dproj
-          as.compilerversion = 11.0
+          as.compilerversion = 12.0
           as.verbosity = Debug
           as.nobanner = True
         end
@@ -635,7 +638,7 @@ begin
           configname = Release
           customvclstyles = C:\\Users\\Public\\Documents\\Embarcadero\\Studio\\22.0\\Styles\\Windows10.vsf
           debugversionnumbers = false
-          delphiversion = Delphi11
+          delphiversion = Delphi12
           enabletimeout = false
           eurekalogverboselogging = false
           frameworktype = VCL
@@ -657,7 +660,7 @@ begin
           manifestfile = %SRC_ROOT%\\dpmManifest.xml
           minorversion = 2
           noconfig = false
-          platform = Win32
+          platform = Win64
           platformsdktype = ProjectSDK
           projectfile = %SRC_ROOT%\\DSpecCreator\\DspecCreator.dpr
           regenerateresource = true
@@ -675,7 +678,7 @@ begin
           usepropertyset = true
           useversionfromdof = false
           verboseoutput = false
-          versioninfokeys = "LegalCopyright\=© 2019 -2024 Vincent Parrett and Contributors" +
+          versioninfokeys = "LegalCopyright\=© 2019 -2025 Vincent Parrett and Contributors" +
                             "ProductName\=DSpec Creator for DPM Package Manager" +
                             "ProductVersion\=0.2.0-alpha" +
                             ""
@@ -728,7 +731,7 @@ begin
             mapfile = 0
             maxstacksize = 1048576
             minstacksize = 16384
-            namespaceprefixes = System;Xml;Data;Datasnap;Web;Soap;Winapi;System.Win;Data.Win;Web.Win;Soap.Win;Bde;
+            namespaceprefixes = System;Xml;Data;Datasnap;Web;Soap;Winapi;System.Win;Data.Win;Web.Win;Soap.Win;
             openstrings = true
             optimisation = true
             outputdir = %OUTPUT_DIR%
@@ -1346,7 +1349,7 @@ begin
         terminateontimeout = true
         timeoutlength = 2
         as.projectpath = %SRC_ROOT%\\%ProjectFile%oj
-        as.compilerversion = XE7
+        as.compilerversion = 12
         as.verbosity = Debug
         as.nobanner = True
         action.script
@@ -1374,7 +1377,7 @@ begin
         compileridl = true
         configname = Release
         debugversionnumbers = false
-        delphiversion = DelphiXE7
+        delphiversion = Delphi12
         enabletimeout = false
         eurekalogverboselogging = false
         frameworktype = VCL
@@ -1395,7 +1398,7 @@ begin
         manifestfile = %SRC_ROOT%\\dpmManifest.xml
         minorversion = 2
         noconfig = false
-        platform = Win32
+        platform = Win64
         platformsdktype = ProjectSDK
         projectfile = %SRC_ROOT%\\%ProjectFile%
         regenerateresource = true
@@ -1413,8 +1416,8 @@ begin
         usepropertyset = true
         useversionfromdof = false
         verboseoutput = false
-        versioninfokeys = "LegalCopyright\=© 2019 -2024 Vincent Parrett and Contributors" +
-                          "ProductName\=DPM IDE Support for DelphiXE7" +
+        versioninfokeys = "LegalCopyright\=© 2019 -2025 Vincent Parrett and Contributors" +
+                          "ProductName\=DPM IDE Support for Delphi12" +
                           "ProductVersion\=0.2.0-alpha" +
                           ""
         versioninfopropertysetname = DPMVersion

@@ -106,6 +106,7 @@ type
       const source, lib, files : IList<ISpecFileEntry>; const search : IList<ISpecSearchPath>);
   public
     constructor Create(const logger : ILogger); override;
+    destructor Destroy;override;
     property LibFiles : IList<ISpecFileEntry>read GetLibFiles;
     property SourceFiles : IList<ISpecFileEntry>read GetSourceFiles;
     property Files : IList<ISpecFileEntry>read GetFiles;
@@ -231,6 +232,19 @@ var
 begin
   source := FindSourceFileBySrc(src);
   FSourceFiles.Remove(source);
+end;
+
+destructor TSpecTemplateBase.Destroy;
+begin
+  FDependencies := nil;
+  FDesignFiles := nil;
+  FFiles := nil;
+  FLibFiles := nil;
+  FRuntimeFiles := nil;
+  FSourceFiles := nil;
+  FSearchPaths := nil;
+  FBuildEntries := nil;
+  inherited;
 end;
 
 function TSpecTemplateBase.NewSource(const src: string): ISpecFileEntry;

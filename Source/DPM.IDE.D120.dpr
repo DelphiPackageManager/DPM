@@ -24,6 +24,8 @@
 {                                                                           }
 {***************************************************************************}
 
+// JCL_DEBUG_EXPERT_GENERATEJDBG OFF
+// JCL_DEBUG_EXPERT_INSERTJDBG OFF
 library DPM.IDE.D120;
 
 

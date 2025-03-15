@@ -1,3 +1,5 @@
+// JCL_DEBUG_EXPERT_GENERATEJDBG OFF
+// JCL_DEBUG_EXPERT_INSERTJDBG OFF
 program DPM.Core.Tests;
 
 {$IFNDEF TESTINSIGHT}
@@ -113,7 +115,8 @@ uses
   DPM.Core.Package.PackageLatestVersionInfo in 'Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas',
   DPM.Core.Manifest.Interfaces in 'Core\Manifest\DPM.Core.Manifest.Interfaces.pas',
   DPM.Core.Manifest in 'Core\Manifest\DPM.Core.Manifest.pas',
-  DPM.Core.Manifest.Reader in 'Core\Manifest\DPM.Core.Manifest.Reader.pas';
+  DPM.Core.Manifest.Reader in 'Core\Manifest\DPM.Core.Manifest.Reader.pas',
+  DPM.Core.Tests.PackageIdentity in 'Tests\DPM.Core.Tests.PackageIdentity.pas';
 
 var
   runner : ITestRunner;

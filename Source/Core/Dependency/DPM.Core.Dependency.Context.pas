@@ -90,6 +90,7 @@ type
   public
     constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>);overload;
     constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectReferences : IList<IPackageReference>);overload;
+    destructor Destroy;override;
   end;
 
 
@@ -166,6 +167,7 @@ var
   end;
 
 begin
+  inherited Create;
   FCompilerVersion := compilerVersion;
   FPlatform := platform;
   FLogger := logger;
@@ -189,6 +191,17 @@ begin
     RecordResolution(projectReference.PackageInfo, projectReference.VersionRange, projectReference.ParentId);
   end;
 
+end;
+
+destructor TResolverContext.Destroy;
+begin
+  FLogger := nil;
+  FPackageInstallerContext := nil;
+  FNoGoods := nil;
+  FResolved := nil;
+  FOpenRequirements := nil;
+  FVersionCache := nil;
+  inherited;
 end;
 
 constructor TResolverContext.Create(const logger : ILogger;  const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>);

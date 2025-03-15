@@ -68,3 +68,5 @@ Packages
 Source/DSpecCreator/__recovery
 *.user
 *.dll
+__recovery
+*.jdbg

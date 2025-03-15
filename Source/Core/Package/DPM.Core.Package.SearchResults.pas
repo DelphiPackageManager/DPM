@@ -101,6 +101,7 @@ type
     constructor CreateFromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const platform : TDPMPlatform; const errorDescription : string);
 
   public
+    destructor Destroy;override;
     class function FromJson(const sourceName : string; const jsonObject : TJsonObject) : IPackageSearchResultItem;
     class function FromMetaData(const sourceName : string; const metaData : IPackageMetadata) : IPackageSearchResultItem;
     class function FromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const platform : TDPMPlatform; const errorDescription : string) : IPackageSearchResultItem;
@@ -236,6 +237,12 @@ begin
   FDownloadCount := -1; //indicates not set;
   FIsReservedPrefix := false;
   FVersionRange := TVersionRange.Empty;
+end;
+
+destructor TDPMPackageSearchResultItem.Destroy;
+begin
+  FDependencies := nil;
+  inherited;
 end;
 
 class function TDPMPackageSearchResultItem.FromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const platform : TDPMPlatform; const errorDescription : string) : IPackageSearchResultItem;

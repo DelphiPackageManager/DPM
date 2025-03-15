@@ -106,6 +106,7 @@ type
 
   public
     constructor Create(const logger : ILogger); override;
+    destructor Destroy;override;
 
   end;
 
@@ -123,6 +124,25 @@ begin
   FVersion := TPackageVersion.Empty;
   FUIFrameworkType := TDPMUIFrameworkType.None;
   FLicenseType := TDPMLicenseType.SPDX;
+end;
+
+destructor TSpecMetaData.Destroy;
+begin
+//  FId := '';
+//  FDescription := '';
+//  FAuthors := '';
+//  FProjectUrl := '';
+//  FRepositoryUrl := '';
+//  FRepositoryType := '';
+//  FRepositoryBranch := '';
+//  FRepositoryCommit := '';
+//  FReleaseNotes := '';
+//  FLicense := '';
+//  FIcon := '';
+//  FCopyright := '';
+//  FTags := '';
+//  FReadme := '';
+  inherited;
 end;
 
 function TSpecMetaData.GetAuthors : string;

@@ -43,7 +43,7 @@ type
     FVersionString : string;
   protected
     function GetId : string;
-    procedure SetId(Id: string);
+    procedure SetId(const Id: string);
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
     function GetVersionString : string;
@@ -138,7 +138,7 @@ begin
 
 end;
 
-procedure TSpecDependency.SetId(Id: string);
+procedure TSpecDependency.SetId(const Id: string);
 begin
   FId := Id;
 end;

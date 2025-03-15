@@ -30,7 +30,7 @@ interface
 
 uses
   Generics.Defaults,
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
@@ -75,6 +75,7 @@ type
 
   public
     constructor Create(const logger : ILogger); override;
+    destructor Destroy;override;
   end;
 
 implementation
@@ -135,10 +136,16 @@ begin
 
 end;
 
+destructor TDPMServerPackageRepository.Destroy;
+begin
+  FServiceIndex := nil;
+  inherited;
+end;
+
 function TDPMServerPackageRepository.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : Boolean;
 var
   httpClient : IHttpClient;
-  request : TRequest;
+  request : IHttpRequest;
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
@@ -176,7 +183,7 @@ begin
   stopwatch := TStopwatch.StartNew;
   Logger.Information('GET ' + uri.BaseUriString + path);
   try
-    response := request.Get(cancellationToken);
+    response := httpClient.Get(request, cancellationToken);
   except
     on ex : Exception do
     begin
@@ -193,6 +200,10 @@ begin
   stopwatch.Stop;
   Logger.Information('OK ' + uri.BaseUriString + path + ' [' + IntToStr(stopwatch.ElapsedMilliseconds) + 'ms]');
 
+  request := nil;
+  response := nil;
+  httpClient := nil;
+
   fileName := destFile;
   result := true;
 end;
@@ -201,7 +212,7 @@ end;
 function TDPMServerPackageRepository.FindLatestVersion(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean): IPackageIdentity;
 var
   httpClient : IHttpClient;
-  request : TRequest;
+  request : IHttpRequest;
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
@@ -239,7 +250,7 @@ begin
     request.WithParameter(cPreReleaseParam, LowerCase(BoolToStr(includePrerelease, true)));
   try
     Logger.Information('GET ' + uri.BaseUriString);
-    response := request.Get(cancellationToken);
+    response := httpClient.Get(request, cancellationToken);
   except
     on ex : Exception do
     begin
@@ -289,7 +300,7 @@ end;
 function TDPMServerPackageRepository.GetPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
 var
   httpClient : IHttpClient;
-  request : TRequest;
+  request : IHttpRequest;
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
@@ -338,7 +349,7 @@ begin
     request.WithParameter('take', IntToStr(options.Take));
 
   try
-    response := request.Get(cancellationToken);
+    response := httpClient.Get(request, cancellationToken);
   except
     on ex : Exception do
     begin
@@ -395,7 +406,7 @@ function TDPMServerPackageRepository.GetPackageFeedByIds(const cancellationToken
   const platform: TDPMPlatform): IPackageSearchResult;
 var
   httpClient : IHttpClient;
-  request : TRequest;
+  request : IHttpRequest;
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
@@ -448,7 +459,7 @@ begin
 
   try
     Logger.Information('POST ' + uri.ToString);
-    response := request.Post(cancellationToken);
+    response := httpClient.Post(request, cancellationToken);
   except
     on ex : Exception do
     begin
@@ -507,7 +518,7 @@ end;
 function TDPMServerPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
 var
   httpClient : IHttpClient;
-  request : TRequest;
+  request : IHttpRequest;
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
@@ -535,7 +546,7 @@ begin
                        .WithHeader(cClientVersionHeader,cDPMClientVersion)
                        .WithHeader(cUserAgentHeader,cDPMUserAgent);
   try
-    response := request.Get(cancelToken);
+    response := httpClient.Get(request, cancelToken);
   except
     on ex : Exception do
     begin
@@ -577,7 +588,7 @@ end;
 function TDPMServerPackageRepository.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
 var
   httpClient : IHttpClient;
-  request : TRequest;
+  request : IHttpRequest;
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
@@ -612,7 +623,7 @@ begin
 
   try
     Logger.Information('GET ' + uri.BaseUriString + path);
-    response := request.Get(cancellationToken);
+    response := httpClient.Get(request, cancellationToken);
   except
     on ex : Exception do
     begin
@@ -669,7 +680,7 @@ end;
 function TDPMServerPackageRepository.GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageSearchResultItem;
 var
   httpClient : IHttpClient;
-  request : TRequest;
+  request : IHttpRequest;
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
@@ -701,7 +712,7 @@ begin
   Logger.Information('GET ' + uri.BaseUriString + path);
 
   try
-    response := request.Get(cancellationToken);
+    response := httpClient.Get(request, cancellationToken);
   except
     on ex : Exception do
     begin
@@ -742,7 +753,7 @@ end;
 function TDPMServerPackageRepository.GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const preRelease : boolean) : IList<TPackageVersion>;
 var
   httpClient : IHttpClient;
-  request : TRequest;
+  request : IHttpRequest;
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
@@ -778,7 +789,7 @@ begin
 
   try
     Logger.Information('GET ' + uri.BaseUriString + path);
-    response := request.Get(cancellationToken);
+    response := httpClient.Get(request, cancellationToken);
   except
     on ex : Exception do
     begin
@@ -822,7 +833,7 @@ end;
 function TDPMServerPackageRepository.GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
 var
   httpClient : IHttpClient;
-  request : TRequest;
+  request : IHttpRequest;
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
@@ -865,7 +876,7 @@ begin
   stopwatch := TStopwatch.StartNew;
   try
     Logger.Information('GET ' + uri.BaseUriString + path);
-    response := request.Get(cancellationToken);
+    response := httpClient.Get(request, cancellationToken);
     stopwatch.Stop;
   except
     on ex : Exception do
@@ -917,7 +928,7 @@ end;
 function TDPMServerPackageRepository.GetServiceIndex(const cancellationToken: ICancellationToken): IServiceIndex;
 var
   httpClient : IHttpClient;
-  request : TRequest;
+  request : IHttpRequest;
   response : IHttpResponse;
   uri : IUri;
 begin
@@ -934,7 +945,7 @@ begin
 
   try
 //    Logger.Debug('getting service Index ' + self.SourceUri);
-    response := request.Get(cancellationToken);
+    response := httpClient.Get(request, cancellationToken);
     if response.StatusCode <> 200 then
     begin
       if response.StatusCode > 0 then
@@ -960,7 +971,7 @@ end;
 function TDPMServerPackageRepository.List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>;
 var
   httpClient : IHttpClient;
-  request : TRequest;
+  request : IHttpRequest;
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
@@ -1022,7 +1033,7 @@ begin
 
 
   try
-    response := request.Get(cancellationToken);
+    response := httpClient.Get(request, cancellationToken);
   except
     on ex : Exception do
     begin
@@ -1066,7 +1077,7 @@ end;
 function TDPMServerPackageRepository.Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions): Boolean;
 var
   httpClient : IHttpClient;
-  request : TRequest;
+  request : IHttpRequest;
   response : IHttpResponse;
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
@@ -1111,7 +1122,7 @@ begin
                        .WithHeader('X-ApiKey', pushOptions.ApiKey)
                        .WithFile(pushOptions.PackagePath);
 
-  response := request.Put(cancellationToken);
+  response := httpClient.Put(request, cancellationToken);
 
   Logger.Information(Format('Package Upload [%d] : %s', [response.StatusCode, response.Response]));
 

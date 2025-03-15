@@ -30,7 +30,7 @@ interface
 
 uses
   Generics.Defaults,
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
@@ -54,7 +54,7 @@ type
     function DoGetPackageMetaData(const cancellationToken : ICancellationToken; const fileName : string; const readManifestFunc : TReadManifestFunc) : IInterface;
 
 
-    function DoList(searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
+    function DoList(const searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
     function DoExactList(const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const version : string) : IList<string>;
 
     function DoGetPackageFeedFiles(const searchTerm : string; const exact : boolean; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
@@ -923,23 +923,25 @@ begin
 
 end;
 
-function TDirectoryPackageRepository.DoList(searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
-//var
+function TDirectoryPackageRepository.DoList(const searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
+var
 //  files : TStringDynArray;
 //  fileList : IList<string>;
+  term : string;
 begin
+  term := searchTerm;
   //  result := TCollections.CreateList<string>;
-  if searchTerm <> '*' then
-    searchTerm := '*' + searchTerm + '*';
+  if term <> '*' then
+    term := '*' + term + '*';
 
-  searchTerm := searchTerm + '-' + CompilerVersionToSearchPart(compilerVersion);
+  term := term + '-' + CompilerVersionToSearchPart(compilerVersion);
 
   if platform = TDPMPlatform.UnknownPlatform then
-    searchTerm := searchTerm + '-*-*' + cPackageFileExt
+    term := term + '-*-*' + cPackageFileExt
   else
-    searchTerm := searchTerm + '-' + DPMPlatformToString(platform) + '-*' + cPackageFileExt;
+    term := term + '-' + DPMPlatformToString(platform) + '-*' + cPackageFileExt;
 
-  result := TDirectoryUtils.GetFiles(SourceUri, searchTerm);
+  result := TDirectoryUtils.GetFiles(SourceUri, term);
 
   //fileList := TCollections.CreateList<string>(files);
 

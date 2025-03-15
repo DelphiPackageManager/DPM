@@ -60,7 +60,10 @@ type
     RS10_3,
     RS10_4,
     RS11_0,
-    RS12_0
+    RS12_0//,
+
+
+//    RS_MAX = RS12_0  //not sure if this won't cause problems
     );
 
   TCompilerVersions = set of TCompilerVersion;

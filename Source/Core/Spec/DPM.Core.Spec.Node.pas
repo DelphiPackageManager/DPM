@@ -46,9 +46,10 @@ type
     function LoadFromJson(const jsonObject : TJsonObject) : boolean; virtual; abstract;
     function ToJSON: string; virtual; abstract;
     function LoadJsonCollection(const collection : TJSonArray; const nodeClass : TSpecNodeClass; const action : TConstProc<IInterface>) : boolean;
-    function LoadObjectList(list: Spring.Collections.IList<ISpecNode>): TJsonArray;
+    function LoadObjectList(const list: Spring.Collections.IList<ISpecNode>): TJsonArray;
   public
     constructor Create(const logger : ILogger); virtual;
+    destructor Destroy;override;
   end;
 
 
@@ -59,7 +60,14 @@ implementation
 
 constructor TSpecNode.Create(const logger : ILogger);
 begin
+  inherited Create;
   FLogger := logger;
+end;
+
+destructor TSpecNode.Destroy;
+begin
+  FLogger := nil;
+  inherited;
 end;
 
 function TSpecNode.LoadJsonCollection(const collection : TJSonArray; const nodeClass : TSpecNodeClass; const action : TConstProc<IInterface>) : boolean;
@@ -81,7 +89,7 @@ begin
   end;
 end;
 
-function TSpecNode.LoadObjectList(list: Spring.Collections.IList<ISpecNode>): TJsonArray;
+function TSpecNode.LoadObjectList(const list: Spring.Collections.IList<ISpecNode>): TJsonArray;
 var
   i: Integer;
   json : TJSONObject;

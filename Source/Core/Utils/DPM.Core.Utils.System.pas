@@ -28,6 +28,10 @@ unit DPM.Core.Utils.System;
 
 interface
 
+uses
+  System.SysUtils;
+
+
 type
   TSystemUtils = class
   public
@@ -40,16 +44,39 @@ type
     class function IsIDEProcess : boolean;
     class function Is64BitIDE : boolean;
     class procedure SetIsIDE;
+    class function GetStackTrace(const ex: Exception; const exAddressAddress: Pointer): string;
   end;
 
 implementation
 
 uses
-  System.SysUtils,
+{$IFDEF JCLDEBUG}
+  JclDebug,
+{$ENDIF}
+  System.Classes,
   WinApi.Windows;
 
 var
   _isIDE : boolean = false;
+
+
+class function TSystemUtils.GetStackTrace(const ex: Exception; const exAddressAddress: Pointer): string;
+{$IFDEF JCLDEBUG}
+var
+  traceList: TStrings;
+{$ENDIF}
+begin
+  result := '';
+  {$IFDEF JCLDEBUG}
+  traceList := TStringList.Create;
+  try
+    JclDebug.JclLastExceptStackListToStrings(traceList, true);
+    Result := traceList.Text;
+  finally
+    traceList.Free;
+  end;
+  {$ENDIF}
+end;
 
 { TSystemUtils }
 

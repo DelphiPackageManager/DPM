@@ -51,9 +51,9 @@ type
 
   protected
     function GetPlatforms : TArray<TDPMPlatform>;
-    procedure SetPlatforms(platforms: TArray<TDPMPlatform>);
+    procedure SetPlatforms(const platforms: TArray<TDPMPlatform>);
     function GetTemplateName : string;
-    procedure SetTemplateName(name: string);
+    procedure SetTemplateName(const name: string);
     function GetCompiler : TCompilerVersion;
     procedure SetCompiler(compiler: TCompilerVersion);
     function GetVariables : TStrings;
@@ -66,7 +66,7 @@ type
     constructor CreateReducedClone(const logger : ILogger; const targetPlatform : ISpecTargetPlatform; const platform : TDPMPlatform; const variables : TStrings);
     destructor Destroy;override;
     function ToString : string;override;
-    function PlatformContains(platformName:string): Boolean;
+    function PlatformContains(const platformName:string): Boolean;
   end;
 
 
@@ -276,7 +276,7 @@ begin
   result := inherited LoadFromJson(jsonObject) and result;
 end;
 
-function TSpecTargetPlatform.PlatformContains(platformName: string): Boolean;
+function TSpecTargetPlatform.PlatformContains(const platformName: string): Boolean;
 var
   I: Integer;
 begin
@@ -293,12 +293,12 @@ begin
   FCompiler := compiler;
 end;
 
-procedure TSpecTargetPlatform.SetPlatforms(platforms: TArray<TDPMPlatform>);
+procedure TSpecTargetPlatform.SetPlatforms(const platforms: TArray<TDPMPlatform>);
 begin
   FPlatforms := platforms;
 end;
 
-procedure TSpecTargetPlatform.SetTemplateName(name: string);
+procedure TSpecTargetPlatform.SetTemplateName(const name: string);
 begin
   FTemplateName := name;
 end;
