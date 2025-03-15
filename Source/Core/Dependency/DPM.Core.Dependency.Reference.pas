@@ -212,8 +212,8 @@ begin
   FPlatform := platform;
   FSelectedOn := selectedOn;
   FUseSource := useSource;
-  if FParent <> nil then
-    FCompilerVersion := parent.CompilerVersion
+  if FParent.IsAlive then
+    FCompilerVersion := FParent.Target.CompilerVersion
   else
     FCompilerVersion := compilerVersion;
 
