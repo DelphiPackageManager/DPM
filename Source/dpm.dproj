@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
@@ -79,7 +79,7 @@
         <DCC_Optimize>false</DCC_Optimize>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <DCC_Define>JCLDEBUGX;$(DCC_Define)</DCC_Define>
+        <DCC_DebugInfoInExe>true</DCC_DebugInfoInExe>
         <DCC_MapFile>3</DCC_MapFile>
         <Debugger_CWD>I:\Github\DelphiPackageManager\DPMMaster\Source</Debugger_CWD>
         <Debugger_EnvVars>DPMPACKAGECACHE=c:\temp\packagecache;$(Debugger_EnvVars)</Debugger_EnvVars>
@@ -91,7 +91,7 @@
         <DPMCompiler>12.0</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.3.0\lib;$(DPM)\VSoft.HttpClient\2.1.0\lib;$(DPM)\VSoft.CommandLine\0.1.6\lib;$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\VSoft.AntPatterns\0.1.7\lib;$(DPM)\Spring4D.Extensions\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\Spring4D.Base\2.0.1\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.3.0\lib;$(DPM)\VSoft.HttpClient\2.2.0\lib;$(DPM)\VSoft.CommandLine\0.1.6\lib;$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\VSoft.AntPatterns\0.1.7\lib;$(DPM)\Spring4D.Extensions\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\Spring4D.Base\2.0.1\lib;</DPMSearch>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -269,7 +269,7 @@
             <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.1.7"/>
             <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.1.2"/>
             <PackageReference id="VSoft.CommandLine" platform="Win32" version="0.1.6"/>
-            <PackageReference id="VSoft.HttpClient" platform="Win32" version="2.1.0">
+            <PackageReference id="VSoft.HttpClient" platform="Win32" version="2.2.0">
                 <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.1.2" range="0.1.2"/>
                 <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.2" range="0.3.2"/>
             </PackageReference>
