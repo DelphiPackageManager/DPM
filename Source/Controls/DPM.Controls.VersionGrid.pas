@@ -187,6 +187,9 @@ type
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X: Integer; Y: Integer); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure KeyDown(var Key: Word; Shift: TShiftState); override;
+
+
 
     procedure DoSelectionChanged;
 
@@ -1193,6 +1196,44 @@ end;
 function TVersionGrid.IsAtTop: boolean;
 begin
   result := FVScrollPos = 0;
+end;
+
+procedure TVersionGrid.KeyDown(var Key: Word; Shift: TShiftState);
+var
+  scrollPos : integer;
+begin
+  inherited;
+  case Key of
+    VK_DOWN   : DoLineDown(false);
+    VK_UP     : DoLineUp(false);
+    VK_PRIOR  :
+    begin
+      ScrollPos :=  FVScrollPos - FSelectableRows;
+      if ScrollPos < 0 then
+        ScrollPos := 0;
+      DoPageUp(true,ScrollPos);
+    end;
+    VK_NEXT :
+    begin
+      ScrollPos :=  FVScrollPos + FSelectableRows;
+      if ScrollPos > RowCount -1 then
+        ScrollPos := RowCount - 1;
+      DoPageDown(true, ScrollPos);
+    end;
+    VK_HOME:
+    begin
+      ScrollPos := 0;
+      DoPageUp(true,ScrollPos);
+    end;
+    VK_END :
+    begin
+      ScrollPos := RowCount - 1;
+      DoPageDown(true, ScrollPos);
+    end;
+
+  end;
+
+
 end;
 
 procedure TVersionGrid.Loaded;
