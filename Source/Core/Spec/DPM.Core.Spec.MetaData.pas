@@ -425,6 +425,9 @@ begin
     if FIsCommercial then
       json.b['iscommercial'] := FIsCommercial;
 
+    if Length(FReadme) > 0 then
+      json.S['readme'] := FReadme;
+
     Result := json.ToJSON;
   finally
     FreeAndNil(json);

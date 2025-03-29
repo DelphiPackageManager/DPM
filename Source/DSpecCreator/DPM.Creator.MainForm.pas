@@ -216,6 +216,9 @@ type
     btnDeleteTemplate : TButton;
     btnDuplicateTemplate : TButton;
     Splitter1: TSplitter;
+    edtReadme: TEdit;
+    Label13: TLabel;
+    Label14: TLabel;
     procedure FormDestroy(Sender : TObject);
     procedure btnAddExcludeClick(Sender : TObject);
     procedure btnAddTemplateClick(Sender : TObject);
@@ -301,6 +304,7 @@ type
     procedure edtCopyrightChange(Sender : TObject);
     procedure edtBPLEntryBuildIdChange(Sender: TObject);
     procedure clbCompilersKeyPress(Sender: TObject; var Key: Char);
+    procedure edtReadmeChange(Sender: TObject);
   private
     { Private declarations }
     FtmpFilename : string;
@@ -476,8 +480,11 @@ begin
   FtmpFilename := ChangeFileExt(FtmpFilename, '.dspec');
   TFile.WriteAllText(FtmpFilename, FOpenFile.AsString);
   if DirectoryExists(edtPackageOutputPath.Text) then
+  begin
+    FDosCommand.CurrentDir := FOpenFile.WorkingDir;
     FDosCommand.CommandLine := 'dpm pack "' + FtmpFilename + '" -o=' + edtPackageOutputPath.Text;
-  FDosCommand.Execute;
+    FDosCommand.Execute;
+  end;
 end;
 
 procedure TDSpecCreatorForm.DeleteSelectedEntry;
@@ -1737,6 +1744,11 @@ begin
   FOpenFile.PackageSpec.metadata.projectUrl := edtProjectURL.Text;
 end;
 
+procedure TDSpecCreatorForm.edtReadmeChange(Sender: TObject);
+begin
+  FOpenFile.PackageSpec.metadata.Readme := edtReadme.Text;
+end;
+
 procedure TDSpecCreatorForm.edtRepositoryURLChange(Sender : TObject);
 begin
   FOpenFile.PackageSpec.metadata.repositoryUrl := edtRepositoryURL.Text;
@@ -1916,6 +1928,7 @@ begin
   edtCopyright.Text := FOpenFile.PackageSpec.metadata.Copyright;
   cboLicense.Text := FOpenFile.PackageSpec.metadata.license;
   edtTags.Text := FOpenFile.PackageSpec.metadata.tags;
+  edtReadme.Text := FOpenFile.PackageSpec.metadata.Readme;
   if Length(FOpenFile.PackageSpec.metadata.Icon) > 0 then
   begin
     ImgIcon.Picture.LoadFromFile(TPath.Combine(FOpenFile.WorkingDir, FOpenFile.PackageSpec.metadata.Icon));
