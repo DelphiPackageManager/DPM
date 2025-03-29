@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
@@ -9,13 +9,18 @@
         <ProjectGuid>{CFBF7204-5639-4643-B895-08DDF96E0F8F}</ProjectGuid>
         <ProjectName Condition="'$(ProjectName)'==''">dpm</ProjectName>
         <ProjectVersion>20.3</ProjectVersion>
-        <TargetedPlatforms>1</TargetedPlatforms>
+        <TargetedPlatforms>3</TargetedPlatforms>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Base)'=='true') or '$(Base_Win32)'!=''">
         <Base_Win32>true</Base_Win32>
+        <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Base)'=='true') or '$(Base_Win64)'!=''">
+        <Base_Win64>true</Base_Win64>
         <CfgParent>Base</CfgParent>
         <Base>true</Base>
     </PropertyGroup>
@@ -41,6 +46,26 @@
         <Cfg_2>true</Cfg_2>
         <Base>true</Base>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(Config)'=='JCLDEBUG' or '$(Cfg_4)'!=''">
+        <Cfg_4>true</Cfg_4>
+        <CfgParent>Cfg_2</CfgParent>
+        <Cfg_2>true</Cfg_2>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_4)'=='true') or '$(Cfg_4_Win32)'!=''">
+        <Cfg_4_Win32>true</Cfg_4_Win32>
+        <CfgParent>Cfg_4</CfgParent>
+        <Cfg_4>true</Cfg_4>
+        <Cfg_2>true</Cfg_2>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Cfg_4)'=='true') or '$(Cfg_4_Win64)'!=''">
+        <Cfg_4_Win64>true</Cfg_4_Win64>
+        <CfgParent>Cfg_4</CfgParent>
+        <Cfg_4>true</Cfg_4>
+        <Cfg_2>true</Cfg_2>
+        <Base>true</Base>
+    </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
         <SanitizedProjectName>dpm</SanitizedProjectName>
         <DCC_ExeOutput>..\Output</DCC_ExeOutput>
@@ -62,6 +87,13 @@
         <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
         <DCC_UsePackage>rtl;$(DCC_UsePackage)</DCC_UsePackage>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(Base_Win64)'!=''">
+        <BT_BuildType>Debug</BT_BuildType>
+        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;$(DCC_Namespace)</DCC_Namespace>
+        <VerInfo_IncludeVerInfo>false</VerInfo_IncludeVerInfo>
+        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Locale>1033</VerInfo_Locale>
+    </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1)'!=''">
         <DCC_DebugInformation>0</DCC_DebugInformation>
         <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
@@ -81,17 +113,29 @@
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <DCC_DebugInfoInExe>true</DCC_DebugInfoInExe>
         <DCC_MapFile>3</DCC_MapFile>
-        <Debugger_CWD>I:\Github\DelphiPackageManager\DPMMaster\Source</Debugger_CWD>
+        <Debugger_CWD>I:\Github\VSoftTechnologies\VSoft.ThreadpoolTimer</Debugger_CWD>
         <Debugger_EnvVars>DPMPACKAGECACHE=c:\temp\packagecache;$(Debugger_EnvVars)</Debugger_EnvVars>
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
-        <Debugger_RunParams>list -source=Private</Debugger_RunParams>
+        <Debugger_RunParams>pack VSoft.ThreadpoolTimer.dspec -o=i:\dpm-upload</Debugger_RunParams>
+        <ILINK_MapFileType>DetailedSegments</ILINK_MapFileType>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_4_Win32)'!=''">
+        <DCC_Define>JCLDEBUG;$(DCC_Define)</DCC_Define>
+        <Debugger_CWD>I:\Github\VSoftTechnologies\VSoft.ThreadpoolTimer</Debugger_CWD>
+        <Debugger_RunParams>pack VSoft.ThreadpoolTimer.dspec -o=i:\dpm-upload</Debugger_RunParams>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_4_Win64)'!=''">
+        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
+        <DCC_Define>JCLDEBUG;$(DCC_Define)</DCC_Define>
+        <DCC_MapFile>3</DCC_MapFile>
         <ILINK_MapFileType>DetailedSegments</ILINK_MapFileType>
     </PropertyGroup>
     <PropertyGroup>
         <DPMCompiler>12.0</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.3.0\lib;$(DPM)\VSoft.HttpClient\2.2.0\lib;$(DPM)\VSoft.CommandLine\0.1.6\lib;$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\VSoft.AntPatterns\0.1.7\lib;$(DPM)\Spring4D.Extensions\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\Spring4D.Base\2.0.1\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.3.0\lib;$(DPM)\VSoft.HttpClient\2.2.1\lib;$(DPM)\VSoft.CommandLine\0.1.6\lib;$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\VSoft.AntPatterns\0.1.7\lib;$(DPM)\Spring4D.Extensions\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\Spring4D.Base\2.0.1\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.3.0\lib;$(DPM)\VSoft.HttpClient\2.2.1\lib;$(DPM)\VSoft.CommandLine\0.1.6\lib;$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\VSoft.AntPatterns\0.1.7\lib;$(DPM)\Spring4D.Extensions\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\Spring4D.Base\2.0.1\lib;</DPMSearch>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -238,6 +282,10 @@
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
         </BuildConfiguration>
+        <BuildConfiguration Include="JCLDEBUG">
+            <Key>Cfg_4</Key>
+            <CfgParent>Cfg_2</CfgParent>
+        </BuildConfiguration>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Delphi.Personality.12</Borland.Personality>
@@ -254,7 +302,7 @@
                 <Platform value="OSX64">False</Platform>
                 <Platform value="OSXARM64">False</Platform>
                 <Platform value="Win32">True</Platform>
-                <Platform value="Win64">False</Platform>
+                <Platform value="Win64">True</Platform>
             </Platforms>
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
@@ -269,13 +317,30 @@
             <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.1.7"/>
             <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.1.2"/>
             <PackageReference id="VSoft.CommandLine" platform="Win32" version="0.1.6"/>
-            <PackageReference id="VSoft.HttpClient" platform="Win32" version="2.2.0">
+            <PackageReference id="VSoft.HttpClient" platform="Win32" version="2.2.1">
                 <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.1.2" range="0.1.2"/>
                 <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.2" range="0.3.2"/>
             </PackageReference>
             <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.3.0"/>
             <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.5"/>
             <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.2"/>
+            <PackageReference id="Spring4D.Base" platform="Win64" version="2.0.1"/>
+            <PackageReference id="Spring4D.Core" platform="Win64" version="2.0.1">
+                <PackageReference id="Spring4D.Base" platform="Win64" version="2.0.1" range="2.0.1"/>
+            </PackageReference>
+            <PackageReference id="Spring4D.Extensions" platform="Win64" version="2.0.1">
+                <PackageReference id="Spring4D.Base" platform="Win64" version="2.0.1" range="2.0.1"/>
+            </PackageReference>
+            <PackageReference id="VSoft.AntPatterns" platform="Win64" version="0.1.7"/>
+            <PackageReference id="VSoft.CancellationToken" platform="Win64" version="0.1.2"/>
+            <PackageReference id="VSoft.CommandLine" platform="Win64" version="0.1.6"/>
+            <PackageReference id="VSoft.HttpClient" platform="Win64" version="2.2.1">
+                <PackageReference id="VSoft.CancellationToken" platform="Win64" version="0.1.2" range="0.1.2"/>
+                <PackageReference id="VSoft.Uri" platform="Win64" version="0.3.2" range="0.3.2"/>
+            </PackageReference>
+            <PackageReference id="VSoft.JsonDataObjects" platform="Win64" version="0.3.0"/>
+            <PackageReference id="VSoft.SemanticVersion" platform="Win64" version="0.2.5"/>
+            <PackageReference id="VSoft.Uri" platform="Win64" version="0.3.2"/>
         </DPM>
     </ProjectExtensions>
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>
