@@ -217,7 +217,6 @@ type
     btnDuplicateTemplate : TButton;
     Splitter1: TSplitter;
     edtReadme: TEdit;
-    Label13: TLabel;
     Label14: TLabel;
     procedure FormDestroy(Sender : TObject);
     procedure btnAddExcludeClick(Sender : TObject);

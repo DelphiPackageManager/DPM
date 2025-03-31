@@ -17,20 +17,12 @@ object DSpecCreatorForm: TDSpecCreatorForm
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   TextHeight = 15
-  object Label13: TLabel
-    Left = 60
-    Top = 476
-    Width = 27
-    Height = 15
-    Alignment = taRightJustify
-    Caption = 'Tags:'
-  end
   object PageControl: TPageControl
     Left = 0
     Top = 0
     Width = 871
     Height = 519
-    ActivePage = tsGenerate
+    ActivePage = tsInfo
     Align = alClient
     TabOrder = 0
     object tsInfo: TTabSheet
@@ -279,6 +271,14 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Height = 23
         TabOrder = 4
         OnChange = edtCopyrightChange
+      end
+      object edtReadme: TEdit
+        Left = 89
+        Top = 447
+        Width = 376
+        Height = 23
+        TabOrder = 10
+        OnChange = edtReadmeChange
       end
     end
     object tsPlatforms: TTabSheet
@@ -1172,14 +1172,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         TabOrder = 0
       end
     end
-  end
-  object edtReadme: TEdit
-    Left = 93
-    Top = 473
-    Width = 376
-    Height = 23
-    TabOrder = 1
-    OnChange = edtReadmeChange
   end
   object MainMenu: TMainMenu
     Left = 508
