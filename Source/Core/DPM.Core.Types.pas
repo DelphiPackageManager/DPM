@@ -221,6 +221,8 @@ begin
       result := TDPMPlatform.AndroidArm64
     else if value = 'Linux64' then
       result := TDPMPlatform.LinuxIntel64
+    else if value = 'Win64x' then
+      result := TDPMPlatform.Win64
     else
       result := TDPMPlatform.UnknownPlatform
   end
