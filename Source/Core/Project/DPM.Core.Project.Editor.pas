@@ -114,7 +114,7 @@ const
 
   projectVersionXPath = '/x:Project/x:PropertyGroup/x:ProjectVersion';
 
-  mainSourceXPath = '/x:Project/x:PropertyGroup/x:ProjectVersion';
+  mainSourceXPath = '/x:Project/x:PropertyGroup/x:MainSource';
 
   projectAppTypeXPath = '/x:Project/x:PropertyGroup/x:AppType';
 
@@ -507,8 +507,8 @@ begin
             sOutputDir := StringReplace(sOutputDir, '$(Platform)', sPlatform, [rfReplaceAll, rfIgnoreCase]);
             sOutputDir := StringReplace(sOutputDir, '$(Config)', configKeys.Names[i], [rfReplaceAll, rfIgnoreCase]);
           end;
-          if sOutputDir = '' then
-             FLogger.Debug('No output directory found for config ' + configKeys.Names[i] + '_' + sPlatform);
+//          if sOutputDir = '' then
+//             FLogger.Debug('No output directory found for config ' + configKeys.Names[i] + '_' + sPlatform);
 
           sUsePackages := 'false';
           TryGetConfigValue(sKey, sPlatform, 'x:UsePackages', sUsePackages);
