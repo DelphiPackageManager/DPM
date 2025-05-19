@@ -38,6 +38,7 @@ procedure InitCore(const container : TContainer; const overrideProc : TConstProc
 implementation
 
 uses
+  System.Rtti,
   System.TypInfo,
   Spring.Container.Registration,
   Spring.Container.Common,
@@ -92,7 +93,6 @@ begin
 
   Container.RegisterType<ICompilerEnvironmentProvider, TCompilerEnvironmentProvider>;
   Container.RegisterType<ICompilerFactory, TCompilerFactory>().AsSingleton();
-
 
   if Assigned(overrideProc) then
     //allow IDE plugin to register it's own implementations.
