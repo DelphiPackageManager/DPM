@@ -8,8 +8,14 @@
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectName Condition="'$(ProjectName)'==''">DPM.IDE.D110</ProjectName>
-        <ProjectVersion>20.3</ProjectVersion>
+        <ProjectVersion>19.3</ProjectVersion>
         <TargetedPlatforms>1</TargetedPlatforms>
+    </PropertyGroup>
+    <PropertyGroup>
+        <DPMCompiler>11.0</DPMCompiler>
+        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
+        <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.10\lib;$(DPM)\VSoft.VirtualListView\0.4.4\lib;$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.3.0\lib;$(DPM)\VSoft.HttpClient\2.2.1\lib;$(DPM)\VSoft.Awaitable\0.6.0\lib;$(DPM)\VSoft.AntPatterns\0.1.7\lib;$(DPM)\Spring4D.Extensions\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\Spring4D.Base\2.0.1\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -46,7 +52,7 @@
         <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
         <DCC_ExeOutput>..\Output</DCC_ExeOutput>
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;$(DCC_Namespace)</DCC_Namespace>
-        <DCC_UnitSearchPath>$(DPMSearch);I:\Github\VSoftTechnologies\VSoft.VirtualListView\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>$(DPMSearch);$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <DCC_UsePackage>designide;rtl;vcl;$(DCC_UsePackage)</DCC_UsePackage>
         <GenDll>true</GenDll>
         <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
@@ -83,12 +89,6 @@
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <Debugger_HostApplication>E:\Emb\Studio\21.0\bin\bds.exe</Debugger_HostApplication>
         <Debugger_RunParams>-rOpenToolsAPI</Debugger_RunParams>
-    </PropertyGroup>
-    <PropertyGroup>
-        <DPMCompiler>11.0</DPMCompiler>
-        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
-        <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.10\lib;$(DPM)\VSoft.VirtualListView\0.4.4\lib;$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.3.0\lib;$(DPM)\VSoft.HttpClient\2.2.1\lib;$(DPM)\VSoft.Awaitable\0.6.0\lib;$(DPM)\VSoft.AntPatterns\0.1.7\lib;$(DPM)\Spring4D.Extensions\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\Spring4D.Base\2.0.1\lib;</DPMSearch>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
