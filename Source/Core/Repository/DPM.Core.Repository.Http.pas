@@ -458,7 +458,7 @@ begin
                        .WithContentType('application/json', 'utf-8');
 
   try
-    Logger.Information('POST ' + uri.ToString);
+    Logger.Verbose('POST ' + uri.ToString);
     response := httpClient.Post(request, cancellationToken);
   except
     on ex : Exception do
@@ -480,7 +480,7 @@ begin
     Logger.Verbose('Server returned no content');
     exit;
   end;
-  Logger.Information('OK ' + uri.ToString);
+  Logger.Verbose('OK ' + uri.ToString);
 
   try
     jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
@@ -688,6 +688,7 @@ var
   jsonObj : TJsonObject;
   uri : IUri;
 begin
+  Logger.Debug('TDPMServerPackageRepository.GetPackageMetaData');
   result := nil;
   serviceIndex := GetServiceIndex(cancellationToken);
   if serviceIndex = nil then

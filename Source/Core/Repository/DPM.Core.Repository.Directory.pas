@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -158,7 +158,7 @@ begin
   sourceFile := IncludeTrailingPathDelimiter(SourceUri) + packageMetadata.ToString + cPackageFileExt;
   if not FileExists(sourceFile) then
   begin
-    Logger.Error('File not found in repository [' + sourceFile + ']');
+    Logger.Warning('Package not found in repository [' + sourceFile + ']');
     exit;
   end;
   destFile := IncludeTrailingPathDelimiter(localFolder) + packageMetadata.ToString + cPackageFileExt;
@@ -831,7 +831,7 @@ var
   iconBytes : TBytes;
   isSvg : boolean;
 begin
-  Logger.Debug('TDirectoryPackageRepository.DoGetPackageMetaData');
+//  Logger.Debug('TDirectoryPackageRepository.DoGetPackageMetaData');
   result := nil;
   reader := TPackageManifestReader.Create(Logger);
 
