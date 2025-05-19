@@ -35,8 +35,8 @@ type
     procedure ActionList1Update(Action: TBasicAction; var Handled: Boolean);
     procedure btnCloseClick(Sender: TObject);
     procedure ClosingInTimerTimer(Sender: TObject);
-    procedure lblDontCloseLinkClick(Sender: TObject; const Link: string;
-      LinkType: TSysLinkType);
+    procedure lblDontCloseLinkClick(Sender: TObject; const Link: string; LinkType: TSysLinkType);
+    procedure FormShow(Sender: TObject);
   private
     FOptions : IDPMIDEOptions;
     FLogMemo : TLogMemo;
@@ -47,6 +47,7 @@ type
     {$IFDEF THEMESERVICES}
     FNotifierId : integer;
     {$ENDIF}
+
     procedure SetCancellationTokenSource(const Value: ICancellationTokenSource);
     procedure SetCloseDelayInSeconds(const Value: integer);
   protected
@@ -155,6 +156,7 @@ end;
 procedure TDPMMessageForm.Clear;
 begin
   FLogMemo.Clear;
+  Application.ProcessMessages;
   FCurrentCloseDelay := FCloseDelayInSeconds;
   lblClosing.Visible := false;
   lblDontClose.Visible := false;
@@ -285,6 +287,11 @@ begin
   FLogMemo.Clear;
 end;
 
+procedure TDPMMessageForm.FormShow(Sender: TObject);
+begin
+  Application.ProcessMessages;
+end;
+
 procedure TDPMMessageForm.Information(const data: string;  const important: Boolean);
 begin
   if important then
@@ -322,11 +329,13 @@ begin
   if not FStopwatch.IsRunning then
   begin
     FStopwatch.Start;
-    Application.ProcessMessages;
+    //Application.ProcessMessages;
+    FLogMemo.Refresh;
   end
-  else if FStopwatch.ElapsedMilliseconds > 50 then
+  else if FStopwatch.ElapsedMilliseconds > 10 then
   begin
     FStopwatch.Stop;
+    FLogMemo.Refresh;
     Application.ProcessMessages;
     FStopwatch.Reset;
     FStopwatch.Start;
@@ -351,7 +360,11 @@ begin
     FLogMemo.AddRow(data, TLogMessageType.mtImportantSuccess)
   else
     FLogMemo.AddRow(data, TLogMessageType.mtSuccess);
-  Self.ProcessMessages;
+  //Self.ProcessMessages;
+  //force repaint asap
+  FLogMemo.Refresh;
+  Application.ProcessMessages;
+
 end;
 
 procedure TDPMMessageForm.Verbose(const data: string;  const important: Boolean);

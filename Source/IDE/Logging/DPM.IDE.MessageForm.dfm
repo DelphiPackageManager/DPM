@@ -15,6 +15,7 @@ object DPMMessageForm: TDPMMessageForm
   Font.Style = []
   Position = poMainFormCenter
   OnHide = FormHide
+  OnShow = FormShow
   DesignSize = (
     879
     425)
@@ -36,8 +37,6 @@ object DPMMessageForm: TDPMMessageForm
     Action = actCanCancel
     Anchors = [akRight, akBottom]
     TabOrder = 0
-    ExplicitLeft = 754
-    ExplicitTop = 387
   end
   object btnCopy: TButton
     Left = 8
@@ -47,7 +46,6 @@ object DPMMessageForm: TDPMMessageForm
     Action = actCopyLog
     Anchors = [akLeft, akBottom]
     TabOrder = 2
-    ExplicitTop = 387
   end
   object btnClose: TButton
     Left = 652
@@ -58,8 +56,6 @@ object DPMMessageForm: TDPMMessageForm
     Caption = 'Close'
     TabOrder = 1
     OnClick = btnCloseClick
-    ExplicitLeft = 648
-    ExplicitTop = 388
   end
   object lblDontClose: TLinkLabel
     Left = 216
@@ -72,7 +68,6 @@ object DPMMessageForm: TDPMMessageForm
     UseVisualStyle = True
     Visible = False
     OnLinkClick = lblDontCloseLinkClick
-    ExplicitTop = 392
   end
   object ActionList1: TActionList
     OnUpdate = ActionList1Update
