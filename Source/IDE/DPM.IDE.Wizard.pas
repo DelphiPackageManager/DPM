@@ -222,7 +222,7 @@ begin
   dpmMenu.Name := 'GlobalDPMMenuItem';
   dpmMenu.Action := action;
 
-  menuServices.AddActionMenu('ToolsTemplateLibrariesItem',action, dpmMenu,true);
+  menuServices.AddActionMenu('ProjectOptionsItem',action, dpmMenu,true);
   //need to assign image index after adding the action menu, otherwise the image never shows.
   action.ImageIndex := idx;
 
