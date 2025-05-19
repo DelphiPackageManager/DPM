@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -29,9 +29,9 @@ unit DPM.IDE.Wizard;
 interface
 
 uses
+  System.Classes,
   ToolsApi,
   Vcl.ActnList,
-  Vcl.ImgList,
   Vcl.Controls,
   Spring.Container,
   DPM.IDE.Logger,
@@ -65,6 +65,11 @@ type
     procedure Destroyed;
     procedure Modified;
 
+
+    procedure DPMMenuClick(Sender : TObject);
+
+    procedure DPMActionUpdate(Sender : TObject);
+
   public
     constructor Create;
     destructor Destroy; override;
@@ -75,7 +80,11 @@ implementation
 uses
   System.TypInfo,
   System.SysUtils,
-  VCL.Dialogs,
+  System.UITypes,
+  Vcl.Dialogs,
+  Vcl.Menus,
+  Vcl.Graphics,
+  Vcl.Imaging.pngimage,
   Spring.Container.Registration,
   DPM.Core.Types,
   DPM.Core.Logging,
@@ -90,7 +99,8 @@ uses
   DPM.IDE.AddInOptions,
   DPM.IDE.Options,
   DPM.IDE.InstallerContext,
-  DPM.IDE.PathManager;
+  DPM.IDE.PathManager,
+  DPM.IDE.ToolsAPI;
 
 {$R DPM.IDE.Resources.res}
 { TDPMWizard }
@@ -141,6 +151,12 @@ var
   options : INTAAddInOptions;
   projectController : IDPMIDEProjectController;
   dpmIDEOptions : IDPMIDEOptions;
+  dpmMenu : TMenuItem;
+  action : TAction;
+  bmp : TBitmap;
+  png : TPngImage;
+  idx : integer;
+  menuServices : INTAServices;
 begin
   InitContainer;
   FLogger := FContainer.Resolve<IDPMIDELogger>;
@@ -177,11 +193,45 @@ begin
 
   storageNotifier := TDPMProjectStorageNotifier.Create(FLogger, projectController);
   FStorageNotifierID := (BorlandIDEServices as IOTAProjectFileStorage).AddNotifier(storageNotifier);
+
+  menuServices := (BorlandIDEServices as INTAServices);
+
+
+  bmp := TBitmap.Create;
+  png := TPngImage.Create;
+  try
+    png.LoadFromResourceName(HInstance, 'DPMLOGO_16');
+    png.AssignTo(bmp);
+    bmp.AlphaFormat:=afIgnored;
+    idx := menuServices.AddMasked(bmp, clNone, 'DPM');
+  finally
+    bmp.Free;
+    png.Free;
+  end;
+
+  action := TAction.Create(menuServices.ActionList);
+  action.Name := 'actDPMPackageManager';
+  action.Caption := 'DPM Package Manager';
+  action.OnUpdate := Self.DPMActionUpdate;
+  action.OnExecute := Self.DPMMenuClick;
+  action.Visible := true;
+  action.Category := 'DPM';
+
+  dpmMenu := TMenuItem.Create(nil);
+  dpmMenu.Caption := 'DPM Package Manager';
+  dpmMenu.Name := 'GlobalDPMMenuItem';
+  dpmMenu.Action := action;
+
+  menuServices.AddActionMenu('ToolsTemplateLibrariesItem',action, dpmMenu,true);
+  //need to assign image index after adding the action menu, otherwise the image never shows.
+  action.ImageIndex := idx;
+
+  menuServices.NewToolbar('DPMPackageManager','DPM Package Manager');
+  menuServices.AddToolButton('DPMPackageManager','ShowDPMButton', action);
 end;
 
 destructor TDPMWizard.Destroy;
 begin
-
   inherited;
 end;
 
@@ -204,6 +254,16 @@ begin
   FEditorViewManager.Destroyed; //don't try to resolve this here, errors in the rtl on 10.2
   FEditorViewManager := nil;
 
+end;
+
+procedure TDPMWizard.DPMActionUpdate(Sender : TObject);
+begin
+  TAction(Sender).Enabled := TToolsApiUtils.IsProjectAvailable;
+end;
+
+procedure TDPMWizard.DPMMenuClick(Sender: TObject);
+begin
+  FEditorViewManager.ShowViewForProject(TToolsApiUtils.GetMainProjectGroup,TToolsApiUtils.GetActiveProject);
 end;
 
 procedure TDPMWizard.Execute;
