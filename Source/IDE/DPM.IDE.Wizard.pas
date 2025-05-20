@@ -211,14 +211,15 @@ begin
 
   action := TAction.Create(menuServices.ActionList);
   action.Name := 'actDPMPackageManager';
-  action.Caption := 'DPM Package Manager';
+  action.Caption := 'Manage DPM Packages...';
   action.OnUpdate := Self.DPMActionUpdate;
   action.OnExecute := Self.DPMMenuClick;
   action.Visible := true;
   action.Category := 'DPM';
+  action.Hint := 'Manage DPM Packages...';
 
   dpmMenu := TMenuItem.Create(nil);
-  dpmMenu.Caption := 'DPM Package Manager';
+  dpmMenu.Caption := 'Manage DPM Packages...';
   dpmMenu.Name := 'GlobalDPMMenuItem';
   dpmMenu.Action := action;
 
