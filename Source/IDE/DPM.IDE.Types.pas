@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -49,6 +49,7 @@ type
 
 const
   //The current IDE version to TCompilerVersion.
+  {$IFDEF VER370}IDECompilerVersion = TCompilerVersion.RS13_0; {$ENDIF}
   {$IFDEF VER360}IDECompilerVersion = TCompilerVersion.RS12_0; {$ENDIF}
   {$IFDEF VER350}IDECompilerVersion = TCompilerVersion.RS11_0; {$ENDIF}
   {$IFDEF VER340}IDECompilerVersion = TCompilerVersion.RS10_4; {$ENDIF}

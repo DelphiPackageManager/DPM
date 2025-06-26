@@ -22,7 +22,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Top = 0
     Width = 871
     Height = 519
-    ActivePage = tsInfo
+    ActivePage = tsPlatforms
     Align = alClient
     TabOrder = 0
     object tsInfo: TTabSheet
@@ -327,7 +327,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
           '10.3'
           '10.4'
           '11.0'
-          '12.0')
+          '12.0'
+          '13.0')
         PopupMenu = pmCompilers
         TabOrder = 0
         OnClick = clbCompilersClick
