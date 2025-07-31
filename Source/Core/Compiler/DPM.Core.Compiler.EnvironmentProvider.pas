@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -44,8 +44,8 @@ type
       TStatus = (unknown, found, notfound);
   private
     FLogger : ILogger;
-    FFound : array[TCompilerVersion.UnknownVersion..TCompilerVersion.RS12_0] of TStatus;
-    FRsVarFiles : array[TCompilerVersion.UnknownVersion..TCompilerVersion.RS12_0] of string;
+    FFound : array[TCompilerVersion.UnknownVersion..TCompilerVersion.RS13_0] of TStatus;
+    FRsVarFiles : array[TCompilerVersion.UnknownVersion..TCompilerVersion.RS13_0] of string;
   protected
     function FoundCompilerInfo(const compilerVersion : TCompilerVersion) : Boolean;
     function GetRsVarsFilePath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;

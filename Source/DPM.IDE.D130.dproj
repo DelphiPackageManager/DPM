@@ -1,0 +1,361 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <Base>True</Base>
+        <AppType>Library</AppType>
+        <Config Condition="'$(Config)'==''">Debug</Config>
+        <FrameworkType>VCL</FrameworkType>
+        <MainSource>DPM.IDE.D130.dpr</MainSource>
+        <Platform Condition="'$(Platform)'==''">Win32</Platform>
+        <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
+        <ProjectName Condition="'$(ProjectName)'==''">DPM.IDE.D130</ProjectName>
+        <ProjectVersion>20.3</ProjectVersion>
+        <TargetedPlatforms>3</TargetedPlatforms>
+    </PropertyGroup>
+    <PropertyGroup>
+        <DPMCompiler>13.0</DPMCompiler>
+        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
+        <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.1.3\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.11\lib;$(DPM)\VSoft.VirtualListView\0.4.6\lib;$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.6\lib;$(DPM)\VSoft.JsonDataObjects\0.3.1\lib;$(DPM)\VSoft.HttpClient\2.2.2\lib;$(DPM)\VSoft.Awaitable\0.6.1\lib;$(DPM)\VSoft.AntPatterns\0.1.8\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.1\lib;$(DPM)\Spring4D.Core\2.0.2-beta.1\lib;$(DPM)\Spring4D.Base\2.0.2-beta.1\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.CancellationToken\0.1.3\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.11\lib;$(DPM)\VSoft.VirtualListView\0.4.6\lib;$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.6\lib;$(DPM)\VSoft.JsonDataObjects\0.3.1\lib;$(DPM)\VSoft.HttpClient\2.2.2\lib;$(DPM)\VSoft.Awaitable\0.6.1\lib;$(DPM)\VSoft.AntPatterns\0.1.8\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.1\lib;$(DPM)\Spring4D.Core\2.0.2-beta.1\lib;$(DPM)\Spring4D.Base\2.0.2-beta.1\lib;</DPMSearch>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Base)'=='true') or '$(Base_Win32)'!=''">
+        <Base_Win32>true</Base_Win32>
+        <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Base)'=='true') or '$(Base_Win64)'!=''">
+        <Base_Win64>true</Base_Win64>
+        <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Config)'=='Debug' or '$(Cfg_1)'!=''">
+        <Cfg_1>true</Cfg_1>
+        <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_1)'=='true') or '$(Cfg_1_Win32)'!=''">
+        <Cfg_1_Win32>true</Cfg_1_Win32>
+        <CfgParent>Cfg_1</CfgParent>
+        <Cfg_1>true</Cfg_1>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Cfg_1)'=='true') or '$(Cfg_1_Win64)'!=''">
+        <Cfg_1_Win64>true</Cfg_1_Win64>
+        <CfgParent>Cfg_1</CfgParent>
+        <Cfg_1>true</Cfg_1>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Config)'=='Release' or '$(Cfg_2)'!=''">
+        <Cfg_2>true</Cfg_2>
+        <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_2)'=='true') or '$(Cfg_2_Win32)'!=''">
+        <Cfg_2_Win32>true</Cfg_2_Win32>
+        <CfgParent>Cfg_2</CfgParent>
+        <Cfg_2>true</Cfg_2>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Base)'!=''">
+        <SanitizedProjectName>DPM_IDE_D130</SanitizedProjectName>
+        <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
+        <DCC_ExeOutput>..\Output</DCC_ExeOutput>
+        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;$(DCC_Namespace)</DCC_Namespace>
+        <DCC_UnitSearchPath>$(DPMSearch);I:\Github\VSoftTechnologies\VSoft.VirtualListView\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UsePackage>designide;rtl;vcl;$(DCC_UsePackage)</DCC_UsePackage>
+        <GenDll>true</GenDll>
+        <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
+        <UsePackages>true</UsePackages>
+        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Locale>3081</VerInfo_Locale>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Base_Win32)'!=''">
+        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
+        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Base_Win64)'!=''">
+        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
+        <BT_BuildType>Debug</BT_BuildType>
+        <DCC_ExeOutput>..\Output64</DCC_ExeOutput>
+        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;$(DCC_Namespace)</DCC_Namespace>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_1)'!=''">
+        <DCC_DebugDCUs>true</DCC_DebugDCUs>
+        <DCC_DebugInfoInExe>true</DCC_DebugInfoInExe>
+        <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
+        <DCC_GenerateStackFrames>true</DCC_GenerateStackFrames>
+        <DCC_Optimize>false</DCC_Optimize>
+        <DCC_RemoteDebug>true</DCC_RemoteDebug>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
+        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
+        <DCC_DebugDCUs>false</DCC_DebugDCUs>
+        <DCC_RemoteDebug>false</DCC_RemoteDebug>
+        <Debugger_HostApplication>E:\emb\Studio\23.0\bin\bds.exe</Debugger_HostApplication>
+        <Debugger_RunParams>-rDPMTesting</Debugger_RunParams>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
+        <Debugger_HostApplication>E:\Emb\Studio\23.0\bin64\bds.exe</Debugger_HostApplication>
+        <Debugger_RunParams>-rDPMTesting</Debugger_RunParams>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_2)'!=''">
+        <DCC_DebugInformation>0</DCC_DebugInformation>
+        <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
+        <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
+        <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
+        <Debugger_HostApplication>E:\Emb\Studio\21.0\bin\bds.exe</Debugger_HostApplication>
+        <Debugger_RunParams>-rOpenToolsAPI</Debugger_RunParams>
+    </PropertyGroup>
+    <ItemGroup>
+        <DelphiCompile Include="$(MainSource)">
+            <MainSource>MainSource</MainSource>
+        </DelphiCompile>
+        <DCCReference Include="SVG\SVGParse.pas"/>
+        <DCCReference Include="SVG\SVG.pas"/>
+        <DCCReference Include="SVG\SVGBase64.pas"/>
+        <DCCReference Include="SVG\SVGStyle.pas"/>
+        <DCCReference Include="SVG\SVGCommon.pas"/>
+        <DCCReference Include="SVG\SVGTypes.pas"/>
+        <DCCReference Include="SVG\SVGPath.pas"/>
+        <DCCReference Include="SVG\SVGInterfaces.pas"/>
+        <DCCReference Include="SVG\XmlLite.pas"/>
+        <DCCReference Include="SVG\SVGPaint.pas"/>
+        <DCCReference Include="SVG\PasSVGFactory.pas"/>
+        <DCCReference Include="SVG\GDIPKerning.pas"/>
+        <DCCReference Include="SVG\GDIPOBJ2.pas"/>
+        <DCCReference Include="SVG\GDIPPathText.pas"/>
+        <DCCReference Include="SVG\SVGColor.pas"/>
+        <DCCReference Include="SVG\SVGGraphic.pas"/>
+        <DCCReference Include="Core\Cache\DPM.Core.Cache.Interfaces.pas"/>
+        <DCCReference Include="Core\Cache\DPM.Core.Cache.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.EnvironmentProvider.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.Factory.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.Interfaces.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.MSBuild.pas"/>
+        <DCCReference Include="Core\Configuration\DPM.Core.Configuration.Classes.pas"/>
+        <DCCReference Include="Core\Configuration\DPM.Core.Configuration.Interfaces.pas"/>
+        <DCCReference Include="Core\Configuration\DPM.Core.Configuration.Manager.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Context.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Reference.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Interfaces.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Resolution.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Resolver.pas"/>
+        <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Version.pas"/>
+        <DCCReference Include="Core\Logging\DPM.Core.Logging.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Base.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Cache.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Common.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Config.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Install.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.List.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Pack.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Push.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Restore.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Search.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Sources.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Spec.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.UnInstall.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Dependency.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Installer.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.InstallerContext.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Interfaces.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Classes.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.SearchResults.pas"/>
+        <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.pas"/>
+        <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.Reader.pas"/>
+        <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.Writer.pas"/>
+        <DCCReference Include="Core\Packaging\DPM.Core.Packaging.IdValidator.pas"/>
+        <DCCReference Include="Core\Packaging\DPM.Core.Packaging.pas"/>
+        <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Writer.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.Configuration.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.Editor.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.GroupProjReader.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.Interfaces.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.Base.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.Directory.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.Factory.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.Http.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.Interfaces.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.Manager.pas"/>
+        <DCCReference Include="Core\Sources\DPM.Core.Sources.Interfaces.pas"/>
+        <DCCReference Include="Core\Sources\DPM.Core.Sources.Manager.pas"/>
+        <DCCReference Include="Core\Sources\DPM.Core.Sources.Types.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.BPLEntry.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.Dependency.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.DependencyGroup.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.FileEntry.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.Interfaces.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.MetaData.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.Node.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.Reader.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.SearchPath.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.SearchPathGroup.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.TargetPlatform.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.Template.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.TemplateBase.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.Writer.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Config.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Directory.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Enum.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Numbers.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Path.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Process.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Strings.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.System.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.XML.pas"/>
+        <DCCReference Include="Core\Xml\DPM.Core.MSXML.pas"/>
+        <DCCReference Include="Core\Xml\DPM.Core.XML.NodeBase.pas"/>
+        <DCCReference Include="Core\DPM.Core.Constants.pas"/>
+        <DCCReference Include="Core\DPM.Core.Init.pas"/>
+        <DCCReference Include="Core\DPM.Core.TargetPlatform.pas"/>
+        <DCCReference Include="Core\DPM.Core.Types.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Icon.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.Installer.Interfaces.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.BOM.pas"/>
+        <DCCReference Include="Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas"/>
+        <DCCReference Include="Controls\DPM.Controls.VersionGrid.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Files.pas"/>
+        <DCCReference Include="Controls\DPM.Controls.LogMemo.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.Main.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.Wizard.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectStorageNotifier.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.IDENotifier.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectMenu.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.Constants.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.AddInOptions.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.AddInOptionsFrame.pas">
+            <Form>DPMOptionsFrame</Form>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="Controls\DPM.Controls.ButtonedEdit.pas"/>
+        <DCCReference Include="Controls\DPM.Controls.AutoComplete.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.AboutForm.pas">
+            <Form>DPMAboutForm</Form>
+        </DCCReference>
+        <DCCReference Include="IDE\DPM.IDE.Types.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.AddInOptionsHostForm.pas">
+            <Form>DPMOptionsHostForm</Form>
+        </DCCReference>
+        <DCCReference Include="IDE\DPM.IDE.IconCache.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.VSTProxy.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectTreeManager.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.Utils.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectTree.Containers.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ProjectController.pas"/>
+        <DCCReference Include="IDE\Options\DPM.IDE.Options.pas"/>
+        <DCCReference Include="IDE\Logging\DPM.IDE.Logger.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.InstallerContext.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorView.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorViewManager.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.PackageDetailsPanel.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.SearchBarFrame.pas">
+            <Form>DPMSearchBarFrame</Form>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="IDE\Logging\DPM.IDE.MessageForm.pas">
+            <Form>DPMMessageForm</Form>
+        </DCCReference>
+        <DCCReference Include="IDE\Logging\DPM.IDE.MessageService.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.ToolsAPI.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.Details.Interfaces.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.PackageDetailsFrame.pas">
+            <Form>PackageDetailsFrame</Form>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="Core\Sources\DPM.Core.Sources.ServiceIndex.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.ListItem.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.EditorViewFrame.pas">
+            <Form>DPMEditViewFrame</Form>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="IDE\DPM.IDE.ProjectNotifier.pas"/>
+        <DCCReference Include="IDE\EditorView\DPM.IDE.ActivityIndicator.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.PathManager.pas"/>
+        <DCCReference Include="Core\Manifest\DPM.Core.Manifest.Interfaces.pas"/>
+        <DCCReference Include="Core\Manifest\DPM.Core.Manifest.pas"/>
+        <DCCReference Include="Core\Manifest\DPM.Core.Manifest.Reader.pas"/>
+        <BuildConfiguration Include="Base">
+            <Key>Base</Key>
+        </BuildConfiguration>
+        <BuildConfiguration Include="Debug">
+            <Key>Cfg_1</Key>
+            <CfgParent>Base</CfgParent>
+        </BuildConfiguration>
+        <BuildConfiguration Include="Release">
+            <Key>Cfg_2</Key>
+            <CfgParent>Base</CfgParent>
+        </BuildConfiguration>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Delphi.Personality.12</Borland.Personality>
+        <Borland.ProjectType>Application</Borland.ProjectType>
+        <BorlandProject>
+            <Delphi.Personality>
+                <Source>
+                    <Source Name="MainSource">DPM.IDE.D130.dpr</Source>
+                </Source>
+                <Excluded_Packages/>
+            </Delphi.Personality>
+            <Platforms>
+                <Platform value="Win32">True</Platform>
+                <Platform value="Win64">True</Platform>
+            </Platforms>
+            <ModelSupport>False</ModelSupport>
+            <Deployment Version="5"/>
+        </BorlandProject>
+        <ProjectFileVersion>12</ProjectFileVersion>
+        <DPM>
+            <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.2-beta.1"/>
+            <PackageReference id="Spring4D.Core" platform="Win32" version="2.0.2-beta.1">
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.2-beta.1" range="2.0.2-beta.1"/>
+            </PackageReference>
+            <PackageReference id="Spring4D.Extensions" platform="Win32" version="2.0.2-beta.1">
+                <PackageReference id="Spring4D.Base" platform="Win32" version="2.0.2-beta.1" range="2.0.2-beta.1"/>
+            </PackageReference>
+            <PackageReference id="VSoft.AntPatterns" platform="Win32" version="0.1.8"/>
+            <PackageReference id="VSoft.Awaitable" platform="Win32" version="0.6.1">
+                <PackageReference id="Gabr42.OmniThreadLibrary" platform="Win32" version="3.7.11" range="[3.7.11,]"/>
+                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.1.3" range="[0.1.3,]"/>
+            </PackageReference>
+            <PackageReference id="VSoft.HttpClient" platform="Win32" version="2.2.2">
+                <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.1.3" range="[0.1.3,]"/>
+                <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.2" range="0.3.2"/>
+            </PackageReference>
+            <PackageReference id="VSoft.JsonDataObjects" platform="Win32" version="0.3.1"/>
+            <PackageReference id="VSoft.SemanticVersion" platform="Win32" version="0.2.6"/>
+            <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.2"/>
+            <PackageReference id="VSoft.VirtualListView" platform="Win32" version="0.4.6"/>
+            <PackageReference id="Spring4D.Base" platform="Win64" version="2.0.2-beta.1"/>
+            <PackageReference id="Spring4D.Core" platform="Win64" version="2.0.2-beta.1">
+                <PackageReference id="Spring4D.Base" platform="Win64" version="2.0.2-beta.1" range="2.0.2-beta.1"/>
+            </PackageReference>
+            <PackageReference id="Spring4D.Extensions" platform="Win64" version="2.0.2-beta.1">
+                <PackageReference id="Spring4D.Base" platform="Win64" version="2.0.2-beta.1" range="2.0.2-beta.1"/>
+            </PackageReference>
+            <PackageReference id="VSoft.AntPatterns" platform="Win64" version="0.1.8"/>
+            <PackageReference id="VSoft.Awaitable" platform="Win64" version="0.6.1">
+                <PackageReference id="Gabr42.OmniThreadLibrary" platform="Win64" version="3.7.11" range="[3.7.11,]"/>
+                <PackageReference id="VSoft.CancellationToken" platform="Win64" version="0.1.3" range="[0.1.3,]"/>
+            </PackageReference>
+            <PackageReference id="VSoft.HttpClient" platform="Win64" version="2.2.2">
+                <PackageReference id="VSoft.CancellationToken" platform="Win64" version="0.1.3" range="[0.1.3,]"/>
+                <PackageReference id="VSoft.Uri" platform="Win64" version="0.3.2" range="0.3.2"/>
+            </PackageReference>
+            <PackageReference id="VSoft.JsonDataObjects" platform="Win64" version="0.3.1"/>
+            <PackageReference id="VSoft.SemanticVersion" platform="Win64" version="0.2.6"/>
+            <PackageReference id="VSoft.Uri" platform="Win64" version="0.3.2"/>
+            <PackageReference id="VSoft.VirtualListView" platform="Win64" version="0.4.6"/>
+        </DPM>
+    </ProjectExtensions>
+    <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>
+    <Import Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj" Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')"/>
+    <Import Project="$(MSBuildProjectName).deployproj" Condition="Exists('$(MSBuildProjectName).deployproj')"/>
+</Project>

@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -428,17 +428,7 @@ begin
   inherited Create(logger);
   FFileName := fileName;
   FMetaData := TSpecMetaData.Create(logger);
-  FTargetPlatforms := TCollections.CreateSortedList<ISpecTargetPlatform>(
-   function(const Left, Right: ISpecTargetPlatform): Integer
-   begin
-      if left.Compiler = right.Compiler then
-        result := 0
-      else if Left.Compiler > Right.Compiler then
-        result := 1
-      else
-        result := -1;
-   end
-  );
+  FTargetPlatforms := TCollections.CreateList<ISpecTargetPlatform>;
   FTemplates := TCollections.CreateSortedList<ISpecTemplate>(
    function(const Left, Right: ISpecTemplate): Integer
    begin
@@ -1046,6 +1036,16 @@ function TSpec.ToJSON: string;
 var
   json : TJsonObject;
 begin
+  FTargetPlatforms.Sort(TComparer<ISpecTargetPlatform>.Construct(
+  function(const Left, Right: ISpecTargetPlatform): Integer
+   begin
+      if Ord(left.Compiler) = Ord(right.Compiler) then
+        result := 0
+      else if Ord(Left.Compiler) > Ord(Right.Compiler) then
+        result := 1
+      else
+        result := -1;
+   end));
   json := TJsonObject.Create;
   try
     json.O['metadata'] := TJsonObject.Parse(FMetaData.ToJSON) as TJsonObject;

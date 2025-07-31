@@ -629,6 +629,7 @@ begin
   sDebug := sDebug + ' Checked [' + BoolToStr(checked, true) + ']';
   OutputDebugString(PChar(sDebug));
 
+  clbPlatforms.CheckAll(cbUnchecked);
   EnableControls(checked);
 
   vPlatform := FOpenFile.GetPlatform(clbCompilers.Items[index]);

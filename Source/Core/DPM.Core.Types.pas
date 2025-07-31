@@ -374,6 +374,9 @@ end;
 function AllPlatforms(const compiler : TCompilerVersion) : TDPMPlatforms;
 begin
   result := [];
+
+  // https://en.wikipedia.org/wiki/History_of_Delphi_(software)
+
   case compiler of
     TCompilerVersion.RSXE2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32];
 
@@ -393,23 +396,29 @@ begin
     TCompilerVersion.RSXE8 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator,
                                         TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32];
 
+    // https://docwiki.embarcadero.com/RADStudio/Berlin/en/Supported_Target_Platforms
     TCompilerVersion.RS10_0,
     TCompilerVersion.RS10_1 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOS64,
                                          TDPMPlatform.iOSSimulator, TDPMPlatform.AndroidArm32];
 
+    // https://docwiki.embarcadero.com/RADStudio/Tokyo/en/Supported_Target_Platforms
     TCompilerVersion.RS10_2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOS64,
-                                         TDPMPlatform.iOSSimulator, TDPMPlatform.AndroidArm32];
+                                         TDPMPlatform.iOSSimulator, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64];
 
+    // https://docwiki.embarcadero.com/RADStudio/Rio/en/Supported_Target_Platforms
     TCompilerVersion.RS10_3 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.OSX64, TDPMPlatform.iOS32,
                                          TDPMPlatform.iOS64, TDPMPlatform.iOSSimulator, TDPMPlatform.AndroidArm32, TDPMPlatform.AndroidArm64,
                                          TDPMPlatform.LinuxIntel64];
 
+    // https://docwiki.embarcadero.com/RADStudio/Sydney/en/Supported_Target_Platforms
     TCompilerVersion.RS10_4 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX64, TDPMPlatform.iOS64, TDPMPlatform.iOSSimulator,
                                          TDPMPlatform.AndroidArm32, TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
 
-    TCompilerVersion.RS11_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSXARM64, TDPMPlatform.OSX64, TDPMPlatform.iOS64,
+    // https://docwiki.embarcadero.com/RADStudio/Alexandria/en/Supported_Target_Platforms
+    TCompilerVersion.RS11_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX64, TDPMPlatform.OSXARM64, TDPMPlatform.iOS64,
                                          TDPMPlatform.AndroidArm32, TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
 
+    // https://docwiki.embarcadero.com/RADStudio/Athens/en/Supported_Target_Platforms
     TCompilerVersion.RS12_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSXARM64, TDPMPlatform.OSX64, TDPMPlatform.iOS64,
                                          TDPMPlatform.AndroidArm32, TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
 
