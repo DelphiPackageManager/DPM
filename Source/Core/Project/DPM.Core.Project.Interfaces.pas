@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -57,7 +57,7 @@ type
 
   TAppType = (Application, Package,Lib, Unknown);
 
-  TProjectElement = (ProjectVersion,MainSource, AppType, Platforms, Configs, PackageRefs, All);
+  TProjectElement = (DPMCompiler, ProjectVersion,MainSource, AppType, Platforms, Configs, PackageRefs, All);
   TProjectElements = set of TProjectElement;
 
   //used by the package installer

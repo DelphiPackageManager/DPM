@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -51,6 +51,7 @@ type
     FProjectFile : string;
     FMainSource : string;
     FProjectVersion : string;
+    FDPMCompilerVersion : string;
     FPackageRefences : IDictionary<TDPMPlatform, IPackageReference>;
     FFileName : string;
     FAppType : TAppType;
@@ -59,6 +60,7 @@ type
   protected
     function GetOutputElementName : string;
 
+    function LoadDPMCompilerVersion : boolean;
     function LoadProjectVersion : boolean;
     function LoadMainSource : boolean;
     function LoadAppType : boolean;
@@ -113,6 +115,8 @@ const
   msbuildNamespace = 'http://schemas.microsoft.com/developer/msbuild/2003';
 
   projectVersionXPath = '/x:Project/x:PropertyGroup/x:ProjectVersion';
+
+  dpmCcompilerXPath = '/x:Project/x:PropertyGroup/x:DPMCompiler';
 
   mainSourceXPath = '/x:Project/x:PropertyGroup/x:MainSource';
 
@@ -363,6 +367,8 @@ var
 begin
   result := true;
   loadAll := TProjectElement.All in elements;
+  if loadAll or (TProjectElement.DPMCompiler in elements) then
+    result := result and LoadDPMCompilerVersion;
   if loadAll or (TProjectElement.ProjectVersion in elements) then
     result := result and LoadProjectVersion;
   if loadAll or (TProjectElement.MainSource in elements) then
@@ -777,6 +783,33 @@ begin
     end;
   end;
 end;
+
+function TProjectEditor.LoadDPMCompilerVersion : boolean;
+var
+  xmlElement : IXMLDOMElement;
+begin
+  result := false;
+  xmlElement := FProjectXML.selectSingleNode(dpmCcompilerXPath) as IXMLDOMElement;
+  if xmlElement <> nil then
+  begin
+    FDPMCompilerVersion := xmlElement.text;
+    if FDPMCompilerVersion <> '' then
+    begin
+      //only use the dpmcompilerversion if we haven't already set the compilerversion.
+      if FCompiler = TCompilerVersion.UnknownVersion then
+      begin
+        FCompiler := StringToCompilerVersion(FDPMCompilerVersion);
+        if FCompiler <> TCompilerVersion.UnknownVersion then
+          result := true
+        else
+          FLogger.Error('Unable to determine Compiler version from DPMCompiler');
+      end
+      else
+        result := true;
+    end
+  end
+end;
+
 
 function TProjectEditor.LoadProjectVersion : boolean;
 var
