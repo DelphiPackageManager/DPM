@@ -222,17 +222,17 @@ var
 begin
   for projectRes  in FProjectResolutions.Values do
   begin
-    resList := projectRes[platform];
-    if resList <> nil then
-    begin
-      resolution := resList.FirstOrDefault(
-        function(const value : IResolvedPackage) : boolean
-        begin
-             result := SameText(value.PackageInfo.Id, packageId);
-        end);
-      if resolution <> nil  then
-        resList.Remove(resolution);
-    end;
+    if projectRes.TryGetValue(platform, resList) then
+      if resList <> nil then
+      begin
+        resolution := resList.FirstOrDefault(
+          function(const value : IResolvedPackage) : boolean
+          begin
+               result := SameText(value.PackageInfo.Id, packageId);
+          end);
+        if resolution <> nil  then
+          resList.Remove(resolution);
+      end;
 
   end;
 end;
