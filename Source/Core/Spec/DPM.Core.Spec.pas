@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -572,8 +572,16 @@ begin
   //override the values with values from the template.
   for i := 0 to targetPlatform.Variables.Count -1 do
   begin
+    //setting a value to '' removes it from the list!!!!!
     list.Values[targetPlatform.Variables.Names[i]] := '';
     list.Add(targetPlatform.Variables.Names[i] + '=' + targetPlatform.Variables.ValueFromIndex[i]);
+  end;
+
+  //fix up some variable overrides
+  if list.Values['compilerCodeName'] = '' then
+  begin
+    list.Values['compilerWithCodeName'] := '';
+    list.Add('compilerWithCodeName=' + CompilerToString(targetPlatform.Compiler));
   end;
 
 
