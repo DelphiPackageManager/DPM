@@ -18,7 +18,7 @@ uses
 type
   TPackageDetailsPanel = class;
 
-  TDetailElement = (deNone, deLicense, deProjectUrl, deReportUrl, deRepositoryUrl, deTags);
+  TDetailElement = (deNone, deLicense, deProjectUrl, deReportUrl, deRepositoryUrl, deRepositoryCommit, deTags);
   TDetailElements = set of TDetailElement;
   TDetailsLayout = record
     PaddingX : integer;
@@ -50,6 +50,9 @@ type
 
     RepositoryUrlLabelRect : TRect;
     RepositoryUrlRect : TRect;
+
+    RepositoryCommitLabelRect : TRect;
+    RepositoryCommitRect : TRect;
 
     TagsLabelRect : TRect;
     TagsRect : TRect;
@@ -108,6 +111,7 @@ implementation
 
 uses
   System.SysUtils,
+  System.StrUtils,
   System.UITypes,
   Vcl.Themes,
   Vcl.Forms,
@@ -190,6 +194,11 @@ begin
       exit(deRepositoryUrl);
   end;
 
+  if deRepositoryCommit in FOptionalElements then
+  begin
+    if FLayout.RepositoryCommitRect.Contains(pt) then
+      exit(deRepositoryCommit);
+  end;
 
 end;
 
@@ -221,6 +230,14 @@ begin
           end;
         deProjectUrl : sUri := FPackage.ProjectUrl;
         deReportUrl : sUri := FPackage.ProjectUrl;
+        deRepositoryCommit :
+        begin
+          if StartsText('https://github.com', FPackage.RepositoryUrl)  then
+          begin
+            sUri := StringReplace(FPackage.RepositoryCommit, 'Id:','',[rfIgnoreCase]);
+            sUri := FPackage.RepositoryUrl + '/commit/' + sUri;
+          end;
+        end
       else
         exit;
       end;
@@ -239,7 +256,7 @@ begin
   if FHitElement <> prevElement then
     Invalidate;
 
-  if FHitElement in [deProjectUrl, deReportUrl, deLicense] then
+  if FHitElement in [deProjectUrl, deReportUrl, deRepositoryUrl, deRepositoryCommit, deLicense] then
     Cursor := crHandPoint
   else
     Cursor := crDefault;
@@ -325,8 +342,6 @@ begin
   DrawText(Canvas.Handle, 'Date published :', Length('Date published :'), FLayout.PublishDateLabelRect, DT_LEFT);
 
   Canvas.Font.Style := [];
-  if FHitElement = deLicense then
-    Canvas.Font.Style := [fsUnderline];
 
   DrawText(Canvas.Handle, FPackage.PublishedDate, Length(FPackage.PublishedDate), FLayout.PublishDateRect, DT_LEFT + DT_WORDBREAK);
 
@@ -353,15 +368,38 @@ begin
   Canvas.Font.Color := fontColor;
 
 
-  Canvas.Font.Style := [fsBold];
-  DrawText(Canvas.Handle, 'Repository URL :', Length('Repository URL :'), FLayout.RepositoryUrlLabelRect, DT_LEFT);
+  if (deRepositoryUrl in FOptionalElements) then
+  begin
+    Canvas.Font.Style := [fsBold];
+    DrawText(Canvas.Handle, 'Repository URL :', Length('Repository URL :'), FLayout.RepositoryUrlLabelRect, DT_LEFT);
 
-  Canvas.Font.Color := uriColor;
-  Canvas.Font.Style := [];
-  if FHitElement = deRepositoryUrl then
-    Canvas.Font.Style := [fsUnderline];
-  DrawText(Canvas.Handle, FPackage.RepositoryUrl, Length(FPackage.RepositoryUrl), FLayout.RepositoryUrlRect, DT_LEFT + DT_WORDBREAK);
-  Canvas.Font.Color := fontColor;
+    Canvas.Font.Color := uriColor;
+    Canvas.Font.Style := [];
+    if FHitElement = deRepositoryUrl then
+      Canvas.Font.Style := [fsUnderline];
+    DrawText(Canvas.Handle, FPackage.RepositoryUrl, Length(FPackage.RepositoryUrl), FLayout.RepositoryUrlRect, DT_LEFT + DT_WORDBREAK);
+    Canvas.Font.Color := fontColor;
+  end;
+
+  if (deRepositoryCommit in FOptionalElements) then
+  begin
+    Canvas.Font.Style := [fsBold];
+    DrawText(Canvas.Handle, 'Commit :', Length('Commit :'), FLayout.RepositoryCommitLabelRect, DT_LEFT);
+
+    Canvas.Font.Color := uriColor;
+    Canvas.Font.Style := [];
+    value := FPackage.RepositoryCommit;
+    //treat github commits as url
+    if StartsText('https://github.com/',FPackage.RepositoryUrl) then
+    begin
+      value := StringReplace(value, 'Id:','',[rfIgnoreCase]);
+      if FHitElement = deRepositoryCommit then
+        Canvas.Font.Style := [fsUnderline];
+    end;
+    DrawText(Canvas.Handle, value, Length(value), FLayout.RepositoryCommitRect, DT_LEFT + DT_WORDBREAK);
+    Canvas.Font.Color := fontColor;
+  end;
+
 
   if (deTags in FOptionalElements) then
   begin
@@ -430,6 +468,13 @@ begin
 
     if package.Tags <> '' then
       Include(FOptionalElements, deTags);
+
+    if package.RepositoryUrl <> '' then
+      Include(FOptionalElements, deRepositoryUrl);
+
+    if package.RepositoryCommit <> '' then
+      Include(FOptionalElements, deRepositoryCommit);
+
   end;
 
   UpdateLayout;
@@ -480,7 +525,7 @@ begin
   VersionPadding := 6;
   PaddingX := 6;
   PaddingY := 4;
-  LineSpacing := 6;
+  LineSpacing := 8;
   DescriptionHeight := 5000;
 end;
 
@@ -619,7 +664,6 @@ begin
     RepositoryUrlLabelRect.Width := textSize.cx;
     RepositoryUrlLabelRect.Height := textSize.cy;
 
-
     RepositoryUrlRect.Top := RepositoryUrlLabelRect.Top;
     RepositoryUrlRect.Left := VersionRect.Left;
     RepositoryUrlRect.Right := clientRect.Right;
@@ -629,6 +673,22 @@ begin
     //TODO : We need reporturl on the searchresultitem
     DrawText(ACanvas.Handle, package.RepositoryUrl, Length(package.RepositoryUrl), RepositoryUrlRect, DT_LEFT + DT_CALCRECT);
     bottom := RepositoryUrlRect.Bottom;
+  end;
+
+  if (deRepositoryCommit in optionalElements) then
+  begin
+
+    RepositoryCommitLabelRect.Top := bottom + LineSpacing;
+    RepositoryCommitLabelRect.Left := clientRect.Left;
+    RepositoryCommitLabelRect.Width := textSize.cx;
+    RepositoryCommitLabelRect.Height := textSize.cy;
+
+    RepositoryCommitRect.Top := RepositoryCommitLabelRect.Top;
+    RepositoryCommitRect.Left := VersionRect.Left;
+    RepositoryCommitRect.Right := clientRect.Right;
+    RepositoryCommitRect.Height := textSize.cy;
+    DrawText(ACanvas.Handle, package.RepositoryCommit, Length(package.RepositoryCommit), RepositoryCommitRect, DT_LEFT + DT_CALCRECT);
+    bottom := RepositoryCommitRect.Bottom;
   end;
 
 

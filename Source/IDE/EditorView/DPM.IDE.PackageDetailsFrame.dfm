@@ -1,4 +1,4 @@
-object PackageDetailsFrame: TPackageDetailsFrame
+﻿object PackageDetailsFrame: TPackageDetailsFrame
   Left = 0
   Top = 0
   Width = 614
@@ -30,8 +30,6 @@ object PackageDetailsFrame: TPackageDetailsFrame
       Cursor = crVSplit
       Align = alTop
       ResizeStyle = rsUpdate
-      ExplicitTop = 369
-      ExplicitWidth = 436
     end
     object pnlPackageId: TPanel
       Left = 0
@@ -162,7 +160,6 @@ object PackageDetailsFrame: TPackageDetailsFrame
           Caption = '+'
           Flat = True
           OnClick = btnInstallAllClick
-          ExplicitTop = 6
         end
         object btnUpgradeAll: TSpeedButton
           AlignWithMargins = True
@@ -177,8 +174,6 @@ object PackageDetailsFrame: TPackageDetailsFrame
           Caption = 'U'
           Flat = True
           OnClick = btnUpgradeAllClick
-          ExplicitLeft = 376
-          ExplicitHeight = 28
         end
         object btnUninstallAll: TSpeedButton
           AlignWithMargins = True
@@ -193,8 +188,6 @@ object PackageDetailsFrame: TPackageDetailsFrame
           Caption = '-'
           Flat = True
           OnClick = btnUninstallAllClick
-          ExplicitLeft = 586
-          ExplicitTop = 6
         end
         object cboVersions: TComboBox
           AlignWithMargins = True
