@@ -1615,7 +1615,7 @@ begin
   else
     FSearchOptions.Sources := '';
 
-  DoPlatformChange(platform, refresh, false);
+  DoPlatformChange(platform, refresh, refresh);
 
 end;
 

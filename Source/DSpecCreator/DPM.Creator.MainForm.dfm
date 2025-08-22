@@ -1,4 +1,4 @@
-﻿object DSpecCreatorForm: TDSpecCreatorForm
+object DSpecCreatorForm: TDSpecCreatorForm
   Left = 0
   Top = 0
   Caption = '.dspec Creator'
@@ -192,7 +192,7 @@
       end
       object mmoDescription: TMemo
         Left = 89
-        Top = 126
+        Top = 125
         Width = 376
         Height = 89
         TabOrder = 2
@@ -213,6 +213,14 @@
         Height = 23
         TabOrder = 6
         OnChange = edtRepositoryURLChange
+      end
+      object edtRepositoryCommit: TEdit
+        Left = 89
+        Top = 345
+        Width = 376
+        Height = 23
+        TabOrder = 8
+        OnChange = edtRepositoryCommitChange
       end
       object cboLicense: TComboBox
         Left = 89
@@ -241,7 +249,7 @@
         Top = 423
         Width = 376
         Height = 23
-        TabOrder = 8
+        TabOrder = 9
         OnChange = edtTagsChange
       end
       object edtAuthor: TEdit
@@ -259,7 +267,7 @@
         Height = 128
         BevelKind = bkFlat
         Caption = 'Select Icon...'
-        TabOrder = 9
+        TabOrder = 10
         object ImgIcon: TImage
           Left = 1
           Top = 1
@@ -285,7 +293,7 @@
         Top = 473
         Width = 376
         Height = 23
-        TabOrder = 10
+        TabOrder = 11
         OnChange = edtReadmeChange
       end
     end
@@ -1181,14 +1189,6 @@
         TabOrder = 0
       end
     end
-  end
-  object edtRepositoryCommit: TEdit
-    Left = 93
-    Top = 371
-    Width = 376
-    Height = 23
-    TabOrder = 1
-    OnChange = edtRepositoryCommitChange
   end
   object MainMenu: TMainMenu
     Left = 508

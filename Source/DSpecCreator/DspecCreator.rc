@@ -20,7 +20,7 @@ BEGIN
               VALUE "LegalCopyright", "© 2019 -2025 Vincent Parrett and Contributors\0"
               VALUE "ProductName", "DSpec Creator for DPM Package Manager\0"
               VALUE "ProductVersion", "0.2.0-alpha\0"
-              VALUE "CompileDate", "Saturday, 15 March 2025 2:51 PM\0"
+              VALUE "CompileDate", "Friday, 22 August 2025 8:29 PM\0"
               VALUE "FileVersion", "0.2.0.0\0"
          END
     END

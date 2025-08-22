@@ -195,6 +195,8 @@ begin
   writer := TPackageSpecWriter.Create(FLogger, FPackageSpec);
   writer.SaveToFile(filename);
   FFilename := Filename;
+  //TODO : This is terrible - find a better way to handle modified
+  FLoadedSpec := FReader.ReadSpec(filename);
 end;
 
 function TDSpecFile.WorkingDir: string;

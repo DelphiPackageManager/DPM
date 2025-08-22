@@ -329,8 +329,8 @@ begin
   if not FStopwatch.IsRunning then
   begin
     FStopwatch.Start;
-    //Application.ProcessMessages;
     FLogMemo.Refresh;
+    Application.ProcessMessages;
   end
   else if FStopwatch.ElapsedMilliseconds > 10 then
   begin
