@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -751,8 +751,8 @@ var
   newPackageIdentity: IPackageIdentity;
   packageFileName: string;
   packageInfo: IPackageInfo; // includes dependencies;
-//  existingPackageRef: IPackageReference;
-//  dependency : IPackageReference;
+  existingPackageRef: IPackageReference;
+  dependency : IPackageReference;
   projectPackageGraph: IPackageReference;
 
   packageManifests: IDictionary<string, IPackageManifest>;
@@ -768,6 +768,8 @@ var
   packageCompiler: ICompiler;
 
   seenPackages: IDictionary<string, IPackageInfo>;
+
+
 begin
   result := false;
 
@@ -776,32 +778,32 @@ begin
   if projectPackageGraph = nil then
     projectPackageGraph := TPackageReference.CreateRoot(Options.compilerVersion, platform);
 
-//  // see if it's already installed.
-//  existingPackageRef := projectPackageGraph.FindTopLevelChild(Options.packageId);
-//  if (existingPackageRef <> nil) then
-//  begin
-//    // if it's installed already and we're not forcing it to install or upgrading the version then we're done.
-//    if (not (Options.force or Options.IsUpgrade)) and (not existingPackageRef.IsTransitive) then
-//    begin
-//      // Note this error won't show from the IDE as we always force install from the IDE.
-//      FLogger.Error('Package [' + Options.packageId +  '] is already installed. Use option -force to force reinstall, or -upgrade to install a different version.');
-//      exit;
-//    end;
-//    // remove it so we can force resolution to happen later.
-//    projectPackageGraph.RemoveTopLevelChild(existingPackageRef.Id);
-//    existingPackageRef := nil; // we no longer need it.
-//  end;
-//
-//  // We could have a transitive dependency that is being promoted.
-//  // Since we want to control what version is installed, we will remove
-//  // any transitive references to that package so the newly installed version
-//  // will take precedence when resolving.
-//  dependency := projectPackageGraph.FindFirstChild(Options.packageId);
-//  while dependency <> nil do
-//  begin
-//    projectPackageGraph.RemoveChild(dependency);
-//    dependency := projectPackageGraph.FindFirstChild(Options.packageId);
-//  end;
+  // see if it's already installed.
+  existingPackageRef := projectPackageGraph.FindTopLevelChild(Options.packageId);
+  if (existingPackageRef <> nil) then
+  begin
+    // if it's installed already and we're not forcing it to install or upgrading the version then we're done.
+    if (not (Options.force or Options.IsUpgrade)) and (not existingPackageRef.IsTransitive) then
+    begin
+      // Note this error won't show from the IDE as we always force install from the IDE.
+      FLogger.Error('Package [' + Options.packageId +  '] is already installed. Use option -force to force reinstall, or -upgrade to install a different version.');
+      exit;
+    end;
+    // remove it so we can force resolution to happen later.
+    projectPackageGraph.RemoveTopLevelChild(existingPackageRef.Id);
+    existingPackageRef := nil; // we no longer need it.
+  end;
+
+  // We could have a transitive dependency that is being promoted.
+  // Since we want to control what version is installed, we will remove
+  // any transitive references to that package so the newly installed version
+  // will take precedence when resolving.
+  dependency := projectPackageGraph.FindFirstChild(Options.packageId);
+  while dependency <> nil do
+  begin
+    projectPackageGraph.RemoveChild(dependency);
+    dependency := projectPackageGraph.FindFirstChild(Options.packageId);
+  end;
 
   // if the user specified a version, either the on the command line or via a file then we will use that
   if not Options.Version.IsEmpty then
