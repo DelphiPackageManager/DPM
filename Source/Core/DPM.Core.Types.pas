@@ -601,7 +601,7 @@ begin
           3 :
           begin
             result := true; //ambigous could be 12.3 or 13.0
-            versions := '12.3';
+            versions := '12.3 / 13.0';
           end;
         end;
       end;
