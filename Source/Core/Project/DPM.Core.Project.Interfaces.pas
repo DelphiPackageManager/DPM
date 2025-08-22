@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -69,6 +69,7 @@ type
     function GetAppType : TAppType;
     function GetHasPackages : boolean;
     function GetProjectFile : string;
+    function GetHasDPM : boolean;
     procedure SetCompiler(const value : TCompilerVersion);
 
     function LoadProject(const filename : string; const elements : TProjectElements = [TProjectElement.All]) : boolean;
@@ -91,6 +92,8 @@ type
     property AppType : TAppType read GetAppType;
     property HasPackages : boolean read GetHasPackages;
     property ProjectFile : string read GetProjectFile;
+    //returns true if dpmcompiler element present
+    property HasDPM : boolean read GetHasDPM;
 
   end;
 

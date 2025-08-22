@@ -79,6 +79,7 @@ type
     function GetAppType : TAppType;
     function GetHasPackages : boolean;
     function GetProjectFile : string;
+    function GetHasDPM : boolean;
     function GetProjectConfiguration(const name : string; const platform : TDPMPlatform) : IProjectConfiguration;
 
     procedure SetCompiler(const value : TCompilerVersion);
@@ -333,6 +334,11 @@ begin
   end;
   dpmElement.text := '$(DPMCache)\$(DPMCompiler)\$(Platform)';
 
+end;
+
+function TProjectEditor.GetHasDPM: boolean;
+begin
+  result := FDPMCompilerVersion <> '';
 end;
 
 function TProjectEditor.GetHasPackages : boolean;

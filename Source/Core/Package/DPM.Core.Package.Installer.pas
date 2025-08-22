@@ -1180,7 +1180,7 @@ var
 begin
   result := false;
 
-  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion, ambiguousVersions);
+  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion, ambiguousVersions) and (not projectEditor.HasDPM);
 
   if ambiguousProjectVersion and (Options.compilerVersion = TCompilerVersion.UnknownVersion) then
     FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous (' + ambiguousVersions + '), recommend specifying compiler version on command line.');
@@ -1708,7 +1708,7 @@ begin
   if cancellationToken.IsCancelled then
     exit;
 
-  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion, ambiguousVersions);
+  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion, ambiguousVersions) and (not projectEditor.HasDPM);
 
   if ambiguousProjectVersion and
     (Options.compilerVersion = TCompilerVersion.UnknownVersion) then
@@ -1899,11 +1899,9 @@ begin
   if cancellationToken.IsCancelled then
     exit;
 
-  ambiguousProjectVersion := IsAmbigousProjectVersion
-    (projectEditor.ProjectVersion, ambiguousVersions);
+  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion, ambiguousVersions) and (not projectEditor.HasDPM);
 
-  if ambiguousProjectVersion and
-    (Options.compilerVersion = TCompilerVersion.UnknownVersion) then
+  if ambiguousProjectVersion and (Options.compilerVersion = TCompilerVersion.UnknownVersion) then
     FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous (' + ambiguousVersions + '), recommend specifying compiler version on command line.');
 
   // if the compiler version was specified (either on the command like or through a package file)
