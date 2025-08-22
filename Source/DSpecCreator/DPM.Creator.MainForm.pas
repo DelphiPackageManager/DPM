@@ -206,7 +206,7 @@ type
     actPlatformsDeselectAll : TAction;
     SelectAll2 : TMenuItem;
     DeselectAll2 : TMenuItem;
-    Label12 : TLabel;
+    lblCopyright: TLabel;
     edtCopyright : TEdit;
     Panel2 : TPanel;
     lblTemplateView : TLabel;
@@ -218,6 +218,8 @@ type
     Splitter1: TSplitter;
     edtReadme: TEdit;
     Label14: TLabel;
+    edtRepositoryCommit: TEdit;
+    Label13: TLabel;
     procedure FormDestroy(Sender : TObject);
     procedure btnAddExcludeClick(Sender : TObject);
     procedure btnAddTemplateClick(Sender : TObject);
@@ -304,6 +306,7 @@ type
     procedure edtBPLEntryBuildIdChange(Sender: TObject);
     procedure clbCompilersKeyPress(Sender: TObject; var Key: Char);
     procedure edtReadmeChange(Sender: TObject);
+    procedure edtRepositoryCommitChange(Sender: TObject);
   private
     { Private declarations }
     FtmpFilename : string;
@@ -1749,6 +1752,11 @@ begin
   FOpenFile.PackageSpec.metadata.Readme := edtReadme.Text;
 end;
 
+procedure TDSpecCreatorForm.edtRepositoryCommitChange(Sender: TObject);
+begin
+  FOpenFile.PackageSpec.metadata.RepositoryCommit := edtRepositoryCommit.Text;
+end;
+
 procedure TDSpecCreatorForm.edtRepositoryURLChange(Sender : TObject);
 begin
   FOpenFile.PackageSpec.metadata.repositoryUrl := edtRepositoryURL.Text;
@@ -1924,6 +1932,7 @@ begin
   mmoDescription.Text := FOpenFile.PackageSpec.metadata.Description;
   edtProjectURL.Text := FOpenFile.PackageSpec.metadata.projectUrl;
   edtRepositoryURL.Text := FOpenFile.PackageSpec.metadata.repositoryUrl;
+  edtRepositoryCommit.Text := FOpenFile.PackageSpec.metadata.RepositoryCommit;
   edtAuthor.Text := FOpenFile.PackageSpec.metadata.authors;
   edtCopyright.Text := FOpenFile.PackageSpec.metadata.Copyright;
   cboLicense.Text := FOpenFile.PackageSpec.metadata.license;
