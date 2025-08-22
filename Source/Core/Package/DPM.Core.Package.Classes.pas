@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -448,7 +448,6 @@ begin
   FRepositoryUrl  := jsonObj.S['RepositoryUrl'];
   FRepositoryType := jsonObj.S['RepositoryType'];
   FRepositoryBranch := jsonObj.S['RepositoryBranch'];
-  FRepositoryCommit := jsonObj.S['RepositoryCommit'];
   FRepositoryCommit := jsonObj.S['RepositoryCommit'];
   searchPaths       := jsonObj.S['searchPaths'];
 
