@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -126,7 +126,11 @@ const
 
   projectExtensionsXPath = '/x:Project/x:ProjectExtensions';
 
-  packageReferencesXPath = '/x:Project/x:ProjectExtensions/x:DPM/x:PackageReference';
+  //new format
+  packageReferencesXPath = '/x:Project/x:ProjectExtensions/x:DPM/x:PackageReferences';
+
+  //old format
+  packageReferenceXPath = '/x:Project/x:ProjectExtensions/x:DPM/x:PackageReference';
 
   dpmElementPath = '/x:Project/x:PropertyGroup/x:DPM';
 
@@ -555,7 +559,7 @@ end;
 
 function TProjectEditor.LoadPackageRefences : boolean;
 
-  procedure ReadPackageReferences(const parentReference : IPackageReference; const parentElement : IXMLDOMElement);
+  procedure ReadPackageReferences(const parentReference : IPackageReference; const parentElement : IXMLDOMElement; parentPlatform : TDPMPlatform );
   var
     isTransitive : boolean;
     packageNodes : IXMLDOMNodeList;
@@ -577,10 +581,11 @@ function TProjectEditor.LoadPackageRefences : boolean;
     rootNode : IPackageReference;
   begin
     isTransitive := parentReference <> nil;
-    if isTransitive then
-      sXPath := 'x:PackageReference'
+    //if it's unknown, we are loading top level in the old format
+    if parentPlatform = TDPMPlatform.UnknownPlatform then
+      sXPath := packageReferenceXPath
     else
-      sXPath := packageReferencesXPath;
+      sXPath := 'x:PackageReference';
 
     packageNodes := parentElement.selectNodes(sXPath);
     if packageNodes.length > 0 then
@@ -618,8 +623,10 @@ function TProjectEditor.LoadPackageRefences : boolean;
           result := false;
           exit;
         end;
-        //if we have a parent that isn't root then we will use it's platform
-        if (parentReference <> nil) and (not parentReference.IsRoot) then
+
+        if parentPlatform <> TDPMPlatform.UnknownPlatform then
+          platform := parentPlatform
+        else  if (parentReference <> nil) and (not parentReference.IsRoot) then
           platform := parentReference.Platform
         else if packageElement.getAttributeNode('platform') <> nil then
         begin
@@ -670,7 +677,6 @@ function TProjectEditor.LoadPackageRefences : boolean;
             raise Exception.Create('Duplicate package reference for package [' + id + '  ' + DPMPlatformToString(platform) + ']');
         end;
 
-
         //only transitive packages need a range
         if isTransitive then
         begin
@@ -704,14 +710,55 @@ function TProjectEditor.LoadPackageRefences : boolean;
           newNode := rootNode.AddChild(id, version, TVersionRange.Empty);
           newNode.UseSource := useSource;
         end;
-        ReadPackageReferences(newNode, packageElement);
+        ReadPackageReferences(newNode, packageElement, platform);
       end;
     end;
   end;
 
+var
+  packageReferencesElements : IXMLDOMNodeList;
+  packageReferencesElement : IXMLDOMElement;
+  j : integer;
+  packageReferencesPlatform : TDPMPlatform;
+  stmp : string;
 begin
   result := true;
-  ReadPackageReferences(nil, FProjectXML.documentElement );
+
+  //try new format first
+  packageReferencesElements := FProjectXML.selectNodes(packageReferencesXPath);
+  if packageReferencesElements.length > 0 then
+  begin
+    for j := 0 to packageReferencesElements.length -1 do
+    begin
+      stmp := '';
+      packageReferencesElement := packageReferencesElements.item[j] as IXMLDOMElement;
+      if packageReferencesElement.getAttributeNode('platform') <> nil then
+        stmp := packageReferencesElement.getAttribute('platform');
+      if stmp = '' then
+      begin
+        FLogger.Error('Invalid package references detected in project, missing required [platform] attribute');
+        result := false;
+        exit;
+      end;
+      packageReferencesPlatform := StringToDPMPlatform(stmp);
+      if packageReferencesPlatform = TDPMPlatform.UnknownPlatform then
+      begin
+        FLogger.Error('Invalid package reference platform value [' + stmp + '] in platform attribute');
+        result := false;
+        exit;
+      end;
+
+      ReadPackageReferences(nil, packageReferencesElement, packageReferencesPlatform );
+    end;
+  end
+  else
+  begin
+    //try old format
+    ReadPackageReferences(nil, FProjectXML.documentElement, TDPMPlatform.UnknownPlatform );
+  end;
+
+
+
 
 end;
 
@@ -948,6 +995,8 @@ var
   i : integer;
   topLevelReference : IPackageReference;
 
+  packageReferencesElement : IXMLDOMElement;
+
   procedure WritePackageReference(const parentElement : IXMLDOMElement; const packageReference : IPackageReference);
   var
     packageReferenceElement : IXMLDOMElement;
@@ -955,7 +1004,7 @@ var
   begin
     packageReferenceElement := FProjectXML.createNode(NODE_ELEMENT, 'PackageReference', msbuildNamespace) as IXMLDOMElement;
     packageReferenceElement.setAttribute('id', packageReference.Id);
-    packageReferenceElement.setAttribute('platform', DPMPlatformToBDString(packageReference.Platform));
+//    packageReferenceElement.setAttribute('platform', DPMPlatformToBDString(packageReference.Platform));
     packageReferenceElement.setAttribute('version', packageReference.Version.ToStringNoMeta);
     if not packageReference.VersionRange.IsEmpty then
       packageReferenceElement.setAttribute('range', packageReference.VersionRange.ToString);
@@ -986,13 +1035,24 @@ begin
   else
   begin
     //remove existing nodes, we'll rewrite them below.
+
+    //old style
     packageReferenceElements := dpmElement.selectNodes('x:PackageReference[@platform="' + DPMPlatformToBDString(platform) + '"]');
+    for i := 0 to packageReferenceElements.length - 1 do
+      dpmElement.removeChild(packageReferenceElements.item[i]);
+
+    //new style
+    packageReferenceElements := dpmElement.selectNodes('x:PackageReferences[@platform="' + DPMPlatformToBDString(platform) + '"]');
     for i := 0 to packageReferenceElements.length - 1 do
       dpmElement.removeChild(packageReferenceElements.item[i]);
   end;
 
+  packageReferencesElement := FProjectXML.createNode(NODE_ELEMENT, 'PackageReferences', msbuildNamespace) as IXMLDOMElement;
+  packageReferencesElement.setAttribute('platform', DPMPlatformToBDString(platform));
+  dpmElement.appendChild(packageReferencesElement);
+
   for topLevelReference in dependencyGraph.Children do
-    WritePackageReference(dpmElement, topLevelReference);
+    WritePackageReference(packageReferencesElement, topLevelReference);
 
 end;
 
