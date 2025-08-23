@@ -1608,7 +1608,7 @@ begin
         terminateontimeout = false
         thumbprint = %SignotaurThumbprint%
         timeoutlength = 2
-        timestampserverurl = http://timestamp.sectigo.com
+        timestampserverurl = http://timestamp.digicert.com
         useerrordialogmonitor = false
         verboselogging = true
       end
