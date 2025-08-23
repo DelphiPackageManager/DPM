@@ -1599,15 +1599,18 @@ begin
         impersonateusenetcredonly = false
         impersonateuser = false
         logprocessparameters = true
+        logtiming = false
         maxdegreeofparallelism = 16
         processoraffinity = 0
         processpriority = tpNormal
+        revocationcheckmode = NoCheck
         serverurl = %SignotaurServer%
         terminateontimeout = false
         thumbprint = %SignotaurThumbprint%
         timeoutlength = 2
         timestampserverurl = http://timestamp.sectigo.com
         useerrordialogmonitor = false
+        verboselogging = true
       end
     end
   end
