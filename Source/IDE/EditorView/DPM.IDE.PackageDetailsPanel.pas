@@ -345,28 +345,33 @@ begin
 
   DrawText(Canvas.Handle, FPackage.PublishedDate, Length(FPackage.PublishedDate), FLayout.PublishDateRect, DT_LEFT + DT_WORDBREAK);
 
+  if (deProjectUrl in FOptionalElements) then
+  begin
+    Canvas.Font.Style := [fsBold];
+    DrawText(Canvas.Handle, 'Project URL :', Length('Project URL :'), FLayout.ProjectUrlLabelRect, DT_LEFT);
 
-  Canvas.Font.Style := [fsBold];
-  DrawText(Canvas.Handle, 'Project URL :', Length('Project URL :'), FLayout.ProjectUrlLabelRect, DT_LEFT);
+    Canvas.Font.Color := uriColor;
+    Canvas.Font.Style := [];
+    if FHitElement = deProjectUrl then
+      Canvas.Font.Style := [fsUnderline];
 
-  Canvas.Font.Color := uriColor;
-  Canvas.Font.Style := [];
-  if FHitElement = deProjectUrl then
-    Canvas.Font.Style := [fsUnderline];
+    DrawText(Canvas.Handle, FPackage.ProjectUrl, Length(FPackage.ProjectUrl), FLayout.ProjectUrlRect, DT_LEFT + DT_WORDBREAK);
+    Canvas.Font.Color := fontColor;
+  end;
 
-  DrawText(Canvas.Handle, FPackage.ProjectUrl, Length(FPackage.ProjectUrl), FLayout.ProjectUrlRect, DT_LEFT + DT_WORDBREAK);
-  Canvas.Font.Color := fontColor;
 
-  Canvas.Font.Style := [fsBold];
-  DrawText(Canvas.Handle, 'Report URL :', Length('Report URL :'), FLayout.ReportUrlLabelRect, DT_LEFT);
+  if (deReportUrl in FOptionalElements) then
+  begin
+    Canvas.Font.Style := [fsBold];
+    DrawText(Canvas.Handle, 'Report URL :', Length('Report URL :'), FLayout.ReportUrlLabelRect, DT_LEFT);
 
-  Canvas.Font.Color := uriColor;
-  Canvas.Font.Style := [];
-  if FHitElement = deReportUrl then
-    Canvas.Font.Style := [fsUnderline];
-  DrawText(Canvas.Handle, FPackage.ReportUrl, Length(FPackage.ReportUrl), FLayout.ReportUrlRect, DT_LEFT + DT_WORDBREAK);
-  Canvas.Font.Color := fontColor;
-
+    Canvas.Font.Color := uriColor;
+    Canvas.Font.Style := [];
+    if FHitElement = deReportUrl then
+      Canvas.Font.Style := [fsUnderline];
+    DrawText(Canvas.Handle, FPackage.ReportUrl, Length(FPackage.ReportUrl), FLayout.ReportUrlRect, DT_LEFT + DT_WORDBREAK);
+    Canvas.Font.Color := fontColor;
+  end;
 
   if (deRepositoryUrl in FOptionalElements) then
   begin
