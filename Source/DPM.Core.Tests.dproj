@@ -225,7 +225,7 @@
                     <PackageReference id="Spring4D.Base" version="2.0.2-beta.2" range="2.0.2-beta.2"/>
                 </PackageReference>
                 <PackageReference id="VSoft.AntPatterns" version="0.1.9"/>
-                <PackageReference id="VSoft.Base64.Polyfill" version="1.0.1"/>
+                <PackageReference id="VSoft.Base64.Polyfill" version="1.0.2"/>
                 <PackageReference id="VSoft.CancellationToken" version="0.1.4"/>
                 <PackageReference id="VSoft.CommandLine" version="0.1.11"/>
                 <PackageReference id="VSoft.DUnitX" version="0.4.4"/>
