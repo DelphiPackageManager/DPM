@@ -107,7 +107,6 @@ uses
   System.IOUtils,
   System.RegularExpressions,
   System.Zip,
-  System.Hash,
   Spring.Collections.Extensions,
   DPM.Core.Constants,
   DPM.Core.Package.Classes,
