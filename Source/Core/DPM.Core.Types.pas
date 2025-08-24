@@ -70,6 +70,7 @@ type
   TCompilerVersions = set of TCompilerVersion;
 
   //covering all bases here.
+  //note do not change these values or the order, they need to mirror the server
   TDPMPlatform = (
     UnknownPlatform,
     Win32,
@@ -85,11 +86,11 @@ type
     AndroidIntel64, //reserved for future use
     iOS32,
     iOS64, //reserved for future use
-    iOSSimulator,
     LinuxIntel32, //reserved for future use
     LinuxIntel64,
     LinuxArm32, //reserved for future use
-    LinuxArm64 //reserved for future use
+    LinuxArm64, //reserved for future use
+    iOSSimulator
     );
 
   TDPMPlatforms = set of TDPMPlatform;
