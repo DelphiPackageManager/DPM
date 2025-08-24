@@ -183,7 +183,8 @@ uses
   DPM.IDE.PathManager in 'IDE\DPM.IDE.PathManager.pas',
   DPM.Core.Manifest.Interfaces in 'Core\Manifest\DPM.Core.Manifest.Interfaces.pas',
   DPM.Core.Manifest in 'Core\Manifest\DPM.Core.Manifest.pas',
-  DPM.Core.Manifest.Reader in 'Core\Manifest\DPM.Core.Manifest.Reader.pas';
+  DPM.Core.Manifest.Reader in 'Core\Manifest\DPM.Core.Manifest.Reader.pas',
+  DPM.Core.Utils.Hash in 'Core\Utils\DPM.Core.Utils.Hash.pas';
 
 {$R *.res}
 

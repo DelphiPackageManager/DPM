@@ -28,7 +28,9 @@
 // JCL_DEBUG_EXPERT_INSERTJDBG OFF
 library DPM.IDE.D120;
 
-
+{$IFDEF CPUX64}
+{$LIBSUFFIX 'x64'}
+{$ENDIF}
 
 uses
   System.SysUtils,
