@@ -333,7 +333,7 @@
                     <PackageReference id="Gabr42.OmniThreadLibrary" version="3.7.12" range="[3.7.12,]"/>
                     <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="0.1.4"/>
                 </PackageReference>
-                <PackageReference id="VSoft.Base64.Polyfill" version="1.0.0"/>
+                <PackageReference id="VSoft.Base64.Polyfill" version="1.0.1"/>
                 <PackageReference id="VSoft.CancellationToken" version="0.1.4"/>
                 <PackageReference id="VSoft.HttpClient" version="2.2.3">
                     <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="0.1.4"/>
