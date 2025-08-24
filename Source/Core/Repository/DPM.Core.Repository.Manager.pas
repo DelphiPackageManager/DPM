@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -69,11 +69,11 @@ type
     function GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResultItem;
 
 
-    function FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform; const includePrerelease : boolean; const sources : string) : IPackageIdentity;
+    function FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform; const includePrerelease : boolean; const sources : string) : IPackageInfo;
 
 
 
-    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
+    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
     function GetPackageIcon(const cancelToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
     function GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const packageId : string; const includePrerelease : boolean) : IList<TPackageVersion>; overload;
@@ -111,7 +111,7 @@ begin
   FRepositories := TCollections.CreateList<IPackageRepository>;
 end;
 
-function TPackageRepositoryManager.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
+function TPackageRepositoryManager.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
 var
   repo : IPackageRepository;
 begin
@@ -150,14 +150,14 @@ begin
   end;
 end;
 
-function TPackageRepositoryManager.FindLatestVersion(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean; const sources : string): IPackageIdentity;
+function TPackageRepositoryManager.FindLatestVersion(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean; const sources : string): IPackageInfo;
 var
   repo : IPackageRepository;
   sourcesList : TStringList;
 //  i : integer;
-  packages : IList<IPackageIdentity>;
-  package : IPackageIdentity;
-  currentPackage : IPackageIdentity;
+  packages : IList<IPackageInfo>;
+  package : IPackageInfo;
+  currentPackage : IPackageInfo;
 
 begin
   Assert(FConfiguration <> nil);
@@ -178,7 +178,7 @@ begin
     sourcesList := nil;
 
   currentPackage := nil;
-  packages := TCollections.CreateList<IPackageIdentity>;
+  packages := TCollections.CreateList<IPackageInfo>;
   try
     for repo in FRepositories do
     begin
@@ -219,7 +219,6 @@ begin
     if sourcesList <> nil then
       sourcesList.Free;
   end;
-
 
 
 end;

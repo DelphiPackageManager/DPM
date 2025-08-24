@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -139,7 +139,7 @@ begin
   manifest := FManifestReader.ReadManifest(metaDataFile);
   if manifest = nil then
     exit;
-  Result := TPackageInfo.CreateFromManifest('', manifest);
+  Result := TPackageInfo.CreateFromManifest('', manifest, '', '');
 end;
 
 function TPackageCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;

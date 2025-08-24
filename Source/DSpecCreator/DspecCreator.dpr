@@ -122,7 +122,8 @@ uses
   Vcl.Themes,
   Vcl.Styles,
   DPM.Creator.MRUService in 'DPM.Creator.MRUService.pas',
-  VSoft.Controls.Menus.MRU in 'Controls\VSoft.Controls.Menus.MRU.pas';
+  VSoft.Controls.Menus.MRU in 'Controls\VSoft.Controls.Menus.MRU.pas',
+  DPM.Core.Utils.Hash in '..\Core\Utils\DPM.Core.Utils.Hash.pas';
 
 {$R *.res}
 

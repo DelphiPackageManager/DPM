@@ -33,10 +33,9 @@ program dpm;
 {$R *.res}
 
 uses
-{$IFDEF JCLDEBUG}
+  {$IFDEF JCLDEBUG}
   JclDebug,
-  JclHookExcept,
-{$ENDIF}
+  {$ENDIF }
   System.SysUtils,
   System.Diagnostics,
   WinApi.ActiveX,
@@ -169,7 +168,8 @@ uses
   DPM.Core.Package.PackageLatestVersionInfo in 'Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas',
   DPM.Core.Manifest.Interfaces in 'Core\Manifest\DPM.Core.Manifest.Interfaces.pas',
   DPM.Core.Manifest in 'Core\Manifest\DPM.Core.Manifest.pas',
-  DPM.Core.Manifest.Reader in 'Core\Manifest\DPM.Core.Manifest.Reader.pas';
+  DPM.Core.Manifest.Reader in 'Core\Manifest\DPM.Core.Manifest.Reader.pas',
+  DPM.Core.Utils.Hash in 'Core\Utils\DPM.Core.Utils.Hash.pas';
 
 //var
 //  stacktrace : string;

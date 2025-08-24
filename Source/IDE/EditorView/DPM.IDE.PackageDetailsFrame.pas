@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -282,26 +282,12 @@ end;
 
 procedure TPackageDetailsFrame.DoGetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform);
 var
-  metaData : IPackageMetadata;
-  packageId : IPackageIdentity;
-  packageVersion : TPackageVersion;
   item : IPackageSearchResultItem ;
   key : string;
 begin
   key := LowerCase(id) + '-' + LowerCase(version);
   //try and get it from the cache first rather than going to the repo.
-  if not FMetaDataCache.TryGetValue(key, item) then
-  begin
-    packageVersion := TPackageVersion.Parse(version);
-    packageId := TPackageIdentity.Create('', id, packageVersion, compilerVersion, platform);
-    metaData :=  FPackageCache.GetPackageMetadata(packageId);
-    if metaData <> nil then
-    begin
-      item := TDPMPackageSearchResultItem.FromMetaData('cache',metaData);
-      FMetaDataCache[key] := item;
-    end;
-  end;
-  if item <> nil then
+  if FMetaDataCache.TryGetValue(key, item) then
   begin
     FDetailsPanel.SetDetails(item);
     FSelectedVersion := item.Version;

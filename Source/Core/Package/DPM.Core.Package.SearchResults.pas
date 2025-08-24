@@ -39,9 +39,10 @@ type
     FLatestStableVersion : TPackageVersion;
     FVersionRange : TVersionRange;
 
-
-
     FDownloadCount : Int64;
+    FFileHash : string;
+    FHashAlgorithm : string;
+
     FInstalled : boolean;
     FIsReservedPrefix : boolean;
     FSourceName : string;
@@ -74,6 +75,8 @@ type
     function GetTags : string;
     function GetVersion : TPackageVersion;
     function GetDownloadCount : Int64;
+    function GetHashAlgorithm : string;
+    function GetFileHash : string;
     function GetSourceName : string;
     function GetIsError : boolean;
     function GetIsTransitive : Boolean;
@@ -97,13 +100,13 @@ type
     procedure SetIsTransitive(const value : Boolean);
     procedure SetVersionRange(const value : TVersionRange);
     constructor CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
-    constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata);
+    constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata; fileHash : string; hasHalgorithm : string);
     constructor CreateFromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const platform : TDPMPlatform; const errorDescription : string);
 
   public
     destructor Destroy;override;
     class function FromJson(const sourceName : string; const jsonObject : TJsonObject) : IPackageSearchResultItem;
-    class function FromMetaData(const sourceName : string; const metaData : IPackageMetadata) : IPackageSearchResultItem;
+    class function FromMetaData(const sourceName : string; const metaData : IPackageMetadata; fileHash : string; hasHalgorithm : string) : IPackageSearchResultItem;
     class function FromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const platform : TDPMPlatform; const errorDescription : string) : IPackageSearchResultItem;
   end;
 
@@ -183,6 +186,8 @@ begin
   FTags             := jsonObject.S['tags'];
 
   FDownloadCount    := jsonObject.L['totalDownloads'];
+  FHashAlgorithm    := jsonObject.S['hashAlgorithm'];
+  FFileHash         := jsonObject.S['hash'];
 
   FLatestVersion    := TPackageVersion.Parse(jsonObject.S['latestVersion']);
 
@@ -212,13 +217,14 @@ begin
 
 end;
 
-constructor TDPMPackageSearchResultItem.CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata);
+constructor TDPMPackageSearchResultItem.CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata; fileHash : string; hasHalgorithm : string);
 begin
   FSourceName := sourceName;
   FPlatform := metaData.Platform;
   FCompilerVersion := metaData.CompilerVersion;
   FDependencies := TCollections.CreateList<IPackageDependency>;
-  FDependencies.AddRange(metaData.Dependencies);
+  if metaData.Dependencies <> nil then
+    FDependencies.AddRange(metaData.Dependencies);
   FAuthors := metaData.Authors;
   FCopyright := metaData.Copyright;
   FDescription := metaData.Description;
@@ -237,6 +243,8 @@ begin
   FDownloadCount := -1; //indicates not set;
   FIsReservedPrefix := false;
   FVersionRange := TVersionRange.Empty;
+  FFileHash := fileHash;
+  FHashAlgorithm := hashAlgorithm;
 end;
 
 destructor TDPMPackageSearchResultItem.Destroy;
@@ -255,9 +263,9 @@ begin
   result := TDPMPackageSearchResultItem.CreateFromJson(sourceName, jsonObject);
 end;
 
-class function TDPMPackageSearchResultItem.FromMetaData(const sourceName : string; const metaData : IPackageMetadata) : IPackageSearchResultItem;
+class function TDPMPackageSearchResultItem.FromMetaData(const sourceName : string; const metaData : IPackageMetadata; fileHash : string; hasHalgorithm : string) : IPackageSearchResultItem;
 begin
-  result := TDPMPackageSearchResultItem.CreateFromMetaData(sourceName, metaData);
+  result := TDPMPackageSearchResultItem.CreateFromMetaData(sourceName, metaData, fileHash, hasHalgorithm);
 end;
 
 function TDPMPackageSearchResultItem.GetAuthors : string;
@@ -288,6 +296,16 @@ end;
 function TDPMPackageSearchResultItem.GetDownloadCount : Int64;
 begin
   result := FDownloadCount;
+end;
+
+function TDPMPackageSearchResultItem.GetFileHash: string;
+begin
+  result := FFileHash;
+end;
+
+function TDPMPackageSearchResultItem.GetHashAlgorithm: string;
+begin
+  result := FHashAlgorithm;
 end;
 
 function TDPMPackageSearchResultItem.GetIcon : string;

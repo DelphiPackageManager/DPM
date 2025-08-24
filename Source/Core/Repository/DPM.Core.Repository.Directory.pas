@@ -44,14 +44,16 @@ uses
   DPM.Core.Repository.Base;
 
 type
-  TReadManifestFunc = reference to function(const name : string; const manifest : IPackageManifest) : IInterface;
+  TReadManifestFunc = reference to function(const name : string; const manifest : IPackageManifest; const fileHash :string; const hashAlgorithm : string) : IInterface;
 
   TDirectoryPackageRepository = class(TBaseRepository, IPackageRepository)
   private
     FPermissionsChecked : boolean;
     FIsWritable : boolean;
   protected
-    function DoGetPackageMetaData(const cancellationToken : ICancellationToken; const fileName : string; const readManifestFunc : TReadManifestFunc) : IInterface;
+    procedure CheckWritable(const folder : string);
+
+    function DoGetPackageMetaData(const cancellationToken : ICancellationToken; const fileName : string; readHash : boolean; const readManifestFunc : TReadManifestFunc) : IInterface;
 
 
     function DoList(const searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
@@ -61,9 +63,9 @@ type
     function DoGetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const files : IList<string>) : IList<IPackageSearchResultItem>;
 
 
-    function DownloadPackage(const cancellationToken : ICancellationToken; const packageMetadata : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
+    function DownloadPackage(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
 
-    function FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform; const includePrerelease : boolean) : IPackageIdentity;
+    function FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform; const includePrerelease : boolean) : IPackageInfo;
 
 
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
@@ -105,6 +107,7 @@ uses
   System.IOUtils,
   System.RegularExpressions,
   System.Zip,
+  System.Hash,
   Spring.Collections.Extensions,
   DPM.Core.Constants,
   DPM.Core.Package.Classes,
@@ -114,7 +117,7 @@ uses
   DPM.Core.Utils.Path,
   DPM.Core.Utils.Directory,
   DPM.Core.Package.SearchResults,
-  DPM.Core.Package.ListItem, DPM.Core.Package.PackageLatestVersionInfo;
+  DPM.Core.Package.ListItem, DPM.Core.Package.PackageLatestVersionInfo, DPM.Core.Utils.Hash;
 
 { TDirectoryPackageRespository }
 
@@ -142,6 +145,15 @@ end;
 
 
 
+procedure TDirectoryPackageRepository.CheckWritable(const folder : string);
+begin
+  if not FPermissionsChecked then
+  begin
+    FIsWritable := TDirectoryUtils.IsDirectoryWriteable(folder);
+    FPermissionsChecked := true;
+  end;
+end;
+
 constructor TDirectoryPackageRepository.Create(const logger : ILogger);
 begin
   inherited Create(logger);
@@ -149,26 +161,49 @@ begin
   FIsWritable := false;
 end;
 
-function TDirectoryPackageRepository.DownloadPackage(const cancellationToken : ICancellationToken; const packageMetadata : IPackageIdentity; const localFolder : string; var fileName : string) : boolean;
+function TDirectoryPackageRepository.DownloadPackage(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
 var
   sourceFile : string;
+  sourceHashFile : string;
   destFile : string;
+  destHashFile : string;
+
+  sourceHash : string;
+  destHash : string;
 begin
   result := false;
-  sourceFile := IncludeTrailingPathDelimiter(SourceUri) + packageMetadata.ToString + cPackageFileExt;
+  sourceFile := IncludeTrailingPathDelimiter(SourceUri) + packageInfo.ToString + cPackageFileExt;
   if not FileExists(sourceFile) then
   begin
-    Logger.Warning('Package not found in repository [' + sourceFile + ']');
+    Logger.Debug('Package not found in repository [' + sourceFile + ']');
     exit;
   end;
-  destFile := IncludeTrailingPathDelimiter(localFolder) + packageMetadata.ToString + cPackageFileExt;
+  destFile := IncludeTrailingPathDelimiter(localFolder) + packageInfo.ToString + cPackageFileExt;
   if TPathUtils.IsRelativePath(destFile) then
     destFile := TPath.GetFullPath(destFile);
   try
     ForceDirectories(ExtractFilePath(destFile));
     Logger.Information('GET ' + sourceFile);
+    destHash := THashSHA256.GetHashStringFromFile(sourceFile);
+    sourceHashFile := sourceFile + cPackageHashAlgorithmExt;
+
+    //if a package hash file exists, verify the package file hasn't changed.
+    if FileExists(sourceHashFile) then
+    begin
+      sourceHash := TFile.ReadAllText(sourceHashFile);
+      if not SameText(sourceHash, destHash) then
+      begin
+        Logger.Error('Source and destination file hashes are different, the file has been modified since being pushed to the source folder.');
+        Logger.Error('If this is intentional, remove the .sha256 file from the source');
+      end;
+    end;
+
     TFile.Copy(sourceFile, destFile, true);
     fileName := destFile;
+
+    destHashFile := destFile + cPackageHashAlgorithmExt;
+    TFile.WriteAllText(destHashFile, destHash);
+
     result := true;
     Logger.Information('OK ' + sourceFile);
   except
@@ -181,7 +216,7 @@ end;
 
 
 
-function TDirectoryPackageRepository.FindLatestVersion(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean): IPackageIdentity;
+function TDirectoryPackageRepository.FindLatestVersion(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean): IPackageInfo;
 var
   searchFiles : IList<string>;
   regex : TRegEx;
@@ -192,6 +227,8 @@ var
   maxVersion : TPackageVersion;
   packageVersion : TPackageVersion;
   maxVersionFile : string;
+  hash : string;
+  hashfileName : string;
 begin
   result := nil;
   if version.IsEmpty then
@@ -234,7 +271,17 @@ begin
 
   if maxVersion.IsEmpty then
     exit;
-  result := TPackageIdentity.Create(Self.Name, id, maxVersion, compilerVersion, platform);
+  hashfileName := packageFile + cPackageHashAlgorithmExt;
+  if FileExists(hashfileName) then
+    hash := TFile.ReadAllText(hashfileName)
+  else
+  begin
+    hash := THashSHA256.GetHashStringFromFile(packageFile);
+    if FIsWritable then
+      TFile.WriteAllText(hashfileName, hash);
+  end;
+
+  result := TPackageInfo.Create(Self.Name, id, maxVersion, compilerVersion, platform, hash, cPackageHashAlgorithm );
 
 end;
 
@@ -347,12 +394,12 @@ begin
   if cancellationToken.IsCancelled then
     exit;
 
-  readManifestFunc := function (const name : string; const manifest : IPackageManifest) : IInterface
+  readManifestFunc := function (const name : string; const manifest : IPackageManifest; const fileHash :string; const hashAlgorithm : string) : IInterface
                   begin
-                    result := TPackageInfo.CreateFromManifest(name, manifest);
+                    result := TPackageInfo.CreateFromManifest(name, manifest, fileHash, hashAlgorithm);
                   end;
 
-  result := DoGetPackageMetaData(cancellationToken, packageFileName, readManifestFunc) as IPackageInfo;
+  result := DoGetPackageMetaData(cancellationToken, packageFileName, false, readManifestFunc) as IPackageInfo;
 end;
 
 
@@ -526,6 +573,8 @@ var
   packageFileName : string;
   readManifestFunc : TReadManifestFunc;
   metaData : IPackageMetadata;
+  _fileHash :string;
+  _hashAlgorithm : string;
 begin
   result := nil;
   packageFileName := Format('%s-%s-%s-%s.dpkg', [packageId, CompilerToString(compilerVersion), DPMPlatformToString(platform), packageVersion]);
@@ -535,14 +584,19 @@ begin
   if cancellationToken.IsCancelled then
     exit;
 
-  readManifestFunc := function (const name : string; const manifest : IPackageManifest) : IInterface
+  readManifestFunc := function (const name : string; const manifest : IPackageManifest; const fileHash :string; const hashAlgorithm : string) : IInterface
                   begin
                     result := TPackageMetadata.CreateFromManifest(name, manifest);
+                    _fileHash := fileHash;
+                    _hashAlgorithm := hashAlgorithm;
                   end;
 
-  metaData := DoGetPackageMetaData(cancellationToken, packageFileName, readManifestFunc) as IPackageMetaData;
+  metaData := DoGetPackageMetaData(cancellationToken, packageFileName, true, readManifestFunc) as IPackageMetaData;
+
+
+
   if metaData <> nil then
-    result := TDPMPackageSearchResultItem.FromMetaData(name, metaData);
+    result := TDPMPackageSearchResultItem.FromMetaData(name, metaData, _fileHash, _hashAlgorithm);
 
 end;
 
@@ -603,9 +657,9 @@ begin
   regex := TRegEx.Create(searchRegEx, [roIgnoreCase]);
 
 
-  readManifestFunc := function (const name : string; const manifest : IPackageManifest) : IInterface
+  readManifestFunc := function (const name : string; const manifest : IPackageManifest; const fileHash :string; const hashAlgorithm : string) : IInterface
                   begin
-                    result := TPackageInfo.CreateFromManifest(name, manifest);
+                    result := TPackageInfo.CreateFromManifest(name, manifest, fileHash, hashAlgorithm);
                   end;
 
   for i := 0 to searchFiles.Count - 1 do
@@ -626,7 +680,7 @@ begin
         if not packageVersion.IsStable then
           continue;
 
-      packageInfo := DoGetPackageMetadata(cancellationToken, searchFiles[i], readManifestFunc) as IPackageInfo;
+      packageInfo := DoGetPackageMetadata(cancellationToken, searchFiles[i], false, readManifestFunc) as IPackageInfo;
       result.Add(packageInfo);
     end;
   end;
@@ -728,7 +782,8 @@ var
   resultItem : IPackageSearchResultItem;
 
   readManifestFunc : TReadManifestFunc;
-
+  _fileHash :string;
+  _hashAlgorithm : string;
 begin
   Logger.Debug('TDirectoryPackageRepository.DoGetPackageFeed');
   result := TCollections.CreateList<IPackageSearchResultItem>;
@@ -785,7 +840,7 @@ begin
     end;
   end;
 
-  readManifestFunc := function (const name : string; const manifest : IPackageManifest) : IInterface
+  readManifestFunc := function (const name : string; const manifest : IPackageManifest; const fileHash :string; const hashAlgorithm : string) : IInterface
                   begin
                     result := TPackageMetadata.CreateFromManifest(name, manifest);
                   end;
@@ -806,11 +861,13 @@ begin
     if not FileExists(packageFileName) then
       exit;
 
-    packageMetadata := DoGetPackageMetaData(cancelToken, packageFileName, readManifestFunc) as IPackageMetadata;
+    _fileHash := '';
+    _hashAlgorithm := '';
+    packageMetadata := DoGetPackageMetaData(cancelToken, packageFileName, true, readManifestFunc) as IPackageMetadata;
 
     if packageMetadata <> nil then
     begin
-      resultItem := TDPMPackageSearchResultItem.FromMetaData(Self.Name, packageMetadata);
+      resultItem := TDPMPackageSearchResultItem.FromMetaData(Self.Name, packageMetadata, _fileHash, _hashAlgorithm);
       resultItem.LatestVersion := find.LatestVersion;
       resultItem.LatestStableVersion := find.LatestStableVersion;
       result.Add(resultItem);
@@ -818,36 +875,58 @@ begin
   end;
 end;
 
-function TDirectoryPackageRepository.DoGetPackageMetaData(const cancellationToken : ICancellationToken; const fileName : string; const readManifestFunc : TReadManifestFunc) : IInterface;
+function TDirectoryPackageRepository.DoGetPackageMetaData(const cancellationToken : ICancellationToken; const fileName : string; readHash : boolean; const readManifestFunc : TReadManifestFunc) : IInterface;
 var
   zipFile : TZipFile;
   metaBytes : TBytes;
   metaString : string;
   manifest : IPackageManifest;
   reader : IPackageManifestReader;
-  extractedFile : string;
+  manifestFileName : string;
   svgIconFileName : string;
   pngIconFileName : string;
   iconBytes : TBytes;
   isSvg : boolean;
+  hashFileName : string;
+  fileHash : string;
 begin
 //  Logger.Debug('TDirectoryPackageRepository.DoGetPackageMetaData');
   result := nil;
+  if not FileExists(fileName) then
+    exit;
+  //we might write to the source folder, so check if writable
+  CheckWritable(ExtractFilePath(fileName));
+
   reader := TPackageManifestReader.Create(Logger);
 
-  //first see if the manifest has been extracted already.
-  extractedFile := ChangeFileExt(fileName, '.dspec');
-  if FileExists(extractedFile) then
+  if readHash then
   begin
-    manifest := reader.ReadManifest(extractedFile);
+    hashFileName := fileName + cPackageHashAlgorithmExt;
+    if FileExists(hashFileName) then
+      fileHash := TFile.ReadAllText(hashFileName)
+    else
+    begin
+      //calulate file hash and save it for next time
+      fileHash := THashSHA256.GetHashStringFromFile(fileName);
+      if FIsWritable then
+        TFile.WriteAllText(hashFileName, fileHash);
+    end;
+  end;
+
+  //first see if the manifest has been extracted already.
+  manifestFileName := ChangeFileExt(fileName, cPackageSpecExt); //old
+  if not FileExists(manifestFileName) then
+    manifestFileName := ChangeFileExt(fileName, cPackageManifestExt); //new
+
+  if FileExists(manifestFileName) then
+  begin
+    manifest := reader.ReadManifest(manifestFileName);
     if manifest <> nil then
     begin
       result := TPackageMetadata.CreateFromManifest(Name, manifest);
       exit;
     end;
   end;
-  if not FileExists(fileName) then
-    exit;
 
   zipFile := TZipFile.Create;
   try
@@ -898,19 +977,13 @@ begin
   manifest := reader.ReadManifestString(metaString);
   if manifest = nil then
     exit;
-  result := readManifestFunc(name, manifest);
-  if not FPermissionsChecked then
-  begin
-    FIsWritable := TDirectoryUtils.IsDirectoryWriteable(ExtractFilePath(fileName));
-    FPermissionsChecked := true;
-  end;
 
   if FIsWritable then
   begin
     try
       //TODO : Could this cause an issue if multiple users attempt this on a shared folder?
       //may need to use a lock file.
-      TFile.WriteAllText(extractedFile, metaString, TEncoding.UTF8);
+      TFile.WriteAllText(manifestFileName, metaString, TEncoding.UTF8);
       if Length(iconBytes) > 0 then
         if isSvg then
           TFile.WriteAllBytes(svgIconFileName, iconBytes)
@@ -920,6 +993,8 @@ begin
       //even though we test for write access other errors might occur (eg with network drives disconnected etc).
     end;
   end;
+
+  result := readManifestFunc(name, manifest, fileHash, cPackageHashAlgorithm);
 
 end;
 
@@ -1103,6 +1178,8 @@ end;
 function TDirectoryPackageRepository.Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions): Boolean;
 var
   targetFile : string;
+  hashFile : string;
+  hash : string;
 begin
   result := false;
   //  if TPath.IsRelativePath(pushOptions.PackagePath) then
@@ -1127,7 +1204,17 @@ begin
       exit(true);
     end;
 
+
     TFile.Copy(pushOptions.PackagePath, targetFile, true);
+
+    //caclulate file has from original file
+    hashFile := targetFile + cPackageHashAlgorithmExt;
+    hash := THashSHA256.GetHashStringFromFile(pushOptions.PackagePath);
+    //write to source.
+    TFile.WriteAllText(hashFile, hash, TEncoding.ANSI);
+
+    //TODO : Extract manifest and icon
+
     Logger.Information('Package pushed ok.', true);
     result := true;
   except

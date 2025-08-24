@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -80,10 +80,13 @@ type
     function GetDependencies : IList<IPackageDependency>;
     function GetUseSource : boolean;
     procedure SetUseSource(const value : boolean);
-
+    function GetHash : string;
+    function GetHashAlgorithm : string;
 
     property Dependencies : IList<IPackageDependency>read GetDependencies;
     property UseSource : boolean read GetUseSource write SetUseSource;
+    property Hash : string read GetHash;
+    property HashAlgorithm : string read GetHashAlgorithm;
   end;
 
   ///<summary>Package Info plus metadata</summary>
@@ -142,6 +145,8 @@ type
     function GetIsTrial : boolean;
     function GetIsCommercial : boolean;
     function GetDownloadCount : Int64;
+    function GetHashAlgorithm : string;
+    function GetFileHash : string;
     function GetInstalled : boolean;
     function GetLatestVersion : TPackageVersion;
     function GetLatestStableVersion : TPackageVersion;
@@ -188,6 +193,8 @@ type
     property IsCommercial : boolean read GetIsCommercial;
     //returns -1 if not set.
     property Downloads : Int64 read GetDownloadCount;
+    property HashAlgorithm : string read GetHashAlgorithm;
+    property FileHash : string read GetFileHash;
 
     //these are for use by the UI, not returned.
     property Installed : boolean read GetInstalled write SetInstalled;

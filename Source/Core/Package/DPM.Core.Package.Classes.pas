@@ -1,8 +1,8 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright � 2019 Vincent Parrett and contributors               }
+{           Copyright © 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -54,33 +54,36 @@ type
     function ToIdVersionString : string; virtual;
     function GetSourceName : string;
     constructor Create(const sourceName : string; const manifest : IPackageManifest); overload;virtual;
-    constructor Create(const sourceName : string; const spec : IPackageSpec); overload; virtual;
     constructor Create(const sourceName : string; const jsonObj : TJsonObject);overload;virtual;
 
   public
     constructor Create(const sourceName : string; const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform); overload; virtual;
     class function TryCreateFromString(const logger : ILogger; const value : string; const source : string; out packageIdentity : IPackageIdentity) : boolean;
-    class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageIdentity;
     class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageIdentity : IPackageIdentity) : boolean;
-    function ToString : string; override;
+    function ToString : string; override; //note - do not override below - we rely on this. should probably create a new property
   end;
 
   TPackageInfo = class(TPackageIdentity, IPackageInfo, IPackageIdentity)
   private
     FDependencies : IList<IPackageDependency>;
     FUseSource : boolean;
+    FHash : string;
+    FHashAlgorithm : string;
   protected
     function GetDependencies : IList<IPackageDependency>;
     function GetUseSource : boolean;
     procedure SetUseSource(const value : boolean);
-    constructor Create(const sourceName : string; const manifest : IPackageManifest); override;
-    constructor Create(const sourceName : string; const spec : IPackageSpec); override;
+    function GetHash : string;
+    function GetHashAlgorithm : string;
+
+    constructor Create(const sourceName : string; const manifest : IPackageManifest; const hash : string; const hashAlgorithm : string);overload;
     constructor Create(const sourceName : string; const jsonObj : TJsonObject);override;
   public
     destructor Destroy;override;
-    class function CreateFromManifest(const sourceName : string; const manifest : IPackageManifest) : IPackageInfo;
-    class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageInfo;
+    constructor Create(const sourceName : string; const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const hash : string; const hashAlgorithm : string); overload; virtual;
+    class function CreateFromManifest(const sourceName : string; const manifest : IPackageManifest; const hash : string; const hashAlgorith : string) : IPackageInfo;
     class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageInfo : IPackageInfo) : boolean;
+
   end;
 
   TPackageMetadata = class(TPackageInfo, IPackageMetadata, IPackageInfo, IPackageIdentity)
@@ -114,12 +117,10 @@ type
     function GetRepositoryType : string;
     function GetRepositoryBranch : string;
     function GetRepositoryCommit : string;
-    constructor Create(const sourceName : string; const spec : IPackageSpec); override;
     constructor Create(const sourceName : string; const manifest : IPackageManifest); override;
   public
     constructor Create(const sourceName : string; const jsonObj : TJsonObject); override;
     destructor Destroy;override;
-    class function CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageMetadata;
     class function CreateFromManifest(const sourceName : string; const manifest : IPackageManifest) : IPackageMetadata;
     class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageMetadata : IPackageMetadata) : boolean;
   end;
@@ -134,10 +135,11 @@ uses
   DPM.Core.Constants,
   DPM.Core.Manifest.Reader,
   DPM.Core.Package.Dependency,
+  VSoft.Base64,
   System.SysUtils,
   System.RegularExpressions,
   System.Zip,
-  System.Classes;
+  System.Classes, DPM.Core.Utils.Hash;
 
 { TPackageMetadata }
 
@@ -185,18 +187,6 @@ begin
   Create(sourceName, manifest.MetaData.Id, manifest.MetaData.Version, manifest.TargetPlatform.Compiler, manifest.TargetPlatform.Platforms[0]);
   FSourceName := sourceName;
 end;
-
-class function TPackageIdentity.CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageIdentity;
-begin
-  result := TPackageIdentity.Create(sourceName, spec);
-end;
-
-constructor TPackageIdentity.Create(const sourceName : string; const spec : IPackageSpec);
-begin
-  Create(sourceName, spec.MetaData.Id, spec.MetaData.Version, spec.TargetPlatform.Compiler, spec.TargetPlatform.Platforms[0]);
-  FSourceName := sourceName;
-end;
-
 
 function TPackageIdentity.GetSourceName : string;
 begin
@@ -257,25 +247,6 @@ begin
   packageIdentity := TPackageIdentity.Create(source, id,  packageVersion, cv, platform);
   result := true;
 
-
-end;
-
-{ TPackageMetaDataWithDependencies }
-
-
-constructor TPackageInfo.Create(const sourceName : string; const spec : IPackageSpec);
-var
-  dep : ISpecDependency;
-  newDep : IPackageDependency;
-begin
-  inherited Create(sourceName, spec);
-  FDependencies := TCollections.CreateList<IPackageDependency>;
-
-  for dep in spec.TargetPlatform.Dependencies do
-  begin
-    newDep := TPackageDependency.Create(dep.Id, dep.Version, FPlatform);
-    FDependencies.Add(newDep);
-  end;
 end;
 
 
@@ -287,9 +258,20 @@ var
   i: Integer;
   range : TVersionRange;
   dependency : IPackageDependency;
+  bytes : TBytes;
 begin
   inherited Create(sourceName, jsonObj);
   FDependencies := TCollections.CreateList<IPackageDependency>;
+
+  FHash := jsonObj.S['hash']; //base64 - need ot convert it to hex.
+  FHashAlgorithm := jsonObj.S['hashAlgorithm'];
+
+  if FHash <> '' then
+  begin
+    bytes := TBase64.Decode(FHash);
+    FHash := THashSHA256.DigestAsString(bytes);
+  end;
+
   //check for isnull is needed due to jd barfing on nulls
   if jsonObj.Contains('dependencies') and (not jsonObj.IsNull('dependencies')) then
   begin
@@ -308,13 +290,15 @@ begin
 
 end;
 
-constructor TPackageInfo.Create(const sourceName: string; const manifest: IPackageManifest);
+constructor TPackageInfo.Create(const sourceName: string; const manifest: IPackageManifest; const hash : string; const hashAlgorithm : string);
 var
   dep : ISpecDependency;
   newDep : IPackageDependency;
 begin
   inherited Create(sourceName, manifest);
   FDependencies := TCollections.CreateList<IPackageDependency>;
+  FHash := hash;
+  FHashAlgorithm := hashAlgorithm;
 
   for dep in manifest.TargetPlatform.Dependencies do
   begin
@@ -324,14 +308,17 @@ begin
 
 end;
 
-class function TPackageInfo.CreateFromManifest(const sourceName: string; const manifest : IPackageManifest): IPackageInfo;
+constructor TPackageInfo.Create(const sourceName, id: string; const version: TPackageVersion; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const hash, hashAlgorithm: string);
 begin
-  result := TPackageInfo.Create(sourceName, manifest);
+  inherited Create(sourceName, id, version, compilerVersion, platform);
+  FHash := hash;
+  FHashAlgorithm := hashAlgorithm;
+
 end;
 
-class function TPackageInfo.CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageInfo;
+class function TPackageInfo.CreateFromManifest(const sourceName: string; const manifest : IPackageManifest; const hash : string; const hashAlgorith : string): IPackageInfo;
 begin
-  result := TPackageInfo.Create(sourceName, spec);
+  result := TPackageInfo.Create(sourceName, manifest, hash, hashAlgorith);
 end;
 
 destructor TPackageInfo.Destroy;
@@ -345,6 +332,16 @@ begin
   result := FDependencies;
 end;
 
+
+function TPackageInfo.GetHash: string;
+begin
+  result := FHash;
+end;
+
+function TPackageInfo.GetHashAlgorithm: string;
+begin
+  result := FHashAlgorithm;
+end;
 
 function TPackageInfo.GetUseSource: boolean;
 begin
@@ -372,32 +369,6 @@ begin
   result := true;
 end;
 
-{ TPackageMetadataFull }
-
-constructor TPackageMetadata.Create(const sourceName : string; const spec : IPackageSpec);
-var
-  specSearchPath : ISpecSearchPath;
-begin
-  inherited Create(sourceName, spec);
-  FSearchPaths := TCollections.CreateList<string>;
-  FAuthors := spec.MetaData.Authors;
-  FCopyright := spec.MetaData.Copyright;
-  FDescription := spec.MetaData.Description;
-  FIcon := spec.MetaData.Icon;
-  FIsCommercial := spec.MetaData.IsCommercial;
-  FIsTrial := spec.MetaData.IsTrial;
-  FLicense := spec.MetaData.License;
-  FProjectUrl := spec.MetaData.ProjectUrl;
-  FTags := spec.MetaData.Tags;
-  FProjectUrl := spec.MetaData.ProjectUrl;
-  FRepositoryUrl := spec.MetaData.RepositoryUrl;
-  FRepositoryType := spec.MetaData.RepositoryType;
-  FRepositoryBranch := spec.MetaData.RepositoryBranch;
-  FRepositoryCommit := spec.MetaData.RepositoryCommit;
-
-  for specSearchPath in spec.TargetPlatform.SearchPaths do
-    FSearchPaths.Add(specSearchPath.Path);
-end;
 
 constructor TPackageMetadata.Create(const sourceName : string; const manifest : IPackageManifest);
 var
@@ -470,10 +441,6 @@ begin
   result := TPackageMetadata.Create(sourceName, manifest );
 end;
 
-class function TPackageMetadata.CreateFromSpec(const sourceName : string; const spec : IPackageSpec) : IPackageMetadata;
-begin
-  result := TPackageMetadata.Create(sourceName, spec);
-end;
 
 destructor TPackageMetadata.Destroy;
 begin
@@ -567,10 +534,6 @@ begin
   result := true;
 end;
 
-
-{ TPackageId }
-
-
 function TPackageIdentity.GetCompilerVersion : TCompilerVersion;
 begin
   result := FCompilerVersion;
@@ -602,7 +565,5 @@ begin
 end;
 
 
-//initialization
-//  JsonSerializationConfig.NullConvertsToValueTypes := true;
 end.
 

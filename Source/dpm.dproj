@@ -5,7 +5,7 @@
         <Config Condition="'$(Config)'==''">Debug</Config>
         <FrameworkType>None</FrameworkType>
         <MainSource>dpm.dpr</MainSource>
-        <Platform Condition="'$(Platform)'==''">Win64</Platform>
+        <Platform Condition="'$(Platform)'==''">Win32</Platform>
         <ProjectGuid>{CFBF7204-5639-4643-B895-08DDF96E0F8F}</ProjectGuid>
         <ProjectName Condition="'$(ProjectName)'==''">dpm</ProjectName>
         <ProjectVersion>20.3</ProjectVersion>
@@ -113,10 +113,10 @@
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <DCC_DebugInfoInExe>true</DCC_DebugInfoInExe>
         <DCC_MapFile>3</DCC_MapFile>
-        <Debugger_CWD>I:\Github\DelphiPackageManager\DPMMaster\Source</Debugger_CWD>
+        <Debugger_CWD>c:\temp</Debugger_CWD>
         <Debugger_EnvVars>DPMPACKAGECACHE=c:\temp\packagecache;$(Debugger_EnvVars)</Debugger_EnvVars>
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
-        <Debugger_RunParams>install VSoft.Awaitable -upgrade .\dpm.core.tests.dproj</Debugger_RunParams>
+        <Debugger_RunParams>push c:\temp\Appercept.AWSSDK.Core-11.0-Android-0.23.0.dpkg -source=private</Debugger_RunParams>
         <ILINK_MapFileType>DetailedSegments</ILINK_MapFileType>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_4_Win32)'!=''">
@@ -134,8 +134,8 @@
         <DPMCompiler>12.0</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.3\lib;$(DPM)\VSoft.CommandLine\0.1.11\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
-        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.Uri\0.3.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.5\lib;$(DPM)\VSoft.JsonDataObjects\0.3.0\lib;$(DPM)\VSoft.HttpClient\2.2.1\lib;$(DPM)\VSoft.CommandLine\0.1.6\lib;$(DPM)\VSoft.CancellationToken\0.1.2\lib;$(DPM)\VSoft.AntPatterns\0.1.8\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.3\lib;$(DPM)\VSoft.CommandLine\0.1.11\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.0\lib;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.HttpClient\2.2.3\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.CommandLine\0.1.11\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.0\lib;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -271,6 +271,7 @@
         <DCCReference Include="Core\Manifest\DPM.Core.Manifest.Interfaces.pas"/>
         <DCCReference Include="Core\Manifest\DPM.Core.Manifest.pas"/>
         <DCCReference Include="Core\Manifest\DPM.Core.Manifest.Reader.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Hash.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -315,6 +316,7 @@
                     <PackageReference id="Spring4D.Base" version="2.0.2-beta.2" range="2.0.2-beta.2"/>
                 </PackageReference>
                 <PackageReference id="VSoft.AntPatterns" version="0.1.9"/>
+                <PackageReference id="VSoft.Base64.Polyfill" version="1.0.0"/>
                 <PackageReference id="VSoft.CancellationToken" version="0.1.4"/>
                 <PackageReference id="VSoft.CommandLine" version="0.1.11"/>
                 <PackageReference id="VSoft.HttpClient" version="2.2.3">
@@ -332,16 +334,17 @@
                 <PackageReference id="Spring4D.Extensions" version="2.0.2-beta.2">
                     <PackageReference id="Spring4D.Base" version="2.0.2-beta.2" range="2.0.2-beta.2"/>
                 </PackageReference>
-                <PackageReference id="VSoft.AntPatterns" version="0.1.8"/>
-                <PackageReference id="VSoft.CancellationToken" version="0.1.2"/>
-                <PackageReference id="VSoft.CommandLine" version="0.1.6"/>
-                <PackageReference id="VSoft.HttpClient" version="2.2.1">
-                    <PackageReference id="VSoft.CancellationToken" version="0.1.2" range="0.1.2"/>
-                    <PackageReference id="VSoft.Uri" version="0.3.2" range="0.3.2"/>
+                <PackageReference id="VSoft.AntPatterns" version="0.1.9"/>
+                <PackageReference id="VSoft.Base64.Polyfill" version="1.0.0"/>
+                <PackageReference id="VSoft.CancellationToken" version="0.1.4"/>
+                <PackageReference id="VSoft.CommandLine" version="0.1.11"/>
+                <PackageReference id="VSoft.HttpClient" version="2.2.3">
+                    <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="0.1.4"/>
+                    <PackageReference id="VSoft.Uri" version="0.3.3" range="0.3.3"/>
                 </PackageReference>
-                <PackageReference id="VSoft.JsonDataObjects" version="0.3.0"/>
-                <PackageReference id="VSoft.SemanticVersion" version="0.2.5"/>
-                <PackageReference id="VSoft.Uri" version="0.3.2"/>
+                <PackageReference id="VSoft.JsonDataObjects" version="0.3.2"/>
+                <PackageReference id="VSoft.SemanticVersion" version="0.2.7"/>
+                <PackageReference id="VSoft.Uri" version="0.3.3"/>
             </PackageReferences>
         </DPM>
     </ProjectExtensions>

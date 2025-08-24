@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -51,8 +51,10 @@ type
     function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : string;overload;
 
 
-    //checks if the package is present as a folder, if not there but the file is
-    //then it will call InstallPackage to extract it.
+    /// <summary>
+    ///  checks if the package is present as a folder, if not there but the file is
+    ///  then it will call InstallPackage to extract it.
+    /// </summary>
     function EnsurePackage(const packageId : IPackageIdentity) : boolean;
 
     function InstallPackageFromFile(const packageFileName : string) : boolean;

@@ -1,4 +1,4 @@
-﻿object PackageDetailsFrame: TPackageDetailsFrame
+object PackageDetailsFrame: TPackageDetailsFrame
   Left = 0
   Top = 0
   Width = 614

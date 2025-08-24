@@ -54,8 +54,8 @@ type
 
 
 
-    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : Boolean;
-    function FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform; const includePrerelease : boolean) : IPackageIdentity;
+    function DownloadPackage(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const localFolder : string; var fileName : string) : Boolean;
+    function FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform; const includePrerelease : boolean) : IPackageInfo;
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
     function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const preRelease : boolean) : IList<TPackageVersion>;
@@ -95,7 +95,7 @@ uses
   DPM.Core.Package.Classes,
   DPM.Core.Package.SearchResults,
   DPM.Core.Sources.ServiceIndex,
-  DPM.Core.Package.ListItem;
+  DPM.Core.Package.ListItem, DPM.Core.Utils.Hash;
 
 
 const
@@ -142,7 +142,8 @@ begin
   inherited;
 end;
 
-function TDPMServerPackageRepository.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageIdentity; const localFolder : string; var fileName : string) : Boolean;
+
+function TDPMServerPackageRepository.DownloadPackage(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const localFolder : string; var fileName : string) : Boolean;
 var
   httpClient : IHttpClient;
   request : IHttpRequest;
@@ -153,6 +154,8 @@ var
   destFile : string;
   uri : IUri;
   stopwatch : TStopwatch;
+  hash : string;
+  hashFileName : string;
 begin
   result := false;
   serviceIndex := GetServiceIndex(cancellationToken);
@@ -168,7 +171,7 @@ begin
 
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
 
-  path := Format('%s/%s/%s/%s/%s/dpkg', [uri.AbsolutePath, packageIdentity.Id, CompilerToString(packageIdentity.CompilerVersion), DPMPlatformToString(packageIdentity.Platform),packageIdentity.Version.ToStringNoMeta]);
+  path := Format('%s/%s/%s/%s/%s/dpkg', [uri.AbsolutePath, packageInfo.Id, CompilerToString(packageInfo.CompilerVersion), DPMPlatformToString(packageInfo.Platform), packageInfo.Version.ToStringNoMeta]);
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
@@ -177,8 +180,8 @@ begin
                        .WithHeader(cUserAgentHeader,cDPMUserAgent);
 
   ForceDirectories(localFolder);
-  destFile := IncludeTrailingPathDelimiter(localFolder) + packageIdentity.ToString + cPackageFileExt;
-
+  destFile := IncludeTrailingPathDelimiter(localFolder) + packageInfo.ToString + cPackageFileExt;
+  hashFileName := destFile + cPackageHashAlgorithmExt;
   request.SaveAsFile := destFile;
   stopwatch := TStopwatch.StartNew;
   Logger.Information('GET ' + uri.BaseUriString + path);
@@ -200,6 +203,14 @@ begin
   stopwatch.Stop;
   Logger.Information('OK ' + uri.BaseUriString + path + ' [' + IntToStr(stopwatch.ElapsedMilliseconds) + 'ms]');
 
+  hash := THashSHA256.GetHashStringFromFile(destFile);
+  if not SameText(hash, packageInfo.Hash) then
+  begin
+    Logger.Error('Downloaded file hash [' + hash + '] does not match server hash [' + packageInfo.Hash + ']');
+    exit(false);
+  end;
+
+
   request := nil;
   response := nil;
   httpClient := nil;
@@ -209,7 +220,7 @@ begin
 end;
 
 
-function TDPMServerPackageRepository.FindLatestVersion(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean): IPackageIdentity;
+function TDPMServerPackageRepository.FindLatestVersion(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean): IPackageInfo;
 var
   httpClient : IHttpClient;
   request : IHttpRequest;
@@ -224,7 +235,7 @@ begin
   if serviceIndex = nil then
     exit;
 
-  serviceItem := serviceIndex.FindItem('PackageFind');
+  serviceItem := serviceIndex.FindItem('PackageFindLatest');
   if serviceItem = nil then
   begin
     Logger.Error('Unabled to determine PackageDownload resource from Service Index');
@@ -289,12 +300,10 @@ begin
     end;
   end;
   try
-    TPackageIdentity.TryLoadFromJson(Logger, jsonObj, Self.Name, Result);
+    TPackageInfo.TryLoadFromJson(Logger, jsonObj, Self.Name, Result);
   finally
     jsonObj.Free;
   end;
-
-
 end;
 
 function TDPMServerPackageRepository.GetPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
@@ -595,7 +604,6 @@ var
   path : string;
   jsonObj : TJsonObject;
   uri : IUri;
-  spec : IPackageSpec;
 begin
   result := nil;
 
@@ -612,7 +620,7 @@ begin
 
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
 
-  path := Format('%s/%s/%s/%s/%s/dspec', [uri.AbsolutePath, packageId.Id, CompilerToString(packageId.CompilerVersion), DPMPlatformToString(packageId.Platform), packageId.Version.ToStringNoMeta]);
+  path := Format('%s/%s/%s/%s/%s/info', [uri.AbsolutePath, packageId.Id, CompilerToString(packageId.CompilerVersion), DPMPlatformToString(packageId.Platform), packageId.Version.ToStringNoMeta]);
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
@@ -655,21 +663,8 @@ begin
     end;
   end;
 
-  try
-    spec := TSpec.Create(Logger,'');
-    if not spec.LoadFromJson(jsonObj) then
-    begin
-      Logger.Error('Http Repository : Error reading dspec');
-      exit;
-    end;
-    result := TPackageInfo.CreateFromSpec(Self.Name, spec);
-  except
-    on e : Exception do
-    begin
-      Logger.Error('Error fetching reading json response from server : ' + e.Message);
-      exit;
-    end;
-  end;
+  if not TPackageInfo.TryLoadFromJson(Logger, jsonObj, Self.Name, result) then
+    result := nil;
 
 end;
 

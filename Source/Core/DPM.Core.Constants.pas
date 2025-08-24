@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -35,6 +35,8 @@ const
   cPackageFileExt = '.dpkg';
   cPackageSpecExt = '.dspec';
   cPackageManifestExt = '.manifest';
+  cPackageHashAlgorithm = 'sha256';
+  cPackageHashAlgorithmExt = '.' + cPackageHashAlgorithm;
 
   //fixed filename for the package dspec so we can easily extract it
   cOldPackageManifestFile = 'package' + cPackageSpecExt; //for older packages

@@ -105,11 +105,11 @@ type
                             const context: IPackageInstallerContext): boolean;
 
     // user specified a package file - will install for single compiler/platform - calls InstallPackageFromId
-    function InstallPackageFromFile(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration;
+    function InstallPackageFromFile(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const projectFiles: IList<string>; const config: IConfiguration;
                                     const context: IPackageInstallerContext): boolean;
 
     // resolves package from id - calls InstallPackage
-    function InstallPackageFromId(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration;
+    function InstallPackageFromId(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const projectFiles: IList<string>; const config: IConfiguration;
                                   const context: IPackageInstallerContext): boolean;
 
     function UnInstallFromProject(const cancellationToken: ICancellationToken; const Options: TUnInstallOptions; const projectFile: string; const config: IConfiguration;
@@ -120,6 +120,8 @@ type
 
     // calls either InstallPackageFromId or InstallPackageFromFile depending on options.
     function Install(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const context: IPackageInstallerContext): boolean;
+
+
     function Uninstall(const cancellationToken: ICancellationToken; const Options: TUnInstallOptions; const context: IPackageInstallerContext): boolean;
     // calls restore project
     function Restore(const cancellationToken: ICancellationToken; const Options: TRestoreOptions; const context: IPackageInstallerContext): boolean;
@@ -127,8 +129,6 @@ type
     function Remove(const cancellationToken: ICancellationToken; const Options: TUnInstallOptions): boolean;
 
     function Cache(const cancellationToken: ICancellationToken; const Options: TCacheOptions): boolean;
-
-    function context: IPackageInstallerContext;
 
   public
     constructor Create(const logger: ILogger;
@@ -501,10 +501,6 @@ begin
 
 end;
 
-function TPackageInstaller.context: IPackageInstallerContext;
-begin
-  result := FContext;
-end;
 
 function TPackageInstaller.CopyLocal(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageManifest>;
                                      const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
@@ -629,33 +625,37 @@ end;
 function TPackageInstaller.DoCachePackage(const cancellationToken : ICancellationToken; const Options: TCacheOptions; const platform: TDPMPlatform): boolean;
 var
   packageIdentity: IPackageIdentity;
+  packageInfo : IPackageInfo;
   packageFileName: string;
 begin
   result := false;
   if not Options.Version.IsEmpty then
+  begin
+    packageIdentity := TPackageIdentity.Create('', Options.packageId, Options.Version, Options.compilerVersion, platform);
     // sourceName will be empty if we are installing the package from a file
-    packageIdentity := TPackageIdentity.Create('', Options.packageId, Options.Version, Options.compilerVersion, platform)
+    packageInfo := FRepositoryManager.GetPackageInfo(cancellationToken, packageIdentity);
+  end
   else
   begin
     // no version specified, so we need to get the latest version available;
-    packageIdentity := FRepositoryManager.FindLatestVersion(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform, Options.PreRelease, options.Sources);
-    if packageIdentity = nil then
-    begin
-      FLogger.Error('Package [' + Options.packageId + '] for platform [' + DPMPlatformToString(platform) + '] not found on any sources');
-      exit;
-    end;
+    packageInfo := FRepositoryManager.FindLatestVersion(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform, Options.PreRelease, options.Sources);
   end;
-  FLogger.Information('Caching package ' + packageIdentity.ToString);
+  if packageInfo = nil then
+  begin
+    FLogger.Error('Package [' + Options.packageId + '] for platform [' + DPMPlatformToString(platform) + '] not found on any sources');
+    exit;
+  end;
+  FLogger.Information('Caching package ' + packageInfo.ToString);
 
-  if not FPackageCache.EnsurePackage(packageIdentity) then
+  if not FPackageCache.EnsurePackage(packageInfo) then
   begin
     // not in the cache, so we need to get it from the the repository
-    if not FRepositoryManager.DownloadPackage(cancellationToken, packageIdentity, FPackageCache.PackagesFolder, packageFileName) then
+    if not FRepositoryManager.DownloadPackage(cancellationToken, packageInfo, FPackageCache.PackagesFolder, packageFileName) then
     begin
       if cancellationToken.IsCancelled then
-        FLogger.Error('Downloading package [' + packageIdentity.ToString + '] cancelled.')
+        FLogger.Error('Downloading package [' + packageInfo.ToString + '] cancelled.')
       else
-        FLogger.Error('Failed to download package [' + packageIdentity.ToString + ']');
+        FLogger.Error('Failed to download package [' + packageInfo.ToString + ']');
       exit;
     end;
     if not FPackageCache.InstallPackageFromFile(packageFileName) then
@@ -807,27 +807,30 @@ begin
 
   // if the user specified a version, either the on the command line or via a file then we will use that
   if not Options.Version.IsEmpty then
+  begin
     // sourceName will be empty if we are installing the package from a file
-    newPackageIdentity := TPackageIdentity.Create(options.Sources, Options.packageId,  Options.Version, Options.compilerVersion, platform)
+    newPackageIdentity := TPackageIdentity.Create(options.Sources, Options.packageId,  Options.Version, Options.compilerVersion, platform);
+    packageInfo := GetPackageInfo(cancellationToken, newPackageIdentity);
+  end
   else
   begin
     // no version specified, so we need to get the latest version available;
-    newPackageIdentity := FRepositoryManager.FindLatestVersion(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform, Options.PreRelease, options.Sources);
+    packageInfo := FRepositoryManager.FindLatestVersion(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform, Options.PreRelease, options.Sources);
 
-    if newPackageIdentity = nil then
-    begin
-      FLogger.Error('Package [' + Options.packageId + '] for platform [' + DPMPlatformToString(platform) + '] not found on any sources');
-      exit;
-    end;
   end;
-  FLogger.Information('Installing package ' + newPackageIdentity.ToString);
+  if packageInfo = nil then
+  begin
+    FLogger.Error('Package [' + Options.packageId + '] for platform [' + DPMPlatformToString(platform) + '] not found on any sources');
+    exit;
+  end;
+  FLogger.Information('Installing package ' + packageInfo.ToString);
 
-  if not FPackageCache.EnsurePackage(newPackageIdentity) then
+  if not FPackageCache.EnsurePackage(packageInfo) then
   begin
     // not in the cache, so we need to get it from the the repository
-    if not FRepositoryManager.DownloadPackage(cancellationToken, newPackageIdentity, FPackageCache.PackagesFolder, packageFileName) then
+    if not FRepositoryManager.DownloadPackage(cancellationToken, packageInfo, FPackageCache.PackagesFolder, packageFileName) then
     begin
-      FLogger.Error('Failed to download package [' + newPackageIdentity.ToString + ']');
+      FLogger.Error('Failed to download package [' + packageInfo.ToString + ']');
       exit;
     end;
     if not FPackageCache.InstallPackageFromFile(packageFileName) then
@@ -835,14 +838,6 @@ begin
       FLogger.Error('Failed to install package file [' + packageFileName + '] into the cache');
       exit;
     end;
-  end;
-
-  // get the package info, which has the dependencies.
-  packageInfo := GetPackageInfo(cancellationToken, newPackageIdentity);
-  if packageInfo = nil then
-  begin
-    FLogger.Error('Unable to get package info for package [' + newPackageIdentity.ToIdVersionString + ']');
-    exit(false);
   end;
 
   packageInfo.UseSource := Options.UseSource;
@@ -1320,7 +1315,6 @@ end;
 
 function TPackageInstaller.Install(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const context: IPackageInstallerContext): boolean;
 var
-  projectFiles: TArray<string>;
   config: IConfiguration;
   groupProjReader: IGroupProjectReader;
   projectList: IList<string>;
@@ -1336,12 +1330,11 @@ begin
       exit;
 
     projectRoot := ExtractFilePath(Options.ProjectPath);
-
+    projectList := TCollections.CreateList<string>;
     isGroup := false;
     if Length(options.Projects) > 0 then
     begin
       //validate
-      projectList := TCollections.CreateList<string>;
       for i := 0 to Length(options.Projects) -1 do
       begin
         if FileExists(options.Projects[i]) then
@@ -1349,9 +1342,7 @@ begin
         else
           FLogger.Warning('Project [' + options.Projects[i] + '] does not exist', true);
       end;
-      projectFiles := projectList.ToArray;
-
-      if Length(projectFiles) = 0 then
+      if projectList.Count = 0 then
       begin
         FLogger.Error('No dproj files found in projectPath : ' + Options.ProjectPath);
         exit;
@@ -1366,7 +1357,6 @@ begin
         if not groupProjReader.LoadGroupProj(Options.ProjectPath) then
           exit;
 
-        projectList := TCollections.CreateList<string>;
         if not groupProjReader.ExtractProjects(projectList) then
           exit;
 
@@ -1378,24 +1368,20 @@ begin
             // TPath.Combine really should do this but it doesn't
             projectList[i] := TPathUtils.CompressRelativePath(projectRoot, projectList[i])
         end;
-        projectFiles := projectList.ToArray;
       end
       else
-      begin
-        SetLength(projectFiles, 1);
-        projectFiles[0] := Options.ProjectPath;
-      end;
-
+        projectList.Add(Options.ProjectPath);
     end
     else if DirectoryExists(Options.ProjectPath) then
     begin
-      projectFiles := TArray<string>(TDirectory.GetFiles(Options.ProjectPath, '*.dproj'));
-      if Length(projectFiles) = 0 then
+      //projectFiles := TArray<string>(TDirectory.GetFiles(Options.ProjectPath, '*.dproj'));
+      projectList.AddRange(TDirectory.GetFiles(Options.ProjectPath, '*.dproj'));
+      if projectList.Count = 0 then
       begin
         FLogger.Error('No dproj files found in projectPath : ' + Options.ProjectPath);
         exit;
       end;
-      FLogger.Information('Found ' + IntToStr(Length(projectFiles)) + ' dproj file(s) to install into.');
+      FLogger.Information('Found ' + IntToStr(projectList.Count) + ' dproj file(s) to install into.');
     end
     else
     begin
@@ -1420,10 +1406,10 @@ begin
         FLogger.Error('The specified packageFile [' + Options.PackageFile + '] does not exist.');
         exit;
       end;
-      result := InstallPackageFromFile(cancellationToken, Options, projectFiles, config, context);
+      result := InstallPackageFromFile(cancellationToken, Options, projectList, config, context);
     end
     else
-      result := InstallPackageFromId(cancellationToken, Options, projectFiles, config, context);
+      result := InstallPackageFromId(cancellationToken, Options, projectList, config, context);
   except
     on e: Exception do
     begin
@@ -1440,7 +1426,7 @@ begin
   result := FContext.InstallDesignPackages(cancellationToken, projectFile, platform, packageManifests);
 end;
 
-function TPackageInstaller.InstallPackageFromFile(const cancellationToken : ICancellationToken; const Options: TInstallOptions;const projectFiles: TArray<string>;
+function TPackageInstaller.InstallPackageFromFile(const cancellationToken : ICancellationToken; const Options: TInstallOptions;const projectFiles: IList<string>;
                                                   const config: IConfiguration; const context: IPackageInstallerContext): boolean;
 var
   packageIdString: string;
@@ -1468,7 +1454,7 @@ begin
   result := InstallPackageFromId(cancellationToken, options, projectFiles, config, context);
 end;
 
-function TPackageInstaller.InstallPackageFromId(const cancellationToken  : ICancellationToken; const Options: TInstallOptions; const projectFiles: TArray<string>;
+function TPackageInstaller.InstallPackageFromId(const cancellationToken  : ICancellationToken; const Options: TInstallOptions; const projectFiles: IList<string>;
                                                 const config: IConfiguration; const context: IPackageInstallerContext): boolean;
 var
   projectFile: string;
@@ -1484,7 +1470,7 @@ begin
 
   projectEditors := TCollections.CreateList<IProjectEditor>;
 
-  for i := 0 to Length(projectFiles) - 1 do
+  for i := 0 to projectFiles.Count - 1 do
   begin
     if cancellationToken.IsCancelled then
       exit;

@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -45,7 +45,7 @@ begin
   consoleWriter.SetColour(ccBrightAqua, ccDefault);
   consoleWriter.WriteLine('DPM - Delphi Package Manager - Version : ' + TSystemUtils.GetVersionString);
   consoleWriter.SetColour(ccBrightWhite);
-  consoleWriter.WriteLine('© 2019-2021 Vincent Parrett and Contributors');
+  consoleWriter.WriteLine('Â© 2019-2025 Vincent Parrett and Contributors');
   //consoleWriter.WriteLine('License - http://www.apache.org/licenses/LICENSE-2.0');
   consoleWriter.WriteLine('');
 end;
