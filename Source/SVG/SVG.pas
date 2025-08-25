@@ -2084,7 +2084,7 @@ var
   Buffer: TBytes;
 begin
   Buffer := TEncoding.UTF8.GetBytes(FSource);
-  Stream.WriteBuffer(Buffer, Length(Buffer));
+  Stream.WriteBuffer(Buffer[0], Length(Buffer));
 end;
 
 procedure TSVG.PaintTo(DC: HDC; Bounds: TGPRectF;
