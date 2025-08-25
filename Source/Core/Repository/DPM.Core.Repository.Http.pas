@@ -640,6 +640,12 @@ begin
     end;
   end;
 
+  if response.StatusCode = 404 then
+  begin
+    Logger.Error('Package ' + packageId.ToString + ' not found on server');
+    exit;
+  end;
+
   if response.StatusCode <> 200 then
   begin
     Logger.Error('Error fetching packageinfo from server : ' + response.ErrorMessage);

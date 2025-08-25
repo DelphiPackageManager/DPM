@@ -180,12 +180,20 @@ begin
   FCompilerVersion := compilerVersion;
   FPlatform := platform;
   FSourceName := sourceName;
+  
 end;
 
 constructor TPackageIdentity.Create(const sourceName: string; const manifest: IPackageManifest);
 begin
-  Create(sourceName, manifest.MetaData.Id, manifest.MetaData.Version, manifest.TargetPlatform.Compiler, manifest.TargetPlatform.Platforms[0]);
+  inherited Create;
   FSourceName := sourceName;
+  FId := manifest.MetaData.Id;
+  FVersion := manifest.MetaData.version;
+  FCompilerVersion := manifest.TargetPlatform.Compiler;
+  FPlatform := manifest.TargetPlatform.Platforms[0];
+  FSourceName := sourceName;
+  
+
 end;
 
 function TPackageIdentity.GetSourceName : string;
@@ -259,6 +267,7 @@ var
   range : TVersionRange;
   dependency : IPackageDependency;
   bytes : TBytes;
+  targetplatform : TJsonObject;
 begin
   inherited Create(sourceName, jsonObj);
   FDependencies := TCollections.CreateList<IPackageDependency>;
@@ -294,11 +303,17 @@ constructor TPackageInfo.Create(const sourceName: string; const manifest: IPacka
 var
   dep : ISpecDependency;
   newDep : IPackageDependency;
+  bytes : TBytes;
 begin
   inherited Create(sourceName, manifest);
   FDependencies := TCollections.CreateList<IPackageDependency>;
   FHash := hash;
   FHashAlgorithm := hashAlgorithm;
+  if FHash <> '' then
+  begin
+    bytes := TBase64.Decode(FHash);
+    FHash := THashSHA256.DigestAsString(bytes);
+  end;  
 
   for dep in manifest.TargetPlatform.Dependencies do
   begin
@@ -374,7 +389,7 @@ constructor TPackageMetadata.Create(const sourceName : string; const manifest : 
 var
   specSearchPath : ISpecSearchPath;
 begin
-  inherited Create(sourceName, manifest);
+  inherited Create(sourceName, manifest, '','');
   FSearchPaths := TCollections.CreateList<string>;
   FAuthors := manifest.MetaData.Authors;
   FCopyright := manifest.MetaData.Copyright;
@@ -393,6 +408,9 @@ begin
 
   for specSearchPath in manifest.TargetPlatform.SearchPaths do
     FSearchPaths.Add(specSearchPath.Path);
+
+
+
 end;
 
 
@@ -438,7 +456,7 @@ end;
 
 class function TPackageMetadata.CreateFromManifest(const sourceName: string; const manifest : IPackageManifest): IPackageMetadata;
 begin
-  result := TPackageMetadata.Create(sourceName, manifest );
+  result := TPackageMetadata.Create(sourceName, manifest);
 end;
 
 

@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -301,8 +301,11 @@ var
   sources : TStringList;
   searchResult : IPackageSearchResult;
   allResults : IList<IPackageSearchResultItem>;
-  distinctResults : IEnumerable<IPackageSearchResultItem>;
-  comparer : IEqualityComparer<IPackageSearchResultItem>;
+  distinctResults : IList<IPackageSearchResultItem>;
+  i: Integer;
+  currentResult : IPackageSearchResultItem;
+  nextResult : IPackageSearchResultItem;
+  count : integer;
 begin
   FLogger.Debug('TPackageRepositoryManager.GetPackageFeed');
 
@@ -340,26 +343,50 @@ begin
       end;
       searchResult := repo.GetPackageFeed(cancelToken, options, compilerVersion, platform);
       allResults.AddRange(searchResult.Results);
-
-
     end;
   finally
     if sources <> nil then
       sources.Free;
   end;
-  comparer := TPackageSearchResultItemComparer.Create;
 
-  distinctResults := TDistinctIterator<IPackageSearchResultItem>.Create(allResults, comparer);
-  if options.Take > 0 then
-    distinctResults := distinctResults.Take(options.Take);
-  result.Results.AddRange(distinctResults);
-  result.TotalCount := result.Results.Count;
-  result.Results.Sort(
+  //sort by id so we can pick out the highest version
+  allresults.Sort(
     function(const Left, Right : IPackageSearchResultItem) : integer
     begin
       result := CompareText(Left.Id, Right.Id);
     end);
 
+
+  distinctResults := TCollections.CreateList<IPackageSearchResultItem>;
+  currentResult := nil;
+  count := allResults.Count;
+  for i := 0 to count -1 do
+  begin
+    nextResult := allResults.Items[i];
+    if currentResult = nil then
+      currentResult := nextResult
+    else if SameText(currentResult.Id, nextResult.Id) then
+    begin
+      if nextResult.Version > currentResult.Version then
+        currentResult := nextResult;
+    end
+    else
+    begin
+      //new package id, save current
+      distinctResults.Add(currentResult);
+      currentResult := nextResult;
+    end;
+    //last one so just add it
+    if i = count -1 then
+      distinctResults.Add(currentResult);
+  end;
+
+  if options.Take > 0 then
+    result.Results.AddRange(distinctResults.Take(options.Take))
+  else
+    result.Results.AddRange(distinctResults);
+
+  result.TotalCount := result.Results.Count;
 
 end;
 

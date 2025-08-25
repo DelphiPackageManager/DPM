@@ -918,80 +918,76 @@ begin
     manifestFileName := ChangeFileExt(fileName, cPackageManifestExt); //new
 
   if FileExists(manifestFileName) then
-  begin
     manifest := reader.ReadManifest(manifestFileName);
-    if manifest <> nil then
-    begin
-      result := TPackageMetadata.CreateFromManifest(Name, manifest);
-      exit;
-    end;
-  end;
 
-  zipFile := TZipFile.Create;
-  try
+  if manifest = nil then
+  begin
+    zipFile := TZipFile.Create;
     try
-      zipFile.Open(fileName, TZipMode.zmRead);
-      if zipFile.IndexOf(cPackageManifestFile) <> -1 then
-        zipFile.Read(cPackageManifestFile, metaBytes)
-      else
-        zipFile.Read(cOldPackageManifestFile, metaBytes);
+      try
+        zipFile.Open(fileName, TZipMode.zmRead);
+        if zipFile.IndexOf(cPackageManifestFile) <> -1 then
+          zipFile.Read(cPackageManifestFile, metaBytes)
+        else
+          zipFile.Read(cOldPackageManifestFile, metaBytes);
 
-      //we will take this opportunity to extract the icon file here
-      //for later use.
-      isSvg := false;
+        //we will take this opportunity to extract the icon file here
+        //for later use.
+        isSvg := false;
 
-      svgIconFileName := ChangeFileExt(filename, '.svg');
-      if not FileExists(svgIconFileName) then
-      begin
-        if zipFile.IndexOf(cIconFileSVG) <> -1 then
+        svgIconFileName := ChangeFileExt(filename, '.svg');
+        if not FileExists(svgIconFileName) then
         begin
-          zipFile.Read(cIconFileSVG, iconBytes);
+          if zipFile.IndexOf(cIconFileSVG) <> -1 then
+          begin
+            zipFile.Read(cIconFileSVG, iconBytes);
+            isSvg := true;
+          end;
+        end
+        else
           isSvg := true;
-        end;
-      end
-      else
-        isSvg := true;
-      pngIconFileName := ChangeFileExt(filename, '.png');
-      if (not isSvg) and not FileExists(pngIconFileName) then
-      begin
-        if zipFile.IndexOf(cIconFilePNG) <> -1 then
+        pngIconFileName := ChangeFileExt(filename, '.png');
+        if (not isSvg) and not FileExists(pngIconFileName) then
         begin
-          zipFile.Read(cIconFilePNG, iconBytes);
-          isSvg := false;
-        end;
+          if zipFile.IndexOf(cIconFilePNG) <> -1 then
+          begin
+            zipFile.Read(cIconFilePNG, iconBytes);
+            isSvg := false;
+          end;
 
+        end;
+      except
+        on e : Exception do
+        begin
+          Logger.Error('Error opening package file [' + fileName + ']');
+          exit;
+        end;
       end;
-    except
-      on e : Exception do
-      begin
-        Logger.Error('Error opening package file [' + fileName + ']');
-        exit;
+    finally
+      zipFile.Free;
+    end;
+    //doing this outside the try/finally to avoid locking the package for too long.
+    metaString := TEncoding.UTF8.GetString(metaBytes);
+    manifest := reader.ReadManifestString(metaString);
+    if FIsWritable then
+    begin
+      try
+        //TODO : Could this cause an issue if multiple users attempt this on a shared folder?
+        //may need to use a lock file.
+        TFile.WriteAllText(manifestFileName, metaString, TEncoding.UTF8);
+        if Length(iconBytes) > 0 then
+          if isSvg then
+            TFile.WriteAllBytes(svgIconFileName, iconBytes)
+          else
+            TFile.WriteAllBytes(pngIconFileName, iconBytes)
+      except
+        //even though we test for write access other errors might occur (eg with network drives disconnected etc).
       end;
     end;
-  finally
-    zipFile.Free;
   end;
-  //doing this outside the try/finally to avoid locking the package for too long.
-  metaString := TEncoding.UTF8.GetString(metaBytes);
-  manifest := reader.ReadManifestString(metaString);
   if manifest = nil then
     exit;
 
-  if FIsWritable then
-  begin
-    try
-      //TODO : Could this cause an issue if multiple users attempt this on a shared folder?
-      //may need to use a lock file.
-      TFile.WriteAllText(manifestFileName, metaString, TEncoding.UTF8);
-      if Length(iconBytes) > 0 then
-        if isSvg then
-          TFile.WriteAllBytes(svgIconFileName, iconBytes)
-        else
-          TFile.WriteAllBytes(pngIconFileName, iconBytes)
-    except
-      //even though we test for write access other errors might occur (eg with network drives disconnected etc).
-    end;
-  end;
 
   result := readManifestFunc(name, manifest, fileHash, cPackageHashAlgorithm);
 
