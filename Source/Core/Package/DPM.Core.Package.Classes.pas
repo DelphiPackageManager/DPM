@@ -267,7 +267,6 @@ var
   range : TVersionRange;
   dependency : IPackageDependency;
   bytes : TBytes;
-  targetplatform : TJsonObject;
 begin
   inherited Create(sourceName, jsonObj);
   FDependencies := TCollections.CreateList<IPackageDependency>;
