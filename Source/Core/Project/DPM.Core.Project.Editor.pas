@@ -1002,6 +1002,7 @@ var
   topLevelReference : IPackageReference;
 
   packageReferencesElement : IXMLDOMElement;
+  packageRefs: IXMLDOMNodeList;
 
   procedure WritePackageReference(const parentElement : IXMLDOMElement; const packageReference : IPackageReference);
   var
@@ -1010,7 +1011,6 @@ var
   begin
     packageReferenceElement := FProjectXML.createNode(NODE_ELEMENT, 'PackageReference', msbuildNamespace) as IXMLDOMElement;
     packageReferenceElement.setAttribute('id', packageReference.Id);
-//    packageReferenceElement.setAttribute('platform', DPMPlatformToBDString(packageReference.Platform));
     packageReferenceElement.setAttribute('version', packageReference.Version.ToStringNoMeta);
     if not packageReference.VersionRange.IsEmpty then
       packageReferenceElement.setAttribute('range', packageReference.VersionRange.ToString);
@@ -1041,21 +1041,28 @@ begin
   else
   begin
     //remove existing nodes, we'll rewrite them below.
-
     //old style
     packageReferenceElements := dpmElement.selectNodes('x:PackageReference[@platform="' + DPMPlatformToBDString(platform) + '"]');
     for i := 0 to packageReferenceElements.length - 1 do
       dpmElement.removeChild(packageReferenceElements.item[i]);
-
-    //new style
-    packageReferenceElements := dpmElement.selectNodes('x:PackageReferences[@platform="' + DPMPlatformToBDString(platform) + '"]');
-    for i := 0 to packageReferenceElements.length - 1 do
-      dpmElement.removeChild(packageReferenceElements.item[i]);
   end;
 
-  packageReferencesElement := FProjectXML.createNode(NODE_ELEMENT, 'PackageReferences', msbuildNamespace) as IXMLDOMElement;
-  packageReferencesElement.setAttribute('platform', DPMPlatformToBDString(platform));
-  dpmElement.appendChild(packageReferencesElement);
+
+  //new style
+  packageReferencesElement := dpmElement.selectSingleNode('x:PackageReferences[@platform="' + DPMPlatformToBDString(platform) + '"]') as IXMLDomElement;
+  if packageReferencesElement <> nil then //keep the element to avoid changing platform orders
+  begin
+    //remove all package references.
+     packageRefs := packageReferencesElement.selectNodes('x:PackageReference');
+     for i := 0 to packageRefs.length - 1 do
+       packageReferencesElement.removeChild(packageRefs.item[i]);
+  end
+  else
+  begin
+    packageReferencesElement := FProjectXML.createNode(NODE_ELEMENT, 'PackageReferences', msbuildNamespace) as IXMLDOMElement;
+    packageReferencesElement.setAttribute('platform', DPMPlatformToBDString(platform));
+    dpmElement.appendChild(packageReferencesElement);
+  end;
 
   for topLevelReference in dependencyGraph.Children do
     WritePackageReference(packageReferencesElement, topLevelReference);
