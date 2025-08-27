@@ -841,7 +841,7 @@ function TProjectEditor.LoadDPMCompilerVersion : boolean;
 var
   xmlElement : IXMLDOMElement;
 begin
-  result := false;
+  result := true;
   xmlElement := FProjectXML.selectSingleNode(dpmCcompilerXPath) as IXMLDOMElement;
   if xmlElement <> nil then
   begin
@@ -856,9 +856,7 @@ begin
           result := true
         else
           FLogger.Error('Unable to determine Compiler version from DPMCompiler');
-      end
-      else
-        result := true;
+      end;
     end
   end
 end;
