@@ -174,16 +174,22 @@ var
     fsPattern : IFileSystemPattern;
     searchBasePath : string;
     fileCount : integer;
-
+    actualDest : string;
 
   begin
     ValidateDestinationPath(source, dest);
+    if dest = '' then
+      actualDest := ExtractFilePath(source)
+    else
+      actualDest := dest;
+    actualDest := ExcludeTrailingPathDelimiter(actualDest);
+
     searchBasePath := TPathUtils.StripWildCard(TPathUtils.CompressRelativePath(basePath, source));
     searchBasePath := ExtractFilePath(searchBasePath);
     fsPatterns := antPattern.Expand(source);
     fileCount := 0;
     for fsPattern in fsPatterns do
-      ProcessPattern(searchBasePath, dest, fsPattern, flatten, exclude, ignore, fileCount);
+      ProcessPattern(searchBasePath, actualDest, fsPattern, flatten, exclude, ignore, fileCount);
 
     if (not ignore) and (fileCount = 0) then
       FLogger.Warning('No files were found for pattern [' + source + ']');
@@ -222,7 +228,6 @@ begin
 
     for fileEntry in targetPlatform.SourceFiles do
       ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, false);
-
 
     for fileEntry in targetPlatform.Files do
       ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, false);

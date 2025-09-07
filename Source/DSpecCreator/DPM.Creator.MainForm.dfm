@@ -420,7 +420,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Width = 529
         Height = 528
         Align = alClient
-        ActiveCard = crdSearchPathItem
+        ActiveCard = crdSource
         Caption = 'CardPanel'
         TabOrder = 0
         object crdSource: TCard
@@ -491,6 +491,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
             ParentShowHint = False
             ShowHint = True
             TabOrder = 2
+            TextHint = 'Leave blank to use same relative path as source'
             OnChange = edtFileEntryDestChange
           end
           object lbFileEntryExclude: TListBox

@@ -77,5 +77,6 @@ object SourceForm: TSourceForm
     ParentShowHint = False
     ShowHint = True
     TabOrder = 2
+    TextHint = 'Leave blank to use the same relative paths as the source'
   end
 end

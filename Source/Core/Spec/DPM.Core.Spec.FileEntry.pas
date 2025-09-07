@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -130,14 +130,7 @@ begin
     result := false;
     Logger.Error('Required attribute [src] is missing');
   end;
-  if not jsonObject.Contains('dest') then
-  begin
-    result := false;
-    Logger.Error('Required attribute [dest] is missing for [' + FSource + ']');
-    FDestination := '';
-  end
-  else
-    FDestination := jsonObject.S['dest'];
+  FDestination := jsonObject.S['dest'];
 
   FFlatten := jsonObject.B['flatten'];
   FIgnore := jsonObject.B['ignore'];
@@ -169,7 +162,8 @@ begin
   json := TJSONObject.Create;
   try
     json.S['src'] := FSource;
-    json.S['dest'] := FDestination;
+    if FDestination <> '' then
+      json.S['dest'] := FDestination;
     if FFlatten then
       json.B['flatten'] := FFlatten;
     if FIgnore then
