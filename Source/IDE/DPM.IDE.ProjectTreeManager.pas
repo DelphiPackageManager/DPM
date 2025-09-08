@@ -348,16 +348,11 @@ begin
 
       FPlatformImageIndexes[TDPMPlatform.AndroidArm32] := imageList.GetIndexByName('Platforms\PlatformAndroid');
       FPlatformImageIndexes[TDPMPlatform.AndroidArm64] := FPlatformImageIndexes[TDPMPlatform.AndroidArm32];
-      FPlatformImageIndexes[TDPMPlatform.AndroidIntel32] := FPlatformImageIndexes[TDPMPlatform.AndroidArm32];
-      FPlatformImageIndexes[TDPMPlatform.AndroidIntel64] := FPlatformImageIndexes[TDPMPlatform.AndroidArm32];
-
+      
       FPlatformImageIndexes[TDPMPlatform.iOS32] := imageList.GetIndexByName('Platforms\PlatformiOS');
       FPlatformImageIndexes[TDPMPlatform.iOS64] := FPlatformImageIndexes[TDPMPlatform.iOS32];
 
-      FPlatformImageIndexes[TDPMPlatform.LinuxIntel32] := imageList.GetIndexByName('Platforms\PlatformLinux');
-      FPlatformImageIndexes[TDPMPlatform.LinuxIntel64] := FPlatformImageIndexes[TDPMPlatform.LinuxIntel32];
-      FPlatformImageIndexes[TDPMPlatform.LinuxArm32] := FPlatformImageIndexes[TDPMPlatform.LinuxIntel32];
-      FPlatformImageIndexes[TDPMPlatform.LinuxArm64] := FPlatformImageIndexes[TDPMPlatform.LinuxIntel32];
+      FPlatformImageIndexes[TDPMPlatform.LinuxIntel64] := imageList.GetIndexByName('Platforms\PlatformLinux');
       {$IFEND}
     end;
   end;

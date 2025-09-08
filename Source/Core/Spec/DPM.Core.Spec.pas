@@ -71,6 +71,8 @@ type
     function PreProcess(const version : TPackageVersion; const properties : TStringList) : boolean;
     function GenerateManifestJson(const version : TSemanticVersion; const targetPlatform : ISpecTargetPlatform) : string;
 
+    function GenerateManifestYML(const version : TSemanticVersion; const targetPlatform : ISpecTargetPlatform) : string;
+
     function GetFileName : string;
     function GetIsValid : boolean;
     function GetMetaData : ISpecMetaData;
@@ -654,6 +656,7 @@ begin
 
   Obj := TJsonObject.Create;
   try
+    Obj.S['min client version'] := cDPMClientVersion;
     metaDataObj := Obj.O['metadata'];
     metaDataObj['id'] := FMetaData.Id;
     metaDataObj['version'] := version.ToStringNoMeta;
@@ -788,6 +791,11 @@ begin
   end;
 end;
 
+
+function TSpec.GenerateManifestYML(const version: TSemanticVersion; const targetPlatform: ISpecTargetPlatform): string;
+begin
+
+end;
 
 function TSpec.GetFileName : string;
 begin

@@ -75,21 +75,14 @@ type
     UnknownPlatform,
     Win32,
     Win64,
-    WinArm32, //reserved for future use
-    WinArm64, //reserved for future use
     OSX32,
     OSX64,
     OSXARM64,
     AndroidArm32,
     AndroidArm64,
-    AndroidIntel32, //reserved for future use
-    AndroidIntel64, //reserved for future use
     iOS32,
-    iOS64, //reserved for future use
-    LinuxIntel32, //reserved for future use
+    iOS64,
     LinuxIntel64,
-    LinuxArm32, //reserved for future use
-    LinuxArm64, //reserved for future use
     iOSSimulator
     );
 
@@ -139,6 +132,10 @@ function DPMPlatformBitness(const value : TDPMPlatform) : string;
 
 function DPMPlatformsToString(const value : TDPMPlatforms; const sep : string = ',') : string;
 
+/// <summary> Creates binary representation - used for package files</summary>
+function DPMPlatformsToBinString(platforms : TDPMPlatforms) : string;
+
+function BinStringToDPMPlatforms(value : string) : TDPMPlatforms;
 
 function CompilerToLibSuffix(const compiler : TCompilerVersion) : string;
 
@@ -301,22 +298,17 @@ begin
     TDPMPlatform.UnknownPlatform: Result := 'Unknown' ;
     TDPMPlatform.Win32: result := 'Windows 32-bit' ;
     TDPMPlatform.Win64: result := 'Windows 64-bit';
-    TDPMPlatform.WinArm32: result := 'Windows 32-bit ARM';
-    TDPMPlatform.WinArm64: result := 'Windows 64-bit ARM';
     TDPMPlatform.OSX32: result := 'macOS 32-bit';
     TDPMPlatform.OSX64: result := 'macOS 64-bit';
     TDPMPlatform.OSXARM64: result := 'macOS ARM 64-bit';
 
     TDPMPlatform.AndroidArm32: result := 'Andriod 32-bit ARM';
     TDPMPlatform.AndroidArm64: result := 'Andriod 64-bit ARM';
-    TDPMPlatform.AndroidIntel32: result := 'Andriod 32-bit Intel';
-    TDPMPlatform.AndroidIntel64: result := 'Andriod 64-bit Intel';
     TDPMPlatform.iOS32: result := 'iOS 32-bit';
     TDPMPlatform.iOS64: result := 'iOS 64-bit';
-    TDPMPlatform.LinuxIntel32: result := 'Linux 32-bit';
     TDPMPlatform.LinuxIntel64: result := 'Linux 64-bit';
-    TDPMPlatform.LinuxArm32: result := 'Linux 32-bit ARM';
-    TDPMPlatform.LinuxArm64: result := 'Linux 64-bit ARM';
+  else
+    raise EArgumentOutOfRangeException.Create('Unknown platform in DPMPlatformToDisplayString');
   end;
 
 end;
@@ -369,6 +361,62 @@ begin
       result := result + sep + DPMPlatformToString(p);
     Inc(i);
   end;
+end;
+
+function IntToBin(Value: Word): string;
+var
+  i: Integer;
+  Digits : integer;
+begin
+  Result := '';
+  Digits := SizeOf(Value) * 8;
+
+  for i := Digits - 1 downto 0 do
+    if (Value and (1 shl i)) <> 0 then
+      Result := Result + '1'
+    else
+      Result := Result + '0';
+end;
+
+function BinStringToDPMPlatforms(value : string) : TDPMPlatforms;
+var
+  i : integer;
+  platform : TDPMPlatform;
+begin
+  result := [];
+  i := 1;
+  while value <> '' do
+  begin
+    if value[Length(value)] = '1' then
+    begin
+      platform := TDPMPlatform(i);
+      result := result + [platform];
+    end;
+    Inc(i);
+    Delete(value, Length(value),1);
+  end;
+end;
+
+
+function DPMPlatformsToBinString(platforms : TDPMPlatforms) : string;
+var
+  value : TDPMPlatform;
+  i : Word;
+begin
+  i := 0;
+  for value in platforms do
+  begin
+    if Ord(value) > 0 then
+      i := i + (1 shl (Ord(value) -1) );
+  end;
+
+  result := IntToBin(i);
+
+  while (result <> '') and (result[1] = '0') do
+    Delete(result, 1,1);
+  //strip leading zeros to keep the string as short as possible.
+  if result = '' then
+    result := '0';
 end;
 
 

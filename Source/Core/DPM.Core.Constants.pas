@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -29,7 +29,7 @@ unit DPM.Core.Constants;
 interface
 
 const
-  cDPMClientVersion = '1.0.0-alpha1';
+  cDPMClientVersion = '1.0.0';
   cLockFileVersion = '0.0.1';
   cLockFileExt = '.dpmlock';
   cPackageFileExt = '.dpkg';
