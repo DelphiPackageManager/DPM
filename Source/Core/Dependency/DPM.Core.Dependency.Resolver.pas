@@ -144,7 +144,7 @@ begin
   begin
     currentPackage := context.PopRequirement;
     //if the package has no dependencies then we are done with it.
-    if not currentPackage.Dependencies.Any then
+    if (currentPackage.Dependencies = nil) or (not currentPackage.Dependencies.Any) then
       continue;
 
     //if the current package is pre-release then we need to include them in the versions we get below.

@@ -270,12 +270,14 @@ begin
 
   if maxVersion.IsEmpty then
     exit;
-  hashfileName := packageFile + cPackageHashAlgorithmExt;
+  packageFile := IncludeTrailingPathDelimiter(SourceUri) + packageFile + cPackageFileExt;
+  hashfileName := packageFile + cPackageFileExt + cPackageHashAlgorithmExt;
   if FileExists(hashfileName) then
     hash := TFile.ReadAllText(hashfileName)
   else
   begin
     hash := THashSHA256.GetHashStringFromFile(packageFile);
+    CheckWritable(ExtractFilePath(packageFile));
     if FIsWritable then
       TFile.WriteAllText(hashfileName, hash);
   end;

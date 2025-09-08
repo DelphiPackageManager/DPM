@@ -134,12 +134,13 @@ var
   begin
     dependencyReference := parent.AddChild(package.Id, package.Version, versionRange);
     dependencyReference.UseSource := package.UseSource;
-    for dependency in package.Dependencies do
-    begin
-      if not TryGetResolvedPackage(dependency.Id, parent.Id, resolution) then
-        raise Exception.Create('Didn''t find a resolution for package [' + dependency.id + ']');
-      AddNode(dependencyReference, resolution.PackageInfo, resolution.VersionRange);
-    end;
+    if package.Dependencies <> nil then
+      for dependency in package.Dependencies do
+      begin
+        if not TryGetResolvedPackage(dependency.Id, parent.Id, resolution) then
+          raise Exception.Create('Didn''t find a resolution for package [' + dependency.id + ']');
+        AddNode(dependencyReference, resolution.PackageInfo, resolution.VersionRange);
+      end;
   end;
 
 begin
