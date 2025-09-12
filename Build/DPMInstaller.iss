@@ -61,7 +61,7 @@ Name: Rio;     Description: Delphi 10.3 IDE Support; Types: full; check: IsDelph
 Name: Sydney;  Description: Delphi 10.4 IDE Support; Types: full; check: IsDelphiInstalled('21.0');
 Name: Alexandria;  Description: Delphi 11 IDE Support; Types: full; check: IsDelphiInstalled('22.0');
 Name: Athens;  Description: Delphi 12 IDE Support; Types: full; check: IsDelphiInstalled('23.0');
-Name: Florence;  Description: Delphi 12 IDE Support; Types: full; check: IsDelphiInstalled('37.0');
+Name: Florence;  Description: Delphi 13 IDE Support; Types: full; check: IsDelphiInstalled('37.0');
 
 
 [Tasks]
