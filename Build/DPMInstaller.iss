@@ -61,6 +61,7 @@ Name: Rio;     Description: Delphi 10.3 IDE Support; Types: full; check: IsDelph
 Name: Sydney;  Description: Delphi 10.4 IDE Support; Types: full; check: IsDelphiInstalled('21.0');
 Name: Alexandria;  Description: Delphi 11 IDE Support; Types: full; check: IsDelphiInstalled('22.0');
 Name: Athens;  Description: Delphi 12 IDE Support; Types: full; check: IsDelphiInstalled('23.0');
+Name: Florence;  Description: Delphi 12 IDE Support; Types: full; check: IsDelphiInstalled('37.0');
 
 
 [Tasks]
@@ -85,6 +86,9 @@ Source: "..\Output\DPM.IDE.D103.dll"; DestDir: "{app}"; Flags: ignoreversion; Co
 Source: "..\Output\DPM.IDE.D104.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Sydney
 Source: "..\Output\DPM.IDE.D110.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Alexandria
 Source: "..\Output\DPM.IDE.D120.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Athens
+Source: "..\Output64\DPM.IDE.D120x64.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Athens
+Source: "..\Output\DPM.IDE.D130.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Florence
+Source: "..\Output64\DPM.IDE.D130x64.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : Florence
 
 [Registry]
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\9.0\Experts";  ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.XE2.dll"; Components: XE2; Flags: uninsdeletevalue
@@ -102,6 +106,13 @@ Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\20.0\Experts"; ValueType: string; 
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\21.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D104.dll"; Components: Sydney;  Flags: uninsdeletevalue
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\22.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D110.dll"; Components: Alexandria;  Flags: uninsdeletevalue
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\23.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D120.dll"; Components: Athens;  Flags: uninsdeletevalue
+
+Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\23.0\Experts x64"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D120x64.dll"; Components: Athens;  Flags: uninsdeletevalue
+
+Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\37.0\Experts"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D130.dll"; Components: Florence;  Flags: uninsdeletevalue
+
+Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\37.0\Experts x64"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D130x64.dll"; Components: Florence;  Flags: uninsdeletevalue
+
 
 [Tasks]
 Name: startmenu; Description: Create &Start Menu Group;

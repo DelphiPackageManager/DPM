@@ -19,8 +19,11 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
+          legalcopyright = "© 2019 -2025 Vincent Parrett and Contributors"
+          linkproductversion = false
+          minorversion = 2
           name = DPMVersion
-          productversion = 0.0.0.0
+          productname = "DPM IDE Support for Delphi13"
           productversionstring = 0.2.0-alpha
         end
       end
@@ -1153,6 +1156,64 @@ begin
             end
           end
         end
+        action.target.execute
+        begin
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] 13 Florence"
+          id = {F8824F16-2FFE-47EA-8056-18305A4A1179}
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = Delphi13
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = Win32
+              variablename = DelphiPlatform
+            end
+            target.argvalue
+            begin
+              value = %OUTPUT_DIR%
+              variablename = OutputFolder
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.D130.dpr
+              variablename = ProjectFile
+            end
+          end
+        end
+        action.target.execute
+        begin
+          actionlistid = {1534FD4E-ABBF-4A37-BB48-93C387954C40}
+          description = "Run Target [ BuildForCompiler ] 13 Florence Win64"
+          id = {2460FB1C-CEB9-49B7-8C48-5014CADC3F40}
+          target.argvalues
+          begin
+            target.argvalue
+            begin
+              value = Delphi13
+              variablename = CompilerVersion
+            end
+            target.argvalue
+            begin
+              value = Win64
+              variablename = DelphiPlatform
+            end
+            target.argvalue
+            begin
+              value = %OUTPUT_DIR%64
+              variablename = OutputFolder
+            end
+            target.argvalue
+            begin
+              value = DPM.IDE.D130.dpr
+              variablename = ProjectFile
+            end
+          end
+        end
       end
       action.group
       begin
@@ -1346,7 +1407,7 @@ begin
         terminateontimeout = true
         timeoutlength = 2
         as.projectpath = %SRC_ROOT%\\%ProjectFile%oj
-        as.compilerversion = 12
+        as.compilerversion = 13
         as.verbosity = Debug
         as.nobanner = True
         action.script
@@ -1374,7 +1435,7 @@ begin
         compileridl = true
         configname = Release
         debugversionnumbers = false
-        delphiversion = Delphi12
+        delphiversion = Delphi13
         enabletimeout = false
         eurekalogverboselogging = false
         frameworktype = VCL
@@ -1414,7 +1475,7 @@ begin
         useversionfromdof = false
         verboseoutput = false
         versioninfokeys = "LegalCopyright\=© 2019 -2025 Vincent Parrett and Contributors" +
-                          "ProductName\=DPM IDE Support for Delphi12" +
+                          "ProductName\=DPM IDE Support for Delphi13" +
                           "ProductVersion\=0.2.0-alpha" +
                           ""
         versioninfopropertysetname = DPMVersion
