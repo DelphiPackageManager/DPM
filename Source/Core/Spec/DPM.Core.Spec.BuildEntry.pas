@@ -29,67 +29,46 @@ unit DPM.Core.Spec.BuildEntry;
 interface
 uses
   JsonDataObjects,
+  VSoft.YAML,
   Spring.Collections,
+  DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Node;
 
 type
-  //Files that need to be copied to the lib folder after compilation - typically dfm and res files
-  TSpecCopyEntry = class(TSpecNode, ISpecCopyEntry)
-  private
-    FSource : string;
-    FFlatten : boolean;
-  protected
-    function GetSource : string;
-    function GetFlatten : boolean;
-    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
-    function Clone : ISpecCopyEntry;
-    function ToJSON: string; override;
-  public
-    constructor CreateClone(const logger : ILogger; const source : string; const flatten : boolean); reintroduce;
-  public
-    constructor Create(const logger : ILogger); override;
-  end;
-
-
   TSpecBuildEntry = class(TSpecNode, ISpecBuildEntry)
   private
-    FBplOutputDir : string;
-    FConfig : string;
-    FLibOutputDir : string;
-    FId : string;
     FProject : string;
-    FDesignOnly : boolean;
-    FBuildForDesign : boolean;
-    FCopyFiles : IList<ISpecCopyEntry>;
+    FPlatforms : TDPMPlatforms;
+    FDefines : string;
   protected
-    function GetConfig : string;
-
-    function GetBplOutputDir : string;
-    function GetLibOutputDir : string;
-    function GetId : string;
     function GetProject : string;
-    function GetDesignOnly : boolean;
-    function GetBuildForDesign : boolean;
-    function GetCopyFiles: IList<ISpecCopyEntry>;
+    function GetPlatforms : TDPMPlatforms;
+    function GetDefines : string;
 
     procedure SetProject(const value : string);
-    procedure SetConfig(const value: string);
-    procedure SetLibOutputDir(const value : string);
-    procedure SetBplOutputDir(const value : string);
-    procedure SetId(const value : string);
-    procedure SetDesignOnly(const value : boolean);
-    procedure SetBuildForDesign(const value : boolean);
+    //virtual so we can override in design to limit to Win32/Win64
+    procedure SetPlatforms(const value : TDPMPlatforms);virtual;
+    procedure SetDefines(const value : string);
 
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
+    function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
+
     function Clone : ISpecBuildEntry;
     function ToJSON: string; override;
+    procedure ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);override;
+
+    //here for design entry to use
+    property Project : string read GetProject write SetProject;
+    property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
+    property Defines : string read GetDefines write SetDefines;
 
   public
-    constructor CreateClone(const logger : ILogger; const id, project, config, bpldir, libdir : string; const designOnly : boolean; const buildForDesign : boolean; const copyFiles : IList<ISpecCopyEntry>); reintroduce;
+    constructor CreateClone(const logger : ILogger; const project : string; const defines : string; const platforms : TDPMPlatforms); reintroduce;
   public
     constructor Create(const logger : ILogger); override;
+
 
   end;
 
@@ -102,69 +81,33 @@ uses
 
 function TSpecBuildEntry.Clone : ISpecBuildEntry;
 begin
-  result := TSpecBuildEntry.CreateClone(logger, FId, FProject, FConfig, FBplOutputDir, FLibOutputDir, FDesignOnly, FBuildForDesign, FCopyFiles);
+  result := TSpecBuildEntry.CreateClone(logger, FProject, FDefines, FPlatforms);
 end;
 
 constructor TSpecBuildEntry.Create(const logger : ILogger);
 begin
   inherited Create(logger);
-  FCopyFiles := TCollections.CreateList<ISpecCopyEntry>;
 end;
 
-constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const id, project, config, bpldir, libdir : string; const designOnly : boolean; const buildForDesign : boolean; const copyFiles : IList<ISpecCopyEntry>);
-var
-  copyEntry : ISpecCopyEntry;
+constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const project, defines : string; const platforms : TDPMPlatforms);
 begin
   inherited Create(logger);
-  FId := id;
   FProject := project;
-  FConfig := config;
-  FBplOutputDir := bpldir;
-  FLibOutputDir := libdir;
-  FDesignOnly   := designOnly;
-  FBuildForDesign := buildForDesign;
-  FCopyFiles := TCollections.CreateList<ISpecCopyEntry>;
-  for copyEntry in copyFiles do
-    FCopyFiles.Add(copyEntry.Clone);
+  FDefines := defines;
+  FPlatforms := platforms;
 end;
 
-function TSpecBuildEntry.GetLibOutputDir: string;
+
+
+function TSpecBuildEntry.GetDefines: string;
 begin
-  result := FLibOutputDir;
+  result := FDefines;
 end;
 
-function TSpecBuildEntry.GetBplOutputDir : string;
+function TSpecBuildEntry.GetPlatforms: TDPMPlatforms;
 begin
-  result := FBplOutputDir;
+  result := FPlatforms;
 end;
-
-function TSpecBuildEntry.GetBuildForDesign: boolean;
-begin
-  result := FBuildForDesign;
-end;
-
-function TSpecBuildEntry.GetConfig : string;
-begin
-  result := FConfig;
-end;
-
-
-function TSpecBuildEntry.GetCopyFiles: IList<ISpecCopyEntry>;
-begin
-  result := FCopyFiles;
-end;
-
-function TSpecBuildEntry.GetDesignOnly: boolean;
-begin
-  result := FDesignOnly;
-end;
-
-function TSpecBuildEntry.GetId : string;
-begin
-  result := FId;
-end;
-
-
 
 function TSpecBuildEntry.GetProject : string;
 begin
@@ -173,79 +116,72 @@ end;
 
 function TSpecBuildEntry.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var
-  copyFilesArray : TJsonArray;
+  platformsArray : TJsonArray;
+  i : integer;
+  platform  : TDPMPlatform;
+  sPlatform : string;
 begin
   result := true;
-  FId := jsonObject.S['id'];
-  if FId = '' then
-  begin
-    Logger.Error('Build Entry is missing required [id] property.');
-    result := false;
-  end;
-
   FProject := jsonObject.S['project'];
   if FProject = '' then
   begin
     Logger.Error('Build Entry is missing required [project] property.');
     result := false;
   end;
-
-  FConfig := jsonObject.S['config'];
-  if FConfig = '' then
-    FConfig := 'Release';
-
-  FBplOutputDir := jsonObject.S['bplOutputDir'];
-  if FBplOutputDir = '' then
-    FBplOutputDir := 'bin';
-
-  FLibOutputDir := jsonObject.S['libOutputDir'];
-  if FLibOutputDir = '' then
-    FLibOutputDir := 'lib';
-
-  FDesignOnly     := jsonObject.B['designOnly'];
-  FBuildForDesign := jsonObject.B['buildForDesign'];
-
-  if jsonObject.Contains('copyFiles') then
+  FDefines := jsonObject.S['defines'];
+  platformsArray := jsonObject.A['platforms'];
+  FPlatforms := [];
+  if platformsArray.Count > 0 then
   begin
-    copyFilesArray :=   jsonObject.A['copyFiles'];
-    LoadJsonCollection(copyFilesArray, TSpecCopyEntry,
-    procedure(const value : IInterface)
+    for i := 0 to platformsArray.Count -1 do
     begin
-      FCopyFiles.Add(value as ISpecCopyEntry);
-    end);
+      sPlatform := platformsArray.S[i];
+      platform := StringToDPMPlatform(sPlatform);
+      if platform <> TDPMPlatform.UnknownPlatform then
+        FPlatforms := FPlatforms + [platform];
+    end;
+  end;
+end;
+
+function TSpecBuildEntry.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
+var
+  platformsSeq : IYAMLSequence;
+  i : integer;
+  platform  : TDPMPlatform;
+  sPlatform : string;
+begin
+  result := true;
+  FProject := yamlObject.S['project'];
+  if FProject = '' then
+  begin
+    Logger.Error('Build Entry is missing required [project] property.');
+    result := false;
   end;
 
+  FDefines := yamlObject.S['defines'];
+  platformsSeq := yamlObject.A['platforms'];
+  FPlatforms := [];
+  if platformsSeq.Count > 0 then
+  begin
+    for i := 0 to platformsSeq.Count -1 do
+    begin
+      sPlatform := platformsSeq.S[i];
+      platform := StringToDPMPlatform(sPlatform);
+      if platform <> TDPMPlatform.UnknownPlatform then
+        FPlatforms := FPlatforms + [platform];
+    end;
+  end;
 end;
 
-procedure TSpecBuildEntry.SetLibOutputDir(const value: string);
+
+procedure TSpecBuildEntry.SetDefines(const value: string);
 begin
-  FLibOutputDir := value;
+  FDefines := value;
 end;
 
-procedure TSpecBuildEntry.SetBplOutputDir(const value : string);
+procedure TSpecBuildEntry.SetPlatforms(const value: TDPMPlatforms);
 begin
-  FBplOutputDir := value;
-end;
-
-procedure TSpecBuildEntry.SetBuildForDesign(const value: boolean);
-begin
-  FBuildForDesign := value;
-end;
-
-
-procedure TSpecBuildEntry.SetConfig(const value: string);
-begin
-  FConfig := value;
-end;
-
-procedure TSpecBuildEntry.SetDesignOnly(const value: boolean);
-begin
-  FDesignOnly := value;
-end;
-
-procedure TSpecBuildEntry.SetId(const value : string);
-begin
-  FId := value;
+  FPlatforms := value;
 end;
 
 procedure TSpecBuildEntry.SetProject(const value : string);
@@ -254,81 +190,15 @@ begin
 end;
 
 function TSpecBuildEntry.ToJSON: string;
-var
-  json : TJSONObject;
 begin
-  json := TJSONObject.Create;
-  try
-    json.S['id'] := FId;
-    json.S['project'] := FProject;
-    if FDesignOnly then
-      json.B['designOnly'] := FDesignOnly;
-    json.S['config'] := FConfig;
-
-    if FBuildForDesign then
-      json.B['buildForDesign'] := FBuildForDesign;
-
-    Result := json.ToJSON;
-  finally
-    FreeAndNil(json);
-  end;
+  raise ENotImplemented.Create('ToJSON not implented, will be removed');
 end;
 
-{ TSpecCopyEntry }
-
-function TSpecCopyEntry.Clone: ISpecCopyEntry;
+procedure TSpecBuildEntry.ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);
 begin
-  result := TSpecCopyEntry.CreateClone(Logger, FSource, FFlatten)
-end;
-
-constructor TSpecCopyEntry.Create(const logger: ILogger);
-begin
-  inherited Create(logger);
 
 end;
 
-constructor TSpecCopyEntry.CreateClone(const logger: ILogger;  const source: string; const flatten: boolean);
-begin
-  inherited Create(logger);
-  FSource := source;
-  FFlatten := flatten;
-end;
-
-function TSpecCopyEntry.GetFlatten: boolean;
-begin
-  result := FFlatten;
-end;
-
-function TSpecCopyEntry.GetSource: string;
-begin
-  result := FSource;
-end;
-
-function TSpecCopyEntry.LoadFromJson(const jsonObject: TJsonObject): Boolean;
-begin
-  result := true;
-  FSource := jsonObject.S['src'];
-  if FSource = '' then
-  begin
-    Logger.Error('Copy Entry is missing required [src] property.');
-    result := false;
-  end;
-  FFlatten := jsonObject.B['flatten'];
-end;
-
-function TSpecCopyEntry.ToJSON: string;
-var
-  json : TJSONObject;
-begin
-  json := TJSONObject.Create;
-  try
-    json.S['src'] := FSource;
-    json.B['flatten'] := FFlatten;
-    Result := json.ToJSON;
-  finally
-    FreeAndNil(json);
-  end;
-end;
 
 end.
 

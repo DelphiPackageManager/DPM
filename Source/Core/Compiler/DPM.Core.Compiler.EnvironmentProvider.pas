@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -44,8 +44,8 @@ type
       TStatus = (unknown, found, notfound);
   private
     FLogger : ILogger;
-    FFound : array[TCompilerVersion.UnknownVersion..TCompilerVersion.RS13_0] of TStatus;
-    FRsVarFiles : array[TCompilerVersion.UnknownVersion..TCompilerVersion.RS13_0] of string;
+    FFound : array[TCompilerVersion.UnknownVersion..DelphiMax] of TStatus;
+    FRsVarFiles : array[TCompilerVersion.UnknownVersion..DelphiMax] of string;
   protected
     function FoundCompilerInfo(const compilerVersion : TCompilerVersion) : Boolean;
     function GetRsVarsFilePath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;

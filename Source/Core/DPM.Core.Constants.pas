@@ -29,7 +29,7 @@ unit DPM.Core.Constants;
 interface
 
 const
-  cDPMClientVersion = '1.0.0';
+  cDPMClientVersion =  '1.0.0';
   cLockFileVersion = '0.0.1';
   cLockFileExt = '.dpmlock';
   cPackageFileExt = '.dpkg';
@@ -82,7 +82,7 @@ const
 
   cRootNode = 'root-node';
   cUserAgentHeader = 'User-Agent';
-  cDPMUserAgent = 'DPM ' + cDPMClientVersion;
+  cDPMUserAgent  = 'DPM ' + cDPMClientVersion;
   cClientVersionHeader = 'Client-Version';
 
 implementation

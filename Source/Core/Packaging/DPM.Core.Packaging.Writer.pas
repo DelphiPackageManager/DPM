@@ -41,6 +41,8 @@ uses
   DPM.Core.Packaging,
   DPM.Core.Packaging.Archive;
 
+/// This only processes specs for the Pack command. For git style packages we will need to do something else.
+
 type
   TPackageWriter = class(TInterfacedObject, IPackageWriter)
   private
@@ -159,7 +161,7 @@ var
   packageFileName : string;
   sStream : TStringStream;
   antPattern : IAntPattern;
-  fileEntry : ISpecFileEntry;
+//  fileEntry : ISpecSourceEntry;
 
   procedure ValidateDestinationPath(const source, dest : string);
   begin
@@ -198,6 +200,7 @@ var
 
 begin
   result := false;
+  raise ENotImplemented.Create('Needs rewriting');
   sManifest := spec.GenerateManifestJson(version, targetPlatform);
   packageFileName := spec.MetaData.Id + '-' + CompilerToString(targetPlatform.Compiler) + '-' + DPMPlatformToString(targetPlatform.Platforms[0]) + '-' + version.ToStringNoMeta + cPackageFileExt;
   packageFileName := IncludeTrailingPathDelimiter(outputFolder) + packageFileName;
@@ -226,17 +229,12 @@ begin
 
     antPattern := TAntPattern.Create(basePath);
 
-    for fileEntry in targetPlatform.SourceFiles do
-      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, false);
-
-    for fileEntry in targetPlatform.Files do
-      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, false);
-
-    for fileEntry in targetPlatform.LibFiles do
-      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, fileEntry.Ignore);
+//    for fileEntry in targetPlatform.SourceEntries do
+//      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, false);
 
 
-    result := true;
+
+//    result := true;
   finally
     FArchiveWriter.Close;
   end;
@@ -251,6 +249,9 @@ var
   properties : TStringList;
   props : TArray<string>;
   prop : string;
+  minCompiler, maxCompiler,
+  currentCompiler : TCompilerVersion;
+  compilers : TArray<TCompilerVersion>;
 begin
   result := false;
 
@@ -301,6 +302,12 @@ begin
     exit;
   end;
 
+  if spec.PackageKind <> TDPMPackageKind.dpm then
+  begin
+    FLogger.Error('Invalid package kind - git packages cannot be packed.');
+    exit;
+  end;
+
   properties := TStringList.Create;
   try
     if options.Properties <> '' then
@@ -321,6 +328,7 @@ begin
 
     FLogger.Information('Spec is valid, writing package files...');
 
+
     result := true;
     for targetPlatform in spec.TargetPlatforms do
     begin
@@ -329,7 +337,36 @@ begin
 
       if version.IsEmpty then
         version := spec.MetaData.Version;
-      result := WritePackage(options.OutputFolder, targetPlatform, spec, version, options.BasePath) and result;
+
+      // TargetPlatforms can specify compiler version 3 ways
+      if targetPlatform.Compiler <> TCompilerVersion.UnknownVersion then
+        result := WritePackage(options.OutputFolder, targetPlatform, spec, version, options.BasePath) and result
+      else if (targetPlatform.MinCompiler <> TCompilerVersion.UnknownVersion ) and (targetPlatform.MinCompiler <> TCompilerVersion.UnknownVersion) then
+      begin
+        minCompiler := targetPlatform.MinCompiler;
+        maxCompiler := targetPlatform.MaxCompiler;
+
+        for currentCompiler := minCompiler to maxCompiler do
+        begin
+          targetPlatform.Compiler := currentCompiler;
+          result := WritePackage(options.OutputFolder, targetPlatform, spec, version, options.BasePath) and result;
+        end;
+      end
+      else if Length(targetPlatform.Compilers) > 0 then
+      begin
+        compilers := targetPlatform.Compilers;
+        for currentCompiler in targetPlatform.Compilers do
+        begin
+          targetPlatform.Compiler := currentCompiler;
+          result := WritePackage(options.OutputFolder, targetPlatform, spec, version, options.BasePath) and result;          
+        end;
+      end
+      else
+      begin
+        FLogger.Error('No compiler version found for target platform');
+        result := false;
+        exit;
+      end;
     end;
     FLogger.Information('Done.');
 

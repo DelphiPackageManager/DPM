@@ -33,6 +33,7 @@ uses
   System.Classes,
   Spring.Collections,
   System.RegularExpressions,
+  VSoft.YAML,
   DPM.Core.Types,
   DPM.Core.Logging,
   VSoft.SemanticVersion,
@@ -44,21 +45,19 @@ uses
 type
   TSpec = class(TSpecNode, IPackageSpec)
   private
+    FPackageKind : TDPMPackageKind;
     FMetaData : ISpecMetaData;
+    FTargetPlatformsComments : TStringList;
     FTargetPlatforms : IList<ISpecTargetPlatform>;
+    FTemplatesComments : TStringList;
     FTemplates : IList<ISpecTemplate>;
     FIsValid : boolean;
     FCurrentTokens : TStringList;
     FFileName : string;
   public
     function ApplyDependencies(const targetPlatform : ISpecTargetPlatform; const dependencies : IList<ISpecDependency>) : boolean;
-    function ApplySearchPaths(const targetPlatform : ISpecTargetPlatform; const searchPaths : IList<ISpecSearchPath>) : boolean;
-
-    function ApplyLibrary(const targetPlatform : ISpecTargetPlatform; const libs : IList<ISpecFileEntry>) : boolean;
-    function ApplySource(const targetPlatform : ISpecTargetPlatform; const sourceFiles : IList<ISpecFileEntry>) : boolean;
-    function ApplyOtherFiles(const targetPlatform : ISpecTargetPlatform; const files : IList<ISpecFileEntry>) : boolean;
-    function ApplyDesign(const targetPlatform : ISpecTargetPlatform; const designFiles : IList<ISpecBPLEntry>) : boolean;
-    function ApplyRuntime(const targetPlatform : ISpecTargetPlatform; const runtimeFiles : IList<ISpecBPLEntry>) : boolean;
+    function ApplySource(const targetPlatform : ISpecTargetPlatform; const sourceFiles : IList<ISpecSourceEntry>) : boolean;
+    function ApplyDesign(const targetPlatform : ISpecTargetPlatform; const designFiles : IList<ISpecDesignEntry>) : boolean;
     function ApplyBuild(const targetPlatform : ISpecTargetPlatform; const buildEntries : IList<ISpecBuildEntry>) : boolean;
 
     function ApplyTemplates : Boolean;
@@ -71,7 +70,7 @@ type
     function PreProcess(const version : TPackageVersion; const properties : TStringList) : boolean;
     function GenerateManifestJson(const version : TSemanticVersion; const targetPlatform : ISpecTargetPlatform) : string;
 
-    function GenerateManifestYML(const version : TSemanticVersion; const targetPlatform : ISpecTargetPlatform) : string;
+    function GenerateManifestYAML(const version : TSemanticVersion; const targetPlatform : ISpecTargetPlatform) : string;
 
     function GetFileName : string;
     function GetIsValid : boolean;
@@ -79,13 +78,29 @@ type
     function GetTargetPlatform : ISpecTargetPlatform;
     function GetTargetPlatforms : IList<ISpecTargetPlatform>;
     function GetTemplates : IList<ISpecTemplate>;
+    function GetPackageKind : TDPMPackageKind;
+    procedure SetPackageKind(const value : TDPMPackageKind);
+
+
+
     function LoadTemplateFromJson(const templateObj : TJsonObject; const templateNo : integer) : boolean;
+    function LoadTemplateFromYAML(const templateObj : IYAMLMapping; const templateNo : integer) : boolean;
 
     function LoadTemplatesFromJson(const templatesArray : TJsonArray) : boolean;
+    function LoadTemplatesFromYAML(const templatesSeq : IYAMLSequence) : boolean;
 
     function LoadTargetPlatformsFromJson(const targetPlatformsArray : TJsonArray) : boolean;
+    function LoadTargetPlatformsFromYAML(const targetPlatformsSeq : IYAMLSequence) : boolean;
+
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
+    function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
+
     function ToJSON: string; override;
+
+    procedure ToYAML(const parent : IYAMLValue; const packageKind : TDPMPackageKind);override;
+
+    procedure ToYAMLFile(const fileName : string);
+
 
     // Template functions
     function FindTemplate(const name : string) : ISpecTemplate;
@@ -95,6 +110,7 @@ type
     function DuplicateTemplate(const sourceTemplate: ISpecTemplate; const newTemplateName: string): ISpecTemplate;
   public
     constructor Create(const logger : ILogger; const fileName : string); reintroduce;
+    destructor Destroy;override;
   end;
 
 
@@ -106,7 +122,7 @@ uses
   DPM.Core.Dependency.Version,
   DPM.Core.Spec.MetaData,
   DPM.Core.Spec.Template,
-  DPM.Core.Spec.FileEntry,
+  DPM.Core.Spec.SourceEntry,
   DPM.Core.Spec.TargetPlatform,
   DPM.Core.Utils.Strings;
 
@@ -115,251 +131,104 @@ uses
 
 
 function TSpec.ApplyBuild(const targetPlatform : ISpecTargetPlatform; const buildEntries : IList<ISpecBuildEntry>) : boolean;
-var
-  existing : ISpecBuildEntry;
-  newBuildEntry : ISpecBuildEntry;
+//var
+//  existing : ISpecBuildEntry;
+//  newBuildEntry : ISpecBuildEntry;
 begin
-  result := true;
-  for newBuildEntry in buildEntries do
-  begin
-    existing := targetPlatform.FindBuildEntryById(newBuildEntry.id);
-    if existing <> nil then
-    begin
-      result := false;
-      Logger.Error('Duplicate Build entry ' + newBuildEntry.Id + '] found in targetPlatform and template');
-    end
-    else
-    begin
-      targetPlatform.BuildEntries.Add(newBuildEntry.Clone);
-    end;
-  end;
+  raise ENotImplemented.Create('will be removed');
+//  result := true;
+//  for newBuildEntry in buildEntries do
+//  begin
+//    existing := targetPlatform.FindBuildEntry(newBuildEntry.Project);
+//    if existing <> nil then
+//    begin
+//      result := false;
+//      Logger.Error('Duplicate Build entry ' + newBuildEntry.Project + '] found in targetPlatform and template');
+//    end
+//    else
+//    begin
+//      targetPlatform.BuildEntries.Add(newBuildEntry.Clone);
+//    end;
+//  end;
 end;
 
 function TSpec.ApplyDependencies(const targetPlatform : ISpecTargetPlatform; const dependencies : IList<ISpecDependency>) : boolean;
-var
-  newDependency : ISpecDependency;
-  existingDependency : ISpecDependency;
-  depGroup : ISpecDependencyGroup;
+//var
+//  newDependency : ISpecDependency;
+//  existingDependency : ISpecDependency;
 begin
-  result := true;
-  if not dependencies.Any then
-    exit;
-
-  //first see if there is a group for this target platform, if there is then that is all we will use.
-
-  depGroup := dependencies.FirstOrDefault(
-    function(const dependency : ISpecDependency) : boolean
-    var
-      group : ISpecDependencyGroup;
-    begin
-      result := dependency.IsGroup;
-      if result then
-      begin
-        group := dependency as ISpecDependencyGroup;
-        result := (group.TargetPlatform.Compiler = targetPlatform.Compiler)
-        and (group.TargetPlatform.Platform = targetPlatform.Platforms[0]);
-      end;
-
-    end) as ISpecDependencyGroup;
-
-  //group replaces existing.
-  if depGroup <> nil then
-  begin
-    targetPlatform.Dependencies.Clear;
-    for existingDependency in depGroup.dependencies do
-    begin
-      newDependency := existingDependency.Clone;
-      targetPlatform.Dependencies.Add(newDependency);
-    end;
-    exit;
-  end;
-
-  for newDependency in dependencies do
-  begin
-    existingDependency := targetPlatform.FindDependencyById(newDependency.Id);
-    if existingDependency <> nil then
-    begin
-      result := false;
-      Logger.Error('Duplicate dependency [' + newDependency.Id + '] found in targetPlatform and template');
-    end
-    else
-    begin
-      existingDependency := newDependency.Clone;
-      targetPlatform.Dependencies.Add(existingDependency);
-    end;
-
-  end;
+  raise ENotImplemented.Create('will be removed');
+//  result := true;
+//  if not dependencies.Any then
+//    exit;
+//
+//  for newDependency in dependencies do
+//  begin
+//    existingDependency := targetPlatform.FindDependency(newDependency.Id);
+//    if existingDependency <> nil then
+//    begin
+//      result := false;
+//      Logger.Error('Duplicate dependency [' + newDependency.Id + '] found in targetPlatform and template');
+//    end
+//    else
+//    begin
+//      existingDependency := newDependency.Clone;
+//      targetPlatform.Dependencies.Add(existingDependency);
+//    end;
+//
+//  end;
 
 
 
 end;
 
-function TSpec.ApplyDesign(const targetPlatform : ISpecTargetPlatform; const designFiles : IList<ISpecBPLEntry>) : boolean;
-var
-  existing : ISpecBPLEntry;
-  newBPL : ISpecBPLEntry;
+function TSpec.ApplyDesign(const targetPlatform : ISpecTargetPlatform; const designFiles : IList<ISpecDesignEntry>) : boolean;
+//var
+//  existing : ISpecDesignEntry;
+//  newBPL : ISpecDesignEntry;
 begin
-  result := true;
-  for newBPL in designFiles do
-  begin
-    existing := targetPlatform.FindDesignBplBySrc(newBPL.Source);
-    if existing <> nil then
-    begin
-      result := false;
-      Logger.Error('Duplicate Design bpl ' + newBPL.Source + '] found in targetPlatform and template');
-    end
-    else
-    begin
-      existing := newBPL.Clone;
-      targetPlatform.DesignFiles.Add(existing.Clone);
-    end;
-  end;
+  raise ENotImplemented.Create('will be removed');
+
+//s  result := true;
+//  for newBPL in designFiles do
+//  begin
+//    existing := targetPlatform.FindDesignEntry(newBPL.Project);
+//    if existing <> nil then
+//    begin
+//      result := false;
+//      Logger.Error('Duplicate Design project ' + newBPL.Project + '] found in targetPlatform and template');
+//    end
+//    else
+//    begin
+//      existing := newBPL.Clone;
+//      targetPlatform.DesignEntries.Add(existing.Clone);
+//    end;
+//  end;
 end;
 
-function TSpec.ApplyLibrary(const targetPlatform : ISpecTargetPlatform; const libs : IList<ISpecFileEntry>) : boolean;
-var
-  existing : ISpecFileEntry;
-  newEntry : ISpecFileEntry;
+
+function TSpec.ApplySource(const targetPlatform : ISpecTargetPlatform; const sourceFiles : IList<ISpecSourceEntry>) : boolean;
+//var
+//  existing : ISpecSourceEntry;
+//  newEntry : ISpecSourceEntry;
 begin
-  result := true;
-  for newEntry in libs do
-  begin
-    existing := targetPlatform.FindLibFileBySrc(newEntry.Source);
-    if existing <> nil then
-    begin
-      result := false;
-      Logger.Error('Duplicate Lib entry ' + newEntry.Source + '] found in targetPlatform and template');
-    end
-    else
-    begin
-      existing := newEntry.Clone;
-      targetPlatform.LibFiles.Add(existing.Clone);
-    end;
-  end;
+  raise ENotImplemented.Create('will be removed');
 
-end;
-
-function TSpec.ApplyOtherFiles(const targetPlatform : ISpecTargetPlatform; const files : IList<ISpecFileEntry>) : boolean;
-var
-  existing : ISpecFileEntry;
-  newEntry : ISpecFileEntry;
-begin
-  result := true;
-  for newEntry in files do
-  begin
-    existing := targetPlatform.FindOtherFileBySrc(newEntry.Source);
-    if existing <> nil then
-    begin
-      result := false;
-      Logger.Error('Duplicate files entry ' + newEntry.Source + '] found in targetPlatform and template');
-    end
-    else
-    begin
-      existing := newEntry.Clone;
-      targetPlatform.Files.Add(existing.Clone);
-    end;
-  end;
-
-end;
-
-function TSpec.ApplyRuntime(const targetPlatform : ISpecTargetPlatform; const runtimeFiles : IList<ISpecBPLEntry>) : boolean;
-var
-  existing : ISpecBPLEntry;
-  newBPL : ISpecBPLEntry;
-begin
-  result := true;
-  for newBPL in runtimeFiles do
-  begin
-    existing := targetPlatform.FindRuntimeBplBySrc(newBPL.Source);
-    if existing <> nil then
-    begin
-      result := false;
-      Logger.Error('Duplicate Runtime bpl ' + newBPL.Source + '] found in targetPlatform and template');
-    end
-    else
-    begin
-      existing := newBPL.Clone;
-      targetPlatform.RuntimeFiles.Add(existing.Clone);
-    end;
-  end;
-
-end;
-
-function TSpec.ApplySearchPaths(const targetPlatform : ISpecTargetPlatform; const searchPaths : IList<ISpecSearchPath>) : boolean;
-var
-  newSearchPath : ISpecSearchPath;
-  existingSearchPath : ISpecSearchPath;
-  searchPathGroup : ISpecSearchPathGroup;
-begin
-  result := true;
-  if not searchPaths.Any then
-    exit;
-
-  //first see if there is a group for this target platform, if there is then that is all we will use.
-
-  searchPathGroup := searchPaths.FirstOrDefault(
-    function(const searchPath : ISpecSearchPath) : boolean
-    var
-      group : ISpecSearchPathGroup;
-    begin
-      result := searchPath.IsGroup;
-      if result then
-      begin
-        group := searchPath as ISpecSearchPathGroup;
-        result := (group.TargetPlatform.Compiler = targetPlatform.Compiler)
-        and (group.TargetPlatform.Platform = targetPlatform.Platforms[0]);
-      end;
-
-    end) as ISpecSearchPathGroup;
-
-  //if we have a group that matches the targetPlatform then we replace the searchPaths with it's searchPaths
-  if searchPathGroup <> nil then
-  begin
-    targetPlatform.SearchPaths.Clear;
-    for newSearchPath in searchPathGroup.SearchPaths do
-    begin
-      existingSearchPath := newSearchPath.Clone;
-      targetPlatform.SearchPaths.Add(existingSearchPath);
-    end;
-    exit;
-  end;
-
-  for newSearchPath in searchPaths do
-  begin
-    existingSearchPath := targetPlatform.FindSearchPathByPath(newSearchPath.Path);
-    if existingSearchPath <> nil then
-    begin
-      result := false;
-      Logger.Error('Duplicate searchPath [' + existingSearchPath.Path + '] found in targetPlatform and template');
-    end
-    else
-    begin
-      existingSearchPath := newSearchPath.Clone;
-      targetPlatform.SearchPaths.Add(existingSearchPath);
-    end;
-  end;
-end;
-
-function TSpec.ApplySource(const targetPlatform : ISpecTargetPlatform; const sourceFiles : IList<ISpecFileEntry>) : boolean;
-var
-  existing : ISpecFileEntry;
-  newEntry : ISpecFileEntry;
-begin
-  result := true;
-  for newEntry in sourceFiles do
-  begin
-    existing := targetPlatform.FindSourceFileBySrc(newEntry.Source);
-    if existing <> nil then
-    begin
-      result := false;
-      Logger.Error('Duplicate Source entry ' + newEntry.Source + '] found in targetPlatform and template');
-    end
-    else
-    begin
-      existing := newEntry.Clone;
-      targetPlatform.SourceFiles.Add(existing.Clone);
-    end;
-  end;
+//  result := true;
+//  for newEntry in sourceFiles do
+//  begin
+//    existing := targetPlatform.FindSourceEntry(newEntry.Source);
+//    if existing <> nil then
+//    begin
+//      result := false;
+//      Logger.Error('Duplicate Source entry ' + newEntry.Source + '] found in targetPlatform and template');
+//    end
+//    else
+//    begin
+//      existing := newEntry.Clone;
+//      targetPlatform.SourceEntries.Add(existing.Clone);
+//    end;
+//  end;
 end;
 
 function TSpec.ApplyTemplates : Boolean;
@@ -371,25 +240,22 @@ begin
   result := true;
   error := false;
   Logger.Information('Applying templates..');
-  //if any targetPlatforms are missing a template then exit
+  //if any targetPlatforms are missing a template then assign default
   FTargetPlatforms.ForEach(
     procedure(const item : ISpecTargetPlatform)
     begin
       if item.TemplateName = '' then
-      begin
-        error := true;
-        Logger.Error('TargetPlatform ' + item.ToString);
-      end;
+        item.TemplateName := 'default';
     end);
 
   if error then
     exit(false);
 
-  if not FTargetPlatforms.Any(function(const item : ISpecTargetPlatform) : boolean
-    begin
-      result := item.TemplateName <> '';
-    end) then
-    exit;
+//  if not FTargetPlatforms.Any(function(const item : ISpecTargetPlatform) : boolean
+//    begin
+//      result := item.TemplateName <> '';
+//    end) then
+//    exit;
 
   //if we don't have templates then the spec is not valid.
   if not FTemplates.Any then
@@ -408,13 +274,9 @@ begin
     if template <> nil then
     begin
       result := ApplyDependencies(targetPlatform, template.Dependencies) and result;
-      result := ApplySearchPaths(targetPlatform, template.SearchPaths) and result;
-      result := ApplyLibrary(targetPlatform, template.LibFiles) and result;
-      result := ApplySource(targetPlatform, template.SourceFiles) and result;
-      result := ApplyOtherFiles(targetPlatform, template.Files) and result;
-      result := ApplyRuntime(targetPlatform, template.RuntimeFiles) and result;
-      result := ApplyDesign(targetPlatform, template.DesignFiles) and result;
+      result := ApplySource(targetPlatform, template.SourceEntries) and result;
       result := ApplyBuild(targetPlatform, template.BuildEntries) and result;
+      result := ApplyDesign(targetPlatform, template.DesignEntries) and result;
     end
     else
     begin
@@ -428,8 +290,12 @@ end;
 constructor TSpec.Create(const logger : ILogger; const fileName : string);
 begin
   inherited Create(logger);
+  FPackageKind := TDPMPackageKind.dpm;
   FFileName := fileName;
-  FMetaData := TSpecMetaData.Create(logger);
+  FTargetPlatformsComments := nil;
+  FTemplatesComments := nil;
+
+  FMetaData := TSpecMetaData.Create(logger, FPackageKind);
   FTargetPlatforms := TCollections.CreateList<ISpecTargetPlatform>;
   FTemplates := TCollections.CreateSortedList<ISpecTemplate>(
    function(const Left, Right: ISpecTemplate): Integer
@@ -453,6 +319,14 @@ begin
   end;
 end;
 
+destructor TSpec.Destroy;
+begin
+  FreeAndNil(FTemplatesComments);
+  FreeAndNil(FTargetPlatformsComments);
+  inherited;
+end;
+
+
 function TSpec.DuplicateTemplate(const sourceTemplate: ISpecTemplate; const newTemplateName: string): ISpecTemplate;
 var
   I: Integer;
@@ -462,33 +336,13 @@ begin
   begin
     result.Dependencies.Add(sourceTemplate.Dependencies[i].Clone);
   end;
-  for I := 0 to sourceTemplate.DesignFiles.Count - 1 do
+  for I := 0 to sourceTemplate.DesignEntries.Count - 1 do
   begin
-    result.DesignFiles.Add(sourceTemplate.DesignFiles[i].Clone);
+    result.DesignEntries.Add(sourceTemplate.DesignEntries[i].Clone);
   end;
-  for I := 0 to sourceTemplate.Files.Count - 1 do
+  for I := 0 to sourceTemplate.SourceEntries.Count - 1 do
   begin
-    result.Files.Add(sourceTemplate.Files[i].Clone);
-  end;
-  for I := 0 to sourceTemplate.LibFiles.Count - 1 do
-  begin
-    result.LibFiles.Add(sourceTemplate.LibFiles[i].Clone);
-  end;
-  for I := 0 to sourceTemplate.RuntimeFiles.Count - 1 do
-  begin
-    result.RuntimeFiles.Add(sourceTemplate.RuntimeFiles[i].Clone);
-  end;
-  for I := 0 to sourceTemplate.SourceFiles.Count - 1 do
-  begin
-    result.SourceFiles.Add(sourceTemplate.SourceFiles[i].Clone);
-  end;
-  for I := 0 to sourceTemplate.SearchPaths.Count - 1 do
-  begin
-    result.SearchPaths.Add(sourceTemplate.SearchPaths[i].Clone);
-  end;
-  for I := 0 to sourceTemplate.SearchPaths.Count - 1 do
-  begin
-    result.SearchPaths.Add(sourceTemplate.SearchPaths[i].Clone);
+    result.SourceEntries.Add(sourceTemplate.SourceEntries[i].Clone);
   end;
   result.Name := newTemplateName;
   FTemplates.Add(result);
@@ -635,166 +489,171 @@ begin
 end;
 
 function TSpec.GenerateManifestJson(const version : TSemanticVersion; const targetPlatform : ISpecTargetPlatform) : string;
-var
-  Obj : TJsonObject;
-  dependency : ISpecDependency;
-  searchPath : ISpecSearchPath;
-  buildEntry : ISpecBuildEntry;
-  bplEntry : ISpecBPLEntry;
-  metaDataObj : TJsonObject;
-  targetPlatformObject : TJDOJsonObject;
-//  variablesObj : TJsonObject;
-  dependencyObj : TJsonObject;
-  seachPathObj : TJsonObject;
-  buildEntryObj : TJsonObject;
-  runtimeEntryObj : TJsonObject;
-  designEntryObj : TJsonObject;
-  copyFileObj : TJsonObject;
-  i: Integer;
+//var
+//  Obj : TJsonObject;
+//  dependency : ISpecDependency;
+//  searchPath : ISpecSearchPath;
+//  buildEntry : ISpecBuildEntry;
+//  bplEntry : ISpecBPLEntry;
+//  metaDataObj : TJsonObject;
+//  targetPlatformObject : TJDOJsonObject;
+////  variablesObj : TJsonObject;
+//  dependencyObj : TJsonObject;
+//  seachPathObj : TJsonObject;
+//  buildEntryObj : TJsonObject;
+//  runtimeEntryObj : TJsonObject;
+//  designEntryObj : TJsonObject;
+//  copyFileObj : TJsonObject;
+//  i: Integer;
 begin
-  result := '';
-
-  Obj := TJsonObject.Create;
-  try
-    Obj.S['min client version'] := cDPMClientVersion;
-    metaDataObj := Obj.O['metadata'];
-    metaDataObj['id'] := FMetaData.Id;
-    metaDataObj['version'] := version.ToStringNoMeta;
-    metaDataObj['description'] := FMetaData.Description;
-    metaDataObj['authors'] := FMetaData.Authors;
-    
-    //optional metadata
-    if FMetaData.ProjectUrl <> '' then
-      metaDataObj['projectUrl'] := FMetaData.ProjectUrl;
-
-    if FMetaData.RepositoryUrl <> '' then
-      metaDataObj['repositoryUrl'] := FMetaData.RepositoryUrl;
-    if FMetaData.RepositoryType <> '' then
-      metaDataObj['repositoryType'] := FMetaData.RepositoryType;
-    if FMetaData.RepositoryBranch <> '' then
-      metaDataObj['repositoryBranch'] := FMetaData.RepositoryBranch;
-    if FMetaData.RepositoryCommit <> '' then
-      metaDataObj['repositoryCommit'] := FMetaData.RepositoryCommit;
-
-    if FMetaData.License <> '' then
-      metaDataObj['license'] := FMetaData.License;
-
-    metaDataObj['licenseType'] := LicenseTypeTypeToString(FMetaData.LicenseType);
-
-
-    if FMetaData.Icon <> '' then
-    begin
-      //ensure consistent icon file name to make it easier to extract later.
-      if ExtractFileExt(FMetaData.Icon) = '.svg' then
-        metaDataObj['icon'] := cIconFileSVG
-      else
-        metaDataObj['icon'] := cIconFilePNG
-    end;
-    if FMetaData.Copyright <> '' then
-      metaDataObj['copyright'] := FMetaData.Copyright;
-    if FMetaData.Tags <> '' then
-      metaDataObj['tags'] := FMetaData.tags;
-
-    if FMetaData.ReadMe <> '' then
-      metaDataObj['readme'] := FMetaData.ReadMe;
-
-    if FMetaData.ReleaseNotes <> '' then
-      metaDataObj['releaseNotes'] := FMetaData.ReleaseNotes;
-
-    metaDataObj['isTrial'] := LowerCase(BoolToStr(FMetaData.IsTrial, true));
-    metaDataObj['isCommercial'] := LowerCase(BoolToStr(FMetaData.IsCommercial, true));
-    metaDataObj['uiFramework'] := UIFrameworkTypeToString(FMetaData.UIFrameworkType);
-
-    targetPlatformObject := Obj.A['targetPlatforms'].AddObject;
-    targetPlatformObject['compiler'] := CompilerToString(targetPlatform.Compiler);
-    targetPlatformObject['platforms'] := DPMPlatformToString(targetPlatform.Platforms[0]);
-
-//    if targetPlatform.Variables.Count > 0 then
+//  result := '';
+//
+//  Obj := TJsonObject.Create;
+//  try
+//    Obj.S['min client version'] := cDPMClientVersion;
+//    metaDataObj := Obj.O['metadata'];
+//    metaDataObj['id'] := FMetaData.Id;
+//    metaDataObj['version'] := version.ToStringNoMeta;
+//    metaDataObj['description'] := FMetaData.Description;
+//    metaDataObj['authors'] := FMetaData.Authors;
+//
+//    //optional metadata
+//    if FMetaData.ProjectUrl <> '' then
+//      metaDataObj['projectUrl'] := FMetaData.ProjectUrl;
+//
+//    if FMetaData.RepositoryUrl <> '' then
+//      metaDataObj['repositoryUrl'] := FMetaData.RepositoryUrl;
+//    if FMetaData.RepositoryType <> '' then
+//      metaDataObj['repositoryType'] := FMetaData.RepositoryType;
+//    if FMetaData.RepositoryBranch <> '' then
+//      metaDataObj['repositoryBranch'] := FMetaData.RepositoryBranch;
+//    if FMetaData.RepositoryCommit <> '' then
+//      metaDataObj['repositoryCommit'] := FMetaData.RepositoryCommit;
+//
+//    if FMetaData.License <> '' then
+//      metaDataObj['license'] := FMetaData.License;
+//
+//    metaDataObj['licenseType'] := LicenseTypeTypeToString(FMetaData.LicenseType);
+//
+//
+//    if FMetaData.Icon <> '' then
 //    begin
-//      variablesObj := targetPlatformObject.O['variables'];
-//      for i := 0 to targetPlatform.Variables.Count -1 do
-//        variablesObj.S[targetPlatform.Variables.Names[i]] := targetPlatform.Variables.ValueFromIndex[i];
+//      //ensure consistent icon file name to make it easier to extract later.
+//      if ExtractFileExt(FMetaData.Icon) = '.svg' then
+//        metaDataObj['icon'] := cIconFileSVG
+//      else
+//        metaDataObj['icon'] := cIconFilePNG
 //    end;
-
-    if targetPlatform.Dependencies.Any then
-    begin
-      for dependency in targetPlatform.Dependencies do
-      begin
-        dependencyObj := targetPlatformObject.A['dependencies'].AddObject;
-        dependencyObj['id'] := dependency.Id;
-        dependencyObj['version'] := dependency.Version.ToString;
-      end;
-    end;
-
-    if targetPlatform.SearchPaths.Any then
-    begin
-      for searchPath in targetPlatform.SearchPaths do
-      begin
-        seachPathObj := targetPlatformObject.A['searchPaths'].AddObject;
-        seachPathObj['path'] := searchPath.Path;
-      end;
-    end;
-
-
-    if targetPlatform.RuntimeFiles.Any then
-    begin
-      for bplEntry in targetPlatform.RuntimeFiles do
-      begin
-        runtimeEntryObj := targetPlatformObject.A['runtime'].AddObject;
-        if bplEntry.BuildId <> '' then
-          runtimeEntryObj['buildId'] := bplEntry.BuildId;
-        runtimeEntryObj['src'] := bplEntry.Source; //TODO : check this is expanded with variables
-        runtimeEntryObj['copyLocal'] := bplEntry.CopyLocal;
-      end;
-    end;
-
-    if targetPlatform.DesignFiles.Any then
-    begin
-      for bplEntry in targetPlatform.DesignFiles do
-      begin
-        designEntryObj := targetPlatformObject.A['design'].AddObject;
-        if bplEntry.BuildId <> '' then
-          designEntryObj['buildId'] := bplEntry.BuildId;
-        designEntryObj['src'] := bplEntry.Source; //TODO : check this is expanded with variables
-        designEntryObj['install'] := bplEntry.Install;
-      end;
-    end;
-
-
-    if targetPlatform.BuildEntries.Any then
-    begin
-      for buildEntry in targetPlatform.BuildEntries do
-      begin
-        buildEntryObj := targetPlatformObject.A['build'].AddObject;
-        buildEntryObj['id'] := buildEntry.Id;
-        buildEntryObj['project'] := buildEntry.Project;
-        buildEntryObj['config'] := buildEntry.Config;
-        buildEntryObj['bplOutputDir'] := buildEntry.BplOutputDir;
-        buildEntryObj['libOutputDir'] := buildEntry.LibOutputDir;
-        buildEntryObj['designOnly']   := buildEntry.DesignOnly;
-        buildEntryObj['buildForDesign']   := buildEntry.BuildForDesign;
-        if buildEntry.CopyFiles.Any then
-        begin
-          for i := 0 to buildEntry.CopyFiles.Count -1 do
-          begin
-            copyFileObj := buildEntryObj.A['copyFiles'].AddObject;
-            copyFileObj['src'] := buildEntry.CopyFiles[i].Source;
-            copyFileObj.B['flatten'] := buildEntry.CopyFiles[i].Flatten;
-          end;
-        end;
-      end;
-    end;
-
-    result := Obj.ToJSON(False);
-  finally
-    Obj.Free;
-  end;
+//    if FMetaData.Copyright <> '' then
+//      metaDataObj['copyright'] := FMetaData.Copyright;
+//
+//    if FMetaData.Tags.Count > 0 then
+//    begin
+//      for i := 0 to FMetaData.Tags.Count -1 do
+//        metaDataObj.A['tags'].Add(FMetaData.Tags[i]);
+//    end;
+//
+//
+//    if FMetaData.ReadMe <> '' then
+//      metaDataObj['readme'] := FMetaData.ReadMe;
+//
+//    if FMetaData.ReleaseNotes <> '' then
+//      metaDataObj['releaseNotes'] := FMetaData.ReleaseNotes;
+//
+//    metaDataObj['isTrial'] := LowerCase(BoolToStr(FMetaData.IsTrial, true));
+//    metaDataObj['isCommercial'] := LowerCase(BoolToStr(FMetaData.IsCommercial, true));
+//    metaDataObj['uiFramework'] := UIFrameworkTypeToString(FMetaData.UIFrameworkType);
+//
+//    targetPlatformObject := Obj.A['targetPlatforms'].AddObject;
+//    targetPlatformObject['compiler'] := CompilerToString(targetPlatform.Compiler);
+//    targetPlatformObject['platforms'] := DPMPlatformToString(targetPlatform.Platforms[0]);
+//
+////    if targetPlatform.Variables.Count > 0 then
+////    begin
+////      variablesObj := targetPlatformObject.O['variables'];
+////      for i := 0 to targetPlatform.Variables.Count -1 do
+////        variablesObj.S[targetPlatform.Variables.Names[i]] := targetPlatform.Variables.ValueFromIndex[i];
+////    end;
+//
+//    if targetPlatform.Dependencies.Any then
+//    begin
+//      for dependency in targetPlatform.Dependencies do
+//      begin
+//        dependencyObj := targetPlatformObject.A['dependencies'].AddObject;
+//        dependencyObj['id'] := dependency.Id;
+//        dependencyObj['version'] := dependency.Version.ToString;
+//      end;
+//    end;
+//
+//    if targetPlatform.SearchPaths.Any then
+//    begin
+//      for searchPath in targetPlatform.SearchPaths do
+//      begin
+//        seachPathObj := targetPlatformObject.A['searchPaths'].AddObject;
+//        seachPathObj['path'] := searchPath.Path;
+//      end;
+//    end;
+//
+//
+//    if targetPlatform.RuntimeFiles.Any then
+//    begin
+//      for bplEntry in targetPlatform.RuntimeFiles do
+//      begin
+//        runtimeEntryObj := targetPlatformObject.A['runtime'].AddObject;
+//        if bplEntry.BuildId <> '' then
+//          runtimeEntryObj['buildId'] := bplEntry.BuildId;
+//        runtimeEntryObj['src'] := bplEntry.Source; //TODO : check this is expanded with variables
+//        runtimeEntryObj['copyLocal'] := bplEntry.CopyLocal;
+//      end;
+//    end;
+//
+//    if targetPlatform.DesignFiles.Any then
+//    begin
+//      for bplEntry in targetPlatform.DesignFiles do
+//      begin
+//        designEntryObj := targetPlatformObject.A['design'].AddObject;
+//        if bplEntry.BuildId <> '' then
+//          designEntryObj['buildId'] := bplEntry.BuildId;
+//        designEntryObj['src'] := bplEntry.Source; //TODO : check this is expanded with variables
+//        designEntryObj['install'] := bplEntry.Install;
+//      end;
+//    end;
+//
+//
+//    if targetPlatform.BuildEntries.Any then
+//    begin
+//      for buildEntry in targetPlatform.BuildEntries do
+//      begin
+//        buildEntryObj := targetPlatformObject.A['build'].AddObject;
+//        buildEntryObj['id'] := buildEntry.Id;
+//        buildEntryObj['project'] := buildEntry.Project;
+//        buildEntryObj['config'] := buildEntry.Config;
+//        buildEntryObj['bplOutputDir'] := buildEntry.BplOutputDir;
+//        buildEntryObj['libOutputDir'] := buildEntry.LibOutputDir;
+//        buildEntryObj['designOnly']   := buildEntry.DesignOnly;
+//        buildEntryObj['buildForDesign']   := buildEntry.BuildForDesign;
+//        if buildEntry.CopyFiles.Any then
+//        begin
+//          for i := 0 to buildEntry.CopyFiles.Count -1 do
+//          begin
+//            copyFileObj := buildEntryObj.A['copyFiles'].AddObject;
+//            copyFileObj['src'] := buildEntry.CopyFiles[i].Source;
+//            copyFileObj.B['flatten'] := buildEntry.CopyFiles[i].Flatten;
+//          end;
+//        end;
+//      end;
+//    end;
+//
+//    result := Obj.ToJSON(False);
+//  finally
+//    Obj.Free;
+//  end;
 end;
 
 
-function TSpec.GenerateManifestYML(const version: TSemanticVersion; const targetPlatform: ISpecTargetPlatform): string;
+function TSpec.GenerateManifestYAML(const version: TSemanticVersion; const targetPlatform: ISpecTargetPlatform): string;
 begin
-
+  raise ENotImplemented.Create('Error Message');
 end;
 
 function TSpec.GetFileName : string;
@@ -810,6 +669,11 @@ end;
 function TSpec.GetMetaData : ISpecMetaData;
 begin
   result := FMetaData;
+end;
+
+function TSpec.GetPackageKind: TDPMPackageKind;
+begin
+  result := FPackageKind;
 end;
 
 function TSpec.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
@@ -855,6 +719,84 @@ end;
 
 
 
+function TSpec.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
+var
+  metaData : IYAMLValue;
+  templates : IYAMLSequence;
+  targetPlatforms : IYAMLSequence;
+  sPackageKind : string;
+  sMinClient : string;
+  minClient : TPackageVersion;
+  currentVersion : TPackageVersion;
+  error : string;
+begin
+  result := true;
+  //preserve comments
+  AddComments(yamlObject);
+
+  sMinClient := yamlObject.S['min dpm client version'];
+  if sMinClient <> '' then
+  begin
+    currentVersion := TPackageVersion.Parse(cDPMClientVersion);
+    if not TPackageVersion.TryParseWithError(sMinClient, minClient, error) then
+    begin
+      Logger.Error('Invalid "min dpm client version" in dspec : ' + sMinClient);
+    end
+    else
+    begin
+      if minClient > currentVersion then
+        raise Exception.Create('Package spec requires newer client version : ' + sMinClient);
+    end;
+  end;
+
+  sPackageKind := yamlObject.S['packageKind'];
+  if sPackageKind <> '' then
+    FPackageKind := StringToPackageKind(sPackageKind)
+  else
+    FPackageKind := TDPMPackageKind.dpm;
+
+  if not yamlObject.Contains('metadata') then
+  begin
+    Logger.Error('Required element [metadata] not found!');
+    result := false;
+  end
+  else
+  begin
+    metaData := yamlObject.Values['metadata'];
+    FMetaData.LoadFromYAML(metaData.AsMapping);
+  end;
+
+  if yamlObject.Contains('templates') then
+  begin
+    templates := yamlObject.A['templates'];
+    if templates.HasComments then
+    begin
+      FTemplatesComments := TStringList.Create;
+      FTemplatesComments.Assign(templates.Comments);
+    end;
+    result := LoadTemplatesFromYAML(templates) and result;
+  end;
+
+  if not yamlObject.Contains('targetPlatforms') then
+  begin
+    Logger.Error('Required element [targetPlatforms] not found!');
+    result := false;
+  end
+  else
+  begin
+    targetPlatforms := yamlObject.A['targetPlatforms'];
+    if targetPlatforms.HasComments then
+    begin
+      FTargetPlatformsComments := TStringList.Create;
+      FTargetPlatformsComments.Assign(targetPlatforms.Comments);
+    end;
+    result := LoadTargetPlatformsFromYAML(targetPlatforms) and result;
+  end;
+
+  FIsValid := result;
+
+end;
+
 function TSpec.LoadTargetPlatformsFromJson(const targetPlatformsArray : TJsonArray) : boolean;
 var
   i : integer;
@@ -877,6 +819,27 @@ begin
 end;
 
 
+function TSpec.LoadTargetPlatformsFromYAML(const targetPlatformsSeq: IYAMLSequence): boolean;
+var
+  i : integer;
+  targetPlatform : ISpecTargetPlatform;
+begin
+  result := true;
+  if targetPlatformsSeq.Count = 0 then
+  begin
+    Logger.Error('No targetPlatforms found, at least 1 is required');
+    exit(false);
+  end;
+
+  for i := 0 to targetPlatformsSeq.Count - 1 do
+  begin
+    targetPlatform := TSpecTargetPlatform.Create(Logger);
+    FTargetPlatforms.Add(targetPlatform);
+    result := targetPlatform.LoadFromYAML(targetPlatformsSeq.O[i]) and result;
+  end;
+
+end;
+
 function TSpec.LoadTemplateFromJson(const templateObj : TJsonObject; const templateNo : integer) : boolean;
 var
   template : ISpecTemplate;
@@ -893,6 +856,22 @@ begin
 end;
 
 
+function TSpec.LoadTemplateFromYAML(const templateObj: IYAMLMapping; const templateNo: integer): boolean;
+var
+  template : ISpecTemplate;
+begin
+  result := true;
+  if not templateObj.Contains('name') then
+  begin
+    result := false;
+    Logger.Error('Template #' + IntToStr(templateNo) + ' is missing the required name field!');
+  end;
+  template := TSpecTemplate.Create(Self.Logger);
+  result := result and template.LoadFromYAML(templateObj);
+  FTemplates.Add(template);
+
+end;
+
 function TSpec.LoadTemplatesFromJson(const templatesArray : TJsonArray) : boolean;
 var
   i : integer;
@@ -905,6 +884,18 @@ begin
   end;
 end;
 
+
+function TSpec.LoadTemplatesFromYAML(const templatesSeq: IYAMLSequence): boolean;
+var
+  i : integer;
+begin
+  result := true;
+  if templatesSeq.Count > 0 then
+  begin
+    for i := 0 to templatesSeq.Count - 1 do
+      result := LoadTemplateFromYAML(templatesSeq.O[i], i + 1) and result;
+  end;
+end;
 
 function TSpec.NewTemplate(const name: string): ISpecTemplate;
 begin
@@ -945,107 +936,93 @@ begin
 end;
 
 function TSpec.ReplaceTokens(const version : TPackageVersion; const properties : TStringList) : boolean;
-var
-  tokenList : TStringList;
-  targetPlatform : ISpecTargetPlatform;
-  fileEntry : ISpecFileEntry;
-  bplEntry : ISpecBPLEntry;
-  buildEntry : ISpecBuildEntry;
-  dependency : ISpecDependency;
-  regEx : TRegEx;
-  evaluator : TMatchEvaluator;
+//var
+//  tokenList : TStringList;
+//  targetPlatform : ISpecTargetPlatform;
+//  fileEntry : ISpecSourceEntry;
+//  buildEntry : ISpecBuildEntry;
+//  designEntry : ISpecDesignEntry;
+//  dependency : ISpecDependency;
+//  regEx : TRegEx;
+//  evaluator : TMatchEvaluator;
 
 begin
+
   result := true;
-  Logger.Information('Replacing tokens..');
-  tokenList := TStringList.Create;
-  FCurrentTokens := tokenList;
-  try
-    try
-      regEx := TRegEx.Create('\$(\w+)\$');
-      evaluator := TokenMatchEvaluator; //work around for compiler overload resolution issue.
-      for targetPlatform in FTargetPlatforms do
-      begin
-        GetTokensForTargetPlatform(targetPlatform, version, tokenList, properties);
-        FMetaData.Id := regEx.Replace(FMetaData.Id, evaluator);
-        FMetaData.Description := regEx.Replace(FMetaData.Description, evaluator);
-        FMetaData.Authors := regEx.Replace(FMetaData.Authors, evaluator);
-        if FMetaData.ProjectUrl <> '' then
-          FMetaData.ProjectUrl := regEx.Replace(FMetaData.ProjectUrl, evaluator);
-        if FMetaData.RepositoryUrl <> '' then
-          FMetaData.RepositoryUrl := regEx.Replace(FMetaData.RepositoryUrl, evaluator);
-        if FMetaData.RepositoryType <> '' then
-          FMetaData.RepositoryType := regEx.Replace(FMetaData.RepositoryType, evaluator);
-        if FMetaData.RepositoryBranch <> '' then
-          FMetaData.RepositoryBranch := regEx.Replace(FMetaData.RepositoryBranch, evaluator);
-        if FMetaData.RepositoryCommit <> '' then
-          FMetaData.RepositoryCommit := regEx.Replace(FMetaData.RepositoryCommit, evaluator);
-        FMetaData.License := regEx.Replace(FMetaData.License, evaluator);
-        if FMetaData.Icon <> '' then
-          FMetaData.Icon := regEx.Replace(FMetaData.Icon, evaluator);
-        if FMetaData.Copyright <> '' then
-          FMetaData.Copyright := regEx.Replace(FMetaData.Copyright, evaluator);
-        if FMetaData.Tags <> '' then
-          FMetaData.Tags := regEx.Replace(FMetaData.Tags, evaluator);
+//  Logger.Information('Replacing tokens..');
+//  tokenList := TStringList.Create;
+//  FCurrentTokens := tokenList;
+//  try
+//    try
+//      regEx := TRegEx.Create('\$(\w+)\$');
+//      evaluator := TokenMatchEvaluator; //work around for compiler overload resolution issue.
+//      for targetPlatform in FTargetPlatforms do
+//      begin
+//        GetTokensForTargetPlatform(targetPlatform, version, tokenList, properties);
+//        FMetaData.Id := regEx.Replace(FMetaData.Id, evaluator);
+//        FMetaData.Description := regEx.Replace(FMetaData.Description, evaluator);
+//        FMetaData.Authors := regEx.Replace(FMetaData.Authors, evaluator);
+//        if FMetaData.ProjectUrl <> '' then
+//          FMetaData.ProjectUrl := regEx.Replace(FMetaData.ProjectUrl, evaluator);
+//        if FMetaData.RepositoryUrl <> '' then
+//          FMetaData.RepositoryUrl := regEx.Replace(FMetaData.RepositoryUrl, evaluator);
+//        if FMetaData.RepositoryType <> '' then
+//          FMetaData.RepositoryType := regEx.Replace(FMetaData.RepositoryType, evaluator);
+//        if FMetaData.RepositoryBranch <> '' then
+//          FMetaData.RepositoryBranch := regEx.Replace(FMetaData.RepositoryBranch, evaluator);
+//        if FMetaData.RepositoryCommit <> '' then
+//          FMetaData.RepositoryCommit := regEx.Replace(FMetaData.RepositoryCommit, evaluator);
+//        FMetaData.License := regEx.Replace(FMetaData.License, evaluator);
+//        if FMetaData.Icon <> '' then
+//          FMetaData.Icon := regEx.Replace(FMetaData.Icon, evaluator);
+//        if FMetaData.Copyright <> '' then
+//          FMetaData.Copyright := regEx.Replace(FMetaData.Copyright, evaluator);
+//
+//        if FMetaData.Tags.Count > 0 then
+//          FMetaData.Tags.Text := regEx.Replace(FMetaData.Tags.Text, evaluator);
+//
+//        for fileEntry in targetPlatform.SourceEntries do
+//        begin
+//          fileEntry.Source := regEx.Replace(fileEntry.Source, evaluator);
+//          fileEntry.Destination := regEx.Replace(fileEntry.Destination, evaluator);
+//        end;
+//
+//        for designEntry in targetPlatform.DesignEntries do
+//        begin
+//          designEntry.Project := Trim(regEx.Replace(designEntry.Project, evaluator));
+//          designEntry.Defines := Trim(regEx.Replace(designEntry.Defines, evaluator));
+//        end;
+//
+//        for buildEntry in targetPlatform.BuildEntries do
+//        begin
+//          buildEntry.Project := regEx.Replace(buildEntry.Project, evaluator);
+//
+//        end;
+//        for dependency in targetPlatform.Dependencies do
+//        begin
+//          if dependency.VersionString = '$version$' then
+//            dependency.Version := TVersionRange.Create(FMetaData.Version);
+//        end;
+//      end;
+//
+//    finally
+//      tokenList.Free;
+//      FCurrentTokens := nil;
+//    end;
+//  except
+//    on e : Exception do
+//    begin
+//      Logger.Error('Error replacing tokens : ' + e.Message);
+//      result := false;
+//    end;
+//
+//  end;
 
-        for fileEntry in targetPlatform.SourceFiles do
-        begin
-          fileEntry.Source := regEx.Replace(fileEntry.Source, evaluator);
-          fileEntry.Destination := regEx.Replace(fileEntry.Destination, evaluator);
-        end;
+end;
 
-        for fileEntry in targetPlatform.LibFiles do
-        begin
-          fileEntry.Source := TRim(regEx.Replace(fileEntry.Source, evaluator));
-          fileEntry.Destination := Trim(regEx.Replace(fileEntry.Destination, evaluator));
-        end;
-
-        for fileEntry in targetPlatform.Files do
-        begin
-          fileEntry.Source := Trim(regEx.Replace(fileEntry.Source, evaluator));
-          fileEntry.Destination := Trim(regEx.Replace(fileEntry.Destination, evaluator));
-        end;
-
-        for bplEntry in targetPlatform.RuntimeFiles do
-        begin
-          bplEntry.Source := Trim(regEx.Replace(bplEntry.Source, evaluator));
-          bplEntry.BuildId := Trim(regEx.Replace(bplEntry.BuildId, evaluator));
-        end;
-
-        for bplEntry in targetPlatform.DesignFiles do
-        begin
-          bplEntry.Source := Trim(regEx.Replace(bplEntry.Source, evaluator));
-          bplEntry.BuildId := Trim(regEx.Replace(bplEntry.BuildId, evaluator));
-        end;
-
-        for buildEntry in targetPlatform.BuildEntries do
-        begin
-          buildEntry.Id := regEx.Replace(buildEntry.Id, evaluator);
-          buildEntry.Project := regEx.Replace(buildEntry.Project, evaluator);
-          buildEntry.BplOutputDir := regEx.Replace(buildEntry.BplOutputDir, evaluator);
-          buildEntry.LibOutputDir := regEx.Replace(buildEntry.LibOutputDir, evaluator);
-        end;
-        for dependency in targetPlatform.Dependencies do
-        begin
-          if dependency.VersionString = '$version$' then
-            dependency.Version := TVersionRange.Create(FMetaData.Version);
-        end;
-
-      end;
-
-    finally
-      tokenList.Free;
-      FCurrentTokens := nil;
-    end;
-  except
-    on e : Exception do
-    begin
-      Logger.Error('Error replacing tokens : ' + e.Message);
-      result := false;
-    end;
-
-  end;
-
+procedure TSpec.SetPackageKind(const value: TDPMPackageKind);
+begin
+  FPackageKind := value;
 end;
 
 function TSpec.ToJSON: string;
@@ -1086,6 +1063,66 @@ begin
   end
   else
     result := match.Value;
+end;
+
+procedure TSpec.ToYAML(const parent: IYAMLValue; const packageKind : TDPMPackageKind);
+var
+  root : IYAMLMapping;
+  targetPlatforms : IYAMLSequence;
+  templates : IYAMLSequence;
+  i : integer;
+begin
+  root := parent.AsMapping;
+
+  if Self.HasComments then
+    root.Comments.Assign(Self.Comments)
+  else
+    root.Comments.Add('# DPM package spec file');
+
+  root.S['min dpm client version'] := cDPMClientVersion;
+  if packageKind <> TDPMPackageKind.dpm then
+    root.S['packageKind'] := PackageKindToString(FPackageKind);
+
+  FMetaData.ToYAML(root, packageKind);
+  targetPlatforms := root.A['targetPlatforms'];
+
+  //attempting to preserve comments
+  if FTargetPlatformsComments <> nil then
+    targetPlatforms.Comments.Assign(FTargetPlatformsComments);
+
+  for i := 0 to FTargetPlatforms.Count -1 do
+    FTargetPlatforms[i].ToYAML(targetPlatforms, packageKind);
+  templates := root.A['templates'];
+
+  if FTemplatesComments <> nil then
+    templates.Comments.Assign(FTemplatesComments);
+
+  for i := 0 to FTemplates.Count -1 do
+    FTemplates[i].ToYAML(templates, packageKind);
+
+end;
+
+procedure TSpec.ToYAMLFile(const fileName: string);
+var
+  doc : IYAMLDocument;
+  root : IYAMLMapping;
+
+begin
+  FTargetPlatforms.Sort(TComparer<ISpecTargetPlatform>.Construct(
+  function(const Left, Right: ISpecTargetPlatform): Integer
+   begin
+      if Ord(left.Compiler) = Ord(right.Compiler) then
+        result := 0
+      else if Ord(Left.Compiler) > Ord(Right.Compiler) then
+        result := 1
+      else
+        result := -1;
+   end));
+
+  doc := TYAML.CreateMapping;
+  root := doc.AsMapping;
+  ToYAML(doc.AsMapping, FPackageKind);
+  TYAML.WriteToFile(doc, fileName);
 end;
 
 end.

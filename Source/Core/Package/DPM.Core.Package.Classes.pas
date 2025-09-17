@@ -29,6 +29,7 @@ unit DPM.Core.Package.Classes;
 interface
 
 uses
+  System.Classes,
   Spring.Collections,
   JsonDataObjects,
   DPM.Core.Types,
@@ -95,7 +96,7 @@ type
     FIsCommercial : Boolean;
     FIsTrial : Boolean;
     FLicense : string;
-    FTags : string;
+    FTags : TStringList;
     FSearchPaths : IList<string>;
     FProjectUrl : string;
     FRepositoryUrl : string;
@@ -110,7 +111,7 @@ type
     function GetIsCommercial : Boolean;
     function GetIsTrial : Boolean;
     function GetLicense : string;
-    function GetTags : string;
+    function GetTags : TStrings;
     function GetSearchPaths : IList<string>;
     function GetProjectUrl : string;
     function GetRepositoryUrl: string;
@@ -139,7 +140,7 @@ uses
   System.SysUtils,
   System.RegularExpressions,
   System.Zip,
-  System.Classes, DPM.Core.Utils.Hash;
+  DPM.Core.Utils.Hash;
 
 { TPackageMetadata }
 
@@ -314,11 +315,13 @@ begin
     FHash := THashSHA256.DigestAsString(bytes);
   end;  
 
-  for dep in manifest.TargetPlatform.Dependencies do
-  begin
-    newDep := TPackageDependency.Create(dep.Id, dep.Version, FPlatform);
-    FDependencies.Add(newDep);
-  end;
+  raise Exception.Create('Needs redoing');
+
+//  for dep in manifest.TargetPlatform.Dependencies do
+//  begin
+//    newDep := TPackageDependency.Create(dep.Id, dep.Version, FPlatform);
+//    FDependencies.Add(newDep);
+//  end;
 
 end;
 
@@ -385,11 +388,10 @@ end;
 
 
 constructor TPackageMetadata.Create(const sourceName : string; const manifest : IPackageManifest);
-var
-  specSearchPath : ISpecSearchPath;
 begin
   inherited Create(sourceName, manifest, '','');
   FSearchPaths := TCollections.CreateList<string>;
+  FTags := TStringList.Create;
   FAuthors := manifest.MetaData.Authors;
   FCopyright := manifest.MetaData.Copyright;
   FDescription := manifest.MetaData.Description;
@@ -398,16 +400,12 @@ begin
   FIsTrial := manifest.MetaData.IsTrial;
   FLicense := manifest.MetaData.License;
   FProjectUrl := manifest.MetaData.ProjectUrl;
-  FTags := manifest.MetaData.Tags;
+  FTags.Assign(manifest.MetaData.Tags);
   FProjectUrl := manifest.MetaData.ProjectUrl;
   FRepositoryUrl := manifest.MetaData.RepositoryUrl;
   FRepositoryType := manifest.MetaData.RepositoryType;
   FRepositoryBranch := manifest.MetaData.RepositoryBranch;
   FRepositoryCommit := manifest.MetaData.RepositoryCommit;
-
-  for specSearchPath in manifest.TargetPlatform.SearchPaths do
-    FSearchPaths.Add(specSearchPath.Path);
-
 
 
 end;
@@ -431,7 +429,8 @@ begin
   FIsTrial        := jsonObj.B['isTrial'];
   FLicense        := jsonObj.S['License'];
   FProjectUrl     := jsonObj.S['ProjectUrl'];
-  FTags           := jsonObj.S['Tags'];
+  if jsonObj.Contains('Tags')  then
+    FTags.Text    := jsonObj.S['Tags'];
   FProjectUrl     := jsonObj.S['ProjectUrl'];
   FRepositoryUrl  := jsonObj.S['RepositoryUrl'];
   FRepositoryType := jsonObj.S['RepositoryType'];
@@ -461,6 +460,7 @@ end;
 
 destructor TPackageMetadata.Destroy;
 begin
+  FreeAndNil(FTags);
   FSearchPaths := nil;
   inherited;
 end;
@@ -530,7 +530,7 @@ begin
   result := FSearchPaths;
 end;
 
-function TPackageMetadata.GetTags : string;
+function TPackageMetadata.GetTags : TStrings;
 begin
   result := FTags;
 end;

@@ -4,6 +4,7 @@ interface
 
 uses
   JsonDataObjects,
+  DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Manifest.Interfaces;
@@ -24,7 +25,7 @@ type
     function LoadTargetPlatformFromJson(const targetPlatformsArray : TJsonArray) : boolean;
     function LoadFromJson(const jsonObject : TJsonObject) : boolean;
   public
-    constructor Create(const logger : ILogger; const fileName : string);
+    constructor Create(const logger : ILogger; const fileName : string; packageKind : TDPMPackageKind);
     destructor Destroy;override;
   end;
 
@@ -36,13 +37,13 @@ uses
 
 { TPackageManifest }
 
-constructor TPackageManifest.Create(const logger: ILogger; const fileName: string);
+constructor TPackageManifest.Create(const logger: ILogger; const fileName: string; packageKind : TDPMPackageKind);
 begin
   inherited Create;
   FLogger := logger;
   FFileName := fileName;
   //FLogger.Debug('Creating manifest for : ' + FFileName);
-  FMetaData := TSpecMetaData.Create(logger) as ISpecMetaData;
+  FMetaData := TSpecMetaData.Create(logger, packageKind) as ISpecMetaData;
 
 end;
 

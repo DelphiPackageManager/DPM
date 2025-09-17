@@ -97,7 +97,7 @@ type
     function GetLicense : string;
     function GetIcon : string;
     function GetCopyright : string;
-    function GetTags : string;
+    function GetTags : TStrings;
     function GetIsTrial : boolean;
     function GetIsCommercial : boolean;
     function GetProjectUrl : string;
@@ -112,7 +112,7 @@ type
     property License : string read GetLicense;
     property Icon : string read GetIcon;
     property Copyright : string read GetCopyright;
-    property Tags : string read GetTags;
+    property Tags : TStrings read GetTags;
     property IsTrial : boolean read GetIsTrial;
     property IsCommercial : boolean read GetIsCommercial;
     property ProjectUrl : string read GetProjectUrl;

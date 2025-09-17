@@ -32,6 +32,7 @@ uses
   System.Classes,
   System.SysUtils,
   JsonDataObjects,
+  VSoft.YAML,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces;
@@ -41,9 +42,10 @@ type
   private
     FLogger : ILogger;
     function InternalReadPackageSpecJson(const fileName : string; const jsonObject : TJsonObject) : IPackageSpec;
+    function InternalReadPackageSpecYAML(const fileName : string; const yamlDoc : IYAMLDocument) : IPackageSpec;
+
   protected
-    function ReadSpec(const fileName : string) : IPackageSpec; overload;
-    function ReadSpec(const stream : TStream) : IPackageSpec; overload;
+    function ReadSpec(const fileName : string) : IPackageSpec;
   public
     constructor Create(const logger : ILogger);
   end;
@@ -59,6 +61,8 @@ uses
 function TPackageSpecReader.ReadSpec(const fileName : string) : IPackageSpec;
 var
   jsonObj : TJsonObject;
+  yamlDoc : IYAMLDocument;
+  ext : string;
 begin
   result := nil;
   if not FileExists(fileName) then
@@ -66,18 +70,37 @@ begin
     FLogger.Error('Spec file : [' + filename + '] does not exist');
     exit;
   end;
-  try
-    jsonObj := TJsonObject.ParseFromFile(fileName) as TJsonObject;
+
+  ext := ExtractFileExt(fileName);
+  if SameText(ext, '.yaml') then
+  begin
     try
-      Result := InternalReadPackageSpecJson(fileName, jsonObj);
-    finally
-      jsonObj.Free;
+      yamlDoc := TYAML.LoadFromFile(fileName);
+      result := InternalReadPackageSpecYAML(fileName, yamlDoc);
+    except
+      on e : Exception do
+      begin
+        FLogger.Error('Error parsing spec yaml : ' + e.Message);
+      end;
+
     end;
-  except
-    on e : Exception do
-    begin
-      FLogger.Error('Error parsing spec json : ' + e.Message);
-      exit;
+
+  end
+  else
+  begin
+    try
+      jsonObj := TJsonObject.ParseFromFile(fileName) as TJsonObject;
+      try
+        Result := InternalReadPackageSpecJson(fileName, jsonObj);
+      finally
+        jsonObj.Free;
+      end;
+    except
+      on e : Exception do
+      begin
+        FLogger.Error('Error parsing spec json : ' + e.Message);
+        exit;
+      end;
     end;
   end;
 end;
@@ -101,12 +124,24 @@ begin
 end;
 
 
-function TPackageSpecReader.ReadSpec(const stream : TStream) : IPackageSpec;
+function TPackageSpecReader.InternalReadPackageSpecYAML(const fileName: string; const yamlDoc: IYAMLDocument): IPackageSpec;
+var
+  root : IYAMLMapping;
 begin
   result := nil;
-  raise ENotImplemented.Create('ReadSpec from stream not implemented');
-end;
+  root := yamlDoc.AsMapping;
+  if not root.ContainsKey('metadata') then
+  begin
+    FLogger.Error('yaml document does not have a metadata object, this is probably not a dspec file');
+    exit;
+  end;
+  result := TSpec.Create(FLogger, fileName);
+  result.LoadFromYAML(root);
 
+
+
+
+end;
 
 end.
 

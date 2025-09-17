@@ -29,6 +29,8 @@ unit DPM.Core.Utils.Hash;
 //works in XE2 or higher - around 10% faster than rtl in release mode.
 //rtl didn't add SHA256 until 10.0
 
+//TODO : Spring4D has hash256 - replace this with spring implementation?
+
 interface
 
 uses

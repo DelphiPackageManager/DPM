@@ -263,343 +263,289 @@ end;
 
 function TPackageInstaller.CompilePackage(const cancellationToken : ICancellationToken; const Compiler: ICompiler; const packageInfo: IPackageInfo; const packageReference: IPackageReference;
                                           const packageSpec: IPackageManifest; const force: boolean; const forceDebug : boolean): boolean;
-var
-  buildEntry: ISpecBuildEntry;
-  packagePath: string;
-  projectFile: string;
-  searchPaths: IList<string>;
-  dependency : IPackageReference;
-  bomNode: IPackageReference;
-  bomFile: string;
-  childSearchPath: string;
-  configuration : string;
-
-  procedure DoCopyFiles(const entry: ISpecBuildEntry);
-  var
-    copyEntry: ISpecCopyEntry;
-    antPattern: IAntPattern;
-    fsPatterns: TArray<IFileSystemPattern>;
-    fsPattern: IFileSystemPattern;
-    searchBasePath: string;
-    Files: TStringDynArray;
-    f: string;
-    destFile: string;
-  begin
-    for copyEntry in entry.CopyFiles do
-    begin
-      FLogger.Debug('Post Compile Copy [' + copyEntry.Source + ']..');
-      try
-        // note : this can throw if the source path steps outside of the base path.
-        searchBasePath := TPathUtils.StripWildCard(TPathUtils.CompressRelativePath(packagePath, copyEntry.Source));
-        searchBasePath := ExtractFilePath(searchBasePath);
-
-        antPattern := TAntPattern.Create(packagePath);
-        fsPatterns := antPattern.Expand(copyEntry.Source);
-        for fsPattern in fsPatterns do
-        begin
-          ForceDirectories(fsPattern.Directory);
-          Files := TDirectory.GetFiles(fsPattern.Directory, fsPattern.FileMask, TSearchOption.soTopDirectoryOnly);
-          for f in Files do
-          begin
-            // copy file to lib directory.
-            if copyEntry.flatten then
-              destFile := Compiler.LibOutputDir + '\' + ExtractFileName(f)
-            else
-              destFile := Compiler.LibOutputDir + '\' +
-                TPathUtils.StripBase(searchBasePath, f);
-
-            ForceDirectories(ExtractFilePath(destFile));
-
-            // FLogger.Debug('Copying "' + f + '" to "' + destFile + '"');
-
-            TFile.Copy(f, destFile, true);
-
-          end;
-        end;
-      except
-        on e: Exception do
-        begin
-          FLogger.Error('Error copying files to lib folder : ' + e.Message);
-          raise;
-        end;
-      end;
-      FLogger.Debug('Post Compile Copy [' + copyEntry.Source + ']..');
-
-    end;
-  end;
+//var
+//  buildEntry: ISpecBuildEntry;
+//  packagePath: string;
+//  projectFile: string;
+//  searchPaths: IList<string>;
+//  dependency : IPackageReference;
+//  bomNode: IPackageReference;
+//  bomFile: string;
+//  childSearchPath: string;
+//  configuration : string;
 
 begin
   result := true;
-
-  packagePath := FPackageCache.GetPackagePath(packageInfo);
-  bomFile := TPath.Combine(packagePath, 'package.bom');
-
-  if (not force) and FileExists(bomFile) then
-  begin
-    // Compare Bill of materials file against node dependencies to determine if we need to compile or not.
-    // if the bom file exists that means it was compiled before. We will check that the bom matchs the dependencies
-    // in the graph
-    bomNode := TBOMFile.LoadFromFile(FLogger, bomFile);
-
-    if bomNode <> nil then
-    begin
-      if bomNode.AreEqual(packageReference) then
-      begin
-        exit;
-      end;
-    end;
-  end;
-
-  // if we get here the previous compliation was done with different dependency versions,
-  // so we delete the bom and compile again
-  DeleteFile(bomFile);
-
-  for buildEntry in packageSpec.TargetPlatform.BuildEntries do
-  begin
-    FLogger.Information('Building project : ' + buildEntry.Project);
-
-    projectFile := TPath.Combine(packagePath, buildEntry.Project);
-    projectFile := TPathUtils.CompressRelativePath('', projectFile);
-
-    // if it's a design time package then we need to do a lot more work.
-    // design time packages are win32 (as the IDE is win32) - since we can
-    // only have one copy of the design package installed we need to check if
-    // it has already been installed via another platform.
-
-    if forceDebug then
-      configuration := 'Debug'
-    else
-      configuration := buildEntry.Config;
-
-    if buildEntry.DesignOnly and (packageInfo.platform <> TDPMPlatform.Win32)  then
-    begin
-      Compiler.BPLOutputDir := TPath.Combine(packagePath, buildEntry.BPLOutputDir);
-      Compiler.LibOutputDir := TPath.Combine(packagePath, buildEntry.LibOutputDir);
-      Compiler.Configuration := buildEntry.config;
-
-      if Compiler.platform <> TDPMPlatform.Win32 then
-      begin
-        Compiler.BPLOutputDir := TPath.Combine(Compiler.BPLOutputDir, 'win32');
-        Compiler.LibOutputDir := TPath.Combine(Compiler.LibOutputDir, 'win32');
-      end
-      else
-      begin
-        packageReference.LibPath := Compiler.LibOutputDir;
-        packageReference.BplPath := Compiler.BPLOutputDir;
-      end;
-
-      if packageReference.HasChildren then
-      begin
-        searchPaths := TCollections.CreateList<string>;
-        for dependency in packageReference.Children do
-        begin
-          childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion, Compiler.platform);
-          childSearchPath := TPath.Combine(childSearchPath, 'lib\win32');
-          searchPaths.Add(childSearchPath);
-        end;
-        Compiler.SetSearchPaths(searchPaths);
-      end
-      else
-        Compiler.SetSearchPaths(nil);
-
-      FLogger.Information('Building project [' + projectFile + '] for design time...');
-
-      result := Compiler.BuildProject(cancellationToken, packageInfo.Platform, projectFile, configuration, packageInfo.Version, true);
-      if result then
-        FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
-      else
-      begin
-        if cancellationToken.IsCancelled then
-          FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
-        else
-          FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
-        exit;
-      end;
-      FLogger.NewLine;
-
-    end
-    else
-    begin
-      // note we are assuming the build entry paths are all relative.
-      Compiler.BPLOutputDir := TPath.Combine(packagePath, buildEntry.BPLOutputDir);
-      Compiler.LibOutputDir := TPath.Combine(packagePath, buildEntry.LibOutputDir);
-      Compiler.Configuration := buildEntry.config;
-
-      packageReference.LibPath := Compiler.LibOutputDir;
-      packageReference.BplPath := Compiler.BPLOutputDir;
-
-      if packageReference.HasChildren then
-      begin
-        searchPaths := TCollections.CreateList<string>;
-        for dependency in packageReference.Children do
-        begin
-          childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion, Compiler.platform);
-          childSearchPath := TPath.Combine(childSearchPath, 'lib');
-          searchPaths.Add(childSearchPath);
-        end;
-        Compiler.SetSearchPaths(searchPaths);
-      end
-      else
-        Compiler.SetSearchPaths(nil);
-
-      result := Compiler.BuildProject(cancellationToken, packageInfo.Platform, projectFile, configuration, packageInfo.Version);
-      if result then
-        FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
-      else
-      begin
-        if cancellationToken.IsCancelled then
-          FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
-        else
-          FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
-        exit;
-      end;
-      FLogger.NewLine;
-
-      if buildEntry.BuildForDesign and (Compiler.platform <> TDPMPlatform.Win32)  then
-      begin
-        FLogger.Information('Building project [' + projectFile + '] for design time support...');
-        // if buildForDesign is true, then it means the design time bpl's also reference
-        // this bpl, so if the platform isn't win32 then we need to build it for win32
-        Compiler.BPLOutputDir := TPath.Combine(Compiler.BPLOutputDir, 'win32');
-        Compiler.LibOutputDir := TPath.Combine(Compiler.LibOutputDir, 'win32');
-        if packageReference.HasChildren then
-        begin
-          searchPaths := TCollections.CreateList<string>;
-          for dependency in packageReference.Children do
-          begin
-            childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion, Compiler.platform);
-            childSearchPath := TPath.Combine(childSearchPath, 'lib\win32');
-            searchPaths.Add(childSearchPath);
-          end;
-          Compiler.SetSearchPaths(searchPaths);
-        end
-        else
-          Compiler.SetSearchPaths(nil);
-
-        result := Compiler.BuildProject(cancellationToken, packageInfo.Platform, projectFile, buildEntry.config, packageInfo.Version, true);
-        if result then
-          FLogger.Success('Project [' + buildEntry.Project + '] Compiled for designtime Ok.')
-        else
-        begin
-          if cancellationToken.IsCancelled then
-            FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
-          else
-            FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
-          exit;
-        end;
-
-      end;
-
-      if buildEntry.CopyFiles.Any then
-        DoCopyFiles(buildEntry);
-
-    end;
-
-  end;
-  // save the bill of materials file for future reference.
-  TBOMFile.SaveToFile(FLogger, bomFile, packageReference);
+//
+//  packagePath := FPackageCache.GetPackagePath(packageInfo);
+//  bomFile := TPath.Combine(packagePath, 'package.bom');
+//
+//  if (not force) and FileExists(bomFile) then
+//  begin
+//    // Compare Bill of materials file against node dependencies to determine if we need to compile or not.
+//    // if the bom file exists that means it was compiled before. We will check that the bom matchs the dependencies
+//    // in the graph
+//    bomNode := TBOMFile.LoadFromFile(FLogger, bomFile);
+//
+//    if bomNode <> nil then
+//    begin
+//      if bomNode.AreEqual(packageReference) then
+//      begin
+//        exit;
+//      end;
+//    end;
+//  end;
+//
+//  // if we get here the previous compliation was done with different dependency versions,
+//  // so we delete the bom and compile again
+//  DeleteFile(bomFile);
+//
+//  for buildEntry in packageSpec.TargetPlatform.BuildEntries do
+//  begin
+//    FLogger.Information('Building project : ' + buildEntry.Project);
+//
+//    projectFile := TPath.Combine(packagePath, buildEntry.Project);
+//    projectFile := TPathUtils.CompressRelativePath('', projectFile);
+//
+//    // if it's a design time package then we need to do a lot more work.
+//    // design time packages are win32 (as the IDE is win32) - since we can
+//    // only have one copy of the design package installed we need to check if
+//    // it has already been installed via another platform.
+//
+//    if forceDebug then
+//      configuration := 'Debug'
+//    else
+//      configuration := 'Release';
+//
+//    if buildEntry.DesignOnly and (packageInfo.platform <> TDPMPlatform.Win32)  then
+//    begin
+//      Compiler.BPLOutputDir := TPath.Combine(packagePath, buildEntry.BPLOutputDir);
+//      Compiler.LibOutputDir := TPath.Combine(packagePath, buildEntry.LibOutputDir);
+//      Compiler.Configuration := buildEntry.config;
+//
+//      if Compiler.platform <> TDPMPlatform.Win32 then
+//      begin
+//        Compiler.BPLOutputDir := TPath.Combine(Compiler.BPLOutputDir, 'win32');
+//        Compiler.LibOutputDir := TPath.Combine(Compiler.LibOutputDir, 'win32');
+//      end
+//      else
+//      begin
+//        packageReference.LibPath := Compiler.LibOutputDir;
+//        packageReference.BplPath := Compiler.BPLOutputDir;
+//      end;
+//
+//      if packageReference.HasChildren then
+//      begin
+//        searchPaths := TCollections.CreateList<string>;
+//        for dependency in packageReference.Children do
+//        begin
+//          childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion, Compiler.platform);
+//          childSearchPath := TPath.Combine(childSearchPath, 'lib\win32');
+//          searchPaths.Add(childSearchPath);
+//        end;
+//        Compiler.SetSearchPaths(searchPaths);
+//      end
+//      else
+//        Compiler.SetSearchPaths(nil);
+//
+//      FLogger.Information('Building project [' + projectFile + '] for design time...');
+//
+//      result := Compiler.BuildProject(cancellationToken, packageInfo.Platform, projectFile, configuration, packageInfo.Version, true);
+//      if result then
+//        FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
+//      else
+//      begin
+//        if cancellationToken.IsCancelled then
+//          FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
+//        else
+//          FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
+//        exit;
+//      end;
+//      FLogger.NewLine;
+//
+//    end
+//    else
+//    begin
+//      // note we are assuming the build entry paths are all relative.
+//      Compiler.BPLOutputDir := TPath.Combine(packagePath, buildEntry.BPLOutputDir);
+//      Compiler.LibOutputDir := TPath.Combine(packagePath, buildEntry.LibOutputDir);
+//      Compiler.Configuration := buildEntry.config;
+//
+//      packageReference.LibPath := Compiler.LibOutputDir;
+//      packageReference.BplPath := Compiler.BPLOutputDir;
+//
+//      if packageReference.HasChildren then
+//      begin
+//        searchPaths := TCollections.CreateList<string>;
+//        for dependency in packageReference.Children do
+//        begin
+//          childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion, Compiler.platform);
+//          childSearchPath := TPath.Combine(childSearchPath, 'lib');
+//          searchPaths.Add(childSearchPath);
+//        end;
+//        Compiler.SetSearchPaths(searchPaths);
+//      end
+//      else
+//        Compiler.SetSearchPaths(nil);
+//
+//      result := Compiler.BuildProject(cancellationToken, packageInfo.Platform, projectFile, configuration, packageInfo.Version);
+//      if result then
+//        FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
+//      else
+//      begin
+//        if cancellationToken.IsCancelled then
+//          FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
+//        else
+//          FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
+//        exit;
+//      end;
+//      FLogger.NewLine;
+//
+//      if buildEntry.BuildForDesign and (Compiler.platform <> TDPMPlatform.Win32)  then
+//      begin
+//        FLogger.Information('Building project [' + projectFile + '] for design time support...');
+//        // if buildForDesign is true, then it means the design time bpl's also reference
+//        // this bpl, so if the platform isn't win32 then we need to build it for win32
+//        Compiler.BPLOutputDir := TPath.Combine(Compiler.BPLOutputDir, 'win32');
+//        Compiler.LibOutputDir := TPath.Combine(Compiler.LibOutputDir, 'win32');
+//        if packageReference.HasChildren then
+//        begin
+//          searchPaths := TCollections.CreateList<string>;
+//          for dependency in packageReference.Children do
+//          begin
+//            childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion, Compiler.platform);
+//            childSearchPath := TPath.Combine(childSearchPath, 'lib\win32');
+//            searchPaths.Add(childSearchPath);
+//          end;
+//          Compiler.SetSearchPaths(searchPaths);
+//        end
+//        else
+//          Compiler.SetSearchPaths(nil);
+//
+//        result := Compiler.BuildProject(cancellationToken, packageInfo.Platform, projectFile, buildEntry.config, packageInfo.Version, true);
+//        if result then
+//          FLogger.Success('Project [' + buildEntry.Project + '] Compiled for designtime Ok.')
+//        else
+//        begin
+//          if cancellationToken.IsCancelled then
+//            FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
+//          else
+//            FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
+//          exit;
+//        end;
+//
+//      end;
+//
+//      if buildEntry.CopyFiles.Any then
+//        DoCopyFiles(buildEntry);
+//
+//    end;
+//
+//  end;
+//  // save the bill of materials file for future reference.
+//  TBOMFile.SaveToFile(FLogger, bomFile, packageReference);
 
 end;
 
 
 function TPackageInstaller.CopyLocal(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageManifest>;
                                      const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
-var
-  configName: string;
-  projectConfig: IProjectConfiguration;
-  packageSpec: IPackageManifest;
-  resolvedPackage: IPackageInfo;
-  configNames: IReadOnlyList<string>;
-  outputDir: string;
-  lastOutputDir: string;
-  bplSourceFile: string;
-  bplTargetFile: string;
-  packageFolder: string;
-  runtimeCopyLocalFiles: TArray<ISpecBPLEntry>;
-  runtimeEntry: ISpecBPLEntry;
+//var
+//  configName: string;
+//  projectConfig: IProjectConfiguration;
+//  packageSpec: IPackageManifest;
+//  resolvedPackage: IPackageInfo;
+//  configNames: IReadOnlyList<string>;
+//  outputDir: string;
+//  lastOutputDir: string;
+//  bplSourceFile: string;
+//  bplTargetFile: string;
+//  packageFolder: string;
+//  runtimeCopyLocalFiles: TArray<ISpecBPLEntry>;
+//  runtimeEntry: ISpecBPLEntry;
 
 begin
   result := true;
 
-  configNames := projectEditor.GetConfigNames;
-
-  for resolvedPackage in resolvedPackages do
-  begin
-    packageSpec := packageManifests[LowerCase(resolvedPackage.Id)];
-    Assert(packageSpec <> nil);
-    // FLogger.Debug('Copylocal for package [' + resolvedPackage.Id + ']');
-
-    // TODO : Is there any point in the copylocal option now.. shouldn't all runtime bpls be copied?
-    runtimeCopyLocalFiles := packageSpec.TargetPlatform.RuntimeFiles.Where(
-      function(const entry: ISpecBPLEntry): boolean
-      begin
-        result := entry.CopyLocal;
-      end).ToArray;
-
-    // if no runtime bpl's are defined with copylocal in the dspec then there is nothing to do.
-    if Length(runtimeCopyLocalFiles) = 0 then
-      continue;
-
-    lastOutputDir := '';
-    packageFolder := FPackageCache.GetPackagePath(resolvedPackage);
-    // FLogger.Debug('Package folder [' + packageFolder + ']');
-
-    for configName in configNames do
-    begin
-      if configName = 'Base' then
-        continue;
-      // FLogger.Debug('Config [' + configName + ']');
-
-      projectConfig := projectEditor.GetProjectConfiguration(configName,
-        platform);
-      // we're only doing this for projects using runtime configs.
-      if not projectConfig.UsesRuntimePackages then
-        continue;
-
-      // FLogger.Debug('uses runtime packages');
-
-      outputDir := projectConfig.outputDir;
-      if (outputDir <> '') and (not SameText(outputDir, lastOutputDir)) then
-      begin
-        lastOutputDir := outputDir;
-
-        for runtimeEntry in runtimeCopyLocalFiles do
-        begin
-          bplSourceFile := TPath.Combine(packageFolder, runtimeEntry.Source);
-          if not FileExists(bplSourceFile) then
-          begin
-            FLogger.Warning('Unabled to find runtime package [' + bplSourceFile + '] during copy local');
-            continue;
-          end;
-          bplTargetFile := TPath.Combine(outputDir,
-            ExtractFileName(bplSourceFile));
-
-          if TPathUtils.IsRelativePath(bplTargetFile) then
-          begin
-            bplTargetFile :=
-              TPath.Combine(ExtractFilePath(projectEditor.projectFile), bplTargetFile);
-            bplTargetFile := TPathUtils.CompressRelativePath('', bplTargetFile);
-          end;
-
-          // if the file exists already, then we need to work out if they are the same or not.
-          if FileExists(bplTargetFile) and
-            TFileUtils.AreSameFiles(bplSourceFile, bplTargetFile) then
-            continue;
-          // now actually copy files.
-          try
-            ForceDirectories(ExtractFilePath(bplTargetFile));
-            TFile.Copy(bplSourceFile, bplTargetFile, true);
-          except
-            on e: Exception do
-            begin
-              FLogger.Warning('Unable to copy runtime package [' + bplSourceFile + '] to [' + bplTargetFile + '] during copy local');
-              FLogger.Warning('  ' + e.Message);
-            end;
-          end;
-        end;
-      end;
-    end;
-  end;
+//  configNames := projectEditor.GetConfigNames;
+//
+//  for resolvedPackage in resolvedPackages do
+//  begin
+//    packageSpec := packageManifests[LowerCase(resolvedPackage.Id)];
+//    Assert(packageSpec <> nil);
+//    // FLogger.Debug('Copylocal for package [' + resolvedPackage.Id + ']');
+//
+//    // TODO : Is there any point in the copylocal option now.. shouldn't all runtime bpls be copied?
+//    runtimeCopyLocalFiles := packageSpec.TargetPlatform.RuntimeFiles.Where(
+//      function(const entry: ISpecBPLEntry): boolean
+//      begin
+//        result := entry.CopyLocal;
+//      end).ToArray;
+//
+//    // if no runtime bpl's are defined with copylocal in the dspec then there is nothing to do.
+//    if Length(runtimeCopyLocalFiles) = 0 then
+//      continue;
+//
+//    lastOutputDir := '';
+//    packageFolder := FPackageCache.GetPackagePath(resolvedPackage);
+//    // FLogger.Debug('Package folder [' + packageFolder + ']');
+//
+//    for configName in configNames do
+//    begin
+//      if configName = 'Base' then
+//        continue;
+//      // FLogger.Debug('Config [' + configName + ']');
+//
+//      projectConfig := projectEditor.GetProjectConfiguration(configName,
+//        platform);
+//      // we're only doing this for projects using runtime configs.
+//      if not projectConfig.UsesRuntimePackages then
+//        continue;
+//
+//      // FLogger.Debug('uses runtime packages');
+//
+//      outputDir := projectConfig.outputDir;
+//      if (outputDir <> '') and (not SameText(outputDir, lastOutputDir)) then
+//      begin
+//        lastOutputDir := outputDir;
+//
+//        for runtimeEntry in runtimeCopyLocalFiles do
+//        begin
+//          bplSourceFile := TPath.Combine(packageFolder, runtimeEntry.Source);
+//          if not FileExists(bplSourceFile) then
+//          begin
+//            FLogger.Warning('Unabled to find runtime package [' + bplSourceFile + '] during copy local');
+//            continue;
+//          end;
+//          bplTargetFile := TPath.Combine(outputDir,
+//            ExtractFileName(bplSourceFile));
+//
+//          if TPathUtils.IsRelativePath(bplTargetFile) then
+//          begin
+//            bplTargetFile :=
+//              TPath.Combine(ExtractFilePath(projectEditor.projectFile), bplTargetFile);
+//            bplTargetFile := TPathUtils.CompressRelativePath('', bplTargetFile);
+//          end;
+//
+//          // if the file exists already, then we need to work out if they are the same or not.
+//          if FileExists(bplTargetFile) and
+//            TFileUtils.AreSameFiles(bplSourceFile, bplTargetFile) then
+//            continue;
+//          // now actually copy files.
+//          try
+//            ForceDirectories(ExtractFilePath(bplTargetFile));
+//            TFile.Copy(bplSourceFile, bplTargetFile, true);
+//          except
+//            on e: Exception do
+//            begin
+//              FLogger.Warning('Unable to copy runtime package [' + bplSourceFile + '] to [' + bplTargetFile + '] during copy local');
+//              FLogger.Warning('  ' + e.Message);
+//            end;
+//          end;
+//        end;
+//      end;
+//    end;
+//  end;
 end;
 
 constructor TPackageInstaller.Create(const logger: ILogger; const configurationManager: IConfigurationManager; const repositoryManager: IPackageRepositoryManager;
@@ -1083,30 +1029,30 @@ begin
 
         Spec := packageManifests[LowerCase(packageReference.Id)];
         Assert(Spec <> nil);
-
-        if Spec.TargetPlatform.BuildEntries.Any then
-        begin
-          // we need to build the package.
-          if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, packageReference, Spec, forceCompile, Options.DebugMode) then
-          begin
-            if cancellationToken.IsCancelled then
-              raise Exception.Create('Compiling package [' + pkgInfo.ToIdVersionString + '] cancelled.')
-            else
-              raise Exception.Create('Compiling package [' +  pkgInfo.ToIdVersionString + '] failed.');
-          end;
-          compiledPackages.Add(pkgInfo);
-          // compiling updates the node searchpaths and libpath, so just copy to any same package nodes
-          otherNodes := projectPackageGraph.FindChildren(packageReference.Id);
-          if otherNodes.Count > 1 then
-            otherNodes.ForEach(
-              procedure(const otherNode: IPackageReference)
-              begin
-                otherNode.searchPaths.Clear;
-                otherNode.searchPaths.AddRange(packageReference.searchPaths);
-                otherNode.LibPath := packageReference.LibPath;
-                otherNode.BplPath := packageReference.BplPath;
-              end);
-        end;
+        raise Exception.Create('Needto use the template');
+//        if Spec.TargetPlatform.BuildEntries.Any then
+//        begin
+//          // we need to build the package.
+//          if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, packageReference, Spec, forceCompile, Options.DebugMode) then
+//          begin
+//            if cancellationToken.IsCancelled then
+//              raise Exception.Create('Compiling package [' + pkgInfo.ToIdVersionString + '] cancelled.')
+//            else
+//              raise Exception.Create('Compiling package [' +  pkgInfo.ToIdVersionString + '] failed.');
+//          end;
+//          compiledPackages.Add(pkgInfo);
+//          // compiling updates the node searchpaths and libpath, so just copy to any same package nodes
+//          otherNodes := projectPackageGraph.FindChildren(packageReference.Id);
+//          if otherNodes.Count > 1 then
+//            otherNodes.ForEach(
+//              procedure(const otherNode: IPackageReference)
+//              begin
+//                otherNode.searchPaths.Clear;
+//                otherNode.searchPaths.AddRange(packageReference.searchPaths);
+//                otherNode.LibPath := packageReference.LibPath;
+//                otherNode.BplPath := packageReference.BplPath;
+//              end);
+//        end;
       end);
     result := true;
 
@@ -1243,12 +1189,12 @@ end;
 procedure TPackageInstaller.GenerateSearchPaths(const compilerVersion : TCompilerVersion; const platform: TDPMPlatform; const packageSpec: IPackageManifest; const searchPaths: IList<string>);
 var
   packageBasePath: string;
-  packageSearchPath: ISpecSearchPath;
+//  packageSearchPath: ISpecSearchPath;
 begin
   packageBasePath := packageSpec.Metadata.Id + PathDelim + packageSpec.Metadata.Version.ToStringNoMeta + PathDelim;
-
-  for packageSearchPath in packageSpec.TargetPlatform.SearchPaths do
-    searchPaths.Add(packageBasePath + packageSearchPath.Path);
+  //TODO : Look at source files and collect folder names?
+//  for packageSearchPath in packageSpec.TargetPlatform.SearchPaths do
+//    searchPaths.Add(packageBasePath + packageSearchPath.Path);
 end;
 
 function TPackageInstaller.GetCompilerVersionFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration): boolean;

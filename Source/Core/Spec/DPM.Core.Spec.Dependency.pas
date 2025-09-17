@@ -30,6 +30,8 @@ interface
 
 uses
   JsonDataObjects,
+  VSoft.YAML,
+  DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Node,
@@ -46,14 +48,17 @@ type
     procedure SetId(const Id: string);
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
-    function GetVersionString : string;
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
-    function IsGroup : Boolean; virtual;
+    function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
+
     constructor CreateClone(const logger : ILogger; const id : string; const version : TVersionRange; const versionString : string);
     function Clone : ISpecDependency; virtual;
     function ToJSON: string; override;
+    procedure ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);override;
   public
     constructor Create(const logger : ILogger); override;
+
+
   end;
 
 implementation
@@ -94,15 +99,6 @@ begin
   result := FVersion;
 end;
 
-function TSpecDependency.GetVersionString : string;
-begin
-  result := FVersionString;
-end;
-
-function TSpecDependency.IsGroup : Boolean;
-begin
-  result := false;
-end;
 
 function TSpecDependency.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var
@@ -138,6 +134,39 @@ begin
 
 end;
 
+function TSpecDependency.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
+var
+  sValue : string;
+  sError : string;
+begin
+  result := true;
+  FId := yamlObject.S['id'];
+  if FId = '' then
+  begin
+    Logger.Error('dependency has no id attribute');
+    result := false;
+  end
+  else if not TPackageIdValidator.IsValidPackageId(FId) then
+  begin
+    Logger.Error('Invalid dependency Id [' + FId + ']');
+    result := false;
+  end;
+  sValue := yamlObject.S['version'];
+  if sValue = '' then
+  begin
+    Logger.Error('dependency has no version');
+    result := false;
+
+  end
+  else if sValue = '$version$' then
+    FVersionString := sValue
+  else if not TVersionRange.TryParseWithError(sValue, FVersion, sError) then
+  begin
+    Logger.Error('Invalid dependency version attribute [' + sValue + '] - ' + sError);
+    result := false;
+  end;
+end;
+
 procedure TSpecDependency.SetId(const Id: string);
 begin
   FId := Id;
@@ -160,6 +189,12 @@ begin
   finally
     FreeAndNil(json);
   end;
+end;
+
+procedure TSpecDependency.ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);
+begin
+  parent.AsMapping.S['id'] := FId;
+  parent.AsMapping.S['version'] := FVersion.ToString;
 end;
 
 end.

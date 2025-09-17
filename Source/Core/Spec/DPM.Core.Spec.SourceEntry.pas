@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -24,19 +24,21 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.Core.Spec.FileEntry;
+unit DPM.Core.Spec.SourceEntry;
 
 interface
 
 uses
   JsonDataObjects,
+  VSoft.YAML,
   Spring.Collections,
+  DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Node;
 
 type
-  TSpecFileEntry = class(TSpecNode, ISpecFileEntry)
+  TSpecSourceEntry = class(TSpecNode, ISpecSourceEntry)
   private
   protected
     //making these protected to simplify clone;
@@ -47,6 +49,8 @@ type
     FIgnore : boolean;
 
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
+    function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
+
     function GetSource : string;
     function GetDestination : string;
     function GetExclude : IList<string>;
@@ -57,10 +61,14 @@ type
     function GetIgnore : boolean;
 
     constructor CreateClone(const logger : ILogger; const src : string; const dest : string; const exclude : IList<string>; const flatten : boolean; const ignore : boolean); virtual;
-    function Clone : ISpecFileEntry;
+    function Clone : ISpecSourceEntry;
+
+    function ToJSON: string; override;
+    procedure ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);override;
+
   public
     constructor Create(const logger : ILogger); override;
-    function ToJSON: string; override;
+
   end;
 
 implementation
@@ -68,20 +76,20 @@ implementation
 uses
   System.SysUtils;
 
-{ TSpecFileEntry }
+{ TSpecSourceEntry }
 
-function TSpecFileEntry.Clone : ISpecFileEntry;
+function TSpecSourceEntry.Clone : ISpecSourceEntry;
 begin
-  result := TSpecFileEntry.CreateClone(logger, FSource, FDestination, FExclude, FFlatten, FIgnore);
+  result := TSpecSourceEntry.CreateClone(logger, FSource, FDestination, FExclude, FFlatten, FIgnore);
 end;
 
-constructor TSpecFileEntry.Create(const logger : ILogger);
+constructor TSpecSourceEntry.Create(const logger : ILogger);
 begin
   inherited Create(Logger);
   FExclude := TCollections.CreateList < string > ;
 end;
 
-constructor TSpecFileEntry.CreateClone(const logger : ILogger; const src, dest : string; const exclude : IList<string> ; const flatten : boolean; const ignore : boolean);
+constructor TSpecSourceEntry.CreateClone(const logger : ILogger; const src, dest : string; const exclude : IList<string> ; const flatten : boolean; const ignore : boolean);
 begin
   inherited Create(logger);
   FSource := src;
@@ -92,32 +100,32 @@ begin
   FIgnore := ignore;
 end;
 
-function TSpecFileEntry.GetExclude : IList<string>;
+function TSpecSourceEntry.GetExclude : IList<string>;
 begin
   result := FExclude;
 end;
 
-function TSpecFileEntry.GetFlatten : Boolean;
+function TSpecSourceEntry.GetFlatten : Boolean;
 begin
   result := FFlatten;
 end;
 
-function TSpecFileEntry.GetIgnore : boolean;
+function TSpecSourceEntry.GetIgnore : boolean;
 begin
   result := FIgnore;
 end;
 
-function TSpecFileEntry.GetSource : string;
+function TSpecSourceEntry.GetSource : string;
 begin
   result := FSource;
 end;
 
-function TSpecFileEntry.GetDestination : string;
+function TSpecSourceEntry.GetDestination : string;
 begin
   result := FDestination;
 end;
 
-function TSpecFileEntry.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
+function TSpecSourceEntry.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var
   excludeArray : TJsonArray;
   entry : string;
@@ -148,12 +156,43 @@ begin
   end;
 end;
 
-procedure TSpecFileEntry.SetSource(const value : string);
+function TSpecSourceEntry.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
+var
+  excludeArray : IYAMLSequence;
+  entry : string;
+  i : Integer;
+begin
+  result := true;
+  FSource := yamlObject.S['src'];
+  if FSource = '' then
+  begin
+    result := false;
+    Logger.Error('Required attribute [src] is missing');
+  end;
+  FDestination := yamlObject.S['dest'];
+
+  FFlatten := yamlObject.B['flatten'];
+  FIgnore := yamlObject.B['ignore'];
+
+  if yamlObject.Contains('exclude') then
+  begin
+    excludeArray := yamlObject.A['exclude'];
+
+    for i := 0 to excludeArray.Count - 1 do
+    begin
+      entry := excludeArray.S[i];
+      if entry <> '' then
+        FExclude.Add(entry);
+    end;
+  end;
+end;
+
+procedure TSpecSourceEntry.SetSource(const value : string);
 begin
   FSource := value;
 end;
 
-function TSpecFileEntry.ToJson: string;
+function TSpecSourceEntry.ToJson: string;
 var
   json : TJSONObject;
   jsonArray : TJsonArray;
@@ -184,12 +223,19 @@ begin
   end;
 end;
 
-procedure TSpecFileEntry.SetDestination(const value : string);
+procedure TSpecSourceEntry.ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);
+begin
+
+  //TODO
+
+end;
+
+procedure TSpecSourceEntry.SetDestination(const value : string);
 begin
   FDestination := value;
 end;
 
-procedure TSpecFileEntry.SetFlatten(value: Boolean);
+procedure TSpecSourceEntry.SetFlatten(value: Boolean);
 begin
   FFlatten := value;
 end;

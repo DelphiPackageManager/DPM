@@ -1,0 +1,492 @@
+{
+    "$id": "https://github.com/delphipackagemanager/dpm/tree/main/schema/dspec.schema.json",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "DPM DSPEC Definition",
+    "description": "Syntax checking, autocompletion and validation for DPM package dspec files.",
+    "type": "object",
+    "defs": {
+        "compilerVersions": {
+            "type": "string",
+            "description": "The Compiler Delphi compilerVersion",
+            "enum": [
+                "delphixe2",
+                "delphixe3",
+                "delphixe4",
+                "delphixe5",
+                "delphixe6",
+                "delphixe7",
+                "delphixe8",
+                "delphi10",
+                "delphi10.1",
+                "delphi10.2",
+                "delphi10.3",
+                "delphi10.4",
+                "delphi11",
+                "delphi12",
+                "delphi13",
+                "delphiMax"
+            ]
+        },
+        "platforms": {
+            "type": "string",
+            "description": "The platforms supported by the framework",
+            "enum": [
+                "win32",
+                "win64",
+                "macos32",
+                "macos64",
+                "macos64arm",
+                "android",
+                "android64",
+                "ios32",
+                "ios64",
+                "linux64",
+                "iossimulator"
+            ],
+            "uniqueItems": true
+        },
+        "design-platforms": {
+            "type": "string",
+            "description": "The IDE bitness supported by design package, defauult is win32 and win64 available",
+            "enum": [
+                "win32",
+                "win64"
+            ],
+            "uniqueItems": true
+        },
+        "frameworks": {
+            "type": "string",
+            "description": "The frameworks supported by this package",
+            "enum": [
+                "vcl",
+                "fmx"
+            ],
+            "uniqueItems": true
+        },
+        "packageKind": {
+            "type": [
+                "string",
+                "null"
+            ],
+            "items": [
+                "dpm",
+                "git"
+            ]
+        }
+    },
+    "properties": {
+        "min client version": {
+            "type": [
+                "string",
+                "number"
+            ],
+            "description": "Minimum version of dpm that can use this file.",
+            "default": "1.0"
+        },
+        "packageKind": {
+            "$ref": "#/defs/packageKind",
+            "description": "Ths file is either a dpm dspec or a git hosted manifest file. ",
+            "enum": [
+                "dpm",
+                "git"
+            ]
+        },
+        "metadata": {
+            "type": "object",
+            "description": "General information about the product.",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "description": "use a short descriptive name in the form company.product. This id will be used everywhere by tms smart setup to refer to this product."
+                },
+                "version": {
+                    "type": "string",
+                    "description": "The semantic version of this package"
+                },
+                "versions": {
+                    "type ": "array",
+                    "items": {
+                        "type": "object",
+                        "minItems": 1,
+                        "properties": {
+                            "version": {
+                                "type": "string",
+                                "description": "A semantic version"
+                            },
+                            "commit": {
+                                "type": "string",
+                                "description": "The commit hash for this version"
+                            }
+                        },
+                        "required": [
+                            "version",
+                            "commit"
+                        ]
+                    }
+                },
+                "description": {
+                    "type": "string",
+                    "description": "A brief description of the product."
+                },
+                "authors": {
+                    "type": "array",
+                    "description": "Tha Authors of this library.",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "projectUrl": {
+                    "type": "string",
+                    "description": "The URL where the product can be downloaded."
+                },
+                "repositoryUrl": {
+                    "type": "string",
+                    "description": "The URL where the product can be downloaded."
+                },
+                "repositoryCommit": {
+                    "type": "string",
+                    "description": "Commit hash for this version."
+                },
+                "license": {
+                    "type": "string",
+                    "description": "The SPDX License type."
+                },
+                "copyright": {
+                    "type": "string",
+                    "description": "The copyright holder of the library."
+                },
+                "tags": {
+                    "type": "array",
+                    "description": "Tags to find this package by.",
+                    "items": {
+                        "type": "string"
+                    },
+                    "uniqueItems": true
+                },
+                "readme": {
+                    "type": "string",
+                    "description": "The readme file, relative to the package root folder"
+                },
+                "icon": {
+                    "type": "string",
+                    "description": "The icon file in the package or repository"
+                },
+                "frameworks": {
+                    "type": "array",
+                    "description": "The frameworks supported by this package",
+                    "items": {
+                        "$ref": "#/defs/frameworks"
+                    }
+                },
+                "isTrial": {
+                    "type": "boolean",
+                    "description": "Indicates if this is a trial version of a commercial package"
+                },
+                "isCommercial": {
+                    "type": "boolean",
+                    "description": "Indicates if this is a commercial package"
+                }
+            },
+            "required": [
+                "id",
+                "description",
+                "authors",
+                "license"
+            ],
+            "oneOf": [
+                {
+                    "properties": {
+                        "version": {
+                            "minItems": 1
+                        }
+                    },
+                    "required": [
+                        "version"
+                    ]
+                },
+                {
+                    "properties": {
+                        "versions": {
+                            "minItems": 1
+                        }
+                    },
+                    "required": [
+                        "versions"
+                    ]
+                }
+            ],
+            "additionalProperties": false
+        },
+        "variables": {
+            "type": "object",
+            "description": "Global Variables, can be overriden in targetPlatforms",
+            "additionalProperties": true
+        },
+        "targetPlatforms": {
+            "type": "array",
+            "description": "And array of compiler/platforms definitions supported by this package",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "compilers": {
+                        "type": "array",
+                        "description": "List Compiler versions supported",
+                        "items": {
+                            "$ref": "#/defs/compilerVersions",
+                            "uniqueItems": true,
+                            "minItems": 1
+                        }
+                    },
+                    "compiler from": {
+                        "$ref": "#/defs/compilerVersions",
+                        "description": "First compiler version in a range"
+                    },
+                    "compiler to": {
+                        "$ref": "#/defs/compilerVersions",
+                        "description": "Last compiler version in a range"
+                    },
+                    "platforms": {
+                        "type": "array",
+                        "description": "An array of platforms",
+                        "items": {
+                            "$ref": "#/defs/platforms",
+                            "uniqueItems": true,
+                            "minItems": 1
+                        }
+                    },
+                    "variables": {
+                        "type": "object",
+                        "description": "Variable overrides",
+                        "additionalProperties": true
+                    },
+                    "template": {
+                        "type": "string",
+                        "description": "The name of the template that defines the package for these compiler/platforms - if omitted then default templated is used"
+                    }
+                },
+                "required": [
+                    "platforms"
+                ],
+                "oneOf": [
+                    {
+                        "properties": {
+                            "compilers": {
+                                "minItems": 1
+                            }
+                        },
+                        "required": [
+                            "compilers"
+                        ]
+                    },
+                    {
+                        "properties": {
+                            "compiler from": {
+                                "$ref": "#/defs/compilerVersions"
+                            },
+                            "compiler to": {
+                                "$ref": "#/defs/compilerVersions"
+                            }
+                        },
+                        "required": [
+                            "compiler from",
+                            "compiler to"
+                        ]
+                    },
+                    {
+                        "properties": {
+                            "compiler": {
+                                "$ref": "#/defs/compilerVersions"
+                            }
+                        },
+                        "required": [
+                            "compiler"
+                        ]
+                    }
+                ]
+            }
+        },
+        "templates": {
+            "type": "array",
+            "description": "An array of templates the define the package contents etc",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The template name"
+                    },
+                    "source": {
+                        "type": "array",
+                        "description": "An array of src/dest that define the files included in the package",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "src": {
+                                    "type": "string",
+                                    "description": "The source ant pattern filespec"
+                                },
+                                "dest": {
+                                    "type": "string",
+                                    "description": "The destination folder in the package file"
+                                }
+                            },
+                            "required": [
+                                "src"
+                            ]
+                        }
+                    },
+                    "dependencies": {
+                        "type": "array",
+                        "description": "An array of packageid and versions this package depends on",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string",
+                                    "description": "The package id - e.g. VSoft.DUnitX"
+                                },
+                                "version": {
+                                    "type": "string",
+                                    "description": "A package version constraint, e.g ^1.2.3"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "version"
+                            ]
+                        }
+                    },
+                    "build": {
+                        "type": "array",
+                        "description": "An array of build definitions for Delphi runtime packages",
+                        "items": {
+                            "type": "object",
+                            "description": "",
+                            "properties": {
+                                "project": {
+                                    "type": "string",
+                                    "description": "The path in the package file to the package.dproj to build on install"
+                                },
+                                "platforms": {
+                                    "type": "array",
+                                    "description": "An array of platforms",
+                                    "items": {
+                                        "$ref": "#/defs/platforms",
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    }
+                                },
+                                "defines": {
+                                    "type": "array",
+                                    "description": "Array of defines to pass to the compiler",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "required": [
+                                "project"
+                            ]
+                        }
+                    },
+                    "design": {
+                        "type": "array",
+                        "description": "An array of build definitions for Delphi Design time packages",
+                        "items": {
+                            "type": "object",
+                            "description": "",
+                            "properties": {
+                                "project": {
+                                    "type": "string",
+                                    "description": ""
+                                },
+                                "platforms": {
+                                    "type": "array",
+                                    "description": "An array of platforms",
+                                    "items": {
+                                        "$ref": "#/defs/design-platforms"
+                                    }
+                                },
+                                "defines": {
+                                    "type": "array",
+                                    "description": "",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "libSuffix": {
+                                    "type": "string",
+                                    "description": "Provide the libSuffix used when packages use non default - needed so we can find the correct bpl to install"
+                                },
+                                "libPrefix": {
+                                    "type": "string",
+                                    "description": "Provide the libPrefx used when packages use non default - needed so we can find the correct bpl to install"
+                                },
+                                "libVersion": {
+                                    "type": "string",
+                                    "description": "Provide the libVersion used when packages use non default - needed so we can find the correct bpl to install"
+                                }
+                            },
+                            "required": [
+                                "project"
+                            ]
+                        }
+                    },
+                    "package definitions": {
+                        "type": "array",
+                        "description": "On or more package definitions that describe how to build the libary",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "The delphi package name to generate, no file extension"
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "Package description"
+                                },
+                                "requires": {
+                                    "type": "array",
+                                    "description": "List of delphi packages to add to requures, e.g rtl,vcl,fmx (without .dcp)",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "source": {
+                                    "type": "array",
+                                    "description": "One or more files objects",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "files": {
+                                                "type": "string",
+                                                "description": "Ant pattern file mask of files to include"
+                                            },
+                                            "exclude": {
+                                                "type": "string",
+                                                "description": "File mask of files to exclude. Use semicolon to seperate multiple masks"
+                                            }
+                                        },
+                                        "additionalProperties": false
+                                    }
+                                }
+                            },
+                            "required": [
+                                "name",
+                                "source",
+                                "requires"
+                            ],
+                            "additionalProperties": false
+                        }
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "additionalProperties": false
+            }
+        },
+        "additionalProperties": false
+    }
+}

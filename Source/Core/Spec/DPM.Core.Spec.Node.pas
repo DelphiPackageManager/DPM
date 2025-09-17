@@ -30,10 +30,12 @@ unit DPM.Core.Spec.Node;
 interface
 
 uses
+  System.Classes,
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Logging,
   JsonDataObjects,
+  VSoft.YAML,
   DPM.Core.Spec.Interfaces;
 
 type
@@ -41,12 +43,29 @@ type
   TSpecNode = class(TInterfacedObject, ISpecNode)
   private
     FLogger : ILogger;
+    FComments : TStringList;
   protected
-    property Logger : ILogger read FLogger;
+    procedure AddToArray<T>(arr : TArray<T>; value : T);
+
+    function GetComments : TStrings;
+    function HasComments : boolean;
+    procedure SetComments(const value : TStrings);
+
+    procedure AddComments(const yamlObject : IYAMLValue);
+
     function LoadFromJson(const jsonObject : TJsonObject) : boolean; virtual; abstract;
+    function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;virtual;abstract;
+
     function ToJSON: string; virtual; abstract;
+    procedure ToYAML(const parent : IYAMLValue; const packageKind : TDPMPackageKind);virtual;abstract;
     function LoadJsonCollection(const collection : TJSonArray; const nodeClass : TSpecNodeClass; const action : TConstProc<IInterface>) : boolean;
+    function LoadYAMLCollection(const collection : IYAMLSequence; const nodeClass : TSpecNodeClass; const action : TConstProc<IInterface>) : boolean;
+
     function LoadObjectList(const list: Spring.Collections.IList<ISpecNode>): TJsonArray;
+
+    //for internal use
+    property Comments : TStrings read GetComments write SetComments;
+    property Logger : ILogger read FLogger;
   public
     constructor Create(const logger : ILogger); virtual;
     destructor Destroy;override;
@@ -56,18 +75,53 @@ type
 
 implementation
 
+uses
+  System.SysUtils;
+
 { TSpecNode }
+
+procedure TSpecNode.AddComments(const yamlObject: IYAMLValue);
+var
+  collection : IYAMLCollection;
+begin
+  if yamlObject.IsSequence or yamlObject.IsMapping then
+  begin
+    collection := yamlObject.AsCollection;
+    if collection.HasComments then
+      SetComments(collection.Comments);
+  end;
+end;
+
+procedure TSpecNode.AddToArray<T>(arr: TArray<T>; value: T);
+begin
+  SetLength(arr, Length(arr)+1);
+  arr[Length(arr)-1] := value;
+end;
 
 constructor TSpecNode.Create(const logger : ILogger);
 begin
   inherited Create;
   FLogger := logger;
+  FComments := nil;
 end;
 
 destructor TSpecNode.Destroy;
 begin
   FLogger := nil;
+  FreeAndNil(FComments);
   inherited;
+end;
+
+function TSpecNode.GetComments: TStrings;
+begin
+  if FComments = nil then
+    FComments := TStringList.Create;
+  result := FComments;
+end;
+
+function TSpecNode.HasComments: boolean;
+begin
+  result := (FComments <> nil) and (FComments.Count > 0);
 end;
 
 function TSpecNode.LoadJsonCollection(const collection : TJSonArray; const nodeClass : TSpecNodeClass; const action : TConstProc<IInterface>) : boolean;
@@ -99,6 +153,36 @@ begin
   begin
     json := TJsonObject.Parse(list[i].ToJson) as TJsonObject;
     Result.Add(json);
+  end;
+end;
+
+function TSpecNode.LoadYAMLCollection(const collection: IYAMLSequence; const nodeClass: TSpecNodeClass; const action: TConstProc<IInterface>): boolean;
+var
+  item : ISpecNode;
+  i : Integer;
+  obj : IYAMLMapping;
+begin
+  result := true;
+  if collection.Count = 0 then
+    exit;
+
+  for i := 0 to collection.Count - 1 do
+  begin
+    item := nodeClass.Create(Logger) as ISpecNode;
+    obj := collection.O[i];
+    item.LoadFromYAML(obj);
+    action(item);
+  end;
+
+end;
+
+procedure TSpecNode.SetComments(const value: TStrings);
+begin
+  if value <> nil then
+  begin
+    if FComments = nil then
+      FComments := TStringList.Create;
+    FComments.Assign(value);
   end;
 end;
 

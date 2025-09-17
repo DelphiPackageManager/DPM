@@ -4,6 +4,7 @@ interface
 
 uses
   JsonDataObjects,
+  VSoft.YAML,
   DPM.Core.Logging,
   DPM.Core.Manifest.Interfaces;
 
@@ -13,6 +14,7 @@ type
     FLogger : ILogger;
   protected
     function InternalReadPackageSpecJson(const fileName : string; const jsonObject : TJsonObject) : IPackageManifest;
+    function InternalReadPackageSpecYaml(const fileName : string; const yamlObject : IYamlMapping) : IPackageManifest;
     function ReadManifest(const fileName : string) : IPackageManifest;
     function ReadManifestString(const manifestString : string) : IPackageManifest;
 
@@ -24,6 +26,7 @@ implementation
 
 uses
   System.SysUtils,
+  DPM.Core.Types,
   DPM.Core.Manifest;
 
 { TPackageManifestReader }
@@ -41,13 +44,20 @@ begin
     FLogger.Error('json document does not have a metadata object, this is probably not a dspec file');
     exit;
   end;
-  result := TPackageManifest.Create(FLogger, fileName);
+  result := TPackageManifest.Create(FLogger, fileName, TDPMPackageKind.dpm);
   result.LoadFromJson(jsonObject);
+end;
+
+function TPackageManifestReader.InternalReadPackageSpecYaml(const fileName: string; const yamlObject: IYamlMapping): IPackageManifest;
+begin
+
 end;
 
 function TPackageManifestReader.ReadManifest(const fileName: string): IPackageManifest;
 var
   jsonObj : TJsonObject;
+  ext : string;
+  yamlDoc : IYAMLDocument;
 begin
   result := nil;
   if not FileExists(fileName) then
@@ -55,19 +65,37 @@ begin
     FLogger.Error('Pacakge manifest file : [' + filename + '] does not exist');
     exit;
   end;
-  try
-    jsonObj := TJsonObject.ParseFromFile(fileName) as TJsonObject;
+  ext := ExtractFileExt(fileName);
+  if SameText('.yaml', ext) then
+  begin
     try
-      Result := InternalReadPackageSpecJson(fileName, jsonObj);
-    finally
-      jsonObj.Free;
+      yamlDoc := TYAML.LoadFromFile(fileName);
+      result := InternalReadPackageSpecYaml(filename, yamlDoc.AsMapping);
+    except
+      on e : Exception do
+      begin
+        result := nil;
+        FLogger.Error('Error parsing package manifest json : ' + e.Message);
+        exit;
+      end;
     end;
-  except
-    on e : Exception do
-    begin
-      result := nil;
-      FLogger.Error('Error parsing package manifest json : ' + e.Message);
-      exit;
+  end
+  else
+  begin
+    try
+      jsonObj := TJsonObject.ParseFromFile(fileName) as TJsonObject;
+      try
+        Result := InternalReadPackageSpecJson(fileName, jsonObj);
+      finally
+        jsonObj.Free;
+      end;
+    except
+      on e : Exception do
+      begin
+        result := nil;
+        FLogger.Error('Error parsing package manifest json : ' + e.Message);
+        exit;
+      end;
     end;
   end;
 

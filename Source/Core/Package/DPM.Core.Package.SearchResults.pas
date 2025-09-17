@@ -238,7 +238,8 @@ begin
   FRepositoryType := metaData.RepositoryType;
   FRepositoryBranch := metaData.RepositoryBranch;
   FRepositoryCommit := metaData.RepositoryCommit;
-  FTags := metaData.Tags;
+  metaData.Tags.Delimiter := ' ';
+  FTags := metaData.Tags.DelimitedText;
   FVersion := metaData.Version;
   FDownloadCount := -1; //indicates not set;
   FIsReservedPrefix := false;

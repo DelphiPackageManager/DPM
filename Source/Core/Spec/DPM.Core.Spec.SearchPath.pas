@@ -30,6 +30,7 @@ interface
 
 uses
   JsonDataObjects,
+  VSoft.YAML,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
@@ -42,10 +43,10 @@ type
   protected
     function GetPath : string;
     procedure SetPath(const value : string);
-
-    function IsGroup : Boolean; virtual;
     function Clone : ISpecSearchPath; virtual;
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
+    function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
+
     function ToJSON: string; override;
 
     constructor CreateClone(const logger : ILogger; const path : string);
@@ -87,16 +88,23 @@ begin
 end;
 
 
-function TSpecSearchPath.IsGroup : Boolean;
-begin
-  result := false;
-end;
 
 
 function TSpecSearchPath.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 begin
   result := true;
   FPath := jsonObject.S['path'];
+  if FPath = '' then
+  begin
+    result := false;
+    Logger.Error('Required property [path] not found');
+  end;
+end;
+
+function TSpecSearchPath.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
+begin
+  result := true;
+  FPath := yamlObject.S['path'];
   if FPath = '' then
   begin
     result := false;

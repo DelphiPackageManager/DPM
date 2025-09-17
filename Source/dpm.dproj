@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
@@ -118,6 +118,7 @@
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
         <Debugger_RunParams>install VSoft.YAML .\dpm.dproj</Debugger_RunParams>
         <ILINK_MapFileType>DetailedSegments</ILINK_MapFileType>
+        <OutputExt>2.exe</OutputExt>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_4_Win32)'!=''">
         <DCC_Define>JCLDEBUG;$(DCC_Define)</DCC_Define>
@@ -227,21 +228,16 @@
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Interfaces.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Manager.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Types.pas"/>
-        <DCCReference Include="Core\Spec\DPM.Core.Spec.BPLEntry.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.DesignEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Dependency.pas"/>
-        <DCCReference Include="Core\Spec\DPM.Core.Spec.DependencyGroup.pas"/>
-        <DCCReference Include="Core\Spec\DPM.Core.Spec.FileEntry.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.SourceEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Interfaces.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.MetaData.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Node.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Reader.pas"/>
-        <DCCReference Include="Core\Spec\DPM.Core.Spec.SearchPath.pas"/>
-        <DCCReference Include="Core\Spec\DPM.Core.Spec.SearchPathGroup.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.TargetPlatform.pas"/>
-        <DCCReference Include="Core\Spec\DPM.Core.Spec.Template.pas"/>
-        <DCCReference Include="Core\Spec\DPM.Core.Spec.TemplateBase.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Writer.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Config.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Directory.pas"/>
@@ -272,6 +268,7 @@
         <DCCReference Include="Core\Manifest\DPM.Core.Manifest.pas"/>
         <DCCReference Include="Core\Manifest\DPM.Core.Manifest.Reader.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Hash.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.Template.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
