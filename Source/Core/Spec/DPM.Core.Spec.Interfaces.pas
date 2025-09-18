@@ -158,19 +158,14 @@ type
     function GetSource : string;
     function GetDestination : string;
     function GetExclude : IList<string>;
-    function GetFlatten : boolean;
-    procedure SetFlatten(value: Boolean);
     procedure SetSource(const value : string);
     procedure SetDestination(const value : string);
-    function GetIgnore : boolean;
 
     function Clone : ISpecSourceEntry;
 
     property Source : string read GetSource write SetSource;
     property Destination : string read GetDestination write SetDestination;
     property Exclude : IList<string>read GetExclude;
-    property Flatten : boolean read GetFlatten write SetFlatten;
-    property Ignore : boolean read GetIgnore;
   end;
 
   ISpecBuildEntry = interface(ISpecNode)

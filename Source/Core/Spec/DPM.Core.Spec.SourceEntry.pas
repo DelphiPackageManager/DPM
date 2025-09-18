@@ -45,8 +45,6 @@ type
     FSource : string;
     FDestination : string;
     FExclude : IList<string>;
-    FFlatten : boolean;
-    FIgnore : boolean;
 
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
@@ -54,13 +52,10 @@ type
     function GetSource : string;
     function GetDestination : string;
     function GetExclude : IList<string>;
-    function GetFlatten : Boolean;
-    procedure SetFlatten(value: Boolean);
     procedure SetSource(const value : string);
     procedure SetDestination(const value : string);
-    function GetIgnore : boolean;
 
-    constructor CreateClone(const logger : ILogger; const src : string; const dest : string; const exclude : IList<string>; const flatten : boolean; const ignore : boolean); virtual;
+    constructor CreateClone(const logger : ILogger; const src : string; const dest : string; const exclude : IList<string>); virtual;
     function Clone : ISpecSourceEntry;
 
     function ToJSON: string; override;
@@ -80,7 +75,7 @@ uses
 
 function TSpecSourceEntry.Clone : ISpecSourceEntry;
 begin
-  result := TSpecSourceEntry.CreateClone(logger, FSource, FDestination, FExclude, FFlatten, FIgnore);
+  result := TSpecSourceEntry.CreateClone(logger, FSource, FDestination, FExclude);
 end;
 
 constructor TSpecSourceEntry.Create(const logger : ILogger);
@@ -89,30 +84,18 @@ begin
   FExclude := TCollections.CreateList < string > ;
 end;
 
-constructor TSpecSourceEntry.CreateClone(const logger : ILogger; const src, dest : string; const exclude : IList<string> ; const flatten : boolean; const ignore : boolean);
+constructor TSpecSourceEntry.CreateClone(const logger : ILogger; const src, dest : string; const exclude : IList<string>);
 begin
   inherited Create(logger);
   FSource := src;
   FDestination := dest;
   FExclude := TCollections.CreateList < string > ;
   FExclude.AddRange(exclude);
-  FFlatten := flatten;
-  FIgnore := ignore;
 end;
 
 function TSpecSourceEntry.GetExclude : IList<string>;
 begin
   result := FExclude;
-end;
-
-function TSpecSourceEntry.GetFlatten : Boolean;
-begin
-  result := FFlatten;
-end;
-
-function TSpecSourceEntry.GetIgnore : boolean;
-begin
-  result := FIgnore;
 end;
 
 function TSpecSourceEntry.GetSource : string;
@@ -139,9 +122,6 @@ begin
     Logger.Error('Required attribute [src] is missing');
   end;
   FDestination := jsonObject.S['dest'];
-
-  FFlatten := jsonObject.B['flatten'];
-  FIgnore := jsonObject.B['ignore'];
 
   if jsonObject.Contains('exclude') then
   begin
@@ -170,9 +150,6 @@ begin
     Logger.Error('Required attribute [src] is missing');
   end;
   FDestination := yamlObject.S['dest'];
-
-  FFlatten := yamlObject.B['flatten'];
-  FIgnore := yamlObject.B['ignore'];
 
   if yamlObject.Contains('exclude') then
   begin
@@ -203,10 +180,6 @@ begin
     json.S['src'] := FSource;
     if FDestination <> '' then
       json.S['dest'] := FDestination;
-    if FFlatten then
-      json.B['flatten'] := FFlatten;
-    if FIgnore then
-      json.B['ignore'] := FIgnore;
 
     if FExclude.Count > 0 then
     begin
@@ -235,10 +208,6 @@ begin
   FDestination := value;
 end;
 
-procedure TSpecSourceEntry.SetFlatten(value: Boolean);
-begin
-  FFlatten := value;
-end;
 
 end.
 
