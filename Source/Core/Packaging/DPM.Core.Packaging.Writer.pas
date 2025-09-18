@@ -57,8 +57,8 @@ type
 
   protected
 
-    procedure ProcessPattern(const basePath, dest : string; const pattern : IFileSystemPattern; const flatten : boolean; const excludePatterns : IList<string> ; const ignore : boolean; var fileCount : integer);
-    procedure ProcessEntry(const basePath : string; const antPattern : IAntPattern; const source, dest : string; const flatten : boolean; const exclude : IList<string> ; const ignore : boolean);
+    procedure ProcessPattern(const basePath, dest : string; const pattern : IFileSystemPattern; const excludePatterns : IList<string> ; var fileCount : integer);
+    procedure ProcessEntry(const basePath : string; const antPattern : IAntPattern; const source, dest : string; const exclude : IList<string>);
 
 
 
@@ -86,6 +86,7 @@ implementation
 
 uses
   System.SysUtils,
+  System.StrUtils,
   System.Types,
   System.IOUtils,
   System.Masks,
@@ -122,7 +123,7 @@ begin
     result := Copy(value, 1, i - 1);
 end;
 
-procedure TPackageWriter.ProcessPattern(const basePath : string; const dest : string; const pattern : IFileSystemPattern; const flatten : boolean; const excludePatterns : IList<string> ; const ignore : boolean; var fileCount : integer);
+procedure TPackageWriter.ProcessPattern(const basePath : string; const dest : string; const pattern : IFileSystemPattern; const excludePatterns : IList<string>; var fileCount : integer);
 var
   files : TStringDynArray;
   f : string;
@@ -147,9 +148,6 @@ var
 begin
 
   if not TDirectory.Exists(pattern.Directory) then
-    if ignore then
-      exit
-    else
       raise Exception.Create('Directory not found : ' + pattern.Directory);
   f := TPath.Combine(pattern.Directory, pattern.FileMask); //TODO : What whas this meant to do???
   files := TDirectory.GetFiles(pattern.Directory, pattern.FileMask, TSearchOption.soTopDirectoryOnly);
@@ -161,11 +159,7 @@ begin
     if not TFile.Exists(f) then
       raise Exception.Create('File not found : ' + f);
 
-
-    if flatten then
-      archivePath := dest + '\' + ExtractFileName(f)
-    else
-      archivePath := dest + '\' + TPathUtils.StripBase(basePath, f);
+    archivePath := dest + '\' + TPathUtils.StripBase(basePath, f);
     if TStringUtils.StartsWith(archivePath, '\') then
       Delete(archivePath, 1, 1);
     Inc(fileCount);
@@ -195,7 +189,8 @@ begin
 
       spec.MetaData.Id := regEx.Replace(spec.MetaData.Id, evaluator);
       spec.MetaData.Description := regEx.Replace(spec.MetaData.Description, evaluator);
-      spec.MetaData.Authors := regEx.Replace(spec.MetaData.Authors, evaluator);
+      for i := 0 to spec.MetaData.Authors.Count -1 do
+        spec.MetaData.Authors[i] := regEx.Replace(spec.MetaData.Authors[i], evaluator);
       if spec.MetaData.ProjectUrl <> '' then
         spec.MetaData.ProjectUrl := regEx.Replace(spec.MetaData.ProjectUrl, evaluator);
       if spec.MetaData.RepositoryUrl <> '' then
@@ -346,7 +341,7 @@ begin
 
 end;
 
-procedure TPackageWriter.ProcessEntry(const basePath : string; const antPattern : IAntPattern; const source, dest : string; const flatten : boolean; const exclude : IList<string> ; const ignore : boolean);
+procedure TPackageWriter.ProcessEntry(const basePath : string; const antPattern : IAntPattern; const source, dest : string; const exclude : IList<string>);
 var
   fsPatterns : TArray<IFileSystemPattern>;
   fsPattern : IFileSystemPattern;
@@ -374,9 +369,9 @@ begin
   fsPatterns := antPattern.Expand(source);
   fileCount := 0;
   for fsPattern in fsPatterns do
-    ProcessPattern(searchBasePath, actualDest, fsPattern, flatten, exclude, ignore, fileCount);
+    ProcessPattern(searchBasePath, actualDest, fsPattern, exclude, fileCount);
 
-  if (not ignore) and (fileCount = 0) then
+  if fileCount = 0 then
     FLogger.Warning('No files were found for pattern [' + source + ']');
 end;
 
@@ -389,8 +384,10 @@ var
   packageFileName : string;
   sStream : TStringStream;
   platforms: TDPMPlatforms;
+  antPattern : IAntPattern;
 
-
+  template : ISpecTemplate;
+  sourceEntry : ISpecSourceEntry;
 
 begin
   result := false;
@@ -401,6 +398,13 @@ begin
   //the passed in targetPlatform is a clone with a single compilerVersion set.
   reducedSpec.TargetPlatforms.Clear;
   reducedSpec.TargetPlatforms.Add(targetPlatform);
+
+  template := reducedSpec.FindTemplate(targetPlatform.TemplateName);
+  if template = nil then
+  begin
+    FLogger.Error('Could not find Template : ' + targetPlatform.TemplateName);
+    exit;
+  end;
 
   ReplaceTokens(version, reducedSpec, targetPlatform, properties);
 
@@ -427,12 +431,14 @@ begin
     sStream := TStringStream.Create(sManifest, TEncoding.UTF8);
     try
       FArchiveWriter.WriteMetaDataFile(sStream);
-
-      //Process Source here
-
     finally
       sStream.Free;
     end;
+
+    antPattern := TAntPattern.Create(basePath);
+
+    for sourceEntry in template.SourceEntries do
+      ProcessEntry(basePath,antPattern, sourceEntry.Source, sourceEntry.Destination, sourceEntry.Exclude);
 
     result := true;
   finally
@@ -461,7 +467,7 @@ begin
   options.SpecFile := TPath.GetFullPath(options.SpecFile);
   if not FileExists(options.SpecFile) then
     raise EArgumentException.Create('Spec file : ' + options.SpecFile + ' - does not exist!');
-  if ExtractFileExt(options.SpecFile) <> cPackageSpecExt then
+  if not EndsText(cPackageSpecExt, options.SpecFile) then
     raise EArgumentException.Create('Spec file : ' + options.SpecFile + ' - is likely not a spec file, incorrect extension, should be [' + cPackageSpecExt + ']');
 
   //output and base path default to current folder if not set

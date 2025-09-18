@@ -194,20 +194,7 @@ var
   iValue : integer;
   sValue : string;
 begin
-  sValue := value;
-  if not TStringUtils.StartsWith(sValue, 'RS') then
-    sValue := 'RS' + sValue;
-  sValue := StringReplace(sValue, '.', '_', [rfReplaceAll]);
-
-  //we changed it to include the _0 - some packages might not have that.
-//  if sValue = 'RS11' then
-//    sValue := 'RS11_0';
-
-  if not TStringUtils.Contains(sValue,'XE') then
-    if not TStringUtils.Contains(sValue, '_') then
-      sValue := sValue + '_0';
-
-
+  sValue := StringReplace(value, '.', '_', [rfReplaceAll]);
 
   iValue := GetEnumValue(typeInfo(TCompilerVersion), sValue);
 

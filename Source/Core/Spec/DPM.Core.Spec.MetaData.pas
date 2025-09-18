@@ -59,7 +59,7 @@ type
     FVersion : TPackageVersion;
     FVersions : IList<ISpecVersion>;
     FDescription : string;
-    FAuthors : string;
+    FAuthors : IList<string>;
     FProjectUrl : string;
     FRepositoryUrl : string;
     FRepositoryType : string;
@@ -79,7 +79,7 @@ type
     function GetVersion : TPackageVersion;
     function GetId : string;
     function GetDescription : string;
-    function GetAuthors : string;
+    function GetAuthors : IList<string>;
     function GetProjectUrl : string;
     function GetRepositoryUrl : string;
     function GetRepositoryType : string;
@@ -99,7 +99,6 @@ type
     procedure SetPackageKind(const value : TDPMPackageKind);
     procedure SetId(const value : string);
     procedure SetDescription(const value : string);
-    procedure SetAuthors(const value : string);
     procedure SetProjectUrl(const value : string);
     procedure SetRepositoryUrl(const value : string);
     procedure SetRepositoryType(const value : string);
@@ -153,6 +152,7 @@ begin
   FFrameworks := [];
   FRepositoryCommit := '#HASH#'; //git replacment.
   FTags := TStringList.Create;
+  FAuthors := TCollections.CreateList<string>;
 end;
 
 
@@ -189,6 +189,7 @@ begin
 
   FTags := TStringList.Create;
   FTags.Assign(source.Tags);
+  FAuthors := TCollections.CreateList<string>;
   FIsTrial := source.IsTrial;
   FIsCommercial := source.IsCommercial;
   FReadme := source.ReadMe;
@@ -201,7 +202,7 @@ begin
   inherited;
 end;
 
-function TSpecMetaData.GetAuthors : string;
+function TSpecMetaData.GetAuthors : IList<string>;
 begin
   result := FAuthors;
 end;
@@ -348,13 +349,13 @@ begin
     result := false;
   end;
 
-  FAuthors := jsonObject.S['authors'];
-  if FAuthors = '' then
-  begin
-    logger.Error('Required field [authors] not found.');
-    result := false;
-  end;
-
+//  FAuthors := jsonObject.S['authors'];
+//  if FAuthors = '' then
+//  begin
+//    logger.Error('Required field [authors] not found.');
+//    result := false;
+//  end;
+//
   FProjectUrl := jsonObject.S['projectUrl'];
   FRepositoryUrl := jsonObject.S['repositoryUrl'];
   FRepositoryType := jsonObject.S['repositoryType'];
@@ -384,6 +385,7 @@ var
   sVersion : string;
   sError : string;
   sUI : string;
+  authorsSeq : IYAMLSequence;
   versionsSeq : IYAMLSequence;
   tagsSeq : IYAMLSequence;
   sCommit : string;
@@ -483,12 +485,15 @@ begin
     result := false;
   end;
 
-  FAuthors := yamlObject.S['authors'];
-  if FAuthors = '' then
+  authorsSeq := yamlObject.A['authors'];
+  if authorsSeq.Count = 0 then
   begin
     logger.Error('Required field [authors] not found.');
     result := false;
   end;
+
+  for i := 0 to authorsSeq.Count -1 do
+    FAuthors.Add(authorsSeq.S[i]);
 
   FProjectUrl := yamlObject.S['projectUrl'];
   FRepositoryUrl := yamlObject.S['repositoryUrl'];
@@ -532,10 +537,6 @@ begin
 
 end;
 
-procedure TSpecMetaData.SetAuthors(const value : string);
-begin
-  FAuthors := value;
-end;
 
 procedure TSpecMetaData.SetCopyright(const value : string);
 begin
@@ -639,7 +640,7 @@ begin
     json.S['description'] := FDescription;
     if Length(FIcon) > 0 then
       json.S['icon'] := FIcon;
-    json.S['authors'] := FAuthors;
+//    json.S['authors'] := FAuthors;
     json.S['projectUrl'] := FProjectUrl;
     json.S['repositoryUrl'] := FRepositoryUrl;
     json.S['repositoryCommit'] := FRepositoryCommit;
@@ -672,6 +673,7 @@ var
   versions : IYAMLSequence;
   version : IYAMLMapping;
   tagsSeq : IYAMLSequence;
+  authorsSeq : IYAMLSequence;
   i: Integer;
 begin
   metaData := parentObj.AsMapping.O['metdata'];
@@ -704,7 +706,11 @@ begin
   metaData.S['description'] := FDescription;
   if Length(FIcon) > 0 then
     metaData.S['icon'] := FIcon;
-  metaData.S['authors'] := FAuthors;
+
+  authorsSeq := metaData.A['authors'];
+  for i := 0 to FAuthors.Count -1 do
+    authorsSeq.AddValue(FAuthors[i]);
+
   if FProjectUrl <> '' then
     metaData.S['projectUrl'] := FProjectUrl;
   if FRepositoryCommit <> '' then

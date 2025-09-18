@@ -89,7 +89,7 @@ type
     function GetId : string;
     function GetVersion : TPackageVersion;
     function GetDescription : string;
-    function GetAuthors : string;
+    function GetAuthors : IList<string>;
     function GetProjectUrl : string;
     function GetRepositoryUrl : string;
     function GetRepositoryType : string;
@@ -110,7 +110,6 @@ type
     procedure SetVersion(const value : TPackageVersion);
     procedure SetId(const value : string);
     procedure SetDescription(const value : string);
-    procedure SetAuthors(const value : string);
     procedure SetProjectUrl(const value : string);
     procedure SetRepositoryUrl(const value : string);
     procedure SetRepositoryType(const value : string);
@@ -134,7 +133,7 @@ type
     property Version : TPackageVersion read GetVersion write SetVersion;
     property Versions : IList<ISpecVersion> read GetVersions;
     property Description : string read GetDescription write SetDescription;
-    property Authors : string read GetAuthors write SetAuthors;
+    property Authors : IList<string> read GetAuthors;
     property ProjectUrl       : string read GetProjectUrl write SetProjectUrl;
     property RepositoryUrl    : string read GetRepositoryUrl write SetRepositoryUrl;
     property RepositoryType   : string read GetRepositoryType write SetRepositoryType;

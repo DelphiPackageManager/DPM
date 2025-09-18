@@ -392,7 +392,7 @@ begin
   inherited Create(sourceName, manifest, '','');
   FSearchPaths := TCollections.CreateList<string>;
   FTags := TStringList.Create;
-  FAuthors := manifest.MetaData.Authors;
+  //FAuthors.Add := manifest.MetaData.Authors;
   FCopyright := manifest.MetaData.Copyright;
   FDescription := manifest.MetaData.Description;
   FIcon := manifest.MetaData.Icon;

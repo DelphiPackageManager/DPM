@@ -33,8 +33,8 @@ const
   cLockFileVersion = '0.0.1';
   cLockFileExt = '.dpmlock';
   cPackageFileExt = '.dpkg';
-  cPackageSpecExt = '.dspec';
-  cPackageManifestExt = '.manifest';
+  cPackageSpecExt = '.dspec.yaml';
+  cPackageManifestExt = '.manifest.yaml';
   cPackageHashAlgorithm = 'sha256';
   cPackageHashAlgorithmExt = '.' + cPackageHashAlgorithm;
 

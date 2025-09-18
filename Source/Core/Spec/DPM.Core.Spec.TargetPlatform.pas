@@ -411,7 +411,6 @@ begin
     end;
   end;
 
-  result := inherited LoadFromYAML(yamlObject) and result;
 end;
 
 function TSpecTargetPlatform.PlatformContains(const platformName: string): Boolean;
