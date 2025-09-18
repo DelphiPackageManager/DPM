@@ -5,6 +5,8 @@
 # to native line endings on checkout.
 *.pas text
 *.dfm text
+*.rc text
+*.dpk text
 
 # Declare files that will always have CRLF line endings on checkout.
 

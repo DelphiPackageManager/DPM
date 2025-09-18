@@ -6,8 +6,7 @@ uses
   System.JSON,
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
-  DPM.Core.Spec.Reader,
-  DPM.Core.Spec.Writer
+  DPM.Core.Spec.Reader
   ;
 
 
@@ -189,14 +188,18 @@ begin
 end;
 
 procedure TDSpecFile.SaveToFile(const filename: string);
-var
-  writer : IPackageSpecWriter;
+//var
+//  writer : IPackageSpecWriter;
 begin
-  writer := TPackageSpecWriter.Create(FLogger, FPackageSpec);
-  writer.SaveToFile(filename);
-  FFilename := Filename;
-  //TODO : This is terrible - find a better way to handle modified
-  FLoadedSpec := FReader.ReadSpec(filename);
+  raise ENotImplemented.Create('Error Message');
+
+  //this is the only place the writer is used - will just use the spec class
+
+//  writer := TPackageSpecWriter.Create(FLogger, FPackageSpec);
+//  writer.SaveToFile(filename);
+//  FFilename := Filename;
+//  //TODO : This is terrible - find a better way to handle modified
+//  FLoadedSpec := FReader.ReadSpec(filename);
 end;
 
 function TDSpecFile.WorkingDir: string;

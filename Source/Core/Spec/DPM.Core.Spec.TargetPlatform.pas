@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -59,7 +59,7 @@ type
     FMaxCompilerVersion : TCompilerVersion;
 
 
-    FVariables : TStringList;
+    FVariables : IOrderedDictionary<string,string>;
   protected
 
     function GetPlatforms : TArray<TDPMPlatform>;
@@ -78,18 +78,22 @@ type
     procedure SetMaxCompiler(value : TCompilerVersion);
 
 
-    function GetVariables : TStrings;
+    function GetVariables : IVariables;
 
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
     function CloneForCompilerVersion(const compilerVersion : TCompilerVersion) : ISpecTargetPlatform;
-    function CloneForPlatform(const platform : TDPMPlatform) : ISpecTargetPlatform;
     function ToJSON: string; override;
     procedure ToYAML(const parent : IYAMLValue; const packageKind : TDPMPackageKind);override;
+
+    function Clone : ISpecTargetPlatform;
+    constructor CreateClone(const logger : ILogger; const source : ISpecTargetPlatform);
+    function AsObject : TSpecTargetPlatform;
+    function IsForCompiler(compilerVersion : TCompilerVersion) : boolean;
+
   public
     constructor Create(const logger : ILogger); override;
-    constructor CreateReducedClone(const logger : ILogger; const targetPlatform : ISpecTargetPlatform; const platform : TDPMPlatform; const variables : TStrings);
     destructor Destroy;override;
     function ToString : string;override;
     function PlatformContains(const platformName:string): Boolean;
@@ -109,11 +113,16 @@ uses
 
 { TSpecTargetPlatform }
 
-function TSpecTargetPlatform.CloneForPlatform(const platform : TDPMPlatform) : ISpecTargetPlatform;
+
+function TSpecTargetPlatform.AsObject: TSpecTargetPlatform;
 begin
-  raise ENotImplemented.Create('Error Message');
+  result := Self;
 end;
 
+function TSpecTargetPlatform.Clone: ISpecTargetPlatform;
+begin
+  result := TSpecTargetPlatform.CreateClone(logger, self);
+end;
 
 function TSpecTargetPlatform.CloneForCompilerVersion(const compilerVersion : TCompilerVersion) : ISpecTargetPlatform;
 begin
@@ -130,86 +139,28 @@ begin
   FMinCompilerVersion := TCompilerVersion.UnknownVersion;
   FMaxCompilerVersion := TCompilerVersion.UnknownVersion;
 
-
-
   FTemplateName := cUnset;
-  FVariables := TStringList.Create;
-  FTemplateName := 'default';
+  FVariables := TCollections.CreateDictionary<string,string>;
 end;
 
 
-constructor TSpecTargetPlatform.CreateReducedClone(const logger : ILogger; const targetPlatform : ISpecTargetPlatform; const platform : TDPMPlatform; const variables : TStrings);
-//var
-//  deps : IList<ISpecDependency>;
-//  dep, newDep : ISpecDependency;
-//  designFiles, runtimeFiles : IList<ISpecBPLEntry>;
-//  bpl, newBpl : ISpecBPLEntry;
-//  sourceFiles, libFiles, otherFiles : IList<ISpecFileEntry>;
-//  fileEntry, newFileEntry : ISpecFileEntry;
-//  searchPaths : IList<ISpecSearchPath>;
-//  path, newPath : ISpecSearchPath;
+constructor TSpecTargetPlatform.CreateClone(const logger : ILogger; const source : ISpecTargetPlatform);
 begin
-//  deps := TCollections.CreateList<ISpecDependency>;
-//  for dep in targetPlatform.Dependencies do
-//  begin
-//    newDep := dep.Clone;
-//    deps.Add(newDep);
-//  end;
-//
-//  designFiles := TCollections.CreateList<ISpecBPLEntry>;
-//  for bpl in targetPlatform.DesignFiles do
-//  begin
-//    newBpl := bpl.Clone;
-//    designFiles.Add(newBpl)
-//  end;
-//
-//  runtimeFiles := TCollections.CreateList<ISpecBPLEntry>;
-//  for bpl in targetPlatform.RuntimeFiles do
-//  begin
-//    newBpl := bpl.Clone;
-//    runtimeFiles.Add(newBpl)
-//  end;
-//
-//  sourceFiles := TCollections.CreateList<ISpecFileEntry>;
-//  for fileEntry in targetPlatform.SourceFiles do
-//  begin
-//    newFileEntry := fileEntry.Clone;
-//    sourceFiles.Add(newFileEntry)
-//  end;
-//
-//  libFiles := TCollections.CreateList<ISpecFileEntry>;
-//  for fileEntry in targetPlatform.LibFiles do
-//  begin
-//    newFileEntry := fileEntry.Clone;
-//    libFiles.Add(newFileEntry)
-//  end;
-//
-//  otherFiles := TCollections.CreateList<ISpecFileEntry>;
-//  for fileEntry in targetPlatform.Files do
-//  begin
-//    newFileEntry := fileEntry.Clone;
-//    otherFiles.Add(newFileEntry)
-//  end;
-//
-//  searchPaths := TCollections.CreateList<ISpecSearchPath>;
-//  for path in targetPlatform.SearchPaths do
-//  begin
-//    newPath := path.Clone;
-//    searchPaths.Add(newPath);
-//  end;
-//
-//  inherited CreateClone(logger, deps, designFiles, runtimeFiles, sourceFiles, libFiles, otherFiles, searchPaths);
-//
-//  FVariables.Assign(variables);
-//
-//  FTemplateName := targetPlatform.TemplateName;
-//  FCompiler := targetPlatform.Compiler;
-//  FPlatforms := TArray<TDPMPlatform>.Create(platform);
+  inherited Create(logger);
+  FVariables := TCollections.CreateDictionary<string,string>;
+  FTemplateName := source.TemplateName;
+
+  FCompiler := source.Compiler;
+  FMinCompilerVersion := source.MinCompiler;
+  FMaxCompilerVersion := source.MaxCompiler;
+  FCompilers := source.Compilers;
+
+  FVariables.AddRange(source.Variables)
 end;
 
 destructor TSpecTargetPlatform.Destroy;
 begin
-  FVariables.Free;
+
   inherited;
 end;
 
@@ -244,9 +195,27 @@ begin
   result := FTemplateName;
 end;
 
-function TSpecTargetPlatform.GetVariables: TStrings;
+function TSpecTargetPlatform.GetVariables: IVariables;
 begin
   result := FVariables;
+end;
+
+function TSpecTargetPlatform.IsForCompiler(compilerVersion: TCompilerVersion): boolean;
+var
+  c : TCompilerVersion;
+begin
+  result := true;
+  if FCompiler = compilerVersion then
+    exit;
+  if (FMinCompilerVersion >= compilerVersion) and (FMaxCompilerVersion <= compilerVersion) then
+    exit;
+
+  for c in FCompilers do
+  begin
+     if c = compilerVersion then
+      exit; 
+  end;
+  result := false;
 end;
 
 function TSpecTargetPlatform.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
@@ -324,7 +293,7 @@ begin
   if variablesObj <> nil then
   begin
     for i := 0 to variablesObj.Count -1 do
-      FVariables.Add(variablesObj.Names[i] + '=' + variablesObj.Values[variablesObj.Names[i]].Value );
+      FVariables[LowerCase(variablesObj.Names[i])] := variablesObj.Values[variablesObj.Names[i]].Value;
     variablesObj.Free;
   end;
   result := inherited LoadFromJson(jsonObject) and result;
@@ -345,6 +314,7 @@ var
   platformsSeq : IYAMLSequence;
 begin
   result := true;
+  LoadComments(yamlObject);
   FCompilers := [];
   //order - compiler, from to, compilers
   sCompiler := yamlObject.S['compiler'];
@@ -437,8 +407,7 @@ begin
     if variablesObj <> nil then
     begin
       for i := 0 to variablesObj.Count -1 do
-        //TODO : update vsoftyaml to make accessing values by index easier
-        FVariables.Add(variablesObj.Keys[i] + '=' + variablesObj.Items[variablesObj.Keys[i]].AsString);
+        FVariables[LowerCase(variablesObj.Keys[i])] := variablesObj.Items[variablesObj.Keys[i]].AsString;
     end;
   end;
 
@@ -499,7 +468,7 @@ begin
   try
     json.S['compiler'] := CompilerToString(FCompiler);
     platformList := '';
-    for i := 0 to High(FPlatforms) do
+    for i := Low(FPlatforms) to High(FPlatforms) do
     begin
       if platformList = '' then
         platformList := DPMPlatformToString(FPlatforms[i])
@@ -513,7 +482,7 @@ begin
       jsonVariables := TJSONObject.Create;
       for j := 0 to FVariables.Count - 1 do
       begin
-        jsonVariables.S[FVariables.Names[j]] := FVariables.ValueFromIndex[j];
+        jsonVariables.S[FVariables.Items[j].Key] := FVariables.Items[j].Value;
       end;
       json.O['variables'] := jsonVariables;
     end;
@@ -535,7 +504,6 @@ var
   platforms : IYAMLSequence;
   sPlatform : string;
   i: Integer;
-  j: Integer;
 begin
   mapping := parent.AsSequence.AddMapping;
   mapping.S['compiler'] := CompilerToString(FCompiler);
@@ -553,8 +521,8 @@ begin
   if FVariables.Count > 0 then
   begin
     variables := mapping.O['variables'];
-    for j := 0 to FVariables.Count - 1 do
-      variables.S[FVariables.Names[j]] := FVariables.ValueFromIndex[j];
+    for i := 0 to FVariables.Count - 1 do
+      variables.S[FVariables.Items[i].Key] := FVariables.ITems[i].Value;
   end;
 end;
 

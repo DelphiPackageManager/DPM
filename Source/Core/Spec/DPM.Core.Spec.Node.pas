@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -51,7 +51,8 @@ type
     function HasComments : boolean;
     procedure SetComments(const value : TStrings);
 
-    procedure AddComments(const yamlObject : IYAMLValue);
+    //takes any comments available on the yamlobject
+    procedure LoadComments(const yamlObject : IYAMLValue);
 
     function LoadFromJson(const jsonObject : TJsonObject) : boolean; virtual; abstract;
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;virtual;abstract;
@@ -80,7 +81,7 @@ uses
 
 { TSpecNode }
 
-procedure TSpecNode.AddComments(const yamlObject: IYAMLValue);
+procedure TSpecNode.LoadComments(const yamlObject: IYAMLValue);
 var
   collection : IYAMLCollection;
 begin

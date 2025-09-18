@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -71,7 +71,6 @@ end;
 
 function TPackCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 var
-  mcVer : TSemanticVersion;
   packVer : TPackageVersion;
   error : string;
 begin
@@ -90,24 +89,6 @@ begin
   begin
     Logger.Error('No Spec file provided!');
     Exit(TExitCode.MissingArg);
-  end;
-
-
-  //does it really make sense to allow this to be overriden from the command line?
-  if TPackOptions.Default.MinClientVersion <> cDPMClientVersion then
-  begin
-    if not TSemanticVersion.TryParseWithError(TPackOptions.Default.MinClientVersion,mcVer,error ) then
-    begin
-      Logger.Error('MinClientVersion : ' + error);
-      Exit(TExitCode.InvalidArguments);
-    end;
-//    defVer := TSemanticVersion.Parse(cDPMClientVersion);
-//    if mcVer > defVer then
-//    begin
-//      Logger.Error('MinClientVersion must be at less than or equal to : ' + defVer.ToString);
-//      Exit(TExitCode.InvalidArguments);
-//
-//    end;
   end;
 
 

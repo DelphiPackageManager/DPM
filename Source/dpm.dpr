@@ -135,7 +135,6 @@ uses
   DPM.Core.Spec in 'Core\Spec\DPM.Core.Spec.pas',
   DPM.Core.Spec.Reader in 'Core\Spec\DPM.Core.Spec.Reader.pas',
   DPM.Core.Spec.TargetPlatform in 'Core\Spec\DPM.Core.Spec.TargetPlatform.pas',
-  DPM.Core.Spec.Writer in 'Core\Spec\DPM.Core.Spec.Writer.pas',
   DPM.Core.Utils.Config in 'Core\Utils\DPM.Core.Utils.Config.pas',
   DPM.Core.Utils.Directory in 'Core\Utils\DPM.Core.Utils.Directory.pas',
   DPM.Core.Utils.Enum in 'Core\Utils\DPM.Core.Utils.Enum.pas',

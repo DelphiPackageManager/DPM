@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -29,6 +29,7 @@ unit DPM.Core.Spec.Template;
 interface
 
 uses
+  System.Classes,
   Spring.Collections,
   JsonDataObjects,
   VSoft.YAML,
@@ -46,6 +47,12 @@ type
     FSourceFiles : IList<ISpecSourceEntry>;
     FBuildEntries : IList<ISpecBuildEntry>;
     FDesignFiles : IList<ISpecDesignEntry>;
+
+    FSourceComments : TStringList;
+    FDependenciesComments : TStringList;
+    FBuildComments : TStringList;
+    FDesignComments : TStringList;
+    FPackageDefComments : TStringList;
   protected
     function IsTemplate : boolean; virtual;
     function GetDependencies : IList<ISpecDependency>;
@@ -54,6 +61,13 @@ type
     function GetBuildEntries : IList<ISpecBuildEntry>;
     function GetName : string;
     procedure SetName(const templateName: string);
+
+    function GetSourceComments : TStrings;
+    function GetDependenciesComments : TStrings;
+    function GetBuildComments : TStrings;
+    function GetDesignComments : TStrings;
+    function GetPackageDefComments : TStrings;
+
 
     function NewDependency(const id : string) : ISpecDependency;
     function NewSource(const src: string): ISpecSourceEntry;
@@ -92,8 +106,7 @@ type
 
     function Clone : ISpecTemplate;
 
-    constructor CreateClone(const logger : ILogger; const deps : IList<ISpecDependency>; const build : IList<ISpecBuildEntry>;
-      const design : IList<ISpecDesignEntry>;   const source : IList<ISpecSourceEntry>);
+    constructor CreateClone(const logger : ILogger; const source : ISpecTemplate);
 
     property SourceEntries : IList<ISpecSourceEntry>read GetSourceFiles;
     property DesignFiles : IList<ISpecDesignEntry> read GetDesignFiles;
@@ -121,7 +134,7 @@ uses
 
 function TSpecTemplate.Clone: ISpecTemplate;
 begin
-  result := TSpecTemplate.CreateClone(Logger,Self.Dependencies, Self.BuildEntries, Self.DesignFiles,Self.SourceEntries);
+  result := TSpecTemplate.CreateClone(Logger, Self);
 end;
 
 constructor TSpecTemplate.Create(const logger : ILogger);
@@ -133,14 +146,41 @@ begin
   FDesignFiles := TCollections.CreateList<ISpecDesignEntry>;
 end;
 
-constructor TSpecTemplate.CreateClone(const logger : ILogger; const deps : IList<ISpecDependency>; const build : IList<ISpecBuildEntry>;
-      const design : IList<ISpecDesignEntry>;   const source : IList<ISpecSourceEntry>);
+constructor TSpecTemplate.CreateClone(const logger : ILogger; const source : ISpecTemplate);
+var
+  newDependency : ISpecDependency;
+  newSourceEntry : ISpecSourceEntry;
+  newBuildEntry : ISpecBuildEntry;
+  newDesignEntry : ISpecDesignEntry;
+  i : integer;
 begin
   Create(logger);
-  FDependencies.AddRange(deps);
-  FSourceFiles.AddRange(source);
-  FDesignFiles.AddRange(design);
+  for i := 0 to source.Dependencies.Count -1 do
+  begin
+    newDependency := source.Dependencies[i].Clone;
+    FDependencies.Add(newDependency);
+  end;
 
+  for i := 0 to source.SourceEntries.Count -1 do
+  begin
+    newSourceEntry := source.SourceEntries[i].Clone;
+    FSourceFiles.Add(newSourceEntry);
+  end;
+
+  for i := 0 to source.BuildEntries.Count -1 do
+  begin
+    newBuildEntry := source.BuildEntries[i].Clone;
+    FBuildEntries.Add(newBuildEntry);
+  end;
+
+  for i := 0 to source.DesignEntries.Count -1 do
+  begin
+    newDesignEntry := source.DesignEntries[i].Clone;
+    FDesignFiles.Add(newDesignEntry);
+  end;
+
+
+  //TODO : Add packagedef cloning here!
 end;
 
 procedure TSpecTemplate.DeleteBuildEntry(const project: string);
@@ -315,6 +355,13 @@ begin
     end);
 end;
 
+function TSpecTemplate.GetBuildComments: TStrings;
+begin
+  if FBuildComments = nil then
+    FBuildComments := TStringList.Create;
+  result := FBuildComments;
+end;
+
 function TSpecTemplate.GetBuildEntries : IList<ISpecBuildEntry>;
 begin
   result := FBuildEntries;
@@ -325,6 +372,21 @@ begin
   result := FDependencies;
 end;
 
+
+function TSpecTemplate.GetDependenciesComments: TStrings;
+begin
+  if FDependenciesComments = nil then
+    FDependenciesComments := TStringList.Create;
+  result := FDependenciesComments;
+end;
+
+function TSpecTemplate.GetDesignComments: TStrings;
+begin
+  if FDesignComments = nil then
+    FDesignComments := TStringList.Create;
+  result := FDesignComments;
+end;
+
 function TSpecTemplate.GetDesignFiles : IList<ISpecDesignEntry>;
 begin
   result := FDesignFiles;
@@ -333,6 +395,21 @@ end;
 function TSpecTemplate.GetName: string;
 begin
   result := FName;
+end;
+
+
+function TSpecTemplate.GetPackageDefComments: TStrings;
+begin
+  if FPackageDefComments = nil then
+    FPackageDefComments := TStringList.Create;
+  result := FPackageDefComments;
+end;
+
+function TSpecTemplate.GetSourceComments: TStrings;
+begin
+  if FSourceComments = nil then
+    FSourceComments := TStringList.Create;
+  result := FSourceComments;
 end;
 
 function TSpecTemplate.GetSourceFiles : IList<ISpecSourceEntry>;
@@ -518,6 +595,8 @@ var
   collectionObj : IYAMLSequence;
 begin
   result := true;
+  LoadComments(yamlObject);
+
   FName := yamlObject.S['name'];
   Logger.Debug('[template] name : ' + FName);
 

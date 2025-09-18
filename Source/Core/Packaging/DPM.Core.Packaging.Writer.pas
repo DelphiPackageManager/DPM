@@ -30,6 +30,8 @@ unit DPM.Core.Packaging.Writer;
 interface
 
 uses
+  System.Classes,
+  System.RegularExpressions,
   Spring.Container,
   Spring.Collections,
   VSoft.AntPatterns,
@@ -42,19 +44,34 @@ uses
   DPM.Core.Packaging.Archive;
 
 /// This only processes specs for the Pack command. For git style packages we will need to do something else.
-
 type
   TPackageWriter = class(TInterfacedObject, IPackageWriter)
   private
     FLogger : ILogger;
     FArchiveWriter : IPackageArchiveWriter;
     FSpecReader : IPackageSpecReader;
-    procedure ProcessPattern(const basePath, dest : string; const pattern : IFileSystemPattern; const flatten : boolean; const excludePatterns : IList<string> ; const ignore : boolean; var fileCount : integer);
+
+    FCurrentTokens : TStringList;
+
+    FVariables : IVariables;
+
   protected
 
-    function WritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion; const basePath : string) : boolean;
+    procedure ProcessPattern(const basePath, dest : string; const pattern : IFileSystemPattern; const flatten : boolean; const excludePatterns : IList<string> ; const ignore : boolean; var fileCount : integer);
+    procedure ProcessEntry(const basePath : string; const antPattern : IAntPattern; const source, dest : string; const flatten : boolean; const exclude : IList<string> ; const ignore : boolean);
 
-    //Generate zip file and xml metadata file.
+
+    procedure GetTokensForTargetPlatform(const spec : IPackageSpec; const targetPlatform : ISpecTargetPlatform; const version : TPackageVersion; const list : TStringList; const externalProps : TStringList);
+    function ReplaceTokens(const version: TPackageVersion; const spec : IPackageSpec; const targetPlatform : ISpecTargetPlatform; const properties: TStringList) : boolean;
+    function TokenMatchEvaluator(const match : TMatch) : string;
+
+
+
+    /// <summary>
+    /// Writes a Package per compiler version.
+    /// </summary>
+    function InternalWritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion; const basePath : string) : boolean;
+
     function WritePackageFromSpec(const cancellationToken : ICancellationToken; const options : TPackOptions) : boolean;
   public
     constructor Create(const logger : ILogger; const archiveWriter : IPackageArchiveWriter; const specReader : IPackageSpecReader);
@@ -68,7 +85,6 @@ uses
   System.SysUtils,
   System.Types,
   System.IOUtils,
-  System.Classes,
   System.Masks,
   DPM.Core.Constants,
   DPM.Core.Spec,
@@ -82,6 +98,7 @@ begin
   FLogger := logger;
   FArchiveWriter := archiveWriter;
   FSpecReader := specReader;
+  FCurrentTokens := nil;
 end;
 
 
@@ -100,6 +117,71 @@ begin
   i := Pos('*', value);
   if i > 0 then
     result := Copy(value, 1, i - 1);
+end;
+
+procedure TPackageWriter.GetTokensForTargetPlatform(const spec: IPackageSpec; const targetPlatform: ISpecTargetPlatform; const version: TPackageVersion; const list, externalProps: TStringList);
+var
+  i: Integer;
+  regEx : TRegEx;
+  evaluator : TMatchEvaluator;
+begin
+  list.Clear;
+  if not version.IsEmpty then
+    list.Add('version=' + version.ToString)
+  else
+    list.Add('version=' +  spec.MetaData.Version.ToString);
+  list.Add('target=' + CompilerToString(targetPlatform.Compiler));
+  list.Add('compiler=' + CompilerToString(targetPlatform.Compiler));
+  list.Add('compilerNoPoint=' + CompilerToStringNoPoint(targetPlatform.Compiler));
+  list.Add('compilerCodeName=' + CompilerCodeName(targetPlatform.Compiler));
+  list.Add('compilerWithCodeName=' + CompilerWithCodeName(targetPlatform.Compiler));
+  //do not replace plaform here - we'll do that during install
+//  list.Add('platform=' + DPMPlatformToString(targetPlatform.Platforms[0]));
+  list.Add('compilerVersion=' + CompilerToCompilerVersionIntStr(targetPlatform.Compiler));
+  list.Add('libSuffix=' + CompilerToLibSuffix(targetPlatform.Compiler));
+  list.Add('bdsVersion=' + CompilerToBDSVersion(targetPlatform.Compiler));
+  list.Add('bitness=' + DPMPlatformBitness(targetPlatform.Platforms[0]));
+  if DPMPlatformBitness(targetPlatform.Platforms[0]) = '64' then
+    list.Add('bitness64Only=' + DPMPlatformBitness(targetPlatform.Platforms[0]))
+  else
+    list.Add('bitness64Only=');
+
+  if targetPlatform.Variables.Count = 0 then
+    exit;
+
+  //override the values with values from the template.
+  for i := 0 to targetPlatform.Variables.Count -1 do
+  begin
+    //setting a value to '' removes it from the list!!!!!
+    list.Values[targetPlatform.Variables.Items[i].Key] := '';
+    list.Add(targetPlatform.Variables.Items[i].Key + '=' + targetPlatform.Variables.Items[i].Value);
+  end;
+
+  //fix up some variable overrides
+  if list.Values['compilerCodeName'] = '' then
+  begin
+    list.Values['compilerWithCodeName'] := '';
+    list.Add('compilerWithCodeName=' + CompilerToString(targetPlatform.Compiler));
+  end;
+
+
+  //apply external props passed in on command line.
+  if externalProps.Count > 0 then
+  begin
+    for i := 0 to externalProps.Count -1 do
+      list.Values[externalProps.Names[i]] := externalProps.ValueFromIndex[i];
+  end;
+
+  regEx := TRegEx.Create('\$(\w+)\$');
+  evaluator := TokenMatchEvaluator;
+
+  //variables from the spec and external may reference existing variables.
+  for i := 0 to list.Count -1 do
+  begin
+    if TStringUtils.Contains(list.ValueFromIndex[i], '$') then
+      list.ValueFromIndex[i] := regEx.Replace(list.ValueFromIndex[i], evaluator);
+  end;
+
 end;
 
 procedure TPackageWriter.ProcessPattern(const basePath : string; const dest : string; const pattern : IFileSystemPattern; const flatten : boolean; const excludePatterns : IList<string> ; const ignore : boolean; var fileCount : integer);
@@ -155,13 +237,52 @@ begin
 end;
 
 
-function TPackageWriter.WritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion; const basePath : string) : boolean;
+function TPackageWriter.ReplaceTokens(const version: TPackageVersion; const spec : IPackageSpec; const targetPlatform : ISpecTargetPlatform; const properties: TStringList): boolean;
 var
-  sManifest : string;
-  packageFileName : string;
-  sStream : TStringStream;
-  antPattern : IAntPattern;
-//  fileEntry : ISpecSourceEntry;
+  pair : TPair<string,string>;
+  evaluator : TMatchEvaluator;
+  regEx : TRegEx;
+
+begin
+  FVariables := TCollections.CreateDictionary<string,string>;
+
+  for pair in spec.Variables do
+    FVariables[LowerCase(pair.Key)] := pair.Value;
+
+  //apply targetPlatform overrides;
+  for pair in targetPlatform.Variables do
+    FVariables[LowerCase(pair.Key)] := pair.Value;
+
+  //we don't want to write out variables into the manifest
+  spec.Variables.Clear;
+  targetPlatform.Variables.Clear;
+
+
+end;
+
+function TPackageWriter.TokenMatchEvaluator(const match: TMatch): string;
+var
+  key : string;
+begin
+  if match.Success and (match.Groups.Count = 2) then
+  begin
+    key := LowerCase(match.Groups.Item[1].Value);
+    if FVariables.ContainsKey(key) then
+      result := FVariables[key]
+    else
+      raise Exception.Create('Unknown token [' + match.Groups.Item[1].Value + ']');
+  end
+  else
+    result := match.Value;
+end;
+
+procedure TPackageWriter.ProcessEntry(const basePath : string; const antPattern : IAntPattern; const source, dest : string; const flatten : boolean; const exclude : IList<string> ; const ignore : boolean);
+var
+  fsPatterns : TArray<IFileSystemPattern>;
+  fsPattern : IFileSystemPattern;
+  searchBasePath : string;
+  fileCount : integer;
+  actualDest : string;
 
   procedure ValidateDestinationPath(const source, dest : string);
   begin
@@ -170,39 +291,55 @@ var
   end;
 
 
-  procedure ProcessEntry(const source, dest : string; const flatten : boolean; const exclude : IList<string> ; const ignore : boolean);
-  var
-    fsPatterns : TArray<IFileSystemPattern>;
-    fsPattern : IFileSystemPattern;
-    searchBasePath : string;
-    fileCount : integer;
-    actualDest : string;
+begin
+  ValidateDestinationPath(source, dest);
+  if dest = '' then
+    actualDest := ExtractFilePath(source)
+  else
+    actualDest := dest;
+  actualDest := ExcludeTrailingPathDelimiter(actualDest);
 
-  begin
-    ValidateDestinationPath(source, dest);
-    if dest = '' then
-      actualDest := ExtractFilePath(source)
-    else
-      actualDest := dest;
-    actualDest := ExcludeTrailingPathDelimiter(actualDest);
+  searchBasePath := TPathUtils.StripWildCard(TPathUtils.CompressRelativePath(basePath, source));
+  searchBasePath := ExtractFilePath(searchBasePath);
+  fsPatterns := antPattern.Expand(source);
+  fileCount := 0;
+  for fsPattern in fsPatterns do
+    ProcessPattern(searchBasePath, actualDest, fsPattern, flatten, exclude, ignore, fileCount);
 
-    searchBasePath := TPathUtils.StripWildCard(TPathUtils.CompressRelativePath(basePath, source));
-    searchBasePath := ExtractFilePath(searchBasePath);
-    fsPatterns := antPattern.Expand(source);
-    fileCount := 0;
-    for fsPattern in fsPatterns do
-      ProcessPattern(searchBasePath, actualDest, fsPattern, flatten, exclude, ignore, fileCount);
+  if (not ignore) and (fileCount = 0) then
+    FLogger.Warning('No files were found for pattern [' + source + ']');
+end;
 
-    if (not ignore) and (fileCount = 0) then
-      FLogger.Warning('No files were found for pattern [' + source + ']');
-  end;
+
+function TPackageWriter.InternalWritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion; const basePath : string) : boolean;
+var
+  reducedSpec : IPackageSpec;
+  actualTargetPlatform : ISpecTargetPlatform;
+
+  sManifest : string;
+  packageFileName : string;
+  sStream : TStringStream;
+  platforms: TDPMPlatforms;
+
 
 
 begin
   result := false;
-  raise ENotImplemented.Create('Needs rewriting');
+
+  //create fresh copy of the spec with a single targetPlatform
+  reducedSpec := spec.Clone;
+
+  //the passed in targetPlatform already has a single compilerVersion set.
+  actualTargetPlatform := targetPlatform.Clone;
+  reducedSpec.TargetPlatforms.Clear;
+  reducedSpec.TargetPlatforms.Add(targetPlatform.Clone);
+
+
+
   sManifest := spec.GenerateManifestJson(version, targetPlatform);
-  packageFileName := spec.MetaData.Id + '-' + CompilerToString(targetPlatform.Compiler) + '-' + DPMPlatformToString(targetPlatform.Platforms[0]) + '-' + version.ToStringNoMeta + cPackageFileExt;
+  platforms := DPMPlatformsArrayToPlatforms(targetPlatform.Platforms);
+
+  packageFileName := spec.MetaData.Id + '-' + CompilerToString(targetPlatform.Compiler) + '-' + DPMPlatformsToBinString(platforms) + '-' + version.ToStringNoMeta + cPackageFileExt;
   packageFileName := IncludeTrailingPathDelimiter(outputFolder) + packageFileName;
   FArchiveWriter.SetBasePath(basePath);
   if not FArchiveWriter.Open(packageFileName) then
@@ -227,10 +364,6 @@ begin
 
 
 
-    antPattern := TAntPattern.Create(basePath);
-
-//    for fileEntry in targetPlatform.SourceEntries do
-//      ProcessEntry(fileEntry.Source, fileEntry.Destination, fileEntry.Flatten, fileEntry.Exclude, false);
 
 
 
@@ -243,7 +376,9 @@ end;
 function TPackageWriter.WritePackageFromSpec(const cancellationToken : ICancellationToken; const options : TPackOptions) : boolean;
 var
   spec : IPackageSpec;
+  compilerVersion : TCompilerVersion;
   targetPlatform : ISpecTargetPlatform;
+  clonedTargetPlatform : ISpecTargetPlatform;
   version : TPackageVersion;
   error : string;
   properties : TStringList;
@@ -308,6 +443,7 @@ begin
     exit;
   end;
 
+  //where is this used?
   properties := TStringList.Create;
   try
     if options.Properties <> '' then
@@ -318,12 +454,6 @@ begin
         if pos('=', prop) > 0 then
           properties.Add(prop);
       end;
-    end;
-
-    if not spec.PreProcess(version, properties) then
-    begin
-      FLogger.Error('Spec is not valid, exiting.');
-      exit;
     end;
 
     FLogger.Information('Spec is valid, writing package files...');
@@ -340,7 +470,10 @@ begin
 
       // TargetPlatforms can specify compiler version 3 ways
       if targetPlatform.Compiler <> TCompilerVersion.UnknownVersion then
-        result := WritePackage(options.OutputFolder, targetPlatform, spec, version, options.BasePath) and result
+      begin
+        clonedTargetPlatform := targetPlatform.Clone;
+        result := InternalWritePackage(options.OutputFolder, clonedTargetPlatform, spec, version, options.BasePath) and result;
+      end
       else if (targetPlatform.MinCompiler <> TCompilerVersion.UnknownVersion ) and (targetPlatform.MinCompiler <> TCompilerVersion.UnknownVersion) then
       begin
         minCompiler := targetPlatform.MinCompiler;
@@ -348,8 +481,9 @@ begin
 
         for currentCompiler := minCompiler to maxCompiler do
         begin
-          targetPlatform.Compiler := currentCompiler;
-          result := WritePackage(options.OutputFolder, targetPlatform, spec, version, options.BasePath) and result;
+          clonedTargetPlatform := targetPlatform.Clone;
+          clonedTargetPlatform.Compiler := currentCompiler;
+          result := InternalWritePackage(options.OutputFolder, targetPlatform, spec, version, options.BasePath) and result;
         end;
       end
       else if Length(targetPlatform.Compilers) > 0 then
@@ -357,8 +491,9 @@ begin
         compilers := targetPlatform.Compilers;
         for currentCompiler in targetPlatform.Compilers do
         begin
+          clonedTargetPlatform := targetPlatform.Clone;
           targetPlatform.Compiler := currentCompiler;
-          result := WritePackage(options.OutputFolder, targetPlatform, spec, version, options.BasePath) and result;          
+          result := InternalWritePackage(options.OutputFolder, targetPlatform, spec, version, options.BasePath) and result;
         end;
       end
       else

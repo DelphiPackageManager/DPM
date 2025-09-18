@@ -12,7 +12,7 @@
         <Projects Include="DSpecCreator\DspecCreator.dproj">
             <Dependencies/>
         </Projects>
-        <Projects Include="DPM.IDE.D120.dproj">
+        <Projects Include="DPM.IDE.D130.dproj">
             <Dependencies/>
         </Projects>
     </ItemGroup>
@@ -50,23 +50,23 @@
     <Target Name="DspecCreator:Make">
         <MSBuild Projects="DSpecCreator\DspecCreator.dproj" Targets="Make"/>
     </Target>
-    <Target Name="DPM_IDE_D120">
-        <MSBuild Projects="DPM.IDE.D120.dproj"/>
+    <Target Name="DPM_IDE_D130">
+        <MSBuild Projects="DPM.IDE.D130.dproj"/>
     </Target>
-    <Target Name="DPM_IDE_D120:Clean">
-        <MSBuild Projects="DPM.IDE.D120.dproj" Targets="Clean"/>
+    <Target Name="DPM_IDE_D130:Clean">
+        <MSBuild Projects="DPM.IDE.D130.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="DPM_IDE_D120:Make">
-        <MSBuild Projects="DPM.IDE.D120.dproj" Targets="Make"/>
+    <Target Name="DPM_IDE_D130:Make">
+        <MSBuild Projects="DPM.IDE.D130.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
-        <CallTarget Targets="DPM_Core_Tests;dpm;DspecCreator;DPM_IDE_D120"/>
+        <CallTarget Targets="DPM_Core_Tests;dpm;DspecCreator;DPM_IDE_D130"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="DPM_Core_Tests:Clean;dpm:Clean;DspecCreator:Clean;DPM_IDE_D120:Clean"/>
+        <CallTarget Targets="DPM_Core_Tests:Clean;dpm:Clean;DspecCreator:Clean;DPM_IDE_D130:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="DPM_Core_Tests:Make;dpm:Make;DspecCreator:Make;DPM_IDE_D120:Make"/>
+        <CallTarget Targets="DPM_Core_Tests:Make;dpm:Make;DspecCreator:Make;DPM_IDE_D130:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

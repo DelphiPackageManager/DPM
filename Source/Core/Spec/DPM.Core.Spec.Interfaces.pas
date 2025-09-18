@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -42,6 +42,8 @@ uses
 
 
 type
+  IVariables = IOrderedDictionary<string,string>;
+
   ISpecNode = interface
     ['{AD47A3ED-591B-4E47-94F2-7EC136182202}']
     function LoadFromJson(const jsonObject : TJsonObject) : boolean;
@@ -102,6 +104,9 @@ type
     function GetIsCommercial : boolean;
     function GetReadMe : string;
     function GetFrameworks : TArray<TDPMUIFrameworkType>;
+    function GetPackageKind : TDPMPackageKind;
+
+    procedure SetPackageKind(const value : TDPMPackageKind);
     procedure SetVersion(const value : TPackageVersion);
     procedure SetId(const value : string);
     procedure SetDescription(const value : string);
@@ -122,7 +127,8 @@ type
     procedure SetFrameworks(const value : TArray<TDPMUIFrameworkType>);
 
     function GetVersions : IList<ISpecVersion>;
-
+    function HasVersions : boolean;
+    function Clone : ISpecMetaData;
 
     property Id : string read GetId write SetId;
     property Version : TPackageVersion read GetVersion write SetVersion;
@@ -144,6 +150,7 @@ type
     property ReadMe : string read GetReadMe write SetReadMe;
 
     property Frameworks : TArray<TDPMUIFrameworkType> read GetFrameworks write SetFrameworks;
+    property PackageKind : TDPMPackageKind read GetPackageKind write SetPackageKind;
   end;
 
   ISpecSourceEntry = interface(ISpecNode)
@@ -226,6 +233,13 @@ type
     function GetName : string;
     procedure SetName(const templateName: string);
 
+    // RoundTripping comments
+    function GetSourceComments : TStrings;
+    function GetDependenciesComments : TStrings;
+    function GetBuildComments : TStrings;
+    function GetDesignComments : TStrings;
+    function GetPackageDefComments : TStrings;
+
 
     function NewDependency(const id : string) : ISpecDependency;
     function NewSource(const src: string): ISpecSourceEntry;
@@ -250,6 +264,12 @@ type
     property SourceEntries : IList<ISpecSourceEntry>read GetSourceFiles;
     property BuildEntries : IList<ISpecBuildEntry>read GetBuildEntries;
     property DesignEntries: IList<ISpecDesignEntry> read GetDesignFiles;
+
+    property SourceComments : TStrings read GetSourceComments;
+    property DependenciesComments : TStrings read GetDependenciesComments;
+    property BuildComments : TStrings read GetBuildComments;
+    property DesignComments : TStrings read GetDesignComments;
+    property PackageDefComments : TStrings read GetPackageDefComments;
   end;
 
 
@@ -271,9 +291,12 @@ type
     function GetMaxCompiler : TCompilerVersion;
     procedure SetMaxCompiler(value : TCompilerVersion);
 
-    function GetVariables : TStrings;
+    function GetVariables : IVariables;
 
-    function CloneForPlatform(const platform : TDPMPlatform) : ISpecTargetPlatform;
+    function Clone : ISpecTargetPlatform;
+
+    function IsForCompiler(compilerVersion : TCompilerVersion) : boolean;
+
     function ToString : string;
 
     property Compiler : TCompilerVersion read GetCompiler write SetCompiler;
@@ -283,7 +306,10 @@ type
 
     property Platforms : TArray<TDPMPlatform> read GetPlatforms write SetPlatforms;
     property TemplateName : string read GetTemplateName write SetTemplateName;
-    property Variables : TStrings read GetVariables;
+    property Variables : IVariables read GetVariables;
+
+
+
   end;
 
 
@@ -297,11 +323,24 @@ type
     function GetFileName : string;
     function GetPackageKind : TDPMPackageKind;
     procedure SetPackageKind(const value : TDPMPackageKind);
+    function GetVariables : IVariables;
 
-    //builds out the full spec
-    function PreProcess(const version : TPackageVersion; const properties : TStringList) : boolean;
+    // targetPlatforms, templates and variabls collections are not backed with a node
+    // so we are collecting the comments here
+    function GetTargetPlatformsComments : TStrings;
+    function GetTemplatesComments : TStrings;
+    function GetVariablesComments : TStrings;
+
+
     function GenerateManifestJson(const version : TPackageVersion; const targetPlatform : ISpecTargetPlatform) : string;
     function GenerateManifestYAML(const version : TPackageVersion; const targetPlatform : ISpecTargetPlatform) : string;
+
+    /// <summary>
+    ///  Generates a preprocessed spec with most variables (apart from platform) expanded.
+    ///  Called by the package Writer
+    /// </summary>
+    function GenerateManifest(const version : TPackageVersion; const targetPlatform : ISpecTargetPlatform) : IPackageSpec;
+
 
     function FindTemplate(const name : string) : ISpecTemplate;
     function NewTemplate(const name: string): ISpecTemplate;
@@ -309,8 +348,8 @@ type
     procedure DeleteTemplate(const templateName: string);
     function DuplicateTemplate(const sourceTemplate: ISpecTemplate; const newTemplateName: string): ISpecTemplate;
 
+    function Clone : IPackageSpec;
     procedure ToYAMLFile(const fileName : string);
-
     function ToJSON : string;
 
     property PackageKind : TDPMPackageKind read GetPackageKind write SetPackageKind;
@@ -320,19 +359,18 @@ type
     property Templates : IList<ISpecTemplate>read GetTemplates;
     property IsValid : boolean read GetIsValid;
     property FileName : string read GetFileName;
+    property Variables : IVariables read GetVariables;
+
+    //these are for attempting to round tripping comments
+    property TargetPlatformsComments : TStrings read GetTargetPlatformsComments;
+    property VariablesComments : TStrings read GetVariablesComments;
+    property TemplatesVariables : TStrings read GetTemplatesComments;
   end;
 
   IPackageSpecReader = interface
     ['{8A20F825-8DCA-4784-BDBD-8F91A651BA72}']
     function ReadSpec(const fileName : string) : IPackageSpec;
   end;
-
-  IPackageSpecWriter = interface
-    ['{F3370E25-2E9D-4353-9985-95C75D35D68E}']
-    procedure SaveToFile(const filename: string);
-  end;
-
-
 
 
 

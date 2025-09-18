@@ -43,34 +43,50 @@ uses
 
 
 type
-  TSpec = class(TSpecNode, IPackageSpec)
+  TSpec = class;
+  IPackageSpecPrivate = interface(IPackageSpec)
+    ['{4236039A-8FD4-4061-A942-01C6DF605163}']
+    function AsObject : TSpec;
+  end;
+
+  TSpec = class(TSpecNode, IPackageSpec, IPackageSpecPrivate)
   private
     FPackageKind : TDPMPackageKind;
     FMetaData : ISpecMetaData;
-    FTargetPlatformsComments : TStringList;
     FTargetPlatforms : IList<ISpecTargetPlatform>;
-    FTemplatesComments : TStringList;
     FTemplates : IList<ISpecTemplate>;
+    FVariables : IVariables;
     FIsValid : boolean;
     FCurrentTokens : TStringList;
     FFileName : string;
+
+    // targetPlatforms, templates and variables collections are not backed by an object, so nowhere else to store comments.
+    FTargetPlatformsComments : TStringList;
+    FTemplatesComments : TStringList;
+    FVariablesComments : TStringList;
+
   public
+    function AsObject : TSpec;
     function ApplyDependencies(const targetPlatform : ISpecTargetPlatform; const dependencies : IList<ISpecDependency>) : boolean;
     function ApplySource(const targetPlatform : ISpecTargetPlatform; const sourceFiles : IList<ISpecSourceEntry>) : boolean;
     function ApplyDesign(const targetPlatform : ISpecTargetPlatform; const designFiles : IList<ISpecDesignEntry>) : boolean;
     function ApplyBuild(const targetPlatform : ISpecTargetPlatform; const buildEntries : IList<ISpecBuildEntry>) : boolean;
 
-    function ApplyTemplates : Boolean;
-    function ExpandTargetPlatforms : boolean;
     function ReplaceTokens(const version : TPackageVersion; const properties : TStringList) : boolean;
 
     procedure GetTokensForTargetPlatform(const targetPlatform : ISpecTargetPlatform; const version : TPackageVersion; const list : TStringList; const externalProps : TStringList);
 
     function TokenMatchEvaluator(const match : TMatch) : string;
-    function PreProcess(const version : TPackageVersion; const properties : TStringList) : boolean;
-    function GenerateManifestJson(const version : TSemanticVersion; const targetPlatform : ISpecTargetPlatform) : string;
 
+    function GenerateManifestJson(const version : TSemanticVersion; const targetPlatform : ISpecTargetPlatform) : string;
     function GenerateManifestYAML(const version : TSemanticVersion; const targetPlatform : ISpecTargetPlatform) : string;
+
+    //
+    function GenerateManifest(const version : TPackageVersion; const targetPlatform : ISpecTargetPlatform) : IPackageSpec;
+
+    //we call this when generating the manifest so the manifest works with an unprocessed spec
+    function Clone : IPackageSpec;
+
 
     function GetFileName : string;
     function GetIsValid : boolean;
@@ -80,7 +96,10 @@ type
     function GetTemplates : IList<ISpecTemplate>;
     function GetPackageKind : TDPMPackageKind;
     procedure SetPackageKind(const value : TDPMPackageKind);
-
+    function GetVariables : IVariables;
+    function GetTargetPlatformsComments : TStrings;
+    function GetTemplatesComments : TStrings;
+    function GetVariablesComments : TStrings;
 
 
     function LoadTemplateFromJson(const templateObj : TJsonObject; const templateNo : integer) : boolean;
@@ -91,6 +110,8 @@ type
 
     function LoadTargetPlatformsFromJson(const targetPlatformsArray : TJsonArray) : boolean;
     function LoadTargetPlatformsFromYAML(const targetPlatformsSeq : IYAMLSequence) : boolean;
+
+    function LoadVariablesFromYAML(const variablesObj : IYAMLMapping) : boolean;
 
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
@@ -108,6 +129,8 @@ type
     procedure RenameTemplate(const currentTemplateName: string; const NewTemplateName:string);
     procedure DeleteTemplate(const templateName: string);
     function DuplicateTemplate(const sourceTemplate: ISpecTemplate; const newTemplateName: string): ISpecTemplate;
+
+    constructor CreateClone(const logger : ILogger; const source : IPackageSpecPrivate);
   public
     constructor Create(const logger : ILogger; const fileName : string); reintroduce;
     destructor Destroy;override;
@@ -231,60 +254,15 @@ begin
 //  end;
 end;
 
-function TSpec.ApplyTemplates : Boolean;
-var
-  template : ISpecTemplate;
-  targetPlatform : ISpecTargetPlatform;
-  error : boolean;
+
+function TSpec.AsObject: TSpec;
 begin
-  result := true;
-  error := false;
-  Logger.Information('Applying templates..');
-  //if any targetPlatforms are missing a template then assign default
-  FTargetPlatforms.ForEach(
-    procedure(const item : ISpecTargetPlatform)
-    begin
-      if item.TemplateName = '' then
-        item.TemplateName := 'default';
-    end);
+  result := Self;
+end;
 
-  if error then
-    exit(false);
-
-//  if not FTargetPlatforms.Any(function(const item : ISpecTargetPlatform) : boolean
-//    begin
-//      result := item.TemplateName <> '';
-//    end) then
-//    exit;
-
-  //if we don't have templates then the spec is not valid.
-  if not FTemplates.Any then
-  begin
-    Logger.Error('No templates were found but targetPlatforms reference a template.');
-    exit(false);
-  end;
-
-
-  for targetPlatform in FTargetPlatforms do
-  begin
-    if SameText(targetPlatform.TemplateName, cUnset) then
-      continue;
-
-    template := FindTemplate(targetPlatform.TemplateName);
-    if template <> nil then
-    begin
-      result := ApplyDependencies(targetPlatform, template.Dependencies) and result;
-      result := ApplySource(targetPlatform, template.SourceEntries) and result;
-      result := ApplyBuild(targetPlatform, template.BuildEntries) and result;
-      result := ApplyDesign(targetPlatform, template.DesignEntries) and result;
-    end
-    else
-    begin
-      Logger.Error('A referenced template [' + targetPlatform.TemplateName + '] was not found.');
-      result := false
-    end;
-  end;
-
+function TSpec.Clone: IPackageSpec;
+begin
+  result := TSpec.CreateClone(Logger, self);
 end;
 
 constructor TSpec.Create(const logger : ILogger; const fileName : string);
@@ -303,7 +281,56 @@ begin
       result := CompareText(Left.Name, Right.Name);
    end
   );
+  FVariables := TCollections.CreateDictionary<string,string>;
 end;
+
+constructor TSpec.CreateClone(const logger: ILogger; const source: IPackageSpecPrivate);
+var
+  newTargetPlatform : ISpecTargetPlatform;
+  newTemplate : ISpecTemplate;
+  i : integer;
+begin
+  inherited Create(logger);
+  FPackageKind := source.PackageKind;
+  FFileName := source.FileName;
+  if source.AsObject.FTargetPlatformsComments <> nil then
+  begin
+    FTargetPlatformsComments := TStringList.Create;
+    FTargetPlatformsComments.Assign(source.AsObject.FTargetPlatformsComments)
+  end;
+
+  if source.AsObject.FTemplatesComments <> nil then
+  begin
+    FTemplatesComments := TStringList.Create;
+    FTemplatesComments.Assign(source.AsObject.FTemplatesComments);
+  end;
+
+  FMetaData := source.MetaData.Clone;
+  FTargetPlatforms := TCollections.CreateList<ISpecTargetPlatform>;
+  for i := 0 to source.TargetPlatforms.Count -1 do
+  begin
+    newTargetPlatform := source.TargetPlatforms[i].Clone;
+    FTargetPlatforms.Add(newTargetPlatform);
+  end;
+
+  FTemplates := TCollections.CreateSortedList<ISpecTemplate>(
+   function(const Left, Right: ISpecTemplate): Integer
+   begin
+      result := CompareText(Left.Name, Right.Name);
+   end
+  );
+
+  for i := 0 to source.Templates.Count -1 do
+  begin
+    newTemplate := source.Templates[i].Clone;
+    FTemplates.Add(newTemplate);
+  end;
+
+  FVariables := TCollections.CreateDictionary<string,string>;
+  FVariables.AddRange(source.Variables);
+end;
+
+
 
 procedure TSpec.DeleteTemplate(const templateName: string);
 var
@@ -323,6 +350,7 @@ destructor TSpec.Destroy;
 begin
   FreeAndNil(FTemplatesComments);
   FreeAndNil(FTargetPlatformsComments);
+  FreeAndNil(FVariablesComments);
   inherited;
 end;
 
@@ -346,54 +374,6 @@ begin
   end;
   result.Name := newTemplateName;
   FTemplates.Add(result);
-end;
-
-function TSpec.ExpandTargetPlatforms : boolean;
-var
-  newTargetPlatforms : IList<ISpecTargetPlatform>;
-  toRemoveTargetPlatforms : IList<ISpecTargetPlatform>;
-  toProcessTargetPlatforms : TArray<ISpecTargetPlatform>;
-  targetPlatform : ISpecTargetPlatform;
-  newTargetPlatform : ISpecTargetPlatform;
-  platform : TDPMPlatform;
-begin
-  result := true;
-  Logger.Information('Expanding targetPlatforms');
-
-  toProcessTargetPlatforms := FTargetPlatforms.Where(
-    function(const tp : ISpecTargetPlatform) : boolean
-    begin
-      result := Length(tp.Platforms) > 1;
-    end).ToArray;
-
-  if length(toProcessTargetPlatforms) = 0 then
-    exit;
-
-  newTargetPlatforms := TCollections.CreateList<ISpecTargetPlatform>;
-  toRemoveTargetPlatforms := TCollections.CreateList<ISpecTargetPlatform>;
-
-  try
-    for targetPlatform in toProcessTargetPlatforms do
-    begin
-      for platform in targetPlatform.Platforms do
-      begin
-        newTargetPlatform := targetPlatform.CloneForPlatform(platform);
-        newTargetPlatforms.Add(newTargetPlatform);
-        //Logger.Debug('Expanded ' + CompilerToString(newTargetPlatform.Compiler) + '.' + DPMPlatformToString(newTargetPlatform.Platforms[0]));
-      end;
-      toRemoveTargetPlatforms.Add(targetPlatform);
-    end;
-    FTargetPlatforms.RemoveRange(toRemoveTargetPlatforms);
-    FTargetPlatforms.AddRange(newTargetPlatforms);
-  except
-    on e : Exception do
-    begin
-      Logger.Error('Error expanding TargetPlatforms : ' + e.Message);
-      result := false;
-    end;
-  end;
-
-  //TODO : Sort targetPlatforms by compiler then platform
 end;
 
 procedure TSpec.GetTokensForTargetPlatform(const targetPlatform : ISpecTargetPlatform; const version : TPackageVersion; const list : TStringList; const externalProps : TStringList);
@@ -429,8 +409,8 @@ begin
   for i := 0 to targetPlatform.Variables.Count -1 do
   begin
     //setting a value to '' removes it from the list!!!!!
-    list.Values[targetPlatform.Variables.Names[i]] := '';
-    list.Add(targetPlatform.Variables.Names[i] + '=' + targetPlatform.Variables.ValueFromIndex[i]);
+    list.Values[targetPlatform.Variables.Items[i].Key] := '';
+    list.Add(targetPlatform.Variables.Items[i].Key + '=' + targetPlatform.Variables.Items[i].Value);
   end;
 
   //fix up some variable overrides
@@ -461,6 +441,18 @@ begin
 
 end;
 
+function TSpec.GetVariables: IVariables;
+begin
+  result := FVariables;
+end;
+
+function TSpec.GetVariablesComments: TStrings;
+begin
+  if FVariablesComments = nil then
+    FVariablesComments := TStringList.Create;
+  result := FVariablesComments;
+end;
+
 function TSpec.FindTemplate(const name : string) : ISpecTemplate;
 begin
   result := FTemplates.FirstOrDefault(
@@ -483,9 +475,32 @@ begin
   result := FTargetPlatforms;
 end;
 
+function TSpec.GetTargetPlatformsComments: TStrings;
+begin
+  if FTargetPlatformsComments = nil then
+    FTargetPlatformsComments := TStringList.Create;
+  result := FTargetPlatformsComments;
+end;
+
 function TSpec.GetTemplates : IList<ISpecTemplate>;
 begin
   result := FTemplates;
+end;
+
+function TSpec.GetTemplatesComments: TStrings;
+begin
+  if FTemplatesComments = nil then
+    FTemplatesComments := TStringList.Create;
+  result := FTemplatesComments;
+end;
+
+function TSpec.GenerateManifest(const version: TPackageVersion; const targetPlatform: ISpecTargetPlatform): IPackageSpec;
+var
+  newSpec : IPackageSpec;
+begin
+//  newSpec := Self.Clone
+
+
 end;
 
 function TSpec.GenerateManifestJson(const version : TSemanticVersion; const targetPlatform : ISpecTargetPlatform) : string;
@@ -729,10 +744,11 @@ var
   minClient : TPackageVersion;
   currentVersion : TPackageVersion;
   error : string;
+  variablesObj : IYAMLMapping;
 begin
   result := true;
   //preserve comments
-  AddComments(yamlObject);
+  LoadComments(yamlObject);
 
   sMinClient := yamlObject.S['min dpm client version'];
   if sMinClient <> '' then
@@ -745,7 +761,7 @@ begin
     else
     begin
       if minClient > currentVersion then
-        raise Exception.Create('Package spec requires newer client version : ' + sMinClient);
+        raise Exception.Create('Package spec requires newer client version : ' + sMinClient + #13#10 + 'Update your dpm client');
     end;
   end;
 
@@ -755,27 +771,19 @@ begin
   else
     FPackageKind := TDPMPackageKind.dpm;
 
-  if not yamlObject.Contains('metadata') then
-  begin
-    Logger.Error('Required element [metadata] not found!');
-    result := false;
-  end
-  else
+  if yamlObject.Contains('metadata') then
   begin
     metaData := yamlObject.Values['metadata'];
     FMetaData.LoadFromYAML(metaData.AsMapping);
+  end
+  else
+  begin
+    Logger.Error('Required element [metadata] not found!');
+    result := false;
   end;
 
-  if yamlObject.Contains('templates') then
-  begin
-    templates := yamlObject.A['templates'];
-    if templates.HasComments then
-    begin
-      FTemplatesComments := TStringList.Create;
-      FTemplatesComments.Assign(templates.Comments);
-    end;
-    result := LoadTemplatesFromYAML(templates) and result;
-  end;
+  variablesObj := yamlObject.O['variables'];
+  result := LoadVariablesFromYAML(variablesObj) and result;
 
   if not yamlObject.Contains('targetPlatforms') then
   begin
@@ -785,13 +793,23 @@ begin
   else
   begin
     targetPlatforms := yamlObject.A['targetPlatforms'];
-    if targetPlatforms.HasComments then
-    begin
-      FTargetPlatformsComments := TStringList.Create;
-      FTargetPlatformsComments.Assign(targetPlatforms.Comments);
-    end;
     result := LoadTargetPlatformsFromYAML(targetPlatforms) and result;
   end;
+
+
+  if yamlObject.Contains('templates') then
+  begin
+    templates := yamlObject.A['templates'];
+    result := LoadTemplatesFromYAML(templates) and result;
+  end
+  else
+  begin
+    Logger.Error('Required element [templates] not found!');
+    result := false;
+
+  end;
+
+
 
   FIsValid := result;
 
@@ -824,20 +842,27 @@ var
   i : integer;
   targetPlatform : ISpecTargetPlatform;
 begin
+  if targetPlatformsSeq.HasComments then
+  begin
+    FTargetPlatformsComments := TStringList.Create;
+    FTargetPlatformsComments.Assign(targetPlatformsSeq.Comments);
+  end;
+
   result := true;
-  if targetPlatformsSeq.Count = 0 then
+  if targetPlatformsSeq.Count > 0 then
+  begin
+    for i := 0 to targetPlatformsSeq.Count - 1 do
+    begin
+      targetPlatform := TSpecTargetPlatform.Create(Logger);
+      FTargetPlatforms.Add(targetPlatform);
+      result := targetPlatform.LoadFromYAML(targetPlatformsSeq.O[i]) and result;
+    end;
+  end
+  else
   begin
     Logger.Error('No targetPlatforms found, at least 1 is required');
     exit(false);
   end;
-
-  for i := 0 to targetPlatformsSeq.Count - 1 do
-  begin
-    targetPlatform := TSpecTargetPlatform.Create(Logger);
-    FTargetPlatforms.Add(targetPlatform);
-    result := targetPlatform.LoadFromYAML(targetPlatformsSeq.O[i]) and result;
-  end;
-
 end;
 
 function TSpec.LoadTemplateFromJson(const templateObj : TJsonObject; const templateNo : integer) : boolean;
@@ -890,10 +915,47 @@ var
   i : integer;
 begin
   result := true;
+  if templatesSeq.HasComments then
+  begin
+    FTemplatesComments := TStringList.Create;
+    FTemplatesComments.Assign(templatesSeq.Comments);
+  end;
   if templatesSeq.Count > 0 then
   begin
     for i := 0 to templatesSeq.Count - 1 do
       result := LoadTemplateFromYAML(templatesSeq.O[i], i + 1) and result;
+  end
+  else
+  begin
+    result := false;
+    Logger.Error('At least 1 template is required');
+  end;
+end;
+
+function TSpec.LoadVariablesFromYAML(const variablesObj: IYAMLMapping): boolean;
+var
+  i : integer;
+begin
+  result := true;
+  if variablesObj.HasComments then
+  begin
+    FVariablesComments := TStringList.Create;
+    FVariablesComments.Assign(variablesObj.Comments);
+  end;
+  if variablesObj.Count > 0 then
+  begin
+    for i := 0 to variablesObj.Count -1 do
+    begin
+      try
+        FVariables[LowerCase(variablesObj.Keys[i])] := variablesObj.Items[variablesObj.Keys[i]].AsString;
+      except
+        on e : Exception do
+        begin
+          result := false;
+          Logger.Error('Error loading variable : ' + e.Message);
+        end;
+      end;
+    end;
   end;
 end;
 
@@ -908,21 +970,6 @@ begin
   GetTemplates.Add(result);
 end;
 
-function TSpec.PreProcess(const version : TPackageVersion; const properties : TStringList) : boolean;
-begin
-  result := false;
-  Logger.Information('Preprocessing spec file..');
-  if not ExpandTargetPlatforms then
-    exit;
-
-  if not ApplyTemplates then
-    exit;
-
-  if not ReplaceTokens(version, properties) then
-    exit;
-
-  result := true;
-end;
 
 procedure TSpec.RenameTemplate(const currentTemplateName, NewTemplateName: string);
 var
@@ -1025,6 +1072,7 @@ begin
   FPackageKind := value;
 end;
 
+
 function TSpec.ToJSON: string;
 var
   json : TJsonObject;
@@ -1070,6 +1118,7 @@ var
   root : IYAMLMapping;
   targetPlatforms : IYAMLSequence;
   templates : IYAMLSequence;
+  variables : IYAMLMapping;
   i : integer;
 begin
   root := parent.AsMapping;
@@ -1092,6 +1141,7 @@ begin
 
   for i := 0 to FTargetPlatforms.Count -1 do
     FTargetPlatforms[i].ToYAML(targetPlatforms, packageKind);
+
   templates := root.A['templates'];
 
   if FTemplatesComments <> nil then
@@ -1099,6 +1149,15 @@ begin
 
   for i := 0 to FTemplates.Count -1 do
     FTemplates[i].ToYAML(templates, packageKind);
+
+  if FVariables.Count > 0 then
+  begin
+    variables := root.O['variables'];
+    if FVariablesComments <> nil then
+      variables.Comments.Assign(FVariablesComments);
+  end;
+
+
 
 end;
 

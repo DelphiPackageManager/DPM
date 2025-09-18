@@ -115,6 +115,7 @@ type
     procedure SetVersion(const value : TPackageVersion);
     procedure SetReadMe(const value : string);
     procedure SetFrameworks(const value : TArray<TDPMUIFrameworkType>);
+    function HasVersions : boolean;
 
     function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
@@ -122,6 +123,9 @@ type
     function ToJSON : string; override;
     procedure ToYAML(const parentObj : IYAMLValue; const packageKind : TDPMPackageKind);override;
 
+    function Clone : ISpecMetaData;
+
+    public constructor CreateClone(const logger : ILogger; const source : ISpecMetadata);
   public
     constructor Create(const logger : ILogger; const packageKind : TDPMPackageKind);reintroduce;
     destructor Destroy;override;
@@ -136,6 +140,11 @@ uses
 
 { TSpecMetaData }
 
+function TSpecMetaData.Clone: ISpecMetaData;
+begin
+  result := TSpecMetaData.CreateClone(Logger, self);
+end;
+
 constructor TSpecMetaData.Create(const logger : ILogger; const packageKind : TDPMPackageKind);
 begin
   inherited Create(logger);
@@ -144,6 +153,46 @@ begin
   FFrameworks := [];
   FRepositoryCommit := '#HASH#'; //git replacment.
   FTags := TStringList.Create;
+end;
+
+
+constructor TSpecMetaData.CreateClone(const logger: ILogger; const source: ISpecMetadata);
+var
+  newVersion : ISpecVersion;
+  i : integer;
+begin
+  inherited Create(logger);
+  FPackageKind := source.PackageKind;
+  FId := source.Id;
+  FVersion := source.Version;
+  if source.HasVersions then
+  begin
+    FVersions := TCollections.CreateList<ISpecVersion>;
+    for i := 0 to source.Versions.Count -1 do
+    begin
+      //clone versions
+      newVersion := TSpecVersion.Create(source.Versions[i].Version,source.Versions[i].Commit );
+      FVersions.Add(newVersion);
+    end;
+  end;
+  FDescription := source.Description;
+  FAuthors := source.Authors;
+  FProjectUrl := source.ProjectUrl;
+  FRepositoryUrl := source.RepositoryUrl;
+  FRepositoryType := source.RepositoryType;
+  FRepositoryBranch := source.RepositoryBranch;
+  FRepositoryCommit := source.RepositoryCommit;
+  FReleaseNotes := source.ReleaseNotes;
+  FLicense := source.License;
+  FIcon := source.Icon;
+  FCopyright := source.Copyright;
+
+  FTags := TStringList.Create;
+  FTags.Assign(source.Tags);
+  FIsTrial := source.IsTrial;
+  FIsCommercial := source.IsCommercial;
+  FReadme := source.ReadMe;
+  FFrameworks := source.Frameworks;
 end;
 
 destructor TSpecMetaData.Destroy;
@@ -259,6 +308,11 @@ begin
   result := FVersions;
 end;
 
+function TSpecMetaData.HasVersions: boolean;
+begin
+  result := (FVersions <> nil) and (FVersions.Count > 0);
+end;
+
 function TSpecMetaData.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
 var
   sVersion : string;
@@ -348,9 +402,8 @@ var
 
 begin
   result := true;
-
   //preserve comments;
-  AddComments(yamlObject);
+  LoadComments(yamlObject);
 
   FId := yamlObject.S['id'];
   if not TPackageIdValidator.IsValidPackageId(FId) then

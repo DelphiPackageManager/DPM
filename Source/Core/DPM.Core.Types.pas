@@ -137,11 +137,14 @@ function DPMPlatformToDisplayString(const value : TDPMPlatform) : string;
 function DPMPlatformToBDString(const value : TDPMPlatform) : string;
 function DPMPlatformBitness(const value : TDPMPlatform) : string;
 
+function DPMPlatformsArrayToPlatforms(const value : TArray<TDPMPlatform>) : TDPMPlatforms;
+
 function DPMPlatformsToString(const value : TDPMPlatforms; const sep : string = ',') : string;
 
 /// <summary> Creates binary representation - used for package files</summary>
 function DPMPlatformsToBinString(platforms : TDPMPlatforms) : string;
 
+/// <summary> Converts binary string to platforms - used for package files</summary>
 function BinStringToDPMPlatforms(value : string) : TDPMPlatforms;
 
 function CompilerToLibSuffix(const compiler : TCompilerVersion) : string;
@@ -353,6 +356,17 @@ begin
     Result := '64';
 end;
 
+
+function DPMPlatformsArrayToPlatforms(const value : TArray<TDPMPlatform>) : TDPMPlatforms;
+var
+  platform : TDPMPlatform;
+begin
+  result := [];
+  for platform in value do
+  begin
+    Include(result, platform);
+  end;
+end;
 
 function DPMPlatformsToString(const value : TDPMPlatforms; const sep : string = ',') : string;
 var
