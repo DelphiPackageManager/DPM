@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -30,6 +30,7 @@ interface
 
 uses
   JsonDataObjects,
+  VSoft.YAML,
   Spring.Cryptography,
   DPM.Core.Types,
   DPM.Core.Sources.Types,
@@ -71,8 +72,10 @@ type
     procedure SetSourceType(const value : TSourceType);
 
 
-    function LoadFromJson(const jsonObj : TJsonObject) : boolean;
-    function SaveToJson(const parentObj : TJsonObject) : boolean;
+    function LoadFromYAML(const yamlObj : IYAMLValue) : boolean;
+
+    function SaveToYAML(const parentObj : IYAMLValue) : boolean;
+
   public
     constructor Create(const logger : ILogger); overload;
     constructor Create(const name : string; const source : string; const sourceType : TSourceType; const userName : string; const password : string; const enabled : boolean); overload;
@@ -97,8 +100,10 @@ type
     function LoadFromFile(const fileName : string) : boolean;
     function SaveToFile(const fileName : string) : boolean;
 
-    function LoadFromJson(const jsonObj : TJsonObject) : boolean;
-    function SaveToJson(const parentObj : TJsonObject) : boolean;
+    function LoadFromYAML(const yamlObj : IYAMLValue) : boolean;
+
+    function SaveToYAML(const parentObj : IYAMLValue) : boolean;
+
   public
     constructor Create(const logger : ILogger);
   end;
@@ -209,23 +214,27 @@ begin
   result := FSourceType;
 end;
 
-function TSourceConfig.LoadFromJson(const jsonObj : TJsonObject) : boolean;
+
+function TSourceConfig.LoadFromYAML(const yamlObj: IYAMLValue): boolean;
 var
+  obj : IYAMLMapping;
   srcType : string;
   uri : IUri;
 begin
   result := true;
-  FName := jsonObj.S['name'];
-  FSource := jsonObj.S['source'];
-  FUserName := jsonObj.S['userName'];
-  FPassword := jsonObj.S['password'];
-  srcType := jsonObj.S['type'];
+  obj := yamlObj.AsMapping;
+
+  FName := obj.S['name'];
+  FSource := obj.S['source'];
+  FUserName := obj.S['userName'];
+  FPassword := obj.S['password'];
+  srcType := obj.S['type'];
 
   if FPassword <> '' then
     FPassword := DecryptString(FPassword);
 
-  if jsonObj.Contains('enabled') then
-    FEnabled := jsonObj.B['enabled'];
+  if obj.Contains('enabled') then
+    FEnabled := obj.B['enabled'];
 
 
 
@@ -252,14 +261,14 @@ begin
     end;
   end;
 
-
 end;
 
-function TSourceConfig.SaveToJson(const parentObj : TJsonObject) : boolean;
+
+function TSourceConfig.SaveToYAML(const parentObj: IYAMLValue): boolean;
 var
-  sourceObj : TJsonObject;
+  sourceObj : IYAMLMapping;
 begin
-  sourceObj := parentObj.A['packageSources'].AddObject;
+  sourceObj := parentObj.AsSequence.AddMapping;
   sourceObj.S['name'] := FName;
   sourceObj.S['source'] := FSource;
   if FUserName <> '' then
@@ -272,9 +281,8 @@ begin
 
   sourceObj.B['enabled'] := FEnabled;
   result := true;
+
 end;
-
-
 
 procedure TSourceConfig.SetIsEnabled(const value : Boolean);
 begin
@@ -359,21 +367,16 @@ end;
 
 function TConfiguration.LoadFromFile(const fileName : string) : boolean;
 var
-  jsonObj : TJsonObject;
+  doc : IYAMLDocument;
 begin
   result := false;
 
   try
-    jsonObj := TJsonObject.ParseFromFile(fileName) as TJsonObject;
-    try
-      Result := LoadFromJson(jsonObj);
+    doc := TYAML.LoadFromFile(fileName);
+    Result := LoadFromYAML(doc.Root);
       if not FSources.Any then
         AddDefaultSources;
-
       FFileName := fileName;
-    finally
-      jsonObj.Free;
-    end;
   except
     on e : Exception do
     begin
@@ -383,22 +386,24 @@ begin
   end;
 end;
 
-function TConfiguration.LoadFromJson(const jsonObj : TJsonObject) : boolean;
+
+function TConfiguration.LoadFromYAML(const yamlObj: IYAMLValue): boolean;
 var
-  sourcesArray : TJsonArray;
+  root : IYAMLMapping;
+  sources : IYAMLSequence;
   source : ISourceConfig;
   bResult : boolean;
   i : integer;
 begin
   result := true;
-  FPackageCacheLocation := jsonObj['packageCacheLocation'];
-  sourcesArray := jsonObj.A['packageSources'];
-
-  bResult := false;
-  for i := 0 to sourcesArray.Count - 1 do
+  root := yamlObj.AsMapping;
+  FPackageCacheLocation := root.S['packageCacheLocation'];
+  sources := root.A['packageSources'];
+  bResult := true;
+  for i := 0 to sources.Count - 1 do
   begin
     source := TSourceConfig.Create(FLogger);
-    bResult := source.LoadFromJson(sourcesArray.O[i]);
+    bResult := source.LoadFromYAML(sources[i]);
     if bResult then
     begin
       if not FSources.Any(
@@ -421,12 +426,14 @@ begin
       AddDefaultSources;
     end;
     result := result and bResult;
+
+
 end;
 
 function TConfiguration.SaveToFile(const fileName : string) : boolean;
 var
   sFileName : string;
-  jsonObj : TJsonObject;
+  yamlDoc : IYAMLDocument;
 begin
 
   if fileName <> '' then
@@ -440,34 +447,35 @@ begin
     exit(false);
   end;
 
-  jsonObj := TJsonObject.Create;
+  yamlDoc := TYAML.CreateMapping;
   try
-    try
-      result := SaveToJson(jsonObj);
-      if result then
-        jsonObj.SaveToFile(sFileName, false);
-      FFileName := sFileName;
-    except
-      on e : Exception do
-      begin
-        FLogger.Error('Exception while saving config to file [' + sFileName + ']' + #13#10 + e.Message);
-        result := false;
-      end;
+    result := SaveToYAML(yamlDoc.Root);
+    if result then
+      TYAML.WriteToFile(yamlDoc, fileName);
+    FFileName := sFileName;
+  except
+    on e : Exception do
+    begin
+      FLogger.Error('Exception while saving config to file [' + sFileName + ']' + #13#10 + e.Message);
+      result := false;
     end;
-  finally
-    jsonObj.Free;
   end;
 end;
 
-function TConfiguration.SaveToJson(const parentObj : TJsonObject) : boolean;
+
+
+function TConfiguration.SaveToYAML(const parentObj: IYAMLValue): boolean;
 var
   i : integer;
+  root : IYAMLMapping;
+  sources : IYAMLSequence;
 begin
   result := true;
-  parentObj['packageCacheLocation'] := FPackageCacheLocation;
-
+  root := parentObj.AsMapping;
+  root.S['packageCacheLocation'] := FPackageCacheLocation;
+  sources := root.A['packageSources'];
   for i := 0 to FSources.Count - 1 do
-    result := FSources[i].SaveToJson(parentObj) and result;
+    result := FSources[i].SaveToYAML(sources) and result;
 
 end;
 

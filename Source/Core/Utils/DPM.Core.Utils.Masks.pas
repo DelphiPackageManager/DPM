@@ -7,12 +7,18 @@ uses
   Spring.Collections;
 
 type
+  /// <summary>
+  ///  A simple wrapper over a list of TMasks
+  /// </summary>
   IFileMatcher = interface
   ['{5269C6DD-50AF-47AE-80F2-50E911B32BC9}']
     procedure AddMask(const mask : string);
 
+    /// <summary>
+    ///  Tests the file against the masks, returns true as
+    ///  soon as one matches.
+    /// </summary>
     function Matches(const fileName : string) : boolean;
-
   end;
 
   TFileMatcher = class(TInterfacedObject, IFileMatcher)

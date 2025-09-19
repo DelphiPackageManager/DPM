@@ -196,6 +196,9 @@ var
   sValue : string;
 begin
   sValue := StringReplace(value, '.', '_', [rfReplaceAll]);
+  //handle shortcuts from cmdline
+  if not TStringUtils.StartsWith(sValue,'delphi', true) then
+    sValue := 'delphi' + sValue;
 
   iValue := GetEnumValue(typeInfo(TCompilerVersion), sValue);
 

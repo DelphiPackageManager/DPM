@@ -44,7 +44,7 @@ const
   cIconFileSVG = 'icon.svg';
   cIconFilePNG = 'icon.png';
 
-  cDPMConfigFileName = 'dpm.config';
+  cDPMConfigFileName = 'dpm.config.yaml';
 
   cDefaultDPMFolder = '%APPDATA%\.dpm';
   cDefaultConfigFile = cDefaultDPMFolder + '\' + cDPMConfigFileName;

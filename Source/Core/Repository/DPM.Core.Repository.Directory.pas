@@ -56,8 +56,8 @@ type
     function DoGetPackageMetaData(const cancellationToken : ICancellationToken; const fileName : string; readHash : boolean; const readManifestFunc : TReadManifestFunc) : IInterface;
 
 
-    function DoList(const searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
-    function DoExactList(const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const version : string) : IList<string>;
+    function DoList(const searchTerm : string; const compilerVersion : TCompilerVersion; const platforms : TDPMPlatforms) : IList<string>;
+    function DoExactList(const id : string; const compilerVersion : TCompilerVersion; const platforms : TDPMPlatforms; const version : string) : IList<string>;
 
     function DoGetPackageFeedFiles(const searchTerm : string; const exact : boolean; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
     function DoGetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const files : IList<string>) : IList<IPackageSearchResultItem>;
@@ -130,7 +130,7 @@ begin
     result := result + '([^\-]+)\-';
 
   if platforms <> [] then
-    result := result + Format('(%s)\-', [DPMPlatformsToString(platforms, '|')])
+    result := result + Format('(%s)\-', [DPMPlatformsToBinString(platforms)])
   else
     result := result + '([^\-]+)\-';
 
@@ -231,9 +231,9 @@ var
 begin
   result := nil;
   if version.IsEmpty then
-    searchFiles := DoExactList(id, compilerVersion, platform, '')
+    searchFiles := DoExactList(id, compilerVersion, [platform], '')
   else
-    searchFiles := DoExactList(id, compilerVersion, platform, version.ToStringNoMeta);
+    searchFiles := DoExactList(id, compilerVersion, [platform], version.ToStringNoMeta);
 
   searchRegEx := GetSearchRegex(compilerVersion, [], '');
   regex := TRegEx.Create(searchRegEx, [roIgnoreCase]);
@@ -466,7 +466,7 @@ begin
   searchRegEx := GetSearchRegex(compilerVersion, [], '');
   regex := TRegEx.Create(searchRegEx, [roIgnoreCase]);
 
-  searchFiles := DoExactList(id, compilerVersion, platform, '');
+  searchFiles := DoExactList(id, compilerVersion, [platform], '');
   latestVersion := TPackageVersion.Empty;
   latestStableVersion := TPackageVersion.Empty;
   for i := 0 to searchFiles.Count -1 do
@@ -612,7 +612,7 @@ var
   packageVersion : TPackageVersion;
 begin
   result := TCollections.CreateList<TPackageVersion>;
-  searchFiles := DoExactList(id, compilerVersion, TDPMPlatform.UnknownPlatform, '');
+  searchFiles := DoExactList(id, compilerVersion, [TDPMPlatform.UnknownPlatform], '');
 
   searchRegEx := GetSearchRegex(compilerVersion, [], '');
   regex := TRegEx.Create(searchRegEx, [roIgnoreCase]);
@@ -652,7 +652,7 @@ var
 begin
   result := TCollections.CreateList<IPackageInfo>;
 
-  searchFiles := DoExactList(id, compilerVersion, platform, '');
+  searchFiles := DoExactList(id, compilerVersion, [platform], '');
 
   searchRegEx := GetSearchRegex(compilerVersion, [platform], '');
   regex := TRegEx.Create(searchRegEx, [roIgnoreCase]);
@@ -706,7 +706,7 @@ begin
   end;
 end;
 
-function TDirectoryPackageRepository.DoExactList(const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const version : string) : IList<string>;
+function TDirectoryPackageRepository.DoExactList(const id : string; const compilerVersion : TCompilerVersion; const platforms : TDPMPlatforms; const version : string) : IList<string>;
 var
   searchTerm : string;
   //files : TStringDynArray;
@@ -715,10 +715,7 @@ begin
   result := TCollections.CreateList < string > ;
   searchTerm := id;
   searchTerm := searchTerm + '-' + CompilerVersionToSearchPart(compilerVersion);
-  if platform = TDPMPlatform.UnknownPlatform then
-    searchTerm := searchTerm + '-*'
-  else
-    searchTerm := searchTerm + '-' + DPMPlatformToString(platform);
+  searchTerm := searchTerm + '-*';
 
   if version <> '' then
     searchTerm := searchTerm + '-' + version + cPackageFileExt
@@ -995,7 +992,7 @@ begin
 
 end;
 
-function TDirectoryPackageRepository.DoList(const searchTerm : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IList<string>;
+function TDirectoryPackageRepository.DoList(const searchTerm : string; const compilerVersion : TCompilerVersion; const platforms : TDPMPlatforms) : IList<string>;
 var
 //  files : TStringDynArray;
 //  fileList : IList<string>;
@@ -1008,11 +1005,7 @@ begin
 
   term := term + '-' + CompilerVersionToSearchPart(compilerVersion);
 
-  if platform = TDPMPlatform.UnknownPlatform then
-    term := term + '-*-*' + cPackageFileExt
-  else
-    term := term + '-' + DPMPlatformToString(platform) + '-*' + cPackageFileExt;
-
+  term := term + '-*-*' + cPackageFileExt;
   result := TDirectoryUtils.GetFiles(SourceUri, term);
 
   //fileList := TCollections.CreateList<string>(files);
@@ -1029,7 +1022,6 @@ var
   searchFiles : IList<string>;
   allFiles : IList<string>;
   i : integer;
-  platform : TDPMPlatform;
   searchRegEx : string;
   regex : TRegEx;
   packageFile : string;
@@ -1065,33 +1057,19 @@ begin
 
   allFiles := TCollections.CreateList < string > ;
 
+  platforms := options.Platforms;
+
+
   for i := 0 to Length(searchTerms) - 1 do
   begin
     if cancellationToken.IsCancelled then
       exit;
 
-    if options.Platforms = [] then
-    begin
-      if options.Exact then
-        searchFiles := DoExactList(searchTerms[i], options.CompilerVersion, TDPMPlatform.UnknownPlatform, options.Version.ToStringNoMeta)
-      else
-        searchFiles := DoList(searchTerms[i], options.CompilerVersion, TDPMPlatform.UnknownPlatform);
-      allFiles.AddRange(searchFiles);
-    end
+    if options.Exact then
+      searchFiles := DoExactList(searchTerms[i], options.CompilerVersion, platforms, options.Version.ToStringNoMeta)
     else
-    begin
-      for platform in options.Platforms do
-      begin
-        if cancellationToken.IsCancelled then
-          exit;
-
-        if options.Exact then
-          searchFiles := DoExactList(searchTerms[i], options.CompilerVersion, platform, options.Version.ToStringNoMeta)
-        else
-          searchFiles := DoList(searchTerms[i], options.CompilerVersion, platform);
-        allFiles.AddRange(searchFiles);
-      end;
-    end;
+      searchFiles := DoList(searchTerms[i], options.CompilerVersion, platforms);
+    allFiles.AddRange(searchFiles);
   end;
 
   //remove the path from the files
@@ -1117,7 +1095,7 @@ begin
     begin
       id := match.Groups[1].Value;
       cv := StringToCompilerVersion(match.Groups[2].Value);
-      platform := StringToDPMPlatform(match.Groups[3].Value);
+      platforms :=  BinStringToDPMPlatforms(match.Groups[3].Value);
       version := match.Groups[4].Value;
 
       if not TPackageVersion.TryParse(version, packageVersion) then
@@ -1144,27 +1122,22 @@ begin
           currentId := id;
           currentCompiler := cv;
           currentVersion := packageVersion;
-          platforms := [platform];
           if bIsLast then
             AddCurrent;
           continue;
         end;
         // a new package, so record the last one if we had one.
-        if (currentId <> '') and (currentCompiler <> TCompilerVersion.UnknownVersion) then
-        begin
-          if bIsLast then
-             Include(platforms, platform);
+        if ((currentId <> '') and (currentCompiler <> TCompilerVersion.UnknownVersion)) then
           AddCurrent;
-        end;
 
         currentId := id;
         currentCompiler := cv;
         currentVersion := packageVersion;
-        platforms := [platform];
+        if bIsLast then
+          AddCurrent;
       end
       else
       begin
-        Include(platforms, platform);
         if bIsLast then
          AddCurrent;
       end;

@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -30,6 +30,7 @@ interface
 
 uses
   JsonDataObjects,
+  VSoft.YAML,
   VSoft.Uri,
   Spring.Collections,
   DPM.Core.Types;
@@ -37,8 +38,9 @@ uses
 type
   IConfigNode = interface
     ['{18443C57-FA60-4DAB-BB67-10ACCBB7EC3B}']
-    function LoadFromJson(const jsonObj : TJsonObject) : boolean;
-    function SaveToJson(const parentObj : TJsonObject) : boolean;
+    function LoadFromYAML(const yamlObj : IYAMLValue) : boolean;
+    function SaveToYAML(const parentObj : IYAMLValue) : boolean;
+
   end;
 
   ISourceConfig = interface(IConfigNode)
