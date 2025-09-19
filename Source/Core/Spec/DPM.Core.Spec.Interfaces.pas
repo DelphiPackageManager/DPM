@@ -32,7 +32,6 @@ uses
   System.SysUtils,
   System.Classes,
   Spring.Collections,
-  JsonDataObjects,
   VSoft.YAML,
   DPM.Core.Types,
   DPM.Core.Logging,
@@ -46,10 +45,7 @@ type
 
   ISpecNode = interface
     ['{AD47A3ED-591B-4E47-94F2-7EC136182202}']
-    function LoadFromJson(const jsonObject : TJsonObject) : boolean;
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;
-    function LoadObjectList(const list: IList<ISpecNode>): TJsonArray;
-    function ToJSON: string;
     procedure ToYAML(const parent : IYAMLValue; const packageKind : TDPMPackageKind);
     function GetComments : TStrings;
     function HasComments : boolean;
@@ -326,14 +322,13 @@ type
     function GetVariablesComments : TStrings;
 
 
-    function GenerateManifestJson(const version : TPackageVersion; const targetPlatform : ISpecTargetPlatform) : string;
-    function GenerateManifestYAML(const version : TPackageVersion; const targetPlatform : ISpecTargetPlatform) : string;
+    function GenerateManifestYAML(const version : TPackageVersion) : string;
 
     /// <summary>
     ///  Generates a preprocessed spec with most variables (apart from platform) expanded.
     ///  Called by the package Writer
     /// </summary>
-    function GenerateManifest(const version : TPackageVersion; const targetPlatform : ISpecTargetPlatform) : IPackageSpec;
+//    function GenerateManifest(const version : TPackageVersion; const targetPlatform : ISpecTargetPlatform) : IPackageSpec;
 
 
     function FindTemplate(const name : string) : ISpecTemplate;
@@ -344,7 +339,6 @@ type
 
     function Clone : IPackageSpec;
     procedure ToYAMLFile(const fileName : string);
-    function ToJSON : string;
 
     property PackageKind : TDPMPackageKind read GetPackageKind write SetPackageKind;
     property MetaData : ISpecMetaData read GetMetaData;

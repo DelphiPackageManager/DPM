@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -310,8 +310,8 @@ begin
         bitmap.LoadFromResourceName(HInstance, 'PLATFORM_WIN32'); //same for win32/64
         FPlatformImageIndexes[TDPMPlatform.Win64] := imageList.AddMasked(bitmap, clFuchsia);
         bitmap.LoadFromResourceName(HInstance, 'PLATFORM_MACOS');
-        FPlatformImageIndexes[TDPMPlatform.OSX32] := imageList.AddMasked(bitmap, clFuchsia);
-        FPlatformImageIndexes[TDPMPlatform.OSX64] := FPlatformImageIndexes[TDPMPlatform.OSX32];
+        FPlatformImageIndexes[TDPMPlatform.MacOS32] := imageList.AddMasked(bitmap, clFuchsia);
+        FPlatformImageIndexes[TDPMPlatform.MacOS64] := FPlatformImageIndexes[TDPMPlatform.MacOS32];
         bitmap.LoadFromResourceName(HInstance, 'PLATFORM_ANDRIOD');
         FPlatformImageIndexes[TDPMPlatform.AndroidArm32] := imageList.AddMasked(bitmap, clFuchsia);
         FPlatformImageIndexes[TDPMPlatform.AndroidArm64] := FPlatformImageIndexes[TDPMPlatform.AndroidArm32];
@@ -343,8 +343,8 @@ begin
       FPlatformImageIndexes[TDPMPlatform.Win32] := imageList.GetIndexByName('Platforms\PlatformWindows');
       FPlatformImageIndexes[TDPMPlatform.Win64] := FPlatformImageIndexes[TDPMPlatform.Win32];
 
-      FPlatformImageIndexes[TDPMPlatform.OSX32] := imageList.GetIndexByName('Platforms\PlatformMacOS');
-      FPlatformImageIndexes[TDPMPlatform.OSX64] := FPlatformImageIndexes[TDPMPlatform.OSX32];
+      FPlatformImageIndexes[TDPMPlatform.MacOS32] := imageList.GetIndexByName('Platforms\PlatformMacOS');
+      FPlatformImageIndexes[TDPMPlatform.MacOS64] := FPlatformImageIndexes[TDPMPlatform.MacOS32];
 
       FPlatformImageIndexes[TDPMPlatform.AndroidArm32] := imageList.GetIndexByName('Platforms\PlatformAndroid');
       FPlatformImageIndexes[TDPMPlatform.AndroidArm64] := FPlatformImageIndexes[TDPMPlatform.AndroidArm32];
@@ -570,8 +570,8 @@ var
 //      TDPMPlatform.Win64:  result := 94;
 //      TDPMPlatform.WinArm32: ;
 //      TDPMPlatform.WinArm64: ;
-//      TDPMPlatform.OSX32: result := 91;
-//      TDPMPlatform.OSX64: result := 91;
+//      TDPMPlatform.MacOS32: result := 91;
+//      TDPMPlatform.MacOS64: result := 91;
 //      TDPMPlatform.AndroidArm32: result := 95;
 //      TDPMPlatform.AndroidArm64: result := 95;
 //      TDPMPlatform.AndroidIntel32: ;

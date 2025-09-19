@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -29,17 +29,20 @@ unit DPM.Core.Spec.DesignEntry;
 interface
 
 uses
-  JsonDataObjects,
   VSoft.YAML,
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
-  DPM.Core.Spec.BuildEntry;
+  DPM.Core.Spec.Node;
 
 type
-  TSpecDesignEntry = class(TSpecBuildEntry, ISpecDesignEntry)
+  TSpecDesignEntry = class(TSpecNode, ISpecDesignEntry)
   private
+    FProject : string;
+    FPlatforms : TDPMPlatforms;
+    FDefines : string;
+
     FLibSuffix : string;
     FLibPrefix : string;
     FLibVersion : string;
@@ -47,19 +50,21 @@ type
     function GetLibSuffix : string;
     function GetLibPrefix : string;
     function GetLibVersion : string;
+    function GetProject : string;
+    function GetPlatforms : TDPMPlatforms;
+    function GetDefines : string;
 
-
+    procedure SetProject(const value : string);
+    procedure SetDefines(const value : string);
     procedure SetLibSuffix(const value : string);
     procedure SetLibPrefix(const value : string);
     procedure SetLibVersion(const value : string);
-    procedure SetPlatforms(const value: TDPMPlatforms); override;
+    procedure SetPlatforms(const value: TDPMPlatforms);
 
 
-    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
     procedure ToYAML(const parent : IYAMLValue; const packageKind : TDPMPackageKind);override;
-    function ToJSON : string; override;
 
 
     function Clone : ISpecDesignEntry;reintroduce;
@@ -79,25 +84,33 @@ uses
 
 function TSpecDesignEntry.Clone : ISpecDesignEntry;
 begin
-  result := TSpecDesignEntry.CreateClone(logger, Project, Defines, Platforms, FLibSuffix, FLibPrefix, FLibVersion );
+  result := TSpecDesignEntry.CreateClone(logger, FProject, FDefines, FPlatforms, FLibSuffix, FLibPrefix, FLibVersion );
 end;
 
 constructor TSpecDesignEntry.Create(const logger : ILogger);
 begin
   inherited Create(logger);
-  Platforms := [TDPMPlatform.Win32, TDPMPlatform.Win64];
+  FPlatforms := [TDPMPlatform.Win32, TDPMPlatform.Win64];
 end;
 
 constructor TSpecDesignEntry.CreateClone(const logger : ILogger; const project : string; const defines : string; platforms : TDPMPlatforms;
                                          const libSuffix, libPrefix, libVersion : string);
 begin
-  inherited CreateClone(logger,project, defines, platforms);
+  inherited Create(logger);
+  FProject := project;
+  FDefines := defines;
+  FPlatforms := platforms;
 
   FLibSuffix := libSuffix;
   FLibPrefix := libPrefix;
   FLibVersion := libVersion;
 end;
 
+
+function TSpecDesignEntry.GetDefines: string;
+begin
+  result := FDefines;
+end;
 
 function TSpecDesignEntry.GetLibPrefix: string;
 begin
@@ -115,35 +128,63 @@ begin
 end;
 
 
-function TSpecDesignEntry.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
+function TSpecDesignEntry.GetPlatforms: TDPMPlatforms;
 begin
-  result := inherited LoadFromJson(jsonObject);
-  FLibSuffix := jsonObject.S['libSuffix'];
-  FLibPrefix := jsonObject.S['libPrefix'];
-  FLibVersion := jsonObject.S['libVersion'];
+  result := FPlatforms;
+end;
 
-  //apply the default if not in the file.
-  if Platforms = [] then
-    Platforms := [TDPMPlatform.Win32, TDPMPlatform.Win64];
-
-
+function TSpecDesignEntry.GetProject: string;
+begin
+  result := FProject;
 end;
 
 
+
 function TSpecDesignEntry.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
+var
+  platformsSeq : IYAMLSequence;
+  i : integer;
+  platform  : TDPMPlatform;
+  sPlatform : string;
 begin
-  result := inherited LoadFromYAML(yamlObject);
+  result := true;
+  FProject := yamlObject.S['project'];
+  if FProject = '' then
+  begin
+    Logger.Error('Build Entry is missing required [project] property.');
+    result := false;
+  end;
+
+  FDefines := yamlObject.S['defines'];
+  platformsSeq := yamlObject.A['platforms'];
+  FPlatforms := [];
+  if platformsSeq.Count > 0 then
+  begin
+    for i := 0 to platformsSeq.Count -1 do
+    begin
+      sPlatform := platformsSeq.S[i];
+      platform := StringToDPMPlatform(sPlatform);
+      if platform <> TDPMPlatform.UnknownPlatform then
+        FPlatforms := FPlatforms + [platform];
+    end;
+  end;
+
   FLibSuffix := yamlObject.S['libSuffix'];
   FLibPrefix := yamlObject.S['libPrefix'];
   FLibVersion := yamlObject.S['libVersion'];
 
   //apply the default if not in the file.
-  if Platforms = [] then
-    Platforms := [TDPMPlatform.Win32, TDPMPlatform.Win64];
+  if FPlatforms = [] then
+    FPlatforms := [TDPMPlatform.Win32, TDPMPlatform.Win64];
 
 
 end;
 
+
+procedure TSpecDesignEntry.SetDefines(const value: string);
+begin
+  FDefines := value;
+end;
 
 procedure TSpecDesignEntry.SetLibPrefix(const value: string);
 begin
@@ -171,43 +212,42 @@ begin
     Include(platforms,TDPMPlatform.win32);
   if (TDPMPlatform.Win32 in value) then
     Include(platforms,TDPMPlatform.win64);
-  inherited SetPlatforms(platforms);
 end;
 
-function TSpecDesignEntry.ToJSON: string;
-//var
-//  json : TJSONObject;
+procedure TSpecDesignEntry.SetProject(const value: string);
 begin
-  raise ENotImplemented.Create('should be removed');
-//  json := TJSONObject.Create;
-//  try
-//    json.S['buildId'] := FBuildId;
-//    json.S['src'] := FSource;
-//    if FCopyLocal then
-//      json.B['copyLocal'] := FCopyLocal;
-//    if FInstall then
-//      json.B['install'] := FInstall;
-//    Result := json.ToJSON;
-//  finally
-//    FreeAndNil(json);
-//  end;
+  FProject := value;
 end;
+
 
 procedure TSpecDesignEntry.ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);
 var
+  mapping : IYAMLMapping;
+  platformsSeq : IYAMLSequence;
+  platform : TDPMPlatform;
+  sPlatform : string;
   platforms : TDPMPlatforms;
 begin
-  //we want to avoid the platforms being written out if they are default value - so blank them out then restor the
-  if Self.Platforms = [TDPMPlatform.Win32, TDPMPlatform.Win64] then
-  begin
-    //save
-    platforms := [TDPMPlatform.Win32, TDPMPlatform.Win64];
-    inherited SetPlatforms([]);
-  end;
-  inherited ToYAML(parent, packageKind);
+  mapping := parent.AsSequence.AddMapping;
+  mapping.S['project'] := FProject;
+  //we want to avoid the platforms being written out if they are default value
+  if FPlatforms = [TDPMPlatform.Win32, TDPMPlatform.Win64] then
+    platforms := []
+  else
+    platforms := FPlatforms;
+
   if platforms <> [] then
-    //restore
-    inherited SetPlatforms(platforms);
+  begin
+    platformsSeq := mapping.A['platforms'];
+    for platform in platforms do
+    begin
+      sPlatform := DPMPlatformToString(platform);
+      platformsSeq.AddValue(sPlatform);
+    end;
+  end;
+
+  if FDefines <> '' then
+    mapping.S['defines'] := FDefines;
 
   if FLibSuffix <> '' then
     parent.AsMapping.S['libSuffix'] := FLibSuffix;

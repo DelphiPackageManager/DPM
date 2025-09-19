@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -31,7 +31,6 @@ interface
 uses
   System.Classes,
   System.SysUtils,
-  JsonDataObjects,
   VSoft.YAML,
   DPM.Core.Types,
   DPM.Core.Logging,
@@ -41,7 +40,6 @@ type
   TPackageSpecReader = class(TInterfacedObject, IPackageSpecReader)
   private
     FLogger : ILogger;
-    function InternalReadPackageSpecJson(const fileName : string; const jsonObject : TJsonObject) : IPackageSpec;
     function InternalReadPackageSpecYAML(const fileName : string; const yamlDoc : IYAMLDocument) : IPackageSpec;
 
   protected
@@ -53,16 +51,14 @@ type
 implementation
 
 uses
-  Winapi.ActiveX,
+  System.StrUtils,
   DPM.Core.Spec;
 
 { TSpecReader }
 
 function TPackageSpecReader.ReadSpec(const fileName : string) : IPackageSpec;
 var
-  jsonObj : TJsonObject;
   yamlDoc : IYAMLDocument;
-  ext : string;
 begin
   result := nil;
   if not FileExists(fileName) then
@@ -71,8 +67,7 @@ begin
     exit;
   end;
 
-  ext := ExtractFileExt(fileName);
-  if SameText(ext, '.yaml') then
+  if not (EndsText(filename, '.dspec.yaml') or EndsText(fileName, '.manifest.yaml')) then
   begin
     try
       yamlDoc := TYAML.LoadFromFile(fileName);
@@ -84,43 +79,12 @@ begin
       end;
 
     end;
-
   end
-  else
-  begin
-    try
-      jsonObj := TJsonObject.ParseFromFile(fileName) as TJsonObject;
-      try
-        Result := InternalReadPackageSpecJson(fileName, jsonObj);
-      finally
-        jsonObj.Free;
-      end;
-    except
-      on e : Exception do
-      begin
-        FLogger.Error('Error parsing spec json : ' + e.Message);
-        exit;
-      end;
-    end;
-  end;
 end;
 
 constructor TPackageSpecReader.Create(const logger : ILogger);
 begin
   FLogger := logger;
-end;
-
-function TPackageSpecReader.InternalReadPackageSpecJson(const fileName : string; const jsonObject : TJsonObject) : IPackageSpec;
-begin
-  result := nil;
-  if not jsonObject.Contains('metadata') then
-  begin
-    FLogger.Error('json document does not have a metadata object, this is probably not a dspec file');
-    exit;
-  end;
-  result := TSpec.Create(FLogger, fileName);
-  result.LoadFromJson(jsonObject)
-
 end;
 
 
@@ -137,10 +101,6 @@ begin
   end;
   result := TSpec.Create(FLogger, fileName);
   result.LoadFromYAML(root);
-
-
-
-
 end;
 
 end.

@@ -3,7 +3,6 @@ unit DPM.Core.Manifest.Reader;
 interface
 
 uses
-  JsonDataObjects,
   VSoft.YAML,
   DPM.Core.Logging,
   DPM.Core.Manifest.Interfaces;
@@ -13,7 +12,6 @@ type
   private
     FLogger : ILogger;
   protected
-    function InternalReadPackageSpecJson(const fileName : string; const jsonObject : TJsonObject) : IPackageManifest;
     function InternalReadPackageSpecYaml(const fileName : string; const yamlObject : IYamlMapping) : IPackageManifest;
     function ReadManifest(const fileName : string) : IPackageManifest;
     function ReadManifestString(const manifestString : string) : IPackageManifest;
@@ -36,26 +34,21 @@ begin
   FLogger := logger;
 end;
 
-function TPackageManifestReader.InternalReadPackageSpecJson(const fileName: string; const jsonObject: TJsonObject): IPackageManifest;
+function TPackageManifestReader.InternalReadPackageSpecYaml(const fileName: string; const yamlObject: IYamlMapping): IPackageManifest;
 begin
   result := nil;
-  if not jsonObject.Contains('metadata') then
+  if not yamlObject.Contains('metadata') then
   begin
     FLogger.Error('json document does not have a metadata object, this is probably not a dspec file');
     exit;
   end;
   result := TPackageManifest.Create(FLogger, fileName, TDPMPackageKind.dpm);
-  result.LoadFromJson(jsonObject);
-end;
-
-function TPackageManifestReader.InternalReadPackageSpecYaml(const fileName: string; const yamlObject: IYamlMapping): IPackageManifest;
-begin
+  result.LoadFromYAML(yamlObject);
 
 end;
 
 function TPackageManifestReader.ReadManifest(const fileName: string): IPackageManifest;
 var
-  jsonObj : TJsonObject;
   ext : string;
   yamlDoc : IYAMLDocument;
 begin
@@ -79,31 +72,12 @@ begin
         exit;
       end;
     end;
-  end
-  else
-  begin
-    try
-      jsonObj := TJsonObject.ParseFromFile(fileName) as TJsonObject;
-      try
-        Result := InternalReadPackageSpecJson(fileName, jsonObj);
-      finally
-        jsonObj.Free;
-      end;
-    except
-      on e : Exception do
-      begin
-        result := nil;
-        FLogger.Error('Error parsing package manifest json : ' + e.Message);
-        exit;
-      end;
-    end;
   end;
-
 end;
 
 function TPackageManifestReader.ReadManifestString(const manifestString: string): IPackageManifest;
 var
-  jsonObj : TJsonObject;
+  yamlDoc: IYAMLDocument;
 begin
   result := nil;
   if manifestString = '' then
@@ -113,12 +87,8 @@ begin
   end;
 
   try
-    jsonObj := TJsonObject.Parse(manifestString) as TJsonObject;
-    try
-      Result := InternalReadPackageSpecJson('', jsonObj);
-    finally
-      jsonObj.Free;
-    end;
+    yamlDoc := TYAML.LoadFromString(manifestString);
+    Result := InternalReadPackageSpecYaml('', yamlDoc.Root.AsMapping);
   except
     on e : Exception do
     begin

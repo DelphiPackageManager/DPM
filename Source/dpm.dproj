@@ -15,8 +15,8 @@
         <DPMCompiler>13.0</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.YAML\1.2.1\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.CommandLine\0.1.11\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
-        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.YAML\1.2.1\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.CommandLine\0.1.11\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\vsoft.yaml\1.2.3\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.CommandLine\0.1.11\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\vsoft.yaml\1.2.3\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.CommandLine\0.1.11\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -194,10 +194,10 @@
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <DCC_DebugInfoInExe>true</DCC_DebugInfoInExe>
         <DCC_MapFile>3</DCC_MapFile>
-        <Debugger_CWD>I:\Github\DelphiPackageManager\DPMMaster\Source</Debugger_CWD>
+        <Debugger_CWD>I:\Github\VSoftTechnologies\OmniThreadLibrary</Debugger_CWD>
         <Debugger_EnvVars>DPMPACKAGECACHE=c:\temp\packagecache;$(Debugger_EnvVars)</Debugger_EnvVars>
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
-        <Debugger_RunParams>install VSoft.YAML .\dpm.dproj</Debugger_RunParams>
+        <Debugger_RunParams>pack gabr42.omnithreadlibrary.dspec.yaml -o=i:\dpm-upload</Debugger_RunParams>
         <ILINK_MapFileType>DetailedSegments</ILINK_MapFileType>
         <OutputExt>2.exe</OutputExt>
     </PropertyGroup>
@@ -348,6 +348,7 @@
         <DCCReference Include="Core\Manifest\DPM.Core.Manifest.Reader.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Hash.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Template.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Masks.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -1280,7 +1281,7 @@
                 <PackageReference id="VSoft.JsonDataObjects" version="0.3.2"/>
                 <PackageReference id="VSoft.SemanticVersion" version="0.2.7"/>
                 <PackageReference id="VSoft.Uri" version="0.3.3"/>
-                <PackageReference id="VSoft.YAML" version="1.2.1"/>
+                <PackageReference id="vsoft.yaml" version="1.2.3"/>
             </PackageReferences>
             <PackageReferences platform="Win64">
                 <PackageReference id="Spring4D.Core" version="2.0.2-beta.2">
@@ -1300,7 +1301,7 @@
                 <PackageReference id="VSoft.JsonDataObjects" version="0.3.2"/>
                 <PackageReference id="VSoft.SemanticVersion" version="0.2.7"/>
                 <PackageReference id="VSoft.Uri" version="0.3.3"/>
-                <PackageReference id="VSoft.YAML" version="1.2.1"/>
+                <PackageReference id="vsoft.yaml" version="1.2.3"/>
             </PackageReferences>
         </DPM>
     </ProjectExtensions>

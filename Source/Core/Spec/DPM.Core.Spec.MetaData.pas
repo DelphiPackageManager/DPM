@@ -31,7 +31,6 @@ interface
 uses
   System.Classes,
   Spring.Collections,
-  JsonDataObjects,
   VSoft.YAML,
   DPM.Core.Types,
   DPM.Core.Logging,
@@ -116,10 +115,8 @@ type
     procedure SetFrameworks(const value : TArray<TDPMUIFrameworkType>);
     function HasVersions : boolean;
 
-    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
-    function ToJSON : string; override;
     procedure ToYAML(const parentObj : IYAMLValue; const packageKind : TDPMPackageKind);override;
 
     function Clone : ISpecMetaData;
@@ -176,7 +173,8 @@ begin
     end;
   end;
   FDescription := source.Description;
-  FAuthors := source.Authors;
+  FAuthors := TCollections.CreateList<string>;
+  FAuthors.AddRange(source.Authors);
   FProjectUrl := source.ProjectUrl;
   FRepositoryUrl := source.RepositoryUrl;
   FRepositoryType := source.RepositoryType;
@@ -189,7 +187,6 @@ begin
 
   FTags := TStringList.Create;
   FTags.Assign(source.Tags);
-  FAuthors := TCollections.CreateList<string>;
   FIsTrial := source.IsTrial;
   FIsCommercial := source.IsCommercial;
   FReadme := source.ReadMe;
@@ -313,72 +310,6 @@ function TSpecMetaData.HasVersions: boolean;
 begin
   result := (FVersions <> nil) and (FVersions.Count > 0);
 end;
-
-function TSpecMetaData.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
-var
-  sVersion : string;
-  sError : string;
-//  sLicenseType : string;
-begin
-  result := true;
-  FId := jsonObject.S['id'];
-
-  if not TPackageIdValidator.IsValidPackageId(FId) then
-  begin
-    Logger.Error('Invalid package Id [' + FId + ']');
-    result := false;
-  end;
-
-  sVersion := jsonObject.S['version'];
-  if sVersion = '' then
-  begin
-    logger.Error('Required field [version] not found.');
-    result := false;
-  end;
-
-  if not TPackageVersion.TryParseWithError(sVersion, FVersion, sError) then
-  begin
-    logger.Error('Invalid Package Version : ' + sError);
-    result := false;
-  end;
-
-  FDescription := jsonObject.S['description'];
-  if FDescription = '' then
-  begin
-    logger.Error('Required field [description] not found.');
-    result := false;
-  end;
-
-//  FAuthors := jsonObject.S['authors'];
-//  if FAuthors = '' then
-//  begin
-//    logger.Error('Required field [authors] not found.');
-//    result := false;
-//  end;
-//
-  FProjectUrl := jsonObject.S['projectUrl'];
-  FRepositoryUrl := jsonObject.S['repositoryUrl'];
-  FRepositoryType := jsonObject.S['repositoryType'];
-  FRepositoryBranch := jsonObject.S['repositoryBranch'];
-  FRepositoryCommit := jsonObject.S['repositoryCommit'];
-  FReleaseNotes := jsonObject.S['releaseNotes'];
-  FLicense := jsonObject.S['license'];
-  FIcon := jsonObject.S['icon'];
-  FCopyright := jsonObject.S['copyright'];
-  FReadme := jsonObject.S['readme'];
-  FTags.Delimiter := ' ';
-  FTags.DelimitedText := jsonObject.S['tags'];
-  FTags.Delimiter := #0;
-  FIsTrial := jsonObject.B['isTrial'];
-  FIsCommercial := jsonObject.B['isCommercial'];
-//  sUI := jsonObject.S['uiFramework'];
-//  if sUI <> '' then
-//    FUIFrameworkType := StringToUIFrameworkType(sUI);
-//  sLicenseType := jsonObject.S['licenseType'];
-//  if sLicenseType <> '' then
-//    FLicenseType := StringToLicenseType(sLicenseType);
-end;
-
 
 function TSpecMetaData.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var
@@ -627,44 +558,6 @@ end;
 procedure TSpecMetaData.SetVersion(const value : TPackageVersion);
 begin
   FVersion := value;
-end;
-
-function TSpecMetaData.ToJSON: string;
-var
-  json : TJSONObject;
-begin
-  json := TJSONObject.Create;
-  try
-    json.S['id'] := FId;
-    json.S['version'] := FVersion.ToString;
-    json.S['description'] := FDescription;
-    if Length(FIcon) > 0 then
-      json.S['icon'] := FIcon;
-//    json.S['authors'] := FAuthors;
-    json.S['projectUrl'] := FProjectUrl;
-    json.S['repositoryUrl'] := FRepositoryUrl;
-    json.S['repositoryCommit'] := FRepositoryCommit;
-    json.S['license'] := FLicense;
-    json.S['copyright'] := FCopyright;
-    if FTags.Count > 0 then
-    begin
-      FTags.Delimiter := ' ';
-      json.S['tags'] := FTags.DelimitedText;
-      FTags.Delimiter := ' ';
-    end;
-
-    if FIsTrial then
-      json.B['istrial'] := FIsTrial;
-    if FIsCommercial then
-      json.b['iscommercial'] := FIsCommercial;
-
-    if Length(FReadme) > 0 then
-      json.S['readme'] := FReadme;
-
-    Result := json.ToJSON;
-  finally
-    FreeAndNil(json);
-  end;
 end;
 
 procedure TSpecMetaData.ToYAML(const parentObj: IYAMLValue; const packageKind : TDPMPackageKind);

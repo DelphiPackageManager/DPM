@@ -4,7 +4,7 @@ interface
 
 uses
   System.Classes,
-  JsonDataObjects,
+  VSoft.YAML,
   DPM.Core.Types,
   DPM.Core.Spec.Interfaces;
 
@@ -17,7 +17,7 @@ type
     function GetTargetPlatform : ISpecTargetPlatform;
     function GetIsValid : boolean;
     function GetFileName : string;
-    function LoadFromJson(const jsonObject : TJsonObject) : boolean;
+    function LoadFromYAML(const yamlObj : IYAMLMapping) : boolean;
 
     property MetaData : ISpecMetaData read GetMetaData;
     property TargetPlatform : ISpecTargetPlatform read GetTargetPlatform;

@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -29,7 +29,6 @@ unit DPM.Core.Spec.Dependency;
 interface
 
 uses
-  JsonDataObjects,
   VSoft.YAML,
   DPM.Core.Types,
   DPM.Core.Logging,
@@ -48,12 +47,10 @@ type
     procedure SetId(const Id: string);
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
-    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
     constructor CreateClone(const logger : ILogger; const id : string; const version : TVersionRange; const versionString : string);
     function Clone : ISpecDependency; virtual;
-    function ToJSON: string; override;
     procedure ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);override;
   public
     constructor Create(const logger : ILogger); override;
@@ -100,40 +97,6 @@ begin
 end;
 
 
-function TSpecDependency.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
-var
-  sValue : string;
-  sError : string;
-begin
-  result := true;
-  FId := jsonObject.S['id'];
-  if FId = '' then
-  begin
-    Logger.Error('dependency has no id attribute');
-    result := false;
-  end
-  else if not TPackageIdValidator.IsValidPackageId(FId) then
-  begin
-    Logger.Error('Invalid dependency Id [' + FId + ']');
-    result := false;
-  end;
-  sValue := jsonObject.S['version'];
-  if sValue = '' then
-  begin
-    Logger.Error('dependency has no version');
-    result := false;
-
-  end
-  else if sValue = '$version$' then
-    FVersionString := sValue
-  else if not TVersionRange.TryParseWithError(sValue, FVersion, sError) then
-  begin
-    Logger.Error('Invalid dependency version attribute [' + sValue + '] - ' + sError);
-    result := false;
-  end;
-
-end;
-
 function TSpecDependency.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var
   sValue : string;
@@ -175,20 +138,6 @@ end;
 procedure TSpecDependency.SetVersionRange(const value : TVersionRange);
 begin
   FVersion := value;
-end;
-
-function TSpecDependency.ToJSON: string;
-var
-  json : TJsonObject;
-begin
-  json := TJsonObject.Create;
-  try
-    json.S['id'] := FId;
-    json.S['version'] := FVersion.ToString;
-    Result := json.ToJSON;
-  finally
-    FreeAndNil(json);
-  end;
 end;
 
 procedure TSpecDependency.ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);

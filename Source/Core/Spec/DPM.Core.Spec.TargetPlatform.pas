@@ -32,7 +32,6 @@ interface
 uses
   System.Classes,
   Spring.Collections,
-  JsonDataObjects,
   VSoft.YAML,
   DPM.Core.Types,
   DPM.Core.Logging,
@@ -80,11 +79,9 @@ type
 
     function GetVariables : IVariables;
 
-    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
     function CloneForCompilerVersion(const compilerVersion : TCompilerVersion) : ISpecTargetPlatform;
-    function ToJSON: string; override;
     procedure ToYAML(const parent : IYAMLValue; const packageKind : TDPMPackageKind);override;
 
     function Clone : ISpecTargetPlatform;
@@ -149,8 +146,8 @@ begin
   inherited Create(logger);
   FVariables := TCollections.CreateDictionary<string,string>;
   FTemplateName := source.TemplateName;
-
   FCompiler := source.Compiler;
+  FPlatforms := source.Platforms;
   FMinCompilerVersion := source.MinCompiler;
   FMaxCompilerVersion := source.MaxCompiler;
   FCompilers := source.Compilers;
@@ -213,90 +210,9 @@ begin
   for c in FCompilers do
   begin
      if c = compilerVersion then
-      exit; 
+      exit;
   end;
   result := false;
-end;
-
-function TSpecTargetPlatform.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
-var
-  sValue : string;
-  platformStrings : TArray<string>;
-  platform : TDPMPlatform;
-  platformList : IList<TDPMPlatform>;
-  sCompiler : string;
-
-  variablesObj : TJsonObject;
-  i: Integer;
-
-begin
-  result := true;
-  sCompiler := jsonObject.S['compiler'];
-  if sCompiler = '' then
-  begin
-    Logger.Error('Required property [compiler] is missing)');
-    result := false;
-  end
-  else
-  begin
-    FCompiler := StringToCompilerVersion(sCompiler);
-    if FCompiler = TCompilerVersion.UnknownVersion then
-    begin
-      result := false;
-      Logger.Error('Invalid compiler value [' + sCompiler + ']');
-    end;
-  end;
-
-  sValue := jsonObject.S['platforms'];
-  if sValue = '' then
-  begin
-    Logger.Error('Required property [platforms] is missing)');
-    result := false;
-  end
-  else
-  begin
-    sValue := StringReplace(sValue, ' ', '', [rfReplaceAll]);
-    //Logger.Debug('[targetPlatform] platforms : ' + sValue);
-    platformStrings := TStringUtils.SplitStr(sValue, ',');
-
-    if Length(platformStrings) > 0 then
-    begin
-      platformList := TCollections.CreateList<TDPMPlatform>;
-      for sValue in platformStrings do
-      begin
-        platform := StringToDPMPlatform(sValue);
-        if platform <> TDPMPlatform.UnknownPlatform then
-        begin
-          platformList.Add(platform);
-          if not ValidatePlatform(FCompiler, platform) then
-          begin
-            Logger.Error('Invalid platform value [' + sValue + '] for compiler version [' + sCompiler + ']');
-            result := false;
-          end;
-        end
-        else
-        begin
-          Logger.Error('Invalid platform value [' + sValue + ']');
-          result := false;
-        end;
-      end;
-      FPlatforms := platformList.ToArray();
-    end
-    else
-    begin
-      Logger.Error('At least 1 platform must be specified.');
-      result := false;
-    end;
-  end;
-  FTemplateName := jsonObject.S['template'];
-  variablesObj := jsonObject.ExtractObject('variables');
-  if variablesObj <> nil then
-  begin
-    for i := 0 to variablesObj.Count -1 do
-      FVariables[LowerCase(variablesObj.Names[i])] := variablesObj.Values[variablesObj.Names[i]].Value;
-    variablesObj.Free;
-  end;
-  result := inherited LoadFromJson(jsonObject) and result;
 end;
 
 function TSpecTargetPlatform.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
@@ -385,9 +301,9 @@ begin
       if platform = TDPMPlatform.UnknownPlatform then
       begin
         result := false;
-        Logger.Error('No compiler versions supplied for targetFramework');
+        Logger.Error('Invalid compiler version : ' + sValue);
       end
-      else
+      else 
         platformList.Add(platform);
     end;
     FPlatforms := platformList.Distinct.ToArray;
@@ -455,41 +371,6 @@ begin
   FTemplateName := name;
 end;
 
-function TSpecTargetPlatform.ToJSON: string;
-var
-  json : TJSONObject;
-  jsonVariables : TJSONObject;
-  platformList : string;
-  i: Integer;
-  j: Integer;
-begin
-  json := TJSONObject.Create;
-  try
-    json.S['compiler'] := CompilerToString(FCompiler);
-    platformList := '';
-    for i := Low(FPlatforms) to High(FPlatforms) do
-    begin
-      if platformList = '' then
-        platformList := DPMPlatformToString(FPlatforms[i])
-      else
-        platformList := platformList + ', ' + DPMPlatformToString(FPlatforms[i]);
-    end;
-    json.S['platforms'] := platformList;
-    json.S['template'] := FTemplateName;
-    if FVariables.Count > 0 then
-    begin
-      jsonVariables := TJSONObject.Create;
-      for j := 0 to FVariables.Count - 1 do
-      begin
-        jsonVariables.S[FVariables.Items[j].Key] := FVariables.Items[j].Value;
-      end;
-      json.O['variables'] := jsonVariables;
-    end;
-    Result := json.ToJSON;
-  finally
-    FreeAndNil(json);
-  end;
-end;
 
 function TSpecTargetPlatform.ToString: string;
 begin
@@ -510,6 +391,11 @@ begin
 
   for i := 0 to High(FPlatforms) do
   begin
+    if not (FPlatforms[i] in AllPlatforms(FCompiler)) then
+    begin
+      Logger.Error('Invalid platform [' + DPMPlatformToString(FPlatforms[i]) + '] for compiler [' + CompilerToString(FCompiler) + ']');
+      continue;
+    end;   
     sPlatform := DPMPlatformToString(FPlatforms[i]);
     platforms.AddValue(sPlatform);
   end;

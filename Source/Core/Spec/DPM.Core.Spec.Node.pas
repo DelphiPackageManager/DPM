@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -34,7 +34,6 @@ uses
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Logging,
-  JsonDataObjects,
   VSoft.YAML,
   DPM.Core.Spec.Interfaces;
 
@@ -45,7 +44,7 @@ type
     FLogger : ILogger;
     FComments : TStringList;
   protected
-    procedure AddToArray<T>(arr : TArray<T>; value : T);
+    procedure AddToArray<T>(var arr : TArray<T>; value : T);
 
     function GetComments : TStrings;
     function HasComments : boolean;
@@ -54,15 +53,11 @@ type
     //takes any comments available on the yamlobject
     procedure LoadComments(const yamlObject : IYAMLValue);
 
-    function LoadFromJson(const jsonObject : TJsonObject) : boolean; virtual; abstract;
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;virtual;abstract;
 
-    function ToJSON: string; virtual; abstract;
     procedure ToYAML(const parent : IYAMLValue; const packageKind : TDPMPackageKind);virtual;abstract;
-    function LoadJsonCollection(const collection : TJSonArray; const nodeClass : TSpecNodeClass; const action : TConstProc<IInterface>) : boolean;
     function LoadYAMLCollection(const collection : IYAMLSequence; const nodeClass : TSpecNodeClass; const action : TConstProc<IInterface>) : boolean;
 
-    function LoadObjectList(const list: Spring.Collections.IList<ISpecNode>): TJsonArray;
 
     //for internal use
     property Comments : TStrings read GetComments write SetComments;
@@ -93,7 +88,7 @@ begin
   end;
 end;
 
-procedure TSpecNode.AddToArray<T>(arr: TArray<T>; value: T);
+procedure TSpecNode.AddToArray<T>(var arr: TArray<T>; value: T);
 begin
   SetLength(arr, Length(arr)+1);
   arr[Length(arr)-1] := value;
@@ -125,37 +120,6 @@ begin
   result := (FComments <> nil) and (FComments.Count > 0);
 end;
 
-function TSpecNode.LoadJsonCollection(const collection : TJSonArray; const nodeClass : TSpecNodeClass; const action : TConstProc<IInterface>) : boolean;
-var
-  item : ISpecNode;
-  i : Integer;
-  obj : TJsonObject;
-begin
-  result := true;
-  if collection.Count = 0 then
-    exit;
-
-  for i := 0 to collection.Count - 1 do
-  begin
-    item := nodeClass.Create(Logger) as ISpecNode;
-    obj := collection.O[i];
-    item.LoadFromJson(obj);
-    action(item);
-  end;
-end;
-
-function TSpecNode.LoadObjectList(const list: Spring.Collections.IList<ISpecNode>): TJsonArray;
-var
-  i: Integer;
-  json : TJSONObject;
-begin
-  Result := TJsonArray.Create;
-  for i := 0 to list.Count - 1 do
-  begin
-    json := TJsonObject.Parse(list[i].ToJson) as TJsonObject;
-    Result.Add(json);
-  end;
-end;
 
 function TSpecNode.LoadYAMLCollection(const collection: IYAMLSequence; const nodeClass: TSpecNodeClass; const action: TConstProc<IInterface>): boolean;
 var

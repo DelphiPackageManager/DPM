@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -191,6 +191,10 @@ begin
   result := false;
   if FZipFile <> nil then
     exit(true); //already open;
+
+  if FileExists(fileName) then
+    DeleteFile(fileName);
+
 
   FZipFile := TZipFile.Create;
   try

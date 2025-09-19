@@ -79,9 +79,9 @@ type
     Win32,
     Win64,
 //    Win64x, TODO : do we need this?
-    OSX32,
-    OSX64,
-    OSXARM64,
+    MacOS32,
+    MacOS64,
+    MacOS64ARM,
     AndroidArm32,
     AndroidArm64,
     iOS32,
@@ -123,6 +123,7 @@ function StringToCompilerVersion(const value : string) : TCompilerVersion;
 function StringToDPMPlatform(const value : string) : TDPMPlatform;
 
 function CompilerToString(const value : TCompilerVersion) : string;
+function CompilerNoPrefix(const value : TCompilerVersion) : string;
 function CompilerToStringNoPoint(const value : TCompilerVersion) : string;
 
 function CompilerCodeName(const value : TCompilerVersion) : string;
@@ -264,14 +265,16 @@ begin
   result := GetEnumName(TypeInfo(TDPMPackageKind), ord(value));
 end;
 
-
+function CompilerNoPrefix(const value : TCompilerVersion) : string;
+begin
+  result := CompilerToString(value);
+  Delete(result,1,6);
+end;
 
 function CompilerToString(const value : TCompilerVersion) : string;
 begin
   result := GetEnumName(TypeInfo(TCompilerVersion), ord(value));
-  if TStringUtils.StartsWith(result,'RS') then
-    Delete(result, 1, 2); // remove RS
-  result := StringReplace(result, '_', '.', [rfReplaceAll]);
+  result := LowerCase(StringReplace(result, '_', '.', [rfReplaceAll]));
 end;
 
 function CompilerToStringNoPoint(const value : TCompilerVersion) : string;
@@ -297,9 +300,9 @@ begin
     TDPMPlatform.UnknownPlatform: Result := 'Unknown' ;
     TDPMPlatform.Win32: result := 'Windows 32-bit' ;
     TDPMPlatform.Win64: result := 'Windows 64-bit';
-    TDPMPlatform.OSX32: result := 'macOS 32-bit';
-    TDPMPlatform.OSX64: result := 'macOS 64-bit';
-    TDPMPlatform.OSXARM64: result := 'macOS ARM 64-bit';
+    TDPMPlatform.MacOS32: result := 'macOS 32-bit';
+    TDPMPlatform.MacOS64: result := 'macOS 64-bit';
+    TDPMPlatform.MacOS64ARM: result := 'macOS ARM 64-bit';
 
     TDPMPlatform.AndroidArm32: result := 'Andriod 32-bit ARM';
     TDPMPlatform.AndroidArm64: result := 'Andriod 64-bit ARM';
@@ -320,6 +323,7 @@ begin
   else
     result := GetEnumName(TypeInfo(TDPMPlatform), ord(value));
   end;
+  result := LowerCase(result);
 end;
 
 function DPMPlatformToBDString(const value : TDPMPlatform) : string;
@@ -371,7 +375,7 @@ begin
       result := result + sep + DPMPlatformToString(p);
     Inc(i);
   end;
-end;
+ end;
 
 function IntToBin(Value: Word): string;
 var
@@ -437,51 +441,51 @@ begin
   // https://en.wikipedia.org/wiki/History_of_Delphi_(software)
 
   case compiler of
-    TCompilerVersion.DelphiXE2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32];
+    TCompilerVersion.DelphiXE2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS32];
 
-    TCompilerVersion.DelphiXE3 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32];
+    TCompilerVersion.DelphiXE3 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS32];
 
-    TCompilerVersion.DelphiXE4 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator];
+    TCompilerVersion.DelphiXE4 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator];
 
-    TCompilerVersion.DelphiXE5 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator,
+    TCompilerVersion.DelphiXE5 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator,
                                         TDPMPlatform.AndroidArm32];
 
-    TCompilerVersion.DelphiXE6 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator,
+    TCompilerVersion.DelphiXE6 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator,
                                         TDPMPlatform.AndroidArm32];
 
-    TCompilerVersion.DelphiXE7 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator,
+    TCompilerVersion.DelphiXE7 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator,
                                         TDPMPlatform.AndroidArm32];
 
-    TCompilerVersion.DelphiXE8 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator,
+    TCompilerVersion.DelphiXE8 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS32, TDPMPlatform.iOS32, TDPMPlatform.iOSSimulator,
                                         TDPMPlatform.iOS64, TDPMPlatform.AndroidArm32];
 
     // https://docwiki.embarcadero.com/RADStudio/Berlin/en/Supported_Target_Platforms
     TCompilerVersion.Delphi10,
-    TCompilerVersion.Delphi10_1 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOS64,
+    TCompilerVersion.Delphi10_1 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS32, TDPMPlatform.iOS32, TDPMPlatform.iOS64,
                                          TDPMPlatform.iOSSimulator, TDPMPlatform.AndroidArm32];
 
     // https://docwiki.embarcadero.com/RADStudio/Tokyo/en/Supported_Target_Platforms
-    TCompilerVersion.Delphi10_2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.iOS32, TDPMPlatform.iOS64,
+    TCompilerVersion.Delphi10_2 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS32, TDPMPlatform.iOS32, TDPMPlatform.iOS64,
                                          TDPMPlatform.iOSSimulator, TDPMPlatform.AndroidArm32, TDPMPlatform.LinuxIntel64];
 
     // https://docwiki.embarcadero.com/RADStudio/Rio/en/Supported_Target_Platforms
-    TCompilerVersion.Delphi10_3 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX32, TDPMPlatform.OSX64, TDPMPlatform.iOS32,
+    TCompilerVersion.Delphi10_3 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS32, TDPMPlatform.MacOS64, TDPMPlatform.iOS32,
                                          TDPMPlatform.iOS64, TDPMPlatform.iOSSimulator, TDPMPlatform.AndroidArm32, TDPMPlatform.AndroidArm64,
                                          TDPMPlatform.LinuxIntel64];
 
     // https://docwiki.embarcadero.com/RADStudio/Sydney/en/Supported_Target_Platforms
-    TCompilerVersion.Delphi10_4 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX64, TDPMPlatform.iOS64, TDPMPlatform.iOSSimulator,
+    TCompilerVersion.Delphi10_4 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS64, TDPMPlatform.iOS64, TDPMPlatform.iOSSimulator,
                                          TDPMPlatform.AndroidArm32, TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
 
     // https://docwiki.embarcadero.com/RADStudio/Alexandria/en/Supported_Target_Platforms
-    TCompilerVersion.Delphi11 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSX64, TDPMPlatform.OSXARM64, TDPMPlatform.iOS64,
+    TCompilerVersion.Delphi11 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS64, TDPMPlatform.MacOS64ARM, TDPMPlatform.iOS64,
                                          TDPMPlatform.AndroidArm32, TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
 
     // https://docwiki.embarcadero.com/RADStudio/Athens/en/Supported_Target_Platforms
-    TCompilerVersion.Delphi12 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSXARM64, TDPMPlatform.OSX64, TDPMPlatform.iOS64,
+    TCompilerVersion.Delphi12 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS64ARM, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
                                          TDPMPlatform.AndroidArm32, TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
 
-    TCompilerVersion.Delphi13 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.OSXARM64, TDPMPlatform.OSX64, TDPMPlatform.iOS64,
+    TCompilerVersion.Delphi13 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS64ARM, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
                                          TDPMPlatform.AndroidArm32, TDPMPlatform.AndroidArm64, TDPMPlatform.LinuxIntel64];
   else
     raise Exception.Create('AllPlatforms is missing for : ' + CompilerToString(compiler));

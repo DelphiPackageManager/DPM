@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -28,7 +28,6 @@ unit DPM.Core.Spec.BuildEntry;
 
 interface
 uses
-  JsonDataObjects,
   VSoft.YAML,
   Spring.Collections,
   DPM.Core.Types,
@@ -48,15 +47,12 @@ type
     function GetDefines : string;
 
     procedure SetProject(const value : string);
-    //virtual so we can override in design to limit to Win32/Win64
-    procedure SetPlatforms(const value : TDPMPlatforms);virtual;
+    procedure SetPlatforms(const value : TDPMPlatforms);
     procedure SetDefines(const value : string);
 
-    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
     function Clone : ISpecBuildEntry;
-    function ToJSON: string; override;
     procedure ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);override;
 
     //here for design entry to use
@@ -114,34 +110,7 @@ begin
   result := FProject;
 end;
 
-function TSpecBuildEntry.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
-var
-  platformsArray : TJsonArray;
-  i : integer;
-  platform  : TDPMPlatform;
-  sPlatform : string;
-begin
-  result := true;
-  FProject := jsonObject.S['project'];
-  if FProject = '' then
-  begin
-    Logger.Error('Build Entry is missing required [project] property.');
-    result := false;
-  end;
-  FDefines := jsonObject.S['defines'];
-  platformsArray := jsonObject.A['platforms'];
-  FPlatforms := [];
-  if platformsArray.Count > 0 then
-  begin
-    for i := 0 to platformsArray.Count -1 do
-    begin
-      sPlatform := platformsArray.S[i];
-      platform := StringToDPMPlatform(sPlatform);
-      if platform <> TDPMPlatform.UnknownPlatform then
-        FPlatforms := FPlatforms + [platform];
-    end;
-  end;
-end;
+
 
 function TSpecBuildEntry.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var
@@ -189,13 +158,29 @@ begin
   FProject := value;
 end;
 
-function TSpecBuildEntry.ToJSON: string;
-begin
-  raise ENotImplemented.Create('ToJSON not implented, will be removed');
-end;
 
 procedure TSpecBuildEntry.ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);
+var
+  mapping : IYAMLMapping;
+  platformsSeq : IYAMLSequence;
+  platform : TDPMPlatform;
+  sPlatform : string;
 begin
+  mapping := parent.AsSequence.AddMapping;
+  mapping.S['project'] := FProject;
+  if FPlatforms <> [] then
+  begin
+    platformsSeq := mapping.A['platforms'];
+    for platform in FPlatforms do
+    begin
+      sPlatform := DPMPlatformToString(platform);
+      platformsSeq.AddValue(sPlatform);
+    end;
+  end;
+
+  if FDefines <> '' then
+    mapping.S['defines'] := FDefines;
+
 
 end;
 

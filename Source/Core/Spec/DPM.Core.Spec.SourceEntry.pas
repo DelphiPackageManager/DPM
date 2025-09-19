@@ -29,7 +29,6 @@ unit DPM.Core.Spec.SourceEntry;
 interface
 
 uses
-  JsonDataObjects,
   VSoft.YAML,
   Spring.Collections,
   DPM.Core.Types,
@@ -46,7 +45,6 @@ type
     FDestination : string;
     FExclude : IList<string>;
 
-    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
     function GetSource : string;
@@ -58,7 +56,6 @@ type
     constructor CreateClone(const logger : ILogger; const src : string; const dest : string; const exclude : IList<string>); virtual;
     function Clone : ISpecSourceEntry;
 
-    function ToJSON: string; override;
     procedure ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);override;
 
   public
@@ -108,33 +105,6 @@ begin
   result := FDestination;
 end;
 
-function TSpecSourceEntry.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
-var
-  excludeArray : TJsonArray;
-  entry : string;
-  i : Integer;
-begin
-  result := true;
-  FSource := jsonObject.S['src'];
-  if FSource = '' then
-  begin
-    result := false;
-    Logger.Error('Required attribute [src] is missing');
-  end;
-  FDestination := jsonObject.S['dest'];
-
-  if jsonObject.Contains('exclude') then
-  begin
-    excludeArray := jsonObject.A['exclude']; //this is causing an av!
-
-    for i := 0 to excludeArray.Count - 1 do
-    begin
-      entry := excludeArray.S[i];
-      if entry <> '' then
-        FExclude.Add(entry);
-    end;
-  end;
-end;
 
 function TSpecSourceEntry.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var
@@ -169,37 +139,24 @@ begin
   FSource := value;
 end;
 
-function TSpecSourceEntry.ToJson: string;
-var
-  json : TJSONObject;
-  jsonArray : TJsonArray;
-  I: Integer;
-begin
-  json := TJSONObject.Create;
-  try
-    json.S['src'] := FSource;
-    if FDestination <> '' then
-      json.S['dest'] := FDestination;
-
-    if FExclude.Count > 0 then
-    begin
-      jsonArray := TJsonArray.Create;
-      for I := 0 to FExclude.Count - 1 do
-      begin
-        jsonArray.Add(FExclude[i]);
-      end;
-      json.A['exclude'] := jsonArray;
-    end;
-    Result := json.ToJSON;
-  finally
-    FreeAndNil(json);
-  end;
-end;
 
 procedure TSpecSourceEntry.ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);
+var
+  exludeSeq : IYAMLSequence;
+  i : integer;
+  mapping : IYAMLMapping;
 begin
+  mapping := parent.AsSequence.AddMapping;
+  mapping.S['src'] := FSource;
+  if FDestination <> '' then
+    mapping.S['dest'] := FDestination;
+  if FExclude.Count > 0 then
+  begin
+    exludeSeq := mapping.A['exclude'];
+    for i := 0 to FExclude.Count -1 do
+      exludeSeq.AddValue(FExclude[i]);
+  end;
 
-  //TODO
 
 end;
 

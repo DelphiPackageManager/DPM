@@ -3,7 +3,7 @@ unit DPM.Core.Manifest;
 interface
 
 uses
-  JsonDataObjects,
+  VSoft.YAML,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
@@ -22,8 +22,8 @@ type
     function GetTargetPlatform : ISpecTargetPlatform;
     function GetIsValid : boolean;
     function GetFileName : string;
-    function LoadTargetPlatformFromJson(const targetPlatformsArray : TJsonArray) : boolean;
-    function LoadFromJson(const jsonObject : TJsonObject) : boolean;
+    function LoadTargetPlatformFromYAML(const targetPlatforms : IYAMLSequence) : boolean;
+    function LoadFromYAML(const yamlObj : IYAMLMapping) : boolean;
   public
     constructor Create(const logger : ILogger; const fileName : string; packageKind : TDPMPackageKind);
     destructor Destroy;override;
@@ -76,55 +76,35 @@ begin
   result := FTargetPlatform;
 end;
 
-function TPackageManifest.LoadFromJson(const jsonObject: TJsonObject): boolean;
+function TPackageManifest.LoadFromYAML(const yamlObj : IYAMLMapping) : boolean;
 var
-  metaDataObj : TJsonObject;
-  targetPlatformsArray : TJsonArray;
+  metaDataO : IYAMLMapping;
+  targetPlatformsSeq : IYAMLSequence;
 begin
-  FIsValid := false;
-  //Logger.Debug('Reading spec metadata');
-  if not jsonObject.Contains('metadata') then
-  begin
-    FLogger.Error('Required element [metadata] not found!');
-    result := false;
-  end
-  else
-  begin
-    metaDataObj := jsonObject.O['metadata'];
-    result := FMetaData.LoadFromJson(metaDataObj)
-  end;
+  metaDataO := yamlObj.O['metadata'];
+  FMetaData.LoadFromYAML(metaDataO);
 
-  if not jsonObject.Contains('targetPlatforms') then
-  begin
-    FLogger.Error('Required element [targetPlatforms] not found!');
-    result := false;
-  end
-  else
-  begin
-    //Logger.Debug('Reading spec targetPlatforms');
-    targetPlatformsArray := jsonObject.A['targetPlatforms'];
-    result := LoadTargetPlatformFromJson(targetPlatformsArray) and result;
-  end;
-
-  FIsValid := result;
+  targetPlatformsSeq := yamlObj.A['targetPlatforms'];
+  result := LoadTargetPlatformFromYAML(targetPlatformsSeq);
 end;
 
 
-function TPackageManifest.LoadTargetPlatformFromJson(const targetPlatformsArray: TJsonArray): boolean;
+
+function TPackageManifest.LoadTargetPlatformFromYAML(const targetPlatforms : IYAMLSequence): boolean;
 begin
-  if targetPlatformsArray.Count = 0 then
+  if targetPlatforms.Count = 0 then
   begin
     FLogger.Error('No targetPlatforms found, at 1 is required');
     exit(false);
   end;
-  if targetPlatformsArray.Count > 1 then
+  if targetPlatforms.Count > 1 then
   begin
     FLogger.Error('More than one targetPlatform found, only 1 is allowed in a package manifest');
     exit(false);
   end;
 
   FTargetPlatform := TSpecTargetPlatform.Create(FLogger);
-  result := FTargetPlatform.LoadFromJson(targetPlatformsArray.O[0]);
+  result := FTargetPlatform.LoadFromYAML(targetPlatforms.O[0]);
 
 end;
 

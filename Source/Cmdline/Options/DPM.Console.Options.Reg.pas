@@ -1,9 +1,9 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -274,7 +274,7 @@ begin
   cmd.Examples.Add('install VSoft.CommandLine');
   cmd.Examples.Add('install VSoft.CommandLine -version=1.0.1 c:\myprojects\project1.dproj');
   cmd.Examples.Add('install Spring.Base c:\myprojects -compiler=10.3');
-  cmd.Examples.Add('install DUnitX.Framework c:\myproject\tests\mytest.dproj -compiler=10.3 -platforms=Win32,Win64,OSX32');
+  cmd.Examples.Add('install DUnitX.Framework c:\myproject\tests\mytest.dproj -compiler=10.3 -platforms=Win32,Win64,MacOS32');
 end;
 
 procedure RegisterListCommand;
@@ -359,7 +359,7 @@ begin
 
   cmd.Examples.Add('list "semantic" -prerelease -skip=10 -take=10');
 
-  cmd.Examples.Add('list "commandline" -compiler=10.2 -platforms=Win32,Win63,OSX32 -source=VSoftInternal -prerelease');
+  cmd.Examples.Add('list "commandline" -compiler=10.2 -platforms=Win32,Win63,MacOS32 -source=VSoftInternal -prerelease');
 
 
 end;
@@ -454,7 +454,7 @@ end;
 //
 //  cmd.Examples.Add('list "semantic" -prerelease -skip=10 -take=10');
 //
-//  cmd.Examples.Add('list "commandline" -compiler=10.2 -platforms=Win32,Win63,OSX32 -source=VSoftInternal -prerelease');
+//  cmd.Examples.Add('list "commandline" -compiler=10.2 -platforms=Win32,Win63,MacOS32 -source=VSoftInternal -prerelease');
 //
 //
 //end;
@@ -830,7 +830,7 @@ begin
   cmd.Examples.Add('uninstall VSoft.CommandLine');
   cmd.Examples.Add('uninstall VSoft.CommandLine project1.dproj');
   cmd.Examples.Add('uninstall VSoft.CommandLine c:\myprojects\project1.dproj');
-  cmd.Examples.Add('uninstall VSoft.CommandLine c:\myprojects\project1.dproj -platforms=Win64,OSX64');
+  cmd.Examples.Add('uninstall VSoft.CommandLine c:\myprojects\project1.dproj -platforms=Win64,MacOS64');
   cmd.Examples.Add('uninstall VSoft.CommandLine c:\myprojects\project1.groupproj');
 end;
 

@@ -31,7 +31,6 @@ interface
 uses
   System.Classes,
   Spring.Collections,
-  JsonDataObjects,
   VSoft.YAML,
   DPM.Core.TargetPlatform,
   DPM.Core.Types,
@@ -84,23 +83,14 @@ type
     function FindBuildEntry(const project : string) : ISpecBuildEntry;
     function FindDesignEntry(const project : string) : ISpecDesignEntry;
 
-    function LoadDependenciesFromJson(const dependenciesArray : TJsonArray) : Boolean;
     function LoadDependenciesFromYAML(const dependenciesArray : IYAMLSequence) : Boolean;
-
-    function LoadSourceFromJson(const sourceArray : TJsonArray) : Boolean;
     function LoadSourceFromYAML(const sourceArray : IYAMLSequence) : Boolean;
-
-    function LoadBuildEntriesFromJson(const buildArray : TJsonArray) : Boolean;
     function LoadBuildEntriesFromYAML(const buildArray : IYAMLSequence) : Boolean;
-
-    function LoadDesignFromJson(const designArray : TJsonArray) : Boolean;
     function LoadDesignFromYAML(const designArray : IYAMLSequence) : Boolean;
 
 
-    function LoadFromJson(const jsonObject : TJsonObject) : Boolean; override;
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
-    function ToJSON: string; override;
     procedure ToYAML(const parent : IYAMLValue; const packageKind : TDPMPackageKind);override;
 
 
@@ -155,6 +145,7 @@ var
   i : integer;
 begin
   Create(logger);
+  FName := source.Name;
   for i := 0 to source.Dependencies.Count -1 do
   begin
     newDependency := source.Dependencies[i].Clone;
@@ -245,10 +236,6 @@ begin
   FName := templateName;
 end;
 
-function TSpecTemplate.ToJSON: string;
-begin
- raise ENotImplemented.Create('To be removed');
-end;
 
 procedure TSpecTemplate.ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);
 var
@@ -424,14 +411,6 @@ begin
 end;
 
 
-function TSpecTemplate.LoadBuildEntriesFromJson(const buildArray : TJsonArray) : Boolean;
-begin
-  result := LoadJsonCollection(buildArray, TSpecBuildEntry,
-    procedure(const value : IInterface)
-    begin
-      FBuildEntries.Add(value as ISpecBuildEntry);
-    end);
-end;
 
 function TSpecTemplate.LoadBuildEntriesFromYAML(const buildArray: IYAMLSequence): Boolean;
 begin
@@ -442,23 +421,6 @@ begin
     end);
 end;
 
-function TSpecTemplate.LoadDependenciesFromJson(const dependenciesArray : TJsonArray) : Boolean;
-var
-  i : integer;
-  dependencyObj : TJsonObject;
-  dependency : ISpecDependency;
-begin
-  result := true;
-  if dependenciesArray.Count = 0 then
-    exit;
-  for i := 0 to dependenciesArray.Count - 1 do
-  begin
-    dependencyObj := dependenciesArray[i];
-    dependency := TSpecDependency.Create(Logger);
-    FDependencies.Add(dependency);
-    result := dependency.LoadFromJson(dependencyObj) and result;
-  end;
-end;
 
 function TSpecTemplate.LoadDependenciesFromYAML(const dependenciesArray: IYAMLSequence): Boolean;
 var
@@ -479,15 +441,6 @@ begin
 
 end;
 
-function TSpecTemplate.LoadDesignFromJson(const designArray : TJsonArray) : Boolean;
-begin
-  result := LoadJsonCollection(designArray, TSpecDesignEntry,
-    procedure(const value : IInterface)
-    begin
-      FDesignFiles.Add(value as ISpecDesignEntry);
-    end);
-
-end;
 
 
 function TSpecTemplate.LoadDesignFromYAML(const designArray: IYAMLSequence): Boolean;
@@ -499,15 +452,6 @@ begin
     end);
 end;
 
-function TSpecTemplate.LoadSourceFromJson(const sourceArray : TJsonArray) : Boolean;
-begin
-  result := LoadJsonCollection(sourceArray, TSpecSourceEntry,
-    procedure(const value : IInterface)
-    begin
-      FSourceFiles.Add(value as ISpecSourceEntry);
-    end);
-end;
-
 function TSpecTemplate.LoadSourceFromYAML(const sourceArray: IYAMLSequence): Boolean;
 begin
   result := LoadYAMLCollection(sourceArray, TSpecSourceEntry,
@@ -516,79 +460,6 @@ begin
       FSourceFiles.Add(value as ISpecSourceEntry);
     end);
 end;
-
-function TSpecTemplate.LoadFromJson(const jsonObject : TJsonObject) : Boolean;
-var
-  hasChildren : boolean;
-  sValue : string;
-  collectionObj : TJsonArray;
-begin
-  result := true;
-  FName := jsonObject.S['name'];
-  Logger.Debug('[template] name : ' + FName);
-
-  if IsTemplate then
-  begin
-    if jsonObject.Contains('template') then
-    begin
-      result := false;
-      Logger.Error('template property not valid in a template!');
-      exit;
-    end;
-    hasChildren := jsonObject.Count > 1; //name +
-    if not hasChildren then
-    begin
-      if jsonObject.Contains('name') then
-        sValue := jsonObject.S['name']
-      else
-        sValue := 'unamed';
-      result := false;
-      Logger.Error('Empty template [' + sValue + ']');
-      exit;
-    end;
-  end
-  else
-  begin
-    //TODO : Rethink this validation, doesn't look all that comprehensive.
-    //if we point to a template and have props other than compiler + platforms then fail
-    if jsonObject.Contains('template') then
-    begin
-      if jsonObject.Count > 4 then //compiler + platforms + template + variables
-      begin
-        Logger.Error('targetPlatform cannot specify a template and it''s own definition, pick one');
-        result := false;
-      end;
-      // if it's 4 props, then variables must be one of them
-      if jsonObject.Count > 3 then //compiler + platforms + template
-        if not jsonObject.Contains('variables') then
-        begin
-          Logger.Error('targetPlatform cannot specify a template and it''s own definition, pick one');
-          result := false;
-        end;
-      exit;
-    end;
-  end;
-
-  collectionObj := jsonObject.A['dependencies'];
-  if collectionObj.Count > 0 then
-    result := LoadDependenciesFromJson(collectionObj) and result;
-
-  collectionObj := jsonObject.A['source'];
-  if collectionObj.Count > 0 then
-    result := LoadSourceFromJson(collectionObj) and result;
-
-  collectionObj := jsonObject.A['build'];
-  if collectionObj.Count > 0 then
-    result := LoadBuildEntriesFromJson(collectionObj) and result;
-
-  collectionObj := jsonObject.A['design'];
-  if collectionObj.Count > 0 then
-    result := LoadDesignFromJson(collectionObj) and result;
-
-
-end;
-
-
 
 function TSpecTemplate.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var

@@ -41,7 +41,8 @@ uses
   DPM.Core.Options.Pack,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Packaging,
-  DPM.Core.Packaging.Archive;
+  DPM.Core.Packaging.Archive,
+  DPM.Core.Utils.Masks;
 
 /// This only processes specs for the Pack command. For git style packages we will need to do something else.
 type
@@ -57,7 +58,7 @@ type
 
   protected
 
-    procedure ProcessPattern(const basePath, dest : string; const pattern : IFileSystemPattern; const excludePatterns : IList<string> ; var fileCount : integer);
+    procedure ProcessPattern(const basePath, dest : string; const pattern : IFileSystemPattern; const excludeMatcher : IFileMatcher; var fileCount : integer);
     procedure ProcessEntry(const basePath : string; const antPattern : IAntPattern; const source, dest : string; const exclude : IList<string>);
 
 
@@ -85,6 +86,7 @@ type
 implementation
 
 uses
+  System.Diagnostics,
   System.SysUtils,
   System.StrUtils,
   System.Types,
@@ -106,12 +108,23 @@ begin
 end;
 
 
+function ApplyBase(const basePath : string; const value : string) : string;
+begin
+  result := value;
+  if TStringUtils.StartsWith(result, '.\') then
+  begin
+    Delete(result, 1, 1);
+    result := TPath.Combine(basePath, result);
+  end;
+end;
+
 function StripCurrent(const value : string) : string;
 begin
   result := value;
   if TStringUtils.StartsWith(result, '.\') then
     Delete(result, 1, 2);
 end;
+
 
 function GetNonWildcardPath(const value : string) : string;
 var
@@ -123,33 +136,19 @@ begin
     result := Copy(value, 1, i - 1);
 end;
 
-procedure TPackageWriter.ProcessPattern(const basePath : string; const dest : string; const pattern : IFileSystemPattern; const excludePatterns : IList<string>; var fileCount : integer);
+procedure TPackageWriter.ProcessPattern(const basePath : string; const dest : string; const pattern : IFileSystemPattern; const excludeMatcher : IFileMatcher; var fileCount : integer);
 var
   files : TStringDynArray;
   f : string;
   archivePath : string;
 
   function IsFileExcluded(const fileName : string) : boolean;
-  var
-    excludePatten : string;
   begin
-    result := false;
-    if excludePatterns.Count > 0 then
-    begin
-      for excludePatten in excludePatterns do
-      begin
-        //this might be slow.. Creates/Destroys TMask each time
-        //if it is then create a record based mask type to do the job.
-        if MatchesMask(fileName, excludePatten) then
-          exit(true);
-      end;
-    end;
+    result := excludeMatcher.Matches(fileName);
   end;
 begin
-
   if not TDirectory.Exists(pattern.Directory) then
       raise Exception.Create('Directory not found : ' + pattern.Directory);
-  f := TPath.Combine(pattern.Directory, pattern.FileMask); //TODO : What whas this meant to do???
   files := TDirectory.GetFiles(pattern.Directory, pattern.FileMask, TSearchOption.soTopDirectoryOnly);
   for f in files do
   begin
@@ -158,12 +157,13 @@ begin
 
     if not TFile.Exists(f) then
       raise Exception.Create('File not found : ' + f);
-
     archivePath := dest + '\' + TPathUtils.StripBase(basePath, f);
     if TStringUtils.StartsWith(archivePath, '\') then
       Delete(archivePath, 1, 1);
     Inc(fileCount);
     // FLogger.Debug('Writing file [' + archivePath + '] to package.');
+  //  FLogger.Debug('Adding file : ' + archivePath);
+
     FArchiveWriter.AddFile(f, archivePath);
   end;
 end;
@@ -191,24 +191,33 @@ begin
       spec.MetaData.Description := regEx.Replace(spec.MetaData.Description, evaluator);
       for i := 0 to spec.MetaData.Authors.Count -1 do
         spec.MetaData.Authors[i] := regEx.Replace(spec.MetaData.Authors[i], evaluator);
+
       if spec.MetaData.ProjectUrl <> '' then
         spec.MetaData.ProjectUrl := regEx.Replace(spec.MetaData.ProjectUrl, evaluator);
+
       if spec.MetaData.RepositoryUrl <> '' then
           spec.MetaData.RepositoryUrl := regEx.Replace(spec.MetaData.RepositoryUrl, evaluator);
+
       if spec.MetaData.RepositoryType <> '' then
         spec.MetaData.RepositoryType := regEx.Replace(spec.MetaData.RepositoryType, evaluator);
+
       if spec.MetaData.RepositoryBranch <> '' then
         spec.MetaData.RepositoryBranch := regEx.Replace(spec.MetaData.RepositoryBranch, evaluator);
+
       if spec.MetaData.RepositoryCommit <> '' then
         spec.MetaData.RepositoryCommit := regEx.Replace(spec.MetaData.RepositoryCommit, evaluator);
+
       spec.MetaData.License := regEx.Replace(spec.MetaData.License, evaluator);
+
       if spec.MetaData.Icon <> '' then
         spec.MetaData.Icon := regEx.Replace(spec.MetaData.Icon, evaluator);
+
       if spec.MetaData.Copyright <> '' then
         spec.MetaData.Copyright := regEx.Replace(spec.MetaData.Copyright, evaluator);
+
       if spec.MetaData.Tags.count > 0 then
       begin
-        for i := 0 to spec.MetaData.Tags.Count do
+        for i := 0 to spec.MetaData.Tags.Count -1 do
           spec.MetaData.Tags[i] := regEx.Replace(spec.MetaData.Tags[i], evaluator);
       end;
 
@@ -225,7 +234,7 @@ begin
         if source.Exclude.Count > 0 then
         begin
           for j := 0 to source.Exclude.Count -1 do
-            source.Exclude[i] := regEx.Replace(source.Exclude[i], evaluator);
+            source.Exclude[j] := regEx.Replace(source.Exclude[j], evaluator);
         end;
       end;
 
@@ -253,6 +262,9 @@ begin
         if design.LibVersion <> '' then
           design.LibVersion := regEx.Replace(design.LibVersion, evaluator);
       end;
+
+      //TODO : Add packagedefs
+
     except
       on e : Exception do
       begin
@@ -263,7 +275,6 @@ begin
 
     end;
 
-    //TODO : Add packagedefs
 
   finally
     FVariables := nil;
@@ -292,6 +303,7 @@ var
   regex : TRegex;
   evaluator : TMatchEvaluator;
   i : integer;
+  replacedVariables : IVariables;
 begin
   for pair in spec.Variables do
     FVariables[LowerCase(pair.Key)] := pair.Value;
@@ -306,14 +318,17 @@ begin
   targetPlatform.Variables.Clear;
 
   if not version.IsEmpty then
-    FVariables['version='] := version.ToString
+    FVariables['version'] := version.ToString
   else
-    FVariables['version='] := spec.MetaData.Version.ToString;
-  FVariables['target='] := CompilerToString(targetPlatform.Compiler);
+    FVariables['version'] := spec.MetaData.Version.ToString;
+  FVariables['target'] := CompilerToString(targetPlatform.Compiler);
   FVariables['compiler'] := CompilerToString(targetPlatform.Compiler);
+  FVariables['compilernoprefix'] := CompilerNoPrefix(targetPlatform.Compiler);
   FVariables['compilernopoint'] := CompilerToStringNoPoint(targetPlatform.Compiler);
   FVariables['compilercodename'] := CompilerCodeName(targetPlatform.Compiler);
-  FVariables['compilerwithcodeName'] := CompilerWithCodeName(targetPlatform.Compiler);
+  FVariables['compilerwithcodename'] := CompilerWithCodeName(targetPlatform.Compiler);
+  FVariables['compilerwithcodename'] := CompilerNoPrefix(targetPlatform.Compiler);
+
   //do not replace plaform here - we'll do that during install
 //  list.Add('platform=' + DPMPlatformToString(targetPlatform.Platforms[0]));
   FVariables['compilerversion'] := CompilerToCompilerVersionIntStr(targetPlatform.Compiler);
@@ -332,12 +347,19 @@ begin
   regEx := TRegEx.Create('\$(\w+)\$');
   evaluator := TokenMatchEvaluator;
 
+  replacedVariables := TCollections.CreateDictionary<string, string>;
+
   //variables from the spec and external may reference existing variables.
   for pair in FVariables do
   begin
     if TStringUtils.Contains(pair.Value, '$') then
-      FVariables[pair.Key] := regEx.Replace(pair.Value, evaluator);
+      replacedVariables[pair.Key] := Trim(regEx.Replace(pair.Value, evaluator))
+    else
+      replacedVariables[pair.Key] := Trim(pair.Value);
   end;
+
+  FVariables.Clear;
+  FVariables.AddRange(replacedVariables);
 
 end;
 
@@ -348,6 +370,11 @@ var
   searchBasePath : string;
   fileCount : integer;
   actualDest : string;
+  actualSource : string;
+  i, j : integer;
+  newPatterns : TArray<IFileSystemPattern>;
+  excludeAntPattern : IAntPattern;
+  fileMatcher : IFileMatcher;
 
   procedure ValidateDestinationPath(const source, dest : string);
   begin
@@ -358,18 +385,36 @@ var
 
 begin
   ValidateDestinationPath(source, dest);
+
+  actualSource := StripCurrent(source);
+
   if dest = '' then
-    actualDest := ExtractFilePath(source)
+    actualDest := ExtractFilePath(actualSource)
   else
     actualDest := dest;
+
+
+  actualDest := StripCurrent(actualDest);
   actualDest := ExcludeTrailingPathDelimiter(actualDest);
 
-  searchBasePath := TPathUtils.StripWildCard(TPathUtils.CompressRelativePath(basePath, source));
+  searchBasePath := TPathUtils.StripWildCard(TPathUtils.CompressRelativePath(basePath, actualSource));
   searchBasePath := ExtractFilePath(searchBasePath);
-  fsPatterns := antPattern.Expand(source);
+
+  fsPatterns := antPattern.Expand(actualSource);
   fileCount := 0;
+
+  fileMatcher := TFileMatcher.Create;
+
+  excludeAntPattern := TAntPattern.Create(basePath);
+  for i := 0 to exclude.Count -1 do
+  begin
+    newPatterns := excludeAntPattern.Expand(ApplyBase(basePath, exclude[i]));
+    for j := 0 to High(newPatterns) do
+      fileMatcher.AddMask(newPatterns[j].Directory + newPatterns[j].FileMask);
+  end;
+
   for fsPattern in fsPatterns do
-    ProcessPattern(searchBasePath, actualDest, fsPattern, exclude, fileCount);
+    ProcessPattern(searchBasePath, actualDest, fsPattern, fileMatcher, fileCount);
 
   if fileCount = 0 then
     FLogger.Warning('No files were found for pattern [' + source + ']');
@@ -388,12 +433,16 @@ var
 
   template : ISpecTemplate;
   sourceEntry : ISpecSourceEntry;
-
+  i : integer;
+  stopWatch : TStopWatch;
 begin
   result := false;
 
   //create fresh copy of the spec with a single targetPlatform
+  stopWatch := TStopWatch.StartNew;
   reducedSpec := spec.Clone;
+  stopWatch.Stop;
+  FLogger.Debug(Format('cloned spec in : %dms', [stopWatch.ElapsedMilliseconds]));
 
   //the passed in targetPlatform is a clone with a single compilerVersion set.
   reducedSpec.TargetPlatforms.Clear;
@@ -407,12 +456,8 @@ begin
   end;
 
   ReplaceTokens(version, reducedSpec, targetPlatform, properties);
-
-
-  sManifest := spec.GenerateManifestYAML(version, targetPlatform);
   platforms := DPMPlatformsArrayToPlatforms(targetPlatform.Platforms);
-
-  packageFileName := spec.MetaData.Id + '-' + CompilerToString(targetPlatform.Compiler) + '-' + DPMPlatformsToBinString(platforms) + '-' + version.ToStringNoMeta + cPackageFileExt;
+  packageFileName := reducedSpec.MetaData.Id + '-' + CompilerToString(targetPlatform.Compiler) + '-' + DPMPlatformsToBinString(platforms) + '-' + version.ToStringNoMeta + cPackageFileExt;
   packageFileName := IncludeTrailingPathDelimiter(outputFolder) + packageFileName;
   FArchiveWriter.SetBasePath(basePath);
   if not FArchiveWriter.Open(packageFileName) then
@@ -422,12 +467,28 @@ begin
   end;
   FLogger.Information('Writing package to file : ' + packageFileName);
   try
-    if spec.MetaData.Icon <> '' then
-      FArchiveWriter.AddIcon(spec.MetaData.Icon);
+    if reducedSpec.MetaData.Icon <> '' then
+      FArchiveWriter.AddIcon(reducedSpec.MetaData.Icon);
 
-    if spec.MetaData.ReadMe <> '' then
-      FArchiveWriter.AddFile(spec.MetaData.ReadMe);
+    if reducedSpec.MetaData.ReadMe <> '' then
+      FArchiveWriter.AddFile(ApplyBase(basePath,reducedSpec.MetaData.ReadMe));
 
+    antPattern := TAntPattern.Create(basePath);
+
+    for sourceEntry in template.SourceEntries do
+    begin
+      sourceEntry.Source := StringReplace(sourceEntry.Source, '/','\',[rfReplaceAll]);
+      sourceEntry.Destination := StringReplace(sourceEntry.Destination, '/','\',[rfReplaceAll]);
+      for i := 0 to sourceEntry.Exclude.Count -1 do
+        sourceEntry.Exclude[i] := StringReplace(sourceEntry.Exclude[i], '/','\',[rfReplaceAll]);
+
+      ProcessEntry(basePath,antPattern, sourceEntry.Source, sourceEntry.Destination, sourceEntry.Exclude);
+    end;
+    //we don't want these in the manifest
+    template.SourceEntries.Clear;
+    //write the manifest last as we need to clear out stuff not needed in the spec
+    sManifest := reducedSpec.GenerateManifestYAML(version);
+    Assert(sManifest <> '');
     sStream := TStringStream.Create(sManifest, TEncoding.UTF8);
     try
       FArchiveWriter.WriteMetaDataFile(sStream);
@@ -435,10 +496,6 @@ begin
       sStream.Free;
     end;
 
-    antPattern := TAntPattern.Create(basePath);
-
-    for sourceEntry in template.SourceEntries do
-      ProcessEntry(basePath,antPattern, sourceEntry.Source, sourceEntry.Destination, sourceEntry.Exclude);
 
     result := true;
   finally
@@ -449,7 +506,6 @@ end;
 function TPackageWriter.WritePackageFromSpec(const cancellationToken : ICancellationToken; const options : TPackOptions) : boolean;
 var
   spec : IPackageSpec;
-  compilerVersion : TCompilerVersion;
   targetPlatform : ISpecTargetPlatform;
   clonedTargetPlatform : ISpecTargetPlatform;
   version : TPackageVersion;
@@ -460,6 +516,7 @@ var
   minCompiler, maxCompiler,
   currentCompiler : TCompilerVersion;
   compilers : TArray<TCompilerVersion>;
+  stopwatch : TStopWatch;
 begin
   result := false;
 
@@ -498,7 +555,10 @@ begin
 
   ForceDirectories(options.OutputFolder);
   FLogger.Information('Reading package spec from file : ' + options.SpecFile);
+  stopwatch := TStopwatch.StartNew;
   spec := FSpecReader.ReadSpec(options.specFile);
+  stopWatch.Stop;
+  FLogger.Debug(Format('Loaded spec in : %dms',[stopWatch.ElapsedMilliseconds]));
   if spec = nil then
   begin
     FLogger.Information('An error occured reading the spec file, package writing failed');
@@ -546,7 +606,7 @@ begin
         clonedTargetPlatform := targetPlatform.Clone;
         result := InternalWritePackage(options.OutputFolder, clonedTargetPlatform, spec, version, options.BasePath, properties) and result;
       end
-      else if (targetPlatform.MinCompiler <> TCompilerVersion.UnknownVersion ) and (targetPlatform.MinCompiler <> TCompilerVersion.UnknownVersion) then
+      else if (targetPlatform.MinCompiler <> TCompilerVersion.UnknownVersion ) and (targetPlatform.MaxCompiler <> TCompilerVersion.UnknownVersion) then
       begin
         minCompiler := targetPlatform.MinCompiler;
         maxCompiler := targetPlatform.MaxCompiler;
