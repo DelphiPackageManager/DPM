@@ -265,8 +265,8 @@ type
 
   ISpecTargetPlatform = interface(ISpecNode)
     ['{43BE69CA-0C29-4147-806B-460FFF402A68}']
-    function GetPlatforms : TArray<TDPMPlatform>;
-    procedure SetPlatforms(const platforms: TArray<TDPMPlatform>);
+    function GetPlatforms : TDPMPlatforms;
+    procedure SetPlatforms(const platforms: TDPMPlatforms);
     function GetTemplateName : string;
     procedure SetTemplateName(const name: string);
 
@@ -294,7 +294,7 @@ type
     property MinCompiler : TCompilerVersion read GetMinCompiler write SetMinCompiler;
     property MaxCompiler : TCompilerVersion read GetMaxCompiler write SetMaxCompiler;
 
-    property Platforms : TArray<TDPMPlatform> read GetPlatforms write SetPlatforms;
+    property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
     property TemplateName : string read GetTemplateName write SetTemplateName;
     property Variables : IVariables read GetVariables;
 

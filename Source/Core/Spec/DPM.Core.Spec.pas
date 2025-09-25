@@ -67,7 +67,7 @@ type
   public
     function AsObject : TSpec;
     
-    procedure GetTokensForTargetPlatform(const targetPlatform : ISpecTargetPlatform; const version : TPackageVersion; const list : TStringList; const externalProps : TStringList);
+//    procedure GetTokensForTargetPlatform(const targetPlatform : ISpecTargetPlatform; const version : TPackageVersion; const list : TStringList; const externalProps : TStringList);
 
     function TokenMatchEvaluator(const match : TMatch) : string;
 
@@ -251,70 +251,70 @@ begin
   FTemplates.Add(result);
 end;
 
-procedure TSpec.GetTokensForTargetPlatform(const targetPlatform : ISpecTargetPlatform; const version : TPackageVersion; const list : TStringList; const externalProps : TStringList);
-var
-  i: Integer;
-  regEx : TRegEx;
-  evaluator : TMatchEvaluator;
-begin
-  list.Clear;
-  if not version.IsEmpty then
-    list.Add('version=' + version.ToString)
-  else
-    list.Add('version=' + FMetaData.Version.ToString);
-  list.Add('target=' + CompilerToString(targetPlatform.Compiler));
-  list.Add('compiler=' + CompilerToString(targetPlatform.Compiler));
-  list.Add('compilerNoPoint=' + CompilerToStringNoPoint(targetPlatform.Compiler));
-  list.Add('compilerCodeName=' + CompilerCodeName(targetPlatform.Compiler));
-  list.Add('compilerWithCodeName=' + CompilerWithCodeName(targetPlatform.Compiler));
-  list.Add('platform=' + DPMPlatformToString(targetPlatform.Platforms[0]));
-  list.Add('compilerVersion=' + CompilerToCompilerVersionIntStr(targetPlatform.Compiler));
-  list.Add('libSuffix=' + CompilerToLibSuffix(targetPlatform.Compiler));
-  list.Add('bdsVersion=' + CompilerToBDSVersion(targetPlatform.Compiler));
-  list.Add('bitness=' + DPMPlatformBitness(targetPlatform.Platforms[0]));
-  if DPMPlatformBitness(targetPlatform.Platforms[0]) = '64' then
-    list.Add('bitness64Only=' + DPMPlatformBitness(targetPlatform.Platforms[0]))
-  else
-    list.Add('bitness64Only=');
-
-  if targetPlatform.Variables.Count = 0 then
-    exit;
-
-  //override the values with values from the template.
-  for i := 0 to targetPlatform.Variables.Count -1 do
-  begin
-    //setting a value to '' removes it from the list!!!!!
-    list.Values[targetPlatform.Variables.Items[i].Key] := '';
-    list.Add(targetPlatform.Variables.Items[i].Key + '=' + targetPlatform.Variables.Items[i].Value);
-  end;
-
-  //fix up some variable overrides
-  if list.Values['compilerCodeName'] = '' then
-  begin
-    list.Values['compilerWithCodeName'] := '';
-    list.Add('compilerWithCodeName=' + CompilerToString(targetPlatform.Compiler));
-  end;
-
-
-  //apply external props passed in on command line.
-  if externalProps.Count > 0 then
-  begin
-    for i := 0 to externalProps.Count -1 do
-      list.Values[externalProps.Names[i]] := externalProps.ValueFromIndex[i];
-  end;
-
-  regEx := TRegEx.Create('\$(\w+)\$');
-  evaluator := TokenMatchEvaluator;
-
-  //variables from the spec and external may reference existing variables.
-  for i := 0 to list.Count -1 do
-  begin
-    if TStringUtils.Contains(list.ValueFromIndex[i], '$') then
-      list.ValueFromIndex[i] := regEx.Replace(list.ValueFromIndex[i], evaluator);
-  end;
-
-
-end;
+//procedure TSpec.GetTokensForTargetPlatform(const targetPlatform : ISpecTargetPlatform; const version : TPackageVersion; const list : TStringList; const externalProps : TStringList);
+//var
+//  i: Integer;
+//  regEx : TRegEx;
+//  evaluator : TMatchEvaluator;
+//begin
+//  list.Clear;
+//  if not version.IsEmpty then
+//    list.Add('version=' + version.ToString)
+//  else
+//    list.Add('version=' + FMetaData.Version.ToString);
+//  list.Add('target=' + CompilerToString(targetPlatform.Compiler));
+//  list.Add('compiler=' + CompilerToString(targetPlatform.Compiler));
+//  list.Add('compilerNoPoint=' + CompilerToStringNoPoint(targetPlatform.Compiler));
+//  list.Add('compilerCodeName=' + CompilerCodeName(targetPlatform.Compiler));
+//  list.Add('compilerWithCodeName=' + CompilerWithCodeName(targetPlatform.Compiler));
+////  list.Add('platform=' + DPMPlatformToString(targetPlatform.Platforms[0]));
+//  list.Add('compilerVersion=' + CompilerToCompilerVersionIntStr(targetPlatform.Compiler));
+//  list.Add('libSuffix=' + CompilerToLibSuffix(targetPlatform.Compiler));
+//  list.Add('bdsVersion=' + CompilerToBDSVersion(targetPlatform.Compiler));
+//  list.Add('bitness=' + DPMPlatformBitness(targetPlatform.Platforms[0]));
+//  if DPMPlatformBitness(targetPlatform.Platforms[0]) = '64' then
+//    list.Add('bitness64Only=' + DPMPlatformBitness(targetPlatform.Platforms[0]))
+//  else
+//    list.Add('bitness64Only=');
+//
+//  if targetPlatform.Variables.Count = 0 then
+//    exit;
+//
+//  //override the values with values from the template.
+//  for i := 0 to targetPlatform.Variables.Count -1 do
+//  begin
+//    //setting a value to '' removes it from the list!!!!!
+//    list.Values[targetPlatform.Variables.Items[i].Key] := '';
+//    list.Add(targetPlatform.Variables.Items[i].Key + '=' + targetPlatform.Variables.Items[i].Value);
+//  end;
+//
+//  //fix up some variable overrides
+//  if list.Values['compilerCodeName'] = '' then
+//  begin
+//    list.Values['compilerWithCodeName'] := '';
+//    list.Add('compilerWithCodeName=' + CompilerToString(targetPlatform.Compiler));
+//  end;
+//
+//
+//  //apply external props passed in on command line.
+//  if externalProps.Count > 0 then
+//  begin
+//    for i := 0 to externalProps.Count -1 do
+//      list.Values[externalProps.Names[i]] := externalProps.ValueFromIndex[i];
+//  end;
+//
+//  regEx := TRegEx.Create('\$(\w+)\$');
+//  evaluator := TokenMatchEvaluator;
+//
+//  //variables from the spec and external may reference existing variables.
+//  for i := 0 to list.Count -1 do
+//  begin
+//    if TStringUtils.Contains(list.ValueFromIndex[i], '$') then
+//      list.ValueFromIndex[i] := regEx.Replace(list.ValueFromIndex[i], evaluator);
+//  end;
+//
+//
+//end;
 
 function TSpec.GetVariables: IVariables;
 begin

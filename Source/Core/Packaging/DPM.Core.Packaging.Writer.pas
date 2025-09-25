@@ -334,7 +334,7 @@ begin
   FVariables['compilerversion'] := CompilerToCompilerVersionIntStr(targetPlatform.Compiler);
   FVariables['libsuffix'] := CompilerToLibSuffix(targetPlatform.Compiler);
   FVariables['bdsversion'] := CompilerToBDSVersion(targetPlatform.Compiler);
-  FVariables['bitness'] := DPMPlatformBitness(targetPlatform.Platforms[0]);
+//  FVariables['bitness'] := DPMPlatformBitness(targetPlatform.Platforms[0]);
 
 
   //apply external props passed in on command line.
@@ -456,7 +456,7 @@ begin
   end;
 
   ReplaceTokens(version, reducedSpec, targetPlatform, properties);
-  platforms := DPMPlatformsArrayToPlatforms(targetPlatform.Platforms);
+  platforms := targetPlatform.Platforms;
   packageFileName := reducedSpec.MetaData.Id + '-' + CompilerToString(targetPlatform.Compiler) + '-' + DPMPlatformsToBinString(platforms) + '-' + version.ToStringNoMeta + cPackageFileExt;
   packageFileName := IncludeTrailingPathDelimiter(outputFolder) + packageFileName;
   FArchiveWriter.SetBasePath(basePath);

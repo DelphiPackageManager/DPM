@@ -45,7 +45,7 @@ type
   TSpecTargetPlatform = class(TSpecNode, ISpecTargetPlatform)
   private
     FTemplateName : string;
-    FPlatforms : TArray<TDPMPlatform>;
+    FPlatforms : TDPMPlatforms;
 
     // Single version
     FCompiler : TCompilerVersion;
@@ -61,8 +61,8 @@ type
     FVariables : IOrderedDictionary<string,string>;
   protected
 
-    function GetPlatforms : TArray<TDPMPlatform>;
-    procedure SetPlatforms(const platforms: TArray<TDPMPlatform>);
+    function GetPlatforms : TDPMPlatforms;
+    procedure SetPlatforms(const platforms: TDPMPlatforms);
     function GetTemplateName : string;
     procedure SetTemplateName(const name: string);
 
@@ -130,7 +130,7 @@ end;
 constructor TSpecTargetPlatform.Create(const logger : ILogger);
 begin
   inherited Create(logger);
-  SetLength(FPlatforms, 0);
+  FPlatforms := [];
   FCompiler := TCompilerVersion.UnknownVersion;
   FCompilers := [];
   FMinCompilerVersion := TCompilerVersion.UnknownVersion;
@@ -161,7 +161,7 @@ begin
   inherited;
 end;
 
-function TSpecTargetPlatform.GetPlatforms : TArray<TDPMPlatform>;
+function TSpecTargetPlatform.GetPlatforms : TDPMPlatforms;
 begin
   result := FPlatforms;
 end;
@@ -219,7 +219,6 @@ function TSpecTargetPlatform.LoadFromYAML(const yamlObject: IYAMLMapping): boole
 var
   sValue : string;
   platform : TDPMPlatform;
-  platformList : IList<TDPMPlatform>;
   sCompiler : string;
   compiler : TCompilerVersion;
   sMinCompiler : string;
@@ -293,7 +292,6 @@ begin
   platformsSeq := yamlObject.A['platforms'];
   if platformsSeq.Count > 0 then
   begin
-    platformList := TCollections.CreateList<TDPMPlatform>;
     for i := 0 to platformsSeq.Count -1 do
     begin
       sValue := platformsSeq.S[i];
@@ -303,10 +301,10 @@ begin
         result := false;
         Logger.Error('Invalid compiler version : ' + sValue);
       end
-      else 
-        platformList.Add(platform);
+      else
+        Include(FPlatforms, platform);
     end;
-    FPlatforms := platformList.Distinct.ToArray;
+
   end
   else
   begin
@@ -331,14 +329,13 @@ end;
 
 function TSpecTargetPlatform.PlatformContains(const platformName: string): Boolean;
 var
-  I: Integer;
+  platform : TDPMPlatform;
 begin
-  Result := False;
-  for I := 0 to High(FPlatforms) do
-  begin
-    if SameText(DPMPlatformToString(FPlatforms[i]), platformName) then
-      Exit(True);
-  end;
+  Result := false;
+  platform := StringToDPMPlatform(platformName);
+  if platform = TDPMPlatform.UnknownPlatform then
+    exit;
+  result := platform in FPlatforms;
 end;
 
 procedure TSpecTargetPlatform.SetCompiler(compiler: TCompilerVersion);
@@ -361,7 +358,7 @@ begin
   FMinCompilerVersion := value;
 end;
 
-procedure TSpecTargetPlatform.SetPlatforms(const platforms: TArray<TDPMPlatform>);
+procedure TSpecTargetPlatform.SetPlatforms(const platforms: TDPMPlatforms);
 begin
   FPlatforms := platforms;
 end;
@@ -382,21 +379,47 @@ var
   mapping : IYAMLMapping;
   variables : IYAMLMapping;
   platforms : IYAMLSequence;
+  compilersSeq : IYAMLSequence;
   sPlatform : string;
-  i: Integer;
+  platform: TDPMPlatform;
+  i : integer;
 begin
   mapping := parent.AsSequence.AddMapping;
-  mapping.S['compiler'] := CompilerToString(FCompiler);
+  //even though we only use compiler when writing packages, we need all compiler options
+  //here for dspec creator.
+  if FCompiler <> TCompilerVersion.UnknownVersion then
+    mapping.S['compiler'] := CompilerToString(FCompiler)
+  else
+  begin
+    if (FMinCompilerVersion <> TCompilerVersion.UnknownVersion) and  (FMaxCompilerVersion <> TCompilerVersion.UnknownVersion) then
+    begin
+      mapping.S['compiler from'] := CompilerToString(FMinCompilerVersion);
+      mapping.S['compiler to'] := CompilerToString(FMaxCompilerVersion);
+    end
+    else
+    begin
+      if Length(FCompilers) > 0 then
+      begin
+        compilersSeq := mapping.A['compilers'];
+        for i := 0 to Length(FCompilers) -1 do
+          compilersSeq.AddValue(CompilerToString(FCompilers[i]));
+      end
+      else
+        raise Exception.Create('No Compiler Version set');
+    end;
+
+  end;
+
   platforms := mapping.A['platforms'];
 
-  for i := 0 to High(FPlatforms) do
+  for platform in FPlatforms do
   begin
-    if not (FPlatforms[i] in AllPlatforms(FCompiler)) then
+    if not (platform in AllPlatforms(FCompiler)) then
     begin
-      Logger.Error('Invalid platform [' + DPMPlatformToString(FPlatforms[i]) + '] for compiler [' + CompilerToString(FCompiler) + ']');
+      Logger.Error('Invalid platform [' + DPMPlatformToString(platform) + '] for compiler [' + CompilerToString(FCompiler) + ']');
       continue;
     end;   
-    sPlatform := DPMPlatformToString(FPlatforms[i]);
+    sPlatform := DPMPlatformToString(platform);
     platforms.AddValue(sPlatform);
   end;
 
