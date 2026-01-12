@@ -358,6 +358,7 @@ type
   IPackageSpecReader = interface
     ['{8A20F825-8DCA-4784-BDBD-8F91A651BA72}']
     function ReadSpec(const fileName : string) : IPackageSpec;
+    function ReadSpecString(const value : string; const fileName : string = '') : IPackageSpec;
   end;
 
 

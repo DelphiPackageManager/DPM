@@ -80,7 +80,7 @@ type
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string>; const packageCacheLocation : string) : boolean;
     procedure UpdatePackageReferences(const dependencyGraph : IPackageReference; const platform : TDPMPlatform);
 
-    function GetPackageReferences(const platform : TDPMPlatform) : IPackageReference;
+    function GetPackageReferences : IPackageReference;
     function GetProjectConfiguration(const name : string; const platform : TDPMPlatform) : IProjectConfiguration;
     function GetConfigNames : IReadOnlyList<string>;
 

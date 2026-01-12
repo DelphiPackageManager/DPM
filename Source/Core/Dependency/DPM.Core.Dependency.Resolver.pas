@@ -57,10 +57,10 @@ type
 
 //    function ValidateDependencyGraph(const cancellationToken : ICancellationToken; var dependencyGraph : IPackageReference) : boolean;
 
-    function DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;  const includePrerelease : boolean; const context : IResolverContext) : boolean;
+    function DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const includePrerelease : boolean; const context : IResolverContext) : boolean;
 
-    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
-    function ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
 
   public
     constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageInstallerContext : IPackageInstallerContext);
@@ -120,7 +120,7 @@ end;
 /// ://github.com/dart-lang/pub/blob/master/doc/solver.md
 /// If anyone is good math and want's to have a stab at implementing it in Delphi that would be great!
 
-function TDependencyResolver.DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;  const includePrerelease : boolean; const context : IResolverContext) : boolean;
+function TDependencyResolver.DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const includePrerelease : boolean; const context : IResolverContext) : boolean;
 var
   currentPackage : IPackageInfo;
   dependency : IPackageDependency;
@@ -235,7 +235,7 @@ begin
         begin
           //passing in the version range to filter the results - not sure if this is valid.. do we need all versions?
           //I suspect it may result in more failures
-          versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, platform, dependency.Id, dependency.VersionRange, preRelease);
+          versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, dependency.Id, dependency.VersionRange, preRelease);
           if versions.Any then //cache the versions in the context in case we need them again
             context.CachePackageVersions(dependency.Id, versions);
         end;
@@ -316,7 +316,7 @@ begin
   result :=FRepositoryManager.Initialize(config);
 end;
 
-function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;
+function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
                                                const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo;
                                                const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference;
                                                out resolved : IList<IPackageInfo>) : boolean;
@@ -332,7 +332,7 @@ begin
   //check for conflicts with already loaded projects
   for packageRef in projectReferences do
   begin
-    resolution := FPackageInstallerContext.FindPackageResolution(projectFile, platform, packageRef.Id);
+    resolution := FPackageInstallerContext.FindPackageResolution(projectFile, packageRef.Id);
     if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Version)) then
     begin
       FLogger.Error('Package project group conflict : ' + packageRef.Id + '-' + resolution.PackageInfo.Version.ToString + ' in project : ' + resolution.ProjectFile + ' does not satisfy ' + packageRef.Version.ToString  );
@@ -342,18 +342,18 @@ begin
   end;
   context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, newPackage, projectReferences);
 
-  result := DoResolve(cancellationToken, compilerVersion, platform, options.Prerelease, context);
+  result := DoResolve(cancellationToken, compilerVersion, options.Prerelease, context);
   resolved := context.GetResolvedPackageInfos;
   dependencyGraph := context.BuildDependencyGraph;
   //record the resolutions so they can be applied to other projects in the group
-  FPackageInstallerContext.RecordResolutions(projectFile, platform, context.GetResolvedPackages);
+  FPackageInstallerContext.RecordResolutions(projectFile, context.GetResolvedPackages);
   result := result and (errorCount = 0);
 end;
 
 
 //This is all wrong. What it should do is just validate the project references and ensure it's correct, not go off and resolve dependencies
 //which might change the dependecy versions. We only want to change the graph if it's wrong.
-function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;
+function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
                                                const projectFile : string; const options : TSearchOptions; const projectReferences : IList<IPackageReference>;
                                                out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
 var
@@ -371,7 +371,7 @@ begin
   //first check if the packages are already resolved in the project group.
   for packageRef in projectReferences do
   begin
-    resolution := FPackageInstallerContext.FindPackageResolution(projectFile, platform, packageRef.Id);
+    resolution := FPackageInstallerContext.FindPackageResolution(projectFile, packageRef.Id);
     //if resolved, check if they are compatible.
     if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Version)) then
     begin
@@ -380,13 +380,13 @@ begin
      // exit; //don't exit, we still want to resolve what we can.
     end;
   end;
-  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, compilerVersion,  platform, projectReferences);
+  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, compilerVersion,  projectReferences);
 
-  result := DoResolve(cancellationToken, compilerVersion,  platform, options.Prerelease, context);
+  result := DoResolve(cancellationToken, compilerVersion,  options.Prerelease, context);
   resolved := context.GetResolvedPackageInfos;
   dependencyGraph := context.BuildDependencyGraph;
   //record the resolutions so they can be applied to other projects in the group
-  FPackageInstallerContext.RecordResolutions(projectFile, platform, context.GetResolvedPackages);
+  FPackageInstallerContext.RecordResolutions(projectFile, context.GetResolvedPackages);
   result := result and (errorCount = 0);
 end;
 

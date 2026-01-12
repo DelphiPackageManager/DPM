@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -64,7 +64,6 @@ var
   sId : string;
   sVersion : string;
   version : TPackageVersion;
-  platform : TDPMPlatform;
   i : integer;
 begin
   result := nil;
@@ -79,10 +78,9 @@ begin
       sId := jsonObj.S['id'];
       sVersion := jsonObj.S['version'];
       version := TPackageVersion.Parse(sVersion);
-      platform := StringToDPMPlatform(jsonObj.S['platform']);
 
       //we don't need the compiler version for this - if that changes we will need to pass it it.
-      result := TPackageReference.Create(nil,sId, version, platform, TCompilerVersion.UnknownVersion, TVersionRange.Empty,false);
+      result := TPackageReference.Create(nil,sId, version, TCompilerVersion.UnknownVersion, TVersionRange.Empty,false);
 
       if jsonObj.Contains('dependencies') then
       begin
@@ -118,7 +116,6 @@ begin
     try
       jsonObj.S['id'] := packageReference.Id;
       jsonObj.S['version'] := packageReference.Version.ToStringNoMeta;
-      jsonObj.S['platform'] := DPMPlatformToString(packageReference.Platform);
       if packageReference.HasChildren then
       begin
         packageReference.Children.ForEach(

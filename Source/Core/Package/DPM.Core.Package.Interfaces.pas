@@ -52,14 +52,12 @@ type
     function GetId : string;
     function GetVersion : TPackageVersion;
     function GetCompilerVersion : TCompilerVersion;
-    function GetPlatform : TDPMPlatform;
     function ToString : string;
     function ToIdVersionString : string;
     function GetSourceName : string;
     property Id : string read GetId;
     property Version : TPackageVersion read GetVersion;
     property CompilerVersion : TCompilerVersion read GetCompilerVersion;
-    property Platform : TDPMPlatform read GetPlatform;
     property SourceName : string read GetSourceName;
   end;
 

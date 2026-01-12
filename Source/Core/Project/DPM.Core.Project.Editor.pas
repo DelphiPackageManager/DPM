@@ -52,7 +52,7 @@ type
     FMainSource : string;
     FProjectVersion : string;
     FDPMCompilerVersion : string;
-    FPackageRefences : IDictionary<TDPMPlatform, IPackageReference>;
+    FPackageRefences : IPackageReference;
     FFileName : string;
     FAppType : TAppType;
     FConfigurations : IDictionary<string, IProjectConfiguration>;
@@ -67,8 +67,6 @@ type
     function LoadProjectPlatforms : boolean;
     function LoadPackageRefences : boolean;
     function LoadConfigurations : boolean;
-
-    function SavePackageReferences : boolean;
 
     function InternalLoadFromXML(const elements : TProjectElements) : boolean;
     procedure Reset;
@@ -93,7 +91,7 @@ type
     procedure RemoveFromSearchPath(const platform : TDPMPlatform; const packageId : string);
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string> ; const packageCacheLocation : string) : boolean;
     procedure UpdatePackageReferences(const dependencyGraph : IPackageReference; const platform : TDPMPlatform);
-    function GetPackageReferences(const platform : TDPMPlatform) : IPackageReference;
+    function GetPackageReferences : IPackageReference;
     function GetConfigNames: IReadOnlyList<string>;
   public
     constructor Create(const logger : ILogger; const config : IConfiguration; const compilerVersion : TCompilerVersion);
@@ -126,6 +124,9 @@ const
   platformsXPath = '/x:Project/x:ProjectExtensions/x:BorlandProject/x:Platforms/x:Platform';
 
   projectExtensionsXPath = '/x:Project/x:ProjectExtensions';
+
+  //newnew format ;)
+  packagesXPath = '/x:Project/x:ProjectExtensions/x:DPM/x:Packages';
 
   //new format
   packageReferencesXPath = '/x:Project/x:ProjectExtensions/x:DPM/x:PackageReferences';
@@ -206,16 +207,14 @@ begin
   FConfig := config;
   FCompiler := compilerVersion;
   FPlatforms := [];
-  FPackageRefences := TCollections.CreateDictionary<TDPMPlatform, IPackageReference>;
+  FPackageRefences := nil;
   FConfigurations := TCollections.CreateDictionary <string, IProjectConfiguration> ;
   FConfigNames := TCollections.CreateList<string>;
 end;
 
-function TProjectEditor.GetPackageReferences(const platform : TDPMPlatform) : IPackageReference;
+function TProjectEditor.GetPackageReferences : IPackageReference;
 begin
-  result := nil;
-  FPackageRefences.TryGetValue(platform,Result);
-  //TODO : Should we return an empty root here?
+  result := FPackageRefences;
 
 end;
 
@@ -343,7 +342,7 @@ end;
 
 function TProjectEditor.GetHasPackages : boolean;
 begin
-  result := FPackageRefences.Any;
+  result := (FPackageRefences <> nil) and FPackageRefences.HasChildren;
 end;
 
 function TProjectEditor.GetOutputElementName : string;
@@ -565,6 +564,7 @@ end;
 
 function TProjectEditor.LoadPackageRefences : boolean;
 
+
   procedure ReadPackageReferences(const parentReference : IPackageReference; const parentElement : IXMLDOMElement; parentPlatform : TDPMPlatform );
   var
     isTransitive : boolean;
@@ -576,7 +576,6 @@ function TProjectEditor.LoadPackageRefences : boolean;
     version : TPackageVersion;
     error : string;
     sPlatform : string;
-    platform : TDPMPlatform;
     sRange : string;
     range : TVersionRange;
     dupCheckReference : IPackageReference;
@@ -584,7 +583,6 @@ function TProjectEditor.LoadPackageRefences : boolean;
     useSource : boolean;
     sUseSource : string;
     newNode : IPackageReference;
-    rootNode : IPackageReference;
   begin
     isTransitive := parentReference <> nil;
     //if it's unknown, we are loading top level in the old format
@@ -598,7 +596,6 @@ function TProjectEditor.LoadPackageRefences : boolean;
     begin
       for i := 0 to packageNodes.length - 1 do
       begin
-        rootNode := nil;
         id := '';
         sVersion := '';
         sPlatform := '';
@@ -630,28 +627,6 @@ function TProjectEditor.LoadPackageRefences : boolean;
           exit;
         end;
 
-        if parentPlatform <> TDPMPlatform.UnknownPlatform then
-          platform := parentPlatform
-        else  if (parentReference <> nil) and (not parentReference.IsRoot) then
-          platform := parentReference.Platform
-        else if packageElement.getAttributeNode('platform') <> nil then
-        begin
-          sPlatform := packageElement.getAttribute('platform');
-          platform := StringToDPMPlatform(sPlatform);
-          if platform = TDPMPlatform.UnknownPlatform then
-          begin
-            FLogger.Error('Invalid package reference platform value [' + sPlatform + '] in platform attribute for [' + id + ']');
-            result := false;
-            exit;
-          end;
-        end
-        else
-        begin
-          FLogger.Error('Package reference missing platform for [' + id + ']');
-          result := false;
-          exit;
-        end;
-
         //if the parent reference is using source then we must use source for Transitive references.
         if (parentReference <> nil) and parentReference.UseSource then
           useSource := true
@@ -663,24 +638,21 @@ function TProjectEditor.LoadPackageRefences : boolean;
         else
           useSource := false;
 
-        if not FPackageRefences.TryGetValue(platform, rootNode) then
-        begin
-          rootNode := TPackageReference.CreateRoot(FCompiler,platform);
-          FPackageRefences[platform] := rootNode;
-        end;
+        if FPackageRefences = nil then
+          FPackageRefences := TPackageReference.CreateRoot(FCompiler);
 
         //check for duplicate references
         if isTransitive then
           dupCheckReference := parentReference
         else
-          dupCheckReference := rootNode;
+          dupCheckReference := FPackageRefences;
 
         if dupCheckReference.FindTopLevelChild(id) <> nil then
         begin
           if parentReference <> nil then
-            raise Exception.Create('Duplicate package reference for package [' + id + '  ' + DPMPlatformToString(platform) + '] under [' + parentReference.Id + ']')
+            raise Exception.Create('Duplicate package reference for package [' + id  + '] under [' + parentReference.Id + ']')
           else
-            raise Exception.Create('Duplicate package reference for package [' + id + '  ' + DPMPlatformToString(platform) + ']');
+            raise Exception.Create('Duplicate package reference for package [' + id + ']');
         end;
 
         //only transitive packages need a range
@@ -713,10 +685,10 @@ function TProjectEditor.LoadPackageRefences : boolean;
         end
         else
         begin
-          newNode := rootNode.AddChild(id, version, TVersionRange.Empty);
+          newNode := FPackageRefences.AddChild(id, version, TVersionRange.Empty);
           newNode.UseSource := useSource;
         end;
-        ReadPackageReferences(newNode, packageElement, platform);
+        ReadPackageReferences(newNode, packageElement, parentPlatform);
       end;
     end;
   end;
@@ -729,6 +701,18 @@ var
   stmp : string;
 begin
   result := true;
+
+  //try the new new format first!
+  packageReferencesElement := FProjectXML.selectSingleNode(packagesXPath) as IXMLDOMElement;
+  if packageReferencesElement <> nil then
+  begin
+    packageReferencesPlatform := TDPMPlatform.Win32; //just so we can still use existing function
+    ReadPackageReferences(nil, packageReferencesElement, packageReferencesPlatform );
+    exit;
+  end;
+
+  //try previous formats
+  //TODO :
 
   //try new format first
   packageReferencesElements := FProjectXML.selectNodes(packageReferencesXPath);
@@ -755,6 +739,9 @@ begin
       end;
 
       ReadPackageReferences(nil, packageReferencesElement, packageReferencesPlatform );
+
+     //we no longer differenciate packages by platform so just take the first one
+      exit;
     end;
   end
   else
@@ -762,16 +749,12 @@ begin
     //try old format
     ReadPackageReferences(nil, FProjectXML.documentElement, TDPMPlatform.UnknownPlatform );
   end;
-
-
-
-
 end;
 
 function TProjectEditor.LoadProject(const filename : string; const elements : TProjectElements) : Boolean;
 begin
   result := false;
-  FPackageRefences.Clear;
+  FPackageRefences := nil;
   FPlatforms := [];
   FProjectVersion := '';
 
@@ -945,10 +928,6 @@ begin
   FPlatforms := [];
 end;
 
-function TProjectEditor.SavePackageReferences : boolean;
-begin
-  result := false;
-end;
 
 function TProjectEditor.SaveProject(const filename : string) : Boolean;
 var

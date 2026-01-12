@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -67,7 +67,6 @@ type
 
     function GetDependencies : IEnumerable<IPackageReference>;
 
-    function GetPlatform : TDPMPlatform;
     function GetUseSource : boolean;
     function GetIsTransitive : boolean;
     function GetIsTopLevel : boolean;
@@ -75,16 +74,6 @@ type
 
     function GetPackageInfo : IPackageInfo;
     procedure SetPackageInfo(const value : IPackageInfo);
-
-    //these will be added when we read the package manifest
-//    procedure AddDesignBPL(const platform : TDPMPlatform; const bplFile : string);
-//
-//    //returns true if we have already loaded the bpls
-//    function GetDesignBPLsLoaded(platform : TDPMPlatform) : boolean;
-//
-//    procedure SetDesignBPLsLoaded(platform : TDPMPlatform; const value : boolean);
-//
-//    function GetDesignBPLs(platform : TDPMPlatform) : IList<string>;
 
     function AddChild(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IPackageReference;
 
@@ -151,7 +140,6 @@ type
     property IsTopLevel : boolean read GetIsTopLevel;
     property Children : IEnumerable<IPackageReference>read GetDependencies;
     property Parent : IPackageReference read GetParent;
-    property Platform : TDPMPlatform read GetPlatform;
     property UseSource : boolean read GetUseSource write SetUseSource;
     property ProjectFile : string read GetProjectFile write SetProjectFile;
 
@@ -194,8 +182,8 @@ type
     ['{B187F0DB-FEA1-48B4-81F2-CECF073C2FB0}']
     function Initialize(const config : IConfiguration) : boolean;
     //returns true if all dependencies were resolved. If true, the graph is fully populated and can be serialized.
-    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
-    function ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
   end;
 
 

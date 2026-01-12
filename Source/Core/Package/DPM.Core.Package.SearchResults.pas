@@ -24,7 +24,6 @@ type
     FIsTrial : Boolean;
     FIsTransitive : boolean;
     FLicense : string;
-    FPlatform : TDPMPlatform;
     FCompilerVersion : TCompilerVersion;
     FProjectUrl : string;
     FRepositoryUrl : string;
@@ -65,7 +64,6 @@ type
     function GetIsCommercial : Boolean;
     function GetIsTrial : Boolean;
     function GetLicense : string;
-    function GetPlatform : TDPMPlatform;
     function GetCompilerVersion : TCompilerVersion;
     function GetProjectUrl : string;
     function GetRepositoryUrl : string;
@@ -101,13 +99,13 @@ type
     procedure SetVersionRange(const value : TVersionRange);
     constructor CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
     constructor CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata; fileHash : string; hasHalgorithm : string);
-    constructor CreateFromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const platform : TDPMPlatform; const errorDescription : string);
+    constructor CreateFromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const errorDescription : string);
 
   public
     destructor Destroy;override;
     class function FromJson(const sourceName : string; const jsonObject : TJsonObject) : IPackageSearchResultItem;
     class function FromMetaData(const sourceName : string; const metaData : IPackageMetadata; fileHash : string; hasHalgorithm : string) : IPackageSearchResultItem;
-    class function FromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const platform : TDPMPlatform; const errorDescription : string) : IPackageSearchResultItem;
+    class function FromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const errorDescription : string) : IPackageSearchResultItem;
   end;
 
   TDPMPackageSearchResult = class(TInterfacedObject, IPackageSearchResult)
@@ -134,14 +132,14 @@ uses
 
 { TDPMPackageSearchResultItem }
 
-constructor TDPMPackageSearchResultItem.CreateFromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const platform : TDPMPlatform; const errorDescription : string);
+constructor TDPMPackageSearchResultItem.CreateFromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const errorDescription : string);
 begin
   FIsError := true;
   FId := id;
   FVersion := version;
   FDescription := errorDescription;
   FCompilerVersion := compiler;
-  FPlatform := platform;
+
   FLatestVersion := version;
   FLatestStableVersion := version;
   FVersionRange := TVersionRange.Empty;
@@ -160,10 +158,6 @@ begin
   FCompilerVersion := StringToCompilerVersion(jsonObject.S['compiler']);
   if FCompilerVersion = TCompilerVersion.UnknownVersion then
     raise EArgumentOutOfRangeException.Create('Invalid compiler version returned from server : ' + jsonObject.S['compiler']);
-
-  FPlatform := StringToDPMPlatform(jsonObject.S['platform']);
-  if FPlatform = TDPMPlatform.UnknownPlatform then
-    raise EArgumentOutOfRangeException.Create('Invalid platform returned from server : ' + jsonObject.S['platform']);
 
   FDependencies := TCollections.CreateList<IPackageDependency>;
 
@@ -208,7 +202,7 @@ begin
 
       if TVersionRange.TryParse(depVersion, range) then
       begin
-        dependency := TPackageDependency.Create(depId, range, FPlatform);
+        dependency := TPackageDependency.Create(depId, range);
         FDependencies.Add(dependency);
       end;
     end;
@@ -220,7 +214,6 @@ end;
 constructor TDPMPackageSearchResultItem.CreateFromMetaData(const sourceName : string; const metaData : IPackageMetadata; fileHash : string; hasHalgorithm : string);
 begin
   FSourceName := sourceName;
-  FPlatform := metaData.Platform;
   FCompilerVersion := metaData.CompilerVersion;
   FDependencies := TCollections.CreateList<IPackageDependency>;
   if metaData.Dependencies <> nil then
@@ -254,9 +247,9 @@ begin
   inherited;
 end;
 
-class function TDPMPackageSearchResultItem.FromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const platform : TDPMPlatform; const errorDescription : string) : IPackageSearchResultItem;
+class function TDPMPackageSearchResultItem.FromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const errorDescription : string) : IPackageSearchResultItem;
 begin
-  result := TDPMPackageSearchResultItem.CreateFromError(id, version, compiler, platform, errorDescription);
+  result := TDPMPackageSearchResultItem.CreateFromError(id, version, compiler, errorDescription);
 end;
 
 class function TDPMPackageSearchResultItem.FromJson(const sourceName : string; const jsonObject : TJsonObject) : IPackageSearchResultItem;
@@ -381,10 +374,6 @@ begin
 end;
 
 
-function TDPMPackageSearchResultItem.GetPlatform : TDPMPlatform;
-begin
-  result := FPlatform;
-end;
 
 function TDPMPackageSearchResultItem.GetProjectUrl : string;
 begin

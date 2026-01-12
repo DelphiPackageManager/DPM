@@ -36,29 +36,26 @@ uses
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
   DPM.Core.Dependency.Version,
-  DPM.Core.Spec.Interfaces,
-  DPM.Core.Manifest.Interfaces;
+  DPM.Core.Spec.Interfaces;
 
 type
   TPackageIdentity = class(TInterfacedObject, IPackageIdentity)
   private
     FCompilerVersion : TCompilerVersion;
     FId : string;
-    FPlatform : TDPMPlatform;
     FVersion : TPackageVersion;
     FSourceName : string;
   protected
     function GetCompilerVersion : TCompilerVersion;
     function GetId : string;
-    function GetPlatform : TDPMPlatform;
     function GetVersion : TPackageVersion;
     function ToIdVersionString : string; virtual;
     function GetSourceName : string;
-    constructor Create(const sourceName : string; const manifest : IPackageManifest); overload;virtual;
+    constructor Create(const sourceName : string; const manifest : IPackageSpec); overload;virtual;
     constructor Create(const sourceName : string; const jsonObj : TJsonObject);overload;virtual;
 
   public
-    constructor Create(const sourceName : string; const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform); overload; virtual;
+    constructor Create(const sourceName : string; const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion); overload; virtual;
     class function TryCreateFromString(const logger : ILogger; const value : string; const source : string; out packageIdentity : IPackageIdentity) : boolean;
     class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageIdentity : IPackageIdentity) : boolean;
     function ToString : string; override; //note - do not override below - we rely on this. should probably create a new property
@@ -77,12 +74,12 @@ type
     function GetHash : string;
     function GetHashAlgorithm : string;
 
-    constructor Create(const sourceName : string; const manifest : IPackageManifest; const hash : string; const hashAlgorithm : string);overload;
+    constructor Create(const sourceName : string; const manifest : IPackageSpec; const hash : string; const hashAlgorithm : string);overload;
     constructor Create(const sourceName : string; const jsonObj : TJsonObject);override;
   public
     destructor Destroy;override;
-    constructor Create(const sourceName : string; const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const hash : string; const hashAlgorithm : string); overload; virtual;
-    class function CreateFromManifest(const sourceName : string; const manifest : IPackageManifest; const hash : string; const hashAlgorith : string) : IPackageInfo;
+    constructor Create(const sourceName : string; const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const hash : string; const hashAlgorithm : string); overload; virtual;
+    class function CreateFromManifest(const sourceName : string; const manifest : IPackageSpec; const hash : string; const hashAlgorith : string) : IPackageInfo;
     class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageInfo : IPackageInfo) : boolean;
 
   end;
@@ -118,11 +115,11 @@ type
     function GetRepositoryType : string;
     function GetRepositoryBranch : string;
     function GetRepositoryCommit : string;
-    constructor Create(const sourceName : string; const manifest : IPackageManifest); override;
+    constructor Create(const sourceName : string; const manifest : IPackageSpec); override;
   public
     constructor Create(const sourceName : string; const jsonObj : TJsonObject); override;
     destructor Destroy;override;
-    class function CreateFromManifest(const sourceName : string; const manifest : IPackageManifest) : IPackageMetadata;
+    class function CreateFromManifest(const sourceName : string; const manifest : IPackageSpec) : IPackageMetadata;
     class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageMetadata : IPackageMetadata) : boolean;
   end;
 
@@ -134,7 +131,7 @@ implementation
 
 uses
   DPM.Core.Constants,
-  DPM.Core.Manifest.Reader,
+  DPM.Core.Spec.Reader,
   DPM.Core.Package.Dependency,
   VSoft.Base64,
   System.SysUtils,
@@ -168,30 +165,28 @@ begin
     raise Exception.Create('Version is not a valid version [' + stmp + ']');
 
 
-  Create(sourceName,  id, packageVersion, cv, platform);
+  Create(sourceName,  id, packageVersion, cv);
 
 
 end;
 
-constructor TPackageIdentity.Create(const sourceName : string; const id: string; const version: TPackageVersion; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform);
+constructor TPackageIdentity.Create(const sourceName : string; const id: string; const version: TPackageVersion; const compilerVersion: TCompilerVersion);
 begin
   inherited Create;
   FId := id;
   FVersion := version;
   FCompilerVersion := compilerVersion;
-  FPlatform := platform;
   FSourceName := sourceName;
   
 end;
 
-constructor TPackageIdentity.Create(const sourceName: string; const manifest: IPackageManifest);
+constructor TPackageIdentity.Create(const sourceName: string; const manifest: IPackageSpec);
 begin
   inherited Create;
   FSourceName := sourceName;
   FId := manifest.MetaData.Id;
   FVersion := manifest.MetaData.version;
   FCompilerVersion := manifest.TargetPlatform.Compiler;
-  FPlatform := manifest.TargetPlatform.Platforms[0];
   FSourceName := sourceName;
   
 
@@ -253,7 +248,7 @@ begin
     exit;
   end;
 
-  packageIdentity := TPackageIdentity.Create(source, id,  packageVersion, cv, platform);
+  packageIdentity := TPackageIdentity.Create(source, id,  packageVersion, cv);
   result := true;
 
 end;
@@ -291,7 +286,7 @@ begin
       depVersion := depArr.O[i].S['versionRange'];
       if TVersionRange.TryParse(depVersion, range) then
       begin
-        dependency := TPackageDependency.Create(depId, range, FPlatform);
+        dependency := TPackageDependency.Create(depId, range);
         FDependencies.Add(dependency);
       end;
     end;
@@ -299,7 +294,7 @@ begin
 
 end;
 
-constructor TPackageInfo.Create(const sourceName: string; const manifest: IPackageManifest; const hash : string; const hashAlgorithm : string);
+constructor TPackageInfo.Create(const sourceName: string; const manifest: IPackageSpec; const hash : string; const hashAlgorithm : string);
 var
   dep : ISpecDependency;
   newDep : IPackageDependency;
@@ -325,15 +320,15 @@ begin
 
 end;
 
-constructor TPackageInfo.Create(const sourceName, id: string; const version: TPackageVersion; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const hash, hashAlgorithm: string);
+constructor TPackageInfo.Create(const sourceName, id: string; const version: TPackageVersion; const compilerVersion: TCompilerVersion; const hash, hashAlgorithm: string);
 begin
-  inherited Create(sourceName, id, version, compilerVersion, platform);
+  inherited Create(sourceName, id, version, compilerVersion);
   FHash := hash;
   FHashAlgorithm := hashAlgorithm;
 
 end;
 
-class function TPackageInfo.CreateFromManifest(const sourceName: string; const manifest : IPackageManifest; const hash : string; const hashAlgorith : string): IPackageInfo;
+class function TPackageInfo.CreateFromManifest(const sourceName: string; const manifest : IPackageSpec; const hash : string; const hashAlgorith : string): IPackageInfo;
 begin
   result := TPackageInfo.Create(sourceName, manifest, hash, hashAlgorith);
 end;
@@ -387,7 +382,7 @@ begin
 end;
 
 
-constructor TPackageMetadata.Create(const sourceName : string; const manifest : IPackageManifest);
+constructor TPackageMetadata.Create(const sourceName : string; const manifest : IPackageSpec);
 begin
   inherited Create(sourceName, manifest, '','');
   FSearchPaths := TCollections.CreateList<string>;
@@ -452,7 +447,7 @@ begin
   end;
 end;
 
-class function TPackageMetadata.CreateFromManifest(const sourceName: string; const manifest : IPackageManifest): IPackageMetadata;
+class function TPackageMetadata.CreateFromManifest(const sourceName: string; const manifest : IPackageSpec): IPackageMetadata;
 begin
   result := TPackageMetadata.Create(sourceName, manifest);
 end;
@@ -561,10 +556,6 @@ begin
   result := FId;
 end;
 
-function TPackageIdentity.GetPlatform : TDPMPlatform;
-begin
-  result := FPlatform;
-end;
 
 function TPackageIdentity.GetVersion : TPackageVersion;
 begin
@@ -578,7 +569,7 @@ end;
 
 function TPackageIdentity.ToString : string;
 begin
-  result := FId + '-' + CompilerToString(FCompilerVersion) + '-' + DPMPlatformToString(FPlatform) + '-' + FVersion.ToStringNoMeta;
+  result := FId + '-' + CompilerToString(FCompilerVersion) + '-' + FVersion.ToStringNoMeta;
 end;
 
 

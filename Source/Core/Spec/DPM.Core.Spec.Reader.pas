@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -44,6 +44,7 @@ type
 
   protected
     function ReadSpec(const fileName : string) : IPackageSpec;
+    function ReadSpecString(const value : string; const fileName : string = '') : IPackageSpec;
   public
     constructor Create(const logger : ILogger);
   end;
@@ -80,6 +81,22 @@ begin
 
     end;
   end
+end;
+
+function TPackageSpecReader.ReadSpecString(const value : string; const fileName : string = '') : IPackageSpec;
+var
+  yamlDoc : IYAMLDocument;
+begin
+  result := nil;
+  try
+    yamlDoc := TYAML.LoadFromString(value);
+    result := InternalReadPackageSpecYAML(fileName, yamlDoc);
+  except
+    on e : Exception do
+    begin
+      FLogger.Error('Error parsing spec yaml : ' + e.Message);
+    end;
+  end;
 end;
 
 constructor TPackageSpecReader.Create(const logger : ILogger);

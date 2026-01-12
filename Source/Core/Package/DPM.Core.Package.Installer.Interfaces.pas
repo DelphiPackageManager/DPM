@@ -39,7 +39,7 @@ uses
   DPM.Core.Options.Restore,
   DPM.Core.Package.Interfaces,
   DPM.Core.Dependency.Interfaces,
-  DPM.Core.Manifest.Interfaces;
+  DPM.Core.Spec.Interfaces;
 
 
 type
@@ -73,20 +73,20 @@ type
     procedure RemoveProject(const projectFile : string);
 
     ///<summary>called from the package installer during install/restore</summary>
-    procedure RecordGraph(const projectFile : string; const platform : TDPMPlatform; const graph : IPackageReference);
+    procedure RecordGraph(const projectFile : string; const graph : IPackageReference);
 
     ///<summary> called from the package installer during install/restore - to install design time packages. See IDE implementation</summary>
-    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests : IDictionary<string, IPackageManifest>) : boolean;
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageManifests : IDictionary<string, IPackageSpec>) : boolean;
 
 
     ///<summary> Called from the dependency resolver to record package resolutions, so we can detect conflicts in other projects in the project group. </summary>
-    procedure RecordResolutions(const projectFile: string; const platform : TDPMPlatform; const resolutions : TArray<IResolvedPackage>);
+    procedure RecordResolutions(const projectFile: string; const resolutions : TArray<IResolvedPackage>);
 
     ///<summary> Check for an existing package resolution in already loaded projects in the group.</summary>
-    function FindPackageResolution(const projectFile: string; const platform : TDPMPlatform; const packageId : string ) : IResolvedPackage;
+    function FindPackageResolution(const projectFile: string; const packageId : string ) : IResolvedPackage;
 
     /// <summary>remove an existing resolution - need to do this when upgrading a package.</summary>
-    procedure RemoveResolution(const platform : TDPMPlatform; const packageId : string);
+    procedure RemoveResolution(const packageId : string);
 
   end;
 

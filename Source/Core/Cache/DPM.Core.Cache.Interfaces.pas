@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -32,7 +32,7 @@ uses
   VSoft.CancellationToken,
   DPM.Core.Types,
   DPM.Core.Package.Interfaces,
-  DPM.Core.Manifest.Interfaces;
+  DPM.Core.Spec.Interfaces;
 
 
 type
@@ -66,7 +66,7 @@ type
     function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
 
     //gets the deserialized manifest file for the package.
-    function GetPackageManifest(const packageId : IPackageIdentity) : IPackageManifest;
+    function GetPackageManifest(const packageId : IPackageIdentity) : IPackageSpec;
 
     property Location : string read GetLocation write SetLocation;
     property PackagesFolder : string read GetPackagesFolder;

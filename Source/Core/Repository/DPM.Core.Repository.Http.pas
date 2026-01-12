@@ -55,19 +55,19 @@ type
 
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const localFolder : string; var fileName : string) : Boolean;
-    function FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platform : TDPMPlatform; const includePrerelease : boolean) : IPackageInfo;
+    function FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const includePrerelease : boolean) : IPackageInfo;
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const preRelease : boolean) : IList<TPackageVersion>;
-    function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const preRelease : boolean) : IList<TPackageVersion>;
+    function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
 
     function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>; overload;
-    function GetPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
-    function GetPackageFeedByIds(const cancellationToken : ICancellationToken;  const ids : IList<IPackageIdentity>; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) :  IPackageSearchResult;
+    function GetPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion) : IPackageSearchResult;
+    function GetPackageFeedByIds(const cancellationToken : ICancellationToken;  const ids : IList<IPackageIdentity>; const compilerVersion : TCompilerVersion) :  IPackageSearchResult;
 
 
-    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
-    function GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageSearchResultItem;
+    function GetPackageIcon(const cancelToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageIcon;
+    function GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion): IPackageSearchResultItem;
 
 
     //commands
@@ -162,7 +162,7 @@ begin
   if serviceIndex = nil then
     exit;
 
-  serviceItem := serviceIndex.FindItem('PackageDownload');
+  serviceItem := serviceIndex.FindItem('PackageDownload2');
   if serviceItem = nil then
   begin
     Logger.Error('Unabled to determine PackageDownload resource from Service Index');
@@ -171,7 +171,7 @@ begin
 
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
 
-  path := Format('%s/%s/%s/%s/%s/dpkg', [uri.AbsolutePath, packageInfo.Id, CompilerToString(packageInfo.CompilerVersion), DPMPlatformToString(packageInfo.Platform), packageInfo.Version.ToStringNoMeta]);
+  path := Format('%s/%s/%s/%s/dpkg', [uri.AbsolutePath, packageInfo.Id, CompilerToString(packageInfo.CompilerVersion),  packageInfo.Version.ToStringNoMeta]);
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
@@ -220,7 +220,7 @@ begin
 end;
 
 
-function TDPMServerPackageRepository.FindLatestVersion(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const platform: TDPMPlatform; const includePrerelease : boolean): IPackageInfo;
+function TDPMServerPackageRepository.FindLatestVersion(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const includePrerelease : boolean): IPackageInfo;
 var
   httpClient : IHttpClient;
   request : IHttpRequest;
@@ -251,8 +251,7 @@ begin
                        .WithHeader(cClientVersionHeader,cDPMClientVersion)
                        .WithAccept('application/json')
                        .WithParameter('id', id)
-                       .WithParameter('compiler', CompilerToString(compilerVersion))
-                       .WithParameter('platform', DPMPlatformToString(platform));
+                       .WithParameter('compiler', CompilerToString(compilerVersion));
 
   //this looks odd but if we specify a version then we want that version only!
   if not version.IsEmpty then
@@ -306,7 +305,7 @@ begin
   end;
 end;
 
-function TDPMServerPackageRepository.GetPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageSearchResult;
+function TDPMServerPackageRepository.GetPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion) : IPackageSearchResult;
 var
   httpClient : IHttpClient;
   request : IHttpRequest;
@@ -345,7 +344,6 @@ begin
     request.WithParameter('q', Trim(options.SearchTerms));
 
   request.WithParameter('compiler', CompilerToString(compilerVersion));
-  request.WithParameter('platform', DPMPlatformToString(platform));
   request.WithParameter(cPreReleaseParam, LowerCase(BoolToStr(options.Prerelease, true)));
   request.WithParameter(cCommercialParam, LowerCase(BoolToStr(options.Commercial, true)));
   request.WithParameter(cTrialParam, LowerCase(BoolToStr(options.Trial, true)));
@@ -411,8 +409,7 @@ begin
 
 end;
 
-function TDPMServerPackageRepository.GetPackageFeedByIds(const cancellationToken: ICancellationToken; const ids: IList<IPackageIdentity>; const compilerVersion: TCompilerVersion;
-  const platform: TDPMPlatform): IPackageSearchResult;
+function TDPMServerPackageRepository.GetPackageFeedByIds(const cancellationToken: ICancellationToken; const ids: IList<IPackageIdentity>; const compilerVersion: TCompilerVersion): IPackageSearchResult;
 var
   httpClient : IHttpClient;
   request : IHttpRequest;
@@ -446,7 +443,6 @@ begin
   jsonObj := TJsonObject.Create;
   try
     jsonObj.S['compiler'] := CompilerToString(compilerVersion);
-    jsonObj.S['platform'] := DPMPlatformToString(platform);
     idArray := jsonObj.A['packageids'];
 
     for i := 0 to ids.Count -1 do
@@ -524,7 +520,7 @@ begin
 
 end;
 
-function TDPMServerPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : IPackageIcon;
+function TDPMServerPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageIcon;
 var
   httpClient : IHttpClient;
   request : IHttpRequest;
@@ -540,14 +536,14 @@ begin
   if serviceIndex = nil then
     exit;
 
-  serviceItem := serviceIndex.FindItem('PackageDownload');
+  serviceItem := serviceIndex.FindItem('PackageIcon2');
   if serviceItem = nil then
   begin
     Logger.Error('Unabled to determine PackageDownload resource from Service Index');
     exit;
   end;
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
-  path := Format('%s/%s/%s/%s/%s/icon', [uri.AbsolutePath, packageId, CompilerToString(compilerVersion), DPMPlatformToString(platform),packageVersion]);
+  path := Format('%s/%s/%s/%s/%s/icon', [uri.AbsolutePath, packageId, CompilerToString(compilerVersion), packageVersion]);
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
@@ -611,7 +607,7 @@ begin
   if serviceIndex = nil then
     exit;
 
-  serviceItem := serviceIndex.FindItem('PackageInfo');
+  serviceItem := serviceIndex.FindItem('PackageInfo2');
   if serviceItem = nil then
   begin
     Logger.Error('Unabled to determine PackageInfo resource from Service Index');
@@ -620,7 +616,7 @@ begin
 
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
 
-  path := Format('%s/%s/%s/%s/%s/info', [uri.AbsolutePath, packageId.Id, CompilerToString(packageId.CompilerVersion), DPMPlatformToString(packageId.Platform), packageId.Version.ToStringNoMeta]);
+  path := Format('%s/%s/%s/%s/info', [uri.AbsolutePath, packageId.Id, CompilerToString(packageId.CompilerVersion), packageId.Version.ToStringNoMeta]);
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
@@ -678,7 +674,7 @@ end;
 //Note - we are downloading the dpspec file here rather than hitting the database with the /info endpoint.
 //since the dpsec will be on the CDN - this will be less load on the db.
 //TODO : profile CDN response times vs hitting the server.
-function TDPMServerPackageRepository.GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IPackageSearchResultItem;
+function TDPMServerPackageRepository.GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion): IPackageSearchResultItem;
 var
   httpClient : IHttpClient;
   request : IHttpRequest;
@@ -695,7 +691,7 @@ begin
   if serviceIndex = nil then
     exit;
 
-    serviceItem := serviceIndex.FindItem('PackageMetadata');
+    serviceItem := serviceIndex.FindItem('PackageMetadata2');
   if serviceItem = nil then
   begin
     Logger.Error('Unabled to determine PackageMetadata resource from Service Index');
@@ -703,7 +699,7 @@ begin
   end;
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
 
-  path := Format('%s/%s/%s/%s/%s/info', [uri.AbsolutePath, packageId, CompilerToString(compilerVersion), DPMPlatformToString(platform), packageVersion]);
+  path := Format('%s/%s/%s/%s/info', [uri.AbsolutePath, packageId, CompilerToString(compilerVersion), packageVersion]);
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
@@ -752,7 +748,7 @@ begin
   end;
 end;
 
-function TDPMServerPackageRepository.GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const preRelease : boolean) : IList<TPackageVersion>;
+function TDPMServerPackageRepository.GetPackageVersions(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const preRelease : boolean) : IList<TPackageVersion>;
 var
   httpClient : IHttpClient;
   request : IHttpRequest;
@@ -772,7 +768,7 @@ begin
   if serviceIndex = nil then
     exit;
 
-  serviceItem := serviceIndex.FindItem('PackageVersions');
+  serviceItem := serviceIndex.FindItem('PackageVersions2');
   if serviceItem = nil then
   begin
     Logger.Error('Unabled to determine PackageVersions resource from Service Index');
@@ -780,7 +776,7 @@ begin
   end;
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
 
-  path := Format('%s/%s/%s/%s/versions', [uri.AbsolutePath, id, CompilerToString(compilerVersion), DPMPlatformToString(platform)]);
+  path := Format('%s/%s/%s/versions', [uri.AbsolutePath, id, CompilerToString(compilerVersion)]);
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
@@ -832,7 +828,7 @@ begin
 
 end;
 
-function TDPMServerPackageRepository.GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
+function TDPMServerPackageRepository.GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
 var
   httpClient : IHttpClient;
   request : IHttpRequest;
@@ -854,7 +850,7 @@ begin
   if serviceIndex = nil then
     exit;
 
-  serviceItem := serviceIndex.FindItem('PackageVersionsWithDeps');
+  serviceItem := serviceIndex.FindItem('PackageVersionsWithDeps2');
   if serviceItem = nil then
   begin
     Logger.Error('Unabled to determine PackageVersionsWithDeps resource from Service Index');
@@ -862,7 +858,7 @@ begin
   end;
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
 
-  path := Format('%s/%s/%s/%s/versionswithdependencies', [uri.AbsolutePath, id, CompilerToString(compilerVersion), DPMPlatformToString(platform)]);
+  path := Format('%s/%s/%s/versionswithdependencies', [uri.AbsolutePath, id, CompilerToString(compilerVersion)]);
 
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);

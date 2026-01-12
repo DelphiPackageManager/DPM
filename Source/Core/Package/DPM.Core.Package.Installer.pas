@@ -44,7 +44,6 @@ uses
   DPM.Core.Options.Restore,
   DPM.Core.Project.Interfaces,
   DPM.Core.Spec.Interfaces,
-  DPM.Core.Manifest.Interfaces,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Cache.Interfaces,
@@ -69,25 +68,25 @@ type
     function CollectSearchPaths(const packageGraph: IPackageReference; const resolvedPackages: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
                                 const compilerVersion: TCompilerVersion; const platform: TDPMPlatform;  const searchPaths: IList<string>): boolean;
 
-    procedure GenerateSearchPaths(const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const packageSpec: IPackageManifest; const searchPaths: IList<string>);
+    procedure GenerateSearchPaths(const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const packageSpec: IPackageSpec; const searchPaths: IList<string>);
 
-    function DownloadPackages(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageManifest>): boolean;
+    function DownloadPackages(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageSpec>): boolean;
 
     function CollectPlatformsFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration) : boolean;
 
     function GetCompilerVersionFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration) : boolean;
 
     function CompilePackage(const cancellationToken: ICancellationToken; const Compiler: ICompiler; const packageInfo: IPackageInfo; const packageReference: IPackageReference;
-                            const packageSpec: IPackageManifest;  const force: boolean; const forceDebug : boolean): boolean;
+                            const packageSpec: IPackageSpec;  const force: boolean; const forceDebug : boolean): boolean;
 
     function BuildDependencies(const cancellationToken: ICancellationToken; const packageCompiler: ICompiler; const projectPackageGraph: IPackageReference;
                                const packagesToCompile: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
-                               const packageManifests: IDictionary<string, IPackageManifest>; const Options: TSearchOptions): boolean;
+                               const packageManifests: IDictionary<string, IPackageSpec>; const Options: TSearchOptions): boolean;
 
-    function CopyLocal(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageManifest>;
+    function CopyLocal(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageSpec>;
                        const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
 
-    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests: IDictionary<string, IPackageManifest>) : boolean;
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests: IDictionary<string, IPackageSpec>) : boolean;
 
     function DoRestoreProjectForPlatform(const cancellationToken: ICancellationToken; const Options: TRestoreOptions; const projectFile: string; const projectEditor: IProjectEditor;
                               const platform: TDPMPlatform; const config: IConfiguration; const context: IPackageInstallerContext): boolean;
@@ -262,7 +261,7 @@ begin
 end;
 
 function TPackageInstaller.CompilePackage(const cancellationToken : ICancellationToken; const Compiler: ICompiler; const packageInfo: IPackageInfo; const packageReference: IPackageReference;
-                                          const packageSpec: IPackageManifest; const force: boolean; const forceDebug : boolean): boolean;
+                                          const packageSpec: IPackageSpec; const force: boolean; const forceDebug : boolean): boolean;
 //var
 //  buildEntry: ISpecBuildEntry;
 //  packagePath: string;
@@ -448,12 +447,12 @@ begin
 end;
 
 
-function TPackageInstaller.CopyLocal(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageManifest>;
+function TPackageInstaller.CopyLocal(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageSpec>;
                                      const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
 //var
 //  configName: string;
 //  projectConfig: IProjectConfiguration;
-//  packageSpec: IPackageManifest;
+//  packageSpec: IPackageSpec;
 //  resolvedPackage: IPackageInfo;
 //  configNames: IReadOnlyList<string>;
 //  outputDir: string;
@@ -577,14 +576,14 @@ begin
   result := false;
   if not Options.Version.IsEmpty then
   begin
-    packageIdentity := TPackageIdentity.Create('', Options.packageId, Options.Version, Options.compilerVersion, platform);
+    packageIdentity := TPackageIdentity.Create('', Options.packageId, Options.Version, Options.compilerVersion);
     // sourceName will be empty if we are installing the package from a file
     packageInfo := FRepositoryManager.GetPackageInfo(cancellationToken, packageIdentity);
   end
   else
   begin
     // no version specified, so we need to get the latest version available;
-    packageInfo := FRepositoryManager.FindLatestVersion(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform, Options.PreRelease, options.Sources);
+    packageInfo := FRepositoryManager.FindLatestVersion(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, Options.PreRelease, options.Sources);
   end;
   if packageInfo = nil then
   begin
@@ -658,7 +657,7 @@ var
 
         info.UseSource := dependency.UseSource;
 
-        newPackageRef := TPackageReference.Create(rootnode, info.Id, info.Version, info.Platform,info.CompilerVersion, dependency.VersionRange, dependency.UseSource);
+        newPackageRef := TPackageReference.Create(rootnode, info.Id, info.Version, info.CompilerVersion, dependency.VersionRange, dependency.UseSource);
         newPackageRef.PackageInfo := info;
 
         if newPackageRef.VersionRange.IsEmpty then
@@ -701,7 +700,7 @@ var
   dependency : IPackageReference;
   projectPackageGraph: IPackageReference;
 
-  packageManifests: IDictionary<string, IPackageManifest>;
+  packageManifests: IDictionary<string, IPackageSpec>;
 
   projectReferences: IList<IPackageReference>;
 
@@ -719,10 +718,10 @@ var
 begin
   result := false;
 
-  projectPackageGraph := projectEditor.GetPackageReferences(platform); // can return nil
+  projectPackageGraph := projectEditor.GetPackageReferences; // can return nil
 
   if projectPackageGraph = nil then
-    projectPackageGraph := TPackageReference.CreateRoot(Options.compilerVersion, platform);
+    projectPackageGraph := TPackageReference.CreateRoot(Options.compilerVersion);
 
   // see if it's already installed.
   existingPackageRef := projectPackageGraph.FindTopLevelChild(Options.packageId);
@@ -755,13 +754,13 @@ begin
   if not Options.Version.IsEmpty then
   begin
     // sourceName will be empty if we are installing the package from a file
-    newPackageIdentity := TPackageIdentity.Create(options.Sources, Options.packageId,  Options.Version, Options.compilerVersion, platform);
+    newPackageIdentity := TPackageIdentity.Create(options.Sources, Options.packageId,  Options.Version, Options.compilerVersion);
     packageInfo := GetPackageInfo(cancellationToken, newPackageIdentity);
   end
   else
   begin
     // no version specified, so we need to get the latest version available;
-    packageInfo := FRepositoryManager.FindLatestVersion(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform, Options.PreRelease, options.Sources);
+    packageInfo := FRepositoryManager.FindLatestVersion(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty,  Options.PreRelease, options.Sources);
 
   end;
   if packageInfo = nil then
@@ -796,7 +795,7 @@ begin
   if not CreateProjectRefs(cancellationToken, projectPackageGraph, projectReferences) then
     exit;
 
-  if not FDependencyResolver.ResolveForInstall(cancellationToken, Options.CompilerVersion, platform, projectFile, Options, packageInfo, projectReferences, projectPackageGraph, resolvedPackages) then
+  if not FDependencyResolver.ResolveForInstall(cancellationToken, Options.CompilerVersion, projectFile, Options, packageInfo, projectReferences, projectPackageGraph, resolvedPackages) then
   begin
     FLogger.Debug('ResolveForInstall failed');
     // we need to carry on here as resolution may have failed for another package
@@ -811,7 +810,7 @@ begin
   end;
 
   //record the resolved package graph so we can detect conflicts between project.
-  FContext.RecordGraph(projectFile, platform, projectPackageGraph);
+  FContext.RecordGraph(projectFile, projectPackageGraph);
 
   // get the package we were installing.
   packageInfo := resolvedPackages.FirstOrDefault(
@@ -827,7 +826,7 @@ begin
     exit(false);
   end;
 
-  packageManifests := TCollections.CreateDictionary<string, IPackageManifest>;
+  packageManifests := TCollections.CreateDictionary<string, IPackageSpec>;
   // downloads the package files to the cache if they are not already there and
   // returns the deserialized dspec as we need it for search paths and design
   if not DownloadPackages(cancellationToken, resolvedPackages, packageManifests) then
@@ -869,11 +868,11 @@ var
   compiledPackages: IList<IPackageInfo>;
   packageSearchPaths: IList<string>;
   packageCompiler: ICompiler;
-  packageManifests: IDictionary<string, IPackageManifest>; //TODO : Try rtl dictionary.
+  packageManifests: IDictionary<string, IPackageSpec>; //TODO : Try rtl dictionary.
 begin
   result := false;
 
-  projectPackageGraph := projectEditor.GetPackageReferences(platform);
+  projectPackageGraph := projectEditor.GetPackageReferences;
   // can return nil
   // if there is no project package graph then there is nothing to do.
   if projectPackageGraph = nil then
@@ -887,7 +886,7 @@ begin
 
   projectPackageGraph := nil;
 
-  if not FDependencyResolver.ResolveForRestore(cancellationToken, Options.CompilerVersion, platform, projectFile, Options, projectReferences, projectPackageGraph, resolvedPackages) then
+  if not FDependencyResolver.ResolveForRestore(cancellationToken, Options.CompilerVersion, projectFile, Options, projectReferences, projectPackageGraph, resolvedPackages) then
     exit;
 
   projectReferences := nil;
@@ -900,9 +899,9 @@ begin
     exit(false);
   end;
 
-  FContext.RecordGraph(projectFile, platform, projectPackageGraph);
+  FContext.RecordGraph(projectFile, projectPackageGraph);
 
-  packageManifests := TCollections.CreateDictionary<string, IPackageManifest>;
+  packageManifests := TCollections.CreateDictionary<string, IPackageSpec>;
   // downloads the package files to the cache if they are not already there and
   // returns the deserialized dspec as we need it for search paths and
   if not DownloadPackages(cancellationToken, resolvedPackages, packageManifests) then
@@ -951,7 +950,7 @@ var
   projectPackageGraph: IPackageReference;
   foundReference: IPackageReference;
 begin
-  projectPackageGraph := projectEditor.GetPackageReferences(platform);
+  projectPackageGraph := projectEditor.GetPackageReferences;
   // can return nil
   // if there is no project package graph then there is nothing to do.
   if projectPackageGraph = nil then
@@ -996,7 +995,7 @@ end;
 
 function TPackageInstaller.BuildDependencies(const cancellationToken : ICancellationToken; const packageCompiler: ICompiler; const projectPackageGraph: IPackageReference;
                                              const packagesToCompile: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
-                                             const packageManifests: IDictionary<string, IPackageManifest>; const Options: TSearchOptions): boolean;
+                                             const packageManifests: IDictionary<string, IPackageSpec>; const Options: TSearchOptions): boolean;
 
 begin
   result := false;
@@ -1006,8 +1005,7 @@ begin
       procedure(const packageReference: IPackageReference)
       var
         pkgInfo: IPackageInfo;
-        Spec: IPackageManifest;
-        otherNodes: IList<IPackageReference>;
+        Spec: IPackageSpec;
         forceCompile: boolean;
       begin
         Assert(packageReference.IsRoot = false, 'graph should not visit root node');
@@ -1067,11 +1065,11 @@ begin
 end;
 
 
-function TPackageInstaller.DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageManifest>): boolean;
+function TPackageInstaller.DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageSpec>): boolean;
 var
   packageInfo: IPackageInfo;
   packageFileName: string;
-  manifest: IPackageManifest;
+  manifest: IPackageSpec;
 begin
   result := false;
   //TODO : Download in parallel
@@ -1186,7 +1184,7 @@ begin
 
 end;
 
-procedure TPackageInstaller.GenerateSearchPaths(const compilerVersion : TCompilerVersion; const platform: TDPMPlatform; const packageSpec: IPackageManifest; const searchPaths: IList<string>);
+procedure TPackageInstaller.GenerateSearchPaths(const compilerVersion : TCompilerVersion; const platform: TDPMPlatform; const packageSpec: IPackageSpec; const searchPaths: IList<string>);
 var
   packageBasePath: string;
 //  packageSearchPath: ISpecSearchPath;
@@ -1366,10 +1364,10 @@ begin
 
 end;
 
-function TPackageInstaller.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests: IDictionary<string, IPackageManifest>): boolean;
+function TPackageInstaller.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests: IDictionary<string, IPackageSpec>): boolean;
 begin
   //Note : we delegate this to the context as this is a no-op in the command line tool, the IDE plugin provides it's own context implementation.
-  result := FContext.InstallDesignPackages(cancellationToken, projectFile, platform, packageManifests);
+  result := FContext.InstallDesignPackages(cancellationToken, projectFile, packageManifests);
 end;
 
 function TPackageInstaller.InstallPackageFromFile(const cancellationToken : ICancellationToken; const Options: TInstallOptions;const projectFiles: IList<string>;
@@ -1394,8 +1392,7 @@ begin
   Options.packageId := packageIdentity.Id + '.' +  packageIdentity.Version.ToStringNoMeta;
   Options.compilerVersion := packageIdentity.compilerVersion;
   // package file is for single compiler version
-  Options.platforms := [packageIdentity.platform];
-  // package file is for single platform.
+  Options.platforms := [];
 
   result := InstallPackageFromId(cancellationToken, options, projectFiles, config, context);
 end;
@@ -1410,7 +1407,6 @@ var
   existingPackageRef: IPackageReference;
   projectPackageGraph: IPackageReference;
   dependency : IPackageReference;
-  platform : TDPMPlatform;
 begin
   result := true;
 
@@ -1443,8 +1439,9 @@ begin
         FLogger.Warning('Skipping project file [' + projectEditor.ProjectFile + '] as it does not match target specified platforms.');
         continue;
       end;
-    end;
-
+    end
+    else
+      options.Platforms := projectEditor.Platforms; //default to installing for all platforms enabled in the project.
     projectEditors.Add(projectEditor);
   end;
 
@@ -1457,40 +1454,39 @@ begin
   begin
     projectEditor := projectEditors[i];
 
-    for platform in options.Platforms do
+   // CONTINUE WORKING HERE!!!!  Need to change to justr single package reference per package no platforms.
+
+    projectPackageGraph := projectEditor.GetPackageReferences; // can return nil
+
+    if projectPackageGraph = nil then
+      projectPackageGraph := TPackageReference.CreateRoot(Options.compilerVersion);
+
+    // see if it's already installed.
+    existingPackageRef := projectPackageGraph.FindTopLevelChild(Options.packageId);
+    if (existingPackageRef <> nil) then
     begin
-      projectPackageGraph := projectEditor.GetPackageReferences(platform); // can return nil
-
-      if projectPackageGraph = nil then
-        projectPackageGraph := TPackageReference.CreateRoot(Options.compilerVersion, platform);
-
-      // see if it's already installed.
-      existingPackageRef := projectPackageGraph.FindTopLevelChild(Options.packageId);
-      if (existingPackageRef <> nil) then
+      // if it's installed already and we're not forcing it to install or upgrading the version then we're done.
+      if (not (Options.force or Options.IsUpgrade)) and (not existingPackageRef.IsTransitive) then
       begin
-        // if it's installed already and we're not forcing it to install or upgrading the version then we're done.
-        if (not (Options.force or Options.IsUpgrade)) and (not existingPackageRef.IsTransitive) then
-        begin
-          // Note this error won't show from the IDE as we always force install from the IDE.
-          FLogger.Error('Package [' + Options.packageId +  '] is already installed. Use option -force to force reinstall, or -upgrade to install a different version.');
-          exit;
-        end;
-        // remove it so we can force resolution to happen later.
-        projectPackageGraph.RemoveTopLevelChild(existingPackageRef.Id);
-        FContext.RemoveResolution(platform, Options.PackageId); //this doesn't work due to how the context stores resolutions.
-        existingPackageRef := nil; // we no longer need it.
+        // Note this error won't show from the IDE as we always force install from the IDE.
+        FLogger.Error('Package [' + Options.packageId +  '] is already installed. Use option -force to force reinstall, or -upgrade to install a different version.');
+        exit;
       end;
+      // remove it so we can force resolution to happen later.
+      projectPackageGraph.RemoveTopLevelChild(existingPackageRef.Id);
+      FContext.RemoveResolution(Options.PackageId); //this doesn't work due to how the context stores resolutions.
+      existingPackageRef := nil; // we no longer need it.
+    end;
 
-      // We could have a transitive dependency that is being promoted.
-      // Since we want to control what version is installed, we will remove
-      // any transitive references to that package so the newly installed version
-      // will take precedence when resolving.
+    // We could have a transitive dependency that is being promoted.
+    // Since we want to control what version is installed, we will remove
+    // any transitive references to that package so the newly installed version
+    // will take precedence when resolving.
+    dependency := projectPackageGraph.FindFirstChild(Options.packageId);
+    while dependency <> nil do
+    begin
+      projectPackageGraph.RemoveChild(dependency);
       dependency := projectPackageGraph.FindFirstChild(Options.packageId);
-      while dependency <> nil do
-      begin
-        projectPackageGraph.RemoveChild(dependency);
-        dependency := projectPackageGraph.FindFirstChild(Options.packageId);
-      end;
     end;
   end;
 

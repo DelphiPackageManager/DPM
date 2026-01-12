@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -34,13 +34,13 @@ uses
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
   DPM.Core.Cache.Interfaces,
-  DPM.Core.Manifest.Interfaces;
+  DPM.Core.Spec.Interfaces;
 
 type
   TPackageCache = class(TInterfacedObject, IPackageCache)
   private
     FLogger : ILogger;
-    FManifestReader : IPackageManifestReader;
+    FManifestReader : IPackageSpecReader;
     FLocation : string;
   protected
     procedure SetLocation(const value : string);
@@ -60,7 +60,7 @@ type
 
     function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
 
-    function GetPackageManifest(const packageId : IPackageIdentity) : IPackageManifest;
+    function GetPackageManifest(const packageId : IPackageIdentity) : IPackageSpec;
 
 
 //    function InstallPackage(const packageId : IPackageIdentity; const saveFile : boolean; const source : string = '') : boolean;
@@ -68,7 +68,7 @@ type
     function InstallPackageFromFile(const packageFileName : string) : boolean;
 
   public
-    constructor Create(const logger : ILogger; const manifestReader : IPackageManifestReader);
+    constructor Create(const logger : ILogger; const manifestReader : IPackageSpecReader);
   end;
 
 implementation
@@ -95,7 +95,7 @@ begin
   result := false;
 end;
 
-constructor TPackageCache.Create(const logger : ILogger; const manifestReader : IPackageManifestReader);
+constructor TPackageCache.Create(const logger : ILogger; const manifestReader : IPackageSpecReader);
 begin
   FLogger := logger;
   FManifestReader := manifestReader;
@@ -120,7 +120,7 @@ function TPackageCache.GetPackageInfo(const cancellationToken : ICancellationTok
 var
   packageFolder : string;
   metaDataFile : string;
-  manifest : IPackageManifest;
+  manifest : IPackageSpec;
 begin
   result := nil;
   packageFolder := GetPackagePath(packageId);
@@ -136,7 +136,7 @@ begin
       exit;
     end;
   end;
-  manifest := FManifestReader.ReadManifest(metaDataFile);
+  manifest := FManifestReader.ReadSpec(metaDataFile);
   if manifest = nil then
     exit;
   Result := TPackageInfo.CreateFromManifest('', manifest, '', '');
@@ -144,7 +144,7 @@ end;
 
 function TPackageCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
 var
-  manifest : IPackageManifest;
+  manifest : IPackageSpec;
 begin
   manifest := GetPackageManifest(packageId);
   if manifest = nil then
@@ -159,7 +159,7 @@ end;
 
 function TPackageCache.GetPackagePath(const packageId : IPackageIdentity) : string;
 begin
-  result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim + DPMPlatformToBDString(packageId.platform) + PathDelim + packageId.Id + PathDelim + packageId.Version.ToStringNoMeta;
+  result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim +  packageId.Id + PathDelim + packageId.Version.ToStringNoMeta;
 end;
 
 function TPackageCache.GetPackagesFolder : string;
@@ -168,7 +168,7 @@ begin
   result := TPath.GetFullPath(FLocation)
 end;
 
-function TPackageCache.GetPackageManifest(const packageId: IPackageIdentity): IPackageManifest;
+function TPackageCache.GetPackageManifest(const packageId: IPackageIdentity): IPackageSpec;
 var
   packageFolder : string;
   metaDataFile : string;
@@ -192,7 +192,7 @@ begin
       exit;
     end;
   end;
-  result := FManifestReader.ReadManifest(metaDataFile);
+  result := FManifestReader.ReadSpec(metaDataFile);
 end;
 
 function TPackageCache.EnsurePackage(const packageId : IPackageIdentity) : Boolean;

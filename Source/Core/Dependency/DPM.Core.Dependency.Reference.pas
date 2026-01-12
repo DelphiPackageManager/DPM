@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -51,7 +51,6 @@ type
     FDependencies : IDictionary<string, IPackageReference>;
     FId : string;
     FVersion : TPackageVersion;
-    FPlatform : TDPMPlatform;
     FSelectedOn : TVersionRange;
     FUseSource : boolean;
     FSearchPaths : IList<string>;
@@ -103,7 +102,6 @@ type
 
     procedure SetBplPath(const value : string);
 
-    function GetPlatform : TDPMPlatform;
     procedure SetVersion(const value : TPackageVersion);
     procedure SetSelectedOn(const value : TVersionRange);
     function IsRoot : boolean;
@@ -117,8 +115,8 @@ type
     function Clone : IPackageReference;
 
   public
-    constructor Create(const parent : IPackageReference; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const selectedOn : TVersionRange; const useSource : boolean);overload;
-    constructor CreateRoot(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform);
+    constructor Create(const parent : IPackageReference; const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const selectedOn : TVersionRange; const useSource : boolean);overload;
+    constructor CreateRoot(const compilerVersion : TCompilerVersion);
     destructor Destroy;override;
   end;
 
@@ -154,7 +152,7 @@ begin
     parent := parent.Parent;
   end;
 
-  result := TPackageReference.Create(self, id, version, FPlatform, FCompilerVersion, selectedOn,  FUseSource);
+  result := TPackageReference.Create(self, id, version, FCompilerVersion, selectedOn,  FUseSource);
   FDependencies.Add(LowerCase(id), result);
 
 end;
@@ -195,11 +193,11 @@ end;
 
 function TPackageReference.Clone: IPackageReference;
 begin
-  result := TPackageReference.Create(nil, FId, FVersion, FPlatform, FCompilerVersion, FSelectedOn, FUseSource);
+  result := TPackageReference.Create(nil, FId, FVersion, FCompilerVersion, FSelectedOn, FUseSource);
   result.PackageInfo := FPackageInfo;
 end;
 
-constructor TPackageReference.Create(const parent : IPackageReference; const id : string; const version : TPackageVersion; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion; const selectedOn : TVersionRange; const useSource : boolean);
+constructor TPackageReference.Create(const parent : IPackageReference; const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const selectedOn : TVersionRange; const useSource : boolean);
 begin
   inherited Create;
   FSearchPaths := TCollections.CreateList<string>;
@@ -209,7 +207,6 @@ begin
   FParent := parent;
   FId := id;
   FVersion := version;
-  FPlatform := platform;
   FSelectedOn := selectedOn;
   FUseSource := useSource;
   if FParent.IsAlive then
@@ -222,9 +219,9 @@ begin
 
 end;
 
-constructor TPackageReference.CreateRoot(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform);
+constructor TPackageReference.CreateRoot(const compilerVersion : TCompilerVersion);
 begin
-  Create(nil, cRootNode, TPackageVersion.Empty, platform, compilerVersion, TVersionRange.Empty, false);
+  Create(nil, cRootNode, TPackageVersion.Empty, compilerVersion, TVersionRange.Empty, false);
 end;
 
 destructor TPackageReference.Destroy;
@@ -356,10 +353,6 @@ begin
     result := '';
 end;
 
-function TPackageReference.GetPlatform: TDPMPlatform;
-begin
-  result := FPlatform;
-end;
 
 function TPackageReference.GetProjectFile: string;
 begin

@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -67,7 +67,6 @@ type
     FResolved : IDictionary<string, IResolvedPackage>;
     FOpenRequirements : IQueue<IPackageInfo>;
     FVersionCache : IDictionary<string, IList<IPackageInfo>>;
-    FPlatform : TDPMPlatform;
     FCompilerVersion : TCompilerVersion;
     FProjectFile : string;
     FPackageInstallerContext : IPackageInstallerContext;
@@ -89,7 +88,7 @@ type
     function ProjectFile : string;
   public
     constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>);overload;
-    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const projectReferences : IList<IPackageReference>);overload;
+    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences : IList<IPackageReference>);overload;
     destructor Destroy;override;
   end;
 
@@ -144,7 +143,7 @@ var
   end;
 
 begin
-  result := TPackageReference.CreateRoot(FCompilerVersion, FPlatform);
+  result := TPackageReference.CreateRoot(FCompilerVersion);
   toplevelPackages := FResolved.Values.Where(function(const value : IResolvedPackage) : boolean
     begin
       result := value.IsTopLevel;
@@ -154,7 +153,7 @@ begin
     AddNode(result, topLevelPackage.PackageInfo, TVersionRange.Empty);
 end;
 
-constructor TResolverContext.Create(const logger: ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const platform: TDPMPlatform; const projectReferences: IList<IPackageReference>);
+constructor TResolverContext.Create(const logger: ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences: IList<IPackageReference>);
 var
   projectReference : IPackageReference;
 
@@ -170,7 +169,6 @@ var
 begin
   inherited Create;
   FCompilerVersion := compilerVersion;
-  FPlatform := platform;
   FLogger := logger;
   FPackageInstallerContext := packageInstallerContext;
   FProjectFile := projectFile;
@@ -208,7 +206,7 @@ end;
 constructor TResolverContext.Create(const logger : ILogger;  const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>);
 begin
   Assert(newPackage <> nil);
-  Create(logger, packageInstallerContext, projectFile, newPackage.CompilerVersion, newPackage.Platform, projectReferences);
+  Create(logger, packageInstallerContext, projectFile, newPackage.CompilerVersion, projectReferences);
   PushRequirement(newPackage);
   RecordResolution(newPackage, TVersionRange.Create(newPackage.Version), cRootNode);
 end;
@@ -306,7 +304,7 @@ function TResolverContext.TryGetResolvedPackage(const packageId : string; const 
     for i := 0 to res.PackageInfo.Dependencies.Count -1 do
     begin
       id := res.PackageInfo.Dependencies[i].Id;
-      childRes := FPackageInstallerContext.FindPackageResolution(FProjectFile,  FPlatform, id);
+      childRes := FPackageInstallerContext.FindPackageResolution(FProjectFile, id);
       if childRes <> nil then
       begin
         FResolved[Lowercase(id)] := childRes;//.Clone(FProjectFile); //should we be cloning here?
@@ -321,7 +319,7 @@ begin
   if not result then
   begin
     //check if it was resolved in another project in the group
-    resolution := FPackageInstallerContext.FindPackageResolution(FProjectFile, FPlatform, packageId);
+    resolution := FPackageInstallerContext.FindPackageResolution(FProjectFile, packageId);
     result := resolution <> nil;
     if resolution <> nil then
     begin
