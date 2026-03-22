@@ -62,6 +62,7 @@ type
 
     function GetPackageManifest(const packageId : IPackageIdentity) : IPackageSpec;
 
+    function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
 
 //    function InstallPackage(const packageId : IPackageIdentity; const saveFile : boolean; const source : string = '') : boolean;
 
@@ -193,6 +194,16 @@ begin
     end;
   end;
   result := FManifestReader.ReadSpec(metaDataFile);
+end;
+
+function TPackageCache.GetPackagePlatforms(const packageId: IPackageIdentity): TDPMPlatforms;
+var
+  manifest: IPackageSpec;
+begin
+  result := [];
+  manifest := GetPackageManifest(packageId);
+  if (manifest <> nil) and (manifest.TargetPlatform <> nil) then
+    result := manifest.TargetPlatform.Platforms;
 end;
 
 function TPackageCache.EnsurePackage(const packageId : IPackageIdentity) : Boolean;

@@ -68,6 +68,9 @@ type
     //gets the deserialized manifest file for the package.
     function GetPackageManifest(const packageId : IPackageIdentity) : IPackageSpec;
 
+    //gets the platforms supported by a package from its manifest.
+    function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
+
     property Location : string read GetLocation write SetLocation;
     property PackagesFolder : string read GetPackagesFolder;
   end;

@@ -179,7 +179,8 @@ uses
   DPM.Core.Manifest.Reader in 'Core\Manifest\DPM.Core.Manifest.Reader.pas',
   DPM.Core.Utils.Hash in 'Core\Utils\DPM.Core.Utils.Hash.pas',
   DPM.Core.Spec.DesignEntry in 'Core\Spec\DPM.Core.Spec.DesignEntry.pas',
-  DPM.Core.Spec.SourceEntry in 'Core\Spec\DPM.Core.Spec.SourceEntry.pas';
+  DPM.Core.Spec.SourceEntry in 'Core\Spec\DPM.Core.Spec.SourceEntry.pas',
+  DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas';
 
 {$R *.res}
 

@@ -74,7 +74,6 @@ uses
   DPM.Core.Package.Dependency in 'Core\Package\DPM.Core.Package.Dependency.pas',
   DPM.Core.Package.Installer in 'Core\Package\DPM.Core.Package.Installer.pas',
   DPM.Core.Package.InstallerContext in 'Core\Package\DPM.Core.Package.InstallerContext.pas',
-  DPM.Core.Package.Interfaces in 'Core\Package\DPM.Core.Package.Interfaces.pas',
   DPM.Core.Package.Classes in 'Core\Package\DPM.Core.Package.Classes.pas',
   DPM.Core.Package.SearchResults in 'Core\Package\DPM.Core.Package.SearchResults.pas',
   DPM.Core.Packaging.Archive in 'Core\Packaging\DPM.Core.Packaging.Archive.pas',
@@ -108,11 +107,10 @@ uses
   DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas',
   DPM.Core.Package.ListItem in 'Core\Package\DPM.Core.Package.ListItem.pas',
   DPM.Core.Package.PackageLatestVersionInfo in 'Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas',
-  DPM.Core.Manifest.Interfaces in 'Core\Manifest\DPM.Core.Manifest.Interfaces.pas',
-  DPM.Core.Manifest in 'Core\Manifest\DPM.Core.Manifest.pas',
-  DPM.Core.Manifest.Reader in 'Core\Manifest\DPM.Core.Manifest.Reader.pas',
   DPM.Core.Tests.PackageIdentity in 'Tests\DPM.Core.Tests.PackageIdentity.pas',
-  DPM.Core.Utils.Hash in 'Core\Utils\DPM.Core.Utils.Hash.pas';
+  DPM.Core.Utils.Hash in 'Core\Utils\DPM.Core.Utils.Hash.pas',
+  DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas',
+  DPM.Core.Package.Interfaces in 'Core\Package\DPM.Core.Package.Interfaces.pas';
 
 var
   runner : ITestRunner;

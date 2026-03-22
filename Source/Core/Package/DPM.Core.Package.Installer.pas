@@ -26,8 +26,6 @@
 
 unit DPM.Core.Package.Installer;
 
-// TODO : Lots of common code between install and restore - refactor!
-
 interface
 
 uses
@@ -88,14 +86,43 @@ type
 
     function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests: IDictionary<string, IPackageSpec>) : boolean;
 
+    // Calculates the intersection of project platforms with platforms supported by ALL resolved packages
+    function GetEffectivePlatforms(const projectPlatforms: TDPMPlatforms; const packageManifests: IDictionary<string, IPackageSpec>): TDPMPlatforms;
+
+    // Common configuration logic for install/restore - builds, collects search paths, copies local, installs design packages
+    function DoConfigurePackageForPlatform(const cancellationToken: ICancellationToken; const options: TSearchOptions;
+      const projectFile: string; const projectEditor: IProjectEditor; const platform: TDPMPlatform;
+      const config: IConfiguration; const projectPackageGraph: IPackageReference;
+      const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageSpec>): boolean;
+
+    // Resolves project files from path (handles .dproj, .groupproj, directory, or explicit list)
+    function ResolveProjectFiles(const projectPath: string; const explicitProjects: TArray<string>;
+      const projectList: IList<string>): boolean;
+
+    // Validates and reconciles compiler version and platforms between options and project
+    procedure ValidateAndSetCompilerPlatforms(const options: TSearchOptions; const projectEditor: IProjectEditor;
+      out effectivePlatforms: TDPMPlatforms; out shouldSkip: boolean);
+
     function DoRestoreProjectForPlatform(const cancellationToken: ICancellationToken; const Options: TRestoreOptions; const projectFile: string; const projectEditor: IProjectEditor;
-                              const platform: TDPMPlatform; const config: IConfiguration; const context: IPackageInstallerContext): boolean;
+                              const platform: TDPMPlatform; const config: IConfiguration; const context: IPackageInstallerContext;
+                              out resultGraph: IPackageReference): boolean;
 
     function DoInstallPackageForPlatform(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const projectFile: string; const projectEditor: IProjectEditor;
-                              const platform: TDPMPlatform; const config: IConfiguration; const context: IPackageInstallerContext): boolean;
+                              const platform: TDPMPlatform; const config: IConfiguration; const context: IPackageInstallerContext;
+                              out resultGraph: IPackageReference): boolean;
 
     function DoUninstallFromProject(const cancellationToken: ICancellationToken; const Options: TUnInstallOptions; const projectFile: string; const projectEditor: IProjectEditor;
                                     const platform: TDPMPlatform; const config: IConfiguration; const context: IPackageInstallerContext): boolean;
+
+    // Shared post-resolution logic: downloads packages, configures for platform, records graph
+    function FinalizePackageConfiguration(const cancellationToken: ICancellationToken; const options: TSearchOptions;
+      const projectFile: string; const projectEditor: IProjectEditor; const platform: TDPMPlatform;
+      const config: IConfiguration; const projectPackageGraph: IPackageReference;
+      const resolvedPackages: IList<IPackageInfo>; out resultGraph: IPackageReference): boolean;
+
+    // Helper to create and load a project editor
+    function LoadProjectEditor(const projectFile: string; const config: IConfiguration;
+      const compilerVersion: TCompilerVersion; out projectEditor: IProjectEditor): boolean;
 
     function DoCachePackage(const cancellationToken: ICancellationToken; const Options: TCacheOptions; const platform: TDPMPlatform): boolean;
 
@@ -262,188 +289,145 @@ end;
 
 function TPackageInstaller.CompilePackage(const cancellationToken : ICancellationToken; const Compiler: ICompiler; const packageInfo: IPackageInfo; const packageReference: IPackageReference;
                                           const packageSpec: IPackageSpec; const force: boolean; const forceDebug : boolean): boolean;
-//var
-//  buildEntry: ISpecBuildEntry;
-//  packagePath: string;
-//  projectFile: string;
-//  searchPaths: IList<string>;
-//  dependency : IPackageReference;
-//  bomNode: IPackageReference;
-//  bomFile: string;
-//  childSearchPath: string;
-//  configuration : string;
-
+var
+  template: ISpecTemplate;
+  buildEntry: ISpecBuildEntry;
+  designEntry: ISpecDesignEntry;
+  packagePath: string;
+  projectFile: string;
+  bomFile: string;
+  configuration: string;
+  searchPaths: IList<string>;
+  dependency: IPackageReference;
+  childSearchPath: string;
+  bomNode: IPackageReference;
+  designPlatform: TDPMPlatform;
 begin
   result := true;
-//
-//  packagePath := FPackageCache.GetPackagePath(packageInfo);
-//  bomFile := TPath.Combine(packagePath, 'package.bom');
-//
-//  if (not force) and FileExists(bomFile) then
-//  begin
-//    // Compare Bill of materials file against node dependencies to determine if we need to compile or not.
-//    // if the bom file exists that means it was compiled before. We will check that the bom matchs the dependencies
-//    // in the graph
-//    bomNode := TBOMFile.LoadFromFile(FLogger, bomFile);
-//
-//    if bomNode <> nil then
-//    begin
-//      if bomNode.AreEqual(packageReference) then
-//      begin
-//        exit;
-//      end;
-//    end;
-//  end;
-//
-//  // if we get here the previous compliation was done with different dependency versions,
-//  // so we delete the bom and compile again
-//  DeleteFile(bomFile);
-//
-//  for buildEntry in packageSpec.TargetPlatform.BuildEntries do
-//  begin
-//    FLogger.Information('Building project : ' + buildEntry.Project);
-//
-//    projectFile := TPath.Combine(packagePath, buildEntry.Project);
-//    projectFile := TPathUtils.CompressRelativePath('', projectFile);
-//
-//    // if it's a design time package then we need to do a lot more work.
-//    // design time packages are win32 (as the IDE is win32) - since we can
-//    // only have one copy of the design package installed we need to check if
-//    // it has already been installed via another platform.
-//
-//    if forceDebug then
-//      configuration := 'Debug'
-//    else
-//      configuration := 'Release';
-//
-//    if buildEntry.DesignOnly and (packageInfo.platform <> TDPMPlatform.Win32)  then
-//    begin
-//      Compiler.BPLOutputDir := TPath.Combine(packagePath, buildEntry.BPLOutputDir);
-//      Compiler.LibOutputDir := TPath.Combine(packagePath, buildEntry.LibOutputDir);
-//      Compiler.Configuration := buildEntry.config;
-//
-//      if Compiler.platform <> TDPMPlatform.Win32 then
-//      begin
-//        Compiler.BPLOutputDir := TPath.Combine(Compiler.BPLOutputDir, 'win32');
-//        Compiler.LibOutputDir := TPath.Combine(Compiler.LibOutputDir, 'win32');
-//      end
-//      else
-//      begin
-//        packageReference.LibPath := Compiler.LibOutputDir;
-//        packageReference.BplPath := Compiler.BPLOutputDir;
-//      end;
-//
-//      if packageReference.HasChildren then
-//      begin
-//        searchPaths := TCollections.CreateList<string>;
-//        for dependency in packageReference.Children do
-//        begin
-//          childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion, Compiler.platform);
-//          childSearchPath := TPath.Combine(childSearchPath, 'lib\win32');
-//          searchPaths.Add(childSearchPath);
-//        end;
-//        Compiler.SetSearchPaths(searchPaths);
-//      end
-//      else
-//        Compiler.SetSearchPaths(nil);
-//
-//      FLogger.Information('Building project [' + projectFile + '] for design time...');
-//
-//      result := Compiler.BuildProject(cancellationToken, packageInfo.Platform, projectFile, configuration, packageInfo.Version, true);
-//      if result then
-//        FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
-//      else
-//      begin
-//        if cancellationToken.IsCancelled then
-//          FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
-//        else
-//          FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
-//        exit;
-//      end;
-//      FLogger.NewLine;
-//
-//    end
-//    else
-//    begin
-//      // note we are assuming the build entry paths are all relative.
-//      Compiler.BPLOutputDir := TPath.Combine(packagePath, buildEntry.BPLOutputDir);
-//      Compiler.LibOutputDir := TPath.Combine(packagePath, buildEntry.LibOutputDir);
-//      Compiler.Configuration := buildEntry.config;
-//
-//      packageReference.LibPath := Compiler.LibOutputDir;
-//      packageReference.BplPath := Compiler.BPLOutputDir;
-//
-//      if packageReference.HasChildren then
-//      begin
-//        searchPaths := TCollections.CreateList<string>;
-//        for dependency in packageReference.Children do
-//        begin
-//          childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion, Compiler.platform);
-//          childSearchPath := TPath.Combine(childSearchPath, 'lib');
-//          searchPaths.Add(childSearchPath);
-//        end;
-//        Compiler.SetSearchPaths(searchPaths);
-//      end
-//      else
-//        Compiler.SetSearchPaths(nil);
-//
-//      result := Compiler.BuildProject(cancellationToken, packageInfo.Platform, projectFile, configuration, packageInfo.Version);
-//      if result then
-//        FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
-//      else
-//      begin
-//        if cancellationToken.IsCancelled then
-//          FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
-//        else
-//          FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
-//        exit;
-//      end;
-//      FLogger.NewLine;
-//
-//      if buildEntry.BuildForDesign and (Compiler.platform <> TDPMPlatform.Win32)  then
-//      begin
-//        FLogger.Information('Building project [' + projectFile + '] for design time support...');
-//        // if buildForDesign is true, then it means the design time bpl's also reference
-//        // this bpl, so if the platform isn't win32 then we need to build it for win32
-//        Compiler.BPLOutputDir := TPath.Combine(Compiler.BPLOutputDir, 'win32');
-//        Compiler.LibOutputDir := TPath.Combine(Compiler.LibOutputDir, 'win32');
-//        if packageReference.HasChildren then
-//        begin
-//          searchPaths := TCollections.CreateList<string>;
-//          for dependency in packageReference.Children do
-//          begin
-//            childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion, Compiler.platform);
-//            childSearchPath := TPath.Combine(childSearchPath, 'lib\win32');
-//            searchPaths.Add(childSearchPath);
-//          end;
-//          Compiler.SetSearchPaths(searchPaths);
-//        end
-//        else
-//          Compiler.SetSearchPaths(nil);
-//
-//        result := Compiler.BuildProject(cancellationToken, packageInfo.Platform, projectFile, buildEntry.config, packageInfo.Version, true);
-//        if result then
-//          FLogger.Success('Project [' + buildEntry.Project + '] Compiled for designtime Ok.')
-//        else
-//        begin
-//          if cancellationToken.IsCancelled then
-//            FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
-//          else
-//            FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
-//          exit;
-//        end;
-//
-//      end;
-//
-//      if buildEntry.CopyFiles.Any then
-//        DoCopyFiles(buildEntry);
-//
-//    end;
-//
-//  end;
-//  // save the bill of materials file for future reference.
-//  TBOMFile.SaveToFile(FLogger, bomFile, packageReference);
+  packagePath := FPackageCache.GetPackagePath(packageInfo);
+  bomFile := TPath.Combine(packagePath, 'package.bom');
 
+  // BOM optimization: skip if dependencies unchanged
+  if (not force) and FileExists(bomFile) then
+  begin
+    bomNode := TBOMFile.LoadFromFile(FLogger, bomFile);
+    if (bomNode <> nil) and bomNode.AreEqual(packageReference) then
+    begin
+      FLogger.Information('Package [' + packageInfo.Id + '] - dependencies unchanged, skipping compilation.');
+      exit;
+    end;
+  end;
+  DeleteFile(bomFile); // Dependencies changed or no BOM, rebuild
+
+  // Get template for this package
+  template := packageSpec.FindTemplate(packageSpec.TargetPlatform.TemplateName);
+  if template = nil then
+    exit(true); // No template = nothing to build
+
+  if (not template.BuildEntries.Any) and (not template.DesignEntries.Any) then
+    exit(true); // Nothing to compile
+
+  // Setup configuration
+  if forceDebug then
+    configuration := 'Debug'
+  else
+    configuration := 'Release';
+
+  // Setup compiler output directories (standardized paths)
+  Compiler.BPLOutputDir := TPath.Combine(packagePath, 'bpl' + PathDelim + DPMPlatformToBDString(Compiler.Platform));
+  Compiler.LibOutputDir := TPath.Combine(packagePath, 'lib' + PathDelim + DPMPlatformToBDString(Compiler.Platform));
+  Compiler.Configuration := configuration;
+
+  // Set library paths from dependencies
+  if packageReference.HasChildren then
+  begin
+    searchPaths := TCollections.CreateList<string>;
+    for dependency in packageReference.Children do
+    begin
+      childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion, Compiler.platform);
+      childSearchPath := TPath.Combine(childSearchPath, 'lib' + PathDelim + DPMPlatformToBDString(Compiler.Platform));
+      searchPaths.Add(childSearchPath);
+    end;
+    Compiler.SetSearchPaths(searchPaths);
+  end
+  else
+    Compiler.SetSearchPaths(nil);
+
+  packageReference.LibPath := Compiler.LibOutputDir;
+  packageReference.BplPath := Compiler.BPLOutputDir;
+
+  // Compile build entries
+  for buildEntry in template.BuildEntries do
+  begin
+    // Check platform filter if specified
+    if (buildEntry.Platforms <> []) and (not (Compiler.Platform in buildEntry.Platforms)) then
+      continue;
+
+    FLogger.Information('Building project: ' + buildEntry.Project);
+    projectFile := TPath.Combine(packagePath, buildEntry.Project);
+    projectFile := TPathUtils.CompressRelativePath('', projectFile);
+
+    result := Compiler.BuildProject(cancellationToken, Compiler.Platform, projectFile, configuration, packageInfo.Version, false);
+    if result then
+      FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
+    else
+    begin
+      if cancellationToken.IsCancelled then
+        FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
+      else
+        FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
+      exit;
+    end;
+  end;
+
+  // Compile design entries
+  // Design packages must match IDE bitness:
+  // - Delphi 12 and earlier: Win32 only (32-bit IDE)
+  // - Delphi 13 and later: Win32 or Win64 (64-bit IDE available)
+  for designEntry in template.DesignEntries do
+  begin
+    FLogger.Information('Building design package: ' + designEntry.Project);
+    projectFile := TPath.Combine(packagePath, designEntry.Project);
+
+    // Determine which platform to build design packages for
+    if (Compiler.compilerVersion >= TCompilerVersion.Delphi13) and (Compiler.Platform = TDPMPlatform.Win64) then
+      designPlatform := TDPMPlatform.Win64
+    else
+      designPlatform := TDPMPlatform.Win32;
+
+    // Set output directories for design platform if different from target
+    if Compiler.Platform <> designPlatform then
+    begin
+      Compiler.BPLOutputDir := TPath.Combine(packagePath, 'bpl' + PathDelim + DPMPlatformToBDString(designPlatform));
+      Compiler.LibOutputDir := TPath.Combine(packagePath, 'lib' + PathDelim + DPMPlatformToBDString(designPlatform));
+      // Also need design platform search paths for dependencies
+      if packageReference.HasChildren then
+      begin
+        searchPaths := TCollections.CreateList<string>;
+        for dependency in packageReference.Children do
+        begin
+          childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion, designPlatform);
+          childSearchPath := TPath.Combine(childSearchPath, 'lib' + PathDelim + DPMPlatformToBDString(designPlatform));
+          searchPaths.Add(childSearchPath);
+        end;
+        Compiler.SetSearchPaths(searchPaths);
+      end;
+    end;
+
+    result := Compiler.BuildProject(cancellationToken, designPlatform, projectFile, configuration, packageInfo.Version, true);
+    if not result then
+    begin
+      if cancellationToken.IsCancelled then
+        FLogger.Error('Building design package [' + designEntry.Project + '] cancelled.')
+      else
+        FLogger.Error('Building design package [' + designEntry.Project + '] failed.');
+      exit;
+    end;
+    FLogger.Success('Design package [' + designEntry.Project + '] build succeeded.');
+  end;
+
+  // Save the bill of materials file for future reference
+  TBOMFile.SaveToFile(FLogger, bomFile, packageReference);
 end;
 
 
@@ -691,7 +675,7 @@ end;
 
 function TPackageInstaller.DoInstallPackageForPlatform(const cancellationToken : ICancellationToken; const Options: TInstallOptions; const projectFile: string;
                                             const projectEditor: IProjectEditor; const platform: TDPMPlatform; const config: IConfiguration;
-                                            const context: IPackageInstallerContext): boolean;
+                                            const context: IPackageInstallerContext; out resultGraph: IPackageReference): boolean;
 var
   newPackageIdentity: IPackageIdentity;
   packageFileName: string;
@@ -705,18 +689,13 @@ var
   projectReferences: IList<IPackageReference>;
 
   resolvedPackages: IList<IPackageInfo>;
-  packagesToCompile: IList<IPackageInfo>;
-
-  compiledPackages: IList<IPackageInfo>;
-  packageSearchPaths: IList<string>;
-
-  packageCompiler: ICompiler;
 
   seenPackages: IDictionary<string, IPackageInfo>;
 
 
 begin
   result := false;
+  resultGraph := nil;
 
   projectPackageGraph := projectEditor.GetPackageReferences; // can return nil
 
@@ -809,68 +788,33 @@ begin
     exit(false);
   end;
 
-  //record the resolved package graph so we can detect conflicts between project.
-  FContext.RecordGraph(projectFile, projectPackageGraph);
-
-  // get the package we were installing.
+  // Install-specific sanity check: verify the package we were installing is in the resolved list
   packageInfo := resolvedPackages.FirstOrDefault(
     function(const info: IPackageInfo): boolean
     begin
-      result := SameText(info.Id, packageInfo.Id);
+      result := SameText(info.Id, Options.packageId);
     end);
 
-  // this is just a sanity check, should never happen.
   if packageInfo = nil then
   begin
     FLogger.Error('Something went wrong, resolution did not return installed package!');
     exit(false);
   end;
 
-  packageManifests := TCollections.CreateDictionary<string, IPackageSpec>;
-  // downloads the package files to the cache if they are not already there and
-  // returns the deserialized dspec as we need it for search paths and design
-  if not DownloadPackages(cancellationToken, resolvedPackages, packageManifests) then
-    exit;
-
-  compiledPackages := TCollections.CreateList<IPackageInfo>;
-  packagesToCompile := TCollections.CreateList<IPackageInfo>(resolvedPackages);
-  packageSearchPaths := TCollections.CreateList<string>;
-  packageCompiler := FCompilerFactory.CreateCompiler(Options.compilerVersion, platform);
-
-  if not BuildDependencies(cancellationToken, packageCompiler,  projectPackageGraph, packagesToCompile, compiledPackages, packageManifests, Options) then
-    exit;
-
-  if not CollectSearchPaths(projectPackageGraph, resolvedPackages, compiledPackages, projectEditor.compilerVersion, platform,  packageSearchPaths) then
-    exit;
-
-  if not CopyLocal(cancellationToken, resolvedPackages, packageManifests, projectEditor, platform) then
-    exit;
-
-  if not InstallDesignPackages(cancellationToken,  projectFile, platform, packageManifests) then
-    exit;
-
-  if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
-    exit;
-
-  projectEditor.UpdatePackageReferences(projectPackageGraph, platform);
-  result := projectEditor.SaveProject();
-
+  // Finalize configuration (download, build, search paths, design packages, etc.)
+  result := FinalizePackageConfiguration(cancellationToken, Options, projectFile, projectEditor, platform, config, projectPackageGraph, resolvedPackages, resultGraph);
 end;
 
 function TPackageInstaller.DoRestoreProjectForPlatform(const cancellationToken : ICancellationToken; const Options: TRestoreOptions; const projectFile: string;
                                             const projectEditor: IProjectEditor; const platform: TDPMPlatform; const config: IConfiguration;
-                                            const context: IPackageInstallerContext): boolean;
+                                            const context: IPackageInstallerContext; out resultGraph: IPackageReference): boolean;
 var
   projectPackageGraph: IPackageReference;
   projectReferences: IList<IPackageReference>;
   resolvedPackages: IList<IPackageInfo>;
-  packagesToCompile: IList<IPackageInfo>;
-  compiledPackages: IList<IPackageInfo>;
-  packageSearchPaths: IList<string>;
-  packageCompiler: ICompiler;
-  packageManifests: IDictionary<string, IPackageSpec>; //TODO : Try rtl dictionary.
 begin
   result := false;
+  resultGraph := nil;
 
   projectPackageGraph := projectEditor.GetPackageReferences;
   // can return nil
@@ -880,7 +824,6 @@ begin
 
   projectReferences := TCollections.CreateList<IPackageReference>;
 
-  // TODO : Can packagerefs be replaced by just adding the info to the nodes?
   if not CreateProjectRefs(cancellationToken, projectPackageGraph, projectReferences) then
     exit;
 
@@ -891,56 +834,8 @@ begin
 
   projectReferences := nil;
 
-  // TODO : The code from here on is the same for install/uninstall/restore - refactor!!!
-
-  if resolvedPackages = nil then
-  begin
-    FLogger.Error('Resolver returned no packages!');
-    exit(false);
-  end;
-
-  FContext.RecordGraph(projectFile, projectPackageGraph);
-
-  packageManifests := TCollections.CreateDictionary<string, IPackageSpec>;
-  // downloads the package files to the cache if they are not already there and
-  // returns the deserialized dspec as we need it for search paths and
-  if not DownloadPackages(cancellationToken, resolvedPackages, packageManifests) then
-    exit;
-
-  compiledPackages := TCollections.CreateList<IPackageInfo>;
-  packagesToCompile := TCollections.CreateList<IPackageInfo>(resolvedPackages);
-  packageSearchPaths := TCollections.CreateList<string>;
-  packageCompiler := FCompilerFactory.CreateCompiler(Options.compilerVersion, platform);
-
-  if not BuildDependencies(cancellationToken, packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageManifests, Options) then
-    exit;
-
-  if not CollectSearchPaths(projectPackageGraph, resolvedPackages, compiledPackages, projectEditor.compilerVersion, platform, packageSearchPaths) then
-    exit;
-
-  if not CopyLocal(cancellationToken, resolvedPackages, packageManifests, projectEditor, platform) then
-    exit;
-
-  if not InstallDesignPackages(cancellationToken, projectFile, platform, packageManifests) then
-    exit;
-
-  if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
-    exit;
-
-  projectEditor.UpdatePackageReferences(projectPackageGraph, platform);
-
-  //trying to get a better stack trace
-  packageManifests := nil;
-  projectPackageGraph := nil;
-  resolvedPackages := nil;
-  packagesToCompile := nil;
-  compiledPackages := nil;
-  packageSearchPaths := nil;
-  packageCompiler := nil;
-
-  // TODO : need to detect if anything has actually changed and only save if it has.
-  // saving triggers the IDE to reload (although we do work around that) - would be good to avoid.
-  result := projectEditor.SaveProject();
+  // Finalize configuration (download, build, search paths, design packages, etc.)
+  result := FinalizePackageConfiguration(cancellationToken, Options, projectFile, projectEditor, platform, config, projectPackageGraph, resolvedPackages, resultGraph);
 end;
 
 function TPackageInstaller.DoUninstallFromProject(const cancellationToken : ICancellationToken; const Options: TUnInstallOptions;const projectFile: string;
@@ -1006,7 +901,10 @@ begin
       var
         pkgInfo: IPackageInfo;
         Spec: IPackageSpec;
+        template: ISpecTemplate;
         forceCompile: boolean;
+        otherNodes: IList<IPackageReference>;
+        otherNode: IPackageReference;
       begin
         Assert(packageReference.IsRoot = false, 'graph should not visit root node');
 
@@ -1019,38 +917,49 @@ begin
         if pkgInfo = nil then
           exit;
 
-        // do we need an option to force compilation when restoring?
-        forceCompile := Options.force and SameText(pkgInfo.Id, Options.SearchTerms); // searchterms backs packageid
-
         // removing it so we don't process it again
         packagesToCompile.Remove(pkgInfo);
 
         Spec := packageManifests[LowerCase(packageReference.Id)];
         Assert(Spec <> nil);
-        raise Exception.Create('Needto use the template');
-//        if Spec.TargetPlatform.BuildEntries.Any then
-//        begin
-//          // we need to build the package.
-//          if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, packageReference, Spec, forceCompile, Options.DebugMode) then
-//          begin
-//            if cancellationToken.IsCancelled then
-//              raise Exception.Create('Compiling package [' + pkgInfo.ToIdVersionString + '] cancelled.')
-//            else
-//              raise Exception.Create('Compiling package [' +  pkgInfo.ToIdVersionString + '] failed.');
-//          end;
-//          compiledPackages.Add(pkgInfo);
-//          // compiling updates the node searchpaths and libpath, so just copy to any same package nodes
-//          otherNodes := projectPackageGraph.FindChildren(packageReference.Id);
-//          if otherNodes.Count > 1 then
-//            otherNodes.ForEach(
-//              procedure(const otherNode: IPackageReference)
-//              begin
-//                otherNode.searchPaths.Clear;
-//                otherNode.searchPaths.AddRange(packageReference.searchPaths);
-//                otherNode.LibPath := packageReference.LibPath;
-//                otherNode.BplPath := packageReference.BplPath;
-//              end);
-//        end;
+
+        // Get the template for this package
+        if Spec.TargetPlatform = nil then
+          exit;
+        template := Spec.FindTemplate(Spec.TargetPlatform.TemplateName);
+        if template = nil then
+          exit;
+
+        // Check if package has build entries that require compilation
+        if template.BuildEntries.Any or template.DesignEntries.Any then
+        begin
+          // Determine if force compilation needed (only for explicitly requested package)
+          forceCompile := Options.force and SameText(pkgInfo.Id, Options.SearchTerms);
+
+          if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, packageReference, Spec, forceCompile, false) then
+          begin
+            if not cancellationToken.IsCancelled then
+              raise Exception.Create('Compiling package [' + pkgInfo.ToIdVersionString + '] failed.');
+            exit;
+          end;
+
+          compiledPackages.Add(pkgInfo);
+
+          // Propagate paths to any duplicate nodes in the graph
+          // (same package may appear multiple times as different packages' dependency)
+          otherNodes := projectPackageGraph.FindChildren(packageReference.Id);
+          if otherNodes.Count > 1 then
+          begin
+            for otherNode in otherNodes do
+            begin
+              if otherNode <> packageReference then
+              begin
+                otherNode.LibPath := packageReference.LibPath;
+                otherNode.BplPath := packageReference.BplPath;
+              end;
+            end;
+          end;
+        end;
       end);
     result := true;
 
@@ -1106,52 +1015,262 @@ begin
 
 end;
 
+function TPackageInstaller.GetEffectivePlatforms(const projectPlatforms: TDPMPlatforms; const packageManifests: IDictionary<string, IPackageSpec>): TDPMPlatforms;
+var
+  packageId: string;
+  manifest: IPackageSpec;
+  packagePlatforms: TDPMPlatforms;
+begin
+  // Start with all project platforms
+  result := projectPlatforms;
+
+  // Intersect with each package's supported platforms
+  for packageId in packageManifests.Keys do
+  begin
+    manifest := packageManifests[packageId];
+    if (manifest <> nil) and (manifest.TargetPlatform <> nil) then
+    begin
+      packagePlatforms := manifest.TargetPlatform.Platforms;
+      // Only intersect if the package actually declares platform support
+      if packagePlatforms <> [] then
+        result := result * packagePlatforms;  // Set intersection
+    end;
+  end;
+end;
+
+function TPackageInstaller.DoConfigurePackageForPlatform(const cancellationToken: ICancellationToken; const options: TSearchOptions;
+  const projectFile: string; const projectEditor: IProjectEditor; const platform: TDPMPlatform;
+  const config: IConfiguration; const projectPackageGraph: IPackageReference;
+  const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageSpec>): boolean;
+var
+  packagesToCompile: IList<IPackageInfo>;
+  compiledPackages: IList<IPackageInfo>;
+  packageSearchPaths: IList<string>;
+  packageCompiler: ICompiler;
+begin
+  result := false;
+
+  // Check if this platform is supported by all resolved packages
+  // If not, skip configuration for this platform (not an error)
+  if not (platform in GetEffectivePlatforms([platform], packageManifests)) then
+  begin
+    FLogger.Information('Platform [' + DPMPlatformToString(platform) + '] skipped - not supported by one or more packages', true);
+    result := true;
+    exit;
+  end;
+
+  compiledPackages := TCollections.CreateList<IPackageInfo>;
+  packagesToCompile := TCollections.CreateList<IPackageInfo>(resolvedPackages);
+  packageSearchPaths := TCollections.CreateList<string>;
+  packageCompiler := FCompilerFactory.CreateCompiler(options.compilerVersion, platform);
+
+  if not BuildDependencies(cancellationToken, packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageManifests, options) then
+    exit;
+
+  if not CollectSearchPaths(projectPackageGraph, resolvedPackages, compiledPackages, projectEditor.compilerVersion, platform, packageSearchPaths) then
+    exit;
+
+  if not CopyLocal(cancellationToken, resolvedPackages, packageManifests, projectEditor, platform) then
+    exit;
+
+  if not InstallDesignPackages(cancellationToken, projectFile, platform, packageManifests) then
+    exit;
+
+  if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
+    exit;
+
+  result := true;
+end;
+
+function TPackageInstaller.FinalizePackageConfiguration(const cancellationToken: ICancellationToken; const options: TSearchOptions;
+  const projectFile: string; const projectEditor: IProjectEditor; const platform: TDPMPlatform;
+  const config: IConfiguration; const projectPackageGraph: IPackageReference;
+  const resolvedPackages: IList<IPackageInfo>; out resultGraph: IPackageReference): boolean;
+var
+  packageManifests: IDictionary<string, IPackageSpec>;
+begin
+  result := false;
+  resultGraph := nil;
+
+  if resolvedPackages = nil then
+  begin
+    FLogger.Error('Resolver returned no packages!');
+    exit;
+  end;
+
+  // Record the resolved package graph so we can detect conflicts between projects
+  FContext.RecordGraph(projectFile, projectPackageGraph);
+
+  packageManifests := TCollections.CreateDictionary<string, IPackageSpec>;
+  // Downloads the package files to the cache if they are not already there and
+  // returns the deserialized dspec as we need it for search paths and design
+  if not DownloadPackages(cancellationToken, resolvedPackages, packageManifests) then
+    exit;
+
+  // Configure the package for this platform (build, search paths, copy local, design packages)
+  if not DoConfigurePackageForPlatform(cancellationToken, options, projectFile, projectEditor, platform, config, projectPackageGraph, resolvedPackages, packageManifests) then
+    exit;
+
+  // Return the graph for caller to handle UpdatePackageReferences and SaveProject
+  resultGraph := projectPackageGraph;
+  result := true;
+end;
+
+function TPackageInstaller.LoadProjectEditor(const projectFile: string; const config: IConfiguration;
+  const compilerVersion: TCompilerVersion; out projectEditor: IProjectEditor): boolean;
+var
+  fullPath: string;
+begin
+  result := false;
+  projectEditor := nil;
+
+  fullPath := projectFile;
+  if TPathUtils.IsRelativePath(fullPath) then
+  begin
+    fullPath := TPath.Combine(GetCurrentDir, fullPath);
+    fullPath := TPathUtils.CompressRelativePath(fullPath);
+  end;
+
+  projectEditor := TProjectEditor.Create(FLogger, config, compilerVersion);
+  if not projectEditor.LoadProject(fullPath) then
+  begin
+    FLogger.Error('Unable to load project file [' + fullPath + '], cannot continue');
+    exit;
+  end;
+
+  result := true;
+end;
+
+function TPackageInstaller.ResolveProjectFiles(const projectPath: string; const explicitProjects: TArray<string>;
+  const projectList: IList<string>): boolean;
+var
+  groupProjReader: IGroupProjectReader;
+  projectRoot: string;
+  i: integer;
+begin
+  result := false;
+
+  // If explicit projects were provided, use them
+  if Length(explicitProjects) > 0 then
+  begin
+    for i := 0 to Length(explicitProjects) - 1 do
+    begin
+      if FileExists(explicitProjects[i]) then
+        projectList.Add(explicitProjects[i])
+      else
+        FLogger.Warning('Project [' + explicitProjects[i] + '] does not exist', true);
+    end;
+    if projectList.Count = 0 then
+    begin
+      FLogger.Error('No valid project files found in the provided list');
+      exit;
+    end;
+    result := true;
+    exit;
+  end;
+
+  // Handle file path (single .dproj or .groupproj)
+  if FileExists(projectPath) then
+  begin
+    if ExtractFileExt(projectPath) = '.groupproj' then
+    begin
+      groupProjReader := TGroupProjectReader.Create(FLogger);
+      if not groupProjReader.LoadGroupProj(projectPath) then
+        exit;
+      if not groupProjReader.ExtractProjects(projectList) then
+        exit;
+      // Projects in a group are likely relative, so make them full paths
+      projectRoot := ExtractFilePath(projectPath);
+      for i := 0 to projectList.Count - 1 do
+      begin
+        if TPathUtils.IsRelativePath(projectList[i]) then
+          projectList[i] := TPathUtils.CompressRelativePath(projectRoot, projectList[i]);
+      end;
+    end
+    else
+      projectList.Add(projectPath);
+    result := true;
+    exit;
+  end;
+
+  // Handle directory path
+  if DirectoryExists(projectPath) then
+  begin
+    projectList.AddRange(TDirectory.GetFiles(projectPath, '*.dproj'));
+    if projectList.Count = 0 then
+    begin
+      FLogger.Error('No dproj files found in projectPath : ' + projectPath);
+      exit;
+    end;
+    FLogger.Information('Found ' + IntToStr(projectList.Count) + ' project file(s).');
+    result := true;
+    exit;
+  end;
+
+  FLogger.Error('The projectPath provided does not exist');
+end;
+
+procedure TPackageInstaller.ValidateAndSetCompilerPlatforms(const options: TSearchOptions; const projectEditor: IProjectEditor;
+  out effectivePlatforms: TDPMPlatforms; out shouldSkip: boolean);
+var
+  ambiguousProjectVersion: boolean;
+  ambiguousVersions: string;
+begin
+  shouldSkip := false;
+  effectivePlatforms := [];
+
+  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion, ambiguousVersions) and (not projectEditor.HasDPM);
+
+  if ambiguousProjectVersion and (options.compilerVersion = TCompilerVersion.UnknownVersion) then
+    FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous (' + ambiguousVersions + '), recommend specifying compiler version on command line.');
+
+  // If the compiler version was specified (either on the command line or through a package file)
+  // then make sure our dproj is actually for that version.
+  if options.compilerVersion <> TCompilerVersion.UnknownVersion then
+  begin
+    if projectEditor.compilerVersion <> options.compilerVersion then
+    begin
+      if not ambiguousProjectVersion then
+        FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] does not match the compiler version.');
+      projectEditor.compilerVersion := options.compilerVersion;
+    end;
+  end
+  else
+    options.compilerVersion := projectEditor.compilerVersion;
+
+  // If the platform was specified (either on the command line or through a package file)
+  // then make sure our dproj is actually for that platform.
+  if options.platforms <> [] then
+  begin
+    effectivePlatforms := options.platforms * projectEditor.platforms; // get the intersection
+    if effectivePlatforms = [] then
+    begin
+      FLogger.Warning('Skipping project file [' + projectEditor.ProjectFile + '] as it does not match specified platforms.');
+      shouldSkip := true;
+    end;
+  end
+  else
+    effectivePlatforms := projectEditor.platforms;
+end;
+
 function TPackageInstaller.InstallPackage(const cancellationToken : ICancellationToken; const Options: TInstallOptions; const projectEditor: IProjectEditor;
                                           const config: IConfiguration; const context: IPackageInstallerContext): boolean;
 var
   platforms: TDPMPlatforms;
   platform: TDPMPlatform;
   platformResult: boolean;
-  ambiguousProjectVersion: boolean;
-  ambiguousVersions: string;
+  shouldSkip: boolean;
   platformOptions: TInstallOptions;
   erroredPlatforms : TDPMPlatforms;
+  finalGraph: IPackageReference;
+  platformGraph: IPackageReference;
 begin
   result := false;
+  finalGraph := nil;
 
-  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion, ambiguousVersions) and (not projectEditor.HasDPM);
-
-  if ambiguousProjectVersion and (Options.compilerVersion = TCompilerVersion.UnknownVersion) then
-    FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous (' + ambiguousVersions + '), recommend specifying compiler version on command line.');
-
-  // if the compiler version was specified (either on the command like or through a package file)
-  // then make sure our dproj is actually for that version.
-  if Options.compilerVersion <> TCompilerVersion.UnknownVersion then
-  begin
-    if projectEditor.compilerVersion <> Options.compilerVersion then
-    begin
-      if not ambiguousProjectVersion then
-        FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] does not match the compiler version.');
-      projectEditor.compilerVersion := Options.compilerVersion;
-    end;
-  end
-  else
-    Options.compilerVersion := projectEditor.compilerVersion;
-
-  // if the platform was specified (either on the command like or through a package file)
-  // then make sure our dproj is actually for that platform.
-  if Options.platforms <> [] then
-  begin
-    platforms := Options.platforms * projectEditor.platforms; // get the intersection of the two sets.
-    if platforms = [] then // no intersection
-    begin
-      FLogger.Warning('Skipping project file [' + projectEditor.ProjectFile + '] as it does not match target specified platforms.');
-      exit;
-    end;
-    // TODO : what if only some of the platforms are supported, what should we do?
-  end
-  else
-    platforms := projectEditor.platforms;
+  ValidateAndSetCompilerPlatforms(Options, projectEditor, platforms, shouldSkip);
+  if shouldSkip then
+    exit;
 
   result := true;
   erroredPlatforms := [];
@@ -1165,7 +1284,7 @@ begin
     platformOptions.platforms := [platform];
 
     FLogger.Information('Installing [' + platformOptions.SearchTerms + '-' +  DPMPlatformToString(platform) + '] into [' + projectEditor.ProjectFile + ']', true);
-    platformResult := DoInstallPackageForPlatform(cancellationToken, platformOptions, projectEditor.projectFile, projectEditor, platform, config, context);
+    platformResult := DoInstallPackageForPlatform(cancellationToken, platformOptions, projectEditor.projectFile, projectEditor, platform, config, context, platformGraph);
 
     if not platformResult then
     begin
@@ -1173,7 +1292,12 @@ begin
       Include(erroredPlatforms, platform);
     end
     else
+    begin
       FLogger.Success('Install succeeded for [' + platformOptions.SearchTerms + '-' + DPMPlatformToString(platform) + ']', true);
+      // Capture the graph from successful platform configuration (graph is same for all platforms)
+      if finalGraph = nil then
+        finalGraph := platformGraph;
+    end;
 
     result := platformResult and result;
     FLogger.Information('');
@@ -1181,6 +1305,12 @@ begin
 
   if not result then
     FLogger.Error('Install failed for [' + Options.SearchTerms + '] on platforms [' + DPMPlatformsToString(erroredPlatforms) + ']')
+  else if finalGraph <> nil then
+  begin
+    // Update package references once using the new platform-independent format
+    projectEditor.UpdatePackageReferences(finalGraph);
+    result := projectEditor.SaveProject();
+  end;
 
 end;
 
@@ -1260,79 +1390,20 @@ end;
 function TPackageInstaller.Install(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const context: IPackageInstallerContext): boolean;
 var
   config: IConfiguration;
-  groupProjReader: IGroupProjectReader;
   projectList: IList<string>;
-  i: integer;
-  projectRoot: string;
-  isGroup : boolean;
+  isGroup: boolean;
 begin
   result := false;
   try
     config := Init(Options);
-    //logged in Init
     if config = nil then
       exit;
 
-    projectRoot := ExtractFilePath(Options.ProjectPath);
     projectList := TCollections.CreateList<string>;
-    isGroup := false;
-    if Length(options.Projects) > 0 then
-    begin
-      //validate
-      for i := 0 to Length(options.Projects) -1 do
-      begin
-        if FileExists(options.Projects[i]) then
-          projectList.Add(options.Projects[i])
-        else
-          FLogger.Warning('Project [' + options.Projects[i] + '] does not exist', true);
-      end;
-      if projectList.Count = 0 then
-      begin
-        FLogger.Error('No dproj files found in projectPath : ' + Options.ProjectPath);
-        exit;
-      end;
-    end
-    else if FileExists(Options.ProjectPath) then
-    begin
-      if ExtractFileExt(Options.ProjectPath) = '.groupproj' then
-      begin
-        isGroup := true;
-        groupProjReader := TGroupProjectReader.Create(FLogger);
-        if not groupProjReader.LoadGroupProj(Options.ProjectPath) then
-          exit;
-
-        if not groupProjReader.ExtractProjects(projectList) then
-          exit;
-
-        // projects in a project group are likely to be relative, so make them full paths
-        for i := 0 to projectList.Count - 1 do
-        begin
-          // sysutils.IsRelativePath returns false with paths starting with .\
-          if TPathUtils.IsRelativePath(projectList[i]) then
-            // TPath.Combine really should do this but it doesn't
-            projectList[i] := TPathUtils.CompressRelativePath(projectRoot, projectList[i])
-        end;
-      end
-      else
-        projectList.Add(Options.ProjectPath);
-    end
-    else if DirectoryExists(Options.ProjectPath) then
-    begin
-      //projectFiles := TArray<string>(TDirectory.GetFiles(Options.ProjectPath, '*.dproj'));
-      projectList.AddRange(TDirectory.GetFiles(Options.ProjectPath, '*.dproj'));
-      if projectList.Count = 0 then
-      begin
-        FLogger.Error('No dproj files found in projectPath : ' + Options.ProjectPath);
-        exit;
-      end;
-      FLogger.Information('Found ' + IntToStr(projectList.Count) + ' dproj file(s) to install into.');
-    end
-    else
-    begin
-      // should never happen when called from the commmand line, but might from the IDE plugin.
-      FLogger.Error('The projectPath provided does no exist, no project to install to');
+    if not ResolveProjectFiles(Options.ProjectPath, Options.Projects, projectList) then
       exit;
-    end;
+
+    isGroup := ExtractFileExt(Options.ProjectPath) = '.groupproj';
 
     if (Options.ProjectGroup <> '') and (not isGroup) then
     begin
@@ -1510,81 +1581,30 @@ end;
 
 function TPackageInstaller.Restore(const cancellationToken: ICancellationToken; const Options: TRestoreOptions; const context: IPackageInstallerContext): boolean;
 var
-  projectFiles: TArray<string>;
   projectFile: string;
   config: IConfiguration;
-  GroupProjReader: IGroupProjectReader;
   projectList: IList<string>;
   i: integer;
-  projectRoot: string;
-  stopwatch : TStopwatch;
+  stopwatch: TStopwatch;
 begin
   result := false;
   stopwatch := TStopwatch.Create;
   stopwatch.Start;
   try
     config := Init(Options);
-    //logged in init
     if config = nil then
       exit;
 
-    if FileExists(Options.ProjectPath) then
-    begin
-      // TODO : If we are using a groupProj then we shouldn't allow different versions of a package in different projects
-      // need to work out how to detect this.
-
-      if ExtractFileExt(Options.ProjectPath) = '.groupproj' then
-      begin
-        GroupProjReader := TGroupProjectReader.Create(FLogger);
-        if not GroupProjReader.LoadGroupProj(Options.ProjectPath) then
-          exit;
-
-        projectList := TCollections.CreateList<string>;
-        if not GroupProjReader.ExtractProjects(projectList) then
-          exit;
-
-        // projects in a project group are likely to be relative, so make them full paths
-        projectRoot := ExtractFilePath(Options.ProjectPath);
-        for i := 0 to projectList.Count - 1 do
-        begin
-          // sysutils.IsRelativePath returns false with paths starting with .\
-          if TPathUtils.IsRelativePath(projectList[i]) then
-            // TPath.Combine really should do this but it doesn't
-            projectList[i] := TPathUtils.CompressRelativePath(projectRoot, projectList[i])
-        end;
-        projectFiles := projectList.ToArray;
-      end
-      else
-      begin
-        SetLength(projectFiles, 1);
-        projectFiles[0] := Options.ProjectPath;
-      end;
-    end
-    else if DirectoryExists(Options.ProjectPath) then
-    begin
-      // todo : add groupproj support!
-      projectFiles := TArray<string>(TDirectory.GetFiles(Options.ProjectPath,
-        '*.dproj'));
-      if Length(projectFiles) = 0 then
-      begin
-        FLogger.Error('No project files found in projectPath : ' + Options.ProjectPath);
-        exit;
-      end;
-      FLogger.Information('Found ' + IntToStr(Length(projectFiles)) +' project file(s) to restore.');
-    end
-    else
-    begin
-      // should never happen when called from the commmand line, but might from the IDE plugin.
-      FLogger.Error('The projectPath provided does no exist, no project to install to');
+    projectList := TCollections.CreateList<string>;
+    if not ResolveProjectFiles(Options.ProjectPath, nil, projectList) then
       exit;
-    end;
 
     result := true;
-    for i := 0 to Length(projectFiles) - 1 do
+    for i := 0 to projectList.Count - 1 do
     begin
       if cancellationToken.IsCancelled then
         exit;
-      projectFile := projectFiles[i];
+      projectFile := projectList[i];
 
       if TPathUtils.IsRelativePath(projectFile) then
       begin
@@ -1618,61 +1638,26 @@ var
   platform: TDPMPlatform;
   errorPlatforms : TDPMPlatforms;
   platformResult: boolean;
-  ambiguousProjectVersion: boolean;
-  ambiguousVersions: string;
+  shouldSkip: boolean;
   platformOptions: TRestoreOptions;
+  finalGraph: IPackageReference;
+  platformGraph: IPackageReference;
 begin
   result := false;
+  finalGraph := nil;
 
-  // make sure we can parse the dproj
-  projectEditor := TProjectEditor.Create(FLogger, config, Options.compilerVersion);
-
-  if not projectEditor.LoadProject(projectFile) then
-  begin
-    FLogger.Error('Unable to load project file, cannot continue');
+  // Load and validate the project file
+  if not LoadProjectEditor(projectFile, config, Options.compilerVersion, projectEditor) then
     exit;
-  end;
 
   if cancellationToken.IsCancelled then
     exit;
 
-  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion, ambiguousVersions) and (not projectEditor.HasDPM);
-
-  if ambiguousProjectVersion and
-    (Options.compilerVersion = TCompilerVersion.UnknownVersion) then
-    FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous (' + ambiguousVersions + '), recommend specifying compiler version on command line.');
-
-  // if the compiler version was specified (either on the command like or through a package file)
-  // then make sure our dproj is actually for that version.
-  if Options.compilerVersion <> TCompilerVersion.UnknownVersion then
-  begin
-    if projectEditor.compilerVersion <> Options.compilerVersion then
-    begin
-      if not ambiguousProjectVersion then
-        FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] does not match the compiler version.');
-      projectEditor.compilerVersion := Options.compilerVersion;
-    end;
-  end
-  else
-    Options.compilerVersion := projectEditor.compilerVersion;
+  ValidateAndSetCompilerPlatforms(Options, projectEditor, platforms, shouldSkip);
+  if shouldSkip then
+    exit;
 
   FLogger.Information('Restoring for compiler version  [' + CompilerToString(Options.compilerVersion) + '].', true);
-
-  // if the platform was specified (either on the command like or through a package file)
-  // then make sure our dproj is actually for that platform.
-  if Options.platforms <> [] then
-  begin
-    platforms := Options.platforms * projectEditor.platforms;
-    // gets the intersection of the two sets.
-    if platforms = [] then // no intersection
-    begin
-      FLogger.Warning('Skipping project file [' + projectFile + '] as it does not match specified platforms.');
-      exit;
-    end;
-    // TODO : what if only some of the platforms are supported, what should we do?
-  end
-  else
-    platforms := projectEditor.platforms;
 
   result := true;
   errorPlatforms := [];
@@ -1685,7 +1670,7 @@ begin
     platformOptions := Options.Clone;
     platformOptions.platforms := [platform];
     FLogger.Information('Restoring project [' + projectFile + '] for [' + DPMPlatformToString(platform) + ']', true);
-    platformResult := DoRestoreProjectForPlatform(cancellationToken, platformOptions, projectFile, projectEditor, platform, config, context);
+    platformResult := DoRestoreProjectForPlatform(cancellationToken, platformOptions, projectFile, projectEditor, platform, config, context, platformGraph);
     if not platformResult then
     begin
       if cancellationToken.IsCancelled then
@@ -1697,25 +1682,33 @@ begin
       end;
     end
     else
+    begin
       FLogger.Success('Restore succeeded for ' + DPMPlatformToString(platform), true);
+      // Capture the graph from successful platform configuration (graph is same for all platforms)
+      if finalGraph = nil then
+        finalGraph := platformGraph;
+    end;
     result := platformResult and result;
     FLogger.Information('');
   end;
+
   if not result then
     FLogger.Error('Restore failed for [' + projectFile + '] on platforms [' + DPMPlatformsToString(errorPlatforms) + ']')
-
+  else if finalGraph <> nil then
+  begin
+    // Update package references once using the new platform-independent format
+    projectEditor.UpdatePackageReferences(finalGraph);
+    result := projectEditor.SaveProject();
+  end;
 
 end;
 
 function TPackageInstaller.Uninstall(const cancellationToken : ICancellationToken; const Options: TUnInstallOptions; const context: IPackageInstallerContext): boolean;
 var
-  projectFiles: TArray<string>;
   projectFile: string;
   config: IConfiguration;
-  GroupProjReader: IGroupProjectReader;
   projectList: IList<string>;
   i: integer;
-  projectRoot: string;
 begin
   result := false;
   // commandline would have validated already, but IDE probably not.
@@ -1737,66 +1730,16 @@ begin
     exit;
   end;
 
-  if Length(options.Projects) > 0 then
-  begin
-    projectFiles := options.Projects;
-  end
-  else if FileExists(Options.ProjectPath) then
-  begin
-    // TODO : If we are using a groupProj then we shouldn't allow different versions of a package in different projects
-    // need to work out how to detect this.
-
-    if ExtractFileExt(Options.ProjectPath) = '.groupproj' then
-    begin
-      GroupProjReader := TGroupProjectReader.Create(FLogger);
-      if not GroupProjReader.LoadGroupProj(Options.ProjectPath) then
-        exit;
-
-      projectList := TCollections.CreateList<string>;
-      if not GroupProjReader.ExtractProjects(projectList) then
-        exit;
-
-      // projects in a project group are likely to be relative, so make them full paths
-      projectRoot := ExtractFilePath(Options.ProjectPath);
-      for i := 0 to projectList.Count - 1 do
-      begin
-        // sysutils.IsRelativePath returns false with paths starting with .\
-        if TPathUtils.IsRelativePath(projectList[i]) then
-          // TPath.Combine really should do this but it doesn't
-          projectList[i] := TPathUtils.CompressRelativePath(projectRoot, projectList[i])
-      end;
-      projectFiles := projectList.ToArray;
-    end
-    else
-    begin
-      SetLength(projectFiles, 1);
-      projectFiles[0] := Options.ProjectPath;
-    end;
-  end
-  else if DirectoryExists(Options.ProjectPath) then
-  begin
-    // todo : add groupproj support!
-    projectFiles := TArray<string>(TDirectory.GetFiles(Options.ProjectPath, '*.dproj'));
-    if Length(projectFiles) = 0 then
-    begin
-      FLogger.Error('No project files found in projectPath : ' + Options.ProjectPath);
-      exit;
-    end;
-    FLogger.Information('Found ' + IntToStr(Length(projectFiles)) + ' project file(s) to uninstall from.');
-  end
-  else
-  begin
-    // should never happen when called from the commmand line, but might from the IDE plugin.
-    FLogger.Error('The projectPath provided does no exist, no project to install to');
+  projectList := TCollections.CreateList<string>;
+  if not ResolveProjectFiles(Options.ProjectPath, Options.Projects, projectList) then
     exit;
-  end;
 
   result := true;
-  // TODO : create some sort of context object here to pass in so we can collect runtime/design time packages
-  for projectFile in projectFiles do
+  for i := 0 to projectList.Count - 1 do
   begin
     if cancellationToken.IsCancelled then
       exit;
+    projectFile := projectList[i];
     result := UnInstallFromProject(cancellationToken, Options, projectFile, config, context) and result;
   end;
 
@@ -1809,14 +1752,12 @@ var
   platforms: TDPMPlatforms;
   platform: TDPMPlatform;
   platformResult: boolean;
-  ambiguousProjectVersion: boolean;
-  ambiguousVersions: string;
+  shouldSkip: boolean;
 begin
   result := false;
 
   // make sure we can parse the dproj
-  projectEditor := TProjectEditor.Create(FLogger, config,
-    Options.compilerVersion);
+  projectEditor := TProjectEditor.Create(FLogger, config, Options.compilerVersion);
 
   if not projectEditor.LoadProject(projectFile) then
   begin
@@ -1827,42 +1768,11 @@ begin
   if cancellationToken.IsCancelled then
     exit;
 
-  ambiguousProjectVersion := IsAmbigousProjectVersion(projectEditor.ProjectVersion, ambiguousVersions) and (not projectEditor.HasDPM);
-
-  if ambiguousProjectVersion and (Options.compilerVersion = TCompilerVersion.UnknownVersion) then
-    FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] is ambiguous (' + ambiguousVersions + '), recommend specifying compiler version on command line.');
-
-  // if the compiler version was specified (either on the command like or through a package file)
-  // then make sure our dproj is actually for that version.
-  if Options.compilerVersion <> TCompilerVersion.UnknownVersion then
-  begin
-    if projectEditor.compilerVersion <> Options.compilerVersion then
-    begin
-      if not ambiguousProjectVersion then
-        FLogger.Warning('ProjectVersion [' + projectEditor.ProjectVersion + '] does not match the compiler version.');
-      projectEditor.compilerVersion := Options.compilerVersion;
-    end;
-  end
-  else
-    Options.compilerVersion := projectEditor.compilerVersion;
+  ValidateAndSetCompilerPlatforms(Options, projectEditor, platforms, shouldSkip);
+  if shouldSkip then
+    exit;
 
   FLogger.Information('Uninstalling for compiler version  [' + CompilerToString(Options.compilerVersion) + '].', true);
-
-  // if the platform was specified (either on the command like or through a package file)
-  // then make sure our dproj is actually for that platform.
-  if Options.platforms <> [] then
-  begin
-    platforms := Options.platforms * projectEditor.platforms;
-    // gets the intersection of the two sets.
-    if platforms = [] then // no intersection
-    begin
-      FLogger.Warning('Skipping project file [' + projectFile + '] as it does not match specified platforms.');
-      exit;
-    end;
-    // TODO : what if only some of the platforms are supported, what should we do?
-  end
-  else
-    platforms := projectEditor.platforms;
 
   result := true;
   for platform in platforms do

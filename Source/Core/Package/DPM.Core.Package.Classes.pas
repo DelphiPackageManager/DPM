@@ -218,7 +218,6 @@ var
   match : TMatch;
   id : string;
   cv : TCompilerVersion;
-  platform : TDPMPlatform;
   packageVersion : TPackageVersion;
 begin
   result := false;
@@ -236,10 +235,11 @@ begin
     logger.Error('Compiler version segment is not a valid version [' + match.Groups[2].Value + ']');
     exit;
   end;
-  platform := StringToDPMPlatform(match.Groups[3].Value);
-  if platform = TDPMPlatform.UnknownPlatform then
+  // Platform segment (Group 3) can be binary string (e.g., '11') or pipe-separated (e.g., 'win32|win64')
+  // IPackageIdentity doesn't store platform, so we just validate it's non-empty
+  if match.Groups[3].Value = '' then
   begin
-    logger.Error('Platform segment is not a valid platform [' + match.Groups[3].Value + ']');
+    logger.Error('Platform segment is empty in package name [' + value + ']');
     exit;
   end;
   if not TPackageVersion.TryParse(match.Groups[4].Value, packageVersion) then
@@ -296,9 +296,11 @@ end;
 
 constructor TPackageInfo.Create(const sourceName: string; const manifest: IPackageSpec; const hash : string; const hashAlgorithm : string);
 var
-  dep : ISpecDependency;
-  newDep : IPackageDependency;
-  bytes : TBytes;
+  template: ISpecTemplate;
+  dep: ISpecDependency;
+  newDep: IPackageDependency;
+  bytes: TBytes;
+  i: integer;
 begin
   inherited Create(sourceName, manifest);
   FDependencies := TCollections.CreateList<IPackageDependency>;
@@ -308,16 +310,22 @@ begin
   begin
     bytes := TBase64.Decode(FHash);
     FHash := THashSHA256.DigestAsString(bytes);
-  end;  
+  end;
 
-  raise Exception.Create('Needs redoing');
-
-//  for dep in manifest.TargetPlatform.Dependencies do
-//  begin
-//    newDep := TPackageDependency.Create(dep.Id, dep.Version, FPlatform);
-//    FDependencies.Add(newDep);
-//  end;
-
+  // Get dependencies from the template referenced by TargetPlatform
+  if manifest.TargetPlatform <> nil then
+  begin
+    template := manifest.FindTemplate(manifest.TargetPlatform.TemplateName);
+    if template <> nil then
+    begin
+      for i := 0 to template.Dependencies.Count - 1 do
+      begin
+        dep := template.Dependencies[i];
+        newDep := TPackageDependency.Create(dep.Id, dep.Version);
+        FDependencies.Add(newDep);
+      end;
+    end;
+  end;
 end;
 
 constructor TPackageInfo.Create(const sourceName, id: string; const version: TPackageVersion; const compilerVersion: TCompilerVersion; const hash, hashAlgorithm: string);

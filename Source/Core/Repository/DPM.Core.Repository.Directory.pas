@@ -755,7 +755,7 @@ end;
 type
   TPackageFind = record
     Id : string;
-    Platform : TDPMPlatform;
+    PlatformString : string;  // Raw platform segment (binary string or pipe-separated)
     LatestVersion : TPackageVersion;
     LatestStableVersion : TPackageVersion;
   end;
@@ -769,7 +769,7 @@ var
   i : integer;
   packageFileName : string;
   id : string;
-  platform : TDPMPlatform;
+  platformStr : string;
   versionString : string;
   packageVersion : TPackageVersion;
   packageLookup : IDictionary<string, TPackageFind>;
@@ -806,7 +806,8 @@ begin
       id := match.Groups[1].Value;
       //ignore the matched compiler version since we are only ever looking at 1 compiler version
       //cv := StringToCompilerVersion(match.Groups[2].Value);
-      platform := StringToDPMPlatform(match.Groups[3].Value);
+      // Platform segment can be binary string (e.g., '11') or pipe-separated (e.g., 'win32|win64')
+      platformStr := match.Groups[3].Value;
       versionString := match.Groups[4].Value;
       if not TPackageVersion.TryParse(versionString, packageVersion) then
         continue;
@@ -818,7 +819,7 @@ begin
       if not packageLookup.TryGetValue(LowerCase(id), find) then
       begin
         find.Id := id;
-        find.Platform := platform;
+        find.PlatformString := platformStr;
         find.LatestVersion := packageVersion;
         if packageVersion.IsStable then
           find.LatestStableVersion := packageVersion;
@@ -853,7 +854,7 @@ begin
     if cancelToken.IsCancelled then
       exit;
 
-    packageFileName := Format('%s-%s-%s-%s.dpkg', [find.Id, CompilerToString(options.CompilerVersion), DPMPlatformToString(find.platform), find.LatestVersion.ToStringNoMeta]);
+    packageFileName := Format('%s-%s-%s-%s.dpkg', [find.Id, CompilerToString(options.CompilerVersion), find.PlatformString, find.LatestVersion.ToStringNoMeta]);
     packageFileName := IncludeTrailingPathDelimiter(SourceUri) + packageFileName;
     if not FileExists(packageFileName) then
       exit;
