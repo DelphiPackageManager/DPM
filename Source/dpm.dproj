@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
@@ -113,10 +113,10 @@
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <DCC_DebugInfoInExe>true</DCC_DebugInfoInExe>
         <DCC_MapFile>3</DCC_MapFile>
-        <Debugger_CWD>c:\temp</Debugger_CWD>
+        <Debugger_CWD>I:\FBAT_HG\Src\Core</Debugger_CWD>
         <Debugger_EnvVars>DPMPACKAGECACHE=c:\temp\packagecache;$(Debugger_EnvVars)</Debugger_EnvVars>
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
-        <Debugger_RunParams>push c:\temp\Appercept.AWSSDK.Core-11.0-Android-0.23.0.dpkg -source=private</Debugger_RunParams>
+        <Debugger_RunParams>install vsoft.httpclient --force .\vsoft.core.dproj -compiler=XE7</Debugger_RunParams>
         <ILINK_MapFileType>DetailedSegments</ILINK_MapFileType>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_4_Win32)'!=''">

@@ -816,7 +816,8 @@ begin
   begin
     // no version specified, so we need to get the latest version available;
     packageInfo := FRepositoryManager.FindLatestVersion(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty, platform, Options.PreRelease, options.Sources);
-
+    if packageInfo <> nil then
+      packageInfo := GetPackageInfo(cancellationToken, packageInfo); //get the full package info including dependencies.
   end;
   if packageInfo = nil then
   begin
