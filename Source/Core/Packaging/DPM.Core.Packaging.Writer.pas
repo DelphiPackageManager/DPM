@@ -468,7 +468,10 @@ begin
   FLogger.Information('Writing package to file : ' + packageFileName);
   try
     if reducedSpec.MetaData.Icon <> '' then
-      FArchiveWriter.AddIcon(reducedSpec.MetaData.Icon);
+    begin
+      if FArchiveWriter.AddIcon(reducedSpec.MetaData.Icon) then
+        reducedSpec.MetaData.Icon := GetIconArchiveFileName(reducedSpec.MetaData.Icon);
+    end;
 
     if reducedSpec.MetaData.ReadMe <> '' then
       FArchiveWriter.AddFile(ApplyBase(basePath,reducedSpec.MetaData.ReadMe));

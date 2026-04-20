@@ -85,7 +85,20 @@ const
   cDPMUserAgent  = 'DPM ' + cDPMClientVersion;
   cClientVersionHeader = 'Client-Version';
 
+function GetIconArchiveFileName(const sourcePath : string) : string;
+
 implementation
+
+uses
+  System.SysUtils;
+
+function GetIconArchiveFileName(const sourcePath : string) : string;
+begin
+  if SameText(ExtractFileExt(sourcePath), '.svg') then
+    result := cIconFileSVG
+  else
+    result := cIconFilePNG;
+end;
 
 end.
 

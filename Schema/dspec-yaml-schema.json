@@ -16,7 +16,7 @@
                 "delphixe6",
                 "delphixe7",
                 "delphixe8",
-                "delphi10",
+                "delphi10.0",
                 "delphi10.1",
                 "delphi10.2",
                 "delphi10.3",
@@ -33,9 +33,10 @@
             "enum": [
                 "win32",
                 "win64",
+                "winarm64ec",
                 "macos32",
                 "macos64",
-                "macos64arm",
+                "macosarm64",
                 "android",
                 "android64",
                 "ios32",
@@ -47,7 +48,7 @@
         },
         "design-platforms": {
             "type": "string",
-            "description": "The IDE bitness supported by design package, defauult is win32 and win64 available",
+            "description": "The IDE bitness supported by design package, default is win32 and win64 available",
             "enum": [
                 "win32",
                 "win64"

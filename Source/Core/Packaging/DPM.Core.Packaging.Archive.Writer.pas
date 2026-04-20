@@ -114,10 +114,7 @@ var
 begin
   try
     iconBytes := TFile.ReadAllBytes(filePath);
-    if ExtractFileExt(filePath) = '.svg' then
-      FZipFile.Add(iconBytes, cIconFileSVG)
-    else
-      FZipFile.Add(iconBytes, cIconFilePNG);
+    FZipFile.Add(iconBytes, GetIconArchiveFileName(filePath));
   except
     on e : Exception do
       raise Exception.Create('Error adding icon [' + filePath + '] to package : ' + e.Message);

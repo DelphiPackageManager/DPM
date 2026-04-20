@@ -684,8 +684,6 @@ var
   dependency : IPackageReference;
   projectPackageGraph: IPackageReference;
 
-  packageManifests: IDictionary<string, IPackageSpec>;
-
   projectReferences: IList<IPackageReference>;
 
   resolvedPackages: IList<IPackageInfo>;

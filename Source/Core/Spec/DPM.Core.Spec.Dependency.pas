@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -141,9 +141,12 @@ begin
 end;
 
 procedure TSpecDependency.ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);
+var
+  mapping : IYAMLMapping;
 begin
-  parent.AsMapping.S['id'] := FId;
-  parent.AsMapping.S['version'] := FVersion.ToString;
+  mapping := parent.AsSequence.AddMapping;
+  mapping.S['id'] := FId;
+  mapping.S['version'] := FVersion.ToString;
 end;
 
 end.

@@ -57,7 +57,7 @@ type
     DelphiXE6,
     DelphiXE7,
     DelphiXE8,
-    Delphi10,
+    Delphi10_0,
     Delphi10_1,
     Delphi10_2,
     Delphi10_3,
@@ -82,6 +82,7 @@ type
     Win32,
     Win64,
     Win64x, //TODO : do we need this?
+    WinARM64EC,
     MacOS32,
     MacOS64,
     MacOSARM64,
@@ -276,6 +277,7 @@ function CompilerNoPrefix(const value : TCompilerVersion) : string;
 begin
   result := CompilerToString(value);
   Delete(result,1,6);
+  result := UpperCase(StringReplace(result, '_', '.', [rfReplaceAll]));
 end;
 
 function CompilerToString(const value : TCompilerVersion) : string;
@@ -307,6 +309,7 @@ begin
     TDPMPlatform.UnknownPlatform: Result := 'Unknown' ;
     TDPMPlatform.Win32: result := 'Windows 32-bit' ;
     TDPMPlatform.Win64: result := 'Windows 64-bit';
+    TDPMPlatform.WinARM64EC: result := 'Windows ARM64EC';
     TDPMPlatform.MacOS32: result := 'macOS 32-bit';
     TDPMPlatform.MacOS64: result := 'macOS 64-bit';
     TDPMPlatform.MacOSARM64: result := 'macOS ARM 64-bit';
@@ -315,6 +318,8 @@ begin
     TDPMPlatform.Android64: result := 'Andriod 64-bit ARM';
     TDPMPlatform.iOS32: result := 'iOS 32-bit';
     TDPMPlatform.iOS64: result := 'iOS 64-bit';
+    TDPMPlatform.iOSSimulator : result := 'iOS Simulator';
+    TDPMPlatform.iOSSimARM64 : result := 'iOS ARM 64 Simulator';
     TDPMPlatform.Linux64: result := 'Linux 64-bit';
   else
     raise EArgumentOutOfRangeException.Create('Unknown platform in DPMPlatformToDisplayString');
@@ -467,7 +472,7 @@ begin
                                         TDPMPlatform.iOS64, TDPMPlatform.Android];
 
     // https://docwiki.embarcadero.com/RADStudio/Berlin/en/Supported_Target_Platforms
-    TCompilerVersion.Delphi10,
+    TCompilerVersion.Delphi10_0,
     TCompilerVersion.Delphi10_1 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS32, TDPMPlatform.iOS32, TDPMPlatform.iOS64,
                                          TDPMPlatform.iOSSimulator, TDPMPlatform.Android];
 
@@ -492,7 +497,7 @@ begin
     TCompilerVersion.Delphi12 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOSARM64, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
                                          TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
 
-    TCompilerVersion.Delphi13 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOSARM64, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
+    TCompilerVersion.Delphi13 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.WinARM64EC, TDPMPlatform.MacOSARM64, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
                                          TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
   else
     raise Exception.Create('AllPlatforms is missing for : ' + CompilerToString(compiler));
@@ -502,7 +507,7 @@ end;
 function CompilerCodeName(const value : TCompilerVersion) : string;
 begin
   case value of
-    TCompilerVersion.Delphi10 : result := 'Seattle';
+    TCompilerVersion.Delphi10_0 : result := 'Seattle';
     TCompilerVersion.Delphi10_1 : result := 'Berlin';
     TCompilerVersion.Delphi10_2 : result := 'Tokyo';
     TCompilerVersion.Delphi10_3 : result := 'Rio';
@@ -538,7 +543,7 @@ begin
     TCompilerVersion.DelphiXE6  : result := '200';
     TCompilerVersion.DelphiXE7  : result := '210';
     TCompilerVersion.DelphiXE8  : result := '220';
-    TCompilerVersion.Delphi10 : result := '230';
+    TCompilerVersion.Delphi10_0 : result := '230';
     TCompilerVersion.Delphi10_1 : result := '240';
     TCompilerVersion.Delphi10_2 : result := '250';
     TCompilerVersion.Delphi10_3 : result := '260';
@@ -562,7 +567,7 @@ begin
     TCompilerVersion.DelphiXE6  : result := '14.0';
     TCompilerVersion.DelphiXE7  : result := '15.0';
     TCompilerVersion.DelphiXE8  : result := '16.0';
-    TCompilerVersion.Delphi10 : result := '17.0';
+    TCompilerVersion.Delphi10_0 : result := '17.0';
     TCompilerVersion.Delphi10_1 : result := '18.0';
     TCompilerVersion.Delphi10_2 : result := '19.0';
     TCompilerVersion.Delphi10_3 : result := '20.0';
@@ -588,7 +593,7 @@ begin
     TCompilerVersion.DelphiXE6  : result := '27';
     TCompilerVersion.DelphiXE7  : result := '28';
     TCompilerVersion.DelphiXE8  : result := '29';
-    TCompilerVersion.Delphi10 : result := '30';
+    TCompilerVersion.Delphi10_0 : result := '30';
     TCompilerVersion.Delphi10_1 : result := '31';
     TCompilerVersion.Delphi10_2 : result := '32';
     TCompilerVersion.Delphi10_3 : result := '33';
@@ -745,7 +750,7 @@ begin
     18 :
       begin
         case minor of
-          0..1 : result := TCompilerVersion.Delphi10;
+          0..1 : result := TCompilerVersion.Delphi10_0;
           2 : result := TCompilerVersion.Delphi10_1;
           3..4 : result := TCompilerVersion.Delphi10_2;
           5..8 : result := TCompilerVersion.Delphi10_3; //18.8 for 10.3.3
