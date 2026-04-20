@@ -66,8 +66,6 @@ type
     function CollectSearchPaths(const packageGraph: IPackageReference; const resolvedPackages: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
                                 const compilerVersion: TCompilerVersion; const platform: TDPMPlatform;  const searchPaths: IList<string>): boolean;
 
-    procedure GenerateSearchPaths(const compilerVersion: TCompilerVersion; const platform: TDPMPlatform; const packageSpec: IPackageSpec; const searchPaths: IList<string>);
-
     function DownloadPackages(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageSpec>): boolean;
 
     function CollectPlatformsFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration) : boolean;
@@ -84,7 +82,35 @@ type
     function CopyLocal(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageSpec>;
                        const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
 
-    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests: IDictionary<string, IPackageSpec>) : boolean;
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageManifests: IDictionary<string, IPackageSpec>) : boolean;
+
+    //Builds a {lowercase id -> manifest} dict by walking the resolved graph and reading manifests from the cache.
+    //Used after the per-platform install/restore loop so design packages can be loaded once per project.
+    function BuildPackageManifestsFromGraph(const graph: IPackageReference; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageSpec>;
+
+    //Restore fast path: validate the existing graph against each package's declared dependencies.
+    //If every transient is present and within its parent's version range, the graph is good and we
+    //can skip resolution. resolvedPackages is populated in topological order (deps before dependers).
+    //Returns false if any violation is found - caller should fall back to a full re-resolve.
+    function TryValidateRestoreGraph(const cancellationToken: ICancellationToken; const projectPackageGraph: IPackageReference;
+                                     const compilerVersion: TCompilerVersion; const resolvedPackages: IList<IPackageInfo>): boolean;
+
+    //Looks up an IPackageInfo for (id, version, compiler), caching the result in the supplied dict.
+    //Hits cache first, then repo. Pulled out as a method because Delphi anonymous methods cannot
+    //capture nested functions (see TryValidateRestoreGraph).
+    function GetOrLoadPackageInfo(const cancellationToken: ICancellationToken; const id: string; const version: TPackageVersion;
+                                  const compilerVersion: TCompilerVersion; const cache: IDictionary<string, IPackageInfo>): IPackageInfo;
+
+    //Builds a fresh root with the top-level references cloned (no transients). Used by the restore
+    //slow path so the resolver derives transients fresh from each top-level's manifest, ignoring any
+    //stale or out-of-range transient versions the user may have left in the dproj.
+    function BuildTopLevelOnlyGraph(const fullGraph: IPackageReference; const compilerVersion: TCompilerVersion): IPackageReference;
+
+    //Restore slow-path: iterate top-level packages and call ResolveForInstall for each, accumulating
+    //resolved refs across iterations so shared transients are seen by later top-levels and not
+    //double-resolved. Returns the final graph + flat resolvedPackages list ready for FinalizePackageConfiguration.
+    function RestoreUsingInstallResolver(const cancellationToken: ICancellationToken; const options: TRestoreOptions; const projectFile: string;
+                                         const topLevelGraph: IPackageReference; out resultGraph: IPackageReference; out resolvedPackages: IList<IPackageInfo>): boolean;
 
     // Calculates the intersection of project platforms with platforms supported by ALL resolved packages
     function GetEffectivePlatforms(const projectPlatforms: TDPMPlatforms; const packageManifests: IDictionary<string, IPackageSpec>): TDPMPlatforms;
@@ -238,11 +264,26 @@ function TPackageInstaller.CollectSearchPaths(const packageGraph: IPackageRefere
                                               const compilerVersion: TCompilerVersion; const platform: TDPMPlatform;  const searchPaths: IList<string>): boolean;
 var
   packageInfo: IPackageInfo;
-  packageMetadata: IPackageMetadata;
-  packageSearchPath: string;
+  packageManifest: IPackageSpec;
+  template: ISpecTemplate;
+  sourceEntry: ISpecSourceEntry;
   packageBasePath: string;
+  destination: string;
+  platformLibPath: string;
+  seenPaths: IDictionary<string, boolean>;
+
+  procedure AddUnique(const path: string);
+  begin
+    if not seenPaths.ContainsKey(LowerCase(path)) then
+    begin
+      seenPaths[LowerCase(path)] := true;
+      searchPaths.Add(path);
+    end;
+  end;
+
 begin
   result := true;
+  seenPaths := TCollections.CreateDictionary<string, boolean>;
 
   // we need to apply usesource from the graph to the package info's
   packageGraph.VisitDFS(
@@ -255,7 +296,6 @@ begin
         function(const pkg: IPackageInfo): boolean
         begin
           result := SameText(pkg.Id, node.Id);
-          //FLogger.Debug('Testing pkg [' + pkg.Id + '] against [' + node.Id + ']');
         end);
       Assert(pkgInfo <> nil, 'pkgInfo is null for id [' + node.Id + '], but should never be');
       pkgInfo.UseSource := pkgInfo.UseSource or node.UseSource;
@@ -265,24 +305,45 @@ begin
   resolvedPackages.Reverse;
   for packageInfo in resolvedPackages do
   begin
-    //if we have already compiled the package and we are not using the source directly, use the compiled dcus
-    if (not packageInfo.UseSource) and compiledPackages.Contains(packageInfo)  then
+    packageManifest := FPackageCache.GetPackageManifest(packageInfo);
+    if packageManifest = nil then
     begin
-      packageBasePath := packageInfo.Id + PathDelim +  packageInfo.Version.ToStringNoMeta + PathDelim;
-      searchPaths.Add(packageBasePath + 'lib');
+      FLogger.Error('Unable to get manifest for package ' + packageInfo.ToString);
+      exit(false);
+    end;
+
+    if (packageManifest.TargetPlatform = nil) or (packageManifest.TargetPlatform.TemplateName = '') then
+    begin
+      FLogger.Warning('Package [' + packageInfo.Id + '] manifest has no target platform / template - no search paths added');
+      continue;
+    end;
+
+    template := packageManifest.FindTemplate(packageManifest.TargetPlatform.TemplateName);
+    if template = nil then
+    begin
+      FLogger.Warning('Package [' + packageInfo.Id + '] template [' + packageManifest.TargetPlatform.TemplateName + '] not found - no search paths added');
+      continue;
+    end;
+
+    packageBasePath := packageInfo.Id + PathDelim + packageInfo.Version.ToStringNoMeta + PathDelim;
+
+    //If the package has build entries (compiled), point at the per-platform lib folder.
+    //Otherwise it's a source-only package - add each source entry's destination folder so the
+    //consumer can compile against the .pas files directly.
+    if (template.BuildEntries.Count > 0) and (not packageInfo.UseSource) and compiledPackages.Contains(packageInfo) then
+    begin
+      platformLibPath := 'lib' + PathDelim + DPMPlatformToBDString(platform);
+      AddUnique(packageBasePath + platformLibPath);
     end
     else
     begin
-      packageMetadata := FPackageCache.GetPackageMetadata(packageInfo);
-      if packageMetadata = nil then
+      for sourceEntry in template.SourceEntries do
       begin
-        FLogger.Error('Unable to get metadata for package ' + packageInfo.ToString);
-        exit(false);
+        destination := sourceEntry.Destination;
+        if destination = '' then
+          destination := 'src';
+        AddUnique(packageBasePath + destination);
       end;
-      packageBasePath := packageMetadata.Id + PathDelim + packageMetadata.Version.ToStringNoMeta + PathDelim;
-
-      for packageSearchPath in packageMetadata.searchPaths do
-        searchPaths.Add(packageBasePath + packageSearchPath);
     end;
   end;
 end;
@@ -305,7 +366,9 @@ var
 begin
   result := true;
   packagePath := FPackageCache.GetPackagePath(packageInfo);
-  bomFile := TPath.Combine(packagePath, 'package.bom');
+  //BOM is per-platform: lib/{platform} folder is per-platform, so the compile-skip check must be too.
+  //Otherwise a Win32 install leaves a BOM that incorrectly short-circuits a later Win64 install.
+  bomFile := TPath.Combine(packagePath, 'package.' + DPMPlatformToBDString(Compiler.Platform) + '.bom');
 
   // BOM optimization: skip if dependencies unchanged
   if (not force) and FileExists(bomFile) then
@@ -313,7 +376,7 @@ begin
     bomNode := TBOMFile.LoadFromFile(FLogger, bomFile);
     if (bomNode <> nil) and bomNode.AreEqual(packageReference) then
     begin
-      FLogger.Information('Package [' + packageInfo.Id + '] - dependencies unchanged, skipping compilation.');
+      FLogger.Information('Package [' + packageInfo.Id + '] [' + DPMPlatformToString(Compiler.Platform) + '] - dependencies unchanged, skipping compilation.');
       exit;
     end;
   end;
@@ -344,7 +407,7 @@ begin
     searchPaths := TCollections.CreateList<string>;
     for dependency in packageReference.Children do
     begin
-      childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion, Compiler.platform);
+      childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion);
       childSearchPath := TPath.Combine(childSearchPath, 'lib' + PathDelim + DPMPlatformToBDString(Compiler.Platform));
       searchPaths.Add(childSearchPath);
     end;
@@ -406,7 +469,7 @@ begin
         searchPaths := TCollections.CreateList<string>;
         for dependency in packageReference.Children do
         begin
-          childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion, designPlatform);
+          childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion);
           childSearchPath := TPath.Combine(childSearchPath, 'lib' + PathDelim + DPMPlatformToBDString(designPlatform));
           searchPaths.Add(childSearchPath);
         end;
@@ -700,20 +763,15 @@ begin
   if projectPackageGraph = nil then
     projectPackageGraph := TPackageReference.CreateRoot(Options.compilerVersion);
 
-  // see if it's already installed.
+  //If the package is already in the project graph, remove it so the resolver re-resolves below.
+  //Install is idempotent: repeats for an already-built platform are short-circuited by the
+  //per-platform BOM check; new platforms get compiled fresh. -force is still honored downstream
+  //by CompilePackage (forces a rebuild even when the BOM would otherwise skip).
   existingPackageRef := projectPackageGraph.FindTopLevelChild(Options.packageId);
-  if (existingPackageRef <> nil) then
+  if existingPackageRef <> nil then
   begin
-    // if it's installed already and we're not forcing it to install or upgrading the version then we're done.
-    if (not (Options.force or Options.IsUpgrade)) and (not existingPackageRef.IsTransitive) then
-    begin
-      // Note this error won't show from the IDE as we always force install from the IDE.
-      FLogger.Error('Package [' + Options.packageId +  '] is already installed. Use option -force to force reinstall, or -upgrade to install a different version.');
-      exit;
-    end;
-    // remove it so we can force resolution to happen later.
     projectPackageGraph.RemoveTopLevelChild(existingPackageRef.Id);
-    existingPackageRef := nil; // we no longer need it.
+    existingPackageRef := nil;
   end;
 
   // We could have a transitive dependency that is being promoted.
@@ -820,14 +878,24 @@ begin
   if projectPackageGraph = nil then
     exit(true);
 
-  projectReferences := TCollections.CreateList<IPackageReference>;
-
-  if not CreateProjectRefs(cancellationToken, projectPackageGraph, projectReferences) then
+  //Fast path: validate the existing graph against each package's declared dependencies.
+  //If it's intact, skip the resolver entirely and proceed straight to download+configure.
+  resolvedPackages := TCollections.CreateList<IPackageInfo>;
+  if TryValidateRestoreGraph(cancellationToken, projectPackageGraph, Options.CompilerVersion, resolvedPackages) then
+  begin
+    FLogger.Verbose('Restore: existing graph is consistent with package manifests - skipping resolution');
+    result := FinalizePackageConfiguration(cancellationToken, Options, projectFile, projectEditor, platform, config, projectPackageGraph, resolvedPackages, resultGraph);
     exit;
+  end;
 
-  projectPackageGraph := nil;
-
-  if not FDependencyResolver.ResolveForRestore(cancellationToken, Options.CompilerVersion, projectFile, Options, projectReferences, projectPackageGraph, resolvedPackages) then
+  //Slow path: graph has missing transients or out-of-range versions. Re-resolve from top-level
+  //constraints by treating each top-level package as a fresh install. ResolveForRestore is currently
+  //a no-op for actual re-resolution (the resolver context filters out PushRequirement for any id
+  //already in projectReferences), so we use ResolveForInstall per top-level. Each iteration's
+  //resolved graph feeds the next as projectReferences so shared transients are reused.
+  if not RestoreUsingInstallResolver(cancellationToken, Options, projectFile,
+                                     BuildTopLevelOnlyGraph(projectPackageGraph, Options.CompilerVersion),
+                                     projectPackageGraph, resolvedPackages) then
     exit;
 
   projectReferences := nil;
@@ -1071,8 +1139,8 @@ begin
   if not CopyLocal(cancellationToken, resolvedPackages, packageManifests, projectEditor, platform) then
     exit;
 
-  if not InstallDesignPackages(cancellationToken, projectFile, platform, packageManifests) then
-    exit;
+  //Design packages are per-IDE/compiler, not per-platform - the call is hoisted out to the
+  //post-platform-loop site in InstallPackage / RestoreProject.
 
   if not projectEditor.AddSearchPaths(platform, packageSearchPaths, config.PackageCacheLocation) then
     exit;
@@ -1308,19 +1376,12 @@ begin
     // Update package references once using the new platform-independent format
     projectEditor.UpdatePackageReferences(finalGraph);
     result := projectEditor.SaveProject();
+    //Load design-time packages once after all platforms are installed - design BPLs are per-IDE,
+    //not per-platform, so this runs at the project level. CLI context is a no-op.
+    if result then
+      InstallDesignPackages(cancellationToken, projectEditor.ProjectFile, BuildPackageManifestsFromGraph(finalGraph, Options.compilerVersion));
   end;
 
-end;
-
-procedure TPackageInstaller.GenerateSearchPaths(const compilerVersion : TCompilerVersion; const platform: TDPMPlatform; const packageSpec: IPackageSpec; const searchPaths: IList<string>);
-var
-  packageBasePath: string;
-//  packageSearchPath: ISpecSearchPath;
-begin
-  packageBasePath := packageSpec.Metadata.Id + PathDelim + packageSpec.Metadata.Version.ToStringNoMeta + PathDelim;
-  //TODO : Look at source files and collect folder names?
-//  for packageSearchPath in packageSpec.TargetPlatform.SearchPaths do
-//    searchPaths.Add(packageBasePath + packageSearchPath.Path);
 end;
 
 function TPackageInstaller.GetCompilerVersionFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration): boolean;
@@ -1433,10 +1494,208 @@ begin
 
 end;
 
-function TPackageInstaller.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests: IDictionary<string, IPackageSpec>): boolean;
+function TPackageInstaller.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageManifests: IDictionary<string, IPackageSpec>): boolean;
 begin
   //Note : we delegate this to the context as this is a no-op in the command line tool, the IDE plugin provides it's own context implementation.
   result := FContext.InstallDesignPackages(cancellationToken, projectFile, packageManifests);
+end;
+
+function TPackageInstaller.BuildPackageManifestsFromGraph(const graph: IPackageReference; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageSpec>;
+var
+  manifests: IDictionary<string, IPackageSpec>;
+begin
+  manifests := TCollections.CreateDictionary<string, IPackageSpec>;
+  graph.VisitDFS(
+    procedure(const node: IPackageReference)
+    var
+      identity: IPackageIdentity;
+      manifest: IPackageSpec;
+      key: string;
+    begin
+      key := LowerCase(node.Id);
+      if manifests.ContainsKey(key) then
+        exit;
+      identity := TPackageIdentity.Create('', node.Id, node.Version, compilerVersion);
+      manifest := FPackageCache.GetPackageManifest(identity);
+      if manifest <> nil then
+        manifests[key] := manifest;
+    end);
+  result := manifests;
+end;
+
+function TPackageInstaller.GetOrLoadPackageInfo(const cancellationToken: ICancellationToken; const id: string; const version: TPackageVersion;
+                                                const compilerVersion: TCompilerVersion; const cache: IDictionary<string, IPackageInfo>): IPackageInfo;
+var
+  identity: IPackageIdentity;
+  key: string;
+begin
+  key := LowerCase(id);
+  if cache.TryGetValue(key, result) then
+    exit;
+  identity := TPackageIdentity.Create('', id, version, compilerVersion);
+  result := GetPackageInfo(cancellationToken, identity); //tries cache then repo
+  if result <> nil then
+    cache[key] := result;
+end;
+
+function TPackageInstaller.BuildTopLevelOnlyGraph(const fullGraph: IPackageReference; const compilerVersion: TCompilerVersion): IPackageReference;
+var
+  child: IPackageReference;
+  cloned: IPackageReference;
+begin
+  result := TPackageReference.CreateRoot(compilerVersion);
+  for child in fullGraph.Children do
+  begin
+    cloned := child.Clone; //clone strips transient sub-children
+    result.AddExistingChild(cloned.Id, cloned);
+  end;
+end;
+
+function TPackageInstaller.RestoreUsingInstallResolver(const cancellationToken: ICancellationToken; const options: TRestoreOptions; const projectFile: string;
+                                                       const topLevelGraph: IPackageReference; out resultGraph: IPackageReference; out resolvedPackages: IList<IPackageInfo>): boolean;
+var
+  topLevelChild: IPackageReference;
+  topLevelIdentity: IPackageIdentity;
+  topLevelInfo: IPackageInfo;
+  accumulatedRefs: IList<IPackageReference>;
+  iterationGraph: IPackageReference;
+  iterationResolved: IList<IPackageInfo>;
+begin
+  result := false;
+  resultGraph := nil;
+  resolvedPackages := TCollections.CreateList<IPackageInfo>;
+  accumulatedRefs := TCollections.CreateList<IPackageReference>;
+
+  for topLevelChild in topLevelGraph.Children do
+  begin
+    if cancellationToken.IsCancelled then
+      exit;
+
+    //Load latest IPackageInfo for this top-level using its dproj-recorded version. The cache lookup
+    //gives us deps populated from the manifest. If the user edited the top-level version to something
+    //bogus, this returns nil and the restore can't proceed.
+    topLevelIdentity := TPackageIdentity.Create('', topLevelChild.Id, topLevelChild.Version, options.CompilerVersion);
+    topLevelInfo := GetPackageInfo(cancellationToken, topLevelIdentity);
+    if topLevelInfo = nil then
+    begin
+      FLogger.Error('Restore: top-level package [' + topLevelChild.Id + '-' + topLevelChild.Version.ToStringNoMeta + '] not found in cache or repo');
+      exit;
+    end;
+
+    if not FDependencyResolver.ResolveForInstall(cancellationToken, options.CompilerVersion, projectFile, options,
+                                                 topLevelInfo, accumulatedRefs, iterationGraph, iterationResolved) then
+    begin
+      FLogger.Error('Restore: re-resolution failed for [' + topLevelChild.Id + ']');
+      exit;
+    end;
+
+    //Carry the resolver's output forward as projectReferences for the next top-level so shared
+    //transients are not re-resolved (and so prior top-levels stay in the final graph).
+    resultGraph := iterationGraph;
+    resolvedPackages := iterationResolved;
+    accumulatedRefs := TCollections.CreateList<IPackageReference>;
+    if not CreateProjectRefs(cancellationToken, iterationGraph, accumulatedRefs) then
+      exit;
+  end;
+
+  result := resultGraph <> nil;
+end;
+
+function TPackageInstaller.TryValidateRestoreGraph(const cancellationToken: ICancellationToken; const projectPackageGraph: IPackageReference;
+                                                   const compilerVersion: TCompilerVersion; const resolvedPackages: IList<IPackageInfo>): boolean;
+var
+  packageInfos: IDictionary<string, IPackageInfo>;
+  validationOk: boolean;
+  topLevelChild: IPackageReference;
+
+  //Recursively validates a node and its declared dependencies.
+  //Order matters: we always check the *parent's* declared range against the graph child's recorded
+  //version BEFORE attempting to load the child's own info. That way a stale/out-of-range transient
+  //is reported as "out of range" rather than "not found in cache or repo".
+  procedure ValidateNode(const node: IPackageReference);
+  var
+    info: IPackageInfo;
+    dep: IPackageDependency;
+    child: IPackageReference;
+  begin
+    if not validationOk then
+      exit;
+    if cancellationToken.IsCancelled then
+    begin
+      validationOk := false;
+      exit;
+    end;
+    info := GetOrLoadPackageInfo(cancellationToken, node.Id, node.Version, compilerVersion, packageInfos);
+    if info = nil then
+    begin
+      FLogger.Information('Restore: package [' + node.Id + '-' + node.Version.ToStringNoMeta + '] not found in cache or repo - re-resolving');
+      validationOk := false;
+      exit;
+    end;
+    //For every dependency this package declares, verify the graph has a child for it whose version
+    //satisfies the declared range. Range check happens BEFORE recursing so we don't try to load info
+    //for a stale child id/version pair that isn't in the cache or repo.
+    for dep in info.Dependencies do
+    begin
+      child := node.FindFirstChild(dep.Id);
+      if child = nil then
+      begin
+        FLogger.Warning('Restore: package [' + node.Id + '] requires [' + dep.Id + '] which is missing from the project graph - re-resolving');
+        validationOk := false;
+        exit;
+      end;
+      if not dep.VersionRange.IsSatisfiedBy(child.Version) then
+      begin
+        FLogger.Warning('Restore: package [' + node.Id + '] dependency [' + child.Id + '-' + child.Version.ToStringNoMeta + '] is outside required range [' + dep.VersionRange.ToString + '] - re-resolving');
+        validationOk := false;
+        exit;
+      end;
+      //Only recurse if the child passed the range check.
+      ValidateNode(child);
+      if not validationOk then
+        exit;
+    end;
+  end;
+
+begin
+  result := false;
+  validationOk := true;
+  packageInfos := TCollections.CreateDictionary<string, IPackageInfo>;
+
+  for topLevelChild in projectPackageGraph.Children do
+  begin
+    ValidateNode(topLevelChild);
+    if not validationOk then
+      exit;
+  end;
+
+  //DFS yields children-before-parents - that is the order resolvedPackages needs (deps before dependers).
+  projectPackageGraph.VisitDFS(
+    procedure(const node: IPackageReference)
+    var
+      info: IPackageInfo;
+      key: string;
+      i: integer;
+      alreadyAdded: boolean;
+    begin
+      key := LowerCase(node.Id);
+      if not packageInfos.TryGetValue(key, info) then
+        exit;
+      //skip duplicates - shared transients can appear under multiple parents
+      alreadyAdded := false;
+      for i := 0 to resolvedPackages.Count - 1 do
+      begin
+        if SameText(resolvedPackages[i].Id, info.Id) then
+        begin
+          alreadyAdded := true;
+          break;
+        end;
+      end;
+      if not alreadyAdded then
+        resolvedPackages.Add(info);
+    end);
+
+  result := true;
 end;
 
 function TPackageInstaller.InstallPackageFromFile(const cancellationToken : ICancellationToken; const Options: TInstallOptions;const projectFiles: IList<string>;
@@ -1444,6 +1703,7 @@ function TPackageInstaller.InstallPackageFromFile(const cancellationToken : ICan
 var
   packageIdString: string;
   packageIdentity: IPackageIdentity;
+  packageManifest: IPackageSpec;
 begin
   // get the package into the cache first then just install as normal
   result := FPackageCache.InstallPackageFromFile(Options.PackageFile);
@@ -1458,10 +1718,20 @@ begin
 
   // update options so we can install from the packageid.
   Options.PackageFile := '';
-  Options.packageId := packageIdentity.Id + '.' +  packageIdentity.Version.ToStringNoMeta;
+  Options.packageId := packageIdentity.Id;
+  Options.Version := packageIdentity.Version;
   Options.compilerVersion := packageIdentity.compilerVersion;
-  // package file is for single compiler version
-  Options.platforms := [];
+
+  //Restrict to the platforms the package actually supports - read from the now-cached manifest.
+  //ValidateAndSetCompilerPlatforms downstream intersects this with the project's enabled platforms.
+  packageManifest := FPackageCache.GetPackageManifest(packageIdentity);
+  if (packageManifest <> nil) and (packageManifest.TargetPlatform <> nil) then
+    Options.platforms := packageManifest.TargetPlatform.Platforms
+  else
+  begin
+    FLogger.Warning('Could not read manifest for [' + packageIdentity.ToString + '] - install will run for all project platforms');
+    Options.platforms := [];
+  end;
 
   result := InstallPackageFromId(cancellationToken, options, projectFiles, config, context);
 end;
@@ -1530,21 +1800,15 @@ begin
     if projectPackageGraph = nil then
       projectPackageGraph := TPackageReference.CreateRoot(Options.compilerVersion);
 
-    // see if it's already installed.
+    //Install is idempotent - if the package is already in the graph, remove it so the resolver
+    //re-resolves below. Repeats for an already-built platform are short-circuited by the
+    //per-platform BOM check; new platforms get compiled fresh.
     existingPackageRef := projectPackageGraph.FindTopLevelChild(Options.packageId);
-    if (existingPackageRef <> nil) then
+    if existingPackageRef <> nil then
     begin
-      // if it's installed already and we're not forcing it to install or upgrading the version then we're done.
-      if (not (Options.force or Options.IsUpgrade)) and (not existingPackageRef.IsTransitive) then
-      begin
-        // Note this error won't show from the IDE as we always force install from the IDE.
-        FLogger.Error('Package [' + Options.packageId +  '] is already installed. Use option -force to force reinstall, or -upgrade to install a different version.');
-        exit;
-      end;
-      // remove it so we can force resolution to happen later.
       projectPackageGraph.RemoveTopLevelChild(existingPackageRef.Id);
       FContext.RemoveResolution(Options.PackageId); //this doesn't work due to how the context stores resolutions.
-      existingPackageRef := nil; // we no longer need it.
+      existingPackageRef := nil;
     end;
 
     // We could have a transitive dependency that is being promoted.
@@ -1697,6 +1961,10 @@ begin
     // Update package references once using the new platform-independent format
     projectEditor.UpdatePackageReferences(finalGraph);
     result := projectEditor.SaveProject();
+    //Load design-time packages once after all platforms are restored - design BPLs are per-IDE,
+    //not per-platform, so this runs at the project level. CLI context is a no-op.
+    if result then
+      InstallDesignPackages(cancellationToken, projectFile, BuildPackageManifestsFromGraph(finalGraph, Options.compilerVersion));
   end;
 
 end;

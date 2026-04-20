@@ -469,7 +469,6 @@ begin
   LoadComments(yamlObject);
 
   FName := yamlObject.S['name'];
-  Logger.Debug('[template] name : ' + FName);
 
   collectionObj := yamlObject.A['dependencies'];
   if collectionObj.Count > 0 then

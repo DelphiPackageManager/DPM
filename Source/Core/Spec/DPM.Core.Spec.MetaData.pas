@@ -569,7 +569,7 @@ var
   authorsSeq : IYAMLSequence;
   i: Integer;
 begin
-  metaData := parentObj.AsMapping.O['metdata'];
+  metaData := parentObj.AsMapping.O['metadata'];
   metaData.S['id'] := FId;
 
   case packageKind of

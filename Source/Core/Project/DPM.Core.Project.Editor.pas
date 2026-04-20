@@ -332,7 +332,9 @@ begin
     dpmElement := FProjectXML.createNode(NODE_ELEMENT, 'DPM', msbuildNamespace) as IXMLDOMElement;
     result.appendChild(dpmElement);
   end;
-  dpmElement.text := '$(DPMCache)\$(DPMCompiler)\$(Platform)';
+  //One package folder per compiler now contains all platforms - no $(Platform) segment.
+  //Per-platform paths are formed by appending \$(Platform) to the lib folder where applicable.
+  dpmElement.text := '$(DPMCache)\$(DPMCompiler)';
 
 end;
 

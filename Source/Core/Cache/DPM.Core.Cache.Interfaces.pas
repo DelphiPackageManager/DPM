@@ -48,7 +48,7 @@ type
     function CreatePackagePath(const packageId : IPackageIdentity) : string;
 
     function GetPackagePath(const packageId : IPackageIdentity) : string;overload;
-    function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : string;overload;
+    function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion) : string;overload;
 
 
     /// <summary>

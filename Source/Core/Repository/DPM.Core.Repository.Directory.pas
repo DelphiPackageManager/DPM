@@ -162,6 +162,7 @@ end;
 
 function TDirectoryPackageRepository.DownloadPackage(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
 var
+  matchingFiles : IList<string>;
   sourceFile : string;
   sourceHashFile : string;
   destFile : string;
@@ -171,13 +172,19 @@ var
   destHash : string;
 begin
   result := false;
-  sourceFile := IncludeTrailingPathDelimiter(SourceUri) + packageInfo.ToString + cPackageFileExt;
-  if not FileExists(sourceFile) then
+  //The on-disk filename has 4 segments: {Id}-{Compiler}-{BinPlatforms}-{Version}.dpkg.
+  //packageInfo.ToString produces only 3 segments (no platforms), so we glob for the actual file.
+  matchingFiles := DoExactList(packageInfo.Id, packageInfo.CompilerVersion, [], packageInfo.Version.ToStringNoMeta);
+  if matchingFiles.Count = 0 then
   begin
-    Logger.Debug('Package not found in repository [' + sourceFile + ']');
+    Logger.Debug('Package not found in repository [' + packageInfo.ToString + ']');
     exit;
   end;
-  destFile := IncludeTrailingPathDelimiter(localFolder) + packageInfo.ToString + cPackageFileExt;
+  if matchingFiles.Count > 1 then
+    Logger.Warning('Multiple package files matched [' + packageInfo.ToString + '] - using first');
+
+  sourceFile := matchingFiles[0];
+  destFile := IncludeTrailingPathDelimiter(localFolder) + ExtractFileName(sourceFile);
   if TPathUtils.IsRelativePath(destFile) then
     destFile := TPath.GetFullPath(destFile);
   try
@@ -226,8 +233,7 @@ var
   maxVersion : TPackageVersion;
   packageVersion : TPackageVersion;
   maxVersionFile : string;
-  hash : string;
-  hashfileName : string;
+  readManifestFunc : TReadManifestFunc;
 begin
   result := nil;
   if version.IsEmpty then
@@ -270,20 +276,15 @@ begin
 
   if maxVersion.IsEmpty then
     exit;
-  packageFile := IncludeTrailingPathDelimiter(SourceUri) + packageFile + cPackageFileExt;
-  hashfileName := packageFile + cPackageFileExt + cPackageHashAlgorithmExt;
-  if FileExists(hashfileName) then
-    hash := TFile.ReadAllText(hashfileName)
-  else
-  begin
-    hash := THashSHA256.GetHashStringFromFile(packageFile);
-    CheckWritable(ExtractFilePath(packageFile));
-    if FIsWritable then
-      TFile.WriteAllText(hashfileName, hash);
-  end;
+  packageFile := IncludeTrailingPathDelimiter(SourceUri) + maxVersionFile + cPackageFileExt;
 
-  result := TPackageInfo.Create(Self.Name, id, maxVersion, compilerVersion, hash, cPackageHashAlgorithm );
+  //Read manifest from the package so dependencies are populated - the resolver needs them.
+  readManifestFunc := function (const name : string; const manifest : IPackageSpec; const fileHash : string; const hashAlgorithm : string) : IInterface
+                  begin
+                    result := TPackageInfo.CreateFromManifest(name, manifest, fileHash, hashAlgorithm);
+                  end;
 
+  result := DoGetPackageMetaData(cancellationToken, packageFile, false, readManifestFunc) as IPackageInfo;
 end;
 
 function TDirectoryPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageIcon;
@@ -299,6 +300,10 @@ var
   zipHeader : TZipHeader;
 begin
   result := nil;
+  //BUG: this builds a literal '*' into the filename then calls FileExists below,
+  //which never matches. Same fix as GetPackageInfo - glob via DoExactList for the
+  //actual 4-segment {Id}-{Compiler}-{BinPlatforms}-{Version}.dpkg filename.
+  //Not on the CLI install path (used by IDE search UI for icons), fix when IDE work resumes.
   packagFileName := Format('%s-%s-%s-%s.dpkg', [packageId, CompilerToString(compilerVersion), '*', packageVersion]);
   packagFileName := TPath.Combine(Self.SourceUri, packagFileName);
   svgIconFileName := ChangeFileExt(packagFileName, '.svg');
@@ -383,15 +388,17 @@ end;
 
 function TDirectoryPackageRepository.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
 var
+  matchingFiles : IList<string>;
   packageFileName : string;
   readManifestFunc : TReadManifestFunc;
 begin
   result := nil;
-  packageFileName := Format('%s-%s-%s-%s.dpkg', [packageId.Id, CompilerToString(packageId.CompilerVersion), '*', packageId.Version.ToStringNoMeta]);
-  packageFileName := IncludeTrailingPathDelimiter(SourceUri) + packageFileName;
-
-  if not FileExists(packageFileName) then
+  //The on-disk filename has 4 segments - glob with the platform wildcard.
+  matchingFiles := DoExactList(packageId.Id, packageId.CompilerVersion, [], packageId.Version.ToStringNoMeta);
+  if matchingFiles.Count = 0 then
     exit;
+  packageFileName := matchingFiles[0];
+
   if cancellationToken.IsCancelled then
     exit;
 
@@ -577,6 +584,10 @@ var
   _hashAlgorithm : string;
 begin
   result := nil;
+  //BUG: builds a literal '*' into the filename then calls FileExists below, which never matches.
+  //Same fix as GetPackageInfo - glob via DoExactList for the actual 4-segment
+  //{Id}-{Compiler}-{BinPlatforms}-{Version}.dpkg filename.
+  //Not on the CLI install path (used by IDE/search UI for the package detail card), fix when IDE work resumes.
   packageFileName := Format('%s-%s-%s-%s.dpkg', [packageId, CompilerToString(compilerVersion), '*', packageVersion]);
   packageFileName := IncludeTrailingPathDelimiter(SourceUri) + packageFileName;
   if not FileExists(packageFileName) then
@@ -967,7 +978,9 @@ begin
     end;
     //doing this outside the try/finally to avoid locking the package for too long.
     metaString := TEncoding.UTF8.GetString(metaBytes);
-    manifest := reader.ReadSpec(metaString); //TODO : can we provide a filename?
+    //metaString is the manifest YAML content extracted from the .dpkg, not a path.
+    //Use ReadSpecString and pass the .dpkg path as the diagnostic filename.
+    manifest := reader.ReadSpecString(metaString, fileName);
     if FIsWritable then
     begin
       try

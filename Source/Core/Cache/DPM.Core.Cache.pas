@@ -52,7 +52,7 @@ type
     function CreatePackagePath(const packageId : IPackageIdentity) : string;
 
     function GetPackagePath(const packageId : IPackageIdentity) : string; overload;
-    function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : string;overload;
+    function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion) : string;overload;
 
     function EnsurePackage(const packageId : IPackageIdentity) : Boolean;
 
@@ -77,6 +77,7 @@ implementation
 uses
   System.SysUtils,
   System.IOUtils,
+  System.Types,
   System.Zip,
   System.RegularExpressions,
   DPM.Core.Constants,
@@ -153,9 +154,9 @@ begin
   Result := TPackageMetadata.CreateFromManifest('', manifest);
 end;
 
-function TPackageCache.GetPackagePath(const id: string; const version: string; const compilerVersion : TCompilerVersion;const platform: TDPMPlatform): string;
+function TPackageCache.GetPackagePath(const id: string; const version: string; const compilerVersion : TCompilerVersion): string;
 begin
-  result := GetPackagesFolder + PathDelim + CompilerToString(compilerVersion) + PathDelim + DPMPlatformToBDString(platform) + PathDelim + Id + PathDelim + Version;
+  result := GetPackagesFolder + PathDelim + CompilerToString(compilerVersion) + PathDelim + Id + PathDelim + Version;
 end;
 
 function TPackageCache.GetPackagePath(const packageId : IPackageIdentity) : string;
@@ -208,26 +209,34 @@ end;
 
 function TPackageCache.EnsurePackage(const packageId : IPackageIdentity) : Boolean;
 var
-  packageFileName : string;
+  packageFolder : string;
   packagesFolder : string;
   manifestFile : string;
   oldManifestFile : string;
+  searchPattern : string;
+  matchingFiles : TStringDynArray;
 begin
   //check if we have a package folder and manifest.
-  packageFileName := GetPackagePath(packageId);
-  result := DirectoryExists(packageFileName);
+  packageFolder := GetPackagePath(packageId);
+  result := DirectoryExists(packageFolder);
 
-  manifestFile := IncludeTrailingPathDelimiter(packageFileName) + cPackageManifestFile;
-  oldManifestFile := IncludeTrailingPathDelimiter(packageFileName) + cOldPackageManifestFile;
+  manifestFile := IncludeTrailingPathDelimiter(packageFolder) + cPackageManifestFile;
+  oldManifestFile := IncludeTrailingPathDelimiter(packageFolder) + cOldPackageManifestFile;
 
   result := result and (FileExists(manifestFile) or FileExists(oldManifestFile));
   if not result then
   begin
     packagesFolder := GetPackagesFolder;
-    //ok, if we still have the file, try install it again.
-    packageFileName := IncludeTrailingPathDelimiter(packagesFolder) + packageId.ToString + cPackageFileExt;
-    if FileExists(packageFileName) then
-      result := InstallPackageFromFile(packageFileName)
+    //if a stray .dpkg is sitting in the cache root, try to install it again.
+    //The on-disk filename has 4 segments: {Id}-{Compiler}-{BinPlatforms}-{Version}.dpkg.
+    //packageId.ToString produces only 3 segments, so we glob for the actual file.
+    searchPattern := packageId.Id + '-' + CompilerToString(packageId.CompilerVersion) + '-*-' + packageId.Version.ToStringNoMeta + cPackageFileExt;
+    if DirectoryExists(packagesFolder) then
+    begin
+      matchingFiles := TDirectory.GetFiles(packagesFolder, searchPattern, TSearchOption.soTopDirectoryOnly);
+      if Length(matchingFiles) > 0 then
+        result := InstallPackageFromFile(matchingFiles[0]);
+    end;
   end;
 end;
 
