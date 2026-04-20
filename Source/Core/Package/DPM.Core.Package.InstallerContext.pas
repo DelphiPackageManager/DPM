@@ -39,8 +39,6 @@ type
     //search other projects in the project group to see if they have resolved the package.
     function FindPackageResolution(const projectFile: string; const packageId : string ) : IResolvedPackage;
 
-    procedure RemoveResolution(const packageId : string);
-
     procedure Clear;virtual;
 
     property Logger : ILogger read FLogger;
@@ -177,25 +175,5 @@ begin
 end;
 
 
-
-procedure TCorePackageInstallerContext.RemoveResolution(const packageId: string);
-var
-  resList : IList<IResolvedPackage>;
-  resolution : IResolvedPackage;
-begin
-  for resList in FProjectResolutions.Values do
-  begin
-    if resList <> nil then
-    begin
-      resolution := resList.FirstOrDefault(
-        function(const value : IResolvedPackage) : boolean
-        begin
-             result := SameText(value.PackageInfo.Id, packageId);
-        end);
-      if resolution <> nil  then
-        resList.Remove(resolution);
-    end;
-  end;
-end;
 
 end.

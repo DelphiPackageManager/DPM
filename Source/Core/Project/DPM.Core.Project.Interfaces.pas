@@ -78,10 +78,8 @@ type
     procedure RemoveFromSearchPath(const platform : TDPMPlatform; const packageId : string);
 
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string>; const packageCacheLocation : string) : boolean;
-    // Updates package references with per-platform format (legacy)
-    procedure UpdatePackageReferences(const dependencyGraph : IPackageReference; const platform : TDPMPlatform); overload;
-    // Updates package references without platform - single reference per package (new format)
-    procedure UpdatePackageReferences(const dependencyGraph : IPackageReference); overload;
+    // Writes the project's package references as a single platform-agnostic <Packages> node.
+    procedure UpdatePackageReferences(const dependencyGraph : IPackageReference);
 
     function GetPackageReferences : IPackageReference;
     function GetProjectConfiguration(const name : string; const platform : TDPMPlatform) : IProjectConfiguration;

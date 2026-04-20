@@ -90,8 +90,7 @@ type
 
     procedure RemoveFromSearchPath(const platform : TDPMPlatform; const packageId : string);
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string> ; const packageCacheLocation : string) : boolean;
-    procedure UpdatePackageReferences(const dependencyGraph : IPackageReference; const platform : TDPMPlatform); overload;
-    procedure UpdatePackageReferences(const dependencyGraph : IPackageReference); overload;
+    procedure UpdatePackageReferences(const dependencyGraph : IPackageReference);
     function GetPackageReferences : IPackageReference;
     function GetConfigNames: IReadOnlyList<string>;
   public
@@ -970,82 +969,6 @@ procedure TProjectEditor.SetCompiler(const value : TCompilerVersion);
 begin
   FCompiler := value;
 
-
-end;
-
-procedure TProjectEditor.UpdatePackageReferences(const dependencyGraph : IPackageReference; const platform : TDPMPlatform);
-var
-  projectExtensionsElement : IXMLDOMElement;
-  dpmElement : IXMLDOMElement;
-  packageReferenceElements : IXMLDOMNodeList;
-  i : integer;
-  topLevelReference : IPackageReference;
-
-  packageReferencesElement : IXMLDOMElement;
-  packageRefs: IXMLDOMNodeList;
-
-  procedure WritePackageReference(const parentElement : IXMLDOMElement; const packageReference : IPackageReference);
-  var
-    packageReferenceElement : IXMLDOMElement;
-    dependency : IPackageReference;
-  begin
-    packageReferenceElement := FProjectXML.createNode(NODE_ELEMENT, 'PackageReference', msbuildNamespace) as IXMLDOMElement;
-    packageReferenceElement.setAttribute('id', packageReference.Id);
-    packageReferenceElement.setAttribute('version', packageReference.Version.ToStringNoMeta);
-    if not packageReference.VersionRange.IsEmpty then
-      packageReferenceElement.setAttribute('range', packageReference.VersionRange.ToString);
-    if packageReference.UseSource then
-      packageReferenceElement.setAttribute('useSource', 'true');
-    parentElement.appendChild(packageReferenceElement);
-    if packageReference.HasChildren then
-    begin
-      for dependency in packageReference.Children do
-        WritePackageReference(packageReferenceElement, dependency);
-    end;
-  end;
-
-
-begin
-  projectExtensionsElement := FProjectXML.selectSingleNode(projectExtensionsXPath) as IXMLDOMElement;
-  if projectExtensionsElement = nil then
-  begin
-    FLogger.Error('Unable to find ProjectExtensions element in project file.');
-    exit;
-  end;
-  dpmElement := projectExtensionsElement.selectSingleNode('x:DPM') as IXMLDOMElement;
-  if dpmElement = nil then
-  begin
-    dpmElement := FProjectXML.createNode(NODE_ELEMENT, 'DPM', msbuildNamespace) as IXMLDOMElement;
-    projectExtensionsElement.appendChild(dpmElement);
-  end
-  else
-  begin
-    //remove existing nodes, we'll rewrite them below.
-    //old style
-    packageReferenceElements := dpmElement.selectNodes('x:PackageReference[@platform="' + DPMPlatformToBDString(platform) + '"]');
-    for i := 0 to packageReferenceElements.length - 1 do
-      dpmElement.removeChild(packageReferenceElements.item[i]);
-  end;
-
-
-  //new style
-  packageReferencesElement := dpmElement.selectSingleNode('x:PackageReferences[@platform="' + DPMPlatformToBDString(platform) + '"]') as IXMLDomElement;
-  if packageReferencesElement <> nil then //keep the element to avoid changing platform orders
-  begin
-    //remove all package references.
-     packageRefs := packageReferencesElement.selectNodes('x:PackageReference');
-     for i := 0 to packageRefs.length - 1 do
-       packageReferencesElement.removeChild(packageRefs.item[i]);
-  end
-  else
-  begin
-    packageReferencesElement := FProjectXML.createNode(NODE_ELEMENT, 'PackageReferences', msbuildNamespace) as IXMLDOMElement;
-    packageReferencesElement.setAttribute('platform', DPMPlatformToBDString(platform));
-    dpmElement.appendChild(packageReferencesElement);
-  end;
-
-  for topLevelReference in dependencyGraph.Children do
-    WritePackageReference(packageReferencesElement, topLevelReference);
 
 end;
 

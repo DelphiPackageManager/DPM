@@ -197,20 +197,30 @@ end;
 
 function StringToCompilerVersion(const value : string) : TCompilerVersion;
 var
-  iValue : integer;
-  sValue : string;
+  candidate : string;
+  v : TCompilerVersion;
 begin
-  sValue := StringReplace(value, '.', '_', [rfReplaceAll]);
-  //handle shortcuts from cmdline
-  if not TStringUtils.StartsWith(sValue,'delphi', true) then
-    sValue := 'delphi' + sValue;
+  //handle shortcuts from cmdline (XE2, 10.4, 11, ...) by prefixing with 'delphi' if missing.
+  //then normalise '.' to '_' to match the enum identifiers (e.g. Delphi10_4).
+  candidate := value;
+  if not TStringUtils.StartsWith(candidate, 'delphi', true) then
+    candidate := 'delphi' + candidate;
+  candidate := StringReplace(candidate, '.', '_', [rfReplaceAll]);
 
-  iValue := GetEnumValue(typeInfo(TCompilerVersion), sValue);
-
-  if iValue = -1 then
-    result := TCompilerVersion.UnknownVersion
-  else
-    result := TCompilerVersion(iValue);
+  //Iterate enum values and match against canonical name via SameText so the lookup is reliably
+  //case-insensitive across Delphi RTL versions (the prior GetEnumValue path rejected fully-lowercase
+  //inputs like 'delphixe2' on some compilers).
+  for v := Low(TCompilerVersion) to High(TCompilerVersion) do
+  begin
+    if v = TCompilerVersion.UnknownVersion then
+      continue;
+    if SameText(GetEnumName(typeInfo(TCompilerVersion), Ord(v)), candidate) then
+    begin
+      result := v;
+      exit;
+    end;
+  end;
+  result := TCompilerVersion.UnknownVersion;
 end;
 
 function StringToDPMPlatform(const value : string) : TDPMPlatform;

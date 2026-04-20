@@ -132,11 +132,11 @@ var
   selected : boolean;
   choices : integer;
   preRelease : boolean;
+  conflict : TUnresolvableConflict;
 begin
   FStopwatch.Reset;
   FStopwatch.Start;
   FLogger.Verbose('Starting dependency resolution...');
-  result := false;
 
   //TODO : This has the potential to infinitely loop - need to provide a hard exit after a number of attempts.
   //NOTE : we are only resolving dependencies here - the requirements on the stack are already deemed to be resolved.
@@ -165,17 +165,27 @@ begin
         begin
           FLogger.Information('       conflict - selected version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
 
-          //Check if the resolution comes from a different project, if so then record a project conflict but carry on?
+          //Check if the resolution comes from a different project, if so record the conflict and carry on
+          //- we want to surface every conflict in one run rather than bail on the first.
           if not SameText(resolution.ProjectFile, context.ProjectFile) then
           begin
             FLogger.Error('Package project conflict - version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' in project : ' + resolution.ProjectFile + ' does not satisfy ' + dependency.VersionRange.ToString  );
-            //record conflicts here in the context so we can show the user and then continue.. that way we can show the user rather than bombing on the first go?
-            exit;
+            conflict.PackageId := dependency.Id;
+            conflict.ParentId := currentPackage.Id;
+            conflict.RequestedRange := dependency.VersionRange;
+            conflict.Reason := 'cross-project: version ' + resolution.PackageInfo.Version.ToString + ' selected in project [' + resolution.ProjectFile + '] does not satisfy ' + dependency.VersionRange.ToString;
+            context.RecordUnresolvable(conflict);
+            continue;
           end
           else if resolution.IsTopLevel then //if it's a top level package then the version is not negotiable.
           begin
             FLogger.Error('Package conflict - selected version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
-            exit;
+            conflict.PackageId := dependency.Id;
+            conflict.ParentId := currentPackage.Id;
+            conflict.RequestedRange := dependency.VersionRange;
+            conflict.Reason := 'top-level version ' + resolution.PackageInfo.Version.ToString + ' is not negotiable and does not satisfy ' + dependency.VersionRange.ToString;
+            context.RecordUnresolvable(conflict);
+            continue;
           end;
 
           FLogger.Verbose('Attempting to find overalapping versionrange with dependency and earlier resolution');
@@ -191,9 +201,15 @@ begin
             //record the resolved version as no good, so we don't try it again
             if context.RecordNoGood(resolution.PackageInfo) then
             begin
-              //we have been here before - time to bail out;
+              //we've been here before - the resolver is looping. Record the conflict and move on
+              //rather than bailing out so other independent dependencies can still be evaluated.
               FLogger.Error('Unable to resolve conflict - selected version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
-              exit;
+              conflict.PackageId := dependency.Id;
+              conflict.ParentId := currentPackage.Id;
+              conflict.RequestedRange := dependency.VersionRange;
+              conflict.Reason := 'no overlapping version range with prior selection ' + resolution.PackageInfo.Version.ToString;
+              context.RecordUnresolvable(conflict);
+              continue;
             end;
             //backtrack the package/version that got us here in the first place
             //not 100% sure this is correct here. More testing needed.
@@ -292,19 +308,31 @@ begin
                 end;
               end;
             end;
-            //if we get here we are unable to continue.
-            //TODO : Context.RecordUnresolvable - and just continue until done.
+            //We've exhausted backtrack options for this dependency - record the conflict and move on
+            //so the rest of the graph still gets evaluated. The summary fires after the outer while loop.
             FLogger.Error('Unable to satisfy dependency : ' + currentPackage.Id + ' -> ' + dependency.Id + ' ' + dependency.VersionRange.ToString);
-            exit(false);
+            conflict.PackageId := dependency.Id;
+            conflict.ParentId := currentPackage.Id;
+            conflict.RequestedRange := dependency.VersionRange;
+            conflict.Reason := 'no available version satisfies the requested range';
+            context.RecordUnresolvable(conflict);
+            continue;
           end;
         end;
       end;
     end;
   end;
 
-  result := true;
-
-  FLogger.Success('Dependency resolution done in [' + IntToStr(FStopwatch.ElapsedMilliseconds) + 'ms]');
+  if context.HasUnresolvable then
+  begin
+    FLogger.Error('Dependency resolution failed: ' + IntToStr(context.GetUnresolvable.Count) + ' conflict(s)');
+    result := false;
+  end
+  else
+  begin
+    FLogger.Success('Dependency resolution done in [' + IntToStr(FStopwatch.ElapsedMilliseconds) + 'ms]');
+    result := true;
+  end;
   FLogger.NewLine;
 
 end;

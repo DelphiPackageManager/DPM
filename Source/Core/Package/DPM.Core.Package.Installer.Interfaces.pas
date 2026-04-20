@@ -66,7 +66,9 @@ type
   ///</summary>
   IPackageInstallerContext = interface
     ['{8FD229A2-FE7B-4315-84B2-FF18B78C76DC}']
-    /// <summary> called from the project controller in the IDE when starting loading. This is probably wrong! </summary>
+    /// <summary> Wipes all recorded per-project graphs and resolutions. Called by the IDE
+    /// project controller in ProjectGroupClosed - the right trigger, since the next group's projects
+    /// will record their own state from scratch. </summary>
     procedure Clear;
 
     ///<summary>called from the ProjectController when a project is closed.</summary>
@@ -84,9 +86,6 @@ type
 
     ///<summary> Check for an existing package resolution in already loaded projects in the group.</summary>
     function FindPackageResolution(const projectFile: string; const packageId : string ) : IResolvedPackage;
-
-    /// <summary>remove an existing resolution - need to do this when upgrading a package.</summary>
-    procedure RemoveResolution(const packageId : string);
 
   end;
 

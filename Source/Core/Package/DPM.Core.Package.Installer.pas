@@ -137,9 +137,6 @@ type
                               const platform: TDPMPlatform; const config: IConfiguration; const context: IPackageInstallerContext;
                               out resultGraph: IPackageReference): boolean;
 
-    function DoUninstallFromProject(const cancellationToken: ICancellationToken; const Options: TUnInstallOptions; const projectFile: string; const projectEditor: IProjectEditor;
-                                    const platform: TDPMPlatform; const config: IConfiguration; const context: IPackageInstallerContext): boolean;
-
     // Shared post-resolution logic: downloads packages, configures for platform, records graph
     function FinalizePackageConfiguration(const cancellationToken: ICancellationToken; const options: TSearchOptions;
       const projectFile: string; const projectEditor: IProjectEditor; const platform: TDPMPlatform;
@@ -150,7 +147,7 @@ type
     function LoadProjectEditor(const projectFile: string; const config: IConfiguration;
       const compilerVersion: TCompilerVersion; out projectEditor: IProjectEditor): boolean;
 
-    function DoCachePackage(const cancellationToken: ICancellationToken; const Options: TCacheOptions; const platform: TDPMPlatform): boolean;
+    function DoCachePackage(const cancellationToken: ICancellationToken; const Options: TCacheOptions): boolean;
 
     // works out what compiler/platform then calls DoInstallPackage
     function InstallPackage(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const projectEditor: IProjectEditor; const config: IConfiguration;
@@ -220,8 +217,6 @@ uses
 function TPackageInstaller.Cache(const cancellationToken: ICancellationToken;  const Options: TCacheOptions): boolean;
 var
   config: IConfiguration;
-  platform: TDPMPlatform;
-  platforms: TDPMPlatforms;
 begin
   result := false;
   config := Init(Options);
@@ -229,19 +224,9 @@ begin
   if config = nil then
       exit;
 
-  platforms := Options.platforms;
-
-  if platforms = [] then
-    platforms := AllPlatforms(Options.compilerVersion);
-
-  result := true;
-  for platform in platforms do
-  begin
-    if cancellationToken.IsCancelled then
-      exit;
-    Options.platforms := [platform];
-    result := DoCachePackage(cancellationToken, Options, platform) and result;
-  end;
+  //One .dpkg per compiler in the new model - it bundles every platform the package supports,
+  //so a single download covers them all.
+  result := DoCachePackage(cancellationToken, Options);
 end;
 
 function TPackageInstaller.CollectPlatformsFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration): boolean;
@@ -614,7 +599,7 @@ begin
     result := FRepositoryManager.GetPackageInfo(cancellationToken, packageId);
 end;
 
-function TPackageInstaller.DoCachePackage(const cancellationToken : ICancellationToken; const Options: TCacheOptions; const platform: TDPMPlatform): boolean;
+function TPackageInstaller.DoCachePackage(const cancellationToken : ICancellationToken; const Options: TCacheOptions): boolean;
 var
   packageIdentity: IPackageIdentity;
   packageInfo : IPackageInfo;
@@ -634,7 +619,7 @@ begin
   end;
   if packageInfo = nil then
   begin
-    FLogger.Error('Package [' + Options.packageId + '] for platform [' + DPMPlatformToString(platform) + '] not found on any sources');
+    FLogger.Error('Package [' + Options.packageId + '] for compiler [' + CompilerToString(Options.compilerVersion) + '] not found on any sources');
     exit;
   end;
   FLogger.Information('Caching package ' + packageInfo.ToString);
@@ -902,56 +887,6 @@ begin
 
   // Finalize configuration (download, build, search paths, design packages, etc.)
   result := FinalizePackageConfiguration(cancellationToken, Options, projectFile, projectEditor, platform, config, projectPackageGraph, resolvedPackages, resultGraph);
-end;
-
-function TPackageInstaller.DoUninstallFromProject(const cancellationToken : ICancellationToken; const Options: TUnInstallOptions;const projectFile: string;
-                                                  const projectEditor: IProjectEditor; const platform: TDPMPlatform; const config: IConfiguration;
-                                                  const context: IPackageInstallerContext): boolean;
-var
-  projectPackageGraph: IPackageReference;
-  foundReference: IPackageReference;
-begin
-  projectPackageGraph := projectEditor.GetPackageReferences;
-  // can return nil
-  // if there is no project package graph then there is nothing to do.
-  if projectPackageGraph = nil then
-  begin
-    FLogger.Information('Package [' + Options.packageId +  '] was not referenced in project [' + projectFile + '] for platform [' + DPMPlatformToString(platform) + '] - nothing to do.');
-    exit(true);
-  end;
-
-  foundReference := projectPackageGraph.FindTopLevelChild(Options.packageId);
-
-  if foundReference = nil then
-  begin
-    FLogger.Information('Package [' + Options.packageId + '] was not referenced in project [' + projectFile + '] for platform [' + DPMPlatformToString(platform) + '] - nothing to do.');
-    // TODO : Should this fail with an error? It's a noop
-    exit(true);
-  end;
-
-  //remove the node from the graph
-  projectPackageGraph.RemoveTopLevelChild(foundReference.Id);
-
-  //TODO : Context - Remove Design Packages if no longer referenced.
-
-  //TODO : Tell context to upgrade graph.
-//  FContext.PackageGraphTrimmed(projectFile, platform, projectPackageGraph)
-
-
-  //now work out which search paths we can remove;
-  //walk the package reference tree and check transitive dependencies
-  foundReference.VisitDFS(
-      procedure(const node: IPackageReference)
-      begin
-        //if there is no other transitive dependency then we can remove
-        //from the search path.
-        if not projectPackageGraph.HasAnyChild(node.Id) then
-            projectEditor.RemoveFromSearchPath(platform, node.Id);
-      end);
-
-
-  projectEditor.UpdatePackageReferences(projectPackageGraph, platform);
-  result := projectEditor.SaveProject();
 end;
 
 function TPackageInstaller.BuildDependencies(const cancellationToken : ICancellationToken; const packageCompiler: ICompiler; const projectPackageGraph: IPackageReference;
@@ -1807,7 +1742,9 @@ begin
     if existingPackageRef <> nil then
     begin
       projectPackageGraph.RemoveTopLevelChild(existingPackageRef.Id);
-      FContext.RemoveResolution(Options.PackageId); //this doesn't work due to how the context stores resolutions.
+      //No call to RemoveResolution here - FindPackageResolution skips the current project, so re-resolving
+      //in this project doesn't see its own stale resolution. Other projects' recorded resolutions reflect
+      //their dprojs and shouldn't be retroactively mutated by an install in a sibling project.
       existingPackageRef := nil;
     end;
 
@@ -2017,8 +1954,11 @@ var
   projectEditor: IProjectEditor;
   platforms: TDPMPlatforms;
   platform: TDPMPlatform;
-  platformResult: boolean;
   shouldSkip: boolean;
+  projectPackageGraph: IPackageReference;
+  foundReference: IPackageReference;
+  orphanedIds: IList<string>;
+  orphanedId: string;
 begin
   result := false;
 
@@ -2040,22 +1980,56 @@ begin
 
   FLogger.Information('Uninstalling for compiler version  [' + CompilerToString(Options.compilerVersion) + '].', true);
 
+  //The package graph is project-level, not per-platform. Find the top-level reference once and bail
+  //if it isn't there - no work needed.
+  projectPackageGraph := projectEditor.GetPackageReferences;
+  if projectPackageGraph = nil then
+  begin
+    FLogger.Information('Package [' + Options.packageId + '] is not referenced in project [' + projectFile + '] - nothing to do.');
+    exit(true);
+  end;
+
+  foundReference := projectPackageGraph.FindTopLevelChild(Options.packageId);
+  if foundReference = nil then
+  begin
+    FLogger.Information('Package [' + Options.packageId + '] is not referenced in project [' + projectFile + '] - nothing to do.');
+    exit(true);
+  end;
+
+  //Remove the top-level node first so HasAnyChild reflects the post-uninstall graph below.
+  projectPackageGraph.RemoveTopLevelChild(foundReference.Id);
+
+  //Walk the removed subtree and collect ids whose subtree is no longer referenced anywhere in the
+  //remaining graph - those are the ones we need to drop from per-platform search paths. Transients
+  //still pulled in by another top-level stay.
+  orphanedIds := TCollections.CreateList<string>;
+  foundReference.VisitDFS(
+    procedure(const node: IPackageReference)
+    begin
+      if not projectPackageGraph.HasAnyChild(node.Id) then
+        orphanedIds.Add(node.Id);
+    end);
+
+  //Search paths ARE per-platform (each <DPMSearch> has a Condition on $(Platform)) so this part
+  //runs once per platform.
   result := true;
   for platform in platforms do
   begin
     if cancellationToken.IsCancelled then
       exit(false);
-
-    Options.platforms := [platform];
-    FLogger.Information('Uninstalling from project [' + projectFile + '] for ['  + DPMPlatformToString(platform) + ']', true);
-    platformResult := DoUninstallFromProject(cancellationToken, Options, projectFile, projectEditor, platform, config, context);
-    if not platformResult then
-      FLogger.Error('Uninstall failed for ' + DPMPlatformToString(platform))
-    else
-      FLogger.Success('Uninstall succeeded for ' + DPMPlatformToString(platform), true);
-    result := platformResult and result;
-    FLogger.Information('');
+    FLogger.Information('Removing [' + Options.packageId + '] from search paths for [' + DPMPlatformToString(platform) + ']');
+    for orphanedId in orphanedIds do
+      projectEditor.RemoveFromSearchPath(platform, orphanedId);
   end;
+
+  //TODO : Context - Remove Design Packages if no longer referenced.
+  //TODO : Tell context to upgrade graph (FContext.PackageGraphTrimmed once that exists).
+
+  //Project-level: write the updated graph (single <Packages> node, no platform attribute) and save once.
+  projectEditor.UpdatePackageReferences(projectPackageGraph);
+  result := projectEditor.SaveProject();
+  if result then
+    FLogger.Success('Uninstall succeeded for [' + Options.packageId + ']', true);
 end;
 
 end.

@@ -40,6 +40,18 @@ uses
 //only intended for internal use by the resolver so interfaces can stay here
 type
   /// <summary>
+  ///  Records a dependency the resolver could not satisfy. Collected on the context so we can keep
+  ///  resolving sibling dependencies and report all conflicts at the end of the run instead of bailing
+  ///  on the first one. Reason is the human-readable message already logged at the conflict site.
+  /// </summary>
+  TUnresolvableConflict = record
+    PackageId : string;
+    ParentId : string;
+    RequestedRange : TVersionRange;
+    Reason : string;
+  end;
+
+  /// <summary>
   /// Used to cache information during dependency resolution.
   /// </summary>
   IResolverContext = interface
@@ -58,6 +70,9 @@ type
     function GetResolvedPackageInfos : IList<IPackageInfo>;
     function BuildDependencyGraph : IPackageReference;
     function ProjectFile : string;
+    procedure RecordUnresolvable(const conflict : TUnresolvableConflict);
+    function HasUnresolvable : boolean;
+    function GetUnresolvable : IList<TUnresolvableConflict>;
   end;
 
   TResolverContext = class(TInterfacedObject, IResolverContext)
@@ -67,6 +82,7 @@ type
     FResolved : IDictionary<string, IResolvedPackage>;
     FOpenRequirements : IQueue<IPackageInfo>;
     FVersionCache : IDictionary<string, IList<IPackageInfo>>;
+    FUnresolvable : IList<TUnresolvableConflict>;
     FCompilerVersion : TCompilerVersion;
     FProjectFile : string;
     FPackageInstallerContext : IPackageInstallerContext;
@@ -86,6 +102,9 @@ type
     function GetResolvedPackageInfos : IList<IPackageInfo>;
     function BuildDependencyGraph : IPackageReference;
     function ProjectFile : string;
+    procedure RecordUnresolvable(const conflict : TUnresolvableConflict);
+    function HasUnresolvable : boolean;
+    function GetUnresolvable : IList<TUnresolvableConflict>;
   public
     constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>);overload;
     constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences : IList<IPackageReference>);overload;
@@ -176,6 +195,7 @@ begin
   FResolved := TCollections.CreateDictionary<string, IResolvedPackage>;
   FOpenRequirements := TCollections.CreateQueue<IPackageInfo>;
   FVersionCache := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
+  FUnresolvable := TCollections.CreateList<TUnresolvableConflict>;
 
   for projectReference in projectReferences do
   begin
@@ -200,7 +220,23 @@ begin
   FResolved := nil;
   FOpenRequirements := nil;
   FVersionCache := nil;
+  FUnresolvable := nil;
   inherited;
+end;
+
+procedure TResolverContext.RecordUnresolvable(const conflict : TUnresolvableConflict);
+begin
+  FUnresolvable.Add(conflict);
+end;
+
+function TResolverContext.HasUnresolvable : boolean;
+begin
+  result := FUnresolvable.Any;
+end;
+
+function TResolverContext.GetUnresolvable : IList<TUnresolvableConflict>;
+begin
+  result := FUnresolvable;
 end;
 
 constructor TResolverContext.Create(const logger : ILogger;  const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>);

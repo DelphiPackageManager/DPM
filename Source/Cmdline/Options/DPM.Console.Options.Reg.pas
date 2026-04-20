@@ -96,24 +96,6 @@ begin
     end);
   option.Required := true;
 
-  option := cmd.RegisterOption<string>('platforms','p', 'The platforms to cache for (comma separated). Default is to cachge for all platforms available.',
-   procedure(const value : string)
-   var
-     platformStrings : TArray<string>;
-     platformString : string;
-     platform : TDPMPlatform;
-   begin
-      platformStrings := TStringUtils.SplitStr(value, ',',TSplitStringOptions.ExcludeEmpty);
-      for platformString in platformStrings do
-      begin
-        platform := StringToDPMPlatform(Trim(platformString));
-        if platform <> TDPMPlatform.UnknownPlatform then
-          TCacheOptions.Default.Platforms := TCacheOptions.Default.Platforms + [platform]
-        else
-          raise Exception.Create('Invalid platform [' + platformString + ']');
-      end;
-    end);
-
   option := cmd.RegisterOption<string>('Sources','s','The sources from which to install packages',
     procedure(const value : string)
     begin
