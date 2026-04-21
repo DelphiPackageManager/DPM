@@ -48,6 +48,7 @@ uses
   DPM.Core.Options.Uninstall,
   DPM.Core.Options.Restore,
   DPM.Core.Options.Spec,
+  DPM.Core.Options.Why,
   DPM.Core.Utils.Strings,
   VSoft.CommandLine.Options;
 
@@ -817,12 +818,35 @@ end;
 procedure RegisterWhyCommand;
 var
   cmd : TCommandDefinition;
+  option : IOptionDefinition;
 begin
+  cmd := TOptionsRegistry.RegisterCommand('why', '', 'Shows the dependency chain(s) that pull a package into a project.',
+                                                      'Specify the package id and optionally a project (.dproj) path.',
+                                                      'why <packageId> [projectPath] [options]');
 
-  cmd := TOptionsRegistry.RegisterCommand('why', '', 'Explains why a package is referenced',
-                                                      '',
-                                                      'why',true);
+  option := cmd.RegisterUnNamedOption<string>('The package id to explain', 'packageId',
+    procedure(const value : string)
+    begin
+      TWhyOptions.Default.PackageId := value;
+    end);
+  option.Required := true;
 
+  option := cmd.RegisterUnNamedOption<string>('The path to the .dproj file. Defaults to a .dproj in the current directory.', 'projectPath',
+    procedure(const value : string)
+    begin
+      TWhyOptions.Default.ProjectPath := value;
+    end);
+
+  option := cmd.RegisterOption<string>('compiler','c','The delphi compiler version.',
+    procedure(const value : string)
+    begin
+      TWhyOptions.Default.CompilerVersion := StringToCompilerVersion(value);
+      if TWhyOptions.Default.CompilerVersion = TCompilerVersion.UnknownVersion then
+        raise EArgumentException.Create('Invalid compiler version : ' + value);
+    end);
+
+  cmd.Examples.Add('why VSoft.HttpClient c:\myprojects\project1.dproj');
+  cmd.Examples.Add('why Spring4D.Base c:\myprojects\project1.dproj -compiler=12.0');
 end;
 
 procedure RegisterInfoCommand;
