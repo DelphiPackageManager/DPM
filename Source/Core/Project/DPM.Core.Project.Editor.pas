@@ -125,14 +125,7 @@ const
 
   projectExtensionsXPath = '/x:Project/x:ProjectExtensions';
 
-  //newnew format ;)
   packagesXPath = '/x:Project/x:ProjectExtensions/x:DPM/x:Packages';
-
-  //new format
-  packageReferencesXPath = '/x:Project/x:ProjectExtensions/x:DPM/x:PackageReferences';
-
-  //old format
-  packageReferenceXPath = '/x:Project/x:ProjectExtensions/x:DPM/x:PackageReference';
 
   dpmElementPath = '/x:Project/x:PropertyGroup/x:DPM';
 
@@ -566,8 +559,7 @@ end;
 
 function TProjectEditor.LoadPackageRefences : boolean;
 
-
-  procedure ReadPackageReferences(const parentReference : IPackageReference; const parentElement : IXMLDOMElement; parentPlatform : TDPMPlatform );
+  procedure ReadPackageReferences(const parentReference : IPackageReference; const parentElement : IXMLDOMElement);
   var
     isTransitive : boolean;
     packageNodes : IXMLDOMNodeList;
@@ -577,30 +569,22 @@ function TProjectEditor.LoadPackageRefences : boolean;
     sVersion : string;
     version : TPackageVersion;
     error : string;
-    sPlatform : string;
     sRange : string;
     range : TVersionRange;
     dupCheckReference : IPackageReference;
-    sXPath : string;
     useSource : boolean;
     sUseSource : string;
     newNode : IPackageReference;
   begin
     isTransitive := parentReference <> nil;
-    //if it's unknown, we are loading top level in the old format
-    if parentPlatform = TDPMPlatform.UnknownPlatform then
-      sXPath := packageReferenceXPath
-    else
-      sXPath := 'x:PackageReference';
 
-    packageNodes := parentElement.selectNodes(sXPath);
+    packageNodes := parentElement.selectNodes('x:PackageReference');
     if packageNodes.length > 0 then
     begin
       for i := 0 to packageNodes.length - 1 do
       begin
         id := '';
         sVersion := '';
-        sPlatform := '';
         sUseSource := '';
 
         packageElement := packageNodes.item[i] as IXMLDOMElement;
@@ -690,67 +674,18 @@ function TProjectEditor.LoadPackageRefences : boolean;
           newNode := FPackageRefences.AddChild(id, version, TVersionRange.Empty);
           newNode.UseSource := useSource;
         end;
-        ReadPackageReferences(newNode, packageElement, parentPlatform);
+        ReadPackageReferences(newNode, packageElement);
       end;
     end;
   end;
 
 var
-  packageReferencesElements : IXMLDOMNodeList;
-  packageReferencesElement : IXMLDOMElement;
-  j : integer;
-  packageReferencesPlatform : TDPMPlatform;
-  stmp : string;
+  packagesElement : IXMLDOMElement;
 begin
   result := true;
-
-  //try the new new format first!
-  packageReferencesElement := FProjectXML.selectSingleNode(packagesXPath) as IXMLDOMElement;
-  if packageReferencesElement <> nil then
-  begin
-    packageReferencesPlatform := TDPMPlatform.Win32; //just so we can still use existing function
-    ReadPackageReferences(nil, packageReferencesElement, packageReferencesPlatform );
-    exit;
-  end;
-
-  //try previous formats
-  //TODO :
-
-  //try new format first
-  packageReferencesElements := FProjectXML.selectNodes(packageReferencesXPath);
-  if packageReferencesElements.length > 0 then
-  begin
-    for j := 0 to packageReferencesElements.length -1 do
-    begin
-      stmp := '';
-      packageReferencesElement := packageReferencesElements.item[j] as IXMLDOMElement;
-      if packageReferencesElement.getAttributeNode('platform') <> nil then
-        stmp := packageReferencesElement.getAttribute('platform');
-      if stmp = '' then
-      begin
-        FLogger.Error('Invalid package references detected in project, missing required [platform] attribute');
-        result := false;
-        exit;
-      end;
-      packageReferencesPlatform := StringToDPMPlatform(stmp);
-      if packageReferencesPlatform = TDPMPlatform.UnknownPlatform then
-      begin
-        FLogger.Error('Invalid package reference platform value [' + stmp + '] in platform attribute');
-        result := false;
-        exit;
-      end;
-
-      ReadPackageReferences(nil, packageReferencesElement, packageReferencesPlatform );
-
-     //we no longer differenciate packages by platform so just take the first one
-      exit;
-    end;
-  end
-  else
-  begin
-    //try old format
-    ReadPackageReferences(nil, FProjectXML.documentElement, TDPMPlatform.UnknownPlatform );
-  end;
+  packagesElement := FProjectXML.selectSingleNode(packagesXPath) as IXMLDOMElement;
+  if packagesElement <> nil then
+    ReadPackageReferences(nil, packagesElement);
 end;
 
 function TProjectEditor.LoadProject(const filename : string; const elements : TProjectElements) : Boolean;
@@ -977,7 +912,6 @@ var
   projectExtensionsElement: IXMLDOMElement;
   dpmElement: IXMLDOMElement;
   packagesElement: IXMLDOMElement;
-  oldPackageRefsElements: IXMLDOMNodeList;
   packageRefs: IXMLDOMNodeList;
   i: integer;
   topLevelReference: IPackageReference;
@@ -1015,21 +949,9 @@ begin
   begin
     dpmElement := FProjectXML.createNode(NODE_ELEMENT, 'DPM', msbuildNamespace) as IXMLDOMElement;
     projectExtensionsElement.appendChild(dpmElement);
-  end
-  else
-  begin
-    // Remove old per-platform PackageReferences elements (migration from old format)
-    oldPackageRefsElements := dpmElement.selectNodes('x:PackageReferences');
-    for i := oldPackageRefsElements.length - 1 downto 0 do
-      dpmElement.removeChild(oldPackageRefsElements.item[i]);
-
-    // Also remove old-style PackageReference elements directly under DPM
-    oldPackageRefsElements := dpmElement.selectNodes('x:PackageReference');
-    for i := oldPackageRefsElements.length - 1 downto 0 do
-      dpmElement.removeChild(oldPackageRefsElements.item[i]);
   end;
 
-  // Find or create the new Packages element
+  // Find or create the Packages element
   packagesElement := dpmElement.selectSingleNode('x:Packages') as IXMLDOMElement;
   if packagesElement <> nil then
   begin

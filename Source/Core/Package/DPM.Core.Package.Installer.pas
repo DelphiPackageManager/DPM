@@ -1703,19 +1703,9 @@ begin
       FLogger.Error('Unable to load project file, cannot continue');
       exit;
     end;
-
-    //the command line might specify multiple platforms, the IDE UI always specifies a single platform;
-    if Options.platforms <> [] then
-    begin
-      Options.platforms := Options.platforms * projectEditor.platforms; // get the intersection of the two sets.
-      if Options.platforms = [] then // no intersection
-      begin
-        FLogger.Warning('Skipping project file [' + projectEditor.ProjectFile + '] as it does not match target specified platforms.');
-        continue;
-      end;
-    end
-    else
-      options.Platforms := projectEditor.Platforms; //default to installing for all platforms enabled in the project.
+    //Per-project platform reconciliation happens later in ValidateAndSetCompilerPlatforms (called from
+    //InstallPackage). Mutating Options.platforms here would leak the first project's platforms into the
+    //second project's call and narrow installs across the directory.
     projectEditors.Add(projectEditor);
   end;
 
@@ -2012,7 +2002,6 @@ begin
 
   //Search paths ARE per-platform (each <DPMSearch> has a Condition on $(Platform)) so this part
   //runs once per platform.
-  result := true;
   for platform in platforms do
   begin
     if cancellationToken.IsCancelled then

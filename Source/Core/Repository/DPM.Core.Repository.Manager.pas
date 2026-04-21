@@ -583,7 +583,6 @@ var
   distinctResults : IEnumerable<IPackageInfo>;
   comparer : IEqualityComparer<IPackageInfo>;
 begin
-  FLogger.Debug('TPackageRepositoryManager.GetPackageVersionsWithDependencies');
   result := TCollections.CreateList<IPackageInfo>;
   unfilteredResults := TCollections.CreateList<IPackageInfo>;
   Assert(FConfiguration <> nil);
