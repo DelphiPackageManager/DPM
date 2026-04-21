@@ -122,7 +122,6 @@ type
 
     FClosing : boolean;
     FIncludePreRelease : boolean;
-    FCurrentPlatform : TDPMPlatform;
     FDropdownOpen : boolean;
 
     FFetchVersions : boolean;
@@ -142,13 +141,13 @@ type
     procedure VersionsDelayTimerEvent(Sender : TObject);
     procedure OnDetailsUriClick(Sender : TObject; const uri : string; const element : TDetailElement);
 
-    procedure DoGetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform);
+    procedure DoGetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion);
 
     procedure UpdateProjectPackageVersions(const packageId : string);
     procedure DoPackageUninstall(options : TUnInstallOptions);
     procedure DoPackageInstall(options : TInstallOptions; const isUpdate : boolean);
 
-    function GetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IAwaitable<IPackageSearchResultItem>;
+    function GetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion): IAwaitable<IPackageSearchResultItem>;
     procedure ChangeScale(M: Integer; D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND}); override;
 
     procedure VersionGridOnInstallEvent(const project : string);
@@ -208,7 +207,7 @@ begin
   options.Version := FSelectedVersion;
   //only install in projects it's not installed in already
   options.Projects := FProjectsGrid.GetNotInstalledProjects;
-  options.Platforms := [FCurrentPlatform];
+  options.Platforms := [];
   options.Prerelease := FIncludePreRelease;
   options.CompilerVersion := IDECompilerVersion;
 
@@ -225,7 +224,7 @@ begin
   options.Version := FPackageMetaData.Version;
   //only attempt to uninstall from projects it's actually installed in.
   options.Projects := FProjectsGrid.GetInstalledProjects;
-  options.Platforms := [FCurrentPlatform];
+  options.Platforms := [];
   options.CompilerVersion := IDECompilerVersion;
 
   DoPackageUninstall(options);
@@ -241,7 +240,7 @@ begin
   options.Version := FSelectedVersion;
   //only upgrade/downgrade in projects it's actually ibstalled in.
   options.Projects := FProjectsGrid.GetInstalledProjects;
-  options.Platforms := [FCurrentPlatform];
+  options.Platforms := [];
   options.Prerelease := FIncludePreRelease;
   options.CompilerVersion := IDECompilerVersion;
   options.IsUpgrade := true;
@@ -263,7 +262,7 @@ begin
   if FFetchVersions then
     FVersionsDelayTimer.Enabled := true;
   if FSelectedVersion <> package.Version then
-    DoGetPackageMetaDataAsync(package.Id, FSelectedVersion.ToStringNoMeta, package.CompilerVersion, FCurrentPlatform)
+    DoGetPackageMetaDataAsync(package.Id, FSelectedVersion.ToStringNoMeta, package.CompilerVersion)
   else
     FDetailsPanel.SetDetails(FPackageMetaData);
 
@@ -279,7 +278,7 @@ begin
   inherited;
 end;
 
-procedure TPackageDetailsFrame.DoGetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform);
+procedure TPackageDetailsFrame.DoGetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion);
 var
   item : IPackageSearchResultItem ;
   key : string;
@@ -295,7 +294,7 @@ begin
   end;
 
   //didn't find it in the cache so fire off a task to get it from the repo.
-  GetPackageMetaDataAsync(id, version, compilerVersion, platform)
+  GetPackageMetaDataAsync(id, version, compilerVersion)
   .OnException(
     procedure(const e : Exception)
     begin
@@ -333,7 +332,6 @@ end;
 procedure TPackageDetailsFrame.DoPackageInstall(options: TInstallOptions; const isUpdate : boolean);
 var
   installResult : boolean;
-  sPlatform : string;
   packageMetadata : IPackageSearchResultItem;
   projectCount : integer;
 begin
@@ -362,11 +360,10 @@ begin
       SetPackage(packageMetadata, FIncludePreRelease, true);
       FInstalledVersion := options.Version;
       FPackageMetaData := packageMetadata;
-      sPlatform := DPMPlatformToString(FCurrentPlatform);
-      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FInstalledVersion.ToStringNoMeta + ' [' + sPlatform + '] installed.');
+      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FInstalledVersion.ToStringNoMeta + ' installed.');
     end
     else
-      FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FInstalledVersion.ToStringNoMeta + ' [' + sPlatform + '] did not install.');
+      FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FInstalledVersion.ToStringNoMeta + ' did not install.');
 
 
   finally
@@ -379,7 +376,6 @@ end;
 procedure TPackageDetailsFrame.DoPackageUninstall(options: TUnInstallOptions);
 var
   uninstallResult : boolean;
-  sPlatform : string;
   packageMetaData : IPackageSearchResultItem;
   projectCount : integer;
 begin
@@ -398,13 +394,12 @@ begin
       projectCount := 1;
     FHost.BeginInstall(projectCount);
 
-    sPlatform := DPMPlatformToString(FCurrentPlatform);
-    FLogger.Information('UnInstalling package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version.ToStringNoMeta + ' [' + sPlatform + ']');
+    FLogger.Information('UnInstalling package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version.ToStringNoMeta);
     uninstallResult := FPackageInstaller.UnInstall(FCancellationTokenSource.Token, options, FInstallerContext);
     if uninstallResult then
     begin
       packageMetaData := FPackageMetaData;
-      FLogger.Information('Package ' + packageMetaData.Id + ' - ' + packageMetaData.Version.ToStringNoMeta + ' [' + sPlatform + '] uninstalled.');
+      FLogger.Information('Package ' + packageMetaData.Id + ' - ' + packageMetaData.Version.ToStringNoMeta + ' uninstalled.');
       FHost.PackageInstalled;
       UpdateProjectPackageVersions(packageMetaData.Id);
 
@@ -421,7 +416,7 @@ begin
       end;
     end
     else
-      FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version.ToStringNoMeta + ' [' + sPlatform + '] did not uninstall.');
+      FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version.ToStringNoMeta + ' did not uninstall.');
 
   finally
     FLogger.EndUnInstall(uninstallResult);
@@ -437,7 +432,7 @@ begin
   sVersion := cboVersions.Items[cboVersions.ItemIndex];
   packageVer := TPackageVersion.Parse(sVersion);
   FProjectsGrid.PackageVersion := packageVer;
-  DoGetPackageMetaDataAsync(FPackageMetaData.Id, sVersion, FPackageMetaData.CompilerVersion, FCurrentPlatform);
+  DoGetPackageMetaDataAsync(FPackageMetaData.Id, sVersion, FPackageMetaData.CompilerVersion);
 end;
 
 procedure TPackageDetailsFrame.cboVersionsCloseUp(Sender: TObject);
@@ -528,7 +523,6 @@ begin
   FDetailsPanel.OnUriClick := Self.OnDetailsUriClick;
   FDetailsPanel.Parent := sbPackageDetails;
 
-  FCurrentPlatform := TDPMPlatform.UnknownPlatform;
   FVersionsDelayTimer := TTimer.Create(AOwner);
   FVersionsDelayTimer.Interval := 100;
   FVersionsDelayTimer.Enabled := false;
@@ -681,7 +675,7 @@ begin
   end;
 end;
 
-function TPackageDetailsFrame.GetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion; const platform: TDPMPlatform): IAwaitable<IPackageSearchResultItem>;
+function TPackageDetailsFrame.GetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion): IAwaitable<IPackageSearchResultItem>;
 var
   repoManager : IPackageRepositoryManager;
 begin
@@ -978,7 +972,7 @@ begin
   options.PackageId := FPackageMetaData.Id;
   options.Version := FSelectedVersion;
   options.ProjectPath := project;
-  options.Platforms := [FCurrentPlatform];
+  options.Platforms := [];
   options.Prerelease := FIncludePreRelease;
   options.CompilerVersion := IDECompilerVersion;
   options.Force := true;
@@ -994,7 +988,7 @@ begin
   options.PackageId := FPackageMetaData.Id;
   options.Version := FSelectedVersion;
   options.ProjectPath := project;
-  options.Platforms := [FCurrentPlatform];
+  options.Platforms := [];
   options.Prerelease := FIncludePreRelease;
   options.CompilerVersion := IDECompilerVersion;
   options.Sources := FPackageMetaData.SourceName;
@@ -1011,7 +1005,7 @@ begin
   options.PackageId := FPackageMetaData.Id;
   options.Version := FPackageMetaData.Version;
   options.ProjectPath := project;
-  options.Platforms := [FCurrentPlatform];
+  options.Platforms := [];
   options.CompilerVersion := IDECompilerVersion;
 
   DoPackageUninstall(options);
@@ -1026,7 +1020,7 @@ begin
   options.PackageId := FPackageMetaData.Id;
   options.Version := FSelectedVersion;
   options.ProjectPath := project;
-  options.Platforms := [FCurrentPlatform];
+  options.Platforms := [];
   options.Prerelease := FIncludePreRelease;
   options.CompilerVersion := IDECompilerVersion;
   options.IsUpgrade := true; //changing the installed version
