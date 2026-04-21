@@ -163,7 +163,7 @@ begin
   dpmGroup := GetDPMPropertyGroup;
   if dpmGroup = nil then
   begin
-    FLogger.Error('Unabled to find or create PropertyGroup for DPM in the project file');
+    FLogger.Error('Unable to find or create PropertyGroup for DPM in the project file');
     exit;
   end;
 
@@ -824,7 +824,7 @@ begin
   dpmGroup := GetDPMPropertyGroup;
   if dpmGroup = nil then
   begin
-    FLogger.Error('Unabled to find or create PropertyGroup for DPM in the project file');
+    FLogger.Error('Unable to find or create PropertyGroup for DPM in the project file');
     exit;
   end;
 

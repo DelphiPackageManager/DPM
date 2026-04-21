@@ -172,8 +172,9 @@ var
   destHash : string;
 begin
   result := false;
-  //The on-disk filename has 4 segments: {Id}-{Compiler}-{BinPlatforms}-{Version}.dpkg.
-  //packageInfo.ToString produces only 3 segments (no platforms), so we glob for the actual file.
+  //On-disk filename: {Id}-{Compiler}-{BinPlatforms}-{Version}.dpkg. BinPlatforms encodes the
+  //set of platforms the package was packed for; packageInfo identifies Id/Compiler/Version
+  //only, so we wildcard the platforms segment via DoExactList.
   matchingFiles := DoExactList(packageInfo.Id, packageInfo.CompilerVersion, [], packageInfo.Version.ToStringNoMeta);
   if matchingFiles.Count = 0 then
   begin
@@ -289,6 +290,7 @@ end;
 
 function TDirectoryPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageIcon;
 var
+  matchingFiles : IList<string>;
   zipFile : TZipFile;
   zipIdx : integer;
   packagFileName : string;
@@ -300,12 +302,10 @@ var
   zipHeader : TZipHeader;
 begin
   result := nil;
-  //BUG: this builds a literal '*' into the filename then calls FileExists below,
-  //which never matches. Same fix as GetPackageInfo - glob via DoExactList for the
-  //actual 4-segment {Id}-{Compiler}-{BinPlatforms}-{Version}.dpkg filename.
-  //Not on the CLI install path (used by IDE search UI for icons), fix when IDE work resumes.
-  packagFileName := Format('%s-%s-%s-%s.dpkg', [packageId, CompilerToString(compilerVersion), '*', packageVersion]);
-  packagFileName := TPath.Combine(Self.SourceUri, packagFileName);
+  matchingFiles := DoExactList(packageId, compilerVersion, [], packageVersion);
+  if matchingFiles.Count = 0 then
+    exit;
+  packagFileName := matchingFiles[0];
   svgIconFileName := ChangeFileExt(packagFileName, '.svg');
   pngIconFileName := ChangeFileExt(packagFileName, '.png');
 
@@ -577,6 +577,7 @@ end;
 
 function TDirectoryPackageRepository.GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion): IPackageSearchResultItem;
 var
+  matchingFiles : IList<string>;
   packageFileName : string;
   readManifestFunc : TReadManifestFunc;
   metaData : IPackageMetadata;
@@ -584,14 +585,10 @@ var
   _hashAlgorithm : string;
 begin
   result := nil;
-  //BUG: builds a literal '*' into the filename then calls FileExists below, which never matches.
-  //Same fix as GetPackageInfo - glob via DoExactList for the actual 4-segment
-  //{Id}-{Compiler}-{BinPlatforms}-{Version}.dpkg filename.
-  //Not on the CLI install path (used by IDE/search UI for the package detail card), fix when IDE work resumes.
-  packageFileName := Format('%s-%s-%s-%s.dpkg', [packageId, CompilerToString(compilerVersion), '*', packageVersion]);
-  packageFileName := IncludeTrailingPathDelimiter(SourceUri) + packageFileName;
-  if not FileExists(packageFileName) then
+  matchingFiles := DoExactList(packageId, compilerVersion, [], packageVersion);
+  if matchingFiles.Count = 0 then
     exit;
+  packageFileName := matchingFiles[0];
   if cancellationToken.IsCancelled then
     exit;
 

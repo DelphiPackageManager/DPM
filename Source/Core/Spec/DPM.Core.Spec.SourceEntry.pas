@@ -142,7 +142,7 @@ end;
 
 procedure TSpecSourceEntry.ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);
 var
-  exludeSeq : IYAMLSequence;
+  excludeSeq : IYAMLSequence;
   i : integer;
   mapping : IYAMLMapping;
 begin
@@ -152,9 +152,9 @@ begin
     mapping.S['dest'] := FDestination;
   if FExclude.Count > 0 then
   begin
-    exludeSeq := mapping.A['exclude'];
+    excludeSeq := mapping.A['exclude'];
     for i := 0 to FExclude.Count -1 do
-      exludeSeq.AddValue(FExclude[i]);
+      excludeSeq.AddValue(FExclude[i]);
   end;
 
 

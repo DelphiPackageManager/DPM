@@ -69,7 +69,7 @@ begin
   result := nil;
   if not FileExists(fileName) then
   begin
-    Logger.Error('BOM File [' + fileName + '] does not exist');
+    logger.Error('BOM File [' + fileName + '] does not exist');
     exit;
   end;
   try
@@ -99,7 +99,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error parsing BOM json : ' + e.Message);
+      logger.Error('Error parsing BOM json : ' + e.Message);
       result := nil;
     end;
   end;
@@ -137,7 +137,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error parsing BOM json : ' + e.Message);
+      logger.Error('Error parsing BOM json : ' + e.Message);
       result := false;
     end;
   end;

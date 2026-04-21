@@ -55,6 +55,7 @@ type
     FCurrentTokens : TStringList;
 
     FVariables : IVariables;
+    FTokenRegEx : TRegEx;
 
   protected
 
@@ -105,6 +106,7 @@ begin
   FArchiveWriter := archiveWriter;
   FSpecReader := specReader;
   FCurrentTokens := nil;
+  FTokenRegEx := TRegEx.Create('\$(\w+)\$');
 end;
 
 
@@ -181,7 +183,7 @@ var
 begin
   result := true;
   FVariables := TCollections.CreateDictionary<string,string>;
-  regEx := TRegEx.Create('\$(\w+)\$');
+  regEx := FTokenRegEx;
   evaluator := TokenMatchEvaluator; //work around for compiler overload resolution issue.
   try
     try
@@ -344,7 +346,7 @@ begin
       FVariables[LowerCase(externalProps.Names[i])] := externalProps.ValueFromIndex[i];
   end;
 
-  regEx := TRegEx.Create('\$(\w+)\$');
+  regEx := FTokenRegEx;
   evaluator := TokenMatchEvaluator;
 
   replacedVariables := TCollections.CreateDictionary<string, string>;

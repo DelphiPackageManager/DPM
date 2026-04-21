@@ -134,12 +134,12 @@ var
   offset, width, len : Integer;
   slLines : TStringList;
 begin
-  Result := TStringList.Create;
+  result := TStringList.Create;
 
   //If we are blank string, add on line entry and leave.
   if s = '' then
   begin
-    Result.Add('');
+    result.Add('');
     Exit;
   end;
 
@@ -160,13 +160,13 @@ begin
         while offset <= len do
         begin
           //Write a line as we have hit the limit of the console.
-          Result.Add(Copy(line, offset, width));
+          result.Add(Copy(line, offset, width));
           Inc(offset, width);
         end;
       end
       else
         //Can write out on a single line
-        Result.Add(line);
+        result.Add(line);
     end;
   finally
     slLines.Free;

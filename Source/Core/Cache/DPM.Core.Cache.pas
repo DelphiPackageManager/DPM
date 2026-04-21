@@ -141,7 +141,7 @@ begin
   manifest := FManifestReader.ReadSpec(metaDataFile);
   if manifest = nil then
     exit;
-  Result := TPackageInfo.CreateFromManifest('', manifest, '', '');
+  result := TPackageInfo.CreateFromManifest('', manifest, '', '');
 end;
 
 function TPackageCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
@@ -151,7 +151,7 @@ begin
   manifest := GetPackageManifest(packageId);
   if manifest = nil then
     exit;
-  Result := TPackageMetadata.CreateFromManifest('', manifest);
+  result := TPackageMetadata.CreateFromManifest('', manifest);
 end;
 
 function TPackageCache.GetPackagePath(const id: string; const version: string; const compilerVersion : TCompilerVersion): string;
@@ -228,8 +228,9 @@ begin
   begin
     packagesFolder := GetPackagesFolder;
     //if a stray .dpkg is sitting in the cache root, try to install it again.
-    //The on-disk filename has 4 segments: {Id}-{Compiler}-{BinPlatforms}-{Version}.dpkg.
-    //packageId.ToString produces only 3 segments, so we glob for the actual file.
+    //On-disk filename: {Id}-{Compiler}-{BinPlatforms}-{Version}.dpkg, where BinPlatforms encodes
+    //the set of platforms the package was packed for (one .dpkg per compiler per platform-set).
+    //packageId identifies a specific Id/Compiler/Version, so we wildcard the platforms segment.
     searchPattern := packageId.Id + '-' + CompilerToString(packageId.CompilerVersion) + '-*-' + packageId.Version.ToStringNoMeta + cPackageFileExt;
     if DirectoryExists(packagesFolder) then
     begin

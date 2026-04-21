@@ -30,14 +30,21 @@ interface
 
 uses
   VSoft.CancellationToken,
+  DPM.Core.Configuration.Interfaces,
+  DPM.Core.Logging,
+  DPM.Console.Writer,
   DPM.Console.ExitCodes,
   DPM.Console.Command,
   DPM.Console.Command.Base;
 
 type
   TWhyCommand = class(TBaseCommand)
+  private
+    FConsole : IConsoleWriter;
   protected
     function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
+  public
+    constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const console : IConsoleWriter); reintroduce;
   end;
 
 
@@ -45,10 +52,11 @@ implementation
 
 uses
   System.SysUtils,
+  System.IOUtils,
+  System.Types,
   System.Generics.Collections,
   Spring.Collections,
   DPM.Core.Types,
-  DPM.Core.Configuration.Interfaces,
   DPM.Core.Dependency.Interfaces,
   DPM.Core.Project.Interfaces,
   DPM.Core.Project.Editor,
@@ -99,10 +107,17 @@ end;
 
 { TWhyCommand }
 
+constructor TWhyCommand.Create(const logger : ILogger; const configurationManager : IConfigurationManager; const console : IConsoleWriter);
+begin
+  inherited Create(logger, configurationManager);
+  FConsole := console;
+end;
+
 function TWhyCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 var
   packageId : string;
   projectPath : string;
+  projectFiles : TStringDynArray;
   config : IConfiguration;
   projectEditor : IProjectEditor;
   graph : IPackageReference;
@@ -118,6 +133,7 @@ var
   var
     k : integer;
     isLast : boolean;
+    isMatch : boolean;
     branch : string;
     childPrefix : string;
     child : TWhyNode;
@@ -136,7 +152,13 @@ var
         branch := '├─ ';
         childPrefix := prefix + '│  ';
       end;
-      Logger.Information(prefix + branch + child.Id + ' (v' + child.Version + ')');
+      isMatch := SameText(child.Id, packageId);
+      FConsole.Write(prefix + branch, ccGrey);
+      if isMatch then
+        FConsole.Write(child.Id, ccBrightAqua)
+      else
+        FConsole.Write(child.Id, ccWhite);
+      FConsole.WriteLine(' (v' + child.Version + ')', ccDarkAqua);
       RenderChildren(child, childPrefix);
     end;
   end;
@@ -150,9 +172,20 @@ begin
 
   if DirectoryExists(projectPath) then
   begin
-    Logger.Error('Project path is a directory; specify a .dproj file.');
-    result := TExitCode.InvalidArguments;
-    exit;
+    projectFiles := TDirectory.GetFiles(projectPath, '*.dproj');
+    if Length(projectFiles) = 0 then
+    begin
+      Logger.Error('No .dproj file found in directory [' + projectPath + ']');
+      result := TExitCode.InvalidArguments;
+      exit;
+    end;
+    if Length(projectFiles) > 1 then
+    begin
+      Logger.Error('Multiple .dproj files found in directory [' + projectPath + '] - specify a single .dproj file.');
+      result := TExitCode.InvalidArguments;
+      exit;
+    end;
+    projectPath := projectFiles[0];
   end;
 
   TWhyOptions.Default.ProjectPath := projectPath;
@@ -216,12 +249,14 @@ begin
         current := current.FindOrAddChild(chain[j].Id, chain[j].Version.ToStringNoMeta);
     end;
 
-    Logger.Information('');
-    Logger.Information('The following dependency graph references ''' + packageId + ''':');
-    Logger.Information('');
-    Logger.Information('[' + root.Id + ']');
+    FConsole.WriteLine;
+    FConsole.Write('The following dependency graph references ''', ccWhite);
+    FConsole.Write(packageId, ccBrightAqua);
+    FConsole.WriteLine(''':', ccWhite);
+    FConsole.WriteLine;
+    FConsole.WriteLine('[' + root.Id + ']', ccBrightWhite);
     RenderChildren(root, '  ');
-    Logger.Information('');
+    FConsole.WriteLine;
   finally
     root.Free;
   end;

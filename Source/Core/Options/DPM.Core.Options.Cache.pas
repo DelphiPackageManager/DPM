@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -112,19 +112,19 @@ begin
 
   if TCacheOptions.Default.PackageId = '' then
   begin
-    Logger.Error('The <packageId> option must be specified.');
+    logger.Error('The <packageId> option must be specified.');
     result := false;
   end;
 
   if ConfigFile = '' then
   begin
-    Logger.Error('No configuration file specified');
+    logger.Error('No configuration file specified');
     exit;
   end;
 
   if not TRegEx.IsMatch(PackageId, cPackageIdRegex) then
   begin
-    Logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
+    logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
     result := false;
   end;
 
@@ -132,14 +132,14 @@ begin
   begin
     if not TPackageVersion.TryParseWithError(VersionString, FVersion, error) then
     begin
-      Logger.Error('The specified package Version  [' + VersionString + '] is not a valid version - ' + error);
+      logger.Error('The specified package Version  [' + VersionString + '] is not a valid version - ' + error);
       result := false;
     end;
   end;
 
   if TCacheOptions.Default.CompilerVersion = TCompilerVersion.UnknownVersion then
   begin
-    Logger.Error('Compiler option is required');
+    logger.Error('Compiler option is required');
     result := false;
   end;
 

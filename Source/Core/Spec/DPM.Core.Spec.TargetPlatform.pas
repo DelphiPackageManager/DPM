@@ -81,7 +81,6 @@ type
 
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
-    function CloneForCompilerVersion(const compilerVersion : TCompilerVersion) : ISpecTargetPlatform;
     procedure ToYAML(const parent : IYAMLValue; const packageKind : TDPMPackageKind);override;
 
     function Clone : ISpecTargetPlatform;
@@ -120,12 +119,6 @@ function TSpecTargetPlatform.Clone: ISpecTargetPlatform;
 begin
   result := TSpecTargetPlatform.CreateClone(logger, self);
 end;
-
-function TSpecTargetPlatform.CloneForCompilerVersion(const compilerVersion : TCompilerVersion) : ISpecTargetPlatform;
-begin
-  raise ENotImplemented.Create('Error Message');
-end;
-
 
 constructor TSpecTargetPlatform.Create(const logger : ILogger);
 begin

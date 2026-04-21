@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -125,7 +125,7 @@ begin
 
   if ConfigFile = '' then
   begin
-    Logger.Error('No configuration file specified');
+    logger.Error('No configuration file specified');
     exit;
   end;
 
@@ -136,12 +136,12 @@ begin
   begin
     if TRegEx.IsMatch(PackageId, cPackageIdRegex) then
     begin
-      //      Logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
+      //      logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
       FPackageFile := ''
     end
     else if not FileExists(FPackageFile) then
     begin
-      Logger.Error('The specified packageFile [' + FPackageFile + '] does not exist.');
+      logger.Error('The specified packageFile [' + FPackageFile + '] does not exist.');
       result := false;
     end
     else
@@ -149,7 +149,7 @@ begin
       packageString := ChangeFileExt(ExtractFileName(FPackageFile), '');
       if not TRegEx.IsMatch(packageString, cPackageFileRegex) then
       begin
-        Logger.Error('The specified packageFile name [' + packageString + '] is not in the correct format.');
+        logger.Error('The specified packageFile name [' + packageString + '] is not in the correct format.');
         result := false;
       end;
       PackageId := '';
@@ -160,7 +160,7 @@ begin
   begin
     if not TPackageVersion.TryParseWithError(VersionString, theVersion, error) then
     begin
-      Logger.Error('The specified package Version  [' + VersionString + '] is not a valid version - ' + error);
+      logger.Error('The specified package Version  [' + VersionString + '] is not a valid version - ' + error);
       result := false;
     end;
     Self.Version := theVersion;
@@ -168,7 +168,7 @@ begin
 
   if (FProjectPath = '') and (Length(FProjects) = 0) then
   begin
-    Logger.Error('Project path cannot be empty, must either be a directory or project file.');
+    logger.Error('Project path cannot be empty, must either be a directory or project file.');
     result := false;
   end;
 

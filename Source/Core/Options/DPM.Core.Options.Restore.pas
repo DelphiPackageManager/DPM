@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -86,7 +86,7 @@ begin
 
   if FProjectPath = '' then
   begin
-    Logger.Error('Project path cannot be empty, must either be a directory or project file.');
+    logger.Error('Project path cannot be empty, must either be a directory or project file.');
     result := false;
   end;
 

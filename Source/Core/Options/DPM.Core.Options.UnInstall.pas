@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -98,19 +98,19 @@ begin
 
   if (FProjectPath = '') and (Length(FProjects) = 0) then
   begin
-    Logger.Error('Project path cannot be empty, must either be a directory or project file.');
+    logger.Error('Project path cannot be empty, must either be a directory or project file.');
     result := false;
   end;
 
   if PackageId = '' then
   begin
-    Logger.Error('The <packageId> option must be specified.');
+    logger.Error('The <packageId> option must be specified.');
     result := false;
   end;
 
   if ConfigFile = '' then
   begin
-    Logger.Error('No configuration file specified');
+    logger.Error('No configuration file specified');
     exit;
   end;
 

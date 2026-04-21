@@ -197,25 +197,25 @@ end;
 
 function TWindowsConsole.GetForegroundColourCode(const cc : TConsoleColor) : Word;
 begin
-  Result := 0;
+  result := 0;
   case cc of
-    ccDefault       : Result := FDefaultForeground;
-    ccBrightRed     : Result := FOREGROUND_RED or FOREGROUND_INTENSITY;
-    ccDarkRed       : Result := FOREGROUND_RED;
-    ccBrightBlue    : Result := FOREGROUND_BLUE or FOREGROUND_INTENSITY;
-    ccDarkBlue      : Result := FOREGROUND_BLUE;
-    ccBrightGreen   : Result := FOREGROUND_GREEN or FOREGROUND_INTENSITY;
-    ccDarkGreen     : Result := FOREGROUND_GREEN;
-    ccBrightYellow  : Result := FOREGROUND_GREEN or FOREGROUND_RED or FOREGROUND_INTENSITY;
-    ccDarkYellow    : Result := FOREGROUND_GREEN or FOREGROUND_RED;
-    ccBrightAqua    : Result := FOREGROUND_GREEN or FOREGROUND_BLUE or FOREGROUND_INTENSITY;
-    ccDarkAqua      : Result := FOREGROUND_GREEN or FOREGROUND_BLUE;
-    ccBrightPurple  : Result := FOREGROUND_BLUE or FOREGROUND_RED or FOREGROUND_INTENSITY;
-    ccDarkPurple    : Result := FOREGROUND_BLUE or FOREGROUND_RED;
-    ccGrey          : Result := FOREGROUND_INTENSITY;
-    ccBlack         : Result := 0;
-    ccBrightWhite   : Result := FOREGROUND_BLUE or FOREGROUND_GREEN or FOREGROUND_RED or FOREGROUND_INTENSITY;
-    ccWhite         : Result := FOREGROUND_BLUE or FOREGROUND_GREEN or FOREGROUND_RED;
+    ccDefault       : result := FDefaultForeground;
+    ccBrightRed     : result := FOREGROUND_RED or FOREGROUND_INTENSITY;
+    ccDarkRed       : result := FOREGROUND_RED;
+    ccBrightBlue    : result := FOREGROUND_BLUE or FOREGROUND_INTENSITY;
+    ccDarkBlue      : result := FOREGROUND_BLUE;
+    ccBrightGreen   : result := FOREGROUND_GREEN or FOREGROUND_INTENSITY;
+    ccDarkGreen     : result := FOREGROUND_GREEN;
+    ccBrightYellow  : result := FOREGROUND_GREEN or FOREGROUND_RED or FOREGROUND_INTENSITY;
+    ccDarkYellow    : result := FOREGROUND_GREEN or FOREGROUND_RED;
+    ccBrightAqua    : result := FOREGROUND_GREEN or FOREGROUND_BLUE or FOREGROUND_INTENSITY;
+    ccDarkAqua      : result := FOREGROUND_GREEN or FOREGROUND_BLUE;
+    ccBrightPurple  : result := FOREGROUND_BLUE or FOREGROUND_RED or FOREGROUND_INTENSITY;
+    ccDarkPurple    : result := FOREGROUND_BLUE or FOREGROUND_RED;
+    ccGrey          : result := FOREGROUND_INTENSITY;
+    ccBlack         : result := 0;
+    ccBrightWhite   : result := FOREGROUND_BLUE or FOREGROUND_GREEN or FOREGROUND_RED or FOREGROUND_INTENSITY;
+    ccWhite         : result := FOREGROUND_BLUE or FOREGROUND_GREEN or FOREGROUND_RED;
   end;
 end;
 
@@ -258,25 +258,25 @@ end;
 
 function TWindowsConsole.GetBackgroundColourCode(const cc : TConsoleColor) : Word;
 begin
-  Result := 0;
+  result := 0;
   case cc of
-    ccDefault       : Result := FDefaultBackground;
-    ccBrightRed     : Result := BACKGROUND_RED or BACKGROUND_INTENSITY;
-    ccDarkRed       : Result := BACKGROUND_RED;
-    ccBrightBlue    : Result := BACKGROUND_BLUE or BACKGROUND_INTENSITY;
-    ccDarkBlue      : Result := BACKGROUND_BLUE;
-    ccBrightGreen   : Result := BACKGROUND_GREEN or BACKGROUND_INTENSITY;
-    ccDarkGreen     : Result := BACKGROUND_GREEN;
-    ccBrightYellow  : Result := BACKGROUND_GREEN or BACKGROUND_RED or BACKGROUND_INTENSITY;
-    ccDarkYellow    : Result := BACKGROUND_GREEN or BACKGROUND_RED;
-    ccBrightAqua    : Result := BACKGROUND_GREEN or BACKGROUND_BLUE or BACKGROUND_INTENSITY;
-    ccDarkAqua      : Result := BACKGROUND_GREEN or BACKGROUND_BLUE;
-    ccBrightPurple  : Result := BACKGROUND_BLUE or BACKGROUND_RED or BACKGROUND_INTENSITY;
-    ccDarkPurple    : Result := BACKGROUND_BLUE or BACKGROUND_RED;
-    ccGrey          : Result := BACKGROUND_INTENSITY;
-    ccBlack         : Result := 0;
-    ccBrightWhite   : Result := BACKGROUND_BLUE or BACKGROUND_GREEN or BACKGROUND_RED or BACKGROUND_INTENSITY;
-    ccWhite         : Result := BACKGROUND_BLUE or BACKGROUND_GREEN or BACKGROUND_RED;
+    ccDefault       : result := FDefaultBackground;
+    ccBrightRed     : result := BACKGROUND_RED or BACKGROUND_INTENSITY;
+    ccDarkRed       : result := BACKGROUND_RED;
+    ccBrightBlue    : result := BACKGROUND_BLUE or BACKGROUND_INTENSITY;
+    ccDarkBlue      : result := BACKGROUND_BLUE;
+    ccBrightGreen   : result := BACKGROUND_GREEN or BACKGROUND_INTENSITY;
+    ccDarkGreen     : result := BACKGROUND_GREEN;
+    ccBrightYellow  : result := BACKGROUND_GREEN or BACKGROUND_RED or BACKGROUND_INTENSITY;
+    ccDarkYellow    : result := BACKGROUND_GREEN or BACKGROUND_RED;
+    ccBrightAqua    : result := BACKGROUND_GREEN or BACKGROUND_BLUE or BACKGROUND_INTENSITY;
+    ccDarkAqua      : result := BACKGROUND_GREEN or BACKGROUND_BLUE;
+    ccBrightPurple  : result := BACKGROUND_BLUE or BACKGROUND_RED or BACKGROUND_INTENSITY;
+    ccDarkPurple    : result := BACKGROUND_BLUE or BACKGROUND_RED;
+    ccGrey          : result := BACKGROUND_INTENSITY;
+    ccBlack         : result := 0;
+    ccBrightWhite   : result := BACKGROUND_BLUE or BACKGROUND_GREEN or BACKGROUND_RED or BACKGROUND_INTENSITY;
+    ccWhite         : result := BACKGROUND_BLUE or BACKGROUND_GREEN or BACKGROUND_RED;
   end;
 end;
 
@@ -284,9 +284,9 @@ function TWindowsConsole.GetConsoleWidth: Integer;
 var
   info : CONSOLE_SCREEN_BUFFER_INFO;
 begin
-  Result := High(Integer); // Default is unlimited width
+  result := High(Integer); // Default is unlimited width
   if GetConsoleScreenBufferInfo(FStdOut, info) then
-    Result := info.dwSize.X;
+    result := info.dwSize.X;
 end;
 
 function TWindowsConsole.GetCurrentBackgroundColor: TConsoleColor;

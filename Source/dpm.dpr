@@ -100,6 +100,7 @@ uses
   DPM.Core.Options.Sources in 'Core\Options\DPM.Core.Options.Sources.pas',
   DPM.Core.Options.Spec in 'Core\Options\DPM.Core.Options.Spec.pas',
   DPM.Core.Options.UnInstall in 'Core\Options\DPM.Core.Options.UnInstall.pas',
+  DPM.Core.Options.Why in 'Core\Options\DPM.Core.Options.Why.pas',
   DPM.Core.Package.Dependency in 'Core\Package\DPM.Core.Package.Dependency.pas',
   DPM.Core.Package.Installer in 'Core\Package\DPM.Core.Package.Installer.pas',
   DPM.Core.Package.InstallerContext in 'Core\Package\DPM.Core.Package.InstallerContext.pas',

@@ -324,8 +324,8 @@ begin
     TDPMPlatform.MacOS64: result := 'macOS 64-bit';
     TDPMPlatform.MacOSARM64: result := 'macOS ARM 64-bit';
 
-    TDPMPlatform.Android: result := 'Andriod 32-bit ARM';
-    TDPMPlatform.Android64: result := 'Andriod 64-bit ARM';
+    TDPMPlatform.Android: result := 'Android 32-bit ARM';
+    TDPMPlatform.Android64: result := 'Android 64-bit ARM';
     TDPMPlatform.iOS32: result := 'iOS 32-bit';
     TDPMPlatform.iOS64: result := 'iOS 64-bit';
     TDPMPlatform.iOSSimulator : result := 'iOS Simulator';
@@ -362,11 +362,22 @@ end;
 
 function DPMPlatformBitness(const value : TDPMPlatform) : string;
 begin
-  Result := '';
-  if Pos('32', DPMPlatformToDisplayString(value)) > 0 then
-    Result := '32'
-  else if Pos('64', DPMPlatformToDisplayString(value)) > 0 then
-    Result := '64';
+  case value of
+    TDPMPlatform.Win32,
+    TDPMPlatform.MacOS32,
+    TDPMPlatform.Android,
+    TDPMPlatform.iOS32         : result := '32';
+    TDPMPlatform.Win64,
+    TDPMPlatform.WinARM64EC,
+    TDPMPlatform.MacOS64,
+    TDPMPlatform.MacOSARM64,
+    TDPMPlatform.Android64,
+    TDPMPlatform.iOS64,
+    TDPMPlatform.iOSSimARM64,
+    TDPMPlatform.Linux64       : result := '64';
+  else
+    result := '';
+  end;
 end;
 
 
