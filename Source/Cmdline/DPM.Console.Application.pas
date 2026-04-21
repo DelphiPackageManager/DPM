@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -94,7 +94,7 @@ class procedure TDPMConsoleApplication.CtrlBreakPressed;
 begin
   if FLogger <> nil then
     FLogger.Information('Ctrl-Break detected.');
-  if FLogger <> nil then
+  if FCancellationTokenSource <> nil then
     FCancellationTokenSource.Cancel;
 end;
 
@@ -117,7 +117,7 @@ begin
   except
     on e : Exception do
     begin
-      //we don't jhave a logger or console here so using system.writeln is ok.
+      //we don't have a logger or console here so using system.writeln is ok.
       System.Writeln('Exception while initializing : ' + e.Message);
       result := TExitCode.InitException;
     end;
@@ -127,12 +127,11 @@ end;
 class function TDPMConsoleApplication.Run: TExitCode;
 var
   console : IConsoleWriter;
-  parseresult :  ICommandLineParseResult;
+  parseResult : ICommandLineParseResult;
   commandHandler : ICommandHandler;
   commandFactory : ICommandFactory;
-  bError : boolean;
+  error : boolean;
   command : TDPMCommand;
-
 begin
   FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
 
@@ -141,70 +140,76 @@ begin
   result := InitContainer; //Init our DI container
   if result <> TExitCode.OK then
     exit;
-  console := FContainer.Resolve<IConsoleWriter>();
-  Assert(console <> nil);
-  FLogger := FContainer.Resolve<ILogger>;
-  bError := false;
+  try
+    console := FContainer.Resolve<IConsoleWriter>();
+    Assert(console <> nil);
+    FLogger := FContainer.Resolve<ILogger>;
+    error := false;
 
-  parseresult := TOptionsRegistry.Parse;
+    parseResult := TOptionsRegistry.Parse;
 
-  if parseresult.HasErrors then
-  begin
-    ShowBanner(console);
-    TCommonOptions.Default.NoBanner := true;  //make sure it doesn't show again.
-    console.WriteLine(parseresult.ErrorText,ccBrightRed);
-    bError := true;
-    TCommonOptions.Default.Help := true; //if it's a valid command but invalid options this will give us command help.
-  end;
-
-  FLogger.Verbosity := TCommonOptions.Default.Verbosity;
-
-  command := GetCommandFromString(parseresult.Command);
-
-  if command = TDPMCommand.Invalid then
-  begin
-    ShowBanner(console);
-    console.WriteLine('Invalid command : [' + parseResult.Command + ']',ccBrightRed );
-    exit(TExitCode.InvalidCommand);
-  end;
-
-  if command = TDPMCommand.None then
-    command := TDPMCommand.Help;
-
-
-  if command <> TDPMCommand.Help then
-  begin
-    if TCommonOptions.Default.Help then
+    if parseResult.HasErrors then
     begin
-      THelpOptions.HelpCommand := command;
-      command := TDPMCommand.Help;
+      ShowBanner(console);
+      TCommonOptions.Default.NoBanner := true;  //make sure it doesn't show again.
+      console.WriteLine(parseResult.ErrorText, ccBrightRed);
+      error := true;
+      TCommonOptions.Default.Help := true; //if it's a valid command but invalid options this will give us command help.
     end;
+
+    FLogger.Verbosity := TCommonOptions.Default.Verbosity;
+
+    command := GetCommandFromString(parseResult.Command);
+
+    if command = TDPMCommand.Invalid then
+    begin
+      ShowBanner(console);
+      console.WriteLine('Invalid command : [' + parseResult.Command + ']', ccBrightRed);
+      exit(TExitCode.InvalidCommand);
+    end;
+
+    if command = TDPMCommand.None then
+      command := TDPMCommand.Help;
+
+    if command <> TDPMCommand.Help then
+    begin
+      if TCommonOptions.Default.Help then
+      begin
+        THelpOptions.HelpCommand := command;
+        command := TDPMCommand.Help;
+      end;
+    end;
+
+    commandFactory := FContainer.Resolve<ICommandFactory>;
+    Assert(commandFactory <> nil, 'CommandFactory did not resolve!');
+    commandHandler := commandFactory.CreateCommand(command);
+    if commandHandler = nil then
+    begin
+      console.WriteLine('No command handler registered for command : [' + CommandString[command] + ']', ccBrightRed);
+      exit(TExitCode.NoCommandHandler);
+    end;
+
+    if (not TCommonOptions.Default.NoBanner) and (not commandHandler.ForceNoBanner) then
+      ShowBanner(console);
+
+    result := commandHandler.ExecuteCommand(FCancellationTokenSource.Token);
+    if error then //an error occured earlier so ignore command result.
+      result := TExitCode.InvalidArguments;
+  finally
+    commandHandler := nil;
+    commandFactory := nil;
+    console := nil;
+    FLogger := nil;
+    FreeAndNil(FContainer);
   end;
-
-
-  commandFactory := FContainer.Resolve<ICommandFactory>;
-  Assert(commandFactory <> nil, 'CommandFactory did not resolve!');
-  commandHandler := commandFactory.CreateCommand(command);
-  if commandHandler = nil then
-  begin
-    console.WriteLine('No command handler registered for command : [' + CommandString[command] + ']',ccBrightRed );
-    exit(TExitCode.NoCommandHandler);
-  end;
-
-  if (not TCommonOptions.Default.NoBanner) and (not commandHandler.ForceNoBanner) then
-    ShowBanner(console);
-
-  result := commandHandler.ExecuteCommand(FCancellationTokenSource.Token);
-  if bError then //an error occured earlier so ignore command result.
-    result := TExitCode.InvalidArguments;
-  FreeAndNil(FContainer);
 end;
 
 class procedure TDPMConsoleApplication.ShutdownEvent;
 begin
-  FLogger.Information('Shutdown detected.');
-  FCancellationTokenSource.Cancel;
-
+  if FLogger <> nil then
+    FLogger.Information('Shutdown detected.');
+  if FCancellationTokenSource <> nil then
+    FCancellationTokenSource.Cancel;
 end;
 
 end.

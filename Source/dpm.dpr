@@ -164,8 +164,6 @@ uses
   DPM.Core.Spec.Template in 'Core\Spec\DPM.Core.Spec.Template.pas',
   DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas';
 
-//var
-//  stacktrace : string;
 {$IFDEF JCLDEBUG}
 procedure LogException(ExceptObj: TObject; ExceptAddr: Pointer; OSException: Boolean);
 var
@@ -178,30 +176,31 @@ end;
 {$ENDIF}
 
 begin
-  //MESettings.BugReportFile := 'C:\Users\vincent.OFFICE\Documents\bugreport.txt';
   CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml
   try
+    try
 {$IFDEF JCLDEBUG}
-    JCLdebug.JclStackTrackingOptions:=[stStack, stRawMode];
-    JclHookExcept.JclAddExceptNotifier(LogException);
-    JclDebug.JclStartExceptionTracking;
+      JCLdebug.JclStackTrackingOptions:=[stStack, stRawMode];
+      JclHookExcept.JclAddExceptNotifier(LogException);
+      JclDebug.JclStartExceptionTracking;
 {$ENDIF}
-    System.ExitCode := Ord(TDPMConsoleApplication.Run);
-    {$IFDEF DEBUG}
-      //if running under the debugger, pause so we can see the output!
-      {$WARN SYMBOL_PLATFORM OFF}
-      if DebugHook <> 0 then
+      System.ExitCode := Ord(TDPMConsoleApplication.Run);
+      {$IFDEF DEBUG}
+        //if running under the debugger, pause so we can see the output!
+        {$WARN SYMBOL_PLATFORM OFF}
+        if DebugHook <> 0 then
+          ReadLn;
+      {$ENDIF};
+    except
+      on E: Exception do
+      begin
+        System.ExitCode := Ord(TExitCode.UnhandledException);
+      {$IFDEF DEBUG}
         ReadLn;
-    {$ENDIF};
-  except
-    on E: Exception do
-    begin
-//      stackTrace := TSystemUtils.GetStackTrace(e, ExceptAddr);
-//      Write(stackTrace);
-      System.ExitCode := Ord(TExitCode.UnhandledException);
-    {$IFDEF DEBUG}
-      ReadLn;
-    {$ENDIF};
+      {$ENDIF};
+      end;
     end;
+  finally
+    CoUninitialize;
   end;
 end.

@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -56,20 +56,6 @@ type
     procedure WriteLine;overload;
     procedure Write(const s : string);overload;
     procedure Write(const s : string; const foregroundColor : TConsoleColor);overload;
-    //this stuff belongs at a logger level
-//    procedure Write(const formatString : string; const args : array of const);overload;
-
-//    procedure WriteError(const s : string);overload;
-//    procedure WriteError(const formatString : string; const args : array of const);overload;
-//
-//    procedure WriteWarning(const s : string);overload;
-//    procedure WriteWarning(const prependWarningString :boolean; const s : string);overload;
-//    procedure WriteWarning(const formatString : string; const args : array of const);overload;
-//    procedure WriteWarning(const prependWarningString :boolean; const formatString : string; const args : array of const);overload;
-//    function  Confirm(const description : string) : boolean;
-
-//TODO : Implement this.
-//    function ReadLine : string;
 
     procedure Indent(const value : integer = 1);
     procedure Outdent(const value : integer = 1);
@@ -214,23 +200,21 @@ end;
 
 procedure TConsoleBase.Write(const s: string);
 var
-  // offset, width, len : Integer;
   slLines : TStringList;
-  iLineIndx : integer;
+  lineIndex : integer;
 begin
   slLines := InternalBreakupMessage(s);
   try
     //Write out all the lines execept the last one.
-    for iLineIndx  := 0 to slLines.Count - 2 do
-      InternalWriteLn(slLines[iLineIndx]);
+    for lineIndex := 0 to slLines.Count - 2 do
+      InternalWriteLn(slLines[lineIndex]);
 
     //Now write out the last one without an end of line character.
     if slLines.Count > 0 then
-      InternalWriteLn(slLines[slLines.Count - 1]);
+      InternalWrite(slLines[slLines.Count - 1]);
   finally
     slLines.Free;
   end;
-
 end;
 
 procedure TConsoleBase.Write(const s: string; const foregroundColor: TConsoleColor);
@@ -255,15 +239,13 @@ end;
 
 procedure TConsoleBase.WriteLine(const s: String);
 var
-  // offset, width, len : Integer;
   slLines : TStringList;
-  iLineIndx : integer;
+  lineIndex : integer;
 begin
   slLines := InternalBreakupMessage(s);
   try
-    //Write out all the lines execept the last one.
-    for iLineIndx  := 0 to slLines.Count - 1 do
-      InternalWriteLn(slLines[iLineIndx]);
+    for lineIndex := 0 to slLines.Count - 1 do
+      InternalWriteLn(slLines[lineIndex]);
   finally
     slLines.Free;
   end;

@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -59,11 +59,8 @@ function TCommandFactory.CreateCommand(const command: TDPMCommand): ICommandHand
 var
   commandName : string;
 begin
-  result := nil;
   commandName := 'command.' + LowerCase(CommandString[command]);
-
   result := FContainer.Resolve<ICommandHandler>(commandName);
-
 end;
 
 end.

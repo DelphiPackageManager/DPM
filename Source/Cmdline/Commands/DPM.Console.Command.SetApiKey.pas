@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -35,17 +35,12 @@ uses
 
 type
   TSetApiKeyCommand = class(TBaseCommand)
-
-
   protected
     function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
   end;
 
 
 implementation
-
-{ TSetApiKeyCommand }
-
 
 { TSetApiKeyCommand }
 

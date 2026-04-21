@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -38,8 +38,6 @@ uses
 
 type
   TConfigCommand = class(TBaseCommand)
-  private
-
   protected
     function Execute(const cancellationToken : ICancellationToken): TExitCode; override;
   public
@@ -51,13 +49,9 @@ implementation
 
 { TConfigCommand }
 
-
-{ TConfigCommand }
-
 constructor TConfigCommand.Create(const logger: ILogger; const configurationManager : IConfigurationManager);
 begin
   inherited Create(logger, configurationManager);
-
 end;
 
 function TConfigCommand.Execute(const cancellationToken : ICancellationToken): TExitCode;

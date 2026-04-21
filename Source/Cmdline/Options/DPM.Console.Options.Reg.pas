@@ -3,7 +3,6 @@
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
 {           Copyright � 2019 Vincent Parrett and contributors               }
-{           Copyright � 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -105,18 +104,15 @@ begin
         TCacheOptions.Default.Sources := TCacheOptions.Default.Sources +',' + value;
     end);
   option.AllowMultiple := true;
-  end;
+end;
 
 
 procedure RegisterDeleteCommand;
 var
-//  option : IOptionDefinition;
   cmd : TCommandDefinition;
 begin
   cmd := TOptionsRegistry.RegisterCommand('delete', '', 'Deletes a package from the server.','Specify the Id and version of the package to delete from the server.',
                                           'delete <package Id> <package version> [API Key] [options]');
-
-
 end;
 
 

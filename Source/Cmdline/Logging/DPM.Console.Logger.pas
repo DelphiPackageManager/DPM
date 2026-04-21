@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -74,7 +74,7 @@ begin
     exit;
 
   FConsole.SetColour(ccGrey);
-  FConsole.Write(data);
+  FConsole.WriteLine(data);
   FConsole.SetColour(ccDefault);
 end;
 
@@ -83,7 +83,7 @@ begin
   //always log errors
 
   FConsole.SetColour(ccBrightRed);
-  FConsole.Write(data);
+  FConsole.WriteLine(data);
   FConsole.SetColour(ccDefault);
 end;
 
@@ -101,7 +101,7 @@ begin
     FConsole.SetColour(ccBrightWhite)
   else
     FConsole.SetColour(ccWhite);
-  FConsole.Write(data);
+  FConsole.WriteLine(data);
   FConsole.SetColour(ccDefault);
 end;
 
@@ -124,7 +124,7 @@ begin
     FConsole.SetColour(ccBrightGreen)
   else
     FConsole.SetColour(ccDarkGreen);
-  FConsole.Write(data);
+  FConsole.WriteLine(data);
   FConsole.SetColour(ccDefault);
 end;
 
@@ -137,7 +137,7 @@ begin
     FConsole.SetColour(ccBrightWhite)
   else
     FConsole.SetColour(ccWhite);
-  FConsole.Write(data);
+  FConsole.WriteLine(data);
   FConsole.SetColour(ccDefault);
 end;
 
@@ -148,7 +148,7 @@ begin
     FConsole.SetColour(ccBrightYellow)
   else
     FConsole.SetColour(ccDarkYellow);
-  FConsole.Write(data);
+  FConsole.WriteLine(data);
   FConsole.SetColour(ccDefault);
 end;
 

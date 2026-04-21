@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -70,10 +70,10 @@ end;
 
 function TSourcesCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 var
-  bResult : boolean;
+  success : boolean;
   newConfig : IConfiguration;
   uri : IUri;
-  sUriError : string;
+  uriError : string;
 begin
   TSourcesOptions.Default.ApplyCommon(TCommonOptions.Default);
 
@@ -114,9 +114,9 @@ begin
         result := TExitCode.MissingArg;
         exit;
       end;
-      if not TUriFactory.TryParseWithError(TSourcesOptions.Default.Source, false, uri, sUriError) then
+      if not TUriFactory.TryParseWithError(TSourcesOptions.Default.Source, false, uri, uriError) then
       begin
-        Logger.Error('Source uri is not valid : ' + sUriError);
+        Logger.Error('Source uri is not valid : ' + uriError);
         result := TExitCode.InvalidArguments;
         exit;
       end;
@@ -133,24 +133,27 @@ begin
         if (uri.Scheme = 'http') or (uri.Scheme = 'https') then
           TSourcesOptions.Default.SourceType := TSourceType.DPMServer
         else
-          raise Exception.Create('Invalid source uri scheme' + uri.Scheme);
+        begin
+          Logger.Error('Invalid source uri scheme : ' + uri.Scheme);
+          result := TExitCode.InvalidArguments;
+          exit;
+        end;
       end;
 
-      bResult := FSourcesManager.AddSource(TSourcesOptions.Default);
+      success := FSourcesManager.AddSource(TSourcesOptions.Default);
     end;
-    TSourcesSubCommand.Remove : bResult := FSourcesManager.RemoveSource(TSourcesOptions.Default);
-    TSourcesSubCommand.List   : bResult := FSourcesManager.ListSources(TSourcesOptions.Default);
-    TSourcesSubCommand.Enable : bResult := FSourcesManager.EnableSource(TSourcesOptions.Default);
-    TSourcesSubCommand.Disable: bResult := FSourcesManager.DisableSource(TSourcesOptions.Default);
-    TSourcesSubCommand.Update : bResult := FSourcesManager.UpdateSource(TSourcesOptions.Default);
+    TSourcesSubCommand.Remove : success := FSourcesManager.RemoveSource(TSourcesOptions.Default);
+    TSourcesSubCommand.List   : success := FSourcesManager.ListSources(TSourcesOptions.Default);
+    TSourcesSubCommand.Enable : success := FSourcesManager.EnableSource(TSourcesOptions.Default);
+    TSourcesSubCommand.Disable: success := FSourcesManager.DisableSource(TSourcesOptions.Default);
+    TSourcesSubCommand.Update : success := FSourcesManager.UpdateSource(TSourcesOptions.Default);
   else
     result := TExitCode.NotImplemented;
     exit;
   end;
 
-  if not bResult then
+  if not success then
     result := TExitCode.Error;
-
 end;
 
 function TSourcesCommand.ForceNoBanner: Boolean;
