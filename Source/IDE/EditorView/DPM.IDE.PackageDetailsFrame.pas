@@ -893,6 +893,7 @@ end;
 procedure TPackageDetailsFrame.UpdateButtonState;
 var
   referenceVersion : TPackageVersion;
+  isTransitive : boolean;
 begin
   if FPackageMetaData = nil then
   begin
@@ -913,9 +914,18 @@ begin
   end;
 
   referenceVersion := GetReferenceVersion;
+  //Transitive packages are brought in by another package, so uninstalling would leave the parent
+  //broken and the transitive would be re-added on the next restore. Upgrades are still allowed -
+  //if the new version is outside the parent's allowed range the resolver will surface that.
+  isTransitive := FPackageMetaData.IsTransitive;
   btnInstallAll.Enabled := FPackageMetaData <> nil;
-  btnUpgradeAll.Enabled := (FPackageMetaData <> nil) and (FInstalledVersion <> TPackageVersion.Empty) and  (FSelectedVersion <> FInstalledVersion);
-  btnUninstallAll.Enabled := (FPackageMetaData <> nil) and (FInstalledVersion <> TPackageVersion.Empty);
+  btnUpgradeAll.Enabled := (FPackageMetaData <> nil) and (FInstalledVersion <> TPackageVersion.Empty) and (FSelectedVersion <> FInstalledVersion);
+  btnUninstallAll.Enabled := (FPackageMetaData <> nil) and (FInstalledVersion <> TPackageVersion.Empty) and (not isTransitive);
+
+  if isTransitive then
+    btnUninstallAll.Hint := 'Cannot uninstall - this package is a dependency of another installed package'
+  else
+    btnUninstallAll.Hint := 'Uninstall from all projects';
 
   {$IFNDEF USEIMAGECOLLECTION}
     if FSelectedVersion = FInstalledVersion then
