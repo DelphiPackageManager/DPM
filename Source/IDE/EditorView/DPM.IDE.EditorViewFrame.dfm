@@ -1,4 +1,4 @@
-object DPMEditViewFrame: TDPMEditViewFrame
+﻿object DPMEditViewFrame: TDPMEditViewFrame
   Left = 0
   Top = 0
   Width = 1010
@@ -75,11 +75,20 @@ object DPMEditViewFrame: TDPMEditViewFrame
           end
           inherited pnlPackageId: TPanel
             Width = 500
+            StyleElements = [seFont, seClient, seBorder]
+            inherited lblPackageId: TLabel
+              StyleElements = [seFont, seClient, seBorder]
+            end
           end
           inherited pnlGridHost: TPanel
             Width = 500
+            StyleElements = [seFont, seClient, seBorder]
             inherited pnlVersion: TPanel
               Width = 500
+              StyleElements = [seFont, seClient, seBorder]
+              inherited lblVersionTitle: TLabel
+                StyleElements = [seFont, seClient, seBorder]
+              end
               inherited btnInstallAll: TSpeedButton
                 Left = 395
               end
@@ -88,6 +97,9 @@ object DPMEditViewFrame: TDPMEditViewFrame
               end
               inherited btnUninstallAll: TSpeedButton
                 Left = 467
+              end
+              inherited cboVersions: TComboBox
+                StyleElements = [seFont, seClient, seBorder]
               end
             end
           end

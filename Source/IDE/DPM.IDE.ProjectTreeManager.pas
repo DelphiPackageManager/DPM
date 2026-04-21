@@ -621,15 +621,10 @@ var
     begin
       platformContainer.Children := TInterfaceList.Create;
 
-      //using for loop rather the enumerator for per reasons.
+      //package references are no longer tagged per-platform; every top-level ref
+      //applies to all platforms the project targets, so list them under each section.
       for packageRef in PackageReferences.Children do
-      begin
-        if packageRef.Platform <> pf then
-          continue;
-
         AddPackage(platformContainer, packageRef, platformContainer.Children);
-
-      end;
     end;
   end;
 
@@ -666,6 +661,9 @@ begin
 
   if projectEditor.LoadProject(projectFile) then
   begin
+    //a single graph now spans all platforms - fetch once, reuse per section.
+    platformPackageReferences := projectEditor.GetPackageReferences;
+
     platformSortedList := TStringList.Create;
     platformSortedList.Sorted := true;
     try
@@ -675,10 +673,8 @@ begin
       for i := 0 to  platformSortedList.Count -1 do
       begin
         pf := TDPMPlatform(Integer(platformSortedList.Objects[i]));
-        platformPackageReferences := projectEditor.GetPackageReferences(pf);
         if platformPackageReferences <> nil then
           AddPlatform(pf, platformPackageReferences);
-
       end;
     finally
       platformSortedList.Free;

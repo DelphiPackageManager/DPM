@@ -120,7 +120,6 @@ uses
   {$IFEND}
   Spring.Collections,
   VSoft.Uri,
-  DPM.Core.Types,
   DPM.Core.Utils.Strings;
 
 { TPackageDetailsPanel }
@@ -304,7 +303,7 @@ begin
   DrawText(Canvas.Handle, 'Version :', Length('Version :'), FLayout.VersionLabelRect, DT_LEFT);
 
   Canvas.Font.Style := [];
-  DrawText(Canvas.Handle, FPackage.Version.ToStringNoMeta, Length(FPackage.Version.ToStringNoMeta), FLayout.VersionRect, DT_LEFT + DT_WORDBREAK);
+  DrawText(Canvas.Handle, FPackage.Version.ToStringNoMeta, Length(FPackage.Version.ToStringNoMeta), FLayout.VersionRect, DT_LEFT + DT_SINGLELINE);
 
   if FPackage.IsError then
   begin
@@ -316,7 +315,7 @@ begin
   DrawText(Canvas.Handle, 'Authors :', Length('Authors :'), FLayout.AuthorsLabelRect, DT_LEFT);
 
   Canvas.Font.Style := [];
-  DrawText(Canvas.Handle, FPackage.Authors, Length(FPackage.Authors), FLayout.AuthorsRect, DT_LEFT + DT_WORDBREAK);
+  DrawText(Canvas.Handle, FPackage.Authors, Length(FPackage.Authors), FLayout.AuthorsRect, DT_LEFT + DT_SINGLELINE);
 
   if (deLicense in FOptionalElements) then
   begin
@@ -332,7 +331,7 @@ begin
 //    if FLicenseIsUri then
 //      DrawText(Canvas.Handle, 'View License', Length('View License'), FLayout.LicenseRect, DT_LEFT)
 //    else
-      DrawText(Canvas.Handle, FPackage.License, Length(FPackage.License), FLayout.LicenseRect, DT_LEFT + DT_WORDBREAK);
+      DrawText(Canvas.Handle, FPackage.License, Length(FPackage.License), FLayout.LicenseRect, DT_LEFT + DT_SINGLELINE);
 
   end;
 
@@ -343,7 +342,7 @@ begin
 
   Canvas.Font.Style := [];
 
-  DrawText(Canvas.Handle, FPackage.PublishedDate, Length(FPackage.PublishedDate), FLayout.PublishDateRect, DT_LEFT + DT_WORDBREAK);
+  DrawText(Canvas.Handle, FPackage.PublishedDate, Length(FPackage.PublishedDate), FLayout.PublishDateRect, DT_LEFT + DT_SINGLELINE);
 
   if (deProjectUrl in FOptionalElements) then
   begin
@@ -426,11 +425,6 @@ begin
 
     dependRect.Left := FLayout.DependRect.Left + textSize.cy;
     dependRect.Bottom := dependRect.Top + textSize.cy;
-    value := '- ' + DPMPlatformToString(FPackage.Platform);
-    DrawText(Canvas.Handle, value, Length(value), dependRect, DT_LEFT);
-
-    dependRect.Left := dependRect.Left + textSize.cy;
-    dependRect.Offset(0, textSize.cy * 2);
 
     for packageDep in FPackage.Dependencies do
     begin
@@ -562,7 +556,7 @@ begin
   DescriptionLabelRect.Height := textSize.cy;
 
   DescriptionRect := clientRect;
-  DescriptionRect.Top := DescriptionLabelRect.Bottom + textSize.cy;
+  DescriptionRect.Top := DescriptionLabelRect.Bottom + PaddingY;
   DescriptionRect.Bottom := DescriptionRect.Top + DescriptionHeight;
   DrawText(ACanvas.Handle, package.Description, Length(package.Description), DescriptionRect, DT_LEFT + DT_CALCRECT + DT_WORDBREAK);
 
@@ -576,7 +570,6 @@ begin
   VersionRect.Left := VersionLabelRect.Right + VersionPadding;
   VersionRect.Right := clientRect.Right;
   VersionRect.Height := textSize.cy;
-  DrawText(ACanvas.Handle, package.Version.ToStringNoMeta, Length(package.Version.ToStringNoMeta), VersionRect, DT_LEFT + DT_CALCRECT + DT_WORDBREAK);
 
   AuthorsLabelRect.Top := VersionRect.Bottom + LineSpacing;
   AuthorsLabelRect.Left := clientRect.Left;
@@ -587,7 +580,6 @@ begin
   AuthorsRect.Left := VersionRect.Left;
   AuthorsRect.Right := clientRect.Right;
   AuthorsRect.Height := textSize.cy;
-  DrawText(ACanvas.Handle, package.Authors, Length(package.Authors), AuthorsRect, DT_LEFT + DT_CALCRECT + DT_WORDBREAK);
 
   bottom := AuthorsRect.Bottom;
 
@@ -604,8 +596,6 @@ begin
     LicenseRect.Right := clientRect.Right;
     LicenseRect.Height := textSize.cy;
 
-    DrawText(ACanvas.Handle, package.License, Length(package.License), LicenseRect, DT_LEFT + DT_CALCRECT + DT_WORDBREAK);
-
     bottom := LicenseRect.Bottom;
   end;
 
@@ -614,7 +604,6 @@ begin
   PublishDateLabelRect.Left := clientRect.Left;
   PublishDateLabelRect.Width := textSize.cx;
   PublishDateLabelRect.Height := textSize.cy;
-
 
   PublishDateRect.Top := PublishDateLabelRect.Top;
   PublishDateRect.Left := VersionRect.Left;
@@ -755,7 +744,7 @@ begin
 
 
   //Change this as we add more fields
-  LayoutHeight := bottom - clientRect.Top + textSize.cy * 2;
+  LayoutHeight := bottom - clientRect.Top + PaddingY * 2;
 end;
 
 end.

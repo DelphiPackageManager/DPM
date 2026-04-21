@@ -835,8 +835,13 @@ begin
       end
       else
       begin
+        //each version's .dpkg can cover a different platform set, so track the
+        //platform string that belongs to the version we're going to load.
         if packageVersion > find.LatestVersion then
+        begin
           find.LatestVersion := packageVersion;
+          find.PlatformString := platformStr;
+        end;
 
         if packageVersion.IsStable then
           if packageVersion > find.LatestStableVersion then
@@ -848,7 +853,18 @@ begin
 
   readManifestFunc := function (const name : string; const manifest : IPackageSpec; const fileHash :string; const hashAlgorithm : string) : IInterface
                   begin
-                    result := TPackageMetadata.CreateFromManifest(name, manifest);
+                    result := nil;
+                    if (manifest = nil) or (manifest.TargetPlatform = nil) then
+                      exit;
+                    try
+                      result := TPackageMetadata.CreateFromManifest(name, manifest);
+                    except
+                      on e : Exception do
+                      begin
+                        Logger.Error('Error building metadata from manifest : ' + e.Message);
+                        result := nil;
+                      end;
+                    end;
                   end;
 
   //now we can use the info collected above to build actual results.
@@ -865,11 +881,19 @@ begin
     packageFileName := Format('%s-%s-%s-%s.dpkg', [find.Id, CompilerToString(options.CompilerVersion), find.PlatformString, find.LatestVersion.ToStringNoMeta]);
     packageFileName := IncludeTrailingPathDelimiter(SourceUri) + packageFileName;
     if not FileExists(packageFileName) then
-      exit;
+      continue;
 
     _fileHash := '';
     _hashAlgorithm := '';
-    packageMetadata := DoGetPackageMetaData(cancelToken, packageFileName, true, readManifestFunc) as IPackageMetadata;
+    try
+      packageMetadata := DoGetPackageMetaData(cancelToken, packageFileName, true, readManifestFunc) as IPackageMetadata;
+    except
+      on e : Exception do
+      begin
+        Logger.Error('Error reading package [' + packageFileName + '] : ' + e.Message);
+        packageMetadata := nil;
+      end;
+    end;
 
     if packageMetadata <> nil then
     begin

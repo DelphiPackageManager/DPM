@@ -22,16 +22,6 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
     DesignSize = (
       930
       67)
-    object lblPlatform: TLabel
-      Left = 697
-      Top = 12
-      Width = 52
-      Height = 15
-      Alignment = taRightJustify
-      Anchors = [akTop, akRight]
-      Caption = 'Platform :'
-      Visible = False
-    end
     object lblSources: TLabel
       Left = 655
       Top = 40
@@ -77,16 +67,6 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       TabOrder = 2
       OnClick = btnSettingsClick
     end
-    object cbPlatforms: TComboBox
-      Left = 755
-      Top = 9
-      Width = 160
-      Height = 23
-      Style = csDropDownList
-      Anchors = [akTop, akRight]
-      TabOrder = 3
-      OnChange = cbPlatformsChange
-    end
     object cbSources: TComboBox
       Left = 755
       Top = 37
@@ -95,7 +75,7 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       Style = csDropDownList
       Anchors = [akTop, akRight]
       ItemIndex = 0
-      TabOrder = 4
+      TabOrder = 3
       Text = 'All'
       OnChange = cbSourcesChange
       Items.Strings = (
@@ -110,7 +90,7 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       Width = 128
       Height = 20
       Caption = 'Include Commercial'
-      TabOrder = 5
+      TabOrder = 4
       OnClick = chkIncludeCommercialClick
     end
     object chkIncludePrerelease: TCheckBox
@@ -119,7 +99,7 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       Width = 120
       Height = 20
       Caption = 'Include Prerelease'
-      TabOrder = 6
+      TabOrder = 5
       OnClick = chkIncludePrereleaseClick
     end
     object chkIncludeTrial: TCheckBox
@@ -128,7 +108,7 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       Width = 128
       Height = 20
       Caption = 'Include Trials'
-      TabOrder = 7
+      TabOrder = 6
       OnClick = chkIncludeTrialClick
     end
     object txtSearch: TButtonedEdit
@@ -144,7 +124,7 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       RightButton.HotImageIndex = 6
       RightButton.ImageIndex = 5
       ShowHint = True
-      TabOrder = 8
+      TabOrder = 7
       TextHint = 'Search'
       OnChange = txtSearchChange
       OnKeyDown = txtSearchKeyDown

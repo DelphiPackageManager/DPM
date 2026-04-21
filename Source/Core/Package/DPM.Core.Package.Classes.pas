@@ -183,13 +183,15 @@ end;
 constructor TPackageIdentity.Create(const sourceName: string; const manifest: IPackageSpec);
 begin
   inherited Create;
+  if manifest = nil then
+    raise Exception.Create('Package manifest is nil');
+  if manifest.TargetPlatform = nil then
+    raise Exception.Create('Package manifest [' + manifest.MetaData.Id + '] has no target platforms');
+
   FSourceName := sourceName;
   FId := manifest.MetaData.Id;
   FVersion := manifest.MetaData.version;
   FCompilerVersion := manifest.TargetPlatform.Compiler;
-  FSourceName := sourceName;
-  
-
 end;
 
 function TPackageIdentity.GetSourceName : string;
@@ -391,11 +393,20 @@ end;
 
 
 constructor TPackageMetadata.Create(const sourceName : string; const manifest : IPackageSpec);
+var
+  author : string;
 begin
   inherited Create(sourceName, manifest, '','');
   FSearchPaths := TCollections.CreateList<string>;
   FTags := TStringList.Create;
-  //FAuthors.Add := manifest.MetaData.Authors;
+  FAuthors := '';
+  if manifest.MetaData.Authors <> nil then
+    for author in manifest.MetaData.Authors do
+    begin
+      if FAuthors <> '' then
+        FAuthors := FAuthors + ', ';
+      FAuthors := FAuthors + author;
+    end;
   FCopyright := manifest.MetaData.Copyright;
   FDescription := manifest.MetaData.Description;
   FIcon := manifest.MetaData.Icon;

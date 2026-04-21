@@ -114,10 +114,8 @@ uses
   DPM.Core.Spec.Node in 'Core\Spec\DPM.Core.Spec.Node.pas',
   DPM.Core.Spec in 'Core\Spec\DPM.Core.Spec.pas',
   DPM.Core.Spec.Reader in 'Core\Spec\DPM.Core.Spec.Reader.pas',
-  DPM.Core.Spec.SearchPath in 'Core\Spec\DPM.Core.Spec.SearchPath.pas',
   DPM.Core.Spec.TargetPlatform in 'Core\Spec\DPM.Core.Spec.TargetPlatform.pas',
   DPM.Core.Spec.Template in 'Core\Spec\DPM.Core.Spec.Template.pas',
-  DPM.Core.Spec.Writer in 'Core\Spec\DPM.Core.Spec.Writer.pas',
   DPM.Core.Utils.Config in 'Core\Utils\DPM.Core.Utils.Config.pas',
   DPM.Core.Utils.Directory in 'Core\Utils\DPM.Core.Utils.Directory.pas',
   DPM.Core.Utils.Enum in 'Core\Utils\DPM.Core.Utils.Enum.pas',
@@ -178,10 +176,8 @@ uses
   DPM.IDE.ActivityIndicator in 'IDE\EditorView\DPM.IDE.ActivityIndicator.pas',
   DPM.Core.Package.PackageLatestVersionInfo in 'Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas',
   DPM.IDE.PathManager in 'IDE\DPM.IDE.PathManager.pas',
-  DPM.Core.Manifest.Interfaces in 'Core\Manifest\DPM.Core.Manifest.Interfaces.pas',
-  DPM.Core.Manifest in 'Core\Manifest\DPM.Core.Manifest.pas',
-  DPM.Core.Manifest.Reader in 'Core\Manifest\DPM.Core.Manifest.Reader.pas',
-  DPM.Core.Utils.Hash in 'Core\Utils\DPM.Core.Utils.Hash.pas';
+  DPM.Core.Utils.Hash in 'Core\Utils\DPM.Core.Utils.Hash.pas',
+  DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas';
 
 {$R *.res}
 

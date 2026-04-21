@@ -24,9 +24,8 @@ uses
 
 type
   TConfigChangedEvent = procedure(const configuration : IConfiguration) of object;
-  TPlatformChangedEvent = procedure(const newPlatform : TDPMPlatform) of object;
   TProjectSelectedEvent = procedure(const projectFile : string) of object;
-  TSearchEvent = procedure(const searchText : string; const searchOptions : TDPMSearchOptions; const source : string; const platform : TDPMPlatform; const refresh : boolean) of object;
+  TSearchEvent = procedure(const searchText : string; const searchOptions : TDPMSearchOptions; const source : string; const refresh : boolean) of object;
 
   TDPMSearchBarFrame = class(TFrame)
     DPMEditorViewImages: TImageList;
@@ -35,12 +34,10 @@ type
     btnAbout: TButton;
     btnRefresh: TButton;
     btnSettings: TButton;
-    cbPlatforms: TComboBox;
     cbSources: TComboBox;
     chkIncludeCommercial: TCheckBox;
     chkIncludePrerelease: TCheckBox;
     chkIncludeTrial: TCheckBox;
-    lblPlatform: TLabel;
     lblSources: TLabel;
     txtSearch: TButtonedEdit;
     procedure txtSearchChange(Sender: TObject);
@@ -55,7 +52,6 @@ type
     procedure chkIncludeCommercialClick(Sender: TObject);
     procedure chkIncludeTrialClick(Sender: TObject);
     procedure cbSourcesChange(Sender: TObject);
-    procedure cbPlatformsChange(Sender: TObject);
   private
     FDPMIDEOptions : IDPMIDEOptions;
     FConfigurationManager : IConfigurationManager;
@@ -65,13 +61,10 @@ type
     FConfigFile : string;
     FHasSources : boolean;
     FLoading : boolean;
-    FPlatforms : TDPMPlatforms;
-    FPlatform  : TDPMPlatform;
     FProjects  : TStringList;
     //events
     FOnSearchEvent : TSearchEvent;
     FOnConfigChanged : TConfigChangedEvent;
-    FOnPlatformChangedEvent : TPlatformChangedEvent;
     FOnFocusList : TNotifyEvent;
 
     {$IFDEF USEIMAGECOLLECTION }
@@ -90,19 +83,14 @@ type
     procedure ReloadSourcesCombo;
 
     procedure DoSearchEvent(const refresh : boolean);
-    procedure DoPlatformChangedEvent(const newPlatform : TDPMPlatform);
 
     procedure Loaded; override;
     procedure SetImageList(const value :  {$IFDEF USEIMAGECOLLECTION} TVirtualImageList {$ELSE} TImageList {$ENDIF});
-    function GetPlatform : TDPMPlatform;
-    procedure SetPlatform(const platform : TDPMPlatform);
 
   public
     constructor Create(AOwner : TComponent);override;
     destructor Destroy;override;
-    procedure Configure(const logger : IDPMIDELogger; const ideOptions : IDPMIDEOptions; const config : IConfiguration; const configurationManager : IConfigurationManager; const configFile : string;
-                        const platforms : TDPMPlatforms; const currentPlatform : TDPMPlatform);
-    procedure UpdatePlatforms(const platforms : TDPMPlatforms);
+    procedure Configure(const logger : IDPMIDELogger; const ideOptions : IDPMIDEOptions; const config : IConfiguration; const configurationManager : IConfigurationManager; const configFile : string);
 
 
     procedure ThemeChanged(const ideStyleServices : TCustomStyleServices);
@@ -111,11 +99,8 @@ type
     property SearchText : string read GetSearchText;
     property IncludePrerelease : boolean read GetIncludePreRelease;
 
-    property Platform : TDPMPlatform read GetPlatform write SetPlatform;
-
     property OnConfigChanged : TConfigChangedEvent read FOnConfigChanged write FOnConfigChanged;
     property OnSearch : TSearchEvent read FOnSearchEvent write FOnSearchEvent;
-    property OnPlatformChanged : TPlatformChangedEvent read FOnPlatformChangedEvent write FOnPlatformChangedEvent;
     property OnFocusList : TNotifyEvent read FOnFocusList write FOnFocusList;
     property ImageList : {$IFDEF USEIMAGECOLLECTION} TVirtualImageList {$ELSE} TImageList {$ENDIF} read FImageList write SetImageList;
 
@@ -186,12 +171,6 @@ begin
 
 end;
 
-procedure TDPMSearchBarFrame.cbPlatformsChange(Sender: TObject);
-begin
-  if not FLoading then
-    DoPlatformChangedEvent(StringToDPMPlatform(cbPlatforms.Items[cbPlatforms.ItemIndex]));
-end;
-
 procedure TDPMSearchBarFrame.cbSourcesChange(Sender: TObject);
 begin
   if not FLoading then
@@ -213,8 +192,7 @@ begin
   DoSearchEvent(true);
 end;
 
-procedure TDPMSearchBarFrame.Configure(const logger: IDPMIDELogger; const ideOptions: IDPMIDEOptions; const config : IConfiguration; const configurationManager: IConfigurationManager; const configFile : string;
-                                       const platforms : TDPMPlatforms; const currentPlatform : TDPMPlatform);
+procedure TDPMSearchBarFrame.Configure(const logger: IDPMIDELogger; const ideOptions: IDPMIDEOptions; const config : IConfiguration; const configurationManager: IConfigurationManager; const configFile : string);
 begin
   FLoading := true;
   FLogger := logger;
@@ -222,11 +200,7 @@ begin
   FConfiguration := config;
   FConfigurationManager := configurationManager;
   FConfigFile := configFile;
-  FPlatforms := platforms;
   ReloadSourcesCombo;
-  lblPlatform.Visible := true;
-  FPlatform := currentPlatform;
-  UpdatePlatforms(FPlatforms);
   FLoading := false;
 end;
 
@@ -273,20 +247,10 @@ begin
   inherited;
 end;
 
-procedure TDPMSearchBarFrame.DoPlatformChangedEvent(const newPlatform: TDPMPlatform);
-begin
-  FPlatform := newPlatform;
-
-  if Assigned(FOnPlatformChangedEvent) then
-    FOnPlatformChangedEvent(newPlatform);
-end;
-
-
 procedure TDPMSearchBarFrame.DoSearchEvent(const refresh : boolean);
 var
   options : TDPMSearchOptions;
   source : string;
-  platform : TDPMPlatform;
 begin
   if Assigned(FOnSearchEvent) then
   begin
@@ -303,8 +267,7 @@ begin
     else
       source := 'All';
 
-    platform := StringToDPMPlatform(cbPlatforms.Items[cbPlatforms.ItemIndex]);
-    FOnSearchEvent(txtSearch.Text, options, source, platform, refresh);
+    FOnSearchEvent(txtSearch.Text, options, source, refresh);
   end;
 end;
 
@@ -313,17 +276,6 @@ end;
 function TDPMSearchBarFrame.GetIncludePreRelease: boolean;
 begin
   result := chkIncludePrerelease.Checked;
-end;
-
-function TDPMSearchBarFrame.GetPlatform: TDPMPlatform;
-begin
-  if FPlatform = TDPMPlatform.UnknownPlatform then
-  begin
-    if cbPlatforms.Items.Count > 0 then
-      FPlatform := StringToDPMPlatform(cbPlatforms.Items[cbPlatforms.ItemIndex]);
-  end;
-
-  result := FPlatform;
 end;
 
 function TDPMSearchBarFrame.GetSearchText: string;
@@ -403,20 +355,6 @@ begin
   end;
 end;
 
-procedure TDPMSearchBarFrame.SetPlatform(const platform: TDPMPlatform);
-var
-  i : integer;
-begin
-  FPlatform := platform;
-  i := cbPlatforms.Items.IndexOfObject(TObject(Ord(FPlatform)));
-  if (cbPlatforms.Items.Count > 0) and (i <> -1) then
-  begin
-    cbPlatforms.ItemIndex := i;
-    cbPlatformsChange(cbPlatforms);
-  end;
-
-end;
-
 procedure TDPMSearchBarFrame.ThemeChanged(const ideStyleServices : TCustomStyleServices);
 begin
 //{$IF CompilerVersion < 34.0 }
@@ -479,30 +417,5 @@ begin
   DoSearchEvent(true);
 end;
 
-
-procedure TDPMSearchBarFrame.UpdatePlatforms(const platforms: TDPMPlatforms);
-var
-  platform : TDPMPlatform;
-  currentPlatform : TDPMPlatform;
-  i : integer;
-begin
-  //preserve the currently selected platform
-  if cbPlatforms.Items.Count > 0 then
-    currentPlatform := TDPMPlatform(Integer(cbPlatforms.Items.Objects[cbPlatforms.ItemIndex]))
-  else
-    currentPlatform := TDPMPlatform.UnknownPlatform;
-
-  cbPlatforms.Items.Clear;
-  for platform in FPlatforms do
-    cbPlatforms.Items.AddObject(DPMPlatformToString(platform), TObject(Ord(platform)));
-
-  i := 0;
-  if currentPlatform <> TDPMPlatform.UnknownPlatform then
-    i := cbPlatforms.Items.IndexOfObject(TObject(Ord(currentPlatform)));
-  if cbPlatforms.Items.Count > 0 then
-    cbPlatforms.ItemIndex := i;
-
-
-end;
 
 end.

@@ -1,4 +1,4 @@
-﻿unit DPM.IDE.InstallerContext;
+unit DPM.IDE.InstallerContext;
 
 interface
 
@@ -10,7 +10,7 @@ uses
   DPM.Core.Dependency.Interfaces,
   DPM.Core.Package.Installer.Interfaces,
   DPM.Core.Package.InstallerContext,
-  DPM.Core.Manifest.Interfaces,
+  DPM.Core.Spec.Interfaces,
   DPM.IDE.PathManager;
 
 type
@@ -20,7 +20,7 @@ type
   protected
     procedure Clear;override;
     procedure RemoveProject(const projectFile : string);override;
-    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests: IDictionary<string, IPackageManifest>) : boolean;override;
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageManifests: IDictionary<string, IPackageSpec>) : boolean;override;
   public
     constructor Create(const logger : ILogger; const pathManager : IDPMIDEPathManager);reintroduce;
   end;
@@ -36,25 +36,15 @@ constructor TDPMIDEPackageInstallerContext.Create(const logger: ILogger; const p
 begin
   inherited Create(logger);
   FPathManager := pathManager;
-
 end;
 
 
-function TDPMIDEPackageInstallerContext.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const platform: TDPMPlatform; const packageManifests: IDictionary<string, IPackageManifest>): boolean;
-var
-  projectGraph : IPackageReference;
+function TDPMIDEPackageInstallerContext.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageManifests: IDictionary<string, IPackageSpec>): boolean;
 begin
+  //design-time package installation is not yet implemented on the single-package-per-compiler branch.
+  //the core installer calls this once per project after all platforms have been processed.
   result := true;
-  projectGraph := GetProjectGraph(projectFile, platform);
-  if projectGraph = nil then
-  begin
-    Logger.Error(Format('No projectGraph recorded for : %s platform : %s',[projectFile,DPMPlatformToString(platform)]));
-
-
-  end;
-
-
-
+  Logger.Debug('InstallDesignPackages: not implemented in current branch (project: ' + projectFile + ')');
 end;
 
 procedure TDPMIDEPackageInstallerContext.RemoveProject(const projectFile: string);
@@ -70,4 +60,3 @@ begin
 end;
 
 end.
-

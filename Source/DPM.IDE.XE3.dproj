@@ -278,9 +278,6 @@
         <DCCReference Include="IDE\EditorView\DPM.IDE.ActivityIndicator.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas"/>
         <DCCReference Include="IDE\DPM.IDE.PathManager.pas"/>
-        <DCCReference Include="Core\Manifest\DPM.Core.Manifest.Interfaces.pas"/>
-        <DCCReference Include="Core\Manifest\DPM.Core.Manifest.pas"/>
-        <DCCReference Include="Core\Manifest\DPM.Core.Manifest.Reader.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Hash.pas"/>
         <DCCReference Include="IDE\Compatibility\System.ImageList.pas"/>
         <BuildConfiguration Include="Debug">
