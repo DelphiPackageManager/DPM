@@ -80,6 +80,9 @@ type
     ///<summary> called from the package installer during install/restore - to install design time packages. See IDE implementation</summary>
     function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageManifests : IDictionary<string, IPackageSpec>) : boolean;
 
+    ///<summary> called from the package installer during uninstall - to unload design time packages whose dpm packages are no longer referenced. See IDE implementation</summary>
+    function UninstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const orphanedPackageIds : IList<string>) : boolean;
+
 
     ///<summary> Called from the dependency resolver to record package resolutions, so we can detect conflicts in other projects in the project group. </summary>
     procedure RecordResolutions(const projectFile: string; const resolutions : TArray<IResolvedPackage>);

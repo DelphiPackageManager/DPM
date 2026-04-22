@@ -190,6 +190,7 @@ type
   ['{7879DE88-0612-45F1-AAE1-9D9CE50748EC}']
     function GetProject : string;
     function GetDefines : string;
+    function GetPlatforms : TDPMPlatforms;
 
     function GetLibSuffix : string;
     function GetLibPrefix : string;
@@ -197,6 +198,7 @@ type
 
     procedure SetProject(const value : string);
     procedure SetDefines(const value : string);
+    procedure SetPlatforms(const value : TDPMPlatforms);
     procedure SetLibSuffix(const value : string);
     procedure SetLibPrefix(const value : string);
     procedure SetLibVersion(const value : string);
@@ -207,6 +209,8 @@ type
     property Project : string read GetProject write SetProject;
     /// <summary> Semicolon seprated list of compiler defines</summary>
     property Defines : string read GetDefines write SetDefines;
+    /// <summary> Design-host platforms this entry supports. Empty = defer to the design dproj's enabled platforms. </summary>
+    property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
 
     property LibSuffix : string read GetLibSuffix write SetLibSuffix;
     property LibPrefix : string read GetLibPrefix write SetLibPrefix;

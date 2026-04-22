@@ -123,7 +123,7 @@ type
   end;
 
 
-function DesignTimePlatform(const target : TCompilerVersion) : TDPMPlatform;
+function DesignTimePlatforms(const target : TCompilerVersion) : TDPMPlatforms;
 function StringToCompilerVersion(const value : string) : TCompilerVersion;
 function StringToDPMPlatform(const value : string) : TDPMPlatform;
 
@@ -190,9 +190,12 @@ uses
   System.SysUtils,
   DPM.Core.Utils.Strings;
 
-function DesignTimePlatform(const target : TCompilerVersion) : TDPMPlatform;
+function DesignTimePlatforms(const target : TCompilerVersion) : TDPMPlatforms;
 begin
-  result := TDPMPlatform.Win32; //currently all delphi IDE's are 32 bit, but that might change in the future.
+  result := [TDPMPlatform.Win32];
+  //Delphi 12.3 introduced a Win64 IDE; 13.x ships both variants.
+  if target >= TCompilerVersion.Delphi12 then
+    result := result + [TDPMPlatform.Win64];
 end;
 
 function StringToCompilerVersion(const value : string) : TCompilerVersion;

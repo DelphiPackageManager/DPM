@@ -347,7 +347,10 @@ var
   dependency: IPackageReference;
   childSearchPath: string;
   bomNode: IPackageReference;
-  designPlatform: TDPMPlatform;
+  supportedByCompiler: TDPMPlatforms;
+  candidates: TDPMPlatforms;
+  designPlatforms: TDPMPlatforms;
+  designProjectEditor: IProjectEditor;
 begin
   result := true;
   packagePath := FPackageCache.GetPackagePath(packageInfo);
@@ -429,40 +432,46 @@ begin
   end;
 
   // Compile design entries
-  // Design packages must match IDE bitness:
-  // - Delphi 12 and earlier: Win32 only (32-bit IDE)
-  // - Delphi 13 and later: Win32 or Win64 (64-bit IDE available)
+  // A design BPL can only be built when the current runtime platform (Compiler.Platform) is
+  // both a supported design host for this compiler version AND declared by the manifest
+  // (if explicit) or by the design .dproj's enabled platforms (if manifest silent). The design
+  // .dpk references the runtime .dcp that was just built in lib\{Compiler.Platform}, so design
+  // and runtime platforms must match. The Win32/Win64 matrix is produced across the series of
+  // per-platform install/restore calls - each call contributes its matching design BPL.
   for designEntry in template.DesignEntries do
   begin
-    FLogger.Information('Building design package: ' + designEntry.Project);
     projectFile := TPath.Combine(packagePath, designEntry.Project);
 
-    // Determine which platform to build design packages for
-    if (Compiler.compilerVersion >= TCompilerVersion.Delphi13) and (Compiler.Platform = TDPMPlatform.Win64) then
-      designPlatform := TDPMPlatform.Win64
-    else
-      designPlatform := TDPMPlatform.Win32;
+    supportedByCompiler := DesignTimePlatforms(Compiler.compilerVersion);
 
-    // Set output directories for design platform if different from target
-    if Compiler.Platform <> designPlatform then
+    if designEntry.Platforms <> [] then
+      //manifest explicit - authoritative
+      candidates := designEntry.Platforms
+    else
     begin
-      Compiler.BPLOutputDir := TPath.Combine(packagePath, 'bpl' + PathDelim + DPMPlatformToBDString(designPlatform));
-      Compiler.LibOutputDir := TPath.Combine(packagePath, 'lib' + PathDelim + DPMPlatformToBDString(designPlatform));
-      // Also need design platform search paths for dependencies
-      if packageReference.HasChildren then
+      //defer to the design dproj - FConfig is only used by AddPackageReference which we don't call.
+      designProjectEditor := TProjectEditor.Create(FLogger, nil, Compiler.compilerVersion);
+      if designProjectEditor.LoadProject(projectFile) then
+        candidates := designProjectEditor.Platforms
+      else
       begin
-        searchPaths := TCollections.CreateList<string>;
-        for dependency in packageReference.Children do
-        begin
-          childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion);
-          childSearchPath := TPath.Combine(childSearchPath, 'lib' + PathDelim + DPMPlatformToBDString(designPlatform));
-          searchPaths.Add(childSearchPath);
-        end;
-        Compiler.SetSearchPaths(searchPaths);
+        FLogger.Warning('Could not inspect design project [' + designEntry.Project + '] - defaulting to Win32 only.');
+        candidates := [TDPMPlatform.Win32];
       end;
     end;
 
-    result := Compiler.BuildProject(cancellationToken, designPlatform, projectFile, configuration, packageInfo.Version, true);
+    designPlatforms := supportedByCompiler * candidates;
+
+    if not (Compiler.Platform in designPlatforms) then
+    begin
+      FLogger.Debug('Skipping design package [' + designEntry.Project + '] - ' + DPMPlatformToString(Compiler.Platform) + ' is not a supported design platform for this entry.');
+      continue;
+    end;
+
+    FLogger.Information('Building design package: ' + designEntry.Project + ' (' + DPMPlatformToString(Compiler.Platform) + ')');
+
+    //output dirs and search paths are already set for Compiler.Platform by the runtime build above - nothing to change.
+    result := Compiler.BuildProject(cancellationToken, Compiler.Platform, projectFile, configuration, packageInfo.Version, true);
     if not result then
     begin
       if cancellationToken.IsCancelled then
@@ -2011,7 +2020,10 @@ begin
       projectEditor.RemoveFromSearchPath(platform, orphanedId);
   end;
 
-  //TODO : Context - Remove Design Packages if no longer referenced.
+  //Tell the context to unload design BPLs whose dpm package is no longer referenced by this project.
+  if not context.UninstallDesignPackages(cancellationToken, projectFile, orphanedIds) then
+    FLogger.Warning('Design-package unload reported failure - continuing.');
+
   //TODO : Tell context to upgrade graph (FContext.PackageGraphTrimmed once that exists).
 
   //Project-level: write the updated graph (single <Packages> node, no platform attribute) and save once.

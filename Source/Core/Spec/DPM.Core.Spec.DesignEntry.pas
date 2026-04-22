@@ -90,7 +90,8 @@ end;
 constructor TSpecDesignEntry.Create(const logger : ILogger);
 begin
   inherited Create(logger);
-  FPlatforms := [TDPMPlatform.Win32, TDPMPlatform.Win64];
+  //leave empty so the installer can tell "author did not specify" from "author explicitly declared"
+  FPlatforms := [];
 end;
 
 constructor TSpecDesignEntry.CreateClone(const logger : ILogger; const project : string; const defines : string; platforms : TDPMPlatforms;
@@ -172,12 +173,7 @@ begin
   FLibSuffix := yamlObject.S['libSuffix'];
   FLibPrefix := yamlObject.S['libPrefix'];
   FLibVersion := yamlObject.S['libVersion'];
-
-  //apply the default if not in the file.
-  if FPlatforms = [] then
-    FPlatforms := [TDPMPlatform.Win32, TDPMPlatform.Win64];
-
-
+  //platforms left empty when not in the file - installer defers to the design dproj in that case
 end;
 
 
@@ -226,20 +222,14 @@ var
   platformsSeq : IYAMLSequence;
   platform : TDPMPlatform;
   sPlatform : string;
-  platforms : TDPMPlatforms;
 begin
   mapping := parent.AsSequence.AddMapping;
   mapping.S['project'] := FProject;
-  //we want to avoid the platforms being written out if they are default value
-  if FPlatforms = [TDPMPlatform.Win32, TDPMPlatform.Win64] then
-    platforms := []
-  else
-    platforms := FPlatforms;
-
-  if platforms <> [] then
+  //FPlatforms is empty when the author did not state platforms; write whatever is set.
+  if FPlatforms <> [] then
   begin
     platformsSeq := mapping.A['platforms'];
-    for platform in platforms do
+    for platform in FPlatforms do
     begin
       sPlatform := DPMPlatformToString(platform);
       platformsSeq.AddValue(sPlatform);

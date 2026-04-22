@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -98,7 +98,6 @@ uses
   System.IOUtils,
   DPM.Core.Utils.Path,
   DPM.Core.Utils.Process,
-  DPM.Core.Utils.System,
   DPM.Core.Compiler.ProjectSettings;
 
 
@@ -113,6 +112,7 @@ var
 begin
 
   result := false;
+  FPlatform := platform;
   FBuildForDesign := forDesign;
   FCompilerOutput.Clear;
 
@@ -228,10 +228,7 @@ begin
   //We should investigate updating the dproj.
   result := '/target:BuildVersionResource;Build';
   result := result + ' /p:Config=' + configName;
-  if FBuildForDesign and (not TSystemUtils.Is64bitIDE) then
-    result := result + ' /p:Platform=' + DPMPlatformToBDString(TDPMPlatform.Win32)
-  else
-    result := result + ' /p:Platform=' + DPMPlatformToBDString(FPlatform);
+  result := result + ' /p:Platform=' + DPMPlatformToBDString(FPlatform);
 
   //THIS DOES NOT WORK!!!
   //attempting to update version info
@@ -306,15 +303,7 @@ begin
     end;
   end;
 
-  if FBuildForDesign then
-  begin
-    if TSystemUtils.Is64BitIDE then
-      platform := TDPMPlatform.Win64
-    else
-      platform := TDPMPlatform.Win32
-  end
-  else
-    platform := FPlatform;
+  platform := FPlatform;
 
   FLogger.Debug('Loading project to get search path : ' + FProjectFile);
   settingsLoader := TDPMProjectSettingsLoader.Create(FLogger, FProjectFile, configName, platform);

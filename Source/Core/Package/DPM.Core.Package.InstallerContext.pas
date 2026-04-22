@@ -34,6 +34,9 @@ type
     //this is a no-op here, look at the IDE installer context to see how this is implemented.
     function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageManifests : IDictionary<string, IPackageSpec>) : boolean;virtual;
 
+    //this is a no-op here, look at the IDE installer context to see how this is implemented.
+    function UninstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const orphanedPackageIds : IList<string>) : boolean;virtual;
+
     //record package resoltions for a project, so we can detect conflicts
     procedure RecordResolutions(const projectFile: string; const resolutions : TArray<IResolvedPackage>);
     //search other projects in the project group to see if they have resolved the package.
@@ -102,6 +105,11 @@ begin
 end;
 
 function TCorePackageInstallerContext.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageManifests : IDictionary<string, IPackageSpec>): boolean;
+begin
+  result := true; //this is only needed for the IDE context
+end;
+
+function TCorePackageInstallerContext.UninstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const orphanedPackageIds : IList<string>): boolean;
 begin
   result := true; //this is only needed for the IDE context
 end;
