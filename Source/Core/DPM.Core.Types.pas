@@ -459,14 +459,8 @@ begin
     if Ord(value) > 0 then
       i := i + (1 shl (Ord(value) -1) );
   end;
-
+  //fixed 16-char (SizeOf(Word)*8) bin string so every filename has the same shape.
   result := IntToBin(i);
-
-  while (result <> '') and (result[1] = '0') do
-    Delete(result, 1,1);
-  //strip leading zeros to keep the string as short as possible.
-  if result = '' then
-    result := '0';
 end;
 
 
