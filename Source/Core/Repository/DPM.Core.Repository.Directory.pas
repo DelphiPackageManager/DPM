@@ -1068,13 +1068,14 @@ var
   currentCompiler : TCompilerVersion;
   currentId : string;
   currentVersion : TPackageVersion;
+  currentPlatforms : TDPMPlatforms;
   platforms : TDPMPlatforms;
   newItem : IPackageListItem;
   bIsLast : boolean;
 
   procedure AddCurrent;
   begin
-    newItem := TPackageListItem.Create(currentId,currentCompiler, currentVersion, DPMPlatformsToString(platforms));
+    newItem := TPackageListItem.Create(currentId,currentCompiler, currentVersion, DPMPlatformsToString(currentPlatforms));
     result.Add(newItem);
   end;
 
@@ -1118,6 +1119,7 @@ begin
   currentId := '';
   currentVersion := TPackageVersion.Empty;
   currentCompiler := TCompilerVersion.UnknownVersion;
+  currentPlatforms := [];
   platforms := [];
   for i := 0 to allFiles.Count - 1 do
   begin
@@ -1156,6 +1158,7 @@ begin
           currentId := id;
           currentCompiler := cv;
           currentVersion := packageVersion;
+          currentPlatforms := platforms;
           if bIsLast then
             AddCurrent;
           continue;
@@ -1167,11 +1170,14 @@ begin
         currentId := id;
         currentCompiler := cv;
         currentVersion := packageVersion;
+        currentPlatforms := platforms;
         if bIsLast then
           AddCurrent;
       end
       else
       begin
+        //same id+compiler+version - merge platforms (legacy multi-file-per-compiler layout)
+        currentPlatforms := currentPlatforms + platforms;
         if bIsLast then
          AddCurrent;
       end;
