@@ -44,7 +44,16 @@ type
 
   TNodeVisitProc = reference to procedure(const packageReference : IPackageReference);
 
-  //a directed asyclic graph (DAG).
+  ///<summary>A node in the project's dependency graph (DAG). Represents a package at a specific
+  /// version chosen during resolution, plus the parent/children links that make up the graph.
+  ///
+  /// Used during the RESOLUTION phase — the resolver builds/walks the graph, and the installer
+  /// visits it DFS to compile packages and apply search paths in dependency order. Mutable: the
+  /// resolver attaches children, sets PackageInfo, and records per-node state (UseSource).
+  ///
+  /// Contrast with IResolvedPackage (flat, immutable-ish record used for cross-project conflict
+  /// detection) and IList&lt;IPackageInfo&gt; (the resolver's flattened output fed to the installer).
+  /// </summary>
   IPackageReference = interface(IPackageIdentity)
     ['{20055C26-8E63-4936-8249-ACF8514A37E7}']
     function GetId : string;
@@ -57,20 +66,13 @@ type
     function GetSelectedOn : TVersionRange;
     procedure SetSelectedOn(const value : TVersionRange);
 
-    function GetSearchPaths : IList<string>;
-    function GetLibPath : string;
-    procedure SetLibPath(const value : string);
-    function GetBplPath : string;
-    procedure SetBplPath(const value : string);
     procedure SetUseSource(const value : boolean);
-    procedure SetProjectFile(const value : string);
 
     function GetDependencies : IEnumerable<IPackageReference>;
 
     function GetUseSource : boolean;
     function GetIsTransitive : boolean;
     function GetIsTopLevel : boolean;
-    function GetProjectFile : string;
 
     function GetPackageInfo : IPackageInfo;
     procedure SetPackageInfo(const value : IPackageInfo);
@@ -141,25 +143,26 @@ type
     property Children : IEnumerable<IPackageReference>read GetDependencies;
     property Parent : IPackageReference read GetParent;
     property UseSource : boolean read GetUseSource write SetUseSource;
-    property ProjectFile : string read GetProjectFile write SetProjectFile;
-
-    //build support
-    property SearchPaths : IList<string> read GetSearchPaths;
-    property LibPath : string read GetLibPath write SetLibPath;
-    property BplPath : string read GetBplPath write SetBplPath;
 
     //resolution support
     property PackageInfo : IPackageInfo read GetPackageInfo write SetPackageInfo;
     property ParentId : string read GetParentId;
 
-    //design support
-//    property DesignBpls[platform : TDPMPlatform] : IList<string> read GetDesignBPLs;
-//
-//    property DesignBplsLoaded[platform : TDPMPlatform] : boolean read GetDesignBplsLoaded write SetDesignBplsLoaded;
-
   end;
 
 
+  ///<summary>A flat record of "this package at this version was resolved for this project file",
+  /// keyed implicitly by (Project, Package.Id). Created per resolved package and stored in the
+  /// installer context so other projects in the same group can see the resolutions already made.
+  ///
+  /// Used for cross-project / project-group CONFLICT DETECTION — if project A has resolved FooLib
+  /// at 1.2.0 and project B wants FooLib in a range that excludes 1.2.0, the resolver reports a
+  /// conflict by inspecting the recorded IResolvedPackage entries.
+  ///
+  /// No graph structure (no parent/children links) — that is IPackageReference's job. Clone(parentId)
+  /// copies the record with a new ParentId so a sibling project in the group can adopt the same
+  /// resolution under its own top-level.
+  /// </summary>
   IResolvedPackage = interface
     ['{CC4F63AA-80F7-46AC-8C42-0F8725B59579}']
     function GetPackage : IPackageInfo;
@@ -183,7 +186,6 @@ type
     function Initialize(const config : IConfiguration) : boolean;
     //returns true if all dependencies were resolved. If true, the graph is fully populated and can be serialized.
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
-    function ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
   end;
 
 

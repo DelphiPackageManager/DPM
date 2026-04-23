@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -101,7 +101,7 @@ begin
     begin
       if cancellationToken.IsCancelled then
         exit;
-      resultString := TStringUtils.PadRight(item.Id, 24) + #9+'v'  + TStringUtils.PadRight(item.Version.ToString, 15) + ' [Delphi '  + CompilerToString(item.CompilerVersion) +  ' - ' + item.Platforms + ']';
+      resultString := TStringUtils.PadRight(item.Id, 24) + #9+'v'  + TStringUtils.PadRight(item.Version.ToString, 15) + ' [Delphi '  + CompilerToString(item.CompilerVersion) +  ' - ' + DPMPlatformsToString(item.Platforms) + ']';
       Logger.Information(resultString);
     end;
     result := TExitCode.OK;

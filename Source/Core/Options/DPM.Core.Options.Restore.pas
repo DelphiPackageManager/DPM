@@ -34,9 +34,14 @@ uses
   DPM.Core.Options.Search;
 
 type
+  ///<summary>Options driving a restore. Unlike TInstallOptions, both callers use the same shape:
+  ///  CLI: ProjectPath = directory or single .dproj (defaulting to cwd); CompilerVersion / Sources / Prerelease.
+  ///  IDE: ProjectPath = the .dproj filename from the current IDE project; CompilerVersion from the IDE bitness.
+  ///  There's no IDE-specific Projects array — the IDE restores one project at a time.
+  ///</summary>
   TRestoreOptions = class(TSearchOptions)
   private
-    FProjectPath : string;
+    FProjectPath : string;                   // CLI: directory or .dproj/.groupproj; IDE: .dproj filename
     class var
       FDefault : TRestoreOptions;
   protected

@@ -404,9 +404,6 @@ begin
   else
     Compiler.SetSearchPaths(nil);
 
-  packageReference.LibPath := Compiler.LibOutputDir;
-  packageReference.BplPath := Compiler.BPLOutputDir;
-
   // Compile build entries
   for buildEntry in template.BuildEntries do
   begin
@@ -883,10 +880,9 @@ begin
   end;
 
   //Slow path: graph has missing transients or out-of-range versions. Re-resolve from top-level
-  //constraints by treating each top-level package as a fresh install. ResolveForRestore is currently
-  //a no-op for actual re-resolution (the resolver context filters out PushRequirement for any id
-  //already in projectReferences), so we use ResolveForInstall per top-level. Each iteration's
-  //resolved graph feeds the next as projectReferences so shared transients are reused.
+  //constraints by treating each top-level package as a fresh install, via ResolveForInstall. Each
+  //iteration's resolved graph feeds the next as projectReferences so shared transients are reused
+  //and not double-resolved.
   if not RestoreUsingInstallResolver(cancellationToken, Options, projectFile,
                                      BuildTopLevelOnlyGraph(projectPackageGraph, Options.CompilerVersion),
                                      projectPackageGraph, resolvedPackages) then
@@ -913,8 +909,6 @@ begin
         Spec: IPackageSpec;
         template: ISpecTemplate;
         forceCompile: boolean;
-        otherNodes: IList<IPackageReference>;
-        otherNode: IPackageReference;
       begin
         Assert(packageReference.IsRoot = false, 'graph should not visit root node');
 
@@ -954,21 +948,6 @@ begin
           end;
 
           compiledPackages.Add(pkgInfo);
-
-          // Propagate paths to any duplicate nodes in the graph
-          // (same package may appear multiple times as different packages' dependency)
-          otherNodes := projectPackageGraph.FindChildren(packageReference.Id);
-          if otherNodes.Count > 1 then
-          begin
-            for otherNode in otherNodes do
-            begin
-              if otherNode <> packageReference then
-              begin
-                otherNode.LibPath := packageReference.LibPath;
-                otherNode.BplPath := packageReference.BplPath;
-              end;
-            end;
-          end;
         end;
       end);
     result := true;

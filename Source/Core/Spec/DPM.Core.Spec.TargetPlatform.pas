@@ -38,6 +38,12 @@ uses
   DPM.Core.Spec.Node,
   DPM.Core.Spec.Interfaces;
 
+/// <summary> Returns the set of concrete compilers the target platform applies to, collapsing
+///  the three authoring forms (single Compiler, Compilers array, or MinCompiler..MaxCompiler range)
+///  into one representation. Callers that iterate or test a specific compiler should use this so the
+///  three-way selection logic lives in one place. </summary>
+function ExpandedCompilersOf(const targetPlatform : ISpecTargetPlatform) : TCompilerVersions;
+
 
 //NOTE: TSpecTargetPlatform descends from TSpecTemplateBase because we need this when we apply the templates during pack.
 // and also when we load the package spec in the IDE for dependencies.
@@ -105,6 +111,30 @@ uses
   DPM.Core.TargetPlatform,
   DPM.Core.Utils.Strings,
   DPM.Core.Spec.Dependency;
+
+
+function ExpandedCompilersOf(const targetPlatform : ISpecTargetPlatform) : TCompilerVersions;
+var
+  c : TCompilerVersion;
+begin
+  result := [];
+  if targetPlatform = nil then
+    exit;
+  if targetPlatform.Compiler <> TCompilerVersion.UnknownVersion then
+  begin
+    Include(result, targetPlatform.Compiler);
+    exit;
+  end;
+  if (targetPlatform.MinCompiler <> TCompilerVersion.UnknownVersion) and
+     (targetPlatform.MaxCompiler <> TCompilerVersion.UnknownVersion) then
+  begin
+    for c := targetPlatform.MinCompiler to targetPlatform.MaxCompiler do
+      Include(result, c);
+    exit;
+  end;
+  for c in targetPlatform.Compilers do
+    Include(result, c);
+end;
 
 
 { TSpecTargetPlatform }
@@ -191,21 +221,8 @@ begin
 end;
 
 function TSpecTargetPlatform.IsForCompiler(compilerVersion: TCompilerVersion): boolean;
-var
-  c : TCompilerVersion;
 begin
-  result := true;
-  if FCompiler = compilerVersion then
-    exit;
-  if (FMinCompilerVersion >= compilerVersion) and (FMaxCompilerVersion <= compilerVersion) then
-    exit;
-
-  for c in FCompilers do
-  begin
-     if c = compilerVersion then
-      exit;
-  end;
-  result := false;
+  result := compilerVersion in ExpandedCompilersOf(self);
 end;
 
 function TSpecTargetPlatform.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;

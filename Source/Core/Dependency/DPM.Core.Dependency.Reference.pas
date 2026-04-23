@@ -53,11 +53,7 @@ type
     FVersion : TPackageVersion;
     FSelectedOn : TVersionRange;
     FUseSource : boolean;
-    FSearchPaths : IList<string>;
-    FLibPath : string;
-    FBplPath : string;
     FCompilerVersion : TCompilerVersion;
-    FProjectFile : string;
 
     FPackageInfo : IPackageInfo;
 
@@ -83,24 +79,15 @@ type
     function GetParentId : string;
     function GetSelectedOn : TVersionRange;
     function GetVersion : TPackageVersion;
-    function GetSearchPaths : IList<string>;
-    function GetLibPath : string;
-    procedure SetLibPath(const value : string);
-    function GetBplPath : string;
     function GetCompilerVersion : TCompilerVersion;
     function GetIsTransitive : boolean;
     function GetIsTopLevel : boolean;
 
-    function GetProjectFile: string;
     function GetSourceName : string;
     procedure SetParent(const value : IPackageReference);
-    procedure SetProjectFile(const value: string);
 
     function GetPackageInfo : IPackageInfo;
     procedure SetPackageInfo(const value : IPackageInfo);
-
-
-    procedure SetBplPath(const value : string);
 
     procedure SetVersion(const value : TPackageVersion);
     procedure SetSelectedOn(const value : TVersionRange);
@@ -200,7 +187,6 @@ end;
 constructor TPackageReference.Create(const parent : IPackageReference; const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const selectedOn : TVersionRange; const useSource : boolean);
 begin
   inherited Create;
-  FSearchPaths := TCollections.CreateList<string>;
   FDependencies := TCollections.CreateSortedDictionary<string, IPackageReference>();
   FDesignBpls := TCollections.CreateDictionary<TDPMPlatform, IList<string>>;
 
@@ -228,7 +214,6 @@ destructor TPackageReference.Destroy;
 begin
   //not strictly needed but chasing an av.
   FParent := nil;
-  FSearchPaths := nil;
   FDependencies.Clear;
   FDependencies := nil;
   FDesignBpls := nil;
@@ -285,11 +270,6 @@ begin
   result := list;
 end;
 
-function TPackageReference.GetBplPath: string;
-begin
-  result := FBplPath;
-end;
-
 function TPackageReference.GetDependencies : IEnumerable<IPackageReference>;
 begin
   result := FDependencies.Values;
@@ -323,11 +303,6 @@ begin
 end;
 
 
-function TPackageReference.GetLibPath: string;
-begin
-  result := FLibPath;
-end;
-
 function TPackageReference.GetPackageInfo: IPackageInfo;
 begin
   result := FPackageInfo;
@@ -353,21 +328,6 @@ begin
     result := '';
 end;
 
-
-function TPackageReference.GetProjectFile: string;
-begin
-  if IsRoot then
-    result := FProjectFile
-  else if FParent.IsAlive then
-    result :=  FParent.Target.ProjectFile
-  else
-    result := '';
-end;
-
-function TPackageReference.GetSearchPaths: IList<string>;
-begin
-  result := FSearchPaths;
-end;
 
 function TPackageReference.GetSelectedOn : TVersionRange;
 begin
@@ -451,16 +411,6 @@ begin
     end;
 end;
 
-procedure TPackageReference.SetBplPath(const value: string);
-begin
-  FBplPath := value;
-end;
-
-procedure TPackageReference.SetLibPath(const value: string);
-begin
-  FLibPath := value;
-end;
-
 procedure TPackageReference.SetPackageInfo(const value: IPackageInfo);
 begin
   FPackageInfo := value;
@@ -469,12 +419,6 @@ end;
 procedure TPackageReference.SetParent(const value: IPackageReference);
 begin
   FParent := value;
-end;
-
-procedure TPackageReference.SetProjectFile(const value: string);
-begin
-  if IsRoot then
-    FProjectFile := value;
 end;
 
 procedure TPackageReference.SetSelectedOn(const value : TVersionRange);

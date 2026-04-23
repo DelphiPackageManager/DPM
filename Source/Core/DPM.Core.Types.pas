@@ -147,6 +147,11 @@ function DPMPlatformsArrayToPlatforms(const value : TArray<TDPMPlatform>) : TDPM
 
 function DPMPlatformsToString(const value : TDPMPlatforms; const sep : string = ',') : string;
 
+/// <summary> Parses a delimited platform list (comma, semicolon or pipe separated) into a set.
+///  Unknown tokens are ignored. Returns empty set for empty input. Used by JSON parsers that
+///  receive the output of DPMPlatformsToString. </summary>
+function StringToDPMPlatforms(const value : string) : TDPMPlatforms;
+
 /// <summary> Creates binary representation - used for package files</summary>
 function DPMPlatformsToBinString(platforms : TDPMPlatforms) : string;
 
@@ -412,6 +417,28 @@ begin
     Inc(i);
   end;
  end;
+
+function StringToDPMPlatforms(const value : string) : TDPMPlatforms;
+var
+  normalized : string;
+  parts : TArray<string>;
+  i : integer;
+  p : TDPMPlatform;
+begin
+  result := [];
+  if value = '' then
+    exit;
+  //accept comma, pipe or semicolon as separators so we don't have to teach every caller the one true format.
+  normalized := StringReplace(value, '|', ',', [rfReplaceAll]);
+  normalized := StringReplace(normalized, ';', ',', [rfReplaceAll]);
+  parts := TStringUtils.SplitStr(normalized, ',');
+  for i := 0 to Length(parts) - 1 do
+  begin
+    p := StringToDPMPlatform(Trim(parts[i]));
+    if p <> TDPMPlatform.UnknownPlatform then
+      Include(result, p);
+  end;
+end;
 
 function IntToBin(Value: Word): string;
 var

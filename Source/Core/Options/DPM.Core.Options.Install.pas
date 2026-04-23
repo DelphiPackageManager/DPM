@@ -35,16 +35,30 @@ uses
   DPM.Core.Options.Search;
 
 type
+  ///<summary>Options driving an install. Populated differently depending on the caller:
+  ///
+  ///  CLI path (via the Install command, reading cmdline args):
+  ///    PackageId / PackageFile / VersionString / ProjectPath (directory or .dproj/.groupproj file)
+  ///    CompilerVersion / Platforms / Sources / Prerelease (from the inherited TSearchOptions)
+  ///
+  ///  IDE path (from the package manager UI):
+  ///    PackageId, Version (TSearchOptions.Version, already-parsed), Projects (explicit list of
+  ///    .dproj files from the project grid), Platforms = [], IsUpgrade, CompilerVersion
+  ///    ProjectPath is left blank — the IDE uses the Projects array instead.
+  ///
+  ///  Either ProjectPath or Projects must be set; Validate rejects the case where both are set
+  ///  (ambiguous) or neither is set.
+  ///</summary>
   TInstallOptions = class(TSearchOptions)
   private
     FPackageFile : string;
     FVersionString : string;
     FNoCache : boolean;
-    FProjectPath : string;
-    FProjects : TArray<string>;
+    FProjectPath : string;                   // CLI: directory or single .dproj/.groupproj; IDE: unused
+    FProjects : TArray<string>;              // IDE: explicit .dproj list from the project grid; CLI: unused
     FProjectGroup : string;
     FFloat : boolean;
-    FIsUpgrade : boolean;
+    FIsUpgrade : boolean;                    // IDE-only: flags this install as an upgrade of an already-installed package
     class var
       FDefault : TInstallOptions;
   protected
@@ -169,6 +183,13 @@ begin
   if (FProjectPath = '') and (Length(FProjects) = 0) then
   begin
     logger.Error('Project path cannot be empty, must either be a directory or project file.');
+    result := false;
+  end
+  else if (FProjectPath <> '') and (Length(FProjects) > 0) then
+  begin
+    //ProjectPath is the CLI's "point at a directory or .dproj"; Projects is the IDE's "here is
+    //the explicit list of .dproj files". Both set at once is ambiguous — reject it.
+    logger.Error('ProjectPath and Projects cannot both be set — use one or the other (ProjectPath is for CLI, Projects for IDE).');
     result := false;
   end;
 

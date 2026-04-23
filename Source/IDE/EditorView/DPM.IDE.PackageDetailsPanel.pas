@@ -272,6 +272,8 @@ var
   packageDep : IPackageDependency;
   textSize : TSize;
   value : string;
+  authorsDisplay : string;
+  authorIdx : integer;
 begin
   Canvas.Brush.Style := bsSolid;
 
@@ -315,7 +317,15 @@ begin
   DrawText(Canvas.Handle, 'Authors :', Length('Authors :'), FLayout.AuthorsLabelRect, DT_LEFT);
 
   Canvas.Font.Style := [];
-  DrawText(Canvas.Handle, FPackage.Authors, Length(FPackage.Authors), FLayout.AuthorsRect, DT_LEFT + DT_SINGLELINE);
+  authorsDisplay := '';
+  if FPackage.Authors <> nil then
+    for authorIdx := 0 to FPackage.Authors.Count - 1 do
+    begin
+      if authorsDisplay <> '' then
+        authorsDisplay := authorsDisplay + ', ';
+      authorsDisplay := authorsDisplay + FPackage.Authors[authorIdx];
+    end;
+  DrawText(Canvas.Handle, authorsDisplay, Length(authorsDisplay), FLayout.AuthorsRect, DT_LEFT + DT_SINGLELINE);
 
   if (deLicense in FOptionalElements) then
   begin
@@ -465,7 +475,7 @@ begin
     if package.ReportUrl <> '' then
       Include(FOptionalElements, deReportUrl);
 
-    if package.Tags <> '' then
+    if (package.Tags <> nil) and (package.Tags.Count > 0) then
       Include(FOptionalElements, deTags);
 
     if package.RepositoryUrl <> '' then
@@ -534,8 +544,6 @@ var
   clientRect : TRect;
   bottom : integer;
   count : integer;
-
-  tagsArr : TArray<string>;
   i : integer;
 
 begin
@@ -703,12 +711,11 @@ begin
     //TODO : Write a function to calc and split into lines
 
     Tags := '';
-    tagsArr := TStringUtils.SplitStr(package.Tags, ' ', TSplitStringOptions.ExcludeEmpty);
-    for i := 0 to Length(tagsArr) -1 do
+    for i := 0 to package.Tags.Count -1 do
     begin
       if Tags <> '' then
         Tags := Tags + ', ' ;
-      Tags := Tags + tagsArr[i];
+      Tags := Tags + package.Tags[i];
     end;
     DrawText(ACanvas.Handle, Tags, Length(Tags), TagsRect, DT_LEFT + DT_CALCRECT);
     bottom := TagsRect.Bottom;

@@ -87,7 +87,7 @@ begin
       if cancellationToken.IsCancelled then
         exit;
 
-      resultString := item.Id + '-' + item.Version + ' [' + DPMPlatformsToString(item.Platforms)  + ']';
+      resultString := item.Id + '-' + item.Version + ' [' + DPMPlatformsToString(item.SupportedPlatforms)  + ']';
       Logger.Information(resultString);
     end;
      result := TExitCode.OK;

@@ -3,6 +3,7 @@ unit DPM.Core.Package.SearchResults;
 interface
 
 uses
+  System.Classes,
   Spring.Collections,
   JsonDataObjects,
   DPM.Core.Types,
@@ -11,10 +12,13 @@ uses
   DPM.Core.Package.Interfaces;
 
 type
-  TDPMPackageSearchResultItem = class(TInterfacedObject, IPackageSearchResultItem)
+  TDPMPackageSearchResultItem = class(TInterfacedObject, IPackageSearchResultItem, IPackageMetadata, IPackageInfo, IPackageIdentity)
   private
     FIsError : boolean;
-    FAuthors : string;
+    FAuthors : IList<string>;
+    FReleaseNotes : string;
+    FReadMe : string;
+    FFrameworks : TArray<TDPMUIFrameworkType>;
     FCopyright : string;
     FDependencies : IList<IPackageDependency>;
     FDescription : string;
@@ -31,7 +35,10 @@ type
     FRepositoryBranch : string;
     FRepositoryCommit : string;
     FReportUrl : string;
-    FTags : string;
+    FTags : TStringList;
+    FSearchPaths : IList<string>;
+    FUseSource : boolean;
+    FSupportedPlatforms : TDPMPlatforms;
 
     FVersion : TPackageVersion;
     FLatestVersion : TPackageVersion;
@@ -47,7 +54,10 @@ type
     FSourceName : string;
     FPublishedDate : string;
   protected
-    function GetAuthors : string;
+    function GetAuthors : IList<string>;
+    function GetReleaseNotes : string;
+    function GetReadMe : string;
+    function GetFrameworks : TArray<TDPMUIFrameworkType>;
     function GetCopyright : string;
     function GetDependencies : IList<IPackageDependency>;
     function GetDescription : string;
@@ -70,9 +80,10 @@ type
     function GetRepositoryType : string;
     function GetRepositoryBranch : string;
     function GetRepositoryCommit : string;
-    function GetTags : string;
+    function GetTags : TStrings;
     function GetVersion : TPackageVersion;
     function GetDownloadCount : Int64;
+    function GetHash : string;
     function GetHashAlgorithm : string;
     function GetFileHash : string;
     function GetSourceName : string;
@@ -81,6 +92,11 @@ type
     function GetIsLatestVersion : boolean;
     function GetIsLatestStableVersion : boolean;
     function GetIsStableVersion : boolean;
+    function GetSearchPaths : IList<string>;
+    function GetUseSource : boolean;
+    procedure SetUseSource(const value : boolean);
+    function GetSupportedPlatforms : TDPMPlatforms;
+    procedure SetSupportedPlatforms(const value : TDPMPlatforms);
     function GetVersionRange : TVersionRange;
 
     function ToIdVersionString : string;
@@ -130,6 +146,25 @@ uses
   System.SysUtils,
   DPM.Core.Package.Dependency;
 
+procedure SplitCsvIntoList(const csv : string; const target : IList<string>);
+var
+  helper : TStringList;
+  i : integer;
+begin
+  if (target = nil) or (csv = '') then
+    exit;
+  helper := TStringList.Create;
+  try
+    helper.Delimiter := ',';
+    helper.StrictDelimiter := true;
+    helper.DelimitedText := csv;
+    for i := 0 to helper.Count - 1 do
+      target.Add(Trim(helper[i]));
+  finally
+    helper.Free;
+  end;
+end;
+
 { TDPMPackageSearchResultItem }
 
 constructor TDPMPackageSearchResultItem.CreateFromError(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion; const errorDescription : string);
@@ -143,6 +178,9 @@ begin
   FLatestVersion := version;
   FLatestStableVersion := version;
   FVersionRange := TVersionRange.Empty;
+  FTags := TStringList.Create;
+  FSearchPaths := TCollections.CreateList<string>;
+  FAuthors := TCollections.CreateList<string>;
 end;
 
 constructor TDPMPackageSearchResultItem.CreateFromJson(const sourceName : string; const jsonObject : TJsonObject);
@@ -153,6 +191,7 @@ var
   i: Integer;
   range : TVersionRange;
   dependency : IPackageDependency;
+  tagsStr : string;
 begin
   FSourceName := sourceName;
   FCompilerVersion := StringToCompilerVersion(jsonObject.S['compiler']);
@@ -160,11 +199,19 @@ begin
     raise EArgumentOutOfRangeException.Create('Invalid compiler version returned from server : ' + jsonObject.S['compiler']);
 
   FDependencies := TCollections.CreateList<IPackageDependency>;
+  FSearchPaths := TCollections.CreateList<string>;
+  FTags := TStringList.Create;
+  FAuthors := TCollections.CreateList<string>;
 
   FId               := jsonObject.S['id'];
   FVersion          := TPackageVersion.Parse(jsonObject.S['version']);
 
-  FAuthors          := jsonObject.S['authors'];
+  //server JSON sends authors as a CSV string — split so the interface exposes the same list shape as the spec.
+  SplitCsvIntoList(jsonObject.S['authors'], FAuthors);
+
+  FReleaseNotes     := jsonObject.S['releaseNotes'];
+  FReadMe           := jsonObject.S['readme'];
+
   FCopyright        := jsonObject.S['copyright'];
   FDescription      := jsonObject.S['description'];
   FIcon             := jsonObject.S['icon'];
@@ -177,7 +224,17 @@ begin
   FRepositoryBranch := jsonObject.S['repositoryBranch'];
   FRepositoryCommit := jsonObject.S['repositoryCommit'];
   FReportUrl        := jsonObject.S['reportUrl'];
-  FTags             := jsonObject.S['tags'];
+
+  if jsonObject.Contains('platforms') then
+    FSupportedPlatforms := StringToDPMPlatforms(jsonObject.S['platforms']);
+
+  tagsStr := jsonObject.S['tags'];
+  if tagsStr <> '' then
+  begin
+    FTags.Delimiter := ' ';
+    FTags.StrictDelimiter := true;
+    FTags.DelimitedText := tagsStr;
+  end;
 
   FDownloadCount    := jsonObject.L['totalDownloads'];
   FHashAlgorithm    := jsonObject.S['hashAlgorithm'];
@@ -218,7 +275,13 @@ begin
   FDependencies := TCollections.CreateList<IPackageDependency>;
   if metaData.Dependencies <> nil then
     FDependencies.AddRange(metaData.Dependencies);
-  FAuthors := metaData.Authors;
+  FSearchPaths := TCollections.CreateList<string>;
+  FAuthors := TCollections.CreateList<string>;
+  if metaData.Authors <> nil then
+    FAuthors.AddRange(metaData.Authors);
+  FReleaseNotes := metaData.ReleaseNotes;
+  FReadMe := metaData.ReadMe;
+  FFrameworks := metaData.Frameworks;
   FCopyright := metaData.Copyright;
   FDescription := metaData.Description;
   FIcon := metaData.Icon;
@@ -231,8 +294,10 @@ begin
   FRepositoryType := metaData.RepositoryType;
   FRepositoryBranch := metaData.RepositoryBranch;
   FRepositoryCommit := metaData.RepositoryCommit;
-  metaData.Tags.Delimiter := ' ';
-  FTags := metaData.Tags.DelimitedText;
+  FSupportedPlatforms := metaData.SupportedPlatforms;
+  FTags := TStringList.Create;
+  if metaData.Tags <> nil then
+    FTags.Assign(metaData.Tags);
   FVersion := metaData.Version;
   FDownloadCount := -1; //indicates not set;
   FIsReservedPrefix := false;
@@ -244,6 +309,8 @@ end;
 destructor TDPMPackageSearchResultItem.Destroy;
 begin
   FDependencies := nil;
+  FSearchPaths := nil;
+  FTags.Free;
   inherited;
 end;
 
@@ -262,9 +329,24 @@ begin
   result := TDPMPackageSearchResultItem.CreateFromMetaData(sourceName, metaData, fileHash, hasHalgorithm);
 end;
 
-function TDPMPackageSearchResultItem.GetAuthors : string;
+function TDPMPackageSearchResultItem.GetAuthors : IList<string>;
 begin
   result := FAuthors;
+end;
+
+function TDPMPackageSearchResultItem.GetFrameworks : TArray<TDPMUIFrameworkType>;
+begin
+  result := FFrameworks;
+end;
+
+function TDPMPackageSearchResultItem.GetReadMe : string;
+begin
+  result := FReadMe;
+end;
+
+function TDPMPackageSearchResultItem.GetReleaseNotes : string;
+begin
+  result := FReleaseNotes;
 end;
 
 function TDPMPackageSearchResultItem.GetCompilerVersion: TCompilerVersion;
@@ -415,9 +497,40 @@ begin
   result := FSourceName;
 end;
 
-function TDPMPackageSearchResultItem.GetTags : string;
+function TDPMPackageSearchResultItem.GetTags : TStrings;
 begin
   result := FTags;
+end;
+
+function TDPMPackageSearchResultItem.GetHash : string;
+begin
+  //search results don't carry a separate IPackageInfo.Hash — reuse the file hash.
+  result := FFileHash;
+end;
+
+function TDPMPackageSearchResultItem.GetSearchPaths : IList<string>;
+begin
+  result := FSearchPaths;
+end;
+
+function TDPMPackageSearchResultItem.GetUseSource : boolean;
+begin
+  result := FUseSource;
+end;
+
+procedure TDPMPackageSearchResultItem.SetUseSource(const value : boolean);
+begin
+  FUseSource := value;
+end;
+
+function TDPMPackageSearchResultItem.GetSupportedPlatforms : TDPMPlatforms;
+begin
+  result := FSupportedPlatforms;
+end;
+
+procedure TDPMPackageSearchResultItem.SetSupportedPlatforms(const value : TDPMPlatforms);
+begin
+  FSupportedPlatforms := value;
 end;
 
 function TDPMPackageSearchResultItem.GetVersion : TPackageVersion;

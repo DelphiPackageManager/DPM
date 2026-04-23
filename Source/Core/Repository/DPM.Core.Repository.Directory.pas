@@ -1075,7 +1075,7 @@ var
 
   procedure AddCurrent;
   begin
-    newItem := TPackageListItem.Create(currentId,currentCompiler, currentVersion, DPMPlatformsToString(currentPlatforms));
+    newItem := TPackageListItem.Create(currentId,currentCompiler, currentVersion, currentPlatforms);
     result.Add(newItem);
   end;
 

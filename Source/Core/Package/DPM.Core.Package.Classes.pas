@@ -67,12 +67,15 @@ type
     FUseSource : boolean;
     FHash : string;
     FHashAlgorithm : string;
+    FSupportedPlatforms : TDPMPlatforms;
   protected
     function GetDependencies : IList<IPackageDependency>;
     function GetUseSource : boolean;
     procedure SetUseSource(const value : boolean);
     function GetHash : string;
     function GetHashAlgorithm : string;
+    function GetSupportedPlatforms : TDPMPlatforms;
+    procedure SetSupportedPlatforms(const value : TDPMPlatforms);
 
     constructor Create(const sourceName : string; const manifest : IPackageSpec; const hash : string; const hashAlgorithm : string);overload;
     constructor Create(const sourceName : string; const jsonObj : TJsonObject);override;
@@ -86,7 +89,7 @@ type
 
   TPackageMetadata = class(TPackageInfo, IPackageMetadata, IPackageInfo, IPackageIdentity)
   private
-    FAuthors : string;
+    FAuthors : IList<string>;
     FCopyright : string;
     FDescription : string;
     FIcon : string;
@@ -100,8 +103,11 @@ type
     FRepositoryType : string;
     FRepositoryBranch : string;
     FRepositoryCommit : string;
+    FReleaseNotes : string;
+    FReadMe : string;
+    FFrameworks : TArray<TDPMUIFrameworkType>;
   protected
-    function GetAuthors : string;
+    function GetAuthors : IList<string>;
     function GetCopyright : string;
     function GetDescription : string;
     function GetIcon : string;
@@ -115,6 +121,13 @@ type
     function GetRepositoryType : string;
     function GetRepositoryBranch : string;
     function GetRepositoryCommit : string;
+    function GetReleaseNotes : string;
+    function GetReadMe : string;
+    function GetFrameworks : TArray<TDPMUIFrameworkType>;
+    ///<summary>Populates this package's metadata fields from the spec's metadata — the single place
+    /// where ISpecMetaData → IPackageMetadata field-copying lives. Allocates FAuthors/FTags first so
+    /// it is also safe to call on an instance created via the json constructor.</summary>
+    procedure AssignFromSpecMetaData(const source : ISpecMetaData);
     constructor Create(const sourceName : string; const manifest : IPackageSpec); override;
   public
     constructor Create(const sourceName : string; const jsonObj : TJsonObject); override;
@@ -269,6 +282,11 @@ begin
   inherited Create(sourceName, jsonObj);
   FDependencies := TCollections.CreateList<IPackageDependency>;
 
+  //new per-compiler JSON shape: server returns a comma/pipe-separated 'platforms' list.
+  //missing/empty is tolerated so feeds that haven't adopted the field yet don't break clients.
+  if jsonObj.Contains('platforms') then
+    FSupportedPlatforms := StringToDPMPlatforms(jsonObj.S['platforms']);
+
   FHash := jsonObj.S['hash']; //base64 - need ot convert it to hex.
   FHashAlgorithm := jsonObj.S['hashAlgorithm'];
 
@@ -317,6 +335,7 @@ begin
   // Get dependencies from the template referenced by TargetPlatform
   if manifest.TargetPlatform <> nil then
   begin
+    FSupportedPlatforms := manifest.TargetPlatform.Platforms;
     template := manifest.FindTemplate(manifest.TargetPlatform.TemplateName);
     if template <> nil then
     begin
@@ -375,6 +394,16 @@ begin
   FUseSource := value;
 end;
 
+function TPackageInfo.GetSupportedPlatforms : TDPMPlatforms;
+begin
+  result := FSupportedPlatforms;
+end;
+
+procedure TPackageInfo.SetSupportedPlatforms(const value : TDPMPlatforms);
+begin
+  FSupportedPlatforms := value;
+end;
+
 class function TPackageInfo.TryLoadFromJson(const logger: ILogger; const jsonObj: TJsonObject; const source: string; out packageInfo: IPackageInfo): boolean;
 begin
   result := false;
@@ -393,37 +422,35 @@ end;
 
 
 constructor TPackageMetadata.Create(const sourceName : string; const manifest : IPackageSpec);
-var
-  author : string;
 begin
-  inherited Create(sourceName, manifest, '','');
+  inherited Create(sourceName, manifest, '', '');
   FSearchPaths := TCollections.CreateList<string>;
   FTags := TStringList.Create;
-  FAuthors := '';
-  if manifest.MetaData.Authors <> nil then
-    for author in manifest.MetaData.Authors do
-    begin
-      if FAuthors <> '' then
-        FAuthors := FAuthors + ', ';
-      FAuthors := FAuthors + author;
-    end;
-  FCopyright := manifest.MetaData.Copyright;
-  FDescription := manifest.MetaData.Description;
-  FIcon := manifest.MetaData.Icon;
-  FIsCommercial := manifest.MetaData.IsCommercial;
-  FIsTrial := manifest.MetaData.IsTrial;
-  FLicense := manifest.MetaData.License;
-  FProjectUrl := manifest.MetaData.ProjectUrl;
-  FTags.Assign(manifest.MetaData.Tags);
-  FProjectUrl := manifest.MetaData.ProjectUrl;
-  FRepositoryUrl := manifest.MetaData.RepositoryUrl;
-  FRepositoryType := manifest.MetaData.RepositoryType;
-  FRepositoryBranch := manifest.MetaData.RepositoryBranch;
-  FRepositoryCommit := manifest.MetaData.RepositoryCommit;
-
-
+  FAuthors := TCollections.CreateList<string>;
+  AssignFromSpecMetaData(manifest.MetaData);
 end;
 
+procedure TPackageMetadata.AssignFromSpecMetaData(const source : ISpecMetaData);
+begin
+  FAuthors.Clear;
+  if source.Authors <> nil then
+    FAuthors.AddRange(source.Authors);
+  FCopyright := source.Copyright;
+  FDescription := source.Description;
+  FIcon := source.Icon;
+  FIsCommercial := source.IsCommercial;
+  FIsTrial := source.IsTrial;
+  FLicense := source.License;
+  FProjectUrl := source.ProjectUrl;
+  FTags.Assign(source.Tags);
+  FRepositoryUrl := source.RepositoryUrl;
+  FRepositoryType := source.RepositoryType;
+  FRepositoryBranch := source.RepositoryBranch;
+  FRepositoryCommit := source.RepositoryCommit;
+  FReleaseNotes := source.ReleaseNotes;
+  FReadMe := source.ReadMe;
+  FFrameworks := source.Frameworks;
+end;
 
 
 constructor TPackageMetadata.Create(const sourceName: string; const jsonObj: TJsonObject);
@@ -431,11 +458,30 @@ var
   searchPaths : string;
   sList : TStringList;
   i: Integer;
+  authorsStr : string;
 begin
   inherited Create(sourceName, jsonObj);
   FSearchPaths := TCollections.CreateList<string>;
+  FAuthors := TCollections.CreateList<string>;
+  FTags := TStringList.Create;
 
-  FAuthors        := jsonObj.S['authors'];;
+  //server JSON has historically sent authors as a comma-joined string; keep parsing that way
+  //so existing feeds still work but expose the list shape through the interface.
+  authorsStr := jsonObj.S['authors'];
+  if authorsStr <> '' then
+  begin
+    sList := TStringList.Create;
+    try
+      sList.Delimiter := ',';
+      sList.StrictDelimiter := true;
+      sList.DelimitedText := authorsStr;
+      for i := 0 to sList.Count - 1 do
+        FAuthors.Add(Trim(sList[i]));
+    finally
+      sList.Free;
+    end;
+  end;
+
   FCopyright      := jsonObj.S['copyright'];
   FDescription    := jsonObj.S['description'];
   FIcon           := jsonObj.S['icon'];
@@ -445,12 +491,13 @@ begin
   FProjectUrl     := jsonObj.S['ProjectUrl'];
   if jsonObj.Contains('Tags')  then
     FTags.Text    := jsonObj.S['Tags'];
-  FProjectUrl     := jsonObj.S['ProjectUrl'];
   FRepositoryUrl  := jsonObj.S['RepositoryUrl'];
   FRepositoryType := jsonObj.S['RepositoryType'];
   FRepositoryBranch := jsonObj.S['RepositoryBranch'];
   FRepositoryCommit := jsonObj.S['RepositoryCommit'];
-  searchPaths       := jsonObj.S['searchPaths'];
+  FReleaseNotes   := jsonObj.S['releaseNotes'];
+  FReadMe         := jsonObj.S['readme'];
+  searchPaths     := jsonObj.S['searchPaths'];
 
   if searchPaths <> '' then
   begin
@@ -479,7 +526,7 @@ begin
   inherited;
 end;
 
-function TPackageMetadata.GetAuthors : string;
+function TPackageMetadata.GetAuthors : IList<string>;
 begin
   result := FAuthors;
 end;
@@ -487,6 +534,21 @@ end;
 function TPackageMetadata.GetCopyright : string;
 begin
   result := FCopyright;
+end;
+
+function TPackageMetadata.GetFrameworks : TArray<TDPMUIFrameworkType>;
+begin
+  result := FFrameworks;
+end;
+
+function TPackageMetadata.GetReadMe : string;
+begin
+  result := FReadMe;
+end;
+
+function TPackageMetadata.GetReleaseNotes : string;
+begin
+  result := FReleaseNotes;
 end;
 
 function TPackageMetadata.GetDescription : string;
@@ -531,7 +593,7 @@ end;
 
 function TPackageMetadata.GetRepositoryType: string;
 begin
-  result := FRepositoryBranch;
+  result := FRepositoryType;
 end;
 
 function TPackageMetadata.GetRepositoryUrl: string;

@@ -55,12 +55,9 @@ type
   protected
     function Initialize(const config: IConfiguration) : boolean;
 
-//    function ValidateDependencyGraph(const cancellationToken : ICancellationToken; var dependencyGraph : IPackageReference) : boolean;
-
     function DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const includePrerelease : boolean; const context : IResolverContext) : boolean;
 
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
-    function ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
 
   public
     constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageInstallerContext : IPackageInstallerContext);
@@ -378,77 +375,6 @@ begin
   result := result and (errorCount = 0);
 end;
 
-
-//This is all wrong. What it should do is just validate the project references and ensure it's correct, not go off and resolve dependencies
-//which might change the dependecy versions. We only want to change the graph if it's wrong.
-function TDependencyResolver.ResolveForRestore(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
-                                               const projectFile : string; const options : TSearchOptions; const projectReferences : IList<IPackageReference>;
-                                               out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
-var
-  context : IResolverContext;
-  packageRef : IPackageReference;
-  resolution : IResolvedPackage;
-  errorCount : integer;
-begin
-  Assert(FConfiguration <> nil, 'config is nil, Initialize has not been called');
-
-  //TODO : First validate that there are no conflicts in the existing graph.. if there are remove them and let the resolver deal with it?
-
-  errorCount := 0;
-
-  //first check if the packages are already resolved in the project group.
-  for packageRef in projectReferences do
-  begin
-    resolution := FPackageInstallerContext.FindPackageResolution(projectFile, packageRef.Id);
-    //if resolved, check if they are compatible.
-    if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Version)) then
-    begin
-      FLogger.Error('Package project group conflict : ' + packageRef.Id + '-' + resolution.PackageInfo.Version.ToString + ' in project : ' + resolution.ProjectFile + ' does not satisfy ' + packageRef.Version.ToString  );
-      Inc(errorCount)
-     // exit; //don't exit, we still want to resolve what we can.
-    end;
-  end;
-  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, compilerVersion,  projectReferences);
-
-  result := DoResolve(cancellationToken, compilerVersion,  options.Prerelease, context);
-  resolved := context.GetResolvedPackageInfos;
-  dependencyGraph := context.BuildDependencyGraph;
-  //record the resolutions so they can be applied to other projects in the group
-  FPackageInstallerContext.RecordResolutions(projectFile, context.GetResolvedPackages);
-  result := result and (errorCount = 0);
-end;
-
-
-//not called or functioning
-//function TDependencyResolver.ValidateDependencyGraph(const cancellationToken: ICancellationToken; var dependencyGraph: IPackageReference): boolean;
-//var
-//  resolvedPackages: IDictionary<string, TPackageVersion>;
-//begin
-//  result := true;
-//
-//  resolvedPackages := TCollections.CreateDictionary<string, TPackageVersion>;
-//
-//  //check for conflicts in the graph. If there are any then log the conflicts and remove them so restore can repair the graph.
-//  dependencyGraph.VisitDFS(
-//    procedure(const node: IPackageReference)
-//    var
-//      pkgVersion : TPackageVersion;
-//    begin
-//
-//      if resolvedPackages.TryGetValue(LowerCase(node.Id), pkgVersion) then
-//      begin
-//
-//
-//      end
-//      else
-//      begin
-//
-//      end;
-//
-//    end);
-//
-//
-//end;
 
 end.
 

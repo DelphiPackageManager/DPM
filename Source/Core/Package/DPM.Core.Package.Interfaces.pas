@@ -72,7 +72,13 @@ type
     property VersionRange : TVersionRange read GetVersionRange write SetVersionRange;
   end;
 
-  ///<summary> PackageIdentity plus dependencies. used when resolving.</summary>
+  ///<summary> PackageIdentity plus dependencies. used when resolving.
+  /// SupportedPlatforms is the set of platforms the package supports (per-compiler in the
+  /// new single-package-per-compiler model). The IDE uses this to filter the feed by the
+  /// platforms enabled on the current project. Populated from the spec's TargetPlatform.Platforms
+  /// when reading a manifest, from the `platforms` JSON field when coming off the HTTP feed,
+  /// and from the filename's platform segment when parsing from a .dpkg filename.
+  /// </summary>
   IPackageInfo = interface(IPackageIdentity)
     ['{5672DB4A-40BC-45E0-857C-39117D03C322}']
     function GetDependencies : IList<IPackageDependency>;
@@ -80,18 +86,23 @@ type
     procedure SetUseSource(const value : boolean);
     function GetHash : string;
     function GetHashAlgorithm : string;
+    function GetSupportedPlatforms : TDPMPlatforms;
+    procedure SetSupportedPlatforms(const value : TDPMPlatforms);
 
     property Dependencies : IList<IPackageDependency>read GetDependencies;
     property UseSource : boolean read GetUseSource write SetUseSource;
     property Hash : string read GetHash;
     property HashAlgorithm : string read GetHashAlgorithm;
+    property SupportedPlatforms : TDPMPlatforms read GetSupportedPlatforms write SetSupportedPlatforms;
   end;
 
-  ///<summary>Package Info plus metadata</summary>
+  ///<summary>Package Info plus metadata. Mirrors ISpecMetaData's shape so everything the author wrote
+  /// in the .dspec survives the round trip through a packed .dpkg — including ReleaseNotes, ReadMe
+  /// and Frameworks (planned future use: filter the IDE feed by project type).</summary>
   IPackageMetadata = interface(IPackageInfo)
     ['{0C39A81D-63FF-4939-A74A-4BFE29724168}']
     function GetDescription : string;
-    function GetAuthors : string;
+    function GetAuthors : IList<string>;
     function GetLicense : string;
     function GetIcon : string;
     function GetCopyright : string;
@@ -104,9 +115,14 @@ type
     function GetRepositoryType : string;
     function GetRepositoryBranch : string;
     function GetRepositoryCommit : string;
+    function GetReleaseNotes : string;
+    function GetReadMe : string;
+    function GetFrameworks : TArray<TDPMUIFrameworkType>;
 
     property Description : string read GetDescription;
-    property Authors : string read GetAuthors;
+    //Authors matches the spec shape (IList<string>) — callers that want a display string
+    //should join at the presentation layer instead of relying on a CSV-joined field here.
+    property Authors : IList<string> read GetAuthors;
     property License : string read GetLicense;
     property Icon : string read GetIcon;
     property Copyright : string read GetCopyright;
@@ -119,41 +135,36 @@ type
     property RepositoryBranch : string read GetRepositoryBranch;
     property RepositoryCommit : string read GetRepositoryCommit;
     property SearchPaths : IList<string> read GetSearchPaths;
+    property ReleaseNotes : string read GetReleaseNotes;
+    property ReadMe : string read GetReadMe;
+    property Frameworks : TArray<TDPMUIFrameworkType> read GetFrameworks;
   end;
 
-  ///<summary>This is what is returned from a package repository for the ui </summary>
-  IPackageSearchResultItem = interface(IPackageIdentity)
+  ///<summary>What a package repository returns for the UI.
+  ///  Extends IPackageMetadata with server-only fields (download count, file hash,
+  ///  published date, reserved-prefix flag, report url) and IDE-mutable UI state
+  ///  (installed flag, latest-version cache, transitive flag, selected version range).
+  ///</summary>
+  IPackageSearchResultItem = interface(IPackageMetadata)
     ['{8EB6EA16-3708-41F7-93A2-FE56EB75510B}']
-    function GetSourceName : string;
-    function GetDependencies : IList<IPackageDependency>;
 
-    function GetDescription : string;
-    function GetAuthors : string;
-    function GetProjectUrl : string;
+    //server-only fields
     function GetReportUrl : string;
-    function GetRepositoryUrl : string;
-    function GetRepositoryType : string;
-    function GetRepositoryBranch : string;
-    function GetRepositoryCommit : string;
     function GetPublishedDate : string;
-    function GetLicense : string;
-    function GetIcon : string;
-    function GetCopyright : string;
-    function GetTags : string;
-    function GetIsTrial : boolean;
-    function GetIsCommercial : boolean;
     function GetDownloadCount : Int64;
-    function GetHashAlgorithm : string;
     function GetFileHash : string;
+    function GetIsReservedPrefix : boolean;
+
+    //UI-mutable state
     function GetInstalled : boolean;
     function GetLatestVersion : TPackageVersion;
     function GetLatestStableVersion : TPackageVersion;
-    function GetIsError : boolean;
-    function GetIsReservedPrefix : boolean;
-    function GetIsTransitive : boolean;
     function GetIsLatestVersion : boolean;
     function GetIsLatestStableVersion : boolean;
+    function GetIsTransitive : boolean;
     function GetVersionRange : TVersionRange;
+
+    function GetIsError : boolean;
 
     procedure SetVersion(const value : TPackageVersion);
     procedure SetInstalled(const value : boolean);
@@ -168,31 +179,22 @@ type
     procedure SetIsTransitive(const value : boolean);
     procedure SetVersionRange(const value : TVersionRange);
 
-    //reintroducing here to make it settable.
+    //Version is re-declared writable here (IPackageIdentity exposes it read-only)
     property Version : TPackageVersion read GetVersion write SetVersion;
 
-    property Description : string read GetDescription;
-    property Authors : string read GetAuthors;
-    property ProjectUrl : string read GetProjectUrl;
-    property RepositoryUrl : string read GetRepositoryUrl;
-    property RepositoryType   : string read GetRepositoryType write SetRepositoryType;
+    //Repository* re-declared writable (IPackageMetadata exposes them read-only)
+    property RepositoryUrl : string read GetRepositoryUrl write SetRepositoryUrl;
+    property RepositoryType : string read GetRepositoryType write SetRepositoryType;
     property RepositoryBranch : string read GetRepositoryBranch write SetRepositoryBranch;
     property RepositoryCommit : string read GetRepositoryCommit write SetRepositoryCommit;
-    property License : string read GetLicense;
-    property Icon : string read GetIcon;
-    property Copyright : string read GetCopyright;
-    property Tags : string read GetTags;
-
-    property Dependencies : IList<IPackageDependency>read GetDependencies;
 
     //only returned from server feeds.
     property IsReservedPrefix : boolean read GetIsReservedPrefix;
-    property IsTrial : boolean read GetIsTrial;
-    property IsCommercial : boolean read GetIsCommercial;
     //returns -1 if not set.
     property Downloads : Int64 read GetDownloadCount;
-    property HashAlgorithm : string read GetHashAlgorithm;
     property FileHash : string read GetFileHash;
+    property ReportUrl : string read GetReportUrl write SetReportUrl;
+    property PublishedDate : string read GetPublishedDate write SetPublishedDate;
 
     //these are for use by the UI, not returned.
     property Installed : boolean read GetInstalled write SetInstalled;
@@ -202,11 +204,8 @@ type
     property IsLatestStableVersion : boolean read GetIsLatestStableVersion;
     property IsTransitive : boolean read GetIsTransitive write SetIsTransitive;
     property VersionRange : TVersionRange read GetVersionRange write SetVersionRange;
-    property ReportUrl : string read GetProjectUrl write SetReportUrl;
-    property PublishedDate : string read GetPublishedDate write SetPublishedDate; //TODO : what format should this be - see repos
-    property IsError : boolean read GetIsError;
 
-    property SourceName : string read GetSourceName;
+    property IsError : boolean read GetIsError;
   end;
 
   //List of search result items
@@ -243,9 +242,9 @@ type
   ['{649F91AF-95F9-47A2-99A3-30BF68844E6B}']
     function GetId : string;
     function GetVersion : TPackageVersion;
-    function GetPlatforms : string;
+    function GetPlatforms : TDPMPlatforms;
     function GetCompilerVersion : TCompilerVersion;
-    procedure SetPlatforms(const value : string);
+    procedure SetPlatforms(const value : TDPMPlatforms);
     function IsSamePackageVersion(const item : IPackageListItem) : Boolean;
     function IsSamePackageId(const item : IPackageListItem) : boolean;
     function MergeWith(const item : IPackageListItem) : IPackageListItem;
@@ -253,7 +252,7 @@ type
     property Id : string read GetId;
     property CompilerVersion : TCompilerVersion read GetCompilerVersion;
     property Version : TPackageVersion read GetVersion;
-    property Platforms : string read GetPlatforms write SetPlatforms;
+    property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
   end;
 
   IPackageLatestVersionInfo = interface
@@ -361,7 +360,7 @@ function TPackageListItemEqualityComparer.GetHashCode(const Value: IPackageListI
 var
   s : string;
 begin
-  s := Value.Id + CompilerToString(value.CompilerVersion) + Value.Version.ToStringNoMeta + Value.Platforms;
+  s := Value.Id + CompilerToString(value.CompilerVersion) + Value.Version.ToStringNoMeta + DPMPlatformsToString(Value.Platforms);
   {$IF CompilerVersion >= 29.0}
   Result := System.Hash.THashBobJenkins.GetHashValue(s);
   {$ELSE}

@@ -719,7 +719,7 @@ begin
       begin
         result := right.Version.CompareTo(left.Version);
         if result = 0 then
-          result := CompareText(left.Platforms, right.Platforms);
+          result := CompareText(DPMPlatformsToString(left.Platforms), DPMPlatformsToString(right.Platforms));
       end;
     end;
   end;

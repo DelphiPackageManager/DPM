@@ -46,6 +46,7 @@ type
     FIDENotifier : integer;
     FProjectMenuNoftifierId : integer;
     FThemeChangeNotifierId : integer;
+    FStartupCleanupNotifierId : integer;
     FEditorViewManager : IDPMEditorViewManager;
     FDPMIDEMessageService : IDPMIDEMessageService;
     FLogger : IDPMIDELogger;
@@ -90,6 +91,8 @@ uses
   DPM.Core.Logging,
   DPM.Core.Init,
   DPM.Core.Utils.Config,
+  DPM.Core.Cache.Interfaces,
+  DPM.Core.Configuration.Interfaces,
   DPM.Core.Package.Interfaces,
   DPM.Core.Package.Installer.Interfaces,
   DPM.IDE.ProjectController,
@@ -103,6 +106,55 @@ uses
   DPM.IDE.ToolsAPI;
 
 {$R DPM.IDE.Resources.res}
+
+type
+  //One-shot IOTAIDENotifier that triggers orphan-BPL cleanup on the first FileNotification event.
+  //By that point Delphi has finished processing Known Packages from the registry and loaded every
+  //BPL it intends to - so IOTAPackageServices can see the orphans we want to remove. Subsequent
+  //FileNotification calls are ignored; the wizard unregisters the notifier on shutdown.
+  TDPMStartupCleanupNotifier = class(TNotifierObject, IOTANotifier, IOTAIDENotifier)
+  private
+    FContext : IDPMIDEPackageInstallerContext;
+    FLogger : IDPMIDELogger;
+    FCleanedUp : boolean;
+  protected
+    //IOTAIDENotifier
+    procedure FileNotification(NotifyCode : TOTAFileNotification; const FileName : string; var Cancel : Boolean);
+    procedure AfterCompile(Succeeded : Boolean);
+    procedure BeforeCompile(const Project : IOTAProject; var Cancel : Boolean);
+  public
+    constructor Create(const context : IDPMIDEPackageInstallerContext; const logger : IDPMIDELogger);
+  end;
+
+constructor TDPMStartupCleanupNotifier.Create(const context : IDPMIDEPackageInstallerContext; const logger : IDPMIDELogger);
+begin
+  inherited Create;
+  FContext := context;
+  FLogger := logger;
+  FCleanedUp := false;
+end;
+
+procedure TDPMStartupCleanupNotifier.AfterCompile(Succeeded : Boolean);
+begin
+end;
+
+procedure TDPMStartupCleanupNotifier.BeforeCompile(const Project : IOTAProject; var Cancel : Boolean);
+begin
+end;
+
+procedure TDPMStartupCleanupNotifier.FileNotification(NotifyCode : TOTAFileNotification; const FileName : string; var Cancel : Boolean);
+begin
+  if FCleanedUp then
+    exit;
+  FCleanedUp := true;
+  try
+    FContext.CleanupOrphanedDesignBPLs;
+  except
+    on e : Exception do
+      FLogger.Error('Exception during startup design BPL cleanup : ' + e.Message);
+  end;
+end;
+
 { TDPMWizard }
 
 procedure TDPMWizard.InitContainer;
@@ -157,6 +209,11 @@ var
   png : TPngImage;
   idx : integer;
   menuServices : INTAServices;
+  installerContext : IPackageInstallerContext;
+  ideInstallerContext : IDPMIDEPackageInstallerContext;
+  configManager : IConfigurationManager;
+  dpmConfig : IConfiguration;
+  packageCache : IPackageCache;
 begin
   InitContainer;
   FLogger := FContainer.Resolve<IDPMIDELogger>;
@@ -179,6 +236,31 @@ begin
   {$ELSE}
   FThemeChangeNotifierId := -1;
   {$IFEND}
+
+  //If the IDE crashed last session with DPM design BPLs loaded, the ToolsAPI reloads them from
+  //the Known Packages registry during IDE startup - well before we get the chance to intercept.
+  //We can't scan & uninstall here in the constructor because Delphi hasn't actually processed
+  //Known Packages yet (IOTAPackageServices reports only built-in IDE packages at this point).
+  //Instead, register a one-shot IDE notifier; on the first FileNotification event - which always
+  //comes after package loading completes - we enumerate IOTAPackageServices and uninstall any
+  //BPL loaded from under the DPM cache root. See TDPMStartupCleanupNotifier above.
+  //
+  //The package cache's Location is normally wired by TPackageInstaller.Initialize which only
+  //runs when a project is installed/restored - so we have to load the config and set it here or
+  //the cleanup method can't resolve the cache root.
+  FStartupCleanupNotifierId := -1;
+  configManager := FContainer.Resolve<IConfigurationManager>;
+  configManager.EnsureDefaultConfig;
+  dpmConfig := configManager.LoadConfig(TConfigUtils.GetDefaultConfigFileName);
+  if dpmConfig <> nil then
+  begin
+    packageCache := FContainer.Resolve<IPackageCache>;
+    packageCache.Location := dpmConfig.PackageCacheLocation;
+    installerContext := FContainer.Resolve<IPackageInstallerContext>;
+    if Supports(installerContext, IDPMIDEPackageInstallerContext, ideInstallerContext) then
+      FStartupCleanupNotifierId := (BorlandIDEServices as IOTAServices).AddNotifier(
+        TDPMStartupCleanupNotifier.Create(ideInstallerContext, FLogger));
+  end;
 
   projectController := FContainer.Resolve<IDPMIDEProjectController>;
 
@@ -242,6 +324,9 @@ begin
     (BorlandIDEServices as IOTAProjectFileStorage).RemoveNotifier(FStorageNotifierId);
   if FIDENotifier > -1 then
     (BorlandIDEServices as IOTAServices).RemoveNotifier(FIDENotifier);
+
+  if FStartupCleanupNotifierId > -1 then
+    (BorlandIDEServices as IOTAServices).RemoveNotifier(FStartupCleanupNotifierId);
 
   if FProjectMenuNoftifierId > -1 then
     (BorlandIDEServices as IOTAServices).RemoveNotifier(FProjectMenuNoftifierId);

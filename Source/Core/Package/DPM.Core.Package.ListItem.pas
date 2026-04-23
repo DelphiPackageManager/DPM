@@ -13,21 +13,21 @@ type
   private
     FCompilerVersion: TCompilerVersion;
     FId: string;
-    FPlatforms: string;
+    FPlatforms: TDPMPlatforms;
     FVersion: TPackageVersion;
   protected
     function GetCompilerVersion: TCompilerVersion;
     function GetId: string;
-    function GetPlatforms: string;
+    function GetPlatforms: TDPMPlatforms;
     function GetVersion: TPackageVersion;
 
-    procedure SetPlatforms(const value : string);
+    procedure SetPlatforms(const value : TDPMPlatforms);
     function IsSamePackageVersion(const item : IPackageListItem) : Boolean;
     function IsSamePackageId(const item : IPackageListItem) : boolean;
     function MergeWith(const item : IPackageListItem) : IPackageListItem;
 
   public
-    constructor Create(const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platforms : string);overload;
+    constructor Create(const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platforms : TDPMPlatforms);overload;
     constructor Create(const jsonObj : TJsonObject);overload;
     class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject;   out listItem : IPackageListItem) : boolean;
   end;
@@ -40,7 +40,7 @@ uses
 
 { TPackageListItem }
 
-constructor TPackageListItem.Create(const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platforms : string);
+constructor TPackageListItem.Create(const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const platforms : TDPMPlatforms);
 begin
   FId := id;
   FCompilerVersion := compilerVersion;
@@ -51,7 +51,7 @@ end;
 constructor TPackageListItem.Create(const jsonObj: TJsonObject);
 var
   id : string;
-  platforms : string;
+  platforms : TDPMPlatforms;
   stmp : string;
   cv : TCompilerVersion;
   packageVersion : TPackageVersion;
@@ -61,7 +61,7 @@ begin
   cv := StringToCompilerVersion(stmp);
   if cv = TCompilerVersion.UnknownVersion then
     raise Exception.Create('Compiler segment is not a valid version [' + stmp+ ']');
-  platforms := jsonObj.S['platforms'];
+  platforms := StringToDPMPlatforms(jsonObj.S['platforms']);
   stmp := jsonObj.S['version'];
   if not TPackageVersion.TryParse(stmp, packageVersion) then
     raise Exception.Create('Version is not a valid version [' + stmp + ']');
@@ -78,7 +78,7 @@ begin
   result := FId;
 end;
 
-function TPackageListItem.GetPlatforms: string;
+function TPackageListItem.GetPlatforms: TDPMPlatforms;
 begin
   result := FPlatforms;
 end;
@@ -99,24 +99,12 @@ begin
 end;
 
 function TPackageListItem.MergeWith(const item: IPackageListItem): IPackageListItem;
-var
-  sList : TStringList;
 begin
   Assert(IsSamePackageVersion(item));
-  sList := TStringList.Create;
-  sList.Duplicates := TDuplicates.dupIgnore;
-  sList.Sorted := true;
-  sList.CaseSensitive := false;
-  try
-    sList.Delimiter := ',';
-    sList.DelimitedText := FPlatforms + ',' + item.Platforms;
-    result := TPackageListItem.Create(FId, FCompilerVersion, FVersion, sList.DelimitedText);
-  finally
-    sList.Free;
-  end;
+  result := TPackageListItem.Create(FId, FCompilerVersion, FVersion, FPlatforms + item.Platforms);
 end;
 
-procedure TPackageListItem.SetPlatforms(const value: string);
+procedure TPackageListItem.SetPlatforms(const value: TDPMPlatforms);
 begin
   FPlatforms := value;
 end;

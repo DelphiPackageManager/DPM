@@ -40,6 +40,7 @@ uses
   DPM.Core.Logging,
   DPM.Core.Options.Pack,
   DPM.Core.Spec.Interfaces,
+  DPM.Core.Spec.TargetPlatform,
   DPM.Core.Packaging,
   DPM.Core.Packaging.Archive,
   DPM.Core.Utils.Masks;
@@ -518,9 +519,8 @@ var
   properties : TStringList;
   props : TArray<string>;
   prop : string;
-  minCompiler, maxCompiler,
   currentCompiler : TCompilerVersion;
-  compilers : TArray<TCompilerVersion>;
+  expandedCompilers : TCompilerVersions;
   stopwatch : TStopWatch;
 begin
   result := false;
@@ -605,39 +605,21 @@ begin
       if cancellationToken.IsCancelled then
         exit(false);
 
-      // TargetPlatforms can specify compiler version 3 ways
-      if targetPlatform.Compiler <> TCompilerVersion.UnknownVersion then
-      begin
-        clonedTargetPlatform := targetPlatform.Clone;
-        result := InternalWritePackage(options.OutputFolder, clonedTargetPlatform, spec, version, options.BasePath, properties) and result;
-      end
-      else if (targetPlatform.MinCompiler <> TCompilerVersion.UnknownVersion ) and (targetPlatform.MaxCompiler <> TCompilerVersion.UnknownVersion) then
-      begin
-        minCompiler := targetPlatform.MinCompiler;
-        maxCompiler := targetPlatform.MaxCompiler;
-
-        for currentCompiler := minCompiler to maxCompiler do
-        begin
-          clonedTargetPlatform := targetPlatform.Clone;
-          clonedTargetPlatform.Compiler := currentCompiler;
-          result := InternalWritePackage(options.OutputFolder, clonedTargetPlatform, spec, version, options.BasePath, properties) and result;
-        end;
-      end
-      else if Length(targetPlatform.Compilers) > 0 then
-      begin
-        compilers := targetPlatform.Compilers;
-        for currentCompiler in targetPlatform.Compilers do
-        begin
-          clonedTargetPlatform := targetPlatform.Clone;
-          clonedTargetPlatform.Compiler := currentCompiler;
-          result := InternalWritePackage(options.OutputFolder, clonedTargetPlatform, spec, version, options.BasePath, properties) and result;
-        end;
-      end
-      else
+      //ExpandedCompilersOf collapses the three authoring forms (Compiler, Compilers, MinCompiler..MaxCompiler)
+      //into one set so the expansion logic lives in exactly one place.
+      expandedCompilers := ExpandedCompilersOf(targetPlatform);
+      if expandedCompilers = [] then
       begin
         FLogger.Error('No compiler version found for target platform');
         result := false;
         exit;
+      end;
+
+      for currentCompiler in expandedCompilers do
+      begin
+        clonedTargetPlatform := targetPlatform.Clone;
+        clonedTargetPlatform.Compiler := currentCompiler;
+        result := InternalWritePackage(options.OutputFolder, clonedTargetPlatform, spec, version, options.BasePath, properties) and result;
       end;
     end;
     FLogger.Information('Done.');
