@@ -83,12 +83,18 @@ type
     function GetFileName : string;
     procedure SetFileName(const value : string);
 
+    function GetAuthor : string;
+    procedure SetAuthor(const value : string);
+
     property FileName : string read GetFileName write SetFileName;
     //defaults to %userprofile%\.dpm\packages - can override with env var DPM_PACKAGES
     property PackageCacheLocation : string read GetPackageCacheLocation write SetPackageCacheLocation;
     property IsDefaultPackageCacheLocation : boolean read GetIsDefaultPackageCacheLocation;
 
     property Sources : IList<ISourceConfig>read GetSources;
+
+    //cached default author used by the spec scaffolder - optional
+    property Author : string read GetAuthor write SetAuthor;
 
   end;
 

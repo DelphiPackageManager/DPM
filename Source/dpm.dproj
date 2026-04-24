@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
@@ -114,10 +114,10 @@
         <BRCC_CompilerToUse>msrc</BRCC_CompilerToUse>
         <DCC_DebugInfoInExe>true</DCC_DebugInfoInExe>
         <DCC_MapFile>3</DCC_MapFile>
-        <Debugger_CWD>I:\Github\VSoftTechnologies\DOSCommand</Debugger_CWD>
+        <Debugger_CWD>I:\Github\VSoftTechnologies\spring4d</Debugger_CWD>
         <Debugger_EnvVars>DPMPACKAGECACHE=c:\temp\packagecache;$(Debugger_EnvVars)</Debugger_EnvVars>
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
-        <Debugger_RunParams>pack VSoft.DOSCommand.dspec.yaml -o=i:\dpm-new</Debugger_RunParams>
+        <Debugger_RunParams>pack Spring4D.Data.dspec.yaml -o=i:\dpm-new</Debugger_RunParams>
         <ILINK_MapFileType>DetailedSegments</ILINK_MapFileType>
         <OutputExt>2.exe</OutputExt>
     </PropertyGroup>
@@ -268,6 +268,9 @@
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Hash.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Template.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Masks.pas"/>
+        <DCCReference Include="Cmdline\DPM.Console.Prompts.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Discovery.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Writer.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

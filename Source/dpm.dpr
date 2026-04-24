@@ -163,7 +163,10 @@ uses
   DPM.Core.Package.PackageLatestVersionInfo in 'Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas',
   DPM.Core.Utils.Hash in 'Core\Utils\DPM.Core.Utils.Hash.pas',
   DPM.Core.Spec.Template in 'Core\Spec\DPM.Core.Spec.Template.pas',
-  DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas';
+  DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas',
+  DPM.Console.Prompts in 'Cmdline\DPM.Console.Prompts.pas',
+  DPM.Console.Command.Spec.Discovery in 'Cmdline\Commands\DPM.Console.Command.Spec.Discovery.pas',
+  DPM.Console.Command.Spec.Writer in 'Cmdline\Commands\DPM.Console.Command.Spec.Writer.pas';
 
 {$IFDEF JCLDEBUG}
 procedure LogException(ExceptObj: TObject; ExceptAddr: Pointer; OSException: Boolean);

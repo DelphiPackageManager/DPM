@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -36,7 +36,6 @@ type
   TSpecOptions = class(TOptionsBase)
   private
     FPackageId : string;
-    FFromProject : string;
     FOverwrite : boolean;
     FNoFlatten : boolean;
     class var
@@ -45,7 +44,6 @@ type
     class constructor CreateDefault;
     class property Default : TSpecOptions read FDefault;
     property PackageId : string read FPackageId write FPackageId;
-    property FromProject : string read FFromProject write FFromProject;
     property Overwrite : boolean read FOverwrite write FOverwrite;
     property NoFlatten : boolean read FNoFlatten write FNoFlatten;
   end;

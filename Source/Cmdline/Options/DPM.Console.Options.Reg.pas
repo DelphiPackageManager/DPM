@@ -702,11 +702,13 @@ begin
     end);
   option.Required := false;
 
-  option := cmd.RegisterOption<string>('from','f','The .dproj or file to base the spec file on',
-    procedure(const value : string)
+  option := cmd.RegisterOption<boolean>('overwrite', 'o', 'Overwrite an existing .dspec.yaml in the current folder without prompting',
+    procedure(const value : boolean)
     begin
-      TSpecOptions.Default.FromProject := value;
+      TSpecOptions.Default.Overwrite := value;
     end);
+  option.HasValue := false;
+
   option := cmd.RegisterOption<boolean>('noflatten', 'n', 'Do not flatten the source folder structure',
     procedure(const value : boolean)
     begin

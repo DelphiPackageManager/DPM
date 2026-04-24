@@ -86,6 +86,7 @@ type
     FSources : IList<ISourceConfig>;
     FPackageCacheLocation : string;
     FFileName : string;
+    FAuthor : string;
     FLogger : ILogger;
   protected
     function GetFileName : string;
@@ -96,6 +97,8 @@ type
     function GetIsDefaultPackageCacheLocation : Boolean;
     procedure AddDefaultSources;
     function GetSourceByName(const name : string) : ISourceConfig;
+    function GetAuthor : string;
+    procedure SetAuthor(const value : string);
 
     function LoadFromFile(const fileName : string) : boolean;
     function SaveToFile(const fileName : string) : boolean;
@@ -332,6 +335,16 @@ begin
 
 end;
 
+function TConfiguration.GetAuthor : string;
+begin
+  result := FAuthor;
+end;
+
+procedure TConfiguration.SetAuthor(const value : string);
+begin
+  FAuthor := value;
+end;
+
 function TConfiguration.GetFileName : string;
 begin
   result := FFileName;
@@ -398,6 +411,8 @@ begin
   result := true;
   root := yamlObj.AsMapping;
   FPackageCacheLocation := root.S['packageCacheLocation'];
+  if root.Contains('author') then
+    FAuthor := root.S['author'];
   sources := root.A['packageSources'];
   bResult := true;
   for i := 0 to sources.Count - 1 do
@@ -473,6 +488,8 @@ begin
   result := true;
   root := parentObj.AsMapping;
   root.S['packageCacheLocation'] := FPackageCacheLocation;
+  if FAuthor <> '' then
+    root.S['author'] := FAuthor;
   sources := root.A['packageSources'];
   for i := 0 to FSources.Count - 1 do
     result := FSources[i].SaveToYAML(sources) and result;
