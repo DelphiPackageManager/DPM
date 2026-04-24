@@ -44,6 +44,12 @@ type
     PackageSourceLiteral : string;    //original folder name for reference
   end;
 
+  TSpecDependency = record
+    Id : string;
+    Version : string;                 //empty string when unknown; writer will emit '' and flag TODO
+  end;
+  TSpecDependencies = TArray<TSpecDependency>;
+
   TSpecScaffold = record
     PackageId : string;
     Version : string;
@@ -65,6 +71,7 @@ type
     DesignDProjs : TArray<string>;
     BuildPlatforms : TDPMPlatforms;   //platforms for every build entry
     DesignPlatforms : TDPMPlatforms;  //platforms for every design entry (schema limits to win32/win64)
+    Dependencies : TSpecDependencies; //emitted under templates[0].dependencies
   end;
 
 function DerivePackageSourceTemplate(const compiler : TCompilerVersion; const folderName : string) : string;
@@ -343,6 +350,27 @@ begin
   end;
 end;
 
+procedure AppendDependencies(var buffer : string; const deps : TSpecDependencies);
+var
+  i : integer;
+  versionText : string;
+begin
+  if Length(deps) = 0 then
+    exit;
+  AppendLine(buffer, '    dependencies:');
+  for i := 0 to High(deps) do
+  begin
+    AppendLine(buffer, '      - id: ' + deps[i].Id);
+    //Emit an empty double-quoted value when we don't know the version so the
+    //YAML stays valid and users see an obvious TODO to fill in.
+    if deps[i].Version = '' then
+      versionText := '""'
+    else
+      versionText := deps[i].Version;
+    AppendLine(buffer, '        version: ' + versionText);
+  end;
+end;
+
 procedure AppendTemplates(var buffer : string; const scaffold : TSpecScaffold);
 var
   i : integer;
@@ -350,6 +378,7 @@ var
 begin
   AppendLine(buffer, 'templates:');
   AppendLine(buffer, '  - name: default');
+  AppendDependencies(buffer, scaffold.Dependencies);
   AppendLine(buffer, '    source:');
   for i := 0 to High(scaffold.SourceGlobs) do
     AppendLine(buffer, '      - src: ' + RelWithDot(scaffold.SourceGlobs[i]));

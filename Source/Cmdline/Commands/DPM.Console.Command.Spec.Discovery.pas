@@ -50,6 +50,19 @@ type
 
   TCompilerFolders = TArray<TCompilerFolder>;
 
+  TDpkUnit = record
+    UnitName : string;        //e.g. 'Spring.Collections'
+    RelPath  : string;        //path as written in the dpk/dproj, forward-slashed (e.g. '../../Source/Base/Spring.pas')
+  end;
+  TDpkUnits = TArray<TDpkUnit>;
+
+  TLogicalPackage = record
+    Stem : string;            //package identifier stem, e.g. 'Spring.Base' or 'VSoft.VirtualListView'
+    RuntimeDProj : string;    //absolute path to the runtime dproj (may be '')
+    DesignDProj : string;     //absolute path to the design dproj (may be '')
+  end;
+  TLogicalPackages = TArray<TLogicalPackage>;
+
 function FindSourceFolder(const rootDir : string; out folder : string) : boolean;
 function FindPackagesFolder(const rootDir : string; out folder : string) : boolean;
 
@@ -84,6 +97,73 @@ function CollectPlatforms(const dprojFiles : TArray<string>; const logger : ILog
   const config : IConfiguration) : TDPMPlatforms;
 
 function MakeRelative(const baseDir : string; const fullPath : string) : string;
+
+/// <summary>
+///  Normalises a dproj/dpk filename stem to the logical package identifier
+///  stem by stripping conventional runtime/design suffixes (R, D, Design,
+///  DesignTime, .Designtime, .Design).
+/// </summary>
+function ComputeLogicalPackageStem(const leafName : string) : string;
+
+/// <summary>
+///  Pairs runtime and design dproj files that share a stem into logical packages.
+/// </summary>
+function GroupDProjsByStem(const dprojFiles : TArray<string>) : TLogicalPackages;
+
+/// <summary>
+///  Parses a .dpk file's `contains` clause. Returns empty when the file cannot
+///  be read or contains no matching entries. Skips `{$IFDEF ...}` and line
+///  comments.
+/// </summary>
+function ParseDpkContains(const dpkPath : string) : TDpkUnits;
+
+/// <summary>
+///  Extracts source unit paths from a .dproj's &lt;DCCReference Include="...pas"&gt;
+///  nodes (falling back when the paired .dpk isn't parseable).
+/// </summary>
+function ExtractDprojUnits(const dprojPath : string) : TArray<string>;
+
+/// <summary>
+///  Parses the `requires` clause of a .dpk file. Returns bare package names
+///  (stripped of any surrounding whitespace) with standard Delphi packages
+///  filtered out via IsStandardDelphiPackage.
+/// </summary>
+function ParseDpkRequires(const dpkPath : string) : TArray<string>;
+
+/// <summary>
+///  Extracts package dependency names from a .dproj's &lt;DCCReference Include="*.dcp"&gt;
+///  nodes, filtered the same way as ParseDpkRequires. Used as a fallback.
+/// </summary>
+function ExtractDprojDcpReferences(const dprojPath : string) : TArray<string>;
+
+/// <summary>
+///  Returns true for well-known Delphi runtime/design packages shipped with the
+///  IDE (rtl, vcl, fmx, FireDAC*, Indy*, ...). Case-insensitive.
+/// </summary>
+function IsStandardDelphiPackage(const name : string) : boolean;
+
+/// <summary>
+///  Turns a list of source file paths relative to projectRoot into a minimal
+///  set of ant-style globs (e.g. `./Source/Base/**.pas`). Paths with matching
+///  extensions grouped under the same deepest-common ancestor collapse into a
+///  single recursive glob. Mixed extensions produce separate globs per extension.
+/// </summary>
+function DeriveSourceGlobs(const unitPaths : TArray<string>; const projectRoot : string) : TArray<string>;
+
+/// <summary>
+///  Finds the deepest forward-slashed folder that contains every path in the
+///  input list. Returns '' when paths don't share any folder (e.g. one is at
+///  project root).
+/// </summary>
+function CommonParentFolder(const paths : TArray<string>) : string;
+
+/// <summary>
+///  Resolves `unitRelPath` as written in a dpk/dproj (possibly containing `..\`)
+///  relative to the directory holding the dpk/dproj, producing a forward-slashed
+///  path relative to projectRoot. Returns '' when the path escapes projectRoot.
+/// </summary>
+function ResolveDpkUnitPath(const containerDir : string; const unitRelPath : string;
+  const projectRoot : string) : string;
 
 implementation
 
@@ -598,6 +678,599 @@ begin
     result := './' + StringReplace(Copy(fullPath, Length(baseNorm) + 1, MaxInt), '\', '/', [rfReplaceAll])
   else
     result := StringReplace(fullPath, '\', '/', [rfReplaceAll]);
+end;
+
+function StripIfSuffix(const s : string; const suffix : string) : string;
+begin
+  if EndsText(suffix, s) and (Length(s) > Length(suffix)) then
+    result := Copy(s, 1, Length(s) - Length(suffix))
+  else
+    result := s;
+end;
+
+function ComputeLogicalPackageStem(const leafName : string) : string;
+var
+  stem : string;
+  stripped : string;
+begin
+  stem := TPath.GetFileNameWithoutExtension(leafName);
+  if stem = '' then
+    exit('');
+
+  //Longer/compound design suffixes first.
+  stripped := StripIfSuffix(stem, '.Designtime');
+  if stripped <> stem then exit(stripped);
+  stripped := StripIfSuffix(stem, '.DesignTime');
+  if stripped <> stem then exit(stripped);
+  stripped := StripIfSuffix(stem, '.Design');
+  if stripped <> stem then exit(stripped);
+  stripped := StripIfSuffix(stem, 'DesignTime');
+  if stripped <> stem then exit(stripped);
+  stripped := StripIfSuffix(stem, 'Design');
+  if stripped <> stem then exit(stripped);
+
+  //Single-char R/D - only strip when the preceding char is also an uppercase
+  //letter or digit so we don't amputate names like "VSoft.CancellationToken"
+  //into "VSoft.CancellationToke".
+  if Length(stem) > 1 then
+  begin
+    if (stem[Length(stem)] = 'R') or (stem[Length(stem)] = 'D') then
+      exit(Copy(stem, 1, Length(stem) - 1));
+  end;
+  result := stem;
+end;
+
+function GroupDProjsByStem(const dprojFiles : TArray<string>) : TLogicalPackages;
+var
+  i, j : integer;
+  stem : string;
+  leaf : string;
+  kind : TDProjKind;
+  existingIdx : integer;
+  entry : TLogicalPackage;
+  list : TLogicalPackages;
+begin
+  SetLength(list, 0);
+  for i := 0 to High(dprojFiles) do
+  begin
+    leaf := ExtractFileName(dprojFiles[i]);
+    stem := ComputeLogicalPackageStem(leaf);
+    if stem = '' then
+      continue;
+    kind := ClassifyDProj(dprojFiles[i]);
+
+    existingIdx := -1;
+    for j := 0 to High(list) do
+      if SameText(list[j].Stem, stem) then
+      begin
+        existingIdx := j;
+        break;
+      end;
+
+    if existingIdx = -1 then
+    begin
+      entry.Stem := stem;
+      entry.RuntimeDProj := '';
+      entry.DesignDProj := '';
+      case kind of
+        dkDesign : entry.DesignDProj := dprojFiles[i];
+      else
+        //dkRuntime or dkUnknown - treat as runtime until a paired design dproj shows up
+        entry.RuntimeDProj := dprojFiles[i];
+      end;
+      SetLength(list, Length(list) + 1);
+      list[High(list)] := entry;
+    end
+    else
+    begin
+      case kind of
+        dkDesign :
+          if list[existingIdx].DesignDProj = '' then
+            list[existingIdx].DesignDProj := dprojFiles[i];
+      else
+        if list[existingIdx].RuntimeDProj = '' then
+          list[existingIdx].RuntimeDProj := dprojFiles[i];
+      end;
+    end;
+  end;
+  result := list;
+end;
+
+function StripDelphiComments(const input : string) : string;
+var
+  i : integer;
+  len : integer;
+  buffer : TStringBuilder;
+begin
+  //Remove `{...}` and `//` comments. Leaves whitespace/newlines in place so
+  //our tokenizer still sees line breaks as separators.
+  len := Length(input);
+  buffer := TStringBuilder.Create(len);
+  try
+    i := 1;
+    while i <= len do
+    begin
+      if input[i] = '{' then
+      begin
+        while (i <= len) and (input[i] <> '}') do
+          Inc(i);
+        if i <= len then
+          Inc(i);
+      end
+      else if (i < len) and (input[i] = '/') and (input[i + 1] = '/') then
+      begin
+        while (i <= len) and (input[i] <> #10) and (input[i] <> #13) do
+          Inc(i);
+      end
+      else
+      begin
+        buffer.Append(input[i]);
+        Inc(i);
+      end;
+    end;
+    result := buffer.ToString;
+  finally
+    buffer.Free;
+  end;
+end;
+
+function FindWordBoundary(const s : string; const word : string; const startPos : integer) : integer;
+var
+  len : integer;
+  wordLen : integer;
+  i : integer;
+  before : Char;
+  after : Char;
+begin
+  result := 0;
+  len := Length(s);
+  wordLen := Length(word);
+  i := startPos;
+  while i <= len - wordLen + 1 do
+  begin
+    if SameText(Copy(s, i, wordLen), word) then
+    begin
+      before := #0;
+      after := #0;
+      if i > 1 then before := s[i - 1];
+      if i + wordLen <= len then after := s[i + wordLen];
+      if not CharInSet(before, ['A'..'Z', 'a'..'z', '0'..'9', '_']) and
+         not CharInSet(after, ['A'..'Z', 'a'..'z', '0'..'9', '_']) then
+      begin
+        result := i;
+        exit;
+      end;
+    end;
+    Inc(i);
+  end;
+end;
+
+function ParseDpkContains(const dpkPath : string) : TDpkUnits;
+var
+  raw : string;
+  stripped : string;
+  containsPos : integer;
+  endPos : integer;
+  body : string;
+  entries : TArray<string>;
+  i : integer;
+  entry : string;
+  inPos : integer;
+  firstQuote : integer;
+  secondQuote : integer;
+  unitName : string;
+  unitPath : string;
+  parsed : TDpkUnit;
+  list : TDpkUnits;
+begin
+  SetLength(list, 0);
+  try
+    raw := TFile.ReadAllText(dpkPath);
+  except
+    result := list;
+    exit;
+  end;
+
+  stripped := StripDelphiComments(raw);
+  containsPos := FindWordBoundary(stripped, 'contains', 1);
+  if containsPos = 0 then
+  begin
+    result := list;
+    exit;
+  end;
+
+  //the contains clause runs from after the keyword up to `end.` or the end of file.
+  endPos := FindWordBoundary(stripped, 'end', containsPos + Length('contains'));
+  if endPos = 0 then
+    endPos := Length(stripped) + 1;
+
+  body := Copy(stripped, containsPos + Length('contains'), endPos - containsPos - Length('contains'));
+  //Normalise separators so a simple split by comma gives us entries.
+  body := StringReplace(body, #13#10, ' ', [rfReplaceAll]);
+  body := StringReplace(body, #10, ' ', [rfReplaceAll]);
+  body := StringReplace(body, #13, ' ', [rfReplaceAll]);
+  body := StringReplace(body, #9, ' ', [rfReplaceAll]);
+  //strip trailing semicolon if any
+  body := Trim(body);
+  while (body <> '') and (body[Length(body)] = ';') do
+    SetLength(body, Length(body) - 1);
+
+  entries := TStringUtils.SplitStr(body, ',');
+  for i := 0 to High(entries) do
+  begin
+    entry := Trim(entries[i]);
+    if entry = '' then continue;
+    inPos := FindWordBoundary(entry, 'in', 1);
+    if inPos = 0 then
+    begin
+      //unit listed without a file path - skip; we cannot derive a source entry
+      continue;
+    end;
+    unitName := Trim(Copy(entry, 1, inPos - 1));
+    if unitName = '' then continue;
+    firstQuote := PosEx('''', entry, inPos + 2);
+    if firstQuote = 0 then continue;
+    secondQuote := PosEx('''', entry, firstQuote + 1);
+    if secondQuote = 0 then continue;
+    unitPath := Copy(entry, firstQuote + 1, secondQuote - firstQuote - 1);
+    if unitPath = '' then continue;
+    parsed.UnitName := unitName;
+    parsed.RelPath := StringReplace(unitPath, '\', '/', [rfReplaceAll]);
+    SetLength(list, Length(list) + 1);
+    list[High(list)] := parsed;
+  end;
+  result := list;
+end;
+
+function ExtractDprojUnits(const dprojPath : string) : TArray<string>;
+const
+  cNeedle = 'DCCReference Include=';
+var
+  raw : string;
+  list : TArray<string>;
+  cursor : integer;
+  nextPos : integer;
+  quoteStart : integer;
+  quoteEnd : integer;
+  value : string;
+  lowerValue : string;
+begin
+  SetLength(list, 0);
+  try
+    raw := TFile.ReadAllText(dprojPath);
+  except
+    result := list;
+    exit;
+  end;
+  cursor := 1;
+  while cursor <= Length(raw) do
+  begin
+    nextPos := PosEx(cNeedle, raw, cursor);
+    if nextPos = 0 then break;
+    quoteStart := PosEx('"', raw, nextPos + Length(cNeedle));
+    if quoteStart = 0 then break;
+    quoteEnd := PosEx('"', raw, quoteStart + 1);
+    if quoteEnd = 0 then break;
+    value := Copy(raw, quoteStart + 1, quoteEnd - quoteStart - 1);
+    lowerValue := LowerCase(value);
+    //Ignore references to .dcp / packages / $() tokens - we only want source units.
+    if EndsStr('.pas', lowerValue) then
+    begin
+      SetLength(list, Length(list) + 1);
+      list[High(list)] := StringReplace(value, '\', '/', [rfReplaceAll]);
+    end;
+    cursor := quoteEnd + 1;
+  end;
+  result := list;
+end;
+
+function IsStandardDelphiPackage(const name : string) : boolean;
+const
+  //Standard Delphi runtime/design packages shipped with the IDE. Case-insensitive
+  //exact match only - a prefix rule risks shadowing user packages that happen
+  //to share a stem (e.g. 'fmxFramework', 'dsnapMyFix').
+  cExact : array[0..51] of string = (
+    'rtl', 'vcl', 'fmx', 'fmxase', 'fmxdae', 'fmxFireDAC', 'fmxobj', 'fmxobjects',
+    'vclactnband', 'vcldb', 'vcldbx', 'vcldsnap', 'vclie',
+    'vclimg', 'vclimaging', 'vclribbon', 'vclsmp', 'vcltouch', 'vclx', 'vclwinx',
+    'dbrtl', 'dsnap', 'dsnapcon', 'dsnaprest', 'dsnapxml',
+    'soaprtl', 'inet', 'inetdb', 'xmlrtl',
+    'webdsnap', 'webdsnapvcl',
+    'tee', 'teedb', 'teeui', 'tethering',
+    'bindengine', 'bindcomp', 'bindcompvcl', 'bindcompfmx', 'bindcompdbx', 'dataimpl',
+    'designide', 'dbxcommondriver', 'dbxcds',
+    'IndyCore', 'IndyProtocols', 'IndySystem', 'IndyIPCommon', 'IndyIPServer', 'IndyIPClient',
+    'FireDAC', 'FireDACCommon'
+    );
+var
+  i : integer;
+  trimmed : string;
+  lowered : string;
+begin
+  result := false;
+  trimmed := Trim(name);
+  if trimmed = '' then
+    exit(true);
+  lowered := LowerCase(trimmed);
+  for i := Low(cExact) to High(cExact) do
+    if lowered = LowerCase(cExact[i]) then
+      exit(true);
+  //The FireDAC family has many variants (FireDACIBDriver, FireDACMSSQLDriver, ...).
+  //These are all Embarcadero-shipped, so treat the prefix as standard. The
+  //lowercase prefix is unusual enough that user collisions are unlikely.
+  if StartsText('FireDAC', trimmed) then
+    exit(true);
+end;
+
+function CollectRequiresBody(const dpkPath : string; out body : string) : boolean;
+var
+  raw : string;
+  stripped : string;
+  requiresPos : integer;
+  terminator : integer;
+  containsAt : integer;
+  endAt : integer;
+  semicolonAt : integer;
+begin
+  result := false;
+  body := '';
+  try
+    raw := TFile.ReadAllText(dpkPath);
+  except
+    exit;
+  end;
+  stripped := StripDelphiComments(raw);
+  requiresPos := FindWordBoundary(stripped, 'requires', 1);
+  if requiresPos = 0 then
+    exit;
+  //requires ends at the first of: `contains`, `end`, or `;` (outside any string)
+  containsAt := FindWordBoundary(stripped, 'contains', requiresPos + Length('requires'));
+  endAt := FindWordBoundary(stripped, 'end', requiresPos + Length('requires'));
+  semicolonAt := PosEx(';', stripped, requiresPos + Length('requires'));
+  terminator := MaxInt;
+  if (containsAt > 0) and (containsAt < terminator) then terminator := containsAt;
+  if (endAt > 0) and (endAt < terminator) then terminator := endAt;
+  //the trailing `;` in `requires rtl;` must be included before the contains
+  //keyword, so accept it when it's strictly before the next keyword
+  if (semicolonAt > 0) and (semicolonAt < terminator) then
+    //keep - but use the token before the semicolon as the end
+    terminator := semicolonAt;
+  if terminator = MaxInt then
+    exit;
+  body := Copy(stripped, requiresPos + Length('requires'), terminator - requiresPos - Length('requires'));
+  result := true;
+end;
+
+function ParseDpkRequires(const dpkPath : string) : TArray<string>;
+var
+  body : string;
+  entries : TArray<string>;
+  i : integer;
+  entry : string;
+  list : TArray<string>;
+begin
+  SetLength(list, 0);
+  if not CollectRequiresBody(dpkPath, body) then
+  begin
+    result := list;
+    exit;
+  end;
+  //entries are comma-separated identifiers, possibly containing dots
+  body := StringReplace(body, #13#10, ' ', [rfReplaceAll]);
+  body := StringReplace(body, #10, ' ', [rfReplaceAll]);
+  body := StringReplace(body, #13, ' ', [rfReplaceAll]);
+  body := StringReplace(body, #9, ' ', [rfReplaceAll]);
+  entries := TStringUtils.SplitStr(body, ',');
+  for i := 0 to High(entries) do
+  begin
+    entry := Trim(entries[i]);
+    //strip stray trailing semicolons just in case
+    while (entry <> '') and (entry[Length(entry)] = ';') do
+      SetLength(entry, Length(entry) - 1);
+    entry := Trim(entry);
+    if entry = '' then continue;
+    if IsStandardDelphiPackage(entry) then continue;
+    SetLength(list, Length(list) + 1);
+    list[High(list)] := entry;
+  end;
+  result := list;
+end;
+
+function ExtractDprojDcpReferences(const dprojPath : string) : TArray<string>;
+const
+  cNeedle = 'DCCReference Include=';
+var
+  raw : string;
+  list : TArray<string>;
+  cursor : integer;
+  nextPos : integer;
+  quoteStart : integer;
+  quoteEnd : integer;
+  value : string;
+  lowerValue : string;
+  baseName : string;
+begin
+  SetLength(list, 0);
+  try
+    raw := TFile.ReadAllText(dprojPath);
+  except
+    result := list;
+    exit;
+  end;
+  cursor := 1;
+  while cursor <= Length(raw) do
+  begin
+    nextPos := PosEx(cNeedle, raw, cursor);
+    if nextPos = 0 then break;
+    quoteStart := PosEx('"', raw, nextPos + Length(cNeedle));
+    if quoteStart = 0 then break;
+    quoteEnd := PosEx('"', raw, quoteStart + 1);
+    if quoteEnd = 0 then break;
+    value := Copy(raw, quoteStart + 1, quoteEnd - quoteStart - 1);
+    lowerValue := LowerCase(value);
+    if EndsStr('.dcp', lowerValue) then
+    begin
+      baseName := ChangeFileExt(ExtractFileName(value), '');
+      if (baseName <> '') and not IsStandardDelphiPackage(baseName) then
+      begin
+        SetLength(list, Length(list) + 1);
+        list[High(list)] := baseName;
+      end;
+    end;
+    cursor := quoteEnd + 1;
+  end;
+  result := list;
+end;
+
+function ResolveDpkUnitPath(const containerDir : string; const unitRelPath : string;
+  const projectRoot : string) : string;
+var
+  combined : string;
+  normalisedRoot : string;
+  normalisedCombined : string;
+begin
+  result := '';
+  if unitRelPath = '' then
+    exit;
+  //TPath.Combine + ExpandFileName handle .. segments cleanly.
+  combined := unitRelPath;
+  combined := StringReplace(combined, '/', PathDelim, [rfReplaceAll]);
+  combined := TPath.Combine(containerDir, combined);
+  try
+    combined := ExpandFileName(combined);
+  except
+    exit;
+  end;
+  normalisedRoot := IncludeTrailingPathDelimiter(ExcludeTrailingPathDelimiter(projectRoot));
+  normalisedCombined := combined;
+  if not StartsText(normalisedRoot, normalisedCombined) then
+    exit;
+  result := StringReplace(Copy(combined, Length(normalisedRoot) + 1, MaxInt), '\', '/', [rfReplaceAll]);
+end;
+
+function CommonParentFolder(const paths : TArray<string>) : string;
+var
+  i : integer;
+  parts : TArray<string>;
+  currentParts : TArray<string>;
+  sharedLen : integer;
+  j : integer;
+  k : integer;
+  buffer : string;
+  folder : string;
+begin
+  //paths are files, forward-slash. Return the deepest folder all share.
+  result := '';
+  if Length(paths) = 0 then exit;
+  folder := paths[0];
+  j := LastDelimiter('/', folder);
+  if j = 0 then
+    exit; //no folder component - everything is at root
+  folder := Copy(folder, 1, j - 1);
+  parts := TStringUtils.SplitStr(folder, '/');
+
+  for i := 1 to High(paths) do
+  begin
+    folder := paths[i];
+    j := LastDelimiter('/', folder);
+    if j = 0 then
+      //this path has no folder - common parent is root
+      exit('');
+    folder := Copy(folder, 1, j - 1);
+    currentParts := TStringUtils.SplitStr(folder, '/');
+    sharedLen := 0;
+    for k := 0 to High(parts) do
+    begin
+      if k > High(currentParts) then break;
+      if not SameText(parts[k], currentParts[k]) then break;
+      Inc(sharedLen);
+    end;
+    SetLength(parts, sharedLen);
+    if sharedLen = 0 then
+      exit('');
+  end;
+
+  buffer := '';
+  for k := 0 to High(parts) do
+  begin
+    if buffer = '' then
+      buffer := parts[k]
+    else
+      buffer := buffer + '/' + parts[k];
+  end;
+  result := buffer;
+end;
+
+function HasPasExtension(const path : string) : boolean;
+begin
+  result := EndsText('.pas', path);
+end;
+
+function HasIncExtension(const path : string) : boolean;
+begin
+  result := EndsText('.inc', path);
+end;
+
+function AppendGlob(const list : TArray<string>; const glob : string) : TArray<string>;
+begin
+  result := list;
+  SetLength(result, Length(result) + 1);
+  result[High(result)] := glob;
+end;
+
+function DeriveSourceGlobs(const unitPaths : TArray<string>; const projectRoot : string) : TArray<string>;
+var
+  pasPaths : TArray<string>;
+  incPaths : TArray<string>;
+  i : integer;
+  commonPas : string;
+  commonInc : string;
+  list : TArray<string>;
+begin
+  SetLength(list, 0);
+  SetLength(pasPaths, 0);
+  SetLength(incPaths, 0);
+  //We only ever receive .pas paths from the dpk parser; .inc files are added
+  //separately by the caller if they're discovered alongside. Still, handle a
+  //mixed list for robustness.
+  for i := 0 to High(unitPaths) do
+  begin
+    if HasPasExtension(unitPaths[i]) then
+    begin
+      SetLength(pasPaths, Length(pasPaths) + 1);
+      pasPaths[High(pasPaths)] := unitPaths[i];
+    end
+    else if HasIncExtension(unitPaths[i]) then
+    begin
+      SetLength(incPaths, Length(incPaths) + 1);
+      incPaths[High(incPaths)] := unitPaths[i];
+    end;
+  end;
+
+  if Length(pasPaths) > 0 then
+  begin
+    commonPas := CommonParentFolder(pasPaths);
+    if commonPas <> '' then
+      list := AppendGlob(list, commonPas + '/**.pas')
+    else
+      //no common folder - fall back to listing each file
+      for i := 0 to High(pasPaths) do
+        list := AppendGlob(list, pasPaths[i]);
+  end;
+
+  if Length(incPaths) > 0 then
+  begin
+    commonInc := CommonParentFolder(incPaths);
+    if commonInc <> '' then
+      list := AppendGlob(list, commonInc + '/**.inc')
+    else
+      for i := 0 to High(incPaths) do
+        list := AppendGlob(list, incPaths[i]);
+  end;
+
+  //silence unused-parameter warning in XE2 compilers
+  if projectRoot = '' then ;
+  result := list;
 end;
 
 end.
