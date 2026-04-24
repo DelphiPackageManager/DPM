@@ -54,6 +54,8 @@ type
     function GetPackagePath(const packageId : IPackageIdentity) : string; overload;
     function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion) : string;overload;
 
+    function GetPackageFileFolder(const packageId : IPackageIdentity) : string;
+
     function EnsurePackage(const packageId : IPackageIdentity) : Boolean;
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
@@ -164,6 +166,13 @@ begin
   result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim +  packageId.Id + PathDelim + packageId.Version.ToStringNoMeta;
 end;
 
+function TPackageCache.GetPackageFileFolder(const packageId : IPackageIdentity) : string;
+begin
+  //{cache}/{compiler}/{id} - parent of the per-version extraction folders. Raw .dpkg files
+  //for all versions of this package id live here side-by-side with the versioned subfolders.
+  result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim + packageId.Id;
+end;
+
 function TPackageCache.GetPackagesFolder : string;
 begin
   //  result := IncludeTrailingPathDelimiter(FLocation);
@@ -210,7 +219,7 @@ end;
 function TPackageCache.EnsurePackage(const packageId : IPackageIdentity) : Boolean;
 var
   packageFolder : string;
-  packagesFolder : string;
+  packageFileFolder : string;
   manifestFile : string;
   oldManifestFile : string;
   searchPattern : string;
@@ -226,15 +235,17 @@ begin
   result := result and (FileExists(manifestFile) or FileExists(oldManifestFile));
   if not result then
   begin
-    packagesFolder := GetPackagesFolder;
-    //if a stray .dpkg is sitting in the cache root, try to install it again.
-    //On-disk filename: {Id}-{Compiler}-{BinPlatforms}-{Version}.dpkg, where BinPlatforms encodes
-    //the set of platforms the package was packed for (one .dpkg per compiler per platform-set).
-    //packageId identifies a specific Id/Compiler/Version, so we wildcard the platforms segment.
-    searchPattern := packageId.Id + '-' + CompilerToString(packageId.CompilerVersion) + '-*-' + packageId.Version.ToStringNoMeta + cPackageFileExt;
-    if DirectoryExists(packagesFolder) then
+    //fallback: the extracted folder is missing or has no manifest, but the .dpkg may still be
+    //on disk from a previous session. On-disk filename is
+    //{Id}-{Compiler}-{BinPlatforms}-{Version}.dpkg - BinPlatforms is a DPMPlatformsToBinString
+    //bitmask encoding the platforms this .dpkg was packed for. packageId only tells us
+    //Id/Compiler/Version so we wildcard the platforms segment.
+    packageFileFolder := GetPackageFileFolder(packageId);
+    if DirectoryExists(packageFileFolder) then
     begin
-      matchingFiles := TDirectory.GetFiles(packagesFolder, searchPattern, TSearchOption.soTopDirectoryOnly);
+      searchPattern := packageId.Id + '-' + CompilerToString(packageId.CompilerVersion) +
+        '-*-' + packageId.Version.ToStringNoMeta + cPackageFileExt;
+      matchingFiles := TDirectory.GetFiles(packageFileFolder, searchPattern, TSearchOption.soTopDirectoryOnly);
       if Length(matchingFiles) > 0 then
         result := InstallPackageFromFile(matchingFiles[0]);
     end;
@@ -248,6 +259,7 @@ var
   fileName : string;
   packageIndentity : IPackageIdentity;
   packageFolder : string;
+  packageFileFolder : string;
 begin
   result := false;
   FLogger.Debug('[PackageCache] installing from file : ' + packageFileName);
@@ -264,33 +276,38 @@ begin
 
   fileName := ChangeFileExt(ExtractFileName(packageFileName), '');
 
-  //if savefile, copy to cache folder.
   if not TPackageIdentity.TryCreateFromString(FLogger, fileName, '', packageIndentity) then
     exit;
 
-  //creates the folder
+  //creates the per-version extraction folder
   packageFolder := CreatePackagePath(packageIndentity);
   FLogger.Debug('[PackageCache] PackageFolder  : ' + packageFolder);
 
-  if (not TStringUtils.StartsWith(packageFileName, GetPackagesFolder)) then
+  //.dpkg lives in the package-id folder (sibling of the per-version folders) so multiple versions
+  //of the same id share a folder rather than cluttering the cache root.
+  packageFileFolder := GetPackageFileFolder(packageIndentity);
+  if not ForceDirectories(packageFileFolder) then
   begin
-    packageFilePath := GetPackagesFolder + PathDelim + ExtractFileName(packageFileName);
-    FLogger.Debug('[PackageCache] Copying Package file to   : ' + packageFilePath);
+    FLogger.Error('Unable to create package file folder [' + packageFileFolder + ']');
+    exit;
+  end;
 
+  //if the source file isn't already in its canonical cache location, copy it there.
+  packageFilePath := IncludeTrailingPathDelimiter(packageFileFolder) + ExtractFileName(packageFileName);
+  if not SameText(packageFileName, packageFilePath) then
+  begin
+    FLogger.Debug('[PackageCache] Copying Package file to   : ' + packageFilePath);
     try
       TFile.Copy(packageFileName, packageFilePath, true);
     except
       on e : Exception do
       begin
-
         FLogger.Error('Unable to copy file [' + packageFileName + '] to the package cache');
         FLogger.Error(e.Message);
         exit;
       end;
     end;
-  end
-  else
-    packageFilePath := packageFileName;
+  end;
 
   //work with packageFilePath now.
 

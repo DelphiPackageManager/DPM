@@ -50,6 +50,12 @@ type
     function GetPackagePath(const packageId : IPackageIdentity) : string;overload;
     function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion) : string;overload;
 
+    /// <summary>
+    ///  Folder where the raw .dpkg file for the given package id lives -
+    ///  {cache}/{compiler}/{id}. Sibling of the per-version extraction folders
+    ///  returned by GetPackagePath. Does not create the folder.
+    /// </summary>
+    function GetPackageFileFolder(const packageId : IPackageIdentity) : string;
 
     /// <summary>
     ///  checks if the package is present as a folder, if not there but the file is
