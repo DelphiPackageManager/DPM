@@ -65,9 +65,9 @@ type
 
 
 
-    procedure PopulateVariables(const spec : IPackageSpec; const targetPlatform : ISpecTargetPlatform; const version : TPackageVersion; const externalProps : TStringList);
+    procedure PopulateVariables(const spec : IPackageSpec; const targetPlatform : ISpecTargetPlatform; const version : TPackageVersion; const externalVariables : TStringList);
 
-    function ReplaceTokens(const version: TPackageVersion; const spec : IPackageSpec; const targetPlatform : ISpecTargetPlatform; const properties: TStringList) : boolean;
+    function ReplaceTokens(const version: TPackageVersion; const spec : IPackageSpec; const targetPlatform : ISpecTargetPlatform; const variables: TStringList) : boolean;
     function TokenMatchEvaluator(const match : TMatch) : string;
 
 
@@ -76,7 +76,7 @@ type
     /// Writes a Package per compiler version.
     /// </summary>
     function InternalWritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion;
-                                  const basePath : string; const properties : TStringList) : boolean;
+                                  const basePath : string; const variables : TStringList) : boolean;
 
     function WritePackageFromSpec(const cancellationToken : ICancellationToken; const options : TPackOptions) : boolean;
   public
@@ -172,7 +172,7 @@ begin
 end;
 
 
-function TPackageWriter.ReplaceTokens(const version: TPackageVersion; const spec : IPackageSpec; const targetPlatform : ISpecTargetPlatform; const properties: TStringList): boolean;
+function TPackageWriter.ReplaceTokens(const version: TPackageVersion; const spec : IPackageSpec; const targetPlatform : ISpecTargetPlatform; const variables: TStringList): boolean;
 var
   evaluator : TMatchEvaluator;
   regEx : TRegEx;
@@ -188,7 +188,7 @@ begin
   evaluator := TokenMatchEvaluator; //work around for compiler overload resolution issue.
   try
     try
-      PopulateVariables(spec, targetPlatform, version, properties);
+      PopulateVariables(spec, targetPlatform, version, variables);
 
       spec.MetaData.Id := regEx.Replace(spec.MetaData.Id, evaluator);
       spec.MetaData.Description := regEx.Replace(spec.MetaData.Description, evaluator);
@@ -300,7 +300,7 @@ begin
     result := match.Value;
 end;
 
-procedure TPackageWriter.PopulateVariables(const spec: IPackageSpec; const targetPlatform: ISpecTargetPlatform; const version: TPackageVersion; const externalProps: TStringList);
+procedure TPackageWriter.PopulateVariables(const spec: IPackageSpec; const targetPlatform: ISpecTargetPlatform; const version: TPackageVersion; const externalVariables: TStringList);
 var
   pair : TPair<string,string>;
   regex : TRegex;
@@ -341,10 +341,10 @@ begin
 
 
   //apply external props passed in on command line.
-  if externalProps.Count > 0 then
+  if externalVariables.Count > 0 then
   begin
-    for i := 0 to externalProps.Count -1 do
-      FVariables[LowerCase(externalProps.Names[i])] := externalProps.ValueFromIndex[i];
+    for i := 0 to externalVariables.Count -1 do
+      FVariables[LowerCase(externalVariables.Names[i])] := externalVariables.ValueFromIndex[i];
   end;
 
   regEx := FTokenRegEx;
@@ -425,7 +425,7 @@ end;
 
 
 function TPackageWriter.InternalWritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion;
-                                             const basePath : string; const properties : TStringList) : boolean;
+                                             const basePath : string; const variables : TStringList) : boolean;
 var
   reducedSpec : IPackageSpec;
   sManifest : string;
@@ -458,7 +458,7 @@ begin
     exit;
   end;
 
-  ReplaceTokens(version, reducedSpec, targetPlatform, properties);
+  ReplaceTokens(version, reducedSpec, targetPlatform, variables);
   platforms := targetPlatform.Platforms;
   packageFileName := reducedSpec.MetaData.Id + '-' + CompilerToString(targetPlatform.Compiler) + '-' + DPMPlatformsToBinString(platforms) + '-' + version.ToStringNoMeta + cPackageFileExt;
   packageFileName := IncludeTrailingPathDelimiter(outputFolder) + packageFileName;
@@ -516,7 +516,7 @@ var
   clonedTargetPlatform : ISpecTargetPlatform;
   version : TPackageVersion;
   error : string;
-  properties : TStringList;
+  variables : TStringList;
   props : TArray<string>;
   prop : string;
   currentCompiler : TCompilerVersion;
@@ -581,16 +581,16 @@ begin
     exit;
   end;
 
-  //where is this used?
-  properties := TStringList.Create;
+
+  variables := TStringList.Create;
   try
-    if options.Properties <> '' then
+    if options.Variables <> '' then
     begin
-      props := TStringUtils.SplitStr(options.Properties, ';');
+      props := TStringUtils.SplitStr(options.Variables, ';');
       for prop in props do
       begin
         if pos('=', prop) > 0 then
-          properties.Add(prop);
+          variables.Add(prop);
       end;
     end;
 
@@ -619,13 +619,13 @@ begin
       begin
         clonedTargetPlatform := targetPlatform.Clone;
         clonedTargetPlatform.Compiler := currentCompiler;
-        result := InternalWritePackage(options.OutputFolder, clonedTargetPlatform, spec, version, options.BasePath, properties) and result;
+        result := InternalWritePackage(options.OutputFolder, clonedTargetPlatform, spec, version, options.BasePath, variables) and result;
       end;
     end;
     FLogger.Information('Done.');
 
   finally
-    properties.Free;
+    variables.Free;
   end;
 end;
 

@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -240,11 +240,11 @@ begin
     mapping.S['defines'] := FDefines;
 
   if FLibSuffix <> '' then
-    parent.AsMapping.S['libSuffix'] := FLibSuffix;
+    mapping.S['libSuffix'] := FLibSuffix;
   if FLibPrefix <> '' then
-    parent.AsMapping.S['libPrefix'] := FLibPrefix;
+    mapping.S['libPrefix'] := FLibPrefix;
   if FLibVersion <> '' then
-    parent.AsMapping.S['libVersion'] := FLibVersion;
+    mapping.S['libVersion'] := FLibVersion;
 
 end;
 

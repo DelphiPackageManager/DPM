@@ -633,7 +633,7 @@ begin
   if not FPackageCache.EnsurePackage(packageInfo) then
   begin
     // not in the cache, so we need to get it from the the repository
-    if not FRepositoryManager.DownloadPackage(cancellationToken, packageInfo, FPackageCache.PackagesFolder, packageFileName) then
+    if not FRepositoryManager.DownloadPackage(cancellationToken, packageInfo, FPackageCache.GetPackageFileFolder(packageInfo), packageFileName) then
     begin
       if cancellationToken.IsCancelled then
         FLogger.Error('Downloading package [' + packageInfo.ToString + '] cancelled.')
@@ -799,7 +799,7 @@ begin
   if not FPackageCache.EnsurePackage(packageInfo) then
   begin
     // not in the cache, so we need to get it from the the repository
-    if not FRepositoryManager.DownloadPackage(cancellationToken, packageInfo, FPackageCache.PackagesFolder, packageFileName) then
+    if not FRepositoryManager.DownloadPackage(cancellationToken, packageInfo, FPackageCache.GetPackageFileFolder(packageInfo), packageFileName) then
     begin
       FLogger.Error('Failed to download package [' + packageInfo.ToString + ']');
       exit;
@@ -979,7 +979,7 @@ begin
     if not FPackageCache.EnsurePackage(packageInfo) then
     begin
       // not in the cache, so we need to get it from the the repository
-      if not FRepositoryManager.DownloadPackage(cancellationToken, packageInfo, FPackageCache.PackagesFolder, packageFileName) then
+      if not FRepositoryManager.DownloadPackage(cancellationToken, packageInfo, FPackageCache.GetPackageFileFolder(packageInfo), packageFileName) then
       begin
         FLogger.Error('Failed to download package [' + packageInfo.ToString + ']');
         exit;

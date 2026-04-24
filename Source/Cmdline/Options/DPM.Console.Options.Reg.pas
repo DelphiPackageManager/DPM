@@ -484,10 +484,10 @@ begin
       TPackOptions.Default.MinClientVersion := value;
     end);
 
-  cmd.RegisterOption<string>('properties','p','Provides the ability to specify a semicolon ";" delimited list of properties when creating a package.',
+  cmd.RegisterOption<string>('variables','p','Provides the ability to specify a semicolon ";" delimited list of variables when creating a package.',
     procedure(const value : string)
     begin
-      TPackOptions.Default.Properties := value;
+      TPackOptions.Default.Variables := value;
     end);
 
   cmd.RegisterOption<string>('version','','Overrides the version number from the dspec file.',

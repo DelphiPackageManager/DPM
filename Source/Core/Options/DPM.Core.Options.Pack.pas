@@ -2,8 +2,8 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -42,7 +42,7 @@ type
     FVersion : string;
     FExclude : boolean;
     FMinClientVer : string;
-    FProperties : string;
+    FVariables : string;
     class var
       FDefault : TPackOptions;
   public
@@ -56,7 +56,7 @@ type
     property Version : string read FVersion write FVersion;
     property Exclude : boolean read FExclude write FExclude;
     property MinClientVersion : string read FMinClientVer write FMinClientVer;
-    property Properties : string read FProperties write FProperties;
+    property Variables : string read FVariables write FVariables;
   end;
 
 implementation
