@@ -162,7 +162,7 @@ begin
   if serviceIndex = nil then
     exit;
 
-  serviceItem := serviceIndex.FindItem('PackageDownload2');
+  serviceItem := serviceIndex.FindItem('PackageDownload');
   if serviceItem = nil then
   begin
     Logger.Error('Unabled to determine PackageDownload resource from Service Index');
@@ -238,7 +238,7 @@ begin
   serviceItem := serviceIndex.FindItem('PackageFindLatest');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageDownload resource from Service Index');
+    Logger.Error('Unabled to determine PackageFindLatest resource from Service Index');
     exit;
   end;
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
