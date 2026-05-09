@@ -1080,11 +1080,19 @@ var
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
   uri : IUri;
+  fileStream : TFileStream;
+  fileName : string;
+  jsonObj : TJsonObject;
+  packageVersionId : string;
+  status : string;
+  statusUrl : string;
+  errorMsg : string;
 begin
   result := false;
   if pushOptions.ApiKey = '' then
   begin
     Logger.Error('ApiKey arg required for remote push');
+    exit;
   end;
 
   pushOptions.PackagePath := TPath.GetFullPath(pushOptions.PackagePath);
@@ -1111,20 +1119,108 @@ begin
   end;
 
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
+  fileName := TPath.GetFileName(pushOptions.PackagePath);
 
   //todo: Add BaseUri to Uri class
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
+
+  // WithBody(stream, true) transfers stream ownership to the request.
+  fileStream := TFileStream.Create(pushOptions.PackagePath, fmOpenRead or fmShareDenyWrite);
   request := httpClient.CreateRequest(uri.AbsolutePath)
-                       .WithHeader(cUserAgentHeader,cDPMUserAgent)
-                       .WithHeader(cClientVersionHeader,cDPMClientVersion)
+                       .WithHeader(cUserAgentHeader, cDPMUserAgent)
+                       .WithHeader(cClientVersionHeader, cDPMClientVersion)
                        .WithHeader('X-ApiKey', pushOptions.ApiKey)
-                       .WithFile(pushOptions.PackagePath);
+                       .WithHeader('X-DPM-Filename', fileName)
+                       .WithContentType('application/octet-stream')
+                       .WithBody(fileStream, true);
 
   response := httpClient.Put(request, cancellationToken);
 
-  Logger.Information(Format('Package Upload [%d] : %s', [response.StatusCode, response.Response]));
+  case response.StatusCode of
+    202:
+      begin
+        packageVersionId := '';
+        status := '';
+        statusUrl := '';
+        try
+          jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+          try
+            if jsonObj.Contains('packageVersionId') then
+              packageVersionId := jsonObj.S['packageVersionId'];
+            if jsonObj.Contains('status') then
+              status := jsonObj.S['status'];
+            if jsonObj.Contains('statusUrl') then
+              statusUrl := jsonObj.S['statusUrl'];
+          finally
+            jsonObj.Free;
+          end;
+        except
+          on e : Exception do
+            Logger.Verbose('Could not parse 202 response body : ' + e.Message);
+        end;
 
-  result := response.StatusCode = 201;
+        Logger.Information('Package accepted for processing.');
+        if packageVersionId <> '' then
+          Logger.Information('  packageVersionId : ' + packageVersionId);
+        if status <> '' then
+          Logger.Information('  status           : ' + status);
+        if statusUrl <> '' then
+          Logger.Information('  statusUrl        : ' + statusUrl);
+        result := true;
+      end;
+    409:
+      begin
+        errorMsg := '';
+        status := '';
+        try
+          jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+          try
+            if jsonObj.Contains('error') then
+              errorMsg := jsonObj.S['error'];
+            if jsonObj.Contains('status') then
+              status := jsonObj.S['status'];
+          finally
+            jsonObj.Free;
+          end;
+        except
+          // body not JSON or empty - errorMsg stays blank, fallback below
+        end;
+        if errorMsg = '' then
+          errorMsg := 'package version already exists';
+
+        if pushOptions.SkipDuplicate then
+        begin
+          if status <> '' then
+            Logger.Information('Package version already exists on server, skipping (existing status: ' + status + ').')
+          else
+            Logger.Information('Package version already exists on server, skipping.');
+          result := true;
+        end
+        else
+        begin
+          if status <> '' then
+            Logger.Error(Format('Push failed [409] : %s (existing status: %s)', [errorMsg, status]))
+          else
+            Logger.Error(Format('Push failed [409] : %s', [errorMsg]));
+        end;
+      end;
+  else
+    errorMsg := '';
+    try
+      jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+      try
+        if jsonObj.Contains('error') then
+          errorMsg := jsonObj.S['error'];
+      finally
+        jsonObj.Free;
+      end;
+    except
+      // body not JSON or empty - fall back to raw response below
+    end;
+    if errorMsg = '' then
+      errorMsg := response.Response;
+    Logger.Error(Format('Push failed [%d] : %s', [response.StatusCode, errorMsg]));
+  end;
 end;
 
 end.
