@@ -40,6 +40,8 @@ type
     FLastForeground : TConsoleColor;
     FLastBackground : TConsoleColor;
     FStdOut : THandle;
+    FNoStdOut : boolean;
+    procedure WriteRedirected(const s : string);
     function GetForegroundColourCode(const cc: TConsoleColor): Word;
     function GetBackgroundColourCode(const cc: TConsoleColor): Word;
 
@@ -73,8 +75,13 @@ begin
   inherited;
 
   FStdOut := GetStdHandle(STD_OUTPUT_HANDLE);
+  // GetStdHandle returns 0 when no stdout is attached (e.g. spawned with no
+  // inherited handles and no console) and INVALID_HANDLE_VALUE on error.
+  // Either case means we have nowhere to write — drop output rather than
+  // letting the Pascal RTL raise EInOutError(6) on every write.
+  FNoStdOut := (FStdOut = 0) or (FStdOut = INVALID_HANDLE_VALUE);
 
-  if not GetConsoleMode(FStdOut, dummy) then // Not a console handle
+  if FNoStdOut or (not GetConsoleMode(FStdOut, dummy)) then // Not a console handle
     Self.RedirectedStdOut := True;
 
   Self.ConsoleWidth := GetConsoleWidth;
@@ -219,6 +226,23 @@ begin
   end;
 end;
 
+procedure TWindowsConsole.WriteRedirected(const s : string);
+var
+  utf8 : UTF8String;
+  bytesWritten : Cardinal;
+begin
+  // When stdout is a pipe/file (e.g. captured by FinalBuilder) we must avoid
+  // the Pascal RTL Output text file — it raises EInOutError(6) if the handle
+  // isn't usable. WriteFile fails silently on a bad handle, which is what we
+  // want for a logger.
+  if FNoStdOut then
+    exit;
+  if s = '' then
+    exit;
+  utf8 := UTF8Encode(s);
+  WriteFile(FStdOut, PAnsiChar(utf8)^, Length(utf8), bytesWritten, nil);
+end;
+
 procedure TWindowsConsole.InternalWrite(const s: String);
 var
   output : string;
@@ -227,7 +251,7 @@ begin
   //Add the indenting.
   output := TStringUtils.PadString(s, length(s)+ Self.CurrentIndentLevel, True, ' ');
   if Self.RedirectedStdOut then
-    System.Write(output)
+    WriteRedirected(output)
   else
     WriteConsoleW(FStdOut, PWideChar(output), Length(output), dummy, nil);
 end;
@@ -245,7 +269,7 @@ begin
     output := output + #13#10;
 
   if Self.RedirectedStdOut then
-    System.Write(output)
+    WriteRedirected(output)
   else
     WriteConsoleW(FStdOut, PWideChar(output), Length(output), dummy, nil);
 end;
