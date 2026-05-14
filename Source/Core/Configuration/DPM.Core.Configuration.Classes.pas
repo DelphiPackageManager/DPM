@@ -466,7 +466,7 @@ begin
   try
     result := SaveToYAML(yamlDoc.Root);
     if result then
-      TYAML.WriteToFile(yamlDoc, fileName);
+      TYAML.WriteToFile(yamlDoc, sFileName);
     FFileName := sFileName;
   except
     on e : Exception do

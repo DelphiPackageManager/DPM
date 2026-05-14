@@ -1,4 +1,4 @@
-unit DPM.Core.Package.SearchResults;
+﻿unit DPM.Core.Package.SearchResults;
 
 interface
 
@@ -192,6 +192,7 @@ var
   range : TVersionRange;
   dependency : IPackageDependency;
   tagsStr : string;
+  latestStable : string;
 begin
   FSourceName := sourceName;
   FCompilerVersion := StringToCompilerVersion(jsonObject.S['compiler']);
@@ -241,9 +242,9 @@ begin
   FFileHash         := jsonObject.S['hash'];
 
   FLatestVersion    := TPackageVersion.Parse(jsonObject.S['latestVersion']);
-
-  if jsonObject.Contains('latestStableVersion') and ( not jsonObject.IsNull('latestStableVersion')  )then
-    FLatestStableVersion := TPackageVersion.Parse(jsonObject.S['latestStableVersion'])
+  latestStable := jsonObject.S['latestStableVersion'];
+  if latestStable <> '' then
+    FLatestStableVersion := TPackageVersion.Parse(latestStable)
   else
     FLatestStableVersion := TPackageVersion.Empty;
   FIsReservedPrefix := jsonObject.B['isReservedPrefix'];

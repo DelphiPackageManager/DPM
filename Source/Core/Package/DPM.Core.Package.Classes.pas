@@ -168,10 +168,17 @@ begin
   cv := StringToCompilerVersion(stmp);
   if cv = TCompilerVersion.UnknownVersion then
     raise Exception.Create('Compiler segment is not a valid version [' + stmp+ ']');
-  stmp := jsonObj.S['platform'];
-  platform := StringToDPMPlatform(stmp);
-  if platform = TDPMPlatform.UnknownPlatform then
-    raise Exception.Create('Platform is not a valid platform [' + stmp+ ']');
+  //Legacy per-platform field. The DPM Gallery 2 server emits 'platforms' (plural)
+  //which TPackageInfo's constructor reads; singular 'platform' is absent. Tolerate
+  //its absence so v2 feed responses parse cleanly. The value isn't stored on
+  //TPackageIdentity anyway.
+  if jsonObj.Contains('platform') then
+  begin
+    stmp := jsonObj.S['platform'];
+    platform := StringToDPMPlatform(stmp);
+    if platform = TDPMPlatform.UnknownPlatform then
+      raise Exception.Create('Platform is not a valid platform [' + stmp+ ']');
+  end;
 
   stmp := jsonObj.S['version'];
   if not TPackageVersion.TryParse(stmp, packageVersion) then

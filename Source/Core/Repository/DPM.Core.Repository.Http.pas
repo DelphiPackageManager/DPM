@@ -180,7 +180,14 @@ begin
                        .WithHeader(cUserAgentHeader,cDPMUserAgent);
 
   ForceDirectories(localFolder);
-  destFile := IncludeTrailingPathDelimiter(localFolder) + packageInfo.ToString + cPackageFileExt;
+  //Canonical .dpkg filename is {id}-{compiler}-{binPlatforms}-{version}.dpkg —
+  //must match DPM.Core.Packaging.Writer.pas:463 and the cPackageFileRegex used
+  //by the cache loader. packageInfo.ToString drops the platforms segment.
+  destFile := IncludeTrailingPathDelimiter(localFolder)
+    + packageInfo.Id + '-'
+    + CompilerToString(packageInfo.CompilerVersion) + '-'
+    + DPMPlatformsToBinString(packageInfo.SupportedPlatforms) + '-'
+    + packageInfo.Version.ToStringNoMeta + cPackageFileExt;
   hashFileName := destFile + cPackageHashAlgorithmExt;
   request.SaveAsFile := destFile;
   stopwatch := TStopwatch.StartNew;
@@ -536,14 +543,14 @@ begin
   if serviceIndex = nil then
     exit;
 
-  serviceItem := serviceIndex.FindItem('PackageIcon2');
+  serviceItem := serviceIndex.FindItem('PackageIcon');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageDownload resource from Service Index');
+    Logger.Error('Unabled to determine PackageIcon resource from Service Index');
     exit;
   end;
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
-  path := Format('%s/%s/%s/%s/%s/icon', [uri.AbsolutePath, packageId, CompilerToString(compilerVersion), packageVersion]);
+  path := Format('%s/%s/%s/%s/icon', [uri.AbsolutePath, packageId, CompilerToString(compilerVersion), packageVersion]);
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
@@ -607,7 +614,7 @@ begin
   if serviceIndex = nil then
     exit;
 
-  serviceItem := serviceIndex.FindItem('PackageInfo2');
+  serviceItem := serviceIndex.FindItem('PackageInfo');
   if serviceItem = nil then
   begin
     Logger.Error('Unabled to determine PackageInfo resource from Service Index');
@@ -691,7 +698,7 @@ begin
   if serviceIndex = nil then
     exit;
 
-    serviceItem := serviceIndex.FindItem('PackageMetadata2');
+    serviceItem := serviceIndex.FindItem('PackageMetadata');
   if serviceItem = nil then
   begin
     Logger.Error('Unabled to determine PackageMetadata resource from Service Index');
@@ -768,7 +775,7 @@ begin
   if serviceIndex = nil then
     exit;
 
-  serviceItem := serviceIndex.FindItem('PackageVersions2');
+  serviceItem := serviceIndex.FindItem('PackageVersions');
   if serviceItem = nil then
   begin
     Logger.Error('Unabled to determine PackageVersions resource from Service Index');
@@ -850,7 +857,7 @@ begin
   if serviceIndex = nil then
     exit;
 
-  serviceItem := serviceIndex.FindItem('PackageVersionsWithDeps2');
+  serviceItem := serviceIndex.FindItem('PackageVersionsWithDeps');
   if serviceItem = nil then
   begin
     Logger.Error('Unabled to determine PackageVersionsWithDeps resource from Service Index');
