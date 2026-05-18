@@ -31,7 +31,6 @@ interface
 const
   cDPMClientVersion =  '1.0.0';
   cLockFileVersion = '0.0.1';
-  cLockFileExt = '.dpmlock';
   cPackageFileExt = '.dpkg';
   cPackageSpecExt = '.dspec.yaml';
   cPackageManifestExt = '.manifest.yaml';
@@ -84,6 +83,9 @@ const
   cUserAgentHeader = 'User-Agent';
   cDPMUserAgent  = 'DPM ' + cDPMClientVersion;
   cClientVersionHeader = 'Client-Version';
+
+  cDefaultSourceName = 'DPM';
+  cDefaultSourceUrl = 'https://delphi.dev/api/v2/index.json';
 
 function GetIconArchiveFileName(const sourcePath : string) : string;
 

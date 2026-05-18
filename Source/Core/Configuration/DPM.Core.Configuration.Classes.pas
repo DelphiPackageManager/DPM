@@ -323,7 +323,7 @@ procedure TConfiguration.AddDefaultSources;
 var
   source : ISourceConfig;
 begin
-  source := TSourceConfig.Create('DPM', 'https://delphi.dev/api/v1/index.json', TSourceType.DPMServer, '', '', true);
+  source := TSourceConfig.Create(cDefaultSourceName, cDefaultSourceUrl, TSourceType.DPMServer, '', '', true);
   FSources.Add(source);
 end;
 
@@ -381,6 +381,7 @@ end;
 function TConfiguration.LoadFromFile(const fileName : string) : boolean;
 var
   doc : IYAMLDocument;
+  defSource : ISourceConfig;
 begin
   result := false;
 
@@ -388,7 +389,21 @@ begin
     doc := TYAML.LoadFromFile(fileName);
     Result := LoadFromYAML(doc.Root);
       if not FSources.Any then
-        AddDefaultSources;
+        AddDefaultSources
+      else
+      begin
+        defSource := FSources.FirstOrDefault(
+          function (const item : ISourceConfig) : boolean
+          begin
+            result := SameText(cDefaultSourceName, item.Name);
+          end);
+        if defSource <> nil then
+        begin
+          if not SameText(defSource.Source, cDefaultSourceUrl) then
+            defSource.Source := cDefaultSourceUrl;
+        end;
+      end;
+
       FFileName := fileName;
   except
     on e : Exception do
