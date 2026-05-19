@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{98924303-C88A-4967-919B-D22C959BA63F}</ProjectGuid>
         <ProjectVersion>20.3</ProjectVersion>
@@ -15,8 +15,8 @@
         <DPMCompiler>delphi12</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">C:\Users\vincent.OFFICE\AppData\Roaming\.dpm\packages-new</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;</DPMSearch>
-        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win64;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win64;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -1134,7 +1134,7 @@
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>
             <Packages>
-                <PackageReference id="VSoft.VirtualListView" version="0.4.6"/>
+                <PackageReference id="Spring4D.Base" version="2.0.2-beta.2"/>
             </Packages>
         </DPM>
     </ProjectExtensions>

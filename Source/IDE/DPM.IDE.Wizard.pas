@@ -45,6 +45,7 @@ type
     FStorageNotifierID : integer;
     FIDENotifier : integer;
     FProjectMenuNoftifierId : integer;
+    FSBOMMenuNotifierId : integer;
     FThemeChangeNotifierId : integer;
     FStartupCleanupNotifierId : integer;
     FEditorViewManager : IDPMEditorViewManager;
@@ -99,6 +100,7 @@ uses
   DPM.IDE.ProjectStorageNotifier,
   DPM.IDE.IDENotifier,
   DPM.IDE.ProjectMenu,
+  DPM.IDE.SBOM.Menu,
   DPM.IDE.AddInOptions,
   DPM.IDE.Options,
   DPM.IDE.InstallerContext,
@@ -270,6 +272,12 @@ begin
   projMenuNotifier := TDPMProjectMenuNotifier.Create(FEditorViewManager);
   FProjectMenuNoftifierId := (BorlandIDEServices as IOTAProjectManager).AddMenuItemCreatorNotifier(projMenuNotifier);
 
+  //Phase 4: separate notifier for the Generate SBOM... menu so we don't widen
+  //TDPMProjectMenuNotifier's constructor. The SBOM menu needs the container to
+  //resolve ISbomGenerator at click time; the editor-view manager doesn't.
+  FSBOMMenuNotifierId := (BorlandIDEServices as IOTAProjectManager).AddMenuItemCreatorNotifier(
+    TDPMSBOMProjectMenuNotifier.Create(FContainer, FLogger));
+
   options := TDPMAddinOptions.Create(FContainer);
   (BorlandIDEServices as INTAEnvironmentOptionsServices).RegisterAddInOptions(options);
 
@@ -330,6 +338,9 @@ begin
 
   if FProjectMenuNoftifierId > -1 then
     (BorlandIDEServices as IOTAServices).RemoveNotifier(FProjectMenuNoftifierId);
+
+  if FSBOMMenuNotifierId > -1 then
+    (BorlandIDEServices as IOTAServices).RemoveNotifier(FSBOMMenuNotifierId);
 
   {$IF CompilerVersion >= 32.0}
   if FThemeChangeNotifierId > -1 then

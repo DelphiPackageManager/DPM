@@ -589,7 +589,6 @@ var
   groupReader : IGroupProjectReader;
   projectsArray : TArray<string>;
   i : integer;
-  child : string;
   resolvedChild : string;
   ok : boolean;
 begin
