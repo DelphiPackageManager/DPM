@@ -216,6 +216,15 @@ begin
     Logger.Error('Downloaded file hash [' + hash + '] does not match server hash [' + packageInfo.Hash + ']');
     exit(false);
   end;
+  //Persist the sidecar so tools that consume the cache (SBOM, audits, signature
+  //verification) can read it without recomputing. The directory repo writes this
+  //on push - HTTP downloads went without it and any consumer just had to recompute.
+  try
+    TFile.WriteAllText(hashFileName, hash);
+  except
+    on e : Exception do
+      Logger.Warning('Could not write hash sidecar [' + hashFileName + '] : ' + e.Message);
+  end;
 
 
   request := nil;

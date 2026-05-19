@@ -271,6 +271,15 @@
         <DCCReference Include="Cmdline\DPM.Console.Prompts.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Discovery.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Writer.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.SBOM.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Generator.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Interfaces.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Types.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.MapFile.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Sbom.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.SearchPaths.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

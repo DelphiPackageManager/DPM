@@ -66,6 +66,8 @@ type
 
     function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
 
+    function GetPackageHash(const packageId : IPackageIdentity) : string;
+
 //    function InstallPackage(const packageId : IPackageIdentity; const saveFile : boolean; const source : string = '') : boolean;
 
     function InstallPackageFromFile(const packageFileName : string) : boolean;
@@ -77,6 +79,7 @@ type
 implementation
 
 uses
+  System.Classes,
   System.SysUtils,
   System.IOUtils,
   System.Types,
@@ -84,6 +87,7 @@ uses
   System.RegularExpressions,
   DPM.Core.Constants,
   DPM.Core.Package.Classes,
+  DPM.Core.Utils.Hash,
   DPM.Core.Utils.System,
   DPM.Core.Utils.Strings;
 
@@ -214,6 +218,92 @@ begin
   manifest := GetPackageManifest(packageId);
   if (manifest <> nil) and (manifest.TargetPlatform <> nil) then
     result := manifest.TargetPlatform.Platforms;
+end;
+
+function TPackageCache.GetPackageHash(const packageId : IPackageIdentity) : string;
+var
+  folder : string;
+  sidecarPattern : string;
+  dpkgPattern : string;
+  matches : TStringDynArray;
+  sidecarPath : string;
+  dpkgPath : string;
+  lines : TStringList;
+begin
+  result := '';
+  if packageId = nil then
+    exit;
+  folder := GetPackageFileFolder(packageId);
+  if not DirectoryExists(folder) then
+    exit;
+
+  //.dpkg filenames follow {id}-{compiler}-{binPlatforms}-{version}.dpkg - the
+  //binPlatforms segment is opaque from this side so we wildcard it. The .sha256
+  //sidecar shares the .dpkg basename plus the .sha256 extension.
+  sidecarPattern := packageId.Id + '-' + CompilerToString(packageId.CompilerVersion) + '-*-'
+                  + packageId.Version.ToStringNoMeta + cPackageFileExt + cPackageHashAlgorithmExt;
+  try
+    matches := TDirectory.GetFiles(folder, sidecarPattern, TSearchOption.soTopDirectoryOnly);
+  except
+    SetLength(matches, 0);
+  end;
+
+  if Length(matches) > 0 then
+  begin
+    sidecarPath := matches[0];
+    lines := TStringList.Create;
+    try
+      try
+        lines.LoadFromFile(sidecarPath);
+        if lines.Count > 0 then
+          result := Trim(lines[0]);
+      except
+        on e : Exception do
+          FLogger.Debug('[Cache] could not read hash sidecar [' + sidecarPath + '] : ' + e.Message);
+      end;
+    finally
+      lines.Free;
+    end;
+    if result <> '' then
+      exit;
+  end;
+
+  //Sidecar missing or unreadable - compute from the .dpkg and persist for
+  //next time (mirrors TDirectoryPackageRepository.DoGetPackageMetaData's
+  //self-heal). Other tooling - SBOM, vulnerability scanners, signature
+  //verification - can then assume the sidecar is present.
+  dpkgPattern := packageId.Id + '-' + CompilerToString(packageId.CompilerVersion) + '-*-'
+              + packageId.Version.ToStringNoMeta + cPackageFileExt;
+  try
+    matches := TDirectory.GetFiles(folder, dpkgPattern, TSearchOption.soTopDirectoryOnly);
+  except
+    SetLength(matches, 0);
+  end;
+  if Length(matches) = 0 then
+    exit;
+  dpkgPath := matches[0];
+
+  try
+    result := THashSHA256.GetHashStringFromFile(dpkgPath);
+  except
+    on e : Exception do
+    begin
+      FLogger.Debug('[Cache] could not hash .dpkg [' + dpkgPath + '] : ' + e.Message);
+      result := '';
+    end;
+  end;
+  if result = '' then
+    exit;
+
+  //Persist the sidecar. Best-effort: if the cache directory is somehow
+  //read-only we still return the computed hash, we just won't have cached
+  //it for the next call.
+  try
+    TFile.WriteAllText(dpkgPath + cPackageHashAlgorithmExt, result);
+  except
+    on e : Exception do
+      FLogger.Debug('[Cache] could not write hash sidecar [' + dpkgPath + cPackageHashAlgorithmExt + '] : ' + e.Message);
+  end;
 end;
 
 function TPackageCache.EnsurePackage(const packageId : IPackageIdentity) : Boolean;

@@ -204,9 +204,31 @@ begin
 end;
 
 function StringToCompilerVersion(const value : string) : TCompilerVersion;
+
+  function TryMatch(const candidate : string; out matched : TCompilerVersion) : boolean;
+  var
+    v : TCompilerVersion;
+  begin
+    result := false;
+    matched := TCompilerVersion.UnknownVersion;
+    //Iterate enum values and match against canonical name via SameText so the lookup is reliably
+    //case-insensitive across Delphi RTL versions (the prior GetEnumValue path rejected fully-lowercase
+    //inputs like 'delphixe2' on some compilers).
+    for v := Low(TCompilerVersion) to High(TCompilerVersion) do
+    begin
+      if v = TCompilerVersion.UnknownVersion then
+        continue;
+      if SameText(GetEnumName(typeInfo(TCompilerVersion), Ord(v)), candidate) then
+      begin
+        matched := v;
+        result := true;
+        exit;
+      end;
+    end;
+  end;
+
 var
   candidate : string;
-  v : TCompilerVersion;
 begin
   //handle shortcuts from cmdline (XE2, 10.4, 11, ...) by prefixing with 'delphi' if missing.
   //then normalise '.' to '_' to match the enum identifiers (e.g. Delphi10_4).
@@ -215,19 +237,18 @@ begin
     candidate := 'delphi' + candidate;
   candidate := StringReplace(candidate, '.', '_', [rfReplaceAll]);
 
-  //Iterate enum values and match against canonical name via SameText so the lookup is reliably
-  //case-insensitive across Delphi RTL versions (the prior GetEnumValue path rejected fully-lowercase
-  //inputs like 'delphixe2' on some compilers).
-  for v := Low(TCompilerVersion) to High(TCompilerVersion) do
+  if TryMatch(candidate, result) then
+    exit;
+
+  //Major-only enums (Delphi11, Delphi12, Delphi13, DelphiXE2..8) don't carry a _0 suffix,
+  //but published file/version strings often do ('12.0', '11.0'). Strip a trailing '_0' and
+  //retry so 12.0 -> Delphi12, 13.0 -> Delphi13, XE2.0 -> DelphiXE2 all resolve.
+  if (Length(candidate) > 2) and (Copy(candidate, Length(candidate) - 1, 2) = '_0') then
   begin
-    if v = TCompilerVersion.UnknownVersion then
-      continue;
-    if SameText(GetEnumName(typeInfo(TCompilerVersion), Ord(v)), candidate) then
-    begin
-      result := v;
+    if TryMatch(Copy(candidate, 1, Length(candidate) - 2), result) then
       exit;
-    end;
   end;
+
   result := TCompilerVersion.UnknownVersion;
 end;
 

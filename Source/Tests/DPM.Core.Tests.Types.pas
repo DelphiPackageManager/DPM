@@ -41,8 +41,11 @@ procedure TCoreTypesTests.TestStringToCompiler(const value :string);
 var
   compilerVersion :TCompilerVersion;
 begin
+  //Round-trip via the short (user-facing) form. CompilerToString returns the prefixed
+  //internal form ('delphixe2', 'delphi10.0') used for on-disk paths and is intentionally
+  //asymmetric with the input; CompilerNoPrefix is the public-facing inverse.
   compilerVersion := StringToCompilerVersion(value);
-  Assert.AreEqual(value, CompilerToString(compilerVersion));
+  Assert.AreEqual(value, CompilerNoPrefix(compilerVersion));
 end;
 
 initialization

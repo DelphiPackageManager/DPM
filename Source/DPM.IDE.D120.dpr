@@ -177,7 +177,13 @@ uses
   DPM.Core.Package.PackageLatestVersionInfo in 'Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas',
   DPM.IDE.PathManager in 'IDE\DPM.IDE.PathManager.pas',
   DPM.Core.Utils.Hash in 'Core\Utils\DPM.Core.Utils.Hash.pas',
-  DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas';
+  DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas',
+  DPM.Core.SBOM.Generator in 'Core\Sbom\DPM.Core.SBOM.Generator.pas',
+  DPM.Core.SBOM.Interfaces in 'Core\Sbom\DPM.Core.SBOM.Interfaces.pas',
+  DPM.Core.SBOM.Types in 'Core\Sbom\DPM.Core.SBOM.Types.pas',
+  DPM.Core.SBOM.Writers in 'Core\Sbom\DPM.Core.SBOM.Writers.pas',
+  DPM.Core.Project.MapFile in 'Core\Project\DPM.Core.Project.MapFile.pas',
+  DPM.Core.Options.Sbo in 'Core\Options\DPM.Core.Options.Sbo.pas';
 
 {$R *.res}
 

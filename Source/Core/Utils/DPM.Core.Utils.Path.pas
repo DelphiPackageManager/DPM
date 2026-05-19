@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -231,7 +231,12 @@ begin
          exit(path);
     end;
 
-    baseSegments := AntSplit(basePath, [PathDelim], MaxInt);
+    //Split on both Windows and POSIX delimiters so paths like
+    //"<windows-path>\./packages/Rad Studio 12/X.dproj" - which come out of TPath.Combine
+    //when the second operand uses forward slashes - get tokenised cleanly. Without `/` in the
+    //separator set the embedded "./packages/..." stays as a single segment and the leading
+    //"." (current-directory) is never recognised or stripped.
+    baseSegments := AntSplit(basePath, [PathDelim, '/'], MaxInt);
     baseSegLength := Length(baseSegments);
   end
   else
@@ -244,7 +249,7 @@ begin
     isUnc := true;
   end;
 
-  segments := AntSplit(path, [PathDelim], MaxInt);
+  segments := AntSplit(path, [PathDelim, '/'], MaxInt);
 
 
   for segment in segments do

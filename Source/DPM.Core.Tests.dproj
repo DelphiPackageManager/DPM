@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
@@ -10,12 +10,6 @@
         <ProjectName Condition="'$(ProjectName)'==''">DPM.Core.Tests</ProjectName>
         <ProjectVersion>20.3</ProjectVersion>
         <TargetedPlatforms>1</TargetedPlatforms>
-    </PropertyGroup>
-    <PropertyGroup>
-        <DPMCompiler>13.0</DPMCompiler>
-        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
-        <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.System.Console\1.1.2\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.YAML\1.5.1\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.DUnitX\0.4.4\src;$(DPM)\VSoft.CommandLine\0.1.11\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -75,6 +69,12 @@
         <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
         <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
+    </PropertyGroup>
+    <PropertyGroup>
+        <DPMCompiler>12.0</DPMCompiler>
+        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
+        <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.YAML\1.5.1\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.System.Console\1.1.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.DUnitX\0.4.4\src;$(DPM)\VSoft.CommandLine\0.1.11\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -153,6 +153,7 @@
         <DCCReference Include="Core\Project\DPM.Core.Project.Editor.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.GroupProjReader.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Interfaces.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.MapFile.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Base.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Directory.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Factory.pas"/>
@@ -178,6 +179,14 @@
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Hash.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Masks.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Interfaces.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Types.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Interfaces.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Sbo.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.SBOM.MapFile.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.SBOM.Writers.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Generator.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Sbom.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -201,79 +210,12 @@
                 <Excluded_Packages/>
             </Delphi.Personality>
             <Platforms>
-                <Platform value="Android">False</Platform>
-                <Platform value="Android64">False</Platform>
-                <Platform value="iOSDevice64">False</Platform>
-                <Platform value="iOSSimARM64">False</Platform>
                 <Platform value="Linux64">False</Platform>
                 <Platform value="OSX64">False</Platform>
                 <Platform value="OSXARM64">False</Platform>
                 <Platform value="Win32">True</Platform>
                 <Platform value="Win64">False</Platform>
             </Platforms>
-            <Deployment Version="5">
-                <DeployFile LocalName="..\Output\DPM.Core.Tests.exe" Configuration="Debug" Class="ProjectOutput">
-                    <Platform Name="Win32">
-                        <RemoteName>DPM.Core.Tests.exe</RemoteName>
-                        <Overwrite>true</Overwrite>
-                    </Platform>
-                </DeployFile>
-                <DeployClass Name="AdditionalDebugSymbols">
-                    <Platform Name="Win32">
-                        <Operation>0</Operation>
-                    </Platform>
-                </DeployClass>
-                <DeployClass Name="DebugSymbols">
-                    <Platform Name="Win32">
-                        <Operation>0</Operation>
-                    </Platform>
-                </DeployClass>
-                <DeployClass Name="DependencyFramework">
-                    <Platform Name="Win32">
-                        <Operation>0</Operation>
-                    </Platform>
-                </DeployClass>
-                <DeployClass Name="DependencyModule">
-                    <Platform Name="Win32">
-                        <Operation>0</Operation>
-                        <Extensions>.dll;.bpl</Extensions>
-                    </Platform>
-                </DeployClass>
-                <DeployClass Required="true" Name="DependencyPackage">
-                    <Platform Name="Win32">
-                        <Operation>0</Operation>
-                        <Extensions>.bpl</Extensions>
-                    </Platform>
-                </DeployClass>
-                <DeployClass Name="File">
-                    <Platform Name="Win32">
-                        <Operation>0</Operation>
-                    </Platform>
-                </DeployClass>
-                <DeployClass Required="true" Name="ProjectOutput">
-                    <Platform Name="Win32">
-                        <Operation>0</Operation>
-                    </Platform>
-                </DeployClass>
-                <DeployClass Name="ProjectUWPManifest">
-                    <Platform Name="Win32">
-                        <Operation>1</Operation>
-                    </Platform>
-                </DeployClass>
-                <DeployClass Name="UWP_DelphiLogo150">
-                    <Platform Name="Win32">
-                        <RemoteDir>Assets</RemoteDir>
-                        <Operation>1</Operation>
-                    </Platform>
-                </DeployClass>
-                <DeployClass Name="UWP_DelphiLogo44">
-                    <Platform Name="Win32">
-                        <RemoteDir>Assets</RemoteDir>
-                        <Operation>1</Operation>
-                    </Platform>
-                </DeployClass>
-                <ProjectRoot Platform="Win32" Name="$(PROJECTNAME)"/>
-            </Deployment>
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>

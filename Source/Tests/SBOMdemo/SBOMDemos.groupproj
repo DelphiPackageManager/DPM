@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{2C48A99F-3FA7-4201-AD03-3E7ABD99F77D}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="SBOMdemo.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="VCLDemo\Project1.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="SBOMdemo">
+        <MSBuild Projects="SBOMdemo.dproj"/>
+    </Target>
+    <Target Name="SBOMdemo:Clean">
+        <MSBuild Projects="SBOMdemo.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="SBOMdemo:Make">
+        <MSBuild Projects="SBOMdemo.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Project1">
+        <MSBuild Projects="VCLDemo\Project1.dproj"/>
+    </Target>
+    <Target Name="Project1:Clean">
+        <MSBuild Projects="VCLDemo\Project1.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Project1:Make">
+        <MSBuild Projects="VCLDemo\Project1.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="SBOMdemo;Project1"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="SBOMdemo:Clean;Project1:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="SBOMdemo:Make;Project1:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

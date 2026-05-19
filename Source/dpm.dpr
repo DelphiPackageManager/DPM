@@ -166,9 +166,17 @@ uses
   DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas',
   DPM.Console.Prompts in 'Cmdline\DPM.Console.Prompts.pas',
   DPM.Console.Command.Spec.Discovery in 'Cmdline\Commands\DPM.Console.Command.Spec.Discovery.pas',
-  DPM.Console.Command.Spec.Writer in 'Cmdline\Commands\DPM.Console.Command.Spec.Writer.pas';
+  DPM.Console.Command.Spec.Writer in 'Cmdline\Commands\DPM.Console.Command.Spec.Writer.pas',
+  DPM.Console.Command.SBOM in 'Cmdline\Commands\DPM.Console.Command.SBOM.pas',
+  DPM.Core.SBOM.Generator in 'Core\Sbom\DPM.Core.SBOM.Generator.pas',
+  DPM.Core.SBOM.Interfaces in 'Core\Sbom\DPM.Core.SBOM.Interfaces.pas',
+  DPM.Core.SBOM.Types in 'Core\Sbom\DPM.Core.SBOM.Types.pas',
+  DPM.Core.SBOM.Writers in 'Core\Sbom\DPM.Core.SBOM.Writers.pas',
+  DPM.Core.Project.MapFile in 'Core\Project\DPM.Core.Project.MapFile.pas',
+  DPM.Core.Options.Sbom in 'Core\Options\DPM.Core.Options.Sbom.pas',
+  DPM.Core.Project.SearchPaths in 'Core\Project\DPM.Core.Project.SearchPaths.pas',
+  DPM.Core.SBOM.Writers.Reports in 'Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas';
 
-{$IFDEF JCLDEBUG}
 procedure LogException(ExceptObj: TObject; ExceptAddr: Pointer; OSException: Boolean);
 var
   s : string;
@@ -177,7 +185,7 @@ begin
   s := TSystemUtils.GetStackTrace(Exception(ExceptObj), ExceptAddr);
   Write(s);
 end;
-{$ENDIF}
+
 
 begin
   CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml

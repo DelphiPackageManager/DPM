@@ -70,7 +70,12 @@ uses
   DPM.Core.Dependency.Resolver,
   DPM.Core.Compiler.Interfaces,
   DPM.Core.Compiler.Factory,
-  DPM.Core.Compiler.EnvironmentProvider;
+  DPM.Core.Compiler.EnvironmentProvider,
+  DPM.Core.Project.MapFile,
+  DPM.Core.SBOM.Interfaces,
+  DPM.Core.SBOM.Writers,
+  DPM.Core.SBOM.Writers.Reports,
+  DPM.Core.SBOM.Generator;
 
 
 procedure InitCore(const container : TContainer; const overrideProc : TConstProc<TContainer>);
@@ -113,6 +118,13 @@ begin
   Container.RegisterType<IPackageCache, TPackageCache>.AsSingleton();
 
   Container.RegisterType<IDependencyResolver, TDependencyResolver>;
+
+  Container.RegisterType<IMapFileReader, TMapFileReader>;
+  Container.RegisterType<ISbomWriter, TCycloneDXWriter>(cSBOMWriterCycloneDX);
+  Container.RegisterType<ISbomWriter, TSPDXWriter>(cSBOMWriterSPDX);
+  Container.RegisterType<ISbomWriter, THTMLReportWriter>(cSBOMWriterHTML);
+  Container.RegisterType<ISbomWriter, TMarkdownReportWriter>(cSBOMWriterMarkdown);
+  Container.RegisterType<ISbomGenerator, TSBOMGenerator>;
 
   Container.RegisterInstance<TContainer>(Container);
 

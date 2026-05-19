@@ -85,6 +85,19 @@ type
     function GetProjectConfiguration(const name : string; const platform : TDPMPlatform) : IProjectConfiguration;
     function GetConfigNames : IReadOnlyList<string>;
 
+    /// <summary>
+    ///  Returns the project's compiled source files - the Include attribute
+    ///  values from every <DCCReference> and <DelphiCompile> ItemGroup entry,
+    ///  preserved verbatim (relative or absolute as the dproj has them). The
+    ///  caller is responsible for resolving relative paths against the dproj's
+    ///  directory.
+    ///  Used by the SBOM generator to seed the search-path index with every
+    ///  folder that physically contains project source - so MAP-file entries
+    ///  for project units (Unit1, MainForm in Forms\, ..\Common\Util etc.)
+    ///  resolve as project source rather than third-party.
+    /// </summary>
+    function GetSourceFiles : IList<string>;
+
     function SaveProject(const fileName : string = '') : boolean;
 
     property CompilerVersion : TCompilerVersion read GetCompilerVersion write SetCompiler;

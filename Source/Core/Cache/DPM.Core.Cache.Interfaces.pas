@@ -77,6 +77,17 @@ type
     //gets the platforms supported by a package from its manifest.
     function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
 
+    /// <summary>
+    ///  Resolves the SHA-256 hash of the package's .dpkg file. Self-heals
+    ///  missing sidecars: if the .sha256 file is absent but the .dpkg is in
+    ///  the cache, computes the hash and persists the sidecar so subsequent
+    ///  calls and any other tooling (SBOM, audits, signature verification)
+    ///  can read it without recomputing. Returns empty if even the .dpkg
+    ///  cannot be located.
+    ///  The algorithm is always 'sha256' (see cPackageHashAlgorithm).
+    /// </summary>
+    function GetPackageHash(const packageId : IPackageIdentity) : string;
+
     property Location : string read GetLocation write SetLocation;
     property PackagesFolder : string read GetPackagesFolder;
   end;

@@ -86,6 +86,8 @@ uses
   DPM.Core.Project.Editor in 'Core\Project\DPM.Core.Project.Editor.pas',
   DPM.Core.Project.GroupProjReader in 'Core\Project\DPM.Core.Project.GroupProjReader.pas',
   DPM.Core.Project.Interfaces in 'Core\Project\DPM.Core.Project.Interfaces.pas',
+  DPM.Core.Project.MapFile in 'Core\Project\DPM.Core.Project.MapFile.pas',
+  DPM.Core.Project.SearchPaths in 'Core\Project\DPM.Core.Project.SearchPaths.pas',
   DPM.Core.Repository.Base in 'Core\Repository\DPM.Core.Repository.Base.pas',
   DPM.Core.Repository.Directory in 'Core\Repository\DPM.Core.Repository.Directory.pas',
   DPM.Core.Repository.Factory in 'Core\Repository\DPM.Core.Repository.Factory.pas',
@@ -110,7 +112,19 @@ uses
   DPM.Core.Tests.PackageIdentity in 'Tests\DPM.Core.Tests.PackageIdentity.pas',
   DPM.Core.Utils.Hash in 'Core\Utils\DPM.Core.Utils.Hash.pas',
   DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas',
-  DPM.Core.Package.Interfaces in 'Core\Package\DPM.Core.Package.Interfaces.pas';
+  DPM.Core.Package.Interfaces in 'Core\Package\DPM.Core.Package.Interfaces.pas',
+  DPM.Core.SBOM.Types in 'Core\Sbom\DPM.Core.SBOM.Types.pas',
+  DPM.Core.SBOM.Interfaces in 'Core\Sbom\DPM.Core.SBOM.Interfaces.pas',
+  DPM.Core.SBOM.Writers in 'Core\Sbom\DPM.Core.SBOM.Writers.pas',
+  DPM.Core.SBOM.Writers.Reports in 'Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas',
+  DPM.Core.SBOM.Generator in 'Core\Sbom\DPM.Core.SBOM.Generator.pas',
+  DPM.Core.Options.SBOM in 'Core\Options\DPM.Core.Options.SBOM.pas',
+  DPM.Core.Tests.SBOM.MapFile in 'Tests\DPM.Core.Tests.SBOM.MapFile.pas',
+  DPM.Core.Tests.SBOM.Writers in 'Tests\DPM.Core.Tests.SBOM.Writers.pas',
+  DPM.Core.Tests.SBOM.UnitOrigin in 'Tests\DPM.Core.Tests.SBOM.UnitOrigin.pas',
+  DPM.Core.Tests.SBOM.Reports in 'Tests\DPM.Core.Tests.SBOM.Reports.pas',
+  DPM.Core.Tests.SBOM.FormatParser in 'Tests\DPM.Core.Tests.SBOM.FormatParser.pas',
+  DPM.Core.Tests.Cache.PackageHash in 'Tests\DPM.Core.Tests.Cache.PackageHash.pas';
 
 var
   runner : ITestRunner;

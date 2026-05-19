@@ -93,6 +93,7 @@ type
     procedure UpdatePackageReferences(const dependencyGraph : IPackageReference);
     function GetPackageReferences : IPackageReference;
     function GetConfigNames: IReadOnlyList<string>;
+    function GetSourceFiles : IList<string>;
   public
     constructor Create(const logger : ILogger; const config : IConfiguration; const compilerVersion : TCompilerVersion);
   end;
@@ -363,6 +364,56 @@ end;
 function TProjectEditor.GetConfigNames: IReadOnlyList<string>;
 begin
   result := FConfigNames as IReadOnlyList<string>;
+end;
+
+function TProjectEditor.GetSourceFiles : IList<string>;
+var
+  nodes : IXMLDOMNodeList;
+  element : IXMLDOMElement;
+  i : integer;
+  includeValue : string;
+begin
+  //Returns the raw Include attribute values of every DCCReference + DelphiCompile
+  //in the dproj. Preserves the original (typically relative) form so the caller
+  //can resolve against the dproj's directory as needed. Parses on demand from
+  //FProjectXML - no LoadProject element flag required.
+  result := TCollections.CreateList<string>;
+  if FProjectXML = nil then
+    exit;
+
+  //DCCReference items - the regular .pas units compiled into the binary.
+  nodes := FProjectXML.selectNodes('/x:Project/x:ItemGroup/x:DCCReference');
+  if nodes <> nil then
+  begin
+    for i := 0 to nodes.length - 1 do
+    begin
+      element := nodes.item[i] as IXMLDOMElement;
+      if (element <> nil) and (element.getAttributeNode('Include') <> nil) then
+      begin
+        includeValue := element.getAttribute('Include');
+        if includeValue <> '' then
+          result.Add(includeValue);
+      end;
+    end;
+  end;
+
+  //DelphiCompile items - the main .dpr / .dpk source file (typically one).
+  //Often an MSBuild macro like '$(MainSource)' rather than a literal path -
+  //add as-is, callers tolerate unresolvable entries (only the directory matters).
+  nodes := FProjectXML.selectNodes('/x:Project/x:ItemGroup/x:DelphiCompile');
+  if nodes <> nil then
+  begin
+    for i := 0 to nodes.length - 1 do
+    begin
+      element := nodes.item[i] as IXMLDOMElement;
+      if (element <> nil) and (element.getAttributeNode('Include') <> nil) then
+      begin
+        includeValue := element.getAttribute('Include');
+        if (includeValue <> '') and (Pos('$(', includeValue) = 0) then
+          result.Add(includeValue);
+      end;
+    end;
+  end;
 end;
 
 function TProjectEditor.InternalLoadFromXML(const elements : TProjectElements) : boolean;

@@ -47,6 +47,7 @@ uses
   DPM.Core.Options.Sources,
   DPM.Core.Options.Uninstall,
   DPM.Core.Options.Restore,
+  DPM.Core.Options.Sbom,
   DPM.Core.Options.Spec,
   DPM.Core.Options.Why,
   DPM.Core.Utils.Strings,
@@ -862,6 +863,98 @@ begin
 
 end;
 
+procedure RegisterSbomCommand;
+var
+  cmd : TCommandDefinition;
+  option : IOptionDefinition;
+begin
+  cmd := TOptionsRegistry.RegisterCommand('sbom', '', 'Generates a Software Bill of Materials (SBOM) for the project.',
+                                                      'Emits CycloneDX 1.5 JSON and / or SPDX 2.3 JSON for each enabled platform. ' +
+                                                      'For non-DPM library detection, ensure the linker option "Map file = Detailed" is enabled in the build configuration you point at.',
+                                                      'sbom <project> [-outdir=<dir>] [-format=cyclonedx|spdx|both] [-platforms=<csv>] [-config=<name>] [-map=<path>] [-no-runtime] [-strict]');
+
+  option := cmd.RegisterUnNamedOption<string>('The .dproj or .groupproj. Defaults to the current directory.', 'projectPath',
+    procedure(const value : string)
+    begin
+      TSBOMOptions.Default.ProjectPath := value;
+    end);
+
+  cmd.RegisterOption<string>('outdir', 'o', 'Output directory for SBOM files. Defaults to the project directory.',
+    procedure(const value : string)
+    begin
+      TSBOMOptions.Default.OutputDir := value;
+    end);
+
+  cmd.RegisterOption<string>('format', 'f',
+    'Comma-separated list of output formats: cyclonedx | spdx | html | markdown. ' +
+    'Aliases: ''both'' = cyclonedx,spdx; ''all'' = every format. Default: cyclonedx,spdx.',
+    procedure(const value : string)
+    begin
+      TSBOMOptions.Default.Formats := StringToSBOMFormats(value);
+    end);
+
+  cmd.RegisterOption<string>('platforms', 'p', 'Platforms to generate for (comma separated). Default: all enabled in the project.',
+    procedure(const value : string)
+    var
+      platformStrings : TArray<string>;
+      platformString : string;
+      platform : TDPMPlatform;
+    begin
+      platformStrings := TStringUtils.SplitStr(value, ',', TSplitStringOptions.ExcludeEmpty);
+      for platformString in platformStrings do
+      begin
+        platform := StringToDPMPlatform(Trim(platformString));
+        if platform <> TDPMPlatform.UnknownPlatform then
+          TSBOMOptions.Default.Platforms := TSBOMOptions.Default.Platforms + [platform]
+        else
+          raise Exception.Create('Invalid platform [' + platformString + ']');
+      end;
+    end);
+
+  cmd.RegisterOption<string>('config', 'c', 'Build configuration to use for locating the MAP file (default: Release, else Debug, else first available).',
+    procedure(const value : string)
+    begin
+      TSBOMOptions.Default.Config := value;
+    end);
+
+  cmd.RegisterOption<string>('map', 'm', 'Path to a specific MAP file. Overrides auto-detection (single-platform invocations only).',
+    procedure(const value : string)
+    begin
+      TSBOMOptions.Default.MapFile := value;
+    end);
+
+  option := cmd.RegisterOption<boolean>('no-runtime', '', 'Exclude the Delphi RTL/VCL/FMX component from the SBOM (included by default).',
+    procedure(const value : boolean)
+    begin
+      TSBOMOptions.Default.IncludeRuntime := not value;
+    end);
+  option.HasValue := false;
+
+  option := cmd.RegisterOption<boolean>('strict', '', 'Fail with a non-zero exit code if a MAP file is missing (default: warn and emit a partial SBOM).',
+    procedure(const value : boolean)
+    begin
+      TSBOMOptions.Default.Strict := value;
+    end);
+  option.HasValue := false;
+
+  option := cmd.RegisterOption<boolean>('per-project', '',
+    'When the input is a .groupproj, emit one SBOM per dproj per platform (legacy behaviour). ' +
+    'Default: one aggregated SBOM per platform spanning the whole group.',
+    procedure(const value : boolean)
+    begin
+      TSBOMOptions.Default.PerProject := value;
+    end);
+  option.HasValue := false;
+
+  cmd.Examples.Add('sbom .\MyProject.dproj');
+  cmd.Examples.Add('sbom .\MyProject.dproj -outdir=c:\temp -format=cyclonedx');
+  cmd.Examples.Add('sbom .\MyProject.dproj -format=html,markdown');
+  cmd.Examples.Add('sbom .\MyProject.dproj -format=all');
+  cmd.Examples.Add('sbom .\MyProject.dproj -platforms=Win32,Win64 -config=Release');
+  cmd.Examples.Add('sbom .\MySolution.groupproj                    # one aggregated SBOM per platform');
+  cmd.Examples.Add('sbom .\MySolution.groupproj -per-project       # one SBOM per dproj per platform');
+end;
+
 
 
 procedure RegisterOptions;
@@ -918,6 +1011,7 @@ begin
   RegisterWhyCommand;
   RegisterExitCodesCommand;
   RegisterInfoCommand;
+  RegisterSbomCommand;
 
 end;
 

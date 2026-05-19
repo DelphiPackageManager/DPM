@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -59,8 +59,11 @@ procedure TDPMTargetPlatformTestFixture.Can_Parse_Valid_String;
 var
   value :TTargetPlatform;
 begin
-  Assert.IsTrue(TTargetPlatform.TryParse('RSXE7.Win32', value));
+  //RS prefix (e.g. RSXE7) is no longer accepted by StringToCompilerVersion - the canonical
+  //CLI form is the bare XE7 / 10.3 / 12 form. Updated test to match.
+  Assert.IsTrue(TTargetPlatform.TryParse('XE7.Win32', value));
   Assert.IsTrue(TTargetPlatform.TryParse('10.3.Win32', value));
+  Assert.IsTrue(TTargetPlatform.TryParse('12.0.Win64', value));
 end;
 
 

@@ -14,6 +14,9 @@ type
     [TestCase('SimpleDot', 'c:\test\foo\.\bar,c:\test\foo\bar')]
     [TestCase('UNC', '\\test\foo\..\bar,\\test\bar')]
     [TestCase('Unrooted', 'test\foo\..\bar,test\bar')]
+    [TestCase('ForwardSlashDot', 'c:\test\.\foo\bar,c:\test\foo\bar')]
+    [TestCase('MixedSlashesDot', 'c:\test\.\packages/Rad Studio 12/X.dproj,c:\test\packages\Rad Studio 12\X.dproj')]
+    [TestCase('AllForwardDot', 'c:/test/./foo/bar,c:\test\foo\bar')]
     procedure TestCompressRelativePath(const input, expected : string);
 
     [Test]
@@ -22,6 +25,7 @@ type
     [TestCase('UNCBase3', '\\test\,foo\..\bar,\\test\bar')]
     [TestCase('UNCBase4', '\\test\,\foo\..\bar,\\test\bar')]
     [TestCase('Rooted', 'c:\test\,foo\..\bar,c:\test\bar')]
+    [TestCase('PosixRelative', 'c:\test\,./foo/bar,c:\test\foo\bar')]
     procedure TestCompressRelativePathWithBase(const base, input, expected : string);
 
     [Test]
