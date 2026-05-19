@@ -179,7 +179,16 @@ uses
   DPM.IDE.GroupEditorViewFrame in 'IDE\EditorView\DPM.IDE.GroupEditorViewFrame.pas' {DPMGroupEditViewFrame: TFrame},
   DPM.IDE.PackageDetailsFrame in 'IDE\EditorView\DPM.IDE.PackageDetailsFrame.pas' {PackageDetailsFrame: TFrame},
   DPM.Core.Sources.ServiceIndex in 'Core\Sources\DPM.Core.Sources.ServiceIndex.pas',
-  DPM.Core.Package.ListItem in 'Core\Package\DPM.Core.Package.ListItem.pas';
+  DPM.Core.Package.ListItem in 'Core\Package\DPM.Core.Package.ListItem.pas',
+  DPM.Core.Project.MapFile in 'Core\Project\DPM.Core.Project.MapFile.pas',
+  DPM.Core.Options.SBOM in 'Core\Options\DPM.Core.Options.SBOM.pas',
+  DPM.Core.Sbom.Generator in 'Core\Sbom\DPM.Core.Sbom.Generator.pas',
+  DPM.Core.Sbom.Interfaces in 'Core\Sbom\DPM.Core.Sbom.Interfaces.pas',
+  DPM.Core.Sbom.Types in 'Core\Sbom\DPM.Core.Sbom.Types.pas',
+  DPM.Core.Sbom.Writers in 'Core\Sbom\DPM.Core.Sbom.Writers.pas',
+  DPM.Core.SBOM.Writers.Reports in 'Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas',
+  DPM.Core.Project.SearchPaths in 'Core\Project\DPM.Core.Project.SearchPaths.pas',
+  DPM.IDE.SBOM.Menu in 'IDE\DPM.IDE.SBOM.Menu.pas';
 
 {$R *.res}
 

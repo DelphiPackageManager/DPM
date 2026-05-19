@@ -280,6 +280,15 @@
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
         </BuildConfiguration>
+        <DCCReference Include="Core\Project\DPM.Core.Project.MapFile.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.SearchPaths.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.SBOM.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Generator.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Interfaces.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Types.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.SBOM.Menu.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
