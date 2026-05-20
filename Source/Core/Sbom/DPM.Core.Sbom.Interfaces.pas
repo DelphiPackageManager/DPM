@@ -54,6 +54,16 @@ type
     function Generate(const cancellationToken : ICancellationToken; const options : TSBOMOptions) : boolean;
   end;
 
+  ///<summary>Inverse of ISbomWriter for the CycloneDX format - parses an existing
+  /// CycloneDX 1.5 JSON document back into a TSBOMReport so dpm scan can consume
+  /// SBOMs the user (or someone else) generated previously. Caller owns the returned
+  /// report.</summary>
+  ISBOMReader = interface
+    ['{0B7C5F2E-8D14-4F3B-9E07-2A6C1D8B9F45}']
+    function ReadFromFile(const fileName : string) : TSBOMReport;
+    function ReadFromString(const json : string) : TSBOMReport;
+  end;
+
 implementation
 
 end.

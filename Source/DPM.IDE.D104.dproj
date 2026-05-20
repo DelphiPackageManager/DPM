@@ -288,6 +288,7 @@
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Types.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Reader.pas"/>
         <DCCReference Include="IDE\DPM.IDE.SBOM.Menu.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

@@ -114,10 +114,10 @@
         <BRCC_CompilerToUse>msrc</BRCC_CompilerToUse>
         <DCC_DebugInfoInExe>true</DCC_DebugInfoInExe>
         <DCC_MapFile>3</DCC_MapFile>
-        <Debugger_CWD>I:\Github\VSoftTechnologies\spring4d</Debugger_CWD>
+        <Debugger_CWD>I:\Github\DelphiPackageManager\DPMMaster\Source\Tests\SBOMdemo</Debugger_CWD>
         <Debugger_EnvVars>DPMPACKAGECACHE=c:\temp\packagecache;$(Debugger_EnvVars)</Debugger_EnvVars>
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
-        <Debugger_RunParams>pack Spring4D.Data.dspec.yaml -o=i:\dpm-new</Debugger_RunParams>
+        <Debugger_RunParams>scan SBOMdemo.dproj</Debugger_RunParams>
         <ILINK_MapFileType>DetailedSegments</ILINK_MapFileType>
         <OutputExt>2.exe</OutputExt>
     </PropertyGroup>
@@ -280,6 +280,15 @@
         <DCCReference Include="Core\Options\DPM.Core.Options.Sbom.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.SearchPaths.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Reader.pas"/>
+        <DCCReference Include="Core\Vuln\DPM.Core.Vuln.Types.pas"/>
+        <DCCReference Include="Core\Vuln\DPM.Core.Vuln.Interfaces.pas"/>
+        <DCCReference Include="Core\Vuln\DPM.Core.Vuln.Cache.pas"/>
+        <DCCReference Include="Core\Vuln\DPM.Core.Vuln.OSV.pas"/>
+        <DCCReference Include="Core\Vuln\DPM.Core.Vuln.Scanner.pas"/>
+        <DCCReference Include="Core\Vuln\DPM.Core.Vuln.Writer.CycloneDX.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Scan.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Scan.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

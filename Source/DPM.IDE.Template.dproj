@@ -356,6 +356,7 @@
         <DCCReference Include="Core\Options\DPM.Core.Options.SBOM.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.MapFile.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.SearchPaths.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Reader.pas"/>
         <DCCReference Include="IDE\DPM.IDE.SBOM.Menu.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

@@ -58,6 +58,12 @@ uses
   DPM.Console.Command.Why,
   DPM.Console.Command.Info,
   DPM.Console.Command.Sbom,
+  DPM.Console.Command.Scan,
+  DPM.Core.Vuln.Interfaces,
+  DPM.Core.Vuln.Cache,
+  DPM.Core.Vuln.OSV,
+  DPM.Core.Vuln.Scanner,
+  DPM.Core.Vuln.Writer.CycloneDX,
   DPM.Core.Logging,
   DPM.Console.Logger,
   DPM.Console.Writer,
@@ -102,6 +108,16 @@ begin
  container.RegisterType<ICommandHandler,TWhyCommand>('command.why');
  container.RegisterType<ICommandHandler,TInfoCommand>('command.info');
  container.RegisterType<ICommandHandler,TSBOMCommand>('command.sbom');
+
+ //Vulnerability scanning - CLI-only, IDE plugin doesn't surface dpm scan.
+ //Cache is a singleton so a `dpm scan` invocation that scans multiple
+ //SBOMs shares one disk cache instance.
+ container.RegisterType<IVulnResponseCache,TVulnResponseCache>.AsSingleton();
+ container.RegisterType<IVulnDatabase,TOSVDatabase>(cOSVSourceName);
+ container.RegisterType<IVulnScanner,TVulnScanner>;
+ container.RegisterType<IVulnWriter,TCycloneDxVexWriter>(cVulnWriterCycloneDX);
+ container.RegisterType<ICommandHandler,TScanCommand>('command.scan');
+
  container.RegisterType<ICommandFactory,TCommandFactory>;
 
 end;

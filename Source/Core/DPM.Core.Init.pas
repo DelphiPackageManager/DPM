@@ -75,6 +75,7 @@ uses
   DPM.Core.SBOM.Interfaces,
   DPM.Core.SBOM.Writers,
   DPM.Core.SBOM.Writers.Reports,
+  DPM.Core.SBOM.Reader,
   DPM.Core.SBOM.Generator;
 
 
@@ -124,6 +125,7 @@ begin
   Container.RegisterType<ISbomWriter, TSPDXWriter>(cSBOMWriterSPDX);
   Container.RegisterType<ISbomWriter, THTMLReportWriter>(cSBOMWriterHTML);
   Container.RegisterType<ISbomWriter, TMarkdownReportWriter>(cSBOMWriterMarkdown);
+  Container.RegisterType<ISBOMReader, TCycloneDXReader>;
   Container.RegisterType<ISbomGenerator, TSBOMGenerator>;
 
   Container.RegisterInstance<TContainer>(Container);

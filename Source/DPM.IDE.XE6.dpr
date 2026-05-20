@@ -187,6 +187,7 @@ uses
   DPM.Core.Sbom.Writers in 'Core\Sbom\DPM.Core.Sbom.Writers.pas',
   DPM.Core.SBOM.Writers.Reports in 'Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas',
   DPM.Core.Project.SearchPaths in 'Core\Project\DPM.Core.Project.SearchPaths.pas',
+  DPM.Core.SBOM.Reader in 'Core\Sbom\DPM.Core.SBOM.Reader.pas',
   DPM.IDE.SBOM.Menu in 'IDE\DPM.IDE.SBOM.Menu.pas';
 
 {$R *.res}

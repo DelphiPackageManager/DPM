@@ -1,22 +1,22 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
         <Config Condition="'$(Config)'==''">Release</Config>
         <FrameworkType>None</FrameworkType>
         <MainSource>SBOMdemo.dpr</MainSource>
-        <Platform Condition="'$(Platform)'==''">Win64</Platform>
+        <Platform Condition="'$(Platform)'==''">Win32</Platform>
         <ProjectGuid>{A1B2C3D4-E5F6-4708-9A0B-1C2D3E4F5061}</ProjectGuid>
         <ProjectName Condition="'$(ProjectName)'==''">SBOMdemo</ProjectName>
         <ProjectVersion>20.3</ProjectVersion>
         <TargetedPlatforms>3</TargetedPlatforms>
     </PropertyGroup>
     <PropertyGroup>
-        <DPMCompiler>delphi12</DPMCompiler>
-        <DPMCache Condition="'$(DPMCache)' == ''">C:\Users\vincent.OFFICE\AppData\Roaming\.dpm\packages-new</DPMCache>
-        <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'"></DPMSearch>
-        <DPMSearch Condition="'$(Platform)'=='Win64'"></DPMSearch>
+        <DPMCompiler>12.0</DPMCompiler>
+        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
+        <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Spring4D.Base\2.0.1\lib;$(DPM)\Spring4D.Core\2.0.1\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -130,7 +130,25 @@
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>
             <Packages>
-			</Packages>
+                <PackageReference id="VSoft.HttpClient" version="2.6.0">
+                    <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="[0.1.4,]"/>
+                    <PackageReference id="VSoft.Uri" version="0.3.3" range="[0.3.3,]"/>
+                </PackageReference>
+            </Packages>
+            <PackageReferences platform="Win32">
+                <PackageReference id="Spring4D.Core" version="2.0.1">
+                    <PackageReference id="Spring4D.Base" version="2.0.1" range="2.0.1"/>
+                </PackageReference>
+                <PackageReference id="VSoft.CancellationToken" version="0.1.4"/>
+                <PackageReference id="VSoft.SemanticVersion" version="0.2.7"/>
+            </PackageReferences>
+            <PackageReferences platform="Win64">
+                <PackageReference id="Spring4D.Core" version="2.0.1">
+                    <PackageReference id="Spring4D.Base" version="2.0.1" range="2.0.1"/>
+                </PackageReference>
+                <PackageReference id="VSoft.CancellationToken" version="0.1.4"/>
+                <PackageReference id="VSoft.SemanticVersion" version="0.2.7"/>
+            </PackageReferences>
         </DPM>
     </ProjectExtensions>
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>

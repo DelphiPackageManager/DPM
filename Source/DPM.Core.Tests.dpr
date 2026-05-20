@@ -124,7 +124,17 @@ uses
   DPM.Core.Tests.SBOM.UnitOrigin in 'Tests\DPM.Core.Tests.SBOM.UnitOrigin.pas',
   DPM.Core.Tests.SBOM.Reports in 'Tests\DPM.Core.Tests.SBOM.Reports.pas',
   DPM.Core.Tests.SBOM.FormatParser in 'Tests\DPM.Core.Tests.SBOM.FormatParser.pas',
-  DPM.Core.Tests.Cache.PackageHash in 'Tests\DPM.Core.Tests.Cache.PackageHash.pas';
+  DPM.Core.Tests.Cache.PackageHash in 'Tests\DPM.Core.Tests.Cache.PackageHash.pas',
+  DPM.Core.SBOM.Reader in 'Core\Sbom\DPM.Core.SBOM.Reader.pas',
+  DPM.Core.Vuln.Types in 'Core\Vuln\DPM.Core.Vuln.Types.pas',
+  DPM.Core.Vuln.Interfaces in 'Core\Vuln\DPM.Core.Vuln.Interfaces.pas',
+  DPM.Core.Vuln.Cache in 'Core\Vuln\DPM.Core.Vuln.Cache.pas',
+  DPM.Core.Vuln.Scanner in 'Core\Vuln\DPM.Core.Vuln.Scanner.pas',
+  DPM.Core.Vuln.Writer.CycloneDX in 'Core\Vuln\DPM.Core.Vuln.Writer.CycloneDX.pas',
+  DPM.Core.Tests.SBOM.Reader in 'Tests\DPM.Core.Tests.SBOM.Reader.pas',
+  DPM.Core.Tests.Vuln.Scanner in 'Tests\DPM.Core.Tests.Vuln.Scanner.pas',
+  DPM.Core.Tests.Vuln.Cache in 'Tests\DPM.Core.Tests.Vuln.Cache.pas',
+  DPM.Core.Tests.Vuln.CycloneDX in 'Tests\DPM.Core.Tests.Vuln.CycloneDX.pas';
 
 var
   runner : ITestRunner;

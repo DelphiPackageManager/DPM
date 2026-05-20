@@ -83,6 +83,7 @@ type
                  Why,
                  Info,
                  Sbom,
+                 Scan,
                  None,
                  Invalid);
 
@@ -109,6 +110,7 @@ const
                        'why',
                        'info',
                        'sbom',
+                       'scan',
                        '',
                        'invalid');
 

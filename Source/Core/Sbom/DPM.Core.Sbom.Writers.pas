@@ -214,6 +214,19 @@ procedure TCycloneDXWriter.Write(const report : TSBOMReport; const fileName : st
       inner.S['name'] := license;
   end;
 
+  function SbomKindToString(const kind : TSBOMComponentKind) : string;
+  begin
+    case kind of
+      TSBOMComponentKind.Application   : result := 'application';
+      TSBOMComponentKind.DpmPackage    : result := 'dpm-package';
+      TSBOMComponentKind.DelphiRuntime : result := 'delphi-runtime';
+      TSBOMComponentKind.ThirdParty    : result := 'third-party';
+      TSBOMComponentKind.Unidentified  : result := 'unidentified';
+    else
+      result := 'unidentified';
+    end;
+  end;
+
   procedure FillComponent(const obj : TJsonObject; const comp : TSBOMComponent);
   var
     typeName : string;
@@ -231,6 +244,8 @@ procedure TCycloneDXWriter.Write(const report : TSBOMReport; const fileName : st
     evidenceObj : TJsonObject;
     occurArr : TJsonArray;
     ev : TSBOMEvidence;
+    kindEmitted : boolean;
+    kindString : string;
   begin
     case comp.Kind of
       TSBOMComponentKind.Application : typeName := 'application';
@@ -304,7 +319,13 @@ procedure TCycloneDXWriter.Write(const report : TSBOMReport; const fileName : st
           tagsArr.Add(tag);
     end;
 
-    if comp.Properties.Count > 0 then
+    //Emit dpm:component-kind so a DPM SBOM reader can recover the original kind
+    //(application / framework / library type alone collapses dpm-package / third-party
+    /// unidentified to 'library', which would break round-trip and scan-time filtering).
+    kindString := SbomKindToString(comp.Kind);
+    kindEmitted := false;
+    propsArr := nil;
+    if (comp.Properties.Count > 0) or (kindString <> '') then
     begin
       propsArr := obj.A['properties'];
       for prop in comp.Properties do
@@ -312,7 +333,17 @@ procedure TCycloneDXWriter.Write(const report : TSBOMReport; const fileName : st
         propObj := propsArr.AddObject;
         propObj.S['name'] := prop.Name;
         propObj.S['value'] := prop.Value;
+        if SameText(prop.Name, 'dpm:component-kind') then
+          kindEmitted := true;
       end;
+    end;
+    if (not kindEmitted) and (kindString <> '') then
+    begin
+      if propsArr = nil then
+        propsArr := obj.A['properties'];
+      propObj := propsArr.AddObject;
+      propObj.S['name'] := 'dpm:component-kind';
+      propObj.S['value'] := kindString;
     end;
 
     if comp.Evidence.Count > 0 then
@@ -362,15 +393,27 @@ begin
 
       FillComponent(meta.O['component'], report.RootComponent);
 
-      if report.MetaProperties.Count > 0 then
+      //CycloneDX has no first-class field for target platform or compiler version,
+      //so DPM emits them as metadata properties. The reader keys off these on
+      //round-trip; without them sbom-name files lose their per-platform identity.
+      metaPropsArr := meta.A['properties'];
+      if report.Platform <> TDPMPlatform.UnknownPlatform then
       begin
-        metaPropsArr := meta.A['properties'];
-        for metaProp in report.MetaProperties do
-        begin
-          metaPropObj := metaPropsArr.AddObject;
-          metaPropObj.S['name'] := metaProp.Name;
-          metaPropObj.S['value'] := metaProp.Value;
-        end;
+        metaPropObj := metaPropsArr.AddObject;
+        metaPropObj.S['name'] := 'dpm:platform';
+        metaPropObj.S['value'] := DPMPlatformToString(report.Platform);
+      end;
+      if report.CompilerVersion <> TCompilerVersion.UnknownVersion then
+      begin
+        metaPropObj := metaPropsArr.AddObject;
+        metaPropObj.S['name'] := 'dpm:compilerVersion';
+        metaPropObj.S['value'] := CompilerToString(report.CompilerVersion);
+      end;
+      for metaProp in report.MetaProperties do
+      begin
+        metaPropObj := metaPropsArr.AddObject;
+        metaPropObj.S['name'] := metaProp.Name;
+        metaPropObj.S['value'] := metaProp.Value;
       end;
 
       componentsArr := root.A['components'];

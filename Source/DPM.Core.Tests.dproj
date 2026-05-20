@@ -187,6 +187,16 @@
         <DCCReference Include="Tests\DPM.Core.Tests.SBOM.Writers.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Generator.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Sbom.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Reader.pas"/>
+        <DCCReference Include="Core\Vuln\DPM.Core.Vuln.Types.pas"/>
+        <DCCReference Include="Core\Vuln\DPM.Core.Vuln.Interfaces.pas"/>
+        <DCCReference Include="Core\Vuln\DPM.Core.Vuln.Cache.pas"/>
+        <DCCReference Include="Core\Vuln\DPM.Core.Vuln.Scanner.pas"/>
+        <DCCReference Include="Core\Vuln\DPM.Core.Vuln.Writer.CycloneDX.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.SBOM.Reader.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Vuln.Scanner.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Vuln.Cache.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Vuln.CycloneDX.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

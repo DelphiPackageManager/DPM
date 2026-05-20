@@ -175,7 +175,16 @@ uses
   DPM.Core.Project.MapFile in 'Core\Project\DPM.Core.Project.MapFile.pas',
   DPM.Core.Options.Sbom in 'Core\Options\DPM.Core.Options.Sbom.pas',
   DPM.Core.Project.SearchPaths in 'Core\Project\DPM.Core.Project.SearchPaths.pas',
-  DPM.Core.SBOM.Writers.Reports in 'Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas';
+  DPM.Core.SBOM.Writers.Reports in 'Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas',
+  DPM.Core.SBOM.Reader in 'Core\Sbom\DPM.Core.SBOM.Reader.pas',
+  DPM.Core.Vuln.Types in 'Core\Vuln\DPM.Core.Vuln.Types.pas',
+  DPM.Core.Vuln.Interfaces in 'Core\Vuln\DPM.Core.Vuln.Interfaces.pas',
+  DPM.Core.Vuln.Cache in 'Core\Vuln\DPM.Core.Vuln.Cache.pas',
+  DPM.Core.Vuln.OSV in 'Core\Vuln\DPM.Core.Vuln.OSV.pas',
+  DPM.Core.Vuln.Scanner in 'Core\Vuln\DPM.Core.Vuln.Scanner.pas',
+  DPM.Core.Vuln.Writer.CycloneDX in 'Core\Vuln\DPM.Core.Vuln.Writer.CycloneDX.pas',
+  DPM.Core.Options.Scan in 'Core\Options\DPM.Core.Options.Scan.pas',
+  DPM.Console.Command.Scan in 'Cmdline\Commands\DPM.Console.Command.Scan.pas';
 
 procedure LogException(ExceptObj: TObject; ExceptAddr: Pointer; OSException: Boolean);
 var

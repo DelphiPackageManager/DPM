@@ -48,8 +48,10 @@ uses
   DPM.Core.Options.Uninstall,
   DPM.Core.Options.Restore,
   DPM.Core.Options.Sbom,
+  DPM.Core.Options.Scan,
   DPM.Core.Options.Spec,
   DPM.Core.Options.Why,
+  DPM.Core.Vuln.Types,
   DPM.Core.Utils.Strings,
   VSoft.CommandLine.Options;
 
@@ -957,6 +959,77 @@ end;
 
 
 
+procedure RegisterScanCommand;
+var
+  cmd : TCommandDefinition;
+  option : IOptionDefinition;
+begin
+  cmd := TOptionsRegistry.RegisterCommand('scan', '', 'Scans a CycloneDX SBOM or a .dproj/.groupproj for known vulnerabilities (OSV).',
+                                                      'Reads the input SBOM (or generates one from the project), queries the Open Source Vulnerabilities database ' +
+                                                      '(https://api.osv.dev), and writes a CycloneDX 1.5 VEX report. Responses are cached for 24 hours under ' +
+                                                      '%APPDATA%\.dpm\vuln-cache. Use -fail-on=high (or critical/medium/low) to fail the build in CI when a serious vuln is found.',
+                                                      'scan <sbom-or-project> [-output=<path>] [-fail-on=none|low|medium|high|critical] [-no-cache] [-source=osv] [-platforms=<csv>] [-config=<name>]');
+
+  option := cmd.RegisterUnNamedOption<string>('The CycloneDX SBOM .json file, or the .dproj / .groupproj to generate and scan.', 'inputPath',
+    procedure(const value : string)
+    begin
+      TScanOptions.Default.InputPath := value;
+    end);
+
+  cmd.RegisterOption<string>('output', 'o', 'Output .vex.json path (file for SBOM input, directory for project input). ' +
+                                            'Default: <input>.vex.json next to the input, or per-platform files in the project folder.',
+    procedure(const value : string)
+    begin
+      TScanOptions.Default.OutputPath := value;
+    end);
+
+  cmd.RegisterOption<string>('source', 's', 'Vulnerability database. Only ''osv'' is supported in v1.',
+    procedure(const value : string)
+    begin
+      TScanOptions.Default.Source := value;
+    end);
+
+  cmd.RegisterOption<string>('fail-on', '',
+    'Exit code 1 if any vulnerability of this severity (or higher) is found. ' +
+    'Accepted: none | low | medium | high | critical. Default: none.',
+    procedure(const value : string)
+    begin
+      TScanOptions.Default.FailOn := StringToSeverity(value);
+    end);
+
+  option := cmd.RegisterOption<boolean>('no-cache', '', 'Bypass the 24h response cache for this run (still writes fresh responses to the cache).',
+    procedure(const value : boolean)
+    begin
+      TScanOptions.Default.NoCache := value;
+    end);
+  option.HasValue := false;
+
+  cmd.RegisterOption<string>('platforms', 'p', 'Platforms to scan (only used when input is a .dproj/.groupproj). Default: all enabled.',
+    procedure(const value : string)
+    var
+      platformStrings : TArray<string>;
+      platformString : string;
+      platform : TDPMPlatform;
+    begin
+      platformStrings := TStringUtils.SplitStr(value, ',', TSplitStringOptions.ExcludeEmpty);
+      for platformString in platformStrings do
+      begin
+        platform := StringToDPMPlatform(Trim(platformString));
+        if platform <> TDPMPlatform.UnknownPlatform then
+          TScanOptions.Default.Platforms := TScanOptions.Default.Platforms + [platform]
+        else
+          raise Exception.Create('Invalid platform [' + platformString + ']');
+      end;
+    end);
+
+  cmd.Examples.Add('scan MyProject.cdx.json');
+  cmd.Examples.Add('scan MyProject.cdx.json -fail-on=high');
+  cmd.Examples.Add('scan MyProject.dproj -platforms=Win32,Win64');
+  cmd.Examples.Add('scan MySolution.groupproj -output=c:\reports');
+  cmd.Examples.Add('scan MyProject.cdx.json -no-cache    # force fresh OSV queries');
+end;
+
+
 procedure RegisterOptions;
 var
   option : IOptionDefinition;
@@ -1012,6 +1085,7 @@ begin
   RegisterExitCodesCommand;
   RegisterInfoCommand;
   RegisterSbomCommand;
+  RegisterScanCommand;
 
 end;
 
