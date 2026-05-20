@@ -8,9 +8,9 @@ uses
 
 type
   TForm1 = class(TForm)
+    VSoftVirtualListView3: TVSoftVirtualListView;
   private
     { Private declarations }
-    FVirtualListView : TVSoftVirtualListView;
   public
     { Public declarations }
   end;

@@ -27,14 +27,7 @@ type
     BPLPath : string;   //lowercase
   end;
 
-  //IDE-only extension of IPackageInstallerContext - methods that only make sense when the
-  //Delphi IDE is hosting DPM (no equivalent in the CLI).
-  IDPMIDEPackageInstallerContext = interface
-    ['{D8A51C2F-4B97-48E6-9C3D-7B5A6F8D19E2}']
-    procedure CleanupOrphanedDesignBPLs;
-  end;
-
-  TDPMIDEPackageInstallerContext = class(TCorePackageInstallerContext, IPackageInstallerContext, IDPMIDEPackageInstallerContext)
+  TDPMIDEPackageInstallerContext = class(TCorePackageInstallerContext, IPackageInstallerContext)
   private
     FPathManager : IDPMIDEPathManager;
     FPackageCache : IPackageCache;
@@ -54,7 +47,6 @@ type
     function UninstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const orphanedPackageIds : IList<string>) : boolean; override;
   public
     constructor Create(const logger : ILogger; const pathManager : IDPMIDEPathManager; const packageCache : IPackageCache); reintroduce;
-    procedure CleanupOrphanedDesignBPLs;
   end;
 
 implementation
@@ -65,6 +57,7 @@ uses
   System.IOUtils,
   System.StrUtils,
   System.SysUtils,
+  Vcl.Forms,
   DPM.Core.Utils.System;
 
 { helpers }
@@ -222,6 +215,17 @@ begin
   loaded.Referencers.Remove(lcProject);
   if loaded.Referencers.Count > 0 then
     exit;
+
+  //During IDE shutdown, skip the UninstallPackage call - the IDE is tearing down its own
+  //package state in parallel, and racing IOTAPackageServices.UninstallPackage against that
+  //is the source of the generic shutdown AV when a project group is loaded (ofnBeginProjectGroupClose
+  //fires Clear() which fans out to UninstallPackage for every design BPL). The IDE will unload
+  //our BPLs as part of its normal package teardown; we just drop our tracking refs here.
+  if Application.Terminated then
+  begin
+    FLoadedBPLs.Remove(lcBplPath);
+    exit;
+  end;
 
   uninstallOk := false;
   RunOnMainThread(
@@ -385,6 +389,16 @@ var
   keys : TArray<string>;
   key : string;
 begin
+  //During IDE shutdown, drop tracking without re-entering the IDE - the IDE will unload our
+  //BPLs as part of its own package teardown. inherited is skipped because it can touch shared
+  //state too. Normal (user-initiated) group close still goes through the full release path so
+  //BPLs are properly removed for the next project group.
+  if Application.Terminated then
+  begin
+    FProjectBPLs.Clear;
+    FLoadedBPLs.Clear;
+    exit;
+  end;
   //snapshot keys so we can release without invalidating enumeration
   keys := FProjectBPLs.Keys.ToArray;
   for key in keys do
@@ -392,95 +406,6 @@ begin
   FProjectBPLs.Clear;
   FLoadedBPLs.Clear; //defensive - should be empty by now
   inherited;
-end;
-
-procedure TDPMIDEPackageInstallerContext.CleanupOrphanedDesignBPLs;
-//Called on a deferred / post-load trigger (see TDPMStartupCleanupNotifier in DPM.IDE.Wizard),
-//NOT from the wizard constructor. By the time this runs, Delphi has already processed Known
-//Packages from the registry and loaded the design BPLs - so IOTAPackageServices can see them.
-//
-//Anything the IDE has loaded from our package cache at this point can only be a leftover from
-//a prior (crashed) session - DPM itself hasn't loaded anything yet this session, it only does so
-//via LoadBPLIfNeeded when a project opens. IOTAPackageServices.UninstallPackage both unloads the
-//BPL and removes it from the Known Packages registry list (see IOTAPackageInfo.SetLoaded docs).
-var
-  cacheRoot : string;
-  cacheRootWithDelim : string;
-  orphaned : TArray<string>;
-  cleanedCount : integer;
-begin
-  cacheRoot := FPackageCache.PackagesFolder;
-  if cacheRoot = '' then
-    exit;
-  cacheRootWithDelim := IncludeTrailingPathDelimiter(cacheRoot);
-  orphaned := nil;
-
-  //First pass: collect matching paths. Don't uninstall inside the loop - UninstallPackage mutates
-  //PackageCount and invalidates the index-based walk.
-  RunOnMainThread(
-    procedure
-    var
-      svc : IOTAPackageServices;
-      info : IOTAPackageInfo;
-      i : integer;
-      candidate : string;
-      found : IList<string>;
-    begin
-      if not Supports(BorlandIDEServices, IOTAPackageServices, svc) then
-        exit;
-      found := TCollections.CreateList<string>;
-      for i := 0 to svc.PackageCount - 1 do
-      begin
-        info := svc.Package[i];
-        if info = nil then
-          continue;
-        //IDE packages are loaded by the IDE itself and cannot be uninstalled by the user - skip
-        //defensively even though they won't match our cache path anyway.
-        if info.IDEPackage then
-          continue;
-        candidate := info.FileName;
-        if candidate = '' then
-          continue;
-        if StartsText(cacheRootWithDelim, candidate) then
-          found.Add(candidate);
-      end;
-      orphaned := found.ToArray;
-    end);
-
-  if Length(orphaned) = 0 then
-    exit;
-
-  cleanedCount := 0;
-  RunOnMainThread(
-    procedure
-    var
-      svc : IOTAPackageServices;
-      k : integer;
-      uninstallOk : boolean;
-    begin
-      if not Supports(BorlandIDEServices, IOTAPackageServices, svc) then
-        exit;
-      for k := 0 to Length(orphaned) - 1 do
-      begin
-        uninstallOk := false;
-        try
-          uninstallOk := svc.UninstallPackage(orphaned[k]);
-        except
-          on e : Exception do
-            FLogger.Error('Exception cleaning up orphaned design BPL [' + orphaned[k] + '] : ' + e.Message);
-        end;
-        if uninstallOk then
-        begin
-          FLogger.Information('Cleaned up orphaned design BPL [' + ExtractFileName(orphaned[k]) + ']');
-          Inc(cleanedCount);
-        end
-        else
-          FLogger.Warning('IDE reported failure unloading orphaned design BPL [' + ExtractFileName(orphaned[k]) + ']');
-      end;
-    end);
-
-  if cleanedCount > 0 then
-    FLogger.Success('Cleaned up ' + IntToStr(cleanedCount) + ' orphaned design BPL(s) from previous session');
 end;
 
 end.

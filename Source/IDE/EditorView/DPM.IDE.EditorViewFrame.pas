@@ -28,6 +28,7 @@ uses
   DPM.Core.Options.Search,
   DPM.Core.Package.Interfaces,
   DPM.Core.Repository.Interfaces,
+  DPM.Core.Cache.Interfaces,
   DPM.Core.Project.Interfaces,
   DPM.IDE.Types,
   DPM.IDE.IconCache,
@@ -101,6 +102,7 @@ type
     FProjectTreeManager : IDPMProjectTreeManager;
     FConfigurationManager : IConfigurationManager;
     FRepositoryManager : IPackageRepositoryManager;
+    FPackageCache : IPackageCache;
     FConfiguration : IConfiguration;
     FConfigIsLocal : boolean;
 
@@ -156,6 +158,11 @@ type
     procedure RequestPackageIcon(const index : integer; const Package : IPackageSearchResultItem);
 
     function GetInstalledPackagesAsync : IAwaitable<IList<IPackageSearchResultItem>>;
+    //Synchronous best-effort paint sourced from the local package cache so the installed list
+    //appears before the GetInstalledPackageFeed network call returns. The async server response
+    //will replace the list when it arrives.
+    function BuildInstalledFromCache(const packageIds : IList<IPackageIdentity>) : IList<IPackageSearchResultItem>;
+    procedure ApplyInstalledBookkeeping(const item : IPackageSearchResultItem);
     function SearchForPackagesAsync(const Options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;
     procedure FilterInstalledPackages(const searchTxt : string);
 
@@ -225,6 +232,7 @@ uses
   DPM.Core.Utils.System,
   DPM.Core.Project.Editor,
   DPM.Core.Package.Icon,
+  DPM.Core.Package.Classes,
   DPM.Core.Package.SearchResults,
   DPM.IDE.ToolsApi,
   DPM.IDE.AboutForm,
@@ -412,6 +420,7 @@ begin
   FConfiguration := FConfigurationManager.LoadConfig(FSearchOptions.ConfigFile);
 
   FRepositoryManager := Container.Resolve<IPackageRepositoryManager>;
+  FPackageCache := Container.Resolve<IPackageCache>;
 
   ConfigureSearchBar;
 
@@ -638,6 +647,22 @@ begin
   end
   else
   begin
+    //Paint installed packages from the local cache immediately so the user sees the list
+    //before GetInstalledPackageFeed returns. The async response below will replace the list
+    //with the authoritative server view (carries LatestVersion / LatestStableVersion etc.).
+    FLock.Acquire;
+    try
+      FAllInstalledPackages := BuildInstalledFromCache(GetPackageIdsFromReferences);
+      if FAllInstalledPackages.Any then
+      begin
+        filterProc(searchTxt);
+        CalculateIndexes;
+        FScrollList.Invalidate;
+      end;
+    finally
+      FLock.Release;
+    end;
+
     GetInstalledPackagesAsync
       .OnException(
       procedure(const e : Exception)
@@ -988,6 +1013,59 @@ begin
 
 end;
 
+procedure TDPMEditViewFrame.ApplyInstalledBookkeeping(const item : IPackageSearchResultItem);
+var
+  packageRef : IPackageReference;
+begin
+  if FPackageReferences = nil then
+    exit;
+  packageRef := FindPackageRef(FPackageReferences, item.Id, true);
+  if packageRef <> nil then
+    item.IsTransitive := false
+  else
+  begin
+    packageRef := FindPackageRef(FPackageReferences, item.Id, false);
+    if packageRef <> nil then
+    begin
+      item.IsTransitive := packageRef.IsTransitive;
+      if item.IsTransitive then
+        item.VersionRange := packageRef.VersionRange;
+    end
+    else
+      item.IsTransitive := false;
+  end;
+  if packageRef <> nil then
+  begin
+    item.Version := packageRef.Version;
+    item.Installed := true;
+  end;
+end;
+
+function TDPMEditViewFrame.BuildInstalledFromCache(const packageIds : IList<IPackageIdentity>) : IList<IPackageSearchResultItem>;
+var
+  pkg : IPackageIdentity;
+  metadata : IPackageMetadata;
+  item : IPackageSearchResultItem;
+begin
+  result := TCollections.CreateList<IPackageSearchResultItem>;
+  if (FPackageCache = nil) or (packageIds = nil) or (not packageIds.Any) then
+    exit;
+  for pkg in packageIds do
+  begin
+    metadata := FPackageCache.GetPackageMetadata(pkg);
+    if metadata = nil then
+      continue;
+    item := TDPMPackageSearchResultItem.FromMetaData('', metadata, '', '');
+    ApplyInstalledBookkeeping(item);
+    result.Add(item);
+  end;
+  result.Sort(
+    function(const Left, Right : IPackageSearchResultItem) : integer
+    begin
+      result := CompareStr(Left.Id, Right.Id);
+    end);
+end;
+
 function TDPMEditViewFrame.GetInstalledPackagesAsync : IAwaitable<IList<IPackageSearchResultItem>>;
 var
   lProjectFile : string;
@@ -1010,7 +1088,6 @@ begin
   result := TAsync.Configure < IList < IPackageSearchResultItem >> (
     function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
     var
-      packageRef : IPackageReference;
       item : IPackageSearchResultItem;
       packageIds : IList<IPackageIdentity>;
       pkg : IPackageIdentity;
@@ -1024,34 +1101,7 @@ begin
         result := repoManager.GetInstalledPackageFeed(cancelToken, Options, packageIds);
         for item in result do
         begin
-          if FPackageReferences <> nil then
-          begin
-            packageRef := FindPackageRef(FPackageReferences, item.Id, true);
-            if packageRef <> nil then // top level reference
-            begin
-              item.IsTransitive := false;
-            end
-            else // not found as a top level reference so check for transitive reference
-            begin
-              packageRef := FindPackageRef(FPackageReferences, item.Id, false);
-              if packageRef <> nil then
-              begin
-                item.IsTransitive := packageRef.IsTransitive;
-                if item.IsTransitive then
-                  item.VersionRange := packageRef.VersionRange;
-              end
-              else
-              begin
-                item.IsTransitive := false;
-              end;
-            end;
-            if packageRef <> nil then
-            begin
-              item.Version := packageRef.Version;
-              item.installed := true;
-            end;
-
-          end;
+          ApplyInstalledBookkeeping(item);
           // remove from the list so we can tell if we got them all in the end.
           pkg := nil;
           for i := 0 to packageIds.Count - 1 do
@@ -1127,6 +1177,9 @@ var
   source : string;
   repoManager : IPackageRepositoryManager;
   stopWatch : TStopWatch;
+  cachedIcon : IPackageIcon;
+  cachedImage : IPackageIconImage;
+  identity : IPackageIdentity;
 begin
   stopWatch.Start;
 
@@ -1135,6 +1188,30 @@ begin
   Version := package.Version.ToStringNoMeta;
   source := package.SourceName;
   FLogger.Debug('DPMIDE : Requesting icon for [' + Id + '.' + Version + ']');
+
+  //Installed packages already have their .dpkg extracted in the local cache; the embedded
+  //icon.svg / icon.png can be served without a network round-trip.
+  if Package.Installed and (FPackageCache <> nil) then
+  begin
+    identity := TPackageIdentity.Create('', Id, Package.Version, IDECompilerVersion);
+    if FPackageCache.TryGetPackageIcon(identity, cachedIcon) and (cachedIcon <> nil) then
+    begin
+      try
+        cachedImage := TPackageIconImage.Create(cachedIcon);
+      except
+        cachedImage := nil;
+        FLogger.Debug('DPMIDE : INVALID cached icon for [' + Id + '.' + Version + ']');
+      end;
+      FIconCache.Cache(Id, cachedImage);
+      stopWatch.Stop;
+      if cachedImage <> nil then
+      begin
+        FLogger.Debug('DPMIDE : Got icon for [' + Id + '.' + Version + '] from cache in ' + IntToStr(stopWatch.ElapsedMilliseconds) + 'ms');
+        FScrollList.Invalidate;
+      end;
+      exit;
+    end;
+  end;
 
   repoManager := FRepositoryManager;
   repoManager.Initialize(FConfiguration);

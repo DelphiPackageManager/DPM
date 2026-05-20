@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -142,7 +142,10 @@ end;
 
 procedure TDPMProjectMenuNotifier.Destroyed;
 begin
-  FEditorViewManager.Destroyed;
+  //Only drop our own reference. FEditorViewManager is a container singleton shared with the
+  //wizard and every menu instance - calling Destroyed on it from here would nil its FEditorView /
+  //FEditorViewServices / FProjectTreeManager fields underneath everyone else. The wizard owns
+  //singleton teardown.
   FEditorViewManager := nil;
 end;
 
@@ -174,7 +177,9 @@ end;
 
 procedure TDPMProjectMenu.Destroyed;
 begin
-  FEditorViewManager.Destroyed;
+  //Only drop our own references. This fires for every menu instance the IDE creates (one per
+  //right-click context menu), so calling Destroyed on the shared FEditorViewManager singleton
+  //here would tear its fields down during normal use, not just shutdown.
   FEditorViewManager := nil;
   FProject := nil;
 end;

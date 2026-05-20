@@ -106,8 +106,11 @@ type
     function HasUnresolvable : boolean;
     function GetUnresolvable : IList<TUnresolvableConflict>;
   public
-    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>);overload;
-    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences : IList<IPackageReference>);overload;
+    /// sharedVersionCache: when supplied, the resolver shares a version cache across multiple
+    /// ResolveForInstall calls (e.g. one per top-level package in a restore). nil = create a
+    /// fresh per-call cache, which is the historical behaviour.
+    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>> = nil);overload;
+    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>> = nil);overload;
     destructor Destroy;override;
   end;
 
@@ -172,7 +175,7 @@ begin
     AddNode(result, topLevelPackage.PackageInfo, TVersionRange.Empty);
 end;
 
-constructor TResolverContext.Create(const logger: ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences: IList<IPackageReference>);
+constructor TResolverContext.Create(const logger: ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences: IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>);
 var
   projectReference : IPackageReference;
 
@@ -194,7 +197,12 @@ begin
   FNoGoods := TCollections.CreateDictionary<string, ISet<TPackageVersion>>;
   FResolved := TCollections.CreateDictionary<string, IResolvedPackage>;
   FOpenRequirements := TCollections.CreateQueue<IPackageInfo>;
-  FVersionCache := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
+  //honour the caller-supplied cache so version lookups can be reused across multiple
+  //ResolveForInstall iterations during a single restore.
+  if sharedVersionCache <> nil then
+    FVersionCache := sharedVersionCache
+  else
+    FVersionCache := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
   FUnresolvable := TCollections.CreateList<TUnresolvableConflict>;
 
   for projectReference in projectReferences do
@@ -239,10 +247,10 @@ begin
   result := FUnresolvable;
 end;
 
-constructor TResolverContext.Create(const logger : ILogger;  const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>);
+constructor TResolverContext.Create(const logger : ILogger;  const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>);
 begin
   Assert(newPackage <> nil);
-  Create(logger, packageInstallerContext, projectFile, newPackage.CompilerVersion, projectReferences);
+  Create(logger, packageInstallerContext, projectFile, newPackage.CompilerVersion, projectReferences, sharedVersionCache);
   PushRequirement(newPackage);
   RecordResolution(newPackage, TVersionRange.Create(newPackage.Version), cRootNode);
 end;

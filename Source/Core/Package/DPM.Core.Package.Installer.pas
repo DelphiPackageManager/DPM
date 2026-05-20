@@ -616,7 +616,10 @@ begin
   begin
     packageIdentity := TPackageIdentity.Create('', Options.packageId, Options.Version, Options.compilerVersion);
     // sourceName will be empty if we are installing the package from a file
-    packageInfo := FRepositoryManager.GetPackageInfo(cancellationToken, packageIdentity);
+    //try the cache first - avoids a network round-trip when we already have this exact id+version.
+    packageInfo := FPackageCache.GetPackageInfo(cancellationToken, packageIdentity);
+    if packageInfo = nil then
+      packageInfo := FRepositoryManager.GetPackageInfo(cancellationToken, packageIdentity);
   end
   else
   begin
@@ -1483,11 +1486,15 @@ var
   accumulatedRefs: IList<IPackageReference>;
   iterationGraph: IPackageReference;
   iterationResolved: IList<IPackageInfo>;
+  sharedVersionCache: IDictionary<string, IList<IPackageInfo>>;
 begin
   result := false;
   resultGraph := nil;
   resolvedPackages := TCollections.CreateList<IPackageInfo>;
   accumulatedRefs := TCollections.CreateList<IPackageReference>;
+  //Shared across every ResolveForInstall iteration below so a transitive dep (e.g. Spring4D)
+  //referenced by multiple top-levels is only queried from the repository once.
+  sharedVersionCache := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
 
   for topLevelChild in topLevelGraph.Children do
   begin
@@ -1506,7 +1513,7 @@ begin
     end;
 
     if not FDependencyResolver.ResolveForInstall(cancellationToken, options.CompilerVersion, projectFile, options,
-                                                 topLevelInfo, accumulatedRefs, iterationGraph, iterationResolved) then
+                                                 topLevelInfo, accumulatedRefs, iterationGraph, iterationResolved, sharedVersionCache) then
     begin
       FLogger.Error('Restore: re-resolution failed for [' + topLevelChild.Id + ']');
       exit;

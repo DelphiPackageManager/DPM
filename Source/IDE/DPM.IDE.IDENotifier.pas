@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -58,6 +58,11 @@ type
     FGroupProjects : IList<string>;
     FProjectController : IDPMIDEProjectController;
     FProjectNotifiers : IDictionary<string, IOTAProjectNotifier>;
+    //Parallel to FProjectNotifiers - records the index returned by project.AddNotifier so we can
+    //call project.RemoveNotifier(index) on the IDE side. Without this, the project notifier stays
+    //attached to IOTAProject past project close and the circular ref via FIDENotifier keeps us
+    //alive into IDE shutdown - the AV showed up on shutdown only after a project group had loaded.
+    FProjectNotifierIndexes : IDictionary<string, integer>;
   protected
     //IOTANotifier
     procedure AfterSave;
@@ -115,15 +120,18 @@ var
   notifier : IOTAProjectNotifier;
   Module: IOTAModule;
   project : IOTAProject;
+  key : string;
+  idx : integer;
 begin
   Module := (BorlandIDEServices as IOTAModuleServices).FindModule(FileName);
   if Supports(Module,IOTAProject, project) then
   begin
     notifier := TDPMProjectNotifier.Create(FLogger, Self, fileName, project);
-    FProjectNotifiers.Add(LowerCase(fileName), notifier);
-
-    project.AddNotifier(notifier);
-
+    key := LowerCase(fileName);
+    FProjectNotifiers.Add(key, notifier);
+    //Capture the index so RemoveProjectNotifier can actually detach us from the IDE's IOTAProject.
+    idx := project.AddNotifier(notifier);
+    FProjectNotifierIndexes.Add(key, idx);
   end;
 end;
 
@@ -148,12 +156,35 @@ begin
   FLogger := logger;
   FGroupProjects := TCollections.CreateList<string> ;
   FProjectNotifiers := TCollections.CreateDictionary<string, IOTAProjectNotifier>;
+  FProjectNotifierIndexes := TCollections.CreateDictionary<string, integer>;
   FProjectController := projectController;
 end;
 
 destructor TDPMIDENotifier.Destroy;
+var
+  fileName : string;
+  Module: IOTAModule;
+  project : IOTAProject;
+  idx : integer;
 begin
-
+  //Safety net for any project notifiers that didn't see an ofnFileClosing - e.g. IDE force-close.
+  //Iterate by key snapshot since Remove mutates the dict.
+  if (FProjectNotifierIndexes <> nil) and (FProjectNotifiers <> nil) then
+  begin
+    for fileName in FProjectNotifierIndexes.Keys.ToArray do
+    begin
+      idx := FProjectNotifierIndexes[fileName];
+      try
+        Module := (BorlandIDEServices as IOTAModuleServices).FindModule(fileName);
+        if Supports(Module, IOTAProject, project) then
+          project.RemoveNotifier(idx);
+      except
+        //IDE may be torn down enough that BorlandIDEServices throws - swallow, we are shutting down.
+      end;
+    end;
+    FProjectNotifierIndexes.Clear;
+    FProjectNotifiers.Clear;
+  end;
   inherited;
 end;
 
@@ -361,26 +392,48 @@ end;
 
 procedure TDPMIDENotifier.ProjectRenamed(const oldFileName, newFileName: string);
 var
-  key : string;
+  oldKey : string;
+  newKey : string;
   notifier : IOTAProjectNotifier;
+  idx : integer;
 begin
-  key := LowerCase(oldFileName);
-  if FProjectNotifiers.TryExtract(key, notifier) then
+  oldKey := LowerCase(oldFileName);
+  newKey := LowerCase(newFileName);
+  if FProjectNotifiers.TryExtract(oldKey, notifier) then
   begin
-    FProjectNotifiers.Remove(key);
-    key := LowerCase(newFileName);
-    FProjectNotifiers.Add(key, notifier);
+    FProjectNotifiers.Add(newKey, notifier);
+    //Keep the index dict aligned with the notifier dict so RemoveProjectNotifier still finds
+    //the IDE-side registration after a rename.
+    if FProjectNotifierIndexes.TryExtract(oldKey, idx) then
+      FProjectNotifierIndexes.Add(newKey, idx);
   end;
 end;
 
 procedure TDPMIDENotifier.RemoveProjectNotifier(const fileName: string);
 var
   key : string;
+  Module : IOTAModule;
+  project : IOTAProject;
+  idx : integer;
 begin
   key := LowerCase(fileName);
+  //Detach from the IDE's IOTAProject before we drop our dict refs - otherwise the notifier stays
+  //attached to the project, the FIDENotifier strong ref keeps us alive through shutdown, and the
+  //IDE can fire Modified on a notifier whose FIDENotifier target is in transition (AV).
+  if FProjectNotifierIndexes.TryGetValue(key, idx) then
+  begin
+    try
+      Module := (BorlandIDEServices as IOTAModuleServices).FindModule(fileName);
+      if Supports(Module, IOTAProject, project) then
+        project.RemoveNotifier(idx);
+    except
+      //If the IDE can't find the module (already closed in some races) RemoveNotifier may throw.
+      //Logging here would re-enter the message service - just swallow.
+    end;
+    FProjectNotifierIndexes.Remove(key);
+  end;
   if FProjectNotifiers.ContainsKey(key) then
     FProjectNotifiers.Remove(key);
-
 end;
 
 end.

@@ -185,7 +185,10 @@ type
     ['{B187F0DB-FEA1-48B4-81F2-CECF073C2FB0}']
     function Initialize(const config : IConfiguration) : boolean;
     //returns true if all dependencies were resolved. If true, the graph is fully populated and can be serialized.
-    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
+    //sharedVersionCache (optional): when supplied, version lookups against the repository are
+    //deduplicated across successive ResolveForInstall calls - used by restore to avoid re-querying
+    //transitive deps once per top-level package.
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>> = nil) : boolean;
   end;
 
 

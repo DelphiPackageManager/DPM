@@ -42,6 +42,13 @@ type
     FMessageForm : TDPMMessageForm;
     FCancellationTokenSource : ICancellationTokenSource;
     FCurrentTask : TMessageTask;
+    //Set true by Shutdown - blocks EnsureMessageForm from re-creating the form during IDE
+    //teardown. Without this, any late logger call (e.g. from a notification fired after the
+    //wizard's Destroyed has already run) creates a fresh TDPMMessageForm and sets its Parent
+    //to Application.MainForm - which may already be dying. Generic AV on shutdown was the
+    //observed symptom when a project group was loaded (load triggers Debug logs, which create
+    //FMessageForm; subsequent group-close notifications log too, into the freed state).
+    FShutdown : boolean;
   protected
     procedure EnsureMessageForm;
     procedure HideMessageWindow;
@@ -86,6 +93,7 @@ begin
   FMessageForm := nil;
   FOptions := options;
   FCurrentTask := TMessageTask.mtNone;
+  FShutdown := false;
 end;
 
 procedure TDPMIDEMessageService.Debug(const data: string);
@@ -110,6 +118,13 @@ end;
 
 procedure TDPMIDEMessageService.EnsureMessageForm;
 begin
+  //After Shutdown - or if MainForm has already been torn down by the IDE - refuse to create
+  //a new form. Callers (Debug/Error/Information/...) all guard with 'if FMessageForm <> nil'
+  //so this just silently drops the log entry, which is the right behaviour during shutdown.
+  if FShutdown then
+    exit;
+  if Application.MainForm = nil then
+    exit;
   if FMessageForm = nil then
   begin
     FMessageForm := TDPMMessageForm.Create(nil, FOptions);
@@ -117,7 +132,6 @@ begin
   end;
   FMessageForm.CancellationTokenSource := FCancellationTokenSource;
   FMessageForm.CloseDelayInSeconds := FOptions.AutoCloseLogDelaySeconds;
-
 end;
 
 procedure TDPMIDEMessageService.Error(const data: string);
@@ -165,6 +179,9 @@ end;
 
 procedure TDPMIDEMessageService.Shutdown;
 begin
+  //Set the flag BEFORE freeing - any logger call racing with shutdown will see Shutdown=true
+  //and skip rather than try to act on a half-freed form.
+  FShutdown := true;
   if FMessageForm <> nil then
   begin
     FMessageForm.Parent := nil;

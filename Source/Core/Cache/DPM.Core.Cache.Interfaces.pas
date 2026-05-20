@@ -78,6 +78,14 @@ type
     function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
 
     /// <summary>
+    ///  Returns the package's icon directly from the extracted cache folder
+    ///  (icon.svg / icon.png), avoiding a network call. Used by the IDE for
+    ///  installed packages. Returns false (and icon = nil) when the package
+    ///  is not in the cache or has no embedded icon.
+    /// </summary>
+    function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+
+    /// <summary>
     ///  Resolves the SHA-256 hash of the package's .dpkg file. Self-heals
     ///  missing sidecars: if the .sha256 file is absent but the .dpkg is in
     ///  the cache, computes the hash and persists the sidecar so subsequent

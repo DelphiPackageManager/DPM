@@ -56,6 +56,10 @@ type
     procedure ProjectLoaded(const fileName : string);
     procedure ProjectClosed(const fileName : string);
     procedure ProjectGroupClosed;
+    //Called by the wizard's Destroyed before container teardown so the 500ms WM_TIMER stops
+    //firing into a half-destroyed IDE. The destructor also kills the timer defensively but
+    //the container leak (TContainer never freed) means the destructor may not run in time.
+    procedure Shutdown;
   end;
 
 const
@@ -88,6 +92,7 @@ type
     procedure ProjectClosed(const fileName : string);
     procedure EndLoading;
     procedure ProjectGroupClosed;
+    procedure Shutdown;
 
     procedure WndProc(var msg: TMessage);
 
@@ -257,6 +262,13 @@ end;
 
 destructor TDPMProjectTreeManager.Destroy;
 begin
+  //Belt-and-braces - Shutdown should have killed the timer already, but a stray WM_TIMER
+  //after DeallocateHWnd would route into a freed WndProc.
+  if FTimerRunning then
+  begin
+    KillTimer(FWindowHandle, 1);
+    FTimerRunning := false;
+  end;
   FLogger := nil;
   FVSTProxy.Free;
   DeallocateHWnd(FWindowHandle);
@@ -504,6 +516,15 @@ end;
 procedure TDPMProjectTreeManager.ProjectGroupClosed;
 begin
   FNodeCache.Clear;
+end;
+
+procedure TDPMProjectTreeManager.Shutdown;
+begin
+  if FTimerRunning then
+  begin
+    KillTimer(FWindowHandle, 1);
+    FTimerRunning := false;
+  end;
 end;
 
 function TDPMProjectTreeManager.TryGetContainerTreeNode(const container: TProjectTreeContainer; out containerNode: PVirtualNode): boolean;

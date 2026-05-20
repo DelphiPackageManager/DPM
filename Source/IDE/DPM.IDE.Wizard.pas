@@ -47,11 +47,20 @@ type
     FProjectMenuNoftifierId : integer;
     FSBOMMenuNotifierId : integer;
     FThemeChangeNotifierId : integer;
-    FStartupCleanupNotifierId : integer;
+    //One-shot IOTAIDENotifier that on the first FileNotification scans IOTAPackageServices
+    //for design BPLs loaded from under our cache root and unloads them. The registry scrub
+    //in the constructor only takes effect on the NEXT session - this catches orphans the
+    //IDE has already re-loaded into the current session.
+    FOrphanUnloaderNotifierId : integer;
     FEditorViewManager : IDPMEditorViewManager;
     FDPMIDEMessageService : IDPMIDEMessageService;
+    FProjectTreeManager : IDPMProjectTreeManager;
     FLogger : IDPMIDELogger;
     FContainer : TContainer;
+    //Held so we can call UnregisterAddInOptions on shutdown. Without the unregister, the
+    //environment-options page entry sticks around with stale container refs if the plugin is
+    //ever reloaded.
+    FAddInOptions : INTAAddInOptions;
     procedure InitContainer;
   protected
 
@@ -72,6 +81,12 @@ type
 
     procedure DPMActionUpdate(Sender : TObject);
 
+    //Scrubs Known-Packages registry entries whose BPL path sits under our cache root.
+    //Anything in there pointing into our cache can only be a leftover from a prior (crashed)
+    //IDE session - we go straight to the registry, no IOTAPackageServices needed, so this is
+    //safe to call synchronously from the wizard constructor.
+    procedure CleanupOrphanedKnownPackages(const cacheRoot : string);
+
   public
     constructor Create;
     destructor Destroy; override;
@@ -82,7 +97,10 @@ implementation
 uses
   System.TypInfo,
   System.SysUtils,
+  System.StrUtils,
   System.UITypes,
+  System.Win.Registry,
+  Winapi.Windows,
   Vcl.Dialogs,
   Vcl.Menus,
   Vcl.Graphics,
@@ -110,54 +128,184 @@ uses
 {$R DPM.IDE.Resources.res}
 
 type
-  //One-shot IOTAIDENotifier that triggers orphan-BPL cleanup on the first FileNotification event.
-  //By that point Delphi has finished processing Known Packages from the registry and loaded every
-  //BPL it intends to - so IOTAPackageServices can see the orphans we want to remove. Subsequent
-  //FileNotification calls are ignored; the wizard unregisters the notifier on shutdown.
-  TDPMStartupCleanupNotifier = class(TNotifierObject, IOTANotifier, IOTAIDENotifier)
+  //One-shot IOTAIDENotifier that runs the IOTAPackageServices-based orphan unload on the
+  //first FileNotification - by which point Delphi has finished processing Known Packages and
+  //the loaded BPLs are visible. 
+  TDPMOrphanPackageUnloader = class(TNotifierObject, IOTANotifier, IOTAIDENotifier)
   private
-    FContext : IDPMIDEPackageInstallerContext;
+    FDone : boolean;
+    FCacheRoot : string;
     FLogger : IDPMIDELogger;
-    FCleanedUp : boolean;
+    procedure UnloadOrphans;
   protected
-    //IOTAIDENotifier
     procedure FileNotification(NotifyCode : TOTAFileNotification; const FileName : string; var Cancel : Boolean);
     procedure AfterCompile(Succeeded : Boolean);
     procedure BeforeCompile(const Project : IOTAProject; var Cancel : Boolean);
   public
-    constructor Create(const context : IDPMIDEPackageInstallerContext; const logger : IDPMIDELogger);
+    constructor Create(const cacheRoot : string; const logger : IDPMIDELogger);
   end;
 
-constructor TDPMStartupCleanupNotifier.Create(const context : IDPMIDEPackageInstallerContext; const logger : IDPMIDELogger);
+constructor TDPMOrphanPackageUnloader.Create(const cacheRoot : string; const logger : IDPMIDELogger);
 begin
   inherited Create;
-  FContext := context;
+  FCacheRoot := cacheRoot;
   FLogger := logger;
-  FCleanedUp := false;
+  FDone := false;
 end;
 
-procedure TDPMStartupCleanupNotifier.AfterCompile(Succeeded : Boolean);
+procedure TDPMOrphanPackageUnloader.AfterCompile(Succeeded : Boolean);
 begin
 end;
 
-procedure TDPMStartupCleanupNotifier.BeforeCompile(const Project : IOTAProject; var Cancel : Boolean);
+procedure TDPMOrphanPackageUnloader.BeforeCompile(const Project : IOTAProject; var Cancel : Boolean);
 begin
 end;
 
-procedure TDPMStartupCleanupNotifier.FileNotification(NotifyCode : TOTAFileNotification; const FileName : string; var Cancel : Boolean);
+procedure TDPMOrphanPackageUnloader.FileNotification(NotifyCode : TOTAFileNotification; const FileName : string; var Cancel : Boolean);
 begin
-  if FCleanedUp then
+  if FDone then
     exit;
-  FCleanedUp := true;
+  FDone := true;
   try
-    FContext.CleanupOrphanedDesignBPLs;
+    UnloadOrphans;
   except
     on e : Exception do
-      FLogger.Error('Exception during startup design BPL cleanup : ' + e.Message);
+      FLogger.Error('Exception during orphan BPL cleanup : ' + e.Message);
+  end;
+end;
+
+procedure TDPMOrphanPackageUnloader.UnloadOrphans;
+var
+  svc : IOTAPackageServices;
+  cacheRootWithDelim : string;
+  info : IOTAPackageInfo;
+  i : integer;
+  candidate : string;
+  found : TStringList;
+  uninstallOk : boolean;
+  cleanedCount : integer;
+begin
+  if FCacheRoot = '' then
+    exit;
+  cacheRootWithDelim := IncludeTrailingPathDelimiter(FCacheRoot);
+
+  if not Supports(BorlandIDEServices, IOTAPackageServices, svc) then
+    exit;
+
+  //First pass: collect matching paths. Don't uninstall inside the loop - UninstallPackage
+  //mutates PackageCount and invalidates the index-based walk.
+  found := TStringList.Create;
+  try
+    for i := 0 to svc.PackageCount - 1 do
+    begin
+      info := svc.Package[i];
+      if info = nil then
+        continue;
+      //IDE packages are loaded by the IDE itself and cannot be uninstalled by the user - skip
+      //defensively even though they won't match our cache path anyway.
+      if info.IDEPackage then
+        continue;
+      candidate := info.FileName;
+      if candidate = '' then
+        continue;
+      if StartsText(cacheRootWithDelim, candidate) then
+        found.Add(candidate);
+    end;
+
+    if found.Count = 0 then
+      exit;
+
+    cleanedCount := 0;
+    for i := 0 to found.Count - 1 do
+    begin
+      uninstallOk := false;
+      try
+        uninstallOk := svc.UninstallPackage(found[i]);
+      except
+        on e : Exception do
+          FLogger.Error('Exception unloading orphaned design BPL [' + found[i] + '] : ' + e.Message);
+      end;
+      if uninstallOk then
+      begin
+        FLogger.Information('Unloaded orphaned design BPL [' + ExtractFileName(found[i]) + ']');
+        Inc(cleanedCount);
+      end
+      else
+        FLogger.Warning('IDE reported failure unloading orphaned design BPL [' + ExtractFileName(found[i]) + ']');
+    end;
+
+    if cleanedCount > 0 then
+      FLogger.Success('Unloaded ' + IntToStr(cleanedCount) + ' orphaned design BPL(s) from previous session');
+  finally
+    found.Free;
   end;
 end;
 
 { TDPMWizard }
+
+procedure TDPMWizard.CleanupOrphanedKnownPackages(const cacheRoot : string);
+var
+  baseKey : string;
+  knownPackagesKey : string;
+  cacheRootWithDelim : string;
+  reg : TRegistry;
+  valueNames : TStringList;
+  i : integer;
+  cleanedCount : integer;
+  svc : IOTAServices;
+  bplPath : string;
+begin
+  if cacheRoot = '' then
+    exit;
+  cacheRootWithDelim := IncludeTrailingPathDelimiter(cacheRoot);
+
+  if not Supports(BorlandIDEServices, IOTAServices, svc) then
+    exit;
+  //GetBaseRegistryKey returns the IDE's HKCU subpath, e.g. 'Software\Embarcadero\BDS\23.0'.
+  baseKey := svc.GetBaseRegistryKey;
+  if baseKey = '' then
+    exit;
+  knownPackagesKey := baseKey + '\Known Packages';
+
+  cleanedCount := 0;
+  reg := TRegistry.Create(KEY_READ or KEY_WRITE);
+  try
+    reg.RootKey := HKEY_CURRENT_USER;
+    if not reg.OpenKey(knownPackagesKey, false) then
+      exit;
+    valueNames := TStringList.Create;
+    try
+      reg.GetValueNames(valueNames);
+      //Each value name is the full BPL path; the value's data is the human-readable description.
+      for i := 0 to valueNames.Count - 1 do
+      begin
+        bplPath := valueNames[i];
+        if not StartsText(cacheRootWithDelim, bplPath) then
+          continue;
+        try
+          if reg.DeleteValue(bplPath) then
+          begin
+            FLogger.Information('Removed orphaned Known-Packages entry [' + ExtractFileName(bplPath) + ']');
+            Inc(cleanedCount);
+          end
+          else
+            FLogger.Warning('Failed to remove Known-Packages registry value [' + bplPath + ']');
+        except
+          on e : Exception do
+            FLogger.Error('Exception removing Known-Packages registry value [' + bplPath + '] : ' + e.Message);
+        end;
+      end;
+    finally
+      valueNames.Free;
+    end;
+    reg.CloseKey;
+  finally
+    reg.Free;
+  end;
+
+  if cleanedCount > 0 then
+    FLogger.Success('Removed ' + IntToStr(cleanedCount) + ' orphaned Known-Packages registry entry/entries from previous session');
+end;
 
 procedure TDPMWizard.InitContainer;
 begin
@@ -211,8 +359,6 @@ var
   png : TPngImage;
   idx : integer;
   menuServices : INTAServices;
-  installerContext : IPackageInstallerContext;
-  ideInstallerContext : IDPMIDEPackageInstallerContext;
   configManager : IConfigurationManager;
   dpmConfig : IConfiguration;
   packageCache : IPackageCache;
@@ -232,6 +378,7 @@ begin
 
   FEditorViewManager := FContainer.Resolve<IDPMEditorViewManager>;
   FDPMIDEMessageService := FContainer.Resolve<IDPMIDEMessageService>;
+  FProjectTreeManager := FContainer.Resolve<IDPMProjectTreeManager>;
 
   {$IF CompilerVersion >= 32.0}
   FThemeChangeNotifierId := (BorlandIDEServices as IOTAIDEThemingServices).AddNotifier(FEditorViewManager as INTAIDEThemingServicesNotifier);
@@ -239,18 +386,16 @@ begin
   FThemeChangeNotifierId := -1;
   {$IFEND}
 
-  //If the IDE crashed last session with DPM design BPLs loaded, the ToolsAPI reloads them from
-  //the Known Packages registry during IDE startup - well before we get the chance to intercept.
-  //We can't scan & uninstall here in the constructor because Delphi hasn't actually processed
-  //Known Packages yet (IOTAPackageServices reports only built-in IDE packages at this point).
-  //Instead, register a one-shot IDE notifier; on the first FileNotification event - which always
-  //comes after package loading completes - we enumerate IOTAPackageServices and uninstall any
-  //BPL loaded from under the DPM cache root. See TDPMStartupCleanupNotifier above.
+  //If a previous IDE session crashed while DPM design BPLs were loaded, the Known Packages
+  //registry under HKCU\<IDE base>\Known Packages still lists them. The IDE has already
+  //read that key by the time we get here, so we can't stop it loading the stale BPLs THIS
+  //session - but scrubbing the registry entries that point into our cache stops the next
+  //IDE start from picking them up again.
   //
   //The package cache's Location is normally wired by TPackageInstaller.Initialize which only
-  //runs when a project is installed/restored - so we have to load the config and set it here or
-  //the cleanup method can't resolve the cache root.
-  FStartupCleanupNotifierId := -1;
+  //runs when a project is installed/restored - so we have to load the config and set it here
+  //or the cleanup can't resolve the cache root to match against.
+  FOrphanUnloaderNotifierId := -1;
   configManager := FContainer.Resolve<IConfigurationManager>;
   configManager.EnsureDefaultConfig;
   dpmConfig := configManager.LoadConfig(TConfigUtils.GetDefaultConfigFileName);
@@ -258,10 +403,16 @@ begin
   begin
     packageCache := FContainer.Resolve<IPackageCache>;
     packageCache.Location := dpmConfig.PackageCacheLocation;
-    installerContext := FContainer.Resolve<IPackageInstallerContext>;
-    if Supports(installerContext, IDPMIDEPackageInstallerContext, ideInstallerContext) then
-      FStartupCleanupNotifierId := (BorlandIDEServices as IOTAServices).AddNotifier(
-        TDPMStartupCleanupNotifier.Create(ideInstallerContext, FLogger));
+    CleanupOrphanedKnownPackages(packageCache.PackagesFolder);
+    //The IDE has already cached the Known-Packages list and may have loaded stale BPLs from
+    //our cache into this session - the registry scrub above won't undo that. Register a
+    //one-shot notifier that on the first FileNotification (by which point IOTAPackageServices
+    //has been populated) walks the loaded package list and unloads anything pointing into
+    //our cache. UninstallPackage also removes the Known-Packages registry entry, so this
+    //path is both more thorough and self-healing.
+    if packageCache.PackagesFolder <> '' then
+      FOrphanUnloaderNotifierId := (BorlandIDEServices as IOTAServices).AddNotifier(
+        TDPMOrphanPackageUnloader.Create(packageCache.PackagesFolder, FLogger));
   end;
 
   projectController := FContainer.Resolve<IDPMIDEProjectController>;
@@ -275,11 +426,11 @@ begin
   //Phase 4: separate notifier for the Generate SBOM... menu so we don't widen
   //TDPMProjectMenuNotifier's constructor. The SBOM menu needs the container to
   //resolve ISbomGenerator at click time; the editor-view manager doesn't.
-  FSBOMMenuNotifierId := (BorlandIDEServices as IOTAProjectManager).AddMenuItemCreatorNotifier(
-    TDPMSBOMProjectMenuNotifier.Create(FContainer, FLogger));
+  FSBOMMenuNotifierId := (BorlandIDEServices as IOTAProjectManager).AddMenuItemCreatorNotifier(TDPMSBOMProjectMenuNotifier.Create(FContainer, FLogger));
 
   options := TDPMAddinOptions.Create(FContainer);
-  (BorlandIDEServices as INTAEnvironmentOptionsServices).RegisterAddInOptions(options);
+  FAddInOptions := options;
+  (BorlandIDEServices as INTAEnvironmentOptionsServices).RegisterAddInOptions(FAddInOptions);
 
   storageNotifier := TDPMProjectStorageNotifier.Create(FLogger, projectController);
   FStorageNotifierID := (BorlandIDEServices as IOTAProjectFileStorage).AddNotifier(storageNotifier);
@@ -332,20 +483,36 @@ begin
     (BorlandIDEServices as IOTAProjectFileStorage).RemoveNotifier(FStorageNotifierId);
   if FIDENotifier > -1 then
     (BorlandIDEServices as IOTAServices).RemoveNotifier(FIDENotifier);
+  if FOrphanUnloaderNotifierId > -1 then
+    (BorlandIDEServices as IOTAServices).RemoveNotifier(FOrphanUnloaderNotifierId);
 
-  if FStartupCleanupNotifierId > -1 then
-    (BorlandIDEServices as IOTAServices).RemoveNotifier(FStartupCleanupNotifierId);
-
+  //Both menu notifiers were registered via IOTAProjectManager.AddMenuItemCreatorNotifier - they
+  //MUST be removed via the same service. Calling IOTAServices.RemoveNotifier with an ID issued
+  //by a different registry either silently fails (leaving them attached to IOTAProjectManager
+  //until IDE shutdown) or - worse - removes a different notifier whose IOTAServices index
+  //happens to collide numerically.
   if FProjectMenuNoftifierId > -1 then
-    (BorlandIDEServices as IOTAServices).RemoveNotifier(FProjectMenuNoftifierId);
+    (BorlandIDEServices as IOTAProjectManager).RemoveMenuItemCreatorNotifier(FProjectMenuNoftifierId);
 
   if FSBOMMenuNotifierId > -1 then
-    (BorlandIDEServices as IOTAServices).RemoveNotifier(FSBOMMenuNotifierId);
+    (BorlandIDEServices as IOTAProjectManager).RemoveMenuItemCreatorNotifier(FSBOMMenuNotifierId);
 
   {$IF CompilerVersion >= 32.0}
   if FThemeChangeNotifierId > -1 then
     (BorlandIDEServices as IOTAIDEThemingServices).RemoveNotifier(FThemeChangeNotifierId);
   {$IFEND}
+
+  if FAddInOptions <> nil then
+  begin
+    (BorlandIDEServices as INTAEnvironmentOptionsServices).UnregisterAddInOptions(FAddInOptions);
+    FAddInOptions := nil;
+  end;
+
+  if FProjectTreeManager <> nil then
+  begin
+    FProjectTreeManager.Shutdown;
+    FProjectTreeManager := nil;
+  end;
 
   FDPMIDEMessageService.ShutDown;
   FEditorViewManager.Destroyed; //don't try to resolve this here, errors in the rtl on 10.2

@@ -66,8 +66,12 @@ end;
 
 procedure TDPMProjectNotifier.Destroyed;
 begin
+  //Release all interface refs so the cycle through FIDENotifier (-> TDPMIDENotifier -> our dict)
+  //can settle. FProject was provided by the IDE; FIDENotifier and FLogger are container singletons
+  //but holding them past Destroyed serves no purpose.
   FProject := nil;
-
+  FIDENotifier := nil;
+  FLogger := nil;
 end;
 
 procedure TDPMProjectNotifier.Modified;

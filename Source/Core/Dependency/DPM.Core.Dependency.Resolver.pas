@@ -57,7 +57,7 @@ type
 
     function DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const includePrerelease : boolean; const context : IResolverContext) : boolean;
 
-    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>> = nil) : boolean;
 
   public
     constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageInstallerContext : IPackageInstallerContext);
@@ -344,7 +344,7 @@ end;
 function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
                                                const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo;
                                                const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference;
-                                               out resolved : IList<IPackageInfo>) : boolean;
+                                               out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>) : boolean;
 var
   context : IResolverContext;
   packageRef : IPackageReference;
@@ -365,7 +365,7 @@ begin
       //exit;
     end;
   end;
-  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, newPackage, projectReferences);
+  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, newPackage, projectReferences, sharedVersionCache);
 
   result := DoResolve(cancellationToken, compilerVersion, options.Prerelease, context);
   resolved := context.GetResolvedPackageInfos;

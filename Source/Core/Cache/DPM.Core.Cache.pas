@@ -68,6 +68,8 @@ type
 
     function GetPackageHash(const packageId : IPackageIdentity) : string;
 
+    function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+
 //    function InstallPackage(const packageId : IPackageIdentity; const saveFile : boolean; const source : string = '') : boolean;
 
     function InstallPackageFromFile(const packageFileName : string) : boolean;
@@ -87,6 +89,7 @@ uses
   System.RegularExpressions,
   DPM.Core.Constants,
   DPM.Core.Package.Classes,
+  DPM.Core.Package.Icon,
   DPM.Core.Utils.Hash,
   DPM.Core.Utils.System,
   DPM.Core.Utils.Strings;
@@ -303,6 +306,55 @@ begin
   except
     on e : Exception do
       FLogger.Debug('[Cache] could not write hash sidecar [' + dpkgPath + cPackageHashAlgorithmExt + '] : ' + e.Message);
+  end;
+end;
+
+function TPackageCache.TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+var
+  packageFolder : string;
+  svgPath : string;
+  pngPath : string;
+  fileStream : TFileStream;
+  stream : TMemoryStream;
+begin
+  result := false;
+  icon := nil;
+  if packageId = nil then
+    exit;
+  //EnsurePackage extracts a stray .dpkg if the folder is missing - cheap no-op once a package
+  //has been installed by either the CLI or the IDE.
+  if not EnsurePackage(packageId) then
+    exit;
+  packageFolder := GetPackagePath(packageId);
+  svgPath := IncludeTrailingPathDelimiter(packageFolder) + cIconFileSVG;
+  pngPath := IncludeTrailingPathDelimiter(packageFolder) + cIconFilePNG;
+
+  if FileExists(svgPath) then
+  begin
+    fileStream := TFileStream.Create(svgPath, fmOpenRead);
+    stream := TMemoryStream.Create;
+    try
+      stream.CopyFrom(fileStream, fileStream.Size);
+    finally
+      fileStream.Free;
+    end;
+    //icon now owns the stream.
+    icon := CreatePackageIcon(TPackageIconKind.ikSvg, stream);
+    result := true;
+    exit;
+  end;
+
+  if FileExists(pngPath) then
+  begin
+    fileStream := TFileStream.Create(pngPath, fmOpenRead);
+    stream := TMemoryStream.Create;
+    try
+      stream.CopyFrom(fileStream, fileStream.Size);
+    finally
+      fileStream.Free;
+    end;
+    icon := CreatePackageIcon(TPackageIconKind.ikPng, stream);
+    result := true;
   end;
 end;
 
