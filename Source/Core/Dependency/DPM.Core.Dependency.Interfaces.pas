@@ -188,7 +188,10 @@ type
     //sharedVersionCache (optional): when supplied, version lookups against the repository are
     //deduplicated across successive ResolveForInstall calls - used by restore to avoid re-querying
     //transitive deps once per top-level package.
-    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>> = nil) : boolean;
+    //preferredVersions (optional): lock-file-style hints (id -> version). When supplied, the resolver
+    //prefers these recorded versions over picking the latest in-range alternative - used by restore
+    //so the existing dproj graph's transient versions are honoured rather than silently upgraded.
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>> = nil; const preferredVersions : IDictionary<string, TPackageVersion> = nil) : boolean;
   end;
 
 

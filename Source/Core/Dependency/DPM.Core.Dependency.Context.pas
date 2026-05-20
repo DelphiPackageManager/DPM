@@ -73,6 +73,12 @@ type
     procedure RecordUnresolvable(const conflict : TUnresolvableConflict);
     function HasUnresolvable : boolean;
     function GetUnresolvable : IList<TUnresolvableConflict>;
+
+    ///  When restore re-uses the dproj's recorded graph as a lock file, the installer hands the
+    ///  recorded (id -> version) map to the resolver via the context. Returns true and the
+    ///  pinned version when there is a hint for this id - the resolver should try to honour it
+    ///  before picking a new version from the cache or repo. Returns false otherwise.
+    function TryGetPreferredVersion(const packageId : string; out version : TPackageVersion) : boolean;
   end;
 
   TResolverContext = class(TInterfacedObject, IResolverContext)
@@ -86,6 +92,7 @@ type
     FCompilerVersion : TCompilerVersion;
     FProjectFile : string;
     FPackageInstallerContext : IPackageInstallerContext;
+    FPreferredVersions : IDictionary<string, TPackageVersion>;
   protected
     function RecordNoGood(const bad : IPackageInfo) : boolean;
     function IsNoGood(const package : IPackageInfo) : boolean;
@@ -105,12 +112,16 @@ type
     procedure RecordUnresolvable(const conflict : TUnresolvableConflict);
     function HasUnresolvable : boolean;
     function GetUnresolvable : IList<TUnresolvableConflict>;
+    function TryGetPreferredVersion(const packageId : string; out version : TPackageVersion) : boolean;
   public
     /// sharedVersionCache: when supplied, the resolver shares a version cache across multiple
     /// ResolveForInstall calls (e.g. one per top-level package in a restore). nil = create a
     /// fresh per-call cache, which is the historical behaviour.
-    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>> = nil);overload;
-    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>> = nil);overload;
+    /// preferredVersions: lock-file-style hints (id -> version) - the resolver prefers these
+    /// versions over picking the latest in-range alternative. nil for install/update, populated
+    /// by restore from the existing project graph.
+    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>> = nil; const preferredVersions : IDictionary<string, TPackageVersion> = nil);overload;
+    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>> = nil; const preferredVersions : IDictionary<string, TPackageVersion> = nil);overload;
     destructor Destroy;override;
   end;
 
@@ -175,7 +186,7 @@ begin
     AddNode(result, topLevelPackage.PackageInfo, TVersionRange.Empty);
 end;
 
-constructor TResolverContext.Create(const logger: ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences: IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>);
+constructor TResolverContext.Create(const logger: ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences: IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>);
 var
   projectReference : IPackageReference;
 
@@ -204,6 +215,9 @@ begin
   else
     FVersionCache := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
   FUnresolvable := TCollections.CreateList<TUnresolvableConflict>;
+  //Lock-file hints. nil for install/update (the caller doesn't pin anything), populated by
+  //restore from the existing dproj graph so the resolver re-uses recorded versions.
+  FPreferredVersions := preferredVersions;
 
   for projectReference in projectReferences do
   begin
@@ -229,6 +243,7 @@ begin
   FOpenRequirements := nil;
   FVersionCache := nil;
   FUnresolvable := nil;
+  FPreferredVersions := nil;
   inherited;
 end;
 
@@ -247,12 +262,20 @@ begin
   result := FUnresolvable;
 end;
 
-constructor TResolverContext.Create(const logger : ILogger;  const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>);
+constructor TResolverContext.Create(const logger : ILogger;  const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>);
 begin
   Assert(newPackage <> nil);
-  Create(logger, packageInstallerContext, projectFile, newPackage.CompilerVersion, projectReferences, sharedVersionCache);
+  Create(logger, packageInstallerContext, projectFile, newPackage.CompilerVersion, projectReferences, sharedVersionCache, preferredVersions);
   PushRequirement(newPackage);
   RecordResolution(newPackage, TVersionRange.Create(newPackage.Version), cRootNode);
+end;
+
+function TResolverContext.TryGetPreferredVersion(const packageId : string; out version : TPackageVersion) : boolean;
+begin
+  result := false;
+  if FPreferredVersions = nil then
+    exit;
+  result := FPreferredVersions.TryGetValue(LowerCase(packageId), version);
 end;
 
 

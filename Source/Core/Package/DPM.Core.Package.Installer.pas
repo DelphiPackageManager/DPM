@@ -106,11 +106,18 @@ type
     //stale or out-of-range transient versions the user may have left in the dproj.
     function BuildTopLevelOnlyGraph(const fullGraph: IPackageReference; const compilerVersion: TCompilerVersion): IPackageReference;
 
+    //Walks the project's recorded graph and returns a flat (id -> version) map of every package
+    //currently recorded in it. Used by the restore slow path as a lock-file: when re-resolving,
+    //the resolver prefers these versions over picking the latest in-range alternative. The dict is
+    //keyed by lowercase id to match the resolver's id-keyed lookups.
+    function CollectGraphVersions(const fullGraph: IPackageReference): IDictionary<string, TPackageVersion>;
+
     //Restore slow-path: iterate top-level packages and call ResolveForInstall for each, accumulating
     //resolved refs across iterations so shared transients are seen by later top-levels and not
     //double-resolved. Returns the final graph + flat resolvedPackages list ready for FinalizePackageConfiguration.
     function RestoreUsingInstallResolver(const cancellationToken: ICancellationToken; const options: TRestoreOptions; const projectFile: string;
-                                         const topLevelGraph: IPackageReference; out resultGraph: IPackageReference; out resolvedPackages: IList<IPackageInfo>): boolean;
+                                         const topLevelGraph: IPackageReference; const preferredVersions: IDictionary<string, TPackageVersion>;
+                                         out resultGraph: IPackageReference; out resolvedPackages: IList<IPackageInfo>): boolean;
 
     // Calculates the intersection of project platforms with platforms supported by ALL resolved packages
     function GetEffectivePlatforms(const projectPlatforms: TDPMPlatforms; const packageManifests: IDictionary<string, IPackageSpec>): TDPMPlatforms;
@@ -862,6 +869,7 @@ var
   projectPackageGraph: IPackageReference;
   projectReferences: IList<IPackageReference>;
   resolvedPackages: IList<IPackageInfo>;
+  preferredVersions: IDictionary<string, TPackageVersion>;
 begin
   result := false;
   resultGraph := nil;
@@ -883,11 +891,14 @@ begin
   end;
 
   //Slow path: graph has missing transients or out-of-range versions. Re-resolve from top-level
-  //constraints by treating each top-level package as a fresh install, via ResolveForInstall. Each
-  //iteration's resolved graph feeds the next as projectReferences so shared transients are reused
-  //and not double-resolved.
+  //constraints by treating each top-level package as a fresh install, via ResolveForInstall.
+  //The dproj acts as a lock file - collect every recorded (id, version) from the existing graph
+  //so the resolver re-uses those exact versions where they still satisfy the parent's range, and
+  //only picks a new version for genuinely missing transients.
+  preferredVersions := CollectGraphVersions(projectPackageGraph);
   if not RestoreUsingInstallResolver(cancellationToken, Options, projectFile,
                                      BuildTopLevelOnlyGraph(projectPackageGraph, Options.CompilerVersion),
+                                     preferredVersions,
                                      projectPackageGraph, resolvedPackages) then
     exit;
 
@@ -1477,8 +1488,32 @@ begin
   end;
 end;
 
+function TPackageInstaller.CollectGraphVersions(const fullGraph: IPackageReference): IDictionary<string, TPackageVersion>;
+var
+  collected: IDictionary<string, TPackageVersion>;
+begin
+  collected := TCollections.CreateDictionary<string, TPackageVersion>;
+  if fullGraph <> nil then
+  begin
+    fullGraph.VisitDFS(
+      procedure(const packageReference: IPackageReference)
+      var
+        key: string;
+      begin
+        key := LowerCase(packageReference.Id);
+        //In a valid graph an id appears once (transients are deduplicated during resolution).
+        //If somehow the same id is recorded at different versions, first write wins - we don't
+        //try to choose between them here.
+        if not collected.ContainsKey(key) then
+          collected.Add(key, packageReference.Version);
+      end);
+  end;
+  result := collected;
+end;
+
 function TPackageInstaller.RestoreUsingInstallResolver(const cancellationToken: ICancellationToken; const options: TRestoreOptions; const projectFile: string;
-                                                       const topLevelGraph: IPackageReference; out resultGraph: IPackageReference; out resolvedPackages: IList<IPackageInfo>): boolean;
+                                                       const topLevelGraph: IPackageReference; const preferredVersions: IDictionary<string, TPackageVersion>;
+                                                       out resultGraph: IPackageReference; out resolvedPackages: IList<IPackageInfo>): boolean;
 var
   topLevelChild: IPackageReference;
   topLevelIdentity: IPackageIdentity;
@@ -1513,7 +1548,7 @@ begin
     end;
 
     if not FDependencyResolver.ResolveForInstall(cancellationToken, options.CompilerVersion, projectFile, options,
-                                                 topLevelInfo, accumulatedRefs, iterationGraph, iterationResolved, sharedVersionCache) then
+                                                 topLevelInfo, accumulatedRefs, iterationGraph, iterationResolved, sharedVersionCache, preferredVersions) then
     begin
       FLogger.Error('Restore: re-resolution failed for [' + topLevelChild.Id + ']');
       exit;

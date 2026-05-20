@@ -29,9 +29,12 @@ unit DPM.Core.Cache;
 interface
 
 uses
+  System.SyncObjs,
+  Spring.Collections,
   VSoft.CancellationToken,
   DPM.Core.Types,
   DPM.Core.Logging,
+  DPM.Core.Dependency.Version,
   DPM.Core.Package.Interfaces,
   DPM.Core.Cache.Interfaces,
   DPM.Core.Spec.Interfaces;
@@ -42,6 +45,13 @@ type
     FLogger : ILogger;
     FManifestReader : IPackageSpecReader;
     FLocation : string;
+    //Process-level memo. Safe because dpm-manifest.json is write-once per (id, compiler, version).
+    //TPackageCache is registered AsSingleton in DPM.Core.Init.pas so these survive the whole command
+    //and dedupe across projects in a group restore as well as IDE operations.
+    FInfoCache : IDictionary<string, IPackageInfo>;
+    FManifestCache : IDictionary<string, IPackageSpec>;
+    FExtractionVerified : ISet<string>;
+    FCacheLock : TCriticalSection;
   protected
     procedure SetLocation(const value : string);
     function GetLocation : string;
@@ -66,6 +76,12 @@ type
 
     function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
 
+    function GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;
+                                                      const id : string;
+                                                      const compilerVersion : TCompilerVersion;
+                                                      const versionRange : TVersionRange;
+                                                      const preRelease : boolean) : IList<IPackageInfo>;
+
     function GetPackageHash(const packageId : IPackageIdentity) : string;
 
     function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
@@ -76,6 +92,7 @@ type
 
   public
     constructor Create(const logger : ILogger; const manifestReader : IPackageSpecReader);
+    destructor Destroy; override;
   end;
 
 implementation
@@ -87,6 +104,7 @@ uses
   System.Types,
   System.Zip,
   System.RegularExpressions,
+  System.Generics.Defaults,
   DPM.Core.Constants,
   DPM.Core.Package.Classes,
   DPM.Core.Package.Icon,
@@ -110,6 +128,23 @@ constructor TPackageCache.Create(const logger : ILogger; const manifestReader : 
 begin
   FLogger := logger;
   FManifestReader := manifestReader;
+  FInfoCache := TCollections.CreateDictionary<string, IPackageInfo>;
+  FManifestCache := TCollections.CreateDictionary<string, IPackageSpec>;
+  FExtractionVerified := TCollections.CreateSet<string>;
+  FCacheLock := TCriticalSection.Create;
+end;
+
+destructor TPackageCache.Destroy;
+begin
+  FCacheLock.Free;
+  inherited;
+end;
+
+function MakeCacheKey(const packageId : IPackageIdentity) : string;
+begin
+  result := LowerCase(packageId.Id) + '|' +
+            CompilerToString(packageId.CompilerVersion) + '|' +
+            packageId.Version.ToStringNoMeta;
 end;
 
 function TPackageCache.CreatePackagePath(const packageId : IPackageIdentity) : string;
@@ -132,8 +167,18 @@ var
   packageFolder : string;
   metaDataFile : string;
   manifest : IPackageSpec;
+  key : string;
 begin
   result := nil;
+  key := MakeCacheKey(packageId);
+  FCacheLock.Enter;
+  try
+    if FInfoCache.TryGetValue(key, result) then
+      exit;
+  finally
+    FCacheLock.Leave;
+  end;
+
   packageFolder := GetPackagePath(packageId);
   if not DirectoryExists(packageFolder) then
     exit;
@@ -151,6 +196,13 @@ begin
   if manifest = nil then
     exit;
   result := TPackageInfo.CreateFromManifest('', manifest, '', '');
+
+  FCacheLock.Enter;
+  try
+    FInfoCache[key] := result;
+  finally
+    FCacheLock.Leave;
+  end;
 end;
 
 function TPackageCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
@@ -190,8 +242,18 @@ function TPackageCache.GetPackageManifest(const packageId: IPackageIdentity): IP
 var
   packageFolder : string;
   metaDataFile : string;
+  key : string;
 begin
   result := nil;
+  key := MakeCacheKey(packageId);
+  FCacheLock.Enter;
+  try
+    if FManifestCache.TryGetValue(key, result) then
+      exit;
+  finally
+    FCacheLock.Leave;
+  end;
+
   if not EnsurePackage(packageId) then
   begin
     FLogger.Error('Package metadata file [' + packageId.ToString + '] not found in cache.');
@@ -211,6 +273,15 @@ begin
     end;
   end;
   result := FManifestReader.ReadSpec(metaDataFile);
+  if result = nil then
+    exit;
+
+  FCacheLock.Enter;
+  try
+    FManifestCache[key] := result;
+  finally
+    FCacheLock.Leave;
+  end;
 end;
 
 function TPackageCache.GetPackagePlatforms(const packageId: IPackageIdentity): TDPMPlatforms;
@@ -221,6 +292,53 @@ begin
   manifest := GetPackageManifest(packageId);
   if (manifest <> nil) and (manifest.TargetPlatform <> nil) then
     result := manifest.TargetPlatform.Platforms;
+end;
+
+function TPackageCache.GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;
+                                                                const id : string;
+                                                                const compilerVersion : TCompilerVersion;
+                                                                const versionRange : TVersionRange;
+                                                                const preRelease : boolean) : IList<IPackageInfo>;
+var
+  packageFileFolder : string;
+  versionFolders : TStringDynArray;
+  versionFolder : string;
+  versionName : string;
+  packageVersion : TPackageVersion;
+  packageIdentity : IPackageIdentity;
+  packageInfo : IPackageInfo;
+begin
+  result := TCollections.CreateList<IPackageInfo>;
+
+  //{cache}/{compiler}/{id} - reusing GetPackageFileFolder which returns this path
+  //without requiring a version. Sibling folders are the per-version extraction folders.
+  packageFileFolder := GetPackagesFolder + PathDelim + CompilerToString(compilerVersion) + PathDelim + id;
+  if not DirectoryExists(packageFileFolder) then
+    exit;
+
+  versionFolders := TDirectory.GetDirectories(packageFileFolder, '*', TSearchOption.soTopDirectoryOnly);
+  for versionFolder in versionFolders do
+  begin
+    versionName := ExtractFileName(ExcludeTrailingPathDelimiter(versionFolder));
+    if not TPackageVersion.TryParse(versionName, packageVersion) then
+      continue;
+    if not versionRange.IsSatisfiedBy(packageVersion) then
+      continue;
+    if (not preRelease) and (not packageVersion.IsStable) then
+      continue;
+
+    packageIdentity := TPackageIdentity.Create('', id, packageVersion, compilerVersion);
+    packageInfo := GetPackageInfo(cancellationToken, packageIdentity);
+    if packageInfo <> nil then
+      result.Add(packageInfo);
+  end;
+
+  //sort descending by version - matches the order produced by TPackageRepositoryManager
+  result.Sort(TComparer<IPackageInfo>.Construct(
+    function(const Left, Right : IPackageInfo) : Integer
+    begin
+      result := Right.Version.CompareTo(Left.Version);
+    end));
 end;
 
 function TPackageCache.GetPackageHash(const packageId : IPackageIdentity) : string;
@@ -366,7 +484,20 @@ var
   oldManifestFile : string;
   searchPattern : string;
   matchingFiles : TStringDynArray;
+  key : string;
 begin
+  key := MakeCacheKey(packageId);
+  FCacheLock.Enter;
+  try
+    if FExtractionVerified.Contains(key) then
+    begin
+      result := true;
+      exit;
+    end;
+  finally
+    FCacheLock.Leave;
+  end;
+
   //check if we have a package folder and manifest.
   packageFolder := GetPackagePath(packageId);
   result := DirectoryExists(packageFolder);
@@ -392,6 +523,16 @@ begin
         result := InstallPackageFromFile(matchingFiles[0]);
     end;
   end;
+
+  if result then
+  begin
+    FCacheLock.Enter;
+    try
+      FExtractionVerified.Add(key);
+    finally
+      FCacheLock.Leave;
+    end;
+  end;
 end;
 
 
@@ -402,6 +543,7 @@ var
   packageIndentity : IPackageIdentity;
   packageFolder : string;
   packageFileFolder : string;
+  key : string;
 begin
   result := false;
   FLogger.Debug('[PackageCache] installing from file : ' + packageFileName);
@@ -420,6 +562,19 @@ begin
 
   if not TPackageIdentity.TryCreateFromString(FLogger, fileName, '', packageIndentity) then
     exit;
+
+  //defensive: about to re-extract this id-compiler-version, invalidate any memoised state
+  //so the next read picks up the fresh manifest. Contents should be identical for the same
+  //(id, compiler, version), but this future-proofs against replacing a corrupt extraction.
+  key := MakeCacheKey(packageIndentity);
+  FCacheLock.Enter;
+  try
+    FInfoCache.Remove(key);
+    FManifestCache.Remove(key);
+    FExtractionVerified.Remove(key);
+  finally
+    FCacheLock.Leave;
+  end;
 
   //creates the per-version extraction folder
   packageFolder := CreatePackagePath(packageIndentity);

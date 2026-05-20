@@ -29,8 +29,10 @@ unit DPM.Core.Cache.Interfaces;
 interface
 
 uses
+  Spring.Collections,
   VSoft.CancellationToken,
   DPM.Core.Types,
+  DPM.Core.Dependency.Version,
   DPM.Core.Package.Interfaces,
   DPM.Core.Spec.Interfaces;
 
@@ -76,6 +78,19 @@ type
 
     //gets the platforms supported by a package from its manifest.
     function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
+
+    /// <summary>
+    ///  Returns IPackageInfo for any cached versions of the given (id, compilerVersion)
+    ///  that satisfy versionRange. Used by the dependency resolver to avoid hitting
+    ///  the repository for packages already on disk. Returns an empty list when no
+    ///  cached version satisfies the range. Sorted descending by version. Prereleases
+    ///  are excluded unless preRelease is true.
+    /// </summary>
+    function GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;
+                                                      const id : string;
+                                                      const compilerVersion : TCompilerVersion;
+                                                      const versionRange : TVersionRange;
+                                                      const preRelease : boolean) : IList<IPackageInfo>;
 
     /// <summary>
     ///  Returns the package's icon directly from the extracted cache folder

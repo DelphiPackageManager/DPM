@@ -37,6 +37,7 @@ uses
   DPM.Core.Package.Interfaces,
   DPM.Core.Project.Interfaces,
   DPM.Core.Repository.Interfaces,
+  DPM.Core.Cache.Interfaces,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Dependency.Interfaces,
   DPM.Core.Dependency.Version,
@@ -49,6 +50,7 @@ type
   private
     FLogger : ILogger;
     FRepositoryManager : IPackageRepositoryManager;
+    FPackageCache : IPackageCache;
     FPackageInstallerContext : IPackageInstallerContext;
     FStopwatch : TStopWatch;
     FConfiguration : IConfiguration;
@@ -57,10 +59,10 @@ type
 
     function DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const includePrerelease : boolean; const context : IResolverContext) : boolean;
 
-    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>> = nil) : boolean;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>> = nil; const preferredVersions : IDictionary<string, TPackageVersion> = nil) : boolean;
 
   public
-    constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageInstallerContext : IPackageInstallerContext);
+    constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageCache : IPackageCache; const packageInstallerContext : IPackageInstallerContext);
 
   end;
 
@@ -69,14 +71,16 @@ implementation
 uses
   System.SysUtils,
   Generics.Defaults,
-  DPM.Core.Constants;
+  DPM.Core.Constants,
+  DPM.Core.Package.Classes;
 
 { TDependencyResolver }
 
-constructor TDependencyResolver.Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageInstallerContext : IPackageInstallerContext);
+constructor TDependencyResolver.Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageCache : IPackageCache; const packageInstallerContext : IPackageInstallerContext);
 begin
   FLogger := logger;
   FRepositoryManager := repositoryManager;
+  FPackageCache := packageCache;
   FStopwatch := TStopwatch.Create;
   FPackageInstallerContext := packageInstallerContext;
 end;
@@ -127,6 +131,10 @@ var
   versions : IList<IPackageInfo>;
   version : IPackageInfo;
   selected : boolean;
+  versionsFromCache : boolean;
+  preferredVersion : TPackageVersion;
+  preferredIdentity : IPackageIdentity;
+  preferredInfo : IPackageInfo;
   choices : integer;
   preRelease : boolean;
   conflict : TUnresolvableConflict;
@@ -242,34 +250,90 @@ begin
       end
       else
       begin
-        //it wasn't resolved before, so get the available versions
-        versions := context.GetPackageVersions(dependency.Id);
-        if versions = nil then
+        selected := false;
+
+        //Restore lock-file behaviour: if the project graph recorded a specific version for this
+        //transient, use it directly when it's available in the cache and still satisfies the
+        //parent's declared range. We only fall through to range-based selection when the recorded
+        //version is missing, out of range, or already marked no-good.
+        if context.TryGetPreferredVersion(dependency.Id, preferredVersion) then
         begin
-          //passing in the version range to filter the results - not sure if this is valid.. do we need all versions?
-          //I suspect it may result in more failures
-          versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, dependency.Id, dependency.VersionRange, preRelease);
-          if versions.Any then //cache the versions in the context in case we need them again
-            context.CachePackageVersions(dependency.Id, versions);
+          if dependency.VersionRange.IsSatisfiedBy(preferredVersion) then
+          begin
+            preferredIdentity := TPackageIdentity.Create('', dependency.Id, preferredVersion, compilerVersion);
+            preferredInfo := FPackageCache.GetPackageInfo(cancellationToken, preferredIdentity);
+            if (preferredInfo <> nil) and (not context.IsNoGood(preferredInfo)) then
+            begin
+              context.RecordResolution(preferredInfo, dependency.VersionRange, currentPackage.Id);
+              if preferredInfo.Dependencies.Any then
+                context.PushRequirement(preferredInfo);
+              FLogger.Information('            selected (from graph) : ' + preferredInfo.Id + '.' + preferredInfo.Version.ToStringNoMeta);
+              selected := true;
+            end;
+          end;
         end;
 
-        selected := false;
-        for version in versions do
+        //it wasn't resolved before, so get the available versions
+        versionsFromCache := false;
+        if not selected then
         begin
-          //skip versions we already know are no good.
-          if context.IsNoGood(version) then
-            continue;
-          if dependency.VersionRange.IsSatisfiedBy(version.Version) then
+          versions := context.GetPackageVersions(dependency.Id);
+          if versions = nil then
           begin
-            context.RecordResolution(version, dependency.VersionRange, currentPackage.Id);
-            if version.Dependencies.Any then //no point pushing it if there are no dependencies - see top of loop
-              context.PushRequirement(version); //resolve it's dependencies
-            FLogger.Information('            selected : ' + version.Id + '.' + version.Version.ToStringNoMeta);
-            selected := true;
-            break;
-          end
-          else
-            context.RecordNoGood(version); // doesn't satisfy the dependency version range - record so we don't try to use it again.
+            //cache-first: the local package cache stores manifests for any version we've previously
+            //downloaded. For a restore (where the dproj effectively pins exact versions) the cache
+            //usually has exactly what we need. Only fall through to the network if the cache is empty
+            //for this id.
+            versions := FPackageCache.GetCachedPackageVersionsWithDependencies(cancellationToken, dependency.Id, compilerVersion, dependency.VersionRange, preRelease);
+            versionsFromCache := versions.Any;
+            if not versionsFromCache then
+              versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, dependency.Id, dependency.VersionRange, preRelease);
+            if versions.Any then //cache the versions in the context in case we need them again
+              context.CachePackageVersions(dependency.Id, versions);
+          end;
+
+          for version in versions do
+          begin
+            //skip versions we already know are no good.
+            if context.IsNoGood(version) then
+              continue;
+            if dependency.VersionRange.IsSatisfiedBy(version.Version) then
+            begin
+              context.RecordResolution(version, dependency.VersionRange, currentPackage.Id);
+              if version.Dependencies.Any then //no point pushing it if there are no dependencies - see top of loop
+                context.PushRequirement(version); //resolve it's dependencies
+              FLogger.Information('            selected : ' + version.Id + '.' + version.Version.ToStringNoMeta);
+              selected := true;
+              break;
+            end
+            else
+              context.RecordNoGood(version); // doesn't satisfy the dependency version range - record so we don't try to use it again.
+          end;
+          //If we couldn't select from the cached set, the repo may have a newer in-range version
+          //that we haven't downloaded yet. Re-query the repo and retry once before backtracking.
+          if (not selected) and versionsFromCache then
+          begin
+            FLogger.Debug('         No cached version of ' + dependency.Id + ' satisfies ' + dependency.VersionRange.ToString + ' - querying repository');
+            versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, dependency.Id, dependency.VersionRange, preRelease);
+            if versions.Any then
+              context.CachePackageVersions(dependency.Id, versions);
+            for version in versions do
+            begin
+              if context.IsNoGood(version) then
+                continue;
+              if dependency.VersionRange.IsSatisfiedBy(version.Version) then
+              begin
+                context.RecordResolution(version, dependency.VersionRange, currentPackage.Id);
+                if version.Dependencies.Any then
+                  context.PushRequirement(version);
+                FLogger.Information('            selected : ' + version.Id + '.' + version.Version.ToStringNoMeta);
+                selected := true;
+                break;
+              end
+              else
+                context.RecordNoGood(version);
+            end;
+          end;
         end;
         if not selected then
         begin
@@ -344,7 +408,8 @@ end;
 function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
                                                const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo;
                                                const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference;
-                                               out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>) : boolean;
+                                               out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>;
+                                               const preferredVersions : IDictionary<string, TPackageVersion>) : boolean;
 var
   context : IResolverContext;
   packageRef : IPackageReference;
@@ -365,7 +430,7 @@ begin
       //exit;
     end;
   end;
-  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, newPackage, projectReferences, sharedVersionCache);
+  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, newPackage, projectReferences, sharedVersionCache, preferredVersions);
 
   result := DoResolve(cancellationToken, compilerVersion, options.Prerelease, context);
   resolved := context.GetResolvedPackageInfos;
