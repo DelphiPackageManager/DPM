@@ -96,6 +96,13 @@ type
     FAvailableHeaderRowIdx : Int64;
 
     FInstallingProjectCount : integer;
+    //Set by PackageUninstalled, cleared by EndInstall - tells ProjectChanged to
+    //skip the server refresh for every ProjectChanged in the uninstall window
+    //(notifier can fire multiple times per project group, and EndInstall also
+    //calls ProjectChanged explicitly as a fallback). FAllInstalledPackages is
+    //reconciled against the on-disk FPackageReferences in LoadPackages's fast
+    //path so we still drop orphan transients without going back to the repo.
+    FSkipInstalledRefresh : boolean;
 
     // dpm core stuff
     FLogger : IDPMIDELogger;
@@ -150,7 +157,9 @@ type
     // IDetailsHost
     procedure SaveBeforeInstall;
     procedure PackageInstalled;
+    procedure PackageUninstalled(const packageId : string);
     procedure BeginInstall(const projectCount : integer);
+    procedure BeginUninstall(const projectCount : integer);
     procedure EndInstall;
 
     function GetPackageReferences : IPackageReference;
@@ -165,6 +174,7 @@ type
     procedure ApplyInstalledBookkeeping(const item : IPackageSearchResultItem);
     function SearchForPackagesAsync(const Options : TSearchOptions) : IAwaitable<IList<IPackageSearchResultItem>>;
     procedure FilterInstalledPackages(const searchTxt : string);
+    procedure ReconcileInstalledPackages;
 
     function GetInstalledCount : Int64;
     function GetImplicitCount : Int64;
@@ -335,6 +345,20 @@ procedure TDPMEditViewFrame.BeginInstall(const projectCount : integer);
 begin
   FInstallingProjectCount := projectCount;
   TSystemUtils.OutputDebugString('BeginInstall : ' + intToStr(projectCount));
+end;
+
+procedure TDPMEditViewFrame.BeginUninstall(const projectCount : integer);
+begin
+  FInstallingProjectCount := projectCount;
+  //Set the skip-refresh flag BEFORE the installer modifies the dproj, because
+  //the IDE storage notifier fires ProjectLoaded -> ProjectChanged synchronously
+  //inside FPackageInstaller.UnInstall - well before we get a chance to call
+  //PackageUninstalled. The flag stays set until EndInstall clears it, so every
+  //ProjectChanged in the uninstall window takes the fast path in LoadPackages
+  //(re-filter the cached FAllInstalledPackages instead of refetching from the
+  //repo).
+  FSkipInstalledRefresh := true;
+  TSystemUtils.OutputDebugString('BeginUninstall : ' + intToStr(projectCount));
 end;
 
 procedure TDPMEditViewFrame.CalculateIndexes;
@@ -559,6 +583,33 @@ begin
   inherited;
 end;
 
+procedure TDPMEditViewFrame.ReconcileInstalledPackages;
+var
+  i : integer;
+  item : IPackageSearchResultItem;
+begin
+  //Walk FAllInstalledPackages, drop entries whose Id is no longer referenced
+  //anywhere in the project group, and re-apply bookkeeping (IsTransitive /
+  //installed version / VersionRange) to the survivors using the current
+  //FPackageReferences. Called from the LoadPackages fast path after a
+  //PackageUninstalled - avoids a GetInstalledPackageFeed round trip while
+  //still keeping the cached list consistent with the dproj on disk.
+  if FAllInstalledPackages = nil then
+    exit;
+  for i := FAllInstalledPackages.Count - 1 downto 0 do
+  begin
+    item := FAllInstalledPackages[i];
+    if FindPackageRef(FPackageReferences, item.Id, false) = nil then
+      FAllInstalledPackages.Delete(i)
+    else
+    begin
+      item.Installed := false;
+      item.IsTransitive := false;
+      ApplyInstalledBookkeeping(item);
+    end;
+  end;
+end;
+
 procedure TDPMEditViewFrame.FilterInstalledPackages(const searchTxt : string);
 var
   installed : IList<IPackageSearchResultItem>;
@@ -636,6 +687,11 @@ begin
   begin
     FLock.Acquire;
     try
+      //Reconcile cached items against the freshly-read FPackageReferences:
+      //drop entries no longer referenced anywhere (e.g. uninstalled top-level, or
+      //orphan transients pruned by the installer), and refresh IsTransitive flags
+      //and pinned versions on entries that remain.
+      ReconcileInstalledPackages;
       FilterInstalledPackages(searchTxt);
       CalculateIndexes;
       FInstalledActivity.Stop;
@@ -772,6 +828,9 @@ begin
     FInstallingProjectCount := 0;
     ProjectChanged;
   end;
+  //Clear after the fallback ProjectChanged so any later notifier-driven
+  //ProjectChanged falls back to the normal refresh-from-server path.
+  FSkipInstalledRefresh := false;
 end;
 
 function TDPMEditViewFrame.GetPackageIdsFromReferences : IList<IPackageIdentity>;
@@ -951,6 +1010,15 @@ begin
   FProjectGroup.refresh(false);
 end;
 
+procedure TDPMEditViewFrame.PackageUninstalled(const packageId : string);
+begin
+  //Re-assert the flag in case the installer somehow ran with it cleared.
+  //BeginUninstall is the primary place this gets set.
+  FSkipInstalledRefresh := true;
+  // Tell the IDE to reload the project as we have just modified it on disk.
+  FProjectGroup.refresh(false);
+end;
+
 function TDPMEditViewFrame.GetAvailableCount : Int64;
 begin
   if FAvailablePackages <> nil then
@@ -981,7 +1049,11 @@ begin
   end;
 
   PackageDetailsFrame.ProjectReloaded;
-  LoadPackages(true);
+  //FSkipInstalledRefresh is set by PackageUninstalled and stays set until EndInstall
+  //clears it - so every ProjectChanged in the uninstall window takes the fast path,
+  //not just the first one (the IDE notifier can fire multiple times, plus EndInstall
+  //may also call us explicitly as a fallback).
+  LoadPackages(not FSkipInstalledRefresh);
 end;
 
 procedure TDPMEditViewFrame.ProjectClosed(const projectName : string);

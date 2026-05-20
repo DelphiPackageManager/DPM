@@ -392,7 +392,7 @@ begin
     projectCount := Length(options.Projects);
     if projectCount = 0 then
       projectCount := 1;
-    FHost.BeginInstall(projectCount);
+    FHost.BeginUninstall(projectCount);
 
     FLogger.Information('UnInstalling package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version.ToStringNoMeta);
     uninstallResult := FPackageInstaller.UnInstall(FCancellationTokenSource.Token, options, FInstallerContext);
@@ -400,7 +400,7 @@ begin
     begin
       packageMetaData := FPackageMetaData;
       FLogger.Information('Package ' + packageMetaData.Id + ' - ' + packageMetaData.Version.ToStringNoMeta + ' uninstalled.');
-      FHost.PackageInstalled;
+      FHost.PackageUninstalled(packageMetaData.Id);
       UpdateProjectPackageVersions(packageMetaData.Id);
 
       if FProjectsGrid.HasAnyInstalled then

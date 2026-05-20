@@ -30,7 +30,9 @@ type
 
     function GetPackageReferences : IPackageReference;
     procedure BeginInstall(const projectCount : integer);
+    procedure BeginUninstall(const projectCount : integer);
     procedure PackageInstalled;
+    procedure PackageUninstalled(const packageId : string);
     procedure EndInstall;
 
   end;
