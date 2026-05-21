@@ -115,7 +115,7 @@ rather than special cases threaded through the package code.
 ```text
 Foo.1.0.0.dpkg
 +- dpm-manifest.json
-+- package.dspec
++- package.dspec.yaml
 +- lib/
 +- source/
 +- tools/
@@ -126,7 +126,7 @@ Foo.1.0.0.dpkg
 ```text
 Foo.1.0.0.dpkg
 +- dpm-manifest.json
-+- package.dspec
++- package.dspec.yaml
 +- lib/
 +- source/
 +- tools/
@@ -288,7 +288,7 @@ there.
   "hashAlgorithm": "SHA256",
   "files": [
     {
-      "path": "package.dspec",
+      "path": "package.dspec.yaml",
       "size": 512,
       "hash": "D4E5F6..."
     },
@@ -412,7 +412,7 @@ and is less conventional.
 
 The concrete arc is fixed once the PEN is assigned; until then the table uses
 placeholders, and obtaining the PEN is tracked as a prerequisite for the
-Phase 1 release.
+Phase 1 release. During development it is acceptable to use UUID OID's while we wait for a PEN (applied, awaiting approval);
 
 ---
 
@@ -488,18 +488,17 @@ identification and debugging, but they are not the pinning mechanism.
 
 ### Configuration example
 
-```json
-{
-  "signatureValidationMode": "require",
-  "allowUnsigned": false,
-  "authorDowngradePolicy": "prompt",
-  "trustedPublishers": [
-    { "name": "VSoft Technologies", "spki": "sha256:AB12CD34..." }
-  ],
-  "trustedRepositories": [
-    { "url": "https://packages.delphi.dev", "spki": "sha256:EF56AB78..." }
-  ]
-}
+```yaml
+---
+signatureValidationMode: require
+allowUnsigned: false
+authorDowngradePolicy: prompt
+trustedPublishers:
+- name: VSoft Technologies
+  spki: sha256:AB12CD34...
+trustedRepositories:
+- url: https://packages.delphi.dev
+  spki: sha256:EF56AB78...
 ```
 
 `spki` is the SHA-256 hash of the certificate's Subject Public Key Info — see
@@ -509,8 +508,7 @@ the client reacts when a previously author-signed package is now unsigned — se
 
 ### Validation modes
 
-* **permissive** — unsigned packages are allowed; invalid signatures produce a
-  warning but do not fail installation.
+* **permissive** — unsigned packages are allowed; invalid signature fails installation.
 * **require** — packages must carry a valid author signature; an invalid or
   missing signature fails installation.
 * **repository-required** — a valid repository signature is mandatory.
@@ -531,6 +529,8 @@ precisely because author signing is optional — `require` would reject every
 package whose author chose not to sign. `allowUnsigned` then survives only for
 local and development folder sources, which are explicitly an insecure
 convenience.
+
+**Note** :  for repository-required and author-and-repository - this only applies to http based repositories - directory based repositories have no ability to ad repository signatures.
 
 ### The no-downgrade rule
 
@@ -685,7 +685,7 @@ key pair is an explicit, deliberate account action.
 ### Publish-time verification
 
 The steps below describe the **official gallery's** publish policy. The DPM
-server is open source, so other instances exist (see *Multiple Repositories and
+server is open source, so other instances might exist (see *Multiple Repositories and
 Re-Ingest*); each instance configures its own publish policy and need not apply
 every step — a private instance, for example, typically has no record of an
 upstream package's original author.
@@ -783,7 +783,7 @@ mode.
 ## Multiple Repositories and Re-Ingest
 
 The DPM server is open source, so the official gallery is not the only
-repository that will exist: organisations will run their own instances, often
+repository that will exist: organisations may run their own instances, often
 for internal use. Such an instance may serve packages that originated on the
 official gallery and therefore already carry an author signature and the
 official gallery's repository signature. When that instance ingests such a
@@ -861,7 +861,7 @@ ships a root store or a Linux distribution ships a keyring package:
 * the SPKI pin(s) of the official package repository's signing key(s),
 * the public certificate-authority roots DPM accepts for code signing and for
   RFC3161 timestamping — the same publicly trusted root set browsers and NuGet
-  rely on.
+  rely on. These might depend on the Windows Certificate store (what does nuget do?).
 
 This built-in trust set is *versioned*: the client records which version it
 carries, and a newer set can be delivered by a DPM update. A fresh install
@@ -1110,9 +1110,9 @@ on this path.
 This mechanism is corruption-aware and policy-aware; it is not a defense against
 a local attacker. The fast path does not re-hash extracted content files, so a
 modification made to an extracted file *after* verification is not caught by a
-normal cache hit. This is a deliberate, NuGet-consistent trade-off: the cache is
+normal cache hit. This is a deliberate trade-off: the cache is
 a per-user, ACL-protected directory, and an attacker able to write to it already
-has the privileges to modify `dpm.exe`, `dpm.config`, or the consuming project
+has the privileges to modify `dpm.exe`, `dpm.config.yaml`, or the consuming project
 directly — cache-integrity checks cannot defend against that and do not try to.
 What the receipt *does* guarantee is detection of accidental corruption and
 partial extraction, and correct re-verification whenever the trust policy
@@ -1131,7 +1131,7 @@ does not match what a *project* expects, a project-level lock file should record
 the manifest hash of each resolved dependency. On restore, DPM compares the
 cache entry's manifest hash against the lock file; a mismatch — a substituted
 package, a wrong resolved version, a tampered manifest — fails the restore. This
-is the analogue of NuGet's `packages.lock.json` content-hash validation.
+is the analogue of NuGet's `packages.lock.json` content-hash validation. Since DPM does not use a separate lock file, this should be recorded in the `PackageReference` entries in the `projectname.dproj` file
 
 ### Optional: content-addressed cache layout
 
@@ -1191,10 +1191,7 @@ implementation:
 * **No reliance on `System.JSON` for manifest generation.** Early `System.JSON`
   is immature and non-deterministic; manifest bytes come from the purpose-built
   emitter described in *Manifest Design*. The verification-side parser must in
-  turn be hardened against hostile input (see *Verification Workflow*).
-* **Conservative generics.** The XE2 generics compiler is prone to internal
-  errors on advanced constructs; the crypto layer keeps to simple, flat generic
-  use.
+  turn be hardened against hostile input (see *Verification Workflow*). We will use JSONDataObjects or VSoft.YAML for this - TBD.
 * **Flat Win32 API imports.** Cryptographic functionality is reached through
   direct `crypt32.dll` / `bcrypt.dll` imports rather than version-specific RTL
   wrappers, keeping the code stable across the whole compiler range.
@@ -1249,6 +1246,9 @@ so consumers never write explicit cleanup.
 * **Enterprise PKI** — Active Directory Certificate Services, internal roots,
   and private trust anchors are supported through the standard chain engine.
 
+**Signotaur** - Signotaur will support signing dpm packages natively in a future update (once package signing is settled) - and can also be integrated into the `dpm sign` command some point via a dedicated remote `ISigningProvider` implementation (Phase 3) that performs the sign-digest operation remotely and assembles the CMS locally. Treating it as
+just another certificate source would not work.
+
 **Azure Key Vault is a special case.** Unlike a smart card or local HSM, Key
 Vault does not present itself as a local CNG provider — the private key never
 reaches the machine and signing happens over a REST API. It therefore does not
@@ -1282,7 +1282,7 @@ process listings or shell history.
 ### Package immutability
 
 Once a package is published, the manifest and all content files
-(`package.dspec`, `lib/`, `source/`, `tools/`) are immutable. Any change to
+(`package.dspec.yaml`, `lib/`, `source/`, `tools/`) are immutable. Any change to
 them invalidates every signature. The one exception is the `signatures/`
 directory, which is append-only: a repository legitimately adds its signature
 after the author published. `signatures/` is excluded from the manifest
@@ -1300,7 +1300,7 @@ cosmetic.
 ### Path traversal
 
 Manifest paths are validated against absolute paths, drive letters, `..`
-escapes, and non-canonical separators before any file is written to disk.
+escapes, and non-canonical separators and normalised before any file is written to disk.
 
 ### Hash algorithm agility and downgrade resistance
 
@@ -1397,7 +1397,7 @@ validation modes, revocation checking, and remote signing providers.
 
 * Revocation checking (CRL and OCSP), timestamp-aware as described above.
 * Cached and offline revocation responses.
-* Remote `ISigningProvider` implementations, including Azure Key Vault.
+* Remote `ISigningProvider` implementations, including Signaotaur and Azure Key Vault.
 * Enterprise repository trust and offline trust policies.
 * CI/CD integration improvements.
 
