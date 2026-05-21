@@ -15,9 +15,6 @@
         <Projects Include="DSpecCreator\DspecCreator.dproj">
             <Dependencies/>
         </Projects>
-        <Projects Include="C:\Users\vincent.OFFICE\AppData\Roaming\.dpm\packages-new\delphi12\VSoft.SemanticVersion\0.2.7\packages\Rad Studio 12\VSoft.SemanticVersionR.dproj">
-            <Dependencies/>
-        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -62,23 +59,14 @@
     <Target Name="DspecCreator:Make">
         <MSBuild Projects="DSpecCreator\DspecCreator.dproj" Targets="Make"/>
     </Target>
-    <Target Name="VSoft_SemanticVersionR">
-        <MSBuild Projects="C:\Users\vincent.OFFICE\AppData\Roaming\.dpm\packages-new\delphi12\VSoft.SemanticVersion\0.2.7\packages\Rad Studio 12\VSoft.SemanticVersionR.dproj"/>
-    </Target>
-    <Target Name="VSoft_SemanticVersionR:Clean">
-        <MSBuild Projects="C:\Users\vincent.OFFICE\AppData\Roaming\.dpm\packages-new\delphi12\VSoft.SemanticVersion\0.2.7\packages\Rad Studio 12\VSoft.SemanticVersionR.dproj" Targets="Clean"/>
-    </Target>
-    <Target Name="VSoft_SemanticVersionR:Make">
-        <MSBuild Projects="C:\Users\vincent.OFFICE\AppData\Roaming\.dpm\packages-new\delphi12\VSoft.SemanticVersion\0.2.7\packages\Rad Studio 12\VSoft.SemanticVersionR.dproj" Targets="Make"/>
-    </Target>
     <Target Name="Build">
-        <CallTarget Targets="DPM_Core_Tests;dpm;DPM_IDE_D120;DspecCreator;VSoft_SemanticVersionR"/>
+        <CallTarget Targets="DPM_Core_Tests;dpm;DPM_IDE_D120;DspecCreator"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="DPM_Core_Tests:Clean;dpm:Clean;DPM_IDE_D120:Clean;DspecCreator:Clean;VSoft_SemanticVersionR:Clean"/>
+        <CallTarget Targets="DPM_Core_Tests:Clean;dpm:Clean;DPM_IDE_D120:Clean;DspecCreator:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="DPM_Core_Tests:Make;dpm:Make;DPM_IDE_D120:Make;DspecCreator:Make;VSoft_SemanticVersionR:Make"/>
+        <CallTarget Targets="DPM_Core_Tests:Make;dpm:Make;DPM_IDE_D120:Make;DspecCreator:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>
