@@ -359,9 +359,10 @@ end;
 constructor TPackageInfo.Create(const sourceName, id: string; const version: TPackageVersion; const compilerVersion: TCompilerVersion; const hash, hashAlgorithm: string);
 begin
   inherited Create(sourceName, id, version, compilerVersion);
+  //sibling constructors initialise this; without it any caller of GetDependencies AVs.
+  FDependencies := TCollections.CreateList<IPackageDependency>;
   FHash := hash;
   FHashAlgorithm := hashAlgorithm;
-
 end;
 
 class function TPackageInfo.CreateFromManifest(const sourceName: string; const manifest : IPackageSpec; const hash : string; const hashAlgorith : string): IPackageInfo;

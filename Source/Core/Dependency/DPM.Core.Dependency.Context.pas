@@ -56,10 +56,22 @@ type
   /// </summary>
   IResolverContext = interface
     ['{B97E7843-4C13-490A-A776-DFAC1BC60A0D}']
-    function RecordNoGood(const bad : IPackageInfo) : boolean;
+    procedure RecordNoGood(const bad : IPackageInfo);
     function IsNoGood(const package : IPackageInfo) : boolean;
     procedure RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
-    function TryGetResolvedPackage(const packageId : string; const parentId : string; out resolution : IResolvedPackage) : boolean;
+
+    ///  Read-only lookup against the local resolution table. Returns false (and resolution=nil)
+    ///  if the package isn't already recorded in THIS context's FResolved. Does not consult the
+    ///  cross-project installer context. Use this for parent / backtrack lookups where importing
+    ///  another project's resolution would be incorrect.
+    function TryGetResolvedPackage(const packageId : string; out resolution : IResolvedPackage) : boolean;
+
+    ///  Like TryGetResolvedPackage, but on miss also consults the cross-project installer
+    ///  context. If a sibling project has resolved this id, the resolution is cloned (with the
+    ///  supplied parentId) into FResolved and its transitive resolutions are imported. Mutates
+    ///  the context's resolution state - use only at the primary dep-resolution call site.
+    function GetOrImportResolvedPackage(const packageId : string; const parentId : string; out resolution : IResolvedPackage) : boolean;
+
     procedure RemoveResolvedPackage(const packageId : string);
     procedure PushRequirement(const package : IPackageInfo);
     function PopRequirement : IPackageInfo;
@@ -79,6 +91,30 @@ type
     ///  pinned version when there is a hint for this id - the resolver should try to honour it
     ///  before picking a new version from the cache or repo. Returns false otherwise.
     function TryGetPreferredVersion(const packageId : string; out version : TPackageVersion) : boolean;
+
+    ///  Records that a parent's dependency on (depId) has been narrowed to a tighter range than
+    ///  the parent's manifest declares - used when an intersection is found with another already-
+    ///  resolved version. Stored on the context so the next iteration sees the narrower range
+    ///  without mutating the parent's IPackageInfo (which would corrupt the manifest's view if
+    ///  the same info is re-evaluated).
+    procedure NarrowDependencyRange(const parentId, depId : string; const range : TVersionRange);
+
+    ///  Returns the effective range for a dependency: the narrowed range if NarrowDependencyRange
+    ///  was called for this (parentId, depId) pair, otherwise the supplied declared range.
+    function GetEffectiveDependencyRange(const parentId, depId : string; const declaredRange : TVersionRange) : TVersionRange;
+
+    ///  Returns true if any package recorded as top-level in this context is a prerelease.
+    ///  Used by the resolver to implement NuGet-style implicit promotion: when the user pins
+    ///  a prerelease (or has one in their project), prereleases become eligible globally for
+    ///  the whole resolve - matching what NuGet does when you install a prerelease by name.
+    function AnyTopLevelIsPrerelease : boolean;
+
+    ///  Returns true the first time we see this id (caller should sort dependencies now),
+    ///  false on subsequent calls (sort already done in a previous iteration). Mutates the
+    ///  context's "already sorted" set as a side effect. Sort order is stable across iterations
+    ///  because the resolver no longer mutates IPackageDependency ranges - so re-sorting on
+    ///  every backtrack-driven re-push of the same parent is wasted work.
+    function ShouldSortDependencies(const packageId : string) : boolean;
   end;
 
   TResolverContext = class(TInterfacedObject, IResolverContext)
@@ -93,12 +129,18 @@ type
     FProjectFile : string;
     FPackageInstallerContext : IPackageInstallerContext;
     FPreferredVersions : IDictionary<string, TPackageVersion>;
+    FNarrowedRanges : IDictionary<string, TVersionRange>;
+    //Tracks ids already imported via GetOrImportResolvedPackage's CopyDependencies, so a
+    //cyclic cross-project resolution graph can't re-enter the same node and loop forever.
+    FImportedIds : ISet<string>;
+    FSortedDependencyIds : ISet<string>;
   protected
-    function RecordNoGood(const bad : IPackageInfo) : boolean;
+    procedure RecordNoGood(const bad : IPackageInfo);
     function IsNoGood(const package : IPackageInfo) : boolean;
 
     procedure RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
-    function TryGetResolvedPackage(const packageId : string; const parentId : string; out resolution : IResolvedPackage) : boolean;
+    function TryGetResolvedPackage(const packageId : string; out resolution : IResolvedPackage) : boolean;
+    function GetOrImportResolvedPackage(const packageId : string; const parentId : string; out resolution : IResolvedPackage) : boolean;
     procedure RemoveResolvedPackage(const packageId : string);
     procedure PushRequirement(const package : IPackageInfo);
     function PopRequirement : IPackageInfo;
@@ -113,6 +155,10 @@ type
     function HasUnresolvable : boolean;
     function GetUnresolvable : IList<TUnresolvableConflict>;
     function TryGetPreferredVersion(const packageId : string; out version : TPackageVersion) : boolean;
+    procedure NarrowDependencyRange(const parentId, depId : string; const range : TVersionRange);
+    function GetEffectiveDependencyRange(const parentId, depId : string; const declaredRange : TVersionRange) : TVersionRange;
+    function AnyTopLevelIsPrerelease : boolean;
+    function ShouldSortDependencies(const packageId : string) : boolean;
   public
     /// sharedVersionCache: when supplied, the resolver shares a version cache across multiple
     /// ResolveForInstall calls (e.g. one per top-level package in a restore). nil = create a
@@ -158,6 +204,28 @@ var
   toplevelPackages : TArray<IResolvedPackage>;
   topLevelPackage : IResolvedPackage;
 
+  //Returns true if [id] is already on the parent chain of [node] - used to short-circuit
+  //recursion in cyclic resolved sets (which can survive when the resolver hits its iteration
+  //limit on an A->B->A graph).
+  function IsAncestor(const node : IPackageReference; const id : string) : boolean;
+  var
+    p : IPackageReference;
+  begin
+    result := false;
+    p := node;
+    while p <> nil do
+    begin
+      if SameText(p.Id, id) then
+        exit(true);
+      p := p.Parent;
+    end;
+  end;
+
+  //Tolerates partial resolution: when a package's dependency isn't in FResolved (because the
+  //resolver couldn't satisfy it OR backtracked and removed it), skip the dep instead of raising.
+  //Also tolerates cycles surviving in the resolved set - we skip transients whose id is already
+  //on the path. Either way the graph is then partial, which is useful for diagnostics; callers
+  //that need a complete graph already check the DoResolve return value before consuming this.
   procedure AddNode(const parent : IPackageReference; const package : IPackageInfo; const versionRange : TVersionRange);
   var
     resolution : IResolvedPackage;
@@ -169,8 +237,19 @@ var
     if package.Dependencies <> nil then
       for dependency in package.Dependencies do
       begin
-        if not TryGetResolvedPackage(dependency.Id, parent.Id, resolution) then
-          raise Exception.Create('Didn''t find a resolution for package [' + dependency.id + ']');
+        if not TryGetResolvedPackage(dependency.Id, resolution) then
+        begin
+          FLogger.Debug('BuildDependencyGraph: no resolution for [' + dependency.Id +
+                        '] required by [' + package.Id + '-' + package.Version.ToStringNoMeta +
+                        '] - graph will be incomplete');
+          continue;
+        end;
+        if IsAncestor(dependencyReference, dependency.Id) then
+        begin
+          FLogger.Debug('BuildDependencyGraph: cycle detected for [' + dependency.Id +
+                        '] under [' + package.Id + '] - skipping to avoid an infinite graph');
+          continue;
+        end;
         AddNode(dependencyReference, resolution.PackageInfo, resolution.VersionRange);
       end;
   end;
@@ -218,6 +297,12 @@ begin
   //Lock-file hints. nil for install/update (the caller doesn't pin anything), populated by
   //restore from the existing dproj graph so the resolver re-uses recorded versions.
   FPreferredVersions := preferredVersions;
+  //Per-(parentId, depId) overlay of narrowed dependency ranges. Used by the resolver when a
+  //sibling has already constrained a shared transient - it stores the intersection here rather
+  //than mutating the parent's manifest IPackageDependency.
+  FNarrowedRanges := TCollections.CreateDictionary<string, TVersionRange>;
+  FImportedIds := TCollections.CreateSet<string>;
+  FSortedDependencyIds := TCollections.CreateSet<string>;
 
   for projectReference in projectReferences do
   begin
@@ -244,6 +329,9 @@ begin
   FVersionCache := nil;
   FUnresolvable := nil;
   FPreferredVersions := nil;
+  FNarrowedRanges := nil;
+  FImportedIds := nil;
+  FSortedDependencyIds := nil;
   inherited;
 end;
 
@@ -276,6 +364,37 @@ begin
   if FPreferredVersions = nil then
     exit;
   result := FPreferredVersions.TryGetValue(LowerCase(packageId), version);
+end;
+
+procedure TResolverContext.NarrowDependencyRange(const parentId, depId : string; const range : TVersionRange);
+begin
+  FNarrowedRanges[LowerCase(parentId) + '|' + LowerCase(depId)] := range;
+end;
+
+function TResolverContext.GetEffectiveDependencyRange(const parentId, depId : string; const declaredRange : TVersionRange) : TVersionRange;
+begin
+  if not FNarrowedRanges.TryGetValue(LowerCase(parentId) + '|' + LowerCase(depId), result) then
+    result := declaredRange;
+end;
+
+function TResolverContext.AnyTopLevelIsPrerelease : boolean;
+var
+  res : IResolvedPackage;
+begin
+  result := false;
+  for res in FResolved.Values do
+    if res.IsTopLevel and (not res.PackageInfo.Version.IsStable) then
+      exit(true);
+end;
+
+function TResolverContext.ShouldSortDependencies(const packageId : string) : boolean;
+var
+  key : string;
+begin
+  key := LowerCase(packageId);
+  result := not FSortedDependencyIds.Contains(key);
+  if result then
+    FSortedDependencyIds.Add(key);
 end;
 
 
@@ -329,7 +448,7 @@ begin
   result := FProjectFile;
 end;
 
-function TResolverContext.RecordNoGood(const bad : IPackageInfo) : boolean;
+procedure TResolverContext.RecordNoGood(const bad : IPackageInfo);
 var
   nogoods : ISet<TPackageVersion>;
 begin
@@ -338,9 +457,7 @@ begin
     nogoods := TCollections.CreateSet<TPackageVersion>;
     FNoGoods.Add(LowerCase(bad.Id), nogoods);
   end;
-  result := nogoods.Contains(bad.Version);
-  if not result then
-    nogoods.add(bad.Version);
+  nogoods.Add(bad.Version);
 end;
 
 procedure TResolverContext.RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
@@ -360,42 +477,55 @@ begin
 end;
 
 
-function TResolverContext.TryGetResolvedPackage(const packageId : string; const parentId : string; out resolution : IResolvedPackage) : boolean;
+function TResolverContext.TryGetResolvedPackage(const packageId : string; out resolution : IResolvedPackage) : boolean;
+begin
+  result := FResolved.TryGetValue(LowerCase(packageId), resolution);
+end;
 
-  procedure CopyDependencies(const parent : string; const res : IResolvedPackage);
+function TResolverContext.GetOrImportResolvedPackage(const packageId : string; const parentId : string; out resolution : IResolvedPackage) : boolean;
+
+  procedure CopyDependencies(const res : IResolvedPackage);
   var
     i: Integer;
     id : string;
     childRes : IResolvedPackage;
   begin
-    for i := 0 to res.PackageInfo.Dependencies.Count -1 do
+    for i := 0 to res.PackageInfo.Dependencies.Count - 1 do
     begin
       id := res.PackageInfo.Dependencies[i].Id;
+      //Defend against cyclic cross-project resolution graphs by tracking which ids we've
+      //already pulled in. Without this guard, a sibling project whose resolved set has
+      //A->B->A would re-enter the same nodes indefinitely.
+      if FImportedIds.Contains(LowerCase(id)) then
+        continue;
       childRes := FPackageInstallerContext.FindPackageResolution(FProjectFile, id);
       if childRes <> nil then
       begin
-        FResolved[Lowercase(id)] := childRes;//.Clone(FProjectFile); //should we be cloning here?
+        FImportedIds.Add(LowerCase(id));
+        FResolved[LowerCase(id)] := childRes;
         if childRes.PackageInfo.Dependencies.Any then
-          CopyDependencies(parent,  childRes);
+          CopyDependencies(childRes);
       end;
     end;
   end;
 
 begin
   result := FResolved.TryGetValue(LowerCase(packageId), resolution);
+  if result then
+    exit;
+
+  //Miss locally - consult the cross-project installer context. If a sibling project has
+  //resolved this id, clone its resolution into ours under the supplied parentId and pull
+  //in any transitive resolutions it relied on.
+  resolution := FPackageInstallerContext.FindPackageResolution(FProjectFile, packageId);
+  result := resolution <> nil;
   if not result then
-  begin
-    //check if it was resolved in another project in the group
-    resolution := FPackageInstallerContext.FindPackageResolution(FProjectFile, packageId);
-    result := resolution <> nil;
-    if resolution <> nil then
-    begin
-      FResolved[Lowercase(packageId)] := resolution.Clone(parentId) as IResolvedPackage;
-      //if we resolved via another projectr in the group, then we need to bring along the resolved dependencies too
-      if resolution.PackageInfo.Dependencies.Any then
-        CopyDependencies(resolution.PackageInfo.Id, resolution);
-    end;
-  end;
+    exit;
+
+  FImportedIds.Add(LowerCase(packageId));
+  FResolved[LowerCase(packageId)] := resolution.Clone(parentId) as IResolvedPackage;
+  if resolution.PackageInfo.Dependencies.Any then
+    CopyDependencies(resolution);
 end;
 
 end.

@@ -134,7 +134,8 @@ uses
   DPM.Core.Tests.SBOM.Reader in 'Tests\DPM.Core.Tests.SBOM.Reader.pas',
   DPM.Core.Tests.Vuln.Scanner in 'Tests\DPM.Core.Tests.Vuln.Scanner.pas',
   DPM.Core.Tests.Vuln.Cache in 'Tests\DPM.Core.Tests.Vuln.Cache.pas',
-  DPM.Core.Tests.Vuln.CycloneDX in 'Tests\DPM.Core.Tests.Vuln.CycloneDX.pas';
+  DPM.Core.Tests.Vuln.CycloneDX in 'Tests\DPM.Core.Tests.Vuln.CycloneDX.pas',
+  DPM.Core.Tests.Dependency.Resolver in 'Tests\DPM.Core.Tests.Dependency.Resolver.pas';
 
 var
   runner : ITestRunner;

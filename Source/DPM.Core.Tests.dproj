@@ -197,6 +197,7 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Vuln.Scanner.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Vuln.Cache.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Vuln.CycloneDX.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Dependency.Resolver.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

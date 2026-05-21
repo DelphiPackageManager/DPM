@@ -80,7 +80,7 @@ begin
   //Per-test cache dir under TEMP so concurrent runs don't collide and so
   //we never touch the user's real cache.
   FCacheDir := IncludeTrailingPathDelimiter(TPath.GetTempPath) +
-               'dpm-vuln-test-' + IntToHex(Random($FFFFFFFF), 8);
+               'dpm-vuln-test-' + IntToHex(Random(MaxInt), 8);
   if DirectoryExists(FCacheDir) then
     TDirectory.Delete(FCacheDir, true);
 end;

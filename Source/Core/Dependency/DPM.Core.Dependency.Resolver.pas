@@ -122,9 +122,16 @@ end;
 /// If anyone is good math and want's to have a stab at implementing it in Delphi that would be great!
 
 function TDependencyResolver.DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const includePrerelease : boolean; const context : IResolverContext) : boolean;
+const
+  //Hard ceiling on resolver iterations. The depth-first / backtrack algorithm can in principle
+  //loop on pathological inputs (e.g. cyclic manifests, or oscillating no-good resolution chains).
+  //Real graphs land in the hundreds of iterations at most; 100k is well above that while still
+  //guaranteeing termination in seconds rather than indefinitely.
+  cMaxIterations = 100000;
 var
   currentPackage : IPackageInfo;
   dependency : IPackageDependency;
+  effectiveRange : TVersionRange;
   resolution : IResolvedPackage;
   parentResolution : IResolvedPackage;
   intersectingRange : TVersionRange;
@@ -135,90 +142,109 @@ var
   preferredVersion : TPackageVersion;
   preferredIdentity : IPackageIdentity;
   preferredInfo : IPackageInfo;
+  backtrackOk : boolean;
   choices : integer;
   preRelease : boolean;
   conflict : TUnresolvableConflict;
+  iterations : integer;
+  limitConflict : TUnresolvableConflict;
 begin
   FStopwatch.Reset;
   FStopwatch.Start;
   FLogger.Verbose('Starting dependency resolution...');
 
-  //TODO : This has the potential to infinitely loop - need to provide a hard exit after a number of attempts.
+  iterations := 0;
+  //NuGet-style prerelease handling: compute eligibility ONCE per resolve, from the user's
+  //explicit flag plus an implicit promotion if any top-level package is itself a prerelease.
+  //This matches what NuGet does when you `Install-Package Foo -Version 1.0.0-beta` - the
+  //prerelease flag is implicitly turned on for the whole resolve so the install can complete,
+  //and the same applies if the project already contains a prerelease top-level. Picking the
+  //flag per-package (e.g. only when currentPackage is itself prerelease) leads to a stable
+  //sibling resolving its transient as stable while a prerelease sibling resolves the same
+  //transient as prerelease - two versions of the same id in one resolve.
+  preRelease := includePrerelease or context.AnyTopLevelIsPrerelease;
+
   //NOTE : we are only resolving dependencies here - the requirements on the stack are already deemed to be resolved.
   while context.AnyOpenRequrements do
   begin
+    Inc(iterations);
+    if iterations > cMaxIterations then
+    begin
+      FLogger.Error('Dependency resolution exceeded ' + IntToStr(cMaxIterations) + ' iterations - aborting (likely infinite loop, e.g. cyclic dependency)');
+      limitConflict.PackageId := '';
+      limitConflict.ParentId := '';
+      limitConflict.RequestedRange := TVersionRange.Empty;
+      limitConflict.Reason := 'resolver iteration limit (' + IntToStr(cMaxIterations) + ') exceeded - suspected infinite loop';
+      context.RecordUnresolvable(limitConflict);
+      break;
+    end;
     currentPackage := context.PopRequirement;
     //if the package has no dependencies then we are done with it.
     if (currentPackage.Dependencies = nil) or (not currentPackage.Dependencies.Any) then
       continue;
 
-    //if the current package is pre-release then we need to include them in the versions we get below.
-    preRelease := includePrerelease or (not currentPackage.Version.IsStable);
-
-    //Sort the dependencies by the width of the dependency's versionrange (smaller the better)
-    //the idea is to fail as quickly as possible, the less work we do the better
-    currentPackage.Dependencies.Sort(TComparer<IPackageDependency>.Construct(SortDependencies));
+    //Sort dependencies by versionrange patch-width (smaller = fewer candidate versions = fail
+    //faster). Sort order is stable across iterations now that the resolver no longer mutates
+    //dependency.VersionRange, so we only sort the first time we see each package id - skip on
+    //the re-pushes that happen during backtracking.
+    if context.ShouldSortDependencies(currentPackage.Id) then
+      currentPackage.Dependencies.Sort(TComparer<IPackageDependency>.Construct(SortDependencies));
 
     for dependency in currentPackage.Dependencies do
     begin
-      FLogger.Information('Resolving dependency : ' + currentPackage.Id + '.' + currentPackage.Version.ToStringNoMeta + '->' + dependency.Id + ' ' + dependency.VersionRange.ToString);
+      //effectiveRange overlays the parent's declared range with any narrowing the resolver
+      //already applied (from sibling intersections). We never mutate dependency.VersionRange.
+      effectiveRange := context.GetEffectiveDependencyRange(currentPackage.Id, dependency.Id, dependency.VersionRange);
+      FLogger.Information('Resolving dependency : ' + currentPackage.Id + '.' + currentPackage.Version.ToStringNoMeta + '->' + dependency.Id + ' ' + effectiveRange.ToString);
       //first see if we have resolved this package already. That may be in this project, or another project in the group.
-      if context.TryGetResolvedPackage(dependency.Id, currentPackage.Id, resolution) then
+      if context.GetOrImportResolvedPackage(dependency.Id, currentPackage.Id, resolution) then
       begin
         //check if the dependency range is satisfied by already resolved version
-        if not dependency.VersionRange.IsSatisfiedBy(resolution.PackageInfo.Version) then
+        if not effectiveRange.IsSatisfiedBy(resolution.PackageInfo.Version) then
         begin
-          FLogger.Information('       conflict - selected version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
+          FLogger.Information('       conflict - selected version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' does not satisfy ' + effectiveRange.ToString);
 
           //Check if the resolution comes from a different project, if so record the conflict and carry on
           //- we want to surface every conflict in one run rather than bail on the first.
           if not SameText(resolution.ProjectFile, context.ProjectFile) then
           begin
-            FLogger.Error('Package project conflict - version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' in project : ' + resolution.ProjectFile + ' does not satisfy ' + dependency.VersionRange.ToString  );
+            FLogger.Error('Package project conflict - version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' in project : ' + resolution.ProjectFile + ' does not satisfy ' + effectiveRange.ToString  );
             conflict.PackageId := dependency.Id;
             conflict.ParentId := currentPackage.Id;
-            conflict.RequestedRange := dependency.VersionRange;
-            conflict.Reason := 'cross-project: version ' + resolution.PackageInfo.Version.ToString + ' selected in project [' + resolution.ProjectFile + '] does not satisfy ' + dependency.VersionRange.ToString;
+            conflict.RequestedRange := effectiveRange;
+            conflict.Reason := 'cross-project: version ' + resolution.PackageInfo.Version.ToString + ' selected in project [' + resolution.ProjectFile + '] does not satisfy ' + effectiveRange.ToString;
             context.RecordUnresolvable(conflict);
             continue;
           end
           else if resolution.IsTopLevel then //if it's a top level package then the version is not negotiable.
           begin
-            FLogger.Error('Package conflict - selected version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
+            FLogger.Error('Package conflict - selected version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' does not satisfy ' + effectiveRange.ToString);
             conflict.PackageId := dependency.Id;
             conflict.ParentId := currentPackage.Id;
-            conflict.RequestedRange := dependency.VersionRange;
-            conflict.Reason := 'top-level version ' + resolution.PackageInfo.Version.ToString + ' is not negotiable and does not satisfy ' + dependency.VersionRange.ToString;
+            conflict.RequestedRange := effectiveRange;
+            conflict.Reason := 'top-level version ' + resolution.PackageInfo.Version.ToString + ' is not negotiable and does not satisfy ' + effectiveRange.ToString;
             context.RecordUnresolvable(conflict);
             continue;
           end;
 
           FLogger.Verbose('Attempting to find overalapping versionrange with dependency and earlier resolution');
           //see if we can reduce to an overlapping versionrange that satisfies both
-          if resolution.VersionRange.TryGetIntersectingRange(dependency.VersionRange, intersectingRange) then
+          if resolution.VersionRange.TryGetIntersectingRange(effectiveRange, intersectingRange) then
           begin
-            //resolution.Dependency.Version := intersectingRange;
-            dependency.VersionRange := intersectingRange;
+            //Stored in the resolver context rather than mutating dependency.VersionRange, which
+            //lives on the parent's manifest IPackageInfo and would corrupt re-evaluation if the
+            //same package is processed again.
+            context.NarrowDependencyRange(currentPackage.Id, dependency.Id, intersectingRange);
             FLogger.Debug('       overlapping range found : ' + dependency.Id + '-' + intersectingRange.ToString);
           end
           else
           begin
-            //record the resolved version as no good, so we don't try it again
-            if context.RecordNoGood(resolution.PackageInfo) then
-            begin
-              //we've been here before - the resolver is looping. Record the conflict and move on
-              //rather than bailing out so other independent dependencies can still be evaluated.
-              FLogger.Error('Unable to resolve conflict - selected version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' does not satisfy ' + dependency.VersionRange.ToString);
-              conflict.PackageId := dependency.Id;
-              conflict.ParentId := currentPackage.Id;
-              conflict.RequestedRange := dependency.VersionRange;
-              conflict.Reason := 'no overlapping version range with prior selection ' + resolution.PackageInfo.Version.ToString;
-              context.RecordUnresolvable(conflict);
-              continue;
-            end;
-            //backtrack the package/version that got us here in the first place
-            //not 100% sure this is correct here. More testing needed.
-            if context.TryGetResolvedPackage(resolution.ParentId, '', parentResolution) then
+            //Record the resolved version as no good so we don't try it again, then backtrack
+            //the parent. The previous "RecordNoGood returned true means we've been here before"
+            //loop-detection branch was fragile - the global iteration limit in DoResolve catches
+            //true infinite loops, so the early-detection path no longer earns its keep.
+            context.RecordNoGood(resolution.PackageInfo);
+            if context.TryGetResolvedPackage(resolution.ParentId, parentResolution) then
             begin
               context.RecordNoGood(parentResolution.PackageInfo);
               context.PushRequirement(parentResolution.PackageInfo);
@@ -258,13 +284,13 @@ begin
         //version is missing, out of range, or already marked no-good.
         if context.TryGetPreferredVersion(dependency.Id, preferredVersion) then
         begin
-          if dependency.VersionRange.IsSatisfiedBy(preferredVersion) then
+          if effectiveRange.IsSatisfiedBy(preferredVersion) then
           begin
             preferredIdentity := TPackageIdentity.Create('', dependency.Id, preferredVersion, compilerVersion);
             preferredInfo := FPackageCache.GetPackageInfo(cancellationToken, preferredIdentity);
             if (preferredInfo <> nil) and (not context.IsNoGood(preferredInfo)) then
             begin
-              context.RecordResolution(preferredInfo, dependency.VersionRange, currentPackage.Id);
+              context.RecordResolution(preferredInfo, effectiveRange, currentPackage.Id);
               if preferredInfo.Dependencies.Any then
                 context.PushRequirement(preferredInfo);
               FLogger.Information('            selected (from graph) : ' + preferredInfo.Id + '.' + preferredInfo.Version.ToStringNoMeta);
@@ -284,10 +310,10 @@ begin
             //downloaded. For a restore (where the dproj effectively pins exact versions) the cache
             //usually has exactly what we need. Only fall through to the network if the cache is empty
             //for this id.
-            versions := FPackageCache.GetCachedPackageVersionsWithDependencies(cancellationToken, dependency.Id, compilerVersion, dependency.VersionRange, preRelease);
+            versions := FPackageCache.GetCachedPackageVersionsWithDependencies(cancellationToken, dependency.Id, compilerVersion, effectiveRange, preRelease);
             versionsFromCache := versions.Any;
             if not versionsFromCache then
-              versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, dependency.Id, dependency.VersionRange, preRelease);
+              versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, dependency.Id, effectiveRange, preRelease);
             if versions.Any then //cache the versions in the context in case we need them again
               context.CachePackageVersions(dependency.Id, versions);
           end;
@@ -297,9 +323,9 @@ begin
             //skip versions we already know are no good.
             if context.IsNoGood(version) then
               continue;
-            if dependency.VersionRange.IsSatisfiedBy(version.Version) then
+            if effectiveRange.IsSatisfiedBy(version.Version) then
             begin
-              context.RecordResolution(version, dependency.VersionRange, currentPackage.Id);
+              context.RecordResolution(version, effectiveRange, currentPackage.Id);
               if version.Dependencies.Any then //no point pushing it if there are no dependencies - see top of loop
                 context.PushRequirement(version); //resolve it's dependencies
               FLogger.Information('            selected : ' + version.Id + '.' + version.Version.ToStringNoMeta);
@@ -313,17 +339,17 @@ begin
           //that we haven't downloaded yet. Re-query the repo and retry once before backtracking.
           if (not selected) and versionsFromCache then
           begin
-            FLogger.Debug('         No cached version of ' + dependency.Id + ' satisfies ' + dependency.VersionRange.ToString + ' - querying repository');
-            versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, dependency.Id, dependency.VersionRange, preRelease);
+            FLogger.Debug('         No cached version of ' + dependency.Id + ' satisfies ' + effectiveRange.ToString + ' - querying repository');
+            versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, dependency.Id, effectiveRange, preRelease);
             if versions.Any then
               context.CachePackageVersions(dependency.Id, versions);
             for version in versions do
             begin
               if context.IsNoGood(version) then
                 continue;
-              if dependency.VersionRange.IsSatisfiedBy(version.Version) then
+              if effectiveRange.IsSatisfiedBy(version.Version) then
               begin
-                context.RecordResolution(version, dependency.VersionRange, currentPackage.Id);
+                context.RecordResolution(version, effectiveRange, currentPackage.Id);
                 if version.Dependencies.Any then
                   context.PushRequirement(version);
                 FLogger.Information('            selected : ' + version.Id + '.' + version.Version.ToStringNoMeta);
@@ -340,14 +366,17 @@ begin
           //if we get here we are blocked on this path.
           //make sure we never try the currentPackage version again
           context.RecordNoGood(currentPackage);
-          FLogger.Debug('         Unable to satisfy dependency ' + dependency.Id + '-' + dependency.VersionRange.ToString);
+          FLogger.Debug('         Unable to satisfy dependency ' + dependency.Id + '-' + effectiveRange.ToString);
 
-          //try backtrack up to where a different choice could have been made for the current package
-          choices := 0;
+          //Try to backtrack to a point where a different choice could have been made.
+          //If currentPackage has alternative untried versions cached, hand control back to its
+          //parent so the parent re-evaluates against those alternatives. Otherwise the conflict
+          //is genuine - record it and move on so the rest of the graph still gets evaluated.
+          backtrackOk := false;
           versions := context.GetPackageVersions(currentPackage.id);
           if (versions <> nil) and versions.Any then
           begin
-            //see if there are any other choices for the current version
+            choices := 0;
             for version in versions do
             begin
               if context.IsNoGood(version) then
@@ -356,11 +385,10 @@ begin
             end;
             if choices > 0 then
             begin
-              //get the parent, and backtrack to it.
-              if context.TryGetResolvedPackage(currentPackage.Id, currentPackage.Id, resolution) then
+              if context.TryGetResolvedPackage(currentPackage.Id, resolution) then
               begin
                 //can't backtrack to a root (direct dependency)
-                if (not resolution.IsTopLevel) and context.TryGetResolvedPackage(resolution.ParentId, '', parentResolution) then
+                if (not resolution.IsTopLevel) and context.TryGetResolvedPackage(resolution.ParentId, parentResolution) then
                 begin
                   FLogger.Debug('Backtracking to : ' + parentResolution.PackageInfo.Id + '-' + parentResolution.PackageInfo.Version.ToString);
                   context.RemoveResolvedPackage(currentPackage.Id);
@@ -369,12 +397,14 @@ begin
                 end;
               end;
             end;
-            //We've exhausted backtrack options for this dependency - record the conflict and move on
-            //so the rest of the graph still gets evaluated. The summary fires after the outer while loop.
-            FLogger.Error('Unable to satisfy dependency : ' + currentPackage.Id + ' -> ' + dependency.Id + ' ' + dependency.VersionRange.ToString);
+          end;
+
+          if not backtrackOk then
+          begin
+            FLogger.Error('Unable to satisfy dependency : ' + currentPackage.Id + ' -> ' + dependency.Id + ' ' + effectiveRange.ToString);
             conflict.PackageId := dependency.Id;
             conflict.ParentId := currentPackage.Id;
-            conflict.RequestedRange := dependency.VersionRange;
+            conflict.RequestedRange := effectiveRange;
             conflict.Reason := 'no available version satisfies the requested range';
             context.RecordUnresolvable(conflict);
             continue;
