@@ -95,6 +95,7 @@ type
     function LoadTemplatesFromYAML(const templatesSeq : IYAMLSequence) : boolean;
     function LoadTargetPlatformsFromYAML(const targetPlatformsSeq : IYAMLSequence) : boolean;
     function LoadVariablesFromYAML(const variablesObj : IYAMLMapping) : boolean;
+    function ValidateNoCompilerOverlap : boolean;
 
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
@@ -462,6 +463,11 @@ begin
   begin
     targetPlatforms := yamlObject.A['targetPlatforms'];
     result := LoadTargetPlatformsFromYAML(targetPlatforms) and result;
+    //Cross-targetPlatform invariant: each compiler must appear in at most one targetPlatform.
+    //Done here (rather than in pack) so the IDE and any other consumer of TSpec also see the
+    //failure as part of spec validation, and the "Spec is valid..." log never lies.
+    if result then
+      result := ValidateNoCompilerOverlap and result;
   end;
 
 
@@ -481,6 +487,40 @@ begin
 
 end;
 
+
+function TSpec.ValidateNoCompilerOverlap : boolean;
+var
+  targetPlatform : ISpecTargetPlatform;
+  expandedCompilers : TCompilerVersions;
+  duplicates : TCompilerVersions;
+  seenCompilers : TCompilerVersions;
+  c : TCompilerVersion;
+  duplicateList : string;
+begin
+  result := true;
+  seenCompilers := [];
+  for targetPlatform in FTargetPlatforms do
+  begin
+    expandedCompilers := ExpandedCompilersOf(targetPlatform);
+    duplicates := expandedCompilers * seenCompilers;
+    if duplicates <> [] then
+    begin
+      duplicateList := '';
+      for c in duplicates do
+      begin
+        if duplicateList <> '' then
+          duplicateList := duplicateList + ', ';
+        duplicateList := duplicateList + CompilerToString(c);
+      end;
+      Logger.Error(
+        'targetPlatform overlap: compiler(s) [' + duplicateList + '] are covered by more than one targetPlatform. ' +
+        'Each compiler must appear in exactly one targetPlatform - overlapping ranges produce conflicting packages ' +
+        'and silently mask per-version variable overrides. Narrow the broader range so the two no longer overlap.');
+      result := false;
+    end;
+    seenCompilers := seenCompilers + expandedCompilers;
+  end;
+end;
 
 function TSpec.LoadTargetPlatformsFromYAML(const targetPlatformsSeq: IYAMLSequence): boolean;
 var

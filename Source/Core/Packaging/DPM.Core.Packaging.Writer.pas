@@ -58,10 +58,17 @@ type
     FVariables : IVariables;
     FTokenRegEx : TRegEx;
 
+    //Lowercase archive paths added during source processing. Used to verify that every
+    //build/design entry project will be present in the package, so we catch missing source
+    //patterns at pack time rather than at install time on every consumer's machine.
+    FArchivePaths : IList<string>;
+
   protected
 
     procedure ProcessPattern(const basePath, dest : string; const pattern : IFileSystemPattern; const excludeMatcher : IFileMatcher; var fileCount : integer);
     procedure ProcessEntry(const basePath : string; const antPattern : IAntPattern; const source, dest : string; const exclude : IList<string>);
+
+    procedure ValidateBuildEntries(const template : ISpecTemplate);
 
 
 
@@ -168,6 +175,8 @@ begin
   //  FLogger.Debug('Adding file : ' + archivePath);
 
     FArchiveWriter.AddFile(f, archivePath);
+    if FArchivePaths <> nil then
+      FArchivePaths.Add(LowerCase(archivePath));
   end;
 end;
 
@@ -424,6 +433,40 @@ begin
 end;
 
 
+procedure TPackageWriter.ValidateBuildEntries(const template : ISpecTemplate);
+var
+  buildEntry  : ISpecBuildEntry;
+  designEntry : ISpecDesignEntry;
+
+  function NormalisedProjectPath(const value : string) : string;
+  begin
+    result := StringReplace(value, '/', '\', [rfReplaceAll]);
+    result := TPathUtils.CompressRelativePath(result);
+    result := LowerCase(result);
+  end;
+
+  procedure CheckProjectIncluded(const entryKind, projectPath : string);
+  var
+    normalised : string;
+  begin
+    if projectPath = '' then
+      exit;
+    normalised := NormalisedProjectPath(projectPath);
+    if not FArchivePaths.Contains(normalised) then
+      raise Exception.Create(
+        entryKind + ' project [' + projectPath + '] was not included in the package by any source entry. ' +
+        'Add a source entry that copies it into the package (e.g. one covering the project''s containing folder), ' +
+        'otherwise install will fail when this package is consumed.');
+  end;
+
+begin
+  for buildEntry in template.BuildEntries do
+    CheckProjectIncluded('Build entry', buildEntry.Project);
+
+  for designEntry in template.DesignEntries do
+    CheckProjectIncluded('Design entry', designEntry.Project);
+end;
+
 function TPackageWriter.InternalWritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion;
                                              const basePath : string; const variables : TStringList) : boolean;
 var
@@ -469,6 +512,7 @@ begin
     exit;
   end;
   FLogger.Information('Writing package to file : ' + packageFileName);
+  FArchivePaths := TCollections.CreateList<string>;
   try
     if reducedSpec.MetaData.Icon <> '' then
     begin
@@ -490,6 +534,11 @@ begin
 
       ProcessEntry(basePath,antPattern, sourceEntry.Source, sourceEntry.Destination, sourceEntry.Exclude);
     end;
+
+    //Every build/design entry's dproj must have landed in the archive via a source entry,
+    //otherwise install will fail on every consumer when MSBuild tries to load the missing file.
+    ValidateBuildEntries(template);
+
     //we don't want these in the manifest
     template.SourceEntries.Clear;
     //write the manifest last as we need to clear out stuff not needed in the spec
@@ -506,6 +555,7 @@ begin
     result := true;
   finally
     FArchiveWriter.Close;
+    FArchivePaths := nil;
   end;
 end;
 

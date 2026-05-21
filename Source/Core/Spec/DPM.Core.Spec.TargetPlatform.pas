@@ -237,16 +237,62 @@ var
   variablesObj : IYAMLMapping;
   i: Integer;
   platformsSeq : IYAMLSequence;
+  hasCompiler : boolean;
+  hasCompilerFrom : boolean;
+  hasCompilerTo : boolean;
+  hasCompilers : boolean;
+  formCount : integer;
 begin
   result := true;
   LoadComments(yamlObject);
   FCompilers := [];
-  //order - compiler, from to, compilers
-  sCompiler := yamlObject.S['compiler'];
-  if sCompiler <> '' then
+  FMinCompilerVersion := TCompilerVersion.UnknownVersion;
+  FMaxCompilerVersion := TCompilerVersion.UnknownVersion;
+
+  //Three valid authoring forms - exactly one must be used:
+  //  1. compiler: X                        (single)
+  //  2. compiler from: X / compiler to: Y  (range, both required)
+  //  3. compilers: [X, Y, ...]             (list)
+  //Mixing forms (e.g. `compiler: X` plus `compiler to: Y`) used to silently drop the
+  //extra keys, which changed the entry's meaning behind the author's back and produced
+  //the wrong set of packages. Reject up front so the typo surfaces immediately.
+  hasCompiler := yamlObject.ContainsKey('compiler');
+  hasCompilerFrom := yamlObject.ContainsKey('compiler from');
+  hasCompilerTo := yamlObject.ContainsKey('compiler to');
+  hasCompilers := yamlObject.ContainsKey('compilers');
+
+  formCount := 0;
+  if hasCompiler then Inc(formCount);
+  if hasCompilerFrom or hasCompilerTo then Inc(formCount);
+  if hasCompilers then Inc(formCount);
+
+  if formCount = 0 then
   begin
-    FMinCompilerVersion := TCompilerVersion.UnknownVersion;
-    FMaxCompilerVersion := TCompilerVersion.UnknownVersion;
+    Logger.Error('targetPlatform must specify one of [compiler], [compiler from + compiler to], or [compilers].');
+    exit(false);
+  end;
+
+  if formCount > 1 then
+  begin
+    Logger.Error(
+      'targetPlatform mixes compiler authoring forms - use exactly one of: ' +
+      '[compiler], [compiler from + compiler to], or [compilers]. ' +
+      'Did you mean to use [compiler from] instead of [compiler]?');
+    exit(false);
+  end;
+
+  if (hasCompilerFrom or hasCompilerTo) and not (hasCompilerFrom and hasCompilerTo) then
+  begin
+    if hasCompilerFrom then
+      Logger.Error('targetPlatform has [compiler from] but is missing [compiler to].')
+    else
+      Logger.Error('targetPlatform has [compiler to] but is missing [compiler from].');
+    exit(false);
+  end;
+
+  if hasCompiler then
+  begin
+    sCompiler := yamlObject.S['compiler'];
     FCompiler := StringToCompilerVersion(sCompiler);
     if FCompiler = TCompilerVersion.UnknownVersion then
     begin
@@ -254,48 +300,50 @@ begin
       Logger.Error('Invalid compiler value [' + sCompiler + ']');
     end;
   end
-  else
+  else if hasCompilerFrom and hasCompilerTo then
   begin
     sMinCompiler := yamlObject.S['compiler from'];
     sMaxCompiler := yamlObject.S['compiler to'];
-    if (sMinCompiler <> '') and (sMaxCompiler <> '') then
+    FMinCompilerVersion := StringToCompilerVersion(sMinCompiler);
+    if FMinCompilerVersion = TCompilerVersion.UnknownVersion then
     begin
-      FMinCompilerVersion := StringToCompilerVersion(sMinCompiler);
-      if FMinCompilerVersion = TCompilerVersion.UnknownVersion then
-      begin
-        result := false;
-        Logger.Error('Invalid compiler from value [' + sMinCompiler + ']');
-      end;
-      FMaxCompilerVersion := StringToCompilerVersion(sMaxCompiler);
-      if FMaxCompilerVersion = TCompilerVersion.UnknownVersion then
-      begin
-        result := false;
-        Logger.Error('Invalid compiler to value [' + sMaxCompiler + ']');
-      end;
-    end
-    else
+      result := false;
+      Logger.Error('Invalid compiler from value [' + sMinCompiler + ']');
+    end;
+    FMaxCompilerVersion := StringToCompilerVersion(sMaxCompiler);
+    if FMaxCompilerVersion = TCompilerVersion.UnknownVersion then
     begin
-      compilersSeq := yamlObject.A['compilers'];
-      if compilersSeq.Count > 0 then
+      result := false;
+      Logger.Error('Invalid compiler to value [' + sMaxCompiler + ']');
+    end;
+    if result and (Ord(FMinCompilerVersion) > Ord(FMaxCompilerVersion)) then
+    begin
+      result := false;
+      Logger.Error('targetPlatform [compiler from] (' + sMinCompiler + ') is later than [compiler to] (' + sMaxCompiler + ').');
+    end;
+  end
+  else // hasCompilers
+  begin
+    compilersSeq := yamlObject.A['compilers'];
+    if compilersSeq.Count > 0 then
+    begin
+      for i := 0 to compilersSeq.Count -1 do
       begin
-        for i := 0 to compilersSeq.Count -1 do
+        sCompiler := compilersSeq.S[i];
+        compiler := StringToCompilerVersion(sCompiler);
+        if compiler = TCompilerVersion.UnknownVersion then
         begin
-          sCompiler := compilersSeq.S[i];
-          compiler := StringToCompilerVersion(sCompiler);
-          if compiler = TCompilerVersion.UnknownVersion then
-          begin
-            result := false;
-            Logger.Error('Invalid compiler value [' + sCompiler + ']');
-          end
-          else
-            AddToArray<TCompilerVersion>(FCompilers, compiler);
-        end;
+          result := false;
+          Logger.Error('Invalid compiler value [' + sCompiler + ']');
+        end
+        else
+          AddToArray<TCompilerVersion>(FCompilers, compiler);
       end;
-      if Length(FCompilers) = 0 then
-      begin
-        result := false;
-        Logger.Error('No compiler versions supplied for targetFramework');
-      end;
+    end;
+    if Length(FCompilers) = 0 then
+    begin
+      result := false;
+      Logger.Error('No compiler versions supplied for targetFramework');
     end;
   end;
 
