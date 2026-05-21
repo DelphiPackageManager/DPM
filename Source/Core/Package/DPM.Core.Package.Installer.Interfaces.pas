@@ -78,7 +78,7 @@ type
     procedure RecordGraph(const projectFile : string; const graph : IPackageReference);
 
     ///<summary> called from the package installer during install/restore - to install design time packages. See IDE implementation</summary>
-    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageManifests : IDictionary<string, IPackageSpec>) : boolean;
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs : IDictionary<string, IPackageSpec>) : boolean;
 
     ///<summary> called from the package installer during uninstall - to unload design time packages whose dpm packages are no longer referenced. See IDE implementation</summary>
     function UninstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const orphanedPackageIds : IList<string>) : boolean;

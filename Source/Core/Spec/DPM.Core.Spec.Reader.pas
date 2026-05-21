@@ -68,7 +68,7 @@ begin
     exit;
   end;
 
-  if EndsText('.dspec.yaml', filename) or EndsText('.manifest.yaml', fileName) then
+  if EndsText('.dspec.yaml', filename) then
   begin
     try
       yamlDoc := TYAML.LoadFromFile(fileName);
@@ -82,7 +82,7 @@ begin
     end;
   end
   else
-    FLogger.Error('Spec file : [' + filename + '] has unrecognized extension (expected .dspec.yaml or .manifest.yaml)');
+    FLogger.Error('Spec file : [' + filename + '] has unrecognized extension (expected .dspec.yaml)');
 end;
 
 function TPackageSpecReader.ReadSpecString(const value : string; const fileName : string = '') : IPackageSpec;

@@ -524,10 +524,8 @@ DPM recognizes these file extensions:
 
 | Extension | Description |
 |-----------|-------------|
-| `.dspec` | Package specification file |
-| `.dspec.yaml` | Explicit YAML variant |
+| `.dspec.yaml` | Package specification file |
 | `.dpkg` | Compiled package archive (ZIP format) |
-| `.manifest.yaml` | Package manifest (generated) |
 
 ---
 

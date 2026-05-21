@@ -33,13 +33,11 @@ const
   cLockFileVersion = '0.0.1';
   cPackageFileExt = '.dpkg';
   cPackageSpecExt = '.dspec.yaml';
-  cPackageManifestExt = '.manifest.yaml';
   cPackageHashAlgorithm = 'sha256';
   cPackageHashAlgorithmExt = '.' + cPackageHashAlgorithm;
 
-  //fixed filename for the package dspec so we can easily extract it
-  cOldPackageManifestFile = 'package' + cPackageSpecExt; //for older packages
-  cPackageManifestFile = 'package' + cPackageManifestExt;
+  //fixed filename for the package dspec inside the .dpkg so we can easily extract it
+  cPackageDspecFile = 'package' + cPackageSpecExt;
   cIconFileSVG = 'icon.svg';
   cIconFilePNG = 'icon.png';
 

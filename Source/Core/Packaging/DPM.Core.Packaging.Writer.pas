@@ -68,7 +68,7 @@ type
     procedure ProcessPattern(const basePath, dest : string; const pattern : IFileSystemPattern; const excludeMatcher : IFileMatcher; var fileCount : integer);
     procedure ProcessEntry(const basePath : string; const antPattern : IAntPattern; const source, dest : string; const exclude : IList<string>);
 
-    procedure ValidateBuildEntries(const template : ISpecTemplate);
+    procedure ValidateBuildEntries(const template : ISpecTemplate; const antPattern : IAntPattern);
 
 
 
@@ -433,16 +433,29 @@ begin
 end;
 
 
-procedure TPackageWriter.ValidateBuildEntries(const template : ISpecTemplate);
+procedure TPackageWriter.ValidateBuildEntries(const template : ISpecTemplate; const antPattern : IAntPattern);
 var
   buildEntry  : ISpecBuildEntry;
   designEntry : ISpecDesignEntry;
+  sourcePatternRegexes : TArray<TRegEx>;
+  sourceEntry : ISpecSourceEntry;
+  patternIndex : integer;
 
   function NormalisedProjectPath(const value : string) : string;
   begin
     result := StringReplace(value, '/', '\', [rfReplaceAll]);
     result := TPathUtils.CompressRelativePath(result);
     result := LowerCase(result);
+  end;
+
+  function MatchesAnySourcePattern(const normalisedPath : string) : boolean;
+  var
+    i : integer;
+  begin
+    for i := 0 to High(sourcePatternRegexes) do
+      if sourcePatternRegexes[i].IsMatch(normalisedPath) then
+        exit(true);
+    result := false;
   end;
 
   procedure CheckProjectIncluded(const entryKind, projectPath : string);
@@ -452,14 +465,34 @@ var
     if projectPath = '' then
       exit;
     normalised := NormalisedProjectPath(projectPath);
-    if not FArchivePaths.Contains(normalised) then
-      raise Exception.Create(
-        entryKind + ' project [' + projectPath + '] was not included in the package by any source entry. ' +
-        'Add a source entry that copies it into the package (e.g. one covering the project''s containing folder), ' +
-        'otherwise install will fail when this package is consumed.');
+    //Fast path: source entry materialised this exact archive path during ProcessEntry.
+    if FArchivePaths.Contains(normalised) then
+      exit;
+    //Wildcard fallback: build entry is covered by a source entry's ant pattern even if
+    //the wildcard expansion didn't materialise this exact file (e.g. .dproj generated
+    //by an upstream step, or path differences that don't survive exact-string compare).
+    if MatchesAnySourcePattern(normalised) then
+      exit;
+    raise Exception.Create(
+      entryKind + ' project [' + projectPath + '] is not covered by any source entry. ' +
+      'Add a source entry that includes it (e.g. one matching its containing folder), ' +
+      'otherwise install will fail when this package is consumed.');
   end;
 
 begin
+  //Pre-compile each source entry's ant pattern into a regex. ConvertAntToRegexString
+  //handles `**`, `*`, `?`, and ambiguous path separators consistently so callers don't
+  //need to care about slash style or escaping.
+  SetLength(sourcePatternRegexes, template.SourceEntries.Count);
+  patternIndex := 0;
+  for sourceEntry in template.SourceEntries do
+  begin
+    sourcePatternRegexes[patternIndex] := TRegEx.Create(
+      antPattern.ConvertAntToRegexString(NormalisedProjectPath(sourceEntry.Source)),
+      [TRegExOption.roIgnoreCase]);
+    Inc(patternIndex);
+  end;
+
   for buildEntry in template.BuildEntries do
     CheckProjectIncluded('Build entry', buildEntry.Project);
 
@@ -471,7 +504,7 @@ function TPackageWriter.InternalWritePackage(const outputFolder : string; const 
                                              const basePath : string; const variables : TStringList) : boolean;
 var
   reducedSpec : IPackageSpec;
-  sManifest : string;
+  sDspec : string;
   packageFileName : string;
   sStream : TStringStream;
   platforms: TDPMPlatforms;
@@ -535,16 +568,16 @@ begin
       ProcessEntry(basePath,antPattern, sourceEntry.Source, sourceEntry.Destination, sourceEntry.Exclude);
     end;
 
-    //Every build/design entry's dproj must have landed in the archive via a source entry,
+    //Every build/design entry's dproj must be covered by a source entry,
     //otherwise install will fail on every consumer when MSBuild tries to load the missing file.
-    ValidateBuildEntries(template);
+    ValidateBuildEntries(template, antPattern);
 
-    //we don't want these in the manifest
+    //we don't want these in the dspec
     template.SourceEntries.Clear;
-    //write the manifest last as we need to clear out stuff not needed in the spec
-    sManifest := reducedSpec.GenerateManifestYAML(version);
-    Assert(sManifest <> '');
-    sStream := TStringStream.Create(sManifest, TEncoding.UTF8);
+    //write the dspec last as we need to clear out stuff not needed in the spec
+    sDspec := reducedSpec.GenerateDspecYAML(version);
+    Assert(sDspec <> '');
+    sStream := TStringStream.Create(sDspec, TEncoding.UTF8);
     try
       FArchiveWriter.WriteMetaDataFile(sStream);
     finally

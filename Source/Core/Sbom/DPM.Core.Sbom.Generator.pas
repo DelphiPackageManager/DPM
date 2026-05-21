@@ -1156,10 +1156,10 @@ procedure TSBOMGenerator.EnumeratePackages(const report : TSBOMReport;
     identity := TPackageIdentity.Create('', node.Id, node.Version, compilerVersion);
     spec := nil;
     try
-      spec := FPackageCache.GetPackageManifest(identity);
+      spec := FPackageCache.GetPackageSpec(identity);
     except
       on e : Exception do
-        FLogger.Warning('[SBOM] could not load manifest for ' + node.Id + ' ' + node.Version.ToStringNoMeta + ' : ' + e.Message);
+        FLogger.Warning('[SBOM] could not load spec for ' + node.Id + ' ' + node.Version.ToStringNoMeta + ' : ' + e.Message);
     end;
 
     comp := report.AddComponent(TSBOMComponentKind.DpmPackage);

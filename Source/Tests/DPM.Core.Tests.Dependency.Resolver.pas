@@ -71,7 +71,7 @@ type
     function InstallPackageFromFile(const packageFileName : string) : boolean;
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
     function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
-    function GetPackageManifest(const packageId : IPackageIdentity) : IPackageSpec;
+    function GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
     function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
     function GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;
                                                       const id : string;
@@ -540,9 +540,9 @@ begin
   raise ENotImplemented.Create('TFakePackageCache.GetPackageMetadata');
 end;
 
-function TFakePackageCache.GetPackageManifest(const packageId : IPackageIdentity) : IPackageSpec;
+function TFakePackageCache.GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
 begin
-  raise ENotImplemented.Create('TFakePackageCache.GetPackageManifest');
+  raise ENotImplemented.Create('TFakePackageCache.GetPackageSpec');
 end;
 
 function TFakePackageCache.GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;

@@ -326,7 +326,7 @@ type
     function GetVariablesComments : TStrings;
 
 
-    function GenerateManifestYAML(const version : TPackageVersion) : string;
+    function GenerateDspecYAML(const version : TPackageVersion) : string;
 
     /// <summary>
     ///  Generates a preprocessed spec with most variables (apart from platform) expanded.

@@ -943,10 +943,8 @@ begin
     end;
   end;
 
-  //first see if the manifest has been extracted already.
-  manifestFileName := ChangeFileExt(fileName, cPackageSpecExt); //old
-  if not FileExists(manifestFileName) then
-    manifestFileName := ChangeFileExt(fileName, cPackageManifestExt); //new
+  //first see if the dspec has been extracted already.
+  manifestFileName := ChangeFileExt(fileName, cPackageSpecExt);
 
   if FileExists(manifestFileName) then
     manifest := reader.ReadSpec(manifestFileName);
@@ -957,10 +955,12 @@ begin
     try
       try
         zipFile.Open(fileName, TZipMode.zmRead);
-        if zipFile.IndexOf(cPackageManifestFile) <> -1 then
-          zipFile.Read(cPackageManifestFile, metaBytes)
-        else
-          zipFile.Read(cOldPackageManifestFile, metaBytes);
+        if zipFile.IndexOf(cPackageDspecFile) = -1 then
+        begin
+          Logger.Error('Package file [' + fileName + '] is missing ' + cPackageDspecFile);
+          exit;
+        end;
+        zipFile.Read(cPackageDspecFile, metaBytes);
 
         //we will take this opportunity to extract the icon file here
         //for later use.
@@ -999,7 +999,7 @@ begin
     end;
     //doing this outside the try/finally to avoid locking the package for too long.
     metaString := TEncoding.UTF8.GetString(metaBytes);
-    //metaString is the manifest YAML content extracted from the .dpkg, not a path.
+    //metaString is the dspec YAML content extracted from the .dpkg, not a path.
     //Use ReadSpecString and pass the .dpkg path as the diagnostic filename.
     manifest := reader.ReadSpecString(metaString, fileName);
     if FIsWritable then

@@ -66,7 +66,7 @@ type
     function CollectSearchPaths(const packageGraph: IPackageReference; const resolvedPackages: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
                                 const compilerVersion: TCompilerVersion; const platform: TDPMPlatform;  const searchPaths: IList<string>): boolean;
 
-    function DownloadPackages(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageSpec>): boolean;
+    function DownloadPackages(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
 
     function CollectPlatformsFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration) : boolean;
 
@@ -77,16 +77,16 @@ type
 
     function BuildDependencies(const cancellationToken: ICancellationToken; const packageCompiler: ICompiler; const projectPackageGraph: IPackageReference;
                                const packagesToCompile: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
-                               const packageManifests: IDictionary<string, IPackageSpec>; const Options: TSearchOptions): boolean;
+                               const packageSpecs: IDictionary<string, IPackageSpec>; const Options: TSearchOptions): boolean;
 
-    function CopyLocal(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageSpec>;
+    function CopyLocal(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>;
                        const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
 
-    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageManifests: IDictionary<string, IPackageSpec>) : boolean;
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;
 
-    //Builds a {lowercase id -> manifest} dict by walking the resolved graph and reading manifests from the cache.
+    //Builds a {lowercase id -> spec} dict by walking the resolved graph and reading specs from the cache.
     //Used after the per-platform install/restore loop so design packages can be loaded once per project.
-    function BuildPackageManifestsFromGraph(const graph: IPackageReference; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageSpec>;
+    function BuildPackageSpecsFromGraph(const graph: IPackageReference; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageSpec>;
 
     //Restore fast path: validate the existing graph against each package's declared dependencies.
     //If every transient is present and within its parent's version range, the graph is good and we
@@ -120,13 +120,13 @@ type
                                          out resultGraph: IPackageReference; out resolvedPackages: IList<IPackageInfo>): boolean;
 
     // Calculates the intersection of project platforms with platforms supported by ALL resolved packages
-    function GetEffectivePlatforms(const projectPlatforms: TDPMPlatforms; const packageManifests: IDictionary<string, IPackageSpec>): TDPMPlatforms;
+    function GetEffectivePlatforms(const projectPlatforms: TDPMPlatforms; const packageSpecs: IDictionary<string, IPackageSpec>): TDPMPlatforms;
 
     // Common configuration logic for install/restore - builds, collects search paths, copies local, installs design packages
     function DoConfigurePackageForPlatform(const cancellationToken: ICancellationToken; const options: TSearchOptions;
       const projectFile: string; const projectEditor: IProjectEditor; const platform: TDPMPlatform;
       const config: IConfiguration; const projectPackageGraph: IPackageReference;
-      const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageSpec>): boolean;
+      const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
 
     // Resolves project files from path (handles .dproj, .groupproj, directory, or explicit list)
     function ResolveProjectFiles(const projectPath: string; const explicitProjects: TArray<string>;
@@ -256,7 +256,7 @@ function TPackageInstaller.CollectSearchPaths(const packageGraph: IPackageRefere
                                               const compilerVersion: TCompilerVersion; const platform: TDPMPlatform;  const searchPaths: IList<string>): boolean;
 var
   packageInfo: IPackageInfo;
-  packageManifest: IPackageSpec;
+  packageSpec: IPackageSpec;
   template: ISpecTemplate;
   sourceEntry: ISpecSourceEntry;
   packageBasePath: string;
@@ -297,23 +297,23 @@ begin
   resolvedPackages.Reverse;
   for packageInfo in resolvedPackages do
   begin
-    packageManifest := FPackageCache.GetPackageManifest(packageInfo);
-    if packageManifest = nil then
+    packageSpec := FPackageCache.GetPackageSpec(packageInfo);
+    if packageSpec = nil then
     begin
-      FLogger.Error('Unable to get manifest for package ' + packageInfo.ToString);
+      FLogger.Error('Unable to get spec for package ' + packageInfo.ToString);
       exit(false);
     end;
 
-    if (packageManifest.TargetPlatform = nil) or (packageManifest.TargetPlatform.TemplateName = '') then
+    if (packageSpec.TargetPlatform = nil) or (packageSpec.TargetPlatform.TemplateName = '') then
     begin
-      FLogger.Warning('Package [' + packageInfo.Id + '] manifest has no target platform / template - no search paths added');
+      FLogger.Warning('Package [' + packageInfo.Id + '] spec has no target platform / template - no search paths added');
       continue;
     end;
 
-    template := packageManifest.FindTemplate(packageManifest.TargetPlatform.TemplateName);
+    template := packageSpec.FindTemplate(packageSpec.TargetPlatform.TemplateName);
     if template = nil then
     begin
-      FLogger.Warning('Package [' + packageInfo.Id + '] template [' + packageManifest.TargetPlatform.TemplateName + '] not found - no search paths added');
+      FLogger.Warning('Package [' + packageInfo.Id + '] template [' + packageSpec.TargetPlatform.TemplateName + '] not found - no search paths added');
       continue;
     end;
 
@@ -492,7 +492,7 @@ begin
 end;
 
 
-function TPackageInstaller.CopyLocal(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageSpec>;
+function TPackageInstaller.CopyLocal(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>;
                                      const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
 //var
 //  configName: string;
@@ -515,7 +515,7 @@ begin
 //
 //  for resolvedPackage in resolvedPackages do
 //  begin
-//    packageSpec := packageManifests[LowerCase(resolvedPackage.Id)];
+//    packageSpec := packageSpecs[LowerCase(resolvedPackage.Id)];
 //    Assert(packageSpec <> nil);
 //    // FLogger.Debug('Copylocal for package [' + resolvedPackage.Id + ']');
 //
@@ -885,7 +885,7 @@ begin
   resolvedPackages := TCollections.CreateList<IPackageInfo>;
   if TryValidateRestoreGraph(cancellationToken, projectPackageGraph, Options.CompilerVersion, resolvedPackages) then
   begin
-    FLogger.Verbose('Restore: existing graph is consistent with package manifests - skipping resolution');
+    FLogger.Verbose('Restore: existing graph is consistent with package specs - skipping resolution');
     result := FinalizePackageConfiguration(cancellationToken, Options, projectFile, projectEditor, platform, config, projectPackageGraph, resolvedPackages, resultGraph);
     exit;
   end;
@@ -910,7 +910,7 @@ end;
 
 function TPackageInstaller.BuildDependencies(const cancellationToken : ICancellationToken; const packageCompiler: ICompiler; const projectPackageGraph: IPackageReference;
                                              const packagesToCompile: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
-                                             const packageManifests: IDictionary<string, IPackageSpec>; const Options: TSearchOptions): boolean;
+                                             const packageSpecs: IDictionary<string, IPackageSpec>; const Options: TSearchOptions): boolean;
 
 begin
   result := false;
@@ -938,7 +938,7 @@ begin
         // removing it so we don't process it again
         packagesToCompile.Remove(pkgInfo);
 
-        Spec := packageManifests[LowerCase(packageReference.Id)];
+        Spec := packageSpecs[LowerCase(packageReference.Id)];
         Assert(Spec <> nil);
 
         // Get the template for this package
@@ -977,11 +977,11 @@ begin
 end;
 
 
-function TPackageInstaller.DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageSpec>): boolean;
+function TPackageInstaller.DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
 var
   packageInfo: IPackageInfo;
   packageFileName: string;
-  manifest: IPackageSpec;
+  spec: IPackageSpec;
 begin
   result := false;
   //TODO : Download in parallel
@@ -1006,11 +1006,11 @@ begin
       if cancellationToken.IsCancelled then
         exit;
     end;
-    if not packageManifests.ContainsKey(LowerCase(packageInfo.Id)) then
+    if not packageSpecs.ContainsKey(LowerCase(packageInfo.Id)) then
     begin
-      manifest := FPackageCache.GetPackageManifest(packageInfo);
-      Assert(manifest <> nil);
-      packageManifests[LowerCase(packageInfo.Id)] := manifest;
+      spec := FPackageCache.GetPackageSpec(packageInfo);
+      Assert(spec <> nil);
+      packageSpecs[LowerCase(packageInfo.Id)] := spec;
     end;
 
   end;
@@ -1018,22 +1018,22 @@ begin
 
 end;
 
-function TPackageInstaller.GetEffectivePlatforms(const projectPlatforms: TDPMPlatforms; const packageManifests: IDictionary<string, IPackageSpec>): TDPMPlatforms;
+function TPackageInstaller.GetEffectivePlatforms(const projectPlatforms: TDPMPlatforms; const packageSpecs: IDictionary<string, IPackageSpec>): TDPMPlatforms;
 var
   packageId: string;
-  manifest: IPackageSpec;
+  spec: IPackageSpec;
   packagePlatforms: TDPMPlatforms;
 begin
   // Start with all project platforms
   result := projectPlatforms;
 
   // Intersect with each package's supported platforms
-  for packageId in packageManifests.Keys do
+  for packageId in packageSpecs.Keys do
   begin
-    manifest := packageManifests[packageId];
-    if (manifest <> nil) and (manifest.TargetPlatform <> nil) then
+    spec := packageSpecs[packageId];
+    if (spec <> nil) and (spec.TargetPlatform <> nil) then
     begin
-      packagePlatforms := manifest.TargetPlatform.Platforms;
+      packagePlatforms := spec.TargetPlatform.Platforms;
       // Only intersect if the package actually declares platform support
       if packagePlatforms <> [] then
         result := result * packagePlatforms;  // Set intersection
@@ -1044,7 +1044,7 @@ end;
 function TPackageInstaller.DoConfigurePackageForPlatform(const cancellationToken: ICancellationToken; const options: TSearchOptions;
   const projectFile: string; const projectEditor: IProjectEditor; const platform: TDPMPlatform;
   const config: IConfiguration; const projectPackageGraph: IPackageReference;
-  const resolvedPackages: IList<IPackageInfo>; const packageManifests: IDictionary<string, IPackageSpec>): boolean;
+  const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
 var
   packagesToCompile: IList<IPackageInfo>;
   compiledPackages: IList<IPackageInfo>;
@@ -1055,7 +1055,7 @@ begin
 
   // Check if this platform is supported by all resolved packages
   // If not, skip configuration for this platform (not an error)
-  if not (platform in GetEffectivePlatforms([platform], packageManifests)) then
+  if not (platform in GetEffectivePlatforms([platform], packageSpecs)) then
   begin
     FLogger.Information('Platform [' + DPMPlatformToString(platform) + '] skipped - not supported by one or more packages', true);
     result := true;
@@ -1067,13 +1067,13 @@ begin
   packageSearchPaths := TCollections.CreateList<string>;
   packageCompiler := FCompilerFactory.CreateCompiler(options.compilerVersion, platform);
 
-  if not BuildDependencies(cancellationToken, packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageManifests, options) then
+  if not BuildDependencies(cancellationToken, packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs, options) then
     exit;
 
   if not CollectSearchPaths(projectPackageGraph, resolvedPackages, compiledPackages, projectEditor.compilerVersion, platform, packageSearchPaths) then
     exit;
 
-  if not CopyLocal(cancellationToken, resolvedPackages, packageManifests, projectEditor, platform) then
+  if not CopyLocal(cancellationToken, resolvedPackages, packageSpecs, projectEditor, platform) then
     exit;
 
   //Design packages are per-IDE/compiler, not per-platform - the call is hoisted out to the
@@ -1090,7 +1090,7 @@ function TPackageInstaller.FinalizePackageConfiguration(const cancellationToken:
   const config: IConfiguration; const projectPackageGraph: IPackageReference;
   const resolvedPackages: IList<IPackageInfo>; out resultGraph: IPackageReference): boolean;
 var
-  packageManifests: IDictionary<string, IPackageSpec>;
+  packageSpecs: IDictionary<string, IPackageSpec>;
 begin
   result := false;
   resultGraph := nil;
@@ -1104,14 +1104,14 @@ begin
   // Record the resolved package graph so we can detect conflicts between projects
   FContext.RecordGraph(projectFile, projectPackageGraph);
 
-  packageManifests := TCollections.CreateDictionary<string, IPackageSpec>;
+  packageSpecs := TCollections.CreateDictionary<string, IPackageSpec>;
   // Downloads the package files to the cache if they are not already there and
   // returns the deserialized dspec as we need it for search paths and design
-  if not DownloadPackages(cancellationToken, resolvedPackages, packageManifests) then
+  if not DownloadPackages(cancellationToken, resolvedPackages, packageSpecs) then
     exit;
 
   // Configure the package for this platform (build, search paths, copy local, design packages)
-  if not DoConfigurePackageForPlatform(cancellationToken, options, projectFile, projectEditor, platform, config, projectPackageGraph, resolvedPackages, packageManifests) then
+  if not DoConfigurePackageForPlatform(cancellationToken, options, projectFile, projectEditor, platform, config, projectPackageGraph, resolvedPackages, packageSpecs) then
     exit;
 
   // Return the graph for caller to handle UpdatePackageReferences and SaveProject
@@ -1316,7 +1316,7 @@ begin
     //Load design-time packages once after all platforms are installed - design BPLs are per-IDE,
     //not per-platform, so this runs at the project level. CLI context is a no-op.
     if result then
-      InstallDesignPackages(cancellationToken, projectEditor.ProjectFile, BuildPackageManifestsFromGraph(finalGraph, Options.compilerVersion));
+      InstallDesignPackages(cancellationToken, projectEditor.ProjectFile, BuildPackageSpecsFromGraph(finalGraph, Options.compilerVersion));
   end;
 
 end;
@@ -1431,33 +1431,33 @@ begin
 
 end;
 
-function TPackageInstaller.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageManifests: IDictionary<string, IPackageSpec>): boolean;
+function TPackageInstaller.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
 begin
   //Note : we delegate this to the context as this is a no-op in the command line tool, the IDE plugin provides it's own context implementation.
-  result := FContext.InstallDesignPackages(cancellationToken, projectFile, packageManifests);
+  result := FContext.InstallDesignPackages(cancellationToken, projectFile, packageSpecs);
 end;
 
-function TPackageInstaller.BuildPackageManifestsFromGraph(const graph: IPackageReference; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageSpec>;
+function TPackageInstaller.BuildPackageSpecsFromGraph(const graph: IPackageReference; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageSpec>;
 var
-  manifests: IDictionary<string, IPackageSpec>;
+  specs: IDictionary<string, IPackageSpec>;
 begin
-  manifests := TCollections.CreateDictionary<string, IPackageSpec>;
+  specs := TCollections.CreateDictionary<string, IPackageSpec>;
   graph.VisitDFS(
     procedure(const node: IPackageReference)
     var
       identity: IPackageIdentity;
-      manifest: IPackageSpec;
+      spec: IPackageSpec;
       key: string;
     begin
       key := LowerCase(node.Id);
-      if manifests.ContainsKey(key) then
+      if specs.ContainsKey(key) then
         exit;
       identity := TPackageIdentity.Create('', node.Id, node.Version, compilerVersion);
-      manifest := FPackageCache.GetPackageManifest(identity);
-      if manifest <> nil then
-        manifests[key] := manifest;
+      spec := FPackageCache.GetPackageSpec(identity);
+      if spec <> nil then
+        specs[key] := spec;
     end);
-  result := manifests;
+  result := specs;
 end;
 
 function TPackageInstaller.GetOrLoadPackageInfo(const cancellationToken: ICancellationToken; const id: string; const version: TPackageVersion;
@@ -1668,7 +1668,7 @@ function TPackageInstaller.InstallPackageFromFile(const cancellationToken : ICan
 var
   packageIdString: string;
   packageIdentity: IPackageIdentity;
-  packageManifest: IPackageSpec;
+  packageSpec: IPackageSpec;
 begin
   // get the package into the cache first then just install as normal
   result := FPackageCache.InstallPackageFromFile(Options.PackageFile);
@@ -1687,14 +1687,14 @@ begin
   Options.Version := packageIdentity.Version;
   Options.compilerVersion := packageIdentity.compilerVersion;
 
-  //Restrict to the platforms the package actually supports - read from the now-cached manifest.
+  //Restrict to the platforms the package actually supports - read from the now-cached spec.
   //ValidateAndSetCompilerPlatforms downstream intersects this with the project's enabled platforms.
-  packageManifest := FPackageCache.GetPackageManifest(packageIdentity);
-  if (packageManifest <> nil) and (packageManifest.TargetPlatform <> nil) then
-    Options.platforms := packageManifest.TargetPlatform.Platforms
+  packageSpec := FPackageCache.GetPackageSpec(packageIdentity);
+  if (packageSpec <> nil) and (packageSpec.TargetPlatform <> nil) then
+    Options.platforms := packageSpec.TargetPlatform.Platforms
   else
   begin
-    FLogger.Warning('Could not read manifest for [' + packageIdentity.ToString + '] - install will run for all project platforms');
+    FLogger.Warning('Could not read spec for [' + packageIdentity.ToString + '] - install will run for all project platforms');
     Options.platforms := [];
   end;
 
@@ -1921,7 +1921,7 @@ begin
     //Load design-time packages once after all platforms are restored - design BPLs are per-IDE,
     //not per-platform, so this runs at the project level. CLI context is a no-op.
     if result then
-      InstallDesignPackages(cancellationToken, projectFile, BuildPackageManifestsFromGraph(finalGraph, Options.compilerVersion));
+      InstallDesignPackages(cancellationToken, projectFile, BuildPackageSpecsFromGraph(finalGraph, Options.compilerVersion));
   end;
 
 end;

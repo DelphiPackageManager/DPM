@@ -71,9 +71,9 @@ type
 
     function TokenMatchEvaluator(const match : TMatch) : string;
 
-    function GenerateManifestYAML(const version : TSemanticVersion) : string;
+    function GenerateDspecYAML(const version : TSemanticVersion) : string;
 
-    //we call this when generating the manifest so the manifest works with an unprocessed spec
+    //we call this when generating the dspec so it works with an unprocessed spec
     function Clone : IPackageSpec;
 
 
@@ -371,7 +371,7 @@ begin
 end;
 
 
-function TSpec.GenerateManifestYAML(const version: TSemanticVersion): string;
+function TSpec.GenerateDspecYAML(const version: TSemanticVersion): string;
 var
   yamlDoc : IYAMLDocument;
 begin

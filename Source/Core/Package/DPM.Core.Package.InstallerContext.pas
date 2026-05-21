@@ -37,7 +37,7 @@ type
     procedure PackageGraphPruned(const projectFile : string; const graph : IPackageReference);virtual;
 
     //this is a no-op here, look at the IDE installer context to see how this is implemented.
-    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageManifests : IDictionary<string, IPackageSpec>) : boolean;virtual;
+    function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs : IDictionary<string, IPackageSpec>) : boolean;virtual;
 
     //this is a no-op here, look at the IDE installer context to see how this is implemented.
     function UninstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const orphanedPackageIds : IList<string>) : boolean;virtual;
@@ -109,7 +109,7 @@ begin
   FProjectGraphs.TryGetValue(LowerCase(projectFile), result);
 end;
 
-function TCorePackageInstallerContext.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageManifests : IDictionary<string, IPackageSpec>): boolean;
+function TCorePackageInstallerContext.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs : IDictionary<string, IPackageSpec>): boolean;
 begin
   result := true; //this is only needed for the IDE context
 end;

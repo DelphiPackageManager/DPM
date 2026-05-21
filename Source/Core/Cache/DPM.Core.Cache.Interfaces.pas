@@ -73,10 +73,10 @@ type
     //gets the full package metadata including search paths.
     function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
 
-    //gets the deserialized manifest file for the package.
-    function GetPackageManifest(const packageId : IPackageIdentity) : IPackageSpec;
+    //gets the deserialized dspec file for the package.
+    function GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
 
-    //gets the platforms supported by a package from its manifest.
+    //gets the platforms supported by a package from its dspec.
     function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
 
     /// <summary>

@@ -479,7 +479,7 @@ begin
   guid := TGUID.NewGuid;
   FtmpFilename := FOpenFile.WorkingDir;
   FtmpFilename := TPath.Combine(FtmpFilename, guid.ToString);
-  FtmpFilename := ChangeFileExt(FtmpFilename, '.dspec');
+  FtmpFilename := ChangeFileExt(FtmpFilename, cPackageSpecExt);
   TFile.WriteAllText(FtmpFilename, FOpenFile.AsString);
   if DirectoryExists(edtPackageOutputPath.Text) then
   begin

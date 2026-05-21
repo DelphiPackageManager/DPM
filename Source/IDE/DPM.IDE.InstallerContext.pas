@@ -43,7 +43,7 @@ type
   protected
     procedure Clear; override;
     procedure RemoveProject(const projectFile : string); override;
-    function InstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const packageManifests : IDictionary<string, IPackageSpec>) : boolean; override;
+    function InstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const packageSpecs : IDictionary<string, IPackageSpec>) : boolean; override;
     function UninstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const orphanedPackageIds : IList<string>) : boolean; override;
   public
     constructor Create(const logger : ILogger; const pathManager : IDPMIDEPathManager; const packageCache : IPackageCache); reintroduce;
@@ -266,7 +266,7 @@ begin
   projectRefs.Clear;
 end;
 
-function TDPMIDEPackageInstallerContext.InstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const packageManifests : IDictionary<string, IPackageSpec>) : boolean;
+function TDPMIDEPackageInstallerContext.InstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const packageSpecs : IDictionary<string, IPackageSpec>) : boolean;
 var
   lcProject : string;
   loadPlatform : TDPMPlatform;
@@ -313,7 +313,7 @@ begin
     begin
       if cancellationToken.IsCancelled then
         exit;
-      if not packageManifests.TryGetValue(LowerCase(node.Id), spec) then
+      if not packageSpecs.TryGetValue(LowerCase(node.Id), spec) then
         exit;
       if spec.TargetPlatform = nil then
         exit;

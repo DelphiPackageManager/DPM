@@ -43,13 +43,13 @@ type
   TPackageCache = class(TInterfacedObject, IPackageCache)
   private
     FLogger : ILogger;
-    FManifestReader : IPackageSpecReader;
+    FSpecReader : IPackageSpecReader;
     FLocation : string;
-    //Process-level memo. Safe because dpm-manifest.json is write-once per (id, compiler, version).
+    //Process-level memo. Safe because the cached spec is write-once per (id, compiler, version).
     //TPackageCache is registered AsSingleton in DPM.Core.Init.pas so these survive the whole command
     //and dedupe across projects in a group restore as well as IDE operations.
     FInfoCache : IDictionary<string, IPackageInfo>;
-    FManifestCache : IDictionary<string, IPackageSpec>;
+    FSpecCache : IDictionary<string, IPackageSpec>;
     FExtractionVerified : ISet<string>;
     FCacheLock : TCriticalSection;
   protected
@@ -72,7 +72,7 @@ type
 
     function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
 
-    function GetPackageManifest(const packageId : IPackageIdentity) : IPackageSpec;
+    function GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
 
     function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
 
@@ -91,7 +91,7 @@ type
     function InstallPackageFromFile(const packageFileName : string) : boolean;
 
   public
-    constructor Create(const logger : ILogger; const manifestReader : IPackageSpecReader);
+    constructor Create(const logger : ILogger; const specReader : IPackageSpecReader);
     destructor Destroy; override;
   end;
 
@@ -124,12 +124,12 @@ begin
   result := false;
 end;
 
-constructor TPackageCache.Create(const logger : ILogger; const manifestReader : IPackageSpecReader);
+constructor TPackageCache.Create(const logger : ILogger; const specReader : IPackageSpecReader);
 begin
   FLogger := logger;
-  FManifestReader := manifestReader;
+  FSpecReader := specReader;
   FInfoCache := TCollections.CreateDictionary<string, IPackageInfo>;
-  FManifestCache := TCollections.CreateDictionary<string, IPackageSpec>;
+  FSpecCache := TCollections.CreateDictionary<string, IPackageSpec>;
   FExtractionVerified := TCollections.CreateSet<string>;
   FCacheLock := TCriticalSection.Create;
 end;
@@ -166,7 +166,7 @@ function TPackageCache.GetPackageInfo(const cancellationToken : ICancellationTok
 var
   packageFolder : string;
   metaDataFile : string;
-  manifest : IPackageSpec;
+  spec : IPackageSpec;
   key : string;
 begin
   result := nil;
@@ -182,20 +182,16 @@ begin
   packageFolder := GetPackagePath(packageId);
   if not DirectoryExists(packageFolder) then
     exit;
-  metaDataFile := IncludeTrailingPathDelimiter(packageFolder) + cPackageManifestFile;
+  metaDataFile := IncludeTrailingPathDelimiter(packageFolder) + cPackageDspecFile;
   if not FileExists(metaDataFile) then
   begin
-    metaDataFile := IncludeTrailingPathDelimiter(packageFolder) + cOldPackageManifestFile;
-    if not FileExists(metaDataFile) then
-    begin
-      FLogger.Debug('Package metadata file [' + metaDataFile + '] not found in cache.');
-      exit;
-    end;
-  end;
-  manifest := FManifestReader.ReadSpec(metaDataFile);
-  if manifest = nil then
+    FLogger.Debug('Package dspec file [' + metaDataFile + '] not found in cache.');
     exit;
-  result := TPackageInfo.CreateFromManifest('', manifest, '', '');
+  end;
+  spec := FSpecReader.ReadSpec(metaDataFile);
+  if spec = nil then
+    exit;
+  result := TPackageInfo.CreateFromManifest('', spec, '', '');
 
   FCacheLock.Enter;
   try
@@ -207,12 +203,12 @@ end;
 
 function TPackageCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
 var
-  manifest : IPackageSpec;
+  spec : IPackageSpec;
 begin
-  manifest := GetPackageManifest(packageId);
-  if manifest = nil then
+  spec := GetPackageSpec(packageId);
+  if spec = nil then
     exit;
-  result := TPackageMetadata.CreateFromManifest('', manifest);
+  result := TPackageMetadata.CreateFromManifest('', spec);
 end;
 
 function TPackageCache.GetPackagePath(const id: string; const version: string; const compilerVersion : TCompilerVersion): string;
@@ -238,7 +234,7 @@ begin
   result := TPath.GetFullPath(FLocation)
 end;
 
-function TPackageCache.GetPackageManifest(const packageId: IPackageIdentity): IPackageSpec;
+function TPackageCache.GetPackageSpec(const packageId: IPackageIdentity): IPackageSpec;
 var
   packageFolder : string;
   metaDataFile : string;
@@ -248,7 +244,7 @@ begin
   key := MakeCacheKey(packageId);
   FCacheLock.Enter;
   try
-    if FManifestCache.TryGetValue(key, result) then
+    if FSpecCache.TryGetValue(key, result) then
       exit;
   finally
     FCacheLock.Leave;
@@ -256,29 +252,25 @@ begin
 
   if not EnsurePackage(packageId) then
   begin
-    FLogger.Error('Package metadata file [' + packageId.ToString + '] not found in cache.');
+    FLogger.Error('Package dspec file [' + packageId.ToString + '] not found in cache.');
     exit;
   end;
   packageFolder := GetPackagePath(packageId);
   if not DirectoryExists(packageFolder) then
     exit;
-  metaDataFile := IncludeTrailingPathDelimiter(packageFolder) + cPackageManifestFile;
+  metaDataFile := IncludeTrailingPathDelimiter(packageFolder) + cPackageDspecFile;
   if not FileExists(metaDataFile) then
   begin
-    metaDataFile := IncludeTrailingPathDelimiter(packageFolder) + cOldPackageManifestFile;
-    if not FileExists(metaDataFile) then
-    begin
-      FLogger.Debug('Package metadata file [' + metaDataFile + '] not found in cache.');
-      exit;
-    end;
+    FLogger.Debug('Package dspec file [' + metaDataFile + '] not found in cache.');
+    exit;
   end;
-  result := FManifestReader.ReadSpec(metaDataFile);
+  result := FSpecReader.ReadSpec(metaDataFile);
   if result = nil then
     exit;
 
   FCacheLock.Enter;
   try
-    FManifestCache[key] := result;
+    FSpecCache[key] := result;
   finally
     FCacheLock.Leave;
   end;
@@ -286,12 +278,12 @@ end;
 
 function TPackageCache.GetPackagePlatforms(const packageId: IPackageIdentity): TDPMPlatforms;
 var
-  manifest: IPackageSpec;
+  spec: IPackageSpec;
 begin
   result := [];
-  manifest := GetPackageManifest(packageId);
-  if (manifest <> nil) and (manifest.TargetPlatform <> nil) then
-    result := manifest.TargetPlatform.Platforms;
+  spec := GetPackageSpec(packageId);
+  if (spec <> nil) and (spec.TargetPlatform <> nil) then
+    result := spec.TargetPlatform.Platforms;
 end;
 
 function TPackageCache.GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;
@@ -480,8 +472,7 @@ function TPackageCache.EnsurePackage(const packageId : IPackageIdentity) : Boole
 var
   packageFolder : string;
   packageFileFolder : string;
-  manifestFile : string;
-  oldManifestFile : string;
+  dspecFile : string;
   searchPattern : string;
   matchingFiles : TStringDynArray;
   key : string;
@@ -498,17 +489,16 @@ begin
     FCacheLock.Leave;
   end;
 
-  //check if we have a package folder and manifest.
+  //check if we have a package folder and dspec.
   packageFolder := GetPackagePath(packageId);
   result := DirectoryExists(packageFolder);
 
-  manifestFile := IncludeTrailingPathDelimiter(packageFolder) + cPackageManifestFile;
-  oldManifestFile := IncludeTrailingPathDelimiter(packageFolder) + cOldPackageManifestFile;
+  dspecFile := IncludeTrailingPathDelimiter(packageFolder) + cPackageDspecFile;
 
-  result := result and (FileExists(manifestFile) or FileExists(oldManifestFile));
+  result := result and FileExists(dspecFile);
   if not result then
   begin
-    //fallback: the extracted folder is missing or has no manifest, but the .dpkg may still be
+    //fallback: the extracted folder is missing or has no dspec, but the .dpkg may still be
     //on disk from a previous session. On-disk filename is
     //{Id}-{Compiler}-{BinPlatforms}-{Version}.dpkg - BinPlatforms is a DPMPlatformsToBinString
     //bitmask encoding the platforms this .dpkg was packed for. packageId only tells us
@@ -564,13 +554,13 @@ begin
     exit;
 
   //defensive: about to re-extract this id-compiler-version, invalidate any memoised state
-  //so the next read picks up the fresh manifest. Contents should be identical for the same
+  //so the next read picks up the fresh dspec. Contents should be identical for the same
   //(id, compiler, version), but this future-proofs against replacing a corrupt extraction.
   key := MakeCacheKey(packageIndentity);
   FCacheLock.Enter;
   try
     FInfoCache.Remove(key);
-    FManifestCache.Remove(key);
+    FSpecCache.Remove(key);
     FExtractionVerified.Remove(key);
   finally
     FCacheLock.Leave;
@@ -611,9 +601,7 @@ begin
   try
     FLogger.Debug('[PackageCache] Extracting Package file [' + packageFilePath + '] to : ' + packageFolder);
     TZipFile.ExtractZipFile(packageFilePath, packageFolder);
-    result := FileExists(IncludeTrailingPathDelimiter(packageFolder) + cPackageManifestFile);
-    if not result then
-      result := FileExists(IncludeTrailingPathDelimiter(packageFolder) + cOldPackageManifestFile);
+    result := FileExists(IncludeTrailingPathDelimiter(packageFolder) + cPackageDspecFile);
     if result then
       FLogger.Verbose('Package  [' + packageFilePath + '] added to cache.');
 

@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -75,7 +75,7 @@ var
   filePath :string;
 begin
   reader := TPackageSpecReader.Create(TTestLogger.Create);
-  filePath := ExtractFilePath(ParamStr(0)) + '..\..\..\DPM.Core.dspec';
+  filePath := ExtractFilePath(ParamStr(0)) + '..\..\..\DPM.Core.dspec.yaml';
   spec := reader.ReadSpec(filePath);
   Assert.IsNotNull(spec);
 

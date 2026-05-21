@@ -448,9 +448,9 @@ var
   option : IOptionDefinition;
   cmd : TCommandDefinition;
 begin
-  cmd := TOptionsRegistry.RegisterCommand('pack', '', 'Creates a DPM package based on the specified .dspec file.',
-                                                      'Specify the location of the dspec file to create a package.',
-                                                      'pack <.dspec file> [options]');
+  cmd := TOptionsRegistry.RegisterCommand('pack', '', 'Creates a DPM package based on the specified .dspec.yaml file.',
+                                                      'Specify the location of the dspec.yaml file to create a package.',
+                                                      'pack <.dspec.yaml file> [options]');
 
   option := cmd.RegisterUnNamedOption<string>('The package spec file','specfile',
     procedure(const value : string)
@@ -475,7 +475,7 @@ begin
     end);
 
 
-  cmd.RegisterOption<string>('basepath','b','The base path of the files defined in the dspec file. If not specified then the location of the dspec is used.',
+  cmd.RegisterOption<string>('basepath','b','The base path of the files defined in the dspec.yaml file. If not specified then the location of the dspec.yaml is used.',
     procedure(const value : string)
     begin
       TPackOptions.Default.BasePath := value;
@@ -493,13 +493,13 @@ begin
       TPackOptions.Default.Variables := value;
     end);
 
-  cmd.RegisterOption<string>('version','','Overrides the version number from the dspec file.',
+  cmd.RegisterOption<string>('version','','Overrides the version number from the dspec.yaml file.',
     procedure(const value : string)
     begin
       TPackOptions.Default.Version := value;
     end);
 
-  cmd.Examples.Add('pack VSoft.CommandLine.dspec -version=1.0.1 -outputFolder=.\output');
+  cmd.Examples.Add('pack VSoft.CommandLine.dspec.yaml -version=1.0.1 -outputFolder=.\output');
 
 end;
 
@@ -693,8 +693,8 @@ var
   cmd : TCommandDefinition;
   option : IOptionDefinition;
 begin
-  cmd := TOptionsRegistry.RegisterCommand('spec', '', 'Generates a package.dspec for a new package. If this command is run in the same folder as a ' +
-                                                      'project file (.dproj), it will create a tokenized dspec file.',
+  cmd := TOptionsRegistry.RegisterCommand('spec', '', 'Generates a package.dspec.yaml for a new package. If this command is run in the same folder as a ' +
+                                                      'project file (.dproj), it will create a tokenized dspec.yaml file.',
                                                       '',
                                                       'spec [package id]');
 
