@@ -43,6 +43,17 @@ type
     procedure FingerprintIsLowercaseHex;
   end;
 
+  // P3 §3.4 — emergency revocation channel. Verifies the policy treats
+  // revoked SPKIs as untrusted even when they're also pinned by the user.
+  [TestFixture]
+  TTrustPolicyRevokeTests = class
+  public
+    [Test] procedure RepositoryTrusted_True_WhenPinned_AndNotRevoked;
+    [Test] procedure RepositoryTrusted_False_WhenRevokedByTrustSet;
+    [Test] procedure RepositoryTrusted_False_WhenPinned_AndAlsoRevoked;
+    [Test] procedure RepositoryTrusted_NormalisesHexCase_And_Prefix;
+  end;
+
   [TestFixture]
   TTrustStateExtraTests = class
   private
@@ -72,8 +83,10 @@ uses
   DPM.Core.Crypto.Algorithms,
   DPM.Core.Crypto.Hashing.Interfaces,
   DPM.Core.Crypto.Hashing,
+  DPM.Core.Configuration.Interfaces,
   DPM.Core.Trust.Interfaces,
   DPM.Core.Trust.State,
+  DPM.Core.Trust.TrustSet,
   DPM.Core.Trust.Policy;
 
 { TTrustStateTests }
@@ -550,9 +563,127 @@ begin
   end;
 end;
 
+{ TTrustPolicyRevokeTests }
+//
+// RepositoryTrusted only needs the trust set + hashing dependencies — it
+// never touches the config manager. We give it a stub config manager that
+// returns nil for everything, a TBuiltInTrustSet primed via YAML, and the
+// real hashing service.
+
+type
+  TStubConfigManager = class(TInterfacedObject, IConfigurationManager)
+  protected
+    function LoadConfig(const configFile : string) : IConfiguration;
+    function NewConfig : IConfiguration;
+    function EnsureDefaultConfig : boolean;
+    function SaveConfig(const configuration : IConfiguration; const fileName : string = '') : boolean;
+  end;
+
+function TStubConfigManager.LoadConfig(const configFile : string) : IConfiguration;
+begin result := nil; end;
+function TStubConfigManager.NewConfig : IConfiguration;
+begin result := nil; end;
+function TStubConfigManager.EnsureDefaultConfig : boolean;
+begin result := true; end;
+function TStubConfigManager.SaveConfig(const configuration : IConfiguration; const fileName : string = '') : boolean;
+begin result := true; end;
+
+function MakePolicyWithPin(const pinHex : string) : TTrustPolicy;
+var
+  repo : TTrustedRepository;
+begin
+  result.ValidationMode := vmPermissive;
+  result.AuthorDowngradePolicy := adpPrompt;
+  result.AllowKeyCompromiseOverride := false;
+  result.TrustSetVersion := 1;
+  SetLength(result.TrustedPublishers, 0);
+  if pinHex = '' then
+    SetLength(result.TrustedRepositories, 0)
+  else
+  begin
+    repo.Url := 'https://test.example';
+    repo.SpkiHex := pinHex;
+    SetLength(result.TrustedRepositories, 1);
+    result.TrustedRepositories[0] := repo;
+  end;
+end;
+
+function MakeService(const trustSetYaml : string) : ITrustPolicyService;
+begin
+  result := TTrustPolicyService.Create(
+    TStubConfigManager.Create,
+    TBuiltInTrustSet.Create(trustSetYaml),
+    TBCryptHashingService.Create);
+end;
+
+procedure TTrustPolicyRevokeTests.RepositoryTrusted_True_WhenPinned_AndNotRevoked;
+var
+  svc : ITrustPolicyService;
+  policy : TTrustPolicy;
+begin
+  svc := MakeService('');   // no revoked entries
+  policy := MakePolicyWithPin('aabbcc');
+  Assert.IsTrue(svc.RepositoryTrusted(policy, 'aabbcc'));
+end;
+
+procedure TTrustPolicyRevokeTests.RepositoryTrusted_False_WhenRevokedByTrustSet;
+const
+  cYaml =
+    'dpmTrustSetVersion: 1'#10 +
+    'revokedRepositorySpki:'#10 +
+    '  - sha256:badbad'#10;
+var
+  svc : ITrustPolicyService;
+  policy : TTrustPolicy;
+begin
+  // Not pinned by user either. Revoked-only is still untrusted, but that's
+  // the same result as Phase 1 — what matters is the next test.
+  svc := MakeService(cYaml);
+  policy := MakePolicyWithPin('');
+  Assert.IsFalse(svc.RepositoryTrusted(policy, 'sha256:badbad'));
+end;
+
+procedure TTrustPolicyRevokeTests.RepositoryTrusted_False_WhenPinned_AndAlsoRevoked;
+const
+  cYaml =
+    'dpmTrustSetVersion: 1'#10 +
+    'revokedRepositorySpki:'#10 +
+    '  - sha256:badbad'#10;
+var
+  svc : ITrustPolicyService;
+  policy : TTrustPolicy;
+begin
+  // The whole point of the channel: even if the user has pinned this SPKI
+  // (because they didn't yet know it was compromised), the trust set's
+  // revoke overrides.
+  svc := MakeService(cYaml);
+  policy := MakePolicyWithPin('badbad');
+  Assert.IsFalse(svc.RepositoryTrusted(policy, 'badbad'),
+    'revoked SPKI must override the user pin');
+end;
+
+procedure TTrustPolicyRevokeTests.RepositoryTrusted_NormalisesHexCase_And_Prefix;
+const
+  cYaml =
+    'dpmTrustSetVersion: 1'#10 +
+    'revokedRepositorySpki:'#10 +
+    '  - sha256:ABCD1234'#10;
+var
+  svc : ITrustPolicyService;
+  policy : TTrustPolicy;
+begin
+  svc := MakeService(cYaml);
+  policy := MakePolicyWithPin('abcd1234');
+  // Same key written as upper-case + "sha256:" prefix on one side, plain
+  // lower-case on the other. Normalisation should treat both as equal.
+  Assert.IsFalse(svc.RepositoryTrusted(policy, 'abcd1234'));
+  Assert.IsFalse(svc.RepositoryTrusted(policy, 'SHA256:abcd1234'));
+end;
+
 initialization
   TDUnitX.RegisterTestFixture(TTrustStateTests);
   TDUnitX.RegisterTestFixture(TTrustPolicyFingerprintTests);
+  TDUnitX.RegisterTestFixture(TTrustPolicyRevokeTests);
   TDUnitX.RegisterTestFixture(TTrustStateExtraTests);
 
 end.

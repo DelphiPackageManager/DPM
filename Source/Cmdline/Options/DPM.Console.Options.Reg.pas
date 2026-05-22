@@ -736,17 +736,31 @@ begin
     end);
 
   cmd.RegisterOption<string>('endpoint', '',
-    'Signotaur service endpoint URL.',
+    'Signotaur service endpoint URL (e.g. https://signotaur.example.com).',
     procedure(const value : string)
     begin
       TSignOptions.Default.SignotaurEndpoint := value;
     end);
 
-  cmd.RegisterOption<string>('api-token-env', '',
-    'Name of an environment variable holding the Signotaur API token.',
+  cmd.RegisterOption<string>('api-key-env', '',
+    'Name of an environment variable holding the Signotaur API key.',
     procedure(const value : string)
     begin
-      TSignOptions.Default.SignotaurApiTokenEnv := value;
+      TSignOptions.Default.SignotaurApiKeyEnv := value;
+    end);
+
+  cmd.RegisterOption<string>('subject', '',
+    'Signotaur cert selector by certificate Subject (alternative to --thumbprint).',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.SignotaurSubject := value;
+    end);
+
+  cmd.RegisterOption<string>('label', '',
+    'Signotaur cert selector by user-assigned Label (alternative to --thumbprint).',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.SignotaurLabel := value;
     end);
 end;
 

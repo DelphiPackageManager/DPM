@@ -346,6 +346,7 @@ const
 
   // szOID constants
   szOID_PKIX_KP_CODE_SIGNING : AnsiString = '1.3.6.1.5.5.7.3.3';
+  szOID_RSA_RSA              : AnsiString = '1.2.840.113549.1.1.1';
   szOID_RSA_SHA256RSA        : AnsiString = '1.2.840.113549.1.1.11';
   szOID_RSA_SHA384RSA        : AnsiString = '1.2.840.113549.1.1.12';
   szOID_RSA_SHA512RSA        : AnsiString = '1.2.840.113549.1.1.13';
@@ -406,7 +407,13 @@ const
   // CryptEncodeObjectEx struct type for a PKCS#7 Attribute. Defined in
   // wincrypt.h as `(LPCSTR)22`. Used to DER-encode the (oid, values) pair
   // that becomes the `blob` of CMSG_CTRL_ADD_SIGNER_UNAUTH_ATTR_PARA.
-  PKCS_ATTRIBUTE         : PAnsiChar = PAnsiChar(22);
+  PKCS_ATTRIBUTE          : PAnsiChar = PAnsiChar(22);
+  // Outer ContentInfo wrapper for CMS messages.
+  PKCS_CONTENT_INFO       : PAnsiChar = PAnsiChar(33);
+  // Encodes a CMSG_SIGNER_INFO struct as a PKCS#7 SignerInfo SEQUENCE.
+  PKCS7_SIGNER_INFO       : PAnsiChar = PAnsiChar(500);
+  // Encodes an AlgorithmIdentifier (OID + optional params).
+  X509_ALGORITHM_IDENTIFIER : PAnsiChar = PAnsiChar(74);
 
   // CryptMsgGetParam types we care about
   CMSG_TYPE_PARAM                = 1;
@@ -464,6 +471,30 @@ type
     rgUnauthAttr        : PCRYPT_ATTRIBUTE;
   end;
   PCMSG_SIGNER_ENCODE_INFO = ^CMSG_SIGNER_ENCODE_INFO;
+
+  // CMSG_SIGNER_INFO — accepted by CryptEncodeObjectEx(PKCS7_SIGNER_INFO).
+  // Fully describes a SignerInfo: signer identity (Issuer + Serial),
+  // hash algorithm, signature algorithm + value, and the signed +
+  // unsigned attribute sets.
+  CMSG_SIGNER_INFO = record
+    dwVersion               : DWORD;
+    Issuer                  : CERT_NAME_BLOB;
+    SerialNumber            : CRYPT_INTEGER_BLOB;
+    HashAlgorithm           : CRYPT_ALGORITHM_IDENTIFIER;
+    HashEncryptionAlgorithm : CRYPT_ALGORITHM_IDENTIFIER;
+    EncryptedHash           : CRYPT_INTEGER_BLOB;       // the signature value
+    AuthAttrs               : CRYPT_ATTRIBUTES;
+    UnauthAttrs             : CRYPT_ATTRIBUTES;
+  end;
+  PCMSG_SIGNER_INFO = ^CMSG_SIGNER_INFO;
+
+  // CryptEncodeObjectEx(PKCS_CONTENT_INFO) parameter struct. Wraps an
+  // inner DER blob with its content-type OID into a ContentInfo SEQUENCE.
+  CRYPT_CONTENT_INFO = record
+    pszObjId : PAnsiChar;
+    Content  : CRYPT_INTEGER_BLOB;
+  end;
+  PCRYPT_CONTENT_INFO = ^CRYPT_CONTENT_INFO;
 
   CRYPT_SIGN_MESSAGE_PARA = record
     cbSize                    : DWORD;

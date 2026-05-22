@@ -105,6 +105,8 @@ uses
   DPM.Core.Package.PackageLatestVersionInfo in 'Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas',
   DPM.Core.Utils.Hash in 'Core\Utils\DPM.Core.Utils.Hash.pas',
   DPM.Core.Utils.DateTime in 'Core\Utils\DPM.Core.Utils.DateTime.pas',
+  DPM.Core.Utils.Base64Url in 'Core\Utils\DPM.Core.Utils.Base64Url.pas',
+  DPM.Core.Tests.Utils.Base64Url in 'Tests\DPM.Core.Tests.Utils.Base64Url.pas',
   DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas',
   DPM.Core.Package.Interfaces in 'Core\Package\DPM.Core.Package.Interfaces.pas',
   DPM.Core.SBOM.Types in 'Core\Sbom\DPM.Core.SBOM.Types.pas',

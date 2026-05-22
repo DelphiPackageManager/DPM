@@ -56,7 +56,9 @@ type
     FClientId : string;
     FClientSecretEnv : string;
     FSignotaurEndpoint : string;
-    FSignotaurApiTokenEnv : string;
+    FSignotaurApiKeyEnv : string;
+    FSignotaurSubject : string;
+    FSignotaurLabel : string;
     class var FDefault : TSignOptions;
   public
     class constructor CreateDefault;
@@ -79,7 +81,9 @@ type
     property ClientId : string read FClientId write FClientId;
     property ClientSecretEnv : string read FClientSecretEnv write FClientSecretEnv;
     property SignotaurEndpoint : string read FSignotaurEndpoint write FSignotaurEndpoint;
-    property SignotaurApiTokenEnv : string read FSignotaurApiTokenEnv write FSignotaurApiTokenEnv;
+    property SignotaurApiKeyEnv : string read FSignotaurApiKeyEnv write FSignotaurApiKeyEnv;
+    property SignotaurSubject : string read FSignotaurSubject write FSignotaurSubject;
+    property SignotaurLabel : string read FSignotaurLabel write FSignotaurLabel;
   end;
 
 implementation
@@ -158,9 +162,15 @@ begin
           logger.Error('--endpoint is required when --provider=signotaur');
           result := false;
         end;
-        if FCertName = '' then
+        if FSignotaurApiKeyEnv = '' then
         begin
-          logger.Error('--cert-id is required when --provider=signotaur');
+          logger.Error('--api-key-env is required when --provider=signotaur ' +
+                       '(names an env var that holds the Signotaur API key)');
+          result := false;
+        end;
+        if (FThumbprint = '') and (FSignotaurSubject = '') and (FSignotaurLabel = '') then
+        begin
+          logger.Error('Signotaur: one of --thumbprint, --subject, --label is required');
           result := false;
         end;
       end;

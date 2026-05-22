@@ -180,6 +180,7 @@ uses
   System.ImageList in 'IDE\Compatibility\System.ImageList.pas',
   DPM.Core.Utils.Hash in 'Core\Utils\DPM.Core.Utils.Hash.pas',
   DPM.Core.Utils.DateTime in 'Core\Utils\DPM.Core.Utils.DateTime.pas',
+  DPM.Core.Utils.Base64Url in 'Core\Utils\DPM.Core.Utils.Base64Url.pas',
   DPM.Core.Project.MapFile in 'Core\Project\DPM.Core.Project.MapFile.pas',
   DPM.Core.Options.SBOM in 'Core\Options\DPM.Core.Options.SBOM.pas',
   DPM.Core.Sbom.Generator in 'Core\Sbom\DPM.Core.Sbom.Generator.pas',

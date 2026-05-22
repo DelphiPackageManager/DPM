@@ -152,6 +152,7 @@ uses
   VSoft.Base64,
   VSoft.HttpClient,
   VSoft.CancellationToken,
+  DPM.Core.Utils.Base64Url,
   DPM.Core.Utils.DateTime;
 
 const
@@ -159,38 +160,8 @@ const
   cAadAuthorityBase   = 'https://login.microsoftonline.com';
   cKeyVaultScope      = 'https://vault.azure.net/.default';
 
-// Base64-URL encoding per RFC 4648 §5: standard base64 with -/_ instead of +//
-// and no padding. KV uses this for both the signing input (digest) and output
-// (signature). Routed through VSoft.Base64 so we keep working on XE2..XE6
-// (System.NetEncoding only landed in XE7).
-function Base64UrlEncode(const bytes : TBytes) : string;
-var
-  s : string;
-begin
-  s := TBase64.Encode(bytes, false);   // no line breaks
-  s := StringReplace(s, '+', '-', [rfReplaceAll]);
-  s := StringReplace(s, '/', '_', [rfReplaceAll]);
-  // Strip trailing '=' padding.
-  while (Length(s) > 0) and (s[Length(s)] = '=') do
-    SetLength(s, Length(s) - 1);
-  result := s;
-end;
-
-function Base64UrlDecode(const value : string) : TBytes;
-var
-  s : string;
-  pad : integer;
-begin
-  s := StringReplace(value, '-', '+', [rfReplaceAll]);
-  s := StringReplace(s, '_', '/', [rfReplaceAll]);
-  // Re-add padding to a multiple of 4.
-  pad := Length(s) mod 4;
-  if pad = 2 then s := s + '==' else
-  if pad = 3 then s := s + '='  else
-  if pad <> 0 then
-    raise EAzureKeyVault.CreateFmt('Invalid base64url length: %d', [Length(s)]);
-  result := TBase64.Decode(s);
-end;
+// base64url codec lives in DPM.Core.Utils.Base64Url so the encoding is
+// testable in isolation and the helper isn't tied to the Azure provider.
 
 // RFC 3986 percent-encoding for application/x-www-form-urlencoded values.
 // Unreserved: ALPHA / DIGIT / "-" / "." / "_" / "~". Everything else escapes
@@ -473,7 +444,7 @@ begin
   reqDoc := TJsonObject.Create;
   try
     reqDoc.S['alg'] := keyVaultAlg;
-    reqDoc.S['value'] := Base64UrlEncode(digest);
+    reqDoc.S['value'] := TBase64Url.Encode(digest);
     reqBody := reqDoc.ToJSON(False);
   finally
     reqDoc.Free;
@@ -504,7 +475,7 @@ begin
   try
     if not respDoc.Contains('value') then
       raise EAzureKeyVault.Create('Key Vault sign response missing "value" field');
-    result := Base64UrlDecode(respDoc.S['value']);
+    result := TBase64Url.Decode(respDoc.S['value']);
   finally
     respDoc.Free;
   end;

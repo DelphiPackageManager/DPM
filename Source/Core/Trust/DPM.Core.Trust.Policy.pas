@@ -246,8 +246,22 @@ function TTrustPolicyService.RepositoryTrusted(const policy : TTrustPolicy; cons
 var
   target : string;
   i : integer;
+  revoked : TArray<string>;
 begin
   target := NormHex(spkiHex);
+
+  // P3 §3.4 — emergency revocation channel always wins. A repository SPKI
+  // listed in the trust set's revokedRepositorySpki array is never trusted,
+  // regardless of being in the user's trustedRepositories or the trust
+  // set's own repositorySpki pin list.
+  revoked := FTrustSet.RevokedRepositorySpkis;
+  for i := 0 to High(revoked) do
+    if NormHex(revoked[i]) = target then
+    begin
+      result := false;
+      exit;
+    end;
+
   for i := 0 to High(policy.TrustedRepositories) do
     if NormHex(policy.TrustedRepositories[i].SpkiHex) = target then
     begin

@@ -50,6 +50,19 @@ type
   TCmsService = class(TInterfacedObject, ICmsService)
   private
     FX509 : IX509Service;
+    FHashing : IHashingService;
+    /// <summary>
+    /// P3 §3.3 v2 — assemble a detached CMS SignedData when the provider
+    /// can't expose a Win32 key handle. Computes the digest of the signed
+    /// attributes locally, delegates the actual signature to provider.SignDigest
+    /// (single remote call), then hand-encodes the SignerInfo + outer
+    /// SignedData using CryptEncodeObjectEx + manual DER for the wrappers
+    /// that Windows doesn't expose an encoder for.
+    /// </summary>
+    function SignRemote(const content : TBytes;
+                        const provider : ISigningProvider;
+                        const signedAttributes : TCmsAttributes;
+                        digest : THashAlgorithm) : TBytes;
   protected
     function Sign(const content : TBytes;
                   const provider : ISigningProvider;
@@ -61,7 +74,7 @@ type
     procedure AddUnsignedAttribute(var der : TBytes;
                                    const oid : AnsiString; const value : TBytes);
   public
-    constructor Create(const x509 : IX509Service);
+    constructor Create(const x509 : IX509Service; const hashing : IHashingService);
   end;
 
 implementation
@@ -163,12 +176,433 @@ end;
 
 { TCmsService }
 
-constructor TCmsService.Create(const x509 : IX509Service);
+constructor TCmsService.Create(const x509 : IX509Service; const hashing : IHashingService);
 begin
   if x509 = nil then
     raise ECryptoCms.Create('TCmsService requires an X509 service');
+  if hashing = nil then
+    raise ECryptoCms.Create('TCmsService requires a hashing service');
   inherited Create;
   FX509 := x509;
+  FHashing := hashing;
+end;
+
+// ---------------------------------------------------------------------------
+// DER hand-encoding primitives — used by SignRemote to assemble the outer
+// SignedData SEQUENCE / SET wrappers that Windows doesn't expose a struct
+// encoder for. Each helper takes already-encoded content and returns the
+// tag+length+content bytes.
+// ---------------------------------------------------------------------------
+
+function DerLength(len : integer) : TBytes;
+var
+  buf : array[0..4] of byte;
+  numBytes, i : integer;
+begin
+  if len < $80 then
+  begin
+    SetLength(result, 1);
+    result[0] := byte(len);
+  end
+  else
+  begin
+    numBytes := 0;
+    i := len;
+    while i > 0 do
+    begin
+      buf[numBytes] := byte(i and $FF);
+      i := i shr 8;
+      Inc(numBytes);
+    end;
+    SetLength(result, numBytes + 1);
+    result[0] := $80 or byte(numBytes);
+    // Length octets are big-endian.
+    for i := 0 to numBytes - 1 do
+      result[numBytes - i] := buf[i];
+  end;
+end;
+
+function DerWrapTag(tag : byte; const content : TBytes) : TBytes;
+var
+  lenBytes : TBytes;
+begin
+  lenBytes := DerLength(Length(content));
+  SetLength(result, 1 + Length(lenBytes) + Length(content));
+  result[0] := tag;
+  Move(lenBytes[0], result[1], Length(lenBytes));
+  if Length(content) > 0 then
+    Move(content[0], result[1 + Length(lenBytes)], Length(content));
+end;
+
+function DerSequence(const content : TBytes) : TBytes;
+begin
+  result := DerWrapTag($30, content);
+end;
+
+function DerSet(const content : TBytes) : TBytes;
+begin
+  result := DerWrapTag($31, content);
+end;
+
+function DerContext0Implicit(const content : TBytes) : TBytes;
+// [0] IMPLICIT (constructed) — context-specific tag with constructed bit.
+// Used for the certificates[0] in SignedData.
+begin
+  result := DerWrapTag($A0, content);
+end;
+
+function DerInteger(value : integer) : TBytes;
+var
+  buf : array[0..3] of byte;
+  i, numBytes : integer;
+  needsLeadingZero : boolean;
+  payload : TBytes;
+begin
+  if value = 0 then
+  begin
+    SetLength(payload, 1);
+    payload[0] := 0;
+  end
+  else
+  begin
+    numBytes := 0;
+    i := value;
+    while i > 0 do
+    begin
+      buf[numBytes] := byte(i and $FF);
+      i := i shr 8;
+      Inc(numBytes);
+    end;
+    needsLeadingZero := (buf[numBytes - 1] and $80) <> 0;
+    if needsLeadingZero then
+    begin
+      SetLength(payload, numBytes + 1);
+      payload[0] := 0;
+      for i := 0 to numBytes - 1 do
+        payload[numBytes - i] := buf[i];
+    end
+    else
+    begin
+      SetLength(payload, numBytes);
+      for i := 0 to numBytes - 1 do
+        payload[numBytes - 1 - i] := buf[i];
+    end;
+  end;
+  result := DerWrapTag($02, payload);
+end;
+
+function ConcatBytes(const parts : array of TBytes) : TBytes;
+var
+  i, total, offset : integer;
+begin
+  total := 0;
+  for i := 0 to High(parts) do
+    Inc(total, Length(parts[i]));
+  SetLength(result, total);
+  offset := 0;
+  for i := 0 to High(parts) do
+  begin
+    if Length(parts[i]) > 0 then
+    begin
+      Move(parts[i][0], result[offset], Length(parts[i]));
+      Inc(offset, Length(parts[i]));
+    end;
+  end;
+end;
+
+// CryptEncodeObjectEx wrapper that returns the bytes as TBytes and frees
+// the OS-allocated buffer for us.
+function EncodeWith(structType : PAnsiChar; structInfo : Pointer; const apiName : string) : TBytes;
+var
+  buf : Pointer;
+  size : DWORD;
+begin
+  buf := nil;
+  size := 0;
+  CheckBool(
+    CryptEncodeObjectEx(cENCODING_TYPE, structType, structInfo,
+      CRYPT_ENCODE_ALLOC_FLAG, nil, @buf, size),
+    apiName);
+  try
+    SetLength(result, size);
+    if size > 0 then
+      Move(buf^, result[0], size);
+  finally
+    LocalFree(HLOCAL(buf));
+  end;
+end;
+
+function EncodeAttributeOctet(const oid : AnsiString; const value : TBytes) : TBytes;
+var
+  octet : TBytes;
+  blob : CRYPT_INTEGER_BLOB;
+  attr : CRYPT_ATTRIBUTE;
+begin
+  // Wrap the value in OCTET STRING — caller's convention for our signed
+  // attribute payloads (e.g. dpmSignatureRole bytes).
+  octet := EncodeOctetString(value);
+  blob.cbData := Length(octet);
+  if blob.cbData > 0 then
+    blob.pbData := @octet[0]
+  else
+    blob.pbData := nil;
+  attr.pszObjId := PAnsiChar(oid);
+  attr.cValue := 1;
+  attr.rgValue := @blob;
+  result := EncodeWith(PKCS_ATTRIBUTE, @attr, 'CryptEncodeObjectEx(PKCS_ATTRIBUTE)');
+end;
+
+function EncodeAttributeRaw(const oid : AnsiString; const valueDer : TBytes) : TBytes;
+var
+  blob : CRYPT_INTEGER_BLOB;
+  attr : CRYPT_ATTRIBUTE;
+begin
+  // Value already DER-encoded (e.g. OBJECT IDENTIFIER for id-data).
+  blob.cbData := Length(valueDer);
+  if blob.cbData > 0 then
+    blob.pbData := @valueDer[0]
+  else
+    blob.pbData := nil;
+  attr.pszObjId := PAnsiChar(oid);
+  attr.cValue := 1;
+  attr.rgValue := @blob;
+  result := EncodeWith(PKCS_ATTRIBUTE, @attr, 'CryptEncodeObjectEx(PKCS_ATTRIBUTE)');
+end;
+
+function EncodeOidValue(const oid : AnsiString) : TBytes;
+const
+  X509_OBJECT_IDENTIFIER : PAnsiChar = PAnsiChar(7);
+var
+  p : PAnsiChar;
+begin
+  p := PAnsiChar(oid);
+  result := EncodeWith(X509_OBJECT_IDENTIFIER, @p, 'CryptEncodeObjectEx(X509_OBJECT_IDENTIFIER)');
+end;
+
+function EncodeAlgorithmIdentifier(const oid : AnsiString) : TBytes;
+var
+  alg : CRYPT_ALGORITHM_IDENTIFIER;
+begin
+  FillChar(alg, SizeOf(alg), 0);
+  alg.pszObjId := PAnsiChar(oid);
+  // Parameters field left empty — Windows omits the optional NULL for some
+  // OIDs and writes ASN.1 NULL for others as appropriate.
+  result := EncodeWith(X509_ALGORITHM_IDENTIFIER, @alg,
+    'CryptEncodeObjectEx(X509_ALGORITHM_IDENTIFIER)');
+end;
+
+// DER SET ordering rule: elements must be sorted byte-wise ascending of
+// their encoded form. CompareDerBytes is the lexicographic predicate.
+function CompareDerBytes(const a, b : TBytes) : integer;
+var
+  i, minLen : integer;
+begin
+  minLen := Length(a);
+  if Length(b) < minLen then
+    minLen := Length(b);
+  for i := 0 to minLen - 1 do
+  begin
+    if a[i] < b[i] then exit(-1);
+    if a[i] > b[i] then exit(1);
+  end;
+  if Length(a) < Length(b) then exit(-1);
+  if Length(a) > Length(b) then exit(1);
+  result := 0;
+end;
+
+procedure SortDerBytes(var items : array of TBytes);
+var
+  i, j : integer;
+  tmp : TBytes;
+begin
+  // Insertion sort — N is tiny (3..5 attributes typically).
+  for i := 1 to High(items) do
+  begin
+    tmp := items[i];
+    j := i - 1;
+    while (j >= 0) and (CompareDerBytes(items[j], tmp) > 0) do
+    begin
+      items[j + 1] := items[j];
+      Dec(j);
+    end;
+    items[j + 1] := tmp;
+  end;
+end;
+
+function TCmsService.SignRemote(const content : TBytes;
+                                const provider : ISigningProvider;
+                                const signedAttributes : TCmsAttributes;
+                                digest : THashAlgorithm) : TBytes;
+var
+  messageDigest : TBytes;
+  encodedAttrs : array of TBytes;
+  attrsSorted : array of TBytes;
+  signedAttrsSetContent : TBytes;
+  signedAttrsSetDer : TBytes;
+  attrsHash : TBytes;
+  signatureBytes : TBytes;
+  cert : ICertificate;
+  certInfo : PCERT_INFO;
+  certDer : TBytes;
+  authAttrsArr : array of CRYPT_ATTRIBUTE;
+  authAttrValues : array of CRYPT_INTEGER_BLOB;
+  authAttrPayloads : array of TBytes;
+  signerInfo : CMSG_SIGNER_INFO;
+  signerInfoDer : TBytes;
+  digestAlgDer, sigAlgDer : TBytes;
+  digestAlgsSetDer : TBytes;
+  encapContentInfoDer : TBytes;
+  encapContentTypeOidValue : TBytes;
+  certificatesField : TBytes;
+  signerInfosSetDer : TBytes;
+  signedDataInner : TBytes;
+  contentInfo : CRYPT_CONTENT_INFO;
+  contentBlob : CRYPT_INTEGER_BLOB;
+  i, n, idx : integer;
+begin
+  cert := provider.Certificate;
+  if cert = nil then
+    raise ECryptoCms.Create('SignRemote: provider has no certificate');
+
+  // 1. Compute message digest of the content (the manifest, for detached).
+  messageDigest := FHashing.HashBytes(content, digest);
+
+  // 2. Build the full signed-attribute set: contentType + messageDigest +
+  //    every caller-supplied attribute. These end up both (a) encoded as
+  //    a SET for the digest input, and (b) carried in the SignerInfo's
+  //    [0] IMPLICIT signedAttrs.
+  n := Length(signedAttributes) + 2;
+  SetLength(authAttrsArr, n);
+  SetLength(authAttrValues, n);
+  SetLength(authAttrPayloads, n);
+
+  // contentType = id-data (detached: encapContentInfo carries id-data with no eContent)
+  encapContentTypeOidValue := EncodeOidValue(szOID_RSA_data);
+  authAttrPayloads[0] := encapContentTypeOidValue;
+  authAttrValues[0].cbData := Length(authAttrPayloads[0]);
+  authAttrValues[0].pbData := @authAttrPayloads[0][0];
+  authAttrsArr[0].pszObjId := PAnsiChar(szOID_RSA_contentType);
+  authAttrsArr[0].cValue := 1;
+  authAttrsArr[0].rgValue := @authAttrValues[0];
+
+  // messageDigest = OCTET STRING(hash-of-content)
+  authAttrPayloads[1] := EncodeOctetString(messageDigest);
+  authAttrValues[1].cbData := Length(authAttrPayloads[1]);
+  authAttrValues[1].pbData := @authAttrPayloads[1][0];
+  authAttrsArr[1].pszObjId := PAnsiChar(szOID_RSA_messageDigest);
+  authAttrsArr[1].cValue := 1;
+  authAttrsArr[1].rgValue := @authAttrValues[1];
+
+  // Caller-supplied attrs (each value wrapped in OCTET STRING, matching the
+  // local-sign path so the verifier sees them identically).
+  for i := 0 to High(signedAttributes) do
+  begin
+    idx := 2 + i;
+    authAttrPayloads[idx] := EncodeOctetString(signedAttributes[i].Value);
+    authAttrValues[idx].cbData := Length(authAttrPayloads[idx]);
+    authAttrValues[idx].pbData := @authAttrPayloads[idx][0];
+    authAttrsArr[idx].pszObjId := PAnsiChar(signedAttributes[i].Oid);
+    authAttrsArr[idx].cValue := 1;
+    authAttrsArr[idx].rgValue := @authAttrValues[idx];
+  end;
+
+  // 3. Encode each attribute on its own, sort byte-wise (DER SET rule),
+  //    concatenate, and wrap in a SET tag. This is what the digest covers.
+  SetLength(encodedAttrs, n);
+  for i := 0 to n - 1 do
+    encodedAttrs[i] := EncodeAttributeRaw(
+      AnsiString(authAttrsArr[i].pszObjId),
+      // value bytes: each rgValue[0] is a CRYPT_INTEGER_BLOB pointing at the
+      // already-DER value payload — wrap-once via PKCS_ATTRIBUTE encoder.
+      // We re-encode here rather than reuse Windows' attribute encoding for
+      // the array form because PKCS_ATTRIBUTE encodes one attr at a time.
+      Copy(authAttrPayloads[i], 0, Length(authAttrPayloads[i])));
+
+  SetLength(attrsSorted, n);
+  for i := 0 to n - 1 do
+    attrsSorted[i] := encodedAttrs[i];
+  SortDerBytes(attrsSorted);
+
+  signedAttrsSetContent := ConcatBytes(attrsSorted);
+  signedAttrsSetDer := DerSet(signedAttrsSetContent);
+
+  // 4. Hash the SET-encoded signed attrs. That hash is what the remote
+  //    signer signs over.
+  attrsHash := FHashing.HashBytes(signedAttrsSetDer, digest);
+
+  // 5. Single remote call — provider.SignDigest returns the raw signature
+  //    value (RSA PKCS#1 v1.5 over the digest, or ECDSA equivalent).
+  signatureBytes := provider.SignDigest(attrsHash, digest);
+  if Length(signatureBytes) = 0 then
+    raise ECryptoCms.Create('SignRemote: provider returned empty signature');
+
+  // 6. Build CMSG_SIGNER_INFO and let Windows encode the SignerInfo
+  //    structure for us (PKCS7_SIGNER_INFO). The encoder takes the same
+  //    CRYPT_ATTRIBUTE array we used for hashing and writes it out as
+  //    [0] IMPLICIT signedAttrs — bit-identical content, different tag.
+  certInfo := cert.GetContext.pCertInfo;
+  FillChar(signerInfo, SizeOf(signerInfo), 0);
+  signerInfo.dwVersion := 1;   // IssuerAndSerial form
+  signerInfo.Issuer := certInfo.Issuer;
+  signerInfo.SerialNumber := certInfo.SerialNumber;
+  signerInfo.HashAlgorithm.pszObjId := PAnsiChar(TAlgorithmProfile.HashOid(digest));
+  // szOID_RSA_RSA (rsaEncryption) is the common signature-algorithm OID for
+  // CMS PKCS#1 v1.5 signatures. ECDSA-keyed providers would use a different
+  // OID here — a follow-up once we have ECDSA test material.
+  signerInfo.HashEncryptionAlgorithm.pszObjId := PAnsiChar(szOID_RSA_RSA);
+  signerInfo.EncryptedHash.cbData := Length(signatureBytes);
+  signerInfo.EncryptedHash.pbData := @signatureBytes[0];
+  signerInfo.AuthAttrs.cAttr := n;
+  signerInfo.AuthAttrs.rgAttr := @authAttrsArr[0];
+  signerInfo.UnauthAttrs.cAttr := 0;
+  signerInfo.UnauthAttrs.rgAttr := nil;
+
+  signerInfoDer := EncodeWith(PKCS7_SIGNER_INFO, @signerInfo, 'CryptEncodeObjectEx(PKCS7_SIGNER_INFO)');
+
+  // 7. Hand-assemble the SignedData SEQUENCE.
+  //
+  //   SignedData ::= SEQUENCE {
+  //       version           INTEGER,                   -- 1
+  //       digestAlgorithms  SET OF AlgorithmIdentifier,
+  //       encapContentInfo  EncapsulatedContentInfo,   -- {id-data} (detached)
+  //       certificates  [0] IMPLICIT CertificateSet,
+  //       signerInfos       SET OF SignerInfo
+  //   }
+  digestAlgDer := EncodeAlgorithmIdentifier(TAlgorithmProfile.HashOid(digest));
+  digestAlgsSetDer := DerSet(digestAlgDer);
+
+  sigAlgDer := EncodeAlgorithmIdentifier(szOID_RSA_RSA);   // not embedded directly; computed for symmetry / future use
+  // sigAlgDer is currently unused at the SignedData level — the algorithm
+  // identifier travels with the SignerInfo. Suppress "unused" via reference:
+  if Length(sigAlgDer) = 0 then ; // intentionally noop
+
+  // EncapsulatedContentInfo for a *detached* signature: SEQUENCE { id-data }
+  // (no [0] EXPLICIT eContent OCTET STRING).
+  encapContentInfoDer := DerSequence(EncodeOidValue(szOID_RSA_data));
+
+  // certificates [0] IMPLICIT — exactly one cert in our bag.
+  certDer := cert.RawDerBytes;
+  certificatesField := DerContext0Implicit(certDer);
+
+  signerInfosSetDer := DerSet(signerInfoDer);
+
+  signedDataInner := DerSequence(ConcatBytes([
+    DerInteger(1),               // version
+    digestAlgsSetDer,
+    encapContentInfoDer,
+    certificatesField,
+    signerInfosSetDer
+  ]));
+
+  // 8. Wrap in ContentInfo via Windows' helper. CryptEncodeObjectEx wraps
+  //    in: SEQUENCE { contentType, [0] EXPLICIT content }.
+  contentInfo.pszObjId := PAnsiChar(szOID_RSA_signedData);
+  contentBlob.cbData := Length(signedDataInner);
+  contentBlob.pbData := @signedDataInner[0];
+  contentInfo.Content := contentBlob;
+
+  result := EncodeWith(PKCS_CONTENT_INFO, @contentInfo,
+    'CryptEncodeObjectEx(PKCS_CONTENT_INFO)');
 end;
 
 function TCmsService.Sign(const content : TBytes;
@@ -187,22 +621,19 @@ var
   signedSize : DWORD;
 begin
   if not TAlgorithmProfile.CmsDigestAllowed(digest) then
-    raise ECryptoCms.CreateFmt('Digest %s not permitted',
-      [TAlgorithmProfile.HashAlgorithmName(digest)]);
+    raise ECryptoCms.CreateFmt('Digest %s not permitted', [TAlgorithmProfile.HashAlgorithmName(digest)]);
   if provider = nil then
     raise ECryptoCms.Create('Sign: provider is nil');
   if provider.Certificate = nil then
     raise ECryptoCms.Create('Sign: provider has no certificate');
-  // P3 §3.3 — remote providers don't expose a Win32 key handle, so
-  // CryptSignMessage can't sign on their behalf. The CMS-assembly path for
-  // remote SignDigest is the Phase 3.3 follow-up; for now, give the user
-  // a clear actionable error rather than a cryptic CryptSignMessage failure.
+  // P3 §3.3 v2 — remote providers don't expose a Win32 key handle, so
+  // CryptSignMessage can't sign on their behalf. Branch into the manual
+  // CMS-assembly path that does the single remote SignDigest call.
   if not provider.IsLocal then
-    raise ECryptoCms.Create(
-      'Sign: remote signing providers (Key Vault / Signotaur) are not yet ' +
-      'wired into the CMS assembly path. Auth + cert download work end-to-end; ' +
-      'the manual CMS assembly that consumes provider.SignDigest is tracked as ' +
-      'a Phase 3.3 follow-up.');
+  begin
+    result := SignRemote(content, provider, signedAttributes, digest);
+    exit;
+  end;
 
   // Pre-encode every signed attribute as an OCTET STRING so the OS will
   // accept them. Build the CRYPT_ATTRIBUTE table on top.

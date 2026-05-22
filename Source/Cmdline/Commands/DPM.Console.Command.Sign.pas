@@ -112,9 +112,19 @@ begin
     spSignotaur :
       begin
         signotaurOpts.Endpoint := options.SignotaurEndpoint;
-        signotaurOpts.CertId := options.CertName;
-        if options.SignotaurApiTokenEnv <> '' then
-          signotaurOpts.ApiToken := GetEnvironmentVariable(options.SignotaurApiTokenEnv);
+        signotaurOpts.ApiKey := GetEnvironmentVariable(options.SignotaurApiKeyEnv);
+        if signotaurOpts.ApiKey = '' then
+        begin
+          Logger.Error('Environment variable ' + options.SignotaurApiKeyEnv + ' is not set or empty.');
+          exit;
+        end;
+        signotaurOpts.Thumbprint := options.Thumbprint;
+        signotaurOpts.Subject := options.SignotaurSubject;
+        signotaurOpts.Label_ := options.SignotaurLabel;
+        // Audit metadata: surface the file being signed so server logs are useful.
+        signotaurOpts.FileName := ExtractFileName(options.PackageFile);
+        if FileExists(options.PackageFile) then
+          signotaurOpts.FileSizeBytes := TFile.GetSize(options.PackageFile);
         result := TSignotaurSigningProvider.Create(Logger, FX509, signotaurOpts);
       end;
   else

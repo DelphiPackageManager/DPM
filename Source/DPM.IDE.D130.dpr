@@ -176,6 +176,7 @@ uses
   DPM.IDE.PathManager in 'IDE\DPM.IDE.PathManager.pas',
   DPM.Core.Utils.Hash in 'Core\Utils\DPM.Core.Utils.Hash.pas',
   DPM.Core.Utils.DateTime in 'Core\Utils\DPM.Core.Utils.DateTime.pas',
+  DPM.Core.Utils.Base64Url in 'Core\Utils\DPM.Core.Utils.Base64Url.pas',
   DPM.Core.Spec.DesignEntry in 'Core\Spec\DPM.Core.Spec.DesignEntry.pas',
   DPM.Core.Spec.SourceEntry in 'Core\Spec\DPM.Core.Spec.SourceEntry.pas',
   DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas',

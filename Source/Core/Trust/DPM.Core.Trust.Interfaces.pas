@@ -75,6 +75,15 @@ type
     function Version : integer;
     function DefaultValidationMode : TValidationMode;
     function RepositorySpkis : TArray<TTrustedRepository>;
+    /// <summary>
+    /// P3 §3.4 emergency revocation channel. A repository SPKI present here
+    /// is treated as untrusted regardless of any other configuration (the
+    /// per-user dpm.config.yaml trustedRepositories list, or its inclusion
+    /// in the trust set's own RepositorySpkis). Checked on every verify
+    /// to ensure a compromised gallery key can be cut off as soon as the
+    /// updated trust set lands.
+    /// </summary>
+    function RevokedRepositorySpkis : TArray<string>;
   end;
 
   ITrustPolicyService = interface

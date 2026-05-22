@@ -27,6 +27,11 @@ type
     [Test] procedure LoadsMultipleRepositorySpkiEntries;
     [Test] procedure MalformedYaml_Tolerated_FallsBackToDefaults;
     [Test] procedure NonMappingRoot_Tolerated;
+
+    // P3 §3.4 — revoked-repository channel
+    [Test] procedure RevokedRepositorySpkis_Default_IsEmpty;
+    [Test] procedure RevokedRepositorySpkis_LoadedFromYaml;
+    [Test] procedure RevokedRepositorySpkis_Tolerates_MissingSequence;
   end;
 
 implementation
@@ -161,6 +166,47 @@ begin
   ts := TBuiltInTrustSet.Create(cYaml);
   Assert.AreEqual(0, ts.Version);
   Assert.AreEqual(0, Length(ts.RepositorySpkis));
+end;
+
+procedure TBuiltInTrustSetTests.RevokedRepositorySpkis_Default_IsEmpty;
+var
+  ts : ITrustSet;
+begin
+  ts := TBuiltInTrustSet.Create('');
+  Assert.AreEqual(0, Length(ts.RevokedRepositorySpkis));
+end;
+
+procedure TBuiltInTrustSetTests.RevokedRepositorySpkis_LoadedFromYaml;
+const
+  cYaml =
+    'dpmTrustSetVersion: 7'#10 +
+    'revokedRepositorySpki:'#10 +
+    '  - sha256:abcd1234'#10 +
+    '  - sha256:cafebabe'#10;
+var
+  ts : ITrustSet;
+  revoked : TArray<string>;
+begin
+  ts := TBuiltInTrustSet.Create(cYaml);
+  revoked := ts.RevokedRepositorySpkis;
+  Assert.AreEqual(2, Length(revoked));
+  Assert.AreEqual('sha256:abcd1234', revoked[0]);
+  Assert.AreEqual('sha256:cafebabe', revoked[1]);
+end;
+
+procedure TBuiltInTrustSetTests.RevokedRepositorySpkis_Tolerates_MissingSequence;
+const
+  cYaml =
+    'dpmTrustSetVersion: 1'#10 +
+    'repositorySpki:'#10 +
+    '  - name: Only'#10 +
+    '    spki: sha256:aa'#10;
+var
+  ts : ITrustSet;
+begin
+  // No revokedRepositorySpki key at all — must yield an empty array, not raise.
+  ts := TBuiltInTrustSet.Create(cYaml);
+  Assert.AreEqual(0, Length(ts.RevokedRepositorySpkis));
 end;
 
 initialization
