@@ -229,6 +229,41 @@ type
     dwInfoStatus  : DWORD;
   end;
 
+  // Stub for PCCRL_CONTEXT — we don't dereference it; we just need a typed
+  // pointer to match the SDK layout.
+  PCCRL_CONTEXT = Pointer;
+
+  // CRL_ENTRY (RFC 5280 §5.1) — describes one revoked certificate. RevocationDate
+  // tells us when it was revoked; rgExtension may carry the reason code under
+  // OID 2.5.29.21 (id-ce-cRLReasons).
+  PCRL_ENTRY = ^CRL_ENTRY;
+  CRL_ENTRY = record
+    SerialNumber    : CRYPT_INTEGER_BLOB;
+    RevocationDate  : TFileTime;
+    cExtension      : DWORD;
+    rgExtension     : PCERT_EXTENSION;
+  end;
+
+  PCERT_REVOCATION_CRL_INFO = ^CERT_REVOCATION_CRL_INFO;
+  CERT_REVOCATION_CRL_INFO = record
+    cbSize             : DWORD;
+    pBaseCrlContext    : PCCRL_CONTEXT;
+    pDeltaCrlContext   : PCCRL_CONTEXT;
+    pCrlEntry          : PCRL_ENTRY;
+    fDeltaCrlEntry     : BOOL;
+  end;
+
+  PCERT_REVOCATION_INFO = ^CERT_REVOCATION_INFO;
+  CERT_REVOCATION_INFO = record
+    cbSize              : DWORD;
+    dwRevocationResult  : DWORD;       // HRESULT from the revocation provider
+    pszRevocationOid    : PAnsiChar;
+    pvOidSpecificInfo   : Pointer;
+    fHasFreshnessTime   : BOOL;
+    dwFreshnessTime     : DWORD;
+    pCrlInfo            : PCERT_REVOCATION_CRL_INFO;
+  end;
+
   // The full CERT_CHAIN_ELEMENT / CERT_SIMPLE_CHAIN / CERT_CHAIN_CONTEXT
   // shapes are large; we only need to read trust status and walk the chain
   // to its root, so the partial declarations below match the layout MSDN
@@ -239,7 +274,7 @@ type
     cbSize             : DWORD;
     pCertContext       : PCCERT_CONTEXT;
     TrustStatus        : CERT_TRUST_STATUS;
-    pRevocationInfo    : Pointer;
+    pRevocationInfo    : PCERT_REVOCATION_INFO;
     pIssuanceUsage     : Pointer;
     pApplicationUsage  : Pointer;
     pwszExtendedErrorInfo : PWideChar;
@@ -324,6 +359,24 @@ const
   szOID_RSA_data             : AnsiString = '1.2.840.113549.1.7.1';
   szOID_RSA_signedData       : AnsiString = '1.2.840.113549.1.7.2';
   szOID_RFC3161_counterSign  : AnsiString = '1.3.6.1.4.1.311.3.3.1';
+  // RFC 5280 §5.3.1 — CRL entry extension carrying the revocation reason.
+  szOID_CRL_REASON_CODE      : AnsiString = '2.5.29.21';
+
+  // CRL reason code values (RFC 5280 §5.3.1). The X509_CRL_REASON_CODE
+  // decoder returns a single DWORD whose low byte is the enumerated value.
+  CRL_REASON_UNSPECIFIED              = 0;
+  CRL_REASON_KEY_COMPROMISE           = 1;
+  CRL_REASON_CA_COMPROMISE            = 2;
+  CRL_REASON_AFFILIATION_CHANGED      = 3;
+  CRL_REASON_SUPERSEDED               = 4;
+  CRL_REASON_CESSATION_OF_OPERATION   = 5;
+  CRL_REASON_CERTIFICATE_HOLD         = 6;
+  CRL_REASON_REMOVE_FROM_CRL          = 8;
+  CRL_REASON_PRIVILEGE_WITHDRAWN      = 9;
+  CRL_REASON_AA_COMPROMISE            = 10;
+
+  // CryptDecodeObjectEx struct type for the CRL reason enum.
+  X509_CRL_REASON_CODE       : PAnsiChar = PAnsiChar(76);
 
   // Chain policy identifiers (passed as LPCSTR via @-cast).
   CERT_CHAIN_POLICY_BASE              = PAnsiChar(1);

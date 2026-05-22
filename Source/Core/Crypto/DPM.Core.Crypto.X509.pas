@@ -115,14 +115,23 @@ type
     FAdditionalStore : HCERTSTORE;
     FLastError : string;
     FHashingService : IHashingService;
+    FRevocationStatus : TRevocationStatus;
+    FRevocationReason : TRevocationReason;
     procedure CloseHandles;
+    procedure CaptureLeafRevocationDetail;
   protected
     function Build(const cert : ICertificate;
                    const additionalCerts : array of ICertificate) : TChainResult;
+    function BuildAtTime(const cert : ICertificate;
+                         const additionalCerts : array of ICertificate;
+                         asOfTime : TDateTime;
+                         checkRevocation : boolean) : TChainResult;
     function VerifyForCodeSigning(asOfTime : TDateTime) : TChainResult;
     function ChainCertificates : TArray<ICertificate>;
     function RootCertificate : ICertificate;
     function LastErrorMessage : string;
+    function RevocationStatus : TRevocationStatus;
+    function RevocationReason : TRevocationReason;
   public
     constructor Create(const hashingService : IHashingService);
     destructor Destroy; override;
@@ -522,15 +531,130 @@ end;
 
 function TCertificateChain.Build(const cert : ICertificate;
                                  const additionalCerts : array of ICertificate) : TChainResult;
+begin
+  // Legacy: no time, no revocation. Phase 1 / Phase 2 behaviour preserved.
+  result := BuildAtTime(cert, additionalCerts, 0, false);
+end;
+
+function TCertificateChain.RevocationStatus : TRevocationStatus;
+begin
+  result := FRevocationStatus;
+end;
+
+function TCertificateChain.RevocationReason : TRevocationReason;
+begin
+  result := FRevocationReason;
+end;
+
+procedure TCertificateChain.CaptureLeafRevocationDetail;
+var
+  simple : PCERT_SIMPLE_CHAIN;
+  leafElement : PCERT_CHAIN_ELEMENT;
+  revInfo : PCERT_REVOCATION_INFO;
+  crlInfo : PCERT_REVOCATION_CRL_INFO;
+  entry : PCRL_ENTRY;
+  ext : PCERT_EXTENSION;
+  i : integer;
+  decoded : Pointer;
+  decodedSize : DWORD;
+  reasonCode : Word;
+begin
+  FRevocationReason := rrNotApplicable;
+  if FChain = nil then
+    exit;
+  if FRevocationStatus <> rsRevoked then
+    exit;   // nothing to surface unless we have a revocation hit
+
+  if FChain.cChain = 0 then
+    exit;
+  simple := PPCERT_SIMPLE_CHAIN(FChain.rgpChain)^;
+  if (simple = nil) or (simple.cElement = 0) then
+    exit;
+  leafElement := PPCERT_CHAIN_ELEMENT(simple.rgpElement)^;
+  if leafElement = nil then
+    exit;
+
+  revInfo := leafElement.pRevocationInfo;
+  if (revInfo = nil) or (revInfo.pCrlInfo = nil) then
+  begin
+    // Revocation came back as revoked but we have no CRL detail to inspect —
+    // e.g. revoked via an OCSP responder that didn't expose the reason.
+    FRevocationReason := rrUnknown;
+    exit;
+  end;
+  crlInfo := revInfo.pCrlInfo;
+  entry := crlInfo.pCrlEntry;
+  if entry = nil then
+  begin
+    FRevocationReason := rrUnknown;
+    exit;
+  end;
+
+  // Walk the CRL entry extensions for 2.5.29.21 (id-ce-cRLReasons).
+  ext := entry.rgExtension;
+  for i := 0 to Integer(entry.cExtension) - 1 do
+  begin
+    if (ext.pszObjId <> nil) and (AnsiString(ext.pszObjId) = szOID_CRL_REASON_CODE) then
+    begin
+      decoded := nil;
+      decodedSize := 0;
+      if CryptDecodeObjectEx(cCRYPT_ASN_ENCODING, X509_CRL_REASON_CODE,
+          ext.Value.pbData, ext.Value.cbData,
+          CRYPT_DECODE_ALLOC_FLAG, nil, @decoded, decodedSize) then
+      begin
+        try
+          // The decoded value is a single byte-sized enum.
+          if (decoded <> nil) and (decodedSize >= 1) then
+          begin
+            reasonCode := PWord(decoded)^ and $FF;
+            case reasonCode of
+              CRL_REASON_UNSPECIFIED            : FRevocationReason := rrUnspecified;
+              CRL_REASON_KEY_COMPROMISE         : FRevocationReason := rrKeyCompromise;
+              CRL_REASON_CA_COMPROMISE          : FRevocationReason := rrCACompromise;
+              CRL_REASON_AFFILIATION_CHANGED    : FRevocationReason := rrAffiliationChanged;
+              CRL_REASON_SUPERSEDED             : FRevocationReason := rrSuperseded;
+              CRL_REASON_CESSATION_OF_OPERATION : FRevocationReason := rrCessationOfOperation;
+              CRL_REASON_CERTIFICATE_HOLD       : FRevocationReason := rrCertificateHold;
+              CRL_REASON_REMOVE_FROM_CRL        : FRevocationReason := rrRemoveFromCRL;
+              CRL_REASON_PRIVILEGE_WITHDRAWN    : FRevocationReason := rrPrivilegeWithdrawn;
+              CRL_REASON_AA_COMPROMISE          : FRevocationReason := rrAACompromise;
+            else
+              FRevocationReason := rrUnknown;
+            end;
+          end;
+        finally
+          LocalFree(HLOCAL(decoded));
+        end;
+      end;
+      exit;
+    end;
+    Inc(ext);
+  end;
+
+  // No reason extension on the CRL entry. RFC 5280 treats this as
+  // "unspecified" rather than "unknown" — the cert is revoked, just without
+  // a stated reason.
+  FRevocationReason := rrUnspecified;
+end;
+
+function TCertificateChain.BuildAtTime(const cert : ICertificate;
+                                       const additionalCerts : array of ICertificate;
+                                       asOfTime : TDateTime;
+                                       checkRevocation : boolean) : TChainResult;
 var
   para : CERT_CHAIN_PARA;
   usage : array[0..0] of PAnsiChar;
   i : integer;
+  filetime : TFileTime;
+  pTimeArg : PFileTime;
+  flags : DWORD;
 begin
   CloseHandles;
+  FRevocationStatus := rsNotChecked;
+  FRevocationReason := rrNotApplicable;
 
   if cert = nil then
-    raise ECryptoX509.Create('Build: cert is nil');
+    raise ECryptoX509.Create('BuildAtTime: cert is nil');
   FLeaf := cert;
 
   // Build an in-memory store holding any additional certs (intermediates
@@ -556,13 +680,47 @@ begin
   usage[0] := PAnsiChar(szOID_PKIX_KP_CODE_SIGNING);
   para.RequestedUsage.Usage.rgpszUsageIdentifier := @usage[0];
 
-  if not CertGetCertificateChain(nil, cert.GetContext, nil, FAdditionalStore,
-    @para, 0, nil, FChain) then
+  // V-26: when asOfTime is set, evaluate the chain *as of* the signing
+  // timestamp. A revocation that post-dates asOfTime does not fail the
+  // chain — the signature was valid when it was made.
+  if asOfTime > 0 then
+  begin
+    filetime := UtcDateTimeToFileTime(asOfTime);
+    pTimeArg := @filetime;
+  end
+  else
+    pTimeArg := nil;
+
+  flags := 0;
+  if checkRevocation then
+    // Exclude the root because trusted roots aren't on CRLs and we don't want
+    // a missing root-CRL to mask the leaf/intermediate result.
+    flags := flags or CERT_CHAIN_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT;
+
+  if not CertGetCertificateChain(nil, cert.GetContext, pTimeArg, FAdditionalStore,
+    @para, flags, nil, FChain) then
   begin
     FLastError := SysErrorMessage(GetLastError);
     FChain := nil;
     result := crUnknownError;
     exit;
+  end;
+
+  // V-26 — translate the chain's revocation-related bits into our enum,
+  // distinct from the overall TChainResult so we can record "checked, good"
+  // vs "checked, unreachable" on the receipt.
+  if checkRevocation then
+  begin
+    if (FChain.TrustStatus.dwErrorStatus and CERT_TRUST_IS_REVOKED) <> 0 then
+      FRevocationStatus := rsRevoked
+    else if (FChain.TrustStatus.dwErrorStatus and CERT_TRUST_REVOCATION_STATUS_UNKNOWN) <> 0 then
+      FRevocationStatus := rsUnknown
+    else
+      FRevocationStatus := rsGood;
+    // V-26 — when revoked, dig into the leaf chain element's pRevocationInfo
+    // to pull out the CRL reason code so the verifier can distinguish
+    // keyCompromise (retroactively invalidating) from administrative reasons.
+    CaptureLeafRevocationDetail;
   end;
 
   // Map the trust status onto our enum.
@@ -576,6 +734,10 @@ begin
     result := crUntrustedRoot
   else if (FChain.TrustStatus.dwErrorStatus and CERT_TRUST_IS_NOT_VALID_FOR_USAGE) <> 0 then
     result := crWrongUsage
+  else if (FChain.TrustStatus.dwErrorStatus = CERT_TRUST_REVOCATION_STATUS_UNKNOWN) then
+    // A CRL/OCSP outage by itself shouldn't fail the chain — surface as valid
+    // with rsUnknown so policy can decide what to do.
+    result := crValid
   else
     result := crUnknownError;
 end;

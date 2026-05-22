@@ -19,6 +19,8 @@ type
     [Test] procedure Write_IsAtomic_RemovesTempOnSuccess;
     [Test] procedure Write_Overwrites_ExistingReceipt;
     [Test] procedure Receipt_With_NoSignatures_RoundTrips;
+    [Test] procedure Receipt_With_RepositoryAttestation_RoundTrips;
+    [Test] procedure Receipt_Without_Attestation_OmitsFields;
   end;
 
 implementation
@@ -227,6 +229,101 @@ begin
     Assert.IsTrue(svc.TryRead(folder, loaded));
     Assert.AreEqual(0, Length(loaded.Signatures));
     Assert.AreEqual('unsigned', loaded.TrustDecision);
+  finally
+    TDirectory.Delete(folder, true);
+  end;
+end;
+
+procedure TReceiptServiceTests.Receipt_With_RepositoryAttestation_RoundTrips;
+var
+  svc : IReceiptService;
+  folder : string;
+  r, loaded : TVerificationReceipt;
+  sig : TReceiptSignature;
+begin
+  svc := TYamlReceiptService.Create;
+  folder := TempCacheFolder;
+  try
+    r.ReceiptVersion := cCurrentReceiptVersion;
+    r.PackageId := 'VSoft.WithAttest';
+    r.Version := '1.0.0';
+    r.Compiler := 'DelphiXE2';
+    r.ManifestHashAlgorithm := haSha256;
+    r.ManifestHashHex := 'beef';
+    r.TrustDecision := 'trusted';
+    r.TrustPolicyFingerprint := 'sha256:00';
+    r.VerifiedAt := EncodeDateTime(2026, 5, 22, 10, 0, 0, 0);
+    r.DpmVersion := '0.6.0';
+
+    sig.Role := 'repository';
+    sig.SignerSpkiHex := 'cafe1234';
+    sig.SignerSubject := 'CN=DPM Gallery';
+    sig.Thumbprint := 'DEADBEEF';
+    sig.EffectiveSigningTime := EncodeDateTime(2026, 5, 22, 9, 0, 0, 0);
+    sig.TimestampAuthority := 'DigiCert';
+    sig.RevocationStatus := 'notChecked';
+    sig.AttestationNamespace := 'VSoft.*';
+    sig.AttestationAuthorSpkiHex := 'aabbcc';
+    sig.AttestationUnsignedReason := '';
+    SetLength(r.Signatures, 1);
+    r.Signatures[0] := sig;
+
+    svc.Write(folder, r);
+    Assert.IsTrue(svc.TryRead(folder, loaded));
+    Assert.AreEqual(1, Length(loaded.Signatures));
+    Assert.AreEqual('VSoft.*', loaded.Signatures[0].AttestationNamespace);
+    Assert.AreEqual('aabbcc', loaded.Signatures[0].AttestationAuthorSpkiHex);
+    Assert.AreEqual('', loaded.Signatures[0].AttestationUnsignedReason);
+  finally
+    TDirectory.Delete(folder, true);
+  end;
+end;
+
+procedure TReceiptServiceTests.Receipt_Without_Attestation_OmitsFields;
+var
+  svc : IReceiptService;
+  folder : string;
+  r, loaded : TVerificationReceipt;
+  sig : TReceiptSignature;
+  yamlText : string;
+begin
+  svc := TYamlReceiptService.Create;
+  folder := TempCacheFolder;
+  try
+    r.ReceiptVersion := cCurrentReceiptVersion;
+    r.PackageId := 'VSoft.NoAttest';
+    r.Version := '1.0.0';
+    r.Compiler := 'DelphiXE2';
+    r.ManifestHashAlgorithm := haSha256;
+    r.ManifestHashHex := 'beef';
+    r.TrustDecision := 'trusted';
+    r.TrustPolicyFingerprint := 'sha256:00';
+    r.VerifiedAt := EncodeDateTime(2026, 5, 22, 10, 0, 0, 0);
+    r.DpmVersion := '0.6.0';
+
+    sig.Role := 'author';
+    sig.SignerSpkiHex := 'aabb';
+    sig.SignerSubject := 'CN=Test';
+    sig.Thumbprint := 'CAFE';
+    sig.EffectiveSigningTime := EncodeDateTime(2026, 5, 22, 9, 0, 0, 0);
+    sig.TimestampAuthority := 'DigiCert';
+    sig.RevocationStatus := 'notChecked';
+    sig.AttestationNamespace := '';
+    sig.AttestationAuthorSpkiHex := '';
+    sig.AttestationUnsignedReason := '';
+    SetLength(r.Signatures, 1);
+    r.Signatures[0] := sig;
+
+    svc.Write(folder, r);
+    // Confirm the file genuinely doesn't carry stale attestation keys when
+    // none were set — keeps receipts clean and avoids reader ambiguity.
+    yamlText := TFile.ReadAllText(svc.ReceiptPath(folder));
+    Assert.IsTrue(Pos('attestation', yamlText) = 0,
+      'attestation block should be omitted when no attestation is present');
+
+    Assert.IsTrue(svc.TryRead(folder, loaded));
+    Assert.AreEqual('', loaded.Signatures[0].AttestationNamespace);
+    Assert.AreEqual('', loaded.Signatures[0].AttestationAuthorSpkiHex);
   finally
     TDirectory.Delete(folder, true);
   end;

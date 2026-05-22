@@ -40,6 +40,7 @@ uses
   DPM.Core.Spec.Interfaces,
   DPM.Core.Trust.Interfaces,
   DPM.Core.Trust.Prompt,
+  DPM.Core.Crypto.X509.Interfaces,
   DPM.Core.Package.Cache.Receipt,
   DPM.Core.Package.Signing.Interfaces;
 
@@ -344,7 +345,27 @@ begin
     receipt.Signatures[i].Thumbprint := verifyResult.Signatures[i].Thumbprint;
     receipt.Signatures[i].EffectiveSigningTime := verifyResult.Signatures[i].EffectiveSigningTime;
     receipt.Signatures[i].TimestampAuthority := verifyResult.Signatures[i].TimestampAuthority;
-    receipt.Signatures[i].RevocationStatus := 'notChecked';   // Phase 3
+    // V-26 revocation outcome captured during chain build at signing time.
+    case verifyResult.Signatures[i].Revocation of
+      rsGood       : receipt.Signatures[i].RevocationStatus := 'good';
+      rsRevoked    : receipt.Signatures[i].RevocationStatus := 'revoked';
+      rsUnknown    : receipt.Signatures[i].RevocationStatus := 'unknown';
+    else
+      receipt.Signatures[i].RevocationStatus := 'notChecked';
+    end;
+    // P2 §2.2 — attestation block is only set when present on this signature
+    // (the verifier only populates it for trusted-repo sigs).
+    if verifyResult.Signatures[i].Attestation.Present then
+    begin
+      receipt.Signatures[i].AttestationNamespace := verifyResult.Signatures[i].Attestation.Namespace;
+      receipt.Signatures[i].AttestationAuthorSpkiHex := verifyResult.Signatures[i].Attestation.AuthorSpkiHex;
+      case verifyResult.Signatures[i].Attestation.UnsignedReason of
+        urAttestNeverSigned          : receipt.Signatures[i].AttestationUnsignedReason := 'neverSigned';
+        urAttestAuthorCeasedSigning  : receipt.Signatures[i].AttestationUnsignedReason := 'authorCeasedSigning';
+      else
+        receipt.Signatures[i].AttestationUnsignedReason := '';
+      end;
+    end;
   end;
 
   try

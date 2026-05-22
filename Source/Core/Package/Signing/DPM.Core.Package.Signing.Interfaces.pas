@@ -32,6 +32,7 @@ uses
   System.SysUtils,
   DPM.Core.Crypto.Algorithms,
   DPM.Core.Crypto.Provider.Interfaces,
+  DPM.Core.Crypto.X509.Interfaces,
   DPM.Core.Trust.Interfaces;
 
 type
@@ -67,6 +68,11 @@ type
     Valid              : boolean;       // CMS verified + chain ok + timestamp ok
     FailureReason      : string;
     Attestation        : TRepositoryAttestation;   // P2: repository attestation
+    Revocation         : TRevocationStatus;        // P3: revocation outcome at signing time
+    // P3 §3.1 follow-up — *current* revocation reason from a second chain
+    // build without pTime. When = rrKeyCompromise, the signature is treated
+    // as retroactively invalid unless TTrustPolicy.AllowKeyCompromiseOverride.
+    CurrentRevocationReason : TRevocationReason;
   end;
 
   TVerificationOutcome = (
@@ -105,6 +111,10 @@ type
                              var reason : string); static;
   end;
 
+  TVerifyFlags = record
+    Offline : boolean;   // P3 §3.2 — skip CRL/OCSP network calls
+  end;
+
   IPackageSigningService = interface
     ['{1A4E5AE5-5F76-491F-AA64-2C0A6F2D7B62}']
 
@@ -121,7 +131,14 @@ type
     /// gate inside TPackageCache.InstallPackageFromFile.
     /// </summary>
     function VerifyPackage(const packageFilePath : string;
-                           const policy : TTrustPolicy) : TVerificationResult;
+                           const policy : TTrustPolicy) : TVerificationResult; overload;
+    /// <summary>
+    /// P3 §3.2 — variant that takes runtime flags (offline mode etc.) so the
+    /// CLI `dpm verify --offline` can skip CRL/OCSP fetches.
+    /// </summary>
+    function VerifyPackage(const packageFilePath : string;
+                           const policy : TTrustPolicy;
+                           const flags : TVerifyFlags) : TVerificationResult; overload;
 
     /// <summary>
     /// Quick re-check on a cache hit. Re-hashes only the manifest and

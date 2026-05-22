@@ -72,6 +72,11 @@ type
     FArchive : IArchiveValidator;
     FReceipt : IReceiptService;
     FTrustPolicy : ITrustPolicyService;
+    // P3 §3.2 — current-call runtime flags. Set by the overloaded entry
+    // point before delegating to the shared VerifyPackage path so the
+    // inner VerifyOneSignature can read e.g. Offline without changing every
+    // intermediate signature.
+    FActiveFlags : TVerifyFlags;
     function ReadManifestBytes(const archivePath : string; out bytes : TBytes) : boolean;
     function ReadSignatureBlobs(const archivePath : string;
                                 out blobs : TList<TPair<string, TBytes>>) : boolean;
@@ -99,7 +104,10 @@ type
                           const provider : ISigningProvider;
                           const options : ISignOptions);
     function VerifyPackage(const packageFilePath : string;
-                           const policy : TTrustPolicy) : TVerificationResult;
+                           const policy : TTrustPolicy) : TVerificationResult; overload;
+    function VerifyPackage(const packageFilePath : string;
+                           const policy : TTrustPolicy;
+                           const flags : TVerifyFlags) : TVerificationResult; overload;
     function QuickRecheck(const cacheFolder : string;
                           const policy : TTrustPolicy) : boolean;
   public
@@ -554,7 +562,16 @@ begin
   end;
 
   chain := FX509.CreateChain;
-  chainResult := chain.Build(signerCert, intermediates);
+  // V-26: build the chain *as of* the RFC3161 signing time, with online
+  // revocation checks enabled. A revocation that post-dates the signing
+  // timestamp does NOT invalidate the signature (the cert was good when the
+  // signature was made). A revocation effective at signing time still fails.
+  // P3 §3.2 — when the caller passed --offline, ask the chain engine to
+  // skip CRL/OCSP fetches. The engine still uses its on-disk cache, so a
+  // recently fetched response is consulted. Unreachable becomes rsUnknown
+  // rather than failing the verify.
+  chainResult := chain.BuildAtTime(signerCert, intermediates,
+    info.EffectiveSigningTime, not FActiveFlags.Offline);
   if chainResult <> crValid then
   begin
     info.FailureReason := Format('chain build: %s', [chain.LastErrorMessage]);
@@ -568,6 +585,24 @@ begin
   end;
 
   info.ChainTrusted := true;
+  info.Revocation := chain.RevocationStatus;
+
+  // V-26 follow-up — second chain build at "now" (no pTime) to detect a
+  // post-signing keyCompromise revocation. The timestamp-aware build above
+  // uses the CRL valid at signing time, which won't carry a revocation
+  // published later. Without this second pass we'd miss keyCompromise
+  // disclosures that arrive after the package shipped.
+  //
+  // Skip in offline mode — we'd just get the same (possibly stale) cached
+  // CRL as the first pass.
+  info.CurrentRevocationReason := rrNotApplicable;
+  if not FActiveFlags.Offline then
+  begin
+    chain := FX509.CreateChain;
+    if chain.BuildAtTime(signerCert, intermediates, 0, True) = crRevoked then
+      info.CurrentRevocationReason := chain.RevocationReason;
+  end;
+
   info.Valid := true;
   result := true;
 end;
@@ -653,6 +688,19 @@ procedure TPackageSigningService.EvaluateRequirements(const policy : TTrustPolic
 begin
   TTrustModeEvaluator.Evaluate(policy, hasAnySignature, hasValidAuthor,
                                hasValidTrustedRepo, outcome, reason);
+end;
+
+function TPackageSigningService.VerifyPackage(const packageFilePath : string;
+                                              const policy : TTrustPolicy;
+                                              const flags : TVerifyFlags) : TVerificationResult;
+begin
+  FActiveFlags := flags;
+  try
+    result := VerifyPackage(packageFilePath, policy);
+  finally
+    // Reset so a subsequent VerifyPackage() call without flags isn't sticky.
+    FActiveFlags.Offline := false;
+  end;
 end;
 
 function TPackageSigningService.VerifyPackage(const packageFilePath : string;
@@ -749,6 +797,18 @@ begin
         // entirely — never read, never displayed.
         if sigInfo.Valid and sigInfo.RepositoryTrusted then
           ReadRepositoryAttestation(blobs[i].Value, sigInfo);
+      end;
+
+      // V-26 follow-up — retroactive invalidation on keyCompromise. The
+      // second-pass build inside VerifyOneSignature surfaces the current
+      // CRL reason; if it's keyCompromise we treat the signature as invalid
+      // unless the administrator has explicitly accepted the residual risk.
+      if sigInfo.Valid and (sigInfo.CurrentRevocationReason = rrKeyCompromise)
+         and not policy.AllowKeyCompromiseOverride then
+      begin
+        sigInfo.Valid := false;
+        sigInfo.FailureReason :=
+          'certificate revoked for keyCompromise — signature retroactively invalid';
       end;
 
       result.Signatures[i] := sigInfo;

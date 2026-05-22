@@ -812,6 +812,14 @@ begin
       TVerifyOptions.Default.Offline := value;
     end);
   option.HasValue := false;
+
+  option := cmd.RegisterOption<boolean>('json-output', '',
+    'Emit verification result as a single JSON object. Suppresses banner / human output.',
+    procedure(const value : boolean)
+    begin
+      TVerifyOptions.Default.JsonOutput := value;
+    end);
+  option.HasValue := false;
 end;
 
 procedure RegisterTrustCommand;

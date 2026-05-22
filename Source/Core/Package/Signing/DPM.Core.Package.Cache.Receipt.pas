@@ -49,6 +49,11 @@ type
     EffectiveSigningTime : TDateTime;
     TimestampAuthority  : string;
     RevocationStatus    : string;       // 'notChecked' | 'good' | 'revoked' | 'unknown'
+    // P2 §2.2 — only populated for repository signatures from trusted repos.
+    // AttestationNamespace empty = no attestation read.
+    AttestationNamespace : string;
+    AttestationAuthorSpkiHex : string;
+    AttestationUnsignedReason : string; // '' | 'neverSigned' | 'authorCeasedSigning'
   end;
 
   TVerificationReceipt = record
@@ -164,6 +169,20 @@ begin
         sb.Append('  effectiveSigningTime: '); sb.AppendLine(YamlSQ(IsoUtc(sig.EffectiveSigningTime)));
         sb.Append('  timestampAuthority: '); sb.AppendLine(YamlSQ(sig.TimestampAuthority));
         sb.Append('  revocationStatus: '); sb.AppendLine(YamlSQ(sig.RevocationStatus));
+        // P2 §2.2 — attestation block is omitted entirely when not present
+        // (i.e. for author signatures or untrusted-repo signatures).
+        if sig.AttestationNamespace <> '' then
+          begin
+            sb.Append('  attestationNamespace: '); sb.AppendLine(YamlSQ(sig.AttestationNamespace));
+          end;
+        if sig.AttestationAuthorSpkiHex <> '' then
+          begin
+            sb.Append('  attestationAuthorSpki: '); sb.AppendLine(YamlSQ(sig.AttestationAuthorSpkiHex));
+          end;
+        if sig.AttestationUnsignedReason <> '' then
+          begin
+            sb.Append('  attestationUnsignedReason: '); sb.AppendLine(YamlSQ(sig.AttestationUnsignedReason));
+          end;
       end;
     end;
 
@@ -266,6 +285,9 @@ begin
       sig.TimestampAuthority := '';
       sig.RevocationStatus := '';
       sig.EffectiveSigningTime := 0;
+      sig.AttestationNamespace := '';
+      sig.AttestationAuthorSpkiHex := '';
+      sig.AttestationUnsignedReason := '';
 
       if sigItem.AsMapping.Values['role'].IsString then
         sig.Role := sigItem.AsMapping.Values['role'].AsString;
@@ -281,6 +303,12 @@ begin
         sig.RevocationStatus := sigItem.AsMapping.Values['revocationStatus'].AsString;
       if sigItem.AsMapping.Values['effectiveSigningTime'].IsString then
         ParseIso(sigItem.AsMapping.Values['effectiveSigningTime'].AsString, sig.EffectiveSigningTime);
+      if sigItem.AsMapping.Values['attestationNamespace'].IsString then
+        sig.AttestationNamespace := sigItem.AsMapping.Values['attestationNamespace'].AsString;
+      if sigItem.AsMapping.Values['attestationAuthorSpki'].IsString then
+        sig.AttestationAuthorSpkiHex := sigItem.AsMapping.Values['attestationAuthorSpki'].AsString;
+      if sigItem.AsMapping.Values['attestationUnsignedReason'].IsString then
+        sig.AttestationUnsignedReason := sigItem.AsMapping.Values['attestationUnsignedReason'].AsString;
 
       receipt.Signatures[i] := sig;
     end;
