@@ -193,6 +193,16 @@ begin
     raise ECryptoCms.Create('Sign: provider is nil');
   if provider.Certificate = nil then
     raise ECryptoCms.Create('Sign: provider has no certificate');
+  // P3 §3.3 — remote providers don't expose a Win32 key handle, so
+  // CryptSignMessage can't sign on their behalf. The CMS-assembly path for
+  // remote SignDigest is the Phase 3.3 follow-up; for now, give the user
+  // a clear actionable error rather than a cryptic CryptSignMessage failure.
+  if not provider.IsLocal then
+    raise ECryptoCms.Create(
+      'Sign: remote signing providers (Key Vault / Signotaur) are not yet ' +
+      'wired into the CMS assembly path. Auth + cert download work end-to-end; ' +
+      'the manual CMS assembly that consumes provider.SignDigest is tracked as ' +
+      'a Phase 3.3 follow-up.');
 
   // Pre-encode every signed attribute as an OCTET STRING so the OS will
   // accept them. Build the CRYPT_ATTRIBUTE table on top.

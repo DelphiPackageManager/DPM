@@ -679,6 +679,75 @@ begin
     begin
       TSignOptions.Default.Digest := value;
     end);
+
+  // P3 §3.3 — remote signing providers.
+  cmd.RegisterOption<string>('provider', '',
+    'Signing provider: local (default, uses --thumbprint/--pfx), keyvault, or signotaur.',
+    procedure(const value : string)
+    begin
+      if SameText(value, 'keyvault') then
+        TSignOptions.Default.Provider := spKeyVault
+      else if SameText(value, 'signotaur') then
+        TSignOptions.Default.Provider := spSignotaur
+      else
+        TSignOptions.Default.Provider := spLocal;
+    end);
+
+  cmd.RegisterOption<string>('vault-url', '',
+    'Azure Key Vault URL (e.g. https://my-vault.vault.azure.net).',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.VaultUrl := value;
+    end);
+
+  cmd.RegisterOption<string>('cert-name', '',
+    'Key Vault certificate name (also used as --cert-id for signotaur).',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.CertName := value;
+    end);
+
+  cmd.RegisterOption<string>('key-version', '',
+    'Optional Key Vault key version. Defaults to latest.',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.KeyVersion := value;
+    end);
+
+  cmd.RegisterOption<string>('tenant-id', '',
+    'Azure AAD tenant id (GUID or domain).',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.TenantId := value;
+    end);
+
+  cmd.RegisterOption<string>('client-id', '',
+    'Azure AAD application (client) id used to authenticate to Key Vault.',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.ClientId := value;
+    end);
+
+  cmd.RegisterOption<string>('client-secret-env', '',
+    'Name of an environment variable holding the AAD client secret.',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.ClientSecretEnv := value;
+    end);
+
+  cmd.RegisterOption<string>('endpoint', '',
+    'Signotaur service endpoint URL.',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.SignotaurEndpoint := value;
+    end);
+
+  cmd.RegisterOption<string>('api-token-env', '',
+    'Name of an environment variable holding the Signotaur API token.',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.SignotaurApiTokenEnv := value;
+    end);
 end;
 
 

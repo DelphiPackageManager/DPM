@@ -34,6 +34,9 @@ uses
 
 type
   TSignStoreLocation = (sslCurrentUser, sslLocalMachine);
+  // Phase 3 §3.3 — provider selector. Default is the legacy cert-store /
+  // PFX path; --provider keyvault / signotaur route to a remote provider.
+  TSignProvider = (spLocal, spKeyVault, spSignotaur);
 
   TSignOptions = class(TOptionsBase)
   private
@@ -44,6 +47,16 @@ type
     FPfxPasswordEnvVar : string;
     FTimestampUrl : string;
     FDigest : string;
+    // P3 §3.3 — remote-provider options
+    FProvider : TSignProvider;
+    FVaultUrl : string;
+    FCertName : string;
+    FKeyVersion : string;
+    FTenantId : string;
+    FClientId : string;
+    FClientSecretEnv : string;
+    FSignotaurEndpoint : string;
+    FSignotaurApiTokenEnv : string;
     class var FDefault : TSignOptions;
   public
     class constructor CreateDefault;
@@ -57,6 +70,16 @@ type
     property PfxPasswordEnvVar : string read FPfxPasswordEnvVar write FPfxPasswordEnvVar;
     property TimestampUrl : string read FTimestampUrl write FTimestampUrl;
     property Digest : string read FDigest write FDigest;
+
+    property Provider : TSignProvider read FProvider write FProvider;
+    property VaultUrl : string read FVaultUrl write FVaultUrl;
+    property CertName : string read FCertName write FCertName;
+    property KeyVersion : string read FKeyVersion write FKeyVersion;
+    property TenantId : string read FTenantId write FTenantId;
+    property ClientId : string read FClientId write FClientId;
+    property ClientSecretEnv : string read FClientSecretEnv write FClientSecretEnv;
+    property SignotaurEndpoint : string read FSignotaurEndpoint write FSignotaurEndpoint;
+    property SignotaurApiTokenEnv : string read FSignotaurApiTokenEnv write FSignotaurApiTokenEnv;
   end;
 
 implementation
@@ -85,20 +108,62 @@ begin
     result := false;
   end;
 
-  if (FThumbprint = '') and (FPfxFile = '') then
-  begin
-    logger.Error('Either --thumbprint (cert store) or --pfx must be specified.');
-    result := false;
-  end;
-  if (FThumbprint <> '') and (FPfxFile <> '') then
-  begin
-    logger.Error('--thumbprint and --pfx are mutually exclusive.');
-    result := false;
-  end;
-  if (FPfxFile <> '') and not FileExists(FPfxFile) then
-  begin
-    logger.Error('PFX file not found: ' + FPfxFile);
-    result := false;
+  case FProvider of
+    spLocal :
+      begin
+        if (FThumbprint = '') and (FPfxFile = '') then
+        begin
+          logger.Error('Either --thumbprint (cert store) or --pfx must be specified.');
+          result := false;
+        end;
+        if (FThumbprint <> '') and (FPfxFile <> '') then
+        begin
+          logger.Error('--thumbprint and --pfx are mutually exclusive.');
+          result := false;
+        end;
+        if (FPfxFile <> '') and not FileExists(FPfxFile) then
+        begin
+          logger.Error('PFX file not found: ' + FPfxFile);
+          result := false;
+        end;
+      end;
+    spKeyVault :
+      begin
+        if FVaultUrl = '' then
+        begin
+          logger.Error('--vault-url is required when --provider=keyvault');
+          result := false;
+        end;
+        if FCertName = '' then
+        begin
+          logger.Error('--cert-name is required when --provider=keyvault');
+          result := false;
+        end;
+        if (FTenantId = '') or (FClientId = '') then
+        begin
+          logger.Error('--tenant-id and --client-id are required when --provider=keyvault');
+          result := false;
+        end;
+        if FClientSecretEnv = '' then
+        begin
+          logger.Error('--client-secret-env is required when --provider=keyvault ' +
+                       '(names an env var that holds the client secret)');
+          result := false;
+        end;
+      end;
+    spSignotaur :
+      begin
+        if FSignotaurEndpoint = '' then
+        begin
+          logger.Error('--endpoint is required when --provider=signotaur');
+          result := false;
+        end;
+        if FCertName = '' then
+        begin
+          logger.Error('--cert-id is required when --provider=signotaur');
+          result := false;
+        end;
+      end;
   end;
 end;
 

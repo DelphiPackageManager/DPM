@@ -303,6 +303,8 @@
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.X509.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Interfaces.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Signotaur.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Azure.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Cms.Interfaces.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Cms.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Timestamping.pas"/>

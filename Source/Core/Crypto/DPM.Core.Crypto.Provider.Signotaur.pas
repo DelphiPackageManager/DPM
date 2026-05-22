@@ -24,58 +24,96 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.Core.Crypto.Provider.Interfaces;
+unit DPM.Core.Crypto.Provider.Signotaur;
+
+// Phase 3 §3.3 — Signotaur signing provider (STUB).
+//
+// Signotaur (https://signotaur.com) is VSoft's hosted code-signing service.
+// The plan calls for it as a sibling of TKeyVaultSigningProvider — same
+// shape (download cert, SignDigest), different REST surface. Per the
+// session brief: "we will come back to it as signotaur needs modification"
+// so this is intentionally a stub. The interface seat is reserved so DI
+// registration + CLI plumbing for `--provider signotaur` lights up without
+// blocking shipping Key Vault.
 
 interface
 
 uses
   WinApi.Windows,
   System.SysUtils,
+  DPM.Core.Logging,
   DPM.Core.Crypto.Win32,
   DPM.Core.Crypto.Algorithms,
-  DPM.Core.Crypto.X509.Interfaces;
+  DPM.Core.Crypto.X509.Interfaces,
+  DPM.Core.Crypto.Provider.Interfaces;
 
 type
-  // The single abstraction the CMS layer uses for signing.
-  //
-  // Local providers (cert-store, PFX) own a Win32 key handle and let the
-  // OS sign in one shot via CryptSignMessage. They set IsLocal=true and
-  // AcquirePrivateKey returns the handle pair.
-  //
-  // Remote providers (Phase 3 §3.3 — Key Vault, Signotaur) don't have the
-  // key locally. They set IsLocal=false and implement SignDigest: the CMS
-  // layer pre-computes the digest of the to-be-signed bytes, hands it to
-  // the provider, and gets the raw signature back. The provider knows
-  // nothing about CMS structure — only "sign these bytes with my key".
-  ISigningProvider = interface
-    ['{D90DD9C6-44B2-4C32-A3B1-5DD3D6E9D2BC}']
+  TSignotaurOptions = record
+    Endpoint     : string;
+    CertId       : string;
+    ApiToken     : string;   // typically sourced from --api-token-env
+  end;
+
+  TSignotaurSigningProvider = class(TInterfacedObject, ISigningProvider)
+  private
+    FLogger : ILogger;
+    FX509 : IX509Service;
+    FOptions : TSignotaurOptions;
+  protected
     function Certificate : ICertificate;
-    /// <summary>
-    /// True when the private key is in-process (cert store, PFX). False
-    /// for remote providers — those use SignDigest instead. The CMS layer
-    /// picks the code path based on this flag.
-    /// </summary>
     function IsLocal : boolean;
-    /// <summary>
-    /// Local-provider only: hand the CMS layer a Win32 key handle so it
-    /// can call CryptSignMessage. Remote providers return false.
-    /// </summary>
     function AcquirePrivateKey(out keyHandle : HCRYPTPROV_OR_NCRYPT_KEY_HANDLE;
                                out keySpec : DWORD;
                                out callerMustFree : boolean) : boolean;
-    /// <summary>
-    /// Remote-provider sign primitive: takes the *digest* of the to-be-signed
-    /// bytes and the digest algorithm used to compute it, and returns the
-    /// raw signature value (the encryptedDigest of the resulting SignerInfo).
-    /// The signature scheme (RSA PKCS#1 / PSS / ECDSA) is determined by the
-    /// provider's certificate key type. Local providers raise.
-    /// </summary>
     function SignDigest(const digest : TBytes; digestAlgorithm : THashAlgorithm) : TBytes;
+  public
+    constructor Create(const logger : ILogger;
+                       const x509 : IX509Service;
+                       const options : TSignotaurOptions);
   end;
 
-  ECryptoProvider = class(Exception);
-  ENotImplementedSignDigest = class(ECryptoProvider);
+  ESignotaur = class(ECryptoProvider);
 
 implementation
+
+constructor TSignotaurSigningProvider.Create(const logger : ILogger;
+                                              const x509 : IX509Service;
+                                              const options : TSignotaurOptions);
+begin
+  inherited Create;
+  FLogger := logger;
+  FX509 := x509;
+  FOptions := options;
+end;
+
+function TSignotaurSigningProvider.Certificate : ICertificate;
+begin
+  raise ESignotaur.Create(
+    'Signotaur signing provider is not yet implemented. ' +
+    'Track Phase 3 §3.3 follow-up.');
+end;
+
+function TSignotaurSigningProvider.IsLocal : boolean;
+begin
+  result := false;
+end;
+
+function TSignotaurSigningProvider.AcquirePrivateKey(
+  out keyHandle : HCRYPTPROV_OR_NCRYPT_KEY_HANDLE;
+  out keySpec : DWORD;
+  out callerMustFree : boolean) : boolean;
+begin
+  keyHandle := 0;
+  keySpec := 0;
+  callerMustFree := false;
+  result := false;
+end;
+
+function TSignotaurSigningProvider.SignDigest(const digest : TBytes; digestAlgorithm : THashAlgorithm) : TBytes;
+begin
+  raise ESignotaur.Create(
+    'Signotaur signing provider is not yet implemented. ' +
+    'Track Phase 3 §3.3 follow-up.');
+end;
 
 end.

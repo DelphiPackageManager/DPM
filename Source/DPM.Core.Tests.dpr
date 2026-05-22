@@ -132,6 +132,8 @@ uses
   DPM.Core.Package.Manifest in 'Core\Package\Signing\DPM.Core.Package.Manifest.pas',
   DPM.Core.Crypto.Provider.Interfaces in 'Core\Crypto\DPM.Core.Crypto.Provider.Interfaces.pas',
   DPM.Core.Crypto.Provider in 'Core\Crypto\DPM.Core.Crypto.Provider.pas',
+  DPM.Core.Crypto.Provider.Azure in 'Core\Crypto\DPM.Core.Crypto.Provider.Azure.pas',
+  DPM.Core.Crypto.Provider.Signotaur in 'Core\Crypto\DPM.Core.Crypto.Provider.Signotaur.pas',
   DPM.Core.Crypto.Cms.Interfaces in 'Core\Crypto\DPM.Core.Crypto.Cms.Interfaces.pas',
   DPM.Core.Crypto.Cms in 'Core\Crypto\DPM.Core.Crypto.Cms.pas',
   DPM.Core.Crypto.Timestamping in 'Core\Crypto\DPM.Core.Crypto.Timestamping.pas',

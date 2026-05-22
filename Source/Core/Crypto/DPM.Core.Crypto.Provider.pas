@@ -38,6 +38,7 @@ uses
   Winapi.Windows,
   System.Classes, System.SysUtils,
   DPM.Core.Crypto.Win32,
+  DPM.Core.Crypto.Algorithms,
   DPM.Core.Crypto.X509.Interfaces,
   DPM.Core.Crypto.Provider.Interfaces;
 
@@ -47,9 +48,11 @@ type
     FCertificate : ICertificate;
   protected
     function Certificate : ICertificate;
+    function IsLocal : boolean;
     function AcquirePrivateKey(out keyHandle : HCRYPTPROV_OR_NCRYPT_KEY_HANDLE;
                                out keySpec : DWORD;
                                out callerMustFree : boolean) : boolean;
+    function SignDigest(const digest : TBytes; digestAlgorithm : THashAlgorithm) : TBytes;
   public
     constructor Create(const cert : ICertificate);
   end;
@@ -76,6 +79,24 @@ end;
 function TCertStoreSigningProvider.Certificate : ICertificate;
 begin
   result := FCertificate;
+end;
+
+function TCertStoreSigningProvider.IsLocal : boolean;
+begin
+  // Cert-store and PFX providers own a Win32 key handle (smart cards / HSM
+  // routed transparently through CNG). The CMS layer signs in-process.
+  result := true;
+end;
+
+function TCertStoreSigningProvider.SignDigest(const digest : TBytes;
+                                               digestAlgorithm : THashAlgorithm) : TBytes;
+begin
+  // Local providers don't need this — the CMS layer goes through the
+  // AcquirePrivateKey + CryptSignMessage path. Surface as a clear error in
+  // case a future code path accidentally calls it.
+  raise ENotImplementedSignDigest.Create(
+    'TCertStoreSigningProvider.SignDigest: local providers sign via CryptSignMessage; ' +
+    'use AcquirePrivateKey instead.');
 end;
 
 function TCertStoreSigningProvider.AcquirePrivateKey(out keyHandle : HCRYPTPROV_OR_NCRYPT_KEY_HANDLE;

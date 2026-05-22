@@ -63,6 +63,8 @@ uses
   System.IOUtils,
   DPM.Core.Crypto.Algorithms,
   DPM.Core.Crypto.Provider,
+  DPM.Core.Crypto.Provider.Azure,
+  DPM.Core.Crypto.Provider.Signotaur,
   DPM.Core.Options.Common,
   DPM.Core.Options.Sign;
 
@@ -83,39 +85,67 @@ var
   pfxBytes : TBytes;
   password : string;
   cert : ICertificate;
+  kvOpts : TKeyVaultOptions;
+  signotaurOpts : TSignotaurOptions;
+  tokenSvc : IAzureAccessTokenService;
 begin
   options := TSignOptions.Default;
   result := nil;
 
-  if options.Thumbprint <> '' then
-  begin
-    store := FX509.OpenSystemStore(TCertStoreLocation(Ord(options.StoreLocation)), 'MY');
-    cert := store.FindByThumbprint(options.Thumbprint);
-    if cert = nil then
-    begin
-      Logger.Error('Certificate with thumbprint ' + options.Thumbprint + ' not found in store.');
-      exit;
-    end;
-    result := TCertStoreSigningProvider.Create(cert);
-  end
+  case options.Provider of
+    spKeyVault :
+      begin
+        kvOpts.VaultUrl := options.VaultUrl;
+        kvOpts.CertificateName := options.CertName;
+        kvOpts.KeyVersion := options.KeyVersion;
+        kvOpts.TenantId := options.TenantId;
+        kvOpts.ClientId := options.ClientId;
+        kvOpts.ClientSecret := GetEnvironmentVariable(options.ClientSecretEnv);
+        if kvOpts.ClientSecret = '' then
+        begin
+          Logger.Error('Environment variable ' + options.ClientSecretEnv + ' is not set or empty.');
+          exit;
+        end;
+        tokenSvc := TAzureAccessTokenService.Create(Logger);
+        result := TKeyVaultSigningProvider.Create(Logger, FX509, tokenSvc, kvOpts);
+      end;
+    spSignotaur :
+      begin
+        signotaurOpts.Endpoint := options.SignotaurEndpoint;
+        signotaurOpts.CertId := options.CertName;
+        if options.SignotaurApiTokenEnv <> '' then
+          signotaurOpts.ApiToken := GetEnvironmentVariable(options.SignotaurApiTokenEnv);
+        result := TSignotaurSigningProvider.Create(Logger, FX509, signotaurOpts);
+      end;
   else
-  begin
-    pfxBytes := TFile.ReadAllBytes(options.PfxFile);
-    if options.PfxPasswordEnvVar <> '' then
-      password := GetEnvironmentVariable(options.PfxPasswordEnvVar)
-    else
-      password := '';   // The PFX may be unencrypted; if not, OpenPfxStore will error.
-    store := FX509.OpenPfxStore(pfxBytes, password);
-
-    // Pick the first cert from the PFX. Multi-cert PFX is rare; if it happens
-    // the user should be using cert-store + --thumbprint instead.
-    cert := store.FindByThumbprint('');   // empty thumbprint = "first match"
-    if cert = nil then
+    // spLocal — original cert-store + PFX path.
+    if options.Thumbprint <> '' then
     begin
-      Logger.Error('No certificate found in PFX file.');
-      exit;
+      store := FX509.OpenSystemStore(TCertStoreLocation(Ord(options.StoreLocation)), 'MY');
+      cert := store.FindByThumbprint(options.Thumbprint);
+      if cert = nil then
+      begin
+        Logger.Error('Certificate with thumbprint ' + options.Thumbprint + ' not found in store.');
+        exit;
+      end;
+      result := TCertStoreSigningProvider.Create(cert);
+    end
+    else
+    begin
+      pfxBytes := TFile.ReadAllBytes(options.PfxFile);
+      if options.PfxPasswordEnvVar <> '' then
+        password := GetEnvironmentVariable(options.PfxPasswordEnvVar)
+      else
+        password := '';
+      store := FX509.OpenPfxStore(pfxBytes, password);
+      cert := store.FindByThumbprint('');
+      if cert = nil then
+      begin
+        Logger.Error('No certificate found in PFX file.');
+        exit;
+      end;
+      result := TPfxSigningProvider.Create(cert);
     end;
-    result := TPfxSigningProvider.Create(cert);
   end;
 end;
 

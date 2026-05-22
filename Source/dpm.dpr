@@ -165,6 +165,8 @@ uses
   DPM.Core.Crypto.Hashing in 'Core\Crypto\DPM.Core.Crypto.Hashing.pas',
   DPM.Core.Crypto.Provider.Interfaces in 'Core\Crypto\DPM.Core.Crypto.Provider.Interfaces.pas',
   DPM.Core.Crypto.Provider in 'Core\Crypto\DPM.Core.Crypto.Provider.pas',
+  DPM.Core.Crypto.Provider.Azure in 'Core\Crypto\DPM.Core.Crypto.Provider.Azure.pas',
+  DPM.Core.Crypto.Provider.Signotaur in 'Core\Crypto\DPM.Core.Crypto.Provider.Signotaur.pas',
   DPM.Core.Crypto.Timestamping in 'Core\Crypto\DPM.Core.Crypto.Timestamping.pas',
   DPM.Core.Crypto.Win32 in 'Core\Crypto\DPM.Core.Crypto.Win32.pas',
   DPM.Core.Crypto.X509.Interfaces in 'Core\Crypto\DPM.Core.Crypto.X509.Interfaces.pas',
