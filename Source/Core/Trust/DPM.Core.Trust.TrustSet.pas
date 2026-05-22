@@ -69,6 +69,15 @@ implementation
 uses
   Winapi.Windows;
 
+// Pull in the DPM_TRUST_SET / YAML resource. Delphi compiles the .rc on
+// demand via brcc32, so simply rebuilding any binary that uses this unit
+// embeds the latest dpm-trust-set.yaml content. The .rc lives alongside
+// dpm.rc in the Source/ directory so both the CLI and every IDE plugin
+// share one source. Delphi resolves $R first in the source file's
+// directory, then in the project (.dpr) directory — which is Source/ for
+// every consumer here, so a bare filename works without path tricks.
+{$R 'DPM.TrustSet.res'}
+
 const
   cTrustSetResource = 'DPM_TRUST_SET';
   cTrustSetResType  = 'YAML';

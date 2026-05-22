@@ -397,22 +397,39 @@ attribute as optional and off by default.
 
 ### Object identifiers
 
-The DPM-specific CMS signed attributes need real, registered OIDs; an
-implementation cannot ship with placeholders. DPM should obtain an IANA Private
-Enterprise Number (PEN) — these are free — and define its arc beneath it, of
-the form `1.3.6.1.4.1.<PEN>.1.x`. The registration-free UUID OID arc,
-`2.25.<uuid-as-integer>`, is a valid fallback but produces unwieldy identifiers
-and is less conventional.
+The DPM-specific CMS signed attributes need real OIDs; an implementation cannot
+ship with throwaway placeholders, because every OID a signature embeds becomes
+part of that signature forever. DPM has applied for an IANA Private Enterprise
+Number (PEN) and will define its canonical arc beneath it as
+`1.3.6.1.4.1.<PEN>.x` once the assignment lands.
 
-| Attribute                        | Carries                                     | OID (DPM arc) |
-| --------------------------------- | ------------------------------------------- | ------------- |
-| `dpmSignatureRole`                | `author` or `repository`                    | `…1.1`        |
-| `dpmRepositoryAttestation`        | publisher namespace + verified author SPKI  | `…1.2`        |
-| `dpmVerifiedAuthorSignatureHash`  | optional author-blob hash (provenance)      | `…1.3`        |
+**Interim arc.** While the IANA assignment is pending, DPM signs and verifies
+under a deliberately distinctive private arc: **`1.3.6.1.4.1.95860`**. The
+choice is intentional and not a placeholder:
 
-The concrete arc is fixed once the PEN is assigned; until then the table uses
-placeholders, and obtaining the PEN is tracked as a prerequisite for the
-Phase 1 release. During development it is acceptable to use UUID OID's while we wait for a PEN (applied, awaiting approval);
+* IANA enterprise numbers have currently been issued up to roughly 65860.
+  A value of 95860 sits well above the active issuance frontier, so the
+  likelihood of another organisation receiving 95860 in the near future is
+  low. (The conventional `99999` was rejected as too well-known a squat;
+  derived-from-hash schemes were rejected as harder to communicate.)
+* The Windows CMS encoder caps each OID sub-arc at 31 bits, which rules out
+  the `2.25.<UUID-as-integer>` approach the original draft contemplated —
+  Microsoft's `CryptEncodeObject` returns `CRYPT_E_OID_FORMAT (0x80091003)`
+  for a 128-bit sub-arc. The IANA PEN arc is the only widely-supported path.
+
+**Permanence and migration.** Once a signature ships with a given attribute
+OID, that OID can never be removed — every signed package embeds it
+literally and would fail verification if the OID disappeared. The interim
+arc above is therefore **load-bearing forever**: even after VSoft's IANA PEN
+arrives, the verifier MUST continue to accept signatures using
+`1.3.6.1.4.1.95860.x`. The transition is a dual-emit / always-accept
+strategy detailed in [package-signing-oid-migration.md](package-signing-oid-migration.md).
+
+| Attribute                        | Carries                                     | Interim OID                  |
+| -------------------------------- | ------------------------------------------- | ---------------------------- |
+| `dpmSignatureRole`               | `author` or `repository`                    | `1.3.6.1.4.1.95860.1`        |
+| `dpmRepositoryAttestation`       | publisher namespace + verified author SPKI  | `1.3.6.1.4.1.95860.2`        |
+| `dpmVerifiedAuthorSignatureHash` | optional author-blob hash (provenance)      | `1.3.6.1.4.1.95860.3`        |
 
 ---
 

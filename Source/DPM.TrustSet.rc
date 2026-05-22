@@ -1,0 +1,18 @@
+// ---------------------------------------------------------------------------
+// DPM built-in trust set resource.
+//
+// Embeds dpm-trust-set.yaml as DPM_TRUST_SET / YAML so every dpm.exe and
+// DPM.IDE.*.dll binary carries a copy of the default trust pins, default
+// validation mode, and emergency-revocation list at startup.
+//
+// Linked by DPM.Core.Trust.TrustSet via `{$R}` directive — see that unit
+// for the resource-name and type the loader expects (DPM_TRUST_SET, YAML).
+//
+// Update flow:
+//   1. Edit dpm-trust-set.yaml (bump dpmTrustSetVersion).
+//   2. Rebuild — via brcc32
+//   3. Ship. Existing receipts on user machines will detect the new
+//      fingerprint and re-verify on next install.
+// ---------------------------------------------------------------------------
+
+DPM_TRUST_SET YAML "dpm-trust-set.yaml"

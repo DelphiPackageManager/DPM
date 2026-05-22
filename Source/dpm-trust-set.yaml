@@ -1,0 +1,56 @@
+# ---------------------------------------------------------------------------
+# DPM built-in trust set
+#
+# Compiled into dpm.exe and every DPM.IDE.*.dll as the DPM_TRUST_SET / YAML
+# resource by DPM.TrustSet.rc.  TBuiltInTrustSet loads it at startup and
+# uses it as the foundation of every trust decision.
+#
+# What this file does and doesn't define:
+#   - It SHIPS the publishing repositories DPM treats as authoritative for
+#     `repository-required` and `author-and-repository` validation modes.
+#   - It SHIPS the trust-set version that contributes to the policy
+#     fingerprint so an upgrade with a new trust set invalidates the
+#     verification cache.
+#   - It SHIPS an emergency revocation channel that overrides any per-user
+#     `trustedRepositories` pin.
+#   - It does NOT define trusted *publishers* — those are per-user, set via
+#     `dpm trust add publisher ...` and live in the user's dpm.config.yaml.
+#
+# When to bump dpmTrustSetVersion:
+#   - Any change to repositorySpki, revokedRepositorySpki, or
+#     defaultValidationMode. Receipts pinned to the old fingerprint will
+#     re-verify on next install.
+#
+# When to use revokedRepositorySpki:
+#   - Emergency: a previously trusted repository key has been compromised
+#     or rotated and must stop being honoured immediately. Entries here
+#     win over both the per-user trustedRepositories list and the
+#     repositorySpki list below.
+# ---------------------------------------------------------------------------
+
+dpmTrustSetVersion: 1
+
+# Permissive while the public gallery is not yet repository-signed.
+# Bump to `repository-required` once the gallery's signing infrastructure
+# is in place (architecture doc §Validation modes; plan §2.5).
+defaultValidationMode: permissive
+
+# Trusted repository SPKI pins. Each entry is a SHA-256 of the repository
+# signing key's SubjectPublicKeyInfo, expressed as 'sha256:<hex>'. Add an
+# entry per repository the DPM client trusts out of the box.
+#
+# Example (do not enable until the real SPKI is published):
+# repositorySpki:
+#   - name: DPM Official Gallery
+#     spki: 'sha256:0000000000000000000000000000000000000000000000000000000000000000'
+repositorySpki:
+  - name: DPM Official Gallery
+    spki: "sha256:c2d7996a815b4d2061789f367b2fcfbb08afcc4c31af47c4efce91a4413a39f8"
+
+# Emergency revocation channel. A repository SPKI here is treated as
+# untrusted REGARDLESS of any other configuration — including the user's
+# own trustedRepositories pin and the repositorySpki list above. Use this
+# when a key is compromised and must be cut off across every install of
+# this DPM version. Quoting the strings is recommended but optional;
+# unquoted `sha256:xxxx` entries are auto-recovered by the loader.
+revokedRepositorySpki: []

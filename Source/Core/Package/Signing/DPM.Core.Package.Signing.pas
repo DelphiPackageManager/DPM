@@ -123,20 +123,28 @@ type
   end;
 
 const
-  // PLACEHOLDER OIDs — replace before release.
+  // INTERIM PRIVATE OID ARC.
   //
-  // The plan called for 2.25.<UUID-as-integer> under ITU-T X.667, but
-  // Microsoft's CryptEncodeObject caps each OID sub-arc at 31 bits
-  // (CRYPT_E_OID_FORMAT, 0x80091003). A 128-bit UUID sub-arc therefore
-  // never reaches the signer. We use the IANA PEN convention's
-  // "private/internal use" subtree 1.3.6.1.4.1.99999.* until VSoft's
-  // own PEN assignment comes through, at which point this whole block
-  // becomes `cDpmOidArc = '1.3.6.1.4.1.<VSoft-PEN>'` and the three
-  // attribute OIDs follow as .1.{1,2,3}.
-  cDpmOidArc          = '1.3.6.1.4.1.99999';
-  cOidDpmSignatureRole         : AnsiString = '1.3.6.1.4.1.99999.1.1';
-  cOidDpmRepositoryAttestation : AnsiString = '1.3.6.1.4.1.99999.1.2';
-  cOidDpmVerifiedAuthorSigHash : AnsiString = '1.3.6.1.4.1.99999.1.3';
+  // The plan originally called for 2.25.<UUID-as-integer> under ITU-T X.667,
+  // but Microsoft's CryptEncodeObject caps each OID sub-arc at 31 bits
+  // (CRYPT_E_OID_FORMAT, 0x80091003). A 128-bit UUID sub-arc never reaches
+  // the signer.
+  //
+  // We squat on 1.3.6.1.4.1.95860 — distinctively higher than the current
+  // highest-issued IANA PEN (~65860 as of 2026-05-23) to make collision
+  // with a future IANA assignment very unlikely. When our own PEN is
+  // assigned, the migration plan is dual-emit + always-accept (see
+  // docs/package-signing-oid-migration.md). The constants below MUST NEVER
+  // be removed — old packages embed them literally in their signed
+  // attributes and will keep verifying via the alias path forever.
+  //
+  // Future PEN flips define a parallel cDpmOidArcCanonical + the three
+  // canonical OIDs. The signer emits both; the verifier matches by
+  // membership in {legacy, canonical}.
+  cDpmOidArc                   : AnsiString = '1.3.6.1.4.1.95860';
+  cOidDpmSignatureRole         : AnsiString = '1.3.6.1.4.1.95860.1';
+  cOidDpmRepositoryAttestation : AnsiString = '1.3.6.1.4.1.95860.2';
+  cOidDpmVerifiedAuthorSigHash : AnsiString = '1.3.6.1.4.1.95860.3';
 
   cSigRoleAuthor     = 'author';
   cSigRoleRepository = 'repository';

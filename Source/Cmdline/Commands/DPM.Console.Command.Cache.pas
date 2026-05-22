@@ -59,6 +59,7 @@ implementation
 uses
   System.SysUtils,
   DPM.Core.Types,
+  DPM.Core.Utils.Config,
   DPM.Core.Options.Common,
   DPM.Core.Options.Cache;
 
@@ -77,12 +78,32 @@ end;
 function TCacheCommand.Execute(const cancellationToken : ICancellationToken): TExitCode;
 var
   failureCount : integer;
+  config : IConfiguration;
+  configPath : string;
 begin
   TCacheOptions.Default.ApplyCommon(TCommonOptions.Default);
 
   // `dpm cache verify` short-circuits the per-package download/cache flow.
   if TCacheOptions.Default.VerifyAll then
   begin
+    // Cache instance is shared across commands; for the install/restore
+    // flows TPackageInstaller.Init sets Location from the loaded config.
+    // The cache verify path bypasses the installer entirely, so do the
+    // same minimal init here — otherwise FullReVerify enumerates from an
+    // empty path and System.IOUtils raises "Invalid characters in path".
+    FConfigurationManager.EnsureDefaultConfig;
+    configPath := TCacheOptions.Default.ConfigFile;
+    if configPath = '' then
+      configPath := TConfigUtils.GetDefaultConfigFileName;
+    config := FConfigurationManager.LoadConfig(configPath);
+    if config = nil then
+    begin
+      Logger.Error('Unable to load configuration; cannot verify cache.');
+      result := TExitCode.Error;
+      exit;
+    end;
+    FPackageCache.Location := config.PackageCacheLocation;
+
     failureCount := FPackageCache.FullReVerify;
     if failureCount = 0 then
       result := TExitCode.OK

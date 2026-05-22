@@ -98,14 +98,16 @@ begin
       TCacheOptions.Default.VersionString := value;
     end);
 
-  option := cmd.RegisterOption<string>('compiler','c', 'The compiler version of the package to cache.',
+  // The download form requires --compiler, but `cache verify` walks every
+  // compiler folder in the cache and ignores this. Mark optional here and
+  // let TCacheOptions.Validate enforce required-when-not-verify.
+  option := cmd.RegisterOption<string>('compiler','c', 'The compiler version of the package to cache (ignored by `cache verify`).',
    procedure(const value : string)
     begin
       TCacheOptions.Default.CompilerVersion := StringToCompilerVersion(value);
       if TCacheOptions.Default.CompilerVersion = TCompilerVersion.UnknownVersion then
         raise EArgumentException.Create('Invalid compiler version : ' + value);
     end);
-  option.Required := true;
 
   option := cmd.RegisterOption<string>('Sources','s','The sources from which to install packages',
     procedure(const value : string)

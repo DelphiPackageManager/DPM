@@ -14,7 +14,11 @@ type
   [TestFixture]
   TBuiltInTrustSetTests = class
   public
-    [Test] procedure DefaultConstructor_NoResource_YieldsSafeDefaults;
+    // Default constructor reads the DPM_TRUST_SET resource that DPM.TrustSet.rc
+    // bakes into every consumer binary. The test exe gets it too via
+    // DPM.Core.Trust.TrustSet's $R directive, so the test asserts what we
+    // ship rather than the (Phase 1) safe-empty fallback.
+    [Test] procedure DefaultConstructor_LoadsBuiltInResource;
     [Test] procedure EmptyYaml_YieldsSafeDefaults;
 
     [Test] procedure LoadsVersion_FromYaml;
@@ -41,14 +45,27 @@ uses
   DPM.Core.Trust.Interfaces,
   DPM.Core.Trust.TrustSet;
 
-procedure TBuiltInTrustSetTests.DefaultConstructor_NoResource_YieldsSafeDefaults;
+procedure TBuiltInTrustSetTests.DefaultConstructor_LoadsBuiltInResource;
 var
   ts : ITrustSet;
+  pins : TArray<TTrustedRepository>;
 begin
+  // Linked-in resource from DPM.TrustSet.rc / dpm-trust-set.yaml. Locked
+  // to the shipped values so a change to the YAML that isn't matched here
+  // is caught — this is the canonical source of trust for every binary.
   ts := TBuiltInTrustSet.Create;
-  Assert.AreEqual(0, ts.Version, 'no resource: version is 0');
+  Assert.AreEqual(1, ts.Version, 'shipped trust-set version');
   Assert.AreEqual(Ord(vmPermissive), Ord(ts.DefaultValidationMode));
-  Assert.AreEqual(0, Length(ts.RepositorySpkis));
+
+  pins := ts.RepositorySpkis;
+  Assert.AreEqual(1, Length(pins), 'should ship exactly one trusted repo');
+  Assert.AreEqual('DPM Official Gallery', pins[0].Url);
+  Assert.AreEqual(
+    'sha256:c2d7996a815b4d2061789f367b2fcfbb08afcc4c31af47c4efce91a4413a39f8',
+    pins[0].SpkiHex);
+
+  // Revocation channel ships empty; entries are added in an emergency.
+  Assert.AreEqual(0, Length(ts.RevokedRepositorySpkis));
 end;
 
 procedure TBuiltInTrustSetTests.EmptyYaml_YieldsSafeDefaults;
