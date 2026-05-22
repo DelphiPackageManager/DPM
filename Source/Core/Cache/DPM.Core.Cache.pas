@@ -37,13 +37,22 @@ uses
   DPM.Core.Dependency.Version,
   DPM.Core.Package.Interfaces,
   DPM.Core.Cache.Interfaces,
-  DPM.Core.Spec.Interfaces;
+  DPM.Core.Spec.Interfaces,
+  DPM.Core.Trust.Interfaces,
+  DPM.Core.Trust.Prompt,
+  DPM.Core.Package.Cache.Receipt,
+  DPM.Core.Package.Signing.Interfaces;
 
 type
   TPackageCache = class(TInterfacedObject, IPackageCache)
   private
     FLogger : ILogger;
     FSpecReader : IPackageSpecReader;
+    FSigningService : IPackageSigningService;
+    FTrustPolicy : ITrustPolicyService;
+    FReceiptService : IReceiptService;
+    FTrustState : ITrustStateService;
+    FTrustPrompt : ITrustPromptStrategy;
     FLocation : string;
     //Process-level memo. Safe because the cached spec is write-once per (id, compiler, version).
     //TPackageCache is registered AsSingleton in DPM.Core.Init.pas so these survive the whole command
@@ -52,6 +61,19 @@ type
     FSpecCache : IDictionary<string, IPackageSpec>;
     FExtractionVerified : ISet<string>;
     FCacheLock : TCriticalSection;
+    procedure WriteReceipt(const packageFolder : string;
+                           const packageId : IPackageIdentity;
+                           const verifyResult : TVerificationResult);
+    // Returns true if the install may proceed. When false, the package must
+    // not be extracted. Records the new author state on a successful pass.
+    function EvaluateAuthorDowngrade(const packageId : IPackageIdentity;
+                                      const verifyResult : TVerificationResult;
+                                      const policy : TTrustPolicy) : boolean;
+    // P2 §2.3 (V-24): repository assurance ratchet. Returns true if the
+    // install may proceed. Hard-fails when a previously seen trusted-repo
+    // signature is now missing or the namespace has changed.
+    function EvaluateRepositoryRatchet(const packageId : IPackageIdentity;
+                                        const verifyResult : TVerificationResult) : boolean;
   protected
     procedure SetLocation(const value : string);
     function GetLocation : string;
@@ -90,8 +112,16 @@ type
 
     function InstallPackageFromFile(const packageFileName : string) : boolean;
 
+    function FullReVerify : integer;
+
   public
-    constructor Create(const logger : ILogger; const specReader : IPackageSpecReader);
+    constructor Create(const logger : ILogger;
+                       const specReader : IPackageSpecReader;
+                       const signingService : IPackageSigningService;
+                       const trustPolicy : ITrustPolicyService;
+                       const receiptService : IReceiptService;
+                       const trustState : ITrustStateService;
+                       const trustPrompt : ITrustPromptStrategy);
     destructor Destroy; override;
   end;
 
@@ -103,6 +133,7 @@ uses
   System.IOUtils,
   System.Types,
   System.Zip,
+  System.DateUtils,
   System.RegularExpressions,
   System.Generics.Defaults,
   DPM.Core.Constants,
@@ -114,6 +145,216 @@ uses
 
 { TPackageCache }
 
+function TPackageCache.FullReVerify : integer;
+var
+  packagesRoot : string;
+  compilerFolders : TStringDynArray;
+  idFolders : TStringDynArray;
+  dpkgFiles : TStringDynArray;
+  i, j, k : integer;
+  failures : integer;
+begin
+  failures := 0;
+  if FSigningService = nil then
+  begin
+    FLogger.Warning('[PackageCache] FullReVerify: signing service not wired; nothing to verify.');
+    result := 0;
+    exit;
+  end;
+
+  packagesRoot := GetPackagesFolder;
+  if not DirectoryExists(packagesRoot) then
+  begin
+    result := 0;
+    exit;
+  end;
+
+  FLogger.Information('[PackageCache] Re-verifying every package in ' + packagesRoot);
+
+  // Invalidate the in-memory "already verified this session" set so the
+  // re-verify path actually re-runs the workflow rather than short-circuiting.
+  FCacheLock.Enter;
+  try
+    FExtractionVerified.Clear;
+  finally
+    FCacheLock.Leave;
+  end;
+
+  compilerFolders := TDirectory.GetDirectories(packagesRoot);
+  for i := 0 to High(compilerFolders) do
+  begin
+    idFolders := TDirectory.GetDirectories(compilerFolders[i]);
+    for j := 0 to High(idFolders) do
+    begin
+      // Every cached id folder holds its .dpkg files sibling to the per-version
+      // extraction folders. Re-installing the .dpkg re-runs the full
+      // verification workflow inside InstallPackageFromFile.
+      dpkgFiles := TDirectory.GetFiles(idFolders[j], '*' + cPackageFileExt,
+        TSearchOption.soTopDirectoryOnly);
+      for k := 0 to High(dpkgFiles) do
+      begin
+        try
+          if not InstallPackageFromFile(dpkgFiles[k]) then
+          begin
+            Inc(failures);
+            FLogger.Error('[PackageCache] FullReVerify failed for ' + dpkgFiles[k]);
+          end;
+        except
+          on e : Exception do
+          begin
+            Inc(failures);
+            FLogger.Error('[PackageCache] FullReVerify exception for ' +
+              dpkgFiles[k] + ': ' + e.Message);
+          end;
+        end;
+      end;
+    end;
+  end;
+
+  if failures = 0 then
+    FLogger.Information('[PackageCache] FullReVerify completed: all packages valid.')
+  else
+    FLogger.Warning(Format('[PackageCache] FullReVerify completed with %d failure(s).', [failures]));
+  result := failures;
+end;
+
+function TPackageCache.EvaluateRepositoryRatchet(const packageId : IPackageIdentity;
+                                                  const verifyResult : TVerificationResult) : boolean;
+var
+  i : integer;
+  prior : TRepositoryTrustEntry;
+  hadPrior : boolean;
+  currentTrustedRepoSpki : string;
+  currentAttestedNamespace : string;
+  hasCurrentTrustedRepo : boolean;
+  newEntry : TRepositoryTrustEntry;
+begin
+  result := true;
+  if (FTrustState = nil) or (packageId = nil) then
+    exit;
+
+  hasCurrentTrustedRepo := false;
+  currentTrustedRepoSpki := '';
+  currentAttestedNamespace := '';
+
+  // First valid trusted repository signature on this build (its attestation
+  // — if present — sets the namespace we ratchet against).
+  for i := 0 to High(verifyResult.Signatures) do
+  begin
+    if (verifyResult.Signatures[i].Role = srRepository) and
+       verifyResult.Signatures[i].Valid and
+       verifyResult.Signatures[i].RepositoryTrusted then
+    begin
+      hasCurrentTrustedRepo := true;
+      currentTrustedRepoSpki := verifyResult.Signatures[i].SignerSpkiHex;
+      if verifyResult.Signatures[i].Attestation.Present then
+        currentAttestedNamespace := verifyResult.Signatures[i].Attestation.Namespace;
+      break;
+    end;
+  end;
+
+  hadPrior := FTrustState.TryGetRepository(packageId.Id, prior);
+
+  if not hadPrior then
+  begin
+    // First time seeing this id — if it carries a trusted repo signature,
+    // record the high-water mark. If not, nothing to do.
+    if hasCurrentTrustedRepo then
+    begin
+      newEntry.TrustedRepoSpkiHex := currentTrustedRepoSpki;
+      newEntry.Namespace := currentAttestedNamespace;
+      newEntry.FirstSeenAt := TTimeZone.Local.ToUniversalTime(Now);
+      newEntry.LastSeenAt := newEntry.FirstSeenAt;
+      FTrustState.RecordRepository(packageId.Id, newEntry);
+    end;
+    exit;
+  end;
+
+  // V-24: once seen carrying a trusted-repo signature, any later build
+  // lacking one is a hard fail regardless of mode.
+  if not hasCurrentTrustedRepo then
+  begin
+    FLogger.Error(Format(
+      '[PackageCache] Package [%s] previously carried a trusted repository ' +
+      'signature (sha256:%s) but this build does not. Hard fail per V-24.',
+      [packageId.Id, prior.TrustedRepoSpkiHex]));
+    result := false;
+    exit;
+  end;
+
+  // Namespace must match if we previously recorded one. An attempt to
+  // re-attest the package id under a different namespace is also a hard
+  // fail — closes the publisher-impersonation door.
+  if (prior.Namespace <> '') and (currentAttestedNamespace <> '') and
+     not SameText(prior.Namespace, currentAttestedNamespace) then
+  begin
+    FLogger.Error(Format(
+      '[PackageCache] Package [%s] repository attestation namespace ' +
+      'changed from "%s" to "%s". Hard fail per V-24.',
+      [packageId.Id, prior.Namespace, currentAttestedNamespace]));
+    result := false;
+    exit;
+  end;
+
+  // No regression — update the high-water mark and ratchet forward.
+  newEntry := prior;
+  newEntry.TrustedRepoSpkiHex := currentTrustedRepoSpki;
+  if currentAttestedNamespace <> '' then
+    newEntry.Namespace := currentAttestedNamespace;
+  newEntry.LastSeenAt := TTimeZone.Local.ToUniversalTime(Now);
+  FTrustState.RecordRepository(packageId.Id, newEntry);
+end;
+
+procedure TPackageCache.WriteReceipt(const packageFolder : string;
+                                      const packageId : IPackageIdentity;
+                                      const verifyResult : TVerificationResult);
+var
+  receipt : TVerificationReceipt;
+  i : integer;
+  outcomeStr : string;
+begin
+  receipt.ReceiptVersion := cCurrentReceiptVersion;
+  receipt.PackageId := packageId.Id;
+  receipt.Version := packageId.Version.ToStringNoMeta;
+  receipt.Compiler := CompilerToString(packageId.CompilerVersion);
+  receipt.ManifestHashAlgorithm := verifyResult.ManifestHashAlgorithm;
+  receipt.ManifestHashHex := verifyResult.ManifestHashHex;
+  receipt.TrustPolicyFingerprint := verifyResult.PolicyFingerprint;
+  receipt.VerifiedAt := TTimeZone.Local.ToUniversalTime(Now);
+  receipt.DpmVersion := TSystemUtils.GetVersionString;
+
+  case verifyResult.Outcome of
+    voTrusted             : outcomeStr := 'trusted';
+    voUnsigned            : outcomeStr := 'unsigned';
+    voUntrustedPublisher  : outcomeStr := 'untrusted-publisher';
+  else
+    outcomeStr := 'invalid';
+  end;
+  receipt.TrustDecision := outcomeStr;
+
+  SetLength(receipt.Signatures, Length(verifyResult.Signatures));
+  for i := 0 to High(verifyResult.Signatures) do
+  begin
+    if verifyResult.Signatures[i].Role = srRepository then
+      receipt.Signatures[i].Role := 'repository'
+    else
+      receipt.Signatures[i].Role := 'author';
+    receipt.Signatures[i].SignerSpkiHex := verifyResult.Signatures[i].SignerSpkiHex;
+    receipt.Signatures[i].SignerSubject := verifyResult.Signatures[i].SignerSubject;
+    receipt.Signatures[i].Thumbprint := verifyResult.Signatures[i].Thumbprint;
+    receipt.Signatures[i].EffectiveSigningTime := verifyResult.Signatures[i].EffectiveSigningTime;
+    receipt.Signatures[i].TimestampAuthority := verifyResult.Signatures[i].TimestampAuthority;
+    receipt.Signatures[i].RevocationStatus := 'notChecked';   // Phase 3
+  end;
+
+  try
+    FReceiptService.Write(packageFolder, receipt);
+  except
+    on e : Exception do
+      FLogger.Warning('[PackageCache] Failed to write verification receipt: ' + e.Message);
+  end;
+end;
+
 function TPackageCache.CachePackage(const packageId : IPackageIdentity; const saveFile : Boolean) : Boolean;
 begin
   result := false;
@@ -124,14 +365,192 @@ begin
   result := false;
 end;
 
-constructor TPackageCache.Create(const logger : ILogger; const specReader : IPackageSpecReader);
+constructor TPackageCache.Create(const logger : ILogger;
+                                  const specReader : IPackageSpecReader;
+                                  const signingService : IPackageSigningService;
+                                  const trustPolicy : ITrustPolicyService;
+                                  const receiptService : IReceiptService;
+                                  const trustState : ITrustStateService;
+                                  const trustPrompt : ITrustPromptStrategy);
 begin
   FLogger := logger;
   FSpecReader := specReader;
+  FSigningService := signingService;
+  FTrustPolicy := trustPolicy;
+  FReceiptService := receiptService;
+  FTrustState := trustState;
+  FTrustPrompt := trustPrompt;
   FInfoCache := TCollections.CreateDictionary<string, IPackageInfo>;
   FSpecCache := TCollections.CreateDictionary<string, IPackageSpec>;
   FExtractionVerified := TCollections.CreateSet<string>;
   FCacheLock := TCriticalSection.Create;
+end;
+
+function TPackageCache.EvaluateAuthorDowngrade(const packageId : IPackageIdentity;
+                                                const verifyResult : TVerificationResult;
+                                                const policy : TTrustPolicy) : boolean;
+var
+  i : integer;
+  prior : TAuthorTrustEntry;
+  hadPrior : boolean;
+  currentSigned : boolean;
+  currentSpki : string;
+  currentSubject : string;
+  isDowngrade : boolean;
+  isKeyChange : boolean;
+  context : TTrustPromptContext;
+  decision : TTrustPromptDecision;
+  newEntry : TAuthorTrustEntry;
+begin
+  result := true;
+  if (FTrustState = nil) or (packageId = nil) then
+    exit;
+
+  // Identify the first valid author signature on the current build. We only
+  // record valid signers — a broken signature does not feed the ratchet.
+  currentSigned := false;
+  currentSpki := '';
+  currentSubject := '';
+  for i := 0 to High(verifyResult.Signatures) do
+  begin
+    if (verifyResult.Signatures[i].Role = srAuthor) and verifyResult.Signatures[i].Valid then
+    begin
+      currentSigned := true;
+      currentSpki := verifyResult.Signatures[i].SignerSpkiHex;
+      currentSubject := verifyResult.Signatures[i].SignerSubject;
+      break;
+    end;
+  end;
+
+  hadPrior := FTrustState.TryGetAuthor(packageId.Id, prior);
+
+  // Permanent block trumps everything else.
+  if hadPrior and prior.BlockedPermanently then
+  begin
+    FLogger.Error(Format(
+      '[PackageCache] Package [%s] is permanently blocked by user choice. ' +
+      'Edit %%APPDATA%%\.dpm\trust-state.yaml or remove the entry to lift the block.',
+      [packageId.Id]));
+    result := false;
+    exit;
+  end;
+
+  // First-ever install for this id — nothing to compare against. Record and
+  // proceed (TOFU).
+  if not hadPrior then
+  begin
+    newEntry.LastAuthorSpkiHex    := currentSpki;
+    newEntry.LastSeenAuthorSigned := currentSigned;
+    newEntry.LastSeenAt           := TTimeZone.Local.ToUniversalTime(Now);
+    newEntry.DowngradeAcknowledged := false;
+    newEntry.BlockedPermanently   := false;
+    FTrustState.RecordAuthor(packageId.Id, newEntry);
+    exit;
+  end;
+
+  // Was there a real downgrade vs. the previous high-water mark?
+  // 1) previously signed, now unsigned: downgrade
+  // 2) previously signed by X, now signed by Y (Y <> X): key change (also a downgrade)
+  // 3) previously unsigned, now signed: upgrade — silently accept and ratchet
+  // 4) previously unsigned, now unsigned: no change
+  // 5) same SPKI as last time: no change
+  isDowngrade := prior.LastSeenAuthorSigned and not currentSigned;
+  isKeyChange := prior.LastSeenAuthorSigned and currentSigned and
+                 (not SameText(prior.LastAuthorSpkiHex, currentSpki));
+
+  if not (isDowngrade or isKeyChange) then
+  begin
+    // No-downgrade — update last-seen if anything changed.
+    if (prior.LastAuthorSpkiHex <> currentSpki) or
+       (prior.LastSeenAuthorSigned <> currentSigned) then
+    begin
+      newEntry := prior;
+      newEntry.LastAuthorSpkiHex    := currentSpki;
+      newEntry.LastSeenAuthorSigned := currentSigned;
+      newEntry.LastSeenAt           := TTimeZone.Local.ToUniversalTime(Now);
+      // Once author has signed, lock that in — even an unsigned re-install
+      // would have already failed the downgrade check above.
+      if currentSigned then
+        newEntry.DowngradeAcknowledged := false;
+      FTrustState.RecordAuthor(packageId.Id, newEntry);
+    end;
+    exit;
+  end;
+
+  // Honour an earlier acknowledgement so we don't re-prompt for the same SPKI.
+  if prior.DowngradeAcknowledged and
+     SameText(prior.LastAuthorSpkiHex, currentSpki) and
+     (prior.LastSeenAuthorSigned = currentSigned) then
+    exit;
+
+  // Apply the downgrade policy.
+  case policy.AuthorDowngradePolicy of
+    adpAllow :
+      begin
+        FLogger.Warning(Format(
+          '[PackageCache] Author downgrade for [%s] silently allowed by policy.',
+          [packageId.Id]));
+        newEntry := prior;
+        newEntry.LastAuthorSpkiHex    := currentSpki;
+        newEntry.LastSeenAuthorSigned := currentSigned;
+        newEntry.LastSeenAt           := TTimeZone.Local.ToUniversalTime(Now);
+        newEntry.DowngradeAcknowledged := true;
+        FTrustState.RecordAuthor(packageId.Id, newEntry);
+      end;
+    adpBlock :
+      begin
+        FLogger.Error(Format(
+          '[PackageCache] Author downgrade for [%s] blocked by policy ' +
+          '(authorDowngradePolicy=block). Previous SPKI sha256:%s.',
+          [packageId.Id, prior.LastAuthorSpkiHex]));
+        result := false;
+      end;
+    adpPrompt :
+      begin
+        if FTrustPrompt = nil then
+        begin
+          FLogger.Error(Format(
+            '[PackageCache] Author downgrade for [%s] but no prompt strategy ' +
+            'is wired — blocking. Set authorDowngradePolicy=allow to override.',
+            [packageId.Id]));
+          result := false;
+          exit;
+        end;
+        context.PackageId        := packageId.Id;
+        context.Version          := packageId.Version.ToStringNoMeta;
+        context.PreviousSpkiHex  := prior.LastAuthorSpkiHex;
+        context.PreviousSubject  := '';
+        context.NewSigned        := currentSigned;
+        context.NewSpkiHex       := currentSpki;
+        context.NewSubject       := currentSubject;
+        result := FTrustPrompt.PromptAuthorDowngrade(context, decision);
+        case decision of
+          tpdTrustOnce :
+            begin
+              newEntry := prior;
+              newEntry.LastAuthorSpkiHex    := currentSpki;
+              newEntry.LastSeenAuthorSigned := currentSigned;
+              newEntry.LastSeenAt           := TTimeZone.Local.ToUniversalTime(Now);
+              newEntry.DowngradeAcknowledged := true;
+              FTrustState.RecordAuthor(packageId.Id, newEntry);
+              result := true;
+            end;
+          tpdBlockOnce :
+            begin
+              FLogger.Warning('[PackageCache] User blocked this build of [' +
+                packageId.Id + '].');
+              result := false;
+            end;
+          tpdBlockAlways :
+            begin
+              FLogger.Warning('[PackageCache] User permanently blocked [' +
+                packageId.Id + '].');
+              FTrustState.BlockPermanently(packageId.Id);
+              result := false;
+            end;
+        end;
+      end;
+  end;
 end;
 
 destructor TPackageCache.Destroy;
@@ -496,6 +915,22 @@ begin
   dspecFile := IncludeTrailingPathDelimiter(packageFolder) + cPackageDspecFile;
 
   result := result and FileExists(dspecFile);
+
+  // Cheap re-check on cache hit (plan §1.7, V-33). Confirms the receipt
+  // exists and matches the active trust-policy fingerprint, and re-hashes
+  // only the manifest. If the policy has changed since extraction, fall
+  // through to InstallPackageFromFile which does the full re-verify.
+  if result and (FSigningService <> nil) and (FTrustPolicy <> nil) then
+  begin
+    if not FSigningService.QuickRecheck(packageFolder, FTrustPolicy.GetEffectivePolicy) then
+    begin
+      FLogger.Information(
+        '[PackageCache] Receipt is missing, policy has changed, or manifest has been altered. ' +
+        'Re-verifying [' + packageId.Id + '].');
+      result := false;
+    end;
+  end;
+
   if not result then
   begin
     //fallback: the extracted folder is missing or has no dspec, but the .dpkg may still be
@@ -534,6 +969,7 @@ var
   packageFolder : string;
   packageFileFolder : string;
   key : string;
+  verifyResult : TVerificationResult;
 begin
   result := false;
   FLogger.Debug('[PackageCache] installing from file : ' + packageFileName);
@@ -598,12 +1034,67 @@ begin
 
   //work with packageFilePath now.
 
+  // Signing — the central verification gate (architecture doc §Verification
+  // Workflow, plan §1.7). Verify the package *before* extraction so a hostile
+  // archive never gets written to disk. The signing service is optional:
+  // tests/legacy harnesses that don't wire DI can skip it.
+  if FSigningService <> nil then
+  begin
+    try
+      verifyResult := FSigningService.VerifyPackage(packageFilePath,
+        FTrustPolicy.GetEffectivePolicy);
+    except
+      on e : Exception do
+      begin
+        FLogger.Error('[PackageCache] Verification raised exception for [' +
+          packageFilePath + ']: ' + e.Message);
+        exit;
+      end;
+    end;
+
+    if verifyResult.Outcome = voInvalid then
+    begin
+      FLogger.Error('[PackageCache] Package verification failed: ' + verifyResult.Reason);
+      exit;
+    end;
+
+    case verifyResult.Outcome of
+      voTrusted :
+        FLogger.Verbose('[PackageCache] Package signature verified (' +
+          IntToStr(Length(verifyResult.Signatures)) + ' signatures).');
+      voUnsigned :
+        FLogger.Information('[PackageCache] Installing unsigned package ' +
+          '[' + packageIndentity.Id + '] under permissive mode.');
+      voUntrustedPublisher :
+        FLogger.Warning('[PackageCache] Package signed but signer is not in ' +
+          'trustedPublishers; install allowed under permissive mode.');
+    end;
+
+    // TOFU author no-downgrade ratchet (plan §1.10). Compares the current
+    // signer against the high-water mark from the last successful install
+    // of this package id and either accepts, blocks, or prompts the user.
+    if not EvaluateAuthorDowngrade(packageIndentity, verifyResult,
+                                    FTrustPolicy.GetEffectivePolicy) then
+      exit;
+
+    // P2 §2.3 (V-24): repository assurance ratchet. Once seen carrying a
+    // trusted-repo signature, future builds must continue to.
+    if not EvaluateRepositoryRatchet(packageIndentity, verifyResult) then
+      exit;
+  end;
+
   try
     FLogger.Debug('[PackageCache] Extracting Package file [' + packageFilePath + '] to : ' + packageFolder);
     TZipFile.ExtractZipFile(packageFilePath, packageFolder);
     result := FileExists(IncludeTrailingPathDelimiter(packageFolder) + cPackageDspecFile);
     if result then
       FLogger.Verbose('Package  [' + packageFilePath + '] added to cache.');
+
+    // Write the verification receipt as the FINAL step of a successful
+    // verify-and-extract — V-31. Its presence is the signal that extraction
+    // completed; a crash leaves no receipt and we re-fetch on next use.
+    if result and (FReceiptService <> nil) and (FSigningService <> nil) then
+      WriteReceipt(packageFolder, packageIndentity, verifyResult);
 
   except
     on e : exception do

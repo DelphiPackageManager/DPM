@@ -59,12 +59,17 @@ uses
 {$IFNDEF CREATOR}
   ToolsApi,
 {$ENDIF}
+  DPM.Core.Trust.Interfaces,
+  DPM.Core.Trust.TrustSet,
   DPM.Core.Utils.System;
 {$I DPMIDE.inc}
 
 {$R *.dfm}
 
 constructor TDPMAboutForm.Create(AOwner: TComponent);
+var
+  trustSet : ITrustSet;
+  trustSetVer : integer;
 begin
   inherited;
 {$IFNDEF CREATOR}
@@ -76,7 +81,12 @@ begin
   {$ENDIF}
 {$ENDIF}
 
-  lblVersion.Caption := lblVersion.Caption + TSystemUtils.GetVersionString;
+  // IDE-1: surface the signing trust-set version alongside the DPM version
+  // so consumers can confirm which trust anchors their IDE is honouring.
+  trustSet := TBuiltInTrustSet.Create;
+  trustSetVer := trustSet.Version;
+  lblVersion.Caption := lblVersion.Caption + TSystemUtils.GetVersionString +
+    Format(' (signing trust set v%d)', [trustSetVer]);
 end;
 
 procedure TDPMAboutForm.githubLinkLabelLinkClick(Sender : TObject; const Link : string; LinkType : TSysLinkType);

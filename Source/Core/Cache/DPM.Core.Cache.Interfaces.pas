@@ -111,6 +111,13 @@ type
     /// </summary>
     function GetPackageHash(const packageId : IPackageIdentity) : string;
 
+    /// <summary>
+    /// Re-hash every cached package against its manifest and re-run signature
+    /// verification (V-34). Used by `dpm cache verify` and the IDE Tools menu.
+    /// Returns the number of packages that failed verification.
+    /// </summary>
+    function FullReVerify : integer;
+
     property Location : string read GetLocation write SetLocation;
     property PackagesFolder : string read GetPackagesFolder;
   end;

@@ -100,7 +100,11 @@ var
 begin
   cacheRoot := MakeTempCacheRoot;
   try
-    cache := TPackageCache.Create(TTestLogger.Create, TPackageSpecReader.Create(TTestLogger.Create));
+    // GetPackageHash predates signing — pass nil for the signing/trust/receipt
+    // deps. The cache code guards each with `if FSigningService <> nil` etc.
+    cache := TPackageCache.Create(TTestLogger.Create,
+      TPackageSpecReader.Create(TTestLogger.Create),
+      nil, nil, nil, nil, nil);
     cache.Location := cacheRoot;
     identity := IPackageIdentity(NewIdentity('Sample.Pkg', '1.2.3'));
     try
@@ -138,7 +142,11 @@ var
 begin
   cacheRoot := MakeTempCacheRoot;
   try
-    cache := TPackageCache.Create(TTestLogger.Create, TPackageSpecReader.Create(TTestLogger.Create));
+    // GetPackageHash predates signing — pass nil for the signing/trust/receipt
+    // deps. The cache code guards each with `if FSigningService <> nil` etc.
+    cache := TPackageCache.Create(TTestLogger.Create,
+      TPackageSpecReader.Create(TTestLogger.Create),
+      nil, nil, nil, nil, nil);
     cache.Location := cacheRoot;
     identity := IPackageIdentity(NewIdentity('Sample.Pkg', '1.2.3'));
     try
@@ -183,7 +191,11 @@ var
 begin
   cacheRoot := MakeTempCacheRoot;
   try
-    cache := TPackageCache.Create(TTestLogger.Create, TPackageSpecReader.Create(TTestLogger.Create));
+    // GetPackageHash predates signing — pass nil for the signing/trust/receipt
+    // deps. The cache code guards each with `if FSigningService <> nil` etc.
+    cache := TPackageCache.Create(TTestLogger.Create,
+      TPackageSpecReader.Create(TTestLogger.Create),
+      nil, nil, nil, nil, nil);
     cache.Location := cacheRoot;
     identity := IPackageIdentity(NewIdentity('No.Such.Pkg', '9.9.9'));
     try
@@ -214,7 +226,11 @@ var
 begin
   cacheRoot := MakeTempCacheRoot;
   try
-    cache := TPackageCache.Create(TTestLogger.Create, TPackageSpecReader.Create(TTestLogger.Create));
+    // GetPackageHash predates signing — pass nil for the signing/trust/receipt
+    // deps. The cache code guards each with `if FSigningService <> nil` etc.
+    cache := TPackageCache.Create(TTestLogger.Create,
+      TPackageSpecReader.Create(TTestLogger.Create),
+      nil, nil, nil, nil, nil);
     cache.Location := cacheRoot;
     identity := IPackageIdentity(NewIdentity('Pkg.With.Content', '0.0.1'));
     try

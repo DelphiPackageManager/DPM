@@ -66,6 +66,7 @@ uses
   System.DateUtils,
   System.Classes,
   JsonDataObjects,
+  DPM.Core.Utils.DateTime,
   DPM.Core.Utils.System,
   DPM.Core.Utils.Hash;
 
@@ -189,7 +190,7 @@ begin
     if not entry.Contains('cachedAt') then
       exit;
     cachedAtStr := entry.S['cachedAt'];
-    if not TryISO8601ToDate(cachedAtStr, cachedAt, true) then
+    if not TDPMDateTimeUtils.TryISO8601ToDate(cachedAtStr, cachedAt, true) then
       exit;
     ageHours := HoursBetween(TTimeZone.Local.ToUniversalTime(Now), cachedAt);
     if ageHours > FTTLHours then
@@ -230,7 +231,7 @@ begin
 
   entry := TJsonObject.Create;
   try
-    entry.S['cachedAt'] := DateToISO8601(TTimeZone.Local.ToUniversalTime(Now), true);
+    entry.S['cachedAt'] := TDPMDateTimeUtils.DateToISO8601(TTimeZone.Local.ToUniversalTime(Now), true);
     entry.S['purl'] := purl;
     entry.S['source'] := sourceName;
     //Persist the raw response as a sub-object if it parses as JSON; otherwise

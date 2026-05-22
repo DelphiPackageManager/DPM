@@ -53,6 +53,7 @@ uses
   DPM.Console.Command.Sign,
   DPM.Console.Command.Sources,
   DPM.Console.Command.Spec,
+  DPM.Console.Command.Trust,
   DPM.Console.Command.Update,
   DPM.Console.Command.Verify,
   DPM.Console.Command.Why,
@@ -65,6 +66,8 @@ uses
   DPM.Core.Vuln.Scanner,
   DPM.Core.Vuln.Writer.CycloneDX,
   DPM.Core.Logging,
+  DPM.Core.Trust.Prompt,
+  DPM.Console.Trust.Prompt,
   DPM.Console.Logger,
   DPM.Console.Writer,
 {$IFDEF MSWINDOWS}
@@ -88,6 +91,10 @@ begin
  container.RegisterInstance<IConsoleWriter>(console);
  container.RegisterType<ILogger, TDPMConsoleLogger>.AsSingleton();
 
+ //Override the non-interactive default registered by InitCore with a stdin-aware
+ //prompt — CLI commands can ask the user about author-signing downgrades.
+ container.RegisterType<ITrustPromptStrategy,TConsoleTrustPromptStrategy>;
+
  container.RegisterType<ICommandHandler,TCacheCommand>('command.cache');
  container.RegisterType<ICommandHandler,TConfigCommand>('command.config');
  container.RegisterType<ICommandHandler,TDeleteCommand>('command.delete');
@@ -103,6 +110,7 @@ begin
  container.RegisterType<ICommandHandler,TSignCommand>('command.sign');
  container.RegisterType<ICommandHandler,TSourcesCommand>('command.sources');
  container.RegisterType<ICommandHandler,TSpecCommand>('command.spec');
+ container.RegisterType<ICommandHandler,TTrustCommand>('command.trust');
  container.RegisterType<ICommandHandler,TUpdateCommand>('command.update');
  container.RegisterType<ICommandHandler,TVerifyCommand>('command.verify');
  container.RegisterType<ICommandHandler,TWhyCommand>('command.why');

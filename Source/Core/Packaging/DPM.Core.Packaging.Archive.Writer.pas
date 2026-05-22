@@ -76,11 +76,19 @@ uses
 
 { TPackageArchiveWriter }
 
+// V-12: archive entry names MUST use forward-slash separators. ZIPs created
+// from Windows paths default to backslash, which our verifier (correctly)
+// rejects. Centralise the normalisation here so every Add path is consistent.
+function NormaliseArchiveName(const name : string) : string;
+begin
+  result := StringReplace(name, '\', '/', [rfReplaceAll]);
+end;
+
 function TPackageArchiveWriter.AddFile(const filePath : string) : Boolean;
 var
   archiveFileName : string;
 begin
-  archiveFileName := ExtractRelativePath(FBasePath, filePath);
+  archiveFileName := NormaliseArchiveName(ExtractRelativePath(FBasePath, filePath));
   FZipFile.Add(filePath, archiveFileName);
   result := true;
 end;
@@ -88,7 +96,7 @@ end;
 function TPackageArchiveWriter.AddFile(const fileName, archiveFileName : string) : boolean;
 begin
   try
-    FZipFile.Add(fileName, archiveFileName);
+    FZipFile.Add(fileName, NormaliseArchiveName(archiveFileName));
     result := true;
   except
     on e : Exception do
@@ -114,7 +122,7 @@ var
 begin
   try
     iconBytes := TFile.ReadAllBytes(filePath);
-    FZipFile.Add(iconBytes, GetIconArchiveFileName(filePath));
+    FZipFile.Add(iconBytes, NormaliseArchiveName(GetIconArchiveFileName(filePath)));
   except
     on e : Exception do
       raise Exception.Create('Error adding icon [' + filePath + '] to package : ' + e.Message);

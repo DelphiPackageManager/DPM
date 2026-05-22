@@ -81,12 +81,61 @@ type
     constructor Create(const name : string; const source : string; const sourceType : TSourceType; const userName : string; const password : string; const enabled : boolean); overload;
   end;
 
+  TTrustedPublisherConfig = class(TInterfacedObject, ITrustedPublisherConfig)
+  private
+    FName : string;
+    FSpki : string;
+  protected
+    function GetName : string;
+    function GetSpki : string;
+    procedure SetName(const value : string);
+    procedure SetSpki(const value : string);
+    function LoadFromYAML(const yamlObj : IYAMLValue) : boolean;
+    function SaveToYAML(const parentObj : IYAMLValue) : boolean;
+  end;
+
+  TTrustedRepositoryConfig = class(TInterfacedObject, ITrustedRepositoryConfig)
+  private
+    FUrl : string;
+    FSpki : string;
+  protected
+    function GetUrl : string;
+    function GetSpki : string;
+    procedure SetUrl(const value : string);
+    procedure SetSpki(const value : string);
+    function LoadFromYAML(const yamlObj : IYAMLValue) : boolean;
+    function SaveToYAML(const parentObj : IYAMLValue) : boolean;
+  end;
+
+  TSigningConfig = class(TInterfacedObject, ISigningConfig)
+  private
+    FValidationMode : string;
+    FAuthorDowngradePolicy : string;
+    FAllowKeyCompromiseOverride : boolean;
+    FTrustedPublishers : IList<ITrustedPublisherConfig>;
+    FTrustedRepositories : IList<ITrustedRepositoryConfig>;
+  protected
+    function GetValidationMode : string;
+    procedure SetValidationMode(const value : string);
+    function GetAuthorDowngradePolicy : string;
+    procedure SetAuthorDowngradePolicy(const value : string);
+    function GetAllowKeyCompromiseOverride : boolean;
+    procedure SetAllowKeyCompromiseOverride(const value : boolean);
+    function GetTrustedPublishers : IList<ITrustedPublisherConfig>;
+    function GetTrustedRepositories : IList<ITrustedRepositoryConfig>;
+    function LoadFromYAML(const yamlObj : IYAMLValue) : boolean;
+    function SaveToYAML(const parentObj : IYAMLValue) : boolean;
+  public
+    constructor Create;
+  end;
+
   TConfiguration = class(TInterfacedObject, IConfiguration, IConfigurationLoadSave)
   private
     FSources : IList<ISourceConfig>;
     FPackageCacheLocation : string;
     FFileName : string;
     FAuthor : string;
+    FSigning : ISigningConfig;
     FLogger : ILogger;
   protected
     function GetFileName : string;
@@ -99,6 +148,7 @@ type
     function GetSourceByName(const name : string) : ISourceConfig;
     function GetAuthor : string;
     procedure SetAuthor(const value : string);
+    function GetSigning : ISigningConfig;
 
     function LoadFromFile(const fileName : string) : boolean;
     function SaveToFile(const fileName : string) : boolean;
@@ -317,6 +367,186 @@ begin
   FSourceType := value;
 end;
 
+{ TTrustedPublisherConfig }
+
+function TTrustedPublisherConfig.GetName : string;
+begin result := FName; end;
+
+function TTrustedPublisherConfig.GetSpki : string;
+begin result := FSpki; end;
+
+procedure TTrustedPublisherConfig.SetName(const value : string);
+begin FName := value; end;
+
+procedure TTrustedPublisherConfig.SetSpki(const value : string);
+begin FSpki := value; end;
+
+function TTrustedPublisherConfig.LoadFromYAML(const yamlObj : IYAMLValue) : boolean;
+var
+  obj : IYAMLMapping;
+begin
+  if not yamlObj.IsMapping then
+    exit(false);
+  obj := yamlObj.AsMapping;
+  FName := obj.S['name'];
+  FSpki := obj.S['spki'];
+  result := true;
+end;
+
+function TTrustedPublisherConfig.SaveToYAML(const parentObj : IYAMLValue) : boolean;
+var
+  item : IYAMLMapping;
+begin
+  item := parentObj.AsSequence.AddMapping;
+  item.S['name'] := FName;
+  item.S['spki'] := FSpki;
+  result := true;
+end;
+
+{ TTrustedRepositoryConfig }
+
+function TTrustedRepositoryConfig.GetUrl : string;
+begin result := FUrl; end;
+
+function TTrustedRepositoryConfig.GetSpki : string;
+begin result := FSpki; end;
+
+procedure TTrustedRepositoryConfig.SetUrl(const value : string);
+begin FUrl := value; end;
+
+procedure TTrustedRepositoryConfig.SetSpki(const value : string);
+begin FSpki := value; end;
+
+function TTrustedRepositoryConfig.LoadFromYAML(const yamlObj : IYAMLValue) : boolean;
+var
+  obj : IYAMLMapping;
+begin
+  if not yamlObj.IsMapping then
+    exit(false);
+  obj := yamlObj.AsMapping;
+  FUrl := obj.S['url'];
+  FSpki := obj.S['spki'];
+  result := true;
+end;
+
+function TTrustedRepositoryConfig.SaveToYAML(const parentObj : IYAMLValue) : boolean;
+var
+  item : IYAMLMapping;
+begin
+  item := parentObj.AsSequence.AddMapping;
+  item.S['url'] := FUrl;
+  item.S['spki'] := FSpki;
+  result := true;
+end;
+
+{ TSigningConfig }
+
+constructor TSigningConfig.Create;
+begin
+  inherited Create;
+  // Architecture doc defaults — see plan §1.11.
+  FValidationMode := 'permissive';
+  FAuthorDowngradePolicy := 'prompt';
+  FAllowKeyCompromiseOverride := false;
+  FTrustedPublishers := TCollections.CreateList<ITrustedPublisherConfig>;
+  FTrustedRepositories := TCollections.CreateList<ITrustedRepositoryConfig>;
+end;
+
+function TSigningConfig.GetValidationMode : string;
+begin result := FValidationMode; end;
+
+procedure TSigningConfig.SetValidationMode(const value : string);
+begin FValidationMode := value; end;
+
+function TSigningConfig.GetAuthorDowngradePolicy : string;
+begin result := FAuthorDowngradePolicy; end;
+
+procedure TSigningConfig.SetAuthorDowngradePolicy(const value : string);
+begin FAuthorDowngradePolicy := value; end;
+
+function TSigningConfig.GetAllowKeyCompromiseOverride : boolean;
+begin result := FAllowKeyCompromiseOverride; end;
+
+procedure TSigningConfig.SetAllowKeyCompromiseOverride(const value : boolean);
+begin FAllowKeyCompromiseOverride := value; end;
+
+function TSigningConfig.GetTrustedPublishers : IList<ITrustedPublisherConfig>;
+begin result := FTrustedPublishers; end;
+
+function TSigningConfig.GetTrustedRepositories : IList<ITrustedRepositoryConfig>;
+begin result := FTrustedRepositories; end;
+
+function TSigningConfig.LoadFromYAML(const yamlObj : IYAMLValue) : boolean;
+var
+  obj : IYAMLMapping;
+  publishers : IYAMLSequence;
+  repositories : IYAMLSequence;
+  i : integer;
+  publisher : ITrustedPublisherConfig;
+  repository : ITrustedRepositoryConfig;
+begin
+  if not yamlObj.IsMapping then
+    exit(false);
+  obj := yamlObj.AsMapping;
+
+  if obj.Contains('validationMode') then
+    FValidationMode := obj.S['validationMode'];
+  if obj.Contains('authorDowngradePolicy') then
+    FAuthorDowngradePolicy := obj.S['authorDowngradePolicy'];
+  if obj.Contains('allowKeyCompromiseOverride') then
+    FAllowKeyCompromiseOverride := obj.B['allowKeyCompromiseOverride'];
+
+  FTrustedPublishers.Clear;
+  if obj.Contains('trustedPublishers') then
+  begin
+    publishers := obj.A['trustedPublishers'];
+    for i := 0 to publishers.Count - 1 do
+    begin
+      publisher := TTrustedPublisherConfig.Create;
+      if publisher.LoadFromYAML(publishers[i]) then
+        FTrustedPublishers.Add(publisher);
+    end;
+  end;
+
+  FTrustedRepositories.Clear;
+  if obj.Contains('trustedRepositories') then
+  begin
+    repositories := obj.A['trustedRepositories'];
+    for i := 0 to repositories.Count - 1 do
+    begin
+      repository := TTrustedRepositoryConfig.Create;
+      if repository.LoadFromYAML(repositories[i]) then
+        FTrustedRepositories.Add(repository);
+    end;
+  end;
+
+  result := true;
+end;
+
+function TSigningConfig.SaveToYAML(const parentObj : IYAMLValue) : boolean;
+var
+  obj : IYAMLMapping;
+  publishers : IYAMLSequence;
+  repositories : IYAMLSequence;
+  i : integer;
+begin
+  obj := parentObj.AsMapping.AddOrSetMapping('signing');
+  obj.S['validationMode'] := FValidationMode;
+  obj.S['authorDowngradePolicy'] := FAuthorDowngradePolicy;
+  if FAllowKeyCompromiseOverride then
+    obj.B['allowKeyCompromiseOverride'] := true;
+
+  publishers := obj.A['trustedPublishers'];
+  for i := 0 to FTrustedPublishers.Count - 1 do
+    FTrustedPublishers[i].SaveToYAML(publishers);
+
+  repositories := obj.A['trustedRepositories'];
+  for i := 0 to FTrustedRepositories.Count - 1 do
+    FTrustedRepositories[i].SaveToYAML(repositories);
+
+  result := true;
+end;
+
 { TConfiguration }
 
 procedure TConfiguration.AddDefaultSources;
@@ -332,7 +562,12 @@ begin
   inherited Create;
   FLogger := logger;
   FSources := TCollections.CreateList<ISourceConfig>;
+  FSigning := TSigningConfig.Create;
+end;
 
+function TConfiguration.GetSigning : ISigningConfig;
+begin
+  result := FSigning;
 end;
 
 function TConfiguration.GetAuthor : string;
@@ -428,6 +663,8 @@ begin
   FPackageCacheLocation := root.S['packageCacheLocation'];
   if root.Contains('author') then
     FAuthor := root.S['author'];
+  if root.Contains('signing') then
+    FSigning.LoadFromYAML(root.Values['signing']);
   sources := root.A['packageSources'];
   bResult := true;
   for i := 0 to sources.Count - 1 do
@@ -505,6 +742,7 @@ begin
   root.S['packageCacheLocation'] := FPackageCacheLocation;
   if FAuthor <> '' then
     root.S['author'] := FAuthor;
+  FSigning.SaveToYAML(parentObj);
   sources := root.A['packageSources'];
   for i := 0 to FSources.Count - 1 do
     result := FSources[i].SaveToYAML(sources) and result;

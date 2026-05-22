@@ -80,6 +80,7 @@ type
                                                       const preRelease : boolean) : IList<IPackageInfo>;
     function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
     function GetPackageHash(const packageId : IPackageIdentity) : string;
+    function FullReVerify : integer;
   public
     constructor Create;
     ///<summary>Register a package info under its identity key (id|version|compiler) so
@@ -559,6 +560,12 @@ end;
 function TFakePackageCache.GetPackageHash(const packageId : IPackageIdentity) : string;
 begin
   result := '';
+end;
+
+function TFakePackageCache.FullReVerify : integer;
+begin
+  // Resolver tests don't exercise signing; nothing to re-verify.
+  result := 0;
 end;
 
 //-----------------------------------------------------------------------------

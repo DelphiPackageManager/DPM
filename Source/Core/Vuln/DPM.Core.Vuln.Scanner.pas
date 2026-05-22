@@ -57,7 +57,8 @@ uses
   System.SysUtils,
   System.DateUtils,
   Spring.Collections,
-  DPM.Core.Types;
+  DPM.Core.Types,
+  DPM.Core.Utils.DateTime;
 
 const
   cScanToolName = 'dpm-scan';
@@ -92,7 +93,7 @@ begin
   try
     result.ToolName := cScanToolName;
     result.ToolVersion := cScanToolVersion;
-    result.TimestampUtc := DateToISO8601(TTimeZone.Local.ToUniversalTime(Now), true);
+    result.TimestampUtc := TDPMDateTimeUtils.DateToISO8601(TTimeZone.Local.ToUniversalTime(Now), true);
     result.SourceSbomSerial := report.SerialNumber;
     result.ProjectName := report.ProjectName;
     result.ProjectVersion := report.ProjectVersion;

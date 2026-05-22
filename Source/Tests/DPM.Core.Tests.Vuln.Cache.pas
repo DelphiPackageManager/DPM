@@ -37,6 +37,7 @@ uses
   System.DateUtils,
   JsonDataObjects,
   DPM.Core.Types,
+  DPM.Core.Utils.DateTime,
   DPM.Core.Logging,
   DPM.Core.Vuln.Interfaces,
   DPM.Core.Vuln.Cache;
@@ -136,7 +137,7 @@ begin
   raw := TFile.ReadAllText(fileName, TEncoding.UTF8);
   entry := TJsonBaseObject.Parse(raw) as TJsonObject;
   try
-    entry.S['cachedAt'] := DateToISO8601(IncHour(TTimeZone.Local.ToUniversalTime(Now), -48), true);
+    entry.S['cachedAt'] := TDPMDateTimeUtils.DateToISO8601(IncHour(TTimeZone.Local.ToUniversalTime(Now), -48), true);
     TFile.WriteAllText(fileName, entry.ToJSON(false), TEncoding.UTF8);
   finally
     entry.Free;

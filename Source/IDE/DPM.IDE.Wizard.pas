@@ -34,6 +34,7 @@ uses
   Vcl.ActnList,
   Vcl.Controls,
   Spring.Container,
+  DPM.Core.Cache.Interfaces,
   DPM.IDE.Logger,
   DPM.IDE.MessageService,
   DPM.IDE.ProjectTreeManager,
@@ -61,7 +62,13 @@ type
     //environment-options page entry sticks around with stale container refs if the plugin is
     //ever reloaded.
     FAddInOptions : INTAAddInOptions;
+    // IDE-6: held so the Tools > DPM > Verify Package Cache menu has the
+    // cache singleton on hand at click time.
+    FPackageCacheForVerify : IPackageCache;
     procedure InitContainer;
+    procedure RegisterVerifyCacheMenu(const menuServices : INTAServices;
+                                      const packageCache : IPackageCache);
+    procedure DPMVerifyCacheClick(Sender : TObject);
   protected
 
     //IOTAWizard
@@ -109,11 +116,12 @@ uses
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Init,
+  DPM.Core.Trust.Prompt,
   DPM.Core.Utils.Config,
-  DPM.Core.Cache.Interfaces,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Package.Interfaces,
   DPM.Core.Package.Installer.Interfaces,
+  DPM.IDE.Trust.Prompt,
   DPM.IDE.ProjectController,
   DPM.IDE.ProjectStorageNotifier,
   DPM.IDE.IDENotifier,
@@ -320,10 +328,12 @@ begin
     FContainer.RegisterType<IDPMIDEPathManager,TDPMIDEPathManager>.AsSingleton();
 
     DPM.Core.Init.InitCore(FContainer,
-      //replaces core registration of the IPackageInstallerContext implementation
+      //replaces core registration of the IPackageInstallerContext implementation,
+      //and swaps the non-interactive trust-prompt default for the IDE modal form.
       procedure(const container : TContainer)
       begin
         container.RegisterType<IPackageInstallerContext, TDPMIDEPackageInstallerContext>().AsSingleton();
+        container.RegisterType<ITrustPromptStrategy, TIdeTrustPromptStrategy>;
       end);
     FContainer.Build;
   except
@@ -470,6 +480,48 @@ begin
 
   menuServices.NewToolbar('DPMPackageManager','DPM Package Manager');
   menuServices.AddToolButton('DPMPackageManager','ShowDPMButton', action);
+
+  // IDE-6: Tools menu item for re-verifying every cached package against its
+  // manifest and signature. Routes to IPackageCache.FullReVerify.
+  RegisterVerifyCacheMenu(menuServices, packageCache);
+end;
+
+procedure TDPMWizard.RegisterVerifyCacheMenu(const menuServices : INTAServices;
+                                              const packageCache : IPackageCache);
+var
+  verifyAction : TAction;
+  verifyMenu : TMenuItem;
+begin
+  FPackageCacheForVerify := packageCache;
+  verifyAction := TAction.Create(menuServices.ActionList);
+  verifyAction.Name := 'actDPMVerifyCache';
+  verifyAction.Caption := 'Verify DPM Package Cache';
+  verifyAction.Visible := true;
+  verifyAction.Category := 'DPM';
+  verifyAction.Hint := 'Re-hash and re-verify every package in the DPM cache.';
+  verifyAction.OnExecute := Self.DPMVerifyCacheClick;
+
+  verifyMenu := TMenuItem.Create(nil);
+  verifyMenu.Caption := 'Verify DPM Package Cache';
+  verifyMenu.Name := 'GlobalDPMVerifyCacheItem';
+  verifyMenu.Action := verifyAction;
+
+  menuServices.AddActionMenu('ProjectOptionsItem', verifyAction, verifyMenu, true);
+end;
+
+procedure TDPMWizard.DPMVerifyCacheClick(Sender : TObject);
+var
+  failures : integer;
+begin
+  if FPackageCacheForVerify = nil then
+    exit;
+  failures := FPackageCacheForVerify.FullReVerify;
+  if failures = 0 then
+    MessageDlg('DPM cache re-verify completed — all packages valid.',
+      mtInformation, [mbOK], 0)
+  else
+    MessageDlg(Format('DPM cache re-verify finished with %d failure(s). See the DPM Messages window for details.',
+      [failures]), mtWarning, [mbOK], 0);
 end;
 
 destructor TDPMWizard.Destroy;

@@ -76,7 +76,27 @@ uses
   DPM.Core.SBOM.Writers,
   DPM.Core.SBOM.Writers.Reports,
   DPM.Core.SBOM.Reader,
-  DPM.Core.SBOM.Generator;
+  DPM.Core.SBOM.Generator,
+
+  // Signing — Phase 1
+  DPM.Core.Crypto.Hashing.Interfaces,
+  DPM.Core.Crypto.Hashing,
+  DPM.Core.Crypto.X509.Interfaces,
+  DPM.Core.Crypto.X509,
+  DPM.Core.Crypto.Cms.Interfaces,
+  DPM.Core.Crypto.Cms,
+  DPM.Core.Crypto.Timestamping,
+  DPM.Core.Trust.Interfaces,
+  DPM.Core.Trust.TrustSet,
+  DPM.Core.Trust.Policy,
+  DPM.Core.Trust.State,
+  DPM.Core.Trust.Prompt,
+  DPM.Core.Package.Manifest.Interfaces,
+  DPM.Core.Package.Manifest,
+  DPM.Core.Package.Archive,
+  DPM.Core.Package.Cache.Receipt,
+  DPM.Core.Package.Signing.Interfaces,
+  DPM.Core.Package.Signing;
 
 
 procedure InitCore(const container : TContainer; const overrideProc : TConstProc<TContainer>);
@@ -127,6 +147,24 @@ begin
   Container.RegisterType<ISbomWriter, TMarkdownReportWriter>(cSBOMWriterMarkdown);
   Container.RegisterType<ISBOMReader, TCycloneDXReader>;
   Container.RegisterType<ISbomGenerator, TSBOMGenerator>;
+
+  // Signing — Phase 1 registrations
+  Container.RegisterType<IHashingService, TBCryptHashingService>.AsSingleton;
+  Container.RegisterType<IX509Service, TX509Service>;
+  Container.RegisterType<ICmsService, TCmsService>;
+  Container.RegisterType<ITimestamper, TWindowsTimestamper>;
+  Container.RegisterType<ITrustSet, TBuiltInTrustSet>.AsSingleton;
+  Container.RegisterType<ITrustPolicyService, TTrustPolicyService>;
+  Container.RegisterType<IManifestService, TManifestService>;
+  Container.RegisterType<IArchiveValidator, TArchiveValidator>;
+  Container.RegisterType<IReceiptService, TYamlReceiptService>;
+  Container.RegisterType<IPackageSigningService, TPackageSigningService>;
+  // TYamlTrustStateService has a parameterless ctor that uses
+  // %APPDATA%\.dpm\trust-state.yaml.
+  Container.RegisterType<ITrustStateService, TYamlTrustStateService>.AsSingleton;
+  // Non-interactive default — fails closed when no UI is wired. The CLI
+  // and IDE register their own ITrustPromptStrategy on top of this default.
+  Container.RegisterType<ITrustPromptStrategy, TNonInteractiveTrustPromptStrategy>;
 
   Container.RegisterInstance<TContainer>(Container);
 

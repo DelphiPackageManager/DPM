@@ -261,6 +261,7 @@
         <DCCReference Include="Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas"/>
         <DCCReference Include="IDE\DPM.IDE.PathManager.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Hash.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.DateTime.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.MapFile.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.SearchPaths.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.SBOM.pas"/>
@@ -271,6 +272,31 @@
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Reader.pas"/>
         <DCCReference Include="IDE\DPM.IDE.SBOM.Menu.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Win32.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Algorithms.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Hashing.Interfaces.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Hashing.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.X509.Interfaces.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.X509.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Interfaces.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Cms.Interfaces.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Cms.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Timestamping.pas"/>
+        <DCCReference Include="Core\Trust\DPM.Core.Trust.Interfaces.pas"/>
+        <DCCReference Include="Core\Trust\DPM.Core.Trust.TrustSet.pas"/>
+        <DCCReference Include="Core\Trust\DPM.Core.Trust.Policy.pas"/>
+        <DCCReference Include="Core\Trust\DPM.Core.Trust.State.pas"/>
+        <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Manifest.Interfaces.pas"/>
+        <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Manifest.pas"/>
+        <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Archive.pas"/>
+        <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Cache.Receipt.pas"/>
+        <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Signing.Interfaces.pas"/>
+        <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Signing.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.TrustPromptForm.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.Trust.Prompt.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.SigningBadge.pas"/>
+        <DCCReference Include="Core\Trust\DPM.Core.Trust.Prompt.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

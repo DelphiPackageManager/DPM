@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
@@ -136,8 +136,8 @@
         <DPMCompiler>12.0</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;$(DPM)\VSoft.YAML\1.5.2\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.System.Console\1.1.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.CommandLine\0.1.11\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;</DPMSearch>
-        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;$(DPM)\VSoft.YAML\1.5.2\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.System.Console\1.1.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.CommandLine\0.1.11\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.YAML\1.5.5\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.System.Console\1.1.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.CommandLine\0.1.11\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.YAML\1.5.5\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.System.Console\1.1.2\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.CommandLine\0.1.11\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;</DPMSearch>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -151,30 +151,8 @@
         <DCCReference Include="Cmdline\Options\DPM.Console.Options.Reg.pas"/>
         <DCCReference Include="Cmdline\Writer\DPM.Console.Writer.pas"/>
         <DCCReference Include="Cmdline\Writer\DPM.Console.Writer.Windows.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Install.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Restore.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Pack.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Factory.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Help.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Config.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Delete.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.List.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Push.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.SetApiKey.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Sources.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.pas"/>
         <DCCReference Include="Cmdline\DPM.Console.ExitCodes.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Update.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.ExitCodes.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Base.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Sign.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Verify.pas"/>
         <DCCReference Include="Cmdline\Logging\DPM.Console.Logger.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Uninstall.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Why.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Add.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Cache.pas"/>
         <DCCReference Include="Core\Cache\DPM.Core.Cache.Interfaces.pas"/>
         <DCCReference Include="Core\Cache\DPM.Core.Cache.pas"/>
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.EnvironmentProvider.pas"/>
@@ -192,7 +170,6 @@
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Version.pas"/>
         <DCCReference Include="Core\Logging\DPM.Core.Logging.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Base.pas"/>
-        <DCCReference Include="Core\Options\DPM.Core.Options.Cache.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Common.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Config.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Install.pas"/>
@@ -260,18 +237,15 @@
         <DCCReference Include="Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Files.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Installer.Interfaces.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Info.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Info.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.ServiceIndex.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.ListItem.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Hash.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.DateTime.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Template.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Masks.pas"/>
         <DCCReference Include="Cmdline\DPM.Console.Prompts.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Discovery.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Writer.pas"/>
-        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.SBOM.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Generator.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Interfaces.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Types.pas"/>
@@ -288,7 +262,61 @@
         <DCCReference Include="Core\Vuln\DPM.Core.Vuln.Scanner.pas"/>
         <DCCReference Include="Core\Vuln\DPM.Core.Vuln.Writer.CycloneDX.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Scan.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Algorithms.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Cms.Interfaces.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Cms.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Hashing.Interfaces.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Hashing.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Interfaces.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Timestamping.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Win32.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.X509.Interfaces.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.X509.pas"/>
+        <DCCReference Include="Core\Trust\DPM.Core.Trust.Interfaces.pas"/>
+        <DCCReference Include="Core\Trust\DPM.Core.Trust.Policy.pas"/>
+        <DCCReference Include="Core\Trust\DPM.Core.Trust.State.pas"/>
+        <DCCReference Include="Core\Trust\DPM.Core.Trust.TrustSet.pas"/>
+        <DCCReference Include="Core\Trust\DPM.Core.Trust.Prompt.pas"/>
+        <DCCReference Include="Cmdline\DPM.Console.Trust.Prompt.pas"/>
+        <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Archive.pas"/>
+        <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Cache.Receipt.pas"/>
+        <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Manifest.Interfaces.pas"/>
+        <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Manifest.pas"/>
+        <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Signing.Interfaces.pas"/>
+        <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Signing.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Add.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Base.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Delete.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Install.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Push.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Restore.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Uninstall.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Pack.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Update.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Config.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.SetApiKey.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Factory.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Sources.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.List.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Discovery.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.ExitCodes.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Help.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Info.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Writer.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Why.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Sbom.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Scan.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Cache.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Trust.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Verify.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Sign.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Cache.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Trust.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Verify.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Sign.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -345,7 +373,7 @@
                 <PackageReference id="VSoft.SemanticVersion" version="0.2.7"/>
                 <PackageReference id="VSoft.System.Console" version="1.1.2"/>
                 <PackageReference id="VSoft.Uri" version="0.3.3"/>
-                <PackageReference id="VSoft.YAML" version="1.5.2"/>
+                <PackageReference id="VSoft.YAML" version="1.5.5"/>
             </PackageReferences>
             <PackageReferences platform="Win64">
                 <PackageReference id="Spring4D.Base" version="2.0.2-beta.2"/>
@@ -367,7 +395,7 @@
                 <PackageReference id="VSoft.SemanticVersion" version="0.2.7"/>
                 <PackageReference id="VSoft.System.Console" version="1.1.2"/>
                 <PackageReference id="VSoft.Uri" version="0.3.3"/>
-                <PackageReference id="VSoft.YAML" version="1.5.2"/>
+                <PackageReference id="VSoft.YAML" version="1.5.5"/>
             </PackageReferences>
         </DPM>
     </ProjectExtensions>

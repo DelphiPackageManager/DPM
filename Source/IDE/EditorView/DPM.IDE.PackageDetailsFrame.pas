@@ -49,6 +49,8 @@ uses
   DPM.Core.Logging,
   DPM.IDE.Logger,
   DPM.Core.Cache.Interfaces,
+  DPM.Core.Package.Cache.Receipt,
+  DPM.IDE.SigningBadge,
   DPM.Core.Options.Search,
   DPM.Core.Options.Install,
   DPM.Core.Options.UnInstall,
@@ -102,6 +104,13 @@ type
 
     FConfiguration : IConfiguration;
     FPackageCache : IPackageCache;
+    FReceiptService : IReceiptService;
+    // IDE-2: programmatic label that sits above the version selector and
+    // reports the signing status (trusted/unsigned/untrusted/invalid) of
+    // the currently selected package. Added in code so we don't need to
+    // round-trip the .dfm for every Delphi version we ship.
+    FSigningLabel : TLabel;
+    FCurrentBadge : TSigningBadge;
     FIconCache : TDPMIconCache;
     FHost : IDetailsHost;
     FLogger : IDPMIDELogger;
@@ -156,6 +165,8 @@ type
     procedure VersionGridOnDowngradeEvent(const project : string);
 
     procedure DoUpdateVersions(const sReferenceVersion : string; const versions : IList<TPackageVersion>);
+    procedure SigningLabelClick(Sender : TObject);
+    procedure UpdateSigningBadge(const package : IPackageSearchResultItem);
 
     //versions cache
     function TryGetCachedVersions(const Id : string; const includePrerelease : boolean; out versions : IList<TPackageVersion>) : boolean;
@@ -545,6 +556,22 @@ begin
   btnUpgradeAll.Caption := '';
   btnUninstallAll.Caption := '';
 
+  // IDE-2: signing status header. Sits in pnlPackageId next to the package
+  // id so users see the trust state alongside the package identity at a
+  // glance. Click opens a small details dialog. Updated by UpdateSigningBadge
+  // whenever SetPackage runs.
+  FSigningLabel := TLabel.Create(Self);
+  FSigningLabel.Parent := pnlPackageId;
+  FSigningLabel.Left := 47;
+  FSigningLabel.Top := 36;
+  FSigningLabel.AutoSize := true;
+  FSigningLabel.Cursor := crHandPoint;
+  FSigningLabel.ShowHint := true;
+  FSigningLabel.Hint := 'Click for signature details';
+  FSigningLabel.OnClick := SigningLabelClick;
+  FSigningLabel.Caption := '';
+  FSigningLabel.Visible := false;
+
   FVersionsCache := TCollections.CreateDictionary<string, IList<TPackageVersion>>;
   FVersionsCacheUdate := TStopWatch.Create;
   FMetaDataCache := TCollections.CreateDictionary<string, IPackageSearchResultItem>;
@@ -567,6 +594,7 @@ begin
   FInstallerContext := container.Resolve<IPackageInstallerContext>;
   FRespositoryManager := container.Resolve<IPackageRepositoryManager>;
   FPackageCache := container.Resolve<IPackageCache>;
+  FReceiptService := container.Resolve<IReceiptService>;
   FHost := host;
   SetPackage(nil, FIncludePreRelease);
 
@@ -732,6 +760,31 @@ begin
 
 end;
 
+procedure TPackageDetailsFrame.SigningLabelClick(Sender : TObject);
+begin
+  if FCurrentBadge.Detail = '' then
+    exit;
+  // Plain MessageDlg keeps this version-portable. A proper dedicated form
+  // is a follow-up if/when we want richer formatting.
+  MessageDlg(FCurrentBadge.Caption + sLineBreak + sLineBreak +
+             FCurrentBadge.Detail, mtInformation, [mbOK], 0);
+end;
+
+procedure TPackageDetailsFrame.UpdateSigningBadge(const package : IPackageSearchResultItem);
+var
+  badge : TSigningBadge;
+begin
+  if (package = nil) or (FSigningLabel = nil) then
+    exit;
+  badge := TSigningBadgeResolver.Resolve(
+    FPackageCache, FReceiptService,
+    package.Id, package.Version, IDECompilerVersion);
+  FCurrentBadge := badge;
+  FSigningLabel.Caption := badge.Caption;
+  FSigningLabel.Font.Color := badge.AccentColor;
+  FSigningLabel.Visible := true;
+end;
+
 procedure TPackageDetailsFrame.SetPackage(const package: IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
 var
   i: Integer;
@@ -759,6 +812,7 @@ begin
 
     lblPackageId.Caption := package.Id;
     SetPackageLogo(package.Id);
+    UpdateSigningBadge(package);
     cboVersions.Enabled := true;
     imgPackageLogo.Visible := true;
     lblPackageId.Visible := true;
@@ -795,6 +849,8 @@ begin
 
     imgPackageLogo.Visible := false;
     lblPackageId.Visible := false;
+    if FSigningLabel <> nil then
+      FSigningLabel.Visible := false;
     cboVersions.Enabled := false;
     lblVersionTitle.Visible := false;
     cboVersions.Visible := false;

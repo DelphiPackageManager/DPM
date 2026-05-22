@@ -43,6 +43,9 @@ uses
   DPM.Core.Spec.TargetPlatform,
   DPM.Core.Packaging,
   DPM.Core.Packaging.Archive,
+  DPM.Core.Crypto.Algorithms,
+  DPM.Core.Package.Manifest.Interfaces,
+  DPM.Core.Package.Archive,
   DPM.Core.Utils.Masks;
 
 /// This only processes specs for the Pack command. For git style packages we will need to do something else.
@@ -52,6 +55,8 @@ type
     FLogger : ILogger;
     FArchiveWriter : IPackageArchiveWriter;
     FSpecReader : IPackageSpecReader;
+    FManifestService : IManifestService;
+    FArchiveValidator : IArchiveValidator;
 
     FCurrentTokens : TStringList;
 
@@ -87,7 +92,11 @@ type
 
     function WritePackageFromSpec(const cancellationToken : ICancellationToken; const options : TPackOptions) : boolean;
   public
-    constructor Create(const logger : ILogger; const archiveWriter : IPackageArchiveWriter; const specReader : IPackageSpecReader);
+    constructor Create(const logger : ILogger;
+                       const archiveWriter : IPackageArchiveWriter;
+                       const specReader : IPackageSpecReader;
+                       const manifestService : IManifestService;
+                       const archiveValidator : IArchiveValidator);
   end;
 
 
@@ -108,11 +117,17 @@ uses
 
 { TPackageWriter }
 
-constructor TPackageWriter.Create(const logger : ILogger; const archiveWriter : IPackageArchiveWriter; const specReader : IPackageSpecReader);
+constructor TPackageWriter.Create(const logger : ILogger;
+                                   const archiveWriter : IPackageArchiveWriter;
+                                   const specReader : IPackageSpecReader;
+                                   const manifestService : IManifestService;
+                                   const archiveValidator : IArchiveValidator);
 begin
   FLogger := logger;
   FArchiveWriter := archiveWriter;
   FSpecReader := specReader;
+  FManifestService := manifestService;
+  FArchiveValidator := archiveValidator;
   FCurrentTokens := nil;
   FTokenRegEx := TRegEx.Create('\$(\w+)\$');
 end;
@@ -513,15 +528,13 @@ var
   template : ISpecTemplate;
   sourceEntry : ISpecSourceEntry;
   i : integer;
-  stopWatch : TStopWatch;
+  archiveValidation : TArchiveValidationResult;
+  manifest : IPackageManifest;
 begin
   result := false;
 
   //create fresh copy of the spec with a single targetPlatform
-  stopWatch := TStopWatch.StartNew;
   reducedSpec := spec.Clone;
-  stopWatch.Stop;
-  FLogger.Debug(Format('cloned spec in : %dms', [stopWatch.ElapsedMilliseconds]));
 
   //the passed in targetPlatform is a clone with a single compilerVersion set.
   reducedSpec.TargetPlatforms.Clear;
@@ -589,6 +602,41 @@ begin
   finally
     FArchiveWriter.Close;
     FArchivePaths := nil;
+  end;
+
+  // Post-process: emit dpm-manifest.json from the just-closed archive and
+  // verify the archive satisfies V-9..V-13 + M-12. Failures here mean the
+  // package is malformed and we don't want to ship it.
+  if result and (FArchiveValidator <> nil) then
+  begin
+    archiveValidation := FArchiveValidator.Validate(packageFileName);
+    if not archiveValidation.Ok then
+    begin
+      FLogger.Error(Format('Archive validation failed: %s (entry "%s")',
+        [archiveValidation.Reason, archiveValidation.Entry]));
+      DeleteFile(packageFileName);
+      result := false;
+      exit;
+    end;
+  end;
+
+  if result and (FManifestService <> nil) then
+  begin
+    try
+      manifest := FManifestService.GenerateFromArchive(packageFileName,
+        reducedSpec.MetaData.Id, version.ToStringNoMeta, haSha256);
+      FManifestService.InjectIntoArchive(packageFileName, manifest);
+      FLogger.Debug(Format('Emitted dpm-manifest.json (%d entries)',
+        [Length(manifest.Files)]));
+    except
+      on e : Exception do
+      begin
+        FLogger.Error('Manifest emission failed: ' + e.Message);
+        DeleteFile(packageFileName);
+        result := false;
+        exit;
+      end;
+    end;
   end;
 end;
 

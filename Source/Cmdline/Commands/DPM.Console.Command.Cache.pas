@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -33,6 +33,7 @@ uses
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
+  DPM.Core.Cache.Interfaces,
   DPM.Console.ExitCodes,
   DPM.Console.Command.Base,
   DPM.Core.Package.Installer.Interfaces;
@@ -41,11 +42,15 @@ type
   TCacheCommand = class(TBaseCommand)
   private
     FPackageInstaller : IPackageInstaller;
+    FPackageCache : IPackageCache;
 
   protected
     function Execute(const cancellationToken : ICancellationToken): TExitCode; override;
   public
-    constructor Create(const logger : ILogger; const configurationManager : IConfigurationManager; const packageInstaller : IPackageInstaller);reintroduce;
+    constructor Create(const logger : ILogger;
+                       const configurationManager : IConfigurationManager;
+                       const packageInstaller : IPackageInstaller;
+                       const packageCache : IPackageCache); reintroduce;
   end;
 
 
@@ -59,15 +64,32 @@ uses
 
 { TCacheCommand }
 
-constructor TCacheCommand.Create(const logger: ILogger; const configurationManager: IConfigurationManager; const packageInstaller: IPackageInstaller);
+constructor TCacheCommand.Create(const logger: ILogger;
+                                  const configurationManager: IConfigurationManager;
+                                  const packageInstaller: IPackageInstaller;
+                                  const packageCache : IPackageCache);
 begin
   inherited Create(logger, configurationManager);
   FPackageInstaller := packageInstaller;
+  FPackageCache := packageCache;
 end;
 
 function TCacheCommand.Execute(const cancellationToken : ICancellationToken): TExitCode;
+var
+  failureCount : integer;
 begin
   TCacheOptions.Default.ApplyCommon(TCommonOptions.Default);
+
+  // `dpm cache verify` short-circuits the per-package download/cache flow.
+  if TCacheOptions.Default.VerifyAll then
+  begin
+    failureCount := FPackageCache.FullReVerify;
+    if failureCount = 0 then
+      result := TExitCode.OK
+    else
+      result := TExitCode.Error;
+    exit;
+  end;
 
   if not TCacheOptions.Default.Validate(Logger) then
   begin

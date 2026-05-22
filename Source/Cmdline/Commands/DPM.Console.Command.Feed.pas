@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -30,7 +30,7 @@ unit DPM.Console.Command.Feed;
 interface
 
 uses
-  VSoft.Awaitable,
+  VSoft.CancellationToken,
   DPM.Console.ExitCodes,
   DPM.Console.Command.Base,
   DPM.Core.Logging,

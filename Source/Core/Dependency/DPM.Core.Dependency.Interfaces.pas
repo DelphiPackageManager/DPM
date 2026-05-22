@@ -68,6 +68,14 @@ type
 
     procedure SetUseSource(const value : boolean);
 
+    // Phase 2 §2.6 — project-level lock. Optional `manifestHash` attribute
+    // on the .dproj PackageReference element. When present, restore compares
+    // the cached package's recorded manifest hash against this value and
+    // hard-fails a mismatch — equivalent to NuGet's packages.lock.json
+    // content-hash check. Format matches receipt: "sha256:<hex>".
+    function GetManifestHash : string;
+    procedure SetManifestHash(const value : string);
+
     function GetDependencies : IEnumerable<IPackageReference>;
 
     function GetUseSource : boolean;
@@ -143,6 +151,7 @@ type
     property Children : IEnumerable<IPackageReference>read GetDependencies;
     property Parent : IPackageReference read GetParent;
     property UseSource : boolean read GetUseSource write SetUseSource;
+    property ManifestHash : string read GetManifestHash write SetManifestHash;
 
     //resolution support
     property PackageInfo : IPackageInfo read GetPackageInfo write SetPackageInfo;

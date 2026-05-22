@@ -54,6 +54,7 @@ type
     FSelectedOn : TVersionRange;
     FUseSource : boolean;
     FCompilerVersion : TCompilerVersion;
+    FManifestHash : string;   // P2 §2.6 — lock-file content hash, "sha256:<hex>"
 
     FPackageInfo : IPackageInfo;
 
@@ -98,6 +99,8 @@ type
     function AreEqual(const otherPackageReference : IPackageReference; const depth : integer = 1) : boolean;
     function GetUseSource: Boolean;
     procedure SetUseSource(const value: Boolean);
+    function GetManifestHash : string;
+    procedure SetManifestHash(const value : string);
     function ToIdVersionString: string;
     function Clone : IPackageReference;
 
@@ -351,6 +354,16 @@ begin
   parent := GetParent;
   //if the parent is using the source then we should too.
   result := FUseSource or ((parent <> nil) and parent.UseSource);
+end;
+
+function TPackageReference.GetManifestHash : string;
+begin
+  result := FManifestHash;
+end;
+
+procedure TPackageReference.SetManifestHash(const value : string);
+begin
+  FManifestHash := value;
 end;
 
 function TPackageReference.HasAnyChild(const id: string): boolean;

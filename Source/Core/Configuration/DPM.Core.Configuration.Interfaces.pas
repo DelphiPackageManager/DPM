@@ -43,6 +43,54 @@ type
 
   end;
 
+  // Signing-policy fields. Sub-record of IConfiguration. The trust policy
+  // service projects this onto TTrustPolicy + a fingerprint. Layout matches
+  // the architecture doc §Trust Policies (cConfiguration example).
+  ITrustedPublisherConfig = interface(IConfigNode)
+    ['{0B7E2A48-2D9F-4A3D-9E5E-7C5D77FA1A18}']
+    function GetName : string;
+    function GetSpki : string;
+    procedure SetName(const value : string);
+    procedure SetSpki(const value : string);
+    property Name : string read GetName write SetName;
+    property Spki : string read GetSpki write SetSpki;
+  end;
+
+  ITrustedRepositoryConfig = interface(IConfigNode)
+    ['{1F4B0D6F-D2C7-4D0A-AAE9-8B6D71D6D8A2}']
+    function GetUrl : string;
+    function GetSpki : string;
+    procedure SetUrl(const value : string);
+    procedure SetSpki(const value : string);
+    property Url : string read GetUrl write SetUrl;
+    property Spki : string read GetSpki write SetSpki;
+  end;
+
+  ISigningConfig = interface(IConfigNode)
+    ['{7E4C9A66-9C7C-46C8-B98D-2BCBD4471B91}']
+    // 'permissive' | 'require' | 'repository-required' | 'author-and-repository'
+    // The mode is the single switch — `permissive` already accepts unsigned
+    // packages; the three stricter modes reject them.
+    function GetValidationMode : string;
+    procedure SetValidationMode(const value : string);
+
+    // 'prompt' | 'block' | 'allow'
+    function GetAuthorDowngradePolicy : string;
+    procedure SetAuthorDowngradePolicy(const value : string);
+
+    function GetAllowKeyCompromiseOverride : boolean;
+    procedure SetAllowKeyCompromiseOverride(const value : boolean);
+
+    function GetTrustedPublishers : IList<ITrustedPublisherConfig>;
+    function GetTrustedRepositories : IList<ITrustedRepositoryConfig>;
+
+    property ValidationMode : string read GetValidationMode write SetValidationMode;
+    property AuthorDowngradePolicy : string read GetAuthorDowngradePolicy write SetAuthorDowngradePolicy;
+    property AllowKeyCompromiseOverride : boolean read GetAllowKeyCompromiseOverride write SetAllowKeyCompromiseOverride;
+    property TrustedPublishers : IList<ITrustedPublisherConfig> read GetTrustedPublishers;
+    property TrustedRepositories : IList<ITrustedRepositoryConfig> read GetTrustedRepositories;
+  end;
+
   ISourceConfig = interface(IConfigNode)
     ['{88D98629-8276-4782-B46B-004E7B9934E4}']
     function GetName : string;
@@ -86,6 +134,8 @@ type
     function GetAuthor : string;
     procedure SetAuthor(const value : string);
 
+    function GetSigning : ISigningConfig;
+
     property FileName : string read GetFileName write SetFileName;
     //defaults to %userprofile%\.dpm\packages - can override with env var DPM_PACKAGES
     property PackageCacheLocation : string read GetPackageCacheLocation write SetPackageCacheLocation;
@@ -95,6 +145,10 @@ type
 
     //cached default author used by the spec scaffolder - optional
     property Author : string read GetAuthor write SetAuthor;
+
+    // Signing policy block (Phase 1+). Always non-nil; freshly created
+    // configs have default values per the architecture doc.
+    property Signing : ISigningConfig read GetSigning;
 
   end;
 

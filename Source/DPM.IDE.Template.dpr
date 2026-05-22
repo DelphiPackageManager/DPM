@@ -189,7 +189,32 @@ uses
   DPM.Core.SBOM.Writers.Reports in 'Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas',
   DPM.Core.Project.SearchPaths in 'Core\Project\DPM.Core.Project.SearchPaths.pas',
   DPM.Core.SBOM.Reader in 'Core\Sbom\DPM.Core.SBOM.Reader.pas',
-  DPM.IDE.SBOM.Menu in 'IDE\DPM.IDE.SBOM.Menu.pas';
+  DPM.IDE.SBOM.Menu in 'IDE\DPM.IDE.SBOM.Menu.pas',
+  DPM.Core.Crypto.Win32 in 'Core\Crypto\DPM.Core.Crypto.Win32.pas',
+  DPM.Core.Crypto.Algorithms in 'Core\Crypto\DPM.Core.Crypto.Algorithms.pas',
+  DPM.Core.Crypto.Hashing.Interfaces in 'Core\Crypto\DPM.Core.Crypto.Hashing.Interfaces.pas',
+  DPM.Core.Crypto.Hashing in 'Core\Crypto\DPM.Core.Crypto.Hashing.pas',
+  DPM.Core.Crypto.X509.Interfaces in 'Core\Crypto\DPM.Core.Crypto.X509.Interfaces.pas',
+  DPM.Core.Crypto.X509 in 'Core\Crypto\DPM.Core.Crypto.X509.pas',
+  DPM.Core.Crypto.Provider.Interfaces in 'Core\Crypto\DPM.Core.Crypto.Provider.Interfaces.pas',
+  DPM.Core.Crypto.Provider in 'Core\Crypto\DPM.Core.Crypto.Provider.pas',
+  DPM.Core.Crypto.Cms.Interfaces in 'Core\Crypto\DPM.Core.Crypto.Cms.Interfaces.pas',
+  DPM.Core.Crypto.Cms in 'Core\Crypto\DPM.Core.Crypto.Cms.pas',
+  DPM.Core.Crypto.Timestamping in 'Core\Crypto\DPM.Core.Crypto.Timestamping.pas',
+  DPM.Core.Trust.Interfaces in 'Core\Trust\DPM.Core.Trust.Interfaces.pas',
+  DPM.Core.Trust.TrustSet in 'Core\Trust\DPM.Core.Trust.TrustSet.pas',
+  DPM.Core.Trust.Policy in 'Core\Trust\DPM.Core.Trust.Policy.pas',
+  DPM.Core.Trust.State in 'Core\Trust\DPM.Core.Trust.State.pas',
+  DPM.Core.Package.Manifest.Interfaces in 'Core\Package\Signing\DPM.Core.Package.Manifest.Interfaces.pas',
+  DPM.Core.Package.Manifest in 'Core\Package\Signing\DPM.Core.Package.Manifest.pas',
+  DPM.Core.Package.Archive in 'Core\Package\Signing\DPM.Core.Package.Archive.pas',
+  DPM.Core.Package.Cache.Receipt in 'Core\Package\Signing\DPM.Core.Package.Cache.Receipt.pas',
+  DPM.Core.Package.Signing.Interfaces in 'Core\Package\Signing\DPM.Core.Package.Signing.Interfaces.pas',
+  DPM.Core.Package.Signing in 'Core\Package\Signing\DPM.Core.Package.Signing.pas',
+  DPM.IDE.TrustPromptForm in 'IDE\DPM.IDE.TrustPromptForm.pas',
+  DPM.Core.Trust.Prompt in 'Core\Trust\DPM.Core.Trust.Prompt.pas',
+  DPM.IDE.Trust.Prompt in 'IDE\DPM.IDE.Trust.Prompt.pas',
+  DPM.IDE.SigningBadge in 'IDE\DPM.IDE.SigningBadge.pas';
 
 {$R *.res}
 

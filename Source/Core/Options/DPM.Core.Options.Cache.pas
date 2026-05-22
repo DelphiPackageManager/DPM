@@ -39,6 +39,7 @@ type
     FPreRelease : boolean;
     FVersionString : string;
     FVersion : TPackageVersion;
+    FVerifyAll : boolean;
     class var
       FDefault : TCacheOptions;
   protected
@@ -57,6 +58,11 @@ type
     property PreRelease : boolean read FPreRelease write FPreRelease;
     property VersionString : string read FVersionString write FVersionString;
     property Version : TPackageVersion read FVersion write FVersion;
+
+    // `dpm cache verify` — re-hash every cached package against its manifest
+    // and re-run signature verification (plan §1.6, V-34). When set, the
+    // PackageId / Compiler / Version checks below are skipped.
+    property VerifyAll : boolean read FVerifyAll write FVerifyAll;
 
   end;
 
@@ -109,6 +115,15 @@ var
 begin
   //must call inherited
   result := inherited Validate(logger);
+
+  // `dpm cache verify` takes no positional args — short-circuit the
+  // package-id / compiler / version checks that the package-download form
+  // requires.
+  if FVerifyAll then
+  begin
+    FIsValid := result;
+    exit;
+  end;
 
   if TCacheOptions.Default.PackageId = '' then
   begin

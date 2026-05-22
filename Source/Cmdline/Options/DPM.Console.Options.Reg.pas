@@ -49,7 +49,10 @@ uses
   DPM.Core.Options.Restore,
   DPM.Core.Options.Sbom,
   DPM.Core.Options.Scan,
+  DPM.Core.Options.Sign,
   DPM.Core.Options.Spec,
+  DPM.Core.Options.Trust,
+  DPM.Core.Options.Verify,
   DPM.Core.Options.Why,
   DPM.Core.Vuln.Types,
   DPM.Core.Utils.Strings,
@@ -75,12 +78,17 @@ var
   option : IOptionDefinition;
   cmd : TCommandDefinition;
 begin
-  cmd := TOptionsRegistry.RegisterCommand('cache', '', 'Downloads a package to the local package cache using the specified sources. If no sources are specified, those listed in the global configuration file, `%appdata%\DPM\dpm.Config`','', 'cache <packageId> [options]');
+  cmd := TOptionsRegistry.RegisterCommand('cache', '', 'Downloads a package to the local package cache, or with `verify` re-checks every package in the cache.','', 'cache <packageId>|verify [options]');
 
-  option := cmd.RegisterUnNamedOption<string>('A valid package Id','packageId',
+  // Positional arg: either a package id (the original behaviour) or the
+  // literal "verify" which triggers FullReVerify (V-34).
+  option := cmd.RegisterUnNamedOption<string>('A valid package Id, or the literal "verify"','packageId',
    procedure(const value : string)
     begin
-      TCacheOptions.Default.PackageId := value;
+      if SameText(value, 'verify') then
+        TCacheOptions.Default.VerifyAll := true
+      else
+        TCacheOptions.Default.PackageId := value;
     end);
   option.Required := true;
 
@@ -620,13 +628,57 @@ end;
 
 procedure RegisterSignCommand;
 var
-//  option : IOptionDefinition;
   cmd : TCommandDefinition;
 begin
-  cmd := TOptionsRegistry.RegisterCommand('sign', '', 'Signs all the packages matching the first argument with a certificate.',
-                                                      'Specify the package(s) to sign (comma separated) and the certificate options.',
-                                                      'sign <package(s)> [options]');
+  cmd := TOptionsRegistry.RegisterCommand('sign', '',
+    'Signs a .dpkg package with an author certificate from the Windows certificate store or a PFX file.',
+    'The cert is selected by --thumbprint (cert store) or --pfx (PFX file).',
+    'sign <package> --thumbprint <hex> | --pfx <file> [options]');
 
+  cmd.RegisterUnNamedOption<string>('Path to the .dpkg to sign', 'packageFile',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.PackageFile := value;
+    end).Required := true;
+
+  cmd.RegisterOption<string>('thumbprint', 't', 'SHA-1 thumbprint of the cert in the Windows store (MY).',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.Thumbprint := value;
+    end);
+
+  cmd.RegisterOption<string>('store', '', 'Certificate-store location: CurrentUser (default) or LocalMachine.',
+    procedure(const value : string)
+    begin
+      if SameText(value, 'LocalMachine') then
+        TSignOptions.Default.StoreLocation := sslLocalMachine
+      else
+        TSignOptions.Default.StoreLocation := sslCurrentUser;
+    end);
+
+  cmd.RegisterOption<string>('pfx', 'p', 'Path to a PFX file containing the signing certificate.',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.PfxFile := value;
+    end);
+
+  cmd.RegisterOption<string>('pfx-password-env', '', 'Name of an environment variable holding the PFX password.',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.PfxPasswordEnvVar := value;
+    end);
+
+  cmd.RegisterOption<string>('timestamper', '', 'RFC3161 timestamp authority URL (default: DigiCert).',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.TimestampUrl := value;
+    end);
+
+  cmd.RegisterOption<string>('digest', 'd', 'CMS digest algorithm: sha256 (default), sha384, or sha512.',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.Digest := value;
+    end);
 end;
 
 
@@ -738,13 +790,74 @@ end;
 
 procedure RegisterVerifyCommand;
 var
-//  option : IOptionDefinition;
   cmd : TCommandDefinition;
+  option : IOptionDefinition;
 begin
-  cmd := TOptionsRegistry.RegisterCommand('verify', '', 'Verifies the signature of the specified package files.',
-                                                      'Specify the package(s) to verify (comma separated).',
-                                                      'verify <package(s)>');
+  cmd := TOptionsRegistry.RegisterCommand('verify', '',
+    'Verifies a .dpkg package using the active trust policy. Runs the full ' +
+    'verification workflow: archive rules, manifest integrity, file-set equality, ' +
+    'CMS signature, chain build, and RFC3161 timestamp.',
+    '',
+    'verify <package> [options]');
 
+  cmd.RegisterUnNamedOption<string>('Path to the .dpkg to verify', 'packageFile',
+    procedure(const value : string)
+    begin
+      TVerifyOptions.Default.PackageFile := value;
+    end).Required := true;
+
+  option := cmd.RegisterOption<boolean>('offline', '', 'Skip network operations (revocation, timestamp authority fetch).',
+    procedure(const value : boolean)
+    begin
+      TVerifyOptions.Default.Offline := value;
+    end);
+  option.HasValue := false;
+end;
+
+procedure RegisterTrustCommand;
+var
+  cmd : TCommandDefinition;
+  option : IOptionDefinition;
+begin
+  cmd := TOptionsRegistry.RegisterCommand('trust', '',
+    'Manages the local trust policy: trusted publishers, trusted repositories, and ' +
+    'related signing settings. Persists changes to dpm.config.yaml.',
+    '',
+    'trust <list|add|remove|show> [publisher|repository] [options]');
+
+  option := cmd.RegisterUnNamedOption<TTrustSubCommand>('Action: list/add/remove/show', 'action',
+    procedure(const value : TTrustSubCommand)
+    begin
+      TTrustOptions.Default.Command := value;
+    end);
+  option.Required := false;
+  option.HasValue := false;
+
+  option := cmd.RegisterUnNamedOption<TTrustKind>('Entry kind: publisher (default) or repository', 'kind',
+    procedure(const value : TTrustKind)
+    begin
+      TTrustOptions.Default.Kind := value;
+    end);
+  option.Required := false;
+  option.HasValue := false;
+
+  cmd.RegisterOption<string>('spki', '', 'SHA-256 SPKI hash, e.g. sha256:AB12CD34...',
+    procedure(const value : string)
+    begin
+      TTrustOptions.Default.Spki := value;
+    end);
+
+  cmd.RegisterOption<string>('name', 'n', 'Display name (publisher only).',
+    procedure(const value : string)
+    begin
+      TTrustOptions.Default.Name := value;
+    end);
+
+  cmd.RegisterOption<string>('url', 'u', 'Repository URL (repository only).',
+    procedure(const value : string)
+    begin
+      TTrustOptions.Default.Url := value;
+    end);
 end;
 
 
@@ -1079,6 +1192,7 @@ begin
   RegisterSignCommand;
   RegisterSourcesCommand;
   RegisterSpecCommand;
+  RegisterTrustCommand;
   RegisterUpdateCommand;
   RegisterVerifyCommand;
   RegisterWhyCommand;
