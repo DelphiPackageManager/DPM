@@ -115,6 +115,7 @@ type
     function UnsignedAttributes : TCmsAttributes;
     function FindSignedAttribute(const oid : AnsiString; out value : TBytes) : boolean;
     function FindUnsignedAttribute(const oid : AnsiString; out value : TBytes) : boolean;
+    function FindSignedAttributeValues(const oid : AnsiString; out values : TArray<TBytes>) : boolean;
     function DerBytes : TBytes;
     function DigestAlgorithm : THashAlgorithm;
     function EncryptedDigest : TBytes;
@@ -984,8 +985,9 @@ var
   size : DWORD;
   buf : TBytes;
   pAttrs : PCRYPT_ATTRIBUTES;
-  i : integer;
+  i, j : integer;
   attr : PCRYPT_ATTRIBUTE;
+  blob : PCRYPT_INTEGER_BLOB;
 begin
   attrs := nil;
   size := 0;
@@ -1000,11 +1002,24 @@ begin
   for i := 0 to Integer(pAttrs.cAttr) - 1 do
   begin
     attrs[i].Oid := AnsiString(attr.pszObjId);
-    if (attr.cValue > 0) and (attr.rgValue.cbData > 0) then
+    // CRYPT_ATTRIBUTE.rgValue points at a contiguous array of cValue
+    // CRYPT_ATTR_BLOB structures. Walk the whole array — most DPM
+    // attributes are single-valued, but dpmVerifiedAuthorSigHash carries
+    // one hash value per attested author signature.
+    SetLength(attrs[i].Values, attr.cValue);
+    for j := 0 to Integer(attr.cValue) - 1 do
     begin
-      SetLength(attrs[i].Value, attr.rgValue.cbData);
-      Move(attr.rgValue.pbData^, attrs[i].Value[0], attr.rgValue.cbData);
+      blob := PCRYPT_INTEGER_BLOB(NativeUInt(attr.rgValue) +
+                                  NativeUInt(j) * SizeOf(CRYPT_INTEGER_BLOB));
+      if blob.cbData > 0 then
+      begin
+        SetLength(attrs[i].Values[j], blob.cbData);
+        Move(blob.pbData^, attrs[i].Values[j][0], blob.cbData);
+      end;
     end;
+    // Convenience shortcut for the common single-value case.
+    if Length(attrs[i].Values) > 0 then
+      attrs[i].Value := attrs[i].Values[0];
     Inc(attr);
   end;
 end;
@@ -1065,6 +1080,22 @@ begin
       exit;
     end;
   value := nil;
+  result := false;
+end;
+
+function TCmsSignedData.FindSignedAttributeValues(const oid : AnsiString;
+                                                   out values : TArray<TBytes>) : boolean;
+var
+  i : integer;
+begin
+  for i := 0 to High(FSignedAttrs) do
+    if FSignedAttrs[i].Oid = oid then
+    begin
+      values := FSignedAttrs[i].Values;
+      result := true;
+      exit;
+    end;
+  values := nil;
   result := false;
 end;
 

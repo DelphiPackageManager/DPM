@@ -96,6 +96,38 @@ type
     // Phase 2: parse the dpmRepositoryAttestation signed attribute off a
     // trusted repository signature and attach to info.Attestation.
     procedure ReadRepositoryAttestation(const der : TBytes; var info : TSignatureInfo);
+    // Cryptographic binding check: confirm the repo sig's
+    // dpmVerifiedAuthorSigHash attribute matches a present author signature
+    // whose signer SPKI equals the attestation's authorSpki. Marks the repo
+    // sigInfo invalid if the binding is declared but doesn't resolve. Soft-
+    // warns (does not fail) when the binding attribute is absent, to allow
+    // older gallery versions to keep working until they catch up.
+    procedure EnforceAuthorSigBinding(const blobs : IList<TPair<string, TBytes>>;
+                                       const earlierSignatures : TArray<TSignatureInfo>;
+                                       var repoSigInfo : TSignatureInfo);
+    // Inverse of EnforceAuthorSigBinding. Attestation declares no verified
+    // author (authorMode = never_author_signed / author_acknowledged_unsigned)
+    // — but if the archive carries any signatures/author-*.p7s blob, the
+    // upload's contents disagree with what the gallery signed. Either an
+    // attacker swapped a verified-author blob for an unverified one (so the
+    // gallery saw no verified signer) or the gallery's attestation generator
+    // is out of sync with the archive. Both cases must refuse the package:
+    // an unverified author sig in the same archive as a "no signer" repo
+    // attestation is exactly the bait-and-switch we're trying to detect.
+    procedure EnforceUnsignedAttestation(const blobs : IList<TPair<string, TBytes>>;
+                                          var repoSigInfo : TSignatureInfo);
+    // Strip a single OCTET STRING (tag 04) or UTF8String (tag 0C) wrapper
+    // from `value`, returning its content bytes. If the bytes don't look
+    // like a recognised wrapper (or claim a length larger than available)
+    // the input is returned unchanged — caller can still attempt to parse,
+    // just from an unexpected shape.
+    function UnwrapOctetString(const value : TBytes) : TBytes;
+    // Tolerant UTF-8 → string conversion. Falls back to byte-by-byte ASCII
+    // when TEncoding.UTF8.GetString raises (strict-UTF8 configurations).
+    // Never raises — the caller for attestation parsing relies on us
+    // returning *something* parseable so the KV walker can spot a malformed
+    // payload and the binding-enforcement security check can still run.
+    function Utf8BytesToStringSafe(const bytes : TBytes) : string;
     // Phase 2: central truth table that turns (mode, hasAuthor, hasRepo)
     // into the verification outcome. Pulled out so the same function is
     // exhaustively covered by tests.
@@ -163,6 +195,7 @@ uses
   System.DateUtils,
   System.IOUtils,
   System.StrUtils,
+  JsonDataObjects,
   DPM.Core.Crypto.Win32,
   DPM.Core.Crypto.Hashing;
 
@@ -556,8 +589,14 @@ begin
   // Find the role attribute. Default to author if absent (back-compat for
   // legacy author-only blobs that pre-date the role attribute — Phase 1
   // tightens this to require the attribute once Phase 1 ships).
+  //
+  // Producers vary on whether they DER-wrap the attribute value in an
+  // OCTET STRING. Our local signer does; some peers write the bytes bare.
+  // UnwrapOctetString is a no-op on bare input and strips the wrapper on
+  // wrapped input, so role detection works either way.
   if decoded.FindSignedAttribute(cOidDpmSignatureRole, roleBytes) then
   begin
+    roleBytes := UnwrapOctetString(roleBytes);
     roleText := LowerCase(Trim(TEncoding.UTF8.GetString(roleBytes)));
     if roleText = cSigRoleRepository then
       info.Role := srRepository
@@ -602,8 +641,27 @@ begin
     exit;
   end;
 
+  // Repository signatures are authenticated by SPKI pinning against the
+  // trust set — NOT chain validation. Per docs/package-signing.md
+  // §Trust Bootstrapping: repository certs are essentially self-issued and
+  // ship with the client as built-in SPKI pins. The CMS verify above plus
+  // the RepositoryTrusted(SPKI) check that happens after VerifyOneSignature
+  // returns are the full authentication for repo sigs. Skip the public-CA
+  // chain build, code-signing EKU check, and the second-pass revocation
+  // build, all of which would fail on a self-issued cert that intentionally
+  // has no public-CA parent.
+  if info.Role = srRepository then
+  begin
+    info.ChainTrusted := false;          // not applicable — SPKI-pinned, not chained
+    info.Revocation := rsNotChecked;
+    info.CurrentRevocationReason := rrNotApplicable;
+    info.Valid := true;
+    result := true;
+    exit;
+  end;
+
   // V-15 / V-16 chain build — gather embedded certs as intermediates and
-  // build to a trusted root.
+  // build to a trusted root. Author signatures only.
   embedded := decoded.EmbeddedCertificates;
   SetLength(intermediates, 0);
   for i := 0 to High(embedded) do
@@ -662,23 +720,112 @@ begin
   result := true;
 end;
 
+function TPackageSigningService.UnwrapOctetString(const value : TBytes) : TBytes;
+const
+  // Tags producers reasonably use to wrap a string-shaped AttributeValue.
+  // CMS AttributeValue is ANY, so the producer picks. OCTET STRING (04) is
+  // what the DPM client emits; .NET / Node CMS libraries often pick
+  // UTF8String (0C) for string payloads — both wrap the same way, and we
+  // want to unwrap either before handing the bytes to a UTF-8 decoder.
+  // Other string-ish tags (PrintableString 13, IA5String 16, …) get added
+  // here if we ever see them in the wild.
+  cTagOctetString = $04;
+  cTagUtf8String  = $0C;
+var
+  tag : byte;
+  contentLen, lenFieldBytes, contentStart : integer;
+  lenOf : byte;
+begin
+  result := value;
+  if Length(value) < 2 then
+    exit;
+  tag := value[0];
+  if (tag <> cTagOctetString) and (tag <> cTagUtf8String) then
+    exit;
+
+  if value[1] < $80 then
+  begin
+    // Short form — length fits in one byte.
+    contentLen := value[1];
+    contentStart := 2;
+  end
+  else
+  begin
+    // Long form — value[1] = 0x80 | <number-of-length-bytes>.
+    // Max length we care about: a few KB, so 1..4 length bytes is plenty.
+    lenOf := value[1] and $7F;
+    if (lenOf = 0) or (lenOf > 4) or (Length(value) < 2 + lenOf) then
+      exit;
+    contentLen := 0;
+    for lenFieldBytes := 0 to lenOf - 1 do
+      contentLen := (contentLen shl 8) or value[2 + lenFieldBytes];
+    contentStart := 2 + lenOf;
+  end;
+
+  if contentLen > Length(value) - contentStart then
+    exit;     // declared length overruns the buffer — leave as-is
+
+  SetLength(result, contentLen);
+  if contentLen > 0 then
+    Move(value[contentStart], result[0], contentLen);
+end;
+
+function TPackageSigningService.Utf8BytesToStringSafe(const bytes : TBytes) : string;
+var
+  i : integer;
+  sb : TStringBuilder;
+begin
+  if Length(bytes) = 0 then
+  begin
+    result := '';
+    exit;
+  end;
+  try
+    result := TEncoding.UTF8.GetString(bytes);
+    exit;
+  except
+    on Exception do
+    begin
+      // Strict UTF-8 configuration rejected an invalid sequence. Fall back
+      // to a byte-by-byte conversion: keep printable ASCII (0x20..0x7E)
+      // plus CR/LF/TAB, replace everything else with '?'. The attestation
+      // KV format is pure ASCII, so any real content survives; corruption
+      // becomes visible '?' chars that won't match expected keys.
+    end;
+  end;
+  sb := TStringBuilder.Create;
+  try
+    for i := 0 to Length(bytes) - 1 do
+      if (bytes[i] = $09) or (bytes[i] = $0A) or (bytes[i] = $0D) or
+         ((bytes[i] >= $20) and (bytes[i] <= $7E)) then
+        sb.Append(Char(bytes[i]))
+      else
+        sb.Append('?');
+    result := sb.ToString;
+  finally
+    sb.Free;
+  end;
+end;
+
 procedure TPackageSigningService.ReadRepositoryAttestation(const der : TBytes;
                                                             var info : TSignatureInfo);
 var
   decoded : ICmsSignedData;
   attrBytes : TBytes;
+  hashValues : TArray<TBytes>;
+  hashBytes : TBytes;
   text : string;
-  eqPos : integer;
-  parts : TStringList;
-  i : integer;
-  key, value : string;
-  authorSpki, namespace : string;
-  unsignedTag : string;
+  doc : TJsonObject;
+  authorMode : string;
+  authorSpki : string;
+  namespace : string;
+  i, collected : integer;
 begin
   info.Attestation.Present := false;
   info.Attestation.Namespace := '';
   info.Attestation.AuthorSpkiHex := '';
   info.Attestation.UnsignedReason := urAttestNotApplicable;
+  SetLength(info.Attestation.BoundAuthorSigHashesHex, 0);
 
   try
     decoded := FCms.Decode(der);
@@ -690,48 +837,225 @@ begin
   if not decoded.FindSignedAttribute(cOidDpmRepositoryAttestation, attrBytes) then
     exit;
 
-  // The attestation payload is a UTF-8 KV pair list, semicolon-separated:
-  //   namespace=VSoft.*;authorSpki=hex;unsigned=neverSigned
-  // unsigned is omitted when the author SPKI is present. Conformance-doc
-  // wire format; the producer (gallery) writes it the same way.
-  text := TEncoding.UTF8.GetString(attrBytes);
-  parts := TStringList.Create;
+  // Canonical wire form (docs/package-signing.md §CMS / PKCS#7 Format and
+  // the gallery spec): UTF8String value containing canonical JSON:
+  //   { "authorMode": "verified" | "never_author_signed" | "author_acknowledged_unsigned",
+  //     "authorSpki": <hex>|null,
+  //     "galleryVersion": "1.0",
+  //     "namespace": <string>,
+  //     "namespaceType": "user"|"org" }
+  // Unknown keys are ignored for forward-compat (gallery may extend the
+  // schema without breaking older verifiers).
+  //
+  // FindSignedAttribute returns the raw attribute-value bytes Windows hands
+  // back from CryptMsgGetParam — the DER-wrapped form. UnwrapOctetString
+  // strips a OCTET STRING (04) or UTF8String (0C) wrapper if present so we
+  // can hand the inner JSON bytes to the decoder.
+  attrBytes := UnwrapOctetString(attrBytes);
+  // Tolerant decode — strict UTF-8 RTL builds raise on invalid sequences,
+  // which would otherwise tunnel out and (before the hard-fail wiring in
+  // VerifyPackage) silently skip the binding check.
+  text := Utf8BytesToStringSafe(attrBytes);
+
+  doc := nil;
   try
-    parts.Delimiter := ';';
-    parts.StrictDelimiter := true;
-    parts.DelimitedText := text;
-    namespace := '';
-    authorSpki := '';
-    unsignedTag := '';
-    for i := 0 to parts.Count - 1 do
-    begin
-      eqPos := Pos('=', parts[i]);
-      if eqPos <= 0 then
-        Continue;
-      key := Trim(Copy(parts[i], 1, eqPos - 1));
-      value := Trim(Copy(parts[i], eqPos + 1, MaxInt));
-      if SameText(key, 'namespace') then
-        namespace := value
-      else if SameText(key, 'authorSpki') then
-        authorSpki := value
-      else if SameText(key, 'unsigned') then
-        unsignedTag := value;
+    try
+      doc := TJsonBaseObject.Parse(text) as TJsonObject;
+    except
+      on e : Exception do
+        raise EPackageSigning.Create(
+          'dpmRepositoryAttestation JSON parse failed: ' + e.Message);
     end;
+    if doc = nil then
+      raise EPackageSigning.Create(
+        'dpmRepositoryAttestation payload is not a JSON object');
+
+    authorMode := doc.S['authorMode'];
+    namespace := doc.S['namespace'];
+    // TJsonObject.S returns '' for both a missing key and a JSON null —
+    // both legitimately mean "no verified author signer", so we don't
+    // distinguish.
+    authorSpki := doc.S['authorSpki'];
+
+    info.Attestation.Present := true;
+    info.Attestation.Namespace := namespace;
+
+    if SameText(authorMode, 'verified') then
+    begin
+      info.Attestation.AuthorSpkiHex := LowerCase(authorSpki);
+      info.Attestation.UnsignedReason := urAttestNotApplicable;
+    end
+    else if SameText(authorMode, 'never_author_signed') then
+    begin
+      info.Attestation.AuthorSpkiHex := '';
+      info.Attestation.UnsignedReason := urAttestNeverSigned;
+    end
+    else if SameText(authorMode, 'author_acknowledged_unsigned') then
+    begin
+      info.Attestation.AuthorSpkiHex := '';
+      info.Attestation.UnsignedReason := urAttestAuthorCeasedSigning;
+    end
+    else
+      raise EPackageSigning.CreateFmt(
+        'dpmRepositoryAttestation has unknown authorMode "%s"', [authorMode]);
   finally
-    parts.Free;
+    doc.Free;
   end;
 
-  info.Attestation.Present := true;
-  info.Attestation.Namespace := namespace;
-  info.Attestation.AuthorSpkiHex := authorSpki;
-  if authorSpki <> '' then
-    info.Attestation.UnsignedReason := urAttestNotApplicable
-  else if SameText(unsignedTag, 'neverSigned') then
-    info.Attestation.UnsignedReason := urAttestNeverSigned
-  else if SameText(unsignedTag, 'authorCeasedSigning') then
-    info.Attestation.UnsignedReason := urAttestAuthorCeasedSigning
+  // Pull the author-sig binding hashes off the same repo signature. The
+  // attribute is multi-value (CMS SET OF), one OCTET STRING per attested
+  // author signature; surface each as hex for symmetry with SignerSpkiHex.
+  // Absence is enforced (or not) by EnforceAuthorSigBinding /
+  // EnforceUnsignedAttestation based on what authorMode declared.
+  if decoded.FindSignedAttributeValues(cOidDpmVerifiedAuthorSigHash, hashValues) then
+  begin
+    SetLength(info.Attestation.BoundAuthorSigHashesHex, Length(hashValues));
+    collected := 0;
+    for i := 0 to High(hashValues) do
+    begin
+      hashBytes := UnwrapOctetString(hashValues[i]);
+      if Length(hashBytes) > 0 then
+      begin
+        info.Attestation.BoundAuthorSigHashesHex[collected] := BytesToHex(hashBytes);
+        Inc(collected);
+      end;
+    end;
+    SetLength(info.Attestation.BoundAuthorSigHashesHex, collected);
+  end;
+end;
+
+procedure TPackageSigningService.EnforceAuthorSigBinding(
+  const blobs : IList<TPair<string, TBytes>>;
+  const earlierSignatures : TArray<TSignatureInfo>;
+  var repoSigInfo : TSignatureInfo);
+var
+  h, k : integer;
+  name : string;
+  blobHashHex : string;
+  boundHash : string;
+  matchedThisHash : boolean;
+  matchedSpkis : TArray<string>;
+  primaryMatched : boolean;
+begin
+  // Empty / absent binding attribute is a hard failure when the attestation
+  // declares a signed author. Without the binding an attacker could strip
+  // or swap the author signature without detection — the repo signature
+  // covers the manifest, not the author sig blob. Gallery is expected to
+  // emit dpmVerifiedAuthorSigHash (OID 1.3.6.1.4.1.95860.1.3) for every
+  // attested author signature.
+  if Length(repoSigInfo.Attestation.BoundAuthorSigHashesHex) = 0 then
+  begin
+    repoSigInfo.Valid := false;
+    repoSigInfo.FailureReason :=
+      'repository attestation declares a signed-author SPKI but the ' +
+      'dpmVerifiedAuthorSigHash binding attribute (OID ' +
+      string(cOidDpmVerifiedAuthorSigHash) + ') is missing — gallery did ' +
+      'not bind the repository signature to any author signature, so the ' +
+      'author<->repo link cannot be verified.';
+    exit;
+  end;
+
+  // Every bound hash must resolve to an author signature actually present
+  // in the archive. Collect the matched sigs' SPKIs while we walk, so the
+  // primary-SPKI check below has the full set.
+  SetLength(matchedSpkis, 0);
+  for h := 0 to High(repoSigInfo.Attestation.BoundAuthorSigHashesHex) do
+  begin
+    boundHash := repoSigInfo.Attestation.BoundAuthorSigHashesHex[h];
+    matchedThisHash := false;
+    for k := 0 to blobs.Count - 1 do
+    begin
+      name := LowerCase(StringReplace(blobs[k].Key, '\', '/', [rfReplaceAll]));
+      if not StartsText('signatures/author-', name) then
+        Continue;
+      blobHashHex := BytesToHex(FHashing.HashBytes(blobs[k].Value, haSha256));
+      if not SameText(blobHashHex, boundHash) then
+        Continue;
+      matchedThisHash := true;
+      // earlierSignatures is populated in the same iteration order as blobs.
+      // Author sigs sort before repo sigs (author-N.p7s < repository-N.p7s
+      // alphabetically), so the SPKI for any matched author has already
+      // been recorded by the time we reach the repo sig.
+      if (k < Length(earlierSignatures)) and
+         (earlierSignatures[k].SignerSpkiHex <> '') then
+      begin
+        SetLength(matchedSpkis, Length(matchedSpkis) + 1);
+        matchedSpkis[High(matchedSpkis)] := earlierSignatures[k].SignerSpkiHex;
+      end;
+      Break;
+    end;
+    if not matchedThisHash then
+    begin
+      repoSigInfo.Valid := false;
+      repoSigInfo.FailureReason := Format(
+        'repository attestation binds to %d author signature(s); hash %s... ' +
+        'has no matching blob in the archive. The author signature was ' +
+        'stripped or modified after the gallery signed it.',
+        [Length(repoSigInfo.Attestation.BoundAuthorSigHashesHex),
+         Copy(boundHash, 1, 16)]);
+      exit;
+    end;
+  end;
+
+  // The primary attestation SPKI (the gallery's registered publisher for
+  // this namespace) must be the signer of at least one of the bound author
+  // sigs we just matched. Co-signers / co-publishers may also be bound and
+  // are vouched for by the gallery, but the primary SPKI anchors the
+  // namespace identity — without that link, the attestation's authorSpki
+  // field is unsupported by the actual blobs in the package.
+  primaryMatched := false;
+  for k := 0 to High(matchedSpkis) do
+    if SameText(matchedSpkis[k], repoSigInfo.Attestation.AuthorSpkiHex) then
+    begin
+      primaryMatched := true;
+      Break;
+    end;
+  if not primaryMatched then
+  begin
+    repoSigInfo.Valid := false;
+    repoSigInfo.FailureReason := Format(
+      'repository attestation declares primary author SPKI %s... but no ' +
+      'bound author signature in the archive is signed by that key — the ' +
+      'author signature was swapped for one from a different certificate.',
+      [Copy(repoSigInfo.Attestation.AuthorSpkiHex, 1, 16)]);
+    exit;
+  end;
+end;
+
+procedure TPackageSigningService.EnforceUnsignedAttestation(
+  const blobs : IList<TPair<string, TBytes>>;
+  var repoSigInfo : TSignatureInfo);
+var
+  k : integer;
+  name : string;
+  authorBlobCount : integer;
+  modeLabel : string;
+begin
+  authorBlobCount := 0;
+  for k := 0 to blobs.Count - 1 do
+  begin
+    name := LowerCase(StringReplace(blobs[k].Key, '\', '/', [rfReplaceAll]));
+    if StartsText('signatures/author-', name) and EndsText('.p7s', name) then
+      Inc(authorBlobCount);
+  end;
+  if authorBlobCount = 0 then
+    exit;
+
+  case repoSigInfo.Attestation.UnsignedReason of
+    urAttestNeverSigned         : modeLabel := 'never_author_signed';
+    urAttestAuthorCeasedSigning : modeLabel := 'author_acknowledged_unsigned';
   else
-    info.Attestation.UnsignedReason := urAttestNotApplicable;
+    modeLabel := 'unspecified';
+  end;
+
+  repoSigInfo.Valid := false;
+  repoSigInfo.FailureReason := Format(
+    'repository attestation declares no verified author signer (authorMode=%s) ' +
+    'but the archive contains %d author signature blob(s) — the archive ' +
+    'contents do not match what the gallery attested at publish time. An ' +
+    'author signature was added, swapped, or the gallery''s attestation is ' +
+    'out of date.',
+    [modeLabel, authorBlobCount]);
 end;
 
 procedure TPackageSigningService.EvaluateRequirements(const policy : TTrustPolicy;
@@ -850,7 +1174,60 @@ begin
       // An attestation present on an untrusted repo signature is ignored
       // entirely — never read, never displayed.
       if sigInfo.Valid and sigInfo.RepositoryTrusted then
-        ReadRepositoryAttestation(blobs[i].Value, sigInfo);
+      begin
+        try
+          ReadRepositoryAttestation(blobs[i].Value, sigInfo);
+        except
+          on e : Exception do
+          begin
+            // Hard fail — a parse exception on a trusted repo sig MUST NOT
+            // bypass the binding check. Silently ignoring would let an
+            // attacker neuter author<->repo binding by corrupting the
+            // attestation: parser raises -> Attestation.Present stays
+            // false -> binding check skipped -> stripped/swapped author
+            // sig goes undetected.
+            sigInfo.Valid := false;
+            sigInfo.FailureReason := Format(
+              'repository attestation could not be parsed (%s: %s) — ' +
+              'cannot verify the gallery''s claim about who signed this ' +
+              'package',
+              [e.ClassName, e.Message]);
+            sigInfo.Attestation.Present := false;
+          end;
+        end;
+        // A trusted repo sig is REQUIRED to carry an attestation. Gallery
+        // never repo-signs without one; if Attestation.Present is false
+        // here, the producer is broken or the attribute was stripped.
+        if sigInfo.Valid and not sigInfo.Attestation.Present then
+        begin
+          sigInfo.Valid := false;
+          sigInfo.FailureReason :=
+            'repository signature has no dpmRepositoryAttestation attribute ' +
+            '— gallery did not declare the registered publisher for this ' +
+            'package, so the author<->repo binding cannot be verified';
+        end;
+        // Enforce the author-sig binding when the attestation declares a
+        // signed publisher. Without this check, an attacker could strip the
+        // author signature (or swap it for one from a different cert) and
+        // the package would still verify — the attestation only proves the
+        // gallery *said* "publisher X signed this", not that the author sig
+        // actually present is from X.
+        if sigInfo.Valid
+           and sigInfo.Attestation.Present
+           and (sigInfo.Attestation.AuthorSpkiHex <> '') then
+          EnforceAuthorSigBinding(blobs, result.Signatures, sigInfo);
+
+        // Inverse: gallery says "no verified author" but archive carries an
+        // author-N.p7s blob. The verifier from §Client verification contract
+        // requires this case to fail — otherwise an attacker could ship an
+        // unverified author sig under an attestation that doesn't bind it,
+        // and a downstream IDE rendering "Signed by …" off the author cert
+        // would mislead the user.
+        if sigInfo.Valid
+           and sigInfo.Attestation.Present
+           and (sigInfo.Attestation.AuthorSpkiHex = '') then
+          EnforceUnsignedAttestation(blobs, sigInfo);
+      end;
     end;
 
     // V-26 follow-up — retroactive invalidation on keyCompromise. The

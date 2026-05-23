@@ -53,6 +53,20 @@ type
     Namespace       : string;       // e.g. "VSoft.*"
     AuthorSpkiHex   : string;       // empty when UnsignedReason set
     UnsignedReason  : TUnsignedReason2;
+    // SHA-256 (hex) of every author signature blob this repo sig co-signed,
+    // as carried in the multi-value dpmVerifiedAuthorSigHash signed
+    // attribute on the repository signature. One entry per attested author
+    // (CMS attribute values are SET OF — gallery emits one hash per
+    // registered-publisher author sig present in the archive).
+    //
+    // Empty array means the attribute was absent (older gallery versions)
+    // or empty. The verifier requires every listed hash to resolve to an
+    // author signature actually present in the archive, AND requires the
+    // primary AuthorSpkiHex to match the signer of at least one of those
+    // resolved sigs — the cryptographic binding between "gallery attested
+    // these authors" and "the author signatures actually present came from
+    // them".
+    BoundAuthorSigHashesHex : TArray<string>;
   end;
 
   TSignatureInfo = record

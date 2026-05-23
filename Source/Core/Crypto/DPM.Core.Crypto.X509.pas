@@ -822,23 +822,45 @@ begin
     CaptureLeafRevocationDetail;
   end;
 
-  // Map the trust status onto our enum.
+  // Map the trust status onto our enum. Populate FLastError on every non-
+  // valid branch — callers (e.g. verify error reporting) format it as
+  // "chain build: <msg>" and an empty msg there is useless.
   if FChain.TrustStatus.dwErrorStatus = CERT_TRUST_NO_ERROR then
     result := crValid
   else if (FChain.TrustStatus.dwErrorStatus and CERT_TRUST_IS_REVOKED) <> 0 then
-    result := crRevoked
+  begin
+    FLastError := Format('certificate revoked (trust status 0x%.8x)',
+      [FChain.TrustStatus.dwErrorStatus]);
+    result := crRevoked;
+  end
   else if (FChain.TrustStatus.dwErrorStatus and CERT_TRUST_IS_NOT_TIME_VALID) <> 0 then
-    result := crExpired
+  begin
+    FLastError := Format('certificate not time-valid (trust status 0x%.8x)',
+      [FChain.TrustStatus.dwErrorStatus]);
+    result := crExpired;
+  end
   else if (FChain.TrustStatus.dwErrorStatus and (CERT_TRUST_IS_UNTRUSTED_ROOT or CERT_TRUST_IS_PARTIAL_CHAIN)) <> 0 then
-    result := crUntrustedRoot
+  begin
+    FLastError := Format('chain terminates in an untrusted root or is incomplete (trust status 0x%.8x)',
+      [FChain.TrustStatus.dwErrorStatus]);
+    result := crUntrustedRoot;
+  end
   else if (FChain.TrustStatus.dwErrorStatus and CERT_TRUST_IS_NOT_VALID_FOR_USAGE) <> 0 then
-    result := crWrongUsage
+  begin
+    FLastError := Format('certificate not valid for code-signing usage (trust status 0x%.8x)',
+      [FChain.TrustStatus.dwErrorStatus]);
+    result := crWrongUsage;
+  end
   else if (FChain.TrustStatus.dwErrorStatus = CERT_TRUST_REVOCATION_STATUS_UNKNOWN) then
     // A CRL/OCSP outage by itself shouldn't fail the chain — surface as valid
     // with rsUnknown so policy can decide what to do.
     result := crValid
   else
+  begin
+    FLastError := Format('chain build failed (trust status 0x%.8x)',
+      [FChain.TrustStatus.dwErrorStatus]);
     result := crUnknownError;
+  end;
 end;
 
 function TCertificateChain.VerifyForCodeSigning(asOfTime : TDateTime) : TChainResult;
