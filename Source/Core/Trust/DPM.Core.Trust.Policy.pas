@@ -59,7 +59,6 @@ type
 implementation
 
 uses
-  System.Generics.Defaults, System.Generics.Collections,
   DPM.Core.Utils.Config;
 
 constructor TTrustPolicyService.Create(const configManager : IConfigurationManager;

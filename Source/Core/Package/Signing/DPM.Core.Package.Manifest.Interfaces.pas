@@ -29,7 +29,7 @@ unit DPM.Core.Package.Manifest.Interfaces;
 interface
 
 uses
-  System.SysUtils, System.Generics.Collections,
+  System.SysUtils,
   DPM.Core.Crypto.Algorithms;
 
 type

@@ -40,9 +40,10 @@ unit DPM.Core.Package.Manifest;
 interface
 
 uses
-  System.Classes, System.SysUtils, System.Generics.Collections,
+  System.Classes, System.SysUtils,
   System.Generics.Defaults,
   System.Zip,
+  Spring.Collections,
   VSoft.YAML,
   DPM.Core.Crypto.Win32,
   DPM.Core.Crypto.Algorithms,
@@ -709,18 +710,20 @@ function TManifestService.BuildManifestFromEntries(const packageId, version : st
                                                     const entries : TArray<TManifestFileEntry>) : IPackageManifest;
 var
   sorted : TArray<TManifestFileEntry>;
+  sortList : IList<TManifestFileEntry>;
   comparer : IComparer<TManifestFileEntry>;
   created : TDateTime;
   encoded : TBytes;
   manifest : TPackageManifest;
 begin
-  sorted := Copy(entries);
   comparer := TComparer<TManifestFileEntry>.Construct(
     function(const Left, Right : TManifestFileEntry) : integer
     begin
       result := CompareStr(Left.Path, Right.Path);
     end);
-  TArray.Sort<TManifestFileEntry>(sorted, comparer);
+  sortList := TCollections.CreateList<TManifestFileEntry>(entries);
+  sortList.Sort(comparer);
+  sorted := sortList.ToArray;
 
   created := TTimeZone.Local.ToUniversalTime(Now);
   encoded := EncodeManifest(

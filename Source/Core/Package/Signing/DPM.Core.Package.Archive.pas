@@ -38,7 +38,8 @@ unit DPM.Core.Package.Archive;
 interface
 
 uses
-  System.Classes, System.SysUtils, System.Zip, System.Generics.Collections,
+  System.Classes, System.SysUtils, System.Zip,
+  Spring.Collections,
   DPM.Core.Package.Manifest.Interfaces;
 
 type
@@ -95,7 +96,7 @@ var
   candidatePath : string;
   normalised : string;
   lowered : string;
-  seen : TDictionary<string, integer>;
+  seen : IDictionary<string, integer>;
   header : TZipHeader;
   reason : string;
   mode : Word;
@@ -105,7 +106,7 @@ begin
   result.Entry := '';
 
   zip := TZipFile.Create;
-  seen := TDictionary<string, integer>.Create;
+  seen := TCollections.CreateDictionary<string, integer>;
   try
     try
       zip.Open(archivePath, zmRead);
@@ -162,7 +163,7 @@ begin
           [name, zip.FileName[seen[lowered]]]);
         exit;
       end;
-      seen.AddOrSetValue(lowered, i);
+      seen[lowered] := i;
 
       // V-13: reject encryption + non-allowlisted compression methods
       if (header.Flag and cZipFlagEncrypted) <> 0 then
@@ -201,7 +202,6 @@ begin
     result.Entry := '';
     result.Ok := true;
   finally
-    seen.Free;
     zip.Free;
   end;
 end;

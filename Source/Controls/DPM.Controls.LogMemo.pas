@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -31,7 +31,7 @@ interface
 uses
   System.Classes,
   System.Types,
-  System.Generics.Collections,
+  Spring.Collections,
   WinApi.Messages,
   WinApi.Windows,
   Vcl.Graphics,
@@ -55,7 +55,7 @@ type
     FBorderStyle : TBorderStyle;
     FPaintBmp : TBitmap;
     FItems : TStringList;
-    FRowRects : TList<TRect>;
+    FRowRects : IList<TRect>;
     FRowHeight: integer;
     FVScrollPos : integer;
     FHScrollPos : integer;
@@ -303,7 +303,7 @@ begin
   FItems.OnChange := RowsChanged;
   FPaintBmp := TBitmap.Create;
   FPaintBmp.PixelFormat := pf32bit;
-  FRowRects := TList<TRect>.Create;
+  FRowRects := TCollections.CreateList<TRect>;
   FBorderStyle := bsSingle;
 
 
@@ -356,7 +356,6 @@ end;
 
 destructor TLogMemo.Destroy;
 begin
-  FRowRects.Free;
   FPaintBmp.Free;
   FItems.Free;
   inherited;

@@ -34,7 +34,7 @@ interface
 
 uses
   Winapi.Windows,
-  System.Classes, System.SysUtils, System.Generics.Collections,
+  System.Classes, System.SysUtils,
   DPM.Core.Crypto.Win32,
   DPM.Core.Crypto.Algorithms,
   DPM.Core.Crypto.Hashing.Interfaces,

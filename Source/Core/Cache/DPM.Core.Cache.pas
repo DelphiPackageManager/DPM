@@ -1081,21 +1081,17 @@ begin
 
     case verifyResult.Outcome of
       voTrusted :
-        FLogger.Verbose('[PackageCache] Package signature verified (' +
-          IntToStr(Length(verifyResult.Signatures)) + ' signatures).');
+        FLogger.Verbose('[PackageCache] Package signature verified (' + IntToStr(Length(verifyResult.Signatures)) + ' signatures).');
       voUnsigned :
-        FLogger.Information('[PackageCache] Installing unsigned package ' +
-          '[' + packageIndentity.Id + '] under permissive mode.');
+        FLogger.Information('[PackageCache] Installing unsigned package ' + '[' + packageIndentity.Id + '] under permissive mode.');
       voUntrustedPublisher :
-        FLogger.Warning('[PackageCache] Package signed but signer is not in ' +
-          'trustedPublishers; install allowed under permissive mode.');
+        FLogger.Warning('[PackageCache] Package signed but signer is not in ' +  'trustedPublishers; install allowed under permissive mode.');
     end;
 
     // TOFU author no-downgrade ratchet (plan §1.10). Compares the current
     // signer against the high-water mark from the last successful install
     // of this package id and either accepts, blocks, or prompts the user.
-    if not EvaluateAuthorDowngrade(packageIndentity, verifyResult,
-                                    FTrustPolicy.GetEffectivePolicy) then
+    if not EvaluateAuthorDowngrade(packageIndentity, verifyResult, FTrustPolicy.GetEffectivePolicy) then
       exit;
 
     // P2 §2.3 (V-24): repository assurance ratchet. Once seen carrying a

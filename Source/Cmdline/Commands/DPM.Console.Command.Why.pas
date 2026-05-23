@@ -54,7 +54,6 @@ uses
   System.SysUtils,
   System.IOUtils,
   System.Types,
-  System.Generics.Collections,
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Dependency.Interfaces,
@@ -68,14 +67,13 @@ type
   strict private
     FId : string;
     FVersion : string;
-    FChildren : TObjectList<TWhyNode>;
+    FChildren : IList<TWhyNode>;
   public
     constructor Create(const id : string; const version : string);
-    destructor Destroy; override;
     function FindOrAddChild(const id : string; const version : string) : TWhyNode;
     property Id : string read FId;
     property Version : string read FVersion;
-    property Children : TObjectList<TWhyNode> read FChildren;
+    property Children : IList<TWhyNode> read FChildren;
   end;
 
 { TWhyNode }
@@ -84,13 +82,7 @@ constructor TWhyNode.Create(const id : string; const version : string);
 begin
   FId := id;
   FVersion := version;
-  FChildren := TObjectList<TWhyNode>.Create(True);
-end;
-
-destructor TWhyNode.Destroy;
-begin
-  FChildren.Free;
-  inherited;
+  FChildren := TCollections.CreateObjectList<TWhyNode>(True);
 end;
 
 function TWhyNode.FindOrAddChild(const id : string; const version : string) : TWhyNode;

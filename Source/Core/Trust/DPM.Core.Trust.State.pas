@@ -40,7 +40,7 @@ uses
   System.Classes,
   System.SysUtils,
   System.SyncObjs,
-  System.Generics.Collections,
+  Spring.Collections,
   VSoft.YAML,
   DPM.Core.Trust.Interfaces;
 
@@ -49,8 +49,8 @@ type
   private
     FFilePath : string;
     FLock : TCriticalSection;
-    FEntries : TDictionary<string, TAuthorTrustEntry>;
-    FRepoEntries : TDictionary<string, TRepositoryTrustEntry>;
+    FEntries : IDictionary<string, TAuthorTrustEntry>;
+    FRepoEntries : IDictionary<string, TRepositoryTrustEntry>;
     FLoaded : boolean;
     procedure EnsureLoaded;
     procedure SaveLocked;
@@ -91,14 +91,12 @@ begin
   inherited Create;
   FFilePath := filePath;
   FLock := TCriticalSection.Create;
-  FEntries := TDictionary<string, TAuthorTrustEntry>.Create;
-  FRepoEntries := TDictionary<string, TRepositoryTrustEntry>.Create;
+  FEntries := TCollections.CreateDictionary<string, TAuthorTrustEntry>;
+  FRepoEntries := TCollections.CreateDictionary<string, TRepositoryTrustEntry>;
 end;
 
 destructor TYamlTrustStateService.Destroy;
 begin
-  FRepoEntries.Free;
-  FEntries.Free;
   FLock.Free;
   inherited;
 end;
@@ -168,7 +166,7 @@ begin
           entry.LastSeenAt := 0;
       end;
     end;
-    FEntries.AddOrSetValue(key, entry);
+    FEntries[key] := entry;
 
     // Phase 2 — pick up the repository ratchet fields if present.
     repoEntry.TrustedRepoSpkiHex := '';
@@ -204,7 +202,7 @@ begin
       end;
     end;
     if hasRepoFields then
-      FRepoEntries.AddOrSetValue(key, repoEntry);
+      FRepoEntries[key] := repoEntry;
   end;
 end;
 
@@ -215,7 +213,7 @@ var
   repoPair : TPair<string, TRepositoryTrustEntry>;
   dir : string;
   tempPath : string;
-  allKeys : TDictionary<string, byte>;
+  allKeys : IDictionary<string, byte>;
   key : string;
   authorEntry : TAuthorTrustEntry;
   repoEntry : TRepositoryTrustEntry;
@@ -228,64 +226,60 @@ begin
   // Union of both keyspaces — a package id may have only repo state
   // (never seen an author signature) or only author state (no trusted
   // repo has yet signed it).
-  allKeys := TDictionary<string, byte>.Create;
+  allKeys := TCollections.CreateDictionary<string, byte>;
+  for pair in FEntries do
+    allKeys[pair.Key] := 0;
+  for repoPair in FRepoEntries do
+    allKeys[repoPair.Key] := 0;
+
+  sb := TStringBuilder.Create;
   try
-    for pair in FEntries do
-      allKeys.AddOrSetValue(pair.Key, 0);
-    for repoPair in FRepoEntries do
-      allKeys.AddOrSetValue(repoPair.Key, 0);
-
-    sb := TStringBuilder.Create;
-    try
-      sb.AppendLine('---');
-      for key in allKeys.Keys do
+    sb.AppendLine('---');
+    for key in allKeys.Keys do
+    begin
+      hasAuthor := FEntries.TryGetValue(key, authorEntry);
+      hasRepo := FRepoEntries.TryGetValue(key, repoEntry);
+      sb.Append(key); sb.AppendLine(':');
+      if hasAuthor then
       begin
-        hasAuthor := FEntries.TryGetValue(key, authorEntry);
-        hasRepo := FRepoEntries.TryGetValue(key, repoEntry);
-        sb.Append(key); sb.AppendLine(':');
-        if hasAuthor then
-        begin
-          sb.Append('  lastAuthorSpki: ''');
-          sb.Append(authorEntry.LastAuthorSpkiHex);
-          sb.AppendLine('''');
-          sb.Append('  lastSeenAuthorSigned: ');
-          sb.AppendLine(BoolToStr(authorEntry.LastSeenAuthorSigned, True));
-          sb.Append('  downgradeAcknowledged: ');
-          sb.AppendLine(BoolToStr(authorEntry.DowngradeAcknowledged, True));
-          sb.Append('  blockedPermanently: ');
-          sb.AppendLine(BoolToStr(authorEntry.BlockedPermanently, True));
-          sb.Append('  lastSeenAt: ''');
-          sb.Append(TDPMDateTimeUtils.DateToISO8601(authorEntry.LastSeenAt, True));
-          sb.AppendLine('''');
-        end;
-        if hasRepo then
-        begin
-          sb.Append('  repoTrustedSpki: ''');
-          sb.Append(repoEntry.TrustedRepoSpkiHex);
-          sb.AppendLine('''');
-          sb.Append('  repoNamespace: ''');
-          sb.Append(repoEntry.Namespace);
-          sb.AppendLine('''');
-          sb.Append('  repoFirstSeenAt: ''');
-          sb.Append(TDPMDateTimeUtils.DateToISO8601(repoEntry.FirstSeenAt, True));
-          sb.AppendLine('''');
-          sb.Append('  repoLastSeenAt: ''');
-          sb.Append(TDPMDateTimeUtils.DateToISO8601(repoEntry.LastSeenAt, True));
-          sb.AppendLine('''');
-        end;
+        sb.Append('  lastAuthorSpki: ''');
+        sb.Append(authorEntry.LastAuthorSpkiHex);
+        sb.AppendLine('''');
+        sb.Append('  lastSeenAuthorSigned: ');
+        sb.AppendLine(BoolToStr(authorEntry.LastSeenAuthorSigned, True));
+        sb.Append('  downgradeAcknowledged: ');
+        sb.AppendLine(BoolToStr(authorEntry.DowngradeAcknowledged, True));
+        sb.Append('  blockedPermanently: ');
+        sb.AppendLine(BoolToStr(authorEntry.BlockedPermanently, True));
+        sb.Append('  lastSeenAt: ''');
+        sb.Append(TDPMDateTimeUtils.DateToISO8601(authorEntry.LastSeenAt, True));
+        sb.AppendLine('''');
       end;
-
-      tempPath := FFilePath + '.tmp';
-      TFile.WriteAllText(tempPath, sb.ToString, TEncoding.UTF8);
-      if FileExists(FFilePath) then
-        DeleteFile(FFilePath);
-      if not RenameFile(tempPath, FFilePath) then
-        raise ETrust.CreateFmt('Failed to atomically replace %s', [FFilePath]);
-    finally
-      sb.Free;
+      if hasRepo then
+      begin
+        sb.Append('  repoTrustedSpki: ''');
+        sb.Append(repoEntry.TrustedRepoSpkiHex);
+        sb.AppendLine('''');
+        sb.Append('  repoNamespace: ''');
+        sb.Append(repoEntry.Namespace);
+        sb.AppendLine('''');
+        sb.Append('  repoFirstSeenAt: ''');
+        sb.Append(TDPMDateTimeUtils.DateToISO8601(repoEntry.FirstSeenAt, True));
+        sb.AppendLine('''');
+        sb.Append('  repoLastSeenAt: ''');
+        sb.Append(TDPMDateTimeUtils.DateToISO8601(repoEntry.LastSeenAt, True));
+        sb.AppendLine('''');
+      end;
     end;
+
+    tempPath := FFilePath + '.tmp';
+    TFile.WriteAllText(tempPath, sb.ToString, TEncoding.UTF8);
+    if FileExists(FFilePath) then
+      DeleteFile(FFilePath);
+    if not RenameFile(tempPath, FFilePath) then
+      raise ETrust.CreateFmt('Failed to atomically replace %s', [FFilePath]);
   finally
-    allKeys.Free;
+    sb.Free;
   end;
 end;
 
@@ -305,7 +299,7 @@ begin
   FLock.Enter;
   try
     EnsureLoaded;
-    FEntries.AddOrSetValue(packageId, entry);
+    FEntries[packageId] := entry;
     SaveLocked;
   finally
     FLock.Leave;
@@ -322,7 +316,7 @@ begin
     if FEntries.TryGetValue(packageId, entry) then
     begin
       entry.DowngradeAcknowledged := true;
-      FEntries.AddOrSetValue(packageId, entry);
+      FEntries[packageId] := entry;
       SaveLocked;
     end;
   finally
@@ -345,7 +339,7 @@ begin
       entry.LastSeenAt := TTimeZone.Local.ToUniversalTime(Now);
     end;
     entry.BlockedPermanently := true;
-    FEntries.AddOrSetValue(packageId, entry);
+    FEntries[packageId] := entry;
     SaveLocked;
   finally
     FLock.Leave;
@@ -370,7 +364,7 @@ begin
   FLock.Enter;
   try
     EnsureLoaded;
-    FRepoEntries.AddOrSetValue(packageId, entry);
+    FRepoEntries[packageId] := entry;
     SaveLocked;
   finally
     FLock.Leave;

@@ -46,7 +46,8 @@ unit DPM.Core.Package.Signing;
 interface
 
 uses
-  System.Classes, System.SysUtils, System.Zip, System.Generics.Collections,
+  System.Classes, System.SysUtils, System.Zip,
+  Spring.Collections,
   DPM.Core.Logging,
   DPM.Core.Crypto.Algorithms,
   DPM.Core.Crypto.Hashing.Interfaces,
@@ -79,7 +80,7 @@ type
     FActiveFlags : TVerifyFlags;
     function ReadManifestBytes(const archivePath : string; out bytes : TBytes) : boolean;
     function ReadSignatureBlobs(const archivePath : string;
-                                out blobs : TList<TPair<string, TBytes>>) : boolean;
+                                out blobs : IList<TPair<string, TBytes>>) : boolean;
     procedure WriteSignatureToArchive(const archivePath : string;
                                       const blobName : string;
                                       const blobBytes : TBytes);
@@ -222,7 +223,7 @@ begin
 end;
 
 function TPackageSigningService.ReadSignatureBlobs(const archivePath : string;
-  out blobs : TList<TPair<string, TBytes>>) : boolean;
+  out blobs : IList<TPair<string, TBytes>>) : boolean;
 var
   zip : TZipFile;
   i : integer;
@@ -231,7 +232,7 @@ var
   bytes : TBytes;
   name : string;
 begin
-  blobs := TList<TPair<string, TBytes>>.Create;
+  blobs := TCollections.CreateList<TPair<string, TBytes>>;
   result := true;
   zip := TZipFile.Create;
   try
@@ -300,7 +301,7 @@ var
   nextIndex : integer;
   blobName : string;
   i : integer;
-  existingBlobs : TList<TPair<string, TBytes>>;
+  existingBlobs : IList<TPair<string, TBytes>>;
   existingName : string;
   imprintBytes : TBytes;
   signerCert : ICertificate;
@@ -377,16 +378,12 @@ begin
 
   // Pick the next available signature file name.
   ReadSignatureBlobs(packageFilePath, existingBlobs);
-  try
-    nextIndex := 1;
-    for i := 0 to existingBlobs.Count - 1 do
-    begin
-      existingName := ExtractFileName(existingBlobs[i].Key);
-      if StartsText('author-', existingName) then
-        Inc(nextIndex);
-    end;
-  finally
-    existingBlobs.Free;
+  nextIndex := 1;
+  for i := 0 to existingBlobs.Count - 1 do
+  begin
+    existingName := ExtractFileName(existingBlobs[i].Key);
+    if StartsText('author-', existingName) then
+      Inc(nextIndex);
   end;
 
   blobName := Format('signatures/author-%d.p7s', [nextIndex]);
@@ -400,8 +397,8 @@ procedure TPackageSigningService.VerifyFileSetIntegrity(const archivePath : stri
 var
   zip : TZipFile;
   i, j : integer;
-  archivePaths : TDictionary<string, integer>;
-  manifestPaths : TDictionary<string, integer>;
+  archivePaths : IDictionary<string, integer>;
+  manifestPaths : IDictionary<string, integer>;
   name : string;
   normalised : string;
   reason : string;
@@ -412,8 +409,8 @@ var
   actualHash : TBytes;
   found : integer;
 begin
-  archivePaths := TDictionary<string, integer>.Create;
-  manifestPaths := TDictionary<string, integer>.Create;
+  archivePaths := TCollections.CreateDictionary<string, integer>;
+  manifestPaths := TCollections.CreateDictionary<string, integer>;
   zip := TZipFile.Create;
   try
     zip.Open(archivePath, zmRead);
@@ -430,7 +427,7 @@ begin
       if StartsText(cSignatureFolder, name) then
         Continue;
       normalised := FManifest.NormalizeToNfc(name);
-      archivePaths.AddOrSetValue(normalised, i);
+      archivePaths[normalised] := i;
     end;
 
     // Walk manifest entries — each must be in the archive with matching hash + size.
@@ -462,7 +459,7 @@ begin
       if not BytesEqual(actualHash, entry.Hash) then
         raise EPackageSigning.CreateFmt('Hash mismatch for "%s"', [entry.Path]);
 
-      manifestPaths.AddOrSetValue(entry.Path, 1);
+      manifestPaths[entry.Path] := 1;
     end;
 
     // Any archive entry (excluding manifest + signatures/) not in manifestPaths
@@ -472,8 +469,6 @@ begin
         raise EPackageSigning.CreateFmt('Archive contains unlisted file "%s"', [name]);
   finally
     zip.Free;
-    archivePaths.Free;
-    manifestPaths.Free;
   end;
 end;
 
@@ -717,7 +712,7 @@ var
   archiveResult : TArchiveValidationResult;
   manifestBytes : TBytes;
   manifest : IPackageManifest;
-  blobs : TList<TPair<string, TBytes>>;
+  blobs : IList<TPair<string, TBytes>>;
   i : integer;
   sigInfo : TSignatureInfo;
   hasValidAuthor : boolean;
@@ -777,56 +772,52 @@ begin
     result.Reason := 'Failed to enumerate signatures/';
     exit;
   end;
-  try
-    hasAnySignature := blobs.Count > 0;
-    hasValidAuthor := false;
-    hasValidTrustedRepo := false;
+  hasAnySignature := blobs.Count > 0;
+  hasValidAuthor := false;
+  hasValidTrustedRepo := false;
 
-    SetLength(result.Signatures, blobs.Count);
-    for i := 0 to blobs.Count - 1 do
-    begin
-      try
-        VerifyOneSignature(blobs[i].Value, manifestBytes, sigInfo);
-      except
-        on e : Exception do
-        begin
-          sigInfo.Valid := false;
-          sigInfo.FailureReason := e.Message;
-        end;
-      end;
-
-      if sigInfo.Role = srAuthor then
-        sigInfo.PublisherTrusted := FTrustPolicy.PublisherTrusted(policy, sigInfo.SignerSpkiHex)
-      else
-      begin
-        sigInfo.RepositoryTrusted := FTrustPolicy.RepositoryTrusted(policy, sigInfo.SignerSpkiHex);
-        // V-21: only read the attestation off a trusted repository signature.
-        // An attestation present on an untrusted repo signature is ignored
-        // entirely — never read, never displayed.
-        if sigInfo.Valid and sigInfo.RepositoryTrusted then
-          ReadRepositoryAttestation(blobs[i].Value, sigInfo);
-      end;
-
-      // V-26 follow-up — retroactive invalidation on keyCompromise. The
-      // second-pass build inside VerifyOneSignature surfaces the current
-      // CRL reason; if it's keyCompromise we treat the signature as invalid
-      // unless the administrator has explicitly accepted the residual risk.
-      if sigInfo.Valid and (sigInfo.CurrentRevocationReason = rrKeyCompromise)
-         and not policy.AllowKeyCompromiseOverride then
+  SetLength(result.Signatures, blobs.Count);
+  for i := 0 to blobs.Count - 1 do
+  begin
+    try
+      VerifyOneSignature(blobs[i].Value, manifestBytes, sigInfo);
+    except
+      on e : Exception do
       begin
         sigInfo.Valid := false;
-        sigInfo.FailureReason :=
-          'certificate revoked for keyCompromise — signature retroactively invalid';
+        sigInfo.FailureReason := e.Message;
       end;
-
-      result.Signatures[i] := sigInfo;
-      if sigInfo.Valid and (sigInfo.Role = srAuthor) then
-        hasValidAuthor := true;
-      if sigInfo.Valid and (sigInfo.Role = srRepository) and sigInfo.RepositoryTrusted then
-        hasValidTrustedRepo := true;
     end;
-  finally
-    blobs.Free;
+
+    if sigInfo.Role = srAuthor then
+      sigInfo.PublisherTrusted := FTrustPolicy.PublisherTrusted(policy, sigInfo.SignerSpkiHex)
+    else
+    begin
+      sigInfo.RepositoryTrusted := FTrustPolicy.RepositoryTrusted(policy, sigInfo.SignerSpkiHex);
+      // V-21: only read the attestation off a trusted repository signature.
+      // An attestation present on an untrusted repo signature is ignored
+      // entirely — never read, never displayed.
+      if sigInfo.Valid and sigInfo.RepositoryTrusted then
+        ReadRepositoryAttestation(blobs[i].Value, sigInfo);
+    end;
+
+    // V-26 follow-up — retroactive invalidation on keyCompromise. The
+    // second-pass build inside VerifyOneSignature surfaces the current
+    // CRL reason; if it's keyCompromise we treat the signature as invalid
+    // unless the administrator has explicitly accepted the residual risk.
+    if sigInfo.Valid and (sigInfo.CurrentRevocationReason = rrKeyCompromise)
+       and not policy.AllowKeyCompromiseOverride then
+    begin
+      sigInfo.Valid := false;
+      sigInfo.FailureReason :=
+        'certificate revoked for keyCompromise — signature retroactively invalid';
+    end;
+
+    result.Signatures[i] := sigInfo;
+    if sigInfo.Valid and (sigInfo.Role = srAuthor) then
+      hasValidAuthor := true;
+    if sigInfo.Valid and (sigInfo.Role = srRepository) and sigInfo.RepositoryTrusted then
+      hasValidTrustedRepo := true;
   end;
 
   EvaluateRequirements(policy, hasAnySignature, hasValidAuthor, hasValidTrustedRepo,

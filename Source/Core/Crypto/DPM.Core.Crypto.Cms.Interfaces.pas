@@ -29,7 +29,7 @@ unit DPM.Core.Crypto.Cms.Interfaces;
 interface
 
 uses
-  System.SysUtils, System.Generics.Collections,
+  System.SysUtils,
   DPM.Core.Crypto.Algorithms,
   DPM.Core.Crypto.X509.Interfaces,
   DPM.Core.Crypto.Provider.Interfaces;

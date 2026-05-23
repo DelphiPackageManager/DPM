@@ -61,7 +61,7 @@ uses
   System.SysUtils,
   System.Classes,
   System.StrUtils,
-  System.Generics.Collections,
+  Spring.Collections,
   JsonDataObjects,
   DPM.Core.Types;
 
@@ -366,7 +366,7 @@ var
   componentsArr : TJsonArray;
   comp : TSBOMComponent;
   depsArr : TJsonArray;
-  depMap : TDictionary<string, TJsonArray>;
+  depMap : IDictionary<string, TJsonArray>;
   refList : TJsonArray;
   rel : TSBOMRelationship;
   refObj : TJsonObject;
@@ -375,9 +375,8 @@ var
 begin
   root := TJsonObject.Create;
   try
-    depMap := TDictionary<string, TJsonArray>.Create;
-    try
-      root.S['bomFormat'] := 'CycloneDX';
+    depMap := TCollections.CreateDictionary<string, TJsonArray>;
+    root.S['bomFormat'] := 'CycloneDX';
       root.S['specVersion'] := '1.5';
       root.I['version'] := 1;
       SetStringIfNotEmpty(root, 'serialNumber', report.SerialNumber);
@@ -441,11 +440,8 @@ begin
         end;
       end;
 
-      jsonText := root.ToJSON(false);
-      WriteUtf8(fileName, jsonText);
-    finally
-      depMap.Free;
-    end;
+    jsonText := root.ToJSON(false);
+    WriteUtf8(fileName, jsonText);
   finally
     root.Free;
   end;
@@ -474,7 +470,7 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
   end;
 
   function SpdxIdFor(const comp : TSBOMComponent;
-                     const usedIds : TDictionary<string, integer>) : string;
+                     const usedIds : IDictionary<string, integer>) : string;
   var
     candidate : string;
     next : integer;
@@ -582,8 +578,8 @@ var
   relsArr : TJsonArray;
   relObj : TJsonObject;
   rootSpdxId : string;
-  bomRefToSpdxId : TDictionary<string, string>;
-  usedIds : TDictionary<string, integer>;
+  bomRefToSpdxId : IDictionary<string, string>;
+  usedIds : IDictionary<string, integer>;
   comp : TSBOMComponent;
   spdxId : string;
   rel : TSBOMRelationship;
@@ -592,8 +588,8 @@ var
   jsonText : string;
 begin
   root := TJsonObject.Create;
-  bomRefToSpdxId := TDictionary<string, string>.Create;
-  usedIds := TDictionary<string, integer>.Create;
+  bomRefToSpdxId := TCollections.CreateDictionary<string, string>;
+  usedIds := TCollections.CreateDictionary<string, integer>;
   try
     root.S['spdxVersion'] := 'SPDX-2.3';
     root.S['dataLicense'] := 'CC0-1.0';
@@ -651,8 +647,6 @@ begin
     jsonText := root.ToJSON(false);
     WriteUtf8(fileName, jsonText);
   finally
-    bomRefToSpdxId.Free;
-    usedIds.Free;
     root.Free;
   end;
 end;
