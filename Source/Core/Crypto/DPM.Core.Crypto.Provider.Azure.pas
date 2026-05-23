@@ -132,6 +132,12 @@ type
                                out keySpec : DWORD;
                                out callerMustFree : boolean) : boolean;
     function SignDigest(const digest : TBytes; digestAlgorithm : THashAlgorithm) : TBytes;
+    // KV-backed keys live on the service side; there's no smart-card session
+    // to keep alive locally. AAD tokens are already cached by the token
+    // service, so a no-op here is correct.
+    procedure BeginSession;
+    procedure EndSession;
+    procedure SetSigningContext(const fileName : string; fileSize : Int64);
   public
     constructor Create(const logger : ILogger;
                        const x509 : IX509Service;
@@ -536,6 +542,25 @@ begin
   keySpec := 0;
   callerMustFree := false;
   result := false;
+end;
+
+procedure TKeyVaultSigningProvider.BeginSession;
+begin
+  // No-op. AAD token caching is handled inside the token service; each
+  // SignDigest reuses the cached token automatically.
+end;
+
+procedure TKeyVaultSigningProvider.EndSession;
+begin
+  // No-op.
+end;
+
+procedure TKeyVaultSigningProvider.SetSigningContext(const fileName : string;
+                                                      fileSize : Int64);
+begin
+  // No-op. Key Vault's sign endpoint takes no audit-metadata fields — the
+  // KV audit log records the caller's AAD identity + key version, not the
+  // file being signed.
 end;
 
 function TKeyVaultSigningProvider.MapAlgToJwa(digestAlgorithm : THashAlgorithm) : string;

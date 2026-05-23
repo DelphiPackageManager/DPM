@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
@@ -114,10 +114,10 @@
         <BRCC_CompilerToUse>msrc</BRCC_CompilerToUse>
         <DCC_DebugInfoInExe>true</DCC_DebugInfoInExe>
         <DCC_MapFile>3</DCC_MapFile>
-        <Debugger_CWD>I:\Github\DelphiPackageManager\DPMMaster\Source\Tests\SBOMdemo</Debugger_CWD>
+        <Debugger_CWD>i:\dpm-new</Debugger_CWD>
         <Debugger_EnvVars>DPMPACKAGECACHE=c:\temp\packagecache;$(Debugger_EnvVars)</Debugger_EnvVars>
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
-        <Debugger_RunParams>scan SBOMdemo.dproj</Debugger_RunParams>
+        <Debugger_RunParams>sign VSoft.YAML-delphixe5-0000101010010011-1.5.5.dpkg -provider=signotaur -endpoint=https://localhost:7575 -api-key=AQAAAA_Pv-SqjWZjO918tgRxTiXU6QTtzGtmZ7-0ebU8WrEXE= -label=MyCert -allow-untrusted -v=debug</Debugger_RunParams>
         <ILINK_MapFileType>DetailedSegments</ILINK_MapFileType>
         <OutputExt>2.exe</OutputExt>
     </PropertyGroup>

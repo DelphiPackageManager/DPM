@@ -347,9 +347,25 @@ const
   // szOID constants
   szOID_PKIX_KP_CODE_SIGNING : AnsiString = '1.3.6.1.5.5.7.3.3';
   szOID_RSA_RSA              : AnsiString = '1.2.840.113549.1.1.1';
+  // id-ecPublicKey — the SubjectPublicKeyInfo algorithm OID for any ECDSA
+  // certificate. The actual curve is identified by the algorithm's parameters
+  // field, which (for named curves) is itself an OBJECT IDENTIFIER.
+  szOID_ECC_PUBLIC_KEY       : AnsiString = '1.2.840.10045.2.1';
+  // Named-curve OIDs we recognise. Used to pair a digest with the curve size
+  // (FIPS 186 / NIST SP 800-57: digest size should match curve size for ECDSA).
+  szOID_ECC_CURVE_P256       : AnsiString = '1.2.840.10045.3.1.7';
+  szOID_ECC_CURVE_P384       : AnsiString = '1.3.132.0.34';
+  szOID_ECC_CURVE_P521       : AnsiString = '1.3.132.0.35';
   szOID_RSA_SHA256RSA        : AnsiString = '1.2.840.113549.1.1.11';
   szOID_RSA_SHA384RSA        : AnsiString = '1.2.840.113549.1.1.12';
   szOID_RSA_SHA512RSA        : AnsiString = '1.2.840.113549.1.1.13';
+  // ECDSA-with-hash signature algorithm OIDs (ANSI X9.62 / RFC 5758).
+  // Used in CMS SignerInfo.HashEncryptionAlgorithm when the signer key is
+  // ECDSA. Confusingly, "HashEncryptionAlgorithm" is the CMS field name —
+  // it's actually the *signature algorithm*, not an encryption algorithm.
+  szOID_ECDSA_SHA256         : AnsiString = '1.2.840.10045.4.3.2';
+  szOID_ECDSA_SHA384         : AnsiString = '1.2.840.10045.4.3.3';
+  szOID_ECDSA_SHA512         : AnsiString = '1.2.840.10045.4.3.4';
   szOID_OIWSEC_SHA1          : AnsiString = '1.3.14.3.2.26';
   szOID_NIST_SHA256          : AnsiString = '2.16.840.1.101.3.4.2.1';
   szOID_NIST_SHA384          : AnsiString = '2.16.840.1.101.3.4.2.2';
@@ -414,6 +430,11 @@ const
   PKCS7_SIGNER_INFO       : PAnsiChar = PAnsiChar(500);
   // Encodes an AlgorithmIdentifier (OID + optional params).
   X509_ALGORITHM_IDENTIFIER : PAnsiChar = PAnsiChar(74);
+  // Encodes a bare OBJECT IDENTIFIER. pvStructInfo points to an LPSTR
+  // (i.e. PAnsiChar*) whose target is the dotted-OID AnsiString. Defined
+  // in wincrypt.h as `(LPCSTR)73`. NB: 7 is X509_NAME — passing 7 here
+  // makes CryptEncodeObjectEx mis-parse the input and fail with E_OUTOFMEMORY.
+  X509_OBJECT_IDENTIFIER  : PAnsiChar = PAnsiChar(73);
 
   // CryptMsgGetParam types we care about
   CMSG_TYPE_PARAM                = 1;
@@ -620,6 +641,18 @@ function CryptAcquireCertificatePrivateKey(pCert : PCCERT_CONTEXT; dwFlags : DWO
                                            out phCryptProvOrNCryptKey : HCRYPTPROV_OR_NCRYPT_KEY_HANDLE;
                                            out pdwKeySpec : DWORD;
                                            out pfCallerFreeProv : BOOL) : BOOL; stdcall; external cCrypt32;
+
+// Used to release a handle acquired by CryptAcquireCertificatePrivateKey.
+// The keySpec out-parameter from the acquire call tells us which release API
+// to use: CERT_NCRYPT_KEY_SPEC -> NCryptFreeObject, otherwise CryptReleaseContext.
+const
+  CERT_NCRYPT_KEY_SPEC = $FFFFFFFF;
+
+function CryptReleaseContext(hProv : HCRYPTPROV; dwFlags : DWORD) : BOOL;
+  stdcall; external 'advapi32.dll';
+
+function NCryptFreeObject(hObject : HCRYPTPROV_OR_NCRYPT_KEY_HANDLE) : LongInt;
+  stdcall; external cNCrypt;
 
 function CertGetCertificateChain(hChainEngine : HCERTCHAINENGINE;
                                  pCertContext : PCCERT_CONTEXT;

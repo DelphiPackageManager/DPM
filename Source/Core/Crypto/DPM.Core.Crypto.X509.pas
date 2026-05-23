@@ -89,6 +89,8 @@ type
     function NotAfter : TDateTime;
     function HasCodeSigningEku : boolean;
     function RawDerBytes : TBytes;
+    function PublicKeyType : TCertKeyType;
+    function PreferredDigest : THashAlgorithm;
     function GetContext : PCCERT_CONTEXT;
   public
     constructor Create(context : PCCERT_CONTEXT; ownsContext : boolean; const hashingService : IHashingService);
@@ -429,6 +431,103 @@ begin
   SetLength(result, FContext.cbCertEncoded);
   if FContext.cbCertEncoded > 0 then
     Move(FContext.pbCertEncoded^, result[0], FContext.cbCertEncoded);
+end;
+
+function TCertificate.PublicKeyType : TCertKeyType;
+var
+  info : PCERT_INFO;
+  algOid : AnsiString;
+begin
+  result := cktUnknown;
+  info := GetCertInfo;
+  if info = nil then
+    exit;
+  algOid := AnsiString(string(info.SubjectPublicKeyInfo.Algorithm.pszObjId));
+  if algOid = szOID_RSA_RSA then
+    result := cktRsa
+  else if algOid = szOID_ECC_PUBLIC_KEY then
+    result := cktEcdsa;
+end;
+
+function TCertificate.PreferredDigest : THashAlgorithm;
+var
+  info : PCERT_INFO;
+  params : CRYPT_OBJID_BLOB;
+  oidLen : byte;
+  oidBytes : TBytes;
+  i : integer;
+
+  function CurveOidEquals(const expected : AnsiString) : boolean;
+  var
+    // Raw Pointer (NOT TBytes). CryptEncodeObjectEx with CRYPT_ENCODE_ALLOC_FLAG
+    // writes back a LocalAlloc'd pointer; using a Delphi-managed TBytes here
+    // makes the RTL read/write Delphi dynamic-array header bytes (refcount,
+    // length) from inside the LocalAlloc heap block — that corrupts the heap
+    // and crashes a later allocator with STATUS_HEAP_CORRUPTION (c0000374).
+    expectedBuf : Pointer;
+    expectedLen : DWORD;
+    j : integer;
+    p : PAnsiChar;
+  begin
+    // Encode the expected OID via the OS so we don't hand-encode dotted-OID
+    // -> DER. expected -> X509_OBJECT_IDENTIFIER -> { 06 LL bb bb bb ... }.
+    expectedBuf := nil;
+    expectedLen := 0;
+    p := PAnsiChar(expected);
+    if not CryptEncodeObjectEx(cENCODING_TYPE, X509_OBJECT_IDENTIFIER, @p,
+             CRYPT_ENCODE_ALLOC_FLAG, nil, @expectedBuf, expectedLen) then
+    begin
+      result := false;
+      exit;
+    end;
+    try
+      // Skip the tag (06) and length byte to get just the OID body bytes.
+      if (expectedLen < 2) or (Length(oidBytes) <> Integer(expectedLen) - 2) then
+      begin
+        result := false;
+        exit;
+      end;
+      result := true;
+      for j := 0 to Length(oidBytes) - 1 do
+        if oidBytes[j] <> PByte(NativeUInt(expectedBuf) + 2 + NativeUInt(j))^ then
+        begin
+          result := false;
+          exit;
+        end;
+    finally
+      LocalFree(HLOCAL(expectedBuf));
+    end;
+  end;
+
+begin
+  // Default: SHA-256. Always safe for RSA; safe for ECDSA P-256; the only
+  // case we need to override is when the cert is ECDSA P-384 / P-521 (FIPS
+  // 186 requires digest size = curve size).
+  result := haSha256;
+  if PublicKeyType <> cktEcdsa then
+    exit;     // RSA or unknown — SHA-256 default stands
+
+  info := GetCertInfo;
+  if info = nil then
+    exit;
+
+  // ECDSA: the curve is in Algorithm.Parameters (DER-encoded OBJECT
+  // IDENTIFIER for named curves: tag 06, length, body bytes).
+  params := info.SubjectPublicKeyInfo.Algorithm.Parameters;
+  if (params.cbData < 2) or (params.pbData = nil) or (PByte(params.pbData)^ <> $06) then
+    exit;
+  oidLen := PByte(NativeUInt(params.pbData) + 1)^;
+  if (oidLen = 0) or (oidLen > params.cbData - 2) then
+    exit;
+  SetLength(oidBytes, oidLen);
+  for i := 0 to oidLen - 1 do
+    oidBytes[i] := PByte(NativeUInt(params.pbData) + 2 + NativeUInt(i))^;
+
+  if CurveOidEquals(szOID_ECC_CURVE_P384) then
+    result := haSha384
+  else if CurveOidEquals(szOID_ECC_CURVE_P521) then
+    result := haSha512;
+  // P-256 and unknown curves fall through to the SHA-256 default.
 end;
 
 { TCertificateStore }

@@ -36,9 +36,16 @@ unit DPM.Core.Crypto.Provider.Signotaur;
 //   POST {endpoint}/api/v1/cert/get   (GetCertRequest  -> GetCertResponse)
 //   POST {endpoint}/api/v1/sign       (SignRequest     -> SignResponse)
 //
-// JSON field names mirror the proto field names verbatim (PascalCase, e.g.
-// "Thumbprint", "Certificate", "Digest"). Bytes fields are base64-encoded
-// (standard, NOT base64url — different from Azure KV).
+// JSON field names are camelCase — the Signotaur server's REST surface
+// canonicalises camelCase regardless of the gRPC proto's PascalCase, because
+// the underlying .NET JsonNamingPolicy.CamelCase serializer rewrites
+// PascalCase property names on emit. JsonDataObjects lookups are
+// case-sensitive so the names below MUST match the wire format exactly.
+// Bytes fields are base64-encoded (standard, NOT base64url — different from
+// Azure KV).
+//
+// Authentication: the API key is sent in the X-Api-Key request header, not
+// in the JSON body. Keeps it out of any body-logging the server / proxies do.
 //
 // The certificate selector is one of: Thumbprint, Subject, Label (exactly
 // one). The server picks based on whichever is non-empty. We surface a
@@ -68,6 +75,10 @@ type
     FileName     : string;
     FileSizeBytes : Int64;
     FileVersion  : string;
+    // Trust TLS chains that fail validation (self-signed, untrusted CA,
+    // hostname mismatch). For dev / on-prem Signotaur deployments only —
+    // production endpoints should always present a chained-to-trusted-CA cert.
+    AllowSelfSignedCertificates : boolean;
   end;
 
   TSignotaurSigningProvider = class(TInterfacedObject, ISigningProvider)
@@ -77,6 +88,11 @@ type
     FOptions : TSignotaurOptions;
     FCert : ICertificate;       // lazy-loaded
     FResolvedThumbprint : string;   // server-returned thumbprint, used for SignDigest
+    // Per-call audit metadata pushed in by the signing service immediately
+    // before each SignDigest. Empty/0 means fall back to FOptions defaults
+    // (e.g. single-file CLI use that still pre-populates options).
+    FCallFileName : string;
+    FCallFileSize : Int64;
     function GetCertificate : ICertificate;
     function HashAlgName(alg : THashAlgorithm) : string;
   protected
@@ -86,6 +102,14 @@ type
                                out keySpec : DWORD;
                                out callerMustFree : boolean) : boolean;
     function SignDigest(const digest : TBytes; digestAlgorithm : THashAlgorithm) : TBytes;
+    // Signotaur signs server-side under an API key; no client-side session
+    // state to maintain. BeginSession/EndSession are no-ops.
+    procedure BeginSession;
+    procedure EndSession;
+    // Per-call audit context. Stored until the next SignDigest call so each
+    // file in a batch sign gets its own FileName / FileSize on the server-
+    // side audit log.
+    procedure SetSigningContext(const fileName : string; fileSize : Int64);
   public
     constructor Create(const logger : ILogger;
                        const x509 : IX509Service;
@@ -167,18 +191,17 @@ begin
     exit;
   end;
 
-  // GetCertRequest: only non-empty selectors are sent. ApiKey + ClientVersion
-  // are always present.
+  // GetCertRequest: only non-empty selectors are sent. ApiKey travels in the
+  // X-Api-Key header (see WithHeader below); ClientVersion is part of the body.
   reqDoc := TJsonObject.Create;
   try
-    reqDoc.S['ApiKey'] := FOptions.ApiKey;
-    reqDoc.S['ClientVersion'] := cSignotaurClientVersion;
+    reqDoc.S['clientVersion'] := cSignotaurClientVersion;
     if FOptions.Thumbprint <> '' then
-      reqDoc.S['Thumbprint'] := FOptions.Thumbprint;
+      reqDoc.S['thumbprint'] := FOptions.Thumbprint;
     if FOptions.Subject <> '' then
-      reqDoc.S['Subject'] := FOptions.Subject;
+      reqDoc.S['subject'] := FOptions.Subject;
     if FOptions.Label_ <> '' then
-      reqDoc.S['Label'] := FOptions.Label_;
+      reqDoc.S['label'] := FOptions.Label_;
     reqBody := reqDoc.ToJSON(False);
   finally
     reqDoc.Free;
@@ -186,41 +209,73 @@ begin
 
   cancellationToken := TCancellationTokenSourceFactory.Create.Token;
   httpClient := THttpClientFactory.CreateClient(FOptions.Endpoint);
+  if FOptions.AllowSelfSignedCertificates then
+  begin
+    httpClient.AllowSelfSignedCertificates := true;
+//    FLogger.Warning('Signotaur: TLS certificate validation is disabled ' +
+//                    '(--allow-untrusted). Use only for dev / on-prem.');
+  end;
   request := httpClient.CreateRequest(cSignotaurApiBase + '/cert/get')
                 .WithHeader('Accept', 'application/json')
+                .WithHeader('X-Api-Key', FOptions.ApiKey)
                 .WithBody(reqBody, TEncoding.UTF8)
                 .WithContentType('application/json', 'utf-8');
 
-  FLogger.Verbose('Signotaur POST ' + FOptions.Endpoint + cSignotaurApiBase + '/cert/get');
-  response := httpClient.Post(request, cancellationToken);
+  FLogger.Debug('Signotaur POST ' + FOptions.Endpoint + cSignotaurApiBase + '/cert/get');
+  try
+    response := httpClient.Post(request, cancellationToken);
+  except
+    on e : Exception do
+    begin
+      FLogger.Error(Format('Signotaur POST raised %s: %s', [e.ClassName, e.Message]));
+      raise EProviderFatal.CreateFmt(
+        'Signotaur cert lookup HTTP call failed (%s): %s',
+        [e.ClassName, e.Message]);
+    end;
+  end;
+  FLogger.Debug(Format('Signotaur HTTP %d response (%d bytes)', [response.StatusCode, Length(response.Response)]));
+  if Length(response.Response) > 0 then
+    FLogger.Verbose('Signotaur response body: ' + response.Response);
   if response.StatusCode <> 200 then
-    raise ESignotaur.CreateFmt(
+    // HTTP-level failure: bad endpoint, bad API key, server down. None of
+    // these get better by trying the next file — raise as fatal so the
+    // batch loop aborts instead of generating N more guaranteed failures.
+    raise EProviderFatal.CreateFmt(
       'Signotaur cert lookup failed (HTTP %d): %s',
       [response.StatusCode, response.Response]);
 
-  respDoc := TJsonBaseObject.Parse(response.Response) as TJsonObject;
   try
-    if respDoc.Contains('Result') then
-      resultCode := respDoc.I['Result']
+    respDoc := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+  except
+    on e : Exception do
+      raise ESignotaur.CreateFmt(
+        'Signotaur cert response is not valid JSON (%s). Raw body: %s',
+        [e.Message, response.Response]);
+  end;
+  try
+    if respDoc.Contains('result') then
+      resultCode := respDoc.I['result']
     else
       resultCode := -1;
     if resultCode <> 0 then
       raise ESignotaur.CreateFmt(
-        'Signotaur cert lookup returned error code %d: %s',
-        [resultCode, respDoc.S['Message']]);
+        'Signotaur cert lookup returned error code %d: %s. Raw body: %s',
+        [resultCode, respDoc.S['message'], response.Response]);
 
-    if not respDoc.Contains('Certificate') then
-      raise ESignotaur.Create('Signotaur cert response missing Certificate field');
+    if not respDoc.Contains('certificate') then
+      raise ESignotaur.CreateFmt(
+        'Signotaur cert response missing certificate field. Raw body: %s',
+        [response.Response]);
 
-    cerBase64 := respDoc.S['Certificate'];
+    cerBase64 := respDoc.S['certificate'];
     derBytes := StdBase64Decode(cerBase64);
     FCert := FX509.LoadCertificateFromDer(derBytes);
 
     // Use the server's authoritative thumbprint for the SignRequest, even
     // if the caller selected by Subject/Label. Otherwise the server would
     // re-resolve and we'd lose audit-trail accuracy.
-    if respDoc.Contains('Thumbprint') then
-      FResolvedThumbprint := respDoc.S['Thumbprint'];
+    if respDoc.Contains('thumbprint') then
+      FResolvedThumbprint := respDoc.S['thumbprint'];
     if FResolvedThumbprint = '' then
       FResolvedThumbprint := FOptions.Thumbprint;
 
@@ -253,6 +308,23 @@ begin
   result := false;
 end;
 
+procedure TSignotaurSigningProvider.BeginSession;
+begin
+  // No-op. Each REST call carries its own API-key header.
+end;
+
+procedure TSignotaurSigningProvider.EndSession;
+begin
+  // No-op.
+end;
+
+procedure TSignotaurSigningProvider.SetSigningContext(const fileName : string;
+                                                       fileSize : Int64);
+begin
+  FCallFileName := fileName;
+  FCallFileSize := fileSize;
+end;
+
 function TSignotaurSigningProvider.SignDigest(const digest : TBytes;
                                                digestAlgorithm : THashAlgorithm) : TBytes;
 var
@@ -264,25 +336,41 @@ var
   reqBody : string;
   sigBase64 : string;
   resultCode : integer;
+  effectiveFileName : string;
+  effectiveFileSize : Int64;
 begin
+  FLogger.Verbose(Format('  Signotaur.SignDigest: entered (digest=%d bytes, alg=%s)',
+    [Length(digest), HashAlgName(digestAlgorithm)]));
   // Ensure cert + resolved thumbprint are populated before signing.
   GetCertificate;
   if FResolvedThumbprint = '' then
     raise ESignotaur.Create('Signotaur: cert lookup did not yield a thumbprint for signing');
 
+  // Prefer per-call context (set by the signing service for each file in a
+  // batch); fall back to the constructor-time defaults from FOptions if the
+  // caller didn't supply anything.
+  if FCallFileName <> '' then
+    effectiveFileName := FCallFileName
+  else
+    effectiveFileName := FOptions.FileName;
+  if FCallFileSize > 0 then
+    effectiveFileSize := FCallFileSize
+  else
+    effectiveFileSize := FOptions.FileSizeBytes;
+
   reqDoc := TJsonObject.Create;
   try
-    reqDoc.S['ApiKey'] := FOptions.ApiKey;
-    reqDoc.S['Thumbprint'] := FResolvedThumbprint;
-    reqDoc.S['Digest'] := StdBase64Encode(digest);
-    reqDoc.S['DigestHashAlgorithm'] := HashAlgName(digestAlgorithm);
-    reqDoc.S['ClientVersion'] := cSignotaurClientVersion;
-    if FOptions.FileName <> '' then
-      reqDoc.S['FileName'] := FOptions.FileName;
-    if FOptions.FileSizeBytes > 0 then
-      reqDoc.L['FileSizeInBytes'] := FOptions.FileSizeBytes;
+    // ApiKey travels in the X-Api-Key header, not the body.
+    reqDoc.S['thumbprint'] := FResolvedThumbprint;
+    reqDoc.S['digest'] := StdBase64Encode(digest);
+    reqDoc.S['digestHashAlgorithm'] := HashAlgName(digestAlgorithm);
+    reqDoc.S['clientVersion'] := cSignotaurClientVersion;
+    if effectiveFileName <> '' then
+      reqDoc.S['fileName'] := effectiveFileName;
+    if effectiveFileSize > 0 then
+      reqDoc.L['fileSizeInBytes'] := effectiveFileSize;
     if FOptions.FileVersion <> '' then
-      reqDoc.S['FileVersion'] := FOptions.FileVersion;
+      reqDoc.S['fileVersion'] := FOptions.FileVersion;
     reqBody := reqDoc.ToJSON(False);
   finally
     reqDoc.Free;
@@ -290,32 +378,68 @@ begin
 
   cancellationToken := TCancellationTokenSourceFactory.Create.Token;
   httpClient := THttpClientFactory.CreateClient(FOptions.Endpoint);
+  // Self-signed flag must be reapplied per client instance — the cert/get
+  // call already warned the user; no need to warn again on every sign.
+  if FOptions.AllowSelfSignedCertificates then
+    httpClient.AllowSelfSignedCertificates := true;
   request := httpClient.CreateRequest(cSignotaurApiBase + '/sign')
                 .WithHeader('Accept', 'application/json')
+                .WithHeader('X-Api-Key', FOptions.ApiKey)
                 .WithBody(reqBody, TEncoding.UTF8)
                 .WithContentType('application/json', 'utf-8');
 
   FLogger.Information('Signing digest via Signotaur (' + HashAlgName(digestAlgorithm) + ')');
   FLogger.Verbose('Signotaur POST ' + FOptions.Endpoint + cSignotaurApiBase + '/sign');
-  response := httpClient.Post(request, cancellationToken);
+  // Wrap the POST itself so any HTTP-layer exception (TLS failure, timeout,
+  // connection drop) is logged with full diagnostics before it bubbles up.
+  // Several batch-sign hangs traced back to exceptions raised here that
+  // looked like silent process exits in higher-level logs.
+  try
+    response := httpClient.Post(request, cancellationToken);
+  except
+    on e : Exception do
+    begin
+      FLogger.Error(Format('Signotaur POST raised %s: %s', [e.ClassName, e.Message]));
+      raise EProviderFatal.CreateFmt(
+        'Signotaur sign HTTP call failed (%s): %s',
+        [e.ClassName, e.Message]);
+    end;
+  end;
+  // Log status separately from body — body logging on a huge / binary
+  // response has crashed the console writer in the past, and we always
+  // want to know the status came back even if the body log fails.
+  FLogger.Debug(Format('Signotaur HTTP %d response (%d bytes)',
+    [response.StatusCode, Length(response.Response)]));
+  if Length(response.Response) > 0 then
+    FLogger.Verbose('Signotaur response body: ' + response.Response);
   if response.StatusCode <> 200 then
-    raise ESignotaur.CreateFmt(
+    // HTTP-level failure: see note on the matching raise in GetCertificate.
+    raise EProviderFatal.CreateFmt(
       'Signotaur sign failed (HTTP %d): %s',
       [response.StatusCode, response.Response]);
 
-  respDoc := TJsonBaseObject.Parse(response.Response) as TJsonObject;
   try
-    if respDoc.Contains('Result') then
-      resultCode := respDoc.I['Result']
+    respDoc := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+  except
+    on e : Exception do
+      raise ESignotaur.CreateFmt(
+        'Signotaur sign response is not valid JSON (%s). Raw body: %s',
+        [e.Message, response.Response]);
+  end;
+  try
+    if respDoc.Contains('result') then
+      resultCode := respDoc.I['result']
     else
       resultCode := -1;
     if resultCode <> 0 then
       raise ESignotaur.CreateFmt(
-        'Signotaur sign returned error code %d: %s',
-        [resultCode, respDoc.S['Message']]);
-    if not respDoc.Contains('SignedData') then
-      raise ESignotaur.Create('Signotaur sign response missing SignedData field');
-    sigBase64 := respDoc.S['SignedData'];
+        'Signotaur sign returned error code %d: %s. Raw body: %s',
+        [resultCode, respDoc.S['message'], response.Response]);
+    if not respDoc.Contains('signedData') then
+      raise ESignotaur.CreateFmt(
+        'Signotaur sign response missing signedData field. Raw body: %s',
+        [response.Response]);
+    sigBase64 := respDoc.S['signedData'];
     result := StdBase64Decode(sigBase64);
   finally
     respDoc.Free;

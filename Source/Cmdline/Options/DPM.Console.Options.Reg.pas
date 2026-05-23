@@ -633,58 +633,55 @@ var
   cmd : TCommandDefinition;
 begin
   cmd := TOptionsRegistry.RegisterCommand('sign', '',
-    'Signs a .dpkg package with an author certificate from the Windows certificate store or a PFX file.',
-    'The cert is selected by --thumbprint (cert store) or --pfx (PFX file).',
-    'sign <package> --thumbprint <hex> | --pfx <file> [options]');
+    'Signs one or more .dpkg packages. Three signing providers are supported: ' +
+    'the Windows certificate store (smart cards / HSMs / YubiKey via CSP/KSP), ' +
+    'a PFX file, Azure Key Vault, or VSoft Signotaur.',
+    'Targets: a single .dpkg, a folder (signs every matching file), or a ' +
+    'wildcard pattern (e.g. C:\packages\*.dpkg). Use --recursive to descend ' +
+    'and --pattern to override the default *.dpkg mask. For smart-card / HSM ' +
+    'signing the private-key session is held open for the whole run, so the ' +
+    'PIN is only prompted once.' + sLineBreak + sLineBreak +
+    'Choose a provider with --provider:' + sLineBreak +
+    '  local      (default) Windows cert store via --thumbprint, or PFX via --pfx.' + sLineBreak +
+    '  keyvault   Azure Key Vault. Requires --vault-url, --cert-name, --tenant-id,' + sLineBreak +
+    '             --client-id, --client-secret-env.' + sLineBreak +
+    '  signotaur  VSoft Signotaur. Requires --endpoint, --api-key-env (or --api-key),' + sLineBreak +
+    '             and one of --thumbprint / --subject / --label as cert selector.',
+    'sign <package|folder|pattern> [--provider <local|keyvault|signotaur>] [options]');
 
-  cmd.RegisterUnNamedOption<string>('Path to the .dpkg to sign', 'packageFile',
+  cmd.RegisterUnNamedOption<string>(
+    'Path to the .dpkg, a folder of .dpkg files, or a wildcard pattern.',
+    'packageFile',
     procedure(const value : string)
     begin
       TSignOptions.Default.PackageFile := value;
     end).Required := true;
 
-  cmd.RegisterOption<string>('thumbprint', 't', 'SHA-1 thumbprint of the cert in the Windows store (MY).',
+  cmd.RegisterOption<boolean>('recursive', 'r',
+    'When the target is a folder, recurse into subdirectories.',
+    procedure(const value : boolean)
+    begin
+      TSignOptions.Default.Recursive := value;
+    end).HasValue := false;
+
+  cmd.RegisterOption<string>('pattern', '',
+    'File pattern to match when the target is a folder (default *.dpkg).',
     procedure(const value : string)
     begin
-      TSignOptions.Default.Thumbprint := value;
+      if value <> '' then
+        TSignOptions.Default.FilePattern := value;
     end);
 
-  cmd.RegisterOption<string>('store', '', 'Certificate-store location: CurrentUser (default) or LocalMachine.',
-    procedure(const value : string)
+  cmd.RegisterOption<boolean>('fail-fast', '',
+    'Stop on the first failure. Default is to continue and report at the end.',
+    procedure(const value : boolean)
     begin
-      if SameText(value, 'LocalMachine') then
-        TSignOptions.Default.StoreLocation := sslLocalMachine
-      else
-        TSignOptions.Default.StoreLocation := sslCurrentUser;
-    end);
+      TSignOptions.Default.FailFast := value;
+    end).HasValue := false;
 
-  cmd.RegisterOption<string>('pfx', 'p', 'Path to a PFX file containing the signing certificate.',
-    procedure(const value : string)
-    begin
-      TSignOptions.Default.PfxFile := value;
-    end);
-
-  cmd.RegisterOption<string>('pfx-password-env', '', 'Name of an environment variable holding the PFX password.',
-    procedure(const value : string)
-    begin
-      TSignOptions.Default.PfxPasswordEnvVar := value;
-    end);
-
-  cmd.RegisterOption<string>('timestamper', '', 'RFC3161 timestamp authority URL (default: DigiCert).',
-    procedure(const value : string)
-    begin
-      TSignOptions.Default.TimestampUrl := value;
-    end);
-
-  cmd.RegisterOption<string>('digest', 'd', 'CMS digest algorithm: sha256 (default), sha384, or sha512.',
-    procedure(const value : string)
-    begin
-      TSignOptions.Default.Digest := value;
-    end);
-
-  // P3 §3.3 — remote signing providers.
+  // --- provider selector -----------------------------------------------
   cmd.RegisterOption<string>('provider', '',
-    'Signing provider: local (default, uses --thumbprint/--pfx), keyvault, or signotaur.',
+    'Signing provider: local (default), keyvault, or signotaur.',
     procedure(const value : string)
     begin
       if SameText(value, 'keyvault') then
@@ -695,75 +692,153 @@ begin
         TSignOptions.Default.Provider := spLocal;
     end);
 
+  // --- [local] cert-store / PFX ----------------------------------------
+  cmd.RegisterOption<string>('thumbprint', 't',
+    '[local|signotaur] SHA-1 thumbprint of the signing cert. For local it is ' +
+    'the cert in the Windows store (MY).',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.Thumbprint := value;
+    end);
+
+  cmd.RegisterOption<string>('store', '',
+    '[local] Certificate-store location: CurrentUser (default) or LocalMachine.',
+    procedure(const value : string)
+    begin
+      if SameText(value, 'LocalMachine') then
+        TSignOptions.Default.StoreLocation := sslLocalMachine
+      else
+        TSignOptions.Default.StoreLocation := sslCurrentUser;
+    end);
+
+  cmd.RegisterOption<string>('pfx', 'p',
+    '[local] Path to a PFX file containing the signing certificate.',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.PfxFile := value;
+    end);
+
+  cmd.RegisterOption<string>('pfx-password-env', '',
+    '[local] Name of an environment variable holding the PFX password.',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.PfxPasswordEnvVar := value;
+    end);
+
+  // --- timestamping + digest (all providers) ---------------------------
+  cmd.RegisterOption<string>('timestamper', '',
+    'RFC3161 timestamp authority URL (default: DigiCert).',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.TimestampUrl := value;
+    end);
+
+  cmd.RegisterOption<string>('digest', 'd',
+    'CMS digest algorithm: sha256, sha384, or sha512. Default: auto-select ' +
+    'from the cert key (RSA -> SHA-256; ECDSA P-256 -> SHA-256; P-384 -> ' +
+    'SHA-384; P-521 -> SHA-512). Override only if your HSM / cert chain ' +
+    'requires it.',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.Digest := value;
+    end);
+
+  // --- [keyvault] Azure Key Vault --------------------------------------
   cmd.RegisterOption<string>('vault-url', '',
-    'Azure Key Vault URL (e.g. https://my-vault.vault.azure.net).',
+    '[keyvault] Azure Key Vault URL (e.g. https://my-vault.vault.azure.net).',
     procedure(const value : string)
     begin
       TSignOptions.Default.VaultUrl := value;
     end);
 
   cmd.RegisterOption<string>('cert-name', '',
-    'Key Vault certificate name (also used as --cert-id for signotaur).',
+    '[keyvault] Key Vault certificate name.',
     procedure(const value : string)
     begin
       TSignOptions.Default.CertName := value;
     end);
 
   cmd.RegisterOption<string>('key-version', '',
-    'Optional Key Vault key version. Defaults to latest.',
+    '[keyvault] Optional Key Vault key version. Defaults to latest.',
     procedure(const value : string)
     begin
       TSignOptions.Default.KeyVersion := value;
     end);
 
   cmd.RegisterOption<string>('tenant-id', '',
-    'Azure AAD tenant id (GUID or domain).',
+    '[keyvault] Azure AAD tenant id (GUID or domain).',
     procedure(const value : string)
     begin
       TSignOptions.Default.TenantId := value;
     end);
 
   cmd.RegisterOption<string>('client-id', '',
-    'Azure AAD application (client) id used to authenticate to Key Vault.',
+    '[keyvault] Azure AAD application (client) id used to authenticate to Key Vault.',
     procedure(const value : string)
     begin
       TSignOptions.Default.ClientId := value;
     end);
 
   cmd.RegisterOption<string>('client-secret-env', '',
-    'Name of an environment variable holding the AAD client secret.',
+    '[keyvault] Name of an environment variable holding the AAD client secret.',
     procedure(const value : string)
     begin
       TSignOptions.Default.ClientSecretEnv := value;
     end);
 
+  // --- [signotaur] VSoft Signotaur -------------------------------------
   cmd.RegisterOption<string>('endpoint', '',
-    'Signotaur service endpoint URL (e.g. https://signotaur.example.com).',
+    '[signotaur] Service endpoint URL (e.g. https://signotaur.example.com).',
     procedure(const value : string)
     begin
       TSignOptions.Default.SignotaurEndpoint := value;
     end);
 
   cmd.RegisterOption<string>('api-key-env', '',
-    'Name of an environment variable holding the Signotaur API key.',
+    '[signotaur] Name of an environment variable holding the API key (preferred over --api-key).',
     procedure(const value : string)
     begin
       TSignOptions.Default.SignotaurApiKeyEnv := value;
     end);
 
+  cmd.RegisterOption<string>('api-key', '',
+    '[signotaur] API key as a literal value. Discouraged — visible in process ' +
+    'listings and shell history. Use --api-key-env instead when possible.',
+    procedure(const value : string)
+    begin
+      TSignOptions.Default.SignotaurApiKey := value;
+    end);
+
   cmd.RegisterOption<string>('subject', '',
-    'Signotaur cert selector by certificate Subject (alternative to --thumbprint).',
+    '[signotaur] Cert selector by certificate Subject (alternative to --thumbprint).',
     procedure(const value : string)
     begin
       TSignOptions.Default.SignotaurSubject := value;
     end);
 
   cmd.RegisterOption<string>('label', '',
-    'Signotaur cert selector by user-assigned Label (alternative to --thumbprint).',
+    '[signotaur] Cert selector by user-assigned Label (alternative to --thumbprint).',
     procedure(const value : string)
     begin
       TSignOptions.Default.SignotaurLabel := value;
     end);
+
+  cmd.RegisterOption<boolean>('allow-untrusted', '',
+    '[signotaur] Trust TLS chains that fail validation (self-signed cert, ' +
+    'untrusted CA, hostname mismatch). Dev / on-prem use only',
+    procedure(const value : boolean)
+    begin
+      TSignOptions.Default.SignotaurAllowSelfSigned := value;
+    end).HasValue := false;
+
+  // --- examples --------------------------------------------------------
+  cmd.Examples.Add('sign Foo.dpkg -thumbprint=AB12CD34EF                       # local cert store');
+  cmd.Examples.Add('sign Foo.dpkg -pfx=cert.pfx -pfx-password-env=PFX_PWD      # local PFX');
+  cmd.Examples.Add('sign C:\packages -thumbprint=AB12CD34EF                    # all *.dpkg in folder');
+  cmd.Examples.Add('sign C:\packages -r                                        # recursive');
+  cmd.Examples.Add('sign "C:\out\*-Win64-*.dpkg" -thumbprint=AB12CD34EF        # wildcard');
+  cmd.Examples.Add('sign Foo.dpkg -provider=keyvault -vault-url=https://my.vault.azure.net -cert-name=codesign -tenant-id=GUID -client-id=GUID -client-secret-env=AAD_SECRET');
+  cmd.Examples.Add('sign Foo.dpkg -provider=signotaur -endpoint=https://signotaur.example.com -api-key-env=SIGNOTAUR_KEY -label=CodeSign');
 end;
 
 

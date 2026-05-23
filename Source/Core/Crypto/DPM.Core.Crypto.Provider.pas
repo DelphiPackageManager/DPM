@@ -46,6 +46,15 @@ type
   TCertStoreSigningProvider = class(TInterfacedObject, ISigningProvider)
   private
     FCertificate : ICertificate;
+    // Session keep-alive. When BeginSession is called, the private key is
+    // acquired and held until EndSession. For smart cards / HSMs (YubiKey,
+    // PIV minidrivers) this keeps the card session — and the cached PIN —
+    // alive across the multiple CryptSignMessage calls a multi-file sign
+    // makes, so the user is only prompted once per `dpm sign` invocation.
+    FSessionHandle      : HCRYPTPROV_OR_NCRYPT_KEY_HANDLE;
+    FSessionKeySpec     : DWORD;
+    FSessionNeedsFree   : boolean;
+    FSessionActive      : boolean;
   protected
     function Certificate : ICertificate;
     function IsLocal : boolean;
@@ -53,8 +62,12 @@ type
                                out keySpec : DWORD;
                                out callerMustFree : boolean) : boolean;
     function SignDigest(const digest : TBytes; digestAlgorithm : THashAlgorithm) : TBytes;
+    procedure BeginSession;
+    procedure EndSession;
+    procedure SetSigningContext(const fileName : string; fileSize : Int64);
   public
     constructor Create(const cert : ICertificate);
+    destructor Destroy; override;
   end;
 
   TPfxSigningProvider = class(TCertStoreSigningProvider)
@@ -74,6 +87,16 @@ begin
     raise ECryptoProvider.Create('Signing provider requires a certificate');
   inherited Create;
   FCertificate := cert;
+  FSessionHandle := 0;
+  FSessionKeySpec := 0;
+  FSessionNeedsFree := false;
+  FSessionActive := false;
+end;
+
+destructor TCertStoreSigningProvider.Destroy;
+begin
+  EndSession;
+  inherited;
 end;
 
 function TCertStoreSigningProvider.Certificate : ICertificate;
@@ -112,6 +135,17 @@ begin
   keySpec := 0;
   callerMustFree := false;
 
+  // If a session is active, hand back the pre-acquired handle and tell the
+  // caller NOT to release it — the session owns it.
+  if FSessionActive then
+  begin
+    keyHandle := FSessionHandle;
+    keySpec := FSessionKeySpec;
+    callerMustFree := false;
+    result := true;
+    exit;
+  end;
+
   result := CryptAcquireCertificatePrivateKey(
     FCertificate.GetContext,
     cCRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG,
@@ -123,6 +157,57 @@ begin
     exit;
 
   callerMustFree := freeProv;
+end;
+
+procedure TCertStoreSigningProvider.BeginSession;
+var
+  freeProv : BOOL;
+const
+  cCRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG = $00010000;
+begin
+  if FSessionActive then
+    exit;
+  // Pre-acquire the private key. The card driver opens its session and
+  // (typically) caches the PIN here. Any CryptSignMessage / SignDigest calls
+  // made during the session re-acquire against the same already-open card
+  // session, so the PIN is not re-prompted.
+  if not CryptAcquireCertificatePrivateKey(
+       FCertificate.GetContext,
+       cCRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG,
+       nil,
+       FSessionHandle,
+       FSessionKeySpec,
+       freeProv) then
+    raise ECryptoProvider.CreateFmt(
+      'BeginSession: CryptAcquireCertificatePrivateKey failed (error %d)',
+      [GetLastError]);
+  FSessionNeedsFree := freeProv;
+  FSessionActive := true;
+end;
+
+procedure TCertStoreSigningProvider.SetSigningContext(const fileName : string;
+                                                      fileSize : Int64);
+begin
+  // No-op. Local CryptSignMessage carries no audit metadata to a remote
+  // service. The interface method exists so the signing service can call
+  // through uniformly.
+end;
+
+procedure TCertStoreSigningProvider.EndSession;
+begin
+  if not FSessionActive then
+    exit;
+  if FSessionNeedsFree and (FSessionHandle <> 0) then
+  begin
+    if FSessionKeySpec = CERT_NCRYPT_KEY_SPEC then
+      NCryptFreeObject(FSessionHandle)
+    else
+      CryptReleaseContext(FSessionHandle, 0);
+  end;
+  FSessionHandle := 0;
+  FSessionKeySpec := 0;
+  FSessionNeedsFree := false;
+  FSessionActive := false;
 end;
 
 end.

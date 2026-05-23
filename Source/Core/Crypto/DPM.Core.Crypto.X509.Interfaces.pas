@@ -78,6 +78,11 @@ type
     cslLocalMachine
   );
 
+  // What kind of public key the cert carries. Drives both digest pairing
+  // (FIPS 186 curve-size matching for ECDSA) and CMS signature-algorithm
+  // OID selection. Unknown when we don't recognise the SPKI algorithm OID.
+  TCertKeyType = (cktUnknown, cktRsa, cktEcdsa);
+
   ICertificate = interface
     ['{B1F31C8C-25A7-4F40-A19B-7E40C2E4D8E8}']
     function SubjectCommonName : string;
@@ -90,6 +95,27 @@ type
     function NotAfter : TDateTime;                    // UTC
     function HasCodeSigningEku : boolean;
     function RawDerBytes : TBytes;
+    /// <summary>
+    /// Public-key algorithm carried by the cert's SubjectPublicKeyInfo.
+    /// Used by the CMS layer to pick the correct signature-algorithm OID
+    /// (RSA vs ECDSA-with-hash) and by PreferredDigest to decide whether
+    /// curve-size matching applies.
+    /// </summary>
+    function PublicKeyType : TCertKeyType;
+    /// <summary>
+    /// Natural digest pairing for this cert's key. RSA is permissive — any
+    /// of SHA-256/384/512 work — and we return SHA-256 as the sensible
+    /// default. ECDSA is strict (FIPS 186): digest size MUST match curve
+    /// size, otherwise CSP/KSP middleware (YubiKey PIV, Azure KV) will
+    /// reject the sign with "algorithm not supported". Returns:
+    ///   RSA / unknown → haSha256
+    ///   ECDSA P-256   → haSha256
+    ///   ECDSA P-384   → haSha384
+    ///   ECDSA P-521   → haSha512
+    /// Callers should prefer this over a hard-coded default unless the user
+    /// explicitly chose a digest on the command line.
+    /// </summary>
+    function PreferredDigest : THashAlgorithm;
     // Win32 handle access — only the X509 / CMS layer should call this.
     function GetContext : PCCERT_CONTEXT;
   end;

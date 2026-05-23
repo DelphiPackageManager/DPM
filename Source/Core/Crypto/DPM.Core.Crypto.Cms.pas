@@ -39,6 +39,7 @@ interface
 uses
   Winapi.Windows,
   System.Classes, System.SysUtils,
+  DPM.Core.Logging,
   DPM.Core.Crypto.Win32,
   DPM.Core.Crypto.Algorithms,
   DPM.Core.Crypto.Hashing.Interfaces,
@@ -51,6 +52,7 @@ type
   private
     FX509 : IX509Service;
     FHashing : IHashingService;
+    FLogger : ILogger;
     /// <summary>
     /// P3 §3.3 v2 — assemble a detached CMS SignedData when the provider
     /// can't expose a Win32 key handle. Computes the digest of the signed
@@ -71,10 +73,13 @@ type
     function VerifyDetached(const der : TBytes; const content : TBytes;
                             out signerCert : ICertificate) : boolean;
     function Decode(const der : TBytes) : ICmsSignedData;
+    function ExtractEncryptedDigest(const der : TBytes) : TBytes;
     procedure AddUnsignedAttribute(var der : TBytes;
                                    const oid : AnsiString; const value : TBytes);
   public
-    constructor Create(const x509 : IX509Service; const hashing : IHashingService);
+    constructor Create(const logger : ILogger;
+                       const x509 : IX509Service;
+                       const hashing : IHashingService);
   end;
 
 implementation
@@ -176,13 +181,18 @@ end;
 
 { TCmsService }
 
-constructor TCmsService.Create(const x509 : IX509Service; const hashing : IHashingService);
+constructor TCmsService.Create(const logger : ILogger;
+                               const x509 : IX509Service;
+                               const hashing : IHashingService);
 begin
+  if logger = nil then
+    raise ECryptoCms.Create('TCmsService requires a logger');
   if x509 = nil then
     raise ECryptoCms.Create('TCmsService requires an X509 service');
   if hashing = nil then
     raise ECryptoCms.Create('TCmsService requires a hashing service');
   inherited Create;
+  FLogger := logger;
   FX509 := x509;
   FHashing := hashing;
 end;
@@ -370,11 +380,11 @@ begin
 end;
 
 function EncodeOidValue(const oid : AnsiString) : TBytes;
-const
-  X509_OBJECT_IDENTIFIER : PAnsiChar = PAnsiChar(7);
 var
   p : PAnsiChar;
 begin
+  // X509_OBJECT_IDENTIFIER struct type is declared in DPM.Core.Crypto.Win32
+  // alongside the other CryptEncodeObjectEx struct-type ids.
   p := PAnsiChar(oid);
   result := EncodeWith(X509_OBJECT_IDENTIFIER, @p, 'CryptEncodeObjectEx(X509_OBJECT_IDENTIFIER)');
 end;
@@ -389,6 +399,29 @@ begin
   // OIDs and writes ASN.1 NULL for others as appropriate.
   result := EncodeWith(X509_ALGORITHM_IDENTIFIER, @alg,
     'CryptEncodeObjectEx(X509_ALGORITHM_IDENTIFIER)');
+end;
+
+// CMS SignerInfo.HashEncryptionAlgorithm OID lookup. The CMS field name is
+// historical — it's the signature algorithm, not encryption. RSA reuses
+// rsaEncryption regardless of digest; ECDSA uses the ecdsa-with-<hash>
+// OIDs from RFC 5758.
+function SignatureAlgOidFor(keyType : TCertKeyType; digest : THashAlgorithm) : AnsiString;
+begin
+  case keyType of
+    cktEcdsa :
+      case digest of
+        haSha256 : result := szOID_ECDSA_SHA256;
+        haSha384 : result := szOID_ECDSA_SHA384;
+        haSha512 : result := szOID_ECDSA_SHA512;
+      else
+        raise ECryptoCms.CreateFmt(
+          'No ECDSA signature OID known for digest %d', [Ord(digest)]);
+      end;
+  else
+    // cktRsa or cktUnknown: rsaEncryption is the safe default and what
+    // pre-existing RSA signing code shipped.
+    result := szOID_RSA_RSA;
+  end;
 end;
 
 // DER SET ordering rule: elements must be sorted byte-wise ascending of
@@ -449,6 +482,14 @@ var
   authAttrPayloads : array of TBytes;
   signerInfo : CMSG_SIGNER_INFO;
   signerInfoDer : TBytes;
+  // Both OIDs are pulled into local AnsiStrings BEFORE being aliased into
+  // signerInfo via PAnsiChar(...) — otherwise the cast captures a pointer
+  // into a function-return temporary that's freed at end-of-statement,
+  // leaving signerInfo.*.pszObjId dangling when CryptEncodeObjectEx reads
+  // it a few lines later. That corrupts the heap and crashes much later
+  // (typically inside an unrelated BCrypt allocation, status c0000374).
+  hashAlgOid : AnsiString;
+  sigAlgOid : AnsiString;
   digestAlgDer, sigAlgDer : TBytes;
   digestAlgsSetDer : TBytes;
   encapContentInfoDer : TBytes;
@@ -460,11 +501,14 @@ var
   contentBlob : CRYPT_INTEGER_BLOB;
   i, n, idx : integer;
 begin
+  FLogger.Verbose('  SignRemote: resolving signer certificate');
   cert := provider.Certificate;
   if cert = nil then
     raise ECryptoCms.Create('SignRemote: provider has no certificate');
 
   // 1. Compute message digest of the content (the manifest, for detached).
+  FLogger.Verbose(Format('  SignRemote: hashing content (%d bytes, %s)',
+    [Length(content), TAlgorithmProfile.HashAlgorithmName(digest)]));
   messageDigest := FHashing.HashBytes(content, digest);
 
   // 2. Build the full signed-attribute set: contentType + messageDigest +
@@ -518,6 +562,7 @@ begin
       // the array form because PKCS_ATTRIBUTE encodes one attr at a time.
       Copy(authAttrPayloads[i], 0, Length(authAttrPayloads[i])));
 
+  FLogger.Verbose(Format('  SignRemote: encoded %d signed attributes; sorting + SET-wrapping', [n]));
   SetLength(attrsSorted, n);
   for i := 0 to n - 1 do
     attrsSorted[i] := encodedAttrs[i];
@@ -525,10 +570,12 @@ begin
 
   signedAttrsSetContent := ConcatBytes(attrsSorted);
   signedAttrsSetDer := DerSet(signedAttrsSetContent);
+  FLogger.Verbose(Format('  SignRemote: SignedAttrs SET = %d bytes', [Length(signedAttrsSetDer)]));
 
   // 4. Hash the SET-encoded signed attrs. That hash is what the remote
   //    signer signs over.
   attrsHash := FHashing.HashBytes(signedAttrsSetDer, digest);
+  FLogger.Verbose(Format('  SignRemote: SignedAttrs digest = %d bytes; calling provider.SignDigest', [Length(attrsHash)]));
 
   // 5. Single remote call — provider.SignDigest returns the raw signature
   //    value (RSA PKCS#1 v1.5 over the digest, or ECDSA equivalent).
@@ -545,11 +592,16 @@ begin
   signerInfo.dwVersion := 1;   // IssuerAndSerial form
   signerInfo.Issuer := certInfo.Issuer;
   signerInfo.SerialNumber := certInfo.SerialNumber;
-  signerInfo.HashAlgorithm.pszObjId := PAnsiChar(TAlgorithmProfile.HashOid(digest));
-  // szOID_RSA_RSA (rsaEncryption) is the common signature-algorithm OID for
-  // CMS PKCS#1 v1.5 signatures. ECDSA-keyed providers would use a different
-  // OID here — a follow-up once we have ECDSA test material.
-  signerInfo.HashEncryptionAlgorithm.pszObjId := PAnsiChar(szOID_RSA_RSA);
+  // Stash both OIDs in locals first; see the comment near the var block —
+  // PAnsiChar(<function-return AnsiString>) leaves a dangling pointer.
+  hashAlgOid := TAlgorithmProfile.HashOid(digest);
+  signerInfo.HashAlgorithm.pszObjId := PAnsiChar(hashAlgOid);
+  // CMS "HashEncryptionAlgorithm" is really the *signature* algorithm. RSA
+  // uses the rsaEncryption OID for any hash; ECDSA uses ecdsa-with-<hash>
+  // OIDs (RFC 5758). Mismatching this against the actual signature bytes
+  // makes verifiers reject the signature outright.
+  sigAlgOid := SignatureAlgOidFor(cert.PublicKeyType, digest);
+  signerInfo.HashEncryptionAlgorithm.pszObjId := PAnsiChar(sigAlgOid);
   signerInfo.EncryptedHash.cbData := Length(signatureBytes);
   signerInfo.EncryptedHash.pbData := @signatureBytes[0];
   signerInfo.AuthAttrs.cAttr := n;
@@ -619,6 +671,7 @@ var
   contentPtr : array[0..0] of Pointer;
   contentSize : array[0..0] of DWORD;
   signedSize : DWORD;
+  hashAlgOid : AnsiString;
 begin
   if not TAlgorithmProfile.CmsDigestAllowed(digest) then
     raise ECryptoCms.CreateFmt('Digest %s not permitted', [TAlgorithmProfile.HashAlgorithmName(digest)]);
@@ -659,7 +712,11 @@ begin
   para.cbSize := SizeOf(para);
   para.dwMsgEncodingType := cENCODING_TYPE;
   para.pSigningCert := certs[0];
-  para.HashAlgorithm.pszObjId := PAnsiChar(TAlgorithmProfile.HashOid(digest));
+  // Pin the OID string in a local AnsiString so PAnsiChar(...) doesn't
+  // capture a function-return temporary that gets freed before
+  // CryptSignMessage reads it (heap-corruption trap — see SignRemote).
+  hashAlgOid := TAlgorithmProfile.HashOid(digest);
+  para.HashAlgorithm.pszObjId := PAnsiChar(hashAlgOid);
   para.cMsgCert := 1;
   para.rgpMsgCert := @certs[0];
   if Length(attrs) > 0 then
@@ -733,6 +790,37 @@ begin
   result := TCmsSignedData.Create(der, FX509);
 end;
 
+function TCmsService.ExtractEncryptedDigest(const der : TBytes) : TBytes;
+var
+  msg : HCRYPTMSG;
+  size : DWORD;
+begin
+  // Minimal decode: open the message, feed the bytes, fetch CMSG_ENCRYPTED_
+  // DIGEST, close. No pointer-chasing into signer-info / attribute arrays —
+  // avoids AVs on hand-assembled CMS that Windows can still parse far
+  // enough to expose the signature value but trips up on deeper traversal.
+  SetLength(result, 0);
+  if Length(der) = 0 then
+    exit;
+  msg := CryptMsgOpenToDecode(cENCODING_TYPE, 0, 0, 0, nil, nil);
+  if msg = nil then
+    raise ECryptoCms.CreateFmt('CryptMsgOpenToDecode failed: 0x%.8x', [GetLastError]);
+  try
+    CheckBool(CryptMsgUpdate(msg, PByte(@der[0]), Length(der), True),
+      'CryptMsgUpdate(ExtractEncryptedDigest)');
+    size := 0;
+    CheckBool(CryptMsgGetParam(msg, CMSG_ENCRYPTED_DIGEST, 0, nil, size),
+      'CryptMsgGetParam(ENCRYPTED_DIGEST size)');
+    SetLength(result, size);
+    if size > 0 then
+      CheckBool(CryptMsgGetParam(msg, CMSG_ENCRYPTED_DIGEST, 0, @result[0], size),
+        'CryptMsgGetParam(ENCRYPTED_DIGEST)');
+    SetLength(result, size);
+  finally
+    CryptMsgClose(msg);
+  end;
+end;
+
 procedure TCmsService.AddUnsignedAttribute(var der : TBytes;
                                            const oid : AnsiString; const value : TBytes);
 var
@@ -745,10 +833,13 @@ var
   encodedSize : DWORD;
   newDer : TBytes;
 begin
+  FLogger.Verbose(Format('    AddUnsignedAttribute: opening message decoder (cms=%d bytes, attr=%d bytes)',
+    [Length(der), Length(value)]));
   msg := CryptMsgOpenToDecode(cENCODING_TYPE, 0, 0, 0, nil, nil);
   if msg = nil then
     raise ECryptoCms.CreateFmt('CryptMsgOpenToDecode failed: %d', [GetLastError]);
   try
+    FLogger.Verbose('    AddUnsignedAttribute: feeding existing CMS to decoder');
     CheckBool(CryptMsgUpdate(msg, PByte(@der[0]), Length(der), True),
       'CryptMsgUpdate');
 
@@ -770,6 +861,7 @@ begin
     // pass the resulting bytes to CryptMsgControl.
     encodedAttr := nil;
     encodedAttrSize := 0;
+    FLogger.Verbose('    AddUnsignedAttribute: encoding PKCS_ATTRIBUTE');
     CheckBool(
       CryptEncodeObjectEx(cENCODING_TYPE, PKCS_ATTRIBUTE, @attr,
         CRYPT_ENCODE_ALLOC_FLAG, nil, @encodedAttr, encodedAttrSize),
@@ -781,6 +873,8 @@ begin
       para.blob.cbData := encodedAttrSize;
       para.blob.pbData := encodedAttr;
 
+      FLogger.Verbose(Format('    AddUnsignedAttribute: CryptMsgControl(ADD_UNAUTH_ATTR) with %d-byte blob',
+        [encodedAttrSize]));
       CheckBool(CryptMsgControl(msg, 0, CMSG_CTRL_ADD_SIGNER_UNAUTH_ATTR, @para),
         'CryptMsgControl(ADD_UNAUTH_ATTR)');
     finally
@@ -789,11 +883,13 @@ begin
 
     // Read the rewritten CMS bytes back out.
     encodedSize := 0;
+    FLogger.Verbose('    AddUnsignedAttribute: re-reading encoded message');
     CheckBool(CryptMsgGetParam(msg, 29 {CMSG_ENCODED_MESSAGE}, 0, nil, encodedSize), 'CryptMsgGetParam(ENCODED_MESSAGE size)');
     SetLength(newDer, encodedSize);
     CheckBool(CryptMsgGetParam(msg, 29 {CMSG_ENCODED_MESSAGE}, 0, @newDer[0], encodedSize), 'CryptMsgGetParam(ENCODED_MESSAGE)');
     SetLength(newDer, encodedSize);
     der := newDer;
+    FLogger.Verbose(Format('    AddUnsignedAttribute: done (new CMS = %d bytes)', [encodedSize]));
   finally
     CryptMsgClose(msg);
   end;

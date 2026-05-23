@@ -81,6 +81,11 @@ type
     function ReadManifestBytes(const archivePath : string; out bytes : TBytes) : boolean;
     function ReadSignatureBlobs(const archivePath : string;
                                 out blobs : IList<TPair<string, TBytes>>) : boolean;
+    // Filename-only scan of the signatures/ folder. No entry contents are
+    // read — just enumerates the central directory and returns the next
+    // free author-N index. Raises on read failure so we never silently
+    // collide on author-1.p7s.
+    function NextAuthorSignatureIndex(const archivePath : string) : integer;
     procedure WriteSignatureToArchive(const archivePath : string;
                                       const blobName : string;
                                       const blobBytes : TBytes);
@@ -265,6 +270,40 @@ begin
   end;
 end;
 
+function TPackageSigningService.NextAuthorSignatureIndex(const archivePath : string) : integer;
+const
+  cPrefix = 'signatures/author-';
+  cSuffix = '.p7s';
+var
+  zip : TZipFile;
+  i, value, highest : integer;
+  name, normalised, stem : string;
+begin
+  highest := 0;
+  zip := TZipFile.Create;
+  try
+    // No try/except — a read failure here MUST surface, not be swallowed
+    // into nextIndex=1 and append a duplicate author-1.p7s.
+    zip.Open(archivePath, zmRead);
+    for i := 0 to zip.FileCount - 1 do
+    begin
+      name := zip.FileName[i];
+      normalised := StringReplace(name, '\', '/', [rfReplaceAll]);
+      if not StartsText(cPrefix, normalised) then
+        Continue;
+      if not EndsText(cSuffix, normalised) then
+        Continue;
+      stem := Copy(normalised, Length(cPrefix) + 1,
+                   Length(normalised) - Length(cPrefix) - Length(cSuffix));
+      if TryStrToInt(stem, value) and (value > highest) then
+        highest := value;
+    end;
+  finally
+    zip.Free;
+  end;
+  result := highest + 1;
+end;
+
 procedure TPackageSigningService.WriteSignatureToArchive(const archivePath : string;
                                                           const blobName : string;
                                                           const blobBytes : TBytes);
@@ -279,6 +318,8 @@ begin
       ms.WriteBuffer(blobBytes[0], Length(blobBytes));
     ms.Position := 0;
     // Append-only: zmReadWrite preserves existing entries and adds new ones.
+    // Caller computes a unique blobName via NextAuthorSignatureIndex; we
+    // never get asked to write a name that already exists.
     zip.Open(archivePath, zmReadWrite);
     zip.Add(ms, blobName, zcDeflate);
   finally
@@ -298,11 +339,7 @@ var
   timestampToken : ITimestampToken;
   timestampUrl : string;
   digest : THashAlgorithm;
-  nextIndex : integer;
   blobName : string;
-  i : integer;
-  existingBlobs : IList<TPair<string, TBytes>>;
-  existingName : string;
   imprintBytes : TBytes;
   signerCert : ICertificate;
 begin
@@ -321,6 +358,13 @@ begin
     FLogger.Verbose('  SPKI (sha256): ' + BytesToHex(signerCert.SpkiHash(haSha256)));
   end;
 
+  // Push per-file audit metadata down to the provider. Remote providers
+  // (Signotaur) use this to record the correct file name + size in their
+  // server-side audit log; local providers no-op.
+  if provider <> nil then
+    provider.SetSigningContext(ExtractFileName(packageFilePath),
+                               TFile.GetSize(packageFilePath));
+
   // Build signed attributes: dpmSignatureRole=author.
   SetLength(signedAttrs, 1);
   signedAttrs[0].Oid := cOidDpmSignatureRole;
@@ -328,8 +372,20 @@ begin
 
   digest := options.DigestAlgorithm;
   if digest = haUnknown then
-    digest := haSha256;
-  FLogger.Information('  Digest: ' + TAlgorithmProfile.HashAlgorithmName(digest));
+  begin
+    // Auto-select from the cert's key parameters. RSA -> SHA-256; ECDSA
+    // P-256 -> SHA-256, P-384 -> SHA-384, P-521 -> SHA-512. This matches
+    // what HSM / smart-card middleware actually accepts (FIPS 186: digest
+    // size = curve size for ECDSA).
+    if (signerCert <> nil) then
+      digest := signerCert.PreferredDigest
+    else
+      digest := haSha256;
+    FLogger.Information('  Digest: ' + TAlgorithmProfile.HashAlgorithmName(digest) +
+                        ' (auto-selected from cert key)');
+  end
+  else
+    FLogger.Information('  Digest: ' + TAlgorithmProfile.HashAlgorithmName(digest));
 
   FLogger.Verbose('  Calling signer (may prompt for token PIN)...');
   cmsDer := FCms.Sign(manifestBytes, provider, signedAttrs, digest);
@@ -348,7 +404,10 @@ begin
   // Imprint covers the signer's encryptedDigest, NOT the full CMS. The
   // unsigned attribute we attach below changes the CMS bytes but doesn't
   // touch encryptedDigest, so verify sees the same bytes we signed over.
-  imprintBytes := FCms.Decode(cmsDer).EncryptedDigest;
+  // ExtractEncryptedDigest is the minimal Win32 decode — no signer/cert/
+  // attribute traversal — to avoid AV exits on hand-assembled CMS (remote
+  // provider path).
+  imprintBytes := FCms.ExtractEncryptedDigest(cmsDer);
   FLogger.Verbose(Format('  Timestamp imprint covers encryptedDigest (%d bytes)',
     [Length(imprintBytes)]));
   FLogger.Information('  Requesting RFC3161 timestamp from ' + timestampUrl);
@@ -376,19 +435,15 @@ begin
   FCms.AddUnsignedAttribute(signatureBytes, szOID_RFC3161_counterSign, timestampToken.RawToken);
   FLogger.Verbose(Format('  Final signature blob: %d bytes', [Length(signatureBytes)]));
 
-  // Pick the next available signature file name.
-  ReadSignatureBlobs(packageFilePath, existingBlobs);
-  nextIndex := 1;
-  for i := 0 to existingBlobs.Count - 1 do
-  begin
-    existingName := ExtractFileName(existingBlobs[i].Key);
-    if StartsText('author-', existingName) then
-      Inc(nextIndex);
-  end;
-
-  blobName := Format('signatures/author-%d.p7s', [nextIndex]);
+  // Filename-only scan of the central directory yields the next free
+  // author-N index. Re-signing accumulates: first run writes author-1.p7s,
+  // a second run sees it and writes author-2.p7s, etc. The archive is
+  // append-only.
+  blobName := Format('signatures/author-%d.p7s',
+    [NextAuthorSignatureIndex(packageFilePath)]);
   FLogger.Information('  Writing ' + blobName + ' into the .dpkg');
   WriteSignatureToArchive(packageFilePath, blobName, signatureBytes);
+  FLogger.Verbose('  Signature file written; sealing archive');
   FLogger.Success('Signed [' + ExtractFileName(packageFilePath) + ']');
 end;
 

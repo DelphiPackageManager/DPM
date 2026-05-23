@@ -70,6 +70,15 @@ type
 
     function Decode(const der : TBytes) : ICmsSignedData;
 
+    /// <summary>
+    /// Pulls just the SignerInfo's encryptedDigest out of a CMS blob, without
+    /// constructing an ICmsSignedData or walking signer-certs / attributes.
+    /// Used for RFC3161 timestamp imprint computation, where a full decode
+    /// is wasteful and exposes us to pointer-fixup edge cases on
+    /// hand-assembled CMS structures (the remote-signer path).
+    /// </summary>
+    function ExtractEncryptedDigest(const der : TBytes) : TBytes;
+
     procedure AddUnsignedAttribute(var der : TBytes;
                                    const oid : AnsiString; const value : TBytes);
   end;

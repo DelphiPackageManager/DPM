@@ -71,10 +71,38 @@ type
     /// provider's certificate key type. Local providers raise.
     /// </summary>
     function SignDigest(const digest : TBytes; digestAlgorithm : THashAlgorithm) : TBytes;
+    /// <summary>
+    /// Open a signing session. For smart-card / HSM providers this pre-acquires
+    /// the private-key handle and keeps it alive until EndSession, so the card
+    /// session (and any cached PIN) survives across multiple sign operations.
+    /// Remote providers may use this to warm up auth tokens. Calling Sign
+    /// without an explicit BeginSession is still valid — providers acquire
+    /// what they need on demand and release immediately.
+    /// </summary>
+    procedure BeginSession;
+    /// <summary>
+    /// Close the signing session started by BeginSession. Idempotent; called
+    /// automatically on destruction if still open.
+    /// </summary>
+    procedure EndSession;
+    /// <summary>
+    /// Provide per-sign-call audit metadata (file name + size) to the provider.
+    /// Called by the signing service immediately before each sign operation so
+    /// remote providers (e.g. Signotaur) can include the correct name/size in
+    /// their server-side audit log even when one provider signs many files in
+    /// a batch. Local providers no-op. Pass empty / 0 to clear.
+    /// </summary>
+    procedure SetSigningContext(const fileName : string; fileSize : Int64);
   end;
 
   ECryptoProvider = class(Exception);
   ENotImplementedSignDigest = class(ECryptoProvider);
+  // Raised when the provider's session has failed in a way that won't be
+  // fixed by retrying the next file — bad credentials (401), service down
+  // (5xx), trust failures, etc. The batch sign loop treats this as fatal
+  // regardless of --fail-fast and aborts the run instead of marching through
+  // the remaining files with N more guaranteed failures.
+  EProviderFatal = class(ECryptoProvider);
 
 implementation
 

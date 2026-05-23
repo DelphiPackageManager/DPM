@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -40,7 +40,16 @@ type
 
   TSignOptions = class(TOptionsBase)
   private
+    // PackageFile is the raw positional arg as typed by the user. May be:
+    //   - a path to a single .dpkg file
+    //   - a directory (sign every matching file inside)
+    //   - a path containing wildcards, e.g. C:\packages\*.dpkg
+    // The sign command expands this into a concrete list at run time.
     FPackageFile : string;
+    // Multi-file controls.
+    FRecursive : boolean;          // --recursive: descend into subdirs when expanding a folder
+    FFilePattern : string;         // --pattern (default *.dpkg) when target is a directory
+    FFailFast : boolean;           // --fail-fast: stop on first failure; default keep-going
     FThumbprint : string;
     FStoreLocation : TSignStoreLocation;
     FPfxFile : string;
@@ -56,9 +65,11 @@ type
     FClientId : string;
     FClientSecretEnv : string;
     FSignotaurEndpoint : string;
-    FSignotaurApiKeyEnv : string;
+    FSignotaurApiKey : string;        // --api-key (literal — discouraged but supported)
+    FSignotaurApiKeyEnv : string;     // --api-key-env (env var name, preferred)
     FSignotaurSubject : string;
     FSignotaurLabel : string;
+    FSignotaurAllowSelfSigned : boolean;  // --allow-untrusted: trust untrusted TLS chains (dev only)
     class var FDefault : TSignOptions;
   public
     class constructor CreateDefault;
@@ -66,6 +77,9 @@ type
     function Validate(const logger : ILogger) : boolean; override;
 
     property PackageFile : string read FPackageFile write FPackageFile;
+    property Recursive : boolean read FRecursive write FRecursive;
+    property FilePattern : string read FFilePattern write FFilePattern;
+    property FailFast : boolean read FFailFast write FFailFast;
     property Thumbprint : string read FThumbprint write FThumbprint;
     property StoreLocation : TSignStoreLocation read FStoreLocation write FStoreLocation;
     property PfxFile : string read FPfxFile write FPfxFile;
@@ -81,9 +95,11 @@ type
     property ClientId : string read FClientId write FClientId;
     property ClientSecretEnv : string read FClientSecretEnv write FClientSecretEnv;
     property SignotaurEndpoint : string read FSignotaurEndpoint write FSignotaurEndpoint;
+    property SignotaurApiKey : string read FSignotaurApiKey write FSignotaurApiKey;
     property SignotaurApiKeyEnv : string read FSignotaurApiKeyEnv write FSignotaurApiKeyEnv;
     property SignotaurSubject : string read FSignotaurSubject write FSignotaurSubject;
     property SignotaurLabel : string read FSignotaurLabel write FSignotaurLabel;
+    property SignotaurAllowSelfSigned : boolean read FSignotaurAllowSelfSigned write FSignotaurAllowSelfSigned;
   end;
 
 implementation
@@ -95,7 +111,14 @@ class constructor TSignOptions.CreateDefault;
 begin
   FDefault := TSignOptions.Create;
   FDefault.FTimestampUrl := 'http://timestamp.digicert.com';
-  FDefault.FDigest := 'sha256';
+  // FDigest left empty on purpose — empty means "auto-select from the cert's
+  // key type" (RSA -> SHA-256, ECDSA P-384 -> SHA-384, etc). Setting an
+  // explicit default would force SHA-256 even for ECDSA P-384 certs whose
+  // HSM/PIV middleware only supports SHA-384 (FIPS 186 curve-size match).
+  FDefault.FDigest := '';
+  FDefault.FFilePattern := '*.dpkg';
+  FDefault.FRecursive := false;
+  FDefault.FFailFast := false;
 end;
 
 function TSignOptions.Validate(const logger : ILogger) : boolean;
@@ -103,14 +126,12 @@ begin
   result := true;
   if FPackageFile = '' then
   begin
-    logger.Error('No package file specified (e.g. dpm sign Foo.dpkg --thumbprint ...).');
-    result := false;
-  end
-  else if not FileExists(FPackageFile) then
-  begin
-    logger.Error('Package file not found: ' + FPackageFile);
+    logger.Error('No package file, folder or pattern specified ' +
+                 '(e.g. dpm sign Foo.dpkg --thumbprint ...).');
     result := false;
   end;
+  // Path existence is checked at expansion time — the input may be a file,
+  // a directory or a wildcard pattern, each with different existence rules.
 
   case FProvider of
     spLocal :
@@ -162,10 +183,11 @@ begin
           logger.Error('--endpoint is required when --provider=signotaur');
           result := false;
         end;
-        if FSignotaurApiKeyEnv = '' then
+        if (FSignotaurApiKey = '') and (FSignotaurApiKeyEnv = '') then
         begin
-          logger.Error('--api-key-env is required when --provider=signotaur ' +
-                       '(names an env var that holds the Signotaur API key)');
+          logger.Error('Signotaur: one of --api-key (literal) or --api-key-env ' +
+                       '(env var name) is required. Prefer --api-key-env to ' +
+                       'keep the key out of process lists and shell history.');
           result := false;
         end;
         if (FThumbprint = '') and (FSignotaurSubject = '') and (FSignotaurLabel = '') then
