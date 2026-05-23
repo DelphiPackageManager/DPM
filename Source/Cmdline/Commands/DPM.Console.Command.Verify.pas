@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -191,15 +191,15 @@ begin
       Logger.Information('Author signature')
     else
       Logger.Information('Repository signature');
-    Logger.Information('  Signer:     ' + sigInfo.SignerSubject);
-    Logger.Information('  Thumbprint: ' + sigInfo.Thumbprint);
-    Logger.Information('  SPKI:       sha256:' + sigInfo.SignerSpkiHex);
+    Logger.Information('  Signer     : ' + sigInfo.SignerSubject);
+    Logger.Information('  Thumbprint : ' + sigInfo.Thumbprint);
+    Logger.Information('  SPKI       : sha256:' + sigInfo.SignerSpkiHex);
     if sigInfo.EffectiveSigningTime > 0 then
-      Logger.Information('  Timestamp:  ' + DateTimeToStr(sigInfo.EffectiveSigningTime) + ' UTC');
+      Logger.Information('  Timestamp  :  ' + DateTimeToStr(sigInfo.EffectiveSigningTime) + ' UTC');
     case sigInfo.Revocation of
-      rsGood    : Logger.Information('  Revocation: checked, good');
-      rsRevoked : Logger.Error      ('  Revocation: REVOKED');
-      rsUnknown : Logger.Warning    ('  Revocation: status unknown (CRL/OCSP unreachable)');
+      rsGood    : Logger.Information('  Revocation : checked, good');
+      rsRevoked : Logger.Error      ('  Revocation : REVOKED');
+      rsUnknown : Logger.Warning    ('  Revocation : status unknown (CRL/OCSP unreachable)');
       // rsNotChecked: silent — Phase 1 default
     end;
     case sigInfo.CurrentRevocationReason of
@@ -220,14 +220,14 @@ begin
       if sigInfo.Role = srAuthor then
       begin
         if sigInfo.PublisherTrusted then
-          Logger.Information('  Result:     valid, publisher trusted')
+          Logger.Information('  Result     : valid, publisher trusted')
         else
-          Logger.Information('  Result:     valid (publisher not pinned)');
+          Logger.Information('  Result     : valid (publisher not pinned)');
       end
       else if sigInfo.RepositoryTrusted then
-        Logger.Information('  Result:     valid, repository trusted')
+        Logger.Information('  Result     : valid, repository trusted')
       else
-        Logger.Information('  Result:     valid (repository not trusted; ignored)');
+        Logger.Information('  Result     : valid (repository not trusted; ignored)');
     end
     else
       Logger.Error('  Result:     INVALID — ' + sigInfo.FailureReason);

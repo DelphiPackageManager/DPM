@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -39,9 +39,9 @@ uses
   DPM.Core.Utils.System;
 
 procedure ShowBanner(const consoleWriter : IConsoleWriter);
+
 begin
   Assert(consoleWriter <> nil, 'No console writer available');
-  consoleWriter.WriteLine('');
   consoleWriter.SetColour(ccBrightAqua, ccDefault);
   consoleWriter.WriteLine('DPM - Delphi Package Manager - Version : ' + TSystemUtils.GetVersionString);
   consoleWriter.SetColour(ccBrightWhite);

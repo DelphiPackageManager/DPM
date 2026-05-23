@@ -251,8 +251,7 @@ begin
   files := ExpandTargets(options.PackageFile, options.FilePattern, options.Recursive);
   if files.Count = 0 then
   begin
-    Logger.Error('No packages to sign — target "' + options.PackageFile +
-                 '" is not a file, directory, or matching pattern.');
+    Logger.Error('No packages to sign — target "' + options.PackageFile + '" is not a file, directory, or matching pattern.');
     exit(TExitCode.InvalidArguments);
   end;
 

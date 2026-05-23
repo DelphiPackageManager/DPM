@@ -148,9 +148,9 @@ const
   // canonical OIDs. The signer emits both; the verifier matches by
   // membership in {legacy, canonical}.
   cDpmOidArc                   : AnsiString = '1.3.6.1.4.1.95860';
-  cOidDpmSignatureRole         : AnsiString = '1.3.6.1.4.1.95860.1';
-  cOidDpmRepositoryAttestation : AnsiString = '1.3.6.1.4.1.95860.2';
-  cOidDpmVerifiedAuthorSigHash : AnsiString = '1.3.6.1.4.1.95860.3';
+  cOidDpmSignatureRole         : AnsiString = '1.3.6.1.4.1.95860.1.1';
+  cOidDpmRepositoryAttestation : AnsiString = '1.3.6.1.4.1.95860.1.2';
+  cOidDpmVerifiedAuthorSigHash : AnsiString = '1.3.6.1.4.1.95860.1.3';
 
   cSigRoleAuthor     = 'author';
   cSigRoleRepository = 'repository';
@@ -353,9 +353,9 @@ begin
   if (provider <> nil) and (provider.Certificate <> nil) then
   begin
     signerCert := provider.Certificate;
-    FLogger.Information('  Signer: ' + signerCert.SubjectDistinguishedName);
-    FLogger.Verbose('  Thumbprint: ' + signerCert.Thumbprint);
-    FLogger.Verbose('  SPKI (sha256): ' + BytesToHex(signerCert.SpkiHash(haSha256)));
+    FLogger.Information('  Signer : ' + signerCert.SubjectDistinguishedName);
+    FLogger.Verbose('  Thumbprint : ' + signerCert.Thumbprint);
+    FLogger.Verbose('  SPKI (sha256) : ' + BytesToHex(signerCert.SpkiHash(haSha256)));
   end;
 
   // Push per-file audit metadata down to the provider. Remote providers
@@ -381,11 +381,11 @@ begin
       digest := signerCert.PreferredDigest
     else
       digest := haSha256;
-    FLogger.Information('  Digest: ' + TAlgorithmProfile.HashAlgorithmName(digest) +
+    FLogger.Information('  Digest Algorithm : ' + TAlgorithmProfile.HashAlgorithmName(digest) +
                         ' (auto-selected from cert key)');
   end
   else
-    FLogger.Information('  Digest: ' + TAlgorithmProfile.HashAlgorithmName(digest));
+    FLogger.Information('  Digest Algorithm : ' + TAlgorithmProfile.HashAlgorithmName(digest));
 
   FLogger.Verbose('  Calling signer (may prompt for token PIN)...');
   cmsDer := FCms.Sign(manifestBytes, provider, signedAttrs, digest);
@@ -396,10 +396,10 @@ begin
   if timestampUrl = '' then
   begin
     timestampUrl := cTimestampUrlDefault;
-    FLogger.Verbose('  Timestamp URL (default): ' + timestampUrl);
+    FLogger.Verbose('  Timestamp URL (default) : ' + timestampUrl);
   end
   else
-    FLogger.Verbose('  Timestamp URL: ' + timestampUrl);
+    FLogger.Verbose('  Timestamp URL : ' + timestampUrl);
 
   // Imprint covers the signer's encryptedDigest, NOT the full CMS. The
   // unsigned attribute we attach below changes the CMS bytes but doesn't
@@ -408,26 +408,23 @@ begin
   // attribute traversal — to avoid AV exits on hand-assembled CMS (remote
   // provider path).
   imprintBytes := FCms.ExtractEncryptedDigest(cmsDer);
-  FLogger.Verbose(Format('  Timestamp imprint covers encryptedDigest (%d bytes)',
-    [Length(imprintBytes)]));
-  FLogger.Information('  Requesting RFC3161 timestamp from ' + timestampUrl);
+  FLogger.Verbose(Format('  Timestamp imprint covers encryptedDigest (%d bytes)', [Length(imprintBytes)]));
+  FLogger.Information('  Requesting RFC3161 timestamp from : ' + timestampUrl);
   try
     timestampToken := FTimestamper.RequestTimestamp(imprintBytes, timestampUrl, haSha256);
   except
     on e : Exception do
     begin
-      FLogger.Error('  Timestamp request failed: ' + e.Message);
+      FLogger.Error('  Timestamp request failed : ' + e.Message);
       raise;
     end;
   end;
   if timestampToken = nil then
     raise EPackageSigning.Create('Timestamp authority returned no token');
-  FLogger.Information(Format('  Timestamp received: signing time %s UTC (%d bytes)',
-    [FormatDateTime('yyyy-mm-dd hh:nn:ss', timestampToken.SigningTime),
+  FLogger.Information(Format('  Timestamp received : signing time %s UTC (%d bytes)', [FormatDateTime('yyyy-mm-dd hh:nn:ss', timestampToken.SigningTime),
      Length(timestampToken.RawToken)]));
   if timestampToken.TsaCertificate <> nil then
-    FLogger.Verbose('  Timestamp authority: ' +
-      timestampToken.TsaCertificate.SubjectDistinguishedName);
+    FLogger.Verbose('  Timestamp authority : ' + timestampToken.TsaCertificate.SubjectDistinguishedName);
 
   signatureBytes := cmsDer;
   // Attach the timestamp token as an unsigned attribute on the signer info.
@@ -439,12 +436,12 @@ begin
   // author-N index. Re-signing accumulates: first run writes author-1.p7s,
   // a second run sees it and writes author-2.p7s, etc. The archive is
   // append-only.
-  blobName := Format('signatures/author-%d.p7s',
-    [NextAuthorSignatureIndex(packageFilePath)]);
+  blobName := Format('signatures/author-%d.p7s', [NextAuthorSignatureIndex(packageFilePath)]);
   FLogger.Information('  Writing ' + blobName + ' into the .dpkg');
   WriteSignatureToArchive(packageFilePath, blobName, signatureBytes);
   FLogger.Verbose('  Signature file written; sealing archive');
   FLogger.Success('Signed [' + ExtractFileName(packageFilePath) + ']');
+  FLogger.NewLine;
 end;
 
 procedure TPackageSigningService.VerifyFileSetIntegrity(const archivePath : string;
