@@ -15,11 +15,15 @@ type
     FId: string;
     FPlatforms: TDPMPlatforms;
     FVersion: TPackageVersion;
+    FIsSigned : boolean;
+    FSignedBy : string;
   protected
     function GetCompilerVersion: TCompilerVersion;
     function GetId: string;
     function GetPlatforms: TDPMPlatforms;
     function GetVersion: TPackageVersion;
+    function GetIsSigned : boolean;
+    function GetSignedBy : string;
 
     procedure SetPlatforms(const value : TDPMPlatforms);
     function IsSamePackageVersion(const item : IPackageListItem) : Boolean;
@@ -66,6 +70,10 @@ begin
   if not TPackageVersion.TryParse(stmp, packageVersion) then
     raise Exception.Create('Version is not a valid version [' + stmp + ']');
   Create(id,cv, packageVersion, platforms);
+  // Advisory signing fields from the gallery. Missing keys default to
+  // false / '' so older servers still parse cleanly.
+  FIsSigned := jsonObj.B['isSigned'];
+  FSignedBy := jsonObj.S['signedBy'];
 end;
 
 function TPackageListItem.GetCompilerVersion: TCompilerVersion;
@@ -88,6 +96,16 @@ begin
   result := FVersion;
 end;
 
+function TPackageListItem.GetIsSigned : boolean;
+begin
+  result := FIsSigned;
+end;
+
+function TPackageListItem.GetSignedBy : string;
+begin
+  result := FSignedBy;
+end;
+
 function TPackageListItem.IsSamePackageId(const item: IPackageListItem): boolean;
 begin
   result := (FCompilerVersion = item.CompilerVersion) and (FId = item.Id);
@@ -99,9 +117,16 @@ begin
 end;
 
 function TPackageListItem.MergeWith(const item: IPackageListItem): IPackageListItem;
+var
+  merged : TPackageListItem;
 begin
   Assert(IsSamePackageVersion(item));
-  result := TPackageListItem.Create(FId, FCompilerVersion, FVersion, FPlatforms + item.Platforms);
+  merged := TPackageListItem.Create(FId, FCompilerVersion, FVersion, FPlatforms + item.Platforms);
+  // Signing status is per (id, compiler, version) so self and item agree —
+  // propagate from self so the merged item still renders the signer.
+  merged.FIsSigned := FIsSigned;
+  merged.FSignedBy := FSignedBy;
+  result := merged;
 end;
 
 procedure TPackageListItem.SetPlatforms(const value: TDPMPlatforms);

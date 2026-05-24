@@ -53,6 +53,8 @@ type
     FIsReservedPrefix : boolean;
     FSourceName : string;
     FPublishedDate : string;
+    FIsSigned : boolean;
+    FSignedBy : string;
   protected
     function GetAuthors : IList<string>;
     function GetReleaseNotes : string;
@@ -98,6 +100,8 @@ type
     function GetSupportedPlatforms : TDPMPlatforms;
     procedure SetSupportedPlatforms(const value : TDPMPlatforms);
     function GetVersionRange : TVersionRange;
+    function GetIsSigned : boolean;
+    function GetSignedBy : string;
 
     function ToIdVersionString : string;
 
@@ -241,6 +245,11 @@ begin
   FHashAlgorithm    := jsonObject.S['hashAlgorithm'];
   FFileHash         := jsonObject.S['hash'];
 
+  // Advisory signing fields from the gallery. Missing keys default to
+  // false / '' so older servers still parse cleanly.
+  FIsSigned         := jsonObject.B['isSigned'];
+  FSignedBy         := jsonObject.S['signedBy'];
+
   FLatestVersion    := TPackageVersion.Parse(jsonObject.S['latestVersion']);
   latestStable := jsonObject.S['latestStableVersion'];
   if latestStable <> '' then
@@ -305,6 +314,8 @@ begin
   FVersionRange := TVersionRange.Empty;
   FFileHash := fileHash;
   FHashAlgorithm := hashAlgorithm;
+  FIsSigned := metaData.IsSigned;
+  FSignedBy := metaData.SignedBy;
 end;
 
 destructor TDPMPackageSearchResultItem.Destroy;
@@ -543,6 +554,16 @@ end;
 function TDPMPackageSearchResultItem.GetVersionRange: TVersionRange;
 begin
   result := FVersionRange;
+end;
+
+function TDPMPackageSearchResultItem.GetIsSigned : boolean;
+begin
+  result := FIsSigned;
+end;
+
+function TDPMPackageSearchResultItem.GetSignedBy : string;
+begin
+  result := FSignedBy;
 end;
 
 procedure TDPMPackageSearchResultItem.SetInstalled(const value : Boolean);

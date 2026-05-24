@@ -69,6 +69,7 @@ var
   searchResults : IList<IPackageListItem>;
   item : IPackageListItem;
   resultString : string;
+  signingTag : string;
   config : IConfiguration;
 begin
   result := TExitCode.Error;
@@ -101,7 +102,15 @@ begin
     begin
       if cancellationToken.IsCancelled then
         exit;
-      resultString := TStringUtils.PadRight(item.Id, 24) + #9+'v'  + TStringUtils.PadRight(item.Version.ToString, 15) + ' [Delphi '  + CompilerToString(item.CompilerVersion) +  ' - ' + DPMPlatformsToString(item.Platforms) + ']';
+      // Gallery-reported signing status. Suppress entirely when unsigned;
+      // when signed with no extractable CN, render bare "(signed)".
+      if not item.IsSigned then
+        signingTag := ''
+      else if item.SignedBy <> '' then
+        signingTag := ' (signed by ' + item.SignedBy + ')'
+      else
+        signingTag := ' (signed)';
+      resultString := TStringUtils.PadRight(item.Id, 24) + #9+'v'  + TStringUtils.PadRight(item.Version.ToString, 15) + ' [Delphi '  + CompilerToString(item.CompilerVersion) +  ' - ' + DPMPlatformsToString(item.Platforms) + ']' + signingTag;
       Logger.Information(resultString);
     end;
     result := TExitCode.OK;

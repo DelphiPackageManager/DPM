@@ -68,6 +68,8 @@ type
     FHash : string;
     FHashAlgorithm : string;
     FSupportedPlatforms : TDPMPlatforms;
+    FIsSigned : boolean;
+    FSignedBy : string;
   protected
     function GetDependencies : IList<IPackageDependency>;
     function GetUseSource : boolean;
@@ -76,6 +78,8 @@ type
     function GetHashAlgorithm : string;
     function GetSupportedPlatforms : TDPMPlatforms;
     procedure SetSupportedPlatforms(const value : TDPMPlatforms);
+    function GetIsSigned : boolean;
+    function GetSignedBy : string;
 
     constructor Create(const sourceName : string; const manifest : IPackageSpec; const hash : string; const hashAlgorithm : string);overload;
     constructor Create(const sourceName : string; const jsonObj : TJsonObject);override;
@@ -303,6 +307,11 @@ begin
     FHash := THashSHA256.DigestAsString(bytes);
   end;
 
+  // Advisory signing fields from the gallery. Missing keys default to
+  // false / '' so older servers still parse cleanly.
+  FIsSigned := jsonObj.B['isSigned'];
+  FSignedBy := jsonObj.S['signedBy'];
+
   //check for isnull is needed due to jd barfing on nulls
   if jsonObj.Contains('dependencies') and (not jsonObj.IsNull('dependencies')) then
   begin
@@ -405,6 +414,16 @@ end;
 function TPackageInfo.GetSupportedPlatforms : TDPMPlatforms;
 begin
   result := FSupportedPlatforms;
+end;
+
+function TPackageInfo.GetIsSigned : boolean;
+begin
+  result := FIsSigned;
+end;
+
+function TPackageInfo.GetSignedBy : string;
+begin
+  result := FSignedBy;
 end;
 
 procedure TPackageInfo.SetSupportedPlatforms(const value : TDPMPlatforms);

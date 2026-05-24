@@ -88,12 +88,22 @@ type
     function GetHashAlgorithm : string;
     function GetSupportedPlatforms : TDPMPlatforms;
     procedure SetSupportedPlatforms(const value : TDPMPlatforms);
+    // Gallery-reported signing status (advisory): the server records the
+    // signer CN it observed at upload time. The CLI still re-verifies the
+    // signature locally against the trust set before install — these fields
+    // are for display only, so users can see who signed a package before
+    // downloading. False / '' against older gallery servers that don't
+    // emit the JSON fields.
+    function GetIsSigned : boolean;
+    function GetSignedBy : string;
 
     property Dependencies : IList<IPackageDependency>read GetDependencies;
     property UseSource : boolean read GetUseSource write SetUseSource;
     property Hash : string read GetHash;
     property HashAlgorithm : string read GetHashAlgorithm;
     property SupportedPlatforms : TDPMPlatforms read GetSupportedPlatforms write SetSupportedPlatforms;
+    property IsSigned : boolean read GetIsSigned;
+    property SignedBy : string read GetSignedBy;
   end;
 
   ///<summary>Package Info plus metadata. Mirrors ISpecMetaData's shape so everything the author wrote
@@ -248,11 +258,16 @@ type
     function IsSamePackageVersion(const item : IPackageListItem) : Boolean;
     function IsSamePackageId(const item : IPackageListItem) : boolean;
     function MergeWith(const item : IPackageListItem) : IPackageListItem;
+    // Gallery-reported signing status — see IPackageInfo for details.
+    function GetIsSigned : boolean;
+    function GetSignedBy : string;
 
     property Id : string read GetId;
     property CompilerVersion : TCompilerVersion read GetCompilerVersion;
     property Version : TPackageVersion read GetVersion;
     property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
+    property IsSigned : boolean read GetIsSigned;
+    property SignedBy : string read GetSignedBy;
   end;
 
   IPackageLatestVersionInfo = interface

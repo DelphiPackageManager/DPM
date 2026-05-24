@@ -69,6 +69,7 @@ var
   searchResults : IList<IPackageSearchResultItem>;
   item : IPackageSearchResultItem;
   resultString : string;
+  signingTag : string;
 begin
   result := TExitCode.Error;
   TFeedOptions.Default.ApplyCommon(TCommonOptions.Default);
@@ -87,7 +88,15 @@ begin
       if cancellationToken.IsCancelled then
         exit;
 
-      resultString := item.Id + '-' + item.Version + ' [' + DPMPlatformsToString(item.SupportedPlatforms)  + ']';
+      // Gallery-reported signing status. Suppress entirely when unsigned;
+      // when signed with no extractable CN, render bare "(signed)".
+      if not item.IsSigned then
+        signingTag := ''
+      else if item.SignedBy <> '' then
+        signingTag := ' (signed by ' + item.SignedBy + ')'
+      else
+        signingTag := ' (signed)';
+      resultString := item.Id + '-' + item.Version + ' [' + DPMPlatformsToString(item.SupportedPlatforms)  + ']' + signingTag;
       Logger.Information(resultString);
     end;
      result := TExitCode.OK;

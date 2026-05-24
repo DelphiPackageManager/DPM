@@ -716,7 +716,12 @@ begin
     FLogger.Error('Package [' + Options.packageId + '] for compiler [' + CompilerToString(Options.compilerVersion) + '] not found on any sources');
     exit;
   end;
-  FLogger.Information('Caching package ' + packageInfo.ToString);
+  if packageInfo.IsSigned and (packageInfo.SignedBy <> '') then
+    FLogger.Information('Caching package ' + packageInfo.ToString + ' (signed by ' + packageInfo.SignedBy + ')')
+  else if packageInfo.IsSigned then
+    FLogger.Information('Caching package ' + packageInfo.ToString + ' (signed)')
+  else
+    FLogger.Information('Caching package ' + packageInfo.ToString);
 
   if not FPackageCache.EnsurePackage(packageInfo) then
   begin
@@ -882,7 +887,12 @@ begin
     FLogger.Error('Package [' + Options.packageId + '] for platform [' + DPMPlatformToString(platform) + '] not found on any sources');
     exit;
   end;
-  FLogger.Information('Installing package ' + packageInfo.ToString);
+  if packageInfo.IsSigned and (packageInfo.SignedBy <> '') then
+    FLogger.Information('Installing package ' + packageInfo.ToString + ' (signed by ' + packageInfo.SignedBy + ')')
+  else if packageInfo.IsSigned then
+    FLogger.Information('Installing package ' + packageInfo.ToString + ' (signed)')
+  else
+    FLogger.Information('Installing package ' + packageInfo.ToString);
 
   if not FPackageCache.EnsurePackage(packageInfo) then
   begin

@@ -105,11 +105,13 @@ type
     FConfiguration : IConfiguration;
     FPackageCache : IPackageCache;
     FReceiptService : IReceiptService;
-    // IDE-2: programmatic label that sits above the version selector and
-    // reports the signing status (trusted/unsigned/untrusted/invalid) of
-    // the currently selected package. Added in code so we don't need to
-    // round-trip the .dfm for every Delphi version we ship.
-    FSigningLabel : TLabel;
+    // IDE-2: programmatic signing-status badge that sits above the version
+    // selector. Painted via TPaintBox (not TLabel) because the IDE's
+    // IOTAIDEThemingServices.ApplyTheme walks every TLabel descendant and
+    // resets Font.Color to clWindowText regardless of StyleElements — so the
+    // green/amber/red tint never reaches the screen on a TLabel. A paint
+    // box's OnPaint isn't touched by the theming service.
+    FSigningLabel : TPaintBox;
     FCurrentBadge : TSigningBadge;
     FIconCache : TDPMIconCache;
     FHost : IDetailsHost;
@@ -166,6 +168,7 @@ type
 
     procedure DoUpdateVersions(const sReferenceVersion : string; const versions : IList<TPackageVersion>);
     procedure SigningLabelClick(Sender : TObject);
+    procedure SigningLabelPaint(Sender : TObject);
     procedure UpdateSigningBadge(const package : IPackageSearchResultItem);
 
     //versions cache
@@ -560,17 +563,26 @@ begin
   // id so users see the trust state alongside the package identity at a
   // glance. Click opens a small details dialog. Updated by UpdateSigningBadge
   // whenever SetPackage runs.
-  FSigningLabel := TLabel.Create(Self);
+  //
+  // Built as a TPaintBox + custom OnPaint because the IDE theming service
+  // (IOTAIDEThemingServices.ApplyTheme) walks every TLabel descendant and
+  // forces Font.Color back to clWindowText, ignoring StyleElements. A paint
+  // box paints whatever its OnPaint draws — the theming service has no hook
+  // into our pen colour.
+  FSigningLabel := TPaintBox.Create(Self);
   FSigningLabel.Parent := pnlPackageId;
   FSigningLabel.Left := 47;
   FSigningLabel.Top := 36;
-  FSigningLabel.AutoSize := true;
+  FSigningLabel.Width := 0;     // sized in UpdateSigningBadge once we know the caption
+  FSigningLabel.Height := 16;
   FSigningLabel.Cursor := crHandPoint;
   FSigningLabel.ShowHint := true;
   FSigningLabel.Hint := 'Click for signature details';
   FSigningLabel.OnClick := SigningLabelClick;
-  FSigningLabel.Caption := '';
+  FSigningLabel.OnPaint := SigningLabelPaint;
   FSigningLabel.Visible := false;
+
+
 
   FVersionsCache := TCollections.CreateDictionary<string, IList<TPackageVersion>>;
   FVersionsCacheUdate := TStopWatch.Create;
@@ -770,19 +782,51 @@ begin
              FCurrentBadge.Detail, mtInformation, [mbOK], 0);
 end;
 
+procedure TPackageDetailsFrame.SigningLabelPaint(Sender : TObject);
+var
+  pb : TPaintBox;
+  bgColor : TColor;
+begin
+  pb := Sender as TPaintBox;
+  // Match the panel background so the badge looks like a label, not a tile.
+  // FIDEStyleServices is non-nil after ThemeChanged has run; before that we
+  // fall back to the parent's resolved colour.
+  if FIDEStyleServices <> nil then
+    bgColor := FIDEStyleServices.GetSystemColor(clWindow)
+  else if pb.Parent <> nil then
+    bgColor := TPanel(pb.Parent).Color
+  else
+    bgColor := clBtnFace;
+  pb.Canvas.Brush.Color := bgColor;
+  pb.Canvas.Brush.Style := bsSolid;
+  pb.Canvas.FillRect(pb.ClientRect);
+  pb.Canvas.Brush.Style := bsClear;
+  pb.Canvas.Font.Color := TColor(FCurrentBadge.AccentColor);
+  pb.Canvas.TextOut(0, 0, FCurrentBadge.Caption);
+end;
+
 procedure TPackageDetailsFrame.UpdateSigningBadge(const package : IPackageSearchResultItem);
 var
   badge : TSigningBadge;
+  textSize : TSize;
 begin
   if (package = nil) or (FSigningLabel = nil) then
     exit;
-  badge := TSigningBadgeResolver.Resolve(
-    FPackageCache, FReceiptService,
-    package.Id, package.Version, IDECompilerVersion);
+  // Pass the gallery-reported signing fields through. When the package
+  // hasn't been installed yet there's no local receipt, but the feed
+  // already carries isSigned/signedBy — the badge falls back to those so
+  // the user sees the signer name before they install.
+  badge := TSigningBadgeResolver.Resolve(FPackageCache, FReceiptService, package.Id, package.Version, IDECompilerVersion,
+                                          package.IsSigned, package.SignedBy);
   FCurrentBadge := badge;
-  FSigningLabel.Caption := badge.Caption;
-  FSigningLabel.Font.Color := badge.AccentColor;
+  // Size the paint box to fit the caption. Canvas.Font inherits from the
+  // paint box's font, which inherits from the parent frame via ParentFont
+  // — so we measure with exactly the same font used at paint time.
+  textSize := FSigningLabel.Canvas.TextExtent(badge.Caption);
+  FSigningLabel.Width := textSize.cx + 2;
+  FSigningLabel.Height := textSize.cy;
   FSigningLabel.Visible := true;
+  FSigningLabel.Invalidate;
 end;
 
 procedure TPackageDetailsFrame.SetPackage(const package: IPackageSearchResultItem; const preRelease : boolean; const fetchVersions : boolean = true);
@@ -926,6 +970,11 @@ begin
   {$IFEND}
   FProjectsGrid.StyleServices := FIDEStyleServices;
 
+  // FSigningLabel is a TPaintBox that draws via SigningLabelPaint, which
+  // reads FCurrentBadge.AccentColor on every paint. A theme change just
+  // needs to trigger a repaint — there is no Font.Color to re-assert.
+  if (FSigningLabel <> nil) and FSigningLabel.Visible then
+    FSigningLabel.Invalidate;
 end;
 
 function TPackageDetailsFrame.TryGetCachedVersions(const Id: string;  const includePrerelease : boolean; out versions: IList<TPackageVersion>): boolean;

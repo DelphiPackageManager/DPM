@@ -35,7 +35,7 @@ object PackageDetailsFrame: TPackageDetailsFrame
       Left = 0
       Top = 0
       Width = 614
-      Height = 49
+      Height = 56
       Align = alTop
       BevelOuter = bvNone
       Caption = 'pnlPackageId'
