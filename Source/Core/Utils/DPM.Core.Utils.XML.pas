@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -35,9 +35,18 @@ type
   TXMLUtils = class
     //we are using this to preserve the formatting of the dproj file.
     class procedure PrettyFormatXML(const node : IXMLDOMNode; const indentSize : integer);
+    //Load via TFileStream/IPersistStreamInit so MSXML's URL parser never sees the
+    //path. IXMLDOMDocument.load() treats its argument as a URL, which trips up on
+    //some valid Windows paths (e.g. paths with spaces inside AppData).
+    class function LoadXMLFromFile(const xmlDoc : IXMLDOMDocument; const filename : string) : boolean;
   end;
 
 implementation
+
+uses
+  System.Classes,
+  System.SysUtils,
+  WinApi.ActiveX;
 
 procedure DoPrettyFormatXML(const node : IXMLDOMNode; const indentSize : integer; var indentLen : integer);
 const
@@ -140,6 +149,26 @@ var
 begin
   indentLen := 0;
   DoPrettyFormatXML(node, indentSize, indentLen);
+end;
+
+class function TXMLUtils.LoadXMLFromFile(const xmlDoc : IXMLDOMDocument; const filename : string) : boolean;
+var
+  fs : TFileStream;
+  stream : IStream;
+  persist : IPersistStreamInit;
+begin
+  result := false;
+  if xmlDoc = nil then
+    exit;
+  if not Supports(xmlDoc, IPersistStreamInit, persist) then
+    exit;
+  fs := TFileStream.Create(filename, fmOpenRead or fmShareDenyWrite);
+  try
+    stream := TStreamAdapter.Create(fs, soReference);
+    result := Succeeded(persist.Load(stream));
+  finally
+    fs.Free;
+  end;
 end;
 
 end.

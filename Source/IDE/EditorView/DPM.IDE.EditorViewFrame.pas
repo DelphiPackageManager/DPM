@@ -1199,6 +1199,7 @@ begin
 
             // TODO : We should probably flag these in the list to show there is a problem!
             searchResultItem := TDPMPackageSearchResultItem.FromError(pkg.Id, pkg.Version, Options.CompilerVersion, 'Package not found on enabled sources');
+            ApplyInstalledBookkeeping(searchResultItem);
             result.Add(searchResultItem)
           end;
         end;

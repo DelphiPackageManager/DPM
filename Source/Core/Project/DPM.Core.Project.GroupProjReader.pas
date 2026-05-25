@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -51,7 +51,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Utils.XML;
 
 const
   projectXPath = '/x:Project/x:ItemGroup/x:Projects';
@@ -109,7 +110,7 @@ begin
 
   FXmlDoc := CoDOMDocument60.Create;
   try
-    if not FXmlDoc.load(groupProjFile) then
+    if not TXMLUtils.LoadXMLFromFile(FXmlDoc, groupProjFile) then
     begin
       result := false;
       FLogger.Error('Error parsing group project [' + groupProjFile + ']');

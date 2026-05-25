@@ -37,7 +37,8 @@ implementation
 
 uses
   System.StrUtils,
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Utils.XML;
 
 const
   PropertyXPathFormatStr = '/def:Project/def:PropertyGroup[@Condition="''$(%s)''!=''''"]/def:%s';
@@ -51,7 +52,9 @@ begin
   FConfigName := configName;
   FXMLDoc := CoDOMDocument60.Create;
   FLogger.Debug('Loading project xml');
-  if not FXMLDoc.load(projectFile) then
+
+
+  if not TXMLUtils.LoadXMLFromFile(FXMLDoc, projectFile) then
     raise Exception.Create('Error loading dproj [' + projectFile + '] : '  + FXMLDoc.parseError.reason);
   (FXMLDoc as IXMLDOMDocument2).setProperty('SelectionLanguage', 'XPath');
   (FXMLDoc as IXMLDOMDocument2).setProperty('SelectionNamespaces', 'xmlns:def=''http://schemas.microsoft.com/developer/msbuild/2003''');

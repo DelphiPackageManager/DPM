@@ -759,7 +759,7 @@ begin
   FProjectXML := CoDOMDocument60.Create;
 
   try
-    result := FProjectXML.load(fileName);
+    result := TXMLUtils.LoadXMLFromFile(FProjectXML, fileName);
     if not result then
     begin
       FLogger.Error('Error loading project file : ' + FProjectXML.parseError.reason);
