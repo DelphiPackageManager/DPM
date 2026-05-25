@@ -1,4 +1,4 @@
-﻿{***************************************************************************}
+{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -24,51 +24,50 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.IDE.Types;
+unit DPM.Core.Options.Prepare;
 
 interface
 
 uses
-  DPM.Core.Constants,
-  DPM.Core.Types;
-
-{$SCOPEDENUMS ON}
+  DPM.Core.Options.Base;
 
 type
-  TDPMPackageStatus = (NotInstalled,
-    Installed, //latest version installed.
-    UpdateAvailable //installed but not on the latest version
-    );
+  TPrepareOptions = class(TOptionsBase)
+  private
+    FSpecFile : string;
+    FForce : boolean;
+    FDryRun : boolean;
+    class var
+      FDefault : TPrepareOptions;
+  public
+    class constructor CreateDefault;
+    class property Default : TPrepareOptions read FDefault;
+    constructor Create; override;
 
-  TDPMEditViewMode = (vmProject, vmGroup);
-
-  TDPMSearchOption = (IncludePrerelease, IncludeCommercial, IncludeTrial);
-
-  TDPMSearchOptions = set of TDPMSearchOption;
-
-
-const
-  //The current IDE version to TCompilerVersion.
-  {$IFDEF VER370}IDECompilerVersion = TCompilerVersion.Delphi13_0; {$ENDIF}
-  {$IFDEF VER360}IDECompilerVersion = TCompilerVersion.Delphi12_0; {$ENDIF}
-  {$IFDEF VER350}IDECompilerVersion = TCompilerVersion.Delphi11_0; {$ENDIF}
-  {$IFDEF VER340}IDECompilerVersion = TCompilerVersion.Delphi10_4; {$ENDIF}
-  {$IFDEF VER330}IDECompilerVersion = TCompilerVersion.Delphi10_3; {$ENDIF}
-  {$IFDEF VER320}IDECompilerVersion = TCompilerVersion.Delphi10_2; {$ENDIF}
-  {$IFDEF VER310}IDECompilerVersion = TCompilerVersion.Delphi10_1; {$ENDIF}
-  {$IFDEF VER300}IDECompilerVersion = TCompilerVersion.Delphi10_0; {$ENDIF}
-  {$IFDEF VER290}IDECompilerVersion = TCompilerVersion.DelphiXE8; {$ENDIF}
-  {$IFDEF VER280}IDECompilerVersion = TCompilerVersion.DelphiXE7; {$ENDIF}
-  {$IFDEF VER270}IDECompilerVersion = TCompilerVersion.DelphiXE6; {$ENDIF}
-  {$IFDEF VER260}IDECompilerVersion = TCompilerVersion.DelphiXE5; {$ENDIF}
-  {$IFDEF VER250}IDECompilerVersion = TCompilerVersion.DelphiXE4; {$ENDIF}
-  {$IFDEF VER240}IDECompilerVersion = TCompilerVersion.DelphiXE3; {$ENDIF}
-  {$IFDEF VER230}IDECompilerVersion = TCompilerVersion.DelphiXE2; {$ENDIF}
-
-  cDPMIDEOptionsFileName = 'dpm-ide.config';
-  cDPMIDEDefaultOptionsFile = cDefaultDPMFolder + '\' + cDPMIDEOptionsFileName;
+    //Optional - if empty, the prepare command discovers a *.dspec in the current directory.
+    property SpecFile : string read FSpecFile write FSpecFile;
+    //When true, propagated dpk/dproj files overwrite existing targets in other version folders.
+    //Default is to skip existing targets.
+    property Force : boolean read FForce write FForce;
+    //When true, no files are created or modified - the command logs what it would do.
+    //Useful for previewing destructive operations before committing to them.
+    property DryRun : boolean read FDryRun write FDryRun;
+  end;
 
 implementation
 
-end.
+{ TPrepareOptions }
 
+constructor TPrepareOptions.Create;
+begin
+  inherited;
+  FForce := false;
+  FDryRun := false;
+end;
+
+class constructor TPrepareOptions.CreateDefault;
+begin
+  FDefault := TPrepareOptions.Create;
+end;
+
+end.

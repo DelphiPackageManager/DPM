@@ -44,7 +44,7 @@ unit DPM.Core.Crypto.Provider.Signotaur;
 // Bytes fields are base64-encoded (standard, NOT base64url — different from
 // Azure KV).
 //
-// Authentication: the API key is sent in the X-Api-Key request header, not
+// Authentication: the API key is sent in the Authorization request header, not
 // in the JSON body. Keeps it out of any body-logging the server / proxies do.
 //
 // The certificate selector is one of: Thumbprint, Subject, Label (exactly
@@ -192,7 +192,7 @@ begin
   end;
 
   // GetCertRequest: only non-empty selectors are sent. ApiKey travels in the
-  // X-Api-Key header (see WithHeader below); ClientVersion is part of the body.
+  // Authorization header (see WithHeader below); ClientVersion is part of the body.
   reqDoc := TJsonObject.Create;
   try
     reqDoc.S['clientVersion'] := cSignotaurClientVersion;
@@ -217,7 +217,7 @@ begin
   end;
   request := httpClient.CreateRequest(cSignotaurApiBase + '/cert/get')
                 .WithHeader('Accept', 'application/json')
-                .WithHeader('X-Api-Key', FOptions.ApiKey)
+                .WithHeader('Authorization', 'Bearer ' + FOptions.ApiKey)
                 .WithBody(reqBody, TEncoding.UTF8)
                 .WithContentType('application/json', 'utf-8');
 
@@ -360,7 +360,7 @@ begin
 
   reqDoc := TJsonObject.Create;
   try
-    // ApiKey travels in the X-Api-Key header, not the body.
+    // ApiKey travels in the Authorization header, not the body.
     reqDoc.S['thumbprint'] := FResolvedThumbprint;
     reqDoc.S['digest'] := StdBase64Encode(digest);
     reqDoc.S['digestHashAlgorithm'] := HashAlgName(digestAlgorithm);
@@ -384,7 +384,7 @@ begin
     httpClient.AllowSelfSignedCertificates := true;
   request := httpClient.CreateRequest(cSignotaurApiBase + '/sign')
                 .WithHeader('Accept', 'application/json')
-                .WithHeader('X-Api-Key', FOptions.ApiKey)
+                .WithHeader('Authorization', 'Bearer ' +FOptions.ApiKey)
                 .WithBody(reqBody, TEncoding.UTF8)
                 .WithContentType('application/json', 'utf-8');
 

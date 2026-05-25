@@ -46,6 +46,7 @@ uses
   DPM.Console.Command.Install,
   DPM.Console.Command.List,
   DPM.Console.Command.Pack,
+  DPM.Console.Command.Prepare,
   DPM.Console.Command.Push,
   DPM.Console.Command.Uninstall,
   DPM.Console.Command.Restore,
@@ -103,6 +104,7 @@ begin
  container.RegisterType<ICommandHandler,TInstallCommand>('command.install');
  container.RegisterType<ICommandHandler,TListCommand>('command.list');
  container.RegisterType<ICommandHandler,TPackCommand>('command.pack');
+ container.RegisterType<ICommandHandler,TPrepareCommand>('command.prepare');
  container.RegisterType<ICommandHandler,TPushCommand>('command.push');
  container.RegisterType<ICommandHandler,TUninstallCommand>('command.uninstall');
  container.RegisterType<ICommandHandler,TRestoreCommand>('command.restore');

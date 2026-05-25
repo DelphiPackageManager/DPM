@@ -133,6 +133,7 @@
         <DCCReference Include="Core\Options\DPM.Core.Options.Install.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.List.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Pack.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Prepare.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Push.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Restore.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Search.pas"/>
@@ -155,6 +156,9 @@
         <DCCReference Include="Core\Project\DPM.Core.Project.Editor.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.GroupProjReader.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Interfaces.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.Templates.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.Transformer.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Base.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Directory.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Factory.pas"/>

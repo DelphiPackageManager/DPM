@@ -233,7 +233,7 @@ uses
   TestLogger;
 
 const
-  cTestCompiler = TCompilerVersion.Delphi12;
+  cTestCompiler = TCompilerVersion.Delphi12_0;
   cTestProject = 'C:\test\project.dproj';
 
 //-----------------------------------------------------------------------------

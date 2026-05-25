@@ -1,4 +1,4 @@
-unit DPM.Core.Tests.Cache.PackageHash;
+﻿unit DPM.Core.Tests.Cache.PackageHash;
 
 interface
 
@@ -83,7 +83,7 @@ var
   identity : IPackageIdentity;
 begin
   ver := TPackageVersion.Parse(version);
-  identity := TPackageIdentity.Create('', id, ver, TCompilerVersion.Delphi12);
+  identity := TPackageIdentity.Create('', id, ver, TCompilerVersion.Delphi12_0);
   result := Pointer(identity);
   identity._AddRef;  //caller is responsible for releasing via IInterface(result)._Release
 end;
@@ -108,10 +108,10 @@ begin
     cache.Location := cacheRoot;
     identity := IPackageIdentity(NewIdentity('Sample.Pkg', '1.2.3'));
     try
-      //{cache}/delphi12/Sample.Pkg/  <- where the .dpkg + sidecar live
+      //{cache}/delphi12.0/Sample.Pkg/  <- where the .dpkg + sidecar live
       packageFolder := IncludeTrailingPathDelimiter(cacheRoot) +
-                       'delphi12' + PathDelim + 'Sample.Pkg' + PathDelim;
-      dpkgPath := packageFolder + 'Sample.Pkg-delphi12-0000000000000011-1.2.3.dpkg';
+                       'delphi12.0' + PathDelim + 'Sample.Pkg' + PathDelim;
+      dpkgPath := packageFolder + 'Sample.Pkg-delphi12.0-0000000000000011-1.2.3.dpkg';
       sidecarPath := dpkgPath + cPackageHashAlgorithmExt;
       WriteBytes(dpkgPath, TEncoding.UTF8.GetBytes('not-the-real-content'));
       WriteText(sidecarPath, 'deadbeefcafebabe');
@@ -151,8 +151,8 @@ begin
     identity := IPackageIdentity(NewIdentity('Sample.Pkg', '1.2.3'));
     try
       packageFolder := IncludeTrailingPathDelimiter(cacheRoot) +
-                       'delphi12' + PathDelim + 'Sample.Pkg' + PathDelim;
-      dpkgPath := packageFolder + 'Sample.Pkg-delphi12-0000000000000011-1.2.3.dpkg';
+                       'delphi12.0' + PathDelim + 'Sample.Pkg' + PathDelim;
+      dpkgPath := packageFolder + 'Sample.Pkg-delphi12.0-0000000000000011-1.2.3.dpkg';
       sidecarPath := dpkgPath + cPackageHashAlgorithmExt;
       contentBytes := TEncoding.UTF8.GetBytes('the actual file content for hashing');
       WriteBytes(dpkgPath, contentBytes);
@@ -235,8 +235,8 @@ begin
     identity := IPackageIdentity(NewIdentity('Pkg.With.Content', '0.0.1'));
     try
       packageFolder := IncludeTrailingPathDelimiter(cacheRoot) +
-                       'delphi12' + PathDelim + 'Pkg.With.Content' + PathDelim;
-      dpkgPath := packageFolder + 'Pkg.With.Content-delphi12-0000000000000011-0.0.1.dpkg';
+                       'delphi12.0' + PathDelim + 'Pkg.With.Content' + PathDelim;
+      dpkgPath := packageFolder + 'Pkg.With.Content-delphi12.0-0000000000000011-0.0.1.dpkg';
       SetLength(contentBytes, 4096);
       FillChar(contentBytes[0], Length(contentBytes), $5A);
       WriteBytes(dpkgPath, contentBytes);

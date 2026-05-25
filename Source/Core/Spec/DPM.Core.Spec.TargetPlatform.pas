@@ -44,6 +44,11 @@ uses
 ///  three-way selection logic lives in one place. </summary>
 function ExpandedCompilersOf(const targetPlatform : ISpecTargetPlatform) : TCompilerVersions;
 
+/// <summary> Returns the set of platforms the spec declares for the given compiler by scanning
+///  spec.TargetPlatforms and picking the first entry whose ExpandedCompilersOf contains the compiler.
+///  Returns the empty set when no entry matches (e.g. the compiler isn't supported by the spec). </summary>
+function PlatformsForCompiler(const spec : IPackageSpec; const compiler : TCompilerVersion) : TDPMPlatforms;
+
 
 //NOTE: TSpecTargetPlatform descends from TSpecTemplateBase because we need this when we apply the templates during pack.
 // and also when we load the package spec in the IDE for dependencies.
@@ -134,6 +139,27 @@ begin
   end;
   for c in targetPlatform.Compilers do
     Include(result, c);
+end;
+
+function PlatformsForCompiler(const spec : IPackageSpec; const compiler : TCompilerVersion) : TDPMPlatforms;
+var
+  i : integer;
+  tp : ISpecTargetPlatform;
+begin
+  result := [];
+  if (spec = nil) or (spec.TargetPlatforms = nil) then
+    exit;
+  for i := 0 to spec.TargetPlatforms.Count - 1 do
+  begin
+    tp := spec.TargetPlatforms[i];
+    if tp = nil then
+      continue;
+    if compiler in ExpandedCompilersOf(tp) then
+    begin
+      result := tp.Platforms;
+      exit;
+    end;
+  end;
 end;
 
 

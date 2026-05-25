@@ -43,6 +43,7 @@ uses
   DPM.Core.Options.Install,
   DPM.Core.Options.List,
   DPM.Core.Options.Pack,
+  DPM.Core.Options.Prepare,
   DPM.Core.Options.Push,
   DPM.Core.Options.Sources,
   DPM.Core.Options.Uninstall,
@@ -511,6 +512,49 @@ begin
 
   cmd.Examples.Add('pack VSoft.CommandLine.dspec.yaml -version=1.0.1 -outputFolder=.\output');
 
+end;
+
+procedure RegisterPrepareCommand;
+var
+  option : IOptionDefinition;
+  cmd : TCommandDefinition;
+begin
+  cmd := TOptionsRegistry.RegisterCommand('prepare', '',
+    'Prepares per-Delphi-version subfolders under /packages with version-correct dpk/dproj files.',
+    'Reads a .dspec.yaml file (or auto-discovers one in the current directory). For each ' +
+    'supported compiler the command ensures a "RAD Studio XXX" subfolder under /packages, ' +
+    'finds an existing dpk/dproj pair to use as the source-of-truth, and propagates that ' +
+    'pair into the other folders with per-version transforms applied. If no pair exists ' +
+    'anywhere, a minimal pair is scaffolded into the lowest supported compiler''s folder ' +
+    'for the user to edit and then re-run prepare.',
+    'prepare [<.dspec.yaml file>] [options]');
+
+  option := cmd.RegisterUnNamedOption<string>('Optional path to the .dspec.yaml file. If omitted, the current directory is scanned for a single *.dspec.yaml',
+    'specfile',
+    procedure(const value : string)
+    begin
+      TPrepareOptions.Default.SpecFile := value;
+    end);
+  option.Required := false;
+
+  option := cmd.RegisterOption<boolean>('force','f','Overwrite existing dpk/dproj files in target folders. Default is to skip existing files.',
+    procedure(const value : boolean)
+    begin
+      TPrepareOptions.Default.Force := value;
+    end);
+  option.HasValue := false;
+
+  option := cmd.RegisterOption<boolean>('dryrun','dr','Preview what the command would do without creating folders or writing files.',
+    procedure(const value : boolean)
+    begin
+      TPrepareOptions.Default.DryRun := value;
+    end);
+  option.HasValue := false;
+
+  cmd.Examples.Add('prepare');
+  cmd.Examples.Add('prepare MyPackage.dspec.yaml');
+  cmd.Examples.Add('prepare MyPackage.dspec.yaml -force');
+  cmd.Examples.Add('prepare MyPackage.dspec.yaml -dryrun');
 end;
 
 procedure RegisterPushCommand;
@@ -1353,6 +1397,7 @@ begin
   RegisterInstallCommand;
   RegisterListCommand;
   RegisterPackCommand;
+  RegisterPrepareCommand;
   RegisterPushCommand;
   RegisterUninstallCommand;
   RegisterRestoreCommand;

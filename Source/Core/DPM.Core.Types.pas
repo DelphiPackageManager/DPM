@@ -62,9 +62,9 @@ type
     Delphi10_2,
     Delphi10_3,
     Delphi10_4,
-    Delphi11,
-    Delphi12,
-    Delphi13
+    Delphi11_0,
+    Delphi12_0,
+    Delphi13_0
 
 //    DelphiMax = RS13_0 can't do this as it removes typeinfo
     );
@@ -165,6 +165,20 @@ function CompilerToBDSVersion(const compiler : TCompilerVersion) : string;
 //returns the delphi compiler version
 function CompilerToCompilerVersionIntStr(const compiler : TCompilerVersion) : string;
 
+//returns the canonical ProjectVersion value to write into a .dproj for the given compiler.
+//values are best-guess and should be verified against real dprojs from each IDE.
+function CompilerVersionToProjectVersion(const compiler : TCompilerVersion) : string;
+
+//returns the per-version subfolder name used by the prepare command, e.g. "RAD Studio XE2".
+function CompilerToRADStudioFolderName(const compiler : TCompilerVersion) : string;
+
+//returns the recommended DCC_LibSuffix / {$LIBSUFFIX} value for the given compiler:
+//"$(Auto)" for 10.4+, else the integer suffix from CompilerToLibSuffix.
+function CompilerToDefaultLibSuffix(const compiler : TCompilerVersion) : string;
+
+//XE5+ uses an integer value (0/1/2) for DCC_DebugInformation; pre-XE5 uses a boolean.
+function CompilerUsesIntegerDebugInformation(const compiler : TCompilerVersion) : boolean;
+
 function ProjectVersionToCompilerVersion(const value : string) : TCompilerVersion;
 function IsAmbigousProjectVersion(const value : string; var versions : string) : boolean;
 
@@ -199,7 +213,7 @@ function DesignTimePlatforms(const target : TCompilerVersion) : TDPMPlatforms;
 begin
   result := [TDPMPlatform.Win32];
   //Delphi 12.3 introduced a Win64 IDE; 13.x ships both variants.
-  if target >= TCompilerVersion.Delphi12 then
+  if target >= TCompilerVersion.Delphi12_0 then
     result := result + [TDPMPlatform.Win64];
 end;
 
@@ -556,14 +570,14 @@ begin
                                          TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
 
     // https://docwiki.embarcadero.com/RADStudio/Alexandria/en/Supported_Target_Platforms
-    TCompilerVersion.Delphi11 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS64, TDPMPlatform.MacOSARM64, TDPMPlatform.iOS64,
+    TCompilerVersion.Delphi11_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS64, TDPMPlatform.MacOSARM64, TDPMPlatform.iOS64,
                                          TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
 
     // https://docwiki.embarcadero.com/RADStudio/Athens/en/Supported_Target_Platforms
-    TCompilerVersion.Delphi12 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOSARM64, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
+    TCompilerVersion.Delphi12_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOSARM64, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
                                          TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
 
-    TCompilerVersion.Delphi13 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.WinARM64EC, TDPMPlatform.MacOSARM64, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
+    TCompilerVersion.Delphi13_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.WinARM64EC, TDPMPlatform.MacOSARM64, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
                                          TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
   else
     raise Exception.Create('AllPlatforms is missing for : ' + CompilerToString(compiler));
@@ -578,9 +592,9 @@ begin
     TCompilerVersion.Delphi10_2 : result := 'Tokyo';
     TCompilerVersion.Delphi10_3 : result := 'Rio';
     TCompilerVersion.Delphi10_4 : result := 'Sydney';
-    TCompilerVersion.Delphi11 : result := 'Alexandria';
-    TCompilerVersion.Delphi12 : result := 'Athens';
-    TCompilerVersion.Delphi13 : result := 'Florence';
+    TCompilerVersion.Delphi11_0 : result := 'Alexandria';
+    TCompilerVersion.Delphi12_0 : result := 'Athens';
+    TCompilerVersion.Delphi13_0 : result := 'Florence';
   else
     result := '';
   end;
@@ -614,9 +628,9 @@ begin
     TCompilerVersion.Delphi10_2 : result := '250';
     TCompilerVersion.Delphi10_3 : result := '260';
     TCompilerVersion.Delphi10_4 : result := '270';
-    TCompilerVersion.Delphi11 : result := '280';
-    TCompilerVersion.Delphi12 : result := '290';
-    TCompilerVersion.Delphi13 : result := '370';
+    TCompilerVersion.Delphi11_0 : result := '280';
+    TCompilerVersion.Delphi12_0 : result := '290';
+    TCompilerVersion.Delphi13_0 : result := '370';
   else
     raise Exception.Create('LibSuffix is missing for : ' + CompilerToString(compiler));
   end;
@@ -638,9 +652,9 @@ begin
     TCompilerVersion.Delphi10_2 : result := '19.0';
     TCompilerVersion.Delphi10_3 : result := '20.0';
     TCompilerVersion.Delphi10_4 : result := '21.0';
-    TCompilerVersion.Delphi11 : result := '22.0';
-    TCompilerVersion.Delphi12 : result := '23.0';
-    TCompilerVersion.Delphi13 : result := '37.0';
+    TCompilerVersion.Delphi11_0 : result := '22.0';
+    TCompilerVersion.Delphi12_0 : result := '23.0';
+    TCompilerVersion.Delphi13_0 : result := '37.0';
   else
     raise Exception.Create('BDSVersion is missing for : ' + CompilerToString(compiler));
   end;
@@ -664,13 +678,75 @@ begin
     TCompilerVersion.Delphi10_2 : result := '32';
     TCompilerVersion.Delphi10_3 : result := '33';
     TCompilerVersion.Delphi10_4 : result := '34';
-    TCompilerVersion.Delphi11 : result := '35';
-    TCompilerVersion.Delphi12 : result := '36';
-    TCompilerVersion.Delphi13 : result := '37';
+    TCompilerVersion.Delphi11_0 : result := '35';
+    TCompilerVersion.Delphi12_0 : result := '36';
+    TCompilerVersion.Delphi13_0 : result := '37';
   else
     raise Exception.Create('BDSVersion is missing for : ' + CompilerToString(compiler));
   end;
 
+end;
+
+function CompilerVersionToProjectVersion(const compiler : TCompilerVersion) : string;
+begin
+  //values are best-guess and should be verified by opening a generated dproj in the
+  //matching IDE. Where the IDE rejects a value, update here.
+  case compiler of
+    TCompilerVersion.DelphiXE2  : result := '13.4'; // TODO verify
+    TCompilerVersion.DelphiXE3  : result := '14.3'; // TODO verify
+    TCompilerVersion.DelphiXE4  : result := '14.4'; // TODO verify
+    TCompilerVersion.DelphiXE5  : result := '15.1'; // TODO verify
+    TCompilerVersion.DelphiXE6  : result := '15.4'; // TODO verify
+    TCompilerVersion.DelphiXE7  : result := '16.1'; // TODO verify
+    TCompilerVersion.DelphiXE8  : result := '17.2'; // TODO verify
+    TCompilerVersion.Delphi10_0 : result := '18.0'; // TODO verify
+    TCompilerVersion.Delphi10_1 : result := '18.2'; // TODO verify
+    TCompilerVersion.Delphi10_2 : result := '18.4'; // TODO verify
+    TCompilerVersion.Delphi10_3 : result := '18.8'; // TODO verify
+    TCompilerVersion.Delphi10_4 : result := '19.2'; // TODO verify
+    TCompilerVersion.Delphi11_0   : result := '19.5'; // TODO verify
+    TCompilerVersion.Delphi12_0   : result := '20.3'; // TODO verify
+    TCompilerVersion.Delphi13_0   : result := '20.4'; // TODO verify
+  else
+    raise Exception.Create('ProjectVersion is missing for : ' + CompilerToString(compiler));
+  end;
+end;
+
+function CompilerToRADStudioFolderName(const compiler : TCompilerVersion) : string;
+begin
+  case compiler of
+    TCompilerVersion.DelphiXE2  : result := 'RAD Studio XE2';
+    TCompilerVersion.DelphiXE3  : result := 'RAD Studio XE3';
+    TCompilerVersion.DelphiXE4  : result := 'RAD Studio XE4';
+    TCompilerVersion.DelphiXE5  : result := 'RAD Studio XE5';
+    TCompilerVersion.DelphiXE6  : result := 'RAD Studio XE6';
+    TCompilerVersion.DelphiXE7  : result := 'RAD Studio XE7';
+    TCompilerVersion.DelphiXE8  : result := 'RAD Studio XE8';
+    TCompilerVersion.Delphi10_0 : result := 'RAD Studio 10.0';
+    TCompilerVersion.Delphi10_1 : result := 'RAD Studio 10.1';
+    TCompilerVersion.Delphi10_2 : result := 'RAD Studio 10.2';
+    TCompilerVersion.Delphi10_3 : result := 'RAD Studio 10.3';
+    TCompilerVersion.Delphi10_4 : result := 'RAD Studio 10.4';
+    TCompilerVersion.Delphi11_0   : result := 'RAD Studio 11.0';
+    TCompilerVersion.Delphi12_0   : result := 'RAD Studio 12.0';
+    TCompilerVersion.Delphi13_0   : result := 'RAD Studio 13.0';
+  else
+    raise Exception.Create('RAD Studio folder name is missing for : ' + CompilerToString(compiler));
+  end;
+end;
+
+function CompilerToDefaultLibSuffix(const compiler : TCompilerVersion) : string;
+begin
+  if compiler >= TCompilerVersion.Delphi10_4 then
+    result := '$(Auto)'
+  else
+    result := CompilerToLibSuffix(compiler);
+end;
+
+function CompilerUsesIntegerDebugInformation(const compiler : TCompilerVersion) : boolean;
+begin
+  //XE5 was the first version where DCC_DebugInformation became an integer (0/1/2) rather than boolean.
+  result := compiler >= TCompilerVersion.DelphiXE5;
 end;
 
 function ProjectPlatformToDPMPlatform(const value : string) : TDPMPlatform;
@@ -827,15 +903,15 @@ begin
         case minor of
           0..2 : result := TCompilerVersion.Delphi10_4;
           else //.3 is 11.0, .4 is ll.1, .5 is 11.2/3
-            result := TCompilerVersion.Delphi11;
+            result := TCompilerVersion.Delphi11_0;
           end;
     end;
     20 :
     begin
       case minor of
-        0..3 : result := TCompilerVersion.Delphi12;
+        0..3 : result := TCompilerVersion.Delphi12_0;
         else
-          result := TCompilerVersion.Delphi13;
+          result := TCompilerVersion.Delphi13_0;
       end;
     end;
   else

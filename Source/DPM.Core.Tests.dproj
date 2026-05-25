@@ -113,6 +113,7 @@
         <DCCReference Include="Core\Options\DPM.Core.Options.Install.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.List.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Pack.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Prepare.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Push.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Restore.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Search.pas"/>
@@ -150,7 +151,10 @@
         <DCCReference Include="Core\Project\DPM.Core.Project.GroupProjReader.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Interfaces.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.MapFile.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.Templates.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.SearchPaths.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.Transformer.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Base.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Directory.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Factory.pas"/>
@@ -218,6 +222,7 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Package.Manifest.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.PackageIdentity.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.PathUtils.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Project.Transformer.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.SBOM.FormatParser.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Sbom.MapFile.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.SBOM.Reader.pas"/>

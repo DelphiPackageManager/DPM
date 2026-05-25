@@ -72,6 +72,8 @@ uses
   DPM.Core.Compiler.Factory,
   DPM.Core.Compiler.EnvironmentProvider,
   DPM.Core.Project.MapFile,
+  DPM.Core.Project.Transformer,
+  DPM.Core.Project.Prepare,
   DPM.Core.SBOM.Interfaces,
   DPM.Core.SBOM.Writers,
   DPM.Core.SBOM.Writers.Reports,
@@ -111,6 +113,11 @@ begin
   Container.RegisterType<IPackageWriter, TPackageWriter>;
 
   Container.RegisterType<IPackageSpecReader, TPackageSpecReader>;
+
+  //Prepare command services — used by `dpm prepare` and reusable from the IDE.
+  Container.RegisterType<IProjectTransformer, TProjectTransformer>;
+  Container.RegisterType<IDpkTransformer, TDpkTransformer>;
+  Container.RegisterType<IPreparePackageFolders, TPreparePackageFolders>;
 
   Container.RegisterType<ICompilerEnvironmentProvider, TCompilerEnvironmentProvider>;
   Container.RegisterType<ICompilerFactory, TCompilerFactory>().AsSingleton();

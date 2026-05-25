@@ -69,7 +69,7 @@ begin
   report.ProjectName := 'SampleProject';
   report.ProjectVersion := '0.1.0';
   report.Platform := TDPMPlatform.Win64;
-  report.CompilerVersion := TCompilerVersion.Delphi12;
+  report.CompilerVersion := TCompilerVersion.Delphi12_0;
 
   report.RootComponent.BomRef := 'project:SampleProject:win64';
   report.RootComponent.Id := 'SampleProject';

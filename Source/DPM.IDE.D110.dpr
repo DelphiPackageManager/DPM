@@ -1,4 +1,4 @@
-﻿{***************************************************************************}
+{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -70,6 +70,7 @@ uses
   DPM.Core.Options.Install in 'Core\Options\DPM.Core.Options.Install.pas',
   DPM.Core.Options.List in 'Core\Options\DPM.Core.Options.List.pas',
   DPM.Core.Options.Pack in 'Core\Options\DPM.Core.Options.Pack.pas',
+  DPM.Core.Options.Prepare in 'Core\Options\DPM.Core.Options.Prepare.pas',
   DPM.Core.Options.Push in 'Core\Options\DPM.Core.Options.Push.pas',
   DPM.Core.Options.Restore in 'Core\Options\DPM.Core.Options.Restore.pas',
   DPM.Core.Options.Search in 'Core\Options\DPM.Core.Options.Search.pas',
@@ -92,6 +93,9 @@ uses
   DPM.Core.Project.Editor in 'Core\Project\DPM.Core.Project.Editor.pas',
   DPM.Core.Project.GroupProjReader in 'Core\Project\DPM.Core.Project.GroupProjReader.pas',
   DPM.Core.Project.Interfaces in 'Core\Project\DPM.Core.Project.Interfaces.pas',
+  DPM.Core.Project.Prepare in 'Core\Project\DPM.Core.Project.Prepare.pas',
+  DPM.Core.Project.Prepare.Templates in 'Core\Project\DPM.Core.Project.Prepare.Templates.pas',
+  DPM.Core.Project.Transformer in 'Core\Project\DPM.Core.Project.Transformer.pas',
   DPM.Core.Repository.Base in 'Core\Repository\DPM.Core.Repository.Base.pas',
   DPM.Core.Repository.Directory in 'Core\Repository\DPM.Core.Repository.Directory.pas',
   DPM.Core.Repository.Factory in 'Core\Repository\DPM.Core.Repository.Factory.pas',
