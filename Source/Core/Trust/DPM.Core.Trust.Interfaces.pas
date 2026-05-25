@@ -124,10 +124,17 @@ type
     procedure RecordAuthor(const packageId : string; const entry : TAuthorTrustEntry);
     procedure AcknowledgeAuthorDowngrade(const packageId : string);
     procedure BlockPermanently(const packageId : string);
+    // Drop the author entry for this package id. Used when the user explicitly
+    // overrides an author-downgrade prompt — the next install is treated as
+    // first-ever (fresh TOFU) rather than another downgrade.
+    procedure RemoveAuthor(const packageId : string);
 
     // P2: repository assurance ratchet.
     function TryGetRepository(const packageId : string; out entry : TRepositoryTrustEntry) : boolean;
     procedure RecordRepository(const packageId : string; const entry : TRepositoryTrustEntry);
+    // Drop the repository entry for this package id. Used when the user
+    // explicitly overrides a V-24 ratchet failure.
+    procedure RemoveRepository(const packageId : string);
   end;
 
   ETrust = class(Exception);

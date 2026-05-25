@@ -115,13 +115,10 @@ begin
   Container.RegisterType<ICompilerEnvironmentProvider, TCompilerEnvironmentProvider>;
   Container.RegisterType<ICompilerFactory, TCompilerFactory>().AsSingleton();
 
-  if Assigned(overrideProc) then
-    //allow IDE plugin to register it's own implementations.
-    overrideProc(container)
-  else
-  begin
-    Container.RegisterType<IPackageInstallerContext, TCorePackageInstallerContext>;
-  end;
+  // Register the core default. The IDE plugin replaces this via overrideProc
+  // (called at the end) with TDPMIDEPackageInstallerContext. Spring4D's default
+  // registration is last-write-wins, so the override takes precedence.
+  Container.RegisterType<IPackageInstallerContext, TCorePackageInstallerContext>;
 
   Container.RegisterType<IPackageInstaller, TPackageInstaller>;
 
@@ -167,6 +164,12 @@ begin
   Container.RegisterType<ITrustPromptStrategy, TNonInteractiveTrustPromptStrategy>;
 
   Container.RegisterInstance<TContainer>(Container);
+
+  // Run overrideProc LAST so callers (e.g. the IDE plugin) can replace any of
+  // the core defaults above — Spring4D's default-registration semantics give
+  // last-write-wins for unnamed registrations of the same interface.
+  if Assigned(overrideProc) then
+    overrideProc(container);
 
 end;
 

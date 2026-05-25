@@ -27,7 +27,7 @@
 unit DPM.Console.Trust.Prompt;
 
 // CLI implementation of ITrustPromptStrategy. When stdin is a TTY, asks
-// the user for [t]rust/[b]lock/[a]lways-block. When stdin is redirected
+// the user for [o]verride/[c]ancel/[a]lways-block. When stdin is redirected
 // (CI), degrades to a hard block — the user can override at config level
 // by setting authorDowngradePolicy=allow.
 
@@ -42,9 +42,12 @@ type
   private
     FLogger : ILogger;
     function StdinIsTty : boolean;
+    function AskUser(out decision : TTrustPromptDecision) : boolean;
   protected
     function PromptAuthorDowngrade(const context : TTrustPromptContext;
                                    out decision : TTrustPromptDecision) : boolean;
+    function PromptRepositoryRatchet(const context : TRepoTrustPromptContext;
+                                     out decision : TTrustPromptDecision) : boolean;
   public
     constructor Create(const logger : ILogger);
   end;
@@ -77,16 +80,40 @@ begin
   result := GetConsoleMode(handle, mode);
 end;
 
-function TConsoleTrustPromptStrategy.PromptAuthorDowngrade(
-  const context : TTrustPromptContext;
-  out decision : TTrustPromptDecision) : boolean;
+function TConsoleTrustPromptStrategy.AskUser(out decision : TTrustPromptDecision) : boolean;
 var
   line : string;
   ch : Char;
 begin
-  decision := tpdBlockOnce;
-  result := false;
+  if not StdinIsTty then
+  begin
+    FLogger.Error('  Non-interactive session — blocking. Set ' +
+      'signing.authorDowngradePolicy=allow in dpm.config.yaml to override.');
+    decision := tpdBlockOnce;
+    result := false;
+    exit;
+  end;
 
+  Write('  [o]verride and install, [c]ancel install, [a]lways block? (c) ');
+  ReadLn(line);
+  line := Trim(line);
+  if line = '' then
+    ch := 'c'
+  else
+    ch := line[1];
+  case ch of
+    'o', 'O' : begin decision := tpdOverride;    result := true;  end;
+    'a', 'A' : begin decision := tpdBlockAlways; result := false; end;
+  else
+    decision := tpdBlockOnce;
+    result := false;
+  end;
+end;
+
+function TConsoleTrustPromptStrategy.PromptAuthorDowngrade(
+  const context : TTrustPromptContext;
+  out decision : TTrustPromptDecision) : boolean;
+begin
   FLogger.Warning('--');
   FLogger.Warning(Format('DPM detected an author-signing change for %s %s',
     [context.PackageId, context.Version]));
@@ -97,27 +124,31 @@ begin
   else
     FLogger.Warning('  New build is UNSIGNED.');
 
-  if not StdinIsTty then
-  begin
-    FLogger.Error('  Non-interactive session — blocking. Set ' +
-      'signing.authorDowngradePolicy=allow in dpm.config.yaml to override.');
-    exit;
-  end;
+  result := AskUser(decision);
+end;
 
-  Write('  [t]rust this build, [b]lock this build, [a]lways block? (b) ');
-  ReadLn(line);
-  line := Trim(line);
-  if line = '' then
-    ch := 'b'
-  else
-    ch := line[1];
-  case ch of
-    't', 'T' : begin decision := tpdTrustOnce;   result := true;  end;
-    'a', 'A' : begin decision := tpdBlockAlways; result := false; end;
-  else
-    decision := tpdBlockOnce;
-    result := false;
+function TConsoleTrustPromptStrategy.PromptRepositoryRatchet(
+  const context : TRepoTrustPromptContext;
+  out decision : TTrustPromptDecision) : boolean;
+begin
+  FLogger.Warning('--');
+  FLogger.Warning(Format('DPM detected a repository trust change for %s %s (V-24)',
+    [context.PackageId, context.Version]));
+  if context.PreviousRepoSpkiHex <> '' then
+  begin
+    if context.PreviousNamespace <> '' then
+      FLogger.Warning(Format('  Previously from trusted repo: sha256:%s / namespace "%s"',
+        [context.PreviousRepoSpkiHex, context.PreviousNamespace]))
+    else
+      FLogger.Warning('  Previously from trusted repo: sha256:' + context.PreviousRepoSpkiHex);
   end;
+  if context.NewHasTrustedRepo then
+    FLogger.Warning(Format('  New build: trusted repo sha256:%s / namespace "%s"',
+      [context.NewRepoSpkiHex, context.NewNamespace]))
+  else
+    FLogger.Warning('  New build: no trusted-repository signature.');
+
+  result := AskUser(decision);
 end;
 
 end.

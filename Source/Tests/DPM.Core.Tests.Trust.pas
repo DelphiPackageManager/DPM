@@ -66,12 +66,16 @@ type
     [Test] procedure BlockPermanently_SetsFlag_OnNewPackage;
     [Test] procedure BlockPermanently_SetsFlag_OnExistingEntry_PreservesOtherFields;
     [Test] procedure BlockPermanently_PersistsAcrossInstances;
+    [Test] procedure RemoveAuthor_DropsExistingEntry_AndPersists;
+    [Test] procedure RemoveAuthor_OnUnknownPackage_IsNoOp;
 
     // P2 — repository ratchet
     [Test] procedure RecordRepository_RoundTrips_SpkiAndNamespace;
     [Test] procedure RecordRepository_OnExistingAuthorEntry_BothCoexist;
     [Test] procedure RecordRepository_Persists_AcrossInstances;
     [Test] procedure TryGetRepository_ReturnsFalse_WhenAbsent;
+    [Test] procedure RemoveRepository_DropsExistingEntry_AndPersists;
+    [Test] procedure RemoveRepository_OnUnknownPackage_IsNoOp;
   end;
 
 implementation
@@ -466,6 +470,51 @@ begin
   end;
 end;
 
+procedure TTrustStateExtraTests.RemoveAuthor_DropsExistingEntry_AndPersists;
+var
+  path : string;
+  svc : ITrustStateService;
+  entry, loaded : TAuthorTrustEntry;
+begin
+  path := TempFile;
+  try
+    svc := TYamlTrustStateService.Create(path);
+    entry.LastAuthorSpkiHex := 'aa11';
+    entry.LastSeenAuthorSigned := true;
+    entry.LastSeenAt := Now;
+    entry.DowngradeAcknowledged := false;
+    entry.BlockedPermanently := false;
+    svc.RecordAuthor('Drop.Me', entry);
+    Assert.IsTrue(svc.TryGetAuthor('Drop.Me', loaded));
+
+    svc.RemoveAuthor('Drop.Me');
+    Assert.IsFalse(svc.TryGetAuthor('Drop.Me', loaded));
+
+    // Re-open from disk to confirm the removal persisted.
+    svc := TYamlTrustStateService.Create(path);
+    Assert.IsFalse(svc.TryGetAuthor('Drop.Me', loaded));
+  finally
+    if FileExists(path) then DeleteFile(path);
+  end;
+end;
+
+procedure TTrustStateExtraTests.RemoveAuthor_OnUnknownPackage_IsNoOp;
+var
+  path : string;
+  svc : ITrustStateService;
+  ignored : TAuthorTrustEntry;
+begin
+  path := TempFile;
+  try
+    svc := TYamlTrustStateService.Create(path);
+    // Must not raise.
+    svc.RemoveAuthor('Never.Recorded');
+    Assert.IsFalse(svc.TryGetAuthor('Never.Recorded', ignored));
+  finally
+    if FileExists(path) then DeleteFile(path);
+  end;
+end;
+
 procedure TTrustStateExtraTests.RecordRepository_RoundTrips_SpkiAndNamespace;
 var
   path : string;
@@ -558,6 +607,50 @@ begin
   try
     svc := TYamlTrustStateService.Create(path);
     Assert.IsFalse(svc.TryGetRepository('Nothing.Here', loaded));
+  finally
+    if FileExists(path) then DeleteFile(path);
+  end;
+end;
+
+procedure TTrustStateExtraTests.RemoveRepository_DropsExistingEntry_AndPersists;
+var
+  path : string;
+  svc : ITrustStateService;
+  entry, loaded : TRepositoryTrustEntry;
+begin
+  path := TempFile;
+  try
+    svc := TYamlTrustStateService.Create(path);
+    entry.TrustedRepoSpkiHex := 'cafe1234';
+    entry.Namespace := 'VSoft.*';
+    entry.FirstSeenAt := Now;
+    entry.LastSeenAt := Now;
+    svc.RecordRepository('Drop.Repo', entry);
+    Assert.IsTrue(svc.TryGetRepository('Drop.Repo', loaded));
+
+    svc.RemoveRepository('Drop.Repo');
+    Assert.IsFalse(svc.TryGetRepository('Drop.Repo', loaded));
+
+    // Re-open from disk to confirm the removal persisted.
+    svc := TYamlTrustStateService.Create(path);
+    Assert.IsFalse(svc.TryGetRepository('Drop.Repo', loaded));
+  finally
+    if FileExists(path) then DeleteFile(path);
+  end;
+end;
+
+procedure TTrustStateExtraTests.RemoveRepository_OnUnknownPackage_IsNoOp;
+var
+  path : string;
+  svc : ITrustStateService;
+  ignored : TRepositoryTrustEntry;
+begin
+  path := TempFile;
+  try
+    svc := TYamlTrustStateService.Create(path);
+    // Must not raise.
+    svc.RemoveRepository('Never.Recorded');
+    Assert.IsFalse(svc.TryGetRepository('Never.Recorded', ignored));
   finally
     if FileExists(path) then DeleteFile(path);
   end;

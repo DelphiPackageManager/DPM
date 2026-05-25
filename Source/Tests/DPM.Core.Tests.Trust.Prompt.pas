@@ -36,6 +36,8 @@ type
   protected
     function PromptAuthorDowngrade(const context : TTrustPromptContext;
                                    out decision : TTrustPromptDecision) : boolean;
+    function PromptRepositoryRatchet(const context : TRepoTrustPromptContext;
+                                     out decision : TTrustPromptDecision) : boolean;
   public
     constructor Create(decision : TTrustPromptDecision; accept : boolean);
     property CallCount : integer read FCallCount;
@@ -55,6 +57,15 @@ function TFakeTrustPromptStrategy.PromptAuthorDowngrade(
 begin
   Inc(FCallCount);
   FLastContext := context;
+  decision := FDecision;
+  result := FAccept;
+end;
+
+function TFakeTrustPromptStrategy.PromptRepositoryRatchet(
+  const context : TRepoTrustPromptContext;
+  out decision : TTrustPromptDecision) : boolean;
+begin
+  Inc(FCallCount);
   decision := FDecision;
   result := FAccept;
 end;
@@ -97,7 +108,7 @@ var
   decision : TTrustPromptDecision;
   ok : boolean;
 begin
-  fake := TFakeTrustPromptStrategy.Create(tpdTrustOnce, true);
+  fake := TFakeTrustPromptStrategy.Create(tpdOverride, true);
   strategy := fake;
   ctx.PackageId := 'Test.Pkg';
   ctx.Version := '3.0.0';
@@ -108,7 +119,7 @@ begin
   ok := strategy.PromptAuthorDowngrade(ctx, decision);
 
   Assert.IsTrue(ok);
-  Assert.AreEqual(Ord(tpdTrustOnce), Ord(decision));
+  Assert.AreEqual(Ord(tpdOverride), Ord(decision));
   Assert.AreEqual(1, fake.CallCount);
   Assert.AreEqual('Test.Pkg', fake.LastContext.PackageId);
   Assert.AreEqual('aa11', fake.LastContext.PreviousSpkiHex);

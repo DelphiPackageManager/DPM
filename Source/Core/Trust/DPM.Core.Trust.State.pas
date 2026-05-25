@@ -60,8 +60,10 @@ type
     procedure RecordAuthor(const packageId : string; const entry : TAuthorTrustEntry);
     procedure AcknowledgeAuthorDowngrade(const packageId : string);
     procedure BlockPermanently(const packageId : string);
+    procedure RemoveAuthor(const packageId : string);
     function TryGetRepository(const packageId : string; out entry : TRepositoryTrustEntry) : boolean;
     procedure RecordRepository(const packageId : string; const entry : TRepositoryTrustEntry);
+    procedure RemoveRepository(const packageId : string);
   public
     // Default location: %APPDATA%\.dpm\trust-state.yaml.
     constructor Create; overload;
@@ -346,6 +348,21 @@ begin
   end;
 end;
 
+procedure TYamlTrustStateService.RemoveAuthor(const packageId : string);
+begin
+  FLock.Enter;
+  try
+    EnsureLoaded;
+    if FEntries.ContainsKey(packageId) then
+    begin
+      FEntries.Remove(packageId);
+      SaveLocked;
+    end;
+  finally
+    FLock.Leave;
+  end;
+end;
+
 function TYamlTrustStateService.TryGetRepository(const packageId : string;
                                                   out entry : TRepositoryTrustEntry) : boolean;
 begin
@@ -366,6 +383,21 @@ begin
     EnsureLoaded;
     FRepoEntries[packageId] := entry;
     SaveLocked;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+procedure TYamlTrustStateService.RemoveRepository(const packageId : string);
+begin
+  FLock.Enter;
+  try
+    EnsureLoaded;
+    if FRepoEntries.ContainsKey(packageId) then
+    begin
+      FRepoEntries.Remove(packageId);
+      SaveLocked;
+    end;
   finally
     FLock.Leave;
   end;

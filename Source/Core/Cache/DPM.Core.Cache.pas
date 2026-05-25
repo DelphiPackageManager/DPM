@@ -75,6 +75,11 @@ type
     // signature is now missing or the namespace has changed.
     function EvaluateRepositoryRatchet(const packageId : IPackageIdentity;
                                         const verifyResult : TVerificationResult) : boolean;
+    // Materialise a TVerificationResult from a cached receipt so the trust-
+    // state ratchets can be re-evaluated on a cache hit without re-extracting.
+    // Trust-set membership (PublisherTrusted/RepositoryTrusted) is re-checked
+    // against the *current* policy — the receipt is only the signature roster.
+    function BuildResultFromReceipt(const receipt : TVerificationReceipt) : TVerificationResult;
   protected
     procedure SetLocation(const value : string);
     function GetLocation : string;
@@ -229,6 +234,9 @@ var
   currentAttestedNamespace : string;
   hasCurrentTrustedRepo : boolean;
   newEntry : TRepositoryTrustEntry;
+  context : TRepoTrustPromptContext;
+  decision : TTrustPromptDecision;
+  ratchetFailure : string;
 begin
   result := true;
   if (FTrustState = nil) or (packageId = nil) then
@@ -272,29 +280,68 @@ begin
   end;
 
   // V-24: once seen carrying a trusted-repo signature, any later build
-  // lacking one is a hard fail regardless of mode.
+  // lacking one or attesting a different namespace would normally be a hard
+  // fail. We now prompt the user (when a UI is wired) so dev workflows can
+  // recover without hand-editing trust-state.yaml — the non-interactive
+  // strategy still fails closed for CI.
+  ratchetFailure := '';
   if not hasCurrentTrustedRepo then
-  begin
-    FLogger.Error(Format(
+    ratchetFailure := Format(
       '[PackageCache] Package [%s] previously carried a trusted repository ' +
-      'signature (sha256:%s) but this build does not. Hard fail per V-24.',
-      [packageId.Id, prior.TrustedRepoSpkiHex]));
-    result := false;
-    exit;
-  end;
-
-  // Namespace must match if we previously recorded one. An attempt to
-  // re-attest the package id under a different namespace is also a hard
-  // fail — closes the publisher-impersonation door.
-  if (prior.Namespace <> '') and (currentAttestedNamespace <> '') and
-     not SameText(prior.Namespace, currentAttestedNamespace) then
-  begin
-    FLogger.Error(Format(
+      'signature (sha256:%s) but this build does not.',
+      [packageId.Id, prior.TrustedRepoSpkiHex])
+  else if (prior.Namespace <> '') and (currentAttestedNamespace <> '') and
+          not SameText(prior.Namespace, currentAttestedNamespace) then
+    ratchetFailure := Format(
       '[PackageCache] Package [%s] repository attestation namespace ' +
-      'changed from "%s" to "%s". Hard fail per V-24.',
-      [packageId.Id, prior.Namespace, currentAttestedNamespace]));
-    result := false;
-    exit;
+      'changed from "%s" to "%s".',
+      [packageId.Id, prior.Namespace, currentAttestedNamespace]);
+
+  if ratchetFailure <> '' then
+  begin
+    FLogger.Warning(ratchetFailure);
+
+    if FTrustPrompt = nil then
+    begin
+      FLogger.Error('[PackageCache] No trust prompt strategy is wired — hard fail per V-24. ' +
+                    'Edit %APPDATA%\.dpm\trust-state.yaml to override.');
+      result := false;
+      exit;
+    end;
+
+    context.PackageId           := packageId.Id;
+    context.Version             := packageId.Version.ToStringNoMeta;
+    context.PreviousRepoSpkiHex := prior.TrustedRepoSpkiHex;
+    context.PreviousNamespace   := prior.Namespace;
+    context.NewHasTrustedRepo   := hasCurrentTrustedRepo;
+    context.NewRepoSpkiHex      := currentTrustedRepoSpki;
+    context.NewNamespace        := currentAttestedNamespace;
+    FTrustPrompt.PromptRepositoryRatchet(context, decision);
+    case decision of
+      tpdOverride :
+        begin
+          FTrustState.RemoveRepository(packageId.Id);
+          FLogger.Warning('[PackageCache] User overrode repository ratchet for [' +
+            packageId.Id + '] — prior repository trust entry removed.');
+          result := true;
+          exit;
+        end;
+      tpdBlockOnce :
+        begin
+          FLogger.Warning('[PackageCache] User cancelled install of [' +
+            packageId.Id + '] at repository ratchet.');
+          result := false;
+          exit;
+        end;
+      tpdBlockAlways :
+        begin
+          FLogger.Warning('[PackageCache] User permanently blocked [' +
+            packageId.Id + '] at repository ratchet.');
+          FTrustState.BlockPermanently(packageId.Id);
+          result := false;
+          exit;
+        end;
+    end;
   end;
 
   // No regression — update the high-water mark and ratchet forward.
@@ -304,6 +351,60 @@ begin
     newEntry.Namespace := currentAttestedNamespace;
   newEntry.LastSeenAt := TTimeZone.Local.ToUniversalTime(Now);
   FTrustState.RecordRepository(packageId.Id, newEntry);
+end;
+
+function TPackageCache.BuildResultFromReceipt(const receipt : TVerificationReceipt) : TVerificationResult;
+var
+  i : integer;
+  effectivePolicy : TTrustPolicy;
+begin
+  effectivePolicy := FTrustPolicy.GetEffectivePolicy;
+
+  if SameText(receipt.TrustDecision, 'trusted') then
+    result.Outcome := voTrusted
+  else if SameText(receipt.TrustDecision, 'unsigned') then
+    result.Outcome := voUnsigned
+  else if SameText(receipt.TrustDecision, 'untrusted-publisher') then
+    result.Outcome := voUntrustedPublisher
+  else
+    result.Outcome := voInvalid;
+
+  result.ManifestHashAlgorithm := receipt.ManifestHashAlgorithm;
+  result.ManifestHashHex := receipt.ManifestHashHex;
+  result.PolicyFingerprint := receipt.TrustPolicyFingerprint;
+  result.Reason := '';
+
+  SetLength(result.Signatures, Length(receipt.Signatures));
+  for i := 0 to High(receipt.Signatures) do
+  begin
+    if SameText(receipt.Signatures[i].Role, 'repository') then
+      result.Signatures[i].Role := srRepository
+    else
+      result.Signatures[i].Role := srAuthor;
+
+    result.Signatures[i].SignerSpkiHex := receipt.Signatures[i].SignerSpkiHex;
+    result.Signatures[i].SignerSubject := receipt.Signatures[i].SignerSubject;
+    result.Signatures[i].Thumbprint := receipt.Signatures[i].Thumbprint;
+    result.Signatures[i].EffectiveSigningTime := receipt.Signatures[i].EffectiveSigningTime;
+    result.Signatures[i].TimestampAuthority := receipt.Signatures[i].TimestampAuthority;
+    // Receipt is only written after successful verification; signatures
+    // recorded here passed the per-signature checks at extraction time.
+    // The receipt schema doesn't carry per-signature Valid, so we assume
+    // true — the ratchets only care about role + SPKI + RepositoryTrusted.
+    result.Signatures[i].Valid := true;
+
+    // Re-check trust set against the CURRENT policy. If the user has since
+    // removed a SPKI from trustedRepositories, the repo ratchet now sees
+    // it as untrusted and reacts accordingly.
+    if result.Signatures[i].Role = srAuthor then
+      result.Signatures[i].PublisherTrusted := FTrustPolicy.PublisherTrusted(effectivePolicy, result.Signatures[i].SignerSpkiHex)
+    else
+      result.Signatures[i].RepositoryTrusted := FTrustPolicy.RepositoryTrusted(effectivePolicy, result.Signatures[i].SignerSpkiHex);
+
+    result.Signatures[i].Attestation.Present := receipt.Signatures[i].AttestationNamespace <> '';
+    result.Signatures[i].Attestation.Namespace := receipt.Signatures[i].AttestationNamespace;
+    result.Signatures[i].Attestation.AuthorSpkiHex := receipt.Signatures[i].AttestationAuthorSpkiHex;
+  end;
 end;
 
 procedure TPackageCache.WriteReceipt(const packageFolder : string;
@@ -546,19 +647,18 @@ begin
         context.NewSubject       := currentSubject;
         result := FTrustPrompt.PromptAuthorDowngrade(context, decision);
         case decision of
-          tpdTrustOnce :
+          tpdOverride :
             begin
-              newEntry := prior;
-              newEntry.LastAuthorSpkiHex    := currentSpki;
-              newEntry.LastSeenAuthorSigned := currentSigned;
-              newEntry.LastSeenAt           := TTimeZone.Local.ToUniversalTime(Now);
-              newEntry.DowngradeAcknowledged := true;
-              FTrustState.RecordAuthor(packageId.Id, newEntry);
+              // Drop the trust entry so the new build installs and the next
+              // install is treated as fresh TOFU rather than another downgrade.
+              FTrustState.RemoveAuthor(packageId.Id);
+              FLogger.Warning('[PackageCache] User overrode trust state for [' +
+                packageId.Id + '] — prior author trust entry removed.');
               result := true;
             end;
           tpdBlockOnce :
             begin
-              FLogger.Warning('[PackageCache] User blocked this build of [' +
+              FLogger.Warning('[PackageCache] User cancelled install of [' +
                 packageId.Id + '].');
               result := false;
             end;
@@ -916,6 +1016,9 @@ var
   searchPattern : string;
   matchingFiles : TStringDynArray;
   key : string;
+  receipt : TVerificationReceipt;
+  cachedVerifyResult : TVerificationResult;
+  ratchetBlocked : boolean;
 begin
   key := MakeCacheKey(packageId);
   FCacheLock.Enter;
@@ -928,6 +1031,8 @@ begin
   finally
     FCacheLock.Leave;
   end;
+
+  ratchetBlocked := false;
 
   //check if we have a package folder and dspec.
   packageFolder := GetPackagePath(packageId);
@@ -949,10 +1054,34 @@ begin
         '[PackageCache] Receipt is missing, policy has changed, or manifest has been altered. ' +
         'Re-verifying [' + packageId.Id + '].');
       result := false;
+    end
+    else if (FReceiptService <> nil) and (FTrustState <> nil) and
+            FReceiptService.TryRead(packageFolder, receipt) then
+    begin
+      // QuickRecheck only verifies the cached extraction against the trust
+      // *policy*. The trust *state* (per-package TOFU history) can change
+      // independently — manual edits to trust-state.yaml or an intervening
+      // install that ratcheted a different signer. Re-run both ratchets
+      // against the signatures recorded in the receipt so cache hits don't
+      // bypass the author / V-24 protections.
+      cachedVerifyResult := BuildResultFromReceipt(receipt);
+      if not EvaluateAuthorDowngrade(packageId, cachedVerifyResult, FTrustPolicy.GetEffectivePolicy) then
+      begin
+        result := false;
+        ratchetBlocked := true;
+      end
+      else if not EvaluateRepositoryRatchet(packageId, cachedVerifyResult) then
+      begin
+        result := false;
+        ratchetBlocked := true;
+      end;
     end;
   end;
 
-  if not result then
+  // Only fall back to the .dpkg when the cached extraction is missing or
+  // stale. A ratchet block is the user's explicit decision — re-installing
+  // from the .dpkg would just trigger the same prompt again.
+  if (not result) and (not ratchetBlocked) then
   begin
     //fallback: the extracted folder is missing or has no dspec, but the .dpkg may still be
     //on disk from a previous session. On-disk filename is
