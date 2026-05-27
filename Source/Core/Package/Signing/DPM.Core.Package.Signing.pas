@@ -187,7 +187,8 @@ uses
   System.StrUtils,
   JsonDataObjects,
   DPM.Core.Crypto.Win32,
-  DPM.Core.Crypto.Hashing;
+  DPM.Core.Crypto.Hashing,
+  DPM.Core.Utils.Files;
 
 constructor TPackageSigningService.Create(const logger : ILogger;
                                           const hashing : IHashingService;
@@ -386,7 +387,7 @@ begin
   // server-side audit log; local providers no-op.
   if provider <> nil then
     provider.SetSigningContext(ExtractFileName(packageFilePath),
-                               TFile.GetSize(packageFilePath));
+                               TFileUtils.GetSize(packageFilePath));
 
   // Build signed attributes: dpmSignatureRole=author.
   SetLength(signedAttrs, 1);

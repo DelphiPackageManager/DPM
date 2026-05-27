@@ -1502,10 +1502,10 @@ begin
   shared := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
   projectRefs := TCollections.CreateList<IPackageReference>;
 
-  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, a, projectRefs, graph, resolved, shared);
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, a, projectRefs, graph, resolved, shared, nil);
   Assert.IsTrue(ok, 'A''s resolve should succeed');
 
-  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, b, projectRefs, graph, resolved, shared);
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, b, projectRefs, graph, resolved, shared, nil);
   Assert.IsTrue(ok, 'B''s resolve should succeed');
 
   Assert.AreEqual(1, FRepo.GetCallCount('C'),

@@ -258,7 +258,7 @@ begin
   if not TDirectory.Exists(folderPath) then
     exit;
 
-  dprojFiles := TDirectory.GetFiles(folderPath, '*.dproj', TSearchOption.soTopDirectoryOnly);
+  dprojFiles := TArray<string>(TDirectory.GetFiles(folderPath, '*.dproj', TSearchOption.soTopDirectoryOnly));
   for i := 0 to High(dprojFiles) do
   begin
     baseName := TPath.GetFileNameWithoutExtension(dprojFiles[i]);
@@ -450,7 +450,7 @@ begin
         continue;
       end;
 
-      files := TDirectory.GetFiles(searchDir, mask, TSearchOption.soTopDirectoryOnly);
+      files := TArray<string>(TDirectory.GetFiles(searchDir, mask, TSearchOption.soTopDirectoryOnly));
       if rawPattern = pattern then
         FLogger.Information(Format('Source pattern %s matched %d file(s)', [rawPattern, Length(files)]))
       else

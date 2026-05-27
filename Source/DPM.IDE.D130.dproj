@@ -12,11 +12,11 @@
         <TargetedPlatforms>3</TargetedPlatforms>
     </PropertyGroup>
     <PropertyGroup>
-        <DPMCompiler>12.0</DPMCompiler>
+        <DPMCompiler>13.0</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.12\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.YAML\1.5.1\lib;$(DPM)\VSoft.VirtualListView\0.4.6\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.Awaitable\0.7.0\lib;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
-        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\Gabr42.OmniThreadLibrary\3.7.12\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.YAML\1.5.1\lib;$(DPM)\VSoft.VirtualListView\0.4.6\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.Awaitable\0.7.0\lib;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Gabr42.OmniThreadLibrary\3.7.12\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.YAML\1.5.5\lib;$(DPM)\VSoft.VirtualListView\0.4.6\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.Awaitable\0.7.0\lib;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Gabr42.OmniThreadLibrary\3.7.12\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.YAML\1.5.5\lib;$(DPM)\VSoft.VirtualListView\0.4.6\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.Awaitable\0.7.0\lib;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -285,13 +285,13 @@
         <DCCReference Include="Core\Spec\DPM.Core.Spec.SourceEntry.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Masks.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.MapFile.pas"/>
-        <DCCReference Include="Core\Project\DPM.Core.Project.SearchPaths.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.SBOM.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Generator.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Interfaces.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Types.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.SearchPaths.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Reader.pas"/>
         <DCCReference Include="IDE\DPM.IDE.SBOM.Menu.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Win32.pas"/>
@@ -302,8 +302,8 @@
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.X509.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Interfaces.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.pas"/>
-        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Signotaur.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Azure.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Signotaur.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Cms.Interfaces.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Cms.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Timestamping.pas"/>
@@ -318,9 +318,9 @@
         <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Signing.Interfaces.pas"/>
         <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Signing.pas"/>
         <DCCReference Include="IDE\DPM.IDE.TrustPromptForm.pas"/>
+        <DCCReference Include="Core\Trust\DPM.Core.Trust.Prompt.pas"/>
         <DCCReference Include="IDE\DPM.IDE.Trust.Prompt.pas"/>
         <DCCReference Include="IDE\DPM.IDE.SigningBadge.pas"/>
-        <DCCReference Include="Core\Trust\DPM.Core.Trust.Prompt.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -1012,6 +1012,9 @@
                     <Platform Name="Win64x">
                         <Operation>1</Operation>
                     </Platform>
+                    <Platform Name="WinARM64EC">
+                        <Operation>1</Operation>
+                    </Platform>
                 </DeployClass>
                 <DeployClass Name="ProjectiOSDeviceDebug">
                     <Platform Name="iOSDevice32">
@@ -1082,6 +1085,10 @@
                         <RemoteDir>Assets</RemoteDir>
                         <Operation>1</Operation>
                     </Platform>
+                    <Platform Name="WinARM64EC">
+                        <RemoteDir>Assets</RemoteDir>
+                        <Operation>1</Operation>
+                    </Platform>
                 </DeployClass>
                 <DeployClass Name="UWP_DelphiLogo44">
                     <Platform Name="Win32">
@@ -1089,6 +1096,10 @@
                         <Operation>1</Operation>
                     </Platform>
                     <Platform Name="Win64">
+                        <RemoteDir>Assets</RemoteDir>
+                        <Operation>1</Operation>
+                    </Platform>
+                    <Platform Name="WinARM64EC">
                         <RemoteDir>Assets</RemoteDir>
                         <Operation>1</Operation>
                     </Platform>
@@ -1305,6 +1316,7 @@
                 <ProjectRoot Platform="Win32" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="Win64" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="Win64x" Name="$(PROJECTNAME)"/>
+                <ProjectRoot Platform="WinARM64EC" Name="$(PROJECTNAME)"/>
             </Deployment>
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>

@@ -181,7 +181,7 @@ begin
   inherited Create(logger);
   FPlatforms := [];
   FCompiler := TCompilerVersion.UnknownVersion;
-  FCompilers := [];
+  FCompilers := nil;
   FMinCompilerVersion := TCompilerVersion.UnknownVersion;
   FMaxCompilerVersion := TCompilerVersion.UnknownVersion;
 
@@ -271,7 +271,7 @@ var
 begin
   result := true;
   LoadComments(yamlObject);
-  FCompilers := [];
+  FCompilers := nil;
   FMinCompilerVersion := TCompilerVersion.UnknownVersion;
   FMaxCompilerVersion := TCompilerVersion.UnknownVersion;
 

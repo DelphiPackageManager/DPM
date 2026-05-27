@@ -494,6 +494,8 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
     extRefs : TJsonArray;
     extObj : TJsonObject;
     suppLine : string;
+    joined : string;
+    i : integer;
     annArr : TJsonArray;
     annObj : TJsonObject;
     prop : TSBOMProperty;
@@ -517,7 +519,16 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
     if comp.Supplier <> '' then
       suppLine := 'Organization: ' + comp.Supplier
     else if comp.Authors.Count > 0 then
-      suppLine := 'Organization: ' + String.Join(', ', comp.Authors.ToArray)
+    begin
+      joined := '';
+      for i := 0 to comp.Authors.Count - 1 do
+      begin
+        if i > 0 then
+          joined := joined + ', ';
+        joined := joined + comp.Authors[i];
+      end;
+      suppLine := 'Organization: ' + joined;
+    end
     else
       suppLine := cNoAssertion;
     obj.S['supplier'] := suppLine;

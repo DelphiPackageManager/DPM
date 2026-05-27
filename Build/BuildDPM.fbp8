@@ -19,8 +19,11 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
+          legalcopyright = "© 2019 -2025 Vincent Parrett and Contributors"
+          linkproductversion = false
+          minorversion = 2
           name = DPMVersion
-          productversion = 0.0.0.0
+          productname = "DPM IDE Support for Delphi13"
           productversionstring = 0.2.0-alpha
         end
       end
@@ -1405,7 +1408,7 @@ begin
         terminateontimeout = true
         timeoutlength = 2
         as.projectpath = %SRC_ROOT%\\%ProjectFile%oj
-        as.compilerversion = XE2
+        as.compilerversion = 13
         as.verbosity = Debug
         as.nobanner = True
         action.script
@@ -1433,7 +1436,7 @@ begin
         compileridl = true
         configname = Release
         debugversionnumbers = false
-        delphiversion = DelphiXE2
+        delphiversion = Delphi13
         enabletimeout = false
         eurekalogverboselogging = false
         frameworktype = VCL
@@ -1473,7 +1476,7 @@ begin
         useversionfromdof = false
         verboseoutput = false
         versioninfokeys = "LegalCopyright\=© 2019 -2025 Vincent Parrett and Contributors" +
-                          "ProductName\=DPM IDE Support for DelphiXE2" +
+                          "ProductName\=DPM IDE Support for Delphi13" +
                           "ProductVersion\=0.2.0-alpha" +
                           ""
         versioninfopropertysetname = DPMVersion
@@ -1647,6 +1650,7 @@ begin
     begin
       action.group
       begin
+        enabled = false
         id = {742E6423-1BE2-45C3-A4C9-495AFFD72800}
       end
       action.signotaur.sign
@@ -1654,7 +1658,6 @@ begin
         apikey = %SignotaurAPIKey%
         contentdescription = %FileDescription%
         contentdescriptionurl = https://docs.delphi.dev
-        enabled = false
         enabletimeout = false
         expandimpersonationtoken = false
         filespecs = "%FileToSign%" +

@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019-2021 Vincent Parrett and contributors          }
+{           Copyright ï¿½ 2019-2021 Vincent Parrett and contributors          }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -33,6 +33,7 @@ type
   public
     //TODO : Improve this!!
     class function AreSameFiles(const fileA, fileB : string ) : boolean;
+    class function GetSize(const path : string) : Int64;
   end;
 
 
@@ -44,6 +45,16 @@ uses
   System.SysUtils;
 
 { TFileUtils }
+
+class function TFileUtils.GetSize(const path : string) : Int64;
+var
+  fad : TWin32FileAttributeData;
+begin
+  if not GetFileAttributesEx(PChar(path), GetFileExInfoStandard, @fad) then
+    RaiseLastOSError;
+  Int64Rec(result).Lo := fad.nFileSizeLow;
+  Int64Rec(result).Hi := fad.nFileSizeHigh;
+end;
 
 class function TFileUtils.AreSameFiles(const fileA, fileB: string): boolean;
 var

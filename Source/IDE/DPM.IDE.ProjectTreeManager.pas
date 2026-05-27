@@ -321,22 +321,19 @@ begin
         FPlatformImageIndexes[TDPMPlatform.Win32] := imageList.AddMasked(bitmap, clFuchsia);
         bitmap.LoadFromResourceName(HInstance, 'PLATFORM_WIN32'); //same for win32/64
         FPlatformImageIndexes[TDPMPlatform.Win64] := imageList.AddMasked(bitmap, clFuchsia);
+        bitmap.LoadFromResourceName(HInstance, 'PLATFORM_WIN32'); //same for win32/64
+        FPlatformImageIndexes[TDPMPlatform.WinARM64EC] := imageList.AddMasked(bitmap, clFuchsia);
         bitmap.LoadFromResourceName(HInstance, 'PLATFORM_MACOS');
         FPlatformImageIndexes[TDPMPlatform.MacOS32] := imageList.AddMasked(bitmap, clFuchsia);
         FPlatformImageIndexes[TDPMPlatform.MacOS64] := FPlatformImageIndexes[TDPMPlatform.MacOS32];
         bitmap.LoadFromResourceName(HInstance, 'PLATFORM_ANDRIOD');
-        FPlatformImageIndexes[TDPMPlatform.AndroidArm32] := imageList.AddMasked(bitmap, clFuchsia);
-        FPlatformImageIndexes[TDPMPlatform.AndroidArm64] := FPlatformImageIndexes[TDPMPlatform.AndroidArm32];
-        FPlatformImageIndexes[TDPMPlatform.AndroidIntel32] := FPlatformImageIndexes[TDPMPlatform.AndroidArm32];
-        FPlatformImageIndexes[TDPMPlatform.AndroidIntel64] := FPlatformImageIndexes[TDPMPlatform.AndroidArm32];
+        FPlatformImageIndexes[TDPMPlatform.Android] := imageList.AddMasked(bitmap, clFuchsia);
+        FPlatformImageIndexes[TDPMPlatform.Android64] := FPlatformImageIndexes[TDPMPlatform.Android];
         bitmap.LoadFromResourceName(HInstance, 'PLATFORM_IOS');
         FPlatformImageIndexes[TDPMPlatform.iOS32] := imageList.AddMasked(bitmap, clFuchsia);
         FPlatformImageIndexes[TDPMPlatform.iOS64] := FPlatformImageIndexes[TDPMPlatform.iOS32];
         bitmap.LoadFromResourceName(HInstance, 'PLATFORM_LINUX');
-        FPlatformImageIndexes[TDPMPlatform.LinuxIntel32] := imageList.AddMasked(bitmap, clFuchsia);
-        FPlatformImageIndexes[TDPMPlatform.LinuxIntel64] := FPlatformImageIndexes[TDPMPlatform.LinuxIntel32];
-        FPlatformImageIndexes[TDPMPlatform.LinuxArm32] := FPlatformImageIndexes[TDPMPlatform.LinuxIntel32];
-        FPlatformImageIndexes[TDPMPlatform.LinuxArm64] := FPlatformImageIndexes[TDPMPlatform.LinuxIntel32];
+        FPlatformImageIndexes[TDPMPlatform.Linux64] := imageList.AddMasked(bitmap, clFuchsia);
 
       finally
         bitmap.Free;

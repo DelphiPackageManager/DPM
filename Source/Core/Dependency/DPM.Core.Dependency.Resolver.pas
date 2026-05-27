@@ -59,7 +59,8 @@ type
 
     function DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const includePrerelease : boolean; const context : IResolverContext) : boolean;
 
-    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>> = nil; const preferredVersions : IDictionary<string, TPackageVersion> = nil) : boolean;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean; overload;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>) : boolean; overload;
 
   public
     constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageCache : IPackageCache; const packageInstallerContext : IPackageInstallerContext);
@@ -433,6 +434,19 @@ begin
   Assert(config <> nil);
   FConfiguration := config;
   result :=FRepositoryManager.Initialize(config);
+end;
+
+function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
+                                               const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo;
+                                               const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference;
+                                               out resolved : IList<IPackageInfo>) : boolean;
+var
+  noSharedCache : IDictionary<string, IList<IPackageInfo>>;
+  noPreferred : IDictionary<string, TPackageVersion>;
+begin
+  noSharedCache := nil;
+  noPreferred := nil;
+  result := ResolveForInstall(cancellationToken, compilerVersion, projectFile, options, newPackage, projectReferences, dependencyGraph, resolved, noSharedCache, noPreferred);
 end;
 
 function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;

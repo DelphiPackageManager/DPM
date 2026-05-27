@@ -146,7 +146,7 @@ begin
   inherited Create(logger);
   FPackageKind := packageKind;
   FVersion := TPackageVersion.Empty;
-  FFrameworks := [];
+  FFrameworks := nil;
   FRepositoryCommit := '#HASH#'; //git replacment.
   FTags := TStringList.Create;
   FAuthors := TCollections.CreateList<string>;
