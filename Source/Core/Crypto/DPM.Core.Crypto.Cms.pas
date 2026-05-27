@@ -425,6 +425,224 @@ begin
   end;
 end;
 
+// ---------------------------------------------------------------------------
+// DER parsing helpers — paired with the DER encoding helpers above. Only
+// what's needed to extract the [0] IMPLICIT signedAttrs from a SignerInfo
+// for the sign-time diagnostic that compares (a) the digest the client
+// sent to the remote signer against (b) the digest a verifier would
+// recompute from the assembled CMS. If those differ we have a client-side
+// encoding divergence; if they agree the bug is in transit / server.
+// ---------------------------------------------------------------------------
+
+type
+  TDerElement = record
+    Tag           : byte;     // raw ASN.1 tag octet (e.g. 0x30, 0x31, 0xA0)
+    ContentStart  : integer;  // index of first content byte
+    ContentLength : integer;  // length of content
+    TotalLength   : integer;  // tag + length + content
+  end;
+
+function ParseDerTLV(const data : TBytes; offset : integer; out element : TDerElement) : boolean;
+var
+  lenByte : byte;
+  i, numLen, len : integer;
+begin
+  result := false;
+  if (offset < 0) or (offset + 2 > Length(data)) then
+    exit;
+  element.Tag := data[offset];
+  lenByte := data[offset + 1];
+  if lenByte < $80 then
+  begin
+    element.ContentStart := offset + 2;
+    element.ContentLength := lenByte;
+    element.TotalLength := 2 + lenByte;
+  end
+  else
+  begin
+    numLen := lenByte and $7F;
+    if (numLen = 0) or (numLen > 4) or (offset + 2 + numLen > Length(data)) then
+      exit;
+    len := 0;
+    for i := 0 to numLen - 1 do
+      len := (len shl 8) or data[offset + 2 + i];
+    element.ContentStart := offset + 2 + numLen;
+    element.ContentLength := len;
+    element.TotalLength := 2 + numLen + len;
+  end;
+  if element.ContentStart + element.ContentLength > Length(data) then
+    exit;
+  result := true;
+end;
+
+// Walk a CMS ContentInfo and return the byte range covering the SignerInfo's
+// [0] IMPLICIT signedAttrs (tag 0xA0). Returns false if the structure isn't
+// shaped how we expect.
+function FindSignedAttrsRange(const cmsDer : TBytes; out attrsOffset, attrsTotalLen : integer) : boolean;
+var
+  contentInfo, ctx0, signedData, ver, digAlgs, encap, siSet, signerInfo : TDerElement;
+  fieldStart : integer;
+  field : TDerElement;
+begin
+  result := false;
+  attrsOffset := 0;
+  attrsTotalLen := 0;
+  // Local records aren't auto-initialised in Delphi — explicitly zero siSet
+  // so the post-loop tag check sees a sentinel (not stack garbage) on the
+  // path where the signerInfos SET isn't found.
+  FillChar(siSet, SizeOf(siSet), 0);
+  // ContentInfo SEQUENCE { OID, [0] EXPLICIT SignedData }
+  if not ParseDerTLV(cmsDer, 0, contentInfo) then exit;
+  if contentInfo.Tag <> $30 then exit;
+  // Skip the contentType OID inside ContentInfo
+  if not ParseDerTLV(cmsDer, contentInfo.ContentStart, ver) then exit;
+  // [0] EXPLICIT
+  if not ParseDerTLV(cmsDer, ver.ContentStart + ver.ContentLength, ctx0) then exit;
+  if ctx0.Tag <> $A0 then exit;
+  // SignedData SEQUENCE
+  if not ParseDerTLV(cmsDer, ctx0.ContentStart, signedData) then exit;
+  if signedData.Tag <> $30 then exit;
+  // SignedData fields: version, digestAlgs SET, encapContent, [certs[0]], [crls[1]], signerInfos SET
+  fieldStart := signedData.ContentStart;
+  // version INTEGER
+  if not ParseDerTLV(cmsDer, fieldStart, ver) then exit;
+  fieldStart := ver.ContentStart + ver.ContentLength;
+  // digestAlgorithms SET (0x31)
+  if not ParseDerTLV(cmsDer, fieldStart, digAlgs) then exit;
+  fieldStart := digAlgs.ContentStart + digAlgs.ContentLength;
+  // encapContentInfo SEQUENCE
+  if not ParseDerTLV(cmsDer, fieldStart, encap) then exit;
+  fieldStart := encap.ContentStart + encap.ContentLength;
+  // Optional [0] certificates and [1] CRLs may appear; skip any context tags
+  // until we find the signerInfos SET (0x31).
+  while fieldStart < signedData.ContentStart + signedData.ContentLength do
+  begin
+    if not ParseDerTLV(cmsDer, fieldStart, field) then exit;
+    if field.Tag = $31 then
+    begin
+      siSet := field;
+      Break;
+    end;
+    if (field.Tag = $A0) or (field.Tag = $A1) then
+    begin
+      // certs[0] / crls[1] — skip
+      fieldStart := field.ContentStart + field.ContentLength;
+      Continue;
+    end;
+    // Unexpected element — bail
+    exit;
+  end;
+  if siSet.Tag <> $31 then exit;
+  // signerInfos SET → SignerInfo SEQUENCE
+  if not ParseDerTLV(cmsDer, siSet.ContentStart, signerInfo) then exit;
+  if signerInfo.Tag <> $30 then exit;
+  // SignerInfo fields: version, sid (issuerAndSerial or [0] subjectKeyId),
+  //   digestAlgorithm, [0] IMPLICIT signedAttrs?, signatureAlgorithm,
+  //   signature, [1] IMPLICIT unsignedAttrs?
+  fieldStart := signerInfo.ContentStart;
+  // version
+  if not ParseDerTLV(cmsDer, fieldStart, ver) then exit;
+  fieldStart := ver.ContentStart + ver.ContentLength;
+  // sid (SEQUENCE for issuerAndSerial, or [0] for SubjectKeyIdentifier)
+  if not ParseDerTLV(cmsDer, fieldStart, field) then exit;
+  fieldStart := field.ContentStart + field.ContentLength;
+  // digestAlgorithm
+  if not ParseDerTLV(cmsDer, fieldStart, field) then exit;
+  fieldStart := field.ContentStart + field.ContentLength;
+  // Next is either [0] IMPLICIT signedAttrs (0xA0) or signatureAlgorithm
+  if not ParseDerTLV(cmsDer, fieldStart, field) then exit;
+  if field.Tag <> $A0 then
+    exit;  // No signedAttrs present — not our use case
+  attrsOffset := fieldStart;
+  attrsTotalLen := field.TotalLength;
+  result := true;
+end;
+
+// Decode an ASN.1 OBJECT IDENTIFIER (already framed by tag 0x06) into the
+// dotted-decimal text form. Returns '' if the bytes don't decode as an OID.
+function DecodeOidText(const data : TBytes; offset, length : integer) : string;
+var
+  i, value : integer;
+  first : boolean;
+begin
+  result := '';
+  if length <= 0 then
+    exit;
+  // First two arcs are packed: byte0 = 40*arc1 + arc2
+  value := data[offset];
+  result := IntToStr(value div 40) + '.' + IntToStr(value mod 40);
+  i := offset + 1;
+  value := 0;
+  first := true;
+  while i < offset + length do
+  begin
+    if first then
+    begin
+      value := 0;
+      first := false;
+    end;
+    value := (value shl 7) or (data[i] and $7F);
+    if (data[i] and $80) = 0 then
+    begin
+      result := result + '.' + IntToStr(value);
+      first := true;
+    end;
+    Inc(i);
+  end;
+end;
+
+// Walk the just-assembled CMS to the SignerInfo's signatureAlgorithm OID
+// (the AlgorithmIdentifier sitting right after the [0] IMPLICIT signedAttrs).
+// Returns the dotted-decimal OID text, or '' if the structure isn't shaped
+// how we expect. Used as a sign-time diagnostic to confirm Windows' encoder
+// preserved the ecdsa-with-shaXXX OID we asked for, instead of writing the
+// generic ECC OID 1.2.840.10045.2.1 (a known issue that breaks .NET
+// SignedCms.CheckSignature — see dotnet/runtime#91168).
+function FindSignatureAlgorithmOid(const cmsDer : TBytes) : string;
+var
+  attrsOffset, attrsTotalLen : integer;
+  algSeq, oid : TDerElement;
+begin
+  result := '';
+  if not FindSignedAttrsRange(cmsDer, attrsOffset, attrsTotalLen) then
+    exit;
+  // Next field after the [0] IMPLICIT signedAttrs is the signatureAlgorithm
+  // AlgorithmIdentifier (SEQUENCE { OID, parameters? }).
+  if not ParseDerTLV(cmsDer, attrsOffset + attrsTotalLen, algSeq) then
+    exit;
+  if algSeq.Tag <> $30 then
+    exit;
+  if not ParseDerTLV(cmsDer, algSeq.ContentStart, oid) then
+    exit;
+  if oid.Tag <> $06 then
+    exit;
+  result := DecodeOidText(cmsDer, oid.ContentStart, oid.ContentLength);
+end;
+
+// Compute the SHA-of-canonical-SignedAttrs-SET as a verifier would: take
+// the [0] IMPLICIT bytes, replace the implicit tag (0xA0) with the SET tag
+// (0x31), hash. The verifier does this internally; we mirror it here to
+// catch encoding divergence at sign time.
+function ComputeCanonicalSignedAttrsHash(const cmsDer : TBytes;
+                                          const hashing : IHashingService;
+                                          digest : THashAlgorithm) : TBytes;
+var
+  attrsOffset, attrsTotalLen : integer;
+  canonical : TBytes;
+begin
+  SetLength(result, 0);
+  if not FindSignedAttrsRange(cmsDer, attrsOffset, attrsTotalLen) then
+    exit;
+  // Copy the [0] IMPLICIT bytes verbatim, then overwrite the leading tag
+  // with the SET tag 0x31. Length and content are identical between the
+  // two forms (RFC 5652 §5.3, RFC 5652 §5.4 — signed attrs are hashed as
+  // a SET OF Attribute regardless of how they're tagged on the wire).
+  SetLength(canonical, attrsTotalLen);
+  Move(cmsDer[attrsOffset], canonical[0], attrsTotalLen);
+  canonical[0] := $31;
+  result := hashing.HashBytes(canonical, digest);
+end;
+
 // DER SET ordering rule: elements must be sorted byte-wise ascending of
 // their encoded form. CompareDerBytes is the lexicographic predicate.
 function CompareDerBytes(const a, b : TBytes) : integer;
@@ -494,6 +712,9 @@ var
   digestAlgDer, sigAlgDer : TBytes;
   digestAlgsSetDer : TBytes;
   encapContentInfoDer : TBytes;
+  embeddedHash : TBytes;
+  embeddedSig : TBytes;
+  embeddedSigAlgOid : string;
   encapContentTypeOidValue : TBytes;
   certificatesField : TBytes;
   signerInfosSetDer : TBytes;
@@ -577,12 +798,22 @@ begin
   //    signer signs over.
   attrsHash := FHashing.HashBytes(signedAttrsSetDer, digest);
   FLogger.Verbose(Format('  SignRemote: SignedAttrs digest = %d bytes; calling provider.SignDigest', [Length(attrsHash)]));
+  // Diagnostic — full hex of the digest that's about to be sent over the
+  // wire. When post-sign verify fails, the user can correlate this against
+  // (a) the digest the server logged for the same request, and (b) the
+  // SHA-of-canonical-SignedAttrs reconstructed from the assembled CMS, to
+  // pinpoint whether the bad signature came from a client encoding bug, an
+  // HTTP-transport corruption, or a server signing bug. Pretty cheap (one
+  // hex line, only at Verbose).
+  FLogger.Verbose('  SignRemote: digest hex = ' + BytesToHex(attrsHash));
 
   // 5. Single remote call — provider.SignDigest returns the raw signature
   //    value (RSA PKCS#1 v1.5 over the digest, or ECDSA equivalent).
   signatureBytes := provider.SignDigest(attrsHash, digest);
   if Length(signatureBytes) = 0 then
     raise ECryptoCms.Create('SignRemote: provider returned empty signature');
+  FLogger.Verbose(Format('  SignRemote: signature returned = %d bytes', [Length(signatureBytes)]));
+  FLogger.Verbose('  SignRemote: signature hex = ' + BytesToHex(signatureBytes));
 
   // 6. Build CMSG_SIGNER_INFO and let Windows encode the SignerInfo
   //    structure for us (PKCS7_SIGNER_INFO). The encoder takes the same
@@ -656,6 +887,75 @@ begin
 
   result := EncodeWith(PKCS_CONTENT_INFO, @contentInfo,
     'CryptEncodeObjectEx(PKCS_CONTENT_INFO)');
+
+  // Diagnostic — recover the canonical SignedAttrs hash a verifier would
+  // recompute from the assembled CMS, and compare against the digest we
+  // actually sent to the remote signer. We've seen post-sign verify failures
+  // where the messageDigest attribute is correct and the remote signer's
+  // own verify passes, but the CMS still fails to verify locally — this
+  // check distinguishes the two possible causes:
+  //   - hashes match → our encoded SignedAttrs match what Windows embedded,
+  //                    so the signature bytes themselves are wrong / corrupt
+  //                    (HTTP transport, server bug, etc.)
+  //   - hashes differ → Windows' PKCS7_SIGNER_INFO encoder produced different
+  //                     bytes than our manual signedAttrsSetDer construction,
+  //                     i.e. a client-side encoding divergence.
+  // Cheap to run on every sign: one DER walk + one hash over ~120 bytes.
+  embeddedHash := ComputeCanonicalSignedAttrsHash(result, FHashing, digest);
+  if Length(embeddedHash) = 0 then
+    FLogger.Verbose('  SignRemote: could not extract embedded SignedAttrs for self-check')
+  else if BytesEqual(embeddedHash, attrsHash) then
+    FLogger.Verbose('  SignRemote: embedded SignedAttrs hash matches sent digest (OK)')
+  else
+  begin
+    FLogger.Error(
+      '  SignRemote: ENCODING DIVERGENCE — the SignedAttrs hash a verifier ' +
+      'will recompute from the assembled CMS does NOT match the digest we ' +
+      'sent to the remote signer. The remote signer signed our digest ' +
+      'correctly, but the bytes Windows embedded in the CMS hash to a ' +
+      'different value, so the signature won''t verify.');
+    FLogger.Error('  SignRemote: sent digest       = ' + BytesToHex(attrsHash));
+    FLogger.Error('  SignRemote: embedded SET hash = ' + BytesToHex(embeddedHash));
+  end;
+
+  // Second self-check: confirm the signature value Windows' PKCS7_SIGNER_INFO
+  // encoder put into the CMS's encryptedDigest is byte-identical to what the
+  // remote signer returned. If they differ, the encoder corrupted the
+  // signature on the way in — distinct from the encoding-divergence case
+  // above. The two checks together fully cover the "received signature →
+  // embedded CMS" hop: if both pass and verify still fails, the bug is
+  // beyond DPM's control (the signature genuinely doesn't match the digest
+  // under this key per Windows' verifier, even though server-side ECDsa
+  // verify accepted it — typically signatureAlgorithm OID mismatches or
+  // CryptoAPI ECDSA strictness peculiarities, see ExtractEncryptedDigest
+  // diagnostic in SignPackage).
+  embeddedSig := ExtractEncryptedDigest(result);
+  if Length(embeddedSig) = 0 then
+    FLogger.Verbose('  SignRemote: could not extract embedded signature value for self-check')
+  else if BytesEqual(embeddedSig, signatureBytes) then
+    FLogger.Verbose('  SignRemote: embedded signature value matches received signature (OK)')
+  else
+  begin
+    FLogger.Error(
+      '  SignRemote: SIGNATURE CORRUPTION — Windows'' PKCS7_SIGNER_INFO ' +
+      'encoder embedded a different signature value than the one returned ' +
+      'by the remote signer.');
+    FLogger.Error('  SignRemote: received sig = ' + BytesToHex(signatureBytes));
+    FLogger.Error('  SignRemote: embedded sig = ' + BytesToHex(embeddedSig));
+  end;
+
+  // Third self-check: log the signatureAlgorithm OID Windows wrote into the
+  // CMS, so we can spot the dotnet/runtime#91168-class issue where Windows'
+  // PKCS7_SIGNER_INFO encoder substitutes the generic ECC OID 1.2.840.10045.2.1
+  // for the specific ecdsa-with-shaXXX OID we asked for. Verifiers that key
+  // off the signatureAlgorithm OID to pick the hash function then fail with
+  // a confusing "digest algorithm not valid for signature algorithm" error.
+  embeddedSigAlgOid := FindSignatureAlgorithmOid(result);
+  if embeddedSigAlgOid = '' then
+    FLogger.Verbose('  SignRemote: could not extract embedded signatureAlgorithm OID')
+  else
+    FLogger.Verbose('  SignRemote: embedded signatureAlgorithm OID = ' + embeddedSigAlgOid +
+                    ' (expected ' + string(sigAlgOid) + ')');
 end;
 
 function TCmsService.Sign(const content : TBytes;

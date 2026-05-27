@@ -19,11 +19,8 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
-          legalcopyright = "© 2019 -2025 Vincent Parrett and Contributors"
-          linkproductversion = false
-          minorversion = 2
           name = DPMVersion
-          productname = "DPM IDE Support for Delphi13"
+          productversion = 0.0.0.0
           productversionstring = 0.2.0-alpha
         end
       end
@@ -524,6 +521,7 @@ begin
       action.group
       begin
         description = DSpecCreator
+        enabled = false
         id = {6107D82E-ADC3-4635-AE9C-F06739F2ACC4}
         variable
         begin
@@ -1407,7 +1405,7 @@ begin
         terminateontimeout = true
         timeoutlength = 2
         as.projectpath = %SRC_ROOT%\\%ProjectFile%oj
-        as.compilerversion = 13
+        as.compilerversion = XE2
         as.verbosity = Debug
         as.nobanner = True
         action.script
@@ -1435,7 +1433,7 @@ begin
         compileridl = true
         configname = Release
         debugversionnumbers = false
-        delphiversion = Delphi13
+        delphiversion = DelphiXE2
         enabletimeout = false
         eurekalogverboselogging = false
         frameworktype = VCL
@@ -1456,7 +1454,7 @@ begin
         manifestfile = %SRC_ROOT%\\dpmManifest.xml
         minorversion = 2
         noconfig = false
-        platform = Win64
+        platform = Win32
         platformsdktype = ProjectSDK
         projectfile = %SRC_ROOT%\\%ProjectFile%
         regenerateresource = true
@@ -1475,7 +1473,7 @@ begin
         useversionfromdof = false
         verboseoutput = false
         versioninfokeys = "LegalCopyright\=© 2019 -2025 Vincent Parrett and Contributors" +
-                          "ProductName\=DPM IDE Support for Delphi13" +
+                          "ProductName\=DPM IDE Support for DelphiXE2" +
                           "ProductVersion\=0.2.0-alpha" +
                           ""
         versioninfopropertysetname = DPMVersion
@@ -1647,16 +1645,22 @@ begin
     end
     rootaction
     begin
+      action.group
+      begin
+        id = {742E6423-1BE2-45C3-A4C9-495AFFD72800}
+      end
       action.signotaur.sign
       begin
         apikey = %SignotaurAPIKey%
         contentdescription = %FileDescription%
         contentdescriptionurl = https://docs.delphi.dev
+        enabled = false
         enabletimeout = false
         expandimpersonationtoken = false
         filespecs = "%FileToSign%" +
                     ""
         id = {8013056E-B409-429A-92B2-DE90DB0BEB1C}
+        ignoreuntrustedroot = false
         impersonateusenetcredonly = false
         impersonateuser = false
         logprocessparameters = true
@@ -1670,6 +1674,7 @@ begin
         thumbprint = %SignotaurThumbprint%
         timeoutlength = 2
         timestampserverurl = http://timestamp.digicert.com
+        updatemode = SourceHash
         useerrordialogmonitor = false
         verboselogging = true
       end
@@ -1702,7 +1707,7 @@ begin
   variable
   begin
     canonicalizepath = true
-    defaultvalue = %FBPROJECTDIR%\\..\\Output
+    defaultvalue = %FBPROJECTDIR%\\..\\OutputNew
     ismacro = true
     name = OUTPUT_DIR
     variablescope = vtProject

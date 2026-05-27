@@ -383,6 +383,7 @@
                 <PackageReference id="VSoft.SemanticVersion" version="0.2.7"/>
                 <PackageReference id="VSoft.Uri" version="0.3.3"/>
                 <PackageReference id="VSoft.VirtualListView" version="0.4.6"/>
+                <PackageReference id="VSoft.YAML" version="1.5.5"/>
             </PackageReferences>
         </DPM>
     </ProjectExtensions>

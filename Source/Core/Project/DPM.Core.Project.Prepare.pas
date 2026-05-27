@@ -47,9 +47,16 @@ type
   //A single dpk/dproj pair to scaffold, derived from one entry in the dspec's
   //templates.build or templates.design lists. ProjectName is the file basename
   //(no extension), Kind determines runtime-only vs design-only flags in the dproj.
+  //Platforms is the entry-level override - empty means "use the targetPlatform's
+  //full list"; non-empty intersects with the targetPlatform's set at scaffold time.
+  //References are the author-declared extra requires (vcl, fmx, sibling runtime
+  //packages) that the prepare command should emit in the dpk's requires clause
+  //and as DCCReferences in the dproj. nil/empty means "no extra references".
   TPrepareScaffoldItem = record
     ProjectName : string;
     Kind : TPrepareProjectKind;
+    Platforms : TDPMPlatforms;
+    References : IList<string>;
   end;
 
   TPrepareFolderState = record
@@ -88,7 +95,8 @@ type
     procedure ScaffoldOnePair(const folderPath, projectName : string;
                               const kind : TPrepareProjectKind;
                               const compiler : TCompilerVersion;
-                              const relativeSources : IList<string>;
+                              const relativeSources : IList<TPrepareSourceFile>;
+                              const requiredPackages : IList<string>;
                               const platforms : TDPMPlatforms;
                               const force : boolean);
     function PropagatePair(const targetCompiler : TCompilerVersion;
@@ -97,7 +105,7 @@ type
     //expand all spec.Templates[].Sources[] globs into absolute file paths, deduped.
     //compiler is used to resolve $compiler*$ variables for the scaffold target.
     function GatherSourceFiles(const specDir : string; const spec : IPackageSpec;
-                               const compiler : TCompilerVersion) : IList<string>;
+                               const compiler : TCompilerVersion) : IList<TPrepareSourceFile>;
     //compute relative path from fromDir to toPath. Both must be absolute and on the same drive.
     function MakeRelativePath(const fromDir, toPath : string) : string;
     //builds the variable dictionary used to expand $name$ tokens in source paths.
@@ -142,6 +150,65 @@ begin
   //path containing them refers to a per-version artefact that doesn't yet exist and
   //isn't a valid DCCReference target anyway.
   result := TRegEx.IsMatch(value, '\$[A-Za-z_][A-Za-z0-9_]*\$');
+end;
+
+function ShouldIncludeSourceFile(const filePath : string) : boolean;
+var
+  ext : string;
+begin
+  //Whitelist of extensions that make sense as DCCReferences in a Delphi package
+  //dproj. .dfm files are pulled in implicitly by the {FormName} reference on
+  //their owning .pas unit (so they're deliberately excluded here). Everything
+  //else - .txt READMEs, .md docs, .json, accidental .dproj/.dpk glob hits -
+  //should not be referenced by the dproj at all.
+  ext := LowerCase(ExtractFileExt(filePath));
+  result := (ext = '.pas') or (ext = '.inc') or (ext = '.rc') or (ext = '.res');
+end;
+
+function ExtractFormNameFromDfm(const dfmPath : string) : string;
+var
+  fs : TFileStream;
+  buffer : TBytes;
+  bytesRead : integer;
+  text : string;
+  newlineIdx : integer;
+  firstLine : string;
+  match : TMatch;
+begin
+  //Text-form .dfm files start with `object Name : TClassName` (or `inherited`).
+  //Binary .dfm files don't parse this way - we silently skip them. Reading just
+  //the first 512 bytes keeps the cost negligible.
+  result := '';
+  if not FileExists(dfmPath) then
+    exit;
+  try
+    fs := TFileStream.Create(dfmPath, fmOpenRead or fmShareDenyNone);
+    try
+      SetLength(buffer, 512);
+      bytesRead := fs.Read(buffer[0], Length(buffer));
+      if bytesRead <= 0 then
+        exit;
+      SetLength(buffer, bytesRead);
+    finally
+      fs.Free;
+    end;
+    text := TEncoding.UTF8.GetString(buffer);
+    //skip a UTF-8 BOM if present.
+    if (Length(text) > 0) and (text[1] = #$FEFF) then
+      Delete(text, 1, 1);
+    newlineIdx := Pos(#10, text);
+    if newlineIdx > 0 then
+      firstLine := Copy(text, 1, newlineIdx - 1)
+    else
+      firstLine := text;
+    firstLine := Trim(StringReplace(firstLine, #13, '', [rfReplaceAll]));
+    match := TRegEx.Match(firstLine, '^(object|inherited)\s+(\w+)\s*:', [roIgnoreCase]);
+    if match.Success and (match.Groups.Count >= 3) then
+      result := match.Groups.Item[2].Value;
+  except
+    on e : Exception do
+      result := ''; //best-effort; don't fail the scaffold over an unreadable dfm.
+  end;
 end;
 
 const
@@ -275,12 +342,15 @@ begin
 
   //compiler-derived variables - mirrors TPackageWriter.PopulateVariables so dspec
   //authors see consistent behaviour between Pack and Prepare.
+  //TODO : this is code dupe, refactor
   result['compiler'] := CompilerToString(compiler);
   result['target'] := CompilerToString(compiler);
   result['compilernoprefix'] := CompilerNoPrefix(compiler);
   result['compilernopoint'] := CompilerToStringNoPoint(compiler);
   result['compilercodename'] := CompilerCodeName(compiler);
   result['compilerwithcodename'] := CompilerWithCodeName(compiler);
+  result['compilermajornoprefix'] := CompilerMajorNoPrefix(compiler);
+
   result['compilerversion'] := CompilerToCompilerVersionIntStr(compiler);
   result['libsuffix'] := CompilerToLibSuffix(compiler);
   result['bdsversion'] := CompilerToBDSVersion(compiler);
@@ -315,7 +385,7 @@ begin
 end;
 
 function TPreparePackageFolders.GatherSourceFiles(const specDir : string; const spec : IPackageSpec;
-                                                   const compiler : TCompilerVersion) : IList<string>;
+                                                   const compiler : TCompilerVersion) : IList<TPrepareSourceFile>;
 var
   i, j : integer;
   template : ISpecTemplate;
@@ -327,10 +397,12 @@ var
   files : TArray<string>;
   k : integer;
   abs : string;
+  dfmPath : string;
   seen : ISet<string>;
   variables : IDictionary<string, string>;
+  entry : TPrepareSourceFile;
 begin
-  result := TCollections.CreateList<string>;
+  result := TCollections.CreateList<TPrepareSourceFile>;
   seen := TCollections.CreateSet<string>;
   if (spec = nil) or (spec.Templates = nil) then
     exit;
@@ -387,12 +459,30 @@ begin
       for k := 0 to High(files) do
       begin
         abs := TPath.GetFullPath(files[k]);
-        if not seen.Contains(LowerCase(abs)) then
+        //Skip extensions that shouldn't be in a dpk/dproj. .dfm files come in via
+        //the {FormName} annotation on their owning .pas.
+        if not ShouldIncludeSourceFile(abs) then
+          continue;
+        if seen.Contains(LowerCase(abs)) then
+          continue;
+        seen.Add(LowerCase(abs));
+
+        entry.Path := abs;
+        entry.FormName := '';
+        //Form detection: if this is a .pas file with a sibling .dfm, lift the form
+        //identifier from the .dfm's first line. Other extensions get no FormName.
+        if SameText(ExtractFileExt(abs), '.pas') then
         begin
-          seen.Add(LowerCase(abs));
-          result.Add(abs);
-          FLogger.Information('  ' + abs);
+          dfmPath := ChangeFileExt(abs, '.dfm');
+          if FileExists(dfmPath) then
+            entry.FormName := ExtractFormNameFromDfm(dfmPath);
         end;
+
+        result.Add(entry);
+        if entry.FormName <> '' then
+          FLogger.Information('  ' + abs + ' (form: ' + entry.FormName + ')')
+        else
+          FLogger.Information('  ' + abs);
       end;
     end;
   end;
@@ -507,6 +597,14 @@ begin
         seen.Add(LowerCase(projectName));
         item.ProjectName := projectName;
         item.Kind := pkRuntime;
+        //buildEntry.Platforms is empty when the dspec didn't declare an override.
+        //ScaffoldInitialPair intersects with the targetPlatform's set; empty here
+        //means "no override - use the targetPlatform's full set as-is".
+        item.Platforms := buildEntry.Platforms;
+        //Author-declared extra requires (e.g. vcl, fmx, sibling runtime packages).
+        //Empty list when the dspec didn't declare any; the engine still appends
+        //the auto-required runtime siblings for design entries.
+        item.References := buildEntry.References;
         result.Add(item);
       end;
     end;
@@ -529,6 +627,9 @@ begin
         seen.Add(LowerCase(projectName));
         item.ProjectName := projectName;
         item.Kind := pkDesign;
+        //designEntry.Platforms - same empty-means-no-override semantics as build.
+        item.Platforms := designEntry.Platforms;
+        item.References := designEntry.References;
         result.Add(item);
       end;
     end;
@@ -538,13 +639,15 @@ end;
 procedure TPreparePackageFolders.ScaffoldOnePair(const folderPath, projectName : string;
                                                  const kind : TPrepareProjectKind;
                                                  const compiler : TCompilerVersion;
-                                                 const relativeSources : IList<string>;
+                                                 const relativeSources : IList<TPrepareSourceFile>;
+                                                 const requiredPackages : IList<string>;
                                                  const platforms : TDPMPlatforms;
                                                  const force : boolean);
 var
   dpkPath : string;
   dprojPath : string;
   kindLabel : string;
+  platformsLabel : string;
 begin
   dpkPath := TPath.Combine(folderPath, projectName + '.dpk');
   dprojPath := TPath.Combine(folderPath, projectName + '.dproj');
@@ -552,6 +655,10 @@ begin
     kindLabel := 'design-only'
   else
     kindLabel := 'runtime-only';
+  //Short summary of the platforms the dproj will be scaffolded for, surfaced in
+  //the log so the user can see at a glance which entry-level overrides took
+  //effect (especially during --dryrun).
+  platformsLabel := DPMPlatformsToString(platforms, ', ');
 
   if FileExists(dpkPath) and not force then
     FLogger.Warning(LogPrefix + 'Scaffold target already exists, skipping: ' + dpkPath)
@@ -561,7 +668,7 @@ begin
       FLogger.Information(LogPrefix + 'Would scaffold ' + kindLabel + ' package: ' + dpkPath + ' (' + IntToStr(relativeSources.Count) + ' source file(s))')
     else
     begin
-      TFile.WriteAllText(dpkPath, TPrepareTemplates.RenderDpk(projectName, compiler, relativeSources, kind), TEncoding.UTF8);
+      TFile.WriteAllText(dpkPath, TPrepareTemplates.RenderDpk(projectName, compiler, relativeSources, requiredPackages, kind), TEncoding.UTF8);
       FLogger.Information('Created (' + kindLabel + '): ' + dpkPath);
     end;
   end;
@@ -571,11 +678,11 @@ begin
   else
   begin
     if FDryRun then
-      FLogger.Information(LogPrefix + 'Would scaffold ' + kindLabel + ' project: ' + dprojPath)
+      FLogger.Information(LogPrefix + 'Would scaffold ' + kindLabel + ' project: ' + dprojPath + ' (platforms: ' + platformsLabel + ')')
     else
     begin
-      TFile.WriteAllText(dprojPath, TPrepareTemplates.RenderDproj(projectName, compiler, relativeSources, kind, platforms), TEncoding.UTF8);
-      FLogger.Information('Created (' + kindLabel + '): ' + dprojPath);
+      TFile.WriteAllText(dprojPath, TPrepareTemplates.RenderDproj(projectName, compiler, relativeSources, requiredPackages, kind, platforms), TEncoding.UTF8);
+      FLogger.Information('Created (' + kindLabel + ', platforms: ' + platformsLabel + '): ' + dprojPath);
     end;
   end;
 end;
@@ -583,16 +690,35 @@ end;
 function TPreparePackageFolders.ScaffoldInitialPair(const packagesRoot : string; const specDir : string;
                                                     const spec : IPackageSpec; const packageId : string;
                                                     const compiler : TCompilerVersion; const force : boolean) : boolean;
+
+  function ContainsIgnoreCase(const list : IList<string>; const value : string) : boolean;
+  var
+    k : integer;
+  begin
+    result := false;
+    for k := 0 to list.Count - 1 do
+      if SameText(list[k], value) then
+      begin
+        result := true;
+        exit;
+      end;
+  end;
+
 var
   folderName : string;
   folderPath : string;
-  absoluteSources : IList<string>;
-  relativeSources : IList<string>;
-  i : integer;
+  absoluteSources : IList<TPrepareSourceFile>;
+  relativeSources : IList<TPrepareSourceFile>;
+  i, j : integer;
   variables : IDictionary<string, string>;
   items : IList<TPrepareScaffoldItem>;
   fallback : TPrepareScaffoldItem;
-  platforms : TDPMPlatforms;
+  compilerPlatforms : TDPMPlatforms;
+  itemPlatforms : TDPMPlatforms;
+  relEntry : TPrepareSourceFile;
+  runtimePackageNames : IList<string>;
+  itemRequires : IList<string>;
+  refName : string;
 begin
   folderName := CompilerToRADStudioFolderName(compiler);
   folderPath := TPath.Combine(packagesRoot, folderName);
@@ -605,19 +731,23 @@ begin
   //expand globs from spec.Templates and compute relative paths from the new folder.
   //pass the target compiler so variables like $compilernoprefix$ resolve correctly.
   absoluteSources := GatherSourceFiles(specDir, spec, compiler);
-  relativeSources := TCollections.CreateList<string>;
+  relativeSources := TCollections.CreateList<TPrepareSourceFile>;
   for i := 0 to absoluteSources.Count - 1 do
-    relativeSources.Add(MakeRelativePath(folderPath, absoluteSources[i]));
+  begin
+    relEntry.Path := MakeRelativePath(folderPath, absoluteSources[i].Path);
+    relEntry.FormName := absoluteSources[i].FormName;
+    relativeSources.Add(relEntry);
+  end;
 
   //Resolve the platforms the dspec declares for this compiler. PlatformsForCompiler
   //returns the empty set when the compiler isn't matched (shouldn't happen because
   //GatherSupportedCompilers filters by membership) - fall back to Win32 with a warning.
-  platforms := PlatformsForCompiler(spec, compiler);
-  if platforms = [] then
+  compilerPlatforms := PlatformsForCompiler(spec, compiler);
+  if compilerPlatforms = [] then
   begin
     FLogger.Warning(Format('Spec declares no platforms for %s - falling back to Win32 only.',
                            [CompilerToRADStudioFolderName(compiler)]));
-    platforms := [TDPMPlatform.Win32];
+    compilerPlatforms := [TDPMPlatform.Win32];
   end;
 
   //Collect every project the dspec wants scaffolded (one per build entry as runtime,
@@ -631,11 +761,60 @@ begin
   begin
     fallback.ProjectName := RuntimeProjectName(packageId);
     fallback.Kind := pkRuntime;
+    fallback.Platforms := []; //no override - inherits compilerPlatforms below.
+    fallback.References := nil; //no dspec, no author references.
     items.Add(fallback);
   end;
 
+  //Collect every runtime project name in this set. A design package in the same
+  //dspec naturally wraps the runtime one(s) - we wire that up automatically by
+  //requiring the runtime bpls from the design's dpk + dproj. Runtime packages
+  //don't require their siblings (they'd cycle if they did).
+  runtimePackageNames := TCollections.CreateList<string>;
   for i := 0 to items.Count - 1 do
-    ScaffoldOnePair(folderPath, items[i].ProjectName, items[i].Kind, compiler, relativeSources, platforms, force);
+    if items[i].Kind = pkRuntime then
+      runtimePackageNames.Add(items[i].ProjectName);
+
+  for i := 0 to items.Count - 1 do
+  begin
+    //Build the per-item requires list. Design entries auto-require the runtime
+    //siblings declared elsewhere in the same dspec (existing behaviour). On top
+    //of that, append any author-declared references (vcl, fmx, extra sibling
+    //packages, etc.) - deduped case-insensitively against what's already there.
+    //For runtime entries the auto-require step is skipped (runtimes don't depend
+    //on each other by default), so references are the only source of extras.
+    itemRequires := TCollections.CreateList<string>;
+    if items[i].Kind = pkDesign then
+      for j := 0 to runtimePackageNames.Count - 1 do
+        itemRequires.Add(runtimePackageNames[j]);
+    if items[i].References <> nil then
+      for j := 0 to items[i].References.Count - 1 do
+      begin
+        refName := Trim(items[i].References[j]);
+        if (refName <> '') and not ContainsIgnoreCase(itemRequires, refName) then
+          itemRequires.Add(refName);
+      end;
+
+    //Per-item effective platforms = entry override intersected with the
+    //targetPlatform's declared platforms. Empty override means "use the
+    //targetPlatform's full set as-is". An empty intersection means the entry
+    //declared only platforms the targetPlatform doesn't support - skip + warn
+    //rather than emit a dproj with no <Platforms>.
+    if items[i].Platforms <> [] then
+      itemPlatforms := compilerPlatforms * items[i].Platforms
+    else
+      itemPlatforms := compilerPlatforms;
+
+    if itemPlatforms = [] then
+    begin
+      FLogger.Warning(Format('Item %s in %s has no platforms after intersecting the entry override with the targetPlatform - skipping.',
+                             [items[i].ProjectName, CompilerToRADStudioFolderName(compiler)]));
+      continue;
+    end;
+
+    ScaffoldOnePair(folderPath, items[i].ProjectName, items[i].Kind, compiler,
+                    relativeSources, itemRequires, itemPlatforms, force);
+  end;
 
   result := true;
 end;

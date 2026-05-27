@@ -42,6 +42,7 @@ type
     FProject : string;
     FPlatforms : TDPMPlatforms;
     FDefines : string;
+    FReferences : IList<string>;
 
     FLibSuffix : string;
     FLibPrefix : string;
@@ -53,6 +54,7 @@ type
     function GetProject : string;
     function GetPlatforms : TDPMPlatforms;
     function GetDefines : string;
+    function GetReferences : IList<string>;
 
     procedure SetProject(const value : string);
     procedure SetDefines(const value : string);
@@ -69,7 +71,7 @@ type
 
     function Clone : ISpecDesignEntry;reintroduce;
     constructor CreateClone(const logger : ILogger; const project : string; const defines : string; platforms : TDPMPlatforms;
-                            const libSuffix, libPrefix, libVersion : string ); reintroduce;
+                            const libSuffix, libPrefix, libVersion : string; const references : IList<string> ); reintroduce;
 
   public
     constructor Create(const logger : ILogger); override;
@@ -84,7 +86,7 @@ uses
 
 function TSpecDesignEntry.Clone : ISpecDesignEntry;
 begin
-  result := TSpecDesignEntry.CreateClone(logger, FProject, FDefines, FPlatforms, FLibSuffix, FLibPrefix, FLibVersion );
+  result := TSpecDesignEntry.CreateClone(logger, FProject, FDefines, FPlatforms, FLibSuffix, FLibPrefix, FLibVersion, FReferences);
 end;
 
 constructor TSpecDesignEntry.Create(const logger : ILogger);
@@ -92,10 +94,11 @@ begin
   inherited Create(logger);
   //leave empty so the installer can tell "author did not specify" from "author explicitly declared"
   FPlatforms := [];
+  FReferences := TCollections.CreateList<string>;
 end;
 
 constructor TSpecDesignEntry.CreateClone(const logger : ILogger; const project : string; const defines : string; platforms : TDPMPlatforms;
-                                         const libSuffix, libPrefix, libVersion : string);
+                                         const libSuffix, libPrefix, libVersion : string; const references : IList<string>);
 begin
   inherited Create(logger);
   FProject := project;
@@ -105,6 +108,10 @@ begin
   FLibSuffix := libSuffix;
   FLibPrefix := libPrefix;
   FLibVersion := libVersion;
+
+  FReferences := TCollections.CreateList<string>;
+  if references <> nil then
+    FReferences.AddRange(references);
 end;
 
 
@@ -139,14 +146,21 @@ begin
   result := FProject;
 end;
 
+function TSpecDesignEntry.GetReferences : IList<string>;
+begin
+  result := FReferences;
+end;
+
 
 
 function TSpecDesignEntry.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var
   platformsSeq : IYAMLSequence;
+  refsSeq : IYAMLSequence;
   i : integer;
   platform  : TDPMPlatform;
   sPlatform : string;
+  refName : string;
 begin
   result := true;
   FProject := yamlObject.S['project'];
@@ -167,6 +181,17 @@ begin
       platform := StringToDPMPlatform(sPlatform);
       if platform <> TDPMPlatform.UnknownPlatform then
         FPlatforms := FPlatforms + [platform];
+    end;
+  end;
+
+  if yamlObject.Contains('references') then
+  begin
+    refsSeq := yamlObject.A['references'];
+    for i := 0 to refsSeq.Count - 1 do
+    begin
+      refName := Trim(refsSeq.S[i]);
+      if refName <> '' then
+        FReferences.Add(refName);
     end;
   end;
 
@@ -220,8 +245,10 @@ procedure TSpecDesignEntry.ToYAML(const parent: IYAMLValue; const packageKind: T
 var
   mapping : IYAMLMapping;
   platformsSeq : IYAMLSequence;
+  refsSeq : IYAMLSequence;
   platform : TDPMPlatform;
   sPlatform : string;
+  i : integer;
 begin
   mapping := parent.AsSequence.AddMapping;
   mapping.S['project'] := FProject;
@@ -238,6 +265,13 @@ begin
 
   if FDefines <> '' then
     mapping.S['defines'] := FDefines;
+
+  if FReferences.Count > 0 then
+  begin
+    refsSeq := mapping.A['references'];
+    for i := 0 to FReferences.Count - 1 do
+      refsSeq.AddValue(FReferences[i]);
+  end;
 
   if FLibSuffix <> '' then
     mapping.S['libSuffix'] := FLibSuffix;

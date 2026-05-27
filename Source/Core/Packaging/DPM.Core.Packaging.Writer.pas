@@ -354,7 +354,8 @@ begin
   FVariables['compilernopoint'] := CompilerToStringNoPoint(targetPlatform.Compiler);
   FVariables['compilercodename'] := CompilerCodeName(targetPlatform.Compiler);
   FVariables['compilerwithcodename'] := CompilerWithCodeName(targetPlatform.Compiler);
-  FVariables['compilerwithcodename'] := CompilerNoPrefix(targetPlatform.Compiler);
+//  FVariables['compilerwithcodename'] := CompilerNoPrefix(targetPlatform.Compiler);
+  FVariables['compilermajornoprefix'] := CompilerMajorNoPrefix(targetPlatform.Compiler);
 
   //do not replace plaform here - we'll do that during install
 //  list.Add('platform=' + DPMPlatformToString(targetPlatform.Platforms[0]));

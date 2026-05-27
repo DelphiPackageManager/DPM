@@ -129,6 +129,8 @@ function StringToDPMPlatform(const value : string) : TDPMPlatform;
 
 function CompilerToString(const value : TCompilerVersion) : string;
 function CompilerNoPrefix(const value : TCompilerVersion) : string;
+function CompilerMajorNoPrefix(const value : TCompilerVersion) : string;
+
 function CompilerToStringNoPoint(const value : TCompilerVersion) : string;
 
 function CompilerCodeName(const value : TCompilerVersion) : string;
@@ -306,7 +308,7 @@ end;
 
 function UIFrameworkTypeToString(const value : TDPMUIFrameworkType) : string;
 begin
-  result := GetEnumName(TypeInfo(TDPMUIFrameworkType), ord(value));
+  result := LowerCase(GetEnumName(TypeInfo(TDPMUIFrameworkType), ord(value)));
 end;
 
 
@@ -331,6 +333,18 @@ begin
   result := CompilerToString(value);
   Delete(result,1,6);
   result := UpperCase(StringReplace(result, '_', '.', [rfReplaceAll]));
+end;
+
+function CompilerMajorNoPrefix(const value : TCompilerVersion) : string;
+var
+  i : integer;
+begin
+  result := CompilerToString(value);
+  Delete(result,1,6);
+  i := Pos('.', result);
+  if i > 0 then
+    Delete(result, i, Length(result));
+
 end;
 
 function CompilerToString(const value : TCompilerVersion) : string;
@@ -393,10 +407,21 @@ end;
 
 function DPMPlatformToBDString(const value : TDPMPlatform) : string;
 begin
+  //Produces the platform string Delphi's dproj XML uses (`<Platform value="...">`).
+  //Embarcadero kept their original naming - OSX* (not MacOS*) and iOSDevice* (not
+  //iOS*) - even though the platforms were rebranded. ProjectPlatformToDPMPlatform
+  //does the reverse mapping when reading dprojs.
   case value of
-    TDPMPlatform.Android : result := 'Android';
-    TDPMPlatform.Android64 : result := 'Android64';
-    TDPMPlatform.Linux64 : result := 'Linux64';
+    TDPMPlatform.Android       : result := 'Android';
+    TDPMPlatform.Android64     : result := 'Android64';
+    TDPMPlatform.Linux64       : result := 'Linux64';
+    TDPMPlatform.MacOS32       : result := 'OSX32';
+    TDPMPlatform.MacOS64       : result := 'OSX64';
+    TDPMPlatform.MacOSARM64    : result := 'OSXARM64';
+    TDPMPlatform.iOS32         : result := 'iOSDevice32';
+    TDPMPlatform.iOS64         : result := 'iOSDevice64';
+    TDPMPlatform.iOSSimulator  : result := 'iOSSimulator';
+    TDPMPlatform.iOSSimARM64   : result := 'iOSSimARM64';
   else
     result := GetEnumName(TypeInfo(TDPMPlatform), ord(value));
   end;

@@ -41,10 +41,12 @@ type
     FProject : string;
     FPlatforms : TDPMPlatforms;
     FDefines : string;
+    FReferences : IList<string>;
   protected
     function GetProject : string;
     function GetPlatforms : TDPMPlatforms;
     function GetDefines : string;
+    function GetReferences : IList<string>;
 
     procedure SetProject(const value : string);
     procedure SetPlatforms(const value : TDPMPlatforms);
@@ -59,9 +61,10 @@ type
     property Project : string read GetProject write SetProject;
     property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
     property Defines : string read GetDefines write SetDefines;
+    property References : IList<string> read GetReferences;
 
   public
-    constructor CreateClone(const logger : ILogger; const project : string; const defines : string; const platforms : TDPMPlatforms); reintroduce;
+    constructor CreateClone(const logger : ILogger; const project : string; const defines : string; const platforms : TDPMPlatforms; const references : IList<string>); reintroduce;
   public
     constructor Create(const logger : ILogger); override;
 
@@ -77,20 +80,24 @@ uses
 
 function TSpecBuildEntry.Clone : ISpecBuildEntry;
 begin
-  result := TSpecBuildEntry.CreateClone(logger, FProject, FDefines, FPlatforms);
+  result := TSpecBuildEntry.CreateClone(logger, FProject, FDefines, FPlatforms, FReferences);
 end;
 
 constructor TSpecBuildEntry.Create(const logger : ILogger);
 begin
   inherited Create(logger);
+  FReferences := TCollections.CreateList<string>;
 end;
 
-constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const project, defines : string; const platforms : TDPMPlatforms);
+constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const project, defines : string; const platforms : TDPMPlatforms; const references : IList<string>);
 begin
   inherited Create(logger);
   FProject := project;
   FDefines := defines;
   FPlatforms := platforms;
+  FReferences := TCollections.CreateList<string>;
+  if references <> nil then
+    FReferences.AddRange(references);
 end;
 
 
@@ -99,6 +106,7 @@ function TSpecBuildEntry.GetDefines: string;
 begin
   result := FDefines;
 end;
+
 
 function TSpecBuildEntry.GetPlatforms: TDPMPlatforms;
 begin
@@ -110,14 +118,21 @@ begin
   result := FProject;
 end;
 
+function TSpecBuildEntry.GetReferences : IList<string>;
+begin
+  result := FReferences;
+end;
+
 
 
 function TSpecBuildEntry.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var
   platformsSeq : IYAMLSequence;
+  refsSeq : IYAMLSequence;
   i : integer;
   platform  : TDPMPlatform;
   sPlatform : string;
+  refName : string;
 begin
   result := true;
   FProject := yamlObject.S['project'];
@@ -140,6 +155,17 @@ begin
         FPlatforms := FPlatforms + [platform];
     end;
   end;
+
+  if yamlObject.Contains('references') then
+  begin
+    refsSeq := yamlObject.A['references'];
+    for i := 0 to refsSeq.Count - 1 do
+    begin
+      refName := Trim(refsSeq.S[i]);
+      if refName <> '' then
+        FReferences.Add(refName);
+    end;
+  end;
 end;
 
 
@@ -147,6 +173,7 @@ procedure TSpecBuildEntry.SetDefines(const value: string);
 begin
   FDefines := value;
 end;
+
 
 procedure TSpecBuildEntry.SetPlatforms(const value: TDPMPlatforms);
 begin
@@ -163,8 +190,10 @@ procedure TSpecBuildEntry.ToYAML(const parent: IYAMLValue; const packageKind: TD
 var
   mapping : IYAMLMapping;
   platformsSeq : IYAMLSequence;
+  refsSeq : IYAMLSequence;
   platform : TDPMPlatform;
   sPlatform : string;
+  i : integer;
 begin
   mapping := parent.AsSequence.AddMapping;
   mapping.S['project'] := FProject;
@@ -181,9 +210,13 @@ begin
   if FDefines <> '' then
     mapping.S['defines'] := FDefines;
 
-
+  if FReferences.Count > 0 then
+  begin
+    refsSeq := mapping.A['references'];
+    for i := 0 to FReferences.Count - 1 do
+      refsSeq.AddValue(FReferences[i]);
+  end;
 end;
 
 
 end.
-

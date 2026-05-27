@@ -414,6 +414,35 @@ begin
   cmsDer := FCms.Sign(manifestBytes, provider, signedAttrs, digest);
   FLogger.Information(Format('  CMS signature produced: %d bytes', [Length(cmsDer)]));
 
+  // Sanity-check the signature locally before we ship it. We've observed
+  // sporadic (~0.4%) signing failures where the produced CMS is structurally
+  // valid and the messageDigest attribute correctly equals SHA(manifest), but
+  // the signature value itself doesn't verify against the signer cert's
+  // public key. Root cause could be on either side — a client-side digest
+  // corruption (TBytes lifetime, HTTP-body truncation, etc.) or a remote
+  // signing service returning a bad signature — and we can't distinguish
+  // them after the fact from the artifact alone. What we CAN do is refuse
+  // to ship the bad package: it would silently fail verification on every
+  // downstream consumer otherwise.
+  //
+  // Re-run with --verbose to capture the digest bytes sent to the signer
+  // and the signature bytes returned (logged by SignRemote). Comparing the
+  // sent-digest hex against SHA-of-canonical-SignedAttrs reconstructed from
+  // the bad CMS tells you which side corrupted: equal => server returned a
+  // bad signature, different => the client sent a wrong digest.
+  if not FCms.VerifyDetached(cmsDer, manifestBytes, signerCert) then
+    raise EPackageSigning.CreateFmt(
+      'Post-sign verification failed for "%s": the produced CMS signature ' +
+      'does not verify against the signed manifest bytes. The messageDigest ' +
+      'attribute is correct, so the manifest itself was hashed right, but ' +
+      'the signature value is wrong for the signer cert''s key. Re-running ' +
+      'the sign command usually succeeds. Re-run with --verbose for the ' +
+      'SignRemote self-check log lines (encoding hash, signature bytes, ' +
+      'signatureAlgorithm OID) to pinpoint which leg of the pipeline ' +
+      'corrupted.',
+      [ExtractFileName(packageFilePath)]);
+  FLogger.Verbose('  Local verify against signed manifest bytes: OK');
+
   // RFC3161 timestamp the CMS blob.
   timestampUrl := options.TimestampUrl;
   if timestampUrl = '' then
@@ -561,6 +590,7 @@ var
   embedded : TArray<ICertificate>;
   intermediates : array of ICertificate;
   i : integer;
+  embeddedSigner : ICertificate;
 begin
   result := false;
   FillChar(info, SizeOf(info), 0);
@@ -571,6 +601,28 @@ begin
   if not FCms.VerifyDetached(der, manifestBytes, signerCert) then
   begin
     info.FailureReason := 'CMS signature does not verify against manifest bytes';
+    // Surface the cert the CMS *claims* to be signed by, even though the
+    // signature is invalid. Without this, the verify output shows empty
+    // Signer / Thumbprint / SPKI and a user staring at "INVALID" has no way
+    // to know which cert produced the bad signature (and therefore which
+    // batch / signer to re-run).
+    try
+      decoded := FCms.Decode(der);
+      if decoded <> nil then
+      begin
+        embeddedSigner := decoded.SignerCertificate;
+        if embeddedSigner <> nil then
+        begin
+          info.SignerSubject := embeddedSigner.SubjectDistinguishedName;
+          info.Thumbprint := embeddedSigner.Thumbprint;
+          info.SignerSpkiHex := BytesToHex(embeddedSigner.SpkiHash(haSha256));
+        end;
+      end;
+    except
+      // Decode itself failed — leave signer fields blank; the FailureReason
+      // already tells the user the signature is invalid.
+      on Exception do ;
+    end;
     exit;
   end;
 

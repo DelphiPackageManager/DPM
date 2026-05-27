@@ -84,7 +84,6 @@ begin
   //This should just be an api call into the core, don't do all the work here!
   //just check for required args here.
 
-  Logger.Information('Pack Command invoked');
   if TPackOptions.Default.SpecFile = '' then
   begin
     Logger.Error('No Spec file provided!');

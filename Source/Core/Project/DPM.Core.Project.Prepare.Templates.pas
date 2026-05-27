@@ -37,21 +37,37 @@ type
   //pkDesign   : design-time package (DesignOnlyPackage=true; requires rtl, designide)
   TPrepareProjectKind = (pkRuntime, pkDesign);
 
+  //A single Pascal source file to include in the package. FormName is set when a
+  //matching .dfm file exists alongside the .pas (e.g. MyForm.pas + MyForm.dfm),
+  //and is the form's object identifier parsed from the .dfm's first line.
+  TPrepareSourceFile = record
+    Path : string;       //relative path from the package folder (e.g. ..\..\src\MyForm.pas)
+    FormName : string;   //form identifier, or '' when the unit has no associated .dfm
+  end;
+
   TPrepareTemplates = class
   public
     //Renders a minimal .dpk file. sourceFiles are relative paths from the package folder
     //(e.g. "..\..\Source\Unit1.pas") - one `contains` entry is emitted per file.
-    //Pass nil/empty to emit a TODO-placeholder.
+    //Pass nil/empty to emit a TODO-placeholder. Units with a non-empty FormName get
+    //a `{FormName}` annotation appended to the contains entry.
+    //requiredPackages are sibling package names (no extension) that this package
+    //requires - typically the runtime package(s) a design package depends on.
+    //Each is added to the `requires` clause and (for the dproj) emitted as a
+    //`<DCCReference Include="<name>.dcp"/>` entry. Pass nil/empty for none.
     class function RenderDpk(const packageId : string; const compiler : TCompilerVersion;
-                             const sourceFiles : IList<string>;
+                             const sourceFiles : IList<TPrepareSourceFile>;
+                             const requiredPackages : IList<string>;
                              const kind : TPrepareProjectKind) : string;
 
     //Renders a minimal .dproj file flavored for the supplied compiler. sourceFiles are
     //relative paths from the package folder - one `<DCCReference>` per file. Pass nil/empty
     //to emit just the rtl.dcp reference. platforms drives the per-platform Cfg_N_<Platform>
     //chain stubs and the BorlandProject <Platforms> list; pass [] to fall back to Win32.
+    //Units with a non-empty FormName get a child `<Form>FormName</Form>` element.
     class function RenderDproj(const packageId : string; const compiler : TCompilerVersion;
-                               const sourceFiles : IList<string>;
+                               const sourceFiles : IList<TPrepareSourceFile>;
+                               const requiredPackages : IList<string>;
                                const kind : TPrepareProjectKind;
                                const platforms : TDPMPlatforms) : string;
   end;
@@ -59,6 +75,7 @@ type
 implementation
 
 uses
+  System.Classes,
   System.SysUtils,
   System.StrUtils;
 
@@ -149,6 +166,7 @@ const
     '        <DCC_S>false</DCC_S>'#13#10 +
     '        <DCC_F>false</DCC_F>'#13#10 +
     '        <DCC_K>false</DCC_K>'#13#10 +
+    '        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>'#13#10 +
     '        <SanitizedProjectName>{{PACKAGE_ID}}</SanitizedProjectName>'#13#10 +
     '    </PropertyGroup>'#13#10 +
     '    <PropertyGroup Condition="''$(Cfg_1)''!=''''">'#13#10 +
@@ -209,42 +227,82 @@ begin
 end;
 
 class function TPrepareTemplates.RenderDpk(const packageId : string; const compiler : TCompilerVersion;
-                                            const sourceFiles : IList<string>;
+                                            const sourceFiles : IList<TPrepareSourceFile>;
+                                            const requiredPackages : IList<string>;
                                             const kind : TPrepareProjectKind) : string;
 var
   containsBlock : string;
   requiresBlock : string;
   i : integer;
-  relativePath : string;
+  entry : TPrepareSourceFile;
   unitName : string;
   separator : string;
+  formSuffix : string;
+  pasEntries : IList<TPrepareSourceFile>;
+  requiresLines : TStringList;
+  requireIdx : integer;
 begin
+  //The dpk `contains` clause only takes Pascal units (.pas). Filter to just those
+  //first so we know how many there are - that drives the separator (',' vs ';') for
+  //the last entry. Non-.pas files (.inc, .rc, .res) belong only in the dproj as
+  //DCCReferences, not in the dpk.
+  pasEntries := TCollections.CreateList<TPrepareSourceFile>;
+  if sourceFiles <> nil then
+    for i := 0 to sourceFiles.Count - 1 do
+      if SameText(ExtractFileExt(sourceFiles[i].Path), '.pas') then
+        pasEntries.Add(sourceFiles[i]);
+
   containsBlock := '';
-  if (sourceFiles = nil) or (sourceFiles.Count = 0) then
+  if pasEntries.Count = 0 then
     containsBlock := '  // TODO: add your units here, e.g. MyUnit in ''..\..\src\MyUnit.pas'';'#13#10 +
                      '  ;'
   else
   begin
-    for i := 0 to sourceFiles.Count - 1 do
+    for i := 0 to pasEntries.Count - 1 do
     begin
-      relativePath := sourceFiles[i];
-      unitName := ExtractUnitName(relativePath);
-      if i < sourceFiles.Count - 1 then
+      entry := pasEntries[i];
+      unitName := ExtractUnitName(entry.Path);
+      if i < pasEntries.Count - 1 then
         separator := ','
       else
         separator := ';';
-      containsBlock := containsBlock + '  ' + unitName + ' in ''' + relativePath + '''' + separator + #13#10;
+      //Form units get a {FormName} annotation between the path and the separator,
+      //matching the dpk syntax Delphi emits when a form is added in the IDE.
+      if entry.FormName <> '' then
+        formSuffix := ' {' + entry.FormName + '}'
+      else
+        formSuffix := '';
+      containsBlock := containsBlock + '  ' + unitName + ' in ''' + entry.Path + '''' + formSuffix + separator + #13#10;
     end;
     //trim trailing CRLF for cleaner output (template already adds the closing CRLF after).
     if (Length(containsBlock) >= 2) and (Copy(containsBlock, Length(containsBlock) - 1, 2) = #13#10) then
       SetLength(containsBlock, Length(containsBlock) - 2);
   end;
 
-  //design-time packages need designide for IDE registration to work.
-  case kind of
-    pkDesign  : requiresBlock := '  rtl,'#13#10'  designide;';
-  else //pkRuntime
-    requiresBlock := '  rtl;';
+  //Build the `requires` clause: always rtl; designide for design packages; plus
+  //any sibling packages (e.g. a design package that wraps a runtime package will
+  //list the runtime package's base name here). Last entry gets a semicolon, all
+  //others a comma.
+  requiresLines := TStringList.Create;
+  try
+    requiresLines.Add('rtl');
+    if kind = pkDesign then
+      requiresLines.Add('designide');
+    if requiredPackages <> nil then
+      for requireIdx := 0 to requiredPackages.Count - 1 do
+        if Trim(requiredPackages[requireIdx]) <> '' then
+          requiresLines.Add(requiredPackages[requireIdx]);
+
+    requiresBlock := '';
+    for requireIdx := 0 to requiresLines.Count - 1 do
+    begin
+      if requireIdx < requiresLines.Count - 1 then
+        requiresBlock := requiresBlock + '  ' + requiresLines[requireIdx] + ','#13#10
+      else
+        requiresBlock := requiresBlock + '  ' + requiresLines[requireIdx] + ';';
+    end;
+  finally
+    requiresLines.Free;
   end;
 
   result := cDpkTemplate;
@@ -352,9 +410,10 @@ begin
 end;
 
 class function TPrepareTemplates.RenderDproj(const packageId : string; const compiler : TCompilerVersion;
-                                              const sourceFiles : IList<string>;
-                                              const kind : TPrepareProjectKind;
-                                              const platforms : TDPMPlatforms) : string;
+                               const sourceFiles : IList<TPrepareSourceFile>;
+                               const requiredPackages : IList<string>;
+                               const kind : TPrepareProjectKind;
+                               const platforms : TDPMPlatforms) : string;
 var
   debugInfoRelease : string;
   projectGuid : string;
@@ -382,9 +441,26 @@ begin
   projectGuid := GUIDToString(newGuid);
 
   references := '';
+  //Required sibling packages come first as <name>.dcp DCCReferences (matches the
+  //order Delphi itself emits when a package is added via Project -> Information).
+  if requiredPackages <> nil then
+    for i := 0 to requiredPackages.Count - 1 do
+      if Trim(requiredPackages[i]) <> '' then
+        references := references + '        <DCCReference Include="' + requiredPackages[i] + '.dcp"/>'#13#10;
+
   if sourceFiles <> nil then
     for i := 0 to sourceFiles.Count - 1 do
-      references := references + '        <DCCReference Include="' + sourceFiles[i] + '"/>'#13#10;
+    begin
+      //Form units expand to a non-self-closing DCCReference with a child <Form>
+      //element so the IDE knows to bundle the matching .dfm at build time.
+      if sourceFiles[i].FormName <> '' then
+        references := references +
+          '        <DCCReference Include="' + sourceFiles[i].Path + '">'#13#10 +
+          '            <Form>' + sourceFiles[i].FormName + '</Form>'#13#10 +
+          '        </DCCReference>'#13#10
+      else
+        references := references + '        <DCCReference Include="' + sourceFiles[i].Path + '"/>'#13#10;
+    end;
 
   //defensive: never emit a dproj with zero <Platform> entries - that would prevent
   //the IDE from loading it. Caller logs the fallback when platforms = [].

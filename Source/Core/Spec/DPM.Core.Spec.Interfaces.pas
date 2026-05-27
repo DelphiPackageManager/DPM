@@ -168,6 +168,7 @@ type
     function GetProject : string;
     function GetPlatforms : TDPMPlatforms;
     function GetDefines : string;
+    function GetReferences : IList<string>;
 
     procedure SetProject(const value : string);
     procedure SetPlatforms(const value : TDPMPlatforms);
@@ -181,6 +182,9 @@ type
     property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
     /// <summary> Semicolon seprated list of compiler defines</summary>
     property Defines : string read GetDefines write SetDefines;
+    /// <summary> Package names this build package requires beyond rtl. Emitted by `dpm prepare` as `requires` entries in the dpk and `<DCCReference>` elements in the dproj. Not consumed at pack/install time. </summary>
+    property References : IList<string> read GetReferences;
+
   end;
 
   /// <summary>
@@ -191,6 +195,7 @@ type
     function GetProject : string;
     function GetDefines : string;
     function GetPlatforms : TDPMPlatforms;
+    function GetReferences : IList<string>;
 
     function GetLibSuffix : string;
     function GetLibPrefix : string;
@@ -211,6 +216,8 @@ type
     property Defines : string read GetDefines write SetDefines;
     /// <summary> Design-host platforms this entry supports. Empty = defer to the design dproj's enabled platforms. </summary>
     property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
+    /// <summary> Package names this design package requires beyond rtl/designide. Emitted by `dpm prepare` as `requires` entries in the dpk and `<DCCReference>` elements in the dproj. Not consumed at pack/install time. </summary>
+    property References : IList<string> read GetReferences;
 
     property LibSuffix : string read GetLibSuffix write SetLibSuffix;
     property LibPrefix : string read GetLibPrefix write SetLibPrefix;

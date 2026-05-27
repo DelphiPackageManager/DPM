@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -116,8 +116,6 @@ var
   specFile : string;
 begin
   TPrepareOptions.Default.ApplyCommon(TCommonOptions.Default);
-
-  Logger.Information('Prepare Command invoked');
 
   if not ResolveSpecFile(specFile) then
   begin
