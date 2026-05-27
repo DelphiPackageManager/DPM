@@ -19,11 +19,8 @@ begin
         propertysetname = DPMVersion
         propertyset.win32.info
         begin
-          legalcopyright = "© 2019 -2025 Vincent Parrett and Contributors"
-          linkproductversion = false
-          minorversion = 2
           name = DPMVersion
-          productname = "DPM IDE Support for Delphi13"
+          productversion = 0.0.0.0
           productversionstring = 0.2.0-alpha
         end
       end
@@ -1710,7 +1707,7 @@ begin
   variable
   begin
     canonicalizepath = true
-    defaultvalue = %FBPROJECTDIR%\\..\\OutputNew
+    defaultvalue = %FBPROJECTDIR%\\..\\Output
     ismacro = true
     name = OUTPUT_DIR
     variablescope = vtProject
