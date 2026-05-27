@@ -70,7 +70,7 @@ Name: AddToPath; Description: "Add dpm folder to PATH Environment variable"; Gro
 
 [Files]
 Source: "..\Output\dpm.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\Output\DSpecCreator.exe"; DestDir: "{app}"; Flags: ignoreversion
+; Source: "..\Output\DSpecCreator.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\Output\DPM.IDE.XE2.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : XE2
 Source: "..\Output\DPM.IDE.XE3.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : XE3
 Source: "..\Output\DPM.IDE.XE4.dll"; DestDir: "{app}"; Flags: ignoreversion; Components : XE4
@@ -118,7 +118,7 @@ Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\37.0\Experts x64"; ValueType: stri
 Name: startmenu; Description: Create &Start Menu Group;
 
 [Icons]
-Name: "{group}\DSpec Creator"; Filename: "{app}\DSpecCreator.exe"; WorkingDir: "{app}"; IconIndex: 0; Tasks: startmenu
+; Name: "{group}\DSpec Creator"; Filename: "{app}\DSpecCreator.exe"; WorkingDir: "{app}"; IconIndex: 0; Tasks: startmenu
 
 [Code]
 
