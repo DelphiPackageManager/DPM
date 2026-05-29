@@ -45,7 +45,7 @@ const
 
   cDefaultDPMFolder = '%APPDATA%\.dpm';
   cDefaultConfigFile = cDefaultDPMFolder + '\' + cDPMConfigFileName;
-  cDefaultPackageCache = cDefaultDPMFolder + '\packages';
+  cDefaultPackageCache = cDefaultDPMFolder + '\package_cache';
   cDPMPackageCacheEnviromentVar = 'DPMPACKAGECACHE';
 
   cTargetPlatformAttribute = 'targetPlatform';
