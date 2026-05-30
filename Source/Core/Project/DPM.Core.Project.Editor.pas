@@ -57,6 +57,17 @@ type
     FAppType : TAppType;
     FConfigurations : IDictionary<string, IProjectConfiguration>;
     FConfigNames : IList<string>;
+    //Set true only when a DOM write actually changes content. SaveProject skips the
+    //(re)format + disk write when this is false, so a no-op restore does not rewrite the dproj.
+    FModified : boolean;
+    //Guarded DOM writers - only mutate (and mark modified) when the value actually differs.
+    procedure SetElementText(const element : IXMLDOMElement; const value : string);
+    procedure SetElementAttr(const element : IXMLDOMElement; const name : string; const value : string);
+    //Structural compare of the existing PackageReference DOM against the resolved graph - lets
+    //UpdatePackageReferences skip the remove/rebuild (and leave FModified false) when unchanged.
+    //Compares semantic attributes only, so pretty-print whitespace never reads as a difference.
+    function PackageRefElementMatches(const element : IXMLDOMElement; const reference : IPackageReference) : boolean;
+    function PackageRefsMatch(const parentElement : IXMLDOMElement; const references : IEnumerable<IPackageReference>) : boolean;
   protected
     function GetOutputElementName : string;
 
@@ -104,6 +115,7 @@ uses
   System.Classes,
   System.SysUtils,
   System.StrUtils,
+  System.Variants,
   DPM.Core.Constants,
   DPM.Core.Utils.Xml,
   DPM.Core.Dependency.Version,
@@ -152,6 +164,32 @@ end;
 
 { TProjectEditor }
 
+procedure TProjectEditor.SetElementText(const element : IXMLDOMElement; const value : string);
+begin
+  if element = nil then
+    exit;
+  if element.text <> value then
+  begin
+    element.text := value;
+    FModified := true;
+  end;
+end;
+
+procedure TProjectEditor.SetElementAttr(const element : IXMLDOMElement; const name : string; const value : string);
+var
+  current : OleVariant;
+begin
+  if element = nil then
+    exit;
+  current := element.getAttribute(name);
+  //getAttribute returns Null when the attribute is absent; VarToStr maps that to ''.
+  if VarIsNull(current) or (VarToStr(current) <> value) then
+  begin
+    element.setAttribute(name, value);
+    FModified := true;
+  end;
+end;
+
 function TProjectEditor.AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string> ; const packageCacheLocation : string) : boolean;
 var
   dpmGroup : IXMLDOMElement;
@@ -181,15 +219,16 @@ begin
   begin
     dpmSearchElement := FProjectXML.createNode(NODE_ELEMENT, 'DPMSearch', msbuildNamespace) as IXMLDOMElement;
     dpmGroup.appendChild(dpmSearchElement);
+    FModified := true;
   end;
-  dpmSearchElement.setAttribute('Condition', condition);
+  SetElementAttr(dpmSearchElement, 'Condition', condition);
 
   for searchPath in searchPaths do
   begin
     searchPathString := searchPathString + '$(DPM)\' + searchPath + ';'
   end;
 
-  dpmSearchElement.text := searchPathString;
+  SetElementText(dpmSearchElement, searchPathString);
 
 
 
@@ -204,6 +243,7 @@ begin
   FPackageRefences := nil;
   FConfigurations := TCollections.CreateDictionary <string, IProjectConfiguration> ;
   FConfigNames := TCollections.CreateList<string>;
+  FModified := false;
 end;
 
 function TProjectEditor.GetPackageReferences : IPackageReference;
@@ -257,6 +297,7 @@ begin
     dccSearchElement := FProjectXML.createNode(NODE_ELEMENT, 'DCC_UnitSearchPath', msbuildNamespace) as IXMLDOMElement;
     dccSearchElement.text := '$(DPMSearch);$(DCC_UnitSearchPath)';
     baseElement.appendChild(dccSearchElement);
+    FModified := true;
   end
   else
   begin
@@ -264,7 +305,7 @@ begin
     searchPath := StringReplace(dccSearchElement.text, '$(DPMSearch);', '', [rfReplaceAll]);
     searchPath := StringReplace(searchPath, '$(DPMSearch)', '', [rfReplaceAll]);
     searchPath := '$(DPMSearch);' + searchPath;
-    dccSearchElement.text := searchPath;
+    SetElementText(dccSearchElement, searchPath);
   end;
   result := true;
 end;
@@ -291,6 +332,7 @@ begin
     projectVersionGroup := xmlElement.parentNode as IXMLDOMElement;
     result := FProjectXML.createNode(NODE_ELEMENT, 'PropertyGroup', msbuildNamespace) as IXMLDOMElement;
     FProjectXML.documentElement.insertBefore(result, projectVersionGroup.nextSibling);
+    FModified := true;
   end
   else
     result := dpmElement.parentNode as IXMLDOMElement;
@@ -300,8 +342,9 @@ begin
   begin
     dpmCompilerElement := FProjectXML.createNode(NODE_ELEMENT, 'DPMCompiler', msbuildNamespace) as IXMLDOMElement;
     result.appendChild(dpmCompilerElement);
+    FModified := true;
   end;
-  dpmCompilerElement.text := CompilerToString(FCompiler);
+  SetElementText(dpmCompilerElement, CompilerToString(FCompiler));
 
 
   dpmCondition := result.selectSingleNode('x:DPMCache[@Condition != '''']') as IXMLDOMElement;
@@ -309,14 +352,15 @@ begin
   begin
     dpmCondition := FProjectXML.createNode(NODE_ELEMENT, 'DPMCache', msbuildNamespace) as IXMLDOMElement;
     result.appendChild(dpmCondition);
+    FModified := true;
   end;
-  dpmCondition.setAttribute('Condition', '''$(DPMCache)'' == ''''');
+  SetElementAttr(dpmCondition, 'Condition', '''$(DPMCache)'' == ''''');
   if FConfig.IsDefaultPackageCacheLocation then
-    dpmCondition.text := StringReplace(cDefaultPackageCache, '%APPDATA%', '$(APPDATA)', [rfIgnoreCase]) //
+    SetElementText(dpmCondition, StringReplace(cDefaultPackageCache, '%APPDATA%', '$(APPDATA)', [rfIgnoreCase])) //
   else
   begin
     //see if we can covert this to a relative path
-    dpmCondition.text := FConfig.PackageCacheLocation;
+    SetElementText(dpmCondition, FConfig.PackageCacheLocation);
   end;
 
   dpmElement := result.selectSingleNode('x:DPM') as IXMLDOMElement;
@@ -324,10 +368,11 @@ begin
   begin
     dpmElement := FProjectXML.createNode(NODE_ELEMENT, 'DPM', msbuildNamespace) as IXMLDOMElement;
     result.appendChild(dpmElement);
+    FModified := true;
   end;
   //One package folder per compiler now contains all platforms - no $(Platform) segment.
   //Per-platform paths are formed by appending \$(Platform) to the lib folder where applicable.
-  dpmElement.text := '$(DPMCache)\$(DPMCompiler)';
+  SetElementText(dpmElement, '$(DPMCache)\$(DPMCompiler)');
 
 end;
 
@@ -770,6 +815,8 @@ begin
     (FProjectXML as IXMLDOMDocument2).setProperty('SelectionNamespaces', 'xmlns:x=''http://schemas.microsoft.com/developer/msbuild/2003''');
 
     result := InternalLoadFromXML(elements);
+    //freshly loaded document is in sync with disk - any later guarded write flips this.
+    FModified := false;
   except
     on e : Exception do
     begin
@@ -906,7 +953,7 @@ begin
         sList.Delete(i);
       end;
     end;
-    dpmSearchElement.text := sList.DelimitedText;
+    SetElementText(dpmSearchElement, sList.DelimitedText);
 
   finally
     sList.Free;
@@ -918,6 +965,7 @@ begin
   FProjectXML := nil;
   FCompiler := TCompilerVersion.UnknownVersion;
   FPlatforms := [];
+  FModified := false;
 end;
 
 
@@ -938,6 +986,16 @@ begin
   else
     projectFileName := FFileName;
 
+  //Nothing changed in the DOM since load/last save and we are writing back to the same file -
+  //skip the (re)format + disk write entirely. This is the common warm-restore no-op case.
+  //An explicit target filename (save-as) always writes.
+  if (filename = '') and (not FModified) then
+  begin
+    FLogger.Debug('Project [' + projectFileName + '] unchanged - skipping save.');
+    result := true;
+    exit;
+  end;
+
   //TODO : Apply package references.
 
 
@@ -945,6 +1003,7 @@ begin
     TXMLUtils.PrettyFormatXML(FProjectXML.documentElement, 4);
 
     FProjectXML.save(projectFileName);
+    FModified := false;
     result := true;
   except
     on e : Exception do
@@ -960,6 +1019,68 @@ begin
   FCompiler := value;
 
 
+end;
+
+function TProjectEditor.PackageRefElementMatches(const element : IXMLDOMElement; const reference : IPackageReference) : boolean;
+begin
+  result := false;
+  if VarToStr(element.getAttribute('id')) <> reference.Id then
+    exit;
+  if VarToStr(element.getAttribute('version')) <> reference.Version.ToStringNoMeta then
+    exit;
+  //range/useSource/manifestHash are only written when meaningful - so an absent attribute must
+  //match a default-valued reference, and a present attribute must match the written value.
+  if reference.VersionRange.IsEmpty then
+  begin
+    if not VarIsNull(element.getAttribute('range')) then
+      exit;
+  end
+  else if VarToStr(element.getAttribute('range')) <> reference.VersionRange.ToString then
+    exit;
+
+  if reference.UseSource then
+  begin
+    if VarToStr(element.getAttribute('useSource')) <> 'true' then
+      exit;
+  end
+  else if not VarIsNull(element.getAttribute('useSource')) then
+    exit;
+
+  if reference.ManifestHash <> '' then
+  begin
+    if VarToStr(element.getAttribute('manifestHash')) <> reference.ManifestHash then
+      exit;
+  end
+  else if not VarIsNull(element.getAttribute('manifestHash')) then
+    exit;
+
+  if reference.HasChildren then
+    result := PackageRefsMatch(element, reference.Children)
+  else
+    result := element.selectNodes('x:PackageReference').length = 0;
+end;
+
+function TProjectEditor.PackageRefsMatch(const parentElement : IXMLDOMElement; const references : IEnumerable<IPackageReference>) : boolean;
+var
+  childElements : IXMLDOMNodeList;
+  reference : IPackageReference;
+  childElement : IXMLDOMElement;
+  i : integer;
+begin
+  result := false;
+  childElements := parentElement.selectNodes('x:PackageReference');
+  i := 0;
+  for reference in references do
+  begin
+    if i >= childElements.length then
+      exit;
+    childElement := childElements.item[i] as IXMLDOMElement;
+    if not PackageRefElementMatches(childElement, reference) then
+      exit;
+    Inc(i);
+  end;
+  //the graph and the DOM must have exactly the same number of refs at this level
+  result := i = childElements.length;
 end;
 
 procedure TProjectEditor.UpdatePackageReferences(const dependencyGraph: IPackageReference);
@@ -1008,10 +1129,17 @@ begin
   begin
     dpmElement := FProjectXML.createNode(NODE_ELEMENT, 'DPM', msbuildNamespace) as IXMLDOMElement;
     projectExtensionsElement.appendChild(dpmElement);
+    FModified := true;
   end;
 
   // Find or create the Packages element
   packagesElement := dpmElement.selectSingleNode('x:Packages') as IXMLDOMElement;
+
+  //If the existing Packages element already represents this exact graph there is nothing to do -
+  //skip the remove/rebuild churn and leave FModified untouched so SaveProject can skip the write.
+  if (packagesElement <> nil) and PackageRefsMatch(packagesElement, dependencyGraph.Children) then
+    exit;
+
   if packagesElement <> nil then
   begin
     // Remove existing package references
@@ -1028,6 +1156,9 @@ begin
   // Write all top-level package references
   for topLevelReference in dependencyGraph.Children do
     WritePackageRef(packagesElement, topLevelReference);
+
+  //We only reach here when the graph differs from the DOM (or there was no Packages element).
+  FModified := true;
 end;
 
 end.
