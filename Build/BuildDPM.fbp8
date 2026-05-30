@@ -89,7 +89,7 @@ begin
       end
       action.group
       begin
-        description = "Build Tests - 12.0"
+        description = "Build Tests - 13.0"
         id = {6BFDB7C5-1968-4220-9E27-9899822374AA}
         action.continua.set-buildstatus
         begin
@@ -117,7 +117,7 @@ begin
           terminateontimeout = true
           timeoutlength = 2
           as.projectpath = %SRC_ROOT%\\DPM.Core.Tests.dproj
-          as.compilerversion = 12.0
+          as.compilerversion = 13.0
           as.verbosity = Debug
           as.nobanner = True
         end
@@ -135,7 +135,7 @@ begin
           compileridl = true
           configname = Release
           debugversionnumbers = false
-          delphiversion = Delphi12
+          delphiversion = Delphi13
           enabletimeout = false
           eurekalogverboselogging = false
           frameworktype = VCL
@@ -357,7 +357,7 @@ begin
           terminateontimeout = true
           timeoutlength = 2
           as.projectpath = %SRC_ROOT%\\dpm.dproj
-          as.compilerversion = 12.0
+          as.compilerversion = 13.0
           as.verbosity = Debug
           as.nobanner = True
         end
@@ -375,7 +375,7 @@ begin
           compileridl = true
           configname = Release
           debugversionnumbers = false
-          delphiversion = Delphi12
+          delphiversion = Delphi13
           enabletimeout = false
           eurekalogverboselogging = false
           frameworktype = VCL
