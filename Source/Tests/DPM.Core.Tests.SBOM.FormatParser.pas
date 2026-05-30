@@ -89,10 +89,10 @@ var
   formats : TSBOMFormats;
 begin
   formats := StringToSBOMFormats('');
-  //Default must include the two machine-readable JSON formats - changing this
-  //is a breaking change for callers that rely on -format omission.
-  Assert.IsTrue(formats = [TSBOMFormat.CycloneDX, TSBOMFormat.SPDX],
-                'default formats should be CycloneDX + SPDX');
+  //Default is CycloneDX only - changing this is a breaking change for callers
+  //that rely on -format omission. Use 'both' to also emit SPDX.
+  Assert.IsTrue(formats = [TSBOMFormat.CycloneDX],
+                'default format should be CycloneDX');
 end;
 
 procedure TSBOMFormatParserTests.WhitespaceTolerated;

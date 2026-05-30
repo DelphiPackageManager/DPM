@@ -42,6 +42,8 @@ type
     FApiKey : string;
     FTimeout : integer;
     FSkipDuplicate : boolean;
+    FMaxRetries : integer;
+    FRetryDelay : integer;
 
     class var
       FDefault : TPushOptions;
@@ -55,6 +57,10 @@ type
     property SkipDuplicate : boolean read FSkipDuplicate write FSkipDuplicate;
     property Source : string read FSource write FSource;
     property Timeout : integer read FTimeout write FTimeout;
+    //Number of additional attempts after the first when the server is rate-limiting (429) or temporarily unavailable (502/503/504). 0 disables retry.
+    property MaxRetries : integer read FMaxRetries write FMaxRetries;
+    //Base delay in seconds between retries when the server does not send a Retry-After header. Backoff is exponential with jitter.
+    property RetryDelay : integer read FRetryDelay write FRetryDelay;
   end;
 
 
@@ -66,6 +72,8 @@ constructor TPushOptions.Create;
 begin
   inherited;
   FTimeout := -1;
+  FMaxRetries := 3;
+  FRetryDelay := 2;
 end;
 
 class constructor TPushOptions.CreateDefault;

@@ -31,6 +31,7 @@ interface
 uses
   Generics.Defaults,
   VSoft.CancellationToken,
+  VSoft.HttpClient,
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
@@ -70,6 +71,9 @@ type
     function GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId: string; const packageVersion: string; const compilerVersion: TCompilerVersion): IPackageSearchResultItem;
 
 
+    function IsRetryableStatus(const statusCode : integer) : boolean;
+    function ComputeRetryDelayMs(const response : IHttpResponse; const attempt : integer; const baseSeconds : integer) : Cardinal;
+
     //commands
     function Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions) : Boolean;
 
@@ -84,9 +88,9 @@ uses
   System.SysUtils,
   System.IOUtils,
   System.Classes,
+  System.SyncObjs,
   System.Diagnostics,
   JsonDataObjects,
-  VSoft.HttpClient,
   VSoft.URI,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec,
@@ -1088,6 +1092,62 @@ begin
 end;
 
 
+function TDPMServerPackageRepository.IsRetryableStatus(const statusCode : integer) : boolean;
+begin
+  //429 = Too Many Requests (rate limiting), 502/503/504 = transient gateway/unavailable errors.
+  result := (statusCode = 429) or (statusCode = 502) or (statusCode = 503) or (statusCode = 504);
+end;
+
+function TDPMServerPackageRepository.ComputeRetryDelayMs(const response : IHttpResponse; const attempt : integer; const baseSeconds : integer) : Cardinal;
+const
+  cMaxRetryDelaySeconds = 60;
+  cMinRetryDelayMs = 1000;
+var
+  retryAfter : string;
+  retryAfterSeconds : integer;
+  delaySeconds : integer;
+  delayMs : Int64;
+  exponent : integer;
+begin
+  delaySeconds := -1;
+
+  //Honor the server's Retry-After header when it is the common integer-seconds form.
+  //The HTTP-date form is not parsed here - we fall back to exponential backoff for it.
+  retryAfter := Trim(response.Headers.Values['Retry-After']);
+  if retryAfter <> '' then
+  begin
+    retryAfterSeconds := StrToIntDef(retryAfter, -1);
+    if retryAfterSeconds >= 0 then
+      delaySeconds := retryAfterSeconds;
+  end;
+
+  if delaySeconds < 0 then
+  begin
+    //Exponential backoff : baseSeconds * 2^(attempt-1).
+    exponent := attempt - 1;
+    if exponent < 0 then
+      exponent := 0;
+    //Cap the exponent so the shift cannot overflow before clamping below.
+    if exponent > 16 then
+      exponent := 16;
+    delaySeconds := baseSeconds * (1 shl exponent);
+  end;
+
+  if delaySeconds > cMaxRetryDelaySeconds then
+    delaySeconds := cMaxRetryDelaySeconds;
+
+  delayMs := Int64(delaySeconds) * 1000;
+
+  //Add jitter (up to 1s) to avoid a thundering herd when no Retry-After was given.
+  if retryAfter = '' then
+    delayMs := delayMs + Random(1000);
+
+  if delayMs < cMinRetryDelayMs then
+    delayMs := cMinRetryDelayMs;
+
+  result := Cardinal(delayMs);
+end;
+
 function TDPMServerPackageRepository.Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions): Boolean;
 var
   httpClient : IHttpClient;
@@ -1103,6 +1163,8 @@ var
   status : string;
   statusUrl : string;
   errorMsg : string;
+  attempt : integer;
+  delayMs : Cardinal;
 begin
   result := false;
   if pushOptions.ApiKey = '' then
@@ -1140,17 +1202,37 @@ begin
   //todo: Add BaseUri to Uri class
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
 
-  // WithBody(stream, true) transfers stream ownership to the request.
-  fileStream := TFileStream.Create(pushOptions.PackagePath, fmOpenRead or fmShareDenyWrite);
-  request := httpClient.CreateRequest(uri.AbsolutePath)
-                       .WithHeader(cUserAgentHeader, cDPMUserAgent)
-                       .WithHeader(cClientVersionHeader, cDPMClientVersion)
-                       .WithHeader('X-ApiKey', pushOptions.ApiKey)
-                       .WithHeader('X-DPM-Filename', fileName)
-                       .WithContentType('application/octet-stream')
-                       .WithBody(fileStream, true);
+  attempt := 0;
+  repeat
+    if cancellationToken.IsCancelled then
+      exit;
 
-  response := httpClient.Put(request, cancellationToken);
+    // (Re)create the body stream and request inside the loop - WithBody(stream, true)
+    // transfers stream ownership and the stream is consumed by the PUT, so it cannot be reused on retry.
+    fileStream := TFileStream.Create(pushOptions.PackagePath, fmOpenRead or fmShareDenyWrite);
+    request := httpClient.CreateRequest(uri.AbsolutePath)
+                         .WithHeader(cUserAgentHeader, cDPMUserAgent)
+                         .WithHeader(cClientVersionHeader, cDPMClientVersion)
+                         .WithHeader('X-ApiKey', pushOptions.ApiKey)
+                         .WithHeader('X-DPM-Filename', fileName)
+                         .WithContentType('application/octet-stream')
+                         .WithBody(fileStream, true);
+
+    response := httpClient.Put(request, cancellationToken);
+
+    if IsRetryableStatus(response.StatusCode) and (attempt < pushOptions.MaxRetries) then
+    begin
+      Inc(attempt);
+      delayMs := ComputeRetryDelayMs(response, attempt, pushOptions.RetryDelay);
+      Logger.Warning(Format('Push got [%d] from server, retrying in %d s (attempt %d of %d)...',
+        [response.StatusCode, delayMs div 1000, attempt, pushOptions.MaxRetries]));
+      //cancellable wait - returns wrSignaled if the token is cancelled during the wait.
+      if cancellationToken.WaitFor(delayMs) = wrSignaled then
+        exit;
+      Continue;
+    end;
+    Break;
+  until False;
 
   case response.StatusCode of
     202:
@@ -1238,6 +1320,10 @@ begin
     Logger.Error(Format('Push failed [%d] : %s', [response.StatusCode, errorMsg]));
   end;
 end;
+
+initialization
+  //seed the RNG so retry backoff jitter varies between processes (avoids a thundering herd).
+  Randomize;
 
 end.
 
