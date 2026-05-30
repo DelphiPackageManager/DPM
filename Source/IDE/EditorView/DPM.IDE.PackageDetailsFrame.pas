@@ -103,6 +103,7 @@ type
     {$ENDIF}
 
     FConfiguration : IConfiguration;
+    FConfigurationManager : IConfigurationManager;
     FPackageCache : IPackageCache;
     FReceiptService : IReceiptService;
     // IDE-2: programmatic signing-status badge that sits above the version
@@ -170,6 +171,7 @@ type
     procedure SigningLabelClick(Sender : TObject);
     procedure SigningLabelPaint(Sender : TObject);
     procedure UpdateSigningBadge(const package : IPackageSearchResultItem);
+    procedure AddCurrentSignerToTrustedPublishers;
 
     //versions cache
     function TryGetCachedVersions(const Id : string; const includePrerelease : boolean; out versions : IList<TPackageVersion>) : boolean;
@@ -206,8 +208,10 @@ uses
   DPM.IDE.Constants,
   DPM.Core.Utils.Strings,
   DPM.Core.Utils.System,
+  DPM.Core.Utils.Config,
   DPM.Core.Package.Classes,
   DPM.Core.Package.SearchResults,
+  DPM.Core.Configuration.Classes,
   DPM.Core.Dependency.Interfaces;
 { TGroupPackageDetailsFrame }
 
@@ -607,6 +611,7 @@ begin
   FRespositoryManager := container.Resolve<IPackageRepositoryManager>;
   FPackageCache := container.Resolve<IPackageCache>;
   FReceiptService := container.Resolve<IReceiptService>;
+  FConfigurationManager := container.Resolve<IConfigurationManager>;
   FHost := host;
   SetPackage(nil, FIncludePreRelease);
 
@@ -776,10 +781,140 @@ procedure TPackageDetailsFrame.SigningLabelClick(Sender : TObject);
 begin
   if FCurrentBadge.Detail = '' then
     exit;
+  // When the package is signed by an untrusted publisher and we have the
+  // author SPKI, offer to add that publisher to the trusted publishers list
+  // rather than just showing the details. Plain MessageDlg keeps this
+  // version-portable.
+  if (FCurrentBadge.State = sbsUntrustedPublisher) and (FCurrentBadge.SignerSpkiHex <> '') then
+  begin
+    if MessageDlg(FCurrentBadge.Caption + sLineBreak + sLineBreak +
+                  FCurrentBadge.Detail + sLineBreak + sLineBreak +
+                  'Add this publisher to your trusted publishers?',
+                  mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+      AddCurrentSignerToTrustedPublishers;
+    exit;
+  end;
   // Plain MessageDlg keeps this version-portable. A proper dedicated form
   // is a follow-up if/when we want richer formatting.
   MessageDlg(FCurrentBadge.Caption + sLineBreak + sLineBreak +
              FCurrentBadge.Detail, mtInformation, [mbOK], 0);
+end;
+
+procedure TPackageDetailsFrame.AddCurrentSignerToTrustedPublishers;
+
+  // Normalise an SPKI for comparison: strip a 'sha256:' prefix and lowercase,
+  // mirroring NormHex in DPM.Core.Trust.Policy so an IDE-added entry dedupes
+  // against a CLI entry stored without the prefix.
+  function NormaliseSpki(const value : string) : string;
+  begin
+    result := LowerCase(Trim(value));
+    if (Length(result) > 7) and (Copy(result, 1, 7) = 'sha256:') then
+      result := Copy(result, 8, MaxInt);
+  end;
+
+var
+  configPath : string;
+  config : IConfiguration;
+  signing : ISigningConfig;
+  publisher : ITrustedPublisherConfig;
+  publisherName : string;
+  spkiToStore : string;
+  target : string;
+  i : integer;
+  found : boolean;
+  textSize : TSize;
+begin
+  if (FCurrentBadge.State <> sbsUntrustedPublisher) or (FCurrentBadge.SignerSpkiHex = '') then
+    exit;
+
+  publisherName := FCurrentBadge.SignerName;
+  if publisherName = '' then
+    publisherName := 'Unknown publisher';
+
+  FConfigurationManager.EnsureDefaultConfig;
+  configPath := TConfigUtils.GetDefaultConfigFileName;
+  config := FConfigurationManager.LoadConfig(configPath);
+  if config = nil then
+  begin
+    FLogger.Error('Could not load configuration file to add trusted publisher.');
+    exit;
+  end;
+  signing := config.Signing;
+
+  spkiToStore := 'sha256:' + LowerCase(Trim(FCurrentBadge.SignerSpkiHex));
+  target := NormaliseSpki(spkiToStore);
+
+  // Dedupe against any existing entry (CLI or IDE added). If found, just
+  // refresh the display name; otherwise add a new entry.
+  found := false;
+  for i := 0 to signing.TrustedPublishers.Count - 1 do
+  begin
+    if NormaliseSpki(signing.TrustedPublishers[i].Spki) = target then
+    begin
+      signing.TrustedPublishers[i].Name := publisherName;
+      found := true;
+      break;
+    end;
+  end;
+  if not found then
+  begin
+    publisher := TTrustedPublisherConfig.Create;
+    publisher.Name := publisherName;
+    publisher.Spki := spkiToStore;
+    signing.TrustedPublishers.Add(publisher);
+  end;
+
+  if not FConfigurationManager.SaveConfig(config, configPath) then
+  begin
+    FLogger.Error('Failed to save configuration when adding trusted publisher.');
+    exit;
+  end;
+  FLogger.Information('Added trusted publisher: ' + publisherName + '  ' + spkiToStore);
+
+  // Keep the in-memory session config in sync so re-selecting this package
+  // (which re-resolves the badge against FConfiguration) doesn't revert to the
+  // amber 'not pinned' state. The on-disk default config saved above remains
+  // the source of truth for the installer / CLI.
+  if (FConfiguration <> nil) and (FConfiguration.Signing <> nil) then
+  begin
+    found := false;
+    for i := 0 to FConfiguration.Signing.TrustedPublishers.Count - 1 do
+    begin
+      if NormaliseSpki(FConfiguration.Signing.TrustedPublishers[i].Spki) = target then
+      begin
+        FConfiguration.Signing.TrustedPublishers[i].Name := publisherName;
+        found := true;
+        break;
+      end;
+    end;
+    if not found then
+    begin
+      publisher := TTrustedPublisherConfig.Create;
+      publisher.Name := publisherName;
+      publisher.Spki := spkiToStore;
+      FConfiguration.Signing.TrustedPublishers.Add(publisher);
+    end;
+  end;
+
+  // Reflect the change on the badge immediately. The publisher is now pinned,
+  // so the badge goes green to match what a re-resolve against the (now
+  // updated) trusted-publishers list would produce.
+  FCurrentBadge.State := sbsSignedTrusted;
+  if FCurrentBadge.SignerName <> '' then
+    FCurrentBadge.Caption := 'Signed by ' + FCurrentBadge.SignerName
+  else
+    FCurrentBadge.Caption := 'Signed by trusted publisher';
+  FCurrentBadge.AccentColor := $00207020;   // green
+  if FSigningLabel <> nil then
+  begin
+    textSize := FSigningLabel.Canvas.TextExtent(FCurrentBadge.Caption);
+    FSigningLabel.Width := textSize.cx + 2;
+    FSigningLabel.Height := textSize.cy;
+    FSigningLabel.Invalidate;
+  end;
+
+  MessageDlg('Added "' + publisherName + '" to your trusted publishers.',
+             mtInformation, [mbOK], 0);
 end;
 
 procedure TPackageDetailsFrame.SigningLabelPaint(Sender : TObject);
@@ -809,15 +944,29 @@ procedure TPackageDetailsFrame.UpdateSigningBadge(const package : IPackageSearch
 var
   badge : TSigningBadge;
   textSize : TSize;
+  trustedSpkis : TArray<string>;
+  i : integer;
 begin
   if (package = nil) or (FSigningLabel = nil) then
     exit;
+  // Collect the user's trusted-publisher SPKIs so the badge can distinguish a
+  // publisher you've pinned (green) from a valid author signature you haven't
+  // (amber + the add action). In permissive mode the receipt records 'trusted'
+  // for any valid author signature regardless of your trusted-publishers list,
+  // so this pin check is what surfaces the add-to-trusted-publishers action.
+  SetLength(trustedSpkis, 0);
+  if (FConfiguration <> nil) and (FConfiguration.Signing <> nil) then
+  begin
+    SetLength(trustedSpkis, FConfiguration.Signing.TrustedPublishers.Count);
+    for i := 0 to FConfiguration.Signing.TrustedPublishers.Count - 1 do
+      trustedSpkis[i] := FConfiguration.Signing.TrustedPublishers[i].Spki;
+  end;
   // Pass the gallery-reported signing fields through. When the package
   // hasn't been installed yet there's no local receipt, but the feed
   // already carries isSigned/signedBy — the badge falls back to those so
   // the user sees the signer name before they install.
   badge := TSigningBadgeResolver.Resolve(FPackageCache, FReceiptService, package.Id, package.Version, IDECompilerVersion,
-                                          package.IsSigned, package.SignedBy);
+                                          package.IsSigned, package.SignedBy, trustedSpkis);
   FCurrentBadge := badge;
   // Size the paint box to fit the caption. Canvas.Font inherits from the
   // paint box's font, which inherits from the parent frame via ParentFont

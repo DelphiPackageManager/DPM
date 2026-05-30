@@ -63,9 +63,32 @@ type
     // resolver stays Core-friendly (no Vcl.Graphics dep), the IDE casts
     // this to TColor at the consumer.
     AccentColor : Cardinal;
+    // Author-role signer details, surfaced so the IDE can offer an
+    // "add to trusted publishers" action without re-reading the receipt.
+    // Populated for the signed (trusted / untrusted-publisher) states;
+    // empty otherwise. SignerSpkiHex is raw hex (no 'sha256:' prefix).
+    SignerSpkiHex : string;
+    SignerName    : string;
   end;
 
   TSigningBadgeResolver = record
+  private
+    /// <summary>
+    /// Shared implementation. When applyPinCheck is true, a 'trusted' receipt
+    /// whose author signer is NOT in trustedPublisherSpkis is rendered as
+    /// sbsUntrustedPublisher (so the IDE can offer to pin the publisher) —
+    /// because in permissive mode the receipt records 'trusted' for any valid
+    /// author signature regardless of the user's trusted-publishers list.
+    /// </summary>
+    class function ResolveCore(const cache : IPackageCache;
+                               const receiptService : IReceiptService;
+                               const id : string;
+                               const version : TPackageVersion;
+                               const compiler : TCompilerVersion;
+                               const gallerySigned : boolean;
+                               const gallerySignedBy : string;
+                               const trustedPublisherSpkis : TArray<string>;
+                               const applyPinCheck : boolean) : TSigningBadge; static;
   public
     /// <summary>
     /// Reads the verification receipt for a given (id, version, compiler)
@@ -87,6 +110,21 @@ type
                            const id : string;
                            const version : TPackageVersion;
                            const compiler : TCompilerVersion) : TSigningBadge; overload; static;
+    /// <summary>
+    /// Pin-aware overload. Pass the user's trusted-publisher SPKIs (each may
+    /// be raw hex or 'sha256:'-prefixed). A package whose author signature is
+    /// valid but whose signer SPKI is not in the list is shown as
+    /// sbsUntrustedPublisher so the caller can offer to add the publisher,
+    /// even when the receipt records a permissive 'trusted' decision.
+    /// </summary>
+    class function Resolve(const cache : IPackageCache;
+                           const receiptService : IReceiptService;
+                           const id : string;
+                           const version : TPackageVersion;
+                           const compiler : TCompilerVersion;
+                           const gallerySigned : boolean;
+                           const gallerySignedBy : string;
+                           const trustedPublisherSpkis : TArray<string>) : TSigningBadge; overload; static;
   end;
 
 implementation
@@ -133,6 +171,62 @@ begin
     result := Copy(result, 2, Length(result) - 2);
 end;
 
+// Pull the author-role signer's SPKI and a display name out of the receipt.
+// Trusted publishers are matched against the *author* signature's SPKI, so we
+// deliberately ignore repository signatures here. Display name is the CN,
+// falling back to the raw subject when no CN parses.
+procedure ExtractAuthorSigner(const receipt : TVerificationReceipt;
+                              out spkiHex : string; out name : string);
+var
+  i : integer;
+begin
+  spkiHex := '';
+  name := '';
+  for i := 0 to High(receipt.Signatures) do
+  begin
+    if SameText(receipt.Signatures[i].Role, 'author') then
+    begin
+      spkiHex := receipt.Signatures[i].SignerSpkiHex;
+      name := ExtractCommonName(receipt.Signatures[i].SignerSubject);
+      if name = '' then
+        name := receipt.Signatures[i].SignerSubject;
+      exit;
+    end;
+  end;
+end;
+
+// Normalise an SPKI for comparison: strip a 'sha256:' prefix, spaces and
+// colons, then lowercase. Mirrors NormHex in DPM.Core.Trust.Policy so a raw
+// receipt SPKI compares equal to a 'sha256:'-prefixed config entry.
+function NormSpki(const value : string) : string;
+var
+  i : integer;
+begin
+  result := LowerCase(Trim(value));
+  if (Length(result) > 7) and (Copy(result, 1, 7) = 'sha256:') then
+    result := Copy(result, 8, MaxInt);
+  for i := Length(result) downto 1 do
+    if (result[i] = ' ') or (result[i] = ':') then
+      Delete(result, i, 1);
+end;
+
+function SpkiInList(const spkiHex : string; const list : TArray<string>) : boolean;
+var
+  target : string;
+  i : integer;
+begin
+  result := false;
+  if spkiHex = '' then
+    exit;
+  target := NormSpki(spkiHex);
+  for i := 0 to High(list) do
+    if NormSpki(list[i]) = target then
+    begin
+      result := true;
+      exit;
+    end;
+end;
+
 class function TSigningBadgeResolver.Resolve(const cache : IPackageCache;
                                               const receiptService : IReceiptService;
                                               const id : string;
@@ -149,6 +243,33 @@ class function TSigningBadgeResolver.Resolve(const cache : IPackageCache;
                                               const compiler : TCompilerVersion;
                                               const gallerySigned : boolean;
                                               const gallerySignedBy : string) : TSigningBadge;
+begin
+  result := ResolveCore(cache, receiptService, id, version, compiler,
+                        gallerySigned, gallerySignedBy, nil, false);
+end;
+
+class function TSigningBadgeResolver.Resolve(const cache : IPackageCache;
+                                              const receiptService : IReceiptService;
+                                              const id : string;
+                                              const version : TPackageVersion;
+                                              const compiler : TCompilerVersion;
+                                              const gallerySigned : boolean;
+                                              const gallerySignedBy : string;
+                                              const trustedPublisherSpkis : TArray<string>) : TSigningBadge;
+begin
+  result := ResolveCore(cache, receiptService, id, version, compiler,
+                        gallerySigned, gallerySignedBy, trustedPublisherSpkis, true);
+end;
+
+class function TSigningBadgeResolver.ResolveCore(const cache : IPackageCache;
+                                              const receiptService : IReceiptService;
+                                              const id : string;
+                                              const version : TPackageVersion;
+                                              const compiler : TCompilerVersion;
+                                              const gallerySigned : boolean;
+                                              const gallerySignedBy : string;
+                                              const trustedPublisherSpkis : TArray<string>;
+                                              const applyPinCheck : boolean) : TSigningBadge;
 var
   packageFolder : string;
   receipt : TVerificationReceipt;
@@ -160,6 +281,8 @@ begin
   result.Caption := 'Unverified — install to verify';
   result.Detail := '';
   result.AccentColor := $00808080;   // grey
+  result.SignerSpkiHex := '';
+  result.SignerName := '';
 
   haveReceipt := false;
   if (cache <> nil) and (receiptService <> nil) and (id <> '') then
@@ -205,6 +328,8 @@ begin
     result.State := sbsUntrustedPublisher;
     result.Caption := 'Signed, signer not in trusted publishers';
     result.AccentColor := $000080FF;   // amber
+    // Surface the author signer so the IDE can offer to trust them.
+    ExtractAuthorSigner(receipt, result.SignerSpkiHex, result.SignerName);
   end
   else if SameText(receipt.TrustDecision, 'trusted') then
   begin
@@ -230,6 +355,22 @@ begin
     else
       result.Caption := 'Signed by ' + signerName;
     result.AccentColor := $00207020;   // green
+    // Surface the author signer for consistency with the untrusted state.
+    ExtractAuthorSigner(receipt, result.SignerSpkiHex, result.SignerName);
+    // Pin-aware downgrade: in permissive mode the receipt records 'trusted'
+    // for any valid author signature, even one whose publisher the user has
+    // not pinned. When asked to check pins, present such a package as
+    // untrusted-publisher so the caller can offer to add the publisher.
+    if applyPinCheck and (result.SignerSpkiHex <> '') and
+       not SpkiInList(result.SignerSpkiHex, trustedPublisherSpkis) then
+    begin
+      result.State := sbsUntrustedPublisher;
+      if result.SignerName <> '' then
+        result.Caption := 'Signed by ' + result.SignerName + ' — not in your trusted publishers'
+      else
+        result.Caption := 'Signed, signer not in trusted publishers';
+      result.AccentColor := $000080FF;   // amber
+    end;
   end
   else
   begin

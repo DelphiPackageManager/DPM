@@ -21,6 +21,13 @@ type
     [Test] procedure SignedTrusted_When_Decision_IsTrusted_NamesSigner;
     [Test] procedure Invalid_When_Decision_IsInvalid;
     [Test] procedure Detail_Includes_ManifestHash_AndSignatures;
+    [Test] procedure UntrustedPublisher_Exposes_AuthorSpkiAndName;
+    [Test] procedure Trusted_Exposes_AuthorSpkiAndName;
+    [Test] procedure Unsigned_HasEmpty_SignerFields;
+    [Test] procedure Invalid_HasEmpty_SignerFields;
+    [Test] procedure AuthorSigner_PreferredOver_RepositorySigner;
+    [Test] procedure Trusted_NotPinned_Downgrades_WhenPinChecked;
+    [Test] procedure Trusted_Pinned_StaysTrusted_WhenPinChecked;
   end;
 
 implementation
@@ -294,6 +301,207 @@ begin
       'detail should include the signer SPKI');
     Assert.IsTrue(Pos('CN=Foo', badge.Detail) > 0,
       'detail should include the signer subject');
+  finally
+    if DirectoryExists(folder) then
+      TDirectory.Delete(folder, true);
+  end;
+end;
+
+procedure TSigningBadgeTests.UntrustedPublisher_Exposes_AuthorSpkiAndName;
+var
+  folder : string;
+  cache : IPackageCache;
+  receipt : IReceiptService;
+  badge : TSigningBadge;
+  r : TVerificationReceipt;
+begin
+  folder := MakeTempFolder;
+  try
+    cache := TStubCache.Create(folder);
+    receipt := TYamlReceiptService.Create;
+    r := MakeReceipt('untrusted-publisher', 'CN=Joe', 'ab12');
+    receipt.Write(folder, r);
+    badge := TSigningBadgeResolver.Resolve(cache, receipt,
+      'Test.Pkg', TPackageVersion.Parse('1.0.0'), TCompilerVersion.DelphiXE2);
+    Assert.AreEqual('ab12', badge.SignerSpkiHex);
+    Assert.AreEqual('Joe', badge.SignerName);
+  finally
+    if DirectoryExists(folder) then
+      TDirectory.Delete(folder, true);
+  end;
+end;
+
+procedure TSigningBadgeTests.Trusted_Exposes_AuthorSpkiAndName;
+var
+  folder : string;
+  cache : IPackageCache;
+  receipt : IReceiptService;
+  badge : TSigningBadge;
+  r : TVerificationReceipt;
+begin
+  folder := MakeTempFolder;
+  try
+    cache := TStubCache.Create(folder);
+    receipt := TYamlReceiptService.Create;
+    r := MakeReceipt('trusted', 'CN=VSoft Technologies', 'cafe');
+    receipt.Write(folder, r);
+    badge := TSigningBadgeResolver.Resolve(cache, receipt,
+      'Test.Pkg', TPackageVersion.Parse('1.0.0'), TCompilerVersion.DelphiXE2);
+    Assert.AreEqual('cafe', badge.SignerSpkiHex);
+    Assert.AreEqual('VSoft Technologies', badge.SignerName);
+  finally
+    if DirectoryExists(folder) then
+      TDirectory.Delete(folder, true);
+  end;
+end;
+
+procedure TSigningBadgeTests.Unsigned_HasEmpty_SignerFields;
+var
+  folder : string;
+  cache : IPackageCache;
+  receipt : IReceiptService;
+  badge : TSigningBadge;
+  r : TVerificationReceipt;
+begin
+  folder := MakeTempFolder;
+  try
+    cache := TStubCache.Create(folder);
+    receipt := TYamlReceiptService.Create;
+    r := MakeReceipt('unsigned');
+    receipt.Write(folder, r);
+    badge := TSigningBadgeResolver.Resolve(cache, receipt,
+      'Test.Pkg', TPackageVersion.Parse('1.0.0'), TCompilerVersion.DelphiXE2);
+    Assert.AreEqual('', badge.SignerSpkiHex);
+    Assert.AreEqual('', badge.SignerName);
+  finally
+    if DirectoryExists(folder) then
+      TDirectory.Delete(folder, true);
+  end;
+end;
+
+procedure TSigningBadgeTests.Invalid_HasEmpty_SignerFields;
+var
+  folder : string;
+  cache : IPackageCache;
+  receipt : IReceiptService;
+  badge : TSigningBadge;
+  r : TVerificationReceipt;
+begin
+  folder := MakeTempFolder;
+  try
+    cache := TStubCache.Create(folder);
+    receipt := TYamlReceiptService.Create;
+    r := MakeReceipt('invalid', 'CN=Joe', 'ab12');
+    receipt.Write(folder, r);
+    badge := TSigningBadgeResolver.Resolve(cache, receipt,
+      'Test.Pkg', TPackageVersion.Parse('1.0.0'), TCompilerVersion.DelphiXE2);
+    Assert.AreEqual('', badge.SignerSpkiHex);
+    Assert.AreEqual('', badge.SignerName);
+  finally
+    if DirectoryExists(folder) then
+      TDirectory.Delete(folder, true);
+  end;
+end;
+
+procedure TSigningBadgeTests.AuthorSigner_PreferredOver_RepositorySigner;
+var
+  folder : string;
+  cache : IPackageCache;
+  receipt : IReceiptService;
+  badge : TSigningBadge;
+  r : TVerificationReceipt;
+  repoSig : TReceiptSignature;
+  authorSig : TReceiptSignature;
+begin
+  folder := MakeTempFolder;
+  try
+    cache := TStubCache.Create(folder);
+    receipt := TYamlReceiptService.Create;
+    // Build a receipt with a repository signature *before* the author one to
+    // prove the resolver selects the author signature regardless of order.
+    r := MakeReceipt('untrusted-publisher');
+    repoSig.Role := 'repository';
+    repoSig.SignerSpkiHex := 'deadbeef';
+    repoSig.SignerSubject := 'CN=Some Gallery';
+    repoSig.Thumbprint := '';
+    repoSig.EffectiveSigningTime := Now;
+    repoSig.TimestampAuthority := '';
+    repoSig.RevocationStatus := 'notChecked';
+    authorSig.Role := 'author';
+    authorSig.SignerSpkiHex := 'ab12';
+    authorSig.SignerSubject := 'CN=Joe';
+    authorSig.Thumbprint := '';
+    authorSig.EffectiveSigningTime := Now;
+    authorSig.TimestampAuthority := '';
+    authorSig.RevocationStatus := 'notChecked';
+    SetLength(r.Signatures, 2);
+    r.Signatures[0] := repoSig;
+    r.Signatures[1] := authorSig;
+    receipt.Write(folder, r);
+    badge := TSigningBadgeResolver.Resolve(cache, receipt,
+      'Test.Pkg', TPackageVersion.Parse('1.0.0'), TCompilerVersion.DelphiXE2);
+    Assert.AreEqual('ab12', badge.SignerSpkiHex);
+    Assert.AreEqual('Joe', badge.SignerName);
+  finally
+    if DirectoryExists(folder) then
+      TDirectory.Delete(folder, true);
+  end;
+end;
+
+procedure TSigningBadgeTests.Trusted_NotPinned_Downgrades_WhenPinChecked;
+var
+  folder : string;
+  cache : IPackageCache;
+  receipt : IReceiptService;
+  badge : TSigningBadge;
+  r : TVerificationReceipt;
+  emptyList : TArray<string>;
+begin
+  folder := MakeTempFolder;
+  try
+    cache := TStubCache.Create(folder);
+    receipt := TYamlReceiptService.Create;
+    // Permissive-mode receipt: 'trusted' even though the signer isn't pinned.
+    r := MakeReceipt('trusted', 'CN=Joe', 'ab12');
+    receipt.Write(folder, r);
+    SetLength(emptyList, 0);
+    badge := TSigningBadgeResolver.Resolve(cache, receipt,
+      'Test.Pkg', TPackageVersion.Parse('1.0.0'), TCompilerVersion.DelphiXE2,
+      false, '', emptyList);
+    Assert.AreEqual(Ord(sbsUntrustedPublisher), Ord(badge.State),
+      'an unpinned author should downgrade to untrusted-publisher when pin-checked');
+    Assert.AreEqual('ab12', badge.SignerSpkiHex);
+    Assert.AreEqual('Joe', badge.SignerName);
+  finally
+    if DirectoryExists(folder) then
+      TDirectory.Delete(folder, true);
+  end;
+end;
+
+procedure TSigningBadgeTests.Trusted_Pinned_StaysTrusted_WhenPinChecked;
+var
+  folder : string;
+  cache : IPackageCache;
+  receipt : IReceiptService;
+  badge : TSigningBadge;
+  r : TVerificationReceipt;
+  pinned : TArray<string>;
+begin
+  folder := MakeTempFolder;
+  try
+    cache := TStubCache.Create(folder);
+    receipt := TYamlReceiptService.Create;
+    r := MakeReceipt('trusted', 'CN=Joe', 'ab12');
+    receipt.Write(folder, r);
+    // Pinned with a 'sha256:'-prefixed entry to prove normalisation matches a
+    // raw-hex receipt SPKI.
+    SetLength(pinned, 1);
+    pinned[0] := 'sha256:AB12';
+    badge := TSigningBadgeResolver.Resolve(cache, receipt,
+      'Test.Pkg', TPackageVersion.Parse('1.0.0'), TCompilerVersion.DelphiXE2,
+      false, '', pinned);
+    Assert.AreEqual(Ord(sbsSignedTrusted), Ord(badge.State),
+      'a pinned author should remain trusted');
   finally
     if DirectoryExists(folder) then
       TDirectory.Delete(folder, true);
