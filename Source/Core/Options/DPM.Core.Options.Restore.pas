@@ -42,6 +42,7 @@ type
   TRestoreOptions = class(TSearchOptions)
   private
     FProjectPath : string;                   // CLI: directory or .dproj/.groupproj; IDE: .dproj filename
+    FIgnoreHashLocks : boolean;              // skip manifest hash lock validation during restore
     class var
       FDefault : TRestoreOptions;
   protected
@@ -55,6 +56,9 @@ type
     function Clone : TRestoreOptions; reintroduce;
 
     property ProjectPath : string read FProjectPath write FProjectPath;
+    //when true, the manifest hash locks recorded in the dproj are not enforced - the locks are
+    //simply refreshed from the cached receipts. Use to recover from a legitimate hash mismatch.
+    property IgnoreHashLocks : boolean read FIgnoreHashLocks write FIgnoreHashLocks;
   end;
 
 implementation
@@ -76,7 +80,7 @@ constructor TRestoreOptions.CreateClone(const original : TRestoreOptions);
 begin
   inherited CreateClone(original);
   FProjectPath := original.ProjectPath;
-
+  FIgnoreHashLocks := original.IgnoreHashLocks;
 end;
 
 class constructor TRestoreOptions.CreateDefault;

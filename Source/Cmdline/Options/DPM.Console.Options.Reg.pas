@@ -661,6 +661,12 @@ begin
     end);
   option.HasValue := false;
 
+  option := cmd.RegisterOption<boolean>('ignoreHashLocks','ihl', 'Ignore the manifest hash locks recorded in the project - refresh them from the cache instead of failing on a mismatch.',
+  procedure(const value : boolean)
+    begin
+      TRestoreOptions.Default.IgnoreHashLocks := value;
+    end);
+  option.HasValue := false;
 
 
 

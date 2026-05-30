@@ -9,7 +9,7 @@
         <Projects Include="dpm.dproj">
             <Dependencies/>
         </Projects>
-        <Projects Include="DPM.IDE.D120.dproj">
+        <Projects Include="DPM.IDE.D130.dproj">
             <Dependencies/>
         </Projects>
         <Projects Include="DSpecCreator\DspecCreator.dproj">
@@ -41,14 +41,14 @@
     <Target Name="dpm:Make">
         <MSBuild Projects="dpm.dproj" Targets="Make"/>
     </Target>
-    <Target Name="DPM_IDE_D120">
-        <MSBuild Projects="DPM.IDE.D120.dproj"/>
+    <Target Name="DPM_IDE_D130">
+        <MSBuild Projects="DPM.IDE.D130.dproj"/>
     </Target>
-    <Target Name="DPM_IDE_D120:Clean">
-        <MSBuild Projects="DPM.IDE.D120.dproj" Targets="Clean"/>
+    <Target Name="DPM_IDE_D130:Clean">
+        <MSBuild Projects="DPM.IDE.D130.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="DPM_IDE_D120:Make">
-        <MSBuild Projects="DPM.IDE.D120.dproj" Targets="Make"/>
+    <Target Name="DPM_IDE_D130:Make">
+        <MSBuild Projects="DPM.IDE.D130.dproj" Targets="Make"/>
     </Target>
     <Target Name="DspecCreator">
         <MSBuild Projects="DSpecCreator\DspecCreator.dproj"/>
@@ -60,13 +60,13 @@
         <MSBuild Projects="DSpecCreator\DspecCreator.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
-        <CallTarget Targets="DPM_Core_Tests;dpm;DPM_IDE_D120;DspecCreator"/>
+        <CallTarget Targets="DPM_Core_Tests;dpm;DPM_IDE_D130;DspecCreator"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="DPM_Core_Tests:Clean;dpm:Clean;DPM_IDE_D120:Clean;DspecCreator:Clean"/>
+        <CallTarget Targets="DPM_Core_Tests:Clean;dpm:Clean;DPM_IDE_D130:Clean;DspecCreator:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="DPM_Core_Tests:Make;dpm:Make;DPM_IDE_D120:Make;DspecCreator:Make"/>
+        <CallTarget Targets="DPM_Core_Tests:Make;dpm:Make;DPM_IDE_D130:Make;DspecCreator:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

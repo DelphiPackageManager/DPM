@@ -231,6 +231,7 @@ var
     resolution : IResolvedPackage;
     dependency : IPackageDependency;
     dependencyReference : IPackageReference;
+    childRange : TVersionRange;
   begin
     dependencyReference := parent.AddChild(package.Id, package.Version, versionRange);
     dependencyReference.UseSource := package.UseSource;
@@ -250,7 +251,15 @@ var
                         '] under [' + package.Id + '] - skipping to avoid an infinite graph');
           continue;
         end;
-        AddNode(dependencyReference, resolution.PackageInfo, resolution.VersionRange);
+        //The recorded edge range must be THIS parent's declared dependency range, not the child's
+        //shared resolution.VersionRange - that single per-id value can be collapsed to a single
+        //version (TVersionRange.Create) by the resolver's promotion path or narrowed by a sibling,
+        //which is what was incorrectly persisting in the dproj. dependency.VersionRange is the
+        //authoritative, per-edge declared range and is never mutated by the resolver.
+        childRange := dependency.VersionRange;
+        if childRange.IsEmpty then
+          childRange := resolution.VersionRange; //defensive fallback only
+        AddNode(dependencyReference, resolution.PackageInfo, childRange);
       end;
   end;
 

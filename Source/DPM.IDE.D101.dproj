@@ -11,10 +11,10 @@
         <AppType>Library</AppType>
     </PropertyGroup>
     <PropertyGroup>
-        <DPMCompiler>10.1</DPMCompiler>
-        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
-        <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Gabr42.OmniThreadLibrary\3.7.12\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.YAML\1.5.5\lib;$(DPM)\VSoft.VirtualListView\0.4.6\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.Awaitable\0.7.0\lib;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
+        <DPMCompiler>delphi10.1</DPMCompiler>
+        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
+        <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.YAML\1.5.5\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win32;$(DPM)\VSoft.Awaitable\0.7.0\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.9\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\Gabr42.OmniThreadLibrary\3.7.12\lib\Win32;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -778,30 +778,31 @@
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>
-            <PackageReferences platform="Win32">
-                <PackageReference id="Spring4D.Core" version="2.0.2-beta.2">
+            <Packages>
+                <PackageReference id="Gabr42.OmniThreadLibrary" version="3.7.12" manifestHash="sha256:1dd7819d8df343f17b336111f37de3d7571a9a7c7d958acda28a4fc496504153"/>
+                <PackageReference id="Spring4D.Core" version="2.0.2-beta.2" manifestHash="sha256:c22610fe1fa300704221dfa155c21c3cd7d906d037fd24ffa65b98f606f9c1b0">
                     <PackageReference id="Spring4D.Base" version="2.0.2-beta.2" range="2.0.2-beta.2"/>
                 </PackageReference>
-                <PackageReference id="Spring4D.Extensions" version="2.0.2-beta.2">
+                <PackageReference id="Spring4D.Extensions" version="2.0.2-beta.2" manifestHash="sha256:bbc5a5ca0cbbae19ac48eb4990c02f84169b036b9e09eacbd96b8a66e75f34ae">
                     <PackageReference id="Spring4D.Base" version="2.0.2-beta.2" range="2.0.2-beta.2"/>
                 </PackageReference>
-                <PackageReference id="VSoft.AntPatterns" version="0.1.9"/>
-                <PackageReference id="VSoft.Awaitable" version="0.7.0">
-                    <PackageReference id="Gabr42.OmniThreadLibrary" version="3.7.12" range="[3.7.12,]"/>
+                <PackageReference id="VSoft.AntPatterns" version="0.1.9" manifestHash="sha256:7ce9199ef6cdd046152c9ea63193df61e70845c32143dde11154e9d3c4b86fab"/>
+                <PackageReference id="VSoft.Awaitable" version="0.7.0" manifestHash="sha256:8b8e0c82b2d9ec13adaf3746847b2dd8a9ca682344195d00f1afcbfffef466b5">
+                    <PackageReference id="Gabr42.OmniThreadLibrary" version="3.7.12" range="3.7.12"/>
                     <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="0.1.4"/>
                 </PackageReference>
-                <PackageReference id="VSoft.Base64.Polyfill" version="1.0.2"/>
-                <PackageReference id="VSoft.CancellationToken" version="0.1.4"/>
-                <PackageReference id="VSoft.HttpClient" version="2.2.5">
+                <PackageReference id="VSoft.Base64.Polyfill" version="0.1.11" manifestHash="sha256:09a0181b11733ae60edce85087d1ba0a4f0cb218a844f1cdfdb5f92c024a5abe"/>
+                <PackageReference id="VSoft.CancellationToken" version="0.1.4" manifestHash="sha256:00247d44438d7d3d48cc9d5ec0c1e30bcd1fb92a3f93042877166a8cb7b3228f"/>
+                <PackageReference id="VSoft.HttpClient" version="2.7.0" manifestHash="sha256:18d0fe3d88cab7d92127c0b5a57ed8359f35df80f741ac6510d304a70ba825b9">
                     <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="0.1.4"/>
                     <PackageReference id="VSoft.Uri" version="0.3.3" range="0.3.3"/>
                 </PackageReference>
-                <PackageReference id="VSoft.JsonDataObjects" version="0.3.2"/>
-                <PackageReference id="VSoft.SemanticVersion" version="0.2.7"/>
-                <PackageReference id="VSoft.Uri" version="0.3.3"/>
-                <PackageReference id="VSoft.VirtualListView" version="0.4.6"/>
-                <PackageReference id="VSoft.YAML" version="1.5.5"/>
-            </PackageReferences>
+                <PackageReference id="VSoft.JsonDataObjects" version="0.3.2" manifestHash="sha256:c59c4e3296fc2f5316af7e4495bceeffd4864f2af03112af99ba2dd7827ddc89"/>
+                <PackageReference id="VSoft.SemanticVersion" version="0.2.8" manifestHash="sha256:4ac9d5a329ce208aab9796faac65510dd2052685e3e2dc7bada3f077332433ad"/>
+                <PackageReference id="VSoft.Uri" version="0.3.3" manifestHash="sha256:7bf6c9108395f083408f83e18180f2c4d135fb8912072c85ba529a69073b11c2"/>
+                <PackageReference id="VSoft.VirtualListView" version="0.4.6" manifestHash="sha256:e69be3e75d9a79d879abccad44ce5f99514367f053fb17450788ca6fc527c0db"/>
+                <PackageReference id="VSoft.YAML" version="1.5.5" manifestHash="sha256:983c97c657d11852acac73c217decba701877795652b96cae11b31cc8a347925"/>
+            </Packages>
         </DPM>
     </ProjectExtensions>
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>

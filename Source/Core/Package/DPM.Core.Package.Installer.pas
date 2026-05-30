@@ -74,7 +74,8 @@ type
     // runs to completion and the refresh is only applied when validation passes,
     // so the abort-before-any-write semantics of the two-call sequence are kept.
     function ValidateAndPopulateManifestHashes(const graph : IPackageReference;
-                                               const compilerVersion : TCompilerVersion) : boolean;
+                                               const compilerVersion : TCompilerVersion;
+                                               const ignoreLocks : boolean) : boolean;
   protected
     function Init(const options : TSearchOptions) : IConfiguration;
     function GetPackageInfo(const cancellationToken: ICancellationToken; const packageId: IPackageIdentity): IPackageInfo;
@@ -664,7 +665,8 @@ end;
 
 
 function TPackageInstaller.ValidateAndPopulateManifestHashes(const graph : IPackageReference;
-                                                             const compilerVersion : TCompilerVersion) : boolean;
+                                                             const compilerVersion : TCompilerVersion;
+                                                             const ignoreLocks : boolean) : boolean;
 var
   node : IPackageReference;
   packageFolder : string;
@@ -695,7 +697,8 @@ begin
 
     // --- validation (mirrors ValidateLockedManifestHashes) ---
     // locked nodes whose folder is absent are skipped - the install path will produce them.
-    if (node.ManifestHash <> '') and folderExists then
+    // when ignoreLocks is set we skip validation entirely and just refresh the locks below.
+    if (node.ManifestHash <> '') and folderExists and (not ignoreLocks) then
     begin
       if not haveReceipt then
       begin
@@ -2082,7 +2085,7 @@ begin
     // P2 §2.6 — enforce existing PackageReference.ManifestHash lock values before we
     // overwrite them (mismatch is a hard restore failure), then refresh from the receipts.
     // Merged into a single pass so each receipt is read only once.
-    if not ValidateAndPopulateManifestHashes(finalGraph, Options.compilerVersion) then
+    if not ValidateAndPopulateManifestHashes(finalGraph, Options.compilerVersion, Options.IgnoreHashLocks) then
     begin
       result := false;
       exit;

@@ -217,6 +217,15 @@ type
 
     [Test]
     procedure Resolved_Top_Level_Leaf_Does_Not_Cause_Extra_Requirements;
+
+    [Test]
+    procedure BuildDependencyGraph_Transitive_Range_Is_Parent_Declared_Range;
+
+    [Test]
+    procedure BuildDependencyGraph_Transitive_Range_Not_Collapsed_After_Promotion;
+
+    [Test]
+    procedure BuildDependencyGraph_Same_Transitive_Two_Parents_Records_Each_Declared_Range;
   end;
 
 implementation
@@ -1688,6 +1697,116 @@ begin
   Assert.AreEqual(1, resolved.Count, 'only A should be resolved - no spurious extra entries');
   Assert.AreEqual(0, FRepo.GetCallCount('A'),
     'no repo call needed for a leaf top-level since it has no deps to fetch versions for');
+end;
+
+procedure TDependencyResolverTests.BuildDependencyGraph_Transitive_Range_Is_Parent_Declared_Range;
+var
+  c, a : IPackageInfo;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  aNode : IPackageReference;
+  cNode : IPackageReference;
+begin
+  // The range recorded on a transitive edge must be the PARENT's declared dependency range
+  // (e.g. [0.1.4,]) - not the resolved single version. A declared open-ended range must survive
+  // verbatim into the graph so it can be re-evaluated on the next restore/resolve.
+  c := MakeInfo('C', '0.1.4', []);
+  a := MakeInfo('A', '1.0.0', [MakeDep('C', '[0.1.4,]')]);
+
+  FRepo.SetVersions('C', ListOf([c]));
+
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, a, projectRefs, graph, resolved);
+  Assert.IsTrue(ok, 'resolve should succeed');
+
+  aNode := graph.FindFirstChild('A');
+  Assert.IsNotNull(aNode, 'graph root should have A as a child');
+  cNode := aNode.FindFirstChild('C');
+  Assert.IsNotNull(cNode, 'A should have C as a child');
+  Assert.AreEqual('[0.1.4,]', cNode.VersionRange.ToString,
+    'transitive C must record A''s declared range [0.1.4,], not the selected version 0.1.4');
+end;
+
+procedure TDependencyResolverTests.BuildDependencyGraph_Transitive_Range_Not_Collapsed_After_Promotion;
+var
+  c, a : IPackageInfo;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  aNode : IPackageReference;
+  cNode : IPackageReference;
+begin
+  // Regression: C is already an installed top-level reference whose range has been collapsed to a
+  // single version (this is what CreateProjectRefs produces for a directly-pinned package). When A,
+  // which declares C [0.1.4,], is installed, the shared resolution carries the collapsed single
+  // version 0.1.4. The A->C edge must still record A's declared [0.1.4,], not the collapsed 0.1.4.
+  c := MakeInfo('C', '0.1.4', []);
+  a := MakeInfo('A', '1.0.0', [MakeDep('C', '[0.1.4,]')]);
+
+  FRepo.SetVersions('C', ListOf([c]));
+
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(MakeTopLevelRef(c, MakeRange('0.1.4')));
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, a, projectRefs, graph, resolved);
+  Assert.IsTrue(ok, 'resolve should succeed');
+
+  aNode := graph.FindFirstChild('A');
+  Assert.IsNotNull(aNode, 'graph root should have A as a child');
+  cNode := aNode.FindFirstChild('C');
+  Assert.IsNotNull(cNode, 'A should have C as a child');
+  Assert.AreEqual('[0.1.4,]', cNode.VersionRange.ToString,
+    'promotion of a seeded top-level must not collapse the recorded transitive range');
+end;
+
+procedure TDependencyResolverTests.BuildDependencyGraph_Same_Transitive_Two_Parents_Records_Each_Declared_Range;
+var
+  c, a, b, root : IPackageInfo;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  rootNode : IPackageReference;
+  aNode : IPackageReference;
+  bNode : IPackageReference;
+  cUnderA : IPackageReference;
+  cUnderB : IPackageReference;
+begin
+  // A single resolved C is shared by two parents that declare DIFFERENT ranges. Each edge must
+  // record its own parent's declared range - something the shared per-id resolution.VersionRange
+  // can never represent. C 1.0.5 satisfies both ranges so no narrowing occurs.
+  c := MakeInfo('C', '1.0.5', []);
+  a := MakeInfo('A', '1.0.0', [MakeDep('C', '[1.0.0,]')]);
+  b := MakeInfo('B', '1.0.0', [MakeDep('C', '[1.0.2,1.0.7]')]);
+  root := MakeInfo('Root', '1.0.0', [MakeDep('A', '[1.0.0,]'), MakeDep('B', '[1.0.0,]')]);
+
+  FRepo.SetVersions('A', ListOf([a]));
+  FRepo.SetVersions('B', ListOf([b]));
+  FRepo.SetVersions('C', ListOf([c]));
+
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, root, projectRefs, graph, resolved);
+  Assert.IsTrue(ok, 'resolve should succeed');
+
+  rootNode := graph.FindFirstChild('Root');
+  Assert.IsNotNull(rootNode, 'graph root should have Root as a child');
+
+  aNode := rootNode.FindFirstChild('A');
+  Assert.IsNotNull(aNode, 'Root should have A as a child');
+  cUnderA := aNode.FindFirstChild('C');
+  Assert.IsNotNull(cUnderA, 'A should have C as a child');
+  Assert.AreEqual('[1.0.0,]', cUnderA.VersionRange.ToString,
+    'C under A must record A''s declared range [1.0.0,]');
+
+  bNode := rootNode.FindFirstChild('B');
+  Assert.IsNotNull(bNode, 'Root should have B as a child');
+  cUnderB := bNode.FindFirstChild('C');
+  Assert.IsNotNull(cUnderB, 'B should have C as a child');
+  Assert.AreEqual('[1.0.2,1.0.7]', cUnderB.VersionRange.ToString,
+    'C under B must record B''s declared range [1.0.2,1.0.7]');
 end;
 
 initialization
