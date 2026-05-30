@@ -326,18 +326,14 @@ end;
 // often as it will slow things down.
 procedure TDPMMessageForm.ProcessMessages;
 begin
-  if not FStopwatch.IsRunning then
+  //AddRow already invalidated the control; force that pending paint out now so the
+  //latest line is visible even while a long synchronous op blocks the IDE message loop.
+  FLogMemo.Update;
+  //Throttle only the (re-entrant, relatively expensive) message pump.
+  if (not FStopwatch.IsRunning) or (FStopwatch.ElapsedMilliseconds > 10) then
   begin
-    FStopwatch.Start;
-    FLogMemo.Refresh;
     Application.ProcessMessages;
-  end
-  else if FStopwatch.ElapsedMilliseconds > 10 then
-  begin
-    FStopwatch.Stop;
-    FLogMemo.Refresh;
-    Application.ProcessMessages;
-    FStopwatch.Reset;
+    FStopwatch.Reset; //Reset stops + zeroes
     FStopwatch.Start;
   end;
 end;
@@ -360,11 +356,7 @@ begin
     FLogMemo.AddRow(data, TLogMessageType.mtImportantSuccess)
   else
     FLogMemo.AddRow(data, TLogMessageType.mtSuccess);
-  //Self.ProcessMessages;
-  //force repaint asap
-  FLogMemo.Refresh;
-  Application.ProcessMessages;
-
+  Self.ProcessMessages;
 end;
 
 procedure TDPMMessageForm.Verbose(const data: string;  const important: Boolean);

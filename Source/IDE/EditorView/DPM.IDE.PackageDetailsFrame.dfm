@@ -24,12 +24,13 @@ object PackageDetailsFrame: TPackageDetailsFrame
     TabOrder = 0
     object DetailsSplitter: TSplitter
       Left = 0
-      Top = 361
+      Top = 368
       Width = 614
       Height = 4
       Cursor = crVSplit
       Align = alTop
       ResizeStyle = rsUpdate
+      ExplicitTop = 361
     end
     object pnlPackageId: TPanel
       Left = 0
@@ -119,7 +120,7 @@ object PackageDetailsFrame: TPackageDetailsFrame
     end
     object pnlGridHost: TPanel
       Left = 0
-      Top = 49
+      Top = 56
       Width = 614
       Height = 312
       Align = alTop

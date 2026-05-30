@@ -108,7 +108,7 @@ type
     procedure WMEraseBkgnd(var Message: TWmEraseBkgnd); message WM_ERASEBKGND;
     procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
     procedure WMVScroll(var Message: TWMVScroll); message WM_VSCROLL;
-    procedure WMHScroll(var Message: TWMVScroll); message WM_HSCROLL;
+    procedure WMHScroll(var Message: TWMHScroll); message WM_HSCROLL;
 
     procedure CMEnter(var Message: TCMEnter); message CM_ENTER;
     procedure CMExit(var Message: TCMExit); message CM_EXIT;
@@ -222,7 +222,12 @@ end;
 procedure TLogMemo.Clear;
 begin
   FMaxWidth := -1;
-  FItems.Clear;
+  FTopRow := 0;
+  FVScrollPos := 0;
+  FHScrollPos := 0;
+  FCurrentRow := -1;
+  FHoverRow := -1;
+  FItems.Clear; //fires RowsChanged -> UpdateVisibleRows + Invalidate
 end;
 
 procedure TLogMemo.CMEnter(var Message: TCMEnter);
@@ -345,8 +350,8 @@ begin
   FMessageColors[TThemeType.Dark][mtImportantInformation] := $00CCCCCC;
   FMessageColors[TThemeType.Dark][mtSuccess] := $0084D188;
   FMessageColors[TThemeType.Dark][mtImportantSuccess] := $0084D188;
-  FMessageColors[TThemeType.Dark][mtVerbose] := FMessageColors[TThemeType.Light][mtInformation];
-  FMessageColors[TThemeType.Dark][mtImportantVerbose] := FMessageColors[TThemeType.Light][mtImportantInformation];
+  FMessageColors[TThemeType.Dark][mtVerbose] := FMessageColors[TThemeType.Dark][mtInformation];
+  FMessageColors[TThemeType.Dark][mtImportantVerbose] := FMessageColors[TThemeType.Dark][mtImportantInformation];
   FMessageColors[TThemeType.Dark][mtWarning] := TColorRec.Orange;
   FMessageColors[TThemeType.Dark][mtImportantWarning] := TColorRec.Orange;
 
@@ -417,7 +422,7 @@ begin
       FCurrentRow := 0;
       FTopRow := 0;
       rowState := GetRowPaintState(oldCurrentRow);
-      DoPaintRow(oldCurrentRow + oldTopRow, rowState);
+      DoPaintRow(oldCurrentRow, rowState); //FCurrentRow is already an absolute index
       rowState := GetRowPaintState(0);
       DoPaintRow(0 , rowState);
     end
@@ -905,8 +910,8 @@ begin
   SetFocus;
   if RowCount = 0 then
     exit;
-  row := GetRowFromY(Y);
-  if (row > FVisibleRows) or (row >= RowCount) then
+  row := GetRowFromY(Y); //view-relative row
+  if (row >= FVisibleRows) or (FTopRow + row >= RowCount) then
     exit;
 
   if FTopRow + row <> FCurrentRow then
@@ -1139,6 +1144,9 @@ begin
     FThemeType := TThemeType.Dark
   else
     FThemeType := TThemeType.Light;
+  //repaint with the new theme colors - covers SetStyleServices and CMStyleChanged paths
+  if HandleAllocated then
+    Invalidate;
 end;
 
 procedure TLogMemo.UpdateHoverRow(const X, Y: integer);
@@ -1251,7 +1259,7 @@ begin
   Message.Result := Message.Result or DLGC_WANTARROWS;
 end;
 
-procedure TLogMemo.WMHScroll(var Message: TWMVScroll);
+procedure TLogMemo.WMHScroll(var Message: TWMHScroll);
 var
   info : TScrollInfo;
 begin

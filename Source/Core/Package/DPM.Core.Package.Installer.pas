@@ -65,10 +65,12 @@ type
     // this back to the .dproj as `manifestHash="sha256:..."`.
     procedure PopulateManifestHashes(const graph : IPackageReference;
                                       const compilerVersion : TCompilerVersion);
-    // P2 §2.6 — for every PackageReference in the graph that carries a lock
-    // hash, compare with the receipt; hard-fail the restore on mismatch.
-    function ValidateLockedManifestHashes(const graph : IPackageReference;
-                                           const compilerVersion : TCompilerVersion) : boolean;
+    // Single-pass equivalent of ValidateLockedManifestHashes followed by
+    // PopulateManifestHashes - reads each receipt at most once. Validation still
+    // runs to completion and the refresh is only applied when validation passes,
+    // so the abort-before-any-write semantics of the two-call sequence are kept.
+    function ValidateAndPopulateManifestHashes(const graph : IPackageReference;
+                                               const compilerVersion : TCompilerVersion) : boolean;
   protected
     function Init(const options : TSearchOptions) : IConfiguration;
     function GetPackageInfo(const cancellationToken: ICancellationToken; const packageId: IPackageIdentity): IPackageInfo;
@@ -642,45 +644,83 @@ begin
   end;
 end;
 
-function TPackageInstaller.ValidateLockedManifestHashes(const graph : IPackageReference;
-                                                         const compilerVersion : TCompilerVersion) : boolean;
+
+function TPackageInstaller.ValidateAndPopulateManifestHashes(const graph : IPackageReference;
+                                                             const compilerVersion : TCompilerVersion) : boolean;
 var
   node : IPackageReference;
   packageFolder : string;
   receipt : TVerificationReceipt;
   expected, actual : string;
+  folderExists : boolean;
+  haveReceipt : boolean;
+  // refresh is staged so it is applied only after the whole graph validates - this preserves
+  // the original "ValidateLockedManifestHashes (abort on mismatch) then PopulateManifestHashes" order.
+  refreshNodes : IList<IPackageReference>;
+  refreshHashes : IList<string>;
+  i : integer;
 begin
   result := true;
   if (graph = nil) or (FReceiptService = nil) or (FPackageCache = nil) then
     exit;
+
+  refreshNodes := TCollections.CreateList<IPackageReference>;
+  refreshHashes := TCollections.CreateList<string>;
+
   for node in graph.Children do
   begin
-    if node.ManifestHash = '' then
-      Continue;   // unlocked — nothing to enforce
     packageFolder := FPackageCache.GetPackagePath(node.Id, node.Version.ToStringNoMeta, compilerVersion);
-    if not DirectoryExists(packageFolder) then
-      Continue;   // package not yet present — install path will produce it
-    if not FReceiptService.TryRead(packageFolder, receipt) then
+    folderExists := DirectoryExists(packageFolder);
+    haveReceipt := false;
+    if folderExists then
+      haveReceipt := FReceiptService.TryRead(packageFolder, receipt);   // read each receipt once
+
+    // --- validation (mirrors ValidateLockedManifestHashes) ---
+    // locked nodes whose folder is absent are skipped - the install path will produce them.
+    if (node.ManifestHash <> '') and folderExists then
     begin
-      FLogger.Error(Format(
-        '[Installer] Lock hash mismatch for [%s %s]: project pins %s but cache has no receipt.',
-        [node.Id, node.Version.ToStringNoMeta, node.ManifestHash]));
-      result := false;
-      Continue;
+      if not haveReceipt then
+      begin
+        FLogger.Error(Format(
+          '[Installer] Lock hash mismatch for [%s %s]: project pins %s but cache has no receipt.',
+          [node.Id, node.Version.ToStringNoMeta, node.ManifestHash]));
+        result := false;
+      end
+      else
+      begin
+        expected := LowerCase(node.ManifestHash);
+        if (Length(expected) > 7) and (Copy(expected, 1, 7) = 'sha256:') then
+          expected := Copy(expected, 8, MaxInt);
+        actual := LowerCase(receipt.ManifestHashHex);
+        if expected <> actual then
+        begin
+          FLogger.Error(Format(
+            '[Installer] Lock hash mismatch for [%s %s]: project pins %s but cache has sha256:%s. ' +
+            'Edit the dproj''s PackageReference or remove the cached package to re-acquire.',
+            [node.Id, node.Version.ToStringNoMeta, node.ManifestHash, actual]));
+          result := false;
+        end;
+      end;
     end;
-    expected := LowerCase(node.ManifestHash);
-    if (Length(expected) > 7) and (Copy(expected, 1, 7) = 'sha256:') then
-      expected := Copy(expected, 8, MaxInt);
-    actual := LowerCase(receipt.ManifestHashHex);
-    if expected <> actual then
+
+    // --- stage the refresh (mirrors PopulateManifestHashes) ---
+    // folder-absent nodes are left untouched, matching the original Continue.
+    if folderExists then
     begin
-      FLogger.Error(Format(
-        '[Installer] Lock hash mismatch for [%s %s]: project pins %s but cache has sha256:%s. ' +
-        'Edit the dproj''s PackageReference or remove the cached package to re-acquire.',
-        [node.Id, node.Version.ToStringNoMeta, node.ManifestHash, actual]));
-      result := false;
+      refreshNodes.Add(node);
+      if haveReceipt and (receipt.ManifestHashHex <> '') then
+        refreshHashes.Add('sha256:' + receipt.ManifestHashHex)
+      else
+        refreshHashes.Add('');
     end;
   end;
+
+  // gate: a lock mismatch aborts before any hash is written, exactly as the two-call flow did.
+  if not result then
+    exit;
+
+  for i := 0 to refreshNodes.Count - 1 do
+    refreshNodes[i].ManifestHash := refreshHashes[i];
 end;
 
 function TPackageInstaller.GetPackageInfo(const cancellationToken: ICancellationToken; const packageId: IPackageIdentity): IPackageInfo;
@@ -2006,15 +2046,14 @@ begin
     FLogger.Error('Restore failed for [' + projectFile + '] on platforms [' + DPMPlatformsToString(errorPlatforms) + ']')
   else if finalGraph <> nil then
   begin
-    // P2 §2.6 — enforce existing PackageReference.ManifestHash lock values
-    // before we overwrite them. A mismatch is a hard restore failure.
-    if not ValidateLockedManifestHashes(finalGraph, Options.compilerVersion) then
+    // P2 §2.6 — enforce existing PackageReference.ManifestHash lock values before we
+    // overwrite them (mismatch is a hard restore failure), then refresh from the receipts.
+    // Merged into a single pass so each receipt is read only once.
+    if not ValidateAndPopulateManifestHashes(finalGraph, Options.compilerVersion) then
     begin
       result := false;
       exit;
     end;
-    // Refresh from the receipts now that we've validated.
-    PopulateManifestHashes(finalGraph, Options.compilerVersion);
     // Update package references once using the new platform-independent format
     projectEditor.UpdatePackageReferences(finalGraph);
     result := projectEditor.SaveProject();

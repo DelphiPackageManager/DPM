@@ -1404,7 +1404,8 @@ begin
       if FClosing then
         exit;
       FLogger.Debug('Got package versions .');
-      UpdateVersionsCache(FPackageMetaData.Id, includePreRelease, versions);
+      if FPackageMetaData <> nil then
+        UpdateVersionsCache(FPackageMetaData.Id, includePreRelease, versions);
       DoUpdateVersions(sReferenceVersion, versions);
     end);
 
