@@ -1241,6 +1241,7 @@ begin
         begin
           definitions = "MyAppVersion\=%DPMVersion%" +
                         "OutputFileName\=DPMSetup-%SemVer%" +
+                        "InstallerFileVersion\=%InstallerFileVersion%" +
                         ""
           enabletimeout = true
           id = {7CD98D00-B517-41B2-A9DC-37BA9C39D864}
@@ -1687,6 +1688,15 @@ begin
     name = BUILD_VERSION
     variablescope = vtProject
     variabletype = btInteger
+  end
+  variable
+  begin
+    defaultvalue = %MAJOR_VERSION%.%MINOR_VERSION%.%RELEASE_VERSION%.%BUILD_VERSION%
+    groupname = VersionInfo
+    ismacro = true
+    name = InstallerFileVersion
+    variablescope = vtProject
+    variabletype = btString
   end
   variable
   begin

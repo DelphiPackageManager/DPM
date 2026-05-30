@@ -5,6 +5,9 @@
 #ifndef MyAppVersion
   #define MyAppVersion "0.1.10-alpha"
 #endif
+#ifndef InstallerFileVersion
+  #define InstallerFileVersion "0.0.0.0"
+#endif
 #define MyAppPublisher "The Delphi Package Manager Project"
 #define HelpURL "https://docs.delphi.dev"
 #define SupportURL "https://github.com/DelphiPackageManager/DPM/issues"
@@ -20,6 +23,7 @@
 AppId={{7762853B-A873-4F11-AAD1-2D6EAE938562}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+VersionInfoVersion={#InstallerFileVersion}
 ;AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#HelpURL}
