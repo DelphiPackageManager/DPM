@@ -65,6 +65,10 @@ type
     // this back to the .dproj as `manifestHash="sha256:..."`.
     procedure PopulateManifestHashes(const graph : IPackageReference;
                                       const compilerVersion : TCompilerVersion);
+    // Recursively clears the ManifestHash lock on every node in the graph. Used on a detected
+    // compiler upgrade (in-place dproj opened in a newer IDE) so the per-compiler locks recorded
+    // under the old compiler are discarded rather than failing validation against the new build.
+    procedure ClearManifestHashes(const graph : IPackageReference);
     // Single-pass equivalent of ValidateLockedManifestHashes followed by
     // PopulateManifestHashes - reads each receipt at most once. Validation still
     // runs to completion and the refresh is only applied when validation passes,
@@ -641,6 +645,20 @@ begin
       // than leave a wrong one in place; next install with the new tooling
       // will populate it.
       node.ManifestHash := '';
+  end;
+end;
+
+procedure TPackageInstaller.ClearManifestHashes(const graph : IPackageReference);
+var
+  node : IPackageReference;
+begin
+  if graph = nil then
+    exit;
+  for node in graph.Children do
+  begin
+    node.ManifestHash := '';
+    //locks are written recursively (WritePackageRef), so clear transients too.
+    ClearManifestHashes(node);
   end;
 end;
 
@@ -1992,6 +2010,7 @@ var
   platformOptions: TRestoreOptions;
   finalGraph: IPackageReference;
   platformGraph: IPackageReference;
+  storedCompiler : TCompilerVersion;
 begin
   result := false;
   finalGraph := nil;
@@ -2046,6 +2065,20 @@ begin
     FLogger.Error('Restore failed for [' + projectFile + '] on platforms [' + DPMPlatformsToString(errorPlatforms) + ']')
   else if finalGraph <> nil then
   begin
+    // The manifest hash lock is per-compiler. When a project is opened in a newer IDE (in-place
+    // dproj upgrade), the locks recorded under the old compiler cannot match the new compiler's
+    // packages - that is a legitimate upgrade, not tampering. Detect it via the <DPMCompiler>
+    // marker captured at load and clear the stale locks so they are simply re-established below
+    // rather than failing validation.
+    storedCompiler := projectEditor.DPMCompilerVersion;
+    if (storedCompiler <> TCompilerVersion.UnknownVersion) and (storedCompiler <> Options.compilerVersion) then
+    begin
+      FLogger.Information(Format(
+        'Project was last managed by DPM under [%s]; restoring under [%s] - ' +
+        'clearing stale manifest hash locks and re-locking for the new compiler.',
+        [CompilerToString(storedCompiler), CompilerToString(Options.compilerVersion)]), true);
+      ClearManifestHashes(finalGraph);
+    end;
     // P2 §2.6 — enforce existing PackageReference.ManifestHash lock values before we
     // overwrite them (mismatch is a hard restore failure), then refresh from the receipts.
     // Merged into a single pass so each receipt is read only once.

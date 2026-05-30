@@ -249,6 +249,7 @@ var
   serviceItem : IServiceIndexItem;
   jsonObj : TJsonObject;
   uri : IUri;
+  requestUrl : string;
 begin
   result := nil;
   serviceIndex := GetServiceIndex(cancellationToken);
@@ -278,8 +279,10 @@ begin
     request.WithParameter('version', version.ToStringNoMeta)
   else if includePrerelease then
     request.WithParameter(cPreReleaseParam, LowerCase(BoolToStr(includePrerelease, true)));
+
+  requestUrl := httpClient.GetRequestUrl(request);
   try
-    Logger.Information('GET ' + uri.BaseUriString);
+    Logger.Information('GET ' + requestUrl);
     response := httpClient.Get(request, cancellationToken);
   except
     on ex : Exception do
@@ -292,13 +295,15 @@ begin
   //if the package or package version is not on the server this is fine
   if response.StatusCode = 404 then
   begin
-    Logger.Information('NOTFOUND ' + uri.BaseUriString);
+    Logger.Information('NOTFOUND ' + requestUrl);
     exit;
   end;
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching list from server : ' + response.ErrorMessage);
+    Logger.Error('Error fetching list from server : ' + response.ErrorMessage + ' (' + IntToStr(response.StatusCode) + ')');
+    if response.Response <> '' then
+      Logger.Error('Server response : ' + response.Response);
     exit;
   end;
 
@@ -307,7 +312,7 @@ begin
     Logger.Verbose('Server returned no content');
     exit;
   end;
-  Logger.Information('OK ' + uri.BaseUriString);
+  Logger.Information('OK ' + requestUrl);
 
   try
     jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
@@ -338,6 +343,7 @@ var
   i: Integer;
   uri : IUri;
   resultItem : IPackageSearchResultItem;
+  requestUrl : string;
 begin
   Result := TDPMPackageSearchResult.Create(options.Skip, 0);
   serviceIndex := GetServiceIndex(cancellationToken);
@@ -375,7 +381,9 @@ begin
   if options.Take <> 0 then
     request.WithParameter('take', IntToStr(options.Take));
 
+  requestUrl := httpClient.GetRequestUrl(request);
   try
+    Logger.Information('GET ' + requestUrl);
     response := httpClient.Get(request, cancellationToken);
   except
     on ex : Exception do
@@ -387,7 +395,9 @@ begin
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching search result from server : ' + response.ErrorMessage);
+    Logger.Error('Error fetching search result from server : ' + response.ErrorMessage + ' (' + IntToStr(response.StatusCode) + ')');
+    if response.Response <> '' then
+      Logger.Error('Server response : ' + response.Response);
     exit;
   end;
 
@@ -782,6 +792,7 @@ var
   sVersion : string;
   packageVersion : TPackageVersion;
   uri : IUri;
+  requestUrl : string;
 begin
   result := TCollections.CreateList<TPackageVersion>;
   serviceIndex := GetServiceIndex(cancellationToken);
@@ -805,8 +816,9 @@ begin
                        .WithHeader(cClientVersionHeader,cDPMClientVersion)
                        .WithParameter(cPreReleaseParam, Lowercase(BoolToStr(preRelease, true)));
 
+  requestUrl := httpClient.GetRequestUrl(request);
   try
-    Logger.Information('GET ' + uri.BaseUriString + path);
+    Logger.Information('GET ' + requestUrl);
     response := httpClient.Get(request, cancellationToken);
   except
     on ex : Exception do
@@ -818,10 +830,12 @@ begin
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching versions from server : ' + response.ErrorMessage);
+    Logger.Error('Error fetching versions from server : ' + response.ErrorMessage + ' (' + IntToStr(response.StatusCode) + ')');
+    if response.Response <> '' then
+      Logger.Error('Server response : ' + response.Response);
     exit;
   end;
-  Logger.Information('OK ' + uri.BaseUriString + path);
+  Logger.Information('OK ' + requestUrl);
 
   try
     jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
@@ -863,6 +877,7 @@ var
   packageInfo : IPackageInfo;
   uri : IUri;
   stopwatch : TStopwatch;
+  requestUrl : string;
 begin
   result := TCollections.CreateList<IPackageInfo>;
 
@@ -891,9 +906,12 @@ begin
                         .WithParameter('versionRange', StringReplace(versionRange.ToString, ' ', '', [rfReplaceAll]))
                         .WithParameter('prerel', Lowercase(BoolToStr(preRelease, true)));
 
+  //log the fully assembled url (including the encoded query string) so failures are diagnosable
+  requestUrl := httpClient.GetRequestUrl(request);
+
   stopwatch := TStopwatch.StartNew;
   try
-    Logger.Information('GET ' + uri.BaseUriString + path);
+    Logger.Information('GET ' + requestUrl);
     response := httpClient.Get(request, cancellationToken);
     stopwatch.Stop;
   except
@@ -906,10 +924,12 @@ begin
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching packageinfo from server : ' + response.ErrorMessage);
+    Logger.Error('Error fetching packageinfo from server : ' + response.ErrorMessage + ' (' + IntToStr(response.StatusCode) + ')');
+    if response.Response <> '' then
+      Logger.Error('Server response : ' + response.Response);
     exit;
   end;
-  Logger.Information('OK ' + uri.BaseUriString + path + ' [' + IntTostr(stopwatch.ElapsedMilliseconds) + 'ms]');
+  Logger.Information('OK ' + requestUrl + ' [' + IntTostr(stopwatch.ElapsedMilliseconds) + 'ms]');
 
   try
     jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
@@ -999,6 +1019,7 @@ var
 
   listItem : IPackageListItem;
   I: Integer;
+  requestUrl : string;
 
 begin
   result := TCollections.CreateList<IPackageListItem>;
@@ -1050,7 +1071,9 @@ begin
     request.WithParameter('take', IntToStr(options.Take));
 
 
+  requestUrl := httpClient.GetRequestUrl(request);
   try
+    Logger.Information('GET ' + requestUrl);
     response := httpClient.Get(request, cancellationToken);
   except
     on ex : Exception do
@@ -1062,9 +1085,12 @@ begin
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching list from server : ' + response.ErrorMessage);
+    Logger.Error('Error fetching list from server : ' + response.ErrorMessage + ' (' + IntToStr(response.StatusCode) + ')');
+    if response.Response <> '' then
+      Logger.Error('Server response : ' + response.Response);
     exit;
   end;
+  Logger.Information('OK ' + requestUrl);
 
   try
     jsonObj := TJsonObject.Parse(response.Response) as TJsonObject;

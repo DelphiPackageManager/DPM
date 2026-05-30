@@ -64,6 +64,10 @@ type
   IProjectEditor = interface
   ['{CFF241F9-8B5B-44FC-95FC-6C1A015637E9}']
     function GetCompilerVersion : TCompilerVersion;
+    //the compiler recorded in the <DPMCompiler> element when the project was loaded - i.e. the
+    //compiler the project was last managed by DPM under. Differs from CompilerVersion (the compiler
+    //we are currently operating as) when a project is opened in a newer IDE (in-place upgrade).
+    function GetDPMCompilerVersion : TCompilerVersion;
     function GetPlatforms : TDPMPlatforms;
     function GetProjectVersion : string;
     function GetAppType : TAppType;
@@ -101,6 +105,7 @@ type
     function SaveProject(const fileName : string = '') : boolean;
 
     property CompilerVersion : TCompilerVersion read GetCompilerVersion write SetCompiler;
+    property DPMCompilerVersion : TCompilerVersion read GetDPMCompilerVersion;
     property ProjectVersion  : string read GetProjectVersion;
     property Platforms : TDPMPlatforms read GetPlatforms;
     property AppType : TAppType read GetAppType;

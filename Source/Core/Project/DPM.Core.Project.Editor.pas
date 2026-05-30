@@ -84,6 +84,7 @@ type
 
     function GetPlatforms : TDPMPlatforms;
     function GetCompilerVersion : TCompilerVersion;
+    function GetDPMCompilerVersion : TCompilerVersion;
     function GetProjectVersion : string;
     function GetAppType : TAppType;
     function GetHasPackages : boolean;
@@ -404,6 +405,16 @@ end;
 function TProjectEditor.GetCompilerVersion : TCompilerVersion;
 begin
   result := FCompiler;
+end;
+
+function TProjectEditor.GetDPMCompilerVersion : TCompilerVersion;
+begin
+  //FDPMCompilerVersion is the raw <DPMCompiler> text captured at load - the compiler the project
+  //was last managed by DPM under. Empty (UnknownVersion) when the project has no DPM marker.
+  if FDPMCompilerVersion = '' then
+    result := TCompilerVersion.UnknownVersion
+  else
+    result := StringToCompilerVersion(FDPMCompilerVersion);
 end;
 
 function TProjectEditor.GetConfigNames: IReadOnlyList<string>;
