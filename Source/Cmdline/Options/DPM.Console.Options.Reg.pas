@@ -599,6 +599,18 @@ begin
     end);
   option.HasValue := false;
 
+  option := cmd.RegisterOption<integer>('retries','','Number of times to retry the push when the server is rate-limiting (429) or temporarily unavailable (502/503/504). Default 3. Use 0 to disable.',
+   procedure(const value : integer)
+    begin
+        TPushOptions.Default.MaxRetries := value;
+    end);
+
+  option := cmd.RegisterOption<integer>('retryDelay','','Base delay in seconds between retries when the server does not send a Retry-After header. Default 2. Backoff is exponential with jitter.',
+   procedure(const value : integer)
+    begin
+        TPushOptions.Default.RetryDelay := value;
+    end);
+
 
   cmd.Examples.Add('push .\VSoft.SemanticVersion.1.0.1.dpkg -source=local');
   cmd.Examples.Add('push .\VSoft.SemanticVersion.1.0.1.dpkg -source=corporate -apiKey=abcdef');
@@ -1214,7 +1226,7 @@ begin
 
   cmd.RegisterOption<string>('format', 'f',
     'Comma-separated list of output formats: cyclonedx | spdx | html | markdown. ' +
-    'Aliases: ''both'' = cyclonedx,spdx; ''all'' = every format. Default: cyclonedx,spdx.',
+    'Aliases: ''both'' = cyclonedx,spdx; ''all'' = every format. Default: cyclonedx.',
     procedure(const value : string)
     begin
       TSBOMOptions.Default.Formats := StringToSBOMFormats(value);

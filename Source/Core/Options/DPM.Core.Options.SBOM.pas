@@ -44,7 +44,10 @@ type
   TSBOMFormats = set of TSBOMFormat;
 
 const
-  cDefaultSBOMFormats : TSBOMFormats = [TSBOMFormat.CycloneDX, TSBOMFormat.SPDX];
+  cDefaultSBOMFormats : TSBOMFormats = [TSBOMFormat.CycloneDX];
+  //'both' is an alias for the two machine-readable formats - kept separate from
+  //the default so the default can be just CycloneDX while 'both' still means both.
+  cBothSBOMFormats : TSBOMFormats = [TSBOMFormat.CycloneDX, TSBOMFormat.SPDX];
   cAllSBOMFormats : TSBOMFormats = [TSBOMFormat.CycloneDX, TSBOMFormat.SPDX, TSBOMFormat.HTML, TSBOMFormat.Markdown];
 
 type
@@ -91,7 +94,7 @@ type
 function StringToSBOMFormat(const value : string) : TSBOMFormat;
 //Parses a comma-separated list of tokens to a format set. Accepts aliases
 //'both' (= cyclonedx + spdx) and 'all' (every format). Empty input maps to
-//the default ([CycloneDX, SPDX]).
+//the default ([CycloneDX]).
 function StringToSBOMFormats(const value : string) : TSBOMFormats;
 function SBOMFormatToString(const value : TSBOMFormat) : string;
 
@@ -146,10 +149,10 @@ begin
       if token = 'all' then
         result := result + cAllSBOMFormats
       else if token = 'both' then
-        result := result + cDefaultSBOMFormats
+        result := result + cBothSBOMFormats
       else if token = 'json' then
         //Convenience alias for 'all the machine-readable formats'.
-        result := result + [TSBOMFormat.CycloneDX, TSBOMFormat.SPDX]
+        result := result + cBothSBOMFormats
       else
         Include(result, StringToSBOMFormat(token));
     end;
