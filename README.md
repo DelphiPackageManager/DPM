@@ -14,14 +14,18 @@ DPM's initial developer is Vincent Parrett (DUnitX, FinalBuilder, Continua CI). 
 
 ## DPM Status
 
-DPM is still in development, so not all functionality is ready yet. At this time, it's at the stage where we are encouraging library authors to take a look and play with it and provide feedback (and perhaps get involved in the development). It's very much at a minimum viable product stage.
+DPM is in BETA, so whilst most features should work, there may be bugs. We're using it in production to build FinalBuilder and Automise.
 
 ### What works
 
-- Creating packages
-- Installing packages, including dependencies
-- Restoring packages, including dependencies.
-- Pushing packages to a package source.
+- Creating packages (library authors)
+- Pushing packages to a package source (directory or server)
+- Installing and Restoring packages, including dependencies and design time components.
+- Multiple package sources
+- Package Signing - both Author (using a code signing certificate) and Repository signing (automatic).
+- Repository and Author Trust.
+- SBOM generation.
+- CLI and IDE plugin clients.
 
 ## How do I use it
 
@@ -31,15 +35,15 @@ The command line documentation can be found [here](https://docs.delphi.dev/comma
 
 ## Is DPM integrated into the Delphi IDE
 
-Yes, the installer available under the releases section includes IDE plugins for XE2-11.3
+Yes, the installer available under the releases section includes IDE plugins for XE2-13.0
 
 ## Is there a central package source
 
-Yes, you can [find it here](https://delphi.dev) - although publishing packages is currently limited while we flesh out the user interface (update coming soon).
+Yes, you can [find it here](https://delphi.dev) - you only need to signup if you intend to publish packages.
 
 ## Is my old version of Delphi supported
 
-Delphi XE2-12.x are currently supported.
+Delphi XE2-13.1 are currently supported.
 
 All target [platforms](https://docs.delphi.dev/platforms.html) for supported compiler versions are supported.
 
@@ -50,7 +54,7 @@ Whilst we would like to support C++Builder, we would need some help - we're delp
 
 ## Does it support design-time components
 
-Not yet, but that is being worked on.
+YES.
 
 ## How does it work
 
