@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -69,6 +69,7 @@ type
     FMaxWidth : integer;
     FUpdating : boolean;
     FUpdatingScrollBars : boolean;
+    FUpdateCount : integer;
 
     FStyleServices : TCustomStyleServices;
 
@@ -109,12 +110,14 @@ type
     procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
     procedure WMVScroll(var Message: TWMVScroll); message WM_VSCROLL;
     procedure WMHScroll(var Message: TWMHScroll); message WM_HSCROLL;
+    procedure WMSize(var Message: TWMSize); message WM_SIZE;
 
     procedure CMEnter(var Message: TCMEnter); message CM_ENTER;
     procedure CMExit(var Message: TCMExit); message CM_EXIT;
     procedure CMMouseEnter(var Msg: TMessage); message CM_MouseEnter;
     procedure CMMouseLeave(var Msg: TMessage); message CM_MouseLeave;
     procedure CMStyleChanged(var Message: TMessage); message CM_STYLECHANGED;
+    procedure CMShowingChanged(var Message: TMessage); message CM_SHOWINGCHANGED;
 
 
     procedure DoLineUp(const fromScrollBar : boolean);
@@ -144,9 +147,12 @@ type
     class constructor Create;
     class destructor Destroy;
 
+    procedure Invalidate; override;
     procedure Clear;
     procedure AddRow(const value : string; const messageType : TLogMessageType);
     procedure CheckTheme;
+    procedure BeginUpdate;
+    procedure EndUpdate;
 
 
     property RowCount : integer read GetRowCount;
@@ -219,6 +225,31 @@ begin
   ScrollInView(idx);
 end;
 
+procedure TLogMemo.BeginUpdate;
+begin
+  Inc(FUpdateCount);
+end;
+
+procedure TLogMemo.EndUpdate;
+begin
+  Dec(FUpdateCount);
+  if FUpdateCount <= 0 then
+  begin
+    FUpdateCount := 0;
+    if HandleAllocated then
+    begin
+      UpdateVisibleRows;
+      Invalidate;
+    end;
+  end;
+end;
+
+procedure TLogMemo.Invalidate;
+begin
+  if FUpdateCount = 0 then
+    inherited;
+end;
+
 procedure TLogMemo.Clear;
 begin
   FMaxWidth := -1;
@@ -267,6 +298,18 @@ procedure TLogMemo.CMStyleChanged(var Message: TMessage);
 begin
   inherited;
   CheckTheme;
+end;
+
+procedure TLogMemo.CMShowingChanged(var Message: TMessage);
+begin
+  inherited;
+  //when the control first becomes visible without a size change, the deferred WM_PAINT
+  //can get starved if a long synchronous op starts immediately - force a paint now.
+  if Showing and HandleAllocated then
+  begin
+    UpdateVisibleRows;
+    RedrawWindow(Handle, nil, 0, RDW_ERASE or RDW_INVALIDATE or RDW_UPDATENOW);
+  end;
 end;
 
 class constructor TLogMemo.Create;
@@ -327,6 +370,7 @@ begin
   BevelOuter := bvNone;
   Ctl3D := false;
   FMaxWidth := -1;
+  FUpdateCount := 0;
   FStyleServices := Vcl.Themes.StyleServices;
 
   FMessageColors[TThemeType.Light][mtDebug] := $00BBBBBB;
@@ -1029,9 +1073,9 @@ begin
   UpdateScrollBars;
   Invalidate;
 
-//  //force repainting scrollbars
-//  if sfHandleMessages in StyleServices.Flags then
-//    SendMessage(Handle, WM_NCPAINT, 0, 0);
+  //force repainting scrollbars
+  if sfHandleMessages in FStyleServices.Flags then
+    SendMessage(Handle, WM_NCPAINT, 0, 0);
   inherited;
 end;
 
@@ -1315,6 +1359,13 @@ begin
     GetScrollInfo(Self.Handle,SB_VERT, info);
     Self.ScrollBarScroll(Self, TScrollCode(ScrollCode), info.nTrackPos);
   end;
+end;
+
+procedure TLogMemo.WMSize(var Message: TWMSize);
+begin
+  inherited;
+  //force a synchronous repaint on show/resize rather than relying on a deferred WM_PAINT
+  RedrawWindow(Handle, nil, 0, RDW_ERASE or RDW_INVALIDATE or RDW_UPDATENOW);
 end;
 
 end.
