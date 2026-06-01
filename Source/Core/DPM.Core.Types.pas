@@ -245,6 +245,8 @@ function StringToCompilerVersion(const value : string) : TCompilerVersion;
 
 var
   candidate : string;
+  numericPart : string;
+  major : integer;
 begin
   //handle shortcuts from cmdline (XE2, 10.4, 11, ...) by prefixing with 'delphi' if missing.
   //then normalise '.' to '_' to match the enum identifiers (e.g. Delphi10_4).
@@ -256,9 +258,25 @@ begin
   if TryMatch(candidate, result) then
     exit;
 
-  //Major-only enums (Delphi11, Delphi12, Delphi13, DelphiXE2..8) don't carry a _0 suffix,
-  //but published file/version strings often do ('12.0', '11.0'). Strip a trailing '_0' and
-  //retry so 12.0 -> Delphi12, 13.0 -> Delphi13, XE2.0 -> DelphiXE2 all resolve.
+  //Major-only shortcuts: from Delphi 11 on, Embarcadero dropped point releases, so authors
+  //write '11'/'12'/'13'. The enum identifiers still carry the _0 (Delphi11_0), so append
+  //'_0' and retry. A bare '10' likewise resolves to Delphi10_0 (the .0 release).
+  if TryMatch(candidate + '_0', result) then
+    exit;
+
+  //For Delphi 11+, a point/update suffix is just an update of the .0 release ('12.3' is
+  //12.0 Update 3), so collapse it to the major's _0 enum. Extract the leading major (digits
+  //after 'delphi', before the first '_'); when >= 11, match against 'delphi{major}_0'.
+  //The 10.x line is left alone here - its points are distinct enums handled by the exact match.
+  numericPart := Copy(candidate, 7, MaxInt);        // strip the 'delphi' prefix
+  if Pos('_', numericPart) > 0 then
+    numericPart := Copy(numericPart, 1, Pos('_', numericPart) - 1);
+  if TryStrToInt(numericPart, major) and (major >= 11) then
+    if TryMatch('delphi' + numericPart + '_0', result) then
+      exit;
+
+  //XE inputs sometimes carry a spurious point ('xe2.0'); the XE enums have no _0 suffix,
+  //so strip a trailing '_0' and retry.
   if (Length(candidate) > 2) and (Copy(candidate, Length(candidate) - 1, 2) = '_0') then
   begin
     if TryMatch(Copy(candidate, 1, Length(candidate) - 2), result) then
