@@ -137,9 +137,6 @@ type
                                          const topLevelGraph: IPackageReference; const preferredVersions: IDictionary<string, TPackageVersion>;
                                          out resultGraph: IPackageReference; out resolvedPackages: IList<IPackageInfo>): boolean;
 
-    // Calculates the intersection of project platforms with platforms supported by ALL resolved packages
-    function GetEffectivePlatforms(const projectPlatforms: TDPMPlatforms; const packageSpecs: IDictionary<string, IPackageSpec>): TDPMPlatforms;
-
     // Common configuration logic for install/restore - builds, collects search paths, copies local, installs design packages
     function DoConfigurePackageForPlatform(const cancellationToken: ICancellationToken; const options: TSearchOptions;
       const projectFile: string; const projectEditor: IProjectEditor; const platform: TDPMPlatform;
@@ -329,7 +326,10 @@ begin
         begin
           result := SameText(pkg.Id, node.Id);
         end);
-      Assert(pkgInfo <> nil, 'pkgInfo is null for id [' + node.Id + '], but should never be');
+      // A graph node may legitimately be absent from resolvedPackages when it has been
+      // excluded for this platform (it doesn't support it) - nothing to propagate then.
+      if pkgInfo = nil then
+        exit;
       pkgInfo.UseSource := pkgInfo.UseSource or node.UseSource;
     end);
 
@@ -1188,29 +1188,6 @@ begin
 
 end;
 
-function TPackageInstaller.GetEffectivePlatforms(const projectPlatforms: TDPMPlatforms; const packageSpecs: IDictionary<string, IPackageSpec>): TDPMPlatforms;
-var
-  packageId: string;
-  spec: IPackageSpec;
-  packagePlatforms: TDPMPlatforms;
-begin
-  // Start with all project platforms
-  result := projectPlatforms;
-
-  // Intersect with each package's supported platforms
-  for packageId in packageSpecs.Keys do
-  begin
-    spec := packageSpecs[packageId];
-    if (spec <> nil) and (spec.TargetPlatform <> nil) then
-    begin
-      packagePlatforms := spec.TargetPlatform.Platforms;
-      // Only intersect if the package actually declares platform support
-      if packagePlatforms <> [] then
-        result := result * packagePlatforms;  // Set intersection
-    end;
-  end;
-end;
-
 function TPackageInstaller.DoConfigurePackageForPlatform(const cancellationToken: ICancellationToken; const options: TSearchOptions;
   const projectFile: string; const projectEditor: IProjectEditor; const platform: TDPMPlatform;
   const config: IConfiguration; const projectPackageGraph: IPackageReference;
@@ -1220,30 +1197,68 @@ var
   compiledPackages: IList<IPackageInfo>;
   packageSearchPaths: IList<string>;
   packageCompiler: ICompiler;
+  supportedPackages: IList<IPackageInfo>;
+  unsupportedPackageIds: IList<string>;
+  packageInfo: IPackageInfo;
+  spec: IPackageSpec;
+  unsupportedList: string;
+  id: string;
 begin
   result := false;
 
-  // Check if this platform is supported by all resolved packages
-  // If not, skip configuration for this platform (not an error)
-  if not (platform in GetEffectivePlatforms([platform], packageSpecs)) then
+  // Partition the resolved packages into those that support this platform and those that
+  // don't. Rather than abandoning the whole platform when a single package lacks support,
+  // we configure the supporting packages and report the rest so the user can fix them
+  // (remove the package or pick a version that supports the platform) and keep working.
+  supportedPackages := TCollections.CreateList<IPackageInfo>;
+  unsupportedPackageIds := TCollections.CreateList<string>;
+  for packageInfo in resolvedPackages do
   begin
-    FLogger.Information('Platform [' + DPMPlatformToString(platform) + '] skipped - not supported by one or more packages', true);
+    spec := packageSpecs[LowerCase(packageInfo.Id)];
+    // Only treat as unsupported when the package actually declares platform support and
+    // this platform isn't in it - a package that declares nothing is left to the existing
+    // downstream handling rather than being excluded here.
+    if (spec <> nil) and (spec.TargetPlatform <> nil) and (spec.TargetPlatform.Platforms <> []) and
+       (not (platform in spec.TargetPlatform.Platforms)) then
+      unsupportedPackageIds.Add(packageInfo.Id)
+    else
+      supportedPackages.Add(packageInfo);
+  end;
+
+  if unsupportedPackageIds.Count > 0 then
+  begin
+    unsupportedList := '';
+    for id in unsupportedPackageIds do
+    begin
+      if unsupportedList <> '' then
+        unsupportedList := unsupportedList + ', ';
+      unsupportedList := unsupportedList + id;
+    end;
+    FLogger.Warning('Platform [' + DPMPlatformToString(platform) + '] not supported by package(s): ' + unsupportedList +
+      ' - these packages are skipped for this platform. Remove them or select a version that supports [' +
+      DPMPlatformToString(platform) + '].', true);
+  end;
+
+  // Nothing supports this platform - skip it entirely (not an error).
+  if supportedPackages.Count = 0 then
+  begin
+    FLogger.Information('Platform [' + DPMPlatformToString(platform) + '] skipped - not supported by any packages', true);
     result := true;
     exit;
   end;
 
   compiledPackages := TCollections.CreateList<IPackageInfo>;
-  packagesToCompile := TCollections.CreateList<IPackageInfo>(resolvedPackages);
+  packagesToCompile := TCollections.CreateList<IPackageInfo>(supportedPackages);
   packageSearchPaths := TCollections.CreateList<string>;
   packageCompiler := FCompilerFactory.CreateCompiler(options.compilerVersion, platform);
 
   if not BuildDependencies(cancellationToken, packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs, options) then
     exit;
 
-  if not CollectSearchPaths(projectPackageGraph, resolvedPackages, compiledPackages, projectEditor.compilerVersion, platform, packageSearchPaths) then
+  if not CollectSearchPaths(projectPackageGraph, supportedPackages, compiledPackages, projectEditor.compilerVersion, platform, packageSearchPaths) then
     exit;
 
-  if not CopyLocal(cancellationToken, resolvedPackages, packageSpecs, projectEditor, platform) then
+  if not CopyLocal(cancellationToken, supportedPackages, packageSpecs, projectEditor, platform) then
     exit;
 
   //Design packages are per-IDE/compiler, not per-platform - the call is hoisted out to the
