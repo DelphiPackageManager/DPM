@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
@@ -88,6 +88,7 @@
         <DCC_UsePackage>rtl;$(DCC_UsePackage)</DCC_UsePackage>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
+        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
         <BT_BuildType>Debug</BT_BuildType>
         <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;$(DCC_Namespace)</DCC_Namespace>
         <VerInfo_IncludeVerInfo>false</VerInfo_IncludeVerInfo>
@@ -119,7 +120,6 @@
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
         <Debugger_RunParams>sign VSoft.YAML-delphixe5-0000101010010011-1.5.5.dpkg -provider=signotaur -endpoint=https://localhost:7575 -api-key=AQAAAA_Pv-SqjWZjO918tgRxTiXU6QTtzGtmZ7-0ebU8WrEXE= -label=MyCert -allow-untrusted -v=debug</Debugger_RunParams>
         <ILINK_MapFileType>DetailedSegments</ILINK_MapFileType>
-        <OutputExt>2.exe</OutputExt>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_4_Win32)'!=''">
         <DCC_Define>JCLDEBUG;$(DCC_Define)</DCC_Define>
