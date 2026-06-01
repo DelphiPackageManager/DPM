@@ -4,6 +4,7 @@ interface
 
 uses
   System.SysUtils,
+  System.Generics.Defaults,
   DUnitX.TestFramework,
   Spring.Collections,
   VSoft.CancellationToken,
@@ -81,6 +82,8 @@ type
     function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
     function GetPackageHash(const packageId : IPackageIdentity) : string;
     function FullReVerify : integer;
+    function GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
+    function RemovePackage(const packageId : IPackageIdentity) : boolean;
   public
     constructor Create;
     ///<summary>Register a package info under its identity key (id|version|compiler) so
@@ -368,11 +371,11 @@ begin
   end;
   //Match the real TPackageRepositoryManager - descending sort so the resolver's first-match loop
   //picks the highest in-range version (including prereleases when allowed).
-  filtered.Sort(
+  filtered.Sort(TComparer<IPackageInfo>.Construct(
     function(const left, right : IPackageInfo) : integer
     begin
       result := right.Version.CompareTo(left.Version);
-    end);
+    end));
   result := filtered;
 end;
 
@@ -488,11 +491,11 @@ begin
   end;
   //Mirror the real TPackageCache - descending sort so the resolver's first-match loop
   //picks the highest in-range version, not the order tests happened to add them in.
-  filtered.Sort(
+  filtered.Sort(TComparer<IPackageInfo>.Construct(
     function(const left, right : IPackageInfo) : integer
     begin
       result := right.Version.CompareTo(left.Version);
-    end);
+    end));
   result := filtered;
 end;
 
@@ -575,6 +578,17 @@ function TFakePackageCache.FullReVerify : integer;
 begin
   // Resolver tests don't exercise signing; nothing to re-verify.
   result := 0;
+end;
+
+function TFakePackageCache.GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
+begin
+  // Resolver tests don't exercise cache removal.
+  result := TCollections.CreateList<IPackageIdentity>;
+end;
+
+function TFakePackageCache.RemovePackage(const packageId : IPackageIdentity) : boolean;
+begin
+  result := false;
 end;
 
 //-----------------------------------------------------------------------------

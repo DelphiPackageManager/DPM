@@ -78,6 +78,8 @@ type
     function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
     function GetPackageHash(const packageId : IPackageIdentity) : string;
     function FullReVerify : integer;
+    function GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
+    function RemovePackage(const packageId : IPackageIdentity) : boolean;
   public
     constructor Create(const folder : string);
   end;
@@ -122,6 +124,11 @@ begin
 end;
 function TStubCache.GetPackageHash(const packageId : IPackageIdentity) : string; begin result := ''; end;
 function TStubCache.FullReVerify : integer; begin result := 0; end;
+function TStubCache.GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
+begin
+  result := TCollections.CreateList<IPackageIdentity>;
+end;
+function TStubCache.RemovePackage(const packageId : IPackageIdentity) : boolean; begin result := false; end;
 
 function TSigningBadgeTests.MakeTempFolder : string;
 var
