@@ -1296,6 +1296,11 @@ procedure TPackageDetailsFrame.DoUpdateVersions(const sReferenceVersion : string
   var
     version : TPackageVersion;
 begin
+  //the package may have been deselected (FPackageMetaData set to nil in SetPackage)
+  //while an async version request was in flight - nothing to update in that case.
+  if FPackageMetaData = nil then
+    exit;
+
   cboVersions.Items.BeginUpdate;
   try
     cboVersions.Clear;
@@ -1343,6 +1348,9 @@ var
 
 begin
   FVersionsDelayTimer.Enabled := false;
+  //a queued/already-fired tick can run after the package was deselected.
+  if FPackageMetaData = nil then
+    exit;
   if FRequestInFlight then
     FCancellationTokenSource.Cancel;
   while FRequestInFlight do
@@ -1404,9 +1412,12 @@ begin
       if FClosing then
         exit;
       FLogger.Debug('Got package versions .');
+      //the package may have been deselected while this request was in flight - drop the stale result.
       if FPackageMetaData <> nil then
+      begin
         UpdateVersionsCache(FPackageMetaData.Id, includePreRelease, versions);
-      DoUpdateVersions(sReferenceVersion, versions);
+        DoUpdateVersions(sReferenceVersion, versions);
+      end;
     end);
 
 end;

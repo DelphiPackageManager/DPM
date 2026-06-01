@@ -56,6 +56,13 @@ type
     function UnInstall(const cancellationToken : ICancellationToken; const options : TUnInstallOptions; const context : IPackageInstallerContext) : boolean;
     function Restore(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const context : IPackageInstallerContext) : boolean;
     function Cache(const cancellationToken : ICancellationToken; const options : TCacheOptions) : boolean;
+
+    /// <summary> Cheap check used by the IDE to decide whether opening this project should
+    ///  trigger a restore (and therefore show the log window). Loads only the PackageReferences
+    ///  from the dproj. Returns False only when the project loads cleanly and has no dpm package
+    ///  references; returns True if unsure (e.g. load failure) so restore still proceeds and any
+    ///  real problem is surfaced through the normal path. </summary>
+    function ProjectHasPackageReferences(const projectFile : string; const compilerVersion : TCompilerVersion) : boolean;
   end;
 
   ///<summary> The installer context is use to collect package resolutions and detect

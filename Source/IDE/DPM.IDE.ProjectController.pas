@@ -195,6 +195,15 @@ begin
 
   if FCancellationTokenSource.Token.IsCancelled then
     exit;
+
+  // Don't trigger a restore (which shows the log window) for projects that don't use dpm.
+  // Keeps the log window hidden when loading projects/groups with no PackageReferences.
+  if not FPackageInstaller.ProjectHasPackageReferences(fileName, IDECompilerVersion) then
+  begin
+    FLogger.Debug('ProjectController.RestoreProject : no package references, skipping : ' + fileName);
+    exit;
+  end;
+
   options := TRestoreOptions.Create;
   options.ApplyCommon(TCommonOptions.Default);
   options.ProjectPath := fileName;

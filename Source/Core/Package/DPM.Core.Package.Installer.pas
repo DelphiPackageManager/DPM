@@ -204,6 +204,8 @@ type
 
     function Cache(const cancellationToken: ICancellationToken; const Options: TCacheOptions): boolean;
 
+    function ProjectHasPackageReferences(const projectFile : string; const compilerVersion : TCompilerVersion) : boolean;
+
   public
     constructor Create(const logger: ILogger;
       const configurationManager: IConfigurationManager;
@@ -253,6 +255,25 @@ begin
   //One .dpkg per compiler in the new model - it bundles every platform the package supports,
   //so a single download covers them all.
   result := DoCachePackage(cancellationToken, Options);
+end;
+
+function TPackageInstaller.ProjectHasPackageReferences(const projectFile : string; const compilerVersion : TCompilerVersion) : boolean;
+var
+  projectEditor : IProjectEditor;
+  fullPath : string;
+begin
+  result := true; // if we can't load the project, let restore proceed so any problem is surfaced
+  fullPath := projectFile;
+  if TPathUtils.IsRelativePath(fullPath) then
+  begin
+    fullPath := TPath.Combine(GetCurrentDir, fullPath);
+    fullPath := TPathUtils.CompressRelativePath(fullPath);
+  end;
+  //Reading PackageReferences is pure xml - the config is only used by the search path code,
+  //not when loading [PackageRefs], so we don't need a config here.
+  projectEditor := TProjectEditor.Create(FLogger, nil, compilerVersion);
+  if projectEditor.LoadProject(fullPath, [TProjectElement.PackageRefs]) then
+    result := projectEditor.HasPackages;
 end;
 
 function TPackageInstaller.CollectPlatformsFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration): boolean;
