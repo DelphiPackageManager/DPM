@@ -118,6 +118,23 @@ type
     /// </summary>
     function FullReVerify : integer;
 
+    /// <summary>
+    ///  Returns the cached package versions matching the filter, for `dpm cache
+    ///  remove`. A blank version matches every cached version of the id; passing
+    ///  UnknownVersion as compilerVersion matches every compiler folder. Unions
+    ///  extracted version folders and raw .dpkg filenames so a downloaded-but-
+    ///  never-extracted package is still found. Empty list when nothing matches.
+    /// </summary>
+    function GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
+
+    /// <summary>
+    ///  Removes a single cached id-compiler-version: deletes its extracted
+    ///  folder and the matching .dpkg + .sha256 sidecar so the next install
+    ///  re-downloads, and drops the in-memory memo entry. Returns true if
+    ///  anything was deleted.
+    /// </summary>
+    function RemovePackage(const packageId : IPackageIdentity) : boolean;
+
     property Location : string read GetLocation write SetLocation;
     property PackagesFolder : string read GetPackagesFolder;
   end;

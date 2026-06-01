@@ -120,6 +120,9 @@ type
 
     function FullReVerify : integer;
 
+    function GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
+    function RemovePackage(const packageId : IPackageIdentity) : boolean;
+
   public
     constructor Create(const logger : ILogger;
                        const specReader : IPackageSpecReader;
@@ -685,6 +688,173 @@ begin
   result := LowerCase(packageId.Id) + '|' +
             CompilerToString(packageId.CompilerVersion) + '|' +
             packageId.Version.ToStringNoMeta;
+end;
+
+function TPackageCache.GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
+var
+  packagesRoot : string;
+  compilerFolders : TStringDynArray;
+  compilerName : string;
+  thisCompiler : TCompilerVersion;
+  idFolder : string;
+  versionFolders : TStringDynArray;
+  dpkgFiles : TStringDynArray;
+  i, j : integer;
+  versionName : string;
+  candidateVersion : TPackageVersion;
+  dpkgIdentity : IPackageIdentity;
+  seen : ISet<string>;
+  key : string;
+begin
+  result := TCollections.CreateList<IPackageIdentity>;
+  seen := TCollections.CreateSet<string>;
+
+  packagesRoot := GetPackagesFolder;
+  if not DirectoryExists(packagesRoot) then
+    exit;
+
+  // Which compiler folders to scan - UnknownVersion means "all of them".
+  if compilerVersion <> TCompilerVersion.UnknownVersion then
+  begin
+    SetLength(compilerFolders, 1);
+    compilerFolders[0] := packagesRoot + PathDelim + CompilerToString(compilerVersion);
+  end
+  else
+    compilerFolders := TDirectory.GetDirectories(packagesRoot, '*', TSearchOption.soTopDirectoryOnly);
+
+  for i := 0 to High(compilerFolders) do
+  begin
+    if not DirectoryExists(compilerFolders[i]) then
+      continue;
+    compilerName := ExtractFileName(ExcludeTrailingPathDelimiter(compilerFolders[i]));
+    thisCompiler := StringToCompilerVersion(compilerName);
+    if thisCompiler = TCompilerVersion.UnknownVersion then
+      continue;
+
+    idFolder := compilerFolders[i] + PathDelim + id;
+    if not DirectoryExists(idFolder) then
+      continue;
+
+    // Versions present as extracted folders.
+    versionFolders := TDirectory.GetDirectories(idFolder, '*', TSearchOption.soTopDirectoryOnly);
+    for j := 0 to High(versionFolders) do
+    begin
+      versionName := ExtractFileName(ExcludeTrailingPathDelimiter(versionFolders[j]));
+      if not TPackageVersion.TryParse(versionName, candidateVersion) then
+        continue;
+      if (version <> '') and (not SameText(candidateVersion.ToStringNoMeta, version)) then
+        continue;
+      key := CompilerToString(thisCompiler) + '|' + candidateVersion.ToStringNoMeta;
+      if seen.Contains(key) then
+        continue;
+      seen.Add(key);
+      result.Add(TPackageIdentity.Create('', id, candidateVersion, thisCompiler));
+    end;
+
+    // Versions present only as raw .dpkg files (downloaded, never extracted).
+    dpkgFiles := TDirectory.GetFiles(idFolder, '*' + cPackageFileExt, TSearchOption.soTopDirectoryOnly);
+    for j := 0 to High(dpkgFiles) do
+    begin
+      versionName := ChangeFileExt(ExtractFileName(dpkgFiles[j]), '');
+      if not TPackageIdentity.TryCreateFromString(FLogger, versionName, '', dpkgIdentity) then
+        continue;
+      if (not SameText(dpkgIdentity.Id, id)) or (dpkgIdentity.CompilerVersion <> thisCompiler) then
+        continue;
+      candidateVersion := dpkgIdentity.Version;
+      if (version <> '') and (not SameText(candidateVersion.ToStringNoMeta, version)) then
+        continue;
+      key := CompilerToString(thisCompiler) + '|' + candidateVersion.ToStringNoMeta;
+      if seen.Contains(key) then
+        continue;
+      seen.Add(key);
+      result.Add(TPackageIdentity.Create('', id, candidateVersion, thisCompiler));
+    end;
+  end;
+end;
+
+function TPackageCache.RemovePackage(const packageId : IPackageIdentity) : boolean;
+var
+  packageFolder : string;
+  packageFileFolder : string;
+  searchPattern : string;
+  matchingFiles : TStringDynArray;
+  i : integer;
+  key : string;
+  removedAnything : boolean;
+begin
+  result := false;
+  if packageId = nil then
+    exit;
+
+  removedAnything := false;
+
+  // 1) the extracted per-version folder.
+  packageFolder := GetPackagePath(packageId);
+  if DirectoryExists(packageFolder) then
+  begin
+    try
+      TDirectory.Delete(packageFolder, true);
+      removedAnything := true;
+    except
+      on e : Exception do
+        FLogger.Error('[PackageCache] Unable to remove cached folder [' + packageFolder + '] : ' + e.Message);
+    end;
+  end;
+
+  // 2) the raw .dpkg files + .sha256 sidecars for this version. On-disk name is
+  // {id}-{compiler}-{binPlatforms}-{version}.dpkg - wildcard the platforms segment.
+  packageFileFolder := GetPackageFileFolder(packageId);
+  if DirectoryExists(packageFileFolder) then
+  begin
+    searchPattern := packageId.Id + '-' + CompilerToString(packageId.CompilerVersion) +
+      '-*-' + packageId.Version.ToStringNoMeta + cPackageFileExt;
+    try
+      matchingFiles := TDirectory.GetFiles(packageFileFolder, searchPattern, TSearchOption.soTopDirectoryOnly);
+    except
+      SetLength(matchingFiles, 0);
+    end;
+
+    for i := 0 to High(matchingFiles) do
+    begin
+      try
+        TFile.Delete(matchingFiles[i]);
+        removedAnything := true;
+      except
+        on e : Exception do
+          FLogger.Error('[PackageCache] Unable to remove cached file [' + matchingFiles[i] + '] : ' + e.Message);
+      end;
+      if FileExists(matchingFiles[i] + cPackageHashAlgorithmExt) then
+      begin
+        try
+          TFile.Delete(matchingFiles[i] + cPackageHashAlgorithmExt);
+        except
+          on e : Exception do
+            FLogger.Debug('[PackageCache] Unable to remove hash sidecar [' + matchingFiles[i] + cPackageHashAlgorithmExt + '] : ' + e.Message);
+        end;
+      end;
+    end;
+
+    // tidy up the now-empty id folder so the cache doesn't accumulate stubs.
+    try
+      if Length(TDirectory.GetFileSystemEntries(packageFileFolder)) = 0 then
+        TDirectory.Delete(packageFileFolder, false);
+    except
+      //best effort - leaving an empty folder is harmless.
+    end;
+  end;
+
+  // 3) drop the in-memory memo so a later re-add / re-install re-reads from disk.
+  key := MakeCacheKey(packageId);
+  FCacheLock.Enter;
+  try
+    FInfoCache.Remove(key);
+    FSpecCache.Remove(key);
+    FExtractionVerified.Remove(key);
+  finally
+    FCacheLock.Leave;
+  end;
+
+  result := removedAnything;
 end;
 
 function TPackageCache.CreatePackagePath(const packageId : IPackageIdentity) : string;

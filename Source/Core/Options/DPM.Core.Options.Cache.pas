@@ -34,12 +34,19 @@ uses
   DPM.Core.Options.Search;
 
 type
+  // `dpm cache <add|remove|verify>`. Plain names so VSoft's RTTI enum parser
+  // maps the positional sub-command argument directly (same pattern as
+  // TSourcesSubCommand). Invalid is ordinal 0 / the default.
+  TCacheSubCommand = (Invalid, Add, Remove, Verify);
+
   TCacheOptions = class(TSearchOptions)
   private
     FPreRelease : boolean;
     FVersionString : string;
     FVersion : TPackageVersion;
     FVerifyAll : boolean;
+    FCommand : TCacheSubCommand;
+    FForce : boolean;
     class var
       FDefault : TCacheOptions;
   protected
@@ -59,9 +66,16 @@ type
     property VersionString : string read FVersionString write FVersionString;
     property Version : TPackageVersion read FVersion write FVersion;
 
+    // Which sub-command was requested. The CLI dispatches on this.
+    property Command : TCacheSubCommand read FCommand write FCommand;
+
+    // `dpm cache remove --force` — skip the y/N confirmation prompt.
+    property Force : boolean read FForce write FForce;
+
     // `dpm cache verify` — re-hash every cached package against its manifest
     // and re-run signature verification (plan §1.6, V-34). When set, the
-    // PackageId / Compiler / Version checks below are skipped.
+    // PackageId / Compiler / Version checks below are skipped. Kept in sync
+    // with Command = Verify by the option registration.
     property VerifyAll : boolean read FVerifyAll write FVerifyAll;
 
   end;
@@ -92,11 +106,15 @@ begin
   FPreRelease := original.FPreRelease;
   FVersionString := original.FVersionString;
   FVersion := original.FVersion;
+  FVerifyAll := original.FVerifyAll;
+  FCommand := original.FCommand;
+  FForce := original.FForce;
 end;
 
 class constructor TCacheOptions.CreateDefault;
 begin
   FDefault := TCacheOptions.Create;
+  FDefault.FCommand := TCacheSubCommand.Invalid;
 end;
 
 function TCacheOptions.GetPackageId : string;
@@ -116,46 +134,80 @@ begin
   //must call inherited
   result := inherited Validate(logger);
 
-  // `dpm cache verify` takes no positional args — short-circuit the
-  // package-id / compiler / version checks that the package-download form
-  // requires.
-  if FVerifyAll then
-  begin
-    FIsValid := result;
-    exit;
-  end;
+  case FCommand of
+    TCacheSubCommand.Invalid :
+      begin
+        logger.Error('A sub-command is required: add, remove or verify.');
+        result := false;
+      end;
 
-  if TCacheOptions.Default.PackageId = '' then
-  begin
-    logger.Error('The <packageId> option must be specified.');
-    result := false;
-  end;
+    // `dpm cache verify` takes no positional args — short-circuit the
+    // package-id / compiler / version checks that the other forms require.
+    TCacheSubCommand.Verify : ; //nothing else to validate
 
-  if ConfigFile = '' then
-  begin
-    logger.Error('No configuration file specified');
-    exit;
-  end;
+    TCacheSubCommand.Add :
+      begin
+        if PackageId = '' then
+        begin
+          logger.Error('The <packageId> option must be specified.');
+          result := false;
+        end;
 
-  if not TRegEx.IsMatch(PackageId, cPackageIdRegex) then
-  begin
-    logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
-    result := false;
-  end;
+        if ConfigFile = '' then
+        begin
+          logger.Error('No configuration file specified');
+          FIsValid := false;
+          result := false;
+          exit;
+        end;
 
-  if VersionString <> '' then
-  begin
-    if not TPackageVersion.TryParseWithError(VersionString, FVersion, error) then
-    begin
-      logger.Error('The specified package Version  [' + VersionString + '] is not a valid version - ' + error);
-      result := false;
-    end;
-  end;
+        if not TRegEx.IsMatch(PackageId, cPackageIdRegex) then
+        begin
+          logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
+          result := false;
+        end;
 
-  if TCacheOptions.Default.CompilerVersion = TCompilerVersion.UnknownVersion then
-  begin
-    logger.Error('Compiler option is required');
-    result := false;
+        if VersionString <> '' then
+        begin
+          if not TPackageVersion.TryParseWithError(VersionString, FVersion, error) then
+          begin
+            logger.Error('The specified package Version  [' + VersionString + '] is not a valid version - ' + error);
+            result := false;
+          end;
+        end;
+
+        if CompilerVersion = TCompilerVersion.UnknownVersion then
+        begin
+          logger.Error('Compiler option is required');
+          result := false;
+        end;
+      end;
+
+    // `dpm cache remove` needs only a valid package id. Compiler and version
+    // are optional filters - omitting them widens the match (all compilers /
+    // all versions).
+    TCacheSubCommand.Remove :
+      begin
+        if PackageId = '' then
+        begin
+          logger.Error('The <packageId> option must be specified.');
+          result := false;
+        end
+        else if not TRegEx.IsMatch(PackageId, cPackageIdRegex) then
+        begin
+          logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
+          result := false;
+        end;
+
+        if VersionString <> '' then
+        begin
+          if not TPackageVersion.TryParseWithError(VersionString, FVersion, error) then
+          begin
+            logger.Error('The specified package Version  [' + VersionString + '] is not a valid version - ' + error);
+            result := false;
+          end;
+        end;
+      end;
   end;
 
   FIsValid := result;

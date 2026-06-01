@@ -79,36 +79,53 @@ var
   option : IOptionDefinition;
   cmd : TCommandDefinition;
 begin
-  cmd := TOptionsRegistry.RegisterCommand('cache', '', 'Downloads a package to the local package cache, or with `verify` re-checks every package in the cache.','', 'cache <packageId>|verify [options]');
+  cmd := TOptionsRegistry.RegisterCommand('cache', '',
+    'Manages the local package cache. `add` downloads a package into the cache, ' +
+    '`remove` evicts cached package versions (so the next install re-downloads), ' +
+    'and `verify` re-checks every package in the cache.',
+    '', 'cache <add|remove|verify> [packageId] [options]');
 
-  // Positional arg: either a package id (the original behaviour) or the
-  // literal "verify" which triggers FullReVerify (V-34).
-  option := cmd.RegisterUnNamedOption<string>('A valid package Id, or the literal "verify"','packageId',
-   procedure(const value : string)
+  // Positional sub-command. HasValue := false so the enum name is the token.
+  option := cmd.RegisterUnNamedOption<TCacheSubCommand>('Sub-command: add, remove or verify','command',
+   procedure(const value : TCacheSubCommand)
     begin
-      if SameText(value, 'verify') then
-        TCacheOptions.Default.VerifyAll := true
-      else
-        TCacheOptions.Default.PackageId := value;
+      TCacheOptions.Default.Command := value;
+      // Keep VerifyAll in sync for any other reader of the option.
+      TCacheOptions.Default.VerifyAll := value = TCacheSubCommand.Verify;
     end);
   option.Required := true;
+  option.HasValue := false;
 
-  option := cmd.RegisterOption<string>('Version','', 'The package version to cache, if not specified the latest will be downloaded',
+  // Positional package id - required by add/remove, ignored by verify
+  // (enforced in TCacheOptions.Validate).
+  option := cmd.RegisterUnNamedOption<string>('A valid package Id (for add/remove)','packageId',
+   procedure(const value : string)
+    begin
+      TCacheOptions.Default.PackageId := value;
+    end);
+
+  option := cmd.RegisterOption<string>('Version','', 'The package version. For add, the version to download (latest if omitted). For remove, the version to evict (all cached versions if omitted).',
    procedure(const value : string)
     begin
       TCacheOptions.Default.VersionString := value;
     end);
 
-  // The download form requires --compiler, but `cache verify` walks every
-  // compiler folder in the cache and ignores this. Mark optional here and
-  // let TCacheOptions.Validate enforce required-when-not-verify.
-  option := cmd.RegisterOption<string>('compiler','c', 'The compiler version of the package to cache (ignored by `cache verify`).',
+  // add requires --compiler; remove treats it as an optional filter (all
+  // compilers when omitted); verify ignores it. Validate enforces per command.
+  option := cmd.RegisterOption<string>('compiler','c', 'The compiler version. Required by `cache add`; an optional filter for `cache remove`; ignored by `cache verify`.',
    procedure(const value : string)
     begin
       TCacheOptions.Default.CompilerVersion := StringToCompilerVersion(value);
       if TCacheOptions.Default.CompilerVersion = TCompilerVersion.UnknownVersion then
         raise EArgumentException.Create('Invalid compiler version : ' + value);
     end);
+
+  option := cmd.RegisterOption<boolean>('force','f', 'Skip the confirmation prompt for `cache remove`.',
+   procedure(const value : boolean)
+    begin
+      TCacheOptions.Default.Force := value;
+    end);
+  option.HasValue := false;
 
   option := cmd.RegisterOption<string>('Sources','s','The sources from which to install packages',
     procedure(const value : string)
