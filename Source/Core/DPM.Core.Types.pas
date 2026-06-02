@@ -132,6 +132,7 @@ function CompilerNoPrefix(const value : TCompilerVersion) : string;
 function CompilerMajorNoPrefix(const value : TCompilerVersion) : string;
 
 function CompilerToStringNoPoint(const value : TCompilerVersion) : string;
+function CompilerToShortVersion(const value : TCompilerVersion) : string;
 
 function CompilerCodeName(const value : TCompilerVersion) : string;
 function CompilerWithCodeName(const value : TCompilerVersion) : string;
@@ -379,6 +380,13 @@ begin
   i := pos('.', result);
   if i > 0 then
     Delete(result, i, length(result));
+end;
+
+function CompilerToShortVersion(const value : TCompilerVersion) : string;
+begin
+  //"10.4" -> "104", "11.0" -> "110", "XE2" -> "XE2". Pairs with folder schemes
+  //like D104/D110 ($compilershortversion$).
+  result := StringReplace(CompilerNoPrefix(value), '.', '', [rfReplaceAll]);
 end;
 
 

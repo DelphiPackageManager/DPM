@@ -75,19 +75,14 @@
           end
           inherited pnlPackageId: TPanel
             Width = 500
-            StyleElements = [seFont, seClient, seBorder]
             inherited lblPackageId: TLabel
-              StyleElements = [seFont, seClient, seBorder]
             end
           end
           inherited pnlGridHost: TPanel
             Width = 500
-            StyleElements = [seFont, seClient, seBorder]
             inherited pnlVersion: TPanel
               Width = 500
-              StyleElements = [seFont, seClient, seBorder]
               inherited lblVersionTitle: TLabel
-                StyleElements = [seFont, seClient, seBorder]
               end
               inherited btnInstallAll: TSpeedButton
                 Left = 395
@@ -99,7 +94,6 @@
                 Left = 467
               end
               inherited cboVersions: TComboBox
-                StyleElements = [seFont, seClient, seBorder]
               end
             end
           end

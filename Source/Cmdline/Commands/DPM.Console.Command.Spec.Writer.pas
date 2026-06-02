@@ -89,6 +89,7 @@ var
   codeName : string;
   cnp : string;
   cnpDotZero : string;
+  shortVer : string;
 begin
   result := folderName;
   if result = '' then
@@ -105,8 +106,15 @@ begin
 
   if Pos(cnpDotZero, result) > 0 then
     result := StringReplace(result, cnpDotZero, '$compilernoprefix$.0', [rfReplaceAll])
+  else if Pos(cnp, result) > 0 then
+    result := StringReplace(result, cnp, '$compilernoprefix$', [rfReplaceAll])
   else
-    result := StringReplace(result, cnp, '$compilernoprefix$', [rfReplaceAll]);
+  begin
+    //compact "D104"/"D110" folder schemes contain "104"/"110", not the dotted form.
+    shortVer := CompilerToShortVersion(compiler);
+    if Pos(shortVer, result) > 0 then
+      result := StringReplace(result, shortVer, '$compilershortversion$', [rfReplaceAll]);
+  end;
 end;
 
 function JoinRelPath(const parts : array of string) : string;

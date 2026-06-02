@@ -39,6 +39,8 @@ begin
     Exit(CompilerToString(FCompiler))
   else if SameText(Match.Groups[1].Value, 'compilerNoPoint') then
     Exit(CompilerToStringNoPoint(FCompiler))
+  else if SameText(Match.Groups[1].Value, 'compilerShortVersion') then
+    Exit(CompilerToShortVersion(FCompiler))
   else if SameText(Match.Groups[1].Value, 'compilerCodeName') then
     Exit(CompilerCodeName(FCompiler))
   else if SameText(Match.Groups[1].Value, 'compilerWithCodeName') then

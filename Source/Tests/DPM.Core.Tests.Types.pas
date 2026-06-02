@@ -47,6 +47,18 @@ type
     [TestCase('11.2', '11.2,Delphi11_0')]
     [TestCase('13.1', '13.1,Delphi13_0')]
     procedure TestStringToCompilerMajorOnly(const value : string; const expected : string);
+
+    [Test]
+    [TestCase('XE2', 'XE2,XE2')]
+    [TestCase('10.0', '10.0,100')]
+    [TestCase('10.1', '10.1,101')]
+    [TestCase('10.2', '10.2,102')]
+    [TestCase('10.3', '10.3,103')]
+    [TestCase('10.4', '10.4,104')]
+    [TestCase('11.0', '11.0,110')]
+    [TestCase('12.0', '12.0,120')]
+    [TestCase('13.0', '13.0,130')]
+    procedure TestCompilerToShortVersion(const value : string; const expected : string);
   end;
 
 implementation
@@ -78,6 +90,16 @@ begin
   expectedVersion := TCompilerVersion(GetEnumValue(TypeInfo(TCompilerVersion), expected));
   compilerVersion := StringToCompilerVersion(value);
   Assert.AreEqual(Ord(expectedVersion), Ord(compilerVersion));
+end;
+
+procedure TCoreTypesTests.TestCompilerToShortVersion(const value : string; const expected : string);
+var
+  compilerVersion : TCompilerVersion;
+begin
+  //CompilerToShortVersion drops the prefix and the point: "10.4" -> "104", "11.0" -> "110",
+  //"XE2" -> "XE2". Used by the $compilershortversion$ token for D100/D104/D110 folder schemes.
+  compilerVersion := StringToCompilerVersion(value);
+  Assert.AreEqual(expected, CompilerToShortVersion(compilerVersion));
 end;
 
 initialization

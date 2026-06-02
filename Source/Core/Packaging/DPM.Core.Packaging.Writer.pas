@@ -352,6 +352,7 @@ begin
   FVariables['compiler'] := CompilerToString(targetPlatform.Compiler);
   FVariables['compilernoprefix'] := CompilerNoPrefix(targetPlatform.Compiler);
   FVariables['compilernopoint'] := CompilerToStringNoPoint(targetPlatform.Compiler);
+  FVariables['compilershortversion'] := CompilerToShortVersion(targetPlatform.Compiler);
   FVariables['compilercodename'] := CompilerCodeName(targetPlatform.Compiler);
   FVariables['compilerwithcodename'] := CompilerWithCodeName(targetPlatform.Compiler);
 //  FVariables['compilerwithcodename'] := CompilerNoPrefix(targetPlatform.Compiler);

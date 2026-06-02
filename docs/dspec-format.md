@@ -370,6 +370,39 @@ templates:
 |----------|-------------|
 | `$version$` | The package version from metadata (useful in dependencies) |
 
+### Built-in Compiler Variables
+
+These are resolved automatically for the target compiler when packing (and when running
+`prepare`). Example values are shown for Delphi 10.4 Sydney and Delphi XE2.
+
+| Variable | 10.4 | XE2 | Description |
+|----------|------|-----|-------------|
+| `$compiler$` / `$target$` | `delphi10.4` | `delphixe2` | Full prefixed version string |
+| `$compilernoprefix$` | `10.4` | `XE2` | Version without the `delphi` prefix |
+| `$compilernopoint$` | `delphi10` | `delphixe2` | Prefixed version with the point removed |
+| `$compilershortversion$` | `104` | `XE2` | No prefix, no point — e.g. `100`, `104`, `110`, `130`. Pairs with `D`-prefixed folder schemes like `D104`/`D110` |
+| `$compilermajornoprefix$` | `10` | `XE` | Major version only, no prefix |
+| `$compilercodename$` | `Sydney` | (empty) | Marketing code name (10.0+ only) |
+| `$compilerwithcodename$` | `delphi10.4 Sydney` | `delphixe2` | Version plus code name |
+| `$compilerversion$` | `34` | `23` | Internal `{$CompilerVersion}` integer |
+| `$libsuffix$` | `270` | `160` | `DCC_LibSuffix` value |
+| `$bdsversion$` | `21.0` | `9.0` | BDS (RAD Studio) version number |
+
+#### Example: compact `D`-series folder scheme
+
+For repos whose per-compiler folders use the `D100`/`D104`/`D110`/`D130` convention:
+
+```yaml
+variables:
+  packageSource: "D$compilershortversion$"   # -> D100, D104, D110, D130, DXE2
+
+templates:
+  - name: "default"
+    source:
+      - src: "./packages/$packageSource$/**"
+        dest: "/src/packages/$packageSource$"
+```
+
 ### Example with Special Variables
 
 ```yaml

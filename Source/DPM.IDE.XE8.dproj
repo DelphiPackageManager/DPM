@@ -14,7 +14,7 @@
         <DPMCompiler>delphixe8</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.YAML\1.5.5\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win32;$(DPM)\VSoft.Awaitable\0.7.0\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.9\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\Gabr42.OmniThreadLibrary\3.7.12\lib\Win32;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.YAML\1.6.0\lib\Win32;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win32;$(DPM)\VSoft.Awaitable\0.7.0\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.9\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;$(DPM)\Gabr42.OmniThreadLibrary\3.7.12\lib\Win32;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -755,20 +755,20 @@
                 </PackageReference>
                 <PackageReference id="VSoft.AntPatterns" version="0.1.9" manifestHash="sha256:0886873ba8e86098004bfa19e2d7b85bc349522f9d1950c6ad5fd6df13c3d00b"/>
                 <PackageReference id="VSoft.Awaitable" version="0.7.0" manifestHash="sha256:08bce195575e0ee6f7353e472fa91afbde6406e3e7e1ea8678eb11f2518f3832">
-                    <PackageReference id="Gabr42.OmniThreadLibrary" version="3.7.12" range="3.7.12"/>
-                    <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="0.1.4"/>
+                    <PackageReference id="Gabr42.OmniThreadLibrary" version="3.7.12" range="[3.7.12,]"/>
+                    <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="[0.1.4,]"/>
                 </PackageReference>
                 <PackageReference id="VSoft.Base64.Polyfill" version="0.1.11" manifestHash="sha256:2ef7e36a3e2bb9cee6388460d637bc5735e075a277a64297b3105d6d0849de13"/>
                 <PackageReference id="VSoft.CancellationToken" version="0.1.4" manifestHash="sha256:60fd41246328e69b17c73152eb3798418dfa9b7bc3bf73868df17021d10f64be"/>
                 <PackageReference id="VSoft.HttpClient" version="2.7.0" manifestHash="sha256:270f69fce185ab3a5cf6bb1b5815975ae8ed7ceb82dd23b363fb90b0eea950af">
-                    <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="0.1.4"/>
-                    <PackageReference id="VSoft.Uri" version="0.3.3" range="0.3.3"/>
+                    <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="[0.1.4,]"/>
+                    <PackageReference id="VSoft.Uri" version="0.3.3" range="[0.3.3,]"/>
                 </PackageReference>
                 <PackageReference id="VSoft.JsonDataObjects" version="0.3.2" manifestHash="sha256:55c7408d75b651b77061f4672e4bbf74f6aa5b7161f50e1b118fca67950672d6"/>
                 <PackageReference id="VSoft.SemanticVersion" version="0.2.8" manifestHash="sha256:96f0a361230b05f25670edb1ffda965dbbd9c3361174564764b502823bf478ec"/>
                 <PackageReference id="VSoft.Uri" version="0.3.3" manifestHash="sha256:ef104799e1b7e59989013c6899041b915057beb9b2f67ec074404fdae1ee95ba"/>
                 <PackageReference id="VSoft.VirtualListView" version="0.4.6" manifestHash="sha256:e593068d6a207384a28ff611e29b5a20708200074e9c48a5f39d659b242d5515"/>
-                <PackageReference id="VSoft.YAML" version="1.5.5" manifestHash="sha256:41c6f18c4c74a0e02dceea6b54e56c88aee461c29034f58061ce600fa8dcd1ea"/>
+                <PackageReference id="VSoft.YAML" version="1.6.0" manifestHash="sha256:30c15ff7edfacc4ec56eb49a89f1bd1c72ee08bff79b0c8485541e605a9fd16d"/>
             </Packages>
         </DPM>
     </ProjectExtensions>

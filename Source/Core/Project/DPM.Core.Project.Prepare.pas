@@ -347,6 +347,7 @@ begin
   result['target'] := CompilerToString(compiler);
   result['compilernoprefix'] := CompilerNoPrefix(compiler);
   result['compilernopoint'] := CompilerToStringNoPoint(compiler);
+  result['compilershortversion'] := CompilerToShortVersion(compiler);
   result['compilercodename'] := CompilerCodeName(compiler);
   result['compilerwithcodename'] := CompilerWithCodeName(compiler);
   result['compilermajornoprefix'] := CompilerMajorNoPrefix(compiler);
