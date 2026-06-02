@@ -21,7 +21,6 @@ type
     btnOk: TButton;
     lblSrc: TLabel;
     edtSource: TEdit;
-    chkFlatten: TCheckBox;
     lblDest: TLabel;
     edtDest: TEdit;
     procedure btnCancelClick(Sender: TObject);

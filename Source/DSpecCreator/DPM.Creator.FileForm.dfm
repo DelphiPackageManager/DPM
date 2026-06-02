@@ -60,14 +60,6 @@ object SourceForm: TSourceForm
     ShowHint = True
     TabOrder = 0
   end
-  object chkFlatten: TCheckBox
-    Left = 47
-    Top = 43
-    Width = 97
-    Height = 17
-    Caption = 'Flatten'
-    TabOrder = 1
-  end
   object edtDest: TEdit
     Left = 46
     Top = 66

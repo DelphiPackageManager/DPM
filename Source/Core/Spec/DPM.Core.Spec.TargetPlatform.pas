@@ -498,11 +498,15 @@ begin
 
   for platform in FPlatforms do
   begin
-    if not (platform in AllPlatforms(FCompiler)) then
+    //Only validate against a specific compiler's platforms when this entry targets a single
+    //compiler. For the compilers-list and compiler from/to range forms FCompiler is UnknownVersion
+    //(AllPlatforms would raise), and per-compiler validation happens later when the pack writer
+    //clones the entry down to one compiler.
+    if (FCompiler <> TCompilerVersion.UnknownVersion) and not (platform in AllPlatforms(FCompiler)) then
     begin
       Logger.Error('Invalid platform [' + DPMPlatformToString(platform) + '] for compiler [' + CompilerToString(FCompiler) + ']');
       continue;
-    end;   
+    end;
     sPlatform := DPMPlatformToString(platform);
     platforms.AddValue(sPlatform);
   end;

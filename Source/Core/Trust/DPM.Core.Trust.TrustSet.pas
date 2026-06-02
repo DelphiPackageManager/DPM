@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -76,7 +76,7 @@ uses
 // share one source. Delphi resolves $R first in the source file's
 // directory, then in the project (.dpr) directory — which is Source/ for
 // every consumer here, so a bare filename works without path tricks.
-{$R 'DPM.TrustSet.res'}
+{$R '..\..\DPM.TrustSet.res'}
 
 const
   cTrustSetResource = 'DPM_TRUST_SET';

@@ -15,6 +15,7 @@ type
   private
     Fspec : IPackageSpec;
     FCompiler : TCompilerVersion;
+    function AuthorsAsString: string;
     function matcher(const Match: TMatch): String;
     function Replace(inputStr: string): string;
     constructor Create(compiler: TCompilerVersion; structure : IPackageSpec);
@@ -26,6 +27,19 @@ type
 implementation
 
 { TClassReplacer }
+
+function TClassReplacer.AuthorsAsString: string;
+var
+  i : integer;
+begin
+  result := '';
+  for i := 0 to FSpec.metadata.authors.Count - 1 do
+  begin
+    if i > 0 then
+      result := result + ', ';
+    result := result + FSpec.metadata.authors[i];
+  end;
+end;
 
 constructor TClassReplacer.Create(compiler: TCompilerVersion; structure : IPackageSpec);
 begin
@@ -56,7 +70,7 @@ begin
   else if SameText(Match.Groups[1].Value, 'version') then
     Exit(FSpec.metadata.version.ToString)
   else if SameText(Match.Groups[1].Value, 'author') then
-    Exit(FSpec.metadata.authors)
+    Exit(AuthorsAsString)
   else if SameText(Match.Groups[1].Value, 'title') then
     Exit(FSpec.metadata.id)
   else if SameText(Match.Groups[1].Value, 'description') then

@@ -16,19 +16,12 @@ object BuildForm: TBuildForm
     487
     129)
   TextHeight = 15
-  object lblBuildId: TLabel
-    Left = 16
-    Top = 16
-    Width = 40
-    Height = 15
-    Caption = 'BuildId:'
-  end
   object lblProject: TLabel
     Left = 16
     Top = 45
-    Width = 40
+    Width = 80
     Height = 15
-    Caption = 'Project:'
+    Caption = 'Project (.dproj):'
   end
   object btnCancel: TButton
     Left = 306
@@ -52,22 +45,14 @@ object BuildForm: TBuildForm
     TabOrder = 1
     OnClick = btnOkClick
   end
-  object edtBuildId: TEdit
-    Left = 72
-    Top = 13
-    Width = 398
-    Height = 23
-    Anchors = [akLeft, akTop, akRight]
-    TabOrder = 2
-  end
   object edtProject: TEdit
-    Left = 72
+    Left = 102
     Top = 42
-    Width = 398
+    Width = 368
     Height = 23
     Anchors = [akLeft, akTop, akRight]
     ParentShowHint = False
     ShowHint = True
-    TabOrder = 3
+    TabOrder = 2
   end
 end

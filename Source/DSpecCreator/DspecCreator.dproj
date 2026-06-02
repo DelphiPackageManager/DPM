@@ -114,11 +114,11 @@
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
     </PropertyGroup>
     <PropertyGroup>
-        <DPMCompiler>12.0</DPMCompiler>
-        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
-        <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.YAML\1.5.5\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.DOSCommand\2023.8.2\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
-        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.YAML\1.5.5\lib;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib;$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.SemanticVersion\0.2.7\lib;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib;$(DPM)\VSoft.HttpClient\2.2.5\lib;$(DPM)\VSoft.DOSCommand\2023.8.2\lib;$(DPM)\VSoft.CancellationToken\0.1.4\lib;$(DPM)\VSoft.Base64.Polyfill\1.0.2\src;$(DPM)\VSoft.AntPatterns\0.1.9\lib;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib;</DPMSearch>
+        <DPMCompiler>delphi13.0</DPMCompiler>
+        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
+        <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\VSoft.YAML\1.6.0\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win32;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win32;$(DPM)\VSoft.DOSCommand\1.1.3\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.9\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win64;$(DPM)\VSoft.Uri\0.3.3\lib\Win64;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win64;$(DPM)\VSoft.YAML\1.6.0\lib\Win64;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win64;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win64;$(DPM)\VSoft.DOSCommand\1.1.3\lib\Win64;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win64;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win64;$(DPM)\VSoft.AntPatterns\0.1.9\lib\Win64;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win64;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win64;</DPMSearch>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -136,14 +136,6 @@
         </DCCReference>
         <DCCReference Include="DPM.Creator.FileForm.pas">
             <Form>SourceForm</Form>
-            <FormType>dfm</FormType>
-        </DCCReference>
-        <DCCReference Include="DPM.Creator.RuntimeForm.pas">
-            <Form>BplForm</Form>
-            <FormType>dfm</FormType>
-        </DCCReference>
-        <DCCReference Include="DPM.Creator.SearchPathForm.pas">
-            <Form>SearchPathForm</Form>
             <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="DPM.Creator.OptionsForm.pas">
@@ -199,10 +191,6 @@
         <DCCReference Include="..\Core\Packaging\DPM.Core.Packaging.IdValidator.pas"/>
         <DCCReference Include="..\Core\Packaging\DPM.Core.Packaging.pas"/>
         <DCCReference Include="..\Core\Packaging\DPM.Core.Packaging.Writer.pas"/>
-        <DCCReference Include="..\Core\Project\DPM.Core.Project.Configuration.pas"/>
-        <DCCReference Include="..\Core\Project\DPM.Core.Project.Editor.pas"/>
-        <DCCReference Include="..\Core\Project\DPM.Core.Project.GroupProjReader.pas"/>
-        <DCCReference Include="..\Core\Project\DPM.Core.Project.Interfaces.pas"/>
         <DCCReference Include="..\Core\Repository\DPM.Core.Repository.Base.pas"/>
         <DCCReference Include="..\Core\Repository\DPM.Core.Repository.Directory.pas"/>
         <DCCReference Include="..\Core\Repository\DPM.Core.Repository.Factory.pas"/>
@@ -223,21 +211,11 @@
         <DCCReference Include="..\Core\Spec\DPM.Core.Spec.Reader.pas"/>
         <DCCReference Include="..\Core\Spec\DPM.Core.Spec.TargetPlatform.pas"/>
         <DCCReference Include="..\Core\Spec\DPM.Core.Spec.Template.pas"/>
-        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Config.pas"/>
-        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Directory.pas"/>
-        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Enum.pas"/>
-        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Numbers.pas"/>
-        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Path.pas"/>
-        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Process.pas"/>
-        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Strings.pas"/>
-        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.System.pas"/>
-        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.XML.pas"/>
         <DCCReference Include="..\Core\Xml\DPM.Core.MSXML.pas"/>
         <DCCReference Include="..\Core\Xml\DPM.Core.XML.NodeBase.pas"/>
         <DCCReference Include="..\Core\Package\DPM.Core.Package.Icon.pas"/>
         <DCCReference Include="..\Core\Compiler\DPM.Core.Compiler.BOM.pas"/>
         <DCCReference Include="..\Core\Compiler\DPM.Core.Compiler.ProjectSettings.pas"/>
-        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Files.pas"/>
         <DCCReference Include="..\Core\Package\DPM.Core.Package.Installer.Interfaces.pas"/>
         <DCCReference Include="..\Core\Options\DPM.Core.Options.Info.pas"/>
         <DCCReference Include="..\Core\Sources\DPM.Core.Sources.ServiceIndex.pas"/>
@@ -261,7 +239,60 @@
         </DCCReference>
         <DCCReference Include="DPM.Creator.MRUService.pas"/>
         <DCCReference Include="Controls\VSoft.Controls.Menus.MRU.pas"/>
+        <DCCReference Include="..\Core\Trust\DPM.Core.Trust.Interfaces.pas"/>
+        <DCCReference Include="..\Core\Trust\DPM.Core.Trust.Policy.pas"/>
+        <DCCReference Include="..\Core\Trust\DPM.Core.Trust.Prompt.pas"/>
+        <DCCReference Include="..\Core\Trust\DPM.Core.Trust.State.pas"/>
+        <DCCReference Include="..\Core\Trust\DPM.Core.Trust.TrustSet.pas"/>
+        <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.Algorithms.pas"/>
+        <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.Cms.Interfaces.pas"/>
+        <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.Cms.pas"/>
+        <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.Hashing.Interfaces.pas"/>
+        <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.Hashing.pas"/>
+        <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.Provider.Azure.pas"/>
+        <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.Provider.Interfaces.pas"/>
+        <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.Provider.pas"/>
+        <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.Provider.Signotaur.pas"/>
+        <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.Timestamping.pas"/>
+        <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.Win32.pas"/>
+        <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.X509.Interfaces.pas"/>
+        <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.X509.pas"/>
+        <DCCReference Include="..\Core\Package\Signing\DPM.Core.Package.Archive.pas"/>
+        <DCCReference Include="..\Core\Package\Signing\DPM.Core.Package.Cache.Receipt.pas"/>
+        <DCCReference Include="..\Core\Package\Signing\DPM.Core.Package.Manifest.Interfaces.pas"/>
+        <DCCReference Include="..\Core\Package\Signing\DPM.Core.Package.Manifest.pas"/>
+        <DCCReference Include="..\Core\Package\Signing\DPM.Core.Package.Signing.Interfaces.pas"/>
+        <DCCReference Include="..\Core\Package\Signing\DPM.Core.Package.Signing.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Base64Url.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Config.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.DateTime.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Directory.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Enum.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Files.pas"/>
         <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Hash.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Masks.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Numbers.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Path.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Process.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Strings.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.System.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.XML.pas"/>
+        <DCCReference Include="..\Core\Project\DPM.Core.Project.Configuration.pas"/>
+        <DCCReference Include="..\Core\Project\DPM.Core.Project.Editor.pas"/>
+        <DCCReference Include="..\Core\Project\DPM.Core.Project.GroupProjReader.pas"/>
+        <DCCReference Include="..\Core\Project\DPM.Core.Project.Interfaces.pas"/>
+        <DCCReference Include="..\Core\Project\DPM.Core.Project.MapFile.pas"/>
+        <DCCReference Include="..\Core\Project\DPM.Core.Project.Prepare.pas"/>
+        <DCCReference Include="..\Core\Project\DPM.Core.Project.Prepare.Templates.pas"/>
+        <DCCReference Include="..\Core\Project\DPM.Core.Project.SearchPaths.pas"/>
+        <DCCReference Include="..\Core\Project\DPM.Core.Project.Transformer.pas"/>
+        <DCCReference Include="..\Core\Sbom\DPM.Core.SBOM.Generator.pas"/>
+        <DCCReference Include="..\Core\Sbom\DPM.Core.SBOM.Interfaces.pas"/>
+        <DCCReference Include="..\Core\Sbom\DPM.Core.SBOM.Reader.pas"/>
+        <DCCReference Include="..\Core\Sbom\DPM.Core.SBOM.Types.pas"/>
+        <DCCReference Include="..\Core\Sbom\DPM.Core.SBOM.Writers.pas"/>
+        <DCCReference Include="..\Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas"/>
+        <DCCReference Include="..\Core\Options\DPM.Core.Options.SBOM.pas"/>
         <RcItem Include="..\images\add_16px.png">
             <ResourceType>RCDATA</ResourceType>
             <ResourceId>ADD_PACKAGE_16</ResourceId>
@@ -376,46 +407,25 @@
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>
-            <PackageReferences platform="Win32">
-                <PackageReference id="Spring4D.Core" version="2.0.2-beta.2">
+            <Packages>
+                <PackageReference id="Spring4D.Core" version="2.0.2-beta.2" manifestHash="sha256:5e8152e9876685ce8e38580a9a08c881200185218ce6cd2b4d5eff1d7edf9495">
                     <PackageReference id="Spring4D.Base" version="2.0.2-beta.2" range="2.0.2-beta.2"/>
                 </PackageReference>
-                <PackageReference id="Spring4D.Extensions" version="2.0.2-beta.2">
+                <PackageReference id="Spring4D.Extensions" version="2.0.2-beta.2" manifestHash="sha256:726d17d8054a4a84d6a2c1af85d065b5a5bc6f456569e20d0066628cdb62a205">
                     <PackageReference id="Spring4D.Base" version="2.0.2-beta.2" range="2.0.2-beta.2"/>
                 </PackageReference>
-                <PackageReference id="VSoft.AntPatterns" version="0.1.9"/>
-                <PackageReference id="VSoft.Base64.Polyfill" version="1.0.2"/>
-                <PackageReference id="VSoft.CancellationToken" version="0.1.4"/>
-                <PackageReference id="VSoft.DOSCommand" version="2023.8.2"/>
-                <PackageReference id="VSoft.HttpClient" version="2.2.5">
-                    <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="0.1.4"/>
-                    <PackageReference id="VSoft.Uri" version="0.3.3" range="0.3.3"/>
+                <PackageReference id="VSoft.AntPatterns" version="0.1.9" manifestHash="sha256:bd3e82f2163f9e8dea0213505838a677b23e417f3d822308bb1f8abf80238f43"/>
+                <PackageReference id="VSoft.Base64.Polyfill" version="0.1.11" manifestHash="sha256:bf9a2cba8eda998ee7b71606e08859ab879ff6dd14491e98baf91ecdf372d29c"/>
+                <PackageReference id="VSoft.CancellationToken" version="0.1.4" manifestHash="sha256:72dac079a37643e38d534975ef3c27efbdcc45d5310e97fec2e1de072aa1721e"/>
+                <PackageReference id="VSoft.DOSCommand" version="1.1.3" manifestHash="sha256:41eb00118132816cb5fb37289bd5a9341c3e6d739d4c0c0ba669688902d16328"/>
+                <PackageReference id="VSoft.HttpClient" version="2.7.0" manifestHash="sha256:ad272a3f63c64c9bdbf13f7259ee268229ef5e646def9b41f1c044b1db3beacc">
+                    <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="[0.1.4,]"/>
+                    <PackageReference id="VSoft.Uri" version="0.3.3" range="[0.3.3,]"/>
                 </PackageReference>
-                <PackageReference id="VSoft.JsonDataObjects" version="0.3.2"/>
-                <PackageReference id="VSoft.SemanticVersion" version="0.2.7"/>
-                <PackageReference id="VSoft.Uri" version="0.3.3"/>
-                <PackageReference id="VSoft.YAML" version="1.5.5"/>
-            </PackageReferences>
-            <PackageReferences platform="Win64">
-                <PackageReference id="Spring4D.Core" version="2.0.2-beta.2">
-                    <PackageReference id="Spring4D.Base" version="2.0.2-beta.2" range="2.0.2-beta.2"/>
-                </PackageReference>
-                <PackageReference id="Spring4D.Extensions" version="2.0.2-beta.2">
-                    <PackageReference id="Spring4D.Base" version="2.0.2-beta.2" range="2.0.2-beta.2"/>
-                </PackageReference>
-                <PackageReference id="VSoft.AntPatterns" version="0.1.9"/>
-                <PackageReference id="VSoft.Base64.Polyfill" version="1.0.2"/>
-                <PackageReference id="VSoft.CancellationToken" version="0.1.4"/>
-                <PackageReference id="VSoft.DOSCommand" version="2023.8.2"/>
-                <PackageReference id="VSoft.HttpClient" version="2.2.5">
-                    <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="0.1.4"/>
-                    <PackageReference id="VSoft.Uri" version="0.3.3" range="0.3.3"/>
-                </PackageReference>
-                <PackageReference id="VSoft.JsonDataObjects" version="0.3.2"/>
-                <PackageReference id="VSoft.SemanticVersion" version="0.2.7"/>
-                <PackageReference id="VSoft.Uri" version="0.3.3"/>
-                <PackageReference id="VSoft.YAML" version="1.5.5"/>
-            </PackageReferences>
+                <PackageReference id="VSoft.JsonDataObjects" version="0.3.2" manifestHash="sha256:28d227b3a7f0baeee16fab98b5844328745b65574f5c23262e1f8e1d8b50a201"/>
+                <PackageReference id="VSoft.SemanticVersion" version="0.2.8" manifestHash="sha256:c5a26da3c2e1199089b7de00c0d8e2c9a82a3d32812c53aaf0969a93fa053b87"/>
+                <PackageReference id="VSoft.YAML" version="1.6.0" manifestHash="sha256:977c9161d0444ea181382892762954a8894c8abf434f1dd90fc6eddf7a37a1cc"/>
+            </Packages>
         </DPM>
     </ProjectExtensions>
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>

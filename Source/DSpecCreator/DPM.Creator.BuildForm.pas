@@ -19,8 +19,6 @@ type
   TBuildForm = class(TForm)
     btnCancel: TButton;
     btnOk: TButton;
-    lblBuildId: TLabel;
-    edtBuildId: TEdit;
     lblProject: TLabel;
     edtProject: TEdit;
     procedure btnCancelClick(Sender: TObject);

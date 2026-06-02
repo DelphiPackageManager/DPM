@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -29,7 +29,6 @@ unit DPM.Core.Configuration.Interfaces;
 interface
 
 uses
-  JsonDataObjects,
   VSoft.YAML,
   VSoft.Uri,
   Spring.Collections,

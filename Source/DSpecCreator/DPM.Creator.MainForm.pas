@@ -30,6 +30,7 @@ uses
   Vcl.ActnCtrls,
   System.Actions,
   System.RegularExpressions,
+  System.Generics.Collections,
   Spring.Collections,
   DosCommand,
   DPM.Core.Types,
@@ -76,35 +77,48 @@ type
     SaveDialog : TSaveDialog;
     CardPanel : TCardPanel;
     crdSource : TCard;
-    crdSearchPathItem : TCard;
     lblSrc : TLabel;
     edtFileEntrySource : TEdit;
-    chkFileEntryFlatten : TCheckBox;
     lblDest : TLabel;
     edtFileEntryDest : TEdit;
     lbFileEntryExclude : TListBox;
     btnAddExclude : TButton;
     btnDeleteExclude : TButton;
     crdBuild : TCard;
-    crdRuntimeOrDesignBpl : TCard;
-    lblSearchPaths : TLabel;
-    lblRuntime : TLabel;
     lblBuild : TLabel;
-    lblBuildId : TLabel;
-    edtBuildId : TEdit;
     lblProject : TLabel;
     edtProject : TEdit;
-    lblRuntimeSrc : TLabel;
-    edtBPLEntrySrc : TEdit;
-    lblRuntimeBuildId : TLabel;
-    edtBPLEntryBuildId : TEdit;
-    chkCopyLocal : TCheckBox;
+    lblBuildDefines : TLabel;
+    edtBuildDefines : TEdit;
+    lblBuildPlatforms : TLabel;
+    clbBuildPlatforms : TCheckListBox;
+    lblBuildReferences : TLabel;
+    lbBuildReferences : TListBox;
+    btnAddBuildRef : TButton;
+    btnDeleteBuildRef : TButton;
+    crdDesign : TCard;
+    lblDesign : TLabel;
+    lblDesignProject : TLabel;
+    edtDesignProject : TEdit;
+    lblDesignDefines : TLabel;
+    edtDesignDefines : TEdit;
+    lblDesignPlatforms : TLabel;
+    clbDesignPlatforms : TCheckListBox;
+    lblDesignReferences : TLabel;
+    lbDesignReferences : TListBox;
+    btnAddDesignRef : TButton;
+    btnDeleteDesignRef : TButton;
+    lblLibPrefix : TLabel;
+    edtLibPrefix : TEdit;
+    lblLibSuffix : TLabel;
+    edtLibSuffix : TEdit;
+    lblLibVersion : TLabel;
+    edtLibVersion : TEdit;
     PopupMenu : TPopupMenu;
     BalloonHint1 : TBalloonHint;
     tsGenerate : TTabSheet;
     lblCompilers : TLabel;
     lblPlatform : TLabel;
-    edtSearchPath : TEdit;
     miOptions : TMenuItem;
     lblAuthor : TLabel;
     edtAuthor : TEdit;
@@ -120,16 +134,11 @@ type
     Memo1 : TMemo;
     edtPackageOutputPath : TEdit;
     Label2 : TLabel;
-    edtConfiguration : TEdit;
-    lblConfiguration : TLabel;
-    chkBuildForDesign : TCheckBox;
-    chkDesignOnly : TCheckBox;
     crdTemplate : TCard;
     edtTemplateName : TEdit;
     lblTemplateName : TLabel;
     tsLogging : TTabSheet;
     Memo2 : TMemo;
-    chkInstall : TCheckBox;
     VariablesList : TValueListEditor;
     ActionList1 : TActionList;
     actDeleteTemplate : TAction;
@@ -144,18 +153,10 @@ type
     actFileSaveAs : TAction;
     actFileNew : TAction;
     actDeleteBuildItem : TAction;
-    actAddRuntimeItem : TAction;
-    actDeleteRuntimeItem : TAction;
     actAddDesignItem : TAction;
     actDeleteDesignItem : TAction;
     actAddSourceItem : TAction;
-    actAddFileItem : TAction;
     actDeleteSourceItem : TAction;
-    actDeleteFileItem : TAction;
-    actAddLibItem : TAction;
-    actDeleteLibItem : TAction;
-    actAddSearchPath : TAction;
-    actDeleteSearchPath : TAction;
     actAddDependency : TAction;
     actDeleteDependency : TAction;
     OpenPictureDialog1 : TOpenPictureDialog;
@@ -164,30 +165,16 @@ type
     crdBuildHeading : TCard;
     lblBuildHeading : TLabel;
     lblBuildDescription : TLabel;
-    crdSearchPathHeading : TCard;
-    lblSearchPathsDescription : TLabel;
-    lblSearchPathsHeading : TLabel;
     crdSourceHeading : TCard;
     lblSourceItemsHeading : TLabel;
     lblSourceItemsDescription : TLabel;
     crdDependenciesHeading : TCard;
     Label6 : TLabel;
     Label7 : TLabel;
-    crdLibEntriesHeading : TCard;
-    lblLibFilesHeading : TLabel;
-    lblLibFilesDescription : TLabel;
-    crdFileEntriesHeading : TCard;
-    lblFileEntriesHeading : TLabel;
-    lblFileEntriesDescription : TLabel;
     crdDesignHeading : TCard;
     lblDesignHeading : TLabel;
     lblDesignDescription : TLabel;
-    crdRuntimeHeading : TCard;
-    lblRuntimeHeading : TLabel;
-    lblRuntimeDescription : TLabel;
     lblSourceItemHeader : TLabel;
-    Label8 : TLabel;
-    Label9 : TLabel;
     Label10 : TLabel;
     Label11 : TLabel;
     Help1 : TMenuItem;
@@ -227,29 +214,31 @@ type
     procedure btnDeleteExcludeClick(Sender : TObject);
     procedure cboLicenseChange(Sender : TObject);
     procedure cboTemplateChange(Sender : TObject);
-    procedure chkBuildForDesignClick(Sender : TObject);
-    procedure chkCopyLocalClick(Sender : TObject);
-    procedure chkDesignInstallClick(Sender : TObject);
-    procedure chkDesignOnlyClick(Sender : TObject);
     procedure clbCompilersClick(Sender : TObject);
     procedure clbPlatformsClickCheck(Sender : TObject);
     procedure DosCommandNewLine(ASender : TObject; const ANewLine : string; AOutputType : TOutputType);
     procedure DosCommandTerminated(Sender : TObject);
     procedure edtAuthorChange(Sender : TObject);
-    procedure edtBuildIdChange(Sender : TObject);
-    procedure edtConfigurationChange(Sender : TObject);
+    procedure edtBuildDefinesChange(Sender : TObject);
+    procedure clbBuildPlatformsClickCheck(Sender : TObject);
+    procedure btnAddBuildRefClick(Sender : TObject);
+    procedure btnDeleteBuildRefClick(Sender : TObject);
+    procedure edtDesignProjectChange(Sender : TObject);
+    procedure edtDesignDefinesChange(Sender : TObject);
+    procedure clbDesignPlatformsClickCheck(Sender : TObject);
+    procedure btnAddDesignRefClick(Sender : TObject);
+    procedure btnDeleteDesignRefClick(Sender : TObject);
+    procedure edtLibPrefixChange(Sender : TObject);
+    procedure edtLibSuffixChange(Sender : TObject);
+    procedure edtLibVersionChange(Sender : TObject);
     procedure edtDependencyIdChange(Sender : TObject);
     procedure edtDependencyVersionChange(Sender : TObject);
-    procedure edtDesignBuildIdChange(Sender : TObject);
-    procedure edtDesignSrcChange(Sender : TObject);
     procedure edtFileEntrySourceChange(Sender : TObject);
     procedure edtFileEntryDestChange(Sender : TObject);
     procedure edtIdChange(Sender : TObject);
     procedure edtProjectChange(Sender : TObject);
     procedure edtProjectURLChange(Sender : TObject);
     procedure edtRepositoryURLChange(Sender : TObject);
-    procedure edtBPLEntrySrcChange(Sender : TObject);
-    procedure edtSearchPathChange(Sender : TObject);
     procedure edtTagsChange(Sender : TObject);
     procedure edtTemplateNameChange(Sender : TObject);
     procedure edtVersionChange(Sender : TObject);
@@ -277,18 +266,10 @@ type
     procedure actDeleteDependencyExecute(Sender : TObject);
     procedure actAddDesignItemExecute(Sender : TObject);
     procedure actDeleteDesignItemExecute(Sender : TObject);
-    procedure actAddFileItemExecute(Sender : TObject);
-    procedure actDeleteFileItemExecute(Sender : TObject);
-    procedure actAddLibItemExecute(Sender : TObject);
-    procedure actDeleteLibItemExecute(Sender : TObject);
     procedure actFileOpenExecute(Sender : TObject);
     procedure actFileSaveExecute(Sender : TObject);
     procedure actFileSaveAsExecute(Sender : TObject);
     procedure actFileNewExecute(Sender : TObject);
-    procedure actAddRuntimeItemExecute(Sender : TObject);
-    procedure actDeleteRuntimeItemExecute(Sender : TObject);
-    procedure actAddSearchPathExecute(Sender : TObject);
-    procedure actDeleteSearchPathExecute(Sender : TObject);
     procedure actAddSourceItemExecute(Sender : TObject);
     procedure actDeleteSourceItemExecute(Sender : TObject);
     procedure ImgIconClick(Sender : TObject);
@@ -303,7 +284,6 @@ type
     procedure actPlatformsSelectAllExecute(Sender : TObject);
     procedure actPlatformsDeselectAllExecute(Sender : TObject);
     procedure edtCopyrightChange(Sender : TObject);
-    procedure edtBPLEntryBuildIdChange(Sender: TObject);
     procedure clbCompilersKeyPress(Sender: TObject; var Key: Char);
     procedure edtReadmeChange(Sender: TObject);
     procedure edtRepositoryCommitChange(Sender: TObject);
@@ -315,6 +295,7 @@ type
     FTemplate : ISpecTemplate;
     FLogger : ILogger;
     FInVariableUpdate : Boolean;
+    FLoadingCard : Boolean;
     FSPDXList : TStringList;
     FMRUMenu : TMRUMenu;
   protected
@@ -343,26 +324,17 @@ type
     function ReplaceVars(const inputStr : String; compiler : TCompilerVersion) : string;
     function AddRootTemplateNode(template : ISpecTemplate) : TTemplateTreeNode;
 
-    function LoadSourceNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const sourceEntry : ISpecFileEntry) : TTemplateTreeNode;
-    procedure LoadSourceNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecFileEntry>);
+    procedure SetCheckListPlatforms(const clb : TCheckListBox; const platforms : TDPMPlatforms);
+    function GetCheckListPlatforms(const clb : TCheckListBox) : TDPMPlatforms;
 
-    function LoadLibNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const libEntry : ISpecFileEntry) : TTemplateTreeNode;
-    procedure LoadLibNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecFileEntry>);
-
-    function LoadFileNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileEntry : ISpecFileEntry) : TTemplateTreeNode;
-    procedure LoadFileNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecFileEntry>);
-
-    function LoadSearchPathNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const searchPath : ISpecSearchPath) : TTemplateTreeNode;
-    procedure LoadSearchPathNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate);
+    function LoadSourceNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const sourceEntry : ISpecSourceEntry) : TTemplateTreeNode;
+    procedure LoadSourceNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecSourceEntry>);
 
     function LoadBuildNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const buildEntry : ISpecBuildEntry) : TTemplateTreeNode;
     procedure LoadBuildNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate);
 
-    function LoadDesigntimeNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const item : ISpecBPLEntry) : TTemplateTreeNode;
-    procedure LoadDesigntimeNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecBPLEntry>);
-
-    function LoadRuntimeNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const item : ISpecBPLEntry) : TTemplateTreeNode;
-    procedure LoadRuntimeNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecBPLEntry>);
+    function LoadDesignNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const item : ISpecDesignEntry) : TTemplateTreeNode;
+    procedure LoadDesignNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecDesignEntry>);
 
     function LoadDependency(const parentNode : TTemplateTreeNode; template : ISpecTemplate; const dependency : ISpecDependency) : TTemplateTreeNode;
     procedure LoadDependencies(const parentNode : TTemplateTreeNode; const template : ISpecTemplate);
@@ -372,8 +344,6 @@ type
     procedure LoadSPDXList;
     procedure LoadDspecStructure;
     procedure SaveDspecStructure(const filename : string);
-
-    function SelectedPlatform : ISpecTargetPlatform;
 
   public
     { Public declarations }
@@ -396,8 +366,6 @@ uses
   DPM.Creator.TemplateForm,
   DPM.Creator.FileForm,
   DPM.Creator.BuildForm,
-  DPM.Creator.RuntimeForm,
-  DPM.Creator.SearchPathForm,
   DPM.Creator.OptionsForm,
   DPM.Creator.DependencyForm,
   DPM.Creator.Logger,
@@ -412,14 +380,14 @@ procedure TDSpecCreatorForm.btnDeleteExcludeClick(Sender : TObject);
 var
   exclude : string;
   itemToDelete : integer;
-  entry : ISpecFileEntry;
+  entry : ISpecSourceEntry;
 begin
   if lbFileEntryExclude.ItemIndex < 0 then
     Exit;
 
   if Assigned(tvTemplates.Selected) then
   begin
-    entry := (tvTemplates.Selected as TTemplateTreeNode).fileEntry;
+    entry := (tvTemplates.Selected as TTemplateTreeNode).sourceEntry;
     if not Assigned(entry) then
       Exit;
 
@@ -433,13 +401,13 @@ end;
 procedure TDSpecCreatorForm.btnAddExcludeClick(Sender : TObject);
 var
   src : string;
-  entry : ISpecFileEntry;
+  entry : ISpecSourceEntry;
 begin
   src := InputBox('Add Exclude', 'Exclude to Add', '');
 
   if Assigned(tvTemplates.Selected) then
   begin
-    entry := (tvTemplates.Selected as TTemplateTreeNode).fileEntry;
+    entry := (tvTemplates.Selected as TTemplateTreeNode).sourceEntry;
     if not Assigned(entry) then
       Exit;
 
@@ -568,38 +536,6 @@ begin
   //cboTemplate.ItemIndex := cboTemplate.Items.IndexOf(templateName);
 end;
 
-procedure TDSpecCreatorForm.chkBuildForDesignClick(Sender : TObject);
-begin
-  if Assigned(tvTemplates.Selected) then
-  begin
-    (tvTemplates.Selected as TTemplateTreeNode).build.buildForDesign := chkBuildForDesign.Checked;
-  end;
-end;
-
-procedure TDSpecCreatorForm.chkCopyLocalClick(Sender : TObject);
-begin
-  if Assigned(tvTemplates.Selected) then
-  begin
-    (tvTemplates.Selected as TTemplateTreeNode).bplEntry.copyLocal := chkCopyLocal.Checked;
-  end;
-end;
-
-procedure TDSpecCreatorForm.chkDesignInstallClick(Sender : TObject);
-begin
-  if Assigned(tvTemplates.Selected) then
-  begin
-    (tvTemplates.Selected as TTemplateTreeNode).bplEntry.Install := chkInstall.Checked;
-  end;
-end;
-
-procedure TDSpecCreatorForm.chkDesignOnlyClick(Sender : TObject);
-begin
-  if Assigned(tvTemplates.Selected) then
-  begin
-    (tvTemplates.Selected as TTemplateTreeNode).build.designOnly := chkDesignOnly.Checked;
-  end;
-end;
-
 procedure TDSpecCreatorForm.clbCompilersClick(Sender : TObject);
 var
   vPlatform : ISpecTargetPlatform;
@@ -608,6 +544,7 @@ var
   checked : boolean;
   index : integer;
   sDebug : string;
+  pair : TPair<string,string>;
 begin
   FInVariableUpdate := true;
   try
@@ -675,7 +612,8 @@ begin
   FInVariableUpdate := true;
   try
     VariablesList.Strings.Clear;
-    VariablesList.Strings.AddStrings(vPlatform.Variables);
+    for pair in vPlatform.Variables do
+      VariablesList.Strings.Add(pair.Key + '=' + pair.Value);
   finally
     FInVariableUpdate := false;
   end;
@@ -696,54 +634,46 @@ procedure TDSpecCreatorForm.clbPlatformsClickCheck(Sender : TObject);
 var
   vPlatform : ISpecTargetPlatform;
   compiler : string;
-  platformString : string;
-  dpmPlatform : TDPMPlatform;
-  i, j : integer;
-  platformCount : integer;
-  newPlatforms : TArray<TDPMPlatform>;
 begin
   if clbCompilers.ItemIndex < 0 then
   begin
     raise Exception.Create('You must select a compiler before you can select platforms');
   end;
-  // if clbPlatforms.ItemIndex < 0 then
-  // Exit;
 
   compiler := clbCompilers.Items[clbCompilers.ItemIndex];
   vPlatform := FOpenFile.GetPlatform(compiler);
   if vPlatform = nil then
     Exit;
 
-  platformCount := 0;
-  for i := 0 to clbPlatforms.Count - 1 do
+  vPlatform.Platforms := GetCheckListPlatforms(clbPlatforms);
+end;
+
+procedure TDSpecCreatorForm.SetCheckListPlatforms(const clb : TCheckListBox; const platforms : TDPMPlatforms);
+var
+  i : integer;
+  dpmPlatform : TDPMPlatform;
+begin
+  for i := 0 to clb.Count - 1 do
   begin
-    if clbPlatforms.Checked[i] then
-    begin
-      platformString := clbPlatforms.Items[i];
-      dpmPlatform := StringToDPMPlatform(platformString);
-      if dpmPlatform = TDPMPlatform.UnknownPlatform then
-        continue;
-      Inc(platformCount);
-    end;
+    dpmPlatform := StringToDPMPlatform(clb.Items[i]);
+    clb.Checked[i] := (dpmPlatform <> TDPMPlatform.UnknownPlatform) and (dpmPlatform in platforms);
   end;
+end;
 
-  SetLength(newPlatforms, platformCount);
-  j := 0;
-  for i := 0 to clbPlatforms.Count - 1 do
+function TDSpecCreatorForm.GetCheckListPlatforms(const clb : TCheckListBox) : TDPMPlatforms;
+var
+  i : integer;
+  dpmPlatform : TDPMPlatform;
+begin
+  result := [];
+  for i := 0 to clb.Count - 1 do
   begin
-    if not clbPlatforms.Checked[i] then
+    if not clb.Checked[i] then
       continue;
-    platformString := clbPlatforms.Items[i];
-
-    dpmPlatform := StringToDPMPlatform(platformString);
-
-    if dpmPlatform = TDPMPlatform.UnknownPlatform then
-      continue;
-    newPlatforms[j] := dpmPlatform;
-    Inc(j);
+    dpmPlatform := StringToDPMPlatform(clb.Items[i]);
+    if dpmPlatform <> TDPMPlatform.UnknownPlatform then
+      Include(result, dpmPlatform);
   end;
-
-  vPlatform.Platforms := newPlatforms;
 end;
 
 procedure TDSpecCreatorForm.CreatingPackages1Click(Sender : TObject);
@@ -753,29 +683,163 @@ end;
 
 procedure TDSpecCreatorForm.edtAuthorChange(Sender : TObject);
 begin
-  FOpenFile.PackageSpec.metadata.authors := edtAuthor.Text;
+  FOpenFile.PackageSpec.metadata.authors.Clear;
+  if edtAuthor.Text <> '' then
+    FOpenFile.PackageSpec.metadata.authors.Add(edtAuthor.Text);
 end;
 
-procedure TDSpecCreatorForm.edtBuildIdChange(Sender : TObject);
+procedure TDSpecCreatorForm.edtBuildDefinesChange(Sender : TObject);
+begin
+  if FLoadingCard then
+    Exit;
+  if Assigned(tvTemplates.Selected) then
+    (tvTemplates.Selected as TTemplateTreeNode).build.Defines := edtBuildDefines.Text;
+end;
+
+procedure TDSpecCreatorForm.clbBuildPlatformsClickCheck(Sender : TObject);
+begin
+  if FLoadingCard then
+    Exit;
+  if Assigned(tvTemplates.Selected) then
+    (tvTemplates.Selected as TTemplateTreeNode).build.Platforms := GetCheckListPlatforms(clbBuildPlatforms);
+end;
+
+procedure TDSpecCreatorForm.btnAddBuildRefClick(Sender : TObject);
+var
+  reference : string;
+  build : ISpecBuildEntry;
+begin
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+  build := (tvTemplates.Selected as TTemplateTreeNode).build;
+  if not Assigned(build) then
+    Exit;
+  reference := InputBox('Add Reference', 'Package name to require', '');
+  if reference = '' then
+    Exit;
+  build.References.Add(reference);
+  lbBuildReferences.Items.Add(reference);
+end;
+
+procedure TDSpecCreatorForm.btnDeleteBuildRefClick(Sender : TObject);
+var
+  reference : string;
+  itemToDelete : integer;
+  build : ISpecBuildEntry;
+begin
+  if lbBuildReferences.ItemIndex < 0 then
+    Exit;
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+  build := (tvTemplates.Selected as TTemplateTreeNode).build;
+  if not Assigned(build) then
+    Exit;
+  reference := lbBuildReferences.Items[lbBuildReferences.ItemIndex];
+  lbBuildReferences.DeleteSelected;
+  itemToDelete := build.References.IndexOf(reference);
+  if itemToDelete >= 0 then
+    build.References.Delete(itemToDelete);
+end;
+
+procedure TDSpecCreatorForm.edtDesignProjectChange(Sender : TObject);
+var
+  str : string;
+  compiler : TCompilerVersion;
 begin
   if Assigned(tvTemplates.Selected) then
   begin
-    (tvTemplates.Selected as TTemplateTreeNode).build.id := edtBuildId.Text;
-    (tvTemplates.Selected as TTemplateTreeNode).Text := edtBuildId.Text;
+    if not FLoadingCard then
+    begin
+      (tvTemplates.Selected as TTemplateTreeNode).designEntry.Project := edtDesignProject.Text;
+      (tvTemplates.Selected as TTemplateTreeNode).Text := edtDesignProject.Text;
+    end;
+
+    str := 'Possible Expanded Paths:' + System.sLineBreak;
+    for compiler := Low(TCompilerVersion) to High(TCompilerVersion) do
+    begin
+      if compiler = TCompilerVersion.UnknownVersion then
+        continue;
+      str := str + System.sLineBreak + ReplaceVars(edtDesignProject.Text, compiler);
+    end;
+    edtDesignProject.Hint := str;
   end;
 end;
 
-procedure TDSpecCreatorForm.edtConfigurationChange(Sender : TObject);
+procedure TDSpecCreatorForm.edtDesignDefinesChange(Sender : TObject);
 begin
+  if FLoadingCard then
+    Exit;
   if Assigned(tvTemplates.Selected) then
-  begin
-    (tvTemplates.Selected as TTemplateTreeNode).build.Config := edtConfiguration.Text;
-  end;
+    (tvTemplates.Selected as TTemplateTreeNode).designEntry.Defines := edtDesignDefines.Text;
 end;
 
-procedure TDSpecCreatorForm.edtCopyrightChange(Sender : TObject);
+procedure TDSpecCreatorForm.clbDesignPlatformsClickCheck(Sender : TObject);
 begin
-  FOpenFile.PackageSpec.metadata.Copyright := edtCopyright.Text;
+  if FLoadingCard then
+    Exit;
+  if Assigned(tvTemplates.Selected) then
+    (tvTemplates.Selected as TTemplateTreeNode).designEntry.Platforms := GetCheckListPlatforms(clbDesignPlatforms);
+end;
+
+procedure TDSpecCreatorForm.btnAddDesignRefClick(Sender : TObject);
+var
+  reference : string;
+  design : ISpecDesignEntry;
+begin
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+  design := (tvTemplates.Selected as TTemplateTreeNode).designEntry;
+  if not Assigned(design) then
+    Exit;
+  reference := InputBox('Add Reference', 'Package name to require', '');
+  if reference = '' then
+    Exit;
+  design.References.Add(reference);
+  lbDesignReferences.Items.Add(reference);
+end;
+
+procedure TDSpecCreatorForm.btnDeleteDesignRefClick(Sender : TObject);
+var
+  reference : string;
+  itemToDelete : integer;
+  design : ISpecDesignEntry;
+begin
+  if lbDesignReferences.ItemIndex < 0 then
+    Exit;
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+  design := (tvTemplates.Selected as TTemplateTreeNode).designEntry;
+  if not Assigned(design) then
+    Exit;
+  reference := lbDesignReferences.Items[lbDesignReferences.ItemIndex];
+  lbDesignReferences.DeleteSelected;
+  itemToDelete := design.References.IndexOf(reference);
+  if itemToDelete >= 0 then
+    design.References.Delete(itemToDelete);
+end;
+
+procedure TDSpecCreatorForm.edtLibPrefixChange(Sender : TObject);
+begin
+  if FLoadingCard then
+    Exit;
+  if Assigned(tvTemplates.Selected) then
+    (tvTemplates.Selected as TTemplateTreeNode).designEntry.LibPrefix := edtLibPrefix.Text;
+end;
+
+procedure TDSpecCreatorForm.edtLibSuffixChange(Sender : TObject);
+begin
+  if FLoadingCard then
+    Exit;
+  if Assigned(tvTemplates.Selected) then
+    (tvTemplates.Selected as TTemplateTreeNode).designEntry.LibSuffix := edtLibSuffix.Text;
+end;
+
+procedure TDSpecCreatorForm.edtLibVersionChange(Sender : TObject);
+begin
+  if FLoadingCard then
+    Exit;
+  if Assigned(tvTemplates.Selected) then
+    (tvTemplates.Selected as TTemplateTreeNode).designEntry.LibVersion := edtLibVersion.Text;
 end;
 
 procedure TDSpecCreatorForm.edtDependencyIdChange(Sender : TObject);
@@ -804,36 +868,6 @@ begin
   end;
 end;
 
-procedure TDSpecCreatorForm.edtDesignSrcChange(Sender : TObject);
-var
-  str : string;
-  compiler : TCompilerVersion;
-begin
-  if Assigned(tvTemplates.Selected) then
-  begin
-    (tvTemplates.Selected as TTemplateTreeNode).bplEntry.Source := edtBPLEntrySrc.Text;
-
-    str := 'Possible Expanded Paths:' + System.sLineBreak;
-
-    for compiler := Low(TCompilerVersion) to High(TCompilerVersion) do
-    begin
-      if compiler = TCompilerVersion.UnknownVersion then
-        continue;
-      str := str + System.sLineBreak + ReplaceVars(edtBPLEntrySrc.Text, compiler);
-    end;
-    edtBPLEntrySrc.Hint := str;
-  end;
-end;
-
-procedure TDSpecCreatorForm.edtDesignBuildIdChange(Sender : TObject);
-begin
-  if Assigned(tvTemplates.Selected) then
-  begin
-    (tvTemplates.Selected as TTemplateTreeNode).bplEntry.buildId := edtBPLEntryBuildId.Text;
-    (tvTemplates.Selected as TTemplateTreeNode).Text := edtBPLEntryBuildId.Text;
-  end;
-end;
-
 procedure TDSpecCreatorForm.edtFileEntryDestChange(Sender : TObject);
 var
   str : string;
@@ -841,7 +875,8 @@ var
 begin
   if Assigned(tvTemplates.Selected) then
   begin
-    (tvTemplates.Selected as TTemplateTreeNode).fileEntry.Destination := edtFileEntryDest.Text;
+    if not FLoadingCard then
+      (tvTemplates.Selected as TTemplateTreeNode).sourceEntry.Destination := edtFileEntryDest.Text;
 
     str := 'Possible Expanded Paths:' + System.sLineBreak;
 
@@ -866,10 +901,10 @@ begin
   result.TemplateHeading := true;
 end;
 
-function TDSpecCreatorForm.LoadSourceNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const sourceEntry : ISpecFileEntry) : TTemplateTreeNode;
+function TDSpecCreatorForm.LoadSourceNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const sourceEntry : ISpecSourceEntry) : TTemplateTreeNode;
 begin
   result := tvTemplates.Items.AddChild(parentNode, sourceEntry.Source) as TTemplateTreeNode;
-  result.fileEntry := sourceEntry;
+  result.sourceEntry := sourceEntry;
   result.NodeType := ntSource;
   result.Template := template;
   result.ImageIndex := 2;
@@ -878,7 +913,7 @@ begin
   result.DeleteAction := actDeleteSourceItem;
 end;
 
-procedure TDSpecCreatorForm.LoadSourceNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecFileEntry>);
+procedure TDSpecCreatorForm.LoadSourceNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecSourceEntry>);
 var
   nodeSource : TTemplateTreeNode;
   j : integer;
@@ -896,99 +931,9 @@ begin
     LoadSourceNode(nodeSource, template, fileList[j]);
 end;
 
-function TDSpecCreatorForm.LoadLibNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const libEntry : ISpecFileEntry) : TTemplateTreeNode;
-begin
-  result := tvTemplates.Items.AddChild(parentNode, libEntry.Source) as TTemplateTreeNode;
-  result.fileEntry := libEntry;
-  result.NodeType := ntLib;
-  result.Template := template;
-  result.ImageIndex := 2;
-  result.SelectedIndex := 2;
-  result.AddAction := actAddLibItem;
-  result.DeleteAction := actDeleteLibItem;
-end;
-
-procedure TDSpecCreatorForm.LoadLibNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecFileEntry>);
-var
-  libsNode : TTemplateTreeNode;
-  j : integer;
-begin
-
-  libsNode := tvTemplates.Items.AddChild(parentNode, 'Libs') as TTemplateTreeNode;
-  libsNode.Template := template;
-  libsNode.NodeType := ntLibHeading;
-  libsNode.ImageIndex := 2;
-  libsNode.SelectedIndex := 2;
-
-  libsNode.AddAction := actAddLibItem;
-  libsNode.DeleteAction := actDeleteLibItem;
-
-  for j := 0 to fileList.Count - 1 do
-    LoadLibNode(libsNode, template, fileList[j]);
-end;
-
-function TDSpecCreatorForm.LoadFileNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileEntry : ISpecFileEntry) : TTemplateTreeNode;
-begin
-  result := tvTemplates.Items.AddChild(parentNode, fileEntry.Source) as TTemplateTreeNode;
-  result.fileEntry := fileEntry;
-  result.NodeType := ntFile;
-  result.Template := template;
-  result.ImageIndex := 2;
-  result.SelectedIndex := 2;
-  result.AddAction := actAddFileItem;
-  result.DeleteAction := actDeleteFileItem;
-end;
-
-procedure TDSpecCreatorForm.LoadFileNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecFileEntry>);
-var
-  filesNode : TTemplateTreeNode;
-  j : integer;
-begin
-
-  filesNode := tvTemplates.Items.AddChild(parentNode, 'Files') as TTemplateTreeNode;
-  filesNode.Template := template;
-  filesNode.NodeType := ntFileHeading;
-  filesNode.ImageIndex := 2;
-  filesNode.SelectedIndex := 2;
-
-  filesNode.AddAction := actAddFileItem;
-  filesNode.DeleteAction := actDeleteFileItem;
-
-  for j := 0 to fileList.Count - 1 do
-    LoadFileNode(filesNode, template, fileList[j]);
-end;
-
-function TDSpecCreatorForm.LoadSearchPathNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const searchPath : ISpecSearchPath) : TTemplateTreeNode;
-begin
-  result := tvTemplates.Items.AddChild(parentNode, searchPath.Path) as TTemplateTreeNode;
-  result.SearchPath := searchPath;
-  result.Template := template;
-  result.NodeType := ntSeachPath;
-  result.ImageIndex := 3;
-  result.SelectedIndex := 3;
-end;
-
-procedure TDSpecCreatorForm.LoadSearchPathNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate);
-var
-  nodeSearchPath : TTemplateTreeNode;
-  j : integer;
-begin
-  nodeSearchPath := tvTemplates.Items.AddChild(parentNode, 'SearchPaths') as TTemplateTreeNode;
-  nodeSearchPath.Template := template;
-  nodeSearchPath.ImageIndex := 3;
-  nodeSearchPath.SelectedIndex := 3;
-  nodeSearchPath.NodeType := ntSeachPathHeading;
-
-  nodeSearchPath.AddAction := actAddSearchPath;
-  nodeSearchPath.DeleteAction := actDeleteSearchPath;
-
-  for j := 0 to template.SearchPaths.Count - 1 do
-    LoadSearchPathNode(nodeSearchPath, template, template.SearchPaths[j]);
-end;
-
 function TDSpecCreatorForm.LoadBuildNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const buildEntry : ISpecBuildEntry) : TTemplateTreeNode;
 begin
-  result := tvTemplates.Items.AddChild(parentNode, buildEntry.id) as TTemplateTreeNode;
+  result := tvTemplates.Items.AddChild(parentNode, buildEntry.Project) as TTemplateTreeNode;
   result.build := buildEntry;
   result.Template := template;
   result.ImageIndex := 0;
@@ -1030,8 +975,8 @@ end;
 
 procedure TDSpecCreatorForm.actAddBuildItemExecute(Sender : TObject);
 var
-  buildId : string;
   BuildForm : TBuildForm;
+  projectName : string;
   build : ISpecBuildEntry;
   templateNode : TTemplateTreeNode;
   parentNode : TTemplateTreeNode;
@@ -1039,15 +984,13 @@ var
 begin
   BuildForm := TBuildForm.Create(nil);
   try
-//    BuildForm.edtBuildId.Text := 'default';
-
+    BuildForm.Caption := 'Add Build entry';
     if BuildForm.ShowModal = mrCancel then
       Exit;
-    buildId := BuildForm.edtBuildId.Text;
-    if buildId.IsEmpty then
+    projectName := BuildForm.edtProject.Text;
+    if projectName.IsEmpty then
       Exit;
-    build := FTemplate.NewBuildEntryById(buildId);
-    build.project := BuildForm.edtProject.Text;
+    build := FTemplate.NewBuildEntry(projectName);
   finally
     FreeAndNil(BuildForm);
   end;
@@ -1077,15 +1020,12 @@ var
 begin
   DependencyForm := TDependencyForm.Create(nil);
   try
-//    DependencyForm.edtDependencyId.Text := 'default';
-//    DependencyForm.edtVersion.Text := '1.0.0';
-
     if DependencyForm.ShowModal = mrCancel then
       Exit;
     dependancyId := DependencyForm.edtDependencyId.Text;
     if dependancyId.IsEmpty then
       Exit;
-    dependency := FTemplate.NewDependencyById(dependancyId);
+    dependency := FTemplate.NewDependency(dependancyId);
     if Length(DependencyForm.edtVersion.Text) > 0 then
     begin
       if TVersionRange.TryParse(DependencyForm.edtVersion.Text, ver) then
@@ -1112,26 +1052,22 @@ end;
 
 procedure TDSpecCreatorForm.actAddDesignItemExecute(Sender : TObject);
 var
-  designBuidId : string;
-  DesignForm : TBplForm;
-  design : ISpecBPLEntry;
+  DesignForm : TBuildForm;
+  projectName : string;
+  design : ISpecDesignEntry;
   templateNode : TTemplateTreeNode;
   parentNode : TTemplateTreeNode;
   designNode : TTemplateTreeNode;
 begin
-  DesignForm := TBplForm.Create(nil);
+  DesignForm := TBuildForm.Create(nil);
   try
-    //DesignForm.edtBuildId.Text := 'buildId';
-
+    DesignForm.Caption := 'Add Design entry';
     if DesignForm.ShowModal = mrCancel then
       Exit;
-    designBuidId := DesignForm.edtBuildId.Text;
-    if designBuidId.IsEmpty then
+    projectName := DesignForm.edtProject.Text;
+    if projectName.IsEmpty then
       Exit;
-    design := FTemplate.NewDesignBplBySrc(DesignForm.edtSource.Text);
-    design.buildId := DesignForm.edtBuildId.Text;
-    design.Source := DesignForm.edtSource.Text;
-    design.Install := DesignForm.chkInstall.Checked;
+    design := FTemplate.NewDesignEntry(projectName);
   finally
     FreeAndNil(DesignForm);
   end;
@@ -1140,159 +1076,10 @@ begin
   parentNode := FindHeadingNode(templateNode, ntDesignHeading);
   tvTemplates.Items.BeginUpdate;
   try
-    designNode := LoadDesigntimeNode(parentNode, FTemplate, design);
+    designNode := LoadDesignNode(parentNode, FTemplate, design);
     templateNode.Expanded := true;
     parentNode.Expand(false);
     tvTemplates.Selected := designNode;
-  finally
-    tvTemplates.Items.EndUpdate;
-  end;
-end;
-
-procedure TDSpecCreatorForm.actAddFileItemExecute(Sender : TObject);
-var
-  SourceSrc : string;
-  FileForm : TSourceForm;
-  fileEntry : ISpecFileEntry;
-  templateNode : TTemplateTreeNode;
-  parentNode : TTemplateTreeNode;
-  fileNode : TTemplateTreeNode;
-begin
-  FileForm := TSourceForm.Create(nil);
-  try
-    FileForm.Caption := 'Add File entry';
-//    FileForm.edtSource.Text := 'default';
-
-    if FileForm.ShowModal = mrCancel then
-      Exit;
-    SourceSrc := FileForm.edtSource.Text;
-    if SourceSrc.IsEmpty then
-      Exit;
-    fileEntry := FTemplate.NewFiles(SourceSrc);
-    fileEntry.flatten := FileForm.chkFlatten.Checked;
-    fileEntry.Destination := FileForm.edtDest.Text;
-  finally
-    FreeAndNil(FileForm);
-  end;
-  templateNode := FindTemplateNode(FTemplate);
-  parentNode := FindHeadingNode(templateNode, ntFileHeading);
-  tvTemplates.Items.BeginUpdate;
-  try
-    fileNode := LoadFileNode(parentNode, FTemplate, fileEntry);
-    templateNode.Expanded := true;
-    parentNode.Expand(false);
-    tvTemplates.Selected := fileNode;
-  finally
-    tvTemplates.Items.EndUpdate;
-  end;
-end;
-
-procedure TDSpecCreatorForm.actAddLibItemExecute(Sender : TObject);
-var
-  SourceSrc : string;
-  LibForm : TSourceForm;
-  libEntry : ISpecFileEntry;
-  templateNode : TTemplateTreeNode;
-  parentNode : TTemplateTreeNode;
-  libNode : TTemplateTreeNode;
-begin
-  LibForm := TSourceForm.Create(nil);
-  try
-    LibForm.Caption := 'Add Lib Item';
-//    LibForm.edtSource.Text := 'default';
-
-    if LibForm.ShowModal = mrCancel then
-      Exit;
-    SourceSrc := LibForm.edtSource.Text;
-    if SourceSrc.IsEmpty then
-      Exit;
-    libEntry := FTemplate.NewLib(SourceSrc);
-    libEntry.flatten := LibForm.chkFlatten.Checked;
-    libEntry.Destination := LibForm.edtDest.Text;
-  finally
-    FreeAndNil(LibForm);
-  end;
-  templateNode := FindTemplateNode(FTemplate);
-  parentNode := FindHeadingNode(templateNode, ntLibHeading);
-  tvTemplates.Items.BeginUpdate;
-  try
-    libNode := LoadLibNode(parentNode, FTemplate, libEntry);
-    templateNode.Expanded := true;
-    parentNode.Expand(false);
-    tvTemplates.Selected := libNode;
-  finally
-    tvTemplates.Items.EndUpdate;
-  end;
-end;
-
-procedure TDSpecCreatorForm.actAddRuntimeItemExecute(Sender : TObject);
-var
-  runtimeBuildId : string;
-  RuntimeForm : TBplForm;
-  runtime : ISpecBPLEntry;
-  templateNode : TTemplateTreeNode;
-  parentNode : TTemplateTreeNode;
-  runtimeNode : TTemplateTreeNode;
-begin
-  RuntimeForm := TBplForm.Create(nil);
-  try
-//    RuntimeForm.edtBuildId.Text := 'default';
-
-    if RuntimeForm.ShowModal = mrCancel then
-      Exit;
-    runtimeBuildId := RuntimeForm.edtBuildId.Text;
-    if runtimeBuildId.IsEmpty then
-      Exit;
-    runtime := FTemplate.NewRuntimeBplBySrc(RuntimeForm.edtSource.Text);
-    runtime.Source := RuntimeForm.edtSource.Text;
-    runtime.buildId := runtimeBuildId;
-    runtime.copyLocal := RuntimeForm.chkCopyLocal.Checked;
-  finally
-    FreeAndNil(RuntimeForm);
-  end;
-  templateNode := FindTemplateNode(FTemplate);
-  parentNode := FindHeadingNode(templateNode, ntRuntimeHeading);
-  tvTemplates.Items.BeginUpdate;
-  try
-    runtimeNode := LoadRuntimeNode(parentNode, FTemplate, runtime);
-    templateNode.Expanded := true;
-    parentNode.Expand(false);
-    tvTemplates.Selected := runtimeNode;
-  finally
-    tvTemplates.Items.EndUpdate;
-  end;
-end;
-
-procedure TDSpecCreatorForm.actAddSearchPathExecute(Sender : TObject);
-var
-  searchPathStr : string;
-  SearchPathForm : TSearchPathForm;
-  searchPath : ISpecSearchPath;
-  templateNode : TTemplateTreeNode;
-  parentNode : TTemplateTreeNode;
-  searchNode : TTemplateTreeNode;
-begin
-  SearchPathForm := TSearchPathForm.Create(nil);
-  try
-//    SearchPathForm.edtSearchPath.Text := 'default';
-
-    if SearchPathForm.ShowModal = mrCancel then
-      Exit;
-    searchPathStr := SearchPathForm.edtSearchPath.Text;
-    if searchPathStr.IsEmpty then
-      Exit;
-    searchPath := FTemplate.NewSearchPath(searchPathStr);
-  finally
-    FreeAndNil(SearchPathForm);
-  end;
-  templateNode := FindTemplateNode(FTemplate);
-  parentNode := FindHeadingNode(templateNode, ntSeachPathHeading);
-  tvTemplates.Items.BeginUpdate;
-  try
-    searchNode := LoadSearchPathNode(parentNode, FTemplate, searchPath);
-    templateNode.Expanded := true;
-    parentNode.Expand(false);
-    tvTemplates.Selected := searchNode;
   finally
     tvTemplates.Items.EndUpdate;
   end;
@@ -1302,7 +1089,7 @@ procedure TDSpecCreatorForm.actAddSourceItemExecute(Sender : TObject);
 var
   SourceSrc : string;
   SourceForm : TSourceForm;
-  Source : ISpecFileEntry;
+  Source : ISpecSourceEntry;
   templateNode : TTemplateTreeNode;
   parentNode : TTemplateTreeNode;
   sourceNode : TTemplateTreeNode;
@@ -1310,7 +1097,6 @@ begin
   SourceForm := TSourceForm.Create(nil);
   try
     SourceForm.Caption := 'Add Source Item';
-//    SourceForm.edtSource.Text := 'default';
 
     if SourceForm.ShowModal = mrCancel then
       Exit;
@@ -1319,7 +1105,6 @@ begin
       Exit;
 
     Source := FTemplate.NewSource(SourceSrc);
-    Source.flatten := SourceForm.chkFlatten.Checked;
     Source.Destination := SourceForm.edtDest.Text;
   finally
     FreeAndNil(SourceForm);
@@ -1374,26 +1159,6 @@ begin
 end;
 
 procedure TDSpecCreatorForm.actDeleteDesignItemExecute(Sender : TObject);
-begin
-  DeleteSelectedEntry;
-end;
-
-procedure TDSpecCreatorForm.actDeleteFileItemExecute(Sender : TObject);
-begin
-  DeleteSelectedEntry;
-end;
-
-procedure TDSpecCreatorForm.actDeleteLibItemExecute(Sender : TObject);
-begin
-  DeleteSelectedEntry;
-end;
-
-procedure TDSpecCreatorForm.actDeleteRuntimeItemExecute(Sender : TObject);
-begin
-  DeleteSelectedEntry;
-end;
-
-procedure TDSpecCreatorForm.actDeleteSearchPathExecute(Sender : TObject);
 begin
   DeleteSelectedEntry;
 end;
@@ -1525,22 +1290,7 @@ begin
   actAddDesignItem.Enabled := hasNode and (selectedNode.IsDesignHeading or selectedNode.IsDesign);
   actDeleteDesignItem.Enabled := hasNode and selectedNode.IsDesign;
 
-  actAddFileItem.Enabled := hasNode and (selectedNode.IsFileEntryHeading or selectedNode.IsFileEntry);
-  actDeleteFileItem.Enabled := hasNode and selectedNode.IsFileEntry;
-
-  actAddLibItem.Enabled := hasNode and (selectedNode.IsLibEntryHeading or selectedNode.IsLibEntry);
-  actDeleteLibItem.Enabled := hasNode and selectedNode.IsLibEntry;
-
-  actAddRuntimeItem.Enabled := hasNode and (selectedNode.IsRuntimeHeading or selectedNode.IsRuntime);
-  actDeleteRuntimeItem.Enabled := hasNode and selectedNode.IsRuntime;
-
-  actAddDependency.Enabled := hasNode and (selectedNode.IsDependencyHeading or selectedNode.IsDependency);
-  actDeleteDependency.Enabled := hasNode and selectedNode.IsDependency;
-
-  actAddSearchPath.Enabled := hasNode and (selectedNode.IsSearchPathHeading or selectedNode.IsSearchPath);
-  actDeleteSearchPath.Enabled := hasNode and selectedNode.IsSearchPath;
-
-  actAddSourceItem.Enabled := hasNode and (selectedNode.IsSourceHeading or selectedNode.IsSearchPath);
+  actAddSourceItem.Enabled := hasNode and (selectedNode.IsSourceHeading or selectedNode.IsSource);
   actDeleteSourceItem.Enabled := hasNode and selectedNode.IsSource;
 
 end;
@@ -1563,19 +1313,17 @@ begin
   clbPlatformsClickCheck(clbPlatforms);
 end;
 
-function TDSpecCreatorForm.LoadDesigntimeNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const item : ISpecBPLEntry) : TTemplateTreeNode;
+function TDSpecCreatorForm.LoadDesignNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const item : ISpecDesignEntry) : TTemplateTreeNode;
 begin
-  result := tvTemplates.Items.AddChild(parentNode, item.Source) as TTemplateTreeNode;
-  result.bplEntry := item;
+  result := tvTemplates.Items.AddChild(parentNode, item.Project) as TTemplateTreeNode;
+  result.designEntry := item;
   result.NodeType := ntDesign;
   result.Template := template;
   result.ImageIndex := 6;
   result.SelectedIndex := 6;
-
-
 end;
 
-procedure TDSpecCreatorForm.LoadDesigntimeNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecBPLEntry>);
+procedure TDSpecCreatorForm.LoadDesignNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecDesignEntry>);
 var
   designtimeNode : TTemplateTreeNode;
   j : integer;
@@ -1590,35 +1338,7 @@ begin
   designtimeNode.DeleteAction := actDeleteDesignItem;
 
   for j := 0 to fileList.Count - 1 do
-    LoadDesigntimeNode(designtimeNode, template, fileList[j]);
-end;
-
-function TDSpecCreatorForm.LoadRuntimeNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const item : ISpecBPLEntry) : TTemplateTreeNode;
-begin
-  result := tvTemplates.Items.AddChild(parentNode, item.Source) as TTemplateTreeNode;
-  result.bplEntry := item;
-  result.NodeType := ntRuntime;
-  result.Template := template;
-  result.ImageIndex := 1;
-  result.SelectedIndex := 1;
-end;
-
-procedure TDSpecCreatorForm.LoadRuntimeNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecBPLEntry>);
-var
-  runtimesNode : TTemplateTreeNode;
-  j : integer;
-begin
-  runtimesNode := tvTemplates.Items.AddChild(parentNode, 'Runtime') as TTemplateTreeNode;
-  runtimesNode.Template := template;
-  runtimesNode.NodeType := ntRuntimeHeading;
-  runtimesNode.ImageIndex := 1;
-  runtimesNode.SelectedIndex := 1;
-
-  runtimesNode.AddAction := actAddRuntimeItem;
-  runtimesNode.DeleteAction := actDeleteRuntimeItem;
-
-  for j := 0 to fileList.Count - 1 do
-    LoadRuntimeNode(runtimesNode, template, fileList[j]);
+    LoadDesignNode(designtimeNode, template, fileList[j]);
 end;
 
 function TDSpecCreatorForm.LoadDependency(const parentNode : TTemplateTreeNode; template : ISpecTemplate; const dependency : ISpecDependency) : TTemplateTreeNode;
@@ -1660,17 +1380,9 @@ begin
   Node := AddRootTemplateNode(template);
   result := Node;
 
-  LoadSourceNodes(Node, template, template.SourceFiles);
-  LoadLibNodes(Node, template, template.LibFiles);
-  LoadFileNodes(Node, template, template.Files);
-
-  LoadSearchPathNodes(Node, template);
-
+  LoadSourceNodes(Node, template, template.SourceEntries);
   LoadBuildNodes(Node, template);
-
-  LoadRuntimeNodes(Node, template, template.RuntimeFiles);
-  LoadDesigntimeNodes(Node, template, template.DesignFiles);
-
+  LoadDesignNodes(Node, template, template.DesignEntries);
   LoadDependencies(Node, template);
   Node.Expand(true);
 
@@ -1728,7 +1440,11 @@ var
 begin
   if Assigned(tvTemplates.Selected) then
   begin
-    (tvTemplates.Selected as TTemplateTreeNode).build.project := edtProject.Text;
+    if not FLoadingCard then
+    begin
+      (tvTemplates.Selected as TTemplateTreeNode).build.project := edtProject.Text;
+      (tvTemplates.Selected as TTemplateTreeNode).Text := edtProject.Text;
+    end;
 
     str := 'Possible Expanded Paths:' + System.sLineBreak;
 
@@ -1767,43 +1483,6 @@ begin
   result := TClassReplacer.ReplaceVars(inputStr, compiler, FOpenFile.PackageSpec);
 end;
 
-procedure TDSpecCreatorForm.edtBPLEntryBuildIdChange(Sender: TObject);
-begin
-  if Assigned(tvTemplates.Selected) then
-    (tvTemplates.Selected as TTemplateTreeNode).bplEntry.BuildId := edtBPLEntryBuildId.Text;
-end;
-
-procedure TDSpecCreatorForm.edtBPLEntrySrcChange(Sender : TObject);
-var
-  str : string;
-  compiler : TCompilerVersion;
-begin
-  if Assigned(tvTemplates.Selected) then
-  begin
-    (tvTemplates.Selected as TTemplateTreeNode).bplEntry.Source := edtBPLEntrySrc.Text;
-    (tvTemplates.Selected as TTemplateTreeNode).Text := edtBPLEntrySrc.Text;
-
-    str := 'Possible Expanded Paths:' + System.sLineBreak;
-
-    for compiler := Low(TCompilerVersion) to High(TCompilerVersion) do
-    begin
-      if compiler = TCompilerVersion.UnknownVersion then
-        continue;
-      str := str + System.sLineBreak + ReplaceVars(edtBPLEntrySrc.Text, compiler);
-    end;
-    edtBPLEntrySrc.Hint := str;
-  end;
-end;
-
-procedure TDSpecCreatorForm.edtSearchPathChange(Sender : TObject);
-begin
-  if Assigned(tvTemplates.Selected) then
-  begin
-    (tvTemplates.Selected as TTemplateTreeNode).SearchPath.Path := edtSearchPath.Text;
-    (tvTemplates.Selected as TTemplateTreeNode).Text := edtSearchPath.Text
-  end;
-end;
-
 procedure TDSpecCreatorForm.edtFileEntrySourceChange(Sender : TObject);
 var
   str : string;
@@ -1811,8 +1490,11 @@ var
 begin
   if Assigned(tvTemplates.Selected) then
   begin
-    (tvTemplates.Selected as TTemplateTreeNode).fileEntry.Source := edtFileEntrySource.Text;
-    (tvTemplates.Selected as TTemplateTreeNode).Text := edtFileEntrySource.Text;
+    if not FLoadingCard then
+    begin
+      (tvTemplates.Selected as TTemplateTreeNode).sourceEntry.Source := edtFileEntrySource.Text;
+      (tvTemplates.Selected as TTemplateTreeNode).Text := edtFileEntrySource.Text;
+    end;
 
     str := 'Possible Expanded Paths:' + System.sLineBreak;
 
@@ -1828,7 +1510,7 @@ end;
 
 procedure TDSpecCreatorForm.edtTagsChange(Sender : TObject);
 begin
-  FOpenFile.PackageSpec.metadata.tags := edtTags.Text;
+  FOpenFile.PackageSpec.metadata.tags.CommaText := edtTags.Text;
 end;
 
 procedure TDSpecCreatorForm.edtTemplateNameChange(Sender : TObject);
@@ -1926,6 +1608,7 @@ procedure TDSpecCreatorForm.LoadDspecStructure;
 var
   i : integer;
   j : integer;
+  compilerVersion : TCompilerVersion;
 begin
   edtId.Text := FOpenFile.PackageSpec.metadata.id;
   edtVersion.Text := FOpenFile.PackageSpec.metadata.Version.ToString;
@@ -1933,10 +1616,13 @@ begin
   edtProjectURL.Text := FOpenFile.PackageSpec.metadata.projectUrl;
   edtRepositoryURL.Text := FOpenFile.PackageSpec.metadata.repositoryUrl;
   edtRepositoryCommit.Text := FOpenFile.PackageSpec.metadata.RepositoryCommit;
-  edtAuthor.Text := FOpenFile.PackageSpec.metadata.authors;
+  if FOpenFile.PackageSpec.metadata.authors.Count > 0 then
+    edtAuthor.Text := FOpenFile.PackageSpec.metadata.authors[0]
+  else
+    edtAuthor.Text := '';
   edtCopyright.Text := FOpenFile.PackageSpec.metadata.Copyright;
   cboLicense.Text := FOpenFile.PackageSpec.metadata.license;
-  edtTags.Text := FOpenFile.PackageSpec.metadata.tags;
+  edtTags.Text := FOpenFile.PackageSpec.metadata.tags.CommaText;
   edtReadme.Text := FOpenFile.PackageSpec.metadata.Readme;
   if Length(FOpenFile.PackageSpec.metadata.Icon) > 0 then
   begin
@@ -1946,16 +1632,22 @@ begin
   cboTemplate.Text := '';
 
   CardPanel.Visible := false;
+
+  //Check each compiler box that any targetPlatform covers. Using IsForCompiler handles all three
+  //authoring forms (single compiler, compilers list, compiler from/to range) and avoids the
+  //CompilerToString ('delphi12.0') vs checklist item ('12.0') naming mismatch.
   for j := 0 to clbCompilers.Count - 1 do
   begin
+    compilerVersion := StringToCompilerVersion(clbCompilers.Items[j]);
     clbCompilers.Checked[j] := false;
-  end;
-
-  for i := 0 to FOpenFile.PackageSpec.targetPlatforms.Count - 1 do
-  begin
-    j := clbCompilers.Items.IndexOf(CompilerToString(FOpenFile.PackageSpec.targetPlatforms[i].compiler));
-    if j >= 0 then
-      clbCompilers.Checked[j] := j >= 0;
+    for i := 0 to FOpenFile.PackageSpec.targetPlatforms.Count - 1 do
+    begin
+      if FOpenFile.PackageSpec.targetPlatforms[i].IsForCompiler(compilerVersion) then
+      begin
+        clbCompilers.Checked[j] := true;
+        break;
+      end;
+    end;
   end;
 
   LoadTemplates;
@@ -1982,14 +1674,6 @@ procedure TDSpecCreatorForm.SaveDspecStructure(const filename : string);
 begin
   FOpenFile.SaveToFile(filename);
   UpdateFormCaption(FOpenFile.filename);
-end;
-
-function TDSpecCreatorForm.SelectedPlatform : ISpecTargetPlatform;
-begin
-  result := nil;
-  if clbPlatforms.ItemIndex < 0 then
-    Exit;
-  result := FOpenFile.GetPlatform(clbPlatforms.Items[clbPlatforms.ItemIndex]);
 end;
 
 procedure TDSpecCreatorForm.UpdateFormCaption(const value : string);
@@ -2057,13 +1741,6 @@ begin
   for i := 0 to clbPlatforms.Count - 1 do
   begin
     platformString := clbPlatforms.Items[i];
-    // if platformString.Equals('Linux') then
-    // platformString := 'Linux64'
-    // else if platformString.Equals('Andriod') then
-
-    // else if platformString.Equals('IOS') then
-    // platformString := 'iOS64';
-
     dpmPlatform := StringToDPMPlatform(platformString);
     clbPlatforms.ItemEnabled[i] := dpmPlatform in DpmPlatforms;
     clbPlatforms.Checked[i] := false;
@@ -2252,80 +1929,65 @@ var
 begin
   lNode := Node as TTemplateTreeNode;
 
-  case lNode.NodeType of
-    ntTemplateHeading :
-      begin
-        edtTemplateName.Text := lNode.Template.name;
-        CardPanel.ActiveCard := crdTemplate;
-      end;
-    ntBuildHeading  :      CardPanel.ActiveCard := crdBuildHeading;
-    ntDesignHeading :      CardPanel.ActiveCard := crdDesignHeading;
-    ntRuntimeHeading :     CardPanel.ActiveCard := crdRuntimeHeading;
-    ntSourceHeading :      CardPanel.ActiveCard := crdSourceHeading;
-    ntFileHeading :        CardPanel.ActiveCard := crdFileEntriesHeading;
-    ntLibHeading :         CardPanel.ActiveCard := crdLibEntriesHeading;
-    ntSeachPathHeading :   CardPanel.ActiveCard := crdSearchPathHeading;
-    ntDependencyHeading :  CardPanel.ActiveCard := crdDependenciesHeading;
-    ntBuild :
-      begin
-        edtBuildId.Text := lNode.build.id;
-        edtProject.Text := lNode.build.project;
-        edtConfiguration.Text := lNode.build.Config;
-        chkBuildForDesign.Checked := lNode.build.buildForDesign;
-        chkDesignOnly.Checked := lNode.build.designOnly;
-        CardPanel.ActiveCard := crdBuild;
-      end;
-    ntDesign :
-      begin
-        lblRuntime.Caption := 'Design time Package (bpl)';
-        edtBPLEntryBuildId.Text := lNode.bplEntry.buildId;
-        edtBPLEntrySrc.Text := lNode.bplEntry.Source;
-        chkCopyLocal.Checked := lNode.bplEntry.copyLocal;
-        chkInstall.Checked := lNode.bplEntry.Install;
-        CardPanel.ActiveCard := crdRuntimeOrDesignBpl;
-      end;
-    ntRuntime :
-      begin
-        lblRuntime.Caption := 'Runtime Package (bpl)';
-        edtBPLEntryBuildId.Text := lNode.bplEntry.buildId;
-        edtBPLEntrySrc.Text := lNode.bplEntry.Source;
-        chkInstall.Checked := lNode.bplEntry.Install;
-        chkCopyLocal.Checked := lNode.bplEntry.copyLocal;
-        CardPanel.ActiveCard := crdRuntimeOrDesignBpl;
-      end;
-    ntSource, ntFile, ntLib :
-      begin
-        edtFileEntrySource.Text := lNode.fileEntry.Source;
-        chkFileEntryFlatten.Checked := lNode.fileEntry.flatten;
-        edtFileEntryDest.Text := lNode.fileEntry.Destination;
-        lbFileEntryExclude.Clear;
-        for i := 0 to lNode.fileEntry.exclude.Count - 1 do
-          lbFileEntryExclude.Items.Add(lNode.fileEntry.exclude[i]);
-
-        case lNode.NodeType of
-          ntSource :  lblSourceItemHeader.Caption := 'Source Files';
-          ntFile :    lblSourceItemHeader.Caption := 'Other Files';
-          ntLib :     lblSourceItemHeader.Caption := 'Lib Files';
+  FLoadingCard := true;
+  try
+    case lNode.NodeType of
+      ntTemplateHeading :
+        begin
+          edtTemplateName.Text := lNode.Template.name;
+          CardPanel.ActiveCard := crdTemplate;
         end;
-
-        CardPanel.ActiveCard := crdSource;
-      end;
-    ntSeachPath :
-      begin
-        edtSearchPath.Text := lNode.SearchPath.Path;
-        CardPanel.ActiveCard := crdSearchPathItem;
-      end;
-    ntDependency :
-      begin
-        if not lNode.dependency.Version.IsEmpty then
-          edtDependencyVersion.Text := lNode.dependency.Version.ToString
-        else
-          edtDependencyVersion.Text := '';
-        edtDependencyId.Text := lNode.dependency.id;
-        CardPanel.ActiveCard := crdDependency;
-      end;
-  else
-    raise Exception.Create('Unknow node type in tvTemplateChange');
+      ntBuildHeading  :      CardPanel.ActiveCard := crdBuildHeading;
+      ntDesignHeading :      CardPanel.ActiveCard := crdDesignHeading;
+      ntSourceHeading :      CardPanel.ActiveCard := crdSourceHeading;
+      ntDependencyHeading :  CardPanel.ActiveCard := crdDependenciesHeading;
+      ntBuild :
+        begin
+          edtProject.Text := lNode.build.project;
+          edtBuildDefines.Text := lNode.build.Defines;
+          SetCheckListPlatforms(clbBuildPlatforms, lNode.build.Platforms);
+          lbBuildReferences.Clear;
+          for i := 0 to lNode.build.References.Count - 1 do
+            lbBuildReferences.Items.Add(lNode.build.References[i]);
+          CardPanel.ActiveCard := crdBuild;
+        end;
+      ntDesign :
+        begin
+          edtDesignProject.Text := lNode.designEntry.Project;
+          edtDesignDefines.Text := lNode.designEntry.Defines;
+          SetCheckListPlatforms(clbDesignPlatforms, lNode.designEntry.Platforms);
+          lbDesignReferences.Clear;
+          for i := 0 to lNode.designEntry.References.Count - 1 do
+            lbDesignReferences.Items.Add(lNode.designEntry.References[i]);
+          edtLibPrefix.Text := lNode.designEntry.LibPrefix;
+          edtLibSuffix.Text := lNode.designEntry.LibSuffix;
+          edtLibVersion.Text := lNode.designEntry.LibVersion;
+          CardPanel.ActiveCard := crdDesign;
+        end;
+      ntSource :
+        begin
+          edtFileEntrySource.Text := lNode.sourceEntry.Source;
+          edtFileEntryDest.Text := lNode.sourceEntry.Destination;
+          lbFileEntryExclude.Clear;
+          for i := 0 to lNode.sourceEntry.exclude.Count - 1 do
+            lbFileEntryExclude.Items.Add(lNode.sourceEntry.exclude[i]);
+          lblSourceItemHeader.Caption := 'Source Files';
+          CardPanel.ActiveCard := crdSource;
+        end;
+      ntDependency :
+        begin
+          if not lNode.dependency.Version.IsEmpty then
+            edtDependencyVersion.Text := lNode.dependency.Version.ToString
+          else
+            edtDependencyVersion.Text := '';
+          edtDependencyId.Text := lNode.dependency.id;
+          CardPanel.ActiveCard := crdDependency;
+        end;
+    else
+      raise Exception.Create('Unknow node type in tvTemplateChange');
+    end;
+  finally
+    FLoadingCard := false;
   end;
   CardPanel.Visible := true;
 end;
@@ -2399,6 +2061,8 @@ end;
 procedure TDSpecCreatorForm.VariablesListStringsChange(Sender : TObject);
 var
   vPlatform : ISpecTargetPlatform;
+  i : integer;
+  key : string;
 begin
   vPlatform := FOpenFile.GetPlatform(clbCompilers.Items[clbCompilers.ItemIndex]);
 
@@ -2411,8 +2075,18 @@ begin
   if Assigned(vPlatform) then
   begin
     vPlatform.Variables.Clear;
-    vPlatform.Variables.AddStrings(VariablesList.Strings);
+    for i := 0 to VariablesList.Strings.Count - 1 do
+    begin
+      key := VariablesList.Strings.Names[i];
+      if key <> '' then
+        vPlatform.Variables[key] := VariablesList.Strings.ValueFromIndex[i];
+    end;
   end;
+end;
+
+procedure TDSpecCreatorForm.edtCopyrightChange(Sender : TObject);
+begin
+  FOpenFile.PackageSpec.metadata.Copyright := edtCopyright.Text;
 end;
 
 end.

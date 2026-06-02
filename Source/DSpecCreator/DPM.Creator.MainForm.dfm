@@ -22,7 +22,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Top = 0
     Width = 871
     Height = 558
-    ActivePage = tsInfo
+    ActivePage = tsGenerate
     Align = alClient
     TabOrder = 0
     object tsInfo: TTabSheet
@@ -298,7 +298,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
       end
     end
     object tsPlatforms: TTabSheet
-      Caption = 'Platforms'
+      Caption = 'TargetPlatforms'
       ImageIndex = 1
       object lblTemplate: TLabel
         Left = 256
@@ -371,15 +371,15 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Items.Strings = (
           'Win32'
           'Win64'
-          'OSX32'
-          'OSX64'
-          'OSXARM64'
+          'MacOS32'
+          'MacOS64'
+          'MacOSARM64'
           'Android'
           'Android64'
           'iOS32'
           'iOS64'
           'iOSSimulator'
-          'LinuxIntel64')
+          'Linux64')
         ParentDoubleBuffered = False
         PopupMenu = pmPlatforms
         TabOrder = 2
@@ -428,7 +428,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Top = 1
           Width = 527
           Height = 526
-          Caption = 'Source/Lib/File'
+          Caption = 'Source'
           CardIndex = 0
           TabOrder = 0
           DesignSize = (
@@ -474,14 +474,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             TabOrder = 0
             OnChange = edtFileEntrySourceChange
           end
-          object chkFileEntryFlatten: TCheckBox
-            Left = 16
-            Top = 90
-            Width = 97
-            Height = 17
-            Caption = 'Flatten'
-            TabOrder = 1
-          end
           object edtFileEntryDest: TEdit
             Left = 16
             Top = 134
@@ -490,7 +482,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
             ShowHint = True
-            TabOrder = 2
+            TabOrder = 1
             TextHint = 'Leave blank to use same relative path as source'
             OnChange = edtFileEntryDestChange
           end
@@ -501,7 +493,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Height = 97
             Anchors = [akLeft, akTop, akRight]
             ItemHeight = 15
-            TabOrder = 3
+            TabOrder = 2
           end
           object btnAddExclude: TButton
             Left = 96
@@ -518,39 +510,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Width = 88
             Height = 25
             Caption = 'Delete Exclude'
-            TabOrder = 5
+            TabOrder = 3
             OnClick = btnDeleteExcludeClick
-          end
-        end
-        object crdSearchPathItem: TCard
-          Left = 1
-          Top = 1
-          Width = 527
-          Height = 526
-          Caption = 'SearchPath Item'
-          CardIndex = 1
-          TabOrder = 1
-          object lblSearchPaths: TLabel
-            Left = 8
-            Top = 8
-            Width = 92
-            Height = 15
-            Caption = 'Search Path Entry'
-          end
-          object Label9: TLabel
-            Left = 16
-            Top = 40
-            Width = 24
-            Height = 15
-            Caption = 'Path'
-          end
-          object edtSearchPath: TEdit
-            Left = 16
-            Top = 62
-            Width = 401
-            Height = 23
-            TabOrder = 0
-            OnChange = edtSearchPathChange
           end
         end
         object crdBuild: TCard
@@ -559,8 +520,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Width = 527
           Height = 526
           Caption = 'Build Item'
-          CardIndex = 2
-          TabOrder = 2
+          CardIndex = 1
+          TabOrder = 1
           DesignSize = (
             527
             526)
@@ -571,149 +532,259 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Height = 15
             Caption = 'Build'
           end
-          object lblBuildId: TLabel
-            Left = 24
-            Top = 37
-            Width = 40
-            Height = 15
-            Caption = 'BuildId:'
-          end
           object lblProject: TLabel
-            Left = 24
-            Top = 85
-            Width = 40
+            Left = 16
+            Top = 40
+            Width = 82
             Height = 15
-            Caption = 'Project:'
+            Caption = 'Project (.dproj):'
           end
-          object lblConfiguration: TLabel
-            Left = 24
-            Top = 135
-            Width = 77
+          object lblBuildDefines: TLabel
+            Left = 16
+            Top = 92
+            Width = 162
             Height = 15
-            Caption = 'Configuration:'
+            Caption = 'Defines (semicolon separated):'
           end
-          object edtBuildId: TEdit
-            Left = 24
-            Top = 56
-            Width = 414
-            Height = 23
-            Anchors = [akLeft, akTop, akRight]
-            TabOrder = 0
-            OnChange = edtBuildIdChange
+          object lblBuildPlatforms: TLabel
+            Left = 16
+            Top = 144
+            Width = 108
+            Height = 15
+            Caption = 'Platforms (override):'
+          end
+          object lblBuildReferences: TLabel
+            Left = 271
+            Top = 144
+            Width = 60
+            Height = 15
+            Caption = 'References:'
           end
           object edtProject: TEdit
-            Left = 24
-            Top = 106
-            Width = 414
-            Height = 23
-            Anchors = [akLeft, akTop, akRight]
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 1
-            OnChange = edtProjectChange
-          end
-          object edtConfiguration: TEdit
-            Left = 24
-            Top = 156
-            Width = 414
-            Height = 23
-            Anchors = [akLeft, akTop, akRight]
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 2
-            OnChange = edtConfigurationChange
-          end
-          object chkBuildForDesign: TCheckBox
-            Left = 24
-            Top = 193
-            Width = 113
-            Height = 17
-            Caption = 'Build For Design'
-            TabOrder = 3
-            OnClick = chkBuildForDesignClick
-          end
-          object chkDesignOnly: TCheckBox
-            Left = 24
-            Top = 223
-            Width = 113
-            Height = 17
-            Caption = 'Design Only'
-            TabOrder = 4
-            OnClick = chkDesignOnlyClick
-          end
-        end
-        object crdRuntimeOrDesignBpl: TCard
-          AlignWithMargins = True
-          Left = 4
-          Top = 4
-          Width = 521
-          Height = 520
-          Caption = 'Runtime Or DesignTime'
-          CardIndex = 3
-          TabOrder = 3
-          DesignSize = (
-            521
-            520)
-          object lblRuntime: TLabel
-            Left = 8
-            Top = 8
-            Width = 45
-            Height = 15
-            Caption = 'Runtime'
-          end
-          object lblRuntimeBuildId: TLabel
-            Left = 10
-            Top = 115
-            Width = 46
-            Height = 15
-            Alignment = taRightJustify
-            Caption = 'Build Id :'
-          end
-          object lblRuntimeSrc: TLabel
-            Left = 34
-            Top = 40
-            Width = 22
-            Height = 15
-            Alignment = taRightJustify
-            Caption = 'Src :'
-          end
-          object edtBPLEntryBuildId: TEdit
-            Left = 62
-            Top = 112
-            Width = 416
-            Height = 23
-            Anchors = [akLeft, akTop, akRight]
-            TabOrder = 3
-            OnChange = edtBPLEntryBuildIdChange
-          end
-          object edtBPLEntrySrc: TEdit
-            Left = 62
-            Top = 37
-            Width = 416
+            Left = 16
+            Top = 61
+            Width = 495
             Height = 23
             Anchors = [akLeft, akTop, akRight]
             ParentShowHint = False
             ShowHint = True
             TabOrder = 0
-            OnChange = edtBPLEntrySrcChange
+            OnChange = edtProjectChange
           end
-          object chkCopyLocal: TCheckBox
-            Left = 62
-            Top = 66
-            Width = 97
-            Height = 17
-            Caption = 'Copy Local'
+          object edtBuildDefines: TEdit
+            Left = 16
+            Top = 113
+            Width = 495
+            Height = 23
+            Anchors = [akLeft, akTop, akRight]
             TabOrder = 1
-            OnClick = chkCopyLocalClick
+            OnChange = edtBuildDefinesChange
           end
-          object chkInstall: TCheckBox
-            Left = 62
-            Top = 89
-            Width = 97
-            Height = 17
-            Caption = 'Install'
+          object clbBuildPlatforms: TCheckListBox
+            Left = 16
+            Top = 165
+            Width = 240
+            Height = 160
+            ItemHeight = 17
+            Items.Strings = (
+              'Win32'
+              'Win64'
+              'MacOS32'
+              'MacOS64'
+              'MacOSARM64'
+              'Android'
+              'Android64'
+              'iOS32'
+              'iOS64'
+              'iOSSimulator'
+              'Linux64')
             TabOrder = 2
-            OnClick = chkDesignInstallClick
+            OnClickCheck = clbBuildPlatformsClickCheck
+          end
+          object lbBuildReferences: TListBox
+            Left = 271
+            Top = 165
+            Width = 240
+            Height = 120
+            ItemHeight = 15
+            TabOrder = 3
+          end
+          object btnAddBuildRef: TButton
+            Left = 271
+            Top = 293
+            Width = 75
+            Height = 25
+            Caption = 'Add'
+            TabOrder = 4
+            OnClick = btnAddBuildRefClick
+          end
+          object btnDeleteBuildRef: TButton
+            Left = 360
+            Top = 293
+            Width = 75
+            Height = 25
+            Caption = 'Delete'
+            TabOrder = 5
+            OnClick = btnDeleteBuildRefClick
+          end
+        end
+        object crdDesign: TCard
+          Left = 1
+          Top = 1
+          Width = 527
+          Height = 526
+          Caption = 'Design Item'
+          CardIndex = 2
+          TabOrder = 2
+          DesignSize = (
+            527
+            526)
+          object lblDesign: TLabel
+            Left = 8
+            Top = 8
+            Width = 36
+            Height = 15
+            Caption = 'Design'
+          end
+          object lblDesignProject: TLabel
+            Left = 16
+            Top = 40
+            Width = 82
+            Height = 15
+            Caption = 'Project (.dproj):'
+          end
+          object lblDesignDefines: TLabel
+            Left = 16
+            Top = 92
+            Width = 162
+            Height = 15
+            Caption = 'Defines (semicolon separated):'
+          end
+          object lblDesignPlatforms: TLabel
+            Left = 16
+            Top = 144
+            Width = 54
+            Height = 15
+            Caption = 'Platforms:'
+          end
+          object lblDesignReferences: TLabel
+            Left = 271
+            Top = 144
+            Width = 60
+            Height = 15
+            Caption = 'References:'
+          end
+          object lblLibPrefix: TLabel
+            Left = 16
+            Top = 320
+            Width = 51
+            Height = 15
+            Caption = 'Lib Prefix:'
+          end
+          object lblLibSuffix: TLabel
+            Left = 16
+            Top = 349
+            Width = 51
+            Height = 15
+            Caption = 'Lib Suffix:'
+          end
+          object lblLibVersion: TLabel
+            Left = 16
+            Top = 378
+            Width = 60
+            Height = 15
+            Caption = 'Lib Version:'
+          end
+          object edtDesignProject: TEdit
+            Left = 16
+            Top = 61
+            Width = 495
+            Height = 23
+            Anchors = [akLeft, akTop, akRight]
+            ParentShowHint = False
+            ShowHint = True
+            TabOrder = 0
+            OnChange = edtDesignProjectChange
+          end
+          object edtDesignDefines: TEdit
+            Left = 16
+            Top = 113
+            Width = 495
+            Height = 23
+            Anchors = [akLeft, akTop, akRight]
+            TabOrder = 1
+            OnChange = edtDesignDefinesChange
+          end
+          object clbDesignPlatforms: TCheckListBox
+            Left = 16
+            Top = 165
+            Width = 240
+            Height = 140
+            ItemHeight = 17
+            Items.Strings = (
+              'Win32'
+              'Win64'
+              'MacOS32'
+              'MacOS64'
+              'MacOSARM64'
+              'Android'
+              'Android64'
+              'iOS32'
+              'iOS64'
+              'iOSSimulator'
+              'Linux64')
+            TabOrder = 2
+            OnClickCheck = clbDesignPlatformsClickCheck
+          end
+          object lbDesignReferences: TListBox
+            Left = 271
+            Top = 165
+            Width = 240
+            Height = 100
+            ItemHeight = 15
+            TabOrder = 3
+          end
+          object btnAddDesignRef: TButton
+            Left = 271
+            Top = 271
+            Width = 75
+            Height = 25
+            Caption = 'Add'
+            TabOrder = 4
+            OnClick = btnAddDesignRefClick
+          end
+          object btnDeleteDesignRef: TButton
+            Left = 360
+            Top = 271
+            Width = 75
+            Height = 25
+            Caption = 'Delete'
+            TabOrder = 5
+            OnClick = btnDeleteDesignRefClick
+          end
+          object edtLibPrefix: TEdit
+            Left = 110
+            Top = 317
+            Width = 150
+            Height = 23
+            TabOrder = 6
+            OnChange = edtLibPrefixChange
+          end
+          object edtLibSuffix: TEdit
+            Left = 110
+            Top = 346
+            Width = 150
+            Height = 23
+            TabOrder = 7
+            OnChange = edtLibSuffixChange
+          end
+          object edtLibVersion: TEdit
+            Left = 110
+            Top = 375
+            Width = 150
+            Height = 23
+            TabOrder = 8
+            OnChange = edtLibVersionChange
           end
         end
         object crdDependency: TCard
@@ -722,8 +793,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Width = 527
           Height = 526
           Caption = 'Dependency'
-          CardIndex = 4
-          TabOrder = 4
+          CardIndex = 3
+          TabOrder = 3
           DesignSize = (
             527
             526)
@@ -740,13 +811,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Width = 16
             Height = 15
             Caption = 'Id :'
-          end
-          object Label8: TLabel
-            Left = 8
-            Top = 8
-            Width = 66
-            Height = 15
-            Caption = 'Dependency'
           end
           object edtDependencyId: TEdit
             Left = 16
@@ -775,8 +839,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Width = 527
           Height = 526
           Caption = 'Templates'
-          CardIndex = 5
-          TabOrder = 5
+          CardIndex = 4
+          TabOrder = 4
           object lblTemplateName: TLabel
             Left = 16
             Top = 40
@@ -806,8 +870,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Width = 527
           Height = 526
           Caption = 'Build Items Heading'
-          CardIndex = 6
-          TabOrder = 6
+          CardIndex = 5
+          TabOrder = 5
           object lblBuildHeading: TLabel
             Left = 8
             Top = 8
@@ -828,42 +892,14 @@ object DSpecCreatorForm: TDSpecCreatorForm
             WordWrap = True
           end
         end
-        object crdSearchPathHeading: TCard
-          Left = 1
-          Top = 1
-          Width = 527
-          Height = 526
-          Caption = 'SearchPath Heading'
-          CardIndex = 7
-          TabOrder = 7
-          object lblSearchPathsDescription: TLabel
-            Left = 8
-            Top = 32
-            Width = 505
-            Height = 292
-            AutoSize = False
-            Caption = 
-              'Add Search paths from the package that wll be added to the Proje' +
-              'ct'#39's Search Path when the package is installed.'
-            Enabled = False
-            WordWrap = True
-          end
-          object lblSearchPathsHeading: TLabel
-            Left = 8
-            Top = 8
-            Width = 67
-            Height = 15
-            Caption = 'Search Paths'
-          end
-        end
         object crdSourceHeading: TCard
           Left = 1
           Top = 1
           Width = 527
           Height = 526
           Caption = 'Source Items Heading'
-          CardIndex = 8
-          TabOrder = 8
+          CardIndex = 6
+          TabOrder = 6
           object lblSourceItemsHeading: TLabel
             Left = 8
             Top = 8
@@ -888,8 +924,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Width = 527
           Height = 526
           Caption = 'Dependencies '
-          CardIndex = 9
-          TabOrder = 9
+          CardIndex = 7
+          TabOrder = 7
           object Label6: TLabel
             Left = 8
             Top = 8
@@ -910,68 +946,14 @@ object DSpecCreatorForm: TDSpecCreatorForm
             WordWrap = True
           end
         end
-        object crdLibEntriesHeading: TCard
-          Left = 1
-          Top = 1
-          Width = 527
-          Height = 526
-          Caption = 'Lib Entries Heading'
-          CardIndex = 10
-          TabOrder = 10
-          object lblLibFilesHeading: TLabel
-            Left = 8
-            Top = 8
-            Width = 42
-            Height = 15
-            Caption = 'Lib Files'
-          end
-          object lblLibFilesDescription: TLabel
-            Left = 8
-            Top = 32
-            Width = 505
-            Height = 292
-            AutoSize = False
-            Caption = 'Add Lib Entries for precompiled dcu/dcp/obj files'
-            Enabled = False
-            WordWrap = True
-          end
-        end
-        object crdFileEntriesHeading: TCard
-          Left = 1
-          Top = 1
-          Width = 527
-          Height = 526
-          Caption = 'File Entries Heading'
-          CardIndex = 11
-          TabOrder = 11
-          object lblFileEntriesHeading: TLabel
-            Left = 8
-            Top = 8
-            Width = 56
-            Height = 15
-            Caption = 'File Entries'
-          end
-          object lblFileEntriesDescription: TLabel
-            Left = 8
-            Top = 32
-            Width = 497
-            Height = 292
-            AutoSize = False
-            Caption = 
-              'Add File Entries to define non source or binaries to include in ' +
-              'the package (eg, images)'
-            Enabled = False
-            WordWrap = True
-          end
-        end
         object crdDesignHeading: TCard
           Left = 1
           Top = 1
           Width = 527
           Height = 526
           Caption = 'Design Heading'
-          CardIndex = 12
-          TabOrder = 12
+          CardIndex = 8
+          TabOrder = 8
           object lblDesignHeading: TLabel
             Left = 8
             Top = 8
@@ -988,32 +970,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Caption = 
               'Define Design time packages to be installed in the IDE when this' +
               ' package is installed.'
-            Enabled = False
-            WordWrap = True
-          end
-        end
-        object crdRuntimeHeading: TCard
-          Left = 1
-          Top = 1
-          Width = 527
-          Height = 526
-          Caption = 'Runtime Heading'
-          CardIndex = 13
-          TabOrder = 13
-          object lblRuntimeHeading: TLabel
-            Left = 8
-            Top = 8
-            Width = 97
-            Height = 15
-            Caption = 'Runtime Packages'
-          end
-          object lblRuntimeDescription: TLabel
-            Left = 8
-            Top = 32
-            Width = 497
-            Height = 292
-            AutoSize = False
-            Caption = 'Define Runtime packages (bpl) for projects that use them'
             Enabled = False
             WordWrap = True
           end
@@ -1102,7 +1058,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
       end
     end
     object tsGenerate: TTabSheet
-      Caption = 'Generate'
+      Caption = 'Pack'
       ImageIndex = 3
       object GridPanel1: TGridPanel
         Left = 0
@@ -1153,7 +1109,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Top = 22
             Width = 97
             Height = 25
-            Caption = 'Build Packages'
+            Hint = 'Generate package files'
+            Caption = 'Pack'
             TabOrder = 0
             OnClick = btnBuildPackagesClick
           end
@@ -1585,16 +1542,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
       Caption = 'Delect Build Item'
       OnExecute = actDeleteBuildItemExecute
     end
-    object actAddRuntimeItem: TAction
-      Category = 'Runtime'
-      Caption = 'Add Runtime Item'
-      OnExecute = actAddRuntimeItemExecute
-    end
-    object actDeleteRuntimeItem: TAction
-      Category = 'Runtime'
-      Caption = 'Delete Runtime Item'
-      OnExecute = actDeleteRuntimeItemExecute
-    end
     object actAddDesignItem: TAction
       Category = 'Design'
       Caption = 'Add Design Item'
@@ -1610,40 +1557,10 @@ object DSpecCreatorForm: TDSpecCreatorForm
       Caption = 'Add Source Item'
       OnExecute = actAddSourceItemExecute
     end
-    object actAddFileItem: TAction
-      Category = 'File'
-      Caption = 'Add File Item'
-      OnExecute = actAddFileItemExecute
-    end
     object actDeleteSourceItem: TAction
       Category = 'Source'
       Caption = 'Delete Source Item'
       OnExecute = actDeleteSourceItemExecute
-    end
-    object actDeleteFileItem: TAction
-      Category = 'File'
-      Caption = 'Delete File Item'
-      OnExecute = actDeleteFileItemExecute
-    end
-    object actAddLibItem: TAction
-      Category = 'Lib'
-      Caption = 'Add Lib Item'
-      OnExecute = actAddLibItemExecute
-    end
-    object actDeleteLibItem: TAction
-      Category = 'Lib'
-      Caption = 'Delete Lib Item'
-      OnExecute = actDeleteLibItemExecute
-    end
-    object actAddSearchPath: TAction
-      Category = 'SearchPath'
-      Caption = 'Add Search Path'
-      OnExecute = actAddSearchPathExecute
-    end
-    object actDeleteSearchPath: TAction
-      Category = 'SearchPath'
-      Caption = 'Delete Search Path'
-      OnExecute = actDeleteSearchPathExecute
     end
     object actAddDependency: TAction
       Category = 'Dependency'

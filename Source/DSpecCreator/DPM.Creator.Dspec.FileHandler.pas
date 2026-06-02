@@ -3,7 +3,6 @@ unit DPM.Creator.Dspec.FileHandler;
 interface
 
 uses
-  System.JSON,
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Reader
@@ -47,8 +46,6 @@ uses
   System.IOUtils,
   System.Classes,
   System.SysUtils,
-  System.JSON.Writers,
-  REST.Json,
   DPM.Core.Spec,
   DPM.Core.Spec.Template,
   DPM.Core.Spec.TargetPlatform,
@@ -71,7 +68,7 @@ end;
 
 function TDSpecFile.AsString: string;
 begin
-  Result := FPackageSpec.ToJSON;
+  Result := FPackageSpec.GenerateDspecYAML(FPackageSpec.MetaData.Version);
 end;
 
 procedure TDSpecFile.ClearCompilers;
@@ -94,10 +91,12 @@ end;
 procedure TDSpecFile.DeleteCompiler(const compiler: string);
 var
   i : Integer;
+  cv : TCompilerVersion;
 begin
+  cv := StringToCompilerVersion(compiler);
   for i := 0 to FPackageSpec.TargetPlatforms.Count - 1 do
   begin
-    if SameText(CompilerToString(FPackageSpec.TargetPlatforms[i].compiler), compiler) then
+    if FPackageSpec.TargetPlatforms[i].IsForCompiler(cv) then
     begin
       FPackageSpec.TargetPlatforms.Delete(i);
       Exit;
@@ -146,11 +145,15 @@ end;
 function TDSpecFile.GetPlatform(const compiler: string): ISpecTargetPlatform;
 var
   i: Integer;
+  cv : TCompilerVersion;
 begin
   Result := nil;
+  cv := StringToCompilerVersion(compiler);
+  //match via IsForCompiler so all three authoring forms (single compiler, compilers list,
+  //compiler from/to range) resolve to the entry that covers this compiler.
   for i := 0 to FPackageSpec.targetPlatforms.Count - 1 do
   begin
-    if FPackageSpec.targetPlatforms[i].compiler = StringToCompilerVersion(compiler) then
+    if FPackageSpec.targetPlatforms[i].IsForCompiler(cv) then
     begin
       Result := FPackageSpec.targetPlatforms[i];
       Exit;
@@ -163,7 +166,8 @@ begin
 //TODO : This is wasteful - implement a modified flag.
 
   if (FPackageSpec <> nil) and (FLoadedSpec <> nil) then
-    Result := not SameText(FPackageSpec.ToJSON, FLoadedSpec.ToJSON)
+    Result := not SameText(FPackageSpec.GenerateDspecYAML(FPackageSpec.MetaData.Version),
+                           FLoadedSpec.GenerateDspecYAML(FLoadedSpec.MetaData.Version))
   else
     result := false;
 end;
@@ -188,18 +192,12 @@ begin
 end;
 
 procedure TDSpecFile.SaveToFile(const filename: string);
-//var
-//  writer : IPackageSpecWriter;
 begin
-  raise ENotImplemented.Create('Error Message');
-
-  //this is the only place the writer is used - will just use the spec class
-
-//  writer := TPackageSpecWriter.Create(FLogger, FPackageSpec);
-//  writer.SaveToFile(filename);
-//  FFilename := Filename;
-//  //TODO : This is terrible - find a better way to handle modified
-//  FLoadedSpec := FReader.ReadSpec(filename);
+  FPackageSpec.ToYAMLFile(filename);
+  FFilename := filename;
+  //reload so the modified-check baseline matches what was just written.
+  FReader := TPackageSpecReader.Create(FLogger);
+  FLoadedSpec := FReader.ReadSpec(filename);
 end;
 
 function TDSpecFile.WorkingDir: string;

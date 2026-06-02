@@ -5,7 +5,7 @@
         <Config Condition="'$(Config)'==''">Debug</Config>
         <FrameworkType>VCL</FrameworkType>
         <MainSource>DPM.IDE.D120.dpr</MainSource>
-        <Platform Condition="'$(Platform)'==''">Win32</Platform>
+        <Platform Condition="'$(Platform)'==''">Win64</Platform>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectName Condition="'$(ProjectName)'==''">DPM.IDE.D120</ProjectName>
         <ProjectVersion>20.3</ProjectVersion>
@@ -15,8 +15,8 @@
         <DPMCompiler>delphi12.0</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.YAML\1.6.0\lib\Win32;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win32;$(DPM)\VSoft.Awaitable\0.7.0\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.9\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;$(DPM)\Gabr42.OmniThreadLibrary\3.7.12\lib\Win32;</DPMSearch>
-        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.YAML\1.6.0\lib\Win64;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win64;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win64;$(DPM)\VSoft.Uri\0.3.3\lib\Win64;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win64;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win64;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win64;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win64;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win64;$(DPM)\VSoft.Awaitable\0.7.0\lib\Win64;$(DPM)\VSoft.AntPatterns\0.1.9\lib\Win64;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win64;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win64;$(DPM)\Gabr42.OmniThreadLibrary\3.7.12\lib\Win64;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Gabr42.OmniThreadLibrary\3.8.0\lib\Win32;$(DPM)\VSoft.Awaitable\0.8.0\lib\Win32;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\VSoft.YAML\1.6.0\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.9\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Gabr42.OmniThreadLibrary\3.8.0\lib\Win64;$(DPM)\VSoft.Awaitable\0.8.0\lib\Win64;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win64;$(DPM)\VSoft.YAML\1.6.0\lib\Win64;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win64;$(DPM)\VSoft.Uri\0.3.3\lib\Win64;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win64;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win64;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win64;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win64;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win64;$(DPM)\VSoft.AntPatterns\0.1.9\lib\Win64;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win64;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win64;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -302,8 +302,8 @@
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.X509.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Interfaces.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.pas"/>
-        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Signotaur.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Azure.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Signotaur.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Cms.Interfaces.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Cms.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Timestamping.pas"/>
@@ -318,9 +318,9 @@
         <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Signing.Interfaces.pas"/>
         <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Signing.pas"/>
         <DCCReference Include="IDE\DPM.IDE.TrustPromptForm.pas"/>
+        <DCCReference Include="Core\Trust\DPM.Core.Trust.Prompt.pas"/>
         <DCCReference Include="IDE\DPM.IDE.Trust.Prompt.pas"/>
         <DCCReference Include="IDE\DPM.IDE.SigningBadge.pas"/>
-        <DCCReference Include="Core\Trust\DPM.Core.Trust.Prompt.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -352,7 +352,6 @@
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>
             <Packages>
-                <PackageReference id="Gabr42.OmniThreadLibrary" version="3.7.12" manifestHash="sha256:66f7f9b98da556af282ff81e93ec586b863f20f2f2bc43baa5c6526cc4672b0f"/>
                 <PackageReference id="Spring4D.Core" version="2.0.2-beta.2" manifestHash="sha256:38f2b105440bdea171a00ca3d62e331bf9538d193f0b9c368aa94559bd83df20">
                     <PackageReference id="Spring4D.Base" version="2.0.2-beta.2" range="2.0.2-beta.2"/>
                 </PackageReference>
@@ -360,8 +359,8 @@
                     <PackageReference id="Spring4D.Base" version="2.0.2-beta.2" range="2.0.2-beta.2"/>
                 </PackageReference>
                 <PackageReference id="VSoft.AntPatterns" version="0.1.9" manifestHash="sha256:254b0a32c04b327ad73267cc7ca9dcae3298347ec4b81c9b83c45d217ca59e29"/>
-                <PackageReference id="VSoft.Awaitable" version="0.7.0" manifestHash="sha256:ae1be40cf3e0f382de2bdcfb68e3334d7149011a09c1f489fd8f25cebdc843c5">
-                    <PackageReference id="Gabr42.OmniThreadLibrary" version="3.7.12" range="[3.7.12,]"/>
+                <PackageReference id="VSoft.Awaitable" version="0.8.0" manifestHash="sha256:e1a12b1cb1272c3c8764a8b9b9da37ea46e65388021b3e6db2e36e060c24c4e6">
+                    <PackageReference id="Gabr42.OmniThreadLibrary" version="3.8.0" range="[3.8.0,]"/>
                     <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="[0.1.4,]"/>
                 </PackageReference>
                 <PackageReference id="VSoft.Base64.Polyfill" version="0.1.11" manifestHash="sha256:baa2ae0ead6ee4385fd8722190df3b21f14e751daffa44332ba537db9cb39a12"/>

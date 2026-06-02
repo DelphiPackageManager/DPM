@@ -97,6 +97,16 @@ type
                                const packagesToCompile: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
                                const packageSpecs: IDictionary<string, IPackageSpec>; const Options: TSearchOptions): boolean;
 
+    //Design-time packages load into the IDE process, so the design BPL (and the runtime .dcp it links
+    //against) must exist for the IDE host platform - Win32 for the classic IDE, Win64 for bds64. The
+    //per-platform install/restore loop only compiles the project's target platforms, so a project that
+    //does not target the host platform (eg a Win64-only project in the 32-bit IDE) never produces the
+    //design BPL the IDE needs. This compiles the host platform into the cache so the BPL exists. It is
+    //cache-only and IDE-only : the project (search paths, copy-local, dproj references) is untouched
+    //because the host platform is not one of the project's targets, and it is a no-op in the CLI.
+    function EnsureDesignHostPlatformCompiled(const cancellationToken: ICancellationToken; const options: TSearchOptions;
+                                              const graph: IPackageReference; const installedPlatforms: TDPMPlatforms): boolean;
+
     function CopyLocal(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>;
                        const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
 
@@ -1147,6 +1157,69 @@ begin
 end;
 
 
+function TPackageInstaller.EnsureDesignHostPlatformCompiled(const cancellationToken : ICancellationToken; const options : TSearchOptions;
+                                                            const graph : IPackageReference; const installedPlatforms : TDPMPlatforms): boolean;
+var
+  hostPlatform : TDPMPlatform;
+  packageCompiler : ICompiler;
+  packageSpecs : IDictionary<string, IPackageSpec>;
+  resolvedPackages : IList<IPackageInfo>;
+  compiledPackages : IList<IPackageInfo>;
+  infoCache : IDictionary<string, IPackageInfo>;
+begin
+  result := true;
+
+  //CLI never loads design packages - InstallDesignPackages is a no-op there, so the host-platform
+  //compile would be wasted work.
+  if not TSystemUtils.IsIDEProcess then
+    exit;
+
+  //The plugin's own bitness tells us which BPL variant the IDE will load (the same decision made in
+  //TDPMIDEPackageInstallerContext.InstallDesignPackages).
+  if TSystemUtils.Is64BitIDE then
+    hostPlatform := TDPMPlatform.Win64
+  else
+    hostPlatform := TDPMPlatform.Win32;
+
+  //Already produced by the normal per-platform loop - nothing extra to do.
+  if hostPlatform in installedPlatforms then
+    exit;
+
+  //Flatten the resolved graph to the set of packages to compile. Prefer the PackageInfo the resolver
+  //already attached to each node, falling back to a cache/repo lookup if absent.
+  infoCache := TCollections.CreateDictionary<string, IPackageInfo>;
+  resolvedPackages := TCollections.CreateList<IPackageInfo>;
+  graph.VisitDFS(
+    procedure(const node : IPackageReference)
+    var
+      info : IPackageInfo;
+      key : string;
+    begin
+      key := LowerCase(node.Id);
+      if infoCache.ContainsKey(key) then
+        exit;
+      info := node.PackageInfo;
+      if info = nil then
+        info := GetOrLoadPackageInfo(cancellationToken, node.Id, node.Version, options.compilerVersion, infoCache)
+      else
+        infoCache[key] := info;
+      if info <> nil then
+        resolvedPackages.Add(info);
+    end);
+
+  if resolvedPackages.Count = 0 then
+    exit;
+
+  packageSpecs := BuildPackageSpecsFromGraph(graph, options.compilerVersion);
+  packageCompiler := FCompilerFactory.CreateCompiler(options.compilerVersion, hostPlatform);
+  compiledPackages := TCollections.CreateList<IPackageInfo>;
+
+  FLogger.Information('Compiling design-time packages for the IDE host platform [' + DPMPlatformToString(hostPlatform) + '].', true);
+  //Cache-only : BuildDependencies populates bpl\{host} and lib\{host} in the cache. We deliberately do
+  //not call CollectSearchPaths/CopyLocal/AddSearchPaths - the host platform is not a project target.
+  result := BuildDependencies(cancellationToken, packageCompiler, graph, resolvedPackages, compiledPackages, packageSpecs, options);
+end;
+
 function TPackageInstaller.DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
 var
   packageInfo: IPackageInfo;
@@ -1504,7 +1577,14 @@ begin
     //Load design-time packages once after all platforms are installed - design BPLs are per-IDE,
     //not per-platform, so this runs at the project level. CLI context is a no-op.
     if result then
+    begin
+      //Make sure the IDE host platform's design BPL exists before we try to load it - the install
+      //loop above only built the project's target platforms. Non-fatal : the install already
+      //succeeded, and a failure here just means the design components may not load.
+      if not EnsureDesignHostPlatformCompiled(cancellationToken, Options, finalGraph, platforms) then
+        FLogger.Warning('Failed to compile design-time packages for the IDE host platform - design components may not load.');
       InstallDesignPackages(cancellationToken, projectEditor.ProjectFile, BuildPackageSpecsFromGraph(finalGraph, Options.compilerVersion));
+    end;
   end;
 
 end;
@@ -2132,7 +2212,14 @@ begin
     //Load design-time packages once after all platforms are restored - design BPLs are per-IDE,
     //not per-platform, so this runs at the project level. CLI context is a no-op.
     if result then
+    begin
+      //Make sure the IDE host platform's design BPL exists before we try to load it - the restore
+      //loop above only built the project's target platforms. Non-fatal : the restore already
+      //succeeded, and a failure here just means the design components may not load.
+      if not EnsureDesignHostPlatformCompiled(cancellationToken, Options, finalGraph, platforms) then
+        FLogger.Warning('Failed to compile design-time packages for the IDE host platform - design components may not load.');
       InstallDesignPackages(cancellationToken, projectFile, BuildPackageSpecsFromGraph(finalGraph, Options.compilerVersion));
+    end;
   end;
 
 end;
