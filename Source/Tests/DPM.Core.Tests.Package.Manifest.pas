@@ -399,7 +399,7 @@ begin
   service := MakeManifestService;
   m := service.Parse(TEncoding.UTF8.GetBytes(cEmptyFiles));
   Assert.IsNotNull(m);
-  Assert.AreEqual(0, Length(m.Files));
+  Assert.AreEqual<integer>(0, Length(m.Files));
 end;
 
 // ---------------------------------------------------------------------------
@@ -417,7 +417,7 @@ begin
   try
     m := service.Generate(root, 'Test', '1.0.0', haSha384);
     Assert.AreEqual(Ord(haSha384), Ord(m.HashAlgorithm));
-    Assert.AreEqual(48, Length(m.Files[0].Hash));
+    Assert.AreEqual<integer>(48, Length(m.Files[0].Hash));
     parsed := service.Parse(m.RawBytes);
     Assert.AreEqual(Ord(haSha384), Ord(parsed.HashAlgorithm));
   finally
@@ -436,7 +436,7 @@ begin
   try
     m := service.Generate(root, 'Test', '1.0.0', haSha512);
     Assert.AreEqual(Ord(haSha512), Ord(m.HashAlgorithm));
-    Assert.AreEqual(64, Length(m.Files[0].Hash));
+    Assert.AreEqual<integer>(64, Length(m.Files[0].Hash));
     parsed := service.Parse(m.RawBytes);
     Assert.AreEqual(Ord(haSha512), Ord(parsed.HashAlgorithm));
   finally
@@ -458,7 +458,7 @@ begin
     m := service.Generate(root, 'Empty.Pkg', '1.0.0', haSha256);
     Assert.IsNotNull(m);
     Assert.AreEqual('Empty.Pkg', m.PackageId);
-    Assert.AreEqual(0, Length(m.Files));
+    Assert.AreEqual<integer>(0, Length(m.Files));
     Assert.IsTrue(Length(m.RawBytes) > 0);
   finally
     TDirectory.Delete(root, true);

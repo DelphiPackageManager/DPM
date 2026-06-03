@@ -1,4 +1,4 @@
-unit DPM.Core.Tests.Trust.TrustSet;
+﻿unit DPM.Core.Tests.Trust.TrustSet;
 
 // TBuiltInTrustSet — verify the YAML loader's defaults and field handling.
 // The default constructor reads from an RC resource; this test exe has no
@@ -58,14 +58,14 @@ begin
   Assert.AreEqual(Ord(vmPermissive), Ord(ts.DefaultValidationMode));
 
   pins := ts.RepositorySpkis;
-  Assert.AreEqual(1, Length(pins), 'should ship exactly one trusted repo');
+  Assert.AreEqual<integer>(1, Length(pins), 'should ship exactly one trusted repo');
   Assert.AreEqual('DPM Official Gallery', pins[0].Url);
   Assert.AreEqual(
     'sha256:c2d7996a815b4d2061789f367b2fcfbb08afcc4c31af47c4efce91a4413a39f8',
     pins[0].SpkiHex);
 
   // Revocation channel ships empty; entries are added in an emergency.
-  Assert.AreEqual(0, Length(ts.RevokedRepositorySpkis));
+  Assert.AreEqual<integer>(0, Length(ts.RevokedRepositorySpkis));
 end;
 
 procedure TBuiltInTrustSetTests.EmptyYaml_YieldsSafeDefaults;
@@ -75,7 +75,7 @@ begin
   ts := TBuiltInTrustSet.Create('');
   Assert.AreEqual(0, ts.Version);
   Assert.AreEqual(Ord(vmPermissive), Ord(ts.DefaultValidationMode));
-  Assert.AreEqual(0, Length(ts.RepositorySpkis));
+  Assert.AreEqual<integer>(0, Length(ts.RepositorySpkis));
 end;
 
 procedure TBuiltInTrustSetTests.LoadsVersion_FromYaml;
@@ -153,7 +153,7 @@ var
 begin
   ts := TBuiltInTrustSet.Create(cYaml);
   pins := ts.RepositorySpkis;
-  Assert.AreEqual(2, Length(pins));
+  Assert.AreEqual<integer>(2, Length(pins));
   Assert.AreEqual('First',        pins[0].Url);
   Assert.AreEqual('sha256:aaaa',  pins[0].SpkiHex);
   Assert.AreEqual('Second',       pins[1].Url);
@@ -170,7 +170,7 @@ begin
   // Should silently fall back to defaults — no exception escapes.
   Assert.AreEqual(0, ts.Version);
   Assert.AreEqual(Ord(vmPermissive), Ord(ts.DefaultValidationMode));
-  Assert.AreEqual(0, Length(ts.RepositorySpkis));
+  Assert.AreEqual<integer>(0, Length(ts.RepositorySpkis));
 end;
 
 procedure TBuiltInTrustSetTests.NonMappingRoot_Tolerated;
@@ -182,7 +182,7 @@ var
 begin
   ts := TBuiltInTrustSet.Create(cYaml);
   Assert.AreEqual(0, ts.Version);
-  Assert.AreEqual(0, Length(ts.RepositorySpkis));
+  Assert.AreEqual<integer>(0, Length(ts.RepositorySpkis));
 end;
 
 procedure TBuiltInTrustSetTests.RevokedRepositorySpkis_Default_IsEmpty;
@@ -190,7 +190,7 @@ var
   ts : ITrustSet;
 begin
   ts := TBuiltInTrustSet.Create('');
-  Assert.AreEqual(0, Length(ts.RevokedRepositorySpkis));
+  Assert.AreEqual<integer>(0, Length(ts.RevokedRepositorySpkis));
 end;
 
 procedure TBuiltInTrustSetTests.RevokedRepositorySpkis_LoadedFromYaml;
@@ -206,7 +206,7 @@ var
 begin
   ts := TBuiltInTrustSet.Create(cYaml);
   revoked := ts.RevokedRepositorySpkis;
-  Assert.AreEqual(2, Length(revoked));
+  Assert.AreEqual<integer>(2, Length(revoked));
   Assert.AreEqual('sha256:abcd1234', revoked[0]);
   Assert.AreEqual('sha256:cafebabe', revoked[1]);
 end;
@@ -223,7 +223,7 @@ var
 begin
   // No revokedRepositorySpki key at all — must yield an empty array, not raise.
   ts := TBuiltInTrustSet.Create(cYaml);
-  Assert.AreEqual(0, Length(ts.RevokedRepositorySpkis));
+  Assert.AreEqual<integer>(0, Length(ts.RevokedRepositorySpkis));
 end;
 
 initialization

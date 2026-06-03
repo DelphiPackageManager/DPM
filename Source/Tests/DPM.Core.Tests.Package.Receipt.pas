@@ -1,4 +1,4 @@
-unit DPM.Core.Tests.Package.Receipt;
+﻿unit DPM.Core.Tests.Package.Receipt;
 
 // V-31, V-32, V-33: cache verification receipt round-trip.
 
@@ -126,7 +126,7 @@ begin
     Assert.AreEqual(written.TrustDecision,          readBack.TrustDecision);
     Assert.AreEqual(written.TrustPolicyFingerprint, readBack.TrustPolicyFingerprint);
     Assert.AreEqual(written.DpmVersion,             readBack.DpmVersion);
-    Assert.AreEqual(1, Length(readBack.Signatures));
+    Assert.AreEqual<integer>(1, Length(readBack.Signatures));
     Assert.AreEqual('author',           readBack.Signatures[0].Role);
     Assert.AreEqual('aabbccdd',         readBack.Signatures[0].SignerSpkiHex);
     Assert.AreEqual('CN=Test Signer',   readBack.Signatures[0].SignerSubject);
@@ -227,7 +227,7 @@ begin
 
     svc.Write(folder, r);
     Assert.IsTrue(svc.TryRead(folder, loaded));
-    Assert.AreEqual(0, Length(loaded.Signatures));
+    Assert.AreEqual<integer>(0, Length(loaded.Signatures));
     Assert.AreEqual('unsigned', loaded.TrustDecision);
   finally
     TDirectory.Delete(folder, true);
@@ -270,7 +270,7 @@ begin
 
     svc.Write(folder, r);
     Assert.IsTrue(svc.TryRead(folder, loaded));
-    Assert.AreEqual(1, Length(loaded.Signatures));
+    Assert.AreEqual<integer>(1, Length(loaded.Signatures));
     Assert.AreEqual('VSoft.*', loaded.Signatures[0].AttestationNamespace);
     Assert.AreEqual('aabbcc', loaded.Signatures[0].AttestationAuthorSpkiHex);
     Assert.AreEqual('', loaded.Signatures[0].AttestationUnsignedReason);

@@ -1,4 +1,4 @@
-unit DPM.Core.Tests.Crypto.Hashing;
+﻿unit DPM.Core.Tests.Crypto.Hashing;
 
 // Phase 1 test plan §1.12 — hashing known-answer + algorithm allowlist.
 
@@ -310,7 +310,7 @@ begin
     big[i] := Byte(i and $FF);
   whole := NewHashing.HashBytes(big, haSha256);
   // Sanity: digest is 32 bytes; first byte is reproducible.
-  Assert.AreEqual(32, Length(whole));
+  Assert.AreEqual<integer>(32, Length(whole));
 end;
 
 initialization
