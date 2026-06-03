@@ -63,6 +63,8 @@ begin
     Exit(CompilerToCompilerVersionIntStr(FCompiler))
   else if SameText(Match.Groups[1].Value, 'libSuffix') then
     Exit(CompilerToLibSuffix(FCompiler))
+  else if SameText(Match.Groups[1].Value, 'libSuffixshort') then
+    Exit(CompilerToLibSuffixShort(FCompiler))
   else if SameText(Match.Groups[1].Value, 'bdsVersion') then
     Exit(CompilerToBDSVersion(FCompiler))
   else if SameText(Match.Groups[1].Value, 'id') then

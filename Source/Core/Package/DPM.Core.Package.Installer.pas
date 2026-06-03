@@ -310,6 +310,11 @@ var
   destination: string;
   platformLibPath: string;
   seenPaths: IDictionary<string, boolean>;
+  byId: IDictionary<string, IPackageInfo>;
+  visited: IDictionary<string, boolean>;
+  orderedPackages: IList<IPackageInfo>;
+  sortedIds: IList<string>;
+  id: string;
 
   procedure AddUnique(const path: string);
   begin
@@ -318,6 +323,31 @@ var
       seenPaths[LowerCase(path)] := true;
       searchPaths.Add(path);
     end;
+  end;
+
+  //Depth-first topological visit: a package is added only after all of its (resolved)
+  //dependencies, so the resulting order is bottom up (dependencies before dependers).
+  //Dependencies are visited in sorted id order so the output is stable regardless of the
+  //order resolvedPackages happened to arrive in.
+  procedure VisitPackage(const visitId: string);
+  var
+    info: IPackageInfo;
+    dep: IPackageDependency;
+    depIds: IList<string>;
+    depId: string;
+  begin
+    if visited.ContainsKey(visitId) then
+      exit;
+    visited[visitId] := true;
+    if not byId.TryGetValue(visitId, info) then
+      exit; //a dependency excluded for this platform - nothing to order
+    depIds := TCollections.CreateList<string>;
+    for dep in info.Dependencies do
+      depIds.Add(LowerCase(dep.Id));
+    depIds.Sort;
+    for depId in depIds do
+      VisitPackage(depId);
+    orderedPackages.Add(info);
   end;
 
 begin
@@ -343,9 +373,27 @@ begin
       pkgInfo.UseSource := pkgInfo.UseSource or node.UseSource;
     end);
 
-  // reverse the list so that we add the paths in reverse order, small optimisation for the compiler.
-  resolvedPackages.Reverse;
+  //Build a deterministic, dependency-ordered (bottom up) list to drive search-path order.
+  //We derive the order from each package's own dependency metadata via a topological sort rather
+  //than from the order of resolvedPackages, which varies depending on which restore path produced
+  //it (fast graph-validation walk vs slow re-resolution). A stable order avoids rewriting the
+  //dproj's search paths when nothing has actually changed.
+  byId := TCollections.CreateDictionary<string, IPackageInfo>;
+  sortedIds := TCollections.CreateList<string>;
   for packageInfo in resolvedPackages do
+  begin
+    byId[LowerCase(packageInfo.Id)] := packageInfo;
+    sortedIds.Add(LowerCase(packageInfo.Id));
+  end;
+  //seed the walk in sorted id order so sibling (independent) packages have a stable order too.
+  sortedIds.Sort;
+
+  visited := TCollections.CreateDictionary<string, boolean>;
+  orderedPackages := TCollections.CreateList<IPackageInfo>;
+  for id in sortedIds do
+    VisitPackage(id);
+
+  for packageInfo in orderedPackages do
   begin
     packageSpec := FPackageCache.GetPackageSpec(packageInfo);
     if packageSpec = nil then

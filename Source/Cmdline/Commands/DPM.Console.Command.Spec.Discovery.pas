@@ -490,6 +490,11 @@ begin
         result := v;
         exit;
       end;
+      if SameText(candidate, CompilerToLibSuffixShort(v)) then
+      begin
+        result := v;
+        exit;
+      end;
     except
       continue;
     end;

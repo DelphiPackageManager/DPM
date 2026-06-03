@@ -354,6 +354,8 @@ begin
 
   result['compilerversion'] := CompilerToCompilerVersionIntStr(compiler);
   result['libsuffix'] := CompilerToLibSuffix(compiler);
+  result['libsuffixshort'] := CompilerToLibSuffixShort(compiler);
+
   result['bdsversion'] := CompilerToBDSVersion(compiler);
 
   //spec-declared variables overlay compiler-derived ones (allows authors to override

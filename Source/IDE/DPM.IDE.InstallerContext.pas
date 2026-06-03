@@ -58,6 +58,7 @@ uses
   System.StrUtils,
   System.SysUtils,
   Vcl.Forms,
+  DPM.Core.Utils.Directory,
   DPM.Core.Utils.System;
 
 { helpers }
@@ -87,6 +88,11 @@ var
   projectBase : string;
   libSuffix : string;
   fileName : string;
+  exactPath : string;
+  pattern : string;
+  matches : IList<string>;
+  candidates : string;
+  i : integer;
 begin
   result := false;
   bplPath := '';
@@ -95,25 +101,69 @@ begin
   packagePath := FPackageCache.GetPackagePath(node);
   bplFolder := TPath.Combine(packagePath, 'bpl' + PathDelim + DPMPlatformToBDString(loadPlatform));
 
-  //LibSuffix in the spec is optional - when absent, .dpk output uses the compiler's default ($LibSuffix)
-  //eg '290' for Delphi 12. Same fallback so the heuristic finds the produced file.
+  //designEntry.Project can use forward slashes - normalise so ExtractFileName works on Windows.
+  projectBase := StringReplace(designEntry.Project, '/', PathDelim, [rfReplaceAll]);
+  projectBase := ChangeFileExt(ExtractFileName(projectBase), '');
+
+  //Exact fast path: honour an author-specified LibSuffix, else the compiler's default ($LibSuffix)
+  //eg '290' for Delphi 12. NOTE: LibVersion intentionally does NOT participate in the bpl filename -
+  //in Delphi it sets the file version resource, not the output name. Don't append it here.
   libSuffix := designEntry.LibSuffix;
   if libSuffix = '' then
     libSuffix := CompilerToLibSuffix(node.CompilerVersion);
 
   //heuristic: {LibPrefix}{ProjectBaseName}{LibSuffix}.bpl
-  //designEntry.Project can use forward slashes - normalise so ExtractFileName works on Windows.
-  projectBase := StringReplace(designEntry.Project, '/', PathDelim, [rfReplaceAll]);
-  projectBase := ChangeFileExt(ExtractFileName(projectBase), '');
   fileName := designEntry.LibPrefix + projectBase + libSuffix + '.bpl';
-  bplPath := TPath.Combine(bplFolder, fileName);
-
-  if not TFile.Exists(bplPath) then
+  exactPath := TPath.Combine(bplFolder, fileName);
+  if TFile.Exists(exactPath) then
   begin
-    FLogger.Warning('Could not locate design BPL for [' + node.Id + '] at [' + bplPath + '] - set LibPrefix/LibSuffix on the design entry to match the compiled .bpl name.');
+    bplPath := exactPath;
+    result := true;
     exit;
   end;
-  result := true;
+
+  //Discovery fallback: DPM controls the bpl output folder and produces exactly one bpl per design
+  //project, but the suffix Delphi actually emitted may differ from our guess - a non-default
+  //{$LIBSUFFIX} baked into the .dpk wins over the dproj/msbuild setting. Glob on the project base
+  //name to find whatever was produced. Never glob with $(Auto)/AUTO - that's a build token, not an
+  //on-disk string; the '*' covers any suffix.
+  pattern := designEntry.LibPrefix + projectBase + '*.bpl';
+  matches := TDirectoryUtils.GetFiles(bplFolder, pattern);
+
+  if (matches = nil) or (matches.Count = 0) then
+  begin
+    FLogger.Warning('Could not locate design BPL for [' + node.Id + '] at [' + exactPath + '] - set LibPrefix/LibSuffix on the design entry to match the compiled .bpl name.');
+    exit;
+  end;
+
+  if matches.Count = 1 then
+  begin
+    bplPath := matches[0];
+    result := true;
+    exit;
+  end;
+
+  //More than one match. Prefer the exact-name candidate if it's among them (defensive - the fast
+  //path above already failed for it), otherwise refuse to guess: loading the wrong bpl into the
+  //IDE is worse than not loading at all.
+  for i := 0 to matches.Count - 1 do
+  begin
+    if SameText(ExtractFileName(matches[i]), fileName) then
+    begin
+      bplPath := matches[i];
+      result := true;
+      exit;
+    end;
+  end;
+
+  candidates := '';
+  for i := 0 to matches.Count - 1 do
+  begin
+    if candidates <> '' then
+      candidates := candidates + ', ';
+    candidates := candidates + ExtractFileName(matches[i]);
+  end;
+  FLogger.Warning('Multiple candidate design BPLs for [' + node.Id + '] in [' + bplFolder + '] : ' + candidates + ' - set LibPrefix/LibSuffix on the design entry to disambiguate.');
 end;
 
 function TDPMIDEPackageInstallerContext.IsAlreadyLoadedByIDE(const bplPath : string) : boolean;

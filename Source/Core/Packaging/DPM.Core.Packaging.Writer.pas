@@ -362,6 +362,7 @@ begin
 //  list.Add('platform=' + DPMPlatformToString(targetPlatform.Platforms[0]));
   FVariables['compilerversion'] := CompilerToCompilerVersionIntStr(targetPlatform.Compiler);
   FVariables['libsuffix'] := CompilerToLibSuffix(targetPlatform.Compiler);
+  FVariables['libsuffixshort'] := CompilerToLibSuffixShort(targetPlatform.Compiler);
   FVariables['bdsversion'] := CompilerToBDSVersion(targetPlatform.Compiler);
 //  FVariables['bitness'] := DPMPlatformBitness(targetPlatform.Platforms[0]);
 

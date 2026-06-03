@@ -162,6 +162,7 @@ function DPMPlatformsToBinString(platforms : TDPMPlatforms) : string;
 function BinStringToDPMPlatforms(value : string) : TDPMPlatforms;
 
 function CompilerToLibSuffix(const compiler : TCompilerVersion) : string;
+function CompilerToLibSuffixShort(const compiler : TCompilerVersion) : string;
 
 function CompilerToBDSVersion(const compiler : TCompilerVersion) : string;
 
@@ -687,6 +688,10 @@ begin
   end;
 end;
 
+function CompilerToLibSuffixShort(const compiler : TCompilerVersion) : string;
+begin
+  result := Copy(CompilerToLibSuffix(compiler), 1,2);
+end;
 
 function CompilerToBDSVersion(const compiler : TCompilerVersion) : string;
 begin
