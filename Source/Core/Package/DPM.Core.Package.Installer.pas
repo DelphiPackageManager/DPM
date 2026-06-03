@@ -269,12 +269,23 @@ var
   projectEditor : IProjectEditor;
   fullPath : string;
 begin
-  result := true; // if we can't load the project, let restore proceed so any problem is surfaced
+  result := true; // if we can't load an existing project, let restore proceed so any problem is surfaced
   fullPath := projectFile;
   if TPathUtils.IsRelativePath(fullPath) then
   begin
     fullPath := TPath.Combine(GetCurrentDir, fullPath);
     fullPath := TPathUtils.CompressRelativePath(fullPath);
+  end;
+  // A project that isn't on disk yet (a new, unsaved project — or a transient
+  // placeholder the IDE creates and removes during project creation) has no
+  // package references. Treat "not on disk" as "no references" so the IDE skips
+  // restore (and the log window) for new projects. The default-true above is
+  // kept for projects that DO exist but fail to load, so genuine problems with
+  // a real project are still surfaced.
+  if not FileExists(fullPath) then
+  begin
+    result := false;
+    exit;
   end;
   //Reading PackageReferences is pure xml - the config is only used by the search path code,
   //not when loading [PackageRefs], so we don't need a config here.
