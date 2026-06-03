@@ -780,8 +780,6 @@ var
   reason : string;
   entries : TArray<TManifestFileEntry>;
   entry : TManifestFileEntry;
-  ms : TStream;
-  header : TZipHeader;
   bytes : TBytes;
 begin
   if not TAlgorithmProfile.FileHashAllowed(algorithm) then
@@ -819,15 +817,11 @@ begin
       if not ValidatePath(canonical, reason) then
         raise EManifestPath.CreateFmt('Refusing to include "%s": %s', [canonical, reason]);
 
-      zip.Read(i, ms, header);
-      try
-        SetLength(bytes, ms.Size);
-        ms.Position := 0;
-        if ms.Size > 0 then
-          ms.Read(bytes[0], ms.Size);
-      finally
-        ms.Free;
-      end;
+      // RTL TBytes overload — reads from the entry's correct position. The
+      // stream overload + ms.Size/ms.Position corrupts STORED entries on Delphi
+      // 10.2 (wrong Size, and Position:=0 seeks to the archive start), which
+      // would bake a wrong size+hash into the manifest.
+      zip.Read(i, bytes);
 
       entry.Path := canonical;
       entry.Size := Length(bytes);

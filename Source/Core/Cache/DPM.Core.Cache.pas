@@ -446,6 +446,9 @@ begin
       receipt.Signatures[i].Role := 'author';
     receipt.Signatures[i].SignerSpkiHex := verifyResult.Signatures[i].SignerSpkiHex;
     receipt.Signatures[i].SignerSubject := verifyResult.Signatures[i].SignerSubject;
+    // DIAGNOSTIC (signature-verify investigation): persist why a signature
+    // failed to verify so the receipt on disk explains a degraded result.
+    receipt.Signatures[i].FailureReason := verifyResult.Signatures[i].FailureReason;
     receipt.Signatures[i].Thumbprint := verifyResult.Signatures[i].Thumbprint;
     receipt.Signatures[i].EffectiveSigningTime := verifyResult.Signatures[i].EffectiveSigningTime;
     receipt.Signatures[i].TimestampAuthority := verifyResult.Signatures[i].TimestampAuthority;

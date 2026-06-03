@@ -221,8 +221,6 @@ function TPackageSigningService.ReadManifestBytes(const archivePath : string;
 var
   zip : TZipFile;
   i : integer;
-  ms : TStream;
-  header : TZipHeader;
 begin
   result := false;
   bytes := nil;
@@ -233,16 +231,11 @@ begin
     begin
       if SameText(zip.FileName[i], cManifestFileName) then
       begin
-        zip.Read(i, ms, header);
-        try
-          SetLength(bytes, ms.Size);
-          ms.Position := 0;
-          if ms.Size > 0 then
-            ms.Read(bytes[0], ms.Size);
-          result := true;
-        finally
-          ms.Free;
-        end;
+        // Use the RTL TBytes overload — it reads UncompressedSize bytes from the
+        // entry stream's correct position. See ReadSignatureBlobs for why the
+        // stream overload + ms.Size/ms.Position is unusable on Delphi 10.2.
+        zip.Read(i, bytes);
+        result := true;
         exit;
       end;
     end;
@@ -256,8 +249,6 @@ function TPackageSigningService.ReadSignatureBlobs(const archivePath : string;
 var
   zip : TZipFile;
   i : integer;
-  ms : TStream;
-  header : TZipHeader;
   bytes : TBytes;
   name : string;
 begin
@@ -278,16 +269,16 @@ begin
         Continue;
       if (Length(name) > 0) and (name[Length(name)] = '/') then
         Continue;   // directory placeholder
-      zip.Read(i, ms, header);
-      try
-        SetLength(bytes, ms.Size);
-        ms.Position := 0;
-        if ms.Size > 0 then
-          ms.Read(bytes[0], ms.Size);
-        blobs.Add(TPair<string, TBytes>.Create(name, bytes));
-      finally
-        ms.Free;
-      end;
+      // Use the RTL TBytes overload — it reads UncompressedSize bytes from the
+      // entry stream's correct position. The stream overload + ms.Size/Position
+      // is unusable on Delphi 10.2: for a STORED entry (a .p7s is incompressible
+      // so it is stored, not deflated) ms.Size is reported as bytes-to-end-of-
+      // archive AND ms.Position:=0 seeks to the start of the ARCHIVE rather than
+      // the entry, so the CMS blob is read as garbage and CryptVerifyDetached-
+      // MessageSignature fails with CRYPT_E_ASN1_BADTAG. Deflated entries return
+      // a fresh decompression stream, which is why they were never affected.
+      zip.Read(i, bytes);
+      blobs.Add(TPair<string, TBytes>.Create(name, bytes));
     end;
   finally
     zip.Free;
@@ -508,8 +499,6 @@ var
   normalised : string;
   reason : string;
   entry : TManifestFileEntry;
-  ms : TStream;
-  header : TZipHeader;
   bytes : TBytes;
   actualHash : TBytes;
   found : integer;
@@ -551,15 +540,11 @@ begin
         raise EPackageSigning.CreateFmt('Size mismatch for "%s": manifest=%d archive=%d',
           [entry.Path, entry.Size, zip.FileInfo[found].UncompressedSize]);
 
-      zip.Read(found, ms, header);
-      try
-        SetLength(bytes, ms.Size);
-        ms.Position := 0;
-        if ms.Size > 0 then
-          ms.Read(bytes[0], ms.Size);
-      finally
-        ms.Free;
-      end;
+      // RTL TBytes overload — reads from the entry's correct position. See
+      // ReadSignatureBlobs: the stream overload + ms.Size/ms.Position corrupts
+      // STORED entries on Delphi 10.2 (wrong Size, and Position:=0 seeks to the
+      // archive start), so a stored file would otherwise fail integrity there.
+      zip.Read(found, bytes);
       actualHash := FHashing.HashBytes(bytes, manifest.HashAlgorithm);
       if not BytesEqual(actualHash, entry.Hash) then
         raise EPackageSigning.CreateFmt('Hash mismatch for "%s"', [entry.Path]);

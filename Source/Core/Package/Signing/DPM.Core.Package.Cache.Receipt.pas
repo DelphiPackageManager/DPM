@@ -45,6 +45,11 @@ type
     Role                : string;       // 'author' | 'repository'
     SignerSpkiHex       : string;
     SignerSubject       : string;
+    // DIAGNOSTIC (signature-verify investigation): why this signature did not
+    // verify, copied straight from TSignatureInfo.FailureReason. Empty on a
+    // valid signature. Lets the on-disk receipt explain a degraded result
+    // without having to reproduce the verify.
+    FailureReason       : string;
     Thumbprint          : string;
     EffectiveSigningTime : TDateTime;
     TimestampAuthority  : string;
@@ -165,6 +170,11 @@ begin
         sb.Append('- role: '); sb.AppendLine(YamlSQ(sig.Role));
         sb.Append('  signerSpki: '); sb.AppendLine(YamlSQ(sig.SignerSpkiHex));
         sb.Append('  signerSubject: '); sb.AppendLine(YamlSQ(sig.SignerSubject));
+        // DIAGNOSTIC: only emitted when the signature failed to verify.
+        if sig.FailureReason <> '' then
+          begin
+            sb.Append('  failureReason: '); sb.AppendLine(YamlSQ(sig.FailureReason));
+          end;
         sb.Append('  thumbprint: '); sb.AppendLine(YamlSQ(sig.Thumbprint));
         sb.Append('  effectiveSigningTime: '); sb.AppendLine(YamlSQ(IsoUtc(sig.EffectiveSigningTime)));
         sb.Append('  timestampAuthority: '); sb.AppendLine(YamlSQ(sig.TimestampAuthority));
@@ -281,6 +291,7 @@ begin
       sig.Role := '';
       sig.SignerSpkiHex := '';
       sig.SignerSubject := '';
+      sig.FailureReason := '';
       sig.Thumbprint := '';
       sig.TimestampAuthority := '';
       sig.RevocationStatus := '';
@@ -295,6 +306,8 @@ begin
         sig.SignerSpkiHex := sigItem.AsMapping.Values['signerSpki'].AsString;
       if sigItem.AsMapping.Values['signerSubject'].IsString then
         sig.SignerSubject := sigItem.AsMapping.Values['signerSubject'].AsString;
+      if sigItem.AsMapping.Values['failureReason'].IsString then
+        sig.FailureReason := sigItem.AsMapping.Values['failureReason'].AsString;
       if sigItem.AsMapping.Values['thumbprint'].IsString then
         sig.Thumbprint := sigItem.AsMapping.Values['thumbprint'].AsString;
       if sigItem.AsMapping.Values['timestampAuthority'].IsString then

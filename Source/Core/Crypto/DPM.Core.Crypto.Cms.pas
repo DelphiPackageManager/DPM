@@ -1074,6 +1074,14 @@ begin
     1, @contentPtr[0], @contentSize[0],
     @ctx);
 
+  // Failure-only diagnostic: surface the Win32 verify outcome + error code so a
+  // CMS verification failure (e.g. CRYPT_E_ASN1_BADTAG = 0x8009310B) is
+  // debuggable from the log rather than only showing up as an untrusted result.
+  if not result then
+    FLogger.Debug(Format('[Cms] CryptVerifyDetachedMessageSignature FAILED: ' +
+      'der=%d bytes, content=%d bytes, GetLastError=0x%.8x',
+      [Length(der), Length(content), GetLastError]));
+
   if result and (ctx <> nil) then
     signerCert := FX509.LoadCertificateFromDer(
       Self.Decode(der).EmbeddedCertificates[0].RawDerBytes);
