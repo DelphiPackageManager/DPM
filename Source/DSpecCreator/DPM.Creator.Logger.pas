@@ -50,6 +50,10 @@ type
     function GetVerbosity : TVerbosity;
     procedure SetVerbosity(const value : TVerbosity);
     constructor Create(const sl : TStrings);
+    // Retarget output to a different memo. Operations (pack/sign/upload) are
+    // mutually exclusive, so the single shared logger can be pointed at the
+    // active page's memo before each operation starts.
+    procedure SetTarget(const sl : TStrings);
   end;
 
 implementation
@@ -119,6 +123,11 @@ end;
 constructor TDSpecQueuedLogger.Create(const sl : TStrings);
 begin
   inherited Create;
+  FStrList := sl;
+end;
+
+procedure TDSpecQueuedLogger.SetTarget(const sl : TStrings);
+begin
   FStrList := sl;
 end;
 

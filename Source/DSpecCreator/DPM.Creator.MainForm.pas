@@ -42,6 +42,9 @@ uses
   DPM.Core.Options.Sign,
   DPM.Core.Crypto.X509.Interfaces,
   DPM.Core.Package.Signing.Interfaces,
+  DPM.Core.Configuration.Interfaces,
+  DPM.Core.Repository.Interfaces,
+  DPM.Creator.Logger,
   DPM.Creator.TemplateTreeNode,
   DPM.Creator.Dspec.FileHandler,
   DPM.Creator.MRUService,
@@ -268,12 +271,33 @@ type
     lblClientSecret : TLabel;
     edtClientSecret : TEdit;
     btnCancelPack : TButton;
+    // Upload tab
+    tsUpload : TTabSheet;
+    pnlUploadTop : TPanel;
+    lblUploadSource : TLabel;
+    cboUploadSource : TComboBox;
+    lblUploadApiKey : TLabel;
+    edtUploadApiKey : TEdit;
+    chkUploadSkipDuplicate : TCheckBox;
+    rgUploadScope : TRadioGroup;
+    lblUploadPackages : TLabel;
+    lstUploadPackages : TListBox;
+    btnRefreshPackages : TButton;
+    btnUpload : TButton;
+    btnCancelUpload : TButton;
+    Memo3 : TMemo;
     procedure FormDestroy(Sender : TObject);
     procedure btnAddExcludeClick(Sender : TObject);
     procedure btnAddTemplateClick(Sender : TObject);
     procedure btnBuildPackagesClick(Sender : TObject);
     procedure btnCancelPackClick(Sender : TObject);
     procedure FormKeyDown(Sender : TObject; var Key : Word; Shift : TShiftState);
+    procedure cboUploadSourceChange(Sender : TObject);
+    procedure rgUploadScopeClick(Sender : TObject);
+    procedure btnRefreshPackagesClick(Sender : TObject);
+    procedure btnUploadClick(Sender : TObject);
+    procedure btnCancelUploadClick(Sender : TObject);
+    procedure PageControlChange(Sender : TObject);
     procedure btnDeleteExcludeClick(Sender : TObject);
     procedure cboLicenseChange(Sender : TObject);
     procedure cboTemplateChange(Sender : TObject);
@@ -362,14 +386,22 @@ type
     FLoadingCard : Boolean;
     FSPDXList : TStringList;
     FMRUMenu : TMRUMenu;
-    // In-process pack / sign
+    // In-process pack / sign / upload
     FContainer : TContainer;
     FPackageWriter : IPackageWriter;
     FSigningService : IPackageSigningService;
     FX509 : IX509Service;
-    FPackLogger : ILogger;
+    FConfigManager : IConfigurationManager;
+    FRepositoryManager : IPackageRepositoryManager;
+    FOpsLogger : TDSpecQueuedLogger;   // concrete instance (for SetTarget)
+    FPackLogger : ILogger;             // same object as FOpsLogger
     FCancellationTokenSource : ICancellationTokenSource;
     FPacking : Boolean;
+    FUploading : Boolean;
+    // Upload page state
+    FUploadConfig : IConfiguration;
+    FUploadConfigFile : string;
+    FUploadCurrentSource : string;
   protected
     // IMRUSource
     procedure MRUAdd(const filename : string);
@@ -398,6 +430,15 @@ type
     // Secrets are kept in Windows Credential Manager, never in the ini file.
     function ReadSecret(const target : string) : string;
     procedure WriteSecret(const target : string; const secret : string);
+
+    // In-process upload (push) helpers
+    procedure LoadUploadSources;
+    function ResolveUploadFiles : TArray<string>;
+    procedure RefreshUploadPackages;
+    procedure UpdateUploadApiKeyState;
+    procedure LoadUploadSettings;
+    procedure SaveUploadSettings;
+    function UploadApiKeyCredTarget(const sourceName : string) : string;
 
     function FindTemplateNode(const template : ISpecTemplate) : TTemplateTreeNode;
     function FindHeadingNode(const templateNode : TTemplateTreeNode; nodeType : TNodeType) : TTemplateTreeNode;
@@ -452,13 +493,14 @@ uses
   DPM.Core.Crypto.Algorithms,
   DPM.Core.Crypto.Provider.Interfaces,
   DPM.Core.Crypto.Provider.Factory,
+  DPM.Core.Options.Push,
+  DPM.Core.Utils.Config,
   VSoft.Windows.CredentialManager,
   DPM.Creator.TemplateForm,
   DPM.Creator.FileForm,
   DPM.Creator.BuildForm,
   DPM.Creator.OptionsForm,
   DPM.Creator.DependencyForm,
-  DPM.Creator.Logger,
   DPM.Creator.Dspec.Replacer,
   DPM.IDE.AboutForm;
 
@@ -474,6 +516,8 @@ const
   // app registration, so we keep them out of the plaintext ini too.
   cCredAzureTenantId = 'DPM.DspecCreator.Signing.AzureTenantId';
   cCredAzureClientId = 'DPM.DspecCreator.Signing.AzureClientId';
+  // Upload api keys are stored per source name in the credential manager.
+  cCredUploadApiKeyPrefix = 'DPM.DspecCreator.Upload.ApiKey.';
 
 procedure TDSpecCreatorForm.btnDeleteExcludeClick(Sender : TObject);
 var
@@ -611,6 +655,7 @@ begin
       end;
     end;
 
+  FOpsLogger.SetTarget(Memo1.Lines);
   Memo1.Clear;
   PageControl.ActivePage := tsGenerate;
   FPacking := true;
@@ -673,13 +718,34 @@ begin
   end;
 end;
 
+procedure TDSpecCreatorForm.btnCancelUploadClick(Sender : TObject);
+begin
+  // Invoked by the Cancel button and by Esc (via FormKeyDown). Ignore unless an
+  // upload is actually running, and only signal cancellation once.
+  if not FUploading then
+    Exit;
+  if (FCancellationTokenSource <> nil) and (not FCancellationTokenSource.Token.IsCancelled) then
+  begin
+    FPackLogger.Information('Cancelling...');
+    btnCancelUpload.Enabled := false;
+    FCancellationTokenSource.Cancel;
+  end;
+end;
+
 procedure TDSpecCreatorForm.FormKeyDown(Sender : TObject; var Key : Word; Shift : TShiftState);
 begin
-  // Esc cancels a running pack/sign from anywhere in the app. Only consume the
-  // key while packing so normal Esc behaviour is unaffected otherwise.
-  if (Key = VK_ESCAPE) and FPacking then
+  // Esc cancels a running pack/sign/upload from anywhere in the app. Only consume
+  // the key while an operation is running so normal Esc behaviour is unaffected.
+  if Key <> VK_ESCAPE then
+    Exit;
+  if FPacking then
   begin
     btnCancelPackClick(nil);
+    Key := 0;
+  end
+  else if FUploading then
+  begin
+    btnCancelUploadClick(nil);
     Key := 0;
   end;
 end;
@@ -770,14 +836,17 @@ end;
 procedure TDSpecCreatorForm.InitCoreContainer;
 begin
   FContainer := TContainer.Create;
-  // InitCore does not register an ILogger - register ours first so the pack and
-  // signing services log into the Pack tab memo.
+  // InitCore does not register an ILogger - register ours first so the pack,
+  // signing and upload services log into the active page's memo (retargeted
+  // per operation via FOpsLogger.SetTarget).
   FContainer.RegisterInstance<ILogger>(FPackLogger);
   DPM.Core.Init.InitCore(FContainer);
   FContainer.Build;
   FPackageWriter := FContainer.Resolve<IPackageWriter>;
   FSigningService := FContainer.Resolve<IPackageSigningService>;
   FX509 := FContainer.Resolve<IX509Service>;
+  FConfigManager := FContainer.Resolve<IConfigurationManager>;
+  FRepositoryManager := FContainer.Resolve<IPackageRepositoryManager>;
 end;
 
 procedure TDSpecCreatorForm.UpdateSigningProviderPage;
@@ -1001,6 +1070,303 @@ begin
   end
   else
     TCredentialManager.WriteCredential(target, cCredUserName, secret, TCredentialPersistence.LocalMachine);
+end;
+
+function TDSpecCreatorForm.UploadApiKeyCredTarget(const sourceName : string) : string;
+begin
+  result := cCredUploadApiKeyPrefix + sourceName;
+end;
+
+procedure TDSpecCreatorForm.LoadUploadSources;
+var
+  i : integer;
+  savedSource : string;
+begin
+  savedSource := cboUploadSource.Text;
+  cboUploadSource.Items.BeginUpdate;
+  try
+    cboUploadSource.Items.Clear;
+    FUploadConfig := nil;
+    try
+      FConfigManager.EnsureDefaultConfig;
+      FUploadConfigFile := TConfigUtils.GetDefaultConfigFileName;
+      FUploadConfig := FConfigManager.LoadConfig(FUploadConfigFile);
+    except
+      on e : Exception do
+        FPackLogger.Error('Could not load DPM configuration: ' + e.Message);
+    end;
+    if FUploadConfig <> nil then
+      for i := 0 to FUploadConfig.Sources.Count - 1 do
+        cboUploadSource.Items.Add(FUploadConfig.Sources[i].Name);
+  finally
+    cboUploadSource.Items.EndUpdate;
+  end;
+  // Restore the previous selection if still present, else pick the first.
+  if savedSource <> '' then
+    cboUploadSource.ItemIndex := cboUploadSource.Items.IndexOf(savedSource);
+  if (cboUploadSource.ItemIndex < 0) and (cboUploadSource.Items.Count > 0) then
+    cboUploadSource.ItemIndex := 0;
+end;
+
+procedure TDSpecCreatorForm.UpdateUploadApiKeyState;
+var
+  src : ISourceConfig;
+  isRemote : boolean;
+begin
+  isRemote := false;
+  if (FUploadConfig <> nil) and (cboUploadSource.Text <> '') then
+  begin
+    src := FUploadConfig.GetSourceByName(cboUploadSource.Text);
+    if src <> nil then
+      isRemote := src.SourceType = TSourceType.DPMServer;
+  end;
+  // API key only applies to https/DPMServer sources; folder sources ignore it.
+  lblUploadApiKey.Enabled := isRemote;
+  edtUploadApiKey.Enabled := isRemote;
+end;
+
+procedure TDSpecCreatorForm.cboUploadSourceChange(Sender : TObject);
+begin
+  // Persist the api key for the previously selected source before switching.
+  if FUploadCurrentSource <> '' then
+    WriteSecret(UploadApiKeyCredTarget(FUploadCurrentSource), edtUploadApiKey.Text);
+  FUploadCurrentSource := cboUploadSource.Text;
+  if FUploadCurrentSource <> '' then
+    edtUploadApiKey.Text := ReadSecret(UploadApiKeyCredTarget(FUploadCurrentSource))
+  else
+    edtUploadApiKey.Text := '';
+  UpdateUploadApiKeyState;
+end;
+
+function TDSpecCreatorForm.ResolveUploadFiles : TArray<string>;
+var
+  outputFolder : string;
+  id : string;
+  version : string;
+  mask : string;
+begin
+  result := nil;
+  outputFolder := edtPackageOutputPath.Text;
+  if not DirectoryExists(outputFolder) then
+    Exit;
+  if rgUploadScope.ItemIndex = 0 then
+  begin
+    // Current package : {id}-*-{version}.dpkg
+    id := Trim(FOpenFile.PackageSpec.metadata.id);
+    version := Trim(edtVersion.Text);
+    if (id = '') or (version = '') then
+      Exit;
+    mask := id + '-*-' + version + cPackageFileExt;
+  end
+  else
+    mask := '*' + cPackageFileExt;
+  result := TDirectory.GetFiles(outputFolder, mask);
+end;
+
+procedure TDSpecCreatorForm.RefreshUploadPackages;
+var
+  files : TArray<string>;
+  f : string;
+begin
+  lstUploadPackages.Items.BeginUpdate;
+  try
+    lstUploadPackages.Items.Clear;
+    files := ResolveUploadFiles;
+    for f in files do
+      lstUploadPackages.Items.Add(ExtractFileName(f));
+  finally
+    lstUploadPackages.Items.EndUpdate;
+  end;
+end;
+
+procedure TDSpecCreatorForm.rgUploadScopeClick(Sender : TObject);
+begin
+  RefreshUploadPackages;
+end;
+
+procedure TDSpecCreatorForm.btnRefreshPackagesClick(Sender : TObject);
+begin
+  LoadUploadSources;
+  UpdateUploadApiKeyState;
+  RefreshUploadPackages;
+end;
+
+procedure TDSpecCreatorForm.PageControlChange(Sender : TObject);
+begin
+  if PageControl.ActivePage = tsUpload then
+    RefreshUploadPackages;
+end;
+
+procedure TDSpecCreatorForm.btnUploadClick(Sender : TObject);
+var
+  files : TArray<string>;
+  sourceName : string;
+  apiKey : string;
+  skipDuplicate : boolean;
+  isRemote : boolean;
+  src : ISourceConfig;
+  cleanup : TProc;
+begin
+  if FPacking or FUploading then
+    Exit;
+
+  sourceName := cboUploadSource.Text;
+  if sourceName = '' then
+  begin
+    MessageDlg('Please select a source to upload to.', mtWarning, [mbOK], 0);
+    Exit;
+  end;
+  if FUploadConfig = nil then
+  begin
+    MessageDlg('No DPM configuration is loaded.', mtWarning, [mbOK], 0);
+    Exit;
+  end;
+
+  src := FUploadConfig.GetSourceByName(sourceName);
+  isRemote := (src <> nil) and (src.SourceType = TSourceType.DPMServer);
+  apiKey := edtUploadApiKey.Text;
+  if isRemote and (Trim(apiKey) = '') then
+  begin
+    MessageDlg('An API key is required for the selected https source.', mtWarning, [mbOK], 0);
+    Exit;
+  end;
+
+  files := ResolveUploadFiles;
+  if Length(files) = 0 then
+  begin
+    MessageDlg('No .dpkg files found to upload in the output folder.', mtWarning, [mbOK], 0);
+    Exit;
+  end;
+  skipDuplicate := chkUploadSkipDuplicate.Checked;
+
+  // Persist the api key for this source before we start.
+  WriteSecret(UploadApiKeyCredTarget(sourceName), edtUploadApiKey.Text);
+
+  cleanup :=
+    procedure
+    begin
+      FUploading := false;
+      btnUpload.Enabled := true;
+      btnCancelUpload.Enabled := false;
+    end;
+
+  FOpsLogger.SetTarget(Memo3.Lines);
+  Memo3.Clear;
+  PageControl.ActivePage := tsUpload;
+  FUploading := true;
+  btnUpload.Enabled := false;
+  btnCancelUpload.Enabled := true;
+  FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
+
+  TAsync.Configure<boolean>(
+    function(const cancelToken : ICancellationToken) : boolean
+    var
+      config : IConfiguration;
+      pushOptions : TPushOptions;
+      f : string;
+      okCount : integer;
+      failCount : integer;
+    begin
+      result := false;
+      config := FConfigManager.LoadConfig(FUploadConfigFile);
+      if config = nil then
+      begin
+        FPackLogger.Error('Could not load DPM configuration.');
+        Exit;
+      end;
+      FRepositoryManager.Initialize(config);
+
+      okCount := 0;
+      failCount := 0;
+      pushOptions := TPushOptions.Create;
+      try
+        pushOptions.Source := sourceName;
+        pushOptions.ApiKey := apiKey;
+        pushOptions.SkipDuplicate := skipDuplicate;
+        for f in files do
+        begin
+          if cancelToken.IsCancelled then
+            Break;
+          pushOptions.PackagePath := f;
+          FPackLogger.Information('Uploading ' + ExtractFileName(f) + ' to ' + sourceName + '...');
+          if FRepositoryManager.Push(cancelToken, pushOptions) then
+            Inc(okCount)
+          else
+            Inc(failCount);
+        end;
+      finally
+        pushOptions.Free;
+      end;
+
+      FPackLogger.Information(Format('Uploaded %d package(s), %d failed.', [okCount, failCount]));
+      result := failCount = 0;
+    end, FCancellationTokenSource.Token)
+  .OnException(
+    procedure(const e : Exception)
+    begin
+      FPackLogger.Error('Error uploading : ' + e.Message);
+      cleanup();
+    end)
+  .OnCancellation(
+    procedure
+    begin
+      FPackLogger.Warning('Upload cancelled.');
+      cleanup();
+    end)
+  .Await(
+    procedure(const ok : boolean)
+    begin
+      if ok then
+        FPackLogger.Success('Upload completed.')
+      else
+        FPackLogger.Error('Upload completed with errors.');
+      cleanup();
+    end);
+end;
+
+procedure TDSpecCreatorForm.LoadUploadSettings;
+var
+  iniFile : TIniFile;
+  lastSource : string;
+  idx : integer;
+begin
+  iniFile := TIniFile.Create(MRUListService.GetIniFilePath);
+  try
+    chkUploadSkipDuplicate.Checked := iniFile.ReadBool('Upload', 'SkipDuplicate', true);
+    rgUploadScope.ItemIndex := iniFile.ReadInteger('Upload', 'Scope', 0);
+    lastSource := iniFile.ReadString('Upload', 'Source', '');
+  finally
+    iniFile.Free;
+  end;
+  if lastSource <> '' then
+  begin
+    idx := cboUploadSource.Items.IndexOf(lastSource);
+    if idx >= 0 then
+      cboUploadSource.ItemIndex := idx;
+  end;
+  // Programmatic selection does not raise OnChange - init the current source and
+  // load its api key from the credential manager.
+  FUploadCurrentSource := cboUploadSource.Text;
+  if FUploadCurrentSource <> '' then
+    edtUploadApiKey.Text := ReadSecret(UploadApiKeyCredTarget(FUploadCurrentSource));
+  RefreshUploadPackages;
+end;
+
+procedure TDSpecCreatorForm.SaveUploadSettings;
+var
+  iniFile : TIniFile;
+begin
+  iniFile := TIniFile.Create(MRUListService.GetIniFilePath);
+  try
+    iniFile.WriteString('Upload', 'Source', cboUploadSource.Text);
+    iniFile.WriteBool('Upload', 'SkipDuplicate', chkUploadSkipDuplicate.Checked);
+    iniFile.WriteInteger('Upload', 'Scope', rgUploadScope.ItemIndex);
+  finally
+    iniFile.Free;
+  end;
+  // The api key (per source) goes to the credential manager, never the ini.
+  if cboUploadSource.Text <> '' then
+    WriteSecret(UploadApiKeyCredTarget(cboUploadSource.Text), edtUploadApiKey.Text);
 end;
 
 procedure TDSpecCreatorForm.clbCompilersClick(Sender : TObject);
@@ -2023,10 +2389,13 @@ begin
   FLogger := TDSpecLogger.Create(Memo2.Lines);
   FOpenFile := TDSpecFile.Create(FLogger);
   FOpenFile.PackageSpec.newTemplate('default');
-  // Pack / sign run in-process via the DPM core; output goes to the Pack tab memo.
-  FPackLogger := TDSpecQueuedLogger.Create(Memo1.Lines);
+  // Pack / sign / upload run in-process via the DPM core; output goes to the
+  // active page's memo (retargeted per operation). Pack/sign default to Memo1.
+  FOpsLogger := TDSpecQueuedLogger.Create(Memo1.Lines);
+  FPackLogger := FOpsLogger;
   InitCoreContainer;
   FPacking := false;
+  FUploading := false;
   FSPDXList := TStringList.Create;
   LoadSPDXList;
   LoadDspecStructure;
@@ -2066,11 +2435,17 @@ begin
   LoadSigningSettings;
   pnlProviders.Enabled := chkEnableSigning.Checked;
   UpdateSigningProviderPage;
+
+  // Upload tab: load configured sources and restore saved settings.
+  LoadUploadSources;
+  LoadUploadSettings;
+  UpdateUploadApiKeyState;
 end;
 
 procedure TDSpecCreatorForm.FormDestroy(Sender : TObject);
 begin
   SaveSigningSettings;
+  SaveUploadSettings;
   MRUListService.SetSource(nil);
   if FCancellationTokenSource <> nil then
     FCancellationTokenSource.Cancel;

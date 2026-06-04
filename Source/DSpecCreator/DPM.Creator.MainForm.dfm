@@ -26,9 +26,10 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Top = 0
     Width = 871
     Height = 558
-    ActivePage = tsLogging
+    ActivePage = tsInfo
     Align = alClient
     TabOrder = 0
+    OnChange = PageControlChange
     object tsInfo: TTabSheet
       Caption = 'Package Info'
       DesignSize = (
@@ -1513,9 +1514,9 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Top = 53
             Width = 97
             Height = 25
+            Hint = 'Cancel the running pack/sign (Esc)'
             Caption = 'Cancel'
             Enabled = False
-            Hint = 'Cancel the running pack/sign (Esc)'
             TabOrder = 2
             OnClick = btnCancelPackClick
           end
@@ -1530,6 +1531,127 @@ object DSpecCreatorForm: TDSpecCreatorForm
           ScrollBars = ssBoth
           TabOrder = 1
         end
+      end
+    end
+    object tsUpload: TTabSheet
+      Caption = 'Upload'
+      ImageIndex = 6
+      object pnlUploadTop: TPanel
+        Left = 0
+        Top = 0
+        Width = 863
+        Height = 233
+        Align = alTop
+        BevelOuter = bvNone
+        ShowCaption = False
+        TabOrder = 0
+        object lblUploadSource: TLabel
+          Left = 16
+          Top = 10
+          Width = 38
+          Height = 15
+          Caption = 'Source'
+        end
+        object lblUploadApiKey: TLabel
+          Left = 336
+          Top = 10
+          Width = 44
+          Height = 15
+          Caption = 'API Key'
+        end
+        object lblUploadPackages: TLabel
+          Left = 16
+          Top = 90
+          Width = 230
+          Height = 15
+          Caption = 'Packages to upload (from output folder):'
+        end
+        object cboUploadSource: TComboBox
+          Left = 16
+          Top = 28
+          Width = 300
+          Height = 23
+          Style = csDropDownList
+          TabOrder = 0
+          OnChange = cboUploadSourceChange
+        end
+        object edtUploadApiKey: TEdit
+          Left = 336
+          Top = 28
+          Width = 300
+          Height = 23
+          PasswordChar = '*'
+          TabOrder = 1
+        end
+        object chkUploadSkipDuplicate: TCheckBox
+          Left = 16
+          Top = 62
+          Width = 300
+          Height = 17
+          Caption = 'Skip packages that already exist on the source'
+          Checked = True
+          State = cbChecked
+          TabOrder = 2
+        end
+        object rgUploadScope: TRadioGroup
+          Left = 648
+          Top = 6
+          Width = 201
+          Height = 73
+          Caption = 'Upload'
+          ItemIndex = 0
+          Items.Strings = (
+            'Current package (this dspec)'
+            'All packages in output folder')
+          TabOrder = 3
+          OnClick = rgUploadScopeClick
+        end
+        object lstUploadPackages: TListBox
+          Left = 16
+          Top = 108
+          Width = 620
+          Height = 80
+          TabOrder = 4
+        end
+        object btnRefreshPackages: TButton
+          Left = 648
+          Top = 108
+          Width = 97
+          Height = 25
+          Caption = 'Refresh'
+          TabOrder = 5
+          OnClick = btnRefreshPackagesClick
+        end
+        object btnUpload: TButton
+          Left = 16
+          Top = 198
+          Width = 97
+          Height = 25
+          Caption = 'Upload'
+          TabOrder = 6
+          OnClick = btnUploadClick
+        end
+        object btnCancelUpload: TButton
+          Left = 120
+          Top = 198
+          Width = 97
+          Height = 25
+          Caption = 'Cancel'
+          Enabled = False
+          Hint = 'Cancel the running upload (Esc)'
+          TabOrder = 7
+          OnClick = btnCancelUploadClick
+        end
+      end
+      object Memo3: TMemo
+        Left = 0
+        Top = 233
+        Width = 863
+        Height = 295
+        Align = alClient
+        ReadOnly = True
+        ScrollBars = ssBoth
+        TabOrder = 1
       end
     end
     object tsLogging: TTabSheet

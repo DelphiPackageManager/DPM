@@ -162,7 +162,7 @@ uses
 begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
-  TStyleManager.TrySetStyle('Glossy');
+  TStyleManager.TrySetStyle('Windows11 MineShaft');
   Application.CreateForm(TDSpecCreatorForm, DSpecCreatorForm);
   Application.CreateForm(TDPMAboutForm, DPMAboutForm);
   Application.Run;
