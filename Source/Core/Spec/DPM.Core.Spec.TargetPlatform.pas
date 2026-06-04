@@ -44,6 +44,11 @@ uses
 ///  three-way selection logic lives in one place. </summary>
 function ExpandedCompilersOf(const targetPlatform : ISpecTargetPlatform) : TCompilerVersions;
 
+/// <summary> Returns the lowest compiler the target platform covers across all three authoring
+///  forms, or UnknownVersion when it covers none. Used to order entries for output, since a
+///  range/list entry's Compiler property is UnknownVersion. </summary>
+function MinCompilerOf(const targetPlatform : ISpecTargetPlatform) : TCompilerVersion;
+
 /// <summary> Returns the set of platforms the spec declares for the given compiler by scanning
 ///  spec.TargetPlatforms and picking the first entry whose ExpandedCompilersOf contains the compiler.
 ///  Returns the empty set when no entry matches (e.g. the compiler isn't supported by the spec). </summary>
@@ -139,6 +144,20 @@ begin
   end;
   for c in targetPlatform.Compilers do
     Include(result, c);
+end;
+
+function MinCompilerOf(const targetPlatform : ISpecTargetPlatform) : TCompilerVersion;
+var
+  c : TCompilerVersion;
+begin
+  result := TCompilerVersion.UnknownVersion;
+  for c := Low(TCompilerVersion) to High(TCompilerVersion) do
+  begin
+    if c = TCompilerVersion.UnknownVersion then
+      continue;
+    if c in ExpandedCompilersOf(targetPlatform) then
+      exit(c);
+  end;
 end;
 
 function PlatformsForCompiler(const spec : IPackageSpec; const compiler : TCompilerVersion) : TDPMPlatforms;
@@ -469,6 +488,10 @@ var
   i : integer;
 begin
   mapping := parent.AsSequence.AddMapping;
+  //carry any comment that sat above this entry through to the output (DSpecCreator round-trips
+  //these via expand/collapse). ToYAML previously dropped them.
+  if Self.HasComments then
+    mapping.Comments.Assign(Self.Comments);
   //even though we only use compiler when writing packages, we need all compiler options
   //here for dspec creator.
   if FCompiler <> TCompilerVersion.UnknownVersion then

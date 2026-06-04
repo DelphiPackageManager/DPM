@@ -1,0 +1,68 @@
+min dpm client version: 1.0.0
+metadata:
+  id: Test.Full
+  version: 3.1.4
+  description: Exercises every dspec element
+  authors:
+    - Vincent Parrett
+    - Contributors
+  projectUrl: https://github.com/VSoftTechnologies/DPM
+  repositoryUrl: https://github.com/VSoftTechnologies/DPM.git
+  repositoryType: git
+  repositoryBranch: master
+  repositoryCommit: 9459e1014dc11e244adc74907f98441557838dbb
+  license: Apache-2.0
+  copyright: Vincent Parrett and contributors
+  icon: icon.png
+  readme: README.md
+  releaseNotes: Initial release
+  tags: [console, terminal, ansi]
+  isTrial: false
+  isCommercial: true
+  frameworks: [VCL, FMX]
+variables:
+  packagesource: RAD Studio $compilernoprefix$
+  company: VSoft
+targetPlatforms:
+  - compiler: 12.0
+    platforms: [Win32, Win64]
+    template: default
+    variables:
+      extradefines: MODERN
+  - compiler: 11.0
+    platforms: [Win32, Win64]
+    template: legacy
+templates:
+  - name: default
+    dependencies:
+      - id: VSoft.SemanticVersion
+        version: "[1.0.0,2.0.0]"
+      - id: VSoft.CommandLine
+        version: "[0.1.0,)"
+    source:
+      - src: .\source\**.pas
+        dest: src
+        exclude:
+          - "*.dcu"
+          - Test*.pas
+      - src: .\LICENSE
+    build:
+      - project: .\packages\$packagesource$\Pkg.dproj
+        platforms: [Win32, Win64]
+        defines: RELEASE;DPM
+        references:
+          - rtl
+          - vcl
+    design:
+      - project: .\packages\$packagesource$\PkgDesign.dproj
+        platforms: [Win32, Win64]
+        defines: DESIGNTIME
+        libSuffix: "290"
+        libPrefix: dcl
+        libVersion: "29.0"
+        references:
+          - designide
+  - name: legacy
+    source:
+      - src: .\legacy\*.pas
+        dest: src

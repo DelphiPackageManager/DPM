@@ -18,6 +18,12 @@ type
     FLoadedSpec : IPackageSpec;
     FPackageSpec : IPackageSpec;
 
+    //The UI edits one compiler per row, so we expand ranges/lists into single-compiler entries on
+    //load and collapse them back on output. CollapsedYAML/SaveCollapsed run an action against the
+    //spec with its targetPlatforms temporarily swapped to the collapsed form, then restore them so
+    //the live (expanded) objects the UI holds are untouched.
+    function CollapsedYAML(const spec : IPackageSpec) : string;
+    procedure SaveCollapsed(const spec : IPackageSpec; const filename : string);
   public
     procedure DeleteTemplate(const templateName: string);
     function DuplicateTemplate(const sourceTemplate: ISpecTemplate; const newTemplateName: string): ISpecTemplate;
@@ -46,9 +52,11 @@ uses
   System.IOUtils,
   System.Classes,
   System.SysUtils,
+  Spring.Collections,
   DPM.Core.Spec,
   DPM.Core.Spec.Template,
   DPM.Core.Spec.TargetPlatform,
+  DPM.Creator.TargetPlatform.Collapse,
   DPM.Core.Types
   ;
 
@@ -68,7 +76,46 @@ end;
 
 function TDSpecFile.AsString: string;
 begin
-  Result := FPackageSpec.GenerateDspecYAML(FPackageSpec.MetaData.Version);
+  //preview/output reflects the collapsed (to-be-saved) form, not the expanded editing form.
+  Result := CollapsedYAML(FPackageSpec);
+end;
+
+function TDSpecFile.CollapsedYAML(const spec: IPackageSpec): string;
+var
+  expanded : IList<ISpecTargetPlatform>;
+  collapsed : IList<ISpecTargetPlatform>;
+begin
+  expanded := TCollections.CreateList<ISpecTargetPlatform>;
+  expanded.AddRange(spec.TargetPlatforms);
+  //collapse before clearing - CollapseTargetPlatforms reads spec.TargetPlatforms.
+  collapsed := CollapseTargetPlatforms(spec);
+  spec.TargetPlatforms.Clear;
+  spec.TargetPlatforms.AddRange(collapsed);
+  try
+    result := spec.GenerateDspecYAML(spec.MetaData.Version);
+  finally
+    spec.TargetPlatforms.Clear;
+    spec.TargetPlatforms.AddRange(expanded);
+  end;
+end;
+
+procedure TDSpecFile.SaveCollapsed(const spec: IPackageSpec; const filename: string);
+var
+  expanded : IList<ISpecTargetPlatform>;
+  collapsed : IList<ISpecTargetPlatform>;
+begin
+  expanded := TCollections.CreateList<ISpecTargetPlatform>;
+  expanded.AddRange(spec.TargetPlatforms);
+  //collapse before clearing - CollapseTargetPlatforms reads spec.TargetPlatforms.
+  collapsed := CollapseTargetPlatforms(spec);
+  spec.TargetPlatforms.Clear;
+  spec.TargetPlatforms.AddRange(collapsed);
+  try
+    spec.ToYAMLFile(filename);
+  finally
+    spec.TargetPlatforms.Clear;
+    spec.TargetPlatforms.AddRange(expanded);
+  end;
 end;
 
 procedure TDSpecFile.ClearCompilers;
@@ -165,9 +212,10 @@ function TDSpecFile.IsModified: Boolean;
 begin
 //TODO : This is wasteful - implement a modified flag.
 
+  //compare the collapsed form of both - it is canonically ordered, so reordering during editing
+  //(e.g. appending a newly added compiler) does not register as a change on its own.
   if (FPackageSpec <> nil) and (FLoadedSpec <> nil) then
-    Result := not SameText(FPackageSpec.GenerateDspecYAML(FPackageSpec.MetaData.Version),
-                           FLoadedSpec.GenerateDspecYAML(FLoadedSpec.MetaData.Version))
+    Result := not SameText(CollapsedYAML(FPackageSpec), CollapsedYAML(FLoadedSpec))
   else
     result := false;
 end;
@@ -180,7 +228,11 @@ begin
     FPackageSpec := FReader.ReadSpec(filename);
     if (FPackageSpec = nil) then
       raise Exception.Create('Failed to load dspec');
+    //expand compiler ranges/lists into one entry per compiler so the UI can edit each
+    //independently. The baseline is expanded too so the modified check compares like with like.
+    ExpandTargetPlatforms(FPackageSpec);
     FLoadedSpec := FReader.ReadSpec(filename);
+    ExpandTargetPlatforms(FLoadedSpec);
   except
     on E : Exception do
     begin
@@ -193,11 +245,13 @@ end;
 
 procedure TDSpecFile.SaveToFile(const filename: string);
 begin
-  FPackageSpec.ToYAMLFile(filename);
+  //collapse the per-compiler editing entries back into ranges/lists for the on-disk file.
+  SaveCollapsed(FPackageSpec, filename);
   FFilename := filename;
-  //reload so the modified-check baseline matches what was just written.
+  //reload so the modified-check baseline matches what was just written (expanded to match FPackageSpec).
   FReader := TPackageSpecReader.Create(FLogger);
   FLoadedSpec := FReader.ReadSpec(filename);
+  ExpandTargetPlatforms(FLoadedSpec);
 end;
 
 function TDSpecFile.WorkingDir: string;

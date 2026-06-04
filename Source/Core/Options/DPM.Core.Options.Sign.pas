@@ -54,6 +54,9 @@ type
     FStoreLocation : TSignStoreLocation;
     FPfxFile : string;
     FPfxPasswordEnvVar : string;
+    // Literal PFX password. Used by the GUI (stored in Windows Credential
+    // Manager, never on disk). Takes precedence over the env var when set.
+    FPfxPassword : string;
     FTimestampUrl : string;
     FDigest : string;
     // P3 §3.3 — remote-provider options
@@ -64,6 +67,9 @@ type
     FTenantId : string;
     FClientId : string;
     FClientSecretEnv : string;
+    // Literal Azure Key Vault client secret. Used by the GUI (stored in Windows
+    // Credential Manager). Takes precedence over the env var when set.
+    FClientSecret : string;
     FSignotaurEndpoint : string;
     FSignotaurApiKey : string;        // --api-key (literal — discouraged but supported)
     FSignotaurApiKeyEnv : string;     // --api-key-env (env var name, preferred)
@@ -84,6 +90,7 @@ type
     property StoreLocation : TSignStoreLocation read FStoreLocation write FStoreLocation;
     property PfxFile : string read FPfxFile write FPfxFile;
     property PfxPasswordEnvVar : string read FPfxPasswordEnvVar write FPfxPasswordEnvVar;
+    property PfxPassword : string read FPfxPassword write FPfxPassword;
     property TimestampUrl : string read FTimestampUrl write FTimestampUrl;
     property Digest : string read FDigest write FDigest;
 
@@ -94,6 +101,7 @@ type
     property TenantId : string read FTenantId write FTenantId;
     property ClientId : string read FClientId write FClientId;
     property ClientSecretEnv : string read FClientSecretEnv write FClientSecretEnv;
+    property ClientSecret : string read FClientSecret write FClientSecret;
     property SignotaurEndpoint : string read FSignotaurEndpoint write FSignotaurEndpoint;
     property SignotaurApiKey : string read FSignotaurApiKey write FSignotaurApiKey;
     property SignotaurApiKeyEnv : string read FSignotaurApiKeyEnv write FSignotaurApiKeyEnv;

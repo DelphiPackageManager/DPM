@@ -378,7 +378,7 @@ begin
   FMetaData.Version := version;
   yamlDoc := TYAML.CreateMapping;
   Self.ToYAML(yamlDoc.Root, FPackageKind);
-  yamlDoc.Options.Format := TYAMLOutputFormat.yofMixed;
+  yamlDoc.Options.Format := TYAMLOutputFormat.yofBlock;
   result := TYAML.WriteToString(yamlDoc);
 end;
 
@@ -673,13 +673,28 @@ begin
   if Self.HasComments then
     root.Comments.Assign(Self.Comments)
   else
-    root.Comments.Add('# DPM package spec file');
+    //the writer adds the leading '# ' marker itself - including it here produces '# # ...' and the
+    //extra '#' then accumulates on every load/save round-trip.
+    root.Comments.Add('DPM package spec file');
 
   root.S['min dpm client version'] := cDPMClientVersion;
   if packageKind <> TDPMPackageKind.dpm then
     root.S['packageKind'] := PackageKindToString(FPackageKind);
 
   FMetaData.ToYAML(root, packageKind);
+
+  //variables come straight after metadata (insertion order is preserved in the output).
+  if FVariables.Count > 0 then
+  begin
+    variables := root.O['variables'];
+    if FVariablesComments <> nil then
+      variables.Comments.Assign(FVariablesComments);
+    //write the actual variable values - pack never reaches here with variables (it clears them
+    //after resolving tokens), so this only affects the DSpecCreator save/preview path.
+    for i := 0 to FVariables.Count - 1 do
+      variables.S[FVariables.Items[i].Key] := FVariables.Items[i].Value;
+  end;
+
   targetPlatforms := root.A['targetPlatforms'];
 
   //attempting to preserve comments
@@ -697,15 +712,6 @@ begin
   for i := 0 to FTemplates.Count -1 do
     FTemplates[i].ToYAML(templates, packageKind);
 
-  if FVariables.Count > 0 then
-  begin
-    variables := root.O['variables'];
-    if FVariablesComments <> nil then
-      variables.Comments.Assign(FVariablesComments);
-  end;
-
-
-
 end;
 
 procedure TSpec.ToYAMLFile(const fileName: string);
@@ -717,12 +723,9 @@ begin
   FTargetPlatforms.Sort(TComparer<ISpecTargetPlatform>.Construct(
   function(const Left, Right: ISpecTargetPlatform): Integer
    begin
-      if Ord(left.Compiler) = Ord(right.Compiler) then
-        result := 0
-      else if Ord(Left.Compiler) > Ord(Right.Compiler) then
-        result := 1
-      else
-        result := -1;
+      //sort by the lowest compiler each entry covers - using Compiler alone would sort range and
+      //list entries (whose Compiler is UnknownVersion) to the front.
+      result := Ord(MinCompilerOf(Left)) - Ord(MinCompilerOf(Right));
    end));
 
   doc := TYAML.CreateMapping;

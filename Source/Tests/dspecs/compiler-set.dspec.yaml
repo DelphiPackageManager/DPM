@@ -1,0 +1,15 @@
+metadata:
+  id: Test.CompilerSet
+  version: 2.0.0
+  description: Discrete compilers list
+  authors:
+    - Vincent Parrett
+targetPlatforms:
+  - compilers: [XE2, XE7, 12.0]
+    platforms: [Win32, Win64]
+    template: default
+templates:
+  - name: default
+    source:
+      - src: .\src\*.pas
+        dest: src

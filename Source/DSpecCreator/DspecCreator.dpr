@@ -8,6 +8,7 @@ uses
   Vcl.Forms,
   DPM.Creator.MainForm in 'DPM.Creator.MainForm.pas' {DSpecCreatorForm},
   DPM.Creator.Dspec.FileHandler in 'DPM.Creator.Dspec.FileHandler.pas',
+  DPM.Creator.TargetPlatform.Collapse in 'DPM.Creator.TargetPlatform.Collapse.pas',
   DPM.Creator.Dspec.Replacer in 'DPM.Creator.Dspec.Replacer.pas',
   DPM.Creator.TemplateForm in 'DPM.Creator.TemplateForm.pas' {TemplateForm},
   DPM.Creator.FileForm in 'DPM.Creator.FileForm.pas' {SourceForm},
@@ -113,6 +114,7 @@ uses
   DPM.Core.Crypto.Provider.Interfaces in '..\Core\Crypto\DPM.Core.Crypto.Provider.Interfaces.pas',
   DPM.Core.Crypto.Provider in '..\Core\Crypto\DPM.Core.Crypto.Provider.pas',
   DPM.Core.Crypto.Provider.Signotaur in '..\Core\Crypto\DPM.Core.Crypto.Provider.Signotaur.pas',
+  DPM.Core.Crypto.Provider.Factory in '..\Core\Crypto\DPM.Core.Crypto.Provider.Factory.pas',
   DPM.Core.Crypto.Timestamping in '..\Core\Crypto\DPM.Core.Crypto.Timestamping.pas',
   DPM.Core.Crypto.Win32 in '..\Core\Crypto\DPM.Core.Crypto.Win32.pas',
   DPM.Core.Crypto.X509.Interfaces in '..\Core\Crypto\DPM.Core.Crypto.X509.Interfaces.pas',
@@ -152,14 +154,15 @@ uses
   DPM.Core.SBOM.Types in '..\Core\Sbom\DPM.Core.SBOM.Types.pas',
   DPM.Core.SBOM.Writers in '..\Core\Sbom\DPM.Core.SBOM.Writers.pas',
   DPM.Core.SBOM.Writers.Reports in '..\Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas',
-  DPM.Core.Options.SBOM in '..\Core\Options\DPM.Core.Options.SBOM.pas';
+  DPM.Core.Options.SBOM in '..\Core\Options\DPM.Core.Options.SBOM.pas',
+  DPM.Core.Options.Sign in '..\Core\Options\DPM.Core.Options.Sign.pas';
 
 {$R *.res}
 
 begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
-  TStyleManager.TrySetStyle('Windows10');
+  TStyleManager.TrySetStyle('Glossy');
   Application.CreateForm(TDSpecCreatorForm, DSpecCreatorForm);
   Application.CreateForm(TDPMAboutForm, DPMAboutForm);
   Application.Run;

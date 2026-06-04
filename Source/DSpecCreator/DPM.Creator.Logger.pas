@@ -28,7 +28,34 @@ type
     constructor Create(sl: TStrings);
   end;
 
+  // Thread-safe ILogger used while packing/signing on a worker thread (the
+  // VSoft.Awaitable work function runs off the UI thread). Each line is
+  // marshalled onto the UI thread via TThread.Queue before touching the memo,
+  // so log output appears live without cross-thread VCL access.
+  TDSpecQueuedLogger = class(TInterfacedObject, ILogger)
+  private
+    FStrList : TStrings;
+    FVerbosity : TVerbosity;
+    procedure QueueLine(const data : string);
+  public
+    procedure Debug(const data : string);
+    procedure Verbose(const data : string; const important : boolean = false);
+    procedure Information(const data : string; const important : boolean = false);
+    procedure Warning(const data : string; const important : boolean = false);
+    procedure Error(const data : string);
+    procedure Success(const data : string; const important : boolean = false);
+    procedure Clear;
+    procedure NewLine;
+
+    function GetVerbosity : TVerbosity;
+    procedure SetVerbosity(const value : TVerbosity);
+    constructor Create(const sl : TStrings);
+  end;
+
 implementation
+
+uses
+  System.SysUtils;
 
 { TDSpecLogger }
 
@@ -85,6 +112,85 @@ end;
 procedure TDSpecLogger.Warning(const data: string; const important: boolean);
 begin
   strList.Add('WARNING: ' + data);
+end;
+
+{ TDSpecQueuedLogger }
+
+constructor TDSpecQueuedLogger.Create(const sl : TStrings);
+begin
+  inherited Create;
+  FStrList := sl;
+end;
+
+procedure TDSpecQueuedLogger.QueueLine(const data : string);
+var
+  line : string;
+  strList : TStrings;
+begin
+  line := data;
+  strList := FStrList;
+  TThread.Queue(nil,
+    procedure
+    begin
+      strList.Add(line);
+    end);
+end;
+
+procedure TDSpecQueuedLogger.Clear;
+var
+  strList : TStrings;
+begin
+  strList := FStrList;
+  TThread.Queue(nil,
+    procedure
+    begin
+      strList.Clear;
+    end);
+end;
+
+procedure TDSpecQueuedLogger.Debug(const data : string);
+begin
+  QueueLine(data);
+end;
+
+procedure TDSpecQueuedLogger.Error(const data : string);
+begin
+  QueueLine(data);
+end;
+
+function TDSpecQueuedLogger.GetVerbosity : TVerbosity;
+begin
+  Result := FVerbosity;
+end;
+
+procedure TDSpecQueuedLogger.Information(const data : string; const important : boolean);
+begin
+  QueueLine(data);
+end;
+
+procedure TDSpecQueuedLogger.NewLine;
+begin
+  QueueLine('');
+end;
+
+procedure TDSpecQueuedLogger.SetVerbosity(const value : TVerbosity);
+begin
+  FVerbosity := value;
+end;
+
+procedure TDSpecQueuedLogger.Success(const data : string; const important : boolean);
+begin
+  QueueLine(data);
+end;
+
+procedure TDSpecQueuedLogger.Verbose(const data : string; const important : boolean);
+begin
+  QueueLine(data);
+end;
+
+procedure TDSpecQueuedLogger.Warning(const data : string; const important : boolean);
+begin
+  QueueLine(data);
 end;
 
 end.

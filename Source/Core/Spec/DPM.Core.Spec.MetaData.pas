@@ -567,6 +567,7 @@ var
   version : IYAMLMapping;
   tagsSeq : IYAMLSequence;
   authorsSeq : IYAMLSequence;
+  frameworksSeq : IYAMLSequence;
   i: Integer;
 begin
   metaData := parentObj.AsMapping.O['metadata'];
@@ -606,14 +607,22 @@ begin
 
   if FProjectUrl <> '' then
     metaData.S['projectUrl'] := FProjectUrl;
-  if FRepositoryCommit <> '' then
+  //these were previously either guarded by the wrong field (repositoryUrl was only written when a
+  //commit was set) or not written at all (repositoryType/Branch, releaseNotes, frameworks), so the
+  //DSpecCreator silently dropped them on save. The read side already expects these keys.
+  if FRepositoryUrl <> '' then
     metaData.S['repositoryUrl'] := FRepositoryUrl;
+  if FRepositoryType <> '' then
+    metaData.S['repositoryType'] := FRepositoryType;
+  if FRepositoryBranch <> '' then
+    metaData.S['repositoryBranch'] := FRepositoryBranch;
   if FRepositoryCommit <> '' then
     metaData.S['repositoryCommit'] := FRepositoryCommit;
   metaData.S['license'] := FLicense;
   if FCopyright <> '' then
     metaData.S['copyright'] := FCopyright;
-
+  if FReleaseNotes <> '' then
+    metaData.S['releaseNotes'] := FReleaseNotes;
 
   if FTags.Count > 0 then
   begin
@@ -621,10 +630,20 @@ begin
     for i := 0 to FTags.Count -1 do
       tagsSeq.AddValue(FTags.Strings[i]);
   end;
+
+  if Length(FFrameworks) > 0 then
+  begin
+    frameworksSeq := metaData.AddOrSetSequence('frameworks');
+    for i := 0 to Length(FFrameworks) - 1 do
+      frameworksSeq.AddValue(UIFrameworkTypeToString(FFrameworks[i]));
+  end;
+
+  //read side uses the camelCase keys (isTrial/isCommercial) - the lowercase keys written before
+  //never round-tripped.
   if FIsTrial then
-    metaData.B['istrial'] := FIsTrial;
+    metaData.B['isTrial'] := FIsTrial;
   if FIsCommercial then
-    metaData.b['iscommercial'] := FIsCommercial;
+    metaData.B['isCommercial'] := FIsCommercial;
 
   if Length(FReadme) > 0 then
     metaData.S['readme'] := FReadme;

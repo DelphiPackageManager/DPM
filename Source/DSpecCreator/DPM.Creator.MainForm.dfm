@@ -5,28 +5,35 @@ object DSpecCreatorForm: TDSpecCreatorForm
   ClientHeight = 558
   ClientWidth = 871
   Color = clBtnFace
+  Constraints.MinHeight = 589
+  Constraints.MinWidth = 880
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -12
   Font.Name = 'Segoe UI'
   Font.Style = []
+  KeyPreview = True
   Menu = MainMenu
   Position = poScreenCenter
   OnClose = FormClose
   OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnKeyDown = FormKeyDown
   TextHeight = 15
   object PageControl: TPageControl
     Left = 0
     Top = 0
     Width = 871
     Height = 558
-    ActivePage = tsGenerate
+    ActivePage = tsLogging
     Align = alClient
     TabOrder = 0
     object tsInfo: TTabSheet
       Caption = 'Package Info'
+      DesignSize = (
+        863
+        528)
       object lblId: TLabel
         Left = 70
         Top = 32
@@ -173,6 +180,13 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Alignment = taRightJustify
         Caption = 'Readme:'
       end
+      object lblPackageVariables: TLabel
+        Left = 488
+        Top = 165
+        Width = 93
+        Height = 15
+        Caption = 'Package Variables'
+      end
       object edtId: TEdit
         Left = 89
         Top = 29
@@ -295,6 +309,25 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Height = 23
         TabOrder = 11
         OnChange = edtReadmeChange
+      end
+      object PackageVariablesList: TValueListEditor
+        Left = 488
+        Top = 184
+        Width = 372
+        Height = 341
+        Anchors = [akLeft, akTop, akRight, akBottom]
+        Constraints.MinHeight = 313
+        DoubleBuffered = True
+        KeyOptions = [keyEdit, keyAdd, keyDelete, keyUnique]
+        ParentDoubleBuffered = False
+        TabOrder = 12
+        TitleCaptions.Strings = (
+          'Variable Name'
+          'Value')
+        OnStringsChange = PackageVariablesListStringsChange
+        ColWidths = (
+          150
+          216)
       end
     end
     object tsPlatforms: TTabSheet
@@ -1057,6 +1090,359 @@ object DSpecCreatorForm: TDSpecCreatorForm
         end
       end
     end
+    object tsSigning: TTabSheet
+      Caption = 'Signing'
+      ImageIndex = 5
+      object pnlProviders: TPanel
+        Left = 0
+        Top = 33
+        Width = 863
+        Height = 495
+        Align = alClient
+        BevelEdges = []
+        BevelOuter = bvNone
+        ShowCaption = False
+        TabOrder = 0
+        object Label8: TLabel
+          Left = 16
+          Top = 6
+          Width = 44
+          Height = 15
+          Caption = 'Provider'
+        end
+        object lblTimestampUrl: TLabel
+          Left = 248
+          Top = 6
+          Width = 84
+          Height = 15
+          Caption = 'Timestamp URL'
+        end
+        object lblDigest: TLabel
+          Left = 568
+          Top = 6
+          Width = 33
+          Height = 15
+          Caption = 'Digest'
+        end
+        object cboSigningProvider: TComboBox
+          Left = 16
+          Top = 32
+          Width = 209
+          Height = 23
+          Style = csDropDownList
+          ItemIndex = 0
+          TabOrder = 0
+          Text = 'Windows Certificate Store'
+          OnChange = cboSigningProviderChange
+          Items.Strings = (
+            'Windows Certificate Store'
+            'PFX file'
+            'Signotaur'
+            'Azure Key Vault')
+        end
+        object edtTimestampUrl: TEdit
+          Left = 248
+          Top = 32
+          Width = 305
+          Height = 23
+          TabOrder = 1
+          Text = 'http://timestamp.digicert.com'
+        end
+        object cboDigest: TComboBox
+          Left = 568
+          Top = 32
+          Width = 137
+          Height = 23
+          Style = csDropDownList
+          ItemIndex = 0
+          TabOrder = 2
+          Text = 'Auto'
+          Items.Strings = (
+            'Auto'
+            'SHA256'
+            'SHA384'
+            'SHA512')
+        end
+        object PageControl1: TPageControl
+          Left = 16
+          Top = 70
+          Width = 841
+          Height = 419
+          ActivePage = TabSheet1
+          TabOrder = 3
+          object TabSheet1: TTabSheet
+            Caption = 'Windows Certificate Store'
+            object lblCertThumbprint: TLabel
+              Left = 16
+              Top = 16
+              Width = 121
+              Height = 15
+              Caption = 'Certificate Thumbprint'
+            end
+            object lblStoreLocation: TLabel
+              Left = 16
+              Top = 70
+              Width = 76
+              Height = 15
+              Caption = 'Store Location'
+            end
+            object edtCertThumbprint: TEdit
+              Left = 16
+              Top = 34
+              Width = 500
+              Height = 23
+              TabOrder = 0
+            end
+            object cboStoreLocation: TComboBox
+              Left = 16
+              Top = 88
+              Width = 200
+              Height = 23
+              Style = csDropDownList
+              ItemIndex = 0
+              TabOrder = 1
+              Text = 'Current User'
+              Items.Strings = (
+                'Current User'
+                'Local Machine')
+            end
+          end
+          object TabSheet2: TTabSheet
+            Caption = 'PFX file'
+            ImageIndex = 1
+            object lblPfxFile: TLabel
+              Left = 16
+              Top = 16
+              Width = 41
+              Height = 15
+              Caption = 'PFX File'
+            end
+            object lblPfxPassword: TLabel
+              Left = 16
+              Top = 70
+              Width = 50
+              Height = 15
+              Caption = 'Password'
+            end
+            object edtPfxFile: TEdit
+              Left = 16
+              Top = 34
+              Width = 460
+              Height = 23
+              TabOrder = 0
+            end
+            object btnBrowsePfx: TButton
+              Left = 482
+              Top = 33
+              Width = 31
+              Height = 25
+              Caption = '...'
+              TabOrder = 1
+              OnClick = btnBrowsePfxClick
+            end
+            object edtPfxPassword: TEdit
+              Left = 16
+              Top = 88
+              Width = 300
+              Height = 23
+              PasswordChar = '*'
+              TabOrder = 2
+            end
+          end
+          object TabSheet3: TTabSheet
+            Caption = 'Signotaur'
+            ImageIndex = 2
+            object lblSignotaurEndpoint: TLabel
+              Left = 16
+              Top = 16
+              Width = 48
+              Height = 15
+              Caption = 'Endpoint'
+            end
+            object lblSignotaurApiKey: TLabel
+              Left = 16
+              Top = 70
+              Width = 40
+              Height = 15
+              Caption = 'API Key'
+            end
+            object lblSignotaurThumbprint: TLabel
+              Left = 16
+              Top = 124
+              Width = 64
+              Height = 15
+              Caption = 'Thumbprint'
+            end
+            object lblSignotaurSubject: TLabel
+              Left = 16
+              Top = 178
+              Width = 39
+              Height = 15
+              Caption = 'Subject'
+            end
+            object lblSignotaurLabel: TLabel
+              Left = 16
+              Top = 232
+              Width = 28
+              Height = 15
+              Caption = 'Label'
+            end
+            object edtSignotaurEndpoint: TEdit
+              Left = 16
+              Top = 34
+              Width = 500
+              Height = 23
+              TabOrder = 0
+            end
+            object edtSignotaurApiKey: TEdit
+              Left = 16
+              Top = 88
+              Width = 300
+              Height = 23
+              PasswordChar = '*'
+              TabOrder = 1
+            end
+            object edtSignotaurThumbprint: TEdit
+              Left = 16
+              Top = 142
+              Width = 500
+              Height = 23
+              TabOrder = 2
+            end
+            object edtSignotaurSubject: TEdit
+              Left = 16
+              Top = 196
+              Width = 500
+              Height = 23
+              TabOrder = 3
+            end
+            object edtSignotaurLabel: TEdit
+              Left = 16
+              Top = 250
+              Width = 300
+              Height = 23
+              TabOrder = 4
+            end
+            object chkSignotaurAllowSelfSigned: TCheckBox
+              Left = 16
+              Top = 290
+              Width = 350
+              Height = 17
+              Caption = 'Allow self-signed TLS certificates (dev only)'
+              TabOrder = 5
+            end
+          end
+          object TabSheet4: TTabSheet
+            Caption = 'Azure Key Vault'
+            ImageIndex = 3
+            object lblVaultUrl: TLabel
+              Left = 16
+              Top = 16
+              Width = 50
+              Height = 15
+              Caption = 'Vault URL'
+            end
+            object lblCertName: TLabel
+              Left = 16
+              Top = 70
+              Width = 89
+              Height = 15
+              Caption = 'Certificate Name'
+            end
+            object lblKeyVersion: TLabel
+              Left = 16
+              Top = 124
+              Width = 60
+              Height = 15
+              Caption = 'Key Version'
+            end
+            object lblTenantId: TLabel
+              Left = 16
+              Top = 178
+              Width = 49
+              Height = 15
+              Caption = 'Tenant Id'
+            end
+            object lblClientId: TLabel
+              Left = 16
+              Top = 232
+              Width = 44
+              Height = 15
+              Caption = 'Client Id'
+            end
+            object lblClientSecret: TLabel
+              Left = 16
+              Top = 286
+              Width = 66
+              Height = 15
+              Caption = 'Client Secret'
+            end
+            object edtVaultUrl: TEdit
+              Left = 16
+              Top = 34
+              Width = 500
+              Height = 23
+              TabOrder = 0
+            end
+            object edtCertName: TEdit
+              Left = 16
+              Top = 88
+              Width = 300
+              Height = 23
+              TabOrder = 1
+            end
+            object edtKeyVersion: TEdit
+              Left = 16
+              Top = 142
+              Width = 300
+              Height = 23
+              TabOrder = 2
+            end
+            object edtTenantId: TEdit
+              Left = 16
+              Top = 196
+              Width = 400
+              Height = 23
+              TabOrder = 3
+            end
+            object edtClientId: TEdit
+              Left = 16
+              Top = 250
+              Width = 400
+              Height = 23
+              TabOrder = 4
+            end
+            object edtClientSecret: TEdit
+              Left = 16
+              Top = 304
+              Width = 300
+              Height = 23
+              PasswordChar = '*'
+              TabOrder = 5
+            end
+          end
+        end
+      end
+      object Panel4: TPanel
+        Left = 0
+        Top = 0
+        Width = 863
+        Height = 33
+        Align = alTop
+        BevelOuter = bvNone
+        ShowCaption = False
+        TabOrder = 1
+        object chkEnableSigning: TCheckBox
+          Left = 16
+          Top = 8
+          Width = 209
+          Height = 17
+          Caption = 'Enable Package Signing After Pack'
+          TabOrder = 0
+          OnClick = chkEnableSigningClick
+        end
+      end
+    end
     object tsGenerate: TTabSheet
       Caption = 'Pack'
       ImageIndex = 3
@@ -1121,6 +1507,17 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Height = 23
             TabOrder = 1
             OnExit = edtPackageOutputPathExit
+          end
+          object btnCancelPack: TButton
+            Left = 16
+            Top = 53
+            Width = 97
+            Height = 25
+            Caption = 'Cancel'
+            Enabled = False
+            Hint = 'Cancel the running pack/sign (Esc)'
+            TabOrder = 2
+            OnClick = btnCancelPackClick
           end
         end
         object Memo1: TMemo

@@ -32,10 +32,16 @@ uses
   System.RegularExpressions,
   System.Generics.Collections,
   Spring.Collections,
-  DosCommand,
+  Spring.Container,
+  VSoft.CancellationToken,
+  VSoft.Awaitable,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Spec.Interfaces,
+  DPM.Core.Packaging,
+  DPM.Core.Options.Sign,
+  DPM.Core.Crypto.X509.Interfaces,
+  DPM.Core.Package.Signing.Interfaces,
   DPM.Creator.TemplateTreeNode,
   DPM.Creator.Dspec.FileHandler,
   DPM.Creator.MRUService,
@@ -140,6 +146,8 @@ type
     tsLogging : TTabSheet;
     Memo2 : TMemo;
     VariablesList : TValueListEditor;
+    PackageVariablesList : TValueListEditor;
+    lblPackageVariables : TLabel;
     ActionList1 : TActionList;
     actDeleteTemplate : TAction;
     actDuplicateTemplate : TAction;
@@ -207,17 +215,70 @@ type
     Label14: TLabel;
     edtRepositoryCommit: TEdit;
     Label13: TLabel;
+    tsSigning: TTabSheet;
+    pnlProviders: TPanel;
+    Panel4: TPanel;
+    chkEnableSigning: TCheckBox;
+    cboSigningProvider: TComboBox;
+    Label8: TLabel;
+    PageControl1: TPageControl;
+    TabSheet1: TTabSheet;
+    TabSheet2: TTabSheet;
+    TabSheet3: TTabSheet;
+    TabSheet4: TTabSheet;
+    // Common signing fields (on pnlProviders)
+    lblTimestampUrl : TLabel;
+    edtTimestampUrl : TEdit;
+    lblDigest : TLabel;
+    cboDigest : TComboBox;
+    // Windows certificate store (TabSheet1)
+    lblCertThumbprint : TLabel;
+    edtCertThumbprint : TEdit;
+    lblStoreLocation : TLabel;
+    cboStoreLocation : TComboBox;
+    // PFX file (TabSheet2)
+    lblPfxFile : TLabel;
+    edtPfxFile : TEdit;
+    btnBrowsePfx : TButton;
+    lblPfxPassword : TLabel;
+    edtPfxPassword : TEdit;
+    // Signotaur (TabSheet3)
+    lblSignotaurEndpoint : TLabel;
+    edtSignotaurEndpoint : TEdit;
+    lblSignotaurApiKey : TLabel;
+    edtSignotaurApiKey : TEdit;
+    lblSignotaurThumbprint : TLabel;
+    edtSignotaurThumbprint : TEdit;
+    lblSignotaurSubject : TLabel;
+    edtSignotaurSubject : TEdit;
+    lblSignotaurLabel : TLabel;
+    edtSignotaurLabel : TEdit;
+    chkSignotaurAllowSelfSigned : TCheckBox;
+    // Azure Key Vault (TabSheet4)
+    lblVaultUrl : TLabel;
+    edtVaultUrl : TEdit;
+    lblCertName : TLabel;
+    edtCertName : TEdit;
+    lblKeyVersion : TLabel;
+    edtKeyVersion : TEdit;
+    lblTenantId : TLabel;
+    edtTenantId : TEdit;
+    lblClientId : TLabel;
+    edtClientId : TEdit;
+    lblClientSecret : TLabel;
+    edtClientSecret : TEdit;
+    btnCancelPack : TButton;
     procedure FormDestroy(Sender : TObject);
     procedure btnAddExcludeClick(Sender : TObject);
     procedure btnAddTemplateClick(Sender : TObject);
     procedure btnBuildPackagesClick(Sender : TObject);
+    procedure btnCancelPackClick(Sender : TObject);
+    procedure FormKeyDown(Sender : TObject; var Key : Word; Shift : TShiftState);
     procedure btnDeleteExcludeClick(Sender : TObject);
     procedure cboLicenseChange(Sender : TObject);
     procedure cboTemplateChange(Sender : TObject);
     procedure clbCompilersClick(Sender : TObject);
     procedure clbPlatformsClickCheck(Sender : TObject);
-    procedure DosCommandNewLine(ASender : TObject; const ANewLine : string; AOutputType : TOutputType);
-    procedure DosCommandTerminated(Sender : TObject);
     procedure edtAuthorChange(Sender : TObject);
     procedure edtBuildDefinesChange(Sender : TObject);
     procedure clbBuildPlatformsClickCheck(Sender : TObject);
@@ -253,6 +314,7 @@ type
     procedure tvTemplatesEdited(Sender : TObject; Node : TTreeNode; var S : string);
     procedure tvTemplatesEditing(Sender : TObject; Node : TTreeNode; var AllowEdit : Boolean);
     procedure VariablesListStringsChange(Sender : TObject);
+    procedure PackageVariablesListStringsChange(Sender : TObject);
     procedure actDuplicateTemplateExecute(Sender : TObject);
     procedure ActionList1Update(Action : TBasicAction; var Handled : Boolean);
     procedure actDeleteTemplateExecute(Sender : TObject);
@@ -287,17 +349,27 @@ type
     procedure clbCompilersKeyPress(Sender: TObject; var Key: Char);
     procedure edtReadmeChange(Sender: TObject);
     procedure edtRepositoryCommitChange(Sender: TObject);
+    procedure chkEnableSigningClick(Sender: TObject);
+    procedure cboSigningProviderChange(Sender : TObject);
+    procedure btnBrowsePfxClick(Sender : TObject);
   private
     { Private declarations }
     FtmpFilename : string;
     FOpenFile : TDSpecFile;
-    FDosCommand : TDosCommand;
     FTemplate : ISpecTemplate;
     FLogger : ILogger;
     FInVariableUpdate : Boolean;
     FLoadingCard : Boolean;
     FSPDXList : TStringList;
     FMRUMenu : TMRUMenu;
+    // In-process pack / sign
+    FContainer : TContainer;
+    FPackageWriter : IPackageWriter;
+    FSigningService : IPackageSigningService;
+    FX509 : IX509Service;
+    FPackLogger : ILogger;
+    FCancellationTokenSource : ICancellationTokenSource;
+    FPacking : Boolean;
   protected
     // IMRUSource
     procedure MRUAdd(const filename : string);
@@ -314,6 +386,18 @@ type
 
     procedure EnableControls(value : Boolean);
     procedure DeleteSelectedEntry;
+
+    // In-process pack / sign helpers
+    procedure InitCoreContainer;
+    procedure UpdateSigningProviderPage;
+    function BuildSignOptionsFromUI : TSignOptions;
+    procedure SignProducedPackages(const cancelToken : ICancellationToken; const outputFolder : string;
+                                   const sinceTime : TDateTime; const signOptions : TSignOptions);
+    procedure LoadSigningSettings;
+    procedure SaveSigningSettings;
+    // Secrets are kept in Windows Credential Manager, never in the ini file.
+    function ReadSecret(const target : string) : string;
+    procedure WriteSecret(const target : string; const secret : string);
 
     function FindTemplateNode(const template : ISpecTemplate) : TTemplateTreeNode;
     function FindHeadingNode(const templateNode : TTemplateTreeNode; nodeType : TNodeType) : TTemplateTreeNode;
@@ -363,6 +447,12 @@ uses
   Winapi.ShellAPI,
   DPM.Core.Constants,
   DPM.Core.dependency.Version,
+  DPM.Core.Init,
+  DPM.Core.Options.Pack,
+  DPM.Core.Crypto.Algorithms,
+  DPM.Core.Crypto.Provider.Interfaces,
+  DPM.Core.Crypto.Provider.Factory,
+  VSoft.Windows.CredentialManager,
   DPM.Creator.TemplateForm,
   DPM.Creator.FileForm,
   DPM.Creator.BuildForm,
@@ -375,6 +465,15 @@ uses
 const
   cToolName = 'DPM dspec Creator';
   cNewTemplate = 'Create New Template...';
+  // Windows Credential Manager target names for signing secrets.
+  cCredUserName = 'DPM';
+  cCredPfxPassword = 'DPM.DspecCreator.Signing.PfxPassword';
+  cCredSignotaurApiKey = 'DPM.DspecCreator.Signing.SignotaurApiKey';
+  cCredAzureClientSecret = 'DPM.DspecCreator.Signing.AzureClientSecret';
+  // Azure tenant/client ids are not secrets, but they identify the tenant and
+  // app registration, so we keep them out of the plaintext ini too.
+  cCredAzureTenantId = 'DPM.DspecCreator.Signing.AzureTenantId';
+  cCredAzureClientId = 'DPM.DspecCreator.Signing.AzureClientId';
 
 procedure TDSpecCreatorForm.btnDeleteExcludeClick(Sender : TObject);
 var
@@ -443,17 +542,145 @@ end;
 procedure TDSpecCreatorForm.btnBuildPackagesClick(Sender : TObject);
 var
   guid : TGUID;
+  packOptions : TPackOptions;
+  signOptions : TSignOptions;
+  outputFolder : string;
+  workingDir : string;
+  versionStr : string;
+  signingEnabled : boolean;
+  packStartTime : TDateTime;
+  cleanup : TProc;
 begin
+  if FPacking then
+    Exit;
+
+  // The packer resolves relative source/readme paths against the current
+  // directory (only '.\'-prefixed values use BasePath), so we must run from the
+  // dspec's folder. That only exists once the project has been saved.
+  if (FOpenFile.FileName = '') or (not FileExists(FOpenFile.FileName)) then
+  begin
+    MessageDlg('Please save the dspec before packing - relative paths in the spec are resolved ' +
+               'against the dspec''s folder.', mtWarning, [mbOK], 0);
+    Exit;
+  end;
+
+  if not DirectoryExists(edtPackageOutputPath.Text) then
+  begin
+    FPackLogger.Error('Output folder does not exist: ' + edtPackageOutputPath.Text);
+    Exit;
+  end;
+
+  // Write the in-memory dspec to a temp file the core spec reader can load.
   guid := TGUID.NewGuid;
-  FtmpFilename := FOpenFile.WorkingDir;
-  FtmpFilename := TPath.Combine(FtmpFilename, guid.ToString);
+  workingDir := FOpenFile.WorkingDir;
+  FtmpFilename := TPath.Combine(workingDir, guid.ToString);
   FtmpFilename := ChangeFileExt(FtmpFilename, cPackageSpecExt);
   TFile.WriteAllText(FtmpFilename, FOpenFile.AsString);
-  if DirectoryExists(edtPackageOutputPath.Text) then
+
+  outputFolder := edtPackageOutputPath.Text;
+  signingEnabled := chkEnableSigning.Checked;
+
+  packOptions := TPackOptions.Create;
+  packOptions.SpecFile := FtmpFilename;
+  packOptions.OutputFolder := outputFolder;
+  packOptions.BasePath := workingDir;
+  versionStr := Trim(edtVersion.Text);
+  if versionStr <> '' then
+    packOptions.Version := versionStr;
+
+  // Read the Signing tab on the UI thread; the worker only consumes the options.
+  if signingEnabled then
+    signOptions := BuildSignOptionsFromUI
+  else
+    signOptions := nil;
+
+  cleanup :=
+    procedure
+    begin
+      FPacking := false;
+      btnBuildPackages.Enabled := true;
+      btnCancelPack.Enabled := false;
+      packOptions.Free;
+      packOptions := nil;
+      signOptions.Free;
+      signOptions := nil;
+      if FtmpFilename <> '' then
+      begin
+        TFile.Delete(FtmpFilename);
+        FtmpFilename := '';
+      end;
+    end;
+
+  Memo1.Clear;
+  PageControl.ActivePage := tsGenerate;
+  FPacking := true;
+  btnBuildPackages.Enabled := false;
+  btnCancelPack.Enabled := true;
+  FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
+  packStartTime := Now;
+
+  TAsync.Configure<boolean>(
+    function(const cancelToken : ICancellationToken) : boolean
+    var
+      savedDir : string;
+    begin
+      // The packer resolves relative paths against the process current
+      // directory; point it at the dspec folder for the duration of the pack.
+      savedDir := GetCurrentDir;
+      SetCurrentDir(workingDir);
+      try
+        result := FPackageWriter.WritePackageFromSpec(cancelToken, packOptions);
+        if result and signingEnabled and (signOptions <> nil) then
+          SignProducedPackages(cancelToken, outputFolder, packStartTime, signOptions);
+      finally
+        SetCurrentDir(savedDir);
+      end;
+    end, FCancellationTokenSource.Token)
+  .OnException(
+    procedure(const e : Exception)
+    begin
+      FPackLogger.Error('Error creating package : ' + e.Message);
+      cleanup();
+    end)
+  .OnCancellation(
+    procedure
+    begin
+      FPackLogger.Warning('Pack cancelled.');
+      cleanup();
+    end)
+  .Await(
+    procedure(const ok : boolean)
+    begin
+      if ok then
+        FPackLogger.Success('Pack completed.')
+      else
+        FPackLogger.Error('Pack failed.');
+      cleanup();
+    end);
+end;
+
+procedure TDSpecCreatorForm.btnCancelPackClick(Sender : TObject);
+begin
+  // Invoked by the Cancel button and by Esc (via FormKeyDown). Ignore unless a
+  // pack is actually running, and only signal cancellation once.
+  if not FPacking then
+    Exit;
+  if (FCancellationTokenSource <> nil) and (not FCancellationTokenSource.Token.IsCancelled) then
   begin
-    FDosCommand.CurrentDir := FOpenFile.WorkingDir;
-    FDosCommand.CommandLine := 'dpm pack "' + FtmpFilename + '" -o=' + edtPackageOutputPath.Text;
-    FDosCommand.Execute;
+    FPackLogger.Information('Cancelling...');
+    btnCancelPack.Enabled := false;
+    FCancellationTokenSource.Cancel;
+  end;
+end;
+
+procedure TDSpecCreatorForm.FormKeyDown(Sender : TObject; var Key : Word; Shift : TShiftState);
+begin
+  // Esc cancels a running pack/sign from anywhere in the app. Only consume the
+  // key while packing so normal Esc behaviour is unaffected otherwise.
+  if (Key = VK_ESCAPE) and FPacking then
+  begin
+    btnCancelPackClick(nil);
+    Key := 0;
   end;
 end;
 
@@ -470,18 +697,6 @@ begin
     tvTemplates.Items.Delete(selectedNode);
     tvTemplates.Selected := parentNode;
   end;
-end;
-
-procedure TDSpecCreatorForm.DosCommandNewLine(ASender : TObject; const ANewLine : string; AOutputType : TOutputType);
-begin
-  if AOutputType = otEntireLine then
-    Memo1.Lines.Add(ANewLine);
-end;
-
-procedure TDSpecCreatorForm.DosCommandTerminated(Sender : TObject);
-begin
-  TFile.Delete(FtmpFilename);
-  FtmpFilename := '';
 end;
 
 procedure TDSpecCreatorForm.cboLicenseChange(Sender : TObject);
@@ -534,6 +749,258 @@ begin
 
   vPlatform.TemplateName := templateName;
   //cboTemplate.ItemIndex := cboTemplate.Items.IndexOf(templateName);
+end;
+
+procedure TDSpecCreatorForm.chkEnableSigningClick(Sender: TObject);
+begin
+  pnlProviders.Enabled := chkEnableSigning.Checked;
+end;
+
+procedure TDSpecCreatorForm.cboSigningProviderChange(Sender : TObject);
+begin
+  UpdateSigningProviderPage;
+end;
+
+procedure TDSpecCreatorForm.btnBrowsePfxClick(Sender : TObject);
+begin
+  if OpenDialog.Execute then
+    edtPfxFile.Text := OpenDialog.FileName;
+end;
+
+procedure TDSpecCreatorForm.InitCoreContainer;
+begin
+  FContainer := TContainer.Create;
+  // InitCore does not register an ILogger - register ours first so the pack and
+  // signing services log into the Pack tab memo.
+  FContainer.RegisterInstance<ILogger>(FPackLogger);
+  DPM.Core.Init.InitCore(FContainer);
+  FContainer.Build;
+  FPackageWriter := FContainer.Resolve<IPackageWriter>;
+  FSigningService := FContainer.Resolve<IPackageSigningService>;
+  FX509 := FContainer.Resolve<IX509Service>;
+end;
+
+procedure TDSpecCreatorForm.UpdateSigningProviderPage;
+begin
+  // The provider combo (not the raw tabs) drives which provider page is shown.
+  // Combo index maps 1:1 to PageControl1 page index.
+  if (cboSigningProvider.ItemIndex >= 0) and (cboSigningProvider.ItemIndex < PageControl1.PageCount) then
+    PageControl1.ActivePageIndex := cboSigningProvider.ItemIndex;
+end;
+
+function TDSpecCreatorForm.BuildSignOptionsFromUI : TSignOptions;
+begin
+  result := TSignOptions.Create;
+  result.TimestampUrl := Trim(edtTimestampUrl.Text);
+  if cboDigest.ItemIndex <= 0 then
+    result.Digest := ''                 // Auto - signing service picks from the cert key type.
+  else
+    result.Digest := cboDigest.Text;
+
+  case cboSigningProvider.ItemIndex of
+    0 : // Windows Certificate Store
+      begin
+        result.Provider := spLocal;
+        result.Thumbprint := Trim(edtCertThumbprint.Text);
+        result.StoreLocation := TSignStoreLocation(cboStoreLocation.ItemIndex);
+      end;
+    1 : // PFX file
+      begin
+        result.Provider := spLocal;
+        result.PfxFile := Trim(edtPfxFile.Text);
+        result.PfxPassword := edtPfxPassword.Text;     // literal - not trimmed, passwords may contain spaces
+      end;
+    2 : // Signotaur
+      begin
+        result.Provider := spSignotaur;
+        result.SignotaurEndpoint := Trim(edtSignotaurEndpoint.Text);
+        result.SignotaurApiKey := edtSignotaurApiKey.Text;   // literal secret
+        result.Thumbprint := Trim(edtSignotaurThumbprint.Text);
+        result.SignotaurSubject := Trim(edtSignotaurSubject.Text);
+        result.SignotaurLabel := Trim(edtSignotaurLabel.Text);
+        result.SignotaurAllowSelfSigned := chkSignotaurAllowSelfSigned.Checked;
+      end;
+    3 : // Azure Key Vault
+      begin
+        result.Provider := spKeyVault;
+        result.VaultUrl := Trim(edtVaultUrl.Text);
+        result.CertName := Trim(edtCertName.Text);
+        result.KeyVersion := Trim(edtKeyVersion.Text);
+        result.TenantId := Trim(edtTenantId.Text);
+        result.ClientId := Trim(edtClientId.Text);
+        result.ClientSecret := edtClientSecret.Text;   // literal secret
+      end;
+  end;
+end;
+
+procedure TDSpecCreatorForm.SignProducedPackages(const cancelToken : ICancellationToken; const outputFolder : string;
+                                                 const sinceTime : TDateTime; const signOptions : TSignOptions);
+var
+  provider : ISigningProvider;
+  signOpts : ISignOptions;
+  alg : THashAlgorithm;
+  files : TArray<string>;
+  f : string;
+  toSign : IList<string>;
+  okCount : integer;
+  failCount : integer;
+begin
+  if signOptions.Digest = '' then
+    alg := haUnknown
+  else if not TAlgorithmProfile.ParseHashName(signOptions.Digest, alg) then
+  begin
+    FPackLogger.Error('Unsupported digest "' + signOptions.Digest + '" (SHA256/SHA384/SHA512 only).');
+    Exit;
+  end;
+
+  provider := TSigningProviderFactory.CreateProvider(FPackLogger, FX509, signOptions);
+  if provider = nil then
+  begin
+    FPackLogger.Error('Signing skipped - the signing provider could not be created.');
+    Exit;
+  end;
+
+  // The pack pipeline returns only a boolean, so identify the produced files by
+  // collecting every .dpkg written since packing started.
+  toSign := TCollections.CreateList<string>;
+  files := TDirectory.GetFiles(outputFolder, '*.dpkg');
+  for f in files do
+    if TFile.GetLastWriteTime(f) >= sinceTime then
+      toSign.Add(f);
+
+  if toSign.Count = 0 then
+  begin
+    FPackLogger.Warning('No newly produced .dpkg files found to sign.');
+    Exit;
+  end;
+
+  signOpts.TimestampUrl := signOptions.TimestampUrl;
+  signOpts.DigestAlgorithm := alg;
+
+  FPackLogger.Information(Format('Signing %d package(s)...', [toSign.Count]));
+  okCount := 0;
+  failCount := 0;
+  // One session for the whole batch - smart-card / HSM providers prompt once.
+  provider.BeginSession;
+  try
+    for f in toSign do
+    begin
+      if cancelToken.IsCancelled then
+        Break;
+      try
+        FSigningService.SignPackage(f, provider, signOpts);
+        FPackLogger.Success('Signed ' + ExtractFileName(f));
+        Inc(okCount);
+      except
+        on e : Exception do
+        begin
+          Inc(failCount);
+          FPackLogger.Error('Sign failed for [' + ExtractFileName(f) + ']: ' + e.Message);
+        end;
+      end;
+    end;
+  finally
+    provider.EndSession;
+  end;
+
+  if failCount = 0 then
+    FPackLogger.Success(Format('Signed %d package(s) successfully.', [okCount]))
+  else
+    FPackLogger.Warning(Format('%d signed, %d failed.', [okCount, failCount]));
+end;
+
+procedure TDSpecCreatorForm.LoadSigningSettings;
+var
+  iniFile : TIniFile;
+begin
+  iniFile := TIniFile.Create(MRUListService.GetIniFilePath);
+  try
+    chkEnableSigning.Checked := iniFile.ReadBool('Signing', 'Enabled', false);
+    cboSigningProvider.ItemIndex := iniFile.ReadInteger('Signing', 'Provider', 0);
+    edtTimestampUrl.Text := iniFile.ReadString('Signing', 'TimestampUrl', 'http://timestamp.digicert.com');
+    cboDigest.ItemIndex := iniFile.ReadInteger('Signing', 'Digest', 0);
+    edtCertThumbprint.Text := iniFile.ReadString('Signing', 'CertThumbprint', '');
+    cboStoreLocation.ItemIndex := iniFile.ReadInteger('Signing', 'StoreLocation', 0);
+    edtPfxFile.Text := iniFile.ReadString('Signing', 'PfxFile', '');
+    edtSignotaurEndpoint.Text := iniFile.ReadString('Signing', 'SignotaurEndpoint', '');
+    edtSignotaurThumbprint.Text := iniFile.ReadString('Signing', 'SignotaurThumbprint', '');
+    edtSignotaurSubject.Text := iniFile.ReadString('Signing', 'SignotaurSubject', '');
+    edtSignotaurLabel.Text := iniFile.ReadString('Signing', 'SignotaurLabel', '');
+    chkSignotaurAllowSelfSigned.Checked := iniFile.ReadBool('Signing', 'SignotaurAllowSelfSigned', false);
+    edtVaultUrl.Text := iniFile.ReadString('Signing', 'VaultUrl', '');
+    edtCertName.Text := iniFile.ReadString('Signing', 'CertName', '');
+    edtKeyVersion.Text := iniFile.ReadString('Signing', 'KeyVersion', '');
+  finally
+    iniFile.Free;
+  end;
+
+  // Secrets and the sensitive Azure tenant/client identifiers live in Windows
+  // Credential Manager, not the ini.
+  edtPfxPassword.Text := ReadSecret(cCredPfxPassword);
+  edtSignotaurApiKey.Text := ReadSecret(cCredSignotaurApiKey);
+  edtClientSecret.Text := ReadSecret(cCredAzureClientSecret);
+  edtTenantId.Text := ReadSecret(cCredAzureTenantId);
+  edtClientId.Text := ReadSecret(cCredAzureClientId);
+end;
+
+procedure TDSpecCreatorForm.SaveSigningSettings;
+var
+  iniFile : TIniFile;
+begin
+  iniFile := TIniFile.Create(MRUListService.GetIniFilePath);
+  try
+    iniFile.WriteBool('Signing', 'Enabled', chkEnableSigning.Checked);
+    iniFile.WriteInteger('Signing', 'Provider', cboSigningProvider.ItemIndex);
+    iniFile.WriteString('Signing', 'TimestampUrl', edtTimestampUrl.Text);
+    iniFile.WriteInteger('Signing', 'Digest', cboDigest.ItemIndex);
+    iniFile.WriteString('Signing', 'CertThumbprint', edtCertThumbprint.Text);
+    iniFile.WriteInteger('Signing', 'StoreLocation', cboStoreLocation.ItemIndex);
+    iniFile.WriteString('Signing', 'PfxFile', edtPfxFile.Text);
+    iniFile.WriteString('Signing', 'SignotaurEndpoint', edtSignotaurEndpoint.Text);
+    iniFile.WriteString('Signing', 'SignotaurThumbprint', edtSignotaurThumbprint.Text);
+    iniFile.WriteString('Signing', 'SignotaurSubject', edtSignotaurSubject.Text);
+    iniFile.WriteString('Signing', 'SignotaurLabel', edtSignotaurLabel.Text);
+    iniFile.WriteBool('Signing', 'SignotaurAllowSelfSigned', chkSignotaurAllowSelfSigned.Checked);
+    iniFile.WriteString('Signing', 'VaultUrl', edtVaultUrl.Text);
+    iniFile.WriteString('Signing', 'CertName', edtCertName.Text);
+    iniFile.WriteString('Signing', 'KeyVersion', edtKeyVersion.Text);
+  finally
+    iniFile.Free;
+  end;
+
+  // Secrets and the sensitive Azure tenant/client identifiers go to Windows
+  // Credential Manager, never the ini.
+  WriteSecret(cCredPfxPassword, edtPfxPassword.Text);
+  WriteSecret(cCredSignotaurApiKey, edtSignotaurApiKey.Text);
+  WriteSecret(cCredAzureClientSecret, edtClientSecret.Text);
+  WriteSecret(cCredAzureTenantId, edtTenantId.Text);
+  WriteSecret(cCredAzureClientId, edtClientId.Text);
+end;
+
+function TDSpecCreatorForm.ReadSecret(const target : string) : string;
+var
+  cred : ICredential;
+begin
+  result := '';
+  cred := TCredentialManager.ReadCredential(target);
+  if cred <> nil then
+    result := cred.Secret;
+end;
+
+procedure TDSpecCreatorForm.WriteSecret(const target : string; const secret : string);
+begin
+  if secret = '' then
+  begin
+    // Nothing to store - remove any previously saved value. DeleteCredential
+    // raises if the target does not exist, so swallow that case.
+    try
+      TCredentialManager.DeleteCredential(target);
+    except
+      on EOSError do; // not found - nothing to delete
+    end;
+  end
+  else
+    TCredentialManager.WriteCredential(target, cCredUserName, secret, TCredentialPersistence.LocalMachine);
 end;
 
 procedure TDSpecCreatorForm.clbCompilersClick(Sender : TObject);
@@ -1556,9 +2023,10 @@ begin
   FLogger := TDSpecLogger.Create(Memo2.Lines);
   FOpenFile := TDSpecFile.Create(FLogger);
   FOpenFile.PackageSpec.newTemplate('default');
-  FDosCommand := TDosCommand.Create(nil);
-  FDosCommand.OnNewLine := DosCommandNewLine;
-  FDosCommand.OnTerminated := DosCommandTerminated;
+  // Pack / sign run in-process via the DPM core; output goes to the Pack tab memo.
+  FPackLogger := TDSpecQueuedLogger.Create(Memo1.Lines);
+  InitCoreContainer;
+  FPacking := false;
   FSPDXList := TStringList.Create;
   LoadSPDXList;
   LoadDspecStructure;
@@ -1585,18 +2053,30 @@ begin
   iniFile := TIniFile.Create(MRUListService.GetIniFilePath);
   try
     edtPackageOutputPath.Text := iniFile.ReadString('Paths', 'PackageOutput', '');
-
   finally
     iniFile.Free;
   end;
 
+  // Signing tab: hide the raw page tabs (the provider combo drives the page) and
+  // restore saved settings.
+  TabSheet1.TabVisible := false;
+  TabSheet2.TabVisible := false;
+  TabSheet3.TabVisible := false;
+  TabSheet4.TabVisible := false;
+  LoadSigningSettings;
+  pnlProviders.Enabled := chkEnableSigning.Checked;
+  UpdateSigningProviderPage;
 end;
 
 procedure TDSpecCreatorForm.FormDestroy(Sender : TObject);
 begin
+  SaveSigningSettings;
   MRUListService.SetSource(nil);
+  if FCancellationTokenSource <> nil then
+    FCancellationTokenSource.Cancel;
   FSPDXList.Free;
-  FreeAndNil(FDosCommand);
+  // Interfaces (FPackageWriter etc.) release with the container.
+  FreeAndNil(FContainer);
 end;
 
 procedure TDSpecCreatorForm.lblSPDXClick(Sender : TObject);
@@ -1609,6 +2089,7 @@ var
   i : integer;
   j : integer;
   compilerVersion : TCompilerVersion;
+  pair : TPair<string,string>;
 begin
   edtId.Text := FOpenFile.PackageSpec.metadata.id;
   edtVersion.Text := FOpenFile.PackageSpec.metadata.Version.ToString;
@@ -1627,6 +2108,16 @@ begin
   if Length(FOpenFile.PackageSpec.metadata.Icon) > 0 then
   begin
     ImgIcon.Picture.LoadFromFile(TPath.Combine(FOpenFile.WorkingDir, FOpenFile.PackageSpec.metadata.Icon));
+  end;
+
+  //package-level (global) variables - shared across all compilers, overridden by per-platform vars.
+  FInVariableUpdate := true;
+  try
+    PackageVariablesList.Strings.Clear;
+    for pair in FOpenFile.PackageSpec.Variables do
+      PackageVariablesList.Strings.Add(pair.Key + '=' + pair.Value);
+  finally
+    FInVariableUpdate := false;
   end;
 
   cboTemplate.Text := '';
@@ -2081,6 +2572,22 @@ begin
       if key <> '' then
         vPlatform.Variables[key] := VariablesList.Strings.ValueFromIndex[i];
     end;
+  end;
+end;
+
+procedure TDSpecCreatorForm.PackageVariablesListStringsChange(Sender : TObject);
+var
+  i : integer;
+  key : string;
+begin
+  if FInVariableUpdate then
+    Exit;
+  FOpenFile.PackageSpec.Variables.Clear;
+  for i := 0 to PackageVariablesList.Strings.Count - 1 do
+  begin
+    key := PackageVariablesList.Strings.Names[i];
+    if key <> '' then
+      FOpenFile.PackageSpec.Variables[LowerCase(key)] := PackageVariablesList.Strings.ValueFromIndex[i];
   end;
 end;
 

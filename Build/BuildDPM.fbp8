@@ -521,7 +521,6 @@ begin
       action.group
       begin
         description = DSpecCreator
-        enabled = false
         id = {6107D82E-ADC3-4635-AE9C-F06739F2ACC4}
         variable
         begin
@@ -617,7 +616,7 @@ begin
           terminateontimeout = true
           timeoutlength = 2
           as.projectpath = %SRC_ROOT%\\DSpecCreator\\DspecCreator.dproj
-          as.compilerversion = 12.0
+          as.compilerversion = 13.0
           as.verbosity = Debug
           as.nobanner = True
         end
@@ -634,9 +633,9 @@ begin
           compileprojectresources = true
           compileridl = true
           configname = Release
-          customvclstyles = C:\\Users\\Public\\Documents\\Embarcadero\\Studio\\22.0\\Styles\\Windows10.vsf
+          customvclstyles = C:\\Users\\Public\\Documents\\Embarcadero\\Studio\\37.0\\Styles\\Windows11_MineShaft.vsf
           debugversionnumbers = false
-          delphiversion = Delphi12
+          delphiversion = Delphi13
           enabletimeout = false
           eurekalogverboselogging = false
           frameworktype = VCL
@@ -706,7 +705,7 @@ begin
                                ""
             conditionals = RELEASE;CREATOR
             consoleapp = false
-            customvclstyles = C:\\Users\\Public\\Documents\\Embarcadero\\Studio\\22.0\\Styles\\Windows10.vsf
+            customvclstyles = C:\\Users\\Public\\Documents\\Embarcadero\\Studio\\37.0\\Styles\\Windows11_MineShaft.vsf
             debuginfo = false
             definitionsonly = false
             emitruntimetypeinformation = false

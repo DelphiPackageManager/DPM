@@ -1,0 +1,39 @@
+metadata:
+  id: Test.CompilerRange
+  version: 0.5.0
+  description: Compiler from/to range with package and per-platform variables
+  authors:
+    - Vincent Parrett
+    - Contributors
+  license: Apache-2.0
+variables:
+  packagesource: RAD Studio $compilernoprefix$
+  company: VSoft
+targetPlatforms:
+  - compiler from: XE2
+    compiler to: 11.0
+    platforms: [Win32, Win64]
+    template: default
+    variables:
+      extradefines: LEGACY
+  - compiler from: 12.0
+    compiler to: 13.0
+    platforms: [Win32, Win64, Linux64]
+    template: default
+    variables:
+      extradefines: MODERN
+templates:
+  - name: default
+    dependencies:
+      - id: VSoft.SemanticVersion
+        version: "[1.0.0,2.0.0]"
+    source:
+      - src: .\source\**.pas
+        dest: src
+        exclude:
+          - "*.dcu"
+          - Test*.pas
+    build:
+      - project: .\packages\$packagesource$\Pkg.dproj
+        platforms: [Win32, Win64]
+        defines: RELEASE;DPM

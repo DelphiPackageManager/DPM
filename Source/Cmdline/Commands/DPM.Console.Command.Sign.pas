@@ -63,12 +63,9 @@ implementation
 
 uses
   System.SysUtils,
-  System.Classes,
   System.IOUtils,
   DPM.Core.Crypto.Algorithms,
-  DPM.Core.Crypto.Provider,
-  DPM.Core.Crypto.Provider.Azure,
-  DPM.Core.Crypto.Provider.Signotaur,
+  DPM.Core.Crypto.Provider.Factory,
   DPM.Core.Options.Common,
   DPM.Core.Options.Sign,
   DPM.Core.Utils.Directory;
@@ -84,92 +81,8 @@ begin
 end;
 
 function TSignCommand.AcquireProvider : ISigningProvider;
-var
-  options : TSignOptions;
-  store : ICertificateStore;
-  pfxBytes : TBytes;
-  password : string;
-  cert : ICertificate;
-  kvOpts : TKeyVaultOptions;
-  signotaurOpts : TSignotaurOptions;
-  tokenSvc : IAzureAccessTokenService;
 begin
-  options := TSignOptions.Default;
-  result := nil;
-
-  case options.Provider of
-    spKeyVault :
-      begin
-        kvOpts.VaultUrl := options.VaultUrl;
-        kvOpts.CertificateName := options.CertName;
-        kvOpts.KeyVersion := options.KeyVersion;
-        kvOpts.TenantId := options.TenantId;
-        kvOpts.ClientId := options.ClientId;
-        kvOpts.ClientSecret := GetEnvironmentVariable(options.ClientSecretEnv);
-        if kvOpts.ClientSecret = '' then
-        begin
-          Logger.Error('Environment variable ' + options.ClientSecretEnv + ' is not set or empty.');
-          exit;
-        end;
-        tokenSvc := TAzureAccessTokenService.Create(Logger);
-        result := TKeyVaultSigningProvider.Create(Logger, FX509, tokenSvc, kvOpts);
-      end;
-    spSignotaur :
-      begin
-        signotaurOpts.Endpoint := options.SignotaurEndpoint;
-        // --api-key (literal) wins over --api-key-env when both are supplied,
-        // since the user explicitly provided one. Validate() guarantees at
-        // least one was supplied.
-        if options.SignotaurApiKey <> '' then
-          signotaurOpts.ApiKey := options.SignotaurApiKey
-        else
-        begin
-          signotaurOpts.ApiKey := GetEnvironmentVariable(options.SignotaurApiKeyEnv);
-          if signotaurOpts.ApiKey = '' then
-          begin
-            Logger.Error('Environment variable ' + options.SignotaurApiKeyEnv + ' is not set or empty.');
-            exit;
-          end;
-        end;
-        signotaurOpts.Thumbprint := options.Thumbprint;
-        signotaurOpts.Subject := options.SignotaurSubject;
-        signotaurOpts.Label_ := options.SignotaurLabel;
-        signotaurOpts.AllowSelfSignedCertificates := options.SignotaurAllowSelfSigned;
-        // Audit metadata (FileName, FileSize) is pushed in per-file by the
-        // signing service via ISigningProvider.SetSigningContext, so each
-        // file in a batch sign gets its own audit record server-side.
-        result := TSignotaurSigningProvider.Create(Logger, FX509, signotaurOpts);
-      end;
-  else
-    // spLocal — original cert-store + PFX path.
-    if options.Thumbprint <> '' then
-    begin
-      store := FX509.OpenSystemStore(TCertStoreLocation(Ord(options.StoreLocation)), 'MY');
-      cert := store.FindByThumbprint(options.Thumbprint);
-      if cert = nil then
-      begin
-        Logger.Error('Certificate with thumbprint ' + options.Thumbprint + ' not found in store.');
-        exit;
-      end;
-      result := TCertStoreSigningProvider.Create(cert);
-    end
-    else
-    begin
-      pfxBytes := TFile.ReadAllBytes(options.PfxFile);
-      if options.PfxPasswordEnvVar <> '' then
-        password := GetEnvironmentVariable(options.PfxPasswordEnvVar)
-      else
-        password := '';
-      store := FX509.OpenPfxStore(pfxBytes, password);
-      cert := store.FindByThumbprint('');
-      if cert = nil then
-      begin
-        Logger.Error('No certificate found in PFX file.');
-        exit;
-      end;
-      result := TPfxSigningProvider.Create(cert);
-    end;
-  end;
+  result := TSigningProviderFactory.CreateProvider(Logger, FX509, TSignOptions.Default);
 end;
 
 function TSignCommand.ExpandTargets(const target : string;
