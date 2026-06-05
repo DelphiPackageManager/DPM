@@ -38,6 +38,12 @@ const
 
   //fixed filename for the package dspec inside the .dpkg so we can easily extract it
   cPackageDspecFile = 'package' + cPackageSpecExt;
+
+  //marks a git registry package that was cloned + built in place in the cache. Such
+  //packages are unsigned source (no .dpkg / manifest / receipt) by design, so the
+  //cache identifies them by this marker and skips the signing verification gate.
+  //Also holds the git commit the clone was built from (for HEAD tracking of untagged repos).
+  cGitPackageMarkerFile = '.dpm-git-commit';
   cIconFileSVG = 'icon.svg';
   cIconFilePNG = 'icon.png';
 
@@ -47,6 +53,13 @@ const
   cDefaultConfigFile = cDefaultDPMFolder + '\' + cDPMConfigFileName;
   cDefaultPackageCache = cDefaultDPMFolder + '\package_cache';
   cDPMPackageCacheEnviromentVar = 'DPMPACKAGECACHE';
+
+  //local mirror folder for git-URL package registries (folder registries are read in place)
+  cDefaultRegistriesFolder = cDefaultDPMFolder + '\registries';
+
+  //default minutes between auto-pulls of a git-URL registry mirror. 0 = always pull,
+  //negative = never auto-pull (explicit `dpm sources refresh` only).
+  cDefaultRegistryRefreshMinutes = 60;
 
   cTargetPlatformAttribute = 'targetPlatform';
   cUnset = '--unset--';

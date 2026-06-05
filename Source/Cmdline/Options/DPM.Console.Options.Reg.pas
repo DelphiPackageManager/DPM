@@ -929,8 +929,8 @@ var
 begin
   cmd := TOptionsRegistry.RegisterCommand('sources', '', 'Provides the ability to manage list of sources located in %AppData%\DPM\DPM.config',
                                                       '',
-                                                      'sources <List|Add|Remove|Enable|Disable|Update> -Name [name] -Source [source] -type <Folder|DMPServer|GitHubDPM|GitHubDN>');
-  option := cmd.RegisterUnNamedOption<TSourcesSubCommand>('<List|Add|Remove|Enable|Disable|Update>','operation',
+                                                      'sources <List|Add|Remove|Enable|Disable|Update|Refresh> -Name [name] -Source [source] -type <Folder|GitRegistry|DPMServer>');
+  option := cmd.RegisterUnNamedOption<TSourcesSubCommand>('<List|Add|Remove|Enable|Disable|Update|Refresh>','operation',
     procedure(const value : TSourcesSubCommand)
     begin
       TSourcesOptions.Default.Command := value;

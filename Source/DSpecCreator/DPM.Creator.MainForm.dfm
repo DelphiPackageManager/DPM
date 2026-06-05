@@ -1675,6 +1675,9 @@ object DSpecCreatorForm: TDSpecCreatorForm
       object miNew: TMenuItem
         Action = actFileNew
       end
+      object miPackageWizard: TMenuItem
+        Action = actFilePackageWizard
+      end
       object miOpen: TMenuItem
         Action = actFileOpen
       end
@@ -2055,6 +2058,11 @@ object DSpecCreatorForm: TDSpecCreatorForm
       Caption = '&New'
       ShortCut = 16462
       OnExecute = actFileNewExecute
+    end
+    object actFilePackageWizard: TAction
+      Category = 'File'
+      Caption = 'Package &Wizard...'
+      OnExecute = actFilePackageWizardExecute
     end
     object actDeleteBuildItem: TAction
       Category = 'Build'

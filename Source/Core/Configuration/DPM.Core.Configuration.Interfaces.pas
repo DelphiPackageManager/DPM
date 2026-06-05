@@ -133,6 +133,9 @@ type
     function GetAuthor : string;
     procedure SetAuthor(const value : string);
 
+    function GetRegistryRefreshIntervalMinutes : integer;
+    procedure SetRegistryRefreshIntervalMinutes(const value : integer);
+
     function GetSigning : ISigningConfig;
 
     property FileName : string read GetFileName write SetFileName;
@@ -144,6 +147,10 @@ type
 
     //cached default author used by the spec scaffolder - optional
     property Author : string read GetAuthor write SetAuthor;
+
+    //how often (minutes) a git-URL registry mirror is auto-pulled. 0 = always pull;
+    //negative = never auto-pull (explicit `dpm sources refresh` only). Default 60.
+    property RegistryRefreshIntervalMinutes : integer read GetRegistryRefreshIntervalMinutes write SetRegistryRefreshIntervalMinutes;
 
     // Signing policy block (Phase 1+). Always non-nil; freshly created
     // configs have default values per the architecture doc.

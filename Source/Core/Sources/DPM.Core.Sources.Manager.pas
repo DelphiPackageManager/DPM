@@ -1,8 +1,8 @@
-{***************************************************************************}
+ï»¿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -55,6 +55,7 @@ implementation
 
 uses
   System.SysUtils,
+  DPM.Core.Types,
   DPM.Core.Utils.System,
   DPM.Core.Sources.Types,
   DPM.Core.Constants,
@@ -103,6 +104,7 @@ begin
   source.Source := options.Source;
   source.UserName := options.UserName;
   source.Password := options.Password;
+  source.SourceType := options.SourceType;
   source.IsEnabled := true;
   config.Sources.Add(source);
   result := FConfigManager.SaveConfig(config);
@@ -212,6 +214,17 @@ var
       result := 'D';
   end;
 
+  function SourceTypeToString(const sourceType : TSourceType) : string;
+  begin
+    case sourceType of
+      TSourceType.Folder : result := 'Folder';
+      TSourceType.GitRegistry : result := 'Git Registry';
+      TSourceType.DPMServer : result := 'DPM Server';
+    else
+      result := 'Unknown';
+    end;
+  end;
+
 begin
   result := false;
   if options.ConfigFile = '' then
@@ -234,7 +247,7 @@ begin
     FLogger.Information('', false);
     for i := 0 to config.Sources.Count - 1 do
     begin
-      FLogger.Information(Format('  %d.  %s  [%s]', [i + 1, config.Sources[i].Name, EnabledToString(config.Sources[i].IsEnabled)]));
+      FLogger.Information(Format('  %d.  %s  [%s]  (%s)', [i + 1, config.Sources[i].Name, EnabledToString(config.Sources[i].IsEnabled), SourceTypeToString(config.Sources[i].SourceType)]));
       FLogger.Information(Format('      %s', [config.Sources[i].Source]), false);
     end;
   end;

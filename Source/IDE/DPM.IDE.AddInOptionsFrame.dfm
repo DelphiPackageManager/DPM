@@ -133,20 +133,6 @@ object DPMOptionsFrame: TDPMOptionsFrame
           Height = 13
           Caption = 'Source Path or Uri :'
         end
-        object Label5: TLabel
-          Left = 24
-          Top = 97
-          Width = 92
-          Height = 13
-          Caption = 'Source UserName :'
-        end
-        object Label6: TLabel
-          Left = 24
-          Top = 145
-          Width = 158
-          Height = 13
-          Caption = 'Source Password/Access Token :'
-        end
         object Label8: TLabel
           Left = 481
           Top = 6
@@ -173,23 +159,6 @@ object DPMOptionsFrame: TDPMOptionsFrame
           OnChange = txtUriChange
           OnRightButtonClick = txtUriRightButtonClick
         end
-        object txtUserName: TEdit
-          Left = 24
-          Top = 113
-          Width = 409
-          Height = 21
-          TabOrder = 2
-          OnChange = txtUserNameChange
-        end
-        object txtPassword: TEdit
-          Left = 24
-          Top = 161
-          Width = 409
-          Height = 21
-          PasswordChar = '*'
-          TabOrder = 3
-          OnChange = txtPasswordChange
-        end
         object cboSourceType: TComboBox
           Left = 480
           Top = 22
@@ -197,14 +166,13 @@ object DPMOptionsFrame: TDPMOptionsFrame
           Height = 21
           Style = csDropDownList
           ItemIndex = 0
-          TabOrder = 4
+          TabOrder = 2
           Text = 'Folder'
           OnChange = cboSourceTypeChange
           Items.Strings = (
             'Folder'
             'DPMServer'
-            'DPMGithub'
-            'DNGithub')
+            'GitRegistry')
         end
       end
       object Panel3: TPanel
@@ -238,11 +206,6 @@ object DPMOptionsFrame: TDPMOptionsFrame
               Caption = 'Type'
               MinWidth = 100
               Width = 100
-            end
-            item
-              AutoSize = True
-              Caption = 'UserName'
-              MinWidth = 100
             end>
           ColumnClick = False
           RowSelect = True

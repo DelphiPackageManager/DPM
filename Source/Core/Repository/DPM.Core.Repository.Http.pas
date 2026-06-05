@@ -668,7 +668,8 @@ begin
 
   if response.StatusCode = 404 then
   begin
-    Logger.Error('Package ' + packageId.ToString + ' not found on server');
+    //not an error!
+    Logger.Information('Package ' + packageId.ToString + ' not found on server');
     exit;
   end;
 

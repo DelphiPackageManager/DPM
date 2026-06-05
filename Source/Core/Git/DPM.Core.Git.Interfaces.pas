@@ -24,33 +24,42 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.Core.Sources.Types;
+unit DPM.Core.Git.Interfaces;
 
 interface
 
-{$SCOPEDENUMS ON}
+uses
+  VSoft.CancellationToken,
+  Spring.Collections;
 
 type
-  TSourcesSubCommand = (Invalid, List, Add, Remove, Enable, Disable, Update, Refresh);
+  //A thin wrapper around the git command line, used by the git registry
+  //repository to discover versions (tags) and fetch package source. Lives in
+  //Core (no VCL) - shells out to git.exe via DPM.Core.Utils.Process.
+  IGitClient = interface
+  ['{D7F3A2B1-4C5E-4A6F-9B8C-1E2D3F4A5B6C}']
+    //returns true if a usable git executable is on the PATH.
+    function IsGitAvailable(const cancellationToken : ICancellationToken) : boolean;
 
-  TSourcesFormat = (Invalid, Detailed, Short);
+    //git ls-remote --tags <url>. Returns a map of tagName -> commit sha. For
+    //annotated tags the peeled (^{}) commit is returned; for lightweight tags
+    //the tag's own sha (which is the commit) is returned.
+    function LsRemoteTags(const cancellationToken : ICancellationToken; const url : string; out tags : IDictionary<string, string>) : boolean;
 
-//true if source looks like a git url (as opposed to a local folder or http dpm server).
-function IsGitRegistryUri(const source : string) : boolean;
+    //git ls-remote <url> <ref>. Returns the commit sha the ref resolves to.
+    //When ref is empty, HEAD (the default branch tip) is used.
+    function LsRemoteHead(const cancellationToken : ICancellationToken; const url : string; const ref : string; out commit : string) : boolean;
+
+    //git clone <url> <targetDir> (full clone so any commit can be checked out).
+    function Clone(const cancellationToken : ICancellationToken; const url : string; const targetDir : string) : boolean;
+
+    //git pull --ff-only in repoDir (used to refresh a cloned registry mirror).
+    function Pull(const cancellationToken : ICancellationToken; const repoDir : string) : boolean;
+
+    //git checkout <commitOrRef> in repoDir.
+    function Checkout(const cancellationToken : ICancellationToken; const repoDir : string; const commitOrRef : string) : boolean;
+  end;
 
 implementation
 
-uses
-  System.SysUtils,
-  System.StrUtils;
-
-function IsGitRegistryUri(const source : string) : boolean;
-begin
-  result := StartsText('git://', source) or
-            StartsText('ssh://', source) or
-            StartsText('git@', source) or
-            EndsText('.git', source);
-end;
-
 end.
-

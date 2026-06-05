@@ -363,47 +363,31 @@ begin
     end;
     TDPMPackageKind.git:
     begin
+      //For git registry packages the available versions normally come from the
+      //package repo's git tags, so a [versions] array is optional here. When it is
+      //present (legacy / explicit pinning) we still load it; [commit] is optional
+      //since the matching git tag supplies the commit.
       versionsSeq := yamlObject.A['versions'];
-      if versionsSeq.Count > 0 then
+      for i := 0 to versionsSeq.Count -1 do
       begin
-        for i := 0 to versionsSeq.Count -1 do
+        versionObj := versionsSeq.Items[i].AsMapping;
+        sVersion := versionObj.S['version'];
+        if sVersion = '' then
         begin
-          versionObj := versionsSeq.Items[i].AsMapping;
-          sVersion := versionObj.S['version'];
-          if sVersion = '' then
-          begin
-            logger.Error('Required field [version] not found.');
-            result := false;
-            continue;
-          end;
-          if not TPackageVersion.TryParseWithError(sVersion, version, sError) then
-          begin
-            logger.Error('Invalid Package Version : ' + sError);
-            result := false;
-            continue;
-          end;
-          sCommit := versionObj.S['commit'];
-          if sCommit = '' then
-          begin
-            logger.Error('Required field [commit] not found.');
-            result := false;
-            continue;
-          end;
-          EnsureVersions;
-          specVersion := TSpecVersion.Create(version, sCommit);
-          FVersions.Add(specVersion);
-        end;
-
-        if (FVersions = nil) or (FVersions.Count = 0) then
-        begin
-          logger.Error('At least 1 version is required.');
+          logger.Error('Required field [version] not found.');
           result := false;
+          continue;
         end;
-      end
-      else
-      begin
-        logger.Error('Required field [versions] for git package kind not found.');
-        result := false;
+        if not TPackageVersion.TryParseWithError(sVersion, version, sError) then
+        begin
+          logger.Error('Invalid Package Version : ' + sError);
+          result := false;
+          continue;
+        end;
+        sCommit := versionObj.S['commit'];
+        EnsureVersions;
+        specVersion := TSpecVersion.Create(version, sCommit);
+        FVersions.Add(specVersion);
       end;
     end;
   end;

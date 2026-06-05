@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -70,10 +70,6 @@ type
     btnRemove: TSpeedButton;
     btnUp: TSpeedButton;
     btnDown: TSpeedButton;
-    Label5 : TLabel;
-    Label6 : TLabel;
-    txtUserName : TEdit;
-    txtPassword : TEdit;
     FolderSelectDialog : TFileOpenDialog;
     cboSourceType : TComboBox;
     Label8 : TLabel;
@@ -101,8 +97,6 @@ type
     procedure dpmOptionsActionListUpdate(Action : TBasicAction; var Handled : Boolean);
     procedure actMoveSourceUpExecute(Sender : TObject);
     procedure actMoveSourceDownExecute(Sender : TObject);
-    procedure txtUserNameChange(Sender : TObject);
-    procedure txtPasswordChange(Sender : TObject);
     procedure txtPackageCacheLocationRightButtonClick(Sender : TObject);
     procedure txtUriRightButtonClick(Sender : TObject);
     procedure cboSourceTypeChange(Sender : TObject);
@@ -167,8 +161,6 @@ begin
   newItem.Checked := true;
   newItem.SubItems.Add(''); //uri
   newItem.SubItems.Add(cboSourceType.Items[cboSourceType.ItemIndex]);
-  newItem.SubItems.Add(''); //username
-  newItem.SubItems.Add(''); //password
   lvSources.ItemIndex := newItem.Index;
   lblPackageSources.Caption := cPackageSources;
 end;
@@ -297,8 +289,6 @@ begin
       item.Checked := sourceConfig.IsEnabled;
       item.SubItems.Add(sourceConfig.Source);
       item.SubItems.Add(TEnumUtils.EnumToString<TSourceType>(sourceConfig.SourceType));
-      item.SubItems.Add(sourceConfig.UserName);
-      item.SubItems.Add(sourceConfig.Password);
     end;
   end
   else
@@ -326,17 +316,6 @@ begin
 
     if item.SubItems.Count > 1 then
       cboSourceType.ItemIndex := cboSourceType.Items.IndexOf(item.SubItems[1]);
-
-    if item.SubItems.Count > 2 then
-      txtUserName.Text := item.SubItems[2]
-    else
-      txtUserName.Text := '';
-
-    if item.SubItems.Count > 3 then
-      txtPassword.Text := item.SubItems[3]
-    else
-      txtPassword.Text := '';
-
   end;
 end;
 
@@ -359,10 +338,6 @@ begin
       sourceConfig.Source := item.SubItems[0];
     if item.SubItems.Count > 1 then
       sourceConfig.SourceType := TEnumUtils.StringToEnum<TSourceType>(item.SubItems[1]);
-    if item.SubItems.Count > 2 then
-      sourceConfig.UserName := item.SubItems[2];
-    if item.SubItems.Count > 3 then
-      sourceConfig.Password := item.SubItems[3];
     FConfiguration.Sources.Add(sourceConfig);
   end;
 
@@ -406,14 +381,6 @@ begin
 
 end;
 
-procedure TDPMOptionsFrame.txtPasswordChange(Sender : TObject);
-var
-  item : TListItem;
-begin
-  item := lvSources.Selected;
-  if item <> nil then
-    item.SubItems[3] := txtPassword.Text;
-end;
 
 procedure TDPMOptionsFrame.txtUriChange(Sender : TObject);
 var
@@ -433,14 +400,6 @@ begin
 
 end;
 
-procedure TDPMOptionsFrame.txtUserNameChange(Sender : TObject);
-var
-  item : TListItem;
-begin
-  item := lvSources.Selected;
-  if item <> nil then
-    item.SubItems[2] := txtUserName.Text;
-end;
 
 function TDPMOptionsFrame.Validate : boolean;
 var
@@ -490,16 +449,21 @@ begin
         end;
 
         uriList.Add(sUri + '=' + sourceType);
-        try
-          uri := TUriFactory.Parse(sUri);
-          //          if not (uri.IsFile or uri.IsUnc) then
-          //          begin
-          //            sErrorMessage := sErrorMessage + 'only folder uri type is supported at the moment' + #13#10;
-          //          end;
-        except
-          on e : Exception do
-          begin
-            sErrorMessage := sErrorMessage + 'Invalid Uri for Source  [' + sName + '] : ' + e.Message + #13#10;
+        //git registry sources can be a git url (including git@/ssh forms) or a local
+        //folder, so the strict uri parse below does not apply to them.
+        if not SameText(sourceType, TEnumUtils.EnumToString<TSourceType>(TSourceType.GitRegistry)) then
+        begin
+          try
+            uri := TUriFactory.Parse(sUri);
+            //          if not (uri.IsFile or uri.IsUnc) then
+            //          begin
+            //            sErrorMessage := sErrorMessage + 'only folder uri type is supported at the moment' + #13#10;
+            //          end;
+          except
+            on e : Exception do
+            begin
+              sErrorMessage := sErrorMessage + 'Invalid Uri for Source  [' + sName + '] : ' + e.Message + #13#10;
+            end;
           end;
         end;
       end;

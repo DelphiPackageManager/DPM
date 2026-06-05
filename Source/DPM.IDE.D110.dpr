@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -102,6 +102,11 @@ uses
   DPM.Core.Repository.Http in 'Core\Repository\DPM.Core.Repository.Http.pas',
   DPM.Core.Repository.Interfaces in 'Core\Repository\DPM.Core.Repository.Interfaces.pas',
   DPM.Core.Repository.Manager in 'Core\Repository\DPM.Core.Repository.Manager.pas',
+  DPM.Core.Git.Interfaces in 'Core\Git\DPM.Core.Git.Interfaces.pas',
+  DPM.Core.Git.Client in 'Core\Git\DPM.Core.Git.Client.pas',
+  DPM.Core.Registry.Interfaces in 'Core\Registry\DPM.Core.Registry.Interfaces.pas',
+  DPM.Core.Registry.Catalog in 'Core\Registry\DPM.Core.Registry.Catalog.pas',
+  DPM.Core.Repository.GitRegistry in 'Core\Repository\DPM.Core.Repository.GitRegistry.pas',
   DPM.Core.Sources.Interfaces in 'Core\Sources\DPM.Core.Sources.Interfaces.pas',
   DPM.Core.Sources.Manager in 'Core\Sources\DPM.Core.Sources.Manager.pas',
   DPM.Core.Sources.Types in 'Core\Sources\DPM.Core.Sources.Types.pas',

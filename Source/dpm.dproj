@@ -208,6 +208,11 @@
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Http.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Interfaces.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Manager.pas"/>
+        <DCCReference Include="Core\Git\DPM.Core.Git.Interfaces.pas"/>
+        <DCCReference Include="Core\Git\DPM.Core.Git.Client.pas"/>
+        <DCCReference Include="Core\Registry\DPM.Core.Registry.Interfaces.pas"/>
+        <DCCReference Include="Core\Registry\DPM.Core.Registry.Catalog.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.GitRegistry.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Interfaces.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Manager.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Types.pas"/>
@@ -315,6 +320,7 @@
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Info.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Writer.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Scaffold.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Why.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Sbom.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Scan.pas"/>

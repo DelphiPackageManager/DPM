@@ -43,7 +43,7 @@ type
 
   TSourceType = (
     Folder,
-    GitDirectory,
+    GitRegistry,
     DPMServer);
 
   //TODO : Decide on min delphi version supported. Ideally go back as far as possible

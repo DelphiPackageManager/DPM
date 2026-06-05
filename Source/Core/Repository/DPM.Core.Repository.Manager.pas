@@ -74,6 +74,8 @@ type
 
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
+    function TryGetSourceType(const sourceName : string; out sourceType : TSourceType) : boolean;
+    function InstallPackageInPlace(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const targetDir : string) : boolean;
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
     function GetPackageIcon(const cancelToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageIcon;
     function GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const packageId : string; const includePrerelease : boolean) : IList<TPackageVersion>; overload;
@@ -797,12 +799,51 @@ begin
 
 end;
 
+function TPackageRepositoryManager.TryGetSourceType(const sourceName : string; out sourceType : TSourceType) : boolean;
+var
+  repo : IPackageRepository;
+begin
+  result := false;
+  if not UpdateRepositories then
+    exit;
+  repo := GetRepositoryByName(sourceName);
+  if repo = nil then
+    exit;
+  sourceType := repo.RepositoryType;
+  result := true;
+end;
+
+function TPackageRepositoryManager.InstallPackageInPlace(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const targetDir : string) : boolean;
+var
+  repo : IPackageRepository;
+  gitRepo : IGitRegistryRepository;
+begin
+  result := false;
+  if cancellationToken.IsCancelled then
+    exit;
+  if not UpdateRepositories then
+    exit;
+  repo := GetRepositoryByName(packageInfo.SourceName);
+  if repo = nil then
+  begin
+    FLogger.Error('Unknown source for package [' + packageInfo.ToString + '] : ' + packageInfo.SourceName);
+    exit;
+  end;
+  if not Supports(repo, IGitRegistryRepository, gitRepo) then
+  begin
+    FLogger.Error('Source [' + packageInfo.SourceName + '] is not a git registry source.');
+    exit;
+  end;
+  result := gitRepo.InstallPackageInPlace(cancellationToken, packageInfo, targetDir);
+end;
+
 function TPackageRepositoryManager.UpdateRepositories : boolean;
 var
   uri : IUri;
   error : string;
   source : ISourceConfig;
   repo : IPackageRepository;
+  gitRepo : IGitRegistryRepository;
   i : integer;
 begin
   //FLogger.Debug('TPackageRepositoryManager.UpdateRepositories');
@@ -825,16 +866,21 @@ begin
     repo := GetRepositoryByName(source.Name);
     if repo = nil then
     begin
-      if not TUriFactory.TryParseWithError(source.Source, false, uri, error) then
+      //git registry sources can be a git url (including git@/ssh forms) or a local
+      //folder, so the strict file/http/https scheme check does not apply to them.
+      if source.SourceType <> TSourceType.GitRegistry then
       begin
-        FLogger.Error('Invalid source uri : ' + source.Source);
-        exit;
-      end;
+        if not TUriFactory.TryParseWithError(source.Source, false, uri, error) then
+        begin
+          FLogger.Error('Invalid source uri : ' + source.Source);
+          exit;
+        end;
 
-      if not MatchText(uri.Scheme, ['file', 'http', 'https']) then
-      begin
-        FLogger.Error('Invalid source uri scheme : ' + uri.Scheme);
-        exit;
+        if not MatchText(uri.Scheme, ['file', 'http', 'https']) then
+        begin
+          FLogger.Error('Invalid source uri scheme : ' + uri.Scheme);
+          exit;
+        end;
       end;
 
       repo := FRepoFactory.CreateRepository(source.SourceType);
@@ -842,6 +888,12 @@ begin
       FRepositories.Add(repo);
     end;
   end;
+
+  //apply the global git-registry refresh interval (from app config) to every git repo.
+  for i := 0 to FRepositories.Count - 1 do
+    if Supports(FRepositories[i], IGitRegistryRepository, gitRepo) then
+      gitRepo.SetRefreshIntervalMinutes(FConfiguration.RegistryRefreshIntervalMinutes);
+
   result := true;
 end;
 

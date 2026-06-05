@@ -356,6 +356,7 @@ type
     procedure actFileSaveExecute(Sender : TObject);
     procedure actFileSaveAsExecute(Sender : TObject);
     procedure actFileNewExecute(Sender : TObject);
+    procedure actFilePackageWizardExecute(Sender : TObject);
     procedure actAddSourceItemExecute(Sender : TObject);
     procedure actDeleteSourceItemExecute(Sender : TObject);
     procedure ImgIconClick(Sender : TObject);
@@ -502,6 +503,7 @@ uses
   DPM.Creator.OptionsForm,
   DPM.Creator.DependencyForm,
   DPM.Creator.Dspec.Replacer,
+  DPM.Creator.PackageWizardForm,
   DPM.IDE.AboutForm;
 
 const
@@ -2723,6 +2725,19 @@ begin
     OptionsForm.ShowModal;
   finally
     FreeAndNil(OptionsForm);
+  end;
+end;
+
+procedure TDSpecCreatorForm.actFilePackageWizardExecute(Sender : TObject);
+var
+  wizard : TPackageWizardForm;
+begin
+  wizard := TPackageWizardForm.Create(nil, FLogger, FConfigManager);
+  try
+    if (wizard.ShowModal = mrOk) and (wizard.ResultFile <> '') then
+      OpenProject(wizard.ResultFile);
+  finally
+    FreeAndNil(wizard);
   end;
 end;
 

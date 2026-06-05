@@ -24,33 +24,33 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.Core.Sources.Types;
+unit DPM.Core.Registry.Interfaces;
 
 interface
 
-{$SCOPEDENUMS ON}
+uses
+  VSoft.CancellationToken,
+  Spring.Collections,
+  DPM.Core.Spec.Interfaces;
 
 type
-  TSourcesSubCommand = (Invalid, List, Add, Remove, Enable, Disable, Update, Refresh);
+  //A package registry is a folder-per-id collection of <id>.dspec.yaml files,
+  //backed either by a plain local folder or by a cloned git repo mirror. The
+  //catalog resolves/refreshes the working copy and parses the dspecs into specs.
+  IRegistryCatalog = interface
+  ['{4E2A1C73-9F6B-4D0A-8C5E-7B1A2D3F4E5A}']
+    //Ensures the local working copy is present and (for git-URL registries)
+    //refreshed per the TTL policy. forceRefresh bypasses the TTL. Folder
+    //registries are always live so this is effectively a presence check.
+    function EnsureUpdated(const cancellationToken : ICancellationToken; const forceRefresh : boolean) : boolean;
 
-  TSourcesFormat = (Invalid, Detailed, Short);
+    //Returns the parsed registry dspec for id (case-insensitive), or nil.
+    function GetPackageSpec(const cancellationToken : ICancellationToken; const id : string) : IPackageSpec;
 
-//true if source looks like a git url (as opposed to a local folder or http dpm server).
-function IsGitRegistryUri(const source : string) : boolean;
+    //All package ids present in the registry.
+    function GetPackageIds(const cancellationToken : ICancellationToken) : IList<string>;
+  end;
 
 implementation
 
-uses
-  System.SysUtils,
-  System.StrUtils;
-
-function IsGitRegistryUri(const source : string) : boolean;
-begin
-  result := StartsText('git://', source) or
-            StartsText('ssh://', source) or
-            StartsText('git@', source) or
-            EndsText('.git', source);
-end;
-
 end.
-

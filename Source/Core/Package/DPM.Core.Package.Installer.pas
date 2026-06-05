@@ -85,6 +85,9 @@ type
                                 const compilerVersion: TCompilerVersion; const platform: TDPMPlatform;  const searchPaths: IList<string>): boolean;
 
     function DownloadPackages(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
+    //Ensures a single package is present in the cache. Git registry packages are cloned
+    //in place (clone + dspec); all others are downloaded as a .dpkg and extracted.
+    function EnsurePackageInCache(const cancellationToken: ICancellationToken; const packageInfo: IPackageInfo): boolean;
 
     function CollectPlatformsFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration) : boolean;
 
@@ -326,6 +329,7 @@ var
   orderedPackages: IList<IPackageInfo>;
   sortedIds: IList<string>;
   id: string;
+  isGitSource: boolean;
 
   procedure AddUnique(const path: string);
   begin
@@ -333,6 +337,52 @@ var
     begin
       seenPaths[LowerCase(path)] := true;
       searchPaths.Add(path);
+    end;
+  end;
+
+  //Adds search paths for a git source entry. The base folder of the src glob is
+  //always added; for a recursive (**) pattern we also add every subfolder under it
+  //that actually contains .pas files (the package is cloned in place, so they exist)
+  //- Delphi search paths are not recursive, so each folder must be listed.
+  procedure AddGitSearchPaths(const pkgInfo: IPackageInfo; const basePath: string; const src: string);
+  var
+    baseRel: string;
+    recursive: boolean;
+    pkgAbs: string;
+    absBase: string;
+    subDir: string;
+    relSub: string;
+  begin
+    baseRel := TPathUtils.GlobBaseDir(src);
+    recursive := Pos('**', src) > 0;
+    pkgAbs := IncludeTrailingPathDelimiter(FPackageCache.GetPackagePath(pkgInfo));
+
+    if baseRel <> '' then
+      AddUnique(basePath + baseRel)
+    else
+      AddUnique(ExcludeTrailingPathDelimiter(basePath));
+
+    if not recursive then
+      exit;
+
+    if baseRel <> '' then
+      absBase := pkgAbs + baseRel
+    else
+      absBase := ExcludeTrailingPathDelimiter(pkgAbs);
+    if not DirectoryExists(absBase) then
+      exit;
+
+    for subDir in TDirectory.GetDirectories(absBase, '*', TSearchOption.soAllDirectories) do
+    begin
+      //skip the git metadata folder and anything under it
+      if SameText(ExtractFileName(subDir), '.git') then
+        continue;
+      if Pos(PathDelim + '.git' + PathDelim, subDir + PathDelim) > 0 then
+        continue;
+      if Length(TDirectory.GetFiles(subDir, '*.pas')) = 0 then
+        continue;
+      relSub := Copy(subDir, Length(pkgAbs) + 1, MaxInt);
+      AddUnique(basePath + relSub);
     end;
   end;
 
@@ -428,8 +478,14 @@ begin
 
     packageBasePath := packageInfo.Id + PathDelim + packageInfo.Version.ToStringNoMeta + PathDelim;
 
+    //git packages are cloned in place, so their source lives at the repo-relative
+    //location given by each source entry's src glob (dest is meaningless - there is
+    //no copy step). Detect via the marker the in-place install writes into the cache
+    //folder - robust even when SourceName is not carried on the resolved-graph package.
+    isGitSource := FileExists(IncludeTrailingPathDelimiter(FPackageCache.GetPackagePath(packageInfo)) + cGitPackageMarkerFile);
+
     //If the package has build entries (compiled), point at the per-platform lib folder.
-    //Otherwise it's a source-only package - add each source entry's destination folder so the
+    //Otherwise it's a source-only package - add each source entry's folder so the
     //consumer can compile against the .pas files directly.
     if (template.BuildEntries.Count > 0) and (not packageInfo.UseSource) and compiledPackages.Contains(packageInfo) then
     begin
@@ -440,10 +496,15 @@ begin
     begin
       for sourceEntry in template.SourceEntries do
       begin
-        destination := sourceEntry.Destination;
-        if destination = '' then
-          destination := 'src';
-        AddUnique(packageBasePath + destination);
+        if isGitSource then
+          AddGitSearchPaths(packageInfo, packageBasePath, sourceEntry.Source)
+        else
+        begin
+          destination := sourceEntry.Destination;
+          if destination = '' then
+            destination := 'src';
+          AddUnique(packageBasePath + destination);
+        end;
       end;
     end;
   end;
@@ -845,7 +906,6 @@ function TPackageInstaller.DoCachePackage(const cancellationToken : ICancellatio
 var
   packageIdentity: IPackageIdentity;
   packageInfo : IPackageInfo;
-  packageFileName: string;
 begin
   result := false;
   if not Options.Version.IsEmpty then
@@ -874,23 +934,8 @@ begin
   else
     FLogger.Information('Caching package ' + packageInfo.ToString);
 
-  if not FPackageCache.EnsurePackage(packageInfo) then
-  begin
-    // not in the cache, so we need to get it from the the repository
-    if not FRepositoryManager.DownloadPackage(cancellationToken, packageInfo, FPackageCache.GetPackageFileFolder(packageInfo), packageFileName) then
-    begin
-      if cancellationToken.IsCancelled then
-        FLogger.Error('Downloading package [' + packageInfo.ToString + '] cancelled.')
-      else
-        FLogger.Error('Failed to download package [' + packageInfo.ToString + ']');
-      exit;
-    end;
-    if not FPackageCache.InstallPackageFromFile(packageFileName) then
-    begin
-      FLogger.Error('Failed to cache package file [' + packageFileName + '] into the cache');
-      exit;
-    end;
-  end;
+  if not EnsurePackageInCache(cancellationToken, packageInfo) then
+    exit;
   result := true;
 end;
 
@@ -976,7 +1021,6 @@ function TPackageInstaller.DoInstallPackageForPlatform(const cancellationToken :
                                             const context: IPackageInstallerContext; out resultGraph: IPackageReference): boolean;
 var
   newPackageIdentity: IPackageIdentity;
-  packageFileName: string;
   packageInfo: IPackageInfo; // includes dependencies;
   existingPackageRef: IPackageReference;
   dependency : IPackageReference;
@@ -1045,20 +1089,8 @@ begin
   else
     FLogger.Information('Installing package ' + packageInfo.ToString);
 
-  if not FPackageCache.EnsurePackage(packageInfo) then
-  begin
-    // not in the cache, so we need to get it from the the repository
-    if not FRepositoryManager.DownloadPackage(cancellationToken, packageInfo, FPackageCache.GetPackageFileFolder(packageInfo), packageFileName) then
-    begin
-      FLogger.Error('Failed to download package [' + packageInfo.ToString + ']');
-      exit;
-    end;
-    if not FPackageCache.InstallPackageFromFile(packageFileName) then
-    begin
-      FLogger.Error('Failed to install package file [' + packageFileName + '] into the cache');
-      exit;
-    end;
-  end;
+  if not EnsurePackageInCache(cancellationToken, packageInfo) then
+    exit;
 
   packageInfo.UseSource := Options.UseSource;
   // we need this later when collecting search paths.
@@ -1279,10 +1311,50 @@ begin
   result := BuildDependencies(cancellationToken, packageCompiler, graph, resolvedPackages, compiledPackages, packageSpecs, options);
 end;
 
+function TPackageInstaller.EnsurePackageInCache(const cancellationToken: ICancellationToken; const packageInfo: IPackageInfo): boolean;
+var
+  packageFileName: string;
+  sourceType: TSourceType;
+begin
+  result := false;
+
+  //git registry packages are installed in place (clone + dspec) rather than
+  //downloaded as a .dpkg. The repository handles cache freshness (incl. HEAD
+  //tracking for untagged repos) so we always call it.
+  if FRepositoryManager.TryGetSourceType(packageInfo.SourceName, sourceType) and (sourceType = TSourceType.GitRegistry) then
+  begin
+    if not FRepositoryManager.InstallPackageInPlace(cancellationToken, packageInfo, FPackageCache.GetPackagePath(packageInfo)) then
+    begin
+      FLogger.Error('Failed to install git package [' + packageInfo.ToString + ']');
+      exit;
+    end;
+    result := true;
+    exit;
+  end;
+
+  if FPackageCache.EnsurePackage(packageInfo) then
+    exit(true);
+
+  // not in the cache, so we need to get it from the repository
+  if not FRepositoryManager.DownloadPackage(cancellationToken, packageInfo, FPackageCache.GetPackageFileFolder(packageInfo), packageFileName) then
+  begin
+    if cancellationToken.IsCancelled then
+      FLogger.Error('Downloading package [' + packageInfo.ToString + '] cancelled.')
+    else
+      FLogger.Error('Failed to download package [' + packageInfo.ToString + ']');
+    exit;
+  end;
+  if not FPackageCache.InstallPackageFromFile(packageFileName) then
+  begin
+    FLogger.Error('Failed to install package file [' + packageFileName + '] into the cache');
+    exit;
+  end;
+  result := true;
+end;
+
 function TPackageInstaller.DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
 var
   packageInfo: IPackageInfo;
-  packageFileName: string;
   spec: IPackageSpec;
 begin
   result := false;
@@ -1292,22 +1364,10 @@ begin
     if cancellationToken.IsCancelled then
       exit;
 
-    if not FPackageCache.EnsurePackage(packageInfo) then
-    begin
-      // not in the cache, so we need to get it from the the repository
-      if not FRepositoryManager.DownloadPackage(cancellationToken, packageInfo, FPackageCache.GetPackageFileFolder(packageInfo), packageFileName) then
-      begin
-        FLogger.Error('Failed to download package [' + packageInfo.ToString + ']');
-        exit;
-      end;
-      if not FPackageCache.InstallPackageFromFile(packageFileName) then
-      begin
-        FLogger.Error('Failed to install package file [' + packageFileName + '] into the cache');
-        exit;
-      end;
-      if cancellationToken.IsCancelled then
-        exit;
-    end;
+    if not EnsurePackageInCache(cancellationToken, packageInfo) then
+      exit;
+    if cancellationToken.IsCancelled then
+      exit;
     if not packageSpecs.ContainsKey(LowerCase(packageInfo.Id)) then
     begin
       spec := FPackageCache.GetPackageSpec(packageInfo);

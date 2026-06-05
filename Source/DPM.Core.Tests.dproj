@@ -174,6 +174,11 @@
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Http.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Interfaces.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Manager.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.GitRegistry.pas"/>
+        <DCCReference Include="Core\Git\DPM.Core.Git.Interfaces.pas"/>
+        <DCCReference Include="Core\Git\DPM.Core.Git.Client.pas"/>
+        <DCCReference Include="Core\Registry\DPM.Core.Registry.Interfaces.pas"/>
+        <DCCReference Include="Core\Registry\DPM.Core.Registry.Catalog.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Interfaces.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Manager.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Types.pas"/>
@@ -260,6 +265,7 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Vuln.Cache.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Vuln.CycloneDX.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Vuln.Scanner.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Git.Client.pas"/>
         <DCCReference Include="Tests\TargetPlatformTests.pas"/>
         <DCCReference Include="Tests\TestLogger.pas"/>
         <BuildConfiguration Include="Base">

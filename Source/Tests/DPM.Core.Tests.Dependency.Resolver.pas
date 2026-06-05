@@ -39,6 +39,8 @@ type
     function Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions) : Boolean;
     function FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const includePrerelease : boolean; const sources : string) : IPackageInfo;
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
+    function TryGetSourceType(const sourceName : string; out sourceType : TSourceType) : boolean;
+    function InstallPackageInPlace(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const targetDir : string) : boolean;
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
                                                 const packageId : string; const versionRange : TVersionRange; const includePrerelease : boolean) : IList<IPackageInfo>;
@@ -397,6 +399,16 @@ end;
 function TFakeRepositoryManager.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
 begin
   raise ENotImplemented.Create('TFakeRepositoryManager.DownloadPackage');
+end;
+
+function TFakeRepositoryManager.TryGetSourceType(const sourceName : string; out sourceType : TSourceType) : boolean;
+begin
+  result := false;
+end;
+
+function TFakeRepositoryManager.InstallPackageInPlace(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const targetDir : string) : boolean;
+begin
+  raise ENotImplemented.Create('TFakeRepositoryManager.InstallPackageInPlace');
 end;
 
 function TFakeRepositoryManager.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;

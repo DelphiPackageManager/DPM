@@ -31,6 +31,21 @@ type
     [Test]
     procedure TestIsRelativePath;
 
+    [Test]
+    [TestCase('Subfolder', './source/*.pas,source')]
+    [TestCase('Recursive', './source/**/*.pas,source')]
+    [TestCase('Nested', './a/b/*.pas,a\b')]
+    [TestCase('BackslashInput', '.\src\*.pas,src')]
+    [TestCase('NoDotSlash', 'source/*.pas,source')]
+    [TestCase('PartialFileName', './source/Test*.pas,source')]
+    [TestCase('Question', './source/test?.pas,source')]
+    procedure TestGlobBaseDir(const input, expected : string);
+
+    //cases whose expected result is '' (root / single file) - kept out of TestCase
+    //to avoid trailing-empty-value parsing differences.
+    [Test]
+    procedure TestGlobBaseDir_RootOrFile_ReturnsEmpty;
+
   end;
 
 implementation
@@ -70,6 +85,18 @@ procedure TPathUtilsTests.TestIsRelativePath;
 begin
 //  Assert.IsTrue((IsRelativePath2('\\..\test')));
     Assert.IsFalse((TPathUtils.IsRelativePath('\\..\test')));
+end;
+
+procedure TPathUtilsTests.TestGlobBaseDir(const input, expected : string);
+begin
+  Assert.AreEqual(Trim(expected), TPathUtils.GlobBaseDir(Trim(input)));
+end;
+
+procedure TPathUtilsTests.TestGlobBaseDir_RootOrFile_ReturnsEmpty;
+begin
+  Assert.AreEqual('', TPathUtils.GlobBaseDir('./*.pas'));
+  Assert.AreEqual('', TPathUtils.GlobBaseDir('*.pas'));
+  Assert.AreEqual('', TPathUtils.GlobBaseDir('./LICENSE'));
 end;
 
 initialization

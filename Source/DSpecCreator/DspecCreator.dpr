@@ -14,6 +14,10 @@ uses
   DPM.Creator.FileForm in 'DPM.Creator.FileForm.pas' {SourceForm},
   DPM.Creator.OptionsForm in 'DPM.Creator.OptionsForm.pas' {OptionsForm},
   DPM.Creator.DependencyForm in 'DPM.Creator.DependencyForm.pas' {DependencyForm},
+  DPM.Creator.PackageWizardForm in 'DPM.Creator.PackageWizardForm.pas' {PackageWizardForm},
+  DPM.Console.Command.Spec.Discovery in '..\Cmdline\Commands\DPM.Console.Command.Spec.Discovery.pas',
+  DPM.Console.Command.Spec.Writer in '..\Cmdline\Commands\DPM.Console.Command.Spec.Writer.pas',
+  DPM.Console.Command.Spec.Scaffold in '..\Cmdline\Commands\DPM.Console.Command.Spec.Scaffold.pas',
   DPM.Core.Types in '..\Core\DPM.Core.Types.pas',
   DPM.Core.TargetPlatform in '..\Core\DPM.Core.TargetPlatform.pas',
   DPM.Core.Init in '..\Core\DPM.Core.Init.pas',
@@ -155,7 +159,12 @@ uses
   DPM.Core.SBOM.Writers in '..\Core\Sbom\DPM.Core.SBOM.Writers.pas',
   DPM.Core.SBOM.Writers.Reports in '..\Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas',
   DPM.Core.Options.SBOM in '..\Core\Options\DPM.Core.Options.SBOM.pas',
-  DPM.Core.Options.Sign in '..\Core\Options\DPM.Core.Options.Sign.pas';
+  DPM.Core.Options.Sign in '..\Core\Options\DPM.Core.Options.Sign.pas',
+  DPM.Core.Repository.GitRegistry in '..\Core\Repository\DPM.Core.Repository.GitRegistry.pas',
+  DPM.Core.Git.Client in '..\Core\Git\DPM.Core.Git.Client.pas',
+  DPM.Core.Git.Interfaces in '..\Core\Git\DPM.Core.Git.Interfaces.pas',
+  DPM.Core.Registry.Catalog in '..\Core\Registry\DPM.Core.Registry.Catalog.pas',
+  DPM.Core.Registry.Interfaces in '..\Core\Registry\DPM.Core.Registry.Interfaces.pas';
 
 {$R *.res}
 

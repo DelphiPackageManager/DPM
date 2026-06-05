@@ -1192,6 +1192,7 @@ var
   receipt : TVerificationReceipt;
   cachedVerifyResult : TVerificationResult;
   ratchetBlocked : boolean;
+  isGitPackage : boolean;
 begin
   key := MakeCacheKey(packageId);
   FCacheLock.Enter;
@@ -1215,11 +1216,16 @@ begin
 
   result := result and FileExists(dspecFile);
 
+  // git registry packages are cloned + built from source in place. They are unsigned
+  // by design (no .dpkg / manifest / receipt), so the signing gate and the .dpkg
+  // fallback below do not apply - presence of the marker + dspec is sufficient.
+  isGitPackage := result and FileExists(IncludeTrailingPathDelimiter(packageFolder) + cGitPackageMarkerFile);
+
   // Cheap re-check on cache hit (plan §1.7, V-33). Confirms the receipt
   // exists and matches the active trust-policy fingerprint, and re-hashes
   // only the manifest. If the policy has changed since extraction, fall
   // through to InstallPackageFromFile which does the full re-verify.
-  if result and (FSigningService <> nil) and (FTrustPolicy <> nil) then
+  if result and (not isGitPackage) and (FSigningService <> nil) and (FTrustPolicy <> nil) then
   begin
     if not FSigningService.QuickRecheck(packageFolder, FTrustPolicy.GetEffectivePolicy) then
     begin

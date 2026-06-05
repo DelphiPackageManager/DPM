@@ -135,6 +135,7 @@ type
     FPackageCacheLocation : string;
     FFileName : string;
     FAuthor : string;
+    FRegistryRefreshIntervalMinutes : integer;
     FSigning : ISigningConfig;
     FLogger : ILogger;
   protected
@@ -148,6 +149,8 @@ type
     function GetSourceByName(const name : string) : ISourceConfig;
     function GetAuthor : string;
     procedure SetAuthor(const value : string);
+    function GetRegistryRefreshIntervalMinutes : integer;
+    procedure SetRegistryRefreshIntervalMinutes(const value : integer);
     function GetSigning : ISigningConfig;
 
     function LoadFromFile(const fileName : string) : boolean;
@@ -302,7 +305,9 @@ begin
   if FSourceType = TSourceType.Folder then
   begin
     //it might not have been set before, so we need to figure it out.
-    if TUriFactory.TryParse(FSource, false, uri) then
+    if IsGitRegistryUri(FSource) then
+      FSourceType := TSourceType.GitRegistry
+    else if TUriFactory.TryParse(FSource, false, uri) then
     begin
       if (uri.Scheme <> 'file') then
       begin
@@ -563,6 +568,7 @@ begin
   FLogger := logger;
   FSources := TCollections.CreateList<ISourceConfig>;
   FSigning := TSigningConfig.Create;
+  FRegistryRefreshIntervalMinutes := cDefaultRegistryRefreshMinutes;
 end;
 
 function TConfiguration.GetSigning : ISigningConfig;
@@ -578,6 +584,16 @@ end;
 procedure TConfiguration.SetAuthor(const value : string);
 begin
   FAuthor := value;
+end;
+
+function TConfiguration.GetRegistryRefreshIntervalMinutes : integer;
+begin
+  result := FRegistryRefreshIntervalMinutes;
+end;
+
+procedure TConfiguration.SetRegistryRefreshIntervalMinutes(const value : integer);
+begin
+  FRegistryRefreshIntervalMinutes := value;
 end;
 
 function TConfiguration.GetFileName : string;
@@ -663,6 +679,8 @@ begin
   FPackageCacheLocation := root.S['packageCacheLocation'];
   if root.Contains('author') then
     FAuthor := root.S['author'];
+  if root.Contains('registryRefreshIntervalMinutes') then
+    FRegistryRefreshIntervalMinutes := root.I['registryRefreshIntervalMinutes'];
   if root.Contains('signing') then
     FSigning.LoadFromYAML(root.Values['signing']);
   sources := root.A['packageSources'];
@@ -742,6 +760,7 @@ begin
   root.S['packageCacheLocation'] := FPackageCacheLocation;
   if FAuthor <> '' then
     root.S['author'] := FAuthor;
+  root.I['registryRefreshIntervalMinutes'] := FRegistryRefreshIntervalMinutes;
   FSigning.SaveToYAML(parentObj);
   sources := root.A['packageSources'];
   for i := 0 to FSources.Count - 1 do

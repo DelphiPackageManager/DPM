@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Library</AppType>
@@ -8,7 +8,7 @@
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectName Condition="'$(ProjectName)'==''">DPM.IDE.D110</ProjectName>
-        <ProjectVersion>19.3</ProjectVersion>
+        <ProjectVersion>19.5</ProjectVersion>
         <TargetedPlatforms>1</TargetedPlatforms>
     </PropertyGroup>
     <PropertyGroup>
@@ -165,18 +165,23 @@
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Http.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Interfaces.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Manager.pas"/>
+        <DCCReference Include="Core\Git\DPM.Core.Git.Interfaces.pas"/>
+        <DCCReference Include="Core\Git\DPM.Core.Git.Client.pas"/>
+        <DCCReference Include="Core\Registry\DPM.Core.Registry.Interfaces.pas"/>
+        <DCCReference Include="Core\Registry\DPM.Core.Registry.Catalog.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.GitRegistry.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Interfaces.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Manager.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Types.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.DesignEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Dependency.pas"/>
-        <DCCReference Include="Core\Spec\DPM.Core.Spec.DesignEntry.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.SourceEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Interfaces.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.MetaData.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Node.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Reader.pas"/>
-        <DCCReference Include="Core\Spec\DPM.Core.Spec.SourceEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.TargetPlatform.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Template.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Config.pas"/>
@@ -264,13 +269,13 @@
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Base64Url.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Masks.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.MapFile.pas"/>
-        <DCCReference Include="Core\Project\DPM.Core.Project.SearchPaths.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.SBOM.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Generator.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Interfaces.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Types.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.SearchPaths.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Reader.pas"/>
         <DCCReference Include="IDE\DPM.IDE.SBOM.Menu.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Win32.pas"/>
@@ -281,8 +286,8 @@
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.X509.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Interfaces.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.pas"/>
-        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Signotaur.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Azure.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Signotaur.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Cms.Interfaces.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Cms.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Timestamping.pas"/>
@@ -297,9 +302,9 @@
         <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Signing.Interfaces.pas"/>
         <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Signing.pas"/>
         <DCCReference Include="IDE\DPM.IDE.TrustPromptForm.pas"/>
+        <DCCReference Include="Core\Trust\DPM.Core.Trust.Prompt.pas"/>
         <DCCReference Include="IDE\DPM.IDE.Trust.Prompt.pas"/>
         <DCCReference Include="IDE\DPM.IDE.SigningBadge.pas"/>
-        <DCCReference Include="Core\Trust\DPM.Core.Trust.Prompt.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

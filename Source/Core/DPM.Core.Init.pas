@@ -64,6 +64,9 @@ uses
   DPM.Core.Repository.Factory,
   DPM.Core.Repository.Directory,
   DPM.Core.Repository.Http,
+  DPM.Core.Repository.GitRegistry,
+  DPM.Core.Git.Interfaces,
+  DPM.Core.Git.Client,
   DPM.Core.Cache.Interfaces,
   DPM.Core.Cache,
   DPM.Core.Dependency.Interfaces,
@@ -137,8 +140,11 @@ begin
   Container.RegisterType<IPackageRepositoryFactory, TPackageRepositoryFactory>;
   Container.RegisterType<IPackageRepositoryManager, TPackageRepositoryManager>().AsSingleton();
 
+  Container.RegisterType<IGitClient, TGitClient>;
+
   Container.RegisterType<IPackageRepository, TDirectoryPackageRepository>(TEnumUtils.EnumToString<TSourceType>(TSourceType.Folder));
   Container.RegisterType<IPackageRepository, TDPMServerPackageRepository>(TEnumUtils.EnumToString<TSourceType>(TSourceType.DPMServer));
+  Container.RegisterType<IPackageRepository, TGitRegistryPackageRepository>(TEnumUtils.EnumToString<TSourceType>(TSourceType.GitRegistry));
 
   Container.RegisterType<IPackageCache, TPackageCache>.AsSingleton();
 

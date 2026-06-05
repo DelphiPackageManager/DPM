@@ -39,6 +39,10 @@ type
     class function QuotePath(const value : string; const force : boolean = false) : string;
     class function StripBase(const base : string; const fileName : string) : string;
     class function StripWildCard(const value : string) : string;
+    //Returns the base directory of an ant-style source glob: backslash-normalised,
+    //a leading .\ removed, truncated at the first wildcard, folder part only.
+    // './source/**/*.pas' -> 'source';  './a/b/*.pas' -> 'a\b';  './*.pas' -> ''.
+    class function GlobBaseDir(const glob : string) : string;
   end;
 
 
@@ -338,6 +342,29 @@ begin
   i := Pos('*', value);
   if i > 0 then
     Delete(result, i, Length(result));
+end;
+
+class function TPathUtils.GlobBaseDir(const glob : string) : string;
+var
+  normalized : string;
+  wildcardPos : integer;
+  i : integer;
+begin
+  normalized := StringReplace(glob, '/', '\', [rfReplaceAll]);
+  if Copy(normalized, 1, 2) = '.\' then
+    Delete(normalized, 1, 2);
+  wildcardPos := 0;
+  for i := 1 to Length(normalized) do
+    if CharInSet(normalized[i], ['*', '?']) then
+    begin
+      wildcardPos := i;
+      Break;
+    end;
+  if wildcardPos > 0 then
+    normalized := Copy(normalized, 1, wildcardPos - 1);
+  //ExtractFileDir returns the folder part: 'source\**.pas' truncated to 'source\' -> 'source';
+  //'a\b\' -> 'a\b'; a bare '*.pas' -> ''.
+  result := ExtractFileDir(normalized);
 end;
 
 class function TPathUtils.IsPathRooted(const value: string): boolean;

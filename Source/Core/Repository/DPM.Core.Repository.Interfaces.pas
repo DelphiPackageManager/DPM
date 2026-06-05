@@ -84,6 +84,16 @@ type
 
   end;
 
+  //Implemented only by the git registry repository. The package installer uses
+  //Supports() to detect a git source and install it in place (clone + build)
+  //rather than via a downloaded .dpkg.
+  IGitRegistryRepository = interface
+    ['{2C9E7A48-3D5B-4F1A-9E6C-8B0D1A2F3E4D}']
+    function InstallPackageInPlace(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const targetDir : string) : boolean;
+    //minutes between auto-pulls of the git-URL registry mirror (from app config).
+    procedure SetRefreshIntervalMinutes(const value : integer);
+  end;
+
   IPackageRepositoryFactory = interface
     ['{67014BE3-AA4C-45ED-A043-68262E57B89A}']
     function CreateRepository(const repoType : TSourceType) : IPackageRepository;
@@ -105,6 +115,12 @@ type
     function FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const includePrerelease : boolean; const sources : string) : IPackageInfo;
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
+
+    //true (and sets sourceType) if a source with this name exists.
+    function TryGetSourceType(const sourceName : string; out sourceType : TSourceType) : boolean;
+    //installs a git registry package in place (clone + dspec) into targetDir.
+    function InstallPackageInPlace(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const targetDir : string) : boolean;
+
     //downloads the dspec
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
 
