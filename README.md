@@ -1,3 +1,7 @@
+[![Delphi: XE2+](https://img.shields.io/badge/Delphi-XE2%2B-red.svg)](https://www.embarcadero.com/products/delphi)
+[![Platform: Windows](https://img.shields.io/badge/platform-Windows-blue.svg)](#compatibility)
+[![License](https://img.shields.io/badge/license-Apache2.0-lightgrey.svg)](LICENSE)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/DelphiPackageManager/DPM)
 # DPM - A package manager for Delphi
 
 ## Introducing DPM
