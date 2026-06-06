@@ -140,76 +140,9 @@ uses
   System.StrUtils,
   System.RegularExpressions,
   DPM.Core.Spec.TargetPlatform,
+  DPM.Core.Project.Prepare.SourceFiles,
   DPM.Core.Utils.Path,
   DPM.Core.Utils.Strings;
-
-function ContainsUnresolvedVariable(const value : string) : boolean;
-begin
-  //matches $name$ tokens used by Pack for variable substitution (e.g. $packageSource$,
-  //$compilernoprefix$). For prepare-time scaffolding these stay literal, so any source
-  //path containing them refers to a per-version artefact that doesn't yet exist and
-  //isn't a valid DCCReference target anyway.
-  result := TRegEx.IsMatch(value, '\$[A-Za-z_][A-Za-z0-9_]*\$');
-end;
-
-function ShouldIncludeSourceFile(const filePath : string) : boolean;
-var
-  ext : string;
-begin
-  //Whitelist of extensions that make sense as DCCReferences in a Delphi package
-  //dproj. .dfm files are pulled in implicitly by the {FormName} reference on
-  //their owning .pas unit (so they're deliberately excluded here). Everything
-  //else - .txt READMEs, .md docs, .json, accidental .dproj/.dpk glob hits -
-  //should not be referenced by the dproj at all.
-  ext := LowerCase(ExtractFileExt(filePath));
-  result := (ext = '.pas') or (ext = '.inc') or (ext = '.rc') or (ext = '.res');
-end;
-
-function ExtractFormNameFromDfm(const dfmPath : string) : string;
-var
-  fs : TFileStream;
-  buffer : TBytes;
-  bytesRead : integer;
-  text : string;
-  newlineIdx : integer;
-  firstLine : string;
-  match : TMatch;
-begin
-  //Text-form .dfm files start with `object Name : TClassName` (or `inherited`).
-  //Binary .dfm files don't parse this way - we silently skip them. Reading just
-  //the first 512 bytes keeps the cost negligible.
-  result := '';
-  if not FileExists(dfmPath) then
-    exit;
-  try
-    fs := TFileStream.Create(dfmPath, fmOpenRead or fmShareDenyNone);
-    try
-      SetLength(buffer, 512);
-      bytesRead := fs.Read(buffer[0], Length(buffer));
-      if bytesRead <= 0 then
-        exit;
-      SetLength(buffer, bytesRead);
-    finally
-      fs.Free;
-    end;
-    text := TEncoding.UTF8.GetString(buffer);
-    //skip a UTF-8 BOM if present.
-    if (Length(text) > 0) and (text[1] = #$FEFF) then
-      Delete(text, 1, 1);
-    newlineIdx := Pos(#10, text);
-    if newlineIdx > 0 then
-      firstLine := Copy(text, 1, newlineIdx - 1)
-    else
-      firstLine := text;
-    firstLine := Trim(StringReplace(firstLine, #13, '', [rfReplaceAll]));
-    match := TRegEx.Match(firstLine, '^(object|inherited)\s+(\w+)\s*:', [roIgnoreCase]);
-    if match.Success and (match.Groups.Count >= 3) then
-      result := match.Groups.Item[2].Value;
-  except
-    on e : Exception do
-      result := ''; //best-effort; don't fail the scaffold over an unreadable dfm.
-  end;
-end;
 
 const
   cPackagesFolder = 'packages';
@@ -335,56 +268,15 @@ begin
 end;
 
 function TPreparePackageFolders.BuildVariables(const spec : IPackageSpec; const compiler : TCompilerVersion) : IDictionary<string, string>;
-var
-  pair : TPair<string, string>;
 begin
-  result := TCollections.CreateDictionary<string, string>;
-
-  //compiler-derived variables - mirrors TPackageWriter.PopulateVariables so dspec
-  //authors see consistent behaviour between Pack and Prepare.
-  //TODO : this is code dupe, refactor
-  result['compiler'] := CompilerToString(compiler);
-  result['target'] := CompilerToString(compiler);
-  result['compilernoprefix'] := CompilerNoPrefix(compiler);
-  result['compilernopoint'] := CompilerToStringNoPoint(compiler);
-  result['compilershortversion'] := CompilerToShortVersion(compiler);
-  result['compilercodename'] := CompilerCodeName(compiler);
-  result['compilerwithcodename'] := CompilerWithCodeName(compiler);
-  result['compilermajornoprefix'] := CompilerMajorNoPrefix(compiler);
-
-  result['compilerversion'] := CompilerToCompilerVersionIntStr(compiler);
-  result['libsuffix'] := CompilerToLibSuffix(compiler);
-  result['libsuffixshort'] := CompilerToLibSuffixShort(compiler);
-
-  result['bdsversion'] := CompilerToBDSVersion(compiler);
-
-  //spec-declared variables overlay compiler-derived ones (allows authors to override
-  //e.g. compilernoprefix if they really want to). Values may themselves contain
-  //$name$ tokens - ResolveVariables iterates to a fixed point so chains like
-  //$packageSource$ -> "Rad Studio $compilernoprefix$" -> "Rad Studio XE2" work.
-  if (spec <> nil) and (spec.Variables <> nil) then
-    for pair in spec.Variables do
-      result[LowerCase(pair.Key)] := pair.Value;
+  //delegated to the shared gatherer so Pack/Prepare/install-time generation all use
+  //one variable-expansion implementation.
+  result := TPrepareSourceGatherer.BuildVariables(spec, compiler);
 end;
 
 function TPreparePackageFolders.ResolveVariables(const value : string; const variables : IDictionary<string, string>) : string;
-const
-  cMaxIterations = 10; //circular-reference guard
-var
-  pair : TPair<string, string>;
-  previous : string;
-  iterations : integer;
 begin
-  result := value;
-  if Pos('$', result) = 0 then
-    exit;
-  iterations := 0;
-  repeat
-    previous := result;
-    for pair in variables do
-      result := StringReplace(result, '$' + pair.Key + '$', pair.Value, [rfReplaceAll, rfIgnoreCase]);
-    Inc(iterations);
-  until (result = previous) or (iterations >= cMaxIterations);
+  result := TPrepareSourceGatherer.ResolveVariables(value, variables);
 end;
 
 function TPreparePackageFolders.GatherSourceFiles(const specDir : string; const spec : IPackageSpec;
@@ -393,150 +285,38 @@ var
   i, j : integer;
   template : ISpecTemplate;
   sourceEntry : ISpecSourceEntry;
-  pattern : string;
-  rawPattern : string;
-  searchDir : string;
-  mask : string;
-  files : TArray<string>;
-  k : integer;
-  abs : string;
-  dfmPath : string;
-  seen : ISet<string>;
+  patterns : IList<string>;
   variables : IDictionary<string, string>;
-  entry : TPrepareSourceFile;
 begin
-  result := TCollections.CreateList<TPrepareSourceFile>;
-  seen := TCollections.CreateSet<string>;
-  if (spec = nil) or (spec.Templates = nil) then
-    exit;
-
-  variables := BuildVariables(spec, compiler);
-
-  for i := 0 to spec.Templates.Count - 1 do
+  //Aggregate every source glob across all templates into one ordered list and expand
+  //through the shared gatherer (a single dedup set spans all entries, matching the
+  //original behaviour). Exclude is not applied for prepare's source entries.
+  patterns := TCollections.CreateList<string>;
+  if (spec <> nil) and (spec.Templates <> nil) then
   begin
-    template := spec.Templates[i];
-    if (template = nil) or (template.SourceEntries = nil) then
-      continue;
-    for j := 0 to template.SourceEntries.Count - 1 do
+    for i := 0 to spec.Templates.Count - 1 do
     begin
-      sourceEntry := template.SourceEntries[j];
-      if sourceEntry = nil then
+      template := spec.Templates[i];
+      if (template = nil) or (template.SourceEntries = nil) then
         continue;
-      rawPattern := sourceEntry.Source;
-      if Trim(rawPattern) = '' then
-        continue;
-
-      //resolve $name$ tokens against the spec + compiler variable set. Anything
-      //unresolved after this is a genuine dspec authoring issue.
-      pattern := ResolveVariables(rawPattern, variables);
-      if ContainsUnresolvedVariable(pattern) then
+      for j := 0 to template.SourceEntries.Count - 1 do
       begin
-        FLogger.Warning('Source entry has unresolvable variable - skipping: ' + rawPattern);
-        continue;
-      end;
-
-      //normalize separators and split off the file mask.
-      pattern := StringReplace(pattern, '/', PathDelim, [rfReplaceAll]);
-      mask := ExtractFileName(pattern);
-      searchDir := ExtractFilePath(pattern);
-      if mask = '' then
-        mask := '*.pas';
-
-      if TPathUtils.IsPathRooted(searchDir) then
-        searchDir := ExcludeTrailingPathDelimiter(searchDir)
-      else
-        searchDir := ExcludeTrailingPathDelimiter(TPath.GetFullPath(TPath.Combine(specDir, searchDir)));
-
-      if not TDirectory.Exists(searchDir) then
-      begin
-        FLogger.Warning('Source path does not exist (skipping): ' + searchDir);
-        continue;
-      end;
-
-      files := TArray<string>(TDirectory.GetFiles(searchDir, mask, TSearchOption.soTopDirectoryOnly));
-      if rawPattern = pattern then
-        FLogger.Information(Format('Source pattern %s matched %d file(s)', [rawPattern, Length(files)]))
-      else
-        FLogger.Information(Format('Source pattern %s (resolved: %s) matched %d file(s)', [rawPattern, pattern, Length(files)]));
-
-      for k := 0 to High(files) do
-      begin
-        abs := TPath.GetFullPath(files[k]);
-        //Skip extensions that shouldn't be in a dpk/dproj. .dfm files come in via
-        //the {FormName} annotation on their owning .pas.
-        if not ShouldIncludeSourceFile(abs) then
+        sourceEntry := template.SourceEntries[j];
+        if sourceEntry = nil then
           continue;
-        if seen.Contains(LowerCase(abs)) then
-          continue;
-        seen.Add(LowerCase(abs));
-
-        entry.Path := abs;
-        entry.FormName := '';
-        //Form detection: if this is a .pas file with a sibling .dfm, lift the form
-        //identifier from the .dfm's first line. Other extensions get no FormName.
-        if SameText(ExtractFileExt(abs), '.pas') then
-        begin
-          dfmPath := ChangeFileExt(abs, '.dfm');
-          if FileExists(dfmPath) then
-            entry.FormName := ExtractFormNameFromDfm(dfmPath);
-        end;
-
-        result.Add(entry);
-        if entry.FormName <> '' then
-          FLogger.Information('  ' + abs + ' (form: ' + entry.FormName + ')')
-        else
-          FLogger.Information('  ' + abs);
+        if Trim(sourceEntry.Source) <> '' then
+          patterns.Add(sourceEntry.Source);
       end;
     end;
   end;
+
+  variables := BuildVariables(spec, compiler);
+  result := TPrepareSourceGatherer.GatherFromPatterns(FLogger, specDir, patterns, nil, variables);
 end;
 
 function TPreparePackageFolders.MakeRelativePath(const fromDir, toPath : string) : string;
-var
-  fromSegments : TArray<string>;
-  toSegments : TArray<string>;
-  i : integer;
-  commonLen : integer;
-  upCount : integer;
-  k : integer;
-  normalizedFrom : string;
-  normalizedTo : string;
 begin
-  //normalize both paths to absolute and use a single separator so segment comparison
-  //is straightforward. ExcludeTrailingPathDelimiter avoids a phantom empty trailing
-  //segment when fromDir was supplied with a trailing slash.
-  normalizedFrom := ExcludeTrailingPathDelimiter(TPath.GetFullPath(fromDir));
-  normalizedTo := TPath.GetFullPath(toPath);
-  normalizedFrom := StringReplace(normalizedFrom, '/', PathDelim, [rfReplaceAll]);
-  normalizedTo := StringReplace(normalizedTo, '/', PathDelim, [rfReplaceAll]);
-
-  fromSegments := TStringUtils.SplitStr(normalizedFrom, PathDelim);
-  toSegments := TStringUtils.SplitStr(normalizedTo, PathDelim);
-
-  commonLen := 0;
-  while (commonLen < Length(fromSegments)) and (commonLen < Length(toSegments)) and
-        SameText(fromSegments[commonLen], toSegments[commonLen]) do
-    Inc(commonLen);
-
-  //if there's no common root (e.g. different drives) fall back to the absolute path.
-  if commonLen = 0 then
-  begin
-    result := normalizedTo;
-    exit;
-  end;
-
-  upCount := Length(fromSegments) - commonLen;
-  result := '';
-  for i := 0 to upCount - 1 do
-    result := result + '..' + PathDelim;
-  for k := commonLen to High(toSegments) do
-  begin
-    result := result + toSegments[k];
-    if k < High(toSegments) then
-      result := result + PathDelim;
-  end;
-  if result = '' then
-    result := '.';
+  result := TPrepareSourceGatherer.MakeRelativePath(fromDir, toPath);
 end;
 
 function RuntimeProjectName(const packageId : string) : string;

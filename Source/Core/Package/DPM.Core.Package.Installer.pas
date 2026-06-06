@@ -47,6 +47,7 @@ uses
   DPM.Core.Cache.Interfaces,
   DPM.Core.Package.Cache.Receipt,
   DPM.Core.Dependency.Interfaces,
+  DPM.Core.Project.PackageGenerator,
   DPM.Core.Compiler.Interfaces;
 
 type
@@ -60,6 +61,7 @@ type
     FContext: IPackageInstallerContext;
     FCompilerFactory: ICompilerFactory;
     FReceiptService : IReceiptService;
+    FPackageGenerator : IPackageProjectGenerator;
     // P2 §2.6 — populate each top-level reference's ManifestHash from the
     // verification receipt the cache wrote during install. The editor writes
     // this back to the .dproj as `manifestHash="sha256:..."`.
@@ -224,7 +226,8 @@ type
       const dependencyResolver: IDependencyResolver;
       const context: IPackageInstallerContext;
       const compilerFactory: ICompilerFactory;
-      const receiptService : IReceiptService);
+      const receiptService : IReceiptService;
+      const packageGenerator : IPackageProjectGenerator);
   end;
 
 implementation
@@ -531,11 +534,14 @@ var
 begin
   result := true;
   packagePath := FPackageCache.GetPackagePath(packageInfo);
+
   //BOM is per-platform: lib/{platform} folder is per-platform, so the compile-skip check must be too.
   //Otherwise a Win32 install leaves a BOM that incorrectly short-circuits a later Win64 install.
   bomFile := TPath.Combine(packagePath, 'package.' + DPMPlatformToBDString(Compiler.Platform) + '.bom');
 
-  // BOM optimization: skip if dependencies unchanged
+  // BOM optimization: skip if dependencies unchanged. A valid BOM means this package was already
+  // compiled on a prior install - which means any `package definitions` were already generated
+  // (that's what produced the compiled output), so there's no need to regenerate them here.
   if (not force) and FileExists(bomFile) then
   begin
     bomNode := TBOMFile.LoadFromFile(FLogger, bomFile);
@@ -554,6 +560,17 @@ begin
 
   if (not template.BuildEntries.Any) and (not template.DesignEntries.Any) then
     exit(true); // Nothing to compile
+
+  // Source-only libraries declare `package definitions` - generate their dpk/dproj into the cache
+  // before building. This runs only on the compile path (the BOM short-circuit above already
+  // returned when nothing changed), so we don't regenerate on every no-op install. The build/design
+  // entry `project` paths must match the definition paths so both resolve to the same cache file.
+  if (FPackageGenerator <> nil) and template.PackageDefinitions.Any then
+  begin
+    if not FPackageGenerator.Generate(cancellationToken, packageSpec, template, packagePath,
+          Compiler.compilerVersion, packageSpec.TargetPlatform.Platforms) then
+      exit(false);
+  end;
 
   // Setup configuration
   if forceDebug then
@@ -764,7 +781,8 @@ end;
 
 constructor TPackageInstaller.Create(const logger: ILogger; const configurationManager: IConfigurationManager; const repositoryManager: IPackageRepositoryManager;
                                      const packageCache: IPackageCache; const dependencyResolver: IDependencyResolver; const context: IPackageInstallerContext;
-                                     const compilerFactory: ICompilerFactory; const receiptService : IReceiptService);
+                                     const compilerFactory: ICompilerFactory; const receiptService : IReceiptService;
+                                     const packageGenerator : IPackageProjectGenerator);
 begin
   FLogger := logger;
   FConfigurationManager := configurationManager;
@@ -774,6 +792,7 @@ begin
   FContext := context;
   FCompilerFactory := compilerFactory;
   FReceiptService := receiptService;
+  FPackageGenerator := packageGenerator;
 end;
 
 procedure TPackageInstaller.PopulateManifestHashes(const graph : IPackageReference;

@@ -218,6 +218,7 @@ var
   es, asrc : ISpecSourceEntry;
   eb, ab : ISpecBuildEntry;
   edsn, adsn : ISpecDesignEntry;
+  epd, apd : ISpecPackageDefinition;
   ctx : string;
 begin
   Assert.AreEqual(expected.Templates.Count, actual.Templates.Count, 'template count');
@@ -270,6 +271,19 @@ begin
       Assert.AreEqual(edsn.LibPrefix, adsn.LibPrefix, ctx + ' design libPrefix ' + edsn.Project);
       Assert.AreEqual(edsn.LibVersion, adsn.LibVersion, ctx + ' design libVersion ' + edsn.Project);
       AssertStringListsEqual(edsn.References, adsn.References, ctx + ' design references ' + edsn.Project);
+    end;
+
+    Assert.AreEqual(et.PackageDefinitions.Count, at.PackageDefinitions.Count, ctx + ' package definition count');
+    for j := 0 to et.PackageDefinitions.Count - 1 do
+    begin
+      epd := et.PackageDefinitions[j];
+      apd := at.FindPackageDefinition(epd.Project);
+      Assert.IsTrue(apd <> nil, ctx + ' missing package definition ' + epd.Project);
+      Assert.AreEqual(epd.Kind, apd.Kind, ctx + ' package definition kind ' + epd.Project);
+      Assert.IsTrue(epd.Platforms = apd.Platforms, ctx + ' package definition platforms ' + epd.Project);
+      AssertStringListsEqual(epd.Files, apd.Files, ctx + ' package definition files ' + epd.Project);
+      AssertStringListsEqual(epd.Exclude, apd.Exclude, ctx + ' package definition exclude ' + epd.Project);
+      AssertStringListsEqual(epd.Requires, apd.Requires, ctx + ' package definition requires ' + epd.Project);
     end;
   end;
 end;

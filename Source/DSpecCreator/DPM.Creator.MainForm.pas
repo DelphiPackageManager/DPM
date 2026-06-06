@@ -286,6 +286,9 @@ type
     btnUpload : TButton;
     btnCancelUpload : TButton;
     Memo3 : TMemo;
+    crdPackageDefsHeading: TCard;
+    lblPackageDefsHeading: TLabel;
+    lblPackageDefsDescription: TLabel;
     procedure FormDestroy(Sender : TObject);
     procedure btnAddExcludeClick(Sender : TObject);
     procedure btnAddTemplateClick(Sender : TObject);

@@ -68,18 +68,6 @@ type
 
 
 
-    //used for git-registry style manifests
-  ISpecVersion = interface
-  ['{56ED6A29-D5CE-4E93-AAE5-84C9C0E2ADCB}']
-    function GetVersion : TPackageVersion;
-    procedure SetVersion(version : TPackageVersion);
-    function GetCommit  : string;
-    procedure SetCommit(const value : string);
-    property Version : TPackageVersion read GetVersion write SetVersion;
-    property Commit : string read GetCommit write SetCommit;
-  end;
-
-
   ISpecMetaData = interface(ISpecNode)
     ['{9972F2EA-4180-4D12-9193-13A55B927B81}']
     function GetId : string;
@@ -121,13 +109,10 @@ type
     procedure SetReadMe(const value : string);
     procedure SetFrameworks(const value : TArray<TDPMUIFrameworkType>);
 
-    function GetVersions : IList<ISpecVersion>;
-    function HasVersions : boolean;
     function Clone : ISpecMetaData;
 
     property Id : string read GetId write SetId;
     property Version : TPackageVersion read GetVersion write SetVersion;
-    property Versions : IList<ISpecVersion> read GetVersions;
     property Description : string read GetDescription write SetDescription;
     property Authors : IList<string> read GetAuthors;
     property ProjectUrl       : string read GetProjectUrl write SetProjectUrl;
@@ -225,12 +210,49 @@ type
   end;
 
 
+  /// <summary>
+  /// Declares a package project (dpk/dproj) that DPM should generate for a source-only
+  /// library that doesn't ship its own package projects. The project is generated into the
+  /// package cache version folder at install time, then compiled via the matching build/design
+  /// entry. The Project path must match the corresponding build/design entry's project path.
+  /// </summary>
+  ISpecPackageDefinition = interface(ISpecNode)
+    ['{E6A1B3C4-5D7E-4F12-9A3B-8C2D4E6F1A09}']
+    function GetProject : string;
+    function GetFiles : IList<string>;
+    function GetExclude : IList<string>;
+    function GetRequires : IList<string>;
+    function GetPlatforms : TDPMPlatforms;
+    function GetKind : string;
+
+    procedure SetProject(const value : string);
+    procedure SetPlatforms(const value : TDPMPlatforms);
+    procedure SetKind(const value : string);
+
+    function Clone : ISpecPackageDefinition;
+
+    /// <summary> The dproj for the package project to generate (path + name, relative to the package root). </summary>
+    property Project : string read GetProject write SetProject;
+    /// <summary> Source file glob patterns to include, same syntax as a source entry's src. </summary>
+    property Files : IList<string> read GetFiles;
+    /// <summary> Glob patterns to exclude from the matched files, same semantics as a source entry's exclude. </summary>
+    property Exclude : IList<string> read GetExclude;
+    /// <summary> Package names to add to the dpk requires clause (beyond the implicit rtl / designide). </summary>
+    property Requires : IList<string> read GetRequires;
+    /// <summary> Optional platform override. Empty = use the targetPlatform's platforms. </summary>
+    property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
+    /// <summary> Optional explicit kind: 'runtime' or 'design'. Empty = infer (design when requires contains designide, else runtime). </summary>
+    property Kind : string read GetKind write SetKind;
+  end;
+
+
   ISpecTemplate = interface(ISpecNode)
     ['{B4DE32F7-AE58-4519-B69D-2389F12EC63F}']
     function GetSourceFiles : IList<ISpecSourceEntry>;
     function GetDesignFiles : IList<ISpecDesignEntry>;
     function GetDependencies : IList<ISpecDependency>;
     function GetBuildEntries : IList<ISpecBuildEntry>;
+    function GetPackageDefinitions : IList<ISpecPackageDefinition>;
     function GetName : string;
     procedure SetName(const templateName: string);
 
@@ -246,16 +268,19 @@ type
     function NewSource(const src: string): ISpecSourceEntry;
     function NewBuildEntry(const project : string) : ISpecBuildEntry;
     function NewDesignEntry(const project : string) : ISpecDesignEntry;
+    function NewPackageDefinition(const project : string) : ISpecPackageDefinition;
 
     procedure DeleteDependency(const id : string);
     procedure DeleteSource(const src: string);
     procedure DeleteBuildEntry(const project : string);
     procedure DeleteDesignEntry(const project : string);
+    procedure DeletePackageDefinition(const project : string);
 
     function FindDependency(const id : string) : ISpecDependency;
     function FindSourceEntry(const src : string) : ISpecSourceEntry;
     function FindBuildEntry(const project : string) : ISpecBuildEntry;
     function FindDesignEntry(const project : string) : ISpecDesignEntry;
+    function FindPackageDefinition(const project : string) : ISpecPackageDefinition;
 
 
     function Clone : ISpecTemplate;
@@ -265,6 +290,7 @@ type
     property SourceEntries : IList<ISpecSourceEntry>read GetSourceFiles;
     property BuildEntries : IList<ISpecBuildEntry>read GetBuildEntries;
     property DesignEntries: IList<ISpecDesignEntry> read GetDesignFiles;
+    property PackageDefinitions : IList<ISpecPackageDefinition> read GetPackageDefinitions;
 
     property SourceComments : TStrings read GetSourceComments;
     property DependenciesComments : TStrings read GetDependenciesComments;

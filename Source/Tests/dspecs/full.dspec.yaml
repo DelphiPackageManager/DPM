@@ -62,6 +62,23 @@ templates:
         libVersion: "29.0"
         references:
           - designide
+    package definitions:
+      - project: .\packages\$packagesource$\GenLibR.dproj
+        kind: runtime
+        requires:
+          - vcl
+        files:
+          - .\source\*.pas
+        exclude:
+          - Test*.pas
+        platforms: [Win32, Win64]
+      - project: .\packages\$packagesource$\GenLibDesign.dproj
+        kind: design
+        requires:
+          - GenLibR
+        files:
+          - .\design\*.pas
+          - .\design\*.dfm
   - name: legacy
     source:
       - src: .\legacy\*.pas

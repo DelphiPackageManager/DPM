@@ -1,4 +1,4 @@
-﻿{***************************************************************************}
+{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -75,149 +75,79 @@ type
 implementation
 
 uses
+  Winapi.Windows,
   System.Classes,
   System.SysUtils,
-  System.StrUtils;
+  System.StrUtils,
+  DPM.Core.Utils.Hash;
+
+//Pull in the dpk/dproj scaffold templates. Delphi compiles the .rc on demand via
+//brcc32, so rebuilding any binary that uses this unit embeds the latest template
+//content. The .rc lives in the Source/ directory (alongside dpm.rc) so both the CLI
+//and every IDE plugin share one source - $R resolves first in this unit's directory,
+//then in the project (.dpr) directory which is Source/ for every consumer here.
+{$R '..\..\DPM.PrepareTemplates.res'}
 
 const
-  cDpkTemplate =
-    'package {{PACKAGE_ID}};'#13#10 +
-    #13#10 +
-    '{$R *.res}'#13#10 +
-    '{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}'#13#10 +
-    '{$ALIGN 8}'#13#10 +
-    '{$ASSERTIONS ON}'#13#10 +
-    '{$BOOLEVAL OFF}'#13#10 +
-    '{$DEBUGINFO ON}'#13#10 +
-    '{$EXTENDEDSYNTAX ON}'#13#10 +
-    '{$IMPORTEDDATA ON}'#13#10 +
-    '{$IOCHECKS ON}'#13#10 +
-    '{$LOCALSYMBOLS ON}'#13#10 +
-    '{$LONGSTRINGS ON}'#13#10 +
-    '{$OPENSTRINGS ON}'#13#10 +
-    '{$OPTIMIZATION OFF}'#13#10 +
-    '{$OVERFLOWCHECKS OFF}'#13#10 +
-    '{$RANGECHECKS OFF}'#13#10 +
-    '{$REFERENCEINFO ON}'#13#10 +
-    '{$SAFEDIVIDE OFF}'#13#10 +
-    '{$STACKFRAMES ON}'#13#10 +
-    '{$TYPEDADDRESS OFF}'#13#10 +
-    '{$VARSTRINGCHECKS ON}'#13#10 +
-    '{$WRITEABLECONST OFF}'#13#10 +
-    '{$MINENUMSIZE 1}'#13#10 +
-    '{$IMAGEBASE $400000}'#13#10 +
-    '{$DEFINE DEBUG}'#13#10 +
-    '{$ENDIF IMPLICITBUILDING}'#13#10 +
-    '{{LIBSUFFIX_DIRECTIVE}}'#13#10 +
-    '{{KIND_DIRECTIVE}}'#13#10 +
-    '{$IMPLICITBUILD OFF}'#13#10 +
-    #13#10 +
-    'requires'#13#10 +
-    '{{REQUIRES_ENTRIES}}'#13#10 +
-    #13#10 +
-    'contains'#13#10 +
-    '{{CONTAINS_ENTRIES}}'#13#10 +
-    'end.'#13#10;
+  cDpkResource     = 'DPM_DPK_TEMPLATE';
+  cDprojResource   = 'DPM_DPROJ_TEMPLATE';
+  cTemplateResType = 'TEMPLATE';
 
-  //Minimal dproj template - XE2-flavored, modelled on a real XE2 package dproj. The
-  //transformer rewrites ProjectVersion, DCC_DebugInformation (and DCC_LibSuffix if
-  //present), DPMCompiler per target compiler when the file is propagated. Targets
-  //Win32 + Win64 by default; the author can add other platforms in the IDE.
-  cDprojTemplate =
-    '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">'#13#10 +
-    '    <PropertyGroup>'#13#10 +
-    '        <ProjectGuid>{{GUID_PROJECT}}</ProjectGuid>'#13#10 +
-    '        <MainSource>{{PACKAGE_ID}}.dpk</MainSource>'#13#10 +
-    '        <ProjectVersion>{{PROJECT_VERSION}}</ProjectVersion>'#13#10 +
-    '        <FrameworkType>None</FrameworkType>'#13#10 +
-    '        <Base>true</Base>'#13#10 +
-    '        <Config Condition="''$(Config)''==''''">Release</Config>'#13#10 +
-    '        <Platform Condition="''$(Platform)''==''''">{{DEFAULT_PLATFORM}}</Platform>'#13#10 +
-    '        <TargetedPlatforms>3</TargetedPlatforms>'#13#10 +
-    '        <AppType>Package</AppType>'#13#10 +
-    '        <ProjectName Condition="''$(ProjectName)''==''''">{{PACKAGE_ID}}</ProjectName>'#13#10 +
-    '    </PropertyGroup>'#13#10 +
-    '    <PropertyGroup Condition="''$(Config)''==''Base'' or ''$(Base)''!=''''">'#13#10 +
-    '        <Base>true</Base>'#13#10 +
-    '    </PropertyGroup>'#13#10 +
-    '    <PropertyGroup Condition="''$(Config)''==''Debug'' or ''$(Cfg_1)''!=''''">'#13#10 +
-    '        <Cfg_1>true</Cfg_1>'#13#10 +
-    '        <CfgParent>Base</CfgParent>'#13#10 +
-    '        <Base>true</Base>'#13#10 +
-    '    </PropertyGroup>'#13#10 +
-    '{{CFG_DEBUG_PLATFORM_GROUPS}}' +
-    '    <PropertyGroup Condition="''$(Config)''==''Release'' or ''$(Cfg_2)''!=''''">'#13#10 +
-    '        <Cfg_2>true</Cfg_2>'#13#10 +
-    '        <CfgParent>Base</CfgParent>'#13#10 +
-    '        <Base>true</Base>'#13#10 +
-    '    </PropertyGroup>'#13#10 +
-    '{{CFG_RELEASE_PLATFORM_GROUPS}}' +
-    '    <PropertyGroup Condition="''$(Base)''!=''''">'#13#10 +
-    '        <DllSuffix>{{LIB_SUFFIX}}</DllSuffix>'#13#10 +
-    '        <DCC_OutputNeverBuildDcps>true</DCC_OutputNeverBuildDcps>'#13#10 +
-    '        <DCC_CBuilderOutput>All</DCC_CBuilderOutput>'#13#10 +
-    '        <GenPackage>true</GenPackage>'#13#10 +
-    '        <GenDll>true</GenDll>'#13#10 +
-    '{{PACKAGE_KIND_FLAG}}' +
-    '        <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>'#13#10 +
-    '        <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>'#13#10 +
-    '        <DCC_E>false</DCC_E>'#13#10 +
-    '        <DCC_N>false</DCC_N>'#13#10 +
-    '        <DCC_S>false</DCC_S>'#13#10 +
-    '        <DCC_F>false</DCC_F>'#13#10 +
-    '        <DCC_K>false</DCC_K>'#13#10 +
-    '        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>'#13#10 +
-    '        <SanitizedProjectName>{{PACKAGE_ID}}</SanitizedProjectName>'#13#10 +
-    '    </PropertyGroup>'#13#10 +
-    '    <PropertyGroup Condition="''$(Cfg_1)''!=''''">'#13#10 +
-    '        <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>'#13#10 +
-    '        <DCC_Optimize>false</DCC_Optimize>'#13#10 +
-    '        <DCC_GenerateStackFrames>true</DCC_GenerateStackFrames>'#13#10 +
-    '        <DCC_DebugInfoInExe>true</DCC_DebugInfoInExe>'#13#10 +
-    '        <DCC_RemoteDebug>true</DCC_RemoteDebug>'#13#10 +
-    '    </PropertyGroup>'#13#10 +
-    '{{PLATFORM_OVERRIDES}}' +
-    '    <PropertyGroup Condition="''$(Cfg_2)''!=''''">'#13#10 +
-    '        <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>'#13#10 +
-    '        <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>'#13#10 +
-    '        <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>'#13#10 +
-    '        <DCC_DebugInformation>{{DEBUG_INFO_RELEASE}}</DCC_DebugInformation>'#13#10 +
-    '    </PropertyGroup>'#13#10 +
-    '    <ItemGroup>'#13#10 +
-    '        <DelphiCompile Include="$(MainSource)">'#13#10 +
-    '            <MainSource>MainSource</MainSource>'#13#10 +
-    '        </DelphiCompile>'#13#10 +
-    '        <DCCReference Include="rtl.dcp"/>'#13#10 +
-    '{{DCC_REFERENCES}}' +
-    '        <BuildConfiguration Include="Release">'#13#10 +
-    '            <Key>Cfg_2</Key>'#13#10 +
-    '            <CfgParent>Base</CfgParent>'#13#10 +
-    '        </BuildConfiguration>'#13#10 +
-    '        <BuildConfiguration Include="Base">'#13#10 +
-    '            <Key>Base</Key>'#13#10 +
-    '        </BuildConfiguration>'#13#10 +
-    '        <BuildConfiguration Include="Debug">'#13#10 +
-    '            <Key>Cfg_1</Key>'#13#10 +
-    '            <CfgParent>Base</CfgParent>'#13#10 +
-    '        </BuildConfiguration>'#13#10 +
-    '    </ItemGroup>'#13#10 +
-    '    <ProjectExtensions>'#13#10 +
-    '        <Borland.Personality>Delphi.Personality.12</Borland.Personality>'#13#10 +
-    '        <Borland.ProjectType>Package</Borland.ProjectType>'#13#10 +
-    '        <BorlandProject>'#13#10 +
-    '            <Delphi.Personality>'#13#10 +
-    '                <Source>'#13#10 +
-    '                    <Source Name="MainSource">{{PACKAGE_ID}}.dpk</Source>'#13#10 +
-    '                </Source>'#13#10 +
-    '            </Delphi.Personality>'#13#10 +
-    '            <Platforms>'#13#10 +
-    '{{PLATFORMS_LIST}}' +
-    '            </Platforms>'#13#10 +
-    '        </BorlandProject>'#13#10 +
-    '        <ProjectFileVersion>12</ProjectFileVersion>'#13#10 +
-    '    </ProjectExtensions>'#13#10 +
-    '    <Import Condition="Exists(''$(BDS)\Bin\CodeGear.Delphi.Targets'')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>'#13#10 +
-    '</Project>'#13#10;
+//Load an embedded template resource (RCDATA-style, UTF-8) as a string and normalise
+//to CRLF line endings so the generated dpk/dproj is consistent regardless of how the
+//template file was saved. Raises on a missing/empty resource - that's a build defect,
+//not a recoverable runtime condition.
+function LoadTemplateResource(const resName : string) : string;
+var
+  hRes : HRSRC;
+  hMem : HGLOBAL;
+  ptr : Pointer;
+  size : DWORD;
+  bytes : TBytes;
+begin
+  result := '';
+  hRes := FindResource(HInstance, PChar(resName), PChar(cTemplateResType));
+  if hRes <> 0 then
+  begin
+    hMem := LoadResource(HInstance, hRes);
+    if hMem <> 0 then
+    begin
+      ptr := LockResource(hMem);
+      size := SizeofResource(HInstance, hRes);
+      if (ptr <> nil) and (size > 0) then
+      begin
+        SetLength(bytes, size);
+        Move(ptr^, bytes[0], size);
+        result := TEncoding.UTF8.GetString(bytes);
+      end;
+    end;
+  end;
+  if result = '' then
+    raise Exception.Create('DPM template resource [' + resName + '] is missing or empty - rebuild required.');
+  //normalise to CRLF (collapse any CRLF/CR/LF mix to LF first, then expand).
+  result := StringReplace(result, #13#10, #10, [rfReplaceAll]);
+  result := StringReplace(result, #13, #10, [rfReplaceAll]);
+  result := StringReplace(result, #10, #13#10, [rfReplaceAll]);
+end;
+
+//Derive a stable project GUID from the project name so regenerating a package project
+//(e.g. on every install) produces a byte-identical dproj rather than churning the GUID.
+//Uses the first 16 bytes of a SHA256 over the lower-cased name - XE2-safe (no System.Hash).
+function DeterministicProjectGuid(const seed : string) : string;
+var
+  stream : TStringStream;
+  digest : TBytes;
+  guid : TGUID;
+begin
+  stream := TStringStream.Create(LowerCase(seed), TEncoding.UTF8);
+  try
+    digest := THashSHA256.GetHashBytes(stream);
+  finally
+    stream.Free;
+  end;
+  Move(digest[0], guid, SizeOf(TGUID));
+  result := GUIDToString(guid);
+end;
 
 function ExtractUnitName(const relativePath : string) : string;
 begin
@@ -305,7 +235,7 @@ begin
     requiresLines.Free;
   end;
 
-  result := cDpkTemplate;
+  result := LoadTemplateResource(cDpkResource);
   result := StringReplace(result, '{{PACKAGE_ID}}', packageId, [rfReplaceAll]);
 
   //LIBSUFFIX directive syntax differs by version:
@@ -417,7 +347,6 @@ class function TPrepareTemplates.RenderDproj(const packageId : string; const com
 var
   debugInfoRelease : string;
   projectGuid : string;
-  newGuid : TGUID;
   references : string;
   packageKindFlag : string;
   effectivePlatforms : TDPMPlatforms;
@@ -436,9 +365,8 @@ begin
   else
     debugInfoRelease := 'false';
 
-  //GUIDToString returns the value wrapped in braces.
-  CreateGUID(newGuid);
-  projectGuid := GUIDToString(newGuid);
+  //Derive a stable GUID from the project name so regeneration is idempotent.
+  projectGuid := DeterministicProjectGuid(packageId);
 
   references := '';
   //Required sibling packages come first as <name>.dcp DCCReferences (matches the
@@ -491,7 +419,7 @@ begin
     packageKindFlag := '        <RuntimeOnlyPackage>true</RuntimeOnlyPackage>'#13#10;
   end;
 
-  result := cDprojTemplate;
+  result := LoadTemplateResource(cDprojResource);
   result := StringReplace(result, '{{PACKAGE_ID}}', packageId, [rfReplaceAll]);
   result := StringReplace(result, '{{PROJECT_VERSION}}', CompilerVersionToProjectVersion(compiler), [rfReplaceAll]);
   result := StringReplace(result, '{{LIB_SUFFIX}}', CompilerToDefaultLibSuffix(compiler), [rfReplaceAll]);

@@ -290,6 +290,45 @@ design:
 
 > **Note:** Design-time packages are only supported on Win32 and Win64 platforms.
 
+### Package Definitions (Auto-generated Projects)
+
+Some libraries ship only `.pas` source and no Delphi package projects (`.dpk`/`.dproj`) —
+this is common for `packageKind: git` source libraries. A `package definitions` section lets
+you describe the package projects DPM should **generate** for such a library. On install, DPM
+renders the `.dpk`/`.dproj` into the package cache and the matching `build`/`design` entry
+compiles them, so consumers still get precompiled, IDE-installable packages.
+
+```yaml
+package definitions:
+  - project: "./packages/MyLibR.dproj"   # path + name to generate
+    kind: runtime                         # optional - inferred when omitted (see below)
+    requires:                             # extra requires beyond rtl
+      - vcl
+    files:                                # globs (same syntax as a source src)
+      - "./src/*.pas"
+    exclude:                              # optional - file-name globs to drop
+      - "*.Tests.pas"
+    platforms:                            # optional - overrides targetPlatform platforms
+      - Win32
+      - Win64
+  - project: "./packages/MyLibDesign.dproj"
+    kind: design
+    requires: [vcl, MyLibR]
+    files: ["./design/*.pas", "./design/*.dfm"]
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `project` | Yes | Path + name of the `.dproj` to generate. **Must match** the `build`/`design` entry that compiles it, so both resolve to the same file in the cache. |
+| `files` | Yes | Ant-pattern globs for the units to include (`.pas`/`.inc`/`.rc`/`.res`; matching `.dfm` forms are pulled in automatically). |
+| `kind` | No | `runtime` (`{$RUNONLY}`) or `design` (`{$DESIGNONLY}`, adds `designide`). When omitted, `design` is inferred if `requires` contains `designide`, otherwise `runtime`. |
+| `requires` | No | Packages added to the dpk `requires` clause (and as `<DCCReference>`s). `rtl` is always added; `designide` is added for design packages. |
+| `exclude` | No | Glob patterns (matched against file names) removed from the matched `files`. |
+| `platforms` | No | Overrides the targetPlatform's platforms; intersected with them when present. |
+
+> **Note:** Because `kind` inference keys off `designide`, a design package that lists only
+> `vcl`/`fmx` in its requires should set `kind: design` explicitly.
+
 ### Complete Template Example
 
 ```yaml

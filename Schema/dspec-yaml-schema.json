@@ -104,27 +104,6 @@
                     "type": "string",
                     "description": "The semantic version of this package"
                 },
-                "versions": {
-                    "type ": "array",
-                    "items": {
-                        "type": "object",
-                        "minItems": 1,
-                        "properties": {
-                            "version": {
-                                "type": "string",
-                                "description": "A semantic version"
-                            },
-                            "commit": {
-                                "type": "string",
-                                "description": "The commit hash for this version"
-                            }
-                        },
-                        "required": [
-                            "version",
-                            "commit"
-                        ]
-                    }
-                },
                 "description": {
                     "type": "string",
                     "description": "A brief description of the product."
@@ -190,31 +169,10 @@
             },
             "required": [
                 "id",
+                "version",
                 "description",
                 "authors",
                 "license"
-            ],
-            "oneOf": [
-                {
-                    "properties": {
-                        "version": {
-                            "minItems": 1
-                        }
-                    },
-                    "required": [
-                        "version"
-                    ]
-                },
-                {
-                    "properties": {
-                        "versions": {
-                            "minItems": 1
-                        }
-                    },
-                    "required": [
-                        "versions"
-                    ]
-                }
             ],
             "additionalProperties": false
         },
@@ -435,48 +393,54 @@
                     },
                     "package definitions": {
                         "type": "array",
-                        "description": "On or more package definitions that describe how to build the libary",
+                        "description": "One or more package projects (dpk/dproj) to generate for a source-only library that ships no package projects. They are generated into the package cache and compiled at install time. Each definition's project path must match the build/design entry that compiles it.",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "name": {
+                                "project": {
                                     "type": "string",
-                                    "description": "The delphi package name to generate, no file extension"
+                                    "description": "Path + name of the dproj to generate (e.g. ./packages/MyLibR.dproj). Must match the corresponding build/design entry's project path."
                                 },
-                                "description": {
+                                "kind": {
                                     "type": "string",
-                                    "description": "Package description"
+                                    "enum": [
+                                        "runtime",
+                                        "design"
+                                    ],
+                                    "description": "Optional. 'runtime' ({$RUNONLY}) or 'design' ({$DESIGNONLY}, requires designide). When omitted, design is inferred if requires contains designide, otherwise runtime."
                                 },
-                                "requires": {
+                                "files": {
                                     "type": "array",
-                                    "description": "List of delphi packages to add to requures, e.g rtl,vcl,fmx (without .dcp)",
+                                    "description": "Ant-pattern globs (same syntax as a source entry's src) for the units to include in the generated package.",
                                     "items": {
                                         "type": "string"
                                     }
                                 },
-                                "source": {
+                                "exclude": {
                                     "type": "array",
-                                    "description": "One or more files objects",
+                                    "description": "Optional glob patterns (matched against file names) to exclude from the matched files.",
                                     "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "files": {
-                                                "type": "string",
-                                                "description": "Ant pattern file mask of files to include"
-                                            },
-                                            "exclude": {
-                                                "type": "string",
-                                                "description": "File mask of files to exclude. Use semicolon to seperate multiple masks"
-                                            }
-                                        },
-                                        "additionalProperties": false
+                                        "type": "string"
+                                    }
+                                },
+                                "requires": {
+                                    "type": "array",
+                                    "description": "Delphi packages to add to the dpk requires clause (e.g. vcl, fmx, sibling runtime packages), without .dcp. rtl is always added; designide is added for design packages.",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "platforms": {
+                                    "type": "array",
+                                    "description": "Optional platform override. When omitted, the targetPlatform's platforms are used. When present, intersected with the targetPlatform's platforms.",
+                                    "items": {
+                                        "type": "string"
                                     }
                                 }
                             },
                             "required": [
-                                "name",
-                                "source",
-                                "requires"
+                                "project",
+                                "files"
                             ],
                             "additionalProperties": false
                         }

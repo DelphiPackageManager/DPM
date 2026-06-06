@@ -165,6 +165,9 @@
         <DCCReference Include="Core\Project\DPM.Core.Project.Interfaces.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.Templates.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.SourceFiles.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.PackageGenerator.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.PackageDefinition.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Transformer.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.MapFile.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.SearchPaths.pas"/>
@@ -251,6 +254,8 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.Reader.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.Collapse.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.RoundTrip.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.PackageGenerator.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Spec.PackageDefinitions.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Trust.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Trust.TrustSet.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Trust.Prompt.pas"/>

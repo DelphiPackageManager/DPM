@@ -26,7 +26,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Top = 0
     Width = 871
     Height = 558
-    ActivePage = tsInfo
+    ActivePage = tsTemplates
     Align = alClient
     TabOrder = 0
     OnChange = PageControlChange
@@ -454,7 +454,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Width = 529
         Height = 528
         Align = alClient
-        ActiveCard = crdSource
+        ActiveCard = crdDesign
         Caption = 'CardPanel'
         TabOrder = 0
         object crdSource: TCard
@@ -1008,6 +1008,41 @@ object DSpecCreatorForm: TDSpecCreatorForm
             WordWrap = True
           end
         end
+        object crdPackageDefsHeading: TCard
+          Left = 1
+          Top = 1
+          Width = 527
+          Height = 526
+          Caption = 'Package Definitions'
+          CardIndex = 9
+          TabOrder = 9
+          ExplicitLeft = 0
+          ExplicitTop = 0
+          ExplicitWidth = 185
+          ExplicitHeight = 41
+          object lblPackageDefsHeading: TLabel
+            Left = 24
+            Top = 24
+            Width = 104
+            Height = 15
+            Caption = 'Package Definitions'
+          end
+          object lblPackageDefsDescription: TLabel
+            Left = 24
+            Top = 48
+            Width = 497
+            Height = 292
+            AutoSize = False
+            Caption = 
+              'Package Definitions define how to generate package projects for ' +
+              'your source code. '#13#10#13#10'Use this if your project does not already ' +
+              'have delphi packages. '#13#10#13#10'Without packages, dpm cannot compile t' +
+              'he library, so users projects will refrence the source, resultin' +
+              'g in longer build times.'
+            Enabled = False
+            WordWrap = True
+          end
+        end
       end
       object Panel2: TPanel
         Left = 0
@@ -1548,21 +1583,21 @@ object DSpecCreatorForm: TDSpecCreatorForm
         object lblUploadSource: TLabel
           Left = 16
           Top = 10
-          Width = 38
+          Width = 36
           Height = 15
           Caption = 'Source'
         end
         object lblUploadApiKey: TLabel
           Left = 336
           Top = 10
-          Width = 44
+          Width = 40
           Height = 15
           Caption = 'API Key'
         end
         object lblUploadPackages: TLabel
           Left = 16
           Top = 90
-          Width = 230
+          Width = 216
           Height = 15
           Caption = 'Packages to upload (from output folder):'
         end
@@ -1611,6 +1646,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Top = 108
           Width = 620
           Height = 80
+          ItemHeight = 15
           TabOrder = 4
         end
         object btnRefreshPackages: TButton
@@ -1636,9 +1672,9 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Top = 198
           Width = 97
           Height = 25
+          Hint = 'Cancel the running upload (Esc)'
           Caption = 'Cancel'
           Enabled = False
-          Hint = 'Cancel the running upload (Esc)'
           TabOrder = 7
           OnClick = btnCancelUploadClick
         end

@@ -46,6 +46,7 @@ type
     FSourceFiles : IList<ISpecSourceEntry>;
     FBuildEntries : IList<ISpecBuildEntry>;
     FDesignFiles : IList<ISpecDesignEntry>;
+    FPackageDefinitions : IList<ISpecPackageDefinition>;
 
     FSourceComments : TStringList;
     FDependenciesComments : TStringList;
@@ -58,6 +59,7 @@ type
     function GetDesignFiles : IList<ISpecDesignEntry>;
     function GetSourceFiles : IList<ISpecSourceEntry>;
     function GetBuildEntries : IList<ISpecBuildEntry>;
+    function GetPackageDefinitions : IList<ISpecPackageDefinition>;
     function GetName : string;
     procedure SetName(const templateName: string);
 
@@ -72,21 +74,25 @@ type
     function NewSource(const src: string): ISpecSourceEntry;
     function NewDesignEntry(const project : string) : ISpecDesignEntry;
     function NewBuildEntry(const project : string) : ISpecBuildEntry;
+    function NewPackageDefinition(const project : string) : ISpecPackageDefinition;
 
     procedure DeleteDependency(const id : string);
     procedure DeleteSource(const src: string);
     procedure DeleteBuildEntry(const project : string);
     procedure DeleteDesignEntry(const project : string);
+    procedure DeletePackageDefinition(const project : string);
 
     function FindDependency(const id : string) : ISpecDependency;
     function FindSourceEntry(const src : string) : ISpecSourceEntry;
     function FindBuildEntry(const project : string) : ISpecBuildEntry;
     function FindDesignEntry(const project : string) : ISpecDesignEntry;
+    function FindPackageDefinition(const project : string) : ISpecPackageDefinition;
 
     function LoadDependenciesFromYAML(const dependenciesArray : IYAMLSequence) : Boolean;
     function LoadSourceFromYAML(const sourceArray : IYAMLSequence) : Boolean;
     function LoadBuildEntriesFromYAML(const buildArray : IYAMLSequence) : Boolean;
     function LoadDesignFromYAML(const designArray : IYAMLSequence) : Boolean;
+    function LoadPackageDefinitionsFromYAML(const packageDefArray : IYAMLSequence) : Boolean;
 
 
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
@@ -102,6 +108,7 @@ type
     property DesignFiles : IList<ISpecDesignEntry> read GetDesignFiles;
     property Dependencies : IList<ISpecDependency>read GetDependencies;
     property BuildEntries : IList<ISpecBuildEntry>read GetBuildEntries;
+    property PackageDefinitions : IList<ISpecPackageDefinition>read GetPackageDefinitions;
 
   public
     constructor Create(const logger : ILogger); override;
@@ -116,7 +123,8 @@ uses
   DPM.Core.Spec.SourceEntry,
   DPM.Core.Spec.DesignEntry,
   DPM.Core.Spec.Dependency,
-  DPM.Core.Spec.BuildEntry;
+  DPM.Core.Spec.BuildEntry,
+  DPM.Core.Spec.PackageDefinition;
 
 
 { TSpecTemplate }
@@ -134,6 +142,7 @@ begin
   FSourceFiles := TCollections.CreateList<ISpecSourceEntry>;
   FBuildEntries := TCollections.CreateList<ISpecBuildEntry>;
   FDesignFiles := TCollections.CreateList<ISpecDesignEntry>;
+  FPackageDefinitions := TCollections.CreateList<ISpecPackageDefinition>;
 end;
 
 constructor TSpecTemplate.CreateClone(const logger : ILogger; const source : ISpecTemplate);
@@ -142,6 +151,7 @@ var
   newSourceEntry : ISpecSourceEntry;
   newBuildEntry : ISpecBuildEntry;
   newDesignEntry : ISpecDesignEntry;
+  newPackageDef : ISpecPackageDefinition;
   i : integer;
 begin
   Create(logger);
@@ -170,8 +180,11 @@ begin
     FDesignFiles.Add(newDesignEntry);
   end;
 
-
-  //TODO : Add packagedef cloning here!
+  for i := 0 to source.PackageDefinitions.Count -1 do
+  begin
+    newPackageDef := source.PackageDefinitions[i].Clone;
+    FPackageDefinitions.Add(newPackageDef);
+  end;
 end;
 
 procedure TSpecTemplate.DeleteBuildEntry(const project: string);
@@ -181,6 +194,15 @@ begin
   build := FindBuildEntry(project);
   if build <> nil then
     FBuildEntries.Remove(build);
+end;
+
+procedure TSpecTemplate.DeletePackageDefinition(const project: string);
+var
+  packageDef : ISpecPackageDefinition;
+begin
+  packageDef := FindPackageDefinition(project);
+  if packageDef <> nil then
+    FPackageDefinitions.Remove(packageDef);
 end;
 
 procedure TSpecTemplate.DeleteDependency(const id: string);
@@ -217,6 +239,7 @@ begin
   FDesignFiles := nil;
   FSourceFiles := nil;
   FBuildEntries := nil;
+  FPackageDefinitions := nil;
   inherited;
 end;
 
@@ -271,8 +294,12 @@ begin
       FDesignFiles[i].ToYAML(seq, packageKind);
   end;
 
-  //TODO : package definitions
-
+  if FPackageDefinitions.Any then
+  begin
+    seq := template.A['package definitions'];
+    for i := 0 to FPackageDefinitions.Count -1 do
+      FPackageDefinitions[i].ToYAML(seq, packageKind);
+  end;
 end;
 
 function TSpecTemplate.NewDependency(const id: string): ISpecDependency;
@@ -305,11 +332,30 @@ begin
   Result := buildEntry;
 end;
 
+function TSpecTemplate.NewPackageDefinition(const project : string) : ISpecPackageDefinition;
+var
+  packageDef : ISpecPackageDefinition;
+begin
+  packageDef := TSpecPackageDefinition.Create(Logger);
+  packageDef.Project := project;
+  FPackageDefinitions.Add(packageDef);
+  Result := packageDef;
+end;
+
 
 function TSpecTemplate.FindBuildEntry(const project : string) : ISpecBuildEntry;
 begin
   result := FBuildEntries.FirstOrDefault(
     function(const item : ISpecBuildEntry) : boolean
+    begin
+      result := SameText(item.Project, project);
+    end);
+end;
+
+function TSpecTemplate.FindPackageDefinition(const project : string) : ISpecPackageDefinition;
+begin
+  result := FPackageDefinitions.FirstOrDefault(
+    function(const item : ISpecPackageDefinition) : boolean
     begin
       result := SameText(item.Project, project);
     end);
@@ -352,6 +398,11 @@ end;
 function TSpecTemplate.GetBuildEntries : IList<ISpecBuildEntry>;
 begin
   result := FBuildEntries;
+end;
+
+function TSpecTemplate.GetPackageDefinitions : IList<ISpecPackageDefinition>;
+begin
+  result := FPackageDefinitions;
 end;
 
 function TSpecTemplate.GetDependencies : IList<ISpecDependency>;
@@ -461,6 +512,15 @@ begin
     end);
 end;
 
+function TSpecTemplate.LoadPackageDefinitionsFromYAML(const packageDefArray: IYAMLSequence): Boolean;
+begin
+  result := LoadYAMLCollection(packageDefArray, TSpecPackageDefinition,
+    procedure(const value : IInterface)
+    begin
+      FPackageDefinitions.Add(value as ISpecPackageDefinition);
+    end);
+end;
+
 function TSpecTemplate.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var
   collectionObj : IYAMLSequence;
@@ -487,7 +547,12 @@ begin
   if collectionObj.Count > 0 then
     result := LoadDesignFromYAML(collectionObj) and result;
 
-
+  if yamlObject.ContainsKey('package definitions') then
+  begin
+    collectionObj := yamlObject.A['package definitions'];
+    if collectionObj.Count > 0 then
+      result := LoadPackageDefinitionsFromYAML(collectionObj) and result;
+  end;
 end;
 
 end.

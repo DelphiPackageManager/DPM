@@ -1,0 +1,19 @@
+// ---------------------------------------------------------------------------
+// DPM package-project scaffold templates.
+//
+// Embeds the minimal dpk/dproj templates used to generate package projects for
+// source-only libraries (dpm prepare, and auto-generation at install time for
+// packages declaring `package definitions`). One copy is carried by every
+// dpm.exe and DPM.IDE.*.dll binary so generation is fully self-contained.
+//
+// Linked by DPM.Core.Project.Prepare.Templates via `{$R}` directive — see that
+// unit for the resource names the loader expects (DPM_DPK_TEMPLATE /
+// DPM_DPROJ_TEMPLATE, type TEMPLATE).
+//
+// Update flow:
+//   1. Edit templates\dpm-package.dpk.template / .dproj.template (CRLF, UTF-8).
+//   2. Rebuild — Delphi compiles this .rc via brcc32 on demand.
+// ---------------------------------------------------------------------------
+
+DPM_DPK_TEMPLATE   TEMPLATE "templates\dpm-package.dpk.template"
+DPM_DPROJ_TEMPLATE TEMPLATE "templates\dpm-package.dproj.template"

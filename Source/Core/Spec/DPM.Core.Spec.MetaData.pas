@@ -38,25 +38,11 @@ uses
   DPM.Core.Spec.Node;
 
 type
-  TSpecVersion = class(TInterfacedObject, ISpecVersion)
-  private
-    FVersion : TPackageVersion;
-    FCommit : string;
-  protected
-    function GetVersion : TPackageVersion;
-    procedure SetVersion(version : TPackageVersion);
-    function GetCommit  : string;
-    procedure SetCommit(const value : string);
-  public
-    constructor Create(version : TPackageVersion; const commit : string);
-  end;
-
   TSpecMetaData = class(TSpecNode, ISpecMetaData)
   private
     FPackageKind : TDPMPackageKind;
     FId : string;
     FVersion : TPackageVersion;
-    FVersions : IList<ISpecVersion>;
     FDescription : string;
     FAuthors : IList<string>;
     FProjectUrl : string;
@@ -74,7 +60,6 @@ type
     FReadme : string;
     FFrameworks : TArray<TDPMUIFrameworkType>;
   protected
-    function GetVersions : IList<ISpecVersion>;
     function GetVersion : TPackageVersion;
     function GetId : string;
     function GetDescription : string;
@@ -113,7 +98,6 @@ type
     procedure SetVersion(const value : TPackageVersion);
     procedure SetReadMe(const value : string);
     procedure SetFrameworks(const value : TArray<TDPMUIFrameworkType>);
-    function HasVersions : boolean;
 
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
@@ -154,24 +138,11 @@ end;
 
 
 constructor TSpecMetaData.CreateClone(const logger: ILogger; const source: ISpecMetadata);
-var
-  newVersion : ISpecVersion;
-  i : integer;
 begin
   inherited Create(logger);
   FPackageKind := source.PackageKind;
   FId := source.Id;
   FVersion := source.Version;
-  if source.HasVersions then
-  begin
-    FVersions := TCollections.CreateList<ISpecVersion>;
-    for i := 0 to source.Versions.Count -1 do
-    begin
-      //clone versions
-      newVersion := TSpecVersion.Create(source.Versions[i].Version,source.Versions[i].Commit );
-      FVersions.Add(newVersion);
-    end;
-  end;
   FDescription := source.Description;
   FAuthors := TCollections.CreateList<string>;
   FAuthors.AddRange(source.Authors);
@@ -298,41 +269,16 @@ begin
   result := FVersion;
 end;
 
-
-function TSpecMetaData.GetVersions: IList<ISpecVersion>;
-begin
-  if FVersions = nil then
-    FVersions := TCollections.CreateList<ISpecVersion>;
-  result := FVersions;
-end;
-
-function TSpecMetaData.HasVersions: boolean;
-begin
-  result := (FVersions <> nil) and (FVersions.Count > 0);
-end;
-
 function TSpecMetaData.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var
   sVersion : string;
   sError : string;
   sUI : string;
   authorsSeq : IYAMLSequence;
-  versionsSeq : IYAMLSequence;
   tagsSeq : IYAMLSequence;
-  sCommit : string;
   i: Integer;
-  versionObj : IYAMLMapping;
-  version : TPackageVersion;
-  specVersion : ISpecVersion;
   frameworksSeq : IYAMLSequence;
   framework : TDPMUIFrameworkType;
-
-  procedure EnsureVersions;
-  begin
-    if FVersions = nil then
-      FVersions := TCollections.CreateList<ISpecVersion>;
-  end;
-
 begin
   result := true;
   //preserve comments;
@@ -345,53 +291,23 @@ begin
     result := false;
   end;
 
-  case FPackageKind of
-    TDPMPackageKind.dpm:
+  //version is required for dpm packages. For git-registry packages the resolvable versions come
+  //from the repo's git tags (the dspec's version is set per-tag at resolve time), so the field is
+  //optional here - we still read it when present.
+  sVersion := yamlObject.S['version'];
+  if (sVersion = '') and (FPackageKind = TDPMPackageKind.dpm) then
+  begin
+    logger.Error('Required field [version] not found.');
+    result := false;
+  end;
+  if sVersion <> '' then
+  begin
+    if not TPackageVersion.TryParseWithError(sVersion, FVersion, sError) then
     begin
-      sVersion := yamlObject.S['version'];
-      if sVersion = '' then
-      begin
-        logger.Error('Required field [version] not found.');
-        result := false;
-      end;
-      if not TPackageVersion.TryParseWithError(sVersion, FVersion, sError) then
-      begin
-        logger.Error('Invalid Package Version : ' + sError);
-        result := false;
-      end;
-
-    end;
-    TDPMPackageKind.git:
-    begin
-      //For git registry packages the available versions normally come from the
-      //package repo's git tags, so a [versions] array is optional here. When it is
-      //present (legacy / explicit pinning) we still load it; [commit] is optional
-      //since the matching git tag supplies the commit.
-      versionsSeq := yamlObject.A['versions'];
-      for i := 0 to versionsSeq.Count -1 do
-      begin
-        versionObj := versionsSeq.Items[i].AsMapping;
-        sVersion := versionObj.S['version'];
-        if sVersion = '' then
-        begin
-          logger.Error('Required field [version] not found.');
-          result := false;
-          continue;
-        end;
-        if not TPackageVersion.TryParseWithError(sVersion, version, sError) then
-        begin
-          logger.Error('Invalid Package Version : ' + sError);
-          result := false;
-          continue;
-        end;
-        sCommit := versionObj.S['commit'];
-        EnsureVersions;
-        specVersion := TSpecVersion.Create(version, sCommit);
-        FVersions.Add(specVersion);
-      end;
+      logger.Error('Invalid Package Version : ' + sError);
+      result := false;
     end;
   end;
-
 
   FDescription := yamlObject.S['description'];
   if FDescription = '' then
@@ -547,8 +463,6 @@ end;
 procedure TSpecMetaData.ToYAML(const parentObj: IYAMLValue; const packageKind : TDPMPackageKind);
 var
   metaData : IYAMLMapping;
-  versions : IYAMLSequence;
-  version : IYAMLMapping;
   tagsSeq : IYAMLSequence;
   authorsSeq : IYAMLSequence;
   frameworksSeq : IYAMLSequence;
@@ -557,29 +471,10 @@ begin
   metaData := parentObj.AsMapping.O['metadata'];
   metaData.S['id'] := FId;
 
-  case packageKind of
-    TDPMPackageKind.dpm: 
-    begin
-      metaData.S['version'] := FVersion.ToString;
-    end;
-    TDPMPackageKind.git:
-    begin
-      if (FVersions = nil) or (not FVersions.Any) then
-        raise Exception.Create('Git style packages must use "versions" with at least 1 version');
-      versions := metaData.A['versions'];
-      for i := 0 to FVersions.Count -1 do
-      begin
-        if FVersions[i].Commit = '' then
-          raise Exception.Create('commit must be a commit hash');
-        if FVersions[i].Version.IsEmpty then
-          raise Exception.Create('version must be a valid semantic version');
-       
-        version := versions.AddMapping;
-        version.S['version'] := FVersions[i].Version.ToString;       
-        version.S['commit'] := FVersions[i].Commit; 
-      end;
-    end;
-  end;
+  //Both dpm and git-registry packages carry a single semantic version. For git packages the
+  //resolvable versions come from the repo's git tags; the dspec version is informational and is
+  //overwritten per-tag at resolve time.
+  metaData.S['version'] := FVersion.ToString;
 
   metaData.S['description'] := FDescription;
   if Length(FIcon) > 0 then
@@ -632,34 +527,6 @@ begin
   if Length(FReadme) > 0 then
     metaData.S['readme'] := FReadme;
 
-end;
-
-{ TSpecVersion }
-
-constructor TSpecVersion.Create(version: TPackageVersion; const commit: string);
-begin
-  FVersion := version;
-  FCommit := commit;
-end;
-
-function TSpecVersion.GetCommit: string;
-begin
-  result := FCommit;
-end;
-
-function TSpecVersion.GetVersion: TPackageVersion;
-begin
-  result := FVersion;
-end;
-
-procedure TSpecVersion.SetCommit(const value: string);
-begin
-  FCommit := value;
-end;
-
-procedure TSpecVersion.SetVersion(version: TPackageVersion);
-begin
-  FVersion := version;
 end;
 
 end.

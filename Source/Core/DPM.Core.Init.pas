@@ -77,6 +77,7 @@ uses
   DPM.Core.Project.MapFile,
   DPM.Core.Project.Transformer,
   DPM.Core.Project.Prepare,
+  DPM.Core.Project.PackageGenerator,
   DPM.Core.SBOM.Interfaces,
   DPM.Core.SBOM.Writers,
   DPM.Core.SBOM.Writers.Reports,
@@ -121,6 +122,9 @@ begin
   Container.RegisterType<IProjectTransformer, TProjectTransformer>;
   Container.RegisterType<IDpkTransformer, TDpkTransformer>;
   Container.RegisterType<IPreparePackageFolders, TPreparePackageFolders>;
+
+  //Install-time package-project generation for source-only libraries (`package definitions`).
+  Container.RegisterType<IPackageProjectGenerator, TPackageProjectGenerator>;
 
   Container.RegisterType<ICompilerEnvironmentProvider, TCompilerEnvironmentProvider>;
   Container.RegisterType<ICompilerFactory, TCompilerFactory>().AsSingleton();
