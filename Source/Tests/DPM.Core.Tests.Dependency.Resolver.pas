@@ -231,6 +231,25 @@ type
 
     [Test]
     procedure BuildDependencyGraph_Same_Transitive_Two_Parents_Records_Each_Declared_Range;
+
+    //bundled dependencies (sentinel 999.999.999, e.g. Indy)
+    [Test]
+    procedure Bundled_Dependency_NoRealPackage_Resolves_AsNoop;
+
+    [Test]
+    procedure Bundled_Dependency_RealTopLevel_Wins;
+
+    [Test]
+    procedure Bundled_Dependency_RealTransitive_Wins;
+
+    [Test]
+    procedure Bundled_Dependency_TwoParents_SingleNode;
+
+    [Test]
+    procedure Bundled_Dependency_CrossProject_Real_Wins;
+
+    [Test]
+    procedure Bundled_Dependency_Excluded_From_Graph;
   end;
 
 implementation
@@ -268,6 +287,13 @@ end;
 function MakeDep(const id : string; const range : string) : IPackageDependency;
 begin
   result := TPackageDependency.Create(id, MakeRange(range));
+end;
+
+///<summary>A dependency on a Delphi-bundled library (e.g. Indy) - declared with the sentinel
+/// version 999.999.999 (cBundledDependencyVersion).</summary>
+function MakeBundledDep(const id : string) : IPackageDependency;
+begin
+  result := TPackageDependency.Create(id, MakeRange(cBundledDependencyVersion));
 end;
 
 ///<summary>Builds an IPackageInfo with the given id/version/dependencies. Dependencies
@@ -1833,6 +1859,204 @@ begin
   Assert.IsNotNull(cUnderB, 'B should have C as a child');
   Assert.AreEqual('[1.0.2,1.0.7]', cUnderB.VersionRange.ToString,
     'C under B must record B''s declared range [1.0.2,1.0.7]');
+end;
+
+//-----------------------------------------------------------------------------
+// Bundled dependency tests (sentinel 999.999.999)
+//-----------------------------------------------------------------------------
+
+procedure TDependencyResolverTests.Bundled_Dependency_NoRealPackage_Resolves_AsNoop;
+var
+  a : IPackageInfo;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  info : IPackageInfo;
+  indyInfo : IPackageInfo;
+begin
+  // A declares a bundled dependency on Indy. No Indy package exists anywhere. Resolution must
+  // succeed (contrast Missing_Repo_Package_Records_Unresolvable), the repo must never be queried
+  // for Indy, and the resolved set must carry a synthetic bundled no-op for Indy.
+  a := MakeInfo('A', '1.0.0', [MakeBundledDep('Indy')]);
+
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, a, projectRefs, graph, resolved);
+
+  Assert.IsTrue(ok, 'bundled dependency must resolve even with no real package present');
+  Assert.AreEqual(0, FRepo.GetCallCount('Indy'), 'bundled dependency must never query the repository');
+
+  indyInfo := nil;
+  for info in resolved do
+    if SameText(info.Id, 'Indy') then
+      indyInfo := info;
+  Assert.IsNotNull(indyInfo, 'a synthetic bundled Indy must be present in the resolved set');
+  Assert.IsTrue(IsBundledPackageInfo(indyInfo), 'the Indy resolution must be the bundled no-op (999.999.999)');
+end;
+
+procedure TDependencyResolverTests.Bundled_Dependency_RealTopLevel_Wins;
+var
+  indy : IPackageInfo;
+  a : IPackageInfo;
+  refForIndy : IPackageReference;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  info : IPackageInfo;
+  indyCount : integer;
+  selectedIndy : TPackageVersion;
+begin
+  // The user has added a real Indy 10.6.2 as a top-level package. A declares a bundled dependency
+  // on Indy. The real package must win at its actual version - no synthetic no-op.
+  indy := MakeInfo('Indy', '10.6.2', []);
+  a := MakeInfo('A', '1.0.0', [MakeBundledDep('Indy')]);
+
+  refForIndy := MakeTopLevelRef(indy, MakeRange('10.6.2'));
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(refForIndy);
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, a, projectRefs, graph, resolved);
+
+  Assert.IsTrue(ok, 'resolve should succeed');
+  indyCount := 0;
+  selectedIndy := MakeVersion('0.0.0');
+  for info in resolved do
+    if SameText(info.Id, 'Indy') then
+    begin
+      Inc(indyCount);
+      selectedIndy := info.Version;
+    end;
+  Assert.AreEqual(1, indyCount, 'Indy must appear exactly once');
+  Assert.AreEqual('10.6.2', selectedIndy.ToStringNoMeta, 'the real top-level Indy must win, not the bundled no-op');
+end;
+
+procedure TDependencyResolverTests.Bundled_Dependency_RealTransitive_Wins;
+var
+  indy : IPackageInfo;
+  b : IPackageInfo;
+  a : IPackageInfo;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  info : IPackageInfo;
+  indyCount : integer;
+  selectedIndy : TPackageVersion;
+begin
+  // A declares a bundled dependency on Indy AND depends on B, which depends on a real Indy in
+  // range. The real transitive Indy must satisfy the bundled dependency - one real Indy, no no-op.
+  indy := MakeInfo('Indy', '10.6.2', []);
+  b := MakeInfo('B', '1.0.0', [MakeDep('Indy', '[10.6.0,]')]);
+  a := MakeInfo('A', '1.0.0', [MakeBundledDep('Indy'), MakeDep('B', '[1.0.0,]')]);
+
+  FRepo.SetVersions('B', ListOf([b]));
+  FRepo.SetVersions('Indy', ListOf([indy]));
+
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, a, projectRefs, graph, resolved);
+
+  Assert.IsTrue(ok, 'resolve should succeed');
+  indyCount := 0;
+  selectedIndy := MakeVersion('0.0.0');
+  for info in resolved do
+    if SameText(info.Id, 'Indy') then
+    begin
+      Inc(indyCount);
+      selectedIndy := info.Version;
+    end;
+  Assert.AreEqual(1, indyCount, 'Indy must appear exactly once');
+  Assert.AreEqual('10.6.2', selectedIndy.ToStringNoMeta, 'the real transitive Indy must win, not the bundled no-op');
+end;
+
+procedure TDependencyResolverTests.Bundled_Dependency_TwoParents_SingleNode;
+var
+  b, c, a : IPackageInfo;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  info : IPackageInfo;
+  xCount : integer;
+begin
+  // Two packages (B and C) both declare a bundled dependency on the same id X. Only one synthetic
+  // bundled node must be created.
+  b := MakeInfo('B', '1.0.0', [MakeBundledDep('X')]);
+  c := MakeInfo('C', '1.0.0', [MakeBundledDep('X')]);
+  a := MakeInfo('A', '1.0.0', [MakeDep('B', '[1.0.0,]'), MakeDep('C', '[1.0.0,]')]);
+
+  FRepo.SetVersions('B', ListOf([b]));
+  FRepo.SetVersions('C', ListOf([c]));
+
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, a, projectRefs, graph, resolved);
+
+  Assert.IsTrue(ok, 'resolve should succeed');
+  xCount := 0;
+  for info in resolved do
+    if SameText(info.Id, 'X') then
+      Inc(xCount);
+  Assert.AreEqual(1, xCount, 'a bundled id required by two parents must resolve to a single node');
+end;
+
+procedure TDependencyResolverTests.Bundled_Dependency_CrossProject_Real_Wins;
+var
+  indy : IPackageInfo;
+  resolvedIndy : IResolvedPackage;
+  a : IPackageInfo;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  info : IPackageInfo;
+  indyCount : integer;
+  selectedIndy : TPackageVersion;
+begin
+  // A sibling project has resolved a real Indy 10.6.2. A in this project declares a bundled
+  // dependency on Indy. The imported sibling resolution must satisfy it - no synthetic no-op.
+  indy := MakeInfo('Indy', '10.6.2', []);
+  resolvedIndy := TResolvedPackage.Create(indy, MakeRange('10.6.2'), 'root-node', 'C:\test\sibling.dproj');
+  FContext.SeedResolutions('C:\test\sibling.dproj', [resolvedIndy]);
+
+  a := MakeInfo('A', '1.0.0', [MakeBundledDep('Indy')]);
+
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, a, projectRefs, graph, resolved);
+
+  Assert.IsTrue(ok, 'resolve should succeed');
+  indyCount := 0;
+  selectedIndy := MakeVersion('0.0.0');
+  for info in resolved do
+    if SameText(info.Id, 'Indy') then
+    begin
+      Inc(indyCount);
+      selectedIndy := info.Version;
+    end;
+  Assert.AreEqual(1, indyCount, 'Indy must appear exactly once');
+  Assert.AreEqual('10.6.2', selectedIndy.ToStringNoMeta, 'the imported sibling Indy must win, not the bundled no-op');
+end;
+
+procedure TDependencyResolverTests.Bundled_Dependency_Excluded_From_Graph;
+var
+  a : IPackageInfo;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  aNode : IPackageReference;
+begin
+  // The synthetic bundled no-op must never appear in the dproj dependency graph (else restore
+  // would pin a dangling 999.999.999 reference). A's node must have no Indy child.
+  a := MakeInfo('A', '1.0.0', [MakeBundledDep('Indy')]);
+
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, a, projectRefs, graph, resolved);
+
+  Assert.IsTrue(ok, 'resolve should succeed');
+  Assert.IsNull(graph.FindFirstChild('Indy'), 'bundled Indy must not appear anywhere in the graph');
+  aNode := graph.FindFirstChild('A');
+  Assert.IsNotNull(aNode, 'A should be in the graph');
+  Assert.IsFalse(aNode.HasAnyChild('Indy'), 'A must have no Indy child in the graph');
 end;
 
 initialization

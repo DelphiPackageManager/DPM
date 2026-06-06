@@ -60,6 +60,12 @@ type
     function IsNoGood(const package : IPackageInfo) : boolean;
     procedure RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
 
+    ///  Records a synthetic no-op resolution for a bundled dependency (e.g. Indy) when no real
+    ///  package for the id is present. Idempotent and never overwrites an existing (real)
+    ///  resolution. The resolution carries no files - the installer skips it and it is excluded
+    ///  from the dproj graph.
+    procedure RecordBundledResolution(const packageId : string);
+
     ///  Read-only lookup against the local resolution table. Returns false (and resolution=nil)
     ///  if the package isn't already recorded in THIS context's FResolved. Does not consult the
     ///  cross-project installer context. Use this for parent / backtrack lookups where importing
@@ -139,6 +145,7 @@ type
     function IsNoGood(const package : IPackageInfo) : boolean;
 
     procedure RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
+    procedure RecordBundledResolution(const packageId : string);
     function TryGetResolvedPackage(const packageId : string; out resolution : IResolvedPackage) : boolean;
     function GetOrImportResolvedPackage(const packageId : string; const parentId : string; out resolution : IResolvedPackage) : boolean;
     procedure RemoveResolvedPackage(const packageId : string);
@@ -177,6 +184,7 @@ implementation
 uses
   System.SysUtils,
   DPM.Core.Constants,
+  DPM.Core.Package.Classes,
   DPM.Core.Dependency.Reference,
   DPM.Core.Dependency.Resolution;
 
@@ -245,6 +253,10 @@ var
                         '] - graph will be incomplete');
           continue;
         end;
+        //bundled deps (e.g. Indy) are a no-op satisfied by the IDE - never emit a graph edge,
+        //else the dproj gets a dangling 999.999.999 PackageReference and restore would pin it.
+        if resolution.IsBundled then
+          continue;
         if IsAncestor(dependencyReference, dependency.Id) then
         begin
           FLogger.Debug('BuildDependencyGraph: cycle detected for [' + dependency.Id +
@@ -267,7 +279,8 @@ begin
   result := TPackageReference.CreateRoot(FCompilerVersion);
   toplevelPackages := FResolved.Values.Where(function(const value : IResolvedPackage) : boolean
     begin
-      result := value.IsTopLevel;
+      //exclude synthetic bundled no-ops - they are not real packages and must not appear in the graph.
+      result := value.IsTopLevel and (not value.IsBundled);
     end).ToArray;
 
   for toplevelPackage in toplevelPackages do
@@ -477,6 +490,20 @@ begin
     raise Exception.Create('Resolution already exists for package [' + package.Id + ']');
   resolution := TResolvedPackage.Create(package, versionRange, parentId, FProjectFile);
   FResolved.Add(LowerCase(package.Id), resolution);
+end;
+
+procedure TResolverContext.RecordBundledResolution(const packageId : string);
+var
+  info : IPackageInfo;
+  range : TVersionRange;
+begin
+  //never clobber a real resolution - if one is already present the bundled dep is satisfied.
+  if FResolved.ContainsKey(LowerCase(packageId)) then
+    exit;
+  info := TPackageInfo.CreateBundled(packageId, FCompilerVersion);
+  range := TVersionRange.Parse(cBundledDependencyVersion);
+  //parent under root - it has no dependencies and contributes nothing to the graph/install.
+  FResolved.Add(LowerCase(packageId), TResolvedPackage.CreateBundled(info, range, cRootNode, FProjectFile));
 end;
 
 procedure TResolverContext.RemoveResolvedPackage(const packageId : string);

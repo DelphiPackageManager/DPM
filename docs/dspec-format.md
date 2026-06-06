@@ -226,7 +226,14 @@ dependencies:
     version: "[1.0.0,2.0.0]"     # Version 1.0.0 to 2.0.0 inclusive
   - id: "MyCompany.Shared"
     version: "$version$"          # Same version as this package
+  - id: "Indy.System"
+    version: bundled              # Bundled with the IDE (e.g. Indy) - see note below
 ```
+
+> **Bundled dependencies:** the special version `bundled` declares a dependency on a
+> library that ships with the Delphi IDE (such as Indy) and has no DPM package. It
+> resolves to the IDE-provided copy when no package exists, and automatically prefers a
+> real package if one is installed. See [Bundled Dependencies](bundled-dependencies.md).
 
 ### Source Entries
 

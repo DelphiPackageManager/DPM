@@ -87,6 +87,10 @@ type
     destructor Destroy;override;
     constructor Create(const sourceName : string; const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const hash : string; const hashAlgorithm : string); overload; virtual;
     class function CreateFromManifest(const sourceName : string; const manifest : IPackageSpec; const hash : string; const hashAlgorith : string) : IPackageInfo;
+    //synthetic no-op IPackageInfo representing a Delphi-bundled library (e.g. Indy) for which no
+    //real package is present. Version is the bundled sentinel (999.999.999), no dependencies, all
+    //platforms - see IsBundledPackageInfo and IResolvedPackage.IsBundled.
+    class function CreateBundled(const id : string; const compilerVersion : TCompilerVersion) : IPackageInfo;
     class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageInfo : IPackageInfo) : boolean;
 
   end;
@@ -139,6 +143,11 @@ type
     class function CreateFromManifest(const sourceName : string; const manifest : IPackageSpec) : IPackageMetadata;
     class function TryLoadFromJson(const logger : ILogger; const jsonObj : TJsonObject; const source : string; out packageMetadata : IPackageMetadata) : boolean;
   end;
+
+//true when [info] is the synthetic no-op for a Delphi-bundled library (version 999.999.999).
+//Lets the installer filter bundled placeholders out of the download/compile/search-path work
+//without carrying IResolvedPackage. See TPackageInfo.CreateBundled.
+function IsBundledPackageInfo(const info : IPackageInfo) : boolean;
 
 
 
@@ -377,6 +386,22 @@ end;
 class function TPackageInfo.CreateFromManifest(const sourceName: string; const manifest : IPackageSpec; const hash : string; const hashAlgorith : string): IPackageInfo;
 begin
   result := TPackageInfo.Create(sourceName, manifest, hash, hashAlgorith);
+end;
+
+class function TPackageInfo.CreateBundled(const id : string; const compilerVersion : TCompilerVersion) : IPackageInfo;
+var
+  info : TPackageInfo;
+begin
+  info := TPackageInfo.Create('', id, TPackageVersion.Create(999, 999, 999), compilerVersion, '', '');
+  //considered available on every platform - it is provided by the IDE's default library path.
+  info.FSupportedPlatforms := AllPlatforms(compilerVersion);
+  result := info;
+end;
+
+function IsBundledPackageInfo(const info : IPackageInfo) : boolean;
+begin
+  result := (info <> nil) and
+    (info.Version.Major = 999) and (info.Version.Minor = 999) and (info.Version.Patch = 999);
 end;
 
 destructor TPackageInfo.Destroy;

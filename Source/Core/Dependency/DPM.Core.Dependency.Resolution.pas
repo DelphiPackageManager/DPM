@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -43,8 +43,10 @@ type
     FParentId : string;
     FVersionRange : TVersionRange;
     FProject : string;
+    FIsBundled : boolean;
   protected
     function GetIsTopLevel : boolean;
+    function GetIsBundled : boolean;
     function GetPackage : IPackageInfo;
     function GetParentId : string;
     function GetProject : string;
@@ -53,6 +55,8 @@ type
     function Clone(const parentId : string) : IResolvedPackage;
   public
     constructor Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
+    //synthetic no-op resolution for a bundled dependency (e.g. Indy) - see IResolvedPackage.IsBundled.
+    constructor CreateBundled(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
     destructor Destroy;override;
   end;
 
@@ -65,8 +69,12 @@ uses
 { TResolvedPackage }
 
 function TResolvedPackage.Clone(const parentId: string): IResolvedPackage;
+var
+  cloned : TResolvedPackage;
 begin
-  result := TResolvedPackage.Create(FPackage, FVersionRange, parentId, FProject);
+  cloned := TResolvedPackage.Create(FPackage, FVersionRange, parentId, FProject);
+  cloned.FIsBundled := FIsBundled;
+  result := cloned;
 end;
 
 constructor TResolvedPackage.Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
@@ -80,6 +88,12 @@ begin
   FProject := project;
 end;
 
+constructor TResolvedPackage.CreateBundled(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
+begin
+  Create(package, range, parentId, project);
+  FIsBundled := true;
+end;
+
 
 destructor TResolvedPackage.Destroy;
 begin
@@ -90,6 +104,11 @@ end;
 function TResolvedPackage.GetIsTopLevel: boolean;
 begin
   result := FParentId = cRootNode;
+end;
+
+function TResolvedPackage.GetIsBundled: boolean;
+begin
+  result := FIsBundled;
 end;
 
 function TResolvedPackage.GetPackage : IPackageInfo;

@@ -63,6 +63,7 @@ implementation
 uses
   System.SysUtils,
   VSoft.SemanticVersion,
+  DPM.Core.Constants,
   DPM.Core.Packaging.IdValidator;
 
 { TSpecDependency }
@@ -123,6 +124,9 @@ begin
   end
   else if sValue = '$version$' then
     FVersionString := sValue
+  else if SameText(sValue, cBundledDependencyToken) then
+    //friendly alias for a dependency on an IDE-bundled library (e.g. Indy)
+    FVersion := TVersionRange.Parse(cBundledDependencyVersion)
   else if not TVersionRange.TryParseWithError(sValue, FVersion, sError) then
   begin
     Logger.Error('Invalid dependency version attribute [' + sValue + '] - ' + sError);

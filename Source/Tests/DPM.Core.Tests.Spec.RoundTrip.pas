@@ -49,6 +49,8 @@ type
     procedure Creator_ExpandCollapse_Preserves_Range;
     procedure Creator_ExpandCollapse_Preserves_Set;
     procedure Creator_ExpandCollapse_Preserves_Full;
+
+    procedure Bundled_Dependency_Alias_And_Sentinel_Load;
   end;
 
 implementation
@@ -64,6 +66,7 @@ uses
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Reader,
   DPM.Core.Spec.TargetPlatform,
+  DPM.Core.Dependency.Version,
   DPM.Creator.TargetPlatform.Collapse;
 
 { path helpers }
@@ -436,6 +439,66 @@ end;
 procedure TSpecRoundTripTests.Creator_ExpandCollapse_Preserves_Full;
 begin
   CheckExpandCollapse('full.dspec.yaml');
+end;
+
+procedure TSpecRoundTripTests.Bundled_Dependency_Alias_And_Sentinel_Load;
+const
+  cYaml =
+    'metadata:'#13#10 +
+    '  id: Test.Bundled'#13#10 +
+    '  version: 1.0.0'#13#10 +
+    '  description: bundled dep test'#13#10 +
+    '  authors:'#13#10 +
+    '    - Vincent Parrett'#13#10 +
+    '  license: Apache-2.0'#13#10 +
+    'targetPlatforms:'#13#10 +
+    '  - compiler: 12.0'#13#10 +
+    '    platforms: [Win32, Win64]'#13#10 +
+    '    template: default'#13#10 +
+    'templates:'#13#10 +
+    '  - name: default'#13#10 +
+    '    dependencies:'#13#10 +
+    '      - id: Test.IndyAlias'#13#10 +
+    '        version: bundled'#13#10 +
+    '      - id: Test.IndySentinel'#13#10 +
+    '        version: 999.999.999'#13#10;
+
+  function FindDep(const spec : IPackageSpec; const id : string) : ISpecDependency;
+  var
+    dep : ISpecDependency;
+  begin
+    result := nil;
+    for dep in spec.Templates[0].Dependencies do
+      if SameText(dep.Id, id) then
+        exit(dep);
+  end;
+
+  procedure AssertBothBundled(const spec : IPackageSpec; const ctx : string);
+  var
+    aliasDep : ISpecDependency;
+    sentinelDep : ISpecDependency;
+  begin
+    Assert.IsNotNull(spec, ctx + ': spec should load');
+    aliasDep := FindDep(spec, 'Test.IndyAlias');
+    sentinelDep := FindDep(spec, 'Test.IndySentinel');
+    Assert.IsNotNull(aliasDep, ctx + ': alias dependency should be present');
+    Assert.IsNotNull(sentinelDep, ctx + ': sentinel dependency should be present');
+    Assert.IsTrue(aliasDep.Version.IsBundledSentinel, ctx + ': "bundled" alias must load as the sentinel range');
+    Assert.IsTrue(sentinelDep.Version.IsBundledSentinel, ctx + ': "999.999.999" must load as the sentinel range');
+  end;
+
+var
+  reader : IPackageSpecReader;
+  spec : IPackageSpec;
+  reloaded : IPackageSpec;
+begin
+  reader := TPackageSpecReader.Create(TTestLogger.Create);
+  spec := reader.ReadSpecString(cYaml);
+  AssertBothBundled(spec, 'initial load');
+
+  //round-trip: generate yaml and reload - the sentinel must survive serialization.
+  reloaded := RoundTrip(spec);
+  AssertBothBundled(reloaded, 'round-trip');
 end;
 
 initialization

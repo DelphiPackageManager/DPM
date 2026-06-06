@@ -91,6 +91,15 @@ const
   cPackageFileRegexV = '^((?:\w+)(?:\.\w+)+)\-([^\-]+)\-([^\-]+)\-(%s)$';
 
   cRootNode = 'root-node';
+
+  //sentinel version that marks a dependency on a library bundled with the Delphi IDE
+  //(e.g. Indy). Such a dependency resolves to the IDE-bundled copy (a no-op - no download,
+  //no search path) when no real package for the id is present in the graph, but defers to
+  //a real package at any version if the user (or another package) brings one in.
+  //cBundledDependencyToken is the friendly alias authors may use in a .dspec instead.
+  cBundledDependencyVersion = '999.999.999';
+  cBundledDependencyToken = 'bundled';
+
   cUserAgentHeader = 'User-Agent';
   cDPMUserAgent  = 'DPM ' + cDPMClientVersion;
   cClientVersionHeader = 'Client-Version';

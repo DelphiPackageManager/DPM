@@ -181,9 +181,15 @@ type
     function GetProject : string;
     function GetIsTopLevel : boolean;
 
+    //true for the synthetic no-op resolution that satisfies a bundled dependency (e.g. Indy)
+    //when no real package is present. Such a resolution has no files - the installer skips it
+    //(no download/compile, no search path) and it is never written to the dproj graph.
+    function GetIsBundled : boolean;
+
     function Clone(const parentId : string) : IResolvedPackage;
 
     property IsTopLevel : boolean read GetIsTopLevel;
+    property IsBundled : boolean read GetIsBundled;
     property PackageInfo : IPackageInfo read GetPackage;
     property VersionRange : TVersionRange read GetVersionRange write SetVersionRange;
     property ParentId : string read GetParentId;

@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -90,6 +90,11 @@ type
 
     procedure Normalize;
     function IsSatisfiedBy(const packageVersion : TPackageVersion) : Boolean;
+
+    //true when this range is the bundled-dependency sentinel (fixed 999.999.999 - see
+    //cBundledDependencyVersion). Detected on the parsed range so it works the same whether
+    //the range came from a manifest, the feed or the lock graph.
+    function IsBundledSentinel : boolean;
 
     function IsSubsetOrEqualTo(const possibleSuperset : TVersionRange) : boolean;
 
@@ -359,6 +364,15 @@ var
 begin
   x := self.Clone(true); //normalize to make calc simpler.
   result := integer(x.MaxVersion.Patch) - integer(x.MinVersion.Patch);
+end;
+
+function TVersionRange.IsBundledSentinel : boolean;
+begin
+  //fixed inclusive range equal to the sentinel 999.999.999 (cBundledDependencyVersion).
+  result := FIsValid and
+    FMinVersionIsInclusive and FMaxVersionIsInclusive and
+    (FMinVersion = FMaxVersion) and
+    (FMinVersion.Major = 999) and (FMinVersion.Minor = 999) and (FMinVersion.Patch = 999);
 end;
 
 function TVersionRange.IsSatisfiedBy(const packageVersion : TPackageVersion) : Boolean;

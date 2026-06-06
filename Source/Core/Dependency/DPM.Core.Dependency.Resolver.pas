@@ -149,12 +149,17 @@ var
   conflict : TUnresolvableConflict;
   iterations : integer;
   limitConflict : TUnresolvableConflict;
+  bundledIds : IList<string>;
+  bundledId : string;
 begin
   FStopwatch.Reset;
   FStopwatch.Start;
   FLogger.Verbose('Starting dependency resolution...');
 
   iterations := 0;
+  //Bundled dependencies (sentinel version 999.999.999, e.g. Indy) are collected here and
+  //resolved in a finalization pass after the main loop, once every real resolution is in place.
+  bundledIds := TCollections.CreateList<string>;
   //NuGet-style prerelease handling: compute eligibility ONCE per resolve, from the user's
   //explicit flag plus an implicit promotion if any top-level package is itself a prerelease.
   //This matches what NuGet does when you `Install-Package Foo -Version 1.0.0-beta` - the
@@ -193,6 +198,16 @@ begin
 
     for dependency in currentPackage.Dependencies do
     begin
+      //Bundled lib (e.g. Indy): satisfied by ANY real resolution of this id, otherwise a no-op
+      //resolved after the main loop. Detected on the raw declared range (never narrowed). Skips
+      //cache/repo lookup, the no-good cache, backtracking and conflict recording entirely.
+      if dependency.VersionRange.IsBundledSentinel then
+      begin
+        if not bundledIds.Contains(LowerCase(dependency.Id)) then
+          bundledIds.Add(LowerCase(dependency.Id));
+        continue;
+      end;
+
       //effectiveRange overlays the parent's declared range with any narrowing the resolver
       //already applied (from sibling intersections). We never mutate dependency.VersionRange.
       effectiveRange := context.GetEffectiveDependencyRange(currentPackage.Id, dependency.Id, dependency.VersionRange);
@@ -413,6 +428,20 @@ begin
         end;
       end;
     end;
+  end;
+
+  //Finalize bundled dependencies now that every real resolution exists. A real package of the
+  //same id - added top-level or pulled in transitively, locally or in a sibling project - always
+  //wins (at whatever version). Only when none exists do we synthesize the bundled no-op. This
+  //after-the-fact pass is what guarantees real-wins regardless of queue order.
+  for bundledId in bundledIds do
+  begin
+    if context.TryGetResolvedPackage(bundledId, resolution) then
+      continue;
+    if context.GetOrImportResolvedPackage(bundledId, cRootNode, resolution) then
+      continue;
+    FLogger.Information('            bundled : ' + bundledId + ' (using IDE-provided version)');
+    context.RecordBundledResolution(bundledId);
   end;
 
   if context.HasUnresolvable then

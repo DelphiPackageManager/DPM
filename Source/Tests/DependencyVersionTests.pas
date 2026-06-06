@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -75,12 +75,19 @@ type
 
     [Test]
     procedure Will_Fail_On_Invalid_Float;
+
+    [Test]
+    procedure IsBundledSentinel_True_For_Sentinel;
+
+    [Test]
+    procedure IsBundledSentinel_False_For_Normal_Ranges;
   end;
 
 implementation
 
 uses
   DPM.Core.Types,
+  DPM.Core.Constants,
   DPM.Core.Dependency.Version;
 
 { TdepVersionTests }
@@ -208,6 +215,35 @@ var
 begin
   Assert.IsFalse(TVersionRange.TryParseWithError('[1.0.1,1.2.3]', depVersion, error), error);
   Assert.IsFalse(depVersion.IsValid);
+end;
+
+procedure TVersionRangeTests.IsBundledSentinel_True_For_Sentinel;
+var
+  fromConst : TVersionRange;
+  fromFixed : TVersionRange;
+  fromRange : TVersionRange;
+begin
+  //the sentinel parses both as a single fixed version and as an explicit fixed range.
+  fromConst := TVersionRange.Parse(cBundledDependencyVersion);
+  Assert.IsTrue(fromConst.IsBundledSentinel, 'cBundledDependencyVersion must be detected as the sentinel');
+
+  fromFixed := TVersionRange.Parse('999.999.999');
+  Assert.IsTrue(fromFixed.IsBundledSentinel, '999.999.999 must be detected as the sentinel');
+
+  fromRange := TVersionRange.Parse('[999.999.999,999.999.999]');
+  Assert.IsTrue(fromRange.IsBundledSentinel, '[999.999.999,999.999.999] must be detected as the sentinel');
+end;
+
+procedure TVersionRangeTests.IsBundledSentinel_False_For_Normal_Ranges;
+var
+  fixed : TVersionRange;
+  openEnded : TVersionRange;
+begin
+  fixed := TVersionRange.Parse('1.0.0');
+  Assert.IsFalse(fixed.IsBundledSentinel, 'a normal fixed version is not the sentinel');
+
+  openEnded := TVersionRange.Parse('[1.0.0,]');
+  Assert.IsFalse(openEnded.IsBundledSentinel, 'a normal range is not the sentinel');
 end;
 
 procedure TVersionRangeTests.Will_Normalize_To_Fixed;

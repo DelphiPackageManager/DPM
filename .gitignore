@@ -25,6 +25,9 @@
 *.otares
 *.drc
 *.res
+# pre-compiled resources we need.
+!Source/DPM.PrepareTemplates.res
+!Source/DPM.TrustSet.res
 # Output Folders  #
 ###################
 /Output/**
@@ -57,7 +60,7 @@ Source/DPM.IDE.XE7.rc
 Source/DPM.IDE.XE8.rc
 Source/dpm.rc
 
-!Source/DPM.TrustSet.res
+
 
 !.gitignore
 Source/IDE/DPM.IDE.Resources.res

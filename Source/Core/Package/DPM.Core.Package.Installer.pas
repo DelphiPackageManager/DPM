@@ -1313,7 +1313,9 @@ begin
         info := GetOrLoadPackageInfo(cancellationToken, node.Id, node.Version, options.compilerVersion, infoCache)
       else
         infoCache[key] := info;
-      if info <> nil then
+      //bundled no-ops (e.g. Indy) have no package to compile - the graph already excludes them,
+      //this guards the fallback load path defensively.
+      if (info <> nil) and (not IsBundledPackageInfo(info)) then
         resolvedPackages.Add(info);
     end);
 
@@ -1487,6 +1489,8 @@ function TPackageInstaller.FinalizePackageConfiguration(const cancellationToken:
   const resolvedPackages: IList<IPackageInfo>; out resultGraph: IPackageReference): boolean;
 var
   packageSpecs: IDictionary<string, IPackageSpec>;
+  packagesToConfigure: IList<IPackageInfo>;
+  packageInfo: IPackageInfo;
 begin
   result := false;
   resultGraph := nil;
@@ -1500,14 +1504,22 @@ begin
   // Record the resolved package graph so we can detect conflicts between projects
   FContext.RecordGraph(projectFile, projectPackageGraph);
 
+  //Drop synthetic bundled no-ops (e.g. Indy) - there is nothing to download or compile and they
+  //contribute no search path (the IDE's library path already provides the bundled library). This
+  //single filter covers DownloadPackages, DoConfigurePackageForPlatform and CollectSearchPaths.
+  packagesToConfigure := TCollections.CreateList<IPackageInfo>;
+  for packageInfo in resolvedPackages do
+    if not IsBundledPackageInfo(packageInfo) then
+      packagesToConfigure.Add(packageInfo);
+
   packageSpecs := TCollections.CreateDictionary<string, IPackageSpec>;
   // Downloads the package files to the cache if they are not already there and
   // returns the deserialized dspec as we need it for search paths and design
-  if not DownloadPackages(cancellationToken, resolvedPackages, packageSpecs) then
+  if not DownloadPackages(cancellationToken, packagesToConfigure, packageSpecs) then
     exit;
 
   // Configure the package for this platform (build, search paths, copy local, design packages)
-  if not DoConfigurePackageForPlatform(cancellationToken, options, projectFile, projectEditor, platform, config, projectPackageGraph, resolvedPackages, packageSpecs) then
+  if not DoConfigurePackageForPlatform(cancellationToken, options, projectFile, projectEditor, platform, config, projectPackageGraph, packagesToConfigure, packageSpecs) then
     exit;
 
   // Return the graph for caller to handle UpdatePackageReferences and SaveProject
@@ -2008,6 +2020,11 @@ var
     //for a stale child id/version pair that isn't in the cache or repo.
     for dep in info.Dependencies do
     begin
+      //bundled deps (e.g. Indy) are satisfied by the IDE and deliberately not written to the
+      //graph - their absence is expected, not a stale/missing transient. If the user added a real
+      //package for the id it appears as its own top-level node and is validated independently.
+      if dep.VersionRange.IsBundledSentinel then
+        continue;
       child := node.FindFirstChild(dep.Id);
       if child = nil then
       begin
