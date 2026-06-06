@@ -33,6 +33,7 @@
             "enum": [
                 "win32",
                 "win64",
+                "win64x",
                 "winarm64ec",
                 "macos32",
                 "macos64",
