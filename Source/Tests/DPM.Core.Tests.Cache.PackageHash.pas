@@ -4,6 +4,7 @@ interface
 
 uses
   System.SysUtils,
+  DPM.Core.Cache.Interfaces,
   DUnitX.TestFramework;
 
 type
@@ -43,7 +44,6 @@ uses
   DPM.Core.Package.Classes,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Reader,
-  DPM.Core.Cache.Interfaces,
   DPM.Core.Cache,
   DPM.Core.Utils.Hash,
   DPM.Core.Dependency.Version;
