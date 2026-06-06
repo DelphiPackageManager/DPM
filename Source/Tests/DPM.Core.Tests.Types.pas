@@ -59,6 +59,30 @@ type
     [TestCase('12.0', '12.0,120')]
     [TestCase('13.0', '13.0,130')]
     procedure TestCompilerToShortVersion(const value : string; const expected : string);
+
+    //Win64x ("Windows 64-bit (Modern)", 12.1+) - distinct platform, binary-compatible with Win64.
+    [Test]
+    procedure Win64x_Parses_To_Distinct_Platform;
+    [Test]
+    procedure Win64x_Round_Trips_Through_String;
+    [Test]
+    procedure Win64x_Is_64_Bit;
+    [Test]
+    procedure Win64x_Has_Display_String;
+    [Test]
+    [TestCase('Delphi12_0', 'Delphi12_0')]
+    [TestCase('Delphi13_0', 'Delphi13_0')]
+    procedure AllPlatforms_Includes_Win64x(const compiler : string);
+    [Test]
+    procedure Win64_Package_Satisfies_Win64x_Target;
+    [Test]
+    procedure Win64x_Package_Satisfies_Win64_Target;
+    [Test]
+    procedure ResolveCompatiblePlatform_Prefers_Direct_Match;
+    [Test]
+    procedure ResolveCompatiblePlatform_Falls_Back_To_Counterpart;
+    [Test]
+    procedure PlatformSatisfiedBy_False_When_No_Compatible_Platform;
   end;
 
 implementation
@@ -100,6 +124,70 @@ begin
   //"XE2" -> "XE2". Used by the $compilershortversion$ token for D100/D104/D110 folder schemes.
   compilerVersion := StringToCompilerVersion(value);
   Assert.AreEqual(expected, CompilerToShortVersion(compilerVersion));
+end;
+
+procedure TCoreTypesTests.Win64x_Parses_To_Distinct_Platform;
+begin
+  //Win64x must parse to its own enum value, not be collapsed to Win64 - the project's platform
+  //identity has to survive so DPM writes the correct $(Platform)=='Win64x' search-path condition.
+  Assert.AreEqual(Ord(TDPMPlatform.Win64x), Ord(StringToDPMPlatform('Win64x')));
+  Assert.AreNotEqual(Ord(TDPMPlatform.Win64), Ord(StringToDPMPlatform('Win64x')));
+end;
+
+procedure TCoreTypesTests.Win64x_Round_Trips_Through_String;
+begin
+  Assert.AreEqual(Ord(TDPMPlatform.Win64x), Ord(StringToDPMPlatform(DPMPlatformToString(TDPMPlatform.Win64x))));
+end;
+
+procedure TCoreTypesTests.Win64x_Is_64_Bit;
+begin
+  Assert.AreEqual('64', DPMPlatformBitness(TDPMPlatform.Win64x));
+end;
+
+procedure TCoreTypesTests.Win64x_Has_Display_String;
+begin
+  //Must not raise (the case statement previously had no Win64x entry).
+  Assert.AreEqual('Windows 64-bit (Modern)', DPMPlatformToDisplayString(TDPMPlatform.Win64x));
+end;
+
+procedure TCoreTypesTests.AllPlatforms_Includes_Win64x(const compiler : string);
+var
+  compilerVersion : TCompilerVersion;
+begin
+  compilerVersion := TCompilerVersion(GetEnumValue(TypeInfo(TCompilerVersion), compiler));
+  Assert.IsTrue(TDPMPlatform.Win64x in AllPlatforms(compilerVersion));
+end;
+
+procedure TCoreTypesTests.Win64_Package_Satisfies_Win64x_Target;
+begin
+  //A Win64-only package can satisfy a Win64x project target (binaries are interchangeable).
+  Assert.IsTrue(PlatformSatisfiedBy(TDPMPlatform.Win64x, [TDPMPlatform.Win32, TDPMPlatform.Win64]));
+end;
+
+procedure TCoreTypesTests.Win64x_Package_Satisfies_Win64_Target;
+begin
+  Assert.IsTrue(PlatformSatisfiedBy(TDPMPlatform.Win64, [TDPMPlatform.Win32, TDPMPlatform.Win64x]));
+end;
+
+procedure TCoreTypesTests.ResolveCompatiblePlatform_Prefers_Direct_Match;
+begin
+  //When the wanted platform is directly available it must be returned as-is, not remapped.
+  Assert.AreEqual(Ord(TDPMPlatform.Win64x),
+    Ord(ResolveCompatiblePlatform(TDPMPlatform.Win64x, [TDPMPlatform.Win64, TDPMPlatform.Win64x])));
+end;
+
+procedure TCoreTypesTests.ResolveCompatiblePlatform_Falls_Back_To_Counterpart;
+begin
+  Assert.AreEqual(Ord(TDPMPlatform.Win64),
+    Ord(ResolveCompatiblePlatform(TDPMPlatform.Win64x, [TDPMPlatform.Win32, TDPMPlatform.Win64])));
+  Assert.AreEqual(Ord(TDPMPlatform.Win64x),
+    Ord(ResolveCompatiblePlatform(TDPMPlatform.Win64, [TDPMPlatform.Win32, TDPMPlatform.Win64x])));
+end;
+
+procedure TCoreTypesTests.PlatformSatisfiedBy_False_When_No_Compatible_Platform;
+begin
+  //The compatibility rule is Win64<->Win64x only - it must not bridge unrelated platforms.
+  Assert.IsFalse(PlatformSatisfiedBy(TDPMPlatform.Win64x, [TDPMPlatform.Win32, TDPMPlatform.Linux64]));
 end;
 
 initialization

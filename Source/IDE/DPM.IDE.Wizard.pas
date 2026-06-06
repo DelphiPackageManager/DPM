@@ -359,7 +359,9 @@ constructor TDPMWizard.Create;
 var
   storageNotifier : IOTAProjectFileStorageNotifier;
   ideNotifier : IOTAIDENotifier;
+  orphanUnloader : IOTAIDENotifier;
   projMenuNotifier : IOTAProjectMenuItemCreatorNotifier;
+  sbomMenuNotifier : IOTAProjectMenuItemCreatorNotifier;
   options : INTAAddInOptions;
   projectController : IDPMIDEProjectController;
   dpmIDEOptions : IDPMIDEOptions;
@@ -421,8 +423,10 @@ begin
     //our cache. UninstallPackage also removes the Known-Packages registry entry, so this
     //path is both more thorough and self-healing.
     if packageCache.PackagesFolder <> '' then
-      FOrphanUnloaderNotifierId := (BorlandIDEServices as IOTAServices).AddNotifier(
-        TDPMOrphanPackageUnloader.Create(packageCache.PackagesFolder, FLogger));
+    begin
+      orphanUnloader := TDPMOrphanPackageUnloader.Create(packageCache.PackagesFolder, FLogger);
+      FOrphanUnloaderNotifierId := (BorlandIDEServices as IOTAServices).AddNotifier(orphanUnloader);
+    end;
   end;
 
   projectController := FContainer.Resolve<IDPMIDEProjectController>;
@@ -436,7 +440,8 @@ begin
   //Phase 4: separate notifier for the Generate SBOM... menu so we don't widen
   //TDPMProjectMenuNotifier's constructor. The SBOM menu needs the container to
   //resolve ISbomGenerator at click time; the editor-view manager doesn't.
-  FSBOMMenuNotifierId := (BorlandIDEServices as IOTAProjectManager).AddMenuItemCreatorNotifier(TDPMSBOMProjectMenuNotifier.Create(FContainer, FLogger));
+  sbomMenuNotifier := TDPMSBOMProjectMenuNotifier.Create(FContainer, FLogger);
+  FSBOMMenuNotifierId := (BorlandIDEServices as IOTAProjectManager).AddMenuItemCreatorNotifier(sbomMenuNotifier);
 
   options := TDPMAddinOptions.Create(FContainer);
   FAddInOptions := options;

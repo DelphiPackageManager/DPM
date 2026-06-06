@@ -702,11 +702,17 @@ begin
 end;
 
 function MakeService(const trustSetYaml : string) : ITrustPolicyService;
+var
+  configManager : IConfigurationManager;
+  trustSet : ITrustSet;
+  hashing : IHashingService;
 begin
-  result := TTrustPolicyService.Create(
-    TStubConfigManager.Create,
-    TBuiltInTrustSet.Create(trustSetYaml),
-    TBCryptHashingService.Create);
+  //hold each dep in an interface local first: constructing an interfaced object
+  //directly in a parameter position can leak in Delphi.
+  configManager := TStubConfigManager.Create;
+  trustSet := TBuiltInTrustSet.Create(trustSetYaml);
+  hashing := TBCryptHashingService.Create;
+  result := TTrustPolicyService.Create(configManager, trustSet, hashing);
 end;
 
 procedure TTrustPolicyRevokeTests.RepositoryTrusted_True_WhenPinned_AndNotRevoked;

@@ -18,6 +18,7 @@ type
     procedure WriteBytes(const path : string; const bytes : TBytes);
     procedure WriteText(const path : string; const text : string);
     function NewIdentity(const id, version : string) : Pointer; //dodge generic IPackageIdentity in DUnitX RTTI scan
+    function MakeCache : IPackageCache;
   public
     [Test]
     procedure SidecarPresentIsReturnedAsIs;
@@ -35,6 +36,7 @@ uses
   System.IOUtils,
   System.Classes,
   TestLogger,
+  DPM.Core.Logging,
   DPM.Core.Types,
   DPM.Core.Constants,
   DPM.Core.Package.Interfaces,
@@ -88,6 +90,20 @@ begin
   identity._AddRef;  //caller is responsible for releasing via IInterface(result)._Release
 end;
 
+function TPackageCacheHashTests.MakeCache : IPackageCache;
+var
+  logger : ILogger;
+  specReader : IPackageSpecReader;
+begin
+  // GetPackageHash predates signing — pass nil for the signing/trust/receipt
+  // deps. The cache code guards each with `if FSigningService <> nil` etc.
+  // Hold the constructed deps in interface locals first: creating an interfaced
+  // object directly in a parameter position can leak in Delphi.
+  logger := TTestLogger.Create;
+  specReader := TPackageSpecReader.Create(logger);
+  result := TPackageCache.Create(logger, specReader, nil, nil, nil, nil, nil);
+end;
+
 procedure TPackageCacheHashTests.SidecarPresentIsReturnedAsIs;
 var
   cacheRoot : string;
@@ -100,11 +116,7 @@ var
 begin
   cacheRoot := MakeTempCacheRoot;
   try
-    // GetPackageHash predates signing — pass nil for the signing/trust/receipt
-    // deps. The cache code guards each with `if FSigningService <> nil` etc.
-    cache := TPackageCache.Create(TTestLogger.Create,
-      TPackageSpecReader.Create(TTestLogger.Create),
-      nil, nil, nil, nil, nil);
+    cache := MakeCache;
     cache.Location := cacheRoot;
     identity := IPackageIdentity(NewIdentity('Sample.Pkg', '1.2.3'));
     try
@@ -142,11 +154,7 @@ var
 begin
   cacheRoot := MakeTempCacheRoot;
   try
-    // GetPackageHash predates signing — pass nil for the signing/trust/receipt
-    // deps. The cache code guards each with `if FSigningService <> nil` etc.
-    cache := TPackageCache.Create(TTestLogger.Create,
-      TPackageSpecReader.Create(TTestLogger.Create),
-      nil, nil, nil, nil, nil);
+    cache := MakeCache;
     cache.Location := cacheRoot;
     identity := IPackageIdentity(NewIdentity('Sample.Pkg', '1.2.3'));
     try
@@ -191,11 +199,7 @@ var
 begin
   cacheRoot := MakeTempCacheRoot;
   try
-    // GetPackageHash predates signing — pass nil for the signing/trust/receipt
-    // deps. The cache code guards each with `if FSigningService <> nil` etc.
-    cache := TPackageCache.Create(TTestLogger.Create,
-      TPackageSpecReader.Create(TTestLogger.Create),
-      nil, nil, nil, nil, nil);
+    cache := MakeCache;
     cache.Location := cacheRoot;
     identity := IPackageIdentity(NewIdentity('No.Such.Pkg', '9.9.9'));
     try
@@ -226,11 +230,7 @@ var
 begin
   cacheRoot := MakeTempCacheRoot;
   try
-    // GetPackageHash predates signing — pass nil for the signing/trust/receipt
-    // deps. The cache code guards each with `if FSigningService <> nil` etc.
-    cache := TPackageCache.Create(TTestLogger.Create,
-      TPackageSpecReader.Create(TTestLogger.Create),
-      nil, nil, nil, nil, nil);
+    cache := MakeCache;
     cache.Location := cacheRoot;
     identity := IPackageIdentity(NewIdentity('Pkg.With.Content', '0.0.1'));
     try

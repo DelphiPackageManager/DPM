@@ -496,6 +496,7 @@ procedure TResolverContext.RecordBundledResolution(const packageId : string);
 var
   info : IPackageInfo;
   range : TVersionRange;
+  resolution : IResolvedPackage;
 begin
   //never clobber a real resolution - if one is already present the bundled dep is satisfied.
   if FResolved.ContainsKey(LowerCase(packageId)) then
@@ -503,7 +504,8 @@ begin
   info := TPackageInfo.CreateBundled(packageId, FCompilerVersion);
   range := TVersionRange.Parse(cBundledDependencyVersion);
   //parent under root - it has no dependencies and contributes nothing to the graph/install.
-  FResolved.Add(LowerCase(packageId), TResolvedPackage.CreateBundled(info, range, cRootNode, FProjectFile));
+  resolution := TResolvedPackage.CreateBundled(info, range, cRootNode, FProjectFile);
+  FResolved.Add(LowerCase(packageId), resolution);
 end;
 
 procedure TResolverContext.RemoveResolvedPackage(const packageId : string);

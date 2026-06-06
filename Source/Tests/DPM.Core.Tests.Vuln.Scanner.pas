@@ -225,10 +225,11 @@ var
   sbom : TSBOMReport;
   vuln : TVulnReport;
   ct : ICancellationToken;
+  advisory : IVulnDatabaseAdvisory;
 begin
   db := TFakeDatabase.Create;
-  db.AddVuln('pkg:generic/dpm/bad@1.0.0',
-             TFakeAdvisory.Create('GHSA-aaaa-bbbb-cccc', TSeverity.High, '1.0.1'));
+  advisory := TFakeAdvisory.Create('GHSA-aaaa-bbbb-cccc', TSeverity.High, '1.0.1');
+  db.AddVuln('pkg:generic/dpm/bad@1.0.0', advisory);
   scanner := TVulnScanner.Create(TSilentLogger.Create, db);
   sbom := MakeReportWithPackage('pkg:generic/dpm/bad@1.0.0', 'bad', '1.0.0');
   try
@@ -295,11 +296,15 @@ var
   comp : TSBOMComponent;
   vuln : TVulnReport;
   ct : ICancellationToken;
+  advisory : IVulnDatabaseAdvisory;
 begin
   db := TFakeDatabase.Create;
-  db.AddVuln('pkg:generic/dpm/low@1.0.0', TFakeAdvisory.Create('LOW-1', TSeverity.Low));
-  db.AddVuln('pkg:generic/dpm/crit@1.0.0', TFakeAdvisory.Create('CRIT-1', TSeverity.Critical));
-  db.AddVuln('pkg:generic/dpm/medium@1.0.0', TFakeAdvisory.Create('MED-1', TSeverity.Medium));
+  advisory := TFakeAdvisory.Create('LOW-1', TSeverity.Low);
+  db.AddVuln('pkg:generic/dpm/low@1.0.0', advisory);
+  advisory := TFakeAdvisory.Create('CRIT-1', TSeverity.Critical);
+  db.AddVuln('pkg:generic/dpm/crit@1.0.0', advisory);
+  advisory := TFakeAdvisory.Create('MED-1', TSeverity.Medium);
+  db.AddVuln('pkg:generic/dpm/medium@1.0.0', advisory);
   scanner := TVulnScanner.Create(TSilentLogger.Create, db);
   sbom := MakeReportWithPackage('pkg:generic/dpm/low@1.0.0', 'low', '1.0.0');
   comp := sbom.AddComponent(TSBOMComponentKind.DpmPackage);

@@ -81,7 +81,7 @@ type
     UnknownPlatform,
     Win32,
     Win64,
-    Win64x, //TODO : do we need this?
+    Win64x, //"Windows 64-bit (Modern)" - 12.1+. Binary-compatible with Win64 (see PlatformSatisfiedBy).
     WinARM64EC,
     MacOS32,
     MacOS64,
@@ -189,6 +189,18 @@ function IsAmbigousProjectVersion(const value : string; var versions : string) :
 function ProjectPlatformToDPMPlatform(const value : string) : TDPMPlatform;
 
 function AllPlatforms(const compiler : TCompilerVersion) : TDPMPlatforms;
+
+/// <summary> Returns the platform from <c>available</c> whose binaries should be used to satisfy a
+///  target of <c>wanted</c>. Returns <c>wanted</c> when it is directly available; otherwise, because
+///  Win64 and Win64x produce interchangeable binaries, returns the Win64/Win64x counterpart when it
+///  is available. Falls back to <c>wanted</c> when nothing compatible is present. </summary>
+function ResolveCompatiblePlatform(const wanted : TDPMPlatform; const available : TDPMPlatforms) : TDPMPlatform;
+
+/// <summary> Returns true when a package built for one of the platforms in <c>available</c> can
+///  satisfy a project target of <c>wanted</c>. This is a plain set membership test, except that
+///  Win64 and Win64x are treated as interchangeable (their binaries are compatible both ways), so
+///  a Win64-only package satisfies a Win64x target and vice versa. </summary>
+function PlatformSatisfiedBy(const wanted : TDPMPlatform; const available : TDPMPlatforms) : boolean;
 
 function StringToUIFrameworkType(const value : string) : TDPMUIFrameworkType;
 function UIFrameworkTypeToString(const value : TDPMUIFrameworkType) : string;
@@ -302,7 +314,9 @@ begin
     else if value = 'Linux64' then
       result := TDPMPlatform.Linux64
     else if value = 'Win64x' then
-      result := TDPMPlatform.Win64
+      //distinct platform (12.1+), kept separate from Win64 - the Win64<->Win64x binary
+      //compatibility is applied later at install time, not by collapsing the identity here.
+      result := TDPMPlatform.Win64x
     else
       result := TDPMPlatform.UnknownPlatform
   end
@@ -403,6 +417,7 @@ begin
     TDPMPlatform.UnknownPlatform: Result := 'Unknown' ;
     TDPMPlatform.Win32: result := 'Windows 32-bit' ;
     TDPMPlatform.Win64: result := 'Windows 64-bit';
+    TDPMPlatform.Win64x: result := 'Windows 64-bit (Modern)';
     TDPMPlatform.WinARM64EC: result := 'Windows ARM64EC';
     TDPMPlatform.MacOS32: result := 'macOS 32-bit';
     TDPMPlatform.MacOS64: result := 'macOS 64-bit';
@@ -463,6 +478,7 @@ begin
     TDPMPlatform.Android,
     TDPMPlatform.iOS32         : result := '32';
     TDPMPlatform.Win64,
+    TDPMPlatform.Win64x,
     TDPMPlatform.WinARM64EC,
     TDPMPlatform.MacOS64,
     TDPMPlatform.MacOSARM64,
@@ -626,14 +642,33 @@ begin
                                          TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
 
     // https://docwiki.embarcadero.com/RADStudio/Athens/en/Supported_Target_Platforms
-    TCompilerVersion.Delphi12_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOSARM64, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
+    //Win64x ("Windows 64-bit (Modern)") arrived in the 12.x line (12.1); the registry/enum can't
+    //distinguish 12.0 from 12.1, so 12.x as a whole reports it.
+    TCompilerVersion.Delphi12_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.Win64x, TDPMPlatform.MacOSARM64, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
                                          TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
 
-    TCompilerVersion.Delphi13_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.WinARM64EC, TDPMPlatform.MacOSARM64, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
+    TCompilerVersion.Delphi13_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.Win64x, TDPMPlatform.WinARM64EC, TDPMPlatform.MacOSARM64, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
                                          TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
   else
     raise Exception.Create('AllPlatforms is missing for : ' + CompilerToString(compiler));
   end;
+end;
+
+function ResolveCompatiblePlatform(const wanted : TDPMPlatform; const available : TDPMPlatforms) : TDPMPlatform;
+begin
+  result := wanted;
+  if wanted in available then
+    exit;
+  //Win64 and Win64x produce interchangeable binaries, so fall back to the counterpart when present.
+  if (wanted = TDPMPlatform.Win64x) and (TDPMPlatform.Win64 in available) then
+    result := TDPMPlatform.Win64
+  else if (wanted = TDPMPlatform.Win64) and (TDPMPlatform.Win64x in available) then
+    result := TDPMPlatform.Win64x;
+end;
+
+function PlatformSatisfiedBy(const wanted : TDPMPlatform; const available : TDPMPlatforms) : boolean;
+begin
+  result := ResolveCompatiblePlatform(wanted, available) in available;
 end;
 
 function CompilerCodeName(const value : TCompilerVersion) : string;

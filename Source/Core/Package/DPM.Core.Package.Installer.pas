@@ -492,7 +492,9 @@ begin
     //consumer can compile against the .pas files directly.
     if (template.BuildEntries.Count > 0) and (not packageInfo.UseSource) and compiledPackages.Contains(packageInfo) then
     begin
-      platformLibPath := 'lib' + PathDelim + DPMPlatformToBDString(platform);
+      //Win64/Win64x binaries are interchangeable - point at whichever the package actually built
+      //to (e.g. a Win64-only package consumed by a Win64x project resolves to lib\Win64).
+      platformLibPath := 'lib' + PathDelim + DPMPlatformToBDString(ResolveCompatiblePlatform(platform, packageSpec.TargetPlatform.Platforms));
       AddUnique(packageBasePath + platformLibPath);
     end
     else
@@ -531,13 +533,21 @@ var
   candidates: TDPMPlatforms;
   designPlatforms: TDPMPlatforms;
   designProjectEditor: IProjectEditor;
+  effectivePlatform: TDPMPlatform;
 begin
   result := true;
   packagePath := FPackageCache.GetPackagePath(packageInfo);
 
+  //Win64 and Win64x produce interchangeable binaries. When this package doesn't itself declare the
+  //requested platform but does declare the compatible counterpart, build (and lay out) against the
+  //counterpart - e.g. a Win64-only package requested for a Win64x project compiles as Win64 (its
+  //dproj has a Win64 config, not Win64x) and lands in lib\Win64. The consumer's search paths point
+  //here while the dproj's DPMSearch condition keeps the project's own ($(Platform)=='Win64x') value.
+  effectivePlatform := ResolveCompatiblePlatform(Compiler.Platform, packageSpec.TargetPlatform.Platforms);
+
   //BOM is per-platform: lib/{platform} folder is per-platform, so the compile-skip check must be too.
   //Otherwise a Win32 install leaves a BOM that incorrectly short-circuits a later Win64 install.
-  bomFile := TPath.Combine(packagePath, 'package.' + DPMPlatformToBDString(Compiler.Platform) + '.bom');
+  bomFile := TPath.Combine(packagePath, 'package.' + DPMPlatformToBDString(effectivePlatform) + '.bom');
 
   // BOM optimization: skip if dependencies unchanged. A valid BOM means this package was already
   // compiled on a prior install - which means any `package definitions` were already generated
@@ -547,7 +557,7 @@ begin
     bomNode := TBOMFile.LoadFromFile(FLogger, bomFile);
     if (bomNode <> nil) and bomNode.AreEqual(packageReference) then
     begin
-      FLogger.Information('Package [' + packageInfo.Id + '] [' + DPMPlatformToString(Compiler.Platform) + '] - dependencies unchanged, skipping compilation.');
+      FLogger.Information('Package [' + packageInfo.Id + '] [' + DPMPlatformToString(effectivePlatform) + '] - dependencies unchanged, skipping compilation.');
       exit;
     end;
   end;
@@ -579,8 +589,8 @@ begin
     configuration := 'Release';
 
   // Setup compiler output directories (standardized paths)
-  Compiler.BPLOutputDir := TPath.Combine(packagePath, 'bpl' + PathDelim + DPMPlatformToBDString(Compiler.Platform));
-  Compiler.LibOutputDir := TPath.Combine(packagePath, 'lib' + PathDelim + DPMPlatformToBDString(Compiler.Platform));
+  Compiler.BPLOutputDir := TPath.Combine(packagePath, 'bpl' + PathDelim + DPMPlatformToBDString(effectivePlatform));
+  Compiler.LibOutputDir := TPath.Combine(packagePath, 'lib' + PathDelim + DPMPlatformToBDString(effectivePlatform));
   Compiler.Configuration := configuration;
 
   // Set library paths from dependencies
@@ -590,7 +600,7 @@ begin
     for dependency in packageReference.Children do
     begin
       childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion);
-      childSearchPath := TPath.Combine(childSearchPath, 'lib' + PathDelim + DPMPlatformToBDString(Compiler.Platform));
+      childSearchPath := TPath.Combine(childSearchPath, 'lib' + PathDelim + DPMPlatformToBDString(effectivePlatform));
       searchPaths.Add(childSearchPath);
     end;
     Compiler.SetSearchPaths(searchPaths);
@@ -602,14 +612,14 @@ begin
   for buildEntry in template.BuildEntries do
   begin
     // Check platform filter if specified
-    if (buildEntry.Platforms <> []) and (not (Compiler.Platform in buildEntry.Platforms)) then
+    if (buildEntry.Platforms <> []) and (not (effectivePlatform in buildEntry.Platforms)) then
       continue;
 
     FLogger.Information('Building project: ' + buildEntry.Project);
     projectFile := TPath.Combine(packagePath, buildEntry.Project);
     projectFile := TPathUtils.CompressRelativePath('', projectFile);
 
-    result := Compiler.BuildProject(cancellationToken, Compiler.Platform, projectFile, configuration, packageInfo.Version, false);
+    result := Compiler.BuildProject(cancellationToken, effectivePlatform, projectFile, configuration, packageInfo.Version, false);
     if result then
       FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
     else
@@ -653,16 +663,16 @@ begin
 
     designPlatforms := supportedByCompiler * candidates;
 
-    if not (Compiler.Platform in designPlatforms) then
+    if not (effectivePlatform in designPlatforms) then
     begin
-      FLogger.Debug('Skipping design package [' + designEntry.Project + '] - ' + DPMPlatformToString(Compiler.Platform) + ' is not a supported design platform for this entry.');
+      FLogger.Debug('Skipping design package [' + designEntry.Project + '] - ' + DPMPlatformToString(effectivePlatform) + ' is not a supported design platform for this entry.');
       continue;
     end;
 
-    FLogger.Information('Building design package: ' + designEntry.Project + ' (' + DPMPlatformToString(Compiler.Platform) + ')');
+    FLogger.Information('Building design package: ' + designEntry.Project + ' (' + DPMPlatformToString(effectivePlatform) + ')');
 
-    //output dirs and search paths are already set for Compiler.Platform by the runtime build above - nothing to change.
-    result := Compiler.BuildProject(cancellationToken, Compiler.Platform, projectFile, configuration, packageInfo.Version, true);
+    //output dirs and search paths are already set for effectivePlatform by the runtime build above - nothing to change.
+    result := Compiler.BuildProject(cancellationToken, effectivePlatform, projectFile, configuration, packageInfo.Version, true);
     if not result then
     begin
       if cancellationToken.IsCancelled then
@@ -1432,7 +1442,7 @@ begin
     // this platform isn't in it - a package that declares nothing is left to the existing
     // downstream handling rather than being excluded here.
     if (spec <> nil) and (spec.TargetPlatform <> nil) and (spec.TargetPlatform.Platforms <> []) and
-       (not (platform in spec.TargetPlatform.Platforms)) then
+       (not PlatformSatisfiedBy(platform, spec.TargetPlatform.Platforms)) then
       unsupportedPackageIds.Add(packageInfo.Id)
     else
       supportedPackages.Add(packageInfo);

@@ -706,6 +706,7 @@ var
   versionName : string;
   candidateVersion : TPackageVersion;
   dpkgIdentity : IPackageIdentity;
+  identity : IPackageIdentity;
   seen : ISet<string>;
   key : string;
 begin
@@ -751,7 +752,8 @@ begin
       if seen.Contains(key) then
         continue;
       seen.Add(key);
-      result.Add(TPackageIdentity.Create('', id, candidateVersion, thisCompiler));
+      identity := TPackageIdentity.Create('', id, candidateVersion, thisCompiler);
+      result.Add(identity);
     end;
 
     // Versions present only as raw .dpkg files (downloaded, never extracted).
@@ -770,7 +772,8 @@ begin
       if seen.Contains(key) then
         continue;
       seen.Add(key);
-      result.Add(TPackageIdentity.Create('', id, candidateVersion, thisCompiler));
+      identity := TPackageIdentity.Create('', id, candidateVersion, thisCompiler);
+      result.Add(identity);
     end;
   end;
 end;

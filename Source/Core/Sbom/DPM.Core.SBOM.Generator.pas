@@ -249,7 +249,7 @@ end;
 
 function IsWindowsPlatform(const platform : TDPMPlatform) : boolean;
 begin
-  result := platform in [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.WinARM64EC];
+  result := platform in [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.Win64x, TDPMPlatform.WinARM64EC];
 end;
 
 function FirstPathSegmentUnder(const root, fullPath : string) : string;
