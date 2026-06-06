@@ -73,6 +73,13 @@ function FindPackagesFolder(const rootDir : string; out folder : string) : boole
 /// </summary>
 function FindLicenseFile(const rootDir : string; out leafName : string) : boolean;
 
+/// <summary>
+///  Looks for a README file at the project root (with or without an extension).
+///  Returns just the leaf file name on success - emitted as metadata.readme, which
+///  the packer copies into the archive.
+/// </summary>
+function FindReadmeFile(const rootDir : string; out leafName : string) : boolean;
+
 function DetectGitRemoteUrl(const rootDir : string; out url : string) : boolean;
 function NormaliseGitUrl(const rawUrl : string) : string;
 function DerivePackageIdFromUrl(const normalisedUrl : string) : string;
@@ -239,6 +246,36 @@ begin
     actualLeaf := ExtractFileName(entry);
     stem := LowerCase(TPath.GetFileNameWithoutExtension(actualLeaf));
     if (stem = 'license') or (stem = 'licence') or (stem = 'copying') then
+    begin
+      leafName := actualLeaf;
+      result := true;
+      exit;
+    end;
+  end;
+end;
+
+function FindReadmeFile(const rootDir : string; out leafName : string) : boolean;
+var
+  entries : TArray<string>;
+  entry : string;
+  stem : string;
+  actualLeaf : string;
+begin
+  //Match files like README, README.md, Readme.txt etc. The file may or may not
+  //have an extension, so we compare on the stem only. Listing the directory and
+  //comparing preserves the actual on-disk casing for the dspec.
+  result := false;
+  leafName := '';
+  try
+    entries := TDirectory.GetFiles(rootDir);
+  except
+    exit;
+  end;
+  for entry in entries do
+  begin
+    actualLeaf := ExtractFileName(entry);
+    stem := LowerCase(TPath.GetFileNameWithoutExtension(actualLeaf));
+    if (stem = 'readme') or (stem = 'read.me') then
     begin
       leafName := actualLeaf;
       result := true;

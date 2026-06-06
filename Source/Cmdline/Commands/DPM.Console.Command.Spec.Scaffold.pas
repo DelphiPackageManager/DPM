@@ -388,6 +388,7 @@ var
   scaffold : TSpecScaffold;
   sourceGlobs : TArray<string>;
   licenseLeaf : string;
+  readmeLeaf : string;
   licenseGlob : TArray<string>;
   merged : TArray<string>;
   i : integer;
@@ -407,6 +408,13 @@ begin
   scaffold.ProjectUrl := ctx.ProjectUrl;
   scaffold.RepositoryUrl := ctx.ProjectUrl;
   SetLength(scaffold.Tags, 0);
+
+  //README at the project root - referenced via metadata.readme; the packer copies
+  //it into the archive, so (unlike LICENSE) it does not go into the source globs.
+  if FindReadmeFile(ctx.RootDir, readmeLeaf) then
+    scaffold.Readme := readmeLeaf
+  else
+    scaffold.Readme := '';
 
   //1. Source globs - prefer dpk/dproj-derived, fall back to broad sourceRel/*.pas
   if logical.RuntimeDProj <> '' then

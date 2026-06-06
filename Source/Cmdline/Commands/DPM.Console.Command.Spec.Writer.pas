@@ -59,6 +59,7 @@ type
     License : string;
     ProjectUrl : string;
     RepositoryUrl : string;
+    Readme : string;           //leaf file name (e.g. 'README.md'); '' when none found
     Tags : TArray<string>;
 
     //All paths below are relative to the project root with forward slashes and
@@ -82,7 +83,8 @@ implementation
 uses
   System.SysUtils,
   System.StrUtils,
-  System.Classes;
+  System.Classes,
+  DPM.Core.Constants;
 
 function DerivePackageSourceTemplate(const compiler : TCompilerVersion; const folderName : string) : string;
 var
@@ -312,6 +314,9 @@ begin
     AppendLine(buffer, '  copyright: ' + scaffold.Copyright);
   if Length(scaffold.Tags) > 0 then
     AppendLine(buffer, '  tags: ' + FormatTags(scaffold.Tags));
+  //readme comes last - same position the canonical writer (TSpecMetaData.ToYAML) emits it.
+  if scaffold.Readme <> '' then
+    AppendLine(buffer, '  readme: ' + YamlEscape(scaffold.Readme));
 end;
 
 procedure AppendTargetPlatforms(var buffer : string; const ranges : TTargetRanges;
@@ -422,7 +427,9 @@ var
   defaultTemplate : string;
 begin
   buffer := '';
-  AppendLine(buffer, 'min client version: 1.0');
+  //use the same key the reader (TSpec.LoadFromYAML) and canonical writer expect - the old
+  //'min client version' key was silently ignored on load.
+  AppendLine(buffer, 'min dpm client version: ' + cDPMClientVersion);
   AppendMetadata(buffer, scaffold);
   AppendLine(buffer, '');
 
