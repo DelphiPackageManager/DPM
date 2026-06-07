@@ -311,6 +311,10 @@ type
     btnDeletePackageDefRequire : TButton;
     actAddPackageDefItem : TAction;
     actDeletePackageDefItem : TAction;
+    crdEnvironmentVariables : TCard;
+    lblEnvironmentVariablesHeading : TLabel;
+    lblEnvironmentVariablesDescription : TLabel;
+    envVariablesList : TValueListEditor;
     procedure FormDestroy(Sender : TObject);
     procedure btnAddExcludeClick(Sender : TObject);
     procedure btnAddTemplateClick(Sender : TObject);
@@ -364,6 +368,7 @@ type
     procedure tvTemplatesEditing(Sender : TObject; Node : TTreeNode; var AllowEdit : Boolean);
     procedure VariablesListStringsChange(Sender : TObject);
     procedure PackageVariablesListStringsChange(Sender : TObject);
+    procedure envVariablesListStringsChange(Sender : TObject);
     procedure actDuplicateTemplateExecute(Sender : TObject);
     procedure ActionList1Update(Action : TBasicAction; var Handled : Boolean);
     procedure actDeleteTemplateExecute(Sender : TObject);
@@ -503,6 +508,8 @@ type
 
     function LoadDependency(const parentNode : TTemplateTreeNode; template : ISpecTemplate; const dependency : ISpecDependency) : TTemplateTreeNode;
     procedure LoadDependencies(const parentNode : TTemplateTreeNode; const template : ISpecTemplate);
+
+    procedure LoadEnvironmentVariablesNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate);
 
     procedure UriClick(const uri : string);
 
@@ -2479,6 +2486,19 @@ begin
     LoadDependency(nodeDependency, template, template.dependencies[j]);
 end;
 
+procedure TDSpecCreatorForm.LoadEnvironmentVariablesNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate);
+var
+  envNode : TTemplateTreeNode;
+begin
+  //Heading-only node - the key/value pairs are edited directly in envVariablesList (a
+  //TValueListEditor), so there are no child item nodes and no Add/Delete actions.
+  envNode := tvTemplates.Items.AddChild(parentNode, 'Environment Variables') as TTemplateTreeNode;
+  envNode.Template := template;
+  envNode.NodeType := ntEnvironmentVariablesHeading;
+  envNode.ImageIndex := 4;
+  envNode.SelectedIndex := 4;
+end;
+
 function TDSpecCreatorForm.LoadTemplate(const template : ISpecTemplate) : TTemplateTreeNode;
 var
   Node : TTemplateTreeNode;
@@ -2491,6 +2511,7 @@ begin
   LoadDesignNodes(Node, template, template.DesignEntries);
   LoadPackageDefNodes(Node, template, template.PackageDefinitions);
   LoadDependencies(Node, template);
+  LoadEnvironmentVariablesNode(Node, template);
   Node.Expand(true);
 
 end;
@@ -3153,6 +3174,18 @@ begin
             lbPackageDefRequires.Items.Add(lNode.packageDef.Requires[i]);
           CardPanel.ActiveCard := crdPackageDef;
         end;
+      ntEnvironmentVariablesHeading :
+        begin
+          FInVariableUpdate := true;
+          try
+            envVariablesList.Strings.Clear;
+            for i := 0 to lNode.Template.EnvironmentVariables.Count - 1 do
+              envVariablesList.Strings.Add(lNode.Template.EnvironmentVariables.Items[i].Key + '=' + lNode.Template.EnvironmentVariables.Items[i].Value);
+          finally
+            FInVariableUpdate := false;
+          end;
+          CardPanel.ActiveCard := crdEnvironmentVariables;
+        end;
     else
       raise Exception.Create('Unknow node type in tvTemplateChange');
     end;
@@ -3195,18 +3228,25 @@ begin
       FTemplate := Node.Template;
 
     categoryNode := Node.categoryNode;
-    item := TMenuItem.Create(PopupMenu);
 
-    item.Action := categoryNode.AddAction;
+    //Some node types (e.g. the Environment Variables heading) have no Add/Delete actions - they are
+    //edited inline. Only add a menu item when its action is assigned, and skip an empty popup.
+    if Assigned(categoryNode.AddAction) then
+    begin
+      item := TMenuItem.Create(PopupMenu);
+      item.Action := categoryNode.AddAction;
+      tvTemplates.PopupMenu.Items.Add(item);
+    end;
 
-    tvTemplates.PopupMenu.Items.Add(item);
+    if Assigned(categoryNode.DeleteAction) then
+    begin
+      item := TMenuItem.Create(PopupMenu);
+      item.Action := categoryNode.DeleteAction;
+      tvTemplates.PopupMenu.Items.Add(item);
+    end;
 
-    item := TMenuItem.Create(PopupMenu);
-    item.Action := categoryNode.DeleteAction;
-
-    tvTemplates.PopupMenu.Items.Add(item);
-
-    tvTemplates.PopupMenu.Popup(localPos.X, localPos.Y);
+    if tvTemplates.PopupMenu.Items.Count > 0 then
+      tvTemplates.PopupMenu.Popup(localPos.X, localPos.Y);
 
     Handled := true;
   end;
@@ -3267,6 +3307,30 @@ begin
     key := PackageVariablesList.Strings.Names[i];
     if key <> '' then
       FOpenFile.PackageSpec.Variables[LowerCase(key)] := PackageVariablesList.Strings.ValueFromIndex[i];
+  end;
+end;
+
+procedure TDSpecCreatorForm.envVariablesListStringsChange(Sender : TObject);
+var
+  i : integer;
+  key : string;
+  lNode : TTemplateTreeNode;
+begin
+  if FInVariableUpdate or FLoadingCard then
+    Exit;
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+  lNode := tvTemplates.Selected as TTemplateTreeNode;
+  if not Assigned(lNode.Template) then
+    Exit;
+  //Preserve the author's key casing (unlike package variables which are lower-cased) - IDE
+  //environment variable names are echoed as written, e.g. SKIADIR.
+  lNode.Template.EnvironmentVariables.Clear;
+  for i := 0 to envVariablesList.Strings.Count - 1 do
+  begin
+    key := envVariablesList.Strings.Names[i];
+    if key <> '' then
+      lNode.Template.EnvironmentVariables[key] := envVariablesList.Strings.ValueFromIndex[i];
   end;
 end;
 

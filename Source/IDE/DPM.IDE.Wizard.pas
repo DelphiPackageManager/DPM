@@ -131,6 +131,7 @@ uses
   DPM.IDE.Options,
   DPM.IDE.InstallerContext,
   DPM.IDE.PathManager,
+  DPM.IDE.EnvironmentVariableManager,
   DPM.IDE.ToolsAPI;
 
 {$R DPM.IDE.Resources.res}
@@ -326,6 +327,7 @@ begin
     FContainer.RegisterType<IDPMEditorViewManager, TDPMEditorViewManager>.AsSingleton();
     FContainer.RegisterType<IDPMIDEProjectController,TDPMIDEProjectController>.AsSingleton();
     FContainer.RegisterType<IDPMIDEPathManager,TDPMIDEPathManager>.AsSingleton();
+    FContainer.RegisterType<IDPMIDEEnvironmentVariableManager,TDPMIDEEnvironmentVariableManager>.AsSingleton();
 
     DPM.Core.Init.InitCore(FContainer,
       //replaces core registration of the IPackageInstallerContext implementation,

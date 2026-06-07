@@ -79,6 +79,9 @@ templates:
         files:
           - .\design\*.pas
           - .\design\*.dfm
+    environmentVariables:
+      TESTFULLDIR: $packageDir$
+      PATH: $packageDir$\bin
   - name: legacy
     source:
       - src: .\legacy\*.pas

@@ -167,7 +167,8 @@ uses
   DPM.Core.Git.Client in '..\Core\Git\DPM.Core.Git.Client.pas',
   DPM.Core.Git.Interfaces in '..\Core\Git\DPM.Core.Git.Interfaces.pas',
   DPM.Core.Registry.Catalog in '..\Core\Registry\DPM.Core.Registry.Catalog.pas',
-  DPM.Core.Registry.Interfaces in '..\Core\Registry\DPM.Core.Registry.Interfaces.pas';
+  DPM.Core.Registry.Interfaces in '..\Core\Registry\DPM.Core.Registry.Interfaces.pas',
+  DPM.Core.Packaging.EnvironmentVariableValidator in '..\Core\Packaging\DPM.Core.Packaging.EnvironmentVariableValidator.pas';
 
 {$R *.res}
 

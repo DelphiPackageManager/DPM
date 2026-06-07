@@ -253,6 +253,7 @@ type
     function GetDependencies : IList<ISpecDependency>;
     function GetBuildEntries : IList<ISpecBuildEntry>;
     function GetPackageDefinitions : IList<ISpecPackageDefinition>;
+    function GetEnvironmentVariables : IVariables;
     function GetName : string;
     procedure SetName(const templateName: string);
 
@@ -291,6 +292,10 @@ type
     property BuildEntries : IList<ISpecBuildEntry>read GetBuildEntries;
     property DesignEntries: IList<ISpecDesignEntry> read GetDesignFiles;
     property PackageDefinitions : IList<ISpecPackageDefinition> read GetPackageDefinitions;
+    /// <summary> IDE environment variables to set (in the IDE process) while this package's design
+    /// components are loaded, and clear/restore when unloaded. Key = variable name (PATH is
+    /// special-cased as append-only); value may use the install-time $packageDir$ token. </summary>
+    property EnvironmentVariables : IVariables read GetEnvironmentVariables;
 
     property SourceComments : TStrings read GetSourceComments;
     property DependenciesComments : TStrings read GetDependenciesComments;

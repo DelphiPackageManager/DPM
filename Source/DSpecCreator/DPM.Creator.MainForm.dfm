@@ -1229,6 +1229,54 @@ object DSpecCreatorForm: TDSpecCreatorForm
             OnClick = btnDeletePackageDefRequireClick
           end
         end
+        object crdEnvironmentVariables: TCard
+          Left = 1
+          Top = 1
+          Width = 527
+          Height = 526
+          Caption = 'Environment Variables'
+          CardIndex = 11
+          TabOrder = 11
+          object lblEnvironmentVariablesHeading: TLabel
+            Left = 8
+            Top = 8
+            Width = 110
+            Height = 15
+            Caption = 'Environment Variables'
+          end
+          object lblEnvironmentVariablesDescription: TLabel
+            Left = 8
+            Top = 32
+            Width = 505
+            Height = 60
+            AutoSize = False
+            Caption =
+              'Environment variables set in the IDE process while the package d' +
+              'esign-time components are loaded, and cleared when unloaded. PAT' +
+              'H is appended (semicolon separated). Use $packageDir$ to referen' +
+              'ce the package cache folder.'
+            Enabled = False
+            WordWrap = True
+          end
+          object envVariablesList: TValueListEditor
+            Left = 8
+            Top = 98
+            Width = 511
+            Height = 419
+            Anchors = [akLeft, akTop, akRight, akBottom]
+            DoubleBuffered = True
+            KeyOptions = [keyEdit, keyAdd, keyDelete, keyUnique]
+            ParentDoubleBuffered = False
+            TabOrder = 0
+            TitleCaptions.Strings = (
+              'Variable Name'
+              'Value')
+            OnStringsChange = envVariablesListStringsChange
+            ColWidths = (
+              150
+              355)
+          end
+        end
       end
       object Panel2: TPanel
         Left = 0

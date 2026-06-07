@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -44,6 +44,7 @@ type
     procedure CompilerRange_Loads_Expected_Coverage;
     procedure CompilerSet_Loads_Expected_Coverage;
     procedure Full_Loads_All_Metadata;
+    procedure Full_Loads_EnvironmentVariables;
     procedure CompilerRange_Per_Platform_Variable_Overrides;
 
     procedure Creator_ExpandCollapse_Preserves_Range;
@@ -59,7 +60,6 @@ uses
   Winapi.ActiveX,
   System.SysUtils,
   System.Classes,
-  System.Generics.Collections,
   Spring.Collections,
   TestLogger,
   DPM.Core.Types,
@@ -288,6 +288,8 @@ begin
       AssertStringListsEqual(epd.Exclude, apd.Exclude, ctx + ' package definition exclude ' + epd.Project);
       AssertStringListsEqual(epd.Requires, apd.Requires, ctx + ' package definition requires ' + epd.Project);
     end;
+
+    AssertVariablesEqual(et.EnvironmentVariables, at.EnvironmentVariables, ctx + ' environmentVariables');
   end;
 end;
 
@@ -386,6 +388,22 @@ begin
   Assert.IsFalse(md.IsTrial, 'isTrial');
   Assert.AreEqual(2, Length(md.Frameworks), 'frameworks');
   Assert.AreEqual(2, spec.Variables.Count, 'package variables');
+end;
+
+procedure TSpecRoundTripTests.Full_Loads_EnvironmentVariables;
+var
+  spec : IPackageSpec;
+  template : ISpecTemplate;
+  value : string;
+begin
+  spec := LoadFixture('full.dspec.yaml');
+  template := spec.FindTemplate('default');
+  Assert.IsNotNull(template, 'default template');
+  Assert.AreEqual(2, template.EnvironmentVariables.Count, 'environment variable count');
+  Assert.IsTrue(template.EnvironmentVariables.TryGetValue('TESTFULLDIR', value), 'TESTFULLDIR present');
+  Assert.AreEqual('$packageDir$', value, 'TESTFULLDIR value (deferred token preserved)');
+  Assert.IsTrue(template.EnvironmentVariables.TryGetValue('PATH', value), 'PATH present');
+  Assert.AreEqual('$packageDir$\bin', value, 'PATH value');
 end;
 
 procedure TSpecRoundTripTests.CompilerRange_Per_Platform_Variable_Overrides;

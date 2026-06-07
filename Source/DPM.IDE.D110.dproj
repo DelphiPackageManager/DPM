@@ -150,6 +150,7 @@
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.Reader.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.Writer.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.IdValidator.pas"/>
+        <DCCReference Include="Core\Packaging\DPM.Core.Packaging.EnvironmentVariableValidator.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Writer.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Configuration.pas"/>
@@ -267,6 +268,7 @@
         <DCCReference Include="IDE\EditorView\DPM.IDE.ActivityIndicator.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.PackageLatestVersionInfo.pas"/>
         <DCCReference Include="IDE\DPM.IDE.PathManager.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.EnvironmentVariableManager.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Hash.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.DateTime.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Base64Url.pas"/>

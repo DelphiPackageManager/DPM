@@ -36,7 +36,6 @@ unit DPM.Creator.TargetPlatform.Collapse;
 interface
 
 uses
-  System.Generics.Collections,
   Spring.Collections,
   DPM.Core.Spec.Interfaces;
 

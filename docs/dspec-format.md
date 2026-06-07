@@ -2,6 +2,8 @@
 
 This document describes the YAML-based `.dspec` file format used by DPM (Delphi Package Manager) to define package metadata, dependencies, and build configurations.
 
+DO NOT DELETE THIS DOC - it is the definative reference for the dspec.yaml
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -264,6 +266,8 @@ build:
   - project: "packages\\RuntimePkg.dpk"
     platforms: "Win32, Win64"     # Can override targetPlatform
     defines: "RELEASE;DPM"        # Semicolon-separated compiler defines
+    references:                   # Extra package names added to the requires clause
+      - vcl
 ```
 
 | Field | Required | Description |
@@ -271,6 +275,7 @@ build:
 | `project` | Yes | Path to .dpk or .dproj file |
 | `platforms` | No | Override platforms for this build |
 | `defines` | No | Additional compiler defines |
+| `references` | No | Array of package names added to the built package's requires clause |
 
 ### Design Entries (Design-time Packages)
 
@@ -281,6 +286,9 @@ design:
   - project: "packages\\DesignPkg.dpk"
     platforms: "Win32, Win64"     # Design packages only support Win32/Win64
     defines: "DESIGNTIME"
+    references:                   # Extra package names added to the requires clause
+      - vcl
+      - designide
     libSuffix: "280"              # Library suffix (e.g., "280" for Delphi 12)
     libPrefix: "dcl"              # Library prefix
     libVersion: "28.0"            # Library version string
@@ -291,6 +299,7 @@ design:
 | `project` | Yes | Path to design-time .dpk file |
 | `platforms` | No | Limited to Win32 and Win64 |
 | `defines` | No | Compiler defines for design-time build |
+| `references` | No | Array of package names added to the built package's requires clause |
 | `libSuffix` | No | Override library suffix |
 | `libPrefix` | No | Override library prefix (default: "dcl") |
 | `libVersion` | No | Override library version string |
@@ -335,6 +344,69 @@ package definitions:
 
 > **Note:** Because `kind` inference keys off `designide`, a design package that lists only
 > `vcl`/`fmx` in its requires should set `kind: design` explicitly.
+
+### Environment Variables
+
+A template may declare IDE environment variables that DPM sets while the package is loaded in the
+IDE and clears (restoring any previous value) when it is removed.
+
+```yaml
+templates:
+  - name: "default"
+    design:
+      - project: "packages\\DesignPkg.dpk"
+    environmentVariables:
+      MYLIBDIR: "$packageDir$"                 # a custom variable pointing at the package
+      PATH: "$packageDir$\\Binary\\Shared"     # appended to PATH (never replaces it)
+```
+
+How they behave:
+
+- **Process environment only.** DPM sets these on the running IDE *process* (via
+  `SetEnvironmentVariable`), so the compiler / MSBuild and any DLLs the IDE loads inherit them.
+  DPM does **not** write the IDE's persistent registry `Environment Variables`, so they are not the
+  same as Tools|Options `$(Var)` project macros. State is session-scoped and rebuilt each time the
+  package is restored/loaded.
+- **Distinct from `variables:`.** The [Variables](#variables-section) section is pack-time text
+  substitution baked into the spec when packing. `environmentVariables` are applied on the consumer
+  machine at *install/load* time.
+- **`PATH` is append-only.** The `PATH` key (case-insensitive) is appended to (semicolon-separated
+  directories supported) and reference counted, never replaced. Directories present on PATH at IDE
+  startup are never removed.
+- **Conflict policy.** For a normal (non-PATH) variable, if it already exists in the process
+  environment its value is captured, overwritten, and restored when the last package that set it is
+  removed.
+
+#### Value expansion
+
+Values are expanded in two stages:
+
+| Stage | What is expanded |
+|-------|------------------|
+| Pack time | Package- and targetPlatform-level `variables:` and the [built-in compiler variables](#built-in-compiler-variables) (e.g. `$compiler$`, `$bdsversion$`), resolved per compiler. |
+| Install time (IDE) | `$packageDir$` → the package's cache folder `{cache}\{compiler}\{id}\{version}` on the consumer machine. Use this to point a variable at a file shipped inside the package. |
+
+> **`$packageDir$` is exclusive to `environmentVariables` values.** They are the only values DPM
+> processes at install time, so `$packageDir$` is only meaningful here. Using it anywhere else in the
+> dspec (a `src`, `project`, `dest`, regular `variables:` value, etc.) is an **error at pack time** —
+> those fields are fully resolved when the package is built and have no access to the consumer's
+> cache path.
+
+#### Banned variable names
+
+To protect system stability and prevent executable-hijack (shadow-exe) redirection, packing
+**fails** if a package declares any of these (compared case-insensitively). `PATH` is allowed
+(append-only) and is *not* in this list:
+
+- Executable redirection: `PATHEXT`, `COMSPEC`, `SYSTEMROOT`, `WINDIR`, `SYSTEMDRIVE`.
+- OS / user profile: `TEMP`, `TMP`, `USERPROFILE`, `PUBLIC`, `HOMEDRIVE`, `HOMEPATH`, `APPDATA`,
+  `LOCALAPPDATA`, `PROGRAMDATA`, `ALLUSERSPROFILE`, `PROGRAMFILES`, `PROGRAMFILES(X86)`,
+  `PROGRAMW6432`, `COMMONPROGRAMFILES`(`(X86)`/`W6432`), `USERNAME`, `USERDOMAIN`, `COMPUTERNAME`,
+  `LOGONSERVER`, `OS`, `NUMBER_OF_PROCESSORS`, `PROCESSOR_ARCHITECTURE`(`W6432`),
+  `PROCESSOR_IDENTIFIER`.
+- RAD Studio built-ins: `BDS`, `BDSBIN`, `BDSINCLUDE`, `BDSLIB`, `BDSCOMMONDIR`, `BDSUSERDIR`,
+  `BDSPROJECTSDIR`, `BDSPLATFORMSDKSDIR`, `BDSCATALOGREPOSITORY`(`ALLUSERS`), `DELPHI`, `BCB`,
+  `FRAMEWORKDIR`, `FRAMEWORKVERSION`.
 
 ### Complete Template Example
 
@@ -482,19 +554,24 @@ metadata:
 
 ### Git Package
 
-Git packages reference a Git repository and can define multiple versions:
+Git packages reference a Git repository. The set of resolvable versions is **not** declared
+in the dspec — DPM derives them from the repository's **git tags** at resolve time.
 
 ```yaml
 packageKind: "git"
 
 metadata:
   id: "MyPackage"
-  versions:                     # Array of versions (instead of single version)
-    - version: "1.0.0"
-      commit: "abc123def456789..."
-    - version: "0.9.0"
-      commit: "xyz789abc123456..."
+  version: "1.0.0"              # OPTIONAL for git packages - informational only.
+                               # Resolvable versions come from the repo's git tags.
+  repositoryUrl: "https://github.com/example/MyPackage.git"
+  repositoryCommit: "abc123def456789..."   # Commit for this spec (often a #HASH# placeholder)
 ```
+
+> **Note:** For `packageKind: git`, the `version` field is optional (the dspec version is
+> informational and is set per-tag during resolution). For the default `packageKind: dpm`,
+> `version` is required. The commit is carried by `repositoryCommit` — there is no per-version
+> `commit` array.
 
 ---
 
@@ -535,7 +612,7 @@ Examples:
 # DPM package spec file
 # Used to build packages
 
-min client version: 1.0
+min dpm client version: 1.0
 # metadata describes the package to the user
 metadata:
   id: Gabr42.OmniThreadLibrary

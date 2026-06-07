@@ -157,6 +157,7 @@
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.Reader.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Archive.Writer.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.IdValidator.pas"/>
+        <DCCReference Include="Core\Packaging\DPM.Core.Packaging.EnvironmentVariableValidator.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Writer.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Configuration.pas"/>

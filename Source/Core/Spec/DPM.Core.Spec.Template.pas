@@ -47,6 +47,7 @@ type
     FBuildEntries : IList<ISpecBuildEntry>;
     FDesignFiles : IList<ISpecDesignEntry>;
     FPackageDefinitions : IList<ISpecPackageDefinition>;
+    FEnvironmentVariables : IVariables;
 
     FSourceComments : TStringList;
     FDependenciesComments : TStringList;
@@ -60,6 +61,7 @@ type
     function GetSourceFiles : IList<ISpecSourceEntry>;
     function GetBuildEntries : IList<ISpecBuildEntry>;
     function GetPackageDefinitions : IList<ISpecPackageDefinition>;
+    function GetEnvironmentVariables : IVariables;
     function GetName : string;
     procedure SetName(const templateName: string);
 
@@ -143,6 +145,7 @@ begin
   FBuildEntries := TCollections.CreateList<ISpecBuildEntry>;
   FDesignFiles := TCollections.CreateList<ISpecDesignEntry>;
   FPackageDefinitions := TCollections.CreateList<ISpecPackageDefinition>;
+  FEnvironmentVariables := TCollections.CreateDictionary<string,string>;
 end;
 
 constructor TSpecTemplate.CreateClone(const logger : ILogger; const source : ISpecTemplate);
@@ -185,6 +188,9 @@ begin
     newPackageDef := source.PackageDefinitions[i].Clone;
     FPackageDefinitions.Add(newPackageDef);
   end;
+
+  for i := 0 to source.EnvironmentVariables.Count -1 do
+    FEnvironmentVariables[source.EnvironmentVariables.Items[i].Key] := source.EnvironmentVariables.Items[i].Value;
 end;
 
 procedure TSpecTemplate.DeleteBuildEntry(const project: string);
@@ -265,6 +271,7 @@ var
   template : IYAMLMapping;
   i : integer;
   seq : IYAMLSequence;
+  envVars : IYAMLMapping;
 begin
   template := parent.AsSequence.AddMapping;
   template.S['name'] := FName;
@@ -299,6 +306,13 @@ begin
     seq := template.A['package definitions'];
     for i := 0 to FPackageDefinitions.Count -1 do
       FPackageDefinitions[i].ToYAML(seq, packageKind);
+  end;
+
+  if FEnvironmentVariables.Count > 0 then
+  begin
+    envVars := template.O['environmentVariables'];
+    for i := 0 to FEnvironmentVariables.Count - 1 do
+      envVars.S[FEnvironmentVariables.Items[i].Key] := FEnvironmentVariables.Items[i].Value;
   end;
 end;
 
@@ -403,6 +417,11 @@ end;
 function TSpecTemplate.GetPackageDefinitions : IList<ISpecPackageDefinition>;
 begin
   result := FPackageDefinitions;
+end;
+
+function TSpecTemplate.GetEnvironmentVariables : IVariables;
+begin
+  result := FEnvironmentVariables;
 end;
 
 function TSpecTemplate.GetDependencies : IList<ISpecDependency>;
@@ -524,6 +543,8 @@ end;
 function TSpecTemplate.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var
   collectionObj : IYAMLSequence;
+  envVarsObj : IYAMLMapping;
+  i : integer;
 begin
   result := true;
   LoadComments(yamlObject);
@@ -552,6 +573,19 @@ begin
     collectionObj := yamlObject.A['package definitions'];
     if collectionObj.Count > 0 then
       result := LoadPackageDefinitionsFromYAML(collectionObj) and result;
+  end;
+
+  //IDE environment variables - preserve the author's key casing (Windows env var names are
+  //case-insensitive, but we echo them back as written). Values are expanded later (pack-time
+  //spec variables, install-time $packageDir$).
+  if yamlObject.ContainsKey('environmentVariables') then
+  begin
+    envVarsObj := yamlObject.O['environmentVariables'];
+    if envVarsObj <> nil then
+    begin
+      for i := 0 to envVarsObj.Count - 1 do
+        FEnvironmentVariables[envVarsObj.Keys[i]] := envVarsObj.Items[envVarsObj.Keys[i]].AsString;
+    end;
   end;
 end;
 

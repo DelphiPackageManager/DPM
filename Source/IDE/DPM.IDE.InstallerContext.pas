@@ -12,7 +12,8 @@ uses
   DPM.Core.Package.Installer.Interfaces,
   DPM.Core.Package.InstallerContext,
   DPM.Core.Spec.Interfaces,
-  DPM.IDE.PathManager;
+  DPM.IDE.PathManager,
+  DPM.IDE.EnvironmentVariableManager;
 
 type
   TDPMLoadedBPL = record
@@ -27,18 +28,29 @@ type
     BPLPath : string;   //lowercase
   end;
 
+  TDPMProjectEnvVarRef = record
+    PackageId : string; //lowercase
+    Name : string;      //env var name as authored (PATH special-cased by the manager)
+    Value : string;     //value with $packageDir$ already resolved
+  end;
+
   TDPMIDEPackageInstallerContext = class(TCorePackageInstallerContext, IPackageInstallerContext)
   private
     FPathManager : IDPMIDEPathManager;
+    FEnvVarManager : IDPMIDEEnvironmentVariableManager;
     FPackageCache : IPackageCache;
     //key: lowercase bpl path. Record holds IList which is shared across copies - mutations via Referencers list are visible.
     FLoadedBPLs : IDictionary<string, TDPMLoadedBPL>;
     //key: lowercase project file. List preserves load order (post-order DFS across graph, spec order within a package).
     FProjectBPLs : IDictionary<string, IList<TDPMProjectBPLRef>>;
+    //key: lowercase project file. Env vars applied for this project, in apply order.
+    FProjectEnvVars : IDictionary<string, IList<TDPMProjectEnvVarRef>>;
     function ResolveDesignBPLPath(const node : IPackageReference; const designEntry : ISpecDesignEntry; const loadPlatform : TDPMPlatform; out bplPath : string; out bplFolder : string) : boolean;
     function LoadBPLIfNeeded(const bplPath : string; const bplFolder : string; const packageId : string; const lcProject : string) : boolean;
     procedure ReleaseBPLRef(const lcBplPath : string; const lcProject : string);
     procedure ReleaseProjectBPLs(const lcProject : string);
+    procedure ApplyEnvironmentVariables(const node : IPackageReference; const template : ISpecTemplate; const lcProject : string; const projectEnvVars : IList<TDPMProjectEnvVarRef>);
+    procedure ReleaseProjectEnvVars(const lcProject : string);
     function IsAlreadyLoadedByIDE(const bplPath : string) : boolean;
   protected
     procedure Clear; override;
@@ -46,7 +58,7 @@ type
     function InstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const packageSpecs : IDictionary<string, IPackageSpec>) : boolean; override;
     function UninstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const orphanedPackageIds : IList<string>) : boolean; override;
   public
-    constructor Create(const logger : ILogger; const pathManager : IDPMIDEPathManager; const packageCache : IPackageCache); reintroduce;
+    constructor Create(const logger : ILogger; const pathManager : IDPMIDEPathManager; const envVarManager : IDPMIDEEnvironmentVariableManager; const packageCache : IPackageCache); reintroduce;
   end;
 
 implementation
@@ -73,13 +85,15 @@ end;
 
 { TDPMIDEPackageInstallerContext }
 
-constructor TDPMIDEPackageInstallerContext.Create(const logger : ILogger; const pathManager : IDPMIDEPathManager; const packageCache : IPackageCache);
+constructor TDPMIDEPackageInstallerContext.Create(const logger : ILogger; const pathManager : IDPMIDEPathManager; const envVarManager : IDPMIDEEnvironmentVariableManager; const packageCache : IPackageCache);
 begin
   inherited Create(logger);
   FPathManager := pathManager;
+  FEnvVarManager := envVarManager;
   FPackageCache := packageCache;
   FLoadedBPLs := TCollections.CreateDictionary<string, TDPMLoadedBPL>;
   FProjectBPLs := TCollections.CreateDictionary<string, IList<TDPMProjectBPLRef>>;
+  FProjectEnvVars := TCollections.CreateDictionary<string, IList<TDPMProjectEnvVarRef>>;
 end;
 
 function TDPMIDEPackageInstallerContext.ResolveDesignBPLPath(const node : IPackageReference; const designEntry : ISpecDesignEntry; const loadPlatform : TDPMPlatform; out bplPath : string; out bplFolder : string) : boolean;
@@ -316,12 +330,51 @@ begin
   projectRefs.Clear;
 end;
 
+procedure TDPMIDEPackageInstallerContext.ApplyEnvironmentVariables(const node : IPackageReference; const template : ISpecTemplate; const lcProject : string; const projectEnvVars : IList<TDPMProjectEnvVarRef>);
+var
+  packagePath : string;
+  keys : TArray<string>;
+  i : integer;
+  resolvedValue : string;
+  ref : TDPMProjectEnvVarRef;
+begin
+  if template.EnvironmentVariables.Count = 0 then
+    exit;
+  //$packageDir$ is the only deferred token - resolve it to this package's cache folder so values can
+  //point at files shipped inside the package. Everything else was expanded at pack time.
+  packagePath := ExcludeTrailingPathDelimiter(FPackageCache.GetPackagePath(node));
+  keys := template.EnvironmentVariables.Keys.ToArray;
+  for i := 0 to High(keys) do
+  begin
+    resolvedValue := StringReplace(template.EnvironmentVariables[keys[i]], '$packageDir$', packagePath, [rfReplaceAll, rfIgnoreCase]);
+    FEnvVarManager.SetVariable(keys[i], resolvedValue, lcProject, node.Id);
+    ref.PackageId := LowerCase(node.Id);
+    ref.Name := keys[i];
+    ref.Value := resolvedValue;
+    projectEnvVars.Add(ref);
+  end;
+end;
+
+procedure TDPMIDEPackageInstallerContext.ReleaseProjectEnvVars(const lcProject : string);
+var
+  envVars : IList<TDPMProjectEnvVarRef>;
+  i : integer;
+begin
+  if not FProjectEnvVars.TryGetValue(lcProject, envVars) then
+    exit;
+  //release in reverse apply order
+  for i := envVars.Count - 1 downto 0 do
+    FEnvVarManager.RemoveVariable(envVars[i].Name, envVars[i].Value, lcProject, envVars[i].PackageId);
+  envVars.Clear;
+end;
+
 function TDPMIDEPackageInstallerContext.InstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const packageSpecs : IDictionary<string, IPackageSpec>) : boolean;
 var
   lcProject : string;
   loadPlatform : TDPMPlatform;
   graph : IPackageReference;
   projectRefs : IList<TDPMProjectBPLRef>;
+  projectEnvVars : IList<TDPMProjectEnvVarRef>;
   overallResult : boolean;
 begin
   result := true;
@@ -344,9 +397,13 @@ begin
   //Restore semantics: release anything we were tracking for this project first so the rebuilt
   //list reflects the new graph exactly. BPLs that are still required will be re-added below.
   ReleaseProjectBPLs(lcProject);
+  ReleaseProjectEnvVars(lcProject);
 
   projectRefs := TCollections.CreateList<TDPMProjectBPLRef>;
   FProjectBPLs[lcProject] := projectRefs;
+
+  projectEnvVars := TCollections.CreateList<TDPMProjectEnvVarRef>;
+  FProjectEnvVars[lcProject] := projectEnvVars;
 
   overallResult := true;
 
@@ -383,6 +440,10 @@ begin
         ref.BPLPath := LowerCase(bplPath);
         projectRefs.Add(ref);
       end;
+
+      //Apply any IDE environment variables this package declares - independent of whether it has a
+      //design BPL, so a runtime-only package can still expose e.g. a path to its bundled DLLs.
+      ApplyEnvironmentVariables(node, template, lcProject, projectEnvVars);
     end);
 
   result := overallResult and not cancellationToken.IsCancelled;
@@ -392,16 +453,15 @@ function TDPMIDEPackageInstallerContext.UninstallDesignPackages(const cancellati
 var
   lcProject : string;
   projectRefs : IList<TDPMProjectBPLRef>;
+  projectEnvVars : IList<TDPMProjectEnvVarRef>;
   orphanSet : IDictionary<string, integer>;
   orphanedId : string;
   i : integer;
   ref : TDPMProjectBPLRef;
+  envRef : TDPMProjectEnvVarRef;
 begin
   result := true;
   lcProject := LowerCase(projectFile);
-
-  if not FProjectBPLs.TryGetValue(lcProject, projectRefs) then
-    exit;
 
   if (orphanedPackageIds = nil) or (orphanedPackageIds.Count = 0) then
     exit;
@@ -409,6 +469,22 @@ begin
   orphanSet := TCollections.CreateDictionary<string, integer>;
   for orphanedId in orphanedPackageIds do
     orphanSet[LowerCase(orphanedId)] := 1;
+
+  //Environment variables for orphaned packages - release in reverse apply order.
+  if FProjectEnvVars.TryGetValue(lcProject, projectEnvVars) then
+  begin
+    for i := projectEnvVars.Count - 1 downto 0 do
+    begin
+      envRef := projectEnvVars[i];
+      if not orphanSet.ContainsKey(envRef.PackageId) then
+        continue;
+      FEnvVarManager.RemoveVariable(envRef.Name, envRef.Value, lcProject, envRef.PackageId);
+      projectEnvVars.Delete(i);
+    end;
+  end;
+
+  if not FProjectBPLs.TryGetValue(lcProject, projectRefs) then
+    exit;
 
   //Reverse load order: dependants before their dependencies, reverse spec order within a package.
   for i := projectRefs.Count - 1 downto 0 do
@@ -431,6 +507,8 @@ begin
   lcProject := LowerCase(projectFile);
   ReleaseProjectBPLs(lcProject);
   FProjectBPLs.Remove(lcProject);
+  ReleaseProjectEnvVars(lcProject);
+  FProjectEnvVars.Remove(lcProject);
   inherited;
 end;
 
@@ -447,6 +525,7 @@ begin
   begin
     FProjectBPLs.Clear;
     FLoadedBPLs.Clear;
+    FProjectEnvVars.Clear;
     exit;
   end;
   //snapshot keys so we can release without invalidating enumeration
@@ -455,6 +534,12 @@ begin
     ReleaseProjectBPLs(key);
   FProjectBPLs.Clear;
   FLoadedBPLs.Clear; //defensive - should be empty by now
+
+  //restore any env vars we set, then drop tracking.
+  keys := FProjectEnvVars.Keys.ToArray;
+  for key in keys do
+    ReleaseProjectEnvVars(key);
+  FProjectEnvVars.Clear;
   inherited;
 end;
 

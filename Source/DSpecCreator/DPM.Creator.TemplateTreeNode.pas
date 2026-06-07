@@ -12,7 +12,8 @@ uses
 type
    TNodeType = (ntTemplateHeading,
                ntSourceHeading, ntBuildHeading, ntDesignHeading, ntDependencyHeading,
-               ntSource, ntBuild, ntDesign, ntDependency, ntPackageDefsHeading, ntPackageDef );
+               ntSource, ntBuild, ntDesign, ntDependency, ntPackageDefsHeading, ntPackageDef,
+               ntEnvironmentVariablesHeading );
 
 
   TTemplateTreeNode = class (TTreeNode)
@@ -41,6 +42,7 @@ type
     function IsDependencyHeading: Boolean;
     function IsPackageDef : boolean;
     function IsPackageDefHeading : boolean;
+    function IsEnvironmentVariablesHeading : Boolean;
 
     procedure DeleteBuild;
     procedure DeleteSource;
@@ -144,10 +146,16 @@ begin
   Result := NodeType = ntDesignHeading;
 end;
 
+function TTemplateTreeNode.IsEnvironmentVariablesHeading: Boolean;
+begin
+  Result := NodeType = ntEnvironmentVariablesHeading;
+end;
+
 function TTemplateTreeNode.IsHeading: Boolean;
 begin
   Result := NodeType in [ntTemplateHeading, ntSourceHeading, ntBuildHeading,
-               ntDesignHeading, ntDependencyHeading, ntPackageDefsHeading];
+               ntDesignHeading, ntDependencyHeading, ntPackageDefsHeading,
+               ntEnvironmentVariablesHeading];
 end;
 
 function TTemplateTreeNode.IsPackageDef: boolean;

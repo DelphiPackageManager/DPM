@@ -445,6 +445,13 @@
                             ],
                             "additionalProperties": false
                         }
+                    },
+                    "environmentVariables": {
+                        "type": "object",
+                        "description": "IDE environment variables to set in the IDE process while this package's design components are loaded, and clear/restore when unloaded. Each key is a variable name and each value a string. PATH is allowed and treated as append-only (semicolon separated dirs). A small set of system/RAD Studio variables is banned at pack time. Values may use the install-time token $packageDir$ which resolves to the package's cache folder on the consumer machine.",
+                        "additionalProperties": {
+                            "type": "string"
+                        }
                     }
                 },
                 "required": [

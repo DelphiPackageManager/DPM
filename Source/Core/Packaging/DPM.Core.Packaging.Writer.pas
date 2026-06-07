@@ -75,12 +75,14 @@ type
 
     procedure ValidateBuildEntries(const template : ISpecTemplate; const antPattern : IAntPattern);
 
-
+    /// <summary> Rejects any package that declares a reserved/banned IDE environment variable name. </summary>
+    function ValidateEnvironmentVariables(const spec : IPackageSpec) : boolean;
 
     procedure PopulateVariables(const spec : IPackageSpec; const targetPlatform : ISpecTargetPlatform; const version : TPackageVersion; const externalVariables : TStringList);
 
     function ReplaceTokens(const version: TPackageVersion; const spec : IPackageSpec; const targetPlatform : ISpecTargetPlatform; const variables: TStringList) : boolean;
     function TokenMatchEvaluator(const match : TMatch) : string;
+    function EnvVarTokenMatchEvaluator(const match : TMatch) : string;
 
 
 
@@ -111,6 +113,7 @@ uses
   System.IOUtils,
   System.Masks,
   DPM.Core.Constants,
+  DPM.Core.Packaging.EnvironmentVariableValidator,
   DPM.Core.Spec,
   DPM.Core.Utils.Strings,
   DPM.Core.Utils.Path;
@@ -196,15 +199,37 @@ begin
 end;
 
 
+function TPackageWriter.ValidateEnvironmentVariables(const spec : IPackageSpec) : boolean;
+var
+  template : ISpecTemplate;
+  pair : TPair<string,string>;
+  reason : string;
+begin
+  result := true;
+  for template in spec.Templates do
+  begin
+    for pair in template.EnvironmentVariables do
+    begin
+      if not TEnvironmentVariableValidator.IsAllowed(pair.Key, reason) then
+      begin
+        FLogger.Error('Template [' + template.Name + '] : ' + reason);
+        result := false;
+      end;
+    end;
+  end;
+end;
+
 function TPackageWriter.ReplaceTokens(const version: TPackageVersion; const spec : IPackageSpec; const targetPlatform : ISpecTargetPlatform; const variables: TStringList): boolean;
 var
   evaluator : TMatchEvaluator;
+  envVarEvaluator : TMatchEvaluator;
   regEx : TRegEx;
   i, j : integer;
   template : ISpecTemplate;
   source : ISpecSourceEntry;
   build  : ISpecBuildEntry;
   design : ISpecDesignEntry;
+  envVarKeys : TArray<string>;
 begin
   result := true;
   FVariables := TCollections.CreateDictionary<string,string>;
@@ -290,6 +315,16 @@ begin
           design.LibVersion := regEx.Replace(design.LibVersion, evaluator);
       end;
 
+      //environment variable values are the ONLY place install-time processing happens. They get the
+      //normal pack-time tokens (spec/targetPlatform variables + built-in compiler tokens) via a
+      //dedicated evaluator that additionally preserves the install-time $packageDir$ token for the
+      //IDE to resolve when the package loads. $packageDir$ is NOT valid anywhere else - in any other
+      //field the normal evaluator raises 'Unknown token'. Keys (names) are never tokenized.
+      envVarEvaluator := EnvVarTokenMatchEvaluator; //work around for compiler overload resolution issue.
+      envVarKeys := template.EnvironmentVariables.Keys.ToArray;
+      for i := 0 to High(envVarKeys) do
+        template.EnvironmentVariables[envVarKeys[i]] := regEx.Replace(template.EnvironmentVariables[envVarKeys[i]], envVarEvaluator);
+
       //TODO : Add packagedefs
 
     except
@@ -316,6 +351,28 @@ begin
   begin
     key := LowerCase(match.Groups.Item[1].Value);
     if FVariables.ContainsKey(key) then
+      result := FVariables[key]
+    else
+      raise Exception.Create('Unknown token [' + match.Groups.Item[1].Value + ']');
+  end
+  else
+    result := match.Value;
+end;
+
+function TPackageWriter.EnvVarTokenMatchEvaluator(const match: TMatch): string;
+var
+  key : string;
+begin
+  //Used only for environmentVariables values. Behaves like TokenMatchEvaluator but additionally
+  //preserves the install-time $packageDir$ token (left intact in the manifest for the IDE installer
+  //to resolve to the package's cache folder on the consumer machine). $packageDir$ is meaningful
+  //ONLY in environment variable values - everywhere else it is an unknown token.
+  if match.Success and (match.Groups.Count = 2) then
+  begin
+    key := LowerCase(match.Groups.Item[1].Value);
+    if key = 'packagedir' then
+      result := '$packageDir$'
+    else if FVariables.ContainsKey(key) then
       result := FVariables[key]
     else
       raise Exception.Create('Unknown token [' + match.Groups.Item[1].Value + ']');
@@ -715,6 +772,9 @@ begin
     exit;
   end;
 
+  //Reject reserved/banned IDE environment variable names before doing any real work.
+  if not ValidateEnvironmentVariables(spec) then
+    exit;
 
   variables := TStringList.Create;
   try

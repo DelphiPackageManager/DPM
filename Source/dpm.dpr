@@ -89,6 +89,7 @@ uses
   DPM.Core.Packaging.Archive.Reader in 'Core\Packaging\DPM.Core.Packaging.Archive.Reader.pas',
   DPM.Core.Packaging.Archive.Writer in 'Core\Packaging\DPM.Core.Packaging.Archive.Writer.pas',
   DPM.Core.Packaging.IdValidator in 'Core\Packaging\DPM.Core.Packaging.IdValidator.pas',
+  DPM.Core.Packaging.EnvironmentVariableValidator in 'Core\Packaging\DPM.Core.Packaging.EnvironmentVariableValidator.pas',
   DPM.Core.Packaging in 'Core\Packaging\DPM.Core.Packaging.pas',
   DPM.Core.Packaging.Writer in 'Core\Packaging\DPM.Core.Packaging.Writer.pas',
   DPM.Core.Project.Configuration in 'Core\Project\DPM.Core.Project.Configuration.pas',
