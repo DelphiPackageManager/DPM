@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -54,9 +54,8 @@ type
     procedure SetVersionRange(const value : TVersionRange);
     function Clone(const parentId : string) : IResolvedPackage;
   public
-    constructor Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
-    //synthetic no-op resolution for a bundled dependency (e.g. Indy) - see IResolvedPackage.IsBundled.
-    constructor CreateBundled(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
+    constructor Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string; isBundled : boolean = false);
+    //isbundled = synthetic no-op resolution for a bundled dependency (e.g. Indy) - see IResolvedPackage.IsBundled.
     destructor Destroy;override;
   end;
 
@@ -77,7 +76,7 @@ begin
   result := cloned;
 end;
 
-constructor TResolvedPackage.Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
+constructor TResolvedPackage.Create(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string; isBundled : boolean);
 begin
   inherited Create;
   FPackage := package;
@@ -86,12 +85,7 @@ begin
     raise EArgumentOutOfRangeException.Create('Empty version range provided for resolution');
   FParentId := parentId;
   FProject := project;
-end;
-
-constructor TResolvedPackage.CreateBundled(const package : IPackageInfo; const range : TVersionRange; const parentId : string; const project : string);
-begin
-  Create(package, range, parentId, project);
-  FIsBundled := true;
+  FIsBundled := isBundled;
 end;
 
 
@@ -137,4 +131,5 @@ begin
 end;
 
 end.
+
 

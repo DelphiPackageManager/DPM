@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -504,7 +504,7 @@ begin
   info := TPackageInfo.CreateBundled(packageId, FCompilerVersion);
   range := TVersionRange.Parse(cBundledDependencyVersion);
   //parent under root - it has no dependencies and contributes nothing to the graph/install.
-  resolution := TResolvedPackage.CreateBundled(info, range, cRootNode, FProjectFile);
+  resolution := TResolvedPackage.Create(info, range, cRootNode, FProjectFile, true);
   FResolved.Add(LowerCase(packageId), resolution);
 end;
 
