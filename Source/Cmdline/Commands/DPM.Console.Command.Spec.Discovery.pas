@@ -106,9 +106,19 @@ function CollectPlatforms(const dprojFiles : TArray<string>; const logger : ILog
 function MakeRelative(const baseDir : string; const fullPath : string) : string;
 
 /// <summary>
+///  Strips a conventional runtime/design suffix (R, D, RT, DT, Runtime, Design,
+///  DesignTime, with optional . _ - separator) from a bare package name, returning
+///  the base name and the implied kind. Unlike ComputeLogicalPackageStem it does
+///  NOT treat a trailing `.Word` as a file extension, so it is safe for dotted
+///  package names like 'Spring.Base'. Returns the name unchanged / dkUnknown when
+///  no suffix matches.
+/// </summary>
+function StripRuntimeDesignSuffix(const packageName : string; out kind : TDProjKind) : string;
+
+/// <summary>
 ///  Normalises a dproj/dpk filename stem to the logical package identifier
-///  stem by stripping conventional runtime/design suffixes (R, D, Design,
-///  DesignTime, .Designtime, .Design).
+///  stem by stripping conventional runtime/design suffixes (R, D, RT, DT, Runtime,
+///  Design, DesignTime).
 /// </summary>
 function ComputeLogicalPackageStem(const leafName : string) : string;
 
@@ -623,42 +633,85 @@ begin
   result := list;
 end;
 
-function EndsWithSuffix(const stem : string; const suffix : string) : boolean;
+type
+  TPackageNameSuffix = record
+    Suffix : string;
+    Kind   : TDProjKind;
+    Short  : boolean;   //R/D/RT/DT: exact-case + word-boundary guard; word suffixes are case-insensitive
+  end;
+
+const
+  //Single source of truth for runtime/design naming conventions, shared by stem
+  //computation (ComputeLogicalPackageStem) and filename classification
+  //(ClassifyByFilename) so the two never drift apart. Ordered longest-first so
+  //'DesignTime' beats 'Design' beats 'DT'/'D', and 'Runtime' beats 'RT'/'R'.
+  //Extend this table to teach DPM new package naming schemes.
+  cRuntimeDesignSuffixes : array[0..6] of TPackageNameSuffix = (
+    (Suffix : 'DesignTime'; Kind : dkDesign;  Short : false),
+    (Suffix : 'Runtime';    Kind : dkRuntime; Short : false),
+    (Suffix : 'Design';     Kind : dkDesign;  Short : false),
+    (Suffix : 'DT';         Kind : dkDesign;  Short : true),
+    (Suffix : 'RT';         Kind : dkRuntime; Short : true),
+    (Suffix : 'D';          Kind : dkDesign;  Short : true),
+    (Suffix : 'R';          Kind : dkRuntime; Short : true));
+
+function StripRuntimeDesignSuffix(const packageName : string; out kind : TDProjKind) : string;
 var
-  stemLen : integer;
-  suffLen : integer;
+  i : integer;
+  suffixLen : integer;
+  baseLen : integer;
+  tail : string;
+  prevChar : Char;
+  matched : boolean;
 begin
-  result := false;
-  stemLen := Length(stem);
-  suffLen := Length(suffix);
-  if (suffLen = 0) or (stemLen < suffLen) then
+  kind := dkUnknown;
+  result := packageName;
+  if packageName = '' then
     exit;
-  result := SameText(Copy(stem, stemLen - suffLen + 1, suffLen), suffix);
+
+  for i := Low(cRuntimeDesignSuffixes) to High(cRuntimeDesignSuffixes) do
+  begin
+    suffixLen := Length(cRuntimeDesignSuffixes[i].Suffix);
+    baseLen := Length(packageName) - suffixLen;
+    if baseLen < 1 then
+      continue; //never strip a name down to nothing
+    tail := Copy(packageName, baseLen + 1, suffixLen);
+
+    if cRuntimeDesignSuffixes[i].Short then
+    begin
+      //exact uppercase match, then require a word boundary before the suffix so
+      //we don't amputate acronyms (CERT, UUID, CRUD) or digit forms (Spring4D).
+      matched := tail = cRuntimeDesignSuffixes[i].Suffix;
+      if matched then
+      begin
+        prevChar := packageName[baseLen];
+        matched := CharInSet(prevChar, ['a'..'z', '.', '_', '-']);
+      end;
+    end
+    else
+      //word suffixes are distinctive enough to match case-insensitively.
+      matched := SameText(tail, cRuntimeDesignSuffixes[i].Suffix);
+
+    if matched then
+    begin
+      result := Copy(packageName, 1, baseLen);
+      //trim a single separator left behind, e.g. 'Spring.Design' -> 'Spring'.
+      if (Length(result) > 1) and CharInSet(result[Length(result)], ['.', '_', '-']) then
+        result := Copy(result, 1, Length(result) - 1);
+      kind := cRuntimeDesignSuffixes[i].Kind;
+      exit;
+    end;
+  end;
+end;
+
+function SplitDProjName(const leafName : string; out kind : TDProjKind) : string;
+begin
+  result := StripRuntimeDesignSuffix(TPath.GetFileNameWithoutExtension(leafName), kind);
 end;
 
 function ClassifyByFilename(const dprojPath : string) : TDProjKind;
-var
-  stem : string;
-  lastChar : Char;
 begin
-  result := dkUnknown;
-  stem := TPath.GetFileNameWithoutExtension(dprojPath);
-  if stem = '' then
-    exit;
-
-  //Longer suffixes first so "Design" beats "D".
-  if EndsWithSuffix(stem, 'DesignTime') or
-     EndsWithSuffix(stem, 'Design') or
-     EndsWithSuffix(stem, 'DT') then
-    exit(dkDesign);
-
-  //Last char heuristic - R means runtime, D means design. Must be the literal
-  //uppercase letter so we don't match random words ending in 'd' or 'r'.
-  lastChar := stem[Length(stem)];
-  if lastChar = 'D' then
-    exit(dkDesign);
-  if lastChar = 'R' then
-    exit(dkRuntime);
+  SplitDProjName(ExtractFileName(dprojPath), result);
 end;
 
 function ClassifyByDProjContent(const dprojPath : string) : TDProjKind;
@@ -722,44 +775,13 @@ begin
     result := StringReplace(fullPath, '\', '/', [rfReplaceAll]);
 end;
 
-function StripIfSuffix(const s : string; const suffix : string) : string;
-begin
-  if EndsText(suffix, s) and (Length(s) > Length(suffix)) then
-    result := Copy(s, 1, Length(s) - Length(suffix))
-  else
-    result := s;
-end;
-
 function ComputeLogicalPackageStem(const leafName : string) : string;
 var
-  stem : string;
-  stripped : string;
+  kind : TDProjKind;
 begin
-  stem := TPath.GetFileNameWithoutExtension(leafName);
-  if stem = '' then
-    exit('');
-
-  //Longer/compound design suffixes first.
-  stripped := StripIfSuffix(stem, '.Designtime');
-  if stripped <> stem then exit(stripped);
-  stripped := StripIfSuffix(stem, '.DesignTime');
-  if stripped <> stem then exit(stripped);
-  stripped := StripIfSuffix(stem, '.Design');
-  if stripped <> stem then exit(stripped);
-  stripped := StripIfSuffix(stem, 'DesignTime');
-  if stripped <> stem then exit(stripped);
-  stripped := StripIfSuffix(stem, 'Design');
-  if stripped <> stem then exit(stripped);
-
-  //Single-char R/D - only strip when the preceding char is also an uppercase
-  //letter or digit so we don't amputate names like "VSoft.CancellationToken"
-  //into "VSoft.CancellationToke".
-  if Length(stem) > 1 then
-  begin
-    if (stem[Length(stem)] = 'R') or (stem[Length(stem)] = 'D') then
-      exit(Copy(stem, 1, Length(stem) - 1));
-  end;
-  result := stem;
+  //Stem and kind share one ruleset (cRuntimeDesignSuffixes via SplitDProjName);
+  //here we only care about the stem.
+  result := SplitDProjName(leafName, kind);
 end;
 
 function GroupDProjsByStem(const dprojFiles : TArray<string>) : TLogicalPackages;

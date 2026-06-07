@@ -185,10 +185,10 @@ object PackageWizardForm: TPackageWizardForm
         Height = 23
         TabOrder = 3
       end
-      object edtLicense: TEdit
+      object cboLicense: TComboBox
         Left = 200
         Top = 204
-        Width = 200
+        Width = 300
         Height = 23
         TabOrder = 4
       end

@@ -1043,6 +1043,192 @@ object DSpecCreatorForm: TDSpecCreatorForm
             WordWrap = True
           end
         end
+        object crdPackageDef: TCard
+          Left = 1
+          Top = 1
+          Width = 527
+          Height = 526
+          Caption = 'Package Definition'
+          CardIndex = 10
+          TabOrder = 10
+          DesignSize = (
+            527
+            526)
+          object lblPackageDef: TLabel
+            Left = 8
+            Top = 8
+            Width = 99
+            Height = 15
+            Caption = 'Package Definition'
+          end
+          object lblPackageDefProject: TLabel
+            Left = 16
+            Top = 40
+            Width = 82
+            Height = 15
+            Caption = 'Project (.dproj):'
+          end
+          object lblPackageDefKind: TLabel
+            Left = 16
+            Top = 92
+            Width = 27
+            Height = 15
+            Caption = 'Kind:'
+          end
+          object lblPackageDefPlatforms: TLabel
+            Left = 16
+            Top = 150
+            Width = 210
+            Height = 15
+            Caption = 'Platforms (overrides target platform):'
+          end
+          object lblPackageDefFiles: TLabel
+            Left = 271
+            Top = 150
+            Width = 28
+            Height = 15
+            Caption = 'Files:'
+          end
+          object lblPackageDefExclude: TLabel
+            Left = 16
+            Top = 331
+            Width = 47
+            Height = 15
+            Caption = 'Exclude:'
+          end
+          object lblPackageDefRequires: TLabel
+            Left = 271
+            Top = 331
+            Width = 52
+            Height = 15
+            Caption = 'Requires:'
+          end
+          object edtPackageDefProject: TEdit
+            Left = 16
+            Top = 61
+            Width = 495
+            Height = 23
+            Anchors = [akLeft, akTop, akRight]
+            ParentShowHint = False
+            ShowHint = True
+            TabOrder = 0
+            OnChange = edtPackageDefProjectChange
+          end
+          object cboPackageDefKind: TComboBox
+            Left = 16
+            Top = 113
+            Width = 200
+            Height = 23
+            Style = csDropDown
+            TabOrder = 1
+            OnChange = cboPackageDefKindChange
+            Items.Strings = (
+              ''
+              'runtime'
+              'design')
+          end
+          object clbPackageDefPlatforms: TCheckListBox
+            Left = 16
+            Top = 171
+            Width = 240
+            Height = 140
+            ItemHeight = 17
+            Items.Strings = (
+              'Win32'
+              'Win64'
+              'MacOS32'
+              'MacOS64'
+              'MacOSARM64'
+              'Android'
+              'Android64'
+              'iOS32'
+              'iOS64'
+              'iOSSimulator'
+              'Linux64')
+            TabOrder = 2
+            OnClickCheck = clbPackageDefPlatformsClickCheck
+          end
+          object lbPackageDefFiles: TListBox
+            Left = 271
+            Top = 171
+            Width = 240
+            Height = 110
+            Anchors = [akLeft, akTop, akRight]
+            ItemHeight = 15
+            TabOrder = 3
+          end
+          object btnAddPackageDefFile: TButton
+            Left = 271
+            Top = 287
+            Width = 75
+            Height = 25
+            Caption = 'Add'
+            TabOrder = 4
+            OnClick = btnAddPackageDefFileClick
+          end
+          object btnDeletePackageDefFile: TButton
+            Left = 360
+            Top = 287
+            Width = 75
+            Height = 25
+            Caption = 'Delete'
+            TabOrder = 5
+            OnClick = btnDeletePackageDefFileClick
+          end
+          object lbPackageDefExclude: TListBox
+            Left = 16
+            Top = 352
+            Width = 240
+            Height = 110
+            ItemHeight = 15
+            TabOrder = 6
+          end
+          object btnAddPackageDefExclude: TButton
+            Left = 16
+            Top = 468
+            Width = 75
+            Height = 25
+            Caption = 'Add'
+            TabOrder = 7
+            OnClick = btnAddPackageDefExcludeClick
+          end
+          object btnDeletePackageDefExclude: TButton
+            Left = 105
+            Top = 468
+            Width = 75
+            Height = 25
+            Caption = 'Delete'
+            TabOrder = 8
+            OnClick = btnDeletePackageDefExcludeClick
+          end
+          object lbPackageDefRequires: TListBox
+            Left = 271
+            Top = 352
+            Width = 240
+            Height = 110
+            Anchors = [akLeft, akTop, akRight]
+            ItemHeight = 15
+            TabOrder = 9
+          end
+          object btnAddPackageDefRequire: TButton
+            Left = 271
+            Top = 468
+            Width = 75
+            Height = 25
+            Caption = 'Add'
+            TabOrder = 10
+            OnClick = btnAddPackageDefRequireClick
+          end
+          object btnDeletePackageDefRequire: TButton
+            Left = 360
+            Top = 468
+            Width = 75
+            Height = 25
+            Caption = 'Delete'
+            TabOrder = 11
+            OnClick = btnDeletePackageDefRequireClick
+          end
+        end
       end
       object Panel2: TPanel
         Left = 0
@@ -2114,6 +2300,16 @@ object DSpecCreatorForm: TDSpecCreatorForm
       Category = 'Design'
       Caption = 'Delete Design Item'
       OnExecute = actDeleteDesignItemExecute
+    end
+    object actAddPackageDefItem: TAction
+      Category = 'PackageDef'
+      Caption = 'Add Package Definition'
+      OnExecute = actAddPackageDefItemExecute
+    end
+    object actDeletePackageDefItem: TAction
+      Category = 'PackageDef'
+      Caption = 'Delete Package Definition'
+      OnExecute = actDeletePackageDefItemExecute
     end
     object actAddSourceItem: TAction
       Category = 'Source'

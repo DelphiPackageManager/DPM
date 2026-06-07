@@ -53,7 +53,7 @@ type
     lblVersion : TLabel;
     edtVersion : TEdit;
     lblLicense : TLabel;
-    edtLicense : TEdit;
+    cboLicense : TComboBox;
     rgMultiMode : TRadioGroup;
     lblWhich : TLabel;
     cboWhichPackage : TComboBox;
@@ -82,6 +82,7 @@ type
     function PrevVisiblePage(const fromIdx : integer) : integer;
     procedure UpdateButtons;
     procedure RunScan;
+    procedure LoadSPDXList;
     procedure BuildReviewText;
     function LeaveRoot(out msg : string) : boolean;
     function LeaveFolders(out msg : string) : boolean;
@@ -133,7 +134,37 @@ begin
     PageControl.Pages[i].TabVisible := false;
   PageControl.ActivePageIndex := cPageRoot;
   edtRootFolder.Text := ExcludeTrailingPathDelimiter(GetCurrentDir);
+  LoadSPDXList;
   UpdateButtons;
+end;
+
+procedure TPackageWizardForm.LoadSPDXList;
+var
+  stream : TResourceStream;
+  spdxList : TStringList;
+  i : integer;
+begin
+  //SPDX license ids come from the same 'SPDX' RCDATA resource the main form uses
+  //(Name=details pairs); we only need the Names for the dropdown.
+  cboLicense.Items.Clear;
+  try
+    stream := TResourceStream.Create(HInstance, 'SPDX', RT_RCDATA);
+    try
+      spdxList := TStringList.Create;
+      try
+        spdxList.LoadFromStream(stream);
+        for i := 0 to spdxList.Count - 1 do
+          cboLicense.Items.Add(spdxList.Names[i]);
+      finally
+        spdxList.Free;
+      end;
+    finally
+      stream.Free;
+    end;
+  except
+    on e : Exception do
+      FLogger.Warning('Could not load SPDX license list : ' + e.Message);
+  end;
 end;
 
 function TPackageWizardForm.IsMultiPackage : boolean;
@@ -361,13 +392,14 @@ begin
     edtAuthor.Text := FConfig.Author;
   if Trim(edtVersion.Text) = '' then
     edtVersion.Text := '0.1.0';
-  if Trim(edtLicense.Text) = '' then
-    edtLicense.Text := 'Apache-2.0';
+  if Trim(cboLicense.Text) = '' then
+    cboLicense.Text := 'Apache-2.0';
 
-  //in single-package mode the id is editable; in multi-package mode each package
-  //is scaffolded under its stem, so hide/disable the id field.
-  edtId.Enabled := not IsMultiPackage;
-  lblId.Enabled := not IsMultiPackage;
+  //the package id is always editable - in single/source-only mode it is the id; in
+  //multi-package "pick single" mode it overrides the chosen package's stem. (In
+  //"scaffold all" mode each file uses its own stem, so the field is not consulted.)
+  edtId.Enabled := true;
+  lblId.Enabled := true;
 
   //populate the multi-package choices
   rgMultiMode.Items.Clear;
@@ -415,7 +447,7 @@ begin
     ver := '0.1.0';
   FCtx.Version := ver;
 
-  lic := Trim(edtLicense.Text);
+  lic := Trim(cboLicense.Text);
   if lic = '' then
     lic := 'Apache-2.0';
   FCtx.License := lic;
@@ -469,6 +501,16 @@ begin
       for i := 0 to High(FLogicalPackages) do
         mmoReview.Lines.Add('  ' + FLogicalPackages[i].Stem + cPackageSpecExt);
     end;
+
+    //Source-only library: the scaffolder generates a runtime package definition (and a
+    //matching build entry) so the source still produces a compiled, installable package.
+    if (not FCtx.HasPackages) and (not IsMultiPackage) then
+    begin
+      mmoReview.Lines.Add('');
+      mmoReview.Lines.Add('Package def : ./packages/' + Trim(edtId.Text) +
+        'R.dproj (runtime, generated from source)');
+    end;
+
     mmoReview.Lines.Add('');
     mmoReview.Lines.Add('Review the generated file(s) and fill in any remaining values.');
   finally
@@ -546,7 +588,10 @@ begin
   if rgMultiMode.ItemIndex = 1 then
   begin
     idx := cboWhichPackage.ItemIndex;
-    effectiveId := FLogicalPackages[idx].Stem;
+    //honour an edited package id; fall back to the selected package's stem.
+    effectiveId := Trim(edtId.Text);
+    if effectiveId = '' then
+      effectiveId := FLogicalPackages[idx].Stem;
     FCtx.PackageIds[idx] := effectiveId;
     scaffold := BuildPackageScaffold(FLogicalPackages[idx], FCtx, effectiveId, FLogger);
     if not WriteScaffoldFile(scaffold, FCtx.RootDir, FLogger, writtenPath) then

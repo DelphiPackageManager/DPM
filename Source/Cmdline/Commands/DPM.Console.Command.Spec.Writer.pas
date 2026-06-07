@@ -50,6 +50,16 @@ type
   end;
   TSpecDependencies = TArray<TSpecDependency>;
 
+  TSpecPackageDef = record
+    Project : string;                 //e.g. 'packages/FooR.dproj' (no leading ./; writer adds it)
+    Kind : string;                    //'runtime' or 'design'; '' = inferred
+    Requires : TArray<string>;        //e.g. ['rtl']
+    Files : TArray<string>;           //source-code globs, root-relative, no leading ./
+    Exclude : TArray<string>;         //file-name globs to drop
+    Platforms : TDPMPlatforms;        //[] = inherit the targetPlatform's platforms
+  end;
+  TSpecPackageDefs = TArray<TSpecPackageDef>;
+
   TSpecScaffold = record
     PackageId : string;
     Version : string;
@@ -73,6 +83,7 @@ type
     BuildPlatforms : TDPMPlatforms;   //platforms for every build entry
     DesignPlatforms : TDPMPlatforms;  //platforms for every design entry (schema limits to win32/win64)
     Dependencies : TSpecDependencies; //emitted under templates[0].dependencies
+    PackageDefs : TSpecPackageDefs;   //package projects to generate (source-only libraries)
   end;
 
 function DerivePackageSourceTemplate(const compiler : TCompilerVersion; const folderName : string) : string;
@@ -319,8 +330,21 @@ begin
     AppendLine(buffer, '  readme: ' + YamlEscape(scaffold.Readme));
 end;
 
+function PackageSourceVaries(const targets : TArray<TSpecTargetInfo>) : boolean;
+var
+  i : integer;
+begin
+  //true when the dproj folder is per-compiler - i.e. some target's folder differs
+  //from the first. One target, or all-equal folders, means a single shared folder
+  //and so no $packageSource$ variable is needed.
+  result := false;
+  for i := 1 to High(targets) do
+    if not SameText(targets[i].PackageSourceLiteral, targets[0].PackageSourceLiteral) then
+      exit(true);
+end;
+
 procedure AppendTargetPlatforms(var buffer : string; const ranges : TTargetRanges;
-  const defaultTemplate : string; const hasPackagesFolder : boolean);
+  const defaultTemplate : string; const emitOverrides : boolean);
 var
   i : integer;
   r : TTargetRange;
@@ -337,7 +361,7 @@ begin
       AppendLine(buffer, '    compiler to: ' + CompilerToString(r.EndCompiler));
     end;
     AppendLine(buffer, '    platforms: ' + FormatPlatformList(r.Platforms));
-    if hasPackagesFolder and (r.PackageSourceTemplate <> defaultTemplate) then
+    if emitOverrides and (r.PackageSourceTemplate <> defaultTemplate) then
     begin
       AppendLine(buffer, '    variables:');
       AppendLine(buffer, '      packageSource: ' + YamlEscape(r.PackageSourceTemplate));
@@ -346,15 +370,19 @@ begin
 end;
 
 procedure AppendProjectEntries(var buffer : string; const dprojs : TArray<string>;
-  const platforms : TDPMPlatforms; const hasPackagesFolder : boolean; const packagesFolderRel : string);
+  const platforms : TDPMPlatforms; const hasPackagesFolder : boolean;
+  const packagesFolderRel : string; const packageSourceSegment : string);
 var
   i : integer;
   projectPath : string;
 begin
   for i := 0 to High(dprojs) do
   begin
+    //packageSourceSegment is '$packageSource$' when the folder varies per compiler,
+    //the literal shared folder otherwise (possibly '' for the packages root, which
+    //JoinRelPath drops).
     if hasPackagesFolder then
-      projectPath := RelWithDot(JoinRelPath([packagesFolderRel, '$packageSource$', dprojs[i]]))
+      projectPath := RelWithDot(JoinRelPath([packagesFolderRel, packageSourceSegment, dprojs[i]]))
     else
       projectPath := RelWithDot(dprojs[i]);
     AppendLine(buffer, '      - project: ' + projectPath);
@@ -384,7 +412,51 @@ begin
   end;
 end;
 
-procedure AppendTemplates(var buffer : string; const scaffold : TSpecScaffold);
+procedure AppendStringListEntries(var buffer : string; const key : string;
+  const values : TArray<string>; const asGlobs : boolean);
+var
+  i : integer;
+  value : string;
+begin
+  if Length(values) = 0 then
+    exit;
+  AppendLine(buffer, '        ' + key + ':');
+  for i := 0 to High(values) do
+  begin
+    //source-code/exclude globs use the same `./`-prefixed style as a source src;
+    //requires are bare package names emitted verbatim (quoted if ambiguous).
+    if asGlobs then
+      value := RelWithDot(values[i])
+    else
+      value := YamlEscape(values[i]);
+    AppendLine(buffer, '          - ' + value);
+  end;
+end;
+
+procedure AppendPackageDefinitions(var buffer : string; const defs : TSpecPackageDefs);
+var
+  i : integer;
+  def : TSpecPackageDef;
+begin
+  if Length(defs) = 0 then
+    exit;
+  AppendLine(buffer, '    package definitions:');
+  for i := 0 to High(defs) do
+  begin
+    def := defs[i];
+    AppendLine(buffer, '      - project: ' + RelWithDot(def.Project));
+    if def.Kind <> '' then
+      AppendLine(buffer, '        kind: ' + def.Kind);
+    AppendStringListEntries(buffer, 'requires', def.Requires, false);
+    AppendStringListEntries(buffer, 'files', def.Files, true);
+    AppendStringListEntries(buffer, 'exclude', def.Exclude, false);
+    if def.Platforms <> [] then
+      AppendLine(buffer, '        platforms: ' + FormatPlatformList(def.Platforms));
+  end;
+end;
+
+procedure AppendTemplates(var buffer : string; const scaffold : TSpecScaffold;
+  const packageSourceSegment : string);
 var
   i : integer;
   pkgRel : string;
@@ -400,23 +472,25 @@ begin
   begin
     //dest is only required when it differs from the src folder, which is the
     //default. Omit it so the generated file stays minimal.
-    pkgRel := RelWithDot(JoinRelPath([scaffold.PackagesFolderRel, '$packageSource$']));
+    pkgRel := RelWithDot(JoinRelPath([scaffold.PackagesFolderRel, packageSourceSegment]));
     AppendLine(buffer, '      - src: ' + pkgRel + '/*.dpk');
     AppendLine(buffer, '      - src: ' + pkgRel + '/*.dproj');
   end;
+
+  AppendPackageDefinitions(buffer, scaffold.PackageDefs);
 
   if Length(scaffold.BuildDProjs) > 0 then
   begin
     AppendLine(buffer, '    build:');
     AppendProjectEntries(buffer, scaffold.BuildDProjs, scaffold.BuildPlatforms,
-      scaffold.HasPackagesFolder, scaffold.PackagesFolderRel);
+      scaffold.HasPackagesFolder, scaffold.PackagesFolderRel, packageSourceSegment);
   end;
 
   if Length(scaffold.DesignDProjs) > 0 then
   begin
     AppendLine(buffer, '    design:');
     AppendProjectEntries(buffer, scaffold.DesignDProjs, scaffold.DesignPlatforms,
-      scaffold.HasPackagesFolder, scaffold.PackagesFolderRel);
+      scaffold.HasPackagesFolder, scaffold.PackagesFolderRel, packageSourceSegment);
   end;
 end;
 
@@ -425,6 +499,8 @@ var
   buffer : string;
   ranges : TTargetRanges;
   defaultTemplate : string;
+  useVar : boolean;
+  folderSegment : string;
 begin
   buffer := '';
   //use the same key the reader (TSpec.LoadFromYAML) and canonical writer expect - the old
@@ -433,23 +509,35 @@ begin
   AppendMetadata(buffer, scaffold);
   AppendLine(buffer, '');
 
-  if scaffold.HasPackagesFolder and (Length(scaffold.Targets) > 0) then
+  //The $packageSource$ variable is only worthwhile when the dproj folder differs
+  //per compiler. When the packages all share one folder (or sit in the packages
+  //root) we emit a literal path and no variable.
+  useVar := scaffold.HasPackagesFolder and (Length(scaffold.Targets) > 0) and
+    PackageSourceVaries(scaffold.Targets);
+  if useVar then
+    folderSegment := '$packageSource$'
+  else if scaffold.HasPackagesFolder and (Length(scaffold.Targets) > 0) then
+    folderSegment := scaffold.Targets[0].PackageSourceLiteral
+  else
+    folderSegment := '';
+
+  if Length(scaffold.Targets) > 0 then
   begin
     ranges := GroupTargetsIntoRanges(scaffold.Targets);
-    MostCommonTemplate(ranges, defaultTemplate);
-    AppendLine(buffer, 'variables:');
-    AppendLine(buffer, '  packageSource: ' + YamlEscape(defaultTemplate));
-    AppendLine(buffer, '');
-    AppendTargetPlatforms(buffer, ranges, defaultTemplate, true);
-  end
-  else if Length(scaffold.Targets) > 0 then
-  begin
-    ranges := GroupTargetsIntoRanges(scaffold.Targets);
-    AppendTargetPlatforms(buffer, ranges, '', false);
+    if useVar then
+    begin
+      MostCommonTemplate(ranges, defaultTemplate);
+      AppendLine(buffer, 'variables:');
+      AppendLine(buffer, '  packageSource: ' + YamlEscape(defaultTemplate));
+      AppendLine(buffer, '');
+    end
+    else
+      defaultTemplate := '';
+    AppendTargetPlatforms(buffer, ranges, defaultTemplate, useVar);
   end;
   AppendLine(buffer, '');
 
-  AppendTemplates(buffer, scaffold);
+  AppendTemplates(buffer, scaffold, folderSegment);
 
   result := buffer;
 end;

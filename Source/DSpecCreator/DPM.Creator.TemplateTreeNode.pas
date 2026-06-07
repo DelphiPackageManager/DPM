@@ -1,4 +1,4 @@
-unit DPM.Creator.TemplateTreeNode;
+﻿unit DPM.Creator.TemplateTreeNode;
 
 interface
 
@@ -12,7 +12,7 @@ uses
 type
    TNodeType = (ntTemplateHeading,
                ntSourceHeading, ntBuildHeading, ntDesignHeading, ntDependencyHeading,
-               ntSource, ntBuild, ntDesign, ntDependency );
+               ntSource, ntBuild, ntDesign, ntDependency, ntPackageDefsHeading, ntPackageDef );
 
 
   TTemplateTreeNode = class (TTreeNode)
@@ -27,6 +27,7 @@ type
     designEntry: ISpecDesignEntry;
     sourceEntry: ISpecSourceEntry;
     dependency: ISpecDependency;
+    packageDef : ISpecPackageDefinition;
 
     function CategoryNode: TTemplateTreeNode;
     function IsHeading: Boolean;
@@ -38,11 +39,14 @@ type
     function IsSourceHeading: Boolean;
     function IsDependency: Boolean;
     function IsDependencyHeading: Boolean;
+    function IsPackageDef : boolean;
+    function IsPackageDefHeading : boolean;
 
     procedure DeleteBuild;
     procedure DeleteSource;
     procedure DeleteDesign;
     procedure DeleteDependency;
+    procedure DeletePackageDef;
 
     procedure DeleteEntry;
 
@@ -89,9 +93,18 @@ begin
     ntDesign: DeleteDesign;
     ntSource: DeleteSource;
     ntDependency: DeleteDependency;
+    ntPackageDef: DeletePackageDef;
   else
     raise Exception.Create('DeleteEntry called on non entry node');
   end;
+end;
+
+procedure TTemplateTreeNode.DeletePackageDef;
+begin
+  if not IsPackageDef then
+    raise Exception.Create('Node is not of type Package Definition');
+
+  Template.DeletePackageDefinition(packageDef.Project);
 end;
 
 procedure TTemplateTreeNode.DeleteSource;
@@ -134,7 +147,18 @@ end;
 function TTemplateTreeNode.IsHeading: Boolean;
 begin
   Result := NodeType in [ntTemplateHeading, ntSourceHeading, ntBuildHeading,
-               ntDesignHeading, ntDependencyHeading];
+               ntDesignHeading, ntDependencyHeading, ntPackageDefsHeading];
+end;
+
+function TTemplateTreeNode.IsPackageDef: boolean;
+begin
+  result := NodeType = TNodeType.ntPackageDef;
+
+end;
+
+function TTemplateTreeNode.IsPackageDefHeading: boolean;
+begin
+result := NodeType = TNodeType.ntPackageDefsHeading;
 end;
 
 function TTemplateTreeNode.IsSource: Boolean;

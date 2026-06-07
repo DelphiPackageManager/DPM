@@ -327,6 +327,8 @@ var
   dpkPath : string;
   requires : TArray<string>;
   rawEntry : string;
+  depName : string;
+  depKind : TDProjKind;
   i : integer;
   dep : TSpecDependency;
   siblingId : string;
@@ -357,10 +359,14 @@ begin
   begin
     rawEntry := Trim(requires[i]);
     if rawEntry = '' then continue;
+    //Strip any runtime/design suffix (e.g. 'dmvcframeworkRT' -> 'dmvcframework')
+    //so the dependency references the logical package id, not the dpk leaf, and
+    //so the sibling lookup below matches the stem-keyed logical packages.
+    depName := StripRuntimeDesignSuffix(rawEntry, depKind);
     //Resolve to a sibling id when one of the project's own packages shares
     //the stem - that way `requires Spring.Base;` becomes a dependency on the
     //sibling spec (which may carry a different id like Spring4D.Base).
-    siblingId := FindSiblingIdByStem(ctx, rawEntry);
+    siblingId := FindSiblingIdByStem(ctx, depName);
     if siblingId <> '' then
     begin
       //skip self-references
@@ -371,8 +377,11 @@ begin
     end
     else
     begin
-      dep.Id := rawEntry;
-      dep.Version := '';
+      dep.Id := depName;
+      //The dpk requires clause carries no version, and we cannot infer one, so
+      //default to 0.0.1 - a valid range that lets the package at least pack and
+      //be tested. The user is expected to tighten this afterwards.
+      dep.Version := '0.0.1';
     end;
     if DepAlreadyInList(list, dep.Id) then
       continue;
@@ -387,6 +396,7 @@ function BuildPackageScaffold(const logical : TLogicalPackage; const ctx : TScaf
 var
   scaffold : TSpecScaffold;
   sourceGlobs : TArray<string>;
+  packageDefFiles : TArray<string>;
   licenseLeaf : string;
   readmeLeaf : string;
   licenseGlob : TArray<string>;
@@ -398,6 +408,8 @@ var
   targetIdx : integer;
   buildDProjs : TArray<string>;
   designDProjs : TArray<string>;
+  genProject : string;
+  packageDef : TSpecPackageDef;
 begin
   scaffold.PackageId := packageId;
   scaffold.Version := ctx.Version;
@@ -424,6 +436,8 @@ begin
   if Length(sourceGlobs) = 0 then
     sourceGlobs := FallbackSourceGlobs(ctx);
   sourceGlobs := PrependSharedIncludes(sourceGlobs, ctx);
+  //capture the source-code globs (no LICENSE) for a generated package definition's files
+  packageDefFiles := sourceGlobs;
 
   //2. LICENSE file at project root
   if FindLicenseFile(ctx.RootDir, licenseLeaf) then
@@ -485,7 +499,30 @@ begin
     designPlatforms := [TDPMPlatform.Win32];
   scaffold.DesignPlatforms := designPlatforms;
 
-  //6. Dependencies - parse dpk/dproj requires, map to sibling ids where possible.
+  //6. Source-only library (no package projects found): generate a runtime package
+  //   definition from the source globs plus a matching build entry so the package
+  //   actually compiles. The package-def project and the build project must be the
+  //   same string so they resolve to the same generated dproj in the cache.
+  if (Length(buildDProjs) = 0) and (Length(designDProjs) = 0) and (not ctx.HasPackages) then
+  begin
+    genProject := 'packages/' + packageId + 'R.dproj';
+
+    packageDef.Project := genProject;
+    packageDef.Kind := 'runtime';
+    SetLength(packageDef.Requires, 1);
+    packageDef.Requires[0] := 'rtl';
+    packageDef.Files := packageDefFiles;
+    SetLength(packageDef.Exclude, 0);
+    packageDef.Platforms := []; //inherit the targetPlatform's platforms
+    SetLength(scaffold.PackageDefs, 1);
+    scaffold.PackageDefs[0] := packageDef;
+
+    SetLength(buildDProjs, 1);
+    buildDProjs[0] := genProject;
+    scaffold.BuildDProjs := buildDProjs;
+  end;
+
+  //7. Dependencies - parse dpk/dproj requires, map to sibling ids where possible.
   scaffold.Dependencies := BuildDependencies(logical, ctx);
 
   result := scaffold;

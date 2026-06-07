@@ -297,7 +297,7 @@ design:
 
 > **Note:** Design-time packages are only supported on Win32 and Win64 platforms.
 
-### Package Definitions (Auto-generated Projects)
+### Package Definitions
 
 Some libraries ship only `.pas` source and no Delphi package projects (`.dpk`/`.dproj`) —
 this is common for `packageKind: git` source libraries. A `package definitions` section lets

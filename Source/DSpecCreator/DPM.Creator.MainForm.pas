@@ -289,6 +289,28 @@ type
     crdPackageDefsHeading: TCard;
     lblPackageDefsHeading: TLabel;
     lblPackageDefsDescription: TLabel;
+    crdPackageDef : TCard;
+    lblPackageDef : TLabel;
+    lblPackageDefProject : TLabel;
+    edtPackageDefProject : TEdit;
+    lblPackageDefKind : TLabel;
+    cboPackageDefKind : TComboBox;
+    lblPackageDefPlatforms : TLabel;
+    clbPackageDefPlatforms : TCheckListBox;
+    lblPackageDefFiles : TLabel;
+    lbPackageDefFiles : TListBox;
+    btnAddPackageDefFile : TButton;
+    btnDeletePackageDefFile : TButton;
+    lblPackageDefExclude : TLabel;
+    lbPackageDefExclude : TListBox;
+    btnAddPackageDefExclude : TButton;
+    btnDeletePackageDefExclude : TButton;
+    lblPackageDefRequires : TLabel;
+    lbPackageDefRequires : TListBox;
+    btnAddPackageDefRequire : TButton;
+    btnDeletePackageDefRequire : TButton;
+    actAddPackageDefItem : TAction;
+    actDeletePackageDefItem : TAction;
     procedure FormDestroy(Sender : TObject);
     procedure btnAddExcludeClick(Sender : TObject);
     procedure btnAddTemplateClick(Sender : TObject);
@@ -355,6 +377,17 @@ type
     procedure actDeleteDependencyExecute(Sender : TObject);
     procedure actAddDesignItemExecute(Sender : TObject);
     procedure actDeleteDesignItemExecute(Sender : TObject);
+    procedure actAddPackageDefItemExecute(Sender : TObject);
+    procedure actDeletePackageDefItemExecute(Sender : TObject);
+    procedure edtPackageDefProjectChange(Sender : TObject);
+    procedure cboPackageDefKindChange(Sender : TObject);
+    procedure clbPackageDefPlatformsClickCheck(Sender : TObject);
+    procedure btnAddPackageDefFileClick(Sender : TObject);
+    procedure btnDeletePackageDefFileClick(Sender : TObject);
+    procedure btnAddPackageDefExcludeClick(Sender : TObject);
+    procedure btnDeletePackageDefExcludeClick(Sender : TObject);
+    procedure btnAddPackageDefRequireClick(Sender : TObject);
+    procedure btnDeletePackageDefRequireClick(Sender : TObject);
     procedure actFileOpenExecute(Sender : TObject);
     procedure actFileSaveExecute(Sender : TObject);
     procedure actFileSaveAsExecute(Sender : TObject);
@@ -464,6 +497,9 @@ type
 
     function LoadDesignNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const item : ISpecDesignEntry) : TTemplateTreeNode;
     procedure LoadDesignNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecDesignEntry>);
+
+    function LoadPackageDefNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const item : ISpecPackageDefinition) : TTemplateTreeNode;
+    procedure LoadPackageDefNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const defList : IList<ISpecPackageDefinition>);
 
     function LoadDependency(const parentNode : TTemplateTreeNode; template : ISpecTemplate; const dependency : ISpecDependency) : TTemplateTreeNode;
     procedure LoadDependencies(const parentNode : TTemplateTreeNode; const template : ISpecTemplate);
@@ -2001,6 +2037,207 @@ begin
   DeleteSelectedEntry;
 end;
 
+procedure TDSpecCreatorForm.actAddPackageDefItemExecute(Sender : TObject);
+var
+  PackageDefForm : TBuildForm;
+  projectName : string;
+  packageDef : ISpecPackageDefinition;
+  templateNode : TTemplateTreeNode;
+  parentNode : TTemplateTreeNode;
+  packageDefNode : TTemplateTreeNode;
+begin
+  PackageDefForm := TBuildForm.Create(nil);
+  try
+    PackageDefForm.Caption := 'Add Package Definition';
+    if PackageDefForm.ShowModal = mrCancel then
+      Exit;
+    projectName := PackageDefForm.edtProject.Text;
+    if projectName.IsEmpty then
+      Exit;
+    packageDef := FTemplate.NewPackageDefinition(projectName);
+    packageDef.Kind := 'runtime';
+    packageDef.Requires.Add('rtl');
+  finally
+    FreeAndNil(PackageDefForm);
+  end;
+
+  templateNode := FindTemplateNode(FTemplate);
+  parentNode := FindHeadingNode(templateNode, ntPackageDefsHeading);
+  tvTemplates.Items.BeginUpdate;
+  try
+    packageDefNode := LoadPackageDefNode(parentNode, FTemplate, packageDef);
+    templateNode.Expanded := true;
+    parentNode.Expand(false);
+    tvTemplates.Selected := packageDefNode;
+  finally
+    tvTemplates.Items.EndUpdate;
+  end;
+end;
+
+procedure TDSpecCreatorForm.actDeletePackageDefItemExecute(Sender : TObject);
+begin
+  DeleteSelectedEntry;
+end;
+
+procedure TDSpecCreatorForm.edtPackageDefProjectChange(Sender : TObject);
+var
+  str : string;
+  compiler : TCompilerVersion;
+begin
+  if Assigned(tvTemplates.Selected) then
+  begin
+    if not FLoadingCard then
+    begin
+      (tvTemplates.Selected as TTemplateTreeNode).packageDef.Project := edtPackageDefProject.Text;
+      (tvTemplates.Selected as TTemplateTreeNode).Text := edtPackageDefProject.Text;
+    end;
+
+    str := 'Possible Expanded Paths:' + System.sLineBreak;
+    for compiler := Low(TCompilerVersion) to High(TCompilerVersion) do
+    begin
+      if compiler = TCompilerVersion.UnknownVersion then
+        continue;
+      str := str + System.sLineBreak + ReplaceVars(edtPackageDefProject.Text, compiler);
+    end;
+    edtPackageDefProject.Hint := str;
+  end;
+end;
+
+procedure TDSpecCreatorForm.cboPackageDefKindChange(Sender : TObject);
+begin
+  if FLoadingCard then
+    Exit;
+  if Assigned(tvTemplates.Selected) then
+    (tvTemplates.Selected as TTemplateTreeNode).packageDef.Kind := Trim(cboPackageDefKind.Text);
+end;
+
+procedure TDSpecCreatorForm.clbPackageDefPlatformsClickCheck(Sender : TObject);
+begin
+  if FLoadingCard then
+    Exit;
+  if Assigned(tvTemplates.Selected) then
+    (tvTemplates.Selected as TTemplateTreeNode).packageDef.Platforms := GetCheckListPlatforms(clbPackageDefPlatforms);
+end;
+
+procedure TDSpecCreatorForm.btnAddPackageDefFileClick(Sender : TObject);
+var
+  fileGlob : string;
+  packageDef : ISpecPackageDefinition;
+begin
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+  packageDef := (tvTemplates.Selected as TTemplateTreeNode).packageDef;
+  if not Assigned(packageDef) then
+    Exit;
+  fileGlob := InputBox('Add File', 'File glob pattern to include', '');
+  if fileGlob = '' then
+    Exit;
+  packageDef.Files.Add(fileGlob);
+  lbPackageDefFiles.Items.Add(fileGlob);
+end;
+
+procedure TDSpecCreatorForm.btnDeletePackageDefFileClick(Sender : TObject);
+var
+  fileGlob : string;
+  itemToDelete : integer;
+  packageDef : ISpecPackageDefinition;
+begin
+  if lbPackageDefFiles.ItemIndex < 0 then
+    Exit;
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+  packageDef := (tvTemplates.Selected as TTemplateTreeNode).packageDef;
+  if not Assigned(packageDef) then
+    Exit;
+  fileGlob := lbPackageDefFiles.Items[lbPackageDefFiles.ItemIndex];
+  lbPackageDefFiles.DeleteSelected;
+  itemToDelete := packageDef.Files.IndexOf(fileGlob);
+  if itemToDelete >= 0 then
+    packageDef.Files.Delete(itemToDelete);
+end;
+
+procedure TDSpecCreatorForm.btnAddPackageDefExcludeClick(Sender : TObject);
+var
+  excludeGlob : string;
+  packageDef : ISpecPackageDefinition;
+begin
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+  packageDef := (tvTemplates.Selected as TTemplateTreeNode).packageDef;
+  if not Assigned(packageDef) then
+    Exit;
+  excludeGlob := InputBox('Add Exclude', 'File-name glob pattern to exclude', '');
+  if excludeGlob = '' then
+    Exit;
+  packageDef.Exclude.Add(excludeGlob);
+  lbPackageDefExclude.Items.Add(excludeGlob);
+end;
+
+procedure TDSpecCreatorForm.btnDeletePackageDefExcludeClick(Sender : TObject);
+var
+  excludeGlob : string;
+  itemToDelete : integer;
+  packageDef : ISpecPackageDefinition;
+begin
+  if lbPackageDefExclude.ItemIndex < 0 then
+    Exit;
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+  packageDef := (tvTemplates.Selected as TTemplateTreeNode).packageDef;
+  if not Assigned(packageDef) then
+    Exit;
+  excludeGlob := lbPackageDefExclude.Items[lbPackageDefExclude.ItemIndex];
+  lbPackageDefExclude.DeleteSelected;
+  itemToDelete := packageDef.Exclude.IndexOf(excludeGlob);
+  if itemToDelete >= 0 then
+    packageDef.Exclude.Delete(itemToDelete);
+end;
+
+procedure TDSpecCreatorForm.btnAddPackageDefRequireClick(Sender : TObject);
+var
+  reference : string;
+  i : integer;
+  packageDef : ISpecPackageDefinition;
+begin
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+  packageDef := (tvTemplates.Selected as TTemplateTreeNode).packageDef;
+  if not Assigned(packageDef) then
+    Exit;
+  reference := Trim(InputBox('Add Require', 'Package name to require', ''));
+  if reference = '' then
+    Exit;
+  // requires are package names - reject case-insensitive duplicates (e.g. a second rtl).
+  for i := 0 to packageDef.Requires.Count - 1 do
+    if SameText(Trim(packageDef.Requires[i]), reference) then
+    begin
+      ShowMessage(Format('"%s" is already in the requires list.', [reference]));
+      Exit;
+    end;
+  packageDef.Requires.Add(reference);
+  lbPackageDefRequires.Items.Add(reference);
+end;
+
+procedure TDSpecCreatorForm.btnDeletePackageDefRequireClick(Sender : TObject);
+var
+  reference : string;
+  itemToDelete : integer;
+  packageDef : ISpecPackageDefinition;
+begin
+  if lbPackageDefRequires.ItemIndex < 0 then
+    Exit;
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+  packageDef := (tvTemplates.Selected as TTemplateTreeNode).packageDef;
+  if not Assigned(packageDef) then
+    Exit;
+  reference := lbPackageDefRequires.Items[lbPackageDefRequires.ItemIndex];
+  lbPackageDefRequires.DeleteSelected;
+  itemToDelete := packageDef.Requires.IndexOf(reference);
+  if itemToDelete >= 0 then
+    packageDef.Requires.Delete(itemToDelete);
+end;
+
 procedure TDSpecCreatorForm.actDeleteSourceItemExecute(Sender : TObject);
 begin
   DeleteSelectedEntry;
@@ -2128,6 +2365,9 @@ begin
   actAddDesignItem.Enabled := hasNode and (selectedNode.IsDesignHeading or selectedNode.IsDesign);
   actDeleteDesignItem.Enabled := hasNode and selectedNode.IsDesign;
 
+  actAddPackageDefItem.Enabled := hasNode and (selectedNode.IsPackageDefHeading or selectedNode.IsPackageDef);
+  actDeletePackageDefItem.Enabled := hasNode and selectedNode.IsPackageDef;
+
   actAddSourceItem.Enabled := hasNode and (selectedNode.IsSourceHeading or selectedNode.IsSource);
   actDeleteSourceItem.Enabled := hasNode and selectedNode.IsSource;
 
@@ -2179,6 +2419,34 @@ begin
     LoadDesignNode(designtimeNode, template, fileList[j]);
 end;
 
+function TDSpecCreatorForm.LoadPackageDefNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const item : ISpecPackageDefinition) : TTemplateTreeNode;
+begin
+  result := tvTemplates.Items.AddChild(parentNode, item.Project) as TTemplateTreeNode;
+  result.packageDef := item;
+  result.NodeType := ntPackageDef;
+  result.Template := template;
+  result.ImageIndex := 6;
+  result.SelectedIndex := 6;
+end;
+
+procedure TDSpecCreatorForm.LoadPackageDefNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const defList : IList<ISpecPackageDefinition>);
+var
+  packageDefsNode : TTemplateTreeNode;
+  j : integer;
+begin
+  packageDefsNode := tvTemplates.Items.AddChild(parentNode, 'Package Definitions') as TTemplateTreeNode;
+  packageDefsNode.Template := template;
+  packageDefsNode.NodeType := ntPackageDefsHeading;
+  packageDefsNode.ImageIndex := 6;
+  packageDefsNode.SelectedIndex := 6;
+
+  packageDefsNode.AddAction := actAddPackageDefItem;
+  packageDefsNode.DeleteAction := actDeletePackageDefItem;
+
+  for j := 0 to defList.Count - 1 do
+    LoadPackageDefNode(packageDefsNode, template, defList[j]);
+end;
+
 function TDSpecCreatorForm.LoadDependency(const parentNode : TTemplateTreeNode; template : ISpecTemplate; const dependency : ISpecDependency) : TTemplateTreeNode;
 var
   sNode : string;
@@ -2221,6 +2489,7 @@ begin
   LoadSourceNodes(Node, template, template.SourceEntries);
   LoadBuildNodes(Node, template);
   LoadDesignNodes(Node, template, template.DesignEntries);
+  LoadPackageDefNodes(Node, template, template.PackageDefinitions);
   LoadDependencies(Node, template);
   Node.Expand(true);
 
@@ -2825,6 +3094,7 @@ begin
       ntDesignHeading :      CardPanel.ActiveCard := crdDesignHeading;
       ntSourceHeading :      CardPanel.ActiveCard := crdSourceHeading;
       ntDependencyHeading :  CardPanel.ActiveCard := crdDependenciesHeading;
+      ntPackageDefsHeading : CardPanel.ActiveCard := crdPackageDefsHeading;
       ntBuild :
         begin
           edtProject.Text := lNode.build.project;
@@ -2866,6 +3136,22 @@ begin
             edtDependencyVersion.Text := '';
           edtDependencyId.Text := lNode.dependency.id;
           CardPanel.ActiveCard := crdDependency;
+        end;
+      ntPackageDef :
+        begin
+          edtPackageDefProject.Text := lNode.packageDef.Project;
+          cboPackageDefKind.Text := lNode.packageDef.Kind;
+          SetCheckListPlatforms(clbPackageDefPlatforms, lNode.packageDef.Platforms);
+          lbPackageDefFiles.Clear;
+          for i := 0 to lNode.packageDef.Files.Count - 1 do
+            lbPackageDefFiles.Items.Add(lNode.packageDef.Files[i]);
+          lbPackageDefExclude.Clear;
+          for i := 0 to lNode.packageDef.Exclude.Count - 1 do
+            lbPackageDefExclude.Items.Add(lNode.packageDef.Exclude[i]);
+          lbPackageDefRequires.Clear;
+          for i := 0 to lNode.packageDef.Requires.Count - 1 do
+            lbPackageDefRequires.Items.Add(lNode.packageDef.Requires[i]);
+          CardPanel.ActiveCard := crdPackageDef;
         end;
     else
       raise Exception.Create('Unknow node type in tvTemplateChange');

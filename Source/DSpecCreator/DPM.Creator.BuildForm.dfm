@@ -31,7 +31,7 @@ object BuildForm: TBuildForm
     Anchors = [akTop, akRight]
     Cancel = True
     Caption = 'Cancel'
-    TabOrder = 0
+    TabOrder = 1
     OnClick = btnCancelClick
   end
   object btnOk: TButton
@@ -42,7 +42,7 @@ object BuildForm: TBuildForm
     Anchors = [akTop, akRight]
     Caption = 'OK'
     Default = True
-    TabOrder = 1
+    TabOrder = 2
     OnClick = btnOkClick
   end
   object edtProject: TEdit
@@ -53,6 +53,6 @@ object BuildForm: TBuildForm
     Anchors = [akLeft, akTop, akRight]
     ParentShowHint = False
     ShowHint = True
-    TabOrder = 2
+    TabOrder = 0
   end
 end
