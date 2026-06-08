@@ -265,6 +265,13 @@ begin
   //Note that some third party libs like omnithreadlibrary have always-build/implicitbuild on
   result := result + ' /p:DCC_OutputNeverBuildDcps=true';
 
+  //Block build events (pre-build / post-build) from running when DPM compiles a
+  //package. These are CodeGear.Common.Targets driven properties (PreBuildEvent /
+  //PostBuildEvent targets, gated on '$(PreBuildEvent)'!='' etc). Passing them empty
+  //as global (command line) properties overrides any value set in the dproj, so the
+  //guard is false and the Exec is skipped. Condition is identical XE2..latest.
+  result := result + ' /p:PreBuildEvent= /p:PostBuildEvent=';
+
   result := result + ' /p:DCC_UnitSearchPath=' +  GetProjectSearchPath(configName);
 
   //result := result +  ' /v:diag';
