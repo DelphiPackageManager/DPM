@@ -79,6 +79,9 @@ templates:
         files:
           - .\design\*.pas
           - .\design\*.dfm
+    precompiledBinaries:
+      - lib/Win32/Test.Full.bpl
+      - lib/Win32/Test.FullDesign.bpl
     environmentVariables:
       TESTFULLDIR: $packageDir$
       PATH: $packageDir$\bin

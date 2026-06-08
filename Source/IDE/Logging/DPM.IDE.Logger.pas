@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -50,6 +50,9 @@ type
     procedure StartUnInstall(const cancellationTokenSource : ICancellationTokenSource);
     procedure EndUnInstall(const success  : boolean);
 
+    procedure StartVerifyCache(const cancellationTokenSource : ICancellationTokenSource);
+    procedure EndVerifyCache(const success  : boolean);
+
   end;
 
   TDPMIDELogger = class(TInterfacedObject, IDPMIDELogger, ILogger )
@@ -85,6 +88,9 @@ type
     procedure EndInstall(const success  : boolean);
     procedure StartUnInstall(const cancellationTokenSource : ICancellationTokenSource);
     procedure EndUnInstall(const success  : boolean);
+
+    procedure StartVerifyCache(const cancellationTokenSource : ICancellationTokenSource);
+    procedure EndVerifyCache(const success  : boolean);
 
 
   public
@@ -256,6 +262,16 @@ end;
 procedure TDPMIDELogger.StartUnInstall(const cancellationTokenSource : ICancellationTokenSource);
 begin
   FDPMMessageService.TaskStarted(cancellationTokenSource, mtUninstall);
+end;
+
+procedure TDPMIDELogger.StartVerifyCache(const cancellationTokenSource : ICancellationTokenSource);
+begin
+  FDPMMessageService.TaskStarted(cancellationTokenSource, mtVerifyCache);
+end;
+
+procedure TDPMIDELogger.EndVerifyCache(const success : boolean);
+begin
+  FDPMMessageService.TaskDone(success);
 end;
 
 procedure TDPMIDELogger.Success(const data: string; const important: Boolean);

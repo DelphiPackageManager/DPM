@@ -280,6 +280,7 @@
         <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Files.pas"/>
         <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Hash.pas"/>
         <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Masks.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.PE.pas"/>
         <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Numbers.pas"/>
         <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Path.pas"/>
         <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Process.pas"/>

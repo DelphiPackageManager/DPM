@@ -50,7 +50,7 @@ type
     // themselves - otherwise the cache enumerates from an empty path.
     function EnsureCacheLocation : boolean;
     function ExecuteAdd(const cancellationToken : ICancellationToken) : TExitCode;
-    function ExecuteVerify : TExitCode;
+    function ExecuteVerify(const cancellationToken : ICancellationToken) : TExitCode;
     function ExecuteRemove : TExitCode;
   protected
     function Execute(const cancellationToken : ICancellationToken): TExitCode; override;
@@ -126,7 +126,7 @@ begin
     result := TExitCode.OK;
 end;
 
-function TCacheCommand.ExecuteVerify : TExitCode;
+function TCacheCommand.ExecuteVerify(const cancellationToken : ICancellationToken) : TExitCode;
 var
   failureCount : integer;
 begin
@@ -136,7 +136,7 @@ begin
     exit;
   end;
 
-  failureCount := FPackageCache.FullReVerify;
+  failureCount := FPackageCache.FullReVerify(cancellationToken);
   if failureCount = 0 then
     result := TExitCode.OK
   else
@@ -221,7 +221,7 @@ begin
 
   case TCacheOptions.Default.Command of
     TCacheSubCommand.Add    : result := ExecuteAdd(cancellationToken);
-    TCacheSubCommand.Verify : result := ExecuteVerify;
+    TCacheSubCommand.Verify : result := ExecuteVerify(cancellationToken);
     TCacheSubCommand.Remove : result := ExecuteRemove;
   else
     Logger.Error('A sub-command is required: add, remove or verify.');

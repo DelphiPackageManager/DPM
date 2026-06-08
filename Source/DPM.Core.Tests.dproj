@@ -201,6 +201,7 @@
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Base64Url.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.Base64Url.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Masks.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.PE.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Interfaces.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Types.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Interfaces.pas"/>
@@ -264,8 +265,10 @@
         <DCCReference Include="IDE\DPM.IDE.SigningBadge.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.SigningBadge.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.DateTime.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Utils.PE.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Crypto.Algorithms.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Package.Archive.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Packaging.PrecompiledBinaries.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Package.Receipt.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Types.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Vuln.Cache.pas"/>

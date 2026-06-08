@@ -77,7 +77,7 @@ type
                                                       const preRelease : boolean) : IList<IPackageInfo>;
     function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
     function GetPackageHash(const packageId : IPackageIdentity) : string;
-    function FullReVerify : integer;
+    function FullReVerify(const cancellationToken : ICancellationToken) : integer;
     function GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
     function RemovePackage(const packageId : IPackageIdentity) : boolean;
   public
@@ -123,7 +123,7 @@ begin
   icon := nil;
 end;
 function TStubCache.GetPackageHash(const packageId : IPackageIdentity) : string; begin result := ''; end;
-function TStubCache.FullReVerify : integer; begin result := 0; end;
+function TStubCache.FullReVerify(const cancellationToken : ICancellationToken) : integer; begin result := 0; end;
 function TStubCache.GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
 begin
   result := TCollections.CreateList<IPackageIdentity>;

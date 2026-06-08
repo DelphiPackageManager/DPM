@@ -68,7 +68,17 @@ type
     //patterns at pack time rather than at install time on every consumer's machine.
     FArchivePaths : IList<string>;
 
+    //Canonical (forward-slash, NFC, exact-case) archive paths of every PE binary (.bpl/.dll/.exe)
+    //added to the package. Auto-derived during source processing and emitted into the package's
+    //dspec as 'precompiledBinaries' so the gallery can cross-check shipped binaries against the
+    //author's declaration.
+    FPrecompiledBinaries : IList<string>;
+
   protected
+
+    /// <summary> Normalises a pack-time archive path (which uses backslashes) to the canonical form
+    /// used inside the .dpkg and its manifest: forward slashes + NFC, preserving case. </summary>
+    function CanonicalArchivePath(const archivePath : string) : string;
 
     procedure ProcessPattern(const basePath, dest : string; const pattern : IFileSystemPattern; const excludeMatcher : IFileMatcher; var fileCount : integer);
     procedure ProcessEntry(const basePath : string; const antPattern : IAntPattern; const source, dest : string; const exclude : IList<string>);
@@ -115,6 +125,7 @@ uses
   DPM.Core.Constants,
   DPM.Core.Packaging.EnvironmentVariableValidator,
   DPM.Core.Spec,
+  DPM.Core.Utils.PE,
   DPM.Core.Utils.Strings,
   DPM.Core.Utils.Path;
 
@@ -135,6 +146,15 @@ begin
   FTokenRegEx := TRegEx.Create('\$(\w+)\$');
 end;
 
+
+function TPackageWriter.CanonicalArchivePath(const archivePath : string) : string;
+begin
+  result := StringReplace(archivePath, '\', '/', [rfReplaceAll]);
+  //match the manifest's canonicalisation so precompiledBinaries paths are byte-identical to the
+  //file entries in dpm-manifest.json. NormalizeToNfc is a no-op on pure ASCII paths.
+  if FManifestService <> nil then
+    result := FManifestService.NormalizeToNfc(result);
+end;
 
 function ApplyBase(const basePath : string; const value : string) : string;
 begin
@@ -195,6 +215,12 @@ begin
     FArchiveWriter.AddFile(f, archivePath);
     if FArchivePaths <> nil then
       FArchivePaths.Add(LowerCase(archivePath));
+
+    //Record any real PE binary so it can be declared in the package's dspec. We sniff the on-disk
+    //file by content (not extension) so a renamed binary is still caught. The path stored here must
+    //match the package.dspec.yaml/manifest exactly: forward slashes, NFC, original case.
+    if (FPrecompiledBinaries <> nil) and TPEUtils.IsPE(f) then
+      FPrecompiledBinaries.Add(CanonicalArchivePath(archivePath));
   end;
 end;
 
@@ -619,6 +645,7 @@ begin
   end;
   FLogger.Information('Writing package to file : ' + packageFileName);
   FArchivePaths := TCollections.CreateList<string>;
+  FPrecompiledBinaries := TCollections.CreateList<string>;
   try
     if reducedSpec.MetaData.Icon <> '' then
     begin
@@ -647,6 +674,15 @@ begin
 
     //we don't want these in the dspec
     template.SourceEntries.Clear;
+
+    //Declare the precompiled PE binaries we actually shipped, with archive paths that match the
+    //manifest exactly. Sorted for deterministic dspec output. The gallery rejects an author-signed
+    //package whose archive contains an undeclared PE, so this list must reflect what was packed.
+    template.PrecompiledBinaries.Clear;
+    FPrecompiledBinaries.Sort;
+    for i := 0 to FPrecompiledBinaries.Count - 1 do
+      template.PrecompiledBinaries.Add(FPrecompiledBinaries[i]);
+
     //write the dspec last as we need to clear out stuff not needed in the spec
     sDspec := reducedSpec.GenerateDspecYAML(version);
     Assert(sDspec <> '');
@@ -662,6 +698,7 @@ begin
   finally
     FArchiveWriter.Close;
     FArchivePaths := nil;
+    FPrecompiledBinaries := nil;
   end;
 
   // Post-process: emit dpm-manifest.json from the just-closed archive and

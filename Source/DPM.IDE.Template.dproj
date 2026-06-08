@@ -196,6 +196,7 @@
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.EnvironmentVariableValidator.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.pas"/>
         <DCCReference Include="Core\Packaging\DPM.Core.Packaging.Writer.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.PE.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Configuration.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Editor.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.GroupProjReader.pas"/>

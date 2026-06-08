@@ -113,10 +113,12 @@ type
 
     /// <summary>
     /// Re-hash every cached package against its manifest and re-run signature
-    /// verification (V-34). Used by `dpm cache verify` and the IDE Tools menu.
-    /// Returns the number of packages that failed verification.
+    /// verification (V-34). Used by `dpm cache verify` and the IDE DPM menu.
+    /// Logs per-package progress and honours cancellationToken between packages
+    /// so a long-running verify can be interrupted. Returns the number of
+    /// packages that failed verification.
     /// </summary>
-    function FullReVerify : integer;
+    function FullReVerify(const cancellationToken : ICancellationToken) : integer;
 
     /// <summary>
     ///  Returns the cached package versions matching the filter, for `dpm cache

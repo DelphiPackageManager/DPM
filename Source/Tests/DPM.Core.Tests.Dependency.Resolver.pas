@@ -83,7 +83,7 @@ type
                                                       const preRelease : boolean) : IList<IPackageInfo>;
     function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
     function GetPackageHash(const packageId : IPackageIdentity) : string;
-    function FullReVerify : integer;
+    function FullReVerify(const cancellationToken : ICancellationToken) : integer;
     function GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
     function RemovePackage(const packageId : IPackageIdentity) : boolean;
   public
@@ -612,7 +612,7 @@ begin
   result := '';
 end;
 
-function TFakePackageCache.FullReVerify : integer;
+function TFakePackageCache.FullReVerify(const cancellationToken : ICancellationToken) : integer;
 begin
   // Resolver tests don't exercise signing; nothing to re-verify.
   result := 0;

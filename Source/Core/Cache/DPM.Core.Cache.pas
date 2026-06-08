@@ -118,7 +118,7 @@ type
 
     function InstallPackageFromFile(const packageFileName : string) : boolean;
 
-    function FullReVerify : integer;
+    function FullReVerify(const cancellationToken : ICancellationToken) : integer;
 
     function GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
     function RemovePackage(const packageId : IPackageIdentity) : boolean;
@@ -154,14 +154,17 @@ uses
 
 { TPackageCache }
 
-function TPackageCache.FullReVerify : integer;
+function TPackageCache.FullReVerify(const cancellationToken : ICancellationToken) : integer;
 var
   packagesRoot : string;
   compilerFolders : TStringDynArray;
   idFolders : TStringDynArray;
   dpkgFiles : TStringDynArray;
+  allPackages : IList<string>;
   i, j, k : integer;
+  total : integer;
   failures : integer;
+  cancelled : boolean;
 begin
   failures := 0;
   if FSigningService = nil then
@@ -174,11 +177,12 @@ begin
   packagesRoot := GetPackagesFolder;
   if not DirectoryExists(packagesRoot) then
   begin
+    FLogger.Information('[PackageCache] Cache folder does not exist - nothing to verify.', true);
     result := 0;
     exit;
   end;
 
-  FLogger.Information('[PackageCache] Re-verifying every package in ' + packagesRoot);
+  FLogger.Information('[PackageCache] Re-verifying every package in ' + packagesRoot, true);
 
   // Invalidate the in-memory "already verified this session" set so the
   // re-verify path actually re-runs the workflow rather than short-circuiting.
@@ -189,6 +193,10 @@ begin
     FCacheLock.Leave;
   end;
 
+  // Enumerate every .dpkg up front. Knowing the total lets us log "[i/total]"
+  // progress so a UI host can show how far through the (potentially slow) verify
+  // we are, and report how many were done if the user cancels partway.
+  allPackages := TCollections.CreateList<string>;
   compilerFolders := TDirectory.GetDirectories(packagesRoot);
   for i := 0 to High(compilerFolders) do
   begin
@@ -201,29 +209,57 @@ begin
       dpkgFiles := TDirectory.GetFiles(idFolders[j], '*' + cPackageFileExt,
         TSearchOption.soTopDirectoryOnly);
       for k := 0 to High(dpkgFiles) do
+        allPackages.Add(dpkgFiles[k]);
+    end;
+  end;
+
+  total := allPackages.Count;
+  if total = 0 then
+  begin
+    FLogger.Information('[PackageCache] No cached packages found to verify.', true);
+    result := 0;
+    exit;
+  end;
+
+  cancelled := false;
+  for i := 0 to total - 1 do
+  begin
+    // Cooperative cancellation - checked between packages. The per-package work in
+    // InstallPackageFromFile is not itself interruptible, so the cancel takes effect
+    // at the next package boundary rather than instantly.
+    if cancellationToken.IsCancelled then
+    begin
+      cancelled := true;
+      break;
+    end;
+    // Important so it shows regardless of verbosity, and (in the IDE host) pumps the
+    // message window so the log stays live and the Cancel button can be clicked.
+    FLogger.Information(Format('[PackageCache] Verifying [%d/%d] %s',
+      [i + 1, total, ExtractFileName(allPackages[i])]), true);
+    try
+      if not InstallPackageFromFile(allPackages[i]) then
       begin
-        try
-          if not InstallPackageFromFile(dpkgFiles[k]) then
-          begin
-            Inc(failures);
-            FLogger.Error('[PackageCache] FullReVerify failed for ' + dpkgFiles[k]);
-          end;
-        except
-          on e : Exception do
-          begin
-            Inc(failures);
-            FLogger.Error('[PackageCache] FullReVerify exception for ' +
-              dpkgFiles[k] + ': ' + e.Message);
-          end;
-        end;
+        Inc(failures);
+        FLogger.Error('[PackageCache] FullReVerify failed for ' + allPackages[i]);
+      end;
+    except
+      on e : Exception do
+      begin
+        Inc(failures);
+        FLogger.Error('[PackageCache] FullReVerify exception for ' +
+          allPackages[i] + ': ' + e.Message);
       end;
     end;
   end;
 
-  if failures = 0 then
-    FLogger.Information('[PackageCache] FullReVerify completed: all packages valid.')
+  if cancelled then
+    FLogger.Warning(Format('[PackageCache] FullReVerify cancelled after %d of %d package(s); %d failure(s) so far.',
+      [i, total, failures]), true)
+  else if failures = 0 then
+    FLogger.Success(Format('[PackageCache] FullReVerify completed: all %d package(s) valid.', [total]), true)
   else
-    FLogger.Warning(Format('[PackageCache] FullReVerify completed with %d failure(s).', [failures]));
+    FLogger.Warning(Format('[PackageCache] FullReVerify completed with %d failure(s) of %d package(s).',
+      [failures, total]), true);
   result := failures;
 end;
 

@@ -137,6 +137,7 @@ uses
   DPM.Core.Utils.Files in '..\Core\Utils\DPM.Core.Utils.Files.pas',
   DPM.Core.Utils.Hash in '..\Core\Utils\DPM.Core.Utils.Hash.pas',
   DPM.Core.Utils.Masks in '..\Core\Utils\DPM.Core.Utils.Masks.pas',
+  DPM.Core.Utils.PE in '..\Core\Utils\DPM.Core.Utils.PE.pas',
   DPM.Core.Utils.Numbers in '..\Core\Utils\DPM.Core.Utils.Numbers.pas',
   DPM.Core.Utils.Path in '..\Core\Utils\DPM.Core.Utils.Path.pas',
   DPM.Core.Utils.Process in '..\Core\Utils\DPM.Core.Utils.Process.pas',

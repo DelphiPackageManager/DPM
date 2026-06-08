@@ -79,6 +79,11 @@ type
     // intermediate signature.
     FActiveFlags : TVerifyFlags;
     function ReadManifestBytes(const archivePath : string; out bytes : TBytes) : boolean;
+    // Pre-flight before applying an author signature: every precompiled PE binary (.bpl/.dll/.exe)
+    // the package ships must carry an embedded Authenticode signature, because the gallery rejects
+    // an author-signed package containing an unsigned PE. Raises EPackageSigning listing every
+    // offender so the author fixes them locally instead of discovering a server-side rejection.
+    procedure EnsureBundledBinariesSigned(const archivePath : string);
     function ReadSignatureBlobs(const archivePath : string;
                                 out blobs : IList<TPair<string, TBytes>>) : boolean;
     // Filename-only scan of the signatures/ folder. No entry contents are
@@ -188,7 +193,8 @@ uses
   JsonDataObjects,
   DPM.Core.Crypto.Win32,
   DPM.Core.Crypto.Hashing,
-  DPM.Core.Utils.Files;
+  DPM.Core.Utils.Files,
+  DPM.Core.Utils.PE;
 
 constructor TPackageSigningService.Create(const logger : ILogger;
                                           const hashing : IHashingService;
@@ -241,6 +247,48 @@ begin
     end;
   finally
     zip.Free;
+  end;
+end;
+
+procedure TPackageSigningService.EnsureBundledBinariesSigned(const archivePath : string);
+var
+  zip : TZipFile;
+  i : integer;
+  name : string;
+  bytes : TBytes;
+  unsigned : IList<string>;
+begin
+  unsigned := TCollections.CreateList<string>;
+  zip := TZipFile.Create;
+  try
+    zip.Open(archivePath, zmRead);
+    for i := 0 to zip.FileCount - 1 do
+    begin
+      name := zip.FileName[i];
+      // skip directory entries and the signatures we are about to add
+      if (Length(name) > 0) and ((name[Length(name)] = '/') or (name[Length(name)] = '\')) then
+        Continue;
+      if StartsText(cSignatureFolder, StringReplace(name, '\', '/', [rfReplaceAll])) then
+        Continue;
+
+      // RTL TBytes overload — reads the entry's bytes from the correct position.
+      zip.Read(i, bytes);
+      // Detect by content, not extension, so a renamed binary is still caught.
+      if TPEUtils.IsPE(bytes) and (not TPEUtils.HasAuthenticodeSignature(bytes)) then
+        unsigned.Add(FManifest.NormalizeToNfc(StringReplace(name, '\', '/', [rfReplaceAll])));
+    end;
+  finally
+    zip.Free;
+  end;
+
+  if unsigned.Count > 0 then
+  begin
+    for name in unsigned do
+      FLogger.Error('  Unsigned binary : ' + name);
+    raise EPackageSigning.CreateFmt(
+      'Cannot author-sign "%s": %d bundled binary(ies) are not Authenticode-signed (e.g. "%s"). ' +
+      'Sign every shipped .bpl/.dll/.exe before publishing an author-signed package.',
+      [ExtractFileName(archivePath), unsigned.Count, unsigned[0]]);
   end;
 end;
 
@@ -364,6 +412,10 @@ begin
   if not ReadManifestBytes(packageFilePath, manifestBytes) then
     raise EPackageSigning.Create('Package contains no dpm-manifest.json');
   FLogger.Verbose(Format('  Manifest read: %d bytes', [Length(manifestBytes)]));
+
+  // We only ever apply author signatures from the CLI. An author-signed package whose archive
+  // carries an unsigned PE binary will be rejected by the gallery, so fail fast here instead.
+  EnsureBundledBinariesSigned(packageFilePath);
 
   if (provider <> nil) and (provider.Certificate <> nil) then
   begin

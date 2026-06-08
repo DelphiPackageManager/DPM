@@ -44,6 +44,7 @@ type
     procedure CompilerRange_Loads_Expected_Coverage;
     procedure CompilerSet_Loads_Expected_Coverage;
     procedure Full_Loads_All_Metadata;
+    procedure Full_Loads_PrecompiledBinaries;
     procedure Full_Loads_EnvironmentVariables;
     procedure CompilerRange_Per_Platform_Variable_Overrides;
 
@@ -289,6 +290,8 @@ begin
       AssertStringListsEqual(epd.Requires, apd.Requires, ctx + ' package definition requires ' + epd.Project);
     end;
 
+    AssertStringListsEqual(et.PrecompiledBinaries, at.PrecompiledBinaries, ctx + ' precompiledBinaries');
+
     AssertVariablesEqual(et.EnvironmentVariables, at.EnvironmentVariables, ctx + ' environmentVariables');
   end;
 end;
@@ -388,6 +391,21 @@ begin
   Assert.IsFalse(md.IsTrial, 'isTrial');
   Assert.AreEqual(2, Length(md.Frameworks), 'frameworks');
   Assert.AreEqual(2, spec.Variables.Count, 'package variables');
+end;
+
+procedure TSpecRoundTripTests.Full_Loads_PrecompiledBinaries;
+var
+  spec : IPackageSpec;
+  template : ISpecTemplate;
+begin
+  spec := LoadFixture('full.dspec.yaml');
+  template := spec.FindTemplate('default');
+  Assert.IsNotNull(template, 'default template');
+  Assert.AreEqual(2, template.PrecompiledBinaries.Count, 'precompiledBinaries count');
+  Assert.AreEqual('lib/Win32/Test.Full.bpl', template.PrecompiledBinaries[0], 'first binary');
+  Assert.AreEqual('lib/Win32/Test.FullDesign.bpl', template.PrecompiledBinaries[1], 'second binary');
+  //the legacy template declares none
+  Assert.AreEqual(0, spec.FindTemplate('legacy').PrecompiledBinaries.Count, 'legacy precompiledBinaries empty');
 end;
 
 procedure TSpecRoundTripTests.Full_Loads_EnvironmentVariables;

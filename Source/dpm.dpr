@@ -155,6 +155,7 @@ uses
   DPM.Core.Utils.Base64Url in 'Core\Utils\DPM.Core.Utils.Base64Url.pas',
   DPM.Core.Spec.Template in 'Core\Spec\DPM.Core.Spec.Template.pas',
   DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas',
+  DPM.Core.Utils.PE in 'Core\Utils\DPM.Core.Utils.PE.pas',
   DPM.Console.Prompts in 'Cmdline\DPM.Console.Prompts.pas',
   DPM.Core.SBOM.Generator in 'Core\Sbom\DPM.Core.SBOM.Generator.pas',
   DPM.Core.SBOM.Interfaces in 'Core\Sbom\DPM.Core.SBOM.Interfaces.pas',

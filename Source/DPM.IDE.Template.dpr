@@ -92,6 +92,7 @@ uses
   DPM.Core.Packaging.EnvironmentVariableValidator in 'Core\Packaging\DPM.Core.Packaging.EnvironmentVariableValidator.pas',
   DPM.Core.Packaging in 'Core\Packaging\DPM.Core.Packaging.pas',
   DPM.Core.Packaging.Writer in 'Core\Packaging\DPM.Core.Packaging.Writer.pas',
+  DPM.Core.Utils.PE in 'Core\Utils\DPM.Core.Utils.PE.pas',
   DPM.Core.Project.Configuration in 'Core\Project\DPM.Core.Project.Configuration.pas',
   DPM.Core.Project.Editor in 'Core\Project\DPM.Core.Project.Editor.pas',
   DPM.Core.Project.GroupProjReader in 'Core\Project\DPM.Core.Project.GroupProjReader.pas',

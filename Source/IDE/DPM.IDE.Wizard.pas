@@ -33,6 +33,7 @@ uses
   ToolsApi,
   Vcl.ActnList,
   Vcl.Controls,
+  Vcl.Menus,
   Spring.Container,
   DPM.Core.Cache.Interfaces,
   DPM.IDE.Logger,
@@ -62,13 +63,22 @@ type
     //environment-options page entry sticks around with stale container refs if the plugin is
     //ever reloaded.
     FAddInOptions : INTAAddInOptions;
-    // IDE-6: held so the Tools > DPM > Verify Package Cache menu has the
+    // IDE-6: held so the DPM > Verify Package Cache menu has the
     // cache singleton on hand at click time.
     FPackageCacheForVerify : IPackageCache;
+    //Top-level "DPM" menu inserted into the IDE main menu bar (after Tools). Held so
+    //it can be freed on shutdown - freeing it frees its child items too. The backing
+    //TActions are owned by INTAServices.ActionList and must NOT be freed here.
+    FDPMTopMenu : TMenuItem;
     procedure InitContainer;
-    procedure RegisterVerifyCacheMenu(const menuServices : INTAServices;
-                                      const packageCache : IPackageCache);
+    procedure RegisterTopLevelMenu(const menuServices : INTAServices;
+                                   const packageCache : IPackageCache; const imageIdx : integer);
     procedure DPMVerifyCacheClick(Sender : TObject);
+    procedure DPMOptionsClick(Sender : TObject);
+    procedure DPMGenerateSBOMProjectClick(Sender : TObject);
+    procedure DPMGenerateSBOMProjectUpdate(Sender : TObject);
+    procedure DPMGenerateSBOMGroupClick(Sender : TObject);
+    procedure DPMGenerateSBOMGroupUpdate(Sender : TObject);
   protected
 
     //IOTAWizard
@@ -109,8 +119,8 @@ uses
   System.Win.Registry,
   Winapi.Windows,
   Vcl.Dialogs,
-  Vcl.Menus,
   Vcl.Graphics,
+  VSoft.CancellationToken,
   Vcl.Imaging.pngimage,
   Spring.Container.Registration,
   DPM.Core.Types,
@@ -128,6 +138,7 @@ uses
   DPM.IDE.ProjectMenu,
   DPM.IDE.SBOM.Menu,
   DPM.IDE.AddInOptions,
+  DPM.IDE.AddInOptionsHostForm,
   DPM.IDE.Options,
   DPM.IDE.InstallerContext,
   DPM.IDE.PathManager,
@@ -367,8 +378,6 @@ var
   options : INTAAddInOptions;
   projectController : IDPMIDEProjectController;
   dpmIDEOptions : IDPMIDEOptions;
-  dpmMenu : TMenuItem;
-  action : TAction;
   bmp : TBitmap;
   png : TPngImage;
   idx : integer;
@@ -467,68 +476,197 @@ begin
     png.Free;
   end;
 
-  action := TAction.Create(menuServices.ActionList);
-  action.Name := 'actDPMPackageManager';
-  action.Caption := 'Manage DPM Packages...';
-  action.OnUpdate := Self.DPMActionUpdate;
-  action.OnExecute := Self.DPMMenuClick;
-  action.Visible := true;
-  action.Category := 'DPM';
-  action.Hint := 'Manage DPM Packages...';
-
-  dpmMenu := TMenuItem.Create(nil);
-  dpmMenu.Caption := 'Manage DPM Packages...';
-  dpmMenu.Name := 'GlobalDPMMenuItem';
-  dpmMenu.Action := action;
-
-  menuServices.AddActionMenu('ProjectOptionsItem',action, dpmMenu,true);
-  //need to assign image index after adding the action menu, otherwise the image never shows.
-  action.ImageIndex := idx;
-
-  menuServices.NewToolbar('DPMPackageManager','DPM Package Manager');
-  menuServices.AddToolButton('DPMPackageManager','ShowDPMButton', action);
-
-  // IDE-6: Tools menu item for re-verifying every cached package against its
-  // manifest and signature. Routes to IPackageCache.FullReVerify.
-  RegisterVerifyCacheMenu(menuServices, packageCache);
+  //Build the top-level "DPM" menu (after Tools) with all DPM commands, plus the
+  //toolbar button. Replaces the old per-command AddActionMenu('ProjectOptionsItem')
+  //entries that buried these under the Project menu.
+  RegisterTopLevelMenu(menuServices, packageCache, idx);
 end;
 
-procedure TDPMWizard.RegisterVerifyCacheMenu(const menuServices : INTAServices;
-                                              const packageCache : IPackageCache);
+procedure TDPMWizard.RegisterTopLevelMenu(const menuServices : INTAServices;
+                                          const packageCache : IPackageCache; const imageIdx : integer);
 var
+  toolsItem : TMenuItem;
+  manageAction : TAction;
+  sbomGroupAction : TAction;
+  sbomProjectAction : TAction;
+  optionsAction : TAction;
   verifyAction : TAction;
-  verifyMenu : TMenuItem;
+  optionsSeparatorItem : TMenuItem;
+  separatorItem : TMenuItem;
+
+  function CreateAction(const aName, aCaption, aHint : string;
+                        const aExecute, aUpdate : TNotifyEvent) : TAction;
+  begin
+    result := TAction.Create(menuServices.ActionList);
+    result.Name := aName;
+    result.Caption := aCaption;
+    result.Category := 'DPM';
+    result.Hint := aHint;
+    result.OnExecute := aExecute;
+    if Assigned(aUpdate) then
+      result.OnUpdate := aUpdate;
+  end;
+
+  procedure AddChild(const aAction : TAction);
+  var
+    item : TMenuItem;
+  begin
+    item := TMenuItem.Create(FDPMTopMenu);
+    item.Action := aAction;
+    FDPMTopMenu.Add(item);
+  end;
+
 begin
   FPackageCacheForVerify := packageCache;
-  verifyAction := TAction.Create(menuServices.ActionList);
-  verifyAction.Name := 'actDPMVerifyCache';
-  verifyAction.Caption := 'Verify DPM Package Cache';
-  verifyAction.Visible := true;
-  verifyAction.Category := 'DPM';
-  verifyAction.Hint := 'Re-hash and re-verify every package in the DPM cache.';
-  verifyAction.OnExecute := Self.DPMVerifyCacheClick;
 
-  verifyMenu := TMenuItem.Create(nil);
-  verifyMenu.Caption := 'Verify DPM Package Cache';
-  verifyMenu.Name := 'GlobalDPMVerifyCacheItem';
-  verifyMenu.Action := verifyAction;
+  //If the design BPL is reloaded without restarting the IDE, the constructor runs
+  //again - bail if we've already inserted the menu so we don't end up with two.
+  if TToolsApiUtils.FindTopLevelMenu('DPMTopLevelMenu') <> nil then
+    exit;
 
-  menuServices.AddActionMenu('ProjectOptionsItem', verifyAction, verifyMenu, true);
+  FDPMTopMenu := TMenuItem.Create(menuServices.MainMenu);
+  FDPMTopMenu.Name := 'DPMTopLevelMenu';
+  FDPMTopMenu.Caption := 'DPM';
+
+  manageAction := CreateAction('actDPMPackageManager', 'Manage DPM Packages',
+    'Manage DPM Packages...', Self.DPMMenuClick, Self.DPMActionUpdate);
+  AddChild(manageAction);
+
+  //Hidden until a saved .groupproj is open - DPMGenerateSBOMGroupUpdate flips it.
+  //Start invisible so it doesn't flash before the first OnUpdate fires.
+  sbomGroupAction := CreateAction('actDPMGenerateSBOMGroup', 'Generate SBOM for Project Group',
+    'Generate an aggregated SBOM for the open project group.',
+    Self.DPMGenerateSBOMGroupClick, Self.DPMGenerateSBOMGroupUpdate);
+  sbomGroupAction.Visible := false;
+  AddChild(sbomGroupAction);
+
+  sbomProjectAction := CreateAction('actDPMGenerateSBOMProject', 'Generate SBOM for Project',
+    'Generate an SBOM for the active project.',
+    Self.DPMGenerateSBOMProjectClick, Self.DPMGenerateSBOMProjectUpdate);
+  AddChild(sbomProjectAction);
+
+  optionsSeparatorItem := TMenuItem.Create(FDPMTopMenu);
+  optionsSeparatorItem.Caption := '-';
+  FDPMTopMenu.Add(optionsSeparatorItem);
+
+  optionsAction := CreateAction('actDPMOptions', 'DPM Options...',
+    'Configure DPM package sources and IDE options.',
+    Self.DPMOptionsClick, nil);
+  AddChild(optionsAction);
+
+  separatorItem := TMenuItem.Create(FDPMTopMenu);
+  separatorItem.Caption := '-';
+  FDPMTopMenu.Add(separatorItem);
+
+  verifyAction := CreateAction('actDPMVerifyCache', 'Verify DPM Package Cache',
+    'Re-hash and re-verify every package in the DPM cache.',
+    Self.DPMVerifyCacheClick, nil);
+  AddChild(verifyAction);
+
+  //Image index must be assigned after the item is added or the image never shows.
+  manageAction.ImageIndex := imageIdx;
+
+  //Insert immediately after the Tools menu. 'ToolsMenu' is the usual Name but it isn't
+  //guaranteed across IDE versions / localisations, so fall back to a Caption match and
+  //finally to appending at the end rather than failing.
+  toolsItem := TToolsApiUtils.FindTopLevelMenu('ToolsMenu');
+  if toolsItem = nil then
+    toolsItem := TToolsApiUtils.FindTopLevelMenu('Tools');
+  if toolsItem <> nil then
+    menuServices.MainMenu.Items.Insert(toolsItem.MenuIndex + 1, FDPMTopMenu)
+  else
+    menuServices.MainMenu.Items.Add(FDPMTopMenu);
+
+  menuServices.NewToolbar('DPMPackageManager', 'DPM Package Manager');
+  menuServices.AddToolButton('DPMPackageManager', 'ShowDPMButton', manageAction);
+end;
+
+procedure TDPMWizard.DPMGenerateSBOMProjectClick(Sender : TObject);
+var
+  activeProject : IOTAProject;
+begin
+  activeProject := TToolsApiUtils.GetActiveProject;
+  if activeProject = nil then
+    exit;
+  TDPMSBOMProjectMenu.RunSBOM(FContainer, FLogger, activeProject.FileName);
+end;
+
+procedure TDPMWizard.DPMGenerateSBOMProjectUpdate(Sender : TObject);
+begin
+  TAction(Sender).Enabled := TToolsApiUtils.IsProjectAvailable;
+end;
+
+procedure TDPMWizard.DPMGenerateSBOMGroupClick(Sender : TObject);
+var
+  projectGroup : IOTAProjectGroup;
+begin
+  projectGroup := TToolsApiUtils.GetMainProjectGroup;
+  if projectGroup = nil then
+    exit;
+  TDPMSBOMProjectMenu.RunSBOM(FContainer, FLogger, projectGroup.FileName);
+end;
+
+procedure TDPMWizard.DPMGenerateSBOMGroupUpdate(Sender : TObject);
+var
+  projectGroup : IOTAProjectGroup;
+  visible : boolean;
+begin
+  //Only meaningful when a real, saved .groupproj is open. MainProjectGroup returns an
+  //implicit group even for a single loose .dproj, so group<>nil alone isn't enough -
+  //the extension + FileExists check excludes the unsaved/implicit case.
+  projectGroup := TToolsApiUtils.GetMainProjectGroup;
+  visible := (projectGroup <> nil) and (projectGroup.FileName <> '') and
+             SameText(ExtractFileExt(projectGroup.FileName), '.groupproj') and
+             FileExists(projectGroup.FileName);
+  TAction(Sender).Visible := visible;
+  TAction(Sender).Enabled := visible;
+end;
+
+procedure TDPMWizard.DPMOptionsClick(Sender : TObject);
+var
+  optionsHost : TDPMOptionsHostForm;
+  configManager : IConfigurationManager;
+  ideOptions : IDPMIDEOptions;
+begin
+  //Reuse the same options host the search bar's settings button shows - it wraps the
+  //TDPMOptionsFrame (package sources + IDE options) with OK/Cancel and persists on OK.
+  configManager := FContainer.Resolve<IConfigurationManager>;
+  ideOptions := FContainer.Resolve<IDPMIDEOptions>;
+  optionsHost := TDPMOptionsHostForm.Create(nil, configManager, FLogger, ideOptions,
+    TConfigUtils.GetDefaultConfigFileName);
+  try
+    if optionsHost.ShowModal = mrOk then
+      //Pick up any verbosity change immediately rather than waiting for the next session.
+      FLogger.Verbosity := ideOptions.LogVerbosity;
+  finally
+    optionsHost.Free;
+  end;
 end;
 
 procedure TDPMWizard.DPMVerifyCacheClick(Sender : TObject);
 var
+  cancellationTokenSource : ICancellationTokenSource;
   failures : integer;
 begin
   if FPackageCacheForVerify = nil then
     exit;
-  failures := FPackageCacheForVerify.FullReVerify;
-  if failures = 0 then
-    MessageDlg('DPM cache re-verify completed — all packages valid.',
-      mtInformation, [mbOK], 0)
-  else
-    MessageDlg(Format('DPM cache re-verify finished with %d failure(s). See the DPM Messages window for details.',
-      [failures]), mtWarning, [mbOK], 0);
+
+  //Drive the verify through the DPM message window: StartVerifyCache shows it and wires
+  //the Cancel button to this token source. The verify runs on the main thread (the message
+  //service/form are main-thread only) but FullReVerify logs per-package progress, and each
+  //log line pumps the message loop - so the window stays live, the cancel click is seen,
+  //and FullReVerify breaks at the next package boundary. Replaces the old blocking MessageDlg
+  //that made a large cache look like the IDE had hung.
+  cancellationTokenSource := TCancellationTokenSourceFactory.Create;
+  FLogger.StartVerifyCache(cancellationTokenSource);
+  failures := 0;
+  try
+    failures := FPackageCacheForVerify.FullReVerify(cancellationTokenSource.Token);
+  finally
+    //Cancelled or failed -> keep the window open so the user sees why; clean success ->
+    //let it auto-close per the user's log options.
+    FLogger.EndVerifyCache((failures = 0) and (not cancellationTokenSource.Token.IsCancelled));
+  end;
 end;
 
 destructor TDPMWizard.Destroy;
@@ -538,6 +676,11 @@ end;
 
 procedure TDPMWizard.Destroyed;
 begin
+  //Free the top-level DPM menu - this frees its child items too. The backing TActions
+  //are owned by INTAServices.ActionList and freed by the IDE, so we must NOT free them.
+  if FDPMTopMenu <> nil then
+    FreeAndNil(FDPMTopMenu);
+
   if FStorageNotifierId > -1 then
     (BorlandIDEServices as IOTAProjectFileStorage).RemoveNotifier(FStorageNotifierId);
   if FIDENotifier > -1 then

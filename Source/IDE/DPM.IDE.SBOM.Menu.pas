@@ -140,6 +140,11 @@ type
     constructor Create(const projectGroup : IOTAProjectGroup; const project : IOTAProject;
                        const container : TContainer; const logger : ILogger;
                        const isGroupContext : boolean);
+    //Shared SBOM generation routine. Resolves ISbomGenerator from the container and
+    //runs it against targetPath (a .dproj or .groupproj), dropping output next to the
+    //file. Called both from this project-tree menu's Execute and from the top-level
+    //DPM menu in TDPMWizard, so the logic lives in one place.
+    class procedure RunSBOM(const container : TContainer; const logger : ILogger; const targetPath : string); static;
   end;
 
 implementation
@@ -399,13 +404,7 @@ end;
 
 procedure TDPMSBOMProjectMenu.Execute(const MenuContextList : IInterfaceList);
 var
-  generator : ISbomGenerator;
-  options : TSBOMOptions;
   targetPath : string;
-  outDir : string;
-  ideLogger : IDPMIDELogger;
-  cancelTokenSource : ICancellationTokenSource;
-  ok : boolean;
 begin
   //Right-click on the project-group root  -> aggregate the whole .groupproj
   //Right-click on a single project        -> just that dproj
@@ -425,6 +424,18 @@ begin
     exit;
   end;
 
+  RunSBOM(FContainer, FLogger, targetPath);
+end;
+
+class procedure TDPMSBOMProjectMenu.RunSBOM(const container : TContainer; const logger : ILogger; const targetPath : string);
+var
+  generator : ISbomGenerator;
+  options : TSBOMOptions;
+  outDir : string;
+  ideLogger : IDPMIDELogger;
+  cancelTokenSource : ICancellationTokenSource;
+  ok : boolean;
+begin
   if (targetPath = '') or (not FileExists(targetPath)) then
   begin
     MessageDlg('Project file [' + targetPath + '] not found - save the project first and try again.',
@@ -434,7 +445,7 @@ begin
 
   generator := nil;
   try
-    generator := FContainer.Resolve<ISbomGenerator>;
+    generator := container.Resolve<ISbomGenerator>;
   except
     on e : Exception do
     begin
@@ -469,9 +480,9 @@ begin
 
     //Surface progress via the existing DPM message tab. The generator's
     //Information / Warning / Error calls land there via TDPMIDELogger.
-    if Supports(FLogger, IDPMIDELogger, ideLogger) then
+    if Supports(logger, IDPMIDELogger, ideLogger) then
       ideLogger.ShowMessageTab;
-    FLogger.Information('[SBOM] generating SBOM for ' + targetPath + ' -> ' + outDir);
+    logger.Information('[SBOM] generating SBOM for ' + targetPath + ' -> ' + outDir);
 
     cancelTokenSource := TCancellationTokenSourceFactory.Create;
     try
@@ -479,7 +490,7 @@ begin
     except
       on e : Exception do
       begin
-        FLogger.Error('[SBOM] generation failed : ' + e.Message);
+        logger.Error('[SBOM] generation failed : ' + e.Message);
         MessageDlg('SBOM generation failed - see DPM message tab for details.', mtError, [mbOK], 0);
         exit;
       end;
@@ -487,12 +498,12 @@ begin
 
     if ok then
     begin
-      FLogger.Success('[SBOM] generated successfully. Output in ' + outDir, true);
+      logger.Success('[SBOM] generated successfully. Output in ' + outDir, true);
       MessageDlg('SBOM generated successfully. Output in:'#13#10 + outDir, mtInformation, [mbOK], 0);
     end
     else
     begin
-      FLogger.Error('[SBOM] generation reported failure - check the DPM message tab.');
+      logger.Error('[SBOM] generation reported failure - check the DPM message tab.');
       MessageDlg('SBOM generation reported a failure. See the DPM message tab for details.',
                  mtWarning, [mbOK], 0);
     end;

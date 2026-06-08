@@ -286,6 +286,7 @@
         <DCCReference Include="Core\Utils\DPM.Core.Utils.DateTime.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Base64Url.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Masks.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.PE.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

@@ -12,7 +12,7 @@ uses
 //that way we don't need the form all the time, only when we need to display it.
 
 type
-  TMessageTask = (mtNone, mtRestore, mtInstall, mtUninstall);
+  TMessageTask = (mtNone, mtRestore, mtInstall, mtUninstall, mtVerifyCache);
 
   ///<Summary>Manages the status windows that shows when installing or restoring packages</Summary>
   IDPMIDEMessageService = interface
@@ -200,6 +200,10 @@ procedure TDPMIDEMessageService.TaskDone(const success : boolean);
 begin
   FCancellationTokenSource := nil;
   FCurrentTask := mtNone;
+  //Re-enable the Close button / close box now the work is done. Done unconditionally up
+  //front so it happens regardless of the success/auto-close branches below.
+  if FMessageForm <> nil then
+    FMessageForm.SetTaskRunning(false);
   if not success then
   begin
     if FMessageForm <> nil then
@@ -226,6 +230,11 @@ begin
     FMessageForm.Clear;
   end;
 
+  //Mark the task as running so the log window can't be closed until it finishes (or is
+  //cancelled). EnsureMessageForm may legitimately leave FMessageForm nil during shutdown.
+  if FMessageForm <> nil then
+    FMessageForm.SetTaskRunning(true);
+
   case task of
     mtNone :
     begin
@@ -245,6 +254,12 @@ begin
     begin
        if FOptions.ShowLogForUninstall then
         ShowMessageWindow;
+    end;
+    mtVerifyCache:
+    begin
+      //No per-task option for this one - the user explicitly invoked it from the DPM
+      //menu and needs to see progress (and the Cancel button), so always show.
+      ShowMessageWindow;
     end;
   end;
 

@@ -37,6 +37,7 @@ type
     procedure ClosingInTimerTimer(Sender: TObject);
     procedure lblDontCloseLinkClick(Sender: TObject; const Link: string; LinkType: TSysLinkType);
     procedure FormShow(Sender: TObject);
+    procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
   private
     FOptions : IDPMIDEOptions;
     FLogMemo : TLogMemo;
@@ -44,6 +45,12 @@ type
     FCloseDelayInSeconds : integer;
     FCurrentCloseDelay : integer;
     FStopwatch : TStopwatch;
+    //True between TaskStarted and TaskDone. While set, the Close button and the window's
+    //system-menu close are blocked so the user can't dismiss the log (and lose sight of a
+    //running operation) without going through Cancel. Driven explicitly by the message
+    //service rather than inferred from FCancellationTokenSource, which TaskDone does not
+    //always clear (e.g. success with auto-close disabled).
+    FTaskRunning : boolean;
     {$IFDEF THEMESERVICES}
     FNotifierId : integer;
     {$ENDIF}
@@ -78,7 +85,11 @@ type
     procedure Clear;
 
     procedure DelayHide;
-    
+
+    //Called by the message service to mark a task as running / finished. While running the
+    //Close button and the window close box are disabled.
+    procedure SetTaskRunning(const value : boolean);
+
     property CancellationTokenSource : ICancellationTokenSource read FCancellationTokenSource write SetCancellationTokenSource;
     property CloseDelayInSeconds : integer read FCloseDelayInSeconds write SetCloseDelayInSeconds;
   end;
@@ -113,6 +124,8 @@ procedure TDPMMessageForm.ActionList1Update(Action: TBasicAction; var Handled: B
 begin
   actCopyLog.Enabled := FLogMemo.RowCount > 0;
   actCanCancel.Enabled := (FCancellationTokenSource <> nil) and (not FCancellationTokenSource.Token.IsCancelled);
+  //Can't close the log while work is in flight - the user must Cancel first.
+  btnClose.Enabled := not FTaskRunning;
   Handled := true;
 end;
 
@@ -128,9 +141,20 @@ end;
 
 procedure TDPMMessageForm.btnCloseClick(Sender: TObject);
 begin
+  //Defensive: the button is disabled while a task runs, but guard anyway so the log can't
+  //be hidden out from under an in-flight operation.
+  if FTaskRunning then
+    exit;
   ClosingInTimer.Enabled := false;
   FCurrentCloseDelay := FCloseDelayInSeconds;
   Self.Hide;
+end;
+
+procedure TDPMMessageForm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+begin
+  //Block the system-menu close box (and Alt+F4) while a task is running, same as the
+  //Close button. Cancel the task first.
+  CanClose := not FTaskRunning;
 end;
 
 procedure TDPMMessageForm.ChangedTheme;
@@ -227,6 +251,9 @@ begin
 
   FCloseDelayInSeconds := 3;
   FCurrentCloseDelay := FCloseDelayInSeconds;
+
+  FTaskRunning := false;
+  Self.OnCloseQuery := FormCloseQuery;
 
   FStopwatch := TStopwatch.Create;
 end;
@@ -348,6 +375,13 @@ procedure TDPMMessageForm.SetCloseDelayInSeconds(const Value: integer);
 begin
   FCloseDelayInSeconds := Value;
   FCurrentCloseDelay := FCloseDelayInSeconds;
+end;
+
+procedure TDPMMessageForm.SetTaskRunning(const value : boolean);
+begin
+  FTaskRunning := value;
+  //Reflect immediately rather than waiting for the next ActionList idle update.
+  btnClose.Enabled := not value;
 end;
 
 procedure TDPMMessageForm.Success(const data: string;  const important: Boolean);

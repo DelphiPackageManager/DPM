@@ -253,6 +253,7 @@ type
     function GetDependencies : IList<ISpecDependency>;
     function GetBuildEntries : IList<ISpecBuildEntry>;
     function GetPackageDefinitions : IList<ISpecPackageDefinition>;
+    function GetPrecompiledBinaries : IList<string>;
     function GetEnvironmentVariables : IVariables;
     function GetName : string;
     procedure SetName(const templateName: string);
@@ -292,6 +293,11 @@ type
     property BuildEntries : IList<ISpecBuildEntry>read GetBuildEntries;
     property DesignEntries: IList<ISpecDesignEntry> read GetDesignFiles;
     property PackageDefinitions : IList<ISpecPackageDefinition> read GetPackageDefinitions;
+    /// <summary> Precompiled Windows PE binaries (.bpl/.dll/.exe) this package ships, declared as
+    /// archive-relative paths (forward slashes) exactly as they appear inside the .dpkg. Auto-derived
+    /// at pack time from the files actually added to the archive. The gallery cross-checks this against
+    /// archive contents: an author-signed package whose archive contains an undeclared PE is rejected. </summary>
+    property PrecompiledBinaries : IList<string> read GetPrecompiledBinaries;
     /// <summary> IDE environment variables to set (in the IDE process) while this package's design
     /// components are loaded, and clear/restore when unloaded. Key = variable name (PATH is
     /// special-cased as append-only); value may use the install-time $packageDir$ token. </summary>

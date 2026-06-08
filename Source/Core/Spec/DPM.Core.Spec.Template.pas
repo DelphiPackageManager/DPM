@@ -47,6 +47,7 @@ type
     FBuildEntries : IList<ISpecBuildEntry>;
     FDesignFiles : IList<ISpecDesignEntry>;
     FPackageDefinitions : IList<ISpecPackageDefinition>;
+    FPrecompiledBinaries : IList<string>;
     FEnvironmentVariables : IVariables;
 
     FSourceComments : TStringList;
@@ -61,6 +62,7 @@ type
     function GetSourceFiles : IList<ISpecSourceEntry>;
     function GetBuildEntries : IList<ISpecBuildEntry>;
     function GetPackageDefinitions : IList<ISpecPackageDefinition>;
+    function GetPrecompiledBinaries : IList<string>;
     function GetEnvironmentVariables : IVariables;
     function GetName : string;
     procedure SetName(const templateName: string);
@@ -145,6 +147,7 @@ begin
   FBuildEntries := TCollections.CreateList<ISpecBuildEntry>;
   FDesignFiles := TCollections.CreateList<ISpecDesignEntry>;
   FPackageDefinitions := TCollections.CreateList<ISpecPackageDefinition>;
+  FPrecompiledBinaries := TCollections.CreateList<string>;
   FEnvironmentVariables := TCollections.CreateDictionary<string,string>;
 end;
 
@@ -188,6 +191,9 @@ begin
     newPackageDef := source.PackageDefinitions[i].Clone;
     FPackageDefinitions.Add(newPackageDef);
   end;
+
+  for i := 0 to source.PrecompiledBinaries.Count -1 do
+    FPrecompiledBinaries.Add(source.PrecompiledBinaries[i]);
 
   for i := 0 to source.EnvironmentVariables.Count -1 do
     FEnvironmentVariables[source.EnvironmentVariables.Items[i].Key] := source.EnvironmentVariables.Items[i].Value;
@@ -246,6 +252,7 @@ begin
   FSourceFiles := nil;
   FBuildEntries := nil;
   FPackageDefinitions := nil;
+  FPrecompiledBinaries := nil;
   inherited;
 end;
 
@@ -306,6 +313,13 @@ begin
     seq := template.A['package definitions'];
     for i := 0 to FPackageDefinitions.Count -1 do
       FPackageDefinitions[i].ToYAML(seq, packageKind);
+  end;
+
+  if FPrecompiledBinaries.Any then
+  begin
+    seq := template.A['precompiledBinaries'];
+    for i := 0 to FPrecompiledBinaries.Count -1 do
+      seq.AddValue(FPrecompiledBinaries[i]);
   end;
 
   if FEnvironmentVariables.Count > 0 then
@@ -417,6 +431,11 @@ end;
 function TSpecTemplate.GetPackageDefinitions : IList<ISpecPackageDefinition>;
 begin
   result := FPackageDefinitions;
+end;
+
+function TSpecTemplate.GetPrecompiledBinaries : IList<string>;
+begin
+  result := FPrecompiledBinaries;
 end;
 
 function TSpecTemplate.GetEnvironmentVariables : IVariables;
@@ -573,6 +592,16 @@ begin
     collectionObj := yamlObject.A['package definitions'];
     if collectionObj.Count > 0 then
       result := LoadPackageDefinitionsFromYAML(collectionObj) and result;
+  end;
+
+  //Precompiled PE binaries shipped by the package - a plain list of archive-relative paths.
+  //Auto-derived at pack time; read here for round-tripping and so the gallery/IDE can consume it.
+  if yamlObject.ContainsKey('precompiledBinaries') then
+  begin
+    collectionObj := yamlObject.A['precompiledBinaries'];
+    for i := 0 to collectionObj.Count - 1 do
+      if collectionObj.S[i] <> '' then
+        FPrecompiledBinaries.Add(collectionObj.S[i]);
   end;
 
   //IDE environment variables - preserve the author's key casing (Windows env var names are

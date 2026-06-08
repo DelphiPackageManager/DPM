@@ -193,6 +193,7 @@ uses
   DPM.Core.Utils.DateTime in 'Core\Utils\DPM.Core.Utils.DateTime.pas',
   DPM.Core.Utils.Base64Url in 'Core\Utils\DPM.Core.Utils.Base64Url.pas',
   DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas',
+  DPM.Core.Utils.PE in 'Core\Utils\DPM.Core.Utils.PE.pas',
   DPM.Core.Project.MapFile in 'Core\Project\DPM.Core.Project.MapFile.pas',
   DPM.Core.Options.SBOM in 'Core\Options\DPM.Core.Options.SBOM.pas',
   DPM.Core.SBOM.Generator in 'Core\Sbom\DPM.Core.SBOM.Generator.pas',

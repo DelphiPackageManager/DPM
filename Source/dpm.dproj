@@ -259,6 +259,7 @@
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Base64Url.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Template.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Masks.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.PE.pas"/>
         <DCCReference Include="Cmdline\DPM.Console.Prompts.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Generator.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Interfaces.pas"/>
