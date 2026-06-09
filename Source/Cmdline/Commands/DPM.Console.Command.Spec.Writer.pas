@@ -34,7 +34,8 @@ unit DPM.Console.Command.Spec.Writer;
 interface
 
 uses
-  DPM.Core.Types;
+  DPM.Core.Types,
+  DPM.Console.Command.Spec.Discovery;
 
 type
   TSpecTargetInfo = record
@@ -74,7 +75,7 @@ type
 
     //All paths below are relative to the project root with forward slashes and
     //no leading `./` - the writer prepends `./` as needed.
-    SourceGlobs : TArray<string>;     //e.g. ['source/*.pas', 'source/*.inc']
+    Sources : TScaffoldSourceEntries; //source entries (globs/files), each with optional excludes
     HasPackagesFolder : boolean;
     PackagesFolderRel : string;       //e.g. 'packages'
     Targets : TArray<TSpecTargetInfo>; //ordered by compiler enum
@@ -458,15 +459,23 @@ end;
 procedure AppendTemplates(var buffer : string; const scaffold : TSpecScaffold;
   const packageSourceSegment : string);
 var
-  i : integer;
+  i, j : integer;
   pkgRel : string;
 begin
   AppendLine(buffer, 'templates:');
   AppendLine(buffer, '  - name: default');
   AppendDependencies(buffer, scaffold.Dependencies);
   AppendLine(buffer, '    source:');
-  for i := 0 to High(scaffold.SourceGlobs) do
-    AppendLine(buffer, '      - src: ' + RelWithDot(scaffold.SourceGlobs[i]));
+  for i := 0 to High(scaffold.Sources) do
+  begin
+    AppendLine(buffer, '      - src: ' + RelWithDot(scaffold.Sources[i].Glob));
+    if Length(scaffold.Sources[i].Exclude) > 0 then
+    begin
+      AppendLine(buffer, '        exclude:');
+      for j := 0 to High(scaffold.Sources[i].Exclude) do
+        AppendLine(buffer, '          - ' + RelWithDot(scaffold.Sources[i].Exclude[j]));
+    end;
+  end;
 
   if scaffold.HasPackagesFolder then
   begin

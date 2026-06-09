@@ -23,6 +23,10 @@ object DPMOptionsFrame: TDPMOptionsFrame
       Margins.Right = 0
       Margins.Bottom = 0
       Caption = ' Package Sources '
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object Panel1: TPanel
         Left = 0
         Top = 0
@@ -223,6 +227,10 @@ object DPMOptionsFrame: TDPMOptionsFrame
       Margins.Bottom = 0
       Caption = ' IDE Options '
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object pnlIDEOptions: TPanel
         Left = 0
         Top = 0

@@ -68,14 +68,6 @@ object OptionsForm: TOptionsForm
             Height = 23
             ExplicitHeight = 23
           end
-          inherited txtUserName: TEdit
-            Height = 23
-            ExplicitHeight = 23
-          end
-          inherited txtPassword: TEdit
-            Height = 23
-            ExplicitHeight = 23
-          end
           inherited cboSourceType: TComboBox
             ExplicitHeight = 23
           end

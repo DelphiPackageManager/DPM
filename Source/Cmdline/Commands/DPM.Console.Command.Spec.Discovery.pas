@@ -63,6 +63,27 @@ type
   end;
   TLogicalPackages = TArray<TLogicalPackage>;
 
+  //A single selectable dproj, flattened out of the runtime/design pairing in
+  //TLogicalPackage so the user can tick runtime and design projects independently
+  //when combining several projects into one dspec.
+  TSelectableDProj = record
+    Path : string;            //absolute path to the dproj
+    Stem : string;            //logical package stem this dproj belongs to
+    DisplayLabel : string;    //human-readable label, e.g. 'Spring.Base (runtime)'
+    Kind : TDProjKind;        //dkRuntime or dkDesign
+  end;
+  TSelectableDProjs = TArray<TSelectableDProj>;
+
+  //A single source entry for a dspec template: an ant glob (or individual file
+  //path), forward-slashed and root-relative with no leading './' (the writer adds
+  //it). Exclude holds root-relative paths the glob would otherwise wrongly include
+  //(empty for plain entries and individual files).
+  TScaffoldSourceEntry = record
+    Glob : string;
+    Exclude : TArray<string>;
+  end;
+  TScaffoldSourceEntries = TArray<TScaffoldSourceEntry>;
+
 function FindSourceFolder(const rootDir : string; out folder : string) : boolean;
 function FindPackagesFolder(const rootDir : string; out folder : string) : boolean;
 
@@ -128,6 +149,21 @@ function ComputeLogicalPackageStem(const leafName : string) : string;
 function GroupDProjsByStem(const dprojFiles : TArray<string>) : TLogicalPackages;
 
 /// <summary>
+///  Flattens the runtime/design dprojs of every logical package into a single list
+///  of individually-selectable entries (one per non-empty dproj). Used by the
+///  "combine selected projects into one dspec" mode so runtime and design projects
+///  can be ticked independently.
+/// </summary>
+function FlattenSelectableDProjs(const packages : TLogicalPackages) : TSelectableDProjs;
+
+/// <summary>
+///  Regroups the chosen flat entries (by index into `entries`) back into logical
+///  packages keyed by stem, filling only the runtime/design side that was actually
+///  selected. Out-of-range indices are ignored.
+/// </summary>
+function BuildSelectedLogicals(const entries : TSelectableDProjs; const selected : TArray<integer>) : TLogicalPackages;
+
+/// <summary>
 ///  Parses a .dpk file's `contains` clause. Returns empty when the file cannot
 ///  be read or contains no matching entries. Skips `{$IFDEF ...}` and line
 ///  comments.
@@ -160,12 +196,14 @@ function ExtractDprojDcpReferences(const dprojPath : string) : TArray<string>;
 function IsStandardDelphiPackage(const name : string) : boolean;
 
 /// <summary>
-///  Turns a list of source file paths relative to projectRoot into a minimal
-///  set of ant-style globs (e.g. `./Source/Base/**.pas`). Paths with matching
-///  extensions grouped under the same deepest-common ancestor collapse into a
-///  single recursive glob. Mixed extensions produce separate globs per extension.
+///  Turns a list of source file paths relative to projectRoot into source entries.
+///  When projectRoot is set, it inspects the real files on disk so it only globs a
+///  folder/namespace the package fully owns - emitting '<folder>/**.ext' for a
+///  fully-owned subtree, a '<folder>/<prefix>*.ext' glob with an exclude list when
+///  the package owns most (but not all) of a shared folder, and individual file
+///  entries otherwise. With an empty projectRoot it falls back to broad folder globs.
 /// </summary>
-function DeriveSourceGlobs(const unitPaths : TArray<string>; const projectRoot : string) : TArray<string>;
+function DeriveSourceGlobs(const unitPaths : TArray<string>; const projectRoot : string) : TScaffoldSourceEntries;
 
 /// <summary>
 ///  Finds the deepest forward-slashed folder that contains every path in the
@@ -840,6 +878,85 @@ begin
   result := list;
 end;
 
+function FlattenSelectableDProjs(const packages : TLogicalPackages) : TSelectableDProjs;
+var
+  i : integer;
+  entry : TSelectableDProj;
+  list : TSelectableDProjs;
+begin
+  SetLength(list, 0);
+  for i := 0 to High(packages) do
+  begin
+    if packages[i].RuntimeDProj <> '' then
+    begin
+      entry.Path := packages[i].RuntimeDProj;
+      entry.Stem := packages[i].Stem;
+      entry.Kind := dkRuntime;
+      entry.DisplayLabel := packages[i].Stem + ' (runtime - ' + ExtractFileName(packages[i].RuntimeDProj) + ')';
+      SetLength(list, Length(list) + 1);
+      list[High(list)] := entry;
+    end;
+    if packages[i].DesignDProj <> '' then
+    begin
+      entry.Path := packages[i].DesignDProj;
+      entry.Stem := packages[i].Stem;
+      entry.Kind := dkDesign;
+      entry.DisplayLabel := packages[i].Stem + ' (design - ' + ExtractFileName(packages[i].DesignDProj) + ')';
+      SetLength(list, Length(list) + 1);
+      list[High(list)] := entry;
+    end;
+  end;
+  result := list;
+end;
+
+function BuildSelectedLogicals(const entries : TSelectableDProjs; const selected : TArray<integer>) : TLogicalPackages;
+var
+  i, j : integer;
+  idx : integer;
+  entry : TSelectableDProj;
+  existingIdx : integer;
+  logical : TLogicalPackage;
+  list : TLogicalPackages;
+begin
+  SetLength(list, 0);
+  for i := 0 to High(selected) do
+  begin
+    idx := selected[i];
+    if (idx < 0) or (idx > High(entries)) then
+      continue;
+    entry := entries[idx];
+
+    existingIdx := -1;
+    for j := 0 to High(list) do
+      if SameText(list[j].Stem, entry.Stem) then
+      begin
+        existingIdx := j;
+        break;
+      end;
+
+    if existingIdx = -1 then
+    begin
+      logical.Stem := entry.Stem;
+      logical.RuntimeDProj := '';
+      logical.DesignDProj := '';
+      if entry.Kind = dkDesign then
+        logical.DesignDProj := entry.Path
+      else
+        logical.RuntimeDProj := entry.Path;
+      SetLength(list, Length(list) + 1);
+      list[High(list)] := logical;
+    end
+    else
+    begin
+      if entry.Kind = dkDesign then
+        list[existingIdx].DesignDProj := entry.Path
+      else
+        list[existingIdx].RuntimeDProj := entry.Path;
+    end;
+  end;
+  result := list;
+end;
+
 function StripDelphiComments(const input : string) : string;
 var
   i : integer;
@@ -1282,14 +1399,508 @@ begin
   result[High(result)] := glob;
 end;
 
-function DeriveSourceGlobs(const unitPaths : TArray<string>; const projectRoot : string) : TArray<string>;
+function FirstPathSegment(const path : string) : string;
+var
+  idx : integer;
+begin
+  idx := Pos('/', path);
+  if idx = 0 then
+    result := ''
+  else
+    result := Copy(path, 1, idx - 1);
+end;
+
+function MakeEntry(const glob : string) : TScaffoldSourceEntry;
+begin
+  result.Glob := glob;
+  SetLength(result.Exclude, 0);
+end;
+
+function AppendEntry(const list : TScaffoldSourceEntries; const entry : TScaffoldSourceEntry) : TScaffoldSourceEntries;
+begin
+  result := list;
+  SetLength(result, Length(result) + 1);
+  result[High(result)] := entry;
+end;
+
+function LeafOf(const path : string) : string;
+var
+  j : integer;
+begin
+  j := LastDelimiter('/', path);
+  if j = 0 then
+    result := path
+  else
+    result := Copy(path, j + 1, MaxInt);
+end;
+
+function LeafNoExt(const leaf, ext : string) : string;
+begin
+  result := leaf;
+  if EndsText(ext, result) then
+    SetLength(result, Length(result) - Length(ext));
+end;
+
+//Cumulative dotted prefixes (each ending with '.') of a base name, e.g.
+//'MARS.Core.Application' -> ['MARS.', 'MARS.Core.']. Used as candidate namespace
+//wildcards ('<prefix>*.ext').
+function DottedPrefixes(const baseName : string) : TArray<string>;
+var
+  i : integer;
+  list : TArray<string>;
+begin
+  SetLength(list, 0);
+  for i := 1 to Length(baseName) - 1 do
+    if baseName[i] = '.' then
+    begin
+      SetLength(list, Length(list) + 1);
+      list[High(list)] := Copy(baseName, 1, i);
+    end;
+  result := list;
+end;
+
+//Turns a set of file paths into recursive folder globs (e.g. './Source/**.pas').
+//When the paths share a single common parent we emit one glob; otherwise we
+//partition by top-level folder and emit one glob per distinct root (plus a flat
+//'*.<ext>' glob for any files sitting at the project root). We never list
+//individual files - the spec should always carry globs, not file-by-file entries.
+function FolderGlobsFor(const paths : TArray<string>; const ext : string) : TArray<string>;
+var
+  common : string;
+  i, j : integer;
+  seg : string;
+  segments : TArray<string>;
+  found : boolean;
+  hasRootFiles : boolean;
+  group : TArray<string>;
+  groupCommon : string;
+  list : TArray<string>;
+begin
+  SetLength(list, 0);
+  if Length(paths) = 0 then
+    exit(list);
+
+  common := CommonParentFolder(paths);
+  if common <> '' then
+  begin
+    list := AppendGlob(list, common + '/**' + ext);
+    exit(list);
+  end;
+
+  //No shared parent - group by the first path segment so each top-level folder
+  //(Source, ThirdParty\..., etc) collapses to its own recursive glob.
+  hasRootFiles := false;
+  SetLength(segments, 0);
+  for i := 0 to High(paths) do
+  begin
+    seg := FirstPathSegment(paths[i]);
+    if seg = '' then
+    begin
+      hasRootFiles := true;
+      continue;
+    end;
+    found := false;
+    for j := 0 to High(segments) do
+      if SameText(segments[j], seg) then
+      begin
+        found := true;
+        break;
+      end;
+    if not found then
+    begin
+      SetLength(segments, Length(segments) + 1);
+      segments[High(segments)] := seg;
+    end;
+  end;
+
+  if hasRootFiles then
+    list := AppendGlob(list, '*' + ext);
+
+  for j := 0 to High(segments) do
+  begin
+    SetLength(group, 0);
+    for i := 0 to High(paths) do
+      if SameText(FirstPathSegment(paths[i]), segments[j]) then
+      begin
+        SetLength(group, Length(group) + 1);
+        group[High(group)] := paths[i];
+      end;
+    //paths in a group share their first segment, so this is always non-empty.
+    groupCommon := CommonParentFolder(group);
+    if groupCommon = '' then
+      groupCommon := segments[j];
+    list := AppendGlob(list, groupCommon + '/**' + ext);
+  end;
+
+  result := list;
+end;
+
+function ParentFolderRel(const path : string) : string;
+var
+  j : integer;
+begin
+  j := LastDelimiter('/', path);
+  if j = 0 then
+    result := ''
+  else
+    result := Copy(path, 1, j - 1);
+end;
+
+//Lists the actual ext files on disk under <projectRoot>/<folderRel>, returned as
+//project-root-relative forward-slash paths. folderRel='' means the project root.
+//Returns empty if the folder doesn't exist or can't be read.
+function DiskFilesUnder(const projectRoot, folderRel, ext : string; recursive : boolean) : TArray<string>;
+var
+  diskFolder : string;
+  rootNorm : string;
+  files : TArray<string>;
+  option : TSearchOption;
+  i : integer;
+  rel : string;
+  list : TArray<string>;
+begin
+  SetLength(list, 0);
+  diskFolder := ExcludeTrailingPathDelimiter(projectRoot);
+  if folderRel <> '' then
+    diskFolder := IncludeTrailingPathDelimiter(diskFolder) + StringReplace(folderRel, '/', PathDelim, [rfReplaceAll]);
+  if not TDirectory.Exists(diskFolder) then
+    exit(list);
+  if recursive then
+    option := TSearchOption.soAllDirectories
+  else
+    option := TSearchOption.soTopDirectoryOnly;
+  try
+    files := TDirectory.GetFiles(diskFolder, '*' + ext, option);
+  except
+    exit(list);
+  end;
+  rootNorm := IncludeTrailingPathDelimiter(ExcludeTrailingPathDelimiter(projectRoot));
+  for i := 0 to High(files) do
+  begin
+    if StartsText(rootNorm, files[i]) then
+      rel := StringReplace(Copy(files[i], Length(rootNorm) + 1, MaxInt), '\', '/', [rfReplaceAll])
+    else
+      rel := StringReplace(files[i], '\', '/', [rfReplaceAll]);
+    SetLength(list, Length(list) + 1);
+    list[High(list)] := rel;
+  end;
+  result := list;
+end;
+
+//True when every path in `candidates` (non-empty) appears in `owned`.
+function AllPathsOwned(const candidates, owned : TArray<string>) : boolean;
+var
+  i, j : integer;
+  found : boolean;
+begin
+  if Length(candidates) = 0 then
+    exit(false);
+  for i := 0 to High(candidates) do
+  begin
+    found := false;
+    for j := 0 to High(owned) do
+      if SameText(candidates[i], owned[j]) then
+      begin
+        found := true;
+        break;
+      end;
+    if not found then
+      exit(false);
+  end;
+  result := true;
+end;
+
+//Returns the paths whose leaf filename starts with `prefix`.
+function FilterByLeafPrefix(const paths : TArray<string>; const prefix : string) : TArray<string>;
+var
+  i : integer;
+  list : TArray<string>;
+begin
+  SetLength(list, 0);
+  for i := 0 to High(paths) do
+    if StartsText(prefix, LeafOf(paths[i])) then
+    begin
+      SetLength(list, Length(list) + 1);
+      list[High(list)] := paths[i];
+    end;
+  result := list;
+end;
+
+//Returns the candidates not present in `owned` (case-insensitive full-path match).
+function PathsNotIn(const candidates, owned : TArray<string>) : TArray<string>;
+var
+  i, j : integer;
+  found : boolean;
+  list : TArray<string>;
+begin
+  SetLength(list, 0);
+  for i := 0 to High(candidates) do
+  begin
+    found := false;
+    for j := 0 to High(owned) do
+      if SameText(candidates[i], owned[j]) then
+      begin
+        found := true;
+        break;
+      end;
+    if not found then
+    begin
+      SetLength(list, Length(list) + 1);
+      list[High(list)] := candidates[i];
+    end;
+  end;
+  result := list;
+end;
+
+//Collapses the package's files in one folder into the fewest source entries that
+//cover exactly them. Prefers the broadest namespace wildcard ('<prefix>*.ext')
+//whose match set on disk is the package's files plus a small exclude list (never
+//more lines than listing the files); anything left over is listed individually.
+function CollapseFolderFiles(const folderRel : string; const ownPaths, diskDirect : TArray<string>;
+  const ext : string) : TScaffoldSourceEntries;
+var
+  remaining : TArray<string>;
+  entries : TScaffoldSourceEntries;
+  entry : TScaffoldSourceEntry;
+  i, k : integer;
+  base, prefix : string;
+  prefixes : TArray<string>;
+  covered, matched, excludes : TArray<string>;
+  globLines : integer;
+  haveBest : boolean;
+  bestPrefix : string;
+  bestCovered, bestExcludes : TArray<string>;
+  nextRemaining : TArray<string>;
+  isCovered : boolean;
+  globBase : string;
+begin
+  SetLength(entries, 0);
+  remaining := Copy(ownPaths, 0, Length(ownPaths));
+
+  while Length(remaining) > 0 do
+  begin
+    haveBest := false;
+    bestPrefix := '';
+    SetLength(bestCovered, 0);
+    SetLength(bestExcludes, 0);
+
+    //Evaluate every dotted prefix of every remaining file as a candidate wildcard.
+    for i := 0 to High(remaining) do
+    begin
+      base := LeafNoExt(LeafOf(remaining[i]), ext);
+      prefixes := DottedPrefixes(base);
+      for k := 0 to High(prefixes) do
+      begin
+        prefix := prefixes[k];
+        covered := FilterByLeafPrefix(remaining, prefix);
+        if Length(covered) < 2 then
+          continue;
+        matched := FilterByLeafPrefix(diskDirect, prefix);
+        excludes := PathsNotIn(matched, ownPaths);
+        if Length(excludes) > 0 then
+          globLines := 2 + Length(excludes)  //src line + 'exclude:' header + items
+        else
+          globLines := 1;
+        if globLines > Length(covered) then
+          continue;  //a wildcard here would cost more lines than just listing the files
+        //Prefer the broadest match, then the fewest excludes, then the longer prefix.
+        if (not haveBest)
+          or (Length(covered) > Length(bestCovered))
+          or ((Length(covered) = Length(bestCovered)) and (Length(excludes) < Length(bestExcludes)))
+          or ((Length(covered) = Length(bestCovered)) and (Length(excludes) = Length(bestExcludes))
+              and (Length(prefix) > Length(bestPrefix))) then
+        begin
+          haveBest := true;
+          bestPrefix := prefix;
+          bestCovered := covered;
+          bestExcludes := excludes;
+        end;
+      end;
+    end;
+
+    if not haveBest then
+      break;
+
+    if folderRel = '' then
+      globBase := ''
+    else
+      globBase := folderRel + '/';
+    entry.Glob := globBase + bestPrefix + '*' + ext;
+    entry.Exclude := bestExcludes;
+    entries := AppendEntry(entries, entry);
+
+    //drop the covered files from remaining
+    SetLength(nextRemaining, 0);
+    for i := 0 to High(remaining) do
+    begin
+      isCovered := false;
+      for k := 0 to High(bestCovered) do
+        if SameText(remaining[i], bestCovered[k]) then
+        begin
+          isCovered := true;
+          break;
+        end;
+      if not isCovered then
+      begin
+        SetLength(nextRemaining, Length(nextRemaining) + 1);
+        nextRemaining[High(nextRemaining)] := remaining[i];
+      end;
+    end;
+    remaining := nextRemaining;
+  end;
+
+  //list whatever couldn't be collapsed as individual files
+  for i := 0 to High(remaining) do
+    entries := AppendEntry(entries, MakeEntry(remaining[i]));
+
+  result := entries;
+end;
+
+//Filesystem-aware glob derivation for a set of paths that share a top-level
+//segment. Emits a recursive '<ancestor>/**.<ext>' glob when the package owns the
+//whole tree, a flat '<folder>/*.<ext>' when it owns a whole folder, otherwise
+//collapses to namespace wildcards + excludes (CollapseFolderFiles). This stops a
+//broad './Source/**.pas' sweeping in sibling packages' source in a shared folder.
+function PreciseGlobsForPartition(const paths : TArray<string>; const ext, projectRoot : string) : TScaffoldSourceEntries;
+var
+  ancestor : string;
+  diskRecursive : TArray<string>;
+  parents : TArray<string>;
+  par : string;
+  i, j : integer;
+  found : boolean;
+  unitsInPar : TArray<string>;
+  diskDirect : TArray<string>;
+  folderEntries : TScaffoldSourceEntries;
+  list : TScaffoldSourceEntries;
+begin
+  SetLength(list, 0);
+  if Length(paths) = 0 then
+    exit(list);
+
+  //Whole-subtree shortcut - one '**' glob when the package owns the entire tree.
+  ancestor := CommonParentFolder(paths);
+  if ancestor <> '' then
+  begin
+    diskRecursive := DiskFilesUnder(projectRoot, ancestor, ext, true);
+    if AllPathsOwned(diskRecursive, paths) then
+    begin
+      list := AppendEntry(list, MakeEntry(ancestor + '/**' + ext));
+      exit(list);
+    end;
+  end;
+
+  //Otherwise decide per immediate parent folder.
+  SetLength(parents, 0);
+  for i := 0 to High(paths) do
+  begin
+    par := ParentFolderRel(paths[i]);
+    found := false;
+    for j := 0 to High(parents) do
+      if SameText(parents[j], par) then
+      begin
+        found := true;
+        break;
+      end;
+    if not found then
+    begin
+      SetLength(parents, Length(parents) + 1);
+      parents[High(parents)] := par;
+    end;
+  end;
+
+  for j := 0 to High(parents) do
+  begin
+    par := parents[j];
+    SetLength(unitsInPar, 0);
+    for i := 0 to High(paths) do
+      if SameText(ParentFolderRel(paths[i]), par) then
+      begin
+        SetLength(unitsInPar, Length(unitsInPar) + 1);
+        unitsInPar[High(unitsInPar)] := paths[i];
+      end;
+
+    diskDirect := DiskFilesUnder(projectRoot, par, ext, false);
+    if AllPathsOwned(diskDirect, unitsInPar) then
+    begin
+      //the package owns every file directly in this folder - a flat glob is exact.
+      if par = '' then
+        list := AppendEntry(list, MakeEntry('*' + ext))
+      else
+        list := AppendEntry(list, MakeEntry(par + '/*' + ext));
+    end
+    else
+    begin
+      //shared folder - collapse to namespace wildcards + excludes where it helps,
+      //list the rest individually.
+      folderEntries := CollapseFolderFiles(par, unitsInPar, diskDirect, ext);
+      for i := 0 to High(folderEntries) do
+        list := AppendEntry(list, folderEntries[i]);
+    end;
+  end;
+
+  result := list;
+end;
+
+function PreciseGlobs(const paths : TArray<string>; const ext, projectRoot : string) : TScaffoldSourceEntries;
+var
+  segments : TArray<string>;
+  seg : string;
+  i, j : integer;
+  found : boolean;
+  partition : TArray<string>;
+  partEntries : TScaffoldSourceEntries;
+  list : TScaffoldSourceEntries;
+begin
+  SetLength(list, 0);
+  if Length(paths) = 0 then
+    exit(list);
+
+  //Partition by first segment so each top-level root ('Source', 'ThirdParty', the
+  //'' root bucket) is evaluated for ownership independently.
+  SetLength(segments, 0);
+  for i := 0 to High(paths) do
+  begin
+    seg := FirstPathSegment(paths[i]);
+    found := false;
+    for j := 0 to High(segments) do
+      if SameText(segments[j], seg) then
+      begin
+        found := true;
+        break;
+      end;
+    if not found then
+    begin
+      SetLength(segments, Length(segments) + 1);
+      segments[High(segments)] := seg;
+    end;
+  end;
+
+  for j := 0 to High(segments) do
+  begin
+    SetLength(partition, 0);
+    for i := 0 to High(paths) do
+      if SameText(FirstPathSegment(paths[i]), segments[j]) then
+      begin
+        SetLength(partition, Length(partition) + 1);
+        partition[High(partition)] := paths[i];
+      end;
+    partEntries := PreciseGlobsForPartition(partition, ext, projectRoot);
+    for i := 0 to High(partEntries) do
+      list := AppendEntry(list, partEntries[i]);
+  end;
+
+  result := list;
+end;
+
+function DeriveSourceGlobs(const unitPaths : TArray<string>; const projectRoot : string) : TScaffoldSourceEntries;
 var
   pasPaths : TArray<string>;
   incPaths : TArray<string>;
   i : integer;
-  commonPas : string;
-  commonInc : string;
-  list : TArray<string>;
+  globs : TArray<string>;
+  entries : TScaffoldSourceEntries;
+  list : TScaffoldSourceEntries;
 begin
   SetLength(list, 0);
   SetLength(pasPaths, 0);
@@ -1311,29 +1922,27 @@ begin
     end;
   end;
 
-  if Length(pasPaths) > 0 then
+  if projectRoot = '' then
   begin
-    commonPas := CommonParentFolder(pasPaths);
-    if commonPas <> '' then
-      list := AppendGlob(list, commonPas + '/**.pas')
-    else
-      //no common folder - fall back to listing each file
-      for i := 0 to High(pasPaths) do
-        list := AppendGlob(list, pasPaths[i]);
+    //No project root to inspect - fall back to broad folder globs (can't tell
+    //whether the package owns a folder, so assume it does).
+    globs := FolderGlobsFor(pasPaths, '.pas');
+    for i := 0 to High(globs) do
+      list := AppendEntry(list, MakeEntry(globs[i]));
+    globs := FolderGlobsFor(incPaths, '.inc');
+    for i := 0 to High(globs) do
+      list := AppendEntry(list, MakeEntry(globs[i]));
+    exit(list);
   end;
 
-  if Length(incPaths) > 0 then
-  begin
-    commonInc := CommonParentFolder(incPaths);
-    if commonInc <> '' then
-      list := AppendGlob(list, commonInc + '/**.inc')
-    else
-      for i := 0 to High(incPaths) do
-        list := AppendGlob(list, incPaths[i]);
-  end;
+  entries := PreciseGlobs(pasPaths, '.pas', projectRoot);
+  for i := 0 to High(entries) do
+    list := AppendEntry(list, entries[i]);
 
-  //silence unused-parameter warning in XE2 compilers
-  if projectRoot = '' then ;
+  entries := PreciseGlobs(incPaths, '.inc', projectRoot);
+  for i := 0 to High(entries) do
+    list := AppendEntry(list, entries[i]);
+
   result := list;
 end;
 

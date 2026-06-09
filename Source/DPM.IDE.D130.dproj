@@ -5,7 +5,7 @@
         <Config Condition="'$(Config)'==''">Debug</Config>
         <FrameworkType>VCL</FrameworkType>
         <MainSource>DPM.IDE.D130.dpr</MainSource>
-        <Platform Condition="'$(Platform)'==''">Win64</Platform>
+        <Platform Condition="'$(Platform)'==''">Win32</Platform>
         <ProjectGuid>{BC78D9C3-FBC0-476D-9E45-576620BCF1CD}</ProjectGuid>
         <ProjectName Condition="'$(ProjectName)'==''">DPM.IDE.D130</ProjectName>
         <ProjectVersion>20.4</ProjectVersion>

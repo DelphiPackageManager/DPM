@@ -15,6 +15,7 @@ uses
   Vcl.StdCtrls,
   Vcl.ExtCtrls,
   Vcl.ComCtrls,
+  Vcl.CheckLst,
   DPM.Core.Logging,
   DPM.Core.Configuration.Interfaces,
   DPM.Console.Command.Spec.Discovery,
@@ -57,6 +58,8 @@ type
     rgMultiMode : TRadioGroup;
     lblWhich : TLabel;
     cboWhichPackage : TComboBox;
+    lblSelectProjects : TLabel;
+    clbSelectProjects : TCheckListBox;
     lblReview : TLabel;
     mmoReview : TMemo;
     procedure FormCreate(Sender : TObject);
@@ -75,6 +78,7 @@ type
     FConfig : IConfiguration;
     FCtx : TScaffoldContext;
     FLogicalPackages : TLogicalPackages;
+    FSelectable : TSelectableDProjs;
     FDefaultId : string;
     FResultFile : string;
     function IsMultiPackage : boolean;
@@ -238,9 +242,11 @@ end;
 
 procedure TPackageWizardForm.rgMultiModeClick(Sender : TObject);
 begin
-  //index 1 = "pick a single package"
+  //index 1 = "pick a single package", index 2 = "combine selected projects"
   cboWhichPackage.Enabled := rgMultiMode.ItemIndex = 1;
   lblWhich.Enabled := rgMultiMode.ItemIndex = 1;
+  clbSelectProjects.Enabled := rgMultiMode.ItemIndex = 2;
+  lblSelectProjects.Enabled := rgMultiMode.ItemIndex = 2;
 end;
 
 function TPackageWizardForm.LeaveRoot(out msg : string) : boolean;
@@ -406,12 +412,24 @@ begin
   rgMultiMode.Items.Add(Format('Scaffold one %s per package (%d files)',
     [cPackageSpecExt, Length(FLogicalPackages)]));
   rgMultiMode.Items.Add('Scaffold a single ' + cPackageSpecExt + ' (pick which package)');
+  rgMultiMode.Items.Add('Combine selected projects into a single ' + cPackageSpecExt + ' (tick below)');
   rgMultiMode.ItemIndex := 0;
   cboWhichPackage.Items.Clear;
   for i := 0 to High(FLogicalPackages) do
     cboWhichPackage.Items.Add(FLogicalPackages[i].Stem);
   if cboWhichPackage.Items.Count > 0 then
     cboWhichPackage.ItemIndex := 0;
+
+  //flatten runtime/design dprojs into individually-tickable entries, all checked
+  //by default so "combine" starts by including everything.
+  FSelectable := FlattenSelectableDProjs(FLogicalPackages);
+  clbSelectProjects.Items.Clear;
+  for i := 0 to High(FSelectable) do
+  begin
+    clbSelectProjects.Items.Add(FSelectable[i].DisplayLabel);
+    clbSelectProjects.Checked[i] := true;
+  end;
+
   rgMultiModeClick(nil);
 end;
 
@@ -465,6 +483,9 @@ begin
 end;
 
 function TPackageWizardForm.LeaveMultiPackage(out msg : string) : boolean;
+var
+  i : integer;
+  checkedCount : integer;
 begin
   result := false;
   msg := '';
@@ -472,6 +493,23 @@ begin
   begin
     msg := 'Please select a package.';
     exit;
+  end;
+  if rgMultiMode.ItemIndex = 2 then
+  begin
+    checkedCount := 0;
+    for i := 0 to clbSelectProjects.Items.Count - 1 do
+      if clbSelectProjects.Checked[i] then
+        Inc(checkedCount);
+    if checkedCount = 0 then
+    begin
+      msg := 'Please tick at least one project to combine.';
+      exit;
+    end;
+    if Trim(edtId.Text) = '' then
+    begin
+      msg := 'A package id is required for the combined package.';
+      exit;
+    end;
   end;
   result := true;
 end;
@@ -495,6 +533,14 @@ begin
       mmoReview.Lines.Add('Will write : ' + Trim(edtId.Text) + cPackageSpecExt)
     else if rgMultiMode.ItemIndex = 1 then
       mmoReview.Lines.Add('Will write : ' + FLogicalPackages[cboWhichPackage.ItemIndex].Stem + cPackageSpecExt)
+    else if rgMultiMode.ItemIndex = 2 then
+    begin
+      mmoReview.Lines.Add('Will write : ' + Trim(edtId.Text) + cPackageSpecExt + ' (combined)');
+      mmoReview.Lines.Add('Combining the ticked projects:');
+      for i := 0 to High(FSelectable) do
+        if (i < clbSelectProjects.Items.Count) and clbSelectProjects.Checked[i] then
+          mmoReview.Lines.Add('  ' + FSelectable[i].DisplayLabel);
+    end
     else
     begin
       mmoReview.Lines.Add(Format('Will write %d files:', [Length(FLogicalPackages)]));
@@ -562,6 +608,8 @@ var
   i : integer;
   writtenPath : string;
   firstPath : string;
+  selectedIndices : TArray<integer>;
+  selectedLogicals : TLogicalPackages;
 begin
   result := false;
   firstPath := '';
@@ -594,6 +642,29 @@ begin
       effectiveId := FLogicalPackages[idx].Stem;
     FCtx.PackageIds[idx] := effectiveId;
     scaffold := BuildPackageScaffold(FLogicalPackages[idx], FCtx, effectiveId, FLogger);
+    if not WriteScaffoldFile(scaffold, FCtx.RootDir, FLogger, writtenPath) then
+    begin
+      MessageDlg('Failed to write ' + writtenPath, mtError, [mbOK], 0);
+      exit;
+    end;
+    FResultFile := writtenPath;
+    result := true;
+    exit;
+  end;
+
+  if rgMultiMode.ItemIndex = 2 then
+  begin
+    //combine the ticked runtime/design projects into a single dspec.
+    effectiveId := Trim(edtId.Text);
+    SetLength(selectedIndices, 0);
+    for i := 0 to clbSelectProjects.Items.Count - 1 do
+      if clbSelectProjects.Checked[i] then
+      begin
+        SetLength(selectedIndices, Length(selectedIndices) + 1);
+        selectedIndices[High(selectedIndices)] := i;
+      end;
+    selectedLogicals := BuildSelectedLogicals(FSelectable, selectedIndices);
+    scaffold := BuildMergedScaffold(selectedLogicals, FCtx, effectiveId, FLogger);
     if not WriteScaffoldFile(scaffold, FCtx.RootDir, FLogger, writtenPath) then
     begin
       MessageDlg('Failed to write ' + writtenPath, mtError, [mbOK], 0);

@@ -65,6 +65,18 @@ type
                         const provider : ISigningProvider;
                         const signedAttributes : TCmsAttributes;
                         digest : THashAlgorithm) : TBytes;
+    /// <summary>
+    /// Build the certificate chain for the signing leaf and return the
+    /// intermediate CA cert(s) between it and the root (leaf and self-signed
+    /// root excluded). These are embedded alongside the leaf in the author
+    /// SignedData so the gallery server can complete leaf -> intermediate ->
+    /// trusted root. Returns an empty array when no chain can be built (e.g.
+    /// self-signed leaf, or the intermediate isn't installed on the signing
+    /// machine) — the signature then degrades to leaf-only. The returned
+    /// ICertificates own duplicated CERT_CONTEXTs, so callers must keep the
+    /// array alive for the duration of the sign call.
+    /// </summary>
+    function CollectIntermediateCerts(const cert : ICertificate) : TArray<ICertificate>;
   protected
     function Sign(const content : TBytes;
                   const provider : ISigningProvider;
@@ -681,6 +693,36 @@ begin
   end;
 end;
 
+function TCmsService.CollectIntermediateCerts(const cert : ICertificate) : TArray<ICertificate>;
+var
+  chain : ICertificateChain;
+  chainCerts : TArray<ICertificate>;
+  i : integer;
+  count : integer;
+begin
+  SetLength(result, 0);
+  if cert = nil then
+    exit;
+  chain := FX509.CreateChain;
+  // Result ignored on purpose: even a partial / untrusted chain still yields
+  // the intermediates we need, and the signing machine has them installed.
+  // Algorithm-agnostic — CertGetCertificateChain works for RSA and ECDSA alike.
+  chain.Build(cert, []);
+  chainCerts := chain.ChainCertificates;   // leaf first, root last
+  count := 0;
+  // Skip element 0 (the leaf — caller adds it). Skip any self-signed cert
+  // (the root, or a partial-chain self-signed terminal): subject = issuer.
+  for i := 1 to High(chainCerts) do
+  begin
+    if SameText(chainCerts[i].SubjectDistinguishedName,
+                chainCerts[i].IssuerDistinguishedName) then
+      Continue;
+    SetLength(result, count + 1);
+    result[count] := chainCerts[i];
+    Inc(count);
+  end;
+end;
+
 function TCmsService.SignRemote(const content : TBytes;
                                 const provider : ISigningProvider;
                                 const signedAttributes : TCmsAttributes;
@@ -694,6 +736,7 @@ var
   attrsHash : TBytes;
   signatureBytes : TBytes;
   cert : ICertificate;
+  intermediates : TArray<ICertificate>;
   certInfo : PCERT_INFO;
   certDer : TBytes;
   authAttrsArr : array of CRYPT_ATTRIBUTE;
@@ -864,8 +907,16 @@ begin
   // (no [0] EXPLICIT eContent OCTET STRING).
   encapContentInfoDer := DerSequence(EncodeOidValue(szOID_RSA_data));
 
-  // certificates [0] IMPLICIT — exactly one cert in our bag.
+  // certificates [0] IMPLICIT CertificateSet — leaf followed by every
+  // intermediate so the gallery server can complete the chain to a trusted
+  // root. Each Certificate DER is already a SEQUENCE, so concatenating the raw
+  // cert DERs is the correct CertificateSet content (no extra SET wrapper).
+  intermediates := CollectIntermediateCerts(cert);
   certDer := cert.RawDerBytes;
+  for i := 0 to High(intermediates) do
+    certDer := ConcatBytes([certDer, intermediates[i].RawDerBytes]);
+  FLogger.Verbose(Format('  SignRemote: embedding leaf + %d intermediate cert(s)',
+    [Length(intermediates)]));
   certificatesField := DerContext0Implicit(certDer);
 
   signerInfosSetDer := DerSet(signerInfoDer);
@@ -964,7 +1015,8 @@ function TCmsService.Sign(const content : TBytes;
                           digest : THashAlgorithm) : TBytes;
 var
   para : CRYPT_SIGN_MESSAGE_PARA;
-  certs : array[0..0] of PCCERT_CONTEXT;
+  intermediates : TArray<ICertificate>;
+  msgCerts : array of PCCERT_CONTEXT;
   attrs : array of CRYPT_ATTRIBUTE;
   attrValues : array of CRYPT_INTEGER_BLOB;
   attrBytes : array of TBytes;
@@ -1007,19 +1059,29 @@ begin
     attrs[i].rgValue := @attrValues[i];
   end;
 
-  certs[0] := provider.Certificate.GetContext;
+  // Embed the leaf followed by every intermediate so the gallery server can
+  // complete the chain to a trusted root. `intermediates` must stay in scope
+  // until after CryptSignMessage — its ICertificates own the duplicated
+  // CERT_CONTEXTs referenced by msgCerts.
+  intermediates := CollectIntermediateCerts(provider.Certificate);
+  SetLength(msgCerts, 1 + Length(intermediates));
+  msgCerts[0] := provider.Certificate.GetContext;
+  for i := 0 to High(intermediates) do
+    msgCerts[1 + i] := intermediates[i].GetContext;
+  FLogger.Verbose(Format('  Sign: embedding leaf + %d intermediate cert(s)',
+    [Length(intermediates)]));
 
   FillChar(para, SizeOf(para), 0);
   para.cbSize := SizeOf(para);
   para.dwMsgEncodingType := cENCODING_TYPE;
-  para.pSigningCert := certs[0];
+  para.pSigningCert := msgCerts[0];
   // Pin the OID string in a local AnsiString so PAnsiChar(...) doesn't
   // capture a function-return temporary that gets freed before
   // CryptSignMessage reads it (heap-corruption trap — see SignRemote).
   hashAlgOid := TAlgorithmProfile.HashOid(digest);
   para.HashAlgorithm.pszObjId := PAnsiChar(hashAlgOid);
-  para.cMsgCert := 1;
-  para.rgpMsgCert := @certs[0];
+  para.cMsgCert := Length(msgCerts);
+  para.rgpMsgCert := @msgCerts[0];
   if Length(attrs) > 0 then
   begin
     para.cAuthAttr := Length(attrs);

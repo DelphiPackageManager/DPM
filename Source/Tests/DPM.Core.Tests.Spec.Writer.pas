@@ -42,6 +42,7 @@ uses
   System.SysUtils,
   System.StrUtils,
   DPM.Core.Types,
+  DPM.Console.Command.Spec.Discovery,
   DPM.Console.Command.Spec.Writer;
 
 function BaseScaffold : TSpecScaffold;
@@ -53,8 +54,9 @@ begin
   result.Author := 'A';
   result.HasPackagesFolder := True;
   result.PackagesFolderRel := 'packages';
-  SetLength(result.SourceGlobs, 1);
-  result.SourceGlobs[0] := 'src/*.pas';
+  SetLength(result.Sources, 1);
+  result.Sources[0].Glob := 'src/*.pas';
+  SetLength(result.Sources[0].Exclude, 0);
   SetLength(result.BuildDProjs, 1);
   result.BuildDProjs[0] := 'Foo.dproj';
   result.BuildPlatforms := [TDPMPlatform.Win32, TDPMPlatform.Win64];

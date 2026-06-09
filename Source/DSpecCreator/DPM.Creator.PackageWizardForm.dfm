@@ -220,6 +220,21 @@ object PackageWizardForm: TPackageWizardForm
         Style = csDropDownList
         TabOrder = 1
       end
+      object lblSelectProjects: TLabel
+        Left = 32
+        Top = 178
+        Width = 144
+        Height = 15
+        Caption = 'Projects to combine:'
+      end
+      object clbSelectProjects: TCheckListBox
+        Left = 32
+        Top = 198
+        Width = 467
+        Height = 140
+        ItemHeight = 17
+        TabOrder = 2
+      end
     end
     object tsReview: TTabSheet
       Caption = 'Review'

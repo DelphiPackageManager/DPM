@@ -40,12 +40,25 @@ function PromptLineRequired(const prompt : string; out cancelled : boolean) : st
 function PromptYesNo(const prompt : string; const defaultYes : boolean; out cancelled : boolean) : boolean;
 function PromptChoice(const prompt : string; const choices : TPromptChoices; const defaultIdx : integer; out cancelled : boolean) : integer;
 
+/// <summary>
+///  Interactive checkbox list (arrow keys to move, space to toggle, enter to
+///  commit, esc to cancel) built over VSoft.AnsiConsole. Each choice starts
+///  checked/unchecked per defaultChecked (defaults to unchecked when the array
+///  is shorter than choices). On commit, `selected` holds the chosen indices
+///  (0-based into choices) and the result is True. On cancel the result is False
+///  and cancelled is set. Requires at least one item to be selected to commit.
+/// </summary>
+function PromptMultiSelect(const prompt : string; const choices : TPromptChoices;
+  const defaultChecked : array of boolean; out selected : TArray<integer>; out cancelled : boolean) : boolean;
+
 implementation
 
 uses
   System.SysUtils,
   System.Console,
-  System.Console.Types;
+  System.Console.Types,
+  VSoft.AnsiConsole,
+  VSoft.AnsiConsole.Prompts.MultiSelect;
 
 const
   cCancelPrompt = 'Cancel? (y/N): ';
@@ -270,6 +283,52 @@ begin
     end;
     Console.WriteLine('  out of range - please enter a number between 1 and ' + IntToStr(Length(choices)));
   end;
+end;
+
+function PromptMultiSelect(const prompt : string; const choices : TPromptChoices;
+  const defaultChecked : array of boolean; out selected : TArray<integer>; out cancelled : boolean) : boolean;
+var
+  msPrompt : IMultiSelectionPrompt<integer>;
+  i : integer;
+  preset : boolean;
+  chosen : TArray<integer>;
+  sentinel : TArray<integer>;
+begin
+  cancelled := false;
+  SetLength(selected, 0);
+  if Length(choices) = 0 then
+    exit(false);
+
+  msPrompt := MultiSelectionPrompt<integer>.Create
+    .WithTitle(prompt)
+    .WithInstructions('up/down move, space toggle, enter confirm, esc cancel')
+    .Required(1);
+
+  for i := 0 to High(choices) do
+  begin
+    if i <= High(defaultChecked) then
+      preset := defaultChecked[i]
+    else
+      preset := false;
+    msPrompt.AddChoice(i, choices[i], preset);
+  end;
+
+  //Esc returns this sentinel (a single -1) rather than raising EPromptCancelled,
+  //so we can detect cancellation without exception handling. Real selections are
+  //always non-negative indices, so [-1] is unambiguous.
+  SetLength(sentinel, 1);
+  sentinel[0] := -1;
+  msPrompt.WithCancelResult(sentinel);
+
+  chosen := msPrompt.Show(AnsiConsole.Console);
+
+  if (Length(chosen) = 1) and (chosen[0] = -1) then
+  begin
+    cancelled := true;
+    exit(false);
+  end;
+  selected := chosen;
+  result := true;
 end;
 
 end.

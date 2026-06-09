@@ -58,7 +58,8 @@ uses
 
 function PromptMultiPackageMode(const packages : TLogicalPackages; out selectedIdx : integer;
   out cancelled : boolean) : integer;
-//returns 0 for "scaffold all", 1 for "scaffold one" (selectedIdx set), -1 for "cancel"
+//returns 0 for "scaffold all", 1 for "scaffold one" (selectedIdx set),
+//2 for "combine selected projects", -1 for "cancel"
 var
   choices : TPromptChoices;
   topChoice : integer;
@@ -67,10 +68,11 @@ var
 begin
   result := -1;
   selectedIdx := -1;
-  SetLength(choices, 3);
+  SetLength(choices, 4);
   choices[0] := 'Scaffold one .dspec.yaml per package (' + IntToStr(Length(packages)) + ' files)';
   choices[1] := 'Scaffold a single .dspec.yaml (I''ll pick which package)';
-  choices[2] := 'Cancel';
+  choices[2] := 'Combine selected projects into a single .dspec.yaml (pick which)';
+  choices[3] := 'Cancel';
   topChoice := PromptChoice('Multiple package projects detected.', choices, 0, cancelled);
   if cancelled then
     exit;
@@ -86,6 +88,7 @@ begin
           exit;
         result := 1;
       end;
+    2 : result := 2;
   else
     result := -1;
   end;
@@ -119,6 +122,11 @@ var
   i : integer;
   writtenPath : string;
   effectiveId : string;
+  selectableDProjs : TSelectableDProjs;
+  selectChoices : TPromptChoices;
+  selectDefaults : TArray<boolean>;
+  selectedIndices : TArray<integer>;
+  selectedLogicals : TLogicalPackages;
 begin
   TSpecOptions.Default.ApplyCommon(TCommonOptions.Default);
   options := TSpecOptions.Default;
@@ -352,6 +360,53 @@ begin
     if not WriteScaffoldFile(scaffold, rootDir, Logger, writtenPath) then
       exit(TExitCode.Error);
     Logger.Information('Review the generated file and fill in any remaining values.');
+    exit(TExitCode.OK);
+  end;
+
+  if mode = 2 then
+  begin
+    //combine selected projects into one dspec - let the user tick which
+    //runtime/design projects to include (all checked by default).
+    selectableDProjs := FlattenSelectableDProjs(logicalPackages);
+    SetLength(selectChoices, Length(selectableDProjs));
+    SetLength(selectDefaults, Length(selectableDProjs));
+    for i := 0 to High(selectableDProjs) do
+    begin
+      selectChoices[i] := selectableDProjs[i].DisplayLabel;
+      selectDefaults[i] := true;
+    end;
+    if not PromptMultiSelect('Select the projects to combine into one package:',
+         selectChoices, selectDefaults, selectedIndices, cancelled) then
+    begin
+      Logger.Information('Cancelled.');
+      exit(TExitCode.OK);
+    end;
+    selectedLogicals := BuildSelectedLogicals(selectableDProjs, selectedIndices);
+    if Length(selectedLogicals) = 0 then
+    begin
+      Logger.Error('No projects selected.');
+      exit(TExitCode.OK);
+    end;
+
+    //resolve the package id for the combined dspec
+    if options.PackageId <> '' then
+      effectiveId := options.PackageId
+    else
+    begin
+      if defaultId <> '' then
+        effectiveId := PromptLine('Package id', defaultId, cancelled)
+      else
+        effectiveId := PromptLineRequired('Package id', cancelled);
+      if cancelled then exit(TExitCode.OK);
+      if Trim(effectiveId) = '' then
+        effectiveId := defaultId;
+    end;
+
+    scaffold := BuildMergedScaffold(selectedLogicals, ctx, effectiveId, Logger);
+    if not WriteScaffoldFile(scaffold, rootDir, Logger, writtenPath) then
+      exit(TExitCode.Error);
+    Logger.Information('Combined ' + IntToStr(Length(selectedLogicals)) + ' project(s) into ' +
+      writtenPath + '. Review and fill in any remaining values.');
     exit(TExitCode.OK);
   end;
 
