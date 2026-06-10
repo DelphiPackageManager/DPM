@@ -220,6 +220,11 @@ var
   authorEntry : TAuthorTrustEntry;
   repoEntry : TRepositoryTrustEntry;
   hasAuthor, hasRepo : boolean;
+  attempt : integer;
+  lastError : cardinal;
+const
+  cReplaceMaxAttempts = 10;
+  cReplaceRetryDelayMs = 25;
 begin
   dir := ExtractFilePath(FFilePath);
   if (dir <> '') and not DirectoryExists(dir) then
@@ -276,10 +281,27 @@ begin
 
     tempPath := FFilePath + '.tmp';
     TFile.WriteAllText(tempPath, sb.ToString, TEncoding.UTF8);
-    if FileExists(FFilePath) then
-      DeleteFile(FFilePath);
-    if not RenameFile(tempPath, FFilePath) then
-      raise ETrust.CreateFmt('Failed to atomically replace %s', [FFilePath]);
+    // MoveFileEx with MOVEFILE_REPLACE_EXISTING is the real atomic replace - it
+    // swaps the temp file over the target in a single syscall (no delete-then-
+    // rename gap). Retry a few times because an AV scanner or the search indexer
+    // routinely holds a brief handle on a just-written file, which surfaces as a
+    // transient sharing violation. FullReVerify rewrites this file once per
+    // package in a tight loop, so it hits that window far more often than a
+    // one-off save would.
+    attempt := 0;
+    while not MoveFileEx(PChar(tempPath), PChar(FFilePath),
+      MOVEFILE_REPLACE_EXISTING or MOVEFILE_WRITE_THROUGH) do
+    begin
+      lastError := GetLastError;
+      Inc(attempt);
+      if (attempt >= cReplaceMaxAttempts) or
+         ((lastError <> ERROR_SHARING_VIOLATION) and
+          (lastError <> ERROR_ACCESS_DENIED) and
+          (lastError <> ERROR_LOCK_VIOLATION)) then
+        raise ETrust.CreateFmt('Failed to atomically replace %s (error %d)',
+          [FFilePath, lastError]);
+      Sleep(cReplaceRetryDelayMs);
+    end;
   finally
     sb.Free;
   end;
