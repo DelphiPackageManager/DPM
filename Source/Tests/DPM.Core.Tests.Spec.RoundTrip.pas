@@ -53,6 +53,8 @@ type
     procedure Creator_ExpandCollapse_Preserves_Full;
 
     procedure Bundled_Dependency_Alias_And_Sentinel_Load;
+
+    procedure Version_Token_RoundTrips_And_Resolves;
   end;
 
 implementation
@@ -535,6 +537,60 @@ begin
   //round-trip: generate yaml and reload - the sentinel must survive serialization.
   reloaded := RoundTrip(spec);
   AssertBothBundled(reloaded, 'round-trip');
+end;
+
+procedure TSpecRoundTripTests.Version_Token_RoundTrips_And_Resolves;
+const
+  cYaml =
+    'metadata:'#13#10 +
+    '  id: Test.VersionToken'#13#10 +
+    '  version: 2.3.4'#13#10 +
+    '  description: version token test'#13#10 +
+    '  authors:'#13#10 +
+    '    - Vincent Parrett'#13#10 +
+    '  license: Apache-2.0'#13#10 +
+    'targetPlatforms:'#13#10 +
+    '  - compiler: 12.0'#13#10 +
+    '    platforms: [Win32, Win64]'#13#10 +
+    '    template: default'#13#10 +
+    'templates:'#13#10 +
+    '  - name: default'#13#10 +
+    '    dependencies:'#13#10 +
+    '      - id: Test.Sibling'#13#10 +
+    '        version: $version$'#13#10;
+
+  function FindDep(const spec : IPackageSpec) : ISpecDependency;
+  begin
+    result := spec.Templates[0].FindDependency('Test.Sibling');
+  end;
+
+var
+  reader : IPackageSpecReader;
+  spec : IPackageSpec;
+  dep : ISpecDependency;
+  pkgVersion : TPackageVersion;
+  yaml : string;
+begin
+  reader := TPackageSpecReader.Create(TTestLogger.Create);
+  spec := reader.ReadSpecString(cYaml);
+  Assert.IsNotNull(spec, 'spec should load');
+  Assert.IsNotNull(FindDep(spec), 'dependency should load');
+
+  //editor path (no pack): an unresolved $version$ token must survive serialization unchanged,
+  //rather than being flattened to an empty/bogus version range.
+  yaml := spec.GenerateDspecYAML(spec.MetaData.Version);
+  Assert.IsTrue(Pos('$version$', yaml) > 0, 'unresolved token must round-trip in the generated yaml');
+
+  //pack path: resolve to this package's own version - a fixed range matching metadata.version.
+  pkgVersion := spec.MetaData.Version;
+  dep := FindDep(spec);
+  dep.ResolveVersionToken(pkgVersion);
+  Assert.AreEqual(pkgVersion.ToStringNoMeta, dep.Version.ToString, 'token must resolve to the package version');
+
+  //once resolved the token is gone - the concrete version is serialized instead.
+  yaml := spec.GenerateDspecYAML(pkgVersion);
+  Assert.IsTrue(Pos('$version$', yaml) = 0, 'resolved dependency must not re-emit the token');
+  Assert.AreEqual(pkgVersion.ToStringNoMeta, FindDep(reader.ReadSpecString(yaml)).Version.ToString, 'resolved version must round-trip');
 end;
 
 initialization

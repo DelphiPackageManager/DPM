@@ -92,6 +92,7 @@ type
     edtFileEntryDest : TEdit;
     lbFileEntryExclude : TListBox;
     btnAddExclude : TButton;
+    btnEditExclude : TButton;
     btnDeleteExclude : TButton;
     crdBuild : TCard;
     lblBuild : TLabel;
@@ -317,6 +318,8 @@ type
     envVariablesList : TValueListEditor;
     procedure FormDestroy(Sender : TObject);
     procedure btnAddExcludeClick(Sender : TObject);
+    procedure btnEditExcludeClick(Sender : TObject);
+    procedure lbFileEntryExcludeDblClick(Sender : TObject);
     procedure btnAddTemplateClick(Sender : TObject);
     procedure btnBuildPackagesClick(Sender : TObject);
     procedure btnCancelPackClick(Sender : TObject);
@@ -605,6 +608,43 @@ begin
     entry.exclude.Add(src);
     lbFileEntryExclude.Items.Add(src);
   end;
+end;
+
+procedure TDSpecCreatorForm.btnEditExcludeClick(Sender : TObject);
+var
+  itemIndex : integer;
+  oldExclude : string;
+  newExclude : string;
+  excludeIndex : integer;
+  entry : ISpecSourceEntry;
+begin
+  itemIndex := lbFileEntryExclude.ItemIndex;
+  if itemIndex < 0 then
+    Exit;
+
+  if Assigned(tvTemplates.Selected) then
+  begin
+    entry := (tvTemplates.Selected as TTemplateTreeNode).sourceEntry;
+    if not Assigned(entry) then
+      Exit;
+
+    oldExclude := lbFileEntryExclude.Items[itemIndex];
+    newExclude := Trim(InputBox('Edit Exclude', 'Exclude', oldExclude));
+    if (newExclude = '') or (newExclude = oldExclude) then
+      Exit;
+
+    excludeIndex := entry.exclude.IndexOf(oldExclude);
+    if excludeIndex < 0 then
+      Exit;
+
+    entry.exclude[excludeIndex] := newExclude;
+    lbFileEntryExclude.Items[itemIndex] := newExclude;
+  end;
+end;
+
+procedure TDSpecCreatorForm.lbFileEntryExcludeDblClick(Sender : TObject);
+begin
+  btnEditExcludeClick(Sender);
 end;
 
 procedure TDSpecCreatorForm.btnAddTemplateClick(Sender : TObject);
@@ -1735,16 +1775,17 @@ end;
 procedure TDSpecCreatorForm.edtDependencyVersionChange(Sender : TObject);
 var
   ver : TVersionRange;
+  versionText : string;
 begin
   if Assigned(tvTemplates.Selected) then
   begin
-    if Length(edtDependencyVersion.Text) > 0 then
+    versionText := Trim(edtDependencyVersion.Text);
+    //accept the $version$ token (resolved to the package version at pack time) as well as any
+    //parseable range. Only commit when valid so partial typing doesn't corrupt the model.
+    if (versionText <> '') and (SameText(versionText, cVersionToken) or TVersionRange.TryParse(versionText, ver)) then
     begin
-      if TVersionRange.TryParse(edtDependencyVersion.Text, ver) then
-      begin
-        (tvTemplates.Selected as TTemplateTreeNode).dependency.Version := ver;
-        (tvTemplates.Selected as TTemplateTreeNode).Text := edtDependencyId.Text + ' - ' + edtDependencyVersion.Text;
-      end;
+      (tvTemplates.Selected as TTemplateTreeNode).dependency.VersionString := versionText;
+      (tvTemplates.Selected as TTemplateTreeNode).Text := edtDependencyId.Text + ' - ' + versionText;
     end;
   end;
 end;
@@ -1892,6 +1933,7 @@ end;
 procedure TDSpecCreatorForm.actAddDependencyExecute(Sender : TObject);
 var
   dependancyId : string;
+  dependencyVersion : string;
   DependencyForm : TDependencyForm;
   dependency : ISpecDependency;
   ver : TVersionRange;
@@ -1907,13 +1949,10 @@ begin
     if dependancyId.IsEmpty then
       Exit;
     dependency := FTemplate.NewDependency(dependancyId);
-    if Length(DependencyForm.edtVersion.Text) > 0 then
-    begin
-      if TVersionRange.TryParse(DependencyForm.edtVersion.Text, ver) then
-      begin
-        dependency.Version := ver;
-      end;
-    end;
+    dependencyVersion := Trim(DependencyForm.edtVersion.Text);
+    //accept the $version$ token (resolved to the package version at pack time) or a parseable range.
+    if (dependencyVersion <> '') and (SameText(dependencyVersion, cVersionToken) or TVersionRange.TryParse(dependencyVersion, ver)) then
+      dependency.VersionString := dependencyVersion;
   finally
     FreeAndNil(DependencyForm);
   end;
@@ -2458,7 +2497,7 @@ function TDSpecCreatorForm.LoadDependency(const parentNode : TTemplateTreeNode; 
 var
   sNode : string;
 begin
-  sNode := dependency.id + ' - ' + dependency.Version.ToString();
+  sNode := dependency.id + ' - ' + dependency.VersionString;
   result := tvTemplates.Items.AddChild(parentNode, sNode) as TTemplateTreeNode;
   result.dependency := dependency;
   result.Template := template;
@@ -3151,10 +3190,9 @@ begin
         end;
       ntDependency :
         begin
-          if not lNode.dependency.Version.IsEmpty then
-            edtDependencyVersion.Text := lNode.dependency.Version.ToString
-          else
-            edtDependencyVersion.Text := '';
+          //VersionString shows the $version$ token (when used) rather than the empty range it
+          //resolves from, and returns '' when no version is set.
+          edtDependencyVersion.Text := lNode.dependency.VersionString;
           edtDependencyId.Text := lNode.dependency.id;
           CardPanel.ActiveCard := crdDependency;
         end;

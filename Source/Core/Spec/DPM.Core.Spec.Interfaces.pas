@@ -61,9 +61,19 @@ type
     procedure SetId(const id: string);
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
+    function GetVersionString : string;
+    procedure SetVersionString(const value : string);
+    /// <summary> If this dependency's version was authored as the $version$ token, resolve it to a
+    /// fixed range on the supplied package version. No-op for any other (already concrete) version. </summary>
+    procedure ResolveVersionToken(const version : TPackageVersion);
     function Clone : ISpecDependency;
     property Id : string read GetId write SetId;
     property Version : TVersionRange read GetVersionRange write SetVersionRange;
+    /// <summary> The version as authored text: the literal $version$ token when this dependency uses
+    /// it (still unresolved), an empty string when no version is set, otherwise the range's string
+    /// form. Setting it accepts the $version$ token or any parseable range. Use this (not Version) for
+    /// UI binding so the token survives editing instead of being flattened to an empty range. </summary>
+    property VersionString : string read GetVersionString write SetVersionString;
   end;
 
 

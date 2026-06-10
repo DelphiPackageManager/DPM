@@ -528,18 +528,28 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Anchors = [akLeft, akTop, akRight]
             ItemHeight = 15
             TabOrder = 2
+            OnDblClick = lbFileEntryExcludeDblClick
           end
           object btnAddExclude: TButton
-            Left = 96
+            Left = 16
             Top = 293
-            Width = 75
+            Width = 88
             Height = 25
             Caption = 'Add Exclude'
             TabOrder = 4
             OnClick = btnAddExcludeClick
           end
+          object btnEditExclude: TButton
+            Left = 147
+            Top = 293
+            Width = 88
+            Height = 25
+            Caption = 'Edit Exclude'
+            TabOrder = 5
+            OnClick = btnEditExcludeClick
+          end
           object btnDeleteExclude: TButton
-            Left = 225
+            Left = 293
             Top = 293
             Width = 88
             Height = 25

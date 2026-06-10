@@ -68,6 +68,11 @@ type
     //patterns at pack time rather than at install time on every consumer's machine.
     FArchivePaths : IList<string>;
 
+    //The package's internal root. Normally the dspec's folder, but when the dspec lives in a
+    //sub-folder and references content above it via '..\', this is the deepest common ancestor of
+    //every referenced path so the archive mirrors the on-disk layout without any '..' segments.
+    FEffectiveBasePath : string;
+
     //Canonical (forward-slash, NFC, exact-case) archive paths of every PE binary (.bpl/.dll/.exe)
     //added to the package. Auto-derived during source processing and emitted into the package's
     //dspec as 'precompiledBinaries' so the gallery can cross-check shipped binaries against the
@@ -82,6 +87,16 @@ type
 
     procedure ProcessPattern(const basePath, dest : string; const pattern : IFileSystemPattern; const excludeMatcher : IFileMatcher; var fileCount : integer);
     procedure ProcessEntry(const basePath : string; const antPattern : IAntPattern; const source, dest : string; const exclude : IList<string>);
+
+    /// <summary> Determines the package's internal root: the deepest folder that is a common ancestor
+    /// of the dspec folder and every path the spec references (source globs, readme, icon, build/design/
+    /// packagedef projects). Archive paths are then computed relative to this so '..\' references resolve
+    /// to clean, root-relative entries. </summary>
+    function ComputeEffectiveBasePath(const basePath : string; const spec : IPackageSpec; const template : ISpecTemplate) : string;
+
+    /// <summary> Resolves an authored (possibly '..\'-relative) path against basePath and expresses it
+    /// relative to FEffectiveBasePath - the archive-relative form. Returns forward-slash separators. </summary>
+    function ToEffectiveRelative(const basePath, value : string) : string;
 
     procedure ValidateBuildEntries(const template : ISpecTemplate; const antPattern : IAntPattern);
 
@@ -171,6 +186,52 @@ begin
   result := value;
   if TStringUtils.StartsWith(result, '.\') then
     Delete(result, 1, 2);
+end;
+
+//Longest common directory prefix (by path segment, case-insensitive) of a set of absolute
+//directory paths. Returns '' when there is no common prefix (eg different drives). Used to find
+//the package's effective root when paths reach above the dspec folder via '..\'.
+function LongestCommonDirPath(const dirs : TArray<string>) : string;
+var
+  i, j : integer;
+  refSegs : TArray<string>;
+  curSegs : TArray<string>;
+  commonLen : integer;
+
+  function SegsOf(const path : string) : TArray<string>;
+  begin
+    //XE2 treats TStringDynArray (SplitString's result) and TArray<string> as distinct - hard-cast.
+    result := TArray<string>(SplitString(StringReplace(ExcludeTrailingPathDelimiter(path), '/', '\', [rfReplaceAll]), '\'));
+  end;
+
+begin
+  result := '';
+  if Length(dirs) = 0 then
+    exit;
+
+  refSegs := SegsOf(dirs[0]);
+  commonLen := Length(refSegs);
+  for i := 1 to High(dirs) do
+  begin
+    curSegs := SegsOf(dirs[i]);
+    if Length(curSegs) < commonLen then
+      commonLen := Length(curSegs);
+    j := 0;
+    while (j < commonLen) and SameText(refSegs[j], curSegs[j]) do
+      Inc(j);
+    commonLen := j;
+    if commonLen = 0 then
+      break;
+  end;
+
+  for j := 0 to commonLen - 1 do
+    if result = '' then
+      result := refSegs[j]
+    else
+      result := result + PathDelim + refSegs[j];
+
+  if result <> '' then
+    result := IncludeTrailingPathDelimiter(result);
 end;
 
 
@@ -343,6 +404,10 @@ begin
           design.LibVersion := regEx.Replace(design.LibVersion, evaluator);
       end;
 
+      //resolve any dependency authored with the $version$ token to this package's own version.
+      for i := 0 to template.Dependencies.Count -1 do
+        template.Dependencies[i].ResolveVersionToken(version);
+
       //environment variable values are the ONLY place install-time processing happens. They get the
       //normal pack-time tokens (spec/targetPlatform variables + built-in compiler tokens) via a
       //dedicated evaluator that additionally preserves the install-time $packageDir$ token for the
@@ -483,6 +548,7 @@ var
   fsPatterns : TArray<IFileSystemPattern>;
   fsPattern : IFileSystemPattern;
   searchBasePath : string;
+  stripBasePath : string;
   fileCount : integer;
   actualDest : string;
   actualSource : string;
@@ -503,17 +569,25 @@ begin
 
   actualSource := StripCurrent(source);
 
-  if dest = '' then
-    actualDest := ExtractFilePath(actualSource)
-  else
-    actualDest := dest;
-
-
-  actualDest := StripCurrent(actualDest);
-  actualDest := ExcludeTrailingPathDelimiter(actualDest);
-
   searchBasePath := TPathUtils.StripWildCard(TPathUtils.CompressRelativePath(basePath, actualSource));
   searchBasePath := ExtractFilePath(searchBasePath);
+
+  if dest = '' then
+  begin
+    //No explicit destination: mirror the source tree under the package's effective root, so a
+    //'..\Sources\Core\Foo.pas' lands at 'Sources\Core\Foo.pas' rather than escaping with '..'.
+    //Strip relative to the effective root and let dest be empty.
+    stripBasePath := IncludeTrailingPathDelimiter(FEffectiveBasePath);
+    actualDest := '';
+  end
+  else
+  begin
+    //Explicit destination: files keep their position relative to the glob's base folder, placed
+    //under dest. This is the long-standing behaviour for authored dest values.
+    stripBasePath := searchBasePath;
+    actualDest := StripCurrent(dest);
+    actualDest := ExcludeTrailingPathDelimiter(actualDest);
+  end;
 
   fsPatterns := antPattern.Expand(actualSource);
   fileCount := 0;
@@ -529,10 +603,77 @@ begin
   end;
 
   for fsPattern in fsPatterns do
-    ProcessPattern(searchBasePath, actualDest, fsPattern, fileMatcher, fileCount);
+    ProcessPattern(stripBasePath, actualDest, fsPattern, fileMatcher, fileCount);
 
   if fileCount = 0 then
     FLogger.Warning('No files were found for pattern [' + source + ']');
+end;
+
+
+function TPackageWriter.ComputeEffectiveBasePath(const basePath : string; const spec : IPackageSpec; const template : ISpecTemplate) : string;
+var
+  dirs : IList<string>;
+  sourceEntry : ISpecSourceEntry;
+  buildEntry : ISpecBuildEntry;
+  designEntry : ISpecDesignEntry;
+  packageDef : ISpecPackageDefinition;
+  fileGlob : string;
+
+  procedure AddPathDir(const value : string; const isGlob : boolean);
+  var
+    resolved : string;
+  begin
+    if Trim(value) = '' then
+      exit;
+    resolved := TPathUtils.CompressRelativePath(basePath, StringReplace(Trim(value), '/', '\', [rfReplaceAll]));
+    if isGlob then
+      resolved := TPathUtils.StripWildCard(resolved);
+    dirs.Add(ExtractFilePath(resolved));
+  end;
+
+begin
+  dirs := TCollections.CreateList<string>;
+  //Always include the dspec folder so the effective root never descends below it.
+  dirs.Add(IncludeTrailingPathDelimiter(basePath));
+
+  AddPathDir(spec.MetaData.Icon, false);
+  AddPathDir(spec.MetaData.ReadMe, false);
+
+  for sourceEntry in template.SourceEntries do
+    AddPathDir(sourceEntry.Source, true);
+
+  for buildEntry in template.BuildEntries do
+    AddPathDir(buildEntry.Project, false);
+
+  for designEntry in template.DesignEntries do
+    AddPathDir(designEntry.Project, false);
+
+  for packageDef in template.PackageDefinitions do
+  begin
+    AddPathDir(packageDef.Project, false);
+    for fileGlob in packageDef.Files do
+      AddPathDir(fileGlob, true);
+  end;
+
+  result := LongestCommonDirPath(dirs.ToArray);
+  if result = '' then
+    result := IncludeTrailingPathDelimiter(basePath);
+end;
+
+
+function TPackageWriter.ToEffectiveRelative(const basePath, value : string) : string;
+var
+  resolved : string;
+begin
+  if Trim(value) = '' then
+    exit('');
+  resolved := TPathUtils.CompressRelativePath(basePath, StringReplace(Trim(value), '/', '\', [rfReplaceAll]));
+  //StripBase returns the root-relative remainder when the path is under the effective root, or just
+  //the file name when it sits outside it (which then lands at the archive root).
+  result := TPathUtils.StripBase(IncludeTrailingPathDelimiter(FEffectiveBasePath), resolved);
+  result := StringReplace(result, '\', '/', [rfReplaceAll]);
+  if TStringUtils.StartsWith(result, '/') then
+    Delete(result, 1, 1);
 end;
 
 
@@ -619,9 +760,15 @@ var
 
   template : ISpecTemplate;
   sourceEntry : ISpecSourceEntry;
+  buildEntry : ISpecBuildEntry;
+  designEntry : ISpecDesignEntry;
+  packageDef : ISpecPackageDefinition;
   i : integer;
   archiveValidation : TArchiveValidationResult;
   manifest : IPackageManifest;
+  iconPath : string;
+  readmePath : string;
+  readmeArchiveName : string;
 begin
   result := false;
 
@@ -643,7 +790,12 @@ begin
   platforms := targetPlatform.Platforms;
   packageFileName := reducedSpec.MetaData.Id + '-' + CompilerToString(targetPlatform.Compiler) + '-' + DPMPlatformsToBinString(platforms) + '-' + version.ToStringNoMeta + cPackageFileExt;
   packageFileName := IncludeTrailingPathDelimiter(outputFolder) + packageFileName;
-  FArchiveWriter.SetBasePath(basePath);
+
+  //Work out the package's internal root. When the dspec sits in a sub-folder and reaches above it
+  //via '..\', this resolves to the common ancestor (eg the repo root) so every archive entry is a
+  //clean, root-relative path. For a dspec at the root of its content this is just basePath.
+  FEffectiveBasePath := ComputeEffectiveBasePath(basePath, reducedSpec, template);
+  FArchiveWriter.SetBasePath(FEffectiveBasePath);
   if not FArchiveWriter.Open(packageFileName) then
   begin
     FLogger.Warning('Could not open package file [' + packageFileName + '] - skipping');
@@ -658,13 +810,34 @@ begin
     reducedSpec.MetaData.Icon := Trim(reducedSpec.MetaData.Icon);
     if reducedSpec.MetaData.Icon <> '' then
     begin
-      if FArchiveWriter.AddIcon(reducedSpec.MetaData.Icon) then
-        reducedSpec.MetaData.Icon := GetIconArchiveFileName(reducedSpec.MetaData.Icon);
+      //Resolve relative to the dspec's folder (basePath). The dspec usually lives in a sub-folder,
+      //so icon/readme paths are commonly authored as '..\something' - resolve those here rather than
+      //leaving them relative to the process working directory.
+      iconPath := TPathUtils.CompressRelativePath(basePath, reducedSpec.MetaData.Icon);
+      if not FileExists(iconPath) then
+      begin
+        FLogger.Error('Icon file not found : ' + iconPath);
+        exit;
+      end;
+      if FArchiveWriter.AddIcon(iconPath) then
+        reducedSpec.MetaData.Icon := GetIconArchiveFileName(iconPath);
     end;
 
     reducedSpec.MetaData.ReadMe := Trim(reducedSpec.MetaData.ReadMe);
     if reducedSpec.MetaData.ReadMe <> '' then
-      FArchiveWriter.AddFile(ApplyBase(basePath,reducedSpec.MetaData.ReadMe));
+    begin
+      readmePath := TPathUtils.CompressRelativePath(basePath, reducedSpec.MetaData.ReadMe);
+      if not FileExists(readmePath) then
+      begin
+        FLogger.Error('Readme file not found : ' + readmePath);
+        exit;
+      end;
+      //Store the readme relative to the package's effective root (mirroring its on-disk location),
+      //so a '..\README.md' lands at 'README.md' rather than escaping the archive with a '..' segment.
+      readmeArchiveName := ToEffectiveRelative(basePath, reducedSpec.MetaData.ReadMe);
+      FArchiveWriter.AddFile(readmePath, readmeArchiveName);
+      reducedSpec.MetaData.ReadMe := readmeArchiveName;
+    end;
 
     antPattern := TAntPattern.Create(basePath);
 
@@ -681,6 +854,20 @@ begin
     //Every build/design entry's dproj must be covered by a source entry,
     //otherwise install will fail on every consumer when MSBuild tries to load the missing file.
     ValidateBuildEntries(template, antPattern);
+
+    //Rewrite build/design/packagedef project (and packagedef file) paths into the same archive-relative
+    //form used when packing the source files, so install can find the dproj/files inside the package
+    //regardless of how they were authored ('..\Sources\X.dproj' -> 'Sources/X.dproj').
+    for buildEntry in template.BuildEntries do
+      buildEntry.Project := ToEffectiveRelative(basePath, buildEntry.Project);
+    for designEntry in template.DesignEntries do
+      designEntry.Project := ToEffectiveRelative(basePath, designEntry.Project);
+    for packageDef in template.PackageDefinitions do
+    begin
+      packageDef.Project := ToEffectiveRelative(basePath, packageDef.Project);
+      for i := 0 to packageDef.Files.Count - 1 do
+        packageDef.Files[i] := ToEffectiveRelative(basePath, packageDef.Files[i]);
+    end;
 
     //we don't want these in the dspec
     template.SourceEntries.Clear;

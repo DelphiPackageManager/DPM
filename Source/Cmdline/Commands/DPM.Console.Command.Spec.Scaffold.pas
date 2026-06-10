@@ -506,7 +506,6 @@ var
   licenseLeaf : string;
   readmeLeaf : string;
   targets : TArray<TSpecTargetInfo>;
-  unionPlatforms : TDPMPlatforms;
   designPlatforms : TDPMPlatforms;
   targetIdx : integer;
   buildDProjs : TArray<string>;
@@ -580,16 +579,14 @@ begin
   scaffold.HasPackagesFolder := ctx.HasPackages;
   scaffold.PackagesFolderRel := ctx.PackagesRel;
 
-  //5. Build platforms = union across target compilers. Design platforms respect
-  //   the IDE's supported bitness (Win32 always, Win64 from Delphi 12).
-  unionPlatforms := [];
+  //5. Build entries inherit the targetPlatform's platforms - we leave the build
+  //   entry platforms empty rather than emitting an explicit per-entry override,
+  //   which is rarely wanted. Design platforms respect the IDE's supported bitness
+  //   (Win32 always, Win64 from Delphi 12).
   designPlatforms := [];
   for targetIdx := 0 to High(targets) do
-  begin
-    unionPlatforms := unionPlatforms + targets[targetIdx].Platforms;
     designPlatforms := designPlatforms + DesignTimePlatforms(targets[targetIdx].Compiler);
-  end;
-  scaffold.BuildPlatforms := unionPlatforms;
+  scaffold.BuildPlatforms := [];
   if (Length(designDProjs) > 0) and (designPlatforms = []) then
     designPlatforms := [TDPMPlatform.Win32];
   scaffold.DesignPlatforms := designPlatforms;
@@ -666,7 +663,6 @@ var
   i, k : integer;
   targets : TArray<TSpecTargetInfo>;
   perTargets : TArray<TSpecTargetInfo>;
-  unionPlatforms : TDPMPlatforms;
   designPlatforms : TDPMPlatforms;
   targetIdx : integer;
   buildDProjs : TArray<string>;
@@ -763,16 +759,14 @@ begin
   scaffold.HasPackagesFolder := ctx.HasPackages;
   scaffold.PackagesFolderRel := ctx.PackagesRel;
 
-  //4. Build platforms = union across target compilers. Design platforms respect
-  //   the IDE's supported bitness (Win32 always, Win64 from Delphi 12).
-  unionPlatforms := [];
+  //4. Build entries inherit the targetPlatform's platforms - we leave the build
+  //   entry platforms empty rather than emitting an explicit per-entry override,
+  //   which is rarely wanted. Design platforms respect the IDE's supported bitness
+  //   (Win32 always, Win64 from Delphi 12).
   designPlatforms := [];
   for targetIdx := 0 to High(targets) do
-  begin
-    unionPlatforms := unionPlatforms + targets[targetIdx].Platforms;
     designPlatforms := designPlatforms + DesignTimePlatforms(targets[targetIdx].Compiler);
-  end;
-  scaffold.BuildPlatforms := unionPlatforms;
+  scaffold.BuildPlatforms := [];
   if (Length(designDProjs) > 0) and (designPlatforms = []) then
     designPlatforms := [TDPMPlatform.Win32];
   scaffold.DesignPlatforms := designPlatforms;

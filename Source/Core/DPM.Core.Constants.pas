@@ -100,6 +100,11 @@ const
   cBundledDependencyVersion = '999.999.999';
   cBundledDependencyToken = 'bundled';
 
+  //token an author may use as a dependency version to mean "the same version as this package".
+  //Recognised at parse time and resolved to the package's own version at pack time (see
+  //ISpecDependency.ResolveVersionToken / TPackageWriter.ReplaceTokens).
+  cVersionToken = '$version$';
+
   cUserAgentHeader = 'User-Agent';
   cDPMUserAgent  = 'DPM ' + cDPMClientVersion;
   cClientVersionHeader = 'Client-Version';

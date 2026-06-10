@@ -47,6 +47,9 @@ type
     procedure SetId(const Id: string);
     function GetVersionRange : TVersionRange;
     procedure SetVersionRange(const value : TVersionRange);
+    function GetVersionString : string;
+    procedure SetVersionString(const value : string);
+    procedure ResolveVersionToken(const version : TPackageVersion);
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
     constructor CreateClone(const logger : ILogger; const id : string; const version : TVersionRange; const versionString : string);
@@ -97,6 +100,33 @@ begin
   result := FVersion;
 end;
 
+function TSpecDependency.GetVersionString : string;
+begin
+  //the authored text: the unresolved token, else the range (empty string when nothing is set) so
+  //the UI can display/round-trip $version$ rather than the empty range that FVersion would show.
+  if FVersionString = cVersionToken then
+    result := cVersionToken
+  else if FVersion.IsEmpty then
+    result := ''
+  else
+    result := FVersion.ToString;
+end;
+
+procedure TSpecDependency.SetVersionString(const value : string);
+var
+  range : TVersionRange;
+begin
+  if SameText(Trim(value), cVersionToken) then
+    //defer - resolved to the package's own version at pack time (ResolveVersionToken).
+    FVersionString := cVersionToken
+  else
+  begin
+    FVersionString := '';
+    if TVersionRange.TryParse(value, range) then
+      FVersion := range;
+  end;
+end;
+
 
 function TSpecDependency.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var
@@ -122,7 +152,8 @@ begin
     result := false;
 
   end
-  else if sValue = '$version$' then
+  else if sValue = cVersionToken then
+    //deferred - resolved to this package's own version at pack time (ResolveVersionToken).
     FVersionString := sValue
   else if SameText(sValue, cBundledDependencyToken) then
     //friendly alias for a dependency on an IDE-bundled library (e.g. Indy)
@@ -134,6 +165,18 @@ begin
   end;
 end;
 
+procedure TSpecDependency.ResolveVersionToken(const version : TPackageVersion);
+begin
+  //only the $version$ token is deferred at parse time; every other version is already a concrete
+  //range in FVersion. Resolve to a fixed range on this package's version and clear the token so
+  //ToYAML writes the resolved version.
+  if FVersionString = cVersionToken then
+  begin
+    FVersion := TVersionRange.Create(version);
+    FVersionString := '';
+  end;
+end;
+
 procedure TSpecDependency.SetId(const Id: string);
 begin
   FId := Id;
@@ -142,6 +185,9 @@ end;
 procedure TSpecDependency.SetVersionRange(const value : TVersionRange);
 begin
   FVersion := value;
+  //a concrete range supersedes any pending $version$ token (e.g. the user edited the version away
+  //from the token in the UI) so ToYAML / resolution don't keep treating it as the token.
+  FVersionString := '';
 end;
 
 procedure TSpecDependency.ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);
@@ -150,7 +196,12 @@ var
 begin
   mapping := parent.AsSequence.AddMapping;
   mapping.S['id'] := FId;
-  mapping.S['version'] := FVersion.ToString;
+  //preserve an unresolved $version$ token (editor round-trip); once resolved at pack time
+  //FVersionString is cleared and FVersion holds the concrete version.
+  if FVersionString = cVersionToken then
+    mapping.S['version'] := FVersionString
+  else
+    mapping.S['version'] := FVersion.ToString;
 end;
 
 end.
