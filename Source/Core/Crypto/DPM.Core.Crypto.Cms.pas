@@ -1114,6 +1114,7 @@ var
   contentPtr : array[0..0] of Pointer;
   contentSize : array[0..0] of DWORD;
   ctx : PCCERT_CONTEXT;
+  signerDer : TBytes;
 begin
   signerCert := nil;
   result := false;
@@ -1144,13 +1145,19 @@ begin
       'der=%d bytes, content=%d bytes, GetLastError=0x%.8x',
       [Length(der), Length(content), GetLastError]));
 
-  if result and (ctx <> nil) then
-    signerCert := FX509.LoadCertificateFromDer(
-      Self.Decode(der).EmbeddedCertificates[0].RawDerBytes);
-  // The cleaner path is to wrap ctx via X509 — but we don't own a public
-  // CertContext-wrapping constructor on the interface. The DER round-trip
-  // above keeps lifetime ownership clean. The verifier already has the
-  // signer's leaf cert embedded in the CMS, so this is cheap.
+  // ctx is the certificate Windows actually verified the signature against —
+  // the signer leaf, identified by the SignerInfo's IssuerAndSerialNumber.
+  // We MUST use it directly: author signatures now embed leaf + intermediate
+  // CA cert(s), so EmbeddedCertificates[0] is NOT guaranteed to be the leaf
+  // (the CMSG_CERT_PARAM enumeration order is unspecified and frequently puts
+  // the intermediate first). Round-trip ctx's own DER rather than wrapping the
+  // context, which keeps lifetime ownership clean.
+  if result and (ctx <> nil) and (ctx.cbCertEncoded > 0) then
+  begin
+    SetLength(signerDer, ctx.cbCertEncoded);
+    Move(ctx.pbCertEncoded^, signerDer[0], ctx.cbCertEncoded);
+    signerCert := FX509.LoadCertificateFromDer(signerDer);
+  end;
 
   if ctx <> nil then
     CertFreeCertificateContext(ctx);
@@ -1300,31 +1307,72 @@ end;
 
 function TCmsSignedData.DecodeSignerCert : ICertificate;
 var
+  certInfoSize : DWORD;
+  certInfoBuf : TBytes;
+  pSignerCertInfo : PCERT_INFO;
+  hStore : HCERTSTORE;
+  pCtx : PCCERT_CONTEXT;
+  der : TBytes;
   count : DWORD;
   countSize : DWORD;
-  i : integer;
   size : DWORD;
-  der : TBytes;
 begin
   result := nil;
+
+  // Select the signer by its IssuerAndSerialNumber — NEVER just take cert[0].
+  // Author signatures now embed the leaf followed by intermediate CA cert(s)
+  // so the gallery can complete the chain. The CMSG_CERT_PARAM enumeration
+  // order is unspecified and Windows frequently returns the intermediate at
+  // index 0, so picking cert[0] would mis-report the intermediate as the
+  // signer (wrong SPKI -> author<->repo binding check fails, false trust-change
+  // prompts on install). CMSG_SIGNER_CERT_INFO_PARAM gives the signer's
+  // Issuer + SerialNumber; CertGetSubjectCertificateFromStore then pulls the
+  // exact matching cert out of the message's certificate bag.
+  certInfoSize := 0;
+  if CryptMsgGetParam(FMsg, CMSG_SIGNER_CERT_INFO_PARAM, 0, nil, certInfoSize) and
+     (certInfoSize > 0) then
+  begin
+    SetLength(certInfoBuf, certInfoSize);
+    if CryptMsgGetParam(FMsg, CMSG_SIGNER_CERT_INFO_PARAM, 0, @certInfoBuf[0], certInfoSize) then
+    begin
+      pSignerCertInfo := PCERT_INFO(@certInfoBuf[0]);
+      hStore := CertOpenStore(CERT_STORE_PROV_MSG, cENCODING_TYPE, 0, 0, FMsg);
+      if hStore <> nil then
+      try
+        pCtx := CertGetSubjectCertificateFromStore(hStore, cENCODING_TYPE, pSignerCertInfo);
+        if (pCtx <> nil) and (pCtx.cbCertEncoded > 0) then
+        try
+          SetLength(der, pCtx.cbCertEncoded);
+          Move(pCtx.pbCertEncoded^, der[0], pCtx.cbCertEncoded);
+          result := FX509.LoadCertificateFromDer(der);
+        finally
+          CertFreeCertificateContext(pCtx);
+        end;
+      finally
+        CertCloseStore(hStore, 0);
+      end;
+    end;
+  end;
+
+  if result <> nil then
+    exit;
+
+  // Fallback: signer-identity lookup unavailable (e.g. a hand-assembled CMS
+  // that omits the matching cert, or an older message shape). Degrade to the
+  // first embedded certificate so single-cert blobs still resolve a signer.
   countSize := SizeOf(count);
   if not CryptMsgGetParam(FMsg, CMSG_CERT_COUNT_PARAM, 0, @count, countSize) then
     exit;
-  for i := 0 to Integer(count) - 1 do
-  begin
-    size := 0;
-    if not CryptMsgGetParam(FMsg, CMSG_CERT_PARAM, i, nil, size) then
-      Continue;
-    SetLength(der, size);
-    if not CryptMsgGetParam(FMsg, CMSG_CERT_PARAM, i, @der[0], size) then
-      Continue;
-    SetLength(der, size);
-    // For Phase 1 we take the first certificate; if there were multiple
-    // SignerInfos we would match by SignerInfo.IssuerAndSerialNumber.
-    result := FX509.LoadCertificateFromDer(der);
-    if i = 0 then
-      exit;
-  end;
+  if count = 0 then
+    exit;
+  size := 0;
+  if not CryptMsgGetParam(FMsg, CMSG_CERT_PARAM, 0, nil, size) then
+    exit;
+  SetLength(der, size);
+  if not CryptMsgGetParam(FMsg, CMSG_CERT_PARAM, 0, @der[0], size) then
+    exit;
+  SetLength(der, size);
+  result := FX509.LoadCertificateFromDer(der);
 end;
 
 procedure TCmsSignedData.DecodeEmbeddedCerts;

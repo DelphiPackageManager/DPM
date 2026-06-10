@@ -311,6 +311,7 @@ const
 
   // Cert store provider IDs — CertOpenStore takes lpszStoreProvider as
   // either a string pointer or a small integer cast to PAnsiChar.
+  CERT_STORE_PROV_MSG        = PAnsiChar(1);
   CERT_STORE_PROV_MEMORY     = PAnsiChar(2);
   CERT_STORE_PROV_FILENAME_A = PAnsiChar(7);
   CERT_STORE_PROV_FILENAME_W = PAnsiChar(8);
@@ -599,6 +600,13 @@ function CertFindCertificateInStore(hCertStore : HCERTSTORE;
                                     dwCertEncodingType, dwFindFlags, dwFindType : DWORD;
                                     pvFindPara : Pointer;
                                     pPrevCertContext : PCCERT_CONTEXT) : PCCERT_CONTEXT; stdcall; external cCrypt32;
+
+// Returns the cert in the store whose Issuer + SerialNumber match the supplied
+// CERT_INFO. Used to resolve a CMS signer leaf out of a bag that also carries
+// intermediate CA certs (where enumeration order can't be relied on).
+function CertGetSubjectCertificateFromStore(hCertStore : HCERTSTORE;
+                                            dwCertEncodingType : DWORD;
+                                            pCertId : PCERT_INFO) : PCCERT_CONTEXT; stdcall; external cCrypt32;
 
 function CertEnumCertificatesInStore(hCertStore : HCERTSTORE;
                                      pPrevCertContext : PCCERT_CONTEXT) : PCCERT_CONTEXT; stdcall; external cCrypt32;
