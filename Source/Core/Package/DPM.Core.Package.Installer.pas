@@ -534,6 +534,22 @@ var
   designPlatforms: TDPMPlatforms;
   designProjectEditor: IProjectEditor;
   effectivePlatform: TDPMPlatform;
+
+  //Build/design `project` paths are relative to the extracted package root, but are authored
+  //with a leading separator (e.g. '/packages/..') and forward slashes. TPath.Combine treats a
+  //leading separator as a rooted path and discards packagePath, so normalise the separators and
+  //strip any leading one first - mirroring how TAntPattern.Combine handles source patterns.
+  function ResolveProjectFile(const projectPath : string) : string;
+  var
+    relativePath : string;
+  begin
+    relativePath := StringReplace(projectPath, '/', PathDelim, [rfReplaceAll]);
+    if (relativePath <> '') and (relativePath[1] = PathDelim) then
+      Delete(relativePath, 1, 1);
+    result := TPath.Combine(packagePath, relativePath);
+    result := TPathUtils.CompressRelativePath('', result);
+  end;
+
 begin
   result := true;
   packagePath := FPackageCache.GetPackagePath(packageInfo);
@@ -616,8 +632,7 @@ begin
       continue;
 
     FLogger.Information('Building project: ' + buildEntry.Project);
-    projectFile := TPath.Combine(packagePath, buildEntry.Project);
-    projectFile := TPathUtils.CompressRelativePath('', projectFile);
+    projectFile := ResolveProjectFile(buildEntry.Project);
 
     result := Compiler.BuildProject(cancellationToken, effectivePlatform, projectFile, configuration, packageInfo.Version, false);
     if result then
@@ -641,7 +656,7 @@ begin
   // per-platform install/restore calls - each call contributes its matching design BPL.
   for designEntry in template.DesignEntries do
   begin
-    projectFile := TPath.Combine(packagePath, designEntry.Project);
+    projectFile := ResolveProjectFile(designEntry.Project);
 
     supportedByCompiler := DesignTimePlatforms(Compiler.compilerVersion);
 

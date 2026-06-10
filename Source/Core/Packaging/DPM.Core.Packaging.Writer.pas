@@ -319,7 +319,9 @@ begin
       for i := 0 to template.BuildEntries.Count -1 do
       begin
         build := template.BuildEntries[i];
-        build.Project := regEx.Replace(build.Project, evaluator);
+        //Trim stray whitespace - a trailing space on the project path (easy to leave in a
+        //dspec) would otherwise propagate into the manifest and break MSBuild at install time.
+        build.Project := Trim(regEx.Replace(build.Project, evaluator));
         if build.Defines <> '' then
           build.Defines := regEx.Replace(build.Defines, evaluator);
       end;
@@ -327,7 +329,7 @@ begin
       for i := 0 to template.DesignEntries.Count -1 do
       begin
         design := template.DesignEntries[i];
-        design.Project := regEx.Replace(design.Project, evaluator);
+        design.Project := Trim(regEx.Replace(design.Project, evaluator));
         if design.Defines <> '' then
           design.Defines := regEx.Replace(design.Defines, evaluator);
 
@@ -544,7 +546,11 @@ var
 
   function NormalisedProjectPath(const value : string) : string;
   begin
-    result := StringReplace(value, '/', '\', [rfReplaceAll]);
+    //Trim first - ConvertAntToRegexString trims source patterns and anchors them with ^..$,
+    //so a trailing/leading space on a build or design project path would never match an
+    //otherwise-covering source entry (and would also miss the exact-path FArchivePaths compare).
+    result := Trim(value);
+    result := StringReplace(result, '/', '\', [rfReplaceAll]);
     result := TPathUtils.CompressRelativePath(result);
     result := LowerCase(result);
   end;
