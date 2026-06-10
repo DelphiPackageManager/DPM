@@ -1238,8 +1238,18 @@ begin
   try
     if FExtractionVerified.Contains(key) then
     begin
-      result := true;
-      exit;
+      //The cache is a session-long singleton in the IDE, so this memo can outlive the
+      //extraction on disk if the user deletes the package folder by hand (e.g. while
+      //testing). Confirm the folder + dspec are still present before trusting it - if
+      //they're gone, drop the stale key and fall through to re-extract / re-download.
+      packageFolder := GetPackagePath(packageId);
+      if DirectoryExists(packageFolder) and
+         FileExists(IncludeTrailingPathDelimiter(packageFolder) + cPackageDspecFile) then
+      begin
+        result := true;
+        exit;
+      end;
+      FExtractionVerified.Remove(key);
     end;
   finally
     FCacheLock.Leave;
