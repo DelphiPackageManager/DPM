@@ -87,7 +87,7 @@ var
 begin
   if not StdinIsTty then
   begin
-    FLogger.Error('  Non-interactive session — blocking. Set ' +
+    FLogger.Error('  Non-interactive session - blocking. Set ' +
       'signing.authorDowngradePolicy=allow in dpm.config.yaml to override.');
     decision := tpdBlockOnce;
     result := false;
