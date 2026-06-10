@@ -653,12 +653,16 @@ begin
   FArchivePaths := TCollections.CreateList<string>;
   FPrecompiledBinaries := TCollections.CreateList<string>;
   try
+    //Trim stray whitespace on path values - the YAML reader preserves trailing spaces in
+    //quoted scalars, which would break file lookups (icon/readme) and pattern matching (source).
+    reducedSpec.MetaData.Icon := Trim(reducedSpec.MetaData.Icon);
     if reducedSpec.MetaData.Icon <> '' then
     begin
       if FArchiveWriter.AddIcon(reducedSpec.MetaData.Icon) then
         reducedSpec.MetaData.Icon := GetIconArchiveFileName(reducedSpec.MetaData.Icon);
     end;
 
+    reducedSpec.MetaData.ReadMe := Trim(reducedSpec.MetaData.ReadMe);
     if reducedSpec.MetaData.ReadMe <> '' then
       FArchiveWriter.AddFile(ApplyBase(basePath,reducedSpec.MetaData.ReadMe));
 
@@ -666,10 +670,10 @@ begin
 
     for sourceEntry in template.SourceEntries do
     begin
-      sourceEntry.Source := StringReplace(sourceEntry.Source, '/','\',[rfReplaceAll]);
-      sourceEntry.Destination := StringReplace(sourceEntry.Destination, '/','\',[rfReplaceAll]);
+      sourceEntry.Source := StringReplace(Trim(sourceEntry.Source), '/','\',[rfReplaceAll]);
+      sourceEntry.Destination := StringReplace(Trim(sourceEntry.Destination), '/','\',[rfReplaceAll]);
       for i := 0 to sourceEntry.Exclude.Count -1 do
-        sourceEntry.Exclude[i] := StringReplace(sourceEntry.Exclude[i], '/','\',[rfReplaceAll]);
+        sourceEntry.Exclude[i] := StringReplace(Trim(sourceEntry.Exclude[i]), '/','\',[rfReplaceAll]);
 
       ProcessEntry(basePath,antPattern, sourceEntry.Source, sourceEntry.Destination, sourceEntry.Exclude);
     end;
