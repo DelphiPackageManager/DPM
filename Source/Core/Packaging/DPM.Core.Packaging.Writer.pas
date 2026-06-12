@@ -98,6 +98,13 @@ type
     /// relative to FEffectiveBasePath - the archive-relative form. Returns forward-slash separators. </summary>
     function ToEffectiveRelative(const basePath, value : string) : string;
 
+    /// <summary> Rewrites a source entry's glob into the archive-relative form its files were packed to,
+    /// so install can re-expand it against the extracted package. Mirrors ProcessEntry's placement:
+    /// no dest -> files mirror the source tree under the effective root (use ToEffectiveRelative);
+    /// explicit dest -> files sit under dest keeping their position relative to the glob's base folder
+    /// (use dest + the glob's wildcard tail). Returns forward-slash separators. </summary>
+    function BuildCopyToLibGlob(const basePath, source, dest : string) : string;
+
     procedure ValidateBuildEntries(const template : ISpecTemplate; const antPattern : IAntPattern);
 
     /// <summary> Rejects any package that declares a reserved/banned IDE environment variable name. </summary>
@@ -677,6 +684,40 @@ begin
 end;
 
 
+function TPackageWriter.BuildCopyToLibGlob(const basePath, source, dest : string) : string;
+var
+  normalisedSource : string;
+  baseDir : string;
+  tail : string;
+  normalisedDest : string;
+begin
+  if Trim(dest) = '' then
+  begin
+    //No dest: ProcessEntry mirrors the source tree under the effective root, so the files land at
+    //their effective-base-relative path - the same transform ToEffectiveRelative applies (wildcards
+    //survive CompressRelativePath/StripBase unchanged).
+    result := ToEffectiveRelative(basePath, source);
+    exit;
+  end;
+
+  //Explicit dest: files keep their position relative to the glob's base folder, placed under dest.
+  //So the archive glob is dest + the wildcard tail of the source (the part after its base folder).
+  normalisedSource := StripCurrent(StringReplace(Trim(source), '/', '\', [rfReplaceAll]));
+  baseDir := TPathUtils.GlobBaseDir(source);
+  if baseDir <> '' then
+    tail := TPathUtils.StripBase(IncludeTrailingPathDelimiter(baseDir), normalisedSource)
+  else
+    tail := normalisedSource;
+  if TStringUtils.StartsWith(tail, '\') then
+    Delete(tail, 1, 1);
+
+  normalisedDest := ExcludeTrailingPathDelimiter(StripCurrent(StringReplace(Trim(dest), '/', '\', [rfReplaceAll])));
+  result := StringReplace(normalisedDest + '\' + tail, '\', '/', [rfReplaceAll]);
+  if TStringUtils.StartsWith(result, '/') then
+    Delete(result, 1, 1);
+end;
+
+
 procedure TPackageWriter.ValidateBuildEntries(const template : ISpecTemplate; const antPattern : IAntPattern);
 var
   buildEntry  : ISpecBuildEntry;
@@ -760,6 +801,8 @@ var
 
   template : ISpecTemplate;
   sourceEntry : ISpecSourceEntry;
+  copyToLibEntry : ISpecSourceEntry;
+  copyToBinEntry : ISpecSourceEntry;
   buildEntry : ISpecBuildEntry;
   designEntry : ISpecDesignEntry;
   packageDef : ISpecPackageDefinition;
@@ -867,6 +910,38 @@ begin
       packageDef.Project := ToEffectiveRelative(basePath, packageDef.Project);
       for i := 0 to packageDef.Files.Count - 1 do
         packageDef.Files[i] := ToEffectiveRelative(basePath, packageDef.Files[i]);
+    end;
+
+    //Re-home any copyToLib-flagged source entries into the template-level copyToLib list before we
+    //drop the source entries. The matched files are already in the archive (packed by their own source
+    //entry above); install re-expands these globs against the extracted package and copies the matches
+    //into lib\{platform}. Store only the archive-relative src - excluded files never made it into the
+    //archive, so excludes are redundant at install time, and dest is baked into the rewritten glob.
+    for sourceEntry in template.SourceEntries do
+    begin
+      if not sourceEntry.CopyToLib then
+        continue;
+      copyToLibEntry := sourceEntry.Clone;
+      copyToLibEntry.Source := BuildCopyToLibGlob(basePath, sourceEntry.Source, sourceEntry.Destination);
+      copyToLibEntry.Destination := '';
+      copyToLibEntry.CopyToLib := false;
+      copyToLibEntry.Exclude.Clear;
+      template.CopyToLibEntries.Add(copyToLibEntry);
+    end;
+
+    //Re-home any copyToBin-flagged source entries into the template-level copyToBin list, same as
+    //copyToLib above but the entry's CopyToBin platform is preserved - install copies the matches
+    //into bpl\{platform} only when installing for that platform.
+    for sourceEntry in template.SourceEntries do
+    begin
+      if sourceEntry.CopyToBin = TDPMPlatform.UnknownPlatform then
+        continue;
+      copyToBinEntry := sourceEntry.Clone;
+      copyToBinEntry.Source := BuildCopyToLibGlob(basePath, sourceEntry.Source, sourceEntry.Destination);
+      copyToBinEntry.Destination := '';
+      copyToBinEntry.CopyToLib := false;
+      copyToBinEntry.Exclude.Clear;
+      template.CopyToBinEntries.Add(copyToBinEntry);
     end;
 
     //we don't want these in the dspec

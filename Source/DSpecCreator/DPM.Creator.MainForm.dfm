@@ -405,6 +405,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Items.Strings = (
           'Win32'
           'Win64'
+          'WinARM64EC'
           'MacOS32'
           'MacOS64'
           'MacOSARM64'
@@ -508,6 +509,15 @@ object DSpecCreatorForm: TDSpecCreatorForm
             TabOrder = 0
             OnChange = edtFileEntrySourceChange
           end
+          object chkFileEntryCopyToLib: TCheckBox
+            Left = 16
+            Top = 89
+            Width = 297
+            Height = 17
+            Caption = 'Copy matched files to lib\{platform} on install'
+            TabOrder = 6
+            OnClick = chkFileEntryCopyToLibClick
+          end
           object edtFileEntryDest: TEdit
             Left = 16
             Top = 134
@@ -556,6 +566,22 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Caption = 'Delete Exclude'
             TabOrder = 3
             OnClick = btnDeleteExcludeClick
+          end
+          object lblFileEntryCopyToBin: TLabel
+            Left = 16
+            Top = 336
+            Width = 145
+            Height = 15
+            Caption = 'Copy to bpl\{platform} for:'
+          end
+          object cboFileEntryCopyToBin: TComboBox
+            Left = 16
+            Top = 354
+            Width = 250
+            Height = 23
+            Style = csDropDownList
+            TabOrder = 7
+            OnChange = cboFileEntryCopyToBinChange
           end
         end
         object crdBuild: TCard
@@ -633,6 +659,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Items.Strings = (
               'Win32'
               'Win64'
+              'WinARM64EC'
               'MacOS32'
               'MacOS64'
               'MacOSARM64'
@@ -768,6 +795,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Items.Strings = (
               'Win32'
               'Win64'
+              'WinARM64EC'
               'MacOS32'
               'MacOS64'
               'MacOSARM64'
@@ -1146,6 +1174,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Items.Strings = (
               'Win32'
               'Win64'
+              'WinARM64EC'
               'MacOS32'
               'MacOS64'
               'MacOSARM64'

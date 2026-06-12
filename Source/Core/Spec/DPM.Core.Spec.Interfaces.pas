@@ -148,14 +148,28 @@ type
     function GetSource : string;
     function GetDestination : string;
     function GetExclude : IList<string>;
+    function GetCopyToLib : boolean;
+    function GetCopyToBin : TDPMPlatform;
     procedure SetSource(const value : string);
     procedure SetDestination(const value : string);
+    procedure SetCopyToLib(const value : boolean);
+    procedure SetCopyToBin(const value : TDPMPlatform);
 
     function Clone : ISpecSourceEntry;
 
     property Source : string read GetSource write SetSource;
     property Destination : string read GetDestination write SetDestination;
     property Exclude : IList<string>read GetExclude;
+    //When true, the files matched by this source entry are also copied into lib\{platform}
+    //at install time (flattened). Authored on the source entry; carried into the packed spec
+    //as the template-level copyToLib list since source entries are stripped during pack.
+    property CopyToLib : boolean read GetCopyToLib write SetCopyToLib;
+    //When set to a real platform (not UnknownPlatform), the files matched by this source entry
+    //are copied into bpl\{platform} at install time (flattened), but only when installing for
+    //that platform - used for native DLLs a runtime/design BPL needs to load. Authored on the
+    //source entry; carried into the packed spec as the template-level copyToBin list since
+    //source entries are stripped during pack.
+    property CopyToBin : TDPMPlatform read GetCopyToBin write SetCopyToBin;
   end;
 
   ISpecBuildEntry = interface(ISpecNode)
@@ -262,6 +276,8 @@ type
     function GetDesignFiles : IList<ISpecDesignEntry>;
     function GetDependencies : IList<ISpecDependency>;
     function GetBuildEntries : IList<ISpecBuildEntry>;
+    function GetCopyToLibEntries : IList<ISpecSourceEntry>;
+    function GetCopyToBinEntries : IList<ISpecSourceEntry>;
     function GetPackageDefinitions : IList<ISpecPackageDefinition>;
     function GetPrecompiledBinaries : IList<string>;
     function GetEnvironmentVariables : IVariables;
@@ -302,6 +318,15 @@ type
     property SourceEntries : IList<ISpecSourceEntry>read GetSourceFiles;
     property BuildEntries : IList<ISpecBuildEntry>read GetBuildEntries;
     property DesignEntries: IList<ISpecDesignEntry> read GetDesignFiles;
+    /// <summary> Source globs (archive-relative) whose matched files should also be copied, flattened,
+    /// into lib\{platform} at install time. Populated at pack time from source entries flagged
+    /// copyToLib, since the source entries themselves are stripped from the packed spec. </summary>
+    property CopyToLibEntries : IList<ISpecSourceEntry> read GetCopyToLibEntries;
+    /// <summary> Source globs (archive-relative) whose matched files should be copied, flattened,
+    /// into bpl\{platform} at install time - but only when installing for the entry's platform.
+    /// Populated at pack time from source entries flagged copyToBin, since the source entries
+    /// themselves are stripped from the packed spec. </summary>
+    property CopyToBinEntries : IList<ISpecSourceEntry> read GetCopyToBinEntries;
     property PackageDefinitions : IList<ISpecPackageDefinition> read GetPackageDefinitions;
     /// <summary> Precompiled Windows PE binaries (.bpl/.dll/.exe) this package ships, declared as
     /// archive-relative paths (forward slashes) exactly as they appear inside the .dpkg. Auto-derived

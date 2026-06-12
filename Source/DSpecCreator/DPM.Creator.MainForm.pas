@@ -90,6 +90,9 @@ type
     edtFileEntrySource : TEdit;
     lblDest : TLabel;
     edtFileEntryDest : TEdit;
+    chkFileEntryCopyToLib : TCheckBox;
+    lblFileEntryCopyToBin : TLabel;
+    cboFileEntryCopyToBin : TComboBox;
     lbFileEntryExclude : TListBox;
     btnAddExclude : TButton;
     btnEditExclude : TButton;
@@ -352,6 +355,8 @@ type
     procedure edtDependencyVersionChange(Sender : TObject);
     procedure edtFileEntrySourceChange(Sender : TObject);
     procedure edtFileEntryDestChange(Sender : TObject);
+    procedure chkFileEntryCopyToLibClick(Sender : TObject);
+    procedure cboFileEntryCopyToBinChange(Sender : TObject);
     procedure edtIdChange(Sender : TObject);
     procedure edtProjectChange(Sender : TObject);
     procedure edtProjectURLChange(Sender : TObject);
@@ -496,6 +501,7 @@ type
 
     procedure SetCheckListPlatforms(const clb : TCheckListBox; const platforms : TDPMPlatforms);
     function GetCheckListPlatforms(const clb : TCheckListBox) : TDPMPlatforms;
+    procedure PopulateCopyToBinCombo;
 
     function LoadSourceNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const sourceEntry : ISpecSourceEntry) : TTemplateTreeNode;
     procedure LoadSourceNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecSourceEntry>);
@@ -1597,6 +1603,23 @@ begin
   end;
 end;
 
+procedure TDSpecCreatorForm.PopulateCopyToBinCombo;
+var
+  copyToBinPlatform : TDPMPlatform;
+begin
+  cboFileEntryCopyToBin.Items.BeginUpdate;
+  try
+    cboFileEntryCopyToBin.Items.Clear;
+    //item 0 means 'no copyToBin' - mapped to UnknownPlatform.
+    cboFileEntryCopyToBin.Items.Add('None');
+    for copyToBinPlatform := Succ(TDPMPlatform.UnknownPlatform) to High(TDPMPlatform) do
+      cboFileEntryCopyToBin.Items.Add(DPMPlatformToString(copyToBinPlatform));
+  finally
+    cboFileEntryCopyToBin.Items.EndUpdate;
+  end;
+  cboFileEntryCopyToBin.ItemIndex := 0;
+end;
+
 procedure TDSpecCreatorForm.CreatingPackages1Click(Sender : TObject);
 begin
   UriClick('https://docs.delphi.dev/getting-started/creating-packages.html');
@@ -1810,6 +1833,30 @@ begin
     end;
     edtFileEntryDest.Hint := str;
   end;
+end;
+
+procedure TDSpecCreatorForm.chkFileEntryCopyToLibClick(Sender : TObject);
+begin
+  if FLoadingCard then
+    exit;
+  if Assigned(tvTemplates.Selected) then
+    (tvTemplates.Selected as TTemplateTreeNode).sourceEntry.CopyToLib := chkFileEntryCopyToLib.Checked;
+end;
+
+procedure TDSpecCreatorForm.cboFileEntryCopyToBinChange(Sender : TObject);
+var
+  copyToBinPlatform : TDPMPlatform;
+begin
+  if FLoadingCard then
+    exit;
+  if not Assigned(tvTemplates.Selected) then
+    exit;
+  //item 0 is 'None' (= UnknownPlatform, ignored); the rest are real platform names.
+  if cboFileEntryCopyToBin.ItemIndex <= 0 then
+    copyToBinPlatform := TDPMPlatform.UnknownPlatform
+  else
+    copyToBinPlatform := StringToDPMPlatform(cboFileEntryCopyToBin.Items[cboFileEntryCopyToBin.ItemIndex]);
+  (tvTemplates.Selected as TTemplateTreeNode).sourceEntry.CopyToBin := copyToBinPlatform;
 end;
 
 function TDSpecCreatorForm.AddRootTemplateNode(template : ISpecTemplate) : TTemplateTreeNode;
@@ -2732,6 +2779,7 @@ begin
   FUploading := false;
   FSPDXList := TStringList.Create;
   LoadSPDXList;
+  PopulateCopyToBinCombo;
   LoadDspecStructure;
   FtmpFilename := '';
   PageControl.ActivePage := tsInfo;
@@ -3182,6 +3230,11 @@ begin
         begin
           edtFileEntrySource.Text := lNode.sourceEntry.Source;
           edtFileEntryDest.Text := lNode.sourceEntry.Destination;
+          chkFileEntryCopyToLib.Checked := lNode.sourceEntry.CopyToLib;
+          if lNode.sourceEntry.CopyToBin = TDPMPlatform.UnknownPlatform then
+            cboFileEntryCopyToBin.ItemIndex := 0
+          else
+            cboFileEntryCopyToBin.ItemIndex := cboFileEntryCopyToBin.Items.IndexOf(DPMPlatformToString(lNode.sourceEntry.CopyToBin));
           lbFileEntryExclude.Clear;
           for i := 0 to lNode.sourceEntry.exclude.Count - 1 do
             lbFileEntryExclude.Items.Add(lNode.sourceEntry.exclude[i]);

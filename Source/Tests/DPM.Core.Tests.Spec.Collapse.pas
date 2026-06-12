@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -192,7 +192,7 @@ begin
   entry := collapsed[0];
   Assert.AreEqual(Ord(TCompilerVersion.UnknownVersion), Ord(entry.Compiler));
   Assert.AreEqual(Ord(TCompilerVersion.UnknownVersion), Ord(entry.MinCompiler), 'a list, not a range');
-  Assert.AreEqual(3, Length(entry.Compilers));
+  Assert.AreEqual<integer>(3, Length(entry.Compilers));
 end;
 
 procedure TSpecCollapseTests.Package_Variables_Survive_Round_Trip;

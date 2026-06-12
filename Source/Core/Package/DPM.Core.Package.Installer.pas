@@ -550,6 +550,104 @@ var
     result := TPathUtils.CompressRelativePath('', result);
   end;
 
+  //Copy the files matched by the template's copyToLib globs (archive-relative, e.g. 'Source/**/*.dfm')
+  //into lib\{platform}, flattened - companion files like .dfm/.res that aren't in the precompiled
+  //.dcu/.dcp but the consumer's compiler still needs on the search path. The matched files were
+  //extracted from the package alongside the source, so we glob the package folder and copy each match.
+  procedure CopyCopyToLibFiles;
+  var
+    copyEntry : ISpecSourceEntry;
+    libAntPattern : IAntPattern;
+    patterns : TArray<IFileSystemPattern>;
+    pattern : IFileSystemPattern;
+    sourceGlob : string;
+    files : TStringDynArray;
+    srcFile : string;
+    targetFile : string;
+  begin
+    if not template.CopyToLibEntries.Any then
+      exit;
+    libAntPattern := TAntPattern.Create(packagePath);
+    for copyEntry in template.CopyToLibEntries do
+    begin
+      sourceGlob := StringReplace(copyEntry.Source, '/', PathDelim, [rfReplaceAll]);
+      if (sourceGlob <> '') and (sourceGlob[1] = PathDelim) then
+        Delete(sourceGlob, 1, 1);
+      patterns := libAntPattern.Expand(sourceGlob);
+      for pattern in patterns do
+      begin
+        if not TDirectory.Exists(pattern.Directory) then
+          continue;
+        files := TDirectory.GetFiles(pattern.Directory, pattern.FileMask, TSearchOption.soTopDirectoryOnly);
+        for srcFile in files do
+        begin
+          //Flatten - everything lands directly in lib\{platform} next to the .dcu/.dcp, no folder mirroring.
+          targetFile := TPath.Combine(Compiler.LibOutputDir, ExtractFileName(srcFile));
+          if FileExists(targetFile) and TFileUtils.AreSameFiles(srcFile, targetFile) then
+            continue;
+          try
+            ForceDirectories(Compiler.LibOutputDir);
+            TFile.Copy(srcFile, targetFile, true);
+            FLogger.Debug('Copied [' + ExtractFileName(srcFile) + '] to lib for package [' + packageInfo.Id + '].');
+          except
+            on e : Exception do
+              FLogger.Warning('Unable to copy [' + srcFile + '] to lib during install: ' + e.Message);
+          end;
+        end;
+      end;
+    end;
+  end;
+
+  //Copy the files matched by the template's copyToBin globs into bpl\{platform}, flattened - native
+  //dlls a runtime/design BPL needs to load. Each entry carries the platform it applies to; we only
+  //copy when that platform matches the platform currently being built (Win64/Win64x are interchangeable).
+  procedure CopyCopyToBinFiles;
+  var
+    copyEntry : ISpecSourceEntry;
+    binAntPattern : IAntPattern;
+    patterns : TArray<IFileSystemPattern>;
+    pattern : IFileSystemPattern;
+    sourceGlob : string;
+    files : TStringDynArray;
+    srcFile : string;
+    targetFile : string;
+  begin
+    if not template.CopyToBinEntries.Any then
+      exit;
+    binAntPattern := TAntPattern.Create(packagePath);
+    for copyEntry in template.CopyToBinEntries do
+    begin
+      //Only copy entries whose platform applies to the platform being built right now.
+      if not PlatformSatisfiedBy(effectivePlatform, [copyEntry.CopyToBin]) then
+        continue;
+      sourceGlob := StringReplace(copyEntry.Source, '/', PathDelim, [rfReplaceAll]);
+      if (sourceGlob <> '') and (sourceGlob[1] = PathDelim) then
+        Delete(sourceGlob, 1, 1);
+      patterns := binAntPattern.Expand(sourceGlob);
+      for pattern in patterns do
+      begin
+        if not TDirectory.Exists(pattern.Directory) then
+          continue;
+        files := TDirectory.GetFiles(pattern.Directory, pattern.FileMask, TSearchOption.soTopDirectoryOnly);
+        for srcFile in files do
+        begin
+          //Flatten - everything lands directly in bpl\{platform} next to the .bpl, no folder mirroring.
+          targetFile := TPath.Combine(Compiler.BPLOutputDir, ExtractFileName(srcFile));
+          if FileExists(targetFile) and TFileUtils.AreSameFiles(srcFile, targetFile) then
+            continue;
+          try
+            ForceDirectories(Compiler.BPLOutputDir);
+            TFile.Copy(srcFile, targetFile, true);
+            FLogger.Debug('Copied [' + ExtractFileName(srcFile) + '] to bpl for package [' + packageInfo.Id + '].');
+          except
+            on e : Exception do
+              FLogger.Warning('Unable to copy [' + srcFile + '] to bpl during install: ' + e.Message);
+          end;
+        end;
+      end;
+    end;
+  end;
+
 begin
   result := true;
   packagePath := FPackageCache.GetPackagePath(packageInfo);
@@ -698,6 +796,12 @@ begin
     end;
     FLogger.Success('Design package [' + designEntry.Project + '] build succeeded.');
   end;
+
+  // Copy any copyToLib companion files (.dfm/.res/etc) into lib\{platform} now that it has been built.
+  CopyCopyToLibFiles;
+
+  // Copy any copyToBin files (native dlls) into bpl\{platform} for the platform just built.
+  CopyCopyToBinFiles;
 
   // Save the bill of materials file for future reference
   TBOMFile.SaveToFile(FLogger, bomFile, packageReference);

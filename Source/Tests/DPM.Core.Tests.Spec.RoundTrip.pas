@@ -55,6 +55,12 @@ type
     procedure Bundled_Dependency_Alias_And_Sentinel_Load;
 
     procedure Version_Token_RoundTrips_And_Resolves;
+
+    procedure SourceEntry_CopyToLib_RoundTrips;
+    procedure Template_CopyToLib_List_RoundTrips;
+
+    procedure SourceEntry_CopyToBin_RoundTrips;
+    procedure Template_CopyToBin_List_RoundTrips;
   end;
 
 implementation
@@ -251,8 +257,14 @@ begin
       asrc := at.FindSourceEntry(es.Source);
       Assert.IsTrue(asrc <> nil, ctx + ' missing source ' + es.Source);
       Assert.AreEqual(es.Destination, asrc.Destination, ctx + ' source dest ' + es.Source);
+      Assert.IsTrue(es.CopyToLib = asrc.CopyToLib, ctx + ' source copyToLib ' + es.Source);
       AssertStringListsEqual(es.Exclude, asrc.Exclude, ctx + ' source exclude ' + es.Source);
     end;
+
+    //copyToLib is a flat, order-preserved list of source globs (only present in a packed spec).
+    Assert.AreEqual(et.CopyToLibEntries.Count, at.CopyToLibEntries.Count, ctx + ' copyToLib count');
+    for j := 0 to et.CopyToLibEntries.Count - 1 do
+      Assert.AreEqual(et.CopyToLibEntries[j].Source, at.CopyToLibEntries[j].Source, ctx + ' copyToLib src ' + IntToStr(j));
 
     Assert.AreEqual(et.BuildEntries.Count, at.BuildEntries.Count, ctx + ' build count');
     for j := 0 to et.BuildEntries.Count - 1 do
@@ -391,8 +403,8 @@ begin
   Assert.AreEqual('Initial release', md.ReleaseNotes);
   Assert.IsTrue(md.IsCommercial, 'isCommercial');
   Assert.IsFalse(md.IsTrial, 'isTrial');
-  Assert.AreEqual(2, Length(md.Frameworks), 'frameworks');
-  Assert.AreEqual(2, spec.Variables.Count, 'package variables');
+  Assert.AreEqual<integer>(2, Length(md.Frameworks), 'frameworks');
+  Assert.AreEqual<integer>(2, spec.Variables.Count, 'package variables');
 end;
 
 procedure TSpecRoundTripTests.Full_Loads_PrecompiledBinaries;
@@ -591,6 +603,160 @@ begin
   yaml := spec.GenerateDspecYAML(pkgVersion);
   Assert.IsTrue(Pos('$version$', yaml) = 0, 'resolved dependency must not re-emit the token');
   Assert.AreEqual(pkgVersion.ToStringNoMeta, FindDep(reader.ReadSpecString(yaml)).Version.ToString, 'resolved version must round-trip');
+end;
+
+procedure TSpecRoundTripTests.SourceEntry_CopyToLib_RoundTrips;
+const
+  cYaml =
+    'metadata:'#13#10 +
+    '  id: Test.CopyToLib'#13#10 +
+    '  version: 1.0.0'#13#10 +
+    '  description: copyToLib source flag test'#13#10 +
+    '  authors:'#13#10 +
+    '    - Vincent Parrett'#13#10 +
+    '  license: Apache-2.0'#13#10 +
+    'targetPlatforms:'#13#10 +
+    '  - compiler: 12.0'#13#10 +
+    '    platforms: [Win32, Win64]'#13#10 +
+    '    template: default'#13#10 +
+    'templates:'#13#10 +
+    '  - name: default'#13#10 +
+    '    source:'#13#10 +
+    '      - src: ./Source/**/*.dfm'#13#10 +
+    '        copyToLib: true'#13#10 +
+    '      - src: ./Source/**/*.pas'#13#10;
+var
+  reader : IPackageSpecReader;
+  spec : IPackageSpec;
+  template : ISpecTemplate;
+begin
+  reader := TPackageSpecReader.Create(TTestLogger.Create);
+  spec := reader.ReadSpecString(cYaml);
+  Assert.IsNotNull(spec, 'spec should load');
+
+  //the flag must survive load -> GenerateDspecYAML -> reload on the authoring spec (source entries kept).
+  spec := RoundTrip(spec);
+  template := spec.FindTemplate('default');
+  Assert.IsNotNull(template, 'default template');
+  Assert.IsTrue(template.FindSourceEntry('./Source/**/*.dfm').CopyToLib, 'dfm entry copyToLib should be true');
+  Assert.IsFalse(template.FindSourceEntry('./Source/**/*.pas').CopyToLib, 'pas entry copyToLib should default to false');
+end;
+
+procedure TSpecRoundTripTests.Template_CopyToLib_List_RoundTrips;
+const
+  //mirrors what pack writes into the embedded package.dspec.yaml: source entries are gone,
+  //their globs re-homed (archive-relative) under a template-level copyToLib list.
+  cYaml =
+    'metadata:'#13#10 +
+    '  id: Test.CopyToLibList'#13#10 +
+    '  version: 1.0.0'#13#10 +
+    '  description: packed copyToLib list test'#13#10 +
+    '  authors:'#13#10 +
+    '    - Vincent Parrett'#13#10 +
+    '  license: Apache-2.0'#13#10 +
+    'targetPlatforms:'#13#10 +
+    '  - compiler: 12.0'#13#10 +
+    '    platforms: [Win32, Win64]'#13#10 +
+    '    template: default'#13#10 +
+    'templates:'#13#10 +
+    '  - name: default'#13#10 +
+    '    copyToLib:'#13#10 +
+    '      - src: Source/**/*.dfm'#13#10 +
+    '      - src: Source/**/*.res'#13#10;
+var
+  reader : IPackageSpecReader;
+  spec : IPackageSpec;
+  template : ISpecTemplate;
+begin
+  reader := TPackageSpecReader.Create(TTestLogger.Create);
+  spec := reader.ReadSpecString(cYaml);
+  Assert.IsNotNull(spec, 'spec should load');
+  spec := RoundTrip(spec);
+
+  template := spec.FindTemplate('default');
+  Assert.IsNotNull(template, 'default template');
+  Assert.AreEqual(2, template.CopyToLibEntries.Count, 'copyToLib entry count');
+  Assert.AreEqual('Source/**/*.dfm', template.CopyToLibEntries[0].Source, 'first copyToLib src');
+  Assert.AreEqual('Source/**/*.res', template.CopyToLibEntries[1].Source, 'second copyToLib src');
+end;
+
+procedure TSpecRoundTripTests.SourceEntry_CopyToBin_RoundTrips;
+const
+  cYaml =
+    'metadata:'#13#10 +
+    '  id: Test.CopyToBin'#13#10 +
+    '  version: 1.0.0'#13#10 +
+    '  description: copyToBin source platform test'#13#10 +
+    '  authors:'#13#10 +
+    '    - Vincent Parrett'#13#10 +
+    '  license: Apache-2.0'#13#10 +
+    'targetPlatforms:'#13#10 +
+    '  - compiler: 12.0'#13#10 +
+    '    platforms: [Win32, Win64]'#13#10 +
+    '    template: default'#13#10 +
+    'templates:'#13#10 +
+    '  - name: default'#13#10 +
+    '    source:'#13#10 +
+    '      - src: ./libs/win32/*.dll'#13#10 +
+    '        copytobin: win32'#13#10 +
+    '      - src: ./Source/**/*.pas'#13#10;
+var
+  reader : IPackageSpecReader;
+  spec : IPackageSpec;
+  template : ISpecTemplate;
+begin
+  reader := TPackageSpecReader.Create(TTestLogger.Create);
+  spec := reader.ReadSpecString(cYaml);
+  Assert.IsNotNull(spec, 'spec should load');
+
+  //the platform must survive load -> GenerateDspecYAML -> reload on the authoring spec (source entries kept).
+  spec := RoundTrip(spec);
+  template := spec.FindTemplate('default');
+  Assert.IsNotNull(template, 'default template');
+  Assert.AreEqual(Ord(TDPMPlatform.Win32), Ord(template.FindSourceEntry('./libs/win32/*.dll').CopyToBin), 'dll entry copyToBin should be Win32');
+  Assert.AreEqual(Ord(TDPMPlatform.UnknownPlatform), Ord(template.FindSourceEntry('./Source/**/*.pas').CopyToBin), 'pas entry copyToBin should default to UnknownPlatform');
+end;
+
+procedure TSpecRoundTripTests.Template_CopyToBin_List_RoundTrips;
+const
+  //mirrors what pack writes into the embedded package.dspec.yaml: source entries are gone,
+  //their globs re-homed (archive-relative) under a template-level copyToBin list, each carrying its platform.
+  cYaml =
+    'metadata:'#13#10 +
+    '  id: Test.CopyToBinList'#13#10 +
+    '  version: 1.0.0'#13#10 +
+    '  description: packed copyToBin list test'#13#10 +
+    '  authors:'#13#10 +
+    '    - Vincent Parrett'#13#10 +
+    '  license: Apache-2.0'#13#10 +
+    'targetPlatforms:'#13#10 +
+    '  - compiler: 12.0'#13#10 +
+    '    platforms: [Win32, Win64]'#13#10 +
+    '    template: default'#13#10 +
+    'templates:'#13#10 +
+    '  - name: default'#13#10 +
+    '    copyToBin:'#13#10 +
+    '      - src: libs/win32/*.dll'#13#10 +
+    '        copyToBin: win32'#13#10 +
+    '      - src: libs/win64/*.dll'#13#10 +
+    '        copyToBin: win64'#13#10;
+var
+  reader : IPackageSpecReader;
+  spec : IPackageSpec;
+  template : ISpecTemplate;
+begin
+  reader := TPackageSpecReader.Create(TTestLogger.Create);
+  spec := reader.ReadSpecString(cYaml);
+  Assert.IsNotNull(spec, 'spec should load');
+  spec := RoundTrip(spec);
+
+  template := spec.FindTemplate('default');
+  Assert.IsNotNull(template, 'default template');
+  Assert.AreEqual(2, template.CopyToBinEntries.Count, 'copyToBin entry count');
+  Assert.AreEqual('libs/win32/*.dll', template.CopyToBinEntries[0].Source, 'first copyToBin src');
+  Assert.AreEqual(Ord(TDPMPlatform.Win32), Ord(template.CopyToBinEntries[0].CopyToBin), 'first copyToBin platform');
+  Assert.AreEqual('libs/win64/*.dll', template.CopyToBinEntries[1].Source, 'second copyToBin src');
+  Assert.AreEqual(Ord(TDPMPlatform.Win64), Ord(template.CopyToBinEntries[1].CopyToBin), 'second copyToBin platform');
 end;
 
 initialization

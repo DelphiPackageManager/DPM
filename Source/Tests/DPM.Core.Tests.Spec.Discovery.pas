@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -109,7 +109,7 @@ begin
   dprojs := TArray<string>.Create('c:\repo\dmvcframeworkRT.dproj', 'c:\repo\dmvcframeworkDT.dproj');
   groups := GroupDProjsByStem(dprojs);
 
-  Assert.AreEqual(1, Length(groups), 'RT/DT pair should collapse to one logical package');
+  Assert.AreEqual<integer>(1, Length(groups), 'RT/DT pair should collapse to one logical package');
   Assert.AreEqual('dmvcframework', groups[0].Stem);
   Assert.AreEqual('dmvcframeworkRT.dproj', ExtractFileName(groups[0].RuntimeDProj), 'runtime slot');
   Assert.AreEqual('dmvcframeworkDT.dproj', ExtractFileName(groups[0].DesignDProj), 'design slot');
@@ -126,7 +126,7 @@ begin
     'c:\repo\Spring.CoreR.dproj', 'c:\repo\Spring.CoreDesign.dproj');
   groups := GroupDProjsByStem(dprojs);
 
-  Assert.AreEqual(2, Length(groups), 'distinct stems must stay separate');
+  Assert.AreEqual<integer>(2, Length(groups), 'distinct stems must stay separate');
 end;
 
 function MakeLogical(const stem, runtimeDProj, designDProj : string) : TLogicalPackage;
@@ -146,7 +146,7 @@ begin
 
   entries := FlattenSelectableDProjs(packages);
 
-  Assert.AreEqual(2, Length(entries), 'runtime + design produce two entries');
+  Assert.AreEqual<integer>(2, Length(entries), 'runtime + design produce two entries');
   Assert.AreEqual('MARS.Core', entries[0].Stem);
   Assert.IsTrue(entries[0].Kind = dkRuntime, 'first entry is the runtime');
   Assert.AreEqual('MARS.CoreR.dproj', ExtractFileName(entries[0].Path));
@@ -165,7 +165,7 @@ begin
 
   entries := FlattenSelectableDProjs(packages);
 
-  Assert.AreEqual(2, Length(entries), 'one entry per non-empty dproj');
+  Assert.AreEqual<integer>(2, Length(entries), 'one entry per non-empty dproj');
   Assert.IsTrue(entries[0].Kind = dkRuntime);
   Assert.IsTrue(entries[1].Kind = dkDesign);
 end;
@@ -186,7 +186,7 @@ begin
   selected := TArray<integer>.Create(0, 1, 2, 3);
   logicals := BuildSelectedLogicals(entries, selected);
 
-  Assert.AreEqual(2, Length(logicals), 'two stems -> two logical packages');
+  Assert.AreEqual<integer>(2, Length(logicals), 'two stems -> two logical packages');
   Assert.AreEqual('MARS.Core', logicals[0].Stem);
   Assert.AreEqual('MARS.CoreR.dproj', ExtractFileName(logicals[0].RuntimeDProj));
   Assert.AreEqual('MARS.CoreD.dproj', ExtractFileName(logicals[0].DesignDProj));
@@ -210,7 +210,7 @@ begin
   selected := TArray<integer>.Create(1);
   logicals := BuildSelectedLogicals(entries, selected);
 
-  Assert.AreEqual(1, Length(logicals));
+  Assert.AreEqual<integer>(1, Length(logicals));
   Assert.AreEqual('MARS.Core', logicals[0].Stem);
   Assert.AreEqual('', logicals[0].RuntimeDProj, 'runtime not selected, stays empty');
   Assert.AreEqual('MARS.CoreD.dproj', ExtractFileName(logicals[0].DesignDProj));
@@ -247,7 +247,7 @@ begin
   units := TArray<string>.Create(
     'Source/MARS.Core.A.pas', 'Source/MARS.Core.B.pas', 'Source/MARS.Core.C.pas');
   globs := DeriveSourceGlobs(units, '');
-  Assert.AreEqual(1, Length(globs), 'one shared folder -> one glob');
+  Assert.AreEqual<integer>(1, Length(globs), 'one shared folder -> one glob');
   Assert.AreEqual('Source/**.pas', globs[0].Glob);
 end;
 
@@ -266,7 +266,7 @@ begin
     'ThirdParty/delphi-jose-jwt/Source/JOSE.Core.JWT.pas');
   globs := DeriveSourceGlobs(units, '');
 
-  Assert.AreEqual(2, Length(globs), 'two roots -> two globs');
+  Assert.AreEqual<integer>(2, Length(globs), 'two roots -> two globs');
   Assert.IsTrue(GlobsContain(globs, 'Source/**.pas'), 'Source glob present');
   Assert.IsTrue(GlobsContain(globs, 'ThirdParty/delphi-jose-jwt/Source/**.pas'), 'ThirdParty glob present');
   //no entry may be an individual .pas file (i.e. a .pas not ending in **.pas)
@@ -285,7 +285,7 @@ begin
     'MARS.pas', 'Source/MARS.Core.A.pas', 'Source/MARS.Core.B.pas');
   globs := DeriveSourceGlobs(units, '');
 
-  Assert.AreEqual(2, Length(globs));
+  Assert.AreEqual<integer>(2, Length(globs));
   Assert.IsTrue(GlobsContain(globs, '*.pas'), 'flat root glob present');
   Assert.IsTrue(GlobsContain(globs, 'Source/**.pas'), 'Source glob present');
 end;
@@ -319,7 +319,7 @@ begin
     units := TArray<string>.Create('Source/Pkg.A.pas', 'Source/Pkg.B.pas');
     globs := DeriveSourceGlobs(units, root);
 
-    Assert.AreEqual(2, Length(globs), 'subset must list its files, not glob the folder');
+    Assert.AreEqual<integer>(2, Length(globs), 'subset must list its files, not glob the folder');
     Assert.IsTrue(GlobsContain(globs, 'Source/Pkg.A.pas'));
     Assert.IsTrue(GlobsContain(globs, 'Source/Pkg.B.pas'));
   finally
@@ -340,7 +340,7 @@ begin
     units := TArray<string>.Create('Source/Pkg.A.pas', 'Source/Pkg.B.pas', 'Source/Pkg.C.pas');
     globs := DeriveSourceGlobs(units, root);
 
-    Assert.AreEqual(1, Length(globs), 'full ownership collapses to one glob');
+    Assert.AreEqual<integer>(1, Length(globs), 'full ownership collapses to one glob');
     Assert.AreEqual('Source/**.pas', globs[0].Glob);
   finally
     TDirectory.Delete(root, true);
@@ -354,7 +354,7 @@ var
   globs : TScaffoldSourceEntries;
   entry : TScaffoldSourceEntry;
 begin
-  //the MARS.Core case in miniature: the folder holds four 'Pkg.Core.*' files but
+  //the folder holds four 'Pkg.Core.*' files but
   //the package only owns three. Collapse to one 'Pkg.Core.*.pas' wildcard and
   //exclude the file that isn't ours, rather than listing every owned file.
   root := MakeTempSourceTree(TArray<string>.Create(
@@ -363,9 +363,9 @@ begin
     units := TArray<string>.Create('Source/Pkg.Core.A.pas', 'Source/Pkg.Core.B.pas', 'Source/Pkg.Core.C.pas');
     globs := DeriveSourceGlobs(units, root);
 
-    Assert.AreEqual(1, Length(globs), 'collapses to a single namespace wildcard');
+    Assert.AreEqual<integer>(1, Length(globs), 'collapses to a single namespace wildcard');
     Assert.IsTrue(FindGlob(globs, 'Source/Pkg.Core.*.pas', entry), 'namespace wildcard present');
-    Assert.AreEqual(1, Length(entry.Exclude), 'the one unowned file is excluded');
+    Assert.AreEqual<integer>(1, Length(entry.Exclude), 'the one unowned file is excluded');
     Assert.AreEqual('Source/Pkg.Core.D.pas', entry.Exclude[0]);
   finally
     TDirectory.Delete(root, true);

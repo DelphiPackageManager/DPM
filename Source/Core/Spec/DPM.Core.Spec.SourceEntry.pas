@@ -44,16 +44,22 @@ type
     FSource : string;
     FDestination : string;
     FExclude : IList<string>;
+    FCopyToLib : boolean;
+    FCopyToBin : TDPMPlatform;
 
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
     function GetSource : string;
     function GetDestination : string;
     function GetExclude : IList<string>;
+    function GetCopyToLib : boolean;
+    function GetCopyToBin : TDPMPlatform;
     procedure SetSource(const value : string);
     procedure SetDestination(const value : string);
+    procedure SetCopyToLib(const value : boolean);
+    procedure SetCopyToBin(const value : TDPMPlatform);
 
-    constructor CreateClone(const logger : ILogger; const src : string; const dest : string; const exclude : IList<string>); virtual;
+    constructor CreateClone(const logger : ILogger; const src : string; const dest : string; const exclude : IList<string>; const copyToLib : boolean; const copyToBin : TDPMPlatform); virtual;
     function Clone : ISpecSourceEntry;
 
     procedure ToYAML(const parent: IYAMLValue; const packageKind: TDPMPackageKind);override;
@@ -72,7 +78,7 @@ uses
 
 function TSpecSourceEntry.Clone : ISpecSourceEntry;
 begin
-  result := TSpecSourceEntry.CreateClone(logger, FSource, FDestination, FExclude);
+  result := TSpecSourceEntry.CreateClone(logger, FSource, FDestination, FExclude, FCopyToLib, FCopyToBin);
 end;
 
 constructor TSpecSourceEntry.Create(const logger : ILogger);
@@ -81,13 +87,25 @@ begin
   FExclude := TCollections.CreateList < string > ;
 end;
 
-constructor TSpecSourceEntry.CreateClone(const logger : ILogger; const src, dest : string; const exclude : IList<string>);
+constructor TSpecSourceEntry.CreateClone(const logger : ILogger; const src, dest : string; const exclude : IList<string>; const copyToLib : boolean; const copyToBin : TDPMPlatform);
 begin
   inherited Create(logger);
   FSource := src;
   FDestination := dest;
+  FCopyToLib := copyToLib;
+  FCopyToBin := copyToBin;
   FExclude := TCollections.CreateList < string > ;
   FExclude.AddRange(exclude);
+end;
+
+function TSpecSourceEntry.GetCopyToLib : boolean;
+begin
+  result := FCopyToLib;
+end;
+
+function TSpecSourceEntry.GetCopyToBin : TDPMPlatform;
+begin
+  result := FCopyToBin;
 end;
 
 function TSpecSourceEntry.GetExclude : IList<string>;
@@ -121,6 +139,18 @@ begin
   end;
   FDestination := yamlObject.S['dest'];
 
+  //Accept both the canonical camelCase key and the all-lowercase variant authors commonly type.
+  if yamlObject.Contains('copyToLib') then
+    FCopyToLib := yamlObject.B['copyToLib']
+  else
+    FCopyToLib := yamlObject.B['copytolib'];
+
+  //copyToBin carries a platform; absent or unrecognised tokens resolve to UnknownPlatform (= ignored).
+  if yamlObject.Contains('copyToBin') then
+    FCopyToBin := StringToDPMPlatform(yamlObject.S['copyToBin'])
+  else
+    FCopyToBin := StringToDPMPlatform(yamlObject.S['copytobin']);
+
   if yamlObject.Contains('exclude') then
   begin
     excludeArray := yamlObject.A['exclude'];
@@ -132,6 +162,16 @@ begin
         FExclude.Add(entry);
     end;
   end;
+end;
+
+procedure TSpecSourceEntry.SetCopyToLib(const value : boolean);
+begin
+  FCopyToLib := value;
+end;
+
+procedure TSpecSourceEntry.SetCopyToBin(const value : TDPMPlatform);
+begin
+  FCopyToBin := value;
 end;
 
 procedure TSpecSourceEntry.SetSource(const value : string);
@@ -150,6 +190,10 @@ begin
   mapping.S['src'] := FSource;
   if FDestination <> '' then
     mapping.S['dest'] := FDestination;
+  if FCopyToLib then
+    mapping.B['copyToLib'] := True;
+  if FCopyToBin <> TDPMPlatform.UnknownPlatform then
+    mapping.S['copyToBin'] := DPMPlatformToString(FCopyToBin);
   if FExclude.Count > 0 then
   begin
     excludeSeq := mapping.A['exclude'];

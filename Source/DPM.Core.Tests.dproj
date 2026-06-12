@@ -1,11 +1,11 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
         <Config Condition="'$(Config)'==''">Debug</Config>
         <FrameworkType>None</FrameworkType>
         <MainSource>DPM.Core.Tests.dpr</MainSource>
-        <Platform Condition="'$(Platform)'==''">Win32</Platform>
+        <Platform Condition="'$(Platform)'==''">Win64</Platform>
         <ProjectGuid>{42F2EF4C-9F0B-408B-8BDD-7CD766A77E4D}</ProjectGuid>
         <ProjectName Condition="'$(ProjectName)'==''">DPM.Core.Tests</ProjectName>
         <ProjectVersion>20.4</ProjectVersion>
@@ -108,6 +108,7 @@
         <DCCReference Include="Core\Utils\DPM.Core.Utils.XML.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.DesignEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.PackageDefinition.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Dependency.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.SourceEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Interfaces.pas"/>
@@ -168,7 +169,6 @@
         <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.Templates.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.SourceFiles.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.PackageGenerator.pas"/>
-        <DCCReference Include="Core\Spec\DPM.Core.Spec.PackageDefinition.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Transformer.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.MapFile.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.SearchPaths.pas"/>
@@ -256,25 +256,34 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.Reader.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.Collapse.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.RoundTrip.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Packaging.EnvironmentVariableValidator.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Packaging.PrecompiledBinaries.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.PackageGenerator.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.PackageDefinitions.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Discovery.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Spec.Discovery.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Writer.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Spec.Writer.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Trust.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Trust.TrustSet.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Trust.Prompt.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Trust.Modes.pas"/>
         <DCCReference Include="IDE\DPM.IDE.SigningBadge.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.SigningBadge.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.PathManager.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.EnvironmentVariableManager.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.IDE.EnvironmentVariableManager.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.DateTime.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.PE.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Crypto.Algorithms.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Package.Archive.pas"/>
-        <DCCReference Include="Tests\DPM.Core.Tests.Packaging.PrecompiledBinaries.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Package.Receipt.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Types.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Vuln.Cache.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Vuln.CycloneDX.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Vuln.Scanner.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Git.Client.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Registry.Catalog.pas"/>
         <DCCReference Include="Tests\TargetPlatformTests.pas"/>
         <DCCReference Include="Tests\TestLogger.pas"/>
         <BuildConfiguration Include="Base">
@@ -305,6 +314,7 @@
                 <Platform value="OSXARM64">False</Platform>
                 <Platform value="Win32">True</Platform>
                 <Platform value="Win64">True</Platform>
+                <Platform value="WinARM64EC">False</Platform>
             </Platforms>
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>

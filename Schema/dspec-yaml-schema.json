@@ -288,6 +288,30 @@
                                 "dest": {
                                     "type": "string",
                                     "description": "The destination folder in the package file"
+                                },
+                                "copytolib": {
+                                    "type": "boolean",
+                                    "description": "when true, files are copied to the lib\\platform folder during build"
+                                },
+                                "copytobin": {
+                                    "type": "string",
+                                    "description": "copy matched files to the bpl\\{platform} folder during install, but only when installing for this platform - used for native dlls a runtime/design bpl needs to load",
+                                    "enum": [
+                                        "win32",
+                                        "win64",
+                                        "win64x",
+                                        "winarm64ec",
+                                        "macos32",
+                                        "macos64",
+                                        "macosarm64",
+                                        "android",
+                                        "android64",
+                                        "ios32",
+                                        "ios64",
+                                        "iossimulator",
+                                        "iossimarm64",
+                                        "linux64"
+                                    ]
                                 }
                             },
                             "required": [
@@ -458,6 +482,42 @@
                         "description": "IDE environment variables to set in the IDE process while this package's design components are loaded, and clear/restore when unloaded. Each key is a variable name and each value a string. PATH is allowed and treated as append-only (semicolon separated dirs). A small set of system/RAD Studio variables is banned at pack time. Values may use the install-time token $packageDir$ which resolves to the package's cache folder on the consumer machine.",
                         "additionalProperties": {
                             "type": "string"
+                        }
+                    },
+                    "copyToLib": {
+                        "type": "array",
+                        "description": "files copied to the lib folder during install - e.g dfm",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "src": {
+                                    "type": "string",
+                                    "description": "The source ant pattern filespec"
+                                }
+                            },
+                            "required": [
+                                "src"
+                            ]
+                        }
+                    },
+                    "copyToBin": {
+                        "type": "array",
+                        "description": "files copied to the bpl\\{platform} folder during install for the matching platform - e.g native dlls",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "src": {
+                                    "type": "string",
+                                    "description": "The source ant pattern filespec"
+                                },
+                                "copytobin": {
+                                    "type": "string",
+                                    "description": "the platform whose bpl folder the matched files are copied into"
+                                }
+                            },
+                            "required": [
+                                "src"
+                            ]
                         }
                     }
                 },

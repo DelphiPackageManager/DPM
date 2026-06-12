@@ -45,6 +45,8 @@ type
     FDependencies : IList<ISpecDependency>;
     FSourceFiles : IList<ISpecSourceEntry>;
     FBuildEntries : IList<ISpecBuildEntry>;
+    FCopyToLibEntries : IList<ISpecSourceEntry>;
+    FCopyToBinEntries : IList<ISpecSourceEntry>;
     FDesignFiles : IList<ISpecDesignEntry>;
     FPackageDefinitions : IList<ISpecPackageDefinition>;
     FPrecompiledBinaries : IList<string>;
@@ -61,6 +63,8 @@ type
     function GetDesignFiles : IList<ISpecDesignEntry>;
     function GetSourceFiles : IList<ISpecSourceEntry>;
     function GetBuildEntries : IList<ISpecBuildEntry>;
+    function GetCopyToLibEntries : IList<ISpecSourceEntry>;
+    function GetCopyToBinEntries : IList<ISpecSourceEntry>;
     function GetPackageDefinitions : IList<ISpecPackageDefinition>;
     function GetPrecompiledBinaries : IList<string>;
     function GetEnvironmentVariables : IVariables;
@@ -97,6 +101,8 @@ type
     function LoadBuildEntriesFromYAML(const buildArray : IYAMLSequence) : Boolean;
     function LoadDesignFromYAML(const designArray : IYAMLSequence) : Boolean;
     function LoadPackageDefinitionsFromYAML(const packageDefArray : IYAMLSequence) : Boolean;
+    function LoadCopyToLibFromYAML(const copyToLibArray : IYAMLSequence) : Boolean;
+    function LoadCopyToBinFromYAML(const copyToBinArray : IYAMLSequence) : Boolean;
 
 
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
@@ -145,6 +151,8 @@ begin
   FDependencies := TCollections.CreateList<ISpecDependency>;
   FSourceFiles := TCollections.CreateList<ISpecSourceEntry>;
   FBuildEntries := TCollections.CreateList<ISpecBuildEntry>;
+  FCopyToLibEntries := TCollections.CreateList<ISpecSourceEntry>;
+  FCopyToBinEntries := TCollections.CreateList<ISpecSourceEntry>;
   FDesignFiles := TCollections.CreateList<ISpecDesignEntry>;
   FPackageDefinitions := TCollections.CreateList<ISpecPackageDefinition>;
   FPrecompiledBinaries := TCollections.CreateList<string>;
@@ -172,6 +180,18 @@ begin
   begin
     newSourceEntry := source.SourceEntries[i].Clone;
     FSourceFiles.Add(newSourceEntry);
+  end;
+
+  for i := 0 to source.CopyToLibEntries.Count -1 do
+  begin
+    newSourceEntry := source.CopyToLibEntries[i].Clone;
+    FCopyToLibEntries.Add(newSourceEntry);
+  end;
+
+  for i := 0 to source.CopyToBinEntries.Count -1 do
+  begin
+    newSourceEntry := source.CopyToBinEntries[i].Clone;
+    FCopyToBinEntries.Add(newSourceEntry);
   end;
 
   for i := 0 to source.BuildEntries.Count -1 do
@@ -251,6 +271,8 @@ begin
   FDesignFiles := nil;
   FSourceFiles := nil;
   FBuildEntries := nil;
+  FCopyToLibEntries := nil;
+  FCopyToBinEntries := nil;
   FPackageDefinitions := nil;
   FPrecompiledBinaries := nil;
   inherited;
@@ -306,6 +328,26 @@ begin
     seq := template.A['design'];
     for i := 0 to FDesignFiles.Count -1 do
       FDesignFiles[i].ToYAML(seq, packageKind);
+  end;
+
+  //Source globs (already archive-relative) whose files install copies into lib\{platform}.
+  //Populated at pack time from source entries flagged copyToLib; the source entries themselves
+  //are cleared before this serialises, so this is how the instruction survives into the packed spec.
+  if FCopyToLibEntries.Any then
+  begin
+    seq := template.A['copyToLib'];
+    for i := 0 to FCopyToLibEntries.Count -1 do
+      FCopyToLibEntries[i].ToYAML(seq, packageKind);
+  end;
+
+  //Source globs (already archive-relative) whose files install copies into bpl\{platform}.
+  //Populated at pack time from source entries flagged copyToBin; the source entries themselves
+  //are cleared before this serialises, so this is how the instruction survives into the packed spec.
+  if FCopyToBinEntries.Any then
+  begin
+    seq := template.A['copyToBin'];
+    for i := 0 to FCopyToBinEntries.Count -1 do
+      FCopyToBinEntries[i].ToYAML(seq, packageKind);
   end;
 
   if FPackageDefinitions.Any then
@@ -426,6 +468,16 @@ end;
 function TSpecTemplate.GetBuildEntries : IList<ISpecBuildEntry>;
 begin
   result := FBuildEntries;
+end;
+
+function TSpecTemplate.GetCopyToLibEntries : IList<ISpecSourceEntry>;
+begin
+  result := FCopyToLibEntries;
+end;
+
+function TSpecTemplate.GetCopyToBinEntries : IList<ISpecSourceEntry>;
+begin
+  result := FCopyToBinEntries;
 end;
 
 function TSpecTemplate.GetPackageDefinitions : IList<ISpecPackageDefinition>;
@@ -559,6 +611,24 @@ begin
     end);
 end;
 
+function TSpecTemplate.LoadCopyToLibFromYAML(const copyToLibArray: IYAMLSequence): Boolean;
+begin
+  result := LoadYAMLCollection(copyToLibArray, TSpecSourceEntry,
+    procedure(const value : IInterface)
+    begin
+      FCopyToLibEntries.Add(value as ISpecSourceEntry);
+    end);
+end;
+
+function TSpecTemplate.LoadCopyToBinFromYAML(const copyToBinArray: IYAMLSequence): Boolean;
+begin
+  result := LoadYAMLCollection(copyToBinArray, TSpecSourceEntry,
+    procedure(const value : IInterface)
+    begin
+      FCopyToBinEntries.Add(value as ISpecSourceEntry);
+    end);
+end;
+
 function TSpecTemplate.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var
   collectionObj : IYAMLSequence;
@@ -586,6 +656,20 @@ begin
   collectionObj := yamlObject.A['design'];
   if collectionObj.Count > 0 then
     result := LoadDesignFromYAML(collectionObj) and result;
+
+  if yamlObject.ContainsKey('copyToLib') then
+  begin
+    collectionObj := yamlObject.A['copyToLib'];
+    if collectionObj.Count > 0 then
+      result := LoadCopyToLibFromYAML(collectionObj) and result;
+  end;
+
+  if yamlObject.ContainsKey('copyToBin') then
+  begin
+    collectionObj := yamlObject.A['copyToBin'];
+    if collectionObj.Count > 0 then
+      result := LoadCopyToBinFromYAML(collectionObj) and result;
+  end;
 
   if yamlObject.ContainsKey('package definitions') then
   begin

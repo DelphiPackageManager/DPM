@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -183,7 +183,7 @@ begin
   end;
 
   produced := TDirectory.GetFiles(workDir, '*' + cPackageFileExt, TSearchOption.soTopDirectoryOnly);
-  Assert.AreEqual(1, Length(produced), 'expected exactly one .dpkg');
+  Assert.AreEqual<integer>(1, Length(produced), 'expected exactly one .dpkg');
   result := produced[0];
 end;
 
