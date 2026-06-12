@@ -15,8 +15,8 @@
         <DPMCompiler>delphi12.0</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Gabr42.OmniThreadLibrary\3.8.0\lib\Win32;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.10\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win32;$(DPM)\VSoft.Awaitable\0.8.0\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.YAML\1.6.0\lib\Win32;</DPMSearch>
-        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Gabr42.OmniThreadLibrary\3.8.0\lib\Win64;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win64;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win64;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win64;$(DPM)\VSoft.AntPatterns\0.1.10\lib\Win64;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win64;$(DPM)\VSoft.Awaitable\0.8.0\lib\Win64;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win64;$(DPM)\VSoft.Uri\0.3.3\lib\Win64;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win64;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win64;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win64;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win64;$(DPM)\VSoft.YAML\1.6.0\lib\Win64;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Gabr42.OmniThreadLibrary\3.8.0\lib\Win32;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.10\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win32;$(DPM)\VSoft.Awaitable\0.8.0\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.YAML\1.7.1\lib\Win32;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Gabr42.OmniThreadLibrary\3.8.0\lib\Win64;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win64;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win64;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win64;$(DPM)\VSoft.AntPatterns\0.1.10\lib\Win64;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win64;$(DPM)\VSoft.Awaitable\0.8.0\lib\Win64;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win64;$(DPM)\VSoft.Uri\0.3.3\lib\Win64;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win64;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win64;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win64;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win64;$(DPM)\VSoft.YAML\1.7.1\lib\Win64;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -384,7 +384,7 @@
                 <PackageReference id="VSoft.SemanticVersion" version="0.2.8" manifestHash="sha256:58308393eccc0349f72041de13f49c225081d0306964af0b80b442a998932378"/>
                 <PackageReference id="VSoft.Uri" version="0.3.3" manifestHash="sha256:d548ca8db06e5aee4c8659bc5973a59782d4b97845c28f94e75d20b2574fed8b"/>
                 <PackageReference id="VSoft.VirtualListView" version="0.4.6" manifestHash="sha256:ec3184eb948721f469b39d0b97af70cf641005f42804abad994de5530d830bf4"/>
-                <PackageReference id="VSoft.YAML" version="1.6.0" manifestHash="sha256:630bb7ce87fad10e814e9ea29664c8c29977088dd4cc1edceec186ea7b489264"/>
+                <PackageReference id="VSoft.YAML" version="1.7.1" manifestHash="sha256:6f90a9cdecb66304e735bc8455f0110a4ad31b4fea1ec5a62c843ee9dd9fe8e9"/>
             </Packages>
         </DPM>
     </ProjectExtensions>

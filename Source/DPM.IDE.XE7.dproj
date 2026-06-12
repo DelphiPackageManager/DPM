@@ -14,7 +14,7 @@
         <DPMCompiler>delphixe7</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Gabr42.OmniThreadLibrary\3.8.0\lib\Win32;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.10\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win32;$(DPM)\VSoft.Awaitable\0.8.0\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.YAML\1.6.0\lib\Win32;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Gabr42.OmniThreadLibrary\3.8.0\lib\Win32;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.10\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win32;$(DPM)\VSoft.Awaitable\0.8.0\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.YAML\1.7.1\lib\Win32;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -741,7 +741,7 @@
                 <PackageReference id="VSoft.SemanticVersion" version="0.2.8" manifestHash="sha256:40ee7a6e0e6f1aee87c2f70a7998cd2ddab5c29a3be7f58d44d46df198c145ee"/>
                 <PackageReference id="VSoft.Uri" version="0.3.3" manifestHash="sha256:88e9c93fa7383bfa9e03c471104e8a9b40d5eabb2bc32d3ac8c0fd0e4992c9de"/>
                 <PackageReference id="VSoft.VirtualListView" version="0.4.6" manifestHash="sha256:964b58e056f1ede5f731fd72a5244427a2ac704633495e1c0be0027fee133ae3"/>
-                <PackageReference id="VSoft.YAML" version="1.6.0" manifestHash="sha256:7b9b2ab449afc1bc0793ef8844a83cc0bd3718919997ea8d433f1f0b4f8632cd"/>
+                <PackageReference id="VSoft.YAML" version="1.7.1" manifestHash="sha256:a4b9173e1008f83d185f780d8572d2e32f335ebeb46191db4c2a77e90361c203"/>
             </Packages>
         </DPM>
     </ProjectExtensions>

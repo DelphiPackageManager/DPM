@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
@@ -136,8 +136,8 @@
         <DPMCompiler>delphi13.0</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\VSoft.System.Console\1.2.2\lib\Win32;$(DPM)\VSoft.AnsiConsole\0.1.3\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.10\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win32;$(DPM)\VSoft.CommandLine\0.1.11\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win32;$(DPM)\VSoft.YAML\1.7.0\lib\Win32;</DPMSearch>
-        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win64;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win64;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win64;$(DPM)\VSoft.System.Console\1.2.2\lib\Win64;$(DPM)\VSoft.AnsiConsole\0.1.3\lib\Win64;$(DPM)\VSoft.AntPatterns\0.1.10\lib\Win64;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win64;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win64;$(DPM)\VSoft.CommandLine\0.1.11\lib\Win64;$(DPM)\VSoft.Uri\0.3.3\lib\Win64;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win64;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win64;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win64;$(DPM)\VSoft.YAML\1.7.0\lib\Win64;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\VSoft.System.Console\1.2.2\lib\Win32;$(DPM)\VSoft.AnsiConsole\0.1.3\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.10\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win32;$(DPM)\VSoft.CommandLine\0.1.11\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win32;$(DPM)\VSoft.YAML\1.7.1\lib\Win32;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win64;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win64;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win64;$(DPM)\VSoft.System.Console\1.2.2\lib\Win64;$(DPM)\VSoft.AnsiConsole\0.1.3\lib\Win64;$(DPM)\VSoft.AntPatterns\0.1.10\lib\Win64;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win64;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win64;$(DPM)\VSoft.CommandLine\0.1.11\lib\Win64;$(DPM)\VSoft.Uri\0.3.3\lib\Win64;$(DPM)\VSoft.HttpClient\2.7.0\lib\Win64;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win64;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win64;$(DPM)\VSoft.YAML\1.7.1\lib\Win64;</DPMSearch>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -397,7 +397,7 @@
                 <PackageReference id="VSoft.SemanticVersion" version="0.2.8" manifestHash="sha256:c5a26da3c2e1199089b7de00c0d8e2c9a82a3d32812c53aaf0969a93fa053b87"/>
                 <PackageReference id="VSoft.System.Console" version="1.2.2" manifestHash="sha256:15bc451deb1766b0bc4c1263e04fcdc3cb0a6cb7250ba9516e4d893e224e8a8f"/>
                 <PackageReference id="VSoft.Uri" version="0.3.3" manifestHash="sha256:c525f2b0db2cbd852031dc85e56f4fd5ec660e453ac1fcd3a4e815b2ed8c1417"/>
-                <PackageReference id="VSoft.YAML" version="1.7.0" manifestHash="sha256:2695115344718b4058e7f70d51a2c41aeadf7c5486b90dff82a27de0aecb8a13"/>
+                <PackageReference id="VSoft.YAML" version="1.7.1" manifestHash="sha256:520171d454b2af8e6539cffb2d5f00e0b2ad2d75cdab265b800610500b2c91b0"/>
             </Packages>
         </DPM>
     </ProjectExtensions>
