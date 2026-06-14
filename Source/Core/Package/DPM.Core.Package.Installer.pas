@@ -356,18 +356,39 @@ var
     end;
   end;
 
+  //Add every subfolder under absBase that actually contains .pas files. relSub is computed
+  //relative to pkgAbs so the search path matches packageBasePath layout. Skips .git metadata.
+  //Delphi search paths are not recursive, so each folder must be listed individually.
+  procedure AddPasSubdirs(const pkgAbs, absBase, basePath: string);
+  var
+    subDir: string;
+    relSub: string;
+  begin
+    if not DirectoryExists(absBase) then
+      exit;
+    for subDir in TDirectory.GetDirectories(absBase, '*', TSearchOption.soAllDirectories) do
+    begin
+      //skip the git metadata folder and anything under it
+      if SameText(ExtractFileName(subDir), '.git') then
+        continue;
+      if Pos(PathDelim + '.git' + PathDelim, subDir + PathDelim) > 0 then
+        continue;
+      if Length(TDirectory.GetFiles(subDir, '*.pas')) = 0 then
+        continue;
+      relSub := Copy(subDir, Length(pkgAbs) + 1, MaxInt);
+      AddUnique(basePath + relSub);
+    end;
+  end;
+
   //Adds search paths for a git source entry. The base folder of the src glob is
   //always added; for a recursive (**) pattern we also add every subfolder under it
-  //that actually contains .pas files (the package is cloned in place, so they exist)
-  //- Delphi search paths are not recursive, so each folder must be listed.
+  //that actually contains .pas files (the package is cloned in place, so they exist).
   procedure AddGitSearchPaths(const pkgInfo: IPackageInfo; const basePath: string; const src: string);
   var
     baseRel: string;
     recursive: boolean;
     pkgAbs: string;
     absBase: string;
-    subDir: string;
-    relSub: string;
   begin
     baseRel := TPathUtils.GlobBaseDir(src);
     recursive := Pos('**', src) > 0;
@@ -385,21 +406,22 @@ var
       absBase := pkgAbs + baseRel
     else
       absBase := ExcludeTrailingPathDelimiter(pkgAbs);
-    if not DirectoryExists(absBase) then
-      exit;
 
-    for subDir in TDirectory.GetDirectories(absBase, '*', TSearchOption.soAllDirectories) do
-    begin
-      //skip the git metadata folder and anything under it
-      if SameText(ExtractFileName(subDir), '.git') then
-        continue;
-      if Pos(PathDelim + '.git' + PathDelim, subDir + PathDelim) > 0 then
-        continue;
-      if Length(TDirectory.GetFiles(subDir, '*.pas')) = 0 then
-        continue;
-      relSub := Copy(subDir, Length(pkgAbs) + 1, MaxInt);
-      AddUnique(basePath + relSub);
-    end;
+    AddPasSubdirs(pkgAbs, absBase, basePath);
+  end;
+
+  //Adds search paths for a packed source entry. Files were copied under {dest} preserving their
+  //subfolder structure, so always add the dest root; for a recursive (**) glob also add each
+  //subfolder containing .pas files (they already exist in the cache - no clone step).
+  procedure AddSourceSearchPaths(const pkgInfo: IPackageInfo; const basePath, dest, src: string);
+  var
+    pkgAbs: string;
+  begin
+    AddUnique(basePath + dest);
+    if Pos('**', src) = 0 then
+      exit;
+    pkgAbs := IncludeTrailingPathDelimiter(FPackageCache.GetPackagePath(pkgInfo));
+    AddPasSubdirs(pkgAbs, pkgAbs + dest, basePath);
   end;
 
   //Depth-first topological visit: a package is added only after all of its (resolved)
@@ -521,7 +543,7 @@ begin
           destination := sourceEntry.Destination;
           if destination = '' then
             destination := 'src';
-          AddUnique(packageBasePath + destination);
+          AddSourceSearchPaths(packageInfo, packageBasePath, destination, sourceEntry.Source);
         end;
       end;
     end;
