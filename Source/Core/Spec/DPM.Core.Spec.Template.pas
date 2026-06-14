@@ -47,6 +47,7 @@ type
     FBuildEntries : IList<ISpecBuildEntry>;
     FCopyToLibEntries : IList<ISpecSourceEntry>;
     FCopyToBinEntries : IList<ISpecSourceEntry>;
+    FCopyLocalEntries : IList<ISpecCopyLocalEntry>;
     FDesignFiles : IList<ISpecDesignEntry>;
     FPackageDefinitions : IList<ISpecPackageDefinition>;
     FPrecompiledBinaries : IList<string>;
@@ -65,6 +66,7 @@ type
     function GetBuildEntries : IList<ISpecBuildEntry>;
     function GetCopyToLibEntries : IList<ISpecSourceEntry>;
     function GetCopyToBinEntries : IList<ISpecSourceEntry>;
+    function GetCopyLocalEntries : IList<ISpecCopyLocalEntry>;
     function GetPackageDefinitions : IList<ISpecPackageDefinition>;
     function GetPrecompiledBinaries : IList<string>;
     function GetEnvironmentVariables : IVariables;
@@ -83,12 +85,14 @@ type
     function NewDesignEntry(const project : string) : ISpecDesignEntry;
     function NewBuildEntry(const project : string) : ISpecBuildEntry;
     function NewPackageDefinition(const project : string) : ISpecPackageDefinition;
+    function NewCopyLocalEntry(const src : string) : ISpecCopyLocalEntry;
 
     procedure DeleteDependency(const id : string);
     procedure DeleteSource(const src: string);
     procedure DeleteBuildEntry(const project : string);
     procedure DeleteDesignEntry(const project : string);
     procedure DeletePackageDefinition(const project : string);
+    procedure DeleteCopyLocalEntry(const src : string);
 
     function FindDependency(const id : string) : ISpecDependency;
     function FindSourceEntry(const src : string) : ISpecSourceEntry;
@@ -103,6 +107,7 @@ type
     function LoadPackageDefinitionsFromYAML(const packageDefArray : IYAMLSequence) : Boolean;
     function LoadCopyToLibFromYAML(const copyToLibArray : IYAMLSequence) : Boolean;
     function LoadCopyToBinFromYAML(const copyToBinArray : IYAMLSequence) : Boolean;
+    function LoadCopyLocalFromYAML(const copyLocalArray : IYAMLSequence) : Boolean;
 
 
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
@@ -134,6 +139,7 @@ uses
   DPM.Core.Spec.DesignEntry,
   DPM.Core.Spec.Dependency,
   DPM.Core.Spec.BuildEntry,
+  DPM.Core.Spec.CopyLocalEntry,
   DPM.Core.Spec.PackageDefinition;
 
 
@@ -153,6 +159,7 @@ begin
   FBuildEntries := TCollections.CreateList<ISpecBuildEntry>;
   FCopyToLibEntries := TCollections.CreateList<ISpecSourceEntry>;
   FCopyToBinEntries := TCollections.CreateList<ISpecSourceEntry>;
+  FCopyLocalEntries := TCollections.CreateList<ISpecCopyLocalEntry>;
   FDesignFiles := TCollections.CreateList<ISpecDesignEntry>;
   FPackageDefinitions := TCollections.CreateList<ISpecPackageDefinition>;
   FPrecompiledBinaries := TCollections.CreateList<string>;
@@ -166,6 +173,7 @@ var
   newBuildEntry : ISpecBuildEntry;
   newDesignEntry : ISpecDesignEntry;
   newPackageDef : ISpecPackageDefinition;
+  newCopyLocalEntry : ISpecCopyLocalEntry;
   i : integer;
 begin
   Create(logger);
@@ -192,6 +200,12 @@ begin
   begin
     newSourceEntry := source.CopyToBinEntries[i].Clone;
     FCopyToBinEntries.Add(newSourceEntry);
+  end;
+
+  for i := 0 to source.CopyLocalEntries.Count -1 do
+  begin
+    newCopyLocalEntry := source.CopyLocalEntries[i].Clone;
+    FCopyLocalEntries.Add(newCopyLocalEntry);
   end;
 
   for i := 0 to source.BuildEntries.Count -1 do
@@ -265,6 +279,20 @@ begin
     FSourceFiles.Remove(source);
 end;
 
+procedure TSpecTemplate.DeleteCopyLocalEntry(const src: string);
+var
+  copyLocalEntry : ISpecCopyLocalEntry;
+begin
+  for copyLocalEntry in FCopyLocalEntries do
+  begin
+    if SameText(copyLocalEntry.Source, src) then
+    begin
+      FCopyLocalEntries.Remove(copyLocalEntry);
+      exit;
+    end;
+  end;
+end;
+
 destructor TSpecTemplate.Destroy;
 begin
   FDependencies := nil;
@@ -273,6 +301,7 @@ begin
   FBuildEntries := nil;
   FCopyToLibEntries := nil;
   FCopyToBinEntries := nil;
+  FCopyLocalEntries := nil;
   FPackageDefinitions := nil;
   FPrecompiledBinaries := nil;
   inherited;
@@ -286,6 +315,16 @@ begin
   sourceFilesEntry.Source := src;
   FSourceFiles.Add(sourceFilesEntry);
   Result := sourceFilesEntry;
+end;
+
+function TSpecTemplate.NewCopyLocalEntry(const src: string): ISpecCopyLocalEntry;
+var
+  copyLocalEntry : ISpecCopyLocalEntry;
+begin
+  copyLocalEntry := TSpecCopyLocalEntry.Create(Logger);
+  copyLocalEntry.Source := src;
+  FCopyLocalEntries.Add(copyLocalEntry);
+  result := copyLocalEntry;
 end;
 
 
@@ -348,6 +387,16 @@ begin
     seq := template.A['copyToBin'];
     for i := 0 to FCopyToBinEntries.Count -1 do
       FCopyToBinEntries[i].ToYAML(seq, packageKind);
+  end;
+
+  //First-class copyLocal entries (globs relative to the package root, may use $platform$) whose
+  //files 'dpm copylocal' copies into the consuming project's build output at build time. Authored
+  //directly, so they can target artifacts built during install (e.g. a runtime .bpl in bpl\{platform}).
+  if FCopyLocalEntries.Any then
+  begin
+    seq := template.A['copyLocal'];
+    for i := 0 to FCopyLocalEntries.Count -1 do
+      FCopyLocalEntries[i].ToYAML(seq, packageKind);
   end;
 
   if FPackageDefinitions.Any then
@@ -478,6 +527,11 @@ end;
 function TSpecTemplate.GetCopyToBinEntries : IList<ISpecSourceEntry>;
 begin
   result := FCopyToBinEntries;
+end;
+
+function TSpecTemplate.GetCopyLocalEntries : IList<ISpecCopyLocalEntry>;
+begin
+  result := FCopyLocalEntries;
 end;
 
 function TSpecTemplate.GetPackageDefinitions : IList<ISpecPackageDefinition>;
@@ -629,6 +683,15 @@ begin
     end);
 end;
 
+function TSpecTemplate.LoadCopyLocalFromYAML(const copyLocalArray: IYAMLSequence): Boolean;
+begin
+  result := LoadYAMLCollection(copyLocalArray, TSpecCopyLocalEntry,
+    procedure(const value : IInterface)
+    begin
+      FCopyLocalEntries.Add(value as ISpecCopyLocalEntry);
+    end);
+end;
+
 function TSpecTemplate.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var
   collectionObj : IYAMLSequence;
@@ -669,6 +732,13 @@ begin
     collectionObj := yamlObject.A['copyToBin'];
     if collectionObj.Count > 0 then
       result := LoadCopyToBinFromYAML(collectionObj) and result;
+  end;
+
+  if yamlObject.ContainsKey('copyLocal') then
+  begin
+    collectionObj := yamlObject.A['copyLocal'];
+    if collectionObj.Count > 0 then
+      result := LoadCopyLocalFromYAML(collectionObj) and result;
   end;
 
   if yamlObject.ContainsKey('package definitions') then

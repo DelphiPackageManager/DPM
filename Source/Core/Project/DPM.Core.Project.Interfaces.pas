@@ -82,6 +82,10 @@ type
     procedure RemoveFromSearchPath(const platform : TDPMPlatform; const packageId : string);
 
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string>; const packageCacheLocation : string) : boolean;
+    // Idempotently injects the cache-relative import of DPM.CopyLocal.targets (and records
+    // dpmExePath in <DPMExe> when non-empty) so an AfterBuild target runs 'dpm copylocal'. The
+    // import is Exists()-guarded so builds never break when the cache/targets file is absent.
+    function EnsureCopyLocalImport(const dpmExePath : string) : boolean;
     // Writes the project's package references as a single platform-agnostic <Packages> node.
     procedure UpdatePackageReferences(const dependencyGraph : IPackageReference);
 

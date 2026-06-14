@@ -60,6 +60,7 @@ uses
   DPM.Console.Command.Why,
   DPM.Console.Command.Info,
   DPM.Console.Command.Sbom,
+  DPM.Console.Command.CopyLocal,
   DPM.Console.Command.Scan,
   DPM.Core.Vuln.Interfaces,
   DPM.Core.Vuln.Cache,
@@ -127,6 +128,8 @@ begin
  container.RegisterType<IVulnScanner,TVulnScanner>;
  container.RegisterType<IVulnWriter,TCycloneDxVexWriter>(cVulnWriterCycloneDX);
  container.RegisterType<ICommandHandler,TScanCommand>('command.scan');
+
+ container.RegisterType<ICommandHandler,TCopyLocalCommand>('command.copylocal');
 
  container.RegisterType<ICommandFactory,TCommandFactory>;
 

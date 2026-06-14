@@ -519,6 +519,36 @@
                                 "src"
                             ]
                         }
+                    },
+                    "copyLocal": {
+                        "type": "array",
+                        "description": "files copied into the consuming project's build output folder at build time (via 'dpm copylocal') - e.g native dlls and runtime bpls. The src is matched against the package cache, so it can target artifacts built during install (e.g. a runtime .bpl). The src may contain the $platform$ token, which resolves to the build platform's folder name.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "src": {
+                                    "type": "string",
+                                    "description": "The source ant pattern filespec, relative to the package root. May contain $platform$, e.g. bpl\\$platform$\\*.bpl"
+                                },
+                                "platforms": {
+                                    "type": "array",
+                                    "description": "The platforms this entry applies to. Omit (or leave empty) to apply to all platforms.",
+                                    "items": {
+                                        "$ref": "#/defs/platforms",
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    }
+                                },
+                                "mode": {
+                                    "type": "string",
+                                    "description": "'always' (default) = always copy; 'runtimeOnly' = only when the project links with runtime packages and references this package's runtime bpl.",
+                                    "enum": [ "always", "runtimeOnly" ]
+                                }
+                            },
+                            "required": [
+                                "src"
+                            ]
+                        }
                     }
                 },
                 "required": [

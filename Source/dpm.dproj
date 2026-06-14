@@ -221,7 +221,8 @@
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Manager.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Types.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.DesignEntry.pas"/>
-        <DCCReference Include="Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.CopyLocalEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Dependency.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.SourceEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Interfaces.pas"/>
@@ -337,6 +338,10 @@
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Trust.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Verify.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Sign.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.CopyLocalTargets.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.CopyLocal.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.CopyLocal.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.CopyLocal.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

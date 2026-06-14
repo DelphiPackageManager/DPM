@@ -803,6 +803,7 @@ var
   sourceEntry : ISpecSourceEntry;
   copyToLibEntry : ISpecSourceEntry;
   copyToBinEntry : ISpecSourceEntry;
+  copyLocalEntry : ISpecCopyLocalEntry;
   buildEntry : ISpecBuildEntry;
   designEntry : ISpecDesignEntry;
   packageDef : ISpecPackageDefinition;
@@ -943,6 +944,13 @@ begin
       copyToBinEntry.Exclude.Clear;
       template.CopyToBinEntries.Add(copyToBinEntry);
     end;
+
+    //copyLocal entries are authored directly (not derived from source entries) - they target
+    //build output produced during install (e.g. a runtime .bpl in bpl\{platform}), so there's no
+    //source file to pack. Normalise the authored glob to forward slashes so the packed spec is
+    //canonical; 'dpm copylocal' re-expands it (substituting $platform$) against the extracted package.
+    for copyLocalEntry in template.CopyLocalEntries do
+      copyLocalEntry.Source := StringReplace(Trim(copyLocalEntry.Source), '\', '/', [rfReplaceAll]);
 
     //we don't want these in the dspec
     template.SourceEntries.Clear;

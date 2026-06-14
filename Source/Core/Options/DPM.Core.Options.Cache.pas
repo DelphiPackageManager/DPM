@@ -34,10 +34,10 @@ uses
   DPM.Core.Options.Search;
 
 type
-  // `dpm cache <add|remove|verify>`. Plain names so VSoft's RTTI enum parser
+  // `dpm cache <install|remove|verify>`. Plain names so VSoft's RTTI enum parser
   // maps the positional sub-command argument directly (same pattern as
   // TSourcesSubCommand). Invalid is ordinal 0 / the default.
-  TCacheSubCommand = (Invalid, Add, Remove, Verify);
+  TCacheSubCommand = (Invalid, Install, Remove, Verify);
 
   TCacheOptions = class(TSearchOptions)
   private
@@ -137,7 +137,7 @@ begin
   case FCommand of
     TCacheSubCommand.Invalid :
       begin
-        logger.Error('A sub-command is required: add, remove or verify.');
+        logger.Error('A sub-command is required: install, remove or verify.');
         result := false;
       end;
 
@@ -145,7 +145,7 @@ begin
     // package-id / compiler / version checks that the other forms require.
     TCacheSubCommand.Verify : ; //nothing else to validate
 
-    TCacheSubCommand.Add :
+    TCacheSubCommand.Install :
       begin
         if PackageId = '' then
         begin

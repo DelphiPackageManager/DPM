@@ -1,4 +1,4 @@
-﻿{***************************************************************************}
+{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -117,7 +117,8 @@ uses
   DPM.Core.Sources.Manager in 'Core\Sources\DPM.Core.Sources.Manager.pas',
   DPM.Core.Sources.Types in 'Core\Sources\DPM.Core.Sources.Types.pas',
   DPM.Core.Spec.DesignEntry in 'Core\Spec\DPM.Core.Spec.DesignEntry.pas',
-  DPM.Core.Spec.BuildEntry in 'Core\Spec\DPM.Core.Spec.BuildEntry.pas',
+  DPM.Core.Spec.BuildEntry in 'Core\Spec\DPM.Core.Spec.BuildEntry.pas',
+  DPM.Core.Spec.CopyLocalEntry in 'Core\Spec\DPM.Core.Spec.CopyLocalEntry.pas',
   DPM.Core.Spec.Dependency in 'Core\Spec\DPM.Core.Spec.Dependency.pas',
   DPM.Core.Spec.SourceEntry in 'Core\Spec\DPM.Core.Spec.SourceEntry.pas',
   DPM.Core.Spec.Interfaces in 'Core\Spec\DPM.Core.Spec.Interfaces.pas',
@@ -232,7 +233,11 @@ uses
   DPM.Console.Command.Cache in 'Cmdline\Commands\DPM.Console.Command.Cache.pas',
   DPM.Console.Command.Trust in 'Cmdline\Commands\DPM.Console.Command.Trust.pas',
   DPM.Console.Command.Verify in 'Cmdline\Commands\DPM.Console.Command.Verify.pas',
-  DPM.Console.Command.Sign in 'Cmdline\Commands\DPM.Console.Command.Sign.pas';
+  DPM.Console.Command.Sign in 'Cmdline\Commands\DPM.Console.Command.Sign.pas',
+  DPM.Core.Project.CopyLocalTargets in 'Core\Project\DPM.Core.Project.CopyLocalTargets.pas',
+  DPM.Core.Package.CopyLocal in 'Core\Package\DPM.Core.Package.CopyLocal.pas',
+  DPM.Console.Command.CopyLocal in 'Cmdline\Commands\DPM.Console.Command.CopyLocal.pas',
+  DPM.Core.Options.CopyLocal in 'Core\Options\DPM.Core.Options.CopyLocal.pas';
 
 procedure LogException(ExceptObj: TObject; ExceptAddr: Pointer; OSException: Boolean);
 var

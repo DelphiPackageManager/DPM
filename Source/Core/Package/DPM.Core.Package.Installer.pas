@@ -112,8 +112,10 @@ type
     function EnsureDesignHostPlatformCompiled(const cancellationToken: ICancellationToken; const options: TSearchOptions;
                                               const graph: IPackageReference; const installedPlatforms: TDPMPlatforms): boolean;
 
-    function CopyLocal(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>;
-                       const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
+    //Returns the path to dpm.exe to record in the project's <DPMExe> for the copy-local targets to
+    //prefer, or '' when the running process isn't dpm (e.g. the IDE plugin restoring) - in which case
+    //the targets file falls back to 'dpm' on PATH.
+    function GetDpmExePathForTargets : string;
 
     function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;
 
@@ -186,6 +188,14 @@ type
 
     function DoCachePackage(const cancellationToken: ICancellationToken; const Options: TCacheOptions): boolean;
 
+    //After a package has been extracted into the cache by DoCachePackage, this resolves its dependency
+    //graph and compiles the package (and its dependencies) into the cache for every platform the package
+    //supports. Without this the cached entry only contains source - no lib\{platform} .dcu/.dcp or
+    //bpl\{platform} .bpl - so it is incomplete (the IDE/restore would have to build it on first use, and
+    //`dpm cache verify` would treat it as invalid). Mirrors the build half of DoConfigurePackageForPlatform
+    //but writes only to the cache (no project search paths / copy-local / dproj edits).
+    function DoBuildCachedPackage(const cancellationToken: ICancellationToken; const Options: TCacheOptions; const packageInfo: IPackageInfo): boolean;
+
     // works out what compiler/platform then calls DoInstallPackage
     function InstallPackage(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const projectEditor: IProjectEditor; const config: IConfiguration;
                             const context: IPackageInstallerContext): boolean;
@@ -245,6 +255,7 @@ uses
   DPM.Core.Utils.Files,
   DPM.Core.Utils.System,
   DPM.Core.Project.Editor,
+  DPM.Core.Project.CopyLocalTargets,
   DPM.Core.Project.GroupProjReader,
   DPM.Core.Options.List,
   DPM.Core.Dependency.Reference,
@@ -265,8 +276,10 @@ begin
   if config = nil then
       exit;
 
-  //One .dpkg per compiler in the new model - it bundles every platform the package supports,
-  //so a single download covers them all.
+  //Installs the package into the cache (the `dpm cache install` command): downloads and extracts
+  //the package, resolves and downloads its dependencies, then compiles them all into the cache.
+  //One .dpkg per compiler in the new model - it bundles every platform the package supports, so a
+  //single download covers them all.
   result := DoCachePackage(cancellationToken, Options);
 end;
 
@@ -808,104 +821,13 @@ begin
 end;
 
 
-function TPackageInstaller.CopyLocal(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>;
-                                     const projectEditor: IProjectEditor; const platform: TDPMPlatform): boolean;
-//var
-//  configName: string;
-//  projectConfig: IProjectConfiguration;
-//  packageSpec: IPackageSpec;
-//  resolvedPackage: IPackageInfo;
-//  configNames: IReadOnlyList<string>;
-//  outputDir: string;
-//  lastOutputDir: string;
-//  bplSourceFile: string;
-//  bplTargetFile: string;
-//  packageFolder: string;
-//  runtimeCopyLocalFiles: TArray<ISpecBPLEntry>;
-//  runtimeEntry: ISpecBPLEntry;
-
+function TPackageInstaller.GetDpmExePathForTargets : string;
 begin
-  result := true;
-
-//  configNames := projectEditor.GetConfigNames;
-//
-//  for resolvedPackage in resolvedPackages do
-//  begin
-//    packageSpec := packageSpecs[LowerCase(resolvedPackage.Id)];
-//    Assert(packageSpec <> nil);
-//    // FLogger.Debug('Copylocal for package [' + resolvedPackage.Id + ']');
-//
-//    // TODO : Is there any point in the copylocal option now.. shouldn't all runtime bpls be copied?
-//    runtimeCopyLocalFiles := packageSpec.TargetPlatform.RuntimeFiles.Where(
-//      function(const entry: ISpecBPLEntry): boolean
-//      begin
-//        result := entry.CopyLocal;
-//      end).ToArray;
-//
-//    // if no runtime bpl's are defined with copylocal in the dspec then there is nothing to do.
-//    if Length(runtimeCopyLocalFiles) = 0 then
-//      continue;
-//
-//    lastOutputDir := '';
-//    packageFolder := FPackageCache.GetPackagePath(resolvedPackage);
-//    // FLogger.Debug('Package folder [' + packageFolder + ']');
-//
-//    for configName in configNames do
-//    begin
-//      if configName = 'Base' then
-//        continue;
-//      // FLogger.Debug('Config [' + configName + ']');
-//
-//      projectConfig := projectEditor.GetProjectConfiguration(configName,
-//        platform);
-//      // we're only doing this for projects using runtime configs.
-//      if not projectConfig.UsesRuntimePackages then
-//        continue;
-//
-//      // FLogger.Debug('uses runtime packages');
-//
-//      outputDir := projectConfig.outputDir;
-//      if (outputDir <> '') and (not SameText(outputDir, lastOutputDir)) then
-//      begin
-//        lastOutputDir := outputDir;
-//
-//        for runtimeEntry in runtimeCopyLocalFiles do
-//        begin
-//          bplSourceFile := TPath.Combine(packageFolder, runtimeEntry.Source);
-//          if not FileExists(bplSourceFile) then
-//          begin
-//            FLogger.Warning('Unabled to find runtime package [' + bplSourceFile + '] during copy local');
-//            continue;
-//          end;
-//          bplTargetFile := TPath.Combine(outputDir,
-//            ExtractFileName(bplSourceFile));
-//
-//          if TPathUtils.IsRelativePath(bplTargetFile) then
-//          begin
-//            bplTargetFile :=
-//              TPath.Combine(ExtractFilePath(projectEditor.projectFile), bplTargetFile);
-//            bplTargetFile := TPathUtils.CompressRelativePath('', bplTargetFile);
-//          end;
-//
-//          // if the file exists already, then we need to work out if they are the same or not.
-//          if FileExists(bplTargetFile) and
-//            TFileUtils.AreSameFiles(bplSourceFile, bplTargetFile) then
-//            continue;
-//          // now actually copy files.
-//          try
-//            ForceDirectories(ExtractFilePath(bplTargetFile));
-//            TFile.Copy(bplSourceFile, bplTargetFile, true);
-//          except
-//            on e: Exception do
-//            begin
-//              FLogger.Warning('Unable to copy runtime package [' + bplSourceFile + '] to [' + bplTargetFile + '] during copy local');
-//              FLogger.Warning('  ' + e.Message);
-//            end;
-//          end;
-//        end;
-//      end;
-//    end;
-//  end;
+  result := ParamStr(0);
+  //Only record the path when we are actually dpm.exe; otherwise leave it empty so the targets file
+  //falls back to 'dpm' on PATH (the IDE plugin restoring would record bds.exe here otherwise).
+  if not SameText(ExtractFileName(result), 'dpm.exe') then
+    result := '';
 end;
 
 constructor TPackageInstaller.Create(const logger: ILogger; const configurationManager: IConfigurationManager; const repositoryManager: IPackageRepositoryManager;
@@ -1084,6 +1006,121 @@ begin
 
   if not EnsurePackageInCache(cancellationToken, packageInfo) then
     exit;
+
+  //Extraction only lays down the source - compile the package (and its dependencies) into the cache so
+  //the entry is actually usable, otherwise we leave behind an incomplete cache entry with no binaries.
+  if not DoBuildCachedPackage(cancellationToken, Options, packageInfo) then
+    exit;
+
+  result := true;
+end;
+
+function TPackageInstaller.DoBuildCachedPackage(const cancellationToken: ICancellationToken; const Options: TCacheOptions; const packageInfo: IPackageInfo): boolean;
+var
+  projectReferences: IList<IPackageReference>;
+  resolvedPackages: IList<IPackageInfo>;
+  dependencyGraph: IPackageReference;
+  packageSpecs: IDictionary<string, IPackageSpec>;
+  spec: IPackageSpec;
+  supportedPlatforms: TDPMPlatforms;
+  platform: TDPMPlatform;
+  packageCompiler: ICompiler;
+  packagesToBuild: IList<IPackageInfo>;
+  packagesToCompile: IList<IPackageInfo>;
+  compiledPackages: IList<IPackageInfo>;
+  pkgInfo: IPackageInfo;
+const
+  //There is no project in the cache flow - the resolver only uses this as a key for cross-project
+  //conflict detection, and the cache command resolves a single package in isolation, so a synthetic
+  //name is fine (and avoids colliding with any real project recorded in the installer context).
+  cCachePseudoProject = ':cache:';
+begin
+  result := false;
+
+  //Resolve the dependency graph so we know the full set of packages to build and the order to build
+  //them in (a package's compile needs its dependencies' search paths). projectReferences is empty -
+  //there is no existing project graph in the cache flow.
+  projectReferences := TCollections.CreateList<IPackageReference>;
+  if not FDependencyResolver.ResolveForInstall(cancellationToken, Options.CompilerVersion, cCachePseudoProject, Options, packageInfo, projectReferences, dependencyGraph, resolvedPackages) then
+  begin
+    FLogger.Error('Failed to resolve dependencies for package [' + packageInfo.ToString + ']');
+    exit;
+  end;
+
+  if (resolvedPackages = nil) or (resolvedPackages.Count = 0) then
+  begin
+    FLogger.Error('Resolver returned no packages for [' + packageInfo.ToString + ']');
+    exit;
+  end;
+
+  //Drop synthetic bundled no-ops (e.g. Indy) - they are IDE-provided, so there is nothing to
+  //download or compile (and no .dpkg exists on the server). Same filter FinalizePackageConfiguration
+  //applies before downloading/configuring on the normal install path.
+  packagesToBuild := TCollections.CreateList<IPackageInfo>;
+  for pkgInfo in resolvedPackages do
+    if not IsBundledPackageInfo(pkgInfo) then
+      packagesToBuild.Add(pkgInfo);
+
+  if packagesToBuild.Count = 0 then
+  begin
+    //Everything resolved was bundled - nothing to cache/build, but that is not an error.
+    result := true;
+    exit;
+  end;
+
+  //Ensure every resolved package (dependencies included) is in the cache and load their specs - the
+  //build needs the specs for templates, build entries and platform support.
+  packageSpecs := TCollections.CreateDictionary<string, IPackageSpec>;
+  if not DownloadPackages(cancellationToken, packagesToBuild, packageSpecs) then
+    exit;
+
+  //The .dpkg bundles every platform the package supports for this compiler. Build them all so the
+  //cache entry is complete - the spec's declared platforms are the source of truth for what can be
+  //built, falling back to the package info if the spec doesn't declare any.
+  spec := packageSpecs[LowerCase(packageInfo.Id)];
+  if (spec <> nil) and (spec.TargetPlatform <> nil) and (spec.TargetPlatform.Platforms <> []) then
+    supportedPlatforms := spec.TargetPlatform.Platforms
+  else
+    supportedPlatforms := packageInfo.SupportedPlatforms;
+
+  if supportedPlatforms = [] then
+  begin
+    FLogger.Error('Package [' + packageInfo.ToString + '] does not declare any supported platforms - nothing to build.');
+    exit;
+  end;
+
+  for platform in supportedPlatforms do
+  begin
+    if cancellationToken.IsCancelled then
+      exit;
+
+    packageCompiler := FCompilerFactory.CreateCompiler(Options.CompilerVersion, platform);
+
+    //BuildDependencies removes packages from this list as it compiles them, so it needs a fresh copy
+    //per platform. Drop any dependency that doesn't support this platform - it can't be built for it
+    //(mirrors the supported/unsupported partition in DoConfigurePackageForPlatform).
+    packagesToCompile := TCollections.CreateList<IPackageInfo>;
+    for pkgInfo in packagesToBuild do
+    begin
+      spec := packageSpecs[LowerCase(pkgInfo.Id)];
+      if (spec <> nil) and (spec.TargetPlatform <> nil) and (spec.TargetPlatform.Platforms <> []) and
+         (not PlatformSatisfiedBy(platform, spec.TargetPlatform.Platforms)) then
+        continue;
+      packagesToCompile.Add(pkgInfo);
+    end;
+
+    if packagesToCompile.Count = 0 then
+      continue;
+
+    compiledPackages := TCollections.CreateList<IPackageInfo>;
+    FLogger.Information('Building package [' + packageInfo.Id + '] for platform [' + DPMPlatformToString(platform) + ']');
+    if not BuildDependencies(cancellationToken, packageCompiler, dependencyGraph, packagesToCompile, compiledPackages, packageSpecs, Options) then
+    begin
+      FLogger.Error('Failed to build package [' + packageInfo.ToString + '] for platform [' + DPMPlatformToString(platform) + ']');
+      exit;
+    end;
+  end;
+
   result := true;
 end;
 
@@ -1600,7 +1637,11 @@ begin
   if not CollectSearchPaths(projectPackageGraph, supportedPackages, compiledPackages, projectEditor.compilerVersion, platform, packageSearchPaths) then
     exit;
 
-  if not CopyLocal(cancellationToken, supportedPackages, packageSpecs, projectEditor, platform) then
+  //Copy-local runs at build time (the output dir is only reliably known then), not here. At
+  //restore/install we just ensure the targets file exists in the cache root and the project imports
+  //it, so its AfterBuild target can invoke 'dpm copylocal'.
+  EnsureCopyLocalTargets(config.PackageCacheLocation, FLogger);
+  if not projectEditor.EnsureCopyLocalImport(GetDpmExePathForTargets) then
     exit;
 
   //Design packages are per-IDE/compiler, not per-platform - the call is hoisted out to the

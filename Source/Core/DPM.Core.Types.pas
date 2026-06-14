@@ -111,6 +111,18 @@ type
     git //points to a git repository
   );
 
+  //Controls whether a source entry's matched files are copied into the consuming project's build
+  //output folder (next to the exe) at build time by the 'dpm copylocal' command.
+  // none        - never copied.
+  // always      - always copied (e.g. a native dll loaded via LoadLibrary regardless of packages).
+  // runtimeOnly - only copied when the project links with runtime packages and actually references
+  //               this package's runtime bpl (e.g. the bpl the project loads at runtime).
+  TCopyLocalMode = (
+    none,
+    always,
+    runtimeOnly
+  );
+
   TConstProc<T> = reference to procedure(const Arg1 : T);
   TConstProc<T1, T2> = reference to procedure(const Arg1 : T1; const Arg2 : T2);
   TConstProc<T1, T2, T3> = reference to procedure(const Arg1 : T1; const Arg2 : T2; const Arg3 : T3);
@@ -208,6 +220,11 @@ function UIFrameworkTypeToString(const value : TDPMUIFrameworkType) : string;
 
 function StringToPackageKind(const value : string) : TDPMPackageKind;
 function PackageKindToString(const value : TDPMPackageKind) : string;
+
+//Tolerant parse for the copyLocal authoring value: accepts the enum tokens (none/always/runtimeOnly,
+//case-insensitive) and a boolean (true -> always, false -> none). Unknown tokens resolve to none.
+function StringToCopyLocalMode(const value : string) : TCopyLocalMode;
+function CopyLocalModeToString(const value : TCopyLocalMode) : string;
 
 
 implementation
@@ -360,6 +377,31 @@ end;
 function PackageKindToString(const value : TDPMPackageKind) : string;
 begin
   result := GetEnumName(TypeInfo(TDPMPackageKind), ord(value));
+end;
+
+function StringToCopyLocalMode(const value : string) : TCopyLocalMode;
+var
+  lowerValue : string;
+  iValue : integer;
+begin
+  lowerValue := LowerCase(Trim(value));
+  if (lowerValue = 'true') or (lowerValue = '1') or (lowerValue = 'yes') then
+    result := TCopyLocalMode.always
+  else if (lowerValue = 'false') or (lowerValue = '0') or (lowerValue = 'no') or (lowerValue = '') then
+    result := TCopyLocalMode.none
+  else
+  begin
+    iValue := GetEnumValue(typeInfo(TCopyLocalMode), value);
+    if iValue = -1 then
+      result := TCopyLocalMode.none
+    else
+      result := TCopyLocalMode(iValue);
+  end;
+end;
+
+function CopyLocalModeToString(const value : TCopyLocalMode) : string;
+begin
+  result := GetEnumName(TypeInfo(TCopyLocalMode), ord(value));
 end;
 
 function CompilerNoPrefix(const value : TCompilerVersion) : string;

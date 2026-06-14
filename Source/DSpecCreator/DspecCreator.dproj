@@ -60,7 +60,7 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
         <SanitizedProjectName>DspecCreator</SanitizedProjectName>
-        <Custom_Styles>"Windows11 MineShaft|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Windows11_MineShaft.vsf";"Windows11 Modern Light|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Windows11_Modern_Light.vsf";"Windows11 White Smoke|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Windows11_WhiteSmoke.vsf"</Custom_Styles>
+        <Custom_Styles>&quot;Windows11 MineShaft|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Windows11_MineShaft.vsf&quot;;&quot;Windows11 Modern Light|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Windows11_Modern_Light.vsf&quot;;&quot;Windows11 White Smoke|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Windows11_WhiteSmoke.vsf&quot;</Custom_Styles>
         <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
         <DCC_Define>CREATOR;$(DCC_Define)</DCC_Define>
         <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
@@ -209,7 +209,8 @@
         <DCCReference Include="..\Core\Sources\DPM.Core.Sources.Manager.pas"/>
         <DCCReference Include="..\Core\Sources\DPM.Core.Sources.Types.pas"/>
         <DCCReference Include="..\Core\Spec\DPM.Core.Spec.DesignEntry.pas"/>
-        <DCCReference Include="..\Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
+        <DCCReference Include="..\Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
+        <DCCReference Include="..\Core\Spec\DPM.Core.Spec.CopyLocalEntry.pas"/>
         <DCCReference Include="..\Core\Spec\DPM.Core.Spec.Dependency.pas"/>
         <DCCReference Include="..\Core\Spec\DPM.Core.Spec.SourceEntry.pas"/>
         <DCCReference Include="..\Core\Spec\DPM.Core.Spec.Interfaces.pas"/>
@@ -289,6 +290,9 @@
         <DCCReference Include="..\Core\Utils\DPM.Core.Utils.XML.pas"/>
         <DCCReference Include="..\Core\Project\DPM.Core.Project.Configuration.pas"/>
         <DCCReference Include="..\Core\Project\DPM.Core.Project.Editor.pas"/>
+        <DCCReference Include="..\Core\Project\DPM.Core.Project.CopyLocalTargets.pas"/>
+        <DCCReference Include="..\Core\Package\DPM.Core.Package.CopyLocal.pas"/>
+        <DCCReference Include="..\Core\Options\DPM.Core.Options.CopyLocal.pas"/>
         <DCCReference Include="..\Core\Project\DPM.Core.Project.GroupProjReader.pas"/>
         <DCCReference Include="..\Core\Project\DPM.Core.Project.Interfaces.pas"/>
         <DCCReference Include="..\Core\Project\DPM.Core.Project.MapFile.pas"/>

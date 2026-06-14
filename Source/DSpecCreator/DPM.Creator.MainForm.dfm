@@ -357,11 +357,18 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Caption = 'Platform'
         Enabled = False
       end
+      object Label9: TLabel
+        Left = 256
+        Top = 315
+        Width = 176
+        Height = 15
+        Caption = 'TargetPlatform Variable Overrides'
+      end
       object clbCompilers: TCheckListBox
         Left = 72
         Top = 28
         Width = 161
-        Height = 417
+        Height = 469
         ItemHeight = 17
         Items.Strings = (
           'XE2'
@@ -422,9 +429,9 @@ object DSpecCreatorForm: TDSpecCreatorForm
       end
       object VariablesList: TValueListEditor
         Left = 256
-        Top = 308
-        Width = 297
-        Height = 137
+        Top = 336
+        Width = 585
+        Height = 153
         DoubleBuffered = True
         Enabled = False
         KeyOptions = [keyEdit, keyAdd, keyDelete, keyUnique]
@@ -436,7 +443,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         OnStringsChange = VariablesListStringsChange
         ColWidths = (
           150
-          141)
+          429)
       end
     end
     object tsTemplates: TTabSheet
@@ -455,7 +462,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Width = 529
         Height = 528
         Align = alClient
-        ActiveCard = crdDesign
+        ActiveCard = crdCopyLocal
         Caption = 'CardPanel'
         TabOrder = 0
         object crdSource: TCard
@@ -497,6 +504,13 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Height = 15
             Caption = 'Excluded Items'
           end
+          object lblFileEntryCopyToBin: TLabel
+            Left = 16
+            Top = 336
+            Width = 142
+            Height = 15
+            Caption = 'Copy to bpl\{platform} for:'
+          end
           object edtFileEntrySource: TEdit
             Left = 16
             Top = 61
@@ -514,6 +528,9 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Top = 89
             Width = 297
             Height = 17
+            Hint = 
+              'Use this to copy form and resource files to the lib\{platform} f' +
+              'older'
             Caption = 'Copy matched files to lib\{platform} on install'
             TabOrder = 6
             OnClick = chkFileEntryCopyToLibClick
@@ -566,13 +583,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Caption = 'Delete Exclude'
             TabOrder = 3
             OnClick = btnDeleteExcludeClick
-          end
-          object lblFileEntryCopyToBin: TLabel
-            Left = 16
-            Top = 336
-            Width = 145
-            Height = 15
-            Caption = 'Copy to bpl\{platform} for:'
           end
           object cboFileEntryCopyToBin: TComboBox
             Left = 16
@@ -739,29 +749,29 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Caption = 'Platforms:'
           end
           object lblDesignReferences: TLabel
-            Left = 271
-            Top = 144
-            Width = 60
+            Left = 16
+            Top = 318
+            Width = 212
             Height = 15
-            Caption = 'References:'
+            Caption = 'References (only used for package defs):'
           end
           object lblLibPrefix: TLabel
-            Left = 16
-            Top = 320
+            Left = 264
+            Top = 176
             Width = 51
             Height = 15
             Caption = 'Lib Prefix:'
           end
           object lblLibSuffix: TLabel
-            Left = 16
-            Top = 349
+            Left = 264
+            Top = 205
             Width = 51
             Height = 15
             Caption = 'Lib Suffix:'
           end
           object lblLibVersion: TLabel
-            Left = 16
-            Top = 378
+            Left = 264
+            Top = 234
             Width = 60
             Height = 15
             Caption = 'Lib Version:'
@@ -809,16 +819,16 @@ object DSpecCreatorForm: TDSpecCreatorForm
             OnClickCheck = clbDesignPlatformsClickCheck
           end
           object lbDesignReferences: TListBox
-            Left = 271
-            Top = 165
+            Left = 16
+            Top = 339
             Width = 240
             Height = 100
             ItemHeight = 15
             TabOrder = 3
           end
           object btnAddDesignRef: TButton
-            Left = 271
-            Top = 271
+            Left = 16
+            Top = 445
             Width = 75
             Height = 25
             Caption = 'Add'
@@ -826,8 +836,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
             OnClick = btnAddDesignRefClick
           end
           object btnDeleteDesignRef: TButton
-            Left = 360
-            Top = 271
+            Left = 105
+            Top = 445
             Width = 75
             Height = 25
             Caption = 'Delete'
@@ -835,24 +845,24 @@ object DSpecCreatorForm: TDSpecCreatorForm
             OnClick = btnDeleteDesignRefClick
           end
           object edtLibPrefix: TEdit
-            Left = 110
-            Top = 317
+            Left = 358
+            Top = 173
             Width = 150
             Height = 23
             TabOrder = 6
             OnChange = edtLibPrefixChange
           end
           object edtLibSuffix: TEdit
-            Left = 110
-            Top = 346
+            Left = 358
+            Top = 202
             Width = 150
             Height = 23
             TabOrder = 7
             OnChange = edtLibSuffixChange
           end
           object edtLibVersion: TEdit
-            Left = 110
-            Top = 375
+            Left = 358
+            Top = 231
             Width = 150
             Height = 23
             TabOrder = 8
@@ -1054,10 +1064,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Package Definitions'
           CardIndex = 9
           TabOrder = 9
-          ExplicitLeft = 0
-          ExplicitTop = 0
-          ExplicitWidth = 185
-          ExplicitHeight = 41
           object lblPackageDefsHeading: TLabel
             Left = 24
             Top = 24
@@ -1116,28 +1122,28 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object lblPackageDefPlatforms: TLabel
             Left = 16
             Top = 150
-            Width = 210
+            Width = 196
             Height = 15
             Caption = 'Platforms (overrides target platform):'
           end
           object lblPackageDefFiles: TLabel
             Left = 271
             Top = 150
-            Width = 28
+            Width = 26
             Height = 15
             Caption = 'Files:'
           end
           object lblPackageDefExclude: TLabel
             Left = 16
             Top = 331
-            Width = 47
+            Width = 43
             Height = 15
             Caption = 'Exclude:'
           end
           object lblPackageDefRequires: TLabel
             Left = 271
             Top = 331
-            Width = 52
+            Width = 48
             Height = 15
             Caption = 'Requires:'
           end
@@ -1157,7 +1163,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Top = 113
             Width = 200
             Height = 23
-            Style = csDropDown
             TabOrder = 1
             OnChange = cboPackageDefKindChange
             Items.Strings = (
@@ -1276,10 +1281,13 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Environment Variables'
           CardIndex = 11
           TabOrder = 11
+          DesignSize = (
+            527
+            526)
           object lblEnvironmentVariablesHeading: TLabel
             Left = 8
             Top = 8
-            Width = 110
+            Width = 117
             Height = 15
             Caption = 'Environment Variables'
           end
@@ -1289,7 +1297,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Width = 505
             Height = 60
             AutoSize = False
-            Caption =
+            Caption = 
               'Environment variables set in the IDE process while the package d' +
               'esign-time components are loaded, and cleared when unloaded. PAT' +
               'H is appended (semicolon separated). Use $packageDir$ to referen' +
@@ -1314,6 +1322,136 @@ object DSpecCreatorForm: TDSpecCreatorForm
             ColWidths = (
               150
               355)
+          end
+        end
+        object crdCopyLocal: TCard
+          Left = 1
+          Top = 1
+          Width = 527
+          Height = 526
+          Caption = 'Copy Local'
+          CardIndex = 12
+          TabOrder = 12
+          DesignSize = (
+            527
+            526)
+          object lblCopyLocal: TLabel
+            Left = 8
+            Top = 8
+            Width = 59
+            Height = 15
+            Caption = 'Copy Local'
+          end
+          object lblCopyLocalSrc: TLabel
+            Left = 16
+            Top = 40
+            Width = 19
+            Height = 15
+            Caption = 'Src:'
+          end
+          object lblCopyLocalPlatforms: TLabel
+            Left = 16
+            Top = 92
+            Width = 54
+            Height = 15
+            Caption = 'Platforms:'
+          end
+          object lblCopyLocalMode: TLabel
+            Left = 271
+            Top = 92
+            Width = 34
+            Height = 15
+            Caption = 'Mode:'
+          end
+          object Label15: TLabel
+            Left = 272
+            Top = 152
+            Width = 233
+            Height = 121
+            Anchors = [akLeft, akTop, akRight]
+            AutoSize = False
+            Caption = 
+              'runtimeOnly mode will copy a bpl if the project uses runtime pac' +
+              'kages and the bpl is referenced.'#13#10#13#10'alway mode will always copy ' +
+              'the file(s) to the output folder'
+            Enabled = False
+            WordWrap = True
+          end
+          object edtCopyLocalSrc: TEdit
+            Left = 16
+            Top = 61
+            Width = 495
+            Height = 23
+            Anchors = [akLeft, akTop, akRight]
+            ParentShowHint = False
+            ShowHint = True
+            TabOrder = 0
+            TextHint = 'e.g. bpl\$platform$\*.bpl'
+            OnChange = edtCopyLocalSrcChange
+          end
+          object clbCopyLocalPlatforms: TCheckListBox
+            Left = 16
+            Top = 113
+            Width = 240
+            Height = 160
+            ItemHeight = 17
+            Items.Strings = (
+              'Win32'
+              'Win64'
+              'WinARM64EC'
+              'MacOS32'
+              'MacOS64'
+              'MacOSARM64'
+              'Android'
+              'Android64'
+              'iOS32'
+              'iOS64'
+              'iOSSimulator'
+              'Linux64')
+            TabOrder = 1
+            OnClickCheck = clbCopyLocalPlatformsClickCheck
+          end
+          object cboCopyLocalMode: TComboBox
+            Left = 271
+            Top = 113
+            Width = 240
+            Height = 23
+            Style = csDropDownList
+            TabOrder = 2
+            OnChange = cboCopyLocalModeChange
+          end
+        end
+        object crdCopyLocalHeading: TCard
+          Left = 1
+          Top = 1
+          Width = 527
+          Height = 526
+          Caption = 'Copy Local'
+          CardIndex = 13
+          TabOrder = 13
+          DesignSize = (
+            527
+            526)
+          object lblCopyLocalHeading: TLabel
+            Left = 8
+            Top = 8
+            Width = 59
+            Height = 15
+            Caption = 'Copy Local'
+          end
+          object Label12: TLabel
+            Left = 5
+            Top = 29
+            Width = 522
+            Height = 60
+            Anchors = [akLeft, akTop, akRight, akBottom]
+            AutoSize = False
+            Caption = 
+              'Copy Local items definre how files in the package should be copi' +
+              'ed to the output folder after build. Use this for runtime bpl'#39's,' +
+              ' dll'#39's etc'
+            Enabled = False
+            WordWrap = True
           end
         end
       end
@@ -1977,8 +2115,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
     end
   end
   object MainMenu: TMainMenu
-    Left = 508
-    Top = 386
+    Left = 444
+    Top = 466
     object mnuFile: TMenuItem
       Caption = '&File'
       object miNew: TMenuItem
@@ -2038,8 +2176,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Top = 386
   end
   object PopupMenu: TPopupMenu
-    Left = 588
-    Top = 386
+    Left = 644
+    Top = 442
   end
   object BalloonHint1: TBalloonHint
     Left = 757
@@ -2378,6 +2516,16 @@ object DSpecCreatorForm: TDSpecCreatorForm
       Caption = 'Delect Build Item'
       OnExecute = actDeleteBuildItemExecute
     end
+    object actAddCopyLocalItem: TAction
+      Category = 'CopyLocal'
+      Caption = 'Add CopyLocal Item'
+      OnExecute = actAddCopyLocalItemExecute
+    end
+    object actDeleteCopyLocalItem: TAction
+      Category = 'CopyLocal'
+      Caption = 'Delete CopyLocal Item'
+      OnExecute = actDeleteCopyLocalItemExecute
+    end
     object actAddDesignItem: TAction
       Category = 'Design'
       Caption = 'Add Design Item'
@@ -2447,8 +2595,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Top = 226
   end
   object pmCompilers: TPopupMenu
-    Left = 588
-    Top = 442
+    Left = 524
+    Top = 506
     object SelectAll1: TMenuItem
       Action = actCompilersSelectAll
     end
@@ -2457,8 +2605,8 @@ object DSpecCreatorForm: TDSpecCreatorForm
     end
   end
   object pmPlatforms: TPopupMenu
-    Left = 660
-    Top = 442
+    Left = 444
+    Top = 506
     object SelectAll2: TMenuItem
       Action = actPlatformsSelectAll
     end

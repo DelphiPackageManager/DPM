@@ -102,6 +102,7 @@ type
 
     procedure RemoveFromSearchPath(const platform : TDPMPlatform; const packageId : string);
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string> ; const packageCacheLocation : string) : boolean;
+    function EnsureCopyLocalImport(const dpmExePath : string) : boolean;
     procedure UpdatePackageReferences(const dependencyGraph : IPackageReference);
     function GetPackageReferences : IPackageReference;
     function GetConfigNames: IReadOnlyList<string>;
@@ -122,6 +123,7 @@ uses
   DPM.Core.Dependency.Version,
   DPM.Core.Dependency.Reference,
 //  DPM.Core.Project.PackageReference,
+  DPM.Core.Project.CopyLocalTargets,
   DPM.Core.Project.Configuration;
 
 const
@@ -233,6 +235,51 @@ begin
 
 
 
+end;
+
+function TProjectEditor.EnsureCopyLocalImport(const dpmExePath : string) : boolean;
+var
+  dpmGroup : IXMLDOMElement;
+  dpmExeElement : IXMLDOMElement;
+  importElement : IXMLDOMElement;
+  importProject : string;
+begin
+  result := false;
+  dpmGroup := GetDPMPropertyGroup;
+  if dpmGroup = nil then
+  begin
+    FLogger.Error('Unable to find or create PropertyGroup for DPM in the project file');
+    exit;
+  end;
+
+  //Record the dpm.exe path so the targets file can prefer it over a PATH lookup. Only write it when
+  //we actually know it's dpm (the IDE plugin restoring would otherwise record bds.exe here).
+  if dpmExePath <> '' then
+  begin
+    dpmExeElement := dpmGroup.selectSingleNode('x:DPMExe') as IXMLDOMElement;
+    if dpmExeElement = nil then
+    begin
+      dpmExeElement := FProjectXML.createNode(NODE_ELEMENT, 'DPMExe', msbuildNamespace) as IXMLDOMElement;
+      dpmGroup.appendChild(dpmExeElement);
+      FModified := true;
+    end;
+    SetElementText(dpmExeElement, dpmExePath);
+  end;
+
+  //Cache-relative import - $(DPMCache) is defined in the DPM PropertyGroup above (earlier in document
+  //order), so it resolves when MSBuild evaluates this import. Exists()-guarded so a build never fails
+  //when the cache or targets file is missing.
+  importProject := '$(DPMCache)\' + cCopyLocalTargetsFileName;
+  importElement := FProjectXML.selectSingleNode('/x:Project/x:Import[@Project="' + importProject + '"]') as IXMLDOMElement;
+  if importElement = nil then
+  begin
+    importElement := FProjectXML.createNode(NODE_ELEMENT, 'Import', msbuildNamespace) as IXMLDOMElement;
+    FProjectXML.documentElement.appendChild(importElement);
+    FModified := true;
+  end;
+  SetElementAttr(importElement, 'Project', importProject);
+  SetElementAttr(importElement, 'Condition', 'Exists(''' + importProject + ''')');
+  result := true;
 end;
 
 constructor TProjectEditor.Create(const logger : ILogger; const config : IConfiguration; const compilerVersion : TCompilerVersion);

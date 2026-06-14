@@ -29,6 +29,7 @@ uses
   DPM.Core.Utils.XML in 'Core\Utils\DPM.Core.Utils.XML.pas',
   DPM.Core.Spec.DesignEntry in 'Core\Spec\DPM.Core.Spec.DesignEntry.pas',
   DPM.Core.Spec.BuildEntry in 'Core\Spec\DPM.Core.Spec.BuildEntry.pas',
+  DPM.Core.Spec.CopyLocalEntry in 'Core\Spec\DPM.Core.Spec.CopyLocalEntry.pas',
   DPM.Core.Spec.PackageDefinition in 'Core\Spec\DPM.Core.Spec.PackageDefinition.pas',
   DPM.Core.Spec.Dependency in 'Core\Spec\DPM.Core.Spec.Dependency.pas',
   DPM.Core.Spec.SourceEntry in 'Core\Spec\DPM.Core.Spec.SourceEntry.pas',
@@ -206,7 +207,11 @@ uses
   DPM.Core.Tests.Git.Client in 'Tests\DPM.Core.Tests.Git.Client.pas',
   DPM.Core.Tests.Registry.Catalog in 'Tests\DPM.Core.Tests.Registry.Catalog.pas',
   TargetPlatformTests in 'Tests\TargetPlatformTests.pas',
-  TestLogger in 'Tests\TestLogger.pas';
+  TestLogger in 'Tests\TestLogger.pas',
+  DPM.Core.Project.CopyLocalTargets in 'Core\Project\DPM.Core.Project.CopyLocalTargets.pas',
+  DPM.Core.Package.CopyLocal in 'Core\Package\DPM.Core.Package.CopyLocal.pas',
+  DPM.Core.Options.CopyLocal in 'Core\Options\DPM.Core.Options.CopyLocal.pas',
+  DPM.Core.Tests.Package.CopyLocal in 'Tests\DPM.Core.Tests.Package.CopyLocal.pas';
 
 var
   runner : ITestRunner;

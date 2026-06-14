@@ -139,16 +139,20 @@ begin
   end;
   FDestination := yamlObject.S['dest'];
 
-  //Accept both the canonical camelCase key and the all-lowercase variant authors commonly type.
+  //Accept the canonical camelCase key and variants authors commonly type.
   if yamlObject.Contains('copyToLib') then
     FCopyToLib := yamlObject.B['copyToLib']
-  else
+  else if  yamlObject.Contains('copytoLib') then
+    FCopyToLib := yamlObject.B['copytolib']
+  else if  yamlObject.Contains('copytolib') then
     FCopyToLib := yamlObject.B['copytolib'];
 
   //copyToBin carries a platform; absent or unrecognised tokens resolve to UnknownPlatform (= ignored).
   if yamlObject.Contains('copyToBin') then
     FCopyToBin := StringToDPMPlatform(yamlObject.S['copyToBin'])
-  else
+  else if yamlObject.Contains('copytoBin') then
+    FCopyToBin := StringToDPMPlatform(yamlObject.S['copytoBin'])
+  else if yamlObject.Contains('copytobin') then
     FCopyToBin := StringToDPMPlatform(yamlObject.S['copytobin']);
 
   if yamlObject.Contains('exclude') then

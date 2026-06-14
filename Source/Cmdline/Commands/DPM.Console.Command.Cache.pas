@@ -49,7 +49,7 @@ type
     // but the verify and remove paths bypass the installer so they must set it
     // themselves - otherwise the cache enumerates from an empty path.
     function EnsureCacheLocation : boolean;
-    function ExecuteAdd(const cancellationToken : ICancellationToken) : TExitCode;
+    function ExecuteInstall(const cancellationToken : ICancellationToken) : TExitCode;
     function ExecuteVerify(const cancellationToken : ICancellationToken) : TExitCode;
     function ExecuteRemove : TExitCode;
   protected
@@ -110,7 +110,7 @@ begin
   result := true;
 end;
 
-function TCacheCommand.ExecuteAdd(const cancellationToken : ICancellationToken) : TExitCode;
+function TCacheCommand.ExecuteInstall(const cancellationToken : ICancellationToken) : TExitCode;
 begin
   if not TCacheOptions.Default.Validate(Logger) then
   begin
@@ -118,8 +118,10 @@ begin
     exit;
   end;
 
-  //One .dpkg per compiler in the new model - it bundles every platform the
-  //package supports, so a single download covers them all.
+  //Installs the package into the cache: resolves its dependency graph, downloads the package
+  //and every dependency, then compiles them for the platforms the package supports. One .dpkg
+  //per compiler in the new model - it bundles every platform, so a single download covers them
+  //all. (The IPackageInstaller method is still named Cache.)
   if not FPackageInstaller.Cache(cancellationToken, TCacheOptions.Default) then
     result := TExitCode.Error
   else
@@ -220,11 +222,11 @@ begin
   TCacheOptions.Default.ApplyCommon(TCommonOptions.Default);
 
   case TCacheOptions.Default.Command of
-    TCacheSubCommand.Add    : result := ExecuteAdd(cancellationToken);
-    TCacheSubCommand.Verify : result := ExecuteVerify(cancellationToken);
-    TCacheSubCommand.Remove : result := ExecuteRemove;
+    TCacheSubCommand.Install : result := ExecuteInstall(cancellationToken);
+    TCacheSubCommand.Verify  : result := ExecuteVerify(cancellationToken);
+    TCacheSubCommand.Remove  : result := ExecuteRemove;
   else
-    Logger.Error('A sub-command is required: add, remove or verify.');
+    Logger.Error('A sub-command is required: install, remove or verify.');
     result := TExitCode.InvalidArguments;
   end;
 end;

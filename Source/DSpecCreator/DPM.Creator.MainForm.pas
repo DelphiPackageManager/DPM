@@ -109,6 +109,18 @@ type
     lbBuildReferences : TListBox;
     btnAddBuildRef : TButton;
     btnDeleteBuildRef : TButton;
+    crdCopyLocal : TCard;
+    lblCopyLocal : TLabel;
+    lblCopyLocalSrc : TLabel;
+    edtCopyLocalSrc : TEdit;
+    lblCopyLocalPlatforms : TLabel;
+    clbCopyLocalPlatforms : TCheckListBox;
+    lblCopyLocalMode : TLabel;
+    cboCopyLocalMode : TComboBox;
+    crdCopyLocalHeading : TCard;
+    lblCopyLocalHeading : TLabel;
+    actAddCopyLocalItem : TAction;
+    actDeleteCopyLocalItem : TAction;
     crdDesign : TCard;
     lblDesign : TLabel;
     lblDesignProject : TLabel;
@@ -319,6 +331,9 @@ type
     lblEnvironmentVariablesHeading : TLabel;
     lblEnvironmentVariablesDescription : TLabel;
     envVariablesList : TValueListEditor;
+    Label9: TLabel;
+    Label12: TLabel;
+    Label15: TLabel;
     procedure FormDestroy(Sender : TObject);
     procedure btnAddExcludeClick(Sender : TObject);
     procedure btnEditExcludeClick(Sender : TObject);
@@ -357,6 +372,11 @@ type
     procedure edtFileEntryDestChange(Sender : TObject);
     procedure chkFileEntryCopyToLibClick(Sender : TObject);
     procedure cboFileEntryCopyToBinChange(Sender : TObject);
+    procedure edtCopyLocalSrcChange(Sender : TObject);
+    procedure clbCopyLocalPlatformsClickCheck(Sender : TObject);
+    procedure cboCopyLocalModeChange(Sender : TObject);
+    procedure actAddCopyLocalItemExecute(Sender : TObject);
+    procedure actDeleteCopyLocalItemExecute(Sender : TObject);
     procedure edtIdChange(Sender : TObject);
     procedure edtProjectChange(Sender : TObject);
     procedure edtProjectURLChange(Sender : TObject);
@@ -502,12 +522,16 @@ type
     procedure SetCheckListPlatforms(const clb : TCheckListBox; const platforms : TDPMPlatforms);
     function GetCheckListPlatforms(const clb : TCheckListBox) : TDPMPlatforms;
     procedure PopulateCopyToBinCombo;
+    procedure PopulateCopyLocalModeCombo;
 
     function LoadSourceNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const sourceEntry : ISpecSourceEntry) : TTemplateTreeNode;
     procedure LoadSourceNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecSourceEntry>);
 
     function LoadBuildNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const buildEntry : ISpecBuildEntry) : TTemplateTreeNode;
     procedure LoadBuildNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate);
+
+    function LoadCopyLocalNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const copyLocalEntry : ISpecCopyLocalEntry) : TTemplateTreeNode;
+    procedure LoadCopyLocalNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate);
 
     function LoadDesignNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const item : ISpecDesignEntry) : TTemplateTreeNode;
     procedure LoadDesignNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecDesignEntry>);
@@ -594,7 +618,8 @@ begin
     exclude := lbFileEntryExclude.Items[lbFileEntryExclude.ItemIndex];
     lbFileEntryExclude.DeleteSelected;
     itemToDelete := entry.exclude.IndexOf(exclude);
-    entry.exclude.Delete(itemToDelete);
+    if (itemToDelete <> -1) then
+      entry.exclude.Delete(itemToDelete);
   end;
 end;
 
@@ -603,7 +628,7 @@ var
   src : string;
   entry : ISpecSourceEntry;
 begin
-  src := InputBox('Add Exclude', 'Exclude to Add', '');
+  src := Trim(InputBox('Add Exclude', 'Exclude to Add', ''));
 
   if Assigned(tvTemplates.Selected) then
   begin
@@ -666,7 +691,7 @@ begin
       TemplateForm.edtTemplate.Text := 'default';
     if TemplateForm.ShowModal = mrCancel then
       Exit;
-    templateName := TemplateForm.edtTemplate.Text;
+    templateName := Trim(TemplateForm.edtTemplate.Text);
     if templateName.IsEmpty then
       Exit;
   finally
@@ -861,8 +886,8 @@ end;
 
 procedure TDSpecCreatorForm.cboLicenseChange(Sender : TObject);
 begin
-  FOpenFile.PackageSpec.metadata.license := cboLicense.Text;
-  var  i := FSPDXList.IndexOfName(cboLicense.Text);
+  FOpenFile.PackageSpec.metadata.license := Trim(cboLicense.Text);
+  var  i := FSPDXList.IndexOfName(Trim(cboLicense.Text));
   if i <> -1 then
   begin
     var data := FSPDXList.ValueFromIndex[i];
@@ -958,7 +983,7 @@ begin
   if cboDigest.ItemIndex <= 0 then
     result.Digest := ''                 // Auto - signing service picks from the cert key type.
   else
-    result.Digest := cboDigest.Text;
+    result.Digest := Trim(cboDigest.Text);
 
   case cboSigningProvider.ItemIndex of
     0 : // Windows Certificate Store
@@ -1154,13 +1179,12 @@ procedure TDSpecCreatorForm.WriteSecret(const target : string; const secret : st
 begin
   if secret = '' then
   begin
-    // Nothing to store - remove any previously saved value. DeleteCredential
-    // raises if the target does not exist, so swallow that case.
-    try
+    // Nothing to store - remove any previously saved value, but only if one
+    // exists. DeleteCredential calls RaiseLastOSError when the target is not
+    // found, which surfaces as a first-chance EOSError in the debugger on every
+    // form destroy. Checking first avoids raising at all.
+    if TCredentialManager.ReadCredential(target) <> nil then
       TCredentialManager.DeleteCredential(target);
-    except
-      on EOSError do; // not found - nothing to delete
-    end;
   end
   else
     TCredentialManager.WriteCredential(target, cCredUserName, secret, TCredentialPersistence.LocalMachine);
@@ -1620,6 +1644,21 @@ begin
   cboFileEntryCopyToBin.ItemIndex := 0;
 end;
 
+procedure TDSpecCreatorForm.PopulateCopyLocalModeCombo;
+begin
+  //A copyLocal entry is always copied - the only choice is always vs runtimeOnly. 'none' is not
+  //offered (an entry that copies nothing makes no sense). Index 0 = always, index 1 = runtimeOnly.
+  cboCopyLocalMode.Items.BeginUpdate;
+  try
+    cboCopyLocalMode.Items.Clear;
+    cboCopyLocalMode.Items.Add(CopyLocalModeToString(TCopyLocalMode.always));
+    cboCopyLocalMode.Items.Add(CopyLocalModeToString(TCopyLocalMode.runtimeOnly));
+  finally
+    cboCopyLocalMode.Items.EndUpdate;
+  end;
+  cboCopyLocalMode.ItemIndex := 0;
+end;
+
 procedure TDSpecCreatorForm.CreatingPackages1Click(Sender : TObject);
 begin
   UriClick('https://docs.delphi.dev/getting-started/creating-packages.html');
@@ -1628,8 +1667,8 @@ end;
 procedure TDSpecCreatorForm.edtAuthorChange(Sender : TObject);
 begin
   FOpenFile.PackageSpec.metadata.authors.Clear;
-  if edtAuthor.Text <> '' then
-    FOpenFile.PackageSpec.metadata.authors.Add(edtAuthor.Text);
+  if Trim(edtAuthor.Text) <> '' then
+    FOpenFile.PackageSpec.metadata.authors.Add(Trim(edtAuthor.Text));
 end;
 
 procedure TDSpecCreatorForm.edtBuildDefinesChange(Sender : TObject);
@@ -1637,7 +1676,7 @@ begin
   if FLoadingCard then
     Exit;
   if Assigned(tvTemplates.Selected) then
-    (tvTemplates.Selected as TTemplateTreeNode).build.Defines := edtBuildDefines.Text;
+    (tvTemplates.Selected as TTemplateTreeNode).build.Defines := Trim(edtBuildDefines.Text);
 end;
 
 procedure TDSpecCreatorForm.clbBuildPlatformsClickCheck(Sender : TObject);
@@ -1658,7 +1697,7 @@ begin
   build := (tvTemplates.Selected as TTemplateTreeNode).build;
   if not Assigned(build) then
     Exit;
-  reference := InputBox('Add Reference', 'Package name to require', '');
+  reference := Trim(InputBox('Add Reference', 'Package name to require', ''));
   if reference = '' then
     Exit;
   build.References.Add(reference);
@@ -1694,8 +1733,8 @@ begin
   begin
     if not FLoadingCard then
     begin
-      (tvTemplates.Selected as TTemplateTreeNode).designEntry.Project := edtDesignProject.Text;
-      (tvTemplates.Selected as TTemplateTreeNode).Text := edtDesignProject.Text;
+      (tvTemplates.Selected as TTemplateTreeNode).designEntry.Project := Trim(edtDesignProject.Text);
+      (tvTemplates.Selected as TTemplateTreeNode).Text := Trim(edtDesignProject.Text);
     end;
 
     str := 'Possible Expanded Paths:' + System.sLineBreak;
@@ -1714,7 +1753,7 @@ begin
   if FLoadingCard then
     Exit;
   if Assigned(tvTemplates.Selected) then
-    (tvTemplates.Selected as TTemplateTreeNode).designEntry.Defines := edtDesignDefines.Text;
+    (tvTemplates.Selected as TTemplateTreeNode).designEntry.Defines := Trim(edtDesignDefines.Text);
 end;
 
 procedure TDSpecCreatorForm.clbDesignPlatformsClickCheck(Sender : TObject);
@@ -1735,7 +1774,7 @@ begin
   design := (tvTemplates.Selected as TTemplateTreeNode).designEntry;
   if not Assigned(design) then
     Exit;
-  reference := InputBox('Add Reference', 'Package name to require', '');
+  reference := Trim(InputBox('Add Reference', 'Package name to require', ''));
   if reference = '' then
     Exit;
   design.References.Add(reference);
@@ -1767,7 +1806,7 @@ begin
   if FLoadingCard then
     Exit;
   if Assigned(tvTemplates.Selected) then
-    (tvTemplates.Selected as TTemplateTreeNode).designEntry.LibPrefix := edtLibPrefix.Text;
+    (tvTemplates.Selected as TTemplateTreeNode).designEntry.LibPrefix := Trim(edtLibPrefix.Text);
 end;
 
 procedure TDSpecCreatorForm.edtLibSuffixChange(Sender : TObject);
@@ -1775,7 +1814,7 @@ begin
   if FLoadingCard then
     Exit;
   if Assigned(tvTemplates.Selected) then
-    (tvTemplates.Selected as TTemplateTreeNode).designEntry.LibSuffix := edtLibSuffix.Text;
+    (tvTemplates.Selected as TTemplateTreeNode).designEntry.LibSuffix := Trim(edtLibSuffix.Text);
 end;
 
 procedure TDSpecCreatorForm.edtLibVersionChange(Sender : TObject);
@@ -1783,15 +1822,15 @@ begin
   if FLoadingCard then
     Exit;
   if Assigned(tvTemplates.Selected) then
-    (tvTemplates.Selected as TTemplateTreeNode).designEntry.LibVersion := edtLibVersion.Text;
+    (tvTemplates.Selected as TTemplateTreeNode).designEntry.LibVersion := Trim(edtLibVersion.Text);
 end;
 
 procedure TDSpecCreatorForm.edtDependencyIdChange(Sender : TObject);
 begin
   if Assigned(tvTemplates.Selected) then
   begin
-    (tvTemplates.Selected as TTemplateTreeNode).dependency.id := edtDependencyId.Text;
-    (tvTemplates.Selected as TTemplateTreeNode).Text := edtDependencyId.Text + ' - ' + edtDependencyVersion.Text;
+    (tvTemplates.Selected as TTemplateTreeNode).dependency.id := Trim(edtDependencyId.Text);
+    (tvTemplates.Selected as TTemplateTreeNode).Text := Trim(edtDependencyId.Text) + ' - ' + Trim(edtDependencyVersion.Text);
   end;
 end;
 
@@ -1808,7 +1847,7 @@ begin
     if (versionText <> '') and (SameText(versionText, cVersionToken) or TVersionRange.TryParse(versionText, ver)) then
     begin
       (tvTemplates.Selected as TTemplateTreeNode).dependency.VersionString := versionText;
-      (tvTemplates.Selected as TTemplateTreeNode).Text := edtDependencyId.Text + ' - ' + versionText;
+      (tvTemplates.Selected as TTemplateTreeNode).Text := Trim(edtDependencyId.Text) + ' - ' + versionText;
     end;
   end;
 end;
@@ -1821,7 +1860,7 @@ begin
   if Assigned(tvTemplates.Selected) then
   begin
     if not FLoadingCard then
-      (tvTemplates.Selected as TTemplateTreeNode).sourceEntry.Destination := edtFileEntryDest.Text;
+      (tvTemplates.Selected as TTemplateTreeNode).sourceEntry.Destination := Trim(edtFileEntryDest.Text);
 
     str := 'Possible Expanded Paths:' + System.sLineBreak;
 
@@ -1857,6 +1896,40 @@ begin
   else
     copyToBinPlatform := StringToDPMPlatform(cboFileEntryCopyToBin.Items[cboFileEntryCopyToBin.ItemIndex]);
   (tvTemplates.Selected as TTemplateTreeNode).sourceEntry.CopyToBin := copyToBinPlatform;
+end;
+
+procedure TDSpecCreatorForm.edtCopyLocalSrcChange(Sender : TObject);
+var
+  node : TTemplateTreeNode;
+begin
+  if FLoadingCard then
+    exit;
+  if not Assigned(tvTemplates.Selected) then
+    exit;
+  node := tvTemplates.Selected as TTemplateTreeNode;
+  node.copyLocalEntry.Source := Trim(edtCopyLocalSrc.Text);
+  node.Text := Trim(edtCopyLocalSrc.Text);
+end;
+
+procedure TDSpecCreatorForm.clbCopyLocalPlatformsClickCheck(Sender : TObject);
+begin
+  if FLoadingCard then
+    exit;
+  if Assigned(tvTemplates.Selected) then
+    (tvTemplates.Selected as TTemplateTreeNode).copyLocalEntry.Platforms := GetCheckListPlatforms(clbCopyLocalPlatforms);
+end;
+
+procedure TDSpecCreatorForm.cboCopyLocalModeChange(Sender : TObject);
+begin
+  if FLoadingCard then
+    exit;
+  if not Assigned(tvTemplates.Selected) then
+    exit;
+  //index 0 = always, index 1 = runtimeOnly (see PopulateCopyLocalModeCombo).
+  if cboCopyLocalMode.ItemIndex <= 0 then
+    (tvTemplates.Selected as TTemplateTreeNode).copyLocalEntry.Mode := TCopyLocalMode.always
+  else
+    (tvTemplates.Selected as TTemplateTreeNode).copyLocalEntry.Mode := TCopyLocalMode.runtimeOnly;
 end;
 
 function TDSpecCreatorForm.AddRootTemplateNode(template : ISpecTemplate) : TTemplateTreeNode;
@@ -1930,6 +2003,36 @@ begin
   end;
 end;
 
+function TDSpecCreatorForm.LoadCopyLocalNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const copyLocalEntry : ISpecCopyLocalEntry) : TTemplateTreeNode;
+begin
+  result := tvTemplates.Items.AddChild(parentNode, copyLocalEntry.Source) as TTemplateTreeNode;
+  result.copyLocalEntry := copyLocalEntry;
+  result.Template := template;
+  result.ImageIndex := 2;
+  result.SelectedIndex := 2;
+  result.NodeType := ntCopyLocal;
+  result.AddAction := actAddCopyLocalItem;
+  result.DeleteAction := actDeleteCopyLocalItem;
+end;
+
+procedure TDSpecCreatorForm.LoadCopyLocalNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate);
+var
+  nodeCopyLocal : TTemplateTreeNode;
+  j : integer;
+begin
+  nodeCopyLocal := tvTemplates.Items.AddChild(parentNode, 'CopyLocal') as TTemplateTreeNode;
+  nodeCopyLocal.Template := template;
+  nodeCopyLocal.ImageIndex := 2;
+  nodeCopyLocal.SelectedIndex := 2;
+  nodeCopyLocal.NodeType := ntCopyLocalHeading;
+
+  nodeCopyLocal.AddAction := actAddCopyLocalItem;
+  nodeCopyLocal.DeleteAction := actDeleteCopyLocalItem;
+
+  for j := 0 to template.CopyLocalEntries.Count - 1 do
+    LoadCopyLocalNode(nodeCopyLocal, template, template.CopyLocalEntries[j]);
+end;
+
 procedure TDSpecCreatorForm.About1Click(Sender : TObject);
 var
   AboutForm : TDPMAboutForm;
@@ -1956,7 +2059,7 @@ begin
     BuildForm.Caption := 'Add Build entry';
     if BuildForm.ShowModal = mrCancel then
       Exit;
-    projectName := BuildForm.edtProject.Text;
+    projectName := Trim(BuildForm.edtProject.Text);
     if projectName.IsEmpty then
       Exit;
     build := FTemplate.NewBuildEntry(projectName);
@@ -1977,6 +2080,39 @@ begin
   end;
 end;
 
+procedure TDSpecCreatorForm.actAddCopyLocalItemExecute(Sender : TObject);
+var
+  src : string;
+  copyLocalEntry : ISpecCopyLocalEntry;
+  templateNode : TTemplateTreeNode;
+  parentNode : TTemplateTreeNode;
+  copyLocalNode : TTemplateTreeNode;
+begin
+  //copyLocal entries have no dest - matched files always go to the consuming project's output
+  //folder - so we only need the src filespec (may use $platform$, e.g. bpl\$platform$\*.bpl).
+  src := Trim(InputBox('Add CopyLocal entry', 'Source filespec (e.g. bpl\$platform$\*.bpl)', ''));
+  if src.IsEmpty then
+    Exit;
+  copyLocalEntry := FTemplate.NewCopyLocalEntry(src);
+
+  templateNode := FindTemplateNode(FTemplate);
+  parentNode := FindHeadingNode(templateNode, ntCopyLocalHeading);
+  tvTemplates.Items.BeginUpdate;
+  try
+    copyLocalNode := LoadCopyLocalNode(parentNode, FTemplate, copyLocalEntry);
+    templateNode.Expanded := true;
+    parentNode.Expand(false);
+    tvTemplates.Selected := copyLocalNode;
+  finally
+    tvTemplates.Items.EndUpdate;
+  end;
+end;
+
+procedure TDSpecCreatorForm.actDeleteCopyLocalItemExecute(Sender : TObject);
+begin
+  DeleteSelectedEntry;
+end;
+
 procedure TDSpecCreatorForm.actAddDependencyExecute(Sender : TObject);
 var
   dependancyId : string;
@@ -1992,7 +2128,7 @@ begin
   try
     if DependencyForm.ShowModal = mrCancel then
       Exit;
-    dependancyId := DependencyForm.edtDependencyId.Text;
+    dependancyId := Trim(DependencyForm.edtDependencyId.Text);
     if dependancyId.IsEmpty then
       Exit;
     dependency := FTemplate.NewDependency(dependancyId);
@@ -2031,7 +2167,7 @@ begin
     DesignForm.Caption := 'Add Design entry';
     if DesignForm.ShowModal = mrCancel then
       Exit;
-    projectName := DesignForm.edtProject.Text;
+    projectName := Trim(DesignForm.edtProject.Text);
     if projectName.IsEmpty then
       Exit;
     design := FTemplate.NewDesignEntry(projectName);
@@ -2067,12 +2203,12 @@ begin
 
     if SourceForm.ShowModal = mrCancel then
       Exit;
-    SourceSrc := SourceForm.edtSource.Text;
+    SourceSrc := Trim(SourceForm.edtSource.Text);
     if SourceSrc.IsEmpty then
       Exit;
 
     Source := FTemplate.NewSource(SourceSrc);
-    Source.Destination := SourceForm.edtDest.Text;
+    Source.Destination := Trim(SourceForm.edtDest.Text);
   finally
     FreeAndNil(SourceForm);
   end;
@@ -2144,7 +2280,7 @@ begin
     PackageDefForm.Caption := 'Add Package Definition';
     if PackageDefForm.ShowModal = mrCancel then
       Exit;
-    projectName := PackageDefForm.edtProject.Text;
+    projectName := Trim(PackageDefForm.edtProject.Text);
     if projectName.IsEmpty then
       Exit;
     packageDef := FTemplate.NewPackageDefinition(projectName);
@@ -2181,8 +2317,8 @@ begin
   begin
     if not FLoadingCard then
     begin
-      (tvTemplates.Selected as TTemplateTreeNode).packageDef.Project := edtPackageDefProject.Text;
-      (tvTemplates.Selected as TTemplateTreeNode).Text := edtPackageDefProject.Text;
+      (tvTemplates.Selected as TTemplateTreeNode).packageDef.Project := Trim(edtPackageDefProject.Text);
+      (tvTemplates.Selected as TTemplateTreeNode).Text := Trim(edtPackageDefProject.Text);
     end;
 
     str := 'Possible Expanded Paths:' + System.sLineBreak;
@@ -2222,7 +2358,7 @@ begin
   packageDef := (tvTemplates.Selected as TTemplateTreeNode).packageDef;
   if not Assigned(packageDef) then
     Exit;
-  fileGlob := InputBox('Add File', 'File glob pattern to include', '');
+  fileGlob := Trim(InputBox('Add File', 'File glob pattern to include', ''));
   if fileGlob = '' then
     Exit;
   packageDef.Files.Add(fileGlob);
@@ -2259,7 +2395,7 @@ begin
   packageDef := (tvTemplates.Selected as TTemplateTreeNode).packageDef;
   if not Assigned(packageDef) then
     Exit;
-  excludeGlob := InputBox('Add Exclude', 'File-name glob pattern to exclude', '');
+  excludeGlob := Trim(InputBox('Add Exclude', 'File-name glob pattern to exclude', ''));
   if excludeGlob = '' then
     Exit;
   packageDef.Exclude.Add(excludeGlob);
@@ -2464,6 +2600,9 @@ begin
   actAddSourceItem.Enabled := hasNode and (selectedNode.IsSourceHeading or selectedNode.IsSource);
   actDeleteSourceItem.Enabled := hasNode and selectedNode.IsSource;
 
+  actAddCopyLocalItem.Enabled := hasNode and (selectedNode.IsCopyLocalHeading or selectedNode.IsCopyLocal);
+  actDeleteCopyLocalItem.Enabled := hasNode and selectedNode.IsCopyLocal;
+
 end;
 
 procedure TDSpecCreatorForm.actPlatformsDeselectAllExecute(Sender : TObject);
@@ -2594,6 +2733,7 @@ begin
 
   LoadSourceNodes(Node, template, template.SourceEntries);
   LoadBuildNodes(Node, template);
+  LoadCopyLocalNodes(Node, template);
   LoadDesignNodes(Node, template, template.DesignEntries);
   LoadPackageDefNodes(Node, template, template.PackageDefinitions);
   LoadDependencies(Node, template);
@@ -2631,7 +2771,7 @@ end;
 
 procedure TDSpecCreatorForm.edtIdChange(Sender : TObject);
 begin
-  FOpenFile.PackageSpec.metadata.id := edtId.Text;
+  FOpenFile.PackageSpec.metadata.id := Trim(edtId.Text);
 end;
 
 procedure TDSpecCreatorForm.edtPackageOutputPathExit(Sender : TObject);
@@ -2656,8 +2796,8 @@ begin
   begin
     if not FLoadingCard then
     begin
-      (tvTemplates.Selected as TTemplateTreeNode).build.project := edtProject.Text;
-      (tvTemplates.Selected as TTemplateTreeNode).Text := edtProject.Text;
+      (tvTemplates.Selected as TTemplateTreeNode).build.project := Trim(edtProject.Text);
+      (tvTemplates.Selected as TTemplateTreeNode).Text := Trim(edtProject.Text);
     end;
 
     str := 'Possible Expanded Paths:' + System.sLineBreak;
@@ -2674,22 +2814,22 @@ end;
 
 procedure TDSpecCreatorForm.edtProjectURLChange(Sender : TObject);
 begin
-  FOpenFile.PackageSpec.metadata.projectUrl := edtProjectURL.Text;
+  FOpenFile.PackageSpec.metadata.projectUrl := Trim(edtProjectURL.Text);
 end;
 
 procedure TDSpecCreatorForm.edtReadmeChange(Sender: TObject);
 begin
-  FOpenFile.PackageSpec.metadata.Readme := edtReadme.Text;
+  FOpenFile.PackageSpec.metadata.Readme := Trim(edtReadme.Text);
 end;
 
 procedure TDSpecCreatorForm.edtRepositoryCommitChange(Sender: TObject);
 begin
-  FOpenFile.PackageSpec.metadata.RepositoryCommit := edtRepositoryCommit.Text;
+  FOpenFile.PackageSpec.metadata.RepositoryCommit := Trim(edtRepositoryCommit.Text);
 end;
 
 procedure TDSpecCreatorForm.edtRepositoryURLChange(Sender : TObject);
 begin
-  FOpenFile.PackageSpec.metadata.repositoryUrl := edtRepositoryURL.Text;
+  FOpenFile.PackageSpec.metadata.repositoryUrl := Trim(edtRepositoryURL.Text);
 end;
 
 function TDSpecCreatorForm.ReplaceVars(const inputStr : String; compiler : TCompilerVersion) : string;
@@ -2706,8 +2846,8 @@ begin
   begin
     if not FLoadingCard then
     begin
-      (tvTemplates.Selected as TTemplateTreeNode).sourceEntry.Source := edtFileEntrySource.Text;
-      (tvTemplates.Selected as TTemplateTreeNode).Text := edtFileEntrySource.Text;
+      (tvTemplates.Selected as TTemplateTreeNode).sourceEntry.Source := Trim(edtFileEntrySource.Text);
+      (tvTemplates.Selected as TTemplateTreeNode).Text := Trim(edtFileEntrySource.Text);
     end;
 
     str := 'Possible Expanded Paths:' + System.sLineBreak;
@@ -2736,29 +2876,34 @@ begin
   begin
     templateNode := (tvTemplates.Selected as TTemplateTreeNode);
     templateName := templateNode.Template.name;
-    if SameText(templateName, edtTemplateName.Text) then
+    if SameText(templateName, Trim(edtTemplateName.Text)) then
       Exit;
 
-    templateNode.Text := edtTemplateName.Text;
-    FOpenFile.PackageSpec.RenameTemplate(templateName, edtTemplateName.Text);
+    templateNode.Text := Trim(edtTemplateName.Text);
+    FOpenFile.PackageSpec.RenameTemplate(templateName, Trim(edtTemplateName.Text));
   end;
 end;
 
 procedure TDSpecCreatorForm.edtVersionChange(Sender : TObject);
 var
   Version : TPackageVersion;
+  versionStr : string;
 begin
-  if Length(edtVersion.Text) > 0 then
+  versionStr := Trim(edtVersion.Text);
+  if Length(versionStr) > 0 then
   begin
-    if TPackageVersion.TryParse(edtVersion.Text, Version) then
+    if TPackageVersion.TryParse(versionStr, Version) then
       FOpenFile.PackageSpec.metadata.Version := Version;
   end;
 end;
 
 procedure TDSpecCreatorForm.edtVersionExit(Sender : TObject);
+var
+  versionStr : string;
 begin
-  if Length(edtVersion.Text) > 0 then
-    FOpenFile.PackageSpec.metadata.Version := TPackageVersion.Parse(edtVersion.Text);
+  versionStr := Trim(edtVersion.Text);
+  if Length(versionStr) > 0 then
+    FOpenFile.PackageSpec.metadata.Version := TPackageVersion.Parse(versionStr);
 end;
 
 procedure TDSpecCreatorForm.FormCreate(Sender : TObject);
@@ -2780,6 +2925,7 @@ begin
   FSPDXList := TStringList.Create;
   LoadSPDXList;
   PopulateCopyToBinCombo;
+  PopulateCopyLocalModeCombo;
   LoadDspecStructure;
   FtmpFilename := '';
   PageControl.ActivePage := tsInfo;
@@ -3123,7 +3269,7 @@ end;
 
 procedure TDSpecCreatorForm.mmoDescriptionChange(Sender : TObject);
 begin
-  FOpenFile.PackageSpec.metadata.Description := mmoDescription.Text;
+  FOpenFile.PackageSpec.metadata.Description := Trim(mmoDescription.Text);
 end;
 
 procedure TDSpecCreatorForm.MRUAdd(const filename : string);
@@ -3203,6 +3349,7 @@ begin
       ntSourceHeading :      CardPanel.ActiveCard := crdSourceHeading;
       ntDependencyHeading :  CardPanel.ActiveCard := crdDependenciesHeading;
       ntPackageDefsHeading : CardPanel.ActiveCard := crdPackageDefsHeading;
+      ntCopyLocalHeading :   CardPanel.ActiveCard := crdCopyLocalHeading;
       ntBuild :
         begin
           edtProject.Text := lNode.build.project;
@@ -3212,6 +3359,17 @@ begin
           for i := 0 to lNode.build.References.Count - 1 do
             lbBuildReferences.Items.Add(lNode.build.References[i]);
           CardPanel.ActiveCard := crdBuild;
+        end;
+      ntCopyLocal :
+        begin
+          edtCopyLocalSrc.Text := lNode.copyLocalEntry.Source;
+          SetCheckListPlatforms(clbCopyLocalPlatforms, lNode.copyLocalEntry.Platforms);
+          //index 0 = always, index 1 = runtimeOnly (see PopulateCopyLocalModeCombo).
+          if lNode.copyLocalEntry.Mode = TCopyLocalMode.runtimeOnly then
+            cboCopyLocalMode.ItemIndex := 1
+          else
+            cboCopyLocalMode.ItemIndex := 0;
+          CardPanel.ActiveCard := crdCopyLocal;
         end;
       ntDesign :
         begin
@@ -3427,7 +3585,7 @@ end;
 
 procedure TDSpecCreatorForm.edtCopyrightChange(Sender : TObject);
 begin
-  FOpenFile.PackageSpec.metadata.Copyright := edtCopyright.Text;
+  FOpenFile.PackageSpec.metadata.Copyright := Trim(edtCopyright.Text);
 end;
 
 end.

@@ -49,6 +49,7 @@ uses
   DPM.Core.Options.Uninstall,
   DPM.Core.Options.Restore,
   DPM.Core.Options.Sbom,
+  DPM.Core.Options.CopyLocal,
   DPM.Core.Options.Scan,
   DPM.Core.Options.Sign,
   DPM.Core.Options.Spec,
@@ -80,13 +81,14 @@ var
   cmd : TCommandDefinition;
 begin
   cmd := TOptionsRegistry.RegisterCommand('cache', '',
-    'Manages the local package cache. `add` downloads a package into the cache, ' +
+    'Manages the local package cache. `install` downloads a package and its dependencies into ' +
+    'the cache and compiles them for the package''s supported platforms, ' +
     '`remove` evicts cached package versions (so the next install re-downloads), ' +
     'and `verify` re-checks every package in the cache.',
-    '', 'cache <add|remove|verify> [packageId] [options]');
+    '', 'cache <install|remove|verify> [packageId] [options]');
 
   // Positional sub-command. HasValue := false so the enum name is the token.
-  option := cmd.RegisterUnNamedOption<TCacheSubCommand>('Sub-command: add, remove or verify','command',
+  option := cmd.RegisterUnNamedOption<TCacheSubCommand>('Sub-command: install, remove or verify','command',
    procedure(const value : TCacheSubCommand)
     begin
       TCacheOptions.Default.Command := value;
@@ -96,23 +98,23 @@ begin
   option.Required := true;
   option.HasValue := false;
 
-  // Positional package id - required by add/remove, ignored by verify
+  // Positional package id - required by install/remove, ignored by verify
   // (enforced in TCacheOptions.Validate).
-  option := cmd.RegisterUnNamedOption<string>('A valid package Id (for add/remove)','packageId',
+  option := cmd.RegisterUnNamedOption<string>('A valid package Id (for install/remove)','packageId',
    procedure(const value : string)
     begin
       TCacheOptions.Default.PackageId := value;
     end);
 
-  option := cmd.RegisterOption<string>('Version','', 'The package version. For add, the version to download (latest if omitted). For remove, the version to evict (all cached versions if omitted).',
+  option := cmd.RegisterOption<string>('Version','', 'The package version. For install, the version to download (latest if omitted). For remove, the version to evict (all cached versions if omitted).',
    procedure(const value : string)
     begin
       TCacheOptions.Default.VersionString := value;
     end);
 
-  // add requires --compiler; remove treats it as an optional filter (all
+  // install requires --compiler; remove treats it as an optional filter (all
   // compilers when omitted); verify ignores it. Validate enforces per command.
-  option := cmd.RegisterOption<string>('compiler','c', 'The compiler version. Required by `cache add`; an optional filter for `cache remove`; ignored by `cache verify`.',
+  option := cmd.RegisterOption<string>('compiler','c', 'The compiler version. Required by `cache install`; an optional filter for `cache remove`; ignored by `cache verify`.',
    procedure(const value : string)
     begin
       TCacheOptions.Default.CompilerVersion := StringToCompilerVersion(value);
@@ -1318,6 +1320,62 @@ begin
 end;
 
 
+procedure RegisterCopyLocalCommand;
+var
+  cmd : TCommandDefinition;
+begin
+  cmd := TOptionsRegistry.RegisterCommand('copylocal', '', 'Copies package binaries (dlls/bpls) into the project build output folder.',
+                                                      'Invoked by DPM.CopyLocal.targets from an AfterBuild MSBuild target. The output dir is only ' +
+                                                      'reliably known at build time, so this runs then rather than at restore. dcc-direct/CI builds ' +
+                                                      'can call it directly with the same arguments.',
+                                                      'copylocal <project> -platform=<platform> -outputDir=<dir> [-config=<name>] [-compiler=<id>] [-usePackages=<bool>] [-runtimePackages=<list>]');
+
+  cmd.RegisterUnNamedOption<string>('The .dproj being built. Defaults to the current directory.', 'projectPath',
+    procedure(const value : string)
+    begin
+      TCopyLocalOptions.Default.ProjectPath := value;
+    end);
+
+  cmd.RegisterOption<string>('platform', 'p', 'The platform being built (msbuild $(Platform), e.g. Win32, Win64).',
+    procedure(const value : string)
+    begin
+      TCopyLocalOptions.Default.Platform := ProjectPlatformToDPMPlatform(Trim(value));
+    end);
+
+  cmd.RegisterOption<string>('config', 'c', 'The build configuration being built (msbuild $(Config)).',
+    procedure(const value : string)
+    begin
+      TCopyLocalOptions.Default.Config := value;
+    end);
+
+  cmd.RegisterOption<string>('outputDir', 'o', 'The build output folder to copy into (msbuild $(OutputPath)).',
+    procedure(const value : string)
+    begin
+      TCopyLocalOptions.Default.OutputDir := value;
+    end);
+
+  cmd.RegisterOption<string>('compiler', '', 'The compiler version the project targets (msbuild $(DPMCompiler)).',
+    procedure(const value : string)
+    begin
+      TCopyLocalOptions.Default.CompilerVersion := StringToCompilerVersion(Trim(value));
+    end);
+
+  cmd.RegisterOption<string>('usePackages', '', 'true when the build links with runtime packages (msbuild $(UsePackages)).',
+    procedure(const value : string)
+    begin
+      TCopyLocalOptions.Default.UsePackages := SameText(Trim(value), 'true');
+    end);
+
+  cmd.RegisterOption<string>('runtimePackages', '', 'The build''s runtime package link set (msbuild $(DCC_UsePackage)).',
+    procedure(const value : string)
+    begin
+      TCopyLocalOptions.Default.RuntimePackages := value;
+    end);
+
+  cmd.Examples.Add('copylocal .\MyApp.dproj -platform=Win64 -config=Release -outputDir=.\Win64\Release');
+end;
+
+
 
 procedure RegisterScanCommand;
 var
@@ -1447,6 +1505,7 @@ begin
   RegisterExitCodesCommand;
   RegisterInfoCommand;
   RegisterSbomCommand;
+  RegisterCopyLocalCommand;
   RegisterScanCommand;
 
 end;

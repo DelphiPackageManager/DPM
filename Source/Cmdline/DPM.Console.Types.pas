@@ -86,6 +86,7 @@ type
                  Info,
                  Sbom,
                  Scan,
+                 CopyLocal,
                  None,
                  Invalid);
 
@@ -115,6 +116,7 @@ const
                        'info',
                        'sbom',
                        'scan',
+                       'copylocal',
                        '',
                        'invalid');
 

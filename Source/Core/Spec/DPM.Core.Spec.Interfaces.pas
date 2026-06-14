@@ -172,6 +172,31 @@ type
     property CopyToBin : TDPMPlatform read GetCopyToBin write SetCopyToBin;
   end;
 
+  //A copyLocal entry: a glob (src) matched against the package cache at 'dpm copylocal' time
+  //and copied, flattened, into the consuming project's build output folder. Unlike copyToLib/
+  //copyToBin (authored as source-entry flags, so the file must exist at pack time), copyLocal
+  //entries are authored directly and can target artifacts built during install (e.g. a runtime
+  //.bpl in bpl\{platform}). The src may contain the $platform$ token, substituted with the build
+  //platform's folder name before expansion.
+  ISpecCopyLocalEntry = interface(ISpecNode)
+    ['{4D8A6F23-7B1E-4C90-9A2D-5E6F0B3C8A14}']
+    function GetSource : string;
+    function GetPlatforms : TDPMPlatforms;
+    function GetMode : TCopyLocalMode;
+    procedure SetSource(const value : string);
+    procedure SetPlatforms(const value : TDPMPlatforms);
+    procedure SetMode(const value : TCopyLocalMode);
+
+    function Clone : ISpecCopyLocalEntry;
+
+    /// <summary> The glob (relative to the extracted package root) of files to copy. May contain $platform$. </summary>
+    property Source : string read GetSource write SetSource;
+    /// <summary> Platforms this entry applies to. Empty = all platforms. </summary>
+    property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
+    /// <summary> always (default) or runtimeOnly (only when the project links this package's runtime bpl). </summary>
+    property Mode : TCopyLocalMode read GetMode write SetMode;
+  end;
+
   ISpecBuildEntry = interface(ISpecNode)
     ['{9E1850EB-40C4-421F-A47F-03FDD6286573}']
     function GetProject : string;
@@ -278,6 +303,7 @@ type
     function GetBuildEntries : IList<ISpecBuildEntry>;
     function GetCopyToLibEntries : IList<ISpecSourceEntry>;
     function GetCopyToBinEntries : IList<ISpecSourceEntry>;
+    function GetCopyLocalEntries : IList<ISpecCopyLocalEntry>;
     function GetPackageDefinitions : IList<ISpecPackageDefinition>;
     function GetPrecompiledBinaries : IList<string>;
     function GetEnvironmentVariables : IVariables;
@@ -297,12 +323,14 @@ type
     function NewBuildEntry(const project : string) : ISpecBuildEntry;
     function NewDesignEntry(const project : string) : ISpecDesignEntry;
     function NewPackageDefinition(const project : string) : ISpecPackageDefinition;
+    function NewCopyLocalEntry(const src : string) : ISpecCopyLocalEntry;
 
     procedure DeleteDependency(const id : string);
     procedure DeleteSource(const src: string);
     procedure DeleteBuildEntry(const project : string);
     procedure DeleteDesignEntry(const project : string);
     procedure DeletePackageDefinition(const project : string);
+    procedure DeleteCopyLocalEntry(const src : string);
 
     function FindDependency(const id : string) : ISpecDependency;
     function FindSourceEntry(const src : string) : ISpecSourceEntry;
@@ -327,6 +355,12 @@ type
     /// Populated at pack time from source entries flagged copyToBin, since the source entries
     /// themselves are stripped from the packed spec. </summary>
     property CopyToBinEntries : IList<ISpecSourceEntry> read GetCopyToBinEntries;
+    /// <summary> First-class copyLocal entries: globs (relative to the extracted package root, may
+    /// contain $platform$) whose matched files 'dpm copylocal' copies, flattened, into the consuming
+    /// project's build output folder at build time. Each entry carries a platform list (empty = all)
+    /// and a mode (always/runtimeOnly). Authored directly, so they can target artifacts built during
+    /// install (e.g. a runtime .bpl in bpl\{platform}). </summary>
+    property CopyLocalEntries : IList<ISpecCopyLocalEntry> read GetCopyLocalEntries;
     property PackageDefinitions : IList<ISpecPackageDefinition> read GetPackageDefinitions;
     /// <summary> Precompiled Windows PE binaries (.bpl/.dll/.exe) this package ships, declared as
     /// archive-relative paths (forward slashes) exactly as they appear inside the .dpkg. Auto-derived

@@ -54,6 +54,7 @@ uses
   DPM.Core.Package.Interfaces,
   DPM.Core.Package.Installer.Interfaces,
   DPM.Core.Package.Installer,
+  DPM.Core.Package.CopyLocal,
   DPM.Core.Package.InstallerContext,
   DPM.Core.Sources.Interfaces,
   DPM.Core.Sources.Manager,
@@ -161,6 +162,8 @@ begin
   Container.RegisterType<ISbomWriter, TMarkdownReportWriter>(cSBOMWriterMarkdown);
   Container.RegisterType<ISBOMReader, TCycloneDXReader>;
   Container.RegisterType<ISbomGenerator, TSBOMGenerator>;
+
+  Container.RegisterType<ICopyLocalService, TCopyLocalService>;
 
   // Signing — Phase 1 registrations
   Container.RegisterType<IHashingService, TBCryptHashingService>.AsSingleton;

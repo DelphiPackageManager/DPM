@@ -152,10 +152,10 @@ begin
     result := false;
 
   end
-  else if sValue = cVersionToken then
+  else if Trim(sValue) = cVersionToken then
     //deferred - resolved to this package's own version at pack time (ResolveVersionToken).
-    FVersionString := sValue
-  else if SameText(sValue, cBundledDependencyToken) then
+    FVersionString := cVersionToken
+  else if SameText(Trim(sValue), cBundledDependencyToken) then
     //friendly alias for a dependency on an IDE-bundled library (e.g. Indy)
     FVersion := TVersionRange.Parse(cBundledDependencyVersion)
   else if not TVersionRange.TryParseWithError(sValue, FVersion, sError) then

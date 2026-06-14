@@ -13,7 +13,7 @@ type
    TNodeType = (ntTemplateHeading,
                ntSourceHeading, ntBuildHeading, ntDesignHeading, ntDependencyHeading,
                ntSource, ntBuild, ntDesign, ntDependency, ntPackageDefsHeading, ntPackageDef,
-               ntEnvironmentVariablesHeading );
+               ntEnvironmentVariablesHeading, ntCopyLocalHeading, ntCopyLocal );
 
 
   TTemplateTreeNode = class (TTreeNode)
@@ -29,6 +29,7 @@ type
     sourceEntry: ISpecSourceEntry;
     dependency: ISpecDependency;
     packageDef : ISpecPackageDefinition;
+    copyLocalEntry : ISpecCopyLocalEntry;
 
     function CategoryNode: TTemplateTreeNode;
     function IsHeading: Boolean;
@@ -43,12 +44,15 @@ type
     function IsPackageDef : boolean;
     function IsPackageDefHeading : boolean;
     function IsEnvironmentVariablesHeading : Boolean;
+    function IsCopyLocal : Boolean;
+    function IsCopyLocalHeading : Boolean;
 
     procedure DeleteBuild;
     procedure DeleteSource;
     procedure DeleteDesign;
     procedure DeleteDependency;
     procedure DeletePackageDef;
+    procedure DeleteCopyLocal;
 
     procedure DeleteEntry;
 
@@ -88,6 +92,13 @@ begin
   Template.DeleteDesignEntry(designEntry.Project);
 end;
 
+procedure TTemplateTreeNode.DeleteCopyLocal;
+begin
+  if not IsCopyLocal then
+    raise Exception.Create('Node is not of type CopyLocal');
+  Template.DeleteCopyLocalEntry(copyLocalEntry.Source);
+end;
+
 procedure TTemplateTreeNode.DeleteEntry;
 begin
   case NodeType of
@@ -96,6 +107,7 @@ begin
     ntSource: DeleteSource;
     ntDependency: DeleteDependency;
     ntPackageDef: DeletePackageDef;
+    ntCopyLocal: DeleteCopyLocal;
   else
     raise Exception.Create('DeleteEntry called on non entry node');
   end;
@@ -151,11 +163,21 @@ begin
   Result := NodeType = ntEnvironmentVariablesHeading;
 end;
 
+function TTemplateTreeNode.IsCopyLocal: Boolean;
+begin
+  Result := NodeType = ntCopyLocal;
+end;
+
+function TTemplateTreeNode.IsCopyLocalHeading: Boolean;
+begin
+  Result := NodeType = ntCopyLocalHeading;
+end;
+
 function TTemplateTreeNode.IsHeading: Boolean;
 begin
   Result := NodeType in [ntTemplateHeading, ntSourceHeading, ntBuildHeading,
                ntDesignHeading, ntDependencyHeading, ntPackageDefsHeading,
-               ntEnvironmentVariablesHeading];
+               ntEnvironmentVariablesHeading, ntCopyLocalHeading];
 end;
 
 function TTemplateTreeNode.IsPackageDef: boolean;
