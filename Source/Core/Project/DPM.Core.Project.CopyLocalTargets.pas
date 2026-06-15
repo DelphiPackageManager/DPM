@@ -71,9 +71,13 @@ begin
     '    <PropertyGroup>' + CRLF +
     '      <_DPMExe Condition="''$(DPMExe)'' != '''' and Exists(''$(DPMExe)'')">$(DPMExe)</_DPMExe>' + CRLF +
     '      <_DPMExe Condition="''$(_DPMExe)'' == ''''">dpm</_DPMExe>' + CRLF +
+    //$(OutputPath) is the item transform @(OutputFile->'%(FullPath)') - the exe path, not its
+    //folder - so take the directory straight from the OutputFile item metadata. (Item refs are
+    //evaluated in a property value, but not inside a property function like GetDirectoryName.)
+    '      <_DPMOutputDir>@(OutputFile->''%(RootDir)%(Directory)'')</_DPMOutputDir>' + CRLF +
     '    </PropertyGroup>' + CRLF +
     '    <Exec ContinueOnError="true" Command="&quot;$(_DPMExe)&quot; copylocal &quot;$(MSBuildProjectFullPath)&quot;' +
-            ' -platform=$(Platform) -config=$(Config) -outputDir=&quot;$(OutputPath)&quot;' +
+            ' -platform=$(Platform) -config=$(Config) -outputDir=&quot;$(_DPMOutputDir)&quot;' +
             ' -compiler=$(DPMCompiler) -usePackages=$(UsePackages) -runtimePackages=&quot;$(DCC_UsePackage)&quot;" />' + CRLF +
     '  </Target>' + CRLF +
     '</Project>' + CRLF;

@@ -51,7 +51,7 @@ type
     procedure ProjectRenamed(const oldFileName : string; const newFileName : string);
   end;
 
-  TDPMIDENotifier = class(TInterfacedObject, IOTANotifier, IOTAIDENotifier, IDPMIDENotifier)
+  TDPMIDENotifier = class(TInterfacedObject, IOTANotifier, IOTAIDENotifier, IOTAIDENotifier80, IDPMIDENotifier)
   private
     FLogger : IDPMIDELogger;
     FLoadingGroup : boolean;
@@ -71,8 +71,14 @@ type
     procedure Modified;
 
     //IOTAIDENotifier
-    procedure AfterCompile(Succeeded : Boolean);
-    procedure BeforeCompile(const Project : IOTAProject; var Cancel : Boolean);
+    procedure AfterCompile(Succeeded : Boolean); overload;
+    procedure BeforeCompile(const Project : IOTAProject; var Cancel : Boolean); overload;
+    //IOTAIDENotifier50
+    procedure AfterCompile(Succeeded : Boolean; IsCodeInsight : Boolean); overload;
+    procedure BeforeCompile(const Project : IOTAProject; IsCodeInsight : Boolean; var Cancel : Boolean); overload;
+    //IOTAIDENotifier80 - the project-aware variant the IDE calls per project (also for Build All /
+    //project groups); this is where we trigger copylocal after a successful in-IDE build.
+    procedure AfterCompile(const Project : IOTAProject; Succeeded : Boolean; IsCodeInsight : Boolean); overload;
 
     procedure FileNotification(NotifyCode : TOTAFileNotification; const FileName : string; var Cancel : Boolean);
 
@@ -137,6 +143,20 @@ end;
 
 procedure TDPMIDENotifier.AfterCompile(Succeeded : Boolean);
 begin
+  //IOTAIDENotifier - superseded by the project-aware IOTAIDENotifier80 variant below.
+end;
+
+procedure TDPMIDENotifier.AfterCompile(Succeeded : Boolean; IsCodeInsight : Boolean);
+begin
+  //IOTAIDENotifier50 - superseded by the project-aware IOTAIDENotifier80 variant below.
+end;
+
+procedure TDPMIDENotifier.AfterCompile(const Project : IOTAProject; Succeeded : Boolean; IsCodeInsight : Boolean);
+begin
+  //The IDE doesn't run the DPM.CopyLocal.targets AfterBuild target, so copy package binaries to the
+  //output here after a successful real (non code-insight) build. Fires once per built project.
+  if Succeeded and (not IsCodeInsight) and (Project <> nil) then
+    FProjectController.ProjectBuilt(Project);
 end;
 
 procedure TDPMIDENotifier.AfterSave;
@@ -145,6 +165,12 @@ end;
 
 procedure TDPMIDENotifier.BeforeCompile(const Project : IOTAProject; var Cancel : Boolean);
 begin
+  //IOTAIDENotifier
+end;
+
+procedure TDPMIDENotifier.BeforeCompile(const Project : IOTAProject; IsCodeInsight : Boolean; var Cancel : Boolean);
+begin
+  //IOTAIDENotifier50
 end;
 
 procedure TDPMIDENotifier.BeforeSave;

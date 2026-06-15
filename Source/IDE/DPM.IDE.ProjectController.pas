@@ -8,6 +8,7 @@ uses
   VSoft.CancellationToken,
   DPM.IDE.Logger,
   DPM.Core.Package.Interfaces,
+  DPM.Core.Package.CopyLocal,
   DPM.IDE.ProjectTreeManager,
   DPM.IDE.EditorViewManager,
   DPM.Core.Package.Installer.Interfaces;
@@ -34,6 +35,10 @@ type
 
     procedure ActivePlatformChanged(const platform : string);
     procedure ActiveProjectChanged(const project : IOTAProject);
+
+    //Called after a successful IDE compile/build (the IDE doesn't run the DPM.CopyLocal.targets
+    //AfterBuild target, so we trigger copylocal here for in-IDE builds).
+    procedure ProjectBuilt(const project : IOTAProject);
   end;
 
   // The Project controller is used to receive notifications from the IDE and funnel
@@ -47,6 +52,7 @@ type
     FProjectMode : TProjectMode;
     FPackageInstaller : IPackageInstaller;
     FInstallerContext : IPackageInstallerContext;
+    FCopyLocalService : ICopyLocalService;
     FCancellationTokenSource : ICancellationTokenSource;
     FLastResult : boolean;
   protected
@@ -67,19 +73,24 @@ type
     procedure RestoreProject(const fileName : string);
     procedure ActivePlatformChanged(const platform : string);
     procedure ActiveProjectChanged(const project : IOTAProject);
+    procedure ProjectBuilt(const project : IOTAProject);
 
   public
     constructor Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager;
-                       const projectTreeManager : IDPMProjectTreeManager; const context : IPackageInstallerContext);
+                       const projectTreeManager : IDPMProjectTreeManager; const context : IPackageInstallerContext;
+                       const copyLocalService : ICopyLocalService);
     destructor Destroy;override;
   end;
 
 implementation
 
 uses
+  System.SysUtils,
   System.TypInfo,
+  DPM.Core.Types,
   DPM.Core.Options.Common,
   DPM.Core.Options.Restore,
+  DPM.Core.Options.CopyLocal,
   DPM.IDE.Types;
 
 { TDPMIDEProjectController }
@@ -94,6 +105,66 @@ begin
   FEditorViewManager.ActiveProjectChanged(project);
 end;
 
+procedure TDPMIDEProjectController.ProjectBuilt(const project: IOTAProject);
+var
+  projectOptions : IOTAProjectOptions;
+  configs : IOTAProjectOptionsConfigurations;
+  config : IOTABuildConfiguration;
+  platformName : string;
+  outputDir : string;
+  options : TCopyLocalOptions;
+begin
+  if project = nil then
+    exit;
+  if not SameText(ExtractFileExt(project.FileName), '.dproj') then
+    exit;
+  //Cheap guard - skip projects that don't use dpm so a normal compile costs nothing (same check
+  //the restore path uses).
+  if not FPackageInstaller.ProjectHasPackageReferences(project.FileName, IDECompilerVersion) then
+    exit;
+
+  projectOptions := project.ProjectOptions;
+  if not Supports(projectOptions, IOTAProjectOptionsConfigurations, configs) then
+    exit;
+  config := configs.ActiveConfiguration;
+  if config = nil then
+    exit;
+
+  //Honour the same opt-out the msbuild target uses.
+  if SameText(Trim(config.GetValue('DPMCopyLocalDisable')), 'true') then
+    exit;
+
+  platformName := project.CurrentPlatform;
+
+  //DCC_ExeOutput is the output folder, commonly carrying $(Platform)/$(Config) macros. The
+  //copylocal service resolves relative paths but not msbuild macros, so expand the two we know.
+  outputDir := config.GetValue('DCC_ExeOutput');
+  outputDir := StringReplace(outputDir, '$(Platform)', platformName, [rfReplaceAll, rfIgnoreCase]);
+  outputDir := StringReplace(outputDir, '$(Config)', config.Name, [rfReplaceAll, rfIgnoreCase]);
+
+  options := TCopyLocalOptions.Create;
+  try
+    options.ApplyCommon(TCommonOptions.Default);
+    options.ProjectPath := project.FileName;
+    options.Platform := ProjectPlatformToDPMPlatform(platformName);
+    options.Config := config.Name;
+    options.OutputDir := outputDir;
+    options.CompilerVersion := IDECompilerVersion;
+    options.UsePackages := SameText(Trim(config.GetValue('UsePackages')), 'true');
+    options.RuntimePackages := config.GetValue('DCC_UsePackage');
+    if not options.Validate(FLogger) then
+      exit;
+    try
+      FCopyLocalService.CopyLocal(FCancellationTokenSource.Token, options);
+    except
+      on e : Exception do
+        FLogger.Error('Error during copylocal for [' + ExtractFileName(project.FileName) + '] : ' + e.Message);
+    end;
+  finally
+    options.Free;
+  end;
+end;
+
 procedure TDPMIDEProjectController.BeginLoading(const mode: TProjectMode);
 begin
   FProjectMode := mode;
@@ -104,7 +175,8 @@ begin
 end;
 
 constructor TDPMIDEProjectController.Create(const logger : IDPMIDELogger; const packageInstaller : IPackageInstaller; const editorViewManager : IDPMEditorViewManager;
-                       const projectTreeManager : IDPMProjectTreeManager; const context : IPackageInstallerContext);
+                       const projectTreeManager : IDPMProjectTreeManager; const context : IPackageInstallerContext;
+                       const copyLocalService : ICopyLocalService);
 begin
   inherited Create;
   FProjectMode := TProjectMode.pmNone;
@@ -114,6 +186,7 @@ begin
   FProjectTreeManager := projectTreeManager;
   FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
   FInstallerContext := context;
+  FCopyLocalService := copyLocalService;
 end;
 
 destructor TDPMIDEProjectController.Destroy;

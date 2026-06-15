@@ -59,9 +59,11 @@ type
 //('FooPkg290') compares equal to its dcp/runtime-package token ('FooPkg').
 function StripLibSuffix(const baseName : string) : string;
 
-//Exposed for testing. True when one of the package's runtime bpls (template.PrecompiledBinaries)
-//appears in the build's runtime-package link set (semicolon-separated $(DCC_UsePackage) tokens).
-function PackageRuntimeLinked(const template : ISpecTemplate; const runtimePackages : string) : boolean;
+//Exposed for testing. True when one of the given bpl files (the .bpl files copylocal matched in
+//the package cache - whether shipped precompiled or built during install) appears in the build's
+//runtime-package link set (semicolon-separated $(DCC_UsePackage) tokens). Non-.bpl entries are
+//ignored.
+function PackageRuntimeLinked(const bplFiles : array of string; const runtimePackages : string) : boolean;
 
 implementation
 
@@ -104,13 +106,13 @@ begin
   result := Copy(result, 1, len);
 end;
 
-//True when one of the package's runtime bpls appears in the build's runtime-package link set
+//True when one of the given bpl files appears in the build's runtime-package link set
 //($(DCC_UsePackage)). Two-stage match, both case-insensitive:
 //  1. Strip the trailing numeric lib suffix from both sides so 'FooPkg290.bpl' matches token 'FooPkg'.
 //  2. Fallback for non-numeric/custom lib suffixes: treat it as a match when the dcp reference is a
 //     prefix of the bpl filename (e.g. token 'VSoft.Foo' starts bpl 'VSoft.Foo_D12'). A minimum token
 //     length guards against short names ('rtl','vcl') matching unrelated bpls.
-function PackageRuntimeLinked(const template : ISpecTemplate; const runtimePackages : string) : boolean;
+function PackageRuntimeLinked(const bplFiles : array of string; const runtimePackages : string) : boolean;
 const
   cMinPrefixMatch = 4;
 var
@@ -118,6 +120,7 @@ var
   token : string;
   tokenTrimmed : string;
   tokenStem : string;
+  i : integer;
   binary : string;
   bplName : string;
   bplStem : string;
@@ -126,8 +129,9 @@ begin
   if Trim(runtimePackages) = '' then
     exit;
   tokens := TStringUtils.SplitStr(runtimePackages, ';', TSplitStringOptions.ExcludeEmpty);
-  for binary in template.PrecompiledBinaries do
+  for i := Low(bplFiles) to High(bplFiles) do
   begin
+    binary := bplFiles[i];
     if not SameText(ExtractFileExt(binary), '.bpl') then
       continue;
     //bplName is the bpl filename (no extension) - may carry a lib suffix, numeric or not.
@@ -187,8 +191,7 @@ var
     spec : IPackageSpec;
     template : ISpecTemplate;
     packagePath : string;
-    runtimeLinked : boolean;
-    runtimeChecked : boolean;
+    isRuntimeOnly : boolean;
     copyEntry : ISpecCopyLocalEntry;
     antPattern : IAntPattern;
     patterns : TArray<IFileSystemPattern>;
@@ -214,8 +217,6 @@ var
       exit;
 
     packagePath := FPackageCache.GetPackagePath(identity);
-    runtimeLinked := false;
-    runtimeChecked := false;
     antPattern := TAntPattern.Create(packagePath);
 
     for copyEntry in template.CopyLocalEntries do
@@ -226,20 +227,11 @@ var
          (not PlatformSatisfiedBy(options.Platform, copyEntry.Platforms)) then
         continue;
 
-      //runtimeOnly: only copy when the build links with runtime packages AND this package's runtime
-      //bpl is actually in the link set. Computed lazily, once per package.
-      if copyEntry.Mode = TCopyLocalMode.runtimeOnly then
-      begin
-        if not options.UsePackages then
-          continue;
-        if not runtimeChecked then
-        begin
-          runtimeLinked := PackageRuntimeLinked(template, options.RuntimePackages);
-          runtimeChecked := true;
-        end;
-        if not runtimeLinked then
-          continue;
-      end;
+      //runtimeOnly governs only bpls: skip the whole entry when the build doesn't link runtime
+      //packages at all. Per-bpl linkage is checked below as each file is copied.
+      isRuntimeOnly := copyEntry.Mode = TCopyLocalMode.runtimeOnly;
+      if isRuntimeOnly and (not options.UsePackages) then
+        continue;
 
       //$platform$ resolves to the build platform's folder name - the same name the installer wrote
       //bpl\{platform} / lib\{platform} output to - so 'bpl\$platform$\*.bpl' matches the right output.
@@ -255,6 +247,10 @@ var
         files := TDirectory.GetFiles(pattern.Directory, pattern.FileMask, TSearchOption.soTopDirectoryOnly);
         for srcFile in files do
         begin
+          //runtimeOnly: copy a bpl only when it's actually in the build's runtime-package link set.
+          //A non-bpl here returns false and is skipped (it belongs in an 'always' entry).
+          if isRuntimeOnly and (not PackageRuntimeLinked([srcFile], options.RuntimePackages)) then
+            continue;
           //Flatten - everything lands directly in the output folder next to the exe.
           targetFile := TPath.Combine(outputDir, ExtractFileName(srcFile));
           if FileExists(targetFile) and TFileUtils.AreSameFiles(srcFile, targetFile) then

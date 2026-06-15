@@ -44,22 +44,7 @@ type
 implementation
 
 uses
-  TestLogger,
-  DPM.Core.Logging,
-  DPM.Core.Spec.Interfaces,
-  DPM.Core.Spec.Template,
   DPM.Core.Package.CopyLocal;
-
-function MakeTemplate(const bpls : array of string) : ISpecTemplate;
-var
-  logger : ILogger;
-  i : integer;
-begin
-  logger := TTestLogger.Create;
-  result := TSpecTemplate.Create(logger);
-  for i := Low(bpls) to High(bpls) do
-    result.PrecompiledBinaries.Add(bpls[i]);
-end;
 
 { TCopyLocalRuntimeTests }
 
@@ -74,73 +59,49 @@ begin
 end;
 
 procedure TCopyLocalRuntimeTests.RuntimeLinked_NumericSuffix_Matches;
-var
-  template : ISpecTemplate;
 begin
-  template := MakeTemplate(['bpl/Win32/FooPkg290.bpl']);
   //the dcp token 'FooPkg' matches the bpl after the numeric suffix is stripped.
-  Assert.IsTrue(PackageRuntimeLinked(template, 'rtl;vcl;FooPkg'));
+  Assert.IsTrue(PackageRuntimeLinked(['bpl/Win32/FooPkg290.bpl'], 'rtl;vcl;FooPkg'));
 end;
 
 procedure TCopyLocalRuntimeTests.RuntimeLinked_CaseInsensitive_Matches;
-var
-  template : ISpecTemplate;
 begin
-  template := MakeTemplate(['bpl/Win32/VSoft.Foo290.bpl']);
-  Assert.IsTrue(PackageRuntimeLinked(template, 'vsoft.foo'));
+  Assert.IsTrue(PackageRuntimeLinked(['bpl/Win32/VSoft.Foo290.bpl'], 'vsoft.foo'));
 end;
 
 procedure TCopyLocalRuntimeTests.RuntimeLinked_NoTokenMatch_ReturnsFalse;
-var
-  template : ISpecTemplate;
 begin
-  template := MakeTemplate(['bpl/Win32/FooPkg290.bpl']);
-  Assert.IsFalse(PackageRuntimeLinked(template, 'rtl;vcl'));
+  Assert.IsFalse(PackageRuntimeLinked(['bpl/Win32/FooPkg290.bpl'], 'rtl;vcl'));
 end;
 
 procedure TCopyLocalRuntimeTests.RuntimeLinked_EmptyRuntimePackages_ReturnsFalse;
-var
-  template : ISpecTemplate;
 begin
-  template := MakeTemplate(['bpl/Win32/FooPkg290.bpl']);
-  Assert.IsFalse(PackageRuntimeLinked(template, ''));
+  Assert.IsFalse(PackageRuntimeLinked(['bpl/Win32/FooPkg290.bpl'], ''));
 end;
 
 procedure TCopyLocalRuntimeTests.RuntimeLinked_NonBplBinary_Ignored;
-var
-  template : ISpecTemplate;
 begin
-  //only .bpl binaries participate - a dll with a matching name must not count.
-  template := MakeTemplate(['lib/Win32/FooPkg.dll']);
-  Assert.IsFalse(PackageRuntimeLinked(template, 'FooPkg'));
+  //only .bpl files participate - a dll with a matching name must not count.
+  Assert.IsFalse(PackageRuntimeLinked(['lib/Win32/FooPkg.dll'], 'FooPkg'));
 end;
 
 procedure TCopyLocalRuntimeTests.RuntimeLinked_NonNumericSuffix_PrefixMatches;
-var
-  template : ISpecTemplate;
 begin
   //custom (non-numeric) lib suffix: striplibsuffix can't normalise '_D12', so the prefix fallback
   //matches because the dcp token 'VSoft.Foo' starts the bpl name 'vsoft.foo_d12'.
-  template := MakeTemplate(['bpl/Win32/VSoft.Foo_D12.bpl']);
-  Assert.IsTrue(PackageRuntimeLinked(template, 'VSoft.Foo'));
+  Assert.IsTrue(PackageRuntimeLinked(['bpl/Win32/VSoft.Foo_D12.bpl'], 'VSoft.Foo'));
 end;
 
 procedure TCopyLocalRuntimeTests.RuntimeLinked_PrefixMatch_MinLengthBoundary;
-var
-  template : ISpecTemplate;
 begin
   //a 4-char token is exactly at the minimum prefix length, so it matches.
-  template := MakeTemplate(['bpl/Win32/Abcd_Custom.bpl']);
-  Assert.IsTrue(PackageRuntimeLinked(template, 'Abcd'));
+  Assert.IsTrue(PackageRuntimeLinked(['bpl/Win32/Abcd_Custom.bpl'], 'Abcd'));
 end;
 
 procedure TCopyLocalRuntimeTests.RuntimeLinked_ShortToken_DoesNotPrefixMatch;
-var
-  template : ISpecTemplate;
 begin
   //'vcl' is below the 4-char minimum, so it must not prefix-match an unrelated 'vclXYZ' bpl.
-  template := MakeTemplate(['bpl/Win32/vclXYZ.bpl']);
-  Assert.IsFalse(PackageRuntimeLinked(template, 'vcl'));
+  Assert.IsFalse(PackageRuntimeLinked(['bpl/Win32/vclXYZ.bpl'], 'vcl'));
 end;
 
 initialization
