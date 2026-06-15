@@ -341,6 +341,14 @@ function TPreparePackageFolders.GatherScaffoldItems(const spec : IPackageSpec;
     result := ChangeFileExt(ExtractFileName(normalized), '');
   end;
 
+  function ContainsWildcard(const aName : string) : boolean;
+  begin
+    //a project filename with glob chars isn't a real, fully qualified project name -
+    //we can't derive a sensible dpk/dproj basename from it, so the caller falls back
+    //to the packageId instead.
+    result := (Pos('*', aName) > 0) or (Pos('?', aName) > 0);
+  end;
+
 var
   i, j : integer;
   template : ISpecTemplate;
@@ -375,8 +383,12 @@ begin
           continue;
         projectPath := ResolveVariables(projectPath, variables);
         projectName := ProjectNameFromPath(projectPath);
-        if (projectName = '') or seen.Contains(LowerCase(projectName)) then
+        if (projectName = '') or ContainsWildcard(projectName) or seen.Contains(LowerCase(projectName)) then
+        begin
+          if ContainsWildcard(projectName) then
+            FLogger.Information(Format('Ignoring wildcard build project entry "%s" - will derive name from packageId instead.', [projectPath]));
           continue;
+        end;
         seen.Add(LowerCase(projectName));
         item.ProjectName := projectName;
         item.Kind := pkRuntime;
@@ -405,8 +417,12 @@ begin
           continue;
         projectPath := ResolveVariables(projectPath, variables);
         projectName := ProjectNameFromPath(projectPath);
-        if (projectName = '') or seen.Contains(LowerCase(projectName)) then
+        if (projectName = '') or ContainsWildcard(projectName) or seen.Contains(LowerCase(projectName)) then
+        begin
+          if ContainsWildcard(projectName) then
+            FLogger.Information(Format('Ignoring wildcard design project entry "%s" - will derive name from packageId instead.', [projectPath]));
           continue;
+        end;
         seen.Add(LowerCase(projectName));
         item.ProjectName := projectName;
         item.Kind := pkDesign;

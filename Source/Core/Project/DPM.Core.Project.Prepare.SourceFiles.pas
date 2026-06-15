@@ -321,7 +321,16 @@ begin
     if TPathUtils.IsPathRooted(searchDir) then
       searchDir := ExcludeTrailingPathDelimiter(searchDir)
     else
+    begin
+      //TPathUtils.IsPathRooted (unlike the RTL) does not treat a single leading '\' as
+      //rooted, so a dspec source like '/packages/...' is meant to be relative to the spec
+      //dir. But TPath.Combine DOES treat the leading '\' as rooted and would discard baseDir,
+      //yielding a bogus current-drive path. Strip the leading delimiter first so it combines
+      //relative to baseDir - matching how Pack (CompressRelativePath) resolves the same paths.
+      if (searchDir <> '') and (searchDir[1] = PathDelim) then
+        Delete(searchDir, 1, 1);
       searchDir := ExcludeTrailingPathDelimiter(TPath.GetFullPath(TPath.Combine(baseDir, searchDir)));
+    end;
 
     if not TDirectory.Exists(searchDir) then
     begin
