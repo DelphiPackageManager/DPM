@@ -63,7 +63,6 @@ type
     procedure Template_CopyToBin_List_RoundTrips;
 
     procedure Template_CopyLocal_List_RoundTrips;
-    procedure Template_CopyLocal_DefaultMode_IsAlways;
   end;
 
 implementation
@@ -269,12 +268,11 @@ begin
     for j := 0 to et.CopyToLibEntries.Count - 1 do
       Assert.AreEqual(et.CopyToLibEntries[j].Source, at.CopyToLibEntries[j].Source, ctx + ' copyToLib src ' + IntToStr(j));
 
-    //copyLocal is a flat, order-preserved list of first-class entries (src + platforms + mode).
+    //copyLocal is a flat, order-preserved list of first-class entries (src + platforms).
     Assert.AreEqual(et.CopyLocalEntries.Count, at.CopyLocalEntries.Count, ctx + ' copyLocal count');
     for j := 0 to et.CopyLocalEntries.Count - 1 do
     begin
       Assert.AreEqual(et.CopyLocalEntries[j].Source, at.CopyLocalEntries[j].Source, ctx + ' copyLocal src ' + IntToStr(j));
-      Assert.IsTrue(et.CopyLocalEntries[j].Mode = at.CopyLocalEntries[j].Mode, ctx + ' copyLocal mode ' + IntToStr(j));
       Assert.IsTrue(et.CopyLocalEntries[j].Platforms = at.CopyLocalEntries[j].Platforms, ctx + ' copyLocal platforms ' + IntToStr(j));
     end;
 
@@ -773,8 +771,8 @@ end;
 
 procedure TSpecRoundTripTests.Template_CopyLocal_List_RoundTrips;
 const
-  //First-class copyLocal entries: a src glob (may use $platform$), an optional platforms list, and
-  //a mode (always/runtimeOnly). Authored directly - they target build output produced during install.
+  //First-class copyLocal entries: a src glob (may use $platform$) and an optional platforms list.
+  //A legacy 'mode' key is tolerated (ignored) for backward compat, and dropped on round-trip.
   cYaml =
     'metadata:'#13#10 +
     '  id: Test.CopyLocalList'#13#10 +
@@ -792,9 +790,9 @@ const
     '    copyLocal:'#13#10 +
     '      - src: libs/win64/foo.dll'#13#10 +
     '        platforms: [Win64]'#13#10 +
-    '      - src: bpl/$platform$/bar.bpl'#13#10 +
+    '      - src: bin/$platform$/bar.dll'#13#10 +
     '        platforms: [Win32, Win64]'#13#10 +
-    '        mode: runtimeOnly'#13#10;
+    '        mode: runtimeOnly'#13#10;   // legacy key - must be ignored on load
 var
   reader : IPackageSpecReader;
   spec : IPackageSpec;
@@ -802,55 +800,16 @@ var
 begin
   reader := TPackageSpecReader.Create(TTestLogger.Create);
   spec := reader.ReadSpecString(cYaml);
-  Assert.IsNotNull(spec, 'spec should load');
+  Assert.IsNotNull(spec, 'spec should load (legacy mode key tolerated)');
   spec := RoundTrip(spec);
 
   template := spec.FindTemplate('default');
   Assert.IsNotNull(template, 'default template');
   Assert.AreEqual(2, template.CopyLocalEntries.Count, 'copyLocal entry count');
   Assert.AreEqual('libs/win64/foo.dll', template.CopyLocalEntries[0].Source, 'first copyLocal src');
-  //mode absent -> defaults to always.
-  Assert.AreEqual(Ord(TCopyLocalMode.always), Ord(template.CopyLocalEntries[0].Mode), 'first copyLocal mode');
   Assert.IsTrue(template.CopyLocalEntries[0].Platforms = [TDPMPlatform.Win64], 'first copyLocal platforms');
-  Assert.AreEqual('bpl/$platform$/bar.bpl', template.CopyLocalEntries[1].Source, 'second copyLocal src');
-  Assert.AreEqual(Ord(TCopyLocalMode.runtimeOnly), Ord(template.CopyLocalEntries[1].Mode), 'second copyLocal mode');
+  Assert.AreEqual('bin/$platform$/bar.dll', template.CopyLocalEntries[1].Source, 'second copyLocal src');
   Assert.IsTrue(template.CopyLocalEntries[1].Platforms = [TDPMPlatform.Win32, TDPMPlatform.Win64], 'second copyLocal platforms');
-end;
-
-procedure TSpecRoundTripTests.Template_CopyLocal_DefaultMode_IsAlways;
-const
-  //An entry with no platforms (= all platforms) and no mode must default to always.
-  cYaml =
-    'metadata:'#13#10 +
-    '  id: Test.CopyLocalDefault'#13#10 +
-    '  version: 1.0.0'#13#10 +
-    '  description: copyLocal default mode test'#13#10 +
-    '  authors:'#13#10 +
-    '    - Vincent Parrett'#13#10 +
-    '  license: Apache-2.0'#13#10 +
-    'targetPlatforms:'#13#10 +
-    '  - compiler: 12.0'#13#10 +
-    '    platforms: [Win64]'#13#10 +
-    '    template: default'#13#10 +
-    'templates:'#13#10 +
-    '  - name: default'#13#10 +
-    '    copyLocal:'#13#10 +
-    '      - src: bpl/$platform$/*.bpl'#13#10;
-var
-  reader : IPackageSpecReader;
-  spec : IPackageSpec;
-  template : ISpecTemplate;
-begin
-  reader := TPackageSpecReader.Create(TTestLogger.Create);
-  spec := reader.ReadSpecString(cYaml);
-  Assert.IsNotNull(spec, 'spec should load');
-  spec := RoundTrip(spec);
-
-  template := spec.FindTemplate('default');
-  Assert.IsNotNull(template, 'default template');
-  Assert.AreEqual(1, template.CopyLocalEntries.Count, 'copyLocal entry count');
-  Assert.AreEqual(Ord(TCopyLocalMode.always), Ord(template.CopyLocalEntries[0].Mode), 'absent mode should default to always');
-  Assert.IsTrue(template.CopyLocalEntries[0].Platforms = [], 'absent platforms should be empty (all)');
 end;
 
 initialization

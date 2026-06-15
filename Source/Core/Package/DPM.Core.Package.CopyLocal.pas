@@ -59,11 +59,13 @@ type
 //('FooPkg290') compares equal to its dcp/runtime-package token ('FooPkg').
 function StripLibSuffix(const baseName : string) : string;
 
-//Exposed for testing. True when one of the given bpl files (the .bpl files copylocal matched in
-//the package cache - whether shipped precompiled or built during install) appears in the build's
-//runtime-package link set (semicolon-separated $(DCC_UsePackage) tokens). Non-.bpl entries are
-//ignored.
-function PackageRuntimeLinked(const bplFiles : array of string; const runtimePackages : string) : boolean;
+//Exposed for testing. Given a package's own .dcp base names (from lib\{platform}) and .bpl file
+//names (from bpl\{platform}), plus the build's semicolon-separated $(DCC_UsePackage) token list,
+//returns the bpl file names that should be auto-copied: those bpls paired with a .dcp whose base
+//name is one of the referenced runtime-package tokens. Pure (no filesystem access). Using the dcp
+//set as the authority excludes design bpls (their library name never appears in $(DCC_UsePackage)).
+function ResolveRuntimeBplNames(const dcpBaseNames : array of string; const bplFileNames : array of string;
+                                const runtimePackages : string) : TArray<string>;
 
 implementation
 
@@ -106,61 +108,101 @@ begin
   result := Copy(result, 1, len);
 end;
 
-//True when one of the given bpl files appears in the build's runtime-package link set
-//($(DCC_UsePackage)). Two-stage match, both case-insensitive:
-//  1. Strip the trailing numeric lib suffix from both sides so 'FooPkg290.bpl' matches token 'FooPkg'.
-//  2. Fallback for non-numeric/custom lib suffixes: treat it as a match when the dcp reference is a
-//     prefix of the bpl filename (e.g. token 'VSoft.Foo' starts bpl 'VSoft.Foo_D12'). A minimum token
-//     length guards against short names ('rtl','vcl') matching unrelated bpls.
-function PackageRuntimeLinked(const bplFiles : array of string; const runtimePackages : string) : boolean;
-const
-  cMinPrefixMatch = 4;
+//True when a $(DCC_UsePackage) token refers to the given dcp base name. Both already lowercased.
+//  1. exact match ('sempare.templater' = 'sempare.templater').
+//  2. fallback - strip a trailing numeric lib suffix from both sides so a token that carries a
+//     suffix ('sempare.templater370') still resolves to the dcp base ('sempare.templater').
+function TokenMatchesDcp(const tokenLower : string; const dcpLower : string) : boolean;
+var
+  tokenStem : string;
+  dcpStem : string;
+begin
+  result := false;
+  if (tokenLower = '') or (dcpLower = '') then
+    exit;
+  if tokenLower = dcpLower then
+  begin
+    result := true;
+    exit;
+  end;
+  tokenStem := StripLibSuffix(tokenLower);
+  dcpStem := StripLibSuffix(dcpLower);
+  result := (tokenStem <> '') and (tokenStem = dcpStem);
+end;
+
+//Maps each referenced runtime-package token to the package's paired bpl, using the package's own
+//.dcp base names as the authority. bpl-centric: for each bpl we find its OWNING dcp (exact base /
+//numeric-stem match wins; otherwise the longest dcp that is a prefix of the bpl base - covers a
+//custom non-numeric suffix like '_D12' while keeping 'Foo' from claiming 'Foobar290'), then include
+//the bpl iff that owning dcp is referenced. Case-insensitive; deduped by bpl file name.
+function ResolveRuntimeBplNames(const dcpBaseNames : array of string; const bplFileNames : array of string;
+                                const runtimePackages : string) : TArray<string>;
 var
   tokens : TArray<string>;
   token : string;
-  tokenTrimmed : string;
-  tokenStem : string;
+  tokenLower : string;
   i : integer;
-  binary : string;
-  bplName : string;
+  j : integer;
+  bplBaseLower : string;
   bplStem : string;
+  dcpLower : string;
+  owningDcp : string;
+  referenced : boolean;
+  matched : ISet<string>;
+  resultList : IList<string>;
 begin
-  result := false;
+  resultList := TCollections.CreateList<string>;
   if Trim(runtimePackages) = '' then
-    exit;
-  tokens := TStringUtils.SplitStr(runtimePackages, ';', TSplitStringOptions.ExcludeEmpty);
-  for i := Low(bplFiles) to High(bplFiles) do
   begin
-    binary := bplFiles[i];
-    if not SameText(ExtractFileExt(binary), '.bpl') then
+    result := resultList.ToArray;
+    exit;
+  end;
+  tokens := TStringUtils.SplitStr(runtimePackages, ';', TSplitStringOptions.ExcludeEmpty);
+  matched := TCollections.CreateSet<string>;
+
+  for j := Low(bplFileNames) to High(bplFileNames) do
+  begin
+    bplBaseLower := LowerCase(ChangeFileExt(bplFileNames[j], ''));
+    if bplBaseLower = '' then
       continue;
-    //bplName is the bpl filename (no extension) - may carry a lib suffix, numeric or not.
-    bplName := LowerCase(ChangeFileExt(ExtractFileName(StringReplace(binary, '/', PathDelim, [rfReplaceAll])), ''));
-    if bplName = '' then
+    bplStem := StripLibSuffix(bplBaseLower);
+
+    //Find the dcp this bpl belongs to.
+    owningDcp := '';
+    for i := Low(dcpBaseNames) to High(dcpBaseNames) do
+    begin
+      dcpLower := LowerCase(dcpBaseNames[i]);
+      if dcpLower = '' then
+        continue;
+      if (bplBaseLower = dcpLower) or (bplStem = dcpLower) then
+      begin
+        owningDcp := dcpLower; //exact / numeric-stem match is definitive.
+        break;
+      end;
+      //custom-suffix fallback: keep the longest dcp that prefixes the bpl base.
+      if (Copy(bplBaseLower, 1, Length(dcpLower)) = dcpLower) and (Length(dcpLower) > Length(owningDcp)) then
+        owningDcp := dcpLower;
+    end;
+    if owningDcp = '' then
       continue;
-    //bplStem additionally drops a trailing numeric lib suffix ('foopkg290' -> 'foopkg').
-    bplStem := StripLibSuffix(bplName);
+
+    //Is the owning dcp referenced by the build?
+    referenced := false;
     for token in tokens do
     begin
-      tokenTrimmed := LowerCase(Trim(token));
-      if tokenTrimmed = '' then
-        continue;
-      //1. exact match after stripping the numeric lib suffix from both sides.
-      tokenStem := StripLibSuffix(tokenTrimmed);
-      if (tokenStem <> '') and (tokenStem = bplStem) then
+      tokenLower := LowerCase(Trim(token));
+      if TokenMatchesDcp(tokenLower, owningDcp) then
       begin
-        result := true;
-        exit;
-      end;
-      //2. prefix fallback for non-numeric lib suffixes - the dcp reference starts the bpl name.
-      if (Length(tokenTrimmed) >= cMinPrefixMatch) and
-         (Copy(bplName, 1, Length(tokenTrimmed)) = tokenTrimmed) then
-      begin
-        result := true;
-        exit;
+        referenced := true;
+        break;
       end;
     end;
+
+    if referenced and matched.Add(LowerCase(bplFileNames[j])) then
+      resultList.Add(bplFileNames[j]);
   end;
+
+  result := resultList.ToArray;
 end;
 
 function TCopyLocalService.CopyLocal(const cancellationToken : ICancellationToken; const options : TCopyLocalOptions) : boolean;
@@ -172,6 +214,7 @@ var
   outputDir : string;
   projectDir : string;
   visited : ISet<string>;
+  copiedTargets : ISet<string>;
   copiedCount : integer;
 
   //Resolves outputDir against the project folder when it was passed as a relative path.
@@ -185,13 +228,41 @@ var
     end;
   end;
 
+  //Copies one source file into the flat output folder, deduped by target filename across the whole
+  //invocation so the explicit and automatic passes never copy/log the same file twice.
+  procedure CopyOneFile(const srcFile : string; const packageId : string);
+  var
+    targetFile : string;
+    targetKey : string;
+  begin
+    targetKey := LowerCase(ExtractFileName(srcFile));
+    if copiedTargets.Contains(targetKey) then
+      exit;
+    targetFile := TPath.Combine(outputDir, ExtractFileName(srcFile));
+    if FileExists(targetFile) and TFileUtils.AreSameFiles(srcFile, targetFile) then
+    begin
+      copiedTargets.Add(targetKey);
+      exit;
+    end;
+    try
+      ForceDirectories(outputDir);
+      TFile.Copy(srcFile, targetFile, true);
+      copiedTargets.Add(targetKey);
+      Inc(copiedCount);
+      FLogger.Information('Copied [' + ExtractFileName(srcFile) + '] to output for package [' + packageId + '].');
+    except
+      on e : Exception do
+        FLogger.Warning('Unable to copy [' + srcFile + '] to output during copylocal: ' + e.Message);
+    end;
+  end;
+
   procedure CopyEntriesForPackage(const node : IPackageReference);
   var
     identity : IPackageIdentity;
     spec : IPackageSpec;
     template : ISpecTemplate;
     packagePath : string;
-    isRuntimeOnly : boolean;
+    platformFolder : string;
     copyEntry : ISpecCopyLocalEntry;
     antPattern : IAntPattern;
     patterns : TArray<IFileSystemPattern>;
@@ -199,7 +270,15 @@ var
     sourceGlob : string;
     files : TStringDynArray;
     srcFile : string;
-    targetFile : string;
+    libDir : string;
+    bplDir : string;
+    dcpFiles : TStringDynArray;
+    bplFiles : TStringDynArray;
+    dcpBaseNames : TArray<string>;
+    bplFileNames : TArray<string>;
+    runtimeBplNames : TArray<string>;
+    bplName : string;
+    i : integer;
   begin
     identity := TPackageIdentity.Create('', node.Id, node.Version, compilerVersion);
     spec := nil;
@@ -213,60 +292,65 @@ var
       exit;
 
     template := spec.FindTemplate(spec.TargetPlatform.TemplateName);
-    if (template = nil) or (not template.CopyLocalEntries.Any) then
-      exit;
-
     packagePath := FPackageCache.GetPackagePath(identity);
-    antPattern := TAntPattern.Create(packagePath);
+    platformFolder := DPMPlatformToBDString(options.Platform);
 
-    for copyEntry in template.CopyLocalEntries do
+    //1. Explicit copyLocal entries - always copied (platform filter permitting), any file type.
+    if (template <> nil) and template.CopyLocalEntries.Any then
     begin
-      //When the entry lists platforms, restrict to a matching one (Win64/Win64x interchangeable);
-      //an empty list means the entry applies to any platform.
-      if (copyEntry.Platforms <> []) and
-         (not PlatformSatisfiedBy(options.Platform, copyEntry.Platforms)) then
-        continue;
-
-      //runtimeOnly governs only bpls: skip the whole entry when the build doesn't link runtime
-      //packages at all. Per-bpl linkage is checked below as each file is copied.
-      isRuntimeOnly := copyEntry.Mode = TCopyLocalMode.runtimeOnly;
-      if isRuntimeOnly and (not options.UsePackages) then
-        continue;
-
-      //$platform$ resolves to the build platform's folder name - the same name the installer wrote
-      //bpl\{platform} / lib\{platform} output to - so 'bpl\$platform$\*.bpl' matches the right output.
-      sourceGlob := StringReplace(copyEntry.Source, '$platform$', DPMPlatformToBDString(options.Platform), [rfReplaceAll, rfIgnoreCase]);
-      sourceGlob := StringReplace(sourceGlob, '/', PathDelim, [rfReplaceAll]);
-      if (sourceGlob <> '') and (sourceGlob[1] = PathDelim) then
-        Delete(sourceGlob, 1, 1);
-      patterns := antPattern.Expand(sourceGlob);
-      for pattern in patterns do
+      antPattern := TAntPattern.Create(packagePath);
+      for copyEntry in template.CopyLocalEntries do
       begin
-        if not TDirectory.Exists(pattern.Directory) then
+        //When the entry lists platforms, restrict to a matching one (Win64/Win64x interchangeable);
+        //an empty list means the entry applies to any platform.
+        if (copyEntry.Platforms <> []) and
+           (not PlatformSatisfiedBy(options.Platform, copyEntry.Platforms)) then
           continue;
-        files := TDirectory.GetFiles(pattern.Directory, pattern.FileMask, TSearchOption.soTopDirectoryOnly);
-        for srcFile in files do
+
+        //$platform$ resolves to the build platform's folder name - the same name the installer wrote
+        //bpl\{platform} / lib\{platform} output to.
+        sourceGlob := StringReplace(copyEntry.Source, '$platform$', platformFolder, [rfReplaceAll, rfIgnoreCase]);
+        sourceGlob := StringReplace(sourceGlob, '/', PathDelim, [rfReplaceAll]);
+        if (sourceGlob <> '') and (sourceGlob[1] = PathDelim) then
+          Delete(sourceGlob, 1, 1);
+        patterns := antPattern.Expand(sourceGlob);
+        for pattern in patterns do
         begin
-          //runtimeOnly: copy a bpl only when it's actually in the build's runtime-package link set.
-          //A non-bpl here returns false and is skipped (it belongs in an 'always' entry).
-          if isRuntimeOnly and (not PackageRuntimeLinked([srcFile], options.RuntimePackages)) then
+          if not TDirectory.Exists(pattern.Directory) then
             continue;
-          //Flatten - everything lands directly in the output folder next to the exe.
-          targetFile := TPath.Combine(outputDir, ExtractFileName(srcFile));
-          if FileExists(targetFile) and TFileUtils.AreSameFiles(srcFile, targetFile) then
-            continue;
-          try
-            ForceDirectories(outputDir);
-            TFile.Copy(srcFile, targetFile, true);
-            Inc(copiedCount);
-            FLogger.Information('Copied [' + ExtractFileName(srcFile) + '] to output for package [' + node.Id + '].');
-          except
-            on e : Exception do
-              FLogger.Warning('Unable to copy [' + srcFile + '] to output during copylocal: ' + e.Message);
-          end;
+          files := TDirectory.GetFiles(pattern.Directory, pattern.FileMask, TSearchOption.soTopDirectoryOnly);
+          for srcFile in files do
+            CopyOneFile(srcFile, node.Id);
         end;
       end;
     end;
+
+    //2. Automatic runtime-bpl copy - only when the build links runtime packages. Map each
+    //$(DCC_UsePackage) token to the package's paired bpl via its own .dcp files (the authority),
+    //which excludes design bpls.
+    if (not options.UsePackages) or (Trim(options.RuntimePackages) = '') then
+      exit;
+
+    libDir := TPath.Combine(packagePath, 'lib' + PathDelim + platformFolder);
+    bplDir := TPath.Combine(packagePath, 'bpl' + PathDelim + platformFolder);
+    if (not TDirectory.Exists(libDir)) or (not TDirectory.Exists(bplDir)) then
+      exit;
+
+    dcpFiles := TDirectory.GetFiles(libDir, '*.dcp', TSearchOption.soTopDirectoryOnly);
+    bplFiles := TDirectory.GetFiles(bplDir, '*.bpl', TSearchOption.soTopDirectoryOnly);
+    if (Length(dcpFiles) = 0) or (Length(bplFiles) = 0) then
+      exit;
+
+    SetLength(dcpBaseNames, Length(dcpFiles));
+    for i := Low(dcpFiles) to High(dcpFiles) do
+      dcpBaseNames[i] := ChangeFileExt(ExtractFileName(dcpFiles[i]), '');
+    SetLength(bplFileNames, Length(bplFiles));
+    for i := Low(bplFiles) to High(bplFiles) do
+      bplFileNames[i] := ExtractFileName(bplFiles[i]);
+
+    runtimeBplNames := ResolveRuntimeBplNames(dcpBaseNames, bplFileNames, options.RuntimePackages);
+    for bplName in runtimeBplNames do
+      CopyOneFile(TPath.Combine(bplDir, bplName), node.Id);
   end;
 
   procedure Visit(const node : IPackageReference);
@@ -338,6 +422,7 @@ begin
   outputDir := ResolveOutputDir;
 
   visited := TCollections.CreateSet<string>;
+  copiedTargets := TCollections.CreateSet<string>;
   copiedCount := 0;
   Visit(graphRoot);
 

@@ -522,13 +522,13 @@
                     },
                     "copyLocal": {
                         "type": "array",
-                        "description": "files copied into the consuming project's build output folder at build time (via 'dpm copylocal') - e.g native dlls and runtime bpls. The src is matched against the package cache, so it can target artifacts built during install (e.g. a runtime .bpl). The src may contain the $platform$ token, which resolves to the build platform's folder name.",
+                        "description": "Files always copied into the consuming project's build output folder at build time (via 'dpm copylocal') - e.g. native dlls. The src is matched against the package cache, so it can target artifacts built during install. The src may contain the $platform$ token, which resolves to the build platform's folder name. NOTE: runtime .bpls do NOT need an entry here - any of this package's runtime bpls that the consuming project links (its name appears in $(DCC_UsePackage)) is copied automatically.",
                         "items": {
                             "type": "object",
                             "properties": {
                                 "src": {
                                     "type": "string",
-                                    "description": "The source ant pattern filespec, relative to the package root. May contain $platform$, e.g. bpl\\$platform$\\*.bpl"
+                                    "description": "The source ant pattern filespec, relative to the package root. May contain $platform$, e.g. bin\\$platform$\\*.dll"
                                 },
                                 "platforms": {
                                     "type": "array",
@@ -538,11 +538,6 @@
                                         "minItems": 1,
                                         "uniqueItems": true
                                     }
-                                },
-                                "mode": {
-                                    "type": "string",
-                                    "description": "'always' (default) = always copy; 'runtimeOnly' = only when the project links with runtime packages and references this package's runtime bpl.",
-                                    "enum": [ "always", "runtimeOnly" ]
                                 }
                             },
                             "required": [

@@ -182,10 +182,8 @@ type
     ['{4D8A6F23-7B1E-4C90-9A2D-5E6F0B3C8A14}']
     function GetSource : string;
     function GetPlatforms : TDPMPlatforms;
-    function GetMode : TCopyLocalMode;
     procedure SetSource(const value : string);
     procedure SetPlatforms(const value : TDPMPlatforms);
-    procedure SetMode(const value : TCopyLocalMode);
 
     function Clone : ISpecCopyLocalEntry;
 
@@ -193,8 +191,6 @@ type
     property Source : string read GetSource write SetSource;
     /// <summary> Platforms this entry applies to. Empty = all platforms. </summary>
     property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
-    /// <summary> always (default) or runtimeOnly (only when the project links this package's runtime bpl). </summary>
-    property Mode : TCopyLocalMode read GetMode write SetMode;
   end;
 
   ISpecBuildEntry = interface(ISpecNode)
@@ -358,8 +354,8 @@ type
     /// <summary> First-class copyLocal entries: globs (relative to the extracted package root, may
     /// contain $platform$) whose matched files 'dpm copylocal' copies, flattened, into the consuming
     /// project's build output folder at build time. Each entry carries a platform list (empty = all)
-    /// and a mode (always/runtimeOnly). Authored directly, so they can target artifacts built during
-    /// install (e.g. a runtime .bpl in bpl\{platform}). </summary>
+    /// and is always copied. (Referenced runtime .bpls are copied automatically and need no entry.)
+    /// Authored directly, so they can target artifacts built during install. </summary>
     property CopyLocalEntries : IList<ISpecCopyLocalEntry> read GetCopyLocalEntries;
     property PackageDefinitions : IList<ISpecPackageDefinition> read GetPackageDefinitions;
     /// <summary> Precompiled Windows PE binaries (.bpl/.dll/.exe) this package ships, declared as

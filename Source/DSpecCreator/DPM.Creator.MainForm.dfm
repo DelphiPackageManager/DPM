@@ -1356,27 +1356,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Height = 15
             Caption = 'Platforms:'
           end
-          object lblCopyLocalMode: TLabel
-            Left = 271
-            Top = 92
-            Width = 34
-            Height = 15
-            Caption = 'Mode:'
-          end
-          object Label15: TLabel
-            Left = 272
-            Top = 152
-            Width = 233
-            Height = 121
-            Anchors = [akLeft, akTop, akRight]
-            AutoSize = False
-            Caption = 
-              'runtimeOnly mode will copy a bpl if the project uses runtime pac' +
-              'kages and the bpl is referenced.'#13#10#13#10'alway mode will always copy ' +
-              'the file(s) to the output folder'
-            Enabled = False
-            WordWrap = True
-          end
           object edtCopyLocalSrc: TEdit
             Left = 16
             Top = 61
@@ -1386,7 +1365,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
             ParentShowHint = False
             ShowHint = True
             TabOrder = 0
-            TextHint = 'e.g. bpl\$platform$\*.bpl'
+            TextHint = 'e.g. bin\$platform$\*.dll'
             OnChange = edtCopyLocalSrcChange
           end
           object clbCopyLocalPlatforms: TCheckListBox
@@ -1394,7 +1373,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Top = 113
             Width = 240
             Height = 160
-            ItemHeight = 17
+            ItemHeight = 15
             Items.Strings = (
               'Win32'
               'Win64'
@@ -1410,15 +1389,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
               'Linux64')
             TabOrder = 1
             OnClickCheck = clbCopyLocalPlatformsClickCheck
-          end
-          object cboCopyLocalMode: TComboBox
-            Left = 271
-            Top = 113
-            Width = 240
-            Height = 23
-            Style = csDropDownList
-            TabOrder = 2
-            OnChange = cboCopyLocalModeChange
           end
         end
         object crdCopyLocalHeading: TCard

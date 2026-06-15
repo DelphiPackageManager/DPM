@@ -44,15 +44,12 @@ type
   private
     FSource : string;
     FPlatforms : TDPMPlatforms;
-    FMode : TCopyLocalMode;
   protected
     function GetSource : string;
     function GetPlatforms : TDPMPlatforms;
-    function GetMode : TCopyLocalMode;
 
     procedure SetSource(const value : string);
     procedure SetPlatforms(const value : TDPMPlatforms);
-    procedure SetMode(const value : TCopyLocalMode);
 
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
@@ -61,10 +58,8 @@ type
 
     property Source : string read GetSource write SetSource;
     property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
-    property Mode : TCopyLocalMode read GetMode write SetMode;
   public
-    constructor CreateClone(const logger : ILogger; const src : string; const platforms : TDPMPlatforms; const mode : TCopyLocalMode); reintroduce;
-    constructor Create(const logger : ILogger); override;
+    constructor CreateClone(const logger : ILogger; const src : string; const platforms : TDPMPlatforms); reintroduce;
   end;
 
 implementation
@@ -76,27 +71,14 @@ uses
 
 function TSpecCopyLocalEntry.Clone : ISpecCopyLocalEntry;
 begin
-  result := TSpecCopyLocalEntry.CreateClone(logger, FSource, FPlatforms, FMode);
+  result := TSpecCopyLocalEntry.CreateClone(logger, FSource, FPlatforms);
 end;
 
-constructor TSpecCopyLocalEntry.Create(const logger : ILogger);
-begin
-  inherited Create(logger);
-  //A standalone copyLocal entry always means "copy" - the default mode is always.
-  FMode := TCopyLocalMode.always;
-end;
-
-constructor TSpecCopyLocalEntry.CreateClone(const logger : ILogger; const src : string; const platforms : TDPMPlatforms; const mode : TCopyLocalMode);
+constructor TSpecCopyLocalEntry.CreateClone(const logger : ILogger; const src : string; const platforms : TDPMPlatforms);
 begin
   inherited Create(logger);
   FSource := src;
   FPlatforms := platforms;
-  FMode := mode;
-end;
-
-function TSpecCopyLocalEntry.GetMode : TCopyLocalMode;
-begin
-  result := FMode;
 end;
 
 function TSpecCopyLocalEntry.GetPlatforms : TDPMPlatforms;
@@ -136,19 +118,8 @@ begin
         FPlatforms := FPlatforms + [platform];
     end;
   end;
-
-  //A standalone copyLocal entry always means "copy"; an absent (or none) mode defaults to always.
-  if yamlObject.Contains('mode') then
-    FMode := StringToCopyLocalMode(yamlObject.S['mode'])
-  else
-    FMode := TCopyLocalMode.always;
-  if FMode = TCopyLocalMode.none then
-    FMode := TCopyLocalMode.always;
-end;
-
-procedure TSpecCopyLocalEntry.SetMode(const value : TCopyLocalMode);
-begin
-  FMode := value;
+  //A legacy 'mode' key (always/runtimeOnly) is no longer used - runtime bpls are auto-copied and
+  //explicit entries are always copied - so it is simply ignored here.
 end;
 
 procedure TSpecCopyLocalEntry.SetPlatforms(const value : TDPMPlatforms);
@@ -175,9 +146,6 @@ begin
     for platform in FPlatforms do
       platformsSeq.AddValue(DPMPlatformToString(platform));
   end;
-  //always is the implicit default, so only emit mode when it differs.
-  if FMode = TCopyLocalMode.runtimeOnly then
-    mapping.S['mode'] := CopyLocalModeToString(FMode);
 end;
 
 end.

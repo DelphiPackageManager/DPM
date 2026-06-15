@@ -20,31 +20,49 @@ type
     [Test]
     procedure StripLibSuffix_AllDigits_ReturnsEmpty;
 
-    //PackageRuntimeLinked - exact match after stripping the numeric lib suffix from both sides.
+    //ResolveRuntimeBplNames - maps a $(DCC_UsePackage) token to the bpl paired with its .dcp.
     [Test]
-    procedure RuntimeLinked_NumericSuffix_Matches;
+    procedure Resolve_TokenEqualsDcp_NumericSuffixBpl;
     [Test]
-    procedure RuntimeLinked_CaseInsensitive_Matches;
+    procedure Resolve_ExactBplBaseEqualsDcp;
     [Test]
-    procedure RuntimeLinked_NoTokenMatch_ReturnsFalse;
+    procedure Resolve_CaseInsensitive;
     [Test]
-    procedure RuntimeLinked_EmptyRuntimePackages_ReturnsFalse;
+    procedure Resolve_TokenCarriesLibSuffix_StripsToDcp;
     [Test]
-    procedure RuntimeLinked_NonBplBinary_Ignored;
-
-    //PackageRuntimeLinked - prefix fallback for non-numeric/custom lib suffixes.
+    procedure Resolve_CustomSuffixBpl_PrefixPairs;
     [Test]
-    procedure RuntimeLinked_NonNumericSuffix_PrefixMatches;
+    procedure Resolve_DesignBpl_NoReferencedDcp_Excluded;
     [Test]
-    procedure RuntimeLinked_PrefixMatch_MinLengthBoundary;
+    procedure Resolve_FooVsFoobar_Disambiguates;
     [Test]
-    procedure RuntimeLinked_ShortToken_DoesNotPrefixMatch;
+    procedure Resolve_TokenNotADcp_ReturnsEmpty;
+    [Test]
+    procedure Resolve_EmptyRuntimePackages_ReturnsEmpty;
+    [Test]
+    procedure Resolve_DuplicateBplNames_Deduped;
   end;
 
 implementation
 
 uses
+  System.SysUtils,
   DPM.Core.Package.CopyLocal;
+
+{ helpers }
+
+function ContainsName(const arr : TArray<string>; const name : string) : boolean;
+var
+  i : integer;
+begin
+  result := false;
+  for i := Low(arr) to High(arr) do
+    if SameText(arr[i], name) then
+    begin
+      result := true;
+      exit;
+    end;
+end;
 
 { TCopyLocalRuntimeTests }
 
@@ -58,50 +76,101 @@ begin
   Assert.AreEqual('', StripLibSuffix('290'));
 end;
 
-procedure TCopyLocalRuntimeTests.RuntimeLinked_NumericSuffix_Matches;
+procedure TCopyLocalRuntimeTests.Resolve_TokenEqualsDcp_NumericSuffixBpl;
+var
+  res : TArray<string>;
 begin
-  //the dcp token 'FooPkg' matches the bpl after the numeric suffix is stripped.
-  Assert.IsTrue(PackageRuntimeLinked(['bpl/Win32/FooPkg290.bpl'], 'rtl;vcl;FooPkg'));
+  //token 'Sempare.TemplateR' = dcp base; its paired bpl carries the numeric lib suffix.
+  res := ResolveRuntimeBplNames(['Sempare.TemplateR'], ['Sempare.TemplateR370.bpl'], 'rtl;vcl;Sempare.TemplateR');
+  Assert.AreEqual(1, Length(res));
+  Assert.IsTrue(ContainsName(res, 'Sempare.TemplateR370.bpl'));
 end;
 
-procedure TCopyLocalRuntimeTests.RuntimeLinked_CaseInsensitive_Matches;
+procedure TCopyLocalRuntimeTests.Resolve_ExactBplBaseEqualsDcp;
+var
+  res : TArray<string>;
 begin
-  Assert.IsTrue(PackageRuntimeLinked(['bpl/Win32/VSoft.Foo290.bpl'], 'vsoft.foo'));
+  //bpl with no lib suffix - base equals the dcp base exactly.
+  res := ResolveRuntimeBplNames(['FooPkg'], ['FooPkg.bpl'], 'FooPkg');
+  Assert.AreEqual(1, Length(res));
+  Assert.IsTrue(ContainsName(res, 'FooPkg.bpl'));
 end;
 
-procedure TCopyLocalRuntimeTests.RuntimeLinked_NoTokenMatch_ReturnsFalse;
+procedure TCopyLocalRuntimeTests.Resolve_CaseInsensitive;
+var
+  res : TArray<string>;
 begin
-  Assert.IsFalse(PackageRuntimeLinked(['bpl/Win32/FooPkg290.bpl'], 'rtl;vcl'));
+  res := ResolveRuntimeBplNames(['VSoft.Foo'], ['VSoft.Foo290.bpl'], 'vsoft.foo');
+  Assert.AreEqual(1, Length(res));
+  Assert.IsTrue(ContainsName(res, 'VSoft.Foo290.bpl'));
 end;
 
-procedure TCopyLocalRuntimeTests.RuntimeLinked_EmptyRuntimePackages_ReturnsFalse;
+procedure TCopyLocalRuntimeTests.Resolve_TokenCarriesLibSuffix_StripsToDcp;
+var
+  res : TArray<string>;
 begin
-  Assert.IsFalse(PackageRuntimeLinked(['bpl/Win32/FooPkg290.bpl'], ''));
+  //some projects record the suffixed name in DCC_UsePackage; it still stems to the dcp base.
+  res := ResolveRuntimeBplNames(['Sempare.TemplateR'], ['Sempare.TemplateR370.bpl'], 'Sempare.TemplateR370');
+  Assert.AreEqual(1, Length(res));
+  Assert.IsTrue(ContainsName(res, 'Sempare.TemplateR370.bpl'));
 end;
 
-procedure TCopyLocalRuntimeTests.RuntimeLinked_NonBplBinary_Ignored;
+procedure TCopyLocalRuntimeTests.Resolve_CustomSuffixBpl_PrefixPairs;
+var
+  res : TArray<string>;
 begin
-  //only .bpl files participate - a dll with a matching name must not count.
-  Assert.IsFalse(PackageRuntimeLinked(['lib/Win32/FooPkg.dll'], 'FooPkg'));
+  //a non-numeric/custom lib suffix - the bpl base starts with the dcp base.
+  res := ResolveRuntimeBplNames(['VSoft.Foo'], ['VSoft.Foo_D12.bpl'], 'VSoft.Foo');
+  Assert.AreEqual(1, Length(res));
+  Assert.IsTrue(ContainsName(res, 'VSoft.Foo_D12.bpl'));
 end;
 
-procedure TCopyLocalRuntimeTests.RuntimeLinked_NonNumericSuffix_PrefixMatches;
+procedure TCopyLocalRuntimeTests.Resolve_DesignBpl_NoReferencedDcp_Excluded;
+var
+  res : TArray<string>;
 begin
-  //custom (non-numeric) lib suffix: striplibsuffix can't normalise '_D12', so the prefix fallback
-  //matches because the dcp token 'VSoft.Foo' starts the bpl name 'vsoft.foo_d12'.
-  Assert.IsTrue(PackageRuntimeLinked(['bpl/Win32/VSoft.Foo_D12.bpl'], 'VSoft.Foo'));
+  //the design bpl 'dclFoo290' has no matching dcp in the (runtime) dcp set, so it is excluded -
+  //this is the key new behaviour: design bpls are never auto-copied.
+  res := ResolveRuntimeBplNames(['Foo'], ['Foo290.bpl', 'dclFoo290.bpl'], 'Foo');
+  Assert.AreEqual(1, Length(res));
+  Assert.IsTrue(ContainsName(res, 'Foo290.bpl'));
+  Assert.IsFalse(ContainsName(res, 'dclFoo290.bpl'));
 end;
 
-procedure TCopyLocalRuntimeTests.RuntimeLinked_PrefixMatch_MinLengthBoundary;
+procedure TCopyLocalRuntimeTests.Resolve_FooVsFoobar_Disambiguates;
+var
+  res : TArray<string>;
 begin
-  //a 4-char token is exactly at the minimum prefix length, so it matches.
-  Assert.IsTrue(PackageRuntimeLinked(['bpl/Win32/Abcd_Custom.bpl'], 'Abcd'));
+  //token 'Foo' must not drag in 'Foobar290.bpl' (which belongs to dcp 'Foobar').
+  res := ResolveRuntimeBplNames(['Foo', 'Foobar'], ['Foo290.bpl', 'Foobar290.bpl'], 'Foo');
+  Assert.AreEqual(1, Length(res));
+  Assert.IsTrue(ContainsName(res, 'Foo290.bpl'));
+  Assert.IsFalse(ContainsName(res, 'Foobar290.bpl'));
 end;
 
-procedure TCopyLocalRuntimeTests.RuntimeLinked_ShortToken_DoesNotPrefixMatch;
+procedure TCopyLocalRuntimeTests.Resolve_TokenNotADcp_ReturnsEmpty;
+var
+  res : TArray<string>;
 begin
-  //'vcl' is below the 4-char minimum, so it must not prefix-match an unrelated 'vclXYZ' bpl.
-  Assert.IsFalse(PackageRuntimeLinked(['bpl/Win32/vclXYZ.bpl'], 'vcl'));
+  res := ResolveRuntimeBplNames(['Foo'], ['Foo290.bpl'], 'rtl;vcl');
+  Assert.AreEqual(0, Length(res));
+end;
+
+procedure TCopyLocalRuntimeTests.Resolve_EmptyRuntimePackages_ReturnsEmpty;
+var
+  res : TArray<string>;
+begin
+  res := ResolveRuntimeBplNames(['Foo'], ['Foo290.bpl'], '');
+  Assert.AreEqual(0, Length(res));
+end;
+
+procedure TCopyLocalRuntimeTests.Resolve_DuplicateBplNames_Deduped;
+var
+  res : TArray<string>;
+begin
+  res := ResolveRuntimeBplNames(['Foo'], ['Foo290.bpl', 'Foo290.bpl'], 'Foo');
+  Assert.AreEqual(1, Length(res));
+  Assert.IsTrue(ContainsName(res, 'Foo290.bpl'));
 end;
 
 initialization

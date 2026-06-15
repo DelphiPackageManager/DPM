@@ -115,8 +115,6 @@ type
     edtCopyLocalSrc : TEdit;
     lblCopyLocalPlatforms : TLabel;
     clbCopyLocalPlatforms : TCheckListBox;
-    lblCopyLocalMode : TLabel;
-    cboCopyLocalMode : TComboBox;
     crdCopyLocalHeading : TCard;
     lblCopyLocalHeading : TLabel;
     actAddCopyLocalItem : TAction;
@@ -333,7 +331,6 @@ type
     envVariablesList : TValueListEditor;
     Label9: TLabel;
     Label12: TLabel;
-    Label15: TLabel;
     procedure FormDestroy(Sender : TObject);
     procedure btnAddExcludeClick(Sender : TObject);
     procedure btnEditExcludeClick(Sender : TObject);
@@ -374,7 +371,6 @@ type
     procedure cboFileEntryCopyToBinChange(Sender : TObject);
     procedure edtCopyLocalSrcChange(Sender : TObject);
     procedure clbCopyLocalPlatformsClickCheck(Sender : TObject);
-    procedure cboCopyLocalModeChange(Sender : TObject);
     procedure actAddCopyLocalItemExecute(Sender : TObject);
     procedure actDeleteCopyLocalItemExecute(Sender : TObject);
     procedure edtIdChange(Sender : TObject);
@@ -522,7 +518,6 @@ type
     procedure SetCheckListPlatforms(const clb : TCheckListBox; const platforms : TDPMPlatforms);
     function GetCheckListPlatforms(const clb : TCheckListBox) : TDPMPlatforms;
     procedure PopulateCopyToBinCombo;
-    procedure PopulateCopyLocalModeCombo;
 
     function LoadSourceNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const sourceEntry : ISpecSourceEntry) : TTemplateTreeNode;
     procedure LoadSourceNodes(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const fileList : IList<ISpecSourceEntry>);
@@ -1644,21 +1639,6 @@ begin
   cboFileEntryCopyToBin.ItemIndex := 0;
 end;
 
-procedure TDSpecCreatorForm.PopulateCopyLocalModeCombo;
-begin
-  //A copyLocal entry is always copied - the only choice is always vs runtimeOnly. 'none' is not
-  //offered (an entry that copies nothing makes no sense). Index 0 = always, index 1 = runtimeOnly.
-  cboCopyLocalMode.Items.BeginUpdate;
-  try
-    cboCopyLocalMode.Items.Clear;
-    cboCopyLocalMode.Items.Add(CopyLocalModeToString(TCopyLocalMode.always));
-    cboCopyLocalMode.Items.Add(CopyLocalModeToString(TCopyLocalMode.runtimeOnly));
-  finally
-    cboCopyLocalMode.Items.EndUpdate;
-  end;
-  cboCopyLocalMode.ItemIndex := 0;
-end;
-
 procedure TDSpecCreatorForm.CreatingPackages1Click(Sender : TObject);
 begin
   UriClick('https://docs.delphi.dev/getting-started/creating-packages.html');
@@ -1917,19 +1897,6 @@ begin
     exit;
   if Assigned(tvTemplates.Selected) then
     (tvTemplates.Selected as TTemplateTreeNode).copyLocalEntry.Platforms := GetCheckListPlatforms(clbCopyLocalPlatforms);
-end;
-
-procedure TDSpecCreatorForm.cboCopyLocalModeChange(Sender : TObject);
-begin
-  if FLoadingCard then
-    exit;
-  if not Assigned(tvTemplates.Selected) then
-    exit;
-  //index 0 = always, index 1 = runtimeOnly (see PopulateCopyLocalModeCombo).
-  if cboCopyLocalMode.ItemIndex <= 0 then
-    (tvTemplates.Selected as TTemplateTreeNode).copyLocalEntry.Mode := TCopyLocalMode.always
-  else
-    (tvTemplates.Selected as TTemplateTreeNode).copyLocalEntry.Mode := TCopyLocalMode.runtimeOnly;
 end;
 
 function TDSpecCreatorForm.AddRootTemplateNode(template : ISpecTemplate) : TTemplateTreeNode;
@@ -2925,7 +2892,6 @@ begin
   FSPDXList := TStringList.Create;
   LoadSPDXList;
   PopulateCopyToBinCombo;
-  PopulateCopyLocalModeCombo;
   LoadDspecStructure;
   FtmpFilename := '';
   PageControl.ActivePage := tsInfo;
@@ -3364,11 +3330,6 @@ begin
         begin
           edtCopyLocalSrc.Text := lNode.copyLocalEntry.Source;
           SetCheckListPlatforms(clbCopyLocalPlatforms, lNode.copyLocalEntry.Platforms);
-          //index 0 = always, index 1 = runtimeOnly (see PopulateCopyLocalModeCombo).
-          if lNode.copyLocalEntry.Mode = TCopyLocalMode.runtimeOnly then
-            cboCopyLocalMode.ItemIndex := 1
-          else
-            cboCopyLocalMode.ItemIndex := 0;
           CardPanel.ActiveCard := crdCopyLocal;
         end;
       ntDesign :

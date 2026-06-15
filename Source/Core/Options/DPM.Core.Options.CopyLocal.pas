@@ -69,7 +69,7 @@ type
     //True when the build links with runtime packages (msbuild passes $(UsePackages)).
     property UsePackages : boolean read FUsePackages write FUsePackages;
     //The project's runtime package link set (msbuild passes $(DCC_UsePackage)). Used to decide
-    //whether a runtimeOnly copyLocal entry's bpl is actually referenced by this build.
+    //which of a package's runtime .bpls this build references, for the automatic bpl copy.
     property RuntimePackages : string read FRuntimePackages write FRuntimePackages;
   end;
 
