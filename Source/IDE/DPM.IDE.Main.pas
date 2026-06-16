@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -43,6 +43,8 @@ implementation
 
 uses
   WinApi.ActiveX,
+  System.Classes,
+  System.TypInfo,
   Vcl.Graphics,
   DPM.Core.Utils.System,
   DPM.IDE.Constants;
@@ -50,6 +52,35 @@ uses
 var
   SplashImage : TBitmap;
   wizardIdx : integer = -1;
+
+procedure DumpEnvironmentOptionNames;
+var
+  Opts: IOTAEnvironmentOptions;
+  Names: TOTAOptionNameArray;
+  I: Integer;
+  SL: TStringList;
+begin
+  Opts := (BorlandIDEServices as IOTAServices).GetEnvironmentOptions;
+  if not Assigned(Opts) then Exit;
+
+  Names := Opts.GetOptionNames;
+  SL := TStringList.Create;
+  try
+    for I := Low(Names) to High(Names) do
+    begin
+////      SL.Add(Format('%s  (%s)',
+////        [Names[I].Name, GetEnumName(TypeInfo(TTypeKind), Ord(Names[I].Kind))]));
+      try
+        SL.Add(' - ' + Names[I].Name + ' : ' + Opts.Values[Names[I].Name]);
+      except
+      end;
+    end;
+    SL.Sort;
+    SL.SaveToFile('c:\temp\envoptions.txt');
+  finally
+    SL.Free;
+  end;
+end;
 
 function CreateWizard(const BorlandIDEServices : IBorlandIDEServices) : IOTAWizard;
 begin
@@ -61,6 +92,8 @@ begin
     SplashScreenServices.AddPluginBitmap(cWizardTitle, SplashImage.Handle);
 
     (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo(cWizardTitle, cWizardDescription, SplashImage.Handle);
+
+    //DumpEnvironmentOptionNames;
 
   except
     on E : Exception do

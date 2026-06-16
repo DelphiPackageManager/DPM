@@ -353,12 +353,12 @@ end;
 // often as it will slow things down.
 procedure TDPMMessageForm.ProcessMessages;
 begin
-  //AddRow already invalidated the control; force that pending paint out now so the
-  //latest line is visible even while a long synchronous op blocks the IDE message loop.
-  FLogMemo.Update;
-  //Throttle only the (re-entrant, relatively expensive) message pump.
+  //AddRow only marked the control dirty (cheap, coalesced). Throttle both the synchronous repaint
+  //and the (re-entrant, relatively expensive) message pump to ~10ms so rapid logging stays smooth
+  //and flicker-free even while a long synchronous op blocks the IDE message loop.
   if (not FStopwatch.IsRunning) or (FStopwatch.ElapsedMilliseconds > 10) then
   begin
+    FLogMemo.Flush; //synchronous, own-handle paint - does not depend on the IDE pumping WM_PAINT.
     Application.ProcessMessages;
     FStopwatch.Reset; //Reset stops + zeroes
     FStopwatch.Start;
@@ -382,6 +382,10 @@ begin
   FTaskRunning := value;
   //Reflect immediately rather than waiting for the next ActionList idle update.
   btnClose.Enabled := not value;
+  //Task finished - force out any lines logged inside the last throttle window so the final
+  //output is visible immediately rather than waiting for the IDE loop to resume.
+  if not value then
+    FLogMemo.Flush;
 end;
 
 procedure TDPMMessageForm.Success(const data: string;  const important: Boolean);

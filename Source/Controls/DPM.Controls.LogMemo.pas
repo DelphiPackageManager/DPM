@@ -70,6 +70,8 @@ type
     FUpdating : boolean;
     FUpdatingScrollBars : boolean;
     FUpdateCount : integer;
+    FContentDirty : boolean;
+    FScrollBarsDirty : boolean;
 
     FStyleServices : TCustomStyleServices;
 
@@ -82,7 +84,8 @@ type
     procedure SetBorderStyle(const Value: TBorderStyle);
     procedure SetRowHeight(const Value: integer);
 
-    procedure UpdateVisibleRows;
+    procedure UpdateVisibleRows(const updateSBs : boolean = true);
+    procedure InvalidateContent;
     function RowInView(const row: integer): boolean;
     procedure ScrollInView(const index : integer; const updateSBs : boolean = true);
 
@@ -153,6 +156,7 @@ type
     procedure CheckTheme;
     procedure BeginUpdate;
     procedure EndUpdate;
+    procedure Flush;
 
 
     property RowCount : integer read GetRowCount;
@@ -220,7 +224,8 @@ begin
   w := FPaintBmp.Canvas.TextWidth(value);
 
   FMaxWidth := Max(w, FMaxWidth);
-  UpdateScrollBars;
+  //Scrollbars are refreshed once per Flush (FMaxWidth/row count changes are picked up there) rather
+  //than eagerly here - avoids redrawing the scrollbar on every appended line.
   idx := FItems.AddObject(value, TObject(NativeUInt(messageType)) );
   ScrollInView(idx);
 end;
@@ -238,9 +243,50 @@ begin
     FUpdateCount := 0;
     if HandleAllocated then
     begin
-      UpdateVisibleRows;
-      Invalidate;
+      UpdateVisibleRows(False); //Flush refreshes the scrollbars in one shot.
+      Flush;
     end;
+  end;
+end;
+
+procedure TLogMemo.InvalidateContent;
+begin
+  //Coalesce a repaint request. We deliberately do NOT paint synchronously here - rapid AddRow
+  //calls just mark the control dirty. The actual paint (and a single scrollbar refresh) is forced
+  //later by Flush (driven by the host's throttled ProcessMessages) or by the normal WM_PAINT once
+  //the IDE message loop runs. A content change always implies the scrollbar range/pos may have
+  //changed, so mark both dirty together.
+  FContentDirty := true;
+  FScrollBarsDirty := true;
+  if FUpdateCount > 0 then
+    exit; //batched - EndUpdate will flush.
+  if HandleAllocated then
+    InvalidateRect(Handle, nil, False); //mark our own region dirty, no background erase.
+end;
+
+procedure TLogMemo.Flush;
+begin
+  if not HandleAllocated then
+    exit;
+
+  //Apply any pending scrollbar change exactly once per flush. Doing this per AddRow caused the
+  //scrollbar to be redrawn many times per frame (SetScrollInfo with redraw) - a flicker source.
+  if FScrollBarsDirty then
+  begin
+    FScrollBarsDirty := false;
+    UpdateScrollBars;
+  end;
+
+  //Force the pending content paint out synchronously on our own handle. InvalidateRect + UpdateWindow
+  //repaints the CLIENT area only (one back-buffer BitBlt) - unlike RedrawWindow/RDW_UPDATENOW it does
+  //not trigger a WM_NCPAINT, so the border and scrollbars are not repainted every frame. It is still
+  //synchronous, so it does not depend on the IDE dispatching a deferred WM_PAINT (it owns the loop and
+  //may not pump it during a synchronous restore/install).
+  if FContentDirty then
+  begin
+    FContentDirty := false;
+    InvalidateRect(Handle, nil, False);
+    UpdateWindow(Handle);
   end;
 end;
 
@@ -258,19 +304,23 @@ begin
   FHScrollPos := 0;
   FCurrentRow := -1;
   FHoverRow := -1;
-  FItems.Clear; //fires RowsChanged -> UpdateVisibleRows + Invalidate
+  FItems.Clear; //fires RowsChanged -> UpdateVisibleRows + InvalidateContent (marks dirty)
+  //Clear is a one-shot, not part of the streaming loop - force the empty state out synchronously
+  //now. Otherwise, if the following task logs nothing, the deferred paint is never flushed and the
+  //previous task's content stays on screen until something else (e.g. a resize) repaints us.
+  Flush;
 end;
 
 procedure TLogMemo.CMEnter(var Message: TCMEnter);
 begin
   inherited;
-  Invalidate;
+  Repaint;
 end;
 
 procedure TLogMemo.CMExit(var Message: TCMExit);
 begin
   FHoverRow := -1;
-  Invalidate;
+  Repaint;
   inherited;
 end;
 
@@ -341,7 +391,7 @@ procedure TLogMemo.CreateWnd;
 begin
   inherited;
   UpdateVisibleRows;
-  Invalidate;
+  Repaint;
 end;
 
 constructor TLogMemo.Create(AOwner: TComponent);
@@ -355,7 +405,7 @@ begin
   FBorderStyle := bsSingle;
 
 
-  ControlStyle := [csCaptureMouse, csClickEvents, csPannable];
+  ControlStyle := [csCaptureMouse, csClickEvents, csPannable, csOpaque];
   FVScrollPos := 0;
   FHoverRow := -1;
   FCurrentRow := -1;
@@ -371,6 +421,8 @@ begin
   Ctl3D := false;
   FMaxWidth := -1;
   FUpdateCount := 0;
+  FContentDirty := false;
+  FScrollBarsDirty := false;
   FStyleServices := Vcl.Themes.StyleServices;
 
   FMessageColors[TThemeType.Light][mtDebug] := $00BBBBBB;
@@ -541,7 +593,7 @@ begin
             Inc(FHoverRow);
           FVScrollPos := FTopRow;
           //DoRowChanged(oldCurrentRow);
-          Invalidate;
+          Repaint;
           UpdateScrollBars;
         end;
       end;
@@ -554,7 +606,7 @@ begin
         FTopRow := FCurrentRow;
         FVScrollPos := FTopRow;
         //DoRowChanged(oldCurrentRow);
-        Invalidate;
+        Repaint;
         UpdateScrollBars;
       end;
     end;
@@ -581,7 +633,7 @@ begin
 
       FVScrollPos := FTopRow;
       //we scrolled so full paint.
-      Invalidate;
+      Repaint;
       UpdateScrollBars;
     end;
   end
@@ -617,7 +669,7 @@ begin
           if FHoverRow > 0 then
             Dec(FHoverRow);
           FVScrollPos := FTopRow;
-          Invalidate;
+          Repaint;
           UpdateScrollBars;
         end;
       end;
@@ -632,7 +684,7 @@ begin
         else
           FTopRow := Max(FCurrentRow - FSelectableRows - 1, 0);
         FVScrollPos := FTopRow;
-        Invalidate;
+        Repaint;
         UpdateScrollBars;
       end;
     end;
@@ -727,7 +779,7 @@ begin
       DoPaintRow(FCurrentRow , rowState);
     end
     else
-      Invalidate;
+      Repaint;
 
     //DoRowChanged(oldCurrentRow);
     FVScrollPos := FTopRow;
@@ -792,7 +844,7 @@ begin
       DoPaintRow(FCurrentRow , rowState);
     end
     else
-      Invalidate;
+      Repaint;
 
     //DoRowChanged(oldCurrentRow);
     FVScrollPos := FTopRow;
@@ -868,7 +920,7 @@ begin
   FVScrollPos := FTopRow;
   if oldTopRow <> FTopRow then
   begin
-    Invalidate;
+    Repaint;
     UpdateScrollBars;
   end;
 end;
@@ -961,7 +1013,7 @@ begin
   if FTopRow + row <> FCurrentRow then
   begin
     FCurrentRow := FTopRow + row;
-    Invalidate;
+    Repaint;
     UpdateScrollBars
   end;
 end;
@@ -1021,6 +1073,9 @@ begin
   BitBlt(Canvas.Handle,0,0,r.Width, r.Height, FPaintBmp.Canvas.Handle,r.Left, r.Top, SRCCOPY);
 //  Canvas.CopyRect(ClientRect, FPaintBmp.Canvas, r); //uses strechblt
 
+  //We've painted the current content - any pending Flush is now satisfied.
+  FContentDirty := false;
+
 end;
 
 procedure TLogMemo.Resize;
@@ -1071,7 +1126,7 @@ begin
   end;
 //  Refresh;
   UpdateScrollBars;
-  Invalidate;
+  Repaint;
 
   //force repainting scrollbars
   if sfHandleMessages in FStyleServices.Flags then
@@ -1090,8 +1145,8 @@ begin
   begin
     if HandleAllocated then
     begin
-      UpdateVisibleRows;
-      Invalidate;
+      UpdateVisibleRows(False); //defer scrollbar refresh to Flush - avoids per-line redraw.
+      InvalidateContent;
     end;
   end;
 end;
@@ -1143,9 +1198,10 @@ begin
 
   FVScrollPos := FTopRow;
 //  Update;
-  if updateSBs then
-    UpdateScrollBars;
-  Invalidate;
+  //Scrollbar refresh is deferred to Flush via InvalidateContent (which marks them dirty); doing it
+  //here would redraw the scrollbar on every appended line. The updateSBs flag is retained for the
+  //Resize caller, which updates the scrollbars itself immediately afterwards.
+  InvalidateContent;
 
 end;
 
@@ -1164,7 +1220,7 @@ begin
   begin
     FRowHeight := Value;
     UpdateVisibleRows;
-    Invalidate;
+    Repaint;
   end;
 end;
 
@@ -1190,7 +1246,7 @@ begin
     FThemeType := TThemeType.Light;
   //repaint with the new theme colors - covers SetStyleServices and CMStyleChanged paths
   if HandleAllocated then
-    Invalidate;
+    Repaint;
 end;
 
 procedure TLogMemo.UpdateHoverRow(const X, Y: integer);
@@ -1273,7 +1329,7 @@ begin
   end;
 end;
 
-procedure TLogMemo.UpdateVisibleRows;
+procedure TLogMemo.UpdateVisibleRows(const updateSBs : boolean = true);
 begin
   FHoverRow := -1;
   if FUpdating then
@@ -1288,7 +1344,12 @@ begin
       //add 1 to ensure a partial row is painted.
       FVisibleRows  := FVisibleRows + 1;
     end;
-    UpdateScrollBars;
+    //The streaming path (RowsChanged) passes False and defers the scrollbar refresh to Flush so
+    //the scrollbar isn't redrawn on every appended line.
+    if updateSBs then
+      UpdateScrollBars
+    else
+      FScrollBarsDirty := true;
   end;
   FUpdating := false;
 end;
