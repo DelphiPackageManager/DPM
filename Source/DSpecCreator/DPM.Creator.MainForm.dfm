@@ -2009,6 +2009,14 @@ object DSpecCreatorForm: TDSpecCreatorForm
           State = cbChecked
           TabOrder = 2
         end
+        object chkUploadUnlisted: TCheckBox
+          Left = 336
+          Top = 62
+          Width = 300
+          Height = 17
+          Caption = 'Upload as unlisted (not shown in package list)'
+          TabOrder = 4
+        end
         object rgUploadScope: TRadioGroup
           Left = 648
           Top = 6

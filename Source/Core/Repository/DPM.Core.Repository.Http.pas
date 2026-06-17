@@ -1245,6 +1245,9 @@ begin
                          .WithContentType('application/octet-stream')
                          .WithBody(fileStream, true);
 
+    if pushOptions.Unlisted then
+      request.WithParameter('unlisted', 'true');
+
     response := httpClient.Put(request, cancellationToken);
 
     if IsRetryableStatus(response.StatusCode) and (attempt < pushOptions.MaxRetries) then

@@ -630,9 +630,17 @@ begin
         TPushOptions.Default.RetryDelay := value;
     end);
 
+  option := cmd.RegisterOption<boolean>('unlisted','','Push the package but do not list it in package search/listing results.',
+   procedure(const value : boolean)
+    begin
+        TPushOptions.Default.Unlisted := value;
+    end);
+  option.HasValue := false;
+
 
   cmd.Examples.Add('push .\VSoft.SemanticVersion.1.0.1.dpkg -source=local');
   cmd.Examples.Add('push .\VSoft.SemanticVersion.1.0.1.dpkg -source=corporate -apiKey=abcdef');
+  cmd.Examples.Add('push .\VSoft.SemanticVersion.1.0.1.dpkg -source=corporate -apiKey=abcdef -unlisted');
 
 end;
 

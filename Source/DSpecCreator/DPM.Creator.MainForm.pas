@@ -293,6 +293,7 @@ type
     lblUploadApiKey : TLabel;
     edtUploadApiKey : TEdit;
     chkUploadSkipDuplicate : TCheckBox;
+    chkUploadUnlisted : TCheckBox;
     rgUploadScope : TRadioGroup;
     lblUploadPackages : TLabel;
     lstUploadPackages : TListBox;
@@ -1307,6 +1308,7 @@ var
   sourceName : string;
   apiKey : string;
   skipDuplicate : boolean;
+  unlisted : boolean;
   isRemote : boolean;
   src : ISourceConfig;
   cleanup : TProc;
@@ -1342,6 +1344,7 @@ begin
     Exit;
   end;
   skipDuplicate := chkUploadSkipDuplicate.Checked;
+  unlisted := chkUploadUnlisted.Checked;
 
   // Persist the api key for this source before we start.
   WriteSecret(UploadApiKeyCredTarget(sourceName), edtUploadApiKey.Text);
@@ -1387,6 +1390,7 @@ begin
         pushOptions.Source := sourceName;
         pushOptions.ApiKey := apiKey;
         pushOptions.SkipDuplicate := skipDuplicate;
+        pushOptions.Unlisted := unlisted;
         for f in files do
         begin
           if cancelToken.IsCancelled then
@@ -1437,6 +1441,7 @@ begin
   iniFile := TIniFile.Create(MRUListService.GetIniFilePath);
   try
     chkUploadSkipDuplicate.Checked := iniFile.ReadBool('Upload', 'SkipDuplicate', true);
+    chkUploadUnlisted.Checked := iniFile.ReadBool('Upload', 'Unlisted', false);
     rgUploadScope.ItemIndex := iniFile.ReadInteger('Upload', 'Scope', 0);
     lastSource := iniFile.ReadString('Upload', 'Source', '');
   finally
@@ -1464,6 +1469,7 @@ begin
   try
     iniFile.WriteString('Upload', 'Source', cboUploadSource.Text);
     iniFile.WriteBool('Upload', 'SkipDuplicate', chkUploadSkipDuplicate.Checked);
+    iniFile.WriteBool('Upload', 'Unlisted', chkUploadUnlisted.Checked);
     iniFile.WriteInteger('Upload', 'Scope', rgUploadScope.ItemIndex);
   finally
     iniFile.Free;

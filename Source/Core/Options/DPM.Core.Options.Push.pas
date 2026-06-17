@@ -42,6 +42,7 @@ type
     FApiKey : string;
     FTimeout : integer;
     FSkipDuplicate : boolean;
+    FUnlisted : boolean;
     FMaxRetries : integer;
     FRetryDelay : integer;
 
@@ -55,6 +56,8 @@ type
     property ApiKey : string read FApiKey write FApiKey;
     property PackagePath : string read FPackagePath write FPackagePath;
     property SkipDuplicate : boolean read FSkipDuplicate write FSkipDuplicate;
+    //When true, the package is pushed but not listed in package search/listing results.
+    property Unlisted : boolean read FUnlisted write FUnlisted;
     property Source : string read FSource write FSource;
     property Timeout : integer read FTimeout write FTimeout;
     //Number of additional attempts after the first when the server is rate-limiting (429) or temporarily unavailable (502/503/504). 0 disables retry.
