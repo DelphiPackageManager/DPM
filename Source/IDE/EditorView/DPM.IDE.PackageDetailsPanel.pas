@@ -20,6 +20,16 @@ type
 
   TDetailElement = (deNone, deLicense, deProjectUrl, deReportUrl, deRepositoryUrl, deRepositoryCommit, deTags);
   TDetailElements = set of TDetailElement;
+
+  //One rendered license link on the license line.
+  TLicenseLink = record
+    Separator : string;   // plain text drawn before this link ('', ', ', ' OR ', ' AND ')
+    SepRect : TRect;      // where the separator text is drawn
+    Text : string;        // license display text, e.g. 'MIT'
+    Uri : string;         // resolved target URL
+    Rect : TRect;         // clickable / underline rect for the license text
+  end;
+
   TDetailsLayout = record
     PaddingX : integer;
     PaddingY : integer;
@@ -37,7 +47,9 @@ type
     AuthorsRect : TRect;
 
     LicenseLabelRect : TRect;
-    LicenseRect : TRect;
+    LicenseLinks : TArray<TLicenseLink>;
+    LicenseHasEllipsis : boolean;
+    LicenseEllipsisRect : TRect;
 
     PublishDateLabelRect : TRect;
     PublishDateRect : TRect;
@@ -75,6 +87,7 @@ type
     FLayout : TDetailsLayout;
     FOptionalElements : TDetailElements;
     FHitElement : TDetailElement;
+    FHitLicenseIndex : integer;
     FUpdating : boolean;
     FOnUriClickEvent : TUriClickEvent;
     FPackage : IPackageSearchResultItem;
@@ -120,7 +133,129 @@ uses
   {$IFEND}
   Spring.Collections,
   VSoft.Uri,
+  DPM.Core.Utils.Spdx,
   DPM.Core.Utils.Strings;
+
+const
+  //horizontal ellipsis, written as a code point so the source stays pure ASCII (file has no BOM)
+  cLicenseEllipsis : string = #$2026;
+
+type
+  TLicensePart = record
+    Separator : string;   // separator text that preceded this license ('', ', ', ' OR ', ' AND ')
+    License : string;     // the trimmed license id or url
+  end;
+
+//Resolve a single license id/url to a target url. Returns '' when the license is
+//neither a real url nor a known SPDX id - the caller then renders it as plain,
+//non-clickable text (e.g. a non-SPDX value like 'MPL 1.1' that would otherwise
+//produce a broken, space-containing spdx.org url).
+function LicenseToUri(const license : string) : string;
+var
+  uri : IUri;
+begin
+  if TUriFactory.TryParse(license, false, uri) then
+    result := license
+  else
+    result := TSpdxLicenses.GetLicenseUrl(license);
+end;
+
+//True when the 'keyword' (e.g. OR / AND) appears at position index as a whole word,
+//delimited by whitespace on both sides (so it won't match inside FOR, WITH, license names).
+function KeywordAt(const value : string; const index : integer; const keyword : string) : boolean;
+var
+  len : integer;
+begin
+  result := false;
+  len := Length(keyword);
+  if index <= 1 then
+    exit;
+  if not CharInSet(value[index - 1], [' ', #9]) then
+    exit;
+  if (index + len) > Length(value) then
+    exit;
+  if not CharInSet(value[index + len], [' ', #9]) then
+    exit;
+  result := SameText(Copy(value, index, len), keyword);
+end;
+
+//Split a license expression into individual licenses, capturing the separator that
+//preceded each. Splits on commas and the whole-word SPDX operators OR / AND.
+function SplitLicenses(const value : string) : TArray<TLicensePart>;
+var
+  parts : TArray<TLicensePart>;
+  count : integer;
+  i : integer;
+  n : integer;
+  tokenStart : integer;
+  pendingSep : string;
+  sepStr : string;
+  sepLen : integer;
+  matched : boolean;
+  token : string;
+
+  procedure AddPart(const aSeparator, aLicense : string);
+  var
+    trimmed : string;
+  begin
+    trimmed := Trim(aLicense);
+    if trimmed = '' then
+      exit;
+    if count >= Length(parts) then
+      SetLength(parts, count + 4);
+    parts[count].Separator := aSeparator;
+    parts[count].License := trimmed;
+    Inc(count);
+  end;
+
+begin
+  count := 0;
+  SetLength(parts, 0);
+  n := Length(value);
+  i := 1;
+  tokenStart := 1;
+  pendingSep := '';
+  while i <= n do
+  begin
+    matched := false;
+    sepStr := '';
+    sepLen := 0;
+    if value[i] = ',' then
+    begin
+      matched := true;
+      sepStr := ', ';
+      sepLen := 1;
+    end
+    else if KeywordAt(value, i, 'OR') then
+    begin
+      matched := true;
+      sepStr := ' OR ';
+      sepLen := 2;
+    end
+    else if KeywordAt(value, i, 'AND') then
+    begin
+      matched := true;
+      sepStr := ' AND ';
+      sepLen := 3;
+    end;
+
+    if matched then
+    begin
+      token := Copy(value, tokenStart, i - tokenStart);
+      AddPart(pendingSep, token);
+      pendingSep := sepStr;
+      i := i + sepLen;
+      tokenStart := i;
+    end
+    else
+      Inc(i);
+  end;
+  token := Copy(value, tokenStart, n - tokenStart + 1);
+  AddPart(pendingSep, token);
+
+  SetLength(parts, count);
+  result := parts;
+end;
 
 { TPackageDetailsPanel }
 
@@ -160,19 +295,31 @@ begin
     TIDEThemeMetrics.Font.AdjustDPISize( Font, TIDEThemeMetrics.Font.Size, CurrentPPI );
   end;
   {$IFEND}
+  FHitLicenseIndex := -1;
   FLayout := TDetailsLayout.Create(0);
 end;
 
 function TPackageDetailsPanel.HitTest(const pt : TPoint) : TDetailElement;
+var
+  i : integer;
 begin
   result := deNone;
+  FHitLicenseIndex := -1;
   if FPackage = nil then
     exit;
 
   if (deLicense in FOptionalElements) then
   begin
-    if FLayout.LicenseRect.Contains(pt) then
-      exit(deLicense);
+    for i := 0 to High(FLayout.LicenseLinks) do
+    begin
+      //only a license with a resolved uri is clickable; unknown licenses render
+      //as plain text and must not hit-test as a link.
+      if (FLayout.LicenseLinks[i].Uri <> '') and FLayout.LicenseLinks[i].Rect.Contains(pt) then
+      begin
+        FHitLicenseIndex := i;
+        exit(deLicense);
+      end;
+    end;
   end;
 
   if deProjectUrl in FOptionalElements then
@@ -204,7 +351,6 @@ end;
 procedure TPackageDetailsPanel.MouseDown(Button : TMouseButton; Shift : TShiftState; X, Y : Integer);
 var
   sUri : string;
-  uri : IUri;
 begin
   if not Assigned(FOnUriClickEvent) then
     exit;
@@ -221,11 +367,10 @@ begin
       case FHitElement of
         deLicense :
           begin
-            //TODO : There can be multiple licenses, comma separated. This does not deal with that.
-            if TUriFactory.TryParse(FPackage.License,false, uri) then
-              sUri := FPackage.License
+            if (FHitLicenseIndex >= 0) and (FHitLicenseIndex <= High(FLayout.LicenseLinks)) then
+              sUri := FLayout.LicenseLinks[FHitLicenseIndex].Uri
             else
-              sUri := 'https://spdx.org/licenses/' + FPackage.License + '.html';
+              exit;
           end;
         deProjectUrl : sUri := FPackage.ProjectUrl;
         deReportUrl : sUri := FPackage.ProjectUrl;
@@ -248,11 +393,13 @@ end;
 procedure TPackageDetailsPanel.MouseMove(Shift : TShiftState; X, Y : Integer);
 var
   prevElement : TDetailElement;
+  prevLicenseIndex : integer;
 begin
   inherited;
   prevElement := FHitElement;
+  prevLicenseIndex := FHitLicenseIndex;
   FHitElement := HitTest(Point(X, Y));
-  if FHitElement <> prevElement then
+  if (FHitElement <> prevElement) or (FHitLicenseIndex <> prevLicenseIndex) then
     Invalidate;
 
   if FHitElement in [deProjectUrl, deReportUrl, deRepositoryUrl, deRepositoryCommit, deLicense] then
@@ -274,6 +421,7 @@ var
   value : string;
   authorsDisplay : string;
   authorIdx : integer;
+  licenseIdx : integer;
 begin
   Canvas.Brush.Style := bsSolid;
 
@@ -332,17 +480,38 @@ begin
     Canvas.Font.Style := [fsBold];
     DrawText(Canvas.Handle, 'License :', Length('License :'), FLayout.LicenseLabelRect, DT_LEFT);
 
-    Canvas.Font.Color := uriColor;
+    for licenseIdx := 0 to High(FLayout.LicenseLinks) do
+    begin
+      //separator before the link is plain (non-link) text
+      if FLayout.LicenseLinks[licenseIdx].Separator <> '' then
+      begin
+        Canvas.Font.Color := fontColor;
+        Canvas.Font.Style := [];
+        value := FLayout.LicenseLinks[licenseIdx].Separator;
+        DrawText(Canvas.Handle, value, Length(value), FLayout.LicenseLinks[licenseIdx].SepRect, DT_LEFT + DT_SINGLELINE);
+      end;
 
-    Canvas.Font.Style := [];
-    if FHitElement = deLicense then
-      Canvas.Font.Style := [fsUnderline];
+      Canvas.Font.Style := [];
+      if FLayout.LicenseLinks[licenseIdx].Uri <> '' then
+      begin
+        //known SPDX id / real url - render as a clickable link
+        Canvas.Font.Color := uriColor;
+        if (FHitElement = deLicense) and (licenseIdx = FHitLicenseIndex) then
+          Canvas.Font.Style := [fsUnderline];
+      end
+      else
+        //unknown license - plain, non-clickable text
+        Canvas.Font.Color := fontColor;
+      value := FLayout.LicenseLinks[licenseIdx].Text;
+      DrawText(Canvas.Handle, value, Length(value), FLayout.LicenseLinks[licenseIdx].Rect, DT_LEFT + DT_SINGLELINE);
+    end;
 
-//    if FLicenseIsUri then
-//      DrawText(Canvas.Handle, 'View License', Length('View License'), FLayout.LicenseRect, DT_LEFT)
-//    else
-      DrawText(Canvas.Handle, FPackage.License, Length(FPackage.License), FLayout.LicenseRect, DT_LEFT + DT_SINGLELINE);
-
+    if FLayout.LicenseHasEllipsis then
+    begin
+      Canvas.Font.Color := fontColor;
+      Canvas.Font.Style := [];
+      DrawText(Canvas.Handle, cLicenseEllipsis, Length(cLicenseEllipsis), FLayout.LicenseEllipsisRect, DT_LEFT + DT_SINGLELINE);
+    end;
   end;
 
   Canvas.Font.Color := fontColor;
@@ -460,14 +629,12 @@ end;
 procedure TPackageDetailsPanel.SetDetails(const package : IPackageSearchResultItem);
 begin
   FPackage := package;
+  FHitLicenseIndex := -1;
   if FPackage <> nil then
   begin
     FOptionalElements := [];
     if package.License <> '' then
-    begin
       Include(FOptionalElements, deLicense);
-      //TODO : check for multiple licenses.
-    end;
 
     if package.ProjectUrl <> '' then
       Include(FOptionalElements, deProjectUrl);
@@ -545,6 +712,14 @@ var
   bottom : integer;
   count : integer;
   i : integer;
+  licenseParts : TArray<TLicensePart>;
+  licenseTop : integer;
+  licenseRight : integer;
+  ellipsisWidth : integer;
+  sepWidth : integer;
+  licWidth : integer;
+  x : integer;
+  placed : integer;
 
 begin
   if package = nil then
@@ -598,13 +773,49 @@ begin
     LicenseLabelRect.Width := textSize.cx;
     LicenseLabelRect.Height := textSize.cy;
 
+    //Lay out each license as its own link on a single line, separated by the
+    //original operator text. Stop with an ellipsis once a link won't fit.
+    licenseParts := SplitLicenses(package.License);
+    SetLength(LicenseLinks, Length(licenseParts));
+    LicenseHasEllipsis := false;
+    licenseTop := LicenseLabelRect.Top;
+    licenseRight := clientRect.Right;
+    ellipsisWidth := ACanvas.TextExtent(cLicenseEllipsis).cx;
+    x := VersionRect.Left;
+    placed := 0;
+    for i := 0 to High(licenseParts) do
+    begin
+      if licenseParts[i].Separator <> '' then
+        sepWidth := ACanvas.TextExtent(licenseParts[i].Separator).cx
+      else
+        sepWidth := 0;
+      licWidth := ACanvas.TextExtent(licenseParts[i].License).cx;
 
-    LicenseRect.Top := LicenseLabelRect.Top;
-    LicenseRect.Left := VersionRect.Left;
-    LicenseRect.Right := clientRect.Right;
-    LicenseRect.Height := textSize.cy;
+      //once at least one link is placed, require the next to fit (leaving room for the ellipsis)
+      if (placed > 0) and (x + sepWidth + licWidth > licenseRight) then
+      begin
+        LicenseHasEllipsis := true;
+        Break;
+      end;
 
-    bottom := LicenseRect.Bottom;
+      LicenseLinks[placed].Separator := licenseParts[i].Separator;
+      if sepWidth > 0 then
+      begin
+        LicenseLinks[placed].SepRect := Rect(x, licenseTop, x + sepWidth, licenseTop + textSize.cy);
+        x := x + sepWidth;
+      end;
+      LicenseLinks[placed].Text := licenseParts[i].License;
+      LicenseLinks[placed].Uri := LicenseToUri(licenseParts[i].License);
+      LicenseLinks[placed].Rect := Rect(x, licenseTop, x + licWidth, licenseTop + textSize.cy);
+      x := x + licWidth;
+      Inc(placed);
+    end;
+    SetLength(LicenseLinks, placed);
+
+    if LicenseHasEllipsis then
+      LicenseEllipsisRect := Rect(x, licenseTop, x + ellipsisWidth, licenseTop + textSize.cy);
+
+    bottom := licenseTop + textSize.cy;
   end;
 
 

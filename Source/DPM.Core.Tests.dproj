@@ -201,6 +201,8 @@
         <DCCReference Include="Core\Utils\DPM.Core.Utils.DateTime.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Base64Url.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.Base64Url.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Spdx.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Utils.Spdx.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Masks.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.PE.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Interfaces.pas"/>

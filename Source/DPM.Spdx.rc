@@ -1,0 +1,19 @@
+// ---------------------------------------------------------------------------
+// DPM SPDX license list resource.
+//
+// Embeds spdx-licenses.txt as DPM_SPDX_LICENSES / RCDATA so every dpm.exe,
+// DPM.IDE.*.dll and DSpecCreator binary carries the full SPDX license list
+// (one "id=name,url" line per license). Used to decide whether a license
+// string is a known SPDX id (and so should be rendered as a clickable link)
+// and to populate license pick lists.
+//
+// Linked by DPM.Core.Utils.Spdx via a `{$R}` directive - see that unit for
+// the resource name and type the loader expects (DPM_SPDX_LICENSES, RCDATA).
+//
+// Update flow:
+//   1. Regenerate spdx-licenses.txt with the SPDXProcessor tool.
+//   2. Rebuild - Delphi compiles this .rc on demand via brcc32.
+//   3. Ship.
+// ---------------------------------------------------------------------------
+
+DPM_SPDX_LICENSES RCDATA "spdx-licenses.txt"

@@ -110,6 +110,7 @@ uses
   DPM.Core.Trust.Prompt in '..\Core\Trust\DPM.Core.Trust.Prompt.pas',
   DPM.Core.Trust.State in '..\Core\Trust\DPM.Core.Trust.State.pas',
   DPM.Core.Trust.TrustSet in '..\Core\Trust\DPM.Core.Trust.TrustSet.pas',
+  DPM.Core.Utils.Spdx in '..\Core\Utils\DPM.Core.Utils.Spdx.pas',
   DPM.Core.Crypto.Algorithms in '..\Core\Crypto\DPM.Core.Crypto.Algorithms.pas',
   DPM.Core.Crypto.Cms.Interfaces in '..\Core\Crypto\DPM.Core.Crypto.Cms.Interfaces.pas',
   DPM.Core.Crypto.Cms in '..\Core\Crypto\DPM.Core.Crypto.Cms.pas',

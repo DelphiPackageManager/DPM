@@ -111,6 +111,7 @@ uses
   DPM.Core.Types,
   DPM.Core.Constants,
   DPM.Core.Utils.Config,
+  DPM.Core.Utils.Spdx,
   DPM.Console.Command.Spec.Writer;
 
 const
@@ -143,28 +144,12 @@ begin
 end;
 
 procedure TPackageWizardForm.LoadSPDXList;
-var
-  stream : TResourceStream;
-  spdxList : TStringList;
-  i : integer;
 begin
-  //SPDX license ids come from the same 'SPDX' RCDATA resource the main form uses
-  //(Name=details pairs); we only need the Names for the dropdown.
+  //SPDX license ids come from the shared DPM_SPDX_LICENSES resource via the Core
+  //lookup; we only need the ids for the dropdown.
   cboLicense.Items.Clear;
   try
-    stream := TResourceStream.Create(HInstance, 'SPDX', RT_RCDATA);
-    try
-      spdxList := TStringList.Create;
-      try
-        spdxList.LoadFromStream(stream);
-        for i := 0 to spdxList.Count - 1 do
-          cboLicense.Items.Add(spdxList.Names[i]);
-      finally
-        spdxList.Free;
-      end;
-    finally
-      stream.Free;
-    end;
+    TSpdxLicenses.GetLicenseIds(cboLicense.Items);
   except
     on e : Exception do
       FLogger.Warning('Could not load SPDX license list : ' + e.Message);

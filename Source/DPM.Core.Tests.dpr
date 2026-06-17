@@ -122,6 +122,8 @@ uses
   DPM.Core.Utils.DateTime in 'Core\Utils\DPM.Core.Utils.DateTime.pas',
   DPM.Core.Utils.Base64Url in 'Core\Utils\DPM.Core.Utils.Base64Url.pas',
   DPM.Core.Tests.Utils.Base64Url in 'Tests\DPM.Core.Tests.Utils.Base64Url.pas',
+  DPM.Core.Utils.Spdx in 'Core\Utils\DPM.Core.Utils.Spdx.pas',
+  DPM.Core.Tests.Utils.Spdx in 'Tests\DPM.Core.Tests.Utils.Spdx.pas',
   DPM.Core.Utils.Masks in 'Core\Utils\DPM.Core.Utils.Masks.pas',
   DPM.Core.Utils.PE in 'Core\Utils\DPM.Core.Utils.PE.pas',
   DPM.Core.Package.Interfaces in 'Core\Package\DPM.Core.Package.Interfaces.pas',

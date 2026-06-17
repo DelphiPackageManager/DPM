@@ -303,6 +303,7 @@
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Timestamping.pas"/>
         <DCCReference Include="Core\Trust\DPM.Core.Trust.Interfaces.pas"/>
         <DCCReference Include="Core\Trust\DPM.Core.Trust.TrustSet.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Spdx.pas"/>
         <DCCReference Include="Core\Trust\DPM.Core.Trust.Policy.pas"/>
         <DCCReference Include="Core\Trust\DPM.Core.Trust.State.pas"/>
         <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Manifest.Interfaces.pas"/>

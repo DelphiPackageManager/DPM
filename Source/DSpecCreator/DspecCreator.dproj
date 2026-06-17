@@ -253,6 +253,7 @@
         <DCCReference Include="..\Core\Trust\DPM.Core.Trust.Prompt.pas"/>
         <DCCReference Include="..\Core\Trust\DPM.Core.Trust.State.pas"/>
         <DCCReference Include="..\Core\Trust\DPM.Core.Trust.TrustSet.pas"/>
+        <DCCReference Include="..\Core\Utils\DPM.Core.Utils.Spdx.pas"/>
         <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.Algorithms.pas"/>
         <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.Cms.Interfaces.pas"/>
         <DCCReference Include="..\Core\Crypto\DPM.Core.Crypto.Cms.pas"/>

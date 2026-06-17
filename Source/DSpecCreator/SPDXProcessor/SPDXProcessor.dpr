@@ -11,6 +11,11 @@ uses
 
 // process https://raw.githubusercontent.com/spdx/license-list-data/main/json/licenses.json
 // and convert to id=name,url list
+//
+// Usage: SPDXProcessor.exe <licenses.json> <outputfile>
+// The canonical output target is Source\spdx-licenses.txt (the shared resource
+// embedded into the CLI, the IDE plugins and DSpecCreator via DPM.Spdx.rc /
+// DPM.Core.Utils.Spdx).
 
 procedure ProcessFile(const jsonFileName : string; const outputFileName : string);
 var

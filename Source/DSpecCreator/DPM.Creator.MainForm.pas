@@ -450,7 +450,6 @@ type
     FLogger : ILogger;
     FInVariableUpdate : Boolean;
     FLoadingCard : Boolean;
-    FSPDXList : TStringList;
     FMRUMenu : TMRUMenu;
     // In-process pack / sign / upload
     FContainer : TContainer;
@@ -570,6 +569,7 @@ uses
   DPM.Core.Crypto.Provider.Factory,
   DPM.Core.Options.Push,
   DPM.Core.Utils.Config,
+  DPM.Core.Utils.Spdx,
   VSoft.Windows.CredentialManager,
   DPM.Creator.TemplateForm,
   DPM.Creator.FileForm,
@@ -882,25 +882,16 @@ end;
 procedure TDSpecCreatorForm.cboLicenseChange(Sender : TObject);
 begin
   FOpenFile.PackageSpec.metadata.license := Trim(cboLicense.Text);
-  var  i := FSPDXList.IndexOfName(Trim(cboLicense.Text));
-  if i <> -1 then
+  var url := TSpdxLicenses.GetLicenseUrl(Trim(cboLicense.Text));
+  if url <> '' then
   begin
-    var data := FSPDXList.ValueFromIndex[i];
-    var Items := data.Split([',']);
-    if Length(Items) <> 2 then // just in case the txt file is messed up.
-    begin
-      lblSPDX.Visible := false;
-      Exit;
-    end;
-
-    lblSPDX.Caption := Items[0];
-    lblSPDX.Hint := Items[1];
+    lblSPDX.Caption := TSpdxLicenses.GetLicenseName(Trim(cboLicense.Text));
+    lblSPDX.Hint := url;
     lblSPDX.Visible := true;
   end
   else
   begin
     lblSPDX.Visible := false;
-
   end;
 end;
 
@@ -2889,7 +2880,6 @@ begin
   InitCoreContainer;
   FPacking := false;
   FUploading := false;
-  FSPDXList := TStringList.Create;
   LoadSPDXList;
   PopulateCopyToBinCombo;
   LoadDspecStructure;
@@ -2943,7 +2933,6 @@ begin
   MRUListService.SetSource(nil);
   if FCancellationTokenSource <> nil then
     FCancellationTokenSource.Cancel;
-  FSPDXList.Free;
   // Interfaces (FPackageWriter etc.) release with the container.
   FreeAndNil(FContainer);
 end;
@@ -3014,19 +3003,11 @@ begin
 end;
 
 procedure TDSpecCreatorForm.LoadSPDXList;
-var
-  Stream : TResourceStream;
 begin
-  Stream := TResourceStream.Create(HInstance, 'SPDX', RT_RCDATA);
-  try
-    FSPDXList.LoadFromStream(Stream);
-    cboLicense.Items.Clear;
-    for var i := 0 to FSPDXList.Count - 1 do
-      cboLicense.Items.Add(FSPDXList.Names[i]);
-
-  finally
-    Stream.Free;
-  end;
+  //SPDX license ids come from the shared DPM_SPDX_LICENSES resource via the Core
+  //lookup; we only need the ids for the dropdown.
+  cboLicense.Items.Clear;
+  TSpdxLicenses.GetLicenseIds(cboLicense.Items);
 
 end;
 

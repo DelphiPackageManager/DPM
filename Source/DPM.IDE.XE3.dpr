@@ -221,6 +221,7 @@ uses
   DPM.Core.Crypto.Timestamping in 'Core\Crypto\DPM.Core.Crypto.Timestamping.pas',
   DPM.Core.Trust.Interfaces in 'Core\Trust\DPM.Core.Trust.Interfaces.pas',
   DPM.Core.Trust.TrustSet in 'Core\Trust\DPM.Core.Trust.TrustSet.pas',
+  DPM.Core.Utils.Spdx in 'Core\Utils\DPM.Core.Utils.Spdx.pas',
   DPM.Core.Trust.Policy in 'Core\Trust\DPM.Core.Trust.Policy.pas',
   DPM.Core.Trust.State in 'Core\Trust\DPM.Core.Trust.State.pas',
   DPM.Core.Package.Manifest.Interfaces in 'Core\Package\Signing\DPM.Core.Package.Manifest.Interfaces.pas',
