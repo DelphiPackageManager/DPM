@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Application</AppType>
@@ -209,7 +209,7 @@
         <DCCReference Include="..\Core\Sources\DPM.Core.Sources.Manager.pas"/>
         <DCCReference Include="..\Core\Sources\DPM.Core.Sources.Types.pas"/>
         <DCCReference Include="..\Core\Spec\DPM.Core.Spec.DesignEntry.pas"/>
-        <DCCReference Include="..\Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
+        <DCCReference Include="..\Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
         <DCCReference Include="..\Core\Spec\DPM.Core.Spec.CopyLocalEntry.pas"/>
         <DCCReference Include="..\Core\Spec\DPM.Core.Spec.Dependency.pas"/>
         <DCCReference Include="..\Core\Spec\DPM.Core.Spec.SourceEntry.pas"/>
@@ -397,11 +397,6 @@
         <RcItem Include="..\images\open_48px.png">
             <ResourceType>RCDATA</ResourceType>
             <ResourceId>OPEN_48</ResourceId>
-        </RcItem>
-        <RcItem Include="Resources\spdx-licenses.txt">
-            <ContainerId>ResourceItem</ContainerId>
-            <ResourceType>RCDATA</ResourceType>
-            <ResourceId>SPDX</ResourceId>
         </RcItem>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
