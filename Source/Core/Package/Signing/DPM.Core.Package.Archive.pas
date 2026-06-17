@@ -78,6 +78,22 @@ const
   cSIfDir = $4000;
   cSIfLnk = $A000;
 
+// True when every character is in the 7-bit ASCII range. A ZIP entry name made
+// of pure ASCII bytes decodes identically under UTF-8 and any OEM/ANSI codepage,
+// so it is unambiguous even when the language-encoding flag (bit 11) is not set.
+// (Delphi's TZipFile decodes a non-UTF-8 name via the system codepage, but bytes
+// < $80 always map to the same char < $80, so an all-ASCII decoded string proves
+// the original bytes were pure ASCII.)
+function IsAsciiName(const value : string) : boolean;
+var
+  i : integer;
+begin
+  for i := 1 to Length(value) do
+    if Ord(value[i]) > 127 then
+      exit(false);
+  result := true;
+end;
+
 { TArchiveValidator }
 
 constructor TArchiveValidator.Create(const manifestService : IManifestService);
@@ -124,11 +140,18 @@ begin
       result.Entry := name;
       header := zip.FileInfo[i];
 
-      // V-10: ZIP language-encoding flag must indicate UTF-8 so the name's
-      // codepage is unambiguous.
-      if (header.Flag and cZipFlagUtf8Name) = 0 then
+      // V-10: the ZIP language-encoding flag (general-purpose bit 11) SHOULD be
+      // set so the name's codepage is unambiguous, but per the package spec it is
+      // only a hint - the byte-level UTF-8 + NFC check below is authoritative.
+      // This matches the gallery verifier (dpm-verifier.ts decodeAndCheckName),
+      // which treats bit 11 as a SHOULD. A name written without the flag is still
+      // unambiguous when it is pure ASCII (identical under UTF-8 and any codepage),
+      // so we accept those - third-party zip tools (7-Zip, .NET, Compress-Archive)
+      // routinely omit the flag for ASCII names. Only a NON-ASCII name that fails
+      // to declare UTF-8 is genuinely ambiguous, so reject just that case.
+      if ((header.Flag and cZipFlagUtf8Name) = 0) and (not IsAsciiName(name)) then
       begin
-        result.Reason := 'entry name is not declared UTF-8 (general-purpose bit 11 unset)';
+        result.Reason := 'entry name does not declare UTF-8 (general-purpose bit 11 unset) and contains non-ASCII characters';
         exit;
       end;
 

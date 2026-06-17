@@ -20,7 +20,9 @@ type
     [Test] procedure AcceptsValidMinimalArchive;
     [Test] procedure AcceptsArchiveWithNestedFolders;
     [Test] procedure AcceptsManifestAndSignaturesEntries;
+    [Test] procedure AcceptsAsciiNameWithoutUtf8Flag;
 
+    [Test] procedure RejectsNonAsciiNameWithoutUtf8Flag;
     [Test] procedure RejectsDuplicateEntryNames;
     [Test] procedure RejectsCaseCollisionDuplicates;
     [Test] procedure RejectsAdsColonInName;
@@ -97,6 +99,30 @@ begin
   end;
 end;
 
+// As BuildArchive, but writes entry names WITHOUT the UTF-8 language-encoding
+// flag (general-purpose bit 11) - exactly how 7-Zip, .NET and PowerShell
+// Compress-Archive store ASCII names. TZipFile with UTF8Support := False encodes
+// names via the system codepage and leaves bit 11 clear.
+procedure BuildArchiveNoUtf8Flag(const path : string; const entries : array of string);
+var
+  zip : TZipFile;
+  i : integer;
+begin
+  zip := TZipFile.Create;
+  try
+    zip.Open(path, zmWrite);
+    zip.UTF8Support := False;
+    i := 0;
+    while i < Length(entries) do
+    begin
+      AddText(zip, entries[i], entries[i + 1]);
+      Inc(i, 2);
+    end;
+  finally
+    zip.Free;
+  end;
+end;
+
 { TArchiveValidatorTests }
 
 procedure TArchiveValidatorTests.AcceptsValidMinimalArchive;
@@ -155,6 +181,52 @@ begin
     ]);
     res := validator.Validate(path);
     Assert.IsTrue(res.Ok, 'rejected: ' + res.Reason);
+  finally
+    if FileExists(path) then DeleteFile(path);
+  end;
+end;
+
+procedure TArchiveValidatorTests.AcceptsAsciiNameWithoutUtf8Flag;
+var
+  validator : IArchiveValidator;
+  path : string;
+  res : TArchiveValidationResult;
+begin
+  // V-10: bit 11 is a SHOULD, not a MUST. Pure-ASCII names are unambiguous even
+  // with the flag clear, so an archive repacked by a tool that omits it (the
+  // sivv.* packages downloaded from the gallery) must still be accepted - this
+  // matches the server verifier, which treats bit 11 as a hint.
+  validator := NewValidator;
+  path := MakeTempPath('ascii-noflag');
+  try
+    BuildArchiveNoUtf8Flag(path, [
+      'README.md',   '# readme',
+      'src/foo.pas', 'unit Foo; end.'
+    ]);
+    res := validator.Validate(path);
+    Assert.IsTrue(res.Ok, 'ASCII name without UTF-8 flag was rejected: ' + res.Reason);
+  finally
+    if FileExists(path) then DeleteFile(path);
+  end;
+end;
+
+procedure TArchiveValidatorTests.RejectsNonAsciiNameWithoutUtf8Flag;
+var
+  validator : IArchiveValidator;
+  path : string;
+  res : TArchiveValidationResult;
+begin
+  // A non-ASCII name with bit 11 clear is genuinely ambiguous (the codepage is
+  // unknown), so it must still be rejected.
+  validator := NewValidator;
+  path := MakeTempPath('nonascii-noflag');
+  try
+    BuildArchiveNoUtf8Flag(path, [
+      'src/caf'#$00E9'.pas', 'unit Cafe; end.'
+    ]);
+    res := validator.Validate(path);
+    Assert.IsFalse(res.Ok, 'non-ASCII name without UTF-8 flag was accepted');
+    Assert.IsTrue(Pos('non-ASCII', res.Reason) > 0, 'unexpected reason: ' + res.Reason);
   finally
     if FileExists(path) then DeleteFile(path);
   end;
