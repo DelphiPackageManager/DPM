@@ -28,6 +28,7 @@
 # pre-compiled resources we need.
 !Source/DPM.PrepareTemplates.res
 !Source/DPM.TrustSet.res
+!Source/DPM.Spdx.res
 # Output Folders  #
 ###################
 /Output/**
