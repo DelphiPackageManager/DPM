@@ -564,6 +564,7 @@ uses
   DPM.Core.Constants,
   DPM.Core.dependency.Version,
   DPM.Core.Init,
+  DPM.Core.Packaging.IdValidator,
   DPM.Core.Options.Pack,
   DPM.Core.Crypto.Algorithms,
   DPM.Core.Crypto.Provider.Interfaces,
@@ -726,6 +727,17 @@ begin
   if not DirectoryExists(edtPackageOutputPath.Text) then
   begin
     FPackLogger.Error('Output folder does not exist: ' + edtPackageOutputPath.Text);
+    Exit;
+  end;
+
+  // Reject an invalid package id before doing any work - the packer would fail on
+  // it anyway (the spec loader marks the spec invalid), but a clear message up
+  // front is friendlier than a generic 'Pack failed' in the log.
+  if not TPackageIdValidator.IsValidPackageId(Trim(FOpenFile.PackageSpec.metadata.id)) then
+  begin
+    MessageDlg('The package id [' + Trim(FOpenFile.PackageSpec.metadata.id) + '] is not valid - ' +
+               'it must be of the form Org.PackageName, start with a letter and have at least a ' +
+               'three character prefix before the first dot.', mtWarning, [mbOK], 0);
     Exit;
   end;
 

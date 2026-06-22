@@ -85,6 +85,7 @@ implementation
 uses
   System.SysUtils,
   System.RegularExpressions,
+  DPM.Core.Packaging.IdValidator,
   DPM.Core.Constants;
 
 { TCacheOptions }
@@ -161,7 +162,13 @@ begin
           exit;
         end;
 
-        if not TRegEx.IsMatch(PackageId, cPackageIdRegex) then
+        // Use the canonical id validator (not the looser cPackageIdRegex) so the
+        // command fails up front for ids that the package spec loader would later
+        // reject anyway - e.g. a too-short org prefix like 'CW.ResourceUtils'.
+        // Otherwise the loose check passes here, we contact the sources and cache
+        // the package, and the strict check then logs 'Invalid package Id' once
+        // per dspec parse without ever stopping the operation.
+        if not TPackageIdValidator.IsValidPackageId(PackageId) then
         begin
           logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
           result := false;

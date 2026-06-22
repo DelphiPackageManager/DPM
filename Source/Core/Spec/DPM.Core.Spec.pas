@@ -443,7 +443,10 @@ begin
   if yamlObject.Contains('metadata') then
   begin
     metaData := yamlObject.Values['metadata'];
-    FMetaData.LoadFromYAML(metaData.AsMapping);
+    //the metadata result must feed into the spec's validity - an invalid id (or any
+    //other metadata failure) has to make the whole spec invalid, otherwise pack and
+    //install just log the error and carry on regardless.
+    result := FMetaData.LoadFromYAML(metaData.AsMapping) and result;
   end
   else
   begin
