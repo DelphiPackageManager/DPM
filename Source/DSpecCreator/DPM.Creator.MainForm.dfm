@@ -26,7 +26,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Top = 0
     Width = 871
     Height = 558
-    ActivePage = tsTemplates
+    ActivePage = tsInfo
     Align = alClient
     TabOrder = 0
     OnChange = PageControlChange
@@ -310,6 +310,24 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Height = 23
         TabOrder = 11
         OnChange = edtReadmeChange
+      end
+      object chkIsCommercial: TCheckBox
+        Left = 89
+        Top = 502
+        Width = 180
+        Height = 17
+        Caption = 'Commercial package'
+        TabOrder = 13
+        OnClick = chkIsCommercialClick
+      end
+      object chkIsTrial: TCheckBox
+        Left = 285
+        Top = 502
+        Width = 180
+        Height = 17
+        Caption = 'Trial package'
+        TabOrder = 14
+        OnClick = chkIsTrialClick
       end
       object PackageVariablesList: TValueListEditor
         Left = 488
@@ -2015,7 +2033,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Width = 300
           Height = 17
           Caption = 'Upload as unlisted (not shown in package list)'
-          TabOrder = 4
+          TabOrder = 8
         end
         object rgUploadScope: TRadioGroup
           Left = 648

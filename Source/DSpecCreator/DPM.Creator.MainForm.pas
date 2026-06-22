@@ -229,6 +229,8 @@ type
     btnDuplicateTemplate : TButton;
     Splitter1: TSplitter;
     edtReadme: TEdit;
+    chkIsCommercial : TCheckBox;
+    chkIsTrial : TCheckBox;
     Label14: TLabel;
     edtRepositoryCommit: TEdit;
     Label13: TLabel;
@@ -443,6 +445,8 @@ type
     procedure chkEnableSigningClick(Sender: TObject);
     procedure cboSigningProviderChange(Sender : TObject);
     procedure btnBrowsePfxClick(Sender : TObject);
+    procedure chkIsCommercialClick(Sender : TObject);
+    procedure chkIsTrialClick(Sender : TObject);
   private
     { Private declarations }
     FtmpFilename : string;
@@ -2798,6 +2802,16 @@ begin
   FOpenFile.PackageSpec.metadata.Readme := Trim(edtReadme.Text);
 end;
 
+procedure TDSpecCreatorForm.chkIsCommercialClick(Sender : TObject);
+begin
+  FOpenFile.PackageSpec.metadata.IsCommercial := chkIsCommercial.Checked;
+end;
+
+procedure TDSpecCreatorForm.chkIsTrialClick(Sender : TObject);
+begin
+  FOpenFile.PackageSpec.metadata.IsTrial := chkIsTrial.Checked;
+end;
+
 procedure TDSpecCreatorForm.edtRepositoryCommitChange(Sender: TObject);
 begin
   FOpenFile.PackageSpec.metadata.RepositoryCommit := Trim(edtRepositoryCommit.Text);
@@ -2942,6 +2956,10 @@ begin
   LoadUploadSources;
   LoadUploadSettings;
   UpdateUploadApiKeyState;
+
+  // Open a dspec file passed on the command line (e.g. shell file association).
+  if (ParamCount > 0) and FileExists(ParamStr(1)) then
+    OpenProject(ParamStr(1));
 end;
 
 procedure TDSpecCreatorForm.FormDestroy(Sender : TObject);
@@ -2981,6 +2999,8 @@ begin
   cboLicense.Text := FOpenFile.PackageSpec.metadata.license;
   edtTags.Text := FOpenFile.PackageSpec.metadata.tags.CommaText;
   edtReadme.Text := FOpenFile.PackageSpec.metadata.Readme;
+  chkIsCommercial.Checked := FOpenFile.PackageSpec.metadata.IsCommercial;
+  chkIsTrial.Checked := FOpenFile.PackageSpec.metadata.IsTrial;
   if Length(FOpenFile.PackageSpec.metadata.Icon) > 0 then
   begin
     ImgIcon.Picture.LoadFromFile(TPath.Combine(FOpenFile.WorkingDir, FOpenFile.PackageSpec.metadata.Icon));
