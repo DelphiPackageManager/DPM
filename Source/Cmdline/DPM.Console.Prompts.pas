@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -30,10 +30,20 @@ interface
 
 //Interactive console prompt helpers built over VSoft.System.Console. Every
 //prompt returns cancelled=True if the user pressed Escape and confirmed they
-//want to abort. Callers must check cancelled and unwind without writing anything.
+//want to abort - or if the registered cancellation token is signalled
+//(Ctrl-C/Ctrl-Break). Callers must check cancelled and unwind without writing
+//anything.
+
+uses
+  VSoft.CancellationToken;
 
 type
   TPromptChoices = array of string;
+
+//Register the process cancellation token so blocking key reads wake up and
+//report cancelled=True when the user presses Ctrl-C. Pass nil to restore plain
+//blocking reads. Set once at startup by the console application.
+procedure SetPromptCancellationToken(const token : ICancellationToken);
 
 function PromptLine(const prompt : string; const defaultValue : string; out cancelled : boolean) : string;
 function PromptLineRequired(const prompt : string; out cancelled : boolean) : string;
@@ -55,6 +65,7 @@ implementation
 
 uses
   System.SysUtils,
+  System.SyncObjs,
   System.Console,
   System.Console.Types,
   VSoft.AnsiConsole,
@@ -62,15 +73,52 @@ uses
 
 const
   cCancelPrompt = 'Cancel? (y/N): ';
+  cPollIntervalMs = 20;
+
+var
+  GCancellationToken : ICancellationToken;
+
+procedure SetPromptCancellationToken(const token : ICancellationToken);
+begin
+  GCancellationToken := token;
+end;
+
+//Blocks until a key is available or the registered cancellation token is
+//signalled, then reads and returns that key. When the token fires (Ctrl-C) the
+//read is abandoned and cancelled is set True so callers unwind exactly as they
+//do for an Esc-confirmed cancel. Without a token registered it falls back to a
+//plain blocking read - the original behaviour.
+function WaitForKey(out cancelled : boolean) : TConsoleKeyInfo;
+begin
+  cancelled := false;
+  if GCancellationToken = nil then
+  begin
+    result := Console.ReadKey(true);
+    exit;
+  end;
+  while not Console.KeyAvailable do
+  begin
+    if GCancellationToken.WaitFor(cPollIntervalMs) = wrSignaled then
+    begin
+      cancelled := true;
+      result := Default(TConsoleKeyInfo);
+      exit;
+    end;
+  end;
+  result := Console.ReadKey(true);
+end;
 
 function ConfirmCancel : boolean;
 var
   keyInfo : TConsoleKeyInfo;
   ch : Char;
+  cancelled : boolean;
 begin
   Console.WriteLine;
   Console.Write(cCancelPrompt);
-  keyInfo := Console.ReadKey(true);
+  keyInfo := WaitForKey(cancelled);
+  if cancelled then
+    exit(true);
   ch := UpCase(keyInfo.KeyChar);
   Console.WriteLine(ch);
   result := ch = 'Y';
@@ -85,7 +133,12 @@ begin
   buf := '';
   while true do
   begin
-    keyInfo := Console.ReadKey(true);
+    keyInfo := WaitForKey(cancelled);
+    if cancelled then
+    begin
+      result := '';
+      exit;
+    end;
     case keyInfo.Key of
       TConsoleKey.Escape :
         begin
@@ -165,7 +218,9 @@ begin
   while true do
   begin
     Console.Write(prompt + hint);
-    keyInfo := Console.ReadKey(true);
+    keyInfo := WaitForKey(cancelled);
+    if cancelled then
+      exit;
     if keyInfo.Key = TConsoleKey.Escape then
     begin
       if ConfirmCancel then
@@ -231,7 +286,9 @@ begin
     keyInfo.Key := TConsoleKey.None;
     while true do
     begin
-      keyInfo := Console.ReadKey(true);
+      keyInfo := WaitForKey(cancelled);
+      if cancelled then
+        exit;
       if keyInfo.Key = TConsoleKey.Escape then
       begin
         if ConfirmCancel then

@@ -65,6 +65,7 @@ uses
   DPM.Console.Writer,
   DPM.Console.Banner,
   DPM.Console.Command,
+  DPM.Console.Prompts,
   DPM.Console.Reg;
 
 function ConProc(CtrlType : DWord) : Bool; stdcall;
@@ -134,6 +135,8 @@ var
   command : TDPMCommand;
 begin
   FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
+  //make interactive prompts wake up and report cancellation on Ctrl-C/Ctrl-Break.
+  SetPromptCancellationToken(FCancellationTokenSource.Token);
 
   SetConsoleCtrlHandler(@ConProc, True);
 
