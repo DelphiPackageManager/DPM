@@ -1,7 +1,8 @@
 object OptionsForm: TOptionsForm
   Left = 0
   Top = 0
-  Caption = 'OptionsForm'
+  BorderIcons = [biSystemMenu]
+  Caption = 'Options'
   ClientHeight = 504
   ClientWidth = 859
   Color = clBtnFace
@@ -18,22 +19,22 @@ object OptionsForm: TOptionsForm
     Left = 0
     Top = 0
     Width = 859
-    Height = 463
+    Height = 464
     Align = alClient
     TabOrder = 0
     ExplicitWidth = 859
     ExplicitHeight = 463
     inherited pgOptions: TPageControl
       Width = 859
-      Height = 463
-      ExplicitWidth = 855
-      ExplicitHeight = 462
+      Height = 464
+      ExplicitWidth = 859
+      ExplicitHeight = 463
       inherited tsSources: TTabSheet
         ExplicitWidth = 851
-        ExplicitHeight = 429
+        ExplicitHeight = 430
         inherited Panel1: TPanel
           Width = 851
-          ExplicitWidth = 847
+          ExplicitWidth = 851
           inherited btnAdd: TSpeedButton
             Left = 668
             ExplicitLeft = 668
@@ -56,10 +57,10 @@ object OptionsForm: TOptionsForm
           end
         end
         inherited Panel2: TPanel
-          Top = 218
+          Top = 219
           Width = 851
-          ExplicitTop = 217
-          ExplicitWidth = 847
+          ExplicitTop = 218
+          ExplicitWidth = 851
           inherited txtName: TEdit
             Height = 23
             ExplicitHeight = 23
@@ -74,14 +75,14 @@ object OptionsForm: TOptionsForm
         end
         inherited Panel3: TPanel
           Width = 851
-          Height = 129
-          ExplicitWidth = 847
-          ExplicitHeight = 128
+          Height = 130
+          ExplicitWidth = 851
+          ExplicitHeight = 129
           inherited lvSources: TListView
             Width = 851
-            Height = 129
-            ExplicitWidth = 847
-            ExplicitHeight = 128
+            Height = 130
+            ExplicitWidth = 851
+            ExplicitHeight = 129
           end
         end
       end
@@ -100,28 +101,32 @@ object OptionsForm: TOptionsForm
   end
   object Panel1: TPanel
     Left = 0
-    Top = 463
+    Top = 464
     Width = 859
-    Height = 41
+    Height = 40
     Align = alBottom
     TabOrder = 1
-    ExplicitTop = 462
-    ExplicitWidth = 855
+    ExplicitTop = 465
+    DesignSize = (
+      859
+      40)
     object btnCancel: TButton
-      Left = 656
+      Left = 764
       Top = 6
       Width = 75
       Height = 25
+      Anchors = [akRight, akBottom]
       Cancel = True
       Caption = 'Cancel'
       TabOrder = 0
       OnClick = btnCancelClick
     end
     object btnOk: TButton
-      Left = 764
+      Left = 660
       Top = 6
       Width = 75
       Height = 25
+      Anchors = [akRight, akBottom]
       Caption = 'Ok'
       Default = True
       TabOrder = 1
