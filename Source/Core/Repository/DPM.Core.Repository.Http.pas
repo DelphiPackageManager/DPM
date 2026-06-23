@@ -1246,7 +1246,10 @@ begin
                          .WithBody(fileStream, true);
 
     if pushOptions.Unlisted then
-      request.WithParameter('unlisted', 'true');
+      //WithQueryParameter (not WithParameter) - this is a PUT with a file body, and
+      //WithParameter would send params as the form body / drop them rather than putting
+      //them on the url query string. WithQueryParameter always appends to the query string.
+      request.WithQueryParameter('unlisted', 'true');
 
     response := httpClient.Put(request, cancellationToken);
 

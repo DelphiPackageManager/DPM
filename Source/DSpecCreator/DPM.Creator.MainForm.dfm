@@ -2160,14 +2160,14 @@ object DSpecCreatorForm: TDSpecCreatorForm
     end
   end
   object OpenDialog: TOpenDialog
-    DefaultExt = '*.dspec.yaml'
-    Filter = 'Delphi Package Manager Spec Files|*.dspec.yaml'
+    DefaultExt = 'dspec'
+    Filter = 'Delphi Package Manager Spec Files|*.dspec;*.dspec.yaml'
     Left = 812
     Top = 386
   end
   object SaveDialog: TSaveDialog
-    DefaultExt = '*.dspec.yaml'
-    Filter = 'Delphi Package Manager Spec Files|*.dspec.yaml'
+    DefaultExt = 'dspec'
+    Filter = 'Delphi Package Manager Spec Files|*.dspec;*.dspec.yaml'
     Left = 740
     Top = 386
   end

@@ -43,8 +43,11 @@ implementation
 
 uses
   WinApi.ActiveX,
+  WinApi.Windows,
   System.Classes,
   System.TypInfo,
+  System.Rtti,
+  System.Win.Registry,
   Vcl.Graphics,
   DPM.Core.Utils.System,
   DPM.IDE.Constants;
@@ -53,33 +56,139 @@ var
   SplashImage : TBitmap;
   wizardIdx : integer = -1;
 
+
+procedure DumpMethod(rttiMethod : TRttiMethod;const sl : TStringList  );
+
+  function dumpParam(rttiParam : TRttiParameter) : string;
+  begin
+    result := rttiParam.Name + ' : ';
+    if rttiParam.ParamType <> nil then
+      result := result + rttiParam.ParamType.Name;
+  end;
+
+var
+  params : TArray<TRttiParameter>;
+  i : integer;
+  sParams : string;
+begin
+
+  params := rttiMethod.GetParameters;
+  if Length(params) > 0 then
+  begin
+    for i := Low(params) to High(params) do
+    begin
+      if sParams <> '' then
+        sParams := sParams + ', ';
+      sParams := sParams + dumpParam(params[i]);
+    end;
+  end;
+  sl.Add(rttiMethod.Name + '(' + sParams + ')');
+end;
+
+
+procedure DumpField(rttiField : TRttiField; const sl : TStringList);
+begin
+  sl.Add(rttiField.Name + ' : ' + GetTypeName(rttiField.FieldType.Handle));
+end;
+
+procedure DumpType(rttiType : TRttiType; const sl : TStringList  );
+var
+  fields : TArray<TRttiField>;
+  methods : TArray<TRttiMethod>;
+  i : integer;
+begin
+  sl.Add(rttiType.Name);
+  fields :=rttiType.GetFields;
+
+  for I := Low(fields) to High(fields) do
+    DumpField(fields[i], sl);
+
+  methods := rttiType.GetDeclaredMethods;
+  for I := Low(methods) to High(methods) do
+      DumpMethod(methods[i], sl);
+end;
+
+
 procedure DumpEnvironmentOptionNames;
 var
   Opts: IOTAEnvironmentOptions;
-  Names: TOTAOptionNameArray;
-  I: Integer;
-  SL: TStringList;
+  rttiCtx : TRttiContext;
+  optType : TRttiInstanceType;
+  inst : TValue;
+  envOptsField : TRttiField;
+  envOptsType : TRttiType;
+  method : TRttiMethod;
+  paramTypes : TArray<TRttiParameter>;
+  params : TArray<TValue>;
+  optObj : TObject;
+  FEnvOptions : TValue;
+  sl : TStringList;
+  reg : TRegistry;
+  sBrowsePath : string;
 begin
   Opts := (BorlandIDEServices as IOTAServices).GetEnvironmentOptions;
   if not Assigned(Opts) then Exit;
+  optObj := TObject(Opts);
 
-  Names := Opts.GetOptionNames;
-  SL := TStringList.Create;
+  rttiCtx := TRttiContext.Create;
+  optType := rttiCtx.GetType(optObj.ClassType) as TRttiInstanceType;
+
+  sl := TStringList.Create;
   try
-    for I := Low(Names) to High(Names) do
-    begin
-////      SL.Add(Format('%s  (%s)',
-////        [Names[I].Name, GetEnumName(TypeInfo(TTypeKind), Ord(Names[I].Kind))]));
-      try
-        SL.Add(' - ' + Names[I].Name + ' : ' + Opts.Values[Names[I].Name]);
-      except
+    DumpType(optType, sl);
+
+
+    inst := TValue.From(optType.Handle, optObj);
+    envOptsField := optType.GetField('FEnvOptions');
+    envOptsType := envOptsField.FieldType;
+
+  //  DumpType(envOptsType, sl);
+
+
+    FEnvOptions :=  envOptsField.GetValue(optObj);
+
+
+    sBrowsePath:= Opts.Values['BrowsePath'];
+
+    Opts.Values['Browsing Path'] := sBrowsePath + ';$(DPMCACHE)\delphi13.0\GR32.graphics32\3.1.0\Source';
+
+
+    reg := TRegistry.Create;
+    try
+      reg.RootKey := HKEY_CURRENT_USER;
+      reg.OpenKey('Software\Embarcadero\DPMTesting\37.0\Environment Variables',true);
+      reg.WriteString('DPMCache', 'C:\Users\vincent.OFFICE\AppData\Roaming\.dpm\package_cache');
+      reg.WriteString('DPMBWin32', '$(DPMCACHE)\delphi13.0\GR32.graphics32\3.1.0\Source');
+      reg.CloseKey;
+
+      reg.OpenKey('Software\Embarcadero\DPMTesting\37.0\Library\Win32', true);
+      sBrowsePath := reg.ReadString('Browsing Path');
+      if Pos('$(DPMBWin32)',sBrowsePath) = -1 then
+      begin
+        sBrowsePath := '$(DPMBWin32);' + sBrowsePath;
+        reg.WriteString('Browsing Path',  sBrowsePath);
       end;
+      reg.CloseKey;
+    finally
+      reg.Free;
     end;
-    SL.Sort;
-    SL.SaveToFile('c:\temp\envoptions.txt');
+
+    SetEnvironmentVariable('DPMCache', 'C:\Users\vincent.OFFICE\AppData\Roaming\.dpm\package_cache');
+    SetEnvironmentVariable('DPMBWin32', '$(DPMCACHE)\delphi13.0\GR32.graphics32\3.1.0\Source');
+
+
+    method := envOptsType.GetMethod('SaveOptions');
+    paramTypes := method.GetParameters;
+    SetLength(params, Length(paramTypes));
+    method.Invoke(FEnvOptions, params);
+
+//    sl.SaveToFile('c:\temp\envoptions.txt');
+
   finally
-    SL.Free;
+    sl.Free;
   end;
+
+
 end;
 
 function CreateWizard(const BorlandIDEServices : IBorlandIDEServices) : IOTAWizard;
@@ -93,7 +202,7 @@ begin
 
     (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo(cWizardTitle, cWizardDescription, SplashImage.Handle);
 
-    //DumpEnvironmentOptionNames;
+//    DumpEnvironmentOptionNames;
 
   except
     on E : Exception do

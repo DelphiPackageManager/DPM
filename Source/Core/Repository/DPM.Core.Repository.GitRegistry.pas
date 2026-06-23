@@ -107,6 +107,7 @@ uses
   System.IOUtils,
   DPM.Core.Constants,
   DPM.Core.Spec.Reader,
+  DPM.Core.Utils.Path,
   DPM.Core.Package.Classes,
   DPM.Core.Package.SearchResults,
   DPM.Core.Package.ListItem,
@@ -543,7 +544,7 @@ var
   f : string;
 begin
   result := nil;
-  files := TDirectory.GetFiles(repoDir, '*.dspec.yaml');
+  files := TPathUtils.FindDspecFiles(repoDir);
   for f in files do
   begin
     //ignore the dspec we write into the cache folder.

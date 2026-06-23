@@ -46,6 +46,16 @@ type
     [Test]
     procedure TestGlobBaseDir_RootOrFile_ReturnsEmpty;
 
+    [Test]
+    [TestCase('NewExt', 'foo.dspec,True')]
+    [TestCase('LegacyExt', 'foo.dspec.yaml,True')]
+    [TestCase('NewExtWithPath', 'c:\packages\MyLib.dspec,True')]
+    [TestCase('LegacyExtWithPath', 'c:\packages\MyLib.dspec.yaml,True')]
+    [TestCase('PlainYaml', 'foo.yaml,False')]
+    [TestCase('UnrelatedExt', 'foo.txt,False')]
+    [TestCase('StrayPrefix', 'foo.dspecbak,False')]
+    procedure TestIsDspecFile(const fileName : string; const expected : boolean);
+
   end;
 
 implementation
@@ -97,6 +107,11 @@ begin
   Assert.AreEqual('', TPathUtils.GlobBaseDir('./*.pas'));
   Assert.AreEqual('', TPathUtils.GlobBaseDir('*.pas'));
   Assert.AreEqual('', TPathUtils.GlobBaseDir('./LICENSE'));
+end;
+
+procedure TPathUtilsTests.TestIsDspecFile(const fileName : string; const expected : boolean);
+begin
+  Assert.AreEqual(expected, TPathUtils.IsDspecFile(Trim(fileName)));
 end;
 
 initialization

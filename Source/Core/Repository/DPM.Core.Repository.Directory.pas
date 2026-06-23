@@ -943,8 +943,10 @@ begin
     end;
   end;
 
-  //first see if the dspec has been extracted already.
-  manifestFileName := ChangeFileExt(fileName, cPackageSpecExt);
+  //first see if the dspec has been extracted already. This sidecar is the extracted copy
+  //of the in-archive 'package.dspec.yaml', so it keeps the legacy extension to match the
+  //archive entry's semantics and to avoid orphaning sidecars in existing caches.
+  manifestFileName := ChangeFileExt(fileName, cLegacyPackageSpecExt);
 
   if FileExists(manifestFileName) then
     manifest := reader.ReadSpec(manifestFileName);

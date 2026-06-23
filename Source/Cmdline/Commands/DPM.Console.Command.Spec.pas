@@ -48,6 +48,7 @@ uses
   DPM.Core.Types,
   DPM.Core.Constants,
   DPM.Core.Logging,
+  DPM.Core.Utils.Path,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Options.Common,
   DPM.Core.Options.Spec,
@@ -69,9 +70,9 @@ begin
   result := -1;
   selectedIdx := -1;
   SetLength(choices, 4);
-  choices[0] := 'Scaffold one .dspec.yaml per package (' + IntToStr(Length(packages)) + ' files)';
-  choices[1] := 'Scaffold a single .dspec.yaml (I''ll pick which package)';
-  choices[2] := 'Combine selected projects into a single .dspec.yaml (pick which)';
+  choices[0] := 'Scaffold one .dspec per package (' + IntToStr(Length(packages)) + ' files)';
+  choices[1] := 'Scaffold a single .dspec (I''ll pick which package)';
+  choices[2] := 'Combine selected projects into a single .dspec (pick which)';
   choices[3] := 'Cancel';
   topChoice := PromptChoice('Multiple package projects detected.', choices, 0, cancelled);
   if cancelled then
@@ -136,7 +137,7 @@ begin
   ctx.RootDir := rootDir;
 
   //1. overwrite guard
-  existingSpec := TDirectory.GetFiles(rootDir, '*' + cPackageSpecExt);
+  existingSpec := TPathUtils.FindDspecFiles(rootDir);
   if (Length(existingSpec) > 0) and not options.Overwrite then
   begin
     if ctx.NonInteractive then

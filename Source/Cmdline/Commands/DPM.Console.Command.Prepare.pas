@@ -54,6 +54,7 @@ uses
   System.SysUtils,
   System.IOUtils,
   DPM.Console.Banner,
+  DPM.Core.Utils.Path,
   DPM.Core.Options.Common,
   DPM.Core.Options.Prepare;
 
@@ -88,18 +89,18 @@ begin
     exit;
   end;
 
-  //auto-discover in current directory. Look for the current .dspec.yaml format -
+  //auto-discover in current directory. Look for the current .dspec / .dspec.yaml format -
   //the older .dspec (JSON) format is no longer supported by the spec reader.
-  candidates := TDirectory.GetFiles(GetCurrentDir, '*.dspec.yaml', TSearchOption.soTopDirectoryOnly);
+  candidates := TPathUtils.FindDspecFiles(GetCurrentDir, TSearchOption.soTopDirectoryOnly);
   if Length(candidates) = 0 then
   begin
-    Logger.Error('No .dspec.yaml file found in current directory: ' + GetCurrentDir);
-    Logger.Error('Pass the spec file path explicitly, e.g. "dpm prepare mypackage.dspec.yaml".');
+    Logger.Error('No .dspec or .dspec.yaml file found in current directory: ' + GetCurrentDir);
+    Logger.Error('Pass the spec file path explicitly, e.g. "dpm prepare mypackage.dspec".');
     exit;
   end;
   if Length(candidates) > 1 then
   begin
-    Logger.Error('Multiple .dspec.yaml files found in current directory - please specify one explicitly:');
+    Logger.Error('Multiple .dspec files found in current directory - please specify one explicitly:');
     list := '';
     for i := 0 to High(candidates) do
       Logger.Error('  ' + TPath.GetFileName(candidates[i]));

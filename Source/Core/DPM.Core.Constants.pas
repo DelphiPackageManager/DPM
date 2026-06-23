@@ -32,12 +32,17 @@ const
   cDPMClientVersion =  '1.0.0';
   cLockFileVersion = '0.0.1';
   cPackageFileExt = '.dpkg';
-  cPackageSpecExt = '.dspec.yaml';
+  //new default authoring extension for spec files
+  cPackageSpecExt = '.dspec';
+  //legacy authoring extension - still read/accepted for backwards compatibility
+  cLegacyPackageSpecExt = '.dspec.yaml';
   cPackageHashAlgorithm = 'sha256';
   cPackageHashAlgorithmExt = '.' + cPackageHashAlgorithm;
 
-  //fixed filename for the package dspec inside the .dpkg so we can easily extract it
-  cPackageDspecFile = 'package' + cPackageSpecExt;
+  //fixed filename for the package dspec inside the .dpkg so we can easily extract it.
+  //This MUST remain 'package.dspec.yaml' (the legacy extension) so that previously
+  //published .dpkg files continue to work unchanged.
+  cPackageDspecFile = 'package' + cLegacyPackageSpecExt;
 
   //marks a git registry package that was cloned + built in place in the cache. Such
   //packages are unsigned source (no .dpkg / manifest / receipt) by design, so the

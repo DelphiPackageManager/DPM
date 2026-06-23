@@ -77,12 +77,13 @@ uses
   System.Types,
   System.IOUtils,
   System.StrUtils,
+  DPM.Core.Constants,
   DPM.Core.Spec.Reader,
+  DPM.Core.Utils.Path,
   DPM.Core.Utils.System;
 
 const
   cFetchStampFileName = '.dpm-fetched';
-  cDspecExt = '.dspec.yaml';
 
 function IsLikelyGitUrl(const source : string) : boolean;
 begin
@@ -251,16 +252,22 @@ begin
     if SameText(ExtractFileName(ExcludeTrailingPathDelimiter(subDir)), '.git') then
       continue;
 
-    //prefer <folderName>.dspec.yaml, else the first *.dspec.yaml in the folder.
-    expected := IncludeTrailingPathDelimiter(subDir) + ExtractFileName(ExcludeTrailingPathDelimiter(subDir)) + cDspecExt;
+    //prefer <folderName>.dspec, then <folderName>.dspec.yaml, else the first dspec in the folder.
+    expected := IncludeTrailingPathDelimiter(subDir) + ExtractFileName(ExcludeTrailingPathDelimiter(subDir)) + cPackageSpecExt;
     if FileExists(expected) then
       dspecFile := expected
     else
     begin
-      dspecFiles := TDirectory.GetFiles(subDir, '*' + cDspecExt);
-      if Length(dspecFiles) = 0 then
-        continue;
-      dspecFile := dspecFiles[0];
+      expected := IncludeTrailingPathDelimiter(subDir) + ExtractFileName(ExcludeTrailingPathDelimiter(subDir)) + cLegacyPackageSpecExt;
+      if FileExists(expected) then
+        dspecFile := expected
+      else
+      begin
+        dspecFiles := TPathUtils.FindDspecFiles(subDir);
+        if Length(dspecFiles) = 0 then
+          continue;
+        dspecFile := dspecFiles[0];
+      end;
     end;
 
     spec := FSpecReader.ReadSpec(dspecFile);

@@ -478,9 +478,9 @@ var
   option : IOptionDefinition;
   cmd : TCommandDefinition;
 begin
-  cmd := TOptionsRegistry.RegisterCommand('pack', '', 'Creates a DPM package based on the specified .dspec.yaml file.',
-                                                      'Specify the location of the dspec.yaml file to create a package.',
-                                                      'pack <.dspec.yaml file> [options]');
+  cmd := TOptionsRegistry.RegisterCommand('pack', '', 'Creates a DPM package based on the specified .dspec file (.dspec.yaml is also accepted).',
+                                                      'Specify the location of the dspec file to create a package.',
+                                                      'pack <.dspec file> [options]');
 
   option := cmd.RegisterUnNamedOption<string>('The package spec file','specfile',
     procedure(const value : string)
@@ -505,7 +505,7 @@ begin
     end);
 
 
-  cmd.RegisterOption<string>('basepath','b','The base path of the files defined in the dspec.yaml file. If not specified then the location of the dspec.yaml is used.',
+  cmd.RegisterOption<string>('basepath','b','The base path of the files defined in the dspec file. If not specified then the location of the dspec is used.',
     procedure(const value : string)
     begin
       TPackOptions.Default.BasePath := value;
@@ -523,13 +523,13 @@ begin
       TPackOptions.Default.Variables := value;
     end);
 
-  cmd.RegisterOption<string>('version','','Overrides the version number from the dspec.yaml file.',
+  cmd.RegisterOption<string>('version','','Overrides the version number from the dspec file.',
     procedure(const value : string)
     begin
       TPackOptions.Default.Version := value;
     end);
 
-  cmd.Examples.Add('pack VSoft.CommandLine.dspec.yaml -version=1.0.1 -outputFolder=.\output');
+  cmd.Examples.Add('pack VSoft.CommandLine.dspec -version=1.0.1 -outputFolder=.\output');
 
 end;
 
@@ -540,15 +540,15 @@ var
 begin
   cmd := TOptionsRegistry.RegisterCommand('prepare', '',
     'Prepares per-Delphi-version subfolders under /packages with version-correct dpk/dproj files.',
-    'Reads a .dspec.yaml file (or auto-discovers one in the current directory). For each ' +
+    'Reads a .dspec file (.dspec.yaml is also accepted) or auto-discovers one in the current directory. For each ' +
     'supported compiler the command ensures a "RAD Studio XXX" subfolder under /packages, ' +
     'finds an existing dpk/dproj pair to use as the source-of-truth, and propagates that ' +
     'pair into the other folders with per-version transforms applied. If no pair exists ' +
     'anywhere, a minimal pair is scaffolded into the lowest supported compiler''s folder ' +
     'for the user to edit and then re-run prepare.',
-    'prepare [<.dspec.yaml file>] [options]');
+    'prepare [<.dspec file>] [options]');
 
-  option := cmd.RegisterUnNamedOption<string>('Optional path to the .dspec.yaml file. If omitted, the current directory is scanned for a single *.dspec.yaml',
+  option := cmd.RegisterUnNamedOption<string>('Optional path to the .dspec file. If omitted, the current directory is scanned for a single .dspec (or .dspec.yaml)',
     'specfile',
     procedure(const value : string)
     begin
@@ -571,9 +571,9 @@ begin
   option.HasValue := false;
 
   cmd.Examples.Add('prepare');
-  cmd.Examples.Add('prepare MyPackage.dspec.yaml');
-  cmd.Examples.Add('prepare MyPackage.dspec.yaml -force');
-  cmd.Examples.Add('prepare MyPackage.dspec.yaml -dryrun');
+  cmd.Examples.Add('prepare MyPackage.dspec');
+  cmd.Examples.Add('prepare MyPackage.dspec -force');
+  cmd.Examples.Add('prepare MyPackage.dspec -dryrun');
 end;
 
 procedure RegisterPushCommand;
@@ -994,8 +994,8 @@ var
   cmd : TCommandDefinition;
   option : IOptionDefinition;
 begin
-  cmd := TOptionsRegistry.RegisterCommand('spec', '', 'Generates a package.dspec.yaml for a new package. If this command is run in the same folder as a ' +
-                                                      'project file (.dproj), it will create a tokenized dspec.yaml file.',
+  cmd := TOptionsRegistry.RegisterCommand('spec', '', 'Generates a .dspec for a new package. If this command is run in the same folder as a ' +
+                                                      'project file (.dproj), it will create a tokenized dspec file.',
                                                       '',
                                                       'spec [package id]');
 
@@ -1006,7 +1006,7 @@ begin
     end);
   option.Required := false;
 
-  option := cmd.RegisterOption<boolean>('overwrite', 'o', 'Overwrite an existing .dspec.yaml in the current folder without prompting',
+  option := cmd.RegisterOption<boolean>('overwrite', 'o', 'Overwrite an existing .dspec in the current folder without prompting',
     procedure(const value : boolean)
     begin
       TSpecOptions.Default.Overwrite := value;

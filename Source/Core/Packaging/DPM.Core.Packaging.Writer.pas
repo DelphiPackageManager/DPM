@@ -1037,8 +1037,8 @@ begin
   options.SpecFile := TPath.GetFullPath(options.SpecFile);
   if not FileExists(options.SpecFile) then
     raise EArgumentException.Create('Spec file : ' + options.SpecFile + ' - does not exist!');
-  if not EndsText(cPackageSpecExt, options.SpecFile) then
-    raise EArgumentException.Create('Spec file : ' + options.SpecFile + ' - is likely not a spec file, incorrect extension, should be [' + cPackageSpecExt + ']');
+  if not TPathUtils.IsDspecFile(options.SpecFile) then
+    raise EArgumentException.Create('Spec file : ' + options.SpecFile + ' - is likely not a spec file, incorrect extension, should be [' + cPackageSpecExt + '] or [' + cLegacyPackageSpecExt + ']');
 
   //output and base path default to current folder if not set
   if options.OutputFolder = '' then

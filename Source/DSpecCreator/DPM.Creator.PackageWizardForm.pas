@@ -111,6 +111,7 @@ uses
   DPM.Core.Types,
   DPM.Core.Constants,
   DPM.Core.Utils.Config,
+  DPM.Core.Utils.Path,
   DPM.Core.Utils.Spdx,
   DPM.Console.Command.Spec.Writer;
 
@@ -250,7 +251,7 @@ begin
   end;
 
   //overwrite guard - mirrors step 1 of the spec command.
-  existingSpec := TDirectory.GetFiles(FCtx.RootDir, '*' + cPackageSpecExt);
+  existingSpec := TPathUtils.FindDspecFiles(FCtx.RootDir);
   if Length(existingSpec) > 0 then
   begin
     if MessageDlg('A ' + cPackageSpecExt + ' already exists in this folder. Overwrite?',

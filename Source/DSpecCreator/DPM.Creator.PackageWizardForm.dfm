@@ -31,7 +31,7 @@ object PackageWizardForm: TPackageWizardForm
         Height = 45
         AutoSize = False
         Caption =
-          'This wizard scaffolds a .dspec.yaml file from an existing source ' +
+          'This wizard scaffolds a .dspec file from an existing source ' +
           'tree, the same way the dpm "spec" command does. Choose the proje' +
           'ct root folder to begin.'
         WordWrap = True

@@ -53,6 +53,7 @@ implementation
 
 uses
   System.StrUtils,
+  DPM.Core.Utils.Path,
   DPM.Core.Spec;
 
 { TSpecReader }
@@ -68,7 +69,7 @@ begin
     exit;
   end;
 
-  if EndsText('.dspec.yaml', filename) then
+  if TPathUtils.IsDspecFile(filename) then
   begin
     try
       yamlDoc := TYAML.LoadFromFile(fileName);
@@ -82,7 +83,7 @@ begin
     end;
   end
   else
-    FLogger.Error('Spec file : [' + filename + '] has unrecognized extension (expected .dspec.yaml)');
+    FLogger.Error('Spec file : [' + filename + '] has unrecognized extension (expected .dspec or .dspec.yaml)');
 end;
 
 function TPackageSpecReader.ReadSpecString(const value : string; const fileName : string = '') : IPackageSpec;

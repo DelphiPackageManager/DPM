@@ -63,6 +63,7 @@ uses
   VSoft.Uri,
   DPM.Core.Types,
   DPM.Core.Constants,
+  DPM.Core.Utils.Path,
   DPM.Core.Options.Common,
   DPM.Core.Options.Sources,
   DPM.Core.Sources.Types,
@@ -86,10 +87,10 @@ begin
   result := false;
   if not TDirectory.Exists(path) then
     exit;
-  //a registry folder has a sub-folder per package id, each containing a *.dspec.yaml.
+  //a registry folder has a sub-folder per package id, each containing a dspec file.
   for subDir in TDirectory.GetDirectories(path) do
   begin
-    if Length(TDirectory.GetFiles(subDir, '*.dspec.yaml')) > 0 then
+    if Length(TPathUtils.FindDspecFiles(subDir)) > 0 then
       exit(true);
   end;
 end;

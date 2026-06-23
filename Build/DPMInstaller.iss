@@ -46,6 +46,7 @@ UsedUserAreasWarning=no
 ChangesEnvironment= CheckChangesPath 
 SetupIconFile=..\Source\Images\dpm.ico
 UninstallDisplayIcon={app}\dpm.exe
+ChangesAssociations=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -70,6 +71,7 @@ Name: Florence;  Description: Delphi 13 IDE Support; Types: full; check: IsDelph
 
 [Tasks]
 Name: AddToPath; Description: "Add dpm folder to PATH Environment variable"; GroupDescription: Environment:;
+Name: startmenu; Description: Create &Start Menu Group;
 
 
 [Files]
@@ -117,9 +119,18 @@ Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\37.0\Experts"; ValueType: string; 
 
 Root: HKCU; Subkey: "SOFTWARE\Embarcadero\BDS\37.0\Experts x64"; ValueType: string; ValueName: "DPM"; ValueData: "{app}\DPM.IDE.D130x64.dll"; Components: Florence;  Flags: uninsdeletevalue
 
+; file association
+; Windows associates by the LAST extension only, so we associate the single-segment .dspec
+; (the legacy .dspec.yaml is still opened by DSpecCreator when passed on the command line).
+; HKA resolves to HKLM\Software\Classes for an admin install and HKCU\Software\Classes for a
+; per-user install - required because this installer runs with PrivilegesRequired=lowest.
+Root: HKA; Subkey: "Software\Classes\.dspec"; ValueType: string; ValueName: ""; ValueData: "DSpecCreator"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\DSpecCreator"; ValueType: string; ValueName: ""; ValueData: "DSpecCreator document"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\DSpecCreator\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\DSpecCreator.EXE,0"
+Root: HKA; Subkey: "Software\Classes\DSpecCreator\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\DSpecCreator.EXE"" ""%1"""
 
-[Tasks]
-Name: startmenu; Description: Create &Start Menu Group;
+
+
 
 [Icons]
 Name: "{group}\DSpec Creator"; Filename: "{app}\DSpecCreator.exe"; WorkingDir: "{app}"; IconIndex: 0; Tasks: startmenu
