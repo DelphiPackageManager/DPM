@@ -29,6 +29,7 @@ unit DPM.Core.Utils.Path;
 interface
 
 uses
+  System.Types,
   System.IOUtils;
 
 type
@@ -51,14 +52,14 @@ type
     class function IsDspecFile(const filename : string) : boolean;
     //Returns all dspec files (both .dspec and .dspec.yaml) in a directory. Uses a broad
     //glob + IsDspecFile filter to handle Windows wildcard quirks and exclude stray names.
-    class function FindDspecFiles(const directory : string; const searchOption : TSearchOption = TSearchOption.soTopDirectoryOnly) : TArray<string>;
+    //Returns TStringDynArray to be a drop-in for TDirectory.GetFiles at the call sites.
+    class function FindDspecFiles(const directory : string; const searchOption : TSearchOption = TSearchOption.soTopDirectoryOnly) : TStringDynArray;
   end;
 
 
 implementation
 
 uses
-  System.Types,
   System.SysUtils,
   System.StrUtils,
   System.RegularExpressions,
@@ -386,23 +387,27 @@ begin
   result := EndsText(cPackageSpecExt, filename) or EndsText(cLegacyPackageSpecExt, filename);
 end;
 
-class function TPathUtils.FindDspecFiles(const directory : string; const searchOption : TSearchOption = TSearchOption.soTopDirectoryOnly) : TArray<string>;
+class function TPathUtils.FindDspecFiles(const directory : string; const searchOption : TSearchOption = TSearchOption.soTopDirectoryOnly) : TStringDynArray;
 var
   candidates : TStringDynArray;
   candidate : string;
-  matches : IList<string>;
+  matchCount : integer;
 begin
-  matches := TCollections.CreateList<string>;
-  if DirectoryExists(directory) then
-  begin
-    //broad glob then filter - '*.dspec*' matches both '.dspec' and '.dspec.yaml' and
-    //the IsDspecFile filter excludes stray names like '*.dspecbak'.
-    candidates := TDirectory.GetFiles(directory, '*.dspec*', searchOption);
-    for candidate in candidates do
-      if IsDspecFile(candidate) then
-        matches.Add(candidate);
-  end;
-  result := matches.ToArray;
+  SetLength(result, 0);
+  if not DirectoryExists(directory) then
+    exit;
+  //broad glob then filter - '*.dspec*' matches both '.dspec' and '.dspec.yaml' and
+  //the IsDspecFile filter excludes stray names like '*.dspecbak'.
+  candidates := TDirectory.GetFiles(directory, '*.dspec*', searchOption);
+  SetLength(result, Length(candidates));
+  matchCount := 0;
+  for candidate in candidates do
+    if IsDspecFile(candidate) then
+    begin
+      result[matchCount] := candidate;
+      Inc(matchCount);
+    end;
+  SetLength(result, matchCount);
 end;
 
 
