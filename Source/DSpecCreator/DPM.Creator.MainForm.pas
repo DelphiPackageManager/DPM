@@ -485,6 +485,7 @@ type
     procedure UpdateFormCaption(const value : string);
 
     procedure OpenProject(const filename : string);
+    function GetFileOpenInitialDir : string;
 
     procedure EnableControls(value : Boolean);
     procedure DeleteSelectedEntry;
@@ -2519,14 +2520,66 @@ begin
   LoadDspecStructure;
 end;
 
+function TDSpecCreatorForm.GetFileOpenInitialDir : string;
+var
+  mruList : TStringList;
+begin
+  result := '';
+
+  //prefer the folder of the currently open file
+  if (not FOpenFile.filename.IsEmpty) and FileExists(FOpenFile.filename) then
+    result := ExtractFileDir(FOpenFile.filename);
+
+  //failing that, the folder of the most recently used file
+  if result = '' then
+  begin
+    mruList := TStringList.Create;
+    try
+      MRUListService.GetList(mruList);
+      if mruList.Count > 0 then
+        result := ExtractFileDir(mruList[0]);
+    finally
+      mruList.Free;
+    end;
+  end;
+
+  //failing that (brand new install), the user's documents folder
+  if (result = '') or (not DirectoryExists(result)) then
+    result := TPath.GetDocumentsPath;
+end;
+
 procedure TDSpecCreatorForm.actFileOpenExecute(Sender : TObject);
 var
-  dspecFilename : string;
+  initialDir : string;
+  fileOpen : TFileOpenDialog;
+  fileType : TFileTypeItem;
 begin
-  if OpenDialog.Execute then
+  initialDir := GetFileOpenInitialDir;
+
+  //TOpenDialog.InitialDir maps to the Vista shell's "default folder" (SetDefaultFolder),
+  //which Windows ignores once it has a remembered last-visited folder for the process - so
+  //it would not honour the location we want. Use the Vista+ dialog with a forced Folder
+  //(SetFolder) instead, falling back to the legacy dialog on pre-Vista.
+  if (Win32MajorVersion >= 6) and not (ofOldStyleDialog in OpenDialog.Options) then
   begin
-    dspecFilename := OpenDialog.filename;
-    OpenProject(dspecFilename);
+    fileOpen := TFileOpenDialog.Create(nil);
+    try
+      fileOpen.DefaultExtension := OpenDialog.DefaultExt;
+      fileType := fileOpen.FileTypes.Add;
+      fileType.DisplayName := 'Delphi Package Manager Spec Files';
+      fileType.FileMask := '*.dspec;*.dspec.yaml';
+      fileOpen.DefaultFolder := initialDir;
+      if fileOpen.Execute then
+        OpenProject(fileOpen.FileName);
+    finally
+      fileOpen.Free;
+    end;
+  end
+  else
+  begin
+    OpenDialog.InitialDir := initialDir;
+    if OpenDialog.Execute then
+      OpenProject(OpenDialog.FileName);
   end;
 end;
 

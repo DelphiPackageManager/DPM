@@ -1391,7 +1391,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Top = 113
             Width = 240
             Height = 160
-            ItemHeight = 15
+            ItemHeight = 17
             Items.Strings = (
               'Win32'
               'Win64'
