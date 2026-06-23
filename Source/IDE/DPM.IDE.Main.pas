@@ -109,87 +109,87 @@ begin
 end;
 
 
-procedure DumpEnvironmentOptionNames;
-var
-  Opts: IOTAEnvironmentOptions;
-  rttiCtx : TRttiContext;
-  optType : TRttiInstanceType;
-  inst : TValue;
-  envOptsField : TRttiField;
-  envOptsType : TRttiType;
-  method : TRttiMethod;
-  paramTypes : TArray<TRttiParameter>;
-  params : TArray<TValue>;
-  optObj : TObject;
-  FEnvOptions : TValue;
-  sl : TStringList;
-  reg : TRegistry;
-  sBrowsePath : string;
-begin
-  Opts := (BorlandIDEServices as IOTAServices).GetEnvironmentOptions;
-  if not Assigned(Opts) then Exit;
-  optObj := TObject(Opts);
-
-  rttiCtx := TRttiContext.Create;
-  optType := rttiCtx.GetType(optObj.ClassType) as TRttiInstanceType;
-
-  sl := TStringList.Create;
-  try
-    DumpType(optType, sl);
-
-
-    inst := TValue.From(optType.Handle, optObj);
-    envOptsField := optType.GetField('FEnvOptions');
-    envOptsType := envOptsField.FieldType;
-
-  //  DumpType(envOptsType, sl);
-
-
-    FEnvOptions :=  envOptsField.GetValue(optObj);
-
-
-    sBrowsePath:= Opts.Values['BrowsePath'];
-
-    Opts.Values['Browsing Path'] := sBrowsePath + ';$(DPMCACHE)\delphi13.0\GR32.graphics32\3.1.0\Source';
-
-
-    reg := TRegistry.Create;
-    try
-      reg.RootKey := HKEY_CURRENT_USER;
-      reg.OpenKey('Software\Embarcadero\DPMTesting\37.0\Environment Variables',true);
-      reg.WriteString('DPMCache', 'C:\Users\vincent.OFFICE\AppData\Roaming\.dpm\package_cache');
-      reg.WriteString('DPMBWin32', '$(DPMCACHE)\delphi13.0\GR32.graphics32\3.1.0\Source');
-      reg.CloseKey;
-
-      reg.OpenKey('Software\Embarcadero\DPMTesting\37.0\Library\Win32', true);
-      sBrowsePath := reg.ReadString('Browsing Path');
-      if Pos('$(DPMBWin32)',sBrowsePath) = -1 then
-      begin
-        sBrowsePath := '$(DPMBWin32);' + sBrowsePath;
-        reg.WriteString('Browsing Path',  sBrowsePath);
-      end;
-      reg.CloseKey;
-    finally
-      reg.Free;
-    end;
-
-    SetEnvironmentVariable('DPMCache', 'C:\Users\vincent.OFFICE\AppData\Roaming\.dpm\package_cache');
-    SetEnvironmentVariable('DPMBWin32', '$(DPMCACHE)\delphi13.0\GR32.graphics32\3.1.0\Source');
-
-
-    method := envOptsType.GetMethod('SaveOptions');
-    paramTypes := method.GetParameters;
-    SetLength(params, Length(paramTypes));
-    method.Invoke(FEnvOptions, params);
-
-//    sl.SaveToFile('c:\temp\envoptions.txt');
-
-  finally
-    sl.Free;
-  end;
-
-
-end;
+//procedure DumpEnvironmentOptionNames;
+//var
+//  Opts: IOTAEnvironmentOptions;
+//  rttiCtx : TRttiContext;
+//  optType : TRttiInstanceType;
+//  inst : TValue;
+//  envOptsField : TRttiField;
+//  envOptsType : TRttiType;
+//  method : TRttiMethod;
+//  paramTypes : TArray<TRttiParameter>;
+//  params : TArray<TValue>;
+//  optObj : TObject;
+//  FEnvOptions : TValue;
+//  sl : TStringList;
+//  reg : TRegistry;
+//  sBrowsePath : string;
+//begin
+//  Opts := (BorlandIDEServices as IOTAServices).GetEnvironmentOptions;
+//  if not Assigned(Opts) then Exit;
+//  optObj := TObject(Opts);
+//
+//  rttiCtx := TRttiContext.Create;
+//  optType := rttiCtx.GetType(optObj.ClassType) as TRttiInstanceType;
+//
+//  sl := TStringList.Create;
+//  try
+//    DumpType(optType, sl);
+//
+//
+//    inst := TValue.From(optType.Handle, optObj);
+//    envOptsField := optType.GetField('FEnvOptions');
+//    envOptsType := envOptsField.FieldType;
+//
+//  //  DumpType(envOptsType, sl);
+//
+//
+//    FEnvOptions :=  envOptsField.GetValue(optObj);
+//
+//
+//    sBrowsePath:= Opts.Values['BrowsePath'];
+//
+//    Opts.Values['Browsing Path'] := sBrowsePath + ';$(DPMCACHE)\delphi13.0\GR32.graphics32\3.1.0\Source';
+//
+//
+//    reg := TRegistry.Create;
+//    try
+//      reg.RootKey := HKEY_CURRENT_USER;
+//      reg.OpenKey('Software\Embarcadero\DPMTesting\37.0\Environment Variables',true);
+//      reg.WriteString('DPMCache', 'C:\Users\vincent.OFFICE\AppData\Roaming\.dpm\package_cache');
+//      reg.WriteString('DPMBWin32', '$(DPMCACHE)\delphi13.0\GR32.graphics32\3.1.0\Source');
+//      reg.CloseKey;
+//
+//      reg.OpenKey('Software\Embarcadero\DPMTesting\37.0\Library\Win32', true);
+//      sBrowsePath := reg.ReadString('Browsing Path');
+//      if Pos('$(DPMBWin32)',sBrowsePath) = -1 then
+//      begin
+//        sBrowsePath := '$(DPMBWin32);' + sBrowsePath;
+//        reg.WriteString('Browsing Path',  sBrowsePath);
+//      end;
+//      reg.CloseKey;
+//    finally
+//      reg.Free;
+//    end;
+//
+//    SetEnvironmentVariable('DPMCache', 'C:\Users\vincent.OFFICE\AppData\Roaming\.dpm\package_cache');
+//    SetEnvironmentVariable('DPMBWin32', '$(DPMCACHE)\delphi13.0\GR32.graphics32\3.1.0\Source');
+//
+//
+//    method := envOptsType.GetMethod('SaveOptions');
+//    paramTypes := method.GetParameters;
+//    SetLength(params, Length(paramTypes));
+//    method.Invoke(FEnvOptions, params);
+//
+////    sl.SaveToFile('c:\temp\envoptions.txt');
+//
+//  finally
+//    sl.Free;
+//  end;
+//
+//
+//end;
 
 function CreateWizard(const BorlandIDEServices : IBorlandIDEServices) : IOTAWizard;
 begin

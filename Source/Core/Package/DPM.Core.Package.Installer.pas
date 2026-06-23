@@ -1661,7 +1661,7 @@ begin
 
   //Copy-local runs at build time (the output dir is only reliably known then), not here. At
   //restore/install we just ensure the targets file exists in the cache root and the project imports
-  //it, so its AfterBuild target can invoke 'dpm copylocal'.
+  //it, so its DPMCopyLocal target (hooked into $(BuildDependsOn)) can invoke 'dpm copylocal'.
   EnsureCopyLocalTargets(config.PackageCacheLocation, FLogger);
   if not projectEditor.EnsureCopyLocalImport(GetDpmExePathForTargets) then
     exit;

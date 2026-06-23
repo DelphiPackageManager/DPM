@@ -37,7 +37,7 @@ const
   cCopyLocalTargetsFileName = 'DPM.CopyLocal.targets';
 
   //Bump when the targets content below changes so EnsureCopyLocalTargets rewrites stale copies.
-  cCopyLocalTargetsVersion = '1';
+  cCopyLocalTargetsVersion = '2';
 
 //Returns the full text of DPM.CopyLocal.targets (CRLF line endings, version-marked).
 function GetCopyLocalTargetsContent : string;
@@ -63,11 +63,22 @@ function GetCopyLocalTargetsContent : string;
 const
   CRLF = #13#10;
 begin
+  //We hook the build by appending DPMCopyLocal to $(BuildDependsOn) rather than using
+  //Target AfterTargets="Build". BeforeTargets/AfterTargets on <Target> require the MSBuild 4.0
+  //engine - Delphi XE2..10.2 Tokyo build with FrameworkVersion v3.5 (MSBuild 3.5) which rejects
+  //the attribute ("The attribute AfterTargets in element Target is unrecognized"). Appending to
+  //$(BuildDependsOn) is the pre-4.0 extension pattern and is non-destructive (additive, never an
+  //override) and works on every supported compiler. This relies on the dproj importing this file
+  //AFTER CodeGear.Delphi.Targets (TProjectEditor.EnsureCopyLocalImport appends the Import as the
+  //last child of <Project>), so $(BuildDependsOn) is already defined when we extend it.
   result :=
     '<?xml version="1.0" encoding="utf-8"?>' + CRLF +
     cVersionMarker + CRLF +
     '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">' + CRLF +
-    '  <Target Name="DPMCopyLocal" AfterTargets="Build" Condition="''$(DPMCopyLocalDisable)'' != ''true''">' + CRLF +
+    '  <PropertyGroup Condition="''$(DPMCopyLocalDisable)'' != ''true''">' + CRLF +
+    '    <BuildDependsOn>$(BuildDependsOn);DPMCopyLocal</BuildDependsOn>' + CRLF +
+    '  </PropertyGroup>' + CRLF +
+    '  <Target Name="DPMCopyLocal">' + CRLF +
     '    <PropertyGroup>' + CRLF +
     '      <_DPMExe Condition="''$(DPMExe)'' != '''' and Exists(''$(DPMExe)'')">$(DPMExe)</_DPMExe>' + CRLF +
     '      <_DPMExe Condition="''$(_DPMExe)'' == ''''">dpm</_DPMExe>' + CRLF +
