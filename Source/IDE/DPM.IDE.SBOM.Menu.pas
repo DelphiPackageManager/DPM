@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -216,14 +216,14 @@ begin
   //  ---                         (pmmpBuildSection + 2)
   //  Generate SBOM              (pmmpBuildSection + 3)
   //  ---                         (pmmpBuildSection + 4)
-  separator := TDPMSBOMMenuSeparator.Create(pmmpBuildSection + 2, 'DPMSBOMSeparatorTop');
-  ProjectManagerMenuList.Add(separator);
+//  separator := TDPMSBOMMenuSeparator.Create(pmmpBuildSection + 2, 'DPMSBOMSeparatorTop');
+//  ProjectManagerMenuList.Add(separator);
 
   menu := TDPMSBOMProjectMenu.Create(projectGroup, proj, FContainer, FLogger, isGroupContext);
   ProjectManagerMenuList.Add(menu);
 
-  separator := TDPMSBOMMenuSeparator.Create(pmmpBuildSection + 4, 'DPMSBOMSeparatorBottom');
-  ProjectManagerMenuList.Add(separator);
+//  separator := TDPMSBOMMenuSeparator.Create(pmmpBuildSection + 4, 'DPMSBOMSeparatorBottom');
+//  ProjectManagerMenuList.Add(separator);
 end;
 
 procedure TDPMSBOMProjectMenuNotifier.AfterSave;
@@ -561,9 +561,7 @@ end;
 
 function TDPMSBOMProjectMenu.GetPosition : Integer;
 begin
-  //Sits AFTER the separator (pmmpBuildSection + 2), which sits after
-  //"Manage DPM Packages" (pmmpBuildSection + 1).
-  result := pmmpBuildSection + 3;
+  result := pmmpUserUtils + 3;
 end;
 
 function TDPMSBOMProjectMenu.GetVerb : string;

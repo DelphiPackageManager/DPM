@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -97,7 +97,8 @@ implementation
 uses
   System.SysUtils,
   Vcl.Dialogs,
-  DPM.IDE.Constants;
+  DPM.IDE.Constants,
+  DPM.IDE.SBOM.Menu;
 
 
 { TDPMProjectMenu }
@@ -105,6 +106,7 @@ uses
 procedure TDPMProjectMenuNotifier.AddMenu(const Project : IOTAProject; const IdentList : TStrings; const ProjectManagerMenuList : IInterfaceList; IsMultiSelect : Boolean);
 var
   menu : IOTAProjectManagerMenu;
+  separator : IOTAProjectManagerMenu;
   projectGroup : IOTAProjectGroup;
   proj : IOTAProject;
 begin
@@ -119,6 +121,10 @@ begin
     Assert(projectGroup <> nil);
     if proj = nil then
      proj := projectGroup.ActiveProject;
+
+    separator := TDPMSBOMMenuSeparator.Create(pmmpBuildSection + 1, 'DPMSBOMSeparatorTop');
+    ProjectManagerMenuList.Add(separator);
+
 
     menu := TDPMProjectMenu.Create(projectGroup, proj, FEditorViewManager);
     ProjectManagerMenuList.Add(menu);
@@ -230,7 +236,8 @@ end;
 
 function TDPMProjectMenu.GetPosition : Integer;
 begin
-  result := pmmpBuildSection + 1;
+//  result := pmmpBuildSection + 1;
+  result := pmmpUserUtils + 2;
 end;
 
 function TDPMProjectMenu.GetVerb : string;
