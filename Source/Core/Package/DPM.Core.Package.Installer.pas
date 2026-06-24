@@ -998,9 +998,30 @@ function TPackageInstaller.DoCachePackage(const cancellationToken : ICancellatio
 var
   packageIdentity: IPackageIdentity;
   packageInfo : IPackageInfo;
+  packageFileName : string;
 begin
   result := false;
-  if not Options.Version.IsEmpty then
+  if Options.PackageFile <> '' then
+  begin
+    //Caching from a .dpkg file on disk (`dpm cache install <file.dpkg>`). Extract the file into the
+    //cache first, then derive the identity from the file name (compiler + version are encoded there)
+    //and read the package info back from the now-cached spec. The build step below still resolves and
+    //compiles the dependency graph from the configured sources, exactly as the id-based path does.
+    if not FPackageCache.InstallPackageFromFile(Options.PackageFile) then
+    begin
+      FLogger.Error('Failed to install package file [' + Options.PackageFile + '] into the cache');
+      exit;
+    end;
+    packageFileName := ChangeFileExt(ExtractFileName(Options.PackageFile), '');
+    if not TPackageIdentity.TryCreateFromString(FLogger, packageFileName, '', packageIdentity) then
+      exit;
+    //The id-based build path keys off Options.CompilerVersion / Version - populate them from the file
+    //so DoBuildCachedPackage (and the resolver) target the right compiler.
+    Options.compilerVersion := packageIdentity.CompilerVersion;
+    Options.Version := packageIdentity.Version;
+    packageInfo := FPackageCache.GetPackageInfo(cancellationToken, packageIdentity);
+  end
+  else if not Options.Version.IsEmpty then
   begin
     packageIdentity := TPackageIdentity.Create('', Options.packageId, Options.Version, Options.compilerVersion);
     // sourceName will be empty if we are installing the package from a file
@@ -1016,7 +1037,10 @@ begin
   end;
   if packageInfo = nil then
   begin
-    FLogger.Error('Package [' + Options.packageId + '] for compiler [' + CompilerToString(Options.compilerVersion) + '] not found on any sources');
+    if Options.PackageFile <> '' then
+      FLogger.Error('Unable to read package info for cached file [' + Options.PackageFile + ']')
+    else
+      FLogger.Error('Package [' + Options.packageId + '] for compiler [' + CompilerToString(Options.compilerVersion) + '] not found on any sources');
     exit;
   end;
   if packageInfo.IsSigned and (packageInfo.SignedBy <> '') then

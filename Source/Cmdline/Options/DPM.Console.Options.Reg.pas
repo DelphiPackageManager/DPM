@@ -82,10 +82,12 @@ var
 begin
   cmd := TOptionsRegistry.RegisterCommand('cache', '',
     'Manages the local package cache. `install` downloads a package and its dependencies into ' +
-    'the cache and compiles them for the package''s supported platforms, ' +
+    'the cache and compiles them for the package''s supported platforms (the package can be given ' +
+    'either as a package id resolved from the configured sources, or as the path to a local .dpkg ' +
+    'file), ' +
     '`remove` evicts cached package versions (so the next install re-downloads), ' +
     'and `verify` re-checks every package in the cache.',
-    '', 'cache <install|remove|verify> [packageId] [options]');
+    '', 'cache <install|remove|verify> [packageId|packageFile] [options]');
 
   // Positional sub-command. HasValue := false so the enum name is the token.
   option := cmd.RegisterUnNamedOption<TCacheSubCommand>('Sub-command: install, remove or verify','command',
@@ -99,8 +101,9 @@ begin
   option.HasValue := false;
 
   // Positional package id - required by install/remove, ignored by verify
-  // (enforced in TCacheOptions.Validate).
-  option := cmd.RegisterUnNamedOption<string>('A valid package Id (for install/remove)','packageId',
+  // (enforced in TCacheOptions.Validate). For install this may also be the path
+  // to a local .dpkg file; Validate routes it to PackageFile in that case.
+  option := cmd.RegisterUnNamedOption<string>('A valid package Id, or (for install) the path to a .dpkg file','packageId',
    procedure(const value : string)
     begin
       TCacheOptions.Default.PackageId := value;

@@ -44,6 +44,8 @@ uses
   DPM.Core.Package.Signing.Interfaces,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Repository.Interfaces,
+  DPM.Core.Package.Installer.Interfaces,
+  DPM.Core.Cache.Interfaces,
   DPM.Creator.Logger,
   DPM.Creator.TemplateTreeNode,
   DPM.Creator.Dspec.FileHandler,
@@ -334,6 +336,20 @@ type
     envVariablesList : TValueListEditor;
     Label9: TLabel;
     Label12: TLabel;
+    Label15: TLabel;
+    tsTest: TTabSheet;
+    pnlTestTop : TPanel;
+    lblTestCompilers : TLabel;
+    lblTestLog : TLabel;
+    clbTestCompilers : TCheckListBox;
+    btnStartTest : TButton;
+    btnCancelTest : TButton;
+    TestLogMemo : TMemo;
+    lblTestHelp: TLabel;
+    procedure btnStartTestClick(Sender : TObject);
+    procedure btnCancelTestClick(Sender : TObject);
+    procedure clbTestCompilersClick(Sender : TObject);
+    procedure clbTestCompilersDrawItem(Control : TWinControl; Index : Integer; Rect : TRect; State : TOwnerDrawState);
     procedure FormDestroy(Sender : TObject);
     procedure btnAddExcludeClick(Sender : TObject);
     procedure btnEditExcludeClick(Sender : TObject);
@@ -468,6 +484,13 @@ type
     FCancellationTokenSource : ICancellationTokenSource;
     FPacking : Boolean;
     FUploading : Boolean;
+    // Test page state
+    FPackageInstaller : IPackageInstaller;
+    FPackageCache : IPackageCache;
+    FTesting : Boolean;
+    FHasPacked : Boolean;                    // gates btnStartTest - nothing to test until a pack succeeds
+    FTestResults : TDictionary<string, Integer>;  // compiler string -> 0 none / 1 pass / 2 fail
+    FTestLogStart : TDictionary<string, Integer>;  // compiler string -> log line index where its test began
     // Upload page state
     FUploadConfig : IConfiguration;
     FUploadConfigFile : string;
@@ -489,6 +512,9 @@ type
 
     procedure EnableControls(value : Boolean);
     procedure DeleteSelectedEntry;
+
+    // Test page helpers
+    procedure RefreshTestCompilers;
 
     // In-process pack / sign helpers
     procedure InitCoreContainer;
@@ -565,12 +591,16 @@ uses
   System.UITypes,
   System.IOUtils,
   System.IniFiles,
+  Winapi.ActiveX,
   Winapi.ShellAPI,
   DPM.Core.Constants,
   DPM.Core.dependency.Version,
   DPM.Core.Init,
   DPM.Core.Packaging.IdValidator,
   DPM.Core.Options.Pack,
+  DPM.Core.Options.Cache,
+  DPM.Core.Package.Interfaces,
+  DPM.Core.Package.Classes,
   DPM.Core.Crypto.Algorithms,
   DPM.Core.Crypto.Provider.Interfaces,
   DPM.Core.Crypto.Provider.Factory,
@@ -789,6 +819,8 @@ begin
 
   FOpsLogger.SetTarget(PackLogMemo.Lines);
   PackLogMemo.Clear;
+  TestLogMemo.Clear;
+
   PageControl.ActivePage := tsGenerate;
   FPacking := true;
   btnBuildPackages.Enabled := false;
@@ -829,7 +861,13 @@ begin
     procedure(const ok : boolean)
     begin
       if ok then
-        FPackLogger.Success('Pack completed.')
+      begin
+        FPackLogger.Success('Pack completed.');
+        // We now have package files in the output folder, so testing is possible.
+        // Refresh the Test tab's compiler list and enable the Start Test button.
+        FHasPacked := true;
+        RefreshTestCompilers;
+      end
       else
         FPackLogger.Error('Pack failed.');
       cleanup();
@@ -864,6 +902,310 @@ begin
   end;
 end;
 
+procedure TDSpecCreatorForm.btnStartTestClick(Sender : TObject);
+var
+  compilersToTest : TArray<string>;
+  outputFolder : string;
+  packageId : string;
+  versionStr : string;
+  configPath : string;
+  config : IConfiguration;
+  i : integer;
+  cleanup : TProc;
+begin
+  // Mutually exclusive with pack / sign / upload - they share FOpsLogger and the
+  // cancellation token source.
+  if FTesting or FPacking or FUploading then
+    Exit;
+
+  // The Start button is only enabled after a successful pack, but guard anyway.
+  if not FHasPacked then
+    Exit;
+
+  outputFolder := edtPackageOutputPath.Text;
+  if not DirectoryExists(outputFolder) then
+  begin
+    MessageDlg('Output folder does not exist: ' + outputFolder, mtWarning, [mbOK], 0);
+    Exit;
+  end;
+
+  packageId := Trim(FOpenFile.PackageSpec.metadata.id);
+  versionStr := Trim(edtVersion.Text);
+  if versionStr = '' then
+    versionStr := FOpenFile.PackageSpec.metadata.Version.ToStringNoMeta;
+
+  // Collect the checked compilers on the UI thread - the worker only consumes this list.
+  compilersToTest := nil;
+  for i := 0 to clbTestCompilers.Count - 1 do
+  begin
+    if clbTestCompilers.Checked[i] then
+    begin
+      SetLength(compilersToTest, Length(compilersToTest) + 1);
+      compilersToTest[High(compilersToTest)] := clbTestCompilers.Items[i];
+    end;
+  end;
+  if Length(compilersToTest) = 0 then
+  begin
+    MessageDlg('Please check at least one compiler to test.', mtWarning, [mbOK], 0);
+    Exit;
+  end;
+
+  // Installing a .dpkg into the cache needs a config (for the cache location and
+  // the sources used to resolve dependencies). Use the default config file - the
+  // same one the command line `dpm cache install` uses.
+  configPath := TConfigUtils.GetDefaultConfigFileName;
+
+  // Point the (shared, singleton) cache at the configured location now, so the
+  // post-test cache removal works even if an install fails before Cache()->Init
+  // gets a chance to set it (mirrors TCacheCommand.EnsureCacheLocation).
+  FConfigManager.EnsureDefaultConfig;
+  config := FConfigManager.LoadConfig(configPath);
+  if config = nil then
+  begin
+    MessageDlg('Unable to load the DPM configuration; cannot access the package cache.', mtWarning, [mbOK], 0);
+    Exit;
+  end;
+  FPackageCache.Location := config.PackageCacheLocation;
+
+  // Reset the result colour state for every listed compiler.
+  FTestResults.Clear;
+  FTestLogStart.Clear;
+  for i := 0 to clbTestCompilers.Count - 1 do
+    FTestResults.AddOrSetValue(clbTestCompilers.Items[i], 0);
+  clbTestCompilers.Invalidate;
+
+  FOpsLogger.SetTarget(TestLogMemo.Lines);
+  TestLogMemo.Clear;
+  PageControl.ActivePage := tsTest;
+
+  FTesting := true;
+  btnStartTest.Enabled := false;
+  btnCancelTest.Enabled := true;
+  FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
+
+  cleanup :=
+    procedure
+    begin
+      FTesting := false;
+      btnStartTest.Enabled := FHasPacked;
+      btnCancelTest.Enabled := false;
+    end;
+
+  TAsync.Configure<boolean>(
+    function(const cancelToken : ICancellationToken) : boolean
+    var
+      compilerStr : string;
+      cv : TCompilerVersion;
+      mask : string;
+      files : TArray<string>;
+      dpkgFile : string;
+      newestTime : TDateTime;
+      f : string;
+      options : TCacheOptions;
+      installOk : boolean;
+      packageIdentity : IPackageIdentity;
+    begin
+      result := true;
+      // Building a package loads its .dproj via MSXML, which requires COM to be
+      // initialised on the calling thread. This runs on a VSoft.Awaitable worker
+      // thread (not the VCL main thread), so initialise COM here and tear it down
+      // when done.
+      CoInitialize(nil);
+      try
+        for compilerStr in compilersToTest do
+        begin
+          if cancelToken.IsCancelled then
+            break;
+
+        cv := StringToCompilerVersion(compilerStr);
+
+        // Record where this compiler's log section begins. Read the line count on
+        // the UI thread (via Synchronize) so any lines queued by earlier tests have
+        // already been flushed into the memo.
+        TThread.Synchronize(nil,
+          procedure
+          begin
+            FTestLogStart.AddOrSetValue(compilerStr, TestLogMemo.Lines.Count);
+          end);
+
+        FPackLogger.Information('');
+        FPackLogger.Information('=== Testing ' + compilerStr + ' ===');
+
+        // Locate the package file produced for this compiler. The packer writes
+        // {id}-{compiler}-{binPlatforms}-{version}.dpkg, so wildcard the platforms
+        // segment and pick the most recently written match.
+        dpkgFile := '';
+        newestTime := 0;
+        mask := packageId + '-' + CompilerToString(cv) + '-*-' + versionStr + cPackageFileExt;
+        try
+          files := TDirectory.GetFiles(outputFolder, mask);
+        except
+          files := nil;
+        end;
+        for f in files do
+        begin
+          if (dpkgFile = '') or (TFile.GetLastWriteTime(f) >= newestTime) then
+          begin
+            dpkgFile := f;
+            newestTime := TFile.GetLastWriteTime(f);
+          end;
+        end;
+
+        if dpkgFile = '' then
+        begin
+          FPackLogger.Error('No package file found for ' + compilerStr + ' (looked for ' + mask + ')');
+          result := false;
+          TThread.Synchronize(nil,
+            procedure
+            begin
+              FTestResults.AddOrSetValue(compilerStr, 2);
+              clbTestCompilers.Invalidate;
+            end);
+          continue;
+        end;
+
+        FPackLogger.Information('Installing ' + ExtractFileName(dpkgFile) + ' into the cache...');
+
+        installOk := false;
+        // Use a fresh TCacheOptions per compiler - never the shared global
+        // TCacheOptions.Default. Cache() reads the compiler + version from the
+        // file name, installs it, and compiles it for every supported platform.
+        options := TCacheOptions.Create;
+        try
+          options.Command := TCacheSubCommand.Install;
+          // Pass the file via PackageId - TCacheOptions.Validate detects it is a
+          // path (not a valid id) and routes it to PackageFile itself. Setting
+          // PackageFile directly would trip the 'packageId must be specified' check.
+          options.PackageId := dpkgFile;
+          options.ConfigFile := configPath;
+          try
+            installOk := FPackageInstaller.Cache(cancelToken, options);
+          except
+            on e : Exception do
+            begin
+              FPackLogger.Error('Test errored for ' + compilerStr + ' : ' + e.Message);
+              installOk := false;
+            end;
+          end;
+        finally
+          options.Free;
+        end;
+
+        // Always remove the package version we just tested from the cache. Any
+        // dependencies that were installed/compiled in the process are left in
+        // place by design - tracking the full closure would be too complex.
+        try
+          if TPackageIdentity.TryCreateFromString(FPackLogger, ChangeFileExt(ExtractFileName(dpkgFile), ''), '', packageIdentity) then
+          begin
+            if FPackageCache.RemovePackage(packageIdentity) then
+              FPackLogger.Information('Removed ' + packageIdentity.ToString + ' from the cache.')
+            else
+              FPackLogger.Warning('Could not remove ' + packageIdentity.ToString + ' from the cache.');
+          end;
+        except
+          on e : Exception do
+            FPackLogger.Warning('Could not remove tested package from the cache : ' + e.Message);
+        end;
+
+        if installOk then
+          FPackLogger.Success('Test passed for ' + compilerStr)
+        else
+        begin
+          FPackLogger.Error('Test failed for ' + compilerStr);
+          result := false;
+        end;
+
+        // Update the checkbox colour (green pass / red fail) on the UI thread.
+        TThread.Synchronize(nil,
+          procedure
+          begin
+            if installOk then
+              FTestResults.AddOrSetValue(compilerStr, 1)
+            else
+              FTestResults.AddOrSetValue(compilerStr, 2);
+            clbTestCompilers.Invalidate;
+          end);
+        end;
+      finally
+        CoUninitialize;
+      end;
+    end, FCancellationTokenSource.Token)
+  .OnException(
+    procedure(const e : Exception)
+    begin
+      FPackLogger.Error('Error running tests : ' + e.Message);
+      cleanup();
+    end)
+  .OnCancellation(
+    procedure
+    begin
+      FPackLogger.Warning('Testing cancelled.');
+      cleanup();
+    end)
+  .Await(
+    procedure(const ok : boolean)
+    begin
+      if ok then
+        FPackLogger.Success('All tests passed.')
+      else
+        FPackLogger.Information('Testing finished - one or more tests failed.');
+      cleanup();
+    end);
+end;
+
+procedure TDSpecCreatorForm.btnCancelTestClick(Sender : TObject);
+begin
+  // Invoked by the Cancel button and by Esc (via FormKeyDown). Ignore unless a
+  // test run is actually running, and only signal cancellation once.
+  if not FTesting then
+    Exit;
+  if (FCancellationTokenSource <> nil) and (not FCancellationTokenSource.Token.IsCancelled) then
+  begin
+    FPackLogger.Information('Cancelling...');
+    btnCancelTest.Enabled := false;
+    FCancellationTokenSource.Cancel;
+  end;
+end;
+
+procedure TDSpecCreatorForm.clbTestCompilersClick(Sender : TObject);
+var
+  idx : integer;
+  startLine : integer;
+begin
+  // Clicking a compiler scrolls the log to where that compiler's test began.
+  idx := clbTestCompilers.ItemIndex;
+  if idx < 0 then
+    Exit;
+  if not FTestLogStart.TryGetValue(clbTestCompilers.Items[idx], startLine) then
+    Exit;
+  if (startLine < 0) or (startLine >= TestLogMemo.Lines.Count) then
+    Exit;
+  TestLogMemo.SelStart := TestLogMemo.Perform(EM_LINEINDEX, startLine, 0);
+  TestLogMemo.SelLength := 0;
+  SendMessage(TestLogMemo.Handle, EM_SCROLLCARET, 0, 0);
+end;
+
+procedure TDSpecCreatorForm.clbTestCompilersDrawItem(Control : TWinControl; Index : Integer; Rect : TRect; State : TOwnerDrawState);
+var
+  clb : TCheckListBox;
+  itemText : string;
+  resultState : integer;
+begin
+  // TCheckListBox draws the checkbox itself and passes us the text area in Rect.
+  // We only override the text colour so passed compilers show green and failed red.
+  clb := Control as TCheckListBox;
+  itemText := clb.Items[Index];
+  clb.Canvas.FillRect(Rect);
+  if FTestResults.TryGetValue(itemText, resultState) then
+  begin
+    case resultState of
+      1 : clb.Canvas.Font.Color := clGreen;
+      2 : clb.Canvas.Font.Color := clRed;
+    end;
+  end;
+  clb.Canvas.TextOut(Rect.Left + 2, Rect.Top + 1, itemText);
+end;
+
 procedure TDSpecCreatorForm.FormKeyDown(Sender : TObject; var Key : Word; Shift : TShiftState);
 begin
   // Esc cancels a running pack/sign/upload from anywhere in the app. Only consume
@@ -878,6 +1220,11 @@ begin
   else if FUploading then
   begin
     btnCancelUploadClick(nil);
+    Key := 0;
+  end
+  else if FTesting then
+  begin
+    btnCancelTestClick(nil);
     Key := 0;
   end;
 end;
@@ -970,6 +1317,8 @@ begin
   FX509 := FContainer.Resolve<IX509Service>;
   FConfigManager := FContainer.Resolve<IConfigurationManager>;
   FRepositoryManager := FContainer.Resolve<IPackageRepositoryManager>;
+  FPackageInstaller := FContainer.Resolve<IPackageInstaller>;
+  FPackageCache := FContainer.Resolve<IPackageCache>;
 end;
 
 procedure TDSpecCreatorForm.UpdateSigningProviderPage;
@@ -1316,7 +1665,9 @@ end;
 procedure TDSpecCreatorForm.PageControlChange(Sender : TObject);
 begin
   if PageControl.ActivePage = tsUpload then
-    RefreshUploadPackages;
+    RefreshUploadPackages
+  else if PageControl.ActivePage = tsTest then
+    RefreshTestCompilers;
 end;
 
 procedure TDSpecCreatorForm.btnUploadClick(Sender : TObject);
@@ -2514,6 +2865,7 @@ begin
   FreeAndNil(FOpenFile);
   PackLogMemo.Clear;
   UploadLogMemo.Clear;
+  TestLogMemo.Clear;
   FOpenFile := TDSpecFile.Create(FLogger);
   FOpenFile.PackageSpec.newTemplate('default');
   UpdateFormCaption('');
@@ -2967,6 +3319,10 @@ begin
   InitCoreContainer;
   FPacking := false;
   FUploading := false;
+  FTesting := false;
+  FHasPacked := false;
+  FTestResults := TDictionary<string, Integer>.Create;
+  FTestLogStart := TDictionary<string, Integer>.Create;
   LoadSPDXList;
   PopulateCopyToBinCombo;
   LoadDspecStructure;
@@ -3026,6 +3382,8 @@ begin
     FCancellationTokenSource.Cancel;
   // Interfaces (FPackageWriter etc.) release with the container.
   FreeAndNil(FContainer);
+  FreeAndNil(FTestResults);
+  FreeAndNil(FTestLogStart);
 end;
 
 procedure TDSpecCreatorForm.lblSPDXClick(Sender : TObject);
@@ -3093,6 +3451,41 @@ begin
   end;
 
   LoadTemplates;
+
+  // A freshly loaded spec hasn't been packed in this session yet, so there is
+  // nothing to test until the user packs. Repopulate the Test tab's compiler
+  // list from the now-updated supported-compiler checkboxes.
+  FHasPacked := false;
+  RefreshTestCompilers;
+end;
+
+procedure TDSpecCreatorForm.RefreshTestCompilers;
+var
+  i : integer;
+  compilerStr : string;
+begin
+  FTestResults.Clear;
+  FTestLogStart.Clear;
+  clbTestCompilers.Items.BeginUpdate;
+  try
+    clbTestCompilers.Clear;
+    // The compilers a package supports are exactly those checked on the
+    // Platforms tab (clbCompilers). Default every one to checked so the user can
+    // test them all in one click and just uncheck any they want to skip.
+    for i := 0 to clbCompilers.Count - 1 do
+    begin
+      if clbCompilers.Checked[i] then
+      begin
+        compilerStr := clbCompilers.Items[i];
+        clbTestCompilers.Items.Add(compilerStr);
+        clbTestCompilers.Checked[clbTestCompilers.Count - 1] := true;
+        FTestResults.AddOrSetValue(compilerStr, 0);
+      end;
+    end;
+  finally
+    clbTestCompilers.Items.EndUpdate;
+  end;
+  btnStartTest.Enabled := FHasPacked and (not FTesting) and (clbTestCompilers.Count > 0);
 end;
 
 procedure TDSpecCreatorForm.LoadSPDXList;
@@ -3357,9 +3750,10 @@ begin
     UpdateFormCaption(filename);
     LoadDspecStructure;
     MRUListService.Add(filename);
-    // clear the pack and upload log memos when opening a project
+    // clear the pack, upload and test log memos when opening a project
     PackLogMemo.Clear;
     UploadLogMemo.Clear;
+    TestLogMemo.Clear;
   end
   else
   begin

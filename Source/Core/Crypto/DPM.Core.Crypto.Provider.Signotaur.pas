@@ -159,6 +159,11 @@ begin
   FLogger := logger;
   FX509 := x509;
   FOptions := options;
+  // Strip any trailing slash so endpoint + cSignotaurApiBase doesn't produce a
+  // double slash (e.g. https://host:82//api/v1/...). Harmless on most servers
+  // but it muddies the logs and some proxies reject it.
+  while (FOptions.Endpoint <> '') and (FOptions.Endpoint[Length(FOptions.Endpoint)] = '/') do
+    FOptions.Endpoint := Copy(FOptions.Endpoint, 1, Length(FOptions.Endpoint) - 1);
 end;
 
 function TSignotaurSigningProvider.HashAlgName(alg : THashAlgorithm) : string;
@@ -236,6 +241,14 @@ begin
   FLogger.Debug(Format('Signotaur HTTP %d response (%d bytes)', [response.StatusCode, Length(response.Response)]));
   if Length(response.Response) > 0 then
     FLogger.Verbose('Signotaur response body: ' + response.Response);
+  // A 405 (Method Not Allowed) on the REST endpoint means the server does not
+  // expose the /api/v1 REST surface at all — that is Signotaur v1, which only
+  // speaks gRPC. DPM signs over REST, so the user needs to upgrade.
+  if response.StatusCode = 405 then
+    raise EProviderFatal.Create(
+      'Signotaur returned HTTP 405 (Method Not Allowed) for the REST endpoint. ' +
+      'This Signotaur server does not support the REST signing API. ' +
+      'Signotaur v2 or later is required to sign with DPM.');
   if response.StatusCode <> 200 then
     // HTTP-level failure: bad endpoint, bad API key, server down. None of
     // these get better by trying the next file — raise as fatal so the
@@ -412,6 +425,12 @@ begin
     [response.StatusCode, Length(response.Response)]));
   if Length(response.Response) > 0 then
     FLogger.Verbose('Signotaur response body: ' + response.Response);
+  // 405 on the REST endpoint => Signotaur v1 (gRPC only). See note in GetCertificate.
+  if response.StatusCode = 405 then
+    raise EProviderFatal.Create(
+      'Signotaur returned HTTP 405 (Method Not Allowed) for the REST endpoint. ' +
+      'This Signotaur server does not support the REST signing API. ' +
+      'Signotaur v2 or later is required to sign with DPM.');
   if response.StatusCode <> 200 then
     // HTTP-level failure: see note on the matching raise in GetCertificate.
     raise EProviderFatal.CreateFmt(

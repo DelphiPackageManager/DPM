@@ -1603,7 +1603,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Top = 70
           Width = 841
           Height = 419
-          ActivePage = TabSheet1
+          ActivePage = TabSheet3
           TabOrder = 3
           object TabSheet1: TTabSheet
             Caption = 'Windows Certificate Store'
@@ -1689,49 +1689,63 @@ object DSpecCreatorForm: TDSpecCreatorForm
             ImageIndex = 2
             object lblSignotaurEndpoint: TLabel
               Left = 16
-              Top = 16
+              Top = 32
               Width = 48
               Height = 15
               Caption = 'Endpoint'
             end
             object lblSignotaurApiKey: TLabel
               Left = 16
-              Top = 70
+              Top = 86
               Width = 40
               Height = 15
               Caption = 'API Key'
             end
             object lblSignotaurThumbprint: TLabel
               Left = 16
-              Top = 124
+              Top = 140
               Width = 64
               Height = 15
               Caption = 'Thumbprint'
             end
             object lblSignotaurSubject: TLabel
               Left = 16
-              Top = 178
+              Top = 194
               Width = 39
               Height = 15
               Caption = 'Subject'
             end
             object lblSignotaurLabel: TLabel
               Left = 16
-              Top = 232
+              Top = 248
               Width = 28
               Height = 15
               Caption = 'Label'
             end
+            object Label15: TLabel
+              Left = 16
+              Top = 11
+              Width = 227
+              Height = 15
+              Caption = 'NOTE : Signotaur version 2 or later required'
+              Font.Charset = DEFAULT_CHARSET
+              Font.Color = clOrange
+              Font.Height = -12
+              Font.Name = 'Segoe UI'
+              Font.Style = []
+              ParentFont = False
+              StyleElements = [seBorder]
+            end
             object edtSignotaurEndpoint: TEdit
               Left = 16
-              Top = 34
+              Top = 50
               Width = 500
               Height = 23
               TabOrder = 0
             end
             object edtSignotaurApiKey: TEdit
               Left = 16
-              Top = 88
+              Top = 104
               Width = 300
               Height = 23
               PasswordChar = '*'
@@ -1739,28 +1753,28 @@ object DSpecCreatorForm: TDSpecCreatorForm
             end
             object edtSignotaurThumbprint: TEdit
               Left = 16
-              Top = 142
+              Top = 158
               Width = 500
               Height = 23
               TabOrder = 2
             end
             object edtSignotaurSubject: TEdit
               Left = 16
-              Top = 196
+              Top = 212
               Width = 500
               Height = 23
               TabOrder = 3
             end
             object edtSignotaurLabel: TEdit
               Left = 16
-              Top = 250
+              Top = 266
               Width = 300
               Height = 23
               TabOrder = 4
             end
             object chkSignotaurAllowSelfSigned: TCheckBox
               Left = 16
-              Top = 290
+              Top = 306
               Width = 350
               Height = 17
               Caption = 'Allow self-signed TLS certificates (dev only)'
@@ -1965,6 +1979,92 @@ object DSpecCreatorForm: TDSpecCreatorForm
           ScrollBars = ssBoth
           TabOrder = 1
         end
+      end
+    end
+    object tsTest: TTabSheet
+      Caption = 'Test'
+      ImageIndex = 7
+      object pnlTestTop: TPanel
+        Left = 0
+        Top = 0
+        Width = 863
+        Height = 200
+        Align = alTop
+        TabOrder = 0
+        DesignSize = (
+          863
+          200)
+        object lblTestCompilers: TLabel
+          Left = 16
+          Top = 12
+          Width = 93
+          Height = 15
+          Caption = 'Compilers to test:'
+        end
+        object lblTestLog: TLabel
+          Left = 16
+          Top = 178
+          Width = 23
+          Height = 15
+          Caption = 'Log:'
+        end
+        object lblTestHelp: TLabel
+          Left = 368
+          Top = 33
+          Width = 481
+          Height = 152
+          Anchors = [akLeft, akTop, akRight, akBottom]
+          AutoSize = False
+          Caption = 
+            'Testing attempts to install the package files in the DPM cache -' +
+            ' equivalent to '#39'dpm cache install/remove'#39' - this will force the ' +
+            'packages to be compiled. '
+          Enabled = False
+          WordWrap = True
+        end
+        object clbTestCompilers: TCheckListBox
+          Left = 16
+          Top = 33
+          Width = 200
+          Height = 134
+          ItemHeight = 17
+          Style = lbOwnerDrawFixed
+          TabOrder = 0
+          OnClick = clbTestCompilersClick
+          OnDrawItem = clbTestCompilersDrawItem
+        end
+        object btnStartTest: TButton
+          Left = 240
+          Top = 33
+          Width = 97
+          Height = 25
+          Hint = 'Install each packed package into the cache to test it'
+          Caption = 'Start Test'
+          Enabled = False
+          TabOrder = 1
+          OnClick = btnStartTestClick
+        end
+        object btnCancelTest: TButton
+          Left = 240
+          Top = 64
+          Width = 97
+          Height = 25
+          Hint = 'Cancel the running test (Esc)'
+          Caption = 'Cancel'
+          Enabled = False
+          TabOrder = 2
+          OnClick = btnCancelTestClick
+        end
+      end
+      object TestLogMemo: TMemo
+        Left = 0
+        Top = 200
+        Width = 863
+        Height = 328
+        Align = alClient
+        ReadOnly = True
+        ScrollBars = ssBoth
+        TabOrder = 1
       end
     end
     object tsUpload: TTabSheet

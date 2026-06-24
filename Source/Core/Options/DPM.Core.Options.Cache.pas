@@ -47,6 +47,7 @@ type
     FVerifyAll : boolean;
     FCommand : TCacheSubCommand;
     FForce : boolean;
+    FPackageFile : string;
     class var
       FDefault : TCacheOptions;
   protected
@@ -62,6 +63,13 @@ type
     function Clone : TCacheOptions; reintroduce;
 
     property PackageId : string read GetPackageId write SetPackageId;
+
+    // `dpm cache install <file.dpkg>` — when the positional argument is the path
+    // to a package file on disk rather than a package id, Validate moves it here
+    // (and clears PackageId). The installer extracts this file into the cache and
+    // builds it, instead of resolving the id from the configured sources. Empty
+    // for the normal id-based form.
+    property PackageFile : string read FPackageFile write FPackageFile;
     property PreRelease : boolean read FPreRelease write FPreRelease;
     property VersionString : string read FVersionString write FVersionString;
     property Version : TPackageVersion read FVersion write FVersion;
@@ -110,6 +118,7 @@ begin
   FVerifyAll := original.FVerifyAll;
   FCommand := original.FCommand;
   FForce := original.FForce;
+  FPackageFile := original.FPackageFile;
 end;
 
 class constructor TCacheOptions.CreateDefault;
@@ -131,6 +140,7 @@ end;
 function TCacheOptions.Validate(const logger : ILogger) : Boolean;
 var
   error : string;
+  packageString : string;
 begin
   //must call inherited
   result := inherited Validate(logger);
@@ -162,30 +172,52 @@ begin
           exit;
         end;
 
-        // Use the canonical id validator (not the looser cPackageIdRegex) so the
-        // command fails up front for ids that the package spec loader would later
-        // reject anyway - e.g. a too-short org prefix like 'CW.ResourceUtils'.
-        // Otherwise the loose check passes here, we contact the sources and cache
-        // the package, and the strict check then logs 'Invalid package Id' once
-        // per dspec parse without ever stopping the operation.
-        if not TPackageIdValidator.IsValidPackageId(PackageId) then
+        // The positional argument is either a package id (resolved from the
+        // configured sources) or the path to a .dpkg file on disk. Mirror the
+        // install command: a value matching the package-id pattern is treated as
+        // an id; otherwise it must be an existing package file. For a file the
+        // compiler and version come from the file name, so --compiler / --version
+        // are not required (and are ignored).
+        if (PackageId <> '') and TPackageIdValidator.IsValidPackageId(PackageId) then
         begin
-          logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
-          result := false;
-        end;
+          // Use the canonical id validator (not the looser cPackageIdRegex) so the
+          // command fails up front for ids that the package spec loader would later
+          // reject anyway - e.g. a too-short org prefix like 'CW.ResourceUtils'.
+          // Otherwise the loose check passes here, we contact the sources and cache
+          // the package, and the strict check then logs 'Invalid package Id' once
+          // per dspec parse without ever stopping the operation.
+          FPackageFile := '';
 
-        if VersionString <> '' then
-        begin
-          if not TPackageVersion.TryParseWithError(VersionString, FVersion, error) then
+          if VersionString <> '' then
           begin
-            logger.Error('The specified package Version  [' + VersionString + '] is not a valid version - ' + error);
+            if not TPackageVersion.TryParseWithError(VersionString, FVersion, error) then
+            begin
+              logger.Error('The specified package Version  [' + VersionString + '] is not a valid version - ' + error);
+              result := false;
+            end;
+          end;
+
+          if CompilerVersion = TCompilerVersion.UnknownVersion then
+          begin
+            logger.Error('Compiler option is required');
             result := false;
           end;
-        end;
-
-        if CompilerVersion = TCompilerVersion.UnknownVersion then
+        end
+        else if (PackageId <> '') and FileExists(PackageId) then
         begin
-          logger.Error('Compiler option is required');
+          FPackageFile := PackageId;
+          packageString := ChangeFileExt(ExtractFileName(FPackageFile), '');
+          if not TRegEx.IsMatch(packageString, cPackageFileRegex) then
+          begin
+            logger.Error('The specified package file name [' + packageString + '] is not in the correct format.');
+            result := false;
+          end;
+          // Compiler and version are taken from the file name by the installer.
+          PackageId := '';
+        end
+        else if PackageId <> '' then
+        begin
+          logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id, and no package file of that name exists.');
           result := false;
         end;
       end;
