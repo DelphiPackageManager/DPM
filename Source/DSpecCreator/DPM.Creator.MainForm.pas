@@ -154,7 +154,7 @@ type
     GridPanel1 : TGridPanel;
     Panel1 : TPanel;
     btnBuildPackages : TButton;
-    Memo1 : TMemo;
+    PackLogMemo: TMemo;
     edtPackageOutputPath : TEdit;
     Label2 : TLabel;
     crdTemplate : TCard;
@@ -302,7 +302,7 @@ type
     btnRefreshPackages : TButton;
     btnUpload : TButton;
     btnCancelUpload : TButton;
-    Memo3 : TMemo;
+    UploadLogMemo: TMemo;
     crdPackageDefsHeading: TCard;
     lblPackageDefsHeading: TLabel;
     lblPackageDefsDescription: TLabel;
@@ -787,8 +787,8 @@ begin
       end;
     end;
 
-  FOpsLogger.SetTarget(Memo1.Lines);
-  Memo1.Clear;
+  FOpsLogger.SetTarget(PackLogMemo.Lines);
+  PackLogMemo.Clear;
   PageControl.ActivePage := tsGenerate;
   FPacking := true;
   btnBuildPackages.Enabled := false;
@@ -1374,8 +1374,8 @@ begin
       btnCancelUpload.Enabled := false;
     end;
 
-  FOpsLogger.SetTarget(Memo3.Lines);
-  Memo3.Clear;
+  FOpsLogger.SetTarget(UploadLogMemo.Lines);
+  UploadLogMemo.Clear;
   PageControl.ActivePage := tsUpload;
   FUploading := true;
   btnUpload.Enabled := false;
@@ -2512,6 +2512,8 @@ end;
 procedure TDSpecCreatorForm.actFileNewExecute(Sender : TObject);
 begin
   FreeAndNil(FOpenFile);
+  PackLogMemo.Clear;
+  UploadLogMemo.Clear;
   FOpenFile := TDSpecFile.Create(FLogger);
   FOpenFile.PackageSpec.newTemplate('default');
   UpdateFormCaption('');
@@ -2960,7 +2962,7 @@ begin
   FOpenFile.PackageSpec.newTemplate('default');
   // Pack / sign / upload run in-process via the DPM core; output goes to the
   // active page's memo (retargeted per operation). Pack/sign default to Memo1.
-  FOpsLogger := TDSpecQueuedLogger.Create(Memo1.Lines);
+  FOpsLogger := TDSpecQueuedLogger.Create(PackLogMemo.Lines);
   FPackLogger := FOpsLogger;
   InitCoreContainer;
   FPacking := false;
@@ -3355,6 +3357,9 @@ begin
     UpdateFormCaption(filename);
     LoadDspecStructure;
     MRUListService.Add(filename);
+    // clear the pack and upload log memos when opening a project
+    PackLogMemo.Clear;
+    UploadLogMemo.Clear;
   end
   else
   begin

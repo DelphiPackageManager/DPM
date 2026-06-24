@@ -1900,7 +1900,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           end
           item
             Column = 0
-            Control = Memo1
+            Control = PackLogMemo
             Row = 1
           end>
         RowCollection = <
@@ -1955,7 +1955,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
             OnClick = btnCancelPackClick
           end
         end
-        object Memo1: TMemo
+        object PackLogMemo: TMemo
           Left = 1
           Top = 89
           Width = 861
@@ -2086,7 +2086,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           OnClick = btnCancelUploadClick
         end
       end
-      object Memo3: TMemo
+      object UploadLogMemo: TMemo
         Left = 0
         Top = 233
         Width = 863
