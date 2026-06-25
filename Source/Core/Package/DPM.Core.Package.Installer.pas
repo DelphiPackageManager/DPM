@@ -75,9 +75,13 @@ type
     // PopulateManifestHashes - reads each receipt at most once. Validation still
     // runs to completion and the refresh is only applied when validation passes,
     // so the abort-before-any-write semantics of the two-call sequence are kept.
+    // The id of every package whose lock did not match is appended to mismatchedPackageIds
+    // so the caller can report them and skip loading their design-time BPLs without aborting
+    // the whole restore.
     function ValidateAndPopulateManifestHashes(const graph : IPackageReference;
                                                const compilerVersion : TCompilerVersion;
-                                               const ignoreLocks : boolean) : boolean;
+                                               const ignoreLocks : boolean;
+                                               const mismatchedPackageIds : IList<string>) : boolean;
   protected
     function Init(const options : TSearchOptions) : IConfiguration;
     function GetPackageInfo(const cancellationToken: ICancellationToken; const packageId: IPackageIdentity): IPackageInfo;
@@ -913,7 +917,8 @@ end;
 
 function TPackageInstaller.ValidateAndPopulateManifestHashes(const graph : IPackageReference;
                                                              const compilerVersion : TCompilerVersion;
-                                                             const ignoreLocks : boolean) : boolean;
+                                                             const ignoreLocks : boolean;
+                                                             const mismatchedPackageIds : IList<string>) : boolean;
 var
   node : IPackageReference;
   packageFolder : string;
@@ -952,6 +957,8 @@ begin
         FLogger.Error(Format(
           '[Installer] Lock hash mismatch for [%s %s]: project pins %s but cache has no receipt.',
           [node.Id, node.Version.ToStringNoMeta, node.ManifestHash]));
+        if mismatchedPackageIds <> nil then
+          mismatchedPackageIds.Add(node.Id);
         result := false;
       end
       else
@@ -966,6 +973,8 @@ begin
             '[Installer] Lock hash mismatch for [%s %s]: project pins %s but cache has sha256:%s. ' +
             'Edit the dproj''s PackageReference or remove the cached package to re-acquire.',
             [node.Id, node.Version.ToStringNoMeta, node.ManifestHash, actual]));
+          if mismatchedPackageIds <> nil then
+            mismatchedPackageIds.Add(node.Id);
           result := false;
         end;
       end;
@@ -2516,6 +2525,9 @@ var
   finalGraph: IPackageReference;
   platformGraph: IPackageReference;
   storedCompiler : TCompilerVersion;
+  mismatchedPackageIds : IList<string>;
+  packageSpecs : IDictionary<string, IPackageSpec>;
+  mismatchedId : string;
 begin
   result := false;
   finalGraph := nil;
@@ -2585,26 +2597,49 @@ begin
       ClearManifestHashes(finalGraph);
     end;
     // P2 §2.6 — enforce existing PackageReference.ManifestHash lock values before we
-    // overwrite them (mismatch is a hard restore failure), then refresh from the receipts.
-    // Merged into a single pass so each receipt is read only once.
-    if not ValidateAndPopulateManifestHashes(finalGraph, Options.compilerVersion, Options.IgnoreHashLocks) then
+    // overwrite them, then refresh from the receipts. Merged into a single pass so each
+    // receipt is read only once.
+    //
+    // A lock mismatch is no longer a hard abort. Previously it failed the whole restore before
+    // any design-time BPLs were loaded, so a single mismatched package stopped every other
+    // package's design components from installing in the IDE. Now we report the problem (with
+    // resolution guidance), leave the dproj untouched (so the recorded locks are preserved and
+    // keep warning until the user resolves it), and still load the design-time BPLs for the
+    // packages that DID validate. The mismatched packages are skipped - we will not load BPLs
+    // whose cached content no longer matches what the project pinned. The restore result is
+    // still marked failed so the CLI exits non-zero and the IDE flags the problem.
+    mismatchedPackageIds := TCollections.CreateList<string>;
+    if ValidateAndPopulateManifestHashes(finalGraph, Options.compilerVersion, Options.IgnoreHashLocks, mismatchedPackageIds) then
     begin
+      // Update package references once using the new platform-independent format
+      projectEditor.UpdatePackageReferences(finalGraph);
+      result := projectEditor.SaveProject();
+    end
+    else
+    begin
+      FLogger.Warning('One or more manifest hash locks did not match the cached packages (see the errors above). ' +
+        'The project file was left unchanged and the affected package(s) were skipped. To resolve: reinstall ' +
+        'the affected package(s), delete them from the cache (' + FPackageCache.Location + ') and restore, or ' +
+        'restore with --ignoreHashLocks (-ihl) to refresh the recorded locks from the cache.');
       result := false;
-      exit;
     end;
-    // Update package references once using the new platform-independent format
-    projectEditor.UpdatePackageReferences(finalGraph);
-    result := projectEditor.SaveProject();
     //Load design-time packages once after all platforms are restored - design BPLs are per-IDE,
-    //not per-platform, so this runs at the project level. CLI context is a no-op.
-    if result then
+    //not per-platform, so this runs at the project level. CLI context is a no-op. This runs even
+    //when a hash lock failed to validate (result is false) so one mismatched package does not block
+    //the rest - only SaveProject failures (disk errors) suppress it.
+    if result or (mismatchedPackageIds.Count > 0) then
     begin
       //Make sure the IDE host platform's design BPL exists before we try to load it - the restore
       //loop above only built the project's target platforms. Non-fatal : the restore already
       //succeeded, and a failure here just means the design components may not load.
       if not EnsureDesignHostPlatformCompiled(cancellationToken, Options, finalGraph, platforms) then
         FLogger.Warning('Failed to compile design-time packages for the IDE host platform - design components may not load.');
-      InstallDesignPackages(cancellationToken, projectFile, BuildPackageSpecsFromGraph(finalGraph, Options.compilerVersion));
+      packageSpecs := BuildPackageSpecsFromGraph(finalGraph, Options.compilerVersion);
+      //Skip the design-time BPLs of any package whose lock did not validate - their cached content
+      //no longer matches what the project pinned, so loading them could load unexpected code.
+      for mismatchedId in mismatchedPackageIds do
+        packageSpecs.Remove(LowerCase(mismatchedId));
+      InstallDesignPackages(cancellationToken, projectFile, packageSpecs);
     end;
   end;
 

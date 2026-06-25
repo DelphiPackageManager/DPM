@@ -1334,6 +1334,7 @@ end;
 procedure RegisterCopyLocalCommand;
 var
   cmd : TCommandDefinition;
+  option : IOptionDefinition;
 begin
   cmd := TOptionsRegistry.RegisterCommand('copylocal', '', 'Copies package binaries (dlls/bpls) into the project build output folder.',
                                                       'Invoked by DPM.CopyLocal.targets from an AfterBuild MSBuild target. The output dir is only ' +
@@ -1347,41 +1348,53 @@ begin
       TCopyLocalOptions.Default.ProjectPath := value;
     end);
 
-  cmd.RegisterOption<string>('platform', 'p', 'The platform being built (msbuild $(Platform), e.g. Win32, Win64).',
+  //All options below are passed by MSBuild as key=value where the value is an interpolated property
+  //(e.g. -usePackages=$(UsePackages)). MSBuild emits an empty value when the property is blank, so
+  //HasValue is set false on each - otherwise the parser rejects '-usePackages=' (empty) as an error,
+  //which aborts copylocal during every build that doesn't set that property. Empty values are still
+  //captured (an empty platform/outputDir is then reported cleanly by TCopyLocalOptions.Validate).
+
+  option := cmd.RegisterOption<string>('platform', 'p', 'The platform being built (msbuild $(Platform), e.g. Win32, Win64).',
     procedure(const value : string)
     begin
       TCopyLocalOptions.Default.Platform := ProjectPlatformToDPMPlatform(Trim(value));
     end);
+  option.HasValue := false;
 
-  cmd.RegisterOption<string>('config', 'c', 'The build configuration being built (msbuild $(Config)).',
+  option := cmd.RegisterOption<string>('config', 'c', 'The build configuration being built (msbuild $(Config)).',
     procedure(const value : string)
     begin
       TCopyLocalOptions.Default.Config := value;
     end);
+  option.HasValue := false;
 
-  cmd.RegisterOption<string>('outputDir', 'o', 'The build output folder to copy into (msbuild $(OutputPath)).',
+  option := cmd.RegisterOption<string>('outputDir', 'o', 'The build output folder to copy into (msbuild $(OutputPath)).',
     procedure(const value : string)
     begin
       TCopyLocalOptions.Default.OutputDir := value;
     end);
+  option.HasValue := false;
 
-  cmd.RegisterOption<string>('compiler', '', 'The compiler version the project targets (msbuild $(DPMCompiler)).',
+  option := cmd.RegisterOption<string>('compiler', '', 'The compiler version the project targets (msbuild $(DPMCompiler)).',
     procedure(const value : string)
     begin
       TCopyLocalOptions.Default.CompilerVersion := StringToCompilerVersion(Trim(value));
     end);
+  option.HasValue := false;
 
-  cmd.RegisterOption<string>('usePackages', '', 'true when the build links with runtime packages (msbuild $(UsePackages)).',
+  option := cmd.RegisterOption<string>('usePackages', '', 'true when the build links with runtime packages (msbuild $(UsePackages)).',
     procedure(const value : string)
     begin
       TCopyLocalOptions.Default.UsePackages := SameText(Trim(value), 'true');
     end);
+  option.HasValue := false;
 
-  cmd.RegisterOption<string>('runtimePackages', '', 'The build''s runtime package link set (msbuild $(DCC_UsePackage)).',
+  option := cmd.RegisterOption<string>('runtimePackages', '', 'The build''s runtime package link set (msbuild $(DCC_UsePackage)).',
     procedure(const value : string)
     begin
       TCopyLocalOptions.Default.RuntimePackages := value;
     end);
+  option.HasValue := false;
 
   cmd.Examples.Add('copylocal .\MyApp.dproj -platform=Win64 -config=Release -outputDir=.\Win64\Release');
 end;
