@@ -64,7 +64,8 @@ type
                             const compilerVersion : TCompilerVersion) : string; overload;
     function GetPackageFileFolder(const packageId : IPackageIdentity) : string;
     function EnsurePackage(const packageId : IPackageIdentity) : boolean;
-    function InstallPackageFromFile(const packageFileName : string) : boolean;
+    function InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
+    procedure SetSkipTrustRatchets(const value : boolean);
     function GetPackageInfo(const cancellationToken : ICancellationToken;
                             const packageId : IPackageIdentity) : IPackageInfo;
     function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
@@ -103,7 +104,8 @@ begin
 end;
 function TStubCache.GetPackageFileFolder(const packageId : IPackageIdentity) : string; begin result := ''; end;
 function TStubCache.EnsurePackage(const packageId : IPackageIdentity) : boolean; begin result := false; end;
-function TStubCache.InstallPackageFromFile(const packageFileName : string) : boolean; begin result := false; end;
+function TStubCache.InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean; begin result := false; end;
+procedure TStubCache.SetSkipTrustRatchets(const value : boolean); begin end;
 function TStubCache.GetPackageInfo(const cancellationToken : ICancellationToken;
                                     const packageId : IPackageIdentity) : IPackageInfo; begin result := nil; end;
 function TStubCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata; begin result := nil; end;

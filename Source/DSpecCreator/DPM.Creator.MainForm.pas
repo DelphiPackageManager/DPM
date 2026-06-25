@@ -346,6 +346,7 @@ type
     btnCancelTest : TButton;
     TestLogMemo : TMemo;
     lblTestHelp: TLabel;
+    StatusBar: TStatusBar;
     procedure btnStartTestClick(Sender : TObject);
     procedure btnCancelTestClick(Sender : TObject);
     procedure clbTestCompilersClick(Sender : TObject);
@@ -1078,6 +1079,10 @@ begin
           // PackageFile directly would trip the 'packageId must be specified' check.
           options.PackageId := dpkgFile;
           options.ConfigFile := configPath;
+          // A freshly built local package legitimately lacks the repository
+          // signature its published counterpart carries, so bypass the TOFU trust
+          // ratchets that would otherwise block the test install.
+          options.SkipTrustRatchets := true;
           try
             installOk := FPackageInstaller.Cache(cancelToken, options);
           except

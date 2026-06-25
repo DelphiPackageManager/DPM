@@ -65,7 +65,19 @@ type
     /// </summary>
     function EnsurePackage(const packageId : IPackageIdentity) : boolean;
 
-    function InstallPackageFromFile(const packageFileName : string) : boolean;
+    // skipTrustRatchets bypasses the TOFU author-downgrade and repository
+    // assurance ratchets (signature verification itself still runs). Used by the
+    // DSpecCreator test workflow where a freshly built local .dpkg legitimately
+    // lacks the repository signature its published counterpart carries.
+    function InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
+
+    // Scoped equivalent of the skipTrustRatchets parameter above: while set, every
+    // ratchet evaluation in the cache (InstallPackageFromFile AND the cache-hit
+    // re-check in EnsurePackage) is skipped. The installer turns this on for the
+    // duration of a test cache build so the package's own re-validation during the
+    // build step doesn't re-trigger the ratchet. The cache is a singleton, so the
+    // caller must reset it (the installer does so in a finally). Off by default.
+    procedure SetSkipTrustRatchets(const value : boolean);
 
     //gets the package info with dependencies. Calls EnsurePackage.
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;

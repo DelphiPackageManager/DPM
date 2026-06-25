@@ -764,6 +764,8 @@ begin
     if (buildEntry.Platforms <> []) and (not (effectivePlatform in buildEntry.Platforms)) then
       continue;
 
+    // Blank line so each project's build output is visually separated in the log.
+    FLogger.NewLine;
     FLogger.Information('Building project: ' + buildEntry.Project);
     projectFile := ResolveProjectFile(buildEntry.Project);
 
@@ -817,6 +819,8 @@ begin
       continue;
     end;
 
+    // Blank line so each design package's build output is visually separated in the log.
+    FLogger.NewLine;
     FLogger.Information('Building design package: ' + designEntry.Project + ' (' + DPMPlatformToString(effectivePlatform) + ')');
 
     //output dirs and search paths are already set for effectivePlatform by the runtime build above - nothing to change.
@@ -1001,13 +1005,21 @@ var
   packageFileName : string;
 begin
   result := false;
+  // When testing, skip the TOFU trust ratchets for the whole operation - not just
+  // the initial file install. The build step re-checks the cached package via
+  // EnsurePackage (which re-evaluates the ratchets from the receipt) and may
+  // re-install it, so the skip has to cover the entire cache flow, not one call.
+  // Reset in the finally below; pack/test/upload are mutually exclusive so the
+  // singleton cache is never in skip-mode for an unrelated operation.
+  FPackageCache.SetSkipTrustRatchets(Options.SkipTrustRatchets);
+  try
   if Options.PackageFile <> '' then
   begin
     //Caching from a .dpkg file on disk (`dpm cache install <file.dpkg>`). Extract the file into the
     //cache first, then derive the identity from the file name (compiler + version are encoded there)
     //and read the package info back from the now-cached spec. The build step below still resolves and
     //compiles the dependency graph from the configured sources, exactly as the id-based path does.
-    if not FPackageCache.InstallPackageFromFile(Options.PackageFile) then
+    if not FPackageCache.InstallPackageFromFile(Options.PackageFile, Options.SkipTrustRatchets) then
     begin
       FLogger.Error('Failed to install package file [' + Options.PackageFile + '] into the cache');
       exit;
@@ -1059,6 +1071,9 @@ begin
     exit;
 
   result := true;
+  finally
+    FPackageCache.SetSkipTrustRatchets(false);
+  end;
 end;
 
 function TPackageInstaller.DoBuildCachedPackage(const cancellationToken: ICancellationToken; const Options: TCacheOptions; const packageInfo: IPackageInfo): boolean;

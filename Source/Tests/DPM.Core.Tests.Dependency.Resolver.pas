@@ -71,7 +71,8 @@ type
     function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion) : string; overload;
     function GetPackageFileFolder(const packageId : IPackageIdentity) : string;
     function EnsurePackage(const packageId : IPackageIdentity) : boolean;
-    function InstallPackageFromFile(const packageFileName : string) : boolean;
+    function InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
+    procedure SetSkipTrustRatchets(const value : boolean);
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
     function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
     function GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
@@ -581,9 +582,14 @@ begin
   result := false;
 end;
 
-function TFakePackageCache.InstallPackageFromFile(const packageFileName : string) : boolean;
+function TFakePackageCache.InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
 begin
   raise ENotImplemented.Create('TFakePackageCache.InstallPackageFromFile');
+end;
+
+procedure TFakePackageCache.SetSkipTrustRatchets(const value : boolean);
+begin
+  // no-op for tests
 end;
 
 function TFakePackageCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;

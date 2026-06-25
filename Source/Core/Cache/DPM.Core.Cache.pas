@@ -55,6 +55,8 @@ type
     FTrustState : ITrustStateService;
     FTrustPrompt : ITrustPromptStrategy;
     FLocation : string;
+    // When set, every TOFU ratchet evaluation is skipped (test cache builds).
+    FSkipTrustRatchets : boolean;
     //Process-level memo. Safe because the cached spec is write-once per (id, compiler, version).
     //TPackageCache is registered AsSingleton in DPM.Core.Init.pas so these survive the whole command
     //and dedupe across projects in a group restore as well as IDE operations.
@@ -116,7 +118,9 @@ type
 
 //    function InstallPackage(const packageId : IPackageIdentity; const saveFile : boolean; const source : string = '') : boolean;
 
-    function InstallPackageFromFile(const packageFileName : string) : boolean;
+    function InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
+
+    procedure SetSkipTrustRatchets(const value : boolean);
 
     function FullReVerify(const cancellationToken : ICancellationToken) : integer;
 
@@ -367,8 +371,13 @@ begin
         end;
       tpdBlockOnce :
         begin
-          FLogger.Warning('[PackageCache] User cancelled install of [' +
-            packageId.Id + '] at repository ratchet.');
+          // Reached either when the user explicitly declined an interactive prompt
+          // or - more commonly in headless/IDE contexts - when the non-interactive
+          // strategy fails closed. "User cancelled" is misleading in the latter
+          // case, so state the actual outcome.
+          FLogger.Warning('[PackageCache] Install of [' +
+            packageId.Id + '] blocked at repository ratchet (this build no longer carries the ' +
+            'previously-seen trusted repository signature).');
           result := false;
           exit;
         end;
@@ -1283,7 +1292,7 @@ begin
         'Re-verifying [' + packageId.Id + '].');
       result := false;
     end
-    else if (FReceiptService <> nil) and (FTrustState <> nil) and
+    else if (not FSkipTrustRatchets) and (FReceiptService <> nil) and (FTrustState <> nil) and
             FReceiptService.TryRead(packageFolder, receipt) then
     begin
       // QuickRecheck only verifies the cached extraction against the trust
@@ -1291,7 +1300,10 @@ begin
       // independently — manual edits to trust-state.yaml or an intervening
       // install that ratcheted a different signer. Re-run both ratchets
       // against the signatures recorded in the receipt so cache hits don't
-      // bypass the author / V-24 protections.
+      // bypass the author / V-24 protections. Skipped entirely while the cache
+      // is in test mode (FSkipTrustRatchets) - the same build that just installed
+      // a ratchet-exempt local package re-checks it here, and would otherwise
+      // block its own freshly-cached entry.
       cachedVerifyResult := BuildResultFromReceipt(receipt);
       if not EvaluateAuthorDowngrade(packageId, cachedVerifyResult, FTrustPolicy.GetEffectivePolicy) then
       begin
@@ -1339,7 +1351,12 @@ begin
 end;
 
 
-function TPackageCache.InstallPackageFromFile(const packageFileName : string) : boolean;
+procedure TPackageCache.SetSkipTrustRatchets(const value : boolean);
+begin
+  FSkipTrustRatchets := value;
+end;
+
+function TPackageCache.InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
 var
   packageFilePath : string;
   fileName : string;
@@ -1445,16 +1462,28 @@ begin
         FLogger.Warning('[PackageCache] Package signed but signer is not in ' +  'trustedPublishers; install allowed under permissive mode.');
     end;
 
-    // TOFU author no-downgrade ratchet (plan §1.10). Compares the current
-    // signer against the high-water mark from the last successful install
-    // of this package id and either accepts, blocks, or prompts the user.
-    if not EvaluateAuthorDowngrade(packageIndentity, verifyResult, FTrustPolicy.GetEffectivePolicy) then
-      exit;
+    // The TOFU ratchets compare this build against the high-water mark from the
+    // last install and can block (or mutate trust state). The test workflow
+    // installs a freshly built local .dpkg that legitimately lacks the repository
+    // signature its published counterpart carries, so it asks us to skip them
+    // (via the per-call argument or the cache-wide FSkipTrustRatchets mode).
+    // Signature verification above still applies; we just don't ratchet.
+    if skipTrustRatchets or FSkipTrustRatchets then
+      FLogger.Information('[PackageCache] Skipping author/repository trust ratchets for [' +
+        packageIndentity.Id + '] (test install).')
+    else
+    begin
+      // TOFU author no-downgrade ratchet (plan §1.10). Compares the current
+      // signer against the high-water mark from the last successful install
+      // of this package id and either accepts, blocks, or prompts the user.
+      if not EvaluateAuthorDowngrade(packageIndentity, verifyResult, FTrustPolicy.GetEffectivePolicy) then
+        exit;
 
-    // P2 §2.3 (V-24): repository assurance ratchet. Once seen carrying a
-    // trusted-repo signature, future builds must continue to.
-    if not EvaluateRepositoryRatchet(packageIndentity, verifyResult) then
-      exit;
+      // P2 §2.3 (V-24): repository assurance ratchet. Once seen carrying a
+      // trusted-repo signature, future builds must continue to.
+      if not EvaluateRepositoryRatchet(packageIndentity, verifyResult) then
+        exit;
+    end;
   end;
 
   try

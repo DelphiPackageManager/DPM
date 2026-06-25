@@ -48,6 +48,7 @@ type
     FCommand : TCacheSubCommand;
     FForce : boolean;
     FPackageFile : string;
+    FSkipTrustRatchets : boolean;
     class var
       FDefault : TCacheOptions;
   protected
@@ -70,6 +71,16 @@ type
     // builds it, instead of resolving the id from the configured sources. Empty
     // for the normal id-based form.
     property PackageFile : string read FPackageFile write FPackageFile;
+
+    // Skip the TOFU author-downgrade and repository-assurance ratchets when
+    // installing the package into the cache. Intended for the DSpecCreator "test"
+    // workflow, where a freshly-built local .dpkg legitimately lacks the
+    // repository signature its published counterpart carries - the ratchet would
+    // otherwise block the test. Leaves the persisted trust state untouched. Not
+    // exposed on the command line; defaults to false so normal installs are
+    // unaffected.
+    property SkipTrustRatchets : boolean read FSkipTrustRatchets write FSkipTrustRatchets;
+
     property PreRelease : boolean read FPreRelease write FPreRelease;
     property VersionString : string read FVersionString write FVersionString;
     property Version : TPackageVersion read FVersion write FVersion;
@@ -119,6 +130,7 @@ begin
   FCommand := original.FCommand;
   FForce := original.FForce;
   FPackageFile := original.FPackageFile;
+  FSkipTrustRatchets := original.FSkipTrustRatchets;
 end;
 
 class constructor TCacheOptions.CreateDefault;
