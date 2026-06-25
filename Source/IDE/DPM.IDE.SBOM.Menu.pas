@@ -170,7 +170,7 @@ end;
 procedure TDPMSBOMProjectMenuNotifier.AddMenu(const Project : IOTAProject; const IdentList : TStrings;
                                               const ProjectManagerMenuList : IInterfaceList; IsMultiSelect : Boolean);
 var
-  separator : IOTAProjectManagerMenu;
+//  separator : IOTAProjectManagerMenu;
   menu : IOTAProjectManagerMenu;
   projectGroup : IOTAProjectGroup;
   proj : IOTAProject;
