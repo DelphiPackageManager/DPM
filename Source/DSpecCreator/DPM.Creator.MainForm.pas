@@ -3422,7 +3422,11 @@ begin
   if Length(FOpenFile.PackageSpec.metadata.Icon) > 0 then
   begin
     ImgIcon.Picture.LoadFromFile(TPath.Combine(FOpenFile.WorkingDir, FOpenFile.PackageSpec.metadata.Icon));
-  end;
+  end
+  else
+    // No icon in the spec - clear any image left over from a previously loaded
+    // spec (otherwise file/new and opening an icon-less spec keep the old image).
+    ImgIcon.Picture.Assign(nil);
 
   //package-level (global) variables - shared across all compilers, overridden by per-platform vars.
   FInVariableUpdate := true;
