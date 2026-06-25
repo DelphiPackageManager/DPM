@@ -354,6 +354,10 @@ var
   projectCount : integer;
 begin
   installResult := false;
+  //capture the current package metadata before we pump any messages - pumping
+  //(the wait loop below and progress updates during install) can re-enter
+  //SetPackage from the editor view and set FPackageMetaData to nil.
+  packageMetadata := FPackageMetaData;
   try
     if FRequestInFlight then
       FCancellationTokenSource.Cancel;
@@ -370,18 +374,23 @@ begin
     installResult := FPackageInstaller.Install(FCancellationTokenSource.Token, options, FInstallerContext);
     if installResult then
     begin
-      packageMetadata := FPackageMetaData;
-      packageMetadata.Installed := true;
-      packageMetadata.IsTransitive := false;
+      if packageMetadata <> nil then
+      begin
+        packageMetadata.Installed := true;
+        packageMetadata.IsTransitive := false;
+      end;
       FHost.PackageInstalled;
-      UpdateProjectPackageVersions(packageMetaData.Id);
-      SetPackage(packageMetadata, FIncludePreRelease, true);
+      if packageMetadata <> nil then
+      begin
+        UpdateProjectPackageVersions(packageMetaData.Id);
+        SetPackage(packageMetadata, FIncludePreRelease, true);
+        FPackageMetaData := packageMetadata;
+      end;
       FInstalledVersion := options.Version;
-      FPackageMetaData := packageMetadata;
-      FLogger.Information('Package ' + FPackageMetaData.Id + ' - ' + FInstalledVersion.ToStringNoMeta + ' installed.');
+      FLogger.Information('Package ' + options.PackageId + ' - ' + FInstalledVersion.ToStringNoMeta + ' installed.');
     end
     else
-      FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FInstalledVersion.ToStringNoMeta + ' did not install.');
+      FLogger.Error('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' did not install.');
 
 
   finally
@@ -398,6 +407,10 @@ var
   projectCount : integer;
 begin
   uninstallResult := false;
+  //capture the current package metadata before we pump any messages - pumping
+  //(the wait loop below and progress updates during uninstall) can re-enter
+  //SetPackage from the editor view and set FPackageMetaData to nil.
+  packageMetaData := FPackageMetaData;
   try
     if FRequestInFlight then
       FCancellationTokenSource.Cancel;
@@ -412,20 +425,22 @@ begin
       projectCount := 1;
     FHost.BeginUninstall(projectCount);
 
-    FLogger.Information('UnInstalling package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version.ToStringNoMeta);
+    FLogger.Information('UnInstalling package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta);
     uninstallResult := FPackageInstaller.UnInstall(FCancellationTokenSource.Token, options, FInstallerContext);
     if uninstallResult then
     begin
-      packageMetaData := FPackageMetaData;
-      FLogger.Information('Package ' + packageMetaData.Id + ' - ' + packageMetaData.Version.ToStringNoMeta + ' uninstalled.');
-      FHost.PackageUninstalled(packageMetaData.Id);
-      UpdateProjectPackageVersions(packageMetaData.Id);
+      FLogger.Information('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' uninstalled.');
+      FHost.PackageUninstalled(options.PackageId);
+      UpdateProjectPackageVersions(options.PackageId);
 
       if FProjectsGrid.HasAnyInstalled then
       begin
         FInstalledVersion := options.Version;
-        packageMetaData.Installed := true;
-        SetPackage(packageMetaData, FIncludePreRelease, false);
+        if packageMetaData <> nil then
+        begin
+          packageMetaData.Installed := true;
+          SetPackage(packageMetaData, FIncludePreRelease, false);
+        end;
       end
       else
       begin
@@ -434,7 +449,7 @@ begin
       end;
     end
     else
-      FLogger.Error('Package ' + FPackageMetaData.Id + ' - ' + FPackageMetaData.Version.ToStringNoMeta + ' did not uninstall.');
+      FLogger.Error('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' did not uninstall.');
 
   finally
     FLogger.EndUnInstall(uninstallResult);
