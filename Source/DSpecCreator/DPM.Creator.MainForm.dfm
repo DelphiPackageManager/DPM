@@ -2665,6 +2665,18 @@ object DSpecCreatorForm: TDSpecCreatorForm
       Caption = 'Add Build Item'
       OnExecute = actAddBuildItemExecute
     end
+    object actMoveEntryUp: TAction
+      Category = 'Template'
+      Caption = 'Move &Up'
+      ShortCut = 16422
+      OnExecute = actMoveEntryUpExecute
+    end
+    object actMoveEntryDown: TAction
+      Category = 'Template'
+      Caption = 'Move &Down'
+      ShortCut = 16424
+      OnExecute = actMoveEntryDownExecute
+    end
     object actFileOpen: TAction
       Category = 'File'
       Caption = '&Open..'

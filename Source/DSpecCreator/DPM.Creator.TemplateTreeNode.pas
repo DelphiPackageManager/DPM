@@ -43,6 +43,7 @@ type
     function IsDependencyHeading: Boolean;
     function IsPackageDef : boolean;
     function IsPackageDefHeading : boolean;
+    function IsEntry : Boolean;
     function IsEnvironmentVariablesHeading : Boolean;
     function IsCopyLocal : Boolean;
     function IsCopyLocalHeading : Boolean;
@@ -156,6 +157,11 @@ end;
 function TTemplateTreeNode.IsDesignHeading: Boolean;
 begin
   Result := NodeType = ntDesignHeading;
+end;
+
+function TTemplateTreeNode.IsEntry: Boolean;
+begin
+  Result := NodeType in [ntSource, ntBuild, ntDesign, ntDependency, ntPackageDef, ntCopyLocal];
 end;
 
 function TTemplateTreeNode.IsEnvironmentVariablesHeading: Boolean;

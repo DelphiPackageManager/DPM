@@ -175,6 +175,8 @@ type
     lblPackageId : TLabel;
     Label5 : TLabel;
     actAddBuildItem : TAction;
+    actMoveEntryUp : TAction;
+    actMoveEntryDown : TAction;
     actFileOpen : TAction;
     actFileSave : TAction;
     actFileSaveAs : TAction;
@@ -422,6 +424,8 @@ type
     procedure UriLabelMouseLeave(Sender : TObject);
     procedure actAddBuildItemExecute(Sender : TObject);
     procedure actDeleteBuildItemExecute(Sender : TObject);
+    procedure actMoveEntryUpExecute(Sender : TObject);
+    procedure actMoveEntryDownExecute(Sender : TObject);
     procedure actAddDependencyExecute(Sender : TObject);
     procedure actDeleteDependencyExecute(Sender : TObject);
     procedure actAddDesignItemExecute(Sender : TObject);
@@ -513,6 +517,8 @@ type
 
     procedure EnableControls(value : Boolean);
     procedure DeleteSelectedEntry;
+    procedure MoveSelectedEntry(const delta : Integer);
+    procedure SwapInList<T>(const list : IList<T>; const item : T; const delta : Integer);
 
     // Test page helpers
     procedure RefreshTestCompilers;
@@ -1247,6 +1253,72 @@ begin
     tvTemplates.Items.Delete(selectedNode);
     tvTemplates.Selected := parentNode;
   end;
+end;
+
+procedure TDSpecCreatorForm.SwapInList<T>(const list : IList<T>; const item : T; const delta : Integer);
+var
+  idx : Integer;
+begin
+  idx := list.IndexOf(item);
+  if idx < 0 then
+    Exit;
+  if (idx + delta < 0) or (idx + delta > list.Count - 1) then
+    Exit;
+  list.Exchange(idx, idx + delta);
+end;
+
+procedure TDSpecCreatorForm.MoveSelectedEntry(const delta : Integer);
+var
+  selectedNode : TTemplateTreeNode;
+  template : ISpecTemplate;
+begin
+  selectedNode := tvTemplates.Selected as TTemplateTreeNode;
+  if (selectedNode = nil) or (not selectedNode.IsEntry) then
+    Exit;
+
+  template := selectedNode.Template;
+  if template = nil then
+    Exit;
+
+  //reorder the underlying model list for the node's category.
+  case selectedNode.NodeType of
+    ntSource     : SwapInList<ISpecSourceEntry>(template.SourceEntries, selectedNode.sourceEntry, delta);
+    ntBuild      : SwapInList<ISpecBuildEntry>(template.BuildEntries, selectedNode.build, delta);
+    ntDesign     : SwapInList<ISpecDesignEntry>(template.DesignEntries, selectedNode.designEntry, delta);
+    ntDependency : SwapInList<ISpecDependency>(template.Dependencies, selectedNode.dependency, delta);
+    ntPackageDef : SwapInList<ISpecPackageDefinition>(template.PackageDefinitions, selectedNode.packageDef, delta);
+    ntCopyLocal  : SwapInList<ISpecCopyLocalEntry>(template.CopyLocalEntries, selectedNode.copyLocalEntry, delta);
+  else
+    Exit;
+  end;
+
+  //reorder the matching tree node to match (naInsert = become sibling immediately before Destination).
+  tvTemplates.Items.BeginUpdate;
+  try
+    if delta < 0 then
+    begin
+      if selectedNode.getPrevSibling <> nil then
+        selectedNode.MoveTo(selectedNode.getPrevSibling, naInsert);
+    end
+    else
+    begin
+      if selectedNode.getNextSibling <> nil then
+        selectedNode.getNextSibling.MoveTo(selectedNode, naInsert);
+    end;
+    tvTemplates.Selected := selectedNode;
+  finally
+    tvTemplates.Items.EndUpdate;
+  end;
+end;
+
+procedure TDSpecCreatorForm.actMoveEntryUpExecute(Sender : TObject);
+begin
+  MoveSelectedEntry(-1);
+end;
+
+procedure TDSpecCreatorForm.actMoveEntryDownExecute(Sender : TObject);
+begin
+  MoveSelectedEntry(1);
 end;
 
 procedure TDSpecCreatorForm.cboLicenseChange(Sender : TObject);
@@ -2995,6 +3067,9 @@ begin
   actAddCopyLocalItem.Enabled := hasNode and (selectedNode.IsCopyLocalHeading or selectedNode.IsCopyLocal);
   actDeleteCopyLocalItem.Enabled := hasNode and selectedNode.IsCopyLocal;
 
+  actMoveEntryUp.Enabled := hasNode and selectedNode.IsEntry and (selectedNode.getPrevSibling <> nil);
+  actMoveEntryDown.Enabled := hasNode and selectedNode.IsEntry and (selectedNode.getNextSibling <> nil);
+
 end;
 
 procedure TDSpecCreatorForm.actPlatformsDeselectAllExecute(Sender : TObject);
@@ -3932,6 +4007,30 @@ begin
     begin
       item := TMenuItem.Create(PopupMenu);
       item.Action := categoryNode.DeleteAction;
+      tvTemplates.PopupMenu.Items.Add(item);
+    end;
+
+    //Entry (item-level) nodes can be reordered within their category - the action enabled state
+    //(set in ActionList1Update) disables Move Up on the first entry and Move Down on the last.
+    if Node.IsEntry then
+    begin
+      //set enabled state now - ActionList1Update may not have run for the freshly selected node yet.
+      actMoveEntryUp.Enabled := Node.getPrevSibling <> nil;
+      actMoveEntryDown.Enabled := Node.getNextSibling <> nil;
+
+      if tvTemplates.PopupMenu.Items.Count > 0 then
+      begin
+        item := TMenuItem.Create(PopupMenu);
+        item.Caption := '-';
+        tvTemplates.PopupMenu.Items.Add(item);
+      end;
+
+      item := TMenuItem.Create(PopupMenu);
+      item.Action := actMoveEntryUp;
+      tvTemplates.PopupMenu.Items.Add(item);
+
+      item := TMenuItem.Create(PopupMenu);
+      item.Action := actMoveEntryDown;
       tvTemplates.PopupMenu.Items.Add(item);
     end;
 
