@@ -911,7 +911,10 @@ begin
         if platform <> TDPMPlatform.UnknownPlatform then
           FPlatforms := FPlatforms + [platform]
         else
-          result := false;
+          //a platform DPM does not recognise (eg a newer IDE platform than this build knows about)
+          //is not a fatal error - we just cannot do anything with it, so warn and skip it rather
+          //than failing the whole project load and forcing callers into a misleading fallback.
+          FLogger.Warning('Project [' + FFileName + '] targets platform [' + sValue + '] which DPM does not support - ignoring it.');
       end;
     end;
   end;

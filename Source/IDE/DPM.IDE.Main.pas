@@ -49,7 +49,9 @@ uses
   System.Rtti,
   System.Win.Registry,
   Vcl.Graphics,
+  Vcl.Forms,
   DPM.Core.Utils.System,
+  DPM.Core.Utils.Process,
   DPM.IDE.Constants;
 
 var
@@ -191,9 +193,19 @@ end;
 //
 //end;
 
+//Installed as DPM.Core.Utils.Process.ProcessMessagePump so TProcess keeps the IDE responsive
+//while it blocks on the main thread waiting for a package compile to finish. In the CLI the
+//hook is never installed, so TProcess does a plain blocking wait.
+procedure DPMPumpMessages;
+begin
+  if Application <> nil then
+    Application.ProcessMessages;
+end;
+
 function CreateWizard(const BorlandIDEServices : IBorlandIDEServices) : IOTAWizard;
 begin
   TSystemUtils.SetIsIDE; //so the core knows it's running in the IDE plugin. needed for design compile
+  ProcessMessagePump := DPMPumpMessages; //keep the IDE message loop alive during package compiles
   try
     result := TDPMWizard.Create;
     SplashImage := Vcl.Graphics.TBitmap.Create;
@@ -219,6 +231,7 @@ procedure TerminateWizard;
 var
   Services : IOTAWizardServices;
 begin
+  ProcessMessagePump := nil; //the IDE is going away - stop TProcess pumping a dying message loop
   Services := BorlandIDEServices as IOTAWizardServices;
   Services.RemoveWizard(wizardIdx);
 end;

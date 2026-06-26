@@ -857,8 +857,10 @@ begin
     <Platform value="Win64">True</Platform>
   }
 
+  //chain the replacements - each must operate on the result of the previous one, otherwise the
+  //second StringReplace discards the first (eg 'OSX64' would never become 'MacOS64').
   sValue := StringReplace(value, 'OSX', 'MacOS', [rfIgnoreCase]);
-  sValue := StringReplace(value, 'iOSDevice', 'iOS', [rfIgnoreCase]);
+  sValue := StringReplace(sValue, 'iOSDevice', 'iOS', [rfIgnoreCase]);
   result := StringToDPMPlatform(sValue);
 end;
 

@@ -382,9 +382,15 @@ begin
   FTaskRunning := value;
   //Reflect immediately rather than waiting for the next ActionList idle update.
   btnClose.Enabled := not value;
-  //Task finished - force out any lines logged inside the last throttle window so the final
-  //output is visible immediately rather than waiting for the IDE loop to resume.
-  if not value then
+  if value then
+    //New task starting - reset the throttle so the very first log line of this task
+    //forces an immediate synchronous flush + pump (otherwise a stale running stopwatch
+    //left over from the previous task can throttle the first line out, leaving the
+    //freshly shown window blank until a later line falls outside the 10ms window).
+    FStopwatch.Reset
+  else
+    //Task finished - force out any lines logged inside the last throttle window so the final
+    //output is visible immediately rather than waiting for the IDE loop to resume.
     FLogMemo.Flush;
 end;
 

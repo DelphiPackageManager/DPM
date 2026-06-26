@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -60,6 +60,16 @@ type
   TEnvironmentBlockFactory = class
     class function Create(const AList : TStrings; const AReadCurrent : boolean = true) : IEnvironmentBlock;
   end;
+
+  TProcessMessagePumpProc = procedure;
+
+var
+  //Optional hook installed by a UI host (the IDE) so TProcess can keep the host's message
+  //loop alive while it is blocked waiting for a child process to exit (e.g. a multi-second
+  //package compile run on the main thread). When this is nil - as it is in the CLI / console,
+  //where there is no message loop to pump - TProcess does a plain blocking wait and never
+  //pumps. The host installs a proc that calls Application.ProcessMessages.
+  ProcessMessagePump : TProcessMessagePumpProc = nil;
 
 
 implementation
@@ -177,6 +187,54 @@ var
       result := GetLastError;
   end;
 
+  //Wait for the process to exit or the cancellation token to be signalled. When a UI host has
+  //installed ProcessMessagePump we pump its message loop while waiting so it stays responsive
+  //(repaints, and the Cancel button - which signals the cancellation token - keeps working)
+  //during a long compile. Otherwise (CLI) we do the original plain blocking wait. The return
+  //value uses the same WAIT_* codes as WaitForMultipleObjects so the case below is unchanged.
+  function DoWaitForProcess: Cardinal;
+  var
+    startTick : Cardinal;
+    elapsed : Cardinal;
+    remaining : Cardinal;
+    res : Cardinal;
+  begin
+    if not Assigned(ProcessMessagePump) then
+    begin
+      result := WaitForMultipleObjects(2, @objHandles, False, timeoutDuration);
+      exit;
+    end;
+
+    startTick := GetTickCount;
+    while True do
+    begin
+      if timeoutDuration = INFINITE then
+        remaining := INFINITE
+      else
+      begin
+        elapsed := GetTickCount - startTick; //Cardinal subtraction is wraparound-safe
+        if elapsed >= timeoutDuration then
+        begin
+          result := WAIT_TIMEOUT;
+          exit;
+        end;
+        remaining := timeoutDuration - elapsed;
+      end;
+
+      //nCount = 2, so the 'a message is waiting' wake is WAIT_OBJECT_0 + 2. With bWaitAll = False
+      //a signalled handle (index 0 = process exit, 1 = cancellation) is returned in preference to
+      //the message wake, so we always break out of the loop promptly once the process is done.
+      res := MsgWaitForMultipleObjects(2, objHandles[0], False, remaining, QS_ALLINPUT);
+      if res = WAIT_OBJECT_0 + 2 then
+        ProcessMessagePump //let the host drain its queue, then wait again
+      else
+      begin
+        result := res; //process exited, cancelled, timed out, or wait failed
+        exit;
+      end;
+    end;
+  end;
+
 begin
   FillChar(startupInfo, SizeOf(TStartupInfo), 0);
   FillChar(processInfo, SizeOf(TProcessInformation), 0);
@@ -218,7 +276,7 @@ begin
   objHandles[1] := cancellationToken.Handle;
 
   { Wait for Something interesting to happen }
-  waitRes := WaitForMultipleObjects(2, @objHandles, False, timeoutDuration);
+  waitRes := DoWaitForProcess;
 
  case waitRes of
     WAIT_OBJECT_0: // Process.hProcess has exited

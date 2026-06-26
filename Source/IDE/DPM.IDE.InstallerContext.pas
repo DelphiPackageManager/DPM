@@ -28,6 +28,14 @@ type
     BPLPath : string;   //lowercase
   end;
 
+  //carries full (original-case) load info through the differential update in InstallDesignPackages -
+  //LoadBPLIfNeeded needs the original-case path/folder/id, which TDPMProjectBPLRef does not retain.
+  TDPMDesignBPL = record
+    PackageId : string;
+    BPLPath : string;
+    BPLFolder : string;
+  end;
+
   TDPMProjectEnvVarRef = record
     PackageId : string; //lowercase
     Name : string;      //env var name as authored (PATH special-cased by the manager)
@@ -373,9 +381,14 @@ var
   lcProject : string;
   loadPlatform : TDPMPlatform;
   graph : IPackageReference;
-  projectRefs : IList<TDPMProjectBPLRef>;
+  oldRefs : IList<TDPMProjectBPLRef>;
+  newRefs : IList<TDPMProjectBPLRef>;
+  desired : IList<TDPMDesignBPL>;
+  desiredSet : IDictionary<string, integer>;
   projectEnvVars : IList<TDPMProjectEnvVarRef>;
   overallResult : boolean;
+  designBpl : TDPMDesignBPL;
+  i : integer;
 begin
   result := true;
   lcProject := LowerCase(projectFile);
@@ -394,20 +407,23 @@ begin
     exit;
   end;
 
-  //Restore semantics: release anything we were tracking for this project first so the rebuilt
-  //list reflects the new graph exactly. BPLs that are still required will be re-added below.
-  ReleaseProjectBPLs(lcProject);
+  //Differential update: rather than unload everything and reload (which needlessly cycles every
+  //design BPL on every install/restore), resolve the desired BPL set from the new graph, then
+  //unload only the orphans and load only the genuinely new ones. BPLs in both old and new sets are
+  //left untouched - LoadBPLIfNeeded is already idempotent for those, and we never release them.
+
+  //Env vars are cheap to re-apply and not the source of the churn - keep the simple rebuild here.
   ReleaseProjectEnvVars(lcProject);
-
-  projectRefs := TCollections.CreateList<TDPMProjectBPLRef>;
-  FProjectBPLs[lcProject] := projectRefs;
-
   projectEnvVars := TCollections.CreateList<TDPMProjectEnvVarRef>;
   FProjectEnvVars[lcProject] := projectEnvVars;
 
+  desired := TCollections.CreateList<TDPMDesignBPL>;
+  desiredSet := TCollections.CreateDictionary<string, integer>;
+  newRefs := TCollections.CreateList<TDPMProjectBPLRef>;
   overallResult := true;
 
-  //Load order: VisitDFS is post-order (children before parent), spec order within a package.
+  //Resolve phase: walk the graph (post-order DFS - children before parent, spec order within a
+  //package) and collect the desired BPLs in load order without touching the IDE yet.
   graph.VisitDFS(
     procedure(const node : IPackageReference)
     var
@@ -416,6 +432,7 @@ begin
       designEntry : ISpecDesignEntry;
       bplPath : string;
       bplFolder : string;
+      entry : TDPMDesignBPL;
       ref : TDPMProjectBPLRef;
     begin
       if cancellationToken.IsCancelled then
@@ -433,18 +450,45 @@ begin
         if not ResolveDesignBPLPath(node, designEntry, loadPlatform, bplPath, bplFolder) then
           continue;
 
-        if not LoadBPLIfNeeded(bplPath, bplFolder, node.Id, lcProject) then
-          overallResult := false;
+        entry.PackageId := node.Id;
+        entry.BPLPath := bplPath;
+        entry.BPLFolder := bplFolder;
+        desired.Add(entry);
+        desiredSet[LowerCase(bplPath)] := 1;
 
         ref.PackageId := LowerCase(node.Id);
         ref.BPLPath := LowerCase(bplPath);
-        projectRefs.Add(ref);
+        newRefs.Add(ref);
       end;
 
       //Apply any IDE environment variables this package declares - independent of whether it has a
       //design BPL, so a runtime-only package can still expose e.g. a path to its bundled DLLs.
       ApplyEnvironmentVariables(node, template, lcProject, projectEnvVars);
     end);
+
+  if cancellationToken.IsCancelled then
+    exit(false);
+
+  //Unload-orphans phase: release BPLs we were tracking for this project that are no longer wanted.
+  //Reverse order (dependants before dependencies) matches ReleaseProjectBPLs. Done before loading
+  //so an upgraded package's old/new same-filename BPL don't collide in the IDE.
+  if FProjectBPLs.TryGetValue(lcProject, oldRefs) then
+  begin
+    for i := oldRefs.Count - 1 downto 0 do
+      if not desiredSet.ContainsKey(oldRefs[i].BPLPath) then
+        ReleaseBPLRef(oldRefs[i].BPLPath, lcProject);
+  end;
+
+  //Load-new phase: forward (post-order DFS) order. Already-loaded BPLs are no-ops in LoadBPLIfNeeded.
+  for designBpl in desired do
+  begin
+    if cancellationToken.IsCancelled then
+      exit(false);
+    if not LoadBPLIfNeeded(designBpl.BPLPath, designBpl.BPLFolder, designBpl.PackageId, lcProject) then
+      overallResult := false;
+  end;
+
+  FProjectBPLs[lcProject] := newRefs;
 
   result := overallResult and not cancellationToken.IsCancelled;
 end;

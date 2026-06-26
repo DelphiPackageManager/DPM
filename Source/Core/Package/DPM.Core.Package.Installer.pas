@@ -350,6 +350,7 @@ var
   sortedIds: IList<string>;
   id: string;
   isGitSource: boolean;
+  addedLibPath: boolean;
 
   procedure AddUnique(const path: string);
   begin
@@ -526,17 +527,30 @@ begin
     //folder - robust even when SourceName is not carried on the resolved-graph package.
     isGitSource := FileExists(IncludeTrailingPathDelimiter(FPackageCache.GetPackagePath(packageInfo)) + cGitPackageMarkerFile);
 
-    //If the package has build entries (compiled), point at the per-platform lib folder.
-    //Otherwise it's a source-only package - add each source entry's folder so the
-    //consumer can compile against the .pas files directly.
-    if (template.BuildEntries.Count > 0) and (not packageInfo.UseSource) and compiledPackages.Contains(packageInfo) then
+    //A compiled package contributes its per-platform lib folder (dcu/dcp). This covers packages with
+    //build entries AND design-only packages (no build entry - e.g. a combined runtime+design package
+    //like VSoft.Internal.Win7Components) - both produce output under lib\{platform}. Without the
+    //design-entry case such packages fell through to the source branch and, having no source entries,
+    //contributed nothing to the search path. Source consumption (UseSource) is handled by the source
+    //branch below so the consumer compiles the .pas directly.
+    addedLibPath := false;
+    if ((template.BuildEntries.Count > 0) or (template.DesignEntries.Count > 0)) and (not packageInfo.UseSource) and compiledPackages.Contains(packageInfo) then
     begin
       //Win64/Win64x binaries are interchangeable - point at whichever the package actually built
       //to (e.g. a Win64-only package consumed by a Win64x project resolves to lib\Win64).
       platformLibPath := 'lib' + PathDelim + DPMPlatformToBDString(ResolveCompatiblePlatform(platform, packageSpec.TargetPlatform.Platforms));
-      AddUnique(packageBasePath + platformLibPath);
-    end
-    else
+      //design-only packages are only compiled for the IDE host platform(s), so the lib folder may not
+      //exist for every declared target platform - only add it when it actually exists on disk.
+      if DirectoryExists(IncludeTrailingPathDelimiter(FPackageCache.GetPackagePath(packageInfo)) + platformLibPath) then
+      begin
+        AddUnique(packageBasePath + platformLibPath);
+        addedLibPath := true;
+      end;
+    end;
+
+    //Fall back to source entries when no binary lib path was added - source-only / UseSource packages,
+    //or a platform the package wasn't compiled for.
+    if not addedLibPath then
     begin
       for sourceEntry in template.SourceEntries do
       begin
@@ -805,11 +819,18 @@ begin
     else
     begin
       //defer to the design dproj - FConfig is only used by AddPackageReference which we don't call.
+      //we only need the platform list, so only load that element - loading everything would let an
+      //unrelated element (AppType, package refs, etc) fail the inspection and force the fallback.
       designProjectEditor := TProjectEditor.Create(FLogger, nil, Compiler.compilerVersion);
-      if designProjectEditor.LoadProject(projectFile) then
-        candidates := designProjectEditor.Platforms
+      if designProjectEditor.LoadProject(projectFile, [TProjectElement.Platforms]) then
+      begin
+        candidates := designProjectEditor.Platforms;
+        if candidates = [] then
+          FLogger.Warning('Design project [' + designEntry.Project + '] declares no platforms DPM supports - no design package will be built.');
+      end
       else
       begin
+        //LoadProject already logged the specific reason (eg file missing or invalid xml).
         FLogger.Warning('Could not inspect design project [' + designEntry.Project + '] - defaulting to Win32 only.');
         candidates := [TDPMPlatform.Win32];
       end;
