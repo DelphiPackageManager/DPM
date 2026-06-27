@@ -59,7 +59,7 @@ type
     procedure ReleaseProjectBPLs(const lcProject : string);
     procedure ApplyEnvironmentVariables(const node : IPackageReference; const template : ISpecTemplate; const lcProject : string; const projectEnvVars : IList<TDPMProjectEnvVarRef>);
     procedure ReleaseProjectEnvVars(const lcProject : string);
-    function IsAlreadyLoadedByIDE(const bplPath : string) : boolean;
+    function FindLoadedBPL(const bplPath : string; out exactPath : boolean) : boolean;
   protected
     procedure Clear; override;
     procedure RemoveProject(const projectFile : string); override;
@@ -188,32 +188,38 @@ begin
   FLogger.Warning('Multiple candidate design BPLs for [' + node.Id + '] in [' + bplFolder + '] : ' + candidates + ' - set LibPrefix/LibSuffix on the design entry to disambiguate.');
 end;
 
-function TDPMIDEPackageInstallerContext.IsAlreadyLoadedByIDE(const bplPath : string) : boolean;
+//returns true if a loaded package shares this BPL's filename.
+//exactPath is set true only when the full path matches (ie it is our cache BPL).
+//Uses IOTAPackageInfo.FileName (the real on-disk path) rather than PackageNames (descriptions)
+//so we can distinguish our cache BPL from a foreign package that happens to share a filename.
+function TDPMIDEPackageInstallerContext.FindLoadedBPL(const bplPath : string; out exactPath : boolean) : boolean;
 var
   svc : IOTAPackageServices;
+  info : IOTAPackageInfo;
+  targetName : string;
+  nameMatch : boolean;
   i : integer;
-  loadedName : string;
-  lcBpl : string;
 begin
   result := false;
+  exactPath := false;
+  nameMatch := false;
   if not Supports(BorlandIDEServices, IOTAPackageServices, svc) then
     exit;
-  lcBpl := LowerCase(bplPath);
+  targetName := ExtractFileName(bplPath);
   for i := 0 to svc.PackageCount - 1 do
   begin
-    loadedName := svc.PackageNames[i];
-    if SameText(loadedName, bplPath) or SameText(ExtractFileName(loadedName), ExtractFileName(bplPath)) then
+    info := svc.Package[i];
+    if (info = nil) or (info.FileName = '') then
+      continue;
+    if SameText(info.FileName, bplPath) then
     begin
-      result := true;
-      exit;
+      exactPath := true;
+      exit(true);
     end;
-    //some Delphi versions return the package name rather than the filename - best-effort compare.
-    if Pos(LowerCase(ExtractFileName(bplPath)), LowerCase(loadedName)) > 0 then
-    begin
-      result := true;
-      exit;
-    end;
+    if SameText(ExtractFileName(info.FileName), targetName) then
+      nameMatch := true;
   end;
+  result := nameMatch;
 end;
 
 function TDPMIDEPackageInstallerContext.LoadBPLIfNeeded(const bplPath : string; const bplFolder : string; const packageId : string; const lcProject : string) : boolean;
@@ -221,6 +227,7 @@ var
   lcBpl : string;
   loaded : TDPMLoadedBPL;
   installOk : boolean;
+  exactPath : boolean;
 begin
   result := true;
   lcBpl := LowerCase(bplPath);
@@ -233,9 +240,26 @@ begin
     exit;
   end;
 
-  if IsAlreadyLoadedByIDE(bplPath) then
+  if FindLoadedBPL(bplPath, exactPath) then
   begin
-    FLogger.Information('Design BPL [' + ExtractFileName(bplPath) + '] already loaded by the IDE - not tracking.');
+    if exactPath then
+    begin
+      //The IDE auto-loaded our cache BPL (persisted in Known Packages and loaded at startup).
+      //Adopt it so we control its lifetime and unload it on project-group close. Do NOT call
+      //InstallPackage - it is already loaded. EnsurePath so its dependent DLLs still resolve,
+      //mirroring the normal load path (ReleaseBPLRef will RemovePath on unload).
+      FPathManager.EnsurePath(bplFolder);
+      loaded.PackageId := packageId;
+      loaded.BPLPath := bplPath;
+      loaded.BPLFolder := bplFolder;
+      loaded.Referencers := TCollections.CreateList<string>;
+      loaded.Referencers.Add(lcProject);
+      FLoadedBPLs[lcBpl] := loaded;
+      FLogger.Information('Design BPL [' + ExtractFileName(bplPath) + '] already loaded by the IDE - taking ownership for tracking.');
+      exit;
+    end;
+    //Same filename, different location: a foreign (non-DPM) package. Leave it alone.
+    FLogger.Warning('Design BPL [' + ExtractFileName(bplPath) + '] is already loaded by the IDE from another location - not tracking to avoid a conflict.');
     exit;
   end;
 
