@@ -905,6 +905,17 @@ begin
     FCacheLock.Leave;
   end;
 
+  // 4) drop the per-user TOFU trust state for this package id. The trust state
+  // is keyed by id only (not version/compiler), so removing a cached package
+  // resets author/repository ratchets for the id. Without this, repacking and
+  // re-testing the same id with a freshly built (differently signed) .dpkg
+  // would trip the author-downgrade / repository ratchet and fail the install.
+  if FTrustState <> nil then
+  begin
+    FTrustState.RemoveAuthor(packageId.Id);
+    FTrustState.RemoveRepository(packageId.Id);
+  end;
+
   result := removedAnything;
 end;
 

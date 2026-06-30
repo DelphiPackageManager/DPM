@@ -144,8 +144,12 @@ type
     /// <summary>
     ///  Removes a single cached id-compiler-version: deletes its extracted
     ///  folder and the matching .dpkg + .sha256 sidecar so the next install
-    ///  re-downloads, and drops the in-memory memo entry. Returns true if
-    ///  anything was deleted.
+    ///  re-downloads, and drops the in-memory memo entry. Also drops the
+    ///  per-user TOFU trust state (author + repository ratchets) for the id -
+    ///  trust state is keyed by id only, so removing the cached package resets
+    ///  it, otherwise repacking/re-testing a differently signed build of the
+    ///  same id would trip the ratchet and fail. Returns true if anything was
+    ///  deleted.
     /// </summary>
     function RemovePackage(const packageId : IPackageIdentity) : boolean;
 
