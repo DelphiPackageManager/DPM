@@ -464,14 +464,21 @@ var
   key : string;
 begin
   //Used only for environmentVariables values. Behaves like TokenMatchEvaluator but additionally
-  //preserves the install-time $packageDir$ token (left intact in the manifest for the IDE installer
-  //to resolve to the package's cache folder on the consumer machine). $packageDir$ is meaningful
-  //ONLY in environment variable values - everywhere else it is an unknown token.
+  //preserves two install-time tokens, left intact in the manifest for the IDE installer to resolve
+  //on the consumer machine:
+  //  $packageDir$ - the package's cache folder.
+  //  $platform$   - the IDE host platform (Win32/Win64). NOT expanded to the build platform here,
+  //                 since the value takes effect in the IDE process, whose bitness is unknown at
+  //                 pack time. (Note 'platform' is deliberately not a pack-time variable - see
+  //                 PopulateVariables - so without this it would raise 'Unknown token'.)
+  //Both are meaningful ONLY in environment variable values - everywhere else they are unknown tokens.
   if match.Success and (match.Groups.Count = 2) then
   begin
     key := LowerCase(match.Groups.Item[1].Value);
     if key = 'packagedir' then
       result := '$packageDir$'
+    else if key = 'platform' then
+      result := '$platform$'
     else if FVariables.ContainsKey(key) then
       result := FVariables[key]
     else

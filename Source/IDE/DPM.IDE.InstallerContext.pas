@@ -365,6 +365,7 @@ end;
 procedure TDPMIDEPackageInstallerContext.ApplyEnvironmentVariables(const node : IPackageReference; const template : ISpecTemplate; const lcProject : string; const projectEnvVars : IList<TDPMProjectEnvVarRef>);
 var
   packagePath : string;
+  platformFolder : string;
   keys : TArray<string>;
   i : integer;
   resolvedValue : string;
@@ -372,13 +373,24 @@ var
 begin
   if template.EnvironmentVariables.Count = 0 then
     exit;
-  //$packageDir$ is the only deferred token - resolve it to this package's cache folder so values can
-  //point at files shipped inside the package. Everything else was expanded at pack time.
+  //Two deferred tokens are resolved here:
+  // $packageDir$ - this package's cache folder, so values can point at files shipped in the package.
+  // $platform$   - the IDE *host* platform (Win32 for the classic IDE, Win64 for bds64), since env
+  //                vars take effect in the IDE process - eg a native DLL loaded by a design component
+  //                must match the IDE's bitness, not the project's target platform. Uses the same
+  //                Is64BitIDE load decision as the design BPL selection above, and the same BD folder
+  //                name the installer writes platform sub-folders with.
+  //Everything else was expanded at pack time.
   packagePath := ExcludeTrailingPathDelimiter(FPackageCache.GetPackagePath(node));
+  if TSystemUtils.Is64BitIDE then
+    platformFolder := DPMPlatformToBDString(TDPMPlatform.Win64)
+  else
+    platformFolder := DPMPlatformToBDString(TDPMPlatform.Win32);
   keys := template.EnvironmentVariables.Keys.ToArray;
   for i := 0 to High(keys) do
   begin
     resolvedValue := StringReplace(template.EnvironmentVariables[keys[i]], '$packageDir$', packagePath, [rfReplaceAll, rfIgnoreCase]);
+    resolvedValue := StringReplace(resolvedValue, '$platform$', platformFolder, [rfReplaceAll, rfIgnoreCase]);
     FEnvVarManager.SetVariable(keys[i], resolvedValue, lcProject, node.Id);
     ref.PackageId := LowerCase(node.Id);
     ref.Name := keys[i];

@@ -365,7 +365,9 @@ type
     property PrecompiledBinaries : IList<string> read GetPrecompiledBinaries;
     /// <summary> IDE environment variables to set (in the IDE process) while this package's design
     /// components are loaded, and clear/restore when unloaded. Key = variable name (PATH is
-    /// special-cased as append-only); value may use the install-time $packageDir$ token. </summary>
+    /// special-cased as append-only); value may use the install-time tokens $packageDir$ (this
+    /// package's cache folder) and $platform$ (the IDE host platform - Win32 for the classic IDE,
+    /// Win64 for bds64 - so a value can point at the DLL variant matching the IDE's bitness). </summary>
     property EnvironmentVariables : IVariables read GetEnvironmentVariables;
 
     property SourceComments : TStrings read GetSourceComments;
