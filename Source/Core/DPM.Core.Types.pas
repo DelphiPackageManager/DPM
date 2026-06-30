@@ -639,16 +639,16 @@ begin
 
     // https://docwiki.embarcadero.com/RADStudio/Alexandria/en/Supported_Target_Platforms
     TCompilerVersion.Delphi11_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.MacOS64, TDPMPlatform.MacOSARM64, TDPMPlatform.iOS64,
-                                         TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
+                                         TDPMPlatform.iOSSimARM64, TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
 
     // https://docwiki.embarcadero.com/RADStudio/Athens/en/Supported_Target_Platforms
     //Win64x ("Windows 64-bit (Modern)") arrived in the 12.x line (12.1); the registry/enum can't
     //distinguish 12.0 from 12.1, so 12.x as a whole reports it.
     TCompilerVersion.Delphi12_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.Win64x, TDPMPlatform.MacOSARM64, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
-                                         TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
+                                         TDPMPlatform.iOSSimARM64, TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
 
     TCompilerVersion.Delphi13_0 : result := [TDPMPlatform.Win32, TDPMPlatform.Win64, TDPMPlatform.Win64x, TDPMPlatform.WinARM64EC, TDPMPlatform.MacOSARM64, TDPMPlatform.MacOS64, TDPMPlatform.iOS64,
-                                         TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
+                                         TDPMPlatform.iOSSimARM64, TDPMPlatform.Android, TDPMPlatform.Android64, TDPMPlatform.Linux64];
   else
     raise Exception.Create('AllPlatforms is missing for : ' + CompilerToString(compiler));
   end;

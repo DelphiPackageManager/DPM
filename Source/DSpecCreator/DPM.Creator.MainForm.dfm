@@ -26,12 +26,10 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Top = 0
     Width = 886
     Height = 568
-    ActivePage = tsInfo
+    ActivePage = tsTemplates
     Align = alClient
     TabOrder = 0
     OnChange = PageControlChange
-    ExplicitWidth = 871
-    ExplicitHeight = 558
     object tsInfo: TTabSheet
       Caption = 'Package Info'
       DesignSize = (
@@ -346,8 +344,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           'Variable Name'
           'Value')
         OnStringsChange = PackageVariablesListStringsChange
-        ExplicitWidth = 372
-        ExplicitHeight = 341
         ColWidths = (
           150
           231)
@@ -443,6 +439,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           'iOS32'
           'iOS64'
           'iOSSimulator'
+          'iOSSimARM64'
           'Linux64')
         ParentDoubleBuffered = False
         PopupMenu = pmPlatforms
@@ -488,8 +485,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         ActiveCard = crdCopyLocal
         Caption = 'CardPanel'
         TabOrder = 0
-        ExplicitWidth = 529
-        ExplicitHeight = 528
         object crdSource: TCard
           Left = 1
           Top = 1
@@ -498,8 +493,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Source'
           CardIndex = 0
           TabOrder = 0
-          ExplicitWidth = 527
-          ExplicitHeight = 526
           DesignSize = (
             542
             536)
@@ -549,7 +542,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             ShowHint = True
             TabOrder = 0
             OnChange = edtFileEntrySourceChange
-            ExplicitWidth = 365
           end
           object chkFileEntryCopyToLib: TCheckBox
             Left = 16
@@ -574,7 +566,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             TabOrder = 1
             TextHint = 'Leave blank to use same relative path as source'
             OnChange = edtFileEntryDestChange
-            ExplicitWidth = 365
           end
           object lbFileEntryExclude: TListBox
             Left = 16
@@ -585,7 +576,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             ItemHeight = 15
             TabOrder = 2
             OnDblClick = lbFileEntryExcludeDblClick
-            ExplicitWidth = 365
           end
           object btnAddExclude: TButton
             Left = 16
@@ -632,8 +622,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Build Item'
           CardIndex = 1
           TabOrder = 1
-          ExplicitWidth = 527
-          ExplicitHeight = 526
           DesignSize = (
             542
             536)
@@ -682,7 +670,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             ShowHint = True
             TabOrder = 0
             OnChange = edtProjectChange
-            ExplicitWidth = 495
           end
           object edtBuildDefines: TEdit
             Left = 16
@@ -692,7 +679,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Anchors = [akLeft, akTop, akRight]
             TabOrder = 1
             OnChange = edtBuildDefinesChange
-            ExplicitWidth = 495
           end
           object clbBuildPlatforms: TCheckListBox
             Left = 16
@@ -712,6 +698,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
               'iOS32'
               'iOS64'
               'iOSSimulator'
+              'iOSSimARM64'
               'Linux64')
             TabOrder = 2
             OnClickCheck = clbBuildPlatformsClickCheck
@@ -751,8 +738,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Design Item'
           CardIndex = 2
           TabOrder = 2
-          ExplicitWidth = 527
-          ExplicitHeight = 526
           DesignSize = (
             542
             536)
@@ -822,7 +807,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             ShowHint = True
             TabOrder = 0
             OnChange = edtDesignProjectChange
-            ExplicitWidth = 495
           end
           object edtDesignDefines: TEdit
             Left = 16
@@ -832,7 +816,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Anchors = [akLeft, akTop, akRight]
             TabOrder = 1
             OnChange = edtDesignDefinesChange
-            ExplicitWidth = 495
           end
           object clbDesignPlatforms: TCheckListBox
             Left = 16
@@ -852,6 +835,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
               'iOS32'
               'iOS64'
               'iOSSimulator'
+              'iOSSimARM64'
               'Linux64')
             TabOrder = 2
             OnClickCheck = clbDesignPlatformsClickCheck
@@ -915,8 +899,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Dependency'
           CardIndex = 3
           TabOrder = 3
-          ExplicitWidth = 527
-          ExplicitHeight = 526
           DesignSize = (
             542
             536)
@@ -942,7 +924,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Anchors = [akLeft, akTop, akRight]
             TabOrder = 0
             OnChange = edtDependencyIdChange
-            ExplicitWidth = 405
           end
           object edtDependencyVersion: TEdit
             Left = 16
@@ -954,7 +935,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             ShowHint = True
             TabOrder = 1
             OnChange = edtDependencyVersionChange
-            ExplicitWidth = 405
           end
         end
         object crdTemplate: TCard
@@ -965,8 +945,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Templates'
           CardIndex = 4
           TabOrder = 4
-          ExplicitWidth = 527
-          ExplicitHeight = 526
           object lblTemplateName: TLabel
             Left = 16
             Top = 40
@@ -998,8 +976,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Build Items Heading'
           CardIndex = 5
           TabOrder = 5
-          ExplicitWidth = 527
-          ExplicitHeight = 526
           object lblBuildHeading: TLabel
             Left = 8
             Top = 8
@@ -1028,8 +1004,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Source Items Heading'
           CardIndex = 6
           TabOrder = 6
-          ExplicitWidth = 527
-          ExplicitHeight = 526
           object lblSourceItemsHeading: TLabel
             Left = 8
             Top = 8
@@ -1056,8 +1030,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Dependencies '
           CardIndex = 7
           TabOrder = 7
-          ExplicitWidth = 527
-          ExplicitHeight = 526
           object Label6: TLabel
             Left = 8
             Top = 8
@@ -1086,8 +1058,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Design Heading'
           CardIndex = 8
           TabOrder = 8
-          ExplicitWidth = 527
-          ExplicitHeight = 526
           object lblDesignHeading: TLabel
             Left = 8
             Top = 8
@@ -1116,8 +1086,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Package Definitions'
           CardIndex = 9
           TabOrder = 9
-          ExplicitWidth = 527
-          ExplicitHeight = 526
           object lblPackageDefsHeading: TLabel
             Left = 24
             Top = 24
@@ -1149,8 +1117,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Package Definition'
           CardIndex = 10
           TabOrder = 10
-          ExplicitWidth = 527
-          ExplicitHeight = 526
           DesignSize = (
             542
             536)
@@ -1213,7 +1179,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             ShowHint = True
             TabOrder = 0
             OnChange = edtPackageDefProjectChange
-            ExplicitWidth = 495
           end
           object cboPackageDefKind: TComboBox
             Left = 16
@@ -1245,6 +1210,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
               'iOS32'
               'iOS64'
               'iOSSimulator'
+              'iOSSimARM64'
               'Linux64')
             TabOrder = 2
             OnClickCheck = clbPackageDefPlatformsClickCheck
@@ -1257,7 +1223,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Anchors = [akLeft, akTop, akRight]
             ItemHeight = 15
             TabOrder = 3
-            ExplicitWidth = 240
           end
           object btnAddPackageDefFile: TButton
             Left = 271
@@ -1311,7 +1276,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Anchors = [akLeft, akTop, akRight]
             ItemHeight = 15
             TabOrder = 9
-            ExplicitWidth = 240
           end
           object btnAddPackageDefRequire: TButton
             Left = 271
@@ -1340,8 +1304,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Environment Variables'
           CardIndex = 11
           TabOrder = 11
-          ExplicitWidth = 527
-          ExplicitHeight = 526
           DesignSize = (
             542
             536)
@@ -1380,8 +1342,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
               'Variable Name'
               'Value')
             OnStringsChange = envVariablesListStringsChange
-            ExplicitWidth = 511
-            ExplicitHeight = 419
             ColWidths = (
               150
               355)
@@ -1395,8 +1355,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Copy Local'
           CardIndex = 12
           TabOrder = 12
-          ExplicitWidth = 527
-          ExplicitHeight = 526
           DesignSize = (
             542
             536)
@@ -1432,13 +1390,12 @@ object DSpecCreatorForm: TDSpecCreatorForm
             TabOrder = 0
             TextHint = 'e.g. bin\$platform$\*.dll'
             OnChange = edtCopyLocalSrcChange
-            ExplicitWidth = 495
           end
           object clbCopyLocalPlatforms: TCheckListBox
             Left = 16
             Top = 113
             Width = 240
-            Height = 160
+            Height = 256
             ItemHeight = 17
             Items.Strings = (
               'Win32'
@@ -1452,6 +1409,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
               'iOS32'
               'iOS64'
               'iOSSimulator'
+              'iOSSimARM64'
               'Linux64')
             TabOrder = 1
             OnClickCheck = clbCopyLocalPlatformsClickCheck
@@ -1465,8 +1423,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Copy Local'
           CardIndex = 13
           TabOrder = 13
-          ExplicitWidth = 527
-          ExplicitHeight = 526
           DesignSize = (
             542
             536)
@@ -1504,7 +1460,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Caption = 'Panel2'
         ShowCaption = False
         TabOrder = 1
-        ExplicitHeight = 528
         DesignSize = (
           330
           538)
@@ -1548,7 +1503,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           OnCreateNodeClass = tvTemplatesCreateNodeClass
           OnEdited = tvTemplatesEdited
           OnEditing = tvTemplatesEditing
-          ExplicitHeight = 439
         end
         object btnAddTemplate: TButton
           Left = 3
@@ -1559,7 +1513,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Add Template'
           TabOrder = 1
           OnClick = btnAddTemplateClick
-          ExplicitTop = 490
         end
         object btnDeleteTemplate: TButton
           Left = 95
@@ -1569,7 +1522,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Action = actDeleteTemplate
           Anchors = [akLeft, akBottom]
           TabOrder = 2
-          ExplicitTop = 490
         end
         object btnDuplicateTemplate: TButton
           Left = 200
@@ -1579,7 +1531,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Action = actDuplicateTemplate
           Anchors = [akLeft, akBottom]
           TabOrder = 3
-          ExplicitTop = 490
         end
       end
     end
@@ -1596,8 +1547,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         BevelOuter = bvNone
         ShowCaption = False
         TabOrder = 0
-        ExplicitWidth = 863
-        ExplicitHeight = 495
         object Label8: TLabel
           Left = 16
           Top = 6
@@ -1941,7 +1890,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         BevelOuter = bvNone
         ShowCaption = False
         TabOrder = 1
-        ExplicitWidth = 863
         object chkEnableSigning: TCheckBox
           Left = 16
           Top = 8
@@ -1986,8 +1934,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Value = 83.333333333333330000
           end>
         TabOrder = 0
-        ExplicitWidth = 863
-        ExplicitHeight = 528
         object Panel1: TPanel
           Left = 1
           Top = 1
@@ -1995,8 +1941,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Height = 89
           Align = alClient
           TabOrder = 0
-          ExplicitWidth = 861
-          ExplicitHeight = 88
           object Label2: TLabel
             Left = 136
             Top = 24
@@ -2043,9 +1987,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           ReadOnly = True
           ScrollBars = ssBoth
           TabOrder = 1
-          ExplicitTop = 89
-          ExplicitWidth = 861
-          ExplicitHeight = 438
         end
       end
     end
@@ -2059,7 +2000,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Height = 200
         Align = alTop
         TabOrder = 0
-        ExplicitWidth = 863
         DesignSize = (
           878
           200)
@@ -2135,8 +2075,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         ReadOnly = True
         ScrollBars = ssBoth
         TabOrder = 1
-        ExplicitWidth = 863
-        ExplicitHeight = 328
       end
     end
     object tsUpload: TTabSheet
@@ -2151,7 +2089,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         BevelOuter = bvNone
         ShowCaption = False
         TabOrder = 0
-        ExplicitWidth = 863
         object lblUploadSource: TLabel
           Left = 16
           Top = 10
@@ -2268,8 +2205,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         ReadOnly = True
         ScrollBars = ssBoth
         TabOrder = 1
-        ExplicitWidth = 863
-        ExplicitHeight = 295
       end
     end
     object tsLogging: TTabSheet
@@ -2282,8 +2217,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Height = 538
         Align = alClient
         TabOrder = 0
-        ExplicitWidth = 863
-        ExplicitHeight = 528
       end
     end
   end
@@ -2293,9 +2226,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Width = 886
     Height = 19
     Panels = <>
-    ExplicitLeft = 640
-    ExplicitTop = -24
-    ExplicitWidth = 0
   end
   object MainMenu: TMainMenu
     Left = 444
