@@ -76,6 +76,7 @@ implementation
 uses
   System.DateUtils,
   System.IOUtils,
+  System.Generics.Defaults,
   DPM.Core.Utils.DateTime;
 
 constructor TYamlTrustStateService.Create;
@@ -93,8 +94,15 @@ begin
   inherited Create;
   FFilePath := filePath;
   FLock := TCriticalSection.Create;
-  FEntries := TCollections.CreateDictionary<string, TAuthorTrustEntry>;
-  FRepoEntries := TCollections.CreateDictionary<string, TRepositoryTrustEntry>;
+  // Case-insensitive keys: package ids are treated case-insensitively everywhere
+  // else (TPackageCache.MakeCacheKey lowercases the id). The trust entry is
+  // recorded under the canonical id parsed from the .dpkg filename on install,
+  // but RemovePackage removes under the id the user typed on the command line.
+  // With an ordinal (case-sensitive) dictionary a casing difference makes the
+  // Remove silently no-op, so the package folders get deleted while the trust
+  // entry survives - tripping the author/repository ratchet on the next install.
+  FEntries := TCollections.CreateDictionary<string, TAuthorTrustEntry>(TIStringComparer.Ordinal);
+  FRepoEntries := TCollections.CreateDictionary<string, TRepositoryTrustEntry>(TIStringComparer.Ordinal);
 end;
 
 destructor TYamlTrustStateService.Destroy;
@@ -233,7 +241,7 @@ begin
   // Union of both keyspaces — a package id may have only repo state
   // (never seen an author signature) or only author state (no trusted
   // repo has yet signed it).
-  allKeys := TCollections.CreateDictionary<string, byte>;
+  allKeys := TCollections.CreateDictionary<string, byte>(TIStringComparer.Ordinal);
   for pair in FEntries do
     allKeys[pair.Key] := 0;
   for repoPair in FRepoEntries do
