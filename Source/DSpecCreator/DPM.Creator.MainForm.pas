@@ -3030,11 +3030,13 @@ begin
     if SaveDialog.Execute then
     begin
       SaveDspecStructure(SaveDialog.filename);
+      MRUListService.Add(SaveDialog.filename);
     end;
   end
   else
   begin
     SaveDspecStructure(FOpenFile.filename);
+    MRUListService.Add(FOpenFile.filename);
   end;
 end;
 
