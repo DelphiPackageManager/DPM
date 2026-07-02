@@ -37,6 +37,7 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
   Vcl.Themes,
   Vcl.StdCtrls,  Vcl.ExtCtrls,
+  Vcl.Menus,
   ToolsApi,
   Spring.Container,
   Spring.Collections,
@@ -145,6 +146,13 @@ type
     //as a fallback - project reloads can re-enter SetPackage(nil) and null FPackageMetaData while
     //the grid is still showing (and clickable for) this package.
     FProjectsGridPackageId : string;
+
+    //Single popup menu shown when a row's '...' button is clicked - rebuilt on each invocation
+    //(never one per row). The FMenu* fields carry the clicked row's context to the item handlers.
+    FPackageMenu : TPopupMenu;
+    FMenuProject : string;
+    FMenuUseSource : boolean;
+    FMenuCachePath : string;
   protected
     procedure AssignImages;
 
@@ -171,6 +179,9 @@ type
     procedure VersionGridOnUpgradeEvent(const project : string);
     procedure VersionGridOnDowngradeEvent(const project : string);
     procedure VersionGridOnUseSourceChanged(const project : string; const useSource : boolean);
+    procedure VersionGridOnShowPackageMenu(const project : string; const screenPos : TPoint);
+    procedure UseSourceMenuItemClick(Sender : TObject);
+    procedure ShowCacheLocationMenuItemClick(Sender : TObject);
 
     procedure DoUpdateVersions(const sReferenceVersion : string; const versions : IList<TPackageVersion>);
     procedure SigningLabelClick(Sender : TObject);
@@ -298,6 +309,7 @@ begin
   FUpgradeBmp.Free;
   FDowngradeBmp.Free;
   {$ENDIF}
+  FPackageMenu.Free;
 
   inherited;
 end;
@@ -550,6 +562,7 @@ begin
   FProjectsGrid.OnUpgradeEvent := Self.VersionGridOnUpgradeEvent;
   FProjectsGrid.OnDowngradeEvent := Self.VersionGridOnDowngradeEvent;
   FProjectsGrid.OnUseSourceChangedEvent := Self.VersionGridOnUseSourceChanged;
+  FProjectsGrid.OnShowPackageMenuEvent := Self.VersionGridOnShowPackageMenu;
   FProjectsGrid.Enabled := false;
   FProjectsGrid.Parent := pnlGridHost;
 
@@ -1377,6 +1390,87 @@ begin
 
   //Refresh only this grid's checkbox/version state - no package list reload.
   UpdateProjectPackageVersions(packageId);
+end;
+
+procedure TPackageDetailsFrame.VersionGridOnShowPackageMenu(const project : string; const screenPos : TPoint);
+var
+  packageId : string;
+  i : integer;
+  rowIndex : integer;
+  installedVersion : TPackageVersion;
+  hasSource : boolean;
+  menuItem : TMenuItem;
+begin
+  //resolve the package id the grid rows represent - same fallback as VersionGridOnUseSourceChanged.
+  if FPackageMetaData <> nil then
+    packageId := FPackageMetaData.Id
+  else
+    packageId := FProjectsGridPackageId;
+  if packageId = '' then
+  begin
+    FLogger.Error('Unable to determine which package the menu was for - ignoring.');
+    exit;
+  end;
+
+  //locate the grid row for this project so we can read its installed version / source state.
+  rowIndex := -1;
+  for i := 0 to FProjectsGrid.RowCount - 1 do
+  begin
+    if SameText(FProjectsGrid.ProjectName[i], project) then
+    begin
+      rowIndex := i;
+      break;
+    end;
+  end;
+  if rowIndex < 0 then
+    exit;
+
+  installedVersion := FProjectsGrid.ProjectVersion[rowIndex];
+  //the grid only fires this for an installed row, but guard anyway.
+  if installedVersion.IsEmpty then
+    exit;
+
+  hasSource := FProjectsGrid.ProjectHasSource[rowIndex];
+
+  //capture context for the item click handlers - the menu items have no per-invocation payload.
+  FMenuProject := project;
+  FMenuUseSource := FProjectsGrid.ProjectUseSource[rowIndex];
+  FMenuCachePath := FPackageCache.GetPackagePath(packageId, installedVersion.ToStringNoMeta, IDECompilerVersion);
+
+  //rebuild the single popup menu on demand (never one per row).
+  if Assigned(FPackageMenu) then
+    FreeAndNil(FPackageMenu);
+  FPackageMenu := TPopupMenu.Create(Self);
+  //paRight -> the menu's right edge aligns to the button's right edge (screenPos), dropping below it.
+  FPackageMenu.Alignment := paRight;
+
+  menuItem := TMenuItem.Create(FPackageMenu);
+  menuItem.Caption := 'Use Source';
+  menuItem.Checked := FMenuUseSource;
+  //row is installed; only offer the toggle when the package actually ships source.
+  menuItem.Enabled := hasSource;
+  menuItem.OnClick := UseSourceMenuItemClick;
+  FPackageMenu.Items.Add(menuItem);
+
+  menuItem := TMenuItem.Create(FPackageMenu);
+  menuItem.Caption := 'Show Cache Location';
+  //grey out when the package folder isn't actually present in the cache.
+  menuItem.Enabled := DirectoryExists(FMenuCachePath);
+  menuItem.OnClick := ShowCacheLocationMenuItemClick;
+  FPackageMenu.Items.Add(menuItem);
+
+  FPackageMenu.Popup(screenPos.X, screenPos.Y);
+end;
+
+procedure TPackageDetailsFrame.UseSourceMenuItemClick(Sender : TObject);
+begin
+  //toggle the current-session choice, reusing the full search-path refresh flow.
+  VersionGridOnUseSourceChanged(FMenuProject, not FMenuUseSource);
+end;
+
+procedure TPackageDetailsFrame.ShowCacheLocationMenuItemClick(Sender : TObject);
+begin
+  ShellExecute(Application.Handle, 'open', PChar(FMenuCachePath), nil, nil, SW_SHOWNORMAL);
 end;
 
 procedure TPackageDetailsFrame.DoUpdateVersions(const sReferenceVersion : string; const versions : IList<TPackageVersion>);
