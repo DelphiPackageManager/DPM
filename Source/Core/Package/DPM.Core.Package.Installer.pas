@@ -846,7 +846,7 @@ begin
     bomNode := TBOMFile.LoadFromFile(FLogger, bomFile);
     if (bomNode <> nil) and bomNode.AreEqual(packageReference) then
     begin
-      FLogger.Information('Package [' + packageInfo.Id + '] [' + DPMPlatformToString(effectivePlatform) + '] - dependencies unchanged, skipping compilation.');
+      FLogger.Verbose('Package [' + packageInfo.Id + '] [' + DPMPlatformToString(effectivePlatform) + '] - dependencies unchanged, skipping compilation.');
       exit;
     end;
   end;
