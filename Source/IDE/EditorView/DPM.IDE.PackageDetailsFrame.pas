@@ -141,6 +141,10 @@ type
     FVersionsCache : IDictionary<string, IList<TPackageVersion>>;
     FMetaDataCache : IDictionary<string, IPackageSearchResultItem>;
     FVersionsCacheUdate : TStopWatch;
+    //The package id the projects grid rows were last populated for. Used by the use-source toggle
+    //as a fallback - project reloads can re-enter SetPackage(nil) and null FPackageMetaData while
+    //the grid is still showing (and clickable for) this package.
+    FProjectsGridPackageId : string;
   protected
     procedure AssignImages;
 
@@ -166,6 +170,7 @@ type
     procedure VersionGridOnUnInstallEvent(const project : string);
     procedure VersionGridOnUpgradeEvent(const project : string);
     procedure VersionGridOnDowngradeEvent(const project : string);
+    procedure VersionGridOnUseSourceChanged(const project : string; const useSource : boolean);
 
     procedure DoUpdateVersions(const sReferenceVersion : string; const versions : IList<TPackageVersion>);
     procedure SigningLabelClick(Sender : TObject);
@@ -212,7 +217,8 @@ uses
   DPM.Core.Package.Classes,
   DPM.Core.Package.SearchResults,
   DPM.Core.Configuration.Classes,
-  DPM.Core.Dependency.Interfaces;
+  DPM.Core.Dependency.Interfaces,
+  DPM.IDE.ToolsAPI;
 { TGroupPackageDetailsFrame }
 
 procedure TPackageDetailsFrame.btnInstallAllClick(Sender: TObject);
@@ -430,7 +436,7 @@ begin
     if uninstallResult then
     begin
       FLogger.Information('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' uninstalled.');
-      FHost.PackageUninstalled(options.PackageId);
+      FHost.PackageUninstalled;
       UpdateProjectPackageVersions(options.PackageId);
 
       if FProjectsGrid.HasAnyInstalled then
@@ -543,6 +549,7 @@ begin
   FProjectsGrid.OnUnInstallEvent := Self.VersionGridOnUnInstallEvent;
   FProjectsGrid.OnUpgradeEvent := Self.VersionGridOnUpgradeEvent;
   FProjectsGrid.OnDowngradeEvent := Self.VersionGridOnDowngradeEvent;
+  FProjectsGrid.OnUseSourceChangedEvent := Self.VersionGridOnUseSourceChanged;
   FProjectsGrid.Enabled := false;
   FProjectsGrid.Parent := pnlGridHost;
 
@@ -692,10 +699,24 @@ var
   i : integer;
 begin
   FProjectsGrid.BeginUpdate;
-  FProjectsGrid.Clear;
-  for i := 0 to FProjectGroup.ProjectCount -1 do
-    FProjectsGrid.AddProject(FProjectGroup.Projects[i].FileName, '');
-  FProjectsGrid.EndUpdate;
+  try
+    FProjectsGrid.Clear;
+    for i := 0 to FProjectGroup.ProjectCount -1 do
+      FProjectsGrid.AddProject(FProjectGroup.Projects[i].FileName, '');
+  finally
+    FProjectsGrid.EndUpdate;
+  end;
+
+  //Clearing/re-adding the rows above drops each row's installed version, HasSource and UseSource.
+  //Repopulate them for the package currently shown so the "Use Source" checkbox keeps its correct
+  //state and stays enabled - otherwise a reload (e.g. after a search-path change, or on focus)
+  //leaves the checkbox disabled and the next click is ignored. FPackageMetaData may have been
+  //nulled by a re-entrant SetPackage during the reload - fall back to the id the grid was last
+  //populated for.
+  if FPackageMetaData <> nil then
+    UpdateProjectPackageVersions(FPackageMetaData.Id)
+  else if FProjectsGridPackageId <> '' then
+    UpdateProjectPackageVersions(FProjectsGridPackageId);
 end;
 
 procedure TPackageDetailsFrame.ProjectSelectionChanged(Sender: TObject);
@@ -711,6 +732,8 @@ var
   projectRefs : IPackageReference;
   projectRef : IPackageReference;
 begin
+  //remember which package the grid rows now represent - see FProjectsGridPackageId.
+  FProjectsGridPackageId := packageId;
   packageRefs := FHost.GetPackageReferences;
   FProjectsGrid.BeginUpdate;
   try
@@ -726,9 +749,19 @@ begin
       end;
 
       if projectRef <> nil then
-        FProjectsGrid.ProjectVersion[i] := projectRef.Version
+      begin
+        FProjectsGrid.ProjectVersion[i] := projectRef.Version;
+        //'use source' can only be offered for an installed package that actually ships source.
+        //HasSource is a cache check on the installed version; UseSource is the current-session choice.
+        FProjectsGrid.ProjectHasSource[i] := FPackageCache.HasSource(projectRef);
+        FProjectsGrid.ProjectUseSource[i] := FInstallerContext.GetUseSource(FProjectGroup.Projects[i].FileName, packageId);
+      end
       else
+      begin
         FProjectsGrid.ProjectVersion[i] := TPackageVersion.Empty;
+        FProjectsGrid.ProjectHasSource[i] := false;
+        FProjectsGrid.ProjectUseSource[i] := false;
+      end;
     end;
   finally
     FProjectsGrid.EndUpdate;
@@ -1287,6 +1320,9 @@ begin
   options.Platforms := [];
   options.CompilerVersion := IDECompilerVersion;
 
+  //drop any current-session 'use source' choice for this package/project - it's being removed.
+  FInstallerContext.ClearUseSource(project, FPackageMetaData.Id);
+
   DoPackageUninstall(options);
 end;
 
@@ -1305,6 +1341,42 @@ begin
   options.IsUpgrade := true; //changing the installed version
   DoPackageInstall(options, true);
   //call common function
+end;
+
+procedure TPackageDetailsFrame.VersionGridOnUseSourceChanged(const project: string; const useSource: boolean);
+var
+  packageId : string;
+begin
+  //The grid only fires this for the package its rows were populated for. FPackageMetaData is the
+  //normal source of that id; fall back to FProjectsGridPackageId in case an earlier reload nulled it.
+  if FPackageMetaData <> nil then
+    packageId := FPackageMetaData.Id
+  else
+    packageId := FProjectsGridPackageId;
+  if packageId = '' then
+  begin
+    FLogger.Error('Unable to determine which package the use source change was for - ignoring.');
+    exit;
+  end;
+
+  //Record the current-session choice (never persisted to the dproj) and rewrite just this project's
+  //DPMSearch entries - source vs precompiled lib. No reinstall/rebuild and no design-time package
+  //work: everything is already in the cache, only the search paths change.
+
+  FInstallerContext.SetUseSource(project, packageId, useSource);
+  FCancellationTokenSource.Reset;
+  if FPackageInstaller.RefreshProjectSearchPaths(FCancellationTokenSource.Token, project, IDECompilerVersion, FConfiguration.FileName, FInstallerContext) then
+  begin
+    FLogger.Information('Updated search paths for [' + packageId + '] in project [' + project + '] (use source = ' + BoolToStr(useSource, true) + ').');
+    //Re-sync the IDE's in-memory copy of the dproj so Alt-Tab doesn't prompt to reload. This does
+    //NOT refetch the package list (see TDPMEditViewFrame.SearchPathsChanged).
+    FHost.SearchPathsChanged;
+  end
+  else
+    FLogger.Error('Failed to update search paths for [' + packageId + '] in project [' + project + '].');
+
+  //Refresh only this grid's checkbox/version state - no package list reload.
+  UpdateProjectPackageVersions(packageId);
 end;
 
 procedure TPackageDetailsFrame.DoUpdateVersions(const sReferenceVersion : string; const versions : IList<TPackageVersion>);

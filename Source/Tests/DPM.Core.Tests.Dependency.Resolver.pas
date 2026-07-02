@@ -77,6 +77,7 @@ type
     function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
     function GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
     function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
+    function HasSource(const packageId : IPackageIdentity) : boolean;
     function GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;
                                                       const id : string;
                                                       const compilerVersion : TCompilerVersion;
@@ -605,6 +606,11 @@ end;
 function TFakePackageCache.GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
 begin
   result := [];
+end;
+
+function TFakePackageCache.HasSource(const packageId : IPackageIdentity) : boolean;
+begin
+  result := false;
 end;
 
 function TFakePackageCache.TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;

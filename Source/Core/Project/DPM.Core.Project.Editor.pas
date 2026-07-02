@@ -726,8 +726,6 @@ function TProjectEditor.LoadPackageRefences : boolean;
     sRange : string;
     range : TVersionRange;
     dupCheckReference : IPackageReference;
-    useSource : boolean;
-    sUseSource : string;
     newNode : IPackageReference;
   begin
     isTransitive := parentReference <> nil;
@@ -739,7 +737,6 @@ function TProjectEditor.LoadPackageRefences : boolean;
       begin
         id := '';
         sVersion := '';
-        sUseSource := '';
 
         packageElement := packageNodes.item[i] as IXMLDOMElement;
         if packageElement.getAttributeNode('id') <> nil then
@@ -767,16 +764,9 @@ function TProjectEditor.LoadPackageRefences : boolean;
           exit;
         end;
 
-        //if the parent reference is using source then we must use source for Transitive references.
-        if (parentReference <> nil) and parentReference.UseSource then
-          useSource := true
-        else if packageElement.getAttributeNode('useSource') <> nil then
-        begin
-          sUseSource := packageElement.getAttribute('useSource');
-          useSource := StrToBoolDef(sUseSource, false);
-        end
-        else
-          useSource := false;
+        //'use source' is an IDE-session-only debugging choice held in the installer context - it is
+        //never persisted to or read from the dproj, so references always load as precompiled (the
+        //session overlay in the installer re-applies any current-session source choice).
 
         if FPackageRefences = nil then
           FPackageRefences := TPackageReference.CreateRoot(FCompiler);
@@ -819,15 +809,9 @@ function TProjectEditor.LoadPackageRefences : boolean;
           end;
         end;
         if isTransitive then
-        begin
-          newNode  := parentReference.AddChild(id, version, range);
-          newNode.UseSource := useSource;
-        end
+          newNode  := parentReference.AddChild(id, version, range)
         else
-        begin
           newNode := FPackageRefences.AddChild(id, version, TVersionRange.Empty);
-          newNode.UseSource := useSource;
-        end;
         // P2 §2.6 — optional manifest-hash lock attribute. Tolerated when
         // absent; older projects without a lock just won't get a lock check.
         if packageElement.getAttributeNode('manifestHash') <> nil then
@@ -1089,22 +1073,16 @@ begin
     exit;
   if VarToStr(element.getAttribute('version')) <> reference.Version.ToStringNoMeta then
     exit;
-  //range/useSource/manifestHash are only written when meaningful - so an absent attribute must
+  //range/manifestHash are only written when meaningful - so an absent attribute must
   //match a default-valued reference, and a present attribute must match the written value.
+  //'use source' is intentionally ignored here - it is a session-only choice that is never
+  //written to the dproj, so it must not influence whether the reference block has changed.
   if reference.VersionRange.IsEmpty then
   begin
     if not VarIsNull(element.getAttribute('range')) then
       exit;
   end
   else if VarToStr(element.getAttribute('range')) <> reference.VersionRange.ToString then
-    exit;
-
-  if reference.UseSource then
-  begin
-    if VarToStr(element.getAttribute('useSource')) <> 'true' then
-      exit;
-  end
-  else if not VarIsNull(element.getAttribute('useSource')) then
     exit;
 
   if reference.ManifestHash <> '' then
@@ -1163,8 +1141,7 @@ var
     packageRefElement.setAttribute('version', packageReference.Version.ToStringNoMeta);
     if not packageReference.VersionRange.IsEmpty then
       packageRefElement.setAttribute('range', packageReference.VersionRange.ToString);
-    if packageReference.UseSource then
-      packageRefElement.setAttribute('useSource', 'true');
+    //'use source' is an IDE-session-only debugging choice - never persisted to the dproj.
     // P2 §2.6 — write the lock hash if the installer recorded one. Older
     // installs may have no hash yet; that's tolerated until next upgrade.
     if packageReference.ManifestHash <> '' then

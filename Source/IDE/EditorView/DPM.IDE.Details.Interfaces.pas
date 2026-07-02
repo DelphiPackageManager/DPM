@@ -32,7 +32,10 @@ type
     procedure BeginInstall(const projectCount : integer);
     procedure BeginUninstall(const projectCount : integer);
     procedure PackageInstalled;
-    procedure PackageUninstalled(const packageId : string);
+    procedure PackageUninstalled;
+    //Re-sync the IDE's in-memory copy of a project after a search-path-only change (Use Source),
+    //without reloading the package list from the server.
+    procedure SearchPathsChanged;
     procedure EndInstall;
 
   end;

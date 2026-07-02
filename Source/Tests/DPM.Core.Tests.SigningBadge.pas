@@ -71,6 +71,7 @@ type
     function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
     function GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
     function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
+    function HasSource(const packageId : IPackageIdentity) : boolean;
     function GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;
                                                       const id : string;
                                                       const compilerVersion : TCompilerVersion;
@@ -111,6 +112,7 @@ function TStubCache.GetPackageInfo(const cancellationToken : ICancellationToken;
 function TStubCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata; begin result := nil; end;
 function TStubCache.GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec; begin result := nil; end;
 function TStubCache.GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms; begin result := []; end;
+function TStubCache.HasSource(const packageId : IPackageIdentity) : boolean; begin result := false; end;
 function TStubCache.GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;
                                                               const id : string;
                                                               const compilerVersion : TCompilerVersion;

@@ -92,6 +92,15 @@ type
     function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
 
     /// <summary>
+    ///  Returns true when the cached package ships source code - it has .pas files under its
+    ///  extracted folder outside the lib\ / bpl\ output dirs (or is a git-registry package,
+    ///  which is always cloned in place as source). Used by the IDE to decide whether the
+    ///  'use source' debugging option can be offered for an installed package. Returns false
+    ///  when the package is not extracted in the cache.
+    /// </summary>
+    function HasSource(const packageId : IPackageIdentity) : boolean;
+
+    /// <summary>
     ///  Returns IPackageInfo for any cached versions of the given (id, compilerVersion)
     ///  that satisfy versionRange. Used by the dependency resolver to avoid hitting
     ///  the repository for packages already on disk. Returns an empty list when no

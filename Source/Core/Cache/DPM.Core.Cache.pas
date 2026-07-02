@@ -106,6 +106,8 @@ type
 
     function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
 
+    function HasSource(const packageId : IPackageIdentity) : boolean;
+
     function GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;
                                                       const id : string;
                                                       const compilerVersion : TCompilerVersion;
@@ -1056,6 +1058,34 @@ begin
   spec := GetPackageSpec(packageId);
   if (spec <> nil) and (spec.TargetPlatform <> nil) then
     result := spec.TargetPlatform.Platforms;
+end;
+
+function TPackageCache.HasSource(const packageId: IPackageIdentity): boolean;
+var
+  packageFolder : string;
+  subDir : string;
+begin
+  result := false;
+  packageFolder := GetPackagePath(packageId);
+  if not DirectoryExists(packageFolder) then
+    exit;
+
+  //git-registry packages are cloned in place - always consumed as source.
+  if FileExists(IncludeTrailingPathDelimiter(packageFolder) + cGitPackageMarkerFile) then
+    exit(true);
+
+  //Mirror the installer's source-path collection (CollectSearchPaths/AddPasSubdirs): a packed
+  //package ships source when some subfolder (outside .git) contains .pas files. The lib\ and bpl\
+  //compiled-output folders hold dcu/dcp/bpl and no .pas, so they are naturally excluded.
+  for subDir in TDirectory.GetDirectories(packageFolder, '*', TSearchOption.soAllDirectories) do
+  begin
+    if SameText(ExtractFileName(subDir), '.git') then
+      continue;
+    if Pos(PathDelim + '.git' + PathDelim, subDir + PathDelim) > 0 then
+      continue;
+    if Length(TDirectory.GetFiles(subDir, '*.pas')) > 0 then
+      exit(true);
+  end;
 end;
 
 function TPackageCache.GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;

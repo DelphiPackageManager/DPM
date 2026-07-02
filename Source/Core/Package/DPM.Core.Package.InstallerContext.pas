@@ -23,6 +23,10 @@ type
     //every cross-project lookup miss.
     FResolutionIndex : IDictionary<string, IDictionary<string, IResolvedPackage>>;
 
+    //Current-session 'use source' choices. Outer key = lowercase projectFile, inner key =
+    //lowercase packageId. Never persisted - populated only by the IDE, empty for the CLI.
+    FUseSourceState : IDictionary<string, IDictionary<string, boolean>>;
+
     FLogger : ILogger;
 
     procedure PackageInstalled(const dpmPackageId : string; const packageVersion : TPackageVersion; const designFiles : TArray<string>);virtual;
@@ -47,6 +51,11 @@ type
     //search other projects in the project group to see if they have resolved the package.
     function FindPackageResolution(const projectFile: string; const packageId : string ) : IResolvedPackage;
 
+    //current-session 'use source' choices - see interface for details.
+    procedure SetUseSource(const projectFile, packageId : string; const value : boolean);virtual;
+    function GetUseSource(const projectFile, packageId : string) : boolean;virtual;
+    procedure ClearUseSource(const projectFile, packageId : string);virtual;
+
     procedure Clear;virtual;
 
     property Logger : ILogger read FLogger;
@@ -70,6 +79,7 @@ begin
   FProjectGraphs.Clear;
   FProjectResolutions.Clear;
   FResolutionIndex.Clear;
+  FUseSourceState.Clear;
 end;
 
 constructor TCorePackageInstallerContext.Create(const logger : ILogger);
@@ -78,6 +88,7 @@ begin
   FProjectGraphs := TCollections.CreateDictionary<string, IPackageReference>;
   FProjectResolutions := TCollections.CreateDictionary<string, IList<IResolvedPackage>>;
   FResolutionIndex := TCollections.CreateDictionary<string, IDictionary<string, IResolvedPackage>>;
+  FUseSourceState := TCollections.CreateDictionary<string, IDictionary<string, boolean>>;
 end;
 
 
@@ -206,6 +217,39 @@ begin
     FProjectResolutions.Remove(projKey);
   if FResolutionIndex.ContainsKey(projKey) then
     FResolutionIndex.Remove(projKey);
+  if FUseSourceState.ContainsKey(projKey) then
+    FUseSourceState.Remove(projKey);
+end;
+
+procedure TCorePackageInstallerContext.SetUseSource(const projectFile, packageId : string; const value : boolean);
+var
+  projKey : string;
+  byPackage : IDictionary<string, boolean>;
+begin
+  projKey := LowerCase(projectFile);
+  if not FUseSourceState.TryGetValue(projKey, byPackage) then
+  begin
+    byPackage := TCollections.CreateDictionary<string, boolean>;
+    FUseSourceState[projKey] := byPackage;
+  end;
+  byPackage[LowerCase(packageId)] := value;
+end;
+
+function TCorePackageInstallerContext.GetUseSource(const projectFile, packageId : string) : boolean;
+var
+  byPackage : IDictionary<string, boolean>;
+begin
+  result := false;
+  if FUseSourceState.TryGetValue(LowerCase(projectFile), byPackage) then
+    byPackage.TryGetValue(LowerCase(packageId), result);
+end;
+
+procedure TCorePackageInstallerContext.ClearUseSource(const projectFile, packageId : string);
+var
+  byPackage : IDictionary<string, boolean>;
+begin
+  if FUseSourceState.TryGetValue(LowerCase(projectFile), byPackage) then
+    byPackage.Remove(LowerCase(packageId));
 end;
 
 

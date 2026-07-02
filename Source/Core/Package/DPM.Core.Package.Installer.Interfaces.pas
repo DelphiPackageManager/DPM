@@ -63,6 +63,15 @@ type
     ///  references; returns True if unsure (e.g. load failure) so restore still proceeds and any
     ///  real problem is surfaced through the normal path. </summary>
     function ProjectHasPackageReferences(const projectFile : string; const compilerVersion : TCompilerVersion) : boolean;
+
+    /// <summary> Lightweight reconfigure used by the IDE's 'use source' toggle. Loads the project's
+    ///  existing package graph, applies the current-session use-source choices from the context,
+    ///  collects the search paths (source vs precompiled lib) and rewrites the dproj's DPMSearch.
+    ///  It does NOT resolve, download, compile, or load/unload design-time packages - everything is
+    ///  already in the cache, only the search paths change. </summary>
+    function RefreshProjectSearchPaths(const cancellationToken : ICancellationToken; const projectFile : string;
+                                       const compilerVersion : TCompilerVersion; const configFile : string;
+                                       const context : IPackageInstallerContext) : boolean;
   end;
 
   ///<summary> The installer context is use to collect package resolutions and detect
@@ -96,6 +105,21 @@ type
 
     ///<summary> Check for an existing package resolution in already loaded projects in the group.</summary>
     function FindPackageResolution(const projectFile: string; const packageId : string ) : IResolvedPackage;
+
+    ///<summary> Records the IDE's current-session 'use source' choice for a package in a project.
+    ///  This is a debugging-only, session-lifetime toggle - it is never persisted to the dproj.
+    ///  The installer consults it when collecting search paths, so a source choice flows down to
+    ///  the package's dependencies. The CLI never sets this, so command line installs always use
+    ///  the precompiled lib folder. </summary>
+    procedure SetUseSource(const projectFile, packageId : string; const value : boolean);
+
+    ///<summary> Returns the current-session 'use source' choice for a package in a project, or
+    ///  false when none has been set (the default - use the precompiled lib folder). </summary>
+    function GetUseSource(const projectFile, packageId : string) : boolean;
+
+    ///<summary> Clears any current-session 'use source' choice for a package in a project - called
+    ///  when the package is uninstalled from the project. </summary>
+    procedure ClearUseSource(const projectFile, packageId : string);
 
   end;
 

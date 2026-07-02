@@ -272,12 +272,9 @@ begin
   option.HasValue := false;
 
 
-  option := cmd.RegisterOption<boolean>('useSource','us', 'Reference package source rather than compiling it.',
-   procedure(const value : boolean)
-    begin
-      TInstallOptions.Default.UseSource := value;
-    end);
-  option.HasValue := false;
+  //'use source' is an IDE-session-only debugging feature (held in the installer context and never
+  //persisted) - it is intentionally not exposed as a command line option, so CLI installs always
+  //reference the precompiled lib folder.
 
   option := cmd.RegisterOption<boolean>('debugMode','dm', 'Compile Debug configuration.',
   procedure(const value : boolean)

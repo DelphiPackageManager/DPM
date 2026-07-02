@@ -103,6 +103,10 @@ type
     //reconciled against the on-disk FPackageReferences in LoadPackages's fast
     //path so we still drop orphan transients without going back to the repo.
     FSkipInstalledRefresh : boolean;
+    //Set only around SearchPathsChanged (Use Source). Tells ProjectChanged to fully
+    //ignore the reload the OTA refresh fires - no package list reload, no server contact.
+    //The grid is refreshed locally by the caller (UpdateProjectPackageVersions).
+    FSuppressReloadOnProjectChanged : boolean;
 
     // dpm core stuff
     FLogger : IDPMIDELogger;
@@ -157,7 +161,8 @@ type
     // IDetailsHost
     procedure SaveBeforeInstall;
     procedure PackageInstalled;
-    procedure PackageUninstalled(const packageId : string);
+    procedure PackageUninstalled;
+    procedure SearchPathsChanged;
     procedure BeginInstall(const projectCount : integer);
     procedure BeginUninstall(const projectCount : integer);
     procedure EndInstall;
@@ -244,7 +249,6 @@ uses
   DPM.Core.Package.Icon,
   DPM.Core.Package.Classes,
   DPM.Core.Package.SearchResults,
-  DPM.IDE.ToolsApi,
   DPM.IDE.AboutForm,
   DPM.IDE.AddInOptionsHostForm,
   DPM.Core.Dependency.Reference;
@@ -1010,13 +1014,31 @@ begin
   FProjectGroup.refresh(false);
 end;
 
-procedure TDPMEditViewFrame.PackageUninstalled(const packageId : string);
+procedure TDPMEditViewFrame.PackageUninstalled;
 begin
   //Re-assert the flag in case the installer somehow ran with it cleared.
   //BeginUninstall is the primary place this gets set.
   FSkipInstalledRefresh := true;
   // Tell the IDE to reload the project as we have just modified it on disk.
   FProjectGroup.refresh(false);
+end;
+
+procedure TDPMEditViewFrame.SearchPathsChanged;
+begin
+  //Use Source only rewrote this project's search paths on disk.
+  // We tried just reloading that project, but that results in a project modified prompt.
+  // Reloading the project group doesn't cause the prompt - makes no sense.
+  //Suppress the ProjectChanged that the reload fires - the installed set is unchanged and we must
+  //not refetch the package list from the server here. The grid was already refreshed locally by
+  //the caller (UpdateProjectPackageVersions).
+  //The reload fires ProjectLoaded -> ProjectChanged synchronously inside Refresh, so clearing the
+  //flag in the finally is safe and guarantees it can't leak into a later genuine reload.
+  FSuppressReloadOnProjectChanged := true;
+  try
+    FProjectGroup.Refresh(false);
+  finally
+    FSuppressReloadOnProjectChanged := false;
+  end;
 end;
 
 function TDPMEditViewFrame.GetAvailableCount : Int64;
@@ -1031,6 +1053,11 @@ end;
 procedure TDPMEditViewFrame.ProjectChanged;
 begin
   FLogger.Debug('DPMIDE : ProjectChanged');
+
+  //A Use Source search-path-only change reloaded a single project purely to re-sync the IDE's
+  //cached timestamp with disk. There is nothing to reload here and we must not hit the server.
+  if FSuppressReloadOnProjectChanged then
+    exit;
 
   // The problem here is that the change notifier fires for each project changed
   // so if we install a package into every project in a group, it will fire for

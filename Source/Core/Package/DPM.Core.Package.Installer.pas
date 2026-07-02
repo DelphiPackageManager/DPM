@@ -232,6 +232,10 @@ type
 
     function ProjectHasPackageReferences(const projectFile : string; const compilerVersion : TCompilerVersion) : boolean;
 
+    function RefreshProjectSearchPaths(const cancellationToken : ICancellationToken; const projectFile : string;
+                                       const compilerVersion : TCompilerVersion; const configFile : string;
+                                       const context : IPackageInstallerContext) : boolean;
+
   public
     constructor Create(const logger: ILogger;
       const configurationManager: IConfigurationManager;
@@ -317,6 +321,88 @@ begin
     result := projectEditor.HasPackages;
 end;
 
+function TPackageInstaller.RefreshProjectSearchPaths(const cancellationToken : ICancellationToken; const projectFile : string;
+                                                     const compilerVersion : TCompilerVersion; const configFile : string;
+                                                     const context : IPackageInstallerContext) : boolean;
+var
+  config : IConfiguration;
+  projectEditor : IProjectEditor;
+  graph : IPackageReference;
+  resolvedPackages : IList<IPackageInfo>;
+  infoCache : IDictionary<string, IPackageInfo>;
+  platforms : TDPMPlatforms;
+  platform : TDPMPlatform;
+  searchPaths : IList<string>;
+begin
+  result := false;
+
+  //Minimal config load - just enough to know the cache location and load the project. We do NOT
+  //initialize the resolver/repository (no resolve or download) - every package is already cached.
+  FConfigurationManager.EnsureDefaultConfig;
+  config := FConfigurationManager.LoadConfig(configFile);
+  if config = nil then
+    exit;
+  FPackageCache.Location := config.PackageCacheLocation;
+
+  if not LoadProjectEditor(projectFile, config, compilerVersion, projectEditor) then
+    exit;
+
+  graph := projectEditor.GetPackageReferences;
+  if graph = nil then
+    exit(true); //no packages installed in this project - nothing to do
+
+  //Apply the current-session 'use source' choices onto the graph. Source flows down to a package's
+  //dependencies via TPackageReference.GetUseSource (which ORs the parent's value).
+  graph.VisitDFS(
+    procedure(const node : IPackageReference)
+    begin
+      if context.GetUseSource(projectFile, node.Id) then
+        node.UseSource := true;
+    end);
+
+  //Flatten the graph to the installed packages, reading each IPackageInfo from the cache (no
+  //compile, no download). Same pattern as EnsureDesignHostPlatformCompiled.
+  infoCache := TCollections.CreateDictionary<string, IPackageInfo>;
+  resolvedPackages := TCollections.CreateList<IPackageInfo>;
+  graph.VisitDFS(
+    procedure(const node : IPackageReference)
+    var
+      info : IPackageInfo;
+      key : string;
+    begin
+      key := LowerCase(node.Id);
+      if infoCache.ContainsKey(key) then
+        exit;
+      info := node.PackageInfo;
+      if info = nil then
+        info := GetOrLoadPackageInfo(cancellationToken, node.Id, node.Version, compilerVersion, infoCache)
+      else
+        infoCache[key] := info;
+      //bundled no-ops (e.g. Indy) contribute no search path.
+      if (info <> nil) and (not IsBundledPackageInfo(info)) then
+        resolvedPackages.Add(info);
+    end);
+
+  //All installed packages are already built in the cache, so pass them all as 'compiled' - the lib
+  //branch in CollectSearchPaths still guards each lib\{platform} path with DirectoryExists, and
+  //UseSource packages fall through to the source branch regardless.
+  platforms := projectEditor.platforms;
+  for platform in platforms do
+  begin
+    if cancellationToken.IsCancelled then
+      exit(false);
+    searchPaths := TCollections.CreateList<string>;
+    if not CollectSearchPaths(graph, resolvedPackages, resolvedPackages, compilerVersion, platform, searchPaths) then
+      exit(false);
+    if not projectEditor.AddSearchPaths(platform, searchPaths, config.PackageCacheLocation) then
+      exit(false);
+  end;
+
+  //Write the dproj (search paths only - the package reference graph is unchanged and useSource is
+  //never persisted). No design-time package load, no build.
+  result := projectEditor.SaveProject;
+end;
+
 function TPackageInstaller.CollectPlatformsFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration): boolean;
 var
   projectFile: string;
@@ -351,6 +437,7 @@ var
   id: string;
   isGitSource: boolean;
   addedLibPath: boolean;
+  pkgAbsRoot: string;
 
   procedure AddUnique(const path: string);
   begin
@@ -361,9 +448,23 @@ var
     end;
   end;
 
-  //Add every subfolder under absBase that actually contains .pas files. relSub is computed
-  //relative to pkgAbs so the search path matches packageBasePath layout. Skips .git metadata.
-  //Delphi search paths are not recursive, so each folder must be listed individually.
+  //True when dir directly contains a file the compiler/IDE needs on the search path:
+  //source (.pas/.inc), form/frame definitions (.dfm/.fmx) or compiled resources (.res).
+  function DirHasSourceFiles(const dir: string): boolean;
+  const
+    cSourceMasks: array[0..4] of string = ('*.pas', '*.inc', '*.dfm', '*.fmx', '*.res');
+  var
+    mask: string;
+  begin
+    result := false;
+    for mask in cSourceMasks do
+      if Length(TDirectory.GetFiles(dir, mask)) > 0 then
+        exit(true);
+  end;
+
+  //Add every subfolder under absBase that contains .pas/.inc/.dfm/.fmx/.res files. relSub is
+  //computed relative to pkgAbs so the search path matches packageBasePath layout. Skips .git
+  //metadata. Delphi search paths are not recursive, so each folder must be listed individually.
   procedure AddPasSubdirs(const pkgAbs, absBase, basePath: string);
   var
     subDir: string;
@@ -378,7 +479,7 @@ var
         continue;
       if Pos(PathDelim + '.git' + PathDelim, subDir + PathDelim) > 0 then
         continue;
-      if Length(TDirectory.GetFiles(subDir, '*.pas')) = 0 then
+      if not DirHasSourceFiles(subDir) then
         continue;
       relSub := Copy(subDir, Length(pkgAbs) + 1, MaxInt);
       AddUnique(basePath + relSub);
@@ -457,6 +558,14 @@ var
 begin
   result := true;
   seenPaths := TCollections.CreateDictionary<string, boolean>;
+
+  // IPackageInfo instances are memoized in the package cache (a process singleton), so UseSource
+  // can carry over from a previous install/restore/refresh. Reset it here before we OR the current
+  // graph's values on - otherwise a package that used source last time can never revert to lib
+  // (the OR below would keep seeing the stale true), which is exactly what breaks un-ticking
+  // 'use source' in the IDE.
+  for packageInfo in resolvedPackages do
+    packageInfo.UseSource := false;
 
   // we need to apply usesource from the graph to the package info's
   packageGraph.VisitDFS(
@@ -552,17 +661,30 @@ begin
     //or a platform the package wasn't compiled for.
     if not addedLibPath then
     begin
-      for sourceEntry in template.SourceEntries do
+      if template.SourceEntries.Count > 0 then
       begin
-        if isGitSource then
-          AddGitSearchPaths(packageInfo, packageBasePath, sourceEntry.Source)
-        else
+        for sourceEntry in template.SourceEntries do
         begin
-          destination := sourceEntry.Destination;
-          if destination = '' then
-            destination := 'src';
-          AddSourceSearchPaths(packageInfo, packageBasePath, destination, sourceEntry.Source);
+          if isGitSource then
+            AddGitSearchPaths(packageInfo, packageBasePath, sourceEntry.Source)
+          else
+          begin
+            destination := sourceEntry.Destination;
+            if destination = '' then
+              destination := 'src';
+            AddSourceSearchPaths(packageInfo, packageBasePath, destination, sourceEntry.Source);
+          end;
         end;
+      end
+      else if not isGitSource then
+      begin
+        //Packed packages have their source entries stripped from the manifest (see the packaging
+        //writer), but the source files were still extracted into the cache. Add every subfolder that
+        //contains source/form/resource files (.pas/.inc/.dfm/.fmx/.res) so a UseSource (or source-only)
+        //package still contributes its source to the search path. The lib\ and bpl\ folders hold
+        //dcu/dcp/bpl and none of those, so they are skipped.
+        pkgAbsRoot := IncludeTrailingPathDelimiter(FPackageCache.GetPackagePath(packageInfo));
+        AddPasSubdirs(pkgAbsRoot, ExcludeTrailingPathDelimiter(pkgAbsRoot), packageBasePath);
       end;
     end;
   end;
@@ -1724,6 +1846,17 @@ begin
 
   if not BuildDependencies(cancellationToken, packageCompiler, projectPackageGraph, packagesToCompile, compiledPackages, packageSpecs, options) then
     exit;
+
+  //Overlay the IDE's current-session 'use source' choices onto the graph before we collect search
+  //paths. This is the single source of truth for the source-vs-lib decision - it is never persisted
+  //to the dproj and is always empty for the CLI (so command line installs use the precompiled lib).
+  //A source choice on a node flows down to its dependencies via TPackageReference.GetUseSource.
+  projectPackageGraph.VisitDFS(
+    procedure(const node : IPackageReference)
+    begin
+      if FContext.GetUseSource(projectFile, node.Id) then
+        node.UseSource := true;
+    end);
 
   if not CollectSearchPaths(projectPackageGraph, supportedPackages, compiledPackages, projectEditor.compilerVersion, platform, packageSearchPaths) then
     exit;

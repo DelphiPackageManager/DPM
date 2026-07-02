@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -60,17 +60,22 @@ type
   TVersionGridRow = class
     ProjectName : string;
     InstalledVersion : TPackageVersion;
+    //IDE session-only 'use source' state for this package in this project. HasSource gates whether
+    //the checkbox is enabled (the package must actually ship source); UseSource is the current choice.
+    HasSource : boolean;
+    UseSource : boolean;
   end;
 
 
   TVersionGridPaintRowState = (rsNormal, rsHot, rsSelected, rsFocusedNormal, rsFocusedHot, rsFocusedSelected);
 
-  THitElement = (htRow, htColumnProject, htColumnInstalleVer, htColumnInstall, htColumnUpDn, htColumnRemove, htRowInstall, htRowUpDn, htRowRemove  );
+  THitElement = (htRow, htColumnProject, htColumnInstalleVer, htColumnUseSource, htColumnInstall, htColumnUpDn, htColumnRemove, htRowUseSource, htRowInstall, htRowUpDn, htRowRemove  );
 
   TOnInstallEvent = procedure(const project : string) of object;
   TOnUnInstallEvent = procedure(const project : string) of object;
   TOnUpgradeEvent = procedure(const project : string) of object;
   TOnDowngradeEvent = procedure(const project : string) of object;
+  TOnUseSourceChangedEvent = procedure(const project : string; const useSource : boolean) of object;
 
   TVersionGrid = class(TCustomControl)
   private
@@ -113,6 +118,7 @@ type
     FOnUnInstallEvent : TOnUnInstallEvent;
     FOnUpgradeEvent : TOnUpgradeEvent;
     FOnDowngradeEvent : TOnDowngradeEvent;
+    FOnUseSourceChangedEvent : TOnUseSourceChangedEvent;
 
 
     procedure SetImageList(const Value: TCustomImageList);
@@ -123,6 +129,10 @@ type
     procedure SetPackageVersion(const value : TPackageVersion);
     function GetProjectVersion(index: integer): TPackageVersion;
     procedure SetProjectVersion(index: integer; const Value: TPackageVersion);
+    function GetProjectHasSource(index: integer): boolean;
+    procedure SetProjectHasSource(index: integer; const Value: boolean);
+    function GetProjectUseSource(index: integer): boolean;
+    procedure SetProjectUseSource(index: integer; const Value: boolean);
 
     function GetTotalColumnWidth : integer;
 
@@ -219,6 +229,8 @@ type
     property ImageList : TCustomImageList read FImageList write SetImageList;
     property ProjectName[index : integer] : string read GetProjectName;
     property ProjectVersion[index : integer] : TPackageVersion read GetProjectVersion write SetProjectVersion;
+    property ProjectHasSource[index : integer] : boolean read GetProjectHasSource write SetProjectHasSource;
+    property ProjectUseSource[index : integer] : boolean read GetProjectUseSource write SetProjectUseSource;
 
     property PackageVersion : TPackageVersion read FPackageVersion write SetPackageVersion;
     property RowCount : integer read GetRowCount;
@@ -257,6 +269,7 @@ type
     property OnUnInstallEvent : TOnUnInstallEvent read FOnUnInstallEvent write FOnUnInstallEvent;
     property OnUpgradeEvent : TOnUpgradeEvent read FOnUpgradeEvent write FOnUpgradeEvent;
     property OnDowngradeEvent : TOnDowngradeEvent read FOnDowngradeEvent write FOnDowngradeEvent;
+    property OnUseSourceChangedEvent : TOnUseSourceChangedEvent read FOnUseSourceChangedEvent write FOnUseSourceChangedEvent;
   end;
 
 implementation
@@ -297,6 +310,7 @@ begin
   FColumnWidths[2] := MulDiv(FColumnWidths[2], M, D);
   FColumnWidths[3] := MulDiv(FColumnWidths[3] , M, D);
   FColumnWidths[4] := MulDiv(FColumnWidths[4] , M, D);
+  FColumnWidths[5] := MulDiv(FColumnWidths[5] , M, D);
   UpdateColumns;
   UpdateVisibleRows;
 
@@ -354,6 +368,7 @@ end;
 const
   cDefaultColumnWidth = 32;
   cInstalledColumnWidth = 120;
+  cUseSourceColumnWidth = 90;
 
 
 constructor TVersionGrid.Create(AOwner: TComponent);
@@ -382,14 +397,15 @@ begin
 
   FRows := TObjectList<TVersionGridRow>.Create(true);
 
-  SetLength(FColumns, 5);
-  SetLength(FColumnWidths, 5);
+  SetLength(FColumns, 6);
+  SetLength(FColumnWidths, 6);
 
   //col 0 takes up the rest of the space
   FColumnWidths[1] := cInstalledColumnWidth;
-  FColumnWidths[2] := cDefaultColumnWidth;
-  FColumnWidths[3] := cDefaultColumnWidth;
-  FColumnWidths[4] := cDefaultColumnWidth;
+  FColumnWidths[2] := cUseSourceColumnWidth; //use source checkbox
+  FColumnWidths[3] := cDefaultColumnWidth;   //install
+  FColumnWidths[4] := cDefaultColumnWidth;   //upgrade/downgrade
+  FColumnWidths[5] := cDefaultColumnWidth;   //remove
   FVertSBWidth := 0;
 
   UpdateColumns;
@@ -850,6 +866,8 @@ var
   colRect : TRect;
   imgRect : TRect;
   btnRect : TRect;
+  chkRect : TRect;
+  chkFlags : UINT;
   txt : string;
   LCanvas : TCanvas;
 
@@ -926,7 +944,7 @@ begin
   LCanvas.Brush.Style := bsClear;
 
 
-  for i := 0 to 4 do
+  for i := 0 to 5 do
   begin
     colRect := FColumns[i].GetBounds;
     colRect.Top := rowRect.Top;
@@ -947,7 +965,21 @@ begin
         if not project.InstalledVersion.IsEmpty then
           txt := project.InstalledVersion.ToStringNoMeta;
       end;
-      2 : //add
+      2 : //use source checkbox - only meaningful for an installed package that ships source
+      begin
+        if not project.InstalledVersion.IsEmpty then
+        begin
+          chkRect := TRect.Create(0, 0, 16, 16);
+          CenterRect(colRect, chkRect);
+          chkFlags := DFCS_BUTTONCHECK;
+          if project.UseSource then
+            chkFlags := chkFlags or DFCS_CHECKED;
+          if not project.HasSource then
+            chkFlags := chkFlags or DFCS_INACTIVE; //greyed - package has no source to use
+          DrawFrameControl(LCanvas.Handle, chkRect, DFC_BUTTON, chkFlags);
+        end;
+      end;
+      3 : //add
       begin
         if project.InstalledVersion.IsEmpty then
         begin
@@ -955,7 +987,7 @@ begin
           FImageList.Draw(LCanvas, imgRect.Left, imgRect.Top, 0,  TDrawingStyle.dsTransparent, TImageType.itImage, true );
         end;
       end;
-      3 :  //upgrade/downgrade
+      4 :  //upgrade/downgrade
       begin
         if FPackageVersion.IsEmpty then
           continue;
@@ -972,7 +1004,7 @@ begin
             FImageList.Draw(LCanvas, imgRect.Left, imgRect.Top, 3, TDrawingStyle.dsTransparent, TImageType.itImage, true );
         end;
       end;
-      4 :
+      5 :
       begin
         if not project.InstalledVersion.IsEmpty then
         begin
@@ -1039,6 +1071,11 @@ begin
   begin
     row := FRows[index];
     case element of
+      htRowUseSource:
+      begin
+        //only when a version is installed and the package actually ships source to switch to.
+        result := (not row.InstalledVersion.IsEmpty) and row.HasSource;
+      end;
       htRowInstall:
       begin
         result := row.InstalledVersion.IsEmpty;
@@ -1169,7 +1206,7 @@ end;
 
 function TVersionGrid.GetTotalColumnWidth: integer;
 begin
-  result := FColumns[3].Left + FColumns[3].Width;
+  result := FColumns[High(FColumns)].Left + FColumns[High(FColumns)].Width;
 end;
 
 function TVersionGrid.GetViewRow(const row: integer): integer;
@@ -1274,6 +1311,8 @@ procedure TVersionGrid.MouseMove(Shift: TShiftState; X, Y: Integer);
 var
   r : TRect;
   row : integer;
+  rowIdx : integer;
+  cbRect : TRect;
   oldHit : THitElement;
 begin
   oldHit := FHitElement;
@@ -1282,7 +1321,26 @@ begin
   try
     if Y > FRowHeight then
     begin
-      r := FColumns[2].GetBounds;
+      //Use Source checkbox: hit only the actual checkbox rect (16x16 centred in the column cell,
+      //matching DoPaintRow), and only for an installed row that ships source - so clicking empty
+      //space in the column, or a disabled/absent checkbox, does nothing.
+      rowIdx := FTopRow + row;
+      if (rowIdx >= 0) and (rowIdx < FRows.Count) and (not FRows[rowIdx].InstalledVersion.IsEmpty) and FRows[rowIdx].HasSource then
+      begin
+        r := FColumns[2].GetBounds;
+        r.Offset(0, (row + 1) * FRowHeight);
+        r.Inflate(-5, 0);
+        cbRect := Rect(r.Left + ((r.Width - 16) div 2), r.Top + ((r.Height - 16) div 2), 0, 0);
+        cbRect.Width := 16;
+        cbRect.Height := 16;
+        if cbRect.Contains(Point(X, Y)) then
+        begin
+          FHitElement := htRowUseSource;
+          exit;
+        end;
+      end;
+
+      r := FColumns[3].GetBounds;
       r.Offset(0, (row + 1) * FRowHeight);
       if r.Contains(Point(X, Y)) then
       begin
@@ -1290,7 +1348,7 @@ begin
         exit;
       end;
 
-      r := FColumns[3].GetBounds;
+      r := FColumns[4].GetBounds;
       r.Offset(0, (row + 1) * FRowHeight);
       if r.Contains(Point(X, Y)) then
       begin
@@ -1298,7 +1356,7 @@ begin
         exit;
       end;
 
-      r := FColumns[4].GetBounds;
+      r := FColumns[5].GetBounds;
       r.Offset(0, (row + 1) * FRowHeight);
       if r.Contains(Point(X, Y)) then
       begin
@@ -1322,6 +1380,16 @@ begin
     exit;
 
   case FHitElement of
+    htRowUseSource :
+    begin
+      if GetButtonEnabled(FCurrentRow, FHitElement) then
+      begin
+        FRows[FCurrentRow].UseSource := not FRows[FCurrentRow].UseSource;
+        Invalidate;
+        if Assigned(FOnUseSourceChangedEvent) then
+          FOnUseSourceChangedEvent(FRows[FCurrentRow].ProjectName, FRows[FCurrentRow].UseSource);
+      end;
+    end;
     htRowInstall :
     begin
       if Assigned(FOnInstallEvent) then
@@ -1360,7 +1428,7 @@ begin
 end;
 
 const
-  hightLightElements : array[0..4] of THitElement = (htColumnProject,htColumnInstalleVer,htColumnInstall, htColumnUpDn,htColumnRemove);
+  hightLightElements : array[0..5] of THitElement = (htColumnProject,htColumnInstalleVer,htColumnUseSource,htColumnInstall, htColumnUpDn,htColumnRemove);
 
 procedure TVersionGrid.Paint;
 var
@@ -1448,7 +1516,7 @@ begin
   LCanvas.Font.Assign(Canvas.Font);
   LCanvas.Font.Color := HeaderTextColor;
 
-  for i := 0 to 4 do
+  for i := 0 to 5 do
   begin
     if FHitElement = hightLightElements[i] then
     begin
@@ -1615,6 +1683,32 @@ begin
     FRows[index].InstalledVersion := value;
 end;
 
+function TVersionGrid.GetProjectHasSource(index: integer): boolean;
+begin
+  result := false;
+  if (index >= 0) and (index < FRows.Count) then
+    result := FRows[index].HasSource;
+end;
+
+procedure TVersionGrid.SetProjectHasSource(index: integer; const Value: boolean);
+begin
+  if (index >= 0) and (index < FRows.Count) then
+    FRows[index].HasSource := value;
+end;
+
+function TVersionGrid.GetProjectUseSource(index: integer): boolean;
+begin
+  result := false;
+  if (index >= 0) and (index < FRows.Count) then
+    result := FRows[index].UseSource;
+end;
+
+procedure TVersionGrid.SetProjectUseSource(index: integer; const Value: boolean);
+begin
+  if (index >= 0) and (index < FRows.Count) then
+    FRows[index].UseSource := value;
+end;
+
 procedure TVersionGrid.SetRowHeight(const Value: integer);
 begin
   if FRowHeight <> value then
@@ -1638,25 +1732,32 @@ end;
 procedure TVersionGrid.UpdateColumns;
 begin
   //remove button
+  FColumns[5].Index := 5;
+  FColumns[5].Title := '';
+  FColumns[5].Width := FColumnWidths[5];
+  FColumns[5].Left  := Self.Width - FColumns[5].Width - 1;
+  FColumns[5].Height := FRowHeight;
+
+  if FVertSBVisible then
+    FColumns[5].Left := FColumns[5].Left - FVertSBWidth;  //TODO : SB Width
+
+  //upgrade/downgrade
   FColumns[4].Index := 4;
   FColumns[4].Title := '';
   FColumns[4].Width := FColumnWidths[4];
-  FColumns[4].Left  := Self.Width - FColumns[4].Width - 1;
+  FColumns[4].Left  := FColumns[5].Left - FColumns[4].Width - 1;
   FColumns[4].Height := FRowHeight;
 
-  if FVertSBVisible then
-    FColumns[4].Left := FColumns[4].Left - FVertSBWidth;  //TODO : SB Width
-
-  //upgrade/downgrade
+  //install
   FColumns[3].Index := 3;
   FColumns[3].Title := '';
   FColumns[3].Width := FColumnWidths[3];
   FColumns[3].Left  := FColumns[4].Left - FColumns[3].Width - 1;
   FColumns[3].Height := FRowHeight;
 
-  //install
+  //use source checkbox
   FColumns[2].Index := 2;
-  FColumns[2].Title := '';
+  FColumns[2].Title := 'Use Source';
   FColumns[2].Width := FColumnWidths[2];
   FColumns[2].Left  := FColumns[3].Left - FColumns[2].Width - 1;
   FColumns[2].Height := FRowHeight;
