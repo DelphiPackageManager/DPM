@@ -1527,6 +1527,29 @@ begin
     end;
   end;
 
+  //Ensure a clean extraction target. Stale files from a previous (possibly partial, or a
+  //different-layout) extraction collide with the archive contents - TZipFile overwrites in
+  //place and fails if any existing file is locked or read-only. Empty the folder first so we
+  //always extract into a known-empty directory.
+  if TDirectory.Exists(packageFolder) and (not TDirectory.IsEmpty(packageFolder)) then
+  begin
+    FLogger.Debug('[PackageCache] Cleaning existing package folder before extraction : ' + packageFolder);
+    try
+      TDirectory.Delete(packageFolder, true);
+    except
+      on e : Exception do
+      begin
+        FLogger.Error('Unable to clean package folder [' + packageFolder + '] before extraction : ' + e.Message);
+        raise Exception.Create('Unable to clean package folder [' + packageFolder + '] before extraction : ' + e.Message);
+      end;
+    end;
+    if not ForceDirectories(packageFolder) then
+    begin
+      FLogger.Error('Unable to recreate package folder [' + packageFolder + ']');
+      exit;
+    end;
+  end;
+
   try
     FLogger.Debug('[PackageCache] Extracting Package file [' + packageFilePath + '] to : ' + packageFolder);
     TZipFile.ExtractZipFile(packageFilePath, packageFolder);
