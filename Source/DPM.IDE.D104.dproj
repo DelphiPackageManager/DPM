@@ -14,7 +14,7 @@
         <DPMCompiler>delphi10.4</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Gabr42.OmniThreadLibrary\3.8.0\lib\Win32;$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.10\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.4\lib\Win32;$(DPM)\VSoft.Awaitable\0.8.0\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.8.1\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.YAML\1.7.1\lib\Win32;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.10\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win32;$(DPM)\VSoft.Awaitable\1.0.0\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.11\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.8.1\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.2.8\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.YAML\1.7.1\lib\Win32;</DPMSearch>
         <DPMExe>I:\Github\DelphiPackageManager\DPMMaster\Output\dpm.exe</DPMExe>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
@@ -1076,14 +1076,13 @@
                     <PackageReference id="Spring4D.Base" version="2.0.2-beta.2" range="2.0.2-beta.2"/>
                 </PackageReference>
                 <PackageReference id="VSoft.AntPatterns" version="0.1.10" manifestHash="sha256:3e671efe57b8ca785441d7e90436d8006c121502476c7545418a6cb9b41baccc"/>
-                <PackageReference id="VSoft.Awaitable" version="0.8.0" manifestHash="sha256:2aea8e97111c08fbd762c788e0ba53fef8ce8fdaad520c57972b54b89ebd18f1">
-                    <PackageReference id="Gabr42.OmniThreadLibrary" version="3.8.0" range="[3.8.0,]"/>
-                    <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="[0.1.4,]"/>
+                <PackageReference id="VSoft.Awaitable" version="1.0.0" manifestHash="sha256:82120e1f215b8dbf42288aed8dcc5b14e2349c6b1ff06a8c406fb41bbd3decfd">
+                    <PackageReference id="VSoft.CancellationToken" version="0.1.6" range="[0.1.4,]"/>
                 </PackageReference>
                 <PackageReference id="VSoft.Base64.Polyfill" version="0.1.11" manifestHash="sha256:f3522ce499ac60ded8b12a8a4a52e1f8009cdd3933eb8fb8cca63c24d91bfad3"/>
-                <PackageReference id="VSoft.CancellationToken" version="0.1.4" manifestHash="sha256:2673c27f35fb00249d191d45a4b8e0ebfc060ec994850c5aac8c74e006db0de4"/>
+                <PackageReference id="VSoft.CancellationToken" version="0.1.6" manifestHash="sha256:91e75e788b9fcf8d19e4199993983f3dedf90896b5a7203c72136b7b860f8436"/>
                 <PackageReference id="VSoft.HttpClient" version="2.8.1" manifestHash="sha256:c6cbfa9b4a53ac3ac3c5e19f7bce8666fa7a258665e204497c1c46205b4fec55">
-                    <PackageReference id="VSoft.CancellationToken" version="0.1.4" range="[0.1.4,]"/>
+                    <PackageReference id="VSoft.CancellationToken" version="0.1.6" range="[0.1.4,]"/>
                     <PackageReference id="VSoft.Uri" version="0.3.3" range="[0.3.3,]"/>
                 </PackageReference>
                 <PackageReference id="VSoft.JsonDataObjects" version="0.3.2" manifestHash="sha256:aca64899e738161957d113864a6ee9849a7379dd1a48cedbd65767f2f06be9f4"/>
