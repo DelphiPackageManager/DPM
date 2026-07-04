@@ -506,17 +506,26 @@ begin
   result := TDPMPackageSearchResult.Create(0,0);
   for item in ids do
   begin
-      metaData := GetPackageMetaData(cancellationToken,item.Id, item.Version.ToString, compilerVersion);
-      if metaData <> nil then
-      begin
-        latestVersionInfo := GetPackageLatestVersion(cancellationToken, item.id, compilerVersion);
-        if latestVersionInfo <> nil then
-        begin
-          metaData.LatestVersion := latestVersionInfo.LatestVersion;
-          metaData.LatestStableVersion := latestVersionInfo.LatestStableVersion;
-          Result.Results.Add(metaData);
-        end;
-      end;
+    //Determine the latest version first, independently of whether the installed
+    //version is present in this folder. Otherwise a source that only carries a
+    //newer (or prerelease) version than the installed one would report nothing,
+    //and its update would never reach the repo manager merge.
+    latestVersionInfo := GetPackageLatestVersion(cancellationToken, item.id, compilerVersion);
+    if latestVersionInfo = nil then
+      continue;
+
+    //Prefer the installed version's metadata for the row, but fall back to the
+    //latest available version's metadata when the installed .dpkg is not here.
+    metaData := GetPackageMetaData(cancellationToken, item.Id, item.Version.ToString, compilerVersion);
+    if metaData = nil then
+      metaData := GetPackageMetaData(cancellationToken, item.Id, latestVersionInfo.LatestVersion.ToString, compilerVersion);
+
+    if metaData <> nil then
+    begin
+      metaData.LatestVersion := latestVersionInfo.LatestVersion;
+      metaData.LatestStableVersion := latestVersionInfo.LatestStableVersion;
+      result.Results.Add(metaData);
+    end;
   end;
 
 

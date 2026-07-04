@@ -1585,7 +1585,8 @@ begin
             Version := ' ' + bulletChar + ' ' + package.Version.ToStringNoMeta;
             if FSearchOptions.Prerelease then
             begin
-              if package.Version <> package.latestVersion then
+              // only show an update when the latest is actually newer than installed
+              if package.latestVersion > package.Version then
               begin
                 latestVersion := package.latestVersion.ToStringNoMeta;
                 latestIsPrerelease := not package.latestVersion.IsStable;
@@ -1593,13 +1594,10 @@ begin
             end
             else
             begin
-              if package.Version <> package.LatestStableVersion then
-              begin
-                // the installed version may be a pre-release version that
-                // is later than the latest stable version so check first!
-                if package.LatestStableVersion > package.Version then
-                  latestVersion := package.LatestStableVersion.ToStringNoMeta;
-              end;
+              // the installed version may be a pre-release version that
+              // is later than the latest stable version so check first!
+              if package.LatestStableVersion > package.Version then
+                latestVersion := package.LatestStableVersion.ToStringNoMeta;
             end;
           end;
         end;
@@ -1616,7 +1614,8 @@ begin
             Version := ' ' + bulletChar + ' (' + package.Version.ToStringNoMeta + ')';
             if FSearchOptions.Prerelease then
             begin
-              if package.Version <> package.latestVersion then
+              // only show an update when the latest is actually newer than installed
+              if package.latestVersion > package.Version then
               begin
                 latestVersion := package.latestVersion.ToStringNoMeta;
                 latestIsPrerelease := not package.latestVersion.IsStable;
@@ -1624,7 +1623,7 @@ begin
             end
             else
             begin
-              if package.Version <> package.LatestStableVersion then
+              if package.LatestStableVersion > package.Version then
               begin
                 latestVersion := package.LatestStableVersion.ToStringNoMeta;
                 latestIsPrerelease := false;
