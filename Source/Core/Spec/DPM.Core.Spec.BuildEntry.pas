@@ -42,11 +42,13 @@ type
     FPlatforms : TDPMPlatforms;
     FDefines : string;
     FReferences : IList<string>;
+    FSearchPaths : IList<string>;
   protected
     function GetProject : string;
     function GetPlatforms : TDPMPlatforms;
     function GetDefines : string;
     function GetReferences : IList<string>;
+    function GetSearchPaths : IList<string>;
 
     procedure SetProject(const value : string);
     procedure SetPlatforms(const value : TDPMPlatforms);
@@ -62,9 +64,10 @@ type
     property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
     property Defines : string read GetDefines write SetDefines;
     property References : IList<string> read GetReferences;
+    property SearchPaths : IList<string> read GetSearchPaths;
 
   public
-    constructor CreateClone(const logger : ILogger; const project : string; const defines : string; const platforms : TDPMPlatforms; const references : IList<string>); reintroduce;
+    constructor CreateClone(const logger : ILogger; const project : string; const defines : string; const platforms : TDPMPlatforms; const references : IList<string>; const searchPaths : IList<string>); reintroduce;
   public
     constructor Create(const logger : ILogger); override;
 
@@ -80,16 +83,17 @@ uses
 
 function TSpecBuildEntry.Clone : ISpecBuildEntry;
 begin
-  result := TSpecBuildEntry.CreateClone(logger, FProject, FDefines, FPlatforms, FReferences);
+  result := TSpecBuildEntry.CreateClone(logger, FProject, FDefines, FPlatforms, FReferences, FSearchPaths);
 end;
 
 constructor TSpecBuildEntry.Create(const logger : ILogger);
 begin
   inherited Create(logger);
   FReferences := TCollections.CreateList<string>;
+  FSearchPaths := TCollections.CreateList<string>;
 end;
 
-constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const project, defines : string; const platforms : TDPMPlatforms; const references : IList<string>);
+constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const project, defines : string; const platforms : TDPMPlatforms; const references : IList<string>; const searchPaths : IList<string>);
 begin
   inherited Create(logger);
   FProject := project;
@@ -98,6 +102,9 @@ begin
   FReferences := TCollections.CreateList<string>;
   if references <> nil then
     FReferences.AddRange(references);
+  FSearchPaths := TCollections.CreateList<string>;
+  if searchPaths <> nil then
+    FSearchPaths.AddRange(searchPaths);
 end;
 
 
@@ -123,16 +130,23 @@ begin
   result := FReferences;
 end;
 
+function TSpecBuildEntry.GetSearchPaths : IList<string>;
+begin
+  result := FSearchPaths;
+end;
+
 
 
 function TSpecBuildEntry.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var
   platformsSeq : IYAMLSequence;
   refsSeq : IYAMLSequence;
+  searchSeq : IYAMLSequence;
   i : integer;
   platform  : TDPMPlatform;
   sPlatform : string;
   refName : string;
+  searchPath : string;
 begin
   result := true;
   FProject := yamlObject.S['project'];
@@ -166,6 +180,17 @@ begin
         FReferences.Add(refName);
     end;
   end;
+
+  if yamlObject.Contains('searchPaths') then
+  begin
+    searchSeq := yamlObject.A['searchPaths'];
+    for i := 0 to searchSeq.Count - 1 do
+    begin
+      searchPath := Trim(searchSeq.S[i]);
+      if searchPath <> '' then
+        FSearchPaths.Add(searchPath);
+    end;
+  end;
 end;
 
 
@@ -191,6 +216,7 @@ var
   mapping : IYAMLMapping;
   platformsSeq : IYAMLSequence;
   refsSeq : IYAMLSequence;
+  searchSeq : IYAMLSequence;
   platform : TDPMPlatform;
   sPlatform : string;
   i : integer;
@@ -215,6 +241,13 @@ begin
     refsSeq := mapping.A['references'];
     for i := 0 to FReferences.Count - 1 do
       refsSeq.AddValue(FReferences[i]);
+  end;
+
+  if FSearchPaths.Count > 0 then
+  begin
+    searchSeq := mapping.A['searchPaths'];
+    for i := 0 to FSearchPaths.Count - 1 do
+      searchSeq.AddValue(FSearchPaths[i]);
   end;
 end;
 

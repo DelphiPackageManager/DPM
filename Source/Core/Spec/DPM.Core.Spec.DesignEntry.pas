@@ -43,6 +43,7 @@ type
     FPlatforms : TDPMPlatforms;
     FDefines : string;
     FReferences : IList<string>;
+    FSearchPaths : IList<string>;
 
     FLibSuffix : string;
     FLibPrefix : string;
@@ -55,6 +56,7 @@ type
     function GetPlatforms : TDPMPlatforms;
     function GetDefines : string;
     function GetReferences : IList<string>;
+    function GetSearchPaths : IList<string>;
 
     procedure SetProject(const value : string);
     procedure SetDefines(const value : string);
@@ -71,7 +73,7 @@ type
 
     function Clone : ISpecDesignEntry;reintroduce;
     constructor CreateClone(const logger : ILogger; const project : string; const defines : string; platforms : TDPMPlatforms;
-                            const libSuffix, libPrefix, libVersion : string; const references : IList<string> ); reintroduce;
+                            const libSuffix, libPrefix, libVersion : string; const references : IList<string>; const searchPaths : IList<string> ); reintroduce;
 
   public
     constructor Create(const logger : ILogger); override;
@@ -86,7 +88,7 @@ uses
 
 function TSpecDesignEntry.Clone : ISpecDesignEntry;
 begin
-  result := TSpecDesignEntry.CreateClone(logger, FProject, FDefines, FPlatforms, FLibSuffix, FLibPrefix, FLibVersion, FReferences);
+  result := TSpecDesignEntry.CreateClone(logger, FProject, FDefines, FPlatforms, FLibSuffix, FLibPrefix, FLibVersion, FReferences, FSearchPaths);
 end;
 
 constructor TSpecDesignEntry.Create(const logger : ILogger);
@@ -95,10 +97,11 @@ begin
   //leave empty so the installer can tell "author did not specify" from "author explicitly declared"
   FPlatforms := [];
   FReferences := TCollections.CreateList<string>;
+  FSearchPaths := TCollections.CreateList<string>;
 end;
 
 constructor TSpecDesignEntry.CreateClone(const logger : ILogger; const project : string; const defines : string; platforms : TDPMPlatforms;
-                                         const libSuffix, libPrefix, libVersion : string; const references : IList<string>);
+                                         const libSuffix, libPrefix, libVersion : string; const references : IList<string>; const searchPaths : IList<string>);
 begin
   inherited Create(logger);
   FProject := project;
@@ -112,6 +115,9 @@ begin
   FReferences := TCollections.CreateList<string>;
   if references <> nil then
     FReferences.AddRange(references);
+  FSearchPaths := TCollections.CreateList<string>;
+  if searchPaths <> nil then
+    FSearchPaths.AddRange(searchPaths);
 end;
 
 
@@ -151,16 +157,23 @@ begin
   result := FReferences;
 end;
 
+function TSpecDesignEntry.GetSearchPaths : IList<string>;
+begin
+  result := FSearchPaths;
+end;
+
 
 
 function TSpecDesignEntry.LoadFromYAML(const yamlObject: IYAMLMapping): boolean;
 var
   platformsSeq : IYAMLSequence;
   refsSeq : IYAMLSequence;
+  searchSeq : IYAMLSequence;
   i : integer;
   platform  : TDPMPlatform;
   sPlatform : string;
   refName : string;
+  searchPath : string;
 begin
   result := true;
   FProject := yamlObject.S['project'];
@@ -192,6 +205,17 @@ begin
       refName := Trim(refsSeq.S[i]);
       if refName <> '' then
         FReferences.Add(refName);
+    end;
+  end;
+
+  if yamlObject.Contains('searchPaths') then
+  begin
+    searchSeq := yamlObject.A['searchPaths'];
+    for i := 0 to searchSeq.Count - 1 do
+    begin
+      searchPath := Trim(searchSeq.S[i]);
+      if searchPath <> '' then
+        FSearchPaths.Add(searchPath);
     end;
   end;
 
@@ -246,6 +270,7 @@ var
   mapping : IYAMLMapping;
   platformsSeq : IYAMLSequence;
   refsSeq : IYAMLSequence;
+  searchSeq : IYAMLSequence;
   platform : TDPMPlatform;
   sPlatform : string;
   i : integer;
@@ -271,6 +296,13 @@ begin
     refsSeq := mapping.A['references'];
     for i := 0 to FReferences.Count - 1 do
       refsSeq.AddValue(FReferences[i]);
+  end;
+
+  if FSearchPaths.Count > 0 then
+  begin
+    searchSeq := mapping.A['searchPaths'];
+    for i := 0 to FSearchPaths.Count - 1 do
+      searchSeq.AddValue(FSearchPaths[i]);
   end;
 
   if FLibSuffix <> '' then

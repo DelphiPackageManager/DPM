@@ -725,6 +725,35 @@ var
     result := TPathUtils.CompressRelativePath('', result);
   end;
 
+  //Resolve an entry's additional searchPaths (authored relative to the package root, same convention
+  //as `project`) against the extracted package folder, and combine them with the dependency lib
+  //folders in `searchPaths`. A path that resolves outside the package folder is warned about and
+  //skipped - it never reaches msbuild. An entry with no searchPaths just yields the dependency folders.
+  function ResolveEntrySearchPaths(const entrySearchPaths : IList<string>) : IList<string>;
+  var
+    entryPath : string;
+    resolvedPath : string;
+    packageRoot : string;
+  begin
+    result := TCollections.CreateList<string>;
+    result.AddRange(searchPaths);
+    if (entrySearchPaths = nil) or (entrySearchPaths.Count = 0) then
+      exit;
+    packageRoot := IncludeTrailingPathDelimiter(packagePath);
+    for entryPath in entrySearchPaths do
+    begin
+      resolvedPath := IncludeTrailingPathDelimiter(ResolveProjectFile(entryPath));
+      //Trailing delimiter on both sides keeps the check from matching a sibling folder that merely
+      //shares the package folder's name as a prefix, and allows the package root itself.
+      if not SameText(Copy(resolvedPath, 1, Length(packageRoot)), packageRoot) then
+      begin
+        FLogger.Warning('Ignoring search path [' + entryPath + '] for package [' + packageInfo.Id + '] - it resolves outside the package folder.');
+        continue;
+      end;
+      result.Add(resolvedPath);
+    end;
+  end;
+
   //Copy the files matched by the template's copyToLib globs (archive-relative, e.g. 'Source/**/*.dfm')
   //into lib\{platform}, flattened - companion files like .dfm/.res that aren't in the precompiled
   //.dcu/.dcp but the consumer's compiler still needs on the search path. The matched files were
@@ -882,20 +911,23 @@ begin
   Compiler.LibOutputDir := TPath.Combine(packagePath, 'lib' + PathDelim + DPMPlatformToBDString(effectivePlatform));
   Compiler.Configuration := configuration;
 
-  // Set library paths from dependencies
+  // Collect the base library paths from dependencies. These are combined per build/design entry with
+  // that entry's own searchPaths (see ResolveEntrySearchPaths) and set on the compiler just before
+  // each BuildProject call, so an entry can add package-local search paths without affecting others.
+  searchPaths := TCollections.CreateList<string>;
   if packageReference.HasChildren then
   begin
-    searchPaths := TCollections.CreateList<string>;
     for dependency in packageReference.Children do
     begin
       childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion);
       childSearchPath := TPath.Combine(childSearchPath, 'lib' + PathDelim + DPMPlatformToBDString(effectivePlatform));
       searchPaths.Add(childSearchPath);
     end;
-    Compiler.SetSearchPaths(searchPaths);
-  end
-  else
-    Compiler.SetSearchPaths(nil);
+  end;
+
+  // Copy any copyToLib companion files (.dfm/.res/etc) into lib\{platform} BEFORE compiling, so the
+  // companion files are already on the compiler's search path when the runtime/design projects build.
+  CopyCopyToLibFiles;
 
   // Compile build entries
   for buildEntry in template.BuildEntries do
@@ -909,6 +941,7 @@ begin
     FLogger.Information('Building project: ' + buildEntry.Project);
     projectFile := ResolveProjectFile(buildEntry.Project);
 
+    Compiler.SetSearchPaths(ResolveEntrySearchPaths(buildEntry.SearchPaths));
     result := Compiler.BuildProject(cancellationToken, effectivePlatform, projectFile, configuration, packageInfo.Version, false);
     if result then
       FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
@@ -970,7 +1003,9 @@ begin
     FLogger.NewLine;
     FLogger.Information('Building design package: ' + designEntry.Project + ' (' + DPMPlatformToString(effectivePlatform) + ')');
 
-    //output dirs and search paths are already set for effectivePlatform by the runtime build above - nothing to change.
+    //output dirs were set for effectivePlatform by the runtime build above; search paths are set per
+    //entry so this design entry's own searchPaths (combined with the dependency lib folders) apply.
+    Compiler.SetSearchPaths(ResolveEntrySearchPaths(designEntry.SearchPaths));
     result := Compiler.BuildProject(cancellationToken, effectivePlatform, projectFile, configuration, packageInfo.Version, true);
     if not result then
     begin
@@ -982,9 +1017,6 @@ begin
     end;
     FLogger.Success('Design package [' + designEntry.Project + '] build succeeded.');
   end;
-
-  // Copy any copyToLib companion files (.dfm/.res/etc) into lib\{platform} now that it has been built.
-  CopyCopyToLibFiles;
 
   // Copy any copyToBin files (native dlls) into bpl\{platform} for the platform just built.
   CopyCopyToBinFiles;

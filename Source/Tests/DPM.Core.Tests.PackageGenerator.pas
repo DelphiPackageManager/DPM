@@ -67,6 +67,9 @@ const
     'metadata:'#13#10 +
     '  id: Test.Gen'#13#10 +
     '  version: 1.0.0'#13#10 +
+    '  description: package generator test'#13#10 +
+    '  authors:'#13#10 +
+    '    - Vincent Parrett'#13#10 +
     'targetPlatforms:'#13#10 +
     '  - compiler: 12.0'#13#10 +
     '    platforms: [Win32, Win64]'#13#10 +

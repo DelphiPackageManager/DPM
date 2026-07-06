@@ -729,6 +729,23 @@ object DSpecCreatorForm: TDSpecCreatorForm
             TabOrder = 5
             OnClick = btnDeleteBuildRefClick
           end
+          object lblBuildSearchPaths: TLabel
+            Left = 16
+            Top = 335
+            Width = 210
+            Height = 15
+            Caption = 'Additional Search Paths (one per line):'
+          end
+          object mmoBuildSearchPaths: TMemo
+            Left = 16
+            Top = 356
+            Width = 510
+            Height = 150
+            Anchors = [akLeft, akTop, akRight]
+            ScrollBars = ssVertical
+            TabOrder = 6
+            OnChange = mmoBuildSearchPathsChange
+          end
         end
         object crdDesign: TCard
           Left = 1
@@ -889,6 +906,23 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Height = 23
             TabOrder = 8
             OnChange = edtLibVersionChange
+          end
+          object lblDesignSearchPaths: TLabel
+            Left = 264
+            Top = 270
+            Width = 210
+            Height = 15
+            Caption = 'Additional Search Paths (one per line):'
+          end
+          object mmoDesignSearchPaths: TMemo
+            Left = 264
+            Top = 291
+            Width = 262
+            Height = 150
+            Anchors = [akLeft, akTop, akRight]
+            ScrollBars = ssVertical
+            TabOrder = 9
+            OnChange = mmoDesignSearchPathsChange
           end
         end
         object crdDependency: TCard

@@ -63,6 +63,8 @@ type
     procedure Template_CopyToBin_List_RoundTrips;
 
     procedure Template_CopyLocal_List_RoundTrips;
+
+    procedure BuildAndDesign_SearchPaths_RoundTrips;
   end;
 
 implementation
@@ -285,6 +287,7 @@ begin
       Assert.IsTrue(eb.Platforms = ab.Platforms, ctx + ' build platforms ' + eb.Project);
       Assert.AreEqual(eb.Defines, ab.Defines, ctx + ' build defines ' + eb.Project);
       AssertStringListsEqual(eb.References, ab.References, ctx + ' build references ' + eb.Project);
+      AssertStringListsEqual(eb.SearchPaths, ab.SearchPaths, ctx + ' build searchPaths ' + eb.Project);
     end;
 
     Assert.AreEqual(et.DesignEntries.Count, at.DesignEntries.Count, ctx + ' design count');
@@ -299,6 +302,7 @@ begin
       Assert.AreEqual(edsn.LibPrefix, adsn.LibPrefix, ctx + ' design libPrefix ' + edsn.Project);
       Assert.AreEqual(edsn.LibVersion, adsn.LibVersion, ctx + ' design libVersion ' + edsn.Project);
       AssertStringListsEqual(edsn.References, adsn.References, ctx + ' design references ' + edsn.Project);
+      AssertStringListsEqual(edsn.SearchPaths, adsn.SearchPaths, ctx + ' design searchPaths ' + edsn.Project);
     end;
 
     Assert.AreEqual(et.PackageDefinitions.Count, at.PackageDefinitions.Count, ctx + ' package definition count');
@@ -810,6 +814,60 @@ begin
   Assert.IsTrue(template.CopyLocalEntries[0].Platforms = [TDPMPlatform.Win64], 'first copyLocal platforms');
   Assert.AreEqual('bin/$platform$/bar.dll', template.CopyLocalEntries[1].Source, 'second copyLocal src');
   Assert.IsTrue(template.CopyLocalEntries[1].Platforms = [TDPMPlatform.Win32, TDPMPlatform.Win64], 'second copyLocal platforms');
+end;
+
+procedure TSpecRoundTripTests.BuildAndDesign_SearchPaths_RoundTrips;
+const
+  //searchPaths is an additional-unit-search-path list on both build and design entries. Each entry
+  //is a package-root-relative path; it must survive load -> GenerateDspecYAML -> reload for both.
+  cYaml =
+    'metadata:'#13#10 +
+    '  id: Test.SearchPaths'#13#10 +
+    '  version: 1.0.0'#13#10 +
+    '  description: searchPaths list test'#13#10 +
+    '  authors:'#13#10 +
+    '    - Vincent Parrett'#13#10 +
+    '  license: Apache-2.0'#13#10 +
+    'targetPlatforms:'#13#10 +
+    '  - compiler: 12.0'#13#10 +
+    '    platforms: [Win32, Win64]'#13#10 +
+    '    template: default'#13#10 +
+    'templates:'#13#10 +
+    '  - name: default'#13#10 +
+    '    build:'#13#10 +
+    '      - project: /packages/Foo.dproj'#13#10 +
+    '        searchPaths:'#13#10 +
+    '          - /Source/Shared'#13#10 +
+    '          - /Source/Common'#13#10 +
+    '    design:'#13#10 +
+    '      - project: /packages/FooDesign.dproj'#13#10 +
+    '        searchPaths:'#13#10 +
+    '          - /Source/Design'#13#10;
+var
+  reader : IPackageSpecReader;
+  spec : IPackageSpec;
+  template : ISpecTemplate;
+  build : ISpecBuildEntry;
+  design : ISpecDesignEntry;
+begin
+  reader := TPackageSpecReader.Create(TTestLogger.Create);
+  spec := reader.ReadSpecString(cYaml);
+  Assert.IsNotNull(spec, 'spec should load');
+  spec := RoundTrip(spec);
+
+  template := spec.FindTemplate('default');
+  Assert.IsNotNull(template, 'default template');
+
+  build := template.FindBuildEntry('/packages/Foo.dproj');
+  Assert.IsNotNull(build, 'build entry');
+  Assert.AreEqual(2, build.SearchPaths.Count, 'build searchPaths count');
+  Assert.AreEqual('/Source/Shared', build.SearchPaths[0], 'first build searchPath');
+  Assert.AreEqual('/Source/Common', build.SearchPaths[1], 'second build searchPath');
+
+  design := template.FindDesignEntry('/packages/FooDesign.dproj');
+  Assert.IsNotNull(design, 'design entry');
+  Assert.AreEqual(1, design.SearchPaths.Count, 'design searchPaths count');
+  Assert.AreEqual('/Source/Design', design.SearchPaths[0], 'first design searchPath');
 end;
 
 initialization

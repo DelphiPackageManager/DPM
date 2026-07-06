@@ -199,6 +199,7 @@ type
     function GetPlatforms : TDPMPlatforms;
     function GetDefines : string;
     function GetReferences : IList<string>;
+    function GetSearchPaths : IList<string>;
 
     procedure SetProject(const value : string);
     procedure SetPlatforms(const value : TDPMPlatforms);
@@ -214,6 +215,8 @@ type
     property Defines : string read GetDefines write SetDefines;
     /// <summary> Package names this build package requires beyond rtl. Emitted by `dpm prepare` as `requires` entries in the dpk and `<DCCReference>` elements in the dproj. Not consumed at pack/install time. </summary>
     property References : IList<string> read GetReferences;
+    /// <summary> Additional unit search paths (relative to the extracted package root) passed to the compiler when building this project. </summary>
+    property SearchPaths : IList<string> read GetSearchPaths;
 
   end;
 
@@ -226,6 +229,7 @@ type
     function GetDefines : string;
     function GetPlatforms : TDPMPlatforms;
     function GetReferences : IList<string>;
+    function GetSearchPaths : IList<string>;
 
     function GetLibSuffix : string;
     function GetLibPrefix : string;
@@ -248,6 +252,8 @@ type
     property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
     /// <summary> Package names this design package requires beyond rtl/designide. Emitted by `dpm prepare` as `requires` entries in the dpk and `<DCCReference>` elements in the dproj. Not consumed at pack/install time. </summary>
     property References : IList<string> read GetReferences;
+    /// <summary> Additional unit search paths (relative to the extracted package root) passed to the compiler when building this design project. </summary>
+    property SearchPaths : IList<string> read GetSearchPaths;
 
     property LibSuffix : string read GetLibSuffix write SetLibSuffix;
     property LibPrefix : string read GetLibPrefix write SetLibPrefix;

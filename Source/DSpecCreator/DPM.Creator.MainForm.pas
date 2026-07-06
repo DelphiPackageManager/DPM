@@ -111,6 +111,8 @@ type
     lbBuildReferences : TListBox;
     btnAddBuildRef : TButton;
     btnDeleteBuildRef : TButton;
+    lblBuildSearchPaths : TLabel;
+    mmoBuildSearchPaths : TMemo;
     crdCopyLocal : TCard;
     lblCopyLocal : TLabel;
     lblCopyLocalSrc : TLabel;
@@ -139,6 +141,8 @@ type
     edtLibSuffix : TEdit;
     lblLibVersion : TLabel;
     edtLibVersion : TEdit;
+    lblDesignSearchPaths : TLabel;
+    mmoDesignSearchPaths : TMemo;
     PopupMenu : TPopupMenu;
     BalloonHint1 : TBalloonHint;
     tsGenerate : TTabSheet;
@@ -377,11 +381,13 @@ type
     procedure clbBuildPlatformsClickCheck(Sender : TObject);
     procedure btnAddBuildRefClick(Sender : TObject);
     procedure btnDeleteBuildRefClick(Sender : TObject);
+    procedure mmoBuildSearchPathsChange(Sender : TObject);
     procedure edtDesignProjectChange(Sender : TObject);
     procedure edtDesignDefinesChange(Sender : TObject);
     procedure clbDesignPlatformsClickCheck(Sender : TObject);
     procedure btnAddDesignRefClick(Sender : TObject);
     procedure btnDeleteDesignRefClick(Sender : TObject);
+    procedure mmoDesignSearchPathsChange(Sender : TObject);
     procedure edtLibPrefixChange(Sender : TObject);
     procedure edtLibSuffixChange(Sender : TObject);
     procedure edtLibVersionChange(Sender : TObject);
@@ -2146,6 +2152,28 @@ begin
     build.References.Delete(itemToDelete);
 end;
 
+procedure TDSpecCreatorForm.mmoBuildSearchPathsChange(Sender : TObject);
+var
+  i : integer;
+  searchPath : string;
+  build : ISpecBuildEntry;
+begin
+  if FLoadingCard then
+    Exit;
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+  build := (tvTemplates.Selected as TTemplateTreeNode).build;
+  if not Assigned(build) then
+    Exit;
+  build.SearchPaths.Clear;
+  for i := 0 to mmoBuildSearchPaths.Lines.Count - 1 do
+  begin
+    searchPath := Trim(mmoBuildSearchPaths.Lines[i]);
+    if searchPath <> '' then
+      build.SearchPaths.Add(searchPath);
+  end;
+end;
+
 procedure TDSpecCreatorForm.edtDesignProjectChange(Sender : TObject);
 var
   str : string;
@@ -2221,6 +2249,28 @@ begin
   itemToDelete := design.References.IndexOf(reference);
   if itemToDelete >= 0 then
     design.References.Delete(itemToDelete);
+end;
+
+procedure TDSpecCreatorForm.mmoDesignSearchPathsChange(Sender : TObject);
+var
+  i : integer;
+  searchPath : string;
+  design : ISpecDesignEntry;
+begin
+  if FLoadingCard then
+    Exit;
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+  design := (tvTemplates.Selected as TTemplateTreeNode).designEntry;
+  if not Assigned(design) then
+    Exit;
+  design.SearchPaths.Clear;
+  for i := 0 to mmoDesignSearchPaths.Lines.Count - 1 do
+  begin
+    searchPath := Trim(mmoDesignSearchPaths.Lines[i]);
+    if searchPath <> '' then
+      design.SearchPaths.Add(searchPath);
+  end;
 end;
 
 procedure TDSpecCreatorForm.edtLibPrefixChange(Sender : TObject);
@@ -3881,6 +3931,9 @@ begin
           lbBuildReferences.Clear;
           for i := 0 to lNode.build.References.Count - 1 do
             lbBuildReferences.Items.Add(lNode.build.References[i]);
+          mmoBuildSearchPaths.Lines.Clear;
+          for i := 0 to lNode.build.SearchPaths.Count - 1 do
+            mmoBuildSearchPaths.Lines.Add(lNode.build.SearchPaths[i]);
           CardPanel.ActiveCard := crdBuild;
         end;
       ntCopyLocal :
@@ -3897,6 +3950,9 @@ begin
           lbDesignReferences.Clear;
           for i := 0 to lNode.designEntry.References.Count - 1 do
             lbDesignReferences.Items.Add(lNode.designEntry.References[i]);
+          mmoDesignSearchPaths.Lines.Clear;
+          for i := 0 to lNode.designEntry.SearchPaths.Count - 1 do
+            mmoDesignSearchPaths.Lines.Add(lNode.designEntry.SearchPaths[i]);
           edtLibPrefix.Text := lNode.designEntry.LibPrefix;
           edtLibSuffix.Text := lNode.designEntry.LibSuffix;
           edtLibVersion.Text := lNode.designEntry.LibVersion;

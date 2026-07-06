@@ -650,8 +650,12 @@ begin
   //Always include the dspec folder so the effective root never descends below it.
   dirs.Add(IncludeTrailingPathDelimiter(basePath));
 
-  AddPathDir(spec.MetaData.Icon, false);
-  AddPathDir(spec.MetaData.ReadMe, false);
+  //Deliberately do NOT include icon/readme here. They are single metadata files placed by their
+  //own dedicated logic (icon -> fixed icon.png/icon.svg at the archive root; readme -> ToEffectiveRelative,
+  //which drops it at the archive root when it sits outside the effective root). Feeding them into the
+  //common-ancestor calc lets a '..\readme.md' above the dspec folder drag the effective root up a level,
+  //which then prefixes the entire source tree with a stray folder (e.g. 'jcl\source\...'). The root must
+  //be derived only from content that is actually laid out relative to it: sources and build/design/packagedef.
 
   for sourceEntry in template.SourceEntries do
     AddPathDir(sourceEntry.Source, true);
