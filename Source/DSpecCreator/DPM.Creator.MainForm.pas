@@ -50,6 +50,7 @@ uses
   DPM.Core.Repository.Interfaces,
   DPM.Core.Package.Installer.Interfaces,
   DPM.Core.Cache.Interfaces,
+  DPM.IDE.Options,
   DPM.Creator.Logger,
   DPM.Creator.TemplateTreeNode,
   DPM.Creator.Dspec.FileHandler,
@@ -224,6 +225,11 @@ type
     actCompilersDeselectAll : TAction;
     SelectAll1 : TMenuItem;
     DeselectAll1 : TMenuItem;
+    pmTestCompilers : TPopupMenu;
+    actTestCompilersSelectAll : TAction;
+    actTestCompilersDeselectAll : TAction;
+    TestSelectAll1 : TMenuItem;
+    TestDeselectAll1 : TMenuItem;
     pmPlatforms : TPopupMenu;
     actPlatformsSelectAll : TAction;
     actPlatformsDeselectAll : TAction;
@@ -466,6 +472,8 @@ type
     procedure actCompilersSelectAllExecute(Sender : TObject);
     procedure actPlatformsSelectAllExecute(Sender : TObject);
     procedure actPlatformsDeselectAllExecute(Sender : TObject);
+    procedure actTestCompilersSelectAllExecute(Sender : TObject);
+    procedure actTestCompilersDeselectAllExecute(Sender : TObject);
     procedure edtCopyrightChange(Sender : TObject);
     procedure clbCompilersKeyPress(Sender: TObject; var Key: Char);
     procedure edtReadmeChange(Sender: TObject);
@@ -525,6 +533,11 @@ type
     procedure MRUListClick(Sender : TObject; const filename : string);
 
     procedure UpdateFormCaption(const value : string);
+
+    // Applies the persisted DPM IDE options log verbosity to all loggers used by
+    // the creator. Shared with the IDE plugin options, so the log level chosen in
+    // the Options dialog takes effect here too.
+    procedure ApplyLogVerbosity;
 
     procedure OpenProject(const filename : string);
     function GetFileOpenInitialDir : string;
@@ -2717,6 +2730,16 @@ begin
 
 end;
 
+procedure TDSpecCreatorForm.actTestCompilersDeselectAllExecute(Sender : TObject);
+begin
+  clbTestCompilers.CheckAll(TCheckBoxState.cbUnchecked);
+end;
+
+procedure TDSpecCreatorForm.actTestCompilersSelectAllExecute(Sender : TObject);
+begin
+  clbTestCompilers.CheckAll(TCheckBoxState.cbChecked);
+end;
+
 procedure TDSpecCreatorForm.actDeleteBuildItemExecute(Sender : TObject);
 begin
   DeleteSelectedEntry;
@@ -3476,6 +3499,7 @@ begin
   // active page's memo (retargeted per operation). Pack/sign default to PackLogMemo.
   FOpsLogger := TDSpecQueuedLogger.Create(PackLogMemo);
   FPackLogger := FOpsLogger;
+  ApplyLogVerbosity;
   InitCoreContainer;
   FPacking := false;
   FUploading := false;
@@ -3839,13 +3863,24 @@ begin
   end;
 end;
 
+procedure TDSpecCreatorForm.ApplyLogVerbosity;
+var
+  ideOptions : IDPMIDEOptions;
+begin
+  ideOptions := TDPMIDEOptions.Create;
+  ideOptions.LoadFromFile();
+  FLogger.Verbosity := ideOptions.LogVerbosity;
+  FPackLogger.Verbosity := ideOptions.LogVerbosity;
+end;
+
 procedure TDSpecCreatorForm.miOptionsClick(Sender : TObject);
 var
   OptionsForm : TOptionsForm;
 begin
   OptionsForm := TOptionsForm.Create(nil, FLogger);
   try
-    OptionsForm.ShowModal;
+    if OptionsForm.ShowModal = mrOk then
+      ApplyLogVerbosity;
   finally
     FreeAndNil(OptionsForm);
   end;

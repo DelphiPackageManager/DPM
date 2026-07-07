@@ -1493,7 +1493,8 @@ end;
 
 procedure TLogMemo.CheckTheme;
 begin
-  if TStringUtils.Contains(FStyleServices.Name, 'Dark') then
+  //Not ideal - but until we find a better way.
+  if TStringUtils.Contains(FStyleServices.Name, 'Dark') or TStringUtils.Contains(FStyleServices.Name, 'Windows11 MineShaft') then
     FThemeType := TThemeType.Dark
   else
     FThemeType := TThemeType.Light;

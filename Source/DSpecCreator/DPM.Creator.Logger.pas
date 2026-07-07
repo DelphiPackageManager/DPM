@@ -73,10 +73,13 @@ constructor TDSpecLogger.Create(const memo : TLogMemo);
 begin
   inherited Create;
   FTarget := memo;
+  FVerbosity := TVerbosity.Normal;
 end;
 
 procedure TDSpecLogger.Debug(const data: string);
 begin
+  if FVerbosity < TVerbosity.Debug then
+    exit;
   FTarget.AddRow(data, mtDebug);
   FTarget.Flush;
 end;
@@ -94,6 +97,8 @@ end;
 
 procedure TDSpecLogger.Information(const data: string; const important: boolean);
 begin
+  if (FVerbosity < TVerbosity.Normal) and (not important) then
+    exit;
   if important then
     FTarget.AddRow(data, mtImportantInformation)
   else
@@ -114,6 +119,8 @@ end;
 
 procedure TDSpecLogger.Success(const data: string; const important: boolean);
 begin
+  if (FVerbosity < TVerbosity.Normal) and (not important) then
+    exit;
   if important then
     FTarget.AddRow(data, mtImportantSuccess)
   else
@@ -123,6 +130,8 @@ end;
 
 procedure TDSpecLogger.Verbose(const data: string; const important: boolean);
 begin
+  if FVerbosity < TVerbosity.Detailed then
+    exit;
   if important then
     FTarget.AddRow(data, mtImportantVerbose)
   else
@@ -145,6 +154,7 @@ constructor TDSpecQueuedLogger.Create(const memo : TLogMemo);
 begin
   inherited Create;
   FTarget := memo;
+  FVerbosity := TVerbosity.Normal;
 end;
 
 procedure TDSpecQueuedLogger.SetTarget(const memo : TLogMemo);
@@ -183,6 +193,8 @@ end;
 
 procedure TDSpecQueuedLogger.Debug(const data : string);
 begin
+  if FVerbosity < TVerbosity.Debug then
+    exit;
   QueueLine(data, mtDebug);
 end;
 
@@ -198,6 +210,8 @@ end;
 
 procedure TDSpecQueuedLogger.Information(const data : string; const important : boolean);
 begin
+  if (FVerbosity < TVerbosity.Normal) and (not important) then
+    exit;
   if important then
     QueueLine(data, mtImportantInformation)
   else
@@ -216,6 +230,8 @@ end;
 
 procedure TDSpecQueuedLogger.Success(const data : string; const important : boolean);
 begin
+  if (FVerbosity < TVerbosity.Normal) and (not important) then
+    exit;
   if important then
     QueueLine(data, mtImportantSuccess)
   else
@@ -224,6 +240,8 @@ end;
 
 procedure TDSpecQueuedLogger.Verbose(const data : string; const important : boolean);
 begin
+  if FVerbosity < TVerbosity.Detailed then
+    exit;
   if important then
     QueueLine(data, mtImportantVerbose)
   else
