@@ -37,6 +37,7 @@ uses
   Vcl.Graphics,
   Vcl.Controls,
   Vcl.StdCtrls,
+  Vcl.Menus,
   Vcl.Forms,
   Vcl.Styles,
   Vcl.Themes;
@@ -65,7 +66,10 @@ type
     FHoverRow : integer; //mouse over row in view (add to top row to get index)
 
     FTopRow : Int64; //this is the top row cursor .
-    FCurrentRow : Int64;
+    FCurrentRow : Int64; //the caret - moving end of the selection.
+    FAnchorRow : Int64;  //fixed end of the selection range (-1 = no selection).
+    FSelecting : boolean; //true while drag-selecting with the left mouse button.
+    FPopupMenu : TPopupMenu;
     FMaxWidth : integer;
     FUpdating : boolean;
     FUpdatingScrollBars : boolean;
@@ -94,6 +98,16 @@ type
     procedure Paint;override;
     procedure DoPaintRow(const index : integer; const state : TPaintRowState; const copyCanvas : boolean = true);
     function GetRowPaintState(const rowIdx : integer) : TPaintRowState;
+    function RowSelected(const rowIdx : integer) : boolean;
+    procedure MoveCaret(const newRow : Int64; const extendSelection : boolean);
+    procedure KeyDown(var Key : Word; Shift : TShiftState); override;
+
+    //popup menu handlers
+    procedure BuildPopupMenu;
+    procedure DoPopupMenuPopup(Sender : TObject);
+    procedure DoCopyClick(Sender : TObject);
+    procedure DoCopyAllClick(Sender : TObject);
+    procedure DoSelectAllClick(Sender : TObject);
 
 
     procedure UpdateScrollBars;
@@ -153,6 +167,11 @@ type
     procedure Invalidate; override;
     procedure Clear;
     procedure AddRow(const value : string; const messageType : TLogMessageType);
+    procedure GoToRow(const index : integer);
+    procedure SelectAll;
+    procedure ClearSelection;
+    procedure CopyToClipboard;
+    function GetSelectedText : string;
     procedure CheckTheme;
     procedure BeginUpdate;
     procedure EndUpdate;
@@ -198,6 +217,7 @@ uses
   System.SysUtils,
   System.Math,
   System.UITypes,
+  Vcl.Clipbrd,
   DPM.Core.Utils.Strings;
 
 
@@ -228,6 +248,206 @@ begin
   //than eagerly here - avoids redrawing the scrollbar on every appended line.
   idx := FItems.AddObject(value, TObject(NativeUInt(messageType)) );
   ScrollInView(idx);
+end;
+
+procedure TLogMemo.GoToRow(const index: integer);
+var
+  row : integer;
+begin
+  if RowCount = 0 then
+    exit;
+  row := index;
+  if row < 0 then
+    row := 0;
+  if row > RowCount - 1 then
+    row := RowCount - 1;
+  FCurrentRow := row;
+  ScrollInView(row);
+  Flush;
+end;
+
+function TLogMemo.RowSelected(const rowIdx: integer): boolean;
+begin
+  //A selection exists only when both ends are valid. The range is inclusive
+  //between the anchor and the caret, in either direction.
+  result := (FCurrentRow >= 0) and (FAnchorRow >= 0) and
+            (rowIdx >= Min(FAnchorRow, FCurrentRow)) and
+            (rowIdx <= Max(FAnchorRow, FCurrentRow));
+end;
+
+procedure TLogMemo.MoveCaret(const newRow: Int64; const extendSelection: boolean);
+var
+  row : Int64;
+begin
+  if RowCount = 0 then
+    exit;
+  row := newRow;
+  if row < 0 then
+    row := 0;
+  if row > RowCount - 1 then
+    row := RowCount - 1;
+  //Plain navigation collapses the selection onto the caret; Shift keeps the anchor
+  //fixed so the range grows/shrinks as the caret moves.
+  if (not extendSelection) or (FAnchorRow < 0) then
+    FAnchorRow := row;
+  FCurrentRow := row;
+  ScrollInView(row);
+  //Selection ranges can span many rows, so repaint the whole visible area rather than
+  //the incremental two-row path used by DoLineUp/DoLineDown.
+  Repaint;
+  UpdateScrollBars;
+end;
+
+procedure TLogMemo.KeyDown(var Key: Word; Shift: TShiftState);
+var
+  extend : boolean;
+  caret : Int64;
+begin
+  inherited;
+  if RowCount = 0 then
+    exit;
+  extend := ssShift in Shift;
+  //When there is no caret yet, seed navigation from the top visible row.
+  caret := FCurrentRow;
+  if caret < 0 then
+    caret := FTopRow;
+
+  if ssCtrl in Shift then
+  begin
+    case Key of
+      Ord('A') :
+      begin
+        SelectAll;
+        Key := 0;
+      end;
+      Ord('C') :
+      begin
+        CopyToClipboard;
+        Key := 0;
+      end;
+    end;
+    exit;
+  end;
+
+  case Key of
+    VK_UP     : MoveCaret(caret - 1, extend);
+    VK_DOWN   : MoveCaret(caret + 1, extend);
+    VK_PRIOR  : MoveCaret(caret - Max(FSelectableRows, 1), extend);
+    VK_NEXT   : MoveCaret(caret + Max(FSelectableRows, 1), extend);
+    VK_HOME   : MoveCaret(0, extend);
+    VK_END    : MoveCaret(RowCount - 1, extend);
+    VK_ESCAPE : ClearSelection;
+  else
+    exit;
+  end;
+  Key := 0;
+end;
+
+procedure TLogMemo.SelectAll;
+begin
+  if RowCount = 0 then
+    exit;
+  FAnchorRow := 0;
+  FCurrentRow := RowCount - 1;
+  Repaint;
+end;
+
+procedure TLogMemo.ClearSelection;
+begin
+  if (FCurrentRow < 0) and (FAnchorRow < 0) then
+    exit; //nothing selected
+  FCurrentRow := -1;
+  FAnchorRow := -1;
+  Repaint;
+end;
+
+function TLogMemo.GetSelectedText: string;
+var
+  i : integer;
+  firstRow : integer;
+  lastRow : integer;
+  sb : TStringBuilder;
+begin
+  result := '';
+  if (FCurrentRow < 0) or (FAnchorRow < 0) or (RowCount = 0) then
+    exit;
+  firstRow := Min(FAnchorRow, FCurrentRow);
+  lastRow := Max(FAnchorRow, FCurrentRow);
+  if firstRow < 0 then
+    firstRow := 0;
+  if lastRow > RowCount - 1 then
+    lastRow := RowCount - 1;
+  sb := TStringBuilder.Create;
+  try
+    for i := firstRow to lastRow do
+    begin
+      if i > firstRow then
+        sb.Append(sLineBreak);
+      sb.Append(FItems.Strings[i]);
+    end;
+    result := sb.ToString;
+  finally
+    sb.Free;
+  end;
+end;
+
+procedure TLogMemo.CopyToClipboard;
+var
+  txt : string;
+begin
+  if RowCount = 0 then
+    exit;
+  //With an active selection copy just those lines, otherwise copy the whole log.
+  txt := GetSelectedText;
+  if txt = '' then
+    txt := Self.Text;
+  Clipboard.AsText := txt;
+end;
+
+procedure TLogMemo.BuildPopupMenu;
+
+  function AddItem(const caption : string; const onClick : TNotifyEvent) : TMenuItem;
+  begin
+    result := TMenuItem.Create(FPopupMenu);
+    result.Caption := caption;
+    result.OnClick := onClick;
+    FPopupMenu.Items.Add(result);
+  end;
+
+begin
+  FPopupMenu := TPopupMenu.Create(Self);
+  FPopupMenu.OnPopup := DoPopupMenuPopup;
+  AddItem('&Copy', DoCopyClick);
+  AddItem('Copy &All', DoCopyAllClick);
+  AddItem('Select A&ll', DoSelectAllClick);
+  Self.PopupMenu := FPopupMenu;
+end;
+
+procedure TLogMemo.DoPopupMenuPopup(Sender: TObject);
+var
+  hasRows : boolean;
+begin
+  //Items[0] Copy, Items[1] Copy All, Items[2] Select All.
+  hasRows := RowCount > 0;
+  FPopupMenu.Items[0].Enabled := hasRows;
+  FPopupMenu.Items[1].Enabled := hasRows;
+  FPopupMenu.Items[2].Enabled := hasRows;
+end;
+
+procedure TLogMemo.DoCopyClick(Sender: TObject);
+begin
+  CopyToClipboard;
+end;
+
+procedure TLogMemo.DoCopyAllClick(Sender: TObject);
+begin
+  if RowCount > 0 then
+    Clipboard.AsText := Self.Text;
+end;
+
+procedure TLogMemo.DoSelectAllClick(Sender: TObject);
+begin
+  SelectAll;
 end;
 
 procedure TLogMemo.BeginUpdate;
@@ -303,6 +523,8 @@ begin
   FVScrollPos := 0;
   FHScrollPos := 0;
   FCurrentRow := -1;
+  FAnchorRow := -1;
+  FSelecting := false;
   FHoverRow := -1;
   FItems.Clear; //fires RowsChanged -> UpdateVisibleRows + InvalidateContent (marks dirty)
   //Clear is a one-shot, not part of the streaming loop - force the empty state out synchronously
@@ -409,12 +631,18 @@ begin
   FVScrollPos := 0;
   FHoverRow := -1;
   FCurrentRow := -1;
+  FAnchorRow := -1;
+  FSelecting := false;
   FRowHeight := 16;
   TabStop := true;
   ParentBackground := false;
   ParentColor := true;
   ParentDoubleBuffered := false;
-  ParentFont := true;
+  //A log view reads best in a monospaced font - own the font rather than inheriting
+  //the (proportional) parent font. Hosts may still override the size for DPI.
+  ParentFont := false;
+  Font.Name := 'Consolas';
+  Font.Size := 10;
   DoubleBuffered := false;
   BevelInner := bvNone;
   BevelOuter := bvNone;
@@ -453,6 +681,7 @@ begin
 
   FThemeType := TThemeType.Light;
 
+  BuildPopupMenu;
 end;
 
 destructor TLogMemo.Destroy;
@@ -947,7 +1176,7 @@ begin
     result := TPaintRowState.rsFocusedNormal;
     if RowInView(rowIdx) then
     begin
-      if (rowIdx = FCurrentRow) then
+      if RowSelected(rowIdx) then
         result := TPaintRowState.rsFocusedSelected
       else if rowIdx = FHoverRow then
         result := TPaintRowState.rsFocusedHot;
@@ -958,7 +1187,7 @@ begin
     result := TPaintRowState.rsNormal;
     if RowInview(rowIdx) then
     begin
-      if (rowIdx = FCurrentRow) then
+      if RowSelected(rowIdx) then
         result := TPaintRowState.rsSelected
       else if rowIdx = FHoverRow then
         result := TPaintRowState.rsHot;
@@ -1001,35 +1230,50 @@ end;
 procedure TLogMemo.MouseDown(Button: TMouseButton; Shift: TShiftState; X,  Y: Integer);
 var
   row : Integer;
+  absRow : Int64;
 begin
   inherited;
   SetFocus;
   if RowCount = 0 then
     exit;
+  //Leave the selection intact for a right-click so the context menu can act on it.
+  if Button <> mbLeft then
+    exit;
   row := GetRowFromY(Y); //view-relative row
   if (row >= FVisibleRows) or (FTopRow + row >= RowCount) then
     exit;
 
-  if FTopRow + row <> FCurrentRow then
-  begin
-    FCurrentRow := FTopRow + row;
-    Repaint;
-    UpdateScrollBars
-  end;
+  absRow := FTopRow + row;
+  FSelecting := true;
+  //Shift+click extends from the existing anchor; a plain click collapses the selection.
+  MoveCaret(absRow, ssShift in Shift);
 end;
 
 procedure TLogMemo.MouseMove(Shift: TShiftState; X, Y: Integer);
+var
+  absRow : Int64;
 begin
   inherited;
   UpdateHoverRow(X, Y);
 
+  //Drag-select while the left button is held (mouse is captured via csCaptureMouse).
+  if FSelecting and (ssLeft in Shift) and (RowCount > 0) then
+  begin
+    absRow := FTopRow + GetRowFromY(Y);
+    if absRow < 0 then
+      absRow := 0;
+    if absRow > RowCount - 1 then
+      absRow := RowCount - 1;
+    if absRow <> FCurrentRow then
+      MoveCaret(absRow, true);
+  end;
 end;
 
 procedure TLogMemo.MouseUp(Button: TMouseButton; Shift: TShiftState; X,
   Y: Integer);
 begin
+  FSelecting := false;
   inherited;
-
 end;
 
 procedure TLogMemo.Paint;
@@ -1183,16 +1427,25 @@ begin
 end;
 
 procedure TLogMemo.ScrollInView(const index: integer; const updateSBs : boolean = true);
+var
+  maxTop : integer;
 begin
-  if (RowCount = 0) or (index > RowCount -1) then
+  if (RowCount = 0) or (index < 0) or (index > RowCount -1) then
     exit;
 
-  //Figure out what the top row should be to make the current row visible.
-  //current row below bottom of vieww
-  if index >= (FTopRow + FSelectableRows) then
-    FTopRow := Max(0, index - FSelectableRows + 1)
-  else //above
-    FTopRow := Min(index, RowCount - FVisibleRows );
+  //Only move the view when the target row is actually outside it. Repositioning while the
+  //row is already fully visible (using FVisibleRows, which counts a partial row) fought the
+  //below-view branch (which uses FSelectableRows) and made the caret oscillate at the bottom.
+  if index < FTopRow then
+    FTopRow := index //above the view - scroll up so the row becomes the top row
+  else if index >= (FTopRow + FSelectableRows) then
+    FTopRow := index - FSelectableRows + 1; //below the view - scroll down so it's the last full row
+  //else the row is already visible - leave FTopRow alone.
+
+  //Never scroll past the end (keeps the last full row pinned to the bottom).
+  maxTop := Max(0, RowCount - FSelectableRows);
+  if FTopRow > maxTop then
+    FTopRow := maxTop;
   if FTopRow < 0 then
     FTopRow := 0;
 

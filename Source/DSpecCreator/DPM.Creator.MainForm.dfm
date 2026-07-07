@@ -660,6 +660,13 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Height = 15
             Caption = 'References:'
           end
+          object lblBuildSearchPaths: TLabel
+            Left = 16
+            Top = 335
+            Width = 201
+            Height = 15
+            Caption = 'Additional Search Paths (one per line):'
+          end
           object edtProject: TEdit
             Left = 16
             Top = 61
@@ -728,13 +735,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Caption = 'Delete'
             TabOrder = 5
             OnClick = btnDeleteBuildRefClick
-          end
-          object lblBuildSearchPaths: TLabel
-            Left = 16
-            Top = 335
-            Width = 210
-            Height = 15
-            Caption = 'Additional Search Paths (one per line):'
           end
           object mmoBuildSearchPaths: TMemo
             Left = 16
@@ -813,6 +813,13 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Width = 60
             Height = 15
             Caption = 'Lib Version:'
+          end
+          object lblDesignSearchPaths: TLabel
+            Left = 264
+            Top = 270
+            Width = 201
+            Height = 15
+            Caption = 'Additional Search Paths (one per line):'
           end
           object edtDesignProject: TEdit
             Left = 16
@@ -906,13 +913,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Height = 23
             TabOrder = 8
             OnChange = edtLibVersionChange
-          end
-          object lblDesignSearchPaths: TLabel
-            Left = 264
-            Top = 270
-            Width = 210
-            Height = 15
-            Caption = 'Additional Search Paths (one per line):'
           end
           object mmoDesignSearchPaths: TMemo
             Left = 264
@@ -1957,7 +1957,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
           end
           item
             Column = 0
-            Control = PackLogMemo
+            Control = pnlPackLog
             Row = 1
           end>
         RowCollection = <
@@ -2012,14 +2012,14 @@ object DSpecCreatorForm: TDSpecCreatorForm
             OnClick = btnCancelPackClick
           end
         end
-        object PackLogMemo: TMemo
+        object pnlPackLog: TPanel
           Left = 1
           Top = 90
           Width = 876
           Height = 447
           Align = alClient
-          ReadOnly = True
-          ScrollBars = ssBoth
+          BevelOuter = bvNone
+          ShowCaption = False
           TabOrder = 1
         end
       end
@@ -2099,16 +2099,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           TabOrder = 2
           OnClick = btnCancelTestClick
         end
-      end
-      object TestLogMemo: TMemo
-        Left = 0
-        Top = 200
-        Width = 878
-        Height = 338
-        Align = alClient
-        ReadOnly = True
-        ScrollBars = ssBoth
-        TabOrder = 1
       end
     end
     object tsUpload: TTabSheet
@@ -2230,28 +2220,10 @@ object DSpecCreatorForm: TDSpecCreatorForm
           OnClick = btnCancelUploadClick
         end
       end
-      object UploadLogMemo: TMemo
-        Left = 0
-        Top = 233
-        Width = 878
-        Height = 305
-        Align = alClient
-        ReadOnly = True
-        ScrollBars = ssBoth
-        TabOrder = 1
-      end
     end
     object tsLogging: TTabSheet
       Caption = 'Logging'
       ImageIndex = 4
-      object Memo2: TMemo
-        Left = 0
-        Top = 0
-        Width = 878
-        Height = 538
-        Align = alClient
-        TabOrder = 0
-      end
     end
   end
   object StatusBar: TStatusBar

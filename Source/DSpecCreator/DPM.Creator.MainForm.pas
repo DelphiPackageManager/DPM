@@ -13,6 +13,10 @@ uses
   Vcl.Graphics,
   Vcl.Controls,
   Vcl.Forms,
+  // Listed before Vcl.Dialogs on purpose: TLogMessageType (mtError/mtWarning/
+  // mtInformation...) shares identifiers with Vcl.Dialogs.TMsgDlgType, so
+  // Vcl.Dialogs must come last for MessageDlg's mt* constants to resolve.
+  DPM.Controls.LogMemo,
   Vcl.Dialogs,
   Vcl.ComCtrls,
   Vcl.StdCtrls,
@@ -160,14 +164,13 @@ type
     GridPanel1 : TGridPanel;
     Panel1 : TPanel;
     btnBuildPackages : TButton;
-    PackLogMemo: TMemo;
+    pnlPackLog : TPanel;
     edtPackageOutputPath : TEdit;
     Label2 : TLabel;
     crdTemplate : TCard;
     edtTemplateName : TEdit;
     lblTemplateName : TLabel;
     tsLogging : TTabSheet;
-    Memo2 : TMemo;
     VariablesList : TValueListEditor;
     PackageVariablesList : TValueListEditor;
     lblPackageVariables : TLabel;
@@ -310,7 +313,6 @@ type
     btnRefreshPackages : TButton;
     btnUpload : TButton;
     btnCancelUpload : TButton;
-    UploadLogMemo: TMemo;
     crdPackageDefsHeading: TCard;
     lblPackageDefsHeading: TLabel;
     lblPackageDefsDescription: TLabel;
@@ -350,7 +352,6 @@ type
     clbTestCompilers : TCheckListBox;
     btnStartTest : TButton;
     btnCancelTest : TButton;
-    TestLogMemo : TMemo;
     lblTestHelp: TLabel;
     StatusBar: TStatusBar;
     procedure btnStartTestClick(Sender : TObject);
@@ -480,6 +481,13 @@ type
     FOpenFile : TDSpecFile;
     FTemplate : ISpecTemplate;
     FLogger : ILogger;
+    // Colour-coded log controls, created in code (TLogMemo has no design-time
+    // registration). PackLogMemo hosts pack/sign output, TestLogMemo the test
+    // run, UploadLogMemo the upload, LogMemo the generic Logging tab.
+    PackLogMemo : TLogMemo;
+    TestLogMemo : TLogMemo;
+    UploadLogMemo : TLogMemo;
+    LogMemo : TLogMemo;
     FInVariableUpdate : Boolean;
     FLoadingCard : Boolean;
     FMRUMenu : TMRUMenu;
@@ -606,6 +614,7 @@ uses
   System.IniFiles,
   Winapi.ActiveX,
   Winapi.ShellAPI,
+  Vcl.Themes,
   DPM.Core.Constants,
   DPM.Core.dependency.Version,
   DPM.Core.Init,
@@ -830,7 +839,7 @@ begin
       end;
     end;
 
-  FOpsLogger.SetTarget(PackLogMemo.Lines);
+  FOpsLogger.SetTarget(PackLogMemo);
   PackLogMemo.Clear;
   TestLogMemo.Clear;
 
@@ -987,7 +996,7 @@ begin
     FTestResults.AddOrSetValue(clbTestCompilers.Items[i], 0);
   clbTestCompilers.Invalidate;
 
-  FOpsLogger.SetTarget(TestLogMemo.Lines);
+  FOpsLogger.SetTarget(TestLogMemo);
   TestLogMemo.Clear;
   PageControl.ActivePage := tsTest;
 
@@ -1038,7 +1047,7 @@ begin
         TThread.Synchronize(nil,
           procedure
           begin
-            FTestLogStart.AddOrSetValue(compilerStr, TestLogMemo.Lines.Count);
+            FTestLogStart.AddOrSetValue(compilerStr, TestLogMemo.RowCount);
           end);
 
         FPackLogger.Information('');
@@ -1195,11 +1204,9 @@ begin
     Exit;
   if not FTestLogStart.TryGetValue(clbTestCompilers.Items[idx], startLine) then
     Exit;
-  if (startLine < 0) or (startLine >= TestLogMemo.Lines.Count) then
+  if (startLine < 0) or (startLine >= TestLogMemo.RowCount) then
     Exit;
-  TestLogMemo.SelStart := TestLogMemo.Perform(EM_LINEINDEX, startLine, 0);
-  TestLogMemo.SelLength := 0;
-  SendMessage(TestLogMemo.Handle, EM_SCROLLCARET, 0, 0);
+  TestLogMemo.GoToRow(startLine);
 end;
 
 procedure TDSpecCreatorForm.clbTestCompilersDrawItem(Control : TWinControl; Index : Integer; Rect : TRect; State : TOwnerDrawState);
@@ -1808,7 +1815,7 @@ begin
       btnCancelUpload.Enabled := false;
     end;
 
-  FOpsLogger.SetTarget(UploadLogMemo.Lines);
+  FOpsLogger.SetTarget(UploadLogMemo);
   UploadLogMemo.Clear;
   PageControl.ActivePage := tsUpload;
   FUploading := true;
@@ -3436,17 +3443,38 @@ begin
 end;
 
 procedure TDSpecCreatorForm.FormCreate(Sender : TObject);
+
+  function MakeLogMemo(const parent : TWinControl) : TLogMemo;
+  begin
+    result := TLogMemo.Create(Self);
+    result.Parent := parent;
+    result.Align := alClient;
+    // Keep TLogMemo's monospaced font; only match the form's font size.
+    result.Font.Size := Self.Font.Size;
+    result.StyleServices := Vcl.Themes.StyleServices;
+    result.StyleElements := [seClient, seBorder];
+    result.Clear;
+  end;
+
 var
   idx : integer;
   iniFile : TIniFile;
   cs : TControlStyle;
 begin
-  FLogger := TDSpecLogger.Create(Memo2.Lines);
+  // TLogMemo has no design-time registration, so the colour-coded log controls are
+  // built in code and parented into their tab sheets (PackLogMemo lives in a grid
+  // cell, so it is hosted by pnlPackLog).
+  PackLogMemo := MakeLogMemo(pnlPackLog);
+  TestLogMemo := MakeLogMemo(tsTest);
+  UploadLogMemo := MakeLogMemo(tsUpload);
+  LogMemo := MakeLogMemo(tsLogging);
+
+  FLogger := TDSpecLogger.Create(LogMemo);
   FOpenFile := TDSpecFile.Create(FLogger);
   FOpenFile.PackageSpec.newTemplate('default');
   // Pack / sign / upload run in-process via the DPM core; output goes to the
-  // active page's memo (retargeted per operation). Pack/sign default to Memo1.
-  FOpsLogger := TDSpecQueuedLogger.Create(PackLogMemo.Lines);
+  // active page's memo (retargeted per operation). Pack/sign default to PackLogMemo.
+  FOpsLogger := TDSpecQueuedLogger.Create(PackLogMemo);
   FPackLogger := FOpsLogger;
   InitCoreContainer;
   FPacking := false;

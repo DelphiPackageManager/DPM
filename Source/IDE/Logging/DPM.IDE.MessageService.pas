@@ -44,8 +44,8 @@ type
     FCurrentTask : TMessageTask;
     //Set true by Shutdown - blocks EnsureMessageForm from re-creating the form during IDE
     //teardown. Without this, any late logger call (e.g. from a notification fired after the
-    //wizard's Destroyed has already run) creates a fresh TDPMMessageForm and sets its Parent
-    //to Application.MainForm - which may already be dying. Generic AV on shutdown was the
+    //wizard's Destroyed has already run) creates a fresh TDPMMessageForm owned by
+    //Application.MainForm - which may already be dying. Generic AV on shutdown was the
     //observed symptom when a project group was loaded (load triggers Debug logs, which create
     //FMessageForm; subsequent group-close notifications log too, into the freed state).
     FShutdown : boolean;
@@ -110,7 +110,7 @@ begin
     FOptions.LogWindowWidth := FMessageForm.Width;
     FOptions.LogWindowHeight := FMessageForm.Height;
     FOptions.SaveToFile();
-    FMessageForm.Parent := nil;
+    FMessageForm.PopupParent := nil;
     FMessageForm.Free;
   end;
   inherited;
@@ -128,7 +128,13 @@ begin
   if FMessageForm = nil then
   begin
     FMessageForm := TDPMMessageForm.Create(nil, FOptions);
-    FMessageForm.Parent := Application.MainForm;
+    //Use PopupParent (owned top-level window) rather than Parent. Setting Parent makes the form a
+    //WS_CHILD embedded in the IDE main form, which never receives WM_ACTIVATE - so it never becomes
+    //Screen.ActiveCustomForm and its focus/keyboard handling is broken (Ctrl+A/Ctrl+C in the log
+    //memo, and the form's IsShortCut override, never fire). PopupParent keeps it above the IDE main
+    //form and owned by it while remaining a proper top-level window with working keyboard focus.
+    FMessageForm.PopupMode := pmExplicit;
+    FMessageForm.PopupParent := Application.MainForm;
   end;
   FMessageForm.CancellationTokenSource := FCancellationTokenSource;
   FMessageForm.CloseDelayInSeconds := FOptions.AutoCloseLogDelaySeconds;
@@ -184,7 +190,7 @@ begin
   FShutdown := true;
   if FMessageForm <> nil then
   begin
-    FMessageForm.Parent := nil;
+    FMessageForm.PopupParent := nil;
     FreeAndNil(FMessageForm);
   end;
 end;

@@ -249,6 +249,7 @@
         </DCCReference>
         <DCCReference Include="DPM.Creator.MRUService.pas"/>
         <DCCReference Include="Controls\VSoft.Controls.Menus.MRU.pas"/>
+        <DCCReference Include="..\Controls\DPM.Controls.LogMemo.pas"/>
         <DCCReference Include="..\Core\Trust\DPM.Core.Trust.Interfaces.pas"/>
         <DCCReference Include="..\Core\Trust\DPM.Core.Trust.Policy.pas"/>
         <DCCReference Include="..\Core\Trust\DPM.Core.Trust.Prompt.pas"/>

@@ -105,6 +105,7 @@ uses
   Vcl.Styles,
   DPM.Creator.MRUService in 'DPM.Creator.MRUService.pas',
   VSoft.Controls.Menus.MRU in 'Controls\VSoft.Controls.Menus.MRU.pas',
+  DPM.Controls.LogMemo in '..\Controls\DPM.Controls.LogMemo.pas',
   DPM.Core.Trust.Interfaces in '..\Core\Trust\DPM.Core.Trust.Interfaces.pas',
   DPM.Core.Trust.Policy in '..\Core\Trust\DPM.Core.Trust.Policy.pas',
   DPM.Core.Trust.Prompt in '..\Core\Trust\DPM.Core.Trust.Prompt.pas',

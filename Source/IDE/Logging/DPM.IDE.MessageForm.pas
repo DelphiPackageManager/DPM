@@ -75,6 +75,13 @@ type
     constructor Create(AOwner : TComponent; const options : IDPMIDEOptions);reintroduce;
     destructor Destroy; override;
 
+    //The IDE registers global menu shortcuts (Edit|Select All = Ctrl+A, Copy = Ctrl+C). Because
+    //this form is modeless and owned by the IDE, TApplication.IsShortCut lets the IDE main form
+    //consume those keys before they are ever dispatched to the focused log control - so the memo's
+    //own KeyDown (which handles Ctrl+A/Ctrl+C) never fires. Screen.ActiveCustomForm.IsShortCut is
+    //checked before MainForm.IsShortCut, so we grab them here while the memo has focus.
+    function IsShortCut(var Message: TWMKey): Boolean; override;
+
     procedure Debug(const data : string);
     procedure Error(const data : string);
     procedure Information(const data : string; const important : Boolean = False);
@@ -246,7 +253,8 @@ begin
   FLogMemo.StyleServices := IDEStyleServices;
   FLogMemo.Clear;
   FLogMemo.Parent := Self;
-  FLogMemo.Font.Assign(Self.Font);
+  // Keep TLogMemo's monospaced font; only match the form's font size.
+  FLogMemo.Font.Size := Self.Font.Size + 1;
   Self.ActiveControl := btnCancel;
 
   FCloseDelayInSeconds := 3;
@@ -326,6 +334,32 @@ begin
   else
     FLogMemo.AddRow(data, TLogMessageType.mtInformation);
   Self.ProcessMessages;
+end;
+
+function TDPMMessageForm.IsShortCut(var Message: TWMKey): Boolean;
+begin
+  //Only steal the key when the log memo actually has focus - otherwise leave Ctrl+A/Ctrl+C to
+  //their normal handling (e.g. focus on a button). GetKeyState is used because the Ctrl modifier
+  //is not carried in the WM_KEYDOWN KeyData.
+  result := false;
+  if (ActiveControl = FLogMemo) and (GetKeyState(VK_CONTROL) < 0) then
+  begin
+    case Message.CharCode of
+      Ord('A') :
+      begin
+        FLogMemo.SelectAll;
+        result := true;
+      end;
+      Ord('C') :
+      begin
+        FLogMemo.CopyToClipboard;
+        result := true;
+      end;
+    end;
+    if result then
+      exit;
+  end;
+  result := inherited IsShortCut(Message);
 end;
 
 procedure TDPMMessageForm.lblDontCloseLinkClick(Sender: TObject; const Link: string; LinkType: TSysLinkType);
