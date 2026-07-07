@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -53,6 +53,7 @@ implementation
 uses
   System.SysUtils,
   VSoft.Uri,
+  DPM.Core.Constants,
   DPM.Core.Options.Common,
   DPM.Core.Options.Push;
 
@@ -72,6 +73,10 @@ var
   error : string;
 begin
   TPushOptions.Default.ApplyCommon(TCommonOptions.Default);
+
+  //fall back to the DPM_API_KEY environment variable when no -apiKey arg was provided.
+  if TPushOptions.Default.ApiKey = '' then
+    TPushOptions.Default.ApiKey := GetEnvironmentVariable(cDPMApiKeyEnviromentVar);
 
   if not FileExists(TPushOptions.Default.ConfigFile) then
   begin

@@ -599,7 +599,7 @@ begin
     end);
   option.Required := true;
 
-  option := cmd.RegisterOption<string>('apiKey','a','Api Key for authenticated http source.',
+  option := cmd.RegisterOption<string>('apiKey','a','Api Key for authenticated http source. Falls back to the DPM_API_KEY environment variable if not specified.',
    procedure(const value : string)
     begin
         TPushOptions.Default.ApiKey := value;
@@ -641,6 +641,7 @@ begin
   cmd.Examples.Add('push .\VSoft.SemanticVersion.1.0.1.dpkg -source=local');
   cmd.Examples.Add('push .\VSoft.SemanticVersion.1.0.1.dpkg -source=corporate -apiKey=abcdef');
   cmd.Examples.Add('push .\VSoft.SemanticVersion.1.0.1.dpkg -source=corporate -apiKey=abcdef -unlisted');
+  cmd.Examples.Add('set DPM_API_KEY=abcdef && push .\VSoft.SemanticVersion.1.0.1.dpkg -source=corporate');
 
 end;
 

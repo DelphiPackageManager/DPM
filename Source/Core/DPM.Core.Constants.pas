@@ -58,6 +58,7 @@ const
   cDefaultConfigFile = cDefaultDPMFolder + '\' + cDPMConfigFileName;
   cDefaultPackageCache = cDefaultDPMFolder + '\package_cache';
   cDPMPackageCacheEnviromentVar = 'DPMPACKAGECACHE';
+  cDPMApiKeyEnviromentVar = 'DPM_API_KEY';
 
   //local mirror folder for git-URL package registries (folder registries are read in place)
   cDefaultRegistriesFolder = cDefaultDPMFolder + '\registries';

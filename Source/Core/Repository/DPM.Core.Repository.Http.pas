@@ -107,6 +107,11 @@ const
   cCommercialParam = 'commercial';
   cTrialParam      = 'trial';
 
+  //Default push timeout in seconds when the user does not pass -t/--timeout (Timeout <= 0).
+  //Matches the value documented in the console option help. Uploads of large packages can
+  //take a while, so this is well above the VSoft.HttpClient 60s default.
+  cDefaultPushTimeoutSeconds = 300;
+
 //function GetBaseUri(const uri : IUri) : string;
 //begin
 //  result := uri.Scheme + '://' + uri.Host;
@@ -1192,6 +1197,8 @@ var
   errorMsg : string;
   attempt : integer;
   delayMs : Cardinal;
+  timeoutSeconds : integer;
+  timeoutMs : integer;
 begin
   result := false;
   if pushOptions.ApiKey = '' then
@@ -1228,6 +1235,18 @@ begin
 
   //todo: Add BaseUri to Uri class
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
+
+  //Apply the configured push timeout. pushOptions.Timeout is in seconds and defaults to -1
+  //(unset) - fall back to cDefaultPushTimeoutSeconds in that case. WinHttp timeouts are in
+  //milliseconds. Setting them on the client means the request created below inherits them at
+  //construction (TRequest copies the client's Send/Response timeouts). ResponseTimeout drives
+  //the overall async wait, and SendTimeout covers uploading the package body.
+  timeoutSeconds := pushOptions.Timeout;
+  if timeoutSeconds <= 0 then
+    timeoutSeconds := cDefaultPushTimeoutSeconds;
+  timeoutMs := timeoutSeconds * 1000;
+  httpClient.SendTimeout := timeoutMs;
+  httpClient.ResponseTimeout := timeoutMs;
 
   attempt := 0;
   repeat
