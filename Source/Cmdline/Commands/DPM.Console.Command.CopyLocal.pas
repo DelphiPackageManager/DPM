@@ -42,6 +42,7 @@ type
     FCopyLocalService : ICopyLocalService;
   protected
     function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
+    function ForceNoBanner : boolean; override;
   public
     constructor Create(const logger : ILogger;
                        const configurationManager : IConfigurationManager;
@@ -61,6 +62,11 @@ constructor TCopyLocalCommand.Create(const logger : ILogger;
 begin
   inherited Create(logger, configurationManager);
   FCopyLocalService := copyLocalService;
+end;
+
+function TCopyLocalCommand.ForceNoBanner : boolean;
+begin
+  result := true;
 end;
 
 function TCopyLocalCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
