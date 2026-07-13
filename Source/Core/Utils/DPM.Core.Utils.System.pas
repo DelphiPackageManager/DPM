@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -41,6 +41,16 @@ type
     class procedure GetResourceVersionNumbers(out AMajor, AMinor, ARelease, ABuild: Integer);
     class procedure OutputDebugString(const value : string);
     class function Is64BitProcess : boolean;
+    // Full path to the module (exe or bpl) that this DPM.Core code is compiled into. In the CLI
+    // that is dpm.exe; inside the IDE it is the DPM design-time package, which is installed in the
+    // same folder as dpm.exe. Used to locate dpm.exe for the copy-local targets without relying on
+    // 'dpm' being on the PATH.
+    class function GetCurrentModuleFileName : string;
+    // Appends the DPM module's own folder to the *process* PATH (not persisted) if not already
+    // present. Child processes we spawn - and, in the IDE, msbuild spawned by the IDE to build the
+    // project - inherit this, so the copy-local target's fallback bare 'dpm' resolves even when
+    // <DPMExe> was not recorded. Safe to call more than once.
+    class procedure EnsureModuleDirOnPath;
     class function IsIDEProcess : boolean;
     class function Is64BitIDE : boolean;
     class procedure SetIsIDE;
@@ -152,6 +162,33 @@ end;
 class function TSystemUtils.Is64BitIDE: boolean;
 begin
   result := _isIDE and Is64BitProcess;
+end;
+
+class function TSystemUtils.GetCurrentModuleFileName : string;
+begin
+  //HInstance is the module handle of the exe/bpl this code is linked into - dpm.exe in the CLI,
+  //the DPM design-time package in the IDE. GetModuleName returns its full path.
+  result := GetModuleName(HInstance);
+end;
+
+class procedure TSystemUtils.EnsureModuleDirOnPath;
+var
+  moduleDir : string;
+  currentPath : string;
+begin
+  moduleDir := ExtractFileDir(GetCurrentModuleFileName); //no trailing path delimiter
+  if moduleDir = '' then
+    exit;
+  currentPath := GetEnvironmentVariable('PATH');
+  //already present (case-insensitive, delimiter-bounded) - nothing to do.
+  if Pos(';' + LowerCase(moduleDir) + ';', ';' + LowerCase(currentPath) + ';') > 0 then
+    exit;
+  if currentPath <> '' then
+    currentPath := currentPath + ';' + moduleDir
+  else
+    currentPath := moduleDir;
+  //Process scope only (not persisted to the registry) - it evaporates when the process exits.
+  Winapi.Windows.SetEnvironmentVariable('PATH', PChar(currentPath));
 end;
 
 class function TSystemUtils.Is64BitProcess : boolean;

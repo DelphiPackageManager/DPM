@@ -205,6 +205,9 @@ end;
 function CreateWizard(const BorlandIDEServices : IBorlandIDEServices) : IOTAWizard;
 begin
   TSystemUtils.SetIsIDE; //so the core knows it's running in the IDE plugin. needed for design compile
+  //Put our own folder (which holds dpm.exe) on the IDE process PATH so msbuild spawned by the IDE
+  //to build the project can resolve the copy-local target's bare 'dpm' fallback.
+  TSystemUtils.EnsureModuleDirOnPath;
   ProcessMessagePump := DPMPumpMessages; //keep the IDE message loop alive during package compiles
   try
     result := TDPMWizard.Create;

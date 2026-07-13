@@ -1027,12 +1027,21 @@ end;
 
 
 function TPackageInstaller.GetDpmExePathForTargets : string;
+var
+  candidate : string;
 begin
+  //When running as dpm.exe (CLI), ParamStr(0) is the exe to record directly.
   result := ParamStr(0);
-  //Only record the path when we are actually dpm.exe; otherwise leave it empty so the targets file
-  //falls back to 'dpm' on PATH (the IDE plugin restoring would record bds.exe here otherwise).
-  if not SameText(ExtractFileName(result), 'dpm.exe') then
-    result := '';
+  if SameText(ExtractFileName(result), 'dpm.exe') then
+    exit;
+
+  //Running inside the IDE (ParamStr(0) is bds.exe): this code executes from the DPM design-time
+  //package, which is installed in the same folder as dpm.exe. Locate dpm.exe next to our own module
+  //so the copy-local target uses a full path rather than relying on 'dpm' being on the PATH.
+  result := '';
+  candidate := TPath.Combine(ExtractFilePath(TSystemUtils.GetCurrentModuleFileName), 'dpm.exe');
+  if TFile.Exists(candidate) then
+    result := candidate;
 end;
 
 constructor TPackageInstaller.Create(const logger: ILogger; const configurationManager: IConfigurationManager; const repositoryManager: IPackageRepositoryManager;

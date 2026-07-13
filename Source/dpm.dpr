@@ -252,6 +252,8 @@ end;
 
 begin
   CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml
+  //Put our own folder on the process PATH so any msbuild we spawn can resolve a bare 'dpm'.
+  TSystemUtils.EnsureModuleDirOnPath;
   try
     try
 {$IFDEF JCLDEBUG}
