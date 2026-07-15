@@ -2605,9 +2605,6 @@ begin
   for i := 0 to projectEditors.Count -1 do
   begin
     projectEditor := projectEditors[i];
-
-   // CONTINUE WORKING HERE!!!!  Need to change to justr single package reference per package no platforms.
-
     projectPackageGraph := projectEditor.GetPackageReferences; // can return nil
 
     if projectPackageGraph = nil then
