@@ -14,7 +14,7 @@
         <DPMCompiler>delphi10.1</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.3-beta.1\lib\Win32;$(DPM)\Spring4D.Core\2.0.3-beta.1\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.3-beta.1\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.11\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win32;$(DPM)\VSoft.Awaitable\1.0.1\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.12\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.9.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.3.0\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.YAML\1.7.1\lib\Win32;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Core\2.0.2-beta.2\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.2-beta.2\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.11\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win32;$(DPM)\VSoft.Awaitable\1.0.1\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.12\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.9.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.3.0\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.YAML\1.7.1\lib\Win32;</DPMSearch>
         <DPMExe>I:\Github\DelphiPackageManager\DPMMaster\Output\dpm.exe</DPMExe>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
@@ -800,11 +800,11 @@
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>
             <Packages>
-                <PackageReference id="Spring4D.Core" version="2.0.3-beta.1" manifestHash="sha256:e84a91346ce3d0063f0c020c50ed31898862f0b7b6b1da13b04198dfd4767e98">
-                    <PackageReference id="Spring4D.Base" version="2.0.3-beta.1" range="2.0.3-beta.1"/>
+                <PackageReference id="Spring4D.Core" version="2.0.2-beta.2" manifestHash="sha256:c22610fe1fa300704221dfa155c21c3cd7d906d037fd24ffa65b98f606f9c1b0">
+                    <PackageReference id="Spring4D.Base" version="2.0.2-beta.2" range="2.0.2-beta.2"/>
                 </PackageReference>
-                <PackageReference id="Spring4D.Extensions" version="2.0.3-beta.1" manifestHash="sha256:d50debeb478794d8937ff9fc893e94f94978f35247937084560ba0678baafbfa">
-                    <PackageReference id="Spring4D.Base" version="2.0.3-beta.1" range="2.0.3-beta.1"/>
+                <PackageReference id="Spring4D.Extensions" version="2.0.2-beta.2" manifestHash="sha256:bbc5a5ca0cbbae19ac48eb4990c02f84169b036b9e09eacbd96b8a66e75f34ae">
+                    <PackageReference id="Spring4D.Base" version="2.0.2-beta.2" range="2.0.2-beta.2"/>
                 </PackageReference>
                 <PackageReference id="VSoft.AntPatterns" version="0.1.11" manifestHash="sha256:da2c24a04ae8baa06d6a10a16594f943e810c11b18da15c549a6fc6dafc099bb"/>
                 <PackageReference id="VSoft.Awaitable" version="1.0.1" manifestHash="sha256:50de3cbc1ac2fd2f91ad6792c473ed55d5bcdc9568fb7bb9a6478c9b9fea5e47">
