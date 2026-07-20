@@ -17,11 +17,29 @@ type
     class function IsProjectAvailable : boolean;static;
     class function GetMainProjectGroup : IOTAProjectGroup;static;
     class function GetActiveProject : IOTAProject;static;
+
+    /// <summary>
+    ///  Saves every modified open module. Used before shutting the IDE down to
+    ///  install a dpm upgrade, so the user does not lose work and is not left
+    ///  answering save prompts while an installer is waiting.
+    ///  Never raises - a module that refuses to save must not abort the upgrade.
+    /// </summary>
+    class procedure SaveModifiedFiles;static;
+
+    /// <summary>
+    ///  Asks the IDE to close, as though the user chose File > Exit. Posts
+    ///  rather than sends, so the caller returns and unwinds first. This goes
+    ///  through the IDE's normal shutdown, so anything still unsaved will
+    ///  prompt as usual.
+    /// </summary>
+    class procedure CloseIDE;static;
   end;
 
 implementation
 
 uses
+  WinApi.Windows,
+  WinApi.Messages,
   System.SysUtils;
 
 { TToolsApiUtils }
@@ -104,6 +122,40 @@ var
 begin
   ModServices := BorlandIDEServices as IOTAModuleServices;
   result := ModServices.GetActiveProject;
+end;
+
+class procedure TToolsApiUtils.SaveModifiedFiles;
+var
+  modServices : IOTAModuleServices;
+  i : integer;
+begin
+  modServices := BorlandIDEServices as IOTAModuleServices;
+  if modServices = nil then
+    exit;
+
+  for i := 0 to modServices.ModuleCount - 1 do
+  begin
+    //Each module is saved independently - one that refuses (read only file,
+    //a designer that will not validate) must not stop the rest being saved.
+    try
+      //(false, true) = don't ask, save even if the IDE thinks it can skip.
+      modServices.Modules[i].Save(false, true);
+    except
+      //Swallow deliberately. The IDE's own shutdown will prompt for anything
+      //still unsaved, so the user is not silently losing work.
+      on Exception do
+        continue;
+    end;
+  end;
+end;
+
+class procedure TToolsApiUtils.CloseIDE;
+begin
+  if Application.MainForm = nil then
+    exit;
+  //Post, not Send - the caller is typically inside a click handler and must be
+  //allowed to unwind before the IDE starts tearing itself down.
+  PostMessage(Application.MainForm.Handle, WM_CLOSE, 0, 0);
 end;
 
 class function TToolsApiUtils.GetMainProjectGroup: IOTAProjectGroup;

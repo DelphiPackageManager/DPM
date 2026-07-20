@@ -4,7 +4,9 @@ interface
 
 uses
   JsonDataObjects,
-  DPM.Core.Types;
+  DPM.Core.Types,
+  //for TDPMUpdateChannel - already used by the implementation section.
+  DPM.IDE.Types;
 
 type
   IDPMIDEOptions = interface
@@ -37,6 +39,9 @@ type
     function GetLogWindowHeight : integer;
     procedure SetLogWindowHeight(const value : integer);
 
+    function GetUpdateChannel : TDPMUpdateChannel;
+    procedure SetUpdateChannel(const value : TDPMUpdateChannel);
+
     property LogVerbosity : TVerbosity read GetLogVerbosity write SetLogVebosity;
     property LogWindowWidth : integer read GetLogWindowWidth write SetLogWindowWidth;
     property LogWindowHeight : integer read GetLogWindowHeight write SetLogWindowHeight;
@@ -49,6 +54,12 @@ type
     property AutoCloseLogDelaySeconds : integer read GetAutoCloseLogDelaySeconds write SetAutoCloseLogDelaySelcond;
 
     property AddDPMToProjectTree : boolean read GetAddDPMToProjectTree write SetAddDPMToProjectTree;
+
+    /// <summary>
+    ///  Which releases the IDE update check offers. Maps directly onto
+    ///  IUpgradeService.CheckForUpgrade's includePrerelease parameter.
+    /// </summary>
+    property UpdateChannel : TDPMUpdateChannel read GetUpdateChannel write SetUpdateChannel;
 
     property FileName : string read GetOptionsFileName;
   end;
@@ -65,6 +76,7 @@ type
     FAddDPMToProjectTree : boolean;
     FLogWindowWidth : integer;
     FLogWindowHeight : integer;
+    FUpdateChannel : TDPMUpdateChannel;
   protected
     function LoadFromJson(const jsonObj : TJsonObject) : boolean;
     function SaveToJson(const parentObj : TJsonObject) : boolean;
@@ -100,6 +112,8 @@ type
     function GetLogWindowHeight : integer;
     procedure SetLogWindowHeight(const value : integer);
 
+    function GetUpdateChannel : TDPMUpdateChannel;
+    procedure SetUpdateChannel(const value : TDPMUpdateChannel);
 
   public
     constructor Create;
@@ -111,7 +125,6 @@ implementation
 uses
   System.SysUtils,
   System.TypInfo,
-  DPM.IDE.Types,
   DPM.Core.Utils.System;
 
 { TDPMIDEOptions }
@@ -132,11 +145,25 @@ begin
   FAddDPMToProjectTree := true;
   FLogWindowWidth := 800;
   FLogWindowHeight := 500;
+  //Beta by default : every dpm release to date is tagged -beta, so defaulting to
+  //Stable would mean the update check never finds anything and the feature
+  //ships dormant. Beta is a superset, so stable releases are still offered.
+  FUpdateChannel := TDPMUpdateChannel.Beta;
 end;
 
 function TDPMIDEOptions.GetAddDPMToProjectTree: boolean;
 begin
   result := FAddDPMToProjectTree;
+end;
+
+function TDPMIDEOptions.GetUpdateChannel : TDPMUpdateChannel;
+begin
+  result := FUpdateChannel;
+end;
+
+procedure TDPMIDEOptions.SetUpdateChannel(const value : TDPMUpdateChannel);
+begin
+  FUpdateChannel := value;
 end;
 
 function TDPMIDEOptions.GetAutoCloseLogDelaySeconds: integer;
@@ -216,6 +243,7 @@ end;
 function TDPMIDEOptions.LoadFromJson(const jsonObj: TJsonObject): boolean;
 var
   sVerbosity : string;
+  sChannel : string;
   iValue : integer;
 begin
   result := false;
@@ -225,6 +253,15 @@ begin
     iValue := GetEnumValue(TypeInfo(TVerbosity),sVerbosity);
     if iValue <> -1 then
       FVerbosity := TVerbosity(iValue);
+  end;
+
+  //stored by name so the file stays readable and is not order dependent.
+  sChannel := jsonObj.s['updatechannel'];
+  if sChannel <> '' then
+  begin
+    iValue := GetEnumValue(TypeInfo(TDPMUpdateChannel),sChannel);
+    if iValue <> -1 then
+      FUpdateChannel := TDPMUpdateChannel(iValue);
   end;
 
   if jsonObj.Contains('showlogforrestore') then
@@ -294,6 +331,7 @@ begin
   parentObj.B['addtoprojecttree'] := FAddDPMToProjectTree;
   parentObj.I['logwindowwidth'] := FLogWindowWidth;
   parentObj.I['logwindowheight'] := FLogWindowHeight;
+  parentObj.S['updatechannel'] := GetEnumName(TypeInfo(TDPMUpdateChannel), Ord(FUpdateChannel));
 
   result := true;
 end;

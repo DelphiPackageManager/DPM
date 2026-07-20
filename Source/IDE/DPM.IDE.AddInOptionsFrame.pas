@@ -1,4 +1,4 @@
-﻿{***************************************************************************}
+{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -89,6 +89,9 @@ type
     Label10: TLabel;
     chkShowOnProjectTree: TCheckBox;
     Label11: TLabel;
+    Label12: TLabel;
+    Label13: TLabel;
+    cboUpdateChannel: TComboBox;
     procedure lvSourcesSelectItem(Sender : TObject; Item : TListItem; Selected : Boolean);
     procedure txtNameChange(Sender : TObject);
     procedure txtUriChange(Sender : TObject);
@@ -139,6 +142,7 @@ uses
   System.TypInfo,
   VSoft.Uri,
   DPM.Core.Types,
+  DPM.IDE.Types,
   DPM.Core.Configuration.Classes,
   DPM.Core.Utils.Config,
   DPM.Core.Utils.Enum;
@@ -302,6 +306,7 @@ begin
   spAutoCloseDelay.Value := FIDEOptions.AutoCloseLogDelaySeconds;
   spAutoCloseDelay.Enabled := chkAutoClose.Checked;
   chkShowOnProjectTree.Checked := FIDEOptions.AddDPMToProjectTree;
+  cboUpdateChannel.ItemIndex := Ord(FIDEOptions.UpdateChannel);
 end;
 
 procedure TDPMOptionsFrame.lvSourcesSelectItem(Sender : TObject; Item : TListItem; Selected : Boolean);
@@ -350,6 +355,7 @@ begin
   FIDEOptions.AutoCloseLogOnSuccess := chkAutoClose.Checked;
   FIDEOptions.AutoCloseLogDelaySeconds := spAutoCloseDelay.Value;
   FIDEOptions.AddDPMToProjectTree := chkShowOnProjectTree.Checked;
+  FIDEOptions.UpdateChannel := TDPMUpdateChannel(cboUpdateChannel.ItemIndex);
   FIDEOptions.SaveToFile();
   FLogger.Verbosity := FIDEOptions.LogVerbosity;
 

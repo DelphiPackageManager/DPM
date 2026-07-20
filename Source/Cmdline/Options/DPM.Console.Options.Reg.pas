@@ -54,6 +54,7 @@ uses
   DPM.Core.Options.Sign,
   DPM.Core.Options.Spec,
   DPM.Core.Options.Trust,
+  DPM.Core.Options.Upgrade,
   DPM.Core.Options.Verify,
   DPM.Core.Options.Why,
   DPM.Core.Vuln.Types,
@@ -1398,6 +1399,37 @@ begin
 end;
 
 
+procedure RegisterUpgradeCommand;
+var
+  cmd : TCommandDefinition;
+  option : IOptionDefinition;
+begin
+  cmd := TOptionsRegistry.RegisterCommand('upgrade', '', 'Checks github for a newer version of dpm, then downloads and runs the installer.',
+                                                      'The installer cannot replace dpm.exe while it is running, so dpm exits as soon as the ' +
+                                                      'installer has been started. Use -check to see whether a newer version exists without ' +
+                                                      'installing anything.',
+                                                      'upgrade [options]');
+
+  //HasValue := false makes these bare flags rather than -pr=true.
+  option := cmd.RegisterOption<boolean>('prerelease', 'pr', 'Include pre-release versions when checking for a newer version.',
+    procedure(const value : boolean)
+    begin
+      TUpgradeOptions.Default.PreRelease := value;
+    end);
+  option.HasValue := false;
+
+  option := cmd.RegisterOption<boolean>('check', 'c', 'Only report whether a newer version is available, do not download or install it.',
+    procedure(const value : boolean)
+    begin
+      TUpgradeOptions.Default.CheckOnly := value;
+    end);
+  option.HasValue := false;
+
+  cmd.Examples.Add('upgrade');
+  cmd.Examples.Add('upgrade -pr');
+  cmd.Examples.Add('upgrade -check');
+end;
+
 
 procedure RegisterScanCommand;
 var
@@ -1529,6 +1561,7 @@ begin
   RegisterSbomCommand;
   RegisterCopyLocalCommand;
   RegisterScanCommand;
+  RegisterUpgradeCommand;
 
 end;
 

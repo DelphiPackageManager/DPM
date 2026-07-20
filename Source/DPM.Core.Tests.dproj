@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
@@ -269,6 +269,7 @@
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Writer.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.Writer.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Trust.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Upgrade.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Trust.TrustSet.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Trust.Prompt.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Trust.Modes.pas"/>
@@ -292,6 +293,10 @@
         <DCCReference Include="Tests\TestLogger.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.CopyLocalTargets.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.CopyLocal.pas"/>
+        <DCCReference Include="Core\DPM.Core.Version.pas"/>
+        <DCCReference Include="Core\Upgrade\DPM.Core.Upgrade.Interfaces.pas"/>
+        <DCCReference Include="Core\Upgrade\DPM.Core.Upgrade.Github.pas"/>
+        <DCCReference Include="Core\Upgrade\DPM.Core.Upgrade.Cache.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.CopyLocal.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Package.CopyLocal.pas"/>
         <BuildConfiguration Include="Base">

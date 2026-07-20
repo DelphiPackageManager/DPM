@@ -1,4 +1,4 @@
-﻿{***************************************************************************}
+{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -45,6 +45,14 @@ type
   TDPMSearchOption = (IncludePrerelease, IncludeCommercial, IncludeTrial);
 
   TDPMSearchOptions = set of TDPMSearchOption;
+
+  /// <summary>
+  ///  Which DPM releases the IDE update check will offer.
+  ///  Beta is a SUPERSET of Stable, not a separate track - a beta channel user
+  ///  is still offered a newer stable release, because the check only ever
+  ///  excludes prereleases and then takes the highest version.
+  /// </summary>
+  TDPMUpdateChannel = (Stable, Beta);
 
 
 const

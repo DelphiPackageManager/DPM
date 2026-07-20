@@ -238,7 +238,13 @@ uses
   DPM.Core.Project.CopyLocalTargets in 'Core\Project\DPM.Core.Project.CopyLocalTargets.pas',
   DPM.Core.Package.CopyLocal in 'Core\Package\DPM.Core.Package.CopyLocal.pas',
   DPM.Console.Command.CopyLocal in 'Cmdline\Commands\DPM.Console.Command.CopyLocal.pas',
-  DPM.Core.Options.CopyLocal in 'Core\Options\DPM.Core.Options.CopyLocal.pas';
+  DPM.Core.Options.CopyLocal in 'Core\Options\DPM.Core.Options.CopyLocal.pas',
+  DPM.Core.Version in 'Core\DPM.Core.Version.pas',
+  DPM.Core.Upgrade.Interfaces in 'Core\Upgrade\DPM.Core.Upgrade.Interfaces.pas',
+  DPM.Core.Upgrade.Github in 'Core\Upgrade\DPM.Core.Upgrade.Github.pas',
+  DPM.Core.Upgrade.Cache in 'Core\Upgrade\DPM.Core.Upgrade.Cache.pas',
+  DPM.Core.Options.Upgrade in 'Core\Options\DPM.Core.Options.Upgrade.pas',
+  DPM.Console.Command.Upgrade in 'Cmdline\Commands\DPM.Console.Command.Upgrade.pas';
 
 procedure LogException(ExceptObj: TObject; ExceptAddr: Pointer; OSException: Boolean);
 var

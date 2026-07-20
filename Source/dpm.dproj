@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
@@ -353,6 +353,12 @@
         <DCCReference Include="Core\Package\DPM.Core.Package.CopyLocal.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.CopyLocal.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.CopyLocal.pas"/>
+        <DCCReference Include="Core\DPM.Core.Version.pas"/>
+        <DCCReference Include="Core\Upgrade\DPM.Core.Upgrade.Interfaces.pas"/>
+        <DCCReference Include="Core\Upgrade\DPM.Core.Upgrade.Github.pas"/>
+        <DCCReference Include="Core\Upgrade\DPM.Core.Upgrade.Cache.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Upgrade.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Upgrade.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

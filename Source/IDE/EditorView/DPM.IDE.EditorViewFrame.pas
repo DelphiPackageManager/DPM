@@ -1,4 +1,4 @@
-﻿unit DPM.IDE.EditorViewFrame;
+unit DPM.IDE.EditorViewFrame;
 
 interface
 
@@ -30,6 +30,8 @@ uses
   DPM.Core.Repository.Interfaces,
   DPM.Core.Cache.Interfaces,
   DPM.Core.Project.Interfaces,
+  DPM.Core.Upgrade.Interfaces,
+  DPM.Core.Upgrade.Cache,
   DPM.IDE.Types,
   DPM.IDE.IconCache,
   DPM.IDE.Options,
@@ -114,6 +116,9 @@ type
     FConfigurationManager : IConfigurationManager;
     FRepositoryManager : IPackageRepositoryManager;
     FPackageCache : IPackageCache;
+    //resolved here and handed to the search bar, which owns the update check.
+    FUpgradeService : IUpgradeService;
+    FUpgradeCache : IUpgradeCheckCache;
     FConfiguration : IConfiguration;
     FConfigIsLocal : boolean;
 
@@ -408,6 +413,8 @@ var
 begin
   FClosing := true;
   PackageDetailsFrame.ViewClosing;
+  //the search bar owns its own token source for the DPM update check.
+  FSearchBar.ViewClosing;
   // cancel any pending requests asap. Needs to return quickly or the IDE will hang.
   FCancelTokenSource.Cancel;
   // allow the cancellation to happen.
@@ -450,6 +457,10 @@ begin
   FRepositoryManager := Container.Resolve<IPackageRepositoryManager>;
   FPackageCache := Container.Resolve<IPackageCache>;
 
+  //for the search bar's DPM update check.
+  FUpgradeService := Container.Resolve<IUpgradeService>;
+  FUpgradeCache := Container.Resolve<IUpgradeCheckCache>;
+
   ConfigureSearchBar;
 
   PackageDetailsFrame.Init(Container, FIconCache, FConfiguration, Self, projectGroup);
@@ -465,7 +476,8 @@ end;
 
 procedure TDPMEditViewFrame.ConfigureSearchBar;
 begin
-  FSearchBar.Configure(FLogger, FDPMIDEOptions, FConfiguration, FConfigurationManager, FSearchOptions.ConfigFile);
+  FSearchBar.Configure(FLogger, FDPMIDEOptions, FConfiguration, FConfigurationManager, FSearchOptions.ConfigFile,
+                       FUpgradeService, FUpgradeCache);
 end;
 
 constructor TDPMEditViewFrame.Create(AOwner : TComponent);

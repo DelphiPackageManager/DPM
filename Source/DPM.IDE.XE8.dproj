@@ -170,6 +170,10 @@
         <DCCReference Include="Core\Project\DPM.Core.Project.Editor.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.CopyLocalTargets.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.CopyLocal.pas"/>
+        <DCCReference Include="Core\DPM.Core.Version.pas"/>
+        <DCCReference Include="Core\Upgrade\DPM.Core.Upgrade.Interfaces.pas"/>
+        <DCCReference Include="Core\Upgrade\DPM.Core.Upgrade.Github.pas"/>
+        <DCCReference Include="Core\Upgrade\DPM.Core.Upgrade.Cache.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.CopyLocal.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.GroupProjReader.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Interfaces.pas"/>

@@ -87,6 +87,7 @@ type
                  Sbom,
                  Scan,
                  CopyLocal,
+                 Upgrade,
                  None,
                  Invalid);
 
@@ -117,6 +118,7 @@ const
                        'sbom',
                        'scan',
                        'copylocal',
+                       'upgrade',
                        '',
                        'invalid');
 

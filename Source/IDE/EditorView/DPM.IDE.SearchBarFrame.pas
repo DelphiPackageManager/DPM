@@ -15,8 +15,14 @@ uses
   Vcl.VirtualImageList,
   {$ENDIF}
 
+  //VSoft.Awaitable re-exports the ICancellationToken* aliases, so
+  //VSoft.CancellationToken is not needed here.
+  VSoft.Awaitable,
+
   DPM.Core.Types,
   DPM.Core.Configuration.Interfaces,
+  DPM.Core.Upgrade.Interfaces,
+  DPM.Core.Upgrade.Cache,
   DPM.IDE.Types,
   DPM.IDE.Logger,
   DPM.IDE.Options,
@@ -40,6 +46,7 @@ type
     chkIncludeTrial: TCheckBox;
     lblSources: TLabel;
     txtSearch: TButtonedEdit;
+    lblUpdateAvailable: TLinkLabel;
     procedure txtSearchChange(Sender: TObject);
     procedure txtSearchRightButtonClick(Sender: TObject);
     procedure DebounceTimerTimer(Sender: TObject);
@@ -52,6 +59,7 @@ type
     procedure chkIncludeCommercialClick(Sender: TObject);
     procedure chkIncludeTrialClick(Sender: TObject);
     procedure cbSourcesChange(Sender: TObject);
+    procedure lblUpdateAvailableLinkClick(Sender: TObject; const Link: string; LinkType: TSysLinkType);
   private
     FDPMIDEOptions : IDPMIDEOptions;
     FConfigurationManager : IConfigurationManager;
@@ -66,6 +74,16 @@ type
     FOnSearchEvent : TSearchEvent;
     FOnConfigChanged : TConfigChangedEvent;
     FOnFocusList : TNotifyEvent;
+
+    //update check. Owns its OWN token source rather than sharing the edit
+    //view's - that one is Cancel/Reset cycled on every LoadPackages, which
+    //would silently un-cancel this check.
+    FUpgradeService : IUpgradeService;
+    FUpgradeCache : IUpgradeCheckCache;
+    FUpgradeInfo : IUpgradeInfo;
+    FCancellationTokenSource : ICancellationTokenSource;
+    FClosing : boolean;
+    FRequestInFlight : boolean;
 
     {$IFDEF USEIMAGECOLLECTION }
     FImageList : TVirtualImageList;
@@ -87,10 +105,26 @@ type
     procedure Loaded; override;
     procedure SetImageList(const value :  {$IFDEF USEIMAGECOLLECTION} TVirtualImageList {$ELSE} TImageList {$ENDIF});
 
+    /// <summary>
+    ///  Consults the cache and, on a miss, kicks off the async github check.
+    ///  Silent when up to date; logs a warning if the check fails.
+    /// </summary>
+    procedure CheckForUpdate;
+    procedure ShowUpdateAvailable(const upgradeInfo : IUpgradeInfo);
+    function IncludePrereleaseUpdates : boolean;
+
   public
     constructor Create(AOwner : TComponent);override;
     destructor Destroy;override;
-    procedure Configure(const logger : IDPMIDELogger; const ideOptions : IDPMIDEOptions; const config : IConfiguration; const configurationManager : IConfigurationManager; const configFile : string);
+    procedure Configure(const logger : IDPMIDELogger; const ideOptions : IDPMIDEOptions; const config : IConfiguration;
+                        const configurationManager : IConfigurationManager; const configFile : string;
+                        const upgradeService : IUpgradeService; const upgradeCache : IUpgradeCheckCache);
+
+    /// <summary>
+    ///  Called by the hosting edit view when the view is closing, so any in
+    ///  flight update check is cancelled before the frame goes away.
+    /// </summary>
+    procedure ViewClosing;
 
 
     procedure ThemeChanged(const ideStyleServices : TCustomStyleServices);
@@ -112,7 +146,10 @@ implementation
 
 
 uses
+  WinApi.ActiveX,
   DPM.Core.Utils.Config,
+  DPM.Core.Version,
+  DPM.IDE.ToolsAPI,
   DPM.IDE.AddInOptionsHostForm,
   DPM.IDE.AboutForm;
 
@@ -177,6 +214,59 @@ begin
     DoSearchEvent(true);
 end;
 
+procedure TDPMSearchBarFrame.lblUpdateAvailableLinkClick(Sender: TObject; const Link: string; LinkType: TSysLinkType);
+var
+  upgradeInfo : IUpgradeInfo;
+  installerFile : string;
+  oldCursor : TCursor;
+  downloaded : boolean;
+begin
+  upgradeInfo := FUpgradeInfo;
+  if (upgradeInfo = nil) or (FUpgradeService = nil) then
+    exit;
+
+  //Plain MessageDlg keeps this version portable - the plugin builds XE2..13.
+  if MessageDlg('DPM ' + upgradeInfo.Version.ToStringNoMeta + ' is available.' + sLineBreak + sLineBreak +
+                'The installer cannot update DPM while the IDE is running, so any modified files will be saved ' +
+                'and the IDE will be closed.' + sLineBreak + sLineBreak +
+                'Download and install it now?',
+                mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
+    exit;
+
+  //Download synchronously - the user just opted in and is waiting, and this
+  //way completion does not have to survive the frame being torn down.
+  oldCursor := Screen.Cursor;
+  Screen.Cursor := crHourGlass;
+  try
+    FLogger.Information('DPMIDE : Downloading ' + upgradeInfo.AssetName + ' ...');
+    downloaded := FUpgradeService.DownloadUpgrade(FCancellationTokenSource.Token, upgradeInfo, installerFile);
+  finally
+    Screen.Cursor := oldCursor;
+  end;
+
+  if not downloaded then
+  begin
+    //DownloadUpgrade has already logged the detail.
+    MessageDlg('Unable to download the DPM installer. See the DPM message view for details.', mtError, [mbOK], 0);
+    exit;
+  end;
+
+  //Save first - once the IDE starts closing the user should not be answering
+  //save prompts while an installer waits behind them.
+  TToolsApiUtils.SaveModifiedFiles;
+
+  if not FUpgradeService.LaunchInstaller(installerFile) then
+  begin
+    MessageDlg('Unable to start the DPM installer. It was downloaded to:' + sLineBreak + installerFile,
+               mtError, [mbOK], 0);
+    exit;
+  end;
+
+  //Order matters : the installer refuses to run while bds.exe is up, so it must
+  //already be started (sitting on its privileges prompt) as we close.
+  TToolsApiUtils.CloseIDE;
+end;
+
 procedure TDPMSearchBarFrame.chkIncludeCommercialClick(Sender: TObject);
 begin
   DoSearchEvent(true);
@@ -192,7 +282,9 @@ begin
   DoSearchEvent(true);
 end;
 
-procedure TDPMSearchBarFrame.Configure(const logger: IDPMIDELogger; const ideOptions: IDPMIDEOptions; const config : IConfiguration; const configurationManager: IConfigurationManager; const configFile : string);
+procedure TDPMSearchBarFrame.Configure(const logger: IDPMIDELogger; const ideOptions: IDPMIDEOptions; const config : IConfiguration;
+                                       const configurationManager: IConfigurationManager; const configFile : string;
+                                       const upgradeService : IUpgradeService; const upgradeCache : IUpgradeCheckCache);
 begin
   FLoading := true;
   FLogger := logger;
@@ -200,8 +292,138 @@ begin
   FConfiguration := config;
   FConfigurationManager := configurationManager;
   FConfigFile := configFile;
+  FUpgradeService := upgradeService;
+  FUpgradeCache := upgradeCache;
   ReloadSourcesCombo;
   FLoading := false;
+
+  //Earliest safe point - FLogger and the options are only available now.
+  CheckForUpdate;
+end;
+
+function TDPMSearchBarFrame.IncludePrereleaseUpdates : boolean;
+begin
+  //Beta is a superset : it stops prereleases being excluded, it does not
+  //exclude stable releases. So a beta user still gets a newer stable.
+  result := (FDPMIDEOptions <> nil) and (FDPMIDEOptions.UpdateChannel = TDPMUpdateChannel.Beta);
+end;
+
+procedure TDPMSearchBarFrame.ShowUpdateAvailable(const upgradeInfo : IUpgradeInfo);
+begin
+  FUpgradeInfo := upgradeInfo;
+  if upgradeInfo = nil then
+  begin
+    lblUpdateAvailable.Visible := false;
+    exit;
+  end;
+  //The <a> markup is what makes this clickable - without it TLinkLabel renders
+  //as plain text and never fires OnLinkClick. Wrap the WHOLE caption so the
+  //entire label is the click target, not just one small word.
+  lblUpdateAvailable.Caption := '<a>DPM ' + upgradeInfo.Version.ToStringNoMeta + ' is available - click here to install</a>';
+  lblUpdateAvailable.Visible := true;
+end;
+
+procedure TDPMSearchBarFrame.CheckForUpdate;
+var
+  currentVersion : TPackageVersion;
+  includePrerelease : boolean;
+  cachedResult : TUpgradeCheckResult;
+  cachedInfo : IUpgradeInfo;
+  upgradeService : IUpgradeService; //local for capture
+  logger : IDPMIDELogger;            //local for capture
+  cache : IUpgradeCheckCache;        //local for capture
+begin
+  lblUpdateAvailable.Visible := false;
+  FUpgradeInfo := nil;
+
+  if (FUpgradeService = nil) or FRequestInFlight or FClosing then
+    exit;
+
+  currentVersion := TDPMVersion.CurrentVersion;
+  //An unstamped/garbage cDPMSemVer would compare as Empty and make every
+  //release look like an upgrade - don't even ask.
+  if currentVersion.IsEmpty then
+    exit;
+
+  includePrerelease := IncludePrereleaseUpdates;
+
+  //Cache hit - no thread needed at all.
+  if (FUpgradeCache <> nil) and FUpgradeCache.TryGet(currentVersion, includePrerelease, cachedResult, cachedInfo) then
+  begin
+    if cachedResult = TUpgradeCheckResult.UpgradeAvailable then
+      ShowUpdateAvailable(cachedInfo);
+    exit;
+  end;
+
+  upgradeService := FUpgradeService;
+  logger := FLogger;
+  cache := FUpgradeCache;
+
+  TAsync.Configure<IUpgradeInfo>(
+    function(const cancelToken : ICancellationToken) : IUpgradeInfo
+    var
+      checkResult : TUpgradeCheckResult;
+      info : IUpgradeInfo;
+    begin
+      result := nil;
+      //the http api needs this on the worker thread.
+      CoInitialize(nil);
+      try
+        if cancelToken.IsCancelled then
+          exit;
+        checkResult := upgradeService.CheckForUpgrade(cancelToken, currentVersion, includePrerelease, info);
+        if cancelToken.IsCancelled then
+          exit;
+        //Errors are deliberately not cached - an offline machine should retry
+        //next time rather than go quiet for an hour.
+        if (checkResult <> TUpgradeCheckResult.Error) and (cache <> nil) then
+          cache.Put(currentVersion, includePrerelease, checkResult, info);
+        if checkResult = TUpgradeCheckResult.UpgradeAvailable then
+          result := info;
+      finally
+        CoUninitialize;
+      end;
+    end, FCancellationTokenSource.Token)
+  .OnException(
+    procedure(const e : Exception)
+    begin
+      FRequestInFlight := false;
+      if FClosing then
+        exit;
+      //Warn rather than error - failing to reach github is not a problem with
+      //the user's project.
+      logger.Warning('DPMIDE : Unable to check for DPM updates : ' + e.Message);
+    end)
+  .OnCancellation(
+    procedure
+    begin
+      FRequestInFlight := false;
+      if FClosing then
+        exit;
+      logger.Debug('DPMIDE : Cancelled checking for DPM updates.');
+    end)
+  .Await(
+    procedure(const theResult : IUpgradeInfo)
+    begin
+      FRequestInFlight := false;
+      //The view may have closed while this was in flight - the frame is being
+      //torn down, so touching controls here would AV.
+      if FClosing then
+        exit;
+      if theResult <> nil then
+      begin
+        logger.Debug('DPMIDE : DPM update available : ' + theResult.Version.ToStringNoMeta);
+        ShowUpdateAvailable(theResult);
+      end;
+    end);
+  FRequestInFlight := true;
+end;
+
+procedure TDPMSearchBarFrame.ViewClosing;
+begin
+  FClosing := true;
+  //Must return quickly - the IDE is waiting on us.
+  FCancellationTokenSource.Cancel;
 end;
 
 constructor TDPMSearchBarFrame.Create(AOwner: TComponent);
@@ -233,6 +455,11 @@ begin
 
 
   FHasSources := false;
+
+  //Must outlive any async call, so it is a field created up front rather than a
+  //local at the call site.
+  FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
+  lblUpdateAvailable.Visible := false;
 end;
 
 procedure TDPMSearchBarFrame.DebounceTimerTimer(Sender: TObject);

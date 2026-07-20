@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -98,6 +98,10 @@ uses
   DPM.Core.Project.Editor in 'Core\Project\DPM.Core.Project.Editor.pas',
   DPM.Core.Project.CopyLocalTargets in 'Core\Project\DPM.Core.Project.CopyLocalTargets.pas',
   DPM.Core.Package.CopyLocal in 'Core\Package\DPM.Core.Package.CopyLocal.pas',
+  DPM.Core.Version in 'Core\DPM.Core.Version.pas',
+  DPM.Core.Upgrade.Interfaces in 'Core\Upgrade\DPM.Core.Upgrade.Interfaces.pas',
+  DPM.Core.Upgrade.Github in 'Core\Upgrade\DPM.Core.Upgrade.Github.pas',
+  DPM.Core.Upgrade.Cache in 'Core\Upgrade\DPM.Core.Upgrade.Cache.pas',
   DPM.Core.Options.CopyLocal in 'Core\Options\DPM.Core.Options.CopyLocal.pas',
   DPM.Core.Project.GroupProjReader in 'Core\Project\DPM.Core.Project.GroupProjReader.pas',
   DPM.Core.Project.Interfaces in 'Core\Project\DPM.Core.Project.Interfaces.pas',
@@ -121,7 +125,8 @@ uses
   DPM.Core.Sources.Interfaces in 'Core\Sources\DPM.Core.Sources.Interfaces.pas',
   DPM.Core.Sources.Manager in 'Core\Sources\DPM.Core.Sources.Manager.pas',
   DPM.Core.Sources.Types in 'Core\Sources\DPM.Core.Sources.Types.pas',
-  DPM.Core.Spec.BuildEntry in 'Core\Spec\DPM.Core.Spec.BuildEntry.pas',
+  DPM.Core.Spec.BuildEntry in 'Core\Spec\DPM.Core.Spec.BuildEntry.pas',
+
   DPM.Core.Spec.CopyLocalEntry in 'Core\Spec\DPM.Core.Spec.CopyLocalEntry.pas',
   DPM.Core.Spec.Dependency in 'Core\Spec\DPM.Core.Spec.Dependency.pas',
   DPM.Core.Spec.Interfaces in 'Core\Spec\DPM.Core.Spec.Interfaces.pas',

@@ -23,10 +23,10 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       930
       67)
     object lblSources: TLabel
-      Left = 655
+      Left = 661
       Top = 40
-      Width = 94
-      Height = 15
+      Width = 88
+      Height = 13
       Alignment = taRightJustify
       Anchors = [akTop, akRight]
       Caption = 'Package Sources :'
@@ -71,7 +71,7 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       Left = 755
       Top = 37
       Width = 160
-      Height = 23
+      Height = 21
       Style = csDropDownList
       Anchors = [akTop, akRight]
       ItemIndex = 0
@@ -115,7 +115,7 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       Left = 8
       Top = 9
       Width = 241
-      Height = 23
+      Height = 21
       Images = DPMEditorViewImages
       LeftButton.Enabled = False
       ParentShowHint = False
@@ -130,12 +130,25 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       OnKeyDown = txtSearchKeyDown
       OnRightButtonClick = txtSearchRightButtonClick
     end
+    object lblUpdateAvailable: TLinkLabel
+      Left = 408
+      Top = 14
+      Width = 507
+      Height = 19
+      Alignment = taRightJustify
+      Anchors = [akTop, akRight]
+      Caption = '<a>An Update to DPM is available - click here to install</a>'
+      TabOrder = 8
+      UseVisualStyle = True
+      Visible = False
+      OnLinkClick = lblUpdateAvailableLinkClick
+    end
   end
   object DPMEditorViewImages: TImageList
     ColorDepth = cd32Bit
     Left = 712
     Bitmap = {
-      494C010107000900040010001000FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
+      494C0101070009000C0010001000FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000400000002000000001002000000000000020
       0000000000000000000000000000000000000000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000000000

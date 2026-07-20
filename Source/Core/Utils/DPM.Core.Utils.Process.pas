@@ -54,6 +54,14 @@ type
 
     //new version using createprocess - not capturing output.
     class function Execute2(const cancellationToken : ICancellationToken; const executable : string; const commandLine : string; const startingDir : string; const enviroment : IEnvironmentBlock = nil; const timeout : integer = -1) : Cardinal;
+
+    //Starts the process and returns immediately - does not wait, does not
+    //capture the exit code. Needed for launching something that will outlive us
+    //(the dpm installer, which cannot replace dpm.exe until we have exited).
+    //Both Execute and Execute2 wait for the child, so neither can be used here.
+    //Shows the process window - this is for user facing apps, not tools.
+    //Throws if the process cannot be started.
+    class procedure ExecuteNoWait(const executable : string; const commandLine : string);
   end;
 
 
@@ -356,6 +364,29 @@ begin
     end;
   end
   else
+    raise Exception.Create('Unable to execute process : ' + SysErrorMessage(GetLastError));
+end;
+
+class procedure TProcess.ExecuteNoWait(const executable, commandLine : string);
+var
+  shellInfo : TShellExecuteInfo;
+begin
+  FillChar(shellInfo, SizeOf(shellInfo), 0);
+  shellInfo.cbSize := SizeOf(TShellExecuteInfo);
+  //No SEE_MASK_NOCLOSEPROCESS - we never wait on or close the handle, so we do
+  //not want one returned to us.
+  shellInfo.fMask := 0;
+  shellInfo.Wnd := 0;
+  //nil verb means 'open' - which lets the shell handle the UAC elevation
+  //prompt if the target's manifest asks for it.
+  shellInfo.lpVerb := nil;
+  shellInfo.lpFile := PChar(executable);
+  shellInfo.lpParameters := PChar(commandLine);
+  shellInfo.lpDirectory := PChar(ExtractFilePath(executable));
+  shellInfo.nShow := SW_SHOWNORMAL;
+  shellInfo.hInstApp := 0;
+
+  if not ShellExecuteEx(@shellInfo) then
     raise Exception.Create('Unable to execute process : ' + SysErrorMessage(GetLastError));
 end;
 

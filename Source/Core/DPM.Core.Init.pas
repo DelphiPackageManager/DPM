@@ -84,6 +84,9 @@ uses
   DPM.Core.SBOM.Writers.Reports,
   DPM.Core.SBOM.Reader,
   DPM.Core.SBOM.Generator,
+  DPM.Core.Upgrade.Interfaces,
+  DPM.Core.Upgrade.Github,
+  DPM.Core.Upgrade.Cache,
 
   // Signing — Phase 1
   DPM.Core.Crypto.Hashing.Interfaces,
@@ -164,6 +167,15 @@ begin
   Container.RegisterType<ISbomGenerator, TSBOMGenerator>;
 
   Container.RegisterType<ICopyLocalService, TCopyLocalService>;
+
+  // Upgrading the dpm client itself. Registered here rather than in
+  // DPM.Console.Reg so the IDE plugin can use the same service.
+  Container.RegisterType<IUpgradeService, TGithubUpgradeService>;
+  // Only the IDE consults this - `dpm upgrade` is an explicit user action and
+  // always does a live check. Like TYamlTrustStateService below, the second
+  // (path + ttl) ctor is test-only and takes unregistered string/integer args,
+  // so the container resolves the ILogger-only one.
+  Container.RegisterType<IUpgradeCheckCache, TUpgradeCheckCache>;
 
   // Signing — Phase 1 registrations
   Container.RegisterType<IHashingService, TBCryptHashingService>.AsSingleton;

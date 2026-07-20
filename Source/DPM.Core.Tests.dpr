@@ -189,6 +189,7 @@ uses
   DPM.Console.Command.Spec.Writer in 'Cmdline\Commands\DPM.Console.Command.Spec.Writer.pas',
   DPM.Core.Tests.Spec.Writer in 'Tests\DPM.Core.Tests.Spec.Writer.pas',
   DPM.Core.Tests.Trust in 'Tests\DPM.Core.Tests.Trust.pas',
+  DPM.Core.Tests.Upgrade in 'Tests\DPM.Core.Tests.Upgrade.pas',
   DPM.Core.Tests.Trust.TrustSet in 'Tests\DPM.Core.Tests.Trust.TrustSet.pas',
   DPM.Core.Tests.Trust.Prompt in 'Tests\DPM.Core.Tests.Trust.Prompt.pas',
   DPM.Core.Tests.Trust.Modes in 'Tests\DPM.Core.Tests.Trust.Modes.pas',
@@ -212,6 +213,10 @@ uses
   TestLogger in 'Tests\TestLogger.pas',
   DPM.Core.Project.CopyLocalTargets in 'Core\Project\DPM.Core.Project.CopyLocalTargets.pas',
   DPM.Core.Package.CopyLocal in 'Core\Package\DPM.Core.Package.CopyLocal.pas',
+  DPM.Core.Version in 'Core\DPM.Core.Version.pas',
+  DPM.Core.Upgrade.Interfaces in 'Core\Upgrade\DPM.Core.Upgrade.Interfaces.pas',
+  DPM.Core.Upgrade.Github in 'Core\Upgrade\DPM.Core.Upgrade.Github.pas',
+  DPM.Core.Upgrade.Cache in 'Core\Upgrade\DPM.Core.Upgrade.Cache.pas',
   DPM.Core.Options.CopyLocal in 'Core\Options\DPM.Core.Options.CopyLocal.pas',
   DPM.Core.Tests.Package.CopyLocal in 'Tests\DPM.Core.Tests.Package.CopyLocal.pas';
 

@@ -5,6 +5,7 @@ interface
 uses
   System.Classes,
   DPM.Core.Types,
+  DPM.IDE.Types,
   DPM.IDE.Options
   ;
 
@@ -21,6 +22,7 @@ type
     FAutoCloseLogOnSuccess: Boolean;
     FAddDPMToProjectTree: Boolean;
     FAutoCloseLogDelaySeconds : Integer;
+    FUpdateChannel : TDPMUpdateChannel;
   public
     function LoadFromFile(const fileName : string = '') : boolean;
     function SaveToFile(const fileName : string = '') : boolean;
@@ -49,12 +51,26 @@ type
     procedure SetLogWindowWidth(const value : integer);
     function GetLogWindowHeight : integer;
     procedure SetLogWindowHeight(const value : integer);
+
+    //DSpecCreator has no update check - present only to satisfy IDPMIDEOptions.
+    function GetUpdateChannel : TDPMUpdateChannel;
+    procedure SetUpdateChannel(const value : TDPMUpdateChannel);
   end;
 
 
 implementation
 
 { TFakeIDE }
+
+function TFakeIDE.GetUpdateChannel : TDPMUpdateChannel;
+begin
+  result := FUpdateChannel;
+end;
+
+procedure TFakeIDE.SetUpdateChannel(const value : TDPMUpdateChannel);
+begin
+  FUpdateChannel := value;
+end;
 
 function TFakeIDE.GetAddDPMToProjectTree: boolean;
 begin

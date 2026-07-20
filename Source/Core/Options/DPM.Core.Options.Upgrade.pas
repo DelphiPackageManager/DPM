@@ -1,8 +1,8 @@
-﻿{***************************************************************************}
+{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright � 2019 Vincent Parrett and contributors               }
+{           Copyright (c) 2019 Vincent Parrett and contributors             }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -24,34 +24,53 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.Console.Banner;
+unit DPM.Core.Options.Upgrade;
 
 interface
-uses
-  DPM.Console.Writer;
 
-procedure ShowBanner(const consoleWriter : IConsoleWriter);
+uses
+  DPM.Core.Options.Base;
+
+type
+  //Descends from TOptionsBase rather than TSearchOptions - upgrading the client
+  //has nothing to do with package sources, compilers or platforms.
+  TUpgradeOptions = class(TOptionsBase)
+  private
+    FPreRelease : boolean;
+    FCheckOnly : boolean;
+    class var
+      FDefault : TUpgradeOptions;
+  public
+    class constructor CreateDefault;
+    class property Default : TUpgradeOptions read FDefault;
+    constructor Create; override;
+
+    /// <summary>
+    ///  Include pre-release versions when looking for a newer version.
+    /// </summary>
+    property PreRelease : boolean read FPreRelease write FPreRelease;
+
+    /// <summary>
+    ///  Only report whether a newer version exists - do not download or install
+    ///  anything. Useful in scripts, and the shape the IDE plugin will want.
+    /// </summary>
+    property CheckOnly : boolean read FCheckOnly write FCheckOnly;
+  end;
 
 implementation
 
-uses
-  System.SysUtils,
-  DPM.Core.Utils.System,
-  DPM.Core.Version;
+{ TUpgradeOptions }
 
-procedure ShowBanner(const consoleWriter : IConsoleWriter);
-
+constructor TUpgradeOptions.Create;
 begin
-  Assert(consoleWriter <> nil, 'No console writer available');
-  consoleWriter.SetColour(ccBrightAqua, ccDefault);
-  //Show the semver as well as the 4 part file version - the semver is what
-  //github releases are tagged with and what `dpm upgrade` compares against, so
-  //the banner needs to agree with it.
-  consoleWriter.WriteLine('DPM - Delphi Package Manager - Version : ' + TDPMVersion.CurrentVersionString +
-                          ' (' + TSystemUtils.GetVersionString + ')');
-  consoleWriter.SetColour(ccBrightWhite);
-  consoleWriter.WriteLine('© 2019-2025 Vincent Parrett and Contributors');
-  consoleWriter.WriteLine('');
+  inherited;
+  FPreRelease := false;
+  FCheckOnly := false;
+end;
+
+class constructor TUpgradeOptions.CreateDefault;
+begin
+  FDefault := TUpgradeOptions.Create;
 end;
 
 end.

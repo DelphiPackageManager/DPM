@@ -62,6 +62,7 @@ uses
   DPM.Console.Command.Sbom,
   DPM.Console.Command.CopyLocal,
   DPM.Console.Command.Scan,
+  DPM.Console.Command.Upgrade,
   DPM.Core.Vuln.Interfaces,
   DPM.Core.Vuln.Cache,
   DPM.Core.Vuln.OSV,
@@ -130,6 +131,9 @@ begin
  container.RegisterType<ICommandHandler,TScanCommand>('command.scan');
 
  container.RegisterType<ICommandHandler,TCopyLocalCommand>('command.copylocal');
+
+ //IUpgradeService itself is registered by InitCore - the IDE plugin uses it too.
+ container.RegisterType<ICommandHandler,TUpgradeCommand>('command.upgrade');
 
  container.RegisterType<ICommandFactory,TCommandFactory>;
 

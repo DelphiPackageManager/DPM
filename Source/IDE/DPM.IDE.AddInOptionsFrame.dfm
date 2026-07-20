@@ -343,6 +343,33 @@ object DPMOptionsFrame: TDPMOptionsFrame
           Caption = 'Show DPM Node in Project Manager'
           TabOrder = 6
         end
+        object Label12: TLabel
+          Left = 24
+          Top = 272
+          Width = 79
+          Height = 13
+          Caption = 'Update Channel'
+        end
+        object Label13: TLabel
+          Left = 176
+          Top = 294
+          Width = 289
+          Height = 13
+          Caption = 'Beta also includes stable releases, whichever is newer.'
+        end
+        object cboUpdateChannel: TComboBox
+          Left = 24
+          Top = 291
+          Width = 145
+          Height = 21
+          Style = csDropDownList
+          ItemIndex = 1
+          TabOrder = 7
+          Text = 'Beta'
+          Items.Strings = (
+            'Stable'
+            'Beta')
+        end
       end
     end
   end
