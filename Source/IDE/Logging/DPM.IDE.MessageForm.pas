@@ -29,6 +29,7 @@ type
     ClosingInTimer: TTimer;
     lblClosing: TLabel;
     lblDontClose: TLinkLabel;
+    Panel1: TPanel;
     procedure actCanCancelExecute(Sender: TObject);
     procedure actCopyLogExecute(Sender: TObject);
     procedure FormHide(Sender: TObject);
@@ -245,16 +246,12 @@ begin
   FLogMemo := TLogMemo.Create(Self);
   FLogMemo.TabOrder := 0;
   FLogMemo.TabStop := true;
-  FLogMemo.Top := 10;
-  FLogMemo.Left := 10;
-  FLogMemo.Width := Self.ClientWidth - 20;
-  FLogMemo.Height := Self.ClientHeight - 30 - btnCancel.Height;
-  FLogMemo.Anchors := [akLeft, akRight, akTop, akBottom];
+  FLogMemo.Align := alClient;
   FLogMemo.StyleServices := IDEStyleServices;
   FLogMemo.Clear;
   FLogMemo.Parent := Self;
-  // Keep TLogMemo's monospaced font; only match the form's font size.
-  FLogMemo.Font.Size := Self.Font.Size + 1;
+  // Keep TLogMemo's monospaced font
+  FLogMemo.Font.Size := Self.Font.Size + 2;
   Self.ActiveControl := btnCancel;
 
   FCloseDelayInSeconds := 3;

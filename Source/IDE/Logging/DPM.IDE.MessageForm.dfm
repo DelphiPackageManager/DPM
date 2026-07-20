@@ -13,61 +13,79 @@ object DPMMessageForm: TDPMMessageForm
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
+  OldCreateOrder = True
   Position = poMainFormCenter
   OnHide = FormHide
   OnShow = FormShow
-  DesignSize = (
-    879
-    425)
+  PixelsPerInch = 96
   TextHeight = 13
-  object lblClosing: TLabel
-    Left = 144
-    Top = 394
-    Width = 46
-    Height = 13
-    Anchors = [akLeft, akBottom]
-    Caption = 'Closing...'
-    Visible = False
-  end
-  object btnCancel: TButton
-    Left = 758
-    Top = 388
-    Width = 89
-    Height = 28
-    Action = actCanCancel
-    Anchors = [akRight, akBottom]
+  object Panel1: TPanel
+    Left = 0
+    Top = 376
+    Width = 879
+    Height = 49
+    Align = alBottom
+    BevelOuter = bvNone
+    ShowCaption = False
     TabOrder = 0
-  end
-  object btnCopy: TButton
-    Left = 8
-    Top = 388
-    Width = 81
-    Height = 28
-    Action = actCopyLog
-    Anchors = [akLeft, akBottom]
-    TabOrder = 2
-  end
-  object btnClose: TButton
-    Left = 652
-    Top = 389
-    Width = 89
-    Height = 28
-    Anchors = [akRight, akBottom]
-    Caption = 'Close'
-    TabOrder = 1
-    OnClick = btnCloseClick
-  end
-  object lblDontClose: TLinkLabel
-    Left = 216
-    Top = 393
-    Width = 95
-    Height = 19
-    Anchors = [akLeft, akBottom]
-    Caption = '[ <a>Cancel closing</a> ]'
-    TabOrder = 3
-    UseVisualStyle = True
-    Visible = False
-    OnLinkClick = lblDontCloseLinkClick
+    ExplicitLeft = 8
+    ExplicitTop = 200
+    ExplicitWidth = 863
+    DesignSize = (
+      879
+      49)
+    object lblClosing: TLabel
+      Left = 144
+      Top = 18
+      Width = 46
+      Height = 13
+      Anchors = [akLeft, akBottom]
+      Caption = 'Closing...'
+      Visible = False
+      ExplicitTop = 394
+    end
+    object btnCancel: TButton
+      Left = 774
+      Top = 12
+      Width = 89
+      Height = 28
+      Action = actCanCancel
+      Anchors = [akRight, akBottom]
+      TabOrder = 0
+      ExplicitLeft = 758
+    end
+    object btnClose: TButton
+      Left = 668
+      Top = 12
+      Width = 89
+      Height = 28
+      Anchors = [akRight, akBottom]
+      Caption = 'Close'
+      TabOrder = 1
+      OnClick = btnCloseClick
+      ExplicitLeft = 652
+    end
+    object btnCopy: TButton
+      Left = 8
+      Top = 12
+      Width = 81
+      Height = 28
+      Action = actCopyLog
+      Anchors = [akLeft, akBottom]
+      TabOrder = 2
+    end
+    object lblDontClose: TLinkLabel
+      Left = 216
+      Top = 18
+      Width = 95
+      Height = 19
+      Anchors = [akLeft, akBottom]
+      Caption = '[ <a>Cancel closing</a> ]'
+      TabOrder = 3
+      UseVisualStyle = True
+      Visible = False
+      OnLinkClick = lblDontCloseLinkClick
+    end
   end
   object ActionList1: TActionList
     OnUpdate = ActionList1Update
