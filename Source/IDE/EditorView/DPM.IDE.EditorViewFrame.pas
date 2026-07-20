@@ -53,7 +53,13 @@ uses
   DPM.IDE.PackageDetailsFrame;
 
 const
-  bulletChar : Char = '•';
+  //U+2022 BULLET, written as a code point rather than a literal on purpose.
+  //This file has no UTF-8 BOM, so dcc32 decodes it using the machine's ANSI
+  //codepage. A literal bullet is 3 utf-8 bytes, which reads as one Char on a
+  //machine with ACP 65001 but as a 3 character string on a normal CP1252 box -
+  //giving "E2010 Incompatible types: 'Char' and 'string'" on some machines and
+  //not others. Keeping the source pure ASCII makes it codepage independent.
+  bulletChar : Char = #$2022;
 
 type
   TPackageRowKind = (rkInstalledHeader, rkImplicitHeader, rkAvailableHeader, rkInstalledPackage, rkImplicitPackage, rkAvailablePackage, rkUnknown);
