@@ -76,8 +76,19 @@ type
     FUpdateCount : integer;
     FContentDirty : boolean;
     FScrollBarsDirty : boolean;
-    FPainted : boolean; //true once Paint has completed on the current window handle.
-
+    //False until Paint has run on the current window handle - see WMEraseBkgnd.
+    FPainted : boolean;
+    //Background brush for the TLogMemo window CLASS - see CreateParams. Windows fills a newly
+    //shown window's surface with the class brush before the first WM_PAINT is composed; the
+    //VCL default is no brush, which left the surface white for the 2-3 frames between the
+    //window appearing and our first paint (a visible white flash against a dark theme, or a
+    //white window if a paint gets starved).
+    //LIFETIME : created once, on first handle creation, and NEVER deleted or replaced - once
+    //RegisterClass has run the window class owns the handle for the life of the module, and
+    //the class is shared by every TLogMemo instance. (An earlier attempt that deleted the old
+    //brush on theme changes left the class referencing freed GDI and crashed the IDE.)
+    class var FBackgroundBrush : HBRUSH;
+    var
     FStyleServices : TCustomStyleServices;
 
     FThemeType : TThemeType;
@@ -486,11 +497,9 @@ begin
 end;
 
 procedure TLogMemo.Flush;
-var
-  updateRect : TRect;
 begin
   if not HandleAllocated then
-    exit; //dirty flags stay set - the flush happens once the handle exists again.
+    exit;
 
   //Apply any pending scrollbar change exactly once per flush. Doing this per AddRow caused the
   //scrollbar to be redrawn many times per frame (SetScrollInfo with redraw) - a flicker source.
@@ -500,38 +509,17 @@ begin
     UpdateScrollBars;
   end;
 
-  //Also honour an OS-pending update region even when no new content arrived (handle recreation
-  //after a theme change, window reveal). The host may not pump messages during a synchronous
-  //restore/install, so if we don't paint it here nothing ever will.
-  if not (FContentDirty or GetUpdateRect(Handle, updateRect, False)) then
-    exit;
-
-  FContentDirty := false;
-
-  if not FPainted then
-  begin
-    //First paint on this window handle. The light client-only path below can fail here - a
-    //not-yet-visible window accumulates no update region, and with VCL styles active (the
-    //themed IDE) the plain WM_PAINT can be intercepted before reaching Paint - leaving the
-    //window white until a resize. Force one full synchronous redraw including the
-    //frame/scrollbars; incremental painting takes over once Paint has run.
-    RedrawWindow(Handle, nil, 0, RDW_INVALIDATE or RDW_ERASE or RDW_FRAME or RDW_UPDATENOW);
-    exit;
-  end;
-
   //Force the pending content paint out synchronously on our own handle. InvalidateRect + UpdateWindow
   //repaints the CLIENT area only (one back-buffer BitBlt) - unlike RedrawWindow/RDW_UPDATENOW it does
   //not trigger a WM_NCPAINT, so the border and scrollbars are not repainted every frame. It is still
   //synchronous, so it does not depend on the IDE dispatching a deferred WM_PAINT (it owns the loop and
   //may not pump it during a synchronous restore/install).
-  InvalidateRect(Handle, nil, False);
-  UpdateWindow(Handle);
-
-  //If the update region survived UpdateWindow, the WM_PAINT never reached Paint (intercepted by
-  //a style hook, or the window was not visible when invalidated) - escalate to a full redraw
-  //rather than leaving the window stale/white.
-  if GetUpdateRect(Handle, updateRect, False) then
-    RedrawWindow(Handle, nil, 0, RDW_INVALIDATE or RDW_ERASE or RDW_FRAME or RDW_UPDATENOW);
+  if FContentDirty then
+  begin
+    FContentDirty := false;
+    InvalidateRect(Handle, nil, False);
+    UpdateWindow(Handle);
+  end;
 end;
 
 procedure TLogMemo.Invalidate;
@@ -631,14 +619,26 @@ begin
   with Params do
     WindowClass.style := WindowClass.style and not (CS_HREDRAW or CS_VREDRAW);
 
+  //Prefill colour for the first composed frame of a freshly shown window - see the
+  //FBackgroundBrush declaration for the reasoning and the lifetime rules. The colour is
+  //resolved at first handle creation from this instance's style services - hosts assign
+  //StyleServices (eg the IDE theme) right after construction, before any handle exists, so a
+  //dark IDE prefills dark. Theme changes after registration keep the original shade for the
+  //prefill frame only - cosmetically invisible next to the white it replaces.
+  if FBackgroundBrush = 0 then
+  begin
+    if (FStyleServices <> nil) and FStyleServices.Enabled then
+      FBackgroundBrush := CreateSolidBrush(ColorToRGB(FStyleServices.GetSystemColor(clWindow)))
+    else
+      FBackgroundBrush := CreateSolidBrush(ColorToRGB(clWindow));
+  end;
+  Params.WindowClass.hbrBackground := FBackgroundBrush;
 end;
 
 procedure TLogMemo.CreateWnd;
 begin
   inherited;
-  //New window handle - nothing has been painted on it yet. Until the first Paint
-  //completes, Flush uses a full synchronous RedrawWindow rather than the light
-  //client-only path (see Flush).
+  //New handle - nothing painted on it yet, so the next erase must fill the background.
   FPainted := false;
   UpdateVisibleRows;
   Repaint;
@@ -1313,6 +1313,20 @@ var
   rowIdx : integer;
   rowState : TPaintRowState;
 begin
+  //The back buffer is normally sized by Resize, but a WM_PAINT can arrive before that has run
+  //(eg during handle creation, or after the handle is recreated by a theme change). BitBlt from
+  //an undersized buffer leaves the window showing its undefined initial surface - white - and
+  //because we clear FContentDirty below, Flush then has nothing to do and it STAYS white until
+  //something resizes the control. Make sure the buffer covers the client area first.
+  if (FPaintBmp.Width < ClientWidth) or (FPaintBmp.Height < ClientHeight) then
+  begin
+    //SetSize(0,0) first - TBitmap otherwise tries to preserve the existing content, which is
+    //both pointless here and slow (same reason Resize does it).
+    FPaintBmp.SetSize(0, 0);
+    FPaintBmp.SetSize(Max(ClientWidth, GetMaxWidth), ClientHeight);
+    UpdateVisibleRows(false);
+  end;
+
   LCanvas := FPaintBmp.Canvas;
   LCanvas.Font.Assign(Self.Font);
 
@@ -1638,7 +1652,32 @@ begin
 end;
 
 procedure TLogMemo.WMEraseBkgnd(var Message: TWmEraseBkgnd);
+var
+  bkColor : TColor;
+  bkBrush : HBRUSH;
+  r : TRect;
 begin
+  //Normally we do NOT erase - Paint fills the entire client area from the back buffer in one
+  //BitBlt, and erasing first would just flicker. Two exceptions, where skipping the erase
+  //leaves undefined (white) content on screen:
+  // 1. Before the very first Paint on a handle - the surface holds nothing of ours yet.
+  // 2. When the erase targets a MEMORY DC (the VCL double-buffer path, DWM window-animation
+  //    and thumbnail rendering via WM_PRINT) - that surface is composed elsewhere and may be
+  //    shown without a full paint following. Filling an off-screen DC can never flicker.
+  if (Message.DC <> 0) and ((not FPainted) or (GetObjectType(Message.DC) = OBJ_MEMDC)) then
+  begin
+    if FStyleServices.Enabled {$IF CompilerVersion >= 24.0} and (seClient in StyleElements) {$IFEND} then
+      bkColor := FStyleServices.GetSystemColor(clWindow)
+    else
+      bkColor := clWindow;
+    bkBrush := CreateSolidBrush(ColorToRGB(bkColor));
+    try
+      Winapi.Windows.GetClientRect(Handle, r);
+      FillRect(Message.DC, r, bkBrush);
+    finally
+      DeleteObject(bkBrush);
+    end;
+  end;
   Message.Result := 1; //we will paint the background
 end;
 

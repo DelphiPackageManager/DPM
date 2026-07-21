@@ -29,6 +29,8 @@ unit DPM.IDE.EditorViewManager;
 interface
 
 uses
+  Winapi.Windows,
+  Winapi.Messages,
   ToolsApi,
   Spring.Container,
   Spring.Collections,
@@ -58,6 +60,11 @@ type
     FImageIndex : integer;
     FProjectTreeManager : IDPMProjectTreeManager;
     FLogger : IDPMIDELogger;
+    //Deferred-close machinery - see ProjectGroupClosed. Views waiting to be closed once the
+    //group teardown that triggered the close has finished.
+    FWindowHandle : HWND;
+    FPendingCloseViews : IList<INTACustomEditorView>;
+    procedure WndProc(var msg : TMessage);
   protected
     procedure ProjectLoaded(const projectFile : string);
     procedure ProjectClosed(const projectFile : string);
@@ -87,9 +94,14 @@ implementation
 uses
   System.SysUtils,
   System.StrUtils,
+  System.Classes,
   DPM.IDE.EditorView,
   Vcl.Graphics,
   Vcl.Controls;
+
+const
+  //Posted by ProjectGroupClosed; handled in WndProc once the group close has unwound.
+  WM_DPM_CLOSEPENDINGVIEWS = WM_USER + 1;
 
 
 { TDPMEditorViewManager }
@@ -155,10 +167,16 @@ begin
     imageList.Free;
   end;
 
+  FPendingCloseViews := TCollections.CreateList<INTACustomEditorView>;
+  FWindowHandle := AllocateHWnd(WndProc);
 end;
 
 destructor TDPMEditorViewManager.Destroy;
 begin
+  //Any still-pending views are simply dropped (not closed) - if we are being destroyed the
+  //IDE is unloading the plugin and has destroyed (or is destroying) the views itself.
+  FPendingCloseViews.Clear;
+  DeallocateHWnd(FWindowHandle);
   FEditorView := nil;
   FEditorViewServices := nil;
   FProjectTreeManager := nil;
@@ -167,10 +185,41 @@ end;
 
 procedure TDPMEditorViewManager.Destroyed;
 begin
-  //The views are already destroyed by the time we get here, so nothing to do.
+  //The views are already destroyed by the time we get here, so nothing to do - and no
+  //deferred close must run after this point (WndProc checks FEditorViewServices).
+  FPendingCloseViews.Clear;
   FEditorView := nil;
   FEditorViewServices := nil;
   FProjectTreeManager := nil;
+end;
+
+procedure TDPMEditorViewManager.WndProc(var msg : TMessage);
+var
+  view : INTACustomEditorView;
+begin
+  if msg.Msg = WM_DPM_CLOSEPENDINGVIEWS then
+  begin
+    msg.Result := 0;
+    //Never let an exception escape into the IDE's message loop.
+    try
+      while FPendingCloseViews.Count > 0 do
+      begin
+        view := FPendingCloseViews[0];
+        FPendingCloseViews.Delete(0);
+        //Destroyed nils the services when the IDE is shutting down - just drop the reference.
+        if FEditorViewServices <> nil then
+          FEditorViewServices.CloseEditorView(view);
+      end;
+    except
+      on e : Exception do
+      begin
+        if FLogger <> nil then
+          FLogger.Debug('EditorViewManager : error closing deferred view : ' + e.Message);
+      end;
+    end;
+  end
+  else
+    msg.Result := DefWindowProc(FWindowHandle, msg.Msg, msg.WParam, msg.LParam);
 end;
 
 procedure TDPMEditorViewManager.Modified;
@@ -180,37 +229,30 @@ end;
 
 procedure TDPMEditorViewManager.ProjectClosed(const projectFile : string);
 begin
+  //Group closes are handled (deferred) by ProjectGroupClosed - never close the view
+  //synchronously from inside a close notification (see ProjectGroupClosed).
   if (EndsText('.groupproj', projectFile)) then
     exit;
   FLogger.Debug('EditorViewManager.ProjectClosed : ' + projectFile);
   if FEditorView <> nil then
-  begin
-    if (EndsText('.groupproj', projectFile)) then
-    begin
-      //closing the project group so close the view
-      if FEditorView <> nil then
-      begin
-        if FEditorViewServices <> nil then
-          FEditorViewServices.CloseEditorView(FEditorView);
-        FEditorView := nil;
-      end;
-    end
-    else
-    begin
-      //if it's not the project group being closed then just notify the view
-       (FEditorView as IDPMEditorView).ProjectClosed(projectFile);
-    end;
-  end;
-
+    (FEditorView as IDPMEditorView).ProjectClosed(projectFile);
 end;
 
 procedure TDPMEditorViewManager.ProjectGroupClosed;
 begin
+  //DO NOT close the view synchronously here. This notification arrives from inside
+  //TProjectGroup.BeforeDestruction, and CloseEditorView makes the IDE select and display the
+  //next editor buffer - activating a form designer and refreshing the component palette
+  //against a half-destroyed module. During IDE shutdown that access violated deep in the
+  //designer (Proxies.IsProxyClass). Instead, park the view and post ourselves a message : on
+  //a normal group close the deferred close runs moments later when the teardown has unwound;
+  //during IDE shutdown the message loop never pumps again and the IDE destroys the views
+  //itself, which is exactly what we want.
   if FEditorView <> nil then
   begin
-    if FEditorViewServices <> nil then
-       FEditorViewServices.CloseEditorView(FEditorView);
+    FPendingCloseViews.Add(FEditorView);
     FEditorView := nil;
+    PostMessage(FWindowHandle, WM_DPM_CLOSEPENDINGVIEWS, 0, 0);
   end;
 end;
 

@@ -78,7 +78,6 @@ type
 implementation
 
 uses
-  Winapi.Windows,
   System.SysUtils;
 
 { TDPMMessageService }
@@ -180,12 +179,7 @@ begin
   begin
     FMessageForm.Show;
     FMessageForm.BringToFront;
-    //Paint the form and every child (panel, buttons, log memo) synchronously on our own call
-    //stack - no message pumping. During a synchronous restore/install the IDE loop is not
-    //pumped, so a deferred WM_PAINT may never be dispatched (the window stayed blank/white
-    //until a resize), and Application.ProcessMessages here risked re-entering project
-    //loading / IDE notifiers.
-    RedrawWindow(FMessageForm.Handle, nil, 0, RDW_INVALIDATE or RDW_ERASE or RDW_FRAME or RDW_ALLCHILDREN or RDW_UPDATENOW);
+    Application.ProcessMessages;//allow repaint
   end;
 end;
 

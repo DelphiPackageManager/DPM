@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -109,6 +109,14 @@ end;
 
 procedure TDPMEditorView.Close(var Allowed : Boolean);
 begin
+  //Close can arrive more than once for the same view : the IDE closes misc edit views
+  //directly during File - Close All, and the view manager also closes us (deferred) when the
+  //project group closes. The second call must be a benign no-op - CanCloseView/Closing on the
+  //nil frame access violated here (CanCloseView 'worked' on nil because it touches no fields,
+  //then Closing wrote to the nil instance).
+  Allowed := true;
+  if FFrame = nil then
+    exit; //already closed.
   Allowed := FFrame.CanCloseView;
   if Allowed then
   begin
@@ -119,7 +127,10 @@ end;
 
 procedure TDPMEditorView.CloseAllCalled(var ShouldClose : Boolean);
 begin
-  //doesn't seem to get called???
+  //doesn't seem to get called??? - guarded the same way as Close regardless.
+  ShouldClose := true;
+  if FFrame = nil then
+    exit; //already closed.
   ShouldClose := FFrame.CanCloseView;
   if ShouldClose then
   begin
