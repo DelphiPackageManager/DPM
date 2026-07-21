@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Library</AppType>
@@ -206,9 +206,11 @@
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Interfaces.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Manager.pas"/>
         <DCCReference Include="Core\Sources\DPM.Core.Sources.Types.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.DesignEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.BuildEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.CopyLocalEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Dependency.pas"/>
+        <DCCReference Include="Core\Spec\DPM.Core.Spec.SourceEntry.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Interfaces.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.MetaData.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.Node.pas"/>
@@ -300,8 +302,6 @@
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Hash.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.DateTime.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Base64Url.pas"/>
-        <DCCReference Include="Core\Spec\DPM.Core.Spec.DesignEntry.pas"/>
-        <DCCReference Include="Core\Spec\DPM.Core.Spec.SourceEntry.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Masks.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.PE.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.MapFile.pas"/>

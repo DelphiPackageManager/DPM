@@ -942,6 +942,7 @@ var
   metaDataFile : string;
   spec : IPackageSpec;
   key : string;
+  packageHash : string;
 begin
   result := nil;
   key := MakeCacheKey(packageId);
@@ -965,7 +966,17 @@ begin
   spec := FSpecReader.ReadSpec(metaDataFile);
   if spec = nil then
     exit;
-  result := TPackageInfo.CreateFromManifest('', spec, '', '');
+  //Carry the package hash through from the .sha256 sidecar next to the cached .dpkg
+  //(GetPackageHash self-heals from the .dpkg when the sidecar is missing). The dspec
+  //itself has no hash, so building the info without one produced an IPackageInfo with
+  //Hash = ''. Both TPackageInstaller.GetPackageInfo and the resolver are cache-first,
+  //so that empty hash then reached TDPMServerPackageRepository.DownloadPackage, which
+  //verifies the downloaded file against it - failing with "does not match server hash []".
+  packageHash := GetPackageHash(packageId);
+  if packageHash <> '' then
+    result := TPackageInfo.CreateFromManifest('', spec, packageHash, cPackageHashAlgorithm)
+  else
+    result := TPackageInfo.CreateFromManifest('', spec, '', '');
 
   FCacheLock.Enter;
   try

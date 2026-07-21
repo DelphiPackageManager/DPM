@@ -220,7 +220,14 @@ begin
   Logger.Information('OK ' + uri.BaseUriString + path + ' [' + IntToStr(stopwatch.ElapsedMilliseconds) + 'ms]');
 
   hash := THashSHA256.GetHashStringFromFile(destFile);
-  if not SameText(hash, packageInfo.Hash) then
+  //Only compare when we actually have a hash to compare against. Not every IPackageInfo
+  //carries one - an older cache with no .sha256 sidecar and no .dpkg to self-heal from
+  //yields Hash = '', as does a feed that doesn't publish the field. Comparing regardless
+  //turned those into a bogus "does not match server hash []" failure. Mirrors the
+  //directory repo, which only verifies when a .sha256 sidecar exists.
+  if packageInfo.Hash = '' then
+    Logger.Warning('No known hash for [' + packageInfo.ToString + '] - skipping download hash verification')
+  else if not SameText(hash, packageInfo.Hash) then
   begin
     Logger.Error('Downloaded file hash [' + hash + '] does not match server hash [' + packageInfo.Hash + ']');
     exit(false);
