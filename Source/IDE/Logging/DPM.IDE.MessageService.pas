@@ -177,9 +177,11 @@ begin
   EnsureMessageForm;
   if not FMessageForm.Showing then
   begin
-    FMessageForm.Show;
+    FMessageForm.Show; //paints synchronously via TDPMMessageForm.CMShowingChanged
     FMessageForm.BringToFront;
-    Application.ProcessMessages;//allow repaint
+    //The z-order change can expose more of us, so paint again. Still synchronous - no
+    //Application.ProcessMessages, which used to re-enter the IDE from inside a notifier here.
+    FMessageForm.PaintNow;
   end;
 end;
 

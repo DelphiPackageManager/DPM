@@ -12,22 +12,13 @@ object Form1: TForm1
   Font.Style = []
   OnCreate = FormCreate
   TextHeight = 15
-  object Memo1: TMemo
-    Left = 296
-    Top = 248
-    Width = 185
-    Height = 89
-    Lines.Strings = (
-      'Memo1')
-    TabOrder = 0
-  end
   object btnBlockedOp: TButton
     Left = 8
     Top = 8
     Width = 145
     Height = 25
     Caption = 'Blocked op (in place)'
-    TabOrder = 1
+    TabOrder = 0
     OnClick = btnBlockedOpClick
   end
   object btnBlockedPopup: TButton
@@ -36,7 +27,7 @@ object Form1: TForm1
     Width = 145
     Height = 25
     Caption = 'Blocked op (popup)'
-    TabOrder = 2
+    TabOrder = 1
     OnClick = btnBlockedPopupClick
   end
   object btnLoadStyle: TButton
@@ -45,8 +36,44 @@ object Form1: TForm1
     Width = 145
     Height = 25
     Caption = 'Load VCL style...'
-    TabOrder = 3
+    TabOrder = 2
     OnClick = btnLoadStyleClick
+  end
+  object btnPopupNoRedraw: TButton
+    Left = 8
+    Top = 39
+    Width = 145
+    Height = 25
+    Caption = 'Popup, no redraw'
+    TabOrder = 3
+    OnClick = btnPopupNoRedrawClick
+  end
+  object btnPopupNoLogging: TButton
+    Left = 159
+    Top = 39
+    Width = 145
+    Height = 25
+    Caption = 'Popup, no logging'
+    TabOrder = 4
+    OnClick = btnPopupNoLoggingClick
+  end
+  object btnPartialInvalidate: TButton
+    Left = 310
+    Top = 39
+    Width = 145
+    Height = 25
+    Caption = 'Partial invalidate'
+    TabOrder = 5
+    OnClick = btnPartialInvalidateClick
+  end
+  object btnReshowCycles: TButton
+    Left = 461
+    Top = 39
+    Width = 145
+    Height = 25
+    Caption = 'Re-show cycles'
+    TabOrder = 6
+    OnClick = btnReshowCyclesClick
   end
   object dlgOpenStyle: TOpenDialog
     Filter = 'VCL Styles (*.vsf)|*.vsf'

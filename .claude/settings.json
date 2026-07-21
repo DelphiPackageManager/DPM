@@ -60,7 +60,8 @@
       "Bash(ls \"i:/Github/DelphiPackageManager/DPMMaster/Build/\" 2>/dev/null | head -20; echo ---; ls \"i:/Github/DelphiPackageManager/\" 2>/dev/null | head -30)",
       "Read(//i/Github/DelphiPackageManager/**)",
       "Read(//i/Github/**)",
-      "WebFetch(domain:api.github.com)"
+      "WebFetch(domain:api.github.com)",
+      "Read(//e/emb/studio/37.0/source/vcl/**)"
     ],
     "additionalDirectories": [
       "I:\\Github\\DelphiPackageManager\\DPMMaster\\Source"

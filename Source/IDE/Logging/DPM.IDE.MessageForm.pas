@@ -55,12 +55,16 @@ type
     {$IFDEF THEMESERVICES}
     FNotifierId : integer;
     {$ENDIF}
+    //Background brush for the TDPMMessageForm window CLASS - see CreateParams for the reasoning
+    //and the lifetime rules. Created once, never deleted or replaced.
+    class var FClassBackgroundBrush : HBRUSH;
 
     procedure SetCancellationTokenSource(const Value: ICancellationTokenSource);
     procedure SetCloseDelayInSeconds(const Value: integer);
   protected
     procedure CreateParams(var Params: TCreateParams); override;
     procedure CMStyleChanged(var Message: TMessage); message CM_STYLECHANGED;
+    procedure CMShowingChanged(var Message: TMessage); message CM_SHOWINGCHANGED;
 
     //INTAIDEThemingServicesNotifier
     procedure ChangingTheme;
@@ -92,6 +96,10 @@ type
     procedure NewLine;
     procedure Clear;
 
+    //Paints the whole window tree synchronously, with no dependency on a message loop. The IDE
+    //does not pump while a restore/install runs, so nothing here may rely on WM_PAINT arriving.
+    procedure PaintNow;
+
     procedure DelayHide;
 
     //Called by the message service to mark a task as running / finished. While running the
@@ -110,6 +118,30 @@ uses
   DPM.IDE.ToolsAPI;
 
 {$R *.dfm}
+
+//Windows replaces the top level windows of a GUI thread that has stopped servicing its message
+//queue with GHOST windows - a frozen copy with "(Not Responding)" appended. Detection kicks in
+//after a few seconds without the thread calling GetMessage/PeekMessage on its whole queue, which
+//is exactly what this plugin does : the core runs restore/install synchronously on the IDE main
+//thread, and the pump below only PeekMessages specific child HWNDs.
+//Ghosting was NOT the cause of the blank log window (that was a latched flag in TLogMemo), so this
+//is not load bearing - but a ghosted log window is still wrong, so it stays.
+//DisableProcessWindowsGhosting is not declared in Winapi.Windows, so it is bound dynamically - it
+//has existed since XP, but a missing export must never stop the plugin loading.
+procedure DisableWindowsGhosting;
+type
+  TDisableProcessWindowsGhosting = procedure; stdcall;
+var
+  userHandle : HMODULE;
+  proc : TDisableProcessWindowsGhosting;
+begin
+  userHandle := GetModuleHandle('user32.dll');
+  if userHandle = 0 then
+    exit;
+  proc := GetProcAddress(userHandle, 'DisableProcessWindowsGhosting');
+  if Assigned(proc) then
+    proc;
+end;
 
 
 { TDPMMessageForm }
@@ -188,10 +220,10 @@ end;
 procedure TDPMMessageForm.Clear;
 begin
   FLogMemo.Clear;
-  Application.ProcessMessages;
   FCurrentCloseDelay := FCloseDelayInSeconds;
   lblClosing.Visible := false;
   lblDontClose.Visible := false;
+  PaintNow;
 end;
 
 procedure TDPMMessageForm.ClosingInTimerTimer(Sender: TObject);
@@ -217,6 +249,41 @@ begin
   inherited;
 end;
 
+procedure TDPMMessageForm.CMShowingChanged(var Message: TMessage);
+begin
+  inherited; //TCustomForm.CMShowingChanged - ends with ShowWindow(Handle, ...)
+  //Only now is IsWindowVisible true for us and for every child, so this is the earliest moment a
+  //paint can actually produce pixels. Everything the controls attempted earlier in the show
+  //cascade (their own CM_SHOWINGCHANGED fires from TWinControl.UpdateShowing, before the line
+  //above) was silently discarded because we were still hidden. Painting here needs no message
+  //loop, which is the whole point - the caller may go straight into a synchronous restore.
+  //Reset first, unconditionally, on BOTH transitions : the memo cannot observe a hide at all (see
+  //TLogMemo.ResetPaintState), so this is the only place its per-visibility state and its
+  //re-entrancy latches are guaranteed to be cleared. Doing it on show as well means a run that
+  //somehow latched state cannot poison the next invocation - which is exactly the failure where
+  //the log window stayed blank for every subsequent restore once it had failed once.
+  if FLogMemo <> nil then
+    FLogMemo.ResetPaintState;
+  if Showing then
+    PaintNow;
+end;
+
+procedure TDPMMessageForm.PaintNow;
+begin
+  if not HandleAllocated then
+    exit;
+  if not IsWindowVisible(Handle) then
+    exit;
+  //Form background, panel, buttons, labels. RDW_UPDATENOW SENDS WM_NCPAINT/WM_ERASEBKGND/WM_PAINT
+  //rather than queueing them, so this completes without the message loop running.
+  RedrawWindow(Handle, nil, 0, RDW_ERASE or RDW_FRAME or RDW_INVALIDATE or RDW_UPDATENOW or RDW_ALLCHILDREN);
+  //The memo owns its entire client surface via its own back buffer - force it explicitly rather
+  //than relying on the RDW_ALLCHILDREN WM_PAINT above, so it also clears its own painted/dirty
+  //latches and repaints its border and scrollbars.
+  FLogMemo.PaintFrameNow;
+  FLogMemo.PaintNow;
+end;
+
 constructor TDPMMessageForm.Create(AOwner: TComponent; const options : IDPMIDEOptions);
 var
   {$IFDEF THEMESERVICES}
@@ -225,6 +292,9 @@ var
   IDEStyleServices : TCustomStyleServices;
 begin
   inherited Create(AOwner);
+  //Must happen before we ever show a window from a thread that is about to block - see the
+  //comment on DisableWindowsGhosting.
+  DisableWindowsGhosting;
   FOptions := options;
   Self.Width := FOptions.LogWindowWidth;
   Self.Height := FOptions.LogWindowHeight;
@@ -264,9 +334,37 @@ begin
 end;
 
 procedure TDPMMessageForm.CreateParams(var Params: TCreateParams);
+var
+  brushColor : TColor;
 begin
   inherited;
   Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST;
+
+  //Kill the white flash on the first show. This is a TOP LEVEL window concern, not a control one :
+  //child windows share the top level window's DWM redirection surface, and that surface is white
+  //when the compositor creates it. The VCL registers every window class with hbrBackground = 0
+  //(Vcl.Controls.pas:10387), so nothing ever fills it, and the white stays visible until the app
+  //composes its first frame. Giving the CLASS a brush is what colours that very first frame -
+  //this is not the WM_ERASEBKGND path (TWinControl.WMEraseBkgnd intercepts that and the class
+  //brush is never consulted there), it is the compositor's initial fill.
+  //LIFETIME : RegisterClass runs once per class name for the life of the module and the class then
+  //owns the handle, so this is created once and never deleted or replaced. The colour is therefore
+  //latched to whatever the IDE theme was on first show - a stale shade on the single pre-paint
+  //frame is invisible next to the white it replaces, whereas deleting a brush the class still
+  //references crashes the IDE.
+  //clWindow, not clBtnFace : the log memo is alClient and covers all but the ~49px button strip,
+  //so matching the memo's background is what makes the pre-paint frame invisible. The colour comes
+  //from the memo's style services (the IDE theme, assigned in the constructor) rather than the
+  //global Vcl.Themes.StyleServices, which is not the IDE's.
+  if FClassBackgroundBrush = 0 then
+  begin
+    if (FLogMemo <> nil) and (FLogMemo.StyleServices <> nil) and FLogMemo.StyleServices.Enabled then
+      brushColor := FLogMemo.StyleServices.GetSystemColor(clWindow)
+    else
+      brushColor := clWindow;
+    FClassBackgroundBrush := CreateSolidBrush(ColorToRGB(brushColor));
+  end;
+  Params.WindowClass.hbrBackground := FClassBackgroundBrush;
 end;
 
 procedure TDPMMessageForm.Debug(const data: string);
@@ -316,12 +414,19 @@ end;
 
 procedure TDPMMessageForm.FormHide(Sender: TObject);
 begin
-  FLogMemo.Clear;
+  //OnHide runs from DoHide inside TCustomForm.CMShowingChanged, BEFORE its ShowWindow(SW_HIDE) -
+  //we are still on screen, so clear WITHOUT repainting, or the emptied log is drawn over the
+  //window the user is still looking at.
+  FLogMemo.Clear(False);
 end;
 
 procedure TDPMMessageForm.FormShow(Sender: TObject);
 begin
-  Application.ProcessMessages;
+  //Nothing to do here. This fires from TCustomForm.CMShowingChanged's DoShow, which runs BEFORE
+  //that method's ShowWindow - so we are still hidden and no paint is possible yet. The
+  //Application.ProcessMessages that used to live here could never have served the first paint;
+  //all it did was pump the IDE queue from inside a notifier, mid show cascade. CMShowingChanged
+  //does the painting, after inherited.
 end;
 
 procedure TDPMMessageForm.Information(const data: string;  const important: Boolean);
@@ -378,26 +483,14 @@ begin
   Self.ProcessMessages;
 end;
 
-//Dispatches any queued WM_PAINT for one window of the log form's tree. Used with
-//EnumChildWindows so every descendant paints - including the VCL style hook's scrollbar
-//overlay windows, which are separate HWNDs parented to the form that nothing else repaints
-//while the IDE loop is blocked.
-function PumpChildPaintProc(wnd : HWND; lParam : LPARAM) : BOOL; stdcall;
-var
-  msg : TMsg;
-begin
-  while PeekMessage(msg, wnd, WM_PAINT, WM_PAINT, PM_REMOVE) do
-    DispatchMessage(msg);
-  result := True;
-end;
-
-// The core runs restore/install synchronously on the IDE main thread, so the IDE message loop
-// is not pumped while a task runs and the log window would not paint. This keeps the log
-// window alive WITHOUT Application.ProcessMessages: only messages already queued for the log
-// window's own controls are dispatched. Posted IDE messages and input for IDE windows stay
-// queued, so nothing re-enters project loading or the IDE notifiers mid-operation - the
-// re-entrance that produced paint artifacts on the IDE main window and churned resources
-// (a 'Not enough timers available' failure) when this pumped the whole thread queue.
+// The core runs restore/install synchronously on the IDE main thread, so the IDE message loop is
+// not pumped while a task runs. Painting no longer depends on that loop at all - TLogMemo.Flush
+// renders straight through a DC it fetches itself - so all this has to do is keep the window's
+// INPUT alive. Only messages already queued for the log window's own controls are dispatched.
+// Posted IDE messages and input for IDE windows stay queued, so nothing re-enters project loading
+// or the IDE notifiers mid-operation - the re-entrance that produced paint artifacts on the IDE
+// main window and churned resources (a 'Not enough timers available' failure) when this pumped
+// the whole thread queue.
 procedure TDPMMessageForm.ProcessMessages;
 var
   msg : TMsg;
@@ -426,28 +519,21 @@ begin
     FStopwatch.Start;
   end;
 
-  //The pump runs on EVERY log line, unthrottled, and AFTER Flush - when nothing is queued it
-  //is just a handful of PeekMessage calls returning false. Unthrottled and in this order
-  //because of the styled scrollbar overlays : the moment Flush's scrollbar update makes a
-  //scrollbar appear, the style hook shows a fresh overlay window whose surface is undefined
-  //(white) until its WM_PAINT is dispatched. Throttling the pump (or running it before the
-  //Flush that showed the overlay) left that white strip on screen for a frame or two - seen
-  //as a white flash whenever a burst of lines made the scrollbars appear.
+  //Input only, and unthrottled - when nothing is queued it is just a handful of PeekMessage calls
+  //returning false. There is no paint pumping here any more : Flush above paints the client
+  //directly, and TLogMemo repaints its border and the style hook's scrollbar overlay windows
+  //itself, synchronously, whenever a scrollbar appears or disappears (TLogMemo.UpdateScrollBars
+  //-> PaintFrameNow). That is what the EnumChildWindows paint pump used to be covering.
   if HandleAllocated and Showing then
   begin
     //Button clicks: WM_LBUTTONDOWN/UP are posted to the button hwnd (dispatched here); the
     //resulting BN_CLICKED arrives via a SENT WM_COMMAND, which needs no pumping. This is
     //what keeps Cancel responsive during an operation.
+    //Deliberately NOT pumping the form's non-client input - dragging the caption would enter
+    //DefWindowProc's modal move loop, which pumps the whole thread queue again.
     PumpControlInput(btnCancel);
     PumpControlInput(btnCopy);
     PumpControlInput(FLogMemo); //scroll/selection - handlers are self contained.
-
-    //Paint-only for the form and every descendant (panel, buttons, labels, scrollbar
-    //overlays). Deliberately NOT pumping the form's non-client input - dragging the caption
-    //would enter DefWindowProc's modal move loop, which pumps the whole thread queue again.
-    while PeekMessage(msg, Self.Handle, WM_PAINT, WM_PAINT, PM_REMOVE) do
-      DispatchMessage(msg);
-    EnumChildWindows(Self.Handle, @PumpChildPaintProc, 0);
   end;
 end;
 

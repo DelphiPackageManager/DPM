@@ -76,19 +76,27 @@ type
     FUpdateCount : integer;
     FContentDirty : boolean;
     FScrollBarsDirty : boolean;
-    //False until Paint has run on the current window handle - see WMEraseBkgnd.
+    //False until a FULL client render has landed on the current window handle - see WMEraseBkgnd
+    //and RenderTo. Reset when the window is hidden, because the surface is lost then.
     FPainted : boolean;
-    //Background brush for the TLogMemo window CLASS - see CreateParams. Windows fills a newly
-    //shown window's surface with the class brush before the first WM_PAINT is composed; the
-    //VCL default is no brush, which left the surface white for the 2-3 frames between the
-    //window appearing and our first paint (a visible white flash against a dark theme, or a
-    //white window if a paint gets starved).
-    //LIFETIME : created once, on first handle creation, and NEVER deleted or replaced - once
-    //RegisterClass has run the window class owns the handle for the life of the module, and
-    //the class is shared by every TLogMemo instance. (An earlier attempt that deleted the old
-    //brush on theme changes left the class referencing freed GDI and crashed the IDE.)
-    class var FBackgroundBrush : HBRUSH;
-    var
+    //Last known scrollbar visibility - used to repaint the non-client area (and, under a VCL
+    //style, the scrollbar overlay windows) exactly when a bar appears or disappears rather than
+    //on every appended line. See UpdateScrollBars.
+    FVScrollVisible : boolean;
+    FHScrollVisible : boolean;
+    //True for the duration of a RenderTo. RenderTo is NOT re-entrant : it draws into the shared
+    //FPaintBmp and then BitBlts from it, so a second render starting mid-way through the first
+    //can resize (SetSize(0,0)) the very buffer the first is about to blit - which puts an empty
+    //bitmap on screen, i.e. the correct background colour and not one row of text. Observed in
+    //the IDE trace as two overlapping RenderTo calls.
+    FRendering : boolean;
+    //NOTE : there is deliberately no 'FHiding' flag here any more. An earlier version had one, set
+    //by a BeginHide method and cleared by ResetPaintState, to stop the Clear in the host's OnHide
+    //repainting a window that is still on screen. It was a LATCH : its reset depended on a message
+    //arriving (CM_SHOWINGCHANGED), and when that did not happen the flag stayed set and PaintNow
+    //silently did nothing for the rest of the session - the log window then only ever painted when
+    //Windows itself invalidated it, i.e. on a resize. Clear takes a parameter instead, so there is
+    //no state to get stuck.
     FStyleServices : TCustomStyleServices;
 
     FThemeType : TThemeType;
@@ -108,6 +116,7 @@ type
     procedure Loaded; override;
     procedure Resize; override;
     procedure Paint;override;
+    function RenderTo(const dc : HDC) : boolean;
     procedure DoPaintRow(const index : integer; const state : TPaintRowState; const copyCanvas : boolean = true);
     function GetRowPaintState(const rowIdx : integer) : TPaintRowState;
     function RowSelected(const rowIdx : integer) : boolean;
@@ -131,10 +140,16 @@ type
     procedure UpdateHoverRow(const X, Y : integer);
 
 
+    //The one place the client background colour is decided. Both the background fill and the row
+    //text colour derive from this, so they can never disagree.
+    function GetBackgroundColor : TColor;
     function GetMaxWidth : integer;
     function GetRowCount : integer;
     procedure RowsChanged(Sender: TObject);
 
+    //Diagnostic only - never blocks the message. WM_SETREDRAW(FALSE) makes InvalidateRect a no-op
+    //for the window, which would explain painting stopping dead while a resize (SetWindowPos
+    //repaints regardless of the update region) still works.
     procedure WMEraseBkgnd(var Message: TWmEraseBkgnd); message WM_ERASEBKGND;
     procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
     procedure WMVScroll(var Message: TWMVScroll); message WM_VSCROLL;
@@ -176,8 +191,25 @@ type
     class constructor Create;
     class destructor Destroy;
 
+    //Synchronous, message-loop-independent painting. The IDE runs restore/install on the main
+    //thread without pumping its message loop, so nothing that depends on WM_PAINT being
+    //DELIVERED can be relied on - WM_PAINT is synthesised by GetMessage/PeekMessage and simply
+    //never arrives while the loop is blocked. These paint through a DC we fetch ourselves.
+    procedure PaintNow;
+    procedure PaintFrameNow;
+    //Clears every piece of per-visibility paint state. MUST be called by the host when its window
+    //is hidden : the memo never receives CM_SHOWINGCHANGED for a hide, because
+    //TWinControl.UpdateShowing (Vcl.Controls.pas:10850) only recurses into children when SHOWING,
+    //so the control cannot detect this for itself.
+    procedure ResetPaintState;
+
     procedure Invalidate; override;
-    procedure Clear;
+    //repaint = False is for the host's OnHide : that runs from DoHide inside
+    //TCustomForm.CMShowingChanged, BEFORE its ShowWindow(SW_HIDE), so the window is still on
+    //screen and repainting an emptied log would visibly blank it in front of the user. Passed as
+    //a parameter rather than held as a 'currently hiding' flag - a flag whose reset depends on a
+    //message arriving is a latch, and that is exactly how this control kept breaking.
+    procedure Clear(const repaint : boolean = true);
     procedure AddRow(const value : string; const messageType : TLogMessageType);
     procedure GoToRow(const index : integer);
     procedure SelectAll;
@@ -232,6 +264,24 @@ uses
   Vcl.Clipbrd,
   DPM.Core.Utils.Strings;
 
+
+//Is this colour dark enough that we should draw light text on it? Rec.601 luma, integer maths.
+//This replaces matching on the style NAME, which was the source of the "log window shows a blank
+//background" bug : the background colour came from FStyleServices.GetSystemColor(clWindow) but the
+//row text colour came from FThemeType, which was derived separately from the style name and was
+//only recomputed in CheckTheme. Nothing kept the two in agreement, so whenever they disagreed
+//every row was drawn in near-background colour - invisible - and it stayed that way for the rest
+//of the session because nothing ever recomputed it. Deriving the answer from the colour we are
+//actually about to paint on makes disagreement impossible.
+function IsDarkColor(const color : TColor) : boolean;
+var
+  rgbValue : longint;
+  luma : integer;
+begin
+  rgbValue := ColorToRGB(color);
+  luma := (GetRValue(rgbValue) * 299 + GetGValue(rgbValue) * 587 + GetBValue(rgbValue) * 114) div 1000;
+  result := luma < 128;
+end;
 
 { TVSoftColorMemo }
 //copied from StyleUtils.inc
@@ -509,17 +559,21 @@ begin
     UpdateScrollBars;
   end;
 
-  //Force the pending content paint out synchronously on our own handle. InvalidateRect + UpdateWindow
-  //repaints the CLIENT area only (one back-buffer BitBlt) - unlike RedrawWindow/RDW_UPDATENOW it does
-  //not trigger a WM_NCPAINT, so the border and scrollbars are not repainted every frame. It is still
-  //synchronous, so it does not depend on the IDE dispatching a deferred WM_PAINT (it owns the loop and
-  //may not pump it during a synchronous restore/install).
-  if FContentDirty then
-  begin
-    FContentDirty := false;
-    InvalidateRect(Handle, nil, False);
-    UpdateWindow(Handle);
-  end;
+  //Force the pending content paint out through a DC we fetch ourselves - no invalidate, no
+  //UpdateWindow, no dependency whatsoever on the host dispatching a WM_PAINT (the IDE owns the
+  //loop and does not pump it during a synchronous restore/install).
+  //The 'not FPainted' clause is the self heal : repaint when the content changed OR when nothing
+  //has ever successfully landed on this handle. Without it, once FContentDirty was cleared - by a
+  //partial WM_PAINT, or by a Clear on an already empty list that fired no OnChange - Flush could
+  //never put anything on screen again and the control stayed blank white for good.
+  //UNCONDITIONAL. This used to be gated on FContentDirty/FPainted, which is where the "once it
+  //stops painting it never paints again" behaviour lived : any flag that got stuck in the wrong
+  //state disabled painting permanently, and nothing ever reset it (the memo never even receives
+  //CM_SHOWINGCHANGED when the form hides - TWinControl.UpdateShowing only recurses into children
+  //when SHOWING, so no hide-time reset can be hung off it). A gate that can latch is not worth the
+  //saving : the host already throttles Flush to ~10ms, so this is at most one back-buffer BitBlt
+  //per frame, which is what it was doing on a dirty frame anyway.
+  PaintNow;
 end;
 
 procedure TLogMemo.Invalidate;
@@ -528,7 +582,7 @@ begin
     inherited;
 end;
 
-procedure TLogMemo.Clear;
+procedure TLogMemo.Clear(const repaint : boolean);
 begin
   FMaxWidth := -1;
   FTopRow := 0;
@@ -539,10 +593,15 @@ begin
   FSelecting := false;
   FHoverRow := -1;
   FItems.Clear; //fires RowsChanged -> UpdateVisibleRows + InvalidateContent (marks dirty)
+  //...but only when the list was not already empty : TStringList.Clear early-outs on FCount = 0
+  //and fires no OnChange at all, so mark dirty explicitly rather than relying on it.
+  FContentDirty := true;
   //Clear is a one-shot, not part of the streaming loop - force the empty state out synchronously
   //now. Otherwise, if the following task logs nothing, the deferred paint is never flushed and the
   //previous task's content stays on screen until something else (e.g. a resize) repaints us.
-  Flush;
+  //The caller suppresses this when clearing on the way to hiding the window - see the declaration.
+  if repaint then
+    Flush;
 end;
 
 procedure TLogMemo.CMEnter(var Message: TCMEnter);
@@ -587,13 +646,22 @@ end;
 procedure TLogMemo.CMShowingChanged(var Message: TMessage);
 begin
   inherited;
-  //when the control first becomes visible without a size change, the deferred WM_PAINT
-  //can get starved if a long synchronous op starts immediately - force a paint now.
-  if Showing and HandleAllocated then
+  if not HandleAllocated then
+    exit;
+  if Showing then
   begin
+    //NOTE : we are NOT visible yet. This fires from TWinControl.UpdateShowing, before the parent
+    //form's own CMShowingChanged has called ShowWindow, so IsWindowVisible is still false and any
+    //paint attempted here would be silently discarded. All we can usefully do is get the state
+    //right and record that we owe a paint - the host forces the real one immediately after its
+    //inherited CMShowingChanged, which is the first moment pixels can land.
     UpdateVisibleRows;
-    RedrawWindow(Handle, nil, 0, RDW_ERASE or RDW_INVALIDATE or RDW_UPDATENOW);
+    FContentDirty := true;
   end;
+  //NOTE : there is deliberately no 'else' branch resetting state for a hide. This message is
+  //NEVER delivered for a hide - TWinControl.UpdateShowing (Vcl.Controls.pas:10850) only recurses
+  //into child controls when SHOWING, so when the parent form hides, the form gets
+  //CM_SHOWINGCHANGED and we do not. The host calls ResetPaintState instead.
 end;
 
 class constructor TLogMemo.Create;
@@ -619,20 +687,11 @@ begin
   with Params do
     WindowClass.style := WindowClass.style and not (CS_HREDRAW or CS_VREDRAW);
 
-  //Prefill colour for the first composed frame of a freshly shown window - see the
-  //FBackgroundBrush declaration for the reasoning and the lifetime rules. The colour is
-  //resolved at first handle creation from this instance's style services - hosts assign
-  //StyleServices (eg the IDE theme) right after construction, before any handle exists, so a
-  //dark IDE prefills dark. Theme changes after registration keep the original shade for the
-  //prefill frame only - cosmetically invisible next to the white it replaces.
-  if FBackgroundBrush = 0 then
-  begin
-    if (FStyleServices <> nil) and FStyleServices.Enabled then
-      FBackgroundBrush := CreateSolidBrush(ColorToRGB(FStyleServices.GetSystemColor(clWindow)))
-    else
-      FBackgroundBrush := CreateSolidBrush(ColorToRGB(clWindow));
-  end;
-  Params.WindowClass.hbrBackground := FBackgroundBrush;
+  //No class background brush here. An earlier attempt set WindowClass.hbrBackground hoping
+  //Windows would prefill the first composed frame, but a class brush is only ever consulted by
+  //DefWindowProc's WM_ERASEBKGND handling and our WMEraseBkgnd always returns 1 without calling
+  //inherited - so DefWindowProc never saw the message and the brush did nothing at all. The only
+  //thing that can colour this window is this window painting itself, which is what PaintNow does.
 end;
 
 procedure TLogMemo.CreateWnd;
@@ -641,7 +700,9 @@ begin
   //New handle - nothing painted on it yet, so the next erase must fill the background.
   FPainted := false;
   UpdateVisibleRows;
-  Repaint;
+  //No paint attempt here : during the show cascade the parent form is still hidden, so any
+  //paint is discarded. FPainted = false makes the first Flush repaint us regardless.
+  FContentDirty := true;
 end;
 
 constructor TLogMemo.Create(AOwner: TComponent);
@@ -1143,7 +1204,9 @@ begin
   end
   else
   begin
-    backgroundColor := FStyleServices.GetSystemColor(clWindow);
+    //Same helper as the background fill in RenderTo - this used to call GetSystemColor directly,
+    //without RenderTo's Enabled/seClient guard, so the two could disagree even in one render.
+    backgroundColor := GetBackgroundColor;
     fontColor := FMessageColors[FThemeType][messageType];
   end;
 
@@ -1180,6 +1243,14 @@ begin
     Repaint;
     UpdateScrollBars;
   end;
+end;
+
+function TLogMemo.GetBackgroundColor : TColor;
+begin
+  if FStyleServices.Enabled {$IF CompilerVersion >= 24.0} and (seClient in StyleElements) {$IFEND} then
+    result := FStyleServices.GetSystemColor(clWindow)
+  else
+    result := clWindow;
 end;
 
 function TLogMemo.GetMaxWidth: integer;
@@ -1304,65 +1375,188 @@ begin
   inherited;
 end;
 
-procedure TLogMemo.Paint;
+//Renders the whole client area into the supplied DC. The destination needs no TCanvas - every
+//row is drawn into the back buffer and the only operation on dc is the final BitBlt - so this
+//works equally well with a WM_PAINT DC and with one we fetched ourselves via GetDC.
+//Returns TRUE only when the render actually covered the entire client. Callers must not mark the
+//control clean unless it did : the old code cleared FContentDirty and set FPainted from Paint
+//unconditionally, but a WM_PAINT DC is clipped to PS.rcPaint, so a partial paint (the strip
+//exposed when a styled scrollbar appears, a sliver uncovered by another window) left most of the
+//client holding the undefined initial surface - white - while marking the control painted. Flush
+//then had nothing to do and FPainted had disabled the WMEraseBkgnd fill, so it stayed white until
+//something resized the control.
+function TLogMemo.RenderTo(const dc : HDC) : boolean;
 var
   LCanvas : TCanvas;
   backgroundColor : TColor;
   r : TRect;
+  clipRect : TRect;
+  clipResult : integer;
+  neededWidth : integer;
   i: Integer;
   rowIdx : integer;
   rowState : TPaintRowState;
 begin
-  //The back buffer is normally sized by Resize, but a WM_PAINT can arrive before that has run
-  //(eg during handle creation, or after the handle is recreated by a theme change). BitBlt from
-  //an undersized buffer leaves the window showing its undefined initial surface - white - and
-  //because we clear FContentDirty below, Flush then has nothing to do and it STAYS white until
-  //something resizes the control. Make sure the buffer covers the client area first.
-  if (FPaintBmp.Width < ClientWidth) or (FPaintBmp.Height < ClientHeight) then
+  result := false;
+  if dc = 0 then
+    exit;
+  //Re-entrancy guard - see FRendering. Leave the control dirty so the outer render's caller, or
+  //the next Flush, repaints in full.
+  if FRendering then
   begin
-    //SetSize(0,0) first - TBitmap otherwise tries to preserve the existing content, which is
-    //both pointless here and slow (same reason Resize does it).
-    FPaintBmp.SetSize(0, 0);
-    FPaintBmp.SetSize(Max(ClientWidth, GetMaxWidth), ClientHeight);
-    UpdateVisibleRows(false);
+    FContentDirty := true;
+    exit;
+  end;
+  if (ClientWidth <= 0) or (ClientHeight <= 0) then
+    exit;
+
+  //An invisible window still yields a DC from GetDC, it just has an empty visible region and
+  //every draw is silently discarded. GetClipBox returns ERROR (0) or NULLREGION (1) for that,
+  //so this is the one check that tells us whether pixels can actually land.
+  clipResult := GetClipBox(dc, clipRect);
+  if clipResult <= NULLREGION then
+    exit;
+
+  FRendering := true;
+  try
+    //The back buffer is normally sized by Resize, but a paint can happen before that has run
+    //(eg during handle creation, or after the handle is recreated by a theme change). The blit
+    //below reads from FHScrollPos to FHScrollPos + ClientWidth, so that - not ClientWidth alone -
+    //is what the buffer has to cover.
+    neededWidth := Max(ClientWidth + FHScrollPos, GetMaxWidth);
+    if (FPaintBmp.Width < neededWidth) or (FPaintBmp.Height < ClientHeight) then
+    begin
+      //SetSize(0,0) first - TBitmap otherwise tries to preserve the existing content, which is
+      //both pointless here and slow (same reason Resize does it).
+      FPaintBmp.SetSize(0, 0);
+      FPaintBmp.SetSize(neededWidth, ClientHeight);
+      UpdateVisibleRows(false);
+    end;
+
+    LCanvas := FPaintBmp.Canvas;
+    LCanvas.Font.Assign(Self.Font);
+
+    backgroundColor := GetBackgroundColor;
+    //Re-derive the row palette from the background we are about to paint, every render. This is
+    //what guarantees the text can never come out invisible against it - see IsDarkColor.
+    if IsDarkColor(backgroundColor) then
+      FThemeType := TThemeType.Dark
+    else
+      FThemeType := TThemeType.Light;
+
+    //paint background
+    r := Self.ClientRect;
+    r.Width := Max(FPaintBmp.Width, r.Width); //paintbmp may be wider than the client.
+    LCanvas.Brush.Style := bsSolid;
+    LCanvas.Brush.Color := backgroundColor;
+    LCanvas.FillRect(r);
+
+    //paint all visible rows
+    for i := 0 to FVisibleRows - 1 do
+    begin
+      rowIdx := FTopRow + i;
+      if rowIdx >= RowCount then
+        break;
+      rowState := GetRowPaintState(rowIdx);
+      DoPaintRow(rowIdx, rowState, false);
+    end;
+
+
+    r := ClientRect;
+    OffsetRect(r, FHScrollPos,0);
+
+    BitBlt(dc, 0, 0, r.Width, r.Height, FPaintBmp.Canvas.Handle, r.Left, r.Top, SRCCOPY);
+  finally
+    FRendering := false;
   end;
 
-  LCanvas := FPaintBmp.Canvas;
-  LCanvas.Font.Assign(Self.Font);
+  //GetClipBox gives the BOUNDING box of the clip region, so two disjoint update rects in
+  //opposite corners would report a full cover. That error is bounded and self correcting - the
+  //next content change repaints in full - and it cannot happen on the PaintNow path at all,
+  //where the visible region is the whole client.
+  result := (clipRect.Left <= 0) and (clipRect.Top <= 0) and
+            (clipRect.Right >= ClientWidth) and (clipRect.Bottom >= ClientHeight);
+end;
 
-  if FStyleServices.Enabled {$IF CompilerVersion >= 24.0} and (seClient in StyleElements) {$IFEND} then
-    backgroundColor := FStyleServices.GetSystemColor(clWindow)
-  else
-    backgroundColor := clWindow;
-
-  //paint background
-  r := Self.ClientRect;
-  r.Width := Max(FPaintBmp.Width, r.Width); //paintbmp may be wider than the client.
-  LCanvas.Brush.Style := bsSolid;
-  LCanvas.Brush.Color := backgroundColor;
-  LCanvas.FillRect(r);
-
-  //paint all visible rows
-  for i := 0 to FVisibleRows - 1 do
+procedure TLogMemo.Paint;
+begin
+  if RenderTo(Canvas.Handle) then
   begin
-    rowIdx := FTopRow + i;
-    if rowIdx >= RowCount then
-      break;
-    rowState := GetRowPaintState(rowIdx);
-    DoPaintRow(rowIdx, rowState, false);
+    //We've painted the current content in full - any pending Flush is now satisfied.
+    FContentDirty := false;
+    FPainted := true;
+  end;
+  //A partial paint deliberately leaves FContentDirty set so the next Flush repaints in full.
+end;
+
+procedure TLogMemo.PaintNow;
+begin
+  if not HandleAllocated then
+    exit;
+  if csDestroying in ComponentState then
+    exit;
+
+  //Showing (the VCL flag) is NOT a usable test here. TWinControl.UpdateShowing creates the child
+  //handles and fires each child's CM_SHOWINGCHANGED before TCustomForm.CMShowingChanged reaches
+  //its ShowWindow, so our own HWND has WS_VISIBLE while the parent form is still hidden. Only
+  //IsWindowVisible walks the ancestor chain and tells us whether pixels can land.
+  if not IsWindowVisible(Handle) then
+  begin
+    FContentDirty := true; //we owe a paint the moment we do become visible.
+    exit;
   end;
 
+  //Drive the REAL Windows paint cycle rather than blitting through a DC of our own.
+  //
+  //This used to be GetDC + RenderTo + ValidateRect. That draws the right pixels into the window's
+  //backing store and GDI reports success for every row, but on a DWM composited window nothing was
+  //ever PRESENTED, so the screen kept showing the old frame. Resizing the window made all the missing rows appear at once, because a resize forces
+  //Windows to invalidate and run a genuine BeginPaint/EndPaint cycle. The ValidateRect was the
+  //active ingredient : by dropping the update region it suppressed the very paint cycle that
+  //would have presented the new content.
+  //
+  //InvalidateRect + UpdateWindow is still completely independent of the message loop - UpdateWindow
+  //SENDS WM_PAINT rather than posting it, so it works while the IDE is blocked in a synchronous
+  //restore - but the painting now happens inside BeginPaint/EndPaint, where the compositor expects
+  //it. Paint() does the rendering and owns the FContentDirty/FPainted bookkeeping.
+  InvalidateRect(Handle, nil, False);
+  UpdateWindow(Handle);
+end;
 
-  r := ClientRect;
-  OffsetRect(r, FHScrollPos,0);
+procedure TLogMemo.ResetPaintState;
+begin
+  FPainted := false;
+  FContentDirty := true;
+  FScrollBarsDirty := true;
+  FRendering := false;
+  //These are the latches that could otherwise disable painting for the rest of the control's
+  //life. Both are re-entrancy guards that are only ever meant to be set for the duration of a
+  //call, so if either is still set here something unwound past its reset - clear them.
+  FUpdating := false;
+  FUpdatingScrollBars := false;
+  FUpdateCount := 0;
+  //Force the next UpdateScrollBars to repaint the frame rather than assuming the remembered
+  //visibility still matches what is on screen.
+  FVScrollVisible := not FVScrollVisible;
+end;
 
-  BitBlt(Canvas.Handle,0,0,r.Width, r.Height, FPaintBmp.Canvas.Handle,r.Left, r.Top, SRCCOPY);
-//  Canvas.CopyRect(ClientRect, FPaintBmp.Canvas, r); //uses strechblt
-
-  //We've painted the current content - any pending Flush is now satisfied.
-  FContentDirty := false;
-  FPainted := true;
-
+procedure TLogMemo.PaintFrameNow;
+begin
+  if not HandleAllocated then
+    exit;
+  if csDestroying in ComponentState then
+    exit;
+  if not IsWindowVisible(Handle) then
+    exit;
+  //Border and scrollbars, synchronously, without touching the client. wParam = 1 is the
+  //documented "entire window region" value. Under a VCL style this lands in TStyleHook.WMNCPaint
+  //-> TScrollingStyleHook.PaintNC, which draws the border, creates/positions the scrollbar
+  //overlay windows and repaints them via UpdateWindow - all synchronous, no queue involved.
+  //Unstyled, DefWindowProc draws the WS_BORDER frame and the native scrollbars.
+  //Deliberately NOT RedrawWindow(RDW_FRAME or RDW_INVALIDATE or RDW_UPDATENOW) : RDW_FRAME
+  //requires RDW_INVALIDATE, which would drag a full client repaint along with every frame
+  //refresh.
+  SendMessage(Handle, WM_NCPAINT, 1, 0);
 end;
 
 procedure TLogMemo.Resize;
@@ -1413,11 +1607,13 @@ begin
   end;
 //  Refresh;
   UpdateScrollBars;
-  Repaint;
+  PaintNow;
 
-  //force repainting scrollbars
+  //force repainting the border and scrollbars (WM_NCPAINT wParam 1 = whole window region - the
+  //old code passed 0, which is not a valid region handle and only ever worked because the VCL
+  //style hook ignores wParam).
   if sfHandleMessages in FStyleServices.Flags then
-    SendMessage(Handle, WM_NCPAINT, 0, 0);
+    PaintFrameNow;
   inherited;
 end;
 
@@ -1536,14 +1732,23 @@ end;
 
 procedure TLogMemo.CheckTheme;
 begin
-  //Not ideal - but until we find a better way.
-  if TStringUtils.Contains(FStyleServices.Name, 'Dark') or TStringUtils.Contains(FStyleServices.Name, 'Windows11 MineShaft') then
+  //Derived from the actual background colour, not from matching substrings against the style NAME.
+  //The name match ('Dark', 'Windows11 MineShaft') silently failed for any style whose name did not
+  //happen to contain one of those, leaving light-theme text colours on a dark background - rows
+  //painted in near-background colour, i.e. an apparently blank log. RenderTo re-derives this on
+  //every render too, so even a missed CheckTheme cannot leave the two out of step.
+  if IsDarkColor(GetBackgroundColor) then
     FThemeType := TThemeType.Dark
   else
     FThemeType := TThemeType.Light;
-  //repaint with the new theme colors - covers SetStyleServices and CMStyleChanged paths
+  //repaint with the new theme colors - covers SetStyleServices and CMStyleChanged paths.
+  //The border is themed too, so the frame goes with it.
   if HandleAllocated then
-    Repaint;
+  begin
+    FContentDirty := true;
+    PaintFrameNow;
+    PaintNow;
+  end;
 end;
 
 procedure TLogMemo.UpdateHoverRow(const X, Y: integer);
@@ -1573,6 +1778,9 @@ end;
 procedure TLogMemo.UpdateScrollBars;
 var
   sbInfo : TScrollInfo;
+  vVisible : boolean;
+  hVisible : boolean;
+  visibilityChanged : boolean;
 begin
   if not HandleAllocated then
     exit;
@@ -1586,7 +1794,8 @@ begin
     sbInfo.nMin := 0;
 
     //Note : this may trigger a resize if the visibility changes
-    if RowCount <= FSelectableRows  then
+    vVisible := RowCount > FSelectableRows;
+    if not vVisible then
     begin
       sbInfo.nMax := 0;
       sbInfo.nPage := 0;
@@ -1606,7 +1815,8 @@ begin
     sbInfo.nMin := 0;
     sbInfo.nTrackPos := 0;
 
-    if FMaxWidth <= ClientWidth then
+    hVisible := FMaxWidth > ClientWidth;
+    if not hVisible then
     begin
       FHScrollPos := 0;
       sbInfo.nMax := 0;
@@ -1621,9 +1831,21 @@ begin
       sbInfo.nPos := FHScrollPos;
       SetScrollInfo(Handle, SB_HORZ, sbInfo, True);
     end;
+
+    visibilityChanged := (vVisible <> FVScrollVisible) or (hVisible <> FHScrollVisible);
+    FVScrollVisible := vVisible;
+    FHScrollVisible := hVisible;
   finally
     FUpdatingScrollBars := false;
   end;
+
+  //A bar that has just appeared owns a strip of the non-client area whose surface is undefined
+  //(white) until it is painted, and under a VCL style the hook shows a brand new overlay window
+  //for it. Nothing repaints either while the host's message loop is blocked. Do it here, once
+  //per visibility change - the host used to pump WM_PAINT for the whole window tree on every
+  //single appended line to cover this.
+  if visibilityChanged then
+    PaintFrameNow;
 end;
 
 procedure TLogMemo.UpdateVisibleRows(const updateSBs : boolean = true);
@@ -1632,23 +1854,33 @@ begin
   if FUpdating then
     exit;
   FUpdating := true;
-  if HandleAllocated then
-  begin
-    FVisibleRows :=  ClientHeight div RowHeight;
-    FSelectableRows := Min(FVisibleRows, RowCount); //the number of full rows
-    if (RowCount > FVisibleRows) and (ClientHeight mod RowHeight > 0) then
+  //try/finally is NOT optional here. UpdateScrollBars re-enters this control (SetScrollInfo can
+  //change the client size, which produces WM_SIZE -> Resize -> UpdateVisibleRows) and can raise.
+  //Without the finally, one exception left FUpdating latched true for the rest of the control's
+  //life : FVisibleRows then froze at whatever it last held - often 0 - so the background painted
+  //but not a single row ever did again, for every subsequent log window invocation. That is
+  //indistinguishable from "the control stopped painting", and in a light theme the frozen
+  //background is literally white.
+  try
+    if HandleAllocated and (RowHeight > 0) then
     begin
-      //add 1 to ensure a partial row is painted.
-      FVisibleRows  := FVisibleRows + 1;
+      FVisibleRows :=  ClientHeight div RowHeight;
+      FSelectableRows := Min(FVisibleRows, RowCount); //the number of full rows
+      if (RowCount > FVisibleRows) and (ClientHeight mod RowHeight > 0) then
+      begin
+        //add 1 to ensure a partial row is painted.
+        FVisibleRows  := FVisibleRows + 1;
+      end;
+      //The streaming path (RowsChanged) passes False and defers the scrollbar refresh to Flush so
+      //the scrollbar isn't redrawn on every appended line.
+      if updateSBs then
+        UpdateScrollBars
+      else
+        FScrollBarsDirty := true;
     end;
-    //The streaming path (RowsChanged) passes False and defers the scrollbar refresh to Flush so
-    //the scrollbar isn't redrawn on every appended line.
-    if updateSBs then
-      UpdateScrollBars
-    else
-      FScrollBarsDirty := true;
+  finally
+    FUpdating := false;
   end;
-  FUpdating := false;
 end;
 
 procedure TLogMemo.WMEraseBkgnd(var Message: TWmEraseBkgnd);
@@ -1747,8 +1979,10 @@ end;
 procedure TLogMemo.WMSize(var Message: TWMSize);
 begin
   inherited;
-  //force a synchronous repaint on show/resize rather than relying on a deferred WM_PAINT
-  RedrawWindow(Handle, nil, 0, RDW_ERASE or RDW_INVALIDATE or RDW_UPDATENOW);
+  //Synchronous repaint on show/resize rather than relying on a deferred WM_PAINT. Frame first so
+  //the border and scrollbars are in place before the client lands.
+  PaintFrameNow;
+  PaintNow;
 end;
 
 end.
