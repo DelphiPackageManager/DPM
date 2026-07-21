@@ -76,6 +76,7 @@ type
     FUpdateCount : integer;
     FContentDirty : boolean;
     FScrollBarsDirty : boolean;
+    FPainted : boolean; //true once Paint has completed on the current window handle.
 
     FStyleServices : TCustomStyleServices;
 
@@ -485,9 +486,11 @@ begin
 end;
 
 procedure TLogMemo.Flush;
+var
+  updateRect : TRect;
 begin
   if not HandleAllocated then
-    exit;
+    exit; //dirty flags stay set - the flush happens once the handle exists again.
 
   //Apply any pending scrollbar change exactly once per flush. Doing this per AddRow caused the
   //scrollbar to be redrawn many times per frame (SetScrollInfo with redraw) - a flicker source.
@@ -497,17 +500,38 @@ begin
     UpdateScrollBars;
   end;
 
+  //Also honour an OS-pending update region even when no new content arrived (handle recreation
+  //after a theme change, window reveal). The host may not pump messages during a synchronous
+  //restore/install, so if we don't paint it here nothing ever will.
+  if not (FContentDirty or GetUpdateRect(Handle, updateRect, False)) then
+    exit;
+
+  FContentDirty := false;
+
+  if not FPainted then
+  begin
+    //First paint on this window handle. The light client-only path below can fail here - a
+    //not-yet-visible window accumulates no update region, and with VCL styles active (the
+    //themed IDE) the plain WM_PAINT can be intercepted before reaching Paint - leaving the
+    //window white until a resize. Force one full synchronous redraw including the
+    //frame/scrollbars; incremental painting takes over once Paint has run.
+    RedrawWindow(Handle, nil, 0, RDW_INVALIDATE or RDW_ERASE or RDW_FRAME or RDW_UPDATENOW);
+    exit;
+  end;
+
   //Force the pending content paint out synchronously on our own handle. InvalidateRect + UpdateWindow
   //repaints the CLIENT area only (one back-buffer BitBlt) - unlike RedrawWindow/RDW_UPDATENOW it does
   //not trigger a WM_NCPAINT, so the border and scrollbars are not repainted every frame. It is still
   //synchronous, so it does not depend on the IDE dispatching a deferred WM_PAINT (it owns the loop and
   //may not pump it during a synchronous restore/install).
-  if FContentDirty then
-  begin
-    FContentDirty := false;
-    InvalidateRect(Handle, nil, False);
-    UpdateWindow(Handle);
-  end;
+  InvalidateRect(Handle, nil, False);
+  UpdateWindow(Handle);
+
+  //If the update region survived UpdateWindow, the WM_PAINT never reached Paint (intercepted by
+  //a style hook, or the window was not visible when invalidated) - escalate to a full redraw
+  //rather than leaving the window stale/white.
+  if GetUpdateRect(Handle, updateRect, False) then
+    RedrawWindow(Handle, nil, 0, RDW_INVALIDATE or RDW_ERASE or RDW_FRAME or RDW_UPDATENOW);
 end;
 
 procedure TLogMemo.Invalidate;
@@ -612,6 +636,10 @@ end;
 procedure TLogMemo.CreateWnd;
 begin
   inherited;
+  //New window handle - nothing has been painted on it yet. Until the first Paint
+  //completes, Flush uses a full synchronous RedrawWindow rather than the light
+  //client-only path (see Flush).
+  FPainted := false;
   UpdateVisibleRows;
   Repaint;
 end;
@@ -1319,6 +1347,7 @@ begin
 
   //We've painted the current content - any pending Flush is now satisfied.
   FContentDirty := false;
+  FPainted := true;
 
 end;
 

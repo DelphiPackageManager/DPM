@@ -21,4 +21,37 @@ object Form1: TForm1
       'Memo1')
     TabOrder = 0
   end
+  object btnBlockedOp: TButton
+    Left = 8
+    Top = 8
+    Width = 145
+    Height = 25
+    Caption = 'Blocked op (in place)'
+    TabOrder = 1
+    OnClick = btnBlockedOpClick
+  end
+  object btnBlockedPopup: TButton
+    Left = 159
+    Top = 8
+    Width = 145
+    Height = 25
+    Caption = 'Blocked op (popup)'
+    TabOrder = 2
+    OnClick = btnBlockedPopupClick
+  end
+  object btnLoadStyle: TButton
+    Left = 310
+    Top = 8
+    Width = 145
+    Height = 25
+    Caption = 'Load VCL style...'
+    TabOrder = 3
+    OnClick = btnLoadStyleClick
+  end
+  object dlgOpenStyle: TOpenDialog
+    Filter = 'VCL Styles (*.vsf)|*.vsf'
+    Options = [ofHideReadOnly, ofFileMustExist, ofEnableSizing]
+    Left = 552
+    Top = 16
+  end
 end

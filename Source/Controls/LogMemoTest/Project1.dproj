@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{ED53CF71-9D92-4134-9CE0-D59667E4988C}</ProjectGuid>
         <ProjectVersion>19.5</ProjectVersion>
@@ -9,6 +9,13 @@
         <TargetedPlatforms>1</TargetedPlatforms>
         <AppType>Application</AppType>
         <MainSource>Project1.dpr</MainSource>
+    </PropertyGroup>
+    <PropertyGroup>
+        <DPMCompiler>delphi13.0</DPMCompiler>
+        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
+        <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
+        <DPMExe>I:\Github\DelphiPackageManager\DPMMaster\Output\dpm.exe</DPMExe>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.3-beta.1\lib\Win32;$(DPM)\Spring4D.Core\2.0.3-beta.1\lib\Win32;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -59,6 +66,7 @@
         <UWP_DelphiLogo150>$(BDS)\bin\Artwork\Windows\UWP\delphi_UwpDefault_150.png</UWP_DelphiLogo150>
         <SanitizedProjectName>Project1</SanitizedProjectName>
         <Custom_Styles>Glossy|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Glossy.vsf</Custom_Styles>
+        <DCC_UnitSearchPath>$(DPMSearch);$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <DCC_UsePackage>RaizeComponentsVcl;vclwinx;DataSnapServer;fmx;vclie;DbxCommonDriver;bindengine;VCLRESTComponents;FireDACCommonODBC;DBXMSSQLDriver;tb2k;emsclient;FireDACCommonDriver;appanalytics;IndyProtocols;vclx;dbxcds;vcledge;bindcompvclwinx;bindcompfmx;DBXFirebirdDriver;SynEdit_R;hclcore_xe11;inetdb;VSoftUIComponents;GFDLIB;FireDACSqliteDriver;DbxClientDriver;FireDACASADriver;soapmidas;vclactnband;fmxFireDAC;dbexpress;FrameViewer;FireDACInfxDriver;DBXMySQLDriver;VclSmp;inet;DataSnapCommon;KWizardR;vcltouch;fmxase;DBXOdbcDriver;dbrtl;FireDACDBXDriver;FireDACOracleDriver;fmxdae;FireDACMSAccDriver;CustomIPTransport;FireDACMSSQLDriver;DataSnapIndy10ServerTransport;NxCommonRun;DataSnapConnectors;vcldsnap;DBXInterBaseDriver;FireDACMongoDBDriver;IndySystem;lmdrtl;FireDACTDataDriver;vcldb;VirtualTreesR;SpTBXLib;vclFireDAC;bindcomp;FireDACCommon;DataSnapServerMidas;FireDACODBCDriver;emsserverresource;NxGridRun;dwWin7Controls;IndyCore;RESTBackendComponents;bindcompdbx;lmdrtdocking;rtl;FireDACMySQLDriver;FireDACADSDriver;RESTComponents;FBFormDesigner;DBXSqliteDriver;vcl;dsnapxml;adortl;dsnapcon;DataSnapClient;DataSnapProviderClient;DBXSybaseASEDriver;NxGridDsgn;DBXDb2Driver;VSPageR;JSDialogPack;vclimg;DataSnapFireDAC;emsclientfiredac;FireDACPgDriver;FireDAC;FireDACDSDriver;inetdbxpress;xmlrtl;tethering;FBSynEditHighlighters;bindcompvcl;dsnap;CloudService;DBXSybaseASADriver;DBXOracleDriver;FireDACDb2Driver;DBXInformixDriver;fmxobj;bindcompvclsmp;DataSnapNativeClient;VSoftToolBarR;DatasnapConnectorsFreePascal;soaprtl;FBDreamRuntime;SVGIconImageList;soapserver;FireDACIBDriver;$(DCC_UsePackage)</DCC_UsePackage>
@@ -972,8 +980,16 @@
             </Platforms>
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
+        <DPM>
+            <Packages>
+                <PackageReference id="Spring4D.Core" version="2.0.3-beta.1" manifestHash="sha256:43cb5bd222476b3a1b05c2d1953f5bdf979729a754c61a35db6cf8be0aee79dc">
+                    <PackageReference id="Spring4D.Base" version="2.0.3-beta.1" range="2.0.3-beta.1"/>
+                </PackageReference>
+            </Packages>
+        </DPM>
     </ProjectExtensions>
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>
     <Import Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj" Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')"/>
     <Import Project="$(MSBuildProjectName).deployproj" Condition="Exists('$(MSBuildProjectName).deployproj')"/>
+    <Import Project="$(DPMCache)\DPM.CopyLocal.targets" Condition="Exists('$(DPMCache)\DPM.CopyLocal.targets')"/>
 </Project>
