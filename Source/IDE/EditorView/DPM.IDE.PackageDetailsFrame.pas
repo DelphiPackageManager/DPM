@@ -816,6 +816,14 @@ begin
   if FPackageMetaData = nil then
     exit(TPackageVersion.Empty);
 
+  //For a transitive (implicitly installed) package the version dropdown is filtered to the parent's
+  //required range (see DoUpdateVersions), and a newer 'latest' version is normally outside that
+  //range. Defaulting to latest would pre-select a version that isn't in the list, leaving the
+  //dropdown blank. Use the installed version instead - it always satisfies the range and is present
+  //in the list.
+  if FPackageMetaData.IsTransitive then
+    exit(FPackageMetaData.Version);
+
   if FIncludePreRelease then
     latestVersion := FPackageMetaData.LatestVersion
   else
