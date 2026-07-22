@@ -64,6 +64,12 @@ const
   //right-aligned column label drawn in each group header, above the per-row latest-version values.
   cLatestVersionHeader = 'Latest version';
 
+  //'Update available' colours for the installed/implicit rows, where the latest version is only
+  //shown when it is newer than the installed one. Chosen to read well on both light and dark IDE
+  //themes. TColor byte order is $00BBGGRR.
+  cNewerStableColor : TColor = $0052A833;      //green       - RGB(51,168,82)
+  cNewerPrereleaseColor : TColor = $000D73D9;  //dark orange - RGB(217,115,13)
+
 type
   TPackageRowKind = (rkInstalledHeader, rkImplicitHeader, rkAvailableHeader, rkInstalledPackage, rkImplicitPackage, rkAvailablePackage, rkUnknown);
 
@@ -1694,10 +1700,24 @@ begin
     if latestVersion <> '' then
     begin
       ACanvas.Font.Style := ACanvas.Font.Style + [fsBold];
-      if latestIsPrerelease then
-        ACanvas.Font.Color := $006464FA // $0F2CAB
+      if rowKind in [rkInstalledPackage, rkImplicitPackage] then
+      begin
+        //these rows only display a latest version when it is newer than the installed one, so colour
+        //it as an 'update available' hint: green for a newer stable, dark orange for a newer pre-release.
+        if latestIsPrerelease then
+          ACanvas.Font.Color := cNewerPrereleaseColor
+        else
+          ACanvas.Font.Color := cNewerStableColor;
+      end
       else
-        ACanvas.Font.Color := $E2A428;
+      begin
+        //available rows just show the current latest version (not an update) - stable keeps its
+        //existing blue; pre-release uses the same dark orange as the 'newer pre-release' hint.
+        if latestIsPrerelease then
+          ACanvas.Font.Color := cNewerPrereleaseColor
+        else
+          ACanvas.Font.Color := $E2A428;
+      end;
       DrawText(ACanvas.Handle, PChar(latestVersion), Length(latestVersion), FRowLayout.LatestVersionRect, DT_SINGLELINE + DT_RIGHT + DT_VCENTER);
     end;
 
