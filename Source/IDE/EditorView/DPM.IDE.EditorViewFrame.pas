@@ -61,6 +61,9 @@ const
   //not others. Keeping the source pure ASCII makes it codepage independent.
   bulletChar : Char = #$2022;
 
+  //right-aligned column label drawn in each group header, above the per-row latest-version values.
+  cLatestVersionHeader = 'Latest version';
+
 type
   TPackageRowKind = (rkInstalledHeader, rkImplicitHeader, rkAvailableHeader, rkInstalledPackage, rkImplicitPackage, rkAvailablePackage, rkUnknown);
 
@@ -1682,6 +1685,12 @@ begin
       ACanvas.Font.Color := FIDEStyleServices.GetSystemColor(clWindowText);
 
     DrawText(ACanvas.Handle, PChar(title), Length(title), FRowLayout.TitleRect, DT_SINGLELINE + DT_LEFT + DT_VCENTER);
+
+    //group headers get a right-aligned 'Latest version' column label, above the per-row latest
+    //versions drawn below. Font is already bold + clWindowText from the header branch above.
+    if rowKind in [rkInstalledHeader, rkImplicitHeader, rkAvailableHeader] then
+      DrawText(ACanvas.Handle, PChar(cLatestVersionHeader), Length(cLatestVersionHeader), FRowLayout.LatestVersionRect, DT_SINGLELINE + DT_RIGHT + DT_VCENTER);
+
     if latestVersion <> '' then
     begin
       ACanvas.Font.Style := ACanvas.Font.Style + [fsBold];
