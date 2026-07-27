@@ -138,7 +138,7 @@ begin
   FVerbosity := TVerbosity.Normal;
   {$ENDIF}
   FShowLogForRestore := true;
-  FShowLogForRestore := true;
+  FShowLogForInstall := true;
   FShowLogForUninstall := true;
   FAutoCloseOnSuccess := true;
   FAutoCloseLogDelaySeconds := 3;
@@ -271,7 +271,7 @@ begin
     FShowLogForInstall := jsonObj.B['showlogforinstall'];
 
   if jsonObj.Contains('showlogforuninstall') then
-    FShowLogForInstall := jsonObj.B['showlogforuninstall'];
+    FShowLogForUninstall := jsonObj.B['showlogforuninstall'];
 
   if jsonObj.Contains('autocloselogonsuccess') then
     FAutoCloseOnSuccess := jsonObj.B['autocloselogonsuccess'];

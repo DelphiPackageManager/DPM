@@ -206,6 +206,13 @@ end;
 
 procedure TDPMIDEMessageService.TaskDone(const success : boolean);
 begin
+  //Nothing was ever started, so there is nothing to finish - and in particular nothing worth
+  //showing. Without this, a TaskDone(false) arriving from a load that never called TaskStarted
+  //(eg opening a new project after an earlier restore failed) force-shows the log window below,
+  //carrying whatever the previous task left in it.
+  if FCurrentTask = mtNone then
+    exit;
+
   FCancellationTokenSource := nil;
   FCurrentTask := mtNone;
   //Re-enable the Close button / close box now the work is done. Done unconditionally up

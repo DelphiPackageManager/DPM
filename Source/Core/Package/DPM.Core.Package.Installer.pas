@@ -318,7 +318,12 @@ begin
   //not when loading [PackageRefs], so we don't need a config here.
   projectEditor := TProjectEditor.Create(FLogger, nil, compilerVersion);
   if projectEditor.LoadProject(fullPath, [TProjectElement.PackageRefs]) then
-    result := projectEditor.HasPackages;
+    result := projectEditor.HasPackages
+  else if not FileExists(fullPath) then
+    //Gone between the check above and the load - a transient the IDE creates and removes while
+    //creating a new project, not a real project. Nothing to restore, and letting the default-true
+    //stand here is what used to pop the log window with a lone "does not exist" error.
+    result := false;
 end;
 
 function TPackageInstaller.RefreshProjectSearchPaths(const cancellationToken : ICancellationToken; const projectFile : string;

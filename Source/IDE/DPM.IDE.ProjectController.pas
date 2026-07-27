@@ -5,6 +5,7 @@ interface
 uses
   System.Classes,
   ToolsApi,
+  Spring.Collections,
   VSoft.CancellationToken,
   DPM.IDE.Logger,
   DPM.Core.Package.Interfaces,
@@ -55,6 +56,15 @@ type
     FCopyLocalService : ICopyLocalService;
     FCancellationTokenSource : ICancellationTokenSource;
     FLastResult : boolean;
+    //True once StartRestore has actually been called for the current load. EndLoading used to
+    //call EndRestore unconditionally, which meant TaskDone ran - and could force the log window
+    //open - for loads where no restore was ever started.
+    FRestoreStarted : boolean;
+    //Projects the IDE told us it is CREATING (IOTAProjectFileStorageNotifier.CreatingProject).
+    //A brand new project must never be restored, even if its default name happens to collide
+    //with a real .dproj left on disk (eg a stale Project1.dproj in the default projects folder).
+    //Keyed on LowerCase(fileName).
+    FCreatingProjects : ISet<string>;
   protected
     //from IDENotifier
     procedure ProjectOpening(const fileName : string);
@@ -91,6 +101,7 @@ uses
   DPM.Core.Options.Common,
   DPM.Core.Options.Restore,
   DPM.Core.Options.CopyLocal,
+  DPM.Core.Utils.System,
   DPM.IDE.Types;
 
 { TDPMIDEProjectController }
@@ -171,6 +182,7 @@ begin
   FLogger.Debug('ProjectController.BeginLoading : ' + GetEnumName(TypeInfo(TProjectMode),Ord(mode)));
   FCancellationTokenSource.Reset;
   FLastResult := true;
+  FRestoreStarted := false;
 //  FInstallerContext.Clear; //should really only do this on closing
 end;
 
@@ -187,6 +199,7 @@ begin
   FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
   FInstallerContext := context;
   FCopyLocalService := copyLocalService;
+  FCreatingProjects := TCollections.CreateSet<string>;
 end;
 
 destructor TDPMIDEProjectController.Destroy;
@@ -201,13 +214,21 @@ procedure TDPMIDEProjectController.EndLoading(const mode: TProjectMode);
 begin
   FLogger.Debug('ProjectController.EndLoading : ' + GetEnumName(TypeInfo(TProjectMode),Ord(mode)));
   FProjectMode := pmNone;
-  FLogger.EndRestore(FLastResult);
+  //Only close off a restore we actually started - otherwise TaskDone runs for loads that had
+  //nothing to do (a new project, or a project with no package references) and can surface the
+  //log window carrying a stale FLastResult from an earlier project in the same group.
+  if FRestoreStarted then
+  begin
+    FRestoreStarted := false;
+    FLogger.EndRestore(FLastResult);
+  end;
   FProjectTreeManager.EndLoading;
 end;
 
 procedure TDPMIDEProjectController.ProjectClosed(const fileName: string);
 begin
   FLogger.Debug('ProjectController.ProjectClosed : ' + fileName);
+  FCreatingProjects.Remove(LowerCase(fileName));
   FProjectTreeManager.ProjectClosed(FileName);
   FEditorViewManager.ProjectClosed(FileName);
   FInstallerContext.RemoveProject(fileName);
@@ -229,12 +250,18 @@ end;
 procedure TDPMIDEProjectController.ProjectCreating(const fileName: string);
 begin
   FLogger.Debug('ProjectController.ProjectCreating : ' + fileName);
+  //The IDE's authoritative "this is a new project" signal - remember it so RestoreProject
+  //skips it no matter what happens to be on disk at that path.
+  FCreatingProjects.Add(LowerCase(fileName));
   ProjectLoaded(fileName);
 end;
 
 
 procedure TDPMIDEProjectController.ProjectGroupClosed;
 begin
+  //Belt and braces - a stale entry must never suppress restore for a project genuinely opened
+  //later in the same IDE session.
+  FCreatingProjects.Clear;
   FProjectTreeManager.ProjectGroupClosed;
   FEditorViewManager.ProjectGroupClosed;
   FInstallerContext.Clear;
@@ -257,7 +284,11 @@ end;
 procedure TDPMIDEProjectController.ProjectSaving(const fileName: string);
 begin
   FLogger.Debug('ProjectController.ProjectSaving : ' + fileName);
-// not sure we need to do anything.
+  //Clear the lot, not just this key : a new project saved under a different name (Project1.dproj
+  //-> Foo.dproj) arrives here as the NEW name, so removing by key would leave the old one behind
+  //to wrongly suppress restore if a real Project1.dproj is opened later in the session. Any other
+  //still-unsaved new project is not on disk, so the FileExists guard in RestoreProject covers it.
+  FCreatingProjects.Clear;
 end;
 
 procedure TDPMIDEProjectController.RestoreProject(const fileName: string);
@@ -269,6 +300,15 @@ begin
   if FCancellationTokenSource.Token.IsCancelled then
     exit;
 
+  // A project the IDE is in the middle of creating is not on disk and has no packages - never
+  // restore it, whatever happens to be at that path.
+  if FCreatingProjects.Contains(LowerCase(fileName)) then
+  begin
+    TSystemUtils.OutputDebugString('ProjectController.RestoreProject : new project, skipping : ' + fileName);
+    FLogger.Debug('ProjectController.RestoreProject : new project, skipping : ' + fileName);
+    exit;
+  end;
+
   // Don't trigger a restore (which shows the log window) for projects that don't use dpm.
   // Keeps the log window hidden when loading projects/groups with no PackageReferences.
   if not FPackageInstaller.ProjectHasPackageReferences(fileName, IDECompilerVersion) then
@@ -277,13 +317,28 @@ begin
     exit;
   end;
 
+  // Last check before we commit - StartRestore below is what shows the log window, and the core
+  // has nothing useful to say about a file that isn't there. Narrows the window between the
+  // check above and the restore to nothing we can act on.
+  if not FileExists(fileName) then
+  begin
+    TSystemUtils.OutputDebugString('ProjectController.RestoreProject : project file missing, skipping : ' + fileName);
+    FLogger.Debug('ProjectController.RestoreProject : project file missing, skipping : ' + fileName);
+    exit;
+  end;
+
   options := TRestoreOptions.Create;
-  options.ApplyCommon(TCommonOptions.Default);
-  options.ProjectPath := fileName;
-  options.Validate(FLogger);
-  options.CompilerVersion := IDECompilerVersion;
-  FLogger.StartRestore(FCancellationTokenSource);
-  FLastResult := FLastResult and FPackageInstaller.Restore(FCancellationTokenSource.Token, options, FInstallerContext);
+  try
+    options.ApplyCommon(TCommonOptions.Default);
+    options.ProjectPath := fileName;
+    options.Validate(FLogger);
+    options.CompilerVersion := IDECompilerVersion;
+    FLogger.StartRestore(FCancellationTokenSource);
+    FRestoreStarted := true;
+    FLastResult := FLastResult and FPackageInstaller.Restore(FCancellationTokenSource.Token, options, FInstallerContext);
+  finally
+    options.Free;
+  end;
 end;
 
 
