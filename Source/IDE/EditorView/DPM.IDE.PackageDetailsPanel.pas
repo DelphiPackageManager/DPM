@@ -134,7 +134,8 @@ uses
   Spring.Collections,
   VSoft.Uri,
   DPM.Core.Utils.Spdx,
-  DPM.Core.Utils.Strings;
+  DPM.Core.Utils.Strings,
+  DPM.IDE.Types;
 
 const
   //horizontal ellipsis, written as a code point so the source stays pure ASCII (file has no BOM)
@@ -432,7 +433,9 @@ begin
   Canvas.FillRect(ClientRect);
 
 
-  uriColor := $00C57321;
+  //The old fixed $00C57321 was unreadable on the dark themes - derive it from
+  //the colour we are painting on instead.
+  uriColor := GetLinkColor(fillColor);
 
   if FPackage = nil then
     exit;

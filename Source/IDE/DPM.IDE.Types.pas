@@ -29,6 +29,8 @@ unit DPM.IDE.Types;
 interface
 
 uses
+  WinApi.Windows,
+  Vcl.Graphics,
   DPM.Core.Constants,
   DPM.Core.Types;
 
@@ -76,7 +78,44 @@ const
   cDPMIDEOptionsFileName = 'dpm-ide.config';
   cDPMIDEDefaultOptionsFile = cDefaultDPMFolder + '\' + cDPMIDEOptionsFileName;
 
+  //Link colours, shared so every clickable url in the view looks the same.
+  //TColor literals are $00BBGGRR. The light colour is the one the package
+  //details panel has always used - it reads well on the light themes but is
+  //far too dark against the dark themes, hence the brightened variant.
+  cDPMLinkColorLight = TColor($00C57321); //#2173C5
+  cDPMLinkColorDark = TColor($00F5A84F);  //#4FA8F5
+
+
+///<summary>
+///  Rec.601 luma. Decide light vs dark from the colour we are actually about
+///  to paint on, rather than from the style name - the two can disagree.
+///</summary>
+function IsDarkBackground(const backgroundColor : TColor) : boolean;
+
+///<summary>
+///  The link colour to use when painting on backgroundColor.
+///</summary>
+function GetLinkColor(const backgroundColor : TColor) : TColor;
+
 implementation
+
+function IsDarkBackground(const backgroundColor : TColor) : boolean;
+var
+  rgbValue : longint;
+  luma : integer;
+begin
+  rgbValue := ColorToRGB(backgroundColor);
+  luma := (GetRValue(rgbValue) * 299 + GetGValue(rgbValue) * 587 + GetBValue(rgbValue) * 114) div 1000;
+  result := luma < 128;
+end;
+
+function GetLinkColor(const backgroundColor : TColor) : TColor;
+begin
+  if IsDarkBackground(backgroundColor) then
+    result := cDPMLinkColorDark
+  else
+    result := cDPMLinkColorLight;
+end;
 
 end.
 

@@ -130,18 +130,17 @@ object DPMSearchBarFrame: TDPMSearchBarFrame
       OnKeyDown = txtSearchKeyDown
       OnRightButtonClick = txtSearchRightButtonClick
     end
-    object lblUpdateAvailable: TLinkLabel
+    object pbUpdateAvailable: TPaintBox
       Left = 408
       Top = 14
       Width = 507
       Height = 19
-      Alignment = taRightJustify
       Anchors = [akTop, akRight]
-      Caption = '<a>An Update to DPM is available - click here to install</a>'
-      TabOrder = 8
-      UseVisualStyle = True
       Visible = False
-      OnLinkClick = lblUpdateAvailableLinkClick
+      OnClick = pbUpdateAvailableClick
+      OnMouseLeave = pbUpdateAvailableMouseLeave
+      OnMouseMove = pbUpdateAvailableMouseMove
+      OnPaint = pbUpdateAvailablePaint
     end
   end
   object DPMEditorViewImages: TImageList

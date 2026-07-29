@@ -7,7 +7,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
-  System.ImageList,
+  System.Types, System.ImageList,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
   Vcl.ImgList, Vcl.StdCtrls, Vcl.ExtCtrls,
   Vcl.Themes,
@@ -46,7 +46,7 @@ type
     chkIncludeTrial: TCheckBox;
     lblSources: TLabel;
     txtSearch: TButtonedEdit;
-    lblUpdateAvailable: TLinkLabel;
+    pbUpdateAvailable: TPaintBox;
     procedure txtSearchChange(Sender: TObject);
     procedure txtSearchRightButtonClick(Sender: TObject);
     procedure DebounceTimerTimer(Sender: TObject);
@@ -59,7 +59,10 @@ type
     procedure chkIncludeCommercialClick(Sender: TObject);
     procedure chkIncludeTrialClick(Sender: TObject);
     procedure cbSourcesChange(Sender: TObject);
-    procedure lblUpdateAvailableLinkClick(Sender: TObject; const Link: string; LinkType: TSysLinkType);
+    procedure pbUpdateAvailableClick(Sender: TObject);
+    procedure pbUpdateAvailablePaint(Sender: TObject);
+    procedure pbUpdateAvailableMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+    procedure pbUpdateAvailableMouseLeave(Sender: TObject);
   private
     FDPMIDEOptions : IDPMIDEOptions;
     FConfigurationManager : IConfigurationManager;
@@ -84,6 +87,16 @@ type
     FCancellationTokenSource : ICancellationTokenSource;
     FClosing : boolean;
     FRequestInFlight : boolean;
+
+    //update link - painted by hand (see pbUpdateAvailablePaint) rather than
+    //being a TLabel/TLinkLabel, because both the vcl style hooks and the IDE's
+    //ApplyTheme reset a label's font colour and there is no reliable point at
+    //which we get the last word. Nothing repaints a TPaintBox but us.
+    FIDEStyleServices : TCustomStyleServices;
+    FLinkColor : TColor;
+    FUpdateCaption : string;
+    FLinkHot : boolean;
+    FLinkTextRect : TRect;
 
     {$IFDEF USEIMAGECOLLECTION }
     FImageList : TVirtualImageList;
@@ -112,6 +125,12 @@ type
     procedure CheckForUpdate;
     procedure ShowUpdateAvailable(const upgradeInfo : IUpgradeInfo);
     function IncludePrereleaseUpdates : boolean;
+
+    /// <summary>
+    ///  Picks the link colour for the current theme. Safe to call before
+    ///  ThemeChanged has run.
+    /// </summary>
+    procedure UpdateLinkColor;
 
   public
     constructor Create(AOwner : TComponent);override;
@@ -155,6 +174,73 @@ uses
 
 const
   cDMPSearchHistoryFile = 'packagesearch.txt';
+
+
+procedure TDPMSearchBarFrame.UpdateLinkColor;
+var
+  backgroundColor : TColor;
+begin
+  //ThemeChanged may not have run yet (it hasn't during Create), in which case
+  //the frame's own colour is the best guess we have.
+  if FIDEStyleServices <> nil then
+    backgroundColor := FIDEStyleServices.GetSystemColor(clBtnFace)
+  else
+    backgroundColor := Self.Color;
+
+  FLinkColor := GetLinkColor(backgroundColor);
+  pbUpdateAvailable.Invalidate;
+end;
+
+procedure TDPMSearchBarFrame.pbUpdateAvailablePaint(Sender: TObject);
+var
+  textWidth : integer;
+begin
+  if FUpdateCaption = '' then
+    exit;
+
+  //take the face and size from the frame - it tracks the IDE font and dpi -
+  //but never its colour, that is ours.
+  pbUpdateAvailable.Canvas.Font := Self.Font;
+  pbUpdateAvailable.Canvas.Font.Color := FLinkColor;
+  //like the details panel, the underline only appears under the mouse.
+  if FLinkHot then
+    pbUpdateAvailable.Canvas.Font.Style := [fsUnderline]
+  else
+    pbUpdateAvailable.Canvas.Font.Style := [];
+  pbUpdateAvailable.Canvas.Brush.Style := bsClear;
+
+  //right aligned - it sits at the far end of the search bar. The text rect is
+  //kept for hit testing, so the empty space to its left is not clickable.
+  textWidth := pbUpdateAvailable.Canvas.TextWidth(FUpdateCaption);
+  FLinkTextRect := Rect(pbUpdateAvailable.ClientWidth - textWidth, 0,
+                        pbUpdateAvailable.ClientWidth, pbUpdateAvailable.ClientHeight);
+  DrawText(pbUpdateAvailable.Canvas.Handle, FUpdateCaption, Length(FUpdateCaption),
+           FLinkTextRect, DT_RIGHT or DT_SINGLELINE or DT_VCENTER);
+end;
+
+procedure TDPMSearchBarFrame.pbUpdateAvailableMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+var
+  hot : boolean;
+begin
+  hot := PtInRect(FLinkTextRect, Point(X, Y));
+  if hot = FLinkHot then
+    exit;
+  FLinkHot := hot;
+  if FLinkHot then
+    pbUpdateAvailable.Cursor := crHandPoint
+  else
+    pbUpdateAvailable.Cursor := crDefault;
+  pbUpdateAvailable.Invalidate;
+end;
+
+procedure TDPMSearchBarFrame.pbUpdateAvailableMouseLeave(Sender: TObject);
+begin
+  if not FLinkHot then
+    exit;
+  FLinkHot := false;
+  pbUpdateAvailable.Cursor := crDefault;
+  pbUpdateAvailable.Invalidate;
+end;
 
 
 procedure TDPMSearchBarFrame.AddDefaultSearchHistory;
@@ -214,7 +300,7 @@ begin
     DoSearchEvent(true);
 end;
 
-procedure TDPMSearchBarFrame.lblUpdateAvailableLinkClick(Sender: TObject; const Link: string; LinkType: TSysLinkType);
+procedure TDPMSearchBarFrame.pbUpdateAvailableClick(Sender: TObject);
 var
   upgradeInfo : IUpgradeInfo;
   installerFile : string;
@@ -223,6 +309,10 @@ var
 begin
   upgradeInfo := FUpgradeInfo;
   if (upgradeInfo = nil) or (FUpgradeService = nil) then
+    exit;
+
+  //the paint box is wider than the text, only the text itself is the link.
+  if not FLinkHot then
     exit;
 
   //Plain MessageDlg keeps this version portable - the plugin builds XE2..13.
@@ -313,14 +403,16 @@ begin
   FUpgradeInfo := upgradeInfo;
   if upgradeInfo = nil then
   begin
-    lblUpdateAvailable.Visible := false;
+    FUpdateCaption := '';
+    pbUpdateAvailable.Visible := false;
     exit;
   end;
-  //The <a> markup is what makes this clickable - without it TLinkLabel renders
-  //as plain text and never fires OnLinkClick. Wrap the WHOLE caption so the
-  //entire label is the click target, not just one small word.
-  lblUpdateAvailable.Caption := '<a>DPM ' + upgradeInfo.Version.ToStringNoMeta + ' is available - click here to install</a>';
-  lblUpdateAvailable.Visible := true;
+  //This was a TLinkLabel, but that wraps the win32 SysLink control which paints
+  //the link in the SYSTEM hyperlink colour (a dark navy) and exposes no way at
+  //all to change it - unreadable against the IDE's dark themes.
+  FUpdateCaption := 'DPM ' + upgradeInfo.Version.ToStringNoMeta + ' is available - click here to install';
+  UpdateLinkColor;
+  pbUpdateAvailable.Visible := true;
 end;
 
 procedure TDPMSearchBarFrame.CheckForUpdate;
@@ -333,7 +425,7 @@ var
   logger : IDPMIDELogger;            //local for capture
   cache : IUpgradeCheckCache;        //local for capture
 begin
-  lblUpdateAvailable.Visible := false;
+  pbUpdateAvailable.Visible := false;
   FUpgradeInfo := nil;
 
   if (FUpgradeService = nil) or FRequestInFlight or FClosing then
@@ -459,7 +551,13 @@ begin
   //Must outlive any async call, so it is a field created up front rather than a
   //local at the call site.
   FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
-  lblUpdateAvailable.Visible := false;
+  pbUpdateAvailable.Visible := false;
+  {$IFDEF STYLEELEMENTS}
+  //belt and braces - we paint the caption ourselves, but this also stops the
+  //style hooks and the IDE's ApplyTheme deciding they own the font.
+  pbUpdateAvailable.StyleElements := pbUpdateAvailable.StyleElements - [seFont];
+  {$ENDIF}
+  UpdateLinkColor;
 end;
 
 procedure TDPMSearchBarFrame.DebounceTimerTimer(Sender: TObject);
@@ -585,9 +683,11 @@ end;
 procedure TDPMSearchBarFrame.ThemeChanged(const ideStyleServices : TCustomStyleServices);
 begin
 //{$IF CompilerVersion < 34.0 }
+  FIDEStyleServices := ideStyleServices;
   Self.Color := ideStyleServices.GetSystemColor(clBtnFace);
   Self.Font.Color := ideStyleServices.GetSystemColor(clWindowText);
 //{$IFEND}
+  UpdateLinkColor;
 end;
 
 procedure TDPMSearchBarFrame.txtSearchChange(Sender: TObject);
