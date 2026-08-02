@@ -706,8 +706,7 @@ var
   bomFile: string;
   configuration: string;
   searchPaths: IList<string>;
-  dependency: IPackageReference;
-  childSearchPath: string;
+  seenDependencies: IDictionary<string, boolean>;
   bomNode: IPackageReference;
   supportedByCompiler: TDPMPlatforms;
   candidates: TDPMPlatforms;
@@ -919,15 +918,33 @@ begin
   // Collect the base library paths from dependencies. These are combined per build/design entry with
   // that entry's own searchPaths (see ResolveEntrySearchPaths) and set on the compiler just before
   // each BuildProject call, so an entry can add package-local search paths without affecting others.
+  //
+  // This must be the TRANSITIVE closure of the subtree, not just packageReference.Children. Delphi
+  // needs the .dcu of every unit reachable from the units it compiles - a unit we use pulls in the
+  // units IT uses - so a dependency-of-a-dependency's lib folder has to be on the search path too.
+  // Direct children only produced 'F1026 File not found: <transient>.dcu' (e.g. VSoft.SlackClient ->
+  // VSoft.HttpClient -> VSoft.Uri). VisitDFS walks descendants then the node itself, so skip self;
+  // dedupe by id since a shared dependency appears under every parent that references it.
   searchPaths := TCollections.CreateList<string>;
   if packageReference.HasChildren then
   begin
-    for dependency in packageReference.Children do
-    begin
-      childSearchPath := FPackageCache.GetPackagePath(dependency.Id, dependency.Version.ToStringNoMeta, Compiler.compilerVersion);
-      childSearchPath := TPath.Combine(childSearchPath, 'lib' + PathDelim + DPMPlatformToBDString(effectivePlatform));
-      searchPaths.Add(childSearchPath);
-    end;
+    seenDependencies := TCollections.CreateDictionary<string, boolean>;
+    packageReference.VisitDFS(
+      procedure(const dependencyReference : IPackageReference)
+      var
+        dependencyKey: string;
+        dependencyLibPath: string;
+      begin
+        if dependencyReference = packageReference then
+          exit;
+        dependencyKey := LowerCase(dependencyReference.Id);
+        if seenDependencies.ContainsKey(dependencyKey) then
+          exit;
+        seenDependencies[dependencyKey] := true;
+        dependencyLibPath := FPackageCache.GetPackagePath(dependencyReference.Id, dependencyReference.Version.ToStringNoMeta, Compiler.compilerVersion);
+        dependencyLibPath := TPath.Combine(dependencyLibPath, 'lib' + PathDelim + DPMPlatformToBDString(effectivePlatform));
+        searchPaths.Add(dependencyLibPath);
+      end);
   end;
 
   // Copy any copyToLib companion files (.dfm/.res/etc) into lib\{platform} BEFORE compiling, so the
