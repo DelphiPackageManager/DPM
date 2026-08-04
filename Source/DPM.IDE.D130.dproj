@@ -189,6 +189,7 @@
         <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.Templates.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.SourceFiles.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.ConfigPatcher.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.PackageGenerator.pas"/>
         <DCCReference Include="Core\Spec\DPM.Core.Spec.PackageDefinition.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Transformer.pas"/>

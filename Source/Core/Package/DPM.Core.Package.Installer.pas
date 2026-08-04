@@ -48,6 +48,7 @@ uses
   DPM.Core.Package.Cache.Receipt,
   DPM.Core.Dependency.Interfaces,
   DPM.Core.Project.PackageGenerator,
+  DPM.Core.Project.ConfigPatcher,
   DPM.Core.Compiler.Interfaces;
 
 type
@@ -62,6 +63,7 @@ type
     FCompilerFactory: ICompilerFactory;
     FReceiptService : IReceiptService;
     FPackageGenerator : IPackageProjectGenerator;
+    FProjectConfigPatcher : IProjectConfigPatcher;
     // P2 §2.6 — populate each top-level reference's ManifestHash from the
     // verification receipt the cache wrote during install. The editor writes
     // this back to the .dproj as `manifestHash="sha256:..."`.
@@ -245,7 +247,8 @@ type
       const context: IPackageInstallerContext;
       const compilerFactory: ICompilerFactory;
       const receiptService : IReceiptService;
-      const packageGenerator : IPackageProjectGenerator);
+      const packageGenerator : IPackageProjectGenerator;
+      const projectConfigPatcher : IProjectConfigPatcher);
   end;
 
 implementation
@@ -713,6 +716,8 @@ var
   designPlatforms: TDPMPlatforms;
   designProjectEditor: IProjectEditor;
   effectivePlatform: TDPMPlatform;
+  //design entry project path (lowercased) -> the platforms it declared BEFORE any dproj patching.
+  designCandidates: IDictionary<string, TDPMPlatforms>;
 
   //Build/design `project` paths are relative to the extracted package root, but are authored
   //with a leading separator (e.g. '/packages/..') and forward slashes. TPath.Combine treats a
@@ -756,6 +761,37 @@ var
       end;
       result.Add(resolvedPath);
     end;
+  end;
+
+  //Before handing a project to msbuild with /p:Config=<configuration> /p:Platform=<effectivePlatform>,
+  //make sure the dproj actually declares that pair. A dspec can legitimately target platforms the
+  //package's own dproj was never configured for, and msbuild applies NONE of the project's settings
+  //when the config activator group is missing. The patch is written in place in the cache folder and
+  //is idempotent - a project that already declares the pair is not rewritten at all.
+  //Failure here is never fatal : we warn and let msbuild try anyway, so this can only ever fix
+  //packages, never break one that builds today.
+  procedure EnsureBuildTarget(const projectFile : string; const entryProject : string; const options : TProjectPatchOptions);
+  var
+    packageRoot : string;
+    patchResult : TProjectPatchResult;
+  begin
+    if FProjectConfigPatcher = nil then
+      exit;
+    //Never mutate a file outside the package's own cache folder - `project` is author supplied and
+    //ResolveProjectFile compresses '..' segments without a containment check. Same guard
+    //ResolveEntrySearchPaths applies to search paths.
+    packageRoot := IncludeTrailingPathDelimiter(packagePath);
+    if not SameText(Copy(projectFile, 1, Length(packageRoot)), packageRoot) then
+    begin
+      FLogger.Warning('Not adjusting project [' + entryProject + '] for package [' + packageInfo.Id +
+                      '] - it resolves outside the package folder.');
+      exit;
+    end;
+    patchResult := FProjectConfigPatcher.EnsureBuildTarget(projectFile, effectivePlatform, configuration,
+                                                          Compiler.compilerVersion, options);
+    if patchResult = TProjectPatchResult.Failed then
+      FLogger.Warning('Unable to add [' + configuration + '] / ' + DPMPlatformToString(effectivePlatform) +
+                      ' to project [' + entryProject + '] - attempting the build anyway.');
   end;
 
   //Copy the files matched by the template's copyToLib globs (archive-relative, e.g. 'Source/**/*.dfm')
@@ -947,48 +983,14 @@ begin
       end);
   end;
 
-  // Copy any copyToLib companion files (.dfm/.res/etc) into lib\{platform} BEFORE compiling, so the
-  // companion files are already on the compiler's search path when the runtime/design projects build.
-  CopyCopyToLibFiles;
-
-  // Compile build entries
-  for buildEntry in template.BuildEntries do
-  begin
-    // Check platform filter if specified
-    if (buildEntry.Platforms <> []) and (not (effectivePlatform in buildEntry.Platforms)) then
-      continue;
-
-    // Blank line so each project's build output is visually separated in the log.
-    FLogger.NewLine;
-    FLogger.Information('Building project: ' + buildEntry.Project);
-    projectFile := ResolveProjectFile(buildEntry.Project);
-
-    Compiler.SetSearchPaths(ResolveEntrySearchPaths(buildEntry.SearchPaths));
-    result := Compiler.BuildProject(cancellationToken, effectivePlatform, projectFile, configuration, packageInfo.Version, false);
-    if result then
-      FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
-    else
-    begin
-      if cancellationToken.IsCancelled then
-        FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
-      else
-        FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
-      exit;
-    end;
-  end;
-
-  // Compile design entries
-  // A design BPL can only be built when the current runtime platform (Compiler.Platform) is
-  // both a supported design host for this compiler version AND declared by the manifest
-  // (if explicit) or by the design .dproj's enabled platforms (if manifest silent). The design
-  // .dpk references the runtime .dcp that was just built in lib\{Compiler.Platform}, so design
-  // and runtime platforms must match. The Win32/Win64 matrix is produced across the series of
-  // per-platform install/restore calls - each call contributes its matching design BPL.
+  // Snapshot each design entry's candidate platforms BEFORE the build loop runs. The build loop
+  // patches dprojs in place (including their <Platform> list), and a project that is both a build
+  // entry and a design entry would otherwise have that list extended before we inspect it - making
+  // a Win32-only design package look like it supports every platform we ever built it for.
+  designCandidates := TCollections.CreateDictionary<string, TDPMPlatforms>;
   for designEntry in template.DesignEntries do
   begin
     projectFile := ResolveProjectFile(designEntry.Project);
-
-    supportedByCompiler := DesignTimePlatforms(Compiler.compilerVersion);
 
     if designEntry.Platforms <> [] then
       //manifest explicit - authoritative
@@ -1012,8 +1014,59 @@ begin
         candidates := [TDPMPlatform.Win32];
       end;
     end;
+    designCandidates[LowerCase(designEntry.Project)] := candidates;
+  end;
 
-    designPlatforms := supportedByCompiler * candidates;
+  // Copy any copyToLib companion files (.dfm/.res/etc) into lib\{platform} BEFORE compiling, so the
+  // companion files are already on the compiler's search path when the runtime/design projects build.
+  CopyCopyToLibFiles;
+
+  // Compile build entries
+  for buildEntry in template.BuildEntries do
+  begin
+    // Check platform filter if specified
+    if (buildEntry.Platforms <> []) and (not (effectivePlatform in buildEntry.Platforms)) then
+      continue;
+
+    FLogger.Information('Building project: ' + buildEntry.Project);
+    projectFile := ResolveProjectFile(buildEntry.Project);
+
+    EnsureBuildTarget(projectFile, buildEntry.Project, [TProjectPatchOption.UpdatePlatformList]);
+
+    Compiler.SetSearchPaths(ResolveEntrySearchPaths(buildEntry.SearchPaths));
+    result := Compiler.BuildProject(cancellationToken, effectivePlatform, projectFile, configuration, packageInfo.Version, false);
+    if result then
+      FLogger.Success('Project [' + buildEntry.Project + '] build succeeded.')
+    else
+    begin
+      if cancellationToken.IsCancelled then
+        FLogger.Error('Building project [' + buildEntry.Project + '] cancelled.')
+      else
+        FLogger.Error('Building project [' + buildEntry.Project + '] failed.');
+      // Trailing blank line so the caller's failure message doesn't run into this project's output.
+      FLogger.NewLine;
+      exit;
+    end;
+    // Trailing blank line so each project's output is a visually distinct block - the header for the
+    // next project (or the next package/platform) then starts against white space rather than ending it.
+    FLogger.NewLine;
+  end;
+
+  // Compile design entries
+  // A design BPL can only be built when the current runtime platform (Compiler.Platform) is
+  // both a supported design host for this compiler version AND declared by the manifest
+  // (if explicit) or by the design .dproj's enabled platforms (if manifest silent). The design
+  // .dpk references the runtime .dcp that was just built in lib\{Compiler.Platform}, so design
+  // and runtime platforms must match. The Win32/Win64 matrix is produced across the series of
+  // per-platform install/restore calls - each call contributes its matching design BPL.
+  for designEntry in template.DesignEntries do
+  begin
+    projectFile := ResolveProjectFile(designEntry.Project);
+
+    supportedByCompiler := DesignTimePlatforms(Compiler.compilerVersion);
+
+    //candidates were captured above, before any dproj was patched.
+    designPlatforms := supportedByCompiler * designCandidates[LowerCase(designEntry.Project)];
 
     if not (effectivePlatform in designPlatforms) then
     begin
@@ -1021,9 +1074,13 @@ begin
       continue;
     end;
 
-    // Blank line so each design package's build output is visually separated in the log.
-    FLogger.NewLine;
     FLogger.Information('Building design package: ' + designEntry.Project + ' (' + DPMPlatformToString(effectivePlatform) + ')');
+
+    //note the empty option set - we never write to a design dproj's <Platform value=..> list,
+    //because that list is exactly what the manifest-silent branch above reads to decide which
+    //design platforms this entry supports, and the patch persists in the cache. msbuild ignores
+    //ProjectExtensions anyway, so the design build loses nothing.
+    EnsureBuildTarget(projectFile, designEntry.Project, []);
 
     //output dirs were set for effectivePlatform by the runtime build above; search paths are set per
     //entry so this design entry's own searchPaths (combined with the dependency lib folders) apply.
@@ -1035,9 +1092,11 @@ begin
         FLogger.Error('Building design package [' + designEntry.Project + '] cancelled.')
       else
         FLogger.Error('Building design package [' + designEntry.Project + '] failed.');
+      FLogger.NewLine;
       exit;
     end;
     FLogger.Success('Design package [' + designEntry.Project + '] build succeeded.');
+    FLogger.NewLine;
   end;
 
   // Copy any copyToBin files (native dlls) into bpl\{platform} for the platform just built.
@@ -1069,7 +1128,8 @@ end;
 constructor TPackageInstaller.Create(const logger: ILogger; const configurationManager: IConfigurationManager; const repositoryManager: IPackageRepositoryManager;
                                      const packageCache: IPackageCache; const dependencyResolver: IDependencyResolver; const context: IPackageInstallerContext;
                                      const compilerFactory: ICompilerFactory; const receiptService : IReceiptService;
-                                     const packageGenerator : IPackageProjectGenerator);
+                                     const packageGenerator : IPackageProjectGenerator;
+                                     const projectConfigPatcher : IProjectConfigPatcher);
 begin
   FLogger := logger;
   FConfigurationManager := configurationManager;
@@ -1080,6 +1140,7 @@ begin
   FCompilerFactory := compilerFactory;
   FReceiptService := receiptService;
   FPackageGenerator := packageGenerator;
+  FProjectConfigPatcher := projectConfigPatcher;
 end;
 
 procedure TPackageInstaller.PopulateManifestHashes(const graph : IPackageReference;

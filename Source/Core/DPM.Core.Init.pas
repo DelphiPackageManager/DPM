@@ -79,6 +79,7 @@ uses
   DPM.Core.Project.Transformer,
   DPM.Core.Project.Prepare,
   DPM.Core.Project.PackageGenerator,
+  DPM.Core.Project.ConfigPatcher,
   DPM.Core.SBOM.Interfaces,
   DPM.Core.SBOM.Writers,
   DPM.Core.SBOM.Writers.Reports,
@@ -129,6 +130,10 @@ begin
 
   //Install-time package-project generation for source-only libraries (`package definitions`).
   Container.RegisterType<IPackageProjectGenerator, TPackageProjectGenerator>;
+
+  //Install-time repair of a cached package's dproj so it declares the (platform, config) pair
+  //we are about to pass to msbuild.
+  Container.RegisterType<IProjectConfigPatcher, TProjectConfigPatcher>;
 
   Container.RegisterType<ICompilerEnvironmentProvider, TCompilerEnvironmentProvider>;
   Container.RegisterType<ICompilerFactory, TCompilerFactory>().AsSingleton();
