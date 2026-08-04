@@ -26,7 +26,6 @@ type
     btnCopy: TButton;
     actCopyLog: TAction;
     btnClose: TButton;
-    ClosingInTimer: TTimer;
     lblClosing: TLabel;
     lblDontClose: TLinkLabel;
     Panel1: TPanel;
@@ -35,7 +34,6 @@ type
     procedure FormHide(Sender: TObject);
     procedure ActionList1Update(Action: TBasicAction; var Handled: Boolean);
     procedure btnCloseClick(Sender: TObject);
-    procedure ClosingInTimerTimer(Sender: TObject);
     procedure lblDontCloseLinkClick(Sender: TObject; const Link: string; LinkType: TSysLinkType);
     procedure FormShow(Sender: TObject);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
@@ -52,6 +50,16 @@ type
     //service rather than inferred from FCancellationTokenSource, which TaskDone does not
     //always clear (e.g. success with auto-close disabled).
     FTaskRunning : boolean;
+    //True while the auto close countdown is armed. The countdown used to be a TTimer dropped on
+    //the form in the dfm, which was wrong for a plugin : TTimer allocates its own hidden window
+    //in its CONSTRUCTOR, so the timer belonged to whatever thread happened to construct the form.
+    //A worker thread logging first (a repo search / icon fetch calls the logger from inside the
+    //async body) built the form - and the timer - on a thread that then exited, taking the hidden
+    //window with it. Every later 'Enabled := true' hit a dead HWND, SetTimer returned 0 and the
+    //VCL reported that as 'Not enough timers available'. The countdown now runs on the form's own
+    //handle, created on the main thread as part of the show cascade, and is re-armed by CreateWnd
+    //if that handle is ever recreated.
+    FCloseTimerRunning : boolean;
     {$IFDEF THEMESERVICES}
     FNotifierId : integer;
     {$ENDIF}
@@ -61,10 +69,15 @@ type
 
     procedure SetCancellationTokenSource(const Value: ICancellationTokenSource);
     procedure SetCloseDelayInSeconds(const Value: integer);
+    procedure StartCloseCountdown;
+    procedure StopCloseCountdown;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
+    procedure CreateWnd; override;
+    procedure DestroyWnd; override;
     procedure CMStyleChanged(var Message: TMessage); message CM_STYLECHANGED;
     procedure CMShowingChanged(var Message: TMessage); message CM_SHOWINGCHANGED;
+    procedure WMTimer(var Message: TWMTimer); message WM_TIMER;
 
     //INTAIDEThemingServicesNotifier
     procedure ChangingTheme;
@@ -118,6 +131,11 @@ uses
   DPM.IDE.ToolsAPI;
 
 {$R *.dfm}
+
+const
+  //Timer id for the auto close countdown. Scoped to our own window handle, so it cannot
+  //collide with anything else in the IDE.
+  CCloseTimerId = 1;
 
 //Windows replaces the top level windows of a GUI thread that has stopped servicing its message
 //queue with GHOST windows - a frozen copy with "(Not Responding)" appended. Detection kicks in
@@ -185,7 +203,7 @@ begin
   //be hidden out from under an in-flight operation.
   if FTaskRunning then
     exit;
-  ClosingInTimer.Enabled := false;
+  StopCloseCountdown;
   FCurrentCloseDelay := FCloseDelayInSeconds;
   Self.Hide;
 end;
@@ -226,20 +244,58 @@ begin
   PaintNow;
 end;
 
-procedure TDPMMessageForm.ClosingInTimerTimer(Sender: TObject);
+procedure TDPMMessageForm.WMTimer(var Message: TWMTimer);
 begin
-  ClosingInTimer.Enabled := false;
+  if Message.TimerID <> CCloseTimerId then
+  begin
+    inherited;
+    exit;
+  end;
+  //Re-armed below rather than left running, so the full second is measured from the caption
+  //update - same behaviour the TTimer had (it was disabled and re-enabled on every tick).
+  StopCloseCountdown;
   Dec(FCurrentCloseDelay);
   if FCurrentCloseDelay > 0  then
   begin
     lblClosing.Caption := 'Closing in ' + IntToStr(FCurrentCloseDelay) + ' seconds' + StringOfChar('.', FCurrentCloseDelay);
-    ClosingInTimer.Enabled := true;
+    StartCloseCountdown;
   end
   else
   begin
     FCurrentCloseDelay := FCloseDelayInSeconds;
     Self.Hide;
   end;
+end;
+
+procedure TDPMMessageForm.StartCloseCountdown;
+begin
+  FCloseTimerRunning := true;
+  //No handle yet means we were never shown - CreateWnd arms it if that changes.
+  if not HandleAllocated then
+    exit;
+  SetTimer(Handle, CCloseTimerId, 1000, nil);
+end;
+
+procedure TDPMMessageForm.StopCloseCountdown;
+begin
+  FCloseTimerRunning := false;
+  if HandleAllocated then
+    KillTimer(Handle, CCloseTimerId);
+end;
+
+procedure TDPMMessageForm.CreateWnd;
+begin
+  inherited;
+  //A recreated handle is a new window - the old one took its timer with it.
+  if FCloseTimerRunning then
+    SetTimer(Handle, CCloseTimerId, 1000, nil);
+end;
+
+procedure TDPMMessageForm.DestroyWnd;
+begin
+  if HandleAllocated then
+    KillTimer(Handle, CCloseTimerId);
+  inherited;
 end;
 
 
@@ -328,6 +384,7 @@ begin
   FCurrentCloseDelay := FCloseDelayInSeconds;
 
   FTaskRunning := false;
+  FCloseTimerRunning := false;
   Self.OnCloseQuery := FormCloseQuery;
 
   FStopwatch := TStopwatch.Create;
@@ -375,7 +432,16 @@ end;
 
 procedure TDPMMessageForm.DelayHide;
 begin
-  ClosingInTimer.Enabled := true;
+  //Never shown (eg auto close on success while 'show log' is off for this task type) - there is
+  //nothing to count down to, and the countdown labels must not be left visible for the next show.
+  if not Showing then
+  begin
+    FCurrentCloseDelay := FCloseDelayInSeconds;
+    lblClosing.Visible := false;
+    lblDontClose.Visible := false;
+    exit;
+  end;
+  StartCloseCountdown;
   lblClosing.Caption := 'Closing in ' + IntToStr(FCurrentCloseDelay) + ' seconds' + StringOfChar('.', FCurrentCloseDelay);
   lblDontClose.Left := lblClosing.Left +  lblClosing.Width + 30;
   lblClosing.Visible := true;
@@ -414,6 +480,9 @@ end;
 
 procedure TDPMMessageForm.FormHide(Sender: TObject);
 begin
+  //However we got hidden (countdown, Close button, close box), the countdown is done - it must
+  //not survive to fire against the next show.
+  StopCloseCountdown;
   //OnHide runs from DoHide inside TCustomForm.CMShowingChanged, BEFORE its ShowWindow(SW_HIDE) -
   //we are still on screen, so clear WITHOUT repainting, or the emptied log is drawn over the
   //window the user is still looking at.
@@ -466,7 +535,7 @@ end;
 
 procedure TDPMMessageForm.lblDontCloseLinkClick(Sender: TObject; const Link: string; LinkType: TSysLinkType);
 begin
-  ClosingInTimer.Enabled := false;
+  StopCloseCountdown;
   lblClosing.Visible := false;
   lblDontClose.Visible := false;
   FCurrentCloseDelay := FCloseDelayInSeconds;

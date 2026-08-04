@@ -101,10 +101,4 @@ object DPMMessageForm: TDPMMessageForm
       OnExecute = actCopyLogExecute
     end
   end
-  object ClosingInTimer: TTimer
-    Enabled = False
-    OnTimer = ClosingInTimerTimer
-    Left = 40
-    Top = 312
-  end
 end
