@@ -554,12 +554,22 @@ end;
 
 // The core runs restore/install synchronously on the IDE main thread, so the IDE message loop is
 // not pumped while a task runs. Painting no longer depends on that loop at all - TLogMemo.Flush
-// renders straight through a DC it fetches itself - so all this has to do is keep the window's
-// INPUT alive. Only messages already queued for the log window's own controls are dispatched.
-// Posted IDE messages and input for IDE windows stay queued, so nothing re-enters project loading
-// or the IDE notifiers mid-operation - the re-entrance that produced paint artifacts on the IDE
-// main window and churned resources (a 'Not enough timers available' failure) when this pumped
-// the whole thread queue.
+// drives a real BeginPaint/EndPaint cycle with InvalidateRect + UpdateWindow, neither of which
+// needs the loop - so all this has to do is keep the window's INPUT alive. Only messages already
+// queued for the log window's own controls are dispatched. Posted IDE messages and input for IDE
+// windows stay queued, so nothing re-enters project loading or the IDE notifiers mid-operation -
+// that re-entrance produced paint artifacts on the IDE main window when this pumped the whole
+// thread queue.
+// It was also blamed at the time for an EOutOfResources 'Not enough timers available'. That was
+// WRONG and the note is kept so nobody chases it again : the VCL raises that for ANY SetTimer
+// failure, and the real cause was a dead window handle, not resource exhaustion - the log form
+// (and the TTimer that drove its auto close countdown) could be constructed on a VSoft.Awaitable
+// worker thread, which then exited and took the timer's hidden window with it. See
+// TDPMIDEMessageService.EnsureMessageForm.
+// Note this only ever runs on the main thread now - the message service buffers worker thread log
+// lines rather than letting them reach the form. It never really worked from a worker anyway :
+// PeekMessage only sees the CALLING thread's queue, and the UpdateWindow inside Flush SENDS
+// WM_PAINT, which cross thread blocks the worker until the main thread pumps.
 procedure TDPMMessageForm.ProcessMessages;
 var
   msg : TMsg;
