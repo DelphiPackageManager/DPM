@@ -56,6 +56,10 @@ type
     class function GetLicenseName(const id : string) : string; static;
     /// <summary>Appends every known SPDX license id to dest. dest is not cleared.</summary>
     class procedure GetLicenseIds(const dest : TStrings); static;
+    /// <summary>The published SPDX license list release the shipped list was generated
+    /// from, e.g. '3.28.0'. SPDX documents declare this as creationInfo.licenseListVersion.
+    /// Empty only if the resource failed to load.</summary>
+    class function LicenseListVersion : string; static;
   end;
 
 implementation
@@ -77,14 +81,20 @@ const
   //RT_RCDATA (not as a custom string type) - that is what the loader must ask
   //for, matching how the list was originally loaded in DSpecCreator.
   cSpdxResource = 'DPM_SPDX_LICENSES';
+  //First line of the list - the published release it was generated from. It shares the
+  //'name=value' shape of the license lines, so EnsureLoaded lifts it out rather than
+  //leaving it to masquerade as a license id.
+  cVersionKey = 'SPDXLicenseListVersion';
 
 var
   GSpdxList : TStringList;
   GLoaded : boolean;
+  GListVersion : string;
 
 procedure EnsureLoaded;
 var
   stream : TResourceStream;
+  idx : integer;
 begin
   if GLoaded then
     exit;
@@ -99,6 +109,12 @@ begin
       GSpdxList.LoadFromStream(stream);
     finally
       stream.Free;
+    end;
+    idx := GSpdxList.IndexOfName(cVersionKey);
+    if idx <> -1 then
+    begin
+      GListVersion := GSpdxList.ValueFromIndex[idx];
+      GSpdxList.Delete(idx);
     end;
   except
     //swallow - GSpdxList stays empty.
@@ -178,6 +194,12 @@ begin
     result := Copy(value, 1, p - 1)
   else
     result := value;
+end;
+
+class function TSpdxLicenses.LicenseListVersion : string;
+begin
+  EnsureLoaded;
+  result := GListVersion;
 end;
 
 class procedure TSpdxLicenses.GetLicenseIds(const dest : TStrings);

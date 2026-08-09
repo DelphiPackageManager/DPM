@@ -60,6 +60,45 @@ type
     function Checkout(const cancellationToken : ICancellationToken; const repoDir : string; const commitOrRef : string) : boolean;
   end;
 
+  TGitUtils = class
+    /// <summary>Strips VCS keyword decoration from a commit id, so
+    /// 'Id:0fe5fa48...', 'Id: 0fe5fa48...' and '$Id: 0fe5fa48... $' all reduce to the
+    /// bare revision. Publishers whose build stamps the dspec via keyword expansion
+    /// ship the decorated form, and it travels with the package - a decorated id makes
+    /// an invalid purl vcs_url and an invalid SPDX download location. Anything that
+    /// isn't decorated (including the unreplaced '#HASH#' placeholder) comes back
+    /// unchanged apart from trimming.</summary>
+    class function NormalizeCommitId(const value : string) : string; static;
+  end;
+
 implementation
+
+uses
+  System.SysUtils,
+  System.StrUtils;
+
+{ TGitUtils }
+
+class function TGitUtils.NormalizeCommitId(const value : string) : string;
+const
+  cIdKeyword = 'Id:';
+begin
+  result := Trim(value);
+  if result = '' then
+    exit;
+
+  //'$Id: <sha> $' - the git/svn keyword in its full form.
+  if (result[1] = '$') and (result[Length(result)] = '$') then
+  begin
+    result := Trim(Copy(result, 2, Length(result) - 2));
+    if result = '' then
+      exit;
+  end;
+
+  //'Id' alone is not the keyword - only strip when the colon follows it, so a commit
+  //ref that merely starts with those letters survives.
+  if StartsText(cIdKeyword, result) then
+    result := Trim(Copy(result, Length(cIdKeyword) + 1, MaxInt));
+end;
 
 end.

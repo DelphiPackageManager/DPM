@@ -157,6 +157,7 @@ implementation
 
 uses
   DPM.Core.Constants,
+  DPM.Core.Git.Interfaces,
   DPM.Core.Spec.Reader,
   DPM.Core.Package.Dependency,
   VSoft.Base64,
@@ -546,7 +547,8 @@ begin
   FRepositoryUrl  := jsonObj.S['RepositoryUrl'];
   FRepositoryType := jsonObj.S['RepositoryType'];
   FRepositoryBranch := jsonObj.S['RepositoryBranch'];
-  FRepositoryCommit := jsonObj.S['RepositoryCommit'];
+  //see the note in TSpecMetaData - strip any 'Id:' keyword decoration on the way in.
+  FRepositoryCommit := TGitUtils.NormalizeCommitId(jsonObj.S['RepositoryCommit']);
   FReleaseNotes   := jsonObj.S['releaseNotes'];
   FReadMe         := jsonObj.S['readme'];
   searchPaths     := jsonObj.S['searchPaths'];

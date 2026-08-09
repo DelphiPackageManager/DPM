@@ -120,6 +120,7 @@ uses
   System.Win.Registry,
   WinApi.Windows,
   DPM.Core.Constants,
+  DPM.Core.Version,
   DPM.Core.Package.Classes,
   DPM.Core.Project.Editor,
   DPM.Core.Project.GroupProjReader,
@@ -919,7 +920,9 @@ begin
       report.SerialNumber := 'urn:uuid:' + NewGuidString;
       report.TimestampUtc := NowUtcIso8601;
       report.ToolName := 'dpm';
-      report.ToolVersion := cDPMClientVersion;
+      //see the note in GenerateForPlatform - the host binary's product version, not the
+      //minimum-client-version constant.
+      report.ToolVersion := TDPMVersion.CurrentVersionString;
       report.ProjectName := groupName;
       report.ProjectVersion := '';
       report.Platform := platform;
@@ -1015,7 +1018,10 @@ begin
     report.SerialNumber := 'urn:uuid:' + NewGuidString;
     report.TimestampUtc := NowUtcIso8601;
     report.ToolName := 'dpm';
-    report.ToolVersion := cDPMClientVersion;
+    //The product version of the host binary, not cDPMClientVersion - that constant is the
+    //minimum-client-version floor written into dspec files, and reporting it here would
+    //name the wrong tool build in every SBOM we emit.
+    report.ToolVersion := TDPMVersion.CurrentVersionString;
     report.ProjectName := projectName;
     report.ProjectVersion := projectVersion;
     report.Platform := platform;

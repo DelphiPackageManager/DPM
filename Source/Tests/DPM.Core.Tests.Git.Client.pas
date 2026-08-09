@@ -26,13 +26,33 @@ type
 
     [Test]
     procedure ParseRefCommit_NoTab_ReturnsEmpty;
+
+    //TGitUtils.NormalizeCommitId - published packages routinely carry a commit id that
+    //still has its VCS keyword decoration attached.
+    [Test]
+    [TestCase('IdPrefix',        'Id:0fe5fa486aae1f4f99b9ea39d29a1915a568d822,0fe5fa486aae1f4f99b9ea39d29a1915a568d822')]
+    [TestCase('IdPrefixSpaced',  'Id: 0fe5fa486aae,0fe5fa486aae')]
+    [TestCase('LowerCasePrefix', 'id:0fe5fa486aae,0fe5fa486aae')]
+    [TestCase('DollarKeyword',   '$Id: 0fe5fa486aae $,0fe5fa486aae')]
+    [TestCase('AlreadyClean',    '0fe5fa486aae,0fe5fa486aae')]
+    [TestCase('Surrounding',     '  0fe5fa486aae  ,0fe5fa486aae')]
+    //'Id' only counts as the keyword when a colon follows it
+    [TestCase('NotAKeyword',     'Identity,Identity')]
+    //the unreplaced placeholder is meaningful to pack - leave it alone
+    [TestCase('HashPlaceholder', '#HASH#,#HASH#')]
+    procedure NormalizeCommitId(const input, expected : string);
+
+    [Test]
+    procedure NormalizeCommitId_EmptyAndDecorationOnly_ReturnEmpty;
   end;
 
 implementation
 
 uses
   System.Classes,
+  System.SysUtils,
   Spring.Collections,
+  DPM.Core.Git.Interfaces,
   DPM.Core.Git.Client;
 
 const
@@ -146,6 +166,24 @@ begin
   finally
     lines.Free;
   end;
+end;
+
+procedure TGitClientTests.NormalizeCommitId(const input, expected : string);
+begin
+  //Trim the TestCase values, not the result - leading/trailing spaces in the attribute
+  //are eaten by the parser, so 'Surrounding' is exercised via the explicit test below.
+  Assert.AreEqual(Trim(expected), TGitUtils.NormalizeCommitId(Trim(input)), false);
+end;
+
+procedure TGitClientTests.NormalizeCommitId_EmptyAndDecorationOnly_ReturnEmpty;
+begin
+  Assert.AreEqual('', TGitUtils.NormalizeCommitId(''));
+  Assert.AreEqual('', TGitUtils.NormalizeCommitId('   '));
+  //nothing left once the keyword is stripped - better empty than a stray 'Id:'
+  Assert.AreEqual('', TGitUtils.NormalizeCommitId('Id:'));
+  Assert.AreEqual('', TGitUtils.NormalizeCommitId('$Id: $'));
+  //whitespace around a real value is removed
+  Assert.AreEqual('0fe5fa486aae', TGitUtils.NormalizeCommitId('  0fe5fa486aae  '), false);
 end;
 
 initialization

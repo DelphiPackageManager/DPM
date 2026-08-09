@@ -58,11 +58,11 @@ uses
   System.DateUtils,
   Spring.Collections,
   DPM.Core.Types,
+  DPM.Core.Version,
   DPM.Core.Utils.DateTime;
 
 const
   cScanToolName = 'dpm-scan';
-  cScanToolVersion = '1.0.0';
 
 { TVulnScanner }
 
@@ -92,7 +92,9 @@ begin
   result := TVulnReport.Create;
   try
     result.ToolName := cScanToolName;
-    result.ToolVersion := cScanToolVersion;
+    //the host binary's product version - a hardcoded constant would name the wrong build
+    //in every VEX document we emit.
+    result.ToolVersion := TDPMVersion.CurrentVersionString;
     result.TimestampUtc := TDPMDateTimeUtils.DateToISO8601(TTimeZone.Local.ToUniversalTime(Now), true);
     result.SourceSbomSerial := report.SerialNumber;
     result.ProjectName := report.ProjectName;

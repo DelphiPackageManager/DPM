@@ -68,6 +68,9 @@ uses
 
 const
   cNoAssertion = 'NOASSERTION';
+  //SPDX documentNamespace prefix. Has to be a URI under a domain the project controls -
+  //the document's own uniqueness comes from the serial number appended to it.
+  cSpdxNamespacePrefix = 'https://github.com/DelphiPackageManager/DPM/spdxdocs/';
 
 //Normalises a hash algorithm name to the CycloneDX hashAlg enum. CycloneDX 1.6 hashes[].alg
 //must be one of MD5, SHA-1, SHA-256, SHA-384, SHA-512, SHA3-256, ... — exact spelling matters
@@ -160,6 +163,69 @@ begin
     result := TSpdxLicenses.TryGetCanonicalLicenseId(Copy(trimmed, 1, Length(trimmed) - 1), id);
 end;
 
+//The DPM component kind, as carried in CycloneDX properties[] and SPDX annotations[].
+//Neither format has a first-class field that keeps these four apart.
+function SBOMKindToString(const kind : TSBOMComponentKind) : string;
+begin
+  case kind of
+    TSBOMComponentKind.Application   : result := 'application';
+    TSBOMComponentKind.DpmPackage    : result := 'dpm-package';
+    TSBOMComponentKind.DelphiRuntime : result := 'delphi-runtime';
+    TSBOMComponentKind.ThirdParty    : result := 'third-party';
+    TSBOMComponentKind.Unidentified  : result := 'unidentified';
+  else
+    result := 'unidentified';
+  end;
+end;
+
+//SPDX 2.3 primaryPackagePurpose. The three DPM library-ish kinds all collapse to LIBRARY -
+//the dpm:component-kind annotation is what keeps them apart.
+function SpdxPackagePurpose(const kind : TSBOMComponentKind) : string;
+begin
+  case kind of
+    TSBOMComponentKind.Application   : result := 'APPLICATION';
+    TSBOMComponentKind.DelphiRuntime : result := 'FRAMEWORK';
+  else
+    result := 'LIBRARY';
+  end;
+end;
+
+//SPDX VCS download location - '<vcs>+<url>@<revision>' (SPDX 2.3 clause 7.7). Returns ''
+//when the component has no repository. RepositoryType defaults to git, which is what a
+//dspec repository url is in practice.
+function SpdxVcsLocation(const comp : TSBOMComponent) : string;
+var
+  vcs : string;
+  revision : string;
+begin
+  result := '';
+  if comp.RepositoryUrl = '' then
+    exit;
+  vcs := Trim(comp.RepositoryType);
+  if vcs = '' then
+    vcs := 'git';
+  result := LowerCase(vcs) + '+' + comp.RepositoryUrl;
+  //a commit pins it exactly; a branch is the next best thing.
+  revision := comp.RepositoryCommit;
+  if revision = '' then
+    revision := comp.RepositoryBranch;
+  if revision <> '' then
+    result := result + '@' + revision;
+end;
+
+//Document-level SPDX annotation. Same shape as the per-package ones in TSPDXWriter.FillPackage,
+//but the document is written before any package so it can't share that nested helper.
+procedure AddDocAnnotation(const annotations : TJsonArray; const report : TSBOMReport; const comment : string);
+var
+  annObj : TJsonObject;
+begin
+  annObj := annotations.AddObject;
+  annObj.S['annotator'] := 'Tool: ' + report.ToolName + '-' + report.ToolVersion;
+  annObj.S['annotationDate'] := report.TimestampUtc;
+  annObj.S['annotationType'] := 'OTHER';
+  annObj.S['comment'] := comment;
+end;
+
 function Slugify(const value : string) : string;
 var
   i : integer;
@@ -246,19 +312,6 @@ procedure TCycloneDXWriter.Write(const report : TSBOMReport; const fileName : st
         inner.S['id'] := spdxId
       else
         inner.S['name'] := license;
-    end;
-  end;
-
-  function SbomKindToString(const kind : TSBOMComponentKind) : string;
-  begin
-    case kind of
-      TSBOMComponentKind.Application   : result := 'application';
-      TSBOMComponentKind.DpmPackage    : result := 'dpm-package';
-      TSBOMComponentKind.DelphiRuntime : result := 'delphi-runtime';
-      TSBOMComponentKind.ThirdParty    : result := 'third-party';
-      TSBOMComponentKind.Unidentified  : result := 'unidentified';
-    else
-      result := 'unidentified';
     end;
   end;
 
@@ -357,7 +410,7 @@ procedure TCycloneDXWriter.Write(const report : TSBOMReport; const fileName : st
     //Emit dpm:component-kind so a DPM SBOM reader can recover the original kind
     //(application / framework / library type alone collapses dpm-package / third-party
     /// unidentified to 'library', which would break round-trip and scan-time filtering).
-    kindString := SbomKindToString(comp.Kind);
+    kindString := SBOMKindToString(comp.Kind);
     kindEmitted := false;
     propsArr := nil;
     if (comp.Properties.Count > 0) or (kindString <> '') then
@@ -531,7 +584,6 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
     checksumObj : TJsonObject;
     extRefs : TJsonArray;
     extObj : TJsonObject;
-    suppLine : string;
     joined : string;
     i : integer;
     annArr : TJsonArray;
@@ -540,11 +592,12 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
     ev : TSBOMEvidence;
     tag : string;
     canonicalLicenseId : string;
+    vcsLocation : string;
 
     procedure AddAnnotation(const comment : string);
     begin
       annObj := annArr.AddObject;
-      annObj.S['annotator'] := 'Tool: dpm';
+      annObj.S['annotator'] := 'Tool: ' + report.ToolName + '-' + report.ToolVersion;
       annObj.S['annotationDate'] := report.TimestampUtc;
       annObj.S['annotationType'] := 'OTHER';
       annObj.S['comment'] := comment;
@@ -555,9 +608,14 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
     obj.S['name'] := comp.Id;
     SetStringIfNotEmpty(obj, 'versionInfo', comp.Version);
 
+    //SPDX separates these: supplier is who distributed the package, originator is who
+    //created it. Collapsing authors into supplier asserts something we don't know.
     if comp.Supplier <> '' then
-      suppLine := 'Organization: ' + comp.Supplier
-    else if comp.Authors.Count > 0 then
+      obj.S['supplier'] := 'Organization: ' + comp.Supplier
+    else
+      obj.S['supplier'] := cNoAssertion;
+
+    if comp.Authors.Count > 0 then
     begin
       joined := '';
       for i := 0 to comp.Authors.Count - 1 do
@@ -566,14 +624,23 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
           joined := joined + ', ';
         joined := joined + comp.Authors[i];
       end;
-      suppLine := 'Organization: ' + joined;
+      obj.S['originator'] := 'Organization: ' + joined;
+    end;
+
+    //A repository url is a perfectly good SPDX download location, so prefer a real
+    //download url but fall back to the VCS location rather than asserting nothing.
+    //When both exist the repository still gets recorded, in sourceInfo.
+    vcsLocation := SpdxVcsLocation(comp);
+    if comp.DownloadUrl <> '' then
+    begin
+      obj.S['downloadLocation'] := comp.DownloadUrl;
+      SetStringIfNotEmpty(obj, 'sourceInfo', vcsLocation);
     end
     else
-      suppLine := cNoAssertion;
-    obj.S['supplier'] := suppLine;
+      obj.S['downloadLocation'] := CoalesceNoAssertion(vcsLocation);
 
-    obj.S['downloadLocation'] := CoalesceNoAssertion(comp.DownloadUrl);
     obj.B['filesAnalyzed'] := false;
+    obj.S['primaryPackagePurpose'] := SpdxPackagePurpose(comp.Kind);
 
     //licenseDeclared must be a valid SPDX licence expression: a known identifier, or a
     //compound expression built from them. A free-text licence ('Apache 2.0', 'see COPYING')
@@ -609,12 +676,19 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
     end;
 
     //SPDX has no first-class properties bag like CycloneDX, so DPM-specific fields, tags and
-    //evidence locations all become annotations[] entries with annotationType=OTHER.
-    if (comp.Properties.Count > 0) or (comp.Tags.Count > 0) or (comp.Evidence.Count > 0) then
+    //evidence locations all become annotations[] entries with annotationType=OTHER. The
+    //component kind leads: primaryPackagePurpose above collapses dpm-package / third-party /
+    //unidentified into LIBRARY, and this is what tells them apart on the way back.
     begin
       annArr := obj.A['annotations'];
+      AddAnnotation('dpm:component-kind=' + SBOMKindToString(comp.Kind));
       for prop in comp.Properties do
+      begin
+        //don't emit the kind twice if it already arrived as an explicit property
+        if SameText(prop.Name, 'dpm:component-kind') then
+          continue;
         AddAnnotation(prop.Name + '=' + prop.Value);
+      end;
       for tag in comp.Tags do
         if Trim(tag) <> '' then
           AddAnnotation('tag=' + tag);
@@ -629,6 +703,8 @@ var
   root : TJsonObject;
   creationInfo : TJsonObject;
   creatorsArr : TJsonArray;
+  docAnnotations : TJsonArray;
+  metaProp : TSBOMProperty;
   uuidPart : string;
   packagesArr : TJsonArray;
   relsArr : TJsonArray;
@@ -657,13 +733,29 @@ begin
       Delete(uuidPart, 1, Length('urn:uuid:'));
     if uuidPart = '' then
       uuidPart := 'unknown';
+    //Must be a unique absolute URI with no fragment. Uniqueness comes from the serial;
+    //the prefix is a domain the project actually owns, per SPDX guidance.
     root.S['documentNamespace'] :=
-      'https://dpm-cli/' + report.ProjectName + '/' + DPMPlatformToString(report.Platform) + '/' + uuidPart;
+      cSpdxNamespacePrefix + Slugify(report.ProjectName) + '-' +
+      DPMPlatformToString(report.Platform) + '-' + uuidPart;
 
     creationInfo := root.O['creationInfo'];
     creationInfo.S['created'] := report.TimestampUtc;
     creatorsArr := creationInfo.A['creators'];
     creatorsArr.Add('Tool: ' + report.ToolName + '-' + report.ToolVersion);
+    //Tells consumers which SPDX license list our licenseDeclared ids were validated against.
+    SetStringIfNotEmpty(creationInfo, 'licenseListVersion', TSpdxLicenses.LicenseListVersion);
+
+    //Platform, compiler and any report-level notes have no home in the SPDX document
+    //structure - CycloneDX carries them in metadata.properties[]. Without these the
+    //compiler version is lost outright and the platform survives only in the name.
+    docAnnotations := root.A['annotations'];
+    if report.Platform <> TDPMPlatform.UnknownPlatform then
+      AddDocAnnotation(docAnnotations, report, 'dpm:platform=' + DPMPlatformToString(report.Platform));
+    if report.CompilerVersion <> TCompilerVersion.UnknownVersion then
+      AddDocAnnotation(docAnnotations, report, 'dpm:compilerVersion=' + CompilerToString(report.CompilerVersion));
+    for metaProp in report.MetaProperties do
+      AddDocAnnotation(docAnnotations, report, metaProp.Name + '=' + metaProp.Value);
 
     //Root component (the project) is a Package too. Without it the SPDX DOCUMENT DESCRIBES
     //relationship has nothing to point at.

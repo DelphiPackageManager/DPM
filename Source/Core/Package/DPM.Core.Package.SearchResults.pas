@@ -148,6 +148,7 @@ implementation
 
 uses
   System.SysUtils,
+  DPM.Core.Git.Interfaces,
   DPM.Core.Package.Dependency;
 
 procedure SplitCsvIntoList(const csv : string; const target : IList<string>);
@@ -227,7 +228,8 @@ begin
   FRepositoryUrl    := jsonObject.S['repositoryUrl'];
   FRepositoryType   := jsonObject.S['repositoryType'];
   FRepositoryBranch := jsonObject.S['repositoryBranch'];
-  FRepositoryCommit := jsonObject.S['repositoryCommit'];
+  //see the note in TSpecMetaData - strip any 'Id:' keyword decoration on the way in.
+  FRepositoryCommit := TGitUtils.NormalizeCommitId(jsonObject.S['repositoryCommit']);
   FReportUrl        := jsonObject.S['reportUrl'];
 
   if jsonObject.Contains('platforms') then

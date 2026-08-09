@@ -116,6 +116,7 @@ implementation
 
 uses
   System.SysUtils,
+  DPM.Core.Git.Interfaces,
   DPM.Core.Packaging.IdValidator;
 
 { TSpecMetaData }
@@ -330,7 +331,9 @@ begin
   FRepositoryUrl := yamlObject.S['repositoryUrl'];
   FRepositoryType := yamlObject.S['repositoryType'];
   FRepositoryBranch := yamlObject.S['repositoryBranch'];
-  FRepositoryCommit := yamlObject.S['repositoryCommit'];
+  //published dspecs routinely carry the commit with its keyword decoration still attached
+  //('Id:<sha>'), which would travel into purls and SBOM download locations as-is.
+  FRepositoryCommit := TGitUtils.NormalizeCommitId(yamlObject.S['repositoryCommit']);
   FReleaseNotes := yamlObject.S['releaseNotes'];
   FLicense := yamlObject.S['license'];
   FIcon := yamlObject.S['icon'];

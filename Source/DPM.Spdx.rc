@@ -10,10 +10,19 @@
 // Linked by DPM.Core.Utils.Spdx via a `{$R}` directive - see that unit for
 // the resource name and type the loader expects (DPM_SPDX_LICENSES, RCDATA).
 //
+// The first line of spdx-licenses.txt is 'SPDXLicenseListVersion=<release>' - the published
+// SPDX license list release the file was generated from. DPM.Core.Utils.Spdx lifts it out
+// of the list and SPDX documents declare it as creationInfo.licenseListVersion.
+//
 // Update flow:
-//   1. Regenerate spdx-licenses.txt with the SPDXProcessor tool.
-//   2. Rebuild - Delphi compiles this .rc on demand via brcc32.
-//   3. Ship.
+//   1. Regenerate spdx-licenses.txt (ids + names + urls) from a published SPDX license list
+//      release, keeping the version header, CRLF line endings and the ANSI/CP1252 encoding
+//      the loader expects.
+//   2. Recompile the resource BY HAND:  brcc32 DPM.Spdx.rc -foDPM.Spdx.res
+//      Nothing does this for you - DPM.Spdx.RES is a checked-in binary and no .dproj lists
+//      this .rc, so an msbuild (or IDE) build just links whatever .res is already on disk.
+//      Editing the .txt alone leaves the previous license list silently embedded.
+//   3. Commit the regenerated DPM.Spdx.RES alongside spdx-licenses.txt, then ship.
 // ---------------------------------------------------------------------------
 
 DPM_SPDX_LICENSES RCDATA "spdx-licenses.txt"

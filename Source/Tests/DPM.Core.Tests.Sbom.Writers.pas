@@ -20,6 +20,8 @@ type
     //round-trips a single licence string through the SPDX writer and returns the
     //licenseDeclared value it produced for the component carrying it.
     function SpdxLicenseDeclaredFor(const license : string) : string;
+    //writes the report with the SPDX writer and returns the parsed document - caller frees
+    function WriteSpdxAndParse(const report : TSBOMReport) : TJsonObject;
   public
     [Test]
     procedure CycloneDX_EmitsRequiredFields;
@@ -47,6 +49,26 @@ type
     procedure SPDX_SpdxLicenseIdIsDeclaredVerbatim;
     [Test]
     procedure SPDX_CompoundLicenseExpressionIsDeclared;
+    [Test]
+    procedure SPDX_PrimaryPackagePurposeReflectsComponentKind;
+    [Test]
+    procedure SPDX_ComponentKindIsAnnotated;
+    [Test]
+    procedure SPDX_DocumentAnnotatesPlatformCompilerAndMetaProperties;
+    [Test]
+    procedure SPDX_AuthorsBecomeOriginatorNotSupplier;
+    [Test]
+    procedure SPDX_SupplierIsUsedWhenPresent;
+    [Test]
+    procedure SPDX_RepositoryBecomesDownloadLocationWhenNoDownloadUrl;
+    [Test]
+    procedure SPDX_DownloadUrlWinsAndRepositoryGoesToSourceInfo;
+    [Test]
+    procedure SPDX_AnnotatorCarriesToolVersion;
+    [Test]
+    procedure SPDX_CreationInfoDeclaresLicenseListVersion;
+    [Test]
+    procedure SPDX_DocumentNamespaceIsUnderTheProjectDomain;
   end;
 
 implementation
@@ -56,6 +78,7 @@ uses
   System.IOUtils,
   System.Classes,
   DPM.Core.Types,
+  DPM.Core.Utils.Spdx,
   DPM.Core.SBOM.Interfaces,
   DPM.Core.SBOM.Writers;
 
@@ -196,6 +219,50 @@ begin
   finally
     report.Free;
   end;
+end;
+
+function TSBOMWritersTests.WriteSpdxAndParse(const report : TSBOMReport) : TJsonObject;
+var
+  writer : ISbomWriter;
+  outPath : string;
+begin
+  writer := TSPDXWriter.Create;
+  outPath := NewTempPath('.spdx.json');
+  try
+    writer.Write(report, outPath);
+    result := TJsonObject.Parse(ReadAllText(outPath)) as TJsonObject;
+  finally
+    if FileExists(outPath) then
+      DeleteFile(outPath);
+  end;
+end;
+
+//finds the packages[] entry with the given name, nil when absent.
+function FindSpdxPackage(const doc : TJsonObject; const name : string) : TJsonObject;
+var
+  packages : TJsonArray;
+  i : integer;
+begin
+  result := nil;
+  packages := doc.A['packages'];
+  for i := 0 to packages.Count - 1 do
+    if packages.O[i].S['name'] = name then
+      exit(packages.O[i]);
+end;
+
+//true when obj (a package or the document) carries an annotation with this comment.
+function HasAnnotation(const obj : TJsonObject; const comment : string) : boolean;
+var
+  annotations : TJsonArray;
+  i : integer;
+begin
+  result := false;
+  if not obj.Contains('annotations') then
+    exit;
+  annotations := obj.A['annotations'];
+  for i := 0 to annotations.Count - 1 do
+    if annotations.O[i].S['comment'] = comment then
+      exit(true);
 end;
 
 procedure TSBOMWritersTests.CycloneDX_EmitsRequiredFields;
@@ -546,6 +613,230 @@ end;
 procedure TSBOMWritersTests.SPDX_CompoundLicenseExpressionIsDeclared;
 begin
   Assert.AreEqual('MIT OR Apache-2.0', SpdxLicenseDeclaredFor('MIT OR Apache-2.0'));
+end;
+
+procedure TSBOMWritersTests.SPDX_PrimaryPackagePurposeReflectsComponentKind;
+var
+  report : TSBOMReport;
+  doc : TJsonObject;
+begin
+  //SPDX 2.3 primaryPackagePurpose is the closest first-class equivalent of the CycloneDX
+  //component type - without it an SPDX consumer cannot tell the Delphi runtime from a package.
+  report := BuildSampleReport;
+  try
+    doc := WriteSpdxAndParse(report);
+    try
+      Assert.AreEqual('APPLICATION', FindSpdxPackage(doc, 'SampleProject').S['primaryPackagePurpose'], false);
+      Assert.AreEqual('LIBRARY', FindSpdxPackage(doc, 'Spring.Base').S['primaryPackagePurpose'], false);
+      Assert.AreEqual('FRAMEWORK', FindSpdxPackage(doc, 'Delphi RTL/VCL/FMX').S['primaryPackagePurpose'], false);
+    finally
+      doc.Free;
+    end;
+  finally
+    report.Free;
+  end;
+end;
+
+procedure TSBOMWritersTests.SPDX_ComponentKindIsAnnotated;
+var
+  report : TSBOMReport;
+  doc : TJsonObject;
+begin
+  //primaryPackagePurpose collapses dpm-package / third-party / unidentified into LIBRARY,
+  //so the DPM kind rides along as an annotation - the same information CycloneDX keeps
+  //in the dpm:component-kind property.
+  report := BuildSampleReport;
+  try
+    doc := WriteSpdxAndParse(report);
+    try
+      Assert.IsTrue(HasAnnotation(FindSpdxPackage(doc, 'Spring.Base'), 'dpm:component-kind=dpm-package'),
+                    'expected dpm:component-kind annotation on the package');
+      Assert.IsTrue(HasAnnotation(FindSpdxPackage(doc, 'Delphi RTL/VCL/FMX'), 'dpm:component-kind=delphi-runtime'),
+                    'expected dpm:component-kind annotation on the runtime');
+    finally
+      doc.Free;
+    end;
+  finally
+    report.Free;
+  end;
+end;
+
+procedure TSBOMWritersTests.SPDX_DocumentAnnotatesPlatformCompilerAndMetaProperties;
+var
+  report : TSBOMReport;
+  doc : TJsonObject;
+begin
+  //The CycloneDX writer puts these in metadata.properties[]. SPDX has no properties bag at
+  //document level, so they become document annotations - otherwise the compiler version and
+  //any evidence notes are lost entirely and the platform survives only in the document name.
+  report := BuildSampleReport;
+  try
+    report.AddMetaProperty('dpm:evidence.note', 'map-file-no-source-paths');
+    doc := WriteSpdxAndParse(report);
+    try
+      Assert.IsTrue(HasAnnotation(doc, 'dpm:platform=win64'), 'expected dpm:platform document annotation');
+      Assert.IsTrue(HasAnnotation(doc, 'dpm:compilerVersion=delphi12.0'), 'expected dpm:compilerVersion document annotation');
+      Assert.IsTrue(HasAnnotation(doc, 'dpm:evidence.note=map-file-no-source-paths'),
+                    'expected report meta properties to reach the document');
+    finally
+      doc.Free;
+    end;
+  finally
+    report.Free;
+  end;
+end;
+
+procedure TSBOMWritersTests.SPDX_AuthorsBecomeOriginatorNotSupplier;
+var
+  report : TSBOMReport;
+  doc : TJsonObject;
+  pkg : TJsonObject;
+begin
+  //SPDX splits these: supplier is who distributed the package, originator is who created it.
+  //Spring.Base in the sample has authors but no supplier.
+  report := BuildSampleReport;
+  try
+    doc := WriteSpdxAndParse(report);
+    try
+      pkg := FindSpdxPackage(doc, 'Spring.Base');
+      Assert.AreEqual('Organization: Spring4D Team', pkg.S['originator']);
+      Assert.AreEqual('NOASSERTION', pkg.S['supplier'], 'authors must not be asserted as the supplier');
+    finally
+      doc.Free;
+    end;
+  finally
+    report.Free;
+  end;
+end;
+
+procedure TSBOMWritersTests.SPDX_SupplierIsUsedWhenPresent;
+var
+  report : TSBOMReport;
+  doc : TJsonObject;
+  pkg : TJsonObject;
+begin
+  report := BuildSampleReport;
+  try
+    doc := WriteSpdxAndParse(report);
+    try
+      //the runtime component carries a supplier and no authors
+      pkg := FindSpdxPackage(doc, 'Delphi RTL/VCL/FMX');
+      Assert.AreEqual('Organization: Embarcadero Technologies', pkg.S['supplier']);
+      Assert.IsFalse(pkg.Contains('originator'), 'no authors means no originator');
+    finally
+      doc.Free;
+    end;
+  finally
+    report.Free;
+  end;
+end;
+
+procedure TSBOMWritersTests.SPDX_RepositoryBecomesDownloadLocationWhenNoDownloadUrl;
+var
+  report : TSBOMReport;
+  doc : TJsonObject;
+  pkg : TJsonObject;
+begin
+  //Spring.Base has a repository url + commit and no download url. SPDX accepts VCS syntax
+  //in downloadLocation, so 'NOASSERTION' would be throwing away something we know.
+  report := BuildSampleReport;
+  try
+    doc := WriteSpdxAndParse(report);
+    try
+      pkg := FindSpdxPackage(doc, 'Spring.Base');
+      Assert.AreEqual('git+https://github.com/spring4d/spring4d@abc123', pkg.S['downloadLocation']);
+    finally
+      doc.Free;
+    end;
+  finally
+    report.Free;
+  end;
+end;
+
+procedure TSBOMWritersTests.SPDX_DownloadUrlWinsAndRepositoryGoesToSourceInfo;
+var
+  report : TSBOMReport;
+  doc : TJsonObject;
+  pkg : TJsonObject;
+begin
+  report := BuildSampleReport;
+  try
+    report.Components[0].DownloadUrl := 'https://cdn.example.com/spring.base-2.0.2.dpkg';
+    doc := WriteSpdxAndParse(report);
+    try
+      pkg := FindSpdxPackage(doc, 'Spring.Base');
+      Assert.AreEqual('https://cdn.example.com/spring.base-2.0.2.dpkg', pkg.S['downloadLocation']);
+      Assert.AreEqual('git+https://github.com/spring4d/spring4d@abc123', pkg.S['sourceInfo'],
+                      'the repository location should still be recorded');
+    finally
+      doc.Free;
+    end;
+  finally
+    report.Free;
+  end;
+end;
+
+procedure TSBOMWritersTests.SPDX_AnnotatorCarriesToolVersion;
+var
+  report : TSBOMReport;
+  doc : TJsonObject;
+  pkg : TJsonObject;
+begin
+  //SPDX wants the same 'Tool: <id>-<version>' identifier used in creationInfo.creators.
+  report := BuildSampleReport;
+  try
+    doc := WriteSpdxAndParse(report);
+    try
+      pkg := FindSpdxPackage(doc, 'Spring.Base');
+      Assert.AreEqual('Tool: dpm-1.0.0', pkg.A['annotations'].O[0].S['annotator']);
+    finally
+      doc.Free;
+    end;
+  finally
+    report.Free;
+  end;
+end;
+
+procedure TSBOMWritersTests.SPDX_CreationInfoDeclaresLicenseListVersion;
+var
+  report : TSBOMReport;
+  doc : TJsonObject;
+begin
+  report := BuildSampleReport;
+  try
+    doc := WriteSpdxAndParse(report);
+    try
+      Assert.AreEqual(TSpdxLicenses.LicenseListVersion, doc.O['creationInfo'].S['licenseListVersion'], false);
+    finally
+      doc.Free;
+    end;
+  finally
+    report.Free;
+  end;
+end;
+
+procedure TSBOMWritersTests.SPDX_DocumentNamespaceIsUnderTheProjectDomain;
+var
+  report : TSBOMReport;
+  doc : TJsonObject;
+  ns : string;
+begin
+  report := BuildSampleReport;
+  try
+    doc := WriteSpdxAndParse(report);
+    try
+      ns := doc.S['documentNamespace'];
+      Assert.StartsWith('https://github.com/DelphiPackageManager/DPM/spdxdocs/', ns,
+                        'the namespace should sit under a domain the project actually owns');
+      //uniqueness still comes from the report serial number
+      Assert.IsTrue(Pos('11111111-2222-3333-4444-555555555555', ns) > 0, 'expected the serial in the namespace');
+      Assert.IsFalse(Pos('#', ns) > 0, 'SPDX forbids a fragment in documentNamespace');
+    finally
+      doc.Free;
+    end;
+  finally
+    report.Free;
+  end;
 end;
 
 initialization
