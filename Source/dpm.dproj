@@ -249,6 +249,7 @@
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Numbers.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Path.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Process.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Spdx.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Strings.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.System.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.XML.pas"/>

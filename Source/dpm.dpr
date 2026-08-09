@@ -135,6 +135,7 @@ uses
   DPM.Core.Utils.Numbers in 'Core\Utils\DPM.Core.Utils.Numbers.pas',
   DPM.Core.Utils.Path in 'Core\Utils\DPM.Core.Utils.Path.pas',
   DPM.Core.Utils.Process in 'Core\Utils\DPM.Core.Utils.Process.pas',
+  DPM.Core.Utils.Spdx in 'Core\Utils\DPM.Core.Utils.Spdx.pas',
   DPM.Core.Utils.Strings in 'Core\Utils\DPM.Core.Utils.Strings.pas',
   DPM.Core.Utils.System in 'Core\Utils\DPM.Core.Utils.System.pas',
   DPM.Core.Utils.XML in 'Core\Utils\DPM.Core.Utils.XML.pas',

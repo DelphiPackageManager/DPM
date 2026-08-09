@@ -1243,7 +1243,7 @@ var
   option : IOptionDefinition;
 begin
   cmd := TOptionsRegistry.RegisterCommand('sbom', '', 'Generates a Software Bill of Materials (SBOM) for the project.',
-                                                      'Emits CycloneDX 1.5 JSON and / or SPDX 2.3 JSON for each enabled platform. ' +
+                                                      'Emits CycloneDX 1.6 JSON and / or SPDX 2.3 JSON for each enabled platform. ' +
                                                       'For non-DPM library detection, ensure the linker option "Map file = Detailed" is enabled in the build configuration you point at.',
                                                       'sbom <project> [-outdir=<dir>] [-format=cyclonedx|spdx|both] [-platforms=<csv>] [-config=<name>] [-map=<path>] [-no-runtime] [-strict]');
 
@@ -1438,7 +1438,7 @@ var
 begin
   cmd := TOptionsRegistry.RegisterCommand('scan', '', 'Scans a CycloneDX SBOM or a .dproj/.groupproj for known vulnerabilities (OSV).',
                                                       'Reads the input SBOM (or generates one from the project), queries the Open Source Vulnerabilities database ' +
-                                                      '(https://api.osv.dev), and writes a CycloneDX 1.5 VEX report. Responses are cached for 24 hours under ' +
+                                                      '(https://api.osv.dev), and writes a CycloneDX 1.6 VEX report. Responses are cached for 24 hours under ' +
                                                       '%APPDATA%\.dpm\vuln-cache. Use -fail-on=high (or critical/medium/low) to fail the build in CI when a serious vuln is found.',
                                                       'scan <sbom-or-project> [-output=<path>] [-fail-on=none|low|medium|high|critical] [-no-cache] [-source=osv] [-platforms=<csv>] [-config=<name>]');
 

@@ -25,6 +25,10 @@ type
     procedure ReadsHashesAndPurl;
     [Test]
     procedure RoundTripsWriterOutput;
+    [Test]
+    procedure ReadsToolsFromObjectForm;
+    [Test]
+    procedure ReadsLicenseExpression;
   end;
 
 implementation
@@ -281,6 +285,47 @@ begin
       if FileExists(tempFile) then
         TFile.Delete(tempFile);
     end;
+  finally
+    report.Free;
+  end;
+end;
+
+procedure TSBOMReaderTests.ReadsToolsFromObjectForm;
+const
+  cToolsObjectForm =
+    '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,' +
+    '"metadata":{"tools":{"components":[' +
+      '{"type":"application","name":"dpm","version":"2.0.0","publisher":"DPM"}]}}}';
+var
+  reader : ISBOMReader;
+  report : TSBOMReport;
+begin
+  //CycloneDX 1.6 metadata.tools is an object with components[]; the legacy array form
+  //(covered by ReadsBomFormatAndVersion) must keep working too.
+  reader := TCycloneDXReader.Create;
+  report := reader.ReadFromString(cToolsObjectForm);
+  try
+    Assert.AreEqual('dpm', report.ToolName);
+    Assert.AreEqual('2.0.0', report.ToolVersion);
+  finally
+    report.Free;
+  end;
+end;
+
+procedure TSBOMReaderTests.ReadsLicenseExpression;
+const
+  cExpressionLicense =
+    '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,' +
+    '"components":[{"type":"library","bom-ref":"a","name":"foo","version":"1.0",' +
+      '"licenses":[{"expression":"MIT OR Apache-2.0"}]}]}';
+var
+  reader : ISBOMReader;
+  report : TSBOMReport;
+begin
+  reader := TCycloneDXReader.Create;
+  report := reader.ReadFromString(cExpressionLicense);
+  try
+    Assert.AreEqual('MIT OR Apache-2.0', report.Components[0].License);
   finally
     report.Free;
   end;

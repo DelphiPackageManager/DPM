@@ -45,6 +45,11 @@ type
   public
     /// <summary>True when id is a known SPDX license id (case-insensitive).</summary>
     class function IsValidLicenseId(const id : string) : boolean; static;
+    /// <summary>Looks the id up case-insensitively and returns it in the canonical
+    /// SPDX spelling. Callers that emit into a case sensitive schema enum
+    /// (CycloneDX licenses[].license.id, SPDX licenseDeclared) need this rather
+    /// than whatever casing the .dspec happened to use.</summary>
+    class function TryGetCanonicalLicenseId(const id : string; out canonicalId : string) : boolean; static;
     /// <summary>Reference url for the id, or '' when the id is unknown.</summary>
     class function GetLicenseUrl(const id : string) : string; static;
     /// <summary>Human readable name for the id, or '' when the id is unknown.</summary>
@@ -121,6 +126,26 @@ end;
 class function TSpdxLicenses.IsValidLicenseId(const id : string) : boolean;
 begin
   result := LookupValue(id) <> '';
+end;
+
+class function TSpdxLicenses.TryGetCanonicalLicenseId(const id : string; out canonicalId : string) : boolean;
+var
+  idx : integer;
+  trimmed : string;
+begin
+  result := false;
+  canonicalId := '';
+  trimmed := Trim(id);
+  if trimmed = '' then
+    exit;
+  EnsureLoaded;
+  //TStringList.IndexOfName is case-insensitive (CaseSensitive defaults false), so this
+  //matches 'mit' and hands back the list's own spelling - 'MIT'.
+  idx := GSpdxList.IndexOfName(trimmed);
+  if idx = -1 then
+    exit;
+  canonicalId := GSpdxList.Names[idx];
+  result := canonicalId <> '';
 end;
 
 class function TSpdxLicenses.GetLicenseUrl(const id : string) : string;

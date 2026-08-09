@@ -21,6 +21,8 @@ type
     [Test] procedure GetLicenseUrl_UnknownId_ReturnsEmpty;
     [Test] procedure GetLicenseName_KnownId_ReturnsName;
     [Test] procedure GetLicenseIds_PopulatesList;
+    [Test] procedure TryGetCanonicalLicenseId_ReturnsCanonicalCasing;
+    [Test] procedure TryGetCanonicalLicenseId_UnknownId_ReturnsFalse;
   end;
 
 implementation
@@ -70,6 +72,32 @@ end;
 procedure TSpdxLicensesTests.GetLicenseName_KnownId_ReturnsName;
 begin
   Assert.AreEqual('MIT License', TSpdxLicenses.GetLicenseName('MIT'));
+end;
+
+procedure TSpdxLicensesTests.TryGetCanonicalLicenseId_ReturnsCanonicalCasing;
+var
+  canonical : string;
+begin
+  //CycloneDX licenses[].license.id is a case sensitive enum, so callers need the
+  //canonical spelling back, not whatever casing the .dspec happened to use.
+  //note the explicit ignoreCase=false - DUnitX string comparisons ignore case by default,
+  //which would make these assertions vacuous.
+  Assert.IsTrue(TSpdxLicenses.TryGetCanonicalLicenseId('apache-2.0', canonical));
+  Assert.AreEqual('Apache-2.0', canonical, false);
+  Assert.IsTrue(TSpdxLicenses.TryGetCanonicalLicenseId('mit', canonical));
+  Assert.AreEqual('MIT', canonical, false);
+  Assert.IsTrue(TSpdxLicenses.TryGetCanonicalLicenseId('  MIT  ', canonical));
+  Assert.AreEqual('MIT', canonical, false);
+end;
+
+procedure TSpdxLicensesTests.TryGetCanonicalLicenseId_UnknownId_ReturnsFalse;
+var
+  canonical : string;
+begin
+  Assert.IsFalse(TSpdxLicenses.TryGetCanonicalLicenseId('Apache 2.0', canonical));
+  Assert.AreEqual('', canonical);
+  Assert.IsFalse(TSpdxLicenses.TryGetCanonicalLicenseId('', canonical));
+  Assert.AreEqual('', canonical);
 end;
 
 procedure TSpdxLicensesTests.GetLicenseIds_PopulatesList;

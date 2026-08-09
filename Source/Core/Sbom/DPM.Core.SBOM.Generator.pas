@@ -126,6 +126,7 @@ uses
   DPM.Core.Compiler.ProjectSettings,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Dependency.Version,
+  DPM.Core.Utils.Path,
   DPM.Core.Utils.Strings;
 
 const
@@ -606,7 +607,11 @@ begin
   if FPackageCache.Location = '' then
     FPackageCache.Location := config.PackageCacheLocation;
 
-  projPath := options.ProjectPath;
+  //Normalise up front: everything downstream (ExtractFileName for the output base name,
+  //ExtractFilePath for the default output dir, ResolveAgainstDproj for group members)
+  //assumes an absolute path using PathDelim. A command line 'sbom ../Source/X.dproj' or
+  //'sbom i:/src/X.dproj' otherwise leaks its separators into the output file name.
+  projPath := TPathUtils.ToAbsolutePath(options.ProjectPath);
   if not FileExists(projPath) then
   begin
     FLogger.Error('Project file not found : ' + projPath);
@@ -753,7 +758,9 @@ begin
   if configName = '' then
     configName := 'Release';
 
-  outDir := options.OutputDir;
+  //--outdir is user supplied, so it gets the same treatment as the project path. A relative
+  //outdir resolves against the current directory, not the project directory.
+  outDir := TPathUtils.ToAbsolutePath(options.OutputDir);
   if outDir = '' then
     outDir := ExtractFilePath(projectPath);
   outDir := ExcludeTrailingPathDelimiter(outDir);
@@ -881,7 +888,7 @@ begin
   end;
 
   groupName := ChangeFileExt(ExtractFileName(groupProjPath), '');
-  outDir := options.OutputDir;
+  outDir := TPathUtils.ToAbsolutePath(options.OutputDir);
   if outDir = '' then
     outDir := ExtractFilePath(groupProjPath);
   outDir := ExcludeTrailingPathDelimiter(outDir);
@@ -1483,7 +1490,9 @@ begin
   cacheRoot := FPackageCache.PackagesFolder;
 
   if options.MapFile <> '' then
-    mapPath := options.MapFile
+    //--map is user supplied too; resolve it against the dproj directory rather than the
+    //current directory, which is what someone typing a relative map path means.
+    mapPath := TPathUtils.ToAbsolutePath(options.MapFile, dprojDir)
   else
   begin
     //Prefer the OutputDir recorded in the project's per-(config,platform) configuration.

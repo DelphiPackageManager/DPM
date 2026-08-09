@@ -56,6 +56,21 @@ type
     [TestCase('StrayPrefix', 'foo.dspecbak,False')]
     procedure TestIsDspecFile(const fileName : string; const expected : boolean);
 
+    [Test]
+    [TestCase('RelativeForwardSlash', 'c:\proj,sub/x.dproj,c:\proj\sub\x.dproj')]
+    [TestCase('RelativeParentForwardSlash', 'c:\proj\build,../Source/X.dproj,c:\proj\Source\X.dproj')]
+    [TestCase('RelativeDotSlash', 'c:\proj,./X.dproj,c:\proj\X.dproj')]
+    [TestCase('RelativeBackslash', 'c:\proj,sub\x.dproj,c:\proj\sub\x.dproj')]
+    [TestCase('RootedBackslash', 'c:\proj,d:\abs\X.dproj,d:\abs\X.dproj')]
+    //the case that broke `dpm sbom --outdir` - a rooted path written with posix separators
+    //is not matched by IsPathRooted, so it used to get appended to the base.
+    [TestCase('RootedForwardSlash', 'c:\proj,d:/other/X.dproj,d:\other\X.dproj')]
+    [TestCase('BaseTrailingDelimiter', 'c:\proj\,sub/x.dproj,c:\proj\sub\x.dproj')]
+    [TestCase('UNCBase', '\\srv\share,sub/x.dproj,\\srv\share\sub\x.dproj')]
+    procedure TestToAbsolutePath(const base, input, expected : string);
+
+    [Test]
+    procedure TestToAbsolutePath_Empty_ReturnsEmpty;
   end;
 
 implementation
@@ -107,6 +122,17 @@ begin
   Assert.AreEqual('', TPathUtils.GlobBaseDir('./*.pas'));
   Assert.AreEqual('', TPathUtils.GlobBaseDir('*.pas'));
   Assert.AreEqual('', TPathUtils.GlobBaseDir('./LICENSE'));
+end;
+
+procedure TPathUtilsTests.TestToAbsolutePath(const base, input, expected : string);
+begin
+  Assert.AreEqual(Trim(expected), TPathUtils.ToAbsolutePath(Trim(input), Trim(base)));
+end;
+
+procedure TPathUtilsTests.TestToAbsolutePath_Empty_ReturnsEmpty;
+begin
+  Assert.AreEqual('', TPathUtils.ToAbsolutePath('', 'c:\proj'));
+  Assert.AreEqual('', TPathUtils.ToAbsolutePath('   ', 'c:\proj'));
 end;
 
 procedure TPathUtilsTests.TestIsDspecFile(const fileName : string; const expected : boolean);

@@ -55,7 +55,7 @@ type
   end;
 
   ///<summary>Inverse of ISbomWriter for the CycloneDX format - parses an existing
-  /// CycloneDX 1.5 JSON document back into a TSBOMReport so dpm scan can consume
+  /// CycloneDX 1.6 JSON document back into a TSBOMReport so dpm scan can consume
   /// SBOMs the user (or someone else) generated previously. Caller owns the returned
   /// report.</summary>
   ISBOMReader = interface

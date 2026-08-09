@@ -19,6 +19,10 @@ type
     procedure SourceObjectIsPickedFromIdPrefix;
     [Test]
     procedure CycloneDXBomFormatAndSpecVersionAreSet;
+    [Test]
+    procedure SourceSbomSerialEmittedAsMetadataProperty;
+    [Test]
+    procedure ToolsEmittedAsComponentsObject;
   end;
 
 implementation
@@ -274,7 +278,110 @@ begin
         obj := ReadVexJsonToObject(outFile);
         try
           Assert.AreEqual('CycloneDX', obj.S['bomFormat']);
-          Assert.AreEqual('1.5', obj.S['specVersion']);
+          Assert.AreEqual('1.6', obj.S['specVersion']);
+        finally
+          obj.Free;
+        end;
+      finally
+        if FileExists(outFile) then TFile.Delete(outFile);
+      end;
+    finally
+      vuln.Free;
+    end;
+  finally
+    sbom.Free;
+  end;
+end;
+
+procedure TCycloneDxVexWriterTests.SourceSbomSerialEmittedAsMetadataProperty;
+var
+  sbom : TSBOMReport;
+  comp : TSBOMComponent;
+  vuln : TVulnReport;
+  writer : IVulnWriter;
+  outFile : string;
+  obj : TJsonObject;
+  meta : TJsonObject;
+  props : TJsonArray;
+  i : integer;
+  found : string;
+begin
+  //metadata is additionalProperties:false in the schema, so the source SBOM serial
+  //has to travel as a metadata property rather than an invented metadata field.
+  sbom := MakeSbom(comp);
+  try
+    vuln := TVulnReport.Create;
+    try
+      vuln.SerialNumber := 'urn:uuid:00000000-0000-0000-0000-000000000000';
+      vuln.TimestampUtc := '2026-05-19T12:00:00Z';
+      vuln.ToolName := 'dpm-scan';
+      vuln.ToolVersion := '1.0.0';
+      vuln.SourceSbomSerial := sbom.SerialNumber;
+
+      outFile := IncludeTrailingPathDelimiter(TPath.GetTempPath) + 'vex-serial.json';
+      writer := TCycloneDxVexWriter.Create;
+      writer.Write(sbom, vuln, outFile);
+      try
+        obj := ReadVexJsonToObject(outFile);
+        try
+          meta := obj.O['metadata'];
+          Assert.IsFalse(meta.Contains('sourceSbomSerialNumber'),
+                         'sourceSbomSerialNumber is not a CycloneDX metadata field');
+          Assert.IsTrue(meta.Contains('properties'), 'expected metadata.properties');
+          props := meta.A['properties'];
+          found := '';
+          for i := 0 to props.Count - 1 do
+            if props.O[i].S['name'] = 'dpm:sourceSbomSerialNumber' then
+              found := props.O[i].S['value'];
+          Assert.AreEqual(sbom.SerialNumber, found,
+                          'expected dpm:sourceSbomSerialNumber metadata property');
+        finally
+          obj.Free;
+        end;
+      finally
+        if FileExists(outFile) then TFile.Delete(outFile);
+      end;
+    finally
+      vuln.Free;
+    end;
+  finally
+    sbom.Free;
+  end;
+end;
+
+procedure TCycloneDxVexWriterTests.ToolsEmittedAsComponentsObject;
+var
+  sbom : TSBOMReport;
+  comp : TSBOMComponent;
+  vuln : TVulnReport;
+  writer : IVulnWriter;
+  outFile : string;
+  obj : TJsonObject;
+  tools : TJsonObject;
+  toolComp : TJsonObject;
+begin
+  sbom := MakeSbom(comp);
+  try
+    vuln := TVulnReport.Create;
+    try
+      vuln.ToolName := 'dpm-scan';
+      vuln.ToolVersion := '1.0.0';
+
+      outFile := IncludeTrailingPathDelimiter(TPath.GetTempPath) + 'vex-tools.json';
+      writer := TCycloneDxVexWriter.Create;
+      writer.Write(sbom, vuln, outFile);
+      try
+        obj := ReadVexJsonToObject(outFile);
+        try
+          Assert.AreEqual(Ord(jdtObject), Ord(obj.O['metadata'].Types['tools']),
+                          'metadata.tools should be an object, not the deprecated array');
+          tools := obj.O['metadata'].O['tools'];
+          Assert.AreEqual<integer>(1, tools.A['components'].Count);
+          toolComp := tools.A['components'].O[0];
+          Assert.AreEqual('application', toolComp.S['type']);
+          Assert.AreEqual('dpm-scan', toolComp.S['name']);
+          Assert.AreEqual('1.0.0', toolComp.S['version']);
+          Assert.AreEqual('DPM', toolComp.S['publisher']);
         finally
           obj.Free;
         end;

@@ -26,7 +26,7 @@
 
 unit DPM.Core.SBOM.Reader;
 
-{ Inverse of TCycloneDXWriter - reads a CycloneDX 1.5 JSON document back into
+{ Inverse of TCycloneDXWriter - reads a CycloneDX 1.6 JSON document back into
   a TSBOMReport. Used by dpm scan when the user hands us an existing SBOM file
   instead of a project. Best-effort kind inference for SBOMs not produced by
   DPM (we look for the dpm:component-kind property first; fall back to mapping
@@ -282,6 +282,8 @@ begin
     if licensesArr.Count > 0 then
     begin
       licWrap := licensesArr.O[0];
+      //Either {license:{id|name}} or a lone {expression} - the two are mutually exclusive
+      //in the schema, and both collapse to our single free-form License string.
       if licWrap.Contains('license') then
       begin
         licInner := licWrap.O['license'];
@@ -289,7 +291,9 @@ begin
           comp.License := licInner.S['id']
         else if licInner.Contains('name') then
           comp.License := licInner.S['name'];
-      end;
+      end
+      else if licWrap.Contains('expression') then
+        comp.License := licWrap.S['expression'];
     end;
   end;
 
@@ -391,6 +395,7 @@ var
   purl : string;
   kind : TSBOMComponentKind;
   toolsArr : TJsonArray;
+  toolsObj : TJsonObject;
   toolObj : TJsonObject;
   bomFormat : string;
   specVersion : string;
@@ -432,8 +437,19 @@ begin
 
         if meta.Contains('tools') and (not meta.IsNull('tools')) then
         begin
-          toolsArr := meta.A['tools'];
-          if toolsArr.Count > 0 then
+          //1.6 writes metadata.tools as an object with components[]; 1.4 / 1.5 wrote a flat
+          //array of tool objects. Both still occur in the wild, so accept either.
+          toolsArr := nil;
+          if meta.Types['tools'] = jdtObject then
+          begin
+            toolsObj := meta.O['tools'];
+            if toolsObj.Contains('components') and (not toolsObj.IsNull('components')) then
+              toolsArr := toolsObj.A['components'];
+          end
+          else if meta.Types['tools'] = jdtArray then
+            toolsArr := meta.A['tools'];
+
+          if (toolsArr <> nil) and (toolsArr.Count > 0) then
           begin
             toolObj := toolsArr.O[0];
             if toolObj.Contains('name') then

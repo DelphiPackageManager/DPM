@@ -26,7 +26,7 @@
 
 unit DPM.Core.SBOM.Writers;
 
-{ CycloneDX 1.5 JSON and SPDX 2.3 JSON writers.
+{ CycloneDX 1.6 JSON and SPDX 2.3 JSON writers.
 
   Both formats are described at https://cyclonedx.org/specification/overview/
   and https://spdx.github.io/spdx-spec/v2.3/. JSON emission uses
@@ -63,12 +63,13 @@ uses
   System.StrUtils,
   Spring.Collections,
   JsonDataObjects,
-  DPM.Core.Types;
+  DPM.Core.Types,
+  DPM.Core.Utils.Spdx;
 
 const
   cNoAssertion = 'NOASSERTION';
 
-//Normalises a hash algorithm name to the CycloneDX hashAlg enum. CycloneDX 1.5 hashes[].alg
+//Normalises a hash algorithm name to the CycloneDX hashAlg enum. CycloneDX 1.6 hashes[].alg
 //must be one of MD5, SHA-1, SHA-256, SHA-384, SHA-512, SHA3-256, ... — exact spelling matters
 //for downstream validation.
 function CycloneDXHashAlg(const value : string) : string;
@@ -134,6 +135,29 @@ begin
       exit;
   end;
   result := true;
+end;
+
+//A compound SPDX expression ('MIT OR Apache-2.0', 'GPL-2.0+', 'GPL-2.0-only WITH Classpath-exception-2.0')
+//is not a licence id - CycloneDX carries it in licenses[0].expression instead. SPDX operators
+//are case sensitive, so we only accept the uppercase forms.
+function IsSpdxLicenseExpression(const value : string) : boolean;
+var
+  trimmed : string;
+  id : string;
+begin
+  result := false;
+  trimmed := Trim(value);
+  if not LooksLikeSpdxExpression(trimmed) then
+    exit;
+  if (Pos(' AND ', trimmed) > 0) or (Pos(' OR ', trimmed) > 0) or (Pos(' WITH ', trimmed) > 0) then
+  begin
+    result := true;
+    exit;
+  end;
+  //'GPL-2.0+' - the 'or later' shorthand. Only treat it as an expression when the base is
+  //an identifier we recognise, otherwise it's just free text that happens to end in a plus.
+  if (Length(trimmed) > 1) and (trimmed[Length(trimmed)] = '+') then
+    result := TSpdxLicenses.TryGetCanonicalLicenseId(Copy(trimmed, 1, Length(trimmed) - 1), id);
 end;
 
 function Slugify(const value : string) : string;
@@ -202,16 +226,27 @@ procedure TCycloneDXWriter.Write(const report : TSBOMReport; const fileName : st
     licArr : TJsonArray;
     licWrap : TJsonObject;
     inner : TJsonObject;
+    spdxId : string;
   begin
     if license = '' then
       exit;
     licArr := componentObj.A['licenses'];
     licWrap := licArr.AddObject;
-    inner := licWrap.O['license'];
-    if LooksLikeSpdxExpression(license) then
-      inner.S['id'] := license
+    //licenses[] is EITHER a list of {license:{id|name}} entries OR a single {expression}
+    //entry - the schema forbids mixing the two, and license.id is a closed enum.
+    if IsSpdxLicenseExpression(license) then
+      licWrap.S['expression'] := license
     else
-      inner.S['name'] := license;
+    begin
+      inner := licWrap.O['license'];
+      //license.id is the SPDX enum - only emit an id the shipped SPDX list knows, and
+      //emit it in the list's canonical casing since the enum is case sensitive. Deprecated
+      //aliases ('GPL-3.0') are not in the list and correctly fall through to name.
+      if TSpdxLicenses.TryGetCanonicalLicenseId(license, spdxId) then
+        inner.S['id'] := spdxId
+      else
+        inner.S['name'] := license;
+    end;
   end;
 
   function SbomKindToString(const kind : TSBOMComponentKind) : string;
@@ -377,18 +412,21 @@ begin
   try
     depMap := TCollections.CreateDictionary<string, TJsonArray>;
     root.S['bomFormat'] := 'CycloneDX';
-      root.S['specVersion'] := '1.5';
+      root.S['specVersion'] := '1.6';
       root.I['version'] := 1;
       SetStringIfNotEmpty(root, 'serialNumber', report.SerialNumber);
 
       meta := root.O['metadata'];
       SetStringIfNotEmpty(meta, 'timestamp', report.TimestampUtc);
 
-      toolsArr := meta.A['tools'];
+      //1.6 form: metadata.tools is an object carrying components[] / services[]. The flat
+      //array of {vendor, name, version} is the deprecated 1.4/1.5 shape.
+      toolsArr := meta.O['tools'].A['components'];
       toolObj := toolsArr.AddObject;
-      toolObj.S['vendor'] := 'DPM';
+      toolObj.S['type'] := 'application';
       toolObj.S['name'] := report.ToolName;
       toolObj.S['version'] := report.ToolVersion;
+      toolObj.S['publisher'] := 'DPM';
 
       FillComponent(meta.O['component'], report.RootComponent);
 
@@ -501,6 +539,7 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
     prop : TSBOMProperty;
     ev : TSBOMEvidence;
     tag : string;
+    canonicalLicenseId : string;
 
     procedure AddAnnotation(const comment : string);
     begin
@@ -536,7 +575,13 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
     obj.S['downloadLocation'] := CoalesceNoAssertion(comp.DownloadUrl);
     obj.B['filesAnalyzed'] := false;
 
-    if (comp.License <> '') and LooksLikeSpdxExpression(comp.License) then
+    //licenseDeclared must be a valid SPDX licence expression: a known identifier, or a
+    //compound expression built from them. A free-text licence ('Apache 2.0', 'see COPYING')
+    //passes the loose character-set heuristic but is not an expression - it has to be
+    //NOASSERTION, otherwise the document fails SPDX validation.
+    if TSpdxLicenses.TryGetCanonicalLicenseId(comp.License, canonicalLicenseId) then
+      obj.S['licenseDeclared'] := canonicalLicenseId
+    else if (comp.License <> '') and IsSpdxLicenseExpression(comp.License) then
       obj.S['licenseDeclared'] := comp.License
     else
       obj.S['licenseDeclared'] := cNoAssertion;

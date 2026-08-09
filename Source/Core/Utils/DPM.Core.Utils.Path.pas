@@ -40,6 +40,12 @@ type
     class function IsRelativePath(const value : string) : boolean;
     class function CompressRelativePath(basePath : string; path : string) : string;overload;
     class function CompressRelativePath(path : string) : string;overload;
+    //Turns a user supplied path (command line, config file) into an absolute, backslash
+    //normalised one. Posix separators are normalised FIRST because IsPathRooted /
+    //IsRelativePath / ExtractFileName all key off PathDelim - without that, 'd:/x/y.dproj'
+    //reads as unrooted and gets appended to basePath, and 'a/b.dproj' reads as a bare
+    //filename. basePath defaults to the process current directory when empty.
+    class function ToAbsolutePath(const value : string; const basePath : string = '') : string;
     class function QuotePath(const value : string; const force : boolean = false) : string;
     class function StripBase(const base : string; const fileName : string) : string;
     class function StripWildCard(const value : string) : string;
@@ -314,6 +320,26 @@ begin
   if path = '' then
     exit(path);
   result := CompressRelativePath('', path);
+end;
+
+class function TPathUtils.ToAbsolutePath(const value : string; const basePath : string) : string;
+var
+  normalized : string;
+  base : string;
+begin
+  result := '';
+  normalized := Trim(value);
+  if normalized = '' then
+    exit;
+  normalized := StringReplace(normalized, '/', PathDelim, [rfReplaceAll]);
+  if IsPathRooted(normalized) then
+    exit(CompressRelativePath(normalized));
+
+  base := Trim(basePath);
+  if base = '' then
+    base := GetCurrentDir;
+  base := StringReplace(base, '/', PathDelim, [rfReplaceAll]);
+  result := CompressRelativePath(ExcludeTrailingPathDelimiter(base), normalized);
 end;
 
 class function TPathUtils.IsRelativePath(const value : string) : boolean;

@@ -26,14 +26,14 @@
 
 unit DPM.Core.Vuln.Writer.CycloneDX;
 
-(* CycloneDX 1.5 VEX writer.
+(* CycloneDX 1.6 VEX writer.
 
-  Emits a CycloneDX 1.5 JSON document carrying:
+  Emits a CycloneDX 1.6 JSON document carrying:
   - The source SBOM's identity in metadata
   - The vulnerabilities[] array, one entry per finding, with affects[].ref
     pointing back into the source SBOM's component bom-refs
 
-  Spec: https://cyclonedx.org/docs/1.5/json/#vulnerabilities *)
+  Spec: https://cyclonedx.org/docs/1.6/json/#vulnerabilities *)
 
 interface
 
@@ -142,6 +142,7 @@ var
   meta : TJsonObject;
   toolsArr : TJsonArray;
   toolObj : TJsonObject;
+  metaPropObj : TJsonObject;
   vulnsArr : TJsonArray;
   vulnObj : TJsonObject;
   vuln : TVulnerability;
@@ -163,18 +164,21 @@ begin
   root := TJsonObject.Create;
   try
     root.S['bomFormat'] := 'CycloneDX';
-    root.S['specVersion'] := '1.5';
+    root.S['specVersion'] := '1.6';
     root.I['version'] := 1;
     SetStringIfNotEmpty(root, 'serialNumber', vulnReport.SerialNumber);
 
     meta := root.O['metadata'];
     SetStringIfNotEmpty(meta, 'timestamp', vulnReport.TimestampUtc);
 
-    toolsArr := meta.A['tools'];
+    //1.6 form: metadata.tools is an object carrying components[] / services[]. The flat
+    //array of {vendor, name, version} is the deprecated 1.4/1.5 shape.
+    toolsArr := meta.O['tools'].A['components'];
     toolObj := toolsArr.AddObject;
-    toolObj.S['vendor'] := 'DPM';
+    toolObj.S['type'] := 'application';
     toolObj.S['name'] := vulnReport.ToolName;
     toolObj.S['version'] := vulnReport.ToolVersion;
+    toolObj.S['publisher'] := 'DPM';
 
     //Reference the source SBOM by serialNumber so a downstream tool can
     //correlate this VEX with the SBOM it scanned. The root component echoes
@@ -186,7 +190,14 @@ begin
       SetStringIfNotEmpty(meta.O['component'], 'name', sbomReport.RootComponent.Id);
       SetStringIfNotEmpty(meta.O['component'], 'version', sbomReport.RootComponent.Version);
     end;
-    SetStringIfNotEmpty(meta, 'sourceSbomSerialNumber', vulnReport.SourceSbomSerial);
+    //metadata is additionalProperties:false in the schema, so the serial of the SBOM we
+    //scanned travels as a namespaced metadata property rather than an invented field.
+    if vulnReport.SourceSbomSerial <> '' then
+    begin
+      metaPropObj := meta.A['properties'].AddObject;
+      metaPropObj.S['name'] := 'dpm:sourceSbomSerialNumber';
+      metaPropObj.S['value'] := vulnReport.SourceSbomSerial;
+    end;
 
     if vulnReport.Vulnerabilities.Count = 0 then
     begin
