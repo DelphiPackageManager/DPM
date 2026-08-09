@@ -75,8 +75,12 @@ type
     // P2 §2.3 (V-24): repository assurance ratchet. Returns true if the
     // install may proceed. Hard-fails when a previously seen trusted-repo
     // signature is now missing or the namespace has changed.
+    // `hadPriorAuthor`/`priorAuthor` must be captured by the caller *before*
+    // EvaluateAuthorDowngrade runs — see TAuthorRebuildExemption.
     function EvaluateRepositoryRatchet(const packageId : IPackageIdentity;
-                                        const verifyResult : TVerificationResult) : boolean;
+                                        const verifyResult : TVerificationResult;
+                                        hadPriorAuthor : boolean;
+                                        const priorAuthor : TAuthorTrustEntry) : boolean;
     // Materialise a TVerificationResult from a cached receipt so the trust-
     // state ratchets can be re-evaluated on a cache hit without re-extracting.
     // Trust-set membership (PublisherTrusted/RepositoryTrusted) is re-checked
@@ -270,7 +274,9 @@ begin
 end;
 
 function TPackageCache.EvaluateRepositoryRatchet(const packageId : IPackageIdentity;
-                                                  const verifyResult : TVerificationResult) : boolean;
+                                                  const verifyResult : TVerificationResult;
+                                                  hadPriorAuthor : boolean;
+                                                  const priorAuthor : TAuthorTrustEntry) : boolean;
 var
   i : integer;
   prior : TRepositoryTrustEntry;
@@ -282,6 +288,7 @@ var
   context : TRepoTrustPromptContext;
   decision : TTrustPromptDecision;
   ratchetFailure : string;
+  missingRepoSignature : boolean;
 begin
   result := true;
   if (FTrustState = nil) or (packageId = nil) then
@@ -330,7 +337,8 @@ begin
   // recover without hand-editing trust-state.yaml — the non-interactive
   // strategy still fails closed for CI.
   ratchetFailure := '';
-  if not hasCurrentTrustedRepo then
+  missingRepoSignature := not hasCurrentTrustedRepo;
+  if missingRepoSignature then
     ratchetFailure := Format(
       '[PackageCache] Package [%s] previously carried a trusted repository ' +
       'signature (sha256:%s) but this build does not.',
@@ -344,6 +352,29 @@ begin
 
   if ratchetFailure <> '' then
   begin
+    // Author-rebuild exemption. The author who published this id is entitled to
+    // install their own locally built copy, which carries no gallery
+    // countersignature until it is pushed. Scoped to the missing-signature case
+    // only: a *different* trusted repository attesting a different namespace is
+    // a distinct situation and still prompts.
+    if missingRepoSignature and
+       TAuthorRebuildExemption.Applies(hadPriorAuthor, priorAuthor, verifyResult.Signatures) then
+    begin
+      FLogger.Warning(Format(
+        '[PackageCache] Package [%s] carries no trusted repository signature, but is ' +
+        'author-signed by the same key previously recorded for it (sha256:%s). Treating ' +
+        'this as an author rebuild and allowing the install.',
+        [packageId.Id, priorAuthor.LastAuthorSpkiHex]));
+      // Deliberately do NOT ratchet forward: TrustedRepoSpkiHex and Namespace must
+      // survive untouched so the next build from a repository is still required to
+      // carry the signature. Only the freshness stamp moves.
+      newEntry := prior;
+      newEntry.LastSeenAt := TTimeZone.Local.ToUniversalTime(Now);
+      FTrustState.RecordRepository(packageId.Id, newEntry);
+      result := true;
+      exit;
+    end;
+
     FLogger.Warning(ratchetFailure);
 
     if FTrustPrompt = nil then
@@ -1293,6 +1324,8 @@ var
   cachedVerifyResult : TVerificationResult;
   ratchetBlocked : boolean;
   isGitPackage : boolean;
+  priorAuthor : TAuthorTrustEntry;
+  hadPriorAuthor : boolean;
 begin
   key := MakeCacheKey(packageId);
   FCacheLock.Enter;
@@ -1357,12 +1390,16 @@ begin
       // a ratchet-exempt local package re-checks it here, and would otherwise
       // block its own freshly-cached entry.
       cachedVerifyResult := BuildResultFromReceipt(receipt);
+      // Read the author high-water mark before EvaluateAuthorDowngrade ratchets
+      // it forward — the repository ratchet's author-rebuild exemption compares
+      // against the *prior* identity, not the one about to be recorded.
+      hadPriorAuthor := FTrustState.TryGetAuthor(packageId.Id, priorAuthor);
       if not EvaluateAuthorDowngrade(packageId, cachedVerifyResult, FTrustPolicy.GetEffectivePolicy) then
       begin
         result := false;
         ratchetBlocked := true;
       end
-      else if not EvaluateRepositoryRatchet(packageId, cachedVerifyResult) then
+      else if not EvaluateRepositoryRatchet(packageId, cachedVerifyResult, hadPriorAuthor, priorAuthor) then
       begin
         result := false;
         ratchetBlocked := true;
@@ -1417,6 +1454,8 @@ var
   packageFileFolder : string;
   key : string;
   verifyResult : TVerificationResult;
+  priorAuthor : TAuthorTrustEntry;
+  hadPriorAuthor : boolean;
 begin
   result := false;
   FLogger.Debug('[PackageCache] installing from file : ' + packageFileName);
@@ -1525,6 +1564,12 @@ begin
         packageIndentity.Id + '] (test install).')
     else
     begin
+      // Read the author high-water mark before EvaluateAuthorDowngrade ratchets
+      // it forward — the repository ratchet's author-rebuild exemption compares
+      // against the *prior* identity, not the one about to be recorded.
+      hadPriorAuthor := (FTrustState <> nil) and
+                        FTrustState.TryGetAuthor(packageIndentity.Id, priorAuthor);
+
       // TOFU author no-downgrade ratchet (plan §1.10). Compares the current
       // signer against the high-water mark from the last successful install
       // of this package id and either accepts, blocks, or prompts the user.
@@ -1532,8 +1577,9 @@ begin
         exit;
 
       // P2 §2.3 (V-24): repository assurance ratchet. Once seen carrying a
-      // trusted-repo signature, future builds must continue to.
-      if not EvaluateRepositoryRatchet(packageIndentity, verifyResult) then
+      // trusted-repo signature, future builds must continue to — unless this is
+      // the author rebuilding their own package (TAuthorRebuildExemption).
+      if not EvaluateRepositoryRatchet(packageIndentity, verifyResult, hadPriorAuthor, priorAuthor) then
         exit;
     end;
   end;

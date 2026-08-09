@@ -259,6 +259,14 @@ end;
 
 
 begin
+  // Consume any I/O error left behind by a unit initialization section before we write
+  // anything. System.Console (linked via DPM.Console.Prompts) has a class constructor that
+  // calls SetInOutRes(GetLastError) when GetConsoleScreenBufferInfo fails - which it always
+  // does when stdout is a pipe or a file (ERROR_INVALID_HANDLE = 6). With {$I+} that stale
+  // value detonates on the *next* RTL text I/O statement anywhere in the process, which is
+  // how 'dpm help > out.txt' used to die with a context-free 'I/O error 6'.
+  // Reading IOResult returns the pending code and resets it to zero.
+  IOResult;
   CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml
   //Put our own folder on the process PATH so any msbuild we spawn can resolve a bare 'dpm'.
   TSystemUtils.EnsureModuleDirOnPath;
@@ -285,6 +293,9 @@ begin
         // the Pascal RTL would otherwise raise EInOutError(6) here and that
         // becomes the only thing the parent process sees.
         try
+          // clear any pending I/O error first, otherwise it is what gets reported
+          // instead of the exception we actually want to see.
+          IOResult;
           WriteLn(e.Message);
         except
           // nothing we can do

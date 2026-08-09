@@ -1573,6 +1573,11 @@ initialization
   except
     on e : Exception do
     begin
+      //This runs during unit initialization, so it is the one RTL text write that the
+      //IOResult call at the top of dpm.dpr cannot protect - another unit's initializer
+      //may already have left InOutRes set (see the note in dpm.dpr). Clear it, otherwise
+      //'I/O error 6' is all the user sees instead of the real registration failure.
+      IOResult;
       Writeln('Error registering options : ' + e.Message);
       ExitProcess(999);
     end;

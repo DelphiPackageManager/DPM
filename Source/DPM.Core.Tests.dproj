@@ -275,6 +275,7 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Trust.TrustSet.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Trust.Prompt.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Trust.Modes.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Trust.AuthorRebuild.pas"/>
         <DCCReference Include="IDE\DPM.IDE.SigningBadge.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.SigningBadge.pas"/>
         <DCCReference Include="IDE\DPM.IDE.PathManager.pas"/>

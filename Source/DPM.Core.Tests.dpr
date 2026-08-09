@@ -195,6 +195,7 @@ uses
   DPM.Core.Tests.Trust.TrustSet in 'Tests\DPM.Core.Tests.Trust.TrustSet.pas',
   DPM.Core.Tests.Trust.Prompt in 'Tests\DPM.Core.Tests.Trust.Prompt.pas',
   DPM.Core.Tests.Trust.Modes in 'Tests\DPM.Core.Tests.Trust.Modes.pas',
+  DPM.Core.Tests.Trust.AuthorRebuild in 'Tests\DPM.Core.Tests.Trust.AuthorRebuild.pas',
   DPM.IDE.SigningBadge in 'IDE\DPM.IDE.SigningBadge.pas',
   DPM.Core.Tests.SigningBadge in 'Tests\DPM.Core.Tests.SigningBadge.pas',
   DPM.IDE.PathManager in 'IDE\DPM.IDE.PathManager.pas',

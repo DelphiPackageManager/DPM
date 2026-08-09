@@ -89,6 +89,12 @@ type
     procedure WriteLine(const s: String; const foregroundColor : TConsoleColor );overload;
     procedure WriteLine(const s: String);overload;virtual;
     procedure WriteLine;overload;
+    //Deliberate shadow of the System.WriteLn intrinsic. Without it, a WriteLn typo anywhere
+    //in this class hierarchy silently binds to System.WriteLn and writes to the RTL Output
+    //text file - bypassing the redirect-safe path and blowing up with EInOutError when
+    //stdout is a pipe or a file. That exact typo lived here from the initial commit until
+    //it was found via 'I/O error 6'. Protected, so descendants are covered too.
+    procedure WriteLn(const s : string = '');
     procedure Write(const s : string);overload;virtual;
     procedure Write(const s : string; const foregroundColor : TConsoleColor);overload;virtual;
     function GetConsoleWidth : integer;virtual;abstract;
@@ -232,9 +238,17 @@ begin
   end;
 end;
 
+procedure TConsoleBase.WriteLn(const s : string);
+begin
+  Self.WriteLine(s);
+end;
+
 procedure TConsoleBase.WriteLine;
 begin
-  WriteLn('');
+  //NOTE : this must not use the System.WriteLn intrinsic. That writes to the RTL Output
+  //text file, which bypasses the redirect-safe write path in InternalWriteLn and raises
+  //EInOutError if InOutRes happens to be set (see the IOResult call in dpm.dpr).
+  InternalWriteLn('');
 end;
 
 procedure TConsoleBase.WriteLine(const s: String);
@@ -261,7 +275,10 @@ begin
   currentBackground := Self.GetCurrentBackgroundColor;
   try
     SetColour(foregroundColor, currentBackground);
-    WriteLn(s);
+    //Self.WriteLine, NOT the System.WriteLn intrinsic - see the note in the parameterless
+    //overload. Going through WriteLine also gives coloured lines the same indenting and
+    //word wrapping every other line gets, which is what Write(s, colour) already does.
+    Self.WriteLine(s);
   finally
     SetColour(currentForeground,currentBackground);
   end;

@@ -183,6 +183,17 @@ begin
 
   if not TCacheOptions.Default.Force then
   begin
+    //Nobody can answer a prompt when stdin is a pipe/file (CI, scripts, an editor
+    //running dpm). Say so and stop rather than blocking or crashing - removing cached
+    //packages unasked is not a safe default.
+    if not PromptsAreInteractive then
+    begin
+      Logger.Error('Cannot prompt for confirmation - stdin is not a console. ' +
+                   'Re-run with --force to remove without confirmation.');
+      result := TExitCode.Error;
+      exit;
+    end;
+
     proceed := PromptYesNo('Remove these package(s) from the cache?', false, cancelled);
     if cancelled or (not proceed) then
     begin

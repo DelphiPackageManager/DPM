@@ -45,6 +45,16 @@ type
 //blocking reads. Set once at startup by the console application.
 procedure SetPromptCancellationToken(const token : ICancellationToken);
 
+/// <summary>
+///  True when stdin is a real console, i.e. there is a user present who can answer a
+///  prompt. False whenever stdin is a pipe, a file or nul - CI, scripts, an editor
+///  running dpm for you. Callers that would otherwise prompt must check this first and
+///  take the non-interactive path (require an explicit flag, or fail with a message)
+///  rather than blocking or crashing. Every prompt below also fails safe on its own,
+///  returning cancelled=True instead of raising.
+/// </summary>
+function PromptsAreInteractive : boolean;
+
 function PromptLine(const prompt : string; const defaultValue : string; out cancelled : boolean) : string;
 function PromptLineRequired(const prompt : string; out cancelled : boolean) : string;
 function PromptYesNo(const prompt : string; const defaultYes : boolean; out cancelled : boolean) : boolean;
@@ -64,6 +74,7 @@ function PromptMultiSelect(const prompt : string; const choices : TPromptChoices
 implementation
 
 uses
+  WinApi.Windows,
   System.SysUtils,
   System.SyncObjs,
   System.Console,
@@ -88,9 +99,36 @@ end;
 //read is abandoned and cancelled is set True so callers unwind exactly as they
 //do for an Esc-confirmed cancel. Without a token registered it falls back to a
 //plain blocking read - the original behaviour.
+function PromptsAreInteractive : boolean;
+var
+  handle : THandle;
+  mode : DWORD;
+begin
+  handle := GetStdHandle(STD_INPUT_HANDLE);
+  if (handle = INVALID_HANDLE_VALUE) or (handle = 0) then
+  begin
+    result := false;
+    exit;
+  end;
+  //GetConsoleMode succeeds only for a real console handle - pipes and redirected
+  //files fail. Same test TConsoleTrustPromptStrategy.StdinIsTty uses.
+  result := GetConsoleMode(handle, mode);
+end;
+
 function WaitForKey(out cancelled : boolean) : TConsoleKeyInfo;
 begin
   cancelled := false;
+  //No console on stdin means nobody can answer. Console.ReadKey would raise
+  //EInvalidOperation('Cannot read key from file') here, which surfaces as an unhandled
+  //exception; reporting cancelled instead lets every caller unwind down the path it
+  //already has for Esc/Ctrl-C.
+  if not PromptsAreInteractive then
+  begin
+    cancelled := true;
+    result := Default(TConsoleKeyInfo);
+    exit;
+  end;
+
   if GCancellationToken = nil then
   begin
     result := Console.ReadKey(true);

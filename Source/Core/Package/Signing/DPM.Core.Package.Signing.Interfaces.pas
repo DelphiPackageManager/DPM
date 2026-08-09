@@ -125,6 +125,31 @@ type
                              var reason : string); static;
   end;
 
+  // Author-rebuild exemption to the V-24 repository ratchet. A package author
+  // rebuilding their own already-published id locally (dpm pack into a local
+  // folder, install to test, push to the gallery afterwards) produces a build
+  // that legitimately carries no gallery repository signature. Without an
+  // exemption the ratchet blocks that install on every release after the id's
+  // first — the ratchet is keyed on package id alone and cannot otherwise tell
+  // an author's own rebuild from a third party shadowing the id.
+  //
+  // The exemption is granted only when the new build carries a valid author
+  // signature from the *same* key the ratchet last recorded for this id. That
+  // key's holder is the one identity entitled to supply an unattested build of
+  // it; anyone shadowing the id would need the author's signing key, a strictly
+  // higher bar than the repository ratchet enforces on its own.
+  //
+  // IMPORTANT: `priorAuthor` must be the entry read *before*
+  // EvaluateAuthorDowngrade runs for the same install. That call ratchets the
+  // author high-water mark forward to the current signer, so comparing against
+  // the post-call entry would match any signer at all and void the check.
+  TAuthorRebuildExemption = record
+  public
+    class function Applies(hadPriorAuthor : boolean;
+                           const priorAuthor : TAuthorTrustEntry;
+                           const signatures : TArray<TSignatureInfo>) : boolean; static;
+  end;
+
   TVerifyFlags = record
     Offline : boolean;   // P3 §3.2 — skip CRL/OCSP network calls
   end;
@@ -165,6 +190,42 @@ type
   EPackageSigning = class(Exception);
 
 implementation
+
+class function TAuthorRebuildExemption.Applies(hadPriorAuthor : boolean;
+                                                const priorAuthor : TAuthorTrustEntry;
+                                                const signatures : TArray<TSignatureInfo>) : boolean;
+var
+  i : integer;
+begin
+  result := false;
+
+  // Nothing recorded to match against, or the id was last seen unsigned:
+  // there is no author identity that could vouch for this build, so the
+  // repository ratchet stands. Fail closed.
+  if not hadPriorAuthor then
+    exit;
+  if not priorAuthor.LastSeenAuthorSigned then
+    exit;
+  if priorAuthor.LastAuthorSpkiHex = '' then
+    exit;
+
+  // A permanent user block outranks the exemption. EvaluateAuthorDowngrade
+  // already rejects these before the repository ratchet is reached; repeated
+  // here so the predicate is correct in isolation.
+  if priorAuthor.BlockedPermanently then
+    exit;
+
+  // SameText rather than a hex normalisation pass, to stay consistent with the
+  // author ratchet's own key-change comparison — both sides of this test come
+  // from TSignatureInfo.SignerSpkiHex, so the formats already agree.
+  for i := 0 to High(signatures) do
+    if (signatures[i].Role = srAuthor) and signatures[i].Valid and
+       SameText(signatures[i].SignerSpkiHex, priorAuthor.LastAuthorSpkiHex) then
+    begin
+      result := true;
+      exit;
+    end;
+end;
 
 class procedure TTrustModeEvaluator.Evaluate(const policy : TTrustPolicy;
                                               hasAnySignature : boolean;

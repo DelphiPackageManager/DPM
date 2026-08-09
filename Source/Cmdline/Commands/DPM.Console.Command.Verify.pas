@@ -50,6 +50,10 @@ type
                              const verifyResult : TVerificationResult);
   protected
     function Execute(const cancellationToken : ICancellationToken) : TExitCode;override;
+    //-json-output promises a single JSON object on stdout, so the banner has to go.
+    //Options are parsed before the application decides whether to show it, so reading
+    //TVerifyOptions.Default here is safe.
+    function ForceNoBanner : boolean;override;
   public
     constructor Create(const logger : ILogger;
                        const configurationManager : IConfigurationManager;
@@ -129,6 +133,11 @@ begin
   end;
 end;
 
+function TVerifyCommand.ForceNoBanner : boolean;
+begin
+  result := TVerifyOptions.Default.JsonOutput;
+end;
+
 function TVerifyCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 var
   options : TVerifyOptions;
@@ -143,9 +152,9 @@ begin
 
   policy := FTrustPolicy.GetEffectivePolicy;
   flags.Offline := options.Offline;
-  // In JSON mode the only thing on stdout is the JSON object — any chat
-  // we'd normally print goes to stderr via the logger, which CI parsers
-  // expect to ignore.
+  // In JSON mode the only thing on stdout is the JSON object. The console logger
+  // writes to stdout too (not stderr), so anything chatty has to be suppressed here
+  // rather than relying on stream separation - and ForceNoBanner keeps the banner off.
   if flags.Offline and not options.JsonOutput then
     Logger.Information('Offline mode — revocation will use cached CRL/OCSP responses only.');
 
@@ -332,8 +341,17 @@ begin
       end;
     end;
 
+    //Raw stdout write - this JSON is machine consumed, so it deliberately bypasses
+    //IConsoleWriter, which would indent and word wrap it (and would emit UTF-8 rather
+    //than the RTL's ANSI, changing the bytes for non-ASCII content). I/O checks are off
+    //so an unusable stdout cannot raise EInOutError, and IOResult consumes any error so
+    //it cannot poison the next RTL statement either - the exit code still reports the
+    //verification result.
+{$IOCHECKS OFF}
     Write(doc.ToJSON(False));
     Writeln;
+    IOResult;
+{$IOCHECKS ON}
   finally
     doc.Free;
   end;

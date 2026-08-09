@@ -188,10 +188,14 @@ procedure TWindowsConsole.SetColour(const foreground, background: TConsoleColor)
 begin
   if (FLastForeground <> foreground) or (FLastBackground <> background) then
   begin
-    SetConsoleTextAttribute(FStdOut,
-       GetForegroundColourCode(foreground) or
-       GetBackgroundColourCode(background));
+    //Colours only mean anything on a real console - the call just fails on a pipe or a
+    //file, and the logger goes through here twice for every line it writes.
+    if not (FNoStdOut or Self.RedirectedStdOut) then
+      SetConsoleTextAttribute(FStdOut,
+         GetForegroundColourCode(foreground) or
+         GetBackgroundColourCode(background));
 
+    //tracked regardless, so the bookkeeping stays consistent either way.
     FLastForeground := foreground;
     FLastBackground := background;
   end;
