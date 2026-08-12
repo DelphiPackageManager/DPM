@@ -108,6 +108,11 @@ type
                        const mapFileReader : IMapFileReader);
   end;
 
+//Where to look for the linker MAP file, in probe order. Exposed (and free of any
+//filesystem access) so the path rules can be unit tested without a build tree.
+function GetMapFileCandidates(const dprojDir, outputDir, projectName, configName : string;
+                              const platform : TDPMPlatform) : TArray<string>;
+
 implementation
 
 uses
@@ -180,6 +185,42 @@ begin
   s := StringReplace(s, '$(Config)', configName, [rfReplaceAll, rfIgnoreCase]);
   s := StringReplace(s, '$(Configuration)', configName, [rfReplaceAll, rfIgnoreCase]);
   result := s;
+end;
+
+//Probe order:
+//  1) the project's configured output dir (DCC_ExeOutput, or DCC_BplOutput for packages).
+//     It may be relative to the dproj, absolute (D:\Ajur2000) or UNC (\\build\drops) - so
+//     it goes through ToAbsolutePath rather than being concatenated onto the dproj dir.
+//  2) the dproj folder itself. dcc with no -E switch writes the binary and its map next to
+//     the project, which is exactly what an absent or empty output dir element means.
+//  3) the IDE's default .\$(Platform)\$(Config) shape - a last guess for projects whose
+//     configuration we couldn't read (mis-keyed config, missing BuildConfiguration entry).
+function GetMapFileCandidates(const dprojDir, outputDir, projectName, configName : string;
+                              const platform : TDPMPlatform) : TArray<string>;
+
+  procedure AddCandidate(const folder : string);
+  var
+    fullPath : string;
+    i : integer;
+  begin
+    if Trim(folder) = '' then
+      exit;
+    fullPath := TPathUtils.ToAbsolutePath(ExpandProjectTokens(folder, platform, configName), dprojDir);
+    if fullPath = '' then
+      exit;
+    fullPath := IncludeTrailingPathDelimiter(fullPath) + projectName + '.map';
+    for i := 0 to Length(result) - 1 do
+      if SameText(result[i], fullPath) then
+        exit;
+    SetLength(result, Length(result) + 1);
+    result[Length(result) - 1] := fullPath;
+  end;
+
+begin
+  result := nil;
+  AddCandidate(outputDir);
+  AddCandidate(dprojDir);
+  AddCandidate('.\$(Platform)\$(Config)');
 end;
 
 //Expand the BDS-family MSBuild macros that show up in IDE Library Path values
@@ -1346,6 +1387,9 @@ var
   delphiRoot : string;
   cacheRoot : string;
   mapPath : string;
+  candidates : TArray<string>;
+  triedPaths : string;
+  i : integer;
   outputDir : string;
   projectConfig : IProjectConfiguration;
   info : IMapFileInfo;
@@ -1496,14 +1540,17 @@ begin
   cacheRoot := FPackageCache.PackagesFolder;
 
   if options.MapFile <> '' then
+  begin
     //--map is user supplied too; resolve it against the dproj directory rather than the
     //current directory, which is what someone typing a relative map path means.
-    mapPath := TPathUtils.ToAbsolutePath(options.MapFile, dprojDir)
+    mapPath := TPathUtils.ToAbsolutePath(options.MapFile, dprojDir);
+    triedPaths := mapPath;
+  end
   else
   begin
-    //Prefer the OutputDir recorded in the project's per-(config,platform) configuration.
-    //Fall back to the default Delphi shape .\$(Platform)\$(Config) only if the editor has
-    //no entry for this pair (rare - happens with mis-keyed configs).
+    //The OutputDir recorded in the project's per-(config,platform) configuration is the
+    //primary location, but it isn't the only one worth looking at - see the notes on
+    //GetMapFileCandidates. Take the first candidate that exists.
     outputDir := '';
     if editor <> nil then
     begin
@@ -1511,21 +1558,29 @@ begin
       if projectConfig <> nil then
         outputDir := projectConfig.OutputDir;
     end;
-    if outputDir = '' then
-      outputDir := '.\$(Platform)\$(Config)';
-    outputDir := ExpandProjectTokens(outputDir, platform, configName);
-    mapPath := IncludeTrailingPathDelimiter(dprojDir) + outputDir;
-    mapPath := IncludeTrailingPathDelimiter(mapPath) + dprojName + '.map';
-    mapPath := TPath.GetFullPath(mapPath);
+    candidates := GetMapFileCandidates(dprojDir, outputDir, dprojName, configName, platform);
+    mapPath := '';
+    triedPaths := '';
+    for i := 0 to Length(candidates) - 1 do
+    begin
+      if triedPaths <> '' then
+        triedPaths := triedPaths + ', ';
+      triedPaths := triedPaths + candidates[i];
+      if (mapPath = '') and FileExists(candidates[i]) then
+        mapPath := candidates[i];
+    end;
+    //Nothing found - report against the primary location, the one the user most likely expects.
+    if (mapPath = '') and (Length(candidates) > 0) then
+      mapPath := candidates[0];
   end;
 
-  if not FileExists(mapPath) then
+  if (mapPath = '') or (not FileExists(mapPath)) then
   begin
     if options.Strict then
-      raise Exception.Create('MAP file not found: ' + mapPath + ' (re-run with the linker option "Map file = Detailed" enabled, or supply -map=<path>)');
+      raise Exception.Create('MAP file not found - looked in: ' + triedPaths + ' (re-run with the linker option "Map file = Detailed" enabled, or supply -map=<path>)');
     report.AddMetaProperty('dpm:evidence', 'map-file-not-found');
     report.AddMetaProperty('dpm:evidence.mapPath', mapPath);
-    FLogger.Warning('[SBOM] MAP file not found at ' + mapPath
+    FLogger.Warning('[SBOM] MAP file not found - looked in: ' + triedPaths
                     + ' - SBOM will contain DPM packages + runtime only.'
                     + ' Enable the linker option "Map file = Detailed" to include non-DPM evidence.');
     exit;

@@ -26,6 +26,29 @@ type
     procedure DedupesGenericInstantiations;
   end;
 
+  //Where the SBOM generator looks for the linker MAP file. Pure path rules - no
+  //build tree required.
+  [TestFixture]
+  TMapFilePathTests = class
+  private
+    function IndexOfPath(const candidates : TArray<string>; const path : string) : integer;
+  public
+    [Test]
+    procedure AbsoluteOutputDirIsNotAppendedToProjectDir;
+    [Test]
+    procedure UncOutputDirIsNotAppendedToProjectDir;
+    [Test]
+    procedure RelativeOutputDirResolvesAgainstProjectDir;
+    [Test]
+    procedure OutputDirTokensAreExpanded;
+    [Test]
+    procedure EmptyOutputDirProbesProjectDirFirst;
+    [Test]
+    procedure ProjectDirIsAlwaysProbed;
+    [Test]
+    procedure CandidatesAreDeduped;
+  end;
+
 implementation
 
 uses
@@ -33,6 +56,8 @@ uses
   System.IOUtils,
   System.Classes,
   TestLogger,
+  DPM.Core.Types,
+  DPM.Core.SBOM.Generator,
   DPM.Core.Project.MapFile;
 
 { TMapFileReaderTests }
@@ -251,7 +276,91 @@ begin
   end;
 end;
 
+{ TMapFilePathTests }
+
+function TMapFilePathTests.IndexOfPath(const candidates : TArray<string>; const path : string) : integer;
+var
+  i : integer;
+begin
+  result := -1;
+  for i := 0 to Length(candidates) - 1 do
+    if SameText(candidates[i], path) then
+      exit(i);
+end;
+
+//The reported bug : a dproj with an absolute DCC_ExeOutput produced
+//'D:\Ajur2000\D:\Ajur2000\ajur.map' because the project dir was prepended blindly.
+procedure TMapFilePathTests.AbsoluteOutputDirIsNotAppendedToProjectDir;
+var
+  candidates : TArray<string>;
+begin
+  candidates := GetMapFileCandidates('D:\Ajur2000', 'D:\Ajur2000', 'ajur', 'Release', TDPMPlatform.Win64);
+  Assert.IsTrue(Length(candidates) > 0, 'expected at least one candidate');
+  Assert.AreEqual('D:\Ajur2000\ajur.map', candidates[0]);
+end;
+
+procedure TMapFilePathTests.UncOutputDirIsNotAppendedToProjectDir;
+var
+  candidates : TArray<string>;
+begin
+  candidates := GetMapFileCandidates('D:\Proj', '\\build\drops\bin', 'ajur', 'Release', TDPMPlatform.Win64);
+  Assert.IsTrue(Length(candidates) > 0, 'expected at least one candidate');
+  Assert.AreEqual('\\build\drops\bin\ajur.map', candidates[0]);
+end;
+
+procedure TMapFilePathTests.RelativeOutputDirResolvesAgainstProjectDir;
+var
+  candidates : TArray<string>;
+begin
+  candidates := GetMapFileCandidates('D:\Proj', '..\bin', 'ajur', 'Release', TDPMPlatform.Win32);
+  Assert.IsTrue(Length(candidates) > 0, 'expected at least one candidate');
+  Assert.AreEqual('D:\bin\ajur.map', candidates[0]);
+end;
+
+procedure TMapFilePathTests.OutputDirTokensAreExpanded;
+var
+  candidates : TArray<string>;
+begin
+  candidates := GetMapFileCandidates('D:\Proj', '.\$(Platform)\$(Config)', 'ajur', 'Debug', TDPMPlatform.Win64);
+  Assert.IsTrue(Length(candidates) > 0, 'expected at least one candidate');
+  Assert.AreEqual('D:\Proj\Win64\Debug\ajur.map', candidates[0]);
+end;
+
+//dcc with no -E switch writes the exe and the map next to the project, so an
+//absent/empty DCC_ExeOutput must probe the project dir before the IDE default shape.
+procedure TMapFilePathTests.EmptyOutputDirProbesProjectDirFirst;
+var
+  candidates : TArray<string>;
+begin
+  candidates := GetMapFileCandidates('D:\Proj', '', 'ajur', 'Release', TDPMPlatform.Win32);
+  Assert.IsTrue(Length(candidates) >= 2, 'expected the project dir and the default shape');
+  Assert.AreEqual('D:\Proj\ajur.map', candidates[0]);
+  Assert.IsTrue(IndexOfPath(candidates, 'D:\Proj\Win32\Release\ajur.map') > 0,
+                'expected the .\$(Platform)\$(Config) shape as a later candidate');
+end;
+
+procedure TMapFilePathTests.ProjectDirIsAlwaysProbed;
+var
+  candidates : TArray<string>;
+begin
+  candidates := GetMapFileCandidates('D:\Proj', '.\Win32\Release', 'ajur', 'Release', TDPMPlatform.Win32);
+  Assert.AreEqual('D:\Proj\Win32\Release\ajur.map', candidates[0]);
+  Assert.IsTrue(IndexOfPath(candidates, 'D:\Proj\ajur.map') > 0,
+                'the project dir should be probed when the configured output dir has no map');
+end;
+
+procedure TMapFilePathTests.CandidatesAreDeduped;
+var
+  candidates : TArray<string>;
+begin
+  //output dir resolves to the project dir itself - shouldn't be listed twice.
+  candidates := GetMapFileCandidates('D:\Proj', '.', 'ajur', 'Release', TDPMPlatform.Win32);
+  Assert.AreEqual('D:\Proj\ajur.map', candidates[0]);
+  Assert.AreEqual<integer>(2, Length(candidates), 'expected the project dir once plus the default shape');
+end;
+
 initialization
   TDUnitX.RegisterTestFixture(TMapFileReaderTests);
+  TDUnitX.RegisterTestFixture(TMapFilePathTests);
 
 end.
