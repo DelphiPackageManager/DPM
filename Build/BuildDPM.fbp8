@@ -87,6 +87,29 @@ begin
                       "SpecialBuildDetails\=0" +
                       ""
       end
+      action.text.findreplace
+      begin
+        casesensitive = true
+        expandvarswhenreplacing = true
+        failmatchcount = 1
+        failonmorematchcount = 1
+        filesetcountallmatches = false
+        id = {C4D10A3D-6F31-43C3-A392-29D4AD7EBA73}
+        matchregexpr = false
+        matchtype = mtAll
+        matchwildcards = false
+        replacementmode = trOriginalFile
+        replacementtext = "cDPMSemVer \= '%SemVer%'"
+        searchstring = "cDPMSemVer \= '0.9.242-beta'"
+        sourcepath = %SRC_ROOT%\\Core\\DPM.Core.Version.pas
+        substitute = false
+        textfindbehaviour = tfDontFail
+        usefileset = false
+        usevariable = false
+        wholelinesonly = false
+        wholewords = false
+        writebom = false
+      end
       action.group
       begin
         description = "Build Tests - 13.0"
