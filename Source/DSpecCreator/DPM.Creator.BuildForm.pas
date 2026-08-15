@@ -27,6 +27,7 @@ type
     { Private declarations }
   public
     { Public declarations }
+    constructor Create(AOwner : TComponent; isDesign : boolean = false);reintroduce;
   end;
 
 implementation
@@ -43,6 +44,13 @@ procedure TBuildForm.btnOkClick(Sender: TObject);
 begin
   Close;
   ModalResult := mrOk;
+end;
+
+constructor TBuildForm.Create(AOwner: TComponent; isDesign: boolean);
+begin
+  inherited Create(AOwner);
+  if isDesign then
+    lblProject.Caption := 'Project (.dproj) or precompiled (.bpl)';
 end;
 
 end.

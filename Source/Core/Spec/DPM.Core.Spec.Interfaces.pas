@@ -234,6 +234,7 @@ type
     function GetLibSuffix : string;
     function GetLibPrefix : string;
     function GetLibVersion : string;
+    function GetIsPrebuilt : boolean;
 
     procedure SetProject(const value : string);
     procedure SetDefines(const value : string);
@@ -244,11 +245,24 @@ type
 
     function Clone : ISpecDesignEntry;
 
-    /// <summary> The dproj for the package file to build </summary>
+    /// <summary>
+    /// For a prebuilt entry, the IDE bitness its .bpl can be loaded into : Win32 for the 32 bit IDE,
+    /// Win64 for the 64 bit IDE. That is a property of the binary, not of what the package compiles
+    /// for - a Win32-only package still needs a Win64 design bpl to show up in a 64 bit IDE - so it
+    /// can never be inferred from targetPlatforms and the entry has to state it. Ship one entry per
+    /// IDE bitness, each pointing at that bitness's own .bpl.
+    /// Returns false with a caller-reportable message in error when the entry doesn't name exactly
+    /// one design host. Only meaningful for prebuilt entries - check IsPrebuilt first.
+    /// </summary>
+    function ResolvePrebuiltPlatform(out designPlatform : TDPMPlatform; out error : string) : boolean;
+
+    /// <summary> The dproj for the package file to build, or - for a package that ships precompiled design-time binaries - the .bpl itself. See IsPrebuilt. </summary>
     property Project : string read GetProject write SetProject;
+    /// <summary> True when Project points at an already-built .bpl rather than a project to compile. Derived from the file extension (a .bpl is a build output, never an msbuild project) so it needs no dspec property of its own. Install skips the dproj patch and the msbuild call for these entries and loads the shipped bpl as-is. </summary>
+    property IsPrebuilt : boolean read GetIsPrebuilt;
     /// <summary> Semicolon seprated list of compiler defines</summary>
     property Defines : string read GetDefines write SetDefines;
-    /// <summary> Design-host platforms this entry supports. Empty = defer to the design dproj's enabled platforms. </summary>
+    /// <summary> Design-host platforms this entry supports. Empty = defer to the design dproj's enabled platforms, or - for a prebuilt entry - to the package's target platforms. </summary>
     property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
     /// <summary> Package names this design package requires beyond rtl/designide. Emitted by `dpm prepare` as `requires` entries in the dpk and `<DCCReference>` elements in the dproj. Not consumed at pack/install time. </summary>
     property References : IList<string> read GetReferences;

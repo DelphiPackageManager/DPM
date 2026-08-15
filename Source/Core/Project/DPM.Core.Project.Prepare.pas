@@ -412,6 +412,10 @@ begin
         designEntry := template.DesignEntries[j];
         if designEntry = nil then
           continue;
+        //A prebuilt entry names a .bpl the package already ships - there is no source to
+        //scaffold a dpk/dproj pair from, and generating one would collide with the binary.
+        if designEntry.IsPrebuilt then
+          continue;
         projectPath := designEntry.Project;
         if Trim(projectPath) = '' then
           continue;

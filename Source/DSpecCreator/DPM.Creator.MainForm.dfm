@@ -26,12 +26,10 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Top = 0
     Width = 1014
     Height = 666
-    ActivePage = tsTest
+    ActivePage = tsTemplates
     Align = alClient
     TabOrder = 0
     OnChange = PageControlChange
-    ExplicitWidth = 886
-    ExplicitHeight = 568
     object tsInfo: TTabSheet
       Caption = 'Package Info'
       DesignSize = (
@@ -484,11 +482,9 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Width = 672
         Height = 636
         Align = alClient
-        ActiveCard = crdCopyLocal
+        ActiveCard = crdDesign
         Caption = 'CardPanel'
         TabOrder = 0
-        ExplicitWidth = 544
-        ExplicitHeight = 538
         object crdSource: TCard
           Left = 1
           Top = 1
@@ -772,9 +768,9 @@ object DSpecCreatorForm: TDSpecCreatorForm
           object lblDesignProject: TLabel
             Left = 16
             Top = 40
-            Width = 82
+            Width = 197
             Height = 15
-            Caption = 'Project (.dproj):'
+            Caption = 'Project (.dproj) or precompiled (.bpl):'
           end
           object lblDesignDefines: TLabel
             Left = 16
@@ -1393,8 +1389,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Copy Local'
           CardIndex = 12
           TabOrder = 12
-          ExplicitWidth = 542
-          ExplicitHeight = 536
           DesignSize = (
             670
             634)
@@ -1430,14 +1424,13 @@ object DSpecCreatorForm: TDSpecCreatorForm
             TabOrder = 0
             TextHint = 'e.g. bin\$platform$\*.dll'
             OnChange = edtCopyLocalSrcChange
-            ExplicitWidth = 510
           end
           object clbCopyLocalPlatforms: TCheckListBox
             Left = 16
             Top = 113
             Width = 240
             Height = 256
-            ItemHeight = 15
+            ItemHeight = 17
             Items.Strings = (
               'Win32'
               'Win64'
@@ -1501,7 +1494,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Caption = 'Panel2'
         ShowCaption = False
         TabOrder = 1
-        ExplicitHeight = 538
         DesignSize = (
           330
           636)
@@ -1545,7 +1537,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           OnCreateNodeClass = tvTemplatesCreateNodeClass
           OnEdited = tvTemplatesEdited
           OnEditing = tvTemplatesEditing
-          ExplicitHeight = 449
         end
         object btnAddTemplate: TButton
           Left = 3
@@ -1556,7 +1547,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Caption = 'Add Template'
           TabOrder = 1
           OnClick = btnAddTemplateClick
-          ExplicitTop = 500
         end
         object btnDeleteTemplate: TButton
           Left = 95
@@ -1566,7 +1556,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Action = actDeleteTemplate
           Anchors = [akLeft, akBottom]
           TabOrder = 2
-          ExplicitTop = 500
         end
         object btnDuplicateTemplate: TButton
           Left = 200
@@ -1576,7 +1565,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
           Action = actDuplicateTemplate
           Anchors = [akLeft, akBottom]
           TabOrder = 3
-          ExplicitTop = 500
         end
       end
     end
@@ -2246,8 +2234,6 @@ object DSpecCreatorForm: TDSpecCreatorForm
     Width = 1014
     Height = 19
     Panels = <>
-    ExplicitTop = 568
-    ExplicitWidth = 886
   end
   object MainMenu: TMainMenu
     Left = 444

@@ -186,6 +186,7 @@ uses
   DPM.Core.Tests.Packaging.PrecompiledBinaries in 'Tests\DPM.Core.Tests.Packaging.PrecompiledBinaries.pas',
   DPM.Core.Tests.PackageGenerator in 'Tests\DPM.Core.Tests.PackageGenerator.pas',
   DPM.Core.Tests.Spec.PackageDefinitions in 'Tests\DPM.Core.Tests.Spec.PackageDefinitions.pas',
+  DPM.Core.Tests.Spec.DesignEntry in 'Tests\DPM.Core.Tests.Spec.DesignEntry.pas',
   DPM.Console.Command.Spec.Discovery in 'Cmdline\Commands\DPM.Console.Command.Spec.Discovery.pas',
   DPM.Core.Tests.Spec.Discovery in 'Tests\DPM.Core.Tests.Spec.Discovery.pas',
   DPM.Console.Command.Spec.Writer in 'Cmdline\Commands\DPM.Console.Command.Spec.Writer.pas',

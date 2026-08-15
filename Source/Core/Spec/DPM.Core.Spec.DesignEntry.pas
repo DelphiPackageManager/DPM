@@ -52,6 +52,7 @@ type
     function GetLibSuffix : string;
     function GetLibPrefix : string;
     function GetLibVersion : string;
+    function GetIsPrebuilt : boolean;
     function GetProject : string;
     function GetPlatforms : TDPMPlatforms;
     function GetDefines : string;
@@ -70,6 +71,8 @@ type
 
     procedure ToYAML(const parent : IYAMLValue; const packageKind : TDPMPackageKind);override;
 
+
+    function ResolvePrebuiltPlatform(out designPlatform : TDPMPlatform; out error : string) : boolean;
 
     function Clone : ISpecDesignEntry;reintroduce;
     constructor CreateClone(const logger : ILogger; const project : string; const defines : string; platforms : TDPMPlatforms;
@@ -141,6 +144,16 @@ begin
   result := FLibVersion;
 end;
 
+
+//A design entry normally names a dproj/dpk for DPM to compile. Packages that ship precompiled
+//design-time binaries have no project to build - they point the entry straight at the .bpl that
+//is packed in the archive. A .bpl is a build *output*, never something msbuild can load, so the
+//extension alone is an unambiguous marker and no extra dspec property is needed. Install skips
+//the dproj patch and the msbuild call for these and treats the shipped bpl as already built.
+function TSpecDesignEntry.GetIsPrebuilt : boolean;
+begin
+  result := SameText(ExtractFileExt(Trim(FProject)), '.bpl');
+end;
 
 function TSpecDesignEntry.GetPlatforms: TDPMPlatforms;
 begin
@@ -225,6 +238,59 @@ begin
   //platforms left empty when not in the file - installer defers to the design dproj in that case
 end;
 
+
+//For a compiled design entry DPM builds the bpl itself, once per platform, into bpl\{platform} - so
+//one entry can serve both IDE bitnesses and the platform list is only ever a filter.
+//
+//A prebuilt entry is the opposite: one binary, one fixed path in the archive, and a bpl can only load
+//into an IDE of its own bitness (32 bit IDE -> Win32 bpl, 64 bit IDE -> Win64 bpl). That is a fact
+//about the binary, NOT about what the package compiles for - a package targeting only Win32 still
+//needs a Win64 design bpl to appear in a 64 bit IDE. Since targetPlatforms therefore can't tell us the
+//answer, the entry has to state it, and authors ship one entry per bitness. Guessing here would mean
+//silently offering the wrong bitness to the IDE, which can only end in a failed load.
+function TSpecDesignEntry.ResolvePrebuiltPlatform(out designPlatform : TDPMPlatform; out error : string) : boolean;
+var
+  candidate : TDPMPlatform;
+  candidateCount : integer;
+begin
+  result := false;
+  designPlatform := TDPMPlatform.UnknownPlatform;
+  error := '';
+
+  candidateCount := 0;
+  for candidate in FPlatforms do
+  begin
+    Inc(candidateCount);
+    designPlatform := candidate;
+  end;
+
+  if candidateCount = 0 then
+  begin
+    error := 'Prebuilt design entry [' + FProject + '] must declare a platform : Win32 for the 32 bit IDE, Win64 for the 64 bit IDE. ' +
+             'A .bpl only loads into an IDE of its own bitness, which is independent of the platforms this package targets - ' +
+             'add one design entry per bitness, each pointing at that bitness''s own .bpl.';
+    exit;
+  end;
+
+  if candidateCount > 1 then
+  begin
+    designPlatform := TDPMPlatform.UnknownPlatform;
+    error := 'Prebuilt design entry [' + FProject + '] declares ' + IntToStr(candidateCount) +
+             ' platforms. A .bpl is a single-platform binary - declare one platform per entry, and add a separate design entry pointing at each bitness''s own .bpl.';
+    exit;
+  end;
+
+  //Design packages are loaded by the IDE itself, and the IDE only ever comes in these two bitnesses.
+  if not (designPlatform in [TDPMPlatform.Win32, TDPMPlatform.Win64]) then
+  begin
+    error := 'Prebuilt design entry [' + FProject + '] declares platform ' + DPMPlatformToString(designPlatform) +
+             '. Design packages load into the IDE, so the platform must be Win32 or Win64.';
+    designPlatform := TDPMPlatform.UnknownPlatform;
+    exit;
+  end;
+
+  result := true;
+end;
 
 procedure TSpecDesignEntry.SetDefines(const value: string);
 begin

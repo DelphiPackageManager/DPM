@@ -716,6 +716,8 @@ var
   designPlatforms: TDPMPlatforms;
   designProjectEditor: IProjectEditor;
   effectivePlatform: TDPMPlatform;
+  designPlatform: TDPMPlatform;
+  prebuiltError: string;
   //design entry project path (lowercased) -> the platforms it declared BEFORE any dproj patching.
   designCandidates: IDictionary<string, TDPMPlatforms>;
 
@@ -992,7 +994,12 @@ begin
   begin
     projectFile := ResolveProjectFile(designEntry.Project);
 
-    if designEntry.Platforms <> [] then
+    //Prebuilt entries are handled wholesale in the build loop below - they are never compiled, and
+    //their platform is an IDE bitness rather than a compile target, so they take no part in the
+    //effectivePlatform gate these candidates feed.
+    if designEntry.IsPrebuilt then
+      continue
+    else if designEntry.Platforms <> [] then
       //manifest explicit - authoritative
       candidates := designEntry.Platforms
     else
@@ -1062,6 +1069,33 @@ begin
   for designEntry in template.DesignEntries do
   begin
     projectFile := ResolveProjectFile(designEntry.Project);
+
+    //Packages that ship precompiled design-time binaries point the entry at the .bpl itself rather
+    //than a dproj. There is nothing to patch and nothing to compile - both steps below fail hard on
+    //a PE file (msxml rejects it as invalid xml, msbuild can't load it as a project). All we owe the
+    //caller is confirmation that the entry is well formed and the binary really is in the package.
+    //Deliberately checked ahead of the effectivePlatform gate: the entry's platform is the bitness of
+    //the IDE that can load the bpl, not a compile target, so a Win64 design bpl is just as relevant
+    //to a Win32-only install. Which one the IDE actually loads is decided at load time.
+    if designEntry.IsPrebuilt then
+    begin
+      if not designEntry.ResolvePrebuiltPlatform(designPlatform, prebuiltError) then
+      begin
+        FLogger.Error('Package [' + packageInfo.Id + '] : ' + prebuiltError);
+        FLogger.NewLine;
+        exit(false);
+      end;
+      if not FileExists(projectFile) then
+      begin
+        FLogger.Error('Prebuilt design package [' + designEntry.Project + '] for package [' + packageInfo.Id +
+                      '] was not found in the package - check the dspec ships it via a source entry.');
+        FLogger.NewLine;
+        exit(false);
+      end;
+      FLogger.Information('Using prebuilt design package: ' + designEntry.Project + ' (' + DPMPlatformToString(designPlatform) + ' IDE)');
+      FLogger.NewLine;
+      continue;
+    end;
 
     supportedByCompiler := DesignTimePlatforms(Compiler.compilerVersion);
 

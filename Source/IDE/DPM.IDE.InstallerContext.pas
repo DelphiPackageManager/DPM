@@ -114,6 +114,8 @@ var
   pattern : string;
   matches : IList<string>;
   candidates : string;
+  entryPlatform : TDPMPlatform;
+  prebuiltError : string;
   i : integer;
 begin
   result := false;
@@ -125,6 +127,46 @@ begin
 
   //designEntry.Project can use forward slashes - normalise so ExtractFileName works on Windows.
   projectBase := StringReplace(designEntry.Project, '/', PathDelim, [rfReplaceAll]);
+
+  //A prebuilt entry names the shipped .bpl itself, so there is nothing to guess: the archive
+  //path IS the answer. Resolve it directly - the LibPrefix/LibSuffix heuristics below exist to
+  //find whatever name Delphi emitted for a project we compiled, which doesn't apply here, and
+  //globbing could pick up a sibling bpl the package ships for a different purpose.
+  if designEntry.IsPrebuilt then
+  begin
+    //The bpl's folder is fixed by where the author packed it, so we can't switch folder on
+    //loadPlatform the way the compiled path does. The entry names the IDE bitness its binary is
+    //built for instead; load it only into a matching IDE, since a Win32 bpl handed to a 64 bit IDE
+    //can only fail to load. A package supporting both ships one entry per bitness, and exactly one
+    //of them matches here.
+    if not designEntry.ResolvePrebuiltPlatform(entryPlatform, prebuiltError) then
+    begin
+      FLogger.Warning('Package [' + node.Id + '] : ' + prebuiltError);
+      exit;
+    end;
+    if entryPlatform <> loadPlatform then
+    begin
+      FLogger.Debug('Skipping prebuilt design BPL [' + designEntry.Project + '] for [' + node.Id + '] - it is a ' +
+                    DPMPlatformToString(entryPlatform) + ' binary and this IDE loads ' + DPMPlatformToString(loadPlatform) + '.');
+      exit;
+    end;
+    //TPath.Combine treats a leading separator as a rooted path and would discard packagePath.
+    if (projectBase <> '') and (projectBase[1] = PathDelim) then
+      Delete(projectBase, 1, 1);
+    exactPath := TPath.Combine(packagePath, projectBase);
+    if not TFile.Exists(exactPath) then
+    begin
+      FLogger.Warning('Prebuilt design BPL for [' + node.Id + '] was not found at [' + exactPath + '].');
+      exit;
+    end;
+    bplPath := exactPath;
+    //Sibling runtime bpls the design package links against live alongside it, so the path the
+    //caller adds to the IDE search path has to be the bpl's own folder, not bpl\{loadPlatform}.
+    bplFolder := ExtractFileDir(exactPath);
+    result := true;
+    exit;
+  end;
+
   projectBase := ChangeFileExt(ExtractFileName(projectBase), '');
 
   //Exact fast path: honour an author-specified LibSuffix, else the compiler's default ($LibSuffix)

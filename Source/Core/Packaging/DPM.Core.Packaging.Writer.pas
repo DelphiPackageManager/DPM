@@ -779,6 +779,22 @@ var
       'otherwise install will fail when this package is consumed.');
   end;
 
+  //A design entry pointing at a .bpl ships the binary instead of building it, and a bpl only loads
+  //into an IDE of its own bitness. Catch an entry that doesn't say which bitness here at pack time -
+  //the consumer can do nothing about it, and it would otherwise surface as a design package that
+  //silently never appears in their IDE.
+  procedure CheckPrebuiltPlatform(const designEntry : ISpecDesignEntry);
+  var
+    designPlatform : TDPMPlatform;
+    error : string;
+  begin
+    if not designEntry.IsPrebuilt then
+      exit;
+    if designEntry.ResolvePrebuiltPlatform(designPlatform, error) then
+      exit;
+    raise Exception.Create(error);
+  end;
+
 begin
   //Pre-compile each source entry's ant pattern into a regex. ConvertAntToRegexString
   //handles `**`, `*`, `?`, and ambiguous path separators consistently so callers don't
@@ -797,7 +813,10 @@ begin
     CheckProjectIncluded('Build entry', buildEntry.Project);
 
   for designEntry in template.DesignEntries do
+  begin
     CheckProjectIncluded('Design entry', designEntry.Project);
+    CheckPrebuiltPlatform(designEntry);
+  end;
 end;
 
 function TPackageWriter.InternalWritePackage(const outputFolder : string; const targetPlatform : ISpecTargetPlatform; const spec : IPackageSpec; const version : TPackageVersion;

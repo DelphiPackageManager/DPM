@@ -2641,7 +2641,7 @@ var
   parentNode : TTemplateTreeNode;
   designNode : TTemplateTreeNode;
 begin
-  DesignForm := TBuildForm.Create(nil);
+  DesignForm := TBuildForm.Create(nil, true);
   try
     DesignForm.Caption := 'Add Design entry';
     if DesignForm.ShowModal = mrCancel then

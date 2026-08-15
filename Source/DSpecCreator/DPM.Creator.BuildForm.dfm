@@ -17,9 +17,9 @@ object BuildForm: TBuildForm
     129)
   TextHeight = 15
   object lblProject: TLabel
-    Left = 16
-    Top = 45
-    Width = 80
+    Left = 14
+    Top = 21
+    Width = 82
     Height = 15
     Caption = 'Project (.dproj):'
   end
@@ -46,9 +46,9 @@ object BuildForm: TBuildForm
     OnClick = btnOkClick
   end
   object edtProject: TEdit
-    Left = 102
+    Left = 14
     Top = 42
-    Width = 368
+    Width = 456
     Height = 23
     Anchors = [akLeft, akTop, akRight]
     ParentShowHint = False
