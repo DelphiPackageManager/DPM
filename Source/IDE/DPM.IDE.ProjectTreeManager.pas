@@ -66,6 +66,27 @@ const
   WM_PROJECTLOADED = WM_USER + $1234;
 
 type
+  //Fired by TProjectTreeDblClickHook for a left double click on the project tree, with the
+  //click position in tree client coordinates. Set handled to true to swallow the message.
+  TTreeDblClickEvent = procedure(const x, y : integer; var handled : boolean) of object;
+
+  //The tools api has no notification for a double click on a project manager node, and the
+  //IDE's project tree is a plain TVirtualStringTree we don't own - so we chain its WindowProc.
+  //Everything except a handled WM_LBUTTONDBLCLK is passed straight through, so the IDE and any
+  //other plugin behave exactly as they did before.
+  TProjectTreeDblClickHook = class(TComponent)
+  private
+    FTree : TControl;
+    FOriginalWndProc : TWndMethod;
+    FOnDblClick : TTreeDblClickEvent;
+    procedure HookedWndProc(var msg : TMessage);
+  protected
+    procedure Notification(component : TComponent; operation : TOperation); override;
+  public
+    constructor Create(const tree : TControl; const onDblClick : TTreeDblClickEvent); reintroduce;
+    destructor Destroy; override;
+  end;
+
   TDPMProjectTreeManager = class(TInterfacedObject,IDPMProjectTreeManager)
   private
     FContainer : TContainer;
@@ -78,6 +99,9 @@ type
     FProjectTreeInstance : TControl;
     FVSTProxy : TVirtualStringTreeProxy;
     FSearchOptions : TSearchOptions;
+    //Double click on the DPM node opens the editor view - nil when the tree hasn't been found
+    //yet, or when the rtti we need for hit testing isn't available on this IDE version.
+    FDblClickHook : TProjectTreeDblClickHook;
 
     FProjectLoadList : IQueue<string>;
     FDPMImageIndex : integer;
@@ -97,6 +121,10 @@ type
     procedure WndProc(var msg: TMessage);
 
     function EnsureProjectTree : boolean;
+
+    procedure HookProjectTree;
+    procedure UnhookProjectTree;
+    procedure TreeDblClick(const x, y : integer; var handled : boolean);
 
     function TryGetContainerTreeNode(const container : TProjectTreeContainer; out containerNode : PVirtualNode) : boolean;
     procedure AddChildContainer(const parentContainer, childContainer : TProjectTreeContainer);
@@ -142,6 +170,9 @@ uses
   DPM.Core.Project.Editor,
   DPM.IDE.Constants,
   DPM.IDE.Utils,
+  DPM.IDE.ToolsAPI,
+  //implementation only - DPM.IDE.EditorViewManager references this unit in its interface.
+  DPM.IDE.EditorViewManager,
   DPM.IDE.Types;
 
 
@@ -149,6 +180,58 @@ const
   cCategoryContainerClass = 'Containers.TStdContainerCategory';
 
 
+{ TProjectTreeDblClickHook }
+
+constructor TProjectTreeDblClickHook.Create(const tree : TControl; const onDblClick : TTreeDblClickEvent);
+begin
+  inherited Create(nil);
+  FTree := tree;
+  FOnDblClick := onDblClick;
+  FOriginalWndProc := tree.WindowProc;
+  tree.WindowProc := HookedWndProc;
+  //so we never touch the control if the IDE destroys the project manager before we shut down.
+  tree.FreeNotification(Self);
+end;
+
+destructor TProjectTreeDblClickHook.Destroy;
+begin
+  if FTree <> nil then
+  begin
+    FTree.RemoveFreeNotification(Self);
+    //Restore unconditionally. If another plugin chained after us we can't put its handler back
+    //without leaving it pointing at this (freed) object - losing that hook is the safe failure,
+    //an access violation in the IDE's message loop is not.
+    FTree.WindowProc := FOriginalWndProc;
+    FTree := nil;
+  end;
+  inherited;
+end;
+
+procedure TProjectTreeDblClickHook.HookedWndProc(var msg : TMessage);
+var
+  handled : boolean;
+begin
+  if (msg.Msg = WM_LBUTTONDBLCLK) and Assigned(FOnDblClick) then
+  begin
+    handled := false;
+    FOnDblClick(TWMMouse(msg).XPos, TWMMouse(msg).YPos, handled);
+    if handled then
+    begin
+      //Swallowed - virtualtrees never sees the double click, so the node isn't toggled.
+      msg.Result := 0;
+      exit;
+    end;
+  end;
+  FOriginalWndProc(msg);
+end;
+
+procedure TProjectTreeDblClickHook.Notification(component : TComponent; operation : TOperation);
+begin
+  inherited;
+  //The tree is going away - drop the reference, there is nothing left to restore.
+  if (operation = opRemove) and (component = FTree) then
+    FTree := nil;
+end;
 
 
 { TProjectTreeManager }
@@ -249,6 +332,7 @@ begin
   //can't find it here as it's too early as our expert is loaded before the project manager is loaded.
   FProjectTreeInstance := nil;
   FVSTProxy := nil;
+  FDblClickHook := nil;
 
   FSearchOptions := TSearchOptions.Create;
   // This ensures that the default config file is uses if a project one doesn't exist.
@@ -269,6 +353,8 @@ begin
     KillTimer(FWindowHandle, 1);
     FTimerRunning := false;
   end;
+  //Belt-and-braces again - Shutdown normally unhooks while the IDE is still healthy.
+  UnhookProjectTree;
   FLogger := nil;
   FVSTProxy.Free;
   DeallocateHWnd(FWindowHandle);
@@ -365,7 +451,71 @@ begin
 
       FPlatformImageIndexes[TDPMPlatform.Linux64] := imageList.GetIndexByName('Platforms\PlatformLinux');
       {$IFEND}
+      HookProjectTree;
     end;
+  end;
+end;
+
+procedure TDPMProjectTreeManager.HookProjectTree;
+begin
+  if FDblClickHook <> nil then
+    exit;
+  if (FProjectTreeInstance = nil) or (FVSTProxy = nil) then
+    exit;
+
+  //Probe the rtti we need for hit testing once, here, rather than finding out it's missing on
+  //every double click in the project tree. Without it we simply don't hook - the node still
+  //works from the context menu.
+  if not FVSTProxy.HasGetNodeAt then
+  begin
+    FLogger.Debug('Project tree GetNodeAt not found via rtti - dpm node double click disabled.');
+    exit;
+  end;
+
+  FDblClickHook := TProjectTreeDblClickHook.Create(FProjectTreeInstance, TreeDblClick);
+end;
+
+procedure TDPMProjectTreeManager.UnhookProjectTree;
+begin
+  //Freeing the hook restores the tree's original WindowProc.
+  FreeAndNil(FDblClickHook);
+end;
+
+procedure TDPMProjectTreeManager.TreeDblClick(const x, y : integer; var handled : boolean);
+var
+  node : PVirtualNode;
+  nodeData : PNodeData;
+  container : TProjectTreeContainer;
+  editorViewManager : IDPMEditorViewManager;
+begin
+  handled := false;
+  //This runs from the IDE's message loop - nothing may escape.
+  try
+    if FVSTProxy = nil then
+      exit;
+    node := FVSTProxy.GetNodeAt(x, y);
+    if node = nil then
+      exit;
+    nodeData := FVSTProxy.GetNodeData(node);
+    if (nodeData = nil) or (nodeData.GraphLocation = nil) then
+      exit;
+    container := TProjectTreeContainer(nodeData.GraphLocation as TObject);
+    //Only our own node - the platform and package nodes under it keep the tree's normal
+    //expand/collapse on double click, as does everything else in the tree.
+    if not SameText(container.DisplayName, cDPMPackages) then
+      exit;
+
+    //Swallow it either way now that we know it's our node, so the tree doesn't also toggle it.
+    handled := true;
+
+    //There is only one editor view and its configuration comes from the project group, so it
+    //doesn't matter which project's dpm node was clicked - this is exactly what the top level
+    //DPM > Manage DPM Packages menu does.
+    editorViewManager := FContainer.Resolve<IDPMEditorViewManager>;
+    editorViewManager.ShowViewForProject(TToolsApiUtils.GetMainProjectGroup, TToolsApiUtils.GetActiveProject);
+  except
+    on e : Exception do
+      FLogger.Debug('Error handling project tree double click : ' + e.Message);
   end;
 end;
 
@@ -524,6 +674,9 @@ begin
     KillTimer(FWindowHandle, 1);
     FTimerRunning := false;
   end;
+  //Put the tree's WindowProc back while the IDE (and the project manager) are still alive -
+  //once we are freed, a message routed into our hook would be an access violation.
+  UnhookProjectTree;
 end;
 
 function TDPMProjectTreeManager.TryGetContainerTreeNode(const container: TProjectTreeContainer; out containerNode: PVirtualNode): boolean;

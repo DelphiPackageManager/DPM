@@ -104,6 +104,13 @@ type
     function GetMethodEntry(const name : string) : TRttiMethodEntry;
     function GetPropEntry(const name : string) : TRttiPropEntry;
 
+    //GetMethodEntry looks methods up by name alone, which picks whichever overload rtti
+    //returns first. Where a method is overloaded (GetNodeAt) we need to select on the
+    //signature. Returns nil rather than raising, since a missing overload is something we
+    //want to degrade gracefully on rather than blow up over.
+    function GetMethodEntryByParamCount(const name : string; const paramCount : integer) : TRttiMethodEntry;
+    function ResolveGetNodeAtMethod : TRttiMethodEntry;
+
   public
     constructor Create(const treeInstance : TControl; const logger : IDPMIDELogger);
     destructor Destroy; override;
@@ -118,6 +125,11 @@ type
     function GetNextSibling(const node : PVirtualNode) : PVirtualNode;
     function GetNextVisible(const node : PVirtualNode) : PVirtualNode;
     function GetNodeData(const node : PVirtualNode) : PNodeData;
+    //True when the rtti for GetNodeAt(x, y) could be resolved. Callers that depend on hit
+    //testing should probe this once rather than per call.
+    function HasGetNodeAt : boolean;
+    //Node at the client coordinates, nil for empty space (or if the rtti wasn't resolvable).
+    function GetNodeAt(const x, y : integer) : PVirtualNode;
     function AddChildNode(const parentNode : PVirtualNode) : PVirtualNode;
     function InsertNode(const parentNode : PVirtualNode; const attachMode : TVTNodeAttachMode) : PVirtualNode;
     procedure DeleteChildren(const parentNode : PVirtualNode);
@@ -128,6 +140,7 @@ type
 implementation
 
 uses
+  System.TypInfo,
   System.SysUtils;
 
 { TVirtualStringTreeHack }
@@ -240,6 +253,70 @@ begin
     result.params := result.rttiMethod.GetParameters;
     FMethodCache[LowerCase(name)] := result;
   end;
+end;
+
+function TVirtualStringTreeProxy.GetMethodEntryByParamCount(const name : string; const paramCount : integer) : TRttiMethodEntry;
+var
+  cacheKey : string;
+  rttiMethod : TRttiMethod;
+  methodParams : TArray<TRttiParameter>;
+begin
+  cacheKey := LowerCase(name) + '#' + IntToStr(paramCount);
+  if FMethodCache.TryGetValue(cacheKey, result) then
+    exit;
+
+  result := nil;
+  //GetMethods(name) exists but we walk them ourselves so this behaves the same all the way
+  //back to XE2.
+  for rttiMethod in FTreeType.GetMethods do
+  begin
+    if not SameText(rttiMethod.Name, name) then
+      continue;
+    methodParams := rttiMethod.GetParameters;
+    if Length(methodParams) <> paramCount then
+      continue;
+    result := TRttiMethodEntry.Create;
+    result.rttiMethod := rttiMethod;
+    result.params := methodParams;
+    FMethodCache[cacheKey] := result;
+    exit;
+  end;
+end;
+
+function TVirtualStringTreeProxy.ResolveGetNodeAtMethod : TRttiMethodEntry;
+begin
+  // function GetNodeAt(X, Y: Integer): PVirtualNode; overload;
+  //the other overloads take (P : TPoint) and (X, Y : Integer; Relative : Boolean; var NodeTop : Integer)
+  result := GetMethodEntryByParamCount('GetNodeAt', 2);
+  if result = nil then
+    exit;
+  //belt and braces - make sure we really have the (integer, integer) overload before we
+  //invoke it, a mismatched signature via rtti invoke is not a survivable mistake.
+  if (result.params[0].ParamType = nil) or (result.params[1].ParamType = nil) or
+     (result.params[0].ParamType.TypeKind <> tkInteger) or (result.params[1].ParamType.TypeKind <> tkInteger) then
+    result := nil;
+end;
+
+function TVirtualStringTreeProxy.HasGetNodeAt : boolean;
+begin
+  result := ResolveGetNodeAtMethod <> nil;
+end;
+
+function TVirtualStringTreeProxy.GetNodeAt(const x, y : integer) : PVirtualNode;
+var
+  rttiMethodEntry : TRttiMethodEntry;
+  param1, param2 : TValue;
+  res : TValue;
+begin
+  result := nil;
+  rttiMethodEntry := ResolveGetNodeAtMethod;
+  if rttiMethodEntry = nil then
+    exit;
+
+  TValue.Make(@x, rttiMethodEntry.params[0].ParamType.Handle, param1);
+  TValue.Make(@y, rttiMethodEntry.params[1].ParamType.Handle, param2);
+  res := rttiMethodEntry.rttiMethod.Invoke(FTreeInstance, [param1, param2]);
+  result := PVirtualNode(PPointer(res.GetReferenceToRawData())^);
 end;
 
 function TVirtualStringTreeProxy.GetNextNode(const node : PVirtualNode) : PVirtualNode;
