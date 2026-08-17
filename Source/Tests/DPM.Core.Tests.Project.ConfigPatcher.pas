@@ -93,6 +93,12 @@ type
     procedure MissingPlatform_AddsWindowsNamespaces_WhenBaseStubsUsed;
 
     [Test]
+    procedure ConfiguredNonWindowsPlatform_DoesNotWarn;
+
+    [Test]
+    procedure MissingNonWindowsPlatform_Warns;
+
+    [Test]
     procedure NoPlatformsBlock_DoesNotSynthesizeProjectExtensions;
 
     [Test]
@@ -126,6 +132,7 @@ uses
   Winapi.ActiveX,
   System.SysUtils,
   System.IOUtils,
+  DPM.Core.Logging,
   DPM.Core.Project.Interfaces,
   DPM.Core.Project.Editor,
   DPM.Core.Project.Prepare.Templates,
@@ -338,6 +345,82 @@ const
     '            <Platforms>'#13#10 +
     '                <Platform value="Win32">true</Platform>'#13#10 +
     '                <Platform value="Win64">False</Platform>'#13#10 +
+    '            </Platforms>'#13#10 +
+    '        </BorlandProject>'#13#10 +
+    '    </ProjectExtensions>'#13#10 +
+    '</Project>'#13#10;
+
+  //The shape a real IDE authored cross platform package has - Linux64 is fully configured via the
+  //Base_Linux64 chain and its settings group, Debug (Cfg_1) has a Linux64 stub because it has a
+  //Linux64 only setting, and Release (Cfg_2) has NO platform stubs at all because it needs none.
+  //This is exactly what tripped the false 'not configured for Linux64' warning.
+  cDprojIdeLinux64 =
+    '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">'#13#10 +
+    '    <PropertyGroup>'#13#10 +
+    '        <Base>True</Base>'#13#10 +
+    '        <Config Condition="''$(Config)''==''''">Debug</Config>'#13#10 +
+    '        <Platform Condition="''$(Platform)''==''''">Linux64</Platform>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Config)''==''Base'' or ''$(Base)''!=''''">'#13#10 +
+    '        <Base>true</Base>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="(''$(Platform)''==''Linux64'' and ''$(Base)''==''true'') or ''$(Base_Linux64)''!=''''">'#13#10 +
+    '        <Base_Linux64>true</Base_Linux64>'#13#10 +
+    '        <CfgParent>Base</CfgParent>'#13#10 +
+    '        <Base>true</Base>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="(''$(Platform)''==''Win32'' and ''$(Base)''==''true'') or ''$(Base_Win32)''!=''''">'#13#10 +
+    '        <Base_Win32>true</Base_Win32>'#13#10 +
+    '        <CfgParent>Base</CfgParent>'#13#10 +
+    '        <Base>true</Base>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Config)''==''Debug'' or ''$(Cfg_1)''!=''''">'#13#10 +
+    '        <Cfg_1>true</Cfg_1>'#13#10 +
+    '        <CfgParent>Base</CfgParent>'#13#10 +
+    '        <Base>true</Base>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="(''$(Platform)''==''Linux64'' and ''$(Cfg_1)''==''true'') or ''$(Cfg_1_Linux64)''!=''''">'#13#10 +
+    '        <Cfg_1_Linux64>true</Cfg_1_Linux64>'#13#10 +
+    '        <CfgParent>Cfg_1</CfgParent>'#13#10 +
+    '        <Cfg_1>true</Cfg_1>'#13#10 +
+    '        <Base>true</Base>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Config)''==''Release'' or ''$(Cfg_2)''!=''''">'#13#10 +
+    '        <Cfg_2>true</Cfg_2>'#13#10 +
+    '        <CfgParent>Base</CfgParent>'#13#10 +
+    '        <Base>true</Base>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Base)''!=''''">'#13#10 +
+    '        <DCC_Namespace>System;Xml;Data;$(DCC_Namespace)</DCC_Namespace>'#13#10 +
+    '        <GenPackage>true</GenPackage>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Base_Linux64)''!=''''">'#13#10 +
+    '        <DCC_Namespace>Posix;$(DCC_Namespace)</DCC_Namespace>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Cfg_1_Linux64)''!=''''">'#13#10 +
+    '        <Debugger_Launcher>/usr/bin/gnome-terminal</Debugger_Launcher>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Cfg_2)''!=''''">'#13#10 +
+    '        <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <ItemGroup>'#13#10 +
+    '        <BuildConfiguration Include="Base">'#13#10 +
+    '            <Key>Base</Key>'#13#10 +
+    '        </BuildConfiguration>'#13#10 +
+    '        <BuildConfiguration Include="Debug">'#13#10 +
+    '            <Key>Cfg_1</Key>'#13#10 +
+    '            <CfgParent>Base</CfgParent>'#13#10 +
+    '        </BuildConfiguration>'#13#10 +
+    '        <BuildConfiguration Include="Release">'#13#10 +
+    '            <Key>Cfg_2</Key>'#13#10 +
+    '            <CfgParent>Base</CfgParent>'#13#10 +
+    '        </BuildConfiguration>'#13#10 +
+    '    </ItemGroup>'#13#10 +
+    '    <ProjectExtensions>'#13#10 +
+    '        <BorlandProject>'#13#10 +
+    '            <Platforms>'#13#10 +
+    '                <Platform value="Linux64">True</Platform>'#13#10 +
+    '                <Platform value="Win32">True</Platform>'#13#10 +
     '            </Platforms>'#13#10 +
     '        </BorlandProject>'#13#10 +
     '    </ProjectExtensions>'#13#10 +
@@ -691,6 +774,56 @@ begin
     xml := ReadSandbox(sandbox);
     Assert.Contains(xml, 'Condition="''$(Base_Win64)''!=''''"');
     Assert.Contains(xml, 'Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;$(DCC_Namespace)');
+  finally
+    if FileExists(sandbox) then
+      TFile.Delete(sandbox);
+  end;
+end;
+
+//A config legitimately has no Cfg_N_<Platform> stub when that config/platform pair has no settings
+//of its own - the IDE never writes an empty one. The platform is still fully configured through
+//Base_<Platform>, so warning here sent people hunting for a missing Linux64 config that was there
+//all along.
+procedure TProjectConfigPatcherTests.ConfiguredNonWindowsPlatform_DoesNotWarn;
+var
+  patcher : IProjectConfigPatcher;
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  sandbox : string;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  patcher := TProjectConfigPatcher.Create(loggerIntf);
+  sandbox := WriteSandbox(cDprojIdeLinux64);
+  try
+    patcher.EnsureBuildTarget(sandbox, TDPMPlatform.Linux64, 'Release', TCompilerVersion.Delphi12_0,
+                              [TProjectPatchOption.UpdatePlatformList]);
+    Assert.IsFalse(logger.Logged('warning', 'was not configured for'),
+                   'Linux64 is configured via Base_Linux64 - must not warn');
+  finally
+    if FileExists(sandbox) then
+      TFile.Delete(sandbox);
+  end;
+end;
+
+//The flip side - a project with no Linux64 settings anywhere really does warrant the warning,
+//because we cannot invent an SDK or namespaces for it the way we can for Windows.
+procedure TProjectConfigPatcherTests.MissingNonWindowsPlatform_Warns;
+var
+  patcher : IProjectConfigPatcher;
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  sandbox : string;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  patcher := TProjectConfigPatcher.Create(loggerIntf);
+  sandbox := WriteSandbox(cDprojWithBaseStubs);
+  try
+    patcher.EnsureBuildTarget(sandbox, TDPMPlatform.Linux64, 'Release', TCompilerVersion.Delphi12_0,
+                              [TProjectPatchOption.UpdatePlatformList]);
+    Assert.IsTrue(logger.Logged('warning', 'was not configured for'),
+                  'a Win32 only project has nothing for Linux64 - the warning is real');
   finally
     if FileExists(sandbox) then
       TFile.Delete(sandbox);

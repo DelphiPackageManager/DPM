@@ -103,6 +103,7 @@ type
     function LastChainGroupFor(const key : string) : IXMLDOMElement;
     function LastPropertyGroup : IXMLDOMElement;
     function UsesBasePlatformStubs : boolean;
+    function HasPlatformConfiguration(const configKey : string; const platformName : string) : boolean;
 
     //--- mutation - each returns true when it changed something
     function EnsureBuildConfigurationItem(const configName : string; const key : string) : boolean;
@@ -492,6 +493,22 @@ begin
       exit(true);
 end;
 
+//Does the dproj carry ANY settings of its own for this platform? Must be asked BEFORE we start
+//adding stubs, or we would only ever be looking at our own work.
+//
+//The Cfg_N_<Platform> chain stub is not evidence either way - the IDE writes one only when that
+//config/platform pair has settings of its own, so a project that is fully configured for Linux64
+//(Base_Linux64 chain + '$(Base_Linux64)'!='' settings) legitimately has no Cfg_2_Linux64 group for
+//Release. Judging platform support by that stub alone cried wolf on every such project, while the
+//real cause of those builds failing was elsewhere entirely.
+function TProjectConfigPatcher.HasPlatformConfiguration(const configKey : string; const platformName : string) : boolean;
+begin
+  result := (FindChainGroup('Base', platformName) <> nil) or
+            (FindSettingsGroup('Base_' + platformName) <> nil) or
+            (FindChainGroup(configKey, platformName) <> nil) or
+            (FindSettingsGroup(configKey + '_' + platformName) <> nil);
+end;
+
 //Not read by msbuild, but DPM's own readers depend on it - TDPMProjectSettingsLoader resolves
 //the config key from here to build the /p:DCC_UnitSearchPath argument, and
 //TProjectEditor.LoadConfigurations errors outright when there are no BuildConfiguration items.
@@ -701,7 +718,7 @@ var
   configKey : string;
   platformName : string;
   createdConfig : boolean;
-  addedChain : boolean;
+  platformConfigured : boolean;
 begin
   result := TProjectPatchResult.Failed;
   FCompiler := compiler;
@@ -741,14 +758,17 @@ begin
     if TProjectPatchOption.UpdatePlatformList in options then
       EnsurePlatformListEntry(platformName);
 
+    //5. Ask about platform support before step 6 starts writing stubs.
+    platformConfigured := HasPlatformConfiguration(configKey, platformName);
+
     if UsesBasePlatformStubs then
     begin
       if EnsureChainGroup('Base', platformName) then
         EnsurePlatformNamespaces(platform, platformName);
     end;
-    addedChain := EnsureChainGroup(configKey, platformName);
+    EnsureChainGroup(configKey, platformName);
 
-    if addedChain and (not (platform in cWindowsPlatforms)) then
+    if (not platformConfigured) and (not (platform in cWindowsPlatforms)) then
       FLogger.Warning('Project [' + FProjectName + '] was not configured for [' + platformName +
                       '] - added the missing configuration, but the project has no ' + platformName +
                       ' specific settings so the build may still fail.');

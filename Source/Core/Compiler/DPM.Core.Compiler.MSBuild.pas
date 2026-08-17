@@ -101,6 +101,13 @@ uses
   DPM.Core.Compiler.ProjectSettings;
 
 
+const
+  //The only platforms whose build needs nothing from the IDE environment - everything the compiler
+  //and linker need lives under $(BDSLIB)\<platform>\release, which CodeGear.Delphi.Targets adds by
+  //itself. See the ImportEnvOptions note in BuildProject.
+  cWindowsPlatforms : TDPMPlatforms = [TDPMPlatform.Win32, TDPMPlatform.Win64,
+                                       TDPMPlatform.Win64x, TDPMPlatform.WinARM64EC];
+
 { TMSBuildCompiler }
 
 function TMSBuildCompiler.BuildProject(const cancellationToken : ICancellationToken; const platform : TDPMPlatform; const projectFile : string; const configName : string; const packageVersion : TPackageVersion; const forDesign : boolean) : Boolean;
@@ -138,8 +145,22 @@ begin
   env.RemoveVariable('BDSCOMMONDIR');
   {$ENDIF}
   env.RemoveVariable('PLATFORM');
-  //envoptions causes problems on our build machines, haven't figured out why yet.
-  env.AddOrSet('ImportEnvOptions','false');
+
+  //EnvOptions.proj is the IDE's environment - the per platform library paths and the selected
+  //platform SDK. CodeGear.Common.Targets imports it unless ImportEnvOptions is exactly 'false'.
+  //
+  //For Windows we keep it out on purpose : it drags the user's whole IDE library path (third party
+  //libs, catalog repository, madExcept etc) into what is meant to be an isolated package build, and
+  //on build machines those paths don't exist at all.
+  //
+  //For every other platform it is NOT optional. The SDK selection (--sysroot) and the linker
+  //library paths - $(BDS)\redist\<platform>, $(BDSCOMMONDIR)\Dcp\<platform>, Bpl\<platform>, and the
+  //SDK's own lib dirs - come from nowhere else, so suppressing it fails the link with
+  //'cannot find -lgcc_s / -lc / -ldl / -lpthread' long after the compile itself succeeded.
+  //Note the unit search path stays under our control either way - we pass DCC_UnitSearchPath as a
+  //global (command line) property, which wins over anything the project or EnvOptions sets.
+  if platform in cWindowsPlatforms then
+    env.AddOrSet('ImportEnvOptions','false');
   FLogger.Debug('Compler - cmdline : ' + commandLine);
   try
     exitCode := TProcess.Execute2(cancellationToken, 'cmd.exe', commandLine,'',env);
