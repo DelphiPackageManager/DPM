@@ -296,7 +296,7 @@ design:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `project` | Yes | Path to design-time .dpk file |
+| `project` | Yes | Path to the design-time `.dpk`/`.dproj` to build, **or** to a prebuilt `.bpl` the package ships (see below) |
 | `platforms` | No | Limited to Win32 and Win64 |
 | `defines` | No | Compiler defines for design-time build |
 | `references` | No | Array of package names added to the built package's requires clause |
@@ -305,6 +305,74 @@ design:
 | `libVersion` | No | Override library version string |
 
 > **Note:** Design-time packages are only supported on Win32 and Win64 platforms.
+
+#### Prebuilt design packages
+
+Commercial libraries are often distributed as compiled binaries with no `.dpk`/`.dproj` to
+build. Point `project` straight at the `.bpl` the package ships and DPM treats it as already
+built — no dproj patching, no MSBuild — and loads it into the IDE as-is:
+
+```yaml
+templates:
+  - name: default
+    source:
+      - src: bpl/Win32/*
+        dest: bpl
+        copyToBin: Win32
+      - src: dcp/Win32/*
+        dest: dcp
+        copyToBin: Win32
+
+    design:
+      - project: bpl/Win32/AcmeDesign370.bpl
+        platforms: [Win32]
+```
+
+Detection is by extension: a `.bpl` is a build *output*, never something MSBuild can load, so
+there is no separate `prebuilt` property to set. Pointing a design entry at a `.bpl` without
+this support produced `Error loading project file [...] : An invalid character was found in
+text content.` followed by a failed MSBuild run.
+
+##### `platforms` on a prebuilt entry means IDE bitness
+
+This is the one place where `platforms` does **not** mean "what the package compiles for".
+Delphi 12.3 and later ship both a 32-bit and a 64-bit IDE, and a design package can only be
+loaded by an IDE of its own bitness:
+
+| `platforms` | Loaded by |
+|-------------|-----------|
+| `Win32`     | the 32-bit IDE (`bds.exe`) |
+| `Win64`     | the 64-bit IDE (`bds64.exe`) |
+
+That is independent of `targetPlatforms`. A package that only ever compiles for Win32 still
+needs a **Win64** design bpl for its components to appear in a 64-bit IDE. Because
+`targetPlatforms` therefore cannot answer the question, **`platforms` is required on a prebuilt
+design entry** and must name exactly one of `Win32`/`Win64`. To support both IDEs, ship one
+entry per bitness, each pointing at that bitness's own binary:
+
+```yaml
+    design:
+      - project: bpl/Win32/AcmeDesign370.bpl
+        platforms: [Win32]        # 32 bit IDE
+      - project: bpl/Win64/AcmeDesign370.bpl
+        platforms: [Win64]        # 64 bit IDE
+```
+
+At install time DPM verifies every prebuilt entry regardless of which platform is being
+installed for; at load time the IDE picks the single entry matching its own bitness and ignores
+the other.
+
+For a *compiled* design entry none of this applies — DPM builds the bpl once per platform into
+`bpl\{platform}` and `platforms` is just a filter, so one entry serves both IDEs.
+
+##### Other rules for prebuilt entries
+
+- The `.bpl` must be packed by a source entry, same as any build/design project — `dpm pack`
+  fails the package otherwise. `install` errors if the binary isn't in the extracted package.
+- `libPrefix`/`libSuffix` are ignored. They exist to find whatever filename Delphi emitted for a
+  project DPM compiled; here the path *is* the filename.
+- The folder holding the `.bpl` is added to the IDE search path, so sibling runtime bpls the
+  design package links against resolve — keep them together.
 
 ### Package Definitions
 
