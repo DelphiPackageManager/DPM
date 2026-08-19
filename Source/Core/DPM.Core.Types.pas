@@ -41,6 +41,10 @@ type
   //Note : This type is serialized in options, changing names or order may break things!
   TVerbosity = (Quiet, Normal, Detailed, Debug);
 
+  //Output format for commands that can emit machine readable results.
+  //Json output is compact, goes to stdout on its own, and suppresses the banner.
+  TOutputFormat = (Text, Json);
+
   TSourceType = (
     Folder,
     GitRegistry,

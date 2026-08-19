@@ -31,6 +31,8 @@ interface
 uses
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Logging,
+  DPM.Core.Options.Common,
+  DPM.Core.Types,
   DPM.Console.ExitCodes,
   DPM.Console.Command,
   VSoft.CancellationToken;
@@ -81,7 +83,12 @@ end;
 
 function TBaseCommand.ForceNoBanner: boolean;
 begin
-  result := false;
+  //Asking for machine readable output means the banner is never wanted - it would be the
+  //first thing to break a parse.
+  //Read the GLOBAL options here, not the command own options object: the banner decision is
+  //made in TDPMConsoleApplication.Run before ExecuteCommand runs, so ApplyCommon has not
+  //copied the value across yet and the command copy is still at its default.
+  result := TCommonOptions.Default.OutputFormat = TOutputFormat.Json;
 end;
 
 end.

@@ -125,7 +125,10 @@
         <DCCReference Include="Core\Options\DPM.Core.Options.Cache.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Common.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Config.pas"/>
-        <DCCReference Include="Core\Options\DPM.Core.Options.Feed.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.SearchCmd.pas"/>
+        <DCCReference Include="Core\Json\DPM.Core.Json.Utils.pas"/>
+        <DCCReference Include="Core\Json\DPM.Core.Json.Projections.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Json.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Install.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.List.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Pack.pas"/>

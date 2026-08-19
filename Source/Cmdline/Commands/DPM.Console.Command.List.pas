@@ -29,17 +29,20 @@ unit DPM.Console.Command.List;
 interface
 
 uses
+  Spring.Collections,
   VSoft.CancellationToken,
   DPM.Console.ExitCodes,
   DPM.Console.Command.Base,
   DPM.Core.Logging,
   DPM.Core.Configuration.Interfaces,
+  DPM.Core.Package.Interfaces,
   DPM.Core.Repository.Interfaces;
 
 type
   TListCommand = class(TBaseCommand)
   private
     FRepositoryManager : IPackageRepositoryManager;
+    procedure EmitJsonResults(const searchResults : IList<IPackageListItem>);
   protected
     function Execute(const cancellationToken : ICancellationToken) : TExitCode; override;
   public
@@ -49,12 +52,14 @@ type
 implementation
 
 uses
-  Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Utils.Strings,
   DPM.Core.Options.Common,
   DPM.Core.Options.List,
-  DPM.Core.Package.Interfaces;
+  VSoft.YAML,
+  DPM.Console.RawIO,
+  DPM.Core.Json.Utils,
+  DPM.Core.Json.Projections;
 
 { TListCommand }
 
@@ -62,6 +67,21 @@ constructor TListCommand.Create(const logger: ILogger; const configurationManage
 begin
   inherited Create(logger, configurationManager);
   FRepositoryManager := repositoryManager;
+end;
+
+procedure TListCommand.EmitJsonResults(const searchResults : IList<IPackageListItem>);
+var
+  doc : IYAMLDocument;
+  packages : IYAMLSequence;
+  item : IPackageListItem;
+begin
+  doc := TYAML.CreateMapping;
+  //Envelope rather than a bare array, to match search and project - a caller can then always
+  //reach the results the same way, and there is somewhere to add totals later.
+  packages := doc.AsMapping.AddOrSetSequence('packages');
+  for item in searchResults do
+    TJsonProjections.PackageListItem(item, packages.AddMapping);
+  TStdOut.WriteLine(TJsonUtils.ToCompactJson(doc));
 end;
 
 function TListCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
@@ -94,6 +114,16 @@ begin
   FRepositoryManager.Initialize(config);
 
   searchResults := FRepositoryManager.List(cancellationToken, TListOptions.Default);
+
+  if TListOptions.Default.OutputFormat = TOutputFormat.Json then
+  begin
+    //An empty result is a legitimate answer in json mode, not a failure - emit an empty
+    //array and exit OK. Text mode keeps its existing behaviour.
+    EmitJsonResults(searchResults);
+    result := TExitCode.OK;
+    exit;
+  end;
+
   //TODO : re-implement this
   if searchResults.Any then
   begin

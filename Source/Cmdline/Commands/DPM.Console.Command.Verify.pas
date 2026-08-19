@@ -66,7 +66,9 @@ implementation
 
 uses
   System.SysUtils,
-  JsonDataObjects,
+  VSoft.YAML,
+  DPM.Console.RawIO,
+  DPM.Core.Json.Utils,
   DPM.Core.Options.Common,
   DPM.Core.Options.Verify;
 
@@ -277,84 +279,78 @@ end;
 procedure TVerifyCommand.EmitJsonResult(const packageFile : string;
                                          const verifyResult : TVerificationResult);
 var
-  doc : TJsonObject;
-  sigsArr : TJsonArray;
-  sigObj : TJsonObject;
-  attObj : TJsonObject;
+  doc : IYAMLDocument;
+  root : IYAMLMapping;
+  sigsArr : IYAMLSequence;
+  sigObj : IYAMLMapping;
+  attObj : IYAMLMapping;
   i : integer;
   sigInfo : TSignatureInfo;
   reasonStr : string;
 begin
-  // P3 §3.5 — single self-describing JSON object on stdout, no banner,
-  // no log noise. CI pipelines can `dpm verify ... --json-output` and
-  // pipe directly into jq.
-  doc := TJsonObject.Create;
-  try
-    doc.S['package'] := ExtractFileName(packageFile);
-    doc.S['mode'] := ModeToString(verifyResult.Mode);
-    doc.S['outcome'] := OutcomeName(verifyResult.Outcome);
-    if verifyResult.Reason <> '' then
-      doc.S['reason'] := verifyResult.Reason;
-    doc.S['manifestHash'] := 'sha256:' + verifyResult.ManifestHashHex;
-    doc.S['policyFingerprint'] := verifyResult.PolicyFingerprint;
+  // P3 3.5 - single self-describing JSON object on stdout, no banner, no log noise.
+  // CI pipelines can `dpm verify ... --json-output` and pipe directly into jq.
+  //
+  // Built with VSoft.YAML rather than JsonDataObjects, which is being retired from the
+  // project. Two things changed with it, both cosmetic: indentation is two spaces rather
+  // than tabs, and optional string fields are omitted when empty rather than written as ""
+  // (TJsonUtils.AddIfNotEmpty - see that unit for why). The set of fields and their values
+  // are unchanged.
+  doc := TYAML.CreateMapping;
+  root := doc.AsMapping;
 
-    sigsArr := doc.A['signatures'];
-    for i := 0 to High(verifyResult.Signatures) do
+  root.AddOrSetValue('package', ExtractFileName(packageFile));
+  root.AddOrSetValue('mode', ModeToString(verifyResult.Mode));
+  root.AddOrSetValue('outcome', OutcomeName(verifyResult.Outcome));
+  TJsonUtils.AddIfNotEmpty(root, 'reason', verifyResult.Reason);
+  root.AddOrSetValue('manifestHash', 'sha256:' + verifyResult.ManifestHashHex);
+  root.AddOrSetValue('policyFingerprint', verifyResult.PolicyFingerprint);
+
+  sigsArr := root.AddOrSetSequence('signatures');
+  for i := 0 to High(verifyResult.Signatures) do
+  begin
+    sigInfo := verifyResult.Signatures[i];
+    sigObj := sigsArr.AddMapping;
+    if sigInfo.Role = srAuthor then
+      sigObj.AddOrSetValue('role', 'author')
+    else
+      sigObj.AddOrSetValue('role', 'repository');
+    TJsonUtils.AddIfNotEmpty(sigObj, 'signerSubject', sigInfo.SignerSubject);
+    sigObj.AddOrSetValue('signerSpki', 'sha256:' + sigInfo.SignerSpkiHex);
+    TJsonUtils.AddIfNotEmpty(sigObj, 'thumbprint', sigInfo.Thumbprint);
+    sigObj.AddOrSetValue('valid', sigInfo.Valid);
+    if not sigInfo.Valid then
+      TJsonUtils.AddIfNotEmpty(sigObj, 'failureReason', sigInfo.FailureReason);
+    if sigInfo.EffectiveSigningTime > 0 then
+      sigObj.AddOrSetValue('effectiveSigningTime',
+        FormatDateTime('yyyy-mm-dd"T"hh:nn:ss"Z"', sigInfo.EffectiveSigningTime));
+    sigObj.AddOrSetValue('revocation', RevocationStatusName(sigInfo.Revocation));
+    reasonStr := RevocationReasonName(sigInfo.CurrentRevocationReason);
+    TJsonUtils.AddIfNotEmpty(sigObj, 'currentRevocationReason', reasonStr);
+    if sigInfo.Role = srAuthor then
+      sigObj.AddOrSetValue('publisherTrusted', sigInfo.PublisherTrusted)
+    else
     begin
-      sigInfo := verifyResult.Signatures[i];
-      sigObj := sigsArr.AddObject;
-      if sigInfo.Role = srAuthor then
-        sigObj.S['role'] := 'author'
-      else
-        sigObj.S['role'] := 'repository';
-      sigObj.S['signerSubject'] := sigInfo.SignerSubject;
-      sigObj.S['signerSpki']    := 'sha256:' + sigInfo.SignerSpkiHex;
-      sigObj.S['thumbprint']    := sigInfo.Thumbprint;
-      sigObj.B['valid']         := sigInfo.Valid;
-      if not sigInfo.Valid then
-        sigObj.S['failureReason'] := sigInfo.FailureReason;
-      if sigInfo.EffectiveSigningTime > 0 then
-        sigObj.S['effectiveSigningTime'] :=
-          FormatDateTime('yyyy-mm-dd"T"hh:nn:ss"Z"', sigInfo.EffectiveSigningTime);
-      sigObj.S['revocation'] := RevocationStatusName(sigInfo.Revocation);
-      reasonStr := RevocationReasonName(sigInfo.CurrentRevocationReason);
-      if reasonStr <> '' then
-        sigObj.S['currentRevocationReason'] := reasonStr;
-      if sigInfo.Role = srAuthor then
-        sigObj.B['publisherTrusted'] := sigInfo.PublisherTrusted
-      else
+      sigObj.AddOrSetValue('repositoryTrusted', sigInfo.RepositoryTrusted);
+      if sigInfo.Attestation.Present then
       begin
-        sigObj.B['repositoryTrusted'] := sigInfo.RepositoryTrusted;
-        if sigInfo.Attestation.Present then
-        begin
-          attObj := sigObj.O['attestation'];
-          if sigInfo.Attestation.Namespace <> '' then
-            attObj.S['namespace'] := sigInfo.Attestation.Namespace;
-          if sigInfo.Attestation.AuthorSpkiHex <> '' then
-            attObj.S['authorSpki'] := 'sha256:' + sigInfo.Attestation.AuthorSpkiHex
-          else
-            case sigInfo.Attestation.UnsignedReason of
-              urAttestNeverSigned         : attObj.S['unsignedReason'] := 'neverSigned';
-              urAttestAuthorCeasedSigning : attObj.S['unsignedReason'] := 'authorCeasedSigning';
-            end;
-        end;
+        attObj := sigObj.AddOrSetMapping('attestation');
+        TJsonUtils.AddIfNotEmpty(attObj, 'namespace', sigInfo.Attestation.Namespace);
+        if sigInfo.Attestation.AuthorSpkiHex <> '' then
+          attObj.AddOrSetValue('authorSpki', 'sha256:' + sigInfo.Attestation.AuthorSpkiHex)
+        else
+          case sigInfo.Attestation.UnsignedReason of
+            urAttestNeverSigned         : attObj.AddOrSetValue('unsignedReason', 'neverSigned');
+            urAttestAuthorCeasedSigning : attObj.AddOrSetValue('unsignedReason', 'authorCeasedSigning');
+          end;
       end;
     end;
-
-    //Raw stdout write - this JSON is machine consumed, so it deliberately bypasses
-    //IConsoleWriter, which would indent and word wrap it (and would emit UTF-8 rather
-    //than the RTL's ANSI, changing the bytes for non-ASCII content). I/O checks are off
-    //so an unusable stdout cannot raise EInOutError, and IOResult consumes any error so
-    //it cannot poison the next RTL statement either - the exit code still reports the
-    //verification result.
-{$IOCHECKS OFF}
-    Write(doc.ToJSON(False));
-    Writeln;
-    IOResult;
-{$IOCHECKS ON}
-  finally
-    doc.Free;
   end;
+
+  //Raw stdout, bypassing IConsoleWriter, which would indent and word wrap this. TStdOut
+  //writes UTF-8 - the previous RTL Write emitted the console ANSI code page, which corrupted
+  //any non ASCII signer subject.
+  TStdOut.WriteLine(TJsonUtils.ToPrettyJson(doc));
 end;
 
 end.

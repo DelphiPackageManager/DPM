@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
@@ -179,6 +179,14 @@
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Resolution.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Resolver.pas"/>
         <DCCReference Include="Core\Dependency\DPM.Core.Dependency.Version.pas"/>
+        <DCCReference Include="Core\Json\DPM.Core.Json.Projections.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.SearchCmd.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Project.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Project.pas"/>
+        <DCCReference Include="Cmdline\Writer\DPM.Console.RawIO.pas"/>
+        <DCCReference Include="Cmdline\Writer\DPM.Console.Writer.StdErr.pas"/>
+        <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Search.pas"/>
+        <DCCReference Include="Core\Json\DPM.Core.Json.Utils.pas"/>
         <DCCReference Include="Core\Logging\DPM.Core.Logging.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Base.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Common.pas"/>

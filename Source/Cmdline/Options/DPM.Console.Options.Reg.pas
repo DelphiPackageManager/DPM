@@ -42,6 +42,8 @@ uses
   DPM.Core.Options.Config,
   DPM.Core.Options.Install,
   DPM.Core.Options.List,
+  DPM.Core.Options.SearchCmd,
+  DPM.Core.Options.Project,
   DPM.Core.Options.Pack,
   DPM.Core.Options.Prepare,
   DPM.Core.Options.Push,
@@ -377,100 +379,106 @@ begin
 
 end;
 
-//procedure RegisterFeedCommand;
-//var
-//  option : IOptionDefinition;
-//  cmd : TCommandDefinition;
-//begin
-//  cmd := TOptionsRegistry.RegisterCommand('feed', 'f', 'Displays a list of packages from a given source. If no sources are specified, all sources ' +
-//                                                        'defined in %AppData%\DPM\DPM.config are used. If DPM.config specifies no sources, ' +
-//                                                        'uses the default DPM feed.',
-//                                                        'Specify optional search term.',
-//                                                        'list [search term] [options]');
-//
-//
-//  option := cmd.RegisterUnNamedOption<string>('Specify optional search terms','searchTerms',
-//    procedure(const value : string)
-//    begin
-//      TFeedOptions.Default.SearchTerms := value;
-//    end);
-//
-//
-//  option := cmd.RegisterOption<string>('source','s','The source from which to list packages',
-//    procedure(const value : string)
-//    begin
-//      if TFeedOptions.Default.Sources = '' then
-//        TFeedOptions.Default.Sources := value
-//      else
-//        TFeedOptions.Default.Sources := TFeedOptions.Default.Sources +',' + value;
-//    end);
-//  option.AllowMultiple := true;
-//
-//  option := cmd.RegisterOption<boolean>('allVersions','a','List all versions of a package. By default, only the latest package version is displayed.',
-//    procedure(const value : boolean)
-//    begin
-//      TFeedOptions.Default.AllVersions := value;
-//    end);
-//  option.HasValue := false;
-//
-//  option := cmd.RegisterOption<boolean>('exact','e','Search for exact package id match.',
-//    procedure(const value : boolean)
-//    begin
-//      TFeedOptions.Default.Exact := value;
-//    end);
-//  option.HasValue := false;
-//
-//  option := cmd.RegisterOption<boolean>('prerelease','pr','Allow prerelease packages to be shown.',
-//    procedure(const value : boolean)
-//    begin
-//      TFeedOptions.Default.Prerelease := value;
-//    end);
-//  option.HasValue := false;
-//
-//  option := cmd.RegisterOption<boolean>('includeDelisted','d','Allow delisted packages to be shown.',
-//    procedure(const value : boolean)
-//    begin
-//      TFeedOptions.Default.IncludeDelisted := value;
-//    end);
-//  option.HasValue := false;
-//
-//  option := cmd.RegisterOption<integer>('skip','','Skip over x results before listing.',
-//    procedure(const value : integer)
-//    begin
-//      TFeedOptions.Default.Skip := value;;
-//    end);
-//
-//  option := cmd.RegisterOption<integer>('take','','Take max x results.',
-//    procedure(const value : integer)
-//    begin
-//      TFeedOptions.Default.Take := value;;
-//    end);
-//
-//  option := cmd.RegisterOption<string>('compiler','c','Compiler version. When not specified, all compiler versions found are listed.',
-//    procedure(const value : string)
-//    begin
-//      TFeedOptions.Default.CompilerVersion := StringToCompilerVersion(value);
-//      if TFeedOptions.Default.CompilerVersion = TCompilerVersion.UnknownVersion then
-//        raise EArgumentException.Create('Invalid compiler version : ' + value);
-//
-//
-//    end);
-//
-//  option := cmd.RegisterOption<TDPMPlatforms>('platforms','p','Target platforms, comma separated. When not specified, all platforms found are listed.',
-//    procedure(const value : TDPMPlatforms)
-//    begin
-//      TFeedOptions.Default.Platforms := value;
-//    end);
-//
-//
-//  cmd.Examples.Add('list "commandline"');
-//
-//  cmd.Examples.Add('list "semantic" -prerelease -skip=10 -take=10');
-//
-//  cmd.Examples.Add('list "commandline" -compiler=10.2 -platforms=Win32,Win63,MacOS32 -source=VSoftInternal -prerelease');
-//
-//
-//end;
+procedure RegisterProjectCommand;
+var
+  option : IOptionDefinition;
+  cmd : TCommandDefinition;
+begin
+  cmd := TOptionsRegistry.RegisterCommand('project', '', 'Reports what a project targets - compiler version, platforms - and the DPM packages it ' +
+                                                         'references, showing which are top level and which were pulled in as dependencies.',
+                                                         'Accepts a .dproj, a .groupproj, or a directory containing exactly one of them. ' +
+                                                         'Defaults to the current directory. The project file is never modified.',
+                                                         'project [path] [options]');
+
+  option := cmd.RegisterUnNamedOption<string>('Path to a .dproj or .groupproj, or a directory containing one.','path',
+    procedure(const value : string)
+    begin
+      TProjectOptions.Default.ProjectPath := value;
+    end);
+
+  option := cmd.RegisterOption<string>('compiler','c','Compiler version. Defaults to whatever the project itself declares.',
+    procedure(const value : string)
+    begin
+      TProjectOptions.Default.CompilerVersion := StringToCompilerVersion(value);
+      if TProjectOptions.Default.CompilerVersion = TCompilerVersion.UnknownVersion then
+        raise EArgumentException.Create('Invalid compiler version : ' + value);
+    end);
+
+  cmd.Examples.Add('project');
+  cmd.Examples.Add('project MyApp.dproj');
+  cmd.Examples.Add('project MyApp.dproj --format=Json');
+end;
+
+procedure RegisterSearchCommand;
+var
+  option : IOptionDefinition;
+  cmd : TCommandDefinition;
+begin
+  cmd := TOptionsRegistry.RegisterCommand('search', '', 'Searches the configured package sources and shows the full details of each match - ' +
+                                                        'description, authors, licence, tags and urls. Use this rather than ''list'' when you ' +
+                                                        'need to work out which package to use.',
+                                                        'A compiler version is required, since packages are published separately for each ' +
+                                                        'Delphi compiler version.',
+                                                        'search [search terms] --compiler=<version> [options]');
+
+  option := cmd.RegisterUnNamedOption<string>('Search terms - matched against package id, description and tags.','searchTerms',
+    procedure(const value : string)
+    begin
+      TSearchCmdOptions.Default.SearchTerms := value;
+    end);
+
+  option := cmd.RegisterOption<string>('compiler','c','Compiler version, e.g. 12.0 or XE2. Required.',
+    procedure(const value : string)
+    begin
+      TSearchCmdOptions.Default.CompilerVersion := StringToCompilerVersion(value);
+      if TSearchCmdOptions.Default.CompilerVersion = TCompilerVersion.UnknownVersion then
+        raise EArgumentException.Create('Invalid compiler version : ' + value);
+    end);
+
+  option := cmd.RegisterOption<string>('source','s','The source to search. May be specified more than once. Defaults to all enabled sources.',
+    procedure(const value : string)
+    begin
+      if TSearchCmdOptions.Default.Sources = '' then
+        TSearchCmdOptions.Default.Sources := value
+      else
+        TSearchCmdOptions.Default.Sources := TSearchCmdOptions.Default.Sources + ',' + value;
+    end);
+  option.AllowMultiple := true;
+
+  option := cmd.RegisterOption<boolean>('exact','e','Match the package id exactly rather than searching.',
+    procedure(const value : boolean)
+    begin
+      TSearchCmdOptions.Default.Exact := value;
+    end);
+  option.HasValue := false;
+
+  option := cmd.RegisterOption<boolean>('prerelease','pr','Include prerelease versions.',
+    procedure(const value : boolean)
+    begin
+      TSearchCmdOptions.Default.Prerelease := value;
+    end);
+  option.HasValue := false;
+
+  option := cmd.RegisterOption<integer>('skip','','Skip over x results.',
+    procedure(const value : integer)
+    begin
+      TSearchCmdOptions.Default.Skip := value;
+    end);
+
+  option := cmd.RegisterOption<integer>('take','','Return at most x results.',
+    procedure(const value : integer)
+    begin
+      TSearchCmdOptions.Default.Take := value;
+    end);
+
+  //NOTE : no 'platforms' option here on purpose. The PackageSearch feed endpoint does not
+  //accept a platforms parameter (only PackageList does), so registering one would silently
+  //do nothing. Each result reports the platforms it supports instead.
+
+  cmd.Examples.Add('search json --compiler=12.0');
+  cmd.Examples.Add('search "http client" --compiler=12.0 --prerelease');
+  cmd.Examples.Add('search Spring4D.Core --compiler=12.0 --exact --format=Json');
+end;
 
 
 
@@ -1531,6 +1539,15 @@ begin
       TCommonOptions.Default.Verbosity := value;
     end);
 
+  //Global output format. No short alias - 'f' is already taken by 'format' on sources and
+  //sbom, and by 'force' on prepare and cache. Command level options are matched before
+  //global ones, so those keep their existing meanings.
+  option := TOptionsRegistry.RegisterOption<TOutputFormat>('format','','Output format (Text|Json). Json emits a single machine readable document and suppresses the banner.',
+    procedure(const value : TOutputFormat)
+    begin
+      TCommonOptions.Default.OutputFormat := value;
+    end);
+
   option := TOptionsRegistry.RegisterOption<string>('configFile','','The dpm.config file to use.',
     procedure(const value : string)
     begin
@@ -1543,6 +1560,8 @@ begin
   RegisterHelpCommand;
   RegisterInstallCommand;
   RegisterListCommand;
+  RegisterSearchCommand;
+  RegisterProjectCommand;
   RegisterPackCommand;
   RegisterPrepareCommand;
   RegisterPushCommand;

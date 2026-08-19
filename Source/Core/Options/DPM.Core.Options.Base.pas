@@ -39,6 +39,7 @@ type
     FVerbosity : TVerbosity;
     FConfigFile : string;
     FNonInteractive : boolean;
+    FOutputFormat : TOutputFormat;
   protected
     FValidated : boolean;
     FIsValid : boolean;
@@ -50,6 +51,9 @@ type
     property ConfigFile : string read FConfigFile write FConfigFile;
     property NonInteractive : boolean read FNonInteractive write FNonInteractive;
     property Verbosity : TVerbosity read FVerbosity write FVerbosity;
+    //Named OutputFormat rather than Format: TSourcesOptions already declares a Format
+    //property of a different type, and a base class Format would silently shadow it.
+    property OutputFormat : TOutputFormat read FOutputFormat write FOutputFormat;
     property Validated : boolean read FValidated;
     property IsValid : boolean read FIsValid;
   end;
@@ -71,6 +75,7 @@ begin
   FVerbosity := options.Verbosity;
   FConfigFile := options.ConfigFile;
   FNonInteractive := options.NonInteractive;
+  FOutputFormat := options.OutputFormat;
   //check if there is a config file in the curent folder.
   if FConfigFile = '' then
   begin
@@ -100,6 +105,7 @@ begin
   FVerbosity := original.Verbosity;
   FConfigFile := original.FConfigFile;
   FNonInteractive := original.FNonInteractive;
+  FOutputFormat := original.FOutputFormat;
   FValidated := original.FValidated;
   FIsValid := original.FIsValid;
 end;

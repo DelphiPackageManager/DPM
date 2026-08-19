@@ -36,6 +36,7 @@ procedure InitConsole(const container : TContainer);
 implementation
 
 uses
+  DPM.Console.Types,
   DPM.Console.Command,
   DPM.Console.Command.Factory,
   DPM.Console.Command.Cache,
@@ -45,6 +46,9 @@ uses
   DPM.Console.Command.Help,
   DPM.Console.Command.Install,
   DPM.Console.Command.List,
+  DPM.Console.Command.Search,
+  DPM.Console.Writer.StdErr,
+  DPM.Console.Command.Project,
   DPM.Console.Command.Pack,
   DPM.Console.Command.Prepare,
   DPM.Console.Command.Push,
@@ -85,12 +89,19 @@ procedure InitConsole(const container : TContainer);
 var
   console : IConsoleWriter;
 begin
+  //When stdout has to carry a machine readable document, every diagnostic - including the
+  //banner, parse errors and help - goes to stderr instead. See TStdErrConsole.
+  if WantsCleanStdOut then
+    console := TStdErrConsole.Create
+  else
+  begin
 {$IFDEF MSWINDOWS}
-  console := TWindowsConsole.Create;
+    console := TWindowsConsole.Create;
 {$ENDIF}
 {$IFDEF MACOS}
-  console := TMacOSConsole.Create;
+    console := TMacOSConsole.Create;
 {$ENDIF}
+  end;
  container.RegisterInstance<IConsoleWriter>(console);
  container.RegisterType<ILogger, TDPMConsoleLogger>.AsSingleton();
 
@@ -105,6 +116,8 @@ begin
  container.RegisterType<ICommandHandler,THelpCommand>('command.help');
  container.RegisterType<ICommandHandler,TInstallCommand>('command.install');
  container.RegisterType<ICommandHandler,TListCommand>('command.list');
+ container.RegisterType<ICommandHandler,TSearchCommand>('command.search');
+ container.RegisterType<ICommandHandler,TProjectCommand>('command.project');
  container.RegisterType<ICommandHandler,TPackCommand>('command.pack');
  container.RegisterType<ICommandHandler,TPrepareCommand>('command.prepare');
  container.RegisterType<ICommandHandler,TPushCommand>('command.push');

@@ -1,8 +1,8 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright � 2019 Vincent Parrett and contributors               }
+{           Copyright © 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -24,43 +24,48 @@
 {                                                                           }
 {***************************************************************************}
 
-unit DPM.Core.Options.Feed;
+unit DPM.Core.Options.Project;
 
 interface
 
-
 uses
   DPM.Core.Types,
-  DPM.Core.Options.Search;
-
-//NOTE : This is just for testing package feeds from the command line.
+  DPM.Core.Options.Base;
 
 type
-  TFeedOptions = class(TSearchOptions)
+  ///<summary> Options for the 'project' command - reports a project's compiler, platforms and package tree. </summary>
+  TProjectOptions = class(TOptionsBase)
   private
+    FProjectPath : string;
+    FCompilerVersion : TCompilerVersion;
     class var
-      FDefault : TFeedOptions;
+      FDefault : TProjectOptions;
   public
     class constructor CreateDefault;
-    class property Default : TFeedOptions read FDefault;
+    class property Default : TProjectOptions read FDefault;
     constructor Create; override;
 
+    property ProjectPath : string read FProjectPath write FProjectPath;
+    ///<summary>
+    ///  Optional. Left as UnknownVersion the project is asked what it targets, which is the
+    ///  usual case - overriding it suppresses that inference (see TProjectEditor).
+    ///</summary>
+    property CompilerVersion : TCompilerVersion read FCompilerVersion write FCompilerVersion;
   end;
 
 implementation
 
-{ TFeedOptions }
+{ TProjectOptions }
 
-constructor TFeedOptions.Create;
+constructor TProjectOptions.Create;
 begin
   inherited;
-
+  FCompilerVersion := TCompilerVersion.UnknownVersion;
 end;
 
-class constructor TFeedOptions.CreateDefault;
+class constructor TProjectOptions.CreateDefault;
 begin
-  FDefault := TFeedOptions.Create;
+  FDefault := TProjectOptions.Create;
 end;
 
 end.
-

@@ -69,10 +69,11 @@ type
                  Help,
                  Install,
                  Uninstall,
-                 Feed,
+                 Search,
                  List,
                  Pack,
                  Prepare,
+                 Project,
                  Push,
                  Restore,
                  SetAPIKey,
@@ -100,10 +101,11 @@ const
                        'help',
                        'install',
                        'uninstall',
-                       'feed',
+                       'search',
                        'list',
                        'pack',
                        'prepare',
+                       'project',
                        'push',
                        'restore',
                        'setapikey',
@@ -124,10 +126,39 @@ const
 
 function GetCommandFromString(const value : string) : TDPMCommand;
 
+///<summary>
+///  True when this invocation needs stdout to carry machine readable output and nothing else.
+///</summary>
+///<remarks>
+///  Deliberately scans the raw parameters rather than reading parsed options. The decision has
+///  to be made in InitConsole, which runs before TOptionsRegistry.Parse - and it still has to
+///  hold when parsing FAILS, because the banner and the parse error are written unconditionally
+///  at that point. Reading parsed state here would leave exactly those two cases on stdout.
+///</remarks>
+function WantsCleanStdOut : boolean;
+
 implementation
 
 uses
+  System.SysUtils,
   System.TypInfo;
+
+function WantsCleanStdOut : boolean;
+var
+  i : integer;
+  param : string;
+begin
+  result := false;
+  for i := 1 to ParamCount do
+  begin
+    param := ParamStr(i);
+    //Accept every spelling the command line parser accepts, so the console cannot end up
+    //disagreeing with the options registry about what was asked for.
+    if SameText(param, '--format=json') or SameText(param, '-format=json') or
+       SameText(param, '/format=json') then
+      exit(true);
+  end;
+end;
 
 function GetCommandFromString(const value : string) : TDPMCommand;
 var

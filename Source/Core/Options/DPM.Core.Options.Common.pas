@@ -39,6 +39,7 @@ type
     FHelp : boolean;
     FConfigFile : string;
     FNonInteractive : boolean;
+    FOutputFormat : TOutputFormat;
     class var
       FDefault : TCommonOptions;
   public
@@ -51,6 +52,7 @@ type
     property Verbosity : TVerbosity read FVerbosity write FVerbosity;
     property Help : boolean read FHelp write FHelp;
     property ConfigFile : string read FConfigFile write FConfigFile;
+    property OutputFormat : TOutputFormat read FOutputFormat write FOutputFormat;
   end;
 implementation
 
