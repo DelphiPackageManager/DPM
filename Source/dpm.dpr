@@ -65,6 +65,18 @@ uses
   DPM.Core.Dependency.Resolver in 'Core\Dependency\DPM.Core.Dependency.Resolver.pas',
   DPM.Core.Dependency.Version in 'Core\Dependency\DPM.Core.Dependency.Version.pas',
   DPM.Core.Json.Projections in 'Core\Json\DPM.Core.Json.Projections.pas',
+  DPM.Core.MCP.Interfaces in 'Core\MCP\DPM.Core.MCP.Interfaces.pas',
+  DPM.Core.MCP.FrameBuffer in 'Core\MCP\DPM.Core.MCP.FrameBuffer.pas',
+  DPM.Core.MCP.Protocol in 'Core\MCP\DPM.Core.MCP.Protocol.pas',
+  DPM.Core.MCP.Transport.Memory in 'Core\MCP\DPM.Core.MCP.Transport.Memory.pas',
+  DPM.Core.MCP.Tools.Common in 'Core\MCP\DPM.Core.MCP.Tools.Common.pas',
+  DPM.Core.MCP.Server in 'Core\MCP\DPM.Core.MCP.Server.pas',
+  DPM.Core.MCP.Tools.Packages in 'Core\MCP\DPM.Core.MCP.Tools.Packages.pas',
+  DPM.Core.MCP.Tools.Project in 'Core\MCP\DPM.Core.MCP.Tools.Project.pas',
+  DPM.Core.MCP.Transport.Logging in 'Core\MCP\DPM.Core.MCP.Transport.Logging.pas',
+  DPM.Core.Options.MCP in 'Core\Options\DPM.Core.Options.MCP.pas',
+  DPM.Console.MCP.StdioTransport in 'Cmdline\MCP\DPM.Console.MCP.StdioTransport.pas',
+  DPM.Console.Command.MCP in 'Cmdline\Commands\DPM.Console.Command.MCP.pas',
   DPM.Core.Options.SearchCmd in 'Core\Options\DPM.Core.Options.SearchCmd.pas',
   DPM.Core.Options.Project in 'Core\Options\DPM.Core.Options.Project.pas',
   DPM.Console.Command.Project in 'Cmdline\Commands\DPM.Console.Command.Project.pas',
@@ -288,8 +300,11 @@ begin
       System.ExitCode := Ord(TDPMConsoleApplication.Run);
       {$IFDEF DEBUG}
         //if running under the debugger, pause so we can see the output!
+        //NOT when stdout is carrying machine readable output: this ReadLn consumes the
+        //process stdin, which for 'dpm mcp' is the client's request stream - a DEBUG
+        //build would swallow the first request and hang the session.
         {$WARN SYMBOL_PLATFORM OFF}
-        if DebugHook <> 0 then
+        if (DebugHook <> 0) and (not WantsCleanStdOut) then
           ReadLn;
       {$ENDIF};
     except
@@ -304,12 +319,14 @@ begin
           // clear any pending I/O error first, otherwise it is what gets reported
           // instead of the exception we actually want to see.
           IOResult;
-          WriteLn(e.Message);
+          //stderr, never stdout: this is the last resort handler, and for 'dpm mcp' or
+          //--format=Json stdout belongs to the machine readable stream.
+          TStdErr.WriteLine(e.Message);
         except
           // nothing we can do
         end;
       {$IFDEF DEBUG}
-        if DebugHook <> 0 then
+        if (DebugHook <> 0) and (not WantsCleanStdOut) then
           ReadLn;
       {$ENDIF};
       end;

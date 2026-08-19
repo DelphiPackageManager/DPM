@@ -49,6 +49,7 @@ uses
   DPM.Console.Command.Search,
   DPM.Console.Writer.StdErr,
   DPM.Console.Command.Project,
+  DPM.Console.Command.MCP,
   DPM.Console.Command.Pack,
   DPM.Console.Command.Prepare,
   DPM.Console.Command.Push,
@@ -118,6 +119,7 @@ begin
  container.RegisterType<ICommandHandler,TListCommand>('command.list');
  container.RegisterType<ICommandHandler,TSearchCommand>('command.search');
  container.RegisterType<ICommandHandler,TProjectCommand>('command.project');
+ container.RegisterType<ICommandHandler,TMCPCommand>('command.mcp');
  container.RegisterType<ICommandHandler,TPackCommand>('command.pack');
  container.RegisterType<ICommandHandler,TPrepareCommand>('command.prepare');
  container.RegisterType<ICommandHandler,TPushCommand>('command.push');

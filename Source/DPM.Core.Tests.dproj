@@ -128,7 +128,17 @@
         <DCCReference Include="Core\Options\DPM.Core.Options.SearchCmd.pas"/>
         <DCCReference Include="Core\Json\DPM.Core.Json.Utils.pas"/>
         <DCCReference Include="Core\Json\DPM.Core.Json.Projections.pas"/>
+        <DCCReference Include="Core\MCP\DPM.Core.MCP.Interfaces.pas"/>
+        <DCCReference Include="Core\MCP\DPM.Core.MCP.FrameBuffer.pas"/>
+        <DCCReference Include="Core\MCP\DPM.Core.MCP.Protocol.pas"/>
+        <DCCReference Include="Core\MCP\DPM.Core.MCP.Transport.Memory.pas"/>
+        <DCCReference Include="Core\MCP\DPM.Core.MCP.Tools.Common.pas"/>
+        <DCCReference Include="Core\MCP\DPM.Core.MCP.Server.pas"/>
+        <DCCReference Include="Core\MCP\DPM.Core.MCP.Tools.Packages.pas"/>
+        <DCCReference Include="Core\MCP\DPM.Core.MCP.Tools.Project.pas"/>
+        <DCCReference Include="Core\MCP\DPM.Core.MCP.Transport.Logging.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Json.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.MCP.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Install.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.List.pas"/>
         <DCCReference Include="Core\Options\DPM.Core.Options.Pack.pas"/>

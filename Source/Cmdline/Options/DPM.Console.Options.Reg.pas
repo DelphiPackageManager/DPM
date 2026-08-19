@@ -44,6 +44,7 @@ uses
   DPM.Core.Options.List,
   DPM.Core.Options.SearchCmd,
   DPM.Core.Options.Project,
+  DPM.Core.Options.MCP,
   DPM.Core.Options.Pack,
   DPM.Core.Options.Prepare,
   DPM.Core.Options.Push,
@@ -407,6 +408,53 @@ begin
   cmd.Examples.Add('project');
   cmd.Examples.Add('project MyApp.dproj');
   cmd.Examples.Add('project MyApp.dproj --format=Json');
+end;
+
+procedure RegisterMCPCommand;
+var
+  option : IOptionDefinition;
+  cmd : TCommandDefinition;
+begin
+  cmd := TOptionsRegistry.RegisterCommand('mcp', '', 'Runs a read only MCP (Model Context Protocol) server over stdio, so an AI coding agent can search DPM packages and inspect Delphi projects.',
+                                                     'Reads JSON-RPC from stdin and writes it to stdout; all logging goes to stderr. ' +
+                                                     'Nothing this server exposes can modify a project - use dpm install for that. ' +
+                                                     'Register it with your agent, e.g. : claude mcp add dpm -- dpm.exe mcp',
+                                                     'mcp [options]');
+
+  option := cmd.RegisterOption<string>('compiler','c','Fallback Delphi compiler version, used only when no project is in play. Normally unnecessary: each tool call reads the compiler from the project it is given.',
+    procedure(const value : string)
+    begin
+      TMCPOptions.Default.CompilerVersion := StringToCompilerVersion(value);
+      if TMCPOptions.Default.CompilerVersion = TCompilerVersion.UnknownVersion then
+        raise EArgumentException.Create('Invalid compiler version : ' + value);
+    end);
+
+  option := cmd.RegisterOption<string>('project','p','Default .dproj when a tool call does not name one. Defaults to the single .dproj in the working directory.',
+    procedure(const value : string)
+    begin
+      TMCPOptions.Default.ProjectPath := value;
+    end);
+
+  option := cmd.RegisterOption<string>('source','s','Restrict package queries to this source. May be given more than once.',
+    procedure(const value : string)
+    begin
+      if TMCPOptions.Default.Sources = '' then
+        TMCPOptions.Default.Sources := value
+      else
+        TMCPOptions.Default.Sources := TMCPOptions.Default.Sources + ',' + value;
+    end);
+  option.AllowMultiple := true;
+
+  option := cmd.RegisterOption<string>('logfile','','Append every MCP frame, both directions, to this file. For diagnosing a client that connects but does not work.',
+    procedure(const value : string)
+    begin
+      TMCPOptions.Default.LogFile := value;
+    end);
+
+  cmd.Examples.Add('mcp');
+  cmd.Examples.Add('mcp --project=C:\src\MyApp.dproj');
+  cmd.Examples.Add('mcp --logfile=%TEMP%\dpm-mcp.log');
+  cmd.Examples.Add('mcp --compiler=12.0     //fallback only - prefer letting the project decide');
 end;
 
 procedure RegisterSearchCommand;
@@ -1562,6 +1610,7 @@ begin
   RegisterListCommand;
   RegisterSearchCommand;
   RegisterProjectCommand;
+  RegisterMCPCommand;
   RegisterPackCommand;
   RegisterPrepareCommand;
   RegisterPushCommand;

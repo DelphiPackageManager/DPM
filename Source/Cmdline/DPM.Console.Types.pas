@@ -71,6 +71,7 @@ type
                  Uninstall,
                  Search,
                  List,
+                 MCP,
                  Pack,
                  Prepare,
                  Project,
@@ -103,6 +104,7 @@ const
                        'uninstall',
                        'search',
                        'list',
+                       'mcp',
                        'pack',
                        'prepare',
                        'project',
@@ -157,6 +159,17 @@ begin
     if SameText(param, '--format=json') or SameText(param, '-format=json') or
        SameText(param, '/format=json') then
       exit(true);
+
+    //The mcp server owns stdout for its whole life - the JSON-RPC framing is one message
+    //per line and a single stray banner or log line would corrupt the session.
+    if (param <> '') and (param[1] <> '-') and (param[1] <> '/') then
+    begin
+      //First non switch token is the command name; stop either way so an argument that
+      //happens to read 'mcp' later on cannot trigger this.
+      if SameText(param, 'mcp') then
+        exit(true);
+      break;
+    end;
   end;
 end;
 
