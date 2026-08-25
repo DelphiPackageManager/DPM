@@ -266,6 +266,7 @@ uses
   DPM.Core.Utils.Files,
   DPM.Core.Utils.System,
   DPM.Core.Project.Editor,
+  DPM.Core.Project.BuildHookValidator,
   DPM.Core.Project.CopyLocalTargets,
   DPM.Core.Project.GroupProjReader,
   DPM.Core.Options.List,
@@ -796,6 +797,44 @@ var
                       ' to project [' + entryProject + '] - attempting the build anyway.');
   end;
 
+  //DPM compiles a package's projects, it does not run them. TMSBuildCompiler passes the IDE level
+  //hooks (PreBuildEvent, CustomToolCommand ...) empty on the msbuild command line so they cannot
+  //fire, but a dproj is an msbuild file : a <Target> hung off Build with AfterTargets, a
+  //<UsingTask>, or an <Import> of a targets file shipped in the package will still execute, and no
+  //command line switch prevents that. So the project is inspected before msbuild ever sees it.
+  //See DPM.Core.Project.BuildHookValidator. `dpm pack` rejects these outright, but nothing forces
+  //a package to have been produced by `dpm pack` - this is the check that actually holds.
+  function ProjectIsSafeToBuild(const projectFile : string; const entryProject : string) : boolean;
+  var
+    blocking : IList<string>;
+    advisory : IList<string>;
+    finding : string;
+  begin
+    blocking := TCollections.CreateList<string>;
+    advisory := TCollections.CreateList<string>;
+    if not TBuildHookValidator.TryScanFile(projectFile, blocking, advisory) then
+    begin
+      //Fail closed : if the project cannot be read we cannot say what it would do, and msbuild
+      //is not going to make a better job of a file that would not parse at all.
+      FLogger.Error('Package [' + packageInfo.Id + '] project [' + entryProject +
+                    '] could not be inspected - refusing to build it.');
+      exit(false);
+    end;
+
+    //Advisory findings are already inert - the author just expected a step that will never run.
+    for finding in advisory do
+      FLogger.Warning('Package [' + packageInfo.Id + '] : ' + finding +
+                      ' - DPM blocks build events, so that step will not run.');
+
+    result := not blocking.Any;
+    if not result then
+    begin
+      FLogger.Error('Package [' + packageInfo.Id + '] project [' + entryProject +
+                    '] would run commands during the build : ' + string.Join('; ', blocking.ToArray));
+      FLogger.Error('DPM compiles package projects, it does not execute them - refusing to build this package.');
+    end;
+  end;
+
   //Copy the files matched by the template's copyToLib globs (archive-relative, e.g. 'Source/**/*.dfm')
   //into lib\{platform}, flattened - companion files like .dfm/.res that aren't in the precompiled
   //.dcu/.dcp but the consumer's compiler still needs on the search path. The matched files were
@@ -1038,6 +1077,12 @@ begin
     FLogger.Information('Building project: ' + buildEntry.Project);
     projectFile := ResolveProjectFile(buildEntry.Project);
 
+    if not ProjectIsSafeToBuild(projectFile, buildEntry.Project) then
+    begin
+      FLogger.NewLine;
+      exit(false);
+    end;
+
     EnsureBuildTarget(projectFile, buildEntry.Project, [TProjectPatchOption.UpdatePlatformList]);
 
     Compiler.SetSearchPaths(ResolveEntrySearchPaths(buildEntry.SearchPaths));
@@ -1109,6 +1154,12 @@ begin
     end;
 
     FLogger.Information('Building design package: ' + designEntry.Project + ' (' + DPMPlatformToString(effectivePlatform) + ')');
+
+    if not ProjectIsSafeToBuild(projectFile, designEntry.Project) then
+    begin
+      FLogger.NewLine;
+      exit(false);
+    end;
 
     //note the empty option set - we never write to a design dproj's <Platform value=..> list,
     //because that list is exactly what the manifest-silent branch above reads to decide which

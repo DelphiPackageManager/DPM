@@ -286,12 +286,33 @@ begin
   //Note that some third party libs like omnithreadlibrary have always-build/implicitbuild on
   result := result + ' /p:DCC_OutputNeverBuildDcps=true';
 
-  //Block build events (pre-build / post-build) from running when DPM compiles a
-  //package. These are CodeGear.Common.Targets driven properties (PreBuildEvent /
-  //PostBuildEvent targets, gated on '$(PreBuildEvent)'!='' etc). Passing them empty
-  //as global (command line) properties overrides any value set in the dproj, so the
-  //guard is false and the Exec is skipped. Condition is identical XE2..latest.
-  result := result + ' /p:PreBuildEvent= /p:PostBuildEvent=';
+  //Package dprojs are whatever the package author happened to ship - DPM compiles them, it does
+  //not run them. Every hook below is a *property* the CodeGear targets test before executing
+  //something, so passing it empty as a global (command line) property beats anything the dproj -
+  //or a file the dproj imports - sets, leaving the guard false and the step skipped :
+  //
+  //  PreBuildEvent / PostBuildEvent - CodeGear.Common.Targets, <Exec> gated on
+  //                                   '$(PreBuildEvent)'!='' etc. Condition identical XE2..13.
+  //  PreLinkEvent                   - the C++ equivalent in CodeGear.Cpp.Targets. A no-op for a
+  //                                   dproj, blocked now so cbproj support can't quietly reopen it.
+  //  CustomToolCommand              - the command __RunUserTool hands to UserTask for a per file
+  //                                   custom build tool. Empty makes _RunUserTools warn and skip.
+  //  _PreCompileTargets /           - target *names* spliced into CoreBuildDependsOn. No shipped
+  //  _PostCompileTargets              .Targets defines either, so a value could only be the
+  //                                   project's own, injecting arbitrary targets into the build.
+  //
+  //Not a sandbox, and can't be - a dproj is an msbuild file, so it can still hang a target off
+  //Build with AfterTargets, or <Import> one that does. What this shuts is the IDE level hooks,
+  //which is all a package that only wants to be compiled has any business using.
+  result := result + ' /p:PreBuildEvent= /p:PostBuildEvent= /p:PreLinkEvent=';
+  result := result + ' /p:CustomToolCommand= /p:_PreCompileTargets= /p:_PostCompileTargets=';
+
+  //DPM.CopyLocal.targets is DPM's own consumer side import - it appends a target to BuildDependsOn
+  //that execs dpm.exe. Authors who use DPM sometimes ship a dproj still carrying the import, and
+  //running copylocal against a project sitting in the package cache is meaningless work. The
+  //generated targets file gates itself on this property, so setting it is the supported off switch
+  //- and it is what lets TBuildHookValidator treat that import as harmless rather than reject it.
+  result := result + ' /p:DPMCopyLocalDisable=true';
 
   result := result + ' /p:DCC_UnitSearchPath=' +  GetProjectSearchPath(configName);
 

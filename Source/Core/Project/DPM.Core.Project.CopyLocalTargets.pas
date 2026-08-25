@@ -36,6 +36,11 @@ const
   //$(DPMCache)\DPM.CopyLocal.targets - see TProjectEditor.EnsureCopyLocalImport.
   cCopyLocalTargetsFileName = 'DPM.CopyLocal.targets';
 
+  //The exact <Import Project=".."> value TProjectEditor.EnsureCopyLocalImport writes. Shared so
+  //that TBuildHookValidator, which has to recognise DPM's own import as legitimate rather than
+  //treat it as an author supplied target injection, cannot drift from what the editor emits.
+  cCopyLocalImportProject = '$(DPMCache)\' + cCopyLocalTargetsFileName;
+
   //Bump when the targets content below changes so EnsureCopyLocalTargets rewrites stale copies.
   cCopyLocalTargetsVersion = '2';
 

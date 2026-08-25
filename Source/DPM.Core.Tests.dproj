@@ -183,6 +183,7 @@
         <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.Templates.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Prepare.SourceFiles.pas"/>
+        <DCCReference Include="Core\Project\DPM.Core.Project.BuildHookValidator.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.ConfigPatcher.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.PackageGenerator.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.Transformer.pas"/>
@@ -264,6 +265,7 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Package.Manifest.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.PackageIdentity.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.PathUtils.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Project.BuildHookValidator.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Project.ConfigPatcher.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Project.Transformer.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.SBOM.FormatParser.pas"/>
@@ -276,6 +278,7 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.Collapse.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.RoundTrip.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Packaging.EnvironmentVariableValidator.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Packaging.BuildHooks.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Packaging.PrecompiledBinaries.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.PackageGenerator.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.PackageDefinitions.pas"/>

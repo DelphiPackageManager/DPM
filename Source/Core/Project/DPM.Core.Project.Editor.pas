@@ -269,7 +269,7 @@ begin
   //Cache-relative import - $(DPMCache) is defined in the DPM PropertyGroup above (earlier in document
   //order), so it resolves when MSBuild evaluates this import. Exists()-guarded so a build never fails
   //when the cache or targets file is missing.
-  importProject := '$(DPMCache)\' + cCopyLocalTargetsFileName;
+  importProject := cCopyLocalImportProject;
   importElement := FProjectXML.selectSingleNode('/x:Project/x:Import[@Project="' + importProject + '"]') as IXMLDOMElement;
   if importElement = nil then
   begin
