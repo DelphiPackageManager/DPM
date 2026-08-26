@@ -264,6 +264,7 @@ uses
   DPM.Core.Compiler.BOM,
   DPM.Core.Utils.Path,
   DPM.Core.Utils.Files,
+  DPM.Core.Utils.Strings,
   DPM.Core.Utils.System,
   DPM.Core.Project.Editor,
   DPM.Core.Project.BuildHookValidator,
@@ -830,7 +831,7 @@ var
     if not result then
     begin
       FLogger.Error('Package [' + packageInfo.Id + '] project [' + entryProject +
-                    '] would run commands during the build : ' + string.Join('; ', blocking.ToArray));
+                    '] would run commands during the build : ' + TStringUtils.Join('; ', blocking.ToArray));
       FLogger.Error('DPM compiles package projects, it does not execute them - refusing to build this package.');
     end;
   end;

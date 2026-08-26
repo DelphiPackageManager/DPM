@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright © 2019 Vincent Parrett and contributors               }
+{           Copyright ï¿½ 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -40,6 +40,9 @@ type
     class function SplitStr(const value : string; const Separator : Char) : TArray<string>; overload;
     class function StartsWith(const theString : string; const value : string; const IgnoreCase : boolean = false) : boolean;
     class function Contains(const theString : string; const value : string; const IgnoreCase : boolean = false) : boolean;
+    //Stands in for string.Join - TStringHelper does not exist before XE3, and Core is compiled
+    //into the XE2 IDE plugin.
+    class function Join(const separator : string; const values : array of string) : string;
   end;
 
 implementation
@@ -106,6 +109,19 @@ begin
   else
     Result := Pos(value, theString) > 0;
 
+end;
+
+class function TStringUtils.Join(const separator : string; const values : array of string) : string;
+var
+  i : integer;
+begin
+  result := '';
+  for i := Low(values) to High(values) do
+  begin
+    if i > Low(values) then
+      result := result + separator;
+    result := result + values[i];
+  end;
 end;
 
 class function TStringUtils.PadRight(const theString : string; TotalWidth : Integer; PaddingChar : Char) : string;

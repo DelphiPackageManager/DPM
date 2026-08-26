@@ -299,6 +299,7 @@
         <DCCReference Include="IDE\DPM.IDE.EnvironmentVariableManager.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.IDE.EnvironmentVariableManager.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.DateTime.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Utils.Strings.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.PE.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Crypto.Algorithms.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Package.Archive.pas"/>

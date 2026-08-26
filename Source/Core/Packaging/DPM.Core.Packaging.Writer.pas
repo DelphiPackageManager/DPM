@@ -819,13 +819,13 @@ var
     if blocking.Any then
       raise Exception.Create(
         entryKind + ' project [' + projectPath + '] can run commands when DPM compiles it during ' +
-        'install : ' + string.Join('; ', blocking.ToArray) + '. A package project must compile, not ' +
+        'install : ' + TStringUtils.Join('; ', blocking.ToArray) + '. A package project must compile, not ' +
         'execute - remove the msbuild targets, tasks and imports before packing.');
 
     if advisory.Any then
       raise Exception.Create(
         entryKind + ' project [' + projectPath + '] sets a build event DPM blocks when it compiles ' +
-        'the package : ' + string.Join('; ', advisory.ToArray) + '. The step will never run on a ' +
+        'the package : ' + TStringUtils.Join('; ', advisory.ToArray) + '. The step will never run on a ' +
         'consumer''s machine, so do the work before packing and remove it from the project.');
   end;
 
