@@ -149,6 +149,7 @@ implementation
 uses
   System.SysUtils,
   DPM.Core.Git.Interfaces,
+  DPM.Core.Utils.DateTime,
   DPM.Core.Package.Dependency;
 
 procedure SplitCsvIntoList(const csv : string; const target : IList<string>);
@@ -251,6 +252,10 @@ begin
   // false / '' so older servers still parse cleanly.
   FIsSigned         := jsonObject.B['isSigned'];
   FSignedBy         := jsonObject.S['signedBy'];
+
+  //published date: the gallery feed sends an ISO 8601 UTC string. Older
+  //servers omit it (blank). Directory sources fill this from the file date.
+  FPublishedDate    := TDPMDateTimeUtils.ISO8601ToDisplayDate(jsonObject.S['publishedUtc']);
 
   FLatestVersion    := TPackageVersion.Parse(jsonObject.S['latestVersion']);
   latestStable := jsonObject.S['latestStableVersion'];
