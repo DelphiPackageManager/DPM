@@ -39,6 +39,12 @@ type
 
     [Test] procedure Offset_Plus_Subtracts_From_UTC;
     [Test] procedure Offset_Minus_Adds_To_UTC;
+
+    [Test] procedure DisplayDate_Empty_ReturnsEmpty;
+    [Test] procedure DisplayDate_Garbage_ReturnsEmpty;
+    [Test] procedure DisplayDate_ValidIso_MatchesFormattedLocal;
+    [Test] procedure FormatPublishedDate_Zero_ReturnsEmpty;
+    [Test] procedure FormatPublishedDate_KnownDate_ContainsDayAndYear;
   end;
 
 implementation
@@ -236,6 +242,43 @@ begin
   dt := TDPMDateTimeUtils.ISO8601ToDate('2026-06-01T18:00:00-08:00', True);
   Assert.AreEqual(2, HourOf(dt));
   Assert.AreEqual(2, DayOf(dt));
+end;
+
+procedure TDateTimeUtilsTests.DisplayDate_Empty_ReturnsEmpty;
+begin
+  Assert.AreEqual('', TDPMDateTimeUtils.ISO8601ToDisplayDate(''));
+end;
+
+procedure TDateTimeUtilsTests.DisplayDate_Garbage_ReturnsEmpty;
+begin
+  Assert.AreEqual('', TDPMDateTimeUtils.ISO8601ToDisplayDate('not-a-date'));
+end;
+
+procedure TDateTimeUtilsTests.DisplayDate_ValidIso_MatchesFormattedLocal;
+var
+  iso : string;
+  expected : string;
+begin
+  //contract: display date == friendly format of the local-converted value.
+  //asserted this way so it is independent of the test machine's timezone.
+  iso := '2026-09-08T12:00:00.000Z';
+  expected := TDPMDateTimeUtils.FormatPublishedDate(TDPMDateTimeUtils.ISO8601ToDate(iso, False));
+  Assert.AreEqual(expected, TDPMDateTimeUtils.ISO8601ToDisplayDate(iso));
+end;
+
+procedure TDateTimeUtilsTests.FormatPublishedDate_Zero_ReturnsEmpty;
+begin
+  Assert.AreEqual('', TDPMDateTimeUtils.FormatPublishedDate(0));
+end;
+
+procedure TDateTimeUtilsTests.FormatPublishedDate_KnownDate_ContainsDayAndYear;
+var
+  s : string;
+begin
+  //locale-independent: day and year are digits regardless of the locale's month names.
+  s := TDPMDateTimeUtils.FormatPublishedDate(EncodeDate(2026, 9, 8));
+  Assert.IsTrue(s.Contains('2026'), 'expected year in "' + s + '"');
+  Assert.IsTrue(s.Contains('8'), 'expected day in "' + s + '"');
 end;
 
 initialization

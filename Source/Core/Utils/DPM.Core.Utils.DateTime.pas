@@ -63,6 +63,19 @@ type
     /// </summary>
     class function TryISO8601ToDate(const value : string; out dateValue : TDateTime;
                                     returnUtc : boolean = false) : boolean; static;
+
+    /// <summary>
+    /// Format a TDateTime as a short, human-friendly published date
+    /// (e.g. "8 Sep 2026"). Returns '' when value is 0 (unassigned).
+    /// </summary>
+    class function FormatPublishedDate(const value : TDateTime) : string; static;
+
+    /// <summary>
+    /// Parse an ISO 8601 UTC timestamp and return it as a friendly local
+    /// display date via FormatPublishedDate. Returns '' when the input is
+    /// empty or cannot be parsed.
+    /// </summary>
+    class function ISO8601ToDisplayDate(const isoValue : string) : string; static;
   end;
 
 implementation
@@ -310,6 +323,25 @@ begin
     on Exception do
       result := false;
   end;
+end;
+
+class function TDPMDateTimeUtils.FormatPublishedDate(const value : TDateTime) : string;
+begin
+  if value = 0 then
+    result := ''
+  else
+    result := FormatDateTime('d mmm yyyy', value);
+end;
+
+class function TDPMDateTimeUtils.ISO8601ToDisplayDate(const isoValue : string) : string;
+var
+  dt : TDateTime;
+begin
+  //server sends UTC; convert to local for display (returnUtc = false).
+  if TryISO8601ToDate(isoValue, dt, False) then
+    result := FormatPublishedDate(dt)
+  else
+    result := '';
 end;
 
 end.
