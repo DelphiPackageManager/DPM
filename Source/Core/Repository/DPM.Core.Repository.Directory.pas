@@ -116,9 +116,26 @@ uses
   DPM.Core.Utils.Path,
   DPM.Core.Utils.Directory,
   DPM.Core.Package.SearchResults,
+  DPM.Core.Utils.DateTime,
   DPM.Core.Package.ListItem, DPM.Core.Package.PackageLatestVersionInfo, DPM.Core.Utils.Hash;
 
 { TDirectoryPackageRespository }
+
+//best-effort published date for directory sources: the .dpkg file's last-write
+//time, formatted the same way as the http feed. blank if it can't be read.
+function GetFilePublishedDate(const fileName : string) : string;
+var
+  fileDate : TDateTime;
+begin
+  result := '';
+  try
+    fileDate := TFile.GetLastWriteTime(fileName);
+    result := TDPMDateTimeUtils.FormatPublishedDate(fileDate);
+  except
+    on Exception do
+      result := '';
+  end;
+end;
 
 function GetSearchRegex(const compilerVersion : TCompilerVersion; const platforms : TDPMPlatforms; const version : string) : string;
 begin
@@ -613,7 +630,10 @@ begin
 
 
   if metaData <> nil then
+  begin
     result := TDPMPackageSearchResultItem.FromMetaData(name, metaData, _fileHash, _hashAlgorithm);
+    result.PublishedDate := GetFilePublishedDate(packageFileName);
+  end;
 
 end;
 
@@ -909,6 +929,7 @@ begin
       resultItem := TDPMPackageSearchResultItem.FromMetaData(Self.Name, packageMetadata, _fileHash, _hashAlgorithm);
       resultItem.LatestVersion := find.LatestVersion;
       resultItem.LatestStableVersion := find.LatestStableVersion;
+      resultItem.PublishedDate := GetFilePublishedDate(packageFileName);
       result.Add(resultItem);
     end;
   end;
