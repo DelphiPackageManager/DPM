@@ -1678,6 +1678,7 @@ begin
         apikey = %SignotaurAPIKey%
         contentdescription = %FileDescription%
         contentdescriptionurl = https://docs.delphi.dev
+        digestalgorithm = SHA384
         enabletimeout = false
         expandimpersonationtoken = false
         filespecs = "%FileToSign%" +
