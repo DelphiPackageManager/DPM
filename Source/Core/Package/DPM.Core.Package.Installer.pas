@@ -2160,18 +2160,28 @@ function TPackageInstaller.ResolveProjectFiles(const projectPath: string; const 
   const projectList: IList<string>): boolean;
 var
   groupProjReader: IGroupProjectReader;
-  projectRoot: string;
+  fullPath: string;
+  explicitProject: string;
   i: integer;
 begin
   result := false;
+
+  //Normalise up front. Everything below - and everything downstream that takes these paths
+  //apart again - relies on an absolute, PathDelim separated path. A path supplied with posix
+  //separators ('dpm restore c:/src/all.groupproj') otherwise breaks the group member
+  //resolution: ExtractFilePath only splits on PathDelim and DriveDelim, so the group root
+  //comes out as 'c:' and every member dproj is looked for under the drive root.
+  fullPath := TPathUtils.ToAbsolutePath(projectPath);
 
   // If explicit projects were provided, use them
   if Length(explicitProjects) > 0 then
   begin
     for i := 0 to Length(explicitProjects) - 1 do
     begin
-      if FileExists(explicitProjects[i]) then
-        projectList.Add(explicitProjects[i])
+      //normalised for the same reason as the project path - these end up in the same list.
+      explicitProject := TPathUtils.ToAbsolutePath(explicitProjects[i]);
+      if FileExists(explicitProject) then
+        projectList.Add(explicitProject)
       else
         FLogger.Warning('Project [' + explicitProjects[i] + '] does not exist', true);
     end;
@@ -2185,36 +2195,32 @@ begin
   end;
 
   // Handle file path (single .dproj or .groupproj)
-  if FileExists(projectPath) then
+  if FileExists(fullPath) then
   begin
-    if ExtractFileExt(projectPath) = '.groupproj' then
+    if SameText(ExtractFileExt(fullPath), '.groupproj') then
     begin
       groupProjReader := TGroupProjectReader.Create(FLogger);
-      if not groupProjReader.LoadGroupProj(projectPath) then
+      if not groupProjReader.LoadGroupProj(fullPath) then
         exit;
       if not groupProjReader.ExtractProjects(projectList) then
         exit;
       // Projects in a group are likely relative, so make them full paths
-      projectRoot := ExtractFilePath(projectPath);
       for i := 0 to projectList.Count - 1 do
-      begin
-        if TPathUtils.IsRelativePath(projectList[i]) then
-          projectList[i] := TPathUtils.CompressRelativePath(projectRoot, projectList[i]);
-      end;
+        projectList[i] := TPathUtils.ResolveRelativeToFile(fullPath, projectList[i]);
     end
     else
-      projectList.Add(projectPath);
+      projectList.Add(fullPath);
     result := true;
     exit;
   end;
 
   // Handle directory path
-  if DirectoryExists(projectPath) then
+  if DirectoryExists(fullPath) then
   begin
-    projectList.AddRange(TDirectory.GetFiles(projectPath, '*.dproj'));
+    projectList.AddRange(TDirectory.GetFiles(fullPath, '*.dproj'));
     if projectList.Count = 0 then
     begin
-      FLogger.Error('No dproj files found in projectPath : ' + projectPath);
+      FLogger.Error('No dproj files found in projectPath : ' + fullPath);
       exit;
     end;
     FLogger.Information('Found ' + IntToStr(projectList.Count) + ' project file(s).');

@@ -174,7 +174,10 @@ type
     /// versions over picking the latest in-range alternative. nil for install/update, populated
     /// by restore from the existing project graph.
     constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>);overload;
-    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>);overload;
+    /// newPackageId: the id of the package the caller records as a top level resolution itself
+    /// (the package being installed, or the top level restore is re-resolving). Any reference to
+    /// the same id in projectReferences is skipped - see the note in the constructor body.
+    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const newPackageId : string = '');overload;
     destructor Destroy;override;
   end;
 
@@ -287,7 +290,7 @@ begin
     AddNode(result, topLevelPackage.PackageInfo, TVersionRange.Empty);
 end;
 
-constructor TResolverContext.Create(const logger: ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences: IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>);
+constructor TResolverContext.Create(const logger: ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences: IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const newPackageId : string);
 var
   projectReference : IPackageReference;
 
@@ -328,6 +331,16 @@ begin
 
   for projectReference in projectReferences do
   begin
+    //The package being installed - or, on restore's slow path, the top level currently being
+    //re-resolved - is recorded as a top level resolution by the calling constructor. It can also
+    //appear in projectReferences: restore feeds the previous iteration's flattened references
+    //(top levels AND transients) back in, so a package that is both a top level of the project
+    //and a transient of an earlier top level arrives in both places. Recording it here would make
+    //the caller's RecordResolution fail with 'Resolution already exists' and abort the restore.
+    //The top level pin is not negotiable, so skip the reference and let the caller record it.
+    if (newPackageId <> '') and SameText(projectReference.Id, newPackageId) then
+      continue;
+
     //don't add to the list of packages to resolve if it has no dependencies..
 
     //this is causing unnecessary work during restore.
@@ -375,7 +388,7 @@ end;
 constructor TResolverContext.Create(const logger : ILogger;  const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>);
 begin
   Assert(newPackage <> nil);
-  Create(logger, packageInstallerContext, projectFile, newPackage.CompilerVersion, projectReferences, sharedVersionCache, preferredVersions);
+  Create(logger, packageInstallerContext, projectFile, newPackage.CompilerVersion, projectReferences, sharedVersionCache, preferredVersions, newPackage.Id);
   PushRequirement(newPackage);
   RecordResolution(newPackage, TVersionRange.Create(newPackage.Version), cRootNode);
 end;

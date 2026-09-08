@@ -252,6 +252,13 @@ type
 
     [Test]
     procedure Bundled_Dependency_Excluded_From_Graph;
+
+    //restore slow path : a package that is both a top level and a transient of an earlier top level
+    [Test]
+    procedure TopLevel_Already_In_ProjectRefs_As_Transient_Promotes_To_TopLevel;
+
+    [Test]
+    procedure TopLevel_Already_In_ProjectRefs_TopLevel_Version_Wins;
   end;
 
 implementation
@@ -2069,6 +2076,87 @@ begin
   aNode := graph.FindFirstChild('A');
   Assert.IsNotNull(aNode, 'A should be in the graph');
   Assert.IsFalse(aNode.HasAnyChild('Indy'), 'A must have no Indy child in the graph');
+end;
+
+procedure TDependencyResolverTests.TopLevel_Already_In_ProjectRefs_As_Transient_Promotes_To_TopLevel;
+var
+  a, c : IPackageInfo;
+  root : IPackageReference;
+  aRef, cRef : IPackageReference;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  cNode : IPackageReference;
+begin
+  // Restore's slow path resolves one top level at a time, feeding the previous iteration's
+  // flattened references (top levels AND transients) back in as projectReferences. A package
+  // that is a top level of the project AND a transient of an earlier top level therefore
+  // arrives in projectReferences and as newPackage in the same call. That must resolve, with
+  // the package promoted to top level - not raise 'Resolution already exists'.
+  c := MakeInfo('C', '0.1.6', []);
+  a := MakeInfo('A', '1.0.0', [MakeDep('C', '[0.1.4,]')]);
+  FRepo.SetVersions('C', ListOf([c]));
+
+  root := TPackageReference.CreateRoot(cTestCompiler);
+  aRef := root.AddChild(a.Id, a.Version, MakeRange('1.0.0'));
+  aRef.PackageInfo := a;
+  cRef := aRef.AddChild(c.Id, c.Version, MakeRange('[0.1.4,]'));
+  cRef.PackageInfo := c;
+
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(aRef);
+  projectRefs.Add(cRef);
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, c, projectRefs, graph, resolved);
+
+  Assert.IsTrue(ok, 'resolve should succeed when the top level is already present as a transient');
+  cNode := graph.FindTopLevelChild('C');
+  Assert.IsNotNull(cNode, 'C must be promoted to a top level node in the graph');
+  Assert.AreEqual('0.1.6', cNode.Version.ToStringNoMeta, 'C should be resolved at the top level version');
+  Assert.IsNotNull(graph.FindTopLevelChild('A'), 'A must still be a top level node in the graph');
+end;
+
+procedure TDependencyResolverTests.TopLevel_Already_In_ProjectRefs_TopLevel_Version_Wins;
+var
+  a, c14, c16 : IPackageInfo;
+  root : IPackageReference;
+  aRef, cRef : IPackageReference;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  info : IPackageInfo;
+  selectedC : TPackageVersion;
+begin
+  // Same shape as above, but the earlier iteration resolved C at a different version than the
+  // project's top level pin. The top level version is not negotiable, so it must win over the
+  // version carried in projectReferences.
+  c14 := MakeInfo('C', '0.1.4', []);
+  c16 := MakeInfo('C', '0.1.6', []);
+  a := MakeInfo('A', '1.0.0', [MakeDep('C', '[0.1.4,]')]);
+  FRepo.SetVersions('C', ListOf([c16, c14]));
+
+  root := TPackageReference.CreateRoot(cTestCompiler);
+  aRef := root.AddChild(a.Id, a.Version, MakeRange('1.0.0'));
+  aRef.PackageInfo := a;
+  //previous iteration resolved C 0.1.4 as a transient of A
+  cRef := aRef.AddChild(c14.Id, c14.Version, MakeRange('[0.1.4,]'));
+  cRef.PackageInfo := c14;
+
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(aRef);
+  projectRefs.Add(cRef);
+
+  //the project pins C 0.1.6 as a top level
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, c16, projectRefs, graph, resolved);
+
+  Assert.IsTrue(ok, 'resolve should succeed');
+  selectedC := MakeVersion('0.0.0');
+  for info in resolved do
+    if SameText(info.Id, 'C') then
+      selectedC := info.Version;
+  Assert.AreEqual('0.1.6', selectedC.ToStringNoMeta, 'the top level pin must win over the transient resolution');
 end;
 
 initialization

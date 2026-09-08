@@ -71,6 +71,22 @@ type
 
     [Test]
     procedure TestToAbsolutePath_Empty_ReturnsEmpty;
+
+    //the case that broke `dpm restore <group>` when the group path used posix separators -
+    //ExtractFilePath returned 'c:' so every member dproj was looked for under the drive root.
+    [Test]
+    [TestCase('GroupForwardSlash', 'c:/src/all.groupproj,IDE/App.dproj,c:\src\IDE\App.dproj')]
+    [TestCase('GroupBackslash', 'c:\src\all.groupproj,IDE\App.dproj,c:\src\IDE\App.dproj')]
+    [TestCase('GroupMixed', 'c:/src/all.groupproj,IDE\App.dproj,c:\src\IDE\App.dproj')]
+    [TestCase('MemberParentRelative', 'c:/src/build/all.groupproj,../IDE/App.dproj,c:\src\IDE\App.dproj')]
+    [TestCase('MemberDotSlash', 'c:/src/all.groupproj,./App.dproj,c:\src\App.dproj')]
+    [TestCase('MemberRootedBackslash', 'c:/src/all.groupproj,d:\abs\App.dproj,d:\abs\App.dproj')]
+    [TestCase('MemberRootedForwardSlash', 'c:/src/all.groupproj,d:/abs/App.dproj,d:\abs\App.dproj')]
+    [TestCase('UNCGroup', '\\srv\share\all.groupproj,IDE/App.dproj,\\srv\share\IDE\App.dproj')]
+    procedure TestResolveRelativeToFile(const baseFile, path, expected : string);
+
+    [Test]
+    procedure TestResolveRelativeToFile_EmptyPath_ReturnsEmpty;
   end;
 
 implementation
@@ -133,6 +149,17 @@ procedure TPathUtilsTests.TestToAbsolutePath_Empty_ReturnsEmpty;
 begin
   Assert.AreEqual('', TPathUtils.ToAbsolutePath('', 'c:\proj'));
   Assert.AreEqual('', TPathUtils.ToAbsolutePath('   ', 'c:\proj'));
+end;
+
+procedure TPathUtilsTests.TestResolveRelativeToFile(const baseFile, path, expected : string);
+begin
+  Assert.AreEqual(Trim(expected), TPathUtils.ResolveRelativeToFile(Trim(baseFile), Trim(path)), false);
+end;
+
+procedure TPathUtilsTests.TestResolveRelativeToFile_EmptyPath_ReturnsEmpty;
+begin
+  Assert.AreEqual('', TPathUtils.ResolveRelativeToFile('c:\src\all.groupproj', ''), false);
+  Assert.AreEqual('', TPathUtils.ResolveRelativeToFile('c:\src\all.groupproj', '   '), false);
 end;
 
 procedure TPathUtilsTests.TestIsDspecFile(const fileName : string; const expected : boolean);

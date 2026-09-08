@@ -46,6 +46,12 @@ type
     //reads as unrooted and gets appended to basePath, and 'a/b.dproj' reads as a bare
     //filename. basePath defaults to the process current directory when empty.
     class function ToAbsolutePath(const value : string; const basePath : string = '') : string;
+    //Resolves a path recorded inside a file (e.g. a .groupproj's member .dproj entries) against
+    //the folder holding that file. baseFile is normalised FIRST - ExtractFilePath only splits on
+    //PathDelim and DriveDelim, so a base written with posix separators ('c:/src/all.groupproj')
+    //otherwise yields a folder of 'c:' and every member resolves under the drive root.
+    //Members that are already rooted are returned as-is (normalised and compressed).
+    class function ResolveRelativeToFile(const baseFile : string; const path : string) : string;
     class function QuotePath(const value : string; const force : boolean = false) : string;
     class function StripBase(const base : string; const fileName : string) : string;
     class function StripWildCard(const value : string) : string;
@@ -340,6 +346,17 @@ begin
     base := GetCurrentDir;
   base := StringReplace(base, '/', PathDelim, [rfReplaceAll]);
   result := CompressRelativePath(ExcludeTrailingPathDelimiter(base), normalized);
+end;
+
+class function TPathUtils.ResolveRelativeToFile(const baseFile : string; const path : string) : string;
+var
+  baseFolder : string;
+begin
+  if Trim(path) = '' then
+    exit('');
+  //normalise the base file before taking its folder - see the note on the declaration.
+  baseFolder := ExtractFilePath(ToAbsolutePath(baseFile));
+  result := ToAbsolutePath(path, ExcludeTrailingPathDelimiter(baseFolder));
 end;
 
 class function TPathUtils.IsRelativePath(const value : string) : boolean;
