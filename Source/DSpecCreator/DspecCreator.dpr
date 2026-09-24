@@ -104,6 +104,7 @@ uses
   Vcl.Themes,
   Vcl.Styles,
   DPM.Creator.MRUService in 'DPM.Creator.MRUService.pas',
+  DPM.Creator.Theme in 'DPM.Creator.Theme.pas',
   VSoft.Controls.Menus.MRU in 'Controls\VSoft.Controls.Menus.MRU.pas',
   DPM.Controls.LogMemo in '..\Controls\DPM.Controls.LogMemo.pas',
   DPM.Core.Trust.Interfaces in '..\Core\Trust\DPM.Core.Trust.Interfaces.pas',
@@ -188,7 +189,11 @@ uses
 begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
-  TStyleManager.TrySetStyle('Windows11 MineShaft');
+  //Follow the Windows apps light/dark preference. ShowErrorDialog = False so a
+  //style that failed to link into the exe can never pop a dialog before the main
+  //form exists; fall back to the dark style, which is what we have always shipped.
+  if not TStyleManager.TrySetStyle(GetPreferredStyleName, False) then
+    TStyleManager.TrySetStyle(cCreatorDarkStyle, False);
   Application.CreateForm(TDSpecCreatorForm, DSpecCreatorForm);
   Application.CreateForm(TDPMAboutForm, DPMAboutForm);
   Application.Run;

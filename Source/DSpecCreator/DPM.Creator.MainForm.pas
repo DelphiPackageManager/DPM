@@ -538,6 +538,9 @@ type
     // the creator. Shared with the IDE plugin options, so the log level chosen in
     // the Options dialog takes effect here too.
     procedure ApplyLogVerbosity;
+    // The dfm's hardcoded link colour is the light one - too dim against the dark
+    // style. Derive it from the colour we are actually painting on.
+    procedure ApplyLinkColors;
 
     procedure OpenProject(const filename : string);
     function GetFileOpenInitialDir : string;
@@ -628,6 +631,7 @@ uses
   Winapi.ActiveX,
   Winapi.ShellAPI,
   Vcl.Themes,
+  DPM.IDE.Types,
   DPM.Core.Constants,
   DPM.Core.dependency.Version,
   DPM.Core.Init,
@@ -868,6 +872,7 @@ begin
     var
       savedDir : string;
     begin
+      CoInitializeEx(nil, COINIT_MULTITHREADED);
       // The packer resolves relative paths against the process current
       // directory; point it at the dspec folder for the duration of the pack.
       savedDir := GetCurrentDir;
@@ -878,6 +883,7 @@ begin
           SignProducedPackages(cancelToken, outputFolder, packStartTime, signOptions);
       finally
         SetCurrentDir(savedDir);
+        CoUninitialize;
       end;
     end, FCancellationTokenSource.Token)
   .OnException(
@@ -3491,6 +3497,7 @@ begin
   TestLogMemo := MakeLogMemo(tsTest);
   UploadLogMemo := MakeLogMemo(tsUpload);
   LogMemo := MakeLogMemo(tsLogging);
+  ApplyLinkColors;
 
   FLogger := TDSpecLogger.Create(LogMemo);
   FOpenFile := TDSpecFile.Create(FLogger);
@@ -3702,6 +3709,23 @@ end;
 procedure TDSpecCreatorForm.UriClick(const uri : string);
 begin
   ShellExecute(Application.Handle, 'open', PChar(uri), nil, nil, SW_SHOWNORMAL);
+end;
+
+procedure TDSpecCreatorForm.ApplyLinkColors;
+var
+  backgroundColor : TColor;
+  linkColor : TColor;
+begin
+  //Both labels sit on tsInfo, whose body the style paints with its button-face
+  //colour - reading lblSPDX.Color would give the unstyled design-time value,
+  //since seClient means the style overrides it at paint time.
+  if Vcl.Themes.StyleServices.Enabled then
+    backgroundColor := Vcl.Themes.StyleServices.GetSystemColor(clBtnFace)
+  else
+    backgroundColor := Self.Color;
+  linkColor := GetLinkColor(backgroundColor);
+  lblSPDX.Font.Color := linkColor;
+  Label5.Font.Color := linkColor;
 end;
 
 procedure TDSpecCreatorForm.UriLabelClick(Sender : TObject);
