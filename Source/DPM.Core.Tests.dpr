@@ -239,7 +239,8 @@ uses
   DPM.Core.Upgrade.Github in 'Core\Upgrade\DPM.Core.Upgrade.Github.pas',
   DPM.Core.Upgrade.Cache in 'Core\Upgrade\DPM.Core.Upgrade.Cache.pas',
   DPM.Core.Options.CopyLocal in 'Core\Options\DPM.Core.Options.CopyLocal.pas',
-  DPM.Core.Tests.Package.CopyLocal in 'Tests\DPM.Core.Tests.Package.CopyLocal.pas';
+  DPM.Core.Tests.Package.CopyLocal in 'Tests\DPM.Core.Tests.Package.CopyLocal.pas',
+  DPM.Core.Tests.Compiler.ProjectSettings in 'Tests\DPM.Core.Tests.Compiler.ProjectSettings.pas';
 
 var
   runner : ITestRunner;

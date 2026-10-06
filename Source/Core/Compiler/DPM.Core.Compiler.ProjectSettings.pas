@@ -103,16 +103,35 @@ begin
 end;
 
 
+//Returns the settings group msbuild evaluates immediately before the one for key - ie where an
+//inherited $(PropName) in key's value comes from. For Config=Release (Cfg_1) Platform=Win64 the
+//groups apply in document order Base, Base_Win64, Cfg_1, Cfg_1_Win64, so walking up from the
+//most specific :
+//
+//  Cfg_1_Win64 -> Cfg_1 -> Base_Win64 -> Base
+//
+//A config that inherits from another config (Cfg_4 -> Cfg_2 -> Base) gets its parent's all
+//platforms group but NOT the parent's platform group - the IDE writes the child's activator after
+//the parent's platform activators, so msbuild never switches those on :
+//
+//  Cfg_4_Win64 -> Cfg_4 -> Cfg_2 -> Base_Win64 -> Base
 function TDPMProjectSettingsLoader.GetConfigParent(const key: string): string;
+var
+  platformSuffix : string;
 begin
-  if key = 'Base' then
-    exit('');
-  result := FConfigParents.Values[key];
-  if result = '' then
+  result := '';
+  if SameText(key, 'Base') then
+    exit;
+  platformSuffix := '_' + FPlatform;
+  if EndsText(platformSuffix, key) then
   begin
-    //if we didn't find a parent then try and remove the platform
-    result := StringReplace(key,'_' + FPlatform,'',[rfIgnoreCase]);
+    result := Copy(key, 1, Length(key) - Length(platformSuffix));
+    exit;
   end;
+  result := FConfigParents.Values[key];
+  //a config that declares no parent hangs off Base, the same as one that says so.
+  if (result = '') or SameText(result, 'Base') then
+    result := 'Base' + platformSuffix;
 end;
 
 
@@ -164,6 +183,12 @@ end;
 function TDPMProjectSettingsLoader.GetSearchPath: string;
 begin
   result := GetStringProperty('DCC_UnitSearchPath', '$(DCC_UnitSearchPath)' );
+  //The caller hands this to msbuild as a global (command line) property, and property references
+  //do not survive that - $(Platform) and $(Config) reach the compiler as nothing at all, turning
+  //..\Source\$(Platform) into ..\Source. We know both values, so resolve them here. msbuild
+  //property names are not case sensitive, the IDE itself writes $(PLATFORM) in library paths.
+  result := StringReplace(result, '$(Platform)', FPlatform, [rfReplaceAll, rfIgnoreCase]);
+  result := StringReplace(result, '$(Config)', FConfigName, [rfReplaceAll, rfIgnoreCase]);
 end;
 
 
@@ -173,7 +198,9 @@ var
 begin
   sConfigKey := FConfigKeys.Values[FConfigName];
   if sConfigKey <> '' then
-    result := DoGetStringProperty(sConfigKey, propName, defaultValue)
+    //start at the most specific group - the config's own platform group - and walk up from there,
+    //otherwise anything set per platform (Base_<Platform>, Cfg_N_<Platform>) is never seen.
+    result := DoGetStringProperty(sConfigKey + '_' + FPlatform, propName, defaultValue)
   else
     result := '';
 end;
@@ -189,10 +216,8 @@ var
   sKey          : string;
   sParent       : string;
 begin
-  //Avert your eyes, ugly code ahead to deal with how config inheritance works in
-  //dproj files.. sometimes the intermediate configs are not present in the dproj
-  //so we have to fudge things to make the tree correct.
-  //TODO : find a neater way to do this.
+  //Only the declared config -> parent config links are recorded here. The per platform groups
+  //are not listed as BuildConfiguration items at all, GetConfigParent slots them into the chain.
   FLogger.Debug('Loading project configs');
   configs := FXMLDoc.selectNodes('/def:Project/def:ItemGroup/def:BuildConfiguration');
   FLogger.Debug('configs.length : ' + IntToStr(configs.length));
@@ -216,30 +241,10 @@ begin
           sParent := parentElement.text;
         FConfigKeys.Add(sName + '=' + sKey);
         FConfigParents.Add(sKey + '=' + sParent);
-
-        //This is a hack to deal with Platforms.. not enough info in the dproj to walk the inheritance tree fully
-        if (sKey <> 'Base') and (sParent <> '') then
-          FConfigParents.Add(sKey + '_' + FPlatform + '=' + sParent + '_' + FPlatform);
       end;
     end;
   end;
   FLogger.Debug('ConfigKeys.Count : ' + IntToStr(FConfigKeys.Count));
-  for i := 0 to FConfigKeys.Count - 1 do
-  begin
-    sKey := FConfigKeys.ValueFromIndex[i];
-    //get the parent that we retrieved from the project file
-    sParent := GetConfigParent(sKey);
-    //remap the parents to inject the platform parents
-    FConfigParents.Add(sKey + '_' + FPlatform + '=' + sKey);
-    if sParent <> '' then
-    begin
-      FConfigParents.Add(sKey + '=' + sParent + '_' + FPlatform);
-      FConfigParents.Add(sParent + '_' + FPlatform + '=' + sParent);
-    end;
-  end;
-
-
-
 end;
 
 end.
