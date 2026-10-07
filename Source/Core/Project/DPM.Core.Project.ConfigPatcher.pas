@@ -103,6 +103,7 @@ type
     function LastChainGroupFor(const key : string) : IXMLDOMElement;
     function LastPropertyGroup : IXMLDOMElement;
     function UsesBasePlatformStubs : boolean;
+    function IsPlatformEnabledInList(const platformName : string) : boolean;
     function HasPlatformConfiguration(const configKey : string; const platformName : string) : boolean;
 
     //--- mutation - each returns true when it changed something
@@ -493,17 +494,39 @@ begin
       exit(true);
 end;
 
-//Does the dproj carry ANY settings of its own for this platform? Must be asked BEFORE we start
-//adding stubs, or we would only ever be looking at our own work.
+//An entry that is present but false is the author switching the platform off, not declaring it.
+function TProjectConfigPatcher.IsPlatformEnabledInList(const platformName : string) : boolean;
+var
+  nodes : IXMLDOMNodeList;
+  element : IXMLDOMElement;
+  i : integer;
+begin
+  result := false;
+  nodes := FProjectXml.selectNodes(platformsXPath + '/x:Platform');
+  for i := 0 to nodes.length - 1 do
+  begin
+    element := nodes.item[i] as IXMLDOMElement;
+    if SameText(AttributeOf(element, 'value'), platformName) then
+      exit(StrToBoolDef(element.text, false));
+  end;
+end;
+
+//Did the author set this project up for the platform? Must be asked BEFORE we start adding stubs
+//or touching the platform list, or we would only ever be looking at our own work.
 //
 //The Cfg_N_<Platform> chain stub is not evidence either way - the IDE writes one only when that
 //config/platform pair has settings of its own, so a project that is fully configured for Linux64
 //(Base_Linux64 chain + '$(Base_Linux64)'!='' settings) legitimately has no Cfg_2_Linux64 group for
 //Release. Judging platform support by that stub alone cried wolf on every such project, while the
 //real cause of those builds failing was elsewhere entirely.
+//
+//A missing Base_<Platform> group is not evidence either - a project whose settings all sit under
+//'$(Base)'!='' has no use for one. The author enabling the platform in the IDE's platform list is
+//them saying it is supported, and that is enough on its own.
 function TProjectConfigPatcher.HasPlatformConfiguration(const configKey : string; const platformName : string) : boolean;
 begin
-  result := (FindChainGroup('Base', platformName) <> nil) or
+  result := IsPlatformEnabledInList(platformName) or
+            (FindChainGroup('Base', platformName) <> nil) or
             (FindSettingsGroup('Base_' + platformName) <> nil) or
             (FindChainGroup(configKey, platformName) <> nil) or
             (FindSettingsGroup(configKey + '_' + platformName) <> nil);
@@ -753,13 +776,14 @@ begin
     if createdConfig then
       EnsureConfigSettings(configuration, configKey);
 
-    //4. The <Platform value=..> list is IDE metadata that msbuild ignores, but DPM reads it -
+    //4. Ask about platform support before step 5 edits the platform list and step 6 starts
+    //   writing stubs.
+    platformConfigured := HasPlatformConfiguration(configKey, platformName);
+
+    //5. The <Platform value=..> list is IDE metadata that msbuild ignores, but DPM reads it -
     //   see the design entry handling in TPackageInstaller.CompilePackage for why it is opt in.
     if TProjectPatchOption.UpdatePlatformList in options then
       EnsurePlatformListEntry(platformName);
-
-    //5. Ask about platform support before step 6 starts writing stubs.
-    platformConfigured := HasPlatformConfiguration(configKey, platformName);
 
     if UsesBasePlatformStubs then
     begin

@@ -99,6 +99,12 @@ type
     procedure MissingNonWindowsPlatform_Warns;
 
     [Test]
+    procedure ListedNonWindowsPlatform_WithoutSettings_DoesNotWarn;
+
+    [Test]
+    procedure DisabledNonWindowsPlatform_Warns;
+
+    [Test]
     procedure NoPlatformsBlock_DoesNotSynthesizeProjectExtensions;
 
     [Test]
@@ -421,6 +427,70 @@ const
     '            <Platforms>'#13#10 +
     '                <Platform value="Linux64">True</Platform>'#13#10 +
     '                <Platform value="Win32">True</Platform>'#13#10 +
+    '            </Platforms>'#13#10 +
+    '        </BorlandProject>'#13#10 +
+    '    </ProjectExtensions>'#13#10 +
+    '</Project>'#13#10;
+
+  //Linux64 is enabled in the IDE's platform list, but the project carries no Linux64 settings of
+  //any kind - only Base_Win32 / Base_Win64 stubs - because it needs none, everything it builds
+  //with sits under '$(Base)'!=''. The author has still told us the platform is supported. Android64
+  //is listed too, but disabled.
+  cDprojLinux64ListedOnly =
+    '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">'#13#10 +
+    '    <PropertyGroup>'#13#10 +
+    '        <Base>True</Base>'#13#10 +
+    '        <Config Condition="''$(Config)''==''''">Release</Config>'#13#10 +
+    '        <Platform Condition="''$(Platform)''==''''">Win32</Platform>'#13#10 +
+    '        <TargetedPlatforms>131</TargetedPlatforms>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Config)''==''Base'' or ''$(Base)''!=''''">'#13#10 +
+    '        <Base>true</Base>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="(''$(Platform)''==''Win32'' and ''$(Base)''==''true'') or ''$(Base_Win32)''!=''''">'#13#10 +
+    '        <Base_Win32>true</Base_Win32>'#13#10 +
+    '        <CfgParent>Base</CfgParent>'#13#10 +
+    '        <Base>true</Base>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="(''$(Platform)''==''Win64'' and ''$(Base)''==''true'') or ''$(Base_Win64)''!=''''">'#13#10 +
+    '        <Base_Win64>true</Base_Win64>'#13#10 +
+    '        <CfgParent>Base</CfgParent>'#13#10 +
+    '        <Base>true</Base>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Config)''==''Release'' or ''$(Cfg_1)''!=''''">'#13#10 +
+    '        <Cfg_1>true</Cfg_1>'#13#10 +
+    '        <CfgParent>Base</CfgParent>'#13#10 +
+    '        <Base>true</Base>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Base)''!=''''">'#13#10 +
+    '        <DCC_Namespace>System;Xml;Data;$(DCC_Namespace)</DCC_Namespace>'#13#10 +
+    '        <GenPackage>true</GenPackage>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Base_Win32)''!=''''">'#13#10 +
+    '        <DCC_Namespace>Winapi;System.Win;Bde;$(DCC_Namespace)</DCC_Namespace>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Base_Win64)''!=''''">'#13#10 +
+    '        <DCC_Namespace>Winapi;System.Win;$(DCC_Namespace)</DCC_Namespace>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Cfg_1)''!=''''">'#13#10 +
+    '        <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <ItemGroup>'#13#10 +
+    '        <BuildConfiguration Include="Base">'#13#10 +
+    '            <Key>Base</Key>'#13#10 +
+    '        </BuildConfiguration>'#13#10 +
+    '        <BuildConfiguration Include="Release">'#13#10 +
+    '            <Key>Cfg_1</Key>'#13#10 +
+    '            <CfgParent>Base</CfgParent>'#13#10 +
+    '        </BuildConfiguration>'#13#10 +
+    '    </ItemGroup>'#13#10 +
+    '    <ProjectExtensions>'#13#10 +
+    '        <BorlandProject>'#13#10 +
+    '            <Platforms>'#13#10 +
+    '                <Platform value="Android64">False</Platform>'#13#10 +
+    '                <Platform value="Linux64">True</Platform>'#13#10 +
+    '                <Platform value="Win32">True</Platform>'#13#10 +
+    '                <Platform value="Win64">True</Platform>'#13#10 +
     '            </Platforms>'#13#10 +
     '        </BorlandProject>'#13#10 +
     '    </ProjectExtensions>'#13#10 +
@@ -824,6 +894,55 @@ begin
                               [TProjectPatchOption.UpdatePlatformList]);
     Assert.IsTrue(logger.Logged('warning', 'was not configured for'),
                   'a Win32 only project has nothing for Linux64 - the warning is real');
+  finally
+    if FileExists(sandbox) then
+      TFile.Delete(sandbox);
+  end;
+end;
+
+//A platform the author enabled in the IDE's platform list is one they say the project supports.
+//Having no Base_<Platform> group just means it needs no platform specific settings - warning here
+//sat directly above an unrelated linker error and took the blame for it.
+procedure TProjectConfigPatcherTests.ListedNonWindowsPlatform_WithoutSettings_DoesNotWarn;
+var
+  patcher : IProjectConfigPatcher;
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  sandbox : string;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  patcher := TProjectConfigPatcher.Create(loggerIntf);
+  sandbox := WriteSandbox(cDprojLinux64ListedOnly);
+  try
+    patcher.EnsureBuildTarget(sandbox, TDPMPlatform.Linux64, 'Release', TCompilerVersion.Delphi12_0,
+                              [TProjectPatchOption.UpdatePlatformList]);
+    Assert.IsFalse(logger.Logged('warning', 'was not configured for'),
+                   'Linux64 is enabled in the platform list - must not warn');
+  finally
+    if FileExists(sandbox) then
+      TFile.Delete(sandbox);
+  end;
+end;
+
+//Listed but switched off is the author saying the opposite - and we are about to flip that entry
+//to true ourselves, which must not then be read back as their declaration.
+procedure TProjectConfigPatcherTests.DisabledNonWindowsPlatform_Warns;
+var
+  patcher : IProjectConfigPatcher;
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  sandbox : string;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  patcher := TProjectConfigPatcher.Create(loggerIntf);
+  sandbox := WriteSandbox(cDprojLinux64ListedOnly);
+  try
+    patcher.EnsureBuildTarget(sandbox, TDPMPlatform.Android64, 'Release', TCompilerVersion.Delphi12_0,
+                              [TProjectPatchOption.UpdatePlatformList]);
+    Assert.IsTrue(logger.Logged('warning', 'was not configured for'),
+                  'Android64 is disabled in the platform list - the warning is real');
   finally
     if FileExists(sandbox) then
       TFile.Delete(sandbox);
