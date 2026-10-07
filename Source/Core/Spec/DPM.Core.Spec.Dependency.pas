@@ -102,10 +102,11 @@ end;
 
 function TSpecDependency.GetVersionString : string;
 begin
-  //the authored text: the unresolved token, else the range (empty string when nothing is set) so
-  //the UI can display/round-trip $version$ rather than the empty range that FVersion would show.
-  if FVersionString = cVersionToken then
-    result := cVersionToken
+  //the authored text: the $version$ token or the bundled alias as written, else the range (empty
+  //string when nothing is set) so the UI can display/round-trip $version$ and bundled rather than
+  //the empty range / sentinel version that FVersion would show.
+  if FVersionString <> '' then
+    result := FVersionString
   else if FVersion.IsEmpty then
     result := ''
   else
@@ -119,6 +120,13 @@ begin
   if SameText(Trim(value), cVersionToken) then
     //defer - resolved to the package's own version at pack time (ResolveVersionToken).
     FVersionString := cVersionToken
+  else if SameText(Trim(value), cBundledDependencyToken) then
+  begin
+    //friendly alias for a dependency on an IDE-bundled library (e.g. Indy). The range is known
+    //now - the alias is only kept so the editor shows and saves what the author wrote.
+    FVersion := TVersionRange.Parse(cBundledDependencyVersion);
+    FVersionString := cBundledDependencyToken;
+  end
   else
   begin
     FVersionString := '';
@@ -156,8 +164,12 @@ begin
     //deferred - resolved to this package's own version at pack time (ResolveVersionToken).
     FVersionString := cVersionToken
   else if SameText(Trim(sValue), cBundledDependencyToken) then
-    //friendly alias for a dependency on an IDE-bundled library (e.g. Indy)
-    FVersion := TVersionRange.Parse(cBundledDependencyVersion)
+  begin
+    //friendly alias for a dependency on an IDE-bundled library (e.g. Indy). The alias is kept
+    //alongside the range so the editor round-trips it (see GetVersionString / ToYAML).
+    FVersion := TVersionRange.Parse(cBundledDependencyVersion);
+    FVersionString := cBundledDependencyToken;
+  end
   else if not TVersionRange.TryParseWithError(sValue, FVersion, sError) then
   begin
     Logger.Error('Invalid dependency version attribute [' + sValue + '] - ' + sError);
@@ -169,12 +181,17 @@ procedure TSpecDependency.ResolveVersionToken(const version : TPackageVersion);
 begin
   //only the $version$ token is deferred at parse time; every other version is already a concrete
   //range in FVersion. Resolve to a fixed range on this package's version and clear the token so
-  //ToYAML writes the resolved version.
+  //ToYAML writes the resolved version rather than the authored text.
   if FVersionString = cVersionToken then
   begin
     FVersion := TVersionRange.Create(version);
     FVersionString := '';
-  end;
+  end
+  else if FVersionString = cBundledDependencyToken then
+    //the bundled alias is an authoring convenience only. FVersion already holds the sentinel
+    //range, so drop the alias and the packed manifest carries the sentinel version (which is
+    //what the gallery and the resolver understand).
+    FVersionString := '';
 end;
 
 procedure TSpecDependency.SetId(const Id: string);
@@ -196,9 +213,9 @@ var
 begin
   mapping := parent.AsSequence.AddMapping;
   mapping.S['id'] := FId;
-  //preserve an unresolved $version$ token (editor round-trip); once resolved at pack time
-  //FVersionString is cleared and FVersion holds the concrete version.
-  if FVersionString = cVersionToken then
+  //preserve an unresolved $version$ token or the bundled alias (editor round-trip); once resolved
+  //at pack time FVersionString is cleared and FVersion holds the concrete version.
+  if FVersionString <> '' then
     mapping.S['version'] := FVersionString
   else
     mapping.S['version'] := FVersion.ToString;

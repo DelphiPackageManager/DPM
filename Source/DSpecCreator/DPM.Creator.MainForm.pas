@@ -2340,9 +2340,10 @@ begin
   if Assigned(tvTemplates.Selected) then
   begin
     versionText := Trim(edtDependencyVersion.Text);
-    //accept the $version$ token (resolved to the package version at pack time) as well as any
-    //parseable range. Only commit when valid so partial typing doesn't corrupt the model.
-    if (versionText <> '') and (SameText(versionText, cVersionToken) or TVersionRange.TryParse(versionText, ver)) then
+    //accept the $version$ token (resolved to the package version at pack time) and the bundled
+    //alias (a dependency on an IDE-bundled library) as well as any parseable range. Only commit
+    //when valid so partial typing doesn't corrupt the model.
+    if (versionText <> '') and (SameText(versionText, cVersionToken) or SameText(versionText, cBundledDependencyToken) or TVersionRange.TryParse(versionText, ver)) then
     begin
       (tvTemplates.Selected as TTemplateTreeNode).dependency.VersionString := versionText;
       (tvTemplates.Selected as TTemplateTreeNode).Text := Trim(edtDependencyId.Text) + ' - ' + versionText;
@@ -2618,8 +2619,9 @@ begin
       Exit;
     dependency := FTemplate.NewDependency(dependancyId);
     dependencyVersion := Trim(DependencyForm.edtVersion.Text);
-    //accept the $version$ token (resolved to the package version at pack time) or a parseable range.
-    if (dependencyVersion <> '') and (SameText(dependencyVersion, cVersionToken) or TVersionRange.TryParse(dependencyVersion, ver)) then
+    //accept the $version$ token (resolved to the package version at pack time), the bundled alias
+    //(a dependency on an IDE-bundled library) or a parseable range.
+    if (dependencyVersion <> '') and (SameText(dependencyVersion, cVersionToken) or SameText(dependencyVersion, cBundledDependencyToken) or TVersionRange.TryParse(dependencyVersion, ver)) then
       dependency.VersionString := dependencyVersion;
   finally
     FreeAndNil(DependencyForm);

@@ -53,6 +53,7 @@ type
     procedure Creator_ExpandCollapse_Preserves_Full;
 
     procedure Bundled_Dependency_Alias_And_Sentinel_Load;
+    procedure Bundled_Dependency_Alias_Set_Via_VersionString;
 
     procedure Version_Token_RoundTrips_And_Resolves;
 
@@ -549,6 +550,9 @@ const
     Assert.IsNotNull(sentinelDep, ctx + ': sentinel dependency should be present');
     Assert.IsTrue(aliasDep.Version.IsBundledSentinel, ctx + ': "bundled" alias must load as the sentinel range');
     Assert.IsTrue(sentinelDep.Version.IsBundledSentinel, ctx + ': "999.999.999" must load as the sentinel range');
+    //the authored text is preserved for the editor - the alias stays the alias, the sentinel the sentinel.
+    Assert.AreEqual('bundled', aliasDep.VersionString, false, ctx + ': the alias must read back as authored');
+    Assert.AreEqual('999.999.999', sentinelDep.VersionString, false, ctx + ': the sentinel must read back as authored');
   end;
 
 var
@@ -563,6 +567,89 @@ begin
   //round-trip: generate yaml and reload - the sentinel must survive serialization.
   reloaded := RoundTrip(spec);
   AssertBothBundled(reloaded, 'round-trip');
+end;
+
+procedure TSpecRoundTripTests.Bundled_Dependency_Alias_Set_Via_VersionString;
+const
+  cYaml =
+    'metadata:'#13#10 +
+    '  id: Test.IdeLibraryEdit'#13#10 +
+    '  version: 1.0.0'#13#10 +
+    '  description: ide library dep editor test'#13#10 +
+    '  authors:'#13#10 +
+    '    - Vincent Parrett'#13#10 +
+    '  license: Apache-2.0'#13#10 +
+    'targetPlatforms:'#13#10 +
+    '  - compiler: 12.0'#13#10 +
+    '    platforms: [Win32, Win64]'#13#10 +
+    '    template: default'#13#10 +
+    'templates:'#13#10 +
+    '  - name: default'#13#10 +
+    '    dependencies:'#13#10 +
+    '      - id: Test.Existing'#13#10 +
+    '        version: 1.0.0'#13#10;
+var
+  reader : IPackageSpecReader;
+  spec : IPackageSpec;
+  reloaded : IPackageSpec;
+  dep : ISpecDependency;
+  yaml : string;
+  i : integer;
+begin
+  reader := TPackageSpecReader.Create(TTestLogger.Create);
+  spec := reader.ReadSpecString(cYaml);
+  Assert.IsNotNull(spec, 'spec should load');
+
+  //the DSpecCreator add path - a new dependency whose version is assigned as text.
+  dep := spec.Templates[0].NewDependency('Test.IndyAdded');
+  dep.VersionString := 'bundled';
+  Assert.IsTrue(dep.Version.IsBundledSentinel, '"bundled" alias must set the sentinel range');
+  //the editor must show the alias the author typed, not the sentinel it stands for.
+  Assert.AreEqual('bundled', dep.VersionString, false, 'the alias must read back as authored');
+
+  //the alias is case insensitive, same as when it is loaded from a dspec.
+  dep := spec.Templates[0].NewDependency('Test.IndyMixedCase');
+  dep.VersionString := ' Bundled ';
+  Assert.IsTrue(dep.Version.IsBundledSentinel, 'the alias must be case insensitive and ignore whitespace');
+  Assert.AreEqual('bundled', dep.VersionString, false, 'the alias must read back in its canonical form');
+
+  //the DSpecCreator edit path - an existing dependency changed to the alias.
+  dep := spec.Templates[0].FindDependency('Test.Existing');
+  dep.VersionString := 'bundled';
+  Assert.IsTrue(dep.Version.IsBundledSentinel, 'an existing dependency must accept the alias');
+
+  //editor save path (no pack): the alias is written to the dspec as authored and survives a reload.
+  yaml := spec.GenerateDspecYAML(spec.MetaData.Version);
+  Assert.IsTrue(Pos('bundled', yaml) > 0, 'the alias must be written to the generated yaml');
+  Assert.IsTrue(Pos('999.999.999', yaml) = 0, 'the sentinel must not replace the authored alias');
+  reloaded := reader.ReadSpecString(yaml);
+  Assert.IsNotNull(reloaded, 'failed to reload generated yaml');
+  Assert.AreEqual(3, reloaded.Templates[0].Dependencies.Count, 'all dependencies must survive the reload');
+  for i := 0 to reloaded.Templates[0].Dependencies.Count - 1 do
+  begin
+    dep := reloaded.Templates[0].Dependencies[i];
+    Assert.IsTrue(dep.Version.IsBundledSentinel, dep.Id + ' must round-trip as the sentinel range');
+    Assert.AreEqual('bundled', dep.VersionString, false, dep.Id + ' must round-trip as the alias');
+  end;
+
+  //pack path: the alias is an authoring convenience only - the packed manifest carries the
+  //sentinel version, which is what the gallery and the resolver understand.
+  for i := 0 to spec.Templates[0].Dependencies.Count - 1 do
+    spec.Templates[0].Dependencies[i].ResolveVersionToken(spec.MetaData.Version);
+  yaml := spec.GenerateDspecYAML(spec.MetaData.Version);
+  Assert.IsTrue(Pos('bundled', yaml) = 0, 'a packed dependency must not emit the alias');
+  Assert.IsTrue(Pos('999.999.999', yaml) > 0, 'a packed dependency must emit the sentinel version');
+  reloaded := reader.ReadSpecString(yaml);
+  Assert.IsNotNull(reloaded, 'failed to reload packed yaml');
+  for i := 0 to reloaded.Templates[0].Dependencies.Count - 1 do
+    Assert.IsTrue(reloaded.Templates[0].Dependencies[i].Version.IsBundledSentinel, 'packed dependency must still be the sentinel range');
+
+  //editing away from the alias replaces it with the concrete version.
+  dep := spec.Templates[0].FindDependency('Test.Existing');
+  dep.VersionString := 'bundled';
+  dep.VersionString := '2.0.0';
+  Assert.IsFalse(dep.Version.IsBundledSentinel, 'a concrete version must replace the sentinel');
+  Assert.AreEqual('2.0.0', dep.VersionString, false, 'a concrete version must replace the alias');
 end;
 
 procedure TSpecRoundTripTests.Version_Token_RoundTrips_And_Resolves;

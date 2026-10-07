@@ -64,15 +64,17 @@ type
     function GetVersionString : string;
     procedure SetVersionString(const value : string);
     /// <summary> If this dependency's version was authored as the $version$ token, resolve it to a
-    /// fixed range on the supplied package version. No-op for any other (already concrete) version. </summary>
+    /// fixed range on the supplied package version. If it was authored as the 'bundled' alias, drop
+    /// the alias so the sentinel version is what gets written. No-op for any other version. </summary>
     procedure ResolveVersionToken(const version : TPackageVersion);
     function Clone : ISpecDependency;
     property Id : string read GetId write SetId;
     property Version : TVersionRange read GetVersionRange write SetVersionRange;
-    /// <summary> The version as authored text: the literal $version$ token when this dependency uses
-    /// it (still unresolved), an empty string when no version is set, otherwise the range's string
-    /// form. Setting it accepts the $version$ token or any parseable range. Use this (not Version) for
-    /// UI binding so the token survives editing instead of being flattened to an empty range. </summary>
+    /// <summary> The version as authored text: the literal $version$ token (still unresolved) or the
+    /// 'bundled' alias when this dependency uses one, an empty string when no version is set,
+    /// otherwise the range's string form. Setting it accepts the $version$ token, the 'bundled' alias
+    /// or any parseable range. Use this (not Version) for UI binding so the token/alias survives
+    /// editing instead of being flattened to an empty range or the sentinel version. </summary>
     property VersionString : string read GetVersionString write SetVersionString;
   end;
 
