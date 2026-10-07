@@ -28,7 +28,8 @@ unit DPM.Core.Tests.Packaging.BuildHooks;
 
 // Pack time half of the build hook check. An author who ships a dproj that would run something
 // during install is told at pack time, when they can still do something about it, rather than
-// leaving it for every consumer to hit. See DPM.Core.Project.BuildHookValidator.
+// leaving it for every consumer to hit. Build events DPM already blanks only warn.
+// See DPM.Core.Project.BuildHookValidator.
 
 interface
 
@@ -49,7 +50,7 @@ type
     procedure Pack_Fails_When_Build_Project_Declares_Target;
     procedure Pack_Fails_When_Build_Project_Declares_UsingTask;
     procedure Pack_Fails_When_Build_Project_Imports_Unknown_Targets;
-    procedure Pack_Fails_When_Build_Project_Sets_PostBuildEvent;
+    procedure Pack_Warns_When_Build_Project_Sets_PostBuildEvent;
     procedure Pack_Fails_When_Design_Project_Declares_Target;
   end;
 
@@ -130,16 +131,14 @@ const
 
 { helpers }
 
-function NewWriter : IPackageWriter;
+function NewWriter(const logger : ILogger) : IPackageWriter;
 var
-  logger : ILogger;
   hashing : IHashingService;
   manifestSvc : IManifestService;
   validator : IArchiveValidator;
   archiveWriter : IPackageArchiveWriter;
   specReader : IPackageSpecReader;
 begin
-  logger := TTestLogger.Create;
   hashing := TBCryptHashingService.Create;
   manifestSvc := TManifestService.Create(hashing);
   validator := TArchiveValidator.Create(manifestSvc);
@@ -202,13 +201,13 @@ end;
 
 // Packs workDir. Unlike the other pack fixtures this deliberately lets an exception escape - a
 // rejected build hook is reported the same way an uncovered build entry is, by raising.
-function Pack(const workDir : string) : boolean;
+function Pack(const workDir : string; const logger : ILogger) : boolean; overload;
 var
   writer : IPackageWriter;
   options : TPackOptions;
   token : ICancellationToken;
 begin
-  writer := NewWriter;
+  writer := NewWriter(logger);
   options := TPackOptions.Create;
   try
     options.SpecFile := TPath.Combine(workDir, 'test.dspec.yaml');
@@ -219,6 +218,14 @@ begin
   finally
     options.Free;
   end;
+end;
+
+function Pack(const workDir : string) : boolean; overload;
+var
+  logger : ILogger;
+begin
+  logger := TTestLogger.Create;
+  result := Pack(workDir, logger);
 end;
 
 // Packs and returns the message of whatever was raised, or '' when the pack completed.
@@ -314,19 +321,23 @@ begin
   end;
 end;
 
-procedure TBuildHookPackTests.Pack_Fails_When_Build_Project_Sets_PostBuildEvent;
+procedure TBuildHookPackTests.Pack_Warns_When_Build_Project_Sets_PostBuildEvent;
 var
   workDir : string;
-  message : string;
+  logger : TTestLogger;
+  loggerIntf : ILogger;
 begin
-  //Advisory at install (TMSBuildCompiler already blanks it) but an error here - the author still
-  //believes the step runs, and only they can remove it.
+  //Advisory, same as at install - TMSBuildCompiler blanks the event so it cannot run. Authors keep
+  //build events in the project for their own builds, so it is worth saying but not worth refusing.
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
   workDir := MakeWorkDir;
   try
     WriteProjectFile(workDir, 'Pkg.dproj', cDprojWithPostBuildEvent);
     WriteDspec(workDir, 'Pkg.dproj', '');
-    message := PackExpectingFailure(workDir);
-    Assert.Contains(message, 'PostBuildEvent', true, 'pack should name the offending property : ' + message);
+    Assert.IsTrue(Pack(workDir, loggerIntf), 'a build event should not stop the pack');
+    Assert.IsTrue(logger.Logged('warning', 'PostBuildEvent'),
+                  'pack should warn naming the property : ' + logger.Messages.Text);
   finally
     Cleanup(workDir);
   end;

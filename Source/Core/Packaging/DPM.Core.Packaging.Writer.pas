@@ -800,6 +800,9 @@ var
   //business running commands while it does - see DPM.Core.Project.BuildHookValidator for what
   //counts and why. The install side refuses to build such a package; catching it here is what
   //gives the author - the only person who can fix it - a chance to.
+  //Build events are the exception : TMSBuildCompiler blanks them, so they are inert on a consumer's
+  //machine, and authors legitimately keep them in the project for their own builds. Those only warn,
+  //the same as at install.
   procedure CheckProjectHooks(const entryKind, projectPath : string);
   var
     onDisk : string;
@@ -823,10 +826,10 @@ var
         'execute - remove the msbuild targets, tasks and imports before packing.');
 
     if advisory.Any then
-      raise Exception.Create(
+      FLogger.Warning(
         entryKind + ' project [' + projectPath + '] sets a build event DPM blocks when it compiles ' +
-        'the package : ' + TStringUtils.Join('; ', advisory.ToArray) + '. The step will never run on a ' +
-        'consumer''s machine, so do the work before packing and remove it from the project.');
+        'the package : ' + TStringUtils.Join('; ', advisory.ToArray) + '. The step will not run on a ' +
+        'consumer''s machine - if the package relies on it, do that work before packing.');
   end;
 
 begin
