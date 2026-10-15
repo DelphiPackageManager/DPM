@@ -42,8 +42,11 @@ uses
   DPM.Core.Options.Sbom,
   DPM.Core.SBOM.Interfaces,
   DPM.Core.SBOM.Types,
+  DPM.Core.SBOM.ProductInfo,
+  DPM.Core.SBOM.ComponentRules,
   DPM.Core.Project.MapFile,
-  DPM.Core.Project.SearchPaths;
+  DPM.Core.Project.SearchPaths,
+  DPM.Core.Crypto.Hashing.Interfaces;
 
 const
   cSBOMWriterCycloneDX = 'sbom.writer.cyclonedx';
@@ -59,6 +62,7 @@ type
     FConfigManager : IConfigurationManager;
     FPackageCache : IPackageCache;
     FMapFileReader : IMapFileReader;
+    FHashingService : IHashingService;
     //caches the per-compiler Delphi RootDir (registry read) for the lifetime
     //of one Generate call - keyed by ord(TCompilerVersion)
     FDelphiRootCache : IDictionary<integer, string>;
@@ -72,6 +76,19 @@ type
     //dproj in an aggregated group) emits a fresh relationship edge but not a duplicate
     //component. Cleared per-platform.
     FVisitedPackages : IDictionary<string, string>;
+    //Components found in the build rather than the package graph, keyed 'folder:' + LowerCase(source
+    //folder) for a ThirdParty component grouping MAP units, 'bpl:' + LowerCase(file name) for a runtime
+    //package. Cleared per-platform alongside FVisitedPackages, so in an aggregated .groupproj a
+    //library linked by several dprojs is one component with an edge from each of them.
+    FComponentsByKey : IDictionary<string, TSBOMComponent>;
+    //LowerCase(bpl file name) -> bomRef of the DPM component whose bpl\<platform> folder ships it.
+    //Populated by EnumeratePackages, consumed by ApplyBinaryImports. Cleared per-platform.
+    FBplOwnership : IDictionary<string, string>;
+    //LowerCase(name) of every component rule that claimed a unit, and whether a MAP file was read,
+    //for the current platform pass - a rule that claims nothing when there was a MAP file to match
+    //against is stale. Cleared per-platform.
+    FMatchedRules : ISet<string>;
+    FMapFileRead : boolean;
   protected
     function Generate(const cancellationToken : ICancellationToken; const options : TSBOMOptions) : boolean;
     function GenerateForProject(const projectPath : string; const options : TSBOMOptions; const config : IConfiguration) : boolean;
@@ -79,8 +96,9 @@ type
                                  const projectPath, projectName, outDir, configName : string;
                                  const compilerVersion : TCompilerVersion;
                                  const platform : TDPMPlatform;
-                                 const projectVersion : string;
                                  const graphRoot : IPackageReference;
+                                 const explicitInfo : TSBOMProductInfo;
+                                 const rules : ISBOMComponentRules;
                                  const options : TSBOMOptions) : boolean;
     function GenerateForGroupAggregated(const groupProjPath : string; const dprojPaths : array of string;
                                         const options : TSBOMOptions; const config : IConfiguration;
@@ -89,27 +107,51 @@ type
                                 const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;
                                 const parentBomRef : string);
     procedure AddDelphiRuntime(const report : TSBOMReport; const compilerVersion : TCompilerVersion);
+    //parentBomRef is the component that links the binary this MAP file describes - the report
+    //root for a single dproj, the dproj's application component in an aggregated group.
     procedure ApplyMapFileEvidence(const report : TSBOMReport; const editor : IProjectEditor;
-                                   const projectPath, dprojName, configName : string;
+                                   const projectPath, dprojName, configName, parentBomRef : string;
                                    const platform : TDPMPlatform; const options : TSBOMOptions;
                                    const compilerVersion : TCompilerVersion;
-                                   const searchIndex : IUnitSearchIndex);
+                                   const searchIndex : IUnitSearchIndex;
+                                   const rules : ISBOMComponentRules);
     function BuildSearchIndex(const editor : IProjectEditor; const dprojDir, configName : string;
                               const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : IUnitSearchIndex;
     function GetIDELibraryPath(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : string;
+    function GetVersionInfo(const projectPath, configName : string; const platform : TDPMPlatform) : TSBOMProductInfo;
+    function LoadExplicitProductInfo(const projectPath : string; const options : TSBOMOptions; out info : TSBOMProductInfo;
+                                     out rules : ISBOMComponentRules) : boolean;
+    function FindOrCreateRuleComponent(const report : TSBOMReport; const parentBomRef : string;
+                                       const rule : TSBOMComponentRule) : TSBOMComponent;
+    procedure ApplyDeclaredComponents(const report : TSBOMReport; const parentBomRef : string; const rules : ISBOMComponentRules);
+    procedure WarnUnmatchedRules(const rules : ISBOMComponentRules; const warned : ISet<string>);
+    procedure ReportProductInfoWarnings(const report : TSBOMReport; const info : TSBOMProductInfo;
+                                        const versionIsExplicit : boolean; const projectPath : string);
+    function ApplyBuiltBinary(const report : TSBOMReport; const comp : TSBOMComponent; const editor : IProjectEditor;
+                              const projectPath, configName : string; const platform : TDPMPlatform;
+                              const compilerVersion : TCompilerVersion) : string;
+    procedure ApplyBinaryImports(const report : TSBOMReport; const parentBomRef, binaryPath : string;
+                                 const compilerVersion : TCompilerVersion);
     function WriteReport(const report : TSBOMReport; const options : TSBOMOptions; const outDir, projectName : string) : boolean;
-    function GetDelphiRootDir(const compilerVersion : TCompilerVersion) : string;
+    //virtual so tests can supply an install folder rather than read the registry
+    function GetDelphiRootDir(const compilerVersion : TCompilerVersion) : string; virtual;
     function ResolveWriter(const name : string) : ISbomWriter;
   public
     constructor Create(const container : TContainer;
                        const logger : ILogger;
                        const configManager : IConfigurationManager;
                        const packageCache : IPackageCache;
-                       const mapFileReader : IMapFileReader);
+                       const mapFileReader : IMapFileReader;
+                       const hashingService : IHashingService);
   end;
 
-//Where to look for the linker MAP file, in probe order. Exposed (and free of any
-//filesystem access) so the path rules can be unit tested without a build tree.
+//Where to look for a file the build writes next to the binary (the binary itself, its MAP file),
+//in probe order. Exposed (and free of any filesystem access) so the path rules can be unit tested
+//without a build tree.
+function GetOutputFileCandidates(const dprojDir, outputDir, fileName, configName : string;
+                                 const platform : TDPMPlatform) : TArray<string>;
+
+//GetOutputFileCandidates for <projectName>.map
 function GetMapFileCandidates(const dprojDir, outputDir, projectName, configName : string;
                               const platform : TDPMPlatform) : TArray<string>;
 
@@ -133,7 +175,9 @@ uses
   DPM.Core.Spec.Interfaces,
   DPM.Core.Dependency.Version,
   DPM.Core.Utils.Path,
-  DPM.Core.Utils.Strings;
+  DPM.Core.Utils.Strings,
+  DPM.Core.Utils.PEImports,
+  DPM.Core.Crypto.Algorithms;
 
 const
   //purl scheme used for all DPM-managed components. `pkg:dpm/` is not registered with
@@ -195,8 +239,8 @@ end;
 //     the project, which is exactly what an absent or empty output dir element means.
 //  3) the IDE's default .\$(Platform)\$(Config) shape - a last guess for projects whose
 //     configuration we couldn't read (mis-keyed config, missing BuildConfiguration entry).
-function GetMapFileCandidates(const dprojDir, outputDir, projectName, configName : string;
-                              const platform : TDPMPlatform) : TArray<string>;
+function GetOutputFileCandidates(const dprojDir, outputDir, fileName, configName : string;
+                                 const platform : TDPMPlatform) : TArray<string>;
 
   procedure AddCandidate(const folder : string);
   var
@@ -208,7 +252,7 @@ function GetMapFileCandidates(const dprojDir, outputDir, projectName, configName
     fullPath := TPathUtils.ToAbsolutePath(ExpandProjectTokens(folder, platform, configName), dprojDir);
     if fullPath = '' then
       exit;
-    fullPath := IncludeTrailingPathDelimiter(fullPath) + projectName + '.map';
+    fullPath := IncludeTrailingPathDelimiter(fullPath) + fileName;
     for i := 0 to Length(result) - 1 do
       if SameText(result[i], fullPath) then
         exit;
@@ -221,6 +265,12 @@ begin
   AddCandidate(outputDir);
   AddCandidate(dprojDir);
   AddCandidate('.\$(Platform)\$(Config)');
+end;
+
+function GetMapFileCandidates(const dprojDir, outputDir, projectName, configName : string;
+                              const platform : TDPMPlatform) : TArray<string>;
+begin
+  result := GetOutputFileCandidates(dprojDir, outputDir, projectName + '.map', configName, platform);
 end;
 
 //Expand the BDS-family MSBuild macros that show up in IDE Library Path values
@@ -401,13 +451,118 @@ begin
   result := cPurlNamespaceDpm + id + '@' + version + qs;
 end;
 
+//Value of one key in a VerInfo_Keys list ('CompanyName=Acme;FileVersion=1.0.0.0;...'). A group that
+//appends to an inherited list can repeat a key - the later, more specific one wins.
+function GetVerInfoKey(const keys, keyName : string) : string;
+var
+  parts : TArray<string>;
+  i : integer;
+  sepPos : integer;
+begin
+  result := '';
+  parts := TStringUtils.SplitStr(keys, ';');
+  for i := 0 to Length(parts) - 1 do
+  begin
+    sepPos := Pos('=', parts[i]);
+    if (sepPos > 0) and SameText(Trim(Copy(parts[i], 1, sepPos - 1)), keyName) then
+      result := Trim(Copy(parts[i], sepPos + 1, MaxInt));
+  end;
+end;
+
+type
+  TFileVersionResource = record
+    Version : string;       // the fixed FileVersion, else the ProductVersion string
+    CompanyName : string;
+  end;
+
+//What a binary's version resource says about it - empty fields when it has none.
+function ReadVersionResource(const fileName : string) : TFileVersionResource;
+var
+  size : DWORD;
+  handle : DWORD;
+  buf : TBytes;
+  fixed : PVSFixedFileInfo;
+  fixedLen : UINT;
+  translation : PDWORD;
+  translationLen : UINT;
+  langCodePage : string;
+
+  function QueryString(const name : string) : string;
+  var
+    value : PChar;
+    valueLen : UINT;
+  begin
+    result := '';
+    value := nil;
+    if VerQueryValue(@buf[0], PChar('\StringFileInfo\' + langCodePage + '\' + name), Pointer(value), valueLen) and
+       (value <> nil) and (valueLen > 0) then
+      result := Trim(string(value));
+  end;
+
+begin
+  result.Version := '';
+  result.CompanyName := '';
+  size := GetFileVersionInfoSize(PChar(fileName), handle);
+  if size = 0 then
+    exit;
+  SetLength(buf, size);
+  if not GetFileVersionInfo(PChar(fileName), 0, size, @buf[0]) then
+    exit;
+
+  //the strings live in a block named after the first language / code page pair the file lists
+  langCodePage := '040904B0';
+  translation := nil;
+  if VerQueryValue(@buf[0], '\VarFileInfo\Translation', Pointer(translation), translationLen) and
+     (translation <> nil) and (translationLen >= SizeOf(DWORD)) then
+    langCodePage := IntToHex(LoWord(translation^), 4) + IntToHex(HiWord(translation^), 4);
+
+  fixed := nil;
+  if VerQueryValue(@buf[0], '\', Pointer(fixed), fixedLen) and (fixed <> nil) and
+     (fixedLen >= SizeOf(TVSFixedFileInfo)) and ((fixed.dwFileVersionMS <> 0) or (fixed.dwFileVersionLS <> 0)) then
+    result.Version := Format('%d.%d.%d.%d', [(fixed.dwFileVersionMS shr 16) and $FFFF, fixed.dwFileVersionMS and $FFFF,
+                                             (fixed.dwFileVersionLS shr 16) and $FFFF, fixed.dwFileVersionLS and $FFFF])
+  else
+    result.Version := QueryString('ProductVersion');
+  result.CompanyName := QueryString('CompanyName');
+end;
+
+//Part of Windows rather than of the product : an API set name (api-ms-win-*, ext-ms-*), which the
+//loader maps onto one of its own DLLs, or a DLL in a system folder whose version resource names
+//Microsoft. The second check keeps a third-party DLL that was installed into System32 (it happens)
+//in the SBOM. Sysnative is how a 32 bit process sees the real System32 on 64 bit Windows.
+function IsWindowsSystemDll(const moduleName : string) : boolean;
+const
+  cSystemFolders : array[0..2] of string = ('System32', 'SysWOW64', 'Sysnative');
+var
+  systemRoot : string;
+  candidate : string;
+  i : integer;
+begin
+  result := StartsText('api-ms-', moduleName) or StartsText('ext-ms-', moduleName);
+  if result then
+    exit;
+  systemRoot := GetEnvironmentVariable('SystemRoot');
+  if systemRoot = '' then
+    exit;
+  for i := Low(cSystemFolders) to High(cSystemFolders) do
+  begin
+    candidate := IncludeTrailingPathDelimiter(systemRoot) + cSystemFolders[i] + PathDelim + moduleName;
+    if FileExists(candidate) and (Pos('microsoft', LowerCase(ReadVersionResource(candidate).CompanyName)) > 0) then
+    begin
+      result := true;
+      exit;
+    end;
+  end;
+end;
+
 { TSBOMGenerator }
 
 constructor TSBOMGenerator.Create(const container : TContainer;
                                    const logger : ILogger;
                                    const configManager : IConfigurationManager;
                                    const packageCache : IPackageCache;
-                                   const mapFileReader : IMapFileReader);
+                                   const mapFileReader : IMapFileReader;
+                                   const hashingService : IHashingService);
 begin
   inherited Create;
   FContainer := container;
@@ -415,9 +570,13 @@ begin
   FConfigManager := configManager;
   FPackageCache := packageCache;
   FMapFileReader := mapFileReader;
+  FHashingService := hashingService;
   FDelphiRootCache := TCollections.CreateDictionary<integer, string>;
   FUnitOwnership := TCollections.CreateDictionary<string, string>;
   FVisitedPackages := TCollections.CreateDictionary<string, string>;
+  FComponentsByKey := TCollections.CreateDictionary<string, TSBOMComponent>;
+  FBplOwnership := TCollections.CreateDictionary<string, string>;
+  FMatchedRules := TCollections.CreateSet<string>;
 end;
 
 function TSBOMGenerator.GetIDELibraryPath(const compilerVersion : TCompilerVersion;
@@ -452,6 +611,384 @@ begin
   finally
     reg.Free;
   end;
+end;
+
+//What the project stamps into its binary's version resource for one (config, platform) - the
+//lowest layer of product metadata. Version is ProductVersion from the version info keys, else
+//FileVersion; not the dproj's ProjectVersion element, which is the MSBuild project format version.
+//Supplier is CompanyName. Empty when the project doesn't include version info, since the dproj's
+//values then describe nothing that ships.
+function TSBOMGenerator.GetVersionInfo(const projectPath, configName : string; const platform : TDPMPlatform) : TSBOMProductInfo;
+var
+  loader : IProjectSettingsLoader;
+  keys : string;
+begin
+  result.Version := '';
+  result.Supplier := '';
+  result.SupplierUrl := '';
+  result.License := '';
+  result.SbomCreator := '';
+  try
+    loader := TDPMProjectSettingsLoader.Create(FLogger, projectPath, configName, platform);
+    if not SameText(loader.GetStringProperty('VerInfo_IncludeVerInfo', ''), 'true') then
+      exit;
+    keys := loader.GetStringProperty('VerInfo_Keys', '');
+  except
+    on e : Exception do
+    begin
+      FLogger.Warning('[SBOM] could not read the project version info : ' + e.Message);
+      exit;
+    end;
+  end;
+  result.Version := GetVerInfoKey(keys, 'ProductVersion');
+  if result.Version = '' then
+    result.Version := GetVerInfoKey(keys, 'FileVersion');
+  result.Supplier := GetVerInfoKey(keys, 'CompanyName');
+end;
+
+//The explicit layer of product metadata for projectPath - the sbom options over its sidecar - and
+//the sidecar's component rules.
+//False, having logged why, when the sidecar can't be read or the SBOM creator isn't a contact.
+function TSBOMGenerator.LoadExplicitProductInfo(const projectPath : string; const options : TSBOMOptions;
+                                                out info : TSBOMProductInfo; out rules : ISBOMComponentRules) : boolean;
+var
+  sidecar : TSBOMProductInfo;
+  fromOptions : TSBOMProductInfo;
+begin
+  result := false;
+  rules := TSBOMComponentRules.Create;
+  if not LoadSBOMSidecar(FLogger, projectPath, sidecar, rules) then
+    exit;
+  fromOptions.Version := Trim(options.ProductVersion);
+  fromOptions.Supplier := Trim(options.Supplier);
+  fromOptions.SupplierUrl := Trim(options.SupplierUrl);
+  fromOptions.License := Trim(options.License);
+  fromOptions.SbomCreator := Trim(options.SbomCreator);
+  info := fromOptions.Merge(sidecar);
+  //BSI TR-03183-2 5.2.1 : the creator is given as an email address, or a URL when there is none.
+  //A company name is not a way to contact anyone.
+  if (info.SbomCreator <> '') and not (IsEmailAddress(info.SbomCreator) or IsHttpUrl(info.SbomCreator)) then
+  begin
+    FLogger.Error('[SBOM] the SBOM creator [' + info.SbomCreator + '] must be an email address or an http(s) URL');
+    exit;
+  end;
+  result := true;
+end;
+
+//The component a rule describes, created the first time something claims it. In an aggregated group
+//every dproj that links the library adds an edge to the one component.
+function TSBOMGenerator.FindOrCreateRuleComponent(const report : TSBOMReport; const parentBomRef : string;
+                                                  const rule : TSBOMComponentRule) : TSBOMComponent;
+var
+  key : string;
+begin
+  key := 'rule:' + LowerCase(rule.Name);
+  if not FComponentsByKey.TryGetValue(key, result) then
+  begin
+    result := report.AddComponent(TSBOMComponentKind.ThirdParty);
+    result.BomRef := report.MakeUniqueBomRef('component:' + LowerCase(rule.Name));
+    result.Id := rule.Name;
+    result.Version := rule.Version;
+    result.Supplier := rule.Supplier;
+    result.SupplierUrl := rule.SupplierUrl;
+    result.License := rule.License;
+    result.Purl := rule.Purl;
+    result.ComponentType := rule.ComponentType;
+    result.AddProperty('dpm:origin', 'component-rule');
+    FComponentsByKey.Add(key, result);
+  end;
+  FMatchedRules.Add(LowerCase(rule.Name));
+  report.AddRelationship(parentBomRef, result.BomRef);
+end;
+
+//Rules with no units to match declare a component outright - something the build can't show, such
+//as a DLL the program loads by name at runtime.
+procedure TSBOMGenerator.ApplyDeclaredComponents(const report : TSBOMReport; const parentBomRef : string;
+                                                 const rules : ISBOMComponentRules);
+var
+  i : integer;
+begin
+  if rules = nil then
+    exit;
+  for i := 0 to rules.Count - 1 do
+    if (Length(rules.Rules[i].Units) = 0) and (Length(rules.Rules[i].UnitPrefixes) = 0) then
+      FindOrCreateRuleComponent(report, parentBomRef, rules.Rules[i]);
+end;
+
+//A rule with units to match that matched none, although a MAP file was read - the library was
+//dropped, or the rule is wrong. warned collects the names already reported, so a group shares it.
+procedure TSBOMGenerator.WarnUnmatchedRules(const rules : ISBOMComponentRules; const warned : ISet<string>);
+var
+  i : integer;
+  rule : TSBOMComponentRule;
+begin
+  if (rules = nil) or not FMapFileRead then
+    exit;
+  for i := 0 to rules.Count - 1 do
+  begin
+    rule := rules.Rules[i];
+    if (Length(rule.Units) = 0) and (Length(rule.UnitPrefixes) = 0) then
+      continue;
+    if FMatchedRules.Contains(LowerCase(rule.Name)) or not warned.Add(LowerCase(rule.Name)) then
+      continue;
+    FLogger.Warning('[SBOM] the component rule [' + rule.Name + '] matched no unit in the MAP file - ' +
+                    'the library may no longer be used, or its units / unitPrefixes are wrong');
+  end;
+end;
+
+//CRA / BSI gaps in the root's metadata - logged, and kept on the report for the HTML / Markdown
+//reports. They never stop the SBOM being written.
+procedure TSBOMGenerator.ReportProductInfoWarnings(const report : TSBOMReport; const info : TSBOMProductInfo;
+                                                   const versionIsExplicit : boolean; const projectPath : string);
+var
+  warning : string;
+begin
+  for warning in GetProductInfoWarnings(info, versionIsExplicit, ExtractFileName(SBOMSidecarFileName(projectPath))) do
+  begin
+    FLogger.Warning('[SBOM] ' + warning);
+    report.Warnings.Add(warning);
+  end;
+end;
+
+//The file the project builds for (config, platform) - <name>.exe, <name>.dll, or <name><suffix>.bpl
+//with the DllSuffix resolved - looked for where the build writes it. On a hit comp gets its SHA-256
+//(primary) and SHA-512; BSI TR-03183-2 5.2.2 wants the SHA-512 of the deployable component. On a miss
+//the report gets a warning - the SBOM is still useful, it just can't be tied to a binary.
+//Returns the binary's path, '' when there is none.
+function TSBOMGenerator.ApplyBuiltBinary(const report : TSBOMReport; const comp : TSBOMComponent; const editor : IProjectEditor;
+                                         const projectPath, configName : string; const platform : TDPMPlatform;
+                                         const compilerVersion : TCompilerVersion) : string;
+var
+  projectName : string;
+  loader : IProjectSettingsLoader;
+  suffix : string;
+  fileName : string;
+  outputDir : string;
+  projectConfig : IProjectConfiguration;
+  candidates : TArray<string>;
+  i : integer;
+  binaryPath : string;
+  warning : string;
+begin
+  result := '';
+  //non-Windows targets build bundles and shared objects under other names - not handled yet
+  if (editor = nil) or not IsWindowsPlatform(platform) then
+    exit;
+
+  projectName := ChangeFileExt(ExtractFileName(projectPath), '');
+  case editor.AppType of
+    TAppType.Application : fileName := projectName + '.exe';
+    TAppType.Lib : fileName := projectName + '.dll';
+    TAppType.Package :
+    begin
+      suffix := '';
+      try
+        loader := TDPMProjectSettingsLoader.Create(FLogger, projectPath, configName, platform);
+        suffix := loader.GetStringProperty('DllSuffix', '');
+      except
+        on e : Exception do
+          FLogger.Debug('[SBOM] could not read DllSuffix : ' + e.Message);
+      end;
+      //$(Auto) is the compiler's package version - 290 for 12.x, 370 for 13.x
+      if SameText(suffix, '$(Auto)') then
+      begin
+        try
+          suffix := CompilerToLibSuffix(compilerVersion);
+        except
+          suffix := '';
+        end;
+      end;
+      fileName := projectName + suffix + '.bpl';
+    end;
+  else
+    exit;
+  end;
+
+  outputDir := '';
+  projectConfig := editor.GetProjectConfiguration(configName, platform);
+  if projectConfig <> nil then
+    outputDir := projectConfig.OutputDir;
+  candidates := GetOutputFileCandidates(ExcludeTrailingPathDelimiter(ExtractFilePath(projectPath)), outputDir,
+                                        fileName, configName, platform);
+  binaryPath := '';
+  for i := 0 to Length(candidates) - 1 do
+  begin
+    if FileExists(candidates[i]) then
+    begin
+      binaryPath := candidates[i];
+      break;
+    end;
+  end;
+
+  if binaryPath = '' then
+  begin
+    warning := 'CRA/BSI: the built file ' + fileName + ' was not found, so the SBOM has no hash for it ' +
+               '(BSI TR-03183-2 5.2.2 asks for the SHA-512 of the deployable component). Build the ' +
+               configName + ' ' + DPMPlatformToString(platform) + ' configuration first, or check --config and --platforms.';
+    FLogger.Warning('[SBOM] ' + warning);
+    report.Warnings.Add(warning);
+    exit;
+  end;
+
+  try
+    comp.HashAlgorithm := 'SHA-256';
+    comp.HashValue := BytesToHex(FHashingService.HashFile(binaryPath, haSha256));
+    comp.AddHash('SHA-512', BytesToHex(FHashingService.HashFile(binaryPath, haSha512)));
+    FLogger.Verbose('[SBOM] hashed ' + binaryPath);
+    result := binaryPath;
+  except
+    on e : Exception do
+    begin
+      comp.HashAlgorithm := '';
+      comp.HashValue := '';
+      comp.Hashes.Clear;
+      warning := 'CRA/BSI: could not hash the built file ' + binaryPath + ' : ' + e.Message;
+      FLogger.Warning('[SBOM] ' + warning);
+      report.Warnings.Add(warning);
+    end;
+  end;
+end;
+
+//The runtime packages and DLLs binaryPath loads, from its PE import table - only what the linker
+//actually referenced, unlike the DCC_UsePackage list, which names every package the IDE knows.
+// - a bpl one of the DPM packages built is evidence on that package
+// - a bpl or DLL from Delphi itself (found in the install's bin / bin64) is evidence on the runtime
+//   component, or dropped with --no-runtime
+// - an API set name, or a DLL Windows ships (in a system folder, version resource names Microsoft),
+//   is part of the operating system, not of the product
+// - anything else is a component of its own, linked from parentBomRef. When the file is next to the
+//   binary - the copy that ships with it - it is hashed, and its version resource gives the version
+//   and the supplier.
+procedure TSBOMGenerator.ApplyBinaryImports(const report : TSBOMReport; const parentBomRef, binaryPath : string;
+                                            const compilerVersion : TCompilerVersion);
+var
+  imports : TArray<TPEImport>;
+  errorMessage : string;
+  i : integer;
+  moduleName : string;
+  key : string;
+  isPackage : boolean;
+  ownerBomRef : string;
+  owner : TSBOMComponent;
+  runtimeComp : TSBOMComponent;
+  comp : TSBOMComponent;
+  delphiRoot : string;
+  binaryDir : string;
+  shippedCopy : string;
+  versionResource : TFileVersionResource;
+
+  function IsDelphiFile(const fileName : string) : boolean;
+  begin
+    result := (delphiRoot <> '') and
+              (FileExists(IncludeTrailingPathDelimiter(delphiRoot) + 'bin' + PathDelim + fileName) or
+               FileExists(IncludeTrailingPathDelimiter(delphiRoot) + 'bin64' + PathDelim + fileName));
+  end;
+
+begin
+  if binaryPath = '' then
+    exit;
+  if not TryReadPEImports(binaryPath, imports, errorMessage) then
+  begin
+    FLogger.Warning('[SBOM] could not read the imports of ' + binaryPath + ' : ' + errorMessage);
+    exit;
+  end;
+
+  runtimeComp := nil;
+  for comp in report.Components do
+    if comp.Kind = TSBOMComponentKind.DelphiRuntime then
+    begin
+      runtimeComp := comp;
+      break;
+    end;
+  delphiRoot := GetDelphiRootDir(compilerVersion);
+  binaryDir := ExtractFilePath(binaryPath);
+
+  for i := 0 to Length(imports) - 1 do
+  begin
+    moduleName := imports[i].ModuleName;
+    key := LowerCase(moduleName);
+    isPackage := SameText(ExtractFileExt(moduleName), '.bpl');
+
+    if isPackage and FBplOwnership.TryGetValue(key, ownerBomRef) then
+    begin
+      owner := report.FindComponentByBomRef(ownerBomRef);
+      if owner <> nil then
+      begin
+        owner.AddEvidence('runtime-package:' + moduleName, 'pe-import');
+        continue;
+      end;
+    end;
+
+    if IsDelphiFile(moduleName) then
+    begin
+      if runtimeComp <> nil then
+      begin
+        if isPackage then
+          runtimeComp.AddEvidence('runtime-package:' + moduleName, 'pe-import')
+        else
+          runtimeComp.AddEvidence('dll:' + moduleName, 'pe-import');
+      end;
+      continue;
+    end;
+
+    if (not isPackage) and IsWindowsSystemDll(moduleName) then
+      continue;
+
+    if isPackage then
+      key := 'bpl:' + key
+    else
+      key := 'dll:' + key;
+    if not FComponentsByKey.TryGetValue(key, comp) then
+    begin
+      comp := report.AddComponent(TSBOMComponentKind.ThirdParty);
+      comp.Id := moduleName;
+      if isPackage then
+      begin
+        comp.BomRef := report.MakeUniqueBomRef('runtime-package:' + LowerCase(moduleName));
+        comp.AddProperty('dpm:origin', 'runtime-package');
+      end
+      else
+      begin
+        comp.BomRef := report.MakeUniqueBomRef('dll:' + LowerCase(moduleName));
+        comp.AddProperty('dpm:origin', 'dll-import');
+        //bound on first call, not at startup - it may never be loaded at all
+        if imports[i].Delayed then
+          comp.AddProperty('dpm:delayLoad', 'true');
+      end;
+
+      shippedCopy := binaryDir + moduleName;
+      if FileExists(shippedCopy) then
+      begin
+        try
+          comp.HashAlgorithm := 'SHA-256';
+          comp.HashValue := BytesToHex(FHashingService.HashFile(shippedCopy, haSha256));
+          comp.AddHash('SHA-512', BytesToHex(FHashingService.HashFile(shippedCopy, haSha512)));
+        except
+          on e : Exception do
+          begin
+            comp.HashAlgorithm := '';
+            comp.HashValue := '';
+            comp.Hashes.Clear;
+            FLogger.Warning('[SBOM] could not hash ' + shippedCopy + ' : ' + e.Message);
+          end;
+        end;
+        versionResource := ReadVersionResource(shippedCopy);
+        comp.Version := versionResource.Version;
+        comp.Supplier := versionResource.CompanyName;
+      end;
+      FComponentsByKey.Add(key, comp);
+    end;
+    report.AddRelationship(parentBomRef, comp.BomRef);
+  end;
+end;
+
+//Puts layered product metadata on a root or application component.
+procedure ApplyProductInfo(const comp : TSBOMComponent; const info : TSBOMProductInfo);
+begin
+  comp.Version := info.Version;
+  comp.Supplier := info.Supplier;
+  comp.SupplierUrl := info.SupplierUrl;
+  comp.License := info.License;
 end;
 
 function TSBOMGenerator.BuildSearchIndex(const editor : IProjectEditor; const dprojDir, configName : string;
@@ -723,8 +1260,9 @@ var
   configName : string;
   outDir : string;
   projectName : string;
-  projectVersion : string;
   graphRoot : IPackageReference;
+  explicitInfo : TSBOMProductInfo;
+  rules : ISBOMComponentRules;
   ok : boolean;
 
   function PickConfig : string;
@@ -761,6 +1299,9 @@ var
 begin
   result := false;
   FLogger.Information('Generating SBOM for project : ' + projectPath);
+
+  if not LoadExplicitProductInfo(projectPath, options, explicitInfo, rules) then
+    exit;
 
   editor := TProjectEditor.Create(FLogger, config, TCompilerVersion.UnknownVersion);
   if not editor.LoadProject(projectPath, [TProjectElement.All]) then
@@ -813,14 +1354,13 @@ begin
   end;
 
   projectName := ChangeFileExt(ExtractFileName(projectPath), '');
-  projectVersion := editor.ProjectVersion;
   graphRoot := editor.GetPackageReferences;
 
   ok := true;
   for platform in selectedPlatforms do
   begin
     if not GenerateForPlatform(editor, projectPath, projectName, outDir, configName,
-                               compilerVersion, platform, projectVersion, graphRoot, options) then
+                               compilerVersion, platform, graphRoot, explicitInfo, rules, options) then
       ok := false;
   end;
   result := ok;
@@ -840,8 +1380,14 @@ type
     GraphRoot : IPackageReference;
     AppBomRef : string;  //bomRef of the Application sub-component added per platform
     ConfigNames : IReadOnlyList<string>;
+    Sidecar : TSBOMProductInfo;  //the dproj's own <name>.sbom.yaml
+    Rules : ISBOMComponentRules; //its sidecar's component rules, then the group's
   end;
 var
+  groupInfo : TSBOMProductInfo;
+  groupRules : ISBOMComponentRules;
+  warnedRules : ISet<string>;
+  groupFallback : TSBOMProductInfo;
   contexts : TArray<TDprojCtx>;
   i : integer;
   ctx : TDprojCtx;
@@ -852,6 +1398,7 @@ var
   platform : TDPMPlatform;
   report : TSBOMReport;
   dprojApp : TSBOMComponent;
+  binaryPath : string;
   runtimeCompiler : TCompilerVersion;
   ok : boolean;
 
@@ -886,6 +1433,14 @@ begin
 
   FLogger.Information('Generating aggregated SBOM for group : ' + groupProjPath);
 
+  //The options and the group's sidecar describe the group root and the SBOM as a whole.
+  if not LoadExplicitProductInfo(groupProjPath, options, groupInfo, groupRules) then
+    exit;
+  //...and are the fallback for each dproj's supplier and licence, but not its version - a dproj's
+  //own version info says more about it than a version given for the group.
+  groupFallback := groupInfo;
+  groupFallback.Version := '';
+
   //First pass: load every dproj and capture its compiler / platforms / config.
   //Doing this once up front lets us iterate platforms in the outer loop and
   //compute the union of platforms across the whole group.
@@ -910,6 +1465,11 @@ begin
     if contexts[i].ConfigName = '' then
       contexts[i].ConfigName := 'Release';
     contexts[i].GraphRoot := contexts[i].Editor.GetPackageReferences;
+    contexts[i].Rules := TSBOMComponentRules.Create;
+    if not LoadSBOMSidecar(FLogger, dprojPaths[i], contexts[i].Sidecar, contexts[i].Rules) then
+      exit;
+    //a dproj's own rules first, so it can name a library differently from the rest of the group
+    contexts[i].Rules.AddAll(groupRules);
     unionPlatforms := unionPlatforms + contexts[i].EnabledPlatforms;
   end;
 
@@ -965,18 +1525,28 @@ begin
       //minimum-client-version constant.
       report.ToolVersion := TDPMVersion.CurrentVersionString;
       report.ProjectName := groupName;
-      report.ProjectVersion := '';
+      report.ProjectVersion := groupInfo.Version;
+      report.SbomCreator := groupInfo.SbomCreator;
       report.Platform := platform;
 
       report.RootComponent.BomRef := 'group:' + groupName + ':' + DPMPlatformToString(platform);
       report.RootComponent.Id := groupName;
-      report.RootComponent.Version := '0.0.0';
+      //the group is exactly the projects the .groupproj lists for this platform, and their runtime
+      report.RootComponent.DependencyCompleteness := TSBOMCompleteness.Complete;
+      //a group project has no version info of its own - unless one was given, Version stays
+      //empty and is omitted
+      ApplyProductInfo(report.RootComponent, groupInfo);
+      ReportProductInfoWarnings(report, groupInfo, true, groupProjPath);
       report.AddMetaProperty('dpm:groupProject', ExtractFileName(groupProjPath));
       report.AddMetaProperty('dpm:projectCount', IntToStr(Length(contexts)));
 
       //Per-platform classifier state (see GenerateForPlatform note).
       FUnitOwnership.Clear;
       FVisitedPackages.Clear;
+      FComponentsByKey.Clear;
+      FBplOwnership.Clear;
+      FMatchedRules.Clear;
+      FMapFileRead := false;
       runtimeCompiler := TCompilerVersion.UnknownVersion;
 
       for i := 0 to Length(contexts) - 1 do
@@ -996,10 +1566,10 @@ begin
         ctx.AppBomRef := 'project:' + ctx.Name + ':' + DPMPlatformToString(platform);
         dprojApp.BomRef := ctx.AppBomRef;
         dprojApp.Id := ctx.Name;
-        if ctx.Editor.ProjectVersion <> '' then
-          dprojApp.Version := ctx.Editor.ProjectVersion
-        else
-          dprojApp.Version := '0.0.0';
+        //as for a single dproj's root - runtime loads by name can't be seen
+        dprojApp.DependencyCompleteness := TSBOMCompleteness.Incomplete;
+        ApplyProductInfo(dprojApp, ctx.Sidecar.Merge(groupFallback).Merge(GetVersionInfo(ctx.Path, ctx.ConfigName, platform)));
+        binaryPath := ApplyBuiltBinary(report, dprojApp, ctx.Editor, ctx.Path, ctx.ConfigName, platform, ctx.CompilerVersion);
         report.AddRelationship(report.RootComponent.BomRef, ctx.AppBomRef);
         contexts[i].AppBomRef := ctx.AppBomRef;
 
@@ -1019,13 +1589,17 @@ begin
         if options.IncludeRuntime then
           AddDelphiRuntime(report, ctx.CompilerVersion);
 
+        //after the packages and the runtime component - those are what an import is matched against
+        ApplyBinaryImports(report, ctx.AppBomRef, binaryPath, ctx.CompilerVersion);
+        ApplyDeclaredComponents(report, ctx.AppBomRef, ctx.Rules);
+
         if IsWindowsPlatform(platform) then
         begin
           try
-            ApplyMapFileEvidence(report, ctx.Editor, ctx.Path, ctx.Name, ctx.ConfigName,
+            ApplyMapFileEvidence(report, ctx.Editor, ctx.Path, ctx.Name, ctx.ConfigName, ctx.AppBomRef,
                                  platform, options, ctx.CompilerVersion,
                                  BuildSearchIndex(ctx.Editor, ExcludeTrailingPathDelimiter(ExtractFilePath(ctx.Path)),
-                                                  ctx.ConfigName, platform, ctx.CompilerVersion));
+                                                  ctx.ConfigName, platform, ctx.CompilerVersion), ctx.Rules);
           except
             on e : Exception do
               FLogger.Error('[SBOM] error processing MAP file for ' + ctx.Name + ' : ' + e.Message);
@@ -1034,6 +1608,12 @@ begin
         else
           report.AddMetaProperty('dpm:evidence', 'platform-not-supported:' + DPMPlatformToString(platform));
       end;
+
+      //once the whole group has been matched - a group rule only one dproj uses is not stale
+      warnedRules := TCollections.CreateSet<string>;
+      for i := 0 to Length(contexts) - 1 do
+        if (contexts[i].Editor <> nil) and (platform in contexts[i].EnabledPlatforms) then
+          WarnUnmatchedRules(contexts[i].Rules, warnedRules);
 
       if not WriteReport(report, options, outDir, groupName) then
         ok := false;
@@ -1048,12 +1628,17 @@ function TSBOMGenerator.GenerateForPlatform(const editor : IProjectEditor;
                                             const projectPath, projectName, outDir, configName : string;
                                             const compilerVersion : TCompilerVersion;
                                             const platform : TDPMPlatform;
-                                            const projectVersion : string;
                                             const graphRoot : IPackageReference;
+                                            const explicitInfo : TSBOMProductInfo;
+                                            const rules : ISBOMComponentRules;
                                             const options : TSBOMOptions) : boolean;
 var
   report : TSBOMReport;
+  productInfo : TSBOMProductInfo;
+  binaryPath : string;
 begin
+  //version info is per (config, platform) - Win32 and Win64 builds can carry different versions
+  productInfo := explicitInfo.Merge(GetVersionInfo(projectPath, configName, platform));
   report := TSBOMReport.Create;
   try
     report.SerialNumber := 'urn:uuid:' + NewGuidString;
@@ -1064,16 +1649,21 @@ begin
     //name the wrong tool build in every SBOM we emit.
     report.ToolVersion := TDPMVersion.CurrentVersionString;
     report.ProjectName := projectName;
-    report.ProjectVersion := projectVersion;
+    report.ProjectVersion := productInfo.Version;
+    report.SbomCreator := productInfo.SbomCreator;
     report.Platform := platform;
     report.CompilerVersion := compilerVersion;
 
     report.RootComponent.BomRef := 'project:' + projectName + ':' + DPMPlatformToString(platform);
     report.RootComponent.Id := projectName;
-    if projectVersion <> '' then
-      report.RootComponent.Version := projectVersion
-    else
-      report.RootComponent.Version := '0.0.0';
+    //what the program loads by name at runtime (LoadLibrary, LoadPackage) is in neither the MAP
+    //file nor its import table
+    report.RootComponent.DependencyCompleteness := TSBOMCompleteness.Incomplete;
+    //anything still empty is unknown - the writers omit it rather than invent a value
+    ApplyProductInfo(report.RootComponent, productInfo);
+    ReportProductInfoWarnings(report, productInfo, explicitInfo.Version <> '', projectPath);
+    //for a single dproj the root is the binary it builds
+    binaryPath := ApplyBuiltBinary(report, report.RootComponent, editor, projectPath, configName, platform, compilerVersion);
 
     //Fresh per-platform: the unit-ownership map, the package-visited map, and the
     //search index are all keyed on the unit / package name and would be wrong if
@@ -1082,6 +1672,10 @@ begin
     //across all dprojs within that platform.
     FUnitOwnership.Clear;
     FVisitedPackages.Clear;
+    FComponentsByKey.Clear;
+    FBplOwnership.Clear;
+    FMatchedRules.Clear;
+    FMapFileRead := false;
 
     try
       EnumeratePackages(report, graphRoot, compilerVersion, platform, report.RootComponent.BomRef);
@@ -1093,13 +1687,17 @@ begin
     if options.IncludeRuntime then
       AddDelphiRuntime(report, compilerVersion);
 
+    //after the packages and the runtime component - those are what an import is matched against
+    ApplyBinaryImports(report, report.RootComponent.BomRef, binaryPath, compilerVersion);
+    ApplyDeclaredComponents(report, report.RootComponent.BomRef, rules);
+
     if IsWindowsPlatform(platform) then
     begin
       try
-        ApplyMapFileEvidence(report, editor, projectPath, projectName, configName, platform, options,
-                             compilerVersion,
+        ApplyMapFileEvidence(report, editor, projectPath, projectName, configName,
+                             report.RootComponent.BomRef, platform, options, compilerVersion,
                              BuildSearchIndex(editor, ExcludeTrailingPathDelimiter(ExtractFilePath(projectPath)),
-                                              configName, platform, compilerVersion));
+                                              configName, platform, compilerVersion), rules);
       except
         on e : Exception do
           FLogger.Error('[SBOM] error processing MAP file : ' + e.Message);
@@ -1110,6 +1708,7 @@ begin
       report.AddMetaProperty('dpm:evidence', 'platform-not-supported:' + DPMPlatformToString(platform));
       FLogger.Information('[SBOM] MAP-file parsing not yet supported on platform [' + DPMPlatformToString(platform) + '] - emitting package + runtime SBOM only.');
     end;
+    WarnUnmatchedRules(rules, TCollections.CreateSet<string>);
 
     result := WriteReport(report, options, outDir, projectName);
   finally
@@ -1150,6 +1749,27 @@ procedure TSBOMGenerator.EnumeratePackages(const report : TSBOMReport;
     end;
   end;
 
+  procedure HarvestBpls(const folder, ownerBomRef : string);
+  var
+    files : TStringDynArray;
+    i : integer;
+    bplKey : string;
+  begin
+    if not DirectoryExists(folder) then
+      exit;
+    try
+      files := TDirectory.GetFiles(folder, '*.bpl', TSearchOption.soTopDirectoryOnly);
+    except
+      SetLength(files, 0);
+    end;
+    for i := 0 to Length(files) - 1 do
+    begin
+      bplKey := LowerCase(ExtractFileName(files[i]));
+      if not FBplOwnership.ContainsKey(bplKey) then
+        FBplOwnership.Add(bplKey, ownerBomRef);
+    end;
+  end;
+
   procedure PopulateUnitOwnership(const identity : IPackageIdentity; const ownerBomRef : string);
   var
     packageFolder : string;
@@ -1167,6 +1787,9 @@ procedure TSBOMGenerator.EnumeratePackages(const report : TSBOMReport;
     HarvestUnits(packageFolder + 'source', ownerBomRef, '*.pas');
     HarvestUnits(packageFolder + 'src', ownerBomRef, '*.pas');
     HarvestUnits(packageFolder + 'lib', ownerBomRef, '*.pas');
+    //Runtime packages the installer compiled into bpl\<BDSPlatform>, so a project linking with
+    //runtime packages can be tied back to this package by the bpl names its binary imports.
+    HarvestBpls(packageFolder + 'bpl' + PathDelim + DPMPlatformToBDString(platform), ownerBomRef);
   end;
 
   procedure Visit(const node : IPackageReference; const parentBomRef : string);
@@ -1221,6 +1844,8 @@ procedure TSBOMGenerator.EnumeratePackages(const report : TSBOMReport;
     comp.BomRef := bomRef;
     comp.Id := node.Id;
     comp.Version := node.Version.ToStringNoMeta;
+    //its dependencies are declared in its dspec and resolved into the dproj - the children below
+    comp.DependencyCompleteness := TSBOMCompleteness.Complete;
     FVisitedPackages.Add(key, bomRef);
 
     hash := ReadPackageSidecarHash(FPackageCache, identity);
@@ -1378,10 +2003,13 @@ begin
 end;
 
 procedure TSBOMGenerator.ApplyMapFileEvidence(const report : TSBOMReport; const editor : IProjectEditor;
-                                              const projectPath, dprojName, configName : string;
+                                              const projectPath, dprojName, configName, parentBomRef : string;
                                               const platform : TDPMPlatform; const options : TSBOMOptions;
                                               const compilerVersion : TCompilerVersion;
-                                              const searchIndex : IUnitSearchIndex);
+                                              const searchIndex : IUnitSearchIndex;
+                                              const rules : ISBOMComponentRules);
+const
+  cUnidentifiedBomRef = 'unidentified:third-party';
 var
   dprojDir : string;
   delphiRoot : string;
@@ -1396,63 +2024,56 @@ var
   u : TMapUnit;
   comp : TSBOMComponent;
   runtimeComp : TSBOMComponent;
-  thirdParty : IDictionary<string, TSBOMComponent>;
   unidentified : TSBOMComponent;
   evidenceLoc : string;
-  groupId : string;
-  groupKey : string;
-  bomRef : string;
   dpkgPackageId : string;
+  ruleIndex : integer;
 
-  //Lazy: created on first hit so SBOMs with full evidence don't contain
-  //an empty 'unidentified-third-party' component.
+  //Lazy: created on first hit so SBOMs with full evidence don't contain an empty
+  //'unidentified-third-party' component. In an aggregated group an earlier dproj may
+  //already have created it - reuse that one and just link it from this dproj too.
   procedure EnsureUnidentified;
   begin
-    if unidentified <> nil then
-      exit;
-    unidentified := report.AddComponent(TSBOMComponentKind.Unidentified);
-    unidentified.BomRef := 'unidentified:third-party';
-    unidentified.Id := 'unidentified-third-party';
-    unidentified.Version := 'unknown';
-    report.AddRelationship(report.RootComponent.BomRef, unidentified.BomRef);
+    if unidentified = nil then
+    begin
+      unidentified := report.AddComponent(TSBOMComponentKind.Unidentified);
+      unidentified.BomRef := cUnidentifiedBomRef;
+      unidentified.Id := 'unidentified-third-party';
+    end;
+    report.AddRelationship(parentBomRef, unidentified.BomRef);
   end;
 
-  //Look up [groupKey] in thirdParty or create a new ThirdParty component for it.
-  function FindOrCreateThirdParty(const aGroupKey, aGroupId, aBomRefPrefix, aOriginTag : string) : TSBOMComponent;
+  //The ThirdParty component grouping the units in sourceFile's folder, created on first use.
+  //The folder name is a deterministic stand-in for the library name. Unrelated libraries often
+  //share one ('Source', 'src') so the bom-ref is made unique - the name is left as it is.
+  function FindOrCreateThirdParty(const sourceFile, originTag : string) : TSBOMComponent;
   var
-    existing : TSBOMComponent;
-    refStr : string;
+    folderKey : string;
+    groupId : string;
   begin
-    if thirdParty.TryGetValue(aGroupKey, existing) then
+    folderKey := 'folder:' + LowerCase(ExtractFilePath(sourceFile));
+    if not FComponentsByKey.TryGetValue(folderKey, result) then
     begin
-      result := existing;
-      exit;
+      groupId := ExtractFileName(ExcludeTrailingPathDelimiter(ExtractFilePath(sourceFile)));
+      if groupId = '' then
+        groupId := 'third-party';
+      result := report.AddComponent(TSBOMComponentKind.ThirdParty);
+      result.BomRef := report.MakeUniqueBomRef('thirdparty:' + LowerCase(groupId));
+      result.Id := groupId;
+      //no Version - nothing in a MAP file tells us which release of the library this is, and a
+      //made up value ('unknown') can be mistaken for a real one by vulnerability matching
+      result.AddProperty('dpm:origin', originTag);
+      FComponentsByKey.Add(folderKey, result);
     end;
-    result := report.AddComponent(TSBOMComponentKind.ThirdParty);
-    refStr := aBomRefPrefix + LowerCase(aGroupId);
-    result.BomRef := refStr;
-    result.Id := aGroupId;
-    result.Version := 'unknown';
-    result.AddProperty('dpm:origin', aOriginTag);
-    thirdParty.Add(aGroupKey, result);
-    report.AddRelationship(report.RootComponent.BomRef, refStr);
+    report.AddRelationship(parentBomRef, result.BomRef);
   end;
 
-  function FindComponentByBomRef(const aBomRef : string) : TSBOMComponent;
-  var
-    i : integer;
+  //A rule written for a library that is now installed with DPM : the package claims the unit, but
+  //the rule is not stale - the library is linked.
+  procedure NoteRuleForDpmUnit(const unitName : string);
   begin
-    result := nil;
-    if aBomRef = '' then
-      exit;
-    for i := 0 to report.Components.Count - 1 do
-    begin
-      if report.Components[i].BomRef = aBomRef then
-      begin
-        result := report.Components[i];
-        exit;
-      end;
-    end;
+    if (rules <> nil) and (rules.Match(unitName, ruleIndex) = TSBOMUnitMatch.Component) then
+      FMatchedRules.Add(LowerCase(rules.Rules[ruleIndex].Name));
   end;
 
   //Classify a MAP entry that has no SourcePath. Returns true if we attached
@@ -1464,19 +2085,17 @@ var
     ownerComp : TSBOMComponent;
     foundPath : string;
     origin : TUnitOrigin;
-    folderName : string;
-    folderKey : string;
-    thirdPartyComp : TSBOMComponent;
   begin
     result := false;
 
     //1) Did one of the DPM packages we already enumerated ship this unit?
     if FUnitOwnership.TryGetValue(LowerCase(unitName), ownerBomRef) then
     begin
-      ownerComp := FindComponentByBomRef(ownerBomRef);
+      ownerComp := report.FindComponentByBomRef(ownerBomRef);
       if ownerComp <> nil then
       begin
         ownerComp.AddEvidence('unit:' + unitName, 'map-no-source');
+        NoteRuleForDpmUnit(unitName);
         result := true;
         exit;
       end;
@@ -1508,7 +2127,26 @@ var
       exit;
     end;
 
-    //3) General search-index lookup for non-Embarcadero-prefixed units.
+    //3) A component rule - the user's word for which library a unit belongs to, or that it is
+    //   the project's own code.
+    if rules <> nil then
+    begin
+      case rules.Match(unitName, ruleIndex) of
+        TSBOMUnitMatch.Component :
+        begin
+          FindOrCreateRuleComponent(report, parentBomRef, rules.Rules[ruleIndex]).AddEvidence('unit:' + unitName, 'map-no-source');
+          result := true;
+          exit;
+        end;
+        TSBOMUnitMatch.OwnCode :
+        begin
+          result := true;
+          exit;
+        end;
+      end;
+    end;
+
+    //4) General search-index lookup for non-Embarcadero-prefixed units.
     if (searchIndex <> nil) and searchIndex.TryFindUnit(unitName, foundPath, origin) then
     begin
       if (delphiRoot <> '') and PathStartsWith(foundPath, delphiRoot) and (runtimeComp <> nil) then
@@ -1523,13 +2161,8 @@ var
         result := true;
         exit;
       end;
-      //Third-party: group by the parent folder name (last segment).
-      folderName := ExtractFileName(ExcludeTrailingPathDelimiter(ExtractFilePath(foundPath)));
-      if folderName = '' then
-        folderName := 'third-party';
-      folderKey := LowerCase(ExtractFilePath(foundPath));
-      thirdPartyComp := FindOrCreateThirdParty(folderKey, folderName, 'thirdparty:', 'search-index');
-      thirdPartyComp.AddEvidence(foundPath, 'map-no-source');
+      //Third-party: grouped by the folder the unit was found in.
+      FindOrCreateThirdParty(foundPath, 'search-index').AddEvidence(foundPath, 'map-no-source');
       result := true;
     end;
   end;
@@ -1588,6 +2221,8 @@ begin
 
   FLogger.Verbose('[SBOM] reading MAP file: ' + mapPath);
   info := FMapFileReader.Read(mapPath);
+  if info <> nil then
+    FMapFileRead := true;
   if info = nil then
   begin
     report.AddMetaProperty('dpm:evidence', 'map-file-unreadable');
@@ -1608,12 +2243,16 @@ begin
   FLogger.Debug(Format('[SBOM] classifier state: runtimeComp=%s, FUnitOwnership=%d units, delphiRoot=%s',
     [BoolToStr(runtimeComp <> nil, true), FUnitOwnership.Count, delphiRoot]));
 
-  thirdParty := TCollections.CreateDictionary<string, TSBOMComponent>;
-  unidentified := nil;
+  //an earlier dproj of an aggregated group may already have created it
+  unidentified := report.FindComponentByBomRef(cUnidentifiedBomRef);
 
   for u in info.Units do
   begin
     evidenceLoc := u.SourcePath;
+    //dcc records some source paths as a bare file name, relative to nothing we can rely on - classify
+    //those by unit name, which looks the unit up on the project's search path
+    if (evidenceLoc <> '') and not TPath.IsPathRooted(evidenceLoc) then
+      evidenceLoc := '';
     if evidenceLoc <> '' then
     begin
       //classify by source-path origin.
@@ -1624,18 +2263,14 @@ begin
         dpkgPackageId := FirstPathSegmentUnder(IncludeTrailingPathDelimiter(cacheRoot) + CompilerToString(compilerVersion), evidenceLoc);
         comp := report.FindComponentById(dpkgPackageId);
         if comp <> nil then
-          comp.AddEvidence(evidenceLoc, 'map')
+        begin
+          comp.AddEvidence(evidenceLoc, 'map');
+          NoteRuleForDpmUnit(u.UnitName);
+        end
         //if we couldn't match it, fall through to the unidentified bucket.
         else
         begin
-          if unidentified = nil then
-          begin
-            unidentified := report.AddComponent(TSBOMComponentKind.Unidentified);
-            unidentified.BomRef := 'unidentified:third-party';
-            unidentified.Id := 'unidentified-third-party';
-            unidentified.Version := 'unknown';
-            report.AddRelationship(report.RootComponent.BomRef, unidentified.BomRef);
-          end;
+          EnsureUnidentified;
           unidentified.AddEvidence(evidenceLoc, 'map');
         end;
         continue;
@@ -1648,31 +2283,27 @@ begin
         continue;
       end;
 
+      //Before the project folder check - a rule also claims library source vendored into the project.
+      if rules <> nil then
+      begin
+        case rules.Match(u.UnitName, ruleIndex) of
+          TSBOMUnitMatch.Component :
+          begin
+            FindOrCreateRuleComponent(report, parentBomRef, rules.Rules[ruleIndex]).AddEvidence(evidenceLoc, 'map');
+            continue;
+          end;
+          TSBOMUnitMatch.OwnCode : continue;
+        end;
+      end;
+
       if PathStartsWith(evidenceLoc, dprojDir) then
       begin
         //own project source - intentionally not surfaced as a component.
         continue;
       end;
 
-      //Third-party. Group by the first directory component above the source file. The id is the
-      //last segment of the parent directory - a reasonable, deterministic stand-in for a library
-      //name. Two files in the same dir collapse to one component.
-      groupId := ExtractFileName(ExcludeTrailingPathDelimiter(ExtractFilePath(evidenceLoc)));
-      groupKey := LowerCase(ExtractFilePath(evidenceLoc));
-      if not thirdParty.TryGetValue(groupKey, comp) then
-      begin
-        comp := report.AddComponent(TSBOMComponentKind.ThirdParty);
-        if groupId = '' then
-          groupId := 'third-party';
-        bomRef := 'thirdparty:' + LowerCase(groupId);
-        comp.BomRef := bomRef;
-        comp.Id := groupId;
-        comp.Version := 'unknown';
-        comp.AddProperty('dpm:origin', 'map-file');
-        thirdParty.Add(groupKey, comp);
-        report.AddRelationship(report.RootComponent.BomRef, bomRef);
-      end;
-      comp.AddEvidence(evidenceLoc, 'map');
+      //Third-party. Two files in the same dir collapse to one component.
+      FindOrCreateThirdParty(evidenceLoc, 'map-file').AddEvidence(evidenceLoc, 'map');
     end
     else
     begin
@@ -1683,8 +2314,8 @@ begin
       if SameText(u.UnitName, dprojName) then
         continue;
       //No source path (release build w/o debug info, or .dcu-only library).
-      //Tiered classifier: per-package unit map -> prefix+path -> search index ->
-      //unidentified. See ClassifyNoSourcePathUnit for the full ladder.
+      //Tiered classifier: per-package unit map -> prefix+path -> component rules ->
+      //search index -> unidentified. See ClassifyNoSourcePathUnit for the full ladder.
       if not ClassifyNoSourcePathUnit(u.UnitName) then
       begin
         EnsureUnidentified;

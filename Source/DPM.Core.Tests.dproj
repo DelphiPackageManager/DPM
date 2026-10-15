@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <Base>True</Base>
         <AppType>Console</AppType>
@@ -85,8 +85,8 @@
         <DPMCompiler>delphi13.0</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.3-beta.1\lib\Win32;$(DPM)\Spring4D.Core\2.0.3-beta.1\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.3-beta.1\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.11\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.12\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win32;$(DPM)\VSoft.CommandLine\0.1.11\lib\Win32;$(DPM)\VSoft.DUnitX\0.5.1\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.9.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.3.0\lib\Win32;$(DPM)\VSoft.System.Console\1.2.4\lib\Win32;$(DPM)\VSoft.YAML\1.7.1\lib\Win32;</DPMSearch>
-        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Spring4D.Base\2.0.3-beta.1\lib\Win64;$(DPM)\Spring4D.Core\2.0.3-beta.1\lib\Win64;$(DPM)\Spring4D.Extensions\2.0.3-beta.1\lib\Win64;$(DPM)\VSoft.AntPatterns\0.1.11\lib\Win64;$(DPM)\VSoft.Base64.Polyfill\0.1.12\lib\Win64;$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win64;$(DPM)\VSoft.CommandLine\0.1.11\lib\Win64;$(DPM)\VSoft.DUnitX\0.5.1\lib\Win64;$(DPM)\VSoft.Uri\0.3.3\lib\Win64;$(DPM)\VSoft.HttpClient\2.9.0\lib\Win64;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win64;$(DPM)\VSoft.SemanticVersion\0.3.0\lib\Win64;$(DPM)\VSoft.System.Console\1.2.4\lib\Win64;$(DPM)\VSoft.YAML\1.7.1\lib\Win64;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.3-beta.1\lib\Win32;$(DPM)\Spring4D.Core\2.0.3-beta.1\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.3-beta.1\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.11\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.12\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win32;$(DPM)\VSoft.CommandLine\0.1.11\lib\Win32;$(DPM)\VSoft.DUnitX\0.5.1\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.9.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.3.0\lib\Win32;$(DPM)\VSoft.System.Console\1.3.0\lib\Win32;$(DPM)\VSoft.YAML\1.7.1\lib\Win32;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\Spring4D.Base\2.0.3-beta.1\lib\Win64;$(DPM)\Spring4D.Core\2.0.3-beta.1\lib\Win64;$(DPM)\Spring4D.Extensions\2.0.3-beta.1\lib\Win64;$(DPM)\VSoft.AntPatterns\0.1.11\lib\Win64;$(DPM)\VSoft.Base64.Polyfill\0.1.12\lib\Win64;$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win64;$(DPM)\VSoft.CommandLine\0.1.11\lib\Win64;$(DPM)\VSoft.DUnitX\0.5.1\lib\Win64;$(DPM)\VSoft.Uri\0.3.3\lib\Win64;$(DPM)\VSoft.HttpClient\2.9.0\lib\Win64;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win64;$(DPM)\VSoft.SemanticVersion\0.3.0\lib\Win64;$(DPM)\VSoft.System.Console\1.3.0\lib\Win64;$(DPM)\VSoft.YAML\1.7.1\lib\Win64;</DPMSearch>
         <DPMExe>I:\Github\DelphiPackageManager\DPMMaster\Output\dpm.exe</DPMExe>
     </PropertyGroup>
     <ItemGroup>
@@ -102,6 +102,7 @@
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Directory.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Enum.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Numbers.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.PEImports.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Path.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Process.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Strings.pas"/>
@@ -223,6 +224,8 @@
         <DCCReference Include="Core\Utils\DPM.Core.Utils.PE.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Interfaces.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Types.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.ComponentRules.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.ProductInfo.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Interfaces.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas"/>
@@ -273,7 +276,10 @@
         <DCCReference Include="Tests\DPM.Core.Tests.SBOM.Reader.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.SBOM.Reports.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Sbom.UnitOrigin.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Utils.PEImports.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Sbom.Writers.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.SBOM.ComponentRules.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.SBOM.Generator.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.Reader.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.Collapse.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.RoundTrip.pas"/>
@@ -377,7 +383,7 @@
                 </PackageReference>
                 <PackageReference id="VSoft.JsonDataObjects" version="0.3.2" manifestHash="sha256:28d227b3a7f0baeee16fab98b5844328745b65574f5c23262e1f8e1d8b50a201"/>
                 <PackageReference id="VSoft.SemanticVersion" version="0.3.0" manifestHash="sha256:d8e3c67b9483ace75b03d9422f35f1e22938bb8049aabf8082d81b1d4d720db6"/>
-                <PackageReference id="VSoft.System.Console" version="1.2.4" manifestHash="sha256:5b72ecbe365f793cb05322cb2399f8ec71b441661c3f5dc6ea03b3641d6b87fb"/>
+                <PackageReference id="VSoft.System.Console" version="1.3.0" manifestHash="sha256:effea5d4ae1eb2eb143e2a8542d7bbb2179b5a56403eeb78ba4c066dc3f1bdda"/>
                 <PackageReference id="VSoft.YAML" version="1.7.1" manifestHash="sha256:520171d454b2af8e6539cffb2d5f00e0b2ad2d75cdab265b800610500b2c91b0"/>
             </Packages>
         </DPM>

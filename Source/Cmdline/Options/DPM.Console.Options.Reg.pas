@@ -1301,7 +1301,8 @@ begin
   cmd := TOptionsRegistry.RegisterCommand('sbom', '', 'Generates a Software Bill of Materials (SBOM) for the project.',
                                                       'Emits CycloneDX 1.6 JSON and / or SPDX 2.3 JSON for each enabled platform. ' +
                                                       'For non-DPM library detection, ensure the linker option "Map file = Detailed" is enabled in the build configuration you point at.',
-                                                      'sbom <project> [-outdir=<dir>] [-format=cyclonedx|spdx|both] [-platforms=<csv>] [-config=<name>] [-map=<path>] [-no-runtime] [-strict]');
+                                                      'sbom <project> [-outdir=<dir>] [-format=cyclonedx|spdx|both] [-platforms=<csv>] [-config=<name>] [-map=<path>] [-no-runtime] [-strict] ' +
+                                                      '[-version=<version>] [-supplier=<name>] [-supplier-url=<url-or-email>] [-license=<spdx>] [-sbom-creator=<email-or-url>]');
 
   option := cmd.RegisterUnNamedOption<string>('The .dproj or .groupproj. Defaults to the current directory.', 'projectPath',
     procedure(const value : string)
@@ -1376,8 +1377,40 @@ begin
     end);
   option.HasValue := false;
 
+  //Product metadata. Each one overrides the same key in <project>.sbom.yaml next to the project,
+  //which is where values that should apply on every run (and in the IDE) belong.
+  cmd.RegisterOption<string>('version', '', 'Product version for the SBOM root. Default: the sidecar, else ProductVersion (or FileVersion) from the project version info.',
+    procedure(const value : string)
+    begin
+      TSBOMOptions.Default.ProductVersion := value;
+    end);
+
+  cmd.RegisterOption<string>('supplier', '', 'Name of the product''s supplier. Default: the sidecar, else CompanyName from the project version info.',
+    procedure(const value : string)
+    begin
+      TSBOMOptions.Default.Supplier := value;
+    end);
+
+  cmd.RegisterOption<string>('supplier-url', '', 'Supplier contact - a URL, or an email address.',
+    procedure(const value : string)
+    begin
+      TSBOMOptions.Default.SupplierUrl := value;
+    end);
+
+  cmd.RegisterOption<string>('license', '', 'Licence the product is distributed under - an SPDX identifier or expression (e.g. MIT, LicenseRef-Acme-EULA).',
+    procedure(const value : string)
+    begin
+      TSBOMOptions.Default.License := value;
+    end);
+
+  cmd.RegisterOption<string>('sbom-creator', '', 'Email address or http(s) URL of whoever produces the SBOM (BSI TR-03183-2).',
+    procedure(const value : string)
+    begin
+      TSBOMOptions.Default.SbomCreator := value;
+    end);
   cmd.Examples.Add('sbom .\MyProject.dproj');
   cmd.Examples.Add('sbom .\MyProject.dproj -outdir=c:\temp -format=cyclonedx');
+  cmd.Examples.Add('sbom .\MyProject.dproj -supplier="Acme Pty Ltd" -supplier-url=https://acme.example -license=MIT -sbom-creator=sbom@acme.example');
   cmd.Examples.Add('sbom .\MyProject.dproj -format=html,markdown');
   cmd.Examples.Add('sbom .\MyProject.dproj -format=all');
   cmd.Examples.Add('sbom .\MyProject.dproj -platforms=Win32,Win64 -config=Release');

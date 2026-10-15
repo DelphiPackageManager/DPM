@@ -12,6 +12,9 @@ type
   IProjectSettingsLoader = interface
   ['{83E9EEA4-02E5-4D13-9C13-21D7F7219F4A}']
     function GetSearchPath : string;
+    //The value of propName for the loader's (config, platform), walking up the same chain of
+    //property groups msbuild would evaluate. Returns defaultValue when no group sets it.
+    function GetStringProperty(const propName, defaultValue : string) : string;
   end;
 
   TDPMProjectSettingsLoader = class(TInterfacedObject, IProjectSettingsLoader)

@@ -365,6 +365,7 @@ var
   evidenceCount : integer;
   comp : TSBOMComponent;
   ev : TSBOMEvidence;
+  warning : string;
 begin
   buckets := BucketByKind(report);
   sb := TStringBuilder.Create;
@@ -381,9 +382,8 @@ begin
               HtmlEscape(DPMPlatformToString(report.Platform)) +
               '</strong> platform. Generated from the project''s dependency graph and the linker MAP file.</p>' + sLineBreak);
 
-    //Card row: at-a-glance counts per component kind. Mirrors the audit-style
-    //summary panels in tools like DX.Comply so a reviewer can see "what's in
-    //this binary" without scrolling.
+    //Card row: at-a-glance counts per component kind, so a reviewer can see
+    //"what's in this binary" without scrolling.
     sb.Append('<div class="stat-grid">' + sLineBreak);
     AppendStatCard(sb, 'dpm', 'DPM packages', IntToStr(buckets.Dpm.Count));
     AppendStatCard(sb, 'runtime', 'Delphi runtime', IntToStr(buckets.Runtime.Count));
@@ -400,6 +400,15 @@ begin
     sb.Append('<tr><td>Serial</td><td><code>' + HtmlEscape(report.SerialNumber) + '</code></td></tr>' + sLineBreak);
     sb.Append('<tr><td>Tool</td><td>' + HtmlEscape(report.ToolName) + ' ' + HtmlEscape(report.ToolVersion) + '</td></tr>' + sLineBreak);
     sb.Append('</tbody></table>' + sLineBreak);
+
+    if report.Warnings.Count > 0 then
+    begin
+      sb.Append('<h2>Warnings<span class="count-badge">(' + IntToStr(report.Warnings.Count) + ')</span></h2>' + sLineBreak);
+      sb.Append('<ul>' + sLineBreak);
+      for warning in report.Warnings do
+        sb.Append('<li>' + HtmlEscape(warning) + '</li>' + sLineBreak);
+      sb.Append('</ul>' + sLineBreak);
+    end;
 
     AppendSection(sb, 'DPM packages', buckets.Dpm);
     AppendSection(sb, 'Delphi runtime', buckets.Runtime);
@@ -501,6 +510,7 @@ var
   evidenceCount : integer;
   comp : TSBOMComponent;
   ev : TSBOMEvidence;
+  warning : string;
 begin
   buckets := BucketByKind(report);
   sb := TStringBuilder.Create;
@@ -516,6 +526,14 @@ begin
     sb.Append('| Serial | `' + MdEscapeCell(report.SerialNumber) + '` |' + sLineBreak);
     sb.Append('| Tool | ' + MdEscapeCell(report.ToolName + ' ' + report.ToolVersion) + ' |' + sLineBreak);
     sb.Append(sLineBreak);
+
+    if report.Warnings.Count > 0 then
+    begin
+      sb.Append('## Warnings' + sLineBreak + sLineBreak);
+      for warning in report.Warnings do
+        sb.Append('- ' + warning + sLineBreak);
+      sb.Append(sLineBreak);
+    end;
 
     sb.Append('## Summary' + sLineBreak + sLineBreak);
     sb.Append('- DPM packages: **' + IntToStr(buckets.Dpm.Count) + '**' + sLineBreak);

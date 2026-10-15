@@ -61,6 +61,19 @@ type
     Note : string;      // optional - e.g. "from map file" / "from dspec"
   end;
 
+  TSBOMHash = record
+    Algorithm : string;
+    Value : string;
+  end;
+
+  ///<summary>How much of a component's dependency list the SBOM knows - written as CycloneDX
+  /// compositions, which BSI TR-03183-2 asks for alongside the dependencies.</summary>
+  TSBOMCompleteness = (
+    Unknown,      // nothing is known about what else it needs
+    Complete,     // every dependency is listed - an empty list means it has none
+    Incomplete    // the list is what could be seen, there may be more
+  );
+
   ///<summary>One component in the SBOM. Plain class (not interfaced) — the report owns
   /// the list and disposes them. Most string fields are optional and emit only when non-empty.
   ///</summary>
@@ -73,10 +86,12 @@ type
     FDescription : string;
     FAuthors : IList<string>;
     FSupplier : string;
+    FSupplierUrl : string;       // supplier contact - a URL, or an email address
     FLicense : string;
     FCopyright : string;
     FHashAlgorithm : string;
     FHashValue : string;
+    FHashes : IList<TSBOMHash>;
     FProjectUrl : string;
     FRepositoryUrl : string;
     FRepositoryType : string;
@@ -87,10 +102,13 @@ type
     FTags : IList<string>;
     FProperties : IList<TSBOMProperty>;
     FEvidence : IList<TSBOMEvidence>;
+    FDependencyCompleteness : TSBOMCompleteness;
+    FComponentType : string;
   public
     constructor Create(const kind : TSBOMComponentKind);
     procedure AddProperty(const name, value : string);
     procedure AddEvidence(const location, note : string);
+    procedure AddHash(const algorithm, value : string);
 
     property Kind : TSBOMComponentKind read FKind;
     property BomRef : string read FBomRef write FBomRef;
@@ -99,10 +117,15 @@ type
     property Description : string read FDescription write FDescription;
     property Authors : IList<string> read FAuthors;
     property Supplier : string read FSupplier write FSupplier;
+    property SupplierUrl : string read FSupplierUrl write FSupplierUrl;
     property License : string read FLicense write FLicense;
     property Copyright : string read FCopyright write FCopyright;
+    //The primary digest - the one the reports show and the DPM purl carries as its checksum.
     property HashAlgorithm : string read FHashAlgorithm write FHashAlgorithm;
     property HashValue : string read FHashValue write FHashValue;
+    //Further digests of the same content (e.g. SHA-512 next to a SHA-256 primary). Writers emit
+    //them after the primary one.
+    property Hashes : IList<TSBOMHash> read FHashes;
     property ProjectUrl : string read FProjectUrl write FProjectUrl;
     property RepositoryUrl : string read FRepositoryUrl write FRepositoryUrl;
     property RepositoryType : string read FRepositoryType write FRepositoryType;
@@ -113,6 +136,10 @@ type
     property Tags : IList<string> read FTags;
     property Properties : IList<TSBOMProperty> read FProperties;
     property Evidence : IList<TSBOMEvidence> read FEvidence;
+    property DependencyCompleteness : TSBOMCompleteness read FDependencyCompleteness write FDependencyCompleteness;
+    //'library', 'framework' or 'application' when something said so (a component rule) - empty
+    //means the writers derive it from Kind
+    property ComponentType : string read FComponentType write FComponentType;
   end;
 
   ///<summary>A dependency edge in the dependency graph: ParentBomRef depends on ChildBomRef.
@@ -131,21 +158,29 @@ type
     FToolVersion : string;
     FProjectName : string;
     FProjectVersion : string;
+    FSbomCreator : string;        // email address or http(s) URL of whoever produced the SBOM
     FPlatform : TDPMPlatform;
     FCompilerVersion : TCompilerVersion;
     FRootComponent : TSBOMComponent;
     FComponents : IList<TSBOMComponent>;
     FRelationships : IList<TSBOMRelationship>;
+    //parent + #0 + child for every edge in FRelationships, so AddRelationship can skip repeats
+    FRelationshipKeys : ISet<string>;
     FMetaProperties : IList<TSBOMProperty>;
+    FWarnings : IList<string>;
   public
     constructor Create;
     destructor Destroy; override;
 
     function AddComponent(const kind : TSBOMComponentKind) : TSBOMComponent;
+    //Records the edge once - adding an edge the report already has does nothing.
     procedure AddRelationship(const parentBomRef, childBomRef : string);
     procedure AddMetaProperty(const name, value : string);
     function FindComponentByPurl(const purl : string) : TSBOMComponent;
     function FindComponentById(const id : string) : TSBOMComponent;
+    function FindComponentByBomRef(const bomRef : string) : TSBOMComponent;
+    //candidate when no component (or the root) uses it yet, otherwise candidate-2, candidate-3 ...
+    function MakeUniqueBomRef(const candidate : string) : string;
 
     property SerialNumber : string read FSerialNumber write FSerialNumber;
     property TimestampUtc : string read FTimestampUtc write FTimestampUtc;
@@ -153,6 +188,7 @@ type
     property ToolVersion : string read FToolVersion write FToolVersion;
     property ProjectName : string read FProjectName write FProjectName;
     property ProjectVersion : string read FProjectVersion write FProjectVersion;
+    property SbomCreator : string read FSbomCreator write FSbomCreator;
     property Platform : TDPMPlatform read FPlatform write FPlatform;
     property CompilerVersion : TCompilerVersion read FCompilerVersion write FCompilerVersion;
     //the component representing the project itself - parent of every top-level dependency edge
@@ -160,6 +196,9 @@ type
     property Components : IList<TSBOMComponent> read FComponents;
     property Relationships : IList<TSBOMRelationship> read FRelationships;
     property MetaProperties : IList<TSBOMProperty> read FMetaProperties;
+    //Gaps a reviewer should know about (CRA / BSI header checks). The SBOM is still valid with
+    //them - the human readable reports list them, the machine readable formats don't.
+    property Warnings : IList<string> read FWarnings;
   end;
 
 
@@ -178,6 +217,16 @@ begin
   FTags := TCollections.CreateList<string>;
   FProperties := TCollections.CreateList<TSBOMProperty>;
   FEvidence := TCollections.CreateList<TSBOMEvidence>;
+  FHashes := TCollections.CreateList<TSBOMHash>;
+end;
+
+procedure TSBOMComponent.AddHash(const algorithm, value : string);
+var
+  h : TSBOMHash;
+begin
+  h.Algorithm := algorithm;
+  h.Value := value;
+  FHashes.Add(h);
 end;
 
 procedure TSBOMComponent.AddProperty(const name, value : string);
@@ -206,7 +255,9 @@ begin
   //Spring's owned-object list disposes children on free / list reassignment.
   FComponents := TCollections.CreateObjectList<TSBOMComponent>(true);
   FRelationships := TCollections.CreateList<TSBOMRelationship>;
+  FRelationshipKeys := TCollections.CreateSet<string>;
   FMetaProperties := TCollections.CreateList<TSBOMProperty>;
+  FWarnings := TCollections.CreateList<string>;
   FRootComponent := TSBOMComponent.Create(TSBOMComponentKind.Application);
 end;
 
@@ -226,6 +277,9 @@ procedure TSBOMReport.AddRelationship(const parentBomRef, childBomRef : string);
 var
   rel : TSBOMRelationship;
 begin
+  //CycloneDX requires each dependsOn list to have unique items
+  if not FRelationshipKeys.Add(parentBomRef + #0 + childBomRef) then
+    exit;
   rel.ParentBomRef := parentBomRef;
   rel.ChildBomRef := childBomRef;
   FRelationships.Add(rel);
@@ -254,6 +308,37 @@ begin
       result := comp;
       exit;
     end;
+  end;
+end;
+
+//bom-refs are compared exactly - CycloneDX treats them as case sensitive identifiers.
+function TSBOMReport.FindComponentByBomRef(const bomRef : string) : TSBOMComponent;
+var
+  comp : TSBOMComponent;
+begin
+  result := nil;
+  if bomRef = '' then
+    exit;
+  for comp in FComponents do
+  begin
+    if comp.BomRef = bomRef then
+    begin
+      result := comp;
+      exit;
+    end;
+  end;
+end;
+
+function TSBOMReport.MakeUniqueBomRef(const candidate : string) : string;
+var
+  n : integer;
+begin
+  result := candidate;
+  n := 1;
+  while (FRootComponent.BomRef = result) or (FindComponentByBomRef(result) <> nil) do
+  begin
+    Inc(n);
+    result := candidate + '-' + IntToStr(n);
   end;
 end;
 

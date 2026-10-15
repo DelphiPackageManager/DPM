@@ -62,6 +62,11 @@ type
     FIncludeRuntime : boolean;
     FStrict : boolean;
     FPerProject : boolean;
+    FProductVersion : string;
+    FSupplier : string;
+    FSupplierUrl : string;
+    FLicense : string;
+    FSbomCreator : string;
     class var
       FDefault : TSBOMOptions;
   protected
@@ -88,6 +93,17 @@ type
     ///  the input is a single .dproj.
     /// </summary>
     property PerProject : boolean read FPerProject write FPerProject;
+
+    //Product metadata for the SBOM root. Each one overrides the same key in the project's
+    //<project>.sbom.yaml sidecar, which in turn overrides the project version info.
+    property ProductVersion : string read FProductVersion write FProductVersion;
+    property Supplier : string read FSupplier write FSupplier;
+    //a URL, or an email address - written as the supplier contact
+    property SupplierUrl : string read FSupplierUrl write FSupplierUrl;
+    //SPDX identifier or expression, or a licence name
+    property License : string read FLicense write FLicense;
+    //email address or http(s) URL of whoever produced the SBOM (BSI TR-03183-2 5.2.1)
+    property SbomCreator : string read FSbomCreator write FSbomCreator;
   end;
 
 //Parses a single token to a single format. Raises on unrecognised input.
@@ -205,6 +221,11 @@ begin
   FIncludeRuntime := original.FIncludeRuntime;
   FStrict := original.FStrict;
   FPerProject := original.FPerProject;
+  FProductVersion := original.FProductVersion;
+  FSupplier := original.FSupplier;
+  FSupplierUrl := original.FSupplierUrl;
+  FLicense := original.FLicense;
+  FSbomCreator := original.FSbomCreator;
 end;
 
 class constructor TSBOMOptions.CreateDefault;

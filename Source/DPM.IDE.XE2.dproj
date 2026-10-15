@@ -203,6 +203,7 @@
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Directory.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Enum.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Numbers.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.PEImports.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Path.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Process.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Strings.pas"/>
@@ -292,6 +293,8 @@
         <DCCReference Include="Core\Options\DPM.Core.Options.SBOM.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Generator.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Interfaces.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.ComponentRules.pas"/>
+        <DCCReference Include="Core\Sbom\DPM.Core.SBOM.ProductInfo.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Types.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.pas"/>
         <DCCReference Include="Core\Sbom\DPM.Core.SBOM.Writers.Reports.pas"/>

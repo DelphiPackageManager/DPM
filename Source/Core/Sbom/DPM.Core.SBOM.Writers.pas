@@ -64,7 +64,8 @@ uses
   Spring.Collections,
   JsonDataObjects,
   DPM.Core.Types,
-  DPM.Core.Utils.Spdx;
+  DPM.Core.Utils.Spdx,
+  DPM.Core.SBOM.ProductInfo;
 
 const
   cNoAssertion = 'NOASSERTION';
@@ -180,9 +181,14 @@ end;
 
 //SPDX 2.3 primaryPackagePurpose. The three DPM library-ish kinds all collapse to LIBRARY -
 //the dpm:component-kind annotation is what keeps them apart.
-function SpdxPackagePurpose(const kind : TSBOMComponentKind) : string;
+function SpdxPackagePurpose(const comp : TSBOMComponent) : string;
 begin
-  case kind of
+  if comp.ComponentType <> '' then
+  begin
+    result := UpperCase(comp.ComponentType);
+    exit;
+  end;
+  case comp.Kind of
     TSBOMComponentKind.Application   : result := 'APPLICATION';
     TSBOMComponentKind.DelphiRuntime : result := 'FRAMEWORK';
   else
@@ -287,6 +293,19 @@ end;
 
 procedure TCycloneDXWriter.Write(const report : TSBOMReport; const fileName : string);
 
+  //CycloneDX organizationalEntity. url is an array of URLs; an email address goes in contact[]
+  //instead, since it is not a URL.
+  procedure FillOrganization(const obj : TJsonObject; const name, urlOrEmail : string);
+  begin
+    SetStringIfNotEmpty(obj, 'name', name);
+    if urlOrEmail = '' then
+      exit;
+    if IsEmailAddress(urlOrEmail) then
+      obj.A['contact'].AddObject.S['email'] := urlOrEmail
+    else
+      obj.A['url'].Add(urlOrEmail);
+  end;
+
   procedure FillLicenses(const componentObj : TJsonObject; const license : string);
   var
     licArr : TJsonArray;
@@ -322,6 +341,7 @@ procedure TCycloneDXWriter.Write(const report : TSBOMReport; const fileName : st
     author : string;
     hashesArr : TJsonArray;
     hashObj : TJsonObject;
+    extraHash : TSBOMHash;
     extRefs : TJsonArray;
     extObj : TJsonObject;
     propsArr : TJsonArray;
@@ -341,6 +361,8 @@ procedure TCycloneDXWriter.Write(const report : TSBOMReport; const fileName : st
     else
       typeName := 'library';
     end;
+    if comp.ComponentType <> '' then
+      typeName := comp.ComponentType;
     obj.S['type'] := typeName;
     SetStringIfNotEmpty(obj, 'bom-ref', comp.BomRef);
     SetStringIfNotEmpty(obj, 'name', comp.Id);
@@ -358,8 +380,8 @@ procedure TCycloneDXWriter.Write(const report : TSBOMReport; const fileName : st
       end;
     end;
 
-    if comp.Supplier <> '' then
-      obj.O['supplier'].S['name'] := comp.Supplier;
+    if (comp.Supplier <> '') or (comp.SupplierUrl <> '') then
+      FillOrganization(obj.O['supplier'], comp.Supplier, comp.SupplierUrl);
 
     FillLicenses(obj, comp.License);
     SetStringIfNotEmpty(obj, 'copyright', comp.Copyright);
@@ -370,6 +392,12 @@ procedure TCycloneDXWriter.Write(const report : TSBOMReport; const fileName : st
       hashObj := hashesArr.AddObject;
       hashObj.S['alg'] := CycloneDXHashAlg(comp.HashAlgorithm);
       hashObj.S['content'] := comp.HashValue;
+    end;
+    for extraHash in comp.Hashes do
+    begin
+      hashObj := obj.A['hashes'].AddObject;
+      hashObj.S['alg'] := CycloneDXHashAlg(extraHash.Algorithm);
+      hashObj.S['content'] := extraHash.Value;
     end;
 
     SetStringIfNotEmpty(obj, 'purl', comp.Purl);
@@ -443,9 +471,16 @@ procedure TCycloneDXWriter.Write(const report : TSBOMReport; const fileName : st
     end;
   end;
 
+const
+  //CycloneDX 1.6 aggregate enum values, by TSBOMCompleteness
+  cAggregates : array[TSBOMCompleteness] of string = ('unknown', 'complete', 'incomplete');
 var
   root : TJsonObject;
   meta : TJsonObject;
+  allComponents : IList<TSBOMComponent>;
+  completeness : TSBOMCompleteness;
+  compositionObj : TJsonObject;
+  compositionRefs : TJsonArray;
   toolsArr : TJsonArray;
   toolObj : TJsonObject;
   metaPropsArr : TJsonArray;
@@ -480,6 +515,11 @@ begin
       toolObj.S['name'] := report.ToolName;
       toolObj.S['version'] := report.ToolVersion;
       toolObj.S['publisher'] := 'DPM';
+
+      //1.6 metadata.manufacturer is the organisation that created the BOM - BSI TR-03183-2's
+      //"creator of the SBOM". Not the deprecated metadata.manufacture, which meant the component's.
+      if report.SbomCreator <> '' then
+        FillOrganization(meta.O['manufacturer'], '', report.SbomCreator);
 
       FillComponent(meta.O['component'], report.RootComponent);
 
@@ -528,6 +568,38 @@ begin
             depMap.Add(parent, refList);
           end;
           refList.Add(rel.ChildBomRef);
+        end;
+      end;
+
+      //A component whose dependency list is complete still gets an entry when the list is empty -
+      //an empty dependsOn is how CycloneDX says "depends on nothing", no entry says nothing at all.
+      allComponents := TCollections.CreateList<TSBOMComponent>;
+      allComponents.Add(report.RootComponent);
+      allComponents.AddRange(report.Components);
+      for comp in allComponents do
+      begin
+        if (comp.DependencyCompleteness <> TSBOMCompleteness.Complete) or (comp.BomRef = '') or depMap.ContainsKey(comp.BomRef) then
+          continue;
+        refObj := root.A['dependencies'].AddObject;
+        refObj.S['ref'] := comp.BomRef;
+        depMap.Add(comp.BomRef, refObj.A['dependsOn']);
+      end;
+
+      //compositions[] - one per aggregate, listing the components whose dependencies it describes
+      for completeness := Low(TSBOMCompleteness) to High(TSBOMCompleteness) do
+      begin
+        compositionRefs := nil;
+        for comp in allComponents do
+        begin
+          if (comp.DependencyCompleteness <> completeness) or (comp.BomRef = '') then
+            continue;
+          if compositionRefs = nil then
+          begin
+            compositionObj := root.A['compositions'].AddObject;
+            compositionObj.S['aggregate'] := cAggregates[completeness];
+            compositionRefs := compositionObj.A['dependencies'];
+          end;
+          compositionRefs.Add(comp.BomRef);
         end;
       end;
 
@@ -582,6 +654,7 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
   var
     checksumsArr : TJsonArray;
     checksumObj : TJsonObject;
+    extraHash : TSBOMHash;
     extRefs : TJsonArray;
     extObj : TJsonObject;
     joined : string;
@@ -610,8 +683,14 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
 
     //SPDX separates these: supplier is who distributed the package, originator is who
     //created it. Collapsing authors into supplier asserts something we don't know.
+    //'Organization: name (email)' - SPDX has room for an email address, not a URL
     if comp.Supplier <> '' then
-      obj.S['supplier'] := 'Organization: ' + comp.Supplier
+    begin
+      if IsEmailAddress(comp.SupplierUrl) then
+        obj.S['supplier'] := 'Organization: ' + comp.Supplier + ' (' + comp.SupplierUrl + ')'
+      else
+        obj.S['supplier'] := 'Organization: ' + comp.Supplier;
+    end
     else
       obj.S['supplier'] := cNoAssertion;
 
@@ -640,7 +719,7 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
       obj.S['downloadLocation'] := CoalesceNoAssertion(vcsLocation);
 
     obj.B['filesAnalyzed'] := false;
-    obj.S['primaryPackagePurpose'] := SpdxPackagePurpose(comp.Kind);
+    obj.S['primaryPackagePurpose'] := SpdxPackagePurpose(comp);
 
     //licenseDeclared must be a valid SPDX licence expression: a known identifier, or a
     //compound expression built from them. A free-text licence ('Apache 2.0', 'see COPYING')
@@ -652,7 +731,12 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
       obj.S['licenseDeclared'] := comp.License
     else
       obj.S['licenseDeclared'] := cNoAssertion;
-    obj.S['licenseConcluded'] := cNoAssertion;
+    //The product's own licence is set by its supplier, the one producing this SBOM, so it is a
+    //conclusion as well as a declaration. A dependency's licence is only what its spec declares.
+    if comp.Kind = TSBOMComponentKind.Application then
+      obj.S['licenseConcluded'] := obj.S['licenseDeclared']
+    else
+      obj.S['licenseConcluded'] := cNoAssertion;
 
     obj.S['copyrightText'] := CoalesceNoAssertion(comp.Copyright);
     SetStringIfNotEmpty(obj, 'description', comp.Description);
@@ -664,6 +748,12 @@ procedure TSPDXWriter.Write(const report : TSBOMReport; const fileName : string)
       checksumObj := checksumsArr.AddObject;
       checksumObj.S['algorithm'] := SpdxChecksumAlg(comp.HashAlgorithm);
       checksumObj.S['checksumValue'] := comp.HashValue;
+    end;
+    for extraHash in comp.Hashes do
+    begin
+      checksumObj := obj.A['checksums'].AddObject;
+      checksumObj.S['algorithm'] := SpdxChecksumAlg(extraHash.Algorithm);
+      checksumObj.S['checksumValue'] := extraHash.Value;
     end;
 
     if comp.Purl <> '' then
@@ -743,6 +833,12 @@ begin
     creationInfo.S['created'] := report.TimestampUtc;
     creatorsArr := creationInfo.A['creators'];
     creatorsArr.Add('Tool: ' + report.ToolName + '-' + report.ToolVersion);
+    //SPDX 2.3 creators carry a name and an optional email, but no URL - a URL creator goes in
+    //the creation comment instead.
+    if IsEmailAddress(report.SbomCreator) then
+      creatorsArr.Add('Organization: ' + report.SbomCreator + ' (' + report.SbomCreator + ')')
+    else if report.SbomCreator <> '' then
+      creationInfo.S['comment'] := 'SBOM creator: ' + report.SbomCreator;
     //Tells consumers which SPDX license list our licenseDeclared ids were validated against.
     SetStringIfNotEmpty(creationInfo, 'licenseListVersion', TSpdxLicenses.LicenseListVersion);
 
