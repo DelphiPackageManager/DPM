@@ -232,22 +232,9 @@ end;
 
 
 function TSpec.DuplicateTemplate(const sourceTemplate: ISpecTemplate; const newTemplateName: string): ISpecTemplate;
-var
-  I: Integer;
 begin
-  result := TSpecTemplate.Create(Logger);
-  for I := 0 to sourceTemplate.Dependencies.Count - 1 do
-  begin
-    result.Dependencies.Add(sourceTemplate.Dependencies[i].Clone);
-  end;
-  for I := 0 to sourceTemplate.DesignEntries.Count - 1 do
-  begin
-    result.DesignEntries.Add(sourceTemplate.DesignEntries[i].Clone);
-  end;
-  for I := 0 to sourceTemplate.SourceEntries.Count - 1 do
-  begin
-    result.SourceEntries.Add(sourceTemplate.SourceEntries[i].Clone);
-  end;
+  //a full clone, so nothing the template carries (build entries, package defs, env vars...) is lost.
+  result := sourceTemplate.Clone;
   result.Name := newTemplateName;
   FTemplates.Add(result);
 end;

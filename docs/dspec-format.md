@@ -276,6 +276,35 @@ build:
 | `platforms` | No | Override platforms for this build |
 | `defines` | No | Additional compiler defines |
 | `references` | No | Array of package names added to the built package's requires clause |
+| `excludeCompilers` | No | Compilers to leave this entry out for (see below) |
+
+#### Excluding an entry for some compilers
+
+A template is shared by every compiler whose target platform uses it, but a project does not always
+exist for all of them. `excludeCompilers` on a build or design entry leaves the entry out for the
+compilers it names, using the same compiler names as `targetPlatforms`:
+
+```yaml
+targetPlatforms:
+  - compiler from: delphixe6
+    compiler to: delphi13.0
+    platforms: [Win32, Win64]
+templates:
+  - name: default
+    build:
+      - project: $packageSource$/StyledComponents.dproj
+      - project: $packageSource$/StyledAnimatedComponents.dproj
+        excludeCompilers: [delphixe6]   # no animated components package for XE6
+    design:
+      - project: $packageSource$/dclStyledComponents.dproj
+      - project: $packageSource$/dclStyledAnimatedComponents.dproj
+        excludeCompilers:
+          - delphixe6
+```
+
+The exclusion is applied when packing: the XE6 package simply does not contain the entry, and its
+project is not checked. An unknown compiler name is an error, so a typo cannot quietly leave the entry
+in. `dpm prepare` does not scaffold an excluded entry for those compilers either.
 
 ### Design Entries (Design-time Packages)
 
@@ -303,6 +332,7 @@ design:
 | `libSuffix` | No | Override library suffix |
 | `libPrefix` | No | Override library prefix (default: "dcl") |
 | `libVersion` | No | Override library version string |
+| `excludeCompilers` | No | Compilers to leave this entry out for (see [Excluding an entry for some compilers](#excluding-an-entry-for-some-compilers)) |
 
 > **Note:** Design-time packages are only supported on Win32 and Win64 platforms.
 

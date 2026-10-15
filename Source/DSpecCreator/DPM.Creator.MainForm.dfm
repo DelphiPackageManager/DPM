@@ -660,6 +660,13 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Height = 15
             Caption = 'References:'
           end
+          object lblBuildExclude: TLabel
+            Left = 526
+            Top = 144
+            Width = 44
+            Height = 15
+            Caption = 'Exclude:'
+          end
           object lblBuildSearchPaths: TLabel
             Left = 16
             Top = 335
@@ -746,6 +753,18 @@ object DSpecCreatorForm: TDSpecCreatorForm
             TabOrder = 6
             OnChange = mmoBuildSearchPathsChange
           end
+          object clbBuildExclude: TCheckListBox
+            Left = 526
+            Top = 165
+            Width = 128
+            Height = 160
+            Hint = 'Compilers this build entry is left out for'
+            ItemHeight = 17
+            ParentShowHint = False
+            ShowHint = True
+            TabOrder = 7
+            OnClickCheck = clbBuildExcludeClickCheck
+          end
         end
         object crdDesign: TCard
           Left = 1
@@ -816,10 +835,17 @@ object DSpecCreatorForm: TDSpecCreatorForm
           end
           object lblDesignSearchPaths: TLabel
             Left = 264
-            Top = 270
+            Top = 335
             Width = 201
             Height = 15
             Caption = 'Additional Search Paths (one per line):'
+          end
+          object lblDesignExclude: TLabel
+            Left = 526
+            Top = 144
+            Width = 44
+            Height = 15
+            Caption = 'Exclude:'
           end
           object edtDesignProject: TEdit
             Left = 16
@@ -916,13 +942,25 @@ object DSpecCreatorForm: TDSpecCreatorForm
           end
           object mmoDesignSearchPaths: TMemo
             Left = 264
-            Top = 291
+            Top = 356
             Width = 390
             Height = 150
             Anchors = [akLeft, akTop, akRight]
             ScrollBars = ssVertical
             TabOrder = 9
             OnChange = mmoDesignSearchPathsChange
+          end
+          object clbDesignExclude: TCheckListBox
+            Left = 526
+            Top = 165
+            Width = 128
+            Height = 160
+            Hint = 'Compilers this design entry is left out for'
+            ItemHeight = 17
+            ParentShowHint = False
+            ShowHint = True
+            TabOrder = 10
+            OnClickCheck = clbDesignExcludeClickCheck
           end
         end
         object crdDependency: TCard

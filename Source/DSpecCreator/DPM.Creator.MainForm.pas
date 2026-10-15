@@ -112,6 +112,8 @@ type
     edtBuildDefines : TEdit;
     lblBuildPlatforms : TLabel;
     clbBuildPlatforms : TCheckListBox;
+    lblBuildExclude : TLabel;
+    clbBuildExclude : TCheckListBox;
     lblBuildReferences : TLabel;
     lbBuildReferences : TListBox;
     btnAddBuildRef : TButton;
@@ -136,6 +138,8 @@ type
     edtDesignDefines : TEdit;
     lblDesignPlatforms : TLabel;
     clbDesignPlatforms : TCheckListBox;
+    lblDesignExclude : TLabel;
+    clbDesignExclude : TCheckListBox;
     lblDesignReferences : TLabel;
     lbDesignReferences : TListBox;
     btnAddDesignRef : TButton;
@@ -386,12 +390,14 @@ type
     procedure edtAuthorChange(Sender : TObject);
     procedure edtBuildDefinesChange(Sender : TObject);
     procedure clbBuildPlatformsClickCheck(Sender : TObject);
+    procedure clbBuildExcludeClickCheck(Sender : TObject);
     procedure btnAddBuildRefClick(Sender : TObject);
     procedure btnDeleteBuildRefClick(Sender : TObject);
     procedure mmoBuildSearchPathsChange(Sender : TObject);
     procedure edtDesignProjectChange(Sender : TObject);
     procedure edtDesignDefinesChange(Sender : TObject);
     procedure clbDesignPlatformsClickCheck(Sender : TObject);
+    procedure clbDesignExcludeClickCheck(Sender : TObject);
     procedure btnAddDesignRefClick(Sender : TObject);
     procedure btnDeleteDesignRefClick(Sender : TObject);
     procedure mmoDesignSearchPathsChange(Sender : TObject);
@@ -585,6 +591,10 @@ type
 
     procedure SetCheckListPlatforms(const clb : TCheckListBox; const platforms : TDPMPlatforms);
     function GetCheckListPlatforms(const clb : TCheckListBox) : TDPMPlatforms;
+    //Lists the compilers whose targetPlatform uses template, plus any already in excluded (so a stale
+    //exclusion stays visible and can be unticked), and ticks the excluded ones.
+    procedure LoadExcludeCompilers(const clb : TCheckListBox; const template : ISpecTemplate; const excluded : TCompilerVersions);
+    function GetCheckListCompilers(const clb : TCheckListBox) : TCompilerVersions;
     procedure PopulateCopyToBinCombo;
 
     function LoadSourceNode(const parentNode : TTemplateTreeNode; const template : ISpecTemplate; const sourceEntry : ISpecSourceEntry) : TTemplateTreeNode;
@@ -633,6 +643,7 @@ uses
   Vcl.Themes,
   DPM.IDE.Types,
   DPM.Core.Constants,
+  DPM.Core.Spec.TargetPlatform,
   DPM.Core.dependency.Version,
   DPM.Core.Init,
   DPM.Core.Packaging.IdValidator,
@@ -2096,6 +2107,53 @@ begin
   end;
 end;
 
+procedure TDSpecCreatorForm.LoadExcludeCompilers(const clb : TCheckListBox; const template : ISpecTemplate; const excluded : TCompilerVersions);
+var
+  compilers : TCompilerVersions;
+  targetPlatform : ISpecTargetPlatform;
+  templateName : string;
+  compiler : TCompilerVersion;
+begin
+  compilers := excluded;
+  for targetPlatform in FOpenFile.PackageSpec.TargetPlatforms do
+  begin
+    templateName := targetPlatform.TemplateName;
+    if templateName = cUnset then
+      templateName := 'default';
+    if SameText(templateName, template.Name) then
+      compilers := compilers + ExpandedCompilersOf(targetPlatform);
+  end;
+  Exclude(compilers, TCompilerVersion.UnknownVersion);
+
+  clb.Items.BeginUpdate;
+  try
+    clb.Items.Clear;
+    for compiler in compilers do
+    begin
+      clb.Items.Add(CompilerNoPrefix(compiler));
+      clb.Checked[clb.Count - 1] := compiler in excluded;
+    end;
+  finally
+    clb.Items.EndUpdate;
+  end;
+end;
+
+function TDSpecCreatorForm.GetCheckListCompilers(const clb : TCheckListBox) : TCompilerVersions;
+var
+  i : integer;
+  compiler : TCompilerVersion;
+begin
+  result := [];
+  for i := 0 to clb.Count - 1 do
+  begin
+    if not clb.Checked[i] then
+      continue;
+    compiler := StringToCompilerVersion(clb.Items[i]);
+    if compiler <> TCompilerVersion.UnknownVersion then
+      Include(result, compiler);
+  end;
+end;
+
 procedure TDSpecCreatorForm.PopulateCopyToBinCombo;
 var
   copyToBinPlatform : TDPMPlatform;
@@ -2139,6 +2197,14 @@ begin
     Exit;
   if Assigned(tvTemplates.Selected) then
     (tvTemplates.Selected as TTemplateTreeNode).build.Platforms := GetCheckListPlatforms(clbBuildPlatforms);
+end;
+
+procedure TDSpecCreatorForm.clbBuildExcludeClickCheck(Sender : TObject);
+begin
+  if FLoadingCard then
+    Exit;
+  if Assigned(tvTemplates.Selected) then
+    (tvTemplates.Selected as TTemplateTreeNode).build.ExcludeCompilers := GetCheckListCompilers(clbBuildExclude);
 end;
 
 procedure TDSpecCreatorForm.btnAddBuildRefClick(Sender : TObject);
@@ -2233,11 +2299,25 @@ begin
 end;
 
 procedure TDSpecCreatorForm.clbDesignPlatformsClickCheck(Sender : TObject);
+var
+  designEntry : ISpecDesignEntry;
+begin
+  if FLoadingCard then
+    Exit;
+  if not Assigned(tvTemplates.Selected) then
+    Exit;
+  designEntry := (tvTemplates.Selected as TTemplateTreeNode).designEntry;
+  designEntry.Platforms := GetCheckListPlatforms(clbDesignPlatforms);
+  //the entry only keeps the IDE platforms (Win32/Win64) - show what it actually kept.
+  SetCheckListPlatforms(clbDesignPlatforms, designEntry.Platforms);
+end;
+
+procedure TDSpecCreatorForm.clbDesignExcludeClickCheck(Sender : TObject);
 begin
   if FLoadingCard then
     Exit;
   if Assigned(tvTemplates.Selected) then
-    (tvTemplates.Selected as TTemplateTreeNode).designEntry.Platforms := GetCheckListPlatforms(clbDesignPlatforms);
+    (tvTemplates.Selected as TTemplateTreeNode).designEntry.ExcludeCompilers := GetCheckListCompilers(clbDesignExclude);
 end;
 
 procedure TDSpecCreatorForm.btnAddDesignRefClick(Sender : TObject);
@@ -3539,6 +3619,10 @@ begin
   Exclude(cs, csDoubleClicks);
   clbCompilers.ControlStyle := cs;
 
+  //design packages load into the IDE, which only comes in Win32 and Win64.
+  for idx := 0 to clbDesignPlatforms.Count - 1 do
+    clbDesignPlatforms.ItemEnabled[idx] := StringToDPMPlatform(clbDesignPlatforms.Items[idx]) in [TDPMPlatform.Win32, TDPMPlatform.Win64];
+
   iniFile := TIniFile.Create(MRUListService.GetIniFilePath);
   try
     edtPackageOutputPath.Text := iniFile.ReadString('Paths', 'PackageOutput', '');
@@ -4017,6 +4101,7 @@ begin
           edtProject.Text := lNode.build.project;
           edtBuildDefines.Text := lNode.build.Defines;
           SetCheckListPlatforms(clbBuildPlatforms, lNode.build.Platforms);
+          LoadExcludeCompilers(clbBuildExclude, lNode.Template, lNode.build.ExcludeCompilers);
           lbBuildReferences.Clear;
           for i := 0 to lNode.build.References.Count - 1 do
             lbBuildReferences.Items.Add(lNode.build.References[i]);
@@ -4036,6 +4121,7 @@ begin
           edtDesignProject.Text := lNode.designEntry.Project;
           edtDesignDefines.Text := lNode.designEntry.Defines;
           SetCheckListPlatforms(clbDesignPlatforms, lNode.designEntry.Platforms);
+          LoadExcludeCompilers(clbDesignExclude, lNode.Template, lNode.designEntry.ExcludeCompilers);
           lbDesignReferences.Clear;
           for i := 0 to lNode.designEntry.References.Count - 1 do
             lbDesignReferences.Items.Add(lNode.designEntry.References[i]);

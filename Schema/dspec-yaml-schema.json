@@ -366,6 +366,14 @@
                                     "items": {
                                         "type": "string"
                                     }
+                                },
+                                "excludeCompilers": {
+                                    "type": "array",
+                                    "description": "Compilers to leave this entry out for, even though their target platform uses this template - eg a project that does not exist for an older compiler",
+                                    "items": {
+                                        "$ref": "#/defs/compilerVersions"
+                                    },
+                                    "uniqueItems": true
                                 }
                             },
                             "required": [
@@ -409,6 +417,14 @@
                                 "libVersion": {
                                     "type": "string",
                                     "description": "Provide the libVersion used when packages use non default - needed so we can find the correct bpl to install"
+                                },
+                                "excludeCompilers": {
+                                    "type": "array",
+                                    "description": "Compilers to leave this entry out for, even though their target platform uses this template - eg a project that does not exist for an older compiler",
+                                    "items": {
+                                        "$ref": "#/defs/compilerVersions"
+                                    },
+                                    "uniqueItems": true
                                 }
                             },
                             "required": [

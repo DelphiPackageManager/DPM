@@ -203,16 +203,24 @@ type
     function GetReferences : IList<string>;
     function GetSearchPaths : IList<string>;
 
+    function GetExcludeCompilers : TCompilerVersions;
+
     procedure SetProject(const value : string);
     procedure SetPlatforms(const value : TDPMPlatforms);
     procedure SetDefines(const value : string);
+    procedure SetExcludeCompilers(const value : TCompilerVersions);
 
     function Clone : ISpecBuildEntry;
+
+    /// <summary> False when compiler is in ExcludeCompilers. </summary>
+    function AppliesTo(const compiler : TCompilerVersion) : boolean;
 
     /// <summary> The dproj for the package file to build </summary>
     property Project : string read GetProject write SetProject;
     /// <summary> Allows you to override the platforms configured on the targetPlatform </summary>
     property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
+    /// <summary> Compilers this entry is left out for, even though their targetPlatform uses this template - eg a project that does not exist for an older compiler. Applied at pack time : the package for an excluded compiler does not contain the entry. </summary>
+    property ExcludeCompilers : TCompilerVersions read GetExcludeCompilers write SetExcludeCompilers;
     /// <summary> Semicolon seprated list of compiler defines</summary>
     property Defines : string read GetDefines write SetDefines;
     /// <summary> Package names this build package requires beyond rtl. Emitted by `dpm prepare` as `requires` entries in the dpk and `<DCCReference>` elements in the dproj. Not consumed at pack/install time. </summary>
@@ -237,6 +245,7 @@ type
     function GetLibPrefix : string;
     function GetLibVersion : string;
     function GetIsPrebuilt : boolean;
+    function GetExcludeCompilers : TCompilerVersions;
 
     procedure SetProject(const value : string);
     procedure SetDefines(const value : string);
@@ -244,8 +253,12 @@ type
     procedure SetLibSuffix(const value : string);
     procedure SetLibPrefix(const value : string);
     procedure SetLibVersion(const value : string);
+    procedure SetExcludeCompilers(const value : TCompilerVersions);
 
     function Clone : ISpecDesignEntry;
+
+    /// <summary> False when compiler is in ExcludeCompilers. </summary>
+    function AppliesTo(const compiler : TCompilerVersion) : boolean;
 
     /// <summary>
     /// For a prebuilt entry, the IDE bitness its .bpl can be loaded into : Win32 for the 32 bit IDE,
@@ -266,6 +279,8 @@ type
     property Defines : string read GetDefines write SetDefines;
     /// <summary> Design-host platforms this entry supports. Empty = defer to the design dproj's enabled platforms, or - for a prebuilt entry - to the package's target platforms. </summary>
     property Platforms : TDPMPlatforms read GetPlatforms write SetPlatforms;
+    /// <summary> Compilers this entry is left out for, even though their targetPlatform uses this template - eg a project that does not exist for an older compiler. Applied at pack time : the package for an excluded compiler does not contain the entry. </summary>
+    property ExcludeCompilers : TCompilerVersions read GetExcludeCompilers write SetExcludeCompilers;
     /// <summary> Package names this design package requires beyond rtl/designide. Emitted by `dpm prepare` as `requires` entries in the dpk and `<DCCReference>` elements in the dproj. Not consumed at pack/install time. </summary>
     property References : IList<string> read GetReferences;
     /// <summary> Additional unit search paths (relative to the extracted package root) passed to the compiler when building this design project. </summary>
@@ -355,6 +370,12 @@ type
     function FindBuildEntry(const project : string) : ISpecBuildEntry;
     function FindDesignEntry(const project : string) : ISpecDesignEntry;
     function FindPackageDefinition(const project : string) : ISpecPackageDefinition;
+
+    /// <summary> Narrows the template to a single compiler : removes the build and design entries whose
+    /// ExcludeCompilers names it, and clears ExcludeCompilers on the entries that remain, since a spec
+    /// reduced to one compiler has nothing left to exclude. Used when packing, and when a git package's
+    /// dspec is reduced to the compiler being installed. </summary>
+    procedure ApplyCompilerExclusions(const compiler : TCompilerVersion);
 
 
     function Clone : ISpecTemplate;

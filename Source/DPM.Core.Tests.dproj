@@ -289,6 +289,7 @@
         <DCCReference Include="Tests\DPM.Core.Tests.PackageGenerator.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.PackageDefinitions.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.DesignEntry.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Spec.ExcludeCompilers.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Discovery.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.Discovery.pas"/>
         <DCCReference Include="Cmdline\Commands\DPM.Console.Command.Spec.Writer.pas"/>

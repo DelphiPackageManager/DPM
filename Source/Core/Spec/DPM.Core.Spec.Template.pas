@@ -100,6 +100,8 @@ type
     function FindDesignEntry(const project : string) : ISpecDesignEntry;
     function FindPackageDefinition(const project : string) : ISpecPackageDefinition;
 
+    procedure ApplyCompilerExclusions(const compiler : TCompilerVersion);
+
     function LoadDependenciesFromYAML(const dependenciesArray : IYAMLSequence) : Boolean;
     function LoadSourceFromYAML(const sourceArray : IYAMLSequence) : Boolean;
     function LoadBuildEntriesFromYAML(const buildArray : IYAMLSequence) : Boolean;
@@ -231,6 +233,33 @@ begin
 
   for i := 0 to source.EnvironmentVariables.Count -1 do
     FEnvironmentVariables[source.EnvironmentVariables.Items[i].Key] := source.EnvironmentVariables.Items[i].Value;
+end;
+
+procedure TSpecTemplate.ApplyCompilerExclusions(const compiler : TCompilerVersion);
+var
+  i : integer;
+begin
+  for i := FBuildEntries.Count - 1 downto 0 do
+  begin
+    if FBuildEntries[i].AppliesTo(compiler) then
+      FBuildEntries[i].ExcludeCompilers := []
+    else
+    begin
+      Logger.Verbose('Build entry [' + FBuildEntries[i].Project + '] is excluded for ' + CompilerToString(compiler));
+      FBuildEntries.Delete(i);
+    end;
+  end;
+
+  for i := FDesignFiles.Count - 1 downto 0 do
+  begin
+    if FDesignFiles[i].AppliesTo(compiler) then
+      FDesignFiles[i].ExcludeCompilers := []
+    else
+    begin
+      Logger.Verbose('Design entry [' + FDesignFiles[i].Project + '] is excluded for ' + CompilerToString(compiler));
+      FDesignFiles.Delete(i);
+    end;
+  end;
 end;
 
 procedure TSpecTemplate.DeleteBuildEntry(const project: string);

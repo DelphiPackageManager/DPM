@@ -226,6 +226,7 @@ function TGitRegistryPackageRepository.ReduceSpec(const spec : IPackageSpec; con
 var
   tp : ISpecTargetPlatform;
   clonedTp : ISpecTargetPlatform;
+  i : integer;
 begin
   result := nil;
   tp := FindTargetPlatform(spec, compilerVersion);
@@ -237,6 +238,9 @@ begin
   result.TargetPlatforms.Clear;
   result.TargetPlatforms.Add(clonedTp);
   result.MetaData.Version := version;
+  //a git package is never packed, so drop the entries excluded for this compiler here instead.
+  for i := 0 to result.Templates.Count - 1 do
+    result.Templates[i].ApplyCompilerExclusions(compilerVersion);
 end;
 
 function TGitRegistryPackageRepository.BuildPackageInfo(const spec : IPackageSpec; const version : TPackageVersion; const compilerVersion : TCompilerVersion) : IPackageInfo;

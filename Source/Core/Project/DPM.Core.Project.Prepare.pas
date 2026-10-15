@@ -117,10 +117,11 @@ type
     function ResolveVariables(const value : string; const variables : IDictionary<string, string>) : string;
     //Collect every (project name, kind) pair the dspec wants scaffolded: one per
     //distinct templates.build[].project (kind = pkRuntime) and templates.design[].project
-    //(kind = pkDesign). Variables in project paths are resolved first. Returns an empty
-    //list when the dspec declares no build/design entries; the caller then falls back
-    //to a single packageId + 'R' runtime scaffold.
-    function GatherScaffoldItems(const spec : IPackageSpec; const variables : IDictionary<string, string>) : IList<TPrepareScaffoldItem>;
+    //(kind = pkDesign). Variables in project paths are resolved first. Entries whose
+    //excludeCompilers names compiler are skipped. Returns an empty list when the dspec
+    //declares no build/design entries; the caller then falls back to a single
+    //packageId + 'R' runtime scaffold.
+    function GatherScaffoldItems(const spec : IPackageSpec; const compiler : TCompilerVersion; const variables : IDictionary<string, string>) : IList<TPrepareScaffoldItem>;
     //consistent prefix on log lines when dry-run is active.
     function LogPrefix : string;
   public
@@ -328,7 +329,7 @@ begin
     result := result + 'R';
 end;
 
-function TPreparePackageFolders.GatherScaffoldItems(const spec : IPackageSpec;
+function TPreparePackageFolders.GatherScaffoldItems(const spec : IPackageSpec; const compiler : TCompilerVersion;
                                                     const variables : IDictionary<string, string>) : IList<TPrepareScaffoldItem>;
 
   function ProjectNameFromPath(const projectPath : string) : string;
@@ -378,6 +379,9 @@ begin
         buildEntry := template.BuildEntries[j];
         if buildEntry = nil then
           continue;
+        //the author has said this project does not exist for this compiler.
+        if not buildEntry.AppliesTo(compiler) then
+          continue;
         projectPath := buildEntry.Project;
         if Trim(projectPath) = '' then
           continue;
@@ -415,6 +419,8 @@ begin
         //A prebuilt entry names a .bpl the package already ships - there is no source to
         //scaffold a dpk/dproj pair from, and generating one would collide with the binary.
         if designEntry.IsPrebuilt then
+          continue;
+        if not designEntry.AppliesTo(compiler) then
           continue;
         projectPath := designEntry.Project;
         if Trim(projectPath) = '' then
@@ -558,7 +564,7 @@ begin
   //single runtime package named <packageId>R so an unconfigured dspec still produces
   //something usable.
   variables := BuildVariables(spec, compiler);
-  items := GatherScaffoldItems(spec, variables);
+  items := GatherScaffoldItems(spec, compiler, variables);
 
   if items.Count = 0 then
   begin

@@ -43,16 +43,21 @@ type
     FDefines : string;
     FReferences : IList<string>;
     FSearchPaths : IList<string>;
+    FExcludeCompilers : TCompilerVersions;
   protected
     function GetProject : string;
     function GetPlatforms : TDPMPlatforms;
     function GetDefines : string;
     function GetReferences : IList<string>;
     function GetSearchPaths : IList<string>;
+    function GetExcludeCompilers : TCompilerVersions;
 
     procedure SetProject(const value : string);
     procedure SetPlatforms(const value : TDPMPlatforms);
     procedure SetDefines(const value : string);
+    procedure SetExcludeCompilers(const value : TCompilerVersions);
+
+    function AppliesTo(const compiler : TCompilerVersion) : boolean;
 
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
 
@@ -65,9 +70,11 @@ type
     property Defines : string read GetDefines write SetDefines;
     property References : IList<string> read GetReferences;
     property SearchPaths : IList<string> read GetSearchPaths;
+    property ExcludeCompilers : TCompilerVersions read GetExcludeCompilers write SetExcludeCompilers;
 
   public
-    constructor CreateClone(const logger : ILogger; const project : string; const defines : string; const platforms : TDPMPlatforms; const references : IList<string>; const searchPaths : IList<string>); reintroduce;
+    constructor CreateClone(const logger : ILogger; const project : string; const defines : string; const platforms : TDPMPlatforms; const references : IList<string>; const searchPaths : IList<string>;
+                            const excludeCompilers : TCompilerVersions); reintroduce;
   public
     constructor Create(const logger : ILogger); override;
 
@@ -83,7 +90,12 @@ uses
 
 function TSpecBuildEntry.Clone : ISpecBuildEntry;
 begin
-  result := TSpecBuildEntry.CreateClone(logger, FProject, FDefines, FPlatforms, FReferences, FSearchPaths);
+  result := TSpecBuildEntry.CreateClone(logger, FProject, FDefines, FPlatforms, FReferences, FSearchPaths, FExcludeCompilers);
+end;
+
+function TSpecBuildEntry.AppliesTo(const compiler : TCompilerVersion) : boolean;
+begin
+  result := not (compiler in FExcludeCompilers);
 end;
 
 constructor TSpecBuildEntry.Create(const logger : ILogger);
@@ -93,12 +105,14 @@ begin
   FSearchPaths := TCollections.CreateList<string>;
 end;
 
-constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const project, defines : string; const platforms : TDPMPlatforms; const references : IList<string>; const searchPaths : IList<string>);
+constructor TSpecBuildEntry.CreateClone(const logger : ILogger; const project, defines : string; const platforms : TDPMPlatforms; const references : IList<string>; const searchPaths : IList<string>;
+                                        const excludeCompilers : TCompilerVersions);
 begin
   inherited Create(logger);
   FProject := project;
   FDefines := defines;
   FPlatforms := platforms;
+  FExcludeCompilers := excludeCompilers;
   FReferences := TCollections.CreateList<string>;
   if references <> nil then
     FReferences.AddRange(references);
@@ -114,6 +128,11 @@ begin
   result := FDefines;
 end;
 
+
+function TSpecBuildEntry.GetExcludeCompilers : TCompilerVersions;
+begin
+  result := FExcludeCompilers;
+end;
 
 function TSpecBuildEntry.GetPlatforms: TDPMPlatforms;
 begin
@@ -191,8 +210,16 @@ begin
         FSearchPaths.Add(searchPath);
     end;
   end;
+
+  if not LoadCompilersFromYAML(yamlObject, 'excludeCompilers', 'Build entry [' + FProject + ']', FExcludeCompilers) then
+    result := false;
 end;
 
+
+procedure TSpecBuildEntry.SetExcludeCompilers(const value : TCompilerVersions);
+begin
+  FExcludeCompilers := value;
+end;
 
 procedure TSpecBuildEntry.SetDefines(const value: string);
 begin
@@ -249,6 +276,8 @@ begin
     for i := 0 to FSearchPaths.Count - 1 do
       searchSeq.AddValue(FSearchPaths[i]);
   end;
+
+  CompilersToYAML(mapping, 'excludeCompilers', FExcludeCompilers);
 end;
 
 

@@ -58,6 +58,13 @@ type
     procedure ToYAML(const parent : IYAMLValue; const packageKind : TDPMPackageKind);virtual;abstract;
     function LoadYAMLCollection(const collection : IYAMLSequence; const nodeClass : TSpecNodeClass; const action : TConstProc<IInterface>) : boolean;
 
+    //Reads the compiler names under key - a sequence, or a single scalar - into compilers. An unknown
+    //name is logged and fails the load rather than being skipped, since the caller acts on what is
+    //missing from the set. owner describes the node for the error message.
+    function LoadCompilersFromYAML(const yamlObject : IYAMLMapping; const key : string; const owner : string; out compilers : TCompilerVersions) : boolean;
+    //Writes compilers as a sequence under key, in compiler order. Writes nothing for an empty set.
+    procedure CompilersToYAML(const mapping : IYAMLMapping; const key : string; const compilers : TCompilerVersions);
+
 
     //for internal use
     property Comments : TStrings read GetComments write SetComments;
@@ -135,10 +142,66 @@ begin
   begin
     item := nodeClass.Create(Logger) as ISpecNode;
     obj := collection.O[i];
-    item.LoadFromYAML(obj);
+    //keep loading the rest so every error is reported, but an item that failed fails the collection.
+    result := item.LoadFromYAML(obj) and result;
     action(item);
   end;
 
+end;
+
+function TSpecNode.LoadCompilersFromYAML(const yamlObject : IYAMLMapping; const key : string; const owner : string; out compilers : TCompilerVersions) : boolean;
+var
+  values : TStringList;
+  compilersSeq : IYAMLSequence;
+  i : integer;
+  sCompiler : string;
+  compiler : TCompilerVersion;
+begin
+  result := true;
+  compilers := [];
+  if not yamlObject.Contains(key) then
+    exit;
+
+  values := TStringList.Create;
+  try
+    if yamlObject.Values[key].IsSequence then
+    begin
+      compilersSeq := yamlObject.A[key];
+      for i := 0 to compilersSeq.Count - 1 do
+        values.Add(compilersSeq.S[i]);
+    end
+    else
+      values.Add(yamlObject.S[key]);
+
+    for i := 0 to values.Count - 1 do
+    begin
+      sCompiler := Trim(values[i]);
+      if sCompiler = '' then
+        continue;
+      compiler := StringToCompilerVersion(sCompiler);
+      if compiler = TCompilerVersion.UnknownVersion then
+      begin
+        Logger.Error(owner + ' has an invalid compiler value [' + sCompiler + '] in [' + key + ']');
+        result := false;
+      end
+      else
+        Include(compilers, compiler);
+    end;
+  finally
+    values.Free;
+  end;
+end;
+
+procedure TSpecNode.CompilersToYAML(const mapping : IYAMLMapping; const key : string; const compilers : TCompilerVersions);
+var
+  compilersSeq : IYAMLSequence;
+  compiler : TCompilerVersion;
+begin
+  if compilers = [] then
+    exit;
+  compilersSeq := mapping.A[key];
+  for compiler in compilers do
+    compilersSeq.AddValue(CompilerToString(compiler));
 end;
 
 procedure TSpecNode.SetComments(const value: TStrings);

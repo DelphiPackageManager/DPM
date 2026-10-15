@@ -903,6 +903,10 @@ begin
     exit;
   end;
 
+  //Before anything else looks at the entries - an excluded entry's project usually doesn't exist for
+  //this compiler, so it must not be token-replaced, validated or used to work out the package root.
+  template.ApplyCompilerExclusions(targetPlatform.Compiler);
+
   ReplaceTokens(version, reducedSpec, targetPlatform, variables);
   platforms := targetPlatform.Platforms;
   packageFileName := reducedSpec.MetaData.Id + '-' + CompilerToString(targetPlatform.Compiler) + '-' + DPMPlatformsToBinString(platforms) + '-' + version.ToStringNoMeta + cPackageFileExt;

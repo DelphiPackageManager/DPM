@@ -48,6 +48,7 @@ type
     FLibSuffix : string;
     FLibPrefix : string;
     FLibVersion : string;
+    FExcludeCompilers : TCompilerVersions;
   protected
     function GetLibSuffix : string;
     function GetLibPrefix : string;
@@ -58,6 +59,7 @@ type
     function GetDefines : string;
     function GetReferences : IList<string>;
     function GetSearchPaths : IList<string>;
+    function GetExcludeCompilers : TCompilerVersions;
 
     procedure SetProject(const value : string);
     procedure SetDefines(const value : string);
@@ -65,6 +67,9 @@ type
     procedure SetLibPrefix(const value : string);
     procedure SetLibVersion(const value : string);
     procedure SetPlatforms(const value: TDPMPlatforms);
+    procedure SetExcludeCompilers(const value : TCompilerVersions);
+
+    function AppliesTo(const compiler : TCompilerVersion) : boolean;
 
 
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;override;
@@ -76,7 +81,8 @@ type
 
     function Clone : ISpecDesignEntry;reintroduce;
     constructor CreateClone(const logger : ILogger; const project : string; const defines : string; platforms : TDPMPlatforms;
-                            const libSuffix, libPrefix, libVersion : string; const references : IList<string>; const searchPaths : IList<string> ); reintroduce;
+                            const libSuffix, libPrefix, libVersion : string; const references : IList<string>; const searchPaths : IList<string>;
+                            const excludeCompilers : TCompilerVersions); reintroduce;
 
   public
     constructor Create(const logger : ILogger); override;
@@ -91,7 +97,12 @@ uses
 
 function TSpecDesignEntry.Clone : ISpecDesignEntry;
 begin
-  result := TSpecDesignEntry.CreateClone(logger, FProject, FDefines, FPlatforms, FLibSuffix, FLibPrefix, FLibVersion, FReferences, FSearchPaths);
+  result := TSpecDesignEntry.CreateClone(logger, FProject, FDefines, FPlatforms, FLibSuffix, FLibPrefix, FLibVersion, FReferences, FSearchPaths, FExcludeCompilers);
+end;
+
+function TSpecDesignEntry.AppliesTo(const compiler : TCompilerVersion) : boolean;
+begin
+  result := not (compiler in FExcludeCompilers);
 end;
 
 constructor TSpecDesignEntry.Create(const logger : ILogger);
@@ -104,12 +115,14 @@ begin
 end;
 
 constructor TSpecDesignEntry.CreateClone(const logger : ILogger; const project : string; const defines : string; platforms : TDPMPlatforms;
-                                         const libSuffix, libPrefix, libVersion : string; const references : IList<string>; const searchPaths : IList<string>);
+                                         const libSuffix, libPrefix, libVersion : string; const references : IList<string>; const searchPaths : IList<string>;
+                                         const excludeCompilers : TCompilerVersions);
 begin
   inherited Create(logger);
   FProject := project;
   FDefines := defines;
   FPlatforms := platforms;
+  FExcludeCompilers := excludeCompilers;
 
   FLibSuffix := libSuffix;
   FLibPrefix := libPrefix;
@@ -127,6 +140,11 @@ end;
 function TSpecDesignEntry.GetDefines: string;
 begin
   result := FDefines;
+end;
+
+function TSpecDesignEntry.GetExcludeCompilers : TCompilerVersions;
+begin
+  result := FExcludeCompilers;
 end;
 
 function TSpecDesignEntry.GetLibPrefix: string;
@@ -192,7 +210,7 @@ begin
   FProject := yamlObject.S['project'];
   if FProject = '' then
   begin
-    Logger.Error('Build Entry is missing required [project] property.');
+    Logger.Error('Design Entry is missing required [project] property.');
     result := false;
   end;
 
@@ -236,6 +254,9 @@ begin
   FLibPrefix := yamlObject.S['libPrefix'];
   FLibVersion := yamlObject.S['libVersion'];
   //platforms left empty when not in the file - installer defers to the design dproj in that case
+
+  if not LoadCompilersFromYAML(yamlObject, 'excludeCompilers', 'Design entry [' + FProject + ']', FExcludeCompilers) then
+    result := false;
 end;
 
 
@@ -314,15 +335,15 @@ end;
 
 
 
-procedure TSpecDesignEntry.SetPlatforms(const value: TDPMPlatforms);
-var
-  platforms : TDPMPlatforms;
+procedure TSpecDesignEntry.SetExcludeCompilers(const value : TCompilerVersions);
 begin
-  //Design only supports Win32/Win64
-  if (TDPMPlatform.Win32 in value) then
-    Include(platforms,TDPMPlatform.win32);
-  if (TDPMPlatform.Win32 in value) then
-    Include(platforms,TDPMPlatform.win64);
+  FExcludeCompilers := value;
+end;
+
+procedure TSpecDesignEntry.SetPlatforms(const value: TDPMPlatforms);
+begin
+  //Design packages load into the IDE, which only comes in Win32 and Win64.
+  FPlatforms := value * [TDPMPlatform.Win32, TDPMPlatform.Win64];
 end;
 
 procedure TSpecDesignEntry.SetProject(const value: string);
@@ -377,6 +398,8 @@ begin
     mapping.S['libPrefix'] := FLibPrefix;
   if FLibVersion <> '' then
     mapping.S['libVersion'] := FLibVersion;
+
+  CompilersToYAML(mapping, 'excludeCompilers', FExcludeCompilers);
 
 end;
 
