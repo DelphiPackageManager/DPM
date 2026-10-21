@@ -170,7 +170,7 @@ type
     procedure UpdateProjectPackageVersions(const packageId : string);
     procedure DoPackageUninstall(options : TUnInstallOptions);
     procedure DoPackageInstall(options : TInstallOptions; const isUpdate : boolean);
-    //plans the upgrade, confirms any companion packages with the user, then applies it. Frees options.
+    //plans an upgrade or downgrade, confirms any companion packages with the user, then applies it. Frees options.
     procedure DoPackageUpgrade(options : TInstallOptions);
     //cancels and waits for an in-flight metadata request before an install starts.
     procedure CancelPendingRequest;
@@ -433,8 +433,9 @@ begin
   FLogger.Information('Package ' + options.PackageId + ' - ' + FInstalledVersion.ToStringNoMeta + ' installed.');
 end;
 
-//An upgrade can need other installed packages to move with it (companions - e.g. packages that pin the
-//same dependency). It is planned first and the user confirms any companions before anything changes.
+//Changing an installed package's version (up or down) can need other installed packages to move with it
+//(companions - e.g. packages that pin the same dependency). It is planned first and the user confirms any
+//companions before anything changes.
 //That is asked between planning and installing, never while an install is running - the IDE must not
 //pump messages mid-operation.
 procedure TPackageDetailsFrame.DoPackageUpgrade(options : TInstallOptions);
@@ -466,7 +467,7 @@ begin
           for line in plan.Errors do
             FLogger.Error(line);
         end;
-        FLogger.Error('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' cannot be upgraded.');
+        FLogger.Error('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' cannot be installed.');
         exit;
       end;
       for line in plan.SummaryLines do
@@ -476,7 +477,7 @@ begin
       begin
         FLogger.EndInstall(true);
         sessionOpen := false;
-        message := 'Upgrading ' + options.PackageId + ' also needs other installed packages upgraded :' + sLineBreak + sLineBreak;
+        message := 'Installing ' + options.PackageId + ' ' + options.Version.ToStringNoMeta + ' needs other installed packages to change with it :' + sLineBreak + sLineBreak;
         for line in plan.SummaryLines do
           message := message + line + sLineBreak;
         message := message + sLineBreak + 'Continue?';
@@ -1397,7 +1398,9 @@ begin
   options.Prerelease := FIncludePreRelease;
   options.CompilerVersion := IDECompilerVersion;
   options.Force := true;
-  DoPackageInstall(options, true);
+  //changing the installed version - packages that pin the same dependencies move down with it.
+  options.IsUpgrade := true;
+  DoPackageUpgrade(options);
 end;
 
 procedure TPackageDetailsFrame.VersionGridOnInstallEvent(const project: string);

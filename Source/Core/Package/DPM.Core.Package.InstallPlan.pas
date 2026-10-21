@@ -49,6 +49,9 @@ const
   cPlanPseudoProject = ':plan:';
   //a companion can need companions of its own - this bounds how many times that can happen.
   cMaxPlanRounds = 10;
+  //every companion reason reads '<what blocks><separator><what it conflicts with>' - SummaryLines puts the
+  //two halves on lines of their own.
+  cReasonSeparator = ', but ';
 
 type
   TInstallPlanItem = class(TInterfacedObject, IInstallPlanItem)
@@ -141,8 +144,13 @@ type
     //lowercase id -> the ranges the plan's packages and their dependencies require of it.
     FDemands : IDictionary<string, IList<TDemand>>;
     FPrereleaseRequested : boolean;
+    //companions move the same way as the requested packages - up for an upgrade, down for a downgrade.
+    FAllowUp : boolean;
+    FAllowDown : boolean;
 
     procedure AddToPlan(const packageInfo : IPackageInfo; const reason : string);
+    function IsCandidateVersion(const version, installedVersion : TPackageVersion) : boolean;
+    function DirectionWord : string;
     function ResolveIsolated(const packages : IList<IPackageInfo>; const conflicts : IList<TUnresolvableConflict>) : IList<IPackageInfo>;
     function BuildDemands : boolean;
     function CheckAgainstDemands(const id : string; const version : TPackageVersion) : string;
@@ -176,11 +184,6 @@ end;
 function SameLine(const a, b : TPackageVersion) : boolean;
 begin
   result := (a.Major = b.Major) and (a.Minor = b.Minor);
-end;
-
-function IsNewerLine(const version, installed : TPackageVersion) : boolean;
-begin
-  result := (version.Major > installed.Major) or ((version.Major = installed.Major) and (version.Minor > installed.Minor));
 end;
 
 { TInstallPlanItem }
@@ -311,11 +314,13 @@ begin
   end;
 end;
 
+//Short lines - this is shown in the IDE's confirmation message box as well as the log.
 function TInstallPlan.SummaryLines : IList<string>;
 var
   item : IInstallPlanItem;
   line : string;
   projectFile : string;
+  separatorPos : integer;
 begin
   result := TCollections.CreateList<string>;
   for item in FItems do
@@ -325,8 +330,25 @@ begin
       line := line + item.CurrentVersion.ToStringNoMeta + ' -> ';
     line := line + item.PackageInfo.Version.ToStringNoMeta;
     if item.IsCompanion then
-      line := line + ' (also upgraded - ' + item.Reason + ')';
+    begin
+      if item.PackageInfo.Version < item.CurrentVersion then
+        line := line + ' (also downgraded)'
+      else
+        line := line + ' (also upgraded)';
+    end;
     result.Add(line);
+    if item.IsCompanion and (item.Reason <> '') then
+    begin
+      //why, indented, with each half of the reason on a line of its own.
+      separatorPos := Pos(cReasonSeparator, item.Reason);
+      if separatorPos > 0 then
+      begin
+        result.Add('    ' + Copy(item.Reason, 1, separatorPos));
+        result.Add('    ' + Copy(item.Reason, separatorPos + 2, Length(item.Reason)));
+      end
+      else
+        result.Add('    ' + item.Reason);
+    end;
   end;
   if FProjects.Any then
   begin
@@ -337,6 +359,7 @@ begin
         line := line + ', ';
       line := line + ExtractFileName(projectFile);
     end;
+    result.Add('');
     result.Add('Projects : ' + line);
   end;
 end;
@@ -504,7 +527,7 @@ begin
   for demand in demands do
   begin
     if not demand.Range.IsSatisfiedBy(version) then
-      exit(id + ' ' + version.ToStringNoMeta + ' is installed, but ' + demand.RequiredBy + ' requires ' + id + ' ' + demand.Range.ToString);
+      exit(id + ' ' + version.ToStringNoMeta + ' is installed' + cReasonSeparator + demand.RequiredBy + ' requires ' + id + ' ' + demand.Range.ToString);
   end;
 end;
 
@@ -530,7 +553,7 @@ begin
     begin
       //the child is being replaced - only the range this node requires of it matters, not its old dependencies.
       if checkRange and (not child.VersionRange.IsSatisfiedBy(planVersion)) then
-        exit(node.Id + ' ' + node.Version.ToStringNoMeta + ' requires ' + child.Id + ' ' + child.VersionRange.ToString + ', but ' + child.Id + ' ' + planVersion.ToStringNoMeta + ' is being installed');
+        exit(node.Id + ' ' + node.Version.ToStringNoMeta + ' requires ' + child.Id + ' ' + child.VersionRange.ToString + cReasonSeparator + child.Id + ' ' + planVersion.ToStringNoMeta + ' is being installed');
       continue;
     end;
     if checkRange and FDemands.TryGetValue(childKey, demands) then
@@ -538,7 +561,7 @@ begin
       for demand in demands do
       begin
         if not child.VersionRange.TryGetIntersectingRange(demand.Range, intersection) then
-          exit(node.Id + ' ' + node.Version.ToStringNoMeta + ' requires ' + child.Id + ' ' + child.VersionRange.ToString + ', but ' + demand.RequiredBy + ' requires ' + child.Id + ' ' + demand.Range.ToString);
+          exit(node.Id + ' ' + node.Version.ToStringNoMeta + ' requires ' + child.Id + ' ' + child.VersionRange.ToString + cReasonSeparator + demand.RequiredBy + ' requires ' + child.Id + ' ' + demand.Range.ToString);
       end;
     end;
     result := CheckEdges(child);
@@ -661,8 +684,7 @@ begin
   begin
     if FCancellationToken.IsCancelled then
       exit;
-    //never downgrade, and the installed version is the blocker.
-    if candidate.Version <= blocker.InstalledVersion then
+    if not IsCandidateVersion(candidate.Version, blocker.InstalledVersion) then
       continue;
     if not IsStaticallyCompatible(candidate) then
       continue;
@@ -671,9 +693,27 @@ begin
   end;
 end;
 
-//The newest version of the blocker that works with the plan. DPM ranges only let the patch float, so one
-//query covers one major.minor line. The installed line is tried first - that's usually where the matching
-//release is, and it's one request. Only if it has nothing do we list the versions to find the newer lines.
+//true for a version a companion may move to - the other side of the installed version, in a direction the
+//requested packages are moving.
+function TUpgradePlanBuilder.IsCandidateVersion(const version, installedVersion : TPackageVersion) : boolean;
+begin
+  result := ((version > installedVersion) and FAllowUp) or ((version < installedVersion) and FAllowDown);
+end;
+
+function TUpgradePlanBuilder.DirectionWord : string;
+begin
+  if FAllowUp and FAllowDown then
+    result := 'other'
+  else if FAllowDown then
+    result := 'older'
+  else
+    result := 'newer';
+end;
+
+//The newest version of the blocker that works with the plan, moving the way the requested packages move.
+//DPM ranges only let the patch float, so one query covers one major.minor line. For an upgrade the installed
+//line is tried first - that's usually where the matching release is, and it's one request. Otherwise (or if
+//it has nothing) we list the versions to find the lines worth trying.
 function TUpgradePlanBuilder.FindCompanion(const blocker : TBlocker) : IPackageInfo;
 var
   prerelease : boolean;
@@ -685,20 +725,27 @@ var
   i : integer;
   found : boolean;
 begin
+  result := nil;
   prerelease := FOptions.Prerelease or FPrereleaseRequested or (not blocker.InstalledVersion.IsStable);
 
-  range := TVersionRange.Create('', blocker.InstalledVersion, true, LineMax(blocker.InstalledVersion), true);
-  candidates := FRepositoryManager.GetPackageVersionsWithDependencies(FCancellationToken, FCompilerVersion, blocker.Id, range, prerelease);
-  result := PickCompanion(blocker, candidates);
-  if (result <> nil) or FCancellationToken.IsCancelled then
-    exit;
+  if not FAllowDown then
+  begin
+    range := TVersionRange.Create('', blocker.InstalledVersion, true, LineMax(blocker.InstalledVersion), true);
+    candidates := FRepositoryManager.GetPackageVersionsWithDependencies(FCancellationToken, FCompilerVersion, blocker.Id, range, prerelease);
+    result := PickCompanion(blocker, candidates);
+    if (result <> nil) or FCancellationToken.IsCancelled then
+      exit;
+  end;
 
-  //the lowest version of each newer line - the bottom of that line's range.
+  //the lowest candidate version of each line - the bottom of that line's range.
   versions := FRepositoryManager.GetPackageVersions(FCancellationToken, FCompilerVersion, blocker.Id, prerelease);
   lines := TCollections.CreateList<TPackageVersion>;
   for version in versions do
   begin
-    if not IsNewerLine(version, blocker.InstalledVersion) then
+    if not IsCandidateVersion(version, blocker.InstalledVersion) then
+      continue;
+    //an upgrade has already tried the installed line.
+    if (not FAllowDown) and SameLine(version, blocker.InstalledVersion) then
       continue;
     found := false;
     for i := 0 to lines.Count - 1 do
@@ -757,7 +804,7 @@ begin
         item.FCurrentVersion := node.Version;
     end;
     if not item.FProjects.Any then
-      FPlan.AddError(info.Id + ' is not installed in any of the projects - there is nothing to upgrade.');
+      FPlan.AddError(info.Id + ' is not installed in any of the projects - there is nothing to change.');
   end;
   FPlan.CollectProjects(FProjects);
 end;
@@ -772,9 +819,30 @@ var
   blocker : TBlocker;
   project : TInstallPlanProject;
   companion : IPackageInfo;
+  current : TPackageVersion;
+  node : IPackageReference;
 begin
   for info in requested do
+  begin
     AddToPlan(info, '');
+    //which way the requested package moves, from the highest version installed in the projects.
+    current := TPackageVersion.Empty;
+    for project in FProjects do
+    begin
+      if project.Graph = nil then
+        continue;
+      node := project.Graph.FindTopLevelChild(info.Id);
+      if (node <> nil) and (node.Version > current) then
+        current := node.Version;
+    end;
+    if current.IsEmpty or (info.Version > current) then
+      FAllowUp := true
+    else if info.Version < current then
+      FAllowDown := true;
+  end;
+  //reinstalling the installed version moves nothing - should anything block it, treat it like an upgrade.
+  if not (FAllowUp or FAllowDown) then
+    FAllowUp := true;
 
   for round := 1 to cMaxPlanRounds do
   begin
@@ -809,7 +877,7 @@ begin
         exit;
       end;
       if companion = nil then
-        FPlan.AddError(blocker.Reason + ' - and no newer version of ' + blocker.Id + ' is compatible.')
+        FPlan.AddError(blocker.Reason + ' - and no ' + DirectionWord + ' version of ' + blocker.Id + ' is compatible.')
       else
         AddToPlan(companion, blocker.Reason);
     end;

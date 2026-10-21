@@ -271,9 +271,9 @@ begin
     end);
   option.HasValue := false;
 
-  option := cmd.RegisterOption<boolean>('upgrade','', 'Upgrade packages that are already installed : only projects that reference them are changed, and ' +
-                                                      'other installed packages that would block the upgrade (e.g. packages that pin the same dependency) ' +
-                                                      'are upgraded with them to their newest compatible version.',
+  option := cmd.RegisterOption<boolean>('upgrade','', 'Change the version of packages that are already installed (up or down) : only projects that ' +
+                                                      'reference them are changed, and other installed packages that would block the change (e.g. packages ' +
+                                                      'that pin the same dependency) move with them, to their newest compatible version.',
    procedure(const value : boolean)
     begin
       TInstallOptions.Default.IsUpgrade := value;

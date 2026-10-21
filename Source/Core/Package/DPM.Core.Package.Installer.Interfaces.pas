@@ -97,9 +97,10 @@ type
     ['{C7A51E26-0F3B-4D98-8E2A-5B6C9D1F3A47}']
     ///<summary> requested : the packages asked for, at concrete versions.
     ///  upgrade = false : every requested package is applied to every project.
-    ///  upgrade = true : a package is only applied to projects where it is a top level reference, and
-    ///  other top level packages that would block the upgrade (they pin a dependency the requested packages
-    ///  need at another version) are added as companions, at their newest compatible version. </summary>
+    ///  upgrade = true (changing installed versions, up or down) : a package is only applied to projects where
+    ///  it is a top level reference, and other top level packages that would block the change (they pin a
+    ///  dependency the requested packages need at another version) are added as companions, at their newest
+    ///  compatible version - moving the same way as the requested packages, never the other way. </summary>
     function Plan(const cancellationToken : ICancellationToken; const config : IConfiguration; const options : TSearchOptions;
                   const requested : IList<IPackageInfo>; const projects : IList<TInstallPlanProject>; const upgrade : boolean) : IInstallPlan;
   end;

@@ -64,7 +64,13 @@ type
     procedure Companion_Of_Companion_Found_In_Next_Round;
 
     [Test]
-    procedure Companions_Are_Never_Downgraded;
+    procedure Upgrade_Never_Downgrades_Companions;
+
+    [Test]
+    procedure Downgrade_Moves_Companions_Down;
+
+    [Test]
+    procedure Summary_Puts_Reason_And_Projects_On_Lines_Of_Their_Own;
 
     [Test]
     procedure Prerelease_Companion_Only_When_Allowed;
@@ -356,7 +362,59 @@ begin
   Assert.AreEqual('1.0.3', FindItem(plan, 'Tool').PackageInfo.Version.ToStringNoMeta);
 end;
 
-procedure TInstallPlannerTests.Companions_Are_Never_Downgraded;
+procedure TInstallPlannerTests.Downgrade_Moves_Companions_Down;
+var
+  root : IPackageReference;
+  plan : IInstallPlan;
+  ext : IInstallPlanItem;
+  line : string;
+  downgraded : boolean;
+begin
+  // Both are at 1.0.3 and Core goes back to 1.0.1 - Ext pins Base 1.0.3, so it has to go back with it.
+  SetupFamily(['1.0.1', '1.0.3']);
+  root := AddProject(cApp);
+  AddPackage(root, 'Core', '1.0.3', '', ['Base', '1.0.3']);
+  AddPackage(root, 'Ext', '1.0.3', '', ['Base', '1.0.3']);
+
+  plan := MakePlan([MakeInfo('Core', '1.0.1', [MakeDep('Base', '1.0.1')])]);
+
+  Assert.IsTrue(plan.Succeeded, 'a downgrade should take its companions down with it');
+  ext := FindItem(plan, 'Ext');
+  Assert.IsNotNull(ext);
+  Assert.AreEqual('1.0.1', ext.PackageInfo.Version.ToStringNoMeta);
+  downgraded := false;
+  for line in plan.SummaryLines do
+    if Pos('Ext 1.0.3 -> 1.0.1 (also downgraded)', line) = 1 then
+      downgraded := true;
+  Assert.IsTrue(downgraded, 'the summary should say Ext is downgraded');
+end;
+
+procedure TInstallPlannerTests.Summary_Puts_Reason_And_Projects_On_Lines_Of_Their_Own;
+var
+  root : IPackageReference;
+  plan : IInstallPlan;
+  lines : IList<string>;
+begin
+  // The summary is shown in a message box - short lines, the reason split in two, a gap before the projects.
+  SetupFamily(['1.0.1', '1.0.3']);
+  root := AddProject(cApp);
+  AddPackage(root, 'Core', '1.0.1', '', ['Base', '1.0.1']);
+  AddPackage(root, 'Ext', '1.0.1', '', ['Base', '1.0.1']);
+
+  plan := MakePlan([MakeInfo('Core', '1.0.3', [MakeDep('Base', '1.0.3')])]);
+
+  Assert.IsTrue(plan.Succeeded);
+  lines := plan.SummaryLines;
+  Assert.AreEqual(6, lines.Count);
+  Assert.AreEqual('Core 1.0.1 -> 1.0.3', lines[0], false);
+  Assert.AreEqual('Ext 1.0.1 -> 1.0.3 (also upgraded)', lines[1], false);
+  Assert.AreEqual('    Ext 1.0.1 requires Base 1.0.1,', lines[2], false);
+  Assert.AreEqual('    but Core 1.0.3 requires Base 1.0.3', lines[3], false);
+  Assert.AreEqual('', lines[4]);
+  Assert.AreEqual('Projects : app.dproj', lines[5], false);
+end;
+
+procedure TInstallPlannerTests.Upgrade_Never_Downgrades_Companions;
 var
   root : IPackageReference;
   plan : IInstallPlan;
