@@ -191,6 +191,7 @@ uses
   DPM.Core.Tests.Project.BuildHookValidator in 'Tests\DPM.Core.Tests.Project.BuildHookValidator.pas',
   DPM.Core.Tests.Project.ConfigPatcher in 'Tests\DPM.Core.Tests.Project.ConfigPatcher.pas',
   DPM.Core.Tests.Project.Transformer in 'Tests\DPM.Core.Tests.Project.Transformer.pas',
+  DPM.Core.Tests.Project.Editor in 'Tests\DPM.Core.Tests.Project.Editor.pas',
   DPM.Core.Tests.SBOM.FormatParser in 'Tests\DPM.Core.Tests.SBOM.FormatParser.pas',
   DPM.Core.Tests.Sbom.MapFile in 'Tests\DPM.Core.Tests.Sbom.MapFile.pas',
   DPM.Core.Tests.SBOM.Reader in 'Tests\DPM.Core.Tests.SBOM.Reader.pas',

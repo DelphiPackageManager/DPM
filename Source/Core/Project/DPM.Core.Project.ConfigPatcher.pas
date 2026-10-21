@@ -43,6 +43,7 @@ interface
 uses
   DPM.Core.Types,
   DPM.Core.MSXML,
+  DPM.Core.Utils.XML,
   DPM.Core.Logging;
 
 {$SCOPEDENUMS ON}
@@ -75,6 +76,7 @@ type
   private
     FLogger : ILogger;
     FProjectXml : IXMLDOMDocument;
+    FFileFormat : TXMLFileFormat;
     FProjectName : string; //ExtractFileName - for log messages
     FCompiler : TCompilerVersion;
     //Set only when a write actually changed the DOM. EnsureBuildTarget skips the save (and the
@@ -125,8 +127,7 @@ implementation
 
 uses
   System.SysUtils,
-  System.Variants,
-  DPM.Core.Utils.XML;
+  System.Variants;
 
 const
   msbuildNamespace = 'http://schemas.microsoft.com/developer/msbuild/2003';
@@ -166,7 +167,7 @@ begin
 
   FProjectXml := CoDOMDocument60.Create;
   try
-    result := TXMLUtils.LoadXMLFromFile(FProjectXml, filename);
+    result := TXMLUtils.LoadXMLFromFile(FProjectXml, filename, FFileFormat);
     if not result then
     begin
       FLogger.Warning('Error loading project file [' + FProjectName + '] : ' + FProjectXml.parseError.reason);
@@ -201,7 +202,7 @@ begin
     exit;
   try
     TXMLUtils.PrettyFormatXML(FProjectXml.documentElement, 4);
-    FProjectXml.save(filename);
+    TXMLUtils.SaveXMLToFile(FProjectXml, filename, FFileFormat);
     result := true;
   except
     on e : Exception do

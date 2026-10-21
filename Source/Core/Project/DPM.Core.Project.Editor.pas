@@ -32,6 +32,7 @@ uses
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.MSXML,
+  DPM.Core.Utils.XML,
   DPM.Core.Logging,
   DPM.Core.Project.Interfaces,
   DPM.Core.Dependency.Interfaces,
@@ -46,6 +47,9 @@ type
     FLogger : ILogger;
     FConfig : IConfiguration;
     FProjectXML : IXMLDOMDocument;
+    //BOM, line break style and trailing new line of the loaded file - the DOM does not carry them,
+    //SaveProject restores them.
+    FFileFormat : TXMLFileFormat;
     FCompiler : TCompilerVersion;
     FPlatforms : TDPMPlatforms;
     FProjectFile : string;
@@ -119,7 +123,6 @@ uses
   System.StrUtils,
   System.Variants,
   DPM.Core.Constants,
-  DPM.Core.Utils.Xml,
   DPM.Core.Dependency.Version,
   DPM.Core.Dependency.Reference,
 //  DPM.Core.Project.PackageReference,
@@ -221,7 +224,7 @@ begin
   if dpmSearchElement = nil then
   begin
     dpmSearchElement := FProjectXML.createNode(NODE_ELEMENT, 'DPMSearch', msbuildNamespace) as IXMLDOMElement;
-    dpmGroup.appendChild(dpmSearchElement);
+    TXMLUtils.AppendChildElement(dpmGroup, dpmSearchElement);
     FModified := true;
   end;
   SetElementAttr(dpmSearchElement, 'Condition', condition);
@@ -260,7 +263,7 @@ begin
     if dpmExeElement = nil then
     begin
       dpmExeElement := FProjectXML.createNode(NODE_ELEMENT, 'DPMExe', msbuildNamespace) as IXMLDOMElement;
-      dpmGroup.appendChild(dpmExeElement);
+      TXMLUtils.AppendChildElement(dpmGroup, dpmExeElement);
       FModified := true;
     end;
     SetElementText(dpmExeElement, dpmExePath);
@@ -274,7 +277,7 @@ begin
   if importElement = nil then
   begin
     importElement := FProjectXML.createNode(NODE_ELEMENT, 'Import', msbuildNamespace) as IXMLDOMElement;
-    FProjectXML.documentElement.appendChild(importElement);
+    TXMLUtils.AppendChildElement(FProjectXML.documentElement, importElement);
     FModified := true;
   end;
   SetElementAttr(importElement, 'Project', importProject);
@@ -344,7 +347,7 @@ begin
   begin
     dccSearchElement := FProjectXML.createNode(NODE_ELEMENT, 'DCC_UnitSearchPath', msbuildNamespace) as IXMLDOMElement;
     dccSearchElement.text := '$(DPMSearch);$(DCC_UnitSearchPath)';
-    baseElement.appendChild(dccSearchElement);
+    TXMLUtils.AppendChildElement(baseElement, dccSearchElement);
     FModified := true;
   end
   else
@@ -379,7 +382,7 @@ begin
     end;
     projectVersionGroup := xmlElement.parentNode as IXMLDOMElement;
     result := FProjectXML.createNode(NODE_ELEMENT, 'PropertyGroup', msbuildNamespace) as IXMLDOMElement;
-    FProjectXML.documentElement.insertBefore(result, projectVersionGroup.nextSibling);
+    TXMLUtils.InsertChildElementAfter(FProjectXML.documentElement, result, projectVersionGroup);
     FModified := true;
   end
   else
@@ -389,7 +392,7 @@ begin
   if dpmCompilerElement = nil then
   begin
     dpmCompilerElement := FProjectXML.createNode(NODE_ELEMENT, 'DPMCompiler', msbuildNamespace) as IXMLDOMElement;
-    result.appendChild(dpmCompilerElement);
+    TXMLUtils.AppendChildElement(result, dpmCompilerElement);
     FModified := true;
   end;
   SetElementText(dpmCompilerElement, CompilerToString(FCompiler));
@@ -399,7 +402,7 @@ begin
   if dpmCondition = nil then
   begin
     dpmCondition := FProjectXML.createNode(NODE_ELEMENT, 'DPMCache', msbuildNamespace) as IXMLDOMElement;
-    result.appendChild(dpmCondition);
+    TXMLUtils.AppendChildElement(result, dpmCondition);
     FModified := true;
   end;
   SetElementAttr(dpmCondition, 'Condition', '''$(DPMCache)'' == ''''');
@@ -415,7 +418,7 @@ begin
   if dpmElement = nil then
   begin
     dpmElement := FProjectXML.createNode(NODE_ELEMENT, 'DPM', msbuildNamespace) as IXMLDOMElement;
-    result.appendChild(dpmElement);
+    TXMLUtils.AppendChildElement(result, dpmElement);
     FModified := true;
   end;
   //One package folder per compiler now contains all platforms - no $(Platform) segment.
@@ -844,9 +847,12 @@ begin
   end;
   FProjectFile := filename;
   FProjectXML := CoDOMDocument60.Create;
+  //keep the file's own whitespace - the IDE wrote this file and will write it again, so SaveProject
+  //must only change the elements we touched (see the TXMLUtils element helpers).
+  FProjectXML.preserveWhiteSpace := true;
 
   try
-    result := TXMLUtils.LoadXMLFromFile(FProjectXML, fileName);
+    result := TXMLUtils.LoadXMLFromFile(FProjectXML, fileName, FFileFormat);
     if not result then
     begin
       FLogger.Error('Error loading project file : ' + FProjectXML.parseError.reason);
@@ -1032,7 +1038,7 @@ begin
     projectFileName := FFileName;
 
   //Nothing changed in the DOM since load/last save and we are writing back to the same file -
-  //skip the (re)format + disk write entirely. This is the common warm-restore no-op case.
+  //skip the disk write entirely. This is the common warm-restore no-op case.
   //An explicit target filename (save-as) always writes.
   if (filename = '') and (not FModified) then
   begin
@@ -1045,9 +1051,7 @@ begin
 
 
   try
-    TXMLUtils.PrettyFormatXML(FProjectXML.documentElement, 4);
-
-    FProjectXML.save(projectFileName);
+    TXMLUtils.SaveXMLToFile(FProjectXML, projectFileName, FFileFormat);
     FModified := false;
     result := true;
   except
@@ -1146,7 +1150,7 @@ var
     // installs may have no hash yet; that's tolerated until next upgrade.
     if packageReference.ManifestHash <> '' then
       packageRefElement.setAttribute('manifestHash', packageReference.ManifestHash);
-    parentElement.appendChild(packageRefElement);
+    TXMLUtils.AppendChildElement(parentElement, packageRefElement);
     if packageReference.HasChildren then
     begin
       for dependency in packageReference.Children do
@@ -1166,7 +1170,7 @@ begin
   if dpmElement = nil then
   begin
     dpmElement := FProjectXML.createNode(NODE_ELEMENT, 'DPM', msbuildNamespace) as IXMLDOMElement;
-    projectExtensionsElement.appendChild(dpmElement);
+    TXMLUtils.AppendChildElement(projectExtensionsElement, dpmElement);
     FModified := true;
   end;
 
@@ -1183,12 +1187,12 @@ begin
     // Remove existing package references
     packageRefs := packagesElement.selectNodes('x:PackageReference');
     for i := packageRefs.length - 1 downto 0 do
-      packagesElement.removeChild(packageRefs.item[i]);
+      TXMLUtils.RemoveChildElement(packagesElement, packageRefs.item[i]);
   end
   else
   begin
     packagesElement := FProjectXML.createNode(NODE_ELEMENT, 'Packages', msbuildNamespace) as IXMLDOMElement;
-    dpmElement.appendChild(packagesElement);
+    TXMLUtils.AppendChildElement(dpmElement, packagesElement);
   end;
 
   // Write all top-level package references

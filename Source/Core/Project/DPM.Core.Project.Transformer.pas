@@ -33,6 +33,7 @@ uses
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.MSXML,
+  DPM.Core.Utils.XML,
   DPM.Core.Logging;
 
 type
@@ -76,6 +77,7 @@ type
   private
     FLogger : ILogger;
     FProjectXml : IXMLDOMDocument;
+    FFileFormat : TXMLFileFormat;
     FCleanupSteps : IList<IProjectCleanupStep>;
   protected
     function EnsureSinglePropertyGroupChild(const elementName : string) : IXMLDOMElement;
@@ -117,8 +119,7 @@ uses
   System.Classes,
   System.SysUtils,
   System.StrUtils,
-  System.IOUtils,
-  DPM.Core.Utils.XML;
+  System.IOUtils;
 
 const
   msbuildNamespace = 'http://schemas.microsoft.com/developer/msbuild/2003';
@@ -154,7 +155,7 @@ begin
 
   FProjectXml := CoDOMDocument60.Create;
   try
-    result := TXMLUtils.LoadXMLFromFile(FProjectXml, filename);
+    result := TXMLUtils.LoadXMLFromFile(FProjectXml, filename, FFileFormat);
     if not result then
     begin
       FLogger.Error('Error loading project file : ' + FProjectXml.parseError.reason);
@@ -183,7 +184,7 @@ begin
   end;
   try
     TXMLUtils.PrettyFormatXML(FProjectXml.documentElement, 4);
-    FProjectXml.save(filename);
+    TXMLUtils.SaveXMLToFile(FProjectXml, filename, FFileFormat);
     result := true;
   except
     on e : Exception do
