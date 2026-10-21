@@ -196,6 +196,18 @@ type
     property ProjectFile : string read GetProject;
   end;
 
+  /// <summary>
+  ///  Records a dependency the resolver could not satisfy. Collected on the context so we can keep
+  ///  resolving sibling dependencies and report all conflicts at the end of the run instead of bailing
+  ///  on the first one. Reason is the human-readable message already logged at the conflict site.
+  /// </summary>
+  TUnresolvableConflict = record
+    PackageId : string;
+    ParentId : string;
+    RequestedRange : TVersionRange;
+    Reason : string;
+  end;
+
   IDependencyResolver = interface
     ['{B187F0DB-FEA1-48B4-81F2-CECF073C2FB0}']
     function Initialize(const config : IConfiguration) : boolean;
@@ -208,6 +220,11 @@ type
     //so the existing dproj graph's transient versions are honoured rather than silently upgraded.
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean; overload;
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>) : boolean; overload;
+    //newPackages : several top-level packages resolved together (e.g. an upgrade and its companions) - each
+    //is recorded as a top level at its exact version, and project references with the same ids are replaced.
+    //conflicts (optional) : receives every conflict found, so the caller can report or act on them.
+    //Resolutions are only recorded in the installer context when the resolve succeeds.
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackages : IList<IPackageInfo>; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const conflicts : IList<TUnresolvableConflict>) : boolean; overload;
   end;
 
 

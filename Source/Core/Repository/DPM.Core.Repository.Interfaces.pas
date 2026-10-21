@@ -129,6 +129,11 @@ type
 
     function GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const packageId : string; const includePrerelease : boolean) : IList<TPackageVersion>; overload;
 
+    ///<summary> Starts remembering GetPackageVersions/GetPackageVersionsWithDependencies results, so identical
+    ///  queries made during one operation reach the server once. Nests - results are dropped at the matching
+    ///  outermost EndRequestCache, so nothing stale is served afterwards. </summary>
+    procedure BeginRequestCache;
+    procedure EndRequestCache;
 
     //ui specific stuff
     function GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageSearchResultItem;

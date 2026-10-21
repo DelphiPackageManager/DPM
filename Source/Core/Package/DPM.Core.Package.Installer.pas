@@ -52,6 +52,32 @@ uses
   DPM.Core.Compiler.Interfaces;
 
 type
+  ///<summary> One project's part in an install : what to apply to it, and what each phase produced.
+  ///  Internal to TPackageInstaller. </summary>
+  TProjectInstallWork = class
+  private
+    FProjectFile : string;
+    FEditor : IProjectEditor;
+    FOptions : TInstallOptions;
+    FPlatforms : TDPMPlatforms;
+    FPackages : IList<IPackageInfo>;
+    FGraph : IPackageReference;
+    FResolved : IList<IPackageInfo>;
+  public
+    constructor Create(const projectFile : string; const editor : IProjectEditor; const options : TInstallOptions; const platforms : TDPMPlatforms);
+    destructor Destroy; override;
+    property ProjectFile : string read FProjectFile;
+    property Editor : IProjectEditor read FEditor;
+    //a clone owned by the work item, set to the operation's compiler version.
+    property Options : TInstallOptions read FOptions;
+    property Platforms : TDPMPlatforms read FPlatforms;
+    //the packages to apply to the project.
+    property Packages : IList<IPackageInfo> read FPackages write FPackages;
+    //what resolving the project produced.
+    property Graph : IPackageReference read FGraph write FGraph;
+    property Resolved : IList<IPackageInfo> read FResolved write FResolved;
+  end;
+
   TPackageInstaller = class(TInterfacedObject, IPackageInstaller)
   private
     FLogger: ILogger;
@@ -64,6 +90,7 @@ type
     FReceiptService : IReceiptService;
     FPackageGenerator : IPackageProjectGenerator;
     FProjectConfigPatcher : IProjectConfigPatcher;
+    FInstallPlanner : IInstallPlanner;
     // P2 §2.6 — populate each top-level reference's ManifestHash from the
     // verification receipt the cache wrote during install. The editor writes
     // this back to the .dproj as `manifestHash="sha256:..."`.
@@ -87,7 +114,9 @@ type
   protected
     function Init(const options : TSearchOptions) : IConfiguration;
     function GetPackageInfo(const cancellationToken: ICancellationToken; const packageId: IPackageIdentity): IPackageInfo;
-    function CreateProjectRefs(const cancellationToken: ICancellationToken; const rootnode: IPackageReference; const projectReferences: IList<IPackageReference>): boolean;
+    function CreateProjectRefs(const cancellationToken: ICancellationToken; const rootnode: IPackageReference; const projectReferences: IList<IPackageReference>): boolean; overload;
+    //excludeIds (lowercase, may be nil) : packages to leave out, with anything only reachable through them.
+    function CreateProjectRefs(const cancellationToken: ICancellationToken; const rootnode: IPackageReference; const excludeIds : ISet<string>; const projectReferences: IList<IPackageReference>): boolean; overload;
 
     function CollectSearchPaths(const packageGraph: IPackageReference; const resolvedPackages: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
                                 const compilerVersion: TCompilerVersion; const platform: TDPMPlatform;  const searchPaths: IList<string>): boolean;
@@ -178,9 +207,10 @@ type
                               const platform: TDPMPlatform; const config: IConfiguration; const context: IPackageInstallerContext;
                               out resultGraph: IPackageReference): boolean;
 
-    function DoInstallPackageForPlatform(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const projectFile: string; const projectEditor: IProjectEditor;
-                              const platform: TDPMPlatform; const config: IConfiguration; const context: IPackageInstallerContext;
-                              out resultGraph: IPackageReference): boolean;
+    // Records the graph and downloads the resolved packages (bundled no-ops left out) - the platform
+    // independent half of FinalizePackageConfiguration.
+    function PrepareProjectPackages(const cancellationToken: ICancellationToken; const projectFile: string; const projectPackageGraph: IPackageReference;
+      const resolvedPackages: IList<IPackageInfo>; out packagesToConfigure: IList<IPackageInfo>; out packageSpecs: IDictionary<string, IPackageSpec>): boolean;
 
     // Shared post-resolution logic: downloads packages, configures for platform, records graph
     function FinalizePackageConfiguration(const cancellationToken: ICancellationToken; const options: TSearchOptions;
@@ -202,17 +232,32 @@ type
     //but writes only to the cache (no project search paths / copy-local / dproj edits).
     function DoBuildCachedPackage(const cancellationToken: ICancellationToken; const Options: TCacheOptions; const packageInfo: IPackageInfo): boolean;
 
-    // works out what compiler/platform then calls DoInstallPackage
-    function InstallPackage(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const projectEditor: IProjectEditor; const config: IConfiguration;
-                            const context: IPackageInstallerContext): boolean;
+    // user specified a package file - puts it in the cache and points the options at the package it holds.
+    function PreparePackageFileInstall(const Options: TInstallOptions): boolean;
 
-    // user specified a package file - will install for single compiler/platform - calls InstallPackageFromId
-    function InstallPackageFromFile(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const projectFiles: IList<string>; const config: IConfiguration;
-                                    const context: IPackageInstallerContext): boolean;
+    // Install = plan, then apply : see PlanInstall/ApplyInstallPlan.
+    function DoPlanInstall(const cancellationToken: ICancellationToken; const options: TInstallOptions; out plan: IInstallPlan): boolean;
+    function DoApplyInstallPlan(const cancellationToken: ICancellationToken; const options: TInstallOptions; const plan: IInstallPlan): boolean;
 
-    // resolves package from id - calls InstallPackage
-    function InstallPackageFromId(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const projectFiles: IList<string>; const config: IConfiguration;
-                                  const context: IPackageInstallerContext): boolean;
+    // Loads the projects, settling the compiler version and each project's platforms. A project whose
+    // platforms don't match the options is left out (not a failure); one that won't load is a failure.
+    function LoadInstallWork(const cancellationToken: ICancellationToken; const options: TInstallOptions; const projectFiles: IList<string>;
+                             const config: IConfiguration; const works: IList<TProjectInstallWork>; out compilerVersion: TCompilerVersion): boolean;
+    // The requested packages at concrete versions - looked up once for the whole install.
+    function LookupRequestedPackages(const cancellationToken: ICancellationToken; const options: TInstallOptions; const compilerVersion: TCompilerVersion;
+                                     const requested: IList<IPackageInfo>): boolean;
+    // Phase 1 : resolve a project with the packages being installed. Changes nothing.
+    function ResolveProjectInstall(const cancellationToken: ICancellationToken; const work: TProjectInstallWork): boolean;
+    // Phase 2 : download, compile and configure every platform, updating the dproj in memory only.
+    function BuildProjectInstall(const cancellationToken: ICancellationToken; const config: IConfiguration; const work: TProjectInstallWork): boolean;
+    // Phase 3 : save the dproj, commit its recorded resolutions, load design packages.
+    function CommitProjectInstall(const cancellationToken: ICancellationToken; const work: TProjectInstallWork): boolean;
+    // After a plain install failed to resolve : if upgrading other installed packages along with it would
+    // have worked, say which.
+    procedure HintCompanions(const cancellationToken: ICancellationToken; const config: IConfiguration; const options: TInstallOptions;
+                             const plan: IInstallPlan; const works: IList<TProjectInstallWork>);
+    procedure LogPlanErrors(const plan: IInstallPlan);
+    procedure LogPlanSummary(const plan: IInstallPlan);
 
     function UnInstallFromProject(const cancellationToken: ICancellationToken; const Options: TUnInstallOptions; const projectFile: string; const config: IConfiguration;
                                   const context: IPackageInstallerContext): boolean;
@@ -220,8 +265,10 @@ type
     function RestoreProject(const cancellationToken: ICancellationToken; const Options: TRestoreOptions; const projectFile: string; const config: IConfiguration;
                             const context: IPackageInstallerContext): boolean;
 
-    // calls either InstallPackageFromId or InstallPackageFromFile depending on options.
+    // plans the install, then applies the plan.
     function Install(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const context: IPackageInstallerContext): boolean;
+    function PlanInstall(const cancellationToken : ICancellationToken; const options : TInstallOptions; out plan : IInstallPlan) : boolean;
+    function ApplyInstallPlan(const cancellationToken : ICancellationToken; const options : TInstallOptions; const plan : IInstallPlan; const context : IPackageInstallerContext) : boolean;
 
 
     function Uninstall(const cancellationToken: ICancellationToken; const Options: TUnInstallOptions; const context: IPackageInstallerContext): boolean;
@@ -248,7 +295,8 @@ type
       const compilerFactory: ICompilerFactory;
       const receiptService : IReceiptService;
       const packageGenerator : IPackageProjectGenerator;
-      const projectConfigPatcher : IProjectConfigPatcher);
+      const projectConfigPatcher : IProjectConfigPatcher;
+      const installPlanner : IInstallPlanner);
   end;
 
 implementation
@@ -274,6 +322,7 @@ uses
   DPM.Core.Dependency.Reference,
   DPM.Core.Dependency.Version,
   DPM.Core.Package.Classes,
+  DPM.Core.Package.InstallPlan,
   DPM.Core.Spec.Reader,
   DPM.Core.Package.InstallerContext;
 
@@ -1215,7 +1264,8 @@ constructor TPackageInstaller.Create(const logger: ILogger; const configurationM
                                      const packageCache: IPackageCache; const dependencyResolver: IDependencyResolver; const context: IPackageInstallerContext;
                                      const compilerFactory: ICompilerFactory; const receiptService : IReceiptService;
                                      const packageGenerator : IPackageProjectGenerator;
-                                     const projectConfigPatcher : IProjectConfigPatcher);
+                                     const projectConfigPatcher : IProjectConfigPatcher;
+                                     const installPlanner : IInstallPlanner);
 begin
   FLogger := logger;
   FConfigurationManager := configurationManager;
@@ -1227,6 +1277,25 @@ begin
   FReceiptService := receiptService;
   FPackageGenerator := packageGenerator;
   FProjectConfigPatcher := projectConfigPatcher;
+  FInstallPlanner := installPlanner;
+end;
+
+{ TProjectInstallWork }
+
+constructor TProjectInstallWork.Create(const projectFile : string; const editor : IProjectEditor; const options : TInstallOptions; const platforms : TDPMPlatforms);
+begin
+  inherited Create;
+  FProjectFile := projectFile;
+  FEditor := editor;
+  FOptions := options;
+  FPlatforms := platforms;
+  FPackages := TCollections.CreateList<IPackageInfo>;
+end;
+
+destructor TProjectInstallWork.Destroy;
+begin
+  FOptions.Free;
+  inherited;
 end;
 
 procedure TPackageInstaller.PopulateManifestHashes(const graph : IPackageReference;
@@ -1547,11 +1616,24 @@ begin
   result := true;
 end;
 
-// convert the dependency graph to a flat list of IPackageinfo's (which has dependencies).
 function TPackageInstaller.CreateProjectRefs(const cancellationToken : ICancellationToken; const rootnode: IPackageReference;  const projectReferences: IList<IPackageReference>): boolean;
+begin
+  result := CreateProjectRefs(cancellationToken, rootnode, nil, projectReferences);
+end;
+
+// convert the dependency graph to a flat list of IPackageinfo's (which has dependencies). Packages in
+// excludeIds are left out along with anything only reachable through them - used for the packages being
+// installed, which replace whatever the graph has for them. The graph itself is not modified.
+function TPackageInstaller.CreateProjectRefs(const cancellationToken : ICancellationToken; const rootnode: IPackageReference; const excludeIds : ISet<string>;
+                                             const projectReferences: IList<IPackageReference>): boolean;
 var
   seenPackages: IDictionary<string, IPackageInfo>;
   packageRefLookup : IDictionary<string, IPackageReference>;
+
+  function IsExcluded(const id : string) : boolean;
+  begin
+    result := (excludeIds <> nil) and excludeIds.Contains(LowerCase(id));
+  end;
 
   function DoCreateProjectRefs(const cancellationToken : ICancellationToken; const rootnode: IPackageReference) : boolean;
   var
@@ -1568,6 +1650,8 @@ var
     begin
       if cancellationToken.IsCancelled then
         exit;
+      if IsExcluded(dependency.Id) then
+        continue;
 
       if seenPackages.TryGetValue(LowerCase(dependency.Id), info) then
       begin
@@ -1606,6 +1690,8 @@ var
     result := true;
     for dependency in rootnode.Children do
     begin
+      if IsExcluded(dependency.Id) then
+        continue;
       if dependency.HasChildren then
         result := DoCreateProjectRefs(cancellationToken, dependency);
       if not result then
@@ -1622,123 +1708,6 @@ begin
   seenPackages := TCollections.CreateDictionary<string, IPackageInfo>;
   packageRefLookup := TCollections.CreateDictionary<string, IPackageReference>;
   result := DoCreateProjectRefs(cancellationToken,rootnode);
-end;
-
-function TPackageInstaller.DoInstallPackageForPlatform(const cancellationToken : ICancellationToken; const Options: TInstallOptions; const projectFile: string;
-                                            const projectEditor: IProjectEditor; const platform: TDPMPlatform; const config: IConfiguration;
-                                            const context: IPackageInstallerContext; out resultGraph: IPackageReference): boolean;
-var
-  newPackageIdentity: IPackageIdentity;
-  packageInfo: IPackageInfo; // includes dependencies;
-  existingPackageRef: IPackageReference;
-  dependency : IPackageReference;
-  projectPackageGraph: IPackageReference;
-
-  projectReferences: IList<IPackageReference>;
-
-  resolvedPackages: IList<IPackageInfo>;
-
-  seenPackages: IDictionary<string, IPackageInfo>;
-
-
-begin
-  result := false;
-  resultGraph := nil;
-
-  projectPackageGraph := projectEditor.GetPackageReferences; // can return nil
-
-  if projectPackageGraph = nil then
-    projectPackageGraph := TPackageReference.CreateRoot(Options.compilerVersion);
-
-  //If the package is already in the project graph, remove it so the resolver re-resolves below.
-  //Install is idempotent: repeats for an already-built platform are short-circuited by the
-  //per-platform BOM check; new platforms get compiled fresh. -force is still honored downstream
-  //by CompilePackage (forces a rebuild even when the BOM would otherwise skip).
-  existingPackageRef := projectPackageGraph.FindTopLevelChild(Options.packageId);
-  if existingPackageRef <> nil then
-  begin
-    projectPackageGraph.RemoveTopLevelChild(existingPackageRef.Id);
-    existingPackageRef := nil;
-  end;
-
-  // We could have a transitive dependency that is being promoted.
-  // Since we want to control what version is installed, we will remove
-  // any transitive references to that package so the newly installed version
-  // will take precedence when resolving.
-  dependency := projectPackageGraph.FindFirstChild(Options.packageId);
-  while dependency <> nil do
-  begin
-    projectPackageGraph.RemoveChild(dependency);
-    dependency := projectPackageGraph.FindFirstChild(Options.packageId);
-  end;
-
-  // if the user specified a version, either the on the command line or via a file then we will use that
-  if not Options.Version.IsEmpty then
-  begin
-    // sourceName will be empty if we are installing the package from a file
-    newPackageIdentity := TPackageIdentity.Create(options.Sources, Options.packageId,  Options.Version, Options.compilerVersion);
-    packageInfo := GetPackageInfo(cancellationToken, newPackageIdentity);
-  end
-  else
-  begin
-    // no version specified, so we need to get the latest version available;
-    packageInfo := FRepositoryManager.FindLatestVersion(cancellationToken, options.PackageId, options.CompilerVersion, TPackageVersion.Empty,  Options.PreRelease, options.Sources);
-
-  end;
-  if packageInfo = nil then
-  begin
-    FLogger.Error('Package [' + Options.packageId + '] for platform [' + DPMPlatformToString(platform) + '] not found on any sources');
-    exit;
-  end;
-  if packageInfo.IsSigned and (packageInfo.SignedBy <> '') then
-    FLogger.Information('Installing package ' + packageInfo.ToString + ' (signed by ' + packageInfo.SignedBy + ')')
-  else if packageInfo.IsSigned then
-    FLogger.Information('Installing package ' + packageInfo.ToString + ' (signed)')
-  else
-    FLogger.Information('Installing package ' + packageInfo.ToString);
-
-  if not EnsurePackageInCache(cancellationToken, packageInfo) then
-    exit;
-
-  packageInfo.UseSource := Options.UseSource;
-  // we need this later when collecting search paths.
-
-  seenPackages := TCollections.CreateDictionary<string, IPackageInfo>;
-  projectReferences := TCollections.CreateList<IPackageReference>;
-
-  //flatten and dedupe the graph to a list of package references.
-  if not CreateProjectRefs(cancellationToken, projectPackageGraph, projectReferences) then
-    exit;
-
-  if not FDependencyResolver.ResolveForInstall(cancellationToken, Options.CompilerVersion, projectFile, Options, packageInfo, projectReferences, projectPackageGraph, resolvedPackages) then
-  begin
-    FLogger.Debug('ResolveForInstall failed');
-    // we need to carry on here as resolution may have failed for another package
-    // not sure what the best solution is here.. a better resolver perhaps.
-     exit;
-  end;
-
-  if resolvedPackages = nil then
-  begin
-    FLogger.Error('Resolver returned no packages!');
-    exit(false);
-  end;
-
-  // Install-specific sanity check: verify the package we were installing is in the resolved list
-  packageInfo := resolvedPackages.FirstOrDefault(
-    function(const info: IPackageInfo): boolean
-    begin
-      result := SameText(info.Id, Options.packageId);
-    end);
-
-  if packageInfo = nil then
-  begin
-    FLogger.Error('Something went wrong, resolution did not return installed package!');
-    exit(false);
-  end;
-
-  // Finalize configuration (download, build, search paths, design packages, etc.)
-  result := FinalizePackageConfiguration(cancellationToken, Options, projectFile, projectEditor, platform, config, projectPackageGraph, resolvedPackages, resultGraph);
 end;
 
 function TPackageInstaller.DoRestoreProjectForPlatform(const cancellationToken : ICancellationToken; const Options: TRestoreOptions; const projectFile: string;
@@ -1787,6 +1756,23 @@ begin
   result := FinalizePackageConfiguration(cancellationToken, Options, projectFile, projectEditor, platform, config, projectPackageGraph, resolvedPackages, resultGraph);
 end;
 
+//True for a package the user asked to install - force only rebuilds those, not their dependencies.
+function IsRequestedPackage(const options : TSearchOptions; const packageId : string) : boolean;
+var
+  request : TInstallPackageRequest;
+begin
+  if (options is TInstallOptions) and (Length(TInstallOptions(options).Packages) > 0) then
+  begin
+    for request in TInstallOptions(options).Packages do
+    begin
+      if SameText(request.PackageId, packageId) then
+        exit(true);
+    end;
+    exit(false);
+  end;
+  result := SameText(packageId, options.SearchTerms);
+end;
+
 function TPackageInstaller.BuildDependencies(const cancellationToken : ICancellationToken; const packageCompiler: ICompiler; const projectPackageGraph: IPackageReference;
                                              const packagesToCompile: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
                                              const packageSpecs: IDictionary<string, IPackageSpec>; const Options: TSearchOptions): boolean;
@@ -1830,8 +1816,8 @@ begin
         // Check if package has build entries that require compilation
         if template.BuildEntries.Any or template.DesignEntries.Any then
         begin
-          // Determine if force compilation needed (only for explicitly requested package)
-          forceCompile := Options.force and SameText(pkgInfo.Id, Options.SearchTerms);
+          // Determine if force compilation needed (only for explicitly requested packages)
+          forceCompile := Options.force and IsRequestedPackage(Options, pkgInfo.Id);
 
           if not CompilePackage(cancellationToken, packageCompiler, pkgInfo, packageReference, Spec, forceCompile, false) then
           begin
@@ -2087,17 +2073,14 @@ begin
   result := true;
 end;
 
-function TPackageInstaller.FinalizePackageConfiguration(const cancellationToken: ICancellationToken; const options: TSearchOptions;
-  const projectFile: string; const projectEditor: IProjectEditor; const platform: TDPMPlatform;
-  const config: IConfiguration; const projectPackageGraph: IPackageReference;
-  const resolvedPackages: IList<IPackageInfo>; out resultGraph: IPackageReference): boolean;
+function TPackageInstaller.PrepareProjectPackages(const cancellationToken: ICancellationToken; const projectFile: string; const projectPackageGraph: IPackageReference;
+  const resolvedPackages: IList<IPackageInfo>; out packagesToConfigure: IList<IPackageInfo>; out packageSpecs: IDictionary<string, IPackageSpec>): boolean;
 var
-  packageSpecs: IDictionary<string, IPackageSpec>;
-  packagesToConfigure: IList<IPackageInfo>;
   packageInfo: IPackageInfo;
 begin
   result := false;
-  resultGraph := nil;
+  packagesToConfigure := nil;
+  packageSpecs := nil;
 
   if resolvedPackages = nil then
   begin
@@ -2120,6 +2103,23 @@ begin
   // Downloads the package files to the cache if they are not already there and
   // returns the deserialized dspec as we need it for search paths and design
   if not DownloadPackages(cancellationToken, packagesToConfigure, packageSpecs) then
+    exit;
+
+  result := true;
+end;
+
+function TPackageInstaller.FinalizePackageConfiguration(const cancellationToken: ICancellationToken; const options: TSearchOptions;
+  const projectFile: string; const projectEditor: IProjectEditor; const platform: TDPMPlatform;
+  const config: IConfiguration; const projectPackageGraph: IPackageReference;
+  const resolvedPackages: IList<IPackageInfo>; out resultGraph: IPackageReference): boolean;
+var
+  packageSpecs: IDictionary<string, IPackageSpec>;
+  packagesToConfigure: IList<IPackageInfo>;
+begin
+  result := false;
+  resultGraph := nil;
+
+  if not PrepareProjectPackages(cancellationToken, projectFile, projectPackageGraph, resolvedPackages, packagesToConfigure, packageSpecs) then
     exit;
 
   // Configure the package for this platform (build, search paths, copy local, design packages)
@@ -2274,81 +2274,6 @@ begin
     effectivePlatforms := projectEditor.platforms;
 end;
 
-function TPackageInstaller.InstallPackage(const cancellationToken : ICancellationToken; const Options: TInstallOptions; const projectEditor: IProjectEditor;
-                                          const config: IConfiguration; const context: IPackageInstallerContext): boolean;
-var
-  platforms: TDPMPlatforms;
-  platform: TDPMPlatform;
-  platformResult: boolean;
-  shouldSkip: boolean;
-  platformOptions: TInstallOptions;
-  erroredPlatforms : TDPMPlatforms;
-  finalGraph: IPackageReference;
-  platformGraph: IPackageReference;
-begin
-  result := false;
-  finalGraph := nil;
-
-  ValidateAndSetCompilerPlatforms(Options, projectEditor, platforms, shouldSkip);
-  if shouldSkip then
-    exit;
-
-  result := true;
-  erroredPlatforms := [];
-  for platform in platforms do
-  begin
-    if cancellationToken.IsCancelled then
-      exit;
-
-    // do not modify the passed in options!
-    platformOptions := Options.Clone;
-    platformOptions.platforms := [platform];
-
-    FLogger.Information('Installing [' + platformOptions.SearchTerms + '-' +  DPMPlatformToString(platform) + '] into [' + projectEditor.ProjectFile + ']', true);
-    platformResult := DoInstallPackageForPlatform(cancellationToken, platformOptions, projectEditor.projectFile, projectEditor, platform, config, context, platformGraph);
-
-    if not platformResult then
-    begin
-      FLogger.Error('Install failed for [' + platformOptions.SearchTerms + '-' + DPMPlatformToString(platform) + ']');
-      Include(erroredPlatforms, platform);
-    end
-    else
-    begin
-      FLogger.Success('Install succeeded for [' + platformOptions.SearchTerms + '-' + DPMPlatformToString(platform) + ']', true);
-      // Capture the graph from successful platform configuration (graph is same for all platforms)
-      if finalGraph = nil then
-        finalGraph := platformGraph;
-    end;
-
-    result := platformResult and result;
-    FLogger.Information('');
-  end;
-
-  if not result then
-    FLogger.Error('Install failed for [' + Options.SearchTerms + '] on platforms [' + DPMPlatformsToString(erroredPlatforms) + ']')
-  else if finalGraph <> nil then
-  begin
-    // P2 §2.6 — pull each cached package's manifest hash off its receipt
-    // and lock it onto the PackageReference before we write the dproj.
-    PopulateManifestHashes(finalGraph, Options.compilerVersion);
-    // Update package references once using the new platform-independent format
-    projectEditor.UpdatePackageReferences(finalGraph);
-    result := projectEditor.SaveProject();
-    //Load design-time packages once after all platforms are installed - design BPLs are per-IDE,
-    //not per-platform, so this runs at the project level. CLI context is a no-op.
-    if result then
-    begin
-      //Make sure the IDE host platform's design BPL exists before we try to load it - the install
-      //loop above only built the project's target platforms. Non-fatal : the install already
-      //succeeded, and a failure here just means the design components may not load.
-      if not EnsureDesignHostPlatformCompiled(cancellationToken, Options, finalGraph, platforms) then
-        FLogger.Warning('Failed to compile design-time packages for the IDE host platform - design components may not load.');
-      InstallDesignPackages(cancellationToken, projectEditor.ProjectFile, BuildPackageSpecsFromGraph(finalGraph, Options.compilerVersion));
-    end;
-  end;
-
-end;
-
 function TPackageInstaller.GetCompilerVersionFromProjectFiles(const Options: TInstallOptions; const projectFiles: TArray<string>; const config: IConfiguration): boolean;
 var
   projectFile: string;
@@ -2413,50 +2338,477 @@ end;
 
 function TPackageInstaller.Install(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const context: IPackageInstallerContext): boolean;
 var
-  config: IConfiguration;
-  projectList: IList<string>;
-  isGroup: boolean;
+  plan : IInstallPlan;
 begin
   result := false;
+  //one request cache across planning and applying - see TRepositoryRequestCache.
+  FRepositoryManager.BeginRequestCache;
   try
-    config := Init(Options);
-    if config = nil then
-      exit;
-
-    projectList := TCollections.CreateList<string>;
-    if not ResolveProjectFiles(Options.ProjectPath, Options.Projects, projectList) then
-      exit;
-
-    isGroup := ExtractFileExt(Options.ProjectPath) = '.groupproj';
-
-    if (Options.ProjectGroup <> '') and (not isGroup) then
-    begin
-      //TODO : load the project group and record the package graphs for the projects in the group
-      //in the installer context so that package conflicts can be taken into account when installing
-      //in a single project from the command line.
-
-    end;
-
-    if Options.PackageFile <> '' then
-    begin
-      if not FileExists(Options.PackageFile) then
+    try
+      if not DoPlanInstall(cancellationToken, Options, plan) then
       begin
-        // should never happen if validation is called on the options.
-        FLogger.Error('The specified packageFile [' + Options.PackageFile + '] does not exist.');
+        LogPlanErrors(plan);
         exit;
       end;
-      result := InstallPackageFromFile(cancellationToken, Options, projectList, config, context);
+      LogPlanSummary(plan);
+      result := DoApplyInstallPlan(cancellationToken, Options, plan);
+    except
+      on e: Exception do
+      begin
+        FLogger.Error(e.Message);
+        result := false;
+      end;
+    end;
+  finally
+    FRepositoryManager.EndRequestCache;
+  end;
+end;
+
+function TPackageInstaller.PlanInstall(const cancellationToken : ICancellationToken; const options : TInstallOptions; out plan : IInstallPlan) : boolean;
+begin
+  plan := nil;
+  FRepositoryManager.BeginRequestCache;
+  try
+    try
+      result := DoPlanInstall(cancellationToken, options, plan);
+    except
+      on e: Exception do
+      begin
+        plan := CreateFailedPlan(e.Message);
+        result := false;
+      end;
+    end;
+  finally
+    FRepositoryManager.EndRequestCache;
+  end;
+end;
+
+function TPackageInstaller.ApplyInstallPlan(const cancellationToken : ICancellationToken; const options : TInstallOptions; const plan : IInstallPlan; const context : IPackageInstallerContext) : boolean;
+begin
+  FRepositoryManager.BeginRequestCache;
+  try
+    try
+      result := DoApplyInstallPlan(cancellationToken, options, plan);
+    except
+      on e: Exception do
+      begin
+        FLogger.Error(e.Message);
+        result := false;
+      end;
+    end;
+  finally
+    FRepositoryManager.EndRequestCache;
+  end;
+end;
+
+procedure TPackageInstaller.LogPlanErrors(const plan : IInstallPlan);
+var
+  error : string;
+begin
+  if plan = nil then
+    exit;
+  for error in plan.Errors do
+    FLogger.Error(error);
+end;
+
+procedure TPackageInstaller.LogPlanSummary(const plan : IInstallPlan);
+var
+  line : string;
+begin
+  //companions are packages the user didn't ask for - make sure they are seen.
+  for line in plan.SummaryLines do
+    FLogger.Information(line, plan.HasCompanions);
+end;
+
+function TPackageInstaller.DoPlanInstall(const cancellationToken : ICancellationToken; const options : TInstallOptions; out plan : IInstallPlan) : boolean;
+var
+  config : IConfiguration;
+  projectFiles : IList<string>;
+  works : IList<TProjectInstallWork>;
+  work : TProjectInstallWork;
+  compilerVersion : TCompilerVersion;
+  requested : IList<IPackageInfo>;
+  planProjects : IList<TInstallPlanProject>;
+  planProject : TInstallPlanProject;
+begin
+  result := false;
+  plan := nil;
+  config := Init(options);
+  if config = nil then
+  begin
+    plan := CreateFailedPlan('Unable to start the install - see the log for details.');
+    exit;
+  end;
+
+  projectFiles := TCollections.CreateList<string>;
+  if not ResolveProjectFiles(options.ProjectPath, options.Projects, projectFiles) then
+  begin
+    plan := CreateFailedPlan('No projects to install into.');
+    exit;
+  end;
+
+  if options.PackageFile <> '' then
+  begin
+    if not FileExists(options.PackageFile) then
+    begin
+      // should never happen if validation is called on the options.
+      plan := CreateFailedPlan('The specified packageFile [' + options.PackageFile + '] does not exist.');
+      exit;
+    end;
+    if not PreparePackageFileInstall(options) then
+    begin
+      plan := CreateFailedPlan('Unable to install the package file [' + options.PackageFile + '].');
+      exit;
+    end;
+  end;
+  //callers that set PackageId/Version directly rather than a list install that one package.
+  if (Length(options.Packages) = 0) and (options.PackageId <> '') then
+    options.AddPackage(options.PackageId, options.Version);
+
+  works := TCollections.CreateObjectList<TProjectInstallWork>(true);
+  if not LoadInstallWork(cancellationToken, options, projectFiles, config, works, compilerVersion) then
+  begin
+    plan := CreateFailedPlan('Unable to load the project(s) - see the log for details.');
+    exit;
+  end;
+
+  requested := TCollections.CreateList<IPackageInfo>;
+  if not LookupRequestedPackages(cancellationToken, options, compilerVersion, requested) then
+  begin
+    plan := CreateFailedPlan('Unable to find the package(s) to install - see the log for details.');
+    exit;
+  end;
+
+  planProjects := TCollections.CreateList<TInstallPlanProject>;
+  for work in works do
+  begin
+    planProject.ProjectFile := work.ProjectFile;
+    planProject.Graph := work.Editor.GetPackageReferences;
+    planProjects.Add(planProject);
+  end;
+
+  plan := FInstallPlanner.Plan(cancellationToken, config, options, requested, planProjects, options.IsUpgrade);
+  result := plan.Succeeded;
+end;
+
+function TPackageInstaller.LoadInstallWork(const cancellationToken : ICancellationToken; const options : TInstallOptions; const projectFiles : IList<string>;
+                                           const config : IConfiguration; const works : IList<TProjectInstallWork>; out compilerVersion : TCompilerVersion) : boolean;
+var
+  i : integer;
+  projectFile : string;
+  projectEditor : IProjectEditor;
+  workOptions : TInstallOptions;
+  platforms : TDPMPlatforms;
+  shouldSkip : boolean;
+begin
+  result := false;
+  compilerVersion := options.CompilerVersion;
+  for i := 0 to projectFiles.Count - 1 do
+  begin
+    if cancellationToken.IsCancelled then
+      exit;
+    projectFile := projectFiles[i];
+    if TPathUtils.IsRelativePath(projectFile) then
+    begin
+      projectFile := TPath.Combine(GetCurrentDir, projectFile);
+      projectFile := TPathUtils.CompressRelativePath(projectFile);
+    end;
+
+    projectEditor := TProjectEditor.Create(FLogger, config, compilerVersion);
+    if not projectEditor.LoadProject(projectFile) then
+    begin
+      FLogger.Error('Unable to load project file [' + projectFile + '], cannot continue');
+      exit;
+    end;
+    //when no compiler version was given the first project decides it - every project is installed for the same one.
+    if compilerVersion = TCompilerVersion.UnknownVersion then
+      compilerVersion := projectEditor.CompilerVersion;
+
+    //each project gets its own options - reconciling the compiler/platforms mustn't leak between projects.
+    workOptions := options.Clone;
+    workOptions.CompilerVersion := compilerVersion;
+    ValidateAndSetCompilerPlatforms(workOptions, projectEditor, platforms, shouldSkip);
+    if shouldSkip then
+    begin
+      //nothing to do in a project that doesn't target the requested platforms - not a failure.
+      workOptions.Free;
+      continue;
+    end;
+    works.Add(TProjectInstallWork.Create(projectFile, projectEditor, workOptions, platforms));
+  end;
+  result := not cancellationToken.IsCancelled;
+end;
+
+function TPackageInstaller.LookupRequestedPackages(const cancellationToken : ICancellationToken; const options : TInstallOptions;
+                                                   const compilerVersion : TCompilerVersion; const requested : IList<IPackageInfo>) : boolean;
+var
+  request : TInstallPackageRequest;
+  packageIdentity : IPackageIdentity;
+  packageInfo : IPackageInfo;
+begin
+  result := true;
+  for request in options.Packages do
+  begin
+    if cancellationToken.IsCancelled then
+      exit(false);
+    // if the user specified a version, either on the command line or via a file then we will use that
+    if not request.Version.IsEmpty then
+    begin
+      // sourceName will be empty if we are installing the package from a file
+      packageIdentity := TPackageIdentity.Create(options.Sources, request.PackageId, request.Version, compilerVersion);
+      packageInfo := GetPackageInfo(cancellationToken, packageIdentity);
     end
     else
-      result := InstallPackageFromId(cancellationToken, Options, projectList, config, context);
-  except
-    on e: Exception do
+      packageInfo := FRepositoryManager.FindLatestVersion(cancellationToken, request.PackageId, compilerVersion, TPackageVersion.Empty, options.PreRelease, options.Sources);
+
+    if packageInfo = nil then
     begin
-      FLogger.Error(e.Message);
+      FLogger.Error('Package [' + request.PackageId + '] not found on any sources');
       result := false;
+      continue;
+    end;
+    if packageInfo.IsSigned and (packageInfo.SignedBy <> '') then
+      FLogger.Information('Installing package ' + packageInfo.ToString + ' (signed by ' + packageInfo.SignedBy + ')')
+    else if packageInfo.IsSigned then
+      FLogger.Information('Installing package ' + packageInfo.ToString + ' (signed)')
+    else
+      FLogger.Information('Installing package ' + packageInfo.ToString);
+    // we need this later when collecting search paths.
+    packageInfo.UseSource := options.UseSource;
+    requested.Add(packageInfo);
+  end;
+end;
+
+function TPackageInstaller.DoApplyInstallPlan(const cancellationToken : ICancellationToken; const options : TInstallOptions; const plan : IInstallPlan) : boolean;
+var
+  config : IConfiguration;
+  works : IList<TProjectInstallWork>;
+  work : TProjectInstallWork;
+  compilerVersion : TCompilerVersion;
+  projectFiles : IList<string>;
+  failedProjects : string;
+begin
+  result := false;
+  if (plan = nil) or (not plan.Succeeded) then
+  begin
+    LogPlanErrors(plan);
+    exit;
+  end;
+  if not plan.Projects.Any then
+  begin
+    FLogger.Error('There is nothing to install - none of the projects need the package(s).');
+    exit;
+  end;
+
+  config := Init(options);
+  if config = nil then
+    exit;
+
+  works := TCollections.CreateObjectList<TProjectInstallWork>(true);
+  if not LoadInstallWork(cancellationToken, options, plan.Projects, config, works, compilerVersion) then
+    exit;
+  projectFiles := TCollections.CreateList<string>;
+  for work in works do
+  begin
+    work.Packages := plan.PackagesForProject(work.ProjectFile);
+    projectFiles.Add(work.ProjectFile);
+  end;
+
+  //Projects in the operation don't block each other while they are resolved, and nothing they record
+  //counts until their dproj is saved - see IPackageInstallerContext.BeginOperation.
+  FContext.BeginOperation(projectFiles);
+  try
+    //Phase 1 : resolve every project before anything is changed. Carry on after a failure so every
+    //problem is reported in one run.
+    failedProjects := '';
+    for work in works do
+    begin
+      if cancellationToken.IsCancelled then
+        exit;
+      if not ResolveProjectInstall(cancellationToken, work) then
+      begin
+        if failedProjects <> '' then
+          failedProjects := failedProjects + ', ';
+        failedProjects := failedProjects + ExtractFileName(work.ProjectFile);
+      end;
+    end;
+    if failedProjects <> '' then
+    begin
+      FLogger.Error('Dependency resolution failed for [' + failedProjects + '] - no project was changed.');
+      if not options.IsUpgrade then
+        HintCompanions(cancellationToken, config, options, plan, works);
+      exit;
+    end;
+
+    //Phase 2 : download, compile and configure every project - in memory, the dprojs are not saved yet.
+    for work in works do
+    begin
+      if cancellationToken.IsCancelled then
+        exit;
+      if not BuildProjectInstall(cancellationToken, config, work) then
+      begin
+        FLogger.Error('Install failed for [' + work.ProjectFile + '] - no project was changed.');
+        exit;
+      end;
+    end;
+
+    //Phase 3 : save. Not interrupted by cancellation - stopping part way would leave the group half changed.
+    result := true;
+    for work in works do
+      result := CommitProjectInstall(cancellationToken, work) and result;
+  finally
+    FContext.EndOperation;
+  end;
+end;
+
+function TPackageInstaller.ResolveProjectInstall(const cancellationToken : ICancellationToken; const work : TProjectInstallWork) : boolean;
+var
+  projectGraph : IPackageReference;
+  excludeIds : ISet<string>;
+  packageInfo : IPackageInfo;
+  projectReferences : IList<IPackageReference>;
+  resolvedGraph : IPackageReference;
+  resolved : IList<IPackageInfo>;
+  ids : string;
+begin
+  result := false;
+  ids := '';
+  excludeIds := TCollections.CreateSet<string>;
+  for packageInfo in work.Packages do
+  begin
+    excludeIds.Add(LowerCase(packageInfo.Id));
+    if ids <> '' then
+      ids := ids + ', ';
+    ids := ids + packageInfo.Id + '-' + packageInfo.Version.ToStringNoMeta;
+  end;
+  FLogger.Information('Resolving [' + ids + '] for [' + work.ProjectFile + ']', true);
+
+  projectGraph := work.Editor.GetPackageReferences; // can return nil
+  if projectGraph = nil then
+    projectGraph := TPackageReference.CreateRoot(work.Options.CompilerVersion);
+
+  //The packages being installed replace any reference to them, top level or transitive, so they (and
+  //anything only reachable through them) are left out of the references the resolver starts from.
+  projectReferences := TCollections.CreateList<IPackageReference>;
+  if not CreateProjectRefs(cancellationToken, projectGraph, excludeIds, projectReferences) then
+    exit;
+
+  if not FDependencyResolver.ResolveForInstall(cancellationToken, work.Options.CompilerVersion, work.ProjectFile, work.Options, work.Packages,
+                                               projectReferences, resolvedGraph, resolved, nil, nil, nil) then
+    exit;
+
+  // Install-specific sanity check: every package being installed must be in the resolved list
+  for packageInfo in work.Packages do
+  begin
+    if not resolved.Any(
+      function(const info : IPackageInfo) : boolean
+      begin
+        result := SameText(info.Id, packageInfo.Id);
+      end) then
+    begin
+      FLogger.Error('Something went wrong, resolution did not return installed package [' + packageInfo.Id + ']!');
+      exit;
     end;
   end;
 
+  work.Graph := resolvedGraph;
+  work.Resolved := resolved;
+  result := true;
+end;
+
+function TPackageInstaller.BuildProjectInstall(const cancellationToken : ICancellationToken; const config : IConfiguration; const work : TProjectInstallWork) : boolean;
+var
+  packagesToConfigure : IList<IPackageInfo>;
+  packageSpecs : IDictionary<string, IPackageSpec>;
+  platform : TDPMPlatform;
+  platformOptions : TInstallOptions;
+  platformResult : boolean;
+begin
+  result := false;
+  if not PrepareProjectPackages(cancellationToken, work.ProjectFile, work.Graph, work.Resolved, packagesToConfigure, packageSpecs) then
+    exit;
+
+  for platform in work.Platforms do
+  begin
+    if cancellationToken.IsCancelled then
+      exit;
+    FLogger.Information('Installing into [' + work.ProjectFile + '] for platform [' + DPMPlatformToString(platform) + ']', true);
+    // do not modify the work's options!
+    platformOptions := work.Options.Clone;
+    try
+      platformOptions.Platforms := [platform];
+      platformResult := DoConfigurePackageForPlatform(cancellationToken, platformOptions, work.ProjectFile, work.Editor, platform, config,
+                                                      work.Graph, packagesToConfigure, packageSpecs);
+    finally
+      platformOptions.Free;
+    end;
+    if not platformResult then
+    begin
+      FLogger.Error('Install failed for [' + work.ProjectFile + '] on platform [' + DPMPlatformToString(platform) + ']');
+      exit;
+    end;
+  end;
+
+  //Make sure the IDE host platform's design BPL exists before design packages are loaded at commit -
+  //the loop above only built the project's target platforms. Non-fatal : a failure here just means the
+  //design components may not load.
+  if not EnsureDesignHostPlatformCompiled(cancellationToken, work.Options, work.Graph, work.Platforms) then
+    FLogger.Warning('Failed to compile design-time packages for the IDE host platform - design components may not load.');
+
+  // P2 §2.6 — pull each cached package's manifest hash off its receipt
+  // and lock it onto the PackageReference before we write the dproj.
+  PopulateManifestHashes(work.Graph, work.Options.CompilerVersion);
+  // Update package references once using the new platform-independent format
+  work.Editor.UpdatePackageReferences(work.Graph);
+  result := true;
+end;
+
+function TPackageInstaller.CommitProjectInstall(const cancellationToken : ICancellationToken; const work : TProjectInstallWork) : boolean;
+begin
+  result := work.Editor.SaveProject;
+  if not result then
+  begin
+    FLogger.Error('Failed to save [' + work.ProjectFile + ']');
+    exit;
+  end;
+  //the dproj now reflects the install, so its resolutions and graph count for the other projects.
+  FContext.CommitProject(work.ProjectFile);
+  //Load design-time packages once per project - design BPLs are per-IDE, not per-platform. CLI context is a no-op.
+  InstallDesignPackages(cancellationToken, work.ProjectFile, BuildPackageSpecsFromGraph(work.Graph, work.Options.CompilerVersion));
+  FLogger.Success('Install succeeded for [' + work.ProjectFile + ']', true);
+end;
+
+procedure TPackageInstaller.HintCompanions(const cancellationToken : ICancellationToken; const config : IConfiguration; const options : TInstallOptions;
+                                           const plan : IInstallPlan; const works : IList<TProjectInstallWork>);
+var
+  requested : IList<IPackageInfo>;
+  item : IInstallPlanItem;
+  planProjects : IList<TInstallPlanProject>;
+  planProject : TInstallPlanProject;
+  work : TProjectInstallWork;
+  upgradePlan : IInstallPlan;
+begin
+  requested := TCollections.CreateList<IPackageInfo>;
+  for item in plan.Items do
+    requested.Add(item.PackageInfo);
+  //the editors' graphs are still as loaded - resolving doesn't change them.
+  planProjects := TCollections.CreateList<TInstallPlanProject>;
+  for work in works do
+  begin
+    planProject.ProjectFile := work.ProjectFile;
+    planProject.Graph := work.Editor.GetPackageReferences;
+    planProjects.Add(planProject);
+  end;
+  upgradePlan := FInstallPlanner.Plan(cancellationToken, config, options, requested, planProjects, true);
+  if (not upgradePlan.Succeeded) or (not upgradePlan.HasCompanions) then
+    exit;
+  FLogger.Warning('Other installed packages need to move with this install :', true);
+  for item in upgradePlan.Items do
+  begin
+    if item.IsCompanion then
+      FLogger.Warning('  ' + item.PackageInfo.Id + ' ' + item.CurrentVersion.ToStringNoMeta + ' -> ' + item.PackageInfo.Version.ToStringNoMeta + ' (' + item.Reason + ')', true);
+  end;
+  FLogger.Warning('Use Upgrade in the IDE, or --upgrade on the command line, to install them together.', true);
 end;
 
 function TPackageInstaller.InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
@@ -2696,8 +3048,7 @@ begin
   result := true;
 end;
 
-function TPackageInstaller.InstallPackageFromFile(const cancellationToken : ICancellationToken; const Options: TInstallOptions;const projectFiles: IList<string>;
-                                                  const config: IConfiguration; const context: IPackageInstallerContext): boolean;
+function TPackageInstaller.PreparePackageFileInstall(const Options: TInstallOptions): boolean;
 var
   packageIdString: string;
   packageIdentity: IPackageIdentity;
@@ -2712,12 +3063,11 @@ begin
   packageIdString := ExtractFileName(Options.PackageFile);
   packageIdString := ChangeFileExt(packageIdString, '');
   if not TPackageIdentity.TryCreateFromString(FLogger, packageIdString, '', packageIdentity) then
-    exit;
+    exit(false);
 
   // update options so we can install from the packageid.
   Options.PackageFile := '';
-  Options.packageId := packageIdentity.Id;
-  Options.Version := packageIdentity.Version;
+  Options.AddPackage(packageIdentity.Id, packageIdentity.Version);
   Options.compilerVersion := packageIdentity.compilerVersion;
 
   //Restrict to the platforms the package actually supports - read from the now-cached spec.
@@ -2730,97 +3080,6 @@ begin
     FLogger.Warning('Could not read spec for [' + packageIdentity.ToString + '] - install will run for all project platforms');
     Options.platforms := [];
   end;
-
-  result := InstallPackageFromId(cancellationToken, options, projectFiles, config, context);
-end;
-
-function TPackageInstaller.InstallPackageFromId(const cancellationToken  : ICancellationToken; const Options: TInstallOptions; const projectFiles: IList<string>;
-                                                const config: IConfiguration; const context: IPackageInstallerContext): boolean;
-var
-  projectFile: string;
-  i: integer;
-  projectEditor : IProjectEditor;
-  projectEditors : IList<IProjectEditor>;
-  existingPackageRef: IPackageReference;
-  projectPackageGraph: IPackageReference;
-  dependency : IPackageReference;
-begin
-  result := true;
-
-  projectEditors := TCollections.CreateList<IProjectEditor>;
-
-  for i := 0 to projectFiles.Count - 1 do
-  begin
-    if cancellationToken.IsCancelled then
-      exit;
-    projectFile := projectFiles[i];
-    if TPathUtils.IsRelativePath(projectFile) then
-    begin
-      projectFile := TPath.Combine(GetCurrentDir, projectFile);
-      projectFile := TPathUtils.CompressRelativePath(projectFile);
-    end;
-
-    projectEditor := TProjectEditor.Create(FLogger, config, Options.compilerVersion);
-    if not projectEditor.LoadProject(projectFile) then
-    begin
-      FLogger.Error('Unable to load project file, cannot continue');
-      exit;
-    end;
-    //Per-project platform reconciliation happens later in ValidateAndSetCompilerPlatforms (called from
-    //InstallPackage). Mutating Options.platforms here would leak the first project's platforms into the
-    //second project's call and narrow installs across the directory.
-    projectEditors.Add(projectEditor);
-  end;
-
-  if cancellationToken.IsCancelled then
-    exit;
-
-
-  //if we are upgrading, remove package references and clean up the resolutions.
-  for i := 0 to projectEditors.Count -1 do
-  begin
-    projectEditor := projectEditors[i];
-    projectPackageGraph := projectEditor.GetPackageReferences; // can return nil
-
-    if projectPackageGraph = nil then
-      projectPackageGraph := TPackageReference.CreateRoot(Options.compilerVersion);
-
-    //Install is idempotent - if the package is already in the graph, remove it so the resolver
-    //re-resolves below. Repeats for an already-built platform are short-circuited by the
-    //per-platform BOM check; new platforms get compiled fresh.
-    existingPackageRef := projectPackageGraph.FindTopLevelChild(Options.packageId);
-    if existingPackageRef <> nil then
-    begin
-      projectPackageGraph.RemoveTopLevelChild(existingPackageRef.Id);
-      //No call to RemoveResolution here - FindPackageResolution skips the current project, so re-resolving
-      //in this project doesn't see its own stale resolution. Other projects' recorded resolutions reflect
-      //their dprojs and shouldn't be retroactively mutated by an install in a sibling project.
-      existingPackageRef := nil;
-    end;
-
-    // We could have a transitive dependency that is being promoted.
-    // Since we want to control what version is installed, we will remove
-    // any transitive references to that package so the newly installed version
-    // will take precedence when resolving.
-    dependency := projectPackageGraph.FindFirstChild(Options.packageId);
-    while dependency <> nil do
-    begin
-      projectPackageGraph.RemoveChild(dependency);
-      dependency := projectPackageGraph.FindFirstChild(Options.packageId);
-    end;
-  end;
-
-  for i := 0 to projectEditors.Count -1 do
-  begin
-    //TODO : Change to pass editor in rather than projectfile.
-    result := InstallPackage(cancellationToken, Options, projectEditors[i], config, context) and result;
-    projectEditors[i] := nil;
-  end;
-
-
-
-
-
 end;
 
 function TPackageInstaller.Remove(const cancellationToken: ICancellationToken; const Options: TUnInstallOptions): boolean;

@@ -183,10 +183,13 @@ begin
                                                       'sources defined in the DPM configuration file are used. If the configuration ' +
                                                       'file specifies no sources, uses the default DPM feed.',
                                                        'Specify the id and optionally the version of the package to install, or the path to a ' +
-                                                       'package file (.dpkg).',
+                                                       'package file (.dpkg). Several packages can be installed together (resolved as one) ' +
+                                                       'by separating them with commas, each optionally with @version.',
                                                       'install <packageId> [options]');
 
-  option := cmd.RegisterUnNamedOption<string>('The package to install','packageId|packagePath',
+  //A list goes in this one argument (comma separated) rather than as several arguments - an unnamed
+  //option that allows multiple values would also swallow the projectPath argument.
+  option := cmd.RegisterUnNamedOption<string>('The package(s) to install - packageId[@version][,packageId[@version]...] or the path to a package file','packageId|packagePath',
     procedure(const value : string)
     begin
       TInstallOptions.Default.PackageId := value;
@@ -202,7 +205,7 @@ begin
       TInstallOptions.Default.ProjectPath := value;
     end);
 
-  option := cmd.RegisterOption<string>('version','', 'The package version to install, if not specified the latest will be downloaded',
+  option := cmd.RegisterOption<string>('version','', 'The package version to install, if not specified the latest will be downloaded. Only valid with a single package - use packageId@version for several.',
    procedure(const value : string)
     begin
       TInstallOptions.Default.VersionString := value;
@@ -268,7 +271,9 @@ begin
     end);
   option.HasValue := false;
 
-  option := cmd.RegisterOption<boolean>('upgrade','', 'Set when installing a different version',
+  option := cmd.RegisterOption<boolean>('upgrade','', 'Upgrade packages that are already installed : only projects that reference them are changed, and ' +
+                                                      'other installed packages that would block the upgrade (e.g. packages that pin the same dependency) ' +
+                                                      'are upgraded with them to their newest compatible version.',
    procedure(const value : boolean)
     begin
       TInstallOptions.Default.IsUpgrade := value;
@@ -291,6 +296,7 @@ begin
   cmd.Examples.Add('install VSoft.CommandLine -version=1.0.1 c:\myprojects\project1.dproj');
   cmd.Examples.Add('install Spring.Base c:\myprojects -compiler=10.3');
   cmd.Examples.Add('install DUnitX.Framework c:\myproject\tests\mytest.dproj -compiler=10.3 -platforms=Win32,Win64,MacOS32');
+  cmd.Examples.Add('install Spring4D.Core@2.0.3-beta.3,Spring4D.Extensions c:\myprojects\all.groupproj --upgrade');
 end;
 
 procedure RegisterListCommand;

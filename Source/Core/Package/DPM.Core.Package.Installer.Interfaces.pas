@@ -33,6 +33,8 @@ uses
   VSoft.CancellationToken,
   DPM.Core.Types,
   DPM.Core.TargetPlatform,
+  DPM.Core.Configuration.Interfaces,
+  DPM.Core.Options.Search,
   DPM.Core.Options.Cache,
   DPM.Core.Options.Install,
   DPM.Core.Options.Uninstall,
@@ -45,6 +47,63 @@ uses
 type
   IPackageInstallerContext = interface;
 
+  ///<summary> A package an install will apply, and where. </summary>
+  IInstallPlanItem = interface
+    ['{4B0B8D5E-1D52-4E7B-9C1B-6A7E3B2F9D10}']
+    function GetPackageInfo : IPackageInfo;
+    function GetIsCompanion : boolean;
+    function GetCurrentVersion : TPackageVersion;
+    function GetReason : string;
+    function GetProjects : IList<string>;
+    property PackageInfo : IPackageInfo read GetPackageInfo;
+    //true when the package was not asked for, but is upgraded because it blocks the packages that were.
+    property IsCompanion : boolean read GetIsCompanion;
+    //the highest version currently referenced at the top level of the plan's projects - empty if none.
+    property CurrentVersion : TPackageVersion read GetCurrentVersion;
+    //why a companion is included.
+    property Reason : string read GetReason;
+    //the projects the package is applied to.
+    property Projects : IList<string> read GetProjects;
+  end;
+
+  ///<summary> What an install will do : which packages, at which versions, in which projects. Built by
+  ///  IPackageInstaller.PlanInstall without changing anything, so it can be shown (and confirmed) before
+  ///  ApplyInstallPlan applies exactly that. </summary>
+  IInstallPlan = interface
+    ['{9E3F2C71-5A4D-4C8E-B0F6-2D7A1E4B8C93}']
+    function GetSucceeded : boolean;
+    function GetItems : IList<IInstallPlanItem>;
+    function GetErrors : IList<string>;
+    function GetProjects : IList<string>;
+    function HasCompanions : boolean;
+    //the packages to apply to a project, requested ones first.
+    function PackagesForProject(const projectFile : string) : IList<IPackageInfo>;
+    //a human readable description, shared by the command line log and the IDE's confirmation.
+    function SummaryLines : IList<string>;
+    property Succeeded : boolean read GetSucceeded;
+    property Items : IList<IInstallPlanItem> read GetItems;
+    property Errors : IList<string> read GetErrors;
+    //the projects with something to apply, in the order they were given.
+    property Projects : IList<string> read GetProjects;
+  end;
+
+  ///<summary> A project an install plan is built for, with its current (unmodified) package graph. </summary>
+  TInstallPlanProject = record
+    ProjectFile : string;
+    Graph : IPackageReference;
+  end;
+
+  IInstallPlanner = interface
+    ['{C7A51E26-0F3B-4D98-8E2A-5B6C9D1F3A47}']
+    ///<summary> requested : the packages asked for, at concrete versions.
+    ///  upgrade = false : every requested package is applied to every project.
+    ///  upgrade = true : a package is only applied to projects where it is a top level reference, and
+    ///  other top level packages that would block the upgrade (they pin a dependency the requested packages
+    ///  need at another version) are added as companions, at their newest compatible version. </summary>
+    function Plan(const cancellationToken : ICancellationToken; const config : IConfiguration; const options : TSearchOptions;
+                  const requested : IList<IPackageInfo>; const projects : IList<TInstallPlanProject>; const upgrade : boolean) : IInstallPlan;
+  end;
+
   //
   /// <summary>
   ///  does the work of installing/restoring/unstalling packages.
@@ -53,6 +112,15 @@ type
   IPackageInstaller = interface
     ['{554A0842-6C83-42BD-882C-B49FE4619DE0}']
     function Install(const cancellationToken : ICancellationToken; const options : TInstallOptions; const context : IPackageInstallerContext) : boolean;
+
+    ///<summary> Works out what Install would do with these options - including, for an upgrade, the companion
+    ///  packages that must move with the requested ones - without changing anything. Returns false (with
+    ///  plan.Errors explaining why) when the install could not go ahead. </summary>
+    function PlanInstall(const cancellationToken : ICancellationToken; const options : TInstallOptions; out plan : IInstallPlan) : boolean;
+
+    ///<summary> Applies a plan from PlanInstall : every project is resolved before anything is changed, and
+    ///  no project is changed unless all of them resolve. </summary>
+    function ApplyInstallPlan(const cancellationToken : ICancellationToken; const options : TInstallOptions; const plan : IInstallPlan; const context : IPackageInstallerContext) : boolean;
     function UnInstall(const cancellationToken : ICancellationToken; const options : TUnInstallOptions; const context : IPackageInstallerContext) : boolean;
     function Restore(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const context : IPackageInstallerContext) : boolean;
     function Cache(const cancellationToken : ICancellationToken; const options : TCacheOptions) : boolean;
@@ -105,6 +173,20 @@ type
 
     ///<summary> Check for an existing package resolution in already loaded projects in the group.</summary>
     function FindPackageResolution(const projectFile: string; const packageId : string ) : IResolvedPackage;
+
+    ///<summary> Starts an install that changes several projects at once. The resolutions already recorded
+    ///  for these projects are hidden from FindPackageResolution (they are about to be replaced, so a
+    ///  project not yet processed must not block one that is), and RecordResolutions/RecordGraph for
+    ///  them are held back until CommitProject. Operations do not nest. </summary>
+    procedure BeginOperation(const projectFiles : IList<string>);
+
+    ///<summary> Makes a project's held back resolutions and graph the recorded ones - called once its
+    ///  dproj has been saved. </summary>
+    procedure CommitProject(const projectFile : string);
+
+    ///<summary> Ends the operation, discarding anything not committed - so a failed or cancelled
+    ///  install leaves the recorded state as it was. </summary>
+    procedure EndOperation;
 
     ///<summary> Records the IDE's current-session 'use source' choice for a package in a project.
     ///  This is a debugging-only, session-lifetime toggle - it is never persisted to the dproj.

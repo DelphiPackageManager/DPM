@@ -59,8 +59,12 @@ type
 
     function DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const includePrerelease : boolean; const context : IResolverContext) : boolean;
 
+    //checks every resolved dependency edge against the version selected for it - see the implementation.
+    procedure ValidateResolvedDependencies(const context : IResolverContext);
+
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean; overload;
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>) : boolean; overload;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackages : IList<IPackageInfo>; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const conflicts : IList<TUnresolvableConflict>) : boolean; overload;
 
   public
     constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageCache : IPackageCache; const packageInstallerContext : IPackageInstallerContext);
@@ -444,6 +448,8 @@ begin
     context.RecordBundledResolution(bundledId);
   end;
 
+  ValidateResolvedDependencies(context);
+
   if context.HasUnresolvable then
   begin
     FLogger.Error('Dependency resolution failed: ' + IntToStr(context.GetUnresolvable.Count) + ' conflict(s)');
@@ -456,6 +462,72 @@ begin
   end;
   FLogger.NewLine;
 
+end;
+
+/// The main loop only evaluates the dependencies of packages it pushes - the new packages and what they
+/// pull in. Project references are recorded as resolved but never re-evaluated, so a reference that pins
+/// a package this install changes (e.g. Ext 1.0.1 pinning Base 1.0.1 while Base 1.0.3 is installed) would
+/// otherwise go unnoticed and an inconsistent graph would be written - one the next restore rejects.
+/// So every resolved edge is checked here. An edge between two packages this install did not change (a
+/// project reference kept as it was, a package restore found at its recorded version, or a sibling
+/// project's resolution) is skipped - an inconsistency that was already there is not this install's to
+/// report, and must not make an unrelated install (or a restore) fail.
+procedure TDependencyResolver.ValidateResolvedDependencies(const context : IResolverContext);
+var
+  resolution : IResolvedPackage;
+  dependencyResolution : IResolvedPackage;
+  dependency : IPackageDependency;
+  effectiveRange : TVersionRange;
+  conflict : TUnresolvableConflict;
+
+  function IsUnchanged(const res : IResolvedPackage) : boolean;
+  begin
+    result := (not SameText(res.ProjectFile, context.ProjectFile)) or context.IsUnchanged(res.PackageInfo);
+  end;
+
+  function AlreadyRecorded(const packageId, parentId : string) : boolean;
+  var
+    existing : TUnresolvableConflict;
+  begin
+    result := false;
+    for existing in context.GetUnresolvable do
+    begin
+      if SameText(existing.PackageId, packageId) and SameText(existing.ParentId, parentId) then
+        exit(true);
+    end;
+  end;
+
+begin
+  for resolution in context.GetResolvedPackages do
+  begin
+    if resolution.IsBundled or (resolution.PackageInfo.Dependencies = nil) then
+      continue;
+    for dependency in resolution.PackageInfo.Dependencies do
+    begin
+      if dependency.VersionRange.IsBundledSentinel then
+        continue;
+      //a dependency with no resolution has already been reported where it failed.
+      if not context.TryGetResolvedPackage(dependency.Id, dependencyResolution) then
+        continue;
+      if dependencyResolution.IsBundled then
+        continue;
+      effectiveRange := context.GetEffectiveDependencyRange(resolution.PackageInfo.Id, dependency.Id, dependency.VersionRange);
+      if effectiveRange.IsSatisfiedBy(dependencyResolution.PackageInfo.Version) then
+        continue;
+      if IsUnchanged(resolution) and IsUnchanged(dependencyResolution) then
+        continue;
+      if AlreadyRecorded(dependency.Id, resolution.PackageInfo.Id) then
+        continue;
+      FLogger.Error('Package conflict - ' + resolution.PackageInfo.Id + '-' + resolution.PackageInfo.Version.ToStringNoMeta + ' requires ' +
+                    dependency.Id + ' ' + effectiveRange.ToString + ' but ' + dependency.Id + '-' + dependencyResolution.PackageInfo.Version.ToStringNoMeta + ' is selected');
+      conflict.PackageId := dependency.Id;
+      conflict.ParentId := resolution.PackageInfo.Id;
+      conflict.RequestedRange := effectiveRange;
+      conflict.Reason := resolution.PackageInfo.Id + '-' + resolution.PackageInfo.Version.ToStringNoMeta + ' requires ' + effectiveRange.ToString +
+                         ' but version ' + dependencyResolution.PackageInfo.Version.ToStringNoMeta + ' is selected';
+      context.RecordUnresolvable(conflict);
+    end;
+  end;
 end;
 
 function TDependencyResolver.Initialize(const config: IConfiguration) : boolean;
@@ -484,10 +556,24 @@ function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancel
                                                out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>;
                                                const preferredVersions : IDictionary<string, TPackageVersion>) : boolean;
 var
+  newPackages : IList<IPackageInfo>;
+begin
+  newPackages := TCollections.CreateList<IPackageInfo>;
+  newPackages.Add(newPackage);
+  result := ResolveForInstall(cancellationToken, compilerVersion, projectFile, options, newPackages, projectReferences, dependencyGraph, resolved, sharedVersionCache, preferredVersions, nil);
+end;
+
+function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
+                                               const projectFile : string; const options : TSearchOptions; const newPackages : IList<IPackageInfo>;
+                                               const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference;
+                                               out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>;
+                                               const preferredVersions : IDictionary<string, TPackageVersion>; const conflicts : IList<TUnresolvableConflict>) : boolean;
+var
   context : IResolverContext;
   packageRef : IPackageReference;
   resolution : IResolvedPackage;
   errorCount : integer;
+  conflict : TUnresolvableConflict;
 begin
   Assert(FConfiguration <> nil, 'config is nil, Initialize has not been called');
 
@@ -499,18 +585,30 @@ begin
     if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Version)) then
     begin
       FLogger.Error('Package project group conflict : ' + packageRef.Id + '-' + resolution.PackageInfo.Version.ToString + ' in project : ' + resolution.ProjectFile + ' does not satisfy ' + packageRef.Version.ToString  );
-      Inc(errorCount)
-      //exit;
+      Inc(errorCount);
+      if conflicts <> nil then
+      begin
+        conflict.PackageId := packageRef.Id;
+        conflict.ParentId := packageRef.ParentId;
+        conflict.RequestedRange := resolution.VersionRange;
+        conflict.Reason := 'cross-project: version ' + packageRef.Version.ToString + ' does not satisfy ' + resolution.VersionRange.ToString + ' selected in project [' + resolution.ProjectFile + ']';
+        conflicts.Add(conflict);
+      end;
     end;
   end;
-  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, newPackage, projectReferences, sharedVersionCache, preferredVersions);
+  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, newPackages, projectReferences, sharedVersionCache, preferredVersions);
 
   result := DoResolve(cancellationToken, compilerVersion, options.Prerelease, context);
   resolved := context.GetResolvedPackageInfos;
   dependencyGraph := context.BuildDependencyGraph;
-  //record the resolutions so they can be applied to other projects in the group
-  FPackageInstallerContext.RecordResolutions(projectFile, context.GetResolvedPackages);
   result := result and (errorCount = 0);
+  if conflicts <> nil then
+    conflicts.AddRange(context.GetUnresolvable);
+  //record the resolutions so they can be checked against by other projects in the group. Only when the
+  //resolve succeeded - a failed install leaves the project as it was, so its resolutions must not claim
+  //otherwise.
+  if result then
+    FPackageInstallerContext.RecordResolutions(projectFile, context.GetResolvedPackages);
 end;
 
 

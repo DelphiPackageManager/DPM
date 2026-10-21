@@ -27,7 +27,18 @@ type
     //lowercase packageId. Never persisted - populated only by the IDE, empty for the CLI.
     FUseSourceState : IDictionary<string, IDictionary<string, boolean>>;
 
+    //Multi-project install operation (BeginOperation .. EndOperation). Projects in the operation
+    //record into the staged dictionaries until CommitProject, and their committed records are
+    //hidden from FindPackageResolution since they are about to be replaced. Keys are lowercase.
+    FInOperation : boolean;
+    FOperationProjects : ISet<string>;
+    FStagedGraphs : IDictionary<string, IPackageReference>;
+    FStagedResolutions : IDictionary<string, IList<IResolvedPackage>>;
+    FStagedIndex : IDictionary<string, IDictionary<string, IResolvedPackage>>;
+
     FLogger : ILogger;
+
+    procedure ClearOperation;
 
     procedure PackageInstalled(const dpmPackageId : string; const packageVersion : TPackageVersion; const designFiles : TArray<string>);virtual;
     procedure PackageUninstalled(const dpmPackageId : string);virtual;
@@ -51,6 +62,11 @@ type
     //search other projects in the project group to see if they have resolved the package.
     function FindPackageResolution(const projectFile: string; const packageId : string ) : IResolvedPackage;
 
+    //multi-project install operation - see interface for details.
+    procedure BeginOperation(const projectFiles : IList<string>);
+    procedure CommitProject(const projectFile : string);
+    procedure EndOperation;
+
     //current-session 'use source' choices - see interface for details.
     procedure SetUseSource(const projectFile, packageId : string; const value : boolean);virtual;
     function GetUseSource(const projectFile, packageId : string) : boolean;virtual;
@@ -73,6 +89,18 @@ uses
 
 { TPackageInstallerContext }
 
+procedure TCorePackageInstallerContext.BeginOperation(const projectFiles : IList<string>);
+var
+  projectFile : string;
+begin
+  if FInOperation then
+    raise EInvalidOpException.Create('An install operation is already in progress');
+  ClearOperation;
+  FInOperation := true;
+  for projectFile in projectFiles do
+    FOperationProjects.Add(LowerCase(projectFile));
+end;
+
 procedure TCorePackageInstallerContext.Clear;
 begin
   //IDE will override this
@@ -80,6 +108,44 @@ begin
   FProjectResolutions.Clear;
   FResolutionIndex.Clear;
   FUseSourceState.Clear;
+  ClearOperation;
+end;
+
+procedure TCorePackageInstallerContext.ClearOperation;
+begin
+  FInOperation := false;
+  FOperationProjects.Clear;
+  FStagedGraphs.Clear;
+  FStagedResolutions.Clear;
+  FStagedIndex.Clear;
+end;
+
+procedure TCorePackageInstallerContext.CommitProject(const projectFile : string);
+var
+  projKey : string;
+  graph : IPackageReference;
+  resolutions : IList<IResolvedPackage>;
+  byPackage : IDictionary<string, IResolvedPackage>;
+begin
+  projKey := LowerCase(projectFile);
+  if not FOperationProjects.Contains(projKey) then
+    exit;
+  if FStagedGraphs.TryGetValue(projKey, graph) then
+  begin
+    FProjectGraphs[projKey] := graph;
+    FStagedGraphs.Remove(projKey);
+  end;
+  if FStagedResolutions.TryGetValue(projKey, resolutions) then
+  begin
+    FProjectResolutions[projKey] := resolutions;
+    FStagedResolutions.Remove(projKey);
+  end;
+  if FStagedIndex.TryGetValue(projKey, byPackage) then
+  begin
+    FResolutionIndex[projKey] := byPackage;
+    FStagedIndex.Remove(projKey);
+  end;
+  FOperationProjects.Remove(projKey);
 end;
 
 constructor TCorePackageInstallerContext.Create(const logger : ILogger);
@@ -89,8 +155,17 @@ begin
   FProjectResolutions := TCollections.CreateDictionary<string, IList<IResolvedPackage>>;
   FResolutionIndex := TCollections.CreateDictionary<string, IDictionary<string, IResolvedPackage>>;
   FUseSourceState := TCollections.CreateDictionary<string, IDictionary<string, boolean>>;
+  FOperationProjects := TCollections.CreateSet<string>;
+  FStagedGraphs := TCollections.CreateDictionary<string, IPackageReference>;
+  FStagedResolutions := TCollections.CreateDictionary<string, IList<IResolvedPackage>>;
+  FStagedIndex := TCollections.CreateDictionary<string, IDictionary<string, IResolvedPackage>>;
 end;
 
+
+procedure TCorePackageInstallerContext.EndOperation;
+begin
+  ClearOperation;
+end;
 
 function TCorePackageInstallerContext.FindPackageResolution(const projectFile : string; const packageId: string): IResolvedPackage;
 var
@@ -104,7 +179,20 @@ begin
   pkgKey := LowerCase(packageId);
   //Skip the current project (we only consult OTHER projects for cross-project lookups) and
   //ask the index directly - O(1) per project rather than scanning every resolution list.
+  //Projects in an install operation are about to be replaced, so their committed records are
+  //skipped too - one not yet processed must not block the project being processed.
   for pair in FResolutionIndex do
+  begin
+    if pair.Key = projKey then
+      continue;
+    if FOperationProjects.Contains(pair.Key) then
+      continue;
+    byPackage := pair.Value;
+    if byPackage.TryGetValue(pkgKey, result) then
+      exit;
+  end;
+  //Projects already processed in the operation are checked against their new resolutions.
+  for pair in FStagedIndex do
   begin
     if pair.Key = projKey then
       continue;
@@ -112,6 +200,7 @@ begin
     if byPackage.TryGetValue(pkgKey, result) then
       exit;
   end;
+  result := nil;
 end;
 
 function TCorePackageInstallerContext.GetProjectGraph(const projectFile: string): IPackageReference;
@@ -186,24 +275,53 @@ begin
 end;
 
 procedure TCorePackageInstallerContext.RecordGraph(const projectFile: string; const graph: IPackageReference);
+var
+  projKey : string;
 begin
-  FProjectGraphs[LowerCase(projectFile)] := graph;
+  projKey := LowerCase(projectFile);
+  if FOperationProjects.Contains(projKey) then
+    FStagedGraphs[projKey] := graph
+  else
+    FProjectGraphs[projKey] := graph;
 end;
 
 
 procedure TCorePackageInstallerContext.RecordResolutions(const projectFile: string; const resolutions: TArray<IResolvedPackage>);
 var
   projKey : string;
+  owned : IList<IResolvedPackage>;
   byPackage : IDictionary<string, IResolvedPackage>;
   resolution : IResolvedPackage;
 begin
   projKey := LowerCase(projectFile);
-  FProjectResolutions[projKey] := TCollections.CreateList<IResolvedPackage>(resolutions);
+  //The resolver adopts resolutions from sibling projects, and those still name the sibling as
+  //their project. Record them as this project's own - it uses that version too. Left as they
+  //were, a sibling re-resolving would find its own stale resolution here (which skipping the
+  //current project in FindPackageResolution is meant to prevent), treat it as local, and loop
+  //removing and re-importing it.
+  owned := TCollections.CreateList<IResolvedPackage>;
+  for resolution in resolutions do
+  begin
+    if SameText(resolution.ProjectFile, projectFile) then
+      owned.Add(resolution)
+    else
+      owned.Add(TResolvedPackage.Create(resolution.PackageInfo, resolution.VersionRange, resolution.ParentId, projectFile, resolution.IsBundled));
+  end;
   //Rebuild the index entry for this project from the new resolution list.
   byPackage := TCollections.CreateDictionary<string, IResolvedPackage>;
-  for resolution in resolutions do
+  for resolution in owned do
     byPackage[LowerCase(resolution.PackageInfo.Id)] := resolution;
-  FResolutionIndex[projKey] := byPackage;
+
+  if FOperationProjects.Contains(projKey) then
+  begin
+    FStagedResolutions[projKey] := owned;
+    FStagedIndex[projKey] := byPackage;
+  end
+  else
+  begin
+    FProjectResolutions[projKey] := owned;
+    FResolutionIndex[projKey] := byPackage;
+  end;
 end;
 
 procedure TCorePackageInstallerContext.RemoveProject(const projectFile: string);
@@ -219,6 +337,14 @@ begin
     FResolutionIndex.Remove(projKey);
   if FUseSourceState.ContainsKey(projKey) then
     FUseSourceState.Remove(projKey);
+  if FOperationProjects.Contains(projKey) then
+    FOperationProjects.Remove(projKey);
+  if FStagedGraphs.ContainsKey(projKey) then
+    FStagedGraphs.Remove(projKey);
+  if FStagedResolutions.ContainsKey(projKey) then
+    FStagedResolutions.Remove(projKey);
+  if FStagedIndex.ContainsKey(projKey) then
+    FStagedIndex.Remove(projKey);
 end;
 
 procedure TCorePackageInstallerContext.SetUseSource(const projectFile, packageId : string; const value : boolean);

@@ -22,88 +22,10 @@ uses
   DPM.Core.Cache.Interfaces,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Package.InstallerContext,
-  DPM.Core.Package.Installer.Interfaces;
+  DPM.Core.Package.Installer.Interfaces,
+  DPM.Core.Tests.Dependency.Fakes;
 
 type
-  ///<summary>Records every call the resolver makes against the repository manager so tests can
-  /// distinguish "served from cache" from "went to the repo". Stores canned IList&lt;IPackageInfo&gt;
-  /// per package id (lowercase). Anything not stubbed raises ENotImplemented.</summary>
-  TFakeRepositoryManager = class(TInterfacedObject, IPackageRepositoryManager)
-  private
-    FCanned : IDictionary<string, IList<IPackageInfo>>;
-    FCallCount : IDictionary<string, integer>;
-  protected
-    function Initialize(const configuration : IConfiguration) : boolean;
-    function HasSources : boolean;
-    function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>;
-    function Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions) : Boolean;
-    function FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const includePrerelease : boolean; const sources : string) : IPackageInfo;
-    function DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
-    function TryGetSourceType(const sourceName : string; out sourceType : TSourceType) : boolean;
-    function InstallPackageInPlace(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const targetDir : string) : boolean;
-    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
-    function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
-                                                const packageId : string; const versionRange : TVersionRange; const includePrerelease : boolean) : IList<IPackageInfo>;
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const packageId : string; const includePrerelease : boolean) : IList<TPackageVersion>;
-    function GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageSearchResultItem;
-    function GetPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion) : IPackageSearchResult;
-    function GetPackageIcon(const cancellationToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageIcon;
-    function GetInstalledPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IList<IPackageIdentity>) : IList<IPackageSearchResultItem>;
-  public
-    constructor Create;
-    procedure SetVersions(const id : string; const versions : IList<IPackageInfo>);
-    function GetCallCount(const id : string) : integer;
-  end;
-
-  ///<summary>Minimal IPackageCache: canned cached-versions lists per id, and a key-based
-  /// GetPackageInfo lookup. Everything else raises ENotImplemented.</summary>
-  TFakePackageCache = class(TInterfacedObject, IPackageCache)
-  private
-    FCanned : IDictionary<string, IList<IPackageInfo>>;
-    FInfoByKey : IDictionary<string, IPackageInfo>;
-  protected
-    function GetLocation : string;
-    procedure SetLocation(const value : string);
-    function GetPackagesFolder : string;
-    function Clean : boolean;
-    function CreatePackagePath(const packageId : IPackageIdentity) : string;
-    function GetPackagePath(const packageId : IPackageIdentity) : string; overload;
-    function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion) : string; overload;
-    function GetPackageFileFolder(const packageId : IPackageIdentity) : string;
-    function EnsurePackage(const packageId : IPackageIdentity) : boolean;
-    function InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
-    procedure SetSkipTrustRatchets(const value : boolean);
-    function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
-    function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
-    function GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
-    function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
-    function HasSource(const packageId : IPackageIdentity) : boolean;
-    function GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;
-                                                      const id : string;
-                                                      const compilerVersion : TCompilerVersion;
-                                                      const versionRange : TVersionRange;
-                                                      const preRelease : boolean) : IList<IPackageInfo>;
-    function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
-    function GetPackageHash(const packageId : IPackageIdentity) : string;
-    function FullReVerify(const cancellationToken : ICancellationToken) : integer;
-    function GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
-    function RemovePackage(const packageId : IPackageIdentity) : boolean;
-  public
-    constructor Create;
-    ///<summary>Register a package info under its identity key (id|version|compiler) so
-    /// GetPackageInfo can return it during preferred-version resolution.</summary>
-    procedure RegisterInfo(const info : IPackageInfo);
-    procedure SetCachedVersions(const id : string; const versions : IList<IPackageInfo>);
-  end;
-
-  ///<summary>Extends the core installer context so we get FindPackageResolution / RecordResolutions
-  /// for free. Tests can pre-populate FProjectResolutions via SeedResolutions to simulate sibling
-  /// projects that have already resolved a package.</summary>
-  TFakeInstallerContext = class(TCorePackageInstallerContext)
-  public
-    procedure SeedResolutions(const projectFile : string; const resolutions : TArray<IResolvedPackage>);
-  end;
-
   [TestFixture]
   TDependencyResolverTests = class
   private
@@ -259,6 +181,46 @@ type
 
     [Test]
     procedure TopLevel_Already_In_ProjectRefs_TopLevel_Version_Wins;
+
+    //upgrade in all projects : a sibling's recorded resolutions must not carry back our own stale ones
+    [Test]
+    procedure Group_Upgrade_Does_Not_Loop_On_Own_Resolution_Recorded_By_Sibling;
+
+    [Test]
+    procedure Failed_Resolve_Records_Nothing_In_Group_Context;
+
+    //resolved edges are checked, including those from project references that are never re-evaluated
+    [Test]
+    procedure Upgrading_Pinned_Transitive_Directly_Fails;
+
+    [Test]
+    procedure Preexisting_Inconsistency_Between_Unchanged_Refs_Is_Tolerated;
+
+    [Test]
+    procedure Restore_Tolerates_Recorded_Top_Level_Outside_Dependent_Range;
+
+    [Test]
+    procedure Imported_Sibling_Resolution_Not_Promoted_To_Top_Level;
+
+    //several new top-level packages in one resolve (an upgrade and its companions)
+    [Test]
+    procedure Multi_Package_Resolve_Shares_One_Transitive;
+
+    [Test]
+    procedure Multi_Package_Replaces_Project_References_With_New_Ids;
+
+    [Test]
+    procedure Multi_Package_Conflict_Reported_In_Conflicts_List;
+
+    //multi-project install operations (IPackageInstallerContext.BeginOperation)
+    [Test]
+    procedure Operation_Projects_Not_Yet_Processed_Do_Not_Block;
+
+    [Test]
+    procedure Operation_Later_Project_Checked_Against_Earlier_Staged_Resolutions;
+
+    [Test]
+    procedure Operation_Project_Out_Of_Scope_Still_Blocks;
   end;
 
 implementation
@@ -273,389 +235,6 @@ uses
   DPM.Core.Dependency.Resolver,
   DPM.Core.Configuration.Classes,
   TestLogger;
-
-const
-  cTestCompiler = TCompilerVersion.Delphi12_0;
-  cTestProject = 'C:\test\project.dproj';
-
-//-----------------------------------------------------------------------------
-// Helpers shared by tests
-//-----------------------------------------------------------------------------
-
-function MakeVersion(const s : string) : TPackageVersion;
-begin
-  if not TPackageVersion.TryParse(s, result) then
-    raise Exception.Create('Bad test version: ' + s);
-end;
-
-function MakeRange(const s : string) : TVersionRange;
-begin
-  result := TVersionRange.Parse(s);
-end;
-
-function MakeDep(const id : string; const range : string) : IPackageDependency;
-begin
-  result := TPackageDependency.Create(id, MakeRange(range));
-end;
-
-///<summary>A dependency on a Delphi-bundled library (e.g. Indy) - declared with the sentinel
-/// version 999.999.999 (cBundledDependencyVersion).</summary>
-function MakeBundledDep(const id : string) : IPackageDependency;
-begin
-  result := TPackageDependency.Create(id, MakeRange(cBundledDependencyVersion));
-end;
-
-///<summary>Builds an IPackageInfo with the given id/version/dependencies. Dependencies
-/// are added in the order supplied. Empty array = leaf package.</summary>
-function MakeInfo(const id : string; const version : string; const deps : array of IPackageDependency) : IPackageInfo;
-var
-  info : IPackageInfo;
-  i : integer;
-begin
-  info := TPackageInfo.Create('test-source', id, MakeVersion(version), cTestCompiler, '', '');
-  for i := 0 to High(deps) do
-    info.Dependencies.Add(deps[i]);
-  result := info;
-end;
-
-///<summary>Builds a top-level IPackageReference with PackageInfo populated. Parented to a fresh
-/// root node so ParentId resolves to cRootNode (the marker the resolver checks for IsTopLevel).
-/// Used to feed projectReferences into ResolveForInstall when simulating restore-style
-/// multi-top-level resolves.</summary>
-function MakeTopLevelRef(const info : IPackageInfo; const selectedOn : TVersionRange) : IPackageReference;
-var
-  root : IPackageReference;
-begin
-  root := TPackageReference.CreateRoot(info.CompilerVersion);
-  result := TPackageReference.Create(root, info.Id, info.Version, info.CompilerVersion, selectedOn, false);
-  result.PackageInfo := info;
-end;
-
-function ListOf(const items : array of IPackageInfo) : IList<IPackageInfo>;
-var
-  i : integer;
-begin
-  result := TCollections.CreateList<IPackageInfo>;
-  for i := 0 to High(items) do
-    result.Add(items[i]);
-end;
-
-function MakeCacheKey(const id : string; const version : TPackageVersion; const compiler : TCompilerVersion) : string;
-begin
-  result := LowerCase(id) + '|' + version.ToStringNoMeta + '|' + CompilerToString(compiler);
-end;
-
-//-----------------------------------------------------------------------------
-// TFakeRepositoryManager
-//-----------------------------------------------------------------------------
-
-constructor TFakeRepositoryManager.Create;
-begin
-  inherited;
-  FCanned := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
-  FCallCount := TCollections.CreateDictionary<string, integer>;
-end;
-
-procedure TFakeRepositoryManager.SetVersions(const id : string; const versions : IList<IPackageInfo>);
-begin
-  FCanned[LowerCase(id)] := versions;
-end;
-
-function TFakeRepositoryManager.GetCallCount(const id : string) : integer;
-begin
-  if not FCallCount.TryGetValue(LowerCase(id), result) then
-    result := 0;
-end;
-
-function TFakeRepositoryManager.Initialize(const configuration : IConfiguration) : boolean;
-begin
-  result := true;
-end;
-
-function TFakeRepositoryManager.HasSources : boolean;
-begin
-  result := true;
-end;
-
-function TFakeRepositoryManager.GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
-                                                                   const packageId : string; const versionRange : TVersionRange; const includePrerelease : boolean) : IList<IPackageInfo>;
-var
-  key : string;
-  all : IList<IPackageInfo>;
-  filtered : IList<IPackageInfo>;
-  info : IPackageInfo;
-  prior : integer;
-begin
-  key := LowerCase(packageId);
-  if FCallCount.TryGetValue(key, prior) then
-    FCallCount[key] := prior + 1
-  else
-    FCallCount[key] := 1;
-
-  filtered := TCollections.CreateList<IPackageInfo>;
-  if not FCanned.TryGetValue(key, all) then
-  begin
-    result := filtered;
-    exit;
-  end;
-  for info in all do
-  begin
-    if not versionRange.IsSatisfiedBy(info.Version) then
-      continue;
-    if (not includePrerelease) and (not info.Version.IsStable) then
-      continue;
-    filtered.Add(info);
-  end;
-  //Match the real TPackageRepositoryManager - descending sort so the resolver's first-match loop
-  //picks the highest in-range version (including prereleases when allowed).
-  filtered.Sort(TComparer<IPackageInfo>.Construct(
-    function(const left, right : IPackageInfo) : integer
-    begin
-      result := right.Version.CompareTo(left.Version);
-    end));
-  result := filtered;
-end;
-
-function TFakeRepositoryManager.List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>;
-begin
-  raise ENotImplemented.Create('TFakeRepositoryManager.List');
-end;
-
-function TFakeRepositoryManager.Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions) : Boolean;
-begin
-  raise ENotImplemented.Create('TFakeRepositoryManager.Push');
-end;
-
-function TFakeRepositoryManager.FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const includePrerelease : boolean; const sources : string) : IPackageInfo;
-begin
-  raise ENotImplemented.Create('TFakeRepositoryManager.FindLatestVersion');
-end;
-
-function TFakeRepositoryManager.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
-begin
-  raise ENotImplemented.Create('TFakeRepositoryManager.DownloadPackage');
-end;
-
-function TFakeRepositoryManager.TryGetSourceType(const sourceName : string; out sourceType : TSourceType) : boolean;
-begin
-  result := false;
-end;
-
-function TFakeRepositoryManager.InstallPackageInPlace(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const targetDir : string) : boolean;
-begin
-  raise ENotImplemented.Create('TFakeRepositoryManager.InstallPackageInPlace');
-end;
-
-function TFakeRepositoryManager.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
-begin
-  raise ENotImplemented.Create('TFakeRepositoryManager.GetPackageInfo');
-end;
-
-function TFakeRepositoryManager.GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const packageId : string; const includePrerelease : boolean) : IList<TPackageVersion>;
-begin
-  raise ENotImplemented.Create('TFakeRepositoryManager.GetPackageVersions');
-end;
-
-function TFakeRepositoryManager.GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageSearchResultItem;
-begin
-  raise ENotImplemented.Create('TFakeRepositoryManager.GetPackageMetaData');
-end;
-
-function TFakeRepositoryManager.GetPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion) : IPackageSearchResult;
-begin
-  raise ENotImplemented.Create('TFakeRepositoryManager.GetPackageFeed');
-end;
-
-function TFakeRepositoryManager.GetPackageIcon(const cancellationToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageIcon;
-begin
-  raise ENotImplemented.Create('TFakeRepositoryManager.GetPackageIcon');
-end;
-
-function TFakeRepositoryManager.GetInstalledPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IList<IPackageIdentity>) : IList<IPackageSearchResultItem>;
-begin
-  raise ENotImplemented.Create('TFakeRepositoryManager.GetInstalledPackageFeed');
-end;
-
-//-----------------------------------------------------------------------------
-// TFakePackageCache
-//-----------------------------------------------------------------------------
-
-constructor TFakePackageCache.Create;
-begin
-  inherited;
-  FCanned := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
-  FInfoByKey := TCollections.CreateDictionary<string, IPackageInfo>;
-end;
-
-procedure TFakePackageCache.RegisterInfo(const info : IPackageInfo);
-begin
-  FInfoByKey[MakeCacheKey(info.Id, info.Version, info.CompilerVersion)] := info;
-end;
-
-procedure TFakePackageCache.SetCachedVersions(const id : string; const versions : IList<IPackageInfo>);
-var
-  info : IPackageInfo;
-begin
-  FCanned[LowerCase(id)] := versions;
-  for info in versions do
-    RegisterInfo(info);
-end;
-
-function TFakePackageCache.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
-var
-  key : string;
-begin
-  key := MakeCacheKey(packageId.Id, packageId.Version, packageId.CompilerVersion);
-  if not FInfoByKey.TryGetValue(key, result) then
-    result := nil;
-end;
-
-function TFakePackageCache.GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;
-                                                                    const id : string;
-                                                                    const compilerVersion : TCompilerVersion;
-                                                                    const versionRange : TVersionRange;
-                                                                    const preRelease : boolean) : IList<IPackageInfo>;
-var
-  key : string;
-  all : IList<IPackageInfo>;
-  filtered : IList<IPackageInfo>;
-  info : IPackageInfo;
-begin
-  filtered := TCollections.CreateList<IPackageInfo>;
-  key := LowerCase(id);
-  if not FCanned.TryGetValue(key, all) then
-  begin
-    result := filtered;
-    exit;
-  end;
-  for info in all do
-  begin
-    if not versionRange.IsSatisfiedBy(info.Version) then
-      continue;
-    if (not preRelease) and (not info.Version.IsStable) then
-      continue;
-    filtered.Add(info);
-  end;
-  //Mirror the real TPackageCache - descending sort so the resolver's first-match loop
-  //picks the highest in-range version, not the order tests happened to add them in.
-  filtered.Sort(TComparer<IPackageInfo>.Construct(
-    function(const left, right : IPackageInfo) : integer
-    begin
-      result := right.Version.CompareTo(left.Version);
-    end));
-  result := filtered;
-end;
-
-function TFakePackageCache.GetLocation : string;
-begin
-  result := '';
-end;
-
-procedure TFakePackageCache.SetLocation(const value : string);
-begin
-end;
-
-function TFakePackageCache.GetPackagesFolder : string;
-begin
-  result := '';
-end;
-
-function TFakePackageCache.Clean : boolean;
-begin
-  result := true;
-end;
-
-function TFakePackageCache.CreatePackagePath(const packageId : IPackageIdentity) : string;
-begin
-  raise ENotImplemented.Create('TFakePackageCache.CreatePackagePath');
-end;
-
-function TFakePackageCache.GetPackagePath(const packageId : IPackageIdentity) : string;
-begin
-  raise ENotImplemented.Create('TFakePackageCache.GetPackagePath');
-end;
-
-function TFakePackageCache.GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion) : string;
-begin
-  raise ENotImplemented.Create('TFakePackageCache.GetPackagePath(2)');
-end;
-
-function TFakePackageCache.GetPackageFileFolder(const packageId : IPackageIdentity) : string;
-begin
-  raise ENotImplemented.Create('TFakePackageCache.GetPackageFileFolder');
-end;
-
-function TFakePackageCache.EnsurePackage(const packageId : IPackageIdentity) : boolean;
-begin
-  result := false;
-end;
-
-function TFakePackageCache.InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
-begin
-  raise ENotImplemented.Create('TFakePackageCache.InstallPackageFromFile');
-end;
-
-procedure TFakePackageCache.SetSkipTrustRatchets(const value : boolean);
-begin
-  // no-op for tests
-end;
-
-function TFakePackageCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
-begin
-  raise ENotImplemented.Create('TFakePackageCache.GetPackageMetadata');
-end;
-
-function TFakePackageCache.GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
-begin
-  raise ENotImplemented.Create('TFakePackageCache.GetPackageSpec');
-end;
-
-function TFakePackageCache.GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
-begin
-  result := [];
-end;
-
-function TFakePackageCache.HasSource(const packageId : IPackageIdentity) : boolean;
-begin
-  result := false;
-end;
-
-function TFakePackageCache.TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
-begin
-  icon := nil;
-  result := false;
-end;
-
-function TFakePackageCache.GetPackageHash(const packageId : IPackageIdentity) : string;
-begin
-  result := '';
-end;
-
-function TFakePackageCache.FullReVerify(const cancellationToken : ICancellationToken) : integer;
-begin
-  // Resolver tests don't exercise signing; nothing to re-verify.
-  result := 0;
-end;
-
-function TFakePackageCache.GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
-begin
-  // Resolver tests don't exercise cache removal.
-  result := TCollections.CreateList<IPackageIdentity>;
-end;
-
-function TFakePackageCache.RemovePackage(const packageId : IPackageIdentity) : boolean;
-begin
-  result := false;
-end;
-
-//-----------------------------------------------------------------------------
-// TFakeInstallerContext
-//-----------------------------------------------------------------------------
-
-procedure TFakeInstallerContext.SeedResolutions(const projectFile : string; const resolutions : TArray<IResolvedPackage>);
-begin
-  RecordResolutions(projectFile, resolutions);
-end;
 
 //-----------------------------------------------------------------------------
 // TDependencyResolverTests
@@ -2157,6 +1736,401 @@ begin
     if SameText(info.Id, 'C') then
       selectedC := info.Version;
   Assert.AreEqual('0.1.6', selectedC.ToStringNoMeta, 'the top level pin must win over the transient resolution');
+end;
+
+procedure TDependencyResolverTests.Group_Upgrade_Does_Not_Loop_On_Own_Resolution_Recorded_By_Sibling;
+const
+  cAppProject = 'C:\test\app.dproj';
+  cTestsProject = 'C:\test\tests.dproj';
+var
+  base1, base3 : IPackageInfo;
+  core1, core3 : IPackageInfo;
+  ext1 : IPackageInfo;
+  logger : TTestLogger;
+  ok : boolean;
+
+  //Both projects reference Core and Ext as top levels, each pinning Base exactly. The installer
+  //removes the package being upgraded (Core) from the graph, so only Ext -> Base remains.
+  function MakeProjectRefs : IList<IPackageReference>;
+  var
+    root : IPackageReference;
+    extRef, baseRef : IPackageReference;
+  begin
+    root := TPackageReference.CreateRoot(cTestCompiler);
+    extRef := root.AddChild(ext1.Id, ext1.Version, MakeRange('1.0.1'));
+    extRef.PackageInfo := ext1;
+    baseRef := extRef.AddChild(base1.Id, base1.Version, MakeRange('1.0.1'));
+    baseRef.PackageInfo := base1;
+    result := TCollections.CreateList<IPackageReference>;
+    result.Add(extRef);
+    result.Add(baseRef);
+  end;
+
+  function Resolve(const projectFile : string) : boolean;
+  var
+    resolved : IList<IPackageInfo>;
+    graph : IPackageReference;
+  begin
+    result := FResolver.ResolveForInstall(FCancellation, cTestCompiler, projectFile, FOptions, core3, MakeProjectRefs, graph, resolved);
+  end;
+
+begin
+  // Core 1.0.3 pins Base 1.0.3 while Ext 1.0.1 still pins Base 1.0.1 - a genuine conflict that must
+  // fail. Earlier in the session the tests project adopted app's Base 1.0.1 through the installer
+  // context, so its recorded resolutions are the ones app resolved (still naming app as their project
+  // when handed to RecordResolutions). When app re-resolves, that record must not hand app back its
+  // own (stale) resolution - doing so made app treat it as local and negotiable, so every backtrack
+  // removed it and the next lookup re-imported it, until the iteration limit.
+  base1 := MakeInfo('Base', '1.0.1', []);
+  base3 := MakeInfo('Base', '1.0.3', []);
+  core1 := MakeInfo('Core', '1.0.1', [MakeDep('Base', '1.0.1')]);
+  core3 := MakeInfo('Core', '1.0.3', [MakeDep('Base', '1.0.3')]);
+  ext1 := MakeInfo('Ext', '1.0.1', [MakeDep('Base', '1.0.1')]);
+  FRepo.SetVersions('Base', ListOf([base3, base1]));
+  FRepo.SetVersions('Ext', ListOf([ext1]));
+
+  //app's resolutions from earlier in the session
+  FContext.SeedResolutions(cAppProject, [TResolvedPackage.Create(core1, MakeRange('1.0.1'), cRootNode, cAppProject),
+                                         TResolvedPackage.Create(ext1, MakeRange('1.0.1'), cRootNode, cAppProject),
+                                         TResolvedPackage.Create(base1, MakeRange('1.0.1'), 'Ext', cAppProject)]);
+  //the tests project's resolutions, adopted from app
+  FContext.SeedResolutions(cTestsProject, [TResolvedPackage.Create(core1, MakeRange('1.0.1'), cRootNode, cAppProject),
+                                           TResolvedPackage.Create(ext1, MakeRange('1.0.1'), cRootNode, cAppProject),
+                                           TResolvedPackage.Create(base1, MakeRange('1.0.1'), 'Ext', cAppProject)]);
+
+  logger := FLogger as TTestLogger;
+  logger.Messages.Clear;
+  ok := Resolve(cAppProject);
+  Assert.IsFalse(ok, 'app project : Core 1.0.3 and Ext 1.0.1 cannot share a Base');
+  Assert.IsFalse(logger.Logged('error', 'exceeded'), 'resolve must end on the conflict, not the iteration limit');
+  Assert.IsTrue(logger.Logged('error', cTestsProject), 'the conflict should name the sibling project that holds Base 1.0.1');
+end;
+
+procedure TDependencyResolverTests.Failed_Resolve_Records_Nothing_In_Group_Context;
+var
+  base1, core3, ext1 : IPackageInfo;
+  root, extRef, baseRef : IPackageReference;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // A failed install leaves the project as it was, so the group context must not claim the project
+  // now uses Core 1.0.3 - other projects would be checked against versions it doesn't have.
+  base1 := MakeInfo('Base', '1.0.1', []);
+  core3 := MakeInfo('Core', '1.0.3', [MakeDep('Base', '1.0.3')]);
+  ext1 := MakeInfo('Ext', '1.0.1', [MakeDep('Base', '1.0.1')]);
+  FRepo.SetVersions('Base', ListOf([MakeInfo('Base', '1.0.3', []), base1]));
+
+  root := TPackageReference.CreateRoot(cTestCompiler);
+  extRef := root.AddChild(ext1.Id, ext1.Version, MakeRange('1.0.1'));
+  extRef.PackageInfo := ext1;
+  baseRef := extRef.AddChild(base1.Id, base1.Version, MakeRange('1.0.1'));
+  baseRef.PackageInfo := base1;
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(extRef);
+  projectRefs.Add(baseRef);
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, core3, projectRefs, graph, resolved);
+
+  Assert.IsFalse(ok, 'Core 1.0.3 and Ext 1.0.1 cannot share a Base');
+  Assert.IsNull(FContextIntf.FindPackageResolution('C:\test\other.dproj', 'Core'), 'a failed resolve must not be recorded for other projects to see');
+end;
+
+procedure TDependencyResolverTests.Upgrading_Pinned_Transitive_Directly_Fails;
+var
+  base1, base3, ext1 : IPackageInfo;
+  root, extRef, baseRef : IPackageReference;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // The project has Ext 1.0.1, which pins Base 1.0.1. Installing Base 1.0.3 directly must fail -
+  // project references are recorded as resolved but never re-evaluated, so without checking the
+  // resolved edges this "succeeded" and wrote a graph the next restore rejects.
+  base1 := MakeInfo('Base', '1.0.1', []);
+  base3 := MakeInfo('Base', '1.0.3', []);
+  ext1 := MakeInfo('Ext', '1.0.1', [MakeDep('Base', '1.0.1')]);
+
+  root := TPackageReference.CreateRoot(cTestCompiler);
+  extRef := root.AddChild(ext1.Id, ext1.Version, MakeRange('1.0.1'));
+  extRef.PackageInfo := ext1;
+  baseRef := extRef.AddChild(base1.Id, base1.Version, MakeRange('1.0.1'));
+  baseRef.PackageInfo := base1;
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(extRef);
+  projectRefs.Add(baseRef);
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, base3, projectRefs, graph, resolved);
+
+  Assert.IsFalse(ok, 'Ext 1.0.1 pins Base 1.0.1 - Base 1.0.3 cannot be installed alongside it');
+end;
+
+procedure TDependencyResolverTests.Preexisting_Inconsistency_Between_Unchanged_Refs_Is_Tolerated;
+var
+  base2, ext1, foo : IPackageInfo;
+  root, extRef, baseRef : IPackageReference;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // The project already has Ext 1.0.1 (pins Base 1.0.1) next to Base 1.0.2 - inconsistent, but
+  // nothing to do with installing Foo. Checking the resolved edges must not make that unrelated
+  // install fail.
+  base2 := MakeInfo('Base', '1.0.2', []);
+  ext1 := MakeInfo('Ext', '1.0.1', [MakeDep('Base', '1.0.1')]);
+  foo := MakeInfo('Foo', '1.0.0', []);
+
+  root := TPackageReference.CreateRoot(cTestCompiler);
+  extRef := root.AddChild(ext1.Id, ext1.Version, MakeRange('1.0.1'));
+  extRef.PackageInfo := ext1;
+  baseRef := extRef.AddChild(base2.Id, base2.Version, MakeRange('1.0.1'));
+  baseRef.PackageInfo := base2;
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(extRef);
+  projectRefs.Add(baseRef);
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, foo, projectRefs, graph, resolved);
+
+  Assert.IsTrue(ok, 'an unrelated install must not fail on an inconsistency that was already there');
+end;
+
+procedure TDependencyResolverTests.Restore_Tolerates_Recorded_Top_Level_Outside_Dependent_Range;
+var
+  console, ansi : IPackageInfo;
+  projectRefs : IList<IPackageReference>;
+  preferred : IDictionary<string, TPackageVersion>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // The project pins Console 1.3.0 as a top level, while Ansi 0.3.0 asks for [1.2.4,] (1.2.x only).
+  // Restore's slow path re-resolves each top level as a 'new' package, but Console is still at the version
+  // the project records (the preferred version), so this inconsistency was already there - restore must not
+  // start failing on it.
+  console := MakeInfo('Console', '1.3.0', []);
+  ansi := MakeInfo('Ansi', '0.3.0', [MakeDep('Console', '[1.2.4,]')]);
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(MakeTopLevelRef(ansi, MakeRange('0.3.0')));
+  preferred := TCollections.CreateDictionary<string, TPackageVersion>;
+  preferred['console'] := console.Version;
+  preferred['ansi'] := ansi.Version;
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, console, projectRefs, graph, resolved, nil, preferred);
+
+  Assert.IsTrue(ok, 'a recorded top level outside a dependent''s range is pre-existing - restore must still succeed');
+end;
+
+procedure TDependencyResolverTests.Imported_Sibling_Resolution_Not_Promoted_To_Top_Level;
+const
+  cSibling = 'C:\test\sibling.dproj';
+var
+  base1, core1, app : IPackageInfo;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  coreNode : IPackageReference;
+begin
+  // The sibling has Base as a top level of its own, and Core (which uses Base). This project adopts
+  // the sibling's Core, which pulls in the sibling's Base too. Base is not a top level HERE - it is
+  // Core's dependency - so it must end up under Core, not as a top level of this project's graph.
+  base1 := MakeInfo('Base', '1.0.1', []);
+  core1 := MakeInfo('Core', '1.0.1', [MakeDep('Base', '1.0.1')]);
+  app := MakeInfo('App', '1.0.0', [MakeDep('Core', '1.0.1')]);
+  FContext.SeedResolutions(cSibling, [TResolvedPackage.Create(core1, MakeRange('1.0.1'), cRootNode, cSibling),
+                                      TResolvedPackage.Create(base1, MakeRange('1.0.1'), cRootNode, cSibling)]);
+
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, app, projectRefs, graph, resolved);
+
+  Assert.IsTrue(ok, 'resolve should adopt the sibling''s Core and Base');
+  Assert.IsNull(graph.FindTopLevelChild('Base'), 'Base is only a dependency of Core in this project');
+  coreNode := graph.FindFirstChild('Core');
+  Assert.IsNotNull(coreNode, 'Core should be in the graph');
+  Assert.IsNotNull(coreNode.FindFirstChild('Base'), 'Base should be under Core');
+end;
+
+//Spring4D style family : Core and Ext both pin Base exactly, so they can only move together.
+function FamilyNewPackages(const coreVersion, extVersion : string) : IList<IPackageInfo>;
+begin
+  result := TCollections.CreateList<IPackageInfo>;
+  result.Add(MakeInfo('Core', coreVersion, [MakeDep('Base', coreVersion)]));
+  result.Add(MakeInfo('Ext', extVersion, [MakeDep('Base', extVersion)]));
+end;
+
+procedure TDependencyResolverTests.Multi_Package_Resolve_Shares_One_Transitive;
+var
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  info : IPackageInfo;
+  baseCount : integer;
+begin
+  FRepo.SetVersions('Base', ListOf([MakeInfo('Base', '1.0.3', []), MakeInfo('Base', '1.0.1', [])]));
+  projectRefs := TCollections.CreateList<IPackageReference>;
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, FamilyNewPackages('1.0.3', '1.0.3'), projectRefs, graph, resolved, nil, nil, nil);
+
+  Assert.IsTrue(ok, 'Core 1.0.3 and Ext 1.0.3 both want Base 1.0.3');
+  baseCount := 0;
+  for info in resolved do
+    if SameText(info.Id, 'Base') then
+    begin
+      Inc(baseCount);
+      Assert.AreEqual('1.0.3', info.Version.ToStringNoMeta);
+    end;
+  Assert.AreEqual(1, baseCount, 'Base should be resolved once');
+  Assert.IsNotNull(graph.FindTopLevelChild('Core'), 'Core should be a top level');
+  Assert.IsNotNull(graph.FindTopLevelChild('Ext'), 'Ext should be a top level');
+  Assert.IsNotNull(graph.FindTopLevelChild('Ext').FindFirstChild('Base'), 'Base should be under Ext as well as Core');
+end;
+
+procedure TDependencyResolverTests.Multi_Package_Replaces_Project_References_With_New_Ids;
+var
+  ext1 : IPackageInfo;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // The project already references Ext 1.0.1 - the upgrade replaces it with 1.0.3 rather than raising
+  // 'Resolution already exists'.
+  ext1 := MakeInfo('Ext', '1.0.1', [MakeDep('Base', '1.0.1')]);
+  FRepo.SetVersions('Base', ListOf([MakeInfo('Base', '1.0.3', [])]));
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(MakeTopLevelRef(ext1, MakeRange('1.0.1')));
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, FamilyNewPackages('1.0.3', '1.0.3'), projectRefs, graph, resolved, nil, nil, nil);
+
+  Assert.IsTrue(ok, 'the new Ext should replace the referenced one');
+  Assert.AreEqual('1.0.3', graph.FindTopLevelChild('Ext').Version.ToStringNoMeta);
+end;
+
+procedure TDependencyResolverTests.Multi_Package_Conflict_Reported_In_Conflicts_List;
+var
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  conflicts : IList<TUnresolvableConflict>;
+  conflict : TUnresolvableConflict;
+  baseNamed : boolean;
+begin
+  FRepo.SetVersions('Base', ListOf([MakeInfo('Base', '1.0.3', []), MakeInfo('Base', '1.0.1', [])]));
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  conflicts := TCollections.CreateList<TUnresolvableConflict>;
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, FamilyNewPackages('1.0.3', '1.0.1'), projectRefs, graph, resolved, nil, nil, conflicts);
+
+  Assert.IsFalse(ok, 'Core 1.0.3 and Ext 1.0.1 cannot share a Base');
+  baseNamed := false;
+  for conflict in conflicts do
+    if SameText(conflict.PackageId, 'Base') then
+      baseNamed := true;
+  Assert.IsTrue(baseNamed, 'the conflicts list should name Base');
+end;
+
+procedure TDependencyResolverTests.Operation_Projects_Not_Yet_Processed_Do_Not_Block;
+const
+  cAppProject = 'C:\test\app.dproj';
+  cTestsProject = 'C:\test\tests.dproj';
+var
+  projects : IList<string>;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // Both projects are being upgraded. The tests project still has its old Base 1.0.1 recorded, but
+  // that is about to be replaced, so it must not block app.
+  FRepo.SetVersions('Base', ListOf([MakeInfo('Base', '1.0.3', []), MakeInfo('Base', '1.0.1', [])]));
+  FContext.SeedResolutions(cTestsProject, [TResolvedPackage.Create(MakeInfo('Base', '1.0.1', []), MakeRange('1.0.1'), 'Ext', cTestsProject)]);
+  projectRefs := TCollections.CreateList<IPackageReference>;
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cAppProject, FOptions, FamilyNewPackages('1.0.3', '1.0.3'), projectRefs, graph, resolved, nil, nil, nil);
+  Assert.IsFalse(ok, 'outside an operation the tests project''s Base 1.0.1 blocks app');
+
+  projects := TCollections.CreateList<string>;
+  projects.Add(cAppProject);
+  projects.Add(cTestsProject);
+  FContextIntf.BeginOperation(projects);
+  try
+    ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cAppProject, FOptions, FamilyNewPackages('1.0.3', '1.0.3'), projectRefs, graph, resolved, nil, nil, nil);
+    Assert.IsTrue(ok, 'in the operation the tests project''s old record must not block app');
+  finally
+    FContextIntf.EndOperation;
+  end;
+end;
+
+procedure TDependencyResolverTests.Operation_Later_Project_Checked_Against_Earlier_Staged_Resolutions;
+const
+  cAppProject = 'C:\test\app.dproj';
+  cTestsProject = 'C:\test\tests.dproj';
+var
+  projects : IList<string>;
+  projectRefs : IList<IPackageReference>;
+  newPackages : IList<IPackageInfo>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  logger : TTestLogger;
+begin
+  // app resolves first and stages Base 1.0.3. The tests project, processed next, asks for Ext 1.0.1
+  // (Base 1.0.1) - it must be checked against app's NEW resolution and fail.
+  FRepo.SetVersions('Base', ListOf([MakeInfo('Base', '1.0.3', []), MakeInfo('Base', '1.0.1', [])]));
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projects := TCollections.CreateList<string>;
+  projects.Add(cAppProject);
+  projects.Add(cTestsProject);
+  logger := FLogger as TTestLogger;
+  FContextIntf.BeginOperation(projects);
+  try
+    ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cAppProject, FOptions, FamilyNewPackages('1.0.3', '1.0.3'), projectRefs, graph, resolved, nil, nil, nil);
+    Assert.IsTrue(ok, 'app should resolve');
+
+    newPackages := TCollections.CreateList<IPackageInfo>;
+    newPackages.Add(MakeInfo('Ext', '1.0.1', [MakeDep('Base', '1.0.1')]));
+    logger.Messages.Clear;
+    ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestsProject, FOptions, newPackages, projectRefs, graph, resolved, nil, nil, nil);
+    Assert.IsFalse(ok, 'tests must conflict with app''s staged Base 1.0.3');
+    Assert.IsTrue(logger.Logged('error', cAppProject), 'the conflict should name app');
+  finally
+    FContextIntf.EndOperation;
+  end;
+end;
+
+procedure TDependencyResolverTests.Operation_Project_Out_Of_Scope_Still_Blocks;
+const
+  cAppProject = 'C:\test\app.dproj';
+  cOtherProject = 'C:\test\other.dproj';
+var
+  projects : IList<string>;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  logger : TTestLogger;
+begin
+  // other is not part of the upgrade - its Base 1.0.1 is real and must still block app.
+  FRepo.SetVersions('Base', ListOf([MakeInfo('Base', '1.0.3', []), MakeInfo('Base', '1.0.1', [])]));
+  FContext.SeedResolutions(cOtherProject, [TResolvedPackage.Create(MakeInfo('Base', '1.0.1', []), MakeRange('1.0.1'), cRootNode, cOtherProject)]);
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projects := TCollections.CreateList<string>;
+  projects.Add(cAppProject);
+  logger := FLogger as TTestLogger;
+  logger.Messages.Clear;
+  FContextIntf.BeginOperation(projects);
+  try
+    ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cAppProject, FOptions, FamilyNewPackages('1.0.3', '1.0.3'), projectRefs, graph, resolved, nil, nil, nil);
+    Assert.IsFalse(ok, 'a project outside the operation still constrains app');
+    Assert.IsTrue(logger.Logged('error', cOtherProject), 'the conflict should name the other project');
+  finally
+    FContextIntf.EndOperation;
+  end;
 end;
 
 initialization

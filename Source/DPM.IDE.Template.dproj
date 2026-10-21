@@ -184,6 +184,7 @@
         <DCCReference Include="Core\Options\DPM.Core.Options.UnInstall.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Dependency.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Installer.pas"/>
+        <DCCReference Include="Core\Package\DPM.Core.Package.InstallPlan.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.InstallerContext.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Interfaces.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.Metadata.pas"/>
@@ -221,6 +222,7 @@
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Factory.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Http.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Interfaces.pas"/>
+        <DCCReference Include="Core\Repository\DPM.Core.Repository.RequestCache.pas"/>
         <DCCReference Include="Core\Repository\DPM.Core.Repository.Manager.pas"/>
         <DCCReference Include="Core\Git\DPM.Core.Git.Interfaces.pas"/>
         <DCCReference Include="Core\Git\DPM.Core.Git.Client.pas"/>

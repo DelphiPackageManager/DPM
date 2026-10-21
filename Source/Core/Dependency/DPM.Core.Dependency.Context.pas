@@ -40,18 +40,6 @@ uses
 //only intended for internal use by the resolver so interfaces can stay here
 type
   /// <summary>
-  ///  Records a dependency the resolver could not satisfy. Collected on the context so we can keep
-  ///  resolving sibling dependencies and report all conflicts at the end of the run instead of bailing
-  ///  on the first one. Reason is the human-readable message already logged at the conflict site.
-  /// </summary>
-  TUnresolvableConflict = record
-    PackageId : string;
-    ParentId : string;
-    RequestedRange : TVersionRange;
-    Reason : string;
-  end;
-
-  /// <summary>
   /// Used to cache information during dependency resolution.
   /// </summary>
   IResolverContext = interface
@@ -121,6 +109,12 @@ type
     ///  because the resolver no longer mutates IPackageDependency ranges - so re-sorting on
     ///  every backtrack-driven re-push of the same parent is wasted work.
     function ShouldSortDependencies(const packageId : string) : boolean;
+
+    ///  True when this package is at the version the project already had : a project reference the
+    ///  resolve kept as it was, or (restore) a package at the version the project's graph records - restore
+    ///  re-resolves each top level as a 'new' package, but that doesn't make it a change. Used to tell an
+    ///  edge the install made inconsistent from one that already was.
+    function IsUnchanged(const package : IPackageInfo) : boolean;
   end;
 
   TResolverContext = class(TInterfacedObject, IResolverContext)
@@ -140,6 +134,8 @@ type
     //cyclic cross-project resolution graph can't re-enter the same node and loop forever.
     FImportedIds : ISet<string>;
     FSortedDependencyIds : ISet<string>;
+    //lowercase id -> version of each project reference recorded as resolved by the constructor.
+    FProjectReferenceVersions : IDictionary<string, TPackageVersion>;
   protected
     procedure RecordNoGood(const bad : IPackageInfo);
     function IsNoGood(const package : IPackageInfo) : boolean;
@@ -166,6 +162,7 @@ type
     function GetEffectiveDependencyRange(const parentId, depId : string; const declaredRange : TVersionRange) : TVersionRange;
     function AnyTopLevelIsPrerelease : boolean;
     function ShouldSortDependencies(const packageId : string) : boolean;
+    function IsUnchanged(const package : IPackageInfo) : boolean;
   public
     /// sharedVersionCache: when supplied, the resolver shares a version cache across multiple
     /// ResolveForInstall calls (e.g. one per top-level package in a restore). nil = create a
@@ -173,11 +170,13 @@ type
     /// preferredVersions: lock-file-style hints (id -> version) - the resolver prefers these
     /// versions over picking the latest in-range alternative. nil for install/update, populated
     /// by restore from the existing project graph.
-    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>);overload;
-    /// newPackageId: the id of the package the caller records as a top level resolution itself
-    /// (the package being installed, or the top level restore is re-resolving). Any reference to
-    /// the same id in projectReferences is skipped - see the note in the constructor body.
-    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const newPackageId : string = '');overload;
+    /// newPackages: the packages being installed (an upgrade and its companions, or the top level
+    /// restore is re-resolving) - each is recorded as a top level at its exact version.
+    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackages : IList<IPackageInfo>; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>);overload;
+    /// newPackageIds: lowercase ids of the packages the caller records as top level resolutions
+    /// itself. Any reference to those ids in projectReferences is skipped - see the note in the
+    /// constructor body. nil when there are none.
+    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const newPackageIds : ISet<string>);overload;
     destructor Destroy;override;
   end;
 
@@ -290,7 +289,7 @@ begin
     AddNode(result, topLevelPackage.PackageInfo, TVersionRange.Empty);
 end;
 
-constructor TResolverContext.Create(const logger: ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences: IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const newPackageId : string);
+constructor TResolverContext.Create(const logger: ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences: IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const newPackageIds : ISet<string>);
 var
   projectReference : IPackageReference;
 
@@ -328,6 +327,7 @@ begin
   FNarrowedRanges := TCollections.CreateDictionary<string, TVersionRange>;
   FImportedIds := TCollections.CreateSet<string>;
   FSortedDependencyIds := TCollections.CreateSet<string>;
+  FProjectReferenceVersions := TCollections.CreateDictionary<string, TPackageVersion>;
 
   for projectReference in projectReferences do
   begin
@@ -338,7 +338,7 @@ begin
     //and a transient of an earlier top level arrives in both places. Recording it here would make
     //the caller's RecordResolution fail with 'Resolution already exists' and abort the restore.
     //The top level pin is not negotiable, so skip the reference and let the caller record it.
-    if (newPackageId <> '') and SameText(projectReference.Id, newPackageId) then
+    if (newPackageIds <> nil) and newPackageIds.Contains(LowerCase(projectReference.Id)) then
       continue;
 
     //don't add to the list of packages to resolve if it has no dependencies..
@@ -350,6 +350,7 @@ begin
 
     //record the project reference as already resolved so that we do not change the version used.
     RecordResolution(projectReference.PackageInfo, projectReference.VersionRange, projectReference.ParentId);
+    FProjectReferenceVersions[LowerCase(projectReference.Id)] := projectReference.PackageInfo.Version;
   end;
 
 end;
@@ -367,6 +368,7 @@ begin
   FNarrowedRanges := nil;
   FImportedIds := nil;
   FSortedDependencyIds := nil;
+  FProjectReferenceVersions := nil;
   inherited;
 end;
 
@@ -385,12 +387,24 @@ begin
   result := FUnresolvable;
 end;
 
-constructor TResolverContext.Create(const logger : ILogger;  const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>);
+constructor TResolverContext.Create(const logger : ILogger;  const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackages : IList<IPackageInfo>; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>);
+var
+  newPackageIds : ISet<string>;
+  newPackage : IPackageInfo;
 begin
-  Assert(newPackage <> nil);
-  Create(logger, packageInstallerContext, projectFile, newPackage.CompilerVersion, projectReferences, sharedVersionCache, preferredVersions, newPackage.Id);
-  PushRequirement(newPackage);
-  RecordResolution(newPackage, TVersionRange.Create(newPackage.Version), cRootNode);
+  Assert((newPackages <> nil) and newPackages.Any);
+  newPackageIds := TCollections.CreateSet<string>;
+  for newPackage in newPackages do
+  begin
+    Assert(not newPackageIds.Contains(LowerCase(newPackage.Id)), 'duplicate new package [' + newPackage.Id + ']');
+    newPackageIds.Add(LowerCase(newPackage.Id));
+  end;
+  Create(logger, packageInstallerContext, projectFile, newPackages[0].CompilerVersion, projectReferences, sharedVersionCache, preferredVersions, newPackageIds);
+  for newPackage in newPackages do
+  begin
+    PushRequirement(newPackage);
+    RecordResolution(newPackage, TVersionRange.Create(newPackage.Version), cRootNode);
+  end;
 end;
 
 function TResolverContext.TryGetPreferredVersion(const packageId : string; out version : TPackageVersion) : boolean;
@@ -430,6 +444,17 @@ begin
   result := not FSortedDependencyIds.Contains(key);
   if result then
     FSortedDependencyIds.Add(key);
+end;
+
+function TResolverContext.IsUnchanged(const package : IPackageInfo) : boolean;
+var
+  key : string;
+  version : TPackageVersion;
+begin
+  key := LowerCase(package.Id);
+  result := FProjectReferenceVersions.TryGetValue(key, version) and (version = package.Version);
+  if (not result) and (FPreferredVersions <> nil) then
+    result := FPreferredVersions.TryGetValue(key, version) and (version = package.Version);
 end;
 
 
@@ -549,11 +574,17 @@ function TResolverContext.GetOrImportResolvedPackage(const packageId : string; c
       //A->B->A would re-enter the same nodes indefinitely.
       if FImportedIds.Contains(LowerCase(id)) then
         continue;
+      //never overwrite a resolution this project already has - the resolver checks it against the
+      //imported package's range when it processes that package's dependencies.
+      if FResolved.ContainsKey(LowerCase(id)) then
+        continue;
       childRes := FPackageInstallerContext.FindPackageResolution(FProjectFile, id);
       if childRes <> nil then
       begin
         FImportedIds.Add(LowerCase(id));
-        FResolved[LowerCase(id)] := childRes;
+        //clone under the package that needs it here - the sibling's own parent (possibly the root,
+        //when it is a top level there) means nothing in this project.
+        FResolved[LowerCase(id)] := childRes.Clone(res.PackageInfo.Id);
         if childRes.PackageInfo.Dependencies.Any then
           CopyDependencies(childRes);
       end;

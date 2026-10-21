@@ -39,7 +39,8 @@ uses
   DPM.Core.Options.Push,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Package.Interfaces,
-  DPM.Core.Repository.Interfaces;
+  DPM.Core.Repository.Interfaces,
+  DPM.Core.Repository.RequestCache;
 
 type
   TPackageRepositoryManager = class(TInterfacedObject, IPackageRepositoryManager)
@@ -48,6 +49,7 @@ type
     FConfiguration : IConfiguration;
     FRepositories : IList<IPackageRepository>;
     FRepoFactory : IPackageRepositoryFactory;
+    FRequestCache : TRepositoryRequestCache;
   protected
     function Initialize(const configuration : IConfiguration) : boolean;
     function HasSources: Boolean;
@@ -83,12 +85,16 @@ type
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
                                                 const packageId : string; const versionRange : TVersionRange; const includePrerelease : boolean ) : IList<IPackageInfo>;
 
+    procedure BeginRequestCache;
+    procedure EndRequestCache;
+
     //commands
     function Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions) : Boolean;
     function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>;
 
   public
     constructor Create(const logger : ILogger; const repoFactory : IPackageRepositoryFactory);
+    destructor Destroy; override;
   end;
 
 implementation
@@ -111,6 +117,23 @@ begin
   FLogger := logger;
   FRepoFactory := repoFactory;
   FRepositories := TCollections.CreateList<IPackageRepository>;
+  FRequestCache := TRepositoryRequestCache.Create;
+end;
+
+destructor TPackageRepositoryManager.Destroy;
+begin
+  FRequestCache.Free;
+  inherited;
+end;
+
+procedure TPackageRepositoryManager.BeginRequestCache;
+begin
+  FRequestCache.BeginScope;
+end;
+
+procedure TPackageRepositoryManager.EndRequestCache;
+begin
+  FRequestCache.EndScope;
 end;
 
 function TPackageRepositoryManager.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
@@ -507,6 +530,9 @@ begin
     exit;
   end;
 
+  if FRequestCache.TryGetVersions(packageId, compilerVersion, includePrerelease, searchResult) then
+    exit(searchResult);
+
   for repo in FRepositories do
   begin
     if cancellationToken.IsCancelled then
@@ -529,6 +555,9 @@ begin
     begin
       result := right.CompareTo(left);
     end);
+  //a cancelled query may be partial - don't remember it.
+  if not cancellationToken.IsCancelled then
+    FRequestCache.AddVersions(packageId, compilerVersion, includePrerelease, result);
 end;
 
 //function TPackageRepositoryManager.InternalGetLatestVersions(const cancellationToken : ICancellationToken; const installedPackages : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : IDictionary<string, IPackageLatestVersionInfo>;
@@ -601,6 +630,8 @@ begin
     exit;
   end;
 
+  if FRequestCache.TryGetVersionsWithDependencies(packageId, compilerVersion, versionRange, includePrerelease, searchResult) then
+    exit(searchResult);
 
   for repo in FRepositories do
   begin
@@ -624,6 +655,9 @@ begin
     begin
       result := right.Version.CompareTo(left.Version); ;
     end);
+  //a cancelled query may be partial - don't remember it.
+  if not cancellationToken.IsCancelled then
+    FRequestCache.AddVersionsWithDependencies(packageId, compilerVersion, versionRange, includePrerelease, result);
 end;
 
 

@@ -227,6 +227,7 @@ type
     procedure AddProject(const project : string; const version : string);
     function GetInstalledProjects : TArray<string>;
     function GetNotInstalledProjects : TArray<string>;
+    function GetAllProjects : TArray<string>;
     property CurrentRow : Integer read FCurrentRow;
     property TopRow : Integer read FTopRow;
 
@@ -1148,6 +1149,15 @@ begin
     list.Free;
   end;
 
+end;
+
+function TVersionGrid.GetAllProjects : TArray<string>;
+var
+  i : integer;
+begin
+  SetLength(result, FRows.Count);
+  for i := 0 to FRows.Count -1 do
+    result[i] := FRows[i].ProjectName;
 end;
 
 function TVersionGrid.GetProjectName(index: integer): string;

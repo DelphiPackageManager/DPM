@@ -56,6 +56,7 @@ uses
   DPM.Core.Package.Installer,
   DPM.Core.Package.CopyLocal,
   DPM.Core.Package.InstallerContext,
+  DPM.Core.Package.InstallPlan,
   DPM.Core.Sources.Interfaces,
   DPM.Core.Sources.Manager,
   DPM.Core.Configuration.Interfaces,
@@ -141,7 +142,11 @@ begin
   // Register the core default. The IDE plugin replaces this via overrideProc
   // (called at the end) with TDPMIDEPackageInstallerContext. Spring4D's default
   // registration is last-write-wins, so the override takes precedence.
-  Container.RegisterType<IPackageInstallerContext, TCorePackageInstallerContext>;
+  // A singleton, so the installer, the dependency resolver and the command all share one -
+  // the recorded resolutions and an install operation (BeginOperation) must be seen by all.
+  Container.RegisterType<IPackageInstallerContext, TCorePackageInstallerContext>().AsSingleton();
+
+  Container.RegisterType<IInstallPlanner, TInstallPlanner>;
 
   Container.RegisterType<IPackageInstaller, TPackageInstaller>;
 

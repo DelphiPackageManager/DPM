@@ -170,6 +170,11 @@ type
     procedure UpdateProjectPackageVersions(const packageId : string);
     procedure DoPackageUninstall(options : TUnInstallOptions);
     procedure DoPackageInstall(options : TInstallOptions; const isUpdate : boolean);
+    //plans the upgrade, confirms any companion packages with the user, then applies it. Frees options.
+    procedure DoPackageUpgrade(options : TInstallOptions);
+    //cancels and waits for an in-flight metadata request before an install starts.
+    procedure CancelPendingRequest;
+    procedure InstallSucceeded(const packageMetadata : IPackageSearchResultItem; const options : TInstallOptions);
 
     function GetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion): IAwaitable<IPackageSearchResultItem>;
     procedure ChangeScale(M: Integer; D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND}); override;
@@ -273,14 +278,16 @@ begin
   options.ConfigFile := FConfiguration.FileName;
   options.PackageId := FPackageMetaData.Id;
   options.Version := FSelectedVersion;
-  //only upgrade/downgrade in projects it's actually ibstalled in.
-  options.Projects := FProjectsGrid.GetInstalledProjects;
+  //every project in the group - an upgrade only changes projects the package is installed in, but the
+  //packages that must move with it (companions) may be installed in others, and the group has to stay
+  //on one version of them.
+  options.Projects := FProjectsGrid.GetAllProjects;
   options.Platforms := [];
   options.Prerelease := FIncludePreRelease;
   options.CompilerVersion := IDECompilerVersion;
   options.IsUpgrade := true;
 
-  DoPackageInstall(options, true);
+  DoPackageUpgrade(options);
 end;
 
 procedure TPackageDetailsFrame.DebounceTimerTimer(Sender: TObject);
@@ -377,12 +384,7 @@ begin
   //SetPackage from the editor view and set FPackageMetaData to nil.
   packageMetadata := FPackageMetaData;
   try
-    if FRequestInFlight then
-      FCancellationTokenSource.Cancel;
-
-    while FRequestInFlight do
-      Application.ProcessMessages;
-    FCancellationTokenSource.Reset;
+    CancelPendingRequest;
     FLogger.Clear;
     FLogger.StartInstall(FCancellationTokenSource);
     projectCount := Length(options.Projects);
@@ -391,22 +393,7 @@ begin
     FHost.BeginInstall(projectCount);
     installResult := FPackageInstaller.Install(FCancellationTokenSource.Token, options, FInstallerContext);
     if installResult then
-    begin
-      if packageMetadata <> nil then
-      begin
-        packageMetadata.Installed := true;
-        packageMetadata.IsTransitive := false;
-      end;
-      FHost.PackageInstalled;
-      if packageMetadata <> nil then
-      begin
-        UpdateProjectPackageVersions(packageMetaData.Id);
-        SetPackage(packageMetadata, FIncludePreRelease, true);
-        FPackageMetaData := packageMetadata;
-      end;
-      FInstalledVersion := options.Version;
-      FLogger.Information('Package ' + options.PackageId + ' - ' + FInstalledVersion.ToStringNoMeta + ' installed.');
-    end
+      InstallSucceeded(packageMetadata, options)
     else
       FLogger.Error('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' did not install.');
 
@@ -416,6 +403,107 @@ begin
     FHost.EndInstall;
   end;
 
+end;
+
+procedure TPackageDetailsFrame.CancelPendingRequest;
+begin
+  if FRequestInFlight then
+    FCancellationTokenSource.Cancel;
+
+  while FRequestInFlight do
+    Application.ProcessMessages;
+  FCancellationTokenSource.Reset;
+end;
+
+procedure TPackageDetailsFrame.InstallSucceeded(const packageMetadata : IPackageSearchResultItem; const options : TInstallOptions);
+begin
+  if packageMetadata <> nil then
+  begin
+    packageMetadata.Installed := true;
+    packageMetadata.IsTransitive := false;
+  end;
+  FHost.PackageInstalled;
+  if packageMetadata <> nil then
+  begin
+    UpdateProjectPackageVersions(packageMetaData.Id);
+    SetPackage(packageMetadata, FIncludePreRelease, true);
+    FPackageMetaData := packageMetadata;
+  end;
+  FInstalledVersion := options.Version;
+  FLogger.Information('Package ' + options.PackageId + ' - ' + FInstalledVersion.ToStringNoMeta + ' installed.');
+end;
+
+//An upgrade can need other installed packages to move with it (companions - e.g. packages that pin the
+//same dependency). It is planned first and the user confirms any companions before anything changes.
+//That is asked between planning and installing, never while an install is running - the IDE must not
+//pump messages mid-operation.
+procedure TPackageDetailsFrame.DoPackageUpgrade(options : TInstallOptions);
+var
+  plan : IInstallPlan;
+  installResult : boolean;
+  sessionOpen : boolean;
+  hostInstalling : boolean;
+  packageMetadata : IPackageSearchResultItem;
+  line : string;
+  message : string;
+begin
+  installResult := false;
+  sessionOpen := false;
+  hostInstalling := false;
+  //capture the current package metadata before we pump any messages - see DoPackageInstall.
+  packageMetadata := FPackageMetaData;
+  try
+    try
+      CancelPendingRequest;
+      FLogger.Clear;
+      FLogger.StartInstall(FCancellationTokenSource);
+      sessionOpen := true;
+
+      if not FPackageInstaller.PlanInstall(FCancellationTokenSource.Token, options, plan) then
+      begin
+        if plan <> nil then
+        begin
+          for line in plan.Errors do
+            FLogger.Error(line);
+        end;
+        FLogger.Error('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' cannot be upgraded.');
+        exit;
+      end;
+      for line in plan.SummaryLines do
+        FLogger.Information(line, true);
+
+      if plan.HasCompanions then
+      begin
+        FLogger.EndInstall(true);
+        sessionOpen := false;
+        message := 'Upgrading ' + options.PackageId + ' also needs other installed packages upgraded :' + sLineBreak + sLineBreak;
+        for line in plan.SummaryLines do
+          message := message + line + sLineBreak;
+        message := message + sLineBreak + 'Continue?';
+        if MessageDlg(message, mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
+          exit;
+        FCancellationTokenSource.Reset;
+        FLogger.Clear;
+        FLogger.StartInstall(FCancellationTokenSource);
+        sessionOpen := true;
+      end;
+
+      FHost.BeginInstall(plan.Projects.Count);
+      hostInstalling := true;
+      installResult := FPackageInstaller.ApplyInstallPlan(FCancellationTokenSource.Token, options, plan, FInstallerContext);
+      if installResult then
+        InstallSucceeded(packageMetadata, options)
+      else
+        FLogger.Error('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' did not install.');
+    finally
+      if sessionOpen then
+        FLogger.EndInstall(installResult);
+      if hostInstalling then
+        FHost.EndInstall;
+    end;
+  finally
+    options.Free;
+  end;
 end;
 
 procedure TPackageDetailsFrame.DoPackageUninstall(options: TUnInstallOptions);
@@ -1360,8 +1448,7 @@ begin
   options.Prerelease := FIncludePreRelease;
   options.CompilerVersion := IDECompilerVersion;
   options.IsUpgrade := true; //changing the installed version
-  DoPackageInstall(options, true);
-  //call common function
+  DoPackageUpgrade(options);
 end;
 
 procedure TPackageDetailsFrame.VersionGridOnUseSourceChanged(const project: string; const useSource: boolean);
