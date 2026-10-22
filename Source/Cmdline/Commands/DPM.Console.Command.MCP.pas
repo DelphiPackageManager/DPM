@@ -156,8 +156,6 @@ var
   defaultProject : string;
   fallbackCompiler : TCompilerVersion;
 begin
-  result := TExitCode.Error;
-
   options := TMCPOptions.Default;
   options.ApplyCommon(TCommonOptions.Default);
   if not options.Validate(Logger) then

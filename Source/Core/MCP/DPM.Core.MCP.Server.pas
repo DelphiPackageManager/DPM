@@ -66,8 +66,10 @@ type
     //hierarchy that already guards against them, and a stray WriteLn here would write into the
     //JSON-RPC stream on stdout - silently corrupting the session. Raising turns a typo into an
     //immediate loud failure instead. Not Assert, which compiles out in Release.
+    {$HINTS OFF}
     procedure WriteLn(const s : string = '');
     procedure Write(const s : string = '');
+    {$HINTS ON}
   public
     constructor Create(const reader : IMCPMessageReader; const writer : IMCPMessageWriter;
                        const registry : IMCPToolRegistry; const logger : ILogger;
