@@ -511,6 +511,9 @@ type
     FSigningService : IPackageSigningService;
     FX509 : IX509Service;
     FConfigManager : IConfigurationManager;
+    //for config work outside an operation (the upload source list, the wizard) - it reports to the
+    //Logging tab rather than whichever page's memo the last operation used.
+    FConfigManagerUI : IConfigurationManager;
     FRepositoryManager : IPackageRepositoryManager;
     FOpsLogger : IDSpecOpsLogger;      // pack / sign / test / upload output, retargeted per operation
     FCancellationTokenSource : ICancellationTokenSource;
@@ -562,8 +565,8 @@ type
     procedure InitCoreContainer;
     procedure UpdateSigningProviderPage;
     function BuildSignOptionsFromUI : TSignOptions;
-    procedure SignProducedPackages(const cancelToken : ICancellationToken; const outputFolder : string;
-                                   const sinceTime : TDateTime; const signOptions : TSignOptions);
+    function SignProducedPackages(const cancelToken : ICancellationToken; const outputFolder : string;
+                                  const sinceTime : TDateTime; const signOptions : TSignOptions) : boolean;
     procedure LoadSigningSettings;
     procedure SaveSigningSettings;
     // Secrets are kept in Windows Credential Manager, never in the ini file.
@@ -664,7 +667,9 @@ uses
   DPM.Creator.DependencyForm,
   DPM.Creator.Dspec.Replacer,
   DPM.Creator.PackageWizardForm,
-  DPM.IDE.AboutForm;
+  DPM.IDE.AboutForm,
+  DPM.Core.Diagnostics,
+  DPM.Core.Configuration.Manager;
 
 const
   cToolName = 'DPM dspec Creator';
@@ -880,31 +885,41 @@ begin
     function(const cancelToken : ICancellationToken) : boolean
     var
       savedDir : string;
+      guard : TOperationGuard;
     begin
+      //here, not in Await - error counts are per thread.
+      guard := TOperationGuard.Start(FOpsLogger);
       CoInitializeEx(nil, COINIT_MULTITHREADED);
       // The packer resolves relative paths against the process current
       // directory; point it at the dspec folder for the duration of the pack.
       savedDir := GetCurrentDir;
       SetCurrentDir(workingDir);
       try
-        result := FPackageWriter.WritePackageFromSpec(cancelToken, packOptions);
-        if result and signingEnabled and (signOptions <> nil) then
-          SignProducedPackages(cancelToken, outputFolder, packStartTime, signOptions);
+        try
+          result := FPackageWriter.WritePackageFromSpec(cancelToken, packOptions);
+          //signing was asked for - a package that could not be signed fails the pack.
+          if result and signingEnabled and (signOptions <> nil) then
+            result := SignProducedPackages(cancelToken, outputFolder, packStartTime, signOptions);
+        except
+          on e : Exception do
+            result := guard.Failed(e);
+        end;
       finally
         SetCurrentDir(savedDir);
         CoUninitialize;
       end;
+      guard.Finish(result, cancelToken.IsCancelled, 'Pack');
     end, FCancellationTokenSource.Token)
   .OnException(
     procedure(const e : Exception)
     begin
-      FOpsLogger.Error('Error creating package : ' + e.Message);
+      LogException(FOpsLogger, e);
       cleanup();
     end)
   .OnCancellation(
     procedure
     begin
-      FOpsLogger.Warning('Pack cancelled.');
+      FOpsLogger.Warning(TWarningCode.W0004_OperationCancelled, 'Pack was cancelled.', true);
       cleanup();
     end)
   .Await(
@@ -919,7 +934,7 @@ begin
         RefreshTestCompilers;
       end
       else
-        FOpsLogger.Error('Pack failed.');
+        FOpsLogger.Information('Pack failed.', true);
       cleanup();
     end);
 end;
@@ -1005,6 +1020,9 @@ begin
   // same one the command line `dpm cache install` uses.
   configPath := TConfigUtils.GetDefaultConfigFileName;
 
+  FOpsLogger.BeginOperation(TestLogMemo);
+  PageControl.ActivePage := tsTest;
+
   // Point the (shared, singleton) cache at the configured location now, so the
   // post-test cache removal works even if an install fails before Cache()->Init
   // gets a chance to set it (mirrors TCacheCommand.EnsureCacheLocation).
@@ -1012,7 +1030,7 @@ begin
   config := FConfigManager.LoadConfig(configPath);
   if config = nil then
   begin
-    MessageDlg('Unable to load the DPM configuration; cannot access the package cache.', mtWarning, [mbOK], 0);
+    MessageDlg('Unable to load the DPM configuration, so the package cache can''t be used - see the log.', mtWarning, [mbOK], 0);
     Exit;
   end;
   FPackageCache.Location := config.PackageCacheLocation;
@@ -1023,9 +1041,6 @@ begin
   for i := 0 to clbTestCompilers.Count - 1 do
     FTestResults.AddOrSetValue(clbTestCompilers.Items[i], 0);
   clbTestCompilers.Invalidate;
-
-  FOpsLogger.BeginOperation(TestLogMemo);
-  PageControl.ActivePage := tsTest;
 
   FTesting := true;
   btnStartTest.Enabled := false;
@@ -1053,6 +1068,7 @@ begin
       options : TCacheOptions;
       installOk : boolean;
       packageIdentity : IPackageIdentity;
+      compilerGuard : TOperationGuard;
     begin
       result := true;
       // Building a package loads its .dproj via MSXML, which requires COM to be
@@ -1065,6 +1081,9 @@ begin
         begin
           if cancelToken.IsCancelled then
             break;
+          //each compiler is a test of its own - its section of the log shows its own errors, even one
+          //an earlier compiler hit too.
+          compilerGuard := TOperationGuard.Start(FOpsLogger);
 
         cv := StringToCompilerVersion(compilerStr);
 
@@ -1102,7 +1121,7 @@ begin
 
         if dpkgFile = '' then
         begin
-          FOpsLogger.Error('No package file found for ' + compilerStr + ' (looked for ' + mask + ')');
+          FOpsLogger.Error(TErrorCode.E3004_PackageFileNotFound, 'No package file was found for ' + compilerStr + ' - looked for ' + mask + ' in [' + outputFolder + '].');
           result := false;
           TThread.Synchronize(nil,
             procedure
@@ -1135,10 +1154,7 @@ begin
             installOk := FPackageInstaller.Cache(cancelToken, options);
           except
             on e : Exception do
-            begin
-              FOpsLogger.Error('Test errored for ' + compilerStr + ' : ' + e.Message);
-              installOk := false;
-            end;
+              installOk := compilerGuard.Failed(e);
           end;
         finally
           options.Free;
@@ -1153,20 +1169,21 @@ begin
             if FPackageCache.RemovePackage(packageIdentity) then
               FOpsLogger.Information('Removed ' + packageIdentity.ToString + ' from the cache.')
             else
-              FOpsLogger.Warning('Could not remove ' + packageIdentity.ToString + ' from the cache.');
+              FOpsLogger.Information('Nothing was removed from the cache for ' + packageIdentity.ToString + '.');
           end;
         except
           on e : Exception do
-            FOpsLogger.Warning('Could not remove tested package from the cache : ' + e.Message);
+            FOpsLogger.Warning(TWarningCode.W9202_TestPackageNotRemoved, 'Unable to remove the tested package from the cache : ' + e.Message);
         end;
 
         if installOk then
           FOpsLogger.Success('Test passed for ' + compilerStr)
         else
         begin
-          FOpsLogger.Error('Test failed for ' + compilerStr);
+          FOpsLogger.Information('Test failed for ' + compilerStr, true);
           result := false;
         end;
+        compilerGuard.Finish(installOk, cancelToken.IsCancelled, 'Testing ' + compilerStr);
 
         // Update the checkbox colour (green pass / red fail) on the UI thread.
         TThread.Synchronize(nil,
@@ -1186,13 +1203,13 @@ begin
   .OnException(
     procedure(const e : Exception)
     begin
-      FOpsLogger.Error('Error running tests : ' + e.Message);
+      LogException(FOpsLogger, e);
       cleanup();
     end)
   .OnCancellation(
     procedure
     begin
-      FOpsLogger.Warning('Testing cancelled.');
+      FOpsLogger.Warning(TWarningCode.W0004_OperationCancelled, 'Testing was cancelled.', true);
       cleanup();
     end)
   .Await(
@@ -1491,8 +1508,9 @@ begin
   end;
 end;
 
-procedure TDSpecCreatorForm.SignProducedPackages(const cancelToken : ICancellationToken; const outputFolder : string;
-                                                 const sinceTime : TDateTime; const signOptions : TSignOptions);
+//False, having said why, when a package could not be signed - signing was asked for, so the pack fails.
+function TDSpecCreatorForm.SignProducedPackages(const cancelToken : ICancellationToken; const outputFolder : string;
+                                                const sinceTime : TDateTime; const signOptions : TSignOptions) : boolean;
 var
   provider : ISigningProvider;
   signOpts : ISignOptions;
@@ -1503,20 +1521,19 @@ var
   okCount : integer;
   failCount : integer;
 begin
+  result := false;
   if signOptions.Digest = '' then
     alg := haUnknown
   else if not TAlgorithmProfile.ParseHashName(signOptions.Digest, alg) then
   begin
-    FOpsLogger.Error('Unsupported digest "' + signOptions.Digest + '" (SHA256/SHA384/SHA512 only).');
+    FOpsLogger.Error(TErrorCode.E0102_InvalidArgument, 'The digest "' + signOptions.Digest + '" is not supported (SHA256, SHA384 or SHA512).');
     Exit;
   end;
 
+  //the factory says why it could not.
   provider := TSigningProviderFactory.CreateProvider(FOpsLogger, FX509, signOptions);
   if provider = nil then
-  begin
-    FOpsLogger.Error('Signing skipped - the signing provider could not be created.');
     Exit;
-  end;
 
   // The pack pipeline returns only a boolean, so identify the produced files by
   // collecting every .dpkg written since packing started.
@@ -1528,7 +1545,7 @@ begin
 
   if toSign.Count = 0 then
   begin
-    FOpsLogger.Warning('No newly produced .dpkg files found to sign.');
+    FOpsLogger.Error(TErrorCode.E0003_InternalError, 'The pack succeeded but no package it wrote was found in [' + outputFolder + '] to sign.');
     Exit;
   end;
 
@@ -1553,7 +1570,7 @@ begin
         on e : Exception do
         begin
           Inc(failCount);
-          FOpsLogger.Error('Sign failed for [' + ExtractFileName(f) + ']: ' + e.Message);
+          FOpsLogger.Error(ErrorCodeOf(e, TErrorCode.E7102_SigningFailed), 'Unable to sign [' + ExtractFileName(f) + '] : ' + e.Message);
         end;
       end;
     end;
@@ -1564,7 +1581,8 @@ begin
   if failCount = 0 then
     FOpsLogger.Success(Format('Signed %d package(s) successfully.', [okCount]))
   else
-    FOpsLogger.Warning(Format('%d signed, %d failed.', [okCount, failCount]));
+    FOpsLogger.Information(Format('%d signed, %d failed.', [okCount, failCount]), true);
+  result := (failCount = 0) and not cancelToken.IsCancelled;
 end;
 
 procedure TDSpecCreatorForm.LoadSigningSettings;
@@ -1676,12 +1694,12 @@ begin
     cboUploadSource.Items.Clear;
     FUploadConfig := nil;
     try
-      FConfigManager.EnsureDefaultConfig;
+      FConfigManagerUI.EnsureDefaultConfig;
       FUploadConfigFile := TConfigUtils.GetDefaultConfigFileName;
-      FUploadConfig := FConfigManager.LoadConfig(FUploadConfigFile);
+      FUploadConfig := FConfigManagerUI.LoadConfig(FUploadConfigFile);
     except
       on e : Exception do
-        FLogger.Error('Could not load DPM configuration: ' + e.Message);
+        LogException(FLogger, e);
     end;
     if FUploadConfig <> nil then
       for i := 0 to FUploadConfig.Sources.Count - 1 do
@@ -1857,15 +1875,20 @@ begin
       f : string;
       okCount : integer;
       failCount : integer;
+      guard : TOperationGuard;
+      itemGuard : TOperationGuard;
+      pushed : boolean;
     begin
       result := false;
+      //here, not in Await - error counts are per thread.
+      guard := TOperationGuard.Start(FOpsLogger);
+      //LoadConfig and Initialize say why.
       config := FConfigManager.LoadConfig(FUploadConfigFile);
-      if config = nil then
+      if (config = nil) or (not FRepositoryManager.Initialize(config)) then
       begin
-        FOpsLogger.Error('Could not load DPM configuration.');
+        guard.Finish(false, cancelToken.IsCancelled, 'Upload');
         Exit;
       end;
-      FRepositoryManager.Initialize(config);
 
       okCount := 0;
       failCount := 0;
@@ -1881,7 +1904,17 @@ begin
             Break;
           pushOptions.PackagePath := f;
           FOpsLogger.Information('Uploading ' + ExtractFileName(f) + ' to ' + sourceName + '...');
-          if FRepositoryManager.Push(cancelToken, pushOptions) then
+          //each file is an upload of its own - one failing doesn't stop the rest.
+          itemGuard := TOperationGuard.Start(FOpsLogger);
+          pushed := false;
+          try
+            pushed := FRepositoryManager.Push(cancelToken, pushOptions);
+          except
+            on e : Exception do
+              itemGuard.Failed(e);
+          end;
+          itemGuard.Finish(pushed, cancelToken.IsCancelled, 'Uploading ' + ExtractFileName(f));
+          if pushed then
             Inc(okCount)
           else
             Inc(failCount);
@@ -1892,17 +1925,18 @@ begin
 
       FOpsLogger.Information(Format('Uploaded %d package(s), %d failed.', [okCount, failCount]));
       result := failCount = 0;
+      guard.Finish(result, cancelToken.IsCancelled, 'Upload');
     end, FCancellationTokenSource.Token)
   .OnException(
     procedure(const e : Exception)
     begin
-      FOpsLogger.Error('Error uploading : ' + e.Message);
+      LogException(FOpsLogger, e);
       cleanup();
     end)
   .OnCancellation(
     procedure
     begin
-      FOpsLogger.Warning('Upload cancelled.');
+      FOpsLogger.Warning(TWarningCode.W0004_OperationCancelled, 'Upload was cancelled.', true);
       cleanup();
     end)
   .Await(
@@ -1911,7 +1945,7 @@ begin
       if ok then
         FOpsLogger.Success('Upload completed.')
       else
-        FOpsLogger.Error('Upload completed with errors.');
+        FOpsLogger.Information('Upload completed with errors.', true);
       cleanup();
     end);
 end;
@@ -3578,6 +3612,7 @@ begin
   ApplyLinkColors;
 
   FLogger := TDSpecLogger.Create(LogMemo);
+  FConfigManagerUI := TConfigurationManager.Create(FLogger);
   FOpenFile := TDSpecFile.Create(FLogger);
   FOpenFile.PackageSpec.newTemplate('default');
   // Pack / sign / upload run in-process via the DPM core; output goes to the
@@ -3995,7 +4030,7 @@ procedure TDSpecCreatorForm.actFilePackageWizardExecute(Sender : TObject);
 var
   wizard : TPackageWizardForm;
 begin
-  wizard := TPackageWizardForm.Create(nil, FLogger, FConfigManager);
+  wizard := TPackageWizardForm.Create(nil, FLogger, FConfigManagerUI);
   try
     if (wizard.ShowModal = mrOk) and (wizard.ResultFile <> '') then
       OpenProject(wizard.ResultFile);

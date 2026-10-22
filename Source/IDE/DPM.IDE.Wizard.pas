@@ -143,7 +143,8 @@ uses
   DPM.IDE.InstallerContext,
   DPM.IDE.PathManager,
   DPM.IDE.EnvironmentVariableManager,
-  DPM.IDE.ToolsAPI;
+  DPM.IDE.ToolsAPI,
+  DPM.Core.Diagnostics;
 
 {$R DPM.IDE.Resources.res}
 
@@ -190,7 +191,7 @@ begin
     UnloadOrphans;
   except
     on e : Exception do
-      FLogger.Error('Exception during orphan BPL cleanup : ' + e.Message);
+      FLogger.Warning(TWarningCode.W9106_OrphanCleanupFailed, 'Unable to clean up the design packages a previous session left loaded : ' + e.Message);
   end;
 end;
 
@@ -204,6 +205,7 @@ var
   found : TStringList;
   uninstallOk : boolean;
   cleanedCount : integer;
+  unloadError : string;
 begin
   if FCacheRoot = '' then
     exit;
@@ -239,11 +241,12 @@ begin
     for i := 0 to found.Count - 1 do
     begin
       uninstallOk := false;
+      unloadError := '';
       try
         uninstallOk := svc.UninstallPackage(found[i]);
       except
         on e : Exception do
-          FLogger.Error('Exception unloading orphaned design BPL [' + found[i] + '] : ' + e.Message);
+          unloadError := ' : ' + e.Message;
       end;
       if uninstallOk then
       begin
@@ -251,7 +254,7 @@ begin
         Inc(cleanedCount);
       end
       else
-        FLogger.Warning('IDE reported failure unloading orphaned design BPL [' + ExtractFileName(found[i]) + ']');
+        FLogger.Warning(TWarningCode.W9106_OrphanCleanupFailed, 'The IDE did not unload the design BPL [' + found[i] + '] a previous session left loaded' + unloadError);
     end;
 
     if cleanedCount > 0 then
@@ -309,10 +312,10 @@ begin
             Inc(cleanedCount);
           end
           else
-            FLogger.Warning('Failed to remove Known-Packages registry value [' + bplPath + ']');
+            FLogger.Warning(TWarningCode.W9106_OrphanCleanupFailed, 'Unable to remove the Known Packages registry entry [' + bplPath + '].');
         except
           on e : Exception do
-            FLogger.Error('Exception removing Known-Packages registry value [' + bplPath + '] : ' + e.Message);
+            FLogger.Warning(TWarningCode.W9106_OrphanCleanupFailed, 'Unable to remove the Known Packages registry entry [' + bplPath + '] : ' + e.Message);
         end;
       end;
     finally
@@ -327,34 +330,29 @@ begin
     FLogger.Success('Removed ' + IntToStr(cleanedCount) + ' orphaned Known-Packages registry entry/entries from previous session');
 end;
 
+//No try/except : the logger comes from this container, so there is none to report a failure with yet
+//(the old handler used a nil FLogger). The exception reaches the IDE, which says why the plugin did not load.
 procedure TDPMWizard.InitContainer;
 begin
-  try
-    FContainer := TContainer.Create;
-    FContainer.RegisterType<IDPMIDEOptions, TDPMIDEOptions>.AsSingleton();
-    FContainer.RegisterType<IDPMIDEMessageService,TDPMIDEMessageService>.AsSingleton();
-    FContainer.RegisterType<TDPMIDELogger>.Implements<IDPMIDELogger>.Implements<ILogger>.AsSingleton();
-    FContainer.RegisterType<IDPMProjectTreeManager, TDPMProjectTreeManager>.AsSingleton();
-    FContainer.RegisterType<IDPMEditorViewManager, TDPMEditorViewManager>.AsSingleton();
-    FContainer.RegisterType<IDPMIDEProjectController,TDPMIDEProjectController>.AsSingleton();
-    FContainer.RegisterType<IDPMIDEPathManager,TDPMIDEPathManager>.AsSingleton();
-    FContainer.RegisterType<IDPMIDEEnvironmentVariableManager,TDPMIDEEnvironmentVariableManager>.AsSingleton();
+  FContainer := TContainer.Create;
+  FContainer.RegisterType<IDPMIDEOptions, TDPMIDEOptions>.AsSingleton();
+  FContainer.RegisterType<IDPMIDEMessageService,TDPMIDEMessageService>.AsSingleton();
+  FContainer.RegisterType<TDPMIDELogger>.Implements<IDPMIDELogger>.Implements<ILogger>.AsSingleton();
+  FContainer.RegisterType<IDPMProjectTreeManager, TDPMProjectTreeManager>.AsSingleton();
+  FContainer.RegisterType<IDPMEditorViewManager, TDPMEditorViewManager>.AsSingleton();
+  FContainer.RegisterType<IDPMIDEProjectController,TDPMIDEProjectController>.AsSingleton();
+  FContainer.RegisterType<IDPMIDEPathManager,TDPMIDEPathManager>.AsSingleton();
+  FContainer.RegisterType<IDPMIDEEnvironmentVariableManager,TDPMIDEEnvironmentVariableManager>.AsSingleton();
 
-    DPM.Core.Init.InitCore(FContainer,
-      //replaces core registration of the IPackageInstallerContext implementation,
-      //and swaps the non-interactive trust-prompt default for the IDE modal form.
-      procedure(const container : TContainer)
-      begin
-        container.RegisterType<IPackageInstallerContext, TDPMIDEPackageInstallerContext>().AsSingleton();
-        container.RegisterType<ITrustPromptStrategy, TIdeTrustPromptStrategy>;
-      end);
-    FContainer.Build;
-  except
-    on e : Exception do
+  DPM.Core.Init.InitCore(FContainer,
+    //replaces core registration of the IPackageInstallerContext implementation,
+    //and swaps the non-interactive trust-prompt default for the IDE modal form.
+    procedure(const container : TContainer)
     begin
-     FLogger.Error('Error setting up the container : ' + e.Message);
-    end;
-  end;
+      container.RegisterType<IPackageInstallerContext, TDPMIDEPackageInstallerContext>().AsSingleton();
+      container.RegisterType<ITrustPromptStrategy, TIdeTrustPromptStrategy>;
+    end);
+  FContainer.Build;
 end;
 
 

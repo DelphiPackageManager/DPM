@@ -235,7 +235,8 @@ uses
   DPM.Core.Package.InstallPlan,
   DPM.Core.Configuration.Classes,
   DPM.Core.Dependency.Interfaces,
-  DPM.IDE.ToolsAPI;
+  DPM.IDE.ToolsAPI,
+  DPM.Core.Diagnostics;
 { TGroupPackageDetailsFrame }
 
 procedure TPackageDetailsFrame.btnInstallAllClick(Sender: TObject);
@@ -345,7 +346,7 @@ begin
       FRequestInFlight := false;
       if FClosing then
         exit;
-      FLogger.Error(e.Message);
+      LogException(FLogger, e);
     end)
   .OnCancellation(
     procedure
@@ -991,10 +992,7 @@ begin
   configPath := TConfigUtils.GetDefaultConfigFileName;
   config := FConfigurationManager.LoadConfig(configPath);
   if config = nil then
-  begin
-    FLogger.Error('Could not load configuration file to add trusted publisher.');
     exit;
-  end;
   signing := config.Signing;
 
   spkiToStore := 'sha256:' + LowerCase(Trim(FCurrentBadge.SignerSpkiHex));
@@ -1021,10 +1019,7 @@ begin
   end;
 
   if not FConfigurationManager.SaveConfig(config, configPath) then
-  begin
-    FLogger.Error('Failed to save configuration when adding trusted publisher.');
     exit;
-  end;
   FLogger.Information('Added trusted publisher: ' + publisherName + '  ' + spkiToStore);
 
   // Keep the in-memory session config in sync so re-selecting this package
@@ -1464,7 +1459,7 @@ begin
     packageId := FProjectsGridPackageId;
   if packageId = '' then
   begin
-    FLogger.Error('Unable to determine which package the use source change was for - ignoring.');
+    FLogger.Error(TErrorCode.E0003_InternalError, 'Unable to determine which package the use source change was for - ignoring it.');
     exit;
   end;
 
@@ -1482,7 +1477,7 @@ begin
     FHost.SearchPathsChanged;
   end
   else
-    FLogger.Error('Failed to update search paths for [' + packageId + '] in project [' + project + '].');
+    FLogger.Information('The search paths for [' + packageId + '] in [' + project + '] were not updated.', true);
 
   //Refresh only this grid's checkbox/version state - no package list reload.
   UpdateProjectPackageVersions(packageId);
@@ -1504,7 +1499,7 @@ begin
     packageId := FProjectsGridPackageId;
   if packageId = '' then
   begin
-    FLogger.Error('Unable to determine which package the menu was for - ignoring.');
+    FLogger.Error(TErrorCode.E0003_InternalError, 'Unable to determine which package the menu was for - ignoring it.');
     exit;
   end;
 
@@ -1670,7 +1665,7 @@ begin
       FRequestInFlight := false;
       if FClosing then
         exit;
-      FLogger.Error(e.Message);
+      LogException(FLogger, e);
     end)
   .OnCancellation(
     procedure

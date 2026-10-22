@@ -113,7 +113,8 @@ uses
   DPM.Core.Utils.Config,
   DPM.Core.Utils.Path,
   DPM.Core.Utils.Spdx,
-  DPM.Console.Command.Spec.Writer;
+  DPM.Console.Command.Spec.Writer,
+  DPM.Core.Diagnostics;
 
 const
   cPageRoot = 0;
@@ -153,7 +154,7 @@ begin
     TSpdxLicenses.GetLicenseIds(cboLicense.Items);
   except
     on e : Exception do
-      FLogger.Warning('Could not load SPDX license list : ' + e.Message);
+      FLogger.Warning(TWarningCode.W9201_SPDXListUnavailable, 'Unable to load the SPDX licence list : ' + e.Message);
   end;
 end;
 
@@ -348,8 +349,8 @@ begin
     FCtx.CompilerFolders := ScanPackagesFolder(FCtx.PackagesFolder, FLogger, FConfig);
     if Length(FCtx.CompilerFolders) = 0 then
     begin
-      FLogger.Warning('No recognisable compiler folders found under ' + FCtx.PackagesFolder +
-        ' - skipping build/design.');
+      FLogger.Warning(TWarningCode.W6404_NoCompilerFoldersFound, 'No compiler folders were found in [' + FCtx.PackagesFolder +
+        '] - the spec has no build or design entries.');
       FCtx.HasPackages := false;
     end;
   end;
@@ -462,7 +463,7 @@ begin
   begin
     FConfig.Author := author;
     if not FConfigManager.SaveConfig(FConfig, FConfig.FileName) then
-      FLogger.Warning('Could not save author to ' + FConfig.FileName);
+      FLogger.Information('The author was not saved to [' + FConfig.FileName + '].', true);
   end;
 
   result := true;

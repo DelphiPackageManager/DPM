@@ -102,7 +102,9 @@ uses
   DPM.Core.Options.Restore,
   DPM.Core.Options.CopyLocal,
   DPM.Core.Utils.System,
-  DPM.IDE.Types;
+  DPM.IDE.Types,
+  DPM.Core.Diagnostics,
+  DPM.Core.Logging;
 
 { TDPMIDEProjectController }
 
@@ -124,6 +126,8 @@ var
   platformName : string;
   outputDir : string;
   options : TCopyLocalOptions;
+  guard : TOperationGuard;
+  copied : boolean;
 begin
   if project = nil then
     exit;
@@ -165,12 +169,14 @@ begin
     options.RuntimePackages := config.GetValue('DCC_UsePackage');
     if not options.Validate(FLogger) then
       exit;
+    guard := TOperationGuard.Start(FLogger);
     try
-      FCopyLocalService.CopyLocal(FCancellationTokenSource.Token, options);
+      copied := FCopyLocalService.CopyLocal(FCancellationTokenSource.Token, options);
     except
       on e : Exception do
-        FLogger.Error('Error during copylocal for [' + ExtractFileName(project.FileName) + '] : ' + e.Message);
+        copied := guard.Failed(e);
     end;
+    guard.Finish(copied, FCancellationTokenSource.Token.IsCancelled, 'Copying the package files for [' + ExtractFileName(project.FileName) + ']');
   finally
     options.Free;
   end;

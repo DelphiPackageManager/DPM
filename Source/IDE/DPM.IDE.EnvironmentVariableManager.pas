@@ -56,7 +56,8 @@ implementation
 uses
   WinApi.Windows,
   System.Classes,
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Diagnostics;
 
 { helpers }
 
@@ -165,7 +166,7 @@ begin
     packages := packages + managed.Refs[i].PackageId;
   end;
   if differs then
-    FLogger.Warning('Environment variable [' + managed.Name + '] is set to differing values by packages [' + packages + '] - using the value from the most recently loaded package.');
+    FLogger.Warning(TWarningCode.W9105_EnvironmentVariableConflict, 'The environment variable [' + managed.Name + '] is set to different values by the packages [' + packages + '] - using the value from the package loaded last.');
 end;
 
 procedure TDPMIDEEnvironmentVariableManager.SetVariable(const name : string; const value : string; const lcProject : string; const packageId : string);

@@ -1458,6 +1458,70 @@ The linker MAP file was found but couldn't be read, so the SBOM lists the DPM pa
 
 ## The IDE plugin, DSpec Creator and the MCP server (9xxx)
 
+### DPMW9101
+
+**A design package could not be loaded into the IDE.**
+
+The package was installed, but the IDE refused to load its design package (.bpl), so its components and editors aren't available. The message names the file and says why when the IDE did.
+
+**What to do:** Check the design package was built for this Delphi version and IDE bitness, and that the packages it needs can be found. Restore the project to try again.
+
+### DPMW9102
+
+**The design package to load into the IDE was not found.**
+
+The package declares a design package, but the .bpl wasn't where DPM expected it after the build, so it wasn't loaded.
+
+**What to do:** If you publish the package, set `libPrefix` / `libSuffix` on the design entry to match the name the compiled .bpl gets, or check the path of a prebuilt one.
+
+### DPMW9103
+
+**More than one file could be the design package to load.**
+
+Several .bpl files match the package's design project, and DPM won't guess - loading the wrong one into the IDE is worse than loading none.
+
+**What to do:** If you publish the package, set `libPrefix` / `libSuffix` on the design entry so it names one file.
+
+### DPMW9104
+
+**A design package with the same name is already loaded from another location.**
+
+The IDE already has a design package with this file name loaded from somewhere other than the DPM package cache - usually the same library installed by hand. DPM leaves it alone.
+
+**What to do:** Remove the hand-installed copy (Component > Install Packages) if you want DPM to manage it.
+
+### DPMW9105
+
+**Packages set an IDE environment variable to different values.**
+
+Two or more packages declare the same IDE environment variable with different values. The value from the package loaded last is used.
+
+**What to do:** Check which value the packages need - this usually means two versions of one library are in use.
+
+### DPMW9106
+
+**Design packages left by a previous IDE session could not be cleaned up.**
+
+At startup DPM unloads design packages, and removes Known Packages registry entries, that a previous session left pointing into the package cache. One of them couldn't be removed.
+
+**What to do:** Remove it in Component > Install Packages. It does no harm unless the file is gone.
+
+### DPMW9201
+
+**The SPDX licence list could not be loaded.**
+
+DSpec Creator couldn't read its list of SPDX licence ids, so the licence list is empty. You can still type a licence id.
+
+**What to do:** Report it - the list is built into DSpec Creator.
+
+### DPMW9202
+
+**The tested package could not be removed from the package cache.**
+
+After a test install DSpec Creator removes the package it tested from the package cache, so the next test uses the newly packed one. That failed.
+
+**What to do:** Remove it with `dpm cache remove <id> --version=<version> --force`.
+
 ### DPMW9501
 
 **The MCP server stopped because its connection failed.**

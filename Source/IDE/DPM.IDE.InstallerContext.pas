@@ -79,7 +79,8 @@ uses
   System.SysUtils,
   Vcl.Forms,
   DPM.Core.Utils.Directory,
-  DPM.Core.Utils.System;
+  DPM.Core.Utils.System,
+  DPM.Core.Diagnostics;
 
 { helpers }
 
@@ -141,7 +142,7 @@ begin
     //of them matches here.
     if not designEntry.ResolvePrebuiltPlatform(entryPlatform, prebuiltError) then
     begin
-      FLogger.Warning('Package [' + node.Id + '] : ' + prebuiltError);
+      FLogger.Warning(TWarningCode.W9101_DesignPackageLoadFailed, 'The design package of [' + node.Id + '] was not loaded : ' + prebuiltError);
       exit;
     end;
     if entryPlatform <> loadPlatform then
@@ -156,7 +157,7 @@ begin
     exactPath := TPath.Combine(packagePath, projectBase);
     if not TFile.Exists(exactPath) then
     begin
-      FLogger.Warning('Prebuilt design BPL for [' + node.Id + '] was not found at [' + exactPath + '].');
+      FLogger.Warning(TWarningCode.W9102_DesignPackageNotFound, 'The prebuilt design BPL of [' + node.Id + '] was not found at [' + exactPath + '].');
       exit;
     end;
     bplPath := exactPath;
@@ -196,7 +197,7 @@ begin
 
   if (matches = nil) or (matches.Count = 0) then
   begin
-    FLogger.Warning('Could not locate design BPL for [' + node.Id + '] at [' + exactPath + '] - set LibPrefix/LibSuffix on the design entry to match the compiled .bpl name.');
+    FLogger.Warning(TWarningCode.W9102_DesignPackageNotFound, 'The design BPL of [' + node.Id + '] was not found at [' + exactPath + '] - set LibPrefix/LibSuffix on the design entry to match the compiled .bpl name.');
     exit;
   end;
 
@@ -227,7 +228,7 @@ begin
       candidates := candidates + ', ';
     candidates := candidates + ExtractFileName(matches[i]);
   end;
-  FLogger.Warning('Multiple candidate design BPLs for [' + node.Id + '] in [' + bplFolder + '] : ' + candidates + ' - set LibPrefix/LibSuffix on the design entry to disambiguate.');
+  FLogger.Warning(TWarningCode.W9103_DesignPackageAmbiguous, 'More than one file in [' + bplFolder + '] could be the design BPL of [' + node.Id + '] : ' + candidates + ' - set LibPrefix/LibSuffix on the design entry to pick one.');
 end;
 
 //returns true if a loaded package shares this BPL's filename.
@@ -270,6 +271,7 @@ var
   loaded : TDPMLoadedBPL;
   installOk : boolean;
   exactPath : boolean;
+  loadError : string;
 begin
   result := true;
   lcBpl := LowerCase(bplPath);
@@ -301,13 +303,14 @@ begin
       exit;
     end;
     //Same filename, different location: a foreign (non-DPM) package. Leave it alone.
-    FLogger.Warning('Design BPL [' + ExtractFileName(bplPath) + '] is already loaded by the IDE from another location - not tracking to avoid a conflict.');
+    FLogger.Warning(TWarningCode.W9104_DesignPackageConflict, 'The design BPL [' + ExtractFileName(bplPath) + '] is already loaded by the IDE from another location - leaving it alone.');
     exit;
   end;
 
   FPathManager.EnsurePath(bplFolder);
 
   installOk := false;
+  loadError := '';
   RunOnMainThread(
     procedure
     var
@@ -319,7 +322,7 @@ begin
       except
         on e : Exception do
         begin
-          FLogger.Error('Exception loading design BPL [' + bplPath + '] : ' + e.Message);
+          loadError := ' : ' + e.Message;
           installOk := false;
         end;
       end;
@@ -327,7 +330,7 @@ begin
 
   if not installOk then
   begin
-    FLogger.Error('Failed to load design BPL [' + bplPath + ']');
+    FLogger.Warning(TWarningCode.W9101_DesignPackageLoadFailed, 'The IDE did not load the design BPL [' + bplPath + ']' + loadError);
     FPathManager.RemovePath(bplFolder);
     result := false;
     exit;
@@ -346,6 +349,7 @@ procedure TDPMIDEPackageInstallerContext.ReleaseBPLRef(const lcBplPath : string;
 var
   loaded : TDPMLoadedBPL;
   uninstallOk : boolean;
+  unloadError : string;
 begin
   if not FLoadedBPLs.TryGetValue(lcBplPath, loaded) then
     exit;
@@ -366,6 +370,7 @@ begin
   end;
 
   uninstallOk := false;
+  unloadError := '';
   RunOnMainThread(
     procedure
     var
@@ -377,14 +382,14 @@ begin
       except
         on e : Exception do
         begin
-          FLogger.Error('Exception unloading design BPL [' + loaded.BPLPath + '] : ' + e.Message);
+          unloadError := ' : ' + e.Message;
           uninstallOk := false;
         end;
       end;
     end);
 
   if not uninstallOk then
-    FLogger.Warning('IDE reported failure unloading design BPL [' + ExtractFileName(loaded.BPLPath) + '] - removing from tracking anyway.');
+    FLogger.Warning(TWarningCode.W3014_DesignPackageUnloadFailed, 'The IDE did not unload the design BPL [' + ExtractFileName(loaded.BPLPath) + '] - DPM has stopped tracking it' + unloadError);
 
   FPathManager.RemovePath(loaded.BPLFolder);
   FLoadedBPLs.Remove(lcBplPath);

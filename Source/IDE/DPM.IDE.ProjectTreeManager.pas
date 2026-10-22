@@ -310,7 +310,7 @@ begin
     except
       on e : Exception do
       begin
-        FLogger.Error(e.Message);
+        LogException(FLogger, e);
         OutputDebugString(PChar(e.Message));
         exit;
       end;

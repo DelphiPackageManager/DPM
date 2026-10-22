@@ -157,7 +157,8 @@ uses
   DPM.Core.SBOM.Interfaces,
   DPM.Core.Utils.Config,
   DPM.IDE.Constants,
-  DPM.IDE.Logger;
+  DPM.IDE.Logger,
+  DPM.Core.Diagnostics;
 
 { TDPMSBOMProjectMenuNotifier }
 
@@ -435,6 +436,7 @@ var
   ideLogger : IDPMIDELogger;
   cancelTokenSource : ICancellationTokenSource;
   ok : boolean;
+  guard : TOperationGuard;
 begin
   if (targetPath = '') or (not FileExists(targetPath)) then
   begin
@@ -485,16 +487,14 @@ begin
     logger.Information('[SBOM] generating SBOM for ' + targetPath + ' -> ' + outDir);
 
     cancelTokenSource := TCancellationTokenSourceFactory.Create;
+    guard := TOperationGuard.Start(logger);
     try
       ok := generator.Generate(cancelTokenSource.Token, options);
     except
       on e : Exception do
-      begin
-        logger.Error('[SBOM] generation failed : ' + e.Message);
-        MessageDlg('SBOM generation failed - see DPM message tab for details.', mtError, [mbOK], 0);
-        exit;
-      end;
+        ok := guard.Failed(e);
     end;
+    guard.Finish(ok, false, 'Generating the SBOM');
 
     if ok then
     begin
@@ -503,7 +503,7 @@ begin
     end
     else
     begin
-      logger.Error('[SBOM] generation reported failure - check the DPM message tab.');
+      logger.Information('[SBOM] the SBOM was not generated.', true);
       MessageDlg('SBOM generation reported a failure. See the DPM message tab for details.',
                  mtWarning, [mbOK], 0);
     end;

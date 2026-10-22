@@ -218,6 +218,14 @@ type
     W8110_BuildConfigNotFound,
     W8114_MapFileNotFound,
     W8116_MapFileUnreadable,
+    W9101_DesignPackageLoadFailed,
+    W9102_DesignPackageNotFound,
+    W9103_DesignPackageAmbiguous,
+    W9104_DesignPackageConflict,
+    W9105_EnvironmentVariableConflict,
+    W9106_OrphanCleanupFailed,
+    W9201_SPDXListUnavailable,
+    W9202_TestPackageNotRemoved,
     W9501_MCPConnectionFailed,
     W9502_MCPFrameLogUnwritable
   );
@@ -397,6 +405,14 @@ const
     (Number : 8110; Title : 'The requested build configuration is not in the project'),
     (Number : 8114; Title : 'The MAP file was not found'),
     (Number : 8116; Title : 'The MAP file could not be read'),
+    (Number : 9101; Title : 'A design package could not be loaded into the IDE'),
+    (Number : 9102; Title : 'The design package to load into the IDE was not found'),
+    (Number : 9103; Title : 'More than one file could be the design package to load'),
+    (Number : 9104; Title : 'A design package with the same name is already loaded from another location'),
+    (Number : 9105; Title : 'Packages set an IDE environment variable to different values'),
+    (Number : 9106; Title : 'Design packages left by a previous IDE session could not be cleaned up'),
+    (Number : 9201; Title : 'The SPDX licence list could not be loaded'),
+    (Number : 9202; Title : 'The tested package could not be removed from the package cache'),
     (Number : 9501; Title : 'The MCP server stopped because its connection failed'),
     (Number : 9502; Title : 'Unable to write the MCP frame log')
   );

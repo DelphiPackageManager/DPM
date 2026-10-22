@@ -757,7 +757,7 @@ begin
         Dec(FRequestsInFlight);
         if FClosing then
           exit;
-        FLogger.Error(e.Message);
+        LogException(FLogger, e);
       end)
       .OnCancellation(
       procedure
@@ -803,7 +803,7 @@ begin
       if FClosing then
         exit;
       FAvailableActivity.Stop;
-      FLogger.Error(e.Message);
+      LogException(FLogger, e);
     end)
     .OnCancellation(
     procedure
@@ -1353,7 +1353,7 @@ begin
     begin
       if FClosing then
         exit;
-      FLogger.Error(e.Message);
+      FLogger.Debug('DPMIDE : Unable to get the icon for [' + Id + '.' + Version + '] : ' + e.Message);
     end)
     .Await(
     procedure(const theResult : IPackageIcon)
