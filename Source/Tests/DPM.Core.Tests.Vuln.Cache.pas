@@ -40,41 +40,8 @@ uses
   DPM.Core.Utils.DateTime,
   DPM.Core.Logging,
   DPM.Core.Vuln.Interfaces,
-  DPM.Core.Vuln.Cache;
-
-type
-  TSilentLogger = class(TInterfacedObject, ILogger)
-  protected
-    function GetVerbosity : TVerbosity;
-    procedure SetVerbosity(const value : TVerbosity);
-    procedure Debug(const data : string);
-    procedure Verbose(const data : string; const important : Boolean = False);
-    procedure Information(const data : string; const important : Boolean = False);
-    procedure Success(const data : string; const important : Boolean = False);
-    procedure Warning(const data : string; const important : Boolean = False);
-    procedure Error(const data : string);
-    procedure NewLine;
-    procedure Clear;
-    function GetUseColor : boolean;
-    procedure SetUseColor(const value : boolean);
-  end;
-
-function TSilentLogger.GetVerbosity : TVerbosity;        begin result := TVerbosity.Quiet; end;
-procedure TSilentLogger.SetVerbosity(const value : TVerbosity); begin end;
-procedure TSilentLogger.Clear;
-begin
-
-end;
-
-procedure TSilentLogger.Debug(const data : string);       begin end;
-procedure TSilentLogger.Verbose(const data : string; const important : Boolean = False);     begin end;
-procedure TSilentLogger.Information(const data : string; const important : Boolean = False); begin end;
-procedure TSilentLogger.Success(const data : string; const important : Boolean = False);     begin end;
-procedure TSilentLogger.Warning(const data : string; const important : Boolean = False);     begin end;
-procedure TSilentLogger.Error(const data : string); begin end;
-procedure TSilentLogger.NewLine; begin end;
-function TSilentLogger.GetUseColor : boolean; begin result := false; end;
-procedure TSilentLogger.SetUseColor(const value : boolean); begin end;
+  DPM.Core.Vuln.Cache,
+  TestLogger;
 
 procedure TVulnCacheTests.Setup;
 begin
@@ -98,7 +65,7 @@ var
   retrieved : string;
   payload : string;
 begin
-  cache := TVulnResponseCache.Create(TSilentLogger.Create, FCacheDir, 24);
+  cache := TVulnResponseCache.Create(TTestLogger.Create, FCacheDir, 24);
   payload := '{"vulnIds":["GHSA-1","GHSA-2"]}';
   cache.Put('pkg:generic/dpm/foo@1.0.0', 'osv', payload);
   Assert.IsTrue(cache.TryGet('pkg:generic/dpm/foo@1.0.0', 'osv', retrieved));
@@ -113,7 +80,7 @@ var
   cache : IVulnResponseCache;
   retrieved : string;
 begin
-  cache := TVulnResponseCache.Create(TSilentLogger.Create, FCacheDir, 24);
+  cache := TVulnResponseCache.Create(TTestLogger.Create, FCacheDir, 24);
   Assert.IsFalse(cache.TryGet('pkg:generic/dpm/never-cached@1.0.0', 'osv', retrieved));
   Assert.AreEqual('', retrieved);
 end;
@@ -127,7 +94,7 @@ var
   entry : TJsonObject;
   raw : string;
 begin
-  cache := TVulnResponseCache.Create(TSilentLogger.Create, FCacheDir, 24);
+  cache := TVulnResponseCache.Create(TTestLogger.Create, FCacheDir, 24);
   cache.Put('pkg:generic/dpm/aged@1.0.0', 'osv', '{"vulnIds":[]}');
 
   //Tamper with the on-disk cachedAt to be 48h old.
@@ -152,7 +119,7 @@ var
   cache : IVulnResponseCache;
   retrieved : string;
 begin
-  cache := TVulnResponseCache.Create(TSilentLogger.Create, FCacheDir, 24);
+  cache := TVulnResponseCache.Create(TTestLogger.Create, FCacheDir, 24);
   cache.Put('pkg:generic/dpm/skip@1.0.0', 'osv', '{"vulnIds":[]}');
   cache.BypassReads := true;
   Assert.IsFalse(cache.TryGet('pkg:generic/dpm/skip@1.0.0', 'osv', retrieved));
@@ -166,7 +133,7 @@ var
   cache : IVulnResponseCache;
   retrieved : string;
 begin
-  cache := TVulnResponseCache.Create(TSilentLogger.Create, FCacheDir, 24);
+  cache := TVulnResponseCache.Create(TTestLogger.Create, FCacheDir, 24);
   cache.BypassReads := true;
   //Even with reads bypassed, Put should still persist - so that the NEXT run
   //(without -no-cache) finds fresh data instead of having to re-query.

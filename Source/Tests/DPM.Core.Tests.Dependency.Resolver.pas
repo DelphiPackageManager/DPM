@@ -1286,7 +1286,7 @@ begin
   projectRefs.Add(xLocal);
 
   logger := FLogger as TTestLogger;
-  logger.Messages.Clear;
+  logger.Clear;
   ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, b, projectRefs, graph, resolved);
   Assert.IsTrue(ok, 'an existing project-group version mismatch the install does not touch must not fail the install');
   Assert.IsFalse(logger.Logged('error', 'project group'), 'an existing mismatch must not be logged as an error');
@@ -1806,7 +1806,7 @@ begin
                                            TResolvedPackage.Create(base1, MakeRange('1.0.1'), 'Ext', cAppProject)]);
 
   logger := FLogger as TTestLogger;
-  logger.Messages.Clear;
+  logger.Clear;
   ok := Resolve(cAppProject);
   Assert.IsFalse(ok, 'app project : Core 1.0.3 and Ext 1.0.1 cannot share a Base');
   Assert.IsFalse(logger.Logged('error', 'exceeded'), 'resolve must end on the conflict, not the iteration limit');
@@ -2101,7 +2101,7 @@ begin
 
     newPackages := TCollections.CreateList<IPackageInfo>;
     newPackages.Add(MakeInfo('Ext', '1.0.1', [MakeDep('Base', '1.0.1')]));
-    logger.Messages.Clear;
+    logger.Clear;
     ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestsProject, FOptions, newPackages, projectRefs, graph, resolved, nil, nil, nil);
     Assert.IsFalse(ok, 'tests must conflict with app''s staged Base 1.0.3');
     Assert.IsTrue(logger.Logged('error', cAppProject), 'the conflict should name app');
@@ -2129,7 +2129,7 @@ begin
   projects := TCollections.CreateList<string>;
   projects.Add(cAppProject);
   logger := FLogger as TTestLogger;
-  logger.Messages.Clear;
+  logger.Clear;
   FContextIntf.BeginOperation(projects);
   try
     ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cAppProject, FOptions, FamilyNewPackages('1.0.3', '1.0.3'), projectRefs, graph, resolved, nil, nil, nil);

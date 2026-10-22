@@ -2365,7 +2365,7 @@ begin
     except
       on e: Exception do
       begin
-        FLogger.Error(e.Message);
+        LogException(FLogger, e);
         result := false;
       end;
     end;
@@ -2402,7 +2402,7 @@ begin
     except
       on e: Exception do
       begin
-        FLogger.Error(e.Message);
+        LogException(FLogger, e);
         result := false;
       end;
     end;
@@ -3194,7 +3194,7 @@ begin
   except
     on e: Exception do
     begin
-      FLogger.Error(e.Message);
+      LogException(FLogger, e);
       result := false;
     end;
   end;

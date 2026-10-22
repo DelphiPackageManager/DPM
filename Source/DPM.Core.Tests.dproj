@@ -93,6 +93,7 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
+        <DCCReference Include="Core\Logging\DPM.Core.Diagnostics.pas"/>
         <DCCReference Include="Core\Logging\DPM.Core.Logging.pas"/>
         <DCCReference Include="Core\DPM.Core.Constants.pas"/>
         <DCCReference Include="Core\DPM.Core.Init.pas"/>
@@ -271,6 +272,7 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Dependency.Fakes.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Repository.RequestCache.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Options.Install.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Diagnostics.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Package.InstallPlanner.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Package.Manifest.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.PackageIdentity.pas"/>

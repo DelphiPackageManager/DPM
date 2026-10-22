@@ -37,7 +37,8 @@ uses
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.IDE.PathManager,
-  DPM.IDE.EnvironmentVariableManager;
+  DPM.IDE.EnvironmentVariableManager,
+  TestLogger;
 
 const
   cFoo = 'DPM_TEST_FOO';
@@ -47,39 +48,11 @@ const
   cProjP = 'c:\group\projp.dproj';
   cProjQ = 'c:\group\projq.dproj';
 
-type
-  //Captures warnings so we can assert the conflict path fired.
-  TCapturingLogger = class(TInterfacedObject, ILogger)
-  public
-    Warnings : string;
-    procedure Debug(const data : string);
-    procedure Error(const data : string);
-    procedure Information(const data : string; const important : boolean = false);
-    procedure Success(const data : string; const important : boolean = false);
-    procedure Verbose(const data : string; const important : boolean = false);
-    procedure Warning(const data : string; const important : boolean = false);
-    procedure Clear;
-    procedure NewLine;
-    function GetVerbosity : TVerbosity;
-    procedure SetVerbosity(const value : TVerbosity);
-  end;
-
-procedure TCapturingLogger.Debug(const data : string); begin end;
-procedure TCapturingLogger.Error(const data : string); begin end;
-procedure TCapturingLogger.Information(const data : string; const important : boolean); begin end;
-procedure TCapturingLogger.Success(const data : string; const important : boolean); begin end;
-procedure TCapturingLogger.Verbose(const data : string; const important : boolean); begin end;
-procedure TCapturingLogger.Warning(const data : string; const important : boolean); begin Warnings := Warnings + data + #13#10; end;
-procedure TCapturingLogger.Clear; begin end;
-procedure TCapturingLogger.NewLine; begin end;
-function TCapturingLogger.GetVerbosity : TVerbosity; begin result := TVerbosity.Normal; end;
-procedure TCapturingLogger.SetVerbosity(const value : TVerbosity); begin end;
-
 { helpers }
 
-function NewManager(out logger : TCapturingLogger) : IDPMIDEEnvironmentVariableManager;
+function NewManager(out logger : TTestLogger) : IDPMIDEEnvironmentVariableManager;
 begin
-  logger := TCapturingLogger.Create;
+  logger := TTestLogger.Create;
   //ILogger is reference counted - the manager holds it alive; the out param is a borrowed view.
   result := TDPMIDEEnvironmentVariableManager.Create(logger, TDPMIDEPathManager.Create);
 end;
@@ -109,7 +82,7 @@ end;
 procedure TEnvironmentVariableManagerTests.SamePackageProject_RefCounts_NotClearedUntilLastPackageGone;
 var
   mgr : IDPMIDEEnvironmentVariableManager;
-  logger : TCapturingLogger;
+  logger : TTestLogger;
 begin
   mgr := NewManager(logger);
   mgr.SetVariable(cFoo, 'a', cProjP, 'pkgA');
@@ -124,7 +97,7 @@ end;
 procedure TEnvironmentVariableManagerTests.SameVar_TwoPackages_OneProject_SurvivesPartialUninstall;
 var
   mgr : IDPMIDEEnvironmentVariableManager;
-  logger : TCapturingLogger;
+  logger : TTestLogger;
 begin
   //THE REGRESSION: two packages in ONE project both set FOO. Uninstalling one must not clear it.
   mgr := NewManager(logger);
@@ -139,7 +112,7 @@ end;
 procedure TEnvironmentVariableManagerTests.SameVar_TwoProjects_SurvivesClosingOneProject;
 var
   mgr : IDPMIDEEnvironmentVariableManager;
-  logger : TCapturingLogger;
+  logger : TTestLogger;
 begin
   mgr := NewManager(logger);
   mgr.SetVariable(cFoo, 'a', cProjP, 'pkgA');
@@ -153,19 +126,19 @@ end;
 procedure TEnvironmentVariableManagerTests.ConflictingValues_LastWins_AndWarns;
 var
   mgr : IDPMIDEEnvironmentVariableManager;
-  logger : TCapturingLogger;
+  logger : TTestLogger;
 begin
   mgr := NewManager(logger);
   mgr.SetVariable(cBar, 'x', cProjP, 'pkgA');
   mgr.SetVariable(cBar, 'y', cProjP, 'pkgB');
   Assert.AreEqual('y', GetEnv(cBar), 'last applied value wins');
-  Assert.IsTrue(ContainsText(logger.Warnings, cBar), 'a conflict warning naming the variable is logged');
+  Assert.IsTrue(logger.Logged('warning', cBar), 'a conflict warning naming the variable is logged');
 end;
 
 procedure TEnvironmentVariableManagerTests.ConflictingValues_RemoveLast_RevertsToSurvivor;
 var
   mgr : IDPMIDEEnvironmentVariableManager;
-  logger : TCapturingLogger;
+  logger : TTestLogger;
 begin
   mgr := NewManager(logger);
   mgr.SetVariable(cBar, 'x', cProjP, 'pkgA');
@@ -177,7 +150,7 @@ end;
 procedure TEnvironmentVariableManagerTests.PreExistingValue_RestoredOnLastRelease;
 var
   mgr : IDPMIDEEnvironmentVariableManager;
-  logger : TCapturingLogger;
+  logger : TTestLogger;
 begin
   WinApi.Windows.SetEnvironmentVariable(PChar(cBaz), 'original');
   mgr := NewManager(logger);
@@ -190,7 +163,7 @@ end;
 procedure TEnvironmentVariableManagerTests.NonExisting_ClearedOnLastRelease;
 var
   mgr : IDPMIDEEnvironmentVariableManager;
-  logger : TCapturingLogger;
+  logger : TTestLogger;
 begin
   Assert.AreEqual('', GetEnv(cBaz), 'precondition: not set');
   mgr := NewManager(logger);
@@ -202,7 +175,7 @@ end;
 procedure TEnvironmentVariableManagerTests.Path_TwoPackages_SameDir_RefCounted;
 var
   mgr : IDPMIDEEnvironmentVariableManager;
-  logger : TCapturingLogger;
+  logger : TTestLogger;
 begin
   mgr := NewManager(logger);
   mgr.SetVariable('PATH', cTestDir, cProjP, 'pkgA');

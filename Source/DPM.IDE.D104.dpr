@@ -62,6 +62,7 @@ uses
   DPM.Core.Dependency.Resolution in 'Core\Dependency\DPM.Core.Dependency.Resolution.pas',
   DPM.Core.Dependency.Resolver in 'Core\Dependency\DPM.Core.Dependency.Resolver.pas',
   DPM.Core.Dependency.Version in 'Core\Dependency\DPM.Core.Dependency.Version.pas',
+  DPM.Core.Diagnostics in 'Core\Logging\DPM.Core.Diagnostics.pas',
   DPM.Core.Logging in 'Core\Logging\DPM.Core.Logging.pas',
   DPM.Core.Options.Base in 'Core\Options\DPM.Core.Options.Base.pas',
   DPM.Core.Options.Cache in 'Core\Options\DPM.Core.Options.Cache.pas',

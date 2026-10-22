@@ -96,26 +96,6 @@ type
     procedure CollectProjects(const projects : IList<TInstallPlanProject>);
   end;
 
-  ///<summary> Trial resolves are expected to fail - that's how a companion's version is chosen - so their
-  ///  output goes to Debug rather than alarming the user. </summary>
-  TDemotingLogger = class(TInterfacedObject, ILogger)
-  private
-    FTarget : ILogger;
-  protected
-    procedure Debug(const data : string);
-    procedure Verbose(const data : string; const important : boolean = false);
-    procedure Information(const data : string; const important : boolean = false);
-    procedure Warning(const data : string; const important : boolean = false);
-    procedure Error(const data : string);
-    procedure Success(const data : string; const important : boolean = false);
-    procedure Clear;
-    procedure NewLine;
-    function GetVerbosity : TVerbosity;
-    procedure SetVerbosity(const value : TVerbosity);
-  public
-    constructor Create(const target : ILogger);
-  end;
-
   //a range one of the plan's packages (or their dependencies) requires of a package.
   TDemand = record
     Range : TVersionRange;
@@ -406,61 +386,6 @@ begin
   end;
 end;
 
-{ TDemotingLogger }
-
-constructor TDemotingLogger.Create(const target : ILogger);
-begin
-  inherited Create;
-  FTarget := target;
-end;
-
-procedure TDemotingLogger.Clear;
-begin
-end;
-
-procedure TDemotingLogger.Debug(const data : string);
-begin
-  FTarget.Debug(data);
-end;
-
-procedure TDemotingLogger.Error(const data : string);
-begin
-  FTarget.Debug(data);
-end;
-
-function TDemotingLogger.GetVerbosity : TVerbosity;
-begin
-  result := FTarget.Verbosity;
-end;
-
-procedure TDemotingLogger.Information(const data : string; const important : boolean);
-begin
-  FTarget.Debug(data);
-end;
-
-procedure TDemotingLogger.NewLine;
-begin
-end;
-
-procedure TDemotingLogger.SetVerbosity(const value : TVerbosity);
-begin
-end;
-
-procedure TDemotingLogger.Success(const data : string; const important : boolean);
-begin
-  FTarget.Debug(data);
-end;
-
-procedure TDemotingLogger.Verbose(const data : string; const important : boolean);
-begin
-  FTarget.Debug(data);
-end;
-
-procedure TDemotingLogger.Warning(const data : string; const important : boolean);
-begin
-  FTarget.Debug(data);
-end;
-
 { TUpgradePlanBuilder }
 
 constructor TUpgradePlanBuilder.Create(const cancellationToken : ICancellationToken; const logger : ILogger; const config : IConfiguration; const options : TSearchOptions;
@@ -481,6 +406,8 @@ begin
   FPlanVersions := TCollections.CreateDictionary<string, TPackageVersion>;
   FCompanionReasons := TCollections.CreateDictionary<string, string>;
   FDemands := TCollections.CreateDictionary<string, IList<TDemand>>;
+  //Trial resolves are expected to fail - that's how a companion's version is chosen - so their output
+  //goes to Debug rather than alarming the user.
   //a context of its own : trial resolves must not be influenced by (or recorded in) the group's resolutions.
   quietLogger := TDemotingLogger.Create(logger);
   isolatedContext := TCorePackageInstallerContext.Create(quietLogger);

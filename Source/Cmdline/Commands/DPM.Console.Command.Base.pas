@@ -55,6 +55,7 @@ type
 implementation
 
 uses
+  System.SysUtils,
   DPM.Core.Constants,
   DPM.Console.Options;
 
@@ -76,9 +77,17 @@ end;
 function TBaseCommand.ExecuteCommand(const cancellationToken : ICancellationToken): TExitCode;
 begin
   if not FConfigurationManager.EnsureDefaultConfig then
-    result := TExitCode.InitException
-  else
+    exit(TExitCode.InitException);
+  try
     result := Execute(cancellationToken);
+  except
+    //the last place a command's exception can be reported through the logger, with its code.
+    on e : Exception do
+    begin
+      LogException(FLogger, e);
+      result := TExitCode.UnhandledException;
+    end;
+  end;
 end;
 
 function TBaseCommand.ForceNoBanner: boolean;

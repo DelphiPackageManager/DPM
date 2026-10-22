@@ -55,27 +55,19 @@ type
 
   end;
 
-  TDPMIDELogger = class(TInterfacedObject, IDPMIDELogger, ILogger )
+  TDPMIDELogger = class(TBaseLogger, IDPMIDELogger, ILogger)
   private
     {$IFDEF DEBUG}
     FMessageServices : IOTAMessageServices;
     FMessageGroup : IOTAMessageGroup;
     {$ENDIF}
-    FVerbosity : TVerbosity;
     FDPMMessageService : IDPMIDEMessageService;
-
+    procedure TaskStarted(const cancellationTokenSource : ICancellationTokenSource; const task : TMessageTask);
   protected
-    procedure Debug(const data : string);
-    procedure Error(const data : string);
-    procedure Information(const data : string; const important : Boolean = False);
-    procedure Success(const data : string; const important : Boolean = False);
-    procedure Verbose(const data : string; const important : Boolean = False);
-    procedure Warning(const data : string; const important : Boolean = False);
-    procedure NewLine;
-    function GetVerbosity : TVerbosity;
-    procedure SetVerbosity(const value : TVerbosity);
+    procedure WriteMessage(const level : TLogLevel; const text : string; const important : boolean); override;
+    procedure DoClear; override;
+    procedure DoNewLine; override;
 
-    procedure Clear;
     procedure ShowMessageTab;
 
     procedure StartProject(const fileName : string; const msg : string = '');
@@ -107,16 +99,9 @@ uses
 
 { TDPMIDELogger }
 
-procedure TDPMIDELogger.Clear;
-begin
-{$IFDEF DEBUG}
-  FMessageServices.ClearMessageGroup(FMessageGroup);
-{$ENDIF}
-  FDPMMessageService.Clear;
-end;
-
 constructor TDPMIDELogger.Create(const dpmMessageService : IDPMIDEMessageService);
 begin
+  inherited Create;
   FDPMMessageService := dpmMessageService;
   {$IFDEF DEBUG}
   FMessageServices := BorlandIDEServices as IOTAMessageServices;
@@ -124,21 +109,7 @@ begin
   FMessageGroup.CanClose := false;
   FMessageGroup.AutoScroll := true;
   {$ENDIF}
-  FVerbosity := TVerbosity.Normal; // we can set this from the options.
-end;
-
-procedure TDPMIDELogger.Debug(const data : string);
-{$IFDEF DEBUG}
-var
-  lineRef : Pointer;
-{$ENDIF}
-begin
-  if (FVerbosity < TVerbosity.Debug) then
-    exit;
-{$IFDEF DEBUG}
-  FMessageServices.AddToolMessage('', 'DEBUG: ' + data, '', 0, 0, nil, lineRef, FMessageGroup);
-{$ENDIF}
-  FDPMMessageService.Debug('DEBUG: ' + data);
+  Verbosity := TVerbosity.Normal; // we can set this from the options.
 end;
 
 destructor TDPMIDELogger.Destroy;
@@ -148,6 +119,55 @@ begin
   FMessageServices := nil;
 {$ENDIF}
   inherited;
+end;
+
+procedure TDPMIDELogger.WriteMessage(const level : TLogLevel; const text : string; const important : boolean);
+{$IFDEF DEBUG}
+var
+  lineRef : Pointer;
+{$ENDIF}
+begin
+{$IFDEF DEBUG}
+  if level = TLogLevel.Debug then
+    FMessageServices.AddToolMessage('', 'DEBUG: ' + text, '', 0, 0, nil, lineRef, FMessageGroup)
+  else
+    FMessageServices.AddToolMessage('', text, '', 0, 0, nil, lineRef, FMessageGroup);
+{$ENDIF}
+  case level of
+    TLogLevel.Debug : FDPMMessageService.Debug('DEBUG: ' + text);
+    TLogLevel.Verbose : FDPMMessageService.Verbose(text, important);
+    TLogLevel.Information : FDPMMessageService.Information(text, important);
+    TLogLevel.Success : FDPMMessageService.Success(text, important);
+    TLogLevel.Warning : FDPMMessageService.Warning(text, important);
+    TLogLevel.Error : FDPMMessageService.Error(text);
+  end;
+end;
+
+procedure TDPMIDELogger.DoClear;
+begin
+{$IFDEF DEBUG}
+  FMessageServices.ClearMessageGroup(FMessageGroup);
+{$ENDIF}
+  FDPMMessageService.Clear;
+end;
+
+procedure TDPMIDELogger.DoNewLine;
+{$IFDEF DEBUG}
+var
+  lineRef : Pointer;
+{$ENDIF}
+begin
+{$IFDEF DEBUG}
+  FMessageServices.AddToolMessage('', ' ', '', 0, 0, nil, lineRef, FMessageGroup);
+{$ENDIF}
+  FDPMMessageService.NewLine;
+end;
+
+procedure TDPMIDELogger.TaskStarted(const cancellationTokenSource : ICancellationTokenSource; const task : TMessageTask);
+begin
+  //a new task - an error the previous task reported must show again if this one hits it too.
+  StartDiagnosticScope;
+  FDPMMessageService.TaskStarted(cancellationTokenSource, task);
 end;
 
 procedure TDPMIDELogger.EndInstall(const success  : boolean);
@@ -182,54 +202,6 @@ begin
   FDPMMessageService.TaskDone(success);
 end;
 
-procedure TDPMIDELogger.Error(const data : string);
-{$IFDEF DEBUG}
-var
-  lineRef : Pointer;
-{$ENDIF}
-begin
-{$IFDEF DEBUG}
-  FMessageServices.AddToolMessage('', 'ERR: ' + data, '', 0, 0, nil, lineRef, FMessageGroup);
-{$ENDIF}
-  FDPMMessageService.Error(data);
-end;
-
-function TDPMIDELogger.GetVerbosity : TVerbosity;
-begin
-  result := FVerbosity;
-end;
-
-procedure TDPMIDELogger.Information(const data : string; const important : Boolean);
-{$IFDEF DEBUG}
-var
-  lineRef : Pointer;
-{$ENDIF}
-begin
-  if (FVerbosity < TVerbosity.Normal) and (not important) then
-    exit;
-{$IFDEF DEBUG}
-  FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
-{$ENDIF}
-  FDPMMessageService.Information(data, important);
-end;
-
-procedure TDPMIDELogger.NewLine;
-{$IFDEF DEBUG}
-var
-  lineRef : Pointer;
-{$ENDIF}
-begin
-{$IFDEF DEBUG}
-  FMessageServices.AddToolMessage('', ' ', '', 0, 0, nil, lineRef, FMessageGroup);
-{$ENDIF}
-  FDPMMessageService.NewLine;
-end;
-
-procedure TDPMIDELogger.SetVerbosity(const value : TVerbosity);
-begin
-  FVerbosity := value;
-end;
-
 procedure TDPMIDELogger.ShowMessageTab;
 begin
 {$IFDEF DEBUG}
@@ -239,7 +211,7 @@ end;
 
 procedure TDPMIDELogger.StartInstall(const cancellationTokenSource : ICancellationTokenSource);
 begin
-  FDPMMessageService.TaskStarted(cancellationTokenSource, mtInstall);
+  TaskStarted(cancellationTokenSource, mtInstall);
 end;
 
 procedure TDPMIDELogger.StartProject(const fileName : string; const msg : string);
@@ -256,17 +228,17 @@ begin
 {$IFDEF DEBUG}
   FMessageServices.AddTitleMessage('Restoring DPM packages', FMessageGroup);
 {$ENDIF}
-  FDPMMessageService.TaskStarted(cancellationTokenSource, mtRestore);
+  TaskStarted(cancellationTokenSource, mtRestore);
 end;
 
 procedure TDPMIDELogger.StartUnInstall(const cancellationTokenSource : ICancellationTokenSource);
 begin
-  FDPMMessageService.TaskStarted(cancellationTokenSource, mtUninstall);
+  TaskStarted(cancellationTokenSource, mtUninstall);
 end;
 
 procedure TDPMIDELogger.StartVerifyCache(const cancellationTokenSource : ICancellationTokenSource);
 begin
-  FDPMMessageService.TaskStarted(cancellationTokenSource, mtVerifyCache);
+  TaskStarted(cancellationTokenSource, mtVerifyCache);
 end;
 
 procedure TDPMIDELogger.EndVerifyCache(const success : boolean);
@@ -274,45 +246,4 @@ begin
   FDPMMessageService.TaskDone(success);
 end;
 
-procedure TDPMIDELogger.Success(const data: string; const important: Boolean);
-{$IFDEF DEBUG}
-var
-  lineRef : Pointer;
-{$ENDIF}
-begin
-  if (FVerbosity < TVerbosity.Normal) and (not important) then
-    exit;
-{$IFDEF DEBUG}
-  FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
-{$ENDIF}
-  FDPMMessageService.Success(data, important);
-end;
-
-procedure TDPMIDELogger.Verbose(const data : string; const important : Boolean);
-{$IFDEF DEBUG}
-var
-  lineRef : Pointer;
-{$ENDIF}
-begin
-  if (FVerbosity < TVerbosity.Detailed) then
-    exit;
-{$IFDEF DEBUG}
-  FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
-{$ENDIF}
-  FDPMMessageService.Verbose(data, important);
-end;
-
-procedure TDPMIDELogger.Warning(const data : string; const important : Boolean);
-{$IFDEF DEBUG}
-var
-  lineRef : Pointer;
-{$ENDIF}
-begin
-{$IFDEF DEBUG}
-  FMessageServices.AddToolMessage('', data, '', 0, 0, nil, lineRef, FMessageGroup);
-{$ENDIF}
-  FDPMMessageService.Warning(data, important);
-end;
-
 end.
-

@@ -10,51 +10,41 @@ uses
   ;
 
 type
-  TDSpecLogger = class(TInterfacedObject, ILogger)
+  TDSpecLogger = class(TBaseLogger)
   private
     FTarget : TLogMemo;
-    FVerbosity : TVerbosity;
+  protected
+    procedure WriteMessage(const level : TLogLevel; const text : string; const important : boolean); override;
+    procedure DoClear; override;
+    procedure DoNewLine; override;
   public
-    procedure Debug(const data : string);
-    procedure Verbose(const data : string; const important : boolean = false);
-    procedure Information(const data : string; const important : boolean = false);
-    procedure Warning(const data : string; const important : boolean = false);
-    procedure Error(const data : string);
-    procedure Success(const data : string; const important : boolean = false);
-    procedure Clear;
-    procedure NewLine;
-
-    function GetVerbosity : TVerbosity;
-    procedure SetVerbosity(const value : TVerbosity);
     constructor Create(const memo : TLogMemo);
+  end;
+
+  //The logger the pack, sign, test and upload operations log through. They take turns (only one runs
+  //at a time), each with its own page's memo.
+  IDSpecOpsLogger = interface(ILogger)
+    ['{3C0E8B1F-6A52-4D1B-9F3E-2B7A4C9D8E61}']
+    //Points the logger at the operation's memo, clears it and starts a new duplicate scope - call it
+    //before the operation logs anything, so nothing lands on the previous operation's page.
+    procedure BeginOperation(const memo : TLogMemo);
   end;
 
   // Thread-safe ILogger used while packing/signing on a worker thread (the
   // VSoft.Awaitable work function runs off the UI thread). Each line is
   // marshalled onto the UI thread via TThread.Queue before touching the memo,
   // so log output appears live without cross-thread VCL access.
-  TDSpecQueuedLogger = class(TInterfacedObject, ILogger)
+  TDSpecQueuedLogger = class(TBaseLogger, IDSpecOpsLogger)
   private
     FTarget : TLogMemo;
-    FVerbosity : TVerbosity;
     procedure QueueLine(const data : string; const messageType : TLogMessageType);
+  protected
+    procedure WriteMessage(const level : TLogLevel; const text : string; const important : boolean); override;
+    procedure DoClear; override;
+    procedure DoNewLine; override;
+    procedure BeginOperation(const memo : TLogMemo);
   public
-    procedure Debug(const data : string);
-    procedure Verbose(const data : string; const important : boolean = false);
-    procedure Information(const data : string; const important : boolean = false);
-    procedure Warning(const data : string; const important : boolean = false);
-    procedure Error(const data : string);
-    procedure Success(const data : string; const important : boolean = false);
-    procedure Clear;
-    procedure NewLine;
-
-    function GetVerbosity : TVerbosity;
-    procedure SetVerbosity(const value : TVerbosity);
     constructor Create(const memo : TLogMemo);
-    // Retarget output to a different memo. Operations (pack/sign/upload) are
-    // mutually exclusive, so the single shared logger can be pointed at the
-    // active page's memo before each operation starts.
-    procedure SetTarget(const memo : TLogMemo);
   end;
 
 implementation
@@ -62,89 +52,62 @@ implementation
 uses
   System.SysUtils;
 
-{ TDSpecLogger }
-
-procedure TDSpecLogger.Clear;
+function MessageTypeOf(const level : TLogLevel; const important : boolean) : TLogMessageType;
 begin
-  FTarget.Clear;
+  case level of
+    TLogLevel.Debug : result := mtDebug;
+    TLogLevel.Verbose :
+    begin
+      if important then
+        result := mtImportantVerbose
+      else
+        result := mtVerbose;
+    end;
+    TLogLevel.Success :
+    begin
+      if important then
+        result := mtImportantSuccess
+      else
+        result := mtSuccess;
+    end;
+    TLogLevel.Warning :
+    begin
+      if important then
+        result := mtImportantWarning
+      else
+        result := mtWarning;
+    end;
+    TLogLevel.Error : result := mtError;
+  else
+    if important then
+      result := mtImportantInformation
+    else
+      result := mtInformation;
+  end;
 end;
+
+{ TDSpecLogger }
 
 constructor TDSpecLogger.Create(const memo : TLogMemo);
 begin
   inherited Create;
   FTarget := memo;
-  FVerbosity := TVerbosity.Normal;
 end;
 
-procedure TDSpecLogger.Debug(const data: string);
+procedure TDSpecLogger.DoClear;
 begin
-  if FVerbosity < TVerbosity.Debug then
-    exit;
-  FTarget.AddRow(data, mtDebug);
-  FTarget.Flush;
+  FTarget.Clear;
 end;
 
-procedure TDSpecLogger.Error(const data: string);
-begin
-  FTarget.AddRow(data, mtError);
-  FTarget.Flush;
-end;
-
-function TDSpecLogger.GetVerbosity: TVerbosity;
-begin
-  Result := FVerbosity;
-end;
-
-procedure TDSpecLogger.Information(const data: string; const important: boolean);
-begin
-  if (FVerbosity < TVerbosity.Normal) and (not important) then
-    exit;
-  if important then
-    FTarget.AddRow(data, mtImportantInformation)
-  else
-    FTarget.AddRow(data, mtInformation);
-  FTarget.Flush;
-end;
-
-procedure TDSpecLogger.NewLine;
+procedure TDSpecLogger.DoNewLine;
 begin
   FTarget.AddRow('', mtInformation);
   FTarget.Flush;
 end;
 
-procedure TDSpecLogger.SetVerbosity(const value: TVerbosity);
+procedure TDSpecLogger.WriteMessage(const level : TLogLevel; const text : string; const important : boolean);
 begin
-  FVerbosity := value;
-end;
-
-procedure TDSpecLogger.Success(const data: string; const important: boolean);
-begin
-  if (FVerbosity < TVerbosity.Normal) and (not important) then
-    exit;
-  if important then
-    FTarget.AddRow(data, mtImportantSuccess)
-  else
-    FTarget.AddRow(data, mtSuccess);
-  FTarget.Flush;
-end;
-
-procedure TDSpecLogger.Verbose(const data: string; const important: boolean);
-begin
-  if FVerbosity < TVerbosity.Detailed then
-    exit;
-  if important then
-    FTarget.AddRow(data, mtImportantVerbose)
-  else
-    FTarget.AddRow(data, mtVerbose);
-  FTarget.Flush;
-end;
-
-procedure TDSpecLogger.Warning(const data: string; const important: boolean);
-begin
-  if important then
-    FTarget.AddRow(data, mtImportantWarning)
-  else
-    FTarget.AddRow(data, mtWarning);
+  FTarget.AddRow(text, MessageTypeOf(level, important));
   FTarget.Flush;
 end;
 
@@ -154,12 +117,12 @@ constructor TDSpecQueuedLogger.Create(const memo : TLogMemo);
 begin
   inherited Create;
   FTarget := memo;
-  FVerbosity := TVerbosity.Normal;
 end;
 
-procedure TDSpecQueuedLogger.SetTarget(const memo : TLogMemo);
+procedure TDSpecQueuedLogger.BeginOperation(const memo : TLogMemo);
 begin
   FTarget := memo;
+  Clear;
 end;
 
 procedure TDSpecQueuedLogger.QueueLine(const data : string; const messageType : TLogMessageType);
@@ -179,7 +142,7 @@ begin
     end);
 end;
 
-procedure TDSpecQueuedLogger.Clear;
+procedure TDSpecQueuedLogger.DoClear;
 var
   memo : TLogMemo;
 begin
@@ -191,69 +154,14 @@ begin
     end);
 end;
 
-procedure TDSpecQueuedLogger.Debug(const data : string);
-begin
-  if FVerbosity < TVerbosity.Debug then
-    exit;
-  QueueLine(data, mtDebug);
-end;
-
-procedure TDSpecQueuedLogger.Error(const data : string);
-begin
-  QueueLine(data, mtError);
-end;
-
-function TDSpecQueuedLogger.GetVerbosity : TVerbosity;
-begin
-  Result := FVerbosity;
-end;
-
-procedure TDSpecQueuedLogger.Information(const data : string; const important : boolean);
-begin
-  if (FVerbosity < TVerbosity.Normal) and (not important) then
-    exit;
-  if important then
-    QueueLine(data, mtImportantInformation)
-  else
-    QueueLine(data, mtInformation);
-end;
-
-procedure TDSpecQueuedLogger.NewLine;
+procedure TDSpecQueuedLogger.DoNewLine;
 begin
   QueueLine('', mtInformation);
 end;
 
-procedure TDSpecQueuedLogger.SetVerbosity(const value : TVerbosity);
+procedure TDSpecQueuedLogger.WriteMessage(const level : TLogLevel; const text : string; const important : boolean);
 begin
-  FVerbosity := value;
-end;
-
-procedure TDSpecQueuedLogger.Success(const data : string; const important : boolean);
-begin
-  if (FVerbosity < TVerbosity.Normal) and (not important) then
-    exit;
-  if important then
-    QueueLine(data, mtImportantSuccess)
-  else
-    QueueLine(data, mtSuccess);
-end;
-
-procedure TDSpecQueuedLogger.Verbose(const data : string; const important : boolean);
-begin
-  if FVerbosity < TVerbosity.Detailed then
-    exit;
-  if important then
-    QueueLine(data, mtImportantVerbose)
-  else
-    QueueLine(data, mtVerbose);
-end;
-
-procedure TDSpecQueuedLogger.Warning(const data : string; const important : boolean);
-begin
-  if important then
-    QueueLine(data, mtImportantWarning)
-  else
-    QueueLine(data, mtWarning);
+  QueueLine(text, MessageTypeOf(level, important));
 end;
 
 end.

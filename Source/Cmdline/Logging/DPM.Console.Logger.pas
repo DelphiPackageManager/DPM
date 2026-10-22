@@ -34,21 +34,12 @@ uses
   DPM.Console.Writer;
 
 type
-  TDPMConsoleLogger = class(TInterfacedObject, ILogger)
+  TDPMConsoleLogger = class(TBaseLogger)
   private
     FConsole : IConsoleWriter;
-    FVerbosity : TVerbosity;
   protected
-    procedure Debug(const data: string);
-    procedure Error(const data: string);
-    procedure Information(const data: string; const important : boolean = false);
-    procedure Success(const data: string; const important : boolean = false);
-    procedure Verbose(const data: string; const important : boolean = false);
-    procedure Warning(const data: string; const important : boolean = false);
-    function GetVerbosity : TVerbosity;
-    procedure SetVerbosity(const value : TVerbosity);
-    procedure Clear;
-    procedure NewLine;
+    procedure WriteMessage(const level : TLogLevel; const text : string; const important : boolean); override;
+    procedure DoNewLine; override;
   public
     constructor Create(const console : IConsoleWriter);
   end;
@@ -57,98 +48,47 @@ implementation
 
 { TDPMConsoleLogger }
 
-procedure TDPMConsoleLogger.Clear;
-begin
-  //no-op
-end;
-
 constructor TDPMConsoleLogger.Create(const console: IConsoleWriter);
 begin
+  inherited Create;
   FConsole := console;
-  FVerbosity := TVerbosity.Debug;
+  Verbosity := TVerbosity.Debug;
 end;
 
-procedure TDPMConsoleLogger.Debug(const data: string);
-begin
-  if FVerbosity < TVerbosity.Debug then
-    exit;
-
-  FConsole.SetColour(ccGrey);
-  FConsole.WriteLine(data);
-  FConsole.SetColour(ccDefault);
-end;
-
-procedure TDPMConsoleLogger.Error(const data: string);
-begin
-  //always log errors
-
-  FConsole.SetColour(ccBrightRed);
-  FConsole.WriteLine(data);
-  FConsole.SetColour(ccDefault);
-end;
-
-function TDPMConsoleLogger.GetVerbosity: TVerbosity;
-begin
-  result := FVerbosity;
-end;
-
-procedure TDPMConsoleLogger.Information(const data: string; const important : boolean);
-begin
-  if (FVerbosity < TVerbosity.Normal) and (not important) then
-    exit;
-
-  if important then
-    FConsole.SetColour(ccBrightWhite)
-  else
-    FConsole.SetColour(ccWhite);
-  FConsole.WriteLine(data);
-  FConsole.SetColour(ccDefault);
-end;
-
-procedure TDPMConsoleLogger.NewLine;
+procedure TDPMConsoleLogger.DoNewLine;
 begin
   FConsole.WriteLine(' ');
 end;
 
-procedure TDPMConsoleLogger.SetVerbosity(const value: TVerbosity);
+procedure TDPMConsoleLogger.WriteMessage(const level : TLogLevel; const text : string; const important : boolean);
 begin
-  FVerbosity := value;
-end;
-
-procedure TDPMConsoleLogger.Success(const data: string; const important: boolean);
-begin
-  if (FVerbosity < TVerbosity.Normal) and (not important) then
-    exit;
-
-  if important then
-    FConsole.SetColour(ccBrightGreen)
-  else
-    FConsole.SetColour(ccDarkGreen);
-  FConsole.WriteLine(data);
-  FConsole.SetColour(ccDefault);
-end;
-
-procedure TDPMConsoleLogger.Verbose(const data: string; const important : boolean);
-begin
-  if (FVerbosity < TVerbosity.Detailed) then
-    exit;
-
-  if important then
-    FConsole.SetColour(ccBrightWhite)
-  else
-    FConsole.SetColour(ccWhite);
-  FConsole.WriteLine(data);
-  FConsole.SetColour(ccDefault);
-end;
-
-procedure TDPMConsoleLogger.Warning(const data: string; const important : boolean);
-begin
-  //always log warnings
-  if important then
-    FConsole.SetColour(ccBrightYellow)
-  else
-    FConsole.SetColour(ccDarkYellow);
-  FConsole.WriteLine(data);
+  case level of
+    TLogLevel.Debug : FConsole.SetColour(ccGrey);
+    TLogLevel.Verbose,
+    TLogLevel.Information :
+    begin
+      if important then
+        FConsole.SetColour(ccBrightWhite)
+      else
+        FConsole.SetColour(ccWhite);
+    end;
+    TLogLevel.Success :
+    begin
+      if important then
+        FConsole.SetColour(ccBrightGreen)
+      else
+        FConsole.SetColour(ccDarkGreen);
+    end;
+    TLogLevel.Warning :
+    begin
+      if important then
+        FConsole.SetColour(ccBrightYellow)
+      else
+        FConsole.SetColour(ccDarkYellow);
+    end;
+    TLogLevel.Error : FConsole.SetColour(ccBrightRed);
+  end;
+  FConsole.WriteLine(text);
   FConsole.SetColour(ccDefault);
 end;
 

@@ -139,7 +139,8 @@ uses
   DPM.Core.MCP.FrameBuffer,
   DPM.Core.MCP.Protocol,
   DPM.Core.MCP.Transport.Memory,
-  DPM.Core.MCP.Server;
+  DPM.Core.MCP.Server,
+  TestLogger;
 
 type
   //Minimal tool so the server can be tested without any DPM machinery.
@@ -156,20 +157,6 @@ type
     function Invoke(const cancellationToken : ICancellationToken; const arguments : IYAMLMapping) : string;
   public
     constructor Create(const name : string; const fail : boolean = false);
-  end;
-
-  TNullLogger = class(TInterfacedObject, ILogger)
-  protected
-    procedure Debug(const data : string);
-    procedure Verbose(const data : string; const important : boolean = false);
-    procedure Information(const data : string; const important : boolean = false);
-    procedure Warning(const data : string; const important : boolean = false);
-    procedure Error(const data : string);
-    procedure Success(const data : string; const important : boolean = false);
-    procedure Clear;
-    procedure NewLine;
-    function GetVerbosity : TVerbosity;
-    procedure SetVerbosity(const value : TVerbosity);
   end;
 
 { TStubTool }
@@ -214,19 +201,6 @@ begin
   result := '{"ok":true}';
 end;
 
-{ TNullLogger }
-
-procedure TNullLogger.Debug(const data : string); begin end;
-procedure TNullLogger.Verbose(const data : string; const important : boolean); begin end;
-procedure TNullLogger.Information(const data : string; const important : boolean); begin end;
-procedure TNullLogger.Warning(const data : string; const important : boolean); begin end;
-procedure TNullLogger.Error(const data : string); begin end;
-procedure TNullLogger.Success(const data : string; const important : boolean); begin end;
-procedure TNullLogger.Clear; begin end;
-procedure TNullLogger.NewLine; begin end;
-function TNullLogger.GetVerbosity : TVerbosity; begin result := TVerbosity.Quiet; end;
-procedure TNullLogger.SetVerbosity(const value : TVerbosity); begin end;
-
 ///<summary> Runs a scripted session and returns everything the server wrote. </summary>
 function RunSession(const requests : array of string; const failingTool : boolean = false) : IList<string>;
 var
@@ -246,7 +220,7 @@ begin
   writerIntf := writer;
   tokenSource := TCancellationTokenSourceFactory.Create;
 
-  server := TMCPServer.Create(reader, writerIntf, registry, TNullLogger.Create, 'test instructions');
+  server := TMCPServer.Create(reader, writerIntf, registry, TTestLogger.Create, 'test instructions');
   try
     server.Run(tokenSource.Token);
   finally

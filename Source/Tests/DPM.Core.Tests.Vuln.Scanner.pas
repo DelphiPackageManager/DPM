@@ -32,7 +32,8 @@ uses
   DPM.Core.SBOM.Types,
   DPM.Core.Vuln.Types,
   DPM.Core.Vuln.Interfaces,
-  DPM.Core.Vuln.Scanner;
+  DPM.Core.Vuln.Scanner,
+  TestLogger;
 
 type
   //Test double - implements IVulnDatabaseAdvisory with constructor-injected values.
@@ -70,24 +71,6 @@ type
   public
     constructor Create;
     procedure AddVuln(const purl : string; const advisory : IVulnDatabaseAdvisory);
-  end;
-
-  //Trivial silent logger so test output isn't polluted.
-  TSilentLogger = class(TInterfacedObject, ILogger)
-  protected
-    function GetVerbosity : TVerbosity;
-    procedure SetVerbosity(const value : TVerbosity);
-    procedure Debug(const data : string);
-    procedure Verbose(const data : string; const important : Boolean = False);
-    procedure Information(const data : string; const important : Boolean = False);
-    procedure Success(const data : string; const important : Boolean = False);
-    procedure Warning(const data : string; const important : Boolean = False);
-    procedure Error(const data : string);
-    procedure Clear; //not implemented in the console logger.
-    procedure NewLine;
-    function GetUseColor : boolean;
-    procedure SetUseColor(const value : boolean);
-
   end;
 
 { TFakeAdvisory }
@@ -150,32 +133,6 @@ begin
       result[purl] := FMap[purl];
 end;
 
-{ TSilentLogger }
-
-function TSilentLogger.GetVerbosity : TVerbosity;
-begin
-result := TVerbosity.Quiet;
-end;
-procedure TSilentLogger.SetVerbosity(const value : TVerbosity);
-begin
-end;
-procedure TSilentLogger.Clear;
-begin
-
-end;
-
-procedure TSilentLogger.Debug(const data : string);
-begin
-end;
-procedure TSilentLogger.Verbose(const data : string; const important : Boolean = False);     begin end;
-procedure TSilentLogger.Information(const data : string; const important : Boolean = False); begin end;
-procedure TSilentLogger.Success(const data : string; const important : Boolean = False);     begin end;
-procedure TSilentLogger.Warning(const data : string; const important : Boolean = False);     begin end;
-procedure TSilentLogger.Error(const data : string); begin end;
-procedure TSilentLogger.NewLine; begin end;
-function TSilentLogger.GetUseColor : boolean; begin result := false; end;
-procedure TSilentLogger.SetUseColor(const value : boolean); begin end;
-
 function MakeReportWithPackage(const purl, id, version : string) : TSBOMReport;
 var
   comp : TSBOMComponent;
@@ -200,7 +157,7 @@ var
   ct : ICancellationToken;
 begin
   db := TFakeDatabase.Create;
-  scanner := TVulnScanner.Create(TSilentLogger.Create, db);
+  scanner := TVulnScanner.Create(TTestLogger.Create, db);
   sbom := MakeReportWithPackage('pkg:generic/dpm/clean@1.0.0', 'clean', '1.0.0');
   try
     ct := TCancellationTokenSourceFactory.Create.Token;
@@ -230,7 +187,7 @@ begin
   db := TFakeDatabase.Create;
   advisory := TFakeAdvisory.Create('GHSA-aaaa-bbbb-cccc', TSeverity.High, '1.0.1');
   db.AddVuln('pkg:generic/dpm/bad@1.0.0', advisory);
-  scanner := TVulnScanner.Create(TSilentLogger.Create, db);
+  scanner := TVulnScanner.Create(TTestLogger.Create, db);
   sbom := MakeReportWithPackage('pkg:generic/dpm/bad@1.0.0', 'bad', '1.0.0');
   try
     ct := TCancellationTokenSourceFactory.Create.Token;
@@ -266,7 +223,7 @@ begin
   db := TFakeDatabase.Create;
   db.AddVuln('pkg:generic/dpm/a@1.0.0', shared);
   db.AddVuln('pkg:generic/dpm/b@2.0.0', shared);
-  scanner := TVulnScanner.Create(TSilentLogger.Create, db);
+  scanner := TVulnScanner.Create(TTestLogger.Create, db);
   sbom := MakeReportWithPackage('pkg:generic/dpm/a@1.0.0', 'a', '1.0.0');
   comp := sbom.AddComponent(TSBOMComponentKind.DpmPackage);
   comp.BomRef := 'pkg-2';
@@ -305,7 +262,7 @@ begin
   db.AddVuln('pkg:generic/dpm/crit@1.0.0', advisory);
   advisory := TFakeAdvisory.Create('MED-1', TSeverity.Medium);
   db.AddVuln('pkg:generic/dpm/medium@1.0.0', advisory);
-  scanner := TVulnScanner.Create(TSilentLogger.Create, db);
+  scanner := TVulnScanner.Create(TTestLogger.Create, db);
   sbom := MakeReportWithPackage('pkg:generic/dpm/low@1.0.0', 'low', '1.0.0');
   comp := sbom.AddComponent(TSBOMComponentKind.DpmPackage);
   comp.BomRef := 'pkg-2';
@@ -341,7 +298,7 @@ var
 begin
   //An unidentified component (no purl) should be silently skipped - no query, no result.
   db := TFakeDatabase.Create;
-  scanner := TVulnScanner.Create(TSilentLogger.Create, db);
+  scanner := TVulnScanner.Create(TTestLogger.Create, db);
   sbom := TSBOMReport.Create;
   comp := sbom.AddComponent(TSBOMComponentKind.Unidentified);
   comp.BomRef := 'unid-1';

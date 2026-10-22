@@ -84,6 +84,7 @@ uses
   DPM.Console.Writer.StdErr in 'Cmdline\Writer\DPM.Console.Writer.StdErr.pas',
   DPM.Console.Command.Search in 'Cmdline\Commands\DPM.Console.Command.Search.pas',
   DPM.Core.Json.Utils in 'Core\Json\DPM.Core.Json.Utils.pas',
+  DPM.Core.Diagnostics in 'Core\Logging\DPM.Core.Diagnostics.pas',
   DPM.Core.Logging in 'Core\Logging\DPM.Core.Logging.pas',
   DPM.Core.Options.Base in 'Core\Options\DPM.Core.Options.Base.pas',
   DPM.Core.Options.Common in 'Core\Options\DPM.Core.Options.Common.pas',
@@ -327,7 +328,7 @@ begin
           IOResult;
           //stderr, never stdout: this is the last resort handler, and for 'dpm mcp' or
           //--format=Json stdout belongs to the machine readable stream.
-          TStdErr.WriteLine(e.Message);
+          TStdErr.WriteLine(FormatError(TErrorCode.E0001_UnexpectedException, e.Message));
         except
           // nothing we can do
         end;

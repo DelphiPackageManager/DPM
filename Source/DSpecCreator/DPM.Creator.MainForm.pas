@@ -512,8 +512,7 @@ type
     FX509 : IX509Service;
     FConfigManager : IConfigurationManager;
     FRepositoryManager : IPackageRepositoryManager;
-    FOpsLogger : TDSpecQueuedLogger;   // concrete instance (for SetTarget)
-    FPackLogger : ILogger;             // same object as FOpsLogger
+    FOpsLogger : IDSpecOpsLogger;      // pack / sign / test / upload output, retargeted per operation
     FCancellationTokenSource : ICancellationTokenSource;
     FPacking : Boolean;
     FUploading : Boolean;
@@ -811,7 +810,7 @@ begin
 
   if not DirectoryExists(edtPackageOutputPath.Text) then
   begin
-    FPackLogger.Error('Output folder does not exist: ' + edtPackageOutputPath.Text);
+    MessageDlg('Output folder does not exist: ' + edtPackageOutputPath.Text, mtWarning, [mbOK], 0);
     Exit;
   end;
 
@@ -867,8 +866,7 @@ begin
       end;
     end;
 
-  FOpsLogger.SetTarget(PackLogMemo);
-  PackLogMemo.Clear;
+  FOpsLogger.BeginOperation(PackLogMemo);
   TestLogMemo.Clear;
 
   PageControl.ActivePage := tsGenerate;
@@ -900,13 +898,13 @@ begin
   .OnException(
     procedure(const e : Exception)
     begin
-      FPackLogger.Error('Error creating package : ' + e.Message);
+      FOpsLogger.Error('Error creating package : ' + e.Message);
       cleanup();
     end)
   .OnCancellation(
     procedure
     begin
-      FPackLogger.Warning('Pack cancelled.');
+      FOpsLogger.Warning('Pack cancelled.');
       cleanup();
     end)
   .Await(
@@ -914,14 +912,14 @@ begin
     begin
       if ok then
       begin
-        FPackLogger.Success('Pack completed.');
+        FOpsLogger.Success('Pack completed.');
         // We now have package files in the output folder, so testing is possible.
         // Refresh the Test tab's compiler list and enable the Start Test button.
         FHasPacked := true;
         RefreshTestCompilers;
       end
       else
-        FPackLogger.Error('Pack failed.');
+        FOpsLogger.Error('Pack failed.');
       cleanup();
     end);
 end;
@@ -934,7 +932,7 @@ begin
     Exit;
   if (FCancellationTokenSource <> nil) and (not FCancellationTokenSource.Token.IsCancelled) then
   begin
-    FPackLogger.Information('Cancelling...');
+    FOpsLogger.Information('Cancelling...');
     btnCancelPack.Enabled := false;
     FCancellationTokenSource.Cancel;
   end;
@@ -948,7 +946,7 @@ begin
     Exit;
   if (FCancellationTokenSource <> nil) and (not FCancellationTokenSource.Token.IsCancelled) then
   begin
-    FPackLogger.Information('Cancelling...');
+    FOpsLogger.Information('Cancelling...');
     btnCancelUpload.Enabled := false;
     FCancellationTokenSource.Cancel;
   end;
@@ -1026,8 +1024,7 @@ begin
     FTestResults.AddOrSetValue(clbTestCompilers.Items[i], 0);
   clbTestCompilers.Invalidate;
 
-  FOpsLogger.SetTarget(TestLogMemo);
-  TestLogMemo.Clear;
+  FOpsLogger.BeginOperation(TestLogMemo);
   PageControl.ActivePage := tsTest;
 
   FTesting := true;
@@ -1080,8 +1077,8 @@ begin
             FTestLogStart.AddOrSetValue(compilerStr, TestLogMemo.RowCount);
           end);
 
-        FPackLogger.Information('');
-        FPackLogger.Information('=== Testing ' + compilerStr + ' ===');
+        FOpsLogger.Information('');
+        FOpsLogger.Information('=== Testing ' + compilerStr + ' ===');
 
         // Locate the package file produced for this compiler. The packer writes
         // {id}-{compiler}-{binPlatforms}-{version}.dpkg, so wildcard the platforms
@@ -1105,7 +1102,7 @@ begin
 
         if dpkgFile = '' then
         begin
-          FPackLogger.Error('No package file found for ' + compilerStr + ' (looked for ' + mask + ')');
+          FOpsLogger.Error('No package file found for ' + compilerStr + ' (looked for ' + mask + ')');
           result := false;
           TThread.Synchronize(nil,
             procedure
@@ -1116,7 +1113,7 @@ begin
           continue;
         end;
 
-        FPackLogger.Information('Installing ' + ExtractFileName(dpkgFile) + ' into the cache...');
+        FOpsLogger.Information('Installing ' + ExtractFileName(dpkgFile) + ' into the cache...');
 
         installOk := false;
         // Use a fresh TCacheOptions per compiler - never the shared global
@@ -1139,7 +1136,7 @@ begin
           except
             on e : Exception do
             begin
-              FPackLogger.Error('Test errored for ' + compilerStr + ' : ' + e.Message);
+              FOpsLogger.Error('Test errored for ' + compilerStr + ' : ' + e.Message);
               installOk := false;
             end;
           end;
@@ -1151,23 +1148,23 @@ begin
         // dependencies that were installed/compiled in the process are left in
         // place by design - tracking the full closure would be too complex.
         try
-          if TPackageIdentity.TryCreateFromString(FPackLogger, ChangeFileExt(ExtractFileName(dpkgFile), ''), '', packageIdentity) then
+          if TPackageIdentity.TryCreateFromString(FOpsLogger, ChangeFileExt(ExtractFileName(dpkgFile), ''), '', packageIdentity) then
           begin
             if FPackageCache.RemovePackage(packageIdentity) then
-              FPackLogger.Information('Removed ' + packageIdentity.ToString + ' from the cache.')
+              FOpsLogger.Information('Removed ' + packageIdentity.ToString + ' from the cache.')
             else
-              FPackLogger.Warning('Could not remove ' + packageIdentity.ToString + ' from the cache.');
+              FOpsLogger.Warning('Could not remove ' + packageIdentity.ToString + ' from the cache.');
           end;
         except
           on e : Exception do
-            FPackLogger.Warning('Could not remove tested package from the cache : ' + e.Message);
+            FOpsLogger.Warning('Could not remove tested package from the cache : ' + e.Message);
         end;
 
         if installOk then
-          FPackLogger.Success('Test passed for ' + compilerStr)
+          FOpsLogger.Success('Test passed for ' + compilerStr)
         else
         begin
-          FPackLogger.Error('Test failed for ' + compilerStr);
+          FOpsLogger.Error('Test failed for ' + compilerStr);
           result := false;
         end;
 
@@ -1189,22 +1186,22 @@ begin
   .OnException(
     procedure(const e : Exception)
     begin
-      FPackLogger.Error('Error running tests : ' + e.Message);
+      FOpsLogger.Error('Error running tests : ' + e.Message);
       cleanup();
     end)
   .OnCancellation(
     procedure
     begin
-      FPackLogger.Warning('Testing cancelled.');
+      FOpsLogger.Warning('Testing cancelled.');
       cleanup();
     end)
   .Await(
     procedure(const ok : boolean)
     begin
       if ok then
-        FPackLogger.Success('All tests passed.')
+        FOpsLogger.Success('All tests passed.')
       else
-        FPackLogger.Information('Testing finished - one or more tests failed.');
+        FOpsLogger.Information('Testing finished - one or more tests failed.');
       cleanup();
     end);
 end;
@@ -1217,7 +1214,7 @@ begin
     Exit;
   if (FCancellationTokenSource <> nil) and (not FCancellationTokenSource.Token.IsCancelled) then
   begin
-    FPackLogger.Information('Cancelling...');
+    FOpsLogger.Information('Cancelling...');
     btnCancelTest.Enabled := false;
     FCancellationTokenSource.Cancel;
   end;
@@ -1428,8 +1425,8 @@ begin
   FContainer := TContainer.Create;
   // InitCore does not register an ILogger - register ours first so the pack,
   // signing and upload services log into the active page's memo (retargeted
-  // per operation via FOpsLogger.SetTarget).
-  FContainer.RegisterInstance<ILogger>(FPackLogger);
+  // per operation via FOpsLogger.BeginOperation).
+  FContainer.RegisterInstance<ILogger>(FOpsLogger);
   DPM.Core.Init.InitCore(FContainer);
   FContainer.Build;
   FPackageWriter := FContainer.Resolve<IPackageWriter>;
@@ -1510,14 +1507,14 @@ begin
     alg := haUnknown
   else if not TAlgorithmProfile.ParseHashName(signOptions.Digest, alg) then
   begin
-    FPackLogger.Error('Unsupported digest "' + signOptions.Digest + '" (SHA256/SHA384/SHA512 only).');
+    FOpsLogger.Error('Unsupported digest "' + signOptions.Digest + '" (SHA256/SHA384/SHA512 only).');
     Exit;
   end;
 
-  provider := TSigningProviderFactory.CreateProvider(FPackLogger, FX509, signOptions);
+  provider := TSigningProviderFactory.CreateProvider(FOpsLogger, FX509, signOptions);
   if provider = nil then
   begin
-    FPackLogger.Error('Signing skipped - the signing provider could not be created.');
+    FOpsLogger.Error('Signing skipped - the signing provider could not be created.');
     Exit;
   end;
 
@@ -1531,14 +1528,14 @@ begin
 
   if toSign.Count = 0 then
   begin
-    FPackLogger.Warning('No newly produced .dpkg files found to sign.');
+    FOpsLogger.Warning('No newly produced .dpkg files found to sign.');
     Exit;
   end;
 
   signOpts.TimestampUrl := signOptions.TimestampUrl;
   signOpts.DigestAlgorithm := alg;
 
-  FPackLogger.Information(Format('Signing %d package(s)...', [toSign.Count]));
+  FOpsLogger.Information(Format('Signing %d package(s)...', [toSign.Count]));
   okCount := 0;
   failCount := 0;
   // One session for the whole batch - smart-card / HSM providers prompt once.
@@ -1550,13 +1547,13 @@ begin
         Break;
       try
         FSigningService.SignPackage(f, provider, signOpts);
-        FPackLogger.Success('Signed ' + ExtractFileName(f));
+        FOpsLogger.Success('Signed ' + ExtractFileName(f));
         Inc(okCount);
       except
         on e : Exception do
         begin
           Inc(failCount);
-          FPackLogger.Error('Sign failed for [' + ExtractFileName(f) + ']: ' + e.Message);
+          FOpsLogger.Error('Sign failed for [' + ExtractFileName(f) + ']: ' + e.Message);
         end;
       end;
     end;
@@ -1565,9 +1562,9 @@ begin
   end;
 
   if failCount = 0 then
-    FPackLogger.Success(Format('Signed %d package(s) successfully.', [okCount]))
+    FOpsLogger.Success(Format('Signed %d package(s) successfully.', [okCount]))
   else
-    FPackLogger.Warning(Format('%d signed, %d failed.', [okCount, failCount]));
+    FOpsLogger.Warning(Format('%d signed, %d failed.', [okCount, failCount]));
 end;
 
 procedure TDSpecCreatorForm.LoadSigningSettings;
@@ -1684,7 +1681,7 @@ begin
       FUploadConfig := FConfigManager.LoadConfig(FUploadConfigFile);
     except
       on e : Exception do
-        FPackLogger.Error('Could not load DPM configuration: ' + e.Message);
+        FLogger.Error('Could not load DPM configuration: ' + e.Message);
     end;
     if FUploadConfig <> nil then
       for i := 0 to FUploadConfig.Sources.Count - 1 do
@@ -1845,8 +1842,7 @@ begin
       btnCancelUpload.Enabled := false;
     end;
 
-  FOpsLogger.SetTarget(UploadLogMemo);
-  UploadLogMemo.Clear;
+  FOpsLogger.BeginOperation(UploadLogMemo);
   PageControl.ActivePage := tsUpload;
   FUploading := true;
   btnUpload.Enabled := false;
@@ -1866,7 +1862,7 @@ begin
       config := FConfigManager.LoadConfig(FUploadConfigFile);
       if config = nil then
       begin
-        FPackLogger.Error('Could not load DPM configuration.');
+        FOpsLogger.Error('Could not load DPM configuration.');
         Exit;
       end;
       FRepositoryManager.Initialize(config);
@@ -1884,7 +1880,7 @@ begin
           if cancelToken.IsCancelled then
             Break;
           pushOptions.PackagePath := f;
-          FPackLogger.Information('Uploading ' + ExtractFileName(f) + ' to ' + sourceName + '...');
+          FOpsLogger.Information('Uploading ' + ExtractFileName(f) + ' to ' + sourceName + '...');
           if FRepositoryManager.Push(cancelToken, pushOptions) then
             Inc(okCount)
           else
@@ -1894,28 +1890,28 @@ begin
         pushOptions.Free;
       end;
 
-      FPackLogger.Information(Format('Uploaded %d package(s), %d failed.', [okCount, failCount]));
+      FOpsLogger.Information(Format('Uploaded %d package(s), %d failed.', [okCount, failCount]));
       result := failCount = 0;
     end, FCancellationTokenSource.Token)
   .OnException(
     procedure(const e : Exception)
     begin
-      FPackLogger.Error('Error uploading : ' + e.Message);
+      FOpsLogger.Error('Error uploading : ' + e.Message);
       cleanup();
     end)
   .OnCancellation(
     procedure
     begin
-      FPackLogger.Warning('Upload cancelled.');
+      FOpsLogger.Warning('Upload cancelled.');
       cleanup();
     end)
   .Await(
     procedure(const ok : boolean)
     begin
       if ok then
-        FPackLogger.Success('Upload completed.')
+        FOpsLogger.Success('Upload completed.')
       else
-        FPackLogger.Error('Upload completed with errors.');
+        FOpsLogger.Error('Upload completed with errors.');
       cleanup();
     end);
 end;
@@ -3587,7 +3583,6 @@ begin
   // Pack / sign / upload run in-process via the DPM core; output goes to the
   // active page's memo (retargeted per operation). Pack/sign default to PackLogMemo.
   FOpsLogger := TDSpecQueuedLogger.Create(PackLogMemo);
-  FPackLogger := FOpsLogger;
   ApplyLogVerbosity;
   InitCoreContainer;
   FPacking := false;
@@ -3980,7 +3975,7 @@ begin
   ideOptions := TDPMIDEOptions.Create;
   ideOptions.LoadFromFile();
   FLogger.Verbosity := ideOptions.LogVerbosity;
-  FPackLogger.Verbosity := ideOptions.LogVerbosity;
+  FOpsLogger.Verbosity := ideOptions.LogVerbosity;
 end;
 
 procedure TDSpecCreatorForm.miOptionsClick(Sender : TObject);

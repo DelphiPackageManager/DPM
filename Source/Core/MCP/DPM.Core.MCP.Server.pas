@@ -84,6 +84,7 @@ uses
   System.SysUtils,
   System.StrUtils,
   DPM.Core.Version,
+  DPM.Core.Diagnostics,
   DPM.Core.Json.Utils;
 
 { TMCPServer }
@@ -300,6 +301,8 @@ begin
 
   isError := false;
   toolResult := '';
+  //each call is an operation of its own - a long lived session must not hide an error a later call hits.
+  FLogger.StartDiagnosticScope;
   try
     toolResult := tool.Invoke(cancellationToken, arguments);
   except
@@ -312,7 +315,7 @@ begin
     end;
     on E : Exception do
     begin
-      FLogger.Error('mcp: unhandled exception in tool ' + toolName + ' : ' + E.Message);
+      FLogger.Error(TErrorCode.E0001_UnexpectedException, 'mcp: unhandled exception in tool ' + toolName + ' : ' + E.Message);
       SendError(message.Id, cJsonRpcInternalError, E.ClassName + ': ' + E.Message);
       exit;
     end;
