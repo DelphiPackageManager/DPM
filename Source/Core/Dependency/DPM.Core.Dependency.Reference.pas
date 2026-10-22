@@ -62,7 +62,6 @@ type
 //    FDesignBplsLoaded : array[TDPMPlatform] of boolean;
 
   protected
-    procedure RecursiveClone(const originalReference : IPackageReference; const newParent : IPackageReference);
     procedure AddExistingChild(const id : string; const packageReference : IPackageReference);
     function AddChild(const id : string; const version : TPackageVersion; const selectedOn : TVersionRange) : IPackageReference;
     function FindFirstChild(const id : string) : IPackageReference;
@@ -107,6 +106,9 @@ type
   public
     constructor Create(const parent : IPackageReference; const id : string; const version : TPackageVersion; const compilerVersion : TCompilerVersion; const selectedOn : TVersionRange; const useSource : boolean);overload;
     constructor CreateRoot(const compilerVersion : TCompilerVersion);
+    {$IF CompilerVersion < 32.0}
+    procedure BeforeDestruction;override;
+    {$IFEND}
     destructor Destroy;override;
   end;
 
@@ -213,10 +215,28 @@ begin
   Create(nil, cRootNode, TPackageVersion.Empty, compilerVersion, TVersionRange.Empty, false);
 end;
 
+{$IF CompilerVersion < 32.0}
+procedure TPackageReference.BeforeDestruction;
+begin
+  inherited;
+  //From 10.2 _Release marks an object as being destroyed, so taking and dropping a reference to it during
+  //Destroy is harmless. Before that (the XE2 - 10.1 IDE plugins) dropping that reference would run Destroy
+  //a second time - hold a reference until the object is gone.
+  FRefCount := 1;
+end;
+{$IFEND}
+
 destructor TPackageReference.Destroy;
 begin
-  //not strictly needed but chasing an av.
+  //FDependencies is only nil once Destroy has run, so this reference is being destroyed a second time
+  //(released once too often), or its memory has been overwritten. Raise rather than carry on - continuing
+  //would free the memory again and corrupt the heap, while raising here stops before the memory is freed
+  //and gives a call stack pointing at the bad release.
+  if FDependencies = nil then
+    raise EInvalidPointer.Create('Package reference [' + FId + '] destroyed more than once');
   FParent := nil;
+  //release the children now, even if something still holds the Children view (which keeps the
+  //dictionary alive).
   FDependencies.Clear;
   FDependencies := nil;
   FDesignBpls := nil;
@@ -387,18 +407,6 @@ end;
 function TPackageReference.IsRoot : boolean;
 begin
   result := FId = cRootNode;
-end;
-
-procedure TPackageReference.RecursiveClone(const originalReference, newParent: IPackageReference);
-var
-  newChild : IPackageReference;
-begin
-  originalReference.Children.ForEach(
-    procedure(const oldChild : IPackageReference)
-    begin
-//      newChild := oldChild.Clone;
-      newParent.AddExistingChild(newChild.Id, newChild);
-    end);
 end;
 
 function TPackageReference.RemoveTopLevelChild(const id : string) : boolean;

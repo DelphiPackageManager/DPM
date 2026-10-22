@@ -1,13 +1,13 @@
 [GeneralSettings]
 MesVersion=4
-HandleExceptions=0
+HandleExceptions=1
 LinkInCode=1
 AppendMapFileToBinary=1
 NoOwnMadExceptSettings=0
 CheckFileCrc=1
 CheckForFrozenMainThread=0
 FreezeTimeout=60000
-ReportLeaks=1
+ReportLeaks=0
 WindowsLogo=0
 CrashOnBuffer=1
 CrashOnUnderrun=0

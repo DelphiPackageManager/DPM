@@ -14,7 +14,7 @@
         <DPMCompiler>delphi10.1</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.3-beta.3\lib\Win32;$(DPM)\Spring4D.Core\2.0.3-beta.3\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.3-beta.3\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.11\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win32;$(DPM)\VSoft.Awaitable\1.0.1\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.12\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.13.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.3.0\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.YAML\2.0.0\lib\Win32;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.3-beta.3\lib\Win32;$(DPM)\Spring4D.Core\2.0.3-beta.3\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.3-beta.3\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.11\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win32;$(DPM)\VSoft.Awaitable\1.0.1\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.12\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.13.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.3.0\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.YAML\2.1.0\lib\Win32;</DPMSearch>
         <DPMExe>I:\Github\DelphiPackageManager\DPMMaster\Output\dpm.exe</DPMExe>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
@@ -827,7 +827,7 @@
                 <PackageReference id="VSoft.SemanticVersion" version="0.3.0" manifestHash="sha256:63c7fd24f750ffd46997fb22c304a9a5c6ffe7b89a954861a02dddc848d10a1f"/>
                 <PackageReference id="VSoft.Uri" version="0.3.3" manifestHash="sha256:7bf6c9108395f083408f83e18180f2c4d135fb8912072c85ba529a69073b11c2"/>
                 <PackageReference id="VSoft.VirtualListView" version="0.4.6" manifestHash="sha256:e69be3e75d9a79d879abccad44ce5f99514367f053fb17450788ca6fc527c0db"/>
-                <PackageReference id="VSoft.YAML" version="2.0.0" manifestHash="sha256:04015d4e26019fb3354d54bbd7cd77f36e8e580439087ab33fd442a8bfbf1eda"/>
+                <PackageReference id="VSoft.YAML" version="2.1.0" manifestHash="sha256:f4746ee6d7074299dc745e6477382e7ed3c91af9a29e463ec287c81f33a37d22"/>
             </Packages>
         </DPM>
     </ProjectExtensions>

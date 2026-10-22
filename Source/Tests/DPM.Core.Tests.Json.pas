@@ -10,11 +10,11 @@ type
   [TestFixture]
   TJsonUtilsTests = class
   public
-    //The reason TJsonUtils exists at all - a regression guard on the VSoft.YAML behaviour the
-    //helpers work around. If this ever starts failing, the library changed and the omit-empty
-    //policy should be revisited.
+    //Before VSoft.YAML 2.1.0 an empty mapping string was stored as null, which is why the
+    //TJsonUtils string helpers omit empty values. They still do - it keeps the CLI and MCP output
+    //unchanged - but it is a choice now rather than a workaround.
     [Test]
-    procedure Mapping_AddOrSetValue_With_Empty_String_Stores_Null;
+    procedure Mapping_AddOrSetValue_With_Empty_String_Stores_An_Empty_String;
 
     [Test]
     procedure Sequence_AddValue_With_Empty_String_Stores_A_Real_Empty_String;
@@ -87,14 +87,15 @@ uses
 
 { TJsonUtilsTests }
 
-procedure TJsonUtilsTests.Mapping_AddOrSetValue_With_Empty_String_Stores_Null;
+procedure TJsonUtilsTests.Mapping_AddOrSetValue_With_Empty_String_Stores_An_Empty_String;
 var
   doc : IYAMLDocument;
 begin
   doc := TYAML.CreateMapping;
   doc.AsMapping.AddOrSetValue('key', '');
-  Assert.IsTrue(doc.AsMapping.Items['key'].IsNull,
-    'VSoft.YAML stores an empty mapping string as null - TJsonUtils.AddIfNotEmpty exists because of this');
+  Assert.IsFalse(doc.AsMapping.Items['key'].IsNull,
+    'VSoft.YAML 2.1.0 stores an empty mapping string as an empty string, not null');
+  Assert.AreEqual('', doc.AsMapping.Items['key'].AsString);
 end;
 
 procedure TJsonUtilsTests.Sequence_AddValue_With_Empty_String_Stores_A_Real_Empty_String;
@@ -103,7 +104,7 @@ var
 begin
   doc := TYAML.CreateSequence;
   doc.AsSequence.AddValue('');
-  Assert.IsFalse(doc.AsSequence.Items[0].IsNull, 'sequences do not share the mapping quirk');
+  Assert.IsFalse(doc.AsSequence.Items[0].IsNull, 'an empty sequence string is a real empty string');
 end;
 
 procedure TJsonUtilsTests.AddIfNotEmpty_Omits_The_Key_When_Value_Is_Empty;

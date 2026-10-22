@@ -40,17 +40,16 @@ type
   ///   Helpers for building JSON documents with VSoft.YAML.
   /// </summary>
   /// <remarks>
-  ///   Empty strings : IYAMLMapping.AddOrSetValue(key, '') stores a *null*, because a Delphi
-  ///   string parameter cannot distinguish '' from nil - VSoft.YAML documents this on
-  ///   AddOrSetNull. Every string helper here therefore OMITS the key when the value is empty
-  ///   rather than emitting null. Consumers tolerate a missing optional field far better than
-  ///   a null (schema validators in particular), and it preserves the behaviour of the
-  ///   SetStringIfNotEmpty helper these were extracted from. Call AddOrSetNull directly on the
-  ///   mapping when a null is genuinely what you mean.
+  ///   Empty strings : every string helper here OMITS the key when the value is empty rather
+  ///   than emitting "". Consumers tolerate a missing optional field far better than an empty
+  ///   one (schema validators in particular), and it preserves the behaviour of the
+  ///   SetStringIfNotEmpty helper these were extracted from. This started as a workaround -
+  ///   before VSoft.YAML 2.1.0, IYAMLMapping.AddOrSetValue(key, '') stored a null - and is kept
+  ///   so the CLI and MCP output does not change. Call AddOrSetNull directly on the mapping
+  ///   when a null is genuinely what you mean.
   ///
-  ///   Sequences do not share this quirk - IYAMLSequence.AddValue('') stores a real empty
-  ///   string - but the list helpers here still skip empty entries, since an empty tag or
-  ///   author is noise rather than data.
+  ///   The list helpers skip empty entries too, since an empty tag or author is noise rather
+  ///   than data.
   ///
   ///   Empty *collections* are emitted as [] rather than omitted. A consumer testing
   ///   dependencies.length should not have to special case a missing key.
