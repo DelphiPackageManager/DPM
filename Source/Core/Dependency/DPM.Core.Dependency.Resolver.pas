@@ -77,6 +77,7 @@ uses
   System.SysUtils,
   Generics.Defaults,
   DPM.Core.Constants,
+  DPM.Core.Diagnostics,
   DPM.Core.Package.Classes;
 
 { TDependencyResolver }
@@ -144,6 +145,7 @@ var
   version : IPackageInfo;
   selected : boolean;
   versionsFromCache : boolean;
+  sourcesUnavailable : string;
   preferredVersion : TPackageVersion;
   preferredIdentity : IPackageIdentity;
   preferredInfo : IPackageInfo;
@@ -180,7 +182,7 @@ begin
     Inc(iterations);
     if iterations > cMaxIterations then
     begin
-      FLogger.Error('Dependency resolution exceeded ' + IntToStr(cMaxIterations) + ' iterations - aborting (likely infinite loop, e.g. cyclic dependency)');
+      FLogger.Error(TErrorCode.E2004_ResolverIterationLimit, 'Dependency resolution exceeded ' + IntToStr(cMaxIterations) + ' iterations - aborting (most likely a cyclic dependency).');
       limitConflict.PackageId := '';
       limitConflict.ParentId := '';
       limitConflict.RequestedRange := TVersionRange.Empty;
@@ -228,7 +230,8 @@ begin
           //- we want to surface every conflict in one run rather than bail on the first.
           if not SameText(resolution.ProjectFile, context.ProjectFile) then
           begin
-            FLogger.Error('Package project conflict - version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' in project : ' + resolution.ProjectFile + ' does not satisfy ' + effectiveRange.ToString  );
+            FLogger.Error(TErrorCode.E2003_ProjectGroupConflict, 'Package conflict - ' + currentPackage.Id + ' requires ' + dependency.Id + ' ' + effectiveRange.ToString + ', but project [' +
+                          resolution.ProjectFile + '] uses ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + '.');
             conflict.PackageId := dependency.Id;
             conflict.ParentId := currentPackage.Id;
             conflict.RequestedRange := effectiveRange;
@@ -238,7 +241,8 @@ begin
           end
           else if resolution.IsTopLevel then //if it's a top level package then the version is not negotiable.
           begin
-            FLogger.Error('Package conflict - selected version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' does not satisfy ' + effectiveRange.ToString);
+            FLogger.Error(TErrorCode.E2002_TopLevelVersionConflict, 'Package conflict - ' + currentPackage.Id + ' requires ' + dependency.Id + ' ' + effectiveRange.ToString + ', but the top level reference is ' +
+                          dependency.Id + '-' + resolution.PackageInfo.Version.ToString + '.');
             conflict.PackageId := dependency.Id;
             conflict.ParentId := currentPackage.Id;
             conflict.RequestedRange := effectiveRange;
@@ -321,6 +325,7 @@ begin
 
         //it wasn't resolved before, so get the available versions
         versionsFromCache := false;
+        sourcesUnavailable := '';
         if not selected then
         begin
           versions := context.GetPackageVersions(dependency.Id);
@@ -333,7 +338,10 @@ begin
             versions := FPackageCache.GetCachedPackageVersionsWithDependencies(cancellationToken, dependency.Id, compilerVersion, effectiveRange, preRelease);
             versionsFromCache := versions.Any;
             if not versionsFromCache then
+            begin
               versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, dependency.Id, effectiveRange, preRelease);
+              sourcesUnavailable := FRepositoryManager.UnavailableSources;
+            end;
             if versions.Any then //cache the versions in the context in case we need them again
               context.CachePackageVersions(dependency.Id, versions);
           end;
@@ -361,6 +369,7 @@ begin
           begin
             FLogger.Debug('         No cached version of ' + dependency.Id + ' satisfies ' + effectiveRange.ToString + ' - querying repository');
             versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, dependency.Id, effectiveRange, preRelease);
+            sourcesUnavailable := FRepositoryManager.UnavailableSources;
             if versions.Any then
               context.CachePackageVersions(dependency.Id, versions);
             for version in versions do
@@ -421,11 +430,21 @@ begin
 
           if not backtrackOk then
           begin
-            FLogger.Error('Unable to satisfy dependency : ' + currentPackage.Id + ' -> ' + dependency.Id + ' ' + effectiveRange.ToString);
             conflict.PackageId := dependency.Id;
             conflict.ParentId := currentPackage.Id;
             conflict.RequestedRange := effectiveRange;
-            conflict.Reason := 'no available version satisfies the requested range';
+            if sourcesUnavailable <> '' then
+            begin
+              conflict.Reason := 'no version satisfying the range was found - source(s) [' + sourcesUnavailable + '] could not be used';
+              FLogger.Error(TErrorCode.E1102_PackageNotFoundSourcesUnavailable, 'Unable to satisfy dependency : ' + currentPackage.Id + ' -> ' + dependency.Id + ' ' + effectiveRange.ToString +
+                            ' - the source(s) [' + sourcesUnavailable + '] could not be used, see the warning(s) above.');
+            end
+            else
+            begin
+              conflict.Reason := 'no available version satisfies the requested range';
+              FLogger.Error(TErrorCode.E2001_DependencyUnsatisfiable, 'Unable to satisfy dependency : ' + currentPackage.Id + ' -> ' + dependency.Id + ' ' + effectiveRange.ToString +
+                            ' - no available version satisfies the range.');
+            end;
             context.RecordUnresolvable(conflict);
             continue;
           end;
@@ -452,7 +471,7 @@ begin
 
   if context.HasUnresolvable then
   begin
-    FLogger.Error('Dependency resolution failed: ' + IntToStr(context.GetUnresolvable.Count) + ' conflict(s)');
+    FLogger.Information('Dependency resolution failed : ' + IntToStr(context.GetUnresolvable.Count) + ' conflict(s).', true);
     result := false;
   end
   else
@@ -518,8 +537,8 @@ begin
         continue;
       if AlreadyRecorded(dependency.Id, resolution.PackageInfo.Id) then
         continue;
-      FLogger.Error('Package conflict - ' + resolution.PackageInfo.Id + '-' + resolution.PackageInfo.Version.ToStringNoMeta + ' requires ' +
-                    dependency.Id + ' ' + effectiveRange.ToString + ' but ' + dependency.Id + '-' + dependencyResolution.PackageInfo.Version.ToStringNoMeta + ' is selected');
+      FLogger.Error(TErrorCode.E2005_SelectedVersionConflict, 'Package conflict - ' + resolution.PackageInfo.Id + '-' + resolution.PackageInfo.Version.ToStringNoMeta + ' requires ' +
+                    dependency.Id + ' ' + effectiveRange.ToString + ' but ' + dependency.Id + '-' + dependencyResolution.PackageInfo.Version.ToStringNoMeta + ' is selected.');
       conflict.PackageId := dependency.Id;
       conflict.ParentId := resolution.PackageInfo.Id;
       conflict.RequestedRange := effectiveRange;
@@ -583,7 +602,7 @@ begin
   begin
     resolution := FPackageInstallerContext.FindPackageResolution(projectFile, packageRef.Id);
     if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Version)) then
-      FLogger.Warning('Package project group mismatch : ' + packageRef.Id + '-' + packageRef.Version.ToStringNoMeta + ' in project [' + projectFile +
+      FLogger.Warning(TWarningCode.W2010_ProjectGroupMismatch, 'Package project group mismatch : ' + packageRef.Id + '-' + packageRef.Version.ToStringNoMeta + ' in project [' + projectFile +
                       '] does not satisfy ' + resolution.VersionRange.ToString + ' used in project [' + resolution.ProjectFile + ']');
   end;
   context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, newPackages, projectReferences, sharedVersionCache, preferredVersions);

@@ -39,6 +39,7 @@ type
   private
     FLogger : ILogger;
     FXmlDoc : IXMLDOMDocument;
+    FGroupProjFile : string;
   protected
     function ExtractProjects(const list : IList<string>) : boolean;
     function LoadGroupProj(const groupProjFile : string) : Boolean;
@@ -52,6 +53,7 @@ implementation
 
 uses
   System.SysUtils,
+  DPM.Core.Diagnostics,
   DPM.Core.Utils.XML;
 
 const
@@ -80,14 +82,14 @@ begin
   list.Clear;
   if FXmlDoc = nil then
   begin
-    FLogger.Error('No project was loaded');
+    FLogger.Error(TErrorCode.E0003_InternalError, 'ExtractProjects was called before a group project was loaded.');
     exit;
   end;
 
   projectNodes := FXmlDoc.selectNodes(projectXPath);
   if projectNodes.length = 0 then
   begin
-    FLogger.Error('The group project contains 0 projects');
+    FLogger.Error(TErrorCode.E4002_NoProjectsFound, 'The group project [' + FGroupProjFile + '] contains no projects.');
     FXmlDoc := nil;
     exit;
   end;
@@ -99,7 +101,7 @@ begin
   end;
 
   if list.Count = 0 then
-    FLogger.Error('The group project contains 0 projects')
+    FLogger.Error(TErrorCode.E4002_NoProjectsFound, 'The group project [' + FGroupProjFile + '] contains no projects.')
   else
     result := true;
 end;
@@ -107,22 +109,24 @@ end;
 function TGroupProjectReader.LoadGroupProj(const groupProjFile : string) : Boolean;
 begin
   result := true;
+  FGroupProjFile := groupProjFile;
 
   FXmlDoc := CoDOMDocument60.Create;
   try
     if not TXMLUtils.LoadXMLFromFile(FXmlDoc, groupProjFile) then
     begin
-      result := false;
-      FLogger.Error('Error parsing group project [' + groupProjFile + ']');
-      FLogger.Error('  ' + FXmlDoc.parseError.reason);
+      FLogger.Error(TErrorCode.E4003_ProjectLoadFailed, 'Unable to load the group project [' + groupProjFile + '] : ' + Trim(FXmlDoc.parseError.reason));
       FXmlDoc := nil;
+      exit(false);
     end;
     (FXmlDoc as IXMLDOMDocument2).setProperty('SelectionLanguage', 'XPath');
     (FXmlDoc as IXMLDOMDocument2).setProperty('SelectionNamespaces', 'xmlns:x=''http://schemas.microsoft.com/developer/msbuild/2003''');
   except
     on e : Exception do
     begin
-      FLogger.Error('Error loading group project [' + groupProjFile + '] ' + e.Message);
+      FLogger.Error(TErrorCode.E4003_ProjectLoadFailed, 'Unable to load the group project [' + groupProjFile + '] : ' + e.Message);
+      FXmlDoc := nil;
+      result := false;
     end;
   end;
 end;

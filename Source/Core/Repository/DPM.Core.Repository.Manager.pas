@@ -50,9 +50,17 @@ type
     FRepositories : IList<IPackageRepository>;
     FRepoFactory : IPackageRepositoryFactory;
     FRequestCache : TRepositoryRequestCache;
+    //the sources the current query could not use - see UnavailableSources.
+    FUnavailable : string;
+    //starts a query : forgets which sources failed the last one.
+    procedure BeginRequest;
+    //after asking a repository : a source that failed a query is a warning - another source may have the
+    //answer, and the caller decides whether finding nothing is an error.
+    procedure NoteUnavailable(const repo : IPackageRepository);
   protected
     function Initialize(const configuration : IConfiguration) : boolean;
     function HasSources: Boolean;
+    function UnavailableSources : string;
 
 //    function InternalGetLatestVersions(const cancellationToken : ICancellationToken; const installedPackages : IList<IPackageId>; const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : IDictionary<string, IPackageLatestVersionInfo>;
 
@@ -60,7 +68,8 @@ type
     function GetRepositories : IList<IPackageRepository>;
     function GetRepositoryByName(const value : string) : IPackageRepository;
 
-    function UpdateRepositories : boolean;
+    //report : Initialize says why a source is not valid - every other caller just stops.
+    function UpdateRepositories(const report : boolean = false) : boolean;
 
 
     //UI specific stuff
@@ -105,6 +114,7 @@ uses
   System.StrUtils,
   Spring.Collections.Extensions,
   VSoft.URI,
+  DPM.Core.Diagnostics,
   DPM.Core.Constants,
   DPM.Core.Utils.System,
   DPM.Core.Package.SearchResults;
@@ -139,40 +149,66 @@ end;
 function TPackageRepositoryManager.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
 var
   repo : IPackageRepository;
+  failures : string;
+  failureCode : TErrorCode;
 begin
   FLogger.Debug('TPackageRepositoryManager.DownloadPackage');
   result := false;
+  //Initialize reported why.
   if not UpdateRepositories then
-  begin
-    FLogger.Error('Unabled to get package versions, error loading repositories');
     exit;
-  end;
+  BeginRequest;
 
   if packageIdentity.SourceName <> '' then
   begin
     repo := GetRepositoryByName(packageIdentity.SourceName);
     if repo = nil then
     begin
-      FLogger.Error('Unabled to find repository for source [' + packageIdentity.SourceName + ']');
-
+      FLogger.Error(TErrorCode.E1003_UnknownSource, 'Unable to download [' + packageIdentity.ToString + '] - its source [' + packageIdentity.SourceName + '] is not configured.');
       exit;
     end;
-    //FLogger.Information('Downloading package [' + packageIdentity.ToString + '] from [' + repo.Name + ']');
     result := repo.DownloadPackage(cancellationToken, packageIdentity, localFolder, fileName);
-  end
-  else
+    if result or cancellationToken.IsCancelled then
+      exit;
+    if repo.LastError <> '' then
+      FLogger.Error(repo.LastErrorCode, 'Unable to download [' + packageIdentity.ToString + '] - source [' + repo.Name + '] ' + repo.LastError)
+    else
+      FLogger.Error(TErrorCode.E1201_PackageDownloadFailed, 'Unable to download [' + packageIdentity.ToString + '] - it was not found on source [' + repo.Name + '].');
+    exit;
+  end;
+
+  //try each source - one that fails only matters if no other has the package.
+  failures := '';
+  failureCode := TErrorCode.E1201_PackageDownloadFailed;
+  for repo in FRepositories do
   begin
-    for repo in FRepositories do
+    if not repo.Enabled then
+      continue;
+    if cancellationToken.IsCancelled then
+      exit;
+    result := repo.DownloadPackage(cancellationToken, packageIdentity, localFolder, fileName);
+    if result then
+      break;
+    if repo.LastError <> '' then
     begin
-      if not repo.Enabled then
-        continue;
-      if cancellationToken.IsCancelled then
-        exit;
-      result := repo.DownloadPackage(cancellationToken, packageIdentity, localFolder, fileName) or result;
-      if result then
-        exit;
+      if failures <> '' then
+        failures := failures + '; ';
+      failures := failures + 'source [' + repo.Name + '] ' + repo.LastError;
+      failureCode := repo.LastErrorCode;
     end;
   end;
+  if cancellationToken.IsCancelled then
+    exit;
+  if result then
+  begin
+    if failures <> '' then
+      FLogger.Warning(TWarningCode.W1004_SourceUnavailable, 'Downloaded [' + packageIdentity.ToString + '], but ' + failures);
+    exit;
+  end;
+  if failures <> '' then
+    FLogger.Error(failureCode, 'Unable to download [' + packageIdentity.ToString + '] - ' + failures)
+  else
+    FLogger.Error(TErrorCode.E1201_PackageDownloadFailed, 'Unable to download [' + packageIdentity.ToString + '] - it was not found on any source.');
 end;
 
 function TPackageRepositoryManager.FindLatestVersion(const cancellationToken: ICancellationToken; const id: string; const compilerVersion: TCompilerVersion; const version: TPackageVersion; const includePrerelease : boolean; const sources : string): IPackageInfo;
@@ -187,11 +223,10 @@ var
 begin
   Assert(FConfiguration <> nil);
 
+  //Initialize reported why.
   if not UpdateRepositories then
-  begin
-    FLogger.Error('Unabled to search, error loading repositories');
     exit;
-  end;
+  BeginRequest;
 
   if sources <> '' then
   begin
@@ -218,6 +253,7 @@ begin
           continue;
       end;
       package := repo.FindLatestVersion(cancellationToken, id, compilerVersion, version, includePrerelease);
+      NoteUnavailable(repo);
       if cancellationToken.IsCancelled then
         exit;
 
@@ -264,11 +300,10 @@ begin
   if not installedPackages.Any then
     exit;
 
+  //Initialize reported why.
   if not UpdateRepositories then
-  begin
-    FLogger.Error('Unabled to search, error loading repositories');
     exit;
-  end;
+  BeginRequest;
 
   if installedPackages.Count = 0 then
     exit;
@@ -284,6 +319,7 @@ begin
       exit;
       
     packageResults := repo.GetPackageFeedByIds(cancelToken, installedPackages, options.CompilerVersion );
+    NoteUnavailable(repo);
     for i := 0 to packageResults.Results.Count -1 do
     begin
       if cancelToken.IsCancelled then
@@ -332,11 +368,10 @@ begin
   Assert(FConfiguration <> nil);
   result := TDPMPackageSearchResult.Create(options.Skip, 0);
 
+  //Initialize reported why.
   if not UpdateRepositories then
-  begin
-    FLogger.Error('Unabled to search, error loading repositories');
     exit;
-  end;
+  BeginRequest;
 
   if options.Sources <> '' then
   begin
@@ -362,6 +397,7 @@ begin
           continue;
       end;
       searchResult := repo.GetPackageFeed(cancelToken, options, compilerVersion);
+      NoteUnavailable(repo);
       allResults.AddRange(searchResult.Results);
     end;
   finally
@@ -419,16 +455,15 @@ begin
   Assert(FConfiguration <> nil);
   result := nil;
 
+  //Initialize reported why.
   if not UpdateRepositories then
-  begin
-    FLogger.Error('Unabled to search, error loading repositories');
     exit;
-  end;
+  BeginRequest;
 
   repo := GetRepositoryByName(source);
   if repo = nil then
   begin
-    FLogger.Error('Unabled to find repository for source [' + source + ']');
+    FLogger.Debug('No repository for source [' + source + '] - no icon.');
     exit;
   end;
   if cancelToken.IsCancelled then
@@ -447,11 +482,10 @@ begin
   result := nil;
   Assert(FConfiguration <> nil);
 
+  //Initialize reported why.
   if not UpdateRepositories then
-  begin
-    FLogger.Error('Unabled to search, error loading repositories');
     exit;
-  end;
+  BeginRequest;
 
   for repo in FRepositories do
   begin
@@ -461,6 +495,7 @@ begin
       continue;
 
     result := repo.GetPackageInfo(cancellationToken, packageId);
+    NoteUnavailable(repo);
     if result <> nil then
       exit;
     if cancellationToken.IsCancelled then
@@ -480,15 +515,14 @@ begin
 
   if compilerVersion = TCompilerVersion.UnknownVersion then
   begin
-    FLogger.Error('Unabled to search, no compiler version specified');
+    FLogger.Error(TErrorCode.E0003_InternalError, 'No compiler version was given for the package query.');
     exit;
   end;
 
+  //Initialize reported why.
   if not UpdateRepositories then
-  begin
-    FLogger.Error('Unabled to search, error loading repositories');
     exit;
-  end;
+  BeginRequest;
 
   
   for repo in FRepositories do
@@ -499,6 +533,7 @@ begin
       continue;
 
     result := repo.GetPackageMetaData(cancellationToken, packageId, packageVersion, compilerVersion);
+    NoteUnavailable(repo);
     if result <> nil then
       exit;
   end;
@@ -516,17 +551,16 @@ begin
   FLogger.Debug('TPackageRepositoryManager.GetPackageVersions');
   result := TCollections.CreateList<TPackageVersion>;
   Assert(FConfiguration <> nil);
+  //Initialize reported why.
   if not UpdateRepositories then
-  begin
-    FLogger.Error('Unabled to get package versions, error loading repositories');
     exit;
-  end;
+  BeginRequest;
 
   unfilteredResults := TCollections.CreateList<TPackageVersion>;
 
   if compilerVersion = TCompilerVersion.UnknownVersion then
   begin
-    FLogger.Error('Unabled to search, no compiler version specified');
+    FLogger.Error(TErrorCode.E0003_InternalError, 'No compiler version was given for the package query.');
     exit;
   end;
 
@@ -541,6 +575,7 @@ begin
       continue;
 
     searchResult := repo.GetPackageVersions(cancellationToken, packageId, compilerVersion, includePrerelease);
+    NoteUnavailable(repo);
     unfilteredResults.AddRange(searchResult);
   end;
 
@@ -556,7 +591,7 @@ begin
       result := right.CompareTo(left);
     end);
   //a cancelled query may be partial - don't remember it.
-  if not cancellationToken.IsCancelled then
+  if (not cancellationToken.IsCancelled) and (FUnavailable = '') then
     FRequestCache.AddVersions(packageId, compilerVersion, includePrerelease, result);
 end;
 
@@ -620,15 +655,14 @@ begin
 
   if compilerVersion = TCompilerVersion.UnknownVersion then
   begin
-    FLogger.Error('Unabled to search, no compiler version specified');
+    FLogger.Error(TErrorCode.E0003_InternalError, 'No compiler version was given for the package query.');
     exit;
   end;
 
+  //Initialize reported why.
   if not UpdateRepositories then
-  begin
-    FLogger.Error('Unabled to get package versions, error loading repositories');
     exit;
-  end;
+  BeginRequest;
 
   if FRequestCache.TryGetVersionsWithDependencies(packageId, compilerVersion, versionRange, includePrerelease, searchResult) then
     exit(searchResult);
@@ -641,6 +675,7 @@ begin
       continue;
 
     searchResult := repo.GetPackageVersionsWithDependencies(cancellationToken, packageId, compilerVersion, versionRange, includePrerelease);
+    NoteUnavailable(repo);
     unfilteredResults.AddRange(searchResult);
   end;
 
@@ -656,7 +691,7 @@ begin
       result := right.Version.CompareTo(left.Version); ;
     end);
   //a cancelled query may be partial - don't remember it.
-  if not cancellationToken.IsCancelled then
+  if (not cancellationToken.IsCancelled) and (FUnavailable = '') then
     FRequestCache.AddVersionsWithDependencies(packageId, compilerVersion, versionRange, includePrerelease, result);
 end;
 
@@ -683,7 +718,32 @@ end;
 function TPackageRepositoryManager.Initialize(const configuration : IConfiguration) : boolean;
 begin
   FConfiguration := configuration;
-  result := UpdateRepositories;
+  result := UpdateRepositories(true);
+end;
+
+function TPackageRepositoryManager.UnavailableSources : string;
+begin
+  result := FUnavailable;
+end;
+
+procedure TPackageRepositoryManager.BeginRequest;
+var
+  repo : IPackageRepository;
+begin
+  FUnavailable := '';
+  for repo in FRepositories do
+    repo.ClearLastError;
+end;
+
+procedure TPackageRepositoryManager.NoteUnavailable(const repo : IPackageRepository);
+begin
+  if repo.LastError = '' then
+    exit;
+  FLogger.Warning(TWarningCode.W1004_SourceUnavailable, 'Source [' + repo.Name + '] ' + repo.LastError);
+  if FUnavailable <> '' then
+    FUnavailable := FUnavailable + ', ';
+  FUnavailable := FUnavailable + repo.Name;
+  repo.ClearLastError;
 end;
 
 function TPackageRepositoryManager.List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>;
@@ -701,11 +761,10 @@ begin
 
   result := TCollections.CreateList<IPackageListItem>;
 
+  //Initialize reported why.
   if not UpdateRepositories then
-  begin
-    FLogger.Error('Unabled to search, error loading repositories');
     exit;
-  end;
+  BeginRequest;
 
   if options.Sources <> '' then
   begin
@@ -734,6 +793,7 @@ begin
           continue;
       end;
       searchResult := repo.List(cancellationToken, options);
+      NoteUnavailable(repo);
       unfilteredResults.AddRange(searchResult);
       if cancellationToken.IsCancelled then
         exit;
@@ -804,11 +864,10 @@ begin
   if cancellationToken.IsCancelled then
     exit;
 
+  //Initialize reported why.
   if not UpdateRepositories then
-  begin
-    FLogger.Error('Unabled to push, error loading source repositories');
     exit;
-  end;
+  BeginRequest;
 
   repo := FRepositories.Where(
     function(const repository : IPackageRepository) : Boolean
@@ -818,7 +877,7 @@ begin
 
   if repo = nil then
   begin
-    FLogger.Error('Unknown Source : ' + pushOptions.Source);
+    FLogger.Error(TErrorCode.E1003_UnknownSource, 'Unable to push - the source [' + pushOptions.Source + '] is not configured.');
     exit;
   end;
 
@@ -829,8 +888,9 @@ begin
   end;
 
   result := repo.Push(cancellationToken, pushOptions);
-
-
+  //the repository reports a push the server rejected - a request that could not be made is reported here.
+  if (not result) and (not cancellationToken.IsCancelled) and (repo.LastError <> '') then
+    FLogger.Error(TErrorCode.E1209_PackagePushFailed, 'Unable to push [' + ExtractFileName(pushOptions.PackagePath) + '] - source [' + repo.Name + '] ' + repo.LastError);
 end;
 
 function TPackageRepositoryManager.TryGetSourceType(const sourceName : string; out sourceType : TSourceType) : boolean;
@@ -860,18 +920,18 @@ begin
   repo := GetRepositoryByName(packageInfo.SourceName);
   if repo = nil then
   begin
-    FLogger.Error('Unknown source for package [' + packageInfo.ToString + '] : ' + packageInfo.SourceName);
+    FLogger.Error(TErrorCode.E1003_UnknownSource, 'Unable to install [' + packageInfo.ToString + '] - its source [' + packageInfo.SourceName + '] is not configured.');
     exit;
   end;
   if not Supports(repo, IGitRegistryRepository, gitRepo) then
   begin
-    FLogger.Error('Source [' + packageInfo.SourceName + '] is not a git registry source.');
+    FLogger.Error(TErrorCode.E0003_InternalError, 'The source [' + packageInfo.SourceName + '] is not a git registry source.');
     exit;
   end;
   result := gitRepo.InstallPackageInPlace(cancellationToken, packageInfo, targetDir);
 end;
 
-function TPackageRepositoryManager.UpdateRepositories : boolean;
+function TPackageRepositoryManager.UpdateRepositories(const report : boolean) : boolean;
 var
   uri : IUri;
   error : string;
@@ -906,13 +966,15 @@ begin
       begin
         if not TUriFactory.TryParseWithError(source.Source, false, uri, error) then
         begin
-          FLogger.Error('Invalid source uri : ' + source.Source);
+          if report then
+            FLogger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + source.Name + '] is not valid - [' + source.Source + '] is not a valid uri : ' + error);
           exit;
         end;
 
         if not MatchText(uri.Scheme, ['file', 'http', 'https']) then
         begin
-          FLogger.Error('Invalid source uri scheme : ' + uri.Scheme);
+          if report then
+            FLogger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + source.Name + '] is not valid - [' + uri.Scheme + '] is not a supported scheme (file, http or https).');
           exit;
         end;
       end;

@@ -157,6 +157,7 @@ implementation
 
 uses
   DPM.Core.Constants,
+  DPM.Core.Diagnostics,
   DPM.Core.Git.Interfaces,
   DPM.Core.Spec.Reader,
   DPM.Core.Package.Dependency,
@@ -239,9 +240,10 @@ begin
   try
     packageIdentity := TPackageIdentity.Create(source, jsonObj);
   except
+    //one entry the source sent that can't be read - the rest of what it sent may be fine.
     on e : Exception do
     begin
-      logger.Error(e.Message);
+      logger.Warning(TWarningCode.W1207_PackageEntryUnreadable, 'A package from [' + source + '] could not be read : ' + e.Message);
       exit
     end;
   end;
@@ -261,26 +263,26 @@ begin
   match := TRegEx.Match(value, cPackageFileRegex, [roIgnoreCase]);
   if not match.Success then
   begin
-    logger.Error('Package name is not a valid package [' + value + ']');
+    logger.Error(TErrorCode.E3005_InvalidPackageFile, 'The package file name [' + value + '] is not valid - expected {Id}-{Compiler}-{Platforms}-{Version}.');
     exit;
   end;
   id := match.Groups[1].Value;
   cv := StringToCompilerVersion(match.Groups[2].Value);
   if cv = TCompilerVersion.UnknownVersion then
   begin
-    logger.Error('Compiler version segment is not a valid version [' + match.Groups[2].Value + ']');
+    logger.Error(TErrorCode.E3005_InvalidPackageFile, 'The compiler [' + match.Groups[2].Value + '] in the package file name [' + value + '] is not a known compiler version.');
     exit;
   end;
   // Platform segment (Group 3) can be binary string (e.g., '11') or pipe-separated (e.g., 'win32|win64')
   // IPackageIdentity doesn't store platform, so we just validate it's non-empty
   if match.Groups[3].Value = '' then
   begin
-    logger.Error('Platform segment is empty in package name [' + value + ']');
+    logger.Error(TErrorCode.E3005_InvalidPackageFile, 'The platforms are missing from the package file name [' + value + '].');
     exit;
   end;
   if not TPackageVersion.TryParse(match.Groups[4].Value, packageVersion) then
   begin
-    logger.Error('Version segment is not a valid version [' + match.Groups[4].Value + ']');
+    logger.Error(TErrorCode.E3005_InvalidPackageFile, 'The version [' + match.Groups[4].Value + '] in the package file name [' + value + '] is not valid.');
     exit;
   end;
 
@@ -466,7 +468,7 @@ begin
     on e : Exception do
     begin
       packageInfo := nil;
-      logger.Error(e.Message);
+      logger.Warning(TWarningCode.W1207_PackageEntryUnreadable, 'A package from [' + source + '] could not be read : ' + e.Message);
       exit;
     end;
   end;
@@ -673,7 +675,7 @@ begin
   except
     on e : Exception do
     begin
-      logger.Error(e.Message);
+      logger.Warning(TWarningCode.W1207_PackageEntryUnreadable, 'A package from [' + source + '] could not be read : ' + e.Message);
       exit;
 
     end;

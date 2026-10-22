@@ -32,6 +32,7 @@ uses
   Spring.Collections,
   VSoft.CancellationToken,
   DPM.Core.Types,
+  DPM.Core.Diagnostics,
   DPM.Core.Sources.Types,
   DPM.Core.Dependency.Version,
   DPM.Core.Options.Search,
@@ -49,6 +50,13 @@ type
     procedure Configure(const source : ISourceConfig);
     function GetEnabled : boolean;
     procedure SetEnabled(const value : boolean);
+    //why the last request failed - '' when it succeeded, or just found nothing. A repository does not log a
+    //failed request : the repository manager decides whether it is a warning (a query another source may
+    //answer) or an error (a download with nowhere else to go).
+    function GetLastError : string;
+    //the code to report LastError with if it fails the operation - eg a hash mismatch.
+    function GetLastErrorCode : TErrorCode;
+    procedure ClearLastError;
     //above implemented in base class
 
 
@@ -78,6 +86,8 @@ type
 
 
     property Enabled : boolean read GetEnabled write SetEnabled;
+    property LastError : string read GetLastError;
+    property LastErrorCode : TErrorCode read GetLastErrorCode;
     property Name : string read GetName;
     property Source : string read GetSource;
     property RepositoryType : TSourceType read GetRepositoryType;
@@ -105,6 +115,10 @@ type
     function Initialize(const configuration : IConfiguration) : boolean;
 
     function HasSources : boolean;
+
+    //the sources the last query could not use, with why - '' when every source answered. Lets a caller
+    //that found nothing say whether that is because a source could not be used.
+    function UnavailableSources : string;
 
     //commands
     function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>;

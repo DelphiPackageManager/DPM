@@ -105,6 +105,7 @@ uses
   System.SysUtils,
   System.StrUtils,
   System.IOUtils,
+  DPM.Core.Diagnostics,
   DPM.Core.Constants,
   DPM.Core.Spec.Reader,
   DPM.Core.Utils.Path,
@@ -195,12 +196,16 @@ begin
   url := spec.MetaData.RepositoryUrl;
   if url = '' then
   begin
-    Logger.Warning('Registry package [' + spec.MetaData.Id + '] has no repositoryUrl - cannot determine versions.');
+    Logger.Warning(TWarningCode.W1208_RegistryEntryInvalid, 'The registry entry [' + spec.MetaData.Id + '] in [' + Name + '] has no repositoryUrl - unable to determine its versions.');
     exit;
   end;
 
   if not FGitClient.LsRemoteTags(cancellationToken, url, tags) then
+  begin
+    if not cancellationToken.IsCancelled then
+      RequestFailed('could not list the versions of [' + spec.MetaData.Id + '] : ' + FGitClient.LastError);
     exit;
+  end;
 
   for tagName in tags.Keys do
   begin
@@ -501,7 +506,7 @@ begin
   //git registry packages are installed in place (clone + build) by the package
   //installer's git branch, not via a downloaded .dpkg. This is intentionally a no-op.
   fileName := '';
-  Logger.Error('DownloadPackage is not supported for git registry packages - they install in place.');
+  Logger.Debug('DownloadPackage is not supported for git registry packages - they install in place.');
   result := false;
 end;
 
@@ -579,14 +584,14 @@ begin
   registrySpec := GetSpec(cancellationToken, packageInfo.Id);
   if registrySpec = nil then
   begin
-    Logger.Error('Package [' + packageInfo.Id + '] not found in registry [' + Name + '].');
+    Logger.Error(TErrorCode.E1101_PackageNotFound, 'The package [' + packageInfo.Id + '] was not found in the registry [' + Name + '].');
     exit;
   end;
 
   url := registrySpec.MetaData.RepositoryUrl;
   if url = '' then
   begin
-    Logger.Error('Registry package [' + packageInfo.Id + '] has no repositoryUrl.');
+    Logger.Error(TErrorCode.E1201_PackageDownloadFailed, 'Unable to install [' + packageInfo.Id + '] - its entry in the registry [' + Name + '] has no repositoryUrl.');
     exit;
   end;
 
@@ -601,7 +606,8 @@ begin
   begin
     if not FGitClient.LsRemoteHead(cancellationToken, url, '', commit) then
     begin
-      Logger.Error('Could not determine HEAD commit for [' + url + '].');
+      if not cancellationToken.IsCancelled then
+        Logger.Error(TErrorCode.E1203_GitCommandFailed, 'Unable to find the commit to install for [' + packageInfo.Id + '] : ' + FGitClient.LastError);
       exit;
     end;
   end;
@@ -623,7 +629,7 @@ begin
     except
       on e : Exception do
       begin
-        Logger.Error('Could not clear cached package folder [' + targetDir + '] : ' + e.Message);
+        Logger.Error(TErrorCode.E3008_CacheWriteFailed, 'Unable to clear the package folder [' + targetDir + '] : ' + e.Message);
         exit;
       end;
     end;
@@ -634,9 +640,17 @@ begin
 
   Logger.Information('Cloning [' + packageInfo.Id + '] from ' + url);
   if not FGitClient.Clone(cancellationToken, url, targetDir) then
+  begin
+    if not cancellationToken.IsCancelled then
+      Logger.Error(TErrorCode.E1203_GitCommandFailed, 'Unable to clone [' + packageInfo.Id + '] : ' + FGitClient.LastError);
     exit;
+  end;
   if not FGitClient.Checkout(cancellationToken, targetDir, commit) then
+  begin
+    if not cancellationToken.IsCancelled then
+      Logger.Error(TErrorCode.E1203_GitCommandFailed, 'Unable to check out [' + packageInfo.Id + '] : ' + FGitClient.LastError);
     exit;
+  end;
 
   //repo dspec wins if present, else use the registry dspec.
   repoSpec := TryReadRepoDspec(targetDir);
@@ -648,7 +662,7 @@ begin
     finalSpec := ReduceSpec(registrySpec, packageInfo.Version, packageInfo.CompilerVersion);
   if finalSpec = nil then
   begin
-    Logger.Error('No target platform for the requested compiler in dspec for [' + packageInfo.Id + '].');
+    Logger.Error(TErrorCode.E3006_PackageDeclaresNoPlatforms, 'The dspec of [' + packageInfo.Id + '] has no target platform for compiler ' + CompilerToString(packageInfo.CompilerVersion) + '.');
     exit;
   end;
 
@@ -662,7 +676,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Could not write package dspec [' + dspecFile + '] : ' + e.Message);
+      Logger.Error(TErrorCode.E3008_CacheWriteFailed, 'Unable to write the package dspec [' + dspecFile + '] : ' + e.Message);
       exit;
     end;
   end;

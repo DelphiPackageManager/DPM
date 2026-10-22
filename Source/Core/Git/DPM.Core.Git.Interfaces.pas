@@ -58,6 +58,10 @@ type
 
     //git checkout <commitOrRef> in repoDir.
     function Checkout(const cancellationToken : ICancellationToken; const repoDir : string; const commitOrRef : string) : boolean;
+
+    //what the last command that failed said - the commands log nothing themselves, the caller decides
+    //whether a failure is an error.
+    function LastError : string;
   end;
 
   TGitUtils = class

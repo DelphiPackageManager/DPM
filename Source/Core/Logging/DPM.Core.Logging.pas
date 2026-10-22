@@ -112,12 +112,20 @@ type
     property Verbosity : TVerbosity read GetVerbosity write SetVerbosity;
   end;
 
+  IDemotingLogger = interface(ILogger)
+    ['{6E1F0A57-9B1C-4E5B-8C2D-3A4B5C6D7E8F}']
+    //the first warning or error logged through it, formatted with its code - '' when there was none.
+    function FirstProblem : string;
+  end;
+
   ///<summary> Sends everything to the wrapped logger's Debug output - for speculative work (trial
-  ///  resolves) whose problems only matter if the caller decides they do. Errors logged through it are
-  ///  not counted. </summary>
-  TDemotingLogger = class(TInterfacedObject, ILogger)
+  ///  resolves, an optional build) whose problems only matter if the caller decides they do. Errors
+  ///  logged through it are not counted; FirstProblem lets the caller report one diagnostic of its own. </summary>
+  TDemotingLogger = class(TInterfacedObject, IDemotingLogger, ILogger)
   private
     FTarget : ILogger;
+    FFirstProblem : string;
+    procedure NoteProblem(const text : string);
   protected
     procedure Debug(const data : string);
     procedure Verbose(const data : string; const important : boolean = false);
@@ -133,6 +141,7 @@ type
     function ErrorCount : integer;
     function GetVerbosity : TVerbosity;
     procedure SetVerbosity(const value : TVerbosity);
+    function FirstProblem : string;
   public
     constructor Create(const target : ILogger);
   end;
@@ -370,12 +379,25 @@ end;
 
 procedure TDemotingLogger.Error(const data : string);
 begin
+  NoteProblem(FormatDiagnostic(true, '', data));
   FTarget.Debug(data);
 end;
 
 procedure TDemotingLogger.Error(const code : TErrorCode; const data : string);
 begin
+  NoteProblem(FormatError(code, data));
   FTarget.Debug(FormatError(code, data));
+end;
+
+function TDemotingLogger.FirstProblem : string;
+begin
+  result := FFirstProblem;
+end;
+
+procedure TDemotingLogger.NoteProblem(const text : string);
+begin
+  if FFirstProblem = '' then
+    FFirstProblem := text;
 end;
 
 function TDemotingLogger.ErrorCount : integer;
@@ -418,11 +440,13 @@ end;
 
 procedure TDemotingLogger.Warning(const data : string; const important : boolean);
 begin
+  NoteProblem(FormatDiagnostic(false, '', data));
   FTarget.Debug(data);
 end;
 
 procedure TDemotingLogger.Warning(const code : TWarningCode; const data : string; const important : boolean);
 begin
+  NoteProblem(FormatWarning(code, data));
   FTarget.Debug(FormatWarning(code, data));
 end;
 

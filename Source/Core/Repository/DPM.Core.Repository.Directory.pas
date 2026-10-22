@@ -109,6 +109,7 @@ uses
   System.Zip,
   Spring.Collections.Extensions,
   DPM.Core.Constants,
+  DPM.Core.Diagnostics,
   DPM.Core.Package.Classes,
   DPM.Core.Package.Icon,
   DPM.Core.Spec.Reader,
@@ -199,7 +200,7 @@ begin
     exit;
   end;
   if matchingFiles.Count > 1 then
-    Logger.Warning('Multiple package files matched [' + packageInfo.ToString + '] - using first');
+    Logger.Warning(TWarningCode.W1206_MultiplePackageFilesMatched, 'More than one package file in [' + Name + '] matched [' + packageInfo.ToString + '] - using the first.');
 
   sourceFile := matchingFiles[0];
   destFile := IncludeTrailingPathDelimiter(localFolder) + ExtractFileName(sourceFile);
@@ -215,10 +216,12 @@ begin
     if FileExists(sourceHashFile) then
     begin
       sourceHash := TFile.ReadAllText(sourceHashFile);
+      //the file has changed since it was pushed - don't use it.
       if not SameText(sourceHash, destHash) then
       begin
-        Logger.Error('Source and destination file hashes are different, the file has been modified since being pushed to the source folder.');
-        Logger.Error('If this is intentional, remove the .sha256 file from the source');
+        RequestFailed('has a package file [' + sourceFile + '] that does not match its .sha256 file - it has been modified since it was pushed. ' +
+                      'If that was intentional, delete the .sha256 file.', TErrorCode.E1202_PackageHashMismatch);
+        exit;
       end;
     end;
 
@@ -233,7 +236,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error downloading  [' + sourceFile + '] to [' + destFile + ']');
+      RequestFailed('could not copy [' + sourceFile + '] to [' + destFile + '] : ' + e.Message);
     end;
   end;
 end;
@@ -394,7 +397,7 @@ begin
     except
       on e : Exception do
       begin
-        Logger.Error('Error opening package file [' + packagFileName + ']');
+        Logger.Warning(TWarningCode.W1207_PackageEntryUnreadable, 'Unable to read the package [' + packagFileName + '] in [' + Name + '] : ' + e.Message);
         exit;
       end;
     end;
@@ -765,7 +768,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error searching source [' + Name + '] : ' + e.Message);
+      RequestFailed('could not be searched : ' + e.Message);
     end;
   end;
 end;
@@ -890,7 +893,7 @@ begin
                     except
                       on e : Exception do
                       begin
-                        Logger.Error('Error building metadata from manifest : ' + e.Message);
+                        Logger.Warning(TWarningCode.W1207_PackageEntryUnreadable, 'Unable to read the package details of [' + packageFileName + '] in [' + Name + '] : ' + e.Message);
                         result := nil;
                       end;
                     end;
@@ -919,7 +922,7 @@ begin
     except
       on e : Exception do
       begin
-        Logger.Error('Error reading package [' + packageFileName + '] : ' + e.Message);
+        Logger.Warning(TWarningCode.W1207_PackageEntryUnreadable, 'Unable to read the package [' + packageFileName + '] in [' + Name + '] : ' + e.Message);
         packageMetadata := nil;
       end;
     end;
@@ -989,7 +992,7 @@ begin
         zipFile.Open(fileName, TZipMode.zmRead);
         if zipFile.IndexOf(cPackageDspecFile) = -1 then
         begin
-          Logger.Error('Package file [' + fileName + '] is missing ' + cPackageDspecFile);
+          Logger.Warning(TWarningCode.W1207_PackageEntryUnreadable, 'The package file [' + fileName + '] in [' + Name + '] does not contain a ' + cPackageDspecFile + '.');
           exit;
         end;
         zipFile.Read(cPackageDspecFile, metaBytes);
@@ -1022,7 +1025,7 @@ begin
       except
         on e : Exception do
         begin
-          Logger.Error('Error opening package file [' + fileName + ']');
+          Logger.Warning(TWarningCode.W1207_PackageEntryUnreadable, 'Unable to read the package [' + fileName + '] in [' + Name + '] : ' + e.Message);
           exit;
         end;
       end;

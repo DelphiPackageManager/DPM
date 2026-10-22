@@ -86,6 +86,9 @@ type
     // Trust-set membership (PublisherTrusted/RepositoryTrusted) is re-checked
     // against the *current* policy — the receipt is only the signature roster.
     function BuildResultFromReceipt(const receipt : TVerificationReceipt) : TVerificationResult;
+    //InstallPackageFromFile, reporting through logger - a TDemotingLogger when trying a .dpkg left on disk,
+    //whose problems are not the operation's because the package is downloaded again.
+    function DoInstallPackageFromFile(const logger : ILogger; const packageFileName : string; const skipTrustRatchets : boolean) : boolean;
   protected
     procedure SetLocation(const value : string);
     function GetLocation : string;
@@ -156,6 +159,7 @@ uses
   System.RegularExpressions,
   System.Generics.Defaults,
   DPM.Core.Constants,
+  DPM.Core.Diagnostics,
   DPM.Core.Package.Classes,
   DPM.Core.Package.Icon,
   DPM.Core.Utils.Hash,
@@ -379,8 +383,8 @@ begin
 
     if FTrustPrompt = nil then
     begin
-      FLogger.Error('[PackageCache] No trust prompt strategy is wired — hard fail per V-24. ' +
-                    'Edit %APPDATA%\.dpm\trust-state.yaml to override.');
+      FLogger.Error(TErrorCode.E7004_RepositorySignatureBlocked, 'The install of [' + packageId.Id + '] was blocked - it no longer carries the repository signature ' +
+                    'previously seen for it, and there is no way to ask whether to continue. Edit %APPDATA%\.dpm\trust-state.yaml to override.');
       result := false;
       exit;
     end;
@@ -408,16 +412,16 @@ begin
           // or - more commonly in headless/IDE contexts - when the non-interactive
           // strategy fails closed. "User cancelled" is misleading in the latter
           // case, so state the actual outcome.
-          FLogger.Warning('[PackageCache] Install of [' +
-            packageId.Id + '] blocked at repository ratchet (this build no longer carries the ' +
-            'previously-seen trusted repository signature).');
+          FLogger.Error(TErrorCode.E7004_RepositorySignatureBlocked, 'The install of [' +
+            packageId.Id + '] was blocked - this build no longer carries the ' +
+            'previously seen trusted repository signature.');
           result := false;
           exit;
         end;
       tpdBlockAlways :
         begin
-          FLogger.Warning('[PackageCache] User permanently blocked [' +
-            packageId.Id + '] at repository ratchet.');
+          FLogger.Error(TErrorCode.E7002_PackageBlocked, 'The install of [' +
+            packageId.Id + '] was blocked, and the package is now permanently blocked - it no longer carries its repository signature.');
           FTrustState.BlockPermanently(packageId.Id);
           result := false;
           exit;
@@ -557,7 +561,7 @@ begin
     FReceiptService.Write(packageFolder, receipt);
   except
     on e : Exception do
-      FLogger.Warning('[PackageCache] Failed to write verification receipt: ' + e.Message);
+      FLogger.Warning(TWarningCode.W3015_CacheReceiptWriteFailed, 'Unable to write the verification receipt for [' + packageId.ToString + '] : ' + e.Message);
   end;
 end;
 
@@ -633,8 +637,8 @@ begin
   // Permanent block trumps everything else.
   if hadPrior and prior.BlockedPermanently then
   begin
-    FLogger.Error(Format(
-      '[PackageCache] Package [%s] is permanently blocked by user choice. ' +
+    FLogger.Error(TErrorCode.E7002_PackageBlocked, Format(
+      'The package [%s] is permanently blocked by user choice. ' +
       'Edit %%APPDATA%%\.dpm\trust-state.yaml or remove the entry to lift the block.',
       [packageId.Id]));
     result := false;
@@ -705,9 +709,9 @@ begin
       end;
     adpBlock :
       begin
-        FLogger.Error(Format(
-          '[PackageCache] Author downgrade for [%s] blocked by policy ' +
-          '(authorDowngradePolicy=block). Previous SPKI sha256:%s.',
+        FLogger.Error(TErrorCode.E7003_AuthorDowngradeBlocked, Format(
+          'The install of [%s] was blocked - its author signature changed, and authorDowngradePolicy is block. ' +
+          'Previous signer sha256:%s.',
           [packageId.Id, prior.LastAuthorSpkiHex]));
         result := false;
       end;
@@ -715,9 +719,9 @@ begin
       begin
         if FTrustPrompt = nil then
         begin
-          FLogger.Error(Format(
-            '[PackageCache] Author downgrade for [%s] but no prompt strategy ' +
-            'is wired — blocking. Set authorDowngradePolicy=allow to override.',
+          FLogger.Error(TErrorCode.E7003_AuthorDowngradeBlocked, Format(
+            'The install of [%s] was blocked - its author signature changed and there is no way to ask ' +
+            'whether to continue. Set authorDowngradePolicy=allow to override.',
             [packageId.Id]));
           result := false;
           exit;
@@ -742,14 +746,14 @@ begin
             end;
           tpdBlockOnce :
             begin
-              FLogger.Warning('[PackageCache] User cancelled install of [' +
-                packageId.Id + '].');
+              FLogger.Error(TErrorCode.E7003_AuthorDowngradeBlocked, 'The install of [' +
+                packageId.Id + '] was blocked - its author signature changed.');
               result := false;
             end;
           tpdBlockAlways :
             begin
-              FLogger.Warning('[PackageCache] User permanently blocked [' +
-                packageId.Id + '].');
+              FLogger.Error(TErrorCode.E7002_PackageBlocked, 'The install of [' +
+                packageId.Id + '] was blocked, and the package is now permanently blocked - its author signature changed.');
               FTrustState.BlockPermanently(packageId.Id);
               result := false;
             end;
@@ -881,7 +885,7 @@ begin
       removedAnything := true;
     except
       on e : Exception do
-        FLogger.Error('[PackageCache] Unable to remove cached folder [' + packageFolder + '] : ' + e.Message);
+        FLogger.Error(TErrorCode.E3008_CacheWriteFailed, 'Unable to remove the cached folder [' + packageFolder + '] : ' + e.Message);
     end;
   end;
 
@@ -905,7 +909,7 @@ begin
         removedAnything := true;
       except
         on e : Exception do
-          FLogger.Error('[PackageCache] Unable to remove cached file [' + matchingFiles[i] + '] : ' + e.Message);
+          FLogger.Error(TErrorCode.E3008_CacheWriteFailed, 'Unable to remove the cached file [' + matchingFiles[i] + '] : ' + e.Message);
       end;
       if FileExists(matchingFiles[i] + cPackageHashAlgorithmExt) then
       begin
@@ -957,7 +961,7 @@ begin
   result := GetPackagePath(packageId);
   if not ForceDirectories(result) then
   begin
-    FLogger.Error('Error creating package folder [' + result + ']');
+    FLogger.Error(TErrorCode.E3008_CacheWriteFailed, 'Unable to create the package folder [' + result + '].');
     exit;
   end;
 end;
@@ -1068,7 +1072,7 @@ begin
 
   if not EnsurePackage(packageId) then
   begin
-    FLogger.Error('Package dspec file [' + packageId.ToString + '] not found in cache.');
+    FLogger.Debug('Package dspec file [' + packageId.ToString + '] not found in cache.');
     exit;
   end;
   packageFolder := GetPackagePath(packageId);
@@ -1424,7 +1428,19 @@ begin
         '-*-' + packageId.Version.ToStringNoMeta + cPackageFileExt;
       matchingFiles := TDirectory.GetFiles(packageFileFolder, searchPattern, TSearchOption.soTopDirectoryOnly);
       if Length(matchingFiles) > 0 then
-        result := InstallPackageFromFile(matchingFiles[0]);
+      begin
+        //speculative - if the .dpkg left on disk is no good, the caller downloads the package again, so
+        //what is wrong with it is not the operation's problem.
+        try
+          result := DoInstallPackageFromFile(TDemotingLogger.Create(FLogger), matchingFiles[0], false);
+        except
+          on e : Exception do
+          begin
+            FLogger.Debug('[PackageCache] Unable to use [' + matchingFiles[0] + '] : ' + e.Message);
+            result := false;
+          end;
+        end;
+      end;
     end;
   end;
 
@@ -1446,6 +1462,11 @@ begin
 end;
 
 function TPackageCache.InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
+begin
+  result := DoInstallPackageFromFile(FLogger, packageFileName, skipTrustRatchets);
+end;
+
+function TPackageCache.DoInstallPackageFromFile(const logger : ILogger; const packageFileName : string; const skipTrustRatchets : boolean) : boolean;
 var
   packageFilePath : string;
   fileName : string;
@@ -1458,21 +1479,21 @@ var
   hadPriorAuthor : boolean;
 begin
   result := false;
-  FLogger.Debug('[PackageCache] installing from file : ' + packageFileName);
+  logger.Debug('[PackageCache] installing from file : ' + packageFileName);
   if not FileExists(packageFileName) then
   begin
-    FLogger.Error('Package File [' + packageFileName + '] does not exist');
+    logger.Error(TErrorCode.E3004_PackageFileNotFound, 'The package file [' + packageFileName + '] does not exist.');
     exit;
   end;
   if ExtractFileExt(packageFileName) <> '.dpkg' then
   begin
-    FLogger.Error('Package File [' + packageFileName + '] is not a valid package file.');
+    logger.Error(TErrorCode.E3005_InvalidPackageFile, 'The file [' + packageFileName + '] is not a package file (.dpkg).');
     exit;
   end;
 
   fileName := ChangeFileExt(ExtractFileName(packageFileName), '');
 
-  if not TPackageIdentity.TryCreateFromString(FLogger, fileName, '', packageIndentity) then
+  if not TPackageIdentity.TryCreateFromString(logger, fileName, '', packageIndentity) then
     exit;
 
   //defensive: about to re-extract this id-compiler-version, invalidate any memoised state
@@ -1490,14 +1511,14 @@ begin
 
   //creates the per-version extraction folder
   packageFolder := CreatePackagePath(packageIndentity);
-  FLogger.Debug('[PackageCache] PackageFolder  : ' + packageFolder);
+  logger.Debug('[PackageCache] PackageFolder  : ' + packageFolder);
 
   //.dpkg lives in the package-id folder (sibling of the per-version folders) so multiple versions
   //of the same id share a folder rather than cluttering the cache root.
   packageFileFolder := GetPackageFileFolder(packageIndentity);
   if not ForceDirectories(packageFileFolder) then
   begin
-    FLogger.Error('Unable to create package file folder [' + packageFileFolder + ']');
+    logger.Error(TErrorCode.E3008_CacheWriteFailed, 'Unable to create the package folder [' + packageFileFolder + '].');
     exit;
   end;
 
@@ -1505,14 +1526,13 @@ begin
   packageFilePath := IncludeTrailingPathDelimiter(packageFileFolder) + ExtractFileName(packageFileName);
   if not SameText(packageFileName, packageFilePath) then
   begin
-    FLogger.Debug('[PackageCache] Copying Package file to   : ' + packageFilePath);
+    logger.Debug('[PackageCache] Copying Package file to   : ' + packageFilePath);
     try
       TFile.Copy(packageFileName, packageFilePath, true);
     except
       on e : Exception do
       begin
-        FLogger.Error('Unable to copy file [' + packageFileName + '] to the package cache');
-        FLogger.Error(e.Message);
+        logger.Error(TErrorCode.E3008_CacheWriteFailed, 'Unable to copy [' + packageFileName + '] into the package cache : ' + e.Message);
         exit;
       end;
     end;
@@ -1532,25 +1552,25 @@ begin
     except
       on e : Exception do
       begin
-        FLogger.Error('[PackageCache] Verification raised exception for [' +
-          packageFilePath + ']: ' + e.Message);
+        logger.Error(TErrorCode.E7001_PackageVerificationFailed, 'Unable to verify the package [' +
+          packageFilePath + '] : ' + e.Message);
         exit;
       end;
     end;
 
     if verifyResult.Outcome = voInvalid then
     begin
-      FLogger.Error('[PackageCache] Package verification failed: ' + verifyResult.Reason);
+      logger.Error(TErrorCode.E7001_PackageVerificationFailed, 'The package [' + packageFilePath + '] failed verification : ' + verifyResult.Reason);
       exit;
     end;
 
     case verifyResult.Outcome of
       voTrusted :
-        FLogger.Verbose('[PackageCache] Package signature verified (' + IntToStr(Length(verifyResult.Signatures)) + ' signatures).');
+        logger.Verbose('[PackageCache] Package signature verified (' + IntToStr(Length(verifyResult.Signatures)) + ' signatures).');
       voUnsigned :
-        FLogger.Information('[PackageCache] Installing unsigned package ' + '[' + packageIndentity.Id + '] under permissive mode.');
+        logger.Information('[PackageCache] Installing unsigned package ' + '[' + packageIndentity.Id + '] under permissive mode.');
       voUntrustedPublisher :
-        FLogger.Warning('[PackageCache] Package signed but signer is not in ' +  'trustedPublishers; install allowed under permissive mode.');
+        logger.Warning('[PackageCache] Package signed but signer is not in ' +  'trustedPublishers; install allowed under permissive mode.');
     end;
 
     // The TOFU ratchets compare this build against the high-water mark from the
@@ -1560,7 +1580,7 @@ begin
     // (via the per-call argument or the cache-wide FSkipTrustRatchets mode).
     // Signature verification above still applies; we just don't ratchet.
     if skipTrustRatchets or FSkipTrustRatchets then
-      FLogger.Information('[PackageCache] Skipping author/repository trust ratchets for [' +
+      logger.Information('[PackageCache] Skipping author/repository trust ratchets for [' +
         packageIndentity.Id + '] (test install).')
     else
     begin
@@ -1590,29 +1610,28 @@ begin
   //always extract into a known-empty directory.
   if TDirectory.Exists(packageFolder) and (not TDirectory.IsEmpty(packageFolder)) then
   begin
-    FLogger.Debug('[PackageCache] Cleaning existing package folder before extraction : ' + packageFolder);
+    logger.Debug('[PackageCache] Cleaning existing package folder before extraction : ' + packageFolder);
     try
       TDirectory.Delete(packageFolder, true);
     except
       on e : Exception do
-      begin
-        FLogger.Error('Unable to clean package folder [' + packageFolder + '] before extraction : ' + e.Message);
-        raise Exception.Create('Unable to clean package folder [' + packageFolder + '] before extraction : ' + e.Message);
-      end;
+        raise EDPMError.Create(TErrorCode.E3008_CacheWriteFailed, 'Unable to clear the package folder [' + packageFolder + '] before extracting into it : ' + e.Message);
     end;
     if not ForceDirectories(packageFolder) then
     begin
-      FLogger.Error('Unable to recreate package folder [' + packageFolder + ']');
+      logger.Error(TErrorCode.E3008_CacheWriteFailed, 'Unable to recreate the package folder [' + packageFolder + '].');
       exit;
     end;
   end;
 
   try
-    FLogger.Debug('[PackageCache] Extracting Package file [' + packageFilePath + '] to : ' + packageFolder);
+    logger.Debug('[PackageCache] Extracting Package file [' + packageFilePath + '] to : ' + packageFolder);
     TZipFile.ExtractZipFile(packageFilePath, packageFolder);
     result := FileExists(IncludeTrailingPathDelimiter(packageFolder) + cPackageDspecFile);
     if result then
-      FLogger.Verbose('Package  [' + packageFilePath + '] added to cache.');
+      logger.Verbose('Package  [' + packageFilePath + '] added to cache.')
+    else
+      logger.Error(TErrorCode.E3005_InvalidPackageFile, 'The package file [' + packageFilePath + '] does not contain a ' + cPackageDspecFile + ' - it is not a valid package.');
 
     // Write the verification receipt as the FINAL step of a successful
     // verify-and-extract — V-31. Its presence is the signal that extraction
@@ -1623,15 +1642,13 @@ begin
   except
     on e : exception do
     begin
-       FLogger.Debug('[PackageCache] Error Extracting Package file : ' + e.Message);
+       logger.Debug('[PackageCache] Error Extracting Package file : ' + e.Message);
        TDirectory.Delete(packageFolder, true); //just empties it but doesn't delete?
+       //the extraction failure below is what matters.
        if not RemoveDir(packageFolder) then
-       begin
-         FLogger.Error('Unable to cleanup directory : ' + packageFolder);
-         FLogger.Error(SysErrorMessage(GetLastError));
-       end;
+         logger.Verbose('Unable to remove the partly extracted folder [' + packageFolder + '] : ' + SysErrorMessage(GetLastError));
       //raising here, if we don't we end up here again!
-      raise Exception.Create('Unable to extract file [' + packageFilePath + '] into the package cache : ' + e.Message);
+      raise EDPMError.Create(TErrorCode.E3010_PackageExtractFailed, 'Unable to extract [' + packageFilePath + '] into the package cache : ' + e.Message);
     end;
   end;
 end;

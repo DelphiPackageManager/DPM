@@ -232,6 +232,7 @@ uses
   DPM.Core.Utils.Config,
   DPM.Core.Package.Classes,
   DPM.Core.Package.SearchResults,
+  DPM.Core.Package.InstallPlan,
   DPM.Core.Configuration.Classes,
   DPM.Core.Dependency.Interfaces,
   DPM.IDE.ToolsAPI;
@@ -392,10 +393,11 @@ begin
       projectCount := 1;
     FHost.BeginInstall(projectCount);
     installResult := FPackageInstaller.Install(FCancellationTokenSource.Token, options, FInstallerContext);
+    //the installer reported why - this is the outcome.
     if installResult then
       InstallSucceeded(packageMetadata, options)
     else
-      FLogger.Error('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' did not install.');
+      FLogger.Information('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' did not install.', true);
 
 
   finally
@@ -462,12 +464,8 @@ begin
 
       if not FPackageInstaller.PlanInstall(FCancellationTokenSource.Token, options, plan) then
       begin
-        if plan <> nil then
-        begin
-          for line in plan.Errors do
-            FLogger.Error(line);
-        end;
-        FLogger.Error('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' cannot be installed.');
+        LogPlanErrors(FLogger, plan);
+        FLogger.Information('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' cannot be installed.', true);
         exit;
       end;
       for line in plan.SummaryLines do
@@ -495,7 +493,7 @@ begin
       if installResult then
         InstallSucceeded(packageMetadata, options)
       else
-        FLogger.Error('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' did not install.');
+        FLogger.Information('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' did not install.', true);
     finally
       if sessionOpen then
         FLogger.EndInstall(installResult);
@@ -556,7 +554,7 @@ begin
       end;
     end
     else
-      FLogger.Error('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' did not uninstall.');
+      FLogger.Information('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' did not uninstall.', true);
 
   finally
     FLogger.EndUnInstall(uninstallResult);

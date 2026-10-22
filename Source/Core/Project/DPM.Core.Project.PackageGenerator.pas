@@ -72,6 +72,7 @@ implementation
 uses
   System.SysUtils,
   System.IOUtils,
+  DPM.Core.Diagnostics,
   DPM.Core.Project.Prepare.Templates,
   DPM.Core.Project.Prepare.SourceFiles;
 
@@ -166,7 +167,7 @@ begin
     folderPath := ExtractFilePath(dprojPath);
     if projectName = '' then
     begin
-      FLogger.Error('Package definition has an invalid project path: ' + def.Project);
+      FLogger.Error(TErrorCode.E5008_PackageProjectGenerationFailed, 'The package definition [' + def.Project + '] has an invalid project path.');
       result := false;
       continue;
     end;
@@ -176,7 +177,7 @@ begin
     absoluteSources := TPrepareSourceGatherer.GatherFromPatterns(FLogger, packagePath, def.Files, def.Exclude, variables);
     if absoluteSources.Count = 0 then
     begin
-      FLogger.Error('Package definition [' + def.Project + '] matched no source files - cannot generate package project.');
+      FLogger.Error(TErrorCode.E5008_PackageProjectGenerationFailed, 'The package definition [' + def.Project + '] matched no source files - unable to generate its package project.');
       result := false;
       continue;
     end;
@@ -203,7 +204,7 @@ begin
 
     if effectivePlatforms = [] then
     begin
-      FLogger.Warning('Package definition [' + def.Project + '] has no platforms after intersecting the override with the targetPlatform - skipping.');
+      FLogger.Warning(TWarningCode.W5017_PackageDefinitionHasNoPlatforms, 'The package definition [' + def.Project + '] has no platforms after intersecting its platforms with the targetPlatform - skipping it.');
       continue;
     end;
 
@@ -217,7 +218,7 @@ begin
     except
       on e : Exception do
       begin
-        FLogger.Error('Failed to generate package project [' + def.Project + '] : ' + e.Message);
+        FLogger.Error(TErrorCode.E5008_PackageProjectGenerationFailed, 'Unable to generate the package project [' + def.Project + '] : ' + e.Message);
         result := false;
       end;
     end;

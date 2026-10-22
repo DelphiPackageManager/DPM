@@ -96,6 +96,7 @@ implementation
 uses
   System.SysUtils,
   System.IOUtils,
+  DPM.Core.Diagnostics,
   DPM.Core.Utils.Path,
   DPM.Core.Utils.Process,
   DPM.Core.Compiler.ProjectSettings;
@@ -129,9 +130,11 @@ begin
   try
     commandLine := GetCommandLine(platform, projectFile, configName, packageVersion);
   except
+    //eg the compiler isn't installed - an EDPMError that says so, reported with its own code.
     on e : Exception do
     begin
-      FLogger.Error('Error generating command line : ' + e.Message);
+      LogException(FLogger, e);
+      TFile.Delete(FCompilerLogFile);
       exit;
     end;
   end;
@@ -167,17 +170,17 @@ begin
   except
     on e : Exception do
     begin
-      FLogger.Error('Error executing compiler : ' + e.Message);
+      FLogger.Error(TErrorCode.E5002_CompilerLaunchFailed, 'Unable to run msbuild to compile [' + projectFile + '] : ' + e.Message);
+      if TFile.Exists(FCompilerLogFile) then
+        TFile.Delete(FCompilerLogFile);
       exit;
     end;
   end;
   result := exitCode = 0;
-  if not result then
-  FLogger.Error('Package compilation failed - exit code : ' + IntToStr(exitCode));
   //TODO : Doesn't give realtime feedback, remove when we have a CreateProcess version of TProcess.
   if TFile.Exists(FCompilerLogFile) then
   begin
-    if not result then
+    if (not result) and (not cancellationToken.IsCancelled) then
     begin
       FCompilerOutput.LoadFromFile(FCompilerLogFile);
       for i := 0 to FCompilerOutput.Count -1 do
@@ -186,6 +189,11 @@ begin
     end;
     TFile.Delete(FCompilerLogFile);
   end;
+  //after the output, so the error is the last thing shown. A cancelled build is not a failure to
+  //report - the operation reports the cancellation.
+  if (not result) and (not cancellationToken.IsCancelled) then
+    FLogger.Error(TErrorCode.E5003_PackageCompileFailed, 'Compiling [' + projectFile + '] for ' + DPMPlatformToString(platform) +
+                  ' failed (msbuild exit code ' + IntToStr(exitCode) + ') - see the compiler output above.');
 end;
 
 constructor TMSBuildCompiler.Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const env : ICompilerEnvironmentProvider);

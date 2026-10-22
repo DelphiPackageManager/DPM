@@ -77,6 +77,7 @@ uses
   System.Types,
   System.IOUtils,
   System.StrUtils,
+  DPM.Core.Diagnostics,
   DPM.Core.Constants,
   DPM.Core.Spec.Reader,
   DPM.Core.Utils.Path,
@@ -194,7 +195,7 @@ begin
     FWorkingDir := FSource;
     result := DirectoryExists(FWorkingDir);
     if not result then
-      FLogger.Error('Registry folder [' + FSource + '] does not exist.');
+      FLogger.Warning(TWarningCode.W1004_SourceUnavailable, 'Source [' + FName + '] could not be used - the registry folder [' + FSource + '] does not exist.');
     exit;
   end;
 
@@ -216,7 +217,9 @@ begin
     FLogger.Information('Cloning package registry [' + FName + '] from ' + FSource);
     result := FGitClient.Clone(cancellationToken, FSource, mirror);
     if result then
-      TouchFetchStamp(mirror);
+      TouchFetchStamp(mirror)
+    else if not cancellationToken.IsCancelled then
+      FLogger.Warning(TWarningCode.W1004_SourceUnavailable, 'Source [' + FName + '] could not be used - unable to clone the registry : ' + FGitClient.LastError);
     exit;
   end;
 
@@ -226,7 +229,7 @@ begin
     if FGitClient.Pull(cancellationToken, mirror) then
       TouchFetchStamp(mirror)
     else
-      FLogger.Warning('Could not refresh registry [' + FName + '] - using cached copy.');
+      FLogger.Warning(TWarningCode.W1004_SourceUnavailable, 'Source [' + FName + '] could not be refreshed - using the cached copy : ' + FGitClient.LastError);
   end;
   result := true;
 end;
@@ -273,17 +276,17 @@ begin
     spec := FSpecReader.ReadSpec(dspecFile);
     if spec = nil then
     begin
-      FLogger.Warning('Could not read registry dspec [' + dspecFile + '] - skipping.');
+      FLogger.Warning(TWarningCode.W1208_RegistryEntryInvalid, 'Unable to read the registry dspec [' + dspecFile + '] in [' + FName + '] - skipping it.');
       continue;
     end;
     id := spec.MetaData.Id;
     if id = '' then
     begin
-      FLogger.Warning('Registry dspec [' + dspecFile + '] has no id - skipping.');
+      FLogger.Warning(TWarningCode.W1208_RegistryEntryInvalid, 'The registry dspec [' + dspecFile + '] in [' + FName + '] has no id - skipping it.');
       continue;
     end;
     if FSpecs.ContainsKey(LowerCase(id)) then
-      FLogger.Warning('Duplicate package id [' + id + '] in registry [' + FName + '] - using first.')
+      FLogger.Warning(TWarningCode.W1208_RegistryEntryInvalid, 'The package id [' + id + '] appears more than once in the registry [' + FName + '] - using the first.')
     else
       FSpecs[LowerCase(id)] := spec;
   end;

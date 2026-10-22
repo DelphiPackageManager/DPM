@@ -127,7 +127,8 @@ implementation
 
 uses
   System.SysUtils,
-  System.Variants;
+  System.Variants,
+  DPM.Core.Diagnostics;
 
 const
   msbuildNamespace = 'http://schemas.microsoft.com/developer/msbuild/2003';
@@ -161,7 +162,7 @@ begin
 
   if not FileExists(filename) then
   begin
-    FLogger.Warning('Project file does not exist : ' + filename);
+    FLogger.Warning(TWarningCode.W5011_BuildTargetPatchFailed, 'Unable to adjust the project [' + filename + '] - it does not exist. Attempting the build anyway.');
     exit;
   end;
 
@@ -170,7 +171,7 @@ begin
     result := TXMLUtils.LoadXMLFromFile(FProjectXml, filename, FFileFormat);
     if not result then
     begin
-      FLogger.Warning('Error loading project file [' + FProjectName + '] : ' + FProjectXml.parseError.reason);
+      FLogger.Warning(TWarningCode.W5011_BuildTargetPatchFailed, 'Unable to adjust the project [' + FProjectName + '] - it could not be loaded : ' + Trim(FProjectXml.parseError.reason) + '. Attempting the build anyway.');
       FProjectXml := nil;
       exit;
     end;
@@ -181,14 +182,14 @@ begin
     //about - bail rather than start bolting property groups onto something unrelated.
     if (FProjectXml.documentElement = nil) or (not SameText(FProjectXml.documentElement.baseName, 'Project')) then
     begin
-      FLogger.Warning('Project file [' + FProjectName + '] does not look like an msbuild project.');
+      FLogger.Warning(TWarningCode.W5011_BuildTargetPatchFailed, 'Unable to adjust the project [' + FProjectName + '] - it does not look like an msbuild project. Attempting the build anyway.');
       FProjectXml := nil;
       result := false;
     end;
   except
     on e : Exception do
     begin
-      FLogger.Warning('Error loading project xml [' + FProjectName + '] : ' + e.Message);
+      FLogger.Warning(TWarningCode.W5011_BuildTargetPatchFailed, 'Unable to adjust the project [' + FProjectName + '] - it could not be loaded : ' + e.Message + '. Attempting the build anyway.');
       FProjectXml := nil;
       result := false;
     end;
@@ -206,7 +207,7 @@ begin
     result := true;
   except
     on e : Exception do
-      FLogger.Warning('Error saving project [' + FProjectName + '] : ' + e.Message);
+      FLogger.Warning(TWarningCode.W5011_BuildTargetPatchFailed, 'Unable to save the adjusted project [' + FProjectName + '] : ' + e.Message + '. Attempting the build anyway.');
   end;
 end;
 
@@ -794,7 +795,7 @@ begin
     EnsureChainGroup(configKey, platformName);
 
     if (not platformConfigured) and (not (platform in cWindowsPlatforms)) then
-      FLogger.Warning('Project [' + FProjectName + '] was not configured for [' + platformName +
+      FLogger.Warning(TWarningCode.W5018_BuildConfigurationAdded, 'Project [' + FProjectName + '] was not configured for [' + platformName +
                       '] - added the missing configuration, but the project has no ' + platformName +
                       ' specific settings so the build may still fail.');
 
@@ -813,7 +814,7 @@ begin
   except
     on e : Exception do
     begin
-      FLogger.Warning('Error while checking project [' + FProjectName + '] : ' + e.Message);
+      FLogger.Warning(TWarningCode.W5011_BuildTargetPatchFailed, 'Unable to adjust the project [' + FProjectName + '] : ' + e.Message + '. Attempting the build anyway.');
       result := TProjectPatchResult.Failed;
     end;
   end;

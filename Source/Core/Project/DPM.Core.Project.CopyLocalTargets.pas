@@ -56,7 +56,8 @@ implementation
 
 uses
   System.SysUtils,
-  System.IOUtils;
+  System.IOUtils,
+  DPM.Core.Diagnostics;
 
 const
   //The Exec Command must stay on a single line - MSBuild turns embedded newlines into separate
@@ -121,7 +122,7 @@ begin
     logger.Debug('Wrote copy-local targets file [' + targetsFile + '].');
   except
     on e : Exception do
-      logger.Warning('Unable to write copy-local targets file [' + targetsFile + ']: ' + e.Message);
+      logger.Warning(TWarningCode.W3016_CopyLocalTargetsWriteFailed, 'Unable to write the copy-local targets file [' + targetsFile + '] : ' + e.Message);
   end;
 end;
 

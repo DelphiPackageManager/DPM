@@ -33,8 +33,10 @@ type
     FCallCount : IDictionary<string, integer>;
     FVersionsCallCount : IDictionary<string, integer>;
     FInfoCallCount : integer;
+    FUnavailable : string;
     procedure Count(const counts : IDictionary<string, integer>; const id : string);
   protected
+    function UnavailableSources : string;
     procedure BeginRequestCache;
     procedure EndRequestCache;
     function Initialize(const configuration : IConfiguration) : boolean;
@@ -62,6 +64,8 @@ type
     function GetVersionsCallCount(const id : string) : integer;
     //GetPackageInfo calls, any id
     property InfoCallCount : integer read FInfoCallCount;
+    //what UnavailableSources returns - set it to pretend a source could not be used.
+    property Unavailable : string read FUnavailable write FUnavailable;
   end;
 
   ///<summary>Minimal IPackageCache: canned cached-versions lists per id, and a key-based
@@ -262,6 +266,11 @@ end;
 function TFakeRepositoryManager.HasSources : boolean;
 begin
   result := true;
+end;
+
+function TFakeRepositoryManager.UnavailableSources : string;
+begin
+  result := FUnavailable;
 end;
 
 function TFakeRepositoryManager.GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;

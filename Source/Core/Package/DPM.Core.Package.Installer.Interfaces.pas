@@ -32,6 +32,7 @@ uses
   Spring.Collections,
   VSoft.CancellationToken,
   DPM.Core.Types,
+  DPM.Core.Diagnostics,
   DPM.Core.TargetPlatform,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Options.Search,
@@ -69,6 +70,12 @@ type
     property Projects : IList<string> read GetProjects;
   end;
 
+  ///<summary> Why a plan can't go ahead - reported (once) by LogPlanErrors in DPM.Core.Package.InstallPlan. </summary>
+  TPlanError = record
+    Code : TErrorCode;
+    Message : string;
+  end;
+
   ///<summary> What an install will do : which packages, at which versions, in which projects. Built by
   ///  IPackageInstaller.PlanInstall without changing anything, so it can be shown (and confirmed) before
   ///  ApplyInstallPlan applies exactly that. </summary>
@@ -76,7 +83,9 @@ type
     ['{9E3F2C71-5A4D-4C8E-B0F6-2D7A1E4B8C93}']
     function GetSucceeded : boolean;
     function GetItems : IList<IInstallPlanItem>;
-    function GetErrors : IList<string>;
+    //why the plan can't go ahead. A plan can fail with no errors : when what went wrong was already
+    //reported to the log, or the planning was cancelled.
+    function GetErrors : IList<TPlanError>;
     function GetProjects : IList<string>;
     function HasCompanions : boolean;
     //the packages to apply to a project, requested ones first.
@@ -85,7 +94,7 @@ type
     function SummaryLines : IList<string>;
     property Succeeded : boolean read GetSucceeded;
     property Items : IList<IInstallPlanItem> read GetItems;
-    property Errors : IList<string> read GetErrors;
+    property Errors : IList<TPlanError> read GetErrors;
     //the projects with something to apply, in the order they were given.
     property Projects : IList<string> read GetProjects;
   end;

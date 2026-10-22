@@ -32,7 +32,8 @@ uses
   System.Classes,
   Spring.Collections,
   VSoft.CancellationToken,
-  DPM.Core.Types;
+  DPM.Core.Types,
+  DPM.Core.Logging;
 
 {$SCOPEDENUMS ON}
 
@@ -83,7 +84,10 @@ type
   //inject
   ICompilerFactory = interface
     ['{3405435B-5D3A-409A-AFB7-FEFA0EA07060}']
-    function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler;
+    function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler; overload;
+    //a compiler that reports through logger rather than the shared one - eg a TDemotingLogger for a
+    //build whose failure is not the operation's.
+    function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const logger : ILogger) : ICompiler; overload;
   end;
 
 implementation

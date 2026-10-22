@@ -61,7 +61,14 @@ uses
   System.Win.Registry,
   System.SysUtils,
   WinApi.Windows,
+  DPM.Core.Diagnostics,
   DPM.Core.Utils.System;
+
+function NotInstalledMessage(const compilerVersion : TCompilerVersion) : string;
+begin
+  result := 'Delphi ' + CompilerToString(compilerVersion) + ' is not installed - unable to find its install location ' +
+            '(RootDir under HKEY_CURRENT_USER\Software\Embarcadero\BDS\' + CompilerToBDSVersion(compilerVersion) + ').';
+end;
 
 
 { TCompilerEnvironmentProvider }
@@ -96,7 +103,7 @@ begin
         exit;
       end;
     TStatus.notfound :
-      exit;
+      raise EDPMError.Create(TErrorCode.E5001_CompilerNotInstalled, NotInstalledMessage(compilerVersion));
     TStatus.unknown :
       begin
         bdsVersion := CompilerToBDSVersion(compilerVersion);
@@ -114,18 +121,14 @@ begin
             FLogger.Debug('RootDir : ' + rootDir);
             if rootDir = '' then
             begin
-              FLogger.Error('Unable to find install location for compiler [' + CompilerToString(compilerVersion) + ']');
               FFound[compilerVersion] := TStatus.notfound;
-              raise Exception.Create('Unable to find install location for compiler [' + CompilerToString(compilerVersion) + ']');
-//              exit;
+              raise EDPMError.Create(TErrorCode.E5001_CompilerNotInstalled, NotInstalledMessage(compilerVersion));
             end;
           end
           else
           begin
-            FLogger.Error('Unable to find install location for compiler [' + CompilerToString(compilerVersion) + ']');
             FFound[compilerVersion] := TStatus.notfound;
-            raise Exception.Create('Unable to find install location for compiler [' + CompilerToString(compilerVersion) + ']');
-  //          exit;
+            raise EDPMError.Create(TErrorCode.E5001_CompilerNotInstalled, NotInstalledMessage(compilerVersion));
           end;
         finally
           reg.Free;

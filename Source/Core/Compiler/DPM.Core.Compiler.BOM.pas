@@ -48,6 +48,7 @@ uses
   System.SysUtils,
   Spring.Collections,
   DPM.Core.Types,
+  DPM.Core.Diagnostics,
   DPM.Core.Dependency.Reference,
   DPM.Core.Dependency.Version;
 
@@ -69,7 +70,7 @@ begin
   result := nil;
   if not FileExists(fileName) then
   begin
-    logger.Error('BOM File [' + fileName + '] does not exist');
+    logger.Verbose('No build record [' + fileName + '] - the package will be built.');
     exit;
   end;
   try
@@ -97,9 +98,10 @@ begin
       jsonObj.Free;
     end;
   except
+    //not a problem - without a usable record the package is just rebuilt.
     on e : Exception do
     begin
-      logger.Error('Error parsing BOM json : ' + e.Message);
+      logger.Verbose('Ignoring the unreadable build record [' + fileName + '] - the package will be rebuilt : ' + e.Message);
       result := nil;
     end;
   end;
@@ -137,7 +139,7 @@ begin
   except
     on e : Exception do
     begin
-      logger.Error('Error parsing BOM json : ' + e.Message);
+      logger.Warning(TWarningCode.W5009_BuildRecordSaveFailed, 'Unable to save the build record [' + fileName + '] - the package will be rebuilt next time : ' + e.Message);
       result := false;
     end;
   end;

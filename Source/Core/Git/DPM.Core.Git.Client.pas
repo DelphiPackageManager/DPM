@@ -39,6 +39,9 @@ type
   TGitClient = class(TInterfacedObject, IGitClient)
   private
     FLogger : ILogger;
+    FLastError : string;
+    //remembers why a command failed, with what git said - for the caller to report.
+    procedure CommandFailed(const what : string; const output : TStrings);
     //runs 'git <args>' via cmd.exe, capturing stdout+stderr into output.
     //returns the process exit code.
     function RunGit(const cancellationToken : ICancellationToken; const args : string; const workingDir : string; const output : TStrings) : Cardinal;
@@ -49,6 +52,7 @@ type
     function Clone(const cancellationToken : ICancellationToken; const url : string; const targetDir : string) : boolean;
     function Pull(const cancellationToken : ICancellationToken; const repoDir : string) : boolean;
     function Checkout(const cancellationToken : ICancellationToken; const repoDir : string; const commitOrRef : string) : boolean;
+    function LastError : string;
   public
     constructor Create(const logger : ILogger);
 
@@ -82,6 +86,26 @@ constructor TGitClient.Create(const logger : ILogger);
 begin
   inherited Create;
   FLogger := logger;
+end;
+
+procedure TGitClient.CommandFailed(const what : string; const output : TStrings);
+var
+  i : integer;
+  line : string;
+begin
+  FLastError := what;
+  for i := 0 to output.Count - 1 do
+  begin
+    line := Trim(output.Strings[i]);
+    if line <> '' then
+      FLastError := FLastError + sLineBreak + '  ' + line;
+  end;
+  FLogger.Verbose('[git] ' + FLastError);
+end;
+
+function TGitClient.LastError : string;
+begin
+  result := FLastError;
 end;
 
 function TGitClient.RunGit(const cancellationToken : ICancellationToken; const args : string; const workingDir : string; const output : TStrings) : Cardinal;
@@ -193,17 +217,15 @@ end;
 function TGitClient.LsRemoteTags(const cancellationToken : ICancellationToken; const url : string; out tags : IDictionary<string, string>) : boolean;
 var
   output : TStringList;
-  i : integer;
 begin
   tags := TCollections.CreateDictionary<string, string>;
   output := TStringList.Create;
   try
+    FLastError := '';
     result := RunGit(cancellationToken, 'ls-remote --tags ' + QuoteArg(url), '', output) = 0;
     if not result then
     begin
-      FLogger.Error('git ls-remote failed for [' + url + ']');
-      for i := 0 to output.Count - 1 do
-        FLogger.Error(output.Strings[i]);
+      CommandFailed('git ls-remote --tags failed for [' + url + ']', output);
       exit;
     end;
     tags := ParseTags(output);
@@ -216,7 +238,6 @@ function TGitClient.LsRemoteHead(const cancellationToken : ICancellationToken; c
 var
   output : TStringList;
   theRef : string;
-  i : integer;
 begin
   commit := '';
   if ref <> '' then
@@ -225,16 +246,17 @@ begin
     theRef := 'HEAD';
   output := TStringList.Create;
   try
+    FLastError := '';
     result := RunGit(cancellationToken, 'ls-remote ' + QuoteArg(url) + ' ' + QuoteArg(theRef), '', output) = 0;
     if not result then
     begin
-      FLogger.Error('git ls-remote failed for [' + url + '] ref [' + theRef + ']');
-      for i := 0 to output.Count - 1 do
-        FLogger.Error(output.Strings[i]);
+      CommandFailed('git ls-remote failed for [' + url + '] ref [' + theRef + ']', output);
       exit;
     end;
     commit := ParseRefCommit(output);
     result := commit <> '';
+    if not result then
+      CommandFailed('git ls-remote found no commit for [' + url + '] ref [' + theRef + ']', output);
   finally
     output.Free;
   end;
@@ -243,17 +265,13 @@ end;
 function TGitClient.Clone(const cancellationToken : ICancellationToken; const url : string; const targetDir : string) : boolean;
 var
   output : TStringList;
-  i : integer;
 begin
   output := TStringList.Create;
   try
+    FLastError := '';
     result := RunGit(cancellationToken, 'clone ' + QuoteArg(url) + ' ' + QuoteArg(targetDir), '', output) = 0;
     if not result then
-    begin
-      FLogger.Error('git clone failed for [' + url + ']');
-      for i := 0 to output.Count - 1 do
-        FLogger.Error(output.Strings[i]);
-    end;
+      CommandFailed('git clone failed for [' + url + ']', output);
   finally
     output.Free;
   end;
@@ -262,17 +280,13 @@ end;
 function TGitClient.Pull(const cancellationToken : ICancellationToken; const repoDir : string) : boolean;
 var
   output : TStringList;
-  i : integer;
 begin
   output := TStringList.Create;
   try
+    FLastError := '';
     result := RunGit(cancellationToken, 'pull --ff-only', repoDir, output) = 0;
     if not result then
-    begin
-      FLogger.Error('git pull failed in [' + repoDir + ']');
-      for i := 0 to output.Count - 1 do
-        FLogger.Error(output.Strings[i]);
-    end;
+      CommandFailed('git pull failed in [' + repoDir + ']', output);
   finally
     output.Free;
   end;
@@ -281,17 +295,13 @@ end;
 function TGitClient.Checkout(const cancellationToken : ICancellationToken; const repoDir : string; const commitOrRef : string) : boolean;
 var
   output : TStringList;
-  i : integer;
 begin
   output := TStringList.Create;
   try
+    FLastError := '';
     result := RunGit(cancellationToken, 'checkout --quiet ' + QuoteArg(commitOrRef), repoDir, output) = 0;
     if not result then
-    begin
-      FLogger.Error('git checkout [' + commitOrRef + '] failed in [' + repoDir + ']');
-      for i := 0 to output.Count - 1 do
-        FLogger.Error(output.Strings[i]);
-    end;
+      CommandFailed('git checkout [' + commitOrRef + '] failed in [' + repoDir + ']', output);
   finally
     output.Free;
   end;

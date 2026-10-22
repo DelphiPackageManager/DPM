@@ -123,6 +123,7 @@ uses
   System.StrUtils,
   System.Variants,
   DPM.Core.Constants,
+  DPM.Core.Diagnostics,
   DPM.Core.Dependency.Version,
   DPM.Core.Dependency.Reference,
 //  DPM.Core.Project.PackageReference,
@@ -205,12 +206,10 @@ var
   searchPathString : string;
 begin
   result := false;
+  //GetDPMPropertyGroup has said why.
   dpmGroup := GetDPMPropertyGroup;
   if dpmGroup = nil then
-  begin
-    FLogger.Error('Unable to find or create PropertyGroup for DPM in the project file');
     exit;
-  end;
 
   result := EnsureBaseSearchPath;
   if not result then
@@ -248,12 +247,10 @@ var
   importProject : string;
 begin
   result := false;
+  //GetDPMPropertyGroup has said why.
   dpmGroup := GetDPMPropertyGroup;
   if dpmGroup = nil then
-  begin
-    FLogger.Error('Unable to find or create PropertyGroup for DPM in the project file');
     exit;
-  end;
 
   //Record the dpm.exe path so the targets file can prefer it over a PATH lookup. Only write it when
   //we actually know it's dpm (the IDE plugin restoring would otherwise record bds.exe here).
@@ -338,7 +335,7 @@ begin
   baseElement := FProjectXML.selectSingleNode(baseConfigPath) as IXMLDOMElement;
   if baseElement = nil then
   begin
-    FLogger.Error('Unable to find the base config element in the project, cannot set search path');
+    FLogger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'Unable to find the base configuration element in [' + FFileName + '] - cannot set the search path.');
     exit;
   end;
 
@@ -377,7 +374,7 @@ begin
     xmlElement := FProjectXML.selectSingleNode(projectVersionXPath) as IXMLDOMElement;
     if xmlElement = nil then
     begin
-      FLogger.Error('Unable to location position in project to insert dpm propertygroup');
+      FLogger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'Unable to find the ProjectVersion element in [' + FFileName + '] - nowhere to add the DPM settings.');
       exit;
     end;
     projectVersionGroup := xmlElement.parentNode as IXMLDOMElement;
@@ -561,13 +558,13 @@ begin
       if FAppType <> TAppType.Unknown then
         result := true
       else
-        FLogger.Error('Unable to determine AppType from project file.');
+        FLogger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'The AppType [' + sAppType + '] in [' + FFileName + '] is not one DPM recognises.');
     end
     else
-      FLogger.Error('AppType element is empty, unable to determine AppType from project file.');
+      FLogger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'The AppType element is empty in [' + FFileName + '].');
   end
   else
-    FLogger.Error('ProjectVersion element not found, unable to determine AppType from project file.');
+    FLogger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'The AppType element was not found in [' + FFileName + '].');
 end;
 
 function TProjectEditor.LoadConfigurations : boolean;
@@ -692,7 +689,7 @@ begin
 
   end
   else
-    FLogger.Error('Unabled to find any BuildConfiguration elements in project file!');
+    FLogger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'No BuildConfiguration elements were found in [' + FFileName + '].');
 
 
 end;
@@ -708,10 +705,10 @@ begin
     FMainSource := xmlElement.text;
     result := FMainSource <> '';
     if not result then
-      FLogger.Error('Unable to determine Compiler version from ProjectVersion');
+      FLogger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'The MainSource element is empty in [' + FFileName + '].');
   end
   else
-    FLogger.Error('ProjectVersion element not found, unable to determine Compiler version');
+    FLogger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'The MainSource element was not found in [' + FFileName + '].');
 end;
 
 function TProjectEditor.LoadPackageRefences : boolean;
@@ -746,7 +743,7 @@ function TProjectEditor.LoadPackageRefences : boolean;
           id := packageElement.getAttribute('id');
         if id = '' then
         begin
-          FLogger.Error('Invalid package reference detected in project, missing required [id] attribute');
+          FLogger.Error(TErrorCode.E4004_InvalidPackageReference, 'Invalid package reference in [' + FFileName + '] - the required [id] attribute is missing.');
           result := false;
           exit;
         end;
@@ -755,14 +752,13 @@ function TProjectEditor.LoadPackageRefences : boolean;
           sVersion := packageElement.getAttribute('version');
         if sVersion = '' then
         begin
-          FLogger.Error('Invalid package reference detected in project, missing required [version] attribute');
+          FLogger.Error(TErrorCode.E4004_InvalidPackageReference, 'Invalid package reference [' + id + '] in [' + FFileName + '] - the required [version] attribute is missing.');
           result := false;
            exit;
         end;
         if not TPackageVErsion.TryParseWithError(sVersion, version, error) then
         begin
-          FLogger.Error('Invalid package reference detected in project, [version] attribute is not valid');
-          FLogger.Error(' ' + error);
+          FLogger.Error(TErrorCode.E4004_InvalidPackageReference, 'Invalid package reference [' + id + '] in [' + FFileName + '] - the [version] attribute is not valid : ' + error);
           result := false;
           exit;
         end;
@@ -783,9 +779,9 @@ function TProjectEditor.LoadPackageRefences : boolean;
         if dupCheckReference.FindTopLevelChild(id) <> nil then
         begin
           if parentReference <> nil then
-            raise Exception.Create('Duplicate package reference for package [' + id  + '] under [' + parentReference.Id + ']')
+            raise EDPMError.Create(TErrorCode.E4004_InvalidPackageReference, 'Duplicate package reference for package [' + id  + '] under [' + parentReference.Id + '] in [' + FFileName + '].')
           else
-            raise Exception.Create('Duplicate package reference for package [' + id + ']');
+            raise EDPMError.Create(TErrorCode.E4004_InvalidPackageReference, 'Duplicate package reference for package [' + id + '] in [' + FFileName + '].');
         end;
 
         //only transitive packages need a range
@@ -797,16 +793,15 @@ function TProjectEditor.LoadPackageRefences : boolean;
             sRange := packageElement.getAttribute('range');
             if not TVersionRange.TryParseWithError(sRange, range, error) then
             begin
-              FLogger.Error('Invalid package reference detected in project, [version] attribute is not valid');
-              FLogger.Error(' ' + error);
+              FLogger.Error(TErrorCode.E4004_InvalidPackageReference, 'Invalid package reference [' + id + '] in [' + FFileName + '] - the [range] attribute is not valid : ' + error);
               result := false;
               exit;
             end;
           end
           else
           begin
-            FLogger.Error('Invalid package reference detected in project, missing required [range] attribute on transitive refererence');
-            FLogger.Error('Remove the reference and run restore to correct the reference.');
+            FLogger.Error(TErrorCode.E4004_InvalidPackageReference, 'Invalid package reference [' + id + '] in [' + FFileName + '] - a transitive reference needs a [range] attribute. ' +
+                          'Remove the reference and run restore to correct it.');
             result := false;
             exit;
           end;
@@ -842,7 +837,7 @@ begin
 
   if not FileExists(fileName) then
   begin
-    FLogger.Error('Project file : [' + filename + '] does not exist');
+    FLogger.Error(TErrorCode.E4001_ProjectNotFound, 'The project file [' + filename + '] does not exist.');
     exit;
   end;
   FProjectFile := filename;
@@ -855,7 +850,7 @@ begin
     result := TXMLUtils.LoadXMLFromFile(FProjectXML, fileName, FFileFormat);
     if not result then
     begin
-      FLogger.Error('Error loading project file : ' + FProjectXML.parseError.reason);
+      FLogger.Error(TErrorCode.E4003_ProjectLoadFailed, 'Unable to load the project file [' + filename + '] : ' + Trim(FProjectXML.parseError.reason));
       exit;
     end;
     FFileName := filename;
@@ -866,10 +861,15 @@ begin
     //freshly loaded document is in sync with disk - any later guarded write flips this.
     FModified := false;
   except
+    on e : EDPMError do
+    begin
+      FLogger.Error(e.Code, e.Message);
+      result := false;
+    end;
     on e : Exception do
     begin
-      FLogger.Error('Error loading project xml doc : ' + e.Message);
-      exit;
+      FLogger.Error(TErrorCode.E4003_ProjectLoadFailed, 'Unable to load the project file [' + filename + '] : ' + e.Message);
+      result := false;
     end;
   end;
 end;
@@ -904,7 +904,7 @@ begin
           //a platform DPM does not recognise (eg a newer IDE platform than this build knows about)
           //is not a fatal error - we just cannot do anything with it, so warn and skip it rather
           //than failing the whole project load and forcing callers into a misleading fallback.
-          FLogger.Warning('Project [' + FFileName + '] targets platform [' + sValue + '] which DPM does not support - ignoring it.');
+          FLogger.Warning(TWarningCode.W4012_UnsupportedProjectPlatform, 'Project [' + FFileName + '] targets platform [' + sValue + '] which DPM does not support - ignoring it.');
       end;
     end;
   end;
@@ -925,10 +925,11 @@ begin
       if FCompiler = TCompilerVersion.UnknownVersion then
       begin
         FCompiler := StringToCompilerVersion(FDPMCompilerVersion);
+        //not fatal - ProjectVersion decides it instead.
         if FCompiler <> TCompilerVersion.UnknownVersion then
           result := true
         else
-          FLogger.Error('Unable to determine Compiler version from DPMCompiler');
+          FLogger.Warning(TWarningCode.W4013_InvalidDPMCompiler, 'The DPMCompiler value [' + FDPMCompilerVersion + '] in [' + FFileName + '] is not a known compiler version - using the ProjectVersion instead.');
       end;
     end
   end
@@ -953,16 +954,16 @@ begin
         if FCompiler <> TCompilerVersion.UnknownVersion then
           result := true
         else
-          FLogger.Error('Unable to determine Compiler version from ProjectVersion');
+          FLogger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'Unable to determine the compiler version from the ProjectVersion [' + FProjectVersion + '] in [' + FFileName + '].');
       end
       else
         result := true;
     end
     else
-      FLogger.Error('ProjectVersion element is empty, unable to determine Compiler version.');
+      FLogger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'The ProjectVersion element is empty in [' + FFileName + '] - unable to determine the compiler version.');
   end
   else
-    FLogger.Error('ProjectVersion element not found, unable to determine Compiler version');
+    FLogger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'The ProjectVersion element was not found in [' + FFileName + '] - unable to determine the compiler version.');
 end;
 
 procedure TProjectEditor.RemoveFromSearchPath(const platform: TDPMPlatform; const packageId: string);
@@ -974,12 +975,10 @@ var
   sList : TStringList;
   i : integer;
 begin
+  //GetDPMPropertyGroup has said why.
   dpmGroup := GetDPMPropertyGroup;
   if dpmGroup = nil then
-  begin
-    FLogger.Error('Unable to find or create PropertyGroup for DPM in the project file');
     exit;
-  end;
 
   condition := '''$(Platform)''==''' + DPMPlatformToBDString(platform) + '''';
 
@@ -1027,7 +1026,7 @@ begin
   result := false;
   if FProjectXML = nil then
   begin
-    FLogger.Error('Unable to save project file, nothing loaded.');
+    FLogger.Error(TErrorCode.E0003_InternalError, 'SaveProject was called before a project was loaded.');
     exit;
   end;
 
@@ -1056,10 +1055,7 @@ begin
     result := true;
   except
     on e : Exception do
-    begin
-      FLogger.Error('Error saving project [' + filename + ']');
-      FLogger.Error('  ' + e.Message);
-    end;
+      FLogger.Error(TErrorCode.E4006_ProjectSaveFailed, 'Unable to save the project file [' + projectFileName + '] : ' + e.Message);
   end;
 end;
 
@@ -1162,7 +1158,7 @@ begin
   projectExtensionsElement := FProjectXML.selectSingleNode(projectExtensionsXPath) as IXMLDOMElement;
   if projectExtensionsElement = nil then
   begin
-    FLogger.Error('Unable to find ProjectExtensions element in project file.');
+    FLogger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'Unable to find the ProjectExtensions element in [' + FFileName + '] - the package references were not recorded.');
     exit;
   end;
 

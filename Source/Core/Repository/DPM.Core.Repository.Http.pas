@@ -49,6 +49,10 @@ type
   TDPMServerPackageRepository = class(TBaseRepository, IPackageRepository)
   private
     FServiceIndex : IServiceIndex;
+    //why the service index could not be fetched, and when - see GetServiceIndex.
+    FServiceIndexError : string;
+    FServiceIndexFailedAt : TDateTime;
+    procedure ServiceIndexFailed(const reason : string);
   protected
     procedure Configure(const source : ISourceConfig); override;
     function GetServiceIndex(const cancellationToken : ICancellationToken) : IServiceIndex;
@@ -90,8 +94,10 @@ uses
   System.Classes,
   System.SyncObjs,
   System.Diagnostics,
+  System.DateUtils,
   JsonDataObjects,
   VSoft.URI,
+  DPM.Core.Diagnostics,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec,
   DPM.Core.Package.Icon,
@@ -111,6 +117,28 @@ const
   //Matches the value documented in the console option help. Uploads of large packages can
   //take a while, so this is well above the VSoft.HttpClient 60s default.
   cDefaultPushTimeoutSeconds = 300;
+
+  //a source whose service index could not be fetched isn't asked again for this long - otherwise every
+  //request an operation makes waits on it again.
+  cServiceIndexRetryMs = 60000;
+
+//winhttp's messages can come with a leading ': '.
+function CleanMessage(const value : string) : string;
+begin
+  result := Trim(value);
+  while (result <> '') and (result[1] = ':') do
+    result := Trim(Copy(result, 2, MaxInt));
+end;
+
+//'404 Not Found - <the start of what the server said>'
+function ResponseError(const response : IHttpResponse) : string;
+begin
+  result := IntToStr(response.StatusCode);
+  if response.ErrorMessage <> '' then
+    result := result + ' ' + CleanMessage(response.ErrorMessage);
+  if response.Response <> '' then
+    result := result + ' - ' + Copy(response.Response, 1, 300);
+end;
 
 //function GetBaseUri(const uri : IUri) : string;
 //begin
@@ -135,7 +163,10 @@ procedure TDPMServerPackageRepository.Configure(const source: ISourceConfig);
 begin
   //if the uri changes service index will be invalid.
   if source.Source <> Self.SourceUri then
+  begin
     FServiceIndex := nil;
+    FServiceIndexError := '';
+  end;
   inherited;
 end;
 
@@ -174,7 +205,7 @@ begin
   serviceItem := serviceIndex.FindItem('PackageDownload');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageDownload resource from Service Index');
+    RequestFailed('does not provide the PackageDownload resource - is it a DPM server?');
     exit;
   end;
 
@@ -206,14 +237,14 @@ begin
   except
     on ex : Exception do
     begin
-      Logger.Error('Error downloading package from server : ' + ex.Message);
+      RequestFailed('download failed : ' + CleanMessage(ex.Message));
       exit;
     end;
   end;
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error downloading package from server : ' + response.ErrorMessage);
+    RequestFailed('download failed : ' + ResponseError(response));
     exit;
   end;
   stopwatch.Stop;
@@ -226,10 +257,10 @@ begin
   //turned those into a bogus "does not match server hash []" failure. Mirrors the
   //directory repo, which only verifies when a .sha256 sidecar exists.
   if packageInfo.Hash = '' then
-    Logger.Warning('No known hash for [' + packageInfo.ToString + '] - skipping download hash verification')
+    Logger.Warning(TWarningCode.W1204_PackageHashUnknown, 'No hash is recorded for [' + packageInfo.ToString + '] - the download was not verified.')
   else if not SameText(hash, packageInfo.Hash) then
   begin
-    Logger.Error('Downloaded file hash [' + hash + '] does not match server hash [' + packageInfo.Hash + ']');
+    RequestFailed('sent a package that does not match its recorded hash (sha256 ' + hash + ', expected ' + packageInfo.Hash + ')', TErrorCode.E1202_PackageHashMismatch);
     exit(false);
   end;
   //Persist the sidecar so tools that consume the cache (SBOM, audits, signature
@@ -239,7 +270,7 @@ begin
     TFile.WriteAllText(hashFileName, hash);
   except
     on e : Exception do
-      Logger.Warning('Could not write hash sidecar [' + hashFileName + '] : ' + e.Message);
+      Logger.Warning(TWarningCode.W1205_HashFileWriteFailed, 'Unable to write the hash file [' + hashFileName + '] : ' + e.Message);
   end;
 
 
@@ -271,7 +302,7 @@ begin
   serviceItem := serviceIndex.FindItem('PackageFindLatest');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageFindLatest resource from Service Index');
+    RequestFailed('does not provide the PackageFindLatest resource - is it a DPM server?');
     exit;
   end;
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
@@ -299,7 +330,7 @@ begin
   except
     on ex : Exception do
     begin
-      Logger.Error('Error finding package identity from server : ' + ex.Message);
+      RequestFailed('request failed : ' + CleanMessage(ex.Message));
       exit;
     end;
   end;
@@ -313,9 +344,7 @@ begin
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching list from server : ' + response.ErrorMessage + ' (' + IntToStr(response.StatusCode) + ')');
-    if response.Response <> '' then
-      Logger.Error('Server response : ' + response.Response);
+    RequestFailed('returned an error : ' + ResponseError(response));
     exit;
   end;
 
@@ -331,7 +360,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error parsing json response from server : ' + e.Message);
+      RequestFailed('returned a response DPM could not read : ' + e.Message);
       exit;
     end;
   end;
@@ -365,7 +394,7 @@ begin
   serviceItem := serviceIndex.FindItem('PackageSearch');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageSearch resource from Service Index');
+    RequestFailed('does not provide the PackageSearch resource - is it a DPM server?');
     exit;
   end;
 
@@ -400,16 +429,14 @@ begin
   except
     on ex : Exception do
     begin
-      Logger.Error('Error fetching list from server : ' + ex.Message);
+      RequestFailed('request failed : ' + CleanMessage(ex.Message));
       exit;
     end;
   end;
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching search result from server : ' + response.ErrorMessage + ' (' + IntToStr(response.StatusCode) + ')');
-    if response.Response <> '' then
-      Logger.Error('Server response : ' + response.Response);
+    RequestFailed('returned an error : ' + ResponseError(response));
     exit;
   end;
 
@@ -424,7 +451,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error parsing json response from server : ' + e.Message);
+      RequestFailed('returned a response DPM could not read : ' + e.Message);
       exit;
     end;
   end;
@@ -475,7 +502,7 @@ begin
   serviceItem := serviceIndex.FindItem('PackageSearchIds');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageSearchIds resource from Service Index');
+    RequestFailed('does not provide the PackageSearchIds resource - is it a DPM server?');
     exit;
   end;
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
@@ -510,7 +537,7 @@ begin
   except
     on ex : Exception do
     begin
-      Logger.Error('Error fetching list from server : ' + ex.Message);
+      RequestFailed('request failed : ' + CleanMessage(ex.Message));
       exit;
     end;
   end;
@@ -518,7 +545,7 @@ begin
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching search result from server : ' + response.ErrorMessage);
+    RequestFailed('returned an error : ' + ResponseError(response));
     exit;
   end;
 
@@ -534,7 +561,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error parsing json response from server : ' + e.Message);
+      RequestFailed('returned a response DPM could not read : ' + e.Message);
       exit;
     end;
   end;
@@ -581,7 +608,7 @@ begin
   serviceItem := serviceIndex.FindItem('PackageIcon');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageIcon resource from Service Index');
+    RequestFailed('does not provide the PackageIcon resource - is it a DPM server?');
     exit;
   end;
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
@@ -597,14 +624,14 @@ begin
   except
     on ex : Exception do
     begin
-      Logger.Error('Error fetching list from server : ' + ex.Message);
+      RequestFailed('request failed : ' + CleanMessage(ex.Message));
       exit;
     end;
   end;
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching list from server : ' + response.ErrorMessage);
+    RequestFailed('returned an error : ' + ResponseError(response));
     exit;
   end;
 
@@ -652,7 +679,7 @@ begin
   serviceItem := serviceIndex.FindItem('PackageInfo');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageInfo resource from Service Index');
+    RequestFailed('does not provide the PackageInfo resource - is it a DPM server?');
     exit;
   end;
 
@@ -673,7 +700,7 @@ begin
   except
     on ex : Exception do
     begin
-      Logger.Error('Error fetching packageinfo from server : ' + ex.Message);
+      RequestFailed('request failed : ' + CleanMessage(ex.Message));
       exit;
     end;
   end;
@@ -687,13 +714,13 @@ begin
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching packageinfo from server : ' + response.ErrorMessage);
+    RequestFailed('returned an error : ' + ResponseError(response));
     exit;
   end;
 
   if response.ContentLength = 0 then
   begin
-    Logger.Error('Server returned empty dspec from : ' + uri.BaseUriString + path);
+    RequestFailed('returned an empty response for ' + uri.BaseUriString + path);
     exit;
   end;
   Logger.Information('OK ' + uri.BaseUriString + path);
@@ -703,7 +730,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error parsing json response from server : ' + e.Message);
+      RequestFailed('returned a response DPM could not read : ' + e.Message);
       exit;
     end;
   end;
@@ -737,7 +764,7 @@ begin
     serviceItem := serviceIndex.FindItem('PackageMetadata');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageMetadata resource from Service Index');
+    RequestFailed('does not provide the PackageMetadata resource - is it a DPM server?');
     exit;
   end;
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
@@ -757,14 +784,14 @@ begin
   except
     on ex : Exception do
     begin
-      Logger.Error('Error fetching packageinfo from server : ' + ex.Message);
+      RequestFailed('request failed : ' + CleanMessage(ex.Message));
       exit;
     end;
   end;
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching packageinfo from server : ' + response.ErrorMessage);
+    RequestFailed('returned an error : ' + ResponseError(response));
     exit;
   end;
   Logger.Information('OK ' + uri.BaseUriString + path);
@@ -774,7 +801,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error parsing json response from server : ' + e.Message);
+      RequestFailed('returned a response DPM could not read : ' + e.Message);
       exit;
     end;
   end;
@@ -785,7 +812,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error deserializing json response from server : ' + e.Message);
+      RequestFailed('returned a response DPM could not read : ' + e.Message);
       exit;
     end;
   end;
@@ -815,7 +842,7 @@ begin
   serviceItem := serviceIndex.FindItem('PackageVersions');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageVersions resource from Service Index');
+    RequestFailed('does not provide the PackageVersions resource - is it a DPM server?');
     exit;
   end;
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
@@ -836,16 +863,14 @@ begin
   except
     on ex : Exception do
     begin
-      Logger.Error('Error fetching versions from server : ' + ex.Message);
+      RequestFailed('request failed : ' + CleanMessage(ex.Message));
       exit;
     end;
   end;
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching versions from server : ' + response.ErrorMessage + ' (' + IntToStr(response.StatusCode) + ')');
-    if response.Response <> '' then
-      Logger.Error('Server response : ' + response.Response);
+    RequestFailed('returned an error : ' + ResponseError(response));
     exit;
   end;
   Logger.Information('OK ' + requestUrl);
@@ -855,7 +880,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error parsing json response from server : ' + e.Message);
+      RequestFailed('returned a response DPM could not read : ' + e.Message);
       exit;
     end;
   end;
@@ -901,7 +926,7 @@ begin
   serviceItem := serviceIndex.FindItem('PackageVersionsWithDeps');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageVersionsWithDeps resource from Service Index');
+    RequestFailed('does not provide the PackageVersionsWithDeps resource - is it a DPM server?');
     exit;
   end;
   uri := TUriFactory.Parse(serviceItem.ResourceUrl);
@@ -930,16 +955,14 @@ begin
   except
     on ex : Exception do
     begin
-      Logger.Error('Error fetching packageinfo from server : ' + ex.Message);
+      RequestFailed('request failed : ' + CleanMessage(ex.Message));
       exit;
     end;
   end;
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching packageinfo from server : ' + response.ErrorMessage + ' (' + IntToStr(response.StatusCode) + ')');
-    if response.Response <> '' then
-      Logger.Error('Server response : ' + response.Response);
+    RequestFailed('returned an error : ' + ResponseError(response));
     exit;
   end;
   Logger.Information('OK ' + requestUrl + ' [' + IntTostr(stopwatch.ElapsedMilliseconds) + 'ms]');
@@ -949,7 +972,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error parsing json response from server : ' + e.Message);
+      RequestFailed('returned a response DPM could not read : ' + e.Message);
       exit;
     end;
   end;
@@ -986,6 +1009,12 @@ begin
   result := FServiceIndex;
   if result <> nil then
     exit;
+  //a source that could not be reached a moment ago isn't asked again straight away.
+  if (FServiceIndexError <> '') and (MilliSecondsBetween(Now, FServiceIndexFailedAt) < cServiceIndexRetryMs) then
+  begin
+    RequestFailed(FServiceIndexError);
+    exit;
+  end;
   uri := TUriFactory.Parse(self.SourceUri);
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
@@ -995,28 +1024,43 @@ begin
                        .WithAccept('application/json');
 
   try
-//    Logger.Debug('getting service Index ' + self.SourceUri);
     response := httpClient.Get(request, cancellationToken);
-    if response.StatusCode <> 200 then
-    begin
-      if response.StatusCode > 0 then
-        Logger.Error(Format('Error [%d] getting source service index : %s ', [response.StatusCode, response.ErrorMessage]))
-      else
-        Logger.Error(Format('Error [%d] getting source service index : %s ', [response.StatusCode, 'unabled to contact source']));
-      exit;
-    end;
-    result := TServiceIndex.LoadFromString(response.Response);
-    FServiceIndex := result;
   except
     on e : Exception do
     begin
-      Logger.Error('Error parsing serviceindex json : ' + e.Message);
-      Logger.Error(e.ClassName);
-      if e.InnerException <> nil then
-        Logger.Error(e.InnerException.Message);
+      if not cancellationToken.IsCancelled then
+        ServiceIndexFailed('could not be reached : ' + CleanMessage(e.Message));
       exit;
     end;
   end;
+  if cancellationToken.IsCancelled then
+    exit;
+  if response.StatusCode <> 200 then
+  begin
+    if response.StatusCode > 0 then
+      ServiceIndexFailed('could not be reached : ' + ResponseError(response))
+    else
+      ServiceIndexFailed('could not be reached : ' + CleanMessage(response.ErrorMessage));
+    exit;
+  end;
+  try
+    result := TServiceIndex.LoadFromString(response.Response);
+  except
+    on e : Exception do
+    begin
+      ServiceIndexFailed('returned a service index DPM could not read : ' + e.Message);
+      exit;
+    end;
+  end;
+  FServiceIndex := result;
+  FServiceIndexError := '';
+end;
+
+procedure TDPMServerPackageRepository.ServiceIndexFailed(const reason : string);
+begin
+  FServiceIndexError := reason;
+  FServiceIndexFailedAt := Now;
+  RequestFailed(reason);
 end;
 
 function TDPMServerPackageRepository.List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>;
@@ -1046,7 +1090,7 @@ begin
   serviceItem := serviceIndex.FindItem('PackageList');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackageList resource from Service Index');
+    RequestFailed('does not provide the PackageList resource - is it a DPM server?');
     exit;
   end;
 
@@ -1091,16 +1135,14 @@ begin
   except
     on ex : Exception do
     begin
-      Logger.Error('Error fetching list from server : ' + ex.Message);
+      RequestFailed('request failed : ' + CleanMessage(ex.Message));
       exit;
     end;
   end;
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error fetching list from server : ' + response.ErrorMessage + ' (' + IntToStr(response.StatusCode) + ')');
-    if response.Response <> '' then
-      Logger.Error('Server response : ' + response.Response);
+    RequestFailed('returned an error : ' + ResponseError(response));
     exit;
   end;
   Logger.Information('OK ' + requestUrl);
@@ -1110,7 +1152,7 @@ begin
   except
     on ex : Exception do
     begin
-      Logger.Error('Error fetching parsing json response server : ' + ex.Message);
+      RequestFailed('returned a response DPM could not read : ' + ex.Message);
       exit;
     end;
   end;
@@ -1233,7 +1275,7 @@ begin
   serviceItem := serviceIndex.FindItem('PackagePublish');
   if serviceItem = nil then
   begin
-    Logger.Error('Unabled to determine PackagePublish resource from Service Index');
+    RequestFailed('does not provide the PackagePublish resource - is it a DPM server?');
     exit;
   end;
 

@@ -6,6 +6,7 @@ uses
   Spring.Collections,
   VSoft.CancellationToken,
   DPM.Core.Types,
+  DPM.Core.Diagnostics,
   DPM.Core.Logging,
   DPM.Core.Options.Search,
   DPM.Core.Configuration.Interfaces,
@@ -33,8 +34,15 @@ type
     constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageCache : IPackageCache);
   end;
 
-///<summary> A plan for an install that couldn't be planned at all (options, projects, packages not found...). </summary>
-function CreateFailedPlan(const error : string) : IInstallPlan;
+///<summary> A plan for an install that couldn't be planned at all, whose cause was already reported to the
+///  log (options, projects, packages not found...) - or that was cancelled. </summary>
+function CreateFailedPlan : IInstallPlan; overload;
+///<summary> A plan for an install that couldn't be planned, carrying why. </summary>
+function CreateFailedPlan(const code : TErrorCode; const error : string) : IInstallPlan; overload;
+
+///<summary> Reports a plan's errors - the one place they are logged, by the command line install and by
+///  the IDE when it shows the plan. </summary>
+procedure LogPlanErrors(const logger : ILogger; const plan : IInstallPlan);
 
 implementation
 
@@ -78,12 +86,13 @@ type
   TInstallPlan = class(TInterfacedObject, IInstallPlan)
   private
     FItems : IList<IInstallPlanItem>;
-    FErrors : IList<string>;
+    FErrors : IList<TPlanError>;
+    FFailed : boolean;
     FProjects : IList<string>;
   protected
     function GetSucceeded : boolean;
     function GetItems : IList<IInstallPlanItem>;
-    function GetErrors : IList<string>;
+    function GetErrors : IList<TPlanError>;
     function GetProjects : IList<string>;
     function HasCompanions : boolean;
     function PackagesForProject(const projectFile : string) : IList<IPackageInfo>;
@@ -91,7 +100,9 @@ type
   public
     constructor Create;
     procedure AddItem(const item : TInstallPlanItem);
-    procedure AddError(const value : string);
+    procedure AddError(const code : TErrorCode; const value : string);
+    //failed without an error of its own - the cause was reported elsewhere, or it was cancelled.
+    procedure MarkFailed;
     //fills Projects from the items, in the order the projects were given.
     procedure CollectProjects(const projects : IList<TInstallPlanProject>);
   end;
@@ -254,13 +265,22 @@ constructor TInstallPlan.Create;
 begin
   inherited Create;
   FItems := TCollections.CreateList<IInstallPlanItem>;
-  FErrors := TCollections.CreateList<string>;
+  FErrors := TCollections.CreateList<TPlanError>;
   FProjects := TCollections.CreateList<string>;
 end;
 
-procedure TInstallPlan.AddError(const value : string);
+procedure TInstallPlan.AddError(const code : TErrorCode; const value : string);
+var
+  error : TPlanError;
 begin
-  FErrors.Add(value);
+  error.Code := code;
+  error.Message := value;
+  FErrors.Add(error);
+end;
+
+procedure TInstallPlan.MarkFailed;
+begin
+  FFailed := true;
 end;
 
 procedure TInstallPlan.AddItem(const item : TInstallPlanItem);
@@ -288,7 +308,7 @@ begin
   end;
 end;
 
-function TInstallPlan.GetErrors : IList<string>;
+function TInstallPlan.GetErrors : IList<TPlanError>;
 begin
   result := FErrors;
 end;
@@ -305,7 +325,7 @@ end;
 
 function TInstallPlan.GetSucceeded : boolean;
 begin
-  result := not FErrors.Any;
+  result := (not FFailed) and (not FErrors.Any);
 end;
 
 function TInstallPlan.HasCompanions : boolean;
@@ -460,7 +480,7 @@ begin
     message := 'The packages to install cannot be resolved together';
     for conflict in conflicts do
       message := message + sLineBreak + '  ' + ConflictText(conflict);
-    FPlan.AddError(message);
+    FPlan.AddError(TErrorCode.E2007_PlanConflict, message);
     exit;
   end;
 
@@ -772,7 +792,7 @@ begin
       item.AddCurrentVersion(node.Version);
     end;
     if not item.FProjects.Any then
-      FPlan.AddError(info.Id + ' is not installed in any of the projects - there is nothing to change.');
+      FPlan.AddError(TErrorCode.E3002_PackageNotInstalled, info.Id + ' is not installed in any of the projects - there is nothing to change.');
   end;
   FPlan.CollectProjects(FProjects);
 end;
@@ -816,7 +836,7 @@ begin
   begin
     if FCancellationToken.IsCancelled then
     begin
-      FPlan.AddError('Cancelled.');
+      FPlan.MarkFailed;
       exit;
     end;
     if not BuildDemands then
@@ -841,27 +861,46 @@ begin
       companion := FindCompanion(blocker);
       if FCancellationToken.IsCancelled then
       begin
-        FPlan.AddError('Cancelled.');
+        FPlan.MarkFailed;
         exit;
       end;
       if companion = nil then
-        FPlan.AddError(blocker.Reason + ' - and no ' + DirectionWord + ' version of ' + blocker.Id + ' is compatible.')
+        FPlan.AddError(TErrorCode.E2008_NoCompatibleCompanion, blocker.Reason + ' - and no ' + DirectionWord + ' version of ' + blocker.Id + ' is compatible.')
       else
         AddToPlan(companion, blocker.Reason);
     end;
     if FPlan.FErrors.Any then
       exit;
   end;
-  FPlan.AddError('Companion packages were still being added after ' + IntToStr(cMaxPlanRounds) + ' rounds - giving up.');
+  FPlan.AddError(TErrorCode.E2009_PlanIterationLimit, 'Companion packages were still being added after ' + IntToStr(cMaxPlanRounds) + ' rounds - giving up.');
 end;
 
-function CreateFailedPlan(const error : string) : IInstallPlan;
+function CreateFailedPlan : IInstallPlan;
 var
   plan : TInstallPlan;
 begin
   plan := TInstallPlan.Create;
-  plan.AddError(error);
+  plan.MarkFailed;
   result := plan;
+end;
+
+function CreateFailedPlan(const code : TErrorCode; const error : string) : IInstallPlan;
+var
+  plan : TInstallPlan;
+begin
+  plan := TInstallPlan.Create;
+  plan.AddError(code, error);
+  result := plan;
+end;
+
+procedure LogPlanErrors(const logger : ILogger; const plan : IInstallPlan);
+var
+  error : TPlanError;
+begin
+  if plan = nil then
+    exit;
+  for error in plan.Errors do
+    logger.Error(error.Code, error.Message);
 end;
 
 { TInstallPlanner }
@@ -889,7 +928,7 @@ begin
   result := plan;
   if not requested.Any then
   begin
-    plan.AddError('No packages to install.');
+    plan.AddError(TErrorCode.E3003_NoPackagesToInstall, 'No packages were given to install.');
     exit;
   end;
 

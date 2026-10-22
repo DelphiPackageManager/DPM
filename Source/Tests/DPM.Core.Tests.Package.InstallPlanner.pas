@@ -102,6 +102,7 @@ implementation
 uses
   System.SysUtils,
   VSoft.CancellationToken.Impl,
+  DPM.Core.Diagnostics,
   DPM.Core.Dependency.Version,
   DPM.Core.Dependency.Reference,
   DPM.Core.Configuration.Classes,
@@ -279,8 +280,9 @@ begin
   plan := MakePlan([MakeInfo('Core', '1.0.3', [MakeDep('Base', '1.0.3')])]);
 
   Assert.IsFalse(plan.Succeeded, 'no Ext works with Base 1.0.3');
-  Assert.IsTrue(Pos('Ext', plan.Errors[0]) > 0, 'the error should name Ext');
-  Assert.IsTrue(Pos('Base', plan.Errors[0]) > 0, 'the error should name Base');
+  Assert.IsTrue(Pos('Ext', plan.Errors[0].Message) > 0, 'the error should name Ext');
+  Assert.IsTrue(Pos('Base', plan.Errors[0].Message) > 0, 'the error should name Base');
+  Assert.IsTrue(plan.Errors[0].Code = TErrorCode.E2008_NoCompatibleCompanion, 'no compatible companion is DPME2008');
 end;
 
 procedure TInstallPlannerTests.Floating_Range_Is_Not_A_Blocker;
@@ -547,7 +549,8 @@ begin
   plan := MakePlan([MakeInfo('Core', '1.0.3', [MakeDep('Base', '1.0.3')])]);
 
   Assert.IsFalse(plan.Succeeded, 'there is nothing to upgrade');
-  Assert.IsTrue(Pos('not installed', plan.Errors[0]) > 0);
+  Assert.IsTrue(Pos('not installed', plan.Errors[0].Message) > 0);
+  Assert.IsTrue(plan.Errors[0].Code = TErrorCode.E3002_PackageNotInstalled, 'an upgrade of a package that is not installed is DPME3002');
 end;
 
 procedure TInstallPlannerTests.Install_Gives_Every_Package_To_Every_Project;

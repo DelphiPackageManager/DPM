@@ -33,6 +33,7 @@ uses
   VSoft.CancellationToken,
   Spring.Collections,
   DPM.Core.Types,
+  DPM.Core.Diagnostics,
   DPM.Core.Sources.Types,
   DPM.Core.Dependency.Version,
   DPM.Core.Logging,
@@ -51,6 +52,8 @@ type
     FPassword : string;
     FRepositoryType : TSourceType;
     FEnabled : boolean;
+    FLastError : string;
+    FLastErrorCode : TErrorCode;
   protected
     //IPackageRepository;
     function GetRepositoryType : TSourceType;
@@ -59,6 +62,12 @@ type
     procedure Configure(const source : ISourceConfig); virtual;
     function GetEnabled : boolean;
     procedure SetEnabled(const value : boolean);
+    function GetLastError : string;
+    function GetLastErrorCode : TErrorCode;
+    procedure ClearLastError;
+    //a request failed - remembered for the repository manager to report (see IPackageRepository.LastError).
+    //reason reads on from 'Source [name] ', eg 'could not be reached : ...'.
+    procedure RequestFailed(const reason : string; const code : TErrorCode = TErrorCode.E1201_PackageDownloadFailed);
 
     //exposing these for descendants
     property Logger : ILogger read FLogger;
@@ -81,6 +90,30 @@ implementation
 constructor TBaseRepository.Create(const logger : ILogger);
 begin
   FLogger := logger;
+  FLastErrorCode := TErrorCode.E1201_PackageDownloadFailed;
+end;
+
+procedure TBaseRepository.ClearLastError;
+begin
+  FLastError := '';
+  FLastErrorCode := TErrorCode.E1201_PackageDownloadFailed;
+end;
+
+function TBaseRepository.GetLastError : string;
+begin
+  result := FLastError;
+end;
+
+function TBaseRepository.GetLastErrorCode : TErrorCode;
+begin
+  result := FLastErrorCode;
+end;
+
+procedure TBaseRepository.RequestFailed(const reason : string; const code : TErrorCode);
+begin
+  FLastError := reason;
+  FLastErrorCode := code;
+  FLogger.Verbose('Source [' + FName + '] ' + reason);
 end;
 
 function TBaseRepository.GetEnabled: boolean;

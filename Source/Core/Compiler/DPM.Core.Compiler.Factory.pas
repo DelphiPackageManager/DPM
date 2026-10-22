@@ -40,7 +40,8 @@ type
     FLogger : ILogger;
     FEnv : ICompilerEnvironmentProvider;
   protected
-    function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler;
+    function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler; overload;
+    function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const logger : ILogger) : ICompiler; overload;
   public
     constructor Create(const logger : ILogger; const env : ICompilerEnvironmentProvider);
   end;
@@ -60,9 +61,13 @@ end;
 
 function TCompilerFactory.CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler;
 begin
-  //if we have different compiler implementations then work that out here.
-  result := TMSBuildCompiler.Create(FLogger, compilerVersion, platform, FEnv);
+  result := CreateCompiler(compilerVersion, platform, FLogger);
+end;
 
+function TCompilerFactory.CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const logger : ILogger) : ICompiler;
+begin
+  //if we have different compiler implementations then work that out here.
+  result := TMSBuildCompiler.Create(logger, compilerVersion, platform, FEnv);
 end;
 
 end.
