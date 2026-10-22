@@ -68,7 +68,8 @@ uses
   JsonDataObjects,
   DPM.Core.Utils.DateTime,
   DPM.Core.Utils.System,
-  DPM.Core.Utils.Hash;
+  DPM.Core.Utils.Hash,
+  DPM.Core.Diagnostics;
 
 const
   cDefaultVulnCacheDir = '%APPDATA%\.dpm\vuln-cache';
@@ -169,7 +170,7 @@ begin
     on e : Exception do
     begin
       if Assigned(FLogger) then
-        FLogger.Warning('Could not read vuln cache file [' + fileName + ']: ' + e.Message);
+        FLogger.Warning(TWarningCode.W8005_VulnerabilityCacheUnavailable, 'Unable to read the vulnerability cache file [' + fileName + '] : ' + e.Message);
       exit;
     end;
   end;
@@ -182,7 +183,7 @@ begin
       on e : Exception do
       begin
         if Assigned(FLogger) then
-          FLogger.Warning('Corrupt vuln cache file [' + fileName + ']: ' + e.Message);
+          FLogger.Warning(TWarningCode.W8005_VulnerabilityCacheUnavailable, 'The vulnerability cache file [' + fileName + '] is damaged : ' + e.Message);
         exit;
       end;
     end;
@@ -223,7 +224,7 @@ begin
       on e : Exception do
       begin
         if Assigned(FLogger) then
-          FLogger.Warning('Could not create vuln cache dir [' + perSourceDir + ']: ' + e.Message);
+          FLogger.Warning(TWarningCode.W8005_VulnerabilityCacheUnavailable, 'Unable to create the vulnerability cache folder [' + perSourceDir + '] : ' + e.Message);
         exit;
       end;
     end;
@@ -259,7 +260,7 @@ begin
     except
       on e : Exception do
         if Assigned(FLogger) then
-          FLogger.Warning('Could not write vuln cache file [' + fileName + ']: ' + e.Message);
+          FLogger.Warning(TWarningCode.W8005_VulnerabilityCacheUnavailable, 'Unable to write the vulnerability cache file [' + fileName + '] : ' + e.Message);
     end;
   finally
     entry.Free;
@@ -275,7 +276,7 @@ begin
     except
       on e : Exception do
         if Assigned(FLogger) then
-          FLogger.Warning('Could not clear vuln cache dir [' + FCacheDir + ']: ' + e.Message);
+          FLogger.Warning(TWarningCode.W8005_VulnerabilityCacheUnavailable, 'Unable to clear the vulnerability cache folder [' + FCacheDir + '] : ' + e.Message);
     end;
   end;
 end;

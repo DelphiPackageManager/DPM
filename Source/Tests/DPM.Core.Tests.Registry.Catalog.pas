@@ -28,6 +28,10 @@ type
 
     [Test]
     procedure GetPackageIds_ReturnsAllPackages;
+    [Test]
+    procedure GitRegistry_ExplicitRefreshFailure_IsAnError;
+    [Test]
+    procedure GitRegistry_CloneFailureDuringAQuery_IsAWarning;
   end;
 
 implementation
@@ -45,7 +49,60 @@ uses
   DPM.Core.Git.Client,
   DPM.Core.Registry.Interfaces,
   DPM.Core.Registry.Catalog,
-  TestLogger;
+  TestLogger,
+  DPM.Core.Diagnostics;
+
+type
+  //every git command fails, as it does when the registry url is wrong.
+  TFailingGitClient = class(TInterfacedObject, IGitClient)
+  protected
+    function IsGitAvailable(const cancellationToken : ICancellationToken) : boolean;
+    function LsRemoteTags(const cancellationToken : ICancellationToken; const url : string; out tags : IDictionary<string, string>) : boolean;
+    function LsRemoteHead(const cancellationToken : ICancellationToken; const url : string; const ref : string; out commit : string) : boolean;
+    function Clone(const cancellationToken : ICancellationToken; const url : string; const targetDir : string) : boolean;
+    function Pull(const cancellationToken : ICancellationToken; const repoDir : string) : boolean;
+    function Checkout(const cancellationToken : ICancellationToken; const repoDir : string; const commitOrRef : string) : boolean;
+    function LastError : string;
+  end;
+
+{ TFailingGitClient }
+
+function TFailingGitClient.Checkout(const cancellationToken : ICancellationToken; const repoDir : string; const commitOrRef : string) : boolean;
+begin
+  result := false;
+end;
+
+function TFailingGitClient.Clone(const cancellationToken : ICancellationToken; const url : string; const targetDir : string) : boolean;
+begin
+  result := false;
+end;
+
+function TFailingGitClient.IsGitAvailable(const cancellationToken : ICancellationToken) : boolean;
+begin
+  result := true;
+end;
+
+function TFailingGitClient.LastError : string;
+begin
+  result := 'fatal: repository not found';
+end;
+
+function TFailingGitClient.LsRemoteHead(const cancellationToken : ICancellationToken; const url : string; const ref : string; out commit : string) : boolean;
+begin
+  commit := '';
+  result := false;
+end;
+
+function TFailingGitClient.LsRemoteTags(const cancellationToken : ICancellationToken; const url : string; out tags : IDictionary<string, string>) : boolean;
+begin
+  tags := nil;
+  result := false;
+end;
+
+function TFailingGitClient.Pull(const cancellationToken : ICancellationToken; const repoDir : string) : boolean;
+begin
+  result := false;
+end;
 
 { TRegistryCatalogTests }
 
@@ -160,6 +217,39 @@ begin
   ct := TCancellationTokenSourceFactory.Create.Token;
   ids := catalog.GetPackageIds(ct);
   Assert.AreEqual(2, ids.Count);
+end;
+
+procedure TRegistryCatalogTests.GitRegistry_ExplicitRefreshFailure_IsAnError;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  catalog : IRegistryCatalog;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  catalog := TRegistryCatalog.Create(loggerIntf, TFailingGitClient.Create, 'gitreg', 'https://example.invalid/registry.git',
+                                     TPath.Combine(FRootDir, 'registries'), 60);
+  //dpm sources refresh - the refresh is what was asked for, so its failure is the error.
+  Assert.IsFalse(catalog.EnsureUpdated(TCancellationTokenSourceFactory.Create.Token, true));
+  Assert.IsTrue(logger.HasError(TErrorCode.E1203_GitCommandFailed), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('error', 'repository not found'), 'the error says what git said : ' + logger.Messages.Text);
+  Assert.IsFalse(logger.HasWarning(TWarningCode.W1004_SourceUnavailable), logger.Messages.Text);
+end;
+
+procedure TRegistryCatalogTests.GitRegistry_CloneFailureDuringAQuery_IsAWarning;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  catalog : IRegistryCatalog;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  catalog := TRegistryCatalog.Create(loggerIntf, TFailingGitClient.Create, 'gitreg', 'https://example.invalid/registry.git',
+                                     TPath.Combine(FRootDir, 'registries'), 60);
+  //a query may find the package in another source - the one that needed it decides.
+  Assert.IsFalse(catalog.EnsureUpdated(TCancellationTokenSourceFactory.Create.Token, false));
+  Assert.IsTrue(logger.HasWarning(TWarningCode.W1004_SourceUnavailable), logger.Messages.Text);
+  Assert.AreEqual(0, loggerIntf.ErrorCount, logger.Messages.Text);
 end;
 
 initialization

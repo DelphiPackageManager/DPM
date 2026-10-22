@@ -52,6 +52,9 @@ type
 
 implementation
 
+uses
+  DPM.Core.Diagnostics;
+
 { TWhyOptions }
 
 function TWhyOptions.Clone : TWhyOptions;
@@ -82,7 +85,7 @@ begin
 
   if FPackageId = '' then
   begin
-    logger.Error('Package id cannot be empty.');
+    logger.Error(TErrorCode.E0101_MissingArgument, 'The package id is required.');
     result := false;
   end;
 end;

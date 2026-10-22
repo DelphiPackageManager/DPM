@@ -72,7 +72,8 @@ uses
   DPM.Core.Project.GroupProjReader,
   DPM.Core.Dependency.Interfaces,
   DPM.Core.Json.Utils,
-  DPM.Core.Json.Projections;
+  DPM.Core.Json.Projections,
+  DPM.Core.Diagnostics;
 
 { TProjectCommand }
 
@@ -89,6 +90,7 @@ var
   groupProjects : IList<string>;
   groupDir : string;
   i : integer;
+  list : string;
 begin
   result := false;
   projectFiles := TCollections.CreateList<string>;
@@ -107,14 +109,19 @@ begin
 
     if Length(found) = 0 then
     begin
-      Logger.Error('No .dproj or .groupproj file found in directory [' + path + ']');
+      Logger.Error(TErrorCode.E4002_NoProjectsFound, 'No .dproj or .groupproj file was found in [' + path + '].');
       exit;
     end;
     if Length(found) > 1 then
     begin
-      Logger.Error('Multiple project files found in directory [' + path + '] - specify one:');
+      list := '';
       for i := 0 to Length(found) - 1 do
-        Logger.Error('  ' + ExtractFileName(found[i]));
+      begin
+        if list <> '' then
+          list := list + ', ';
+        list := list + ExtractFileName(found[i]);
+      end;
+      Logger.Error(TErrorCode.E0101_MissingArgument, 'More than one project file was found in [' + path + '] - pass the one to use : ' + list);
       exit;
     end;
     path := found[0];
@@ -122,7 +129,7 @@ begin
 
   if not FileExists(path) then
   begin
-    Logger.Error('Project file not found [' + path + ']');
+    Logger.Error(TErrorCode.E4001_ProjectNotFound, 'The project file [' + path + '] does not exist.');
     exit;
   end;
 
@@ -152,8 +159,6 @@ begin
   result := editor.LoadProject(projectFile, [TProjectElement.PackageRefs, TProjectElement.DPMCompiler,
                                              TProjectElement.ProjectVersion, TProjectElement.Platforms,
                                              TProjectElement.AppType]);
-  if not result then
-    Logger.Error('Unable to load project [' + projectFile + ']');
 end;
 
 procedure TProjectCommand.EmitText(const editors : IList<IProjectEditor>);

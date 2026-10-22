@@ -77,6 +77,14 @@ DPM found itself in a state that should not be possible.
 You cancelled the operation (Ctrl+C on the command line, or Cancel in the IDE) before it finished. Any
 changes it hadn't finished making were not saved.
 
+### DPME0005
+
+**Unable to create a folder.**
+
+DPM couldn't create a folder it needed, such as an output folder or a temporary working folder. The message names the folder and says why.
+
+**What to do:** Check the path is valid and that you can write to its parent folder.
+
 ### DPME0101
 
 **A required argument is missing.**
@@ -93,6 +101,46 @@ message says what.
 A value given on the command line isn't one the command accepts. The message says which and why.
 
 **What to do:** Correct the value. `dpm help <command>` lists what each argument accepts.
+
+### DPME0103
+
+**Arguments that cannot be used together were given.**
+
+Two of the arguments contradict each other, for example `--thumbprint` and `--pfx`, or a version given both with `--version` and as `id@version`. The message says which.
+
+**What to do:** Remove one of them.
+
+### DPME0104
+
+**The command line could not be parsed.**
+
+An option on the command line isn't one DPM knows, or it is missing its value. Each problem is reported separately, followed by the help for the command.
+
+**What to do:** Correct the option. `dpm help <command>` lists a command's options.
+
+### DPME0105
+
+**The command is not known.**
+
+The first word on the command line isn't a DPM command.
+
+**What to do:** Check the spelling. `dpm help` lists the commands.
+
+### DPME0106
+
+**The command is not implemented yet.**
+
+The command is reserved for a future version of DPM and does nothing yet.
+
+**What to do:** Use another way to do what you need - `dpm help` lists the commands that work.
+
+### DPME0107
+
+**A confirmation is needed but there is no console to ask.**
+
+The command asks before it does something that can't be undone, but its input is redirected (a script, a CI job or another program running DPM), so nobody can answer.
+
+**What to do:** Run it in a console, or pass the option the message names (eg `--force`) to go ahead without asking.
 
 ### DPME0201
 
@@ -118,6 +166,46 @@ DPM couldn't write the configuration file.
 The command needs a configuration file, and the one it was given (or the default one) doesn't exist.
 
 **What to do:** Check the `--configFile` path, or add a source with `dpm sources add`, which creates the file.
+
+### DPME0301
+
+**Unable to check for a newer version of DPM.**
+
+`dpm upgrade` couldn't get the list of DPM releases from GitHub, or the newest release has no installer attached. The message says why - GitHub limits how often a computer can ask, so `rate limited` usually just means trying again later.
+
+**What to do:** Check you can reach https://api.github.com, then try again.
+
+### DPMW0302
+
+**The check for a newer version of DPM could not be made.**
+
+The IDE plugin checks for newer DPM versions in the background and couldn't reach GitHub. Nothing else is affected.
+
+**What to do:** Nothing, unless it keeps happening while you are online - then check you can reach https://api.github.com.
+
+### DPME0303
+
+**Unable to download the DPM installer.**
+
+The installer for the new version couldn't be downloaded or saved. The message says why.
+
+**What to do:** Check you can reach github.com and write to your temp folder, then try again. You can also download the installer from the DPM releases page.
+
+### DPME0304
+
+**Unable to start the DPM installer.**
+
+The installer was downloaded but couldn't be started.
+
+**What to do:** Run the installer from the path in the message yourself.
+
+### DPMW0305
+
+**Unable to write the update check cache.**
+
+DPM remembers the result of its last update check for a while so it doesn't ask GitHub every time. It couldn't save that, so it will just check again next time.
+
+**What to do:** Check you can write to `%APPDATA%\.dpm`.
 
 ## Package sources and repositories (1xxx)
 
@@ -158,6 +246,14 @@ becomes a problem if none of them has what was asked for, and then an error (suc
 
 **What to do:** Check the source's url and your network or proxy settings. A source that is down only for a
 while can be disabled with `dpm sources disable` until it's back.
+
+### DPME1005
+
+**A source with that name already exists.**
+
+`dpm sources add` was given a name that is already used by a configured source.
+
+**What to do:** Pick another name, or change the existing source with `dpm sources update`.
 
 ### DPME1101
 
@@ -573,6 +669,14 @@ DPM couldn't write the project file.
 **What to do:** Check the file isn't read-only or locked (for example checked out by version control, or
 open in another program).
 
+### DPME4007
+
+**The compiler version of the project could not be determined.**
+
+The project has no `DPMCompiler` property and its `ProjectVersion` doesn't identify a single Delphi version.
+
+**What to do:** Open and save the project in the Delphi version it is for, or install a package into it, which records the compiler.
+
 ### DPMW4008
 
 **The project does not target the requested platforms.**
@@ -604,7 +708,7 @@ option.
 
 **A listed project file does not exist.**
 
-One of the projects given doesn't exist and is skipped.
+One of the projects given, or listed in a .groupproj, doesn't exist and is skipped.
 
 **What to do:** Check the path.
 
@@ -624,6 +728,22 @@ The `DPMCompiler` value DPM recorded in the project isn't a compiler version it 
 project's `ProjectVersion` instead.
 
 **What to do:** Nothing - the next restore or install records the right value.
+
+### DPME4014
+
+**The project has no enabled platforms.**
+
+The project file doesn't enable any platform, so there is nothing to do for it.
+
+**What to do:** Enable a platform in the project (Project Manager > Target Platforms) and save it.
+
+### DPME4015
+
+**The project does not target any of the requested platforms.**
+
+None of the platforms given with `--platforms` is enabled in the project.
+
+**What to do:** Pass platforms the project targets, or leave `--platforms` out to use all of them.
 
 ## Compiling packages (5xxx)
 
@@ -965,6 +1085,54 @@ The source named for the push is disabled in the configuration.
 
 **What to do:** Add the platforms to the spec's target platform.
 
+### DPME6401
+
+**A spec file already exists.**
+
+`dpm spec` would replace the .dspec file that is already in the folder, and it was run non-interactively so it can't ask.
+
+**What to do:** Pass `--overwrite` to replace it, or run it in a console to be asked.
+
+### DPME6402
+
+**No source folder was found to create the spec from.**
+
+`dpm spec` looks for a `Source` folder, or .pas files in the current folder, and found neither. It was run non-interactively so it can't ask where the source is.
+
+**What to do:** Run it from the folder that holds your library, or run it in a console to be asked.
+
+### DPMW6403
+
+**The packages folder does not exist.**
+
+The packages folder you gave `dpm spec` doesn't exist, so the spec gets no build or design entries.
+
+**What to do:** Run it again with the right folder, or add the entries to the spec yourself.
+
+### DPMW6404
+
+**No compiler folders were found in the packages folder.**
+
+`dpm spec` expects one folder per Delphi version in the packages folder (eg `Rad Studio 12.0`), and didn't recognise any, so the spec gets no build or design entries.
+
+**What to do:** Add the entries to the spec yourself, or rename the folders after the Delphi versions they are for.
+
+### DPMW6405
+
+**No author is set in the configuration.**
+
+`dpm spec` fills in the author from the DPM configuration, and none is set there. It was run non-interactively so it can't ask.
+
+**What to do:** Fill in `authors` in the spec, or run it once in a console - it asks and saves the answer.
+
+### DPME6406
+
+**Unable to write the spec file.**
+
+The .dspec file couldn't be written. The message names the file and says why.
+
+**What to do:** Check you can write to the folder.
+
 ## Signing, trust and verification (7xxx)
 
 ### DPME7001
@@ -1126,3 +1294,182 @@ The package's manifest, which lists its files and their hashes, is damaged or do
 DPM couldn't read or save its record of the signatures it has seen (`%APPDATA%\.dpm\trust-state.yaml`).
 
 **What to do:** Check the `APPDATA` environment variable is set, and that you can write to the file.
+## SBOM and vulnerability scanning (8xxx)
+
+### DPME8001
+
+**Vulnerabilities at or above the --fail-on severity were found.**
+
+`dpm scan` found a known vulnerability in a component, at or above the severity given with `--fail-on`. The VEX report lists what was found and the versions that fix it.
+
+**What to do:** Update the affected packages to a version that fixes the vulnerability, or record why it doesn't affect you and raise `--fail-on`.
+
+### DPME8002
+
+**Unable to read the SBOM.**
+
+The SBOM given to `dpm scan` couldn't be read - it doesn't exist, isn't valid JSON, or isn't a CycloneDX 1.x SBOM.
+
+**What to do:** Check the file, or let `dpm scan` generate the SBOM by passing the .dproj or .groupproj instead.
+
+### DPME8003
+
+**Unable to query the vulnerability database.**
+
+The vulnerability database (osv.dev) couldn't be reached, or its answer couldn't be read. DPM never reports a scan as clean when it couldn't ask.
+
+**What to do:** Check you can reach https://api.osv.dev, then try again.
+
+### DPME8004
+
+**Unable to write the vulnerability report.**
+
+The VEX report couldn't be written. The message names the file and says why.
+
+**What to do:** Check you can write to the output folder.
+
+### DPMW8005
+
+**Unable to use the vulnerability cache.**
+
+DPM keeps vulnerability database answers for a while to avoid asking again. A cached answer couldn't be read or saved, so DPM asked the database instead.
+
+**What to do:** Nothing, unless it keeps happening - then delete the cache folder named in the message.
+
+### DPME8101
+
+**The SBOM product information is not valid.**
+
+The product information for the SBOM - from the options or the project's `.sbom.yaml` file - has a value that can't be used, such as an SBOM creator that is neither an email address nor an http(s) URL, or a `.sbom.yaml` that isn't a list of `key: value` pairs.
+
+**What to do:** Correct the value the message names.
+
+### DPME8102
+
+**The SBOM product information file could not be read.**
+
+The project's `.sbom.yaml` file exists but isn't valid YAML, or can't be opened.
+
+**What to do:** Fix the file, or delete it.
+
+### DPMW8103
+
+**An entry in the SBOM product information was ignored.**
+
+The `.sbom.yaml` file has a key DPM doesn't know, or a value of the wrong kind (a list where a single value belongs). The rest of the file is used.
+
+**What to do:** Correct or remove the entry the message names.
+
+### DPMW8104
+
+**An SBOM component rule is not valid.**
+
+A component rule in the `.sbom.yaml` file has no name (it is skipped), an unknown type (library is used), or a unit prefix so short it may claim other libraries' units.
+
+**What to do:** Correct the rule the message names.
+
+### DPMW8105
+
+**An SBOM component rule matched no unit.**
+
+A component rule in the `.sbom.yaml` file didn't match any unit in the MAP file. The library may no longer be used, or the rule's units or unit prefixes are wrong.
+
+**What to do:** Remove the rule, or correct its `units` / `unitPrefixes`.
+
+### DPMW8106
+
+**The SBOM is missing product information CRA/BSI ask for.**
+
+The SBOM was written, but it has no supplier, licence or version for the product, which the EU Cyber Resilience Act and BSI TR-03183-2 expect. The message names the `.sbom.yaml` file to fill in.
+
+**What to do:** Add the missing values to the `.sbom.yaml` file, or pass them as options.
+
+### DPMW8107
+
+**The built binary was not found.**
+
+The SBOM was written, but the file the project builds wasn't found, so the SBOM has no hash for it and no import evidence.
+
+**What to do:** Build the configuration and platform the SBOM is for first, or check `--config` and `--platforms`.
+
+### DPMW8108
+
+**A binary could not be read.**
+
+A built binary, or a package binary it ships, couldn't be hashed or its imports read. The SBOM is written without that detail.
+
+**What to do:** Check the file isn't locked or damaged, then try again.
+
+### DPMW8109
+
+**Project settings the SBOM uses could not be read.**
+
+The project's version information or search path couldn't be read, so the SBOM goes without it.
+
+**What to do:** Check the project opens in the IDE. Run with `--verbosity=Debug` for more detail.
+
+### DPMW8110
+
+**The requested build configuration is not in the project.**
+
+The configuration given with `--config` isn't defined in the project, so DPM used Release, then Debug, then the first one there is.
+
+**What to do:** Pass a configuration the project defines.
+
+### DPME8112
+
+**Unable to list the packages for the SBOM.**
+
+Something went wrong while DPM worked out which packages the project uses, so no SBOM was written for that platform - one without its packages would be wrong.
+
+**What to do:** Restore the project (`dpm restore`) and try again. If it persists, report it as a DPM bug.
+
+### DPME8113
+
+**The MAP file is required and could not be read.**
+
+`--strict` was given, and the linker MAP file - the evidence for components that aren't DPM packages - is missing or couldn't be read.
+
+**What to do:** Enable the linker option "Map file = Detailed", build the project, and try again. Or pass the MAP file with `--map`.
+
+### DPMW8114
+
+**The MAP file was not found.**
+
+The linker MAP file wasn't found, so the SBOM lists the DPM packages and the Delphi runtime only.
+
+**What to do:** Enable the linker option "Map file = Detailed" and build the project to include other components, or pass the MAP file with `--map`.
+
+### DPME8115
+
+**Unable to write the SBOM.**
+
+An SBOM file couldn't be written. The message names the file and says why.
+
+**What to do:** Check you can write to the output folder.
+
+### DPMW8116
+
+**The MAP file could not be read.**
+
+The linker MAP file was found but couldn't be read, so the SBOM lists the DPM packages and the Delphi runtime only.
+
+**What to do:** Build the project again to regenerate the MAP file.
+
+## The IDE plugin, DSpec Creator and the MCP server (9xxx)
+
+### DPMW9501
+
+**The MCP server stopped because its connection failed.**
+
+DPM couldn't write to the MCP client - usually because the client went away without closing the connection.
+
+**What to do:** Nothing - restart the server from the client.
+
+### DPMW9502
+
+**Unable to write the MCP frame log.**
+
+The file given with `--logfile` couldn't be written, so frame logging is off for the session. The server itself is unaffected.
+
+**What to do:** Check the path, and that you can write to it.

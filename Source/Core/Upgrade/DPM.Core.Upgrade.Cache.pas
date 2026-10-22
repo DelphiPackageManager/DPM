@@ -107,7 +107,8 @@ uses
   System.DateUtils,
   VSoft.YAML,
   DPM.Core.Utils.System,
-  DPM.Core.Utils.DateTime;
+  DPM.Core.Utils.DateTime,
+  DPM.Core.Diagnostics;
 
 const
   //channel is stored as a readable string rather than the raw boolean so the
@@ -264,7 +265,7 @@ begin
     //never let it propagate into the update check.
     on e : Exception do
       if Assigned(FLogger) then
-        FLogger.Warning('Could not write update check cache [' + FFileName + '] : ' + e.Message);
+        FLogger.Warning(TWarningCode.W0305_UpgradeCacheWriteFailed, 'Unable to write the update check cache [' + FFileName + '] : ' + e.Message);
   end;
 end;
 
@@ -276,7 +277,7 @@ begin
   except
     on e : Exception do
       if Assigned(FLogger) then
-        FLogger.Warning('Could not delete update check cache [' + FFileName + '] : ' + e.Message);
+        FLogger.Warning(TWarningCode.W0305_UpgradeCacheWriteFailed, 'Unable to delete the update check cache [' + FFileName + '] : ' + e.Message);
   end;
 end;
 

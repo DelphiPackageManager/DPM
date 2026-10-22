@@ -82,7 +82,8 @@ implementation
 uses
   System.SysUtils,
   System.StrUtils,
-  VSoft.YAML;
+  VSoft.YAML,
+  DPM.Core.Diagnostics;
 
 const
   cSidecarExt = '.sbom.yaml';
@@ -226,7 +227,7 @@ begin
     else if SameText(key, 'unitPrefixes') then
       rule.UnitPrefixes := ScalarList(value)
     else if not value.IsScalar then
-      logger.Warning('[SBOM] ' + context + ' : ignoring [' + key + '] - expected a single value')
+      logger.Warning(TWarningCode.W8103_SBOMProductInfoIgnored, '[SBOM] ' + context + ' : ignoring [' + key + '] - expected a single value')
     else if SameText(key, 'name') then
       rule.Name := ScalarText(value)
     else if SameText(key, 'version') then
@@ -242,7 +243,7 @@ begin
     else if SameText(key, 'type') then
       rule.ComponentType := ScalarText(value)
     else if not SameText(key, 'notes') then
-      logger.Warning('[SBOM] ' + context + ' : ignoring unknown key [' + key + '] - expected name, version, supplier, ' +
+      logger.Warning(TWarningCode.W8103_SBOMProductInfoIgnored, '[SBOM] ' + context + ' : ignoring unknown key [' + key + '] - expected name, version, supplier, ' +
                      'supplierUrl, license, purl, type, units or unitPrefixes');
   end;
   if ValidateComponentRule(logger, context, rule) then
@@ -277,7 +278,7 @@ begin
     except
       on e : Exception do
       begin
-        logger.Error('[SBOM] could not read [' + fileName + '] : ' + e.Message);
+        logger.Error(TErrorCode.E8102_SBOMProductInfoUnreadable, '[SBOM] could not read [' + fileName + '] : ' + e.Message);
         exit;
       end;
     end;
@@ -287,7 +288,7 @@ begin
     begin
       if not doc.Root.IsMapping then
       begin
-        logger.Error('[SBOM] [' + fileName + '] must be a mapping of key: value pairs');
+        logger.Error(TErrorCode.E8101_SBOMProductInfoInvalid, '[SBOM] [' + fileName + '] must be a mapping of key: value pairs');
         exit;
       end;
 
@@ -304,7 +305,7 @@ begin
         begin
           if not value.IsSequence then
           begin
-            logger.Warning('[SBOM] ignoring [components] in [' + fileName + '] - expected a list');
+            logger.Warning(TWarningCode.W8103_SBOMProductInfoIgnored, '[SBOM] ignoring [components] in [' + fileName + '] - expected a list');
             continue;
           end;
           if rules = nil then
@@ -314,7 +315,7 @@ begin
           begin
             if (components[j] = nil) or not components[j].IsMapping then
             begin
-              logger.Warning('[SBOM] ' + ExtractFileName(fileName) + ' component ' + IntToStr(j) + ' is not a mapping and was skipped');
+              logger.Warning(TWarningCode.W8104_SBOMComponentRuleInvalid, '[SBOM] ' + ExtractFileName(fileName) + ' component ' + IntToStr(j) + ' is not a mapping and was skipped');
               continue;
             end;
             ReadSidecarComponent(logger, ExtractFileName(fileName) + ' component ' + IntToStr(j), components[j].AsMapping, rules);
@@ -334,7 +335,7 @@ begin
 
         if not value.IsScalar then
         begin
-          logger.Warning('[SBOM] ignoring [' + key + '] in [' + fileName + '] - expected a single value');
+          logger.Warning(TWarningCode.W8103_SBOMProductInfoIgnored, '[SBOM] ignoring [' + key + '] in [' + fileName + '] - expected a single value');
           continue;
         end;
         if SameText(key, 'version') then
@@ -348,7 +349,7 @@ begin
         else if SameText(key, 'sbomCreator') then
           info.SbomCreator := ScalarText(value)
         else
-          logger.Warning('[SBOM] ignoring unknown key [' + key + '] in [' + fileName + '] - expected version, supplier, ' +
+          logger.Warning(TWarningCode.W8103_SBOMProductInfoIgnored, '[SBOM] ignoring unknown key [' + key + '] in [' + fileName + '] - expected version, supplier, ' +
                          'supplierUrl, license, sbomCreator, components, ownUnits or ownUnitPrefixes');
       end;
     end;

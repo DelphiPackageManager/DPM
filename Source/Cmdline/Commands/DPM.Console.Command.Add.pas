@@ -44,11 +44,14 @@ type
 
 implementation
 
+uses
+  DPM.Core.Diagnostics;
+
 { TAddCommand }
 
 function TAddCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
-  Logger.Error('Add command not implemented');
+  Logger.Error(TErrorCode.E0106_CommandNotImplemented, 'The add command is not implemented yet.');
   result := TExitCode.NotImplemented;
 end;
 

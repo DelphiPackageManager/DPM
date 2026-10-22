@@ -57,6 +57,9 @@ type
 
 implementation
 
+uses
+  DPM.Core.Diagnostics;
+
 { TRemoveOptions }
 
 function TUninstallOptions.Clone : TUninstallOptions;
@@ -98,20 +101,20 @@ begin
 
   if (FProjectPath = '') and (Length(FProjects) = 0) then
   begin
-    logger.Error('Project path cannot be empty, must either be a directory or project file.');
+    logger.Error(TErrorCode.E0101_MissingArgument, 'The project path is required - a folder or a project file.');
     result := false;
   end;
 
   if PackageId = '' then
   begin
-    logger.Error('The <packageId> option must be specified.');
+    logger.Error(TErrorCode.E0101_MissingArgument, 'The <packageId> argument is required.');
     result := false;
   end;
 
   if ConfigFile = '' then
   begin
-    logger.Error('No configuration file specified');
-    exit;
+    logger.Error(TErrorCode.E0101_MissingArgument, 'No configuration file was specified.');
+    result := false;
   end;
 
 end;

@@ -76,7 +76,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Diagnostics;
 
 { TCopyLocalOptions }
 
@@ -116,19 +117,19 @@ begin
 
   if FProjectPath = '' then
   begin
-    logger.Error('Project path cannot be empty, must be a .dproj file.');
+    logger.Error(TErrorCode.E0101_MissingArgument, 'The project path is required - a .dproj file.');
     result := false;
   end;
 
   if FPlatform = TDPMPlatform.UnknownPlatform then
   begin
-    logger.Error('A valid -platform is required.');
+    logger.Error(TErrorCode.E0101_MissingArgument, 'A valid --platform is required.');
     result := false;
   end;
 
   if FOutputDir = '' then
   begin
-    logger.Error('An -outputDir is required.');
+    logger.Error(TErrorCode.E0101_MissingArgument, 'The --outputDir option is required.');
     result := false;
   end;
 end;

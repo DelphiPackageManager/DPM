@@ -166,10 +166,7 @@ begin
     exit(TExitCode.InitException);
 
   if not FRepositoryManager.Initialize(config) then
-  begin
-    Logger.Error('mcp: unable to initialize package sources');
     exit(TExitCode.InitException);
-  end;
 
   defaultProject := ResolveDefaultProjectPath;
   //Only the --compiler flag. Anything project derived is resolved per call, so that
@@ -220,7 +217,7 @@ begin
       //Nothing may escape into the RTL exception handler in dpm.dpr, which writes to stdout.
       on E : Exception do
       begin
-        Logger.Error('mcp: ' + E.ClassName + ': ' + E.Message);
+        LogException(Logger, E);
         result := TExitCode.Error;
       end;
     end;

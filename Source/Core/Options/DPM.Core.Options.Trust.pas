@@ -58,6 +58,9 @@ type
 
 implementation
 
+uses
+  DPM.Core.Diagnostics;
+
 class constructor TTrustOptions.CreateDefault;
 begin
   FDefault := TTrustOptions.Create;
@@ -73,20 +76,20 @@ begin
       begin
         if FSpki = '' then
         begin
-          logger.Error('trust add requires --spki sha256:...');
+          logger.Error(TErrorCode.E0101_MissingArgument, 'trust add requires --spki sha256:...');
           result := false;
         end;
         if FKind = tkRepository then
         begin
           if FUrl = '' then
           begin
-            logger.Error('trust add repository requires --url <repository url>');
+            logger.Error(TErrorCode.E0101_MissingArgument, 'trust add repository requires --url <repository url>');
             result := false;
           end;
         end
         else if FName = '' then
         begin
-          logger.Error('trust add publisher requires --name <display name>');
+          logger.Error(TErrorCode.E0101_MissingArgument, 'trust add publisher requires --name <display name>');
           result := false;
         end;
       end;
@@ -94,7 +97,7 @@ begin
       begin
         if FSpki = '' then
         begin
-          logger.Error('trust remove requires --spki sha256:... to identify the entry to remove.');
+          logger.Error(TErrorCode.E0101_MissingArgument, 'trust remove requires --spki sha256:... to identify the entry to remove.');
           result := false;
         end;
       end;

@@ -345,7 +345,7 @@ var
   guard : TOperationGuard;
 begin
   result := false;
-  guard := TOperationGuard.Start(FLogger, true);
+  guard := TOperationGuard.Start(FLogger);
   try
     config := Init(Options);
     //Init has said why.
@@ -403,7 +403,7 @@ function TPackageInstaller.RefreshProjectSearchPaths(const cancellationToken : I
 var
   guard : TOperationGuard;
 begin
-  guard := TOperationGuard.Start(FLogger, true);
+  guard := TOperationGuard.Start(FLogger);
   try
     result := DoRefreshProjectSearchPaths(cancellationToken, projectFile, compilerVersion, configFile, context);
   except
@@ -2279,7 +2279,7 @@ var
   guard : TOperationGuard;
 begin
   result := false;
-  guard := TOperationGuard.Start(FLogger, true);
+  guard := TOperationGuard.Start(FLogger);
   //one request cache across planning and applying - see TRepositoryRequestCache.
   FRepositoryManager.BeginRequestCache;
   try
@@ -2306,7 +2306,7 @@ var
   guard : TOperationGuard;
 begin
   plan := nil;
-  guard := TOperationGuard.Start(FLogger, true);
+  guard := TOperationGuard.Start(FLogger);
   FRepositoryManager.BeginRequestCache;
   try
     try
@@ -2332,7 +2332,7 @@ function TPackageInstaller.ApplyInstallPlan(const cancellationToken : ICancellat
 var
   guard : TOperationGuard;
 begin
-  guard := TOperationGuard.Start(FLogger, true);
+  guard := TOperationGuard.Start(FLogger);
   FRepositoryManager.BeginRequestCache;
   try
     try
@@ -3092,7 +3092,7 @@ var
   guard : TOperationGuard;
   stopwatch : TStopwatch;
 begin
-  guard := TOperationGuard.Start(FLogger, true);
+  guard := TOperationGuard.Start(FLogger);
   stopwatch := TStopwatch.Create;
   stopwatch.Start;
   //one request cache across the projects - a group's projects look up the same packages.
@@ -3297,7 +3297,7 @@ function TPackageInstaller.Uninstall(const cancellationToken : ICancellationToke
 var
   guard : TOperationGuard;
 begin
-  guard := TOperationGuard.Start(FLogger, true);
+  guard := TOperationGuard.Start(FLogger);
   try
     result := DoUninstall(cancellationToken, Options, context);
   except

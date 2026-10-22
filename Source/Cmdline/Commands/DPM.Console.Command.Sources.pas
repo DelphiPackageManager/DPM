@@ -68,7 +68,8 @@ uses
   DPM.Core.Options.Sources,
   DPM.Core.Sources.Types,
   DPM.Core.Registry.Interfaces,
-  DPM.Core.Registry.Catalog;
+  DPM.Core.Registry.Catalog,
+  DPM.Core.Diagnostics;
 
 
 { TSourcesCommand }
@@ -129,10 +130,7 @@ begin
     begin
       Logger.Information('Refreshing registry [' + source.Name + '] from ' + source.Source);
       if not catalog.EnsureUpdated(cancellationToken, true) then
-      begin
-        Logger.Error('Failed to refresh registry [' + source.Name + ']');
-        result := false;
-      end
+        result := false
       else
         Logger.Information(Format('  %d package(s).', [catalog.GetPackageIds(cancellationToken).Count]));
     end;
@@ -156,7 +154,7 @@ begin
     //name is required
     if TSourcesOptions.Default.Name = '' then
     begin
-      Logger.Error('Name is required for this command.');
+      Logger.Error(TErrorCode.E0101_MissingArgument, 'The --name option is required for this command.');
       result := TExitCode.MissingArg;
       exit;
     end;
@@ -175,7 +173,7 @@ begin
   case TSourcesOptions.Default.Command of
     TSourcesSubCommand.Invalid:
     begin
-      Logger.Error('invalid command');
+      Logger.Error(TErrorCode.E0101_MissingArgument, 'A sub-command is required - add, remove, list, enable, disable, update or refresh.');
       result := TExitCode.InvalidArguments;
       exit;
     end;
@@ -184,7 +182,7 @@ begin
     begin
       if TSourcesOptions.Default.Source = '' then
       begin
-        Logger.Error('Source is required for this command.');
+        Logger.Error(TErrorCode.E0101_MissingArgument, 'The --source option is required for this command.');
         result := TExitCode.MissingArg;
         exit;
       end;
@@ -201,7 +199,7 @@ begin
       begin
         if not TUriFactory.TryParseWithError(TSourcesOptions.Default.Source, false, uri, uriError) then
         begin
-          Logger.Error('Source uri is not valid : ' + uriError);
+          Logger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + TSourcesOptions.Default.Source + '] is not a valid uri : ' + uriError);
           result := TExitCode.InvalidArguments;
           exit;
         end;
@@ -209,7 +207,7 @@ begin
         //this logic is not quite all there.. more testing required.
         if (uri.Scheme = 'file') and (TSourcesOptions.Default.SourceType <> TSourceType.Folder)  then
         begin
-          Logger.Error('Source uri is not valid for folder source');
+          Logger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + TSourcesOptions.Default.Source + '] is a file uri, which is only valid for a folder source.');
           result := TExitCode.InvalidArguments;
           exit;
         end
@@ -219,7 +217,7 @@ begin
             TSourcesOptions.Default.SourceType := TSourceType.DPMServer
           else
           begin
-            Logger.Error('Invalid source uri scheme : ' + uri.Scheme);
+            Logger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + TSourcesOptions.Default.Source + '] is not valid - [' + uri.Scheme + '] is not a supported scheme (file, http or https).');
             result := TExitCode.InvalidArguments;
             exit;
           end;
@@ -235,6 +233,7 @@ begin
     TSourcesSubCommand.Update : success := FSourcesManager.UpdateSource(TSourcesOptions.Default);
     TSourcesSubCommand.Refresh: success := RefreshSources(cancellationToken);
   else
+    Logger.Error(TErrorCode.E0106_CommandNotImplemented, 'That sources sub-command is not implemented.');
     result := TExitCode.NotImplemented;
     exit;
   end;

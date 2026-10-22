@@ -76,7 +76,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Diagnostics;
 
 { TScanOptions }
 
@@ -116,13 +117,13 @@ begin
 
   if FInputPath = '' then
   begin
-    logger.Error('Input path cannot be empty - expected an SBOM .json file or a .dproj / .groupproj.');
+    logger.Error(TErrorCode.E0101_MissingArgument, 'The input path is required - an SBOM .json file, a .dproj or a .groupproj.');
     result := false;
   end;
 
   if (FSource <> '') and (not SameText(FSource, 'osv')) then
   begin
-    logger.Error('Unknown vulnerability source [' + FSource + '] - v1 supports osv only.');
+    logger.Error(TErrorCode.E0102_InvalidArgument, '[' + FSource + '] is not a known vulnerability source - only osv is supported.');
     result := false;
   end;
 end;

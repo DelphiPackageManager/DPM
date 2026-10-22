@@ -62,7 +62,9 @@ type
     FMessageGroup : IOTAMessageGroup;
     {$ENDIF}
     FDPMMessageService : IDPMIDEMessageService;
+    FTaskCancellation : ICancellationTokenSource;
     procedure TaskStarted(const cancellationTokenSource : ICancellationTokenSource; const task : TMessageTask);
+    procedure TaskEnded(const success : boolean; const what : string);
   protected
     procedure WriteMessage(const level : TLogLevel; const text : string; const important : boolean); override;
     procedure DoClear; override;
@@ -95,7 +97,8 @@ implementation
 
 uses
   System.SysUtils,
-  System.Classes;
+  System.Classes,
+  DPM.Core.Diagnostics;
 
 { TDPMIDELogger }
 
@@ -167,12 +170,23 @@ procedure TDPMIDELogger.TaskStarted(const cancellationTokenSource : ICancellatio
 begin
   //a new task - an error the previous task reported must show again if this one hits it too.
   StartDiagnosticScope;
+  FTaskCancellation := cancellationTokenSource;
   FDPMMessageService.TaskStarted(cancellationTokenSource, task);
+end;
+
+//The IDE action is the boundary that owns the cancellation token, so it is the one that says the action
+//was cancelled - once, whatever was running when it stopped.
+procedure TDPMIDELogger.TaskEnded(const success : boolean; const what : string);
+begin
+  if (FTaskCancellation <> nil) and FTaskCancellation.Token.IsCancelled then
+    Warning(TWarningCode.W0004_OperationCancelled, what + ' was cancelled.', true);
+  FTaskCancellation := nil;
+  FDPMMessageService.TaskDone(success);
 end;
 
 procedure TDPMIDELogger.EndInstall(const success  : boolean);
 begin
-  FDPMMessageService.TaskDone(success);
+  TaskEnded(success, 'Install');
 end;
 
 procedure TDPMIDELogger.EndProject(const fileName : string; const msg : string);
@@ -191,7 +205,7 @@ begin
 {$IFDEF DEBUG}
   FMessageServices.AddTitleMessage('DPM Restore done.', FMessageGroup);
 {$ENDIF}
-  FDPMMessageService.TaskDone(success);
+  TaskEnded(success, 'Restore');
 end;
 
 procedure TDPMIDELogger.EndUnInstall(const success  : boolean);
@@ -199,7 +213,7 @@ begin
 {$IFDEF DEBUG}
   FMessageServices.AddTitleMessage('DPM Install done.', FMessageGroup);
 {$ENDIF}
-  FDPMMessageService.TaskDone(success);
+  TaskEnded(success, 'Uninstall');
 end;
 
 procedure TDPMIDELogger.ShowMessageTab;
@@ -243,7 +257,7 @@ end;
 
 procedure TDPMIDELogger.EndVerifyCache(const success : boolean);
 begin
-  FDPMMessageService.TaskDone(success);
+  TaskEnded(success, 'Verifying the package cache');
 end;
 
 end.

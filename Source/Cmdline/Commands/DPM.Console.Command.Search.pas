@@ -71,7 +71,8 @@ uses
   DPM.Core.Options.Common,
   DPM.Core.Options.SearchCmd,
   DPM.Core.Json.Utils,
-  DPM.Core.Json.Projections;
+  DPM.Core.Json.Projections,
+  DPM.Core.Diagnostics;
 
 { TSearchCommand }
 
@@ -162,6 +163,7 @@ begin
 
   if options.ConfigFile = '' then
   begin
+    Logger.Error(TErrorCode.E0101_MissingArgument, 'No configuration file was specified.');
     result := TExitCode.InvalidArguments;
     exit;
   end;
@@ -169,7 +171,9 @@ begin
   config := FConfigurationManager.LoadConfig(options.ConfigFile);
   if config = nil then
     exit(TExitCode.InitException);
-  FRepositoryManager.Initialize(config);
+  //it reported the source that is not valid.
+  if not FRepositoryManager.Initialize(config) then
+    exit(TExitCode.InitException);
 
   searchResult := FRepositoryManager.GetPackageFeed(cancellationToken, options, options.CompilerVersion);
   if cancellationToken.IsCancelled then

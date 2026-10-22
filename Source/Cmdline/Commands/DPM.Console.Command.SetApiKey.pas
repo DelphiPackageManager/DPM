@@ -42,11 +42,14 @@ type
 
 implementation
 
+uses
+  DPM.Core.Diagnostics;
+
 { TSetApiKeyCommand }
 
 function TSetApiKeyCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
-  Logger.Error('SetApiKey command not implemented');
+  Logger.Error(TErrorCode.E0106_CommandNotImplemented, 'The setapikey command is not implemented yet.');
   result := TExitCode.NotImplemented;
 end;
 

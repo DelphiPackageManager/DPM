@@ -46,6 +46,9 @@ type
 
 implementation
 
+uses
+  DPM.Core.Diagnostics;
+
 
 { TConfigCommand }
 
@@ -56,7 +59,7 @@ end;
 
 function TConfigCommand.Execute(const cancellationToken : ICancellationToken): TExitCode;
 begin
-  Logger.Error('Config command not implemented');
+  Logger.Error(TErrorCode.E0106_CommandNotImplemented, 'The config command is not implemented yet.');
   result := TExitCode.NotImplemented;
 end;
 

@@ -63,7 +63,8 @@ uses
   VSoft.YAML,
   DPM.Console.RawIO,
   DPM.Core.Json.Utils,
-  DPM.Core.Options.Why;
+  DPM.Core.Options.Why,
+  DPM.Core.Diagnostics;
 
 type
   TWhyNode = class
@@ -221,13 +222,13 @@ begin
     projectFiles := TDirectory.GetFiles(projectPath, '*.dproj');
     if Length(projectFiles) = 0 then
     begin
-      Logger.Error('No .dproj file found in directory [' + projectPath + ']');
+      Logger.Error(TErrorCode.E4002_NoProjectsFound, 'No .dproj file was found in [' + projectPath + '].');
       result := TExitCode.InvalidArguments;
       exit;
     end;
     if Length(projectFiles) > 1 then
     begin
-      Logger.Error('Multiple .dproj files found in directory [' + projectPath + '] - specify a single .dproj file.');
+      Logger.Error(TErrorCode.E0101_MissingArgument, 'More than one .dproj file was found in [' + projectPath + '] - pass the one to use.');
       result := TExitCode.InvalidArguments;
       exit;
     end;

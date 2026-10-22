@@ -62,7 +62,8 @@ uses
   DPM.Core.Options.Why,
   DPM.Core.Vuln.Types,
   DPM.Core.Utils.Strings,
-  VSoft.CommandLine.Options;
+  VSoft.CommandLine.Options,
+  DPM.Core.Diagnostics;
 
 procedure RegisterConfigCommand;
 var
@@ -1685,7 +1686,7 @@ initialization
       //may already have left InOutRes set (see the note in dpm.dpr). Clear it, otherwise
       //'I/O error 6' is all the user sees instead of the real registration failure.
       IOResult;
-      Writeln('Error registering options : ' + e.Message);
+      Writeln(FormatError(TErrorCode.E0003_InternalError, 'Error registering options : ' + e.Message));
       ExitProcess(999);
     end;
   end;

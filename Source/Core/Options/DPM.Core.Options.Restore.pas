@@ -63,6 +63,9 @@ type
 
 implementation
 
+uses
+  DPM.Core.Diagnostics;
+
 { TRestoreOptions }
 
 function TRestoreOptions.Clone : TRestoreOptions;
@@ -95,7 +98,7 @@ begin
 
   if FProjectPath = '' then
   begin
-    logger.Error('Project path cannot be empty, must either be a directory or project file.');
+    logger.Error(TErrorCode.E0101_MissingArgument, 'The project path is required - a folder or a project file.');
     result := false;
   end;
 

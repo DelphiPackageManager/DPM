@@ -52,6 +52,12 @@ type
 
     [Test]
     procedure AddPackage_Sets_First_Package_As_PackageId;
+
+    [Test]
+    procedure Missing_Config_File_Fails_Validation;
+
+    [Test]
+    procedure Errors_Carry_Codes;
   end;
 
 implementation
@@ -59,7 +65,8 @@ implementation
 uses
   System.SysUtils,
   System.IOUtils,
-  TestLogger;
+  TestLogger,
+  DPM.Core.Diagnostics;
 
 { TInstallOptionsTests }
 
@@ -108,6 +115,24 @@ begin
   Assert.IsTrue(FOptions.Packages[1].Version.IsEmpty, 'no inline version means latest');
   Assert.AreEqual('Spring4D.Core', FOptions.PackageId, false, 'PackageId mirrors the first package');
   Assert.AreEqual('2.0.3-beta.3', FOptions.Version.ToStringNoMeta, 'Version mirrors the first package');
+end;
+
+procedure TInstallOptionsTests.Missing_Config_File_Fails_Validation;
+begin
+  //it used to log the error and still say the options were valid.
+  FOptions.PackageId := 'Spring4D.Core';
+  FOptions.ConfigFile := '';
+  Assert.IsFalse(FOptions.Validate(FLogger));
+  Assert.IsFalse(FOptions.IsValid);
+  Assert.IsTrue((FLogger as TTestLogger).HasError(TErrorCode.E0101_MissingArgument), (FLogger as TTestLogger).Messages.Text);
+end;
+
+procedure TInstallOptionsTests.Errors_Carry_Codes;
+begin
+  FOptions.PackageId := 'Spring4D.Core,spring4d.core';
+  Assert.IsFalse(FOptions.Validate(FLogger));
+  Assert.IsTrue((FLogger as TTestLogger).HasError(TErrorCode.E0103_ConflictingArguments), (FLogger as TTestLogger).Messages.Text);
+  Assert.AreEqual(1, FLogger.ErrorCount, (FLogger as TTestLogger).Messages.Text);
 end;
 
 procedure TInstallOptionsTests.Duplicate_Id_Is_An_Error;

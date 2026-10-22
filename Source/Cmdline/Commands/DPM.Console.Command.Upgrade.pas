@@ -56,7 +56,8 @@ uses
   DPM.Core.Version,
   DPM.Core.Options.Common,
   DPM.Core.Options.Upgrade,
-  DPM.Console.Prompts;
+  DPM.Console.Prompts,
+  DPM.Core.Diagnostics;
 
 const
   //Requested wording - when we found nothing newer and the user did not ask for
@@ -100,7 +101,10 @@ begin
 
   case checkResult of
     TUpgradeCheckResult.Error :
-      exit(TExitCode.Error); //the service logs the reason
+      begin
+        Logger.Error(TErrorCode.E0301_UpgradeCheckFailed, FUpgradeService.LastError);
+        exit(TExitCode.Error);
+      end;
 
     TUpgradeCheckResult.UpToDate :
       begin

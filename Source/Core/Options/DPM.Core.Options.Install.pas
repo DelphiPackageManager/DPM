@@ -103,7 +103,8 @@ uses
   System.SysUtils,
   System.RegularExpressions,
   DPM.Core.Constants,
-  DPM.Core.Utils.Strings;
+  DPM.Core.Utils.Strings,
+  DPM.Core.Diagnostics;
 
 { TInstallOptions }
 
@@ -195,7 +196,7 @@ begin
 
     if not TRegEx.IsMatch(id, cPackageIdRegex) then
     begin
-      logger.Error('[' + id + '] is not a valid package id or an existing package file.');
+      logger.Error(TErrorCode.E0102_InvalidArgument, '[' + id + '] is not a valid package id or an existing package file.');
       result := false;
       continue;
     end;
@@ -204,7 +205,7 @@ begin
     begin
       if SameText(FPackages[i].PackageId, id) then
       begin
-        logger.Error('Package [' + id + '] is specified more than once.');
+        logger.Error(TErrorCode.E0103_ConflictingArguments, 'The package [' + id + '] is specified more than once.');
         result := false;
       end;
     end;
@@ -215,7 +216,7 @@ begin
       anyInlineVersion := true;
       if not TPackageVersion.TryParseWithError(versionText, version, error) then
       begin
-        logger.Error('The version [' + versionText + '] specified for package [' + id + '] is not a valid version - ' + error);
+        logger.Error(TErrorCode.E0102_InvalidArgument, 'The version [' + versionText + '] given for the package [' + id + '] is not a valid version - ' + error);
         result := false;
         continue;
       end;
@@ -229,7 +230,7 @@ begin
   if Length(FPackages) = 0 then
   begin
     if result then
-      logger.Error('No package specified.');
+      logger.Error(TErrorCode.E0101_MissingArgument, 'No package was specified.');
     result := false;
     exit;
   end;
@@ -238,12 +239,12 @@ begin
   begin
     if Length(FPackages) > 1 then
     begin
-      logger.Error('The version option can only be used with a single package - use id@version for each package instead.');
+      logger.Error(TErrorCode.E0103_ConflictingArguments, 'The --version option can only be used with a single package - use id@version for each package instead.');
       result := false;
     end
     else if anyInlineVersion then
     begin
-      logger.Error('The version is specified twice - use either the version option or id@version.');
+      logger.Error(TErrorCode.E0103_ConflictingArguments, 'The version is specified twice - use either the --version option or id@version.');
       result := false;
     end;
   end;
@@ -268,15 +269,16 @@ begin
 
   if ConfigFile = '' then
   begin
-    logger.Error('No configuration file specified');
-    exit;
+    logger.Error(TErrorCode.E0101_MissingArgument, 'No configuration file was specified.');
+    FIsValid := false;
+    exit(false);
   end;
 
   if VersionString <> '' then
   begin
     if not TPackageVersion.TryParseWithError(VersionString, theVersion, error) then
     begin
-      logger.Error('The specified package Version  [' + VersionString + '] is not a valid version - ' + error);
+      logger.Error(TErrorCode.E0102_InvalidArgument, 'The version [' + VersionString + '] is not a valid version - ' + error);
       result := false;
     end;
     Self.Version := theVersion;
@@ -293,7 +295,7 @@ begin
       packageString := ChangeFileExt(ExtractFileName(FPackageFile), '');
       if not TRegEx.IsMatch(packageString, cPackageFileRegex) then
       begin
-        logger.Error('The specified packageFile name [' + packageString + '] is not in the correct format.');
+        logger.Error(TErrorCode.E3005_InvalidPackageFile, 'The package file name [' + packageString + '] is not in the correct format (id-compiler-platforms-version).');
         result := false;
       end;
       PackageId := '';
@@ -304,14 +306,14 @@ begin
 
   if (FProjectPath = '') and (Length(FProjects) = 0) then
   begin
-    logger.Error('Project path cannot be empty, must either be a directory or project file.');
+    logger.Error(TErrorCode.E0101_MissingArgument, 'The project path is required - a folder or a project file.');
     result := false;
   end
   else if (FProjectPath <> '') and (Length(FProjects) > 0) then
   begin
     //ProjectPath is the CLI's "point at a directory or .dproj"; Projects is the IDE's "here is
     //the explicit list of .dproj files". Both set at once is ambiguous — reject it.
-    logger.Error('ProjectPath and Projects cannot both be set — use one or the other (ProjectPath is for CLI, Projects for IDE).');
+    logger.Error(TErrorCode.E0003_InternalError, 'ProjectPath and Projects cannot both be set - use one or the other (ProjectPath is for the CLI, Projects for the IDE).');
     result := false;
   end;
 

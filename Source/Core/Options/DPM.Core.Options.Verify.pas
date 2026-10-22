@@ -54,7 +54,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Diagnostics;
 
 class constructor TVerifyOptions.CreateDefault;
 begin
@@ -66,12 +67,12 @@ begin
   result := true;
   if FPackageFile = '' then
   begin
-    logger.Error('No package file specified (e.g. dpm verify Foo.dpkg).');
+    logger.Error(TErrorCode.E0101_MissingArgument, 'No package file was specified (eg dpm verify Foo.dpkg).');
     result := false;
   end
   else if not FileExists(FPackageFile) then
   begin
-    logger.Error('Package file not found: ' + FPackageFile);
+    logger.Error(TErrorCode.E3004_PackageFileNotFound, 'The package file [' + FPackageFile + '] does not exist.');
     result := false;
   end;
 end;

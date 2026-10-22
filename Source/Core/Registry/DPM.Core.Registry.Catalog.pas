@@ -219,7 +219,12 @@ begin
     if result then
       TouchFetchStamp(mirror)
     else if not cancellationToken.IsCancelled then
-      FLogger.Warning(TWarningCode.W1004_SourceUnavailable, 'Source [' + FName + '] could not be used - unable to clone the registry : ' + FGitClient.LastError);
+    begin
+      if forceRefresh then
+        FLogger.Error(TErrorCode.E1203_GitCommandFailed, 'Unable to clone the registry [' + FName + '] from ' + FSource + ' : ' + FGitClient.LastError)
+      else
+        FLogger.Warning(TWarningCode.W1004_SourceUnavailable, 'Source [' + FName + '] could not be used - unable to clone the registry : ' + FGitClient.LastError);
+    end;
     exit;
   end;
 
@@ -228,6 +233,13 @@ begin
     FLogger.Information('Refreshing package registry [' + FName + ']');
     if FGitClient.Pull(cancellationToken, mirror) then
       TouchFetchStamp(mirror)
+    else if cancellationToken.IsCancelled then
+      exit(false)
+    else if forceRefresh then
+    begin
+      FLogger.Error(TErrorCode.E1203_GitCommandFailed, 'Unable to refresh the registry [' + FName + '] from ' + FSource + ' : ' + FGitClient.LastError);
+      exit(false);
+    end
     else
       FLogger.Warning(TWarningCode.W1004_SourceUnavailable, 'Source [' + FName + '] could not be refreshed - using the cached copy : ' + FGitClient.LastError);
   end;

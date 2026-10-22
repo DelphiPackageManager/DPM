@@ -107,7 +107,8 @@ implementation
 
 uses
   System.SysUtils,
-  System.StrUtils;
+  System.StrUtils,
+  DPM.Core.Diagnostics;
 
 const
   //a shorter prefix claims far more than the library it was written for
@@ -232,7 +233,7 @@ begin
   rule.Name := Trim(rule.Name);
   if rule.Name = '' then
   begin
-    logger.Warning('[SBOM] ' + context + ' has no name and was skipped');
+    logger.Warning(TWarningCode.W8104_SBOMComponentRuleInvalid, '[SBOM] ' + context + ' has no name and was skipped');
     exit(false);
   end;
 
@@ -240,14 +241,14 @@ begin
   if (rule.ComponentType <> '') and (rule.ComponentType <> 'library') and
      (rule.ComponentType <> 'framework') and (rule.ComponentType <> 'application') then
   begin
-    logger.Warning('[SBOM] ' + context + ' (' + rule.Name + ') : type [' + rule.ComponentType +
+    logger.Warning(TWarningCode.W8104_SBOMComponentRuleInvalid, '[SBOM] ' + context + ' (' + rule.Name + ') : type [' + rule.ComponentType +
                    '] is not library, framework or application - library is used');
     rule.ComponentType := '';
   end;
 
   for i := 0 to Length(rule.UnitPrefixes) - 1 do
     if Length(rule.UnitPrefixes[i]) < cMinPrefixLength then
-      logger.Warning('[SBOM] ' + context + ' (' + rule.Name + ') : the unit prefix [' + rule.UnitPrefixes[i] +
+      logger.Warning(TWarningCode.W8104_SBOMComponentRuleInvalid, '[SBOM] ' + context + ' (' + rule.Name + ') : the unit prefix [' + rule.UnitPrefixes[i] +
                      '] is shorter than ' + IntToStr(cMinPrefixLength) + ' characters and may claim units of other libraries');
   result := true;
 end;

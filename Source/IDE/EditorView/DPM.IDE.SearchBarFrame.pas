@@ -170,7 +170,8 @@ uses
   DPM.Core.Version,
   DPM.IDE.ToolsAPI,
   DPM.IDE.AddInOptionsHostForm,
-  DPM.IDE.AboutForm;
+  DPM.IDE.AboutForm,
+  DPM.Core.Diagnostics;
 
 const
   cDMPSearchHistoryFile = 'packagesearch.txt';
@@ -466,6 +467,8 @@ begin
         checkResult := upgradeService.CheckForUpgrade(cancelToken, currentVersion, includePrerelease, info);
         if cancelToken.IsCancelled then
           exit;
+        if checkResult = TUpgradeCheckResult.Error then
+          logger.Warning(TWarningCode.W0302_UpgradeCheckUnavailable, 'DPMIDE : Unable to check for DPM updates : ' + upgradeService.LastError);
         //Errors are deliberately not cached - an offline machine should retry
         //next time rather than go quiet for an hour.
         if (checkResult <> TUpgradeCheckResult.Error) and (cache <> nil) then
@@ -484,7 +487,7 @@ begin
         exit;
       //Warn rather than error - failing to reach github is not a problem with
       //the user's project.
-      logger.Warning('DPMIDE : Unable to check for DPM updates : ' + e.Message);
+      logger.Warning(TWarningCode.W0302_UpgradeCheckUnavailable, 'DPMIDE : Unable to check for DPM updates : ' + e.Message);
     end)
   .OnCancellation(
     procedure

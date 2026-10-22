@@ -83,7 +83,8 @@ uses
   DPM.Core.Project.Editor,
   DPM.Core.Utils.Files,
   DPM.Core.Utils.Strings,
-  DPM.Core.Utils.Path;
+  DPM.Core.Utils.Path,
+  DPM.Core.Diagnostics;
 
 { TCopyLocalService }
 
@@ -252,7 +253,7 @@ var
       FLogger.Information('Copied [' + ExtractFileName(srcFile) + '] to output for package [' + packageId + '].');
     except
       on e : Exception do
-        FLogger.Warning('Unable to copy [' + srcFile + '] to output during copylocal: ' + e.Message);
+        FLogger.Warning(TWarningCode.W5014_CopyFileFailed, 'Unable to copy [' + srcFile + '] to the output folder : ' + e.Message);
     end;
   end;
 
@@ -286,7 +287,7 @@ var
       spec := FPackageCache.GetPackageSpec(identity);
     except
       on e : Exception do
-        FLogger.Warning('[copylocal] could not load spec for ' + node.Id + ' ' + node.Version.ToStringNoMeta + ' : ' + e.Message);
+        FLogger.Warning(TWarningCode.W3013_PackageSpecUnreadable, '[copylocal] could not load the spec for ' + node.Id + ' ' + node.Version.ToStringNoMeta + ' : ' + e.Message);
     end;
     if spec = nil then
       exit;
@@ -381,16 +382,13 @@ begin
 
   config := FConfigManager.LoadConfig(options.ConfigFile);
   if config = nil then
-  begin
-    FLogger.Error('Unable to load configuration.');
     exit;
-  end;
   if FPackageCache.Location = '' then
     FPackageCache.Location := config.PackageCacheLocation;
 
   if not FileExists(options.ProjectPath) then
   begin
-    FLogger.Error('Project file not found: ' + options.ProjectPath);
+    FLogger.Error(TErrorCode.E4001_ProjectNotFound, 'The project file [' + options.ProjectPath + '] does not exist.');
     exit;
   end;
 
@@ -398,10 +396,7 @@ begin
 
   editor := TProjectEditor.Create(FLogger, config, compilerVersion);
   if not editor.LoadProject(options.ProjectPath, [TProjectElement.All]) then
-  begin
-    FLogger.Error('Unable to load project: ' + options.ProjectPath);
     exit;
-  end;
 
   if compilerVersion = TCompilerVersion.UnknownVersion then
   begin

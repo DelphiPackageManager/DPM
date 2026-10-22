@@ -177,7 +177,8 @@ uses
   DPM.Core.Utils.Path,
   DPM.Core.Utils.Strings,
   DPM.Core.Utils.PEImports,
-  DPM.Core.Crypto.Algorithms;
+  DPM.Core.Crypto.Algorithms,
+  DPM.Core.Diagnostics;
 
 const
   //purl scheme used for all DPM-managed components. `pkg:dpm/` is not registered with
@@ -636,7 +637,7 @@ begin
   except
     on e : Exception do
     begin
-      FLogger.Warning('[SBOM] could not read the project version info : ' + e.Message);
+      FLogger.Warning(TWarningCode.W8109_ProjectSettingsUnreadable, '[SBOM] could not read the project version info : ' + e.Message);
       exit;
     end;
   end;
@@ -669,7 +670,7 @@ begin
   //A company name is not a way to contact anyone.
   if (info.SbomCreator <> '') and not (IsEmailAddress(info.SbomCreator) or IsHttpUrl(info.SbomCreator)) then
   begin
-    FLogger.Error('[SBOM] the SBOM creator [' + info.SbomCreator + '] must be an email address or an http(s) URL');
+    FLogger.Error(TErrorCode.E8101_SBOMProductInfoInvalid, '[SBOM] the SBOM creator [' + info.SbomCreator + '] must be an email address or an http(s) URL');
     exit;
   end;
   result := true;
@@ -731,7 +732,7 @@ begin
       continue;
     if FMatchedRules.Contains(LowerCase(rule.Name)) or not warned.Add(LowerCase(rule.Name)) then
       continue;
-    FLogger.Warning('[SBOM] the component rule [' + rule.Name + '] matched no unit in the MAP file - ' +
+    FLogger.Warning(TWarningCode.W8105_SBOMComponentRuleUnmatched, '[SBOM] the component rule [' + rule.Name + '] matched no unit in the MAP file - ' +
                     'the library may no longer be used, or its units / unitPrefixes are wrong');
   end;
 end;
@@ -745,7 +746,7 @@ var
 begin
   for warning in GetProductInfoWarnings(info, versionIsExplicit, ExtractFileName(SBOMSidecarFileName(projectPath))) do
   begin
-    FLogger.Warning('[SBOM] ' + warning);
+    FLogger.Warning(TWarningCode.W8106_SBOMProductInfoIncomplete, '[SBOM] ' + warning);
     report.Warnings.Add(warning);
   end;
 end;
@@ -825,7 +826,7 @@ begin
     warning := 'CRA/BSI: the built file ' + fileName + ' was not found, so the SBOM has no hash for it ' +
                '(BSI TR-03183-2 5.2.2 asks for the SHA-512 of the deployable component). Build the ' +
                configName + ' ' + DPMPlatformToString(platform) + ' configuration first, or check --config and --platforms.';
-    FLogger.Warning('[SBOM] ' + warning);
+    FLogger.Warning(TWarningCode.W8107_BuiltBinaryNotFound, '[SBOM] ' + warning);
     report.Warnings.Add(warning);
     exit;
   end;
@@ -843,7 +844,7 @@ begin
       comp.HashValue := '';
       comp.Hashes.Clear;
       warning := 'CRA/BSI: could not hash the built file ' + binaryPath + ' : ' + e.Message;
-      FLogger.Warning('[SBOM] ' + warning);
+      FLogger.Warning(TWarningCode.W8108_BinaryUnreadable, '[SBOM] ' + warning);
       report.Warnings.Add(warning);
     end;
   end;
@@ -889,7 +890,7 @@ begin
     exit;
   if not TryReadPEImports(binaryPath, imports, errorMessage) then
   begin
-    FLogger.Warning('[SBOM] could not read the imports of ' + binaryPath + ' : ' + errorMessage);
+    FLogger.Warning(TWarningCode.W8108_BinaryUnreadable, '[SBOM] could not read the imports of ' + binaryPath + ' : ' + errorMessage);
     exit;
   end;
 
@@ -969,7 +970,7 @@ begin
             comp.HashAlgorithm := '';
             comp.HashValue := '';
             comp.Hashes.Clear;
-            FLogger.Warning('[SBOM] could not hash ' + shippedCopy + ' : ' + e.Message);
+            FLogger.Warning(TWarningCode.W8108_BinaryUnreadable, '[SBOM] could not hash ' + shippedCopy + ' : ' + e.Message);
           end;
         end;
         versionResource := ReadVersionResource(shippedCopy);
@@ -1088,7 +1089,7 @@ begin
       AddSemicolonPaths(result, projectSearchPath, TUnitOrigin.Other);
     except
       on e : Exception do
-        FLogger.Warning('[SBOM] could not read project search path : ' + e.Message);
+        FLogger.Warning(TWarningCode.W8109_ProjectSettingsUnreadable, '[SBOM] could not read the project search path : ' + e.Message);
     end;
   end;
 
@@ -1109,7 +1110,7 @@ begin
     result := FContainer.Resolve<ISbomWriter>(name);
   except
     on e : Exception do
-      FLogger.Error('[SBOM] could not resolve writer [' + name + '] : ' + e.Message);
+      FLogger.Error(TErrorCode.E0003_InternalError, '[SBOM] could not resolve the writer [' + name + '] : ' + e.Message);
   end;
 end;
 
@@ -1178,10 +1179,7 @@ begin
 
   config := FConfigManager.LoadConfig(options.ConfigFile);
   if config = nil then
-  begin
-    FLogger.Error('Unable to load configuration.');
     exit;
-  end;
 
   if FPackageCache.Location = '' then
     FPackageCache.Location := config.PackageCacheLocation;
@@ -1193,7 +1191,7 @@ begin
   projPath := TPathUtils.ToAbsolutePath(options.ProjectPath);
   if not FileExists(projPath) then
   begin
-    FLogger.Error('Project file not found : ' + projPath);
+    FLogger.Error(TErrorCode.E4001_ProjectNotFound, 'The project file [' + projPath + '] does not exist.');
     exit;
   end;
 
@@ -1244,7 +1242,7 @@ begin
   end
   else
   begin
-    FLogger.Error('Unsupported project type [' + ext + '] - expected .dproj or .groupproj');
+    FLogger.Error(TErrorCode.E0102_InvalidArgument, 'The project type [' + ext + '] is not supported - expected a .dproj or a .groupproj.');
     exit;
   end;
 end;
@@ -1278,7 +1276,7 @@ var
           result := name;
           exit;
         end;
-      FLogger.Warning('Requested config [' + options.Config + '] not found in project - falling back to first available.');
+      FLogger.Warning(TWarningCode.W8110_BuildConfigNotFound, 'The configuration [' + options.Config + '] is not in the project - using the first available.');
     end;
     for name in configNames do
       if SameText(name, 'Release') then
@@ -1314,7 +1312,7 @@ begin
     compilerVersion := ProjectVersionToCompilerVersion(editor.ProjectVersion);
     if compilerVersion = TCompilerVersion.UnknownVersion then
     begin
-      FLogger.Error('Unable to determine compiler version for project : ' + projectPath);
+      FLogger.Error(TErrorCode.E4007_ProjectCompilerUnknown, 'Unable to determine the compiler version of the project [' + projectPath + '].');
       exit;
     end;
   end;
@@ -1322,7 +1320,7 @@ begin
   enabledPlatforms := editor.Platforms;
   if enabledPlatforms = [] then
   begin
-    FLogger.Error('Project has no enabled platforms : ' + projectPath);
+    FLogger.Error(TErrorCode.E4014_ProjectHasNoPlatforms, 'The project [' + projectPath + '] has no enabled platforms.');
     exit;
   end;
   if options.Platforms = [] then
@@ -1332,7 +1330,7 @@ begin
 
   if selectedPlatforms = [] then
   begin
-    FLogger.Error('No requested platform is enabled in the project [' + DPMPlatformsToString(options.Platforms) + ']');
+    FLogger.Error(TErrorCode.E4015_RequestedPlatformsNotTargeted, 'None of the requested platforms [' + DPMPlatformsToString(options.Platforms) + '] is enabled in the project [' + projectPath + '].');
     exit;
   end;
 
@@ -1349,7 +1347,7 @@ begin
   outDir := ExcludeTrailingPathDelimiter(outDir);
   if not ForceDirectories(outDir) then
   begin
-    FLogger.Error('Unable to create output directory : ' + outDir);
+    FLogger.Error(TErrorCode.E0005_FolderCreateFailed, 'Unable to create the output folder [' + outDir + '].');
     exit;
   end;
 
@@ -1401,6 +1399,9 @@ var
   binaryPath : string;
   runtimeCompiler : TCompilerVersion;
   ok : boolean;
+  editor : IProjectEditor;
+  loadFailed : boolean;
+  platformFailed : boolean;
 
   function PickConfig(const names : IReadOnlyList<string>) : string;
   var
@@ -1427,7 +1428,7 @@ begin
   result := false;
   if Length(dprojPaths) = 0 then
   begin
-    FLogger.Error('Group project [' + groupProjPath + '] contains no projects.');
+    FLogger.Error(TErrorCode.E4002_NoProjectsFound, 'The project group [' + groupProjPath + '] contains no projects.');
     exit;
   end;
 
@@ -1441,6 +1442,7 @@ begin
   groupFallback := groupInfo;
   groupFallback.Version := '';
 
+  loadFailed := false;
   //First pass: load every dproj and capture its compiler / platforms / config.
   //Doing this once up front lets us iterate platforms in the outer loop and
   //compute the union of platforms across the whole group.
@@ -1450,12 +1452,20 @@ begin
   begin
     contexts[i].Path := dprojPaths[i];
     contexts[i].Name := ChangeFileExt(ExtractFileName(dprojPaths[i]), '');
-    contexts[i].Editor := TProjectEditor.Create(FLogger, config, TCompilerVersion.UnknownVersion);
-    if not contexts[i].Editor.LoadProject(dprojPaths[i], [TProjectElement.All]) then
+    contexts[i].Editor := nil;
+    if not FileExists(dprojPaths[i]) then
     begin
-      FLogger.Error('[SBOM] could not load dproj [' + dprojPaths[i] + '] - skipping in group aggregation.');
+      FLogger.Warning(TWarningCode.W4011_ProjectNotFoundInList, '[SBOM] skipping [' + dprojPaths[i] + '] - the group lists it but it does not exist.');
       continue;
     end;
+    editor := TProjectEditor.Create(FLogger, config, TCompilerVersion.UnknownVersion);
+    if not editor.LoadProject(dprojPaths[i], [TProjectElement.All]) then
+    begin
+      FLogger.Information('[SBOM] skipping [' + dprojPaths[i] + '] in the group SBOM.', true);
+      loadFailed := true;
+      continue;
+    end;
+    contexts[i].Editor := editor;
     contexts[i].CompilerVersion := contexts[i].Editor.CompilerVersion;
     if contexts[i].CompilerVersion = TCompilerVersion.UnknownVersion then
       contexts[i].CompilerVersion := ProjectVersionToCompilerVersion(contexts[i].Editor.ProjectVersion);
@@ -1475,7 +1485,9 @@ begin
 
   if unionPlatforms = [] then
   begin
-    FLogger.Error('No enabled platforms across any dproj in [' + groupProjPath + ']');
+    //the loads that failed said why.
+    if not loadFailed then
+      FLogger.Error(TErrorCode.E4014_ProjectHasNoPlatforms, 'None of the projects in [' + groupProjPath + '] has an enabled platform.');
     exit;
   end;
 
@@ -1485,7 +1497,7 @@ begin
     selectedPlatforms := options.Platforms * unionPlatforms;
   if selectedPlatforms = [] then
   begin
-    FLogger.Error('No requested platform is enabled in any dproj of the group [' + DPMPlatformsToString(options.Platforms) + ']');
+    FLogger.Error(TErrorCode.E4015_RequestedPlatformsNotTargeted, 'None of the requested platforms [' + DPMPlatformsToString(options.Platforms) + '] is enabled in any project in [' + groupProjPath + '].');
     exit;
   end;
 
@@ -1496,7 +1508,7 @@ begin
   outDir := ExcludeTrailingPathDelimiter(outDir);
   if not ForceDirectories(outDir) then
   begin
-    FLogger.Error('Unable to create output directory : ' + outDir);
+    FLogger.Error(TErrorCode.E0005_FolderCreateFailed, 'Unable to create the output folder [' + outDir + '].');
     exit;
   end;
 
@@ -1548,6 +1560,7 @@ begin
       FMatchedRules.Clear;
       FMapFileRead := false;
       runtimeCompiler := TCompilerVersion.UnknownVersion;
+      platformFailed := false;
 
       for i := 0 to Length(contexts) - 1 do
       begin
@@ -1573,11 +1586,16 @@ begin
         report.AddRelationship(report.RootComponent.BomRef, ctx.AppBomRef);
         contexts[i].AppBomRef := ctx.AppBomRef;
 
+        //an SBOM without the packages would be wrong - nothing is written for the platform.
         try
           EnumeratePackages(report, ctx.GraphRoot, ctx.CompilerVersion, platform, ctx.AppBomRef);
         except
           on e : Exception do
-            FLogger.Error('[SBOM] error enumerating packages for ' + ctx.Name + ' : ' + e.Message);
+          begin
+            FLogger.Error(ErrorCodeOf(e, TErrorCode.E8112_PackageEnumerationFailed), '[SBOM] unable to list the packages of ' + ctx.Name +
+              ' for ' + DPMPlatformToString(platform) + ' : ' + e.Message);
+            platformFailed := true;
+          end;
         end;
 
         //First dproj wins the compiler-version vote for the runtime component.
@@ -1602,7 +1620,16 @@ begin
                                                   ctx.ConfigName, platform, ctx.CompilerVersion), ctx.Rules);
           except
             on e : Exception do
-              FLogger.Error('[SBOM] error processing MAP file for ' + ctx.Name + ' : ' + e.Message);
+            begin
+              if options.Strict then
+              begin
+                FLogger.Error(ErrorCodeOf(e, TErrorCode.E8113_MapFileRequired), '[SBOM] ' + ctx.Name + ' : ' + e.Message);
+                platformFailed := true;
+              end
+              else
+                FLogger.Warning(TWarningCode.W8116_MapFileUnreadable, '[SBOM] the MAP file of ' + ctx.Name + ' could not be read : ' + e.Message +
+                  ' - its part of the SBOM lists the DPM packages and the runtime only.');
+            end;
           end;
         end
         else
@@ -1615,13 +1642,15 @@ begin
         if (contexts[i].Editor <> nil) and (platform in contexts[i].EnabledPlatforms) then
           WarnUnmatchedRules(contexts[i].Rules, warnedRules);
 
-      if not WriteReport(report, options, outDir, groupName) then
+      if platformFailed then
+        ok := false
+      else if not WriteReport(report, options, outDir, groupName) then
         ok := false;
     finally
       report.Free;
     end;
   end;
-  result := ok;
+  result := ok and not loadFailed;
 end;
 
 function TSBOMGenerator.GenerateForPlatform(const editor : IProjectEditor;
@@ -1677,11 +1706,16 @@ begin
     FMatchedRules.Clear;
     FMapFileRead := false;
 
+    //an SBOM without the packages would be wrong - nothing is written for the platform.
     try
       EnumeratePackages(report, graphRoot, compilerVersion, platform, report.RootComponent.BomRef);
     except
       on e : Exception do
-        FLogger.Error('[SBOM] error enumerating packages : ' + e.Message);
+      begin
+        FLogger.Error(ErrorCodeOf(e, TErrorCode.E8112_PackageEnumerationFailed), '[SBOM] unable to list the packages of ' + projectName +
+          ' for ' + DPMPlatformToString(platform) + ' : ' + e.Message);
+        exit(false);
+      end;
     end;
 
     if options.IncludeRuntime then
@@ -1700,7 +1734,15 @@ begin
                                               configName, platform, compilerVersion), rules);
       except
         on e : Exception do
-          FLogger.Error('[SBOM] error processing MAP file : ' + e.Message);
+        begin
+          if options.Strict then
+          begin
+            FLogger.Error(ErrorCodeOf(e, TErrorCode.E8113_MapFileRequired), '[SBOM] ' + e.Message);
+            exit(false);
+          end;
+          FLogger.Warning(TWarningCode.W8116_MapFileUnreadable, '[SBOM] the MAP file could not be read : ' + e.Message +
+            ' - the SBOM lists the DPM packages and the runtime only.');
+        end;
       end;
     end
     else
@@ -1836,7 +1878,7 @@ procedure TSBOMGenerator.EnumeratePackages(const report : TSBOMReport;
       spec := FPackageCache.GetPackageSpec(identity);
     except
       on e : Exception do
-        FLogger.Warning('[SBOM] could not load spec for ' + node.Id + ' ' + node.Version.ToStringNoMeta + ' : ' + e.Message);
+        FLogger.Warning(TWarningCode.W3013_PackageSpecUnreadable, '[SBOM] could not load the spec for ' + node.Id + ' ' + node.Version.ToStringNoMeta + ' : ' + e.Message);
     end;
 
     comp := report.AddComponent(TSBOMComponentKind.DpmPackage);
@@ -2210,10 +2252,10 @@ begin
   if (mapPath = '') or (not FileExists(mapPath)) then
   begin
     if options.Strict then
-      raise Exception.Create('MAP file not found - looked in: ' + triedPaths + ' (re-run with the linker option "Map file = Detailed" enabled, or supply -map=<path>)');
+      raise EDPMError.Create(TErrorCode.E8113_MapFileRequired, 'The MAP file was not found - looked in: ' + triedPaths + ' (re-run with the linker option "Map file = Detailed" enabled, or supply --map=<path>)');
     report.AddMetaProperty('dpm:evidence', 'map-file-not-found');
     report.AddMetaProperty('dpm:evidence.mapPath', mapPath);
-    FLogger.Warning('[SBOM] MAP file not found - looked in: ' + triedPaths
+    FLogger.Warning(TWarningCode.W8114_MapFileNotFound, '[SBOM] MAP file not found - looked in: ' + triedPaths
                     + ' - SBOM will contain DPM packages + runtime only.'
                     + ' Enable the linker option "Map file = Detailed" to include non-DPM evidence.');
     exit;
@@ -2225,6 +2267,9 @@ begin
     FMapFileRead := true;
   if info = nil then
   begin
+    //the reader said why.
+    if options.Strict then
+      raise EDPMError.Create(TErrorCode.E8113_MapFileRequired, 'The MAP file [' + mapPath + '] could not be read.');
     report.AddMetaProperty('dpm:evidence', 'map-file-unreadable');
     exit;
   end;
@@ -2332,6 +2377,7 @@ function TSBOMGenerator.WriteReport(const report : TSBOMReport; const options : 
 var
   baseName : string;
   emittedAny : boolean;
+  writeFailed : boolean;
 
   procedure RunWriter(const writer : ISbomWriter);
   var
@@ -2346,13 +2392,17 @@ var
       FLogger.Information('[SBOM] wrote ' + target);
     except
       on e : Exception do
-        FLogger.Error('[SBOM] failed writing ' + target + ' : ' + e.Message);
+      begin
+        FLogger.Error(ErrorCodeOf(e, TErrorCode.E8115_SBOMWriteFailed), '[SBOM] unable to write ' + target + ' : ' + e.Message);
+        writeFailed := true;
+      end;
     end;
   end;
 
 begin
   baseName := projectName + '-' + DPMPlatformToString(report.Platform);
   emittedAny := false;
+  writeFailed := false;
 
   //Iterate the format set. Each writer is resolved by name from the container
   //so adding a new format is purely a registration step in DPM.Core.Init.pas.
@@ -2365,7 +2415,7 @@ begin
   if TSBOMFormat.Markdown in options.Formats then
     RunWriter(ResolveWriter(cSBOMWriterMarkdown));
 
-  result := emittedAny;
+  result := emittedAny and not writeFailed;
 end;
 
 end.

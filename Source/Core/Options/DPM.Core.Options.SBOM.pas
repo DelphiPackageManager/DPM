@@ -118,7 +118,8 @@ implementation
 
 uses
   System.SysUtils,
-  System.Classes;
+  System.Classes,
+  DPM.Core.Diagnostics;
 
 function StringToSBOMFormat(const value : string) : TSBOMFormat;
 var
@@ -239,7 +240,7 @@ begin
 
   if FProjectPath = '' then
   begin
-    logger.Error('Project path cannot be empty, must be a .dproj or .groupproj file.');
+    logger.Error(TErrorCode.E0101_MissingArgument, 'The project path is required - a .dproj or .groupproj file.');
     result := false;
   end;
 end;

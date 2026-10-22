@@ -105,7 +105,8 @@ uses
   System.SysUtils,
   System.RegularExpressions,
   DPM.Core.Packaging.IdValidator,
-  DPM.Core.Constants;
+  DPM.Core.Constants,
+  DPM.Core.Diagnostics;
 
 { TCacheOptions }
 
@@ -160,7 +161,7 @@ begin
   case FCommand of
     TCacheSubCommand.Invalid :
       begin
-        logger.Error('A sub-command is required: install, remove or verify.');
+        logger.Error(TErrorCode.E0101_MissingArgument, 'A sub-command is required - install, remove or verify.');
         result := false;
       end;
 
@@ -172,13 +173,13 @@ begin
       begin
         if PackageId = '' then
         begin
-          logger.Error('The <packageId> option must be specified.');
+          logger.Error(TErrorCode.E0101_MissingArgument, 'The <packageId> argument is required.');
           result := false;
         end;
 
         if ConfigFile = '' then
         begin
-          logger.Error('No configuration file specified');
+          logger.Error(TErrorCode.E0101_MissingArgument, 'No configuration file was specified.');
           FIsValid := false;
           result := false;
           exit;
@@ -204,14 +205,14 @@ begin
           begin
             if not TPackageVersion.TryParseWithError(VersionString, FVersion, error) then
             begin
-              logger.Error('The specified package Version  [' + VersionString + '] is not a valid version - ' + error);
+              logger.Error(TErrorCode.E0102_InvalidArgument, 'The version [' + VersionString + '] is not a valid version - ' + error);
               result := false;
             end;
           end;
 
           if CompilerVersion = TCompilerVersion.UnknownVersion then
           begin
-            logger.Error('Compiler option is required');
+            logger.Error(TErrorCode.E0101_MissingArgument, 'The --compiler option is required, eg --compiler=12.0');
             result := false;
           end;
         end
@@ -221,7 +222,7 @@ begin
           packageString := ChangeFileExt(ExtractFileName(FPackageFile), '');
           if not TRegEx.IsMatch(packageString, cPackageFileRegex) then
           begin
-            logger.Error('The specified package file name [' + packageString + '] is not in the correct format.');
+            logger.Error(TErrorCode.E3005_InvalidPackageFile, 'The package file name [' + packageString + '] is not in the correct format (id-compiler-platforms-version).');
             result := false;
           end;
           // Compiler and version are taken from the file name by the installer.
@@ -229,7 +230,7 @@ begin
         end
         else if PackageId <> '' then
         begin
-          logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id, and no package file of that name exists.');
+          logger.Error(TErrorCode.E0102_InvalidArgument, '[' + PackageId + '] is not a valid package id, and no package file of that name exists.');
           result := false;
         end;
       end;
@@ -241,12 +242,12 @@ begin
       begin
         if PackageId = '' then
         begin
-          logger.Error('The <packageId> option must be specified.');
+          logger.Error(TErrorCode.E0101_MissingArgument, 'The <packageId> argument is required.');
           result := false;
         end
         else if not TRegEx.IsMatch(PackageId, cPackageIdRegex) then
         begin
-          logger.Error('The specified package Id  [' + PackageId + '] is not a valid Package Id.');
+          logger.Error(TErrorCode.E0102_InvalidArgument, '[' + PackageId + '] is not a valid package id.');
           result := false;
         end;
 
@@ -254,7 +255,7 @@ begin
         begin
           if not TPackageVersion.TryParseWithError(VersionString, FVersion, error) then
           begin
-            logger.Error('The specified package Version  [' + VersionString + '] is not a valid version - ' + error);
+            logger.Error(TErrorCode.E0102_InvalidArgument, 'The version [' + VersionString + '] is not a valid version - ' + error);
             result := false;
           end;
         end;

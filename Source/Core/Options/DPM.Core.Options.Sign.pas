@@ -113,7 +113,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Diagnostics;
 
 class constructor TSignOptions.CreateDefault;
 begin
@@ -134,8 +135,8 @@ begin
   result := true;
   if FPackageFile = '' then
   begin
-    logger.Error('No package file, folder or pattern specified ' +
-                 '(e.g. dpm sign Foo.dpkg --thumbprint ...).');
+    logger.Error(TErrorCode.E0101_MissingArgument, 'No package file, folder or pattern was specified ' +
+                 '(eg dpm sign Foo.dpkg --thumbprint ...).');
     result := false;
   end;
   // Path existence is checked at expansion time — the input may be a file,
@@ -146,17 +147,17 @@ begin
       begin
         if (FThumbprint = '') and (FPfxFile = '') then
         begin
-          logger.Error('Either --thumbprint (cert store) or --pfx must be specified.');
+          logger.Error(TErrorCode.E0101_MissingArgument, 'Either --thumbprint (certificate store) or --pfx is required.');
           result := false;
         end;
         if (FThumbprint <> '') and (FPfxFile <> '') then
         begin
-          logger.Error('--thumbprint and --pfx are mutually exclusive.');
+          logger.Error(TErrorCode.E0103_ConflictingArguments, '--thumbprint and --pfx cannot be used together.');
           result := false;
         end;
         if (FPfxFile <> '') and not FileExists(FPfxFile) then
         begin
-          logger.Error('PFX file not found: ' + FPfxFile);
+          logger.Error(TErrorCode.E0102_InvalidArgument, 'The PFX file [' + FPfxFile + '] does not exist.');
           result := false;
         end;
       end;
@@ -164,22 +165,22 @@ begin
       begin
         if FVaultUrl = '' then
         begin
-          logger.Error('--vault-url is required when --provider=keyvault');
+          logger.Error(TErrorCode.E0101_MissingArgument, '--vault-url is required when --provider=keyvault');
           result := false;
         end;
         if FCertName = '' then
         begin
-          logger.Error('--cert-name is required when --provider=keyvault');
+          logger.Error(TErrorCode.E0101_MissingArgument, '--cert-name is required when --provider=keyvault');
           result := false;
         end;
         if (FTenantId = '') or (FClientId = '') then
         begin
-          logger.Error('--tenant-id and --client-id are required when --provider=keyvault');
+          logger.Error(TErrorCode.E0101_MissingArgument, '--tenant-id and --client-id are required when --provider=keyvault');
           result := false;
         end;
         if FClientSecretEnv = '' then
         begin
-          logger.Error('--client-secret-env is required when --provider=keyvault ' +
+          logger.Error(TErrorCode.E0101_MissingArgument, '--client-secret-env is required when --provider=keyvault ' +
                        '(names an env var that holds the client secret)');
           result := false;
         end;
@@ -188,19 +189,19 @@ begin
       begin
         if FSignotaurEndpoint = '' then
         begin
-          logger.Error('--endpoint is required when --provider=signotaur');
+          logger.Error(TErrorCode.E0101_MissingArgument, '--endpoint is required when --provider=signotaur');
           result := false;
         end;
         if (FSignotaurApiKey = '') and (FSignotaurApiKeyEnv = '') then
         begin
-          logger.Error('Signotaur: one of --api-key (literal) or --api-key-env ' +
+          logger.Error(TErrorCode.E0101_MissingArgument, 'Signotaur : one of --api-key (literal) or --api-key-env ' +
                        '(env var name) is required. Prefer --api-key-env to ' +
                        'keep the key out of process lists and shell history.');
           result := false;
         end;
         if (FThumbprint = '') and (FSignotaurSubject = '') and (FSignotaurLabel = '') then
         begin
-          logger.Error('Signotaur: one of --thumbprint, --subject, --label is required');
+          logger.Error(TErrorCode.E0101_MissingArgument, 'Signotaur : one of --thumbprint, --subject or --label is required');
           result := false;
         end;
       end;

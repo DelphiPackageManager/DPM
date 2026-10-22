@@ -277,6 +277,8 @@ begin
     res := svc.SelectFrom('[' + Release('v2.0.0', false, false) + ',' + Release('v1.0.0') + ']', '0.9.0', true, info);
     Assert.AreEqual(Ord(TUpgradeCheckResult.Error), Ord(res));
     Assert.IsNull(info);
+    //the caller reports it - an error for dpm upgrade, a warning for the IDE's background check.
+    Assert.Contains(svc.LastError, 'v2.0.0');
   finally
     svc.Free;
   end;

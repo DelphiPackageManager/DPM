@@ -55,7 +55,8 @@ uses
   DPM.Console.Prompts,
   DPM.Console.Command.Spec.Discovery,
   DPM.Console.Command.Spec.Writer,
-  DPM.Console.Command.Spec.Scaffold;
+  DPM.Console.Command.Spec.Scaffold,
+  DPM.Core.Diagnostics;
 
 function PromptMultiPackageMode(const packages : TLogicalPackages; out selectedIdx : integer;
   out cancelled : boolean) : integer;
@@ -142,7 +143,7 @@ begin
   begin
     if ctx.NonInteractive then
     begin
-      Logger.Error('A ' + cPackageSpecExt + ' already exists in this folder - pass --overwrite to replace it.');
+      Logger.Error(TErrorCode.E6401_SpecAlreadyExists, 'A ' + cPackageSpecExt + ' already exists in this folder - pass --overwrite to replace it.');
       exit(TExitCode.Error);
     end;
     overwrite := PromptYesNo('A ' + cPackageSpecExt + ' already exists. Overwrite?', false, cancelled);
@@ -158,7 +159,7 @@ begin
   begin
     if ctx.NonInteractive then
     begin
-      Logger.Error('Could not find a Source folder and no .pas files in current dir.');
+      Logger.Error(TErrorCode.E6402_SourceFolderNotFound, 'There is no Source folder, and no .pas files, in [' + rootDir + '].');
       exit(TExitCode.MissingArg);
     end;
     ctx.SourceFolder := PromptLineRequired('Source folder (absolute or relative)', cancelled);
@@ -182,7 +183,7 @@ begin
         ctx.PackagesFolder := TPath.Combine(rootDir, ctx.PackagesFolder);
       ctx.HasPackages := TDirectory.Exists(ctx.PackagesFolder);
       if not ctx.HasPackages then
-        Logger.Warning('Packages folder does not exist, skipping build/design entries.');
+        Logger.Warning(TWarningCode.W6403_PackagesFolderNotFound, 'The packages folder [' + ctx.PackagesFolder + '] does not exist - the spec has no build or design entries.');
     end;
   end;
   if ctx.HasPackages then
@@ -192,6 +193,8 @@ begin
 
   //4. load config (needed before scanning - TProjectEditor requires it)
   ctx.Config := FConfigurationManager.LoadConfig(options.ConfigFile);
+  if ctx.Config = nil then
+    exit(TExitCode.InitException);
   configFile := options.ConfigFile;
   if configFile = '' then
     configFile := ctx.Config.FileName;
@@ -202,7 +205,7 @@ begin
     ctx.CompilerFolders := ScanPackagesFolder(ctx.PackagesFolder, Logger, ctx.Config);
     if Length(ctx.CompilerFolders) = 0 then
     begin
-      Logger.Warning('No recognisable compiler folders found under ' + ctx.PackagesFolder + ' - skipping build/design.');
+      Logger.Warning(TWarningCode.W6404_NoCompilerFoldersFound, 'No compiler folders were found in [' + ctx.PackagesFolder + '] - the spec has no build or design entries.');
       ctx.HasPackages := false;
     end;
   end;
@@ -256,14 +259,17 @@ begin
   if author = '' then
   begin
     if ctx.NonInteractive then
-      Logger.Warning('No author set in ' + configFile + ' - metadata will have an empty author.')
+      Logger.Warning(TWarningCode.W6405_AuthorNotSet, 'No author is set in [' + configFile + '] - the spec has no author.')
     else
     begin
       author := PromptLineRequired('Author name', cancelled);
       if cancelled then exit(TExitCode.OK);
       ctx.Config.Author := author;
       if not FConfigurationManager.SaveConfig(ctx.Config, configFile) then
-        Logger.Warning('Could not save author to ' + configFile);
+      begin
+        Logger.Information('Nothing was written.', true);
+        exit(TExitCode.Error);
+      end;
     end;
   end;
   ctx.Author := author;
@@ -297,7 +303,7 @@ begin
       begin
         if defaultId = '' then
         begin
-          Logger.Error('No --packageId provided and no git remote from which to derive one.');
+          Logger.Error(TErrorCode.E0101_MissingArgument, 'The --packageId option is required - there is no git remote to take the id from.');
           exit(TExitCode.MissingArg);
         end;
         packageId := defaultId;
@@ -385,7 +391,7 @@ begin
     selectedLogicals := BuildSelectedLogicals(selectableDProjs, selectedIndices);
     if Length(selectedLogicals) = 0 then
     begin
-      Logger.Error('No projects selected.');
+      Logger.Information('No projects were selected - nothing was written.');
       exit(TExitCode.OK);
     end;
 

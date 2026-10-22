@@ -212,6 +212,14 @@ type
     procedure ComponentRuleType_IsTheCycloneDXType;
     [Test]
     procedure GroupProject_GroupRule_IsOneComponentLinkedFromEachProject;
+
+    //what is reported when something is missing
+    [Test]
+    procedure MissingMapFile_IsAWarning;
+    [Test]
+    procedure MissingMapFile_WithStrict_FailsGeneration;
+    [Test]
+    procedure GroupProject_MissingProject_IsSkippedWithAWarning;
   end;
 
   //Which gaps in the product metadata get a CRA / BSI warning. Each warning names the sidecar key
@@ -282,7 +290,8 @@ uses
   DPM.Core.SBOM.Writers,
   DPM.Core.SBOM.Writers.Reports,
   DPM.Core.SBOM.Generator,
-  DPM.Core.Tests.Utils.PEImports;
+  DPM.Core.Tests.Utils.PEImports,
+  DPM.Core.Diagnostics;
 
 const
   cKindProperty = 'dpm:component-kind';
@@ -2367,6 +2376,57 @@ end;
 procedure TSBOMContactTests.IsHttpUrl(const value : string; const expected : boolean);
 begin
   Assert.AreEqual(expected, DPM.Core.SBOM.ProductInfo.IsHttpUrl(value));
+end;
+
+procedure TSBOMGeneratorTests.MissingMapFile_IsAWarning;
+var
+  dproj : string;
+  generated : boolean;
+begin
+  dproj := TPath.Combine(FTempDir, 'app\App.dproj');
+  WriteDproj(dproj, 'App', '', '');
+
+  generated := Generate(dproj, 'Release', TPath.Combine(FTempDir, 'out'), false);
+
+  Assert.IsTrue(generated, FLogger.Messages.Text);
+  Assert.IsTrue(FLogger.HasWarning(TWarningCode.W8114_MapFileNotFound), FLogger.Messages.Text);
+  Assert.AreEqual(0, FLoggerRef.ErrorCount, FLogger.Messages.Text);
+end;
+
+procedure TSBOMGeneratorTests.MissingMapFile_WithStrict_FailsGeneration;
+var
+  dproj : string;
+  generated : boolean;
+begin
+  dproj := TPath.Combine(FTempDir, 'app\App.dproj');
+  WriteDproj(dproj, 'App', '', '');
+
+  generated := GenerateWith(dproj, TPath.Combine(FTempDir, 'out'),
+    procedure(options : TSBOMOptions)
+    begin
+      options.Strict := true;
+    end);
+
+  //--strict asks for the MAP file evidence - it used to log an error and write the SBOM anyway.
+  Assert.IsFalse(generated, FLogger.Messages.Text);
+  Assert.IsTrue(FLogger.HasError(TErrorCode.E8113_MapFileRequired), FLogger.Messages.Text);
+  Assert.AreEqual(1, FLoggerRef.ErrorCount, FLogger.Messages.Text);
+  Assert.IsFalse(FileExists(TPath.Combine(FTempDir, 'out\App-Win32.cdx.json')), 'nothing is written for the platform');
+end;
+
+procedure TSBOMGeneratorTests.GroupProject_MissingProject_IsSkippedWithAWarning;
+var
+  generated : boolean;
+begin
+  WriteDproj(TPath.Combine(FTempDir, 'group\app1\App1.dproj'), 'App1', '', '');
+  WriteGroupProj(TPath.Combine(FTempDir, 'group\Suite.groupproj'), ['app1\App1.dproj', 'gone\Gone.dproj']);
+
+  generated := Generate(TPath.Combine(FTempDir, 'group\Suite.groupproj'), 'Release', TPath.Combine(FTempDir, 'out'), false);
+
+  Assert.IsTrue(generated, FLogger.Messages.Text);
+  Assert.IsTrue(FLogger.HasWarning(TWarningCode.W4011_ProjectNotFoundInList), FLogger.Messages.Text);
+  Assert.AreEqual(0, FLoggerRef.ErrorCount, FLogger.Messages.Text);
+  Assert.IsTrue(FileExists(TPath.Combine(FTempDir, 'out\Suite-Win32.cdx.json')), 'the rest of the group is written');
 end;
 
 initialization

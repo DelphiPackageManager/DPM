@@ -43,12 +43,15 @@ type
 
 implementation
 
+uses
+  DPM.Core.Diagnostics;
+
 
 { TUpdateCommand }
 
 function TUpdateCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
-  Logger.Error('Update command not implemented');
+  Logger.Error(TErrorCode.E0106_CommandNotImplemented, 'The update command is not implemented yet.');
   result := TExitCode.NotImplemented;
 end;
 

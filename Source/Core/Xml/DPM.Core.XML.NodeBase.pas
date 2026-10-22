@@ -65,7 +65,8 @@ implementation
 
 uses
   System.SysUtils,
-  System.Variants;
+  System.Variants,
+  DPM.Core.Diagnostics;
 
 constructor TXMLNodeBase.Create(const logger : ILogger);
 begin
@@ -82,7 +83,7 @@ begin
   if VarIsNull(attributeValue) then
   begin
     if required then
-      logger.Error('Required attribute [' + attributeName + '] is empty.')
+      logger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'The required attribute [' + attributeName + '] is empty.')
     else
       result := true;
     exit;
@@ -92,7 +93,7 @@ begin
     field := StrToBool(sValue);
     result := true;
   except
-    logger.Error('Invalid  value [' + sValue + '] for ' + attributeName);
+    logger.Error(TErrorCode.E4005_ProjectStructureInvalid, '[' + sValue + '] is not a valid value for ' + attributeName);
   end;
 
 end;
@@ -109,7 +110,7 @@ begin
     try
       field := StrToBool(sValue)
     except
-      logger.Error('Invalid  value [' + sValue + '] for ' + nodeName);
+      logger.Error(TErrorCode.E4005_ProjectStructureInvalid, '[' + sValue + '] is not a valid value for ' + nodeName);
       result := false;
     end;
   end;
@@ -124,7 +125,7 @@ begin
   if tmpNode = nil then
   begin
     if required then
-      logger.Error('Required Element [' + nodeName + '] not found.')
+      logger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'The required element [' + nodeName + '] was not found.')
     else
       result := true;
     exit;
@@ -133,7 +134,7 @@ begin
   if field = '' then
   begin
     if required then
-      logger.Error('Required Element [' + nodeName + '] is empty.');
+      logger.Error(TErrorCode.E4005_ProjectStructureInvalid, 'The required element [' + nodeName + '] is empty.');
     exit;
   end
   else

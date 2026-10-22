@@ -96,7 +96,8 @@ uses
   WinApi.Windows,
 {$ENDIF}
   System.SysUtils,
-  System.Classes;
+  System.Classes,
+  DPM.Core.Diagnostics;
 
 ///<summary> Expands %NAME% style variables, since no shell is involved. </summary>
 function ExpandVariables(const value : string) : string;
@@ -166,7 +167,7 @@ begin
       begin
         FReportedFailure := true;
         if FLogger <> nil then
-          FLogger.Error('mcp: cannot write the frame log at "' + FFileName + '" - ' + E.Message +
+          FLogger.Warning(TWarningCode.W9502_MCPFrameLogUnwritable, 'mcp : cannot write the frame log at "' + FFileName + '" - ' + E.Message +
             '. Frame logging is disabled for this session; the server itself is unaffected.');
       end;
     end;

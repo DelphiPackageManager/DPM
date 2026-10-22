@@ -78,7 +78,8 @@ uses
   DPM.Core.Options.Common,
   DPM.Core.Options.Scan,
   DPM.Core.Options.Sbom,
-  DPM.Core.SBOM.Types;
+  DPM.Core.SBOM.Types,
+  DPM.Core.Diagnostics;
 
 constructor TScanCommand.Create(const logger : ILogger;
                                 const configurationManager : IConfigurationManager;
@@ -155,7 +156,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Could not read SBOM [' + sbomPath + ']: ' + e.Message);
+      Logger.Error(ErrorCodeOf(e, TErrorCode.E8002_SBOMReadFailed), 'Unable to read the SBOM [' + sbomPath + '] : ' + e.Message);
       result := TExitCode.Error;
       exit;
     end;
@@ -169,7 +170,7 @@ begin
       except
         on e : Exception do
         begin
-          Logger.Error('Scan failed: ' + e.Message);
+          LogException(Logger, e);
           result := TExitCode.Error;
           exit;
         end;
@@ -188,7 +189,7 @@ begin
       except
         on e : Exception do
         begin
-          Logger.Error('Could not write VEX report: ' + e.Message);
+          Logger.Error(ErrorCodeOf(e, TErrorCode.E8004_VexWriteFailed), 'Unable to write the vulnerability report [' + outBase + '] : ' + e.Message);
           result := TExitCode.Error;
           exit;
         end;
@@ -202,8 +203,8 @@ begin
          (Ord(vulnReport.MaxSeverity) >= Ord(failOn)) and
          (vulnReport.MaxSeverity <> TSeverity.Unknown) then
       begin
-        Logger.Warning('[scan] max severity ' + SeverityToString(vulnReport.MaxSeverity) +
-                       ' meets -fail-on=' + SeverityToString(failOn));
+        Logger.Error(TErrorCode.E8001_VulnerabilityPolicyFailed, '[scan] ' + ExtractFileName(sbomPath) + ' has vulnerabilities of ' +
+                     SeverityToString(vulnReport.MaxSeverity) + ' severity, which meets --fail-on=' + SeverityToString(failOn) + ' - see ' + outBase);
         result := TExitCode.Error;
       end;
     finally
@@ -228,11 +229,10 @@ var
   worstExitCode : TExitCode;
   fileExit : TExitCode;
 begin
-  result := TExitCode.OK;
   tempRoot := IncludeTrailingPathDelimiter(TPath.GetTempPath) + 'dpm-scan-' + IntToHex(Random(MaxInt), 8);
   if not ForceDirectories(tempRoot) then
   begin
-    Logger.Error('Could not create temp working folder for SBOM generation: ' + tempRoot);
+    Logger.Error(TErrorCode.E0005_FolderCreateFailed, 'Unable to create the temporary folder [' + tempRoot + '] to generate the SBOM in.');
     result := TExitCode.Error;
     exit;
   end;
@@ -253,14 +253,14 @@ begin
     if not DirectoryExists(outDir) then
       if not ForceDirectories(outDir) then
       begin
-        Logger.Error('Could not create output directory: ' + outDir);
+        Logger.Error(TErrorCode.E0005_FolderCreateFailed, 'Unable to create the output folder [' + outDir + '].');
         result := TExitCode.Error;
         exit;
       end;
   end
   else
   begin
-    Logger.Error('-output for project input must be a directory (or omitted), not a file: ' + outputBase);
+    Logger.Error(TErrorCode.E0102_InvalidArgument, '--output must be a folder (or left out) when scanning a project, not a file : ' + outputBase);
     result := TExitCode.InvalidArguments;
     exit;
   end;
@@ -281,7 +281,7 @@ begin
 
       if not FSbomGenerator.Generate(cancellationToken, sbomOpts) then
       begin
-        Logger.Error('SBOM generation failed - cannot scan.');
+        Logger.Information('No SBOM was generated, so nothing was scanned.', true);
         result := TExitCode.Error;
         exit;
       end;
@@ -292,7 +292,8 @@ begin
     generated := TDirectory.GetFiles(tempRoot, '*.cdx.json', TSearchOption.soAllDirectories);
     if Length(generated) = 0 then
     begin
-      Logger.Warning('No SBOMs were produced - nothing to scan.');
+      Logger.Error(TErrorCode.E0003_InternalError, 'The SBOM generator succeeded but wrote no CycloneDX SBOM to [' + tempRoot + '].');
+      result := TExitCode.Error;
       exit;
     end;
 
@@ -333,7 +334,7 @@ begin
     inputPath := GetCurrentDir;
   if DirectoryExists(inputPath) then
   begin
-    Logger.Error('Input must be an SBOM .json file or a .dproj / .groupproj, not a directory.');
+    Logger.Error(TErrorCode.E0102_InvalidArgument, 'The input must be an SBOM .json file, a .dproj or a .groupproj, not a folder.');
     result := TExitCode.InvalidArguments;
     exit;
   end;
@@ -353,7 +354,7 @@ begin
 
   if not FileExists(inputPath) then
   begin
-    Logger.Error('Input file not found: ' + inputPath);
+    Logger.Error(TErrorCode.E0102_InvalidArgument, 'The input file [' + inputPath + '] does not exist.');
     result := TExitCode.InvalidArguments;
     exit;
   end;
@@ -362,7 +363,7 @@ begin
 
   if (not isProject) and (not IsSbomFile(inputPath)) then
   begin
-    Logger.Error('Unsupported input extension - expected .json (CycloneDX SBOM), .dproj or .groupproj.');
+    Logger.Error(TErrorCode.E0102_InvalidArgument, 'The input [' + inputPath + '] is not supported - expected a CycloneDX SBOM (.json), a .dproj or a .groupproj.');
     result := TExitCode.InvalidArguments;
     exit;
   end;

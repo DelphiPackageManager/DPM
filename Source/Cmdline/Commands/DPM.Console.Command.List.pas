@@ -59,7 +59,8 @@ uses
   VSoft.YAML,
   DPM.Console.RawIO,
   DPM.Core.Json.Utils,
-  DPM.Core.Json.Projections;
+  DPM.Core.Json.Projections,
+  DPM.Core.Diagnostics;
 
 { TListCommand }
 
@@ -102,6 +103,7 @@ begin
 
   if TListOptions.Default.ConfigFile = '' then
   begin
+    Logger.Error(TErrorCode.E0101_MissingArgument, 'No configuration file was specified.');
     result := TExitCode.InvalidArguments;
     exit;
   end;
@@ -111,7 +113,9 @@ begin
   config := FConfigurationManager.LoadConfig(TListOptions.Default.ConfigFile);
   if config = nil then
     exit(TExitCode.InitException);
-  FRepositoryManager.Initialize(config);
+  //it reported the source that is not valid.
+  if not FRepositoryManager.Initialize(config) then
+    exit(TExitCode.InitException);
 
   searchResults := FRepositoryManager.List(cancellationToken, TListOptions.Default);
 
@@ -145,8 +149,11 @@ begin
     end;
     result := TExitCode.OK;
   end
+  else if FRepositoryManager.UnavailableSources <> '' then
+    Logger.Error(TErrorCode.E1102_PackageNotFoundSourcesUnavailable, 'No packages were found - and the source(s) ' +
+      FRepositoryManager.UnavailableSources + ' could not be used.')
   else
-    Logger.Information('No packages were found');
+    Logger.Error(TErrorCode.E1101_PackageNotFound, 'No packages were found.');
 
 end;
 

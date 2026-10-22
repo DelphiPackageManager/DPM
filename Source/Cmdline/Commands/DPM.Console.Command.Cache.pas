@@ -71,7 +71,8 @@ uses
   DPM.Core.Utils.Config,
   DPM.Core.Options.Common,
   DPM.Core.Options.Cache,
-  DPM.Console.Prompts;
+  DPM.Console.Prompts,
+  DPM.Core.Diagnostics;
 
 { TCacheCommand }
 
@@ -102,10 +103,7 @@ begin
     configPath := TConfigUtils.GetDefaultConfigFileName;
   config := FConfigurationManager.LoadConfig(configPath);
   if config = nil then
-  begin
-    Logger.Error('Unable to load configuration; cannot access the package cache.');
     exit;
-  end;
   FPackageCache.Location := config.PackageCacheLocation;
   result := true;
 end;
@@ -188,8 +186,8 @@ begin
     //packages unasked is not a safe default.
     if not PromptsAreInteractive then
     begin
-      Logger.Error('Cannot prompt for confirmation - stdin is not a console. ' +
-                   'Re-run with --force to remove without confirmation.');
+      Logger.Error(TErrorCode.E0107_ConfirmationNeeded, 'Removing packages from the cache needs a confirmation, but the input is not a console - ' +
+                   'pass --force to remove them without asking.');
       result := TExitCode.Error;
       exit;
     end;
@@ -216,8 +214,8 @@ begin
     else
     begin
       Inc(failed);
-      Logger.Error('Failed to remove ' + packageId.Id + ' ' + packageId.Version.ToStringNoMeta +
-        ' [' + CompilerToString(packageId.CompilerVersion) + ']');
+      Logger.Information('Unable to remove ' + packageId.Id + ' ' + packageId.Version.ToStringNoMeta +
+        ' [' + CompilerToString(packageId.CompilerVersion) + ']', true);
     end;
   end;
 
@@ -237,7 +235,7 @@ begin
     TCacheSubCommand.Verify  : result := ExecuteVerify(cancellationToken);
     TCacheSubCommand.Remove  : result := ExecuteRemove;
   else
-    Logger.Error('A sub-command is required: install, remove or verify.');
+    Logger.Error(TErrorCode.E0101_MissingArgument, 'A sub-command is required - install, remove or verify.');
     result := TExitCode.InvalidArguments;
   end;
 end;

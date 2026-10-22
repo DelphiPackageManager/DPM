@@ -313,6 +313,12 @@ begin
       toolResult := E.Message;
       isError := true;
     end;
+    //a DPM failure the caller can read and act on - with its code.
+    on E : EDPMError do
+    begin
+      toolResult := FormatError(E.Code, E.Message);
+      isError := true;
+    end;
     on E : Exception do
     begin
       FLogger.Error(TErrorCode.E0001_UnexpectedException, 'mcp: unhandled exception in tool ' + toolName + ' : ' + E.Message);
@@ -404,7 +410,7 @@ begin
       //A write failure means the client is gone; there is nowhere to report it.
       on E : Exception do
       begin
-        FLogger.Error('mcp: ' + E.Message);
+        FLogger.Warning(TWarningCode.W9501_MCPConnectionFailed, 'mcp : stopping - ' + E.Message);
         exit;
       end;
     end;

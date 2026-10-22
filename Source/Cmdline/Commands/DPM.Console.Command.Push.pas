@@ -89,7 +89,9 @@ begin
   config := FConfigurationManager.LoadConfig(TPushOptions.Default.ConfigFile);
   if config = nil then
     exit(TExitCode.InitException);
-  FRepositoryManager.Initialize(config);
+  //it reported the source that is not valid.
+  if not FRepositoryManager.Initialize(config) then
+    exit(TExitCode.InitException);
 
   //validate the source
   sourceConfig := config.Sources.Where(function(const item : ISourceConfig):boolean

@@ -42,11 +42,14 @@ type
 
 implementation
 
+uses
+  DPM.Core.Diagnostics;
+
 { TDeleteCommand }
 
 function TDeleteCommand.Execute(const cancellationToken : ICancellationToken) : TExitCode;
 begin
-  Logger.Error('Delete command not implemented');
+  Logger.Error(TErrorCode.E0106_CommandNotImplemented, 'The delete command is not implemented yet.');
   result := TExitCode.NotImplemented;
 end;
 

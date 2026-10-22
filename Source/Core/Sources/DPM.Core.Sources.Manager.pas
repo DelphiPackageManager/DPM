@@ -59,7 +59,8 @@ uses
   DPM.Core.Utils.System,
   DPM.Core.Sources.Types,
   DPM.Core.Constants,
-  DPM.Core.Configuration.Classes;
+  DPM.Core.Configuration.Classes,
+  DPM.Core.Diagnostics;
 
 { TSourcesManager }
 
@@ -71,7 +72,7 @@ begin
   result := false;
   if options.ConfigFile = '' then
   begin
-    FLogger.Error('No configuration file specified');
+    FLogger.Error(TErrorCode.E0101_MissingArgument, 'No configuration file was specified.');
     exit;
   end;
 
@@ -81,13 +82,13 @@ begin
 
   if options.Name = '' then
   begin
-    FLogger.Error('Required parameter [name] is blank.');
+    FLogger.Error(TErrorCode.E0101_MissingArgument, 'The --name option is required.');
     exit;
   end;
 
   if options.Source = '' then
   begin
-    FLogger.Error('Required parameter [source] is blank.');
+    FLogger.Error(TErrorCode.E0101_MissingArgument, 'The --source option is required.');
     exit;
   end;
 
@@ -96,7 +97,7 @@ begin
       result := SameText(item.Name, options.Name);
     end) then
   begin
-    FLogger.Error('Source with name [' + options.Name + '] already exists');
+    FLogger.Error(TErrorCode.E1005_SourceAlreadyExists, 'A source named [' + options.Name + '] already exists - use dpm sources update to change it.');
     exit;
   end;
   source := TSourceConfig.Create(FLogger);
@@ -108,8 +109,8 @@ begin
   source.IsEnabled := true;
   config.Sources.Add(source);
   result := FConfigManager.SaveConfig(config);
-
-  FLogger.Information('Source [' + source.Name + '] added.');
+  if result then
+    FLogger.Information('Source [' + source.Name + '] added.');
 
 
 end;
@@ -128,7 +129,7 @@ begin
   result := false;
   if options.ConfigFile = '' then
   begin
-    FLogger.Error('No configuration file specified');
+    FLogger.Error(TErrorCode.E0101_MissingArgument, 'No configuration file was specified.');
     exit;
   end;
 
@@ -137,7 +138,7 @@ begin
     exit;
   if options.Name = '' then
   begin
-    FLogger.Error('Required parameter [name] is blank.');
+    FLogger.Error(TErrorCode.E0101_MissingArgument, 'The --name option is required.');
     exit;
   end;
 
@@ -147,7 +148,7 @@ begin
     end);
   if source = nil then
   begin
-    FLogger.Error('Source with name [' + options.Name + '] not found.');
+    FLogger.Error(TErrorCode.E1003_UnknownSource, 'There is no source named [' + options.Name + '].');
     exit;
   end;
   source.IsEnabled := false;
@@ -165,7 +166,7 @@ begin
   result := false;
   if options.ConfigFile = '' then
   begin
-    FLogger.Error('No configuration file specified');
+    FLogger.Error(TErrorCode.E0101_MissingArgument, 'No configuration file was specified.');
     exit;
   end;
 
@@ -174,7 +175,7 @@ begin
     exit;
   if options.Name = '' then
   begin
-    FLogger.Error('Required parameter [name] is blank.');
+    FLogger.Error(TErrorCode.E0101_MissingArgument, 'The --name option is required.');
     exit;
   end;
 
@@ -184,7 +185,7 @@ begin
     end);
   if source = nil then
   begin
-    FLogger.Error('Source with name [' + options.Name + '] not found.');
+    FLogger.Error(TErrorCode.E1003_UnknownSource, 'There is no source named [' + options.Name + '].');
     exit;
   end;
   source.IsEnabled := true;
@@ -229,7 +230,7 @@ begin
   result := false;
   if options.ConfigFile = '' then
   begin
-    FLogger.Error('No configuration file specified');
+    FLogger.Error(TErrorCode.E0101_MissingArgument, 'No configuration file was specified.');
     exit;
   end;
 
@@ -262,7 +263,7 @@ begin
   result := false;
   if options.ConfigFile = '' then
   begin
-    FLogger.Error('No configuration file specified');
+    FLogger.Error(TErrorCode.E0101_MissingArgument, 'No configuration file was specified.');
     exit;
   end;
 
@@ -271,7 +272,7 @@ begin
     exit;
   if options.Name = '' then
   begin
-    FLogger.Error('Required parameter [name] is blank.');
+    FLogger.Error(TErrorCode.E0101_MissingArgument, 'The --name option is required.');
     exit;
   end;
 
@@ -281,7 +282,7 @@ begin
     end);
   if source = nil then
   begin
-    FLogger.Error('Source with name [' + options.Name + '] not found.');
+    FLogger.Error(TErrorCode.E1003_UnknownSource, 'There is no source named [' + options.Name + '].');
     exit;
   end;
   config.Sources.Remove(source);
@@ -298,7 +299,7 @@ begin
   result := false;
   if options.ConfigFile = '' then
   begin
-    FLogger.Error('No configuration file specified');
+    FLogger.Error(TErrorCode.E0101_MissingArgument, 'No configuration file was specified.');
     exit;
   end;
 
@@ -307,7 +308,7 @@ begin
     exit;
   if options.Name = '' then
   begin
-    FLogger.Error('Required parameter [name] is blank.');
+    FLogger.Error(TErrorCode.E0101_MissingArgument, 'The --name option is required.');
     exit;
   end;
 
@@ -317,7 +318,7 @@ begin
     end);
   if source = nil then
   begin
-    FLogger.Error('Source with name [' + options.Name + '] not found.');
+    FLogger.Error(TErrorCode.E1003_UnknownSource, 'There is no source named [' + options.Name + '].');
     exit;
   end;
   source.Name := options.Name;

@@ -76,7 +76,8 @@ uses
   JsonDataObjects,
   VSoft.HttpClient,
   DPM.Core.Constants,
-  DPM.Core.Vuln.Types;
+  DPM.Core.Vuln.Types,
+  DPM.Core.Diagnostics;
 
 const
   cOSVCacheKeyVulnPrefix = 'osv-vuln:';
@@ -391,7 +392,7 @@ begin
       except
         on e : Exception do
         begin
-          FLogger.Warning('Invalid vuln cache entry for ' + purls[i] + ': ' + e.Message);
+          FLogger.Warning(TWarningCode.W8005_VulnerabilityCacheUnavailable, 'The cached vulnerability lookup for ' + purls[i] + ' could not be read - asking again : ' + e.Message);
           toQueryPurls.Add(purls[i]);
           toQueryIdx.Add(i);
         end;
@@ -443,36 +444,24 @@ begin
     response := httpClient.Post(request, cancellationToken);
   except
     on e : Exception do
-    begin
-      FLogger.Error('OSV batch query failed: ' + e.Message);
-      exit;
-    end;
+      raise EDPMError.Create(TErrorCode.E8003_VulnerabilityQueryFailed, 'Unable to query ' + cOSVBaseUri + ' : ' + e.Message);
   end;
 
   if response.StatusCode <> 200 then
-  begin
-    FLogger.Error('OSV batch query returned HTTP ' + IntToStr(response.StatusCode) + ': ' + response.ErrorMessage);
-    exit;
-  end;
+    raise EDPMError.Create(TErrorCode.E8003_VulnerabilityQueryFailed, 'Unable to query ' + cOSVBaseUri + ' : HTTP ' +
+      IntToStr(response.StatusCode) + ' ' + response.ErrorMessage);
 
   fetchedResponse := response.Response;
   try
     responseJson := TJsonBaseObject.Parse(fetchedResponse) as TJsonObject;
   except
     on e : Exception do
-    begin
-      FLogger.Error('Could not parse OSV batch response: ' + e.Message);
-      exit;
-    end;
+      raise EDPMError.Create(TErrorCode.E8003_VulnerabilityQueryFailed, 'Unable to read the answer from ' + cOSVBaseUri + ' : ' + e.Message);
   end;
 
   try
     if not responseJson.Contains('results') then
-    begin
-      FLogger.Warning('OSV batch response missing results[]');
-      result := true;
-      exit;
-    end;
+      raise EDPMError.Create(TErrorCode.E8003_VulnerabilityQueryFailed, 'The answer from ' + cOSVBaseUri + ' has no results.');
     resultsArr := responseJson.A['results'];
     for i := 0 to toQueryPurls.Count - 1 do
     begin
@@ -535,17 +524,12 @@ begin
       response := httpClient.Get(request, cancellationToken);
     except
       on e : Exception do
-      begin
-        FLogger.Error('OSV vuln detail fetch [' + vulnId + '] failed: ' + e.Message);
-        exit;
-      end;
+        raise EDPMError.Create(TErrorCode.E8003_VulnerabilityQueryFailed, 'Unable to get the details of ' + vulnId + ' from ' + cOSVBaseUri + ' : ' + e.Message);
     end;
 
     if response.StatusCode <> 200 then
-    begin
-      FLogger.Error('OSV vuln detail [' + vulnId + '] returned HTTP ' + IntToStr(response.StatusCode));
-      exit;
-    end;
+      raise EDPMError.Create(TErrorCode.E8003_VulnerabilityQueryFailed, 'Unable to get the details of ' + vulnId + ' from ' + cOSVBaseUri + ' : HTTP ' +
+        IntToStr(response.StatusCode));
 
     cacheJson := response.Response;
     if Assigned(FCache) then
@@ -556,10 +540,7 @@ begin
     responseJson := TJsonBaseObject.Parse(cacheJson) as TJsonObject;
   except
     on e : Exception do
-    begin
-      FLogger.Error('Could not parse OSV vuln detail for [' + vulnId + ']: ' + e.Message);
-      exit;
-    end;
+      raise EDPMError.Create(TErrorCode.E8003_VulnerabilityQueryFailed, 'Unable to read the details of ' + vulnId + ' : ' + e.Message);
   end;
 
   try

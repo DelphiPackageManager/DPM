@@ -55,6 +55,9 @@ type
 
 implementation
 
+uses
+  DPM.Core.Diagnostics;
+
 { TSearchCmdOptions }
 
 constructor TSearchCmdOptions.Create;
@@ -84,8 +87,7 @@ begin
   //version, so there is no sensible default to guess here - ask.
   if CompilerVersion = TCompilerVersion.UnknownVersion then
   begin
-    logger.Error('A compiler version is required, e.g. --compiler=12.0');
-    logger.Error('DPM packages are published separately for each Delphi compiler version.');
+    logger.Error(TErrorCode.E0101_MissingArgument, 'The --compiler option is required, eg --compiler=12.0 - DPM packages are published separately for each Delphi compiler version.');
     result := false;
   end;
 

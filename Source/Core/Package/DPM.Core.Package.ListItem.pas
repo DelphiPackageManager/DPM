@@ -40,7 +40,8 @@ implementation
 
 uses
   System.SysUtils,
-  System.Classes;
+  System.Classes,
+  DPM.Core.Diagnostics;
 
 { TPackageListItem }
 
@@ -142,7 +143,7 @@ begin
   except
     on e : Exception do
     begin
-      logger.Error(e.Message);
+      logger.Warning(TWarningCode.W1207_PackageEntryUnreadable, 'A package list entry could not be read : ' + e.Message);
       exit
     end;
   end;

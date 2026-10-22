@@ -66,7 +66,9 @@ uses
   DPM.Console.Banner,
   DPM.Console.Command,
   DPM.Console.Prompts,
-  DPM.Console.Reg;
+  DPM.Console.Reg,
+  DPM.Core.Diagnostics,
+  DPM.Core.Utils.Strings;
 
 function ConProc(CtrlType : DWord) : Bool; stdcall;
 begin
@@ -119,7 +121,7 @@ begin
     on e : Exception do
     begin
       //we don't have a logger or console here so using system.writeln is ok.
-      System.Writeln('Exception while initializing : ' + e.Message);
+      System.Writeln(FormatError(TErrorCode.E0001_UnexpectedException, 'Exception while initializing : ' + e.Message));
       result := TExitCode.InitException;
     end;
   end;
@@ -133,6 +135,8 @@ var
   commandFactory : ICommandFactory;
   error : boolean;
   command : TDPMCommand;
+  line : string;
+  guard : TOperationGuard;
 begin
   FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
   //make interactive prompts wake up and report cancellation on Ctrl-C/Ctrl-Break.
@@ -155,7 +159,9 @@ begin
     begin
       ShowBanner(console);
       TCommonOptions.Default.NoBanner := true;  //make sure it doesn't show again.
-      console.WriteLine(parseResult.ErrorText, ccBrightRed);
+      //each problem is one of its own.
+      for line in TStringUtils.SplitStr(StringReplace(parseResult.ErrorText, #13, '', [rfReplaceAll]), #10, TSplitStringOptions.ExcludeEmpty) do
+        FLogger.Error(TErrorCode.E0104_InvalidCommandLine, line);
       error := true;
       TCommonOptions.Default.Help := true; //if it's a valid command but invalid options this will give us command help.
     end;
@@ -167,7 +173,7 @@ begin
     if command = TDPMCommand.Invalid then
     begin
       ShowBanner(console);
-      console.WriteLine('Invalid command : [' + parseResult.Command + ']', ccBrightRed);
+      FLogger.Error(TErrorCode.E0105_UnknownCommand, '[' + parseResult.Command + '] is not a dpm command - dpm help lists the commands.');
       exit(TExitCode.InvalidCommand);
     end;
 
@@ -188,14 +194,16 @@ begin
     commandHandler := commandFactory.CreateCommand(command);
     if commandHandler = nil then
     begin
-      console.WriteLine('No command handler registered for command : [' + CommandString[command] + ']', ccBrightRed);
+      FLogger.Error(TErrorCode.E0003_InternalError, 'No command handler is registered for the command [' + CommandString[command] + '].');
       exit(TExitCode.NoCommandHandler);
     end;
 
     if (not TCommonOptions.Default.NoBanner) and (not commandHandler.ForceNoBanner) then
       ShowBanner(console);
 
+    guard := TOperationGuard.Start(FLogger, true);
     result := commandHandler.ExecuteCommand(FCancellationTokenSource.Token);
+    guard.Finish(result = TExitCode.OK, FCancellationTokenSource.Token.IsCancelled, 'dpm ' + CommandString[command]);
     if error then //an error occured earlier so ignore command result.
       result := TExitCode.InvalidArguments;
   finally

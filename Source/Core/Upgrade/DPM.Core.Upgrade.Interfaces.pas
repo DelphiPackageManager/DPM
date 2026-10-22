@@ -88,6 +88,12 @@ type
                              const includePrerelease : boolean; out upgradeInfo : IUpgradeInfo) : TUpgradeCheckResult;
 
     /// <summary>
+    ///  Why the last CheckForUpgrade returned Error. The check does not log it - an upgrade the
+    ///  user asked for fails with it, a background check only warns.
+    /// </summary>
+    function LastError : string;
+
+    /// <summary>
     ///  Downloads the installer asset to the temp folder. Returns false and
     ///  logs on failure.
     /// </summary>

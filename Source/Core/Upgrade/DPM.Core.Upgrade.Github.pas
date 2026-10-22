@@ -41,15 +41,17 @@ type
   TGithubUpgradeService = class(TInterfacedObject, IUpgradeService)
   private
     FLogger : ILogger;
+    FLastError : string;
   protected
     function CheckForUpgrade(const cancellationToken : ICancellationToken; const currentVersion : TPackageVersion;
                              const includePrerelease : boolean; out upgradeInfo : IUpgradeInfo) : TUpgradeCheckResult;
     function DownloadUpgrade(const cancellationToken : ICancellationToken; const upgradeInfo : IUpgradeInfo;
                              out installerFile : string) : boolean;
     function LaunchInstaller(const installerFile : string) : boolean;
+    function LastError : string;
 
     /// <summary>
-    ///  Fetches and parses the releases list. Returns nil (having logged) on any
+    ///  Fetches and parses the releases list. Returns nil (with LastError set) on any
     ///  transport or parse failure - callers cannot distinguish "no releases"
     ///  from "failed", which is why an empty repo also yields an error.
     /// </summary>
@@ -91,7 +93,8 @@ uses
   VSoft.HttpClient,
   DPM.Core.Constants,
   DPM.Core.Utils.Process,
-  DPM.Core.Utils.Strings;
+  DPM.Core.Utils.Strings,
+  DPM.Core.Diagnostics;
 
 const
   //Note : we use the releases list rather than /releases/latest, because
@@ -106,6 +109,11 @@ constructor TGithubUpgradeService.Create(const logger : ILogger);
 begin
   inherited Create;
   FLogger := logger;
+end;
+
+function TGithubUpgradeService.LastError : string;
+begin
+  result := FLastError;
 end;
 
 function TGithubUpgradeService.FetchReleases(const cancellationToken : ICancellationToken) : IYAMLSequence;
@@ -131,7 +139,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error contacting github : ' + e.Message);
+      FLastError := 'Unable to contact github : ' + e.Message;
       exit;
     end;
   end;
@@ -144,9 +152,9 @@ begin
     //403 here is almost always the unauthenticated rate limit, which is easy to
     //hit on a shared/office IP - call it out rather than just printing 403.
     if response.StatusCode = 403 then
-      Logger.Error('Error querying github releases : rate limited by github (403). Please try again later.')
+      FLastError := 'Unable to get the DPM releases from github : rate limited by github (403). Please try again later.'
     else
-      Logger.Error('Error querying github releases : ' + IntToStr(response.StatusCode) + ' ' + response.ErrorMessage);
+      FLastError := 'Unable to get the DPM releases from github : ' + IntToStr(response.StatusCode) + ' ' + response.ErrorMessage;
     exit;
   end;
 
@@ -157,14 +165,14 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Unable to parse the response from github : ' + e.Message);
+      FLastError := 'Unable to read the response from github : ' + e.Message;
       exit;
     end;
   end;
 
   if not doc.IsSequence then
   begin
-    Logger.Error('Unexpected response from github - expected a list of releases.');
+    FLastError := 'Unexpected response from github - expected a list of releases.';
     exit;
   end;
 
@@ -210,18 +218,19 @@ var
 begin
   upgradeInfo := nil;
   result := TUpgradeCheckResult.Error;
+  FLastError := '';
 
   //A build that stamped an invalid cDPMSemVer would compare as Empty and report
   //every release as an upgrade - refuse rather than doing something surprising.
   if currentVersion.IsEmpty then
   begin
-    Logger.Error('Unable to determine the current dpm version, cannot check for upgrades.');
+    FLastError := 'Unable to determine the current dpm version, so there is nothing to compare releases with.';
     exit;
   end;
 
   releases := FetchReleases(cancellationToken);
   if releases = nil then
-    exit; //already logged
+    exit; //LastError says why
 
   result := SelectBestRelease(releases, currentVersion, includePrerelease, upgradeInfo);
 end;
@@ -309,8 +318,8 @@ begin
 
   if not FindInstallerAsset(bestRelease, assetName, downloadUrl) then
   begin
-    Logger.Error('Release [' + bestTag + '] does not have an installer (' + cDPMInstallerPrefix + '*' +
-                 cDPMInstallerExt + ') attached, unable to upgrade.');
+    FLastError := 'The release [' + bestTag + '] does not have an installer (' + cDPMInstallerPrefix + '*' +
+                  cDPMInstallerExt + ') attached, so it can not be installed.';
     exit;
   end;
 
@@ -339,7 +348,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Unable to create the download folder [' + ExtractFilePath(destFile) + '] : ' + e.Message);
+      Logger.Error(TErrorCode.E0005_FolderCreateFailed, 'Unable to create the download folder [' + ExtractFilePath(destFile) + '] : ' + e.Message);
       exit;
     end;
   end;
@@ -353,7 +362,7 @@ begin
     except
       on e : Exception do
       begin
-        Logger.Error('Unable to overwrite [' + destFile + '] : ' + e.Message);
+        Logger.Error(TErrorCode.E0303_UpgradeDownloadFailed, 'Unable to overwrite [' + destFile + '] : ' + e.Message);
         exit;
       end;
     end;
@@ -375,7 +384,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error downloading the installer : ' + e.Message);
+      Logger.Error(TErrorCode.E0303_UpgradeDownloadFailed, 'Unable to download the installer : ' + e.Message);
       exit;
     end;
   end;
@@ -385,14 +394,14 @@ begin
 
   if response.StatusCode <> 200 then
   begin
-    Logger.Error('Error downloading the installer : ' + IntToStr(response.StatusCode) + ' ' + response.ErrorMessage);
+    Logger.Error(TErrorCode.E0303_UpgradeDownloadFailed, 'Unable to download the installer : ' + IntToStr(response.StatusCode) + ' ' + response.ErrorMessage);
     exit;
   end;
   stopwatch.Stop;
 
   if not TFile.Exists(destFile) then
   begin
-    Logger.Error('The installer download reported success but no file was written to [' + destFile + ']');
+    Logger.Error(TErrorCode.E0303_UpgradeDownloadFailed, 'The installer download reported success but no file was written to [' + destFile + '].');
     exit;
   end;
 
@@ -406,7 +415,7 @@ begin
   result := false;
   if not TFile.Exists(installerFile) then
   begin
-    Logger.Error('Installer not found : ' + installerFile);
+    Logger.Error(TErrorCode.E0304_UpgradeInstallerFailed, 'The installer [' + installerFile + '] does not exist.');
     exit;
   end;
 
@@ -416,7 +425,7 @@ begin
     result := true;
   except
     on e : Exception do
-      Logger.Error('Unable to start the installer : ' + e.Message);
+      Logger.Error(TErrorCode.E0304_UpgradeInstallerFailed, 'Unable to start the installer [' + installerFile + '] : ' + e.Message);
   end;
 end;
 

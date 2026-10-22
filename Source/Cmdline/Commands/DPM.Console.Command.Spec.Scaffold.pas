@@ -111,7 +111,8 @@ uses
   System.IOUtils,
   System.StrUtils,
   DPM.Core.Types,
-  DPM.Core.Constants;
+  DPM.Core.Constants,
+  DPM.Core.Diagnostics;
 
 function JoinSrc(const folder, glob : string) : string;
 begin
@@ -797,7 +798,7 @@ begin
   except
     on e : Exception do
     begin
-      logger.Error('Failed to write ' + outputPath + ' : ' + e.Message);
+      logger.Error(TErrorCode.E6406_SpecWriteFailed, 'Unable to write [' + outputPath + '] : ' + e.Message);
       exit(false);
     end;
   end;

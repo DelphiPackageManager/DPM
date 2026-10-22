@@ -93,7 +93,8 @@ uses
   System.Classes,
   System.SysUtils,
   System.StrUtils,
-  System.RegularExpressions;
+  System.RegularExpressions,
+  DPM.Core.Diagnostics;
 
 type
   TMapFileInfo = class(TInterfacedObject, IMapFileInfo)
@@ -260,7 +261,7 @@ begin
       on e : Exception do
       begin
         if FLogger <> nil then
-          FLogger.Error('[MapFile] failed to load [' + fileName + '] : ' + e.Message);
+          FLogger.Warning(TWarningCode.W8116_MapFileUnreadable, '[MapFile] unable to read [' + fileName + '] : ' + e.Message);
         exit;
       end;
     end;

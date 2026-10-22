@@ -55,7 +55,8 @@ uses
   System.IOUtils,
   System.Types,
   DPM.Core.Options.Common,
-  DPM.Core.Options.Sbom;
+  DPM.Core.Options.Sbom,
+  DPM.Core.Diagnostics;
 
 constructor TSBOMCommand.Create(const logger : ILogger;
                                  const configurationManager : IConfigurationManager;
@@ -84,13 +85,13 @@ begin
       projectFiles := TDirectory.GetFiles(projectPath, '*.dproj');
     if Length(projectFiles) = 0 then
     begin
-      Logger.Error('No .dproj or .groupproj file found in directory [' + projectPath + ']');
+      Logger.Error(TErrorCode.E4002_NoProjectsFound, 'No .dproj or .groupproj file was found in [' + projectPath + '].');
       result := TExitCode.InvalidArguments;
       exit;
     end;
     if Length(projectFiles) > 1 then
     begin
-      Logger.Error('Multiple project files found in directory [' + projectPath + '] - specify a single .dproj or .groupproj.');
+      Logger.Error(TErrorCode.E0101_MissingArgument, 'More than one project file was found in [' + projectPath + '] - pass the .dproj or .groupproj to use.');
       result := TExitCode.InvalidArguments;
       exit;
     end;
