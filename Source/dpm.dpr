@@ -33,11 +33,6 @@ program dpm;
 {$R *.res}
 
 uses
-  madExcept,
-  madLinkDisAsm,
-  madListHardware,
-  madListProcesses,
-  madListModules,
   {$IFDEF JCLDEBUG}
   JclDebug,
   {$ENDIF }

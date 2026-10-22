@@ -128,7 +128,6 @@
         <ILINK_MapFileType>DetailedSegments</ILINK_MapFileType>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
-        <DCC_Define>madExcept;$(DCC_Define)</DCC_Define>
         <DCC_MapFile>3</DCC_MapFile>
         <Debugger_CWD>I:\FBAT_HG_LIBS9\Addict4\Source</Debugger_CWD>
         <Debugger_RunParams>spec</Debugger_RunParams>
