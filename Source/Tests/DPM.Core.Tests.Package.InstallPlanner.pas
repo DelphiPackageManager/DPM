@@ -73,6 +73,12 @@ type
     procedure Summary_Puts_Reason_And_Projects_On_Lines_Of_Their_Own;
 
     [Test]
+    procedure Summary_Lists_Every_Installed_Version;
+
+    [Test]
+    procedure Summary_Leaves_Out_Projects_Already_On_The_New_Version;
+
+    [Test]
     procedure Prerelease_Companion_Only_When_Allowed;
 
     [Test]
@@ -412,6 +418,45 @@ begin
   Assert.AreEqual('    but Core 1.0.3 requires Base 1.0.3', lines[3], false);
   Assert.AreEqual('', lines[4]);
   Assert.AreEqual('Projects : app.dproj', lines[5], false);
+end;
+
+procedure TInstallPlannerTests.Summary_Lists_Every_Installed_Version;
+var
+  root : IPackageReference;
+  plan : IInstallPlan;
+begin
+  // The projects don't agree on Core - the summary must show both versions it moves from, not just
+  // the highest one.
+  SetupFamily(['1.0.1', '1.0.2', '1.0.3']);
+  root := AddProject(cApp);
+  AddPackage(root, 'Core', '1.0.2', '', ['Base', '1.0.2']);
+  root := AddProject(cTests);
+  AddPackage(root, 'Core', '1.0.1', '', ['Base', '1.0.1']);
+
+  plan := MakePlan([MakeInfo('Core', '1.0.3', [MakeDep('Base', '1.0.3')])]);
+
+  Assert.IsTrue(plan.Succeeded);
+  Assert.AreEqual('Core 1.0.1, 1.0.2 -> 1.0.3', plan.SummaryLines[0], false);
+end;
+
+procedure TInstallPlannerTests.Summary_Leaves_Out_Projects_Already_On_The_New_Version;
+var
+  root : IPackageReference;
+  plan : IInstallPlan;
+begin
+  // app already has Core 1.0.3 and tests has 1.0.1 - tests still moves, so the summary must say so
+  // rather than showing just the version app already has. other has no Core at all.
+  SetupFamily(['1.0.1', '1.0.3']);
+  root := AddProject(cApp);
+  AddPackage(root, 'Core', '1.0.3', '', ['Base', '1.0.3']);
+  root := AddProject(cTests);
+  AddPackage(root, 'Core', '1.0.1', '', ['Base', '1.0.1']);
+  AddProject('C:\test\other.dproj');
+
+  plan := MakePlan([MakeInfo('Core', '1.0.3', [MakeDep('Base', '1.0.3')])], false);
+
+  Assert.IsTrue(plan.Succeeded);
+  Assert.AreEqual('Core 1.0.1 -> 1.0.3', plan.SummaryLines[0], false);
 end;
 
 procedure TInstallPlannerTests.Upgrade_Never_Downgrades_Companions;

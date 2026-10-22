@@ -91,6 +91,10 @@ type
     procedure Normalize;
     function IsSatisfiedBy(const packageVersion : TPackageVersion) : Boolean;
 
+    //true when the version is newer than the range allows, but on the same major version - so by semver it
+    //should still be compatible. Below the range, or on another major, it is not.
+    function IsCompatibleNewer(const packageVersion : TPackageVersion) : boolean;
+
     //true when this range is the bundled-dependency sentinel (fixed 999.999.999 - see
     //cBundledDependencyVersion). Detected on the parsed range so it works the same whether
     //the range came from a manifest, the feed or the lock graph.
@@ -187,6 +191,13 @@ var
 begin
   patch := 0;
   result := TPackageVersion.Create(maxVersion.Major, maxVersion.Minor, patch);
+end;
+
+function TVersionRange.IsCompatibleNewer(const packageVersion : TPackageVersion) : boolean;
+begin
+  //outside the range and at or past the max (the max itself is outside an exclusive range). A range only
+  //floats the patch, so min and max are always on the same major.
+  result := (not IsSatisfiedBy(packageVersion)) and (packageVersion >= FMaxVersion) and (packageVersion.Major = FMinVersion.Major);
 end;
 
 function TVersionRange.IsEmpty : boolean;
@@ -385,7 +396,7 @@ begin
   if FMaxVersionIsInclusive then
     result := result and (packageVersion <= FMaxVersion)
   else
-    result := result and (packageVersion <= FMaxVersion)
+    result := result and (packageVersion < FMaxVersion)
 end;
 
 function TVersionRange.ToDisplayString : string;

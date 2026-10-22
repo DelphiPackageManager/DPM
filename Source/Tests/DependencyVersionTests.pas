@@ -81,6 +81,27 @@ type
 
     [Test]
     procedure IsBundledSentinel_False_For_Normal_Ranges;
+
+    [Test]
+    procedure IsCompatibleNewer_True_Above_Range_On_Same_Major;
+
+    [Test]
+    procedure IsCompatibleNewer_False_Within_Range;
+
+    [Test]
+    procedure IsCompatibleNewer_False_Below_Range;
+
+    [Test]
+    procedure IsCompatibleNewer_False_On_Another_Major;
+
+    [Test]
+    procedure IsCompatibleNewer_True_At_Exclusive_Max;
+
+    [Test]
+    procedure IsSatisfiedBy_Honours_Exclusive_Bounds;
+
+    [Test]
+    procedure No_Intersection_At_Exclusive_Max;
   end;
 
 implementation
@@ -244,6 +265,85 @@ begin
 
   openEnded := TVersionRange.Parse('[1.0.0,]');
   Assert.IsFalse(openEnded.IsBundledSentinel, 'a normal range is not the sentinel');
+end;
+
+procedure TVersionRangeTests.IsCompatibleNewer_True_Above_Range_On_Same_Major;
+var
+  range : TVersionRange;
+begin
+  //[1.2.4,] only floats the patch - 1.3.0 is outside it, but a minor bump is compatible by semver.
+  range := TVersionRange.Parse('[1.2.4,]');
+  Assert.IsTrue(range.IsCompatibleNewer(TPackageVersion.Parse('1.3.0')), 'a newer minor on the same major');
+  Assert.IsTrue(range.IsCompatibleNewer(TPackageVersion.Parse('1.12.1')), 'a much newer minor on the same major');
+
+  range := TVersionRange.Parse('1.2.4');
+  Assert.IsTrue(range.IsCompatibleNewer(TPackageVersion.Parse('1.2.5')), 'a newer patch than an exact pin');
+end;
+
+procedure TVersionRangeTests.IsCompatibleNewer_False_Within_Range;
+var
+  range : TVersionRange;
+begin
+  range := TVersionRange.Parse('[1.2.4,]');
+  Assert.IsFalse(range.IsCompatibleNewer(TPackageVersion.Parse('1.2.4')), 'the minimum is in the range');
+  Assert.IsFalse(range.IsCompatibleNewer(TPackageVersion.Parse('1.2.9')), 'a floating patch is in the range');
+end;
+
+procedure TVersionRangeTests.IsCompatibleNewer_False_Below_Range;
+var
+  range : TVersionRange;
+begin
+  range := TVersionRange.Parse('[1.2.4,]');
+  Assert.IsFalse(range.IsCompatibleNewer(TPackageVersion.Parse('1.2.3')), 'an older patch');
+  Assert.IsFalse(range.IsCompatibleNewer(TPackageVersion.Parse('1.1.9')), 'an older minor');
+  Assert.IsFalse(range.IsCompatibleNewer(TPackageVersion.Parse('0.9.0')), 'an older major');
+end;
+
+procedure TVersionRangeTests.IsCompatibleNewer_False_On_Another_Major;
+var
+  range : TVersionRange;
+begin
+  range := TVersionRange.Parse('[1.2.4,]');
+  Assert.IsFalse(range.IsCompatibleNewer(TPackageVersion.Parse('2.0.0')), 'a new major is a breaking change');
+end;
+
+procedure TVersionRangeTests.IsCompatibleNewer_True_At_Exclusive_Max;
+var
+  range : TVersionRange;
+begin
+  //the max itself is outside an exclusive range - above it, not below.
+  range := TVersionRange.Parse('[1.2.4,1.2.9)');
+  Assert.IsTrue(range.IsCompatibleNewer(TPackageVersion.Parse('1.2.9')));
+end;
+
+procedure TVersionRangeTests.IsSatisfiedBy_Honours_Exclusive_Bounds;
+var
+  range : TVersionRange;
+begin
+  range := TVersionRange.Parse('(1.0.12,1.0.57)');
+  Assert.IsFalse(range.IsSatisfiedBy(TPackageVersion.Parse('1.0.12')), 'exclusive min');
+  Assert.IsTrue(range.IsSatisfiedBy(TPackageVersion.Parse('1.0.13')));
+  Assert.IsTrue(range.IsSatisfiedBy(TPackageVersion.Parse('1.0.56')));
+  Assert.IsFalse(range.IsSatisfiedBy(TPackageVersion.Parse('1.0.57')), 'exclusive max');
+
+  range := TVersionRange.Parse('[1.0.12,1.0.57)');
+  Assert.IsTrue(range.IsSatisfiedBy(TPackageVersion.Parse('1.0.12')), 'inclusive min');
+  Assert.IsFalse(range.IsSatisfiedBy(TPackageVersion.Parse('1.0.57')), 'exclusive max');
+
+  range := TVersionRange.Parse('[1.0.12,1.0.57]');
+  Assert.IsTrue(range.IsSatisfiedBy(TPackageVersion.Parse('1.0.57')), 'inclusive max');
+end;
+
+procedure TVersionRangeTests.No_Intersection_At_Exclusive_Max;
+var
+  left : TVersionRange;
+  right : TVersionRange;
+  intersection : TVersionRange;
+begin
+  //1.0.5 is the left range's exclusive max - nothing satisfies both.
+  left := TVersionRange.Parse('[1.0.0,1.0.5)');
+  right := TVersionRange.Parse('1.0.5');
+  Assert.IsFalse(left.TryGetIntersectingRange(right, intersection));
 end;
 
 procedure TVersionRangeTests.Will_Normalize_To_Fixed;

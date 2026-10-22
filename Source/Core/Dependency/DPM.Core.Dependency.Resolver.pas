@@ -572,36 +572,25 @@ var
   context : IResolverContext;
   packageRef : IPackageReference;
   resolution : IResolvedPackage;
-  errorCount : integer;
-  conflict : TUnresolvableConflict;
 begin
   Assert(FConfiguration <> nil, 'config is nil, Initialize has not been called');
 
-  errorCount := 0;
-  //check for conflicts with already loaded projects
+  //check for mismatches with already loaded projects. projectReferences are what the project already
+  //has, minus the packages being installed, so a mismatch here was there before the install and is still
+  //there whether it goes ahead or not. Failing the install over it fixes nothing - it only blocks every
+  //unrelated install in the group until the projects are brought in line by hand - so just report it.
   for packageRef in projectReferences do
   begin
     resolution := FPackageInstallerContext.FindPackageResolution(projectFile, packageRef.Id);
     if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Version)) then
-    begin
-      FLogger.Error('Package project group conflict : ' + packageRef.Id + '-' + resolution.PackageInfo.Version.ToString + ' in project : ' + resolution.ProjectFile + ' does not satisfy ' + packageRef.Version.ToString  );
-      Inc(errorCount);
-      if conflicts <> nil then
-      begin
-        conflict.PackageId := packageRef.Id;
-        conflict.ParentId := packageRef.ParentId;
-        conflict.RequestedRange := resolution.VersionRange;
-        conflict.Reason := 'cross-project: version ' + packageRef.Version.ToString + ' does not satisfy ' + resolution.VersionRange.ToString + ' selected in project [' + resolution.ProjectFile + ']';
-        conflicts.Add(conflict);
-      end;
-    end;
+      FLogger.Warning('Package project group mismatch : ' + packageRef.Id + '-' + packageRef.Version.ToStringNoMeta + ' in project [' + projectFile +
+                      '] does not satisfy ' + resolution.VersionRange.ToString + ' used in project [' + resolution.ProjectFile + ']');
   end;
   context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, newPackages, projectReferences, sharedVersionCache, preferredVersions);
 
   result := DoResolve(cancellationToken, compilerVersion, options.Prerelease, context);
   resolved := context.GetResolvedPackageInfos;
   dependencyGraph := context.BuildDependencyGraph;
-  result := result and (errorCount = 0);
   if conflicts <> nil then
     conflicts.AddRange(context.GetUnresolvable);
   //record the resolutions so they can be checked against by other projects in the group. Only when the

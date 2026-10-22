@@ -139,7 +139,7 @@ type
     procedure Cross_Project_Conflict_Outside_Range_Records_Unresolvable;
 
     [Test]
-    procedure Group_Project_Version_Conflict_Counted_As_Error;
+    procedure Group_Project_Existing_Version_Mismatch_Is_Warning;
 
     [Test]
     procedure BuildDependencyGraph_Reflects_Resolved_Tree_Structure;
@@ -1260,7 +1260,7 @@ begin
   Assert.IsFalse(ok, 'cross-project resolution outside our range must surface as unresolvable');
 end;
 
-procedure TDependencyResolverTests.Group_Project_Version_Conflict_Counted_As_Error;
+procedure TDependencyResolverTests.Group_Project_Existing_Version_Mismatch_Is_Warning;
 var
   x, b : IPackageInfo;
   siblingX : IResolvedPackage;
@@ -1268,13 +1268,14 @@ var
   projectRefs : IList<IPackageReference>;
   resolved : IList<IPackageInfo>;
   graph : IPackageReference;
+  logger : TTestLogger;
   ok : boolean;
 begin
   // Sibling project has resolved X 1.0.0 under range [1.0.0,1.0.0]. Current project's project
-  // graph carries X at 1.0.5 (incompatible with the sibling's recorded range). The pre-resolve
-  // loop in ResolveForInstall checks each projectRef against the cross-project resolutions and
-  // increments errorCount on mismatch - the final result must be false even if the local
-  // resolve completes.
+  // graph already carries X at 1.0.5. Installing B (which has nothing to do with X) doesn't change
+  // X anywhere, so refusing the install would not fix the mismatch - it would only stop every
+  // unrelated install in the group until the projects are brought in line by hand. The mismatch is
+  // reported as a warning and the install goes ahead.
   x := MakeInfo('X', '1.0.0', []);
   b := MakeInfo('B', '1.0.0', []);
   siblingX := TResolvedPackage.Create(x, MakeRange('1.0.0'), 'root-node', 'C:\test\sibling.dproj');
@@ -1284,8 +1285,14 @@ begin
   projectRefs := TCollections.CreateList<IPackageReference>;
   projectRefs.Add(xLocal);
 
+  logger := FLogger as TTestLogger;
+  logger.Messages.Clear;
   ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, b, projectRefs, graph, resolved);
-  Assert.IsFalse(ok, 'project-group version mismatch on a top-level must be counted as a resolver error');
+  Assert.IsTrue(ok, 'an existing project-group version mismatch the install does not touch must not fail the install');
+  Assert.IsFalse(logger.Logged('error', 'project group'), 'an existing mismatch must not be logged as an error');
+  Assert.IsTrue(logger.Logged('warning', 'X-1.0.5 in project [' + cTestProject + '] does not satisfy 1.0.0'),
+    'the warning should name this project''s version first, then the range it does not satisfy');
+  Assert.IsTrue(logger.Logged('warning', 'C:\test\sibling.dproj'), 'the warning should name the sibling project');
 end;
 
 procedure TDependencyResolverTests.BuildDependencyGraph_Reflects_Resolved_Tree_Structure;

@@ -52,6 +52,10 @@ uses
   DPM.Core.Compiler.Interfaces;
 
 type
+  //what the restore fast path found in a project's recorded graph : good as it is, needs re-resolving, or
+  //can't be restored at all.
+  TRestoreGraphState = (rgsValid, rgsNeedsResolve, rgsInvalid);
+
   ///<summary> One project's part in an install : what to apply to it, and what each phase produced.
   ///  Internal to TPackageInstaller. </summary>
   TProjectInstallWork = class
@@ -159,11 +163,13 @@ type
     function BuildPackageSpecsFromGraph(const graph: IPackageReference; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageSpec>;
 
     //Restore fast path: validate the existing graph against each package's declared dependencies.
-    //If every transient is present and within its parent's version range, the graph is good and we
-    //can skip resolution. resolvedPackages is populated in topological order (deps before dependers).
-    //Returns false if any violation is found - caller should fall back to a full re-resolve.
-    function TryValidateRestoreGraph(const cancellationToken: ICancellationToken; const projectPackageGraph: IPackageReference;
-                                     const compilerVersion: TCompilerVersion; const resolvedPackages: IList<IPackageInfo>): boolean;
+    //If every transient is present and within its parent's version range, the graph is good (rgsValid) and
+    //we can skip resolution - resolvedPackages is then populated in topological order (deps before dependers).
+    //A stale or missing transient gives rgsNeedsResolve - caller should fall back to a full re-resolve.
+    //A top level reference wins over the range a package declares for it : newer on the same major is
+    //accepted with a warning, anything else gives rgsInvalid and the restore fails.
+    function ValidateRestoreGraph(const cancellationToken: ICancellationToken; const projectPackageGraph: IPackageReference;
+                                  const compilerVersion: TCompilerVersion; const resolvedPackages: IList<IPackageInfo>): TRestoreGraphState;
 
     //Looks up an IPackageInfo for (id, version, compiler), caching the result in the supplied dict.
     //Hits cache first, then repo. Pulled out as a method because Delphi anonymous methods cannot
@@ -1718,6 +1724,7 @@ var
   projectReferences: IList<IPackageReference>;
   resolvedPackages: IList<IPackageInfo>;
   preferredVersions: IDictionary<string, TPackageVersion>;
+  graphState: TRestoreGraphState;
 begin
   result := false;
   resultGraph := nil;
@@ -1731,7 +1738,10 @@ begin
   //Fast path: validate the existing graph against each package's declared dependencies.
   //If it's intact, skip the resolver entirely and proceed straight to download+configure.
   resolvedPackages := TCollections.CreateList<IPackageInfo>;
-  if TryValidateRestoreGraph(cancellationToken, projectPackageGraph, Options.CompilerVersion, resolvedPackages) then
+  graphState := ValidateRestoreGraph(cancellationToken, projectPackageGraph, Options.CompilerVersion, resolvedPackages);
+  if graphState = rgsInvalid then
+    exit;
+  if graphState = rgsValid then
   begin
     FLogger.Verbose('Restore: existing graph is consistent with package specs - skipping resolution');
     result := FinalizePackageConfiguration(cancellationToken, Options, projectFile, projectEditor, platform, config, projectPackageGraph, resolvedPackages, resultGraph);
@@ -2806,7 +2816,7 @@ begin
   for item in upgradePlan.Items do
   begin
     if item.IsCompanion then
-      FLogger.Warning('  ' + item.PackageInfo.Id + ' ' + item.CurrentVersion.ToStringNoMeta + ' -> ' + item.PackageInfo.Version.ToStringNoMeta + ' (' + item.Reason + ')', true);
+      FLogger.Warning('  ' + item.PackageInfo.Id + ' ' + item.VersionChangeText + ' (' + item.Reason + ')', true);
   end;
   FLogger.Warning('Use Upgrade in the IDE, or --upgrade on the command line, to install them together.', true);
 end;
@@ -2946,14 +2956,47 @@ begin
   result := resultGraph <> nil;
 end;
 
-function TPackageInstaller.TryValidateRestoreGraph(const cancellationToken: ICancellationToken; const projectPackageGraph: IPackageReference;
-                                                   const compilerVersion: TCompilerVersion; const resolvedPackages: IList<IPackageInfo>): boolean;
+function TPackageInstaller.ValidateRestoreGraph(const cancellationToken: ICancellationToken; const projectPackageGraph: IPackageReference;
+                                                const compilerVersion: TCompilerVersion; const resolvedPackages: IList<IPackageInfo>): TRestoreGraphState;
 var
   packageInfos: IDictionary<string, IPackageInfo>;
-  validationOk: boolean;
+  state: TRestoreGraphState;
+  warned: ISet<string>;
   topLevelChild: IPackageReference;
 
-  //Recursively validates a node and its declared dependencies.
+  //A top level reference wins over the range a package declares for it, so it is the version that package
+  //gets. Newer on the same major is accepted with a warning - DPM ranges only float the patch, so a top level
+  //a minor ahead of a package's range is common, and by semver it is compatible. Older, or another major,
+  //the package may not work with it - false, and the restore fails.
+  function CheckTopLevelOverride(const node: IPackageReference; const dep: IPackageDependency; const topLevel: IPackageReference): boolean;
+  var
+    text: string;
+    key: string;
+  begin
+    result := true;
+    if dep.VersionRange.IsSatisfiedBy(topLevel.Version) then
+      exit;
+    text := 'Restore: ' + topLevel.Id + '-' + topLevel.Version.ToStringNoMeta + ' is a top level reference, but ' +
+            node.Id + '-' + node.Version.ToStringNoMeta + ' requires ' + dep.Id + ' ' + dep.VersionRange.ToString;
+    if not dep.VersionRange.IsCompatibleNewer(topLevel.Version) then
+    begin
+      if topLevel.Version.Major <> dep.VersionRange.MinVersion.Major then
+        FLogger.Error(text + ' - a different major version is not compatible')
+      else
+        FLogger.Error(text + ' - an older version is not compatible');
+      exit(false);
+    end;
+    //a shared package is visited once for every package that uses it - only say it once.
+    key := LowerCase(node.Id + '>' + dep.Id);
+    if warned.Contains(key) then
+      exit;
+    warned.Add(key);
+    FLogger.Warning(text + ' - using ' + topLevel.Version.ToStringNoMeta + ' (same major version)');
+  end;
+
+  //Recursively validates a node and its declared dependencies. Carries on past anything that only needs a
+  //re-resolve, so a top level reference that fails the restore is still found further on - the re-resolve
+  //keeps the project's versions, so it wouldn't catch it.
   //Order matters: we always check the *parent's* declared range against the graph child's recorded
   //version BEFORE attempting to load the child's own info. That way a stale/out-of-range transient
   //is reported as "out of range" rather than "not found in cache or repo".
@@ -2962,19 +3005,20 @@ var
     info: IPackageInfo;
     dep: IPackageDependency;
     child: IPackageReference;
+    topLevel: IPackageReference;
   begin
-    if not validationOk then
+    if state = rgsInvalid then
       exit;
     if cancellationToken.IsCancelled then
     begin
-      validationOk := false;
+      state := rgsInvalid;
       exit;
     end;
     info := GetOrLoadPackageInfo(cancellationToken, node.Id, node.Version, compilerVersion, packageInfos);
     if info = nil then
     begin
       FLogger.Information('Restore: package [' + node.Id + '-' + node.Version.ToStringNoMeta + '] not found in cache or repo - re-resolving');
-      validationOk := false;
+      state := rgsNeedsResolve;
       exit;
     end;
     //For every dependency this package declares, verify the graph has a child for it whose version
@@ -2987,37 +3031,57 @@ var
       //package for the id it appears as its own top-level node and is validated independently.
       if dep.VersionRange.IsBundledSentinel then
         continue;
+      topLevel := projectPackageGraph.FindTopLevelChild(dep.Id);
+      if (topLevel <> nil) and (not CheckTopLevelOverride(node, dep, topLevel)) then
+      begin
+        state := rgsInvalid;
+        exit;
+      end;
       child := node.FindFirstChild(dep.Id);
       if child = nil then
       begin
         FLogger.Warning('Restore: package [' + node.Id + '] requires [' + dep.Id + '] which is missing from the project graph - re-resolving');
-        validationOk := false;
-        exit;
+        state := rgsNeedsResolve;
+        continue;
+      end;
+      if topLevel <> nil then
+      begin
+        //the top level node is validated on its own - the graph only has to agree with it.
+        if child.Version <> topLevel.Version then
+        begin
+          FLogger.Warning('Restore: package [' + node.Id + '] dependency [' + child.Id + '-' + child.Version.ToStringNoMeta + '] differs from the top level reference [' +
+                          topLevel.Id + '-' + topLevel.Version.ToStringNoMeta + '] - re-resolving');
+          state := rgsNeedsResolve;
+        end;
+        continue;
       end;
       if not dep.VersionRange.IsSatisfiedBy(child.Version) then
       begin
         FLogger.Warning('Restore: package [' + node.Id + '] dependency [' + child.Id + '-' + child.Version.ToStringNoMeta + '] is outside required range [' + dep.VersionRange.ToString + '] - re-resolving');
-        validationOk := false;
-        exit;
+        state := rgsNeedsResolve;
+        continue;
       end;
       //Only recurse if the child passed the range check.
       ValidateNode(child);
-      if not validationOk then
+      if state = rgsInvalid then
         exit;
     end;
   end;
 
 begin
-  result := false;
-  validationOk := true;
+  state := rgsValid;
+  warned := TCollections.CreateSet<string>;
   packageInfos := TCollections.CreateDictionary<string, IPackageInfo>;
 
   for topLevelChild in projectPackageGraph.Children do
   begin
     ValidateNode(topLevelChild);
-    if not validationOk then
-      exit;
+    if state = rgsInvalid then
+      break;
   end;
+  result := state;
+  if result <> rgsValid then
+    exit;
 
   //DFS yields children-before-parents - that is the order resolvedPackages needs (deps before dependers).
   projectPackageGraph.VisitDFS(
@@ -3044,8 +3108,6 @@ begin
       if not alreadyAdded then
         resolvedPackages.Add(info);
     end);
-
-  result := true;
 end;
 
 function TPackageInstaller.PreparePackageFileInstall(const Options: TInstallOptions): boolean;

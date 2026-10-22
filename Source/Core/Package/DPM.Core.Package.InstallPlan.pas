@@ -59,6 +59,8 @@ type
     FPackageInfo : IPackageInfo;
     FIsCompanion : boolean;
     FCurrentVersion : TPackageVersion;
+    //every version referenced at the top level of the plan's projects, lowest first, no duplicates.
+    FCurrentVersions : IList<TPackageVersion>;
     FReason : string;
     FProjects : IList<string>;
   protected
@@ -67,8 +69,10 @@ type
     function GetCurrentVersion : TPackageVersion;
     function GetReason : string;
     function GetProjects : IList<string>;
+    function VersionChangeText : string;
   public
     constructor Create(const packageInfo : IPackageInfo; const isCompanion : boolean; const reason : string);
+    procedure AddCurrentVersion(const version : TPackageVersion);
   end;
 
   TInstallPlan = class(TInterfacedObject, IInstallPlan)
@@ -195,7 +199,48 @@ begin
   FIsCompanion := isCompanion;
   FReason := reason;
   FCurrentVersion := TPackageVersion.Empty;
+  FCurrentVersions := TCollections.CreateList<TPackageVersion>;
   FProjects := TCollections.CreateList<string>;
+end;
+
+procedure TInstallPlanItem.AddCurrentVersion(const version : TPackageVersion);
+var
+  i : integer;
+begin
+  if version > FCurrentVersion then
+    FCurrentVersion := version;
+  //kept in order by hand - the list's default comparer compares the records' memory, not the versions.
+  for i := 0 to FCurrentVersions.Count - 1 do
+  begin
+    if FCurrentVersions[i] = version then
+      exit;
+    if FCurrentVersions[i] > version then
+    begin
+      FCurrentVersions.Insert(i, version);
+      exit;
+    end;
+  end;
+  FCurrentVersions.Add(version);
+end;
+
+function TInstallPlanItem.VersionChangeText : string;
+var
+  version : TPackageVersion;
+  fromText : string;
+begin
+  //projects already on the new version don't change, so only the others are listed.
+  fromText := '';
+  for version in FCurrentVersions do
+  begin
+    if version = FPackageInfo.Version then
+      continue;
+    if fromText <> '' then
+      fromText := fromText + ', ';
+    fromText := fromText + version.ToStringNoMeta;
+  end;
+  result := FPackageInfo.Version.ToStringNoMeta;
+  if fromText <> '' then
+    result := fromText + ' -> ' + result;
 end;
 
 function TInstallPlanItem.GetCurrentVersion : TPackageVersion;
@@ -325,10 +370,7 @@ begin
   result := TCollections.CreateList<string>;
   for item in FItems do
   begin
-    line := item.PackageInfo.Id + ' ';
-    if (not item.CurrentVersion.IsEmpty) and (item.CurrentVersion <> item.PackageInfo.Version) then
-      line := line + item.CurrentVersion.ToStringNoMeta + ' -> ';
-    line := line + item.PackageInfo.Version.ToStringNoMeta;
+    line := item.PackageInfo.Id + ' ' + item.VersionChangeText;
     if item.IsCompanion then
     begin
       if item.PackageInfo.Version < item.CurrentVersion then
@@ -800,8 +842,7 @@ begin
       if node = nil then
         continue;
       item.FProjects.Add(project.ProjectFile);
-      if node.Version > item.FCurrentVersion then
-        item.FCurrentVersion := node.Version;
+      item.AddCurrentVersion(node.Version);
     end;
     if not item.FProjects.Any then
       FPlan.AddError(info.Id + ' is not installed in any of the projects - there is nothing to change.');
@@ -938,8 +979,8 @@ begin
         if project.Graph = nil then
           continue;
         node := project.Graph.FindTopLevelChild(info.Id);
-        if (node <> nil) and (node.Version > item.FCurrentVersion) then
-          item.FCurrentVersion := node.Version;
+        if node <> nil then
+          item.AddCurrentVersion(node.Version);
       end;
     end;
     plan.CollectProjects(projects);

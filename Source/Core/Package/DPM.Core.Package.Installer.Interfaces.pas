@@ -55,6 +55,9 @@ type
     function GetCurrentVersion : TPackageVersion;
     function GetReason : string;
     function GetProjects : IList<string>;
+    //'<installed versions> -> <new version>' for the summary - every installed version that changes, lowest
+    //first, since the projects needn't agree. Just the new version when no project changes version.
+    function VersionChangeText : string;
     property PackageInfo : IPackageInfo read GetPackageInfo;
     //true when the package was not asked for, but is upgraded because it blocks the packages that were.
     property IsCompanion : boolean read GetIsCompanion;
