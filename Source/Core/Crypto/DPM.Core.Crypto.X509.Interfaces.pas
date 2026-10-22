@@ -29,6 +29,7 @@ unit DPM.Core.Crypto.X509.Interfaces;
 interface
 
 uses
+  DPM.Core.Diagnostics,
   System.Classes, System.SysUtils,
   DPM.Core.Crypto.Win32,
   DPM.Core.Crypto.Algorithms;
@@ -172,8 +173,19 @@ type
     function CreateChain : ICertificateChain;
   end;
 
-  ECryptoX509 = class(Exception);
+  //raised with E7104 unless said otherwise (see EDPMCodedError).
+  ECryptoX509 = class(EDPMCodedError)
+  protected
+    class function DefaultCode : TErrorCode; override;
+  end;
 
 implementation
+
+{ ECryptoX509 }
+
+class function ECryptoX509.DefaultCode : TErrorCode;
+begin
+  result := TErrorCode.E7104_CertificateInvalid;
+end;
 
 end.

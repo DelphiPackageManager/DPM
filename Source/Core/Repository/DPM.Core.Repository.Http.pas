@@ -1252,7 +1252,7 @@ begin
   result := false;
   if pushOptions.ApiKey = '' then
   begin
-    Logger.Error('ApiKey arg required for remote push');
+    Logger.Error(TErrorCode.E0101_MissingArgument, 'An api key is needed to push to [' + Name + '] - pass --apiKey, or set the DPM_API_KEY environment variable.');
     exit;
   end;
 
@@ -1260,7 +1260,7 @@ begin
 
   if not FileExists(pushOptions.PackagePath) then
   begin
-    Logger.Error('Package file [' + pushOptions.PackagePath + '] not found.');
+    Logger.Error(TErrorCode.E3004_PackageFileNotFound, 'The package file [' + pushOptions.PackagePath + '] does not exist.');
     exit;
   end;
 
@@ -1319,14 +1319,24 @@ begin
       //them on the url query string. WithQueryParameter always appends to the query string.
       request.WithQueryParameter('unlisted', 'true');
 
-    response := httpClient.Put(request, cancellationToken);
+    try
+      response := httpClient.Put(request, cancellationToken);
+    except
+      //the repository manager reports it.
+      on e : Exception do
+      begin
+        if not cancellationToken.IsCancelled then
+          RequestFailed('push request failed : ' + CleanMessage(e.Message));
+        exit;
+      end;
+    end;
 
     if IsRetryableStatus(response.StatusCode) and (attempt < pushOptions.MaxRetries) then
     begin
       Inc(attempt);
       delayMs := ComputeRetryDelayMs(response, attempt, pushOptions.RetryDelay);
-      Logger.Warning(Format('Push got [%d] from server, retrying in %d s (attempt %d of %d)...',
-        [response.StatusCode, delayMs div 1000, attempt, pushOptions.MaxRetries]));
+      Logger.Information(Format('The server returned [%d] - retrying the push in %d s (attempt %d of %d)...',
+        [response.StatusCode, delayMs div 1000, attempt, pushOptions.MaxRetries]), true);
       //cancellable wait - returns wrSignaled if the token is cancelled during the wait.
       if cancellationToken.WaitFor(delayMs) = wrSignaled then
         exit;
@@ -1398,9 +1408,9 @@ begin
         else
         begin
           if status <> '' then
-            Logger.Error(Format('Push failed [409] : %s (existing status: %s)', [errorMsg, status]))
+            Logger.Error(TErrorCode.E6201_PushRejected, Format('The server [%s] rejected [%s] : 409 %s (existing status: %s)', [Name, ExtractFileName(pushOptions.PackagePath), errorMsg, status]))
           else
-            Logger.Error(Format('Push failed [409] : %s', [errorMsg]));
+            Logger.Error(TErrorCode.E6201_PushRejected, Format('The server [%s] rejected [%s] : 409 %s', [Name, ExtractFileName(pushOptions.PackagePath), errorMsg]));
         end;
       end;
   else
@@ -1418,7 +1428,7 @@ begin
     end;
     if errorMsg = '' then
       errorMsg := response.Response;
-    Logger.Error(Format('Push failed [%d] : %s', [response.StatusCode, errorMsg]));
+    Logger.Error(TErrorCode.E6201_PushRejected, Format('The server [%s] rejected [%s] : %d %s', [Name, ExtractFileName(pushOptions.PackagePath), response.StatusCode, errorMsg]));
   end;
 end;
 

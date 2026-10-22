@@ -56,7 +56,8 @@ uses
   DPM.Console.Banner,
   DPM.Core.Utils.Path,
   DPM.Core.Options.Common,
-  DPM.Core.Options.Prepare;
+  DPM.Core.Options.Prepare,
+  DPM.Core.Diagnostics;
 
 { TPrepareCommand }
 
@@ -81,7 +82,7 @@ begin
   begin
     if not FileExists(explicitFile) then
     begin
-      Logger.Error('Spec file not found: ' + explicitFile);
+      Logger.Error(TErrorCode.E6001_SpecNotFound, 'The spec file [' + explicitFile + '] does not exist.');
       exit;
     end;
     specFile := explicitFile;
@@ -94,16 +95,19 @@ begin
   candidates := TPathUtils.FindDspecFiles(GetCurrentDir, TSearchOption.soTopDirectoryOnly);
   if Length(candidates) = 0 then
   begin
-    Logger.Error('No .dspec or .dspec.yaml file found in current directory: ' + GetCurrentDir);
-    Logger.Error('Pass the spec file path explicitly, e.g. "dpm prepare mypackage.dspec".');
+    Logger.Error(TErrorCode.E6001_SpecNotFound, 'No .dspec or .dspec.yaml file was found in [' + GetCurrentDir + '] - pass the spec file, eg "dpm prepare mypackage.dspec".');
     exit;
   end;
   if Length(candidates) > 1 then
   begin
-    Logger.Error('Multiple .dspec files found in current directory - please specify one explicitly:');
     list := '';
     for i := 0 to High(candidates) do
-      Logger.Error('  ' + TPath.GetFileName(candidates[i]));
+    begin
+      if list <> '' then
+        list := list + ', ';
+      list := list + TPath.GetFileName(candidates[i]);
+    end;
+    Logger.Error(TErrorCode.E0101_MissingArgument, 'More than one spec file was found in [' + GetCurrentDir + '] - pass the one to prepare : ' + list);
     exit;
   end;
 
@@ -133,7 +137,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error preparing packages : ' + e.Message);
+      LogException(Logger, e);
       exit(TExitCode.Error);
     end;
   end;

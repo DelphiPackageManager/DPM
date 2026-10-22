@@ -1232,13 +1232,14 @@ begin
 
   if not FileExists(pushOptions.PackagePath) then
   begin
-    Logger.Error('Package file [' + pushOptions.PackagePath + '] not found.');
+    Logger.Error(TErrorCode.E3004_PackageFileNotFound, 'The package file [' + pushOptions.PackagePath + '] does not exist.');
     exit;
   end;
 
+  //the repository manager reports these, as for any other source that can't be used.
   if not DirectoryExists(SourceUri) then
   begin
-    Logger.Error('Source uri path does not exist [' + SourceUri + '].');
+    RequestFailed('folder [' + SourceUri + '] does not exist.');
     exit;
   end;
   try
@@ -1265,7 +1266,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Unable to copy file [' + pushOptions.PackagePath + '] to [' + SourceUri + '] : ' + e.Message);
+      RequestFailed('could not take the package : ' + e.Message);
     end;
   end;
 end;

@@ -29,6 +29,7 @@ unit DPM.Core.Crypto.Cms.Interfaces;
 interface
 
 uses
+  DPM.Core.Diagnostics,
   System.SysUtils,
   DPM.Core.Crypto.Algorithms,
   DPM.Core.Crypto.X509.Interfaces,
@@ -99,8 +100,19 @@ type
                                    const oid : AnsiString; const value : TBytes);
   end;
 
-  ECryptoCms = class(Exception);
+  //raised with E7103 unless said otherwise (see EDPMCodedError).
+  ECryptoCms = class(EDPMCodedError)
+  protected
+    class function DefaultCode : TErrorCode; override;
+  end;
 
 implementation
+
+{ ECryptoCms }
+
+class function ECryptoCms.DefaultCode : TErrorCode;
+begin
+  result := TErrorCode.E7103_SignatureInvalid;
+end;
 
 end.

@@ -183,7 +183,7 @@ begin
   failures := 0;
   if FSigningService = nil then
   begin
-    FLogger.Warning('[PackageCache] FullReVerify: signing service not wired; nothing to verify.');
+    FLogger.Error(TErrorCode.E0003_InternalError, 'No signing service is available to verify the package cache with.');
     result := 0;
     exit;
   end;
@@ -251,28 +251,26 @@ begin
     FLogger.Information(Format('[PackageCache] Verifying [%d/%d] %s',
       [i + 1, total, ExtractFileName(allPackages[i])]), true);
     try
+      //what is wrong with it was reported by InstallPackageFromFile.
       if not InstallPackageFromFile(allPackages[i]) then
-      begin
         Inc(failures);
-        FLogger.Error('[PackageCache] FullReVerify failed for ' + allPackages[i]);
-      end;
     except
       on e : Exception do
       begin
         Inc(failures);
-        FLogger.Error('[PackageCache] FullReVerify exception for ' +
-          allPackages[i] + ': ' + e.Message);
+        FLogger.Error(ErrorCodeOf(e, TErrorCode.E7001_PackageVerificationFailed), 'Unable to re-verify [' +
+          allPackages[i] + '] : ' + e.Message);
       end;
     end;
   end;
 
   if cancelled then
-    FLogger.Warning(Format('[PackageCache] FullReVerify cancelled after %d of %d package(s); %d failure(s) so far.',
+    FLogger.Information(Format('[PackageCache] FullReVerify cancelled after %d of %d package(s); %d failure(s) so far.',
       [i, total, failures]), true)
   else if failures = 0 then
     FLogger.Success(Format('[PackageCache] FullReVerify completed: all %d package(s) valid.', [total]), true)
   else
-    FLogger.Warning(Format('[PackageCache] FullReVerify completed with %d failure(s) of %d package(s).',
+    FLogger.Information(Format('[PackageCache] FullReVerify completed with %d failure(s) of %d package(s).',
       [failures, total]), true);
   result := failures;
 end;
@@ -344,13 +342,13 @@ begin
   missingRepoSignature := not hasCurrentTrustedRepo;
   if missingRepoSignature then
     ratchetFailure := Format(
-      '[PackageCache] Package [%s] previously carried a trusted repository ' +
+      'The package [%s] previously carried a trusted repository ' +
       'signature (sha256:%s) but this build does not.',
       [packageId.Id, prior.TrustedRepoSpkiHex])
   else if (prior.Namespace <> '') and (currentAttestedNamespace <> '') and
           not SameText(prior.Namespace, currentAttestedNamespace) then
     ratchetFailure := Format(
-      '[PackageCache] Package [%s] repository attestation namespace ' +
+      'The repository attestation namespace of the package [%s] ' +
       'changed from "%s" to "%s".',
       [packageId.Id, prior.Namespace, currentAttestedNamespace]);
 
@@ -364,8 +362,8 @@ begin
     if missingRepoSignature and
        TAuthorRebuildExemption.Applies(hadPriorAuthor, priorAuthor, verifyResult.Signatures) then
     begin
-      FLogger.Warning(Format(
-        '[PackageCache] Package [%s] carries no trusted repository signature, but is ' +
+      FLogger.Warning(TWarningCode.W7007_AuthorRebuildAccepted, Format(
+        'The package [%s] carries no trusted repository signature, but is ' +
         'author-signed by the same key previously recorded for it (sha256:%s). Treating ' +
         'this as an author rebuild and allowing the install.',
         [packageId.Id, priorAuthor.LastAuthorSpkiHex]));
@@ -379,7 +377,7 @@ begin
       exit;
     end;
 
-    FLogger.Warning(ratchetFailure);
+    FLogger.Warning(TWarningCode.W7005_RepositorySignatureChanged, ratchetFailure);
 
     if FTrustPrompt = nil then
     begin
@@ -401,8 +399,8 @@ begin
       tpdOverride :
         begin
           FTrustState.RemoveRepository(packageId.Id);
-          FLogger.Warning('[PackageCache] User overrode repository ratchet for [' +
-            packageId.Id + '] — prior repository trust entry removed.');
+          FLogger.Information('The repository signature change of [' +
+            packageId.Id + '] was accepted - its previous repository trust entry was removed.', true);
           result := true;
           exit;
         end;
@@ -697,8 +695,8 @@ begin
   case policy.AuthorDowngradePolicy of
     adpAllow :
       begin
-        FLogger.Warning(Format(
-          '[PackageCache] Author downgrade for [%s] silently allowed by policy.',
+        FLogger.Warning(TWarningCode.W7006_AuthorSignatureChanged, Format(
+          'The author signature of [%s] changed - allowed by authorDowngradePolicy=allow.',
           [packageId.Id]));
         newEntry := prior;
         newEntry.LastAuthorSpkiHex    := currentSpki;
@@ -733,6 +731,14 @@ begin
         context.NewSigned        := currentSigned;
         context.NewSpkiHex       := currentSpki;
         context.NewSubject       := currentSubject;
+        if currentSigned then
+          FLogger.Warning(TWarningCode.W7006_AuthorSignatureChanged, Format(
+            'The author signature of [%s] changed - previously sha256:%s, now sha256:%s.',
+            [packageId.Id, prior.LastAuthorSpkiHex, currentSpki]))
+        else
+          FLogger.Warning(TWarningCode.W7006_AuthorSignatureChanged, Format(
+            'The package [%s] is no longer author-signed - previously sha256:%s.',
+            [packageId.Id, prior.LastAuthorSpkiHex]));
         result := FTrustPrompt.PromptAuthorDowngrade(context, decision);
         case decision of
           tpdOverride :
@@ -740,8 +746,8 @@ begin
               // Drop the trust entry so the new build installs and the next
               // install is treated as fresh TOFU rather than another downgrade.
               FTrustState.RemoveAuthor(packageId.Id);
-              FLogger.Warning('[PackageCache] User overrode trust state for [' +
-                packageId.Id + '] — prior author trust entry removed.');
+              FLogger.Information('The author signature change of [' +
+                packageId.Id + '] was accepted - its previous author trust entry was removed.', true);
               result := true;
             end;
           tpdBlockOnce :
@@ -1570,7 +1576,7 @@ begin
       voUnsigned :
         logger.Information('[PackageCache] Installing unsigned package ' + '[' + packageIndentity.Id + '] under permissive mode.');
       voUntrustedPublisher :
-        logger.Warning('[PackageCache] Package signed but signer is not in ' +  'trustedPublishers; install allowed under permissive mode.');
+        logger.Warning(TWarningCode.W7008_PublisherNotTrusted, 'The package [' + packageIndentity.Id + '] is signed by a publisher that is not in trustedPublishers - permissive mode allows installing it.');
     end;
 
     // The TOFU ratchets compare this build against the high-water mark from the

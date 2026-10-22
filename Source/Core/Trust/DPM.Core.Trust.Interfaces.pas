@@ -29,6 +29,7 @@ unit DPM.Core.Trust.Interfaces;
 interface
 
 uses
+  DPM.Core.Diagnostics,
   System.SysUtils;
 
 type
@@ -137,8 +138,19 @@ type
     procedure RemoveRepository(const packageId : string);
   end;
 
-  ETrust = class(Exception);
+  //raised with E7108 unless said otherwise (see EDPMCodedError).
+  ETrust = class(EDPMCodedError)
+  protected
+    class function DefaultCode : TErrorCode; override;
+  end;
 
 implementation
+
+{ ETrust }
+
+class function ETrust.DefaultCode : TErrorCode;
+begin
+  result := TErrorCode.E7108_TrustStateFailed;
+end;
 
 end.

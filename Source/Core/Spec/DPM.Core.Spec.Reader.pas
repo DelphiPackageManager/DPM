@@ -54,7 +54,8 @@ implementation
 uses
   System.StrUtils,
   DPM.Core.Utils.Path,
-  DPM.Core.Spec;
+  DPM.Core.Spec,
+  DPM.Core.Diagnostics;
 
 { TSpecReader }
 
@@ -65,7 +66,7 @@ begin
   result := nil;
   if not FileExists(fileName) then
   begin
-    FLogger.Error('Spec file : [' + filename + '] does not exist');
+    FLogger.Error(TErrorCode.E6001_SpecNotFound, 'The spec file [' + filename + '] does not exist.');
     exit;
   end;
 
@@ -75,15 +76,21 @@ begin
       yamlDoc := TYAML.LoadFromFile(fileName);
       result := InternalReadPackageSpecYAML(fileName, yamlDoc);
     except
+      //a spec that failed to load may have been half built - don't hand it out.
+      on e : EDPMError do
+      begin
+        result := nil;
+        FLogger.Error(e.Code, 'Spec [' + fileName + '] : ' + e.Message);
+      end;
       on e : Exception do
       begin
-        FLogger.Error('Error parsing spec yaml : ' + e.Message);
+        result := nil;
+        FLogger.Error(TErrorCode.E6002_SpecUnreadable, 'Unable to read the spec [' + fileName + '] : ' + e.Message);
       end;
-
     end;
   end
   else
-    FLogger.Error('Spec file : [' + filename + '] has unrecognized extension (expected .dspec or .dspec.yaml)');
+    FLogger.Error(TErrorCode.E6002_SpecUnreadable, 'The spec file [' + filename + '] has an unrecognised extension (expected .dspec or .dspec.yaml).');
 end;
 
 function TPackageSpecReader.ReadSpecString(const value : string; const fileName : string = '') : IPackageSpec;
@@ -95,9 +102,15 @@ begin
     yamlDoc := TYAML.LoadFromString(value);
     result := InternalReadPackageSpecYAML(fileName, yamlDoc);
   except
+    on e : EDPMError do
+    begin
+      result := nil;
+      FLogger.Error(e.Code, e.Message);
+    end;
     on e : Exception do
     begin
-      FLogger.Error('Error parsing spec yaml : ' + e.Message);
+      result := nil;
+      FLogger.Error(TErrorCode.E6002_SpecUnreadable, 'Unable to read the spec : ' + e.Message);
     end;
   end;
 end;
@@ -111,15 +124,21 @@ end;
 function TPackageSpecReader.InternalReadPackageSpecYAML(const fileName: string; const yamlDoc: IYAMLDocument): IPackageSpec;
 var
   root : IYAMLMapping;
+  specLogger : ILogger;
 begin
   result := nil;
   root := yamlDoc.AsMapping;
   if not root.ContainsKey('metadata') then
   begin
-    FLogger.Error('yaml document does not have a metadata object, this is probably not a dspec file');
+    FLogger.Error(TErrorCode.E6002_SpecUnreadable, 'The yaml document [' + fileName + '] has no metadata - it is probably not a dspec file.');
     exit;
   end;
-  result := TSpec.Create(FLogger, fileName);
+  //the spec's parts don't know which file they came from - say so in what they report.
+  if fileName <> '' then
+    specLogger := TContextLogger.Create(FLogger, 'Spec [' + fileName + '] : ')
+  else
+    specLogger := FLogger;
+  result := TSpec.Create(specLogger, fileName);
   result.LoadFromYAML(root);
 end;
 

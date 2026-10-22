@@ -85,7 +85,8 @@ uses
   System.Masks,
   System.RegularExpressions,
   DPM.Core.Utils.Path,
-  DPM.Core.Utils.Strings;
+  DPM.Core.Utils.Strings,
+  DPM.Core.Diagnostics;
 
 class function TPrepareSourceGatherer.ContainsUnresolvedVariable(const value : string) : boolean;
 begin
@@ -307,7 +308,7 @@ begin
     pattern := ResolveVariables(rawPattern, variables);
     if ContainsUnresolvedVariable(pattern) then
     begin
-      logger.Warning('Source entry has unresolvable variable - skipping: ' + rawPattern);
+      logger.Warning(TWarningCode.W6110_SourceVariableUnresolved, 'Skipping the source pattern [' + rawPattern + '] - it uses a variable that is not defined.');
       continue;
     end;
 
@@ -334,7 +335,7 @@ begin
 
     if not TDirectory.Exists(searchDir) then
     begin
-      logger.Warning('Source path does not exist (skipping): ' + searchDir);
+      logger.Warning(TWarningCode.W6104_PatternMatchedNoFiles, 'Skipping the source path [' + searchDir + '] - it does not exist.');
       continue;
     end;
 

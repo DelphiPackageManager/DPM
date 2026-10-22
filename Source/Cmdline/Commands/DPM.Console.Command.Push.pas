@@ -55,7 +55,8 @@ uses
   VSoft.Uri,
   DPM.Core.Constants,
   DPM.Core.Options.Common,
-  DPM.Core.Options.Push;
+  DPM.Core.Options.Push,
+  DPM.Core.Diagnostics;
 
 { TPushCommand }
 
@@ -80,7 +81,7 @@ begin
 
   if not FileExists(TPushOptions.Default.ConfigFile) then
   begin
-    Logger.Error('No configuration file found, create one by adding a source - see sources command.');
+    Logger.Error(TErrorCode.E0203_ConfigurationNotFound, 'The configuration file [' + TPushOptions.Default.ConfigFile + '] does not exist - add a source with `dpm sources add` to create it.');
     exit(TExitCode.InitException);
   end;
 
@@ -98,13 +99,13 @@ begin
 
   if sourceConfig = nil then
   begin
-    Logger.Error('No source named [' + TPushOptions.Default.Source + '] is registered');
+    Logger.Error(TErrorCode.E1003_UnknownSource, 'Unable to push - the source [' + TPushOptions.Default.Source + '] is not configured.');
     exit(TExitCode.InvalidArguments);
   end;
 
   if not TUriFactory.TryParseWithError(sourceConfig.Source,false, sourceUri, error) then
   begin
-    Logger.Error('Error parsing source Uri [' + sourceConfig.Source + '] - ' + error);
+    Logger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + sourceConfig.Name + '] is not valid - [' + sourceConfig.Source + '] is not a valid uri : ' + error);
     exit(TExitCode.Error);
   end;
 

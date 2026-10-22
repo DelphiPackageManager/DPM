@@ -97,7 +97,8 @@ type
 implementation
 
 uses
-  DPM.Core.Crypto.Hashing;  // BytesToHex, HexToBytes, BytesEqual
+  DPM.Core.Crypto.Hashing,
+  DPM.Core.Diagnostics;  // BytesToHex, HexToBytes, BytesEqual
 
 const
   cENCODING_TYPE         = X509_ASN_ENCODING or PKCS_7_ASN_ENCODING;
@@ -959,14 +960,14 @@ begin
     FLogger.Verbose('  SignRemote: embedded SignedAttrs hash matches sent digest (OK)')
   else
   begin
-    FLogger.Error(
-      '  SignRemote: ENCODING DIVERGENCE — the SignedAttrs hash a verifier ' +
+    FLogger.Warning(TWarningCode.W7009_SignatureSelfCheckFailed,
+      'SignRemote: ENCODING DIVERGENCE — the SignedAttrs hash a verifier ' +
       'will recompute from the assembled CMS does NOT match the digest we ' +
       'sent to the remote signer. The remote signer signed our digest ' +
       'correctly, but the bytes Windows embedded in the CMS hash to a ' +
-      'different value, so the signature won''t verify.');
-    FLogger.Error('  SignRemote: sent digest       = ' + BytesToHex(attrsHash));
-    FLogger.Error('  SignRemote: embedded SET hash = ' + BytesToHex(embeddedHash));
+      'different value, so the signature won''t verify.' + sLineBreak +
+      '  sent digest       = ' + BytesToHex(attrsHash) + sLineBreak +
+      '  embedded SET hash = ' + BytesToHex(embeddedHash));
   end;
 
   // Second self-check: confirm the signature value Windows' PKCS7_SIGNER_INFO
@@ -987,12 +988,12 @@ begin
     FLogger.Verbose('  SignRemote: embedded signature value matches received signature (OK)')
   else
   begin
-    FLogger.Error(
-      '  SignRemote: SIGNATURE CORRUPTION — Windows'' PKCS7_SIGNER_INFO ' +
+    FLogger.Warning(TWarningCode.W7009_SignatureSelfCheckFailed,
+      'SignRemote: SIGNATURE CORRUPTION — Windows'' PKCS7_SIGNER_INFO ' +
       'encoder embedded a different signature value than the one returned ' +
-      'by the remote signer.');
-    FLogger.Error('  SignRemote: received sig = ' + BytesToHex(signatureBytes));
-    FLogger.Error('  SignRemote: embedded sig = ' + BytesToHex(embeddedSig));
+      'by the remote signer.' + sLineBreak +
+      '  received sig = ' + BytesToHex(signatureBytes) + sLineBreak +
+      '  embedded sig = ' + BytesToHex(embeddedSig));
   end;
 
   // Third self-check: log the signatureAlgorithm OID Windows wrote into the

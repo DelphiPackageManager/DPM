@@ -51,7 +51,8 @@ uses
   DPM.Core.Configuration.Classes,
   DPM.Core.Utils.Config,
   DPM.Core.Options.Common,
-  DPM.Core.Options.Trust;
+  DPM.Core.Options.Trust,
+  DPM.Core.Diagnostics;
 
 function NormaliseSpki(const value : string) : string;
 begin
@@ -108,10 +109,7 @@ begin
   configPath := TConfigUtils.GetDefaultConfigFileName;
   config := FConfigurationManager.LoadConfig(configPath);
   if config = nil then
-  begin
-    Logger.Error('Could not load configuration file.');
     exit(TExitCode.Error);
-  end;
   signing := config.Signing;
 
   case options.Command of
@@ -172,10 +170,7 @@ begin
           end;
         end;
         if not FConfigurationManager.SaveConfig(config, configPath) then
-        begin
-          Logger.Error('Failed to save configuration.');
           exit(TExitCode.Error);
-        end;
         Logger.Success('Trust entry added.');
         result := TExitCode.OK;
       end;
@@ -187,7 +182,7 @@ begin
           idx := FindPublisherIndex(signing.TrustedPublishers, options.Spki);
           if idx < 0 then
           begin
-            Logger.Error('No trusted publisher found with that SPKI.');
+            Logger.Error(TErrorCode.E0102_InvalidArgument, 'No trusted publisher has the SPKI [' + options.Spki + '].');
             exit(TExitCode.InvalidArguments);
           end;
           signing.TrustedPublishers.Delete(idx);
@@ -197,22 +192,19 @@ begin
           idx := FindRepositoryIndex(signing.TrustedRepositories, options.Spki);
           if idx < 0 then
           begin
-            Logger.Error('No trusted repository found with that SPKI.');
+            Logger.Error(TErrorCode.E0102_InvalidArgument, 'No trusted repository has the SPKI [' + options.Spki + '].');
             exit(TExitCode.InvalidArguments);
           end;
           signing.TrustedRepositories.Delete(idx);
         end;
         if not FConfigurationManager.SaveConfig(config, configPath) then
-        begin
-          Logger.Error('Failed to save configuration.');
           exit(TExitCode.Error);
-        end;
         Logger.Success('Trust entry removed.');
         result := TExitCode.OK;
       end;
 
   else
-    Logger.Error('Unknown trust subcommand.');
+    Logger.Error(TErrorCode.E0102_InvalidArgument, 'That is not a trust subcommand - use list, show, add or remove.');
     result := TExitCode.InvalidArguments;
   end;
 end;

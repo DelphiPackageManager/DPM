@@ -119,7 +119,8 @@ uses
   System.Classes,
   System.SysUtils,
   System.StrUtils,
-  System.IOUtils;
+  System.IOUtils,
+  DPM.Core.Diagnostics;
 
 const
   msbuildNamespace = 'http://schemas.microsoft.com/developer/msbuild/2003';
@@ -149,7 +150,7 @@ begin
 
   if not FileExists(filename) then
   begin
-    FLogger.Error('Project file does not exist : ' + filename);
+    FLogger.Error(TErrorCode.E4001_ProjectNotFound, 'The project file [' + filename + '] does not exist.');
     exit;
   end;
 
@@ -158,7 +159,7 @@ begin
     result := TXMLUtils.LoadXMLFromFile(FProjectXml, filename, FFileFormat);
     if not result then
     begin
-      FLogger.Error('Error loading project file : ' + FProjectXml.parseError.reason);
+      FLogger.Error(TErrorCode.E4003_ProjectLoadFailed, 'Unable to load the project file [' + filename + '] : ' + Trim(FProjectXml.parseError.reason));
       exit;
     end;
     (FProjectXml as IXMLDOMDocument2).setProperty('SelectionLanguage', 'XPath');
@@ -167,7 +168,7 @@ begin
   except
     on e : Exception do
     begin
-      FLogger.Error('Error loading project xml : ' + e.Message);
+      FLogger.Error(TErrorCode.E4003_ProjectLoadFailed, 'Unable to load the project file [' + filename + '] : ' + e.Message);
       FProjectXml := nil;
       result := false;
     end;
@@ -179,7 +180,7 @@ begin
   result := false;
   if FProjectXml = nil then
   begin
-    FLogger.Error('Cannot save project - nothing loaded.');
+    FLogger.Error(TErrorCode.E0003_InternalError, 'SaveToFile was called before a project was loaded.');
     exit;
   end;
   try
@@ -189,7 +190,7 @@ begin
   except
     on e : Exception do
     begin
-      FLogger.Error('Error saving project [' + filename + '] : ' + e.Message);
+      FLogger.Error(TErrorCode.E4006_ProjectSaveFailed, 'Unable to save the project file [' + filename + '] : ' + e.Message);
     end;
   end;
 end;

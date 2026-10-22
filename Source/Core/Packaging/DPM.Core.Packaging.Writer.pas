@@ -150,7 +150,8 @@ uses
   DPM.Core.Spec,
   DPM.Core.Utils.PE,
   DPM.Core.Utils.Strings,
-  DPM.Core.Utils.Path;
+  DPM.Core.Utils.Path,
+  DPM.Core.Diagnostics;
 
 { TPackageWriter }
 
@@ -307,7 +308,7 @@ begin
     begin
       if not TEnvironmentVariableValidator.IsAllowed(pair.Key, reason) then
       begin
-        FLogger.Error('Template [' + template.Name + '] : ' + reason);
+        FLogger.Error(TErrorCode.E6102_EnvironmentVariableNotAllowed, 'Template [' + template.Name + '] : ' + reason);
         result := false;
       end;
     end;
@@ -431,7 +432,7 @@ begin
     except
       on e : Exception do
       begin
-        FLogger.Error('Error replacing variables : ' + e.Message);
+        FLogger.Error(TErrorCode.E6103_VariableReplacementFailed, 'Unable to replace the variables in the spec : ' + e.Message);
         result := false;
 
       end;
@@ -621,7 +622,7 @@ begin
     ProcessPattern(stripBasePath, actualDest, fsPattern, fileMatcher, fileCount);
 
   if fileCount = 0 then
-    FLogger.Warning('No files were found for pattern [' + source + ']');
+    FLogger.Warning(TWarningCode.W6104_PatternMatchedNoFiles, 'No files were found for the pattern [' + source + '].');
 end;
 
 
@@ -820,13 +821,13 @@ var
       exit;
 
     if blocking.Any then
-      raise Exception.Create(
+      raise EDPMError.Create(TErrorCode.E5005_BuildProjectRunsCommands,
         entryKind + ' project [' + projectPath + '] can run commands when DPM compiles it during ' +
         'install : ' + TStringUtils.Join('; ', blocking.ToArray) + '. A package project must compile, not ' +
         'execute - remove the msbuild targets, tasks and imports before packing.');
 
     if advisory.Any then
-      FLogger.Warning(
+      FLogger.Warning(TWarningCode.W5013_BuildEventIgnored,
         entryKind + ' project [' + projectPath + '] sets a build event DPM blocks when it compiles ' +
         'the package : ' + TStringUtils.Join('; ', advisory.ToArray) + '. The step will not run on a ' +
         'consumer''s machine - if the package relies on it, do that work before packing.');
@@ -899,7 +900,7 @@ begin
   template := reducedSpec.FindTemplate(targetPlatform.TemplateName);
   if template = nil then
   begin
-    FLogger.Error('Could not find Template : ' + targetPlatform.TemplateName);
+    FLogger.Error(TErrorCode.E6101_TemplateNotFound, 'The spec has no template [' + targetPlatform.TemplateName + '] - its targetPlatform for ' + CompilerToString(targetPlatform.Compiler) + ' uses it.');
     exit;
   end;
 
@@ -918,10 +919,7 @@ begin
   FEffectiveBasePath := ComputeEffectiveBasePath(basePath, reducedSpec, template);
   FArchiveWriter.SetBasePath(FEffectiveBasePath);
   if not FArchiveWriter.Open(packageFileName) then
-  begin
-    FLogger.Warning('Could not open package file [' + packageFileName + '] - skipping');
     exit;
-  end;
   FLogger.Information('Writing package to file : ' + packageFileName);
   FArchivePaths := TCollections.CreateList<string>;
   FPrecompiledBinaries := TCollections.CreateList<string>;
@@ -937,7 +935,7 @@ begin
       iconPath := TPathUtils.CompressRelativePath(basePath, reducedSpec.MetaData.Icon);
       if not FileExists(iconPath) then
       begin
-        FLogger.Error('Icon file not found : ' + iconPath);
+        FLogger.Error(TErrorCode.E6105_PackFileNotFound, 'The icon file [' + iconPath + '] does not exist.');
         exit;
       end;
       if FArchiveWriter.AddIcon(iconPath) then
@@ -950,7 +948,7 @@ begin
       readmePath := TPathUtils.CompressRelativePath(basePath, reducedSpec.MetaData.ReadMe);
       if not FileExists(readmePath) then
       begin
-        FLogger.Error('Readme file not found : ' + readmePath);
+        FLogger.Error(TErrorCode.E6105_PackFileNotFound, 'The readme file [' + readmePath + '] does not exist.');
         exit;
       end;
       //Store the readme relative to the package's effective root (mirroring its on-disk location),
@@ -1066,7 +1064,7 @@ begin
     archiveValidation := FArchiveValidator.Validate(packageFileName);
     if not archiveValidation.Ok then
     begin
-      FLogger.Error(Format('Archive validation failed: %s (entry "%s")',
+      FLogger.Error(TErrorCode.E6107_PackageInvalid, Format('The package written is not valid : %s (entry "%s") - it was deleted.',
         [archiveValidation.Reason, archiveValidation.Entry]));
       DeleteFile(packageFileName);
       result := false;
@@ -1085,7 +1083,7 @@ begin
     except
       on e : Exception do
       begin
-        FLogger.Error('Manifest emission failed: ' + e.Message);
+        FLogger.Error(TErrorCode.E6108_ManifestWriteFailed, 'Unable to write the package manifest : ' + e.Message);
         DeleteFile(packageFileName);
         result := false;
         exit;
@@ -1135,7 +1133,7 @@ begin
   begin
     if not TPackageVersion.TryParseWithError(options.Version, version, error) then
     begin
-      FLogger.Error('Invalid Version : ' + error);
+      FLogger.Error(TErrorCode.E0102_InvalidArgument, 'The version [' + options.Version + '] is not valid : ' + error);
       Exit(false);
     end;
   end
@@ -1156,13 +1154,13 @@ begin
   end;
   if not spec.IsValid then
   begin
-    FLogger.Error('Spec is not valid, exiting.');
+    FLogger.Information('The spec is not valid - no packages were written.', true);
     exit;
   end;
 
   if spec.PackageKind <> TDPMPackageKind.dpm then
   begin
-    FLogger.Error('Invalid package kind - git packages cannot be packed.');
+    FLogger.Error(TErrorCode.E6109_GitPackageNotPackable, 'The spec is for a git registry package, and those cannot be packed.');
     exit;
   end;
 
@@ -1198,7 +1196,7 @@ begin
       expandedCompilers := ExpandedCompilersOf(targetPlatform);
       if expandedCompilers = [] then
       begin
-        FLogger.Error('No compiler version found for target platform');
+        FLogger.Error(TErrorCode.E0003_InternalError, 'A targetPlatform has no compiler versions.');
         result := false;
         exit;
       end;

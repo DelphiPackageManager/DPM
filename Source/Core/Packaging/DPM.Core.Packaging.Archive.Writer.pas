@@ -72,7 +72,8 @@ implementation
 uses
   DPM.Core.Constants,
   System.SysUtils,
-  System.IOUtils;
+  System.IOUtils,
+  DPM.Core.Diagnostics;
 
 { TPackageArchiveWriter }
 
@@ -209,7 +210,7 @@ begin
     on e : Exception do
     begin
       FreeAndNil(FZipFile);
-      FLogger.Error('Error opening package file : ' + e.Message);
+      FLogger.Error(TErrorCode.E6106_PackageWriteFailed, 'Unable to create the package file [' + FFileName + '] : ' + e.Message);
       FLastError := e.ToString;
     end;
   end;

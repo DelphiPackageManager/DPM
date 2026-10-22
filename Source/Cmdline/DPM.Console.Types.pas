@@ -149,26 +149,34 @@ function WantsCleanStdOut : boolean;
 var
   i : integer;
   param : string;
+  commandSeen : boolean;
 begin
   result := false;
+  commandSeen := false;
   for i := 1 to ParamCount do
   begin
     param := ParamStr(i);
     //Accept every spelling the command line parser accepts, so the console cannot end up
-    //disagreeing with the options registry about what was asked for.
+    //disagreeing with the options registry about what was asked for. Options can come before or
+    //after the command, so look at every parameter.
     if SameText(param, '--format=json') or SameText(param, '-format=json') or
        SameText(param, '/format=json') then
       exit(true);
 
+    //verify's own machine readable switch.
+    if SameText(param, '--json-output') or SameText(param, '-json-output') or
+       SameText(param, '/json-output') then
+      exit(true);
+
     //The mcp server owns stdout for its whole life - the JSON-RPC framing is one message
     //per line and a single stray banner or log line would corrupt the session.
-    if (param <> '') and (param[1] <> '-') and (param[1] <> '/') then
+    if (not commandSeen) and (param <> '') and (param[1] <> '-') and (param[1] <> '/') then
     begin
-      //First non switch token is the command name; stop either way so an argument that
-      //happens to read 'mcp' later on cannot trigger this.
+      //First non switch token is the command name - an argument that happens to read 'mcp'
+      //later on must not trigger this.
+      commandSeen := true;
       if SameText(param, 'mcp') then
         exit(true);
-      break;
     end;
   end;
 end;

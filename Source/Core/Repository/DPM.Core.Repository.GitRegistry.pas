@@ -518,7 +518,7 @@ end;
 
 function TGitRegistryPackageRepository.Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions) : Boolean;
 begin
-  Logger.Error('Push is not supported for git registry sources.');
+  Logger.Error(TErrorCode.E6202_PushNotSupported, 'The source [' + Name + '] is a git registry - packages can not be pushed to it.');
   result := false;
 end;
 

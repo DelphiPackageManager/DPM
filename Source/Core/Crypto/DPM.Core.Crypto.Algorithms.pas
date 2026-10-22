@@ -37,6 +37,7 @@ unit DPM.Core.Crypto.Algorithms;
 interface
 
 uses
+  DPM.Core.Diagnostics,
   System.SysUtils,
   DPM.Core.Crypto.Win32;
 
@@ -74,10 +75,20 @@ type
     class function HashBCryptAlgorithm(algorithm : THashAlgorithm) : PWideChar; static;
   end;
 
-  ECryptoAlgorithm = class(Exception)
+  //raised with E7106 unless said otherwise (see EDPMCodedError).
+  ECryptoAlgorithm = class(EDPMCodedError)
+  protected
+    class function DefaultCode : TErrorCode; override;
   end;
 
 implementation
+
+{ ECryptoAlgorithm }
+
+class function ECryptoAlgorithm.DefaultCode : TErrorCode;
+begin
+  result := TErrorCode.E7106_CryptoFailed;
+end;
 
 
 { TAlgorithmProfile }

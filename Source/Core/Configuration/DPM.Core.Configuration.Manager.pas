@@ -52,7 +52,8 @@ uses
   DPM.Core.Utils.System,
   DPM.Core.Utils.Config,
   DPM.Core.Constants,
-  DPM.Core.Configuration.Classes;
+  DPM.Core.Configuration.Classes,
+  DPM.Core.Diagnostics;
 
 { TConfigurationManager }
 
@@ -65,27 +66,29 @@ function TConfigurationManager.EnsureDefaultConfig : boolean;
 var
   sDefaultConfigFile : string;
   config : IConfiguration;
+  errorMark : integer;
 begin
   sDefaultConfigFile := TConfigUtils.GetDefaultConfigFileName;
   //if it exists, load it to make sure it's valid.
+  //loading and saving report what went wrong - these only make sure a failure is never silent.
+  errorMark := FLogger.ErrorCount;
   if FileExists(sDefaultConfigFile) then
   begin
-    config := LoadConfig(sDefaultConfigFile); //this will log errors
+    config := LoadConfig(sDefaultConfigFile);
     if ((config <> nil) and (not config.Sources.Any)) then
       config.AddDefaultSources;
 
     result := config <> nil;
-    if not result then
-      FLogger.Error('Unable to load the default config  file : ' + cDefaultConfigFile);
-
+    if (not result) and (FLogger.ErrorCount = errorMark) then
+      FLogger.Error(TErrorCode.E0201_ConfigurationLoadFailed, 'Unable to load the configuration file [' + sDefaultConfigFile + '].');
   end
   else
   begin
     config := NewConfig;
     TConfigUtils.EnsureDefaultConfigDir;
     result := SaveConfig(config, sDefaultConfigFile);
-    if not result then
-      FLogger.Error('No default config file found and unable to create one at : ' + cDefaultConfigFile);
+    if (not result) and (FLogger.ErrorCount = errorMark) then
+      FLogger.Error(TErrorCode.E0202_ConfigurationSaveFailed, 'There is no configuration file, and one could not be created at [' + sDefaultConfigFile + '].');
   end;
 end;
 
@@ -120,7 +123,7 @@ begin
   if config <> nil then
     result := config.SaveToFile(fileName)
   else
-    FLogger.Error('configuration does not implement IConfigurationLoadSave');
+    FLogger.Error(TErrorCode.E0003_InternalError, 'The configuration does not implement IConfigurationLoadSave.');
 end;
 
 end.

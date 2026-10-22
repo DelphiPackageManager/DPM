@@ -72,7 +72,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Diagnostics;
 
 { TSpecSourceEntry }
 
@@ -135,7 +136,7 @@ begin
   if FSource = '' then
   begin
     result := false;
-    Logger.Error('Required attribute [src] is missing');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'A source entry is missing the required [src].');
   end;
   FDestination := yamlObject.S['dest'];
 

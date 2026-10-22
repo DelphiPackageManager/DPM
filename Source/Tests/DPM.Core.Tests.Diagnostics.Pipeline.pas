@@ -61,6 +61,19 @@ type
     procedure Unreadable_Build_Record_Is_Not_An_Error;
     [Test]
     procedure Demoted_Problems_Are_Kept_For_The_Caller;
+
+    [Test]
+    procedure Missing_Spec_Is_One_Error;
+    [Test]
+    procedure Unreadable_Spec_Is_One_Error;
+    [Test]
+    procedure Spec_Field_Errors_Each_Name_The_Spec;
+    [Test]
+    procedure Spec_Needing_A_Newer_DPM_Says_So;
+    [Test]
+    procedure Area_Exceptions_Carry_Their_Code;
+    [Test]
+    procedure Context_Is_Added_To_Warnings_And_Errors_Only;
   end;
 
 implementation
@@ -96,6 +109,9 @@ uses
   DPM.Core.Project.Interfaces,
   DPM.Core.Project.Editor,
   DPM.Core.Project.GroupProjReader,
+  DPM.Core.Spec.Interfaces,
+  DPM.Core.Spec.Reader,
+  DPM.Core.Crypto.X509.Interfaces,
   DPM.Core.Tests.Dependency.Fakes,
   TestLogger;
 
@@ -625,6 +641,134 @@ begin
   demoting.Error(TErrorCode.E5003_PackageCompileFailed, 'the second');
   Assert.AreEqual('error DPME5003: the first', demoting.FirstProblem, false);
   Assert.AreEqual(0, targetIntf.ErrorCount, target.Messages.Text);
+end;
+
+procedure TDiagnosticsPipelineTests.Missing_Spec_Is_One_Error;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  reader : IPackageSpecReader;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  reader := TPackageSpecReader.Create(loggerIntf);
+  Assert.IsNull(reader.ReadSpec(TPath.Combine(FTempFolder, 'missing.dspec.yaml')));
+  Assert.AreEqual(1, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(logger.HasError(TErrorCode.E6001_SpecNotFound), logger.Messages.Text);
+end;
+
+procedure TDiagnosticsPipelineTests.Unreadable_Spec_Is_One_Error;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  reader : IPackageSpecReader;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  reader := TPackageSpecReader.Create(loggerIntf);
+  Assert.IsNull(reader.ReadSpec(TempFile('broken.dspec.yaml', 'metadata: [unclosed')));
+  Assert.AreEqual(1, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(logger.HasError(TErrorCode.E6002_SpecUnreadable), logger.Messages.Text);
+end;
+
+procedure TDiagnosticsPipelineTests.Spec_Field_Errors_Each_Name_The_Spec;
+const
+  //no version, description or authors.
+  cSpec =
+    'metadata:' + sLineBreak +
+    '  id: VSoft.Incomplete' + sLineBreak +
+    'targetPlatforms:' + sLineBreak +
+    '  - compiler: 12.0' + sLineBreak +
+    '    platforms: [Win32]' + sLineBreak +
+    '    template: default' + sLineBreak +
+    'templates:' + sLineBreak +
+    '  - name: default' + sLineBreak;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  reader : IPackageSpecReader;
+  spec : IPackageSpec;
+  specFile : string;
+  i : integer;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  specFile := TempFile('incomplete.dspec.yaml', cSpec);
+  reader := TPackageSpecReader.Create(loggerIntf);
+  spec := reader.ReadSpec(specFile);
+  Assert.IsNotNull(spec);
+  Assert.IsFalse(spec.IsValid);
+  //each missing field is its own error - independent problems, no summary after them.
+  Assert.AreEqual(3, loggerIntf.ErrorCount, logger.Messages.Text);
+  for i := 0 to logger.Diagnostics.Count - 1 do
+    Assert.AreEqual('error DPME6003', logger.Diagnostics[i], false);
+  //the spec's parts don't know the file - the reader adds it.
+  for i := 0 to logger.Messages.Count - 1 do
+    Assert.IsTrue(Pos('Spec [' + specFile + ']', logger.Messages[i]) > 0, logger.Messages[i]);
+end;
+
+procedure TDiagnosticsPipelineTests.Spec_Needing_A_Newer_DPM_Says_So;
+const
+  cSpec =
+    'min dpm client version: 99.0.0' + sLineBreak +
+    'metadata:' + sLineBreak +
+    '  id: VSoft.FromTheFuture' + sLineBreak;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  reader : IPackageSpecReader;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  reader := TPackageSpecReader.Create(loggerIntf);
+  Assert.IsNull(reader.ReadSpec(TempFile('future.dspec.yaml', cSpec)));
+  Assert.AreEqual(1, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(logger.HasError(TErrorCode.E6005_SpecNeedsNewerDPM), logger.Messages.Text);
+end;
+
+procedure TDiagnosticsPipelineTests.Area_Exceptions_Carry_Their_Code;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  e : Exception;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  e := ECryptoX509.Create('bad certificate');
+  try
+    Assert.IsTrue(e is EDPMError);
+    Assert.IsTrue(EDPMError(e).Code = TErrorCode.E7104_CertificateInvalid);
+    LogException(loggerIntf, e);
+    Assert.IsTrue(ErrorCodeOf(e, TErrorCode.E7102_SigningFailed) = TErrorCode.E7104_CertificateInvalid);
+  finally
+    e.Free;
+  end;
+  Assert.AreEqual('error: DPME7104: bad certificate', logger.Messages[0], false);
+  e := Exception.Create('plain');
+  try
+    Assert.IsTrue(ErrorCodeOf(e, TErrorCode.E7102_SigningFailed) = TErrorCode.E7102_SigningFailed);
+  finally
+    e.Free;
+  end;
+end;
+
+procedure TDiagnosticsPipelineTests.Context_Is_Added_To_Warnings_And_Errors_Only;
+var
+  target : TTestLogger;
+  targetIntf : ILogger;
+  context : ILogger;
+begin
+  target := TTestLogger.Create;
+  targetIntf := target;
+  context := TContextLogger.Create(targetIntf, 'Spec [x.dspec] : ');
+  context.Information('reading');
+  context.Warning(TWarningCode.W6104_PatternMatchedNoFiles, 'no files');
+  context.Error(TErrorCode.E6003_SpecElementMissing, 'no version');
+  Assert.AreEqual('information: reading', target.Messages[0], false);
+  Assert.AreEqual('warning: DPMW6104: Spec [x.dspec] : no files', target.Messages[1], false);
+  Assert.AreEqual('error: DPME6003: Spec [x.dspec] : no version', target.Messages[2], false);
+  Assert.AreEqual(1, context.ErrorCount, 'counted by the logger it wraps');
+  Assert.AreEqual(1, targetIntf.ErrorCount);
 end;
 
 initialization

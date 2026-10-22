@@ -59,7 +59,8 @@ uses
   DPM.Console.Banner,
   DPM.Console.Options,
   DPM.Core.Options.Common,
-  DPM.Core.Options.Pack;
+  DPM.Core.Options.Pack,
+  DPM.Core.Diagnostics;
 
 { TPackCommand }
 
@@ -86,7 +87,7 @@ begin
 
   if TPackOptions.Default.SpecFile = '' then
   begin
-    Logger.Error('No Spec file provided!');
+    Logger.Error(TErrorCode.E0101_MissingArgument, 'No spec file was given - pass the .dspec file to pack.');
     Exit(TExitCode.MissingArg);
   end;
 
@@ -95,7 +96,7 @@ begin
   begin
     if not TPackageVersion.TryParseWithError(TPackOptions.Default.Version, packVer, error) then
     begin
-      Logger.Error('Invalid Version : ' + error);
+      Logger.Error(TErrorCode.E0102_InvalidArgument, 'The version [' + TPackOptions.Default.Version + '] is not valid : ' + error);
       Exit(TExitCode.InvalidArguments);
     end;
   end;
@@ -107,7 +108,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Error creating package : ' + e.Message);
+      LogException(Logger, e);
       exit(TExitCode.Error);
     end;
   end;

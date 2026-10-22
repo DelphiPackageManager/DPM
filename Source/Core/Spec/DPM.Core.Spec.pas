@@ -127,7 +127,8 @@ uses
   DPM.Core.Spec.Template,
   DPM.Core.Spec.SourceEntry,
   DPM.Core.Spec.TargetPlatform,
-  DPM.Core.Utils.Strings;
+  DPM.Core.Utils.Strings,
+  DPM.Core.Diagnostics;
 
 { TSpec }
 
@@ -412,12 +413,12 @@ begin
     currentVersion := TPackageVersion.Parse(cDPMClientVersion);
     if not TPackageVersion.TryParseWithError(sMinClient, minClient, error) then
     begin
-      Logger.Error('Invalid "min dpm client version" in dspec : ' + sMinClient);
+      Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The [min dpm client version] [' + sMinClient + '] is not a valid version.');
     end
     else
     begin
       if minClient > currentVersion then
-        raise Exception.Create('Package spec requires newer client version : ' + sMinClient + #13#10 + 'Update your dpm client');
+        raise EDPMError.Create(TErrorCode.E6005_SpecNeedsNewerDPM, 'The spec needs DPM ' + sMinClient + ' or later - update dpm.');
     end;
   end;
 
@@ -437,7 +438,7 @@ begin
   end
   else
   begin
-    Logger.Error('Required element [metadata] not found!');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'The required element [metadata] was not found.');
     result := false;
   end;
 
@@ -446,7 +447,7 @@ begin
 
   if not yamlObject.Contains('targetPlatforms') then
   begin
-    Logger.Error('Required element [targetPlatforms] not found!');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'The required element [targetPlatforms] was not found.');
     result := false;
   end
   else
@@ -468,7 +469,7 @@ begin
   end
   else
   begin
-    Logger.Error('Required element [templates] not found!');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'The required element [templates] was not found.');
     result := false;
 
   end;
@@ -502,7 +503,7 @@ begin
           duplicateList := duplicateList + ', ';
         duplicateList := duplicateList + CompilerToString(c);
       end;
-      Logger.Error(
+      Logger.Error(TErrorCode.E6004_SpecValueInvalid,
         'targetPlatform overlap: compiler(s) [' + duplicateList + '] are covered by more than one targetPlatform. ' +
         'Each compiler must appear in exactly one targetPlatform - overlapping ranges produce conflicting packages ' +
         'and silently mask per-version variable overrides. Narrow the broader range so the two no longer overlap.');
@@ -535,7 +536,7 @@ begin
   end
   else
   begin
-    Logger.Error('No targetPlatforms found, at least 1 is required');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'No targetPlatforms were found - at least one is required.');
     exit(false);
   end;
 end;
@@ -549,7 +550,7 @@ begin
   if not templateObj.Contains('name') then
   begin
     result := false;
-    Logger.Error('Template #' + IntToStr(templateNo) + ' is missing the required name field!');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'Template #' + IntToStr(templateNo) + ' is missing the required [name].');
   end;
   template := TSpecTemplate.Create(Self.Logger);
   result := result and template.LoadFromYAML(templateObj);
@@ -575,7 +576,7 @@ begin
   else
   begin
     result := false;
-    Logger.Error('At least 1 template is required');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'No templates were found - at least one is required.');
   end;
 end;
 
@@ -599,7 +600,7 @@ begin
         on e : Exception do
         begin
           result := false;
-          Logger.Error('Error loading variable : ' + e.Message);
+          Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The variable [' + variablesObj.Keys[i] + '] is not valid : ' + e.Message);
         end;
       end;
     end;

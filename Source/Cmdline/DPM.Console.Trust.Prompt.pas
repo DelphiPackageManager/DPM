@@ -87,8 +87,9 @@ var
 begin
   if not StdinIsTty then
   begin
-    FLogger.Error('  Non-interactive session - blocking. Set ' +
-      'signing.authorDowngradePolicy=allow in dpm.config.yaml to override.');
+    //the install is blocked, and the cache says so.
+    FLogger.Information('  This is not an interactive session, so the install is blocked. Set ' +
+      'signing.authorDowngradePolicy=allow in dpm.config.yaml to allow author signature changes.', true);
     decision := tpdBlockOnce;
     result := false;
     exit;
@@ -114,15 +115,15 @@ function TConsoleTrustPromptStrategy.PromptAuthorDowngrade(
   const context : TTrustPromptContext;
   out decision : TTrustPromptDecision) : boolean;
 begin
-  FLogger.Warning('--');
-  FLogger.Warning(Format('DPM detected an author-signing change for %s %s',
-    [context.PackageId, context.Version]));
+  FLogger.Information('--', true);
+  FLogger.Information(Format('DPM detected an author-signing change for %s %s',
+    [context.PackageId, context.Version]), true);
   if context.PreviousSpkiHex <> '' then
-    FLogger.Warning('  Previously signed by: sha256:' + context.PreviousSpkiHex);
+    FLogger.Information('  Previously signed by: sha256:' + context.PreviousSpkiHex, true);
   if context.NewSigned then
-    FLogger.Warning('  New build signed by: sha256:' + context.NewSpkiHex)
+    FLogger.Information('  New build signed by: sha256:' + context.NewSpkiHex, true)
   else
-    FLogger.Warning('  New build is UNSIGNED.');
+    FLogger.Information('  New build is UNSIGNED.', true);
 
   result := AskUser(decision);
 end;
@@ -131,22 +132,22 @@ function TConsoleTrustPromptStrategy.PromptRepositoryRatchet(
   const context : TRepoTrustPromptContext;
   out decision : TTrustPromptDecision) : boolean;
 begin
-  FLogger.Warning('--');
-  FLogger.Warning(Format('DPM detected a repository trust change for %s %s (V-24)',
-    [context.PackageId, context.Version]));
+  FLogger.Information('--', true);
+  FLogger.Information(Format('DPM detected a repository trust change for %s %s (V-24)',
+    [context.PackageId, context.Version]), true);
   if context.PreviousRepoSpkiHex <> '' then
   begin
     if context.PreviousNamespace <> '' then
-      FLogger.Warning(Format('  Previously from trusted repo: sha256:%s / namespace "%s"',
-        [context.PreviousRepoSpkiHex, context.PreviousNamespace]))
+      FLogger.Information(Format('  Previously from trusted repo: sha256:%s / namespace "%s"',
+        [context.PreviousRepoSpkiHex, context.PreviousNamespace]), true)
     else
-      FLogger.Warning('  Previously from trusted repo: sha256:' + context.PreviousRepoSpkiHex);
+      FLogger.Information('  Previously from trusted repo: sha256:' + context.PreviousRepoSpkiHex, true);
   end;
   if context.NewHasTrustedRepo then
-    FLogger.Warning(Format('  New build: trusted repo sha256:%s / namespace "%s"',
-      [context.NewRepoSpkiHex, context.NewNamespace]))
+    FLogger.Information(Format('  New build: trusted repo sha256:%s / namespace "%s"',
+      [context.NewRepoSpkiHex, context.NewNamespace]), true)
   else
-    FLogger.Warning('  New build: no trusted-repository signature.');
+    FLogger.Information('  New build: no trusted-repository signature.', true);
 
   result := AskUser(decision);
 end;

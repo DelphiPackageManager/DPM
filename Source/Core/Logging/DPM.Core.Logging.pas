@@ -146,6 +146,32 @@ type
     constructor Create(const target : ILogger);
   end;
 
+  ///<summary> Adds what a warning or error is about to its message - for code that reports problems
+  ///  without knowing what they belong to (the parts of a spec don't know the file they came from). </summary>
+  TContextLogger = class(TInterfacedObject, ILogger)
+  private
+    FTarget : ILogger;
+    FContext : string;
+  protected
+    procedure Debug(const data : string);
+    procedure Verbose(const data : string; const important : boolean = false);
+    procedure Information(const data : string; const important : boolean = false);
+    procedure Warning(const data : string; const important : boolean = false); overload;
+    procedure Warning(const code : TWarningCode; const data : string; const important : boolean = false); overload;
+    procedure Error(const data : string); overload;
+    procedure Error(const code : TErrorCode; const data : string); overload;
+    procedure Success(const data : string; const important : boolean = false);
+    procedure Clear;
+    procedure NewLine;
+    procedure StartDiagnosticScope;
+    function ErrorCount : integer;
+    function GetVerbosity : TVerbosity;
+    procedure SetVerbosity(const value : TVerbosity);
+  public
+    //context goes in front of every warning and error, eg 'Spec [<file name>] : '.
+    constructor Create(const target : ILogger; const context : string);
+  end;
+
   ///<summary> Brackets one operation at a boundary - an installer entry point, a command, an IDE action,
   ///  one item of a batch. It starts a new duplicate scope, and makes sure a failed operation never ends
   ///  silently : if it failed without reporting an error, Finish reports DPME0002, which is always a DPM
@@ -172,6 +198,10 @@ type
 ///  An EDPMError keeps its code, anything else is unexpected (DPME0001). </summary>
 procedure LogException(const logger : ILogger; const e : Exception);
 
+///<summary> The code to report an exception with when adding context to its message - an EDPMError's own
+///  code, otherwise defaultCode (what failing at that point means). </summary>
+function ErrorCodeOf(const e : Exception; const defaultCode : TErrorCode = TErrorCode.E0001_UnexpectedException) : TErrorCode;
+
 implementation
 
 uses
@@ -189,6 +219,14 @@ begin
     logger.Error(TErrorCode.E0001_UnexpectedException, e.Message)
   else
     logger.Error(TErrorCode.E0001_UnexpectedException, e.ClassName + ' : ' + e.Message);
+end;
+
+function ErrorCodeOf(const e : Exception; const defaultCode : TErrorCode) : TErrorCode;
+begin
+  if e is EDPMError then
+    result := EDPMError(e).Code
+  else
+    result := defaultCode;
 end;
 
 { TBaseLogger }
@@ -448,6 +486,85 @@ procedure TDemotingLogger.Warning(const code : TWarningCode; const data : string
 begin
   NoteProblem(FormatWarning(code, data));
   FTarget.Debug(FormatWarning(code, data));
+end;
+
+{ TContextLogger }
+
+constructor TContextLogger.Create(const target : ILogger; const context : string);
+begin
+  inherited Create;
+  FTarget := target;
+  FContext := context;
+end;
+
+procedure TContextLogger.Clear;
+begin
+  FTarget.Clear;
+end;
+
+procedure TContextLogger.Debug(const data : string);
+begin
+  FTarget.Debug(data);
+end;
+
+procedure TContextLogger.Error(const data : string);
+begin
+  FTarget.Error(FContext + data);
+end;
+
+procedure TContextLogger.Error(const code : TErrorCode; const data : string);
+begin
+  FTarget.Error(code, FContext + data);
+end;
+
+function TContextLogger.ErrorCount : integer;
+begin
+  result := FTarget.ErrorCount;
+end;
+
+function TContextLogger.GetVerbosity : TVerbosity;
+begin
+  result := FTarget.Verbosity;
+end;
+
+procedure TContextLogger.Information(const data : string; const important : boolean);
+begin
+  FTarget.Information(data, important);
+end;
+
+procedure TContextLogger.NewLine;
+begin
+  FTarget.NewLine;
+end;
+
+procedure TContextLogger.SetVerbosity(const value : TVerbosity);
+begin
+  FTarget.Verbosity := value;
+end;
+
+procedure TContextLogger.StartDiagnosticScope;
+begin
+  FTarget.StartDiagnosticScope;
+end;
+
+procedure TContextLogger.Success(const data : string; const important : boolean);
+begin
+  FTarget.Success(data, important);
+end;
+
+procedure TContextLogger.Verbose(const data : string; const important : boolean);
+begin
+  FTarget.Verbose(data, important);
+end;
+
+procedure TContextLogger.Warning(const data : string; const important : boolean);
+begin
+  FTarget.Warning(FContext + data, important);
+end;
+
+procedure TContextLogger.Warning(const code : TWarningCode; const data : string; const important : boolean);
+begin
+  FTarget.Warning(code, FContext + data, important);
 end;
 
 { TOperationGuard }

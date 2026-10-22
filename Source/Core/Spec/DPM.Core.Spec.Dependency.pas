@@ -67,7 +67,8 @@ uses
   System.SysUtils,
   VSoft.SemanticVersion,
   DPM.Core.Constants,
-  DPM.Core.Packaging.IdValidator;
+  DPM.Core.Packaging.IdValidator,
+  DPM.Core.Diagnostics;
 
 { TSpecDependency }
 
@@ -145,18 +146,18 @@ begin
   FId := yamlObject.S['id'];
   if FId = '' then
   begin
-    Logger.Error('dependency has no id attribute');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'A dependency is missing the required [id].');
     result := false;
   end
   else if not TPackageIdValidator.IsValidPackageId(FId) then
   begin
-    Logger.Error('Invalid dependency Id [' + FId + ']');
+    Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The dependency id [' + FId + '] is not a valid package id.');
     result := false;
   end;
   sValue := yamlObject.S['version'];
   if sValue = '' then
   begin
-    Logger.Error('dependency has no version');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'The dependency [' + FId + '] is missing the required [version].');
     result := false;
 
   end
@@ -172,7 +173,7 @@ begin
   end
   else if not TVersionRange.TryParseWithError(sValue, FVersion, sError) then
   begin
-    Logger.Error('Invalid dependency version attribute [' + sValue + '] - ' + sError);
+    Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The version [' + sValue + '] of the dependency [' + FId + '] is not valid - ' + sError);
     result := false;
   end;
 end;

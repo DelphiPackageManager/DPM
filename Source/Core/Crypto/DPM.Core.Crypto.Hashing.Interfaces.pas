@@ -29,6 +29,7 @@ unit DPM.Core.Crypto.Hashing.Interfaces;
 interface
 
 uses
+  DPM.Core.Diagnostics,
   System.Classes, System.SysUtils,
   DPM.Core.Crypto.Algorithms;
 
@@ -53,7 +54,11 @@ type
     function HashString(const value : string; algorithm : THashAlgorithm) : TBytes;
   end;
 
-  ECryptoHashing = class(Exception);
+  //raised with E7106 unless said otherwise (see EDPMCodedError).
+  ECryptoHashing = class(EDPMCodedError)
+  protected
+    class function DefaultCode : TErrorCode; override;
+  end;
 
 // Hex / Base64 helpers used everywhere we render hashes.
 function BytesToHex(const bytes : TBytes) : string;
@@ -64,6 +69,13 @@ implementation
 
 uses
   System.Character;
+
+{ ECryptoHashing }
+
+class function ECryptoHashing.DefaultCode : TErrorCode;
+begin
+  result := TErrorCode.E7106_CryptoFailed;
+end;
 
 function BytesToHex(const bytes : TBytes) : string;
 const

@@ -70,7 +70,8 @@ uses
   DPM.Console.RawIO,
   DPM.Core.Json.Utils,
   DPM.Core.Options.Common,
-  DPM.Core.Options.Verify;
+  DPM.Core.Options.Verify,
+  DPM.Core.Diagnostics;
 
 function RevocationStatusName(value : TRevocationStatus) : string;
 begin
@@ -165,7 +166,7 @@ begin
   except
     on e : Exception do
     begin
-      Logger.Error('Verify exception: ' + e.Message);
+      Logger.Error(ErrorCodeOf(e, TErrorCode.E7001_PackageVerificationFailed), 'Unable to verify [' + options.PackageFile + '] : ' + e.Message);
       exit(TExitCode.Error);
     end;
   end;
@@ -174,6 +175,16 @@ begin
     EmitJsonResult(options.PackageFile, verifyResult)
   else
     EmitHumanResult(options.PackageFile, verifyResult);
+
+  //the one diagnostic for the outcome - the report is the detail. In json mode this goes to stderr.
+  case verifyResult.Outcome of
+    voUnsigned :
+      Logger.Warning(TWarningCode.W7010_PackageUnsigned, 'The package [' + ExtractFileName(options.PackageFile) + '] is not signed - permissive mode allows installing it.');
+    voUntrustedPublisher :
+      Logger.Warning(TWarningCode.W7008_PublisherNotTrusted, 'The package [' + ExtractFileName(options.PackageFile) + '] is signed by a publisher that is not in trustedPublishers.');
+    voInvalid :
+      Logger.Error(TErrorCode.E7001_PackageVerificationFailed, 'The package [' + ExtractFileName(options.PackageFile) + '] failed verification : ' + verifyResult.Reason);
+  end;
 
   case verifyResult.Outcome of
     voTrusted, voUnsigned, voUntrustedPublisher : result := TExitCode.OK;
@@ -209,21 +220,21 @@ begin
       Logger.Information('  Timestamp  :  ' + DateTimeToStr(sigInfo.EffectiveSigningTime) + ' UTC');
     case sigInfo.Revocation of
       rsGood    : Logger.Information('  Revocation : checked, good');
-      rsRevoked : Logger.Error      ('  Revocation : REVOKED');
-      rsUnknown : Logger.Warning    ('  Revocation : status unknown (CRL/OCSP unreachable)');
+      rsRevoked : Logger.Information('  Revocation : REVOKED', true);
+      rsUnknown : Logger.Information('  Revocation : status unknown (CRL/OCSP unreachable)', true);
       // rsNotChecked: silent — Phase 1 default
     end;
     case sigInfo.CurrentRevocationReason of
-      rrKeyCompromise         : Logger.Error  ('  Current status: REVOKED (keyCompromise) — retroactively invalid');
-      rrCACompromise          : Logger.Warning('  Current status: revoked (cACompromise)');
-      rrSuperseded            : Logger.Warning('  Current status: revoked (superseded)');
-      rrAffiliationChanged    : Logger.Warning('  Current status: revoked (affiliationChanged)');
-      rrCessationOfOperation  : Logger.Warning('  Current status: revoked (cessationOfOperation)');
-      rrCertificateHold       : Logger.Warning('  Current status: revoked (certificateHold)');
-      rrPrivilegeWithdrawn    : Logger.Warning('  Current status: revoked (privilegeWithdrawn)');
-      rrAACompromise          : Logger.Warning('  Current status: revoked (aACompromise)');
-      rrUnspecified           : Logger.Warning('  Current status: revoked (unspecified)');
-      rrUnknown               : Logger.Warning('  Current status: revoked (reason undecodable)');
+      rrKeyCompromise         : Logger.Information('  Current status: REVOKED (keyCompromise) — retroactively invalid', true);
+      rrCACompromise          : Logger.Information('  Current status: revoked (cACompromise)', true);
+      rrSuperseded            : Logger.Information('  Current status: revoked (superseded)', true);
+      rrAffiliationChanged    : Logger.Information('  Current status: revoked (affiliationChanged)', true);
+      rrCessationOfOperation  : Logger.Information('  Current status: revoked (cessationOfOperation)', true);
+      rrCertificateHold       : Logger.Information('  Current status: revoked (certificateHold)', true);
+      rrPrivilegeWithdrawn    : Logger.Information('  Current status: revoked (privilegeWithdrawn)', true);
+      rrAACompromise          : Logger.Information('  Current status: revoked (aACompromise)', true);
+      rrUnspecified           : Logger.Information('  Current status: revoked (unspecified)', true);
+      rrUnknown               : Logger.Information('  Current status: revoked (reason undecodable)', true);
       // rrNotApplicable: silent
     end;
     if sigInfo.Valid then
@@ -241,7 +252,7 @@ begin
         Logger.Information('  Result     : valid (repository not trusted; ignored)');
     end
     else
-      Logger.Error('  Result:     INVALID — ' + sigInfo.FailureReason);
+      Logger.Information('  Result:     INVALID — ' + sigInfo.FailureReason, true);
 
     if (sigInfo.Role = srRepository) and sigInfo.Attestation.Present then
     begin
@@ -268,12 +279,9 @@ begin
   Logger.Information('Policy fingerprint: ' + verifyResult.PolicyFingerprint);
   Logger.Information('');
 
-  case verifyResult.Outcome of
-    voTrusted             : Logger.Success('Trust decision: TRUSTED');
-    voUnsigned            : Logger.Warning('Trust decision: UNSIGNED (permissive mode allows install)');
-    voUntrustedPublisher  : Logger.Warning('Trust decision: UNTRUSTED-PUBLISHER');
-    voInvalid             : Logger.Error  ('Trust decision: INVALID — ' + verifyResult.Reason);
-  end;
+  //anything but trusted is reported as a warning or error by Execute.
+  if verifyResult.Outcome = voTrusted then
+    Logger.Success('Trust decision: TRUSTED');
 end;
 
 procedure TVerifyCommand.EmitJsonResult(const packageFile : string;

@@ -29,6 +29,7 @@ unit DPM.Core.Crypto.Provider.Interfaces;
 interface
 
 uses
+  DPM.Core.Diagnostics,
   WinApi.Windows,
   System.SysUtils,
   DPM.Core.Crypto.Win32,
@@ -95,7 +96,11 @@ type
     procedure SetSigningContext(const fileName : string; fileSize : Int64);
   end;
 
-  ECryptoProvider = class(Exception);
+  //raised with E7102 unless said otherwise (see EDPMCodedError).
+  ECryptoProvider = class(EDPMCodedError)
+  protected
+    class function DefaultCode : TErrorCode; override;
+  end;
   ENotImplementedSignDigest = class(ECryptoProvider);
   // Raised when the provider's session has failed in a way that won't be
   // fixed by retrying the next file — bad credentials (401), service down
@@ -105,5 +110,12 @@ type
   EProviderFatal = class(ECryptoProvider);
 
 implementation
+
+{ ECryptoProvider }
+
+class function ECryptoProvider.DefaultCode : TErrorCode;
+begin
+  result := TErrorCode.E7102_SigningFailed;
+end;
 
 end.

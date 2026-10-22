@@ -79,7 +79,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Diagnostics;
 
 { TSpecNode }
 
@@ -181,7 +182,7 @@ begin
       compiler := StringToCompilerVersion(sCompiler);
       if compiler = TCompilerVersion.UnknownVersion then
       begin
-        Logger.Error(owner + ' has an invalid compiler value [' + sCompiler + '] in [' + key + ']');
+        Logger.Error(TErrorCode.E6004_SpecValueInvalid, owner + ' has an invalid compiler value [' + sCompiler + '] in [' + key + ']');
         result := false;
       end
       else

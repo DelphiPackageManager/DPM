@@ -143,7 +143,8 @@ uses
   DPM.Core.Spec.TargetPlatform,
   DPM.Core.Project.Prepare.SourceFiles,
   DPM.Core.Utils.Path,
-  DPM.Core.Utils.Strings;
+  DPM.Core.Utils.Strings,
+  DPM.Core.Diagnostics;
 
 const
   cPackagesFolder = 'packages';
@@ -470,7 +471,7 @@ begin
   platformsLabel := DPMPlatformsToString(platforms, ', ');
 
   if FileExists(dpkPath) and not force then
-    FLogger.Warning(LogPrefix + 'Scaffold target already exists, skipping: ' + dpkPath)
+    FLogger.Warning(TWarningCode.W6301_PrepareTargetExists, LogPrefix + 'Skipping [' + dpkPath + '] - it already exists (pass --force to replace it).')
   else
   begin
     if FDryRun then
@@ -483,7 +484,7 @@ begin
   end;
 
   if FileExists(dprojPath) and not force then
-    FLogger.Warning(LogPrefix + 'Scaffold target already exists, skipping: ' + dprojPath)
+    FLogger.Warning(TWarningCode.W6301_PrepareTargetExists, LogPrefix + 'Skipping [' + dprojPath + '] - it already exists (pass --force to replace it).')
   else
   begin
     if FDryRun then
@@ -554,7 +555,7 @@ begin
   compilerPlatforms := PlatformsForCompiler(spec, compiler);
   if compilerPlatforms = [] then
   begin
-    FLogger.Warning(Format('Spec declares no platforms for %s - falling back to Win32 only.',
+    FLogger.Warning(TWarningCode.W6302_SpecHasNoPlatforms, Format('The spec declares no platforms for %s - using Win32 only.',
                            [CompilerToRADStudioFolderName(compiler)]));
     compilerPlatforms := [TDPMPlatform.Win32];
   end;
@@ -616,7 +617,7 @@ begin
 
     if itemPlatforms = [] then
     begin
-      FLogger.Warning(Format('Item %s in %s has no platforms after intersecting the entry override with the targetPlatform - skipping.',
+      FLogger.Warning(TWarningCode.W5017_PackageDefinitionHasNoPlatforms, Format('Skipping %s in %s - it has no platforms after intersecting its platforms with the targetPlatform.',
                              [items[i].ProjectName, CompilerToRADStudioFolderName(compiler)]));
       continue;
     end;
@@ -656,7 +657,7 @@ begin
     except
       on e : Exception do
       begin
-        FLogger.Error('Failed to write ' + targetDpk + ' : ' + e.Message);
+        FLogger.Error(ErrorCodeOf(e, TErrorCode.E4006_ProjectSaveFailed), 'Unable to write [' + targetDpk + '] : ' + e.Message);
         exit;
       end;
     end;
@@ -670,21 +671,15 @@ begin
   begin
     try
       if not FTransformer.LoadFromFile(pair.DprojFile) then
-      begin
-        FLogger.Error('Failed to load source dproj: ' + pair.DprojFile);
         exit;
-      end;
       FTransformer.ApplyForCompiler(targetCompiler);
       if not FTransformer.SaveToFile(targetDproj) then
-      begin
-        FLogger.Error('Failed to save target dproj: ' + targetDproj);
         exit;
-      end;
       FLogger.Information('Wrote: ' + targetDproj);
     except
       on e : Exception do
       begin
-        FLogger.Error('Failed to transform ' + pair.DprojFile + ' -> ' + targetDproj + ' : ' + e.Message);
+        FLogger.Error(ErrorCodeOf(e, TErrorCode.E4006_ProjectSaveFailed), 'Unable to write [' + targetDproj + '] from [' + pair.DprojFile + '] : ' + e.Message);
         exit;
       end;
     end;
@@ -718,20 +713,20 @@ begin
 
   if not FileExists(specFile) then
   begin
-    FLogger.Error('Spec file does not exist: ' + specFile);
+    FLogger.Error(TErrorCode.E6001_SpecNotFound, 'The spec file [' + specFile + '] does not exist.');
     exit;
   end;
 
   spec := FSpecReader.ReadSpec(specFile);
   if (spec = nil) or not spec.IsValid then
   begin
-    FLogger.Error('Failed to read spec file: ' + specFile);
+    FLogger.Information('The spec [' + specFile + '] is not valid - nothing was prepared.', true);
     exit;
   end;
 
   if (spec.MetaData = nil) or (Trim(spec.MetaData.Id) = '') then
   begin
-    FLogger.Error('Spec is missing required metadata.id');
+    FLogger.Error(TErrorCode.E6003_SpecElementMissing, 'The spec [' + specFile + '] is missing the required [id].');
     exit;
   end;
   packageId := spec.MetaData.Id;
@@ -739,7 +734,7 @@ begin
   compilers := GatherSupportedCompilers(spec);
   if compilers = [] then
   begin
-    FLogger.Error('Spec does not declare any supported compilers in targetPlatforms.');
+    FLogger.Error(TErrorCode.E6003_SpecElementMissing, 'The spec [' + specFile + '] does not declare any supported compilers in its targetPlatforms.');
     exit;
   end;
 
@@ -830,7 +825,7 @@ begin
                            TPath.Combine(packagesRoot, CompilerToRADStudioFolderName(c)),
                            pair, force) then
       begin
-        FLogger.Error('Aborting due to earlier error.');
+        FLogger.Information('Stopping - see the error above.', true);
         exit;
       end;
     end;

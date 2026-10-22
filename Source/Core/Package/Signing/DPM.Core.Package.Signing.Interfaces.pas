@@ -29,6 +29,7 @@ unit DPM.Core.Package.Signing.Interfaces;
 interface
 
 uses
+  DPM.Core.Diagnostics,
   System.SysUtils,
   DPM.Core.Crypto.Algorithms,
   DPM.Core.Crypto.Provider.Interfaces,
@@ -187,9 +188,20 @@ type
                           const policy : TTrustPolicy) : boolean;
   end;
 
-  EPackageSigning = class(Exception);
+  //raised with E7102 unless said otherwise (see EDPMCodedError).
+  EPackageSigning = class(EDPMCodedError)
+  protected
+    class function DefaultCode : TErrorCode; override;
+  end;
 
 implementation
+
+{ EPackageSigning }
+
+class function EPackageSigning.DefaultCode : TErrorCode;
+begin
+  result := TErrorCode.E7102_SigningFailed;
+end;
 
 class function TAuthorRebuildExemption.Applies(hadPriorAuthor : boolean;
                                                 const priorAuthor : TAuthorTrustEntry;

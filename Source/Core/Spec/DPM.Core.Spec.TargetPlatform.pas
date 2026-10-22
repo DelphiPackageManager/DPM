@@ -120,7 +120,8 @@ uses
   DPM.Core.Constants,
   DPM.Core.TargetPlatform,
   DPM.Core.Utils.Strings,
-  DPM.Core.Spec.Dependency;
+  DPM.Core.Spec.Dependency,
+  DPM.Core.Diagnostics;
 
 
 function ExpandedCompilersOf(const targetPlatform : ISpecTargetPlatform) : TCompilerVersions;
@@ -313,14 +314,14 @@ begin
 
   if formCount = 0 then
   begin
-    Logger.Error('targetPlatform must specify one of [compiler], [compiler from + compiler to], or [compilers].');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'A targetPlatform must specify one of [compiler], [compiler from + compiler to], or [compilers].');
     exit(false);
   end;
 
   if formCount > 1 then
   begin
-    Logger.Error(
-      'targetPlatform mixes compiler authoring forms - use exactly one of: ' +
+    Logger.Error(TErrorCode.E6004_SpecValueInvalid,
+      'A targetPlatform mixes compiler authoring forms - use exactly one of: ' +
       '[compiler], [compiler from + compiler to], or [compilers]. ' +
       'Did you mean to use [compiler from] instead of [compiler]?');
     exit(false);
@@ -329,9 +330,9 @@ begin
   if (hasCompilerFrom or hasCompilerTo) and not (hasCompilerFrom and hasCompilerTo) then
   begin
     if hasCompilerFrom then
-      Logger.Error('targetPlatform has [compiler from] but is missing [compiler to].')
+      Logger.Error(TErrorCode.E6003_SpecElementMissing, 'A targetPlatform has [compiler from] but is missing [compiler to].')
     else
-      Logger.Error('targetPlatform has [compiler to] but is missing [compiler from].');
+      Logger.Error(TErrorCode.E6003_SpecElementMissing, 'A targetPlatform has [compiler to] but is missing [compiler from].');
     exit(false);
   end;
 
@@ -342,7 +343,7 @@ begin
     if FCompiler = TCompilerVersion.UnknownVersion then
     begin
       result := false;
-      Logger.Error('Invalid compiler value [' + sCompiler + ']');
+      Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The compiler [' + sCompiler + '] is not a known compiler version.');
     end;
   end
   else if hasCompilerFrom and hasCompilerTo then
@@ -353,18 +354,18 @@ begin
     if FMinCompilerVersion = TCompilerVersion.UnknownVersion then
     begin
       result := false;
-      Logger.Error('Invalid compiler from value [' + sMinCompiler + ']');
+      Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The [compiler from] [' + sMinCompiler + '] is not a known compiler version.');
     end;
     FMaxCompilerVersion := StringToCompilerVersion(sMaxCompiler);
     if FMaxCompilerVersion = TCompilerVersion.UnknownVersion then
     begin
       result := false;
-      Logger.Error('Invalid compiler to value [' + sMaxCompiler + ']');
+      Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The [compiler to] [' + sMaxCompiler + '] is not a known compiler version.');
     end;
     if result and (Ord(FMinCompilerVersion) > Ord(FMaxCompilerVersion)) then
     begin
       result := false;
-      Logger.Error('targetPlatform [compiler from] (' + sMinCompiler + ') is later than [compiler to] (' + sMaxCompiler + ').');
+      Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The targetPlatform [compiler from] (' + sMinCompiler + ') is later than its [compiler to] (' + sMaxCompiler + ').');
     end;
   end
   else // hasCompilers
@@ -379,7 +380,7 @@ begin
         if compiler = TCompilerVersion.UnknownVersion then
         begin
           result := false;
-          Logger.Error('Invalid compiler value [' + sCompiler + ']');
+          Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The compiler [' + sCompiler + '] is not a known compiler version.');
         end
         else
           AddToArray<TCompilerVersion>(FCompilers, compiler);
@@ -388,7 +389,7 @@ begin
     if Length(FCompilers) = 0 then
     begin
       result := false;
-      Logger.Error('No compiler versions supplied for targetFramework');
+      Logger.Error(TErrorCode.E6003_SpecElementMissing, 'A targetPlatform has an empty [compilers] list.');
     end;
   end;
 
@@ -402,7 +403,7 @@ begin
       if platform = TDPMPlatform.UnknownPlatform then
       begin
         result := false;
-        Logger.Error('Invalid compiler version : ' + sValue);
+        Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The platform [' + sValue + '] is not a known platform.');
       end
       else
         Include(FPlatforms, platform);
@@ -411,7 +412,7 @@ begin
   end
   else
   begin
-    Logger.Error('Required property [platforms] is missing)');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'A targetPlatform is missing the required [platforms].');
     result := false;
   end;
   FTemplateName := yamlObject.S['template'];
@@ -527,7 +528,7 @@ begin
     //clones the entry down to one compiler.
     if (FCompiler <> TCompilerVersion.UnknownVersion) and not (platform in AllPlatforms(FCompiler)) then
     begin
-      Logger.Error('Invalid platform [' + DPMPlatformToString(platform) + '] for compiler [' + CompilerToString(FCompiler) + ']');
+      Logger.Warning(TWarningCode.W6006_PlatformNotValidForCompiler, 'Skipping the platform [' + DPMPlatformToString(platform) + '] - it is not valid for compiler [' + CompilerToString(FCompiler) + '].');
       continue;
     end;
     sPlatform := DPMPlatformToString(platform);

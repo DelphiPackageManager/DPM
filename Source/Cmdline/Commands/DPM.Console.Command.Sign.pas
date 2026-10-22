@@ -68,7 +68,8 @@ uses
   DPM.Core.Crypto.Provider.Factory,
   DPM.Core.Options.Common,
   DPM.Core.Options.Sign,
-  DPM.Core.Utils.Directory;
+  DPM.Core.Utils.Directory,
+  DPM.Core.Diagnostics;
 
 constructor TSignCommand.Create(const logger : ILogger;
                                 const configurationManager : IConfigurationManager;
@@ -157,14 +158,14 @@ begin
     alg := haUnknown
   else if not TAlgorithmProfile.ParseHashName(options.Digest, alg) then
   begin
-    Logger.Error('Unsupported --digest "' + options.Digest + '" (SHA256/SHA384/SHA512 only).');
+    Logger.Error(TErrorCode.E0102_InvalidArgument, 'The --digest "' + options.Digest + '" is not supported (SHA256, SHA384 or SHA512).');
     exit(TExitCode.InvalidArguments);
   end;
 
   files := ExpandTargets(options.PackageFile, options.FilePattern, options.Recursive);
   if files.Count = 0 then
   begin
-    Logger.Error('No packages to sign — target "' + options.PackageFile + '" is not a file, directory, or matching pattern.');
+    Logger.Error(TErrorCode.E0102_InvalidArgument, 'There are no packages to sign - "' + options.PackageFile + '" is not a file, a folder or a matching pattern.');
     exit(TExitCode.InvalidArguments);
   end;
 
@@ -200,16 +201,16 @@ begin
           // Continuing would just generate one identical failure per file —
           // abort the batch immediately even when --fail-fast is off.
           Inc(failCount);
-          Logger.Error('Sign failed for [' + packageFile + ']: ' + e.Message);
-          Logger.Error('Provider session unrecoverable — aborting batch (' +
-                       IntToStr(files.Count - okCount - failCount) +
-                       ' files not signed).');
+          Logger.Error(ErrorCodeOf(e, TErrorCode.E7102_SigningFailed), 'Unable to sign [' + packageFile + '] : ' + e.Message);
+          Logger.Information('The signing provider can not recover - stopping (' +
+                             IntToStr(files.Count - okCount - failCount) +
+                             ' files not signed).', true);
           Break;
         end;
         on e : Exception do
         begin
           Inc(failCount);
-          Logger.Error('Sign failed for [' + packageFile + ']: ' + e.Message);
+          Logger.Error(ErrorCodeOf(e, TErrorCode.E7102_SigningFailed), 'Unable to sign [' + packageFile + '] : ' + e.Message);
           if options.FailFast then
             Break;
         end;
@@ -225,7 +226,7 @@ begin
     if failCount = 0 then
       Logger.Success(Format('Signed %d package(s) successfully.', [okCount]))
     else
-      Logger.Warning(Format('%d signed, %d failed.', [okCount, failCount]));
+      Logger.Information(Format('%d signed, %d failed.', [okCount, failCount]), true);
   end;
 
   if failCount > 0 then

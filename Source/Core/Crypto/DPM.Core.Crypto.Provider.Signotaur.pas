@@ -231,12 +231,9 @@ begin
     response := httpClient.Post(request, cancellationToken);
   except
     on e : Exception do
-    begin
-      FLogger.Error(Format('Signotaur POST raised %s: %s', [e.ClassName, e.Message]));
       raise EProviderFatal.CreateFmt(
         'Signotaur cert lookup HTTP call failed (%s): %s',
         [e.ClassName, e.Message]);
-    end;
   end;
   FLogger.Debug(Format('Signotaur HTTP %d response (%d bytes)', [response.StatusCode, Length(response.Response)]));
   if Length(response.Response) > 0 then
@@ -411,12 +408,9 @@ begin
     response := httpClient.Post(request, cancellationToken);
   except
     on e : Exception do
-    begin
-      FLogger.Error(Format('Signotaur POST raised %s: %s', [e.ClassName, e.Message]));
       raise EProviderFatal.CreateFmt(
         'Signotaur sign HTTP call failed (%s): %s',
         [e.ClassName, e.Message]);
-    end;
   end;
   // Log status separately from body — body logging on a huge / binary
   // response has crashed the console writer in the past, and we always

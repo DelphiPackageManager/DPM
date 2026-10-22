@@ -65,7 +65,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Diagnostics;
 
 { TSpecCopyLocalEntry }
 
@@ -102,7 +103,7 @@ begin
   FSource := yamlObject.S['src'];
   if FSource = '' then
   begin
-    Logger.Error('copyLocal entry is missing required [src] property.');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'A copyLocal entry is missing the required [src].');
     result := false;
   end;
 

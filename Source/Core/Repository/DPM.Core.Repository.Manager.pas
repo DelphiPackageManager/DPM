@@ -883,7 +883,7 @@ begin
 
   if not repo.Enabled then
   begin
-    FLogger.Error('Source not enabled : ' + pushOptions.Source);
+    FLogger.Error(TErrorCode.E6203_PushSourceDisabled, 'Unable to push - the source [' + pushOptions.Source + '] is disabled. Enable it with `dpm sources enable`.');
     exit;
   end;
 

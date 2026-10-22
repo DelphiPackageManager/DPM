@@ -53,7 +53,8 @@ uses
   System.IOUtils,
   DPM.Core.Crypto.Provider,
   DPM.Core.Crypto.Provider.Azure,
-  DPM.Core.Crypto.Provider.Signotaur;
+  DPM.Core.Crypto.Provider.Signotaur,
+  DPM.Core.Diagnostics;
 
 { TSigningProviderFactory }
 
@@ -86,8 +87,8 @@ begin
           kvOpts.ClientSecret := GetEnvironmentVariable(options.ClientSecretEnv);
         if kvOpts.ClientSecret = '' then
         begin
-          logger.Error('Azure Key Vault client secret is empty (set it directly or via the ' +
-                       options.ClientSecretEnv + ' environment variable).');
+          logger.Error(TErrorCode.E7101_SigningProviderUnavailable, 'The Azure Key Vault client secret is empty - set it directly or with the ' +
+                       options.ClientSecretEnv + ' environment variable.');
           exit;
         end;
         tokenSvc := TAzureAccessTokenService.Create(logger);
@@ -106,7 +107,7 @@ begin
           signotaurOpts.ApiKey := GetEnvironmentVariable(options.SignotaurApiKeyEnv);
           if signotaurOpts.ApiKey = '' then
           begin
-            logger.Error('Environment variable ' + options.SignotaurApiKeyEnv + ' is not set or empty.');
+            logger.Error(TErrorCode.E7101_SigningProviderUnavailable, 'The Signotaur api key environment variable ' + options.SignotaurApiKeyEnv + ' is not set or is empty.');
             exit;
           end;
         end;
@@ -127,7 +128,7 @@ begin
       cert := store.FindByThumbprint(options.Thumbprint);
       if cert = nil then
       begin
-        logger.Error('Certificate with thumbprint ' + options.Thumbprint + ' not found in store.');
+        logger.Error(TErrorCode.E7101_SigningProviderUnavailable, 'No certificate with the thumbprint ' + options.Thumbprint + ' was found in the certificate store.');
         exit;
       end;
       result := TCertStoreSigningProvider.Create(cert);
@@ -146,7 +147,7 @@ begin
       cert := store.FindByThumbprint('');
       if cert = nil then
       begin
-        logger.Error('No certificate found in PFX file.');
+        logger.Error(TErrorCode.E7101_SigningProviderUnavailable, 'No certificate was found in the PFX file [' + options.PfxFile + '].');
         exit;
       end;
       result := TPfxSigningProvider.Create(cert);

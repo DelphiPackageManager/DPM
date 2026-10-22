@@ -173,7 +173,8 @@ uses
   DPM.Core.Utils.System,
   DPM.Core.Utils.Strings,
   DPM.Core.Utils.Enum,
-  VSoft.Uri;
+  VSoft.Uri,
+  DPM.Core.Diagnostics;
 
 { TSourceConfig }
 
@@ -659,7 +660,7 @@ begin
   except
     on e : Exception do
     begin
-      FLogger.Error('Exception while loading config file [' + fileName + ']' + #13#10 + e.Message);
+      FLogger.Error(TErrorCode.E0201_ConfigurationLoadFailed, 'Unable to load the configuration file [' + fileName + '] : ' + e.Message);
       exit;
     end;
   end;
@@ -728,7 +729,7 @@ begin
 
   if sFileName = '' then
   begin
-    FLogger.Error('No filename set for config file, unable to save');
+    FLogger.Error(TErrorCode.E0003_InternalError, 'The configuration has no file name to save to.');
     exit(false);
   end;
 
@@ -741,7 +742,7 @@ begin
   except
     on e : Exception do
     begin
-      FLogger.Error('Exception while saving config to file [' + sFileName + ']' + #13#10 + e.Message);
+      FLogger.Error(TErrorCode.E0202_ConfigurationSaveFailed, 'Unable to save the configuration file [' + sFileName + '] : ' + e.Message);
       result := false;
     end;
   end;

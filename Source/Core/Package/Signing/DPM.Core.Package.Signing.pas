@@ -255,6 +255,7 @@ var
   zip : TZipFile;
   i : integer;
   name : string;
+  names : string;
   bytes : TBytes;
   unsigned : IList<string>;
 begin
@@ -283,12 +284,14 @@ begin
 
   if unsigned.Count > 0 then
   begin
+    //listed in the error - whoever catches it reports it once.
+    names := '';
     for name in unsigned do
-      FLogger.Error('  Unsigned binary : ' + name);
+      names := names + sLineBreak + '  ' + name;
     raise EPackageSigning.CreateFmt(
-      'Cannot author-sign "%s": %d bundled binary(ies) are not Authenticode-signed (e.g. "%s"). ' +
-      'Sign every shipped .bpl/.dll/.exe before publishing an author-signed package.',
-      [ExtractFileName(archivePath), unsigned.Count, unsigned[0]]);
+      'Cannot author-sign "%s": %d bundled binary(ies) are not Authenticode-signed. ' +
+      'Sign every shipped .bpl/.dll/.exe before publishing an author-signed package :%s',
+      [ExtractFileName(archivePath), unsigned.Count, names]);
   end;
 end;
 
@@ -510,10 +513,7 @@ begin
     timestampToken := FTimestamper.RequestTimestamp(imprintBytes, timestampUrl, haSha256);
   except
     on e : Exception do
-    begin
-      FLogger.Error('  Timestamp request failed : ' + e.Message);
-      raise;
-    end;
+      raise ECryptoTimestamp.Create('The timestamp request to [' + timestampUrl + '] failed : ' + e.Message);
   end;
   if timestampToken = nil then
     raise EPackageSigning.Create('Timestamp authority returned no token');

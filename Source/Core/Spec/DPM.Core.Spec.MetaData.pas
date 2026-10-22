@@ -117,7 +117,8 @@ implementation
 uses
   System.SysUtils,
   DPM.Core.Git.Interfaces,
-  DPM.Core.Packaging.IdValidator;
+  DPM.Core.Packaging.IdValidator,
+  DPM.Core.Diagnostics;
 
 { TSpecMetaData }
 
@@ -288,7 +289,7 @@ begin
   FId := yamlObject.S['id'];
   if not TPackageIdValidator.IsValidPackageId(FId) then
   begin
-    Logger.Error('Invalid package Id [' + FId + ']');
+    Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The package id [' + FId + '] is not valid - it must be of the form Org.PackageName.');
     result := false;
   end;
 
@@ -298,14 +299,14 @@ begin
   sVersion := yamlObject.S['version'];
   if (sVersion = '') and (FPackageKind = TDPMPackageKind.dpm) then
   begin
-    logger.Error('Required field [version] not found.');
+    logger.Error(TErrorCode.E6003_SpecElementMissing, 'The required [version] was not found.');
     result := false;
   end;
   if sVersion <> '' then
   begin
     if not TPackageVersion.TryParseWithError(sVersion, FVersion, sError) then
     begin
-      logger.Error('Invalid Package Version : ' + sError);
+      logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The version [' + sVersion + '] is not valid : ' + sError);
       result := false;
     end;
   end;
@@ -313,14 +314,14 @@ begin
   FDescription := yamlObject.S['description'];
   if FDescription = '' then
   begin
-    logger.Error('Required field [description] not found.');
+    logger.Error(TErrorCode.E6003_SpecElementMissing, 'The required [description] was not found.');
     result := false;
   end;
 
   authorsSeq := yamlObject.A['authors'];
   if authorsSeq.Count = 0 then
   begin
-    logger.Error('Required field [authors] not found.');
+    logger.Error(TErrorCode.E6003_SpecElementMissing, 'The required [authors] were not found.');
     result := false;
   end;
 

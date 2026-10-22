@@ -55,6 +55,11 @@ type
     E0001_UnexpectedException,
     E0002_FailedWithoutDetail,
     E0003_InternalError,
+    E0101_MissingArgument,
+    E0102_InvalidArgument,
+    E0201_ConfigurationLoadFailed,
+    E0202_ConfigurationSaveFailed,
+    E0203_ConfigurationNotFound,
     E1001_NoSourcesConfigured,
     E1002_InvalidSource,
     E1003_UnknownSource,
@@ -97,10 +102,34 @@ type
     E5006_PrebuiltDesignPackageInvalid,
     E5007_PrebuiltDesignPackageMissing,
     E5008_PackageProjectGenerationFailed,
+    E6001_SpecNotFound,
+    E6002_SpecUnreadable,
+    E6003_SpecElementMissing,
+    E6004_SpecValueInvalid,
+    E6005_SpecNeedsNewerDPM,
+    E6101_TemplateNotFound,
+    E6102_EnvironmentVariableNotAllowed,
+    E6103_VariableReplacementFailed,
+    E6105_PackFileNotFound,
+    E6106_PackageWriteFailed,
+    E6107_PackageInvalid,
+    E6108_ManifestWriteFailed,
+    E6109_GitPackageNotPackable,
+    E6201_PushRejected,
+    E6202_PushNotSupported,
+    E6203_PushSourceDisabled,
     E7001_PackageVerificationFailed,
     E7002_PackageBlocked,
     E7003_AuthorDowngradeBlocked,
-    E7004_RepositorySignatureBlocked
+    E7004_RepositorySignatureBlocked,
+    E7101_SigningProviderUnavailable,
+    E7102_SigningFailed,
+    E7103_SignatureInvalid,
+    E7104_CertificateInvalid,
+    E7105_TimestampFailed,
+    E7106_CryptoFailed,
+    E7107_ManifestInvalid,
+    E7108_TrustStateFailed
   );
 
   //Every warning DPM reports - the same rules as TErrorCode.
@@ -136,7 +165,18 @@ type
     W5015_DesignProjectHasNoPlatforms,
     W5016_DesignProjectUnreadable,
     W5017_PackageDefinitionHasNoPlatforms,
-    W5018_BuildConfigurationAdded
+    W5018_BuildConfigurationAdded,
+    W6006_PlatformNotValidForCompiler,
+    W6104_PatternMatchedNoFiles,
+    W6110_SourceVariableUnresolved,
+    W6301_PrepareTargetExists,
+    W6302_SpecHasNoPlatforms,
+    W7005_RepositorySignatureChanged,
+    W7006_AuthorSignatureChanged,
+    W7007_AuthorRebuildAccepted,
+    W7008_PublisherNotTrusted,
+    W7009_SignatureSelfCheckFailed,
+    W7010_PackageUnsigned
   );
 
   TDiagnosticInfo = record
@@ -152,6 +192,11 @@ const
     (Number : 1; Title : 'An unexpected exception occurred'),
     (Number : 2; Title : 'The operation failed without reporting why'),
     (Number : 3; Title : 'Internal error'),
+    (Number : 101; Title : 'A required argument is missing'),
+    (Number : 102; Title : 'An argument is not valid'),
+    (Number : 201; Title : 'Unable to load the configuration file'),
+    (Number : 202; Title : 'Unable to save the configuration file'),
+    (Number : 203; Title : 'The configuration file does not exist'),
     (Number : 1001; Title : 'No package sources are configured'),
     (Number : 1002; Title : 'A package source is not valid'),
     (Number : 1003; Title : 'The package source is not configured'),
@@ -194,10 +239,34 @@ const
     (Number : 5006; Title : 'A prebuilt design package entry is not valid'),
     (Number : 5007; Title : 'A prebuilt design package is missing from the package'),
     (Number : 5008; Title : 'Unable to generate a package project from its package definition'),
+    (Number : 6001; Title : 'The spec file does not exist'),
+    (Number : 6002; Title : 'The spec file could not be read'),
+    (Number : 6003; Title : 'The spec is missing something it needs'),
+    (Number : 6004; Title : 'A value in the spec is not valid'),
+    (Number : 6005; Title : 'The spec needs a newer version of DPM'),
+    (Number : 6101; Title : 'The spec has no template with that name'),
+    (Number : 6102; Title : 'A template sets an environment variable DPM does not allow'),
+    (Number : 6103; Title : 'Unable to replace the variables in the spec'),
+    (Number : 6105; Title : 'A file the spec refers to does not exist'),
+    (Number : 6106; Title : 'Unable to write the package file'),
+    (Number : 6107; Title : 'The package written is not valid'),
+    (Number : 6108; Title : 'Unable to write the package manifest'),
+    (Number : 6109; Title : 'Git registry packages cannot be packed'),
+    (Number : 6201; Title : 'The server rejected the package'),
+    (Number : 6202; Title : 'The source does not accept pushed packages'),
+    (Number : 6203; Title : 'The source to push to is disabled'),
     (Number : 7001; Title : 'The package failed verification'),
     (Number : 7002; Title : 'The package is blocked'),
     (Number : 7003; Title : 'The package author signature changed and the install was blocked'),
-    (Number : 7004; Title : 'The package no longer carries its repository signature and the install was blocked')
+    (Number : 7004; Title : 'The package no longer carries its repository signature and the install was blocked'),
+    (Number : 7101; Title : 'Unable to set up the signing provider'),
+    (Number : 7102; Title : 'Unable to sign the package'),
+    (Number : 7103; Title : 'A signature could not be built or read'),
+    (Number : 7104; Title : 'A certificate could not be used'),
+    (Number : 7105; Title : 'Unable to get a timestamp for the signature'),
+    (Number : 7106; Title : 'A cryptographic operation failed'),
+    (Number : 7107; Title : 'The package manifest is not valid'),
+    (Number : 7108; Title : 'Unable to read or write the trust state')
   );
 
   cWarningInfo : array[TWarningCode] of TDiagnosticInfo = (
@@ -232,7 +301,18 @@ const
     (Number : 5015; Title : 'A design project declares no platforms DPM supports'),
     (Number : 5016; Title : 'A design project could not be inspected'),
     (Number : 5017; Title : 'A package definition has no platforms'),
-    (Number : 5018; Title : 'A package project had no configuration for the platform being built')
+    (Number : 5018; Title : 'A package project had no configuration for the platform being built'),
+    (Number : 6006; Title : 'A platform in the spec is not valid for its compiler'),
+    (Number : 6104; Title : 'A file pattern in the spec matched no files'),
+    (Number : 6110; Title : 'A source pattern in the spec uses a variable that is not defined'),
+    (Number : 6301; Title : 'A file prepare would write already exists'),
+    (Number : 6302; Title : 'The spec declares no platforms'),
+    (Number : 7005; Title : 'The package repository signature changed'),
+    (Number : 7006; Title : 'The package author signature changed'),
+    (Number : 7007; Title : 'A rebuild by the package author, without a repository signature, was allowed'),
+    (Number : 7008; Title : 'The package signer is not a trusted publisher'),
+    (Number : 7009; Title : 'A signature self-check failed'),
+    (Number : 7010; Title : 'The package is not signed')
   );
 
 //'DPME0001'
@@ -262,6 +342,16 @@ type
     constructor Create(const code : TErrorCode; const msg : string);
     constructor CreateFmt(const code : TErrorCode; const msg : string; const args : array of const);
     property Code : TErrorCode read FCode;
+  end;
+
+  ///<summary> Base for an area's own exception class, which supplies the code - so raising one stays
+  ///  `raise ECryptoX509.Create(msg)`. </summary>
+  EDPMCodedError = class(EDPMError)
+  protected
+    class function DefaultCode : TErrorCode; virtual; abstract;
+  public
+    constructor Create(const msg : string);
+    constructor CreateFmt(const msg : string; const args : array of const);
   end;
 
 implementation
@@ -309,6 +399,18 @@ constructor EDPMError.CreateFmt(const code : TErrorCode; const msg : string; con
 begin
   inherited CreateFmt(msg, args);
   FCode := code;
+end;
+
+{ EDPMCodedError }
+
+constructor EDPMCodedError.Create(const msg : string);
+begin
+  inherited Create(DefaultCode, msg);
+end;
+
+constructor EDPMCodedError.CreateFmt(const msg : string; const args : array of const);
+begin
+  inherited CreateFmt(DefaultCode, msg, args);
 end;
 
 end.

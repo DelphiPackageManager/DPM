@@ -91,7 +91,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Diagnostics;
 
 { TSpecDesignEntry }
 
@@ -210,7 +211,7 @@ begin
   FProject := yamlObject.S['project'];
   if FProject = '' then
   begin
-    Logger.Error('Design Entry is missing required [project] property.');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'A design entry is missing the required [project].');
     result := false;
   end;
 

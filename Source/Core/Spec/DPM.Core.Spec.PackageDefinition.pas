@@ -82,7 +82,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Diagnostics;
 
 { TSpecPackageDefinition }
 
@@ -162,7 +163,7 @@ begin
   FProject := yamlObject.S['project'];
   if FProject = '' then
   begin
-    Logger.Error('Package definition is missing required [project] property.');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'A package definition is missing the required [project].');
     result := false;
   end;
 
@@ -179,7 +180,7 @@ begin
   end;
   if FFiles.Count = 0 then
   begin
-    Logger.Error('Package definition [' + FProject + '] is missing required [files] entries.');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'The package definition [' + FProject + '] is missing the required [files].');
     result := false;
   end;
 

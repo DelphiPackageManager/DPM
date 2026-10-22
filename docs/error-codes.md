@@ -77,6 +77,48 @@ DPM found itself in a state that should not be possible.
 You cancelled the operation (Ctrl+C on the command line, or Cancel in the IDE) before it finished. Any
 changes it hadn't finished making were not saved.
 
+### DPME0101
+
+**A required argument is missing.**
+
+The command needs something it wasn't given, such as the spec file to pack or the api key to push with. The
+message says what.
+
+**What to do:** Pass the missing argument. `dpm help <command>` lists a command's arguments.
+
+### DPME0102
+
+**An argument is not valid.**
+
+A value given on the command line isn't one the command accepts. The message says which and why.
+
+**What to do:** Correct the value. `dpm help <command>` lists what each argument accepts.
+
+### DPME0201
+
+**Unable to load the configuration file.**
+
+The DPM configuration file couldn't be read - it may not be valid YAML, or it can't be opened. The message
+names the file and says why.
+
+**What to do:** Fix the file, or move it aside so DPM creates a new default one.
+
+### DPME0202
+
+**Unable to save the configuration file.**
+
+DPM couldn't write the configuration file.
+
+**What to do:** Check you can write to the file and its folder (by default `%APPDATA%\.dpm`).
+
+### DPME0203
+
+**The configuration file does not exist.**
+
+The command needs a configuration file, and the one it was given (or the default one) doesn't exist.
+
+**What to do:** Check the `--configFile` path, or add a source with `dpm sources add`, which creates the file.
+
 ## Package sources and repositories (1xxx)
 
 ### DPME1001
@@ -744,6 +786,185 @@ are no platform specific settings, so the build may still fail.
 
 **What to do:** Nothing, unless the build then fails - then report it to the package author.
 
+## Package specs, pack, push and prepare (6xxx)
+
+### DPME6001
+
+**The spec file does not exist.**
+
+The `.dspec` file given (or the one found) doesn't exist.
+
+**What to do:** Check the path.
+
+### DPME6002
+
+**The spec file could not be read.**
+
+The spec isn't valid YAML, doesn't have the `.dspec` or `.dspec.yaml` extension, or has no `metadata` - so it
+probably isn't a spec at all. The message says why.
+
+**What to do:** Fix the file. DSpec Creator can open and save a spec to tidy it.
+
+### DPME6003
+
+**The spec is missing something it needs.**
+
+A required element or value isn't in the spec - for example `metadata`, `version`, `description`, `authors`,
+`targetPlatforms`, `platforms`, `templates`, a template's `name`, or an entry's `project`, `src` or `files`.
+The message says which.
+
+**What to do:** Add it to the spec. `docs\dspec-format.md` describes every element.
+
+### DPME6004
+
+**A value in the spec is not valid.**
+
+A value in the spec isn't one DPM accepts - an invalid package id or version, an unknown compiler or platform,
+a dependency range that isn't valid, or overlapping target platforms. The message says which.
+
+**What to do:** Correct the value. `docs\dspec-format.md` describes what each element accepts.
+
+### DPME6005
+
+**The spec needs a newer version of DPM.**
+
+The spec's `min dpm client version` is later than the version of DPM being used.
+
+**What to do:** Update DPM (`dpm upgrade`).
+
+### DPMW6006
+
+**A platform in the spec is not valid for its compiler.**
+
+Writing the spec out, a target platform lists a platform its compiler doesn't support, so it's left out.
+
+**What to do:** Remove the platform from that target platform.
+
+### DPME6101
+
+**The spec has no template with that name.**
+
+A target platform names a template that isn't in the spec's `templates`.
+
+**What to do:** Correct the target platform's `template`, or add the template.
+
+### DPME6102
+
+**A template sets an environment variable DPM does not allow.**
+
+A template's environment variables include one DPM reserves (one the IDE itself sets, for example).
+
+**What to do:** Rename or remove the variable.
+
+### DPME6103
+
+**Unable to replace the variables in the spec.**
+
+Replacing `$variable$` tokens in the spec failed. The message says why.
+
+**What to do:** Check the spec's `variables` and the `--variables` given to pack.
+
+### DPMW6104
+
+**A file pattern in the spec matched no files.**
+
+A source pattern in the spec (or a folder it names) matched nothing, so nothing is added for it.
+
+**What to do:** Check the pattern and the base path. A pattern that should match nothing can be removed.
+
+### DPME6105
+
+**A file the spec refers to does not exist.**
+
+The spec's `icon` or `readme` file doesn't exist.
+
+**What to do:** Correct the path in the spec, or add the file.
+
+### DPME6106
+
+**Unable to write the package file.**
+
+DPM couldn't create the `.dpkg` file in the output folder.
+
+**What to do:** Check you can write to the output folder and that nothing has the file open.
+
+### DPME6107
+
+**The package written is not valid.**
+
+The package was written, but failed DPM's checks on what a package may contain, so it was deleted. The
+message names the entry.
+
+**What to do:** Change the spec so the package doesn't include that entry, or report it as a DPM bug if the
+entry looks fine.
+
+### DPME6108
+
+**Unable to write the package manifest.**
+
+DPM couldn't add the manifest, which lists every file and its hash, to the package. The package was deleted.
+
+**What to do:** Check there is space in the output folder and try again.
+
+### DPME6109
+
+**Git registry packages cannot be packed.**
+
+The spec is for a git registry package (`packageKind: git`). Those are installed from their repository and
+aren't packed.
+
+**What to do:** Pack a `dpm` package instead, or publish the git package through a registry.
+
+### DPMW6110
+
+**A source pattern in the spec uses a variable that is not defined.**
+
+A source pattern still has a `$variable$` token after the spec's variables were applied, so it's skipped.
+
+**What to do:** Define the variable in the spec's `variables`, or correct the pattern.
+
+### DPME6201
+
+**The server rejected the package.**
+
+The package server refused the push - the version may already exist, the api key may not allow it, or the
+package may not be valid for the server. The message has what the server said.
+
+**What to do:** Act on the server's message. To push a version that already exists without an error, use
+`--skipDuplicate`.
+
+### DPME6202
+
+**The source does not accept pushed packages.**
+
+The source is a git registry, which packages can't be pushed to.
+
+**What to do:** Push to a folder source or a DPM server.
+
+### DPME6203
+
+**The source to push to is disabled.**
+
+The source named for the push is disabled in the configuration.
+
+**What to do:** Enable it with `dpm sources enable`, or push to another source.
+
+### DPMW6301
+
+**A file prepare would write already exists.**
+
+`dpm prepare` didn't overwrite a package project that already exists.
+
+**What to do:** Nothing, if you meant to keep it. Pass `--force` to replace it.
+
+### DPMW6302
+
+**The spec declares no platforms.**
+
+`dpm prepare` found no platforms for a compiler in the spec, so it uses Win32 only.
+
+**What to do:** Add the platforms to the spec's target platform.
+
 ## Signing, trust and verification (7xxx)
 
 ### DPME7001
@@ -783,3 +1004,125 @@ repository vouches for a different namespace), and the install was blocked.
 
 **What to do:** Check where the package came from. If the change is genuine, accept it when asked, or edit
 `%APPDATA%\.dpm\trust-state.yaml` to remove the package's repository entry.
+
+### DPMW7005
+
+**The package repository signature changed.**
+
+Earlier versions of this package carried a trusted repository's signature, and this one doesn't, or the
+repository vouches for a different namespace. You are asked whether to continue (where DPM can ask).
+
+**What to do:** Check where the package came from before accepting the change.
+
+### DPMW7006
+
+**The package author signature changed.**
+
+The package is signed by a different author key than before, or is no longer signed by its author. You are
+asked whether to continue, or your `authorDowngradePolicy` decides.
+
+**What to do:** Check the change is genuine before accepting it - an author changing keys normally says so.
+
+### DPMW7007
+
+**A rebuild by the package author, without a repository signature, was allowed.**
+
+The package has no trusted repository signature, but is signed by the same author key as before, so DPM
+treats it as the author's own rebuild and installs it.
+
+**What to do:** Nothing, if you built the package yourself. Otherwise check where it came from.
+
+### DPMW7008
+
+**The package signer is not a trusted publisher.**
+
+The package is signed, but by a publisher that isn't in your `trustedPublishers`. Permissive mode allows
+installing it.
+
+**What to do:** If you trust the publisher, add them with `dpm trust add publisher`.
+
+### DPMW7009
+
+**A signature self-check failed.**
+
+While signing with a remote provider, DPM's check of the signature it assembled found a mismatch. The
+signature may not verify. The message has the details.
+
+**What to do:** Verify the signed package with `dpm verify`, and report the warning with its details.
+
+### DPMW7010
+
+**The package is not signed.**
+
+`dpm verify` found no signatures on the package. Permissive mode allows installing it.
+
+**What to do:** Nothing, unless you require signed packages - then sign it, or use a signed version.
+
+### DPME7101
+
+**Unable to set up the signing provider.**
+
+DPM couldn't create the signing provider: the certificate wasn't found, the PFX file has no certificate, or a
+secret or api key it needs isn't set. The message says which.
+
+**What to do:** Check the signing options (thumbprint, PFX file and password, Azure Key Vault or Signotaur
+settings) and the environment variables they name.
+
+### DPME7102
+
+**Unable to sign the package.**
+
+Signing a package failed - the provider returned an error, or the package can't be author-signed (for
+example, it bundles binaries that aren't Authenticode-signed). The message says why.
+
+**What to do:** Act on the message. For a provider error, check the provider's credentials and that it can be
+reached.
+
+### DPME7103
+
+**A signature could not be built or read.**
+
+Building or reading a CMS signature failed. The message says why.
+
+**What to do:** For a package you're signing, try again and report it if it persists. For a package you're
+installing, the signature is damaged - get the package again.
+
+### DPME7104
+
+**A certificate could not be used.**
+
+A certificate couldn't be read, or doesn't meet DPM's requirements for signing or verification.
+
+**What to do:** Check the certificate (and its private key, for signing).
+
+### DPME7105
+
+**Unable to get a timestamp for the signature.**
+
+The timestamp authority couldn't be reached, or didn't return a timestamp.
+
+**What to do:** Check the `--timestamper` url and your network, then sign again.
+
+### DPME7106
+
+**A cryptographic operation failed.**
+
+Hashing, or another cryptographic operation, failed - often because the algorithm isn't supported.
+
+**What to do:** Use SHA256, SHA384 or SHA512. Report it if it persists.
+
+### DPME7107
+
+**The package manifest is not valid.**
+
+The package's manifest, which lists its files and their hashes, is damaged or doesn't match the package.
+
+**What to do:** Get the package again. If you produced it, pack it again.
+
+### DPME7108
+
+**Unable to read or write the trust state.**
+
+DPM couldn't read or save its record of the signatures it has seen (`%APPDATA%\.dpm\trust-state.yaml`).
+
+**What to do:** Check the `APPDATA` environment variable is set, and that you can write to the file.

@@ -84,7 +84,8 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  DPM.Core.Diagnostics;
 
 { TSpecBuildEntry }
 
@@ -171,7 +172,7 @@ begin
   FProject := yamlObject.S['project'];
   if FProject = '' then
   begin
-    Logger.Error('Build Entry is missing required [project] property.');
+    Logger.Error(TErrorCode.E6003_SpecElementMissing, 'A build entry is missing the required [project].');
     result := false;
   end;
 

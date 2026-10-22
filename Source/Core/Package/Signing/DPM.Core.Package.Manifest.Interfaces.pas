@@ -29,6 +29,7 @@ unit DPM.Core.Package.Manifest.Interfaces;
 interface
 
 uses
+  DPM.Core.Diagnostics,
   System.SysUtils,
   DPM.Core.Crypto.Algorithms;
 
@@ -77,7 +78,11 @@ type
     function NormalizeToNfc(const value : string) : string;
   end;
 
-  EManifest = class(Exception);
+  //raised with E7107 unless said otherwise (see EDPMCodedError).
+  EManifest = class(EDPMCodedError)
+  protected
+    class function DefaultCode : TErrorCode; override;
+  end;
   EManifestPath = class(EManifest);
   EManifestParse = class(EManifest);
 
@@ -89,5 +94,12 @@ const
   cCurrentManifestSchemaVersion = 1;
 
 implementation
+
+{ EManifest }
+
+class function EManifest.DefaultCode : TErrorCode;
+begin
+  result := TErrorCode.E7107_ManifestInvalid;
+end;
 
 end.

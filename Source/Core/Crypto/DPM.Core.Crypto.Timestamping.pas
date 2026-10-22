@@ -34,6 +34,7 @@ unit DPM.Core.Crypto.Timestamping;
 interface
 
 uses
+  DPM.Core.Diagnostics,
   Winapi.Windows,
   System.Classes, System.SysUtils,
   DPM.Core.Crypto.Win32,
@@ -72,12 +73,23 @@ type
     constructor Create(const x509 : IX509Service);
   end;
 
-  ECryptoTimestamp = class(Exception);
+  //raised with E7105 unless said otherwise (see EDPMCodedError).
+  ECryptoTimestamp = class(EDPMCodedError)
+  protected
+    class function DefaultCode : TErrorCode; override;
+  end;
 
 implementation
 
 uses
   System.DateUtils;
+
+{ ECryptoTimestamp }
+
+class function ECryptoTimestamp.DefaultCode : TErrorCode;
+begin
+  result := TErrorCode.E7105_TimestampFailed;
+end;
 
 const
   cTIMESTAMP_NO_AUTH_RETRIEVAL = $00020000;
