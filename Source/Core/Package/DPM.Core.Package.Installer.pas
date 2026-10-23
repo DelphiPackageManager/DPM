@@ -237,9 +237,16 @@ type
     // user specified a package file - puts it in the cache and points the options at the package it holds.
     function PreparePackageFileInstall(const Options: TInstallOptions): boolean;
 
-    // Install = plan, then apply : see PlanInstall/ApplyInstallPlan.
-    function DoPlanInstall(const cancellationToken: ICancellationToken; const options: TInstallOptions; out plan: IInstallPlan): boolean;
+    // Install = plan, then apply : see PlanInstall/ApplyInstallPlan. Planning hands back the configuration and the
+    // projects it loaded, so Install can apply the plan to them rather than loading them again.
+    function DoPlanInstall(const cancellationToken: ICancellationToken; const options: TInstallOptions; out plan: IInstallPlan;
+                           out config: IConfiguration; out works: IList<TProjectInstallWork>): boolean;
     function DoApplyInstallPlan(const cancellationToken: ICancellationToken; const options: TInstallOptions; const plan: IInstallPlan): boolean;
+    // false, having said why, when the plan failed or changes nothing.
+    function CanApplyPlan(const plan: IInstallPlan): boolean;
+    // resolves, builds and saves the projects in works - which are the plan's projects, already loaded.
+    function ApplyInstallWork(const cancellationToken: ICancellationToken; const options: TInstallOptions; const plan: IInstallPlan;
+                              const config: IConfiguration; const works: IList<TProjectInstallWork>): boolean;
 
     // Loads the projects, settling the compiler version and each project's platforms. A project whose
     // platforms don't match the options is left out (not a failure); one that won't load is a failure.
@@ -2260,9 +2267,10 @@ begin
 
   FPackageCache.Location := result.PackageCacheLocation;
 
-  //also inits the repository manager - which says why a source isn't valid.
-  if not FDependencyResolver.Initialize(result) then
+  //the repository manager says why a source isn't valid.
+  if not FRepositoryManager.Initialize(result) then
     exit(nil);
+  FDependencyResolver.Initialize(result);
 
   if not FRepositoryManager.HasSources then
   begin
@@ -2276,6 +2284,10 @@ end;
 function TPackageInstaller.Install(const cancellationToken: ICancellationToken; const Options: TInstallOptions; const context: IPackageInstallerContext): boolean;
 var
   plan : IInstallPlan;
+  config : IConfiguration;
+  works : IList<TProjectInstallWork>;
+  i : integer;
+  workFile : string;
   guard : TOperationGuard;
 begin
   result := false;
@@ -2284,10 +2296,25 @@ begin
   FRepositoryManager.BeginRequestCache;
   try
     try
-      if DoPlanInstall(cancellationToken, Options, plan) then
+      if DoPlanInstall(cancellationToken, Options, plan, config, works) then
       begin
         LogPlanSummary(plan);
-        result := DoApplyInstallPlan(cancellationToken, Options, plan);
+        if CanApplyPlan(plan) then
+        begin
+          //nothing can change between planning and applying here (the IDE asks first, so it loads them
+          //again) - apply to the projects planning loaded, leaving out the ones the plan doesn't change.
+          for i := works.Count - 1 downto 0 do
+          begin
+            workFile := works[i].ProjectFile;
+            if not plan.Projects.Any(
+              function(const projectFile : string) : boolean
+              begin
+                result := SameText(projectFile, workFile);
+              end) then
+              works.Delete(i);
+          end;
+          result := ApplyInstallWork(cancellationToken, Options, plan, config, works);
+        end;
       end
       else
         LogPlanErrors(FLogger, plan);
@@ -2304,13 +2331,16 @@ end;
 function TPackageInstaller.PlanInstall(const cancellationToken : ICancellationToken; const options : TInstallOptions; out plan : IInstallPlan) : boolean;
 var
   guard : TOperationGuard;
+  config : IConfiguration;
+  works : IList<TProjectInstallWork>;
 begin
   plan := nil;
   guard := TOperationGuard.Start(FLogger);
   FRepositoryManager.BeginRequestCache;
   try
     try
-      result := DoPlanInstall(cancellationToken, options, plan);
+      //ApplyInstallPlan loads the projects again - the user may change things before confirming the plan.
+      result := DoPlanInstall(cancellationToken, options, plan, config, works);
     except
       on e: Exception do
       begin
@@ -2364,11 +2394,10 @@ begin
     FLogger.Information(line, plan.HasCompanions);
 end;
 
-function TPackageInstaller.DoPlanInstall(const cancellationToken : ICancellationToken; const options : TInstallOptions; out plan : IInstallPlan) : boolean;
+function TPackageInstaller.DoPlanInstall(const cancellationToken : ICancellationToken; const options : TInstallOptions; out plan : IInstallPlan;
+                                         out config : IConfiguration; out works : IList<TProjectInstallWork>) : boolean;
 var
-  config : IConfiguration;
   projectFiles : IList<string>;
-  works : IList<TProjectInstallWork>;
   work : TProjectInstallWork;
   compilerVersion : TCompilerVersion;
   requested : IList<IPackageInfo>;
@@ -2377,6 +2406,7 @@ var
 begin
   result := false;
   plan := nil;
+  works := nil;
   //every step below that fails has said why - those plans carry no errors of their own.
   config := Init(options);
   if config = nil then
@@ -2527,14 +2557,7 @@ begin
   end;
 end;
 
-function TPackageInstaller.DoApplyInstallPlan(const cancellationToken : ICancellationToken; const options : TInstallOptions; const plan : IInstallPlan) : boolean;
-var
-  config : IConfiguration;
-  works : IList<TProjectInstallWork>;
-  work : TProjectInstallWork;
-  compilerVersion : TCompilerVersion;
-  projectFiles : IList<string>;
-  failedProjects : string;
+function TPackageInstaller.CanApplyPlan(const plan : IInstallPlan) : boolean;
 begin
   result := false;
   if (plan = nil) or (not plan.Succeeded) then
@@ -2547,6 +2570,18 @@ begin
     FLogger.Error(TErrorCode.E3001_NothingToInstall, 'There is nothing to install - none of the projects need the package(s).');
     exit;
   end;
+  result := true;
+end;
+
+function TPackageInstaller.DoApplyInstallPlan(const cancellationToken : ICancellationToken; const options : TInstallOptions; const plan : IInstallPlan) : boolean;
+var
+  config : IConfiguration;
+  works : IList<TProjectInstallWork>;
+  compilerVersion : TCompilerVersion;
+begin
+  result := false;
+  if not CanApplyPlan(plan) then
+    exit;
 
   config := Init(options);
   if config = nil then
@@ -2555,6 +2590,17 @@ begin
   works := TCollections.CreateObjectList<TProjectInstallWork>(true);
   if not LoadInstallWork(cancellationToken, options, plan.Projects, config, works, compilerVersion) then
     exit;
+  result := ApplyInstallWork(cancellationToken, options, plan, config, works);
+end;
+
+function TPackageInstaller.ApplyInstallWork(const cancellationToken : ICancellationToken; const options : TInstallOptions; const plan : IInstallPlan;
+                                            const config : IConfiguration; const works : IList<TProjectInstallWork>) : boolean;
+var
+  work : TProjectInstallWork;
+  projectFiles : IList<string>;
+  failedProjects : string;
+begin
+  result := false;
   projectFiles := TCollections.CreateList<string>;
   for work in works do
   begin

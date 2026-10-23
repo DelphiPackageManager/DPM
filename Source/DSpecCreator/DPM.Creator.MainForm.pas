@@ -1178,7 +1178,7 @@ begin
 
         if installOk then
           FOpsLogger.Success('Test passed for ' + compilerStr)
-        else
+        else if not cancelToken.IsCancelled then
         begin
           FOpsLogger.Information('Test failed for ' + compilerStr, true);
           result := false;
@@ -1191,6 +1191,8 @@ begin
           begin
             if installOk then
               FTestResults.AddOrSetValue(compilerStr, 1)
+            else if cancelToken.IsCancelled then
+              FTestResults.AddOrSetValue(compilerStr, 0)
             else
               FTestResults.AddOrSetValue(compilerStr, 2);
             clbTestCompilers.Invalidate;

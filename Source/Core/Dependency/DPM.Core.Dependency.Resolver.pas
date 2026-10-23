@@ -549,11 +549,13 @@ begin
   end;
 end;
 
+//The repository manager is shared, and its owner initializes it - doing it again here would re-check (and
+//re-report) the sources each time a resolver is set up, eg for the trial resolves an install plan makes.
 function TDependencyResolver.Initialize(const config: IConfiguration) : boolean;
 begin
   Assert(config <> nil);
   FConfiguration := config;
-  result :=FRepositoryManager.Initialize(config);
+  result := true;
 end;
 
 function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;

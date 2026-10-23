@@ -194,6 +194,8 @@ uses
   DPM.Core.Tests.Options.Install in 'Tests\DPM.Core.Tests.Options.Install.pas',
   DPM.Core.Tests.Diagnostics in 'Tests\DPM.Core.Tests.Diagnostics.pas',
   DPM.Core.Tests.Diagnostics.Pipeline in 'Tests\DPM.Core.Tests.Diagnostics.Pipeline.pas',
+  DPM.Core.Tests.Package.Installer.Diagnostics in 'Tests\DPM.Core.Tests.Package.Installer.Diagnostics.pas',
+  DPM.Core.Tests.Utils.Process in 'Tests\DPM.Core.Tests.Utils.Process.pas',
   DPM.Core.Tests.Package.InstallPlanner in 'Tests\DPM.Core.Tests.Package.InstallPlanner.pas',
   DPM.Core.Tests.Package.Manifest in 'Tests\DPM.Core.Tests.Package.Manifest.pas',
   DPM.Core.Tests.PackageIdentity in 'Tests\DPM.Core.Tests.PackageIdentity.pas',

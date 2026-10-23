@@ -274,6 +274,8 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Options.Install.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Diagnostics.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Diagnostics.Pipeline.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Package.Installer.Diagnostics.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Utils.Process.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Package.InstallPlanner.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Package.Manifest.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.PackageIdentity.pas"/>

@@ -109,6 +109,18 @@ const
   cWindowsPlatforms : TDPMPlatforms = [TDPMPlatform.Win32, TDPMPlatform.Win64,
                                        TDPMPlatform.Win64x, TDPMPlatform.WinARM64EC];
 
+//The log is ours to tidy up - not something a build fails over.
+procedure DeleteCompilerLog(const logger : ILogger; const fileName : string);
+begin
+  try
+    if TFile.Exists(fileName) then
+      TFile.Delete(fileName);
+  except
+    on e : Exception do
+      logger.Debug('Unable to delete the compiler log [' + fileName + '] : ' + e.Message);
+  end;
+end;
+
 { TMSBuildCompiler }
 
 function TMSBuildCompiler.BuildProject(const cancellationToken : ICancellationToken; const platform : TDPMPlatform; const projectFile : string; const configName : string; const packageVersion : TPackageVersion; const forDesign : boolean) : Boolean;
@@ -134,7 +146,7 @@ begin
     on e : Exception do
     begin
       LogException(FLogger, e);
-      TFile.Delete(FCompilerLogFile);
+      DeleteCompilerLog(FLogger, FCompilerLogFile);
       exit;
     end;
   end;
@@ -171,8 +183,7 @@ begin
     on e : Exception do
     begin
       FLogger.Error(TErrorCode.E5002_CompilerLaunchFailed, 'Unable to run msbuild to compile [' + projectFile + '] : ' + e.Message);
-      if TFile.Exists(FCompilerLogFile) then
-        TFile.Delete(FCompilerLogFile);
+      DeleteCompilerLog(FLogger, FCompilerLogFile);
       exit;
     end;
   end;
@@ -187,7 +198,7 @@ begin
         FLogger.Information(FCompilerOutput.Strings[i]);
       FCompilerOutput.Clear;
     end;
-    TFile.Delete(FCompilerLogFile);
+    DeleteCompilerLog(FLogger, FCompilerLogFile);
   end;
   //after the output, so the error is the last thing shown. A cancelled build is not a failure to
   //report - the operation reports the cancellation.

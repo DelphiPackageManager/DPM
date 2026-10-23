@@ -88,6 +88,32 @@ uses
   Winapi.TlHelp32,
   System.SysUtils;
 
+//The job object API - declared here because XE2's Winapi.Windows doesn't have it.
+const
+  cJobObjectBasicProcessIdList = 3;
+  //more than a build ever runs at once - any beyond it are still stopped, just not waited for.
+  cMaxJobProcesses = 256;
+
+type
+  //JOBOBJECT_BASIC_PROCESS_ID_LIST
+  TJobProcessIdList = record
+    NumberOfAssignedProcesses : DWORD;
+    NumberOfProcessIdsInList : DWORD;
+    ProcessIdList : array[0..cMaxJobProcesses - 1] of NativeUInt;
+  end;
+
+const
+  //what a process we stop is given as its exit code.
+  cStoppedExitCode = 1001;
+  //how long to wait for stopped processes to go before giving up on them.
+  cStopWaitMs = 10000;
+
+function DPMCreateJobObject(lpJobAttributes : Pointer; lpName : PWideChar) : THandle; stdcall; external kernel32 name 'CreateJobObjectW';
+function DPMAssignProcessToJobObject(hJob : THandle; hProcess : THandle) : BOOL; stdcall; external kernel32 name 'AssignProcessToJobObject';
+function DPMTerminateJobObject(hJob : THandle; uExitCode : UINT) : BOOL; stdcall; external kernel32 name 'TerminateJobObject';
+function DPMQueryInformationJobObject(hJob : THandle; infoClass : integer; lpJobObjectInfo : Pointer;
+                                      cbJobObjectInfoLength : DWORD; lpReturnLength : PDWORD) : BOOL; stdcall; external kernel32 name 'QueryInformationJobObject';
+
 
 function StripQuotes(const value : string) : string;
 var
@@ -118,58 +144,111 @@ begin
 end;
 
 
+//Terminates the process and everything below it - the fallback for when the process could not be put in
+//a job. A parent is stopped before its children, so it can't start another while they are being stopped.
 function TerminateProcessTree(const ParentProcessID : Cardinal) : Cardinal;
 var
   hSnapshot : THandle;
+  entry : PROCESSENTRY32;
+  processIds : array of Cardinal;
+  parentIds : array of Cardinal;
+  count : integer;
 
-  function _TerminateProcess(const ProcessID : Cardinal) : Cardinal; // A simple wrapper around TerminateProcess
+  //TerminateProcess only starts the process stopping - wait until it has, and so closed what it had open.
+  function _TerminateProcess(const ProcessID : Cardinal) : Cardinal;
   var
     hProcess : THandle;
   begin
-    Result := 1001;
+    Result := cStoppedExitCode;
 
-    hProcess := OpenProcess(PROCESS_TERMINATE,False, ProcessID);
+    hProcess := OpenProcess(PROCESS_TERMINATE or SYNCHRONIZE, False, ProcessID);
 
     if (hProcess <> 0) and (hProcess <> INVALID_HANDLE_VALUE) then
     begin
       TerminateProcess(hProcess,Result);
+      WaitForSingleObject(hProcess, cStopWaitMs);
       CloseHandle(hProcess);
     end;
   end;
 
-  function _TerminateProcessAndChildren(const snapshot : THandle; const processID : DWORD) : Cardinal; // Nested recursive function
+  //every level - one pass over the snapshot only finds the children, not their children.
+  procedure TerminateDescendants(const processID : Cardinal);
   var
-    processInfo : PROCESSENTRY32;
-    res : Boolean;
+    i : integer;
+    childId : Cardinal;
   begin
-    processInfo.dwSize := sizeof(PROCESSENTRY32);
-
-    res := Process32First(snapshot, processInfo);
-
-    while res do
+    for i := 0 to count - 1 do
     begin
-      if processInfo.th32ParentProcessID = ProcessID then // Child process of ProcessID
-        _TerminateProcess(processInfo.th32ProcessID);
-
-      res := Process32Next(hSnapshot, processInfo);
+      if (parentIds[i] <> processID) or (processIds[i] = processID) then
+        continue;
+      childId := processIds[i];
+      //visited - a recycled process id can't send us round in circles.
+      parentIds[i] := 0;
+      _TerminateProcess(childId);
+      TerminateDescendants(childId);
     end;
-
-    result := _TerminateProcess(processID);
   end;
+
 begin
-  // First set up a global system snapshot to provide data to the recursive function
+  Result := _TerminateProcess(ParentProcessID);
+
   hSnapshot := CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0);
   if hSnapshot = INVALID_HANDLE_VALUE then
+    exit;
+  try
+    count := 0;
+    entry.dwSize := SizeOf(PROCESSENTRY32);
+    if Process32First(hSnapshot, entry) then
+    begin
+      repeat
+        SetLength(processIds, count + 1);
+        SetLength(parentIds, count + 1);
+        processIds[count] := entry.th32ProcessID;
+        parentIds[count] := entry.th32ParentProcessID;
+        Inc(count);
+      until not Process32Next(hSnapshot, entry);
+    end;
+  finally
+    CloseHandle(hSnapshot);
+  end;
+  TerminateDescendants(ParentProcessID);
+end;
+
+//Stops the process and everything it started, then waits for them to go - until they have, they still
+//hold what they had open (a compile holds its log file, the files it writes in the package cache).
+function StopProcess(const processId : Cardinal; const job : THandle) : Cardinal;
+var
+  ids : TJobProcessIdList;
+  handles : array of THandle;
+  count : integer;
+  i : integer;
+begin
+  result := cStoppedExitCode;
+  if job = 0 then
   begin
-    // If we can't get a snapshot (for some reason) just kill the parent process
-    Result := _TerminateProcess(ParentProcessID);
+    result := TerminateProcessTree(processId);
     exit;
   end;
 
-  try
-    Result := _TerminateProcessAndChildren(hSnapshot, ParentProcessID);
-  finally
-    CloseHandle(hSnapshot);
+  //The processes, to wait on. Not the job's own count - that drops to 0 the moment the job is told to
+  //stop, before its processes have actually gone and let go of their files.
+  FillChar(ids, SizeOf(ids), 0);
+  //a list too long for the buffer fails with ERROR_MORE_DATA, but the ids that fit are still there.
+  DPMQueryInformationJobObject(job, cJobObjectBasicProcessIdList, @ids, SizeOf(ids), nil);
+  SetLength(handles, ids.NumberOfProcessIdsInList);
+  count := 0;
+  for i := 0 to Integer(ids.NumberOfProcessIdsInList) - 1 do
+  begin
+    handles[count] := OpenProcess(SYNCHRONIZE, False, Cardinal(ids.ProcessIdList[i]));
+    if handles[count] <> 0 then
+      Inc(count);
+  end;
+
+  DPMTerminateJobObject(job, cStoppedExitCode);
+  for i := 0 to count - 1 do
+  begin
+    WaitForSingleObject(handles[i], cStopWaitMs);
+    CloseHandle(handles[i]);
   end;
 end;
 
@@ -188,6 +267,7 @@ var
 
   waitRes: Cardinal;
   objHandles: array[0..1] of THandle;
+  job : THandle;
 
   function DoGetExitCodeProcess: Cardinal;
   begin
@@ -263,12 +343,23 @@ begin
 
   sParams := DoubleQuoteString(executable) + ' ' + commandLine;
 
-  if not CreateProcess(nil, PChar(sParams), nil, nil, false, CREATE_UNICODE_ENVIRONMENT + CREATE_NEW_CONSOLE, pEnvironment, pDir, startupInfo, processInfo) then
+  //Suspended, so it is in the job before it can start anything - the job is how a stop reaches the whole
+  //tree (cmd.exe starts cmd, which starts msbuild, which starts the compiler).
+  if not CreateProcess(nil, PChar(sParams), nil, nil, false, CREATE_UNICODE_ENVIRONMENT + CREATE_NEW_CONSOLE + CREATE_SUSPENDED, pEnvironment, pDir, startupInfo, processInfo) then
   begin
     result := GetLastError;
     exit;
   end;
 
+  job := DPMCreateJobObject(nil, nil);
+  if (job <> 0) and (not DPMAssignProcessToJobObject(job, processInfo.hProcess)) then
+  begin
+    //eg Windows 7, when DPM itself already runs in a job - StopProcess walks the process tree instead.
+    CloseHandle(job);
+    job := 0;
+  end;
+
+  ResumeThread(processInfo.hThread);
   //we don't need this handle.
   CloseHandle(processInfo.hThread);
 
@@ -293,23 +384,27 @@ begin
       end;
     WAIT_OBJECT_0 + 1: // Event signalled to terminate process
       begin
-        result := TerminateProcessTree(processInfo.dwProcessId);
+        result := StopProcess(processInfo.dwProcessId, job);
       end;
     WAIT_TIMEOUT: // Timed out
       begin
         Result := DoGetExitCodeProcess; // Check is still running (just in case)
         if (result = STILL_ACTIVE)  then
         begin
-          result := TerminateProcessTree(processInfo.dwProcessId);
+          result := StopProcess(processInfo.dwProcessId, job);
         end;
       end;
   else // Something else happened (like WAIT_FAILED)
     begin
+        if job <> 0 then
+          CloseHandle(job);
         CloseHandle(processInfo.hProcess);
         raise Exception.Create('IProcess : Unexpected event wait result ' + IntToStr(waitRes));
     end;
   end;
 
+  if job <> 0 then
+    CloseHandle(job);
   CloseHandle(processInfo.hProcess);
 
 
