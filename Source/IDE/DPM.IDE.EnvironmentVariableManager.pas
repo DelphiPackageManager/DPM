@@ -57,7 +57,8 @@ uses
   WinApi.Windows,
   System.Classes,
   System.SysUtils,
-  DPM.Core.Diagnostics;
+  DPM.Core.Diagnostics,
+  DPM.Core.Packaging.EnvironmentVariableValidator;
 
 { helpers }
 
@@ -177,19 +178,29 @@ var
   referencer : string;
   idx : integer;
   ref : TEnvVarRef;
+  reason : string;
 begin
-  //PATH is append-only and delegated to the existing path manager, which ref-counts entries and
-  //protects directories that were on PATH at IDE startup.
-  if SameText(Trim(name), 'PATH') then
+  key := UpperCase(Trim(name));
+  if key = '' then
+    exit;
+
+  //"dpm pack" refuses these names, but nothing forces a package to have been made by "dpm pack" (or left
+  //alone since), so the check that holds is this one, where the variable would be set.
+  if not TEnvironmentVariableValidator.IsAllowed(name, reason) then
+  begin
+    FLogger.Warning(TWarningCode.W9107_EnvironmentVariableNotAllowed, 'The package [' + packageId + '] sets the environment variable [' + name +
+                    '], which packages are not allowed to set - it was not set.');
+    exit;
+  end;
+
+  //PATH is append-only and delegated to the existing path manager, which adds entries after what is
+  //already on PATH, ref-counts them and protects directories that were on PATH at IDE startup.
+  if TEnvironmentVariableValidator.IsPathVariable(name) then
   begin
     for dir in SplitPathDirs(value) do
       FPathManager.EnsurePath(dir);
     exit;
   end;
-
-  key := UpperCase(Trim(name));
-  if key = '' then
-    exit;
 
   referencer := MakeReferencer(lcProject, packageId);
   ref.Referencer := referencer;
@@ -227,7 +238,7 @@ var
   referencer : string;
   idx : integer;
 begin
-  if SameText(Trim(name), 'PATH') then
+  if TEnvironmentVariableValidator.IsPathVariable(name) then
   begin
     for dir in SplitPathDirs(value) do
       FPathManager.RemovePath(dir);

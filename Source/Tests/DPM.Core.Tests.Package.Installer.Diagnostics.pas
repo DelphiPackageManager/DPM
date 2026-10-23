@@ -31,6 +31,17 @@ type
     procedure Two_Conflicts_Are_Two_Errors_And_Nothing_Else;
     [Test]
     procedure Restore_Conflict_On_Two_Platforms_Is_Reported_Once;
+
+    //A spec's build/design project must be inside the package - DPM only reads, patches and builds what
+    //the package itself contains.
+    [Test]
+    procedure Build_Project_Outside_The_Package_Is_One_Error_And_Not_Built;
+    [Test]
+    procedure Absolute_Build_Project_Is_One_Error_And_Not_Built;
+    [Test]
+    procedure Design_Project_Outside_The_Package_Is_One_Error_And_Not_Built;
+    [Test]
+    procedure CopyToBin_Files_Outside_The_Package_Are_Not_Copied;
   end;
 
 implementation
@@ -142,10 +153,15 @@ type
     constructor Create(const config : IConfiguration);
   end;
 
+var
+  //how many projects the fake compiler was asked to build - CachePackageSpec resets it.
+  BuildCount : integer;
+
 const
   cPackageId = 'VSoft.Compiles';
 
-  cPackageSpec =
+  //the spec up to the template's build/design/copy entries.
+  cPackageSpecHead =
     'metadata:' + sLineBreak +
     '  id: ' + cPackageId + sLineBreak +
     '  version: 1.0.0' + sLineBreak +
@@ -161,9 +177,13 @@ const
     '  - name: default' + sLineBreak +
     '    source:' + sLineBreak +
     '      - src: .\source\*.pas' + sLineBreak +
-    '        dest: source' + sLineBreak +
+    '        dest: source' + sLineBreak;
+
+  cPackageBuild =
     '    build:' + sLineBreak +
     '      - project: .\source\Pkg.dproj' + sLineBreak;
+
+  cPackageSpec = cPackageSpecHead + cPackageBuild;
 
   //nothing in it that DPM refuses to build.
   cPackageProject =
@@ -243,6 +263,7 @@ end;
 function TFakeCompiler.BuildProject(const cancellationToken : ICancellationToken; const platform : TDPMPlatform; const projectFile : string;
                                     const configName : string; const packageVersion : TPackageVersion; const forDesign : boolean) : boolean;
 begin
+  Inc(BuildCount);
   case FOutcome of
     coSucceed :
       result := true;
@@ -436,6 +457,10 @@ begin
   FTempFolder := TPath.Combine(TPath.GetTempPath, 'dpm-installer-diagnostics-' + IntToHex(Random(MaxInt), 8));
   ForceDirectories(TPath.Combine(FTempFolder, 'package\source'));
   TFile.WriteAllText(TPath.Combine(FTempFolder, 'package\source\Pkg.dproj'), cPackageProject, TEncoding.UTF8);
+  //next to the package folder, not in it - a project that would build, and a dll to copy.
+  ForceDirectories(TPath.Combine(FTempFolder, 'outside'));
+  TFile.WriteAllText(TPath.Combine(FTempFolder, 'outside\Evil.dproj'), cPackageProject, TEncoding.UTF8);
+  TFile.WriteAllText(TPath.Combine(FTempFolder, 'outside\Evil.dll'), 'not really a dll', TEncoding.UTF8);
 end;
 
 procedure TInstallerDiagnosticsTests.FixtureTearDown;
@@ -445,10 +470,10 @@ begin
   CoUninitialize;
 end;
 
-//Builds the test package into the 'cache' with the compiler doing what outcome says - returns what
-//dpm cache install would have.
-function CachePackage(const tempFolder : string; const logger : ILogger; const outcome : TCompileOutcome;
-                      const cancellation : ICancellationTokenSource) : boolean;
+//Builds a package with the spec given into the 'cache' with the compiler doing what outcome says - returns
+//what dpm cache install would have.
+function CachePackageSpec(const tempFolder : string; const logger : ILogger; const outcome : TCompileOutcome;
+                          const cancellation : ICancellationTokenSource; const spec : string) : boolean;
 var
   repo : TFakeRepositoryManager;
   repoIntf : IPackageRepositoryManager;
@@ -463,12 +488,13 @@ begin
   packageFolder := TPath.Combine(tempFolder, 'package');
   //the BOM a successful build leaves would skip the next build.
   DeleteFile(TPath.Combine(packageFolder, 'package.Win32.bom'));
+  BuildCount := 0;
   info := MakeInfo(cPackageId, '1.0.0', []);
   repo := TFakeRepositoryManager.Create;
   repoIntf := repo;
   repo.SetVersions(cPackageId, ListOf([info]));
   reader := TPackageSpecReader.Create(logger);
-  cache := TExtractedPackageCache.Create(packageFolder, reader.ReadSpecString(cPackageSpec));
+  cache := TExtractedPackageCache.Create(packageFolder, reader.ReadSpecString(spec));
   cacheIntf := cache;
   cache.RegisterInfo(info);
   installer := NewInstaller(logger, repoIntf, cacheIntf, TFakeInstallerContext.Create(logger),
@@ -479,6 +505,12 @@ begin
   finally
     options.Free;
   end;
+end;
+
+function CachePackage(const tempFolder : string; const logger : ILogger; const outcome : TCompileOutcome;
+                      const cancellation : ICancellationTokenSource) : boolean;
+begin
+  result := CachePackageSpec(tempFolder, logger, outcome, cancellation, cPackageSpec);
 end;
 
 procedure TInstallerDiagnosticsTests.Compile_Failure_Is_One_Error;
@@ -617,6 +649,82 @@ begin
   //the project's graph is resolved once, not once per platform.
   Assert.AreEqual(1, loggerIntf.ErrorCount, logger.Messages.Text);
   Assert.IsTrue(logger.HasError(TErrorCode.E2001_DependencyUnsatisfiable), logger.Messages.Text);
+end;
+
+//Caches a package whose template has the entries given, which the installer must refuse, and checks it
+//said so once - naming the package and the path - without building anything.
+procedure CheckProjectRefused(const tempFolder : string; const entries : string; const path : string);
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsFalse(CachePackageSpec(tempFolder, loggerIntf, coSucceed, TCancellationTokenSourceFactory.Create, cPackageSpecHead + entries),
+                 'the package must not install : ' + logger.Messages.Text);
+  Assert.AreEqual(0, BuildCount, 'nothing outside the package may reach msbuild : ' + logger.Messages.Text);
+  Assert.AreEqual(1, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(logger.HasError(TErrorCode.E5019_ProjectOutsidePackage), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('error', cPackageId), 'the error names the package : ' + logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('error', path), 'the error names the path : ' + logger.Messages.Text);
+end;
+
+procedure TInstallerDiagnosticsTests.Build_Project_Outside_The_Package_Is_One_Error_And_Not_Built;
+begin
+  //a project that exists and would build, one folder up from the package.
+  CheckProjectRefused(FTempFolder,
+    '    build:' + sLineBreak +
+    '      - project: ''..\outside\Evil.dproj''' + sLineBreak,
+    '..\outside\Evil.dproj');
+end;
+
+procedure TInstallerDiagnosticsTests.Absolute_Build_Project_Is_One_Error_And_Not_Built;
+var
+  projectFile : string;
+begin
+  //refused even though it is the package's own project - spec paths are relative to the package.
+  projectFile := TPath.Combine(FTempFolder, 'package\source\Pkg.dproj');
+  CheckProjectRefused(FTempFolder,
+    '    build:' + sLineBreak +
+    '      - project: ''' + projectFile + '''' + sLineBreak,
+    projectFile);
+end;
+
+procedure TInstallerDiagnosticsTests.Design_Project_Outside_The_Package_Is_One_Error_And_Not_Built;
+begin
+  CheckProjectRefused(FTempFolder,
+    cPackageBuild +
+    '    design:' + sLineBreak +
+    '      - project: ''/../outside/Evil.dproj''' + sLineBreak,
+    '/../outside/Evil.dproj');
+end;
+
+procedure TInstallerDiagnosticsTests.CopyToBin_Files_Outside_The_Package_Are_Not_Copied;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  copiedFile : string;
+  outsideWarnings : integer;
+  i : integer;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  copiedFile := TPath.Combine(FTempFolder, 'package\bpl\Win32\Evil.dll');
+  //one pattern up out of the package, one rooted somewhere else entirely.
+  Assert.IsTrue(CachePackageSpec(FTempFolder, loggerIntf, coSucceed, TCancellationTokenSourceFactory.Create,
+                  cPackageSpecHead + cPackageBuild +
+                  '    copyToBin:' + sLineBreak +
+                  '      - src: ''..\outside\*.dll''' + sLineBreak +
+                  '        copyToBin: Win32' + sLineBreak +
+                  '      - src: ''' + TPath.Combine(FTempFolder, 'outside\*.dll') + '''' + sLineBreak +
+                  '        copyToBin: Win32' + sLineBreak),
+                'the package itself is fine : ' + logger.Messages.Text);
+  Assert.IsFalse(TFile.Exists(copiedFile), 'a file from outside the package was copied into its bpl folder');
+  outsideWarnings := 0;
+  for i := 0 to logger.Diagnostics.Count - 1 do
+    if logger.Diagnostics[i] = 'warning ' + WarningCodeToString(TWarningCode.W5012_PathOutsidePackage) then
+      Inc(outsideWarnings);
+  Assert.AreEqual(2, outsideWarnings, 'one warning per pattern : ' + logger.Messages.Text);
 end;
 
 initialization

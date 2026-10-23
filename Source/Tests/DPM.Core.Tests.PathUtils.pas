@@ -87,6 +87,53 @@ type
 
     [Test]
     procedure TestResolveRelativeToFile_EmptyPath_ReturnsEmpty;
+
+    //Paths in a package spec (build/design projects, search paths, copy patterns) must stay inside the
+    //package folder - the folder itself counts, a sibling that merely shares its name as a prefix doesn't.
+    [Test]
+    [TestCase('Child', 'c:\cache\pkg,c:\cache\pkg\src\a.pas,True')]
+    [TestCase('FolderItself', 'c:\cache\pkg,c:\cache\pkg,True')]
+    [TestCase('FolderTrailingDelimiter', 'c:\cache\pkg\,c:\cache\pkg,True')]
+    [TestCase('PathTrailingDelimiter', 'c:\cache\pkg,c:\cache\pkg\src\,True')]
+    [TestCase('IgnoresCase', 'c:\cache\pkg,C:\CACHE\PKG\Src\A.pas,True')]
+    [TestCase('DotDotStaysInside', 'c:\cache\pkg,c:\cache\pkg\src\..\lib\a.dcu,True')]
+    [TestCase('ForwardSlashes', 'c:\cache\pkg,c:/cache/pkg/src/a.pas,True')]
+    [TestCase('SiblingWithSamePrefix', 'c:\cache\pkg,c:\cache\pkg2\a.pas,False')]
+    [TestCase('Parent', 'c:\cache\pkg,c:\cache,False')]
+    [TestCase('DotDotEscapes', 'c:\cache\pkg,c:\cache\pkg\..\other\a.pas,False')]
+    [TestCase('DotDotEscapesFromDeep', 'c:\cache\pkg,c:\cache\pkg\src\..\..\..\Windows\a.dll,False')]
+    [TestCase('OtherDrive', 'c:\cache\pkg,d:\cache\pkg\a.pas,False')]
+    [TestCase('Unc', 'c:\cache\pkg,\\server\share\a.pas,False')]
+    procedure TestIsPathInFolder(const folder, path : string; const expected : boolean);
+
+    [Test]
+    procedure TestIsPathInFolder_Empty_IsFalse;
+
+    //A spec path is relative to the package folder, '/' or '\' separated, and may start with one separator
+    //for the package root ('/packages/X.dproj').
+    [Test]
+    [TestCase('LeadingSlash', 'c:\cache\pkg,/packages/X.dproj,c:\cache\pkg\packages\X.dproj')]
+    [TestCase('LeadingBackslash', 'c:\cache\pkg,\packages\X.dproj,c:\cache\pkg\packages\X.dproj')]
+    [TestCase('DotSlash', 'c:\cache\pkg,.\source\Pkg.dproj,c:\cache\pkg\source\Pkg.dproj')]
+    [TestCase('Bare', 'c:\cache\pkg,source\Pkg.dproj,c:\cache\pkg\source\Pkg.dproj')]
+    [TestCase('DotDotStaysInside', 'c:\cache\pkg,source/../packages/X.dproj,c:\cache\pkg\packages\X.dproj')]
+    [TestCase('FolderTrailingDelimiter', 'c:\cache\pkg\,/packages/X.dproj,c:\cache\pkg\packages\X.dproj')]
+    [TestCase('Folder', 'c:\cache\pkg,source/,c:\cache\pkg\source\')]
+    procedure TestTryResolveInFolder_Inside(const folder, path, expected : string);
+
+    [Test]
+    [TestCase('Parent', 'c:\cache\pkg,../Evil.dproj')]
+    [TestCase('LeadingSlashParent', 'c:\cache\pkg,/../../Evil.dproj')]
+    [TestCase('DeepParent', 'c:\cache\pkg,source/../../../../Windows/System32/Evil.dproj')]
+    [TestCase('SiblingWithSamePrefix', 'c:\cache\pkg,../pkg2/Evil.dproj')]
+    //absolute paths are refused even when they point inside the package
+    [TestCase('AbsoluteInside', 'c:\cache\pkg,c:\cache\pkg\Pkg.dproj')]
+    [TestCase('AbsoluteForwardSlash', 'c:\cache\pkg,c:/Windows/Evil.dproj')]
+    [TestCase('DriveRelative', 'c:\cache\pkg,c:Evil.dproj')]
+    [TestCase('UncForwardSlash', 'c:\cache\pkg,//server/share/Evil.dproj')]
+    [TestCase('Unc', 'c:\cache\pkg,\\server\share\Evil.dproj')]
+    [TestCase('LongPathPrefix', 'c:\cache\pkg,\\?\c:\cache\pkg\Pkg.dproj')]
+    procedure TestTryResolveInFolder_Refused(const folder, path : string);
   end;
 
 implementation
@@ -165,6 +212,33 @@ end;
 procedure TPathUtilsTests.TestIsDspecFile(const fileName : string; const expected : boolean);
 begin
   Assert.AreEqual(expected, TPathUtils.IsDspecFile(Trim(fileName)));
+end;
+
+procedure TPathUtilsTests.TestIsPathInFolder(const folder, path : string; const expected : boolean);
+begin
+  Assert.AreEqual(expected, TPathUtils.IsPathInFolder(folder, path), folder + ' / ' + path);
+end;
+
+procedure TPathUtilsTests.TestIsPathInFolder_Empty_IsFalse;
+begin
+  Assert.IsFalse(TPathUtils.IsPathInFolder('', 'c:\cache\pkg\a.pas'), 'no folder');
+  Assert.IsFalse(TPathUtils.IsPathInFolder('c:\cache\pkg', ''), 'no path');
+end;
+
+procedure TPathUtilsTests.TestTryResolveInFolder_Inside(const folder, path, expected : string);
+var
+  resolved : string;
+begin
+  Assert.IsTrue(TPathUtils.TryResolveInFolder(folder, path, resolved), path);
+  Assert.AreEqual(expected, resolved, true, path);
+end;
+
+procedure TPathUtilsTests.TestTryResolveInFolder_Refused(const folder, path : string);
+var
+  resolved : string;
+begin
+  Assert.IsFalse(TPathUtils.TryResolveInFolder(folder, path, resolved), path + ' resolved to ' + resolved);
+  Assert.AreEqual('', resolved, 'nothing to use when refused');
 end;
 
 initialization

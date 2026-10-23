@@ -43,6 +43,10 @@ type
     //Stands in for string.Join - TStringHelper does not exist before XE3, and Core is compiled
     //into the XE2 IDE plugin.
     class function Join(const separator : string; const values : array of string) : string;
+    //True for an http:// or https:// link with a host, holding nothing a url never has unencoded (spaces,
+    //control characters, quotes). The only kind of link from a package that DPM hands to the shell - a
+    //file: link or a \\server\share\program.exe path would run a program, not open a browser.
+    class function IsWebUrl(const value : string) : boolean;
   end;
 
 implementation
@@ -122,6 +126,29 @@ begin
       result := result + separator;
     result := result + values[i];
   end;
+end;
+
+class function TStringUtils.IsWebUrl(const value : string) : boolean;
+var
+  schemeLength : integer;
+  i : integer;
+begin
+  result := false;
+  if StartsText('https://', value) then
+    schemeLength := Length('https://')
+  else if StartsText('http://', value) then
+    schemeLength := Length('http://')
+  else
+    exit;
+  //a host has to follow the scheme.
+  if (Length(value) <= schemeLength) or CharInSet(value[schemeLength + 1], ['/', '\']) then
+    exit;
+  for i := 1 to Length(value) do
+  begin
+    if (value[i] <= ' ') or (value[i] = '"') or (value[i] = #127) then
+      exit;
+  end;
+  result := true;
 end;
 
 class function TStringUtils.PadRight(const theString : string; TotalWidth : Integer; PaddingChar : Char) : string;

@@ -781,6 +781,20 @@ begin
 end;
 
 
+//The links come from the package's metadata, and the shell runs a file: link or a \\server\share\program.exe
+//path just as readily as it opens a web page in a browser - so only web links are opened, anything else is
+//shown to the user instead.
+procedure OpenPackageLink(const uri : string);
+begin
+  if uri = '' then
+    exit;
+  if TStringUtils.IsWebUrl(uri) then
+    ShellExecute(Application.Handle, 'open', PChar(uri), nil, nil, SW_SHOWNORMAL)
+  else
+    MessageDlg('DPM only opens http and https links. The link the package gives is :' + sLineBreak + sLineBreak + uri,
+               mtInformation, [mbOK], 0);
+end;
+
 procedure TPackageDetailsFrame.OnDetailsUriClick(Sender: TObject; const uri: string; const element: TDetailElement);
 begin
   case element of
@@ -789,7 +803,7 @@ begin
     deProjectUrl,
     deRepositoryUrl,
     deRepositoryCommit,
-    deReportUrl : ShellExecute(Application.Handle, 'open', PChar(uri), nil, nil, SW_SHOWNORMAL);
+    deReportUrl : OpenPackageLink(uri);
     deTags : ;
   end;
 

@@ -66,12 +66,23 @@ type
     //glob + IsDspecFile filter to handle Windows wildcard quirks and exclude stray names.
     //Returns TStringDynArray to be a drop-in for TDirectory.GetFiles at the call sites.
     class function FindDspecFiles(const directory : string; const searchOption : TSearchOption = TSearchOption.soTopDirectoryOnly) : TStringDynArray;
+    //True when path is folder itself or something inside it. Both are expanded the way Windows expands a
+    //path it opens (GetFullPathName - '..', '.', '/', trailing dots and spaces) before they are compared,
+    //case insensitively, so nothing in path can hide where it really leads. A relative path is relative to
+    //the current folder.
+    class function IsPathInFolder(const folder : string; const path : string) : boolean;
+    //Resolves a path a package spec gives relative to the package folder - '/' or '\' separated, with an
+    //optional single leading separator for the folder itself ('/packages/X.dproj') - to a full path. False,
+    //with resolvedPath '', when it is absolute (a drive, UNC or rooted path) or leads out of folder: spec
+    //paths are author supplied, and DPM only reads, writes, builds and loads what the package contains.
+    class function TryResolveInFolder(const folder : string; const relativePath : string; out resolvedPath : string) : boolean;
   end;
 
 
 implementation
 
 uses
+  WinApi.Windows,
   System.SysUtils,
   System.StrUtils,
   System.RegularExpressions,
@@ -451,6 +462,67 @@ begin
       Inc(matchCount);
     end;
   SetLength(result, matchCount);
+end;
+
+//GetFullPathName - the expansion Windows itself applies to a path it opens.
+function TryGetFullPath(const path : string; out fullPath : string) : boolean;
+var
+  len : DWORD;
+  filePart : PChar;
+begin
+  fullPath := '';
+  len := GetFullPathName(PChar(path), 0, nil, filePart);
+  result := len > 0;
+  if not result then
+    exit;
+  SetLength(fullPath, len);
+  len := GetFullPathName(PChar(path), len, PChar(fullPath), filePart);
+  //on success len is the length without the terminating null, so less than the buffer.
+  result := (len > 0) and (len < DWORD(Length(fullPath)));
+  if result then
+    SetLength(fullPath, len)
+  else
+    fullPath := '';
+end;
+
+class function TPathUtils.IsPathInFolder(const folder : string; const path : string) : boolean;
+var
+  fullFolder : string;
+  fullPath : string;
+begin
+  result := false;
+  if (folder = '') or (path = '') then
+    exit;
+  if not (TryGetFullPath(folder, fullFolder) and TryGetFullPath(path, fullPath)) then
+    exit;
+  //a trailing delimiter on both, so the folder itself is in it, and a sibling that only shares its name as a
+  //prefix ('c:\cache\pkg2' against 'c:\cache\pkg') isn't.
+  fullFolder := IncludeTrailingPathDelimiter(fullFolder);
+  fullPath := IncludeTrailingPathDelimiter(fullPath);
+  result := SameText(Copy(fullPath, 1, Length(fullFolder)), fullFolder);
+end;
+
+class function TPathUtils.TryResolveInFolder(const folder : string; const relativePath : string; out resolvedPath : string) : boolean;
+var
+  relative : string;
+begin
+  result := false;
+  resolvedPath := '';
+  if folder = '' then
+    exit;
+  relative := StringReplace(relativePath, '/', PathDelim, [rfReplaceAll]);
+  //a single leading separator is the folder itself - how specs write package paths.
+  if (relative <> '') and (relative[1] = PathDelim) then
+    Delete(relative, 1, 1);
+  //what is left has to be relative : no drive ('c:\x', or 'c:x' - relative to that drive's current folder)
+  //and no second leading separator ('\\server\share\x', '\\?\c:\x').
+  if (relative <> '') and ((relative[1] = PathDelim) or (ExtractFileDrive(relative) <> '')) then
+    exit;
+  if not TryGetFullPath(IncludeTrailingPathDelimiter(folder) + relative, resolvedPath) then
+    exit;
+  result := IsPathInFolder(folder, resolvedPath);
+  if not result then
+    resolvedPath := '';
 end;
 
 

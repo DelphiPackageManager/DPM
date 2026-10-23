@@ -150,9 +150,9 @@ type
     procedure EnsureDesignHostPlatformCompiled(const cancellationToken: ICancellationToken; const options: TSearchOptions;
                                                const graph: IPackageReference; const installedPlatforms: TDPMPlatforms);
 
-    //Returns the path to dpm.exe to record in the project's <DPMExe> for the copy-local targets to
-    //prefer, or '' when the running process isn't dpm (e.g. the IDE plugin restoring) - in which case
-    //the targets file falls back to 'dpm' on PATH.
+    //Returns the path to dpm.exe to record in the copy-local targets file in the package cache, or ''
+    //when it can't be found (the IDE plugin, with no dpm.exe beside it) - the file then keeps the path
+    //it already has.
     function GetDpmExePathForTargets : string;
 
     function InstallDesignPackages(const cancellationToken: ICancellationToken; const projectFile : string; const packageSpecs: IDictionary<string, IPackageSpec>) : boolean;
@@ -800,19 +800,41 @@ var
   //design entry project path (lowercased) -> the platforms it declared BEFORE any dproj patching.
   designCandidates: IDictionary<string, TDPMPlatforms>;
 
-  //Build/design `project` paths are relative to the extracted package root, but are authored
-  //with a leading separator (e.g. '/packages/..') and forward slashes. TPath.Combine treats a
-  //leading separator as a rooted path and discards packagePath, so normalise the separators and
-  //strip any leading one first - mirroring how TAntPattern.Combine handles source patterns.
+  //Build/design `project` paths are relative to the extracted package root, authored with a leading
+  //separator (e.g. '/packages/..') and forward slashes. They are author supplied, so CheckProjectPaths has
+  //already refused any that is absolute or leads out of the package folder - this only resolves them.
   function ResolveProjectFile(const projectPath : string) : string;
-  var
-    relativePath : string;
   begin
-    relativePath := StringReplace(projectPath, '/', PathDelim, [rfReplaceAll]);
-    if (relativePath <> '') and (relativePath[1] = PathDelim) then
-      Delete(relativePath, 1, 1);
-    result := TPath.Combine(packagePath, relativePath);
-    result := TPathUtils.CompressRelativePath('', result);
+    if not TPathUtils.TryResolveInFolder(packagePath, projectPath, result) then
+      result := '';
+  end;
+
+  //Every build and design project has to be inside the package folder - DPM reads, patches and builds
+  //them. Checked once, before anything touches any of them, and fatal: a package that points its build
+  //somewhere else is not one to half install.
+  function CheckProjectPaths : boolean;
+  var
+    projects : IList<string>;
+    buildItem : ISpecBuildEntry;
+    designItem : ISpecDesignEntry;
+    entryProject : string;
+    resolvedFile : string;
+  begin
+    projects := TCollections.CreateList<string>;
+    for buildItem in template.BuildEntries do
+      projects.Add(buildItem.Project);
+    for designItem in template.DesignEntries do
+      projects.Add(designItem.Project);
+    for entryProject in projects do
+    begin
+      if not TPathUtils.TryResolveInFolder(packagePath, entryProject, resolvedFile) then
+      begin
+        logger.Error(TErrorCode.E5019_ProjectOutsidePackage, 'The project [' + entryProject + '] of [' + packageInfo.Id +
+                     '] is not inside the package folder - spec paths are relative to it, and DPM only builds what the package contains.');
+        exit(false);
+      end;
+    end;
+    result := true;
   end;
 
   //Resolve an entry's additional searchPaths (authored relative to the package root, same convention
@@ -823,24 +845,19 @@ var
   var
     entryPath : string;
     resolvedPath : string;
-    packageRoot : string;
   begin
     result := TCollections.CreateList<string>;
     result.AddRange(searchPaths);
     if (entrySearchPaths = nil) or (entrySearchPaths.Count = 0) then
       exit;
-    packageRoot := IncludeTrailingPathDelimiter(packagePath);
     for entryPath in entrySearchPaths do
     begin
-      resolvedPath := IncludeTrailingPathDelimiter(ResolveProjectFile(entryPath));
-      //Trailing delimiter on both sides keeps the check from matching a sibling folder that merely
-      //shares the package folder's name as a prefix, and allows the package root itself.
-      if not SameText(Copy(resolvedPath, 1, Length(packageRoot)), packageRoot) then
+      if not TPathUtils.TryResolveInFolder(packagePath, entryPath, resolvedPath) then
       begin
         logger.Warning(TWarningCode.W5012_PathOutsidePackage, 'Ignoring the search path [' + entryPath + '] of [' + packageInfo.Id + '] - it resolves outside the package folder.');
         continue;
       end;
-      result.Add(resolvedPath);
+      result.Add(IncludeTrailingPathDelimiter(resolvedPath));
     end;
   end;
 
@@ -851,23 +868,14 @@ var
   //is idempotent - a project that already declares the pair is not rewritten at all.
   //Failure here is never fatal : we warn and let msbuild try anyway, so this can only ever fix
   //packages, never break one that builds today.
+  //The project is inside the package folder - CheckProjectPaths refused the package otherwise - so the
+  //patch never touches a file the package doesn't own.
   procedure EnsureBuildTarget(const projectFile : string; const entryProject : string; const options : TProjectPatchOptions);
   var
-    packageRoot : string;
     patchResult : TProjectPatchResult;
   begin
     if FProjectConfigPatcher = nil then
       exit;
-    //Never mutate a file outside the package's own cache folder - `project` is author supplied and
-    //ResolveProjectFile compresses '..' segments without a containment check. Same guard
-    //ResolveEntrySearchPaths applies to search paths.
-    packageRoot := IncludeTrailingPathDelimiter(packagePath);
-    if not SameText(Copy(projectFile, 1, Length(packageRoot)), packageRoot) then
-    begin
-      logger.Warning(TWarningCode.W5012_PathOutsidePackage, 'Not adjusting the project [' + entryProject + '] of [' + packageInfo.Id +
-                      '] - it resolves outside the package folder.');
-      exit;
-    end;
     //a failure is reported by the patcher - the build is attempted anyway.
     patchResult := FProjectConfigPatcher.EnsureBuildTarget(projectFile, effectivePlatform, configuration,
                                                           Compiler.compilerVersion, options);
@@ -928,6 +936,7 @@ var
     files : TStringDynArray;
     srcFile : string;
     targetFile : string;
+    warned : boolean;
   begin
     if not template.CopyToLibEntries.Any then
       exit;
@@ -938,8 +947,18 @@ var
       if (sourceGlob <> '') and (sourceGlob[1] = PathDelim) then
         Delete(sourceGlob, 1, 1);
       patterns := libAntPattern.Expand(sourceGlob);
+      warned := false;
       for pattern in patterns do
       begin
+        //only ever from inside the package - Expand keeps a rooted pattern as it is and follows '..', so a
+        //pattern could otherwise copy any file on the machine into lib\{platform}.
+        if not TPathUtils.IsPathInFolder(packagePath, pattern.Directory) then
+        begin
+          if not warned then
+            logger.Warning(TWarningCode.W5012_PathOutsidePackage, 'Ignoring the copyToLib pattern [' + copyEntry.Source + '] of [' + packageInfo.Id + '] - it resolves outside the package folder.');
+          warned := true;
+          continue;
+        end;
         if not TDirectory.Exists(pattern.Directory) then
           continue;
         files := TDirectory.GetFiles(pattern.Directory, pattern.FileMask, TSearchOption.soTopDirectoryOnly);
@@ -975,6 +994,7 @@ var
     files : TStringDynArray;
     srcFile : string;
     targetFile : string;
+    warned : boolean;
   begin
     if not template.CopyToBinEntries.Any then
       exit;
@@ -988,8 +1008,17 @@ var
       if (sourceGlob <> '') and (sourceGlob[1] = PathDelim) then
         Delete(sourceGlob, 1, 1);
       patterns := binAntPattern.Expand(sourceGlob);
+      warned := false;
       for pattern in patterns do
       begin
+        //only ever from inside the package, as for copyToLib - and bpl\{platform} is on the IDE's PATH.
+        if not TPathUtils.IsPathInFolder(packagePath, pattern.Directory) then
+        begin
+          if not warned then
+            logger.Warning(TWarningCode.W5012_PathOutsidePackage, 'Ignoring the copyToBin pattern [' + copyEntry.Source + '] of [' + packageInfo.Id + '] - it resolves outside the package folder.');
+          warned := true;
+          continue;
+        end;
         if not TDirectory.Exists(pattern.Directory) then
           continue;
         files := TDirectory.GetFiles(pattern.Directory, pattern.FileMask, TSearchOption.soTopDirectoryOnly);
@@ -1048,6 +1077,10 @@ begin
 
   if (not template.BuildEntries.Any) and (not template.DesignEntries.Any) then
     exit(true); // Nothing to compile
+
+  // Before anything reads, generates, patches or builds a project.
+  if not CheckProjectPaths then
+    exit(false);
 
   // Source-only libraries declare `package definitions` - generate their dpk/dproj into the cache
   // before building. This runs only on the compile path (the BOM short-circuit above already
@@ -2064,8 +2097,8 @@ begin
   //Copy-local runs at build time (the output dir is only reliably known then), not here. At
   //restore/install we just ensure the targets file exists in the cache root and the project imports
   //it, so its DPMCopyLocal target (hooked into $(BuildDependsOn)) can invoke 'dpm copylocal'.
-  EnsureCopyLocalTargets(config.PackageCacheLocation, FLogger);
-  if not projectEditor.EnsureCopyLocalImport(GetDpmExePathForTargets) then
+  EnsureCopyLocalTargets(config.PackageCacheLocation, GetDpmExePathForTargets, FLogger);
+  if not projectEditor.EnsureCopyLocalImport then
     exit;
 
   //Design packages are per-IDE/compiler, not per-platform - the call is hoisted out to the

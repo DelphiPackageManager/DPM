@@ -28,6 +28,13 @@ type
     [TestCase('Bds', 'BDS')]
     [TestCase('BdsCommonDir', 'BDSCOMMONDIR')]
     [TestCase('Delphi', 'DELPHI')]
+    //msbuild reads these as properties in an IDE build - see the validator.
+    [TestCase('DPMCache', 'DPMCache')]
+    [TestCase('DPMExe', 'DPMExe')]
+    [TestCase('DPMSearch', 'DPMSearch')]
+    [TestCase('Dpm', 'DPM')]
+    [TestCase('GlobalOptionFile', 'GlobalOptionFile')]
+    [TestCase('MSBuildPrefix', 'MSBuildExtensionsPath')]
     procedure ReservedVariable_IsNotAllowed(const name : string);
   end;
 

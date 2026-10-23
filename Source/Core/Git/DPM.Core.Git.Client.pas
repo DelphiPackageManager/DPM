@@ -42,7 +42,7 @@ type
     FLastError : string;
     //remembers why a command failed, with what git said - for the caller to report.
     procedure CommandFailed(const what : string; const output : TStrings);
-    //runs 'git <args>' via cmd.exe, capturing stdout+stderr into output.
+    //runs git.exe (GitExe) with args, capturing stdout+stderr into output.
     //returns the process exit code.
     function RunGit(const cancellationToken : ICancellationToken; const args : string; const workingDir : string; const output : TStrings) : Cardinal;
   protected
@@ -56,6 +56,15 @@ type
   public
     constructor Create(const logger : ILogger);
 
+    //The git.exe every command runs, by its full path - '' when git isn't installed. Found once, on the PATH
+    //as it was when DPM was loaded: the IDE later adds the folders of the packages it loads to PATH, and a
+    //package can put any file in those.
+    class function GitExe : string;
+    //The first <folder>\git.exe on searchPath (a PATH value). Only absolute folders are searched - a relative
+    //entry is relative to the current folder, which for a checkout is a repository someone else wrote - and
+    //only for git.exe, never a git.cmd or git.bat.
+    class function FindGitExe(const searchPath : string) : string;
+
     //Pure parsing helpers - exposed for testing (no git/network required).
     //Parses 'git ls-remote --tags' output into a tagName -> commit map.
     class function ParseTags(const lines : TStrings) : IDictionary<string, string>;
@@ -66,18 +75,38 @@ type
 implementation
 
 uses
+  WinApi.Windows,
   System.SysUtils,
+  System.SyncObjs,
   System.IOUtils,
   System.StrUtils,
+  DPM.Core.Utils.Strings,
   DPM.Core.Utils.Process;
 
 const
   cTagRefPrefix = 'refs/tags/';
   cPeeledSuffix = '^{}';
+  cGitExeName = 'git.exe';
+
+var
+  //PATH as it was when DPM was loaded - see TGitClient.GitExe.
+  StartupSearchPath : string;
+  GitExeLock : TCriticalSection;
+  GitExeResolved : boolean;
+  GitExePath : string;
 
 function QuoteArg(const value : string) : string;
 begin
   result := '"' + value + '"';
+end;
+
+//'c:\x' or '\\server\share\x' - not '.', 'bin', '\x' (the root of the current drive) or 'c:x' (relative to
+//that drive's current folder).
+function IsAbsoluteFolder(const folder : string) : boolean;
+begin
+  result := (Length(folder) >= 3) and
+            ((CharInSet(folder[1], ['a'..'z', 'A'..'Z']) and (folder[2] = ':') and (folder[3] = PathDelim)) or
+             ((folder[1] = PathDelim) and (folder[2] = PathDelim)));
 end;
 
 { TGitClient }
@@ -108,21 +137,65 @@ begin
   result := FLastError;
 end;
 
+class function TGitClient.FindGitExe(const searchPath : string) : string;
+var
+  entries : TArray<string>;
+  folder : string;
+  candidate : string;
+  i : integer;
+begin
+  result := '';
+  entries := TStringUtils.SplitStr(searchPath, ';', TSplitStringOptions.ExcludeEmpty);
+  for i := 0 to Length(entries) - 1 do
+  begin
+    folder := Trim(entries[i]);
+    //a PATH entry may be quoted.
+    if (Length(folder) >= 2) and (folder[1] = '"') and (folder[Length(folder)] = '"') then
+      folder := Copy(folder, 2, Length(folder) - 2);
+    if not IsAbsoluteFolder(folder) then
+      continue;
+    candidate := IncludeTrailingPathDelimiter(folder) + cGitExeName;
+    if FileExists(candidate) then
+      exit(candidate);
+  end;
+end;
+
+class function TGitClient.GitExe : string;
+begin
+  GitExeLock.Enter;
+  try
+    if not GitExeResolved then
+    begin
+      GitExePath := FindGitExe(StartupSearchPath);
+      GitExeResolved := true;
+    end;
+    result := GitExePath;
+  finally
+    GitExeLock.Leave;
+  end;
+end;
+
 function TGitClient.RunGit(const cancellationToken : ICancellationToken; const args : string; const workingDir : string; const output : TStrings) : Cardinal;
 var
   tmpFile : string;
-  commandLine : string;
+  exeFile : string;
 begin
   output.Clear;
+  exeFile := GitExe;
+  if exeFile = '' then
+  begin
+    output.Add('git.exe was not found on the PATH - install Git for Windows (https://git-scm.com), or add the folder git.exe is in to the PATH.');
+    result := ERROR_FILE_NOT_FOUND;
+    exit;
+  end;
   //temp file in the environment TEMP/TMP folder - never the working dir.
   tmpFile := TPath.GetTempFileName;
   try
-    //Execute2 prefixes the executable, producing: "cmd.exe" /c git <args> > "tmp" 2>&1
-    //The text after '/c ' does not start with a quote, so cmd's outer-quote
-    //stripping rule is not triggered and the redirection works as expected.
-    commandLine := '/c git ' + args + ' > ' + QuoteArg(tmpFile) + ' 2>&1';
-    FLogger.Debug('[git] git ' + args);
-    result := TProcess.Execute2(cancellationToken, 'cmd.exe', commandLine, workingDir);
+    //git.exe by its full path, started directly with stdout and stderr going to tmpFile. Never through cmd.exe -
+    //cmd looks for 'git' in the current folder before PATH, and the working folder of a checkout is a
+    //repository someone else wrote, which could hold a git.cmd.
+    FLogger.Debug('[git] ' + exeFile + ' ' + args);
+    result := TProcess.Execute2(cancellationToken, exeFile, args, workingDir, nil, -1, tmpFile);
     if TFile.Exists(tmpFile) then
     begin
       try
@@ -222,7 +295,9 @@ begin
   output := TStringList.Create;
   try
     FLastError := '';
-    result := RunGit(cancellationToken, 'ls-remote --tags ' + QuoteArg(url), '', output) = 0;
+    //'--' - the url comes from a registry entry, and one starting with '-' would be read as an option
+    //('--upload-pack=<program>').
+    result := RunGit(cancellationToken, 'ls-remote --tags -- ' + QuoteArg(url), '', output) = 0;
     if not result then
     begin
       CommandFailed('git ls-remote --tags failed for [' + url + ']', output);
@@ -247,7 +322,7 @@ begin
   output := TStringList.Create;
   try
     FLastError := '';
-    result := RunGit(cancellationToken, 'ls-remote ' + QuoteArg(url) + ' ' + QuoteArg(theRef), '', output) = 0;
+    result := RunGit(cancellationToken, 'ls-remote -- ' + QuoteArg(url) + ' ' + QuoteArg(theRef), '', output) = 0;
     if not result then
     begin
       CommandFailed('git ls-remote failed for [' + url + '] ref [' + theRef + ']', output);
@@ -269,7 +344,7 @@ begin
   output := TStringList.Create;
   try
     FLastError := '';
-    result := RunGit(cancellationToken, 'clone ' + QuoteArg(url) + ' ' + QuoteArg(targetDir), '', output) = 0;
+    result := RunGit(cancellationToken, 'clone -- ' + QuoteArg(url) + ' ' + QuoteArg(targetDir), '', output) = 0;
     if not result then
       CommandFailed('git clone failed for [' + url + ']', output);
   finally
@@ -296,9 +371,17 @@ function TGitClient.Checkout(const cancellationToken : ICancellationToken; const
 var
   output : TStringList;
 begin
+  FLastError := '';
+  //checkout can't take '--' in front of the commit (what follows it are paths), so a value git would read
+  //as an option is refused instead.
+  if StartsStr('-', commitOrRef) then
+  begin
+    FLastError := 'git checkout refused [' + commitOrRef + '] - it is not a commit or ref.';
+    FLogger.Verbose('[git] ' + FLastError);
+    exit(false);
+  end;
   output := TStringList.Create;
   try
-    FLastError := '';
     result := RunGit(cancellationToken, 'checkout --quiet ' + QuoteArg(commitOrRef), repoDir, output) = 0;
     if not result then
       CommandFailed('git checkout [' + commitOrRef + '] failed in [' + repoDir + ']', output);
@@ -306,5 +389,13 @@ begin
     output.Free;
   end;
 end;
+
+initialization
+  //before anything - the IDE plugin included - has had a chance to change it.
+  StartupSearchPath := GetEnvironmentVariable('PATH');
+  GitExeLock := TCriticalSection.Create;
+
+finalization
+  GitExeLock.Free;
 
 end.

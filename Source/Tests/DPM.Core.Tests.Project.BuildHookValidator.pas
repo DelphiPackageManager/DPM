@@ -238,7 +238,7 @@ begin
   configManager := TConfigurationManager.Create(logger);
   editor := TProjectEditor.Create(logger, configManager.NewConfig, TCompilerVersion.Delphi12_0);
   Assert.IsTrue(editor.LoadProject(projectFile, [TProjectElement.Platforms]), 'LoadProject should succeed');
-  Assert.IsTrue(editor.EnsureCopyLocalImport('c:\tools\dpm.exe'), 'EnsureCopyLocalImport should succeed');
+  Assert.IsTrue(editor.EnsureCopyLocalImport, 'EnsureCopyLocalImport should succeed');
   Assert.IsTrue(editor.SaveProject(projectFile), 'SaveProject should succeed');
 
   blocking := TCollections.CreateList<string>;

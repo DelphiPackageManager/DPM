@@ -31,8 +31,9 @@ interface
 // Validates IDE environment variable names that a package wants to set when its design-time
 // components are loaded. A package may create/override most variables, but a small set is banned
 // because overriding them could compromise system stability or be used to redirect the IDE (or a
-// process it spawns) to a shadow executable. PATH is allowed but treated specially (append-only) by
-// the IDE installer, so it is NOT banned here.
+// process it spawns) to a shadow executable, or the IDE's builds to files the package supplies. PATH
+// is allowed but treated specially (append-only) by the IDE installer, so it is NOT banned here.
+// Checked by "dpm pack" and again by the IDE when it sets the variables.
 
 type
   TEnvironmentVariableValidator = class
@@ -47,12 +48,13 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils,
+  System.StrUtils;
 
 const
   // Compared case-insensitively (Windows env var names are case-insensitive). PATH is intentionally
   // NOT in this list - it is allowed and append-only.
-  cBannedEnvVars : array[0..43] of string = (
+  cBannedEnvVars : array[0..50] of string = (
     //Executable-hijack / redirect risks
     'PATHEXT',
     'COMSPEC',
@@ -99,8 +101,23 @@ const
     'DELPHI',
     'BCB',
     'FRAMEWORKDIR',
-    'FRAMEWORKVERSION'
+    'FRAMEWORKVERSION',
+    //The IDE's msbuild takes environment variables as properties, and a project only defines some of
+    //these when they are not already set - so a package setting one would point the build at its own
+    //files (DPMCache at a DPM.CopyLocal.targets it ships, DPMExe at a program of its own).
+    'DPM',
+    'DPMCACHE',
+    'DPMCOMPILER',
+    'DPMSEARCH',
+    'DPMEXE',
+    'DPMCOPYLOCALDISABLE',
+    //CodeGear.Common.Targets imports this file when it is set, and never sets it itself.
+    'GLOBALOPTIONFILE'
   );
+
+  //msbuild's own properties (MSBuildExtensionsPath and the like) - set from the environment, they move
+  //where a build imports its targets from.
+  cBannedEnvVarPrefix = 'MSBUILD';
 
 { TEnvironmentVariableValidator }
 
@@ -123,16 +140,12 @@ begin
     exit(false);
   end;
 
+  result := not StartsStr(cBannedEnvVarPrefix, upperName);
   for i := Low(cBannedEnvVars) to High(cBannedEnvVars) do
-  begin
     if upperName = cBannedEnvVars[i] then
-    begin
-      reason := 'environment variable [' + name + '] is reserved (system stability / executable hijack risk) and cannot be set by a package. Use a package specific variable name instead.';
-      exit(false);
-    end;
-  end;
-
-  result := true;
+      result := false;
+  if not result then
+    reason := 'environment variable [' + name + '] is reserved (system stability / executable hijack risk) and cannot be set by a package. Use a package specific variable name instead.';
 end;
 
 end.

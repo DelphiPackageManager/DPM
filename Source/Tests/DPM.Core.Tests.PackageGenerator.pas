@@ -45,6 +45,8 @@ type
     procedure Explicit_Kind_Overrides_Inference;
     procedure Generated_Dproj_Guid_Is_Deterministic;
     procedure Empty_Files_Match_Fails;
+    //the generator writes the dpk and dproj - never anywhere but inside the package folder.
+    procedure Project_Outside_The_Package_Fails_And_Writes_Nothing;
   end;
 
 implementation
@@ -57,6 +59,7 @@ uses
   TestLogger,
   DPM.Core.Types,
   DPM.Core.Logging,
+  DPM.Core.Diagnostics,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Reader,
   DPM.Core.Project.PackageGenerator;
@@ -252,6 +255,35 @@ begin
     '        files: [./src/*.nonexistent]'#13#10) as IPackageSpec;
 
   Assert.IsFalse(RunGenerator(spec, FRoot), 'generator must fail when no files match');
+end;
+
+procedure TPackageGeneratorTests.Project_Outside_The_Package_Fails_And_Writes_Nothing;
+var
+  spec : IPackageSpec;
+  outsideFolder : string;
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  generator : IPackageProjectGenerator;
+begin
+  //a sibling of the package folder - '..\' out of it.
+  outsideFolder := FRoot + '_outside';
+  spec := MakeSpec(
+    '      - project: ../' + ExtractFileName(FRoot) + '_outside/GenR.dproj'#13#10 +
+    '        kind: runtime'#13#10 +
+    '        files: [./src/*.pas]'#13#10) as IPackageSpec;
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  generator := TPackageProjectGenerator.Create(loggerIntf);
+  try
+    Assert.IsFalse(generator.Generate(TCancellationTokenSourceFactory.Create.Token, spec, spec.FindTemplate('default'), FRoot,
+                                      TCompilerVersion.Delphi12_0, [TDPMPlatform.Win32, TDPMPlatform.Win64]),
+                   'generator must refuse a project outside the package');
+    Assert.IsFalse(TDirectory.Exists(outsideFolder), 'nothing may be written outside the package folder');
+    Assert.IsTrue(logger.HasError(TErrorCode.E5008_PackageProjectGenerationFailed), logger.Messages.Text);
+  finally
+    if TDirectory.Exists(outsideFolder) then
+      TDirectory.Delete(outsideFolder, true);
+  end;
 end;
 
 initialization

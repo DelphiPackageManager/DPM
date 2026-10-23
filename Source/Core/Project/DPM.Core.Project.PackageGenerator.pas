@@ -73,6 +73,7 @@ uses
   System.SysUtils,
   System.IOUtils,
   DPM.Core.Diagnostics,
+  DPM.Core.Utils.Path,
   DPM.Core.Project.Prepare.Templates,
   DPM.Core.Project.Prepare.SourceFiles;
 
@@ -159,10 +160,16 @@ begin
 
     //resolve the project path (variables + separators) and split into folder + name.
     //combined against packagePath the same way the installer's build loop combines
-    //the build entry's project path, so they land on the same file.
+    //the build entry's project path, so they land on the same file - and refused, as
+    //there, when it is absolute or leads out of the package folder: the dpk and dproj
+    //are written there.
     projectPath := TPrepareSourceGatherer.ResolveVariables(def.Project, variables);
-    projectPath := StringReplace(projectPath, '/', PathDelim, [rfReplaceAll]);
-    dprojPath := TPath.GetFullPath(TPath.Combine(packagePath, projectPath));
+    if not TPathUtils.TryResolveInFolder(packagePath, projectPath, dprojPath) then
+    begin
+      FLogger.Error(TErrorCode.E5008_PackageProjectGenerationFailed, 'The package definition [' + def.Project + '] has a project path outside the package folder.');
+      result := false;
+      continue;
+    end;
     projectName := ChangeFileExt(ExtractFileName(dprojPath), '');
     folderPath := ExtractFilePath(dprojPath);
     if projectName = '' then

@@ -48,8 +48,8 @@ type
     class function GetCurrentModuleFileName : string;
     // Appends the DPM module's own folder to the *process* PATH (not persisted) if not already
     // present. Child processes we spawn - and, in the IDE, msbuild spawned by the IDE to build the
-    // project - inherit this, so the copy-local target's fallback bare 'dpm' resolves even when
-    // <DPMExe> was not recorded. Safe to call more than once.
+    // project - inherit this. The copy-local target does not rely on it: it only ever runs dpm.exe
+    // by the full path the targets file records, never a bare 'dpm'. Safe to call more than once.
     class procedure EnsureModuleDirOnPath;
     class function IsIDEProcess : boolean;
     class function Is64BitIDE : boolean;

@@ -80,6 +80,10 @@ type
     [Test]
     procedure Install_OnlyChangesDPMElements;
 
+    //earlier versions wrote the restoring machine's dpm.exe path into the project - it goes, cleanly.
+    [Test]
+    procedure Install_RemovesARecordedDPMExe;
+
     [Test]
     procedure Uninstall_RemovesReferenceWithoutLeavingBlankLines;
 
@@ -425,7 +429,7 @@ begin
   try
     editor := CreateEditor;
     Assert.IsTrue(editor.LoadProject(sandbox), 'LoadProject should succeed');
-    Assert.IsTrue(editor.EnsureCopyLocalImport(''), 'EnsureCopyLocalImport should succeed');
+    Assert.IsTrue(editor.EnsureCopyLocalImport, 'EnsureCopyLocalImport should succeed');
     Assert.IsTrue(editor.AddSearchPaths(TDPMPlatform.Win32, SearchPaths(['Foo\1.0.0', 'Bar\2.0.0', 'Baz\3.1.0']), cDPMCache), 'AddSearchPaths should succeed');
     editor.UpdatePackageReferences(InstalledGraph);
     Assert.IsTrue(editor.SaveProject, 'SaveProject should succeed');
@@ -482,9 +486,32 @@ begin
     editor := CreateEditor;
     Assert.IsTrue(editor.LoadProject(sandbox), 'LoadProject should succeed');
     //the calls the installer makes, in its order.
-    Assert.IsTrue(editor.EnsureCopyLocalImport(''), 'EnsureCopyLocalImport should succeed');
+    Assert.IsTrue(editor.EnsureCopyLocalImport, 'EnsureCopyLocalImport should succeed');
     Assert.IsTrue(editor.AddSearchPaths(TDPMPlatform.Win32, SearchPaths(['Foo\1.0.0', 'Bar\2.0.0', 'Baz\3.1.0']), cDPMCache), 'AddSearchPaths should succeed');
     editor.UpdatePackageReferences(InstalledGraph);
+    Assert.IsTrue(editor.SaveProject, 'SaveProject should succeed');
+    AssertSameText(InstalledProject, ReadProjectFile(sandbox));
+  finally
+    TFile.Delete(sandbox);
+  end;
+end;
+
+procedure TProjectEditorFormattingTests.Install_RemovesARecordedDPMExe;
+var
+  editor : IProjectEditor;
+  sandbox : string;
+  withDPMExe : string;
+begin
+  //where it was written - the end of the DPM property group.
+  withDPMExe := StringReplace(InstalledProject, '</DPMSearch>' + CRLF,
+                              '</DPMSearch>' + CRLF + '        <DPMExe>c:\somebody\else\dpm.exe</DPMExe>' + CRLF, []);
+  Assert.IsTrue(withDPMExe <> InstalledProject, 'precondition : the test project records a dpm.exe');
+  sandbox := MakeTempFile;
+  WriteProjectFile(sandbox, withDPMExe, true);
+  try
+    editor := CreateEditor;
+    Assert.IsTrue(editor.LoadProject(sandbox), 'LoadProject should succeed');
+    Assert.IsTrue(editor.EnsureCopyLocalImport, 'EnsureCopyLocalImport should succeed');
     Assert.IsTrue(editor.SaveProject, 'SaveProject should succeed');
     AssertSameText(InstalledProject, ReadProjectFile(sandbox));
   finally

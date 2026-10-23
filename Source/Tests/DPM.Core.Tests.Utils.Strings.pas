@@ -35,6 +35,37 @@ type
   {$M+}
   [TestFixture]
   TStringUtilsTests = class
+  public
+    //Package links (project, licence, repository) are opened by the IDE when clicked - only web links
+    //may be, anything else (file:, a \\server\share\program.exe path, shell:) could start a program.
+    [Test]
+    [TestCase('Http', 'http://example.com')]
+    [TestCase('Https', 'https://example.com')]
+    [TestCase('PathAndQuery', 'https://github.com/VSoft/DPM/blob/master/LICENSE.txt?raw=true#L1')]
+    [TestCase('UpperCaseScheme', 'HTTPS://EXAMPLE.COM')]
+    [TestCase('Port', 'http://localhost:8080/x')]
+    procedure IsWebUrl_AcceptsWebLinks(const value : string);
+
+    [Test]
+    [TestCase('FileUrl', 'file:///C:/Windows/System32/calc.exe')]
+    [TestCase('FileHost', 'file://server/share/program.exe')]
+    [TestCase('UncPath', '\\server\share\program.exe')]
+    [TestCase('LocalPath', 'C:\Windows\notepad.exe')]
+    [TestCase('RelativePath', 'program.exe')]
+    [TestCase('JavaScript', 'javascript:alert(1)')]
+    [TestCase('Ftp', 'ftp://example.com/file')]
+    [TestCase('Mailto', 'mailto:someone@example.com')]
+    [TestCase('Shell', 'shell:startup')]
+    [TestCase('SearchMs', 'search-ms:query=x')]
+    [TestCase('BackslashScheme', 'http:\\example.com')]
+    [TestCase('SchemeOnly', 'https://')]
+    [TestCase('NoHost', 'https:///path')]
+    [TestCase('SchemeInside', 'xhttps://example.com')]
+    procedure IsWebUrl_RejectsEverythingElse(const value : string);
+
+    //spaces and quotes have no place in a url - a browser's command line is built around it.
+    [Test]
+    procedure IsWebUrl_RejectsWhitespaceQuotesAndControlCharacters;
   published
     procedure Join_Empty_ReturnsEmptyString;
     procedure Join_SingleValue_HasNoSeparator;
@@ -89,6 +120,26 @@ begin
   values[1] := '';
   values[2] := 'c';
   Assert.AreEqual('a||c', TStringUtils.Join('|', values), false);
+end;
+
+procedure TStringUtilsTests.IsWebUrl_AcceptsWebLinks(const value : string);
+begin
+  Assert.IsTrue(TStringUtils.IsWebUrl(value), value);
+end;
+
+procedure TStringUtilsTests.IsWebUrl_RejectsEverythingElse(const value : string);
+begin
+  Assert.IsFalse(TStringUtils.IsWebUrl(value), value);
+end;
+
+procedure TStringUtilsTests.IsWebUrl_RejectsWhitespaceQuotesAndControlCharacters;
+begin
+  Assert.IsFalse(TStringUtils.IsWebUrl(''), 'empty');
+  Assert.IsFalse(TStringUtils.IsWebUrl(' https://example.com'), 'leading space');
+  Assert.IsFalse(TStringUtils.IsWebUrl('https://example.com/a b'), 'space');
+  Assert.IsFalse(TStringUtils.IsWebUrl('https://example.com/" --some-switch "'), 'quote');
+  Assert.IsFalse(TStringUtils.IsWebUrl('https://example.com/'#9'x'), 'tab');
+  Assert.IsFalse(TStringUtils.IsWebUrl('https://example.com/'#13#10'x'), 'line break');
 end;
 
 initialization

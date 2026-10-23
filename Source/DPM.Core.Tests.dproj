@@ -318,6 +318,7 @@
         <DCCReference Include="IDE\DPM.IDE.PathManager.pas"/>
         <DCCReference Include="IDE\DPM.IDE.EnvironmentVariableManager.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.IDE.EnvironmentVariableManager.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.IDE.PathManager.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.DateTime.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.Strings.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.PE.pas"/>
@@ -333,6 +334,7 @@
         <DCCReference Include="Tests\TargetPlatformTests.pas"/>
         <DCCReference Include="Tests\TestLogger.pas"/>
         <DCCReference Include="Core\Project\DPM.Core.Project.CopyLocalTargets.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Project.CopyLocalTargets.pas"/>
         <DCCReference Include="Core\Package\DPM.Core.Package.CopyLocal.pas"/>
         <DCCReference Include="Core\DPM.Core.Version.pas"/>
         <DCCReference Include="Core\Upgrade\DPM.Core.Upgrade.Interfaces.pas"/>

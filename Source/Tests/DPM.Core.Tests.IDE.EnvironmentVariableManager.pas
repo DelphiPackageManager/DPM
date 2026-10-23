@@ -26,6 +26,11 @@ type
     procedure PreExistingValue_RestoredOnLastRelease;
     procedure NonExisting_ClearedOnLastRelease;
     procedure Path_TwoPackages_SameDir_RefCounted;
+    //"dpm pack" refuses these names, but nothing forces a package to have been made by "dpm pack" - the
+    //IDE has to refuse them too.
+    procedure ReservedVariable_IsNotSet_AndWarns;
+    procedure ReservedVariable_IsCaseInsensitive;
+    procedure ReservedVariable_Remove_LeavesItAlone;
   end;
 
 implementation
@@ -36,6 +41,7 @@ uses
   System.StrUtils,
   DPM.Core.Types,
   DPM.Core.Logging,
+  DPM.Core.Diagnostics,
   DPM.IDE.PathManager,
   DPM.IDE.EnvironmentVariableManager,
   TestLogger;
@@ -185,6 +191,61 @@ begin
   Assert.IsTrue(ContainsText(GetEnv('PATH'), cTestDir), 'still on PATH - pkgB needs it');
   mgr.RemoveVariable('PATH', cTestDir, cProjP, 'pkgB');
   Assert.IsFalse(ContainsText(GetEnv('PATH'), cTestDir), 'removed once both gone');
+end;
+
+procedure TEnvironmentVariableManagerTests.ReservedVariable_IsNotSet_AndWarns;
+var
+  mgr : IDPMIDEEnvironmentVariableManager;
+  logger : TTestLogger;
+  comSpec : string;
+begin
+  comSpec := GetEnv('COMSPEC');
+  try
+    mgr := NewManager(logger);
+    mgr.SetVariable('COMSPEC', 'C:\evil\cmd.exe', cProjP, 'Evil.Package');
+    Assert.AreEqual(comSpec, GetEnv('COMSPEC'), false, 'a reserved variable must not be set');
+    Assert.IsTrue(logger.HasWarning(TWarningCode.W9107_EnvironmentVariableNotAllowed), logger.Messages.Text);
+    Assert.AreEqual(1, logger.WarningCount, logger.Messages.Text);
+    Assert.IsTrue(logger.Logged('warning', 'Evil.Package'), 'the warning names the package : ' + logger.Messages.Text);
+    Assert.IsTrue(logger.Logged('warning', '[COMSPEC]'), 'the warning names the variable : ' + logger.Messages.Text);
+  finally
+    WinApi.Windows.SetEnvironmentVariable('COMSPEC', PChar(comSpec));
+  end;
+end;
+
+procedure TEnvironmentVariableManagerTests.ReservedVariable_IsCaseInsensitive;
+var
+  mgr : IDPMIDEEnvironmentVariableManager;
+  logger : TTestLogger;
+  pathExt : string;
+begin
+  pathExt := GetEnv('PATHEXT');
+  try
+    mgr := NewManager(logger);
+    mgr.SetVariable('PathExt', '.CMD;.BAT;.EXE', cProjP, 'Evil.Package');
+    Assert.AreEqual(pathExt, GetEnv('PATHEXT'), false, 'PathExt is PATHEXT');
+    Assert.IsTrue(logger.HasWarning(TWarningCode.W9107_EnvironmentVariableNotAllowed), logger.Messages.Text);
+  finally
+    WinApi.Windows.SetEnvironmentVariable('PATHEXT', PChar(pathExt));
+  end;
+end;
+
+procedure TEnvironmentVariableManagerTests.ReservedVariable_Remove_LeavesItAlone;
+var
+  mgr : IDPMIDEEnvironmentVariableManager;
+  logger : TTestLogger;
+  comSpec : string;
+begin
+  comSpec := GetEnv('COMSPEC');
+  try
+    mgr := NewManager(logger);
+    mgr.SetVariable('COMSPEC', 'C:\evil\cmd.exe', cProjP, 'Evil.Package');
+    //the installer context still releases what it asked for when the project closes.
+    mgr.RemoveVariable('COMSPEC', 'C:\evil\cmd.exe', cProjP, 'Evil.Package');
+    Assert.AreEqual(comSpec, GetEnv('COMSPEC'), false, 'was never ours to restore or clear');
+  finally
+    WinApi.Windows.SetEnvironmentVariable('COMSPEC', PChar(comSpec));
+  end;
 end;
 
 initialization

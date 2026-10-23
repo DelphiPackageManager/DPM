@@ -52,8 +52,10 @@ type
     //throws if cannot create process.
     class function Execute(const cancellationToken : ICancellationToken; const executable : string; const commandLine : string) : Cardinal;
 
-    //new version using createprocess - not capturing output.
-    class function Execute2(const cancellationToken : ICancellationToken; const executable : string; const commandLine : string; const startingDir : string; const enviroment : IEnvironmentBlock = nil; const timeout : integer = -1) : Cardinal;
+    //new version using createprocess. The executable is started directly - give its full path when it must
+    //not be looked up. With an outputFile, the process's stdout and stderr are both written to it (as
+    //'> file 2>&1' would, without needing cmd.exe to do the redirecting) and its stdin is NUL.
+    class function Execute2(const cancellationToken : ICancellationToken; const executable : string; const commandLine : string; const startingDir : string; const enviroment : IEnvironmentBlock = nil; const timeout : integer = -1; const outputFile : string = '') : Cardinal;
 
     //Starts the process and returns immediately - does not wait, does not
     //capture the exit code. Needed for launching something that will outlive us
@@ -255,7 +257,7 @@ end;
 
 { TProcess }
 
-class function TProcess.Execute2(const cancellationToken : ICancellationToken; const executable : string; const commandLine : string; const startingDir : string; const enviroment : IEnvironmentBlock = nil; const timeout : integer = -1) : Cardinal;
+class function TProcess.Execute2(const cancellationToken : ICancellationToken; const executable : string; const commandLine : string; const startingDir : string; const enviroment : IEnvironmentBlock = nil; const timeout : integer = -1; const outputFile : string = '') : Cardinal;
 var
   sParams: string;
   pDir: PChar;
@@ -268,6 +270,10 @@ var
   waitRes: Cardinal;
   objHandles: array[0..1] of THandle;
   job : THandle;
+
+  securityAttributes : TSecurityAttributes;
+  outputHandle : THandle;
+  inputHandle : THandle;
 
   function DoGetExitCodeProcess: Cardinal;
   begin
@@ -343,13 +349,49 @@ begin
 
   sParams := DoubleQuoteString(executable) + ' ' + commandLine;
 
+  outputHandle := 0;
+  inputHandle := 0;
+  if outputFile <> '' then
+  begin
+    //inheritable, so the process gets them as its standard handles.
+    FillChar(securityAttributes, SizeOf(securityAttributes), 0);
+    securityAttributes.nLength := SizeOf(securityAttributes);
+    securityAttributes.bInheritHandle := true;
+    outputHandle := CreateFile(PChar(outputFile), GENERIC_WRITE, FILE_SHARE_READ or FILE_SHARE_WRITE, @securityAttributes,
+                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+    if outputHandle = INVALID_HANDLE_VALUE then
+    begin
+      result := GetLastError;
+      exit;
+    end;
+    inputHandle := CreateFile('NUL', GENERIC_READ, FILE_SHARE_READ or FILE_SHARE_WRITE, @securityAttributes, OPEN_EXISTING, 0, 0);
+    if inputHandle = INVALID_HANDLE_VALUE then
+    begin
+      result := GetLastError;
+      CloseHandle(outputHandle);
+      exit;
+    end;
+    startupInfo.dwFlags := startupInfo.dwFlags or STARTF_USESTDHANDLES;
+    startupInfo.hStdInput := inputHandle;
+    //one handle for both, so what the process writes to each stays in order.
+    startupInfo.hStdOutput := outputHandle;
+    startupInfo.hStdError := outputHandle;
+  end;
+
   //Suspended, so it is in the job before it can start anything - the job is how a stop reaches the whole
   //tree (cmd.exe starts cmd, which starts msbuild, which starts the compiler).
-  if not CreateProcess(nil, PChar(sParams), nil, nil, false, CREATE_UNICODE_ENVIRONMENT + CREATE_NEW_CONSOLE + CREATE_SUSPENDED, pEnvironment, pDir, startupInfo, processInfo) then
-  begin
+  if CreateProcess(nil, PChar(sParams), nil, nil, outputHandle <> 0, CREATE_UNICODE_ENVIRONMENT + CREATE_NEW_CONSOLE + CREATE_SUSPENDED, pEnvironment, pDir, startupInfo, processInfo) then
+    result := 0
+  else
     result := GetLastError;
-    exit;
+  //the process has its own copies now - ours would only hold the file open.
+  if outputHandle <> 0 then
+  begin
+    CloseHandle(outputHandle);
+    CloseHandle(inputHandle);
   end;
+  if result <> 0 then
+    exit;
 
   job := DPMCreateJobObject(nil, nil);
   if (job <> 0) and (not DPMAssignProcessToJobObject(job, processInfo.hProcess)) then

@@ -79,6 +79,7 @@ uses
   System.SysUtils,
   Vcl.Forms,
   DPM.Core.Utils.Directory,
+  DPM.Core.Utils.Path,
   DPM.Core.Utils.System,
   DPM.Core.Diagnostics;
 
@@ -151,10 +152,14 @@ begin
                     DPMPlatformToString(entryPlatform) + ' binary and this IDE loads ' + DPMPlatformToString(loadPlatform) + '.');
       exit;
     end;
-    //TPath.Combine treats a leading separator as a rooted path and would discard packagePath.
-    if (projectBase <> '') and (projectBase[1] = PathDelim) then
-      Delete(projectBase, 1, 1);
-    exactPath := TPath.Combine(packagePath, projectBase);
+    //Author supplied, so like every spec path it has to be inside the package folder - the IDE loads it
+    //and puts its folder on PATH.
+    if not TPathUtils.TryResolveInFolder(packagePath, designEntry.Project, exactPath) then
+    begin
+      FLogger.Warning(TWarningCode.W5012_PathOutsidePackage, 'The prebuilt design BPL [' + designEntry.Project + '] of [' + node.Id +
+                      '] is not inside the package folder - it was not loaded.');
+      exit;
+    end;
     if not TFile.Exists(exactPath) then
     begin
       FLogger.Warning(TWarningCode.W9102_DesignPackageNotFound, 'The prebuilt design BPL of [' + node.Id + '] was not found at [' + exactPath + '].');

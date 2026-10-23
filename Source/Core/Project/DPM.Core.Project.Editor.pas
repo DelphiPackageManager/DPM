@@ -106,7 +106,7 @@ type
 
     procedure RemoveFromSearchPath(const platform : TDPMPlatform; const packageId : string);
     function AddSearchPaths(const platform : TDPMPlatform; const searchPaths : IList<string> ; const packageCacheLocation : string) : boolean;
-    function EnsureCopyLocalImport(const dpmExePath : string) : boolean;
+    function EnsureCopyLocalImport : boolean;
     procedure UpdatePackageReferences(const dependencyGraph : IPackageReference);
     function GetPackageReferences : IPackageReference;
     function GetConfigNames: IReadOnlyList<string>;
@@ -239,7 +239,7 @@ begin
 
 end;
 
-function TProjectEditor.EnsureCopyLocalImport(const dpmExePath : string) : boolean;
+function TProjectEditor.EnsureCopyLocalImport : boolean;
 var
   dpmGroup : IXMLDOMElement;
   dpmExeElement : IXMLDOMElement;
@@ -252,18 +252,14 @@ begin
   if dpmGroup = nil then
     exit;
 
-  //Record the dpm.exe path so the targets file can prefer it over a PATH lookup. Only write it when
-  //we actually know it's dpm (the IDE plugin restoring would otherwise record bds.exe here).
-  if dpmExePath <> '' then
+  //Earlier versions recorded the dpm.exe path here - a path on whichever machine restored last, so the
+  //project changed from machine to machine and was often wrong on the next one. The copy-local targets
+  //file in the (per machine) package cache records it now.
+  dpmExeElement := dpmGroup.selectSingleNode('x:DPMExe') as IXMLDOMElement;
+  if dpmExeElement <> nil then
   begin
-    dpmExeElement := dpmGroup.selectSingleNode('x:DPMExe') as IXMLDOMElement;
-    if dpmExeElement = nil then
-    begin
-      dpmExeElement := FProjectXML.createNode(NODE_ELEMENT, 'DPMExe', msbuildNamespace) as IXMLDOMElement;
-      TXMLUtils.AppendChildElement(dpmGroup, dpmExeElement);
-      FModified := true;
-    end;
-    SetElementText(dpmExeElement, dpmExePath);
+    TXMLUtils.RemoveChildElement(dpmGroup, dpmExeElement);
+    FModified := true;
   end;
 
   //Cache-relative import - $(DPMCache) is defined in the DPM PropertyGroup above (earlier in document
