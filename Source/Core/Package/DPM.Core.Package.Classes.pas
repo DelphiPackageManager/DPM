@@ -179,6 +179,9 @@ var
   packageVersion : TPackageVersion;
 begin
   id := jsonObj.S['id'];
+  //it names folders in the package cache - see TPackageCache.
+  if not TRegEx.IsMatch(id, cPackageIdRegex) then
+    raise Exception.Create('Id is not a valid package id [' + id + ']');
   stmp := jsonObj.S['compiler'];
   cv := StringToCompilerVersion(stmp);
   if cv = TCompilerVersion.UnknownVersion then
@@ -222,6 +225,9 @@ begin
     raise Exception.Create('Package manifest is nil');
   if manifest.TargetPlatform = nil then
     raise Exception.Create('Package manifest [' + manifest.MetaData.Id + '] has no target platforms');
+  //reading the spec only logs an invalid id - it names folders in the package cache, see TPackageCache.
+  if not TRegEx.IsMatch(manifest.MetaData.Id, cPackageIdRegex) then
+    raise Exception.Create('Package manifest id is not a valid package id [' + manifest.MetaData.Id + ']');
 
   FSourceName := sourceName;
   FId := manifest.MetaData.Id;

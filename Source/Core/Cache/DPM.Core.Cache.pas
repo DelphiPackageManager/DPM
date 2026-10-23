@@ -166,6 +166,17 @@ uses
   DPM.Core.Utils.System,
   DPM.Core.Utils.Strings;
 
+//A package id is a folder name in the cache, and it comes from wherever the package did - a feed's json,
+//a package's own spec. Anything but a package id's shape - words separated by dots, so never a separator,
+//drive or '..' ('..\..\x', 'c:\x') - would put the package, and everything DPM later reads and builds
+//from it, outside the cache.
+function PackageFolderName(const id : string) : string;
+begin
+  if not TRegEx.IsMatch(id, cPackageIdRegex) then
+    raise EDPMError.Create(TErrorCode.E3017_InvalidPackageId, 'The package id [' + id + '] is not a valid package id - it can''t be used in the package cache.');
+  result := id;
+end;
+
 { TPackageCache }
 
 function TPackageCache.FullReVerify(const cancellationToken : ICancellationToken) : integer;
@@ -1039,19 +1050,19 @@ end;
 
 function TPackageCache.GetPackagePath(const id: string; const version: string; const compilerVersion : TCompilerVersion): string;
 begin
-  result := GetPackagesFolder + PathDelim + CompilerToString(compilerVersion) + PathDelim + Id + PathDelim + Version;
+  result := GetPackagesFolder + PathDelim + CompilerToString(compilerVersion) + PathDelim + PackageFolderName(Id) + PathDelim + Version;
 end;
 
 function TPackageCache.GetPackagePath(const packageId : IPackageIdentity) : string;
 begin
-  result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim +  packageId.Id + PathDelim + packageId.Version.ToStringNoMeta;
+  result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim +  PackageFolderName(packageId.Id) + PathDelim + packageId.Version.ToStringNoMeta;
 end;
 
 function TPackageCache.GetPackageFileFolder(const packageId : IPackageIdentity) : string;
 begin
   //{cache}/{compiler}/{id} - parent of the per-version extraction folders. Raw .dpkg files
   //for all versions of this package id live here side-by-side with the versioned subfolders.
-  result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim + packageId.Id;
+  result := GetPackagesFolder + PathDelim + CompilerToString(packageId.CompilerVersion) + PathDelim + PackageFolderName(packageId.Id);
 end;
 
 function TPackageCache.GetPackagesFolder : string;

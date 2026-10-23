@@ -319,6 +319,7 @@ type
 implementation
 
 uses
+  WinApi.Windows,
   System.IOUtils,
   System.Types,
   System.SysUtils,
@@ -546,9 +547,23 @@ var
         exit(true);
   end;
 
+  //A source entry's folder (a packed entry's dest, a git entry's src base folder) is author supplied and
+  //goes on the consumer's search path - one that is absolute or leads out of the package folder would
+  //have the project compile whatever is there. Such a folder is warned about and never added.
+  function SourceFolderInPackage(const pkgInfo: IPackageInfo; const folder: string): boolean;
+  var
+    resolvedFolder: string;
+  begin
+    result := TPathUtils.TryResolveInFolder(FPackageCache.GetPackagePath(pkgInfo), folder, resolvedFolder);
+    if not result then
+      FLogger.Warning(TWarningCode.W5012_PathOutsidePackage, 'Ignoring the source folder [' + folder + '] of [' + pkgInfo.Id + '] - it resolves outside the package folder.');
+  end;
+
   //Add every subfolder under absBase that contains .pas/.inc/.dfm/.fmx/.res files. relSub is
   //computed relative to pkgAbs so the search path matches packageBasePath layout. Skips .git
   //metadata. Delphi search paths are not recursive, so each folder must be listed individually.
+  //A junction or symbolic link is not followed - it can lead anywhere, out of the package folder (a
+  //git package is a clone of someone else's repository).
   procedure AddPasSubdirs(const pkgAbs, absBase, basePath: string);
   var
     subDir: string;
@@ -556,17 +571,19 @@ var
   begin
     if not DirectoryExists(absBase) then
       exit;
-    for subDir in TDirectory.GetDirectories(absBase, '*', TSearchOption.soAllDirectories) do
+    for subDir in TDirectory.GetDirectories(absBase, '*', TSearchOption.soTopDirectoryOnly) do
     begin
       //skip the git metadata folder and anything under it
       if SameText(ExtractFileName(subDir), '.git') then
         continue;
-      if Pos(PathDelim + '.git' + PathDelim, subDir + PathDelim) > 0 then
+      if (GetFileAttributes(PChar(subDir)) and FILE_ATTRIBUTE_REPARSE_POINT) <> 0 then
         continue;
-      if not DirHasSourceFiles(subDir) then
-        continue;
-      relSub := Copy(subDir, Length(pkgAbs) + 1, MaxInt);
-      AddUnique(basePath + relSub);
+      if DirHasSourceFiles(subDir) then
+      begin
+        relSub := Copy(subDir, Length(pkgAbs) + 1, MaxInt);
+        AddUnique(basePath + relSub);
+      end;
+      AddPasSubdirs(pkgAbs, subDir, basePath);
     end;
   end;
 
@@ -581,6 +598,8 @@ var
     absBase: string;
   begin
     baseRel := TPathUtils.GlobBaseDir(src);
+    if not SourceFolderInPackage(pkgInfo, baseRel) then
+      exit;
     recursive := Pos('**', src) > 0;
     pkgAbs := IncludeTrailingPathDelimiter(FPackageCache.GetPackagePath(pkgInfo));
 
@@ -607,6 +626,8 @@ var
   var
     pkgAbs: string;
   begin
+    if not SourceFolderInPackage(pkgInfo, dest) then
+      exit;
     AddUnique(basePath + dest);
     if Pos('**', src) = 0 then
       exit;

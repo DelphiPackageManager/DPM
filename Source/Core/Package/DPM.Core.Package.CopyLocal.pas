@@ -280,6 +280,7 @@ var
     runtimeBplNames : TArray<string>;
     bplName : string;
     i : integer;
+    warned : boolean;
   begin
     identity := TPackageIdentity.Create('', node.Id, node.Version, compilerVersion);
     spec := nil;
@@ -315,8 +316,18 @@ var
         if (sourceGlob <> '') and (sourceGlob[1] = PathDelim) then
           Delete(sourceGlob, 1, 1);
         patterns := antPattern.Expand(sourceGlob);
+        warned := false;
         for pattern in patterns do
         begin
+          //only ever from inside the package - Expand keeps a rooted pattern as it is and follows '..', so a
+          //pattern could otherwise copy any file on the machine into the project's output folder.
+          if not TPathUtils.IsPathInFolder(packagePath, pattern.Directory) then
+          begin
+            if not warned then
+              FLogger.Warning(TWarningCode.W5012_PathOutsidePackage, 'Ignoring the copyLocal pattern [' + copyEntry.Source + '] of [' + node.Id + '] - it resolves outside the package folder.');
+            warned := true;
+            continue;
+          end;
           if not TDirectory.Exists(pattern.Directory) then
             continue;
           files := TDirectory.GetFiles(pattern.Directory, pattern.FileMask, TSearchOption.soTopDirectoryOnly);

@@ -239,6 +239,7 @@ uses
   DPM.IDE.EnvironmentVariableManager in 'IDE\DPM.IDE.EnvironmentVariableManager.pas',
   DPM.Core.Tests.IDE.EnvironmentVariableManager in 'Tests\DPM.Core.Tests.IDE.EnvironmentVariableManager.pas',
   DPM.Core.Tests.IDE.PathManager in 'Tests\DPM.Core.Tests.IDE.PathManager.pas',
+  DPM.Core.Tests.Cache.PackageId in 'Tests\DPM.Core.Tests.Cache.PackageId.pas',
   DPM.Core.Tests.Utils.DateTime in 'Tests\DPM.Core.Tests.Utils.DateTime.pas',
   DPM.Core.Tests.Utils.Strings in 'Tests\DPM.Core.Tests.Utils.Strings.pas',
   DPM.Core.Tests.Utils.PE in 'Tests\DPM.Core.Tests.Utils.PE.pas',

@@ -42,17 +42,34 @@ type
     procedure Design_Project_Outside_The_Package_Is_One_Error_And_Not_Built;
     [Test]
     procedure CopyToBin_Files_Outside_The_Package_Are_Not_Copied;
+
+    //A source entry's folder goes on the consumer's search path - never one outside the package.
+    [Test]
+    procedure Source_Folder_Inside_The_Package_Is_Added_To_The_Project;
+    [Test]
+    procedure Source_Folder_Outside_The_Package_Is_Not_Added_To_The_Project;
+    [Test]
+    procedure Git_Source_Folder_Outside_The_Package_Is_Not_Added_To_The_Project;
+    [Test]
+    procedure Git_Source_Search_Does_Not_Follow_A_Junction_Out_Of_The_Package;
+
+    //dpm copylocal, run by the build, copies a spec's copyLocal files into the project's output folder.
+    [Test]
+    procedure CopyLocal_Files_Outside_The_Package_Are_Not_Copied;
   end;
 
 implementation
 
 uses
   System.SysUtils,
+  System.StrUtils,
   System.Classes,
   System.IOUtils,
   WinApi.ActiveX,
   Spring.Collections,
   VSoft.CancellationToken,
+  DPM.Core.Constants,
+  DPM.Core.Utils.Process,
   DPM.Core.Types,
   DPM.Core.Diagnostics,
   DPM.Core.Logging,
@@ -63,6 +80,8 @@ uses
   DPM.Core.Configuration.Classes,
   DPM.Core.Options.Cache,
   DPM.Core.Options.Restore,
+  DPM.Core.Options.CopyLocal,
+  DPM.Core.Package.CopyLocal,
   DPM.Core.Package.Interfaces,
   DPM.Core.Package.Installer.Interfaces,
   DPM.Core.Package.Installer,
@@ -184,6 +203,23 @@ const
     '      - project: .\source\Pkg.dproj' + sLineBreak;
 
   cPackageSpec = cPackageSpecHead + cPackageBuild;
+
+  //VSoft.Foo - the package cConsumerProject uses - as source only, up to its source entries.
+  cSourcePackageSpecHead =
+    'metadata:' + sLineBreak +
+    '  id: VSoft.Foo' + sLineBreak +
+    '  version: 1.0.0' + sLineBreak +
+    '  description: installer search path test package' + sLineBreak +
+    '  authors:' + sLineBreak +
+    '    - DPM' + sLineBreak +
+    '  license: Apache-2.0' + sLineBreak +
+    'targetPlatforms:' + sLineBreak +
+    '  - compiler: 12.0' + sLineBreak +
+    '    platforms: [Win32, Win64]' + sLineBreak +
+    '    template: default' + sLineBreak +
+    'templates:' + sLineBreak +
+    '  - name: default' + sLineBreak +
+    '    source:' + sLineBreak;
 
   //nothing in it that DPM refuses to build.
   cPackageProject =
@@ -461,6 +497,8 @@ begin
   ForceDirectories(TPath.Combine(FTempFolder, 'outside'));
   TFile.WriteAllText(TPath.Combine(FTempFolder, 'outside\Evil.dproj'), cPackageProject, TEncoding.UTF8);
   TFile.WriteAllText(TPath.Combine(FTempFolder, 'outside\Evil.dll'), 'not really a dll', TEncoding.UTF8);
+  ForceDirectories(TPath.Combine(FTempFolder, 'outside\deep'));
+  TFile.WriteAllText(TPath.Combine(FTempFolder, 'outside\deep\Evil.pas'), 'unit Evil; interface implementation end.', TEncoding.UTF8);
 end;
 
 procedure TInstallerDiagnosticsTests.FixtureTearDown;
@@ -511,6 +549,47 @@ function CachePackage(const tempFolder : string; const logger : ILogger; const o
                       const cancellation : ICancellationTokenSource) : boolean;
 begin
   result := CachePackageSpec(tempFolder, logger, outcome, cancellation, cPackageSpec);
+end;
+
+//cConsumerProject with the base configuration the IDE writes - where the search path goes.
+function ConsumerProjectWithBase : string;
+begin
+  result := StringReplace(cConsumerProject, '    <ItemGroup>' + sLineBreak,
+    '    <PropertyGroup Condition="''$(Config)''==''Base'' or ''$(Base)''!=''''">' + sLineBreak +
+    '        <Base>true</Base>' + sLineBreak +
+    '    </PropertyGroup>' + sLineBreak +
+    '    <PropertyGroup Condition="''$(Base)''!=''''">' + sLineBreak +
+    '        <DCC_UnitSearchPath>$(DCC_UnitSearchPath)</DCC_UnitSearchPath>' + sLineBreak +
+    '    </PropertyGroup>' + sLineBreak +
+    '    <ItemGroup>' + sLineBreak, []);
+end;
+
+//Refreshes the search paths of a project using VSoft.Foo, cached in packageFolder with the source entries
+//given, the way the IDE does when 'use source' changes - projectText is the project file afterwards.
+function RefreshSearchPaths(const packageFolder : string; const sourceEntries : string; const logger : ILogger;
+                            out projectText : string) : boolean;
+var
+  repo : TFakeRepositoryManager;
+  repoIntf : IPackageRepositoryManager;
+  cache : TExtractedPackageCache;
+  cacheIntf : IPackageCache;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+  reader : IPackageSpecReader;
+  projectFile : string;
+begin
+  projectFile := packageFolder + '.dproj';
+  TFile.WriteAllText(projectFile, ConsumerProjectWithBase, TEncoding.UTF8);
+  repo := TFakeRepositoryManager.Create;
+  repoIntf := repo;
+  reader := TPackageSpecReader.Create(logger);
+  cache := TExtractedPackageCache.Create(packageFolder, reader.ReadSpecString(cSourcePackageSpecHead + sourceEntries));
+  cacheIntf := cache;
+  cache.RegisterInfo(MakeInfo('VSoft.Foo', '1.0.0', []));
+  context := TFakeInstallerContext.Create(logger);
+  installer := NewInstaller(logger, repoIntf, cacheIntf, context, TFakeCompilerFactory.Create(logger, coSucceed, nil));
+  result := installer.RefreshProjectSearchPaths(TCancellationTokenSourceFactory.Create.Token, projectFile, cTestCompiler, 'dpm.config.yaml', context);
+  projectText := TFile.ReadAllText(projectFile);
 end;
 
 procedure TInstallerDiagnosticsTests.Compile_Failure_Is_One_Error;
@@ -720,6 +799,160 @@ begin
                   '        copyToBin: Win32' + sLineBreak),
                 'the package itself is fine : ' + logger.Messages.Text);
   Assert.IsFalse(TFile.Exists(copiedFile), 'a file from outside the package was copied into its bpl folder');
+  outsideWarnings := 0;
+  for i := 0 to logger.Diagnostics.Count - 1 do
+    if logger.Diagnostics[i] = 'warning ' + WarningCodeToString(TWarningCode.W5012_PathOutsidePackage) then
+      Inc(outsideWarnings);
+  Assert.AreEqual(2, outsideWarnings, 'one warning per pattern : ' + logger.Messages.Text);
+end;
+
+procedure TInstallerDiagnosticsTests.Source_Folder_Inside_The_Package_Is_Added_To_The_Project;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  packageFolder : string;
+  projectText : string;
+  refreshed : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  packageFolder := TPath.Combine(FTempFolder, 'search-inside');
+  ForceDirectories(TPath.Combine(packageFolder, 'source\sub'));
+  TFile.WriteAllText(TPath.Combine(packageFolder, 'source\sub\Foo.pas'), 'unit Foo; interface implementation end.', TEncoding.UTF8);
+  refreshed := RefreshSearchPaths(packageFolder,
+                 '      - src: ''.\source\**\*.pas''' + sLineBreak +
+                 '        dest: source' + sLineBreak, loggerIntf, projectText);
+  Assert.IsTrue(refreshed, logger.Messages.Text);
+  Assert.IsTrue(ContainsText(projectText, '$(DPM)\VSoft.Foo\1.0.0\source;'), projectText);
+  Assert.IsTrue(ContainsText(projectText, '$(DPM)\VSoft.Foo\1.0.0\source\sub'), 'found by the ** walk : ' + projectText);
+  Assert.IsFalse(logger.HasWarning(TWarningCode.W5012_PathOutsidePackage), logger.Messages.Text);
+end;
+
+procedure TInstallerDiagnosticsTests.Source_Folder_Outside_The_Package_Is_Not_Added_To_The_Project;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  packageFolder : string;
+  projectText : string;
+  refreshed : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  packageFolder := TPath.Combine(FTempFolder, 'search-outside');
+  ForceDirectories(packageFolder);
+  //a dest one folder up out of the package - and, with **, every folder below it holding source.
+  refreshed := RefreshSearchPaths(packageFolder,
+                 '      - src: ''.\source\**\*.pas''' + sLineBreak +
+                 '        dest: ''..\outside''' + sLineBreak, loggerIntf, projectText);
+  Assert.IsTrue(refreshed, logger.Messages.Text);
+  Assert.IsFalse(ContainsText(projectText, 'outside'), 'a search path outside the package was written : ' + projectText);
+  Assert.IsTrue(logger.HasWarning(TWarningCode.W5012_PathOutsidePackage), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('warning', '..\outside'), 'the warning names the folder : ' + logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('warning', 'VSoft.Foo'), 'the warning names the package : ' + logger.Messages.Text);
+end;
+
+procedure TInstallerDiagnosticsTests.Git_Source_Folder_Outside_The_Package_Is_Not_Added_To_The_Project;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  packageFolder : string;
+  projectText : string;
+  refreshed : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  packageFolder := TPath.Combine(FTempFolder, 'search-git-outside');
+  ForceDirectories(packageFolder);
+  //what a git registry install leaves - the package is the clone itself, its source where src says.
+  TFile.WriteAllText(TPath.Combine(packageFolder, cGitPackageMarkerFile), 'abc', TEncoding.UTF8);
+  refreshed := RefreshSearchPaths(packageFolder, '      - src: ''..\outside\**\*.pas''' + sLineBreak, loggerIntf, projectText);
+  Assert.IsTrue(refreshed, logger.Messages.Text);
+  Assert.IsFalse(ContainsText(projectText, 'outside'), 'a search path outside the package was written : ' + projectText);
+  Assert.IsTrue(logger.HasWarning(TWarningCode.W5012_PathOutsidePackage), logger.Messages.Text);
+end;
+
+procedure TInstallerDiagnosticsTests.Git_Source_Search_Does_Not_Follow_A_Junction_Out_Of_The_Package;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  packageFolder : string;
+  linkFolder : string;
+  projectText : string;
+  exitCode : Cardinal;
+  refreshed : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  packageFolder := TPath.Combine(FTempFolder, 'search-junction');
+  ForceDirectories(TPath.Combine(packageFolder, 'src'));
+  TFile.WriteAllText(TPath.Combine(packageFolder, 'src\Foo.pas'), 'unit Foo; interface implementation end.', TEncoding.UTF8);
+  TFile.WriteAllText(TPath.Combine(packageFolder, cGitPackageMarkerFile), 'abc', TEncoding.UTF8);
+  //a link in the clone to a folder outside it - a junction needs no special rights to make.
+  linkFolder := TPath.Combine(packageFolder, 'link');
+  exitCode := TProcess.Execute2(TCancellationTokenSourceFactory.Create.Token, GetEnvironmentVariable('COMSPEC'),
+                                '/c mklink /J "' + linkFolder + '" "' + TPath.Combine(FTempFolder, 'outside') + '"', '');
+  Assert.IsTrue((exitCode = 0) and DirectoryExists(linkFolder), 'could not make the junction');
+  try
+    refreshed := RefreshSearchPaths(packageFolder, '      - src: ''**\*.pas''' + sLineBreak, loggerIntf, projectText);
+    Assert.IsTrue(refreshed, logger.Messages.Text);
+    Assert.IsTrue(ContainsText(projectText, '$(DPM)\VSoft.Foo\1.0.0\src'), projectText);
+    Assert.IsFalse(ContainsText(projectText, '1.0.0\link'), 'the junction was followed : ' + projectText);
+  finally
+    //the link only - never what it points at.
+    RemoveDir(linkFolder);
+  end;
+end;
+
+procedure TInstallerDiagnosticsTests.CopyLocal_Files_Outside_The_Package_Are_Not_Copied;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  packageFolder : string;
+  outputFolder : string;
+  projectFile : string;
+  reader : IPackageSpecReader;
+  cache : TExtractedPackageCache;
+  cacheIntf : IPackageCache;
+  service : ICopyLocalService;
+  options : TCopyLocalOptions;
+  copied : boolean;
+  outsideWarnings : integer;
+  i : integer;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  packageFolder := TPath.Combine(FTempFolder, 'copylocal');
+  outputFolder := TPath.Combine(FTempFolder, 'copylocal-output');
+  ForceDirectories(TPath.Combine(packageFolder, 'bin'));
+  TFile.WriteAllText(TPath.Combine(packageFolder, 'bin\Good.dll'), 'not really a dll', TEncoding.UTF8);
+  projectFile := TPath.Combine(FTempFolder, 'copylocal.dproj');
+  TFile.WriteAllText(projectFile, ConsumerProjectWithBase, TEncoding.UTF8);
+  reader := TPackageSpecReader.Create(loggerIntf);
+  cache := TExtractedPackageCache.Create(packageFolder, reader.ReadSpecString(cSourcePackageSpecHead +
+    '      - src: ''.\source\*.pas''' + sLineBreak +
+    '    copyLocal:' + sLineBreak +
+    '      - src: ''bin\*.dll''' + sLineBreak +
+    //one pattern up out of the package, one rooted somewhere else entirely.
+    '      - src: ''..\outside\*.dll''' + sLineBreak +
+    '      - src: ''' + TPath.Combine(FTempFolder, 'outside\*.dll') + '''' + sLineBreak));
+  cacheIntf := cache;
+  service := TCopyLocalService.Create(loggerIntf, TFakeConfigurationManager.Create(TConfiguration.Create(loggerIntf)), cacheIntf);
+  options := TCopyLocalOptions.Create;
+  try
+    options.ProjectPath := projectFile;
+    options.Platform := TDPMPlatform.Win32;
+    options.Config := 'Debug';
+    options.OutputDir := outputFolder;
+    options.CompilerVersion := cTestCompiler;
+    options.ConfigFile := 'dpm.config.yaml';
+    copied := service.CopyLocal(TCancellationTokenSourceFactory.Create.Token, options);
+  finally
+    options.Free;
+  end;
+
+  Assert.IsTrue(copied, logger.Messages.Text);
+  Assert.IsTrue(TFile.Exists(TPath.Combine(outputFolder, 'Good.dll')), 'the package''s own file is copied : ' + logger.Messages.Text);
+  Assert.IsFalse(TFile.Exists(TPath.Combine(outputFolder, 'Evil.dll')), 'a file from outside the package was copied into the output folder');
   outsideWarnings := 0;
   for i := 0 to logger.Diagnostics.Count - 1 do
     if logger.Diagnostics[i] = 'warning ' + WarningCodeToString(TWarningCode.W5012_PathOutsidePackage) then
