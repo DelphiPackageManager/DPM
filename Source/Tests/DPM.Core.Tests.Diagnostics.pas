@@ -110,6 +110,8 @@ begin
   result := StrToInt(Copy(name, 2, 4));
 end;
 
+//The page is in the docs repository (github.com/DelphiPackageManager/docs), checked out next to this one -
+//so it is <parent>\docs\docs\error-codes.md, found by walking up from the test exe.
 function FindErrorCodesDoc : string;
 var
   folder : string;
@@ -118,7 +120,7 @@ begin
   folder := ExtractFileDir(ParamStr(0));
   while folder <> '' do
   begin
-    result := TPath.Combine(folder, 'docs\error-codes.md');
+    result := TPath.Combine(folder, 'docs\docs\error-codes.md');
     if FileExists(result) then
       exit;
     parent := ExtractFileDir(folder);
@@ -238,7 +240,7 @@ begin
   docFile := FindErrorCodesDoc;
   if docFile = '' then
   begin
-    Assert.Pass('docs\error-codes.md was not found above ' + ExtractFileDir(ParamStr(0)) + ' - not checked');
+    Assert.Pass('The docs repository (docs\docs\error-codes.md) was not found above ' + ExtractFileDir(ParamStr(0)) + ' - not checked');
     exit;
   end;
   doc := TFile.ReadAllText(docFile, TEncoding.UTF8);

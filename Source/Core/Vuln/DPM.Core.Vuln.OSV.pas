@@ -1,4 +1,4 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
@@ -359,7 +359,7 @@ var
   cachedIds : IDictionary<integer, IList<string>>;
   fetchedResponse : string;
 begin
-  result := false;
+//  result := false;
   perQueryIds := TCollections.CreateList<IList<string>>;
   for i := 0 to purls.Count - 1 do
     perQueryIds.Add(TCollections.CreateList<string>);

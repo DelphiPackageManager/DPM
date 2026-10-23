@@ -27,7 +27,8 @@
 unit DPM.Core.Diagnostics;
 
 //The codes for every error and warning DPM reports - 'error DPME1101: ...', 'warning DPMW1004: ...'.
-//docs\error-codes.md explains what each one means and how to fix it.
+//https://docs.delphi.dev/error-codes explains what each one means and how to fix it - the page is docs\error-codes.md in the
+//docs repository (github.com/DelphiPackageManager/docs).
 
 interface
 
@@ -50,7 +51,8 @@ type
   //     7 signing/trust/verify, 8 sbom/vulnerabilities, 9 ide/dspec creator/mcp.
   // - never renumber or reuse a released code - retire it (keep the entry, stop using it).
   // - no explicit ordinal values - an enum with them has no RTTI, which the tests rely on.
-  // - keep the list in number order, and add the matching row to cErrorInfo and docs\error-codes.md.
+  // - keep the list in number order, and add the matching row to cErrorInfo and to the error codes page in
+  //   the docs repository (docs\error-codes.md) - DPM.Core.Tests checks they agree.
   TErrorCode = (
     E0001_UnexpectedException,
     E0002_FailedWithoutDetail,

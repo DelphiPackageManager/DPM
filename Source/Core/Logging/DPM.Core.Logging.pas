@@ -40,7 +40,7 @@ uses
 type
   TLogLevel = (Debug, Verbose, Information, Success, Warning, Error);
 
-  //Errors and warnings carry a code (DPM.Core.Diagnostics, docs\error-codes.md). An error means the
+  //Errors and warnings carry a code (DPM.Core.Diagnostics, https://docs.delphi.dev/error-codes). An error means the
   //operation fails, and is reported once, by the code that detected the problem - callers that see
   //the failure come back don't report it again.
   ILogger = interface
@@ -48,7 +48,7 @@ type
     procedure Debug(const data : string);
     procedure Verbose(const data : string; const important : boolean = false);
     procedure Information(const data : string; const important : boolean = false);
-    //every warning and error has a code - see docs\error-codes.md.
+    //every warning and error has a code - see https://docs.delphi.dev/error-codes.
     procedure Warning(const code : TWarningCode; const data : string; const important : boolean = false);
     procedure Error(const code : TErrorCode; const data : string);
     procedure Success(const data : string; const important : boolean = false);
