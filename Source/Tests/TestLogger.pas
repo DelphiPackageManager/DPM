@@ -31,8 +31,7 @@ type
     function Messages : TStrings;
     //True when any message at this level contains text (case insensitive).
     function Logged(const level : string; const text : string) : boolean;
-    //Every warning and error reported, duplicates included, as '<level> <code>' ('error DPME1101'),
-    //'<level> -' for an uncoded one.
+    //Every warning and error reported, duplicates included, as '<level> <code>' ('error DPME1101').
     function Diagnostics : TStrings;
     function HasError(const code : TErrorCode) : boolean;
     function HasWarning(const code : TWarningCode) : boolean;
@@ -74,17 +73,11 @@ procedure TTestLogger.WriteMessage(const level : TLogLevel; const text : string;
 var
   data : string;
 begin
-  //warnings and errors arrive formatted - 'error DPME1101: text', or 'error: text' when uncoded. Keep
-  //the '<level>: ' prefix the assertions match on, followed by the code if there is one.
+  //warnings and errors arrive formatted - 'error DPME1101: text'. Keep the '<level>: ' prefix the
+  //assertions match on, followed by the code.
   data := text;
   if level in [TLogLevel.Warning, TLogLevel.Error] then
-  begin
-    data := Copy(text, Length(cLevelNames[level]) + 1, MaxInt);
-    if Pos(': ', data) = 1 then
-      data := Copy(data, 3, MaxInt)
-    else
-      data := Copy(data, 2, MaxInt);
-  end;
+    data := Copy(text, Length(cLevelNames[level]) + 2, MaxInt);
   FMessages.Add(cLevelNames[level] + ': ' + data);
 end;
 
@@ -92,10 +85,7 @@ procedure TTestLogger.DiagnosticReported(const level : TLogLevel; const code : s
 begin
   if level = TLogLevel.Warning then
     Inc(FWarningCount);
-  if code <> '' then
-    FDiagnostics.Add(cLevelNames[level] + ' ' + code)
-  else
-    FDiagnostics.Add(cLevelNames[level] + ' -');
+  FDiagnostics.Add(cLevelNames[level] + ' ' + code);
 end;
 
 procedure TTestLogger.DoClear;

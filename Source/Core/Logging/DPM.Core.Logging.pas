@@ -48,11 +48,9 @@ type
     procedure Debug(const data : string);
     procedure Verbose(const data : string; const important : boolean = false);
     procedure Information(const data : string; const important : boolean = false);
-    //the uncoded Warning and Error are being phased out - every warning and error gets a code.
-    procedure Warning(const data : string; const important : boolean = false); overload;
-    procedure Warning(const code : TWarningCode; const data : string; const important : boolean = false); overload;
-    procedure Error(const data : string); overload;
-    procedure Error(const code : TErrorCode; const data : string); overload;
+    //every warning and error has a code - see docs\error-codes.md.
+    procedure Warning(const code : TWarningCode; const data : string; const important : boolean = false);
+    procedure Error(const code : TErrorCode; const data : string);
     procedure Success(const data : string; const important : boolean = false);
     //clears the visible log where that is supported (not in the console logger), and starts a new
     //duplicate scope for the calling thread.
@@ -85,8 +83,8 @@ type
     function IsEnabled(const level : TLogLevel; const important : boolean) : boolean; virtual;
     //text is ready to show - warnings and errors are already formatted.
     procedure WriteMessage(const level : TLogLevel; const text : string; const important : boolean); virtual; abstract;
-    //called for every warning and error, duplicates included (they are not written). code is empty
-    //for an uncoded one.
+    //called for every warning and error, duplicates included (they are not written). code is the
+    //formatted code, eg 'DPME1101'.
     procedure DiagnosticReported(const level : TLogLevel; const code : string; const data : string; const duplicate : boolean); virtual;
     procedure DoClear; virtual;
     procedure DoNewLine; virtual;
@@ -99,10 +97,8 @@ type
     procedure Debug(const data : string);
     procedure Verbose(const data : string; const important : boolean = false);
     procedure Information(const data : string; const important : boolean = false);
-    procedure Warning(const data : string; const important : boolean = false); overload;
-    procedure Warning(const code : TWarningCode; const data : string; const important : boolean = false); overload;
-    procedure Error(const data : string); overload;
-    procedure Error(const code : TErrorCode; const data : string); overload;
+    procedure Warning(const code : TWarningCode; const data : string; const important : boolean = false);
+    procedure Error(const code : TErrorCode; const data : string);
     procedure Success(const data : string; const important : boolean = false);
     procedure Clear;
     procedure NewLine;
@@ -130,10 +126,8 @@ type
     procedure Debug(const data : string);
     procedure Verbose(const data : string; const important : boolean = false);
     procedure Information(const data : string; const important : boolean = false);
-    procedure Warning(const data : string; const important : boolean = false); overload;
-    procedure Warning(const code : TWarningCode; const data : string; const important : boolean = false); overload;
-    procedure Error(const data : string); overload;
-    procedure Error(const code : TErrorCode; const data : string); overload;
+    procedure Warning(const code : TWarningCode; const data : string; const important : boolean = false);
+    procedure Error(const code : TErrorCode; const data : string);
     procedure Success(const data : string; const important : boolean = false);
     procedure Clear;
     procedure NewLine;
@@ -156,10 +150,8 @@ type
     procedure Debug(const data : string);
     procedure Verbose(const data : string; const important : boolean = false);
     procedure Information(const data : string; const important : boolean = false);
-    procedure Warning(const data : string; const important : boolean = false); overload;
-    procedure Warning(const code : TWarningCode; const data : string; const important : boolean = false); overload;
-    procedure Error(const data : string); overload;
-    procedure Error(const code : TErrorCode; const data : string); overload;
+    procedure Warning(const code : TWarningCode; const data : string; const important : boolean = false);
+    procedure Error(const code : TErrorCode; const data : string);
     procedure Success(const data : string; const important : boolean = false);
     procedure Clear;
     procedure NewLine;
@@ -269,8 +261,7 @@ begin
       reported := TCollections.CreateSet<string>;
       FReported.Add(threadId, reported);
     end;
-    //the code is not part of the key - a message logged uncoded and then raised with a code is the
-    //same problem.
+    //the code is not part of the key - the same message reported with two codes is still one problem.
     duplicate := reported.Contains(key);
     if (not duplicate) and (reported.Count < cMaxDuplicateKeys) then
       reported.Add(key);
@@ -343,19 +334,9 @@ begin
     WriteMessage(TLogLevel.Success, data, important);
 end;
 
-procedure TBaseLogger.Warning(const data : string; const important : boolean);
-begin
-  Report(TLogLevel.Warning, '', data, important);
-end;
-
 procedure TBaseLogger.Warning(const code : TWarningCode; const data : string; const important : boolean);
 begin
   Report(TLogLevel.Warning, WarningCodeToString(code), data, important);
-end;
-
-procedure TBaseLogger.Error(const data : string);
-begin
-  Report(TLogLevel.Error, '', data, true);
 end;
 
 procedure TBaseLogger.Error(const code : TErrorCode; const data : string);
@@ -415,12 +396,6 @@ begin
   FTarget.Debug(data);
 end;
 
-procedure TDemotingLogger.Error(const data : string);
-begin
-  NoteProblem(FormatDiagnostic(true, '', data));
-  FTarget.Debug(data);
-end;
-
 procedure TDemotingLogger.Error(const code : TErrorCode; const data : string);
 begin
   NoteProblem(FormatError(code, data));
@@ -476,12 +451,6 @@ begin
   FTarget.Debug(data);
 end;
 
-procedure TDemotingLogger.Warning(const data : string; const important : boolean);
-begin
-  NoteProblem(FormatDiagnostic(false, '', data));
-  FTarget.Debug(data);
-end;
-
 procedure TDemotingLogger.Warning(const code : TWarningCode; const data : string; const important : boolean);
 begin
   NoteProblem(FormatWarning(code, data));
@@ -505,11 +474,6 @@ end;
 procedure TContextLogger.Debug(const data : string);
 begin
   FTarget.Debug(data);
-end;
-
-procedure TContextLogger.Error(const data : string);
-begin
-  FTarget.Error(FContext + data);
 end;
 
 procedure TContextLogger.Error(const code : TErrorCode; const data : string);
@@ -555,11 +519,6 @@ end;
 procedure TContextLogger.Verbose(const data : string; const important : boolean);
 begin
   FTarget.Verbose(data, important);
-end;
-
-procedure TContextLogger.Warning(const data : string; const important : boolean);
-begin
-  FTarget.Warning(FContext + data, important);
 end;
 
 procedure TContextLogger.Warning(const code : TWarningCode; const data : string; const important : boolean);

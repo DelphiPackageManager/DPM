@@ -14,8 +14,7 @@ This is the same layout MSBuild uses, so CI systems that recognise MSBuild error
 
 When an operation fails, DPM reports the error that caused it once, where it was found. The lines that
 follow it ("Install failed for ...", "Restore failed in ...") say what happened as a result and carry no
-code. Search this page for the code to find out what it means and what to do about it. Messages without a
-code (`error: ...`) come from parts of DPM that haven't been given codes yet.
+code. Search this page for the code to find out what it means and what to do about it.
 
 To see more detail about what DPM was doing when something went wrong, run the command again with
 `--verbosity=Detailed`, or `--verbosity=Debug` for everything.

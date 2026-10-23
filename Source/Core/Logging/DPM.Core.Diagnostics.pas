@@ -429,8 +429,7 @@ function FormatError(const code : TErrorCode; const message : string) : string;
 //'warning DPMW0004: message'
 function FormatWarning(const code : TWarningCode; const message : string) : string;
 
-//'error DPME0001: message' / 'warning DPMW0004: message', or 'error: message' when code is empty -
-//errors and warnings that have not been given a code yet.
+//'error DPME0001: message' / 'warning DPMW0004: message' - code is the formatted code, eg 'DPME0001'.
 function FormatDiagnostic(const isError : boolean; const code : string; const message : string) : string;
 
 type
@@ -474,9 +473,7 @@ begin
     result := 'error'
   else
     result := 'warning';
-  if code <> '' then
-    result := result + ' ' + code;
-  result := result + ': ' + message;
+  result := result + ' ' + code + ': ' + message;
 end;
 
 function FormatError(const code : TErrorCode; const message : string) : string;

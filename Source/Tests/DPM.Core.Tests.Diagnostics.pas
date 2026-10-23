@@ -222,8 +222,6 @@ begin
   Assert.AreEqual('DPMW0004', WarningCodeToString(TWarningCode.W0004_OperationCancelled), false);
   Assert.AreEqual('error DPME0003: boom', FormatError(TErrorCode.E0003_InternalError, 'boom'), false);
   Assert.AreEqual('warning DPMW0004: stopped', FormatWarning(TWarningCode.W0004_OperationCancelled, 'stopped'), false);
-  Assert.AreEqual('error: not coded yet', FormatDiagnostic(true, '', 'not coded yet'), false);
-  Assert.AreEqual('warning: not coded yet', FormatDiagnostic(false, '', 'not coded yet'), false);
 end;
 
 procedure TDiagnosticsTests.Docs_List_Every_Code;
@@ -270,17 +268,13 @@ begin
   loggerIntf := logger;
   loggerIntf.Error(TErrorCode.E0003_InternalError, 'coded error');
   loggerIntf.Warning(TWarningCode.W0004_OperationCancelled, 'coded warning');
-  loggerIntf.Error('uncoded error');
-  loggerIntf.Warning('uncoded warning');
-  Assert.AreEqual(4, logger.Messages.Count, logger.Messages.Text);
+  Assert.AreEqual(2, logger.Messages.Count, logger.Messages.Text);
   Assert.AreEqual('error: DPME0003: coded error', logger.Messages[0], false);
   Assert.AreEqual('warning: DPMW0004: coded warning', logger.Messages[1], false);
-  Assert.AreEqual('error: uncoded error', logger.Messages[2], false);
-  Assert.AreEqual('warning: uncoded warning', logger.Messages[3], false);
   Assert.IsTrue(logger.HasError(TErrorCode.E0003_InternalError));
   Assert.IsTrue(logger.HasWarning(TWarningCode.W0004_OperationCancelled));
-  Assert.AreEqual(2, loggerIntf.ErrorCount);
-  Assert.AreEqual(2, logger.WarningCount);
+  Assert.AreEqual(1, loggerIntf.ErrorCount);
+  Assert.AreEqual(1, logger.WarningCount);
 end;
 
 procedure TDiagnosticsTests.Duplicate_Is_Shown_Once_But_Counted;
@@ -292,16 +286,16 @@ begin
   loggerIntf := logger;
   loggerIntf.Error(TErrorCode.E0003_InternalError, 'same problem');
   loggerIntf.Error(TErrorCode.E0003_InternalError, 'same problem');
-  //logged uncoded and then raised with a code - still the same problem.
-  loggerIntf.Error('same problem');
+  //the same message with another code - still the same problem.
+  loggerIntf.Error(TErrorCode.E0001_UnexpectedException, 'same problem');
   loggerIntf.Warning(TWarningCode.W0004_OperationCancelled, 'same warning');
   loggerIntf.Warning(TWarningCode.W0004_OperationCancelled, 'same warning');
   //a different level is a different line.
-  loggerIntf.Warning('same problem');
+  loggerIntf.Warning(TWarningCode.W0004_OperationCancelled, 'same problem');
 
   Assert.AreEqual(1, CountLines(logger.Messages, 'error: DPME0003: same problem'), logger.Messages.Text);
   Assert.AreEqual(1, CountLines(logger.Messages, 'warning: DPMW0004: same warning'), logger.Messages.Text);
-  Assert.AreEqual(1, CountLines(logger.Messages, 'warning: same problem'), logger.Messages.Text);
+  Assert.AreEqual(1, CountLines(logger.Messages, 'warning: DPMW0004: same problem'), logger.Messages.Text);
   Assert.AreEqual(3, logger.Messages.Count, logger.Messages.Text);
   //duplicates still count, so a test sees a structural repeat even though the user does not.
   Assert.AreEqual(3, loggerIntf.ErrorCount);
