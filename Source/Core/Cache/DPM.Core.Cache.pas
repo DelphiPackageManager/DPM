@@ -67,6 +67,8 @@ type
     procedure WriteReceipt(const packageFolder : string;
                            const packageId : IPackageIdentity;
                            const verifyResult : TVerificationResult);
+    //true when packageFolder already holds a completed extraction of the package verifyResult describes.
+    function ExtractionMatchesPackage(const packageFolder : string; const verifyResult : TVerificationResult) : boolean;
     // Returns true if the install may proceed. When false, the package must
     // not be extracted. Records the new author state on a successful pass.
     function EvaluateAuthorDowngrade(const packageId : IPackageIdentity;
@@ -162,6 +164,7 @@ uses
   DPM.Core.Diagnostics,
   DPM.Core.Package.Classes,
   DPM.Core.Package.Icon,
+  DPM.Core.Package.Manifest.Interfaces,
   DPM.Core.Utils.Hash,
   DPM.Core.Utils.System,
   DPM.Core.Utils.Strings;
@@ -572,6 +575,29 @@ begin
     on e : Exception do
       FLogger.Warning(TWarningCode.W3015_CacheReceiptWriteFailed, 'Unable to write the verification receipt for [' + packageId.ToString + '] : ' + e.Message);
   end;
+end;
+
+//The receipt is written last, so its presence means the extraction finished, and its manifest hash says
+//which package it came from. The manifest on disk is re-hashed too (as QuickRecheck does), so an extraction
+//whose manifest was altered is not taken as intact.
+function TPackageCache.ExtractionMatchesPackage(const packageFolder : string; const verifyResult : TVerificationResult) : boolean;
+var
+  receipt : TVerificationReceipt;
+  manifestFile : string;
+begin
+  result := false;
+  if (FReceiptService = nil) or (verifyResult.ManifestHashHex = '') then
+    exit;
+  if not FileExists(IncludeTrailingPathDelimiter(packageFolder) + cPackageDspecFile) then
+    exit;
+  if not FReceiptService.TryRead(packageFolder, receipt) then
+    exit;
+  if not SameText(receipt.ManifestHashHex, verifyResult.ManifestHashHex) then
+    exit;
+  manifestFile := IncludeTrailingPathDelimiter(packageFolder) + cManifestFileName;
+  if not FileExists(manifestFile) then
+    exit;
+  result := SameText(THashSHA256.GetHashStringFromFile(manifestFile), verifyResult.ManifestHashHex);
 end;
 
 function TPackageCache.CachePackage(const packageId : IPackageIdentity; const saveFile : Boolean) : Boolean;
@@ -1618,6 +1644,18 @@ begin
       // the author rebuilding their own package (TAuthorRebuildExemption).
       if not EvaluateRepositoryRatchet(packageIndentity, verifyResult, hadPriorAuthor, priorAuthor) then
         exit;
+    end;
+
+    //Already extracted from this very package - keep it. The installer builds into the package folder
+    //(lib\, bpl\ and the package.{platform}.bom compile-skip marker), so emptying it would throw that away
+    //and force a recompile - re-verifying the cache did that to every package. Only the receipt is
+    //rewritten, so it carries the fingerprint of the policy the package was just verified under.
+    if ExtractionMatchesPackage(packageFolder, verifyResult) then
+    begin
+      logger.Debug('[PackageCache] The package folder already holds this package, keeping it : ' + packageFolder);
+      WriteReceipt(packageFolder, packageIndentity, verifyResult);
+      result := true;
+      exit;
     end;
   end;
 

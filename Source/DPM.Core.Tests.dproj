@@ -265,6 +265,7 @@
         <DCCReference Include="Core\Package\Signing\DPM.Core.Package.Signing.pas"/>
         <DCCReference Include="Tests\DependencyVersionTests.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Cache.PackageHash.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Cache.Verify.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Crypto.Hashing.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Dependency.Resolver.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Package.InstallerContext.pas"/>
