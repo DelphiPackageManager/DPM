@@ -147,6 +147,7 @@ var
   policy : TTrustPolicy;
   verifyResult : TVerificationResult;
   flags : TVerifyFlags;
+  i : integer;
 begin
   TVerifyOptions.Default.ApplyCommon(TCommonOptions.Default);
   options := TVerifyOptions.Default;
@@ -181,10 +182,18 @@ begin
     voUnsigned :
       Logger.Warning(TWarningCode.W7010_PackageUnsigned, 'The package [' + ExtractFileName(options.PackageFile) + '] is not signed - permissive mode allows installing it.');
     voUntrustedPublisher :
-      Logger.Warning(TWarningCode.W7008_PublisherNotTrusted, 'The package [' + ExtractFileName(options.PackageFile) + '] is signed by a publisher that is not in trustedPublishers.');
+      Logger.Warning(TWarningCode.W7008_PublisherNotTrusted, 'The package [' + ExtractFileName(options.PackageFile) + '] is signed, but not by a signer this configuration trusts - ' +
+        'the author certificate does not chain to a trusted root and is not in trustedPublishers.');
     voInvalid :
-      Logger.Error(TErrorCode.E7001_PackageVerificationFailed, 'The package [' + ExtractFileName(options.PackageFile) + '] failed verification : ' + verifyResult.Reason);
+      if verifyResult.FormatNotSupported then
+        Logger.Error(TErrorCode.E7109_PackageFormatNotSupported, 'The package [' + ExtractFileName(options.PackageFile) + '] can''t be verified : ' + verifyResult.Reason)
+      else
+        Logger.Error(TErrorCode.E7001_PackageVerificationFailed, 'The package [' + ExtractFileName(options.PackageFile) + '] failed verification : ' + verifyResult.Reason);
   end;
+  for i := 0 to High(verifyResult.Signatures) do
+    if verifyResult.Signatures[i].TimestampAuthorityUntrusted then
+      Logger.Warning(TWarningCode.W7011_TimestampAuthorityUntrusted, Format('The timestamp authority [%s] does not chain to a trusted root - the signing certificate was ' +
+        'checked as of now instead. Updating this machine''s root certificates fixes this.', [verifyResult.Signatures[i].TimestampAuthority]));
 
   case verifyResult.Outcome of
     voTrusted, voUnsigned, voUntrustedPublisher : result := TExitCode.OK;
@@ -213,10 +222,23 @@ begin
       Logger.Information('Author signature')
     else
       Logger.Information('Repository signature');
-    Logger.Information('  Signer     : ' + sigInfo.SignerSubject);
-    Logger.Information('  Thumbprint : ' + sigInfo.Thumbprint);
-    Logger.Information('  SPKI       : sha256:' + sigInfo.SignerSpkiHex);
-    if sigInfo.EffectiveSigningTime > 0 then
+    if sigInfo.Valid then
+    begin
+      Logger.Information('  Signer     : ' + sigInfo.SignerSubject);
+      Logger.Information('  Thumbprint : ' + sigInfo.Thumbprint);
+      Logger.Information('  SPKI       : sha256:' + sigInfo.SignerSpkiHex);
+    end
+    else
+    begin
+      //nothing vouches for who made a signature that doesn't verify - say what it claims.
+      Logger.Information('  Claims     : ' + sigInfo.ClaimedSubject);
+      Logger.Information('  Thumbprint : ' + sigInfo.Thumbprint);
+      if sigInfo.ClaimedSignerSpkiHex <> '' then
+        Logger.Information('  SPKI       : sha256:' + sigInfo.ClaimedSignerSpkiHex + ' (claimed)');
+    end;
+    if sigInfo.TimestampAuthorityUntrusted then
+      Logger.Information('  Timestamp  :  authority [' + sigInfo.TimestampAuthority + '] not trusted - checked as of now', true)
+    else if sigInfo.EffectiveSigningTime > 0 then
       Logger.Information('  Timestamp  :  ' + DateTimeToStr(sigInfo.EffectiveSigningTime) + ' UTC');
     case sigInfo.Revocation of
       rsGood    : Logger.Information('  Revocation : checked, good');
@@ -241,7 +263,14 @@ begin
     begin
       if sigInfo.Role = srAuthor then
       begin
-        if sigInfo.PublisherTrusted then
+        if sigInfo.UntrustedRoot then
+        begin
+          if sigInfo.PublisherTrusted then
+            Logger.Information('  Result     : valid, publisher pinned (certificate does not chain to a trusted root)')
+          else
+            Logger.Information('  Result     : valid, but the certificate does not chain to a trusted root - add its SPKI to signing.trustedPublishers to trust it', true);
+        end
+        else if sigInfo.PublisherTrusted then
           Logger.Information('  Result     : valid, publisher trusted')
         else
           Logger.Information('  Result     : valid (publisher not pinned)');
@@ -324,14 +353,25 @@ begin
     else
       sigObj.AddOrSetValue('role', 'repository');
     TJsonUtils.AddIfNotEmpty(sigObj, 'signerSubject', sigInfo.SignerSubject);
-    sigObj.AddOrSetValue('signerSpki', 'sha256:' + sigInfo.SignerSpkiHex);
+    if sigInfo.SignerSpkiHex <> '' then
+      sigObj.AddOrSetValue('signerSpki', 'sha256:' + sigInfo.SignerSpkiHex);
     TJsonUtils.AddIfNotEmpty(sigObj, 'thumbprint', sigInfo.Thumbprint);
     sigObj.AddOrSetValue('valid', sigInfo.Valid);
     if not sigInfo.Valid then
+    begin
       TJsonUtils.AddIfNotEmpty(sigObj, 'failureReason', sigInfo.FailureReason);
+      TJsonUtils.AddIfNotEmpty(sigObj, 'claimedSignerSubject', sigInfo.ClaimedSubject);
+      if sigInfo.ClaimedSignerSpkiHex <> '' then
+        sigObj.AddOrSetValue('claimedSignerSpki', 'sha256:' + sigInfo.ClaimedSignerSpkiHex);
+    end;
+    if sigInfo.Role = srAuthor then
+      sigObj.AddOrSetValue('untrustedRoot', sigInfo.UntrustedRoot);
     if sigInfo.EffectiveSigningTime > 0 then
       sigObj.AddOrSetValue('effectiveSigningTime',
         FormatDateTime('yyyy-mm-dd"T"hh:nn:ss"Z"', sigInfo.EffectiveSigningTime));
+    TJsonUtils.AddIfNotEmpty(sigObj, 'timestampAuthority', sigInfo.TimestampAuthority);
+    if sigInfo.TimestampAuthorityUntrusted then
+      sigObj.AddOrSetValue('timestampAuthorityUntrusted', true);
     sigObj.AddOrSetValue('revocation', RevocationStatusName(sigInfo.Revocation));
     reasonStr := RevocationReasonName(sigInfo.CurrentRevocationReason);
     TJsonUtils.AddIfNotEmpty(sigObj, 'currentRevocationReason', reasonStr);

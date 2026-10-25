@@ -254,6 +254,8 @@
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Azure.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Signotaur.pas"/>
+        <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Provider.Factory.pas"/>
+        <DCCReference Include="Core\Options\DPM.Core.Options.Sign.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Cms.Interfaces.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Cms.pas"/>
         <DCCReference Include="Core\Crypto\DPM.Core.Crypto.Timestamping.pas"/>
@@ -322,6 +324,9 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Cache.PackageId.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.DateTime.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.Strings.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Utils.Files.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Crypto.Chain.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Crypto.Pfx.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.PE.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Crypto.Algorithms.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Package.Archive.pas"/>

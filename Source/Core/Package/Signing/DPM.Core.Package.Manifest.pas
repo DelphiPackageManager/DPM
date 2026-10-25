@@ -262,10 +262,12 @@ begin
   end;
 end;
 
+//Case-insensitive, as the verifier's signatures/ exclusion is - a manifest that hashed a
+//'Signatures/' file the verifier then skips could never be installed.
 function PathStartsWith(const path, prefix : string) : boolean;
 begin
   result := (Length(path) >= Length(prefix)) and
-            SameStr(Copy(path, 1, Length(prefix)), prefix);
+            SameText(Copy(path, 1, Length(prefix)), prefix);
 end;
 
 // V-2 strict-duplicate-key scan. Walks the raw manifest text and tracks every
@@ -1011,6 +1013,14 @@ begin
     raise EManifestParse.Create('packageId must be a string');
   if not rootMap.Values['version'].IsString then
     raise EManifestParse.Create('version must be a string');
+  // V-5: a format this client doesn't know may mean something it can't check.
+  if (rootMap.Values['dpmPackageFormat'].AsInteger < 1) or (rootMap.Values['manifestSchemaVersion'].AsInteger < 1) then
+    raise EManifestParse.Create('dpmPackageFormat and manifestSchemaVersion must be at least 1');
+  if (rootMap.Values['dpmPackageFormat'].AsInteger > cCurrentDpmPackageFormat) or
+     (rootMap.Values['manifestSchemaVersion'].AsInteger > cCurrentManifestSchemaVersion) then
+    raise EManifestFormatNotSupported.CreateFmt('The package is in a newer format (package format %d, manifest schema %d) than this version of DPM ' +
+      'supports (%d, %d) - update DPM (dpm upgrade) to install it.', [rootMap.Values['dpmPackageFormat'].AsInteger,
+      rootMap.Values['manifestSchemaVersion'].AsInteger, cCurrentDpmPackageFormat, cCurrentManifestSchemaVersion]);
 
   createdStr := '';
   if rootMap.Values['created'].IsString then

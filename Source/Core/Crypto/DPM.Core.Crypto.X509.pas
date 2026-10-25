@@ -88,8 +88,10 @@ type
     function NotBefore : TDateTime;
     function NotAfter : TDateTime;
     function HasCodeSigningEku : boolean;
+    function HasEku(const oid : AnsiString; requirePresent : boolean) : boolean;
     function RawDerBytes : TBytes;
     function PublicKeyType : TCertKeyType;
+    function PublicKeyBits : integer;
     function PreferredDigest : THashAlgorithm;
     function GetContext : PCCERT_CONTEXT;
   public
@@ -104,6 +106,7 @@ type
   protected
     function FindByThumbprint(const thumbprint : string) : ICertificate;
     function FindBySpki(const spkiHash : TBytes; algorithm : THashAlgorithm) : ICertificate;
+    function FirstWithPrivateKey : ICertificate;
     function GetHandle : HCERTSTORE;
   public
     constructor Create(handle : HCERTSTORE; const hashingService : IHashingService);
@@ -128,7 +131,13 @@ type
                          const additionalCerts : array of ICertificate;
                          asOfTime : TDateTime;
                          checkRevocation : boolean) : TChainResult;
-    function VerifyForCodeSigning(asOfTime : TDateTime) : TChainResult;
+    function BuildAtTimeForUsage(const cert : ICertificate;
+                                 const additionalCerts : array of ICertificate;
+                                 asOfTime : TDateTime;
+                                 checkRevocation : boolean;
+                                 const usageOid : AnsiString) : TChainResult;
+    function VerifyForCodeSigning(asOfTime : TDateTime; allowUntrustedRoot : boolean = false) : TChainResult;
+    function EndsOnlyAtUntrustedRoot : boolean;
     function ChainCertificates : TArray<ICertificate>;
     function RootCertificate : ICertificate;
     function LastErrorMessage : string;
@@ -384,22 +393,27 @@ begin
 end;
 
 function TCertificate.HasCodeSigningEku : boolean;
+begin
+  // No EKU extension at all means the certificate is implicitly valid for
+  // any usage. Chain policy enforcement decides at validation time; for
+  // display purposes we report "true" to avoid false-negative UI.
+  result := HasEku(szOID_PKIX_KP_CODE_SIGNING, false);
+end;
+
+function TCertificate.HasEku(const oid : AnsiString; requirePresent : boolean) : boolean;
 var
   ext : PCERT_EXTENSION;
   decoded : Pointer;
   decodedSize : DWORD;
   usage : PCERT_ENHKEY_USAGE;
   i : integer;
-  oid : AnsiString;
+  usageOid : AnsiString;
 begin
   result := false;
   ext := FindExtension('2.5.29.37');
   if ext = nil then
   begin
-    // No EKU extension at all means the certificate is implicitly valid for
-    // any usage. Chain policy enforcement decides at validation time; for
-    // display purposes we report "true" to avoid false-negative UI.
-    result := true;
+    result := not requirePresent;
     exit;
   end;
 
@@ -414,8 +428,8 @@ begin
     usage := PCERT_ENHKEY_USAGE(decoded);
     for i := 0 to Integer(usage.cUsageIdentifier) - 1 do
     begin
-      oid := AnsiString(PPAnsiChar(NativeUInt(usage.rgpszUsageIdentifier) + NativeUInt(i * SizeOf(Pointer)))^);
-      if oid = szOID_PKIX_KP_CODE_SIGNING then
+      usageOid := AnsiString(PPAnsiChar(NativeUInt(usage.rgpszUsageIdentifier) + NativeUInt(i * SizeOf(Pointer)))^);
+      if usageOid = oid then
       begin
         result := true;
         exit;
@@ -447,6 +461,17 @@ begin
     result := cktRsa
   else if algOid = szOID_ECC_PUBLIC_KEY then
     result := cktEcdsa;
+end;
+
+function TCertificate.PublicKeyBits : integer;
+var
+  info : PCERT_INFO;
+begin
+  result := 0;
+  info := GetCertInfo;
+  if info = nil then
+    exit;
+  result := integer(CertGetPublicKeyLength(X509_ASN_ENCODING or PKCS_7_ASN_ENCODING, @info.SubjectPublicKeyInfo));
 end;
 
 function TCertificate.PreferredDigest : THashAlgorithm;
@@ -593,9 +618,44 @@ begin
     if BytesEqual(candidate.SpkiHash(algorithm), spkiHash) then
     begin
       result := candidate;
+      //leaving the enumeration early - the enumerator's own reference is ours to release.
+      CertFreeCertificateContext(ctx);
       exit;
     end;
     candidate := nil;
+    ctx := CertEnumCertificatesInStore(FHandle, ctx);
+  end;
+end;
+
+function TCertificateStore.FirstWithPrivateKey : ICertificate;
+const
+  cCERT_KEY_PROV_INFO_PROP_ID = 2;
+  cCERT_KEY_CONTEXT_PROP_ID = 5;
+  //a PFX imported with PKCS12_NO_PERSIST_KEY - the ephemeral key's handle.
+  cCERT_NCRYPT_KEY_HANDLE_PROP_ID = 78;
+
+  function HasProperty(const certContext : PCCERT_CONTEXT; propId : DWORD) : boolean;
+  var
+    size : DWORD;
+  begin
+    size := 0;
+    result := CertGetCertificateContextProperty(certContext, propId, nil, size);
+  end;
+
+var
+  ctx : PCCERT_CONTEXT;
+begin
+  result := nil;
+  ctx := CertEnumCertificatesInStore(FHandle, nil);
+  while ctx <> nil do
+  begin
+    if HasProperty(ctx, cCERT_NCRYPT_KEY_HANDLE_PROP_ID) or HasProperty(ctx, cCERT_KEY_PROV_INFO_PROP_ID) or
+       HasProperty(ctx, cCERT_KEY_CONTEXT_PROP_ID) then
+    begin
+      //leaving the enumeration early - the enumerator's reference becomes the certificate's.
+      result := TCertificate.Create(ctx, true, FHashingService);
+      exit;
+    end;
     ctx := CertEnumCertificatesInStore(FHandle, ctx);
   end;
 end;
@@ -740,6 +800,15 @@ function TCertificateChain.BuildAtTime(const cert : ICertificate;
                                        const additionalCerts : array of ICertificate;
                                        asOfTime : TDateTime;
                                        checkRevocation : boolean) : TChainResult;
+begin
+  result := BuildAtTimeForUsage(cert, additionalCerts, asOfTime, checkRevocation, szOID_PKIX_KP_CODE_SIGNING);
+end;
+
+function TCertificateChain.BuildAtTimeForUsage(const cert : ICertificate;
+                                               const additionalCerts : array of ICertificate;
+                                               asOfTime : TDateTime;
+                                               checkRevocation : boolean;
+                                               const usageOid : AnsiString) : TChainResult;
 var
   para : CERT_CHAIN_PARA;
   usage : array[0..0] of PAnsiChar;
@@ -776,7 +845,7 @@ begin
   para.cbSize := SizeOf(para);
   para.RequestedUsage.dwType := USAGE_MATCH_TYPE_AND;
   para.RequestedUsage.Usage.cUsageIdentifier := 1;
-  usage[0] := PAnsiChar(szOID_PKIX_KP_CODE_SIGNING);
+  usage[0] := PAnsiChar(usageOid);
   para.RequestedUsage.Usage.rgpszUsageIdentifier := @usage[0];
 
   // V-26: when asOfTime is set, evaluate the chain *as of* the signing
@@ -847,13 +916,14 @@ begin
   end
   else if (FChain.TrustStatus.dwErrorStatus and CERT_TRUST_IS_NOT_VALID_FOR_USAGE) <> 0 then
   begin
-    FLastError := Format('certificate not valid for code-signing usage (trust status 0x%.8x)',
+    FLastError := Format('certificate not valid for the requested usage (trust status 0x%.8x)',
       [FChain.TrustStatus.dwErrorStatus]);
     result := crWrongUsage;
   end
-  else if (FChain.TrustStatus.dwErrorStatus = CERT_TRUST_REVOCATION_STATUS_UNKNOWN) then
+  else if (FChain.TrustStatus.dwErrorStatus and not (CERT_TRUST_REVOCATION_STATUS_UNKNOWN or CERT_TRUST_IS_OFFLINE_REVOCATION)) = 0 then
     // A CRL/OCSP outage by itself shouldn't fail the chain — surface as valid
-    // with rsUnknown so policy can decide what to do.
+    // with rsUnknown so policy can decide what to do. An unreachable revocation
+    // server sets CERT_TRUST_IS_OFFLINE_REVOCATION alongside STATUS_UNKNOWN.
     result := crValid
   else
   begin
@@ -863,7 +933,20 @@ begin
   end;
 end;
 
-function TCertificateChain.VerifyForCodeSigning(asOfTime : TDateTime) : TChainResult;
+function TCertificateChain.EndsOnlyAtUntrustedRoot : boolean;
+const
+  cTolerated = CERT_TRUST_IS_UNTRUSTED_ROOT or CERT_TRUST_REVOCATION_STATUS_UNKNOWN or CERT_TRUST_IS_OFFLINE_REVOCATION;
+var
+  status : DWORD;
+begin
+  result := false;
+  if FChain = nil then
+    exit;
+  status := FChain.TrustStatus.dwErrorStatus;
+  result := ((status and CERT_TRUST_IS_UNTRUSTED_ROOT) <> 0) and ((status and not cTolerated) = 0);
+end;
+
+function TCertificateChain.VerifyForCodeSigning(asOfTime : TDateTime; allowUntrustedRoot : boolean) : TChainResult;
 var
   policyPara : CERT_CHAIN_POLICY_PARA;
   policyStatus : CERT_CHAIN_POLICY_STATUS;
@@ -877,6 +960,11 @@ begin
 
   FillChar(policyPara, SizeOf(policyPara), 0);
   policyPara.cbSize := SizeOf(policyPara);
+  // Revocation that couldn't be checked (CRL/OCSP unreachable) is reported through
+  // RevocationStatus as rsUnknown, not as a failed chain - a revoked certificate still fails.
+  policyPara.dwFlags := CERT_CHAIN_POLICY_IGNORE_ALL_REV_UNKNOWN_FLAGS;
+  if allowUntrustedRoot then
+    policyPara.dwFlags := policyPara.dwFlags or CERT_CHAIN_POLICY_ALLOW_UNKNOWN_CA_FLAG;
 
   FillChar(policyStatus, SizeOf(policyStatus), 0);
   policyStatus.cbSize := SizeOf(policyStatus);
@@ -998,6 +1086,7 @@ var
   blob : CRYPT_DATA_BLOB;
   pwd : PWideChar;
   handle : HCERTSTORE;
+  lastError : DWORD;
 const
   cCRYPT_USER_KEYSET = $00001000;
   cPKCS12_NO_PERSIST_KEY = $00008000;
@@ -1012,10 +1101,20 @@ begin
   else
     pwd := PWideChar(password);
 
-  handle := PFXImportCertStore(@blob, pwd, cCRYPT_USER_KEYSET);
+  // An ephemeral CNG key that goes with the certificate context - imported into the user's key store,
+  // every sign left a key container behind that nothing ever removed.
+  handle := PFXImportCertStore(@blob, pwd, cPKCS12_NO_PERSIST_KEY);
   if handle = nil then
-    raise ECryptoX509.CreateFmt('PFXImportCertStore failed: %d (wrong password or malformed PFX)',
-      [GetLastError]);
+  begin
+    lastError := GetLastError;
+    // A key the ephemeral import can't take - import it the old way rather than fail a PFX that signs
+    // today. A wrong password fails both ways.
+    if lastError <> ERROR_INVALID_PASSWORD then
+      handle := PFXImportCertStore(@blob, pwd, cCRYPT_USER_KEYSET);
+    if handle = nil then
+      raise ECryptoX509.CreateFmt('PFXImportCertStore failed: %d (wrong password or malformed PFX)',
+        [lastError]);
+  end;
   result := TCertificateStore.Create(handle, FHashingService);
 end;
 

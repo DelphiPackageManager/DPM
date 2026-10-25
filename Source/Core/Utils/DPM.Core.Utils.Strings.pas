@@ -47,6 +47,10 @@ type
     //control characters, quotes). The only kind of link from a package that DPM hands to the shell - a
     //file: link or a \\server\share\program.exe path would run a program, not open a browser.
     class function IsWebUrl(const value : string) : boolean;
+    //value as a YAML single-quoted scalar - the only escape inside one is a doubled quote. Quoting every
+    //value a hand-written YAML file holds keeps it from being read back as something else ("02" as 2,
+    //"no" as false) and keeps a quote in it from ending the scalar.
+    class function YamlSingleQuote(const value : string) : string;
   end;
 
 implementation
@@ -231,6 +235,11 @@ begin
   Result := 0;
 end;
 {$WARN WIDECHAR_REDUCED ON}
+
+class function TStringUtils.YamlSingleQuote(const value : string) : string;
+begin
+  result := '''' + StringReplace(value, '''', '''''', [rfReplaceAll]) + '''';
+end;
 
 class function TStringUtils.StartsWith(const theString, value : string; const IgnoreCase : boolean) : boolean;
 begin

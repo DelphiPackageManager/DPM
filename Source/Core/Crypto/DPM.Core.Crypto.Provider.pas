@@ -79,6 +79,28 @@ type
 
 implementation
 
+const
+  cCRYPT_ACQUIRE_CACHE_FLAG = $00000001;
+  cCRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG = $00010000;
+  cCRYPT_E_NO_KEY_PROPERTY = DWORD($8009200B);
+
+//A PFX imported with PKCS12_NO_PERSIST_KEY has no key container to open - just the handle cached on the
+//certificate context (CERT_KEY_CONTEXT_PROP_ID), which the context owns. Ask for that only when there is
+//nothing else, so a certificate store or token key is acquired as it always was.
+function AcquireCertificateKey(const certificate : ICertificate; out keyHandle : HCRYPTPROV_OR_NCRYPT_KEY_HANDLE;
+                               out keySpec : DWORD; out callerMustFree : boolean) : boolean;
+var
+  freeProv : BOOL;
+begin
+  freeProv := false;
+  result := CryptAcquireCertificatePrivateKey(certificate.GetContext, cCRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG, nil,
+    keyHandle, keySpec, freeProv);
+  if (not result) and (GetLastError = cCRYPT_E_NO_KEY_PROPERTY) then
+    result := CryptAcquireCertificatePrivateKey(certificate.GetContext, cCRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG or cCRYPT_ACQUIRE_CACHE_FLAG,
+      nil, keyHandle, keySpec, freeProv);
+  callerMustFree := result and freeProv;
+end;
+
 { TCertStoreSigningProvider }
 
 constructor TCertStoreSigningProvider.Create(const cert : ICertificate);
@@ -125,11 +147,6 @@ end;
 function TCertStoreSigningProvider.AcquirePrivateKey(out keyHandle : HCRYPTPROV_OR_NCRYPT_KEY_HANDLE;
                                                     out keySpec : DWORD;
                                                     out callerMustFree : boolean) : boolean;
-var
-  freeProv : BOOL;
-const
-  cCRYPT_ACQUIRE_PREFER_NCRYPT_KEY_FLAG = $00040000;
-  cCRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG  = $00010000;
 begin
   keyHandle := 0;
   keySpec := 0;
@@ -146,24 +163,10 @@ begin
     exit;
   end;
 
-  result := CryptAcquireCertificatePrivateKey(
-    FCertificate.GetContext,
-    cCRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG,
-    nil,
-    keyHandle,
-    keySpec,
-    freeProv);
-  if not result then
-    exit;
-
-  callerMustFree := freeProv;
+  result := AcquireCertificateKey(FCertificate, keyHandle, keySpec, callerMustFree);
 end;
 
 procedure TCertStoreSigningProvider.BeginSession;
-var
-  freeProv : BOOL;
-const
-  cCRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG = $00010000;
 begin
   if FSessionActive then
     exit;
@@ -171,17 +174,10 @@ begin
   // (typically) caches the PIN here. Any CryptSignMessage / SignDigest calls
   // made during the session re-acquire against the same already-open card
   // session, so the PIN is not re-prompted.
-  if not CryptAcquireCertificatePrivateKey(
-       FCertificate.GetContext,
-       cCRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG,
-       nil,
-       FSessionHandle,
-       FSessionKeySpec,
-       freeProv) then
+  if not AcquireCertificateKey(FCertificate, FSessionHandle, FSessionKeySpec, FSessionNeedsFree) then
     raise ECryptoProvider.CreateFmt(
       'BeginSession: CryptAcquireCertificatePrivateKey failed (error %d)',
       [GetLastError]);
-  FSessionNeedsFree := freeProv;
   FSessionActive := true;
 end;
 

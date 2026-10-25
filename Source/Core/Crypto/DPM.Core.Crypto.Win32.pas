@@ -347,6 +347,7 @@ const
 
   // szOID constants
   szOID_PKIX_KP_CODE_SIGNING : AnsiString = '1.3.6.1.5.5.7.3.3';
+  szOID_PKIX_KP_TIMESTAMP_SIGNING : AnsiString = '1.3.6.1.5.5.7.3.8';
   szOID_RSA_RSA              : AnsiString = '1.2.840.113549.1.1.1';
   // id-ecPublicKey — the SubjectPublicKeyInfo algorithm OID for any ECDSA
   // certificate. The actual curve is identified by the algorithm's parameters
@@ -417,6 +418,12 @@ const
   CERT_TRUST_IS_UNTRUSTED_ROOT                     = $00000020;
   CERT_TRUST_REVOCATION_STATUS_UNKNOWN             = $00000040;
   CERT_TRUST_IS_PARTIAL_CHAIN                      = $00010000;
+  CERT_TRUST_IS_OFFLINE_REVOCATION                 = $01000000;
+
+  // CERT_CHAIN_POLICY_PARA.dwFlags
+  CERT_CHAIN_POLICY_ALLOW_UNKNOWN_CA_FLAG          = $00000010;
+  // end, CTL signer, CA and root "revocation unknown" combined
+  CERT_CHAIN_POLICY_IGNORE_ALL_REV_UNKNOWN_FLAGS   = $00000F00;
 
   // CryptMsg control codes
   CMSG_CTRL_ADD_SIGNER_UNAUTH_ATTR = 8;
@@ -614,6 +621,7 @@ function CertEnumCertificatesInStore(hCertStore : HCERTSTORE;
 function CertDuplicateCertificateContext(pCertContext : PCCERT_CONTEXT) : PCCERT_CONTEXT; stdcall; external cCrypt32;
 
 function CertFreeCertificateContext(pCertContext : PCCERT_CONTEXT) : BOOL; stdcall; external cCrypt32;
+function CertGetPublicKeyLength(dwCertEncodingType : DWORD; pPublicKey : PCERT_PUBLIC_KEY_INFO) : DWORD; stdcall; external cCrypt32;
 
 function CertCreateCertificateContext(dwCertEncodingType : DWORD;
                                       pbCertEncoded : PByte;

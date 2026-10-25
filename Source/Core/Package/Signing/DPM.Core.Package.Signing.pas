@@ -107,8 +107,10 @@ type
     // sigInfo invalid if the binding is declared but doesn't resolve. Soft-
     // warns (does not fail) when the binding attribute is absent, to allow
     // older gallery versions to keep working until they catch up.
+    // Author signatures are picked by their decoded role (V-18 - never by blob file
+    // name), and signatures[k] must be the verified result for blobs[k].
     procedure EnforceAuthorSigBinding(const blobs : IList<TPair<string, TBytes>>;
-                                       const earlierSignatures : TArray<TSignatureInfo>;
+                                       const signatures : TArray<TSignatureInfo>;
                                        var repoSigInfo : TSignatureInfo);
     // Inverse of EnforceAuthorSigBinding. Attestation declares no verified
     // author (authorMode = never_author_signed / author_acknowledged_unsigned)
@@ -119,7 +121,7 @@ type
     // is out of sync with the archive. Both cases must refuse the package:
     // an unverified author sig in the same archive as a "no signer" repo
     // attestation is exactly the bait-and-switch we're trying to detect.
-    procedure EnforceUnsignedAttestation(const blobs : IList<TPair<string, TBytes>>;
+    procedure EnforceUnsignedAttestation(const signatures : TArray<TSignatureInfo>;
                                           var repoSigInfo : TSignatureInfo);
     // Strip a single OCTET STRING (tag 04) or UTF8String (tag 0C) wrapper
     // from `value`, returning its content bytes. If the bytes don't look
@@ -133,15 +135,6 @@ type
     // returning *something* parseable so the KV walker can spot a malformed
     // payload and the binding-enforcement security check can still run.
     function Utf8BytesToStringSafe(const bytes : TBytes) : string;
-    // Phase 2: central truth table that turns (mode, hasAuthor, hasRepo)
-    // into the verification outcome. Pulled out so the same function is
-    // exhaustively covered by tests.
-    procedure EvaluateRequirements(const policy : TTrustPolicy;
-                                    hasAnySignature : boolean;
-                                    hasValidAuthor : boolean;
-                                    hasValidTrustedRepo : boolean;
-                                    var outcome : TVerificationOutcome;
-                                    var reason : string);
   protected
     procedure SignPackage(const packageFilePath : string;
                           const provider : ISigningProvider;
@@ -153,6 +146,8 @@ type
                            const flags : TVerifyFlags) : TVerificationResult; overload;
     function QuickRecheck(const cacheFolder : string;
                           const policy : TTrustPolicy) : boolean;
+    function VerifyExtractedFiles(const packageFolder : string;
+                                  out mismatched : TArray<string>) : boolean;
   public
     constructor Create(const logger : ILogger;
                        const hashing : IHashingService;
@@ -614,6 +609,26 @@ begin
   end;
 end;
 
+//Why a signing key is too weak to accept - '' when it is fine. RSA keys need the profile's
+//minimum size, ECDSA keys a NIST curve (P-256 / P-384 / P-521).
+function SignerKeyProblem(const cert : ICertificate) : string;
+var
+  bits : integer;
+begin
+  result := '';
+  bits := cert.PublicKeyBits;
+  case cert.PublicKeyType of
+    cktRsa :
+      if bits < TAlgorithmProfile.MinRsaKeyBits then
+        result := Format('the signing certificate''s RSA key is %d bits - at least %d are required', [bits, TAlgorithmProfile.MinRsaKeyBits]);
+    cktEcdsa :
+      if (bits <> 256) and (bits <> 384) and (bits <> 521) then
+        result := Format('the signing certificate''s ECDSA key is on an unsupported curve (%d bits)', [bits]);
+  else
+    result := 'the signing certificate''s key type is not supported (RSA or ECDSA only)';
+  end;
+end;
+
 function TPackageSigningService.VerifyOneSignature(const der : TBytes; const manifestBytes : TBytes;
                                                     out info : TSignatureInfo) : boolean;
 var
@@ -624,16 +639,18 @@ var
   roleBytes : TBytes;
   roleText : string;
   tsToken : TBytes;
-  tsSigningTime : TDateTime;
+  tsCheck : TTimestampCheck;
   embedded : TArray<ICertificate>;
   intermediates : array of ICertificate;
   i : integer;
   embeddedSigner : ICertificate;
+  untrustedRoot : boolean;
 begin
   result := false;
   FillChar(info, SizeOf(info), 0);
   info.Role := srAuthor;
   info.Valid := false;
+  try
 
   // V-15: detached CMS signature verifies against the manifest bytes.
   if not FCms.VerifyDetached(der, manifestBytes, signerCert) then
@@ -643,7 +660,8 @@ begin
     // signature is invalid. Without this, the verify output shows empty
     // Signer / Thumbprint / SPKI and a user staring at "INVALID" has no way
     // to know which cert produced the bad signature (and therefore which
-    // batch / signer to re-run).
+    // batch / signer to re-run). (The finally below moves it to the Claimed
+    // fields - nothing vouches for it.)
     try
       decoded := FCms.Decode(der);
       if decoded <> nil then
@@ -700,26 +718,46 @@ begin
   info.Thumbprint := signerCert.Thumbprint;
   info.SignerSpkiHex := BytesToHex(signerCert.SpkiHash(haSha256));
 
-  // V-17: RFC3161 timestamp — establish effective signing time
-  if decoded.FindUnsignedAttribute(szOID_RFC3161_counterSign, tsToken) then
+  // V-16: the algorithm profile governs what we accept, not only what we sign with -
+  // CryptoAPI still verifies SHA-1 signatures and small RSA keys.
+  if not TAlgorithmProfile.CmsDigestAllowed(decoded.DigestAlgorithm) then
   begin
-    // The imprint covers the signer's encryptedDigest — the same bytes we
-    // signed at pack time. Adding the unsigned attribute does not change
-    // encryptedDigest, so the round-trip matches.
-    if FTimestamper.Verify(tsToken, decoded.EncryptedDigest, haSha256,
-        tsSigningTime) then
-      info.EffectiveSigningTime := tsSigningTime
-    else
-    begin
-      info.FailureReason := 'RFC3161 timestamp verification failed';
-      exit;
-    end;
-  end
-  else
+    info.FailureReason := 'the signature''s digest algorithm is not allowed (SHA-256, SHA-384 or SHA-512 only)';
+    exit;
+  end;
+  if not TAlgorithmProfile.SignatureAlgorithmAllowed(decoded.SignatureAlgorithmOid) then
+  begin
+    info.FailureReason := Format('the signature algorithm [%s] is not allowed', [decoded.SignatureAlgorithmOid]);
+    exit;
+  end;
+  info.FailureReason := SignerKeyProblem(signerCert);
+  if info.FailureReason <> '' then
+    exit;
+
+  // V-17: RFC3161 timestamp — establish effective signing time
+  if not decoded.FindUnsignedAttribute(szOID_RFC3161_counterSign, tsToken) then
   begin
     info.FailureReason := 'signature has no RFC3161 timestamp';
     exit;
   end;
+  // The imprint covers the signer's encryptedDigest — the same bytes we
+  // signed at pack time. Adding the unsigned attribute does not change
+  // encryptedDigest, so the round-trip matches.
+  if not FTimestamper.Verify(tsToken, decoded.EncryptedDigest, not FActiveFlags.Offline, tsCheck) then
+  begin
+    info.FailureReason := 'RFC3161 timestamp : ' + tsCheck.FailureReason;
+    exit;
+  end;
+  info.TimestampAuthority := tsCheck.Authority;
+  // A timestamp authority this machine doesn't trust (typically an out of date root
+  // store) can't vouch for the signing time - a self-made, backdated timestamp would
+  // otherwise extend an expired certificate. Validate as of now instead, so a currently
+  // valid certificate still installs.
+  info.TimestampAuthorityUntrusted := not tsCheck.AuthorityTrusted;
+  if info.TimestampAuthorityUntrusted then
+    info.EffectiveSigningTime := TTimeZone.Local.ToUniversalTime(Now)
+  else
+    info.EffectiveSigningTime := tsCheck.SigningTime;
 
   // Repository signatures are authenticated by SPKI pinning against the
   // trust set — NOT chain validation. Per docs/package-signing.md
@@ -765,19 +803,24 @@ begin
   // rather than failing the verify.
   chainResult := chain.BuildAtTime(signerCert, intermediates,
     info.EffectiveSigningTime, not FActiveFlags.Offline);
-  if chainResult <> crValid then
+  // A chain that is sound but ends at a root this machine doesn't trust (a self-signed or
+  // private-CA certificate, as private feeds use) is a valid signature from a signer that
+  // isn't trusted - trustedPublishers decides. Anything else wrong with the chain fails it.
+  untrustedRoot := (chainResult = crUntrustedRoot) and chain.EndsOnlyAtUntrustedRoot;
+  if (chainResult <> crValid) and (not untrustedRoot) then
   begin
     info.FailureReason := Format('chain build: %s', [chain.LastErrorMessage]);
     exit;
   end;
-  chainResult := chain.VerifyForCodeSigning(info.EffectiveSigningTime);
+  chainResult := chain.VerifyForCodeSigning(info.EffectiveSigningTime, untrustedRoot);
   if chainResult <> crValid then
   begin
     info.FailureReason := Format('chain verify: %s', [chain.LastErrorMessage]);
     exit;
   end;
 
-  info.ChainTrusted := true;
+  info.ChainTrusted := not untrustedRoot;
+  info.UntrustedRoot := untrustedRoot;
   info.Revocation := chain.RevocationStatus;
 
   // V-26 follow-up — second chain build at "now" (no pTime) to detect a
@@ -798,6 +841,17 @@ begin
 
   info.Valid := true;
   result := true;
+
+  finally
+    //only a signature that verified vouches for who made it.
+    if not info.Valid then
+    begin
+      info.ClaimedSignerSpkiHex := info.SignerSpkiHex;
+      info.ClaimedSubject := info.SignerSubject;
+      info.SignerSpkiHex := '';
+      info.SignerSubject := '';
+    end;
+  end;
 end;
 
 function TPackageSigningService.UnwrapOctetString(const value : TBytes) : TBytes;
@@ -1006,11 +1060,10 @@ end;
 
 procedure TPackageSigningService.EnforceAuthorSigBinding(
   const blobs : IList<TPair<string, TBytes>>;
-  const earlierSignatures : TArray<TSignatureInfo>;
+  const signatures : TArray<TSignatureInfo>;
   var repoSigInfo : TSignatureInfo);
 var
   h, k : integer;
-  name : string;
   blobHashHex : string;
   boundHash : string;
   matchedThisHash : boolean;
@@ -1045,22 +1098,18 @@ begin
     matchedThisHash := false;
     for k := 0 to blobs.Count - 1 do
     begin
-      name := LowerCase(StringReplace(blobs[k].Key, '\', '/', [rfReplaceAll]));
-      if not StartsText('signatures/author-', name) then
+      if (k >= Length(signatures)) or (signatures[k].Role <> srAuthor) then
         Continue;
       blobHashHex := BytesToHex(FHashing.HashBytes(blobs[k].Value, haSha256));
       if not SameText(blobHashHex, boundHash) then
         Continue;
       matchedThisHash := true;
-      // earlierSignatures is populated in the same iteration order as blobs.
-      // Author sigs sort before repo sigs (author-N.p7s < repository-N.p7s
-      // alphabetically), so the SPKI for any matched author has already
-      // been recorded by the time we reach the repo sig.
-      if (k < Length(earlierSignatures)) and
-         (earlierSignatures[k].SignerSpkiHex <> '') then
+      // Every signature was verified before this check runs, whatever order the
+      // blobs are in. Only a signature that verified vouches for its signer.
+      if signatures[k].Valid and (signatures[k].SignerSpkiHex <> '') then
       begin
         SetLength(matchedSpkis, Length(matchedSpkis) + 1);
-        matchedSpkis[High(matchedSpkis)] := earlierSignatures[k].SignerSpkiHex;
+        matchedSpkis[High(matchedSpkis)] := signatures[k].SignerSpkiHex;
       end;
       Break;
     end;
@@ -1103,21 +1152,19 @@ begin
 end;
 
 procedure TPackageSigningService.EnforceUnsignedAttestation(
-  const blobs : IList<TPair<string, TBytes>>;
+  const signatures : TArray<TSignatureInfo>;
   var repoSigInfo : TSignatureInfo);
 var
   k : integer;
-  name : string;
   authorBlobCount : integer;
   modeLabel : string;
 begin
+  //by decoded role (V-18). A blob that didn't decode far enough to carry a role counts
+  //as an author signature - failing closed.
   authorBlobCount := 0;
-  for k := 0 to blobs.Count - 1 do
-  begin
-    name := LowerCase(StringReplace(blobs[k].Key, '\', '/', [rfReplaceAll]));
-    if StartsText('signatures/author-', name) and EndsText('.p7s', name) then
+  for k := 0 to High(signatures) do
+    if signatures[k].Role <> srRepository then
       Inc(authorBlobCount);
-  end;
   if authorBlobCount = 0 then
     exit;
 
@@ -1136,17 +1183,6 @@ begin
     'author signature was added, swapped, or the gallery''s attestation is ' +
     'out of date.',
     [modeLabel, authorBlobCount]);
-end;
-
-procedure TPackageSigningService.EvaluateRequirements(const policy : TTrustPolicy;
-                                                       hasAnySignature : boolean;
-                                                       hasValidAuthor : boolean;
-                                                       hasValidTrustedRepo : boolean;
-                                                       var outcome : TVerificationOutcome;
-                                                       var reason : string);
-begin
-  TTrustModeEvaluator.Evaluate(policy, hasAnySignature, hasValidAuthor,
-                               hasValidTrustedRepo, outcome, reason);
 end;
 
 function TPackageSigningService.VerifyPackage(const packageFilePath : string;
@@ -1171,9 +1207,6 @@ var
   blobs : IList<TPair<string, TBytes>>;
   i : integer;
   sigInfo : TSignatureInfo;
-  hasValidAuthor : boolean;
-  hasAnySignature : boolean;
-  hasValidTrustedRepo : boolean;
 begin
   FillChar(result, SizeOf(result), 0);
   result.Outcome := voInvalid;
@@ -1182,6 +1215,8 @@ begin
   // Strings need explicit init after FillChar.
   result.ManifestHashHex := '';
   result.Reason := '';
+  result.ManifestPackageId := '';
+  result.ManifestVersion := '';
   result.PolicyFingerprint := FTrustPolicy.PolicyFingerprint(policy);
 
   // 1. archive-format rules
@@ -1202,12 +1237,20 @@ begin
   try
     manifest := FManifest.Parse(manifestBytes);
   except
+    on e : EManifestFormatNotSupported do
+    begin
+      result.FormatNotSupported := true;
+      result.Reason := e.Message;
+      exit;
+    end;
     on e : Exception do
     begin
       result.Reason := 'Manifest parse failed: ' + e.Message;
       exit;
     end;
   end;
+  result.ManifestPackageId := manifest.PackageId;
+  result.ManifestVersion := manifest.Version;
   result.ManifestHashAlgorithm := haSha256;
   result.ManifestHashHex := BytesToHex(FHashing.HashBytes(manifestBytes, haSha256));
 
@@ -1228,9 +1271,6 @@ begin
     result.Reason := 'Failed to enumerate signatures/';
     exit;
   end;
-  hasAnySignature := blobs.Count > 0;
-  hasValidAuthor := false;
-  hasValidTrustedRepo := false;
 
   SetLength(result.Signatures, blobs.Count);
   for i := 0 to blobs.Count - 1 do
@@ -1246,10 +1286,10 @@ begin
     end;
 
     if sigInfo.Role = srAuthor then
-      sigInfo.PublisherTrusted := FTrustPolicy.PublisherTrusted(policy, sigInfo.SignerSpkiHex)
+      sigInfo.PublisherTrusted := sigInfo.Valid and FTrustPolicy.PublisherTrusted(policy, sigInfo.SignerSpkiHex)
     else
     begin
-      sigInfo.RepositoryTrusted := FTrustPolicy.RepositoryTrusted(policy, sigInfo.SignerSpkiHex);
+      sigInfo.RepositoryTrusted := sigInfo.Valid and FTrustPolicy.RepositoryTrusted(policy, sigInfo.SignerSpkiHex);
       // V-21: only read the attestation off a trusted repository signature.
       // An attestation present on an untrusted repo signature is ignored
       // entirely — never read, never displayed.
@@ -1286,27 +1326,6 @@ begin
             '— gallery did not declare the registered publisher for this ' +
             'package, so the author<->repo binding cannot be verified';
         end;
-        // Enforce the author-sig binding when the attestation declares a
-        // signed publisher. Without this check, an attacker could strip the
-        // author signature (or swap it for one from a different cert) and
-        // the package would still verify — the attestation only proves the
-        // gallery *said* "publisher X signed this", not that the author sig
-        // actually present is from X.
-        if sigInfo.Valid
-           and sigInfo.Attestation.Present
-           and (sigInfo.Attestation.AuthorSpkiHex <> '') then
-          EnforceAuthorSigBinding(blobs, result.Signatures, sigInfo);
-
-        // Inverse: gallery says "no verified author" but archive carries an
-        // author-N.p7s blob. The verifier from §Client verification contract
-        // requires this case to fail — otherwise an attacker could ship an
-        // unverified author sig under an attestation that doesn't bind it,
-        // and a downstream IDE rendering "Signed by …" off the author cert
-        // would mislead the user.
-        if sigInfo.Valid
-           and sigInfo.Attestation.Present
-           and (sigInfo.Attestation.AuthorSpkiHex = '') then
-          EnforceUnsignedAttestation(blobs, sigInfo);
       end;
     end;
 
@@ -1323,14 +1342,34 @@ begin
     end;
 
     result.Signatures[i] := sigInfo;
-    if sigInfo.Valid and (sigInfo.Role = srAuthor) then
-      hasValidAuthor := true;
-    if sigInfo.Valid and (sigInfo.Role = srRepository) and sigInfo.RepositoryTrusted then
-      hasValidTrustedRepo := true;
   end;
 
-  EvaluateRequirements(policy, hasAnySignature, hasValidAuthor, hasValidTrustedRepo,
-                       result.Outcome, result.Reason);
+  // 5. The trusted repository attestation's author binding. This runs once every
+  // signature has been verified on its own, so it doesn't depend on the order the
+  // blobs appear in the archive.
+  for i := 0 to High(result.Signatures) do
+  begin
+    sigInfo := result.Signatures[i];
+    if (sigInfo.Role <> srRepository) or (not sigInfo.Valid) or (not sigInfo.RepositoryTrusted) or
+       (not sigInfo.Attestation.Present) then
+      Continue;
+    // The attestation declares a signed publisher : the author signature actually
+    // present must be bound and be from that key. Without this an attacker could
+    // strip the author signature, or swap it for one from a different certificate,
+    // and the package would still verify - the attestation only proves the gallery
+    // *said* "publisher X signed this".
+    if sigInfo.Attestation.AuthorSpkiHex <> '' then
+      EnforceAuthorSigBinding(blobs, result.Signatures, sigInfo)
+    else
+      // Inverse: the gallery says "no verified author" but the archive carries an
+      // author signature. An unverified author signature under an attestation that
+      // doesn't bind it would let an IDE show "Signed by ..." off a certificate the
+      // gallery never vouched for.
+      EnforceUnsignedAttestation(result.Signatures, sigInfo);
+    result.Signatures[i] := sigInfo;
+  end;
+
+  TTrustModeEvaluator.Evaluate(policy, TTrustModeEvaluator.GatherFacts(result.Signatures), result.Outcome, result.Reason);
 end;
 
 function TPackageSigningService.QuickRecheck(const cacheFolder : string;
@@ -1341,6 +1380,7 @@ var
   manifestBytes : TBytes;
   recomputedHash : string;
   policyFingerprint : string;
+  i : integer;
 begin
   result := false;
   if not FReceipt.TryRead(cacheFolder, receipt) then
@@ -1350,12 +1390,72 @@ begin
   if not SameText(policyFingerprint, receipt.TrustPolicyFingerprint) then
     exit;   // policy changed; force full re-verify
 
+  // A receipt that records a signature which failed was written under the old rules, which
+  // installed such packages anyway. A failed signature now fails the package, so verify it again
+  // rather than trust that decision.
+  for i := 0 to High(receipt.Signatures) do
+    if receipt.Signatures[i].FailureReason <> '' then
+      exit;
+
   manifestPath := IncludeTrailingPathDelimiter(cacheFolder) + cManifestFileName;
   if not FileExists(manifestPath) then
     exit;
   manifestBytes := TFile.ReadAllBytes(manifestPath);
   recomputedHash := BytesToHex(FHashing.HashBytes(manifestBytes, haSha256));
   result := SameText(recomputedHash, receipt.ManifestHashHex);
+end;
+
+function TPackageSigningService.VerifyExtractedFiles(const packageFolder : string;
+                                                     out mismatched : TArray<string>) : boolean;
+var
+  manifestPath : string;
+  manifest : IPackageManifest;
+  entries : TArray<TManifestFileEntry>;
+  i : integer;
+  count : integer;
+  fileName : string;
+  matches : boolean;
+  actualHash : TBytes;
+begin
+  SetLength(mismatched, 0);
+  result := false;
+  manifestPath := IncludeTrailingPathDelimiter(packageFolder) + cManifestFileName;
+  if not FileExists(manifestPath) then
+    exit;
+  try
+    manifest := FManifest.Parse(TFile.ReadAllBytes(manifestPath));
+  except
+    exit;
+  end;
+
+  entries := manifest.Files;
+  SetLength(mismatched, Length(entries));
+  count := 0;
+  for i := 0 to High(entries) do
+  begin
+    fileName := IncludeTrailingPathDelimiter(packageFolder) + StringReplace(entries[i].Path, '/', '\', [rfReplaceAll]);
+    matches := FileExists(fileName);
+    //DPM patches a package's project files in the cache before building them (missing configs and
+    //platforms), so only their presence can be checked. They are scanned for build hooks before every
+    //compile regardless.
+    if matches and (not SameText(ExtractFileExt(fileName), '.dproj')) then
+    begin
+      matches := TFileUtils.GetSize(fileName) = entries[i].Size;
+      if matches then
+      begin
+        actualHash := FHashing.HashFile(fileName, manifest.HashAlgorithm);
+        matches := (Length(actualHash) = Length(entries[i].Hash)) and
+                   ((Length(actualHash) = 0) or CompareMem(@actualHash[0], @entries[i].Hash[0], Length(actualHash)));
+      end;
+    end;
+    if not matches then
+    begin
+      mismatched[count] := entries[i].Path;
+      Inc(count);
+    end;
+  end;
+  SetLength(mismatched, count);
+  result := count = 0;
 end;
 
 end.

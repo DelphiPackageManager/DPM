@@ -95,6 +95,11 @@ type
     function NotBefore : TDateTime;                   // UTC
     function NotAfter : TDateTime;                    // UTC
     function HasCodeSigningEku : boolean;
+    /// <summary>
+    /// True when the extended key usage extension lists oid. A certificate with no EKU
+    /// extension is valid for any usage : true then, unless requirePresent.
+    /// </summary>
+    function HasEku(const oid : AnsiString; requirePresent : boolean) : boolean;
     function RawDerBytes : TBytes;
     /// <summary>
     /// Public-key algorithm carried by the cert's SubjectPublicKeyInfo.
@@ -103,6 +108,11 @@ type
     /// curve-size matching applies.
     /// </summary>
     function PublicKeyType : TCertKeyType;
+    /// <summary>
+    /// Size of the public key in bits - the modulus for RSA, the curve for ECDSA
+    /// (256 / 384 / 521). 0 when it can't be determined.
+    /// </summary>
+    function PublicKeyBits : integer;
     /// <summary>
     /// Natural digest pairing for this cert's key. RSA is permissive — any
     /// of SHA-256/384/512 work — and we return SHA-256 as the sensible
@@ -125,6 +135,11 @@ type
     ['{6B2A7C20-04B6-43FB-A0F1-2C57F6B0E11C}']
     function FindByThumbprint(const thumbprint : string) : ICertificate;
     function FindBySpki(const spkiHash : TBytes; algorithm : THashAlgorithm) : ICertificate;
+    /// <summary>
+    /// The first certificate whose private key the store holds - in a PFX, the signing certificate
+    /// (the others are its chain). nil when there is none.
+    /// </summary>
+    function FirstWithPrivateKey : ICertificate;
     function GetHandle : HCERTSTORE;
   end;
 
@@ -143,7 +158,28 @@ type
                          const additionalCerts : array of ICertificate;
                          asOfTime : TDateTime;
                          checkRevocation : boolean) : TChainResult;
-    function VerifyForCodeSigning(asOfTime : TDateTime) : TChainResult;
+    /// <summary>
+    /// BuildAtTime for a usage other than code signing - e.g. a timestamp authority's
+    /// certificate (szOID_PKIX_KP_TIMESTAMP_SIGNING).
+    /// </summary>
+    function BuildAtTimeForUsage(const cert : ICertificate;
+                                 const additionalCerts : array of ICertificate;
+                                 asOfTime : TDateTime;
+                                 checkRevocation : boolean;
+                                 const usageOid : AnsiString) : TChainResult;
+    /// <summary>
+    /// The base chain policy over the last built chain, plus the leaf's validity at asOfTime.
+    /// With allowUntrustedRoot the chain may end at a root that isn't trusted on this
+    /// machine (a self-signed or private-CA certificate) - every other check still applies.
+    /// </summary>
+    function VerifyForCodeSigning(asOfTime : TDateTime; allowUntrustedRoot : boolean = false) : TChainResult;
+    /// <summary>
+    /// True when the last built chain's only fault is that it ends at a root this machine
+    /// doesn't trust - a complete chain, every certificate valid, correctly signed and fit
+    /// for the requested usage, nothing revoked. Revocation that couldn't be checked is
+    /// tolerated, since private CAs often publish no revocation list.
+    /// </summary>
+    function EndsOnlyAtUntrustedRoot : boolean;
     function ChainCertificates : TArray<ICertificate>;  // leaf first, root last
     function RootCertificate : ICertificate;
     function LastErrorMessage : string;

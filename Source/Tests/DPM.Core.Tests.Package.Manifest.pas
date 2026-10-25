@@ -63,6 +63,14 @@ type
     procedure Parse_RejectsDuplicatePathInFiles;
     [Test]
     procedure Parse_AcceptsEmptyFilesArray;
+    [Test]
+    [TestCase('NewerPackageFormat', '2,1')]
+    [TestCase('NewerManifestSchema', '1,2')]
+    procedure Parse_RejectsNewerFormat(const packageFormat : integer; const schemaVersion : integer);
+    [Test]
+    [TestCase('PackageFormatZero', '0,1')]
+    [TestCase('ManifestSchemaZero', '1,0')]
+    procedure Parse_RejectsFormatBelowOne(const packageFormat : integer; const schemaVersion : integer);
 
     [Test]
     procedure Generate_HashAlgorithmRoundTrip_Sha384;
@@ -94,6 +102,7 @@ uses
   System.Classes,
   System.IOUtils,
   System.Zip,
+  DPM.Core.Diagnostics,
   DPM.Core.Crypto.Algorithms,
   DPM.Core.Crypto.Hashing.Interfaces,
   DPM.Core.Crypto.Hashing,
@@ -384,6 +393,42 @@ begin
   service := MakeManifestService;
   Assert.WillRaise(
     procedure begin service.Parse(TEncoding.UTF8.GetBytes(cBad)); end,
+    EManifestParse);
+end;
+
+function ManifestWithFormat(const packageFormat : integer; const schemaVersion : integer) : TBytes;
+begin
+  result := TEncoding.UTF8.GetBytes(Format('{ "dpmPackageFormat": %d, "manifestSchemaVersion": %d, "packageId": "X",' +
+    ' "version": "1.0.0", "hashAlgorithm": "SHA256", "files": [] }', [packageFormat, schemaVersion]));
+end;
+
+procedure TManifestTests.Parse_RejectsNewerFormat(const packageFormat : integer; const schemaVersion : integer);
+var
+  service : IManifestService;
+  raised : boolean;
+begin
+  //V-5: a newer format may carry something this client can't check - it needs a newer DPM (E7109).
+  service := MakeManifestService;
+  raised := false;
+  try
+    service.Parse(ManifestWithFormat(packageFormat, schemaVersion));
+  except
+    on e : EManifestFormatNotSupported do
+    begin
+      raised := true;
+      Assert.AreEqual(Ord(TErrorCode.E7109_PackageFormatNotSupported), Ord(e.Code));
+    end;
+  end;
+  Assert.IsTrue(raised, 'a newer format was accepted');
+end;
+
+procedure TManifestTests.Parse_RejectsFormatBelowOne(const packageFormat : integer; const schemaVersion : integer);
+var
+  service : IManifestService;
+begin
+  service := MakeManifestService;
+  Assert.WillRaise(
+    procedure begin service.Parse(ManifestWithFormat(packageFormat, schemaVersion)); end,
     EManifestParse);
 end;
 

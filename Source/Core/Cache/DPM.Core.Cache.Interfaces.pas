@@ -166,7 +166,27 @@ type
     property PackagesFolder : string read GetPackagesFolder;
   end;
 
+/// <summary>
+/// True when packageFolder holds a git registry package - cloned and built in place, so it
+/// is consumed as source and has no .dpkg or receipt to re-check. A package extracted from a
+/// .dpkg always gets a verification receipt, so the git marker only counts without one : an
+/// archive can't carry the marker (archive validation rejects it), but an extraction made
+/// before that check existed could.
+/// </summary>
+function IsGitRegistryPackageFolder(const packageFolder : string) : boolean;
+
 implementation
+
+uses
+  System.SysUtils,
+  DPM.Core.Constants,
+  DPM.Core.Package.Cache.Receipt;
+
+function IsGitRegistryPackageFolder(const packageFolder : string) : boolean;
+begin
+  result := FileExists(IncludeTrailingPathDelimiter(packageFolder) + cGitPackageMarkerFile) and
+            (not FileExists(IncludeTrailingPathDelimiter(packageFolder) + cReceiptFileName));
+end;
 
 end.
 

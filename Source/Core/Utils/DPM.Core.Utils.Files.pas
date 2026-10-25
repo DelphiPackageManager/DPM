@@ -28,23 +28,110 @@ unit DPM.Core.Utils.Files;
 
 interface
 
+uses
+  WinApi.Windows,
+  System.SysUtils;
+
 type
   TFileUtils = class
   public
     //TODO : Improve this!!
     class function AreSameFiles(const fileA, fileB : string ) : boolean;
+    //True when the two version resources carry the same file version (major.minor.release.build).
+    class function SameFileVersion(const versionA, versionB : TVSFixedFileInfo) : boolean;
     class function GetSize(const path : string) : Int64;
+
+    //A unique temporary file name in the same folder as fileName - a rename from it onto fileName
+    //stays on one volume, which is what makes TryReplaceFile atomic.
+    class function TempFileNameFor(const fileName : string) : string;
+    //Swaps sourceFile over targetFile in a single MoveFileEx call (no delete-then-rename gap, so a
+    //reader sees either the old file or the new one, never a truncated one). Retries briefly on the
+    //transient sharing/lock violations AV scanners and the search indexer cause on a just-written file.
+    class function TryReplaceFile(const sourceFile : string; const targetFile : string; out lastError : Cardinal) : boolean;
+    //Writes to a temporary file next to fileName and atomically swaps it in. On failure the original
+    //file is left untouched, the temporary file is removed and an EInOutError is raised.
+    class procedure AtomicWriteAllText(const fileName : string; const contents : string; const encoding : TEncoding);
+    class procedure AtomicWriteAllBytes(const fileName : string; const bytes : TBytes);
   end;
 
 
 implementation
 
 uses
-  WinApi.Windows,
-  System.IOUtils,
-  System.SysUtils;
+  System.IOUtils;
 
 { TFileUtils }
+
+class function TFileUtils.SameFileVersion(const versionA, versionB : TVSFixedFileInfo) : boolean;
+begin
+  result := (versionA.dwFileVersionMS = versionB.dwFileVersionMS) and
+            (versionA.dwFileVersionLS = versionB.dwFileVersionLS);
+end;
+
+class function TFileUtils.TempFileNameFor(const fileName : string) : string;
+var
+  guid : TGUID;
+begin
+  CreateGUID(guid);
+  result := fileName + '.tmp-' + Copy(GUIDToString(guid), 2, 36);
+end;
+
+class function TFileUtils.TryReplaceFile(const sourceFile : string; const targetFile : string; out lastError : Cardinal) : boolean;
+const
+  cReplaceMaxAttempts = 10;
+  cReplaceRetryDelayMs = 25;
+var
+  attempt : integer;
+begin
+  lastError := 0;
+  attempt := 0;
+  while not MoveFileEx(PChar(sourceFile), PChar(targetFile), MOVEFILE_REPLACE_EXISTING or MOVEFILE_WRITE_THROUGH) do
+  begin
+    lastError := GetLastError;
+    Inc(attempt);
+    if (attempt >= cReplaceMaxAttempts) or
+       ((lastError <> ERROR_SHARING_VIOLATION) and
+        (lastError <> ERROR_ACCESS_DENIED) and
+        (lastError <> ERROR_LOCK_VIOLATION)) then
+      exit(false);
+    Sleep(cReplaceRetryDelayMs);
+  end;
+  result := true;
+end;
+
+class procedure TFileUtils.AtomicWriteAllBytes(const fileName : string; const bytes : TBytes);
+var
+  tempFile : string;
+  lastError : Cardinal;
+begin
+  tempFile := TempFileNameFor(fileName);
+  try
+    TFile.WriteAllBytes(tempFile, bytes);
+    if not TryReplaceFile(tempFile, fileName, lastError) then
+      raise EInOutError.CreateFmt('Unable to replace [%s] : %s', [fileName, SysErrorMessage(lastError)]);
+  except
+    if FileExists(tempFile) then
+      System.SysUtils.DeleteFile(tempFile);
+    raise;
+  end;
+end;
+
+class procedure TFileUtils.AtomicWriteAllText(const fileName : string; const contents : string; const encoding : TEncoding);
+var
+  tempFile : string;
+  lastError : Cardinal;
+begin
+  tempFile := TempFileNameFor(fileName);
+  try
+    TFile.WriteAllText(tempFile, contents, encoding);
+    if not TryReplaceFile(tempFile, fileName, lastError) then
+      raise EInOutError.CreateFmt('Unable to replace [%s] : %s', [fileName, SysErrorMessage(lastError)]);
+  except
+    if FileExists(tempFile) then
+      System.SysUtils.DeleteFile(tempFile);
+    raise;
+  end;
+end;
 
 class function TFileUtils.GetSize(const path : string) : Int64;
 var
@@ -113,23 +200,7 @@ begin
     if not VerQueryValue(PVerInfoB, '\', Pointer(PVerValueB), dummy) then
       exit;
 
-    //major
-    if HiWord(PVerValueA.dwFileVersionMS) <> HiWord(PVerValueA.dwFileVersionMS) then
-      exit;
-
-    //minor
-    if LoWord(PVerValueA.dwFileVersionMS) <> LoWord(PVerValueA.dwFileVersionMS) then
-      exit;
-
-    //release
-    if HiWord(PVerValueA.dwFileVersionLS) <> HiWord(PVerValueA.dwFileVersionLS) then
-      exit;
-
-    //build
-    if LoWord(PVerValueA.dwFileVersionLS) <> LoWord(PVerValueA.dwFileVersionLS) then
-      exit;
-
-    exit(true);
+    exit(SameFileVersion(PVerValueA^, PVerValueB^));
   end;
 
   //if we get here, the file sizes match but there is no version info, so we cannot be sure.

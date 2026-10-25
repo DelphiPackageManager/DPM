@@ -4,7 +4,9 @@ interface
 
 uses
   System.SysUtils,
+  DPM.Core.Logging,
   DPM.Core.Cache.Interfaces,
+  TestLogger,
   DUnitX.TestFramework;
 
 type
@@ -18,8 +20,15 @@ type
     FCacheRoot : string;
     FPackageFileName : string;
     FPackageFolder : string;
+    //the last cache's logger - FLoggerRef keeps it alive.
+    FLogger : TTestLogger;
+    FLoggerRef : ILogger;
+    //what the fake verifier says the signed manifest declares.
+    FManifestPackageId : string;
+    FManifestVersion : string;
+    FFormatNotSupported : boolean;
     function MakeCache(const fingerprint : string) : IPackageCache;
-    procedure WriteTestPackage(const fileName : string);
+    procedure WriteTestPackage(const fileName : string; const specVersion : string = '1.2.3'; const specCompiler : string = '12.0');
     procedure WriteText(const path : string; const text : string);
     procedure WriteBuildOutput;
     procedure AssertBuildOutputKept;
@@ -36,6 +45,24 @@ type
     procedure FullReVerify_ReExtractsWhenExtractedManifestAltered;
     [Test]
     procedure FullReVerify_ReExtractsWhenReceiptMissing;
+    [Test]
+    procedure FullReVerify_RestoresModifiedFileAndKeepsBuildOutput;
+    [Test]
+    procedure InstallPackageFromFile_OnlyFullReVerifyChecksEveryFile;
+    [Test]
+    procedure GitMarker_CountsOnlyWithoutAReceipt;
+    [Test]
+    procedure InstallPackageFromFile_ManifestOfAnotherVersion_FailsAndRemovesFile;
+    [Test]
+    procedure InstallPackageFromFile_ManifestOfAnotherPackage_Fails;
+    [Test]
+    procedure InstallPackageFromFile_ManifestVersionMetadataIsIgnored;
+    [Test]
+    procedure InstallPackageFromFile_DspecOfAnotherVersion_FailsAndRemovesExtraction;
+    [Test]
+    procedure InstallPackageFromFile_DspecForAnotherCompiler_Fails;
+    [Test]
+    procedure InstallPackageFromFile_NewerFormat_IsE7109;
   end;
 
 implementation
@@ -46,8 +73,7 @@ uses
   System.Zip,
   VSoft.CancellationToken,
   VSoft.CancellationToken.Impl,
-  TestLogger,
-  DPM.Core.Logging,
+  DPM.Core.Diagnostics,
   DPM.Core.Constants,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Reader,
@@ -63,6 +89,8 @@ uses
 const
   cTestPackageFile = 'Sample.Pkg-delphi12.0-0000000000000011-1.2.3.dpkg';
   cTestSourceFile = 'Source' + PathDelim + 'Sample.Unit.pas';
+  cTestSourceEntry = 'Source/Sample.Unit.pas';
+  cTestSourceContent = 'unit Sample.Unit;' + sLineBreak + 'interface' + sLineBreak + 'implementation' + sLineBreak + 'end.';
 
 type
   //Trust policy whose fingerprint the test controls - a changed fingerprint is how a trust policy
@@ -80,10 +108,14 @@ type
   end;
 
   //Stands in for the real verifier: every package verifies as unsigned, carrying the hash of the
-  //manifest inside the .dpkg - the same value the real service puts in the result and the receipt.
+  //manifest inside the .dpkg - the same value the real service puts in the result and the receipt -
+  //and the identity the test says the manifest declares.
   TFakeSigningService = class(TInterfacedObject, IPackageSigningService)
   private
     FTrustPolicy : ITrustPolicyService;
+    FManifestPackageId : string;
+    FManifestVersion : string;
+    FFormatNotSupported : boolean;
   protected
     procedure SignPackage(const packageFilePath : string;
                           const provider : ISigningProvider;
@@ -95,8 +127,12 @@ type
                            const flags : TVerifyFlags) : TVerificationResult; overload;
     function QuickRecheck(const cacheFolder : string;
                           const policy : TTrustPolicy) : boolean;
+    //the test package's only source file must be there with its original content.
+    function VerifyExtractedFiles(const packageFolder : string;
+                                  out mismatched : TArray<string>) : boolean;
   public
-    constructor Create(const trustPolicy : ITrustPolicyService);
+    constructor Create(const trustPolicy : ITrustPolicyService; const manifestPackageId : string; const manifestVersion : string;
+                       const formatNotSupported : boolean);
   end;
 
 { TFakeTrustPolicy }
@@ -134,10 +170,14 @@ end;
 
 { TFakeSigningService }
 
-constructor TFakeSigningService.Create(const trustPolicy : ITrustPolicyService);
+constructor TFakeSigningService.Create(const trustPolicy : ITrustPolicyService; const manifestPackageId : string; const manifestVersion : string;
+                                       const formatNotSupported : boolean);
 begin
   inherited Create;
   FTrustPolicy := trustPolicy;
+  FManifestPackageId := manifestPackageId;
+  FManifestVersion := manifestVersion;
+  FFormatNotSupported := formatNotSupported;
 end;
 
 procedure TFakeSigningService.SignPackage(const packageFilePath : string;
@@ -173,6 +213,14 @@ begin
   result.Reason := '';
   result.Mode := policy.ValidationMode;
   result.PolicyFingerprint := FTrustPolicy.PolicyFingerprint(policy);
+  result.ManifestPackageId := FManifestPackageId;
+  result.ManifestVersion := FManifestVersion;
+  result.FormatNotSupported := FFormatNotSupported;
+  if FFormatNotSupported then
+  begin
+    result.Outcome := voInvalid;
+    result.Reason := 'The package is in a newer format than this version of DPM supports.';
+  end;
 end;
 
 function TFakeSigningService.VerifyPackage(const packageFilePath : string;
@@ -188,6 +236,21 @@ begin
   result := false;
 end;
 
+function TFakeSigningService.VerifyExtractedFiles(const packageFolder : string;
+                                                  out mismatched : TArray<string>) : boolean;
+var
+  fileName : string;
+begin
+  SetLength(mismatched, 0);
+  fileName := TPath.Combine(packageFolder, cTestSourceFile);
+  result := FileExists(fileName) and (TFile.ReadAllText(fileName) = cTestSourceContent);
+  if not result then
+  begin
+    SetLength(mismatched, 1);
+    mismatched[0] := cTestSourceEntry;
+  end;
+end;
+
 { TPackageCacheVerifyTests }
 
 procedure TPackageCacheVerifyTests.Setup;
@@ -200,6 +263,9 @@ begin
   //{cache}\delphi12.0\Sample.Pkg\ holds the .dpkg, 1.2.3\ beside it is the extraction.
   FPackageFileName := TPath.Combine(FCacheRoot, 'delphi12.0' + PathDelim + 'Sample.Pkg' + PathDelim + cTestPackageFile);
   FPackageFolder := TPath.Combine(FCacheRoot, 'delphi12.0' + PathDelim + 'Sample.Pkg' + PathDelim + '1.2.3');
+  FManifestPackageId := 'Sample.Pkg';
+  FManifestVersion := '1.2.3';
+  FFormatNotSupported := false;
   WriteTestPackage(FPackageFileName);
 end;
 
@@ -219,27 +285,45 @@ var
 begin
   //hold each dep in an interface local first: constructing an interfaced object directly in a
   //parameter position can leak in Delphi. No trust state - the TOFU ratchets aren't under test.
-  logger := TTestLogger.Create;
+  FLogger := TTestLogger.Create;
+  FLoggerRef := FLogger;
+  logger := FLoggerRef;
   specReader := TPackageSpecReader.Create(logger);
   trustPolicy := TFakeTrustPolicy.Create(fingerprint);
-  signingService := TFakeSigningService.Create(trustPolicy);
+  signingService := TFakeSigningService.Create(trustPolicy, FManifestPackageId, FManifestVersion, FFormatNotSupported);
   receiptService := TYamlReceiptService.Create;
   result := TPackageCache.Create(logger, specReader, signingService, trustPolicy, receiptService, nil, nil);
   result.Location := FCacheRoot;
 end;
 
-procedure TPackageCacheVerifyTests.WriteTestPackage(const fileName : string);
+procedure TPackageCacheVerifyTests.WriteTestPackage(const fileName : string; const specVersion : string; const specCompiler : string);
 var
   zip : TZipFile;
+  spec : string;
 begin
   ForceDirectories(ExtractFilePath(fileName));
+  spec :=
+    'metadata:' + sLineBreak +
+    '  id: Sample.Pkg' + sLineBreak +
+    '  version: ' + specVersion + sLineBreak +
+    '  description: cache verify test package' + sLineBreak +
+    '  authors:' + sLineBreak +
+    '    - DPM' + sLineBreak +
+    '  license: Apache-2.0' + sLineBreak +
+    'targetPlatforms:' + sLineBreak +
+    '  - compiler: ' + specCompiler + sLineBreak +
+    '    platforms: [Win32]' + sLineBreak +
+    '    template: default' + sLineBreak +
+    'templates:' + sLineBreak +
+    '  - name: default' + sLineBreak +
+    '    source:' + sLineBreak +
+    '      - src: Source\*.pas' + sLineBreak;
   zip := TZipFile.Create;
   try
     zip.Open(fileName, zmWrite);
     zip.Add(TEncoding.UTF8.GetBytes('{"files":[]}'), cManifestFileName);
-    zip.Add(TEncoding.UTF8.GetBytes('metadata:' + sLineBreak + '  id: Sample.Pkg' + sLineBreak), cPackageDspecFile);
-    zip.Add(TEncoding.UTF8.GetBytes('unit Sample.Unit;' + sLineBreak + 'interface' + sLineBreak + 'implementation' + sLineBreak + 'end.'),
-            'Source/Sample.Unit.pas');
+    zip.Add(TEncoding.UTF8.GetBytes(spec), cPackageDspecFile);
+    zip.Add(TEncoding.UTF8.GetBytes(cTestSourceContent), cTestSourceEntry);
     zip.Close;
   finally
     zip.Free;
@@ -341,6 +425,130 @@ begin
   Assert.AreEqual(0, failures, 'the .dpkg itself is valid');
   Assert.IsTrue(FileExists(TPath.Combine(FPackageFolder, cTestSourceFile)),
                 'an extraction without a receipt is incomplete and should be replaced from the .dpkg');
+end;
+
+procedure TPackageCacheVerifyTests.FullReVerify_RestoresModifiedFileAndKeepsBuildOutput;
+var
+  cache : IPackageCache;
+  failures : integer;
+begin
+  cache := MakeCache('policy-a');
+  Assert.IsTrue(cache.InstallPackageFromFile(FPackageFileName), 'precondition: the package installs into the cache');
+  WriteBuildOutput;
+  //edited while debugging with "use source", say.
+  WriteText(TPath.Combine(FPackageFolder, cTestSourceFile), 'unit Sample.Unit; //edited');
+
+  failures := cache.FullReVerify(TCancellationTokenSourceFactory.Create.Token);
+
+  Assert.AreEqual(0, failures, 'the package is valid once its file is restored');
+  Assert.AreEqual(cTestSourceContent, TFile.ReadAllText(TPath.Combine(FPackageFolder, cTestSourceFile)),
+                  'the modified file should be restored from the .dpkg');
+  AssertBuildOutputKept;
+  Assert.IsTrue(FLogger.HasWarning(TWarningCode.W3018_CacheExtractionRepaired), 'restoring files should be reported');
+end;
+
+procedure TPackageCacheVerifyTests.InstallPackageFromFile_OnlyFullReVerifyChecksEveryFile;
+var
+  cache : IPackageCache;
+begin
+  //hashing every file on every cache hit would make each restore pay for it - that is cache verify's job.
+  cache := MakeCache('policy-a');
+  Assert.IsTrue(cache.InstallPackageFromFile(FPackageFileName), 'precondition: the package installs into the cache');
+  WriteText(TPath.Combine(FPackageFolder, cTestSourceFile), 'unit Sample.Unit; //edited');
+
+  Assert.IsTrue(cache.InstallPackageFromFile(FPackageFileName));
+
+  Assert.AreEqual('unit Sample.Unit; //edited', TFile.ReadAllText(TPath.Combine(FPackageFolder, cTestSourceFile)));
+  Assert.IsFalse(FLogger.HasWarning(TWarningCode.W3018_CacheExtractionRepaired));
+end;
+
+procedure TPackageCacheVerifyTests.GitMarker_CountsOnlyWithoutAReceipt;
+var
+  cache : IPackageCache;
+begin
+  cache := MakeCache('policy-a');
+  Assert.IsTrue(cache.InstallPackageFromFile(FPackageFileName), 'precondition: the package installs into the cache');
+  Assert.IsFalse(IsGitRegistryPackageFolder(FPackageFolder), 'no marker');
+
+  //a marker in an extraction from a .dpkg (which always has a receipt) must not turn off its re-checks.
+  WriteText(TPath.Combine(FPackageFolder, cGitPackageMarkerFile), 'abc');
+  Assert.IsFalse(IsGitRegistryPackageFolder(FPackageFolder), 'marker beside a receipt');
+
+  DeleteFile(TPath.Combine(FPackageFolder, cReceiptFileName));
+  Assert.IsTrue(IsGitRegistryPackageFolder(FPackageFolder), 'marker without a receipt - a git registry install');
+end;
+
+procedure TPackageCacheVerifyTests.InstallPackageFromFile_ManifestOfAnotherVersion_FailsAndRemovesFile;
+var
+  cache : IPackageCache;
+begin
+  //a validly signed 1.2.2 renamed to stand in for 1.2.3 - the signatures vouch for the manifest, not the name.
+  FManifestVersion := '1.2.2';
+  cache := MakeCache('policy-a');
+  Assert.IsFalse(cache.InstallPackageFromFile(FPackageFileName));
+  Assert.IsTrue(FLogger.HasError(TErrorCode.E7012_PackageIdentityMismatch), FLogger.Messages.Text);
+  Assert.AreEqual(1, FLoggerRef.ErrorCount, FLogger.Messages.Text);
+  Assert.IsFalse(FileExists(FPackageFileName), 'the misnamed package was left in the cache');
+  Assert.IsFalse(FileExists(TPath.Combine(FPackageFolder, cPackageDspecFile)), 'the misnamed package was extracted');
+end;
+
+procedure TPackageCacheVerifyTests.InstallPackageFromFile_ManifestOfAnotherPackage_Fails;
+var
+  cache : IPackageCache;
+begin
+  FManifestPackageId := 'Other.Pkg';
+  cache := MakeCache('policy-a');
+  Assert.IsFalse(cache.InstallPackageFromFile(FPackageFileName));
+  Assert.IsTrue(FLogger.HasError(TErrorCode.E7012_PackageIdentityMismatch), FLogger.Messages.Text);
+end;
+
+procedure TPackageCacheVerifyTests.InstallPackageFromFile_ManifestVersionMetadataIsIgnored;
+var
+  cache : IPackageCache;
+begin
+  //build metadata isn't part of a version's identity; neither is the id's case.
+  FManifestPackageId := 'sample.pkg';
+  FManifestVersion := '1.2.3+build.7';
+  cache := MakeCache('policy-a');
+  Assert.IsTrue(cache.InstallPackageFromFile(FPackageFileName), FLogger.Messages.Text);
+  Assert.AreEqual(0, FLoggerRef.ErrorCount, FLogger.Messages.Text);
+end;
+
+procedure TPackageCacheVerifyTests.InstallPackageFromFile_DspecOfAnotherVersion_FailsAndRemovesExtraction;
+var
+  cache : IPackageCache;
+begin
+  //the dspec is what the rest of DPM reads - its dependencies above all.
+  WriteTestPackage(FPackageFileName, '9.9.9');
+  cache := MakeCache('policy-a');
+  Assert.IsFalse(cache.InstallPackageFromFile(FPackageFileName));
+  Assert.IsTrue(FLogger.HasError(TErrorCode.E7012_PackageIdentityMismatch), FLogger.Messages.Text);
+  Assert.AreEqual(1, FLoggerRef.ErrorCount, FLogger.Messages.Text);
+  Assert.IsFalse(FileExists(FPackageFileName), 'the misnamed package was left in the cache');
+  Assert.IsFalse(DirectoryExists(FPackageFolder), 'the misnamed package''s extraction was left in the cache');
+end;
+
+procedure TPackageCacheVerifyTests.InstallPackageFromFile_DspecForAnotherCompiler_Fails;
+var
+  cache : IPackageCache;
+begin
+  WriteTestPackage(FPackageFileName, '1.2.3', '11.0');
+  cache := MakeCache('policy-a');
+  Assert.IsFalse(cache.InstallPackageFromFile(FPackageFileName));
+  Assert.IsTrue(FLogger.HasError(TErrorCode.E7012_PackageIdentityMismatch), FLogger.Messages.Text);
+  Assert.IsFalse(DirectoryExists(FPackageFolder), 'the misnamed package''s extraction was left in the cache');
+end;
+
+procedure TPackageCacheVerifyTests.InstallPackageFromFile_NewerFormat_IsE7109;
+var
+  cache : IPackageCache;
+begin
+  //the cause is an old client, not a bad package - say so, once.
+  FFormatNotSupported := true;
+  cache := MakeCache('policy-a');
+  Assert.IsFalse(cache.InstallPackageFromFile(FPackageFileName));
+  Assert.IsTrue(FLogger.HasError(TErrorCode.E7109_PackageFormatNotSupported), FLogger.Messages.Text);
+  Assert.AreEqual(1, FLoggerRef.ErrorCount, FLogger.Messages.Text);
 end;
 
 initialization

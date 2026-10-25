@@ -97,7 +97,8 @@ implementation
 
 uses
   System.IOUtils,
-  DPM.Core.Utils.DateTime;
+  DPM.Core.Utils.DateTime,
+  DPM.Core.Utils.Strings;
 
 function IsoUtc(value : TDateTime) : string;
 begin
@@ -105,14 +106,6 @@ begin
     result := ''
   else
     result := TDPMDateTimeUtils.DateToISO8601(value, True);
-end;
-
-// YAML single-quote a string. Doubles any embedded single quote. Quoting
-// every user-provided field prevents YAML from re-interpreting bare scalars
-// (e.g. "02" as integer 2, "no" as boolean false) on read.
-function YamlSQ(const value : string) : string;
-begin
-  result := '''' + StringReplace(value, '''', '''''', [rfReplaceAll]) + '''';
 end;
 
 function ParseIso(const value : string; out dt : TDateTime) : boolean;
@@ -152,12 +145,12 @@ begin
   try
     sb.AppendLine('---');
     sb.Append('dpmReceiptVersion: '); sb.AppendLine(IntToStr(receipt.ReceiptVersion));
-    sb.Append('packageId: '); sb.AppendLine(YamlSQ(receipt.PackageId));
-    sb.Append('version: '); sb.AppendLine(YamlSQ(receipt.Version));
-    sb.Append('compiler: '); sb.AppendLine(YamlSQ(receipt.Compiler));
+    sb.Append('packageId: '); sb.AppendLine(TStringUtils.YamlSingleQuote(receipt.PackageId));
+    sb.Append('version: '); sb.AppendLine(TStringUtils.YamlSingleQuote(receipt.Version));
+    sb.Append('compiler: '); sb.AppendLine(TStringUtils.YamlSingleQuote(receipt.Compiler));
     sb.Append('manifestHashAlgorithm: ');
-    sb.AppendLine(YamlSQ(TAlgorithmProfile.HashAlgorithmName(receipt.ManifestHashAlgorithm)));
-    sb.Append('manifestHash: '); sb.AppendLine(YamlSQ(receipt.ManifestHashHex));
+    sb.AppendLine(TStringUtils.YamlSingleQuote(TAlgorithmProfile.HashAlgorithmName(receipt.ManifestHashAlgorithm)));
+    sb.Append('manifestHash: '); sb.AppendLine(TStringUtils.YamlSingleQuote(receipt.ManifestHashHex));
 
     if Length(receipt.Signatures) = 0 then
       sb.AppendLine('signatures: []')
@@ -167,39 +160,39 @@ begin
       for i := 0 to High(receipt.Signatures) do
       begin
         sig := receipt.Signatures[i];
-        sb.Append('- role: '); sb.AppendLine(YamlSQ(sig.Role));
-        sb.Append('  signerSpki: '); sb.AppendLine(YamlSQ(sig.SignerSpkiHex));
-        sb.Append('  signerSubject: '); sb.AppendLine(YamlSQ(sig.SignerSubject));
+        sb.Append('- role: '); sb.AppendLine(TStringUtils.YamlSingleQuote(sig.Role));
+        sb.Append('  signerSpki: '); sb.AppendLine(TStringUtils.YamlSingleQuote(sig.SignerSpkiHex));
+        sb.Append('  signerSubject: '); sb.AppendLine(TStringUtils.YamlSingleQuote(sig.SignerSubject));
         // DIAGNOSTIC: only emitted when the signature failed to verify.
         if sig.FailureReason <> '' then
           begin
-            sb.Append('  failureReason: '); sb.AppendLine(YamlSQ(sig.FailureReason));
+            sb.Append('  failureReason: '); sb.AppendLine(TStringUtils.YamlSingleQuote(sig.FailureReason));
           end;
-        sb.Append('  thumbprint: '); sb.AppendLine(YamlSQ(sig.Thumbprint));
-        sb.Append('  effectiveSigningTime: '); sb.AppendLine(YamlSQ(IsoUtc(sig.EffectiveSigningTime)));
-        sb.Append('  timestampAuthority: '); sb.AppendLine(YamlSQ(sig.TimestampAuthority));
-        sb.Append('  revocationStatus: '); sb.AppendLine(YamlSQ(sig.RevocationStatus));
+        sb.Append('  thumbprint: '); sb.AppendLine(TStringUtils.YamlSingleQuote(sig.Thumbprint));
+        sb.Append('  effectiveSigningTime: '); sb.AppendLine(TStringUtils.YamlSingleQuote(IsoUtc(sig.EffectiveSigningTime)));
+        sb.Append('  timestampAuthority: '); sb.AppendLine(TStringUtils.YamlSingleQuote(sig.TimestampAuthority));
+        sb.Append('  revocationStatus: '); sb.AppendLine(TStringUtils.YamlSingleQuote(sig.RevocationStatus));
         // P2 §2.2 — attestation block is omitted entirely when not present
         // (i.e. for author signatures or untrusted-repo signatures).
         if sig.AttestationNamespace <> '' then
           begin
-            sb.Append('  attestationNamespace: '); sb.AppendLine(YamlSQ(sig.AttestationNamespace));
+            sb.Append('  attestationNamespace: '); sb.AppendLine(TStringUtils.YamlSingleQuote(sig.AttestationNamespace));
           end;
         if sig.AttestationAuthorSpkiHex <> '' then
           begin
-            sb.Append('  attestationAuthorSpki: '); sb.AppendLine(YamlSQ(sig.AttestationAuthorSpkiHex));
+            sb.Append('  attestationAuthorSpki: '); sb.AppendLine(TStringUtils.YamlSingleQuote(sig.AttestationAuthorSpkiHex));
           end;
         if sig.AttestationUnsignedReason <> '' then
           begin
-            sb.Append('  attestationUnsignedReason: '); sb.AppendLine(YamlSQ(sig.AttestationUnsignedReason));
+            sb.Append('  attestationUnsignedReason: '); sb.AppendLine(TStringUtils.YamlSingleQuote(sig.AttestationUnsignedReason));
           end;
       end;
     end;
 
-    sb.Append('trustDecision: '); sb.AppendLine(YamlSQ(receipt.TrustDecision));
-    sb.Append('trustPolicyFingerprint: '); sb.AppendLine(YamlSQ(receipt.TrustPolicyFingerprint));
-    sb.Append('verifiedAt: '); sb.AppendLine(YamlSQ(IsoUtc(receipt.VerifiedAt)));
-    sb.Append('dpmVersion: '); sb.AppendLine(YamlSQ(receipt.DpmVersion));
+    sb.Append('trustDecision: '); sb.AppendLine(TStringUtils.YamlSingleQuote(receipt.TrustDecision));
+    sb.Append('trustPolicyFingerprint: '); sb.AppendLine(TStringUtils.YamlSingleQuote(receipt.TrustPolicyFingerprint));
+    sb.Append('verifiedAt: '); sb.AppendLine(TStringUtils.YamlSingleQuote(IsoUtc(receipt.VerifiedAt)));
+    sb.Append('dpmVersion: '); sb.AppendLine(TStringUtils.YamlSingleQuote(receipt.DpmVersion));
 
     destPath := ReceiptPath(folder);
     tempPath := destPath + '.tmp';

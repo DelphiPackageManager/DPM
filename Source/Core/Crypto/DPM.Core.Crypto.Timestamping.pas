@@ -49,14 +49,30 @@ type
     function TsaCertificate : ICertificate;
   end;
 
+  TTimestampCheck = record
+    SigningTime : TDateTime;        // UTC, as the token states it
+    Authority : string;             // the timestamp authority certificate's subject
+    // The authority's certificate chain reaches a root this machine trusts. When it
+    // doesn't, nothing vouches for SigningTime and the caller must not rely on it.
+    AuthorityTrusted : boolean;
+    FailureReason : string;         // why the token was rejected - '' when it wasn't
+  end;
+
   ITimestamper = interface
     ['{6B3FAB2C-1B5E-4F4E-A6A1-3F9D8E70F02A}']
     function RequestTimestamp(const dataToTimestamp : TBytes;
                               const url : string;
                               digest : THashAlgorithm) : ITimestampToken;
+    /// <summary>
+    /// Verifies an RFC3161 token over data : the authority's signature and the message
+    /// imprint, a SHA-256 imprint, and an authority certificate issued for time stamping
+    /// whose chain is sound as of the timestamp. A chain whose only fault is a root this
+    /// machine doesn't trust (an out of date root store, say) is reported through
+    /// AuthorityTrusted rather than rejected. False - with FailureReason - otherwise.
+    /// </summary>
     function Verify(const token : TBytes; const data : TBytes;
-                    digest : THashAlgorithm;
-                    out signingTime : TDateTime) : boolean;
+                    checkRevocation : boolean;
+                    out check : TTimestampCheck) : boolean;
   end;
 
   TWindowsTimestamper = class(TInterfacedObject, ITimestamper)
@@ -67,8 +83,8 @@ type
                               const url : string;
                               digest : THashAlgorithm) : ITimestampToken;
     function Verify(const token : TBytes; const data : TBytes;
-                    digest : THashAlgorithm;
-                    out signingTime : TDateTime) : boolean;
+                    checkRevocation : boolean;
+                    out check : TTimestampCheck) : boolean;
   public
     constructor Create(const x509 : IX509Service);
   end;
@@ -204,31 +220,131 @@ begin
 end;
 
 function TWindowsTimestamper.Verify(const token : TBytes; const data : TBytes;
-                                    digest : THashAlgorithm;
-                                    out signingTime : TDateTime) : boolean;
+                                    checkRevocation : boolean;
+                                    out check : TTimestampCheck) : boolean;
 var
   ctx : PCRYPT_TIMESTAMP_CONTEXT;
-begin
-  signingTime := 0;
-  result := false;
-  if Length(token) = 0 then
-    exit;
-  ctx := nil;
-  // CryptVerifyTimeStampSignature does the heavy lifting — chain to TSA root,
-  // verify the message imprint matches the hashed input, return the parsed
-  // CRYPT_TIMESTAMP_INFO.
-  if not CryptVerifyTimeStampSignature(
-      PByte(@token[0]), Length(token),
-      PByte(@data[0]), Length(data),
-      nil,
-      ctx,
-      nil, nil) then
-    exit;
+  tsSigner : PCCERT_CONTEXT;
+  tsStore : HCERTSTORE;
+  hashOid : AnsiString;
+  hashAlg : THashAlgorithm;
+  tsaCert : ICertificate;
+  extras : array of ICertificate;
+  enumCtx : PCCERT_CONTEXT;
+  chain : ICertificateChain;
+  chainResult : TChainResult;
+  untrustedRoot : boolean;
 
+  function CertFromContext(const certContext : PCCERT_CONTEXT) : ICertificate;
+  var
+    der : TBytes;
+  begin
+    SetLength(der, certContext.cbCertEncoded);
+    if certContext.cbCertEncoded > 0 then
+      Move(certContext.pbCertEncoded^, der[0], certContext.cbCertEncoded);
+    result := FX509.LoadCertificateFromDer(der);
+  end;
+
+begin
+  check.SigningTime := 0;
+  check.Authority := '';
+  check.AuthorityTrusted := false;
+  check.FailureReason := '';
+  result := false;
+  if (Length(token) = 0) or (Length(data) = 0) then
+  begin
+    check.FailureReason := 'the timestamp token is empty';
+    exit;
+  end;
+  ctx := nil;
+  tsSigner := nil;
+  tsStore := nil;
   try
-    signingTime := FileTimeToUtc(ctx.pTimeStamp.ftTime);
+    // The token's own signature and its message imprint over data. This is the only
+    // parser of the token - a strict DER decoder rejects tokens Windows accepts, and
+    // the gallery has some.
+    if not CryptVerifyTimeStampSignature(
+        PByte(@token[0]), Length(token),
+        PByte(@data[0]), Length(data),
+        nil,
+        ctx,
+        @tsSigner, @tsStore) then
+    begin
+      check.FailureReason := 'the timestamp does not verify : ' + SysErrorMessage(GetLastError);
+      exit;
+    end;
+    check.SigningTime := FileTimeToUtc(ctx.pTimeStamp.ftTime);
+
+    hashOid := AnsiString(ctx.pTimeStamp.HashAlgorithm.pszObjId);
+    if hashOid = szOID_NIST_SHA256 then
+      hashAlg := haSha256
+    else if hashOid = szOID_NIST_SHA384 then
+      hashAlg := haSha384
+    else if hashOid = szOID_NIST_SHA512 then
+      hashAlg := haSha512
+    else
+      hashAlg := haUnknown;
+    if not TAlgorithmProfile.TimestampDigestAllowed(hashAlg) then
+    begin
+      check.FailureReason := Format('the timestamp''s digest algorithm [%s] is not allowed (SHA-256 only)', [string(hashOid)]);
+      exit;
+    end;
+
+    // Who issued it. Without this anyone could mint a token with any time in it - and a
+    // backdated time would make an expired signing certificate look valid.
+    if tsSigner = nil then
+    begin
+      check.FailureReason := 'the timestamp carries no signer certificate';
+      exit;
+    end;
+    tsaCert := CertFromContext(tsSigner);
+    check.Authority := tsaCert.SubjectDistinguishedName;
+    if not tsaCert.HasEku(szOID_PKIX_KP_TIMESTAMP_SIGNING, true) then
+    begin
+      check.FailureReason := 'the timestamp authority''s certificate is not issued for time stamping';
+      exit;
+    end;
+    if (tsaCert.PublicKeyType = cktRsa) and (tsaCert.PublicKeyBits < TAlgorithmProfile.MinRsaKeyBits) then
+    begin
+      check.FailureReason := Format('the timestamp authority''s RSA key is %d bits - at least %d are required',
+        [tsaCert.PublicKeyBits, TAlgorithmProfile.MinRsaKeyBits]);
+      exit;
+    end;
+
+    // the other certificates the token carries - the authority's intermediates.
+    SetLength(extras, 0);
+    if tsStore <> nil then
+    begin
+      enumCtx := CertEnumCertificatesInStore(tsStore, nil);
+      while enumCtx <> nil do
+      begin
+        SetLength(extras, Length(extras) + 1);
+        extras[High(extras)] := CertFromContext(enumCtx);
+        enumCtx := CertEnumCertificatesInStore(tsStore, enumCtx);
+      end;
+    end;
+
+    chain := FX509.CreateChain;
+    chainResult := chain.BuildAtTimeForUsage(tsaCert, extras, check.SigningTime, checkRevocation, szOID_PKIX_KP_TIMESTAMP_SIGNING);
+    untrustedRoot := (chainResult = crUntrustedRoot) and chain.EndsOnlyAtUntrustedRoot;
+    if (chainResult <> crValid) and (not untrustedRoot) then
+    begin
+      check.FailureReason := 'the timestamp authority''s certificate chain : ' + chain.LastErrorMessage;
+      exit;
+    end;
+    chainResult := chain.VerifyForCodeSigning(check.SigningTime, untrustedRoot);
+    if chainResult <> crValid then
+    begin
+      check.FailureReason := 'the timestamp authority''s certificate chain : ' + chain.LastErrorMessage;
+      exit;
+    end;
+    check.AuthorityTrusted := not untrustedRoot;
     result := true;
   finally
+    if tsSigner <> nil then
+      CertFreeCertificateContext(tsSigner);
+    if tsStore <> nil then
+      CertCloseStore(tsStore, 0);
     if ctx <> nil then
       CryptMemFree(ctx);
   end;

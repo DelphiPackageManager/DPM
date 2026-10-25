@@ -56,6 +56,12 @@ type
   //can't be restored at all.
   TRestoreGraphState = (rgsValid, rgsNeedsResolve, rgsInvalid);
 
+  //the manifest hash a project recorded for a package, and the version (no metadata) it was recorded for.
+  TRecordedLock = record
+    Version : string;
+    Hash : string;
+  end;
+
   ///<summary> One project's part in an install : what to apply to it, and what each phase produced.
   ///  Internal to TPackageInstaller. </summary>
   TProjectInstallWork = class
@@ -67,6 +73,7 @@ type
     FPackages : IList<IPackageInfo>;
     FGraph : IPackageReference;
     FResolved : IList<IPackageInfo>;
+    FLocks : IDictionary<string, TRecordedLock>;
   public
     constructor Create(const projectFile : string; const editor : IProjectEditor; const options : TInstallOptions; const platforms : TDPMPlatforms);
     destructor Destroy; override;
@@ -80,6 +87,8 @@ type
     //what resolving the project produced.
     property Graph : IPackageReference read FGraph write FGraph;
     property Resolved : IList<IPackageInfo> read FResolved write FResolved;
+    //the locks the project recorded for the packages it keeps (see CollectGraphLocks).
+    property Locks : IDictionary<string, TRecordedLock> read FLocks write FLocks;
   end;
 
   TPackageInstaller = class(TInterfacedObject, IPackageInstaller)
@@ -95,22 +104,15 @@ type
     FPackageGenerator : IPackageProjectGenerator;
     FProjectConfigPatcher : IProjectConfigPatcher;
     FInstallPlanner : IInstallPlanner;
-    // P2 §2.6 — populate each top-level reference's ManifestHash from the
-    // verification receipt the cache wrote during install. The editor writes
-    // this back to the .dproj as `manifestHash="sha256:..."`.
-    procedure PopulateManifestHashes(const graph : IPackageReference;
-                                      const compilerVersion : TCompilerVersion);
     // Recursively clears the ManifestHash lock on every node in the graph. Used on a detected
     // compiler upgrade (in-place dproj opened in a newer IDE) so the per-compiler locks recorded
     // under the old compiler are discarded rather than failing validation against the new build.
     procedure ClearManifestHashes(const graph : IPackageReference);
-    // Single-pass equivalent of ValidateLockedManifestHashes followed by
-    // PopulateManifestHashes - reads each receipt at most once. Validation still
-    // runs to completion and the refresh is only applied when validation passes,
-    // so the abort-before-any-write semantics of the two-call sequence are kept.
-    // The id of every package whose lock did not match is appended to mismatchedPackageIds
-    // so the caller can report them and skip loading their design-time BPLs without aborting
-    // the whole restore.
+    // P2 §2.6 — checks every locked node in the graph, transitive packages included, against the
+    // verification receipt the cache wrote for it, then (only when they all match) sets each node's
+    // ManifestHash from its receipt - the editor writes it to the .dproj as `manifestHash="sha256:..."`.
+    // Each receipt is read once. The id of every package whose lock did not match is appended to
+    // mismatchedPackageIds (when given) so the caller can skip loading its design-time BPLs.
     function ValidateAndPopulateManifestHashes(const graph : IPackageReference;
                                                const compilerVersion : TCompilerVersion;
                                                const ignoreLocks : boolean;
@@ -186,6 +188,12 @@ type
     //the resolver prefers these versions over picking the latest in-range alternative. The dict is
     //keyed by lowercase id to match the resolver's id-keyed lookups.
     function CollectGraphVersions(const fullGraph: IPackageReference): IDictionary<string, TPackageVersion>;
+
+    //The locks a project recorded, keyed by lowercase id - excludeIds (lowercase, may be nil) are left out.
+    //Re-resolving builds new nodes, so ApplyGraphLocks carries these over to the ones still at the version
+    //each was recorded for : without it a re-resolve dropped every lock and re-locked whatever the cache held.
+    function CollectGraphLocks(const graph : IPackageReference; const excludeIds : ISet<string>) : IDictionary<string, TRecordedLock>;
+    procedure ApplyGraphLocks(const graph : IPackageReference; const locks : IDictionary<string, TRecordedLock>);
 
     //Restore slow-path: iterate top-level packages and call ResolveForInstall for each, accumulating
     //resolved refs across iterations so shared transients are seen by later top-levels and not
@@ -344,6 +352,14 @@ uses
   DPM.Core.Package.InstallPlan,
   DPM.Core.Spec.Reader,
   DPM.Core.Package.InstallerContext;
+
+type
+  //what ValidateAndPopulateManifestHashes read from a package's receipt.
+  TReceiptLookup = record
+    FolderExists : boolean;
+    HaveReceipt : boolean;
+    ManifestHashHex : string;
+  end;
 
 { TPackageInstaller }
 
@@ -742,7 +758,7 @@ begin
     //location given by each source entry's src glob (dest is meaningless - there is
     //no copy step). Detect via the marker the in-place install writes into the cache
     //folder - robust even when SourceName is not carried on the resolved-graph package.
-    isGitSource := FileExists(IncludeTrailingPathDelimiter(FPackageCache.GetPackagePath(packageInfo)) + cGitPackageMarkerFile);
+    isGitSource := IsGitRegistryPackageFolder(FPackageCache.GetPackagePath(packageInfo));
 
     //A compiled package contributes its per-platform lib folder (dcu/dcp). This covers packages with
     //build entries AND design-only packages (no build entry - e.g. a combined runtime+design package
@@ -1374,30 +1390,6 @@ begin
   inherited;
 end;
 
-procedure TPackageInstaller.PopulateManifestHashes(const graph : IPackageReference;
-                                                    const compilerVersion : TCompilerVersion);
-var
-  node : IPackageReference;
-  packageFolder : string;
-  receipt : TVerificationReceipt;
-begin
-  if (graph = nil) or (FReceiptService = nil) or (FPackageCache = nil) then
-    exit;
-  for node in graph.Children do
-  begin
-    packageFolder := FPackageCache.GetPackagePath(node.Id, node.Version.ToStringNoMeta, compilerVersion);
-    if not DirectoryExists(packageFolder) then
-      Continue;
-    if FReceiptService.TryRead(packageFolder, receipt) and (receipt.ManifestHashHex <> '') then
-      node.ManifestHash := 'sha256:' + receipt.ManifestHashHex
-    else
-      // No receipt — legacy package. Clear any stale lock attribute rather
-      // than leave a wrong one in place; next install with the new tooling
-      // will populate it.
-      node.ManifestHash := '';
-  end;
-end;
-
 procedure TPackageInstaller.ClearManifestHashes(const graph : IPackageReference);
 var
   node : IPackageReference;
@@ -1418,84 +1410,86 @@ function TPackageInstaller.ValidateAndPopulateManifestHashes(const graph : IPack
                                                              const ignoreLocks : boolean;
                                                              const mismatchedPackageIds : IList<string>) : boolean;
 var
+  nodes : IList<IPackageReference>;
   node : IPackageReference;
+  key : string;
   packageFolder : string;
+  lookups : IDictionary<string, TReceiptLookup>;
+  lookup : TReceiptLookup;
   receipt : TVerificationReceipt;
-  expected, actual : string;
-  folderExists : boolean;
-  haveReceipt : boolean;
-  // refresh is staged so it is applied only after the whole graph validates - this preserves
-  // the original "ValidateLockedManifestHashes (abort on mismatch) then PopulateManifestHashes" order.
-  refreshNodes : IList<IPackageReference>;
-  refreshHashes : IList<string>;
-  i : integer;
+  reported : ISet<string>;
+  expected : string;
+  problem : string;
 begin
   result := true;
   if (graph = nil) or (FReceiptService = nil) or (FPackageCache = nil) then
     exit;
 
-  refreshNodes := TCollections.CreateList<IPackageReference>;
-  refreshHashes := TCollections.CreateList<string>;
+  //every node - the project records (and locks) its transitive packages too. A package a diamond reaches
+  //twice is one receipt and, with the same lock, one report.
+  nodes := TCollections.CreateList<IPackageReference>;
+  graph.VisitDFS(
+    procedure(const packageReference : IPackageReference)
+    begin
+      nodes.Add(packageReference);
+    end);
+  lookups := TCollections.CreateDictionary<string, TReceiptLookup>;
+  reported := TCollections.CreateSet<string>;
 
-  for node in graph.Children do
+  for node in nodes do
   begin
-    packageFolder := FPackageCache.GetPackagePath(node.Id, node.Version.ToStringNoMeta, compilerVersion);
-    folderExists := DirectoryExists(packageFolder);
-    haveReceipt := false;
-    if folderExists then
-      haveReceipt := FReceiptService.TryRead(packageFolder, receipt);   // read each receipt once
+    key := LowerCase(node.Id) + '|' + node.Version.ToStringNoMeta;
+    if not lookups.TryGetValue(key, lookup) then
+    begin
+      packageFolder := FPackageCache.GetPackagePath(node.Id, node.Version.ToStringNoMeta, compilerVersion);
+      lookup.FolderExists := DirectoryExists(packageFolder);
+      lookup.HaveReceipt := lookup.FolderExists and FReceiptService.TryRead(packageFolder, receipt);
+      if lookup.HaveReceipt then
+        lookup.ManifestHashHex := LowerCase(receipt.ManifestHashHex)
+      else
+        lookup.ManifestHashHex := '';
+      lookups[key] := lookup;
+    end;
 
-    // --- validation (mirrors ValidateLockedManifestHashes) ---
     // locked nodes whose folder is absent are skipped - the install path will produce them.
     // when ignoreLocks is set we skip validation entirely and just refresh the locks below.
-    if (node.ManifestHash <> '') and folderExists and (not ignoreLocks) then
-    begin
-      if not haveReceipt then
-      begin
-        FLogger.Error(TErrorCode.E3007_LockHashMismatch, Format(
-          'Lock hash mismatch for [%s %s] : the project pins %s but the package cache has no receipt for it.',
-          [node.Id, node.Version.ToStringNoMeta, node.ManifestHash]));
-        if mismatchedPackageIds <> nil then
-          mismatchedPackageIds.Add(node.Id);
-        result := false;
-      end
-      else
-      begin
-        expected := LowerCase(node.ManifestHash);
-        if (Length(expected) > 7) and (Copy(expected, 1, 7) = 'sha256:') then
-          expected := Copy(expected, 8, MaxInt);
-        actual := LowerCase(receipt.ManifestHashHex);
-        if expected <> actual then
-        begin
-          FLogger.Error(TErrorCode.E3007_LockHashMismatch, Format(
-            'Lock hash mismatch for [%s %s] : the project pins %s but the package cache has sha256:%s. ' +
-            'Edit the dproj''s PackageReference or remove the cached package to re-acquire it.',
-            [node.Id, node.Version.ToStringNoMeta, node.ManifestHash, actual]));
-          if mismatchedPackageIds <> nil then
-            mismatchedPackageIds.Add(node.Id);
-          result := false;
-        end;
-      end;
-    end;
+    if (node.ManifestHash = '') or (not lookup.FolderExists) or ignoreLocks then
+      Continue;
+    expected := LowerCase(node.ManifestHash);
+    if (Length(expected) > 7) and (Copy(expected, 1, 7) = 'sha256:') then
+      expected := Copy(expected, 8, MaxInt);
+    if lookup.HaveReceipt and (expected = lookup.ManifestHashHex) then
+      Continue;
 
-    // --- stage the refresh (mirrors PopulateManifestHashes) ---
-    // folder-absent nodes are left untouched, matching the original Continue.
-    if folderExists then
-    begin
-      refreshNodes.Add(node);
-      if haveReceipt and (receipt.ManifestHashHex <> '') then
-        refreshHashes.Add('sha256:' + receipt.ManifestHashHex)
-      else
-        refreshHashes.Add('');
-    end;
+    result := false;
+    if not reported.Add(key + '|' + expected) then
+      Continue;
+    if not lookup.HaveReceipt then
+      problem := 'the package cache has no receipt for it.'
+    else
+      problem := 'the package cache has sha256:' + lookup.ManifestHashHex + '. Edit the dproj''s PackageReference or remove the cached package to re-acquire it.';
+    FLogger.Error(TErrorCode.E3007_LockHashMismatch, Format('Lock hash mismatch for [%s %s] : the project pins %s but %s',
+      [node.Id, node.Version.ToStringNoMeta, node.ManifestHash, problem]));
+    if (mismatchedPackageIds <> nil) and (not mismatchedPackageIds.Contains(node.Id)) then
+      mismatchedPackageIds.Add(node.Id);
   end;
 
-  // gate: a lock mismatch aborts before any hash is written, exactly as the two-call flow did.
+  // a lock mismatch aborts before any hash is written.
   if not result then
     exit;
 
-  for i := 0 to refreshNodes.Count - 1 do
-    refreshNodes[i].ManifestHash := refreshHashes[i];
+  // folder-absent nodes are left untouched. A package without a receipt (a git registry install) or one
+  // that predates receipts gets no lock rather than a wrong one.
+  for node in nodes do
+  begin
+    lookup := lookups[LowerCase(node.Id) + '|' + node.Version.ToStringNoMeta];
+    if not lookup.FolderExists then
+      Continue;
+    if lookup.ManifestHashHex <> '' then
+      node.ManifestHash := 'sha256:' + lookup.ManifestHashHex
+    else
+      node.ManifestHash := '';
+  end;
 end;
 
 function TPackageInstaller.GetPackageInfo(const cancellationToken: ICancellationToken; const packageId: IPackageIdentity): IPackageInfo;
@@ -1792,6 +1786,7 @@ var
   graphState : TRestoreGraphState;
   preferredVersions : IDictionary<string, TPackageVersion>;
   topLevelGraph : IPackageReference;
+  locks : IDictionary<string, TRecordedLock>;
 begin
   result := false;
   resolvedPackages := TCollections.CreateList<IPackageInfo>;
@@ -1818,8 +1813,11 @@ begin
   //so the resolver re-uses those exact versions where they still satisfy the parent's range, and
   //only picks a new version for genuinely missing transients.
   preferredVersions := CollectGraphVersions(projectGraph);
+  locks := CollectGraphLocks(projectGraph, nil);
   topLevelGraph := BuildTopLevelOnlyGraph(projectGraph, options.CompilerVersion);
   result := RestoreUsingInstallResolver(cancellationToken, options, projectFile, topLevelGraph, preferredVersions, projectGraph, resolvedPackages);
+  if result then
+    ApplyGraphLocks(projectGraph, locks);
 end;
 
 //True for a package the user asked to install - force only rebuilds those, not their dependencies.
@@ -2738,6 +2736,9 @@ begin
   if projectGraph = nil then
     projectGraph := TPackageReference.CreateRoot(work.Options.CompilerVersion);
 
+  //The project's locks on the packages it keeps still apply - the packages being installed get new ones.
+  work.Locks := CollectGraphLocks(projectGraph, excludeIds);
+
   //The packages being installed replace any reference to them, top level or transitive, so they (and
   //anything only reachable through them) are left out of the references the resolver starts from.
   projectReferences := TCollections.CreateList<IPackageReference>;
@@ -2779,6 +2780,17 @@ begin
   if not PrepareProjectPackages(cancellationToken, work.ProjectFile, work.Graph, work.Resolved, packagesToConfigure, packageSpecs) then
     exit;
 
+  // P2 §2.6 — the packages are in the cache : what the project already pinned must be what is there before
+  // any of it is built (a build runs the package's own project), and the rest are locked to the receipts.
+  ApplyGraphLocks(work.Graph, work.Locks);
+  if not ValidateAndPopulateManifestHashes(work.Graph, work.Options.CompilerVersion, false, nil) then
+  begin
+    FLogger.Information('Nothing was built and [' + work.ProjectFile + '] was not changed - the package cache no longer holds what the ' +
+      'project pinned (see the errors above). Restore the project with --ignoreHashLocks (-ihl) to accept what the cache holds, ' +
+      'or remove the package from the cache to fetch it again.', true);
+    exit;
+  end;
+
   for platform in work.Platforms do
   begin
     if cancellationToken.IsCancelled then
@@ -2803,9 +2815,6 @@ begin
   //design components may not load.
   EnsureDesignHostPlatformCompiled(cancellationToken, work.Options, work.Graph, work.Platforms);
 
-  // P2 §2.6 — pull each cached package's manifest hash off its receipt
-  // and lock it onto the PackageReference before we write the dproj.
-  PopulateManifestHashes(work.Graph, work.Options.CompilerVersion);
   // Update package references once using the new platform-independent format
   work.Editor.UpdatePackageReferences(work.Graph);
   result := true;
@@ -2938,6 +2947,56 @@ begin
       end);
   end;
   result := collected;
+end;
+
+function TPackageInstaller.CollectGraphLocks(const graph : IPackageReference; const excludeIds : ISet<string>) : IDictionary<string, TRecordedLock>;
+var
+  collected : IDictionary<string, TRecordedLock>;
+  excluded : ISet<string>;
+begin
+  collected := TCollections.CreateDictionary<string, TRecordedLock>;
+  excluded := excludeIds;
+  if graph <> nil then
+    graph.VisitDFS(
+      procedure(const packageReference : IPackageReference)
+      var
+        key : string;
+        recorded : TRecordedLock;
+      begin
+        key := LowerCase(packageReference.Id);
+        if (packageReference.ManifestHash = '') or collected.ContainsKey(key) then
+          exit;
+        if (excluded <> nil) and excluded.Contains(key) then
+          exit;
+        recorded.Version := packageReference.Version.ToStringNoMeta;
+        recorded.Hash := packageReference.ManifestHash;
+        collected.Add(key, recorded);
+      end);
+  result := collected;
+end;
+
+procedure TPackageInstaller.ApplyGraphLocks(const graph : IPackageReference; const locks : IDictionary<string, TRecordedLock>);
+var
+  recordedLocks : IDictionary<string, TRecordedLock>;
+  moved : ISet<string>;
+begin
+  if (graph = nil) or (locks = nil) or (locks.Count = 0) then
+    exit;
+  recordedLocks := locks;
+  moved := TCollections.CreateSet<string>;
+  graph.VisitDFS(
+    procedure(const packageReference : IPackageReference)
+    var
+      recorded : TRecordedLock;
+    begin
+      if not recordedLocks.TryGetValue(LowerCase(packageReference.Id), recorded) then
+        exit;
+      if SameText(recorded.Version, packageReference.Version.ToStringNoMeta) then
+        packageReference.ManifestHash := recorded.Hash
+      else if moved.Add(LowerCase(packageReference.Id)) then
+        FLogger.Information(Format('[%s] is now %s rather than %s - its manifest hash is locked afresh from the package cache.',
+          [packageReference.Id, packageReference.Version.ToStringNoMeta, recorded.Version]));
+    end);
 end;
 
 function TPackageInstaller.RestoreUsingInstallResolver(const cancellationToken: ICancellationToken; const options: TRestoreOptions; const projectFile: string;
@@ -3300,6 +3359,43 @@ begin
   if not PrepareProjectPackages(cancellationToken, projectFile, finalGraph, resolvedPackages, packagesToConfigure, packageSpecs) then
     exit;
 
+  // The manifest hash lock is per-compiler. When a project is opened in a newer IDE (in-place
+  // dproj upgrade), the locks recorded under the old compiler cannot match the new compiler's
+  // packages - that is a legitimate upgrade, not tampering. Detect it via the <DPMCompiler>
+  // marker captured at load and clear the stale locks so they are simply re-established below
+  // rather than failing validation.
+  storedCompiler := projectEditor.DPMCompilerVersion;
+  if (storedCompiler <> TCompilerVersion.UnknownVersion) and (storedCompiler <> Options.compilerVersion) then
+  begin
+    FLogger.Information(Format(
+      'Project was last managed by DPM under [%s]; restoring under [%s] - ' +
+      'clearing stale manifest hash locks and re-locking for the new compiler.',
+      [CompilerToString(storedCompiler), CompilerToString(Options.compilerVersion)]), true);
+    ClearManifestHashes(finalGraph);
+  end;
+  // P2 §2.6 — the cached packages must be what the project pinned before any of them is built - a build
+  // runs the package's own project. Checked for the whole graph, transitive packages included, then the
+  // locks are refreshed from the receipts.
+  //
+  // A mismatch fails the restore and nothing is built or written - the recorded locks are kept, so it
+  // keeps failing until the user resolves it. The design-time BPLs already built for the packages that
+  // did validate are still loaded, so one mismatched package doesn't take every other package's design
+  // components out of the IDE. The mismatched packages are skipped - their cached content no longer
+  // matches what the project pinned.
+  mismatchedPackageIds := TCollections.CreateList<string>;
+  if not ValidateAndPopulateManifestHashes(finalGraph, Options.compilerVersion, Options.IgnoreHashLocks, mismatchedPackageIds) then
+  begin
+    FLogger.Information('One or more manifest hash locks did not match the cached packages (see the errors above). ' +
+      'Nothing was built and the project file was left unchanged. To resolve: reinstall ' +
+      'the affected package(s), delete them from the cache (' + FPackageCache.Location + ') and restore, or ' +
+      'restore with --ignoreHashLocks (-ihl) to refresh the recorded locks from the cache.', true);
+    packageSpecs := BuildPackageSpecsFromGraph(finalGraph, Options.compilerVersion);
+    for mismatchedId in mismatchedPackageIds do
+      packageSpecs.Remove(LowerCase(mismatchedId));
+    InstallDesignPackages(cancellationToken, projectFile, packageSpecs);
+    exit(false);
+  end;
+
   result := true;
   errorPlatforms := [];
   for platform in platforms do
@@ -3333,63 +3429,19 @@ begin
     exit;
   end;
 
-  // The manifest hash lock is per-compiler. When a project is opened in a newer IDE (in-place
-  // dproj upgrade), the locks recorded under the old compiler cannot match the new compiler's
-  // packages - that is a legitimate upgrade, not tampering. Detect it via the <DPMCompiler>
-  // marker captured at load and clear the stale locks so they are simply re-established below
-  // rather than failing validation.
-  storedCompiler := projectEditor.DPMCompilerVersion;
-  if (storedCompiler <> TCompilerVersion.UnknownVersion) and (storedCompiler <> Options.compilerVersion) then
-  begin
-    FLogger.Information(Format(
-      'Project was last managed by DPM under [%s]; restoring under [%s] - ' +
-      'clearing stale manifest hash locks and re-locking for the new compiler.',
-      [CompilerToString(storedCompiler), CompilerToString(Options.compilerVersion)]), true);
-    ClearManifestHashes(finalGraph);
-  end;
-  // P2 §2.6 — enforce existing PackageReference.ManifestHash lock values before we
-  // overwrite them, then refresh from the receipts. Merged into a single pass so each
-  // receipt is read only once.
-  //
-  // A lock mismatch is no longer a hard abort. Previously it failed the whole restore before
-  // any design-time BPLs were loaded, so a single mismatched package stopped every other
-  // package's design components from installing in the IDE. Now we report the problem (with
-  // resolution guidance), leave the dproj untouched (so the recorded locks are preserved and
-  // keep warning until the user resolves it), and still load the design-time BPLs for the
-  // packages that DID validate. The mismatched packages are skipped - we will not load BPLs
-  // whose cached content no longer matches what the project pinned. The restore result is
-  // still marked failed so the CLI exits non-zero and the IDE flags the problem.
-  mismatchedPackageIds := TCollections.CreateList<string>;
-  if ValidateAndPopulateManifestHashes(finalGraph, Options.compilerVersion, Options.IgnoreHashLocks, mismatchedPackageIds) then
-  begin
-    // Update package references once using the new platform-independent format
-    projectEditor.UpdatePackageReferences(finalGraph);
-    result := projectEditor.SaveProject();
-  end
-  else
-  begin
-    FLogger.Information('One or more manifest hash locks did not match the cached packages (see the errors above). ' +
-      'The project file was left unchanged and the affected package(s) were skipped. To resolve: reinstall ' +
-      'the affected package(s), delete them from the cache (' + FPackageCache.Location + ') and restore, or ' +
-      'restore with --ignoreHashLocks (-ihl) to refresh the recorded locks from the cache.', true);
-    result := false;
-  end;
+  // Update package references once using the new platform-independent format
+  projectEditor.UpdatePackageReferences(finalGraph);
+  result := projectEditor.SaveProject();
   //Load design-time packages once after all platforms are restored - design BPLs are per-IDE,
-  //not per-platform, so this runs at the project level. CLI context is a no-op. This runs even
-  //when a hash lock failed to validate (result is false) so one mismatched package does not block
-  //the rest - only SaveProject failures (disk errors) suppress it.
-  if result or (mismatchedPackageIds.Count > 0) then
+  //not per-platform, so this runs at the project level. CLI context is a no-op. A SaveProject
+  //failure (disk errors) suppresses it.
+  if result then
   begin
     //Make sure the IDE host platform's design BPL exists before we try to load it - the restore
     //loop above only built the project's target platforms. Non-fatal : the restore already
     //succeeded, and a failure here just means the design components may not load.
     EnsureDesignHostPlatformCompiled(cancellationToken, Options, finalGraph, platforms);
-    packageSpecs := BuildPackageSpecsFromGraph(finalGraph, Options.compilerVersion);
-    //Skip the design-time BPLs of any package whose lock did not validate - their cached content
-    //no longer matches what the project pinned, so loading them could load unexpected code.
-    for mismatchedId in mismatchedPackageIds do
-      packageSpecs.Remove(LowerCase(mismatchedId));
-    InstallDesignPackages(cancellationToken, projectFile, packageSpecs);
+    InstallDesignPackages(cancellationToken, projectFile, BuildPackageSpecsFromGraph(finalGraph, Options.compilerVersion));
   end;
 end;
 

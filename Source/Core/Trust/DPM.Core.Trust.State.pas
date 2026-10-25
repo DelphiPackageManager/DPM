@@ -30,8 +30,10 @@ unit DPM.Core.Trust.State;
 // highest assurance ever observed for the author dimension (Phase 1) — the
 // repository dimension is added in Phase 2.
 //
-// File: %APPDATA%\.dpm\trust-state.yaml. Atomic writes (temp + rename) so
-// a crash during update never leaves a half-written state file.
+// File: %APPDATA%\.dpm\trust-state.yaml. The CLI, the IDE and parallel builds share it, so every
+// change is made under a named mutex to a fresh read of the file - two processes recording
+// different packages both keep their records - and written atomically (temp + rename), so a crash
+// never leaves a half-written file. A file that can't be parsed is set aside, never overwritten.
 
 interface
 
@@ -42,19 +44,37 @@ uses
   System.SyncObjs,
   Spring.Collections,
   VSoft.YAML,
+  DPM.Core.Logging,
   DPM.Core.Trust.Interfaces;
 
 type
+  //a change to the state - true when it changed anything, so it must be saved.
+  TTrustStateChange = reference to function : boolean;
+
   TYamlTrustStateService = class(TInterfacedObject, ITrustStateService)
   private
+    FLogger : ILogger;
     FFilePath : string;
     FLock : TCriticalSection;
+    //held while the file is read or written - across processes.
+    FMutex : THandle;
     FEntries : IDictionary<string, TAuthorTrustEntry>;
     FRepoEntries : IDictionary<string, TRepositoryTrustEntry>;
     FLoaded : boolean;
-    procedure EnsureLoaded;
-    procedure SaveLocked;
+    //the file as it was when last read or written - a different one means another process wrote it.
+    FLoadedExists : boolean;
+    FLoadedWriteTime : Int64;
+    FLoadedSize : Int64;
+    function ReadStamp(out writeTime : Int64; out size : Int64) : boolean;
+    function IsCurrent : boolean;
+    procedure RememberStamp;
+    procedure AcquireFileLock;
+    procedure ReleaseFileLock;
+    procedure EnsureCurrent;
+    procedure Change(const apply : TTrustStateChange);
     procedure LoadLocked;
+    procedure SetAsideCorruptFile(const reason : string);
+    procedure SaveLocked;
   protected
     function TryGetAuthor(const packageId : string; out entry : TAuthorTrustEntry) : boolean;
     procedure RecordAuthor(const packageId : string; const entry : TAuthorTrustEntry);
@@ -66,8 +86,8 @@ type
     procedure RemoveRepository(const packageId : string);
   public
     // Default location: %APPDATA%\.dpm\trust-state.yaml.
-    constructor Create; overload;
-    constructor Create(const filePath : string); overload;
+    constructor Create(const logger : ILogger); overload;
+    constructor Create(const logger : ILogger; const filePath : string); overload;
     destructor Destroy; override;
   end;
 
@@ -77,23 +97,72 @@ uses
   System.DateUtils,
   System.IOUtils,
   System.Generics.Defaults,
-  DPM.Core.Utils.DateTime;
+  DPM.Core.Diagnostics,
+  DPM.Core.Utils.DateTime,
+  DPM.Core.Utils.Files,
+  DPM.Core.Utils.Hash,
+  DPM.Core.Utils.Strings;
 
-constructor TYamlTrustStateService.Create;
+const
+  cMutexWaitMs = 30000;
+  cReadAttempts = 10;
+  cReadRetryDelayMs = 25;
+
+//one mutex per state file - a test's file, or a redirected APPDATA, doesn't wait on the real one.
+function MutexNameFor(const filePath : string) : string;
+var
+  stream : TBytesStream;
+begin
+  stream := TBytesStream.Create(TEncoding.UTF8.GetBytes(LowerCase(ExpandFileName(filePath))));
+  try
+    result := 'Local\DPM.TrustState.' + Copy(THashSHA256.GetHashString(stream), 1, 16);
+  finally
+    stream.Free;
+  end;
+end;
+
+//An AV scanner or the search indexer briefly holding the file is not a reason to call it corrupt.
+function ReadStateText(const filePath : string) : string;
+var
+  attempt : integer;
+begin
+  attempt := 0;
+  while true do
+  begin
+    try
+      result := TFile.ReadAllText(filePath);
+      exit;
+    except
+      on e : Exception do
+      begin
+        Inc(attempt);
+        if attempt >= cReadAttempts then
+          raise ETrust.CreateFmt('Unable to read the trust state [%s] : %s', [filePath, e.Message]);
+        Sleep(cReadRetryDelayMs);
+      end;
+    end;
+  end;
+end;
+
+constructor TYamlTrustStateService.Create(const logger : ILogger);
 var
   appData : string;
 begin
   appData := GetEnvironmentVariable('APPDATA');
   if appData = '' then
     raise ETrust.Create('APPDATA environment variable is not set');
-  Create(IncludeTrailingPathDelimiter(appData) + '.dpm' + PathDelim + 'trust-state.yaml');
+  Create(logger, IncludeTrailingPathDelimiter(appData) + '.dpm' + PathDelim + 'trust-state.yaml');
 end;
 
-constructor TYamlTrustStateService.Create(const filePath : string);
+constructor TYamlTrustStateService.Create(const logger : ILogger; const filePath : string);
 begin
   inherited Create;
+  FLogger := logger;
   FFilePath := filePath;
   FLock := TCriticalSection.Create;
+  FMutex := CreateMutex(nil, false, PChar(MutexNameFor(filePath)));
+  if FMutex = 0 then
+    raise ETrust.CreateFmt('Unable to create the trust state lock : %s', [SysErrorMessage(GetLastError)]);
   // Case-insensitive keys: package ids are treated case-insensitively everywhere
   // else (TPackageCache.MakeCacheKey lowercases the id). The trust entry is
   // recorded under the canonical id parsed from the .dpkg filename on install,
@@ -107,20 +176,97 @@ end;
 
 destructor TYamlTrustStateService.Destroy;
 begin
+  if FMutex <> 0 then
+    CloseHandle(FMutex);
   FLock.Free;
   inherited;
 end;
 
-procedure TYamlTrustStateService.EnsureLoaded;
+function TYamlTrustStateService.ReadStamp(out writeTime : Int64; out size : Int64) : boolean;
+var
+  fad : TWin32FileAttributeData;
 begin
-  if FLoaded then
-    exit;
-  LoadLocked;
-  FLoaded := true;
+  writeTime := 0;
+  size := 0;
+  result := GetFileAttributesEx(PChar(FFilePath), GetFileExInfoStandard, @fad);
+  if result then
+  begin
+    writeTime := Int64(fad.ftLastWriteTime.dwHighDateTime) shl 32 or fad.ftLastWriteTime.dwLowDateTime;
+    size := Int64(fad.nFileSizeHigh) shl 32 or fad.nFileSizeLow;
+  end;
 end;
 
+function TYamlTrustStateService.IsCurrent : boolean;
+var
+  writeTime : Int64;
+  size : Int64;
+  exists : boolean;
+begin
+  result := false;
+  if not FLoaded then
+    exit;
+  exists := ReadStamp(writeTime, size);
+  if exists <> FLoadedExists then
+    exit;
+  result := (not exists) or ((writeTime = FLoadedWriteTime) and (size = FLoadedSize));
+end;
+
+procedure TYamlTrustStateService.RememberStamp;
+begin
+  FLoadedExists := ReadStamp(FLoadedWriteTime, FLoadedSize);
+end;
+
+procedure TYamlTrustStateService.AcquireFileLock;
+begin
+  case WaitForSingleObject(FMutex, cMutexWaitMs) of
+    //abandoned : the process that held it died. The file is still whole - it is only ever replaced.
+    WAIT_OBJECT_0, WAIT_ABANDONED : ;
+  else
+    raise ETrust.CreateFmt('Timed out waiting for another DPM process to finish with the trust state [%s]', [FFilePath]);
+  end;
+end;
+
+procedure TYamlTrustStateService.ReleaseFileLock;
+begin
+  ReleaseMutex(FMutex);
+end;
+
+//FLock is held.
+procedure TYamlTrustStateService.EnsureCurrent;
+begin
+  if IsCurrent then
+    exit;
+  AcquireFileLock;
+  try
+    LoadLocked;
+  finally
+    ReleaseFileLock;
+  end;
+end;
+
+procedure TYamlTrustStateService.Change(const apply : TTrustStateChange);
+begin
+  FLock.Enter;
+  try
+    AcquireFileLock;
+    try
+      //another process may have written since this one last read - change a fresh copy, so its records survive.
+      if not IsCurrent then
+        LoadLocked;
+      if apply() then
+        SaveLocked;
+    finally
+      ReleaseFileLock;
+    end;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+//FLock and the file lock are held.
 procedure TYamlTrustStateService.LoadLocked;
 var
+  text : string;
   doc : IYAMLDocument;
   root : IYAMLValue;
   mapping : IYAMLMapping;
@@ -134,16 +280,28 @@ var
 begin
   FEntries.Clear;
   FRepoEntries.Clear;
-  if not FileExists(FFilePath) then
+  FLoaded := true;
+  RememberStamp;
+  if not FLoadedExists then
     exit;
+  text := ReadStateText(FFilePath);
   try
-    doc := TYAML.LoadFromFile(FFilePath);
+    doc := TYAML.LoadFromString(text);
   except
-    on Exception do
-      exit;   // tolerate corrupt state; rebuild on next write
+    on e : Exception do
+    begin
+      SetAsideCorruptFile(e.Message);
+      exit;
+    end;
   end;
-  if (doc = nil) or (doc.Root = nil) or not doc.Root.IsMapping then
+  //nothing recorded yet.
+  if (doc = nil) or (doc.Root = nil) or doc.Root.IsNull then
     exit;
+  if not doc.Root.IsMapping then
+  begin
+    SetAsideCorruptFile('it does not hold a mapping of package ids');
+    exit;
+  end;
 
   root := doc.Root;
   mapping := root.AsMapping;
@@ -216,23 +374,43 @@ begin
   end;
 end;
 
+//The ratchets lose their history if the file goes - keep it for whoever wants to look, and start again
+//rather than write over it. FLock and the file lock are held.
+procedure TYamlTrustStateService.SetAsideCorruptFile(const reason : string);
+var
+  backup : string;
+  stamp : string;
+  n : integer;
+begin
+  stamp := FormatDateTime('yyyymmdd"T"hhnnss"Z"', TTimeZone.Local.ToUniversalTime(Now));
+  backup := FFilePath + '.corrupt-' + stamp;
+  n := 1;
+  while FileExists(backup) do
+  begin
+    Inc(n);
+    backup := FFilePath + '.corrupt-' + stamp + '-' + IntToStr(n);
+  end;
+  if not MoveFileEx(PChar(FFilePath), PChar(backup), MOVEFILE_WRITE_THROUGH) then
+    raise ETrust.CreateFmt('The trust state [%s] can''t be read (%s), and setting it aside as [%s] failed : %s',
+      [FFilePath, reason, backup, SysErrorMessage(GetLastError)]);
+  FLogger.Warning(TWarningCode.W7013_TrustStateCorrupt, Format('The trust state [%s] can''t be read (%s). It has been kept as [%s] and DPM ' +
+    'starts again with no record of the signatures it has seen - each package''s signer is trusted on first use again.',
+    [FFilePath, reason, backup]));
+  RememberStamp;
+end;
+
+//FLock and the file lock are held.
 procedure TYamlTrustStateService.SaveLocked;
 var
   sb : TStringBuilder;
   pair : TPair<string, TAuthorTrustEntry>;
   repoPair : TPair<string, TRepositoryTrustEntry>;
   dir : string;
-  tempPath : string;
   allKeys : IDictionary<string, byte>;
   key : string;
   authorEntry : TAuthorTrustEntry;
   repoEntry : TRepositoryTrustEntry;
   hasAuthor, hasRepo : boolean;
-  attempt : integer;
-  lastError : cardinal;
-const
-  cReplaceMaxAttempts = 10;
-  cReplaceRetryDelayMs = 25;
 begin
   dir := ExtractFilePath(FFilePath);
   if (dir <> '') and not DirectoryExists(dir) then
@@ -254,62 +432,42 @@ begin
     begin
       hasAuthor := FEntries.TryGetValue(key, authorEntry);
       hasRepo := FRepoEntries.TryGetValue(key, repoEntry);
-      sb.Append(key); sb.AppendLine(':');
+      sb.Append(TStringUtils.YamlSingleQuote(key)); sb.AppendLine(':');
       if hasAuthor then
       begin
-        sb.Append('  lastAuthorSpki: ''');
-        sb.Append(authorEntry.LastAuthorSpkiHex);
-        sb.AppendLine('''');
+        sb.Append('  lastAuthorSpki: ');
+        sb.AppendLine(TStringUtils.YamlSingleQuote(authorEntry.LastAuthorSpkiHex));
         sb.Append('  lastSeenAuthorSigned: ');
         sb.AppendLine(BoolToStr(authorEntry.LastSeenAuthorSigned, True));
         sb.Append('  downgradeAcknowledged: ');
         sb.AppendLine(BoolToStr(authorEntry.DowngradeAcknowledged, True));
         sb.Append('  blockedPermanently: ');
         sb.AppendLine(BoolToStr(authorEntry.BlockedPermanently, True));
-        sb.Append('  lastSeenAt: ''');
-        sb.Append(TDPMDateTimeUtils.DateToISO8601(authorEntry.LastSeenAt, True));
-        sb.AppendLine('''');
+        sb.Append('  lastSeenAt: ');
+        sb.AppendLine(TStringUtils.YamlSingleQuote(TDPMDateTimeUtils.DateToISO8601(authorEntry.LastSeenAt, True)));
       end;
       if hasRepo then
       begin
-        sb.Append('  repoTrustedSpki: ''');
-        sb.Append(repoEntry.TrustedRepoSpkiHex);
-        sb.AppendLine('''');
-        sb.Append('  repoNamespace: ''');
-        sb.Append(repoEntry.Namespace);
-        sb.AppendLine('''');
-        sb.Append('  repoFirstSeenAt: ''');
-        sb.Append(TDPMDateTimeUtils.DateToISO8601(repoEntry.FirstSeenAt, True));
-        sb.AppendLine('''');
-        sb.Append('  repoLastSeenAt: ''');
-        sb.Append(TDPMDateTimeUtils.DateToISO8601(repoEntry.LastSeenAt, True));
-        sb.AppendLine('''');
+        sb.Append('  repoTrustedSpki: ');
+        sb.AppendLine(TStringUtils.YamlSingleQuote(repoEntry.TrustedRepoSpkiHex));
+        sb.Append('  repoNamespace: ');
+        sb.AppendLine(TStringUtils.YamlSingleQuote(repoEntry.Namespace));
+        sb.Append('  repoFirstSeenAt: ');
+        sb.AppendLine(TStringUtils.YamlSingleQuote(TDPMDateTimeUtils.DateToISO8601(repoEntry.FirstSeenAt, True)));
+        sb.Append('  repoLastSeenAt: ');
+        sb.AppendLine(TStringUtils.YamlSingleQuote(TDPMDateTimeUtils.DateToISO8601(repoEntry.LastSeenAt, True)));
       end;
     end;
 
-    tempPath := FFilePath + '.tmp';
-    TFile.WriteAllText(tempPath, sb.ToString, TEncoding.UTF8);
-    // MoveFileEx with MOVEFILE_REPLACE_EXISTING is the real atomic replace - it
-    // swaps the temp file over the target in a single syscall (no delete-then-
-    // rename gap). Retry a few times because an AV scanner or the search indexer
-    // routinely holds a brief handle on a just-written file, which surfaces as a
-    // transient sharing violation. FullReVerify rewrites this file once per
-    // package in a tight loop, so it hits that window far more often than a
-    // one-off save would.
-    attempt := 0;
-    while not MoveFileEx(PChar(tempPath), PChar(FFilePath),
-      MOVEFILE_REPLACE_EXISTING or MOVEFILE_WRITE_THROUGH) do
-    begin
-      lastError := GetLastError;
-      Inc(attempt);
-      if (attempt >= cReplaceMaxAttempts) or
-         ((lastError <> ERROR_SHARING_VIOLATION) and
-          (lastError <> ERROR_ACCESS_DENIED) and
-          (lastError <> ERROR_LOCK_VIOLATION)) then
-        raise ETrust.CreateFmt('Failed to atomically replace %s (error %d)',
-          [FFilePath, lastError]);
-      Sleep(cReplaceRetryDelayMs);
+    // An AV scanner or the search indexer routinely holds a brief handle on a just-written file,
+    // and FullReVerify rewrites this file once per package - the replace retries for that.
+    try
+      TFileUtils.AtomicWriteAllText(FFilePath, sb.ToString, TEncoding.UTF8);
+    except
+      on e : Exception do
+        raise ETrust.CreateFmt('Unable to save the trust state [%s] : %s', [FFilePath, e.Message]);
     end;
+    RememberStamp;
   finally
     sb.Free;
   end;
@@ -319,7 +477,7 @@ function TYamlTrustStateService.TryGetAuthor(const packageId : string; out entry
 begin
   FLock.Enter;
   try
-    EnsureLoaded;
+    EnsureCurrent;
     result := FEntries.TryGetValue(packageId, entry);
   finally
     FLock.Leave;
@@ -327,70 +485,74 @@ begin
 end;
 
 procedure TYamlTrustStateService.RecordAuthor(const packageId : string; const entry : TAuthorTrustEntry);
+var
+  id : string;
+  value : TAuthorTrustEntry;
 begin
-  FLock.Enter;
-  try
-    EnsureLoaded;
-    FEntries[packageId] := entry;
-    SaveLocked;
-  finally
-    FLock.Leave;
-  end;
+  id := packageId;
+  value := entry;
+  Change(
+    function : boolean
+    begin
+      FEntries[id] := value;
+      result := true;
+    end);
 end;
 
 procedure TYamlTrustStateService.AcknowledgeAuthorDowngrade(const packageId : string);
 var
-  entry : TAuthorTrustEntry;
+  id : string;
 begin
-  FLock.Enter;
-  try
-    EnsureLoaded;
-    if FEntries.TryGetValue(packageId, entry) then
+  id := packageId;
+  Change(
+    function : boolean
+    var
+      entry : TAuthorTrustEntry;
     begin
-      entry.DowngradeAcknowledged := true;
-      FEntries[packageId] := entry;
-      SaveLocked;
-    end;
-  finally
-    FLock.Leave;
-  end;
+      result := FEntries.TryGetValue(id, entry);
+      if result then
+      begin
+        entry.DowngradeAcknowledged := true;
+        FEntries[id] := entry;
+      end;
+    end);
 end;
 
 procedure TYamlTrustStateService.BlockPermanently(const packageId : string);
 var
-  entry : TAuthorTrustEntry;
+  id : string;
 begin
-  FLock.Enter;
-  try
-    EnsureLoaded;
-    if not FEntries.TryGetValue(packageId, entry) then
+  id := packageId;
+  Change(
+    function : boolean
+    var
+      entry : TAuthorTrustEntry;
     begin
-      entry.LastAuthorSpkiHex := '';
-      entry.LastSeenAuthorSigned := false;
-      entry.DowngradeAcknowledged := false;
-      entry.LastSeenAt := TTimeZone.Local.ToUniversalTime(Now);
-    end;
-    entry.BlockedPermanently := true;
-    FEntries[packageId] := entry;
-    SaveLocked;
-  finally
-    FLock.Leave;
-  end;
+      if not FEntries.TryGetValue(id, entry) then
+      begin
+        entry.LastAuthorSpkiHex := '';
+        entry.LastSeenAuthorSigned := false;
+        entry.DowngradeAcknowledged := false;
+        entry.LastSeenAt := TTimeZone.Local.ToUniversalTime(Now);
+      end;
+      entry.BlockedPermanently := true;
+      FEntries[id] := entry;
+      result := true;
+    end);
 end;
 
 procedure TYamlTrustStateService.RemoveAuthor(const packageId : string);
+var
+  id : string;
 begin
-  FLock.Enter;
-  try
-    EnsureLoaded;
-    if FEntries.ContainsKey(packageId) then
+  id := packageId;
+  Change(
+    function : boolean
     begin
-      FEntries.Remove(packageId);
-      SaveLocked;
-    end;
-  finally
-    FLock.Leave;
-  end;
+      result := FEntries.ContainsKey(id);
+      if result then
+        FEntries.Remove(id);
+    end);
 end;
 
 function TYamlTrustStateService.TryGetRepository(const packageId : string;
@@ -398,7 +560,7 @@ function TYamlTrustStateService.TryGetRepository(const packageId : string;
 begin
   FLock.Enter;
   try
-    EnsureLoaded;
+    EnsureCurrent;
     result := FRepoEntries.TryGetValue(packageId, entry);
   finally
     FLock.Leave;
@@ -407,30 +569,32 @@ end;
 
 procedure TYamlTrustStateService.RecordRepository(const packageId : string;
                                                    const entry : TRepositoryTrustEntry);
+var
+  id : string;
+  value : TRepositoryTrustEntry;
 begin
-  FLock.Enter;
-  try
-    EnsureLoaded;
-    FRepoEntries[packageId] := entry;
-    SaveLocked;
-  finally
-    FLock.Leave;
-  end;
+  id := packageId;
+  value := entry;
+  Change(
+    function : boolean
+    begin
+      FRepoEntries[id] := value;
+      result := true;
+    end);
 end;
 
 procedure TYamlTrustStateService.RemoveRepository(const packageId : string);
+var
+  id : string;
 begin
-  FLock.Enter;
-  try
-    EnsureLoaded;
-    if FRepoEntries.ContainsKey(packageId) then
+  id := packageId;
+  Change(
+    function : boolean
     begin
-      FRepoEntries.Remove(packageId);
-      SaveLocked;
-    end;
-  finally
-    FLock.Leave;
-  end;
+      result := FRepoEntries.ContainsKey(id);
+      if result then
+        FRepoEntries.Remove(id);
+    end);
 end;
 
 end.

@@ -62,7 +62,11 @@ type
     [Test] procedure RecordAuthor_Overwrites_PriorEntry;
     [Test] procedure RecordAuthor_RoundTrips_FalseSignedFlag;
     [Test] procedure Acknowledge_OnUnknownPackage_IsNoOp;
-    [Test] procedure CorruptStateFile_IsTolerated_TreatedAsEmpty;
+    [Test] procedure CorruptStateFile_IsSetAside_AndStartsEmpty;
+    [Test] procedure StateFileThatIsNotAMapping_IsSetAside;
+    [Test] procedure EmptyStateDocument_IsNotCorrupt;
+    [Test] procedure TwoServicesOnOneFile_BothKeepTheirRecords;
+    [Test] procedure Namespace_WithQuote_RoundTrips;
     [Test] procedure BlockPermanently_SetsFlag_OnNewPackage;
     [Test] procedure BlockPermanently_SetsFlag_OnExistingEntry_PreservesOtherFields;
     [Test] procedure BlockPermanently_PersistsAcrossInstances;
@@ -91,7 +95,51 @@ uses
   DPM.Core.Trust.Interfaces,
   DPM.Core.Trust.State,
   DPM.Core.Trust.TrustSet,
-  DPM.Core.Trust.Policy;
+  DPM.Core.Trust.Policy,
+  DPM.Core.Logging,
+  DPM.Core.Diagnostics,
+  TestLogger;
+
+function NewTrustState(const path : string; out logger : TTestLogger) : ITrustStateService; overload;
+var
+  loggerRef : ILogger;
+begin
+  logger := TTestLogger.Create;
+  loggerRef := logger;
+  result := TYamlTrustStateService.Create(loggerRef, path);
+end;
+
+function NewTrustState(const path : string) : ITrustStateService; overload;
+var
+  logger : TTestLogger;
+begin
+  result := NewTrustState(path, logger);
+end;
+
+//the files a corrupt state file was set aside as.
+function CorruptBackups(const path : string) : TArray<string>;
+begin
+  result := TArray<string>(TDirectory.GetFiles(ExtractFilePath(path), ExtractFileName(path) + '.corrupt-*'));
+end;
+
+procedure DeleteStateFiles(const path : string);
+var
+  backup : string;
+begin
+  if FileExists(path) then
+    DeleteFile(path);
+  for backup in CorruptBackups(path) do
+    DeleteFile(backup);
+end;
+
+function MakeAuthorEntry(const spkiHex : string) : TAuthorTrustEntry;
+begin
+  result.LastAuthorSpkiHex := spkiHex;
+  result.LastSeenAuthorSigned := true;
+  result.LastSeenAt := Now;
+  result.DowngradeAcknowledged := false;
+  result.BlockedPermanently := false;
+end;
 
 { TTrustStateTests }
 
@@ -110,7 +158,7 @@ var
 begin
   path := TempFile;
   try
-    svc1 := TYamlTrustStateService.Create(path);
+    svc1 := NewTrustState(path);
     entry.LastAuthorSpkiHex := 'ab12';
     entry.LastSeenAuthorSigned := true;
     entry.LastSeenAt := Now;
@@ -119,7 +167,7 @@ begin
     svc1.RecordAuthor('VSoft.Foo', entry);
     svc1 := nil;
 
-    svc2 := TYamlTrustStateService.Create(path);
+    svc2 := NewTrustState(path);
     Assert.IsTrue(svc2.TryGetAuthor('VSoft.Foo', loaded));
     Assert.AreEqual('ab12', loaded.LastAuthorSpkiHex);
     Assert.IsTrue(loaded.LastSeenAuthorSigned);
@@ -137,7 +185,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     Assert.IsFalse(svc.TryGetAuthor('Nonexistent.Package', loaded));
   finally
     if FileExists(path) then
@@ -153,7 +201,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     entry.LastAuthorSpkiHex := 'cc';
     entry.LastSeenAuthorSigned := true;
     entry.LastSeenAt := Now;
@@ -324,7 +372,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
 
     first.LastAuthorSpkiHex := 'aa11';
     first.LastSeenAuthorSigned := true;
@@ -352,7 +400,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     entry.LastAuthorSpkiHex := '';
     entry.LastSeenAuthorSigned := false;
     entry.LastSeenAt := Now;
@@ -361,7 +409,7 @@ begin
     svc.RecordAuthor('Unsigned.Pkg', entry);
 
     // Re-open from disk to confirm the bool serialisation
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     Assert.IsTrue(svc.TryGetAuthor('Unsigned.Pkg', loaded));
     Assert.IsFalse(loaded.LastSeenAuthorSigned);
     Assert.IsTrue(loaded.DowngradeAcknowledged);
@@ -378,7 +426,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     // Must not raise.
     svc.AcknowledgeAuthorDowngrade('Never.Seen');
     Assert.IsFalse(svc.TryGetAuthor('Never.Seen', ignored));
@@ -387,20 +435,128 @@ begin
   end;
 end;
 
-procedure TTrustStateExtraTests.CorruptStateFile_IsTolerated_TreatedAsEmpty;
+procedure TTrustStateExtraTests.CorruptStateFile_IsSetAside_AndStartsEmpty;
+const
+  cCorrupt = 'Some.Pkg:' + sLineBreak + '  lastAuthorSpki: [unclosed';
 var
   path : string;
   svc : ITrustStateService;
+  logger : TTestLogger;
+  loaded : TAuthorTrustEntry;
+  backups : TArray<string>;
+begin
+  //never overwritten silently - the ratchets' history is in it.
+  path := TempFile;
+  try
+    TFile.WriteAllText(path, cCorrupt, TEncoding.UTF8);
+    svc := NewTrustState(path, logger);
+    Assert.IsFalse(svc.TryGetAuthor('Anything', loaded));
+    Assert.IsTrue(logger.HasWarning(TWarningCode.W7013_TrustStateCorrupt), logger.Messages.Text);
+    backups := CorruptBackups(path);
+    Assert.AreEqual(1, Length(backups), 'the corrupt file should be kept beside the new one');
+    Assert.AreEqual(cCorrupt, TFile.ReadAllText(backups[0]));
+
+    //and the new state works.
+    svc.RecordAuthor('New.Pkg', MakeAuthorEntry('abcd'));
+    svc := NewTrustState(path, logger);
+    Assert.IsTrue(svc.TryGetAuthor('New.Pkg', loaded));
+    Assert.IsFalse(logger.HasWarning(TWarningCode.W7013_TrustStateCorrupt), logger.Messages.Text);
+  finally
+    DeleteStateFiles(path);
+  end;
+end;
+
+procedure TTrustStateExtraTests.StateFileThatIsNotAMapping_IsSetAside;
+var
+  path : string;
+  svc : ITrustStateService;
+  logger : TTestLogger;
   loaded : TAuthorTrustEntry;
 begin
   path := TempFile;
   try
-    TFile.WriteAllText(path, 'this is { not valid yaml at all', TEncoding.UTF8);
-    // Service must tolerate corrupt state files — fall back to empty in-memory map.
-    svc := TYamlTrustStateService.Create(path);
+    TFile.WriteAllText(path, '- just' + sLineBreak + '- a list' + sLineBreak, TEncoding.UTF8);
+    svc := NewTrustState(path, logger);
     Assert.IsFalse(svc.TryGetAuthor('Anything', loaded));
+    Assert.IsTrue(logger.HasWarning(TWarningCode.W7013_TrustStateCorrupt), logger.Messages.Text);
+    Assert.AreEqual(1, Length(CorruptBackups(path)));
   finally
-    if FileExists(path) then DeleteFile(path);
+    DeleteStateFiles(path);
+  end;
+end;
+
+procedure TTrustStateExtraTests.EmptyStateDocument_IsNotCorrupt;
+var
+  path : string;
+  svc : ITrustStateService;
+  logger : TTestLogger;
+  loaded : TAuthorTrustEntry;
+begin
+  //what a save with nothing recorded writes.
+  path := TempFile;
+  try
+    TFile.WriteAllText(path, '---' + sLineBreak, TEncoding.UTF8);
+    svc := NewTrustState(path, logger);
+    Assert.IsFalse(svc.TryGetAuthor('Anything', loaded));
+    Assert.IsFalse(logger.HasWarning(TWarningCode.W7013_TrustStateCorrupt), logger.Messages.Text);
+    Assert.AreEqual(0, Length(CorruptBackups(path)));
+  finally
+    DeleteStateFiles(path);
+  end;
+end;
+
+procedure TTrustStateExtraTests.TwoServicesOnOneFile_BothKeepTheirRecords;
+var
+  path : string;
+  first, second, third : ITrustStateService;
+  loaded : TAuthorTrustEntry;
+begin
+  //the CLI and the IDE (or two builds) each hold their own copy of the file.
+  path := TempFile;
+  try
+    first := NewTrustState(path);
+    second := NewTrustState(path);
+    Assert.IsFalse(first.TryGetAuthor('A.Pkg', loaded));
+    Assert.IsFalse(second.TryGetAuthor('A.Pkg', loaded));
+
+    first.RecordAuthor('A.Pkg', MakeAuthorEntry('aaaa'));
+    second.RecordAuthor('B.Pkg', MakeAuthorEntry('bbbb'));
+
+    Assert.IsTrue(second.TryGetAuthor('A.Pkg', loaded), 'a record another instance saved should be seen');
+    Assert.IsTrue(first.TryGetAuthor('B.Pkg', loaded), 'a record another instance saved should be seen');
+    third := NewTrustState(path);
+    Assert.IsTrue(third.TryGetAuthor('A.Pkg', loaded), 'the second save lost the first one''s record');
+    Assert.AreEqual('aaaa', loaded.LastAuthorSpkiHex);
+    Assert.IsTrue(third.TryGetAuthor('B.Pkg', loaded));
+    Assert.AreEqual('bbbb', loaded.LastAuthorSpkiHex);
+  finally
+    DeleteStateFiles(path);
+  end;
+end;
+
+procedure TTrustStateExtraTests.Namespace_WithQuote_RoundTrips;
+var
+  path : string;
+  svc : ITrustStateService;
+  logger : TTestLogger;
+  entry, loaded : TRepositoryTrustEntry;
+begin
+  //the namespace comes from a repository's attestation - a quote in it must not end the scalar.
+  path := TempFile;
+  try
+    svc := NewTrustState(path);
+    entry.TrustedRepoSpkiHex := 'cafe';
+    entry.Namespace := 'o''brien: #x';
+    entry.FirstSeenAt := Now;
+    entry.LastSeenAt := Now;
+    svc.RecordRepository('Quote.Pkg', entry);
+
+    svc := NewTrustState(path, logger);
+    Assert.IsTrue(svc.TryGetRepository('Quote.Pkg', loaded), logger.Messages.Text);
+    Assert.AreEqual('o''brien: #x', loaded.Namespace);
+    Assert.IsFalse(logger.HasWarning(TWarningCode.W7013_TrustStateCorrupt), logger.Messages.Text);
+  finally
+    DeleteStateFiles(path);
   end;
 end;
 
@@ -412,7 +568,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     // BlockPermanently must create a fresh entry if none exists yet —
     // this happens when the user picks "Always block" on a TOFU first-install.
     svc.BlockPermanently('Brand.New.Pkg');
@@ -431,7 +587,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     entry.LastAuthorSpkiHex := 'feedbeef';
     entry.LastSeenAuthorSigned := true;
     entry.LastSeenAt := Now;
@@ -458,11 +614,11 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     svc.BlockPermanently('Sticky.Pkg');
     svc := nil;
 
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     Assert.IsTrue(svc.TryGetAuthor('Sticky.Pkg', loaded));
     Assert.IsTrue(loaded.BlockedPermanently);
   finally
@@ -478,7 +634,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     entry.LastAuthorSpkiHex := 'aa11';
     entry.LastSeenAuthorSigned := true;
     entry.LastSeenAt := Now;
@@ -491,7 +647,7 @@ begin
     Assert.IsFalse(svc.TryGetAuthor('Drop.Me', loaded));
 
     // Re-open from disk to confirm the removal persisted.
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     Assert.IsFalse(svc.TryGetAuthor('Drop.Me', loaded));
   finally
     if FileExists(path) then DeleteFile(path);
@@ -506,7 +662,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     // Must not raise.
     svc.RemoveAuthor('Never.Recorded');
     Assert.IsFalse(svc.TryGetAuthor('Never.Recorded', ignored));
@@ -523,7 +679,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     entry.TrustedRepoSpkiHex := 'cafe1234';
     entry.Namespace := 'VSoft.*';
     entry.FirstSeenAt := Now;
@@ -548,7 +704,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     authorEntry.LastAuthorSpkiHex := 'aabb';
     authorEntry.LastSeenAuthorSigned := true;
     authorEntry.LastSeenAt := Now;
@@ -580,7 +736,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     entry.TrustedRepoSpkiHex := 'deadbeef';
     entry.Namespace := 'Other.*';
     entry.FirstSeenAt := Now;
@@ -588,7 +744,7 @@ begin
     svc.RecordRepository('Persist.Pkg', entry);
     svc := nil;
 
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     Assert.IsTrue(svc.TryGetRepository('Persist.Pkg', loaded));
     Assert.AreEqual('deadbeef', loaded.TrustedRepoSpkiHex);
     Assert.AreEqual('Other.*', loaded.Namespace);
@@ -605,7 +761,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     Assert.IsFalse(svc.TryGetRepository('Nothing.Here', loaded));
   finally
     if FileExists(path) then DeleteFile(path);
@@ -620,7 +776,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     entry.TrustedRepoSpkiHex := 'cafe1234';
     entry.Namespace := 'VSoft.*';
     entry.FirstSeenAt := Now;
@@ -632,7 +788,7 @@ begin
     Assert.IsFalse(svc.TryGetRepository('Drop.Repo', loaded));
 
     // Re-open from disk to confirm the removal persisted.
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     Assert.IsFalse(svc.TryGetRepository('Drop.Repo', loaded));
   finally
     if FileExists(path) then DeleteFile(path);
@@ -647,7 +803,7 @@ var
 begin
   path := TempFile;
   try
-    svc := TYamlTrustStateService.Create(path);
+    svc := NewTrustState(path);
     // Must not raise.
     svc.RemoveRepository('Never.Recorded');
     Assert.IsFalse(svc.TryGetRepository('Never.Recorded', ignored));

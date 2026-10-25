@@ -56,6 +56,19 @@ type
     //dpm copylocal, run by the build, copies a spec's copyLocal files into the project's output folder.
     [Test]
     procedure CopyLocal_Files_Outside_The_Package_Are_Not_Copied;
+
+    //The cached packages must be what the project pinned (manifestHash) - checked before anything is
+    //built, since a build runs the package's own project, and for transitive packages too.
+    [Test]
+    procedure Restore_Matching_Locks_Builds_And_Keeps_Them;
+    [Test]
+    procedure Restore_Transitive_Lock_Mismatch_Fails_Before_Building;
+    [Test]
+    procedure Restore_Re_Resolve_Keeps_Transitive_Lock;
+    [Test]
+    procedure Install_Keeps_The_Locks_Of_The_Packages_It_Keeps;
+    [Test]
+    procedure Install_Stale_Lock_On_A_Kept_Package_Fails_Before_Building;
   end;
 
 implementation
@@ -80,16 +93,19 @@ uses
   DPM.Core.Configuration.Classes,
   DPM.Core.Options.Cache,
   DPM.Core.Options.Restore,
+  DPM.Core.Options.Install,
   DPM.Core.Options.CopyLocal,
   DPM.Core.Package.CopyLocal,
   DPM.Core.Package.Interfaces,
   DPM.Core.Package.Installer.Interfaces,
   DPM.Core.Package.Installer,
+  DPM.Core.Package.InstallPlan,
   DPM.Core.Cache.Interfaces,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Compiler.Interfaces,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Reader,
+  DPM.Core.Package.Cache.Receipt,
   DPM.Core.Tests.Dependency.Fakes,
   TestLogger;
 
@@ -157,6 +173,33 @@ type
     function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion) : string; overload;
   public
     constructor Create(const packageFolder : string; const spec : IPackageSpec);
+  end;
+
+  //Each package extracted to its own folder - <root>\<id> - with the spec given.
+  TPerPackageCache = class(TFakePackageCache, IPackageCache)
+  private
+    FRoot : string;
+    FSpec : IPackageSpec;
+  protected
+    function EnsurePackage(const packageId : IPackageIdentity) : boolean;
+    function GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
+    function GetPackagePath(const packageId : IPackageIdentity) : string; overload;
+    function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion) : string; overload;
+  public
+    constructor Create(const root : string; const spec : IPackageSpec);
+  end;
+
+  //The receipts the cache wrote - just each package folder's manifest hash.
+  TFakeReceiptService = class(TInterfacedObject, IReceiptService)
+  private
+    FHashes : IDictionary<string, string>;
+  protected
+    procedure Write(const folder : string; const receipt : TVerificationReceipt);
+    function TryRead(const folder : string; out receipt : TVerificationReceipt) : boolean;
+    function ReceiptPath(const folder : string) : string;
+  public
+    constructor Create;
+    procedure SetHash(const folder : string; const manifestHashHex : string);
   end;
 
   //The configuration the installer loads - in memory, nothing is read from or written to the profile.
@@ -431,6 +474,68 @@ begin
   result := FSpec;
 end;
 
+{ TPerPackageCache }
+
+constructor TPerPackageCache.Create(const root : string; const spec : IPackageSpec);
+begin
+  inherited Create;
+  FRoot := root;
+  FSpec := spec;
+end;
+
+function TPerPackageCache.EnsurePackage(const packageId : IPackageIdentity) : boolean;
+begin
+  result := true;
+end;
+
+function TPerPackageCache.GetPackagePath(const packageId : IPackageIdentity) : string;
+begin
+  result := TPath.Combine(FRoot, packageId.Id);
+end;
+
+function TPerPackageCache.GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion) : string;
+begin
+  result := TPath.Combine(FRoot, id);
+end;
+
+function TPerPackageCache.GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
+begin
+  result := FSpec;
+end;
+
+{ TFakeReceiptService }
+
+constructor TFakeReceiptService.Create;
+begin
+  inherited Create;
+  FHashes := TCollections.CreateDictionary<string, string>;
+end;
+
+procedure TFakeReceiptService.SetHash(const folder : string; const manifestHashHex : string);
+begin
+  FHashes[LowerCase(ExcludeTrailingPathDelimiter(folder))] := manifestHashHex;
+end;
+
+procedure TFakeReceiptService.Write(const folder : string; const receipt : TVerificationReceipt);
+begin
+  SetHash(folder, receipt.ManifestHashHex);
+end;
+
+function TFakeReceiptService.TryRead(const folder : string; out receipt : TVerificationReceipt) : boolean;
+var
+  hash : string;
+begin
+  receipt := Default(TVerificationReceipt);
+  result := FHashes.TryGetValue(LowerCase(ExcludeTrailingPathDelimiter(folder)), hash);
+  if result then
+    receipt.ManifestHashHex := hash;
+end;
+
+function TFakeReceiptService.ReceiptPath(const folder : string) : string;
+begin
+  result := TPath.Combine(folder, cReceiptFileName);
+end;
+
 { TFakeConfigurationManager }
 
 constructor TFakeConfigurationManager.Create(const config : IConfiguration);
@@ -551,10 +656,10 @@ begin
   result := CachePackageSpec(tempFolder, logger, outcome, cancellation, cPackageSpec);
 end;
 
-//cConsumerProject with the base configuration the IDE writes - where the search path goes.
-function ConsumerProjectWithBase : string;
+//project with the base configuration the IDE writes - where the search path goes.
+function ConsumerProjectWithBaseFor(const project : string) : string;
 begin
-  result := StringReplace(cConsumerProject, '    <ItemGroup>' + sLineBreak,
+  result := StringReplace(project, '    <ItemGroup>' + sLineBreak,
     '    <PropertyGroup Condition="''$(Config)''==''Base'' or ''$(Base)''!=''''">' + sLineBreak +
     '        <Base>true</Base>' + sLineBreak +
     '    </PropertyGroup>' + sLineBreak +
@@ -562,6 +667,132 @@ begin
     '        <DCC_UnitSearchPath>$(DCC_UnitSearchPath)</DCC_UnitSearchPath>' + sLineBreak +
     '    </PropertyGroup>' + sLineBreak +
     '    <ItemGroup>' + sLineBreak, []);
+end;
+
+function ConsumerProjectWithBase : string;
+begin
+  result := ConsumerProjectWithBaseFor(cConsumerProject);
+end;
+
+const
+  cFooHash = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  cBarHash = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+  cStaleHash = 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+  cBazHash = 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
+
+//The consumer project recording VSoft.Foo (locked to cFooHash) and its dependency VSoft.Bar, locked to barHash.
+function LockedConsumerProject(const barHash : string) : string;
+begin
+  result := StringReplace(ConsumerProjectWithBaseFor(cConsumerProject),
+    '                <PackageReference id="VSoft.Foo" version="1.0.0"/>' + sLineBreak,
+    '                <PackageReference id="VSoft.Foo" version="1.0.0" manifestHash="sha256:' + cFooHash + '">' + sLineBreak +
+    '                    <PackageReference id="VSoft.Bar" version="1.0.0" range="1.0.0" manifestHash="sha256:' + barHash + '"/>' + sLineBreak +
+    '                </PackageReference>' + sLineBreak, []);
+end;
+
+//An installer over a cache holding VSoft.Foo (depending on fooDependencies), VSoft.Bar and VSoft.Baz, each in its
+//own folder, whose receipts say they are cFooHash, cBarHash and cBazHash - with projectFile, holding the project
+//text given, beside them.
+function NewLockedFixture(const tempFolder : string; const logger : ILogger; const project : string;
+                          const fooDependencies : array of IPackageDependency; out projectFile : string;
+                          out context : IPackageInstallerContext) : IPackageInstaller;
+var
+  root : string;
+  repo : TFakeRepositoryManager;
+  repoIntf : IPackageRepositoryManager;
+  cache : TPerPackageCache;
+  cacheIntf : IPackageCache;
+  receipts : TFakeReceiptService;
+  receiptsIntf : IReceiptService;
+  config : IConfiguration;
+  reader : IPackageSpecReader;
+  fooInfo, barInfo, bazInfo : IPackageInfo;
+  id : string;
+begin
+  root := TPath.Combine(tempFolder, 'locks');
+  if DirectoryExists(root) then
+    TDirectory.Delete(root, true);
+  for id in TArray<string>.Create('VSoft.Foo', 'VSoft.Bar', 'VSoft.Baz') do
+  begin
+    ForceDirectories(TPath.Combine(root, id + '\source'));
+    TFile.WriteAllText(TPath.Combine(root, id + '\source\Pkg.dproj'), cPackageProject, TEncoding.UTF8);
+  end;
+  projectFile := TPath.Combine(root, 'Consumer.dproj');
+  TFile.WriteAllText(projectFile, project, TEncoding.UTF8);
+
+  fooInfo := MakeInfo('VSoft.Foo', '1.0.0', fooDependencies);
+  barInfo := MakeInfo('VSoft.Bar', '1.0.0', []);
+  bazInfo := MakeInfo('VSoft.Baz', '1.0.0', []);
+  repo := TFakeRepositoryManager.Create;
+  repoIntf := repo;
+  repo.SetVersions('VSoft.Foo', ListOf([fooInfo]));
+  repo.SetVersions('VSoft.Bar', ListOf([barInfo]));
+  repo.SetVersions('VSoft.Baz', ListOf([bazInfo]));
+  reader := TPackageSpecReader.Create(logger);
+  cache := TPerPackageCache.Create(root, reader.ReadSpecString(cPackageSpec));
+  cacheIntf := cache;
+  cache.RegisterInfo(fooInfo);
+  cache.RegisterInfo(barInfo);
+  cache.RegisterInfo(bazInfo);
+  receipts := TFakeReceiptService.Create;
+  receiptsIntf := receipts;
+  receipts.SetHash(TPath.Combine(root, 'VSoft.Foo'), cFooHash);
+  receipts.SetHash(TPath.Combine(root, 'VSoft.Bar'), cBarHash);
+  receipts.SetHash(TPath.Combine(root, 'VSoft.Baz'), cBazHash);
+  context := TFakeInstallerContext.Create(logger);
+  config := TConfiguration.Create(logger);
+  result := TPackageInstaller.Create(logger, TFakeConfigurationManager.Create(config), repoIntf, cacheIntf,
+                                     TDependencyResolver.Create(logger, repoIntf, cacheIntf, context), context,
+                                     TFakeCompilerFactory.Create(logger, coSucceed, nil), receiptsIntf, nil, nil,
+                                     TInstallPlanner.Create(logger, repoIntf, cacheIntf));
+  BuildCount := 0;
+end;
+
+//Restores the project text given over the locked fixture - projectText is the project afterwards.
+function RestoreLockedProject(const tempFolder : string; const logger : ILogger; const project : string;
+                              const fooDependencies : array of IPackageDependency; out projectText : string) : boolean;
+var
+  projectFile : string;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+  options : TRestoreOptions;
+begin
+  installer := NewLockedFixture(tempFolder, logger, project, fooDependencies, projectFile, context);
+  options := TRestoreOptions.Create;
+  try
+    options.ProjectPath := projectFile;
+    options.CompilerVersion := cTestCompiler;
+    options.ConfigFile := 'dpm.config.yaml';
+    options.Platforms := [TDPMPlatform.Win32];
+    result := installer.Restore(TCancellationTokenSourceFactory.Create.Token, options, context);
+  finally
+    options.Free;
+  end;
+  projectText := TFile.ReadAllText(projectFile);
+end;
+
+//Installs VSoft.Baz 1.0.0 into the project text given over the locked fixture - projectText is the project afterwards.
+function InstallIntoLockedProject(const tempFolder : string; const logger : ILogger; const project : string;
+                                  out projectText : string) : boolean;
+var
+  projectFile : string;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+  options : TInstallOptions;
+begin
+  installer := NewLockedFixture(tempFolder, logger, project, [MakeDep('VSoft.Bar', '1.0.0')], projectFile, context);
+  options := TInstallOptions.Create;
+  try
+    options.ProjectPath := projectFile;
+    options.CompilerVersion := cTestCompiler;
+    options.ConfigFile := 'dpm.config.yaml';
+    options.Platforms := [TDPMPlatform.Win32];
+    options.AddPackage('VSoft.Baz', TPackageVersion.Parse('1.0.0'));
+    result := installer.Install(TCancellationTokenSourceFactory.Create.Token, options, context);
+  finally
+    options.Free;
+  end;
+  projectText := TFile.ReadAllText(projectFile);
 end;
 
 //Refreshes the search paths of a project using VSoft.Foo, cached in packageFolder with the source entries
@@ -958,6 +1189,90 @@ begin
     if logger.Diagnostics[i] = 'warning ' + WarningCodeToString(TWarningCode.W5012_PathOutsidePackage) then
       Inc(outsideWarnings);
   Assert.AreEqual(2, outsideWarnings, 'one warning per pattern : ' + logger.Messages.Text);
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Matching_Locks_Builds_And_Keeps_Them;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectText : string;
+begin
+  //the control : the same project and cache, with every lock matching, restores and builds.
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsTrue(RestoreLockedProject(FTempFolder, loggerIntf, LockedConsumerProject(cBarHash), [MakeDep('VSoft.Bar', '1.0.0')], projectText),
+                logger.Messages.Text);
+  Assert.AreEqual(0, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(BuildCount > 0, 'the packages should have been built : ' + logger.Messages.Text);
+  Assert.IsTrue(Pos('manifestHash="sha256:' + cBarHash + '"', projectText) > 0, 'the transitive lock was not kept : ' + projectText);
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Transitive_Lock_Mismatch_Fails_Before_Building;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectText : string;
+begin
+  //VSoft.Bar is only a dependency of VSoft.Foo - its lock counts as much as a top level one.
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsFalse(RestoreLockedProject(FTempFolder, loggerIntf, LockedConsumerProject(cStaleHash), [MakeDep('VSoft.Bar', '1.0.0')], projectText));
+  Assert.AreEqual(1, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(logger.HasError(TErrorCode.E3007_LockHashMismatch), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('error', 'VSoft.Bar'), 'the error names the package : ' + logger.Messages.Text);
+  Assert.AreEqual(0, BuildCount, 'nothing may be built from a package that is not what the project pinned : ' + logger.Messages.Text);
+  Assert.IsTrue(Pos('manifestHash="sha256:' + cStaleHash + '"', projectText) > 0, 'the recorded lock must be kept : ' + projectText);
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Re_Resolve_Keeps_Transitive_Lock;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectText : string;
+begin
+  //VSoft.Foo now also needs VSoft.Baz, which the project hasn't recorded - the graph is re-resolved, and
+  //VSoft.Bar, still at the version it was locked at, is still held to its lock.
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsFalse(RestoreLockedProject(FTempFolder, loggerIntf, LockedConsumerProject(cStaleHash),
+                                      [MakeDep('VSoft.Bar', '1.0.0'), MakeDep('VSoft.Baz', '1.0.0')], projectText));
+  Assert.AreEqual(1, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(logger.HasError(TErrorCode.E3007_LockHashMismatch), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('error', 'VSoft.Bar'), 'the error names the package : ' + logger.Messages.Text);
+  Assert.AreEqual(0, BuildCount, 'nothing may be built from a package that is not what the project pinned : ' + logger.Messages.Text);
+end;
+
+procedure TInstallerDiagnosticsTests.Install_Keeps_The_Locks_Of_The_Packages_It_Keeps;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectText : string;
+begin
+  //the control : installing VSoft.Baz builds, keeps the transitive lock on VSoft.Bar and locks VSoft.Baz.
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsTrue(InstallIntoLockedProject(FTempFolder, loggerIntf, LockedConsumerProject(cBarHash), projectText), logger.Messages.Text);
+  Assert.AreEqual(0, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(BuildCount > 0, 'the packages should have been built : ' + logger.Messages.Text);
+  Assert.IsTrue(Pos('manifestHash="sha256:' + cBarHash + '"', projectText) > 0, 'the transitive lock was not kept : ' + projectText);
+  Assert.IsTrue(Pos('manifestHash="sha256:' + cBazHash + '"', projectText) > 0, 'the installed package was not locked : ' + projectText);
+end;
+
+procedure TInstallerDiagnosticsTests.Install_Stale_Lock_On_A_Kept_Package_Fails_Before_Building;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectText : string;
+begin
+  //installing something else doesn't make VSoft.Bar's lock go away - it used to be overwritten with whatever the cache held.
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsFalse(InstallIntoLockedProject(FTempFolder, loggerIntf, LockedConsumerProject(cStaleHash), projectText));
+  Assert.AreEqual(1, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(logger.HasError(TErrorCode.E3007_LockHashMismatch), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('error', 'VSoft.Bar'), 'the error names the package : ' + logger.Messages.Text);
+  Assert.AreEqual(0, BuildCount, 'nothing may be built from a package that is not what the project pinned : ' + logger.Messages.Text);
+  Assert.IsTrue(Pos('manifestHash="sha256:' + cStaleHash + '"', projectText) > 0, 'the project must not change : ' + projectText);
 end;
 
 initialization

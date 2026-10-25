@@ -72,15 +72,29 @@ type
 
   TSignatureInfo = record
     Role               : TSignatureRole;
+    // Only set for a signature that verified - an identity nothing vouches for must
+    // never reach a trust decision (ratchets, pins, bindings).
     SignerSpkiHex      : string;
     SignerSubject      : string;
+    // The certificate a signature that failed to verify claims it was made with -
+    // for messages only.
+    ClaimedSignerSpkiHex : string;
+    ClaimedSubject     : string;
     Thumbprint         : string;
     EffectiveSigningTime : TDateTime;
     TimestampAuthority : string;
+    // The timestamp verified, but its authority doesn't chain to a root this machine
+    // trusts (e.g. an out of date root store), so its time can't be relied on - the
+    // certificate chain was validated as of now, and EffectiveSigningTime is now.
+    TimestampAuthorityUntrusted : boolean;
     ChainTrusted       : boolean;
+    // The certificate chain is sound but ends at a root this machine doesn't trust - a
+    // self-signed or private-CA certificate. The signature is valid; whether its signer
+    // is trusted is down to trustedPublishers. Gallery packages never carry these.
+    UntrustedRoot      : boolean;
     PublisherTrusted   : boolean;       // SPKI in trustedPublishers (author only)
     RepositoryTrusted  : boolean;       // SPKI in trustedRepositories (repo only)
-    Valid              : boolean;       // CMS verified + chain ok + timestamp ok
+    Valid              : boolean;       // CMS verified + chain ok (bar UntrustedRoot) + timestamp ok
     FailureReason      : string;
     Attestation        : TRepositoryAttestation;   // P2: repository attestation
     Revocation         : TRevocationStatus;        // P3: revocation outcome at signing time
@@ -105,6 +119,12 @@ type
     Reason              : string;
     Mode                : TValidationMode;
     PolicyFingerprint   : string;
+    // The identity the signed manifest declares - '' until it parses. The installer checks it
+    // against the identity the package is installed as.
+    ManifestPackageId   : string;
+    ManifestVersion     : string;
+    // Invalid because the package is in a format newer than this client reads (E7109).
+    FormatNotSupported  : boolean;
   end;
 
   ISignOptions = record
@@ -113,15 +133,29 @@ type
   end;
   PSignOptions = ^ISignOptions;
 
+  // What the verified signatures add up to, as TTrustModeEvaluator.Evaluate needs it.
+  TSignatureFacts = record
+    HasAnySignature : boolean;
+    // Why the first signature that failed verification failed - '' when none did. Any
+    // failed signature makes the package invalid, in every mode.
+    InvalidReason : string;
+    // A verified author signature whose signer is trusted : its chain reaches a trusted
+    // root, or its SPKI is pinned in trustedPublishers.
+    HasValidAuthor : boolean;
+    // A verified author signature whose chain ends at an untrusted root and whose SPKI
+    // isn't pinned - the SPKI, for the message that says what to pin.
+    UntrustedRootAuthorSpki : string;
+    HasValidTrustedRepo : boolean;
+  end;
+
   // Phase 2: static helper. The single source of truth for "given this
   // mode and these per-signature facts, what's the outcome?" The verifier
   // and tests both go through this so the rules are exhaustively covered.
   TTrustModeEvaluator = record
   public
+    class function GatherFacts(const signatures : TArray<TSignatureInfo>) : TSignatureFacts; static;
     class procedure Evaluate(const policy : TTrustPolicy;
-                             hasAnySignature : boolean;
-                             hasValidAuthor : boolean;
-                             hasValidTrustedRepo : boolean;
+                             const facts : TSignatureFacts;
                              var outcome : TVerificationOutcome;
                              var reason : string); static;
   end;
@@ -186,6 +220,17 @@ type
     /// </summary>
     function QuickRecheck(const cacheFolder : string;
                           const policy : TTrustPolicy) : boolean;
+
+    /// <summary>
+    /// Checks an extracted package's files against its dpm-manifest.json : every listed
+    /// file must exist with the recorded size and hash. Returns false when any doesn't,
+    /// naming them (manifest paths) in mismatched - or with mismatched empty when the
+    /// manifest itself can't be read. Project files (.dproj) are only checked for
+    /// presence : DPM patches them in the cache before building. Files DPM adds to an
+    /// extraction (lib\, bpl\, the receipt, build markers) aren't in the manifest.
+    /// </summary>
+    function VerifyExtractedFiles(const packageFolder : string;
+                                  out mismatched : TArray<string>) : boolean;
   end;
 
   //raised with E7102 unless said otherwise (see EDPMCodedError).
@@ -239,36 +284,95 @@ begin
     end;
 end;
 
+class function TTrustModeEvaluator.GatherFacts(const signatures : TArray<TSignatureInfo>) : TSignatureFacts;
+var
+  i : integer;
+  roleName : string;
+begin
+  result.HasAnySignature := Length(signatures) > 0;
+  result.InvalidReason := '';
+  result.HasValidAuthor := false;
+  result.UntrustedRootAuthorSpki := '';
+  result.HasValidTrustedRepo := false;
+
+  for i := 0 to High(signatures) do
+  begin
+    if not signatures[i].Valid then
+    begin
+      if result.InvalidReason = '' then
+      begin
+        if signatures[i].Role = srRepository then
+          roleName := 'repository'
+        else
+          roleName := 'author';
+        result.InvalidReason := Format('the %s signature does not verify : %s', [roleName, signatures[i].FailureReason]);
+        if signatures[i].ClaimedSubject <> '' then
+          result.InvalidReason := result.InvalidReason + Format(' (claims to be signed by %s)', [signatures[i].ClaimedSubject]);
+      end;
+      Continue;
+    end;
+
+    if signatures[i].Role = srAuthor then
+    begin
+      if (not signatures[i].UntrustedRoot) or signatures[i].PublisherTrusted then
+        result.HasValidAuthor := true
+      else if result.UntrustedRootAuthorSpki = '' then
+        result.UntrustedRootAuthorSpki := signatures[i].SignerSpkiHex;
+    end
+    else if signatures[i].RepositoryTrusted then
+      result.HasValidTrustedRepo := true;
+  end;
+end;
+
 class procedure TTrustModeEvaluator.Evaluate(const policy : TTrustPolicy;
-                                              hasAnySignature : boolean;
-                                              hasValidAuthor : boolean;
-                                              hasValidTrustedRepo : boolean;
+                                              const facts : TSignatureFacts;
                                               var outcome : TVerificationOutcome;
                                               var reason : string);
+
+  //for the modes that need an author : why the one present doesn't count.
+  function AuthorShortfall(const prefix : string) : string;
+  begin
+    if facts.UntrustedRootAuthorSpki <> '' then
+      result := prefix + ': the author certificate does not chain to a trusted root - add its SPKI (sha256:' +
+                facts.UntrustedRootAuthorSpki + ') to signing.trustedPublishers to trust it'
+    else
+      result := prefix + ': no valid author signature present';
+  end;
+
 begin
+  //A signature that is present but doesn't verify fails the package whatever the mode - including
+  //permissive, which only allows packages that aren't signed at all.
+  if facts.InvalidReason <> '' then
+  begin
+    outcome := voInvalid;
+    reason := facts.InvalidReason;
+    exit;
+  end;
+
   case policy.ValidationMode of
     vmPermissive :
       begin
-        if not hasAnySignature then
+        if not facts.HasAnySignature then
           outcome := voUnsigned
-        else if hasValidAuthor or hasValidTrustedRepo then
+        else if facts.HasValidAuthor or facts.HasValidTrustedRepo then
           outcome := voTrusted
         else
+          //signatures that verify, from signers nothing here trusts.
           outcome := voUntrustedPublisher;
       end;
     vmRequire :
       begin
-        if hasValidAuthor then
+        if facts.HasValidAuthor then
           outcome := voTrusted
         else
         begin
           outcome := voInvalid;
-          reason := 'require mode: no valid author signature present';
+          reason := AuthorShortfall('require mode');
         end;
       end;
     vmRepositoryRequired :
       begin
-        if hasValidTrustedRepo then
+        if facts.HasValidTrustedRepo then
           outcome := voTrusted
         else
         begin
@@ -278,15 +382,15 @@ begin
       end;
     vmAuthorAndRepository :
       begin
-        if hasValidAuthor and hasValidTrustedRepo then
+        if facts.HasValidAuthor and facts.HasValidTrustedRepo then
           outcome := voTrusted
         else
         begin
           outcome := voInvalid;
-          if not hasValidAuthor and not hasValidTrustedRepo then
+          if not facts.HasValidAuthor and not facts.HasValidTrustedRepo then
             reason := 'author-and-repository mode: no valid author or trusted repository signature'
-          else if not hasValidAuthor then
-            reason := 'author-and-repository mode: missing valid author signature'
+          else if not facts.HasValidAuthor then
+            reason := AuthorShortfall('author-and-repository mode')
           else
             reason := 'author-and-repository mode: missing valid trusted repository signature';
         end;

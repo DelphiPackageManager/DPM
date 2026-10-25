@@ -64,11 +64,14 @@ type
     FSpecCache : IDictionary<string, IPackageSpec>;
     FExtractionVerified : ISet<string>;
     FCacheLock : TCriticalSection;
+    //set while FullReVerify runs - an extraction that is kept is then checked file by file.
+    FDeepVerify : boolean;
     procedure WriteReceipt(const packageFolder : string;
                            const packageId : IPackageIdentity;
                            const verifyResult : TVerificationResult);
     //true when packageFolder already holds a completed extraction of the package verifyResult describes.
     function ExtractionMatchesPackage(const packageFolder : string; const verifyResult : TVerificationResult) : boolean;
+    function ExtractedFilesIntact(const logger : ILogger; const packageFilePath : string; const packageFolder : string) : boolean;
     // Returns true if the install may proceed. When false, the package must
     // not be extracted. Records the new author state on a successful pass.
     function EvaluateAuthorDowngrade(const packageId : IPackageIdentity;
@@ -156,12 +159,12 @@ uses
   System.SysUtils,
   System.IOUtils,
   System.Types,
-  System.Zip,
   System.DateUtils,
   System.RegularExpressions,
   System.Generics.Defaults,
   DPM.Core.Constants,
   DPM.Core.Diagnostics,
+  DPM.Core.Package.Archive,
   DPM.Core.Package.Classes,
   DPM.Core.Package.Icon,
   DPM.Core.Package.Manifest.Interfaces,
@@ -178,6 +181,40 @@ begin
   if not TRegEx.IsMatch(id, cPackageIdRegex) then
     raise EDPMError.Create(TErrorCode.E3017_InvalidPackageId, 'The package id [' + id + '] is not a valid package id - it can''t be used in the package cache.');
   result := id;
+end;
+
+//'' when the identity a package declares - in its manifest or its dspec - is the one it is installed as,
+//the one in its file name. Otherwise what differs.
+function DeclaredIdentityProblem(const packageIdentity : IPackageIdentity; const declaredIn : string;
+                                 const id : string; const version : TPackageVersion) : string;
+begin
+  result := '';
+  if not SameText(id, packageIdentity.Id) then
+    result := Format('its %s says it is [%s]', [declaredIn, id])
+  else if version <> packageIdentity.Version then
+    result := Format('its %s says it is version [%s]', [declaredIn, version.ToStringNoMeta]);
+end;
+
+//A package that isn't what its name says is never installed - a validly signed old version renamed to
+//stand in for the current one, say. The file is removed so the next restore fetches the package again.
+procedure RejectMisnamedPackage(const logger : ILogger; const packageFilePath : string; const packageIdentity : IPackageIdentity;
+                                const problem : string);
+begin
+  logger.Error(TErrorCode.E7012_PackageIdentityMismatch, Format('The package file [%s] is not %s %s - %s.',
+    [ExtractFileName(packageFilePath), packageIdentity.Id, packageIdentity.Version.ToStringNoMeta, problem]));
+  if FileExists(packageFilePath) and (not DeleteFile(packageFilePath)) then
+    logger.Verbose('Unable to remove [' + packageFilePath + '] from the package cache : ' + SysErrorMessage(GetLastError));
+end;
+
+//an extraction that can't be used - leave nothing behind for the cache-hit checks to find.
+procedure RemoveExtraction(const logger : ILogger; const packageFolder : string);
+begin
+  try
+    TDirectory.Delete(packageFolder, true);
+  except
+    on e : Exception do
+      logger.Verbose('Unable to remove the extracted package folder [' + packageFolder + '] : ' + e.Message);
+  end;
 end;
 
 { TPackageCache }
@@ -250,32 +287,38 @@ begin
   end;
 
   cancelled := false;
-  for i := 0 to total - 1 do
-  begin
-    // Cooperative cancellation - checked between packages. The per-package work in
-    // InstallPackageFromFile is not itself interruptible, so the cancel takes effect
-    // at the next package boundary rather than instantly.
-    if cancellationToken.IsCancelled then
+  //re-hash the files of every extraction that is kept, not just its manifest.
+  FDeepVerify := true;
+  try
+    for i := 0 to total - 1 do
     begin
-      cancelled := true;
-      break;
-    end;
-    // Important so it shows regardless of verbosity, and (in the IDE host) pumps the
-    // message window so the log stays live and the Cancel button can be clicked.
-    FLogger.Information(Format('[PackageCache] Verifying [%d/%d] %s',
-      [i + 1, total, ExtractFileName(allPackages[i])]), true);
-    try
-      //what is wrong with it was reported by InstallPackageFromFile.
-      if not InstallPackageFromFile(allPackages[i]) then
-        Inc(failures);
-    except
-      on e : Exception do
+      // Cooperative cancellation - checked between packages. The per-package work in
+      // InstallPackageFromFile is not itself interruptible, so the cancel takes effect
+      // at the next package boundary rather than instantly.
+      if cancellationToken.IsCancelled then
       begin
-        Inc(failures);
-        FLogger.Error(ErrorCodeOf(e, TErrorCode.E7001_PackageVerificationFailed), 'Unable to re-verify [' +
-          allPackages[i] + '] : ' + e.Message);
+        cancelled := true;
+        break;
+      end;
+      // Important so it shows regardless of verbosity, and (in the IDE host) pumps the
+      // message window so the log stays live and the Cancel button can be clicked.
+      FLogger.Information(Format('[PackageCache] Verifying [%d/%d] %s',
+        [i + 1, total, ExtractFileName(allPackages[i])]), true);
+      try
+        //what is wrong with it was reported by InstallPackageFromFile.
+        if not InstallPackageFromFile(allPackages[i]) then
+          Inc(failures);
+      except
+        on e : Exception do
+        begin
+          Inc(failures);
+          FLogger.Error(ErrorCodeOf(e, TErrorCode.E7001_PackageVerificationFailed), 'Unable to re-verify [' +
+            allPackages[i] + '] : ' + e.Message);
+        end;
       end;
     end;
+  finally
+    FDeepVerify := false;
   end;
 
   if cancelled then
@@ -484,11 +527,11 @@ begin
     result.Signatures[i].Thumbprint := receipt.Signatures[i].Thumbprint;
     result.Signatures[i].EffectiveSigningTime := receipt.Signatures[i].EffectiveSigningTime;
     result.Signatures[i].TimestampAuthority := receipt.Signatures[i].TimestampAuthority;
-    // Receipt is only written after successful verification; signatures
-    // recorded here passed the per-signature checks at extraction time.
-    // The receipt schema doesn't carry per-signature Valid, so we assume
-    // true — the ratchets only care about role + SPKI + RepositoryTrusted.
-    result.Signatures[i].Valid := true;
+    // The receipt records every signature, and why one failed. A receipt that records a
+    // failure never reaches here (QuickRecheck sends the package back for a full verify), but
+    // the ratchets pick the first *valid* signature - never let a failed one count.
+    result.Signatures[i].Valid := receipt.Signatures[i].FailureReason = '';
+    result.Signatures[i].FailureReason := receipt.Signatures[i].FailureReason;
 
     // Re-check trust set against the CURRENT policy. If the user has since
     // removed a SPKI from trustedRepositories, the repo ratchet now sees
@@ -598,6 +641,48 @@ begin
   if not FileExists(manifestFile) then
     exit;
   result := SameText(THashSHA256.GetHashStringFromFile(manifestFile), verifyResult.ManifestHashHex);
+end;
+
+//Only while re-verifying the whole cache : the extraction being kept is checked file by file against its
+//manifest, and missing or modified files are restored from the package file that was just verified. That
+//leaves the compiled output (lib\, bpl\) alone, where re-extracting the package would throw it away. False
+//when the extraction can't be checked or put right - the caller then re-extracts the package.
+function TPackageCache.ExtractedFilesIntact(const logger : ILogger; const packageFilePath : string; const packageFolder : string) : boolean;
+const
+  cMaxNamesShown = 10;
+var
+  mismatched : TArray<string>;
+  stillMismatched : TArray<string>;
+  names : string;
+  i : integer;
+begin
+  result := true;
+  if (not FDeepVerify) or (FSigningService = nil) then
+    exit;
+  if FSigningService.VerifyExtractedFiles(packageFolder, mismatched) then
+    exit;
+  //the manifest itself couldn't be read.
+  if Length(mismatched) = 0 then
+    exit(false);
+
+  TPackageArchiveExtractor.ExtractFiles(packageFilePath, packageFolder, mismatched);
+  if not FSigningService.VerifyExtractedFiles(packageFolder, stillMismatched) then
+    exit(false);
+
+  names := '';
+  for i := 0 to High(mismatched) do
+  begin
+    if i = cMaxNamesShown then
+    begin
+      names := names + Format(' and %d more', [Length(mismatched) - cMaxNamesShown]);
+      break;
+    end;
+    if names <> '' then
+      names := names + ', ';
+    names := names + mismatched[i];
+  end;
+  logger.Warning(TWarningCode.W3018_CacheExtractionRepaired, Format('%d file(s) in the cached package [%s] were missing or modified and have been restored : %s',
+    [Length(mismatched), packageFolder, names]));
 end;
 
 function TPackageCache.CachePackage(const packageId : IPackageIdentity; const saveFile : Boolean) : Boolean;
@@ -1160,7 +1245,7 @@ begin
     exit;
 
   //git-registry packages are cloned in place - always consumed as source.
-  if FileExists(IncludeTrailingPathDelimiter(packageFolder) + cGitPackageMarkerFile) then
+  if IsGitRegistryPackageFolder(packageFolder) then
     exit(true);
 
   //Mirror the installer's source-path collection (CollectSearchPaths/AddPasSubdirs): a packed
@@ -1409,7 +1494,7 @@ begin
   // git registry packages are cloned + built from source in place. They are unsigned
   // by design (no .dpkg / manifest / receipt), so the signing gate and the .dpkg
   // fallback below do not apply - presence of the marker + dspec is sufficient.
-  isGitPackage := result and FileExists(IncludeTrailingPathDelimiter(packageFolder) + cGitPackageMarkerFile);
+  isGitPackage := result and IsGitRegistryPackageFolder(packageFolder);
 
   // Cheap re-check on cache hit (plan §1.7, V-33). Confirms the receipt
   // exists and matches the active trust-policy fingerprint, and re-hashes
@@ -1520,6 +1605,10 @@ var
   verifyResult : TVerificationResult;
   priorAuthor : TAuthorTrustEntry;
   hadPriorAuthor : boolean;
+  i : integer;
+  declaredVersion : TPackageVersion;
+  identityProblem : string;
+  spec : IPackageSpec;
 begin
   result := false;
   logger.Debug('[PackageCache] installing from file : ' + packageFileName);
@@ -1603,7 +1692,21 @@ begin
 
     if verifyResult.Outcome = voInvalid then
     begin
-      logger.Error(TErrorCode.E7001_PackageVerificationFailed, 'The package [' + packageFilePath + '] failed verification : ' + verifyResult.Reason);
+      if verifyResult.FormatNotSupported then
+        logger.Error(TErrorCode.E7109_PackageFormatNotSupported, 'The package [' + packageFilePath + '] can''t be installed : ' + verifyResult.Reason)
+      else
+        logger.Error(TErrorCode.E7001_PackageVerificationFailed, 'The package [' + packageFilePath + '] failed verification : ' + verifyResult.Reason);
+      exit;
+    end;
+
+    //the signatures vouch for the identity in the manifest, not for the file name.
+    if not TPackageVersion.TryParse(verifyResult.ManifestVersion, declaredVersion) then
+      identityProblem := Format('its manifest version [%s] is not a valid version', [verifyResult.ManifestVersion])
+    else
+      identityProblem := DeclaredIdentityProblem(packageIndentity, 'manifest', verifyResult.ManifestPackageId, declaredVersion);
+    if identityProblem <> '' then
+    begin
+      RejectMisnamedPackage(logger, packageFilePath, packageIndentity, identityProblem);
       exit;
     end;
 
@@ -1613,8 +1716,14 @@ begin
       voUnsigned :
         logger.Information('[PackageCache] Installing unsigned package ' + '[' + packageIndentity.Id + '] under permissive mode.');
       voUntrustedPublisher :
-        logger.Warning(TWarningCode.W7008_PublisherNotTrusted, 'The package [' + packageIndentity.Id + '] is signed by a publisher that is not in trustedPublishers - permissive mode allows installing it.');
+        logger.Warning(TWarningCode.W7008_PublisherNotTrusted, 'The package [' + packageIndentity.Id + '] is signed, but its author certificate does not chain to a trusted root and is ' +
+          'not in trustedPublishers - permissive mode allows installing it.');
     end;
+    for i := 0 to High(verifyResult.Signatures) do
+      if verifyResult.Signatures[i].TimestampAuthorityUntrusted then
+        logger.Warning(TWarningCode.W7011_TimestampAuthorityUntrusted, Format('The timestamp authority [%s] on a signature of the package [%s] does not chain to a trusted root - the ' +
+          'signing certificate was checked as of now instead. Updating this machine''s root certificates fixes this.',
+          [verifyResult.Signatures[i].TimestampAuthority, packageIndentity.Id]));
 
     // The TOFU ratchets compare this build against the high-water mark from the
     // last install and can block (or mutate trust state). The test workflow
@@ -1650,7 +1759,7 @@ begin
     //(lib\, bpl\ and the package.{platform}.bom compile-skip marker), so emptying it would throw that away
     //and force a recompile - re-verifying the cache did that to every package. Only the receipt is
     //rewritten, so it carries the fingerprint of the policy the package was just verified under.
-    if ExtractionMatchesPackage(packageFolder, verifyResult) then
+    if ExtractionMatchesPackage(packageFolder, verifyResult) and ExtractedFilesIntact(logger, packageFilePath, packageFolder) then
     begin
       logger.Debug('[PackageCache] The package folder already holds this package, keeping it : ' + packageFolder);
       WriteReceipt(packageFolder, packageIndentity, verifyResult);
@@ -1681,12 +1790,38 @@ begin
 
   try
     logger.Debug('[PackageCache] Extracting Package file [' + packageFilePath + '] to : ' + packageFolder);
-    TZipFile.ExtractZipFile(packageFilePath, packageFolder);
+    //not TZipFile.ExtractZipFile - from 10.1 Berlin the RTL takes file names from a Unicode Path
+    //extra field and creates symbolic links, neither of which the archive validation covers.
+    TPackageArchiveExtractor.Extract(packageFilePath, packageFolder);
     result := FileExists(IncludeTrailingPathDelimiter(packageFolder) + cPackageDspecFile);
+    if not result then
+      logger.Error(TErrorCode.E3005_InvalidPackageFile, 'The package file [' + packageFilePath + '] does not contain a ' + cPackageDspecFile + ' - it is not a valid package.')
+    else if FSpecReader <> nil then
+    begin
+      //what the rest of DPM reads about the package - its dependencies above all - comes from its dspec.
+      spec := FSpecReader.ReadSpec(IncludeTrailingPathDelimiter(packageFolder) + cPackageDspecFile);
+      if spec = nil then
+      begin
+        //the reader said why.
+        logger.Verbose('The package [' + packageFilePath + '] has a dspec that can''t be read.');
+        result := false;
+      end
+      else
+      begin
+        identityProblem := DeclaredIdentityProblem(packageIndentity, cPackageDspecFile, spec.MetaData.Id, spec.MetaData.Version);
+        if (identityProblem = '') and (spec.TargetPlatform <> nil) and (spec.TargetPlatform.Compiler <> packageIndentity.CompilerVersion) then
+          identityProblem := Format('its %s says it is for %s', [cPackageDspecFile, CompilerToString(spec.TargetPlatform.Compiler)]);
+        if identityProblem <> '' then
+        begin
+          RejectMisnamedPackage(logger, packageFilePath, packageIndentity, identityProblem);
+          result := false;
+        end;
+      end;
+      if not result then
+        RemoveExtraction(logger, packageFolder);
+    end;
     if result then
-      logger.Verbose('Package  [' + packageFilePath + '] added to cache.')
-    else
-      logger.Error(TErrorCode.E3005_InvalidPackageFile, 'The package file [' + packageFilePath + '] does not contain a ' + cPackageDspecFile + ' - it is not a valid package.');
+      logger.Verbose('Package  [' + packageFilePath + '] added to cache.');
 
     // Write the verification receipt as the FINAL step of a successful
     // verify-and-extract — V-31. Its presence is the signal that extraction

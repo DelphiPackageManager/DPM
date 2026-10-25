@@ -198,8 +198,8 @@ begin
   Container.RegisterType<IArchiveValidator, TArchiveValidator>;
   Container.RegisterType<IReceiptService, TYamlReceiptService>;
   Container.RegisterType<IPackageSigningService, TPackageSigningService>;
-  // TYamlTrustStateService has a parameterless ctor that uses
-  // %APPDATA%\.dpm\trust-state.yaml.
+  // TYamlTrustStateService's ILogger-only ctor uses %APPDATA%\.dpm\trust-state.yaml;
+  // the (logger, path) one is test-only.
   Container.RegisterType<ITrustStateService, TYamlTrustStateService>.AsSingleton;
   // Non-interactive default — fails closed when no UI is wired. The CLI
   // and IDE register their own ITrustPromptStrategy on top of this default.

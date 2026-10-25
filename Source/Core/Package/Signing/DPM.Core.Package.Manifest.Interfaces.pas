@@ -85,6 +85,11 @@ type
   end;
   EManifestPath = class(EManifest);
   EManifestParse = class(EManifest);
+  //the package was made in a format newer than this client reads - raised with E7109.
+  EManifestFormatNotSupported = class(EManifest)
+  protected
+    class function DefaultCode : TErrorCode; override;
+  end;
 
 const
   cManifestFileName = 'dpm-manifest.json';
@@ -100,6 +105,13 @@ implementation
 class function EManifest.DefaultCode : TErrorCode;
 begin
   result := TErrorCode.E7107_ManifestInvalid;
+end;
+
+{ EManifestFormatNotSupported }
+
+class function EManifestFormatNotSupported.DefaultCode : TErrorCode;
+begin
+  result := TErrorCode.E7109_PackageFormatNotSupported;
 end;
 
 end.

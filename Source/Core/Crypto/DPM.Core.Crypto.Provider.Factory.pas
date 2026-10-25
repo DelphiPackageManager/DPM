@@ -144,10 +144,11 @@ begin
       else
         password := '';
       store := x509.OpenPfxStore(pfxBytes, password);
-      cert := store.FindByThumbprint('');
+      //the PFX's other certificates are the signing certificate's chain.
+      cert := store.FirstWithPrivateKey;
       if cert = nil then
       begin
-        logger.Error(TErrorCode.E7101_SigningProviderUnavailable, 'No certificate was found in the PFX file [' + options.PfxFile + '].');
+        logger.Error(TErrorCode.E7101_SigningProviderUnavailable, 'No certificate with a private key was found in the PFX file [' + options.PfxFile + '].');
         exit;
       end;
       result := TPfxSigningProvider.Create(cert);

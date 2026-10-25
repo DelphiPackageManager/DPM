@@ -115,12 +115,14 @@ type
     FSignedAttrs : TCmsAttributes;
     FUnsignedAttrs : TCmsAttributes;
     FDigestAlgorithm : THashAlgorithm;
+    FSignatureAlgorithmOid : string;
     FX509 : IX509Service;
     procedure Decode;
     procedure DecodeAttributes(paramType : DWORD; out attrs : TCmsAttributes);
     function DecodeSignerCert : ICertificate;
     procedure DecodeEmbeddedCerts;
     procedure DecodeDigestAlgorithm;
+    procedure DecodeSignatureAlgorithm;
   protected
     function SignerCertificate : ICertificate;
     function EmbeddedCertificates : TArray<ICertificate>;
@@ -131,6 +133,7 @@ type
     function FindSignedAttributeValues(const oid : AnsiString; out values : TArray<TBytes>) : boolean;
     function DerBytes : TBytes;
     function DigestAlgorithm : THashAlgorithm;
+    function SignatureAlgorithmOid : string;
     function EncryptedDigest : TBytes;
   public
     constructor Create(const der : TBytes; const x509 : IX509Service);
@@ -1304,6 +1307,7 @@ begin
   DecodeAttributes(CMSG_SIGNER_AUTH_ATTR_PARAM, FSignedAttrs);
   DecodeAttributes(CMSG_SIGNER_UNAUTH_ATTR_PARAM, FUnsignedAttrs);
   DecodeDigestAlgorithm;
+  DecodeSignatureAlgorithm;
 end;
 
 function TCmsSignedData.DecodeSignerCert : ICertificate;
@@ -1465,6 +1469,27 @@ begin
     FDigestAlgorithm := haSha384
   else if oid = szOID_NIST_SHA512 then
     FDigestAlgorithm := haSha512;
+end;
+
+procedure TCmsSignedData.DecodeSignatureAlgorithm;
+var
+  size : DWORD;
+  buf : TBytes;
+begin
+  FSignatureAlgorithmOid := '';
+  size := 0;
+  if not CryptMsgGetParam(FMsg, CMSG_SIGNER_INFO_PARAM, 0, nil, size) or (size = 0) then
+    exit;
+  SetLength(buf, size);
+  if not CryptMsgGetParam(FMsg, CMSG_SIGNER_INFO_PARAM, 0, @buf[0], size) then
+    exit;
+  if PCMSG_SIGNER_INFO(@buf[0]).HashEncryptionAlgorithm.pszObjId <> nil then
+    FSignatureAlgorithmOid := string(AnsiString(PCMSG_SIGNER_INFO(@buf[0]).HashEncryptionAlgorithm.pszObjId));
+end;
+
+function TCmsSignedData.SignatureAlgorithmOid : string;
+begin
+  result := FSignatureAlgorithmOid;
 end;
 
 function TCmsSignedData.SignerCertificate : ICertificate;

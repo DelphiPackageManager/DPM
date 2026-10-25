@@ -122,11 +122,14 @@ const
   // Bare RSA — discouraged but allowed for legacy CAs; the hash declared on
   // the signed-attribute side still determines actual digest strength.
   cRsa = '1.2.840.113549.1.1.1';
+  // Bare id-ecPublicKey - what CryptoAPI writes for some ECDSA keys, the ECDSA
+  // counterpart of bare RSA. The digest is the SignerInfo's, checked separately.
+  cEcPublicKey = '1.2.840.10045.2.1';
 begin
   result :=
     (oid = cRsaSha256) or (oid = cRsaSha384) or (oid = cRsaSha512) or
     (oid = cEcdsaSha256) or (oid = cEcdsaSha384) or
-    (oid = cRsa);
+    (oid = cRsa) or (oid = cEcPublicKey);
 end;
 
 class function TAlgorithmProfile.MinRsaKeyBits : integer;

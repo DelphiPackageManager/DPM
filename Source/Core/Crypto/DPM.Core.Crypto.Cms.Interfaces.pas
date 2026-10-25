@@ -68,6 +68,12 @@ type
     function FindSignedAttributeValues(const oid : AnsiString; out values : TArray<TBytes>) : boolean;
     function DerBytes : TBytes;
     function DigestAlgorithm : THashAlgorithm;
+    /// <summary>
+    /// The SignerInfo's signature algorithm OID (what CMS calls HashEncryptionAlgorithm) -
+    /// e.g. sha256WithRSAEncryption, ecdsa-with-SHA384, or a bare rsaEncryption /
+    /// ecPublicKey as CryptoAPI emits for some keys. '' when it can't be read.
+    /// </summary>
+    function SignatureAlgorithmOid : string;
     // Per RFC3161 + szOID_RFC3161_counterSign convention, the timestamp
     // covers the signer info's `encryptedDigest` (signature value) — not
     // the whole CMS. Adding/removing unsigned attributes does NOT change
