@@ -327,6 +327,7 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.Files.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Crypto.Chain.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Crypto.Pfx.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Repository.Directory.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.PE.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Crypto.Algorithms.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Package.Archive.pas"/>

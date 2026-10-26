@@ -118,7 +118,8 @@ uses
   DPM.Core.Utils.Directory,
   DPM.Core.Package.SearchResults,
   DPM.Core.Utils.DateTime,
-  DPM.Core.Package.ListItem, DPM.Core.Package.PackageLatestVersionInfo, DPM.Core.Utils.Hash;
+  DPM.Core.Package.ListItem, DPM.Core.Package.PackageLatestVersionInfo, DPM.Core.Utils.Hash,
+  DPM.Core.Utils.Files;
 
 { TDirectoryPackageRespository }
 
@@ -185,9 +186,10 @@ var
   sourceHashFile : string;
   destFile : string;
   destHashFile : string;
-
+  tempFile : string;
   sourceHash : string;
-  destHash : string;
+  copyHash : string;
+  lastError : Cardinal;
 begin
   result := false;
   //On-disk filename: {Id}-{Compiler}-{BinPlatforms}-{Version}.dpkg. BinPlatforms encodes the
@@ -206,38 +208,58 @@ begin
   destFile := IncludeTrailingPathDelimiter(localFolder) + ExtractFileName(sourceFile);
   if TPathUtils.IsRelativePath(destFile) then
     destFile := TPath.GetFullPath(destFile);
+  //The copy is what gets checked - the file in the folder can change while it is read - and it only becomes
+  //the cached package once it matches, so a bad copy never replaces a good cached one.
+  tempFile := TFileUtils.TempFileNameFor(destFile);
   try
-    ForceDirectories(ExtractFilePath(destFile));
-    Logger.Information('GET ' + sourceFile);
-    destHash := THashSHA256.GetHashStringFromFile(sourceFile);
-    sourceHashFile := sourceFile + cPackageHashAlgorithmExt;
+    try
+      ForceDirectories(ExtractFilePath(destFile));
+      Logger.Information('GET ' + sourceFile);
+      TFile.Copy(sourceFile, tempFile, true);
+      copyHash := THashSHA256.GetHashStringFromFile(tempFile);
+      sourceHashFile := sourceFile + cPackageHashAlgorithmExt;
 
-    //if a package hash file exists, verify the package file hasn't changed.
-    if FileExists(sourceHashFile) then
-    begin
-      sourceHash := TFile.ReadAllText(sourceHashFile);
-      //the file has changed since it was pushed - don't use it.
-      if not SameText(sourceHash, destHash) then
+      //if a package hash file exists, verify the package file hasn't changed.
+      if FileExists(sourceHashFile) then
       begin
-        RequestFailed('has a package file [' + sourceFile + '] that does not match its .sha256 file - it has been modified since it was pushed. ' +
-                      'If that was intentional, delete the .sha256 file.', TErrorCode.E1202_PackageHashMismatch);
+        sourceHash := Trim(TFile.ReadAllText(sourceHashFile));
+        //the file has changed since it was pushed - don't use it.
+        if not SameText(sourceHash, copyHash) then
+        begin
+          RequestFailed('has a package file [' + sourceFile + '] that does not match its .sha256 file - it has been modified since it was pushed. ' +
+                        'If that was intentional, delete the .sha256 file.', TErrorCode.E1202_PackageHashMismatch);
+          exit;
+        end;
+      end;
+      //the hash the package was listed with - it changed after it was found.
+      if (packageInfo.Hash <> '') and (not SameText(packageInfo.Hash, copyHash)) then
+      begin
+        RequestFailed('has a package file [' + sourceFile + '] that has changed since it was listed (sha256 ' + copyHash + ', expected ' +
+                      packageInfo.Hash + ').', TErrorCode.E1202_PackageHashMismatch);
         exit;
       end;
+
+      if not TFileUtils.TryReplaceFile(tempFile, destFile, lastError) then
+      begin
+        RequestFailed('could not copy [' + sourceFile + '] to [' + destFile + '] : ' + SysErrorMessage(lastError), TErrorCode.E3008_CacheWriteFailed);
+        exit;
+      end;
+      fileName := destFile;
+
+      destHashFile := destFile + cPackageHashAlgorithmExt;
+      TFileUtils.AtomicWriteAllText(destHashFile, copyHash, TEncoding.ASCII);
+
+      result := true;
+      Logger.Information('OK ' + sourceFile);
+    except
+      on e : Exception do
+      begin
+        RequestFailed('could not copy [' + sourceFile + '] to [' + destFile + '] : ' + e.Message);
+      end;
     end;
-
-    TFile.Copy(sourceFile, destFile, true);
-    fileName := destFile;
-
-    destHashFile := destFile + cPackageHashAlgorithmExt;
-    TFile.WriteAllText(destHashFile, destHash);
-
-    result := true;
-    Logger.Information('OK ' + sourceFile);
-  except
-    on e : Exception do
-    begin
-      RequestFailed('could not copy [' + sourceFile + '] to [' + destFile + '] : ' + e.Message);
-    end;
+  finally
+    if FileExists(tempFile) then
+      System.SysUtils.DeleteFile(tempFile);
   end;
 end;
 
@@ -966,7 +988,7 @@ begin
   begin
     hashFileName := fileName + cPackageHashAlgorithmExt;
     if FileExists(hashFileName) then
-      fileHash := TFile.ReadAllText(hashFileName)
+      fileHash := Trim(TFile.ReadAllText(hashFileName))
     else
     begin
       //calulate file hash and save it for next time

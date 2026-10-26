@@ -91,8 +91,9 @@ type
     FMapFileRead : boolean;
   protected
     function Generate(const cancellationToken : ICancellationToken; const options : TSBOMOptions) : boolean;
-    function GenerateForProject(const projectPath : string; const options : TSBOMOptions; const config : IConfiguration) : boolean;
-    function GenerateForPlatform(const editor : IProjectEditor;
+    function GenerateForProject(const cancellationToken : ICancellationToken; const projectPath : string; const options : TSBOMOptions;
+                                const config : IConfiguration) : boolean;
+    function GenerateForPlatform(const cancellationToken : ICancellationToken; const editor : IProjectEditor;
                                  const projectPath, projectName, outDir, configName : string;
                                  const compilerVersion : TCompilerVersion;
                                  const platform : TDPMPlatform;
@@ -103,7 +104,7 @@ type
     function GenerateForGroupAggregated(const groupProjPath : string; const dprojPaths : array of string;
                                         const options : TSBOMOptions; const config : IConfiguration;
                                         const cancellationToken : ICancellationToken) : boolean;
-    procedure EnumeratePackages(const report : TSBOMReport; const graphRoot : IPackageReference;
+    procedure EnumeratePackages(const cancellationToken : ICancellationToken; const report : TSBOMReport; const graphRoot : IPackageReference;
                                 const compilerVersion : TCompilerVersion; const platform : TDPMPlatform;
                                 const parentBomRef : string);
     procedure AddDelphiRuntime(const report : TSBOMReport; const compilerVersion : TCompilerVersion);
@@ -1223,7 +1224,7 @@ begin
           break;
         end;
         resolvedChild := projectsArray[i];
-        ok := GenerateForProject(resolvedChild, options, config) and ok;
+        ok := GenerateForProject(cancellationToken, resolvedChild, options, config) and ok;
       end;
       result := ok;
     end
@@ -1238,7 +1239,7 @@ begin
   end
   else if ext = '.dproj' then
   begin
-    result := GenerateForProject(projPath, options, config);
+    result := GenerateForProject(cancellationToken, projPath, options, config);
   end
   else
   begin
@@ -1247,7 +1248,8 @@ begin
   end;
 end;
 
-function TSBOMGenerator.GenerateForProject(const projectPath : string; const options : TSBOMOptions; const config : IConfiguration) : boolean;
+function TSBOMGenerator.GenerateForProject(const cancellationToken : ICancellationToken; const projectPath : string; const options : TSBOMOptions;
+                                          const config : IConfiguration) : boolean;
 var
   editor : IProjectEditor;
   compilerVersion : TCompilerVersion;
@@ -1357,7 +1359,7 @@ begin
   ok := true;
   for platform in selectedPlatforms do
   begin
-    if not GenerateForPlatform(editor, projectPath, projectName, outDir, configName,
+    if not GenerateForPlatform(cancellationToken, editor, projectPath, projectName, outDir, configName,
                                compilerVersion, platform, graphRoot, explicitInfo, rules, options) then
       ok := false;
   end;
@@ -1588,7 +1590,7 @@ begin
 
         //an SBOM without the packages would be wrong - nothing is written for the platform.
         try
-          EnumeratePackages(report, ctx.GraphRoot, ctx.CompilerVersion, platform, ctx.AppBomRef);
+          EnumeratePackages(cancellationToken, report, ctx.GraphRoot, ctx.CompilerVersion, platform, ctx.AppBomRef);
         except
           on e : Exception do
           begin
@@ -1653,7 +1655,7 @@ begin
   result := ok and not loadFailed;
 end;
 
-function TSBOMGenerator.GenerateForPlatform(const editor : IProjectEditor;
+function TSBOMGenerator.GenerateForPlatform(const cancellationToken : ICancellationToken; const editor : IProjectEditor;
                                             const projectPath, projectName, outDir, configName : string;
                                             const compilerVersion : TCompilerVersion;
                                             const platform : TDPMPlatform;
@@ -1708,7 +1710,7 @@ begin
 
     //an SBOM without the packages would be wrong - nothing is written for the platform.
     try
-      EnumeratePackages(report, graphRoot, compilerVersion, platform, report.RootComponent.BomRef);
+      EnumeratePackages(cancellationToken, report, graphRoot, compilerVersion, platform, report.RootComponent.BomRef);
     except
       on e : Exception do
       begin
@@ -1758,7 +1760,7 @@ begin
   end;
 end;
 
-procedure TSBOMGenerator.EnumeratePackages(const report : TSBOMReport;
+procedure TSBOMGenerator.EnumeratePackages(const cancellationToken : ICancellationToken; const report : TSBOMReport;
                                             const graphRoot : IPackageReference;
                                             const compilerVersion : TCompilerVersion;
                                             const platform : TDPMPlatform;
@@ -1875,7 +1877,7 @@ procedure TSBOMGenerator.EnumeratePackages(const report : TSBOMReport;
     identity := TPackageIdentity.Create('', node.Id, node.Version, compilerVersion);
     spec := nil;
     try
-      spec := FPackageCache.GetPackageSpec(identity);
+      spec := FPackageCache.GetPackageSpec(cancellationToken, identity);
     except
       on e : Exception do
         FLogger.Warning(TWarningCode.W3013_PackageSpecUnreadable, '[SBOM] could not load the spec for ' + node.Id + ' ' + node.Version.ToStringNoMeta + ' : ' + e.Message);

@@ -63,13 +63,13 @@ type
     ///  checks if the package is present as a folder, if not there but the file is
     ///  then it will call InstallPackage to extract it.
     /// </summary>
-    function EnsurePackage(const packageId : IPackageIdentity) : boolean;
+    function EnsurePackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean;
 
     // skipTrustRatchets bypasses the TOFU author-downgrade and repository
     // assurance ratchets (signature verification itself still runs). Used by the
     // DSpecCreator test workflow where a freshly built local .dpkg legitimately
     // lacks the repository signature its published counterpart carries.
-    function InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
+    function InstallPackageFromFile(const cancellationToken : ICancellationToken; const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
 
     // Scoped equivalent of the skipTrustRatchets parameter above: while set, every
     // ratchet evaluation in the cache (InstallPackageFromFile AND the cache-hit
@@ -83,13 +83,13 @@ type
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
 
     //gets the full package metadata including search paths.
-    function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
+    function GetPackageMetadata(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageMetadata;
 
     //gets the deserialized dspec file for the package.
-    function GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
+    function GetPackageSpec(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageSpec;
 
     //gets the platforms supported by a package from its dspec.
-    function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
+    function GetPackagePlatforms(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : TDPMPlatforms;
 
     /// <summary>
     ///  Returns true when the cached package ships source code - it has .pas files under its
@@ -119,7 +119,7 @@ type
     ///  installed packages. Returns false (and icon = nil) when the package
     ///  is not in the cache or has no embedded icon.
     /// </summary>
-    function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+    function TryGetPackageIcon(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
 
     /// <summary>
     ///  Resolves the SHA-256 hash of the package's .dpkg file. Self-heals

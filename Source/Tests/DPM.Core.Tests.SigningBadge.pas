@@ -63,21 +63,21 @@ type
     function GetPackagePath(const id : string; const version : string;
                             const compilerVersion : TCompilerVersion) : string; overload;
     function GetPackageFileFolder(const packageId : IPackageIdentity) : string;
-    function EnsurePackage(const packageId : IPackageIdentity) : boolean;
-    function InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
+    function EnsurePackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean;
+    function InstallPackageFromFile(const cancellationToken : ICancellationToken; const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
     procedure SetSkipTrustRatchets(const value : boolean);
     function GetPackageInfo(const cancellationToken : ICancellationToken;
                             const packageId : IPackageIdentity) : IPackageInfo;
-    function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
-    function GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
-    function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
+    function GetPackageMetadata(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageMetadata;
+    function GetPackageSpec(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageSpec;
+    function GetPackagePlatforms(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : TDPMPlatforms;
     function HasSource(const packageId : IPackageIdentity) : boolean;
     function GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;
                                                       const id : string;
                                                       const compilerVersion : TCompilerVersion;
                                                       const versionRange : TVersionRange;
                                                       const preRelease : boolean) : IList<IPackageInfo>;
-    function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+    function TryGetPackageIcon(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
     function GetPackageHash(const packageId : IPackageIdentity) : string;
     function FullReVerify(const cancellationToken : ICancellationToken) : integer;
     function GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
@@ -104,14 +104,14 @@ begin
   result := FFolder;
 end;
 function TStubCache.GetPackageFileFolder(const packageId : IPackageIdentity) : string; begin result := ''; end;
-function TStubCache.EnsurePackage(const packageId : IPackageIdentity) : boolean; begin result := false; end;
-function TStubCache.InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean; begin result := false; end;
+function TStubCache.EnsurePackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean; begin result := false; end;
+function TStubCache.InstallPackageFromFile(const cancellationToken : ICancellationToken; const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean; begin result := false; end;
 procedure TStubCache.SetSkipTrustRatchets(const value : boolean); begin end;
 function TStubCache.GetPackageInfo(const cancellationToken : ICancellationToken;
                                     const packageId : IPackageIdentity) : IPackageInfo; begin result := nil; end;
-function TStubCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata; begin result := nil; end;
-function TStubCache.GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec; begin result := nil; end;
-function TStubCache.GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms; begin result := []; end;
+function TStubCache.GetPackageMetadata(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageMetadata; begin result := nil; end;
+function TStubCache.GetPackageSpec(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageSpec; begin result := nil; end;
+function TStubCache.GetPackagePlatforms(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : TDPMPlatforms; begin result := []; end;
 function TStubCache.HasSource(const packageId : IPackageIdentity) : boolean; begin result := false; end;
 function TStubCache.GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;
                                                               const id : string;
@@ -121,7 +121,7 @@ function TStubCache.GetCachedPackageVersionsWithDependencies(const cancellationT
 begin
   result := TCollections.CreateList<IPackageInfo>;
 end;
-function TStubCache.TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+function TStubCache.TryGetPackageIcon(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
 begin
   result := false;
   icon := nil;

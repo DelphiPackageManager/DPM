@@ -8,10 +8,8 @@ uses
   DUnitX.TestFramework;
 
 type
-  //Exercises TPackageCache.GetPackageHash - the self-heal that mirrors the
-  //directory repo's hash handling so any consumer (SBOM, scan, verify) sees
-  //a consistent hash regardless of whether the .sha256 sidecar was written
-  //at download / push time.
+  //Exercises TPackageCache.GetPackageHash - the .sha256 sidecar written when the package was checked, or else
+  //the hash of the .dpkg as it is - and the hash a package info read from the cache carries.
   [TestFixture]
   TPackageCacheHashTests = class
   private
@@ -24,11 +22,13 @@ type
     [Test]
     procedure SidecarPresentIsReturnedAsIs;
     [Test]
-    procedure SidecarMissingIsComputedAndPersisted;
+    procedure SidecarMissingIsComputedButNotWritten;
     [Test]
     procedure NoDpkgOrSidecarReturnsEmpty;
     [Test]
     procedure SidecarComputedHashMatchesDirectHash;
+    [Test]
+    procedure CachedPackageInfoCarriesTheSidecarHash;
   end;
 
 implementation
@@ -46,7 +46,9 @@ uses
   DPM.Core.Spec.Reader,
   DPM.Core.Cache,
   DPM.Core.Utils.Hash,
-  DPM.Core.Dependency.Version;
+  DPM.Core.Dependency.Version,
+  VSoft.CancellationToken,
+  VSoft.CancellationToken.Impl;
 
 function TPackageCacheHashTests.MakeTempCacheRoot : string;
 var
@@ -139,7 +141,7 @@ begin
   end;
 end;
 
-procedure TPackageCacheHashTests.SidecarMissingIsComputedAndPersisted;
+procedure TPackageCacheHashTests.SidecarMissingIsComputedButNotWritten;
 var
   cacheRoot : string;
   cache : IPackageCache;
@@ -171,16 +173,12 @@ begin
       firstCallHash := cache.GetPackageHash(identity);
       Assert.AreEqual(expectedHash, firstCallHash,
                       'first call should compute and return the hash');
-      Assert.IsTrue(FileExists(sidecarPath),
-                    'first call should have persisted the sidecar');
-
-      //Touch the sidecar file with a known marker, then call again - we expect
-      //the second call to short-circuit to the sidecar (proving we don't
-      //recompute on every call).
-      WriteText(sidecarPath, 'previously-written-marker');
+      //a sidecar is only written for a package that has been checked - one made from whatever file is there
+      //(an error page a failed download saved, say) would vouch for it.
+      Assert.IsFalse(FileExists(sidecarPath),
+                     'the hash of an unchecked .dpkg must not be written as its sidecar');
       secondCallHash := cache.GetPackageHash(identity);
-      Assert.AreEqual('previously-written-marker', secondCallHash,
-                      'second call should read the persisted sidecar, not recompute');
+      Assert.AreEqual(expectedHash, secondCallHash);
     finally
       IInterface(identity)._Release;
     end;
@@ -247,6 +245,50 @@ begin
     finally
       IInterface(identity)._Release;
     end;
+  finally
+    if DirectoryExists(cacheRoot) then
+      TDirectory.Delete(cacheRoot, true);
+  end;
+end;
+
+procedure TPackageCacheHashTests.CachedPackageInfoCarriesTheSidecarHash;
+const
+  cHash = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+var
+  cacheRoot : string;
+  cache : IPackageCache;
+  identity : IPackageIdentity;
+  idFolder : string;
+  info : IPackageInfo;
+begin
+  //the .sha256 file holds it in hex - it was read as if it were base64, which made a different 96 character hash.
+  cacheRoot := MakeTempCacheRoot;
+  try
+    cache := MakeCache;
+    cache.Location := cacheRoot;
+    identity := TPackageIdentity.Create('', 'Sample.Pkg', TPackageVersion.Parse('1.2.3'), TCompilerVersion.Delphi12_0);
+    idFolder := IncludeTrailingPathDelimiter(cacheRoot) + 'delphi12.0' + PathDelim + 'Sample.Pkg' + PathDelim;
+    WriteText(idFolder + 'Sample.Pkg-delphi12.0-0000000000000011-1.2.3.dpkg', 'package');
+    WriteText(idFolder + 'Sample.Pkg-delphi12.0-0000000000000011-1.2.3.dpkg' + cPackageHashAlgorithmExt, cHash);
+    WriteText(idFolder + '1.2.3' + PathDelim + cPackageDspecFile,
+      'metadata:' + sLineBreak +
+      '  id: Sample.Pkg' + sLineBreak +
+      '  version: 1.2.3' + sLineBreak +
+      '  description: cache hash test package' + sLineBreak +
+      '  authors:' + sLineBreak +
+      '    - DPM' + sLineBreak +
+      '  license: Apache-2.0' + sLineBreak +
+      'targetPlatforms:' + sLineBreak +
+      '  - compiler: 12.0' + sLineBreak +
+      '    platforms: [Win32]' + sLineBreak +
+      '    template: default' + sLineBreak +
+      'templates:' + sLineBreak +
+      '  - name: default' + sLineBreak +
+      '    source:' + sLineBreak +
+      '      - src: ''Source\*.pas''' + sLineBreak);
+    info := cache.GetPackageInfo(TCancellationTokenSourceFactory.Create.Token, identity);
+    Assert.IsNotNull(info, 'the cached package info');
+    Assert.AreEqual(cHash, info.Hash, false);
   finally
     if DirectoryExists(cacheRoot) then
       TDirectory.Delete(cacheRoot, true);

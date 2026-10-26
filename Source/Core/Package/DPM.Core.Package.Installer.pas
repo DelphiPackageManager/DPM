@@ -124,7 +124,7 @@ type
     //excludeIds (lowercase, may be nil) : packages to leave out, with anything only reachable through them.
     function CreateProjectRefs(const cancellationToken: ICancellationToken; const rootnode: IPackageReference; const excludeIds : ISet<string>; const projectReferences: IList<IPackageReference>): boolean; overload;
 
-    function CollectSearchPaths(const packageGraph: IPackageReference; const resolvedPackages: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
+    function CollectSearchPaths(const cancellationToken: ICancellationToken; const packageGraph: IPackageReference; const resolvedPackages: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
                                 const compilerVersion: TCompilerVersion; const platform: TDPMPlatform;  const searchPaths: IList<string>): boolean;
 
     function DownloadPackages(const cancellationToken: ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
@@ -161,7 +161,7 @@ type
 
     //Builds a {lowercase id -> spec} dict by walking the resolved graph and reading specs from the cache.
     //Used after the per-platform install/restore loop so design packages can be loaded once per project.
-    function BuildPackageSpecsFromGraph(const graph: IPackageReference; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageSpec>;
+    function BuildPackageSpecsFromGraph(const cancellationToken: ICancellationToken; const graph: IPackageReference; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageSpec>;
 
     //Restore fast path: validate the existing graph against each package's declared dependencies.
     //If every transient is present and within its parent's version range, the graph is good (rgsValid) and
@@ -243,7 +243,7 @@ type
     function DoBuildCachedPackage(const cancellationToken: ICancellationToken; const Options: TCacheOptions; const packageInfo: IPackageInfo): boolean;
 
     // user specified a package file - puts it in the cache and points the options at the package it holds.
-    function PreparePackageFileInstall(const Options: TInstallOptions): boolean;
+    function PreparePackageFileInstall(const cancellationToken : ICancellationToken; const Options: TInstallOptions): boolean;
 
     // Install = plan, then apply : see PlanInstall/ApplyInstallPlan. Planning hands back the configuration and the
     // projects it loaded, so Install can apply the plan to them rather than loading them again.
@@ -508,7 +508,7 @@ begin
     if cancellationToken.IsCancelled then
       exit(false);
     searchPaths := TCollections.CreateList<string>;
-    if not CollectSearchPaths(graph, resolvedPackages, resolvedPackages, compilerVersion, platform, searchPaths) then
+    if not CollectSearchPaths(cancellationToken, graph, resolvedPackages, resolvedPackages, compilerVersion, platform, searchPaths) then
       exit(false);
     if not projectEditor.AddSearchPaths(platform, searchPaths, config.PackageCacheLocation) then
       exit(false);
@@ -519,7 +519,7 @@ begin
   result := projectEditor.SaveProject;
 end;
 
-function TPackageInstaller.CollectSearchPaths(const packageGraph: IPackageReference; const resolvedPackages: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
+function TPackageInstaller.CollectSearchPaths(const cancellationToken: ICancellationToken; const packageGraph: IPackageReference; const resolvedPackages: IList<IPackageInfo>; const compiledPackages: IList<IPackageInfo>;
                                               const compilerVersion: TCompilerVersion; const platform: TDPMPlatform;  const searchPaths: IList<string>): boolean;
 var
   packageInfo: IPackageInfo;
@@ -730,7 +730,7 @@ begin
   for packageInfo in orderedPackages do
   begin
     errorMark := FLogger.ErrorCount;
-    packageSpec := FPackageCache.GetPackageSpec(packageInfo);
+    packageSpec := FPackageCache.GetPackageSpec(cancellationToken, packageInfo);
     if packageSpec = nil then
     begin
       //the cache (or the spec reader) may already have said why.
@@ -1521,7 +1521,7 @@ begin
     //and read the package info back from the now-cached spec. The build step below still resolves and
     //compiles the dependency graph from the configured sources, exactly as the id-based path does.
     //the cache says why it couldn't.
-    if not FPackageCache.InstallPackageFromFile(Options.PackageFile, Options.SkipTrustRatchets) then
+    if not FPackageCache.InstallPackageFromFile(cancellationToken, Options.PackageFile, Options.SkipTrustRatchets) then
       exit;
     packageFileName := ChangeFileExt(ExtractFileName(Options.PackageFile), '');
     if not TPackageIdentity.TryCreateFromString(FLogger, packageFileName, '', packageIdentity) then
@@ -1953,7 +1953,7 @@ begin
   if resolvedPackages.Count = 0 then
     exit;
 
-  packageSpecs := BuildPackageSpecsFromGraph(graph, options.compilerVersion);
+  packageSpecs := BuildPackageSpecsFromGraph(cancellationToken, graph, options.compilerVersion);
   //not the operation's failure : the project's own platforms are built, a failure here just means the
   //design components may not load - so its problems become one warning.
   quietLogger := TDemotingLogger.Create(FLogger);
@@ -1973,6 +1973,7 @@ function TPackageInstaller.EnsurePackageInCache(const cancellationToken: ICancel
 var
   packageFileName: string;
   sourceType: TSourceType;
+  downloadInfo: IPackageInfo;
 begin
   result := false;
 
@@ -1986,14 +1987,27 @@ begin
     exit;
   end;
 
-  if FPackageCache.EnsurePackage(packageInfo) then
+  if FPackageCache.EnsurePackage(cancellationToken, packageInfo) then
     exit(true);
 
   // not in the cache, so we need to get it from the repository - the repository manager says why it
   // couldn't, and the cache why it couldn't use the download.
-  if not FRepositoryManager.DownloadPackage(cancellationToken, packageInfo, FPackageCache.GetPackageFileFolder(packageInfo), packageFileName) then
+  //
+  // A download is checked against the hash its source publishes. A package info read from the cache (no
+  // source name) carries the cache's own record of the hash instead - the very thing that just proved
+  // unusable - so ask the sources for theirs.
+  downloadInfo := packageInfo;
+  if packageInfo.SourceName = '' then
+  begin
+    downloadInfo := FRepositoryManager.GetPackageInfo(cancellationToken, packageInfo);
+    if cancellationToken.IsCancelled then
+      exit;
+    if downloadInfo = nil then
+      downloadInfo := packageInfo;
+  end;
+  if not FRepositoryManager.DownloadPackage(cancellationToken, downloadInfo, FPackageCache.GetPackageFileFolder(packageInfo), packageFileName) then
     exit;
-  result := FPackageCache.InstallPackageFromFile(packageFileName);
+  result := FPackageCache.InstallPackageFromFile(cancellationToken, packageFileName);
 end;
 
 function TPackageInstaller.DownloadPackages(const cancellationToken : ICancellationToken; const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
@@ -2016,7 +2030,7 @@ begin
     if not packageSpecs.ContainsKey(LowerCase(packageInfo.Id)) then
     begin
       errorMark := FLogger.ErrorCount;
-      spec := FPackageCache.GetPackageSpec(packageInfo);
+      spec := FPackageCache.GetPackageSpec(cancellationToken, packageInfo);
       if spec = nil then
       begin
         //the cache (or the spec reader) may already have said why.
@@ -2110,7 +2124,7 @@ begin
         node.UseSource := true;
     end);
 
-  if not CollectSearchPaths(projectPackageGraph, supportedPackages, compiledPackages, projectEditor.compilerVersion, platform, packageSearchPaths) then
+  if not CollectSearchPaths(cancellationToken, projectPackageGraph, supportedPackages, compiledPackages, projectEditor.compilerVersion, platform, packageSearchPaths) then
     exit;
 
   //Copy-local runs at build time (the output dir is only reliably known then), not here. At
@@ -2482,7 +2496,7 @@ begin
       plan := CreateFailedPlan(TErrorCode.E3004_PackageFileNotFound, 'The package file [' + options.PackageFile + '] does not exist.');
       exit;
     end;
-    if not PreparePackageFileInstall(options) then
+    if not PreparePackageFileInstall(cancellationToken, options) then
     begin
       plan := CreateFailedPlan;
       exit;
@@ -2829,7 +2843,7 @@ begin
   //the dproj now reflects the install, so its resolutions and graph count for the other projects.
   FContext.CommitProject(work.ProjectFile);
   //Load design-time packages once per project - design BPLs are per-IDE, not per-platform. CLI context is a no-op.
-  InstallDesignPackages(cancellationToken, work.ProjectFile, BuildPackageSpecsFromGraph(work.Graph, work.Options.CompilerVersion));
+  InstallDesignPackages(cancellationToken, work.ProjectFile, BuildPackageSpecsFromGraph(cancellationToken, work.Graph, work.Options.CompilerVersion));
   FLogger.Success('Install succeeded for [' + work.ProjectFile + ']', true);
 end;
 
@@ -2875,7 +2889,7 @@ begin
   result := FContext.InstallDesignPackages(cancellationToken, projectFile, packageSpecs);
 end;
 
-function TPackageInstaller.BuildPackageSpecsFromGraph(const graph: IPackageReference; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageSpec>;
+function TPackageInstaller.BuildPackageSpecsFromGraph(const cancellationToken: ICancellationToken; const graph: IPackageReference; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageSpec>;
 var
   specs: IDictionary<string, IPackageSpec>;
 begin
@@ -2891,7 +2905,7 @@ begin
       if specs.ContainsKey(key) then
         exit;
       identity := TPackageIdentity.Create('', node.Id, node.Version, compilerVersion);
-      spec := FPackageCache.GetPackageSpec(identity);
+      spec := FPackageCache.GetPackageSpec(cancellationToken, identity);
       if spec <> nil then
         specs[key] := spec;
     end);
@@ -3207,14 +3221,14 @@ begin
     end);
 end;
 
-function TPackageInstaller.PreparePackageFileInstall(const Options: TInstallOptions): boolean;
+function TPackageInstaller.PreparePackageFileInstall(const cancellationToken : ICancellationToken; const Options: TInstallOptions): boolean;
 var
   packageIdString: string;
   packageIdentity: IPackageIdentity;
   packageSpec: IPackageSpec;
 begin
   // get the package into the cache first then just install as normal
-  result := FPackageCache.InstallPackageFromFile(Options.PackageFile);
+  result := FPackageCache.InstallPackageFromFile(cancellationToken, Options.PackageFile);
   if not result then
     exit;
 
@@ -3231,7 +3245,7 @@ begin
 
   //Restrict to the platforms the package actually supports - read from the now-cached spec.
   //ValidateAndSetCompilerPlatforms downstream intersects this with the project's enabled platforms.
-  packageSpec := FPackageCache.GetPackageSpec(packageIdentity);
+  packageSpec := FPackageCache.GetPackageSpec(cancellationToken, packageIdentity);
   if (packageSpec <> nil) and (packageSpec.TargetPlatform <> nil) then
     Options.platforms := packageSpec.TargetPlatform.Platforms
   else
@@ -3389,7 +3403,7 @@ begin
       'Nothing was built and the project file was left unchanged. To resolve: reinstall ' +
       'the affected package(s), delete them from the cache (' + FPackageCache.Location + ') and restore, or ' +
       'restore with --ignoreHashLocks (-ihl) to refresh the recorded locks from the cache.', true);
-    packageSpecs := BuildPackageSpecsFromGraph(finalGraph, Options.compilerVersion);
+    packageSpecs := BuildPackageSpecsFromGraph(cancellationToken, finalGraph, Options.compilerVersion);
     for mismatchedId in mismatchedPackageIds do
       packageSpecs.Remove(LowerCase(mismatchedId));
     InstallDesignPackages(cancellationToken, projectFile, packageSpecs);
@@ -3441,7 +3455,7 @@ begin
     //loop above only built the project's target platforms. Non-fatal : the restore already
     //succeeded, and a failure here just means the design components may not load.
     EnsureDesignHostPlatformCompiled(cancellationToken, Options, finalGraph, platforms);
-    InstallDesignPackages(cancellationToken, projectFile, BuildPackageSpecsFromGraph(finalGraph, Options.compilerVersion));
+    InstallDesignPackages(cancellationToken, projectFile, BuildPackageSpecsFromGraph(cancellationToken, finalGraph, Options.compilerVersion));
   end;
 end;
 

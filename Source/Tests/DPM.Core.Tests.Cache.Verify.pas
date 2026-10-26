@@ -28,6 +28,7 @@ type
     FManifestVersion : string;
     FFormatNotSupported : boolean;
     function MakeCache(const fingerprint : string) : IPackageCache;
+    function NewCache(const fingerprint : string; const logger : ILogger) : IPackageCache;
     procedure WriteTestPackage(const fileName : string; const specVersion : string = '1.2.3'; const specCompiler : string = '12.0');
     procedure WriteText(const path : string; const text : string);
     procedure WriteBuildOutput;
@@ -63,18 +64,46 @@ type
     procedure InstallPackageFromFile_DspecForAnotherCompiler_Fails;
     [Test]
     procedure InstallPackageFromFile_NewerFormat_IsE7109;
+
+    //A .dpkg left from an earlier session is only used if it is still a package matching its .sha256 file.
+    [Test]
+    procedure EnsurePackage_RemovesALeftoverThatIsNotAPackage;
+    [Test]
+    procedure EnsurePackage_RemovesALeftoverNotMatchingItsHashFile;
+    [Test]
+    procedure EnsurePackage_UsesALeftoverMatchingItsHashFile;
+    [Test]
+    procedure InstallPackageFromFile_AFileThatFailsDoesNotReplaceTheCachedOne;
+    [Test]
+    procedure InstallPackageFromFile_RecordsTheHashOfThePackage;
+    //the IDE and the CLI, or parallel builds, installing the same package into one cache.
+    [Test]
+    procedure InstallPackageFromFile_ConcurrentInstallsOfOnePackage_AllSucceed;
+    //waiting for another process to finish with the package stops when the operation is cancelled.
+    [Test]
+    procedure InstallPackageFromFile_WaitingForAnotherProcess_StopsWhenCancelled;
+    //a token already cancelled - the IDE's main thread - takes a free lock, and doesn't wait for a held one.
+    [Test]
+    procedure CancelledToken_TakesAFreeLock_AndDoesNotWaitForAHeldOne;
   end;
 
 implementation
 
 uses
+  WinApi.Windows,
   System.Classes,
   System.IOUtils,
+  System.Types,
+  System.SyncObjs,
+  System.Diagnostics,
   System.Zip,
   VSoft.CancellationToken,
   VSoft.CancellationToken.Impl,
   DPM.Core.Diagnostics,
   DPM.Core.Constants,
+  DPM.Core.Types,
+  DPM.Core.Package.Interfaces,
+  DPM.Core.Package.Classes,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Reader,
   DPM.Core.Cache,
@@ -276,8 +305,14 @@ begin
 end;
 
 function TPackageCacheVerifyTests.MakeCache(const fingerprint : string) : IPackageCache;
+begin
+  FLogger := TTestLogger.Create;
+  FLoggerRef := FLogger;
+  result := NewCache(fingerprint, FLoggerRef);
+end;
+
+function TPackageCacheVerifyTests.NewCache(const fingerprint : string; const logger : ILogger) : IPackageCache;
 var
-  logger : ILogger;
   specReader : IPackageSpecReader;
   trustPolicy : ITrustPolicyService;
   signingService : IPackageSigningService;
@@ -285,9 +320,6 @@ var
 begin
   //hold each dep in an interface local first: constructing an interfaced object directly in a
   //parameter position can leak in Delphi. No trust state - the TOFU ratchets aren't under test.
-  FLogger := TTestLogger.Create;
-  FLoggerRef := FLogger;
-  logger := FLoggerRef;
   specReader := TPackageSpecReader.Create(logger);
   trustPolicy := TFakeTrustPolicy.Create(fingerprint);
   signingService := TFakeSigningService.Create(trustPolicy, FManifestPackageId, FManifestVersion, FFormatNotSupported);
@@ -360,7 +392,7 @@ var
   failures : integer;
 begin
   cache := MakeCache('policy-a');
-  Assert.IsTrue(cache.InstallPackageFromFile(FPackageFileName), 'precondition: the package installs into the cache');
+  Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName), 'precondition: the package installs into the cache');
   WriteBuildOutput;
 
   failures := cache.FullReVerify(TCancellationTokenSourceFactory.Create.Token);
@@ -377,7 +409,7 @@ var
   failures : integer;
 begin
   cache := MakeCache('policy-a');
-  Assert.IsTrue(cache.InstallPackageFromFile(FPackageFileName), 'precondition: the package installs into the cache');
+  Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName), 'precondition: the package installs into the cache');
   WriteBuildOutput;
 
   //same cache folder, new policy - the receipt on disk now carries a stale fingerprint.
@@ -398,9 +430,9 @@ var
   failures : integer;
 begin
   cache := MakeCache('policy-a');
-  Assert.IsTrue(cache.InstallPackageFromFile(FPackageFileName), 'precondition: the package installs into the cache');
+  Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName), 'precondition: the package installs into the cache');
   WriteText(TPath.Combine(FPackageFolder, cManifestFileName), '{"files":["tampered"]}');
-  DeleteFile(TPath.Combine(FPackageFolder, cTestSourceFile));
+  System.SysUtils.DeleteFile(TPath.Combine(FPackageFolder, cTestSourceFile));
 
   failures := cache.FullReVerify(TCancellationTokenSourceFactory.Create.Token);
 
@@ -415,10 +447,10 @@ var
   failures : integer;
 begin
   cache := MakeCache('policy-a');
-  Assert.IsTrue(cache.InstallPackageFromFile(FPackageFileName), 'precondition: the package installs into the cache');
+  Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName), 'precondition: the package installs into the cache');
   //no receipt = the extraction never completed (it is written last).
-  DeleteFile(TPath.Combine(FPackageFolder, cReceiptFileName));
-  DeleteFile(TPath.Combine(FPackageFolder, cTestSourceFile));
+  System.SysUtils.DeleteFile(TPath.Combine(FPackageFolder, cReceiptFileName));
+  System.SysUtils.DeleteFile(TPath.Combine(FPackageFolder, cTestSourceFile));
 
   failures := cache.FullReVerify(TCancellationTokenSourceFactory.Create.Token);
 
@@ -433,7 +465,7 @@ var
   failures : integer;
 begin
   cache := MakeCache('policy-a');
-  Assert.IsTrue(cache.InstallPackageFromFile(FPackageFileName), 'precondition: the package installs into the cache');
+  Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName), 'precondition: the package installs into the cache');
   WriteBuildOutput;
   //edited while debugging with "use source", say.
   WriteText(TPath.Combine(FPackageFolder, cTestSourceFile), 'unit Sample.Unit; //edited');
@@ -453,10 +485,10 @@ var
 begin
   //hashing every file on every cache hit would make each restore pay for it - that is cache verify's job.
   cache := MakeCache('policy-a');
-  Assert.IsTrue(cache.InstallPackageFromFile(FPackageFileName), 'precondition: the package installs into the cache');
+  Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName), 'precondition: the package installs into the cache');
   WriteText(TPath.Combine(FPackageFolder, cTestSourceFile), 'unit Sample.Unit; //edited');
 
-  Assert.IsTrue(cache.InstallPackageFromFile(FPackageFileName));
+  Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName));
 
   Assert.AreEqual('unit Sample.Unit; //edited', TFile.ReadAllText(TPath.Combine(FPackageFolder, cTestSourceFile)));
   Assert.IsFalse(FLogger.HasWarning(TWarningCode.W3018_CacheExtractionRepaired));
@@ -467,14 +499,14 @@ var
   cache : IPackageCache;
 begin
   cache := MakeCache('policy-a');
-  Assert.IsTrue(cache.InstallPackageFromFile(FPackageFileName), 'precondition: the package installs into the cache');
+  Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName), 'precondition: the package installs into the cache');
   Assert.IsFalse(IsGitRegistryPackageFolder(FPackageFolder), 'no marker');
 
   //a marker in an extraction from a .dpkg (which always has a receipt) must not turn off its re-checks.
   WriteText(TPath.Combine(FPackageFolder, cGitPackageMarkerFile), 'abc');
   Assert.IsFalse(IsGitRegistryPackageFolder(FPackageFolder), 'marker beside a receipt');
 
-  DeleteFile(TPath.Combine(FPackageFolder, cReceiptFileName));
+  System.SysUtils.DeleteFile(TPath.Combine(FPackageFolder, cReceiptFileName));
   Assert.IsTrue(IsGitRegistryPackageFolder(FPackageFolder), 'marker without a receipt - a git registry install');
 end;
 
@@ -485,7 +517,7 @@ begin
   //a validly signed 1.2.2 renamed to stand in for 1.2.3 - the signatures vouch for the manifest, not the name.
   FManifestVersion := '1.2.2';
   cache := MakeCache('policy-a');
-  Assert.IsFalse(cache.InstallPackageFromFile(FPackageFileName));
+  Assert.IsFalse(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName));
   Assert.IsTrue(FLogger.HasError(TErrorCode.E7012_PackageIdentityMismatch), FLogger.Messages.Text);
   Assert.AreEqual(1, FLoggerRef.ErrorCount, FLogger.Messages.Text);
   Assert.IsFalse(FileExists(FPackageFileName), 'the misnamed package was left in the cache');
@@ -498,7 +530,7 @@ var
 begin
   FManifestPackageId := 'Other.Pkg';
   cache := MakeCache('policy-a');
-  Assert.IsFalse(cache.InstallPackageFromFile(FPackageFileName));
+  Assert.IsFalse(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName));
   Assert.IsTrue(FLogger.HasError(TErrorCode.E7012_PackageIdentityMismatch), FLogger.Messages.Text);
 end;
 
@@ -510,7 +542,7 @@ begin
   FManifestPackageId := 'sample.pkg';
   FManifestVersion := '1.2.3+build.7';
   cache := MakeCache('policy-a');
-  Assert.IsTrue(cache.InstallPackageFromFile(FPackageFileName), FLogger.Messages.Text);
+  Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName), FLogger.Messages.Text);
   Assert.AreEqual(0, FLoggerRef.ErrorCount, FLogger.Messages.Text);
 end;
 
@@ -521,7 +553,7 @@ begin
   //the dspec is what the rest of DPM reads - its dependencies above all.
   WriteTestPackage(FPackageFileName, '9.9.9');
   cache := MakeCache('policy-a');
-  Assert.IsFalse(cache.InstallPackageFromFile(FPackageFileName));
+  Assert.IsFalse(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName));
   Assert.IsTrue(FLogger.HasError(TErrorCode.E7012_PackageIdentityMismatch), FLogger.Messages.Text);
   Assert.AreEqual(1, FLoggerRef.ErrorCount, FLogger.Messages.Text);
   Assert.IsFalse(FileExists(FPackageFileName), 'the misnamed package was left in the cache');
@@ -534,7 +566,7 @@ var
 begin
   WriteTestPackage(FPackageFileName, '1.2.3', '11.0');
   cache := MakeCache('policy-a');
-  Assert.IsFalse(cache.InstallPackageFromFile(FPackageFileName));
+  Assert.IsFalse(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName));
   Assert.IsTrue(FLogger.HasError(TErrorCode.E7012_PackageIdentityMismatch), FLogger.Messages.Text);
   Assert.IsFalse(DirectoryExists(FPackageFolder), 'the misnamed package''s extraction was left in the cache');
 end;
@@ -546,9 +578,288 @@ begin
   //the cause is an old client, not a bad package - say so, once.
   FFormatNotSupported := true;
   cache := MakeCache('policy-a');
-  Assert.IsFalse(cache.InstallPackageFromFile(FPackageFileName));
+  Assert.IsFalse(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName));
   Assert.IsTrue(FLogger.HasError(TErrorCode.E7109_PackageFormatNotSupported), FLogger.Messages.Text);
   Assert.AreEqual(1, FLoggerRef.ErrorCount, FLogger.Messages.Text);
+end;
+
+type
+  //installs a package, as another process would.
+  TInstallThread = class(TThread)
+  private
+    FCache : IPackageCache;
+    FFileName : string;
+    FLog : TTestLogger;
+  protected
+    procedure Execute; override;
+  public
+    constructor Create(const cache : IPackageCache; const fileName : string; const log : TTestLogger);
+  end;
+
+constructor TInstallThread.Create(const cache : IPackageCache; const fileName : string; const log : TTestLogger);
+begin
+  inherited Create(true);
+  FreeOnTerminate := false;
+  FCache := cache;
+  FFileName := fileName;
+  FLog := log;
+end;
+
+procedure TInstallThread.Execute;
+begin
+  try
+    if FCache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FFileName) then
+      FLog.Messages.Add('installed');
+  except
+    on e : Exception do
+      FLog.Messages.Add('raised : ' + e.Message);
+  end;
+end;
+
+type
+  //holds the lock on a package folder, as another DPM process installing it would.
+  THoldLockThread = class(TThread)
+  private
+    FLockName : string;
+    FHeld : TEvent;
+    FRelease : TEvent;
+  protected
+    procedure Execute; override;
+  public
+    constructor Create(const lockName : string);
+    destructor Destroy; override;
+    property Held : TEvent read FHeld;
+    property Release : TEvent read FRelease;
+  end;
+
+constructor THoldLockThread.Create(const lockName : string);
+begin
+  inherited Create(true);
+  FreeOnTerminate := false;
+  FLockName := lockName;
+  FHeld := TEvent.Create(nil, true, false, '');
+  FRelease := TEvent.Create(nil, true, false, '');
+end;
+
+destructor THoldLockThread.Destroy;
+begin
+  FHeld.Free;
+  FRelease.Free;
+  inherited;
+end;
+
+procedure THoldLockThread.Execute;
+var
+  lock : THandle;
+begin
+  lock := CreateMutex(nil, false, PChar(FLockName));
+  if lock = 0 then
+    exit;
+  try
+    if WaitForSingleObject(lock, 10000) <> WAIT_OBJECT_0 then
+      exit;
+    FHeld.SetEvent;
+    FRelease.WaitFor(60000);
+    ReleaseMutex(lock);
+  finally
+    CloseHandle(lock);
+  end;
+end;
+
+//the name TPackageCache locks a package folder under - one mutex per folder, shared by every DPM process.
+function PackageLockName(const packageFolder : string) : string;
+var
+  stream : TBytesStream;
+begin
+  stream := TBytesStream.Create(TEncoding.UTF8.GetBytes(LowerCase(ExcludeTrailingPathDelimiter(ExpandFileName(packageFolder)))));
+  try
+    result := 'Local\DPM.Cache.' + Copy(THashSHA256.GetHashString(stream), 1, 16);
+  finally
+    stream.Free;
+  end;
+end;
+
+function TestIdentity : IPackageIdentity;
+begin
+  result := TPackageIdentity.Create('', 'Sample.Pkg', TPackageVersion.Parse('1.2.3'), TCompilerVersion.Delphi12_0);
+end;
+
+//copies of a package left part way - none may stay behind.
+function TempCopiesIn(const folder : string) : integer;
+begin
+  result := Length(TDirectory.GetFiles(folder, '*.tmp-*'));
+end;
+
+procedure TPackageCacheVerifyTests.EnsurePackage_RemovesALeftoverThatIsNotAPackage;
+var
+  cache : IPackageCache;
+begin
+  //what a failed download saved under the package's name.
+  TFile.WriteAllText(FPackageFileName, '<html><body>502 Bad Gateway</body></html>');
+  TFile.WriteAllText(FPackageFileName + cPackageHashAlgorithmExt, THashSHA256.GetHashStringFromFile(FPackageFileName));
+  cache := MakeCache('policy-a');
+  Assert.IsFalse(cache.EnsurePackage(TCancellationTokenSourceFactory.Create.Token, TestIdentity), 'an error page is not a package');
+  Assert.AreEqual(0, FLoggerRef.ErrorCount, 'the package is downloaded again - not an error : ' + FLogger.Messages.Text);
+  Assert.IsFalse(FileExists(FPackageFileName), 'the error page was left in the cache');
+  Assert.IsFalse(FileExists(FPackageFileName + cPackageHashAlgorithmExt), 'its hash file was left in the cache');
+end;
+
+procedure TPackageCacheVerifyTests.EnsurePackage_RemovesALeftoverNotMatchingItsHashFile;
+var
+  cache : IPackageCache;
+begin
+  TFile.WriteAllText(FPackageFileName + cPackageHashAlgorithmExt, StringOfChar('a', 64));
+  cache := MakeCache('policy-a');
+  Assert.IsFalse(cache.EnsurePackage(TCancellationTokenSourceFactory.Create.Token, TestIdentity));
+  Assert.AreEqual(0, FLoggerRef.ErrorCount, FLogger.Messages.Text);
+  Assert.IsFalse(FileExists(FPackageFileName), 'a package that is not what was recorded was left in the cache');
+  Assert.IsFalse(DirectoryExists(FPackageFolder), 'it was extracted');
+end;
+
+procedure TPackageCacheVerifyTests.EnsurePackage_UsesALeftoverMatchingItsHashFile;
+var
+  cache : IPackageCache;
+begin
+  TFile.WriteAllText(FPackageFileName + cPackageHashAlgorithmExt, THashSHA256.GetHashStringFromFile(FPackageFileName) + sLineBreak);
+  cache := MakeCache('policy-a');
+  Assert.IsTrue(cache.EnsurePackage(TCancellationTokenSourceFactory.Create.Token, TestIdentity), FLogger.Messages.Text);
+  Assert.IsTrue(FileExists(TPath.Combine(FPackageFolder, cPackageDspecFile)), 'it was not extracted');
+end;
+
+procedure TPackageCacheVerifyTests.InstallPackageFromFile_AFileThatFailsDoesNotReplaceTheCachedOne;
+var
+  cache : IPackageCache;
+  goodHash : string;
+  otherFile : string;
+begin
+  cache := MakeCache('policy-a');
+  Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName), 'precondition: the package installs into the cache');
+  goodHash := THashSHA256.GetHashStringFromFile(FPackageFileName);
+  //the same name, from somewhere else, and broken.
+  otherFile := TPath.Combine(TPath.Combine(FCacheRoot, 'elsewhere'), cTestPackageFile);
+  ForceDirectories(ExtractFilePath(otherFile));
+  TFile.WriteAllText(otherFile, 'not a package');
+
+  Assert.IsFalse(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, otherFile));
+  Assert.AreEqual(goodHash, THashSHA256.GetHashStringFromFile(FPackageFileName), 'the cached package was overwritten by one that failed');
+  Assert.AreEqual(0, TempCopiesIn(ExtractFilePath(FPackageFileName)), 'the copy that failed was left in the cache');
+end;
+
+procedure TPackageCacheVerifyTests.InstallPackageFromFile_RecordsTheHashOfThePackage;
+var
+  cache : IPackageCache;
+begin
+  //left from an older copy of the package - the SBOM reads it.
+  TFile.WriteAllText(FPackageFileName + cPackageHashAlgorithmExt, StringOfChar('a', 64));
+  cache := MakeCache('policy-a');
+  Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName), FLogger.Messages.Text);
+  Assert.AreEqual(THashSHA256.GetHashStringFromFile(FPackageFileName), Trim(TFile.ReadAllText(FPackageFileName + cPackageHashAlgorithmExt)));
+end;
+
+procedure TPackageCacheVerifyTests.InstallPackageFromFile_ConcurrentInstallsOfOnePackage_AllSucceed;
+const
+  cRounds = 6;
+var
+  loggers : array[0..1] of TTestLogger;
+  loggerRefs : array[0..1] of ILogger;
+  caches : array[0..1] of IPackageCache;
+  threads : array[0..1] of TInstallThread;
+  round, i : integer;
+begin
+  for i := 0 to 1 do
+  begin
+    loggers[i] := TTestLogger.Create;
+    loggerRefs[i] := loggers[i];
+    caches[i] := NewCache('policy-a', loggerRefs[i]);
+  end;
+  for round := 1 to cRounds do
+  begin
+    //nothing extracted - both have to extract it.
+    if DirectoryExists(FPackageFolder) then
+      TDirectory.Delete(FPackageFolder, true);
+    for i := 0 to 1 do
+      threads[i] := TInstallThread.Create(caches[i], FPackageFileName, loggers[i]);
+    try
+      for i := 0 to 1 do
+        threads[i].Start;
+      for i := 0 to 1 do
+        threads[i].WaitFor;
+    finally
+      for i := 0 to 1 do
+        threads[i].Free;
+    end;
+    for i := 0 to 1 do
+    begin
+      Assert.IsTrue(loggers[i].Messages.IndexOf('installed') >= 0, Format('round %d, install %d : %s', [round, i, loggers[i].Messages.Text]));
+      loggers[i].Messages.Clear;
+      Assert.AreEqual(0, loggerRefs[i].ErrorCount, loggers[i].Messages.Text);
+    end;
+    Assert.AreEqual(cTestSourceContent, TFile.ReadAllText(TPath.Combine(FPackageFolder, cTestSourceFile)), 'the extraction is not whole');
+  end;
+end;
+
+procedure TPackageCacheVerifyTests.InstallPackageFromFile_WaitingForAnotherProcess_StopsWhenCancelled;
+var
+  holder : THoldLockThread;
+  cache : IPackageCache;
+  cancellation : ICancellationTokenSource;
+  stopwatch : TStopwatch;
+  installed : boolean;
+begin
+  cache := MakeCache('policy-a');
+  cancellation := TCancellationTokenSourceFactory.Create;
+  holder := THoldLockThread.Create(PackageLockName(FPackageFolder));
+  try
+    holder.Start;
+    Assert.AreEqual(Ord(wrSignaled), Ord(holder.Held.WaitFor(10000)), 'the other process did not take the lock');
+    //Ctrl+C a moment after the install starts waiting.
+    TThread.CreateAnonymousThread(
+      procedure
+      begin
+        Sleep(300);
+        cancellation.Cancel;
+      end).Start;
+    stopwatch := TStopwatch.StartNew;
+    installed := cache.InstallPackageFromFile(cancellation.Token, FPackageFileName);
+    stopwatch.Stop;
+    Assert.IsFalse(installed, 'it installed while another process held the package');
+    Assert.IsTrue(stopwatch.ElapsedMilliseconds < 5000, Format('cancelling took %d ms to stop the wait', [stopwatch.ElapsedMilliseconds]));
+    Assert.AreEqual(0, FLoggerRef.ErrorCount, 'a cancelled wait reports nothing - whoever cancelled says so : ' + FLogger.Messages.Text);
+  finally
+    holder.Release.SetEvent;
+    holder.WaitFor;
+    holder.Free;
+  end;
+  //and once the other process is done with it, it installs.
+  Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName), FLogger.Messages.Text);
+end;
+
+procedure TPackageCacheVerifyTests.CancelledToken_TakesAFreeLock_AndDoesNotWaitForAHeldOne;
+var
+  holder : THoldLockThread;
+  cache : IPackageCache;
+  cancelled : ICancellationTokenSource;
+  stopwatch : TStopwatch;
+begin
+  cache := MakeCache('policy-a');
+  cancelled := TCancellationTokenSourceFactory.Create;
+  cancelled.Cancel;
+  Assert.IsTrue(cache.InstallPackageFromFile(cancelled.Token, FPackageFileName), 'a free lock should be taken : ' + FLogger.Messages.Text);
+
+  holder := THoldLockThread.Create(PackageLockName(FPackageFolder));
+  try
+    holder.Start;
+    Assert.AreEqual(Ord(wrSignaled), Ord(holder.Held.WaitFor(10000)), 'the other process did not take the lock');
+    stopwatch := TStopwatch.StartNew;
+    Assert.IsFalse(cache.InstallPackageFromFile(cancelled.Token, FPackageFileName), 'it installed while another process held the package');
+    stopwatch.Stop;
+    Assert.IsTrue(stopwatch.ElapsedMilliseconds < 1000, Format('it waited %d ms', [stopwatch.ElapsedMilliseconds]));
+    Assert.AreEqual(0, FLoggerRef.ErrorCount, FLogger.Messages.Text);
+  finally
+    holder.Release.SetEvent;
+    holder.WaitFor;
+    holder.Free;
+  end;
 end;
 
 initialization

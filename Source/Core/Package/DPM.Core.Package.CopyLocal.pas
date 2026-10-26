@@ -285,7 +285,7 @@ var
     identity := TPackageIdentity.Create('', node.Id, node.Version, compilerVersion);
     spec := nil;
     try
-      spec := FPackageCache.GetPackageSpec(identity);
+      spec := FPackageCache.GetPackageSpec(cancellationToken, identity);
     except
       on e : Exception do
         FLogger.Warning(TWarningCode.W3013_PackageSpecUnreadable, '[copylocal] could not load the spec for ' + node.Id + ' ' + node.Version.ToStringNoMeta + ' : ' + e.Message);

@@ -353,18 +353,13 @@ var
   template: ISpecTemplate;
   dep: ISpecDependency;
   newDep: IPackageDependency;
-  bytes: TBytes;
   i: integer;
 begin
   inherited Create(sourceName, manifest);
   FDependencies := TCollections.CreateList<IPackageDependency>;
-  FHash := hash;
+  //hex, as a .sha256 file holds it - unlike a feed's json, which has it in base64.
+  FHash := Trim(hash);
   FHashAlgorithm := hashAlgorithm;
-  if FHash <> '' then
-  begin
-    bytes := TBase64.Decode(FHash);
-    FHash := THashSHA256.DigestAsString(bytes);
-  end;
 
   // Get dependencies from the template referenced by TargetPlatform
   if manifest.TargetPlatform <> nil then

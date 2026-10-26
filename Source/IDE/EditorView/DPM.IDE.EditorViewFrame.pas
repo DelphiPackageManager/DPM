@@ -276,6 +276,18 @@ uses
 type
   TFilterProc = procedure(const searchTxt : string) of object;
 
+//For a cache read on the main thread : the lock on a package is taken only if it is free, so the IDE never waits
+//for another DPM process (a command line restore, say) to finish with it - a package being installed right now
+//is treated as not cached.
+function NoWaitToken : ICancellationToken;
+var
+  source : ICancellationTokenSource;
+begin
+  source := TCancellationTokenSourceFactory.Create;
+  source.Cancel;
+  result := source.Token;
+end;
+
 function FindPackageRef(const node : IPackageReference; const searchId : string; const topLevelOnly : boolean) : IPackageReference;
 var
   Reference : IPackageReference;
@@ -1178,7 +1190,7 @@ begin
     exit;
   for pkg in packageIds do
   begin
-    metadata := FPackageCache.GetPackageMetadata(pkg);
+    metadata := FPackageCache.GetPackageMetadata(NoWaitToken, pkg);
     if metadata = nil then
       continue;
     item := TDPMPackageSearchResultItem.FromMetaData('', metadata, '', '');
@@ -1321,7 +1333,7 @@ begin
   if Package.Installed and (FPackageCache <> nil) then
   begin
     identity := TPackageIdentity.Create('', Id, Package.Version, IDECompilerVersion);
-    if FPackageCache.TryGetPackageIcon(identity, cachedIcon) and (cachedIcon <> nil) then
+    if FPackageCache.TryGetPackageIcon(NoWaitToken, identity, cachedIcon) and (cachedIcon <> nil) then
     begin
       try
         cachedImage := TPackageIconImage.Create(cachedIcon);

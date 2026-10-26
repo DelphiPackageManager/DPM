@@ -93,7 +93,15 @@ type
     function BuildResultFromReceipt(const receipt : TVerificationReceipt) : TVerificationResult;
     //InstallPackageFromFile, reporting through logger - a TDemotingLogger when trying a .dpkg left on disk,
     //whose problems are not the operation's because the package is downloaded again.
-    function DoInstallPackageFromFile(const logger : ILogger; const packageFileName : string; const skipTrustRatchets : boolean) : boolean;
+    function DoInstallPackageFromFile(const logger : ILogger; const cancellationToken : ICancellationToken; const packageFileName : string;
+                                      const skipTrustRatchets : boolean) : boolean;
+    //DoInstallPackageFromFile's work once the package's lock is held : verifies workFile - packageFilePath, or a copy
+    //beside it of a file from elsewhere - puts it in place as packageFilePath once it passes, and extracts it.
+    function InstallLockedPackageFile(const logger : ILogger; const workFile : string; const packageFilePath : string;
+                                      const packageIndentity : IPackageIdentity; const packageFolder : string;
+                                      const skipTrustRatchets : boolean) : boolean;
+    //EnsurePackage's work once the package's lock is held.
+    function CheckAndRepairPackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean;
   protected
     procedure SetLocation(const value : string);
     function GetLocation : string;
@@ -108,15 +116,15 @@ type
 
     function GetPackageFileFolder(const packageId : IPackageIdentity) : string;
 
-    function EnsurePackage(const packageId : IPackageIdentity) : Boolean;
+    function EnsurePackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : Boolean;
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
 
-    function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
+    function GetPackageMetadata(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageMetadata;
 
-    function GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
+    function GetPackageSpec(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageSpec;
 
-    function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
+    function GetPackagePlatforms(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : TDPMPlatforms;
 
     function HasSource(const packageId : IPackageIdentity) : boolean;
 
@@ -128,11 +136,11 @@ type
 
     function GetPackageHash(const packageId : IPackageIdentity) : string;
 
-    function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+    function TryGetPackageIcon(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
 
 //    function InstallPackage(const packageId : IPackageIdentity; const saveFile : boolean; const source : string = '') : boolean;
 
-    function InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
+    function InstallPackageFromFile(const cancellationToken : ICancellationToken; const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
 
     procedure SetSkipTrustRatchets(const value : boolean);
 
@@ -155,6 +163,7 @@ type
 implementation
 
 uses
+  WinApi.Windows,
   System.Classes,
   System.SysUtils,
   System.IOUtils,
@@ -169,8 +178,12 @@ uses
   DPM.Core.Package.Icon,
   DPM.Core.Package.Manifest.Interfaces,
   DPM.Core.Utils.Hash,
+  DPM.Core.Utils.Files,
   DPM.Core.Utils.System,
   DPM.Core.Utils.Strings;
+
+const
+  cPackageLockWaitMs = 5 * 60 * 1000;
 
 //A package id is a folder name in the cache, and it comes from wherever the package did - a feed's json,
 //a package's own spec. Anything but a package id's shape - words separated by dots, so never a separator,
@@ -197,13 +210,115 @@ end;
 
 //A package that isn't what its name says is never installed - a validly signed old version renamed to
 //stand in for the current one, say. The file is removed so the next restore fetches the package again.
-procedure RejectMisnamedPackage(const logger : ILogger; const packageFilePath : string; const packageIdentity : IPackageIdentity;
-                                const problem : string);
+//fileToRemove is the file that was checked - packageFilePath, or the copy of a file from elsewhere beside it.
+procedure RejectMisnamedPackage(const logger : ILogger; const packageFilePath : string; const fileToRemove : string;
+                                const packageIdentity : IPackageIdentity; const problem : string);
 begin
   logger.Error(TErrorCode.E7012_PackageIdentityMismatch, Format('The package file [%s] is not %s %s - %s.',
     [ExtractFileName(packageFilePath), packageIdentity.Id, packageIdentity.Version.ToStringNoMeta, problem]));
-  if FileExists(packageFilePath) and (not DeleteFile(packageFilePath)) then
-    logger.Verbose('Unable to remove [' + packageFilePath + '] from the package cache : ' + SysErrorMessage(GetLastError));
+  if FileExists(fileToRemove) and (not System.SysUtils.DeleteFile(fileToRemove)) then
+    logger.Verbose('Unable to remove [' + fileToRemove + '] from the package cache : ' + SysErrorMessage(GetLastError));
+end;
+
+//One process at a time works on a package folder - the IDE and the CLI, or parallel builds, share the cache.
+//One mutex per package folder, so different packages don't wait on each other. A thread holding it can take
+//it again, so EnsurePackage's repair can install the package it holds the lock for.
+function AcquirePackageLock(const logger : ILogger; const packageFolder : string; const cancellationToken : ICancellationToken;
+                            out lock : THandle) : boolean;
+var
+  stream : TBytesStream;
+  lockName : string;
+  waitHandles : array[0..1] of THandle;
+  handleCount : DWORD;
+begin
+  result := false;
+  stream := TBytesStream.Create(TEncoding.UTF8.GetBytes(LowerCase(ExcludeTrailingPathDelimiter(ExpandFileName(packageFolder)))));
+  try
+    lockName := 'Local\DPM.Cache.' + Copy(THashSHA256.GetHashString(stream), 1, 16);
+  finally
+    stream.Free;
+  end;
+  lock := CreateMutex(nil, false, PChar(lockName));
+  if lock = 0 then
+  begin
+    logger.Error(TErrorCode.E3008_CacheWriteFailed, 'Unable to lock [' + packageFolder + '] in the package cache : ' + SysErrorMessage(GetLastError));
+    exit;
+  end;
+  //the lock, or the operation being cancelled - whichever comes first. A token that is already cancelled takes the
+  //lock only if it is free - the IDE's main thread doesn't wait. With both signalled, the lock (the lower index) wins.
+  waitHandles[0] := lock;
+  handleCount := 1;
+  if cancellationToken <> nil then
+  begin
+    waitHandles[1] := cancellationToken.Handle;
+    handleCount := 2;
+  end;
+  case WaitForMultipleObjects(handleCount, @waitHandles[0], false, cPackageLockWaitMs) of
+    //abandoned : the process that held it died part way - what it left is checked like anything else in the cache.
+    WAIT_OBJECT_0, WAIT_ABANDONED_0 :
+      result := true;
+    //cancelled - whoever cancelled says so.
+    WAIT_OBJECT_0 + 1 : ;
+    WAIT_TIMEOUT :
+      logger.Error(TErrorCode.E3019_PackageCacheBusy, 'Another DPM process has been working on [' + packageFolder + '] in the package cache ' +
+        'for more than 5 minutes - try again once it has finished.');
+  else
+    logger.Error(TErrorCode.E3008_CacheWriteFailed, 'Unable to lock [' + packageFolder + '] in the package cache : ' + SysErrorMessage(GetLastError));
+  end;
+  if not result then
+  begin
+    CloseHandle(lock);
+    lock := 0;
+  end;
+end;
+
+procedure ReleasePackageLock(var lock : THandle);
+begin
+  if lock = 0 then
+    exit;
+  ReleaseMutex(lock);
+  CloseHandle(lock);
+  lock := 0;
+end;
+
+//A .dpkg left from an earlier session is only worth trying if it is still the file it was : a package (not an
+//error page a failed download saved under its name) that matches its .sha256 file. reason says why not.
+function LocalPackageFileUsable(const packageFilePath : string; out reason : string) : boolean;
+var
+  stream : TFileStream;
+  signature : array[0..3] of Byte;
+  hashFile : string;
+  recorded : string;
+begin
+  result := false;
+  reason := '';
+  try
+    stream := TFileStream.Create(packageFilePath, fmOpenRead or fmShareDenyWrite);
+    try
+      if (stream.Read(signature, SizeOf(signature)) <> SizeOf(signature)) or
+         (signature[0] <> $50) or (signature[1] <> $4B) or (signature[2] <> $03) or (signature[3] <> $04) then
+      begin
+        reason := 'it is not a package (zip) file';
+        exit;
+      end;
+    finally
+      stream.Free;
+    end;
+    hashFile := packageFilePath + cPackageHashAlgorithmExt;
+    if FileExists(hashFile) then
+    begin
+      recorded := Trim(TFile.ReadAllText(hashFile));
+      if (recorded <> '') and (not SameText(recorded, THashSHA256.GetHashStringFromFile(packageFilePath))) then
+      begin
+        reason := 'it does not match its ' + cPackageHashAlgorithmExt + ' file';
+        exit;
+      end;
+    end;
+    result := true;
+  except
+    on e : Exception do
+      reason := e.Message;
+  end;
 end;
 
 //an extraction that can't be used - leave nothing behind for the cache-hit checks to find.
@@ -306,7 +421,7 @@ begin
         [i + 1, total, ExtractFileName(allPackages[i])]), true);
       try
         //what is wrong with it was reported by InstallPackageFromFile.
-        if not InstallPackageFromFile(allPackages[i]) then
+        if not InstallPackageFromFile(cancellationToken, allPackages[i]) then
           Inc(failures);
       except
         on e : Exception do
@@ -1149,11 +1264,11 @@ begin
   end;
 end;
 
-function TPackageCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
+function TPackageCache.GetPackageMetadata(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageMetadata;
 var
   spec : IPackageSpec;
 begin
-  spec := GetPackageSpec(packageId);
+  spec := GetPackageSpec(cancellationToken, packageId);
   if spec = nil then
     exit;
   result := TPackageMetadata.CreateFromManifest('', spec);
@@ -1182,7 +1297,7 @@ begin
   result := TPath.GetFullPath(FLocation)
 end;
 
-function TPackageCache.GetPackageSpec(const packageId: IPackageIdentity): IPackageSpec;
+function TPackageCache.GetPackageSpec(const cancellationToken : ICancellationToken; const packageId: IPackageIdentity): IPackageSpec;
 var
   packageFolder : string;
   metaDataFile : string;
@@ -1198,7 +1313,7 @@ begin
     FCacheLock.Leave;
   end;
 
-  if not EnsurePackage(packageId) then
+  if not EnsurePackage(cancellationToken, packageId) then
   begin
     FLogger.Debug('Package dspec file [' + packageId.ToString + '] not found in cache.');
     exit;
@@ -1224,12 +1339,12 @@ begin
   end;
 end;
 
-function TPackageCache.GetPackagePlatforms(const packageId: IPackageIdentity): TDPMPlatforms;
+function TPackageCache.GetPackagePlatforms(const cancellationToken : ICancellationToken; const packageId: IPackageIdentity): TDPMPlatforms;
 var
   spec: IPackageSpec;
 begin
   result := [];
-  spec := GetPackageSpec(packageId);
+  spec := GetPackageSpec(cancellationToken, packageId);
   if (spec <> nil) and (spec.TargetPlatform <> nil) then
     result := spec.TargetPlatform.Platforms;
 end;
@@ -1357,10 +1472,9 @@ begin
       exit;
   end;
 
-  //Sidecar missing or unreadable - compute from the .dpkg and persist for
-  //next time (mirrors TDirectoryPackageRepository.DoGetPackageMetaData's
-  //self-heal). Other tooling - SBOM, vulnerability scanners, signature
-  //verification - can then assume the sidecar is present.
+  //Sidecar missing or unreadable - the hash of the .dpkg as it is. Not written as its sidecar : a sidecar is
+  //only ever written for a package that has been checked (PlacePackageFile, a verified download), otherwise one
+  //made from a bad file - an error page saved under the package's name - would vouch for it.
   dpkgPattern := packageId.Id + '-' + CompilerToString(packageId.CompilerVersion) + '-*-'
               + packageId.Version.ToStringNoMeta + cPackageFileExt;
   try
@@ -1381,21 +1495,9 @@ begin
       result := '';
     end;
   end;
-  if result = '' then
-    exit;
-
-  //Persist the sidecar. Best-effort: if the cache directory is somehow
-  //read-only we still return the computed hash, we just won't have cached
-  //it for the next call.
-  try
-    TFile.WriteAllText(dpkgPath + cPackageHashAlgorithmExt, result);
-  except
-    on e : Exception do
-      FLogger.Debug('[Cache] could not write hash sidecar [' + dpkgPath + cPackageHashAlgorithmExt + '] : ' + e.Message);
-  end;
 end;
 
-function TPackageCache.TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+function TPackageCache.TryGetPackageIcon(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
 var
   packageFolder : string;
   svgPath : string;
@@ -1409,7 +1511,7 @@ begin
     exit;
   //EnsurePackage extracts a stray .dpkg if the folder is missing - cheap no-op once a package
   //has been installed by either the CLI or the IDE.
-  if not EnsurePackage(packageId) then
+  if not EnsurePackage(cancellationToken, packageId) then
     exit;
   packageFolder := GetPackagePath(packageId);
   svgPath := IncludeTrailingPathDelimiter(packageFolder) + cIconFileSVG;
@@ -1444,20 +1546,11 @@ begin
   end;
 end;
 
-function TPackageCache.EnsurePackage(const packageId : IPackageIdentity) : Boolean;
+function TPackageCache.EnsurePackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : Boolean;
 var
   packageFolder : string;
-  packageFileFolder : string;
-  dspecFile : string;
-  searchPattern : string;
-  matchingFiles : TStringDynArray;
   key : string;
-  receipt : TVerificationReceipt;
-  cachedVerifyResult : TVerificationResult;
-  ratchetBlocked : boolean;
-  isGitPackage : boolean;
-  priorAuthor : TAuthorTrustEntry;
-  hadPriorAuthor : boolean;
+  packageLock : THandle;
 begin
   key := MakeCacheKey(packageId);
   FCacheLock.Enter;
@@ -1481,6 +1574,43 @@ begin
     FCacheLock.Leave;
   end;
 
+  //another DPM process (the IDE and the CLI, parallel builds) may be installing or repairing this package - it is
+  //checked once that is done, so this one doesn't take apart what the other is putting together.
+  if not AcquirePackageLock(FLogger, GetPackagePath(packageId), cancellationToken, packageLock) then
+    exit(false);
+  try
+    result := CheckAndRepairPackage(cancellationToken, packageId);
+  finally
+    ReleasePackageLock(packageLock);
+  end;
+
+  if result then
+  begin
+    FCacheLock.Enter;
+    try
+      FExtractionVerified.Add(key);
+    finally
+      FCacheLock.Leave;
+    end;
+  end;
+end;
+
+function TPackageCache.CheckAndRepairPackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean;
+var
+  packageFolder : string;
+  packageFileFolder : string;
+  dspecFile : string;
+  searchPattern : string;
+  matchingFiles : TStringDynArray;
+  receipt : TVerificationReceipt;
+  cachedVerifyResult : TVerificationResult;
+  ratchetBlocked : boolean;
+  isGitPackage : boolean;
+  priorAuthor : TAuthorTrustEntry;
+  hadPriorAuthor : boolean;
+  speculativeLogger : ILogger;
+  reason : string;
+begin
   ratchetBlocked := false;
 
   //check if we have a package folder and dspec.
@@ -1557,30 +1687,32 @@ begin
       matchingFiles := TDirectory.GetFiles(packageFileFolder, searchPattern, TSearchOption.soTopDirectoryOnly);
       if Length(matchingFiles) > 0 then
       begin
-        //speculative - if the .dpkg left on disk is no good, the caller downloads the package again, so
-        //what is wrong with it is not the operation's problem.
-        try
-          result := DoInstallPackageFromFile(TDemotingLogger.Create(FLogger), matchingFiles[0], false);
-        except
-          on e : Exception do
-          begin
-            FLogger.Debug('[PackageCache] Unable to use [' + matchingFiles[0] + '] : ' + e.Message);
-            result := false;
+        //not to be trusted - it goes, and the caller downloads the package again.
+        if not LocalPackageFileUsable(matchingFiles[0], reason) then
+        begin
+          FLogger.Verbose('[PackageCache] Not using [' + matchingFiles[0] + '] - ' + reason + '. Removing it.');
+          System.SysUtils.DeleteFile(matchingFiles[0]);
+          System.SysUtils.DeleteFile(matchingFiles[0] + cPackageHashAlgorithmExt);
+        end
+        else
+        begin
+          //speculative - if the .dpkg left on disk is no good, the caller downloads the package again, so
+          //what is wrong with it is not the operation's problem.
+          speculativeLogger := TDemotingLogger.Create(FLogger);
+          try
+            result := DoInstallPackageFromFile(speculativeLogger, cancellationToken, matchingFiles[0], false);
+          except
+            on e : Exception do
+            begin
+              FLogger.Debug('[PackageCache] Unable to use [' + matchingFiles[0] + '] : ' + e.Message);
+              result := false;
+            end;
           end;
         end;
       end;
     end;
   end;
 
-  if result then
-  begin
-    FCacheLock.Enter;
-    try
-      FExtractionVerified.Add(key);
-    finally
-      FCacheLock.Leave;
-    end;
-  end;
 end;
 
 
@@ -1589,12 +1721,13 @@ begin
   FSkipTrustRatchets := value;
 end;
 
-function TPackageCache.InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
+function TPackageCache.InstallPackageFromFile(const cancellationToken : ICancellationToken; const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
 begin
-  result := DoInstallPackageFromFile(FLogger, packageFileName, skipTrustRatchets);
+  result := DoInstallPackageFromFile(FLogger, cancellationToken, packageFileName, skipTrustRatchets);
 end;
 
-function TPackageCache.DoInstallPackageFromFile(const logger : ILogger; const packageFileName : string; const skipTrustRatchets : boolean) : boolean;
+function TPackageCache.DoInstallPackageFromFile(const logger : ILogger; const cancellationToken : ICancellationToken; const packageFileName : string;
+                                                const skipTrustRatchets : boolean) : boolean;
 var
   packageFilePath : string;
   fileName : string;
@@ -1602,13 +1735,8 @@ var
   packageFolder : string;
   packageFileFolder : string;
   key : string;
-  verifyResult : TVerificationResult;
-  priorAuthor : TAuthorTrustEntry;
-  hadPriorAuthor : boolean;
-  i : integer;
-  declaredVersion : TPackageVersion;
-  identityProblem : string;
-  spec : IPackageSpec;
+  workFile : string;
+  packageLock : THandle;
 begin
   result := false;
   logger.Debug('[PackageCache] installing from file : ' + packageFileName);
@@ -1654,24 +1782,81 @@ begin
     exit;
   end;
 
-  //if the source file isn't already in its canonical cache location, copy it there.
   packageFilePath := IncludeTrailingPathDelimiter(packageFileFolder) + ExtractFileName(packageFileName);
-  if not SameText(packageFileName, packageFilePath) then
-  begin
-    logger.Debug('[PackageCache] Copying Package file to   : ' + packageFilePath);
-    try
-      TFile.Copy(packageFileName, packageFilePath, true);
-    except
-      on e : Exception do
-      begin
-        logger.Error(TErrorCode.E3008_CacheWriteFailed, 'Unable to copy [' + packageFileName + '] into the package cache : ' + e.Message);
-        exit;
+
+  //another DPM process (the IDE and the CLI, parallel builds) may be installing this package into the same cache.
+  if not AcquirePackageLock(logger, packageFolder, cancellationToken, packageLock) then
+    exit;
+  try
+    //A package from elsewhere is checked as a copy beside the cached one, and only replaces it once it passes -
+    //a file that fails never overwrites a good cached package.
+    workFile := packageFilePath;
+    if not SameText(packageFileName, packageFilePath) then
+    begin
+      workFile := TFileUtils.TempFileNameFor(packageFilePath);
+      logger.Debug('[PackageCache] Copying Package file to   : ' + workFile);
+      try
+        TFile.Copy(packageFileName, workFile, true);
+      except
+        on e : Exception do
+        begin
+          if FileExists(workFile) then
+            System.SysUtils.DeleteFile(workFile);
+          logger.Error(TErrorCode.E3008_CacheWriteFailed, 'Unable to copy [' + packageFileName + '] into the package cache : ' + e.Message);
+          exit;
+        end;
       end;
     end;
+    try
+      result := InstallLockedPackageFile(logger, workFile, packageFilePath, packageIndentity, packageFolder, skipTrustRatchets);
+    finally
+      if (not SameText(workFile, packageFilePath)) and FileExists(workFile) then
+        System.SysUtils.DeleteFile(workFile);
+    end;
+  finally
+    ReleasePackageLock(packageLock);
   end;
+end;
 
-  //work with packageFilePath now.
+//Puts a checked package in place as the cached .dpkg, and records its hash beside it. The sidecar is only ever
+//written for a package that has been checked, from the file now in place - one left from an older copy would
+//vouch for the wrong file.
+function PlacePackageFile(const logger : ILogger; const workFile : string; const packageFilePath : string) : boolean;
+var
+  lastError : Cardinal;
+  hashFile : string;
+begin
+  result := false;
+  if (not SameText(workFile, packageFilePath)) and (not TFileUtils.TryReplaceFile(workFile, packageFilePath, lastError)) then
+  begin
+    logger.Error(TErrorCode.E3008_CacheWriteFailed, 'Unable to put [' + ExtractFileName(packageFilePath) + '] in the package cache : ' + SysErrorMessage(lastError));
+    exit;
+  end;
+  result := true;
+  hashFile := packageFilePath + cPackageHashAlgorithmExt;
+  try
+    TFileUtils.AtomicWriteAllText(hashFile, THashSHA256.GetHashStringFromFile(packageFilePath), TEncoding.ASCII);
+  except
+    on e : Exception do
+      logger.Warning(TWarningCode.W1205_HashFileWriteFailed, 'Unable to write the hash file [' + hashFile + '] : ' + e.Message);
+  end;
+end;
 
+function TPackageCache.InstallLockedPackageFile(const logger : ILogger; const workFile : string; const packageFilePath : string;
+                                                const packageIndentity : IPackageIdentity; const packageFolder : string;
+                                                const skipTrustRatchets : boolean) : boolean;
+var
+  verifyResult : TVerificationResult;
+  priorAuthor : TAuthorTrustEntry;
+  hadPriorAuthor : boolean;
+  i : integer;
+  declaredVersion : TPackageVersion;
+  identityProblem : string;
+  spec : IPackageSpec;
+  placed : boolean;
+begin
+  result := false;
+  placed := false;
   // Signing — the central verification gate (architecture doc §Verification
   // Workflow, plan §1.7). Verify the package *before* extraction so a hostile
   // archive never gets written to disk. The signing service is optional:
@@ -1679,7 +1864,7 @@ begin
   if FSigningService <> nil then
   begin
     try
-      verifyResult := FSigningService.VerifyPackage(packageFilePath,
+      verifyResult := FSigningService.VerifyPackage(workFile,
         FTrustPolicy.GetEffectivePolicy);
     except
       on e : Exception do
@@ -1706,7 +1891,7 @@ begin
       identityProblem := DeclaredIdentityProblem(packageIndentity, 'manifest', verifyResult.ManifestPackageId, declaredVersion);
     if identityProblem <> '' then
     begin
-      RejectMisnamedPackage(logger, packageFilePath, packageIndentity, identityProblem);
+      RejectMisnamedPackage(logger, packageFilePath, workFile, packageIndentity, identityProblem);
       exit;
     end;
 
@@ -1755,6 +1940,11 @@ begin
         exit;
     end;
 
+    //it passed - it is the cached package now.
+    if not PlacePackageFile(logger, workFile, packageFilePath) then
+      exit;
+    placed := true;
+
     //Already extracted from this very package - keep it. The installer builds into the package folder
     //(lib\, bpl\ and the package.{platform}.bom compile-skip marker), so emptying it would throw that away
     //and force a recompile - re-verifying the cache did that to every package. Only the receipt is
@@ -1767,6 +1957,8 @@ begin
       exit;
     end;
   end;
+  if (not placed) and (not PlacePackageFile(logger, workFile, packageFilePath)) then
+    exit;
 
   //Ensure a clean extraction target. Stale files from a previous (possibly partial, or a
   //different-layout) extraction collide with the archive contents - TZipFile overwrites in
@@ -1813,7 +2005,7 @@ begin
           identityProblem := Format('its %s says it is for %s', [cPackageDspecFile, CompilerToString(spec.TargetPlatform.Compiler)]);
         if identityProblem <> '' then
         begin
-          RejectMisnamedPackage(logger, packageFilePath, packageIndentity, identityProblem);
+          RejectMisnamedPackage(logger, packageFilePath, packageFilePath, packageIndentity, identityProblem);
           result := false;
         end;
       end;

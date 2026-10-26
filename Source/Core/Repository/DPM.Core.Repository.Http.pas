@@ -105,7 +105,8 @@ uses
   DPM.Core.Package.Classes,
   DPM.Core.Package.SearchResults,
   DPM.Core.Sources.ServiceIndex,
-  DPM.Core.Package.ListItem, DPM.Core.Utils.Hash;
+  DPM.Core.Package.ListItem, DPM.Core.Utils.Hash,
+  DPM.Core.Utils.Files;
 
 
 const
@@ -117,6 +118,11 @@ const
   //Matches the value documented in the console option help. Uploads of large packages can
   //take a while, so this is well above the VSoft.HttpClient 60s default.
   cDefaultPushTimeoutSeconds = 300;
+
+  //VSoft.HttpClient waits at most ResponseTimeout for the whole response, body included, and as long for a
+  //stalled one - its 60s default failed any package that took longer than that to download. The same as a
+  //push's default. Cancelling stops a download sooner.
+  cDownloadTimeoutMs = cDefaultPushTimeoutSeconds * 1000;
 
   //a source whose service index could not be fetched isn't asked again for this long - otherwise every
   //request an operation makes waits on it again.
@@ -196,6 +202,9 @@ var
   stopwatch : TStopwatch;
   hash : string;
   hashFileName : string;
+  partialFile : string;
+  partialId : TGUID;
+  lastError : Cardinal;
 begin
   result := false;
   serviceIndex := GetServiceIndex(cancellationToken);
@@ -214,6 +223,8 @@ begin
   path := Format('%s/%s/%s/%s/dpkg', [uri.AbsolutePath, packageInfo.Id, CompilerToString(packageInfo.CompilerVersion),  packageInfo.Version.ToStringNoMeta]);
 
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
+  //the request copies the client's timeouts when it is created.
+  httpClient.ResponseTimeout := cDownloadTimeoutMs;
 
   request := httpClient.CreateRequest(path)
                        .WithHeader(cClientVersionHeader,cDPMClientVersion)
@@ -229,53 +240,65 @@ begin
     + DPMPlatformsToBinString(packageInfo.SupportedPlatforms) + '-'
     + packageInfo.Version.ToStringNoMeta + cPackageFileExt;
   hashFileName := destFile + cPackageHashAlgorithmExt;
-  request.SaveAsFile := destFile;
-  stopwatch := TStopwatch.StartNew;
-  Logger.Information('GET ' + uri.BaseUriString + path);
+  //The download goes to a file of its own, and only becomes the cached package once it has arrived whole
+  //and matches the source's hash - a failed, cancelled or tampered download leaves nothing behind, and
+  //never replaces a good cached copy. (A non-200 response's body is saved too - an error page.)
+  CreateGUID(partialId);
+  partialFile := destFile + '.partial-' + LowerCase(Copy(GUIDToString(partialId), 2, 36));
+  request.SaveAsFile := partialFile;
   try
-    response := httpClient.Get(request, cancellationToken);
-  except
-    on ex : Exception do
+    stopwatch := TStopwatch.StartNew;
+    Logger.Information('GET ' + uri.BaseUriString + path);
+    try
+      response := httpClient.Get(request, cancellationToken);
+    except
+      on ex : Exception do
+      begin
+        RequestFailed('download failed : ' + CleanMessage(ex.Message));
+        exit;
+      end;
+    end;
+
+    if response.StatusCode <> 200 then
     begin
-      RequestFailed('download failed : ' + CleanMessage(ex.Message));
+      RequestFailed('download failed : ' + ResponseError(response));
       exit;
     end;
-  end;
+    stopwatch.Stop;
+    Logger.Information('OK ' + uri.BaseUriString + path + ' [' + IntToStr(stopwatch.ElapsedMilliseconds) + 'ms]');
+    response := nil;
+    request := nil;
 
-  if response.StatusCode <> 200 then
-  begin
-    RequestFailed('download failed : ' + ResponseError(response));
-    exit;
+    hash := THashSHA256.GetHashStringFromFile(partialFile);
+    //Only compare when we actually have a hash to compare against - a feed that doesn't publish the field
+    //gives none. The package's signatures are still verified when it is installed.
+    if packageInfo.Hash = '' then
+      Logger.Warning(TWarningCode.W1204_PackageHashUnknown, 'No hash is recorded for [' + packageInfo.ToString + '] - the download was not verified.')
+    else if not SameText(hash, packageInfo.Hash) then
+    begin
+      RequestFailed('sent a package that does not match its recorded hash (sha256 ' + hash + ', expected ' + packageInfo.Hash + ')', TErrorCode.E1202_PackageHashMismatch);
+      exit;
+    end;
+    if not TFileUtils.TryReplaceFile(partialFile, destFile, lastError) then
+    begin
+      RequestFailed('was downloaded, but [' + destFile + '] could not be written : ' + SysErrorMessage(lastError), TErrorCode.E3008_CacheWriteFailed);
+      exit;
+    end;
+  finally
+    //the response holds the file it saved to open.
+    response := nil;
+    request := nil;
+    if FileExists(partialFile) then
+      System.SysUtils.DeleteFile(partialFile);
   end;
-  stopwatch.Stop;
-  Logger.Information('OK ' + uri.BaseUriString + path + ' [' + IntToStr(stopwatch.ElapsedMilliseconds) + 'ms]');
-
-  hash := THashSHA256.GetHashStringFromFile(destFile);
-  //Only compare when we actually have a hash to compare against. Not every IPackageInfo
-  //carries one - an older cache with no .sha256 sidecar and no .dpkg to self-heal from
-  //yields Hash = '', as does a feed that doesn't publish the field. Comparing regardless
-  //turned those into a bogus "does not match server hash []" failure. Mirrors the
-  //directory repo, which only verifies when a .sha256 sidecar exists.
-  if packageInfo.Hash = '' then
-    Logger.Warning(TWarningCode.W1204_PackageHashUnknown, 'No hash is recorded for [' + packageInfo.ToString + '] - the download was not verified.')
-  else if not SameText(hash, packageInfo.Hash) then
-  begin
-    RequestFailed('sent a package that does not match its recorded hash (sha256 ' + hash + ', expected ' + packageInfo.Hash + ')', TErrorCode.E1202_PackageHashMismatch);
-    exit(false);
-  end;
-  //Persist the sidecar so tools that consume the cache (SBOM, audits, signature
-  //verification) can read it without recomputing. The directory repo writes this
-  //on push - HTTP downloads went without it and any consumer just had to recompute.
+  //Persist the sidecar so tools that consume the cache (SBOM, audits) can read it without recomputing.
   try
-    TFile.WriteAllText(hashFileName, hash);
+    TFileUtils.AtomicWriteAllText(hashFileName, hash, TEncoding.ASCII);
   except
     on e : Exception do
       Logger.Warning(TWarningCode.W1205_HashFileWriteFailed, 'Unable to write the hash file [' + hashFileName + '] : ' + e.Message);
   end;
 
-
-  request := nil;
-  response := nil;
   httpClient := nil;
 
   fileName := destFile;

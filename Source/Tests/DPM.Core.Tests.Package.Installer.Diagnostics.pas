@@ -69,6 +69,11 @@ type
     procedure Install_Keeps_The_Locks_Of_The_Packages_It_Keeps;
     [Test]
     procedure Install_Stale_Lock_On_A_Kept_Package_Fails_Before_Building;
+
+    //A package the cache has the details of, but can't use, is downloaded against the hash its source
+    //publishes - not the cache's own record of it, which is what is in doubt.
+    [Test]
+    procedure Download_Of_A_Cached_Package_Uses_The_Source_Hash;
   end;
 
 implementation
@@ -97,6 +102,7 @@ uses
   DPM.Core.Options.CopyLocal,
   DPM.Core.Package.CopyLocal,
   DPM.Core.Package.Interfaces,
+  DPM.Core.Package.Classes,
   DPM.Core.Package.Installer.Interfaces,
   DPM.Core.Package.Installer,
   DPM.Core.Package.InstallPlan,
@@ -167,8 +173,8 @@ type
     FPackageFolder : string;
     FSpec : IPackageSpec;
   protected
-    function EnsurePackage(const packageId : IPackageIdentity) : boolean;
-    function GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
+    function EnsurePackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean;
+    function GetPackageSpec(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageSpec;
     function GetPackagePath(const packageId : IPackageIdentity) : string; overload;
     function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion) : string; overload;
   public
@@ -180,13 +186,17 @@ type
   private
     FRoot : string;
     FSpec : IPackageSpec;
+    FMissing : ISet<string>;
   protected
-    function EnsurePackage(const packageId : IPackageIdentity) : boolean;
-    function GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
+    function EnsurePackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean;
+    function GetPackageSpec(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageSpec;
     function GetPackagePath(const packageId : IPackageIdentity) : string; overload;
     function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion) : string; overload;
+    function GetPackageFileFolder(const packageId : IPackageIdentity) : string;
   public
     constructor Create(const root : string; const spec : IPackageSpec);
+    //ids (lowercase) that are not extracted - EnsurePackage says so, and the installer downloads them.
+    property Missing : ISet<string> read FMissing;
   end;
 
   //The receipts the cache wrote - just each package folder's manifest hash.
@@ -454,7 +464,7 @@ begin
   FSpec := spec;
 end;
 
-function TExtractedPackageCache.EnsurePackage(const packageId : IPackageIdentity) : boolean;
+function TExtractedPackageCache.EnsurePackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean;
 begin
   result := true;
 end;
@@ -469,7 +479,7 @@ begin
   result := FPackageFolder;
 end;
 
-function TExtractedPackageCache.GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
+function TExtractedPackageCache.GetPackageSpec(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageSpec;
 begin
   result := FSpec;
 end;
@@ -481,11 +491,12 @@ begin
   inherited Create;
   FRoot := root;
   FSpec := spec;
+  FMissing := TCollections.CreateSet<string>;
 end;
 
-function TPerPackageCache.EnsurePackage(const packageId : IPackageIdentity) : boolean;
+function TPerPackageCache.EnsurePackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean;
 begin
-  result := true;
+  result := not FMissing.Contains(LowerCase(packageId.Id));
 end;
 
 function TPerPackageCache.GetPackagePath(const packageId : IPackageIdentity) : string;
@@ -498,7 +509,12 @@ begin
   result := TPath.Combine(FRoot, id);
 end;
 
-function TPerPackageCache.GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
+function TPerPackageCache.GetPackageFileFolder(const packageId : IPackageIdentity) : string;
+begin
+  result := FRoot;
+end;
+
+function TPerPackageCache.GetPackageSpec(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageSpec;
 begin
   result := FSpec;
 end;
@@ -1273,6 +1289,57 @@ begin
   Assert.IsTrue(logger.Logged('error', 'VSoft.Bar'), 'the error names the package : ' + logger.Messages.Text);
   Assert.AreEqual(0, BuildCount, 'nothing may be built from a package that is not what the project pinned : ' + logger.Messages.Text);
   Assert.IsTrue(Pos('manifestHash="sha256:' + cStaleHash + '"', projectText) > 0, 'the project must not change : ' + projectText);
+end;
+
+procedure TInstallerDiagnosticsTests.Download_Of_A_Cached_Package_Uses_The_Source_Hash;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  root : string;
+  projectFile : string;
+  repo : TFakeRepositoryManager;
+  repoIntf : IPackageRepositoryManager;
+  cache : TPerPackageCache;
+  cacheIntf : IPackageCache;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+  config : IConfiguration;
+  options : TRestoreOptions;
+  reader : IPackageSpecReader;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  root := TPath.Combine(FTempFolder, 'download');
+  ForceDirectories(root);
+  projectFile := TPath.Combine(root, 'Consumer.dproj');
+  TFile.WriteAllText(projectFile, cConsumerProject, TEncoding.UTF8);
+  repo := TFakeRepositoryManager.Create;
+  repoIntf := repo;
+  repo.SetVersions('VSoft.Foo', ListOf([TPackageInfo.Create('test-source', 'VSoft.Foo', TPackageVersion.Parse('1.0.0'), cTestCompiler, cFooHash, 'SHA256')]));
+  reader := TPackageSpecReader.Create(loggerIntf);
+  cache := TPerPackageCache.Create(root, reader.ReadSpecString(cPackageSpec));
+  cacheIntf := cache;
+  //what the cache knows of it - read from its own .sha256 file, which no longer matches anything.
+  cache.RegisterInfo(TPackageInfo.Create('', 'VSoft.Foo', TPackageVersion.Parse('1.0.0'), cTestCompiler, cStaleHash, 'SHA256'));
+  cache.Missing.Add('vsoft.foo');
+  context := TFakeInstallerContext.Create(loggerIntf);
+  config := TConfiguration.Create(loggerIntf);
+  installer := TPackageInstaller.Create(loggerIntf, TFakeConfigurationManager.Create(config), repoIntf, cacheIntf,
+                                        TDependencyResolver.Create(loggerIntf, repoIntf, cacheIntf, context), context,
+                                        TFakeCompilerFactory.Create(loggerIntf, coSucceed, nil), nil, nil, nil, nil);
+  options := TRestoreOptions.Create;
+  try
+    options.ProjectPath := projectFile;
+    options.CompilerVersion := cTestCompiler;
+    options.ConfigFile := 'dpm.config.yaml';
+    options.Platforms := [TDPMPlatform.Win32];
+    installer.Restore(TCancellationTokenSourceFactory.Create.Token, options, context);
+  finally
+    options.Free;
+  end;
+  Assert.AreEqual(1, repo.Downloaded.Count, 'the package should have been downloaded : ' + logger.Messages.Text);
+  Assert.AreEqual(cFooHash, repo.Downloaded[0].Hash, 'the download was checked against the cache''s record of the hash');
+  Assert.AreEqual('test-source', repo.Downloaded[0].SourceName);
 end;
 
 initialization

@@ -34,6 +34,7 @@ type
     FVersionsCallCount : IDictionary<string, integer>;
     FInfoCallCount : integer;
     FUnavailable : string;
+    FDownloaded : IList<IPackageInfo>;
     procedure Count(const counts : IDictionary<string, integer>; const id : string);
   protected
     function UnavailableSources : string;
@@ -66,6 +67,8 @@ type
     property InfoCallCount : integer read FInfoCallCount;
     //what UnavailableSources returns - set it to pretend a source could not be used.
     property Unavailable : string read FUnavailable write FUnavailable;
+    //the package infos DownloadPackage was asked for - it downloads nothing, and fails.
+    property Downloaded : IList<IPackageInfo> read FDownloaded;
   end;
 
   ///<summary>Minimal IPackageCache: canned cached-versions lists per id, and a key-based
@@ -83,20 +86,20 @@ type
     function GetPackagePath(const packageId : IPackageIdentity) : string; overload;
     function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion) : string; overload;
     function GetPackageFileFolder(const packageId : IPackageIdentity) : string;
-    function EnsurePackage(const packageId : IPackageIdentity) : boolean;
-    function InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
+    function EnsurePackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean;
+    function InstallPackageFromFile(const cancellationToken : ICancellationToken; const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
     procedure SetSkipTrustRatchets(const value : boolean);
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
-    function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
-    function GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
-    function GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
+    function GetPackageMetadata(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageMetadata;
+    function GetPackageSpec(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageSpec;
+    function GetPackagePlatforms(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : TDPMPlatforms;
     function HasSource(const packageId : IPackageIdentity) : boolean;
     function GetCachedPackageVersionsWithDependencies(const cancellationToken : ICancellationToken;
                                                       const id : string;
                                                       const compilerVersion : TCompilerVersion;
                                                       const versionRange : TVersionRange;
                                                       const preRelease : boolean) : IList<IPackageInfo>;
-    function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+    function TryGetPackageIcon(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
     function GetPackageHash(const packageId : IPackageIdentity) : string;
     function FullReVerify(const cancellationToken : ICancellationToken) : integer;
     function GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
@@ -218,6 +221,7 @@ begin
   FCanned := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
   FCallCount := TCollections.CreateDictionary<string, integer>;
   FVersionsCallCount := TCollections.CreateDictionary<string, integer>;
+  FDownloaded := TCollections.CreateList<IPackageInfo>;
 end;
 
 procedure TFakeRepositoryManager.Count(const counts : IDictionary<string, integer>; const id : string);
@@ -325,7 +329,8 @@ end;
 
 function TFakeRepositoryManager.DownloadPackage(const cancellationToken : ICancellationToken; const packageIdentity : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
 begin
-  raise ENotImplemented.Create('TFakeRepositoryManager.DownloadPackage');
+  FDownloaded.Add(packageIdentity);
+  result := false;
 end;
 
 function TFakeRepositoryManager.TryGetSourceType(const sourceName : string; out sourceType : TSourceType) : boolean;
@@ -506,12 +511,12 @@ begin
   raise ENotImplemented.Create('TFakePackageCache.GetPackageFileFolder');
 end;
 
-function TFakePackageCache.EnsurePackage(const packageId : IPackageIdentity) : boolean;
+function TFakePackageCache.EnsurePackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean;
 begin
   result := false;
 end;
 
-function TFakePackageCache.InstallPackageFromFile(const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
+function TFakePackageCache.InstallPackageFromFile(const cancellationToken : ICancellationToken; const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
 begin
   raise ENotImplemented.Create('TFakePackageCache.InstallPackageFromFile');
 end;
@@ -521,17 +526,17 @@ begin
   // no-op for tests
 end;
 
-function TFakePackageCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
+function TFakePackageCache.GetPackageMetadata(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageMetadata;
 begin
   raise ENotImplemented.Create('TFakePackageCache.GetPackageMetadata');
 end;
 
-function TFakePackageCache.GetPackageSpec(const packageId : IPackageIdentity) : IPackageSpec;
+function TFakePackageCache.GetPackageSpec(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageSpec;
 begin
   raise ENotImplemented.Create('TFakePackageCache.GetPackageSpec');
 end;
 
-function TFakePackageCache.GetPackagePlatforms(const packageId : IPackageIdentity) : TDPMPlatforms;
+function TFakePackageCache.GetPackagePlatforms(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : TDPMPlatforms;
 begin
   result := [];
 end;
@@ -541,7 +546,7 @@ begin
   result := false;
 end;
 
-function TFakePackageCache.TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+function TFakePackageCache.TryGetPackageIcon(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
 begin
   icon := nil;
   result := false;
