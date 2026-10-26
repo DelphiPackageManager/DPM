@@ -74,6 +74,17 @@ type
     //publishes - not the cache's own record of it, which is what is in doubt.
     [Test]
     procedure Download_Of_A_Cached_Package_Uses_The_Source_Hash;
+
+    //A platform that can't be built (no SDK for it, say) doesn't take the others down : the project is changed
+    //for the platforms that built, the failed one's search path is left alone, and the operation still fails.
+    [Test]
+    procedure Install_A_Failing_Last_Platform_Still_Installs_The_Others;
+    [Test]
+    procedure Install_A_Failing_First_Platform_Still_Installs_The_Others;
+    [Test]
+    procedure Install_Failing_On_Every_Platform_Changes_Nothing;
+    [Test]
+    procedure Restore_A_Failing_Platform_Still_Restores_The_Others;
   end;
 
 implementation
@@ -160,11 +171,15 @@ type
     FLogger : ILogger;
     FOutcome : TCompileOutcome;
     FCancellation : ICancellationTokenSource;
+    FFailPlatforms : TDPMPlatforms;
+    function OutcomeFor(const platform : TDPMPlatform) : TCompileOutcome;
   protected
     function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler; overload;
     function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const logger : ILogger) : ICompiler; overload;
   public
-    constructor Create(const logger : ILogger; const outcome : TCompileOutcome; const cancellation : ICancellationTokenSource);
+    //the builds for failPlatforms fail whatever outcome says - a platform the machine can't build for.
+    constructor Create(const logger : ILogger; const outcome : TCompileOutcome; const cancellation : ICancellationTokenSource;
+                       const failPlatforms : TDPMPlatforms = []);
   end;
 
   //Every package is already in the cache, extracted to one folder, with the spec given.
@@ -437,22 +452,32 @@ end;
 
 { TFakeCompilerFactory }
 
-constructor TFakeCompilerFactory.Create(const logger : ILogger; const outcome : TCompileOutcome; const cancellation : ICancellationTokenSource);
+constructor TFakeCompilerFactory.Create(const logger : ILogger; const outcome : TCompileOutcome; const cancellation : ICancellationTokenSource;
+                                        const failPlatforms : TDPMPlatforms);
 begin
   inherited Create;
   FLogger := logger;
   FOutcome := outcome;
   FCancellation := cancellation;
+  FFailPlatforms := failPlatforms;
+end;
+
+function TFakeCompilerFactory.OutcomeFor(const platform : TDPMPlatform) : TCompileOutcome;
+begin
+  if platform in FFailPlatforms then
+    result := coFail
+  else
+    result := FOutcome;
 end;
 
 function TFakeCompilerFactory.CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler;
 begin
-  result := TFakeCompiler.Create(FLogger, FOutcome, FCancellation, compilerVersion, platform);
+  result := TFakeCompiler.Create(FLogger, OutcomeFor(platform), FCancellation, compilerVersion, platform);
 end;
 
 function TFakeCompilerFactory.CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const logger : ILogger) : ICompiler;
 begin
-  result := TFakeCompiler.Create(logger, FOutcome, FCancellation, compilerVersion, platform);
+  result := TFakeCompiler.Create(logger, OutcomeFor(platform), FCancellation, compilerVersion, platform);
 end;
 
 { TExtractedPackageCache }
@@ -706,11 +731,18 @@ begin
     '                </PackageReference>' + sLineBreak, []);
 end;
 
+//cPackageSpec for Win32 and Win64.
+function TwoPlatformPackageSpec : string;
+begin
+  result := StringReplace(cPackageSpec, 'platforms: [Win32]', 'platforms: [Win32, Win64]', []);
+end;
+
 //An installer over a cache holding VSoft.Foo (depending on fooDependencies), VSoft.Bar and VSoft.Baz, each in its
-//own folder, whose receipts say they are cFooHash, cBarHash and cBazHash - with projectFile, holding the project
-//text given, beside them.
+//own folder with the spec given, whose receipts say they are cFooHash, cBarHash and cBazHash - with projectFile,
+//holding the project text given, beside them. Their builds fail for failPlatforms.
 function NewLockedFixture(const tempFolder : string; const logger : ILogger; const project : string;
-                          const fooDependencies : array of IPackageDependency; out projectFile : string;
+                          const fooDependencies : array of IPackageDependency; const spec : string;
+                          const failPlatforms : TDPMPlatforms; out projectFile : string;
                           out context : IPackageInstallerContext) : IPackageInstaller;
 var
   root : string;
@@ -745,7 +777,7 @@ begin
   repo.SetVersions('VSoft.Bar', ListOf([barInfo]));
   repo.SetVersions('VSoft.Baz', ListOf([bazInfo]));
   reader := TPackageSpecReader.Create(logger);
-  cache := TPerPackageCache.Create(root, reader.ReadSpecString(cPackageSpec));
+  cache := TPerPackageCache.Create(root, reader.ReadSpecString(spec));
   cacheIntf := cache;
   cache.RegisterInfo(fooInfo);
   cache.RegisterInfo(barInfo);
@@ -759,28 +791,62 @@ begin
   config := TConfiguration.Create(logger);
   result := TPackageInstaller.Create(logger, TFakeConfigurationManager.Create(config), repoIntf, cacheIntf,
                                      TDependencyResolver.Create(logger, repoIntf, cacheIntf, context), context,
-                                     TFakeCompilerFactory.Create(logger, coSucceed, nil), receiptsIntf, nil, nil,
+                                     TFakeCompilerFactory.Create(logger, coSucceed, nil, failPlatforms), receiptsIntf, nil, nil,
                                      TInstallPlanner.Create(logger, repoIntf, cacheIntf));
   BuildCount := 0;
 end;
 
-//Restores the project text given over the locked fixture - projectText is the project afterwards.
-function RestoreLockedProject(const tempFolder : string; const logger : ILogger; const project : string;
-                              const fooDependencies : array of IPackageDependency; out projectText : string) : boolean;
+//Restores the project text given over the locked fixture for the platforms given - projectText is the project afterwards.
+function RestoreLockedProjectFor(const tempFolder : string; const logger : ILogger; const project : string;
+                                 const fooDependencies : array of IPackageDependency; const spec : string;
+                                 const platforms : TDPMPlatforms; const failPlatforms : TDPMPlatforms;
+                                 out projectText : string) : boolean;
 var
   projectFile : string;
   context : IPackageInstallerContext;
   installer : IPackageInstaller;
   options : TRestoreOptions;
 begin
-  installer := NewLockedFixture(tempFolder, logger, project, fooDependencies, projectFile, context);
+  installer := NewLockedFixture(tempFolder, logger, project, fooDependencies, spec, failPlatforms, projectFile, context);
   options := TRestoreOptions.Create;
   try
     options.ProjectPath := projectFile;
     options.CompilerVersion := cTestCompiler;
     options.ConfigFile := 'dpm.config.yaml';
-    options.Platforms := [TDPMPlatform.Win32];
+    options.Platforms := platforms;
     result := installer.Restore(TCancellationTokenSourceFactory.Create.Token, options, context);
+  finally
+    options.Free;
+  end;
+  projectText := TFile.ReadAllText(projectFile);
+end;
+
+//Restores the project text given over the locked fixture - projectText is the project afterwards.
+function RestoreLockedProject(const tempFolder : string; const logger : ILogger; const project : string;
+                              const fooDependencies : array of IPackageDependency; out projectText : string) : boolean;
+begin
+  result := RestoreLockedProjectFor(tempFolder, logger, project, fooDependencies, cPackageSpec, [TDPMPlatform.Win32], [], projectText);
+end;
+
+//Installs VSoft.Baz 1.0.0 into the project text given over the locked fixture for the platforms given - projectText
+//is the project afterwards, and context the one the install ran with.
+function InstallIntoLockedProjectFor(const tempFolder : string; const logger : ILogger; const project : string; const spec : string;
+                                     const platforms : TDPMPlatforms; const failPlatforms : TDPMPlatforms;
+                                     out projectText : string; out context : IPackageInstallerContext) : boolean;
+var
+  projectFile : string;
+  installer : IPackageInstaller;
+  options : TInstallOptions;
+begin
+  installer := NewLockedFixture(tempFolder, logger, project, [MakeDep('VSoft.Bar', '1.0.0')], spec, failPlatforms, projectFile, context);
+  options := TInstallOptions.Create;
+  try
+    options.ProjectPath := projectFile;
+    options.CompilerVersion := cTestCompiler;
+    options.ConfigFile := 'dpm.config.yaml';
+    options.Platforms := platforms;
+    options.AddPackage('VSoft.Baz', TPackageVersion.Parse('1.0.0'));
+    result := installer.Install(TCancellationTokenSourceFactory.Create.Token, options, context);
   finally
     options.Free;
   end;
@@ -791,24 +857,27 @@ end;
 function InstallIntoLockedProject(const tempFolder : string; const logger : ILogger; const project : string;
                                   out projectText : string) : boolean;
 var
-  projectFile : string;
   context : IPackageInstallerContext;
-  installer : IPackageInstaller;
-  options : TInstallOptions;
 begin
-  installer := NewLockedFixture(tempFolder, logger, project, [MakeDep('VSoft.Bar', '1.0.0')], projectFile, context);
-  options := TInstallOptions.Create;
-  try
-    options.ProjectPath := projectFile;
-    options.CompilerVersion := cTestCompiler;
-    options.ConfigFile := 'dpm.config.yaml';
-    options.Platforms := [TDPMPlatform.Win32];
-    options.AddPackage('VSoft.Baz', TPackageVersion.Parse('1.0.0'));
-    result := installer.Install(TCancellationTokenSourceFactory.Create.Token, options, context);
-  finally
-    options.Free;
-  end;
-  projectText := TFile.ReadAllText(projectFile);
+  result := InstallIntoLockedProjectFor(tempFolder, logger, project, cPackageSpec, [TDPMPlatform.Win32], [], projectText, context);
+end;
+
+//The text of the project's DPMSearch property for the platform given - '' when it has none.
+function SearchPathFor(const projectText : string; const platform : string) : string;
+var
+  marker : string;
+  startPos : integer;
+  endPos : integer;
+begin
+  result := '';
+  marker := '<DPMSearch Condition="''$(Platform)''==''' + platform + '''">';
+  startPos := Pos(marker, projectText);
+  if startPos = 0 then
+    exit;
+  startPos := startPos + Length(marker);
+  endPos := PosEx('</DPMSearch>', projectText, startPos);
+  if endPos > 0 then
+    result := Copy(projectText, startPos, endPos - startPos);
 end;
 
 //Refreshes the search paths of a project using VSoft.Foo, cached in packageFolder with the source entries
@@ -1340,6 +1409,73 @@ begin
   Assert.AreEqual(1, repo.Downloaded.Count, 'the package should have been downloaded : ' + logger.Messages.Text);
   Assert.AreEqual(cFooHash, repo.Downloaded[0].Hash, 'the download was checked against the cache''s record of the hash');
   Assert.AreEqual('test-source', repo.Downloaded[0].SourceName);
+end;
+
+//Installs VSoft.Baz into the two platform project with failing's build failing - checks the install fails, says so
+//once, and changed the project for building but not for failing.
+procedure CheckPartialInstall(const tempFolder : string; const failing : TDPMPlatform; const building : TDPMPlatform);
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectText : string;
+  context : IPackageInstallerContext;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsFalse(InstallIntoLockedProjectFor(tempFolder, loggerIntf, LockedConsumerProject(cBarHash), TwoPlatformPackageSpec,
+                                             [TDPMPlatform.Win32, TDPMPlatform.Win64], [failing], projectText, context),
+                 'a platform failed - the install did not entirely succeed : ' + logger.Messages.Text);
+  Assert.AreEqual(1, loggerIntf.ErrorCount, 'the failed build, once : ' + logger.Messages.Text);
+  Assert.IsTrue(logger.HasError(TErrorCode.E5003_PackageCompileFailed), logger.Messages.Text);
+  Assert.IsTrue(Pos('id="VSoft.Baz"', projectText) > 0, 'the package reference was not written : ' + projectText);
+  Assert.IsTrue(Pos('VSoft.Baz', SearchPathFor(projectText, DPMPlatformToBDString(building))) > 0,
+                'the search path of the platform that built was not written : ' + projectText);
+  Assert.AreEqual(0, Pos('VSoft.Baz', SearchPathFor(projectText, DPMPlatformToBDString(failing))),
+                  'the failed platform''s search path must not change : ' + projectText);
+  Assert.IsTrue(context.AnyProjectCommitted, 'the project was saved - the IDE has to know to reload it');
+end;
+
+procedure TInstallerDiagnosticsTests.Install_A_Failing_Last_Platform_Still_Installs_The_Others;
+begin
+  CheckPartialInstall(FTempFolder, TDPMPlatform.Win64, TDPMPlatform.Win32);
+end;
+
+procedure TInstallerDiagnosticsTests.Install_A_Failing_First_Platform_Still_Installs_The_Others;
+begin
+  CheckPartialInstall(FTempFolder, TDPMPlatform.Win32, TDPMPlatform.Win64);
+end;
+
+procedure TInstallerDiagnosticsTests.Install_Failing_On_Every_Platform_Changes_Nothing;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectText : string;
+  context : IPackageInstallerContext;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsFalse(InstallIntoLockedProjectFor(FTempFolder, loggerIntf, LockedConsumerProject(cBarHash), TwoPlatformPackageSpec,
+                                             [TDPMPlatform.Win32, TDPMPlatform.Win64], [TDPMPlatform.Win32, TDPMPlatform.Win64],
+                                             projectText, context));
+  Assert.AreEqual(2, loggerIntf.ErrorCount, 'one failed build per platform - each was tried : ' + logger.Messages.Text);
+  Assert.AreEqual(0, Pos('VSoft.Baz', projectText), 'nothing built - the project must not change : ' + projectText);
+  Assert.IsFalse(context.AnyProjectCommitted, 'no project was saved');
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_A_Failing_Platform_Still_Restores_The_Others;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectText : string;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsFalse(RestoreLockedProjectFor(FTempFolder, loggerIntf, LockedConsumerProject(cBarHash), [MakeDep('VSoft.Bar', '1.0.0')],
+                                         TwoPlatformPackageSpec, [TDPMPlatform.Win32, TDPMPlatform.Win64], [TDPMPlatform.Win64], projectText),
+                 'a platform failed - the restore did not entirely succeed : ' + logger.Messages.Text);
+  Assert.AreEqual(1, loggerIntf.ErrorCount, 'the failed build, once : ' + logger.Messages.Text);
+  Assert.IsTrue(Pos('VSoft.Foo', SearchPathFor(projectText, 'Win32')) > 0, 'the Win32 search path was not written : ' + projectText);
+  Assert.AreEqual(0, Pos('VSoft.Foo', SearchPathFor(projectText, 'Win64')), 'the failed platform''s search path must not change : ' + projectText);
 end;
 
 initialization

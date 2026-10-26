@@ -59,6 +59,9 @@ type
 
     [Test]
     procedure Clear_Ends_Operation;
+
+    [Test]
+    procedure AnyProjectCommitted_Says_Whether_The_Last_Operation_Saved_A_Project;
   end;
 
 implementation
@@ -250,6 +253,23 @@ begin
       FContextIntf.BeginOperation(ProjectList(cProjectA));
     end, EInvalidOpException, 'clear ends the operation, so a new one can begin');
   FContextIntf.EndOperation;
+end;
+
+procedure TInstallerContextTests.AnyProjectCommitted_Says_Whether_The_Last_Operation_Saved_A_Project;
+begin
+  FContextIntf.BeginOperation(ProjectList(cProjectA));
+  Assert.IsFalse(FContextIntf.AnyProjectCommitted, 'nothing is saved yet');
+  FContextIntf.CommitProject(cProjectB);
+  Assert.IsFalse(FContextIntf.AnyProjectCommitted, 'B is not in the operation');
+  FContextIntf.CommitProject(cProjectA);
+  Assert.IsTrue(FContextIntf.AnyProjectCommitted, 'A was saved');
+  FContextIntf.EndOperation;
+  Assert.IsTrue(FContextIntf.AnyProjectCommitted, 'still answered once the operation is over - the IDE asks after the install returns');
+
+  FContextIntf.BeginOperation(ProjectList(cProjectA));
+  Assert.IsFalse(FContextIntf.AnyProjectCommitted, 'the next operation starts afresh');
+  FContextIntf.EndOperation;
+  Assert.IsFalse(FContextIntf.AnyProjectCommitted, 'an operation that saved nothing says so');
 end;
 
 initialization

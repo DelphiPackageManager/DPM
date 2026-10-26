@@ -35,6 +35,8 @@ type
     FStagedGraphs : IDictionary<string, IPackageReference>;
     FStagedResolutions : IDictionary<string, IList<IResolvedPackage>>;
     FStagedIndex : IDictionary<string, IDictionary<string, IResolvedPackage>>;
+    //whether the last operation committed a project - kept past EndOperation, reset by BeginOperation.
+    FAnyCommitted : boolean;
 
     FLogger : ILogger;
 
@@ -66,6 +68,7 @@ type
     procedure BeginOperation(const projectFiles : IList<string>);
     procedure CommitProject(const projectFile : string);
     procedure EndOperation;
+    function AnyProjectCommitted : boolean;
 
     //current-session 'use source' choices - see interface for details.
     procedure SetUseSource(const projectFile, packageId : string; const value : boolean);virtual;
@@ -89,6 +92,11 @@ uses
 
 { TPackageInstallerContext }
 
+function TCorePackageInstallerContext.AnyProjectCommitted : boolean;
+begin
+  result := FAnyCommitted;
+end;
+
 procedure TCorePackageInstallerContext.BeginOperation(const projectFiles : IList<string>);
 var
   projectFile : string;
@@ -97,6 +105,7 @@ begin
     raise EInvalidOpException.Create('An install operation is already in progress');
   ClearOperation;
   FInOperation := true;
+  FAnyCommitted := false;
   for projectFile in projectFiles do
     FOperationProjects.Add(LowerCase(projectFile));
 end;
@@ -130,6 +139,7 @@ begin
   projKey := LowerCase(projectFile);
   if not FOperationProjects.Contains(projKey) then
     exit;
+  FAnyCommitted := true;
   if FStagedGraphs.TryGetValue(projKey, graph) then
   begin
     FProjectGraphs[projKey] := graph;

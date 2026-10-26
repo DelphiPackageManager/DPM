@@ -186,7 +186,9 @@ type
     procedure CancelPendingRequest;
     //a token source of its own for an install / uninstall, which ViewClosing cancels.
     function BeginOperation : ICancellationTokenSource;
-    procedure InstallSucceeded(const packageMetadata : IPackageSearchResultItem; const options : TInstallOptions);
+    //the package is in the project now - everyPlatform is false when some of its platforms failed.
+    procedure InstallSucceeded(const packageMetadata : IPackageSearchResultItem; const options : TInstallOptions;
+                               const everyPlatform : boolean);
 
     function GetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion): IAwaitable<IPackageSearchResultItem>;
     procedure ChangeScale(M: Integer; D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND}); override;
@@ -421,9 +423,10 @@ begin
       projectCount := 1;
     FHost.BeginInstall(projectCount);
     installResult := FPackageInstaller.Install(operation.Token, options, FInstallerContext);
-    //the installer reported why - this is the outcome.
-    if installResult then
-      InstallSucceeded(packageMetadata, options)
+    //the installer reported why - this is the outcome. A platform that failed after others built still
+    //left the project saved for those, so it has to be treated as installed (and reloaded).
+    if installResult or FInstallerContext.AnyProjectCommitted then
+      InstallSucceeded(packageMetadata, options, installResult)
     else
       FLogger.Information('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' did not install.', true);
 
@@ -455,7 +458,8 @@ begin
   FOperationTokenSource := result;
 end;
 
-procedure TPackageDetailsFrame.InstallSucceeded(const packageMetadata : IPackageSearchResultItem; const options : TInstallOptions);
+procedure TPackageDetailsFrame.InstallSucceeded(const packageMetadata : IPackageSearchResultItem; const options : TInstallOptions;
+                                                const everyPlatform : boolean);
 begin
   if packageMetadata <> nil then
   begin
@@ -471,7 +475,11 @@ begin
     FPackageMetaData := packageMetadata;
   end;
   FInstalledVersion := options.Version;
-  FLogger.Information('Package ' + options.PackageId + ' - ' + FInstalledVersion.ToStringNoMeta + ' installed.');
+  if everyPlatform then
+    FLogger.Information('Package ' + options.PackageId + ' - ' + FInstalledVersion.ToStringNoMeta + ' installed.')
+  else
+    FLogger.Information('Package ' + options.PackageId + ' - ' + FInstalledVersion.ToStringNoMeta +
+      ' installed, but not for every platform - see above.', true);
 end;
 
 //Changing an installed package's version (up or down) can need other installed packages to move with it
@@ -535,8 +543,9 @@ begin
       FHost.BeginInstall(plan.Projects.Count);
       hostInstalling := true;
       installResult := FPackageInstaller.ApplyInstallPlan(operation.Token, options, plan, FInstallerContext);
-      if installResult then
-        InstallSucceeded(packageMetadata, options)
+      //see DoPackageInstall - a project saved for the platforms that built is installed.
+      if installResult or FInstallerContext.AnyProjectCommitted then
+        InstallSucceeded(packageMetadata, options, installResult)
       else
         FLogger.Information('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' did not install.', true);
     finally

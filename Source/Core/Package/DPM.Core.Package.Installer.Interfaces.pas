@@ -201,6 +201,12 @@ type
     ///  install leaves the recorded state as it was. </summary>
     procedure EndOperation;
 
+    ///<summary> Whether the last operation committed (saved) a project - still answered once it has
+    ///  ended, and reset by the next BeginOperation. An install that fails for one platform still saves
+    ///  the project for the platforms that built, so the IDE asks this, rather than going by the
+    ///  install's result, whether it has a changed project to reload. </summary>
+    function AnyProjectCommitted : boolean;
+
     ///<summary> Records the IDE's current-session 'use source' choice for a package in a project.
     ///  This is a debugging-only, session-lifetime toggle - it is never persisted to the dproj.
     ///  The installer consults it when collecting search paths, so a source choice flows down to

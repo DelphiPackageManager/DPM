@@ -74,6 +74,7 @@ type
     FGraph : IPackageReference;
     FResolved : IList<IPackageInfo>;
     FLocks : IDictionary<string, TRecordedLock>;
+    FFailedPlatforms : TDPMPlatforms;
   public
     constructor Create(const projectFile : string; const editor : IProjectEditor; const options : TInstallOptions; const platforms : TDPMPlatforms);
     destructor Destroy; override;
@@ -89,6 +90,8 @@ type
     property Resolved : IList<IPackageInfo> read FResolved write FResolved;
     //the locks the project recorded for the packages it keeps (see CollectGraphLocks).
     property Locks : IDictionary<string, TRecordedLock> read FLocks write FLocks;
+    //the platforms that didn't build - the project is still installed into the others.
+    property FailedPlatforms : TDPMPlatforms read FFailedPlatforms write FFailedPlatforms;
   end;
 
   TPackageInstaller = class(TInterfacedObject, IPackageInstaller)
@@ -151,6 +154,11 @@ type
     //Not the operation's failure if it doesn't build - that is reported as one warning.
     procedure EnsureDesignHostPlatformCompiled(const cancellationToken: ICancellationToken; const options: TSearchOptions;
                                                const graph: IPackageReference; const installedPlatforms: TDPMPlatforms);
+
+    //Loads the project's design-time packages, unless the build for the platform the IDE loads them for
+    //(see DesignHostPlatform) is one of failedPlatforms - then there are no design BPLs to load.
+    procedure LoadDesignPackages(const cancellationToken: ICancellationToken; const projectFile: string; const graph: IPackageReference;
+                                 const compilerVersion: TCompilerVersion; const failedPlatforms: TDPMPlatforms);
 
     //Returns the path to dpm.exe to record in the copy-local targets file in the package cache, or ''
     //when it can't be found (the IDE plugin, with no dpm.exe beside it) - the file then keeps the path
@@ -1899,6 +1907,30 @@ begin
 end;
 
 
+//The platform the IDE loads design packages for - the plugin's own bitness tells us which BPL variant
+//the IDE will load (the same decision made in TDPMIDEPackageInstallerContext.InstallDesignPackages).
+function DesignHostPlatform : TDPMPlatform;
+begin
+  if TSystemUtils.Is64BitIDE then
+    result := TDPMPlatform.Win64
+  else
+    result := TDPMPlatform.Win32;
+end;
+
+procedure TPackageInstaller.LoadDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const graph : IPackageReference;
+                                               const compilerVersion : TCompilerVersion; const failedPlatforms : TDPMPlatforms);
+begin
+  //The design BPLs are built for the IDE's own platform - when that build failed there are none to load,
+  //and trying would only add a 'not found' for each. The CLI loads none anyway.
+  if TSystemUtils.IsIDEProcess and (DesignHostPlatform in failedPlatforms) then
+  begin
+    FLogger.Information('The design-time packages were not loaded - the [' + DPMPlatformToString(DesignHostPlatform) +
+      '] build, which the IDE loads them from, failed.', true);
+    exit;
+  end;
+  InstallDesignPackages(cancellationToken, projectFile, BuildPackageSpecsFromGraph(cancellationToken, graph, compilerVersion));
+end;
+
 procedure TPackageInstaller.EnsureDesignHostPlatformCompiled(const cancellationToken : ICancellationToken; const options : TSearchOptions;
                                                              const graph : IPackageReference; const installedPlatforms : TDPMPlatforms);
 var
@@ -1915,12 +1947,7 @@ begin
   if not TSystemUtils.IsIDEProcess then
     exit;
 
-  //The plugin's own bitness tells us which BPL variant the IDE will load (the same decision made in
-  //TDPMIDEPackageInstallerContext.InstallDesignPackages).
-  if TSystemUtils.Is64BitIDE then
-    hostPlatform := TDPMPlatform.Win64
-  else
-    hostPlatform := TDPMPlatform.Win32;
+  hostPlatform := DesignHostPlatform;
 
   //Already produced by the normal per-platform loop - nothing extra to do.
   if hostPlatform in installedPlatforms then
@@ -2789,6 +2816,8 @@ var
   platform : TDPMPlatform;
   platformOptions : TInstallOptions;
   platformResult : boolean;
+  builtPlatforms : TDPMPlatforms;
+  failedPlatforms : TDPMPlatforms;
 begin
   result := false;
   if not PrepareProjectPackages(cancellationToken, work.ProjectFile, work.Graph, work.Resolved, packagesToConfigure, packageSpecs) then
@@ -2805,6 +2834,8 @@ begin
     exit;
   end;
 
+  builtPlatforms := [];
+  failedPlatforms := [];
   for platform in work.Platforms do
   begin
     if cancellationToken.IsCancelled then
@@ -2819,14 +2850,27 @@ begin
     finally
       platformOptions.Free;
     end;
-    //what went wrong was reported where it happened.
-    if not platformResult then
-      exit;
+    //What went wrong was reported where it happened. A platform that can't be built (no SDK for it, say)
+    //mustn't cost the others their install, so carry on - a failed platform's search path is only ever
+    //written once it has built, so it is left as it was.
+    if platformResult then
+      Include(builtPlatforms, platform)
+    else
+    begin
+      if cancellationToken.IsCancelled then
+        exit;
+      Include(failedPlatforms, platform);
+    end;
   end;
+  work.FailedPlatforms := failedPlatforms;
+  //nothing built - nothing worth recording, so the project is left alone.
+  if (failedPlatforms <> []) and (builtPlatforms = []) then
+    exit;
 
   //Make sure the IDE host platform's design BPL exists before design packages are loaded at commit -
   //the loop above only built the project's target platforms. Non-fatal : a failure here just means the
-  //design components may not load.
+  //design components may not load. (When the host platform was one of them and failed, it isn't tried
+  //again - LoadDesignPackages leaves the design packages out.)
   EnsureDesignHostPlatformCompiled(cancellationToken, work.Options, work.Graph, work.Platforms);
 
   // Update package references once using the new platform-independent format
@@ -2843,8 +2887,16 @@ begin
   //the dproj now reflects the install, so its resolutions and graph count for the other projects.
   FContext.CommitProject(work.ProjectFile);
   //Load design-time packages once per project - design BPLs are per-IDE, not per-platform. CLI context is a no-op.
-  InstallDesignPackages(cancellationToken, work.ProjectFile, BuildPackageSpecsFromGraph(cancellationToken, work.Graph, work.Options.CompilerVersion));
-  FLogger.Success('Install succeeded for [' + work.ProjectFile + ']', true);
+  LoadDesignPackages(cancellationToken, work.ProjectFile, work.Graph, work.Options.CompilerVersion, work.FailedPlatforms);
+  if work.FailedPlatforms = [] then
+  begin
+    FLogger.Success('Install succeeded for [' + work.ProjectFile + ']', true);
+    exit;
+  end;
+  //the failures were reported where they happened - this is the outcome.
+  FLogger.Information('Install failed for [' + work.ProjectFile + '] on platforms [' + DPMPlatformsToString(work.FailedPlatforms) +
+    '] - the project was changed for the platforms that built. Restore it once the problem is fixed to finish those platforms.', true);
+  result := false;
 end;
 
 procedure TPackageInstaller.HintCompanions(const cancellationToken : ICancellationToken; const config : IConfiguration; const options : TInstallOptions;
@@ -3336,6 +3388,7 @@ var
   platforms: TDPMPlatforms;
   platform: TDPMPlatform;
   errorPlatforms : TDPMPlatforms;
+  builtPlatforms : TDPMPlatforms;
   platformResult: boolean;
   shouldSkip: boolean;
   platformOptions: TRestoreOptions;
@@ -3410,8 +3463,8 @@ begin
     exit(false);
   end;
 
-  result := true;
   errorPlatforms := [];
+  builtPlatforms := [];
   for platform in platforms do
   begin
     if cancellationToken.IsCancelled then
@@ -3428,18 +3481,23 @@ begin
       platformOptions.Free;
     end;
     if platformResult then
-      FLogger.Success('Restore succeeded for ' + DPMPlatformToString(platform), true)
-    else if not cancellationToken.IsCancelled then
+    begin
+      Include(builtPlatforms, platform);
+      FLogger.Success('Restore succeeded for ' + DPMPlatformToString(platform), true);
+    end
+    else if cancellationToken.IsCancelled then
+      exit(false)
+    else
       Include(errorPlatforms, platform);
-    result := platformResult and result;
     FLogger.Information('');
   end;
 
-  //what went wrong was reported where it happened - this is the outcome.
-  if not result then
+  //What went wrong was reported where it happened. A platform that can't be built mustn't cost the others
+  //their restore - the failed ones' search paths are only ever written once they build, so they are left
+  //as they were. Nothing built - nothing worth recording.
+  if (errorPlatforms <> []) and (builtPlatforms = []) then
   begin
-    if errorPlatforms <> [] then
-      FLogger.Information('Restore failed for [' + projectFile + '] on platforms [' + DPMPlatformsToString(errorPlatforms) + ']', true);
+    FLogger.Information('Restore failed for [' + projectFile + '] on platforms [' + DPMPlatformsToString(errorPlatforms) + ']', true);
     exit;
   end;
 
@@ -3452,10 +3510,18 @@ begin
   if result then
   begin
     //Make sure the IDE host platform's design BPL exists before we try to load it - the restore
-    //loop above only built the project's target platforms. Non-fatal : the restore already
-    //succeeded, and a failure here just means the design components may not load.
+    //loop above only built the project's target platforms. Non-fatal : a failure here just means the
+    //design components may not load. (When the host platform was one of them and failed, it isn't
+    //tried again - LoadDesignPackages leaves the design packages out.)
     EnsureDesignHostPlatformCompiled(cancellationToken, Options, finalGraph, platforms);
-    InstallDesignPackages(cancellationToken, projectFile, BuildPackageSpecsFromGraph(cancellationToken, finalGraph, Options.compilerVersion));
+    LoadDesignPackages(cancellationToken, projectFile, finalGraph, Options.compilerVersion, errorPlatforms);
+  end;
+  //this is the outcome.
+  if errorPlatforms <> [] then
+  begin
+    FLogger.Information('Restore failed for [' + projectFile + '] on platforms [' + DPMPlatformsToString(errorPlatforms) +
+      '] - the project was restored for the platforms that built.', true);
+    result := false;
   end;
 end;
 
