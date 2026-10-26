@@ -19,6 +19,9 @@ type
     //only the main thread runs the host's message loop.
     [Test]
     procedure WaitForAnyHandle_DoesNotPumpOnAnotherThread;
+    //a program that can't be started has no exit code - it used to report the Windows error as one.
+    [Test]
+    procedure Execute2_OfAProgramThatCanNotStart_Raises;
   end;
 
 implementation
@@ -143,6 +146,18 @@ begin
   finally
     signal.Free;
   end;
+end;
+
+procedure TProcessTests.Execute2_OfAProgramThatCanNotStart_Raises;
+var
+  missing : string;
+begin
+  missing := TPath.Combine(TPath.GetTempPath, 'dpm-no-such-program-' + IntToStr(GetCurrentProcessId) + '.exe');
+  Assert.WillRaise(
+    procedure
+    begin
+      TProcess.Execute2(TCancellationTokenSourceFactory.Create.Token, missing, '', '');
+    end, EOSError);
 end;
 
 initialization

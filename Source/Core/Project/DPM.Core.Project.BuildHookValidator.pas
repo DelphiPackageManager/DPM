@@ -40,8 +40,10 @@ unit DPM.Core.Project.BuildHookValidator;
 // copylocal import.
 //
 // Findings are split by whether the construct can still execute :
-//   blocking - <Target>, <UsingTask>, an unrecognised <Import>. Nothing neuters these, so a
-//              package carrying one must not be built.
+//   blocking - <Target>, <UsingTask>, an unrecognised <Import>, or a property that decides what the
+//              CodeGear targets import (GlobalOptionFile, BDS, APPDATA ...). Nothing neuters the first
+//              three, so a package carrying one must not be built; the properties are pinned on the
+//              command line too, but no IDE written dproj sets one, so setting one is a red flag.
 //   advisory - the properties TMSBuildCompiler blanks. They cannot run, but shipping one means
 //              the author expected a step to happen that never will, which is worth saying.
 //
@@ -83,6 +85,7 @@ uses
   System.SysUtils,
   System.StrUtils,
   System.Variants,
+  System.Generics.Defaults,
   DPM.Core.MSXML,
   DPM.Core.Project.CopyLocalTargets,
   DPM.Core.Utils.XML;
@@ -94,7 +97,8 @@ const
   cTargetXPath = '//*[local-name()=''Target'']';
   cUsingTaskXPath = '//*[local-name()=''UsingTask'']';
   cImportXPath = '//*[local-name()=''Import'']';
-  cPropertyXPathFmt = '//*[local-name()=''PropertyGroup'']/*[local-name()=''%s'']';
+  //every property a project sets - msbuild property names aren't case sensitive, so they are compared in code.
+  cPropertiesXPath = '//*[local-name()=''PropertyGroup'']/*';
 
   //The properties TMSBuildCompiler.GetMSBuildParameters passes empty on the msbuild command line.
   //Keep the two lists in step - a property dropped there has to move from advisory to blocking.
@@ -106,11 +110,27 @@ const
     '_PreCompileTargets',
     '_PostCompileTargets');
 
+  //The properties that decide what CodeGear.Common.Targets imports - the file it imports when GlobalOptionFile is
+  //set, environment.proj and EnvOptions.proj under $(APPDATA)\Embarcadero\$(BDSAppDataBaseDir)\$(ProductVersion),
+  //and Profiles under $(BDS). TMSBuildCompiler pins them as global properties, so setting one does nothing - but no
+  //IDE written dproj does (none of the 924 in a fully populated package cache), so one that does is refused.
+  //DPMCache is not here : DPM itself writes a conditional default for it, and it is pinned too.
+  cImportProperties : array[0..8] of string = (
+    'GlobalOptionFile',
+    'BDSAppDataBaseDir',
+    'BDS',
+    'APPDATA',
+    'Profiles',
+    'EnvironmentSettings',
+    'EnvOptions',
+    'ProductVersion',
+    'ImportEnvOptions');
+
   //Import allow list.
   cCodeGearTargetsPrefix = '$(BDS)\Bin\CodeGear.';   //+ <product>.Targets, no further path segment
   cTargetsSuffix = '.targets';
-  cUserToolsPrefix = '$(APPDATA)\';                  //+ ..\UserTools.proj, the IDE's own tool config
-  cUserToolsSuffix = '\UserTools.proj';
+  //the IDE's own tool config - exactly what the IDE writes, so no ..\ can walk from APPDATA into the package cache.
+  cUserTools = '$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj';
   cDeployProj = '$(MSBuildProjectName).deployproj';  //IDE deployment manifest, scanned separately
   //DPM's own import - taken from the same constant TProjectEditor.EnsureCopyLocalImport writes,
   //so this can never drift out of step with it.
@@ -128,6 +148,16 @@ begin
   //getAttribute returns Null when the attribute is absent; VarToStr maps that to ''.
   if not VarIsNull(value) then
     result := Trim(VarToStr(value));
+end;
+
+function IsOneOf(const value : string; const names : array of string) : boolean;
+var
+  i : integer;
+begin
+  result := false;
+  for i := Low(names) to High(names) do
+    if SameText(value, names[i]) then
+      exit(true);
 end;
 
 function NameOrPlaceholder(const value : string) : string;
@@ -161,7 +191,7 @@ begin
 
   //The IDE's per user custom build tool config. It lives on the consumer's machine rather than
   //in the package, and the tool commands it defines are neutered by CustomToolCommand= anyway.
-  if StartsText(cUserToolsPrefix, value) and EndsText(cUserToolsSuffix, value) then
+  if SameText(cUserTools, value) then
     exit(true);
 
   //Written into every dproj by the IDE. Relative, so the file itself can ship inside a package -
@@ -185,6 +215,8 @@ var
   displayName : string;
   importProject : string;
   taskName : string;
+  propertyName : string;
+  reported : ISet<string>;
 begin
   result := false;
   if not FileExists(filename) then
@@ -239,17 +271,27 @@ begin
       blocking.Add(displayName + ' imports [' + NameOrPlaceholder(importProject) + ']');
   end;
 
-  //--- the properties the compiler already blanks.
-  for i := Low(cNeuteredProperties) to High(cNeuteredProperties) do
+  //--- properties : the ones that decide what is imported, and the ones the compiler already blanks. Every
+  //occurrence counts - a project can set one in more than one group, and the last that applies wins.
+  reported := TCollections.CreateSet<string>(TIStringComparer.Ordinal);
+  nodes := doc.selectNodes(cPropertiesXPath);
+  for i := 0 to nodes.length - 1 do
   begin
-    nodes := doc.selectNodes(Format(cPropertyXPathFmt, [cNeuteredProperties[i]]));
-    if nodes.length = 0 then
+    propertyName := nodes.item[i].baseName;
+    if reported.Contains(propertyName) then
       continue;
+    if IsOneOf(propertyName, cImportProperties) then
+    begin
+      reported.Add(propertyName);
+      blocking.Add(displayName + ' sets [' + propertyName + '], which decides what msbuild imports');
+    end
     //The IDE writes empty elements into projects that never had the event set - those say nothing
     //about intent, so only a non blank value is worth reporting.
-    if Trim(nodes.item[0].text) = '' then
-      continue;
-    advisory.Add(displayName + ' sets [' + cNeuteredProperties[i] + ']');
+    else if IsOneOf(propertyName, cNeuteredProperties) and (Trim(nodes.item[i].text) <> '') then
+    begin
+      reported.Add(propertyName);
+      advisory.Add(displayName + ' sets [' + propertyName + ']');
+    end;
   end;
 end;
 

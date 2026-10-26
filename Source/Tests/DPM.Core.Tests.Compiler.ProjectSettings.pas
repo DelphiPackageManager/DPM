@@ -42,6 +42,14 @@ type
 
     [Test]
     procedure PlatformAndConfigMacros_AreExpanded_IgnoringCase;
+    //each group's $(DCC_UnitSearchPath) is replaced by what the group before it ends up with, where it appears.
+    [Test]
+    procedure SearchPath_IsInTheOrderMSBuildBuildsIt;
+    [Test]
+    procedure InheritedValue_KeepsItsPlaceInTheList;
+    //nothing set anywhere is nothing - not a $(DCC_UnitSearchPath) the command line can't expand.
+    [Test]
+    procedure NoSearchPath_IsEmpty;
   end;
 
 implementation
@@ -262,6 +270,53 @@ begin
   //each platform and config gets its own values, not whatever was resolved first.
   searchPath := LoadSearchPath(cDproj, 'Custom', TDPMPlatform.Win64);
   Assert.Contains(searchPath, '.\Win64\Custom');
+end;
+
+const
+  //Base and one config, with the config's search path given.
+  cSmallDprojHead =
+    '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">'#13#10 +
+    '    <PropertyGroup Condition="''$(Config)''==''Base'' or ''$(Base)''!=''''">'#13#10 +
+    '        <Base>true</Base>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Config)''==''Release'' or ''$(Cfg_1)''!=''''">'#13#10 +
+    '        <Cfg_1>true</Cfg_1>'#13#10 +
+    '        <CfgParent>Base</CfgParent>'#13#10 +
+    '        <Base>true</Base>'#13#10 +
+    '    </PropertyGroup>'#13#10;
+  cSmallDprojTail =
+    '    <ItemGroup>'#13#10 +
+    '        <BuildConfiguration Include="Base">'#13#10 +
+    '            <Key>Base</Key>'#13#10 +
+    '        </BuildConfiguration>'#13#10 +
+    '        <BuildConfiguration Include="Release">'#13#10 +
+    '            <Key>Cfg_1</Key>'#13#10 +
+    '            <CfgParent>Base</CfgParent>'#13#10 +
+    '        </BuildConfiguration>'#13#10 +
+    '    </ItemGroup>'#13#10 +
+    '</Project>'#13#10;
+
+procedure TProjectSettingsLoaderTests.SearchPath_IsInTheOrderMSBuildBuildsIt;
+begin
+  //Cfg_1_Win64, then Cfg_1, then Base_Win64, then Base - the most specific group's own paths first.
+  Assert.AreEqual('.\Release64;.\ReleaseOnly;..\Source\Win64;.\BaseOnly;.\Win64\Release',
+                  LoadSearchPath(cDproj, 'Release', TDPMPlatform.Win64));
+end;
+
+procedure TProjectSettingsLoaderTests.InheritedValue_KeepsItsPlaceInTheList;
+begin
+  Assert.AreEqual('.\First;.\FromBase;.\Last', LoadSearchPath(cSmallDprojHead +
+    '    <PropertyGroup Condition="''$(Base)''!=''''">'#13#10 +
+    '        <DCC_UnitSearchPath>.\FromBase;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Cfg_1)''!=''''">'#13#10 +
+    '        <DCC_UnitSearchPath>.\First;$(DCC_UnitSearchPath);.\Last</DCC_UnitSearchPath>'#13#10 +
+    '    </PropertyGroup>'#13#10 + cSmallDprojTail, 'Release', TDPMPlatform.Win32));
+end;
+
+procedure TProjectSettingsLoaderTests.NoSearchPath_IsEmpty;
+begin
+  Assert.AreEqual('', LoadSearchPath(cSmallDprojHead + cSmallDprojTail, 'Release', TDPMPlatform.Win32));
 end;
 
 procedure TProjectSettingsLoaderTests.PlatformAndConfigMacros_AreExpanded_IgnoringCase;

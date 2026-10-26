@@ -62,7 +62,28 @@ type
     [TestCase('OtherBdsFile', '$(BDS)\Bin\evil.proj')]
     [TestCase('BdsSubFolder', '$(BDS)\Bin\sub\CodeGear.Delphi.Targets')]
     [TestCase('CopyLocalLookAlike', '$(DPMCache)\DPM.CopyLocal.targets.evil')]
+    [TestCase('UserToolsWalkingOutOfAppData', '$(APPDATA)\..\..\Local\Temp\x\UserTools.proj')]
+    [TestCase('UserToolsIntoThePackageCache', '$(APPDATA)\.dpm\package_cache\delphi12.0\Evil.Pkg\1.0.0\UserTools.proj')]
     procedure UnknownImport_IsNotAllowed(const importProject : string);
+
+    //what decides the files the CodeGear targets import - pinned on the msbuild command line, and refused here.
+    [Test]
+    [TestCase('GlobalOptionFile', 'GlobalOptionFile')]
+    [TestCase('BDSAppDataBaseDir', 'BDSAppDataBaseDir')]
+    [TestCase('BDS', 'BDS')]
+    [TestCase('APPDATA', 'APPDATA')]
+    [TestCase('Profiles', 'Profiles')]
+    [TestCase('EnvironmentSettings', 'EnvironmentSettings')]
+    [TestCase('EnvOptions', 'EnvOptions')]
+    [TestCase('ProductVersion', 'ProductVersion')]
+    [TestCase('ImportEnvOptions', 'ImportEnvOptions')]
+    [TestCase('NameInAnotherCase', 'bds')]
+    procedure ImportProperty_IsBlocking(const propertyName : string);
+    [Test]
+    procedure DpmCacheDefault_IsNotBlocking;
+    //a project can set a property in more than one group - any of them counts.
+    [Test]
+    procedure BuildEventProperty_InALaterGroup_IsReported;
 
     [Test]
     procedure DpmsOwnCopyLocalImportValue_IsAllowed;
@@ -354,6 +375,48 @@ begin
   Assert.AreEqual(0, blocking.Count, 'should not block : ' + string.Join(' | ', blocking.ToArray));
   Assert.AreEqual(1, advisory.Count, 'expected one advisory finding');
   Assert.Contains(advisory[0], propertyName, true, 'the finding should name the property');
+end;
+
+procedure TBuildHookValidatorTests.ImportProperty_IsBlocking(const propertyName : string);
+var
+  findings : string;
+begin
+  findings := ScanBlocking(WriteProject(cProjectOpen + cAllowedImports +
+    '    <PropertyGroup>'#13#10 +
+    '        <' + propertyName + '>c:\evil</' + propertyName + '>'#13#10 +
+    '    </PropertyGroup>'#13#10 + cProjectClose));
+  Assert.Contains(findings, propertyName, true, 'the finding should name the property : ' + findings);
+end;
+
+procedure TBuildHookValidatorTests.DpmCacheDefault_IsNotBlocking;
+var
+  findings : string;
+begin
+  //what DPM itself writes into a project that uses packages.
+  findings := ScanBlocking(WriteProject(cProjectOpen + cAllowedImports +
+    '    <PropertyGroup>'#13#10 +
+    '        <DPMCache Condition="''$(DPMCache)'' == ''''">$(APPDATA)\.dpm\package_cache</DPMCache>'#13#10 +
+    '    </PropertyGroup>'#13#10 + cProjectClose));
+  Assert.AreEqual('', findings);
+end;
+
+procedure TBuildHookValidatorTests.BuildEventProperty_InALaterGroup_IsReported;
+var
+  projectFile : string;
+  blocking : IList<string>;
+  advisory : IList<string>;
+begin
+  blocking := TCollections.CreateList<string>;
+  advisory := TCollections.CreateList<string>;
+  projectFile := WriteProject(cProjectOpen + cAllowedImports +
+    '    <PropertyGroup>'#13#10 +
+    '        <PostBuildEvent/>'#13#10 +
+    '    </PropertyGroup>'#13#10 +
+    '    <PropertyGroup Condition="''$(Cfg_1)''!=''''">'#13#10 +
+    '        <PostBuildEvent>calc.exe</PostBuildEvent>'#13#10 +
+    '    </PropertyGroup>'#13#10 + cProjectClose);
+  Assert.IsTrue(TBuildHookValidator.TryScanFile(projectFile, blocking, advisory));
+  Assert.AreEqual(1, advisory.Count, 'advisory : ' + string.Join(' | ', advisory.ToArray));
 end;
 
 procedure TBuildHookValidatorTests.EmptyBuildEventProperty_IsNotReported;

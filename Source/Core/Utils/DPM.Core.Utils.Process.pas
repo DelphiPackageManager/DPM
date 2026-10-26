@@ -311,12 +311,28 @@ begin
   end;
 end;
 
+//A program that can't be started has no exit code to return.
+procedure RaiseLaunchError(const executable : string; const what : string; const errorCode : Cardinal);
+var
+  e : EOSError;
+  detail : string;
+begin
+  detail := SysErrorMessage(errorCode);
+  if what <> '' then
+    detail := what + ' : ' + detail;
+  e := EOSError.CreateFmt('Unable to start [%s] - %s', [executable, detail]);
+  e.ErrorCode := errorCode;
+  raise e;
+end;
+
 { TProcess }
 
 class function TProcess.Execute2(const cancellationToken : ICancellationToken; const executable : string; const commandLine : string; const startingDir : string; const enviroment : IEnvironmentBlock = nil; const timeout : integer = -1; const outputFile : string = '') : Cardinal;
 var
   sParams: string;
   pDir: PChar;
+  pApplication: PChar;
+  launchError: Cardinal;
 
   pEnvironment : Pointer;
   startupInfo : TStartupInfo;
@@ -363,6 +379,12 @@ begin
     pDir := nil;
 
   sParams := DoubleQuoteString(executable) + ' ' + commandLine;
+  //A path is started as that file and nothing else. A bare name is looked for in DPM's own folder and the current
+  //folder before the system folders - callers that start anything that matters pass the full path.
+  if ExtractFileDrive(executable) <> '' then
+    pApplication := PChar(executable)
+  else
+    pApplication := nil;
 
   outputHandle := 0;
   inputHandle := 0;
@@ -375,16 +397,13 @@ begin
     outputHandle := CreateFile(PChar(outputFile), GENERIC_WRITE, FILE_SHARE_READ or FILE_SHARE_WRITE, @securityAttributes,
                                CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
     if outputHandle = INVALID_HANDLE_VALUE then
-    begin
-      result := GetLastError;
-      exit;
-    end;
+      RaiseLaunchError(executable, 'unable to create the output file [' + outputFile + ']', GetLastError);
     inputHandle := CreateFile('NUL', GENERIC_READ, FILE_SHARE_READ or FILE_SHARE_WRITE, @securityAttributes, OPEN_EXISTING, 0, 0);
     if inputHandle = INVALID_HANDLE_VALUE then
     begin
-      result := GetLastError;
+      launchError := GetLastError;
       CloseHandle(outputHandle);
-      exit;
+      RaiseLaunchError(executable, 'unable to open NUL for its input', launchError);
     end;
     startupInfo.dwFlags := startupInfo.dwFlags or STARTF_USESTDHANDLES;
     startupInfo.hStdInput := inputHandle;
@@ -395,18 +414,19 @@ begin
 
   //Suspended, so it is in the job before it can start anything - the job is how a stop reaches the whole
   //tree (cmd.exe starts cmd, which starts msbuild, which starts the compiler).
-  if CreateProcess(nil, PChar(sParams), nil, nil, outputHandle <> 0, CREATE_UNICODE_ENVIRONMENT + CREATE_NEW_CONSOLE + CREATE_SUSPENDED, pEnvironment, pDir, startupInfo, processInfo) then
-    result := 0
+  if CreateProcess(pApplication, PChar(sParams), nil, nil, outputHandle <> 0, CREATE_UNICODE_ENVIRONMENT + CREATE_NEW_CONSOLE + CREATE_SUSPENDED, pEnvironment, pDir, startupInfo, processInfo) then
+    launchError := 0
   else
-    result := GetLastError;
+    launchError := GetLastError;
   //the process has its own copies now - ours would only hold the file open.
   if outputHandle <> 0 then
   begin
     CloseHandle(outputHandle);
     CloseHandle(inputHandle);
   end;
-  if result <> 0 then
-    exit;
+  //not an exit code - the program never ran.
+  if launchError <> 0 then
+    RaiseLaunchError(executable, '', launchError);
 
   job := DPMCreateJobObject(nil, nil);
   if (job <> 0) and (not DPMAssignProcessToJobObject(job, processInfo.hProcess)) then

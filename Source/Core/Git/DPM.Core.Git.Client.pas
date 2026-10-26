@@ -195,7 +195,17 @@ begin
     //cmd looks for 'git' in the current folder before PATH, and the working folder of a checkout is a
     //repository someone else wrote, which could hold a git.cmd.
     FLogger.Debug('[git] ' + exeFile + ' ' + args);
-    result := TProcess.Execute2(cancellationToken, exeFile, args, workingDir, nil, -1, tmpFile);
+    try
+      result := TProcess.Execute2(cancellationToken, exeFile, args, workingDir, nil, -1, tmpFile);
+    except
+      //git couldn't be started - that is the output.
+      on e : EOSError do
+      begin
+        output.Add(e.Message);
+        result := e.ErrorCode;
+        exit;
+      end;
+    end;
     if TFile.Exists(tmpFile) then
     begin
       try

@@ -83,29 +83,6 @@ begin
   result := Format(PropertyXPathFormatStr,[sPath,PropertyName]);
 end;
 
-function IncludeTrailingChar(const sValue :string; const AChar : Char) : string;
-var
-  l : integer;
-begin
-  result := sValue;
-  l := Length(result);
-  if l > 0 then
-    if result[l] <> AChar then
-      result := result + AChar
-end;
-
-function ExcludeTrailingChar(const sValue :string; const AChar : Char) : string;
-var
-  l : integer;
-begin
-  result := sValue;
-  l := Length(result);
-  if l > 0 then
-    if result[l] = AChar then
-      Delete(result,l,1);
-end;
-
-
 //Returns the settings group msbuild evaluates immediately before the one for key - ie where an
 //inherited $(PropName) in key's value comes from. For Config=Release (Cfg_1) Platform=Win64 the
 //groups apply in document order Base, Base_Win64, Cfg_1, Cfg_1_Win64, so walking up from the
@@ -138,54 +115,69 @@ begin
 end;
 
 
+//a ; separated list without its empty entries - what substituting an empty inherited value leaves.
+function TidyList(const value : string) : string;
+var
+  parts : TStringList;
+  i : integer;
+begin
+  result := '';
+  parts := TStringList.Create;
+  try
+    parts.StrictDelimiter := true;
+    parts.Delimiter := ';';
+    parts.DelimitedText := value;
+    for i := 0 to parts.Count - 1 do
+    begin
+      if Trim(parts[i]) = '' then
+        continue;
+      if result <> '' then
+        result := result + ';';
+      result := result + parts[i];
+    end;
+  finally
+    parts.Free;
+  end;
+end;
+
+//The value msbuild ends up with for propName in configKey's group : the group's own, with each $(propName) in it
+//replaced by what the group before it ends up with - where it appears, so ..\src;$(X) and $(X);..\src keep their
+//order. A group that doesn't set it has the value of the one before it.
 function TDPMProjectSettingsLoader.DoGetStringProperty(const configKey, propName, defaultValue : string) : string;
 var
   tmpElement    : IXMLDOMElement;
   sParentConfig : string;
   sInherit      : string;
-  bInherit      : boolean;
   sParentValue  : string;
 begin
-  bInherit := False;
-
   sInherit := '$(' + propName + ')';
+  sParentConfig := GetConfigParent(configKey);
   tmpElement := FXMLDoc.selectSingleNode(GetXPath(configKey, propName)) as IXMLDOMElement;
-  if tmpElement <> nil then
+  if tmpElement = nil then
   begin
-    result := tmpElement.text;
-    if not bInherit then
-      if Pos(sInherit,result) > 0  then
-        bInherit := True;
-  end
-  else
-  begin
-    bInherit := True; //didn't find a value so we will look at it's base config for a value
-    result := '';
-  end;
-
-  if bInherit then
-  begin
-    if sInherit <> '' then
-      result := StringReplace(Result,sInherit,'',[rfIgnoreCase]);
-
-    sParentConfig := GetConfigParent(configKey);
     if sParentConfig <> '' then
-    begin
-      sParentValue := DoGetStringProperty(sParentConfig,propName, defaultValue);
-      result := IncludeTrailingChar(sParentValue,';')  + result;
-    end
+      result := DoGetStringProperty(sParentConfig, propName, defaultValue)
     else
-      result := StringReplace(Result,sInherit,'',[rfIgnoreCase]);
+      result := defaultValue;
+    exit;
   end;
-  if result = '' then
-     result := defaultValue;
-  result := ExcludeTrailingChar(Result,';');
+  result := tmpElement.text;
+  if ContainsText(result, sInherit) then
+  begin
+    if sParentConfig <> '' then
+      sParentValue := DoGetStringProperty(sParentConfig, propName, defaultValue)
+    else
+      sParentValue := defaultValue;
+    result := StringReplace(result, sInherit, sParentValue, [rfReplaceAll, rfIgnoreCase]);
+  end;
+  result := TidyList(result);
 end;
 
 
 function TDPMProjectSettingsLoader.GetSearchPath: string;
 begin
-  result := GetStringProperty('DCC_UnitSearchPath', '$(DCC_UnitSearchPath)' );
+  //nothing set anywhere is nothing - not a $(DCC_UnitSearchPath) the command line can't expand.
+  result := GetStringProperty('DCC_UnitSearchPath', '');
   //The caller hands this to msbuild as a global (command line) property, and property references
   //do not survive that - $(Platform) and $(Config) reach the compiler as nothing at all, turning
   //..\Source\$(Platform) into ..\Source. We know both values, so resolve them here. msbuild

@@ -120,6 +120,8 @@ type
   TMissingCompilerEnvironment = class(TInterfacedObject, ICompilerEnvironmentProvider)
   protected
     function GetRsVarsFilePath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;
+    function GetRootDir(const compilerVersion : TCompilerVersion) : string;
+    function GetMSBuildPath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;
   end;
 
   //A package source that either answers, or fails with a given reason.
@@ -160,6 +162,16 @@ type
 function TMissingCompilerEnvironment.GetRsVarsFilePath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;
 begin
   raise EDPMError.Create(TErrorCode.E5001_CompilerNotInstalled, 'Delphi ' + CompilerToString(compilerVersion) + ' is not installed.');
+end;
+
+function TMissingCompilerEnvironment.GetRootDir(const compilerVersion : TCompilerVersion) : string;
+begin
+  result := GetRsVarsFilePath(TDPMPlatform.Win32, compilerVersion);
+end;
+
+function TMissingCompilerEnvironment.GetMSBuildPath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;
+begin
+  result := GetRsVarsFilePath(platform, compilerVersion);
 end;
 
 { TFakeSource }
@@ -309,7 +321,7 @@ var
 begin
   logger := TTestLogger.Create;
   loggerIntf := logger;
-  compiler := TMSBuildCompiler.Create(loggerIntf, cTestCompiler, TDPMPlatform.Win32, TMissingCompilerEnvironment.Create);
+  compiler := TMSBuildCompiler.Create(loggerIntf, cTestCompiler, TDPMPlatform.Win32, TMissingCompilerEnvironment.Create, '');
   Assert.IsFalse(compiler.BuildProject(TCancellationTokenSourceFactory.Create.Token, TDPMPlatform.Win32, 'C:\nowhere\pkg.dproj', 'Release', TPackageVersion.Parse('1.0.0')));
   Assert.AreEqual(1, loggerIntf.ErrorCount, logger.Messages.Text);
   Assert.IsTrue(logger.HasError(TErrorCode.E5001_CompilerNotInstalled), logger.Messages.Text);

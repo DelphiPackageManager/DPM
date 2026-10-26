@@ -32,6 +32,7 @@ interface
 uses
   DPM.Core.Types,
   DPM.Core.Logging,
+  DPM.Core.Cache.Interfaces,
   DPM.Core.Compiler.Interfaces;
 
 type
@@ -39,11 +40,12 @@ type
   private
     FLogger : ILogger;
     FEnv : ICompilerEnvironmentProvider;
+    FPackageCache : IPackageCache;
   protected
     function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler; overload;
     function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const logger : ILogger) : ICompiler; overload;
   public
-    constructor Create(const logger : ILogger; const env : ICompilerEnvironmentProvider);
+    constructor Create(const logger : ILogger; const env : ICompilerEnvironmentProvider; const packageCache : IPackageCache);
   end;
 
 implementation
@@ -53,10 +55,11 @@ uses
 
 { TCompilerFactory }
 
-constructor TCompilerFactory.Create(const logger : ILogger; const env : ICompilerEnvironmentProvider);
+constructor TCompilerFactory.Create(const logger : ILogger; const env : ICompilerEnvironmentProvider; const packageCache : IPackageCache);
 begin
   FLogger := logger;
   FEnv := env;
+  FPackageCache := packageCache;
 end;
 
 function TCompilerFactory.CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler;
@@ -67,7 +70,8 @@ end;
 function TCompilerFactory.CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const logger : ILogger) : ICompiler;
 begin
   //if we have different compiler implementations then work that out here.
-  result := TMSBuildCompiler.Create(logger, compilerVersion, platform, FEnv);
+  //the cache root a package's dproj sees as $(DPMCache) - read now, it is set from the configuration.
+  result := TMSBuildCompiler.Create(logger, compilerVersion, platform, FEnv, FPackageCache.PackagesFolder);
 end;
 
 end.

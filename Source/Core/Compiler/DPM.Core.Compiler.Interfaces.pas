@@ -79,6 +79,10 @@ type
   ICompilerEnvironmentProvider = interface
     ['{54814318-551F-4F53-B0FB-66AC0E430DB7}']
     function GetRsVarsFilePath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;
+    //the compiler's install folder - $(BDS). Raises E5001 when it isn't installed.
+    function GetRootDir(const compilerVersion : TCompilerVersion) : string;
+    //MSBuild.exe by its full path - the one the compiler's rsvars.bat puts first on the PATH (its FrameworkDir).
+    function GetMSBuildPath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;
   end;
 
   //inject

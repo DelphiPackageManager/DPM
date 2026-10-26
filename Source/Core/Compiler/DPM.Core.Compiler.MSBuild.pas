@@ -57,6 +57,8 @@ type
     FCompilerOutput : TStringList;
 
     FBuildForDesign : boolean;
+    //the package cache root - what a package's dproj sees as $(DPMCache).
+    FPackageCacheFolder : string;
   protected
     function GetBPLOutput : string;
     function GetCompilerVersion : TCompilerVersion;
@@ -86,7 +88,8 @@ type
 
     function BuildProject(const cancellationToken : ICancellationToken; const platform : TDPMPlatform; const projectFile : string; const configName : string; const packageVersion : TPackageVersion; const forDesign : boolean) : Boolean;
   public
-    constructor Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const env : ICompilerEnvironmentProvider);
+    constructor Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const env : ICompilerEnvironmentProvider;
+                       const packageCacheFolder : string);
     destructor Destroy; override;
 
   end;
@@ -94,6 +97,8 @@ type
 implementation
 
 uses
+  WinApi.Windows,
+  WinApi.ShlObj,
   System.SysUtils,
   System.IOUtils,
   DPM.Core.Diagnostics,
@@ -108,6 +113,40 @@ const
   //itself. See the ImportEnvOptions note in BuildProject.
   cWindowsPlatforms : TDPMPlatforms = [TDPMPlatform.Win32, TDPMPlatform.Win64,
                                        TDPMPlatform.Win64x, TDPMPlatform.WinARM64EC];
+
+//cmd.exe by its full path - never a cmd.exe in DPM's folder or the current one.
+function CmdExePath : string;
+var
+  buffer : array[0..MAX_PATH] of Char;
+  len : UINT;
+begin
+  len := GetSystemDirectory(buffer, Length(buffer));
+  if (len = 0) or (len > MAX_PATH) then
+    raise EDPMError.Create(TErrorCode.E5002_CompilerLaunchFailed, 'Unable to find the system folder (for cmd.exe) : ' + SysErrorMessage(GetLastError));
+  SetString(result, buffer, len);
+  result := IncludeTrailingPathDelimiter(result) + 'cmd.exe';
+end;
+
+//the user's roaming profile folder - $(APPDATA).
+function AppDataFolder : string;
+var
+  buffer : array[0..MAX_PATH] of Char;
+begin
+  result := GetEnvironmentVariable('APPDATA');
+  if result = '' then
+  begin
+    if SHGetFolderPath(0, CSIDL_APPDATA, 0, 0, @buffer[0]) <> S_OK then
+      raise EDPMError.Create(TErrorCode.E5002_CompilerLaunchFailed, 'Unable to find the user''s application data folder (APPDATA).');
+    result := buffer;
+  end;
+  result := ExcludeTrailingPathDelimiter(result);
+end;
+
+//a path as a global property - quoted, and with no trailing \, which would escape the closing quote.
+function PathProperty(const name : string; const path : string) : string;
+begin
+  result := ' /p:' + name + '=' + TPathUtils.QuotePath(ExcludeTrailingPathDelimiter(path), true);
+end;
 
 //The log is ours to tidy up - not something a build fails over.
 procedure DeleteCompilerLog(const logger : ILogger; const fileName : string);
@@ -129,6 +168,7 @@ var
   env : IEnvironmentBlock;
   i : integer;
   exitCode : Cardinal;
+  oemEncoding : TEncoding;
 begin
 
   result := false;
@@ -160,6 +200,9 @@ begin
   env.RemoveVariable('BDSCOMMONDIR');
   {$ENDIF}
   env.RemoveVariable('PLATFORM');
+  //cmd looks for a command in the current folder before the PATH unless this is set - and a package's own folder
+  //could hold an msbuild.bat. Everything is run by its full path anyway; this covers what msbuild itself starts.
+  env.AddOrSet('NoDefaultCurrentDirectoryInExePath', '1');
 
   //EnvOptions.proj is the IDE's environment - the per platform library paths and the selected
   //platform SDK. CodeGear.Common.Targets imports it unless ImportEnvOptions is exactly 'false'.
@@ -174,11 +217,10 @@ begin
   //'cannot find -lgcc_s / -lc / -ldl / -lpthread' long after the compile itself succeeded.
   //Note the unit search path stays under our control either way - we pass DCC_UnitSearchPath as a
   //global (command line) property, which wins over anything the project or EnvOptions sets.
-  if platform in cWindowsPlatforms then
-    env.AddOrSet('ImportEnvOptions','false');
+  //(ImportEnvOptions=false is passed as a global property for these - see GetMSBuildParameters.)
   FLogger.Debug('Compler - cmdline : ' + commandLine);
   try
-    exitCode := TProcess.Execute2(cancellationToken, 'cmd.exe', commandLine,'',env);
+    exitCode := TProcess.Execute2(cancellationToken, CmdExePath, commandLine,'',env);
   except
     on e : Exception do
     begin
@@ -193,7 +235,13 @@ begin
   begin
     if (not result) and (not cancellationToken.IsCancelled) then
     begin
-      FCompilerOutput.LoadFromFile(FCompilerLogFile);
+      //what cmd redirected - console output, in the OEM code page.
+      oemEncoding := TEncoding.GetEncoding(GetOEMCP);
+      try
+        FCompilerOutput.LoadFromFile(FCompilerLogFile, oemEncoding);
+      finally
+        oemEncoding.Free;
+      end;
       for i := 0 to FCompilerOutput.Count -1 do
         FLogger.Information(FCompilerOutput.Strings[i]);
       FCompilerOutput.Clear;
@@ -207,9 +255,11 @@ begin
                   ' failed (msbuild exit code ' + IntToStr(exitCode) + ') - see the compiler output above.');
 end;
 
-constructor TMSBuildCompiler.Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const env : ICompilerEnvironmentProvider);
+constructor TMSBuildCompiler.Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const env : ICompilerEnvironmentProvider;
+                                    const packageCacheFolder : string);
 begin
   FLogger := logger;
+  FPackageCacheFolder := packageCacheFolder;
   FCompilerVersion := compilerVersion;
   FPlatform := platform;
   FEnv := env;
@@ -235,11 +285,14 @@ end;
 
 function TMSBuildCompiler.GetCommandLine(const platform : TDPMPlatform; const projectFile, configName : string; const packageVersion : TPackageVersion) : string;
 begin
-  //I don't like this... but it will do for a start.
-
-  result := 'call "' + FEnv.GetRsVarsFilePath(platform, FCompilerVersion) + '"';
-  result := result + ' & msbuild "' + projectfile + '" ' + GetMSBuildParameters(configName, packageVersion);
-  result := ' cmd /c ' + result + ' > ' + FCompilerLogFile;
+  FProjectFile := projectFile;
+  //cmd.exe runs rsvars.bat - the compiler's environment - then MSBuild.exe by its full path, never an 'msbuild' looked
+  //up on the PATH (cmd looks in the current folder first). Both go to the log, errors included. /s /c "..." makes cmd
+  //strip just the outer quotes, so every path inside can be quoted.
+  result := '/s /c "(call ' + TPathUtils.QuotePath(FEnv.GetRsVarsFilePath(platform, FCompilerVersion), true) +
+            ' && ' + TPathUtils.QuotePath(FEnv.GetMSBuildPath(platform, FCompilerVersion), true) +
+            ' ' + TPathUtils.QuotePath(projectFile, true) + ' ' + GetMSBuildParameters(configName, packageVersion) +
+            ') > ' + TPathUtils.QuotePath(FCompilerLogFile, true) + ' 2>&1"';
 end;
 
 function TMSBuildCompiler.GetCompilerOutput : TStrings;
@@ -333,6 +386,23 @@ begin
   //- and it is what lets TBuildHookValidator treat that import as harmless rather than reject it.
   result := result + ' /p:DPMCopyLocalDisable=true';
 
+  //The imports CodeGear's own targets make are chosen by properties : GlobalOptionFile (imported whenever it is set),
+  //APPDATA and BDSAppDataBaseDir (environment.proj, EnvOptions.proj), BDS (the targets themselves and Profiles), and
+  //DPMCache for DPM's copylocal import. A dproj - or a file it imports - that sets one of them could point the
+  //import at a file of its own, inside the package. Global (command line) properties win over anything a project
+  //sets, so it can't. EnvironmentSettings, EnvOptions, Profiles and ProductVersion are set unconditionally by
+  //CodeGear.Common.Targets from these, and imported at once. TBuildHookValidator refuses a dproj that sets any of
+  //them as well.
+  result := result + ' /p:GlobalOptionFile=';
+  result := result + ' /p:BDSAppDataBaseDir=BDS';
+  result := result + PathProperty('APPDATA', AppDataFolder);
+  result := result + PathProperty('BDS', FEnv.GetRootDir(FCompilerVersion));
+  if FPackageCacheFolder <> '' then
+    result := result + PathProperty('DPMCache', FPackageCacheFolder);
+  //see BuildProject - the IDE's environment stays out of a Windows package build.
+  if FPlatform in cWindowsPlatforms then
+    result := result + ' /p:ImportEnvOptions=false';
+
   result := result + ' /p:DCC_UnitSearchPath=' +  GetProjectSearchPath(configName);
 
   //result := result +  ' /v:diag';
@@ -379,7 +449,12 @@ begin
   FLogger.Debug('Project Search Path : ' + s);
 
   if s <> '' then
-    result := s + ';' + result;
+  begin
+    if result <> '' then
+      result := s + ';' + result
+    else
+      result := s;
+  end;
 
   FLogger.Debug('SearchPath : ' + result);
 
