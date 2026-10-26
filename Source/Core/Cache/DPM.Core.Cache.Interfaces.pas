@@ -83,7 +83,9 @@ type
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
 
     //gets the full package metadata including search paths.
-    function GetPackageMetadata(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageMetadata;
+    //For display : what a finished install of the package holds. Never extracts, verifies or waits - nil when the
+    //package isn't installed, or another process is installing it right now.
+    function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
 
     //gets the deserialized dspec file for the package.
     function GetPackageSpec(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageSpec;
@@ -119,7 +121,8 @@ type
     ///  installed packages. Returns false (and icon = nil) when the package
     ///  is not in the cache or has no embedded icon.
     /// </summary>
-    function TryGetPackageIcon(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+    //For display, like GetPackageMetadata : the icon a finished install of the package holds.
+    function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
 
     /// <summary>
     ///  Resolves the SHA-256 hash of the package's .dpkg file. Self-heals

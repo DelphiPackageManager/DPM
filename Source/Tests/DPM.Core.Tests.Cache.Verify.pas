@@ -82,9 +82,15 @@ type
     //waiting for another process to finish with the package stops when the operation is cancelled.
     [Test]
     procedure InstallPackageFromFile_WaitingForAnotherProcess_StopsWhenCancelled;
-    //a token already cancelled - the IDE's main thread - takes a free lock, and doesn't wait for a held one.
+    //what the IDE shows from the cache : only a finished install, never repaired, never waited for.
     [Test]
-    procedure CancelledToken_TakesAFreeLock_AndDoesNotWaitForAHeldOne;
+    procedure GetPackageMetadata_ReadsAFinishedInstall;
+    [Test]
+    procedure GetPackageMetadata_IgnoresAnInstallInProgress;
+    [Test]
+    procedure GetPackageMetadata_NeverRepairsTheCache;
+    [Test]
+    procedure GetPackageMetadata_DoesNotWaitForAnotherProcess;
   end;
 
 implementation
@@ -834,27 +840,51 @@ begin
   Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName), FLogger.Messages.Text);
 end;
 
-procedure TPackageCacheVerifyTests.CancelledToken_TakesAFreeLock_AndDoesNotWaitForAHeldOne;
+procedure TPackageCacheVerifyTests.GetPackageMetadata_ReadsAFinishedInstall;
 var
-  holder : THoldLockThread;
   cache : IPackageCache;
-  cancelled : ICancellationTokenSource;
+  metadata : IPackageMetadata;
+begin
+  cache := MakeCache('policy-a');
+  Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName), FLogger.Messages.Text);
+  metadata := MakeCache('policy-a').GetPackageMetadata(TestIdentity);
+  Assert.IsNotNull(metadata, 'a finished install should be shown');
+  Assert.AreEqual('Sample.Pkg', metadata.Id);
+end;
+
+procedure TPackageCacheVerifyTests.GetPackageMetadata_IgnoresAnInstallInProgress;
+begin
+  //what another process has extracted so far - its receipt is written last.
+  ForceDirectories(FPackageFolder);
+  TFile.WriteAllText(TPath.Combine(FPackageFolder, cPackageDspecFile), 'metadata:' + sLineBreak + '  id: Sample.Pkg');
+  Assert.IsNull(MakeCache('policy-a').GetPackageMetadata(TestIdentity), 'an install in progress is not something to show');
+  Assert.AreEqual(0, FLoggerRef.ErrorCount, FLogger.Messages.Text);
+end;
+
+procedure TPackageCacheVerifyTests.GetPackageMetadata_NeverRepairsTheCache;
+begin
+  //only the .dpkg is there - extracting and verifying it is an install's job, not a display's.
+  Assert.IsNull(MakeCache('policy-a').GetPackageMetadata(TestIdentity));
+  Assert.IsFalse(DirectoryExists(FPackageFolder), 'reading for display extracted the package');
+end;
+
+procedure TPackageCacheVerifyTests.GetPackageMetadata_DoesNotWaitForAnotherProcess;
+var
+  cache : IPackageCache;
+  holder : THoldLockThread;
   stopwatch : TStopwatch;
 begin
   cache := MakeCache('policy-a');
-  cancelled := TCancellationTokenSourceFactory.Create;
-  cancelled.Cancel;
-  Assert.IsTrue(cache.InstallPackageFromFile(cancelled.Token, FPackageFileName), 'a free lock should be taken : ' + FLogger.Messages.Text);
-
+  Assert.IsTrue(cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName), FLogger.Messages.Text);
+  cache := MakeCache('policy-a');
   holder := THoldLockThread.Create(PackageLockName(FPackageFolder));
   try
     holder.Start;
     Assert.AreEqual(Ord(wrSignaled), Ord(holder.Held.WaitFor(10000)), 'the other process did not take the lock');
     stopwatch := TStopwatch.StartNew;
-    Assert.IsFalse(cache.InstallPackageFromFile(cancelled.Token, FPackageFileName), 'it installed while another process held the package');
+    Assert.IsNotNull(cache.GetPackageMetadata(TestIdentity));
     stopwatch.Stop;
-    Assert.IsTrue(stopwatch.ElapsedMilliseconds < 1000, Format('it waited %d ms', [stopwatch.ElapsedMilliseconds]));
-    Assert.AreEqual(0, FLoggerRef.ErrorCount, FLogger.Messages.Text);
+    Assert.IsTrue(stopwatch.ElapsedMilliseconds < 1000, Format('the display read waited %d ms', [stopwatch.ElapsedMilliseconds]));
   finally
     holder.Release.SetEvent;
     holder.WaitFor;

@@ -13,13 +13,22 @@ type
     //used to stop only the first process, so msbuild kept building and kept the log open.
     [Test]
     procedure Cancel_Stops_The_Whole_Process_Tree;
+    //a wait on the IDE's main thread keeps it responsive - repaints, and its Cancel button working.
+    [Test]
+    procedure WaitForAnyHandle_PumpsTheHostOnTheMainThread;
+    //only the main thread runs the host's message loop.
+    [Test]
+    procedure WaitForAnyHandle_DoesNotPumpOnAnotherThread;
   end;
 
 implementation
 
 uses
+  WinApi.Windows,
+  WinApi.Messages,
   System.SysUtils,
   System.Classes,
+  System.SyncObjs,
   System.IOUtils,
   System.Diagnostics,
   VSoft.CancellationToken,
@@ -50,6 +59,90 @@ begin
   //nothing still running holds it.
   TFile.Delete(logFile);
   Assert.IsFalse(TFile.Exists(logFile));
+end;
+
+var
+  PumpCount : integer;
+
+//what the IDE installs - here it just drains the queue.
+procedure CountingPump;
+var
+  msg : TMsg;
+begin
+  Inc(PumpCount);
+  while PeekMessage(msg, 0, 0, 0, PM_REMOVE) do
+    ;
+end;
+
+procedure TProcessTests.WaitForAnyHandle_PumpsTheHostOnTheMainThread;
+var
+  signal : TEvent;
+  result_ : Cardinal;
+begin
+  signal := TEvent.Create(nil, true, false, '');
+  try
+    PumpCount := 0;
+    ProcessMessagePump := CountingPump;
+    try
+      //a message arrives while it waits, then the handle is signalled.
+      TThread.CreateAnonymousThread(
+        procedure
+        begin
+          Sleep(100);
+          PostThreadMessage(MainThreadID, WM_NULL, 0, 0);
+          Sleep(100);
+          signal.SetEvent;
+        end).Start;
+      result_ := WaitForAnyHandle([signal.Handle], 10000);
+    finally
+      ProcessMessagePump := nil;
+    end;
+    Assert.AreEqual(Cardinal(WAIT_OBJECT_0), result_);
+    Assert.IsTrue(PumpCount > 0, 'the host was not pumped while waiting');
+  finally
+    signal.Free;
+  end;
+end;
+
+procedure TProcessTests.WaitForAnyHandle_DoesNotPumpOnAnotherThread;
+var
+  signal : TEvent;
+  worker : TThread;
+  result_ : Cardinal;
+begin
+  signal := TEvent.Create(nil, true, false, '');
+  try
+    PumpCount := 0;
+    result_ := WAIT_FAILED;
+    ProcessMessagePump := CountingPump;
+    try
+      worker := TThread.CreateAnonymousThread(
+        procedure
+        var
+          msg : TMsg;
+        begin
+          //give the worker a queue, and a message in it.
+          PeekMessage(msg, 0, 0, 0, PM_NOREMOVE);
+          PostThreadMessage(GetCurrentThreadId, WM_NULL, 0, 0);
+          result_ := WaitForAnyHandle([signal.Handle], 10000);
+        end);
+      worker.FreeOnTerminate := false;
+      try
+        worker.Start;
+        Sleep(200);
+        signal.SetEvent;
+        worker.WaitFor;
+      finally
+        worker.Free;
+      end;
+    finally
+      ProcessMessagePump := nil;
+    end;
+    Assert.AreEqual(Cardinal(WAIT_OBJECT_0), result_);
+    Assert.AreEqual(0, PumpCount, 'a worker thread must never run the host''s message loop');
+  finally
+    signal.Free;
+  end;
 end;
 
 initialization

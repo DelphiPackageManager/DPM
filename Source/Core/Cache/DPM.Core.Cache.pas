@@ -100,6 +100,8 @@ type
     function InstallLockedPackageFile(const logger : ILogger; const workFile : string; const packageFilePath : string;
                                       const packageIndentity : IPackageIdentity; const packageFolder : string;
                                       const skipTrustRatchets : boolean) : boolean;
+    //what a finished install of the package holds - see GetPackageMetadata.
+    function ReadInstalledSpec(const packageId : IPackageIdentity) : IPackageSpec;
     //EnsurePackage's work once the package's lock is held.
     function CheckAndRepairPackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean;
   protected
@@ -120,7 +122,7 @@ type
 
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
 
-    function GetPackageMetadata(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageMetadata;
+    function GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
 
     function GetPackageSpec(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageSpec;
 
@@ -136,7 +138,7 @@ type
 
     function GetPackageHash(const packageId : IPackageIdentity) : string;
 
-    function TryGetPackageIcon(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+    function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
 
 //    function InstallPackage(const packageId : IPackageIdentity; const saveFile : boolean; const source : string = '') : boolean;
 
@@ -179,6 +181,7 @@ uses
   DPM.Core.Package.Manifest.Interfaces,
   DPM.Core.Utils.Hash,
   DPM.Core.Utils.Files,
+  DPM.Core.Utils.Process,
   DPM.Core.Utils.System,
   DPM.Core.Utils.Strings;
 
@@ -228,8 +231,7 @@ function AcquirePackageLock(const logger : ILogger; const packageFolder : string
 var
   stream : TBytesStream;
   lockName : string;
-  waitHandles : array[0..1] of THandle;
-  handleCount : DWORD;
+  waitResult : Cardinal;
 begin
   result := false;
   stream := TBytesStream.Create(TEncoding.UTF8.GetBytes(LowerCase(ExcludeTrailingPathDelimiter(ExpandFileName(packageFolder)))));
@@ -244,16 +246,13 @@ begin
     logger.Error(TErrorCode.E3008_CacheWriteFailed, 'Unable to lock [' + packageFolder + '] in the package cache : ' + SysErrorMessage(GetLastError));
     exit;
   end;
-  //the lock, or the operation being cancelled - whichever comes first. A token that is already cancelled takes the
-  //lock only if it is free - the IDE's main thread doesn't wait. With both signalled, the lock (the lower index) wins.
-  waitHandles[0] := lock;
-  handleCount := 1;
+  //the lock, or the operation being cancelled - whichever comes first. In the IDE an install runs on the main thread,
+  //so the wait keeps it responsive (repaints, and its Cancel button working) as a compile does.
   if cancellationToken <> nil then
-  begin
-    waitHandles[1] := cancellationToken.Handle;
-    handleCount := 2;
-  end;
-  case WaitForMultipleObjects(handleCount, @waitHandles[0], false, cPackageLockWaitMs) of
+    waitResult := WaitForAnyHandle([lock, cancellationToken.Handle], cPackageLockWaitMs)
+  else
+    waitResult := WaitForAnyHandle([lock], cPackageLockWaitMs);
+  case waitResult of
     //abandoned : the process that held it died part way - what it left is checked like anything else in the cache.
     WAIT_OBJECT_0, WAIT_ABANDONED_0 :
       result := true;
@@ -279,6 +278,16 @@ begin
   ReleaseMutex(lock);
   CloseHandle(lock);
   lock := 0;
+end;
+
+//A finished install of a package : the receipt is written as the last step of one from a .dpkg (V-31), a git
+//registry install has its marker. One another process is doing right now has neither yet - read without the lock,
+//so a display (the IDE's main thread) never waits.
+function IsFinishedInstall(const packageFolder : string) : boolean;
+begin
+  result := FileExists(IncludeTrailingPathDelimiter(packageFolder) + cPackageDspecFile) and
+            (FileExists(IncludeTrailingPathDelimiter(packageFolder) + cReceiptFileName) or
+             FileExists(IncludeTrailingPathDelimiter(packageFolder) + cGitPackageMarkerFile));
 end;
 
 //A .dpkg left from an earlier session is only worth trying if it is still the file it was : a package (not an
@@ -1264,14 +1273,42 @@ begin
   end;
 end;
 
-function TPackageCache.GetPackageMetadata(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageMetadata;
+function TPackageCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
 var
   spec : IPackageSpec;
 begin
-  spec := GetPackageSpec(cancellationToken, packageId);
-  if spec = nil then
+  result := nil;
+  spec := ReadInstalledSpec(packageId);
+  if spec <> nil then
+    result := TPackageMetadata.CreateFromManifest('', spec);
+end;
+
+function TPackageCache.ReadInstalledSpec(const packageId : IPackageIdentity) : IPackageSpec;
+var
+  key : string;
+  packageFolder : string;
+begin
+  result := nil;
+  key := MakeCacheKey(packageId);
+  FCacheLock.Enter;
+  try
+    if FSpecCache.TryGetValue(key, result) then
+      exit;
+  finally
+    FCacheLock.Leave;
+  end;
+  packageFolder := GetPackagePath(packageId);
+  if not IsFinishedInstall(packageFolder) then
     exit;
-  result := TPackageMetadata.CreateFromManifest('', spec);
+  result := FSpecReader.ReadSpec(IncludeTrailingPathDelimiter(packageFolder) + cPackageDspecFile);
+  if result = nil then
+    exit;
+  FCacheLock.Enter;
+  try
+    FSpecCache[key] := result;
+  finally
+    FCacheLock.Leave;
+  end;
 end;
 
 function TPackageCache.GetPackagePath(const id: string; const version: string; const compilerVersion : TCompilerVersion): string;
@@ -1497,52 +1534,54 @@ begin
   end;
 end;
 
-function TPackageCache.TryGetPackageIcon(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+//the whole of a file, in a stream the caller owns.
+function ReadFileToStream(const fileName : string) : TMemoryStream;
+var
+  fileStream : TFileStream;
+begin
+  result := TMemoryStream.Create;
+  try
+    fileStream := TFileStream.Create(fileName, fmOpenRead or fmShareDenyWrite);
+    try
+      result.CopyFrom(fileStream, fileStream.Size);
+    finally
+      fileStream.Free;
+    end;
+  except
+    result.Free;
+    raise;
+  end;
+end;
+
+function TPackageCache.TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
 var
   packageFolder : string;
   svgPath : string;
   pngPath : string;
-  fileStream : TFileStream;
-  stream : TMemoryStream;
 begin
   result := false;
   icon := nil;
   if packageId = nil then
     exit;
-  //EnsurePackage extracts a stray .dpkg if the folder is missing - cheap no-op once a package
-  //has been installed by either the CLI or the IDE.
-  if not EnsurePackage(cancellationToken, packageId) then
-    exit;
   packageFolder := GetPackagePath(packageId);
+  if not IsFinishedInstall(packageFolder) then
+    exit;
   svgPath := IncludeTrailingPathDelimiter(packageFolder) + cIconFileSVG;
   pngPath := IncludeTrailingPathDelimiter(packageFolder) + cIconFilePNG;
-
-  if FileExists(svgPath) then
-  begin
-    fileStream := TFileStream.Create(svgPath, fmOpenRead);
-    stream := TMemoryStream.Create;
-    try
-      stream.CopyFrom(fileStream, fileStream.Size);
-    finally
-      fileStream.Free;
+  //another process may be replacing the package as we read - then it is not cached for now.
+  try
+    //the icon owns the stream.
+    if FileExists(svgPath) then
+      icon := CreatePackageIcon(TPackageIconKind.ikSvg, ReadFileToStream(svgPath))
+    else if FileExists(pngPath) then
+      icon := CreatePackageIcon(TPackageIconKind.ikPng, ReadFileToStream(pngPath));
+    result := icon <> nil;
+  except
+    on e : Exception do
+    begin
+      FLogger.Debug('[PackageCache] Unable to read the icon of [' + packageId.ToString + '] : ' + e.Message);
+      icon := nil;
     end;
-    //icon now owns the stream.
-    icon := CreatePackageIcon(TPackageIconKind.ikSvg, stream);
-    result := true;
-    exit;
-  end;
-
-  if FileExists(pngPath) then
-  begin
-    fileStream := TFileStream.Create(pngPath, fmOpenRead);
-    stream := TMemoryStream.Create;
-    try
-      stream.CopyFrom(fileStream, fileStream.Size);
-    finally
-      fileStream.Free;
-    end;
-    icon := CreatePackageIcon(TPackageIconKind.ikPng, stream);
-    result := true;
   end;
 end;
 

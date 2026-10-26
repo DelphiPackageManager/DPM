@@ -81,6 +81,12 @@ var
   //pumps. The host installs a proc that calls Application.ProcessMessages.
   ProcessMessagePump : TProcessMessagePumpProc = nil;
 
+///<summary> Waits for any of handles, as WaitForMultipleObjects does (not all) - the same WAIT_* results. On the main
+///  thread of a UI host that has installed ProcessMessagePump the host's message loop is pumped while it waits, so
+///  the host stays responsive : it repaints, and its Cancel button (which signals a cancellation token being waited
+///  on) keeps working. Anywhere else it is a plain blocking wait. </summary>
+function WaitForAnyHandle(const handles : array of THandle; const timeoutMs : Cardinal) : Cardinal;
+
 
 implementation
 
@@ -255,6 +261,56 @@ begin
 end;
 
 
+function WaitForAnyHandle(const handles : array of THandle; const timeoutMs : Cardinal) : Cardinal;
+var
+  waitHandles : array of THandle;
+  count : DWORD;
+  i : integer;
+  startTick : Cardinal;
+  elapsed : Cardinal;
+  remaining : Cardinal;
+  res : Cardinal;
+begin
+  count := Length(handles);
+  SetLength(waitHandles, count);
+  for i := 0 to High(handles) do
+    waitHandles[i] := handles[i];
+  //only the main thread pumps the host's message loop.
+  if (not Assigned(ProcessMessagePump)) or (GetCurrentThreadId <> MainThreadID) then
+  begin
+    result := WaitForMultipleObjects(count, @waitHandles[0], False, timeoutMs);
+    exit;
+  end;
+
+  startTick := GetTickCount;
+  while True do
+  begin
+    if timeoutMs = INFINITE then
+      remaining := INFINITE
+    else
+    begin
+      elapsed := GetTickCount - startTick; //Cardinal subtraction is wraparound-safe
+      if elapsed >= timeoutMs then
+      begin
+        result := WAIT_TIMEOUT;
+        exit;
+      end;
+      remaining := timeoutMs - elapsed;
+    end;
+
+    //the 'a message is waiting' wake is WAIT_OBJECT_0 + count. With bWaitAll = False a signalled handle is returned
+    //in preference to the message wake, so the loop always ends promptly once one is signalled.
+    res := MsgWaitForMultipleObjects(count, waitHandles[0], False, remaining, QS_ALLINPUT);
+    if res = WAIT_OBJECT_0 + count then
+      ProcessMessagePump //let the host drain its queue, then wait again
+    else
+    begin
+      result := res; //signalled, abandoned, timed out, or the wait failed
+      exit;
+    end;
+  end;
+end;
+
 { TProcess }
 
 class function TProcess.Execute2(const cancellationToken : ICancellationToken; const executable : string; const commandLine : string; const startingDir : string; const enviroment : IEnvironmentBlock = nil; const timeout : integer = -1; const outputFile : string = '') : Cardinal;
@@ -281,52 +337,11 @@ var
       result := GetLastError;
   end;
 
-  //Wait for the process to exit or the cancellation token to be signalled. When a UI host has
-  //installed ProcessMessagePump we pump its message loop while waiting so it stays responsive
-  //(repaints, and the Cancel button - which signals the cancellation token - keeps working)
-  //during a long compile. Otherwise (CLI) we do the original plain blocking wait. The return
-  //value uses the same WAIT_* codes as WaitForMultipleObjects so the case below is unchanged.
+  //Wait for the process to exit (index 0) or the cancellation token to be signalled (index 1) - keeping a UI host
+  //responsive during a long compile (see WaitForAnyHandle).
   function DoWaitForProcess: Cardinal;
-  var
-    startTick : Cardinal;
-    elapsed : Cardinal;
-    remaining : Cardinal;
-    res : Cardinal;
   begin
-    if not Assigned(ProcessMessagePump) then
-    begin
-      result := WaitForMultipleObjects(2, @objHandles, False, timeoutDuration);
-      exit;
-    end;
-
-    startTick := GetTickCount;
-    while True do
-    begin
-      if timeoutDuration = INFINITE then
-        remaining := INFINITE
-      else
-      begin
-        elapsed := GetTickCount - startTick; //Cardinal subtraction is wraparound-safe
-        if elapsed >= timeoutDuration then
-        begin
-          result := WAIT_TIMEOUT;
-          exit;
-        end;
-        remaining := timeoutDuration - elapsed;
-      end;
-
-      //nCount = 2, so the 'a message is waiting' wake is WAIT_OBJECT_0 + 2. With bWaitAll = False
-      //a signalled handle (index 0 = process exit, 1 = cancellation) is returned in preference to
-      //the message wake, so we always break out of the loop promptly once the process is done.
-      res := MsgWaitForMultipleObjects(2, objHandles[0], False, remaining, QS_ALLINPUT);
-      if res = WAIT_OBJECT_0 + 2 then
-        ProcessMessagePump //let the host drain its queue, then wait again
-      else
-      begin
-        result := res; //process exited, cancelled, timed out, or wait failed
-        exit;
-      end;
-    end;
+    result := WaitForAnyHandle(objHandles, timeoutDuration);
   end;
 
 begin
