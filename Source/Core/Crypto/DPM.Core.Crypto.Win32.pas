@@ -27,8 +27,8 @@
 unit DPM.Core.Crypto.Win32;
 
 // Flat Win32 imports for the cryptography layer: crypt32.dll, bcrypt.dll,
-// ncrypt.dll. This is the single API surface for the whole crypto layer —
-// no other DPM unit imports these DLLs directly.
+// ncrypt.dll, wintrust.dll. This is the single API surface for the whole
+// crypto layer — no other DPM unit imports these DLLs directly.
 //
 // Conventions:
 //   * Structures use Windows naming (e.g. CERT_CONTEXT) to keep MSDN searches
@@ -762,6 +762,71 @@ function NormalizeString(NormForm : Integer; lpSrcString : PWideChar;
 function IsNormalizedString(NormForm : Integer; lpString : PWideChar;
                             cwLength : Integer) : BOOL; stdcall;
   external cNormaliz;
+
+// ---------------------------------------------------------------------------
+// WinTrust — Authenticode verification of an executable (used by DPM.Core.Utils.PE)
+// ---------------------------------------------------------------------------
+
+const
+  cWinTrust = 'wintrust.dll';
+
+  // the Authenticode policy provider
+  WINTRUST_ACTION_GENERIC_VERIFY_V2 : TGUID = '{00AAC56B-CD44-11D0-8CC2-00C04FC295EE}';
+
+  // WINTRUST_DATA.dwUIChoice
+  WTD_UI_NONE = 2;
+
+  // WINTRUST_DATA.fdwRevocationChecks
+  WTD_REVOKE_NONE       = 0;
+  WTD_REVOKE_WHOLECHAIN = 1;
+
+  // WINTRUST_DATA.dwUnionChoice
+  WTD_CHOICE_FILE = 1;
+
+  // WINTRUST_DATA.dwStateAction
+  WTD_STATEACTION_VERIFY = 1;
+  WTD_STATEACTION_CLOSE  = 2;
+
+  // WINTRUST_DATA.dwProvFlags
+  WTD_REVOCATION_CHECK_NONE               = $00000010;
+  WTD_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT = $00000080;
+
+  // WinVerifyTrust results Winapi.Windows doesn't declare (the TRUST_E_* / CERT_E_* ones it does are used from there)
+  TRUST_E_BAD_DIGEST          = HRESULT($80096010);
+  CRYPT_E_REVOKED             = HRESULT($80092010);
+  CRYPT_E_NO_REVOCATION_CHECK = HRESULT($80092012);
+  CRYPT_E_REVOCATION_OFFLINE  = HRESULT($80092013);
+  CRYPT_E_SECURITY_SETTINGS   = HRESULT($80092026);
+
+type
+  WINTRUST_FILE_INFO = record
+    cbStruct       : DWORD;
+    pcwszFilePath  : PWideChar;
+    hFile          : THandle;
+    pgKnownSubject : PGUID;
+  end;
+  PWINTRUST_FILE_INFO = ^WINTRUST_FILE_INFO;
+
+  WINTRUST_DATA = record
+    cbStruct            : DWORD;
+    pPolicyCallbackData : Pointer;
+    pSIPClientData      : Pointer;
+    dwUIChoice          : DWORD;
+    fdwRevocationChecks : DWORD;
+    dwUnionChoice       : DWORD;
+    // a union of pointers in C - WTD_CHOICE_FILE is the only choice we use.
+    pFile               : PWINTRUST_FILE_INFO;
+    dwStateAction       : DWORD;
+    hWVTStateData       : THandle;
+    pwszURLReference    : PWideChar;
+    dwProvFlags         : DWORD;
+    dwUIContext         : DWORD;
+    pSignatureSettings  : Pointer;
+  end;
+
+// hwnd INVALID_HANDLE_VALUE : there is no interactive user to ask.
+function WinVerifyTrust(hwnd : HWND; var pgActionID : TGUID; pWVTData : Pointer) : LongInt; stdcall;
+  external cWinTrust;
 
 implementation
 

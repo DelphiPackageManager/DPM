@@ -30,6 +30,7 @@ interface
 
 uses
   VSoft.CancellationToken,
+  VSoft.Uri,
   DPM.Core.Types;
 
 {$SCOPEDENUMS ON}
@@ -49,6 +50,7 @@ type
     function GetDownloadUrl : string;
     function GetReleaseUrl : string;
     function GetIsPrerelease : boolean;
+    function GetDigest : string;
 
     /// <summary>The semver parsed from the release tag.</summary>
     property Version : TPackageVersion read GetVersion;
@@ -61,6 +63,11 @@ type
     /// <summary>The html url of the release, for display / release notes.</summary>
     property ReleaseUrl : string read GetReleaseUrl;
     property IsPrerelease : boolean read GetIsPrerelease;
+    /// <summary>
+    ///  The SHA-256 (lowercase hex) github published for the installer asset, '' when it published none -
+    ///  assets uploaded before github started recording digests have none.
+    /// </summary>
+    property Digest : string read GetDigest;
   end;
 
   /// <summary>
@@ -95,7 +102,9 @@ type
 
     /// <summary>
     ///  Downloads the installer asset to the temp folder. Returns false and
-    ///  logs on failure.
+    ///  logs on failure. Only an installer that matches the digest github
+    ///  published for it and carries a valid Authenticode signature is kept -
+    ///  any other download is deleted.
     /// </summary>
     /// <param name="installerFile">The full path to the downloaded installer.</param>
     function DownloadUpgrade(const cancellationToken : ICancellationToken; const upgradeInfo : IUpgradeInfo;
@@ -104,7 +113,9 @@ type
     /// <summary>
     ///  Starts the installer and returns immediately without waiting - the
     ///  installer cannot replace our exe until we have exited, so the caller
-    ///  must exit promptly after this returns true.
+    ///  must exit promptly after this returns true. Checks the Authenticode
+    ///  signature again first (it is a file in temp, it may have changed since
+    ///  it was downloaded) and refuses, deleting it, when it is not valid.
     /// </summary>
     function LaunchInstaller(const installerFile : string) : boolean;
   end;
@@ -122,6 +133,7 @@ type
     FDownloadUrl : string;
     FReleaseUrl : string;
     FIsPrerelease : boolean;
+    FDigest : string;
   protected
     function GetVersion : TPackageVersion;
     function GetTagName : string;
@@ -129,9 +141,39 @@ type
     function GetDownloadUrl : string;
     function GetReleaseUrl : string;
     function GetIsPrerelease : boolean;
+    function GetDigest : string;
   public
     constructor Create(const version : TPackageVersion; const tagName : string; const assetName : string;
-                       const downloadUrl : string; const releaseUrl : string; const isPrerelease : boolean); reintroduce;
+                       const downloadUrl : string; const releaseUrl : string; const isPrerelease : boolean;
+                       const digest : string); reintroduce;
+  end;
+
+  /// <summary>
+  ///  What dpm accepts as an upgrade installer. Checked when a release is
+  ///  picked, when the IDE reads a cached check back, and again before the
+  ///  download - the release list and update-check.json are both just data.
+  /// </summary>
+  TUpgradeAssetRules = class
+  public
+    /// <summary>
+    ///  DPMSetup-{version}.exe, the version made only of letters, digits and
+    ///  . + - (no path separators, drive letters or spaces), as the build names it.
+    /// </summary>
+    class function IsInstallerName(const assetName : string) : boolean; static;
+
+    /// <summary>
+    ///  Parses url and returns true when it is https (port 443, no user info)
+    ///  on one of the hosts github serves release assets from. The download
+    ///  must use the uri returned here, so what was checked is what is fetched.
+    ///  Otherwise reason says why, in a form that follows "the url ...".
+    /// </summary>
+    class function TryParseDownloadUrl(const url : string; out uri : IUri; out reason : string) : boolean; static;
+
+    /// <summary>
+    ///  github's asset digest is 'sha256:{64 hex}'. Returns true with the hex
+    ///  (lowercase) for that form, false for anything else.
+    /// </summary>
+    class function TryParseDigest(const digest : string; out sha256Hex : string) : boolean; static;
   end;
 
 const
@@ -154,12 +196,24 @@ const
   cDPMInstallerPrefix = 'DPMSetup-';
   cDPMInstallerExt = '.exe';
 
+  //browser_download_url is on github.com, which redirects to one of the other two - VSoft.HttpClient follows
+  //redirects but never from https to http.
+  cGithubDownloadHosts : array[0..2] of string = ('github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com');
+
 implementation
+
+uses
+  System.SysUtils,
+  DPM.Core.Utils.Strings;
+
+const
+  cSha256DigestPrefix = 'sha256:';
+  cHttpsPort = 443;
 
 { TUpgradeInfo }
 
 constructor TUpgradeInfo.Create(const version : TPackageVersion; const tagName, assetName, downloadUrl, releaseUrl : string;
-                                const isPrerelease : boolean);
+                                const isPrerelease : boolean; const digest : string);
 begin
   inherited Create;
   FVersion := version;
@@ -168,11 +222,17 @@ begin
   FDownloadUrl := downloadUrl;
   FReleaseUrl := releaseUrl;
   FIsPrerelease := isPrerelease;
+  FDigest := digest;
 end;
 
 function TUpgradeInfo.GetAssetName : string;
 begin
   result := FAssetName;
+end;
+
+function TUpgradeInfo.GetDigest : string;
+begin
+  result := FDigest;
 end;
 
 function TUpgradeInfo.GetDownloadUrl : string;
@@ -198,6 +258,93 @@ end;
 function TUpgradeInfo.GetVersion : TPackageVersion;
 begin
   result := FVersion;
+end;
+
+{ TUpgradeAssetRules }
+
+class function TUpgradeAssetRules.IsInstallerName(const assetName : string) : boolean;
+var
+  version : string;
+  i : integer;
+begin
+  result := false;
+  if Length(assetName) <= Length(cDPMInstallerPrefix) + Length(cDPMInstallerExt) then
+    exit;
+  if not TStringUtils.StartsWith(assetName, cDPMInstallerPrefix, true) then
+    exit;
+  if not SameText(Copy(assetName, Length(assetName) - Length(cDPMInstallerExt) + 1, Length(cDPMInstallerExt)), cDPMInstallerExt) then
+    exit;
+  version := Copy(assetName, Length(cDPMInstallerPrefix) + 1, Length(assetName) - Length(cDPMInstallerPrefix) - Length(cDPMInstallerExt));
+  for i := 1 to Length(version) do
+  begin
+    case version[i] of
+      '0'..'9', 'a'..'z', 'A'..'Z', '.', '+', '-' : ;
+    else
+      exit;
+    end;
+  end;
+  result := true;
+end;
+
+class function TUpgradeAssetRules.TryParseDownloadUrl(const url : string; out uri : IUri; out reason : string) : boolean;
+var
+  i : integer;
+  normalised : string;
+begin
+  result := false;
+  reason := '';
+  uri := nil;
+  //schemes are case insensitive, but VSoft.Uri only knows https's default port when it is written in lowercase.
+  normalised := url;
+  i := Pos(':', normalised);
+  if i > 0 then
+    normalised := LowerCase(Copy(normalised, 1, i - 1)) + Copy(normalised, i, MaxInt);
+  if (normalised = '') or not TUriFactory.TryParse(normalised, true, uri) then
+  begin
+    uri := nil;
+    reason := 'is not a valid url';
+    exit;
+  end;
+  if not SameText(uri.Scheme, 'https') then
+    reason := 'is not an https url'
+  else if (uri.UserName <> '') or (uri.Password <> '') then
+    reason := 'has user information in it'
+  else if uri.Port <> cHttpsPort then
+    reason := 'is not on the https port'
+  else
+  begin
+    for i := Low(cGithubDownloadHosts) to High(cGithubDownloadHosts) do
+    begin
+      if SameText(uri.Host, cGithubDownloadHosts[i]) then
+        exit(true);
+    end;
+    reason := 'is not on a host github serves release downloads from';
+  end;
+  uri := nil;
+end;
+
+class function TUpgradeAssetRules.TryParseDigest(const digest : string; out sha256Hex : string) : boolean;
+var
+  hex : string;
+  i : integer;
+begin
+  result := false;
+  sha256Hex := '';
+  if not TStringUtils.StartsWith(digest, cSha256DigestPrefix, true) then
+    exit;
+  hex := LowerCase(Copy(digest, Length(cSha256DigestPrefix) + 1, MaxInt));
+  if Length(hex) <> 64 then
+    exit;
+  for i := 1 to Length(hex) do
+  begin
+    case hex[i] of
+      '0'..'9', 'a'..'f' : ;
+    else
+      exit;
+    end;
+  end;
+  sha256Hex := hex;
+  result := true;
 end;
 
 end.

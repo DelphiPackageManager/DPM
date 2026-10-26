@@ -42,12 +42,37 @@ type
     procedure Signed_Buffer_Is_Still_A_PE;
   end;
 
+  // VerifyAuthenticode is what stands between a downloaded DPM installer and running it. The signed
+  // fixture is the IDE's bds.exe - every machine that builds these tests has a Delphi, and Embarcadero
+  // embeds its signature (the files in System32 are catalog signed, which doesn't count). Revocation
+  // is not checked here, so the tests don't depend on reaching a certificate authority.
+  [TestFixture]
+  TAuthenticodeTests = class
+  private
+    FTempFiles : TArray<string>;
+    function TempExe : string;
+  public
+    [TearDown]
+    procedure TearDown;
+  published
+    procedure Signed_Executable_Verifies;
+    procedure Modified_Copy_Of_A_Signed_Executable_Is_Refused;
+    procedure Unsigned_Executable_Is_Refused;
+    procedure Catalog_Signed_System_File_Is_Refused;
+    procedure Text_File_Named_Exe_Is_Refused;
+    procedure Missing_File_Is_Refused;
+  end;
+
 implementation
 
 uses
   System.SysUtils,
   System.Classes,
   System.IOUtils,
+  TestLogger,
+  DPM.Core.Types,
+  DPM.Core.Compiler.Interfaces,
+  DPM.Core.Compiler.EnvironmentProvider,
   DPM.Core.Utils.PE;
 
 const
@@ -269,7 +294,122 @@ begin
   Assert.IsTrue(TPEUtils.IsPE(MakePE(true, true)), 'a signed PE32+ is still a PE');
 end;
 
+{ TAuthenticodeTests }
+
+//the newest installed Delphi's bds.exe that carries an embedded signature (they all do, XE2's included).
+function FindSignedDelphiExe : string;
+var
+  provider : ICompilerEnvironmentProvider;
+  version : TCompilerVersion;
+  candidate : string;
+begin
+  result := '';
+  provider := TCompilerEnvironmentProvider.Create(TTestLogger.Create);
+  for version := DelphiMax downto TCompilerVersion.DelphiXE2 do
+  begin
+    try
+      candidate := provider.GetRootDir(version) + '\bin\bds.exe';
+    except
+      //not installed.
+      continue;
+    end;
+    if FileExists(candidate) and TPEUtils.HasAuthenticodeSignature(candidate) then
+      exit(candidate);
+  end;
+  Assert.Fail('No installed Delphi with a signed bds.exe was found - these tests use it as the signed executable.');
+end;
+
+function TAuthenticodeTests.TempExe : string;
+var
+  guid : TGUID;
+begin
+  CreateGUID(guid);
+  result := TPath.Combine(TPath.GetTempPath, 'dpm-authenticode-' + Copy(GUIDToString(guid), 2, 36) + '.exe');
+  SetLength(FTempFiles, Length(FTempFiles) + 1);
+  FTempFiles[High(FTempFiles)] := result;
+end;
+
+procedure TAuthenticodeTests.TearDown;
+var
+  i : integer;
+begin
+  for i := 0 to High(FTempFiles) do
+  begin
+    if FileExists(FTempFiles[i]) then
+      System.SysUtils.DeleteFile(FTempFiles[i]);
+  end;
+  SetLength(FTempFiles, 0);
+end;
+
+procedure TAuthenticodeTests.Signed_Executable_Verifies;
+var
+  reason : string;
+begin
+  Assert.IsTrue(TPEUtils.VerifyAuthenticode(FindSignedDelphiExe, false, reason), 'refused : the file ' + reason);
+  Assert.AreEqual('', reason);
+end;
+
+procedure TAuthenticodeTests.Modified_Copy_Of_A_Signed_Executable_Is_Refused;
+var
+  fileName : string;
+  bytes : TBytes;
+  reason : string;
+begin
+  //the middle of the image is code/data the signature covers (the signature itself is at the end).
+  bytes := TFile.ReadAllBytes(FindSignedDelphiExe);
+  bytes[Length(bytes) div 2] := bytes[Length(bytes) div 2] xor $FF;
+  fileName := TempExe;
+  TFile.WriteAllBytes(fileName, bytes);
+  Assert.IsTrue(TPEUtils.HasAuthenticodeSignature(fileName), 'precondition : the copy still carries the signature');
+
+  Assert.IsFalse(TPEUtils.VerifyAuthenticode(fileName, false, reason));
+  Assert.Contains(reason, 'changed since it was signed');
+end;
+
+procedure TAuthenticodeTests.Unsigned_Executable_Is_Refused;
+var
+  reason : string;
+begin
+  //the test runner is built here and never signed.
+  Assert.IsFalse(TPEUtils.HasAuthenticodeSignature(ParamStr(0)), 'precondition : this test exe is not signed');
+  Assert.IsFalse(TPEUtils.VerifyAuthenticode(ParamStr(0), false, reason));
+  Assert.Contains(reason, 'is not signed');
+end;
+
+procedure TAuthenticodeTests.Catalog_Signed_System_File_Is_Refused;
+var
+  fileName : string;
+  reason : string;
+begin
+  //Windows vouches for cmd.exe through a catalog - an installer has to carry its own signature.
+  fileName := TPath.Combine(GetEnvironmentVariable('SystemRoot'), 'System32\cmd.exe');
+  Assert.IsFalse(TPEUtils.HasAuthenticodeSignature(fileName), 'precondition : cmd.exe has no embedded signature');
+  Assert.IsFalse(TPEUtils.VerifyAuthenticode(fileName, false, reason));
+  Assert.Contains(reason, 'is not signed');
+end;
+
+procedure TAuthenticodeTests.Text_File_Named_Exe_Is_Refused;
+var
+  fileName : string;
+  reason : string;
+begin
+  //an html error page saved under the installer's name, say.
+  fileName := TempExe;
+  TFile.WriteAllText(fileName, '<html><body>Not Found</body></html>');
+  Assert.IsFalse(TPEUtils.VerifyAuthenticode(fileName, false, reason));
+  Assert.AreNotEqual('', reason);
+end;
+
+procedure TAuthenticodeTests.Missing_File_Is_Refused;
+var
+  reason : string;
+begin
+  Assert.IsFalse(TPEUtils.VerifyAuthenticode(TempExe, false, reason));
+  Assert.Contains(reason, 'does not exist');
+end;
+
 initialization
   TDUnitX.RegisterTestFixture(TPEUtilsTests);
+  TDUnitX.RegisterTestFixture(TAuthenticodeTests);
 
 end.

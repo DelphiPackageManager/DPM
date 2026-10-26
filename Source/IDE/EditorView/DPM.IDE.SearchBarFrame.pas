@@ -348,8 +348,12 @@ begin
 
   if not FUpgradeService.LaunchInstaller(installerFile) then
   begin
-    MessageDlg('Unable to start the DPM installer. It was downloaded to:' + sLineBreak + installerFile,
-               mtError, [mbOK], 0);
+    //an installer that failed its signature check is deleted, not left for the user to run by hand.
+    if FileExists(installerFile) then
+      MessageDlg('Unable to start the DPM installer. It was downloaded to:' + sLineBreak + installerFile,
+                 mtError, [mbOK], 0)
+    else
+      MessageDlg('The DPM installer was not started. See the DPM message view for details.', mtError, [mbOK], 0);
     exit;
   end;
 

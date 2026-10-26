@@ -26,16 +26,17 @@
 
 unit DPM.Core.Utils.PE;
 
-// Pure byte-level inspection of Windows PE binaries (.exe/.dll/.bpl). No Windows API is used so this
-// unit is safe in Core (which must run in Docker Windows Server Core and not depend on VCL/GDI).
+// Inspection of Windows PE binaries (.exe/.dll/.bpl). Safe in Core (which must run in Docker Windows
+// Server Core and not depend on VCL/GDI) - wintrust.dll is part of Server Core.
 //
 //  - IsPE detects whether the bytes are a real PE image (MZ + PE signature), regardless of extension.
 //  - HasAuthenticodeSignature detects the *presence* of an embedded Authenticode signature by reading
 //    the PE security data directory (IMAGE_DIRECTORY_ENTRY_SECURITY). It does NOT validate the
 //    signature or its certificate chain - it answers "is this binary signed at all?", which is enough
 //    to fail fast on an unsigned binary before an author-signed package is rejected by the gallery.
-//    The two are deliberately separate so a Windows WinVerifyTrust validator can be layered on later
-//    without changing call sites.
+//    Pure byte-level, no Windows API.
+//  - VerifyAuthenticode asks Windows (WinVerifyTrust) whether the embedded signature is valid and
+//    chains to a trusted root - the check before dpm runs an executable it downloaded.
 
 interface
 
@@ -57,9 +58,21 @@ type
     class function HasAuthenticodeSignature(const stream : TStream) : boolean; overload; static;
     class function HasAuthenticodeSignature(const bytes : TBytes) : boolean; overload; static;
     class function HasAuthenticodeSignature(const fileName : string) : boolean; overload; static;
+
+    //True when fileName carries an embedded Authenticode signature that Windows reports valid : the file is
+    //unchanged since it was signed and the signing certificate chains to a trusted root, was valid when it
+    //signed (or when the signature was timestamped) and is allowed to sign code. Catalog signatures don't
+    //count - an installer we downloaded has to carry its own. checkRevocation checks every certificate
+    //in the chain online and fails when that can't be done. Otherwise reason says what was wrong, in a
+    //form that follows "the file ...".
+    class function VerifyAuthenticode(const fileName : string; const checkRevocation : boolean; out reason : string) : boolean; static;
   end;
 
 implementation
+
+uses
+  WinApi.Windows,
+  DPM.Core.Crypto.Win32;
 
 const
   cMZSignature = $5A4D;          // 'MZ' as a little-endian word at offset 0
@@ -231,6 +244,91 @@ begin
     result := HasAuthenticodeSignature(TStream(fs));
   finally
     fs.Free;
+  end;
+end;
+
+//what a WinVerifyTrust result means for the file, worded to follow "the file ...".
+function AuthenticodeFailureReason(const status : LongInt) : string;
+begin
+  case status of
+    TRUST_E_NOSIGNATURE :
+      result := 'is not signed';
+    TRUST_E_SUBJECT_FORM_UNKNOWN :
+      result := 'is not a file Windows can check a signature on (not a Windows executable)';
+    TRUST_E_BAD_DIGEST :
+      result := 'has been changed since it was signed';
+    CERT_E_UNTRUSTEDROOT, CERT_E_UNTRUSTEDTESTROOT :
+      result := 'is signed with a certificate that does not chain to a trusted root';
+    CERT_E_CHAINING :
+      result := 'is signed with a certificate whose chain could not be built';
+    CERT_E_EXPIRED :
+      result := 'is signed with a certificate that had expired when it signed, and the signature is not timestamped';
+    CERT_E_REVOKED, CRYPT_E_REVOKED :
+      result := 'is signed with a certificate that has been revoked';
+    CERT_E_REVOCATION_FAILURE, CRYPT_E_REVOCATION_OFFLINE, CRYPT_E_NO_REVOCATION_CHECK :
+      result := 'is signed, but the revocation status of its certificates could not be checked (is something blocking ' +
+                'the certificate authority''s revocation servers?)';
+    CERT_E_WRONG_USAGE :
+      result := 'is signed with a certificate that is not valid for signing code';
+    TRUST_E_EXPLICIT_DISTRUST :
+      result := 'is signed with a certificate that this machine is set to distrust';
+    CRYPT_E_SECURITY_SETTINGS :
+      result := 'can not be run under this machine''s security settings';
+    TRUST_E_SUBJECT_NOT_TRUSTED :
+      result := 'is not trusted';
+  else
+    result := 'failed its signature check : ' + SysErrorMessage(DWORD(status)) + ' (0x' + IntToHex(DWORD(status), 8) + ')';
+  end;
+end;
+
+class function TPEUtils.VerifyAuthenticode(const fileName : string; const checkRevocation : boolean; out reason : string) : boolean;
+var
+  fileInfo : WINTRUST_FILE_INFO;
+  trustData : WINTRUST_DATA;
+  actionId : TGUID;
+  status : LongInt;
+begin
+  result := false;
+  reason := '';
+  if not FileExists(fileName) then
+  begin
+    reason := 'does not exist';
+    exit;
+  end;
+
+  FillChar(fileInfo, SizeOf(fileInfo), 0);
+  fileInfo.cbStruct := SizeOf(fileInfo);
+  fileInfo.pcwszFilePath := PWideChar(fileName);
+
+  FillChar(trustData, SizeOf(trustData), 0);
+  trustData.cbStruct := SizeOf(trustData);
+  trustData.dwUIChoice := WTD_UI_NONE;
+  trustData.dwUnionChoice := WTD_CHOICE_FILE;
+  trustData.pFile := @fileInfo;
+  trustData.dwStateAction := WTD_STATEACTION_VERIFY;
+  if checkRevocation then
+  begin
+    trustData.fdwRevocationChecks := WTD_REVOKE_WHOLECHAIN;
+    //a root is trusted because it is in the store - there is nothing to revoke it.
+    trustData.dwProvFlags := WTD_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT;
+  end
+  else
+  begin
+    trustData.fdwRevocationChecks := WTD_REVOKE_NONE;
+    trustData.dwProvFlags := WTD_REVOCATION_CHECK_NONE;
+  end;
+
+  //a typed constant can't be passed as a var parameter.
+  actionId := WINTRUST_ACTION_GENERIC_VERIFY_V2;
+  status := WinVerifyTrust(INVALID_HANDLE_VALUE, actionId, @trustData);
+  try
+    result := status = 0;
+    if not result then
+      reason := AuthenticodeFailureReason(status);
+  finally
+    //the verify call keeps state (the chain, the file open) until it is closed - whatever it returned.
+    trustData.dwStateAction := WTD_STATEACTION_CLOSE;
+    WinVerifyTrust(INVALID_HANDLE_VALUE, actionId, @trustData);
   end;
 end;
 

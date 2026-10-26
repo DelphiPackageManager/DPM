@@ -57,6 +57,9 @@ type
     /// </summary>
     function FetchReleases(const cancellationToken : ICancellationToken) : IYAMLSequence;
 
+    //TPEUtils.VerifyAuthenticode (revocation checked), logging E0306 when the installer fails it.
+    function VerifyInstallerSignature(const fileName : string; const displayName : string) : boolean;
+
     /// <summary>
     ///  Picks the newest usable release from an already parsed releases list.
     ///  Split out from CheckForUpgrade purely so the channel/version selection
@@ -74,9 +77,12 @@ type
 
     /// <summary>
     ///  Finds the DPMSetup-*.exe asset on a release. Returns false if the
-    ///  release has no installer attached (eg a source-only release).
+    ///  release has no installer attached (eg a source-only release), or the
+    ///  one it has is not one dpm will download (TUpgradeAssetRules) - problem
+    ///  then says why.
     /// </summary>
-    function FindInstallerAsset(const release : IYAMLMapping; out assetName : string; out downloadUrl : string) : boolean;
+    function FindInstallerAsset(const release : IYAMLMapping; out assetName : string; out downloadUrl : string;
+                                out digest : string; out problem : string) : boolean;
 
     property Logger : ILogger read FLogger;
   public
@@ -92,6 +98,9 @@ uses
   VSoft.Uri,
   VSoft.HttpClient,
   DPM.Core.Constants,
+  DPM.Core.Utils.Files,
+  DPM.Core.Utils.Hash,
+  DPM.Core.Utils.PE,
   DPM.Core.Utils.Process,
   DPM.Core.Utils.Strings,
   DPM.Core.Diagnostics;
@@ -102,6 +111,11 @@ const
   //100 is the github api maximum page size, and is far more than enough to find
   //the newest release.
   cReleasesPageSize = 100;
+
+  //VSoft.HttpClient waits at most ResponseTimeout for the whole response, body included - its 60s default
+  //failed the ~20MB installer on any connection slower than about 350KB/s. The same 5 minutes as a package
+  //download; cancelling stops it sooner.
+  cInstallerDownloadTimeoutMs = 5 * 60 * 1000;
 
 { TGithubUpgradeService }
 
@@ -179,16 +193,22 @@ begin
   result := doc.AsSequence;
 end;
 
-function TGithubUpgradeService.FindInstallerAsset(const release : IYAMLMapping; out assetName, downloadUrl : string) : boolean;
+function TGithubUpgradeService.FindInstallerAsset(const release : IYAMLMapping; out assetName, downloadUrl, digest, problem : string) : boolean;
 var
   assets : IYAMLSequence;
   asset : IYAMLMapping;
   i : integer;
   name : string;
+  url : string;
+  uri : IUri;
+  urlProblem : string;
+  publishedDigest : string;
 begin
   result := false;
   assetName := '';
   downloadUrl := '';
+  digest := '';
+  problem := '';
 
   if not release.Contains('assets') then
     exit;
@@ -204,9 +224,27 @@ begin
     if TStringUtils.StartsWith(name, cDPMInstallerPrefix, true) and
        SameText(ExtractFileExt(name), cDPMInstallerExt) then
     begin
+      url := asset.S['browser_download_url'];
+      if url = '' then
+        exit;
+      //it looks like the installer - so anything wrong with it is a reason not to upgrade, not to look further.
+      if not TUpgradeAssetRules.IsInstallerName(name) then
+      begin
+        problem := 'its name [' + name + '] is not ' + cDPMInstallerPrefix + '{version}' + cDPMInstallerExt;
+        exit;
+      end;
+      if not TUpgradeAssetRules.TryParseDownloadUrl(url, uri, urlProblem) then
+      begin
+        problem := 'its download url [' + url + '] ' + urlProblem;
+        exit;
+      end;
+      //assets uploaded before github recorded digests have none (json null) - the Authenticode check still applies.
+      publishedDigest := asset.S['digest'];
+      if (publishedDigest <> '') and not TUpgradeAssetRules.TryParseDigest(publishedDigest, digest) then
+        Logger.Verbose('Ignoring the digest [' + publishedDigest + '] of ' + name + ' - it is not a sha256 digest');
       assetName := name;
-      downloadUrl := asset.S['browser_download_url'];
-      exit(downloadUrl <> '');
+      downloadUrl := url;
+      exit(true);
     end;
   end;
 end;
@@ -250,6 +288,8 @@ var
   bestIsPrerelease : boolean;
   assetName : string;
   downloadUrl : string;
+  digest : string;
+  problem : string;
 begin
   upgradeInfo := nil;
   result := TUpgradeCheckResult.Error;
@@ -316,14 +356,17 @@ begin
     exit;
   end;
 
-  if not FindInstallerAsset(bestRelease, assetName, downloadUrl) then
+  if not FindInstallerAsset(bestRelease, assetName, downloadUrl, digest, problem) then
   begin
-    FLastError := 'The release [' + bestTag + '] does not have an installer (' + cDPMInstallerPrefix + '*' +
-                  cDPMInstallerExt + ') attached, so it can not be installed.';
+    if problem <> '' then
+      FLastError := 'The installer attached to the release [' + bestTag + '] is not one dpm will download - ' + problem + '.'
+    else
+      FLastError := 'The release [' + bestTag + '] does not have an installer (' + cDPMInstallerPrefix + '*' +
+                    cDPMInstallerExt + ') attached, so it can not be installed.';
     exit;
   end;
 
-  upgradeInfo := TUpgradeInfo.Create(bestVersion, bestTag, assetName, downloadUrl, bestRelease.S['html_url'], bestIsPrerelease);
+  upgradeInfo := TUpgradeInfo.Create(bestVersion, bestTag, assetName, downloadUrl, bestRelease.S['html_url'], bestIsPrerelease, digest);
   result := TUpgradeCheckResult.UpgradeAvailable;
 end;
 
@@ -334,11 +377,30 @@ var
   request : IHttpRequest;
   response : IHttpResponse;
   uri : IUri;
+  problem : string;
   destFile : string;
+  partialFile : string;
+  hash : string;
+  lastError : Cardinal;
   stopwatch : TStopwatch;
 begin
   result := false;
   installerFile := '';
+
+  //upgradeInfo may have come back from the IDE's update-check.json - check it again here, it decides what we
+  //download and then run.
+  if not TUpgradeAssetRules.IsInstallerName(upgradeInfo.AssetName) then
+  begin
+    Logger.Error(TErrorCode.E0303_UpgradeDownloadFailed, 'The installer name [' + upgradeInfo.AssetName + '] is not ' +
+                 cDPMInstallerPrefix + '{version}' + cDPMInstallerExt + ', so it was not downloaded.');
+    exit;
+  end;
+  if not TUpgradeAssetRules.TryParseDownloadUrl(upgradeInfo.DownloadUrl, uri, problem) then
+  begin
+    Logger.Error(TErrorCode.E0303_UpgradeDownloadFailed, 'The installer url [' + upgradeInfo.DownloadUrl + '] ' + problem +
+                 ', so it was not downloaded.');
+    exit;
+  end;
 
   //Download into a dpm subfolder of temp rather than temp itself, so a failed
   //or cancelled download leaves something obviously ours behind.
@@ -368,46 +430,91 @@ begin
     end;
   end;
 
-  uri := TUriFactory.Parse(upgradeInfo.DownloadUrl);
   httpClient := THttpClientFactory.CreateClient(uri.BaseUriString);
+  //the request copies the client's timeouts when it is created.
+  httpClient.ResponseTimeout := cInstallerDownloadTimeoutMs;
   request := httpClient.CreateRequest(uri.AbsolutePath)
                        .WithHeader(cUserAgentHeader, cDPMUserAgent);
   //browser_download_url redirects to objects.githubusercontent.com. The client
   //follows redirects by default, this just makes the requirement explicit.
   request.FollowRedirects := true;
-  request.SaveAsFile := destFile;
-
-  Logger.Information('Downloading ' + upgradeInfo.AssetName + ' ...');
-  stopwatch := TStopwatch.StartNew;
+  //The download goes to a file of its own, and only becomes the installer once it has arrived whole and
+  //passed its checks - a failed, cancelled or tampered download leaves nothing behind that could be run.
+  partialFile := TFileUtils.TempFileNameFor(destFile);
+  request.SaveAsFile := partialFile;
   try
-    response := httpClient.Get(request, cancellationToken);
-  except
-    on e : Exception do
+    Logger.Information('Downloading ' + upgradeInfo.AssetName + ' ...');
+    stopwatch := TStopwatch.StartNew;
+    try
+      response := httpClient.Get(request, cancellationToken);
+    except
+      on e : Exception do
+      begin
+        Logger.Error(TErrorCode.E0303_UpgradeDownloadFailed, 'Unable to download the installer : ' + e.Message);
+        exit;
+      end;
+    end;
+
+    if cancellationToken.IsCancelled then
+      exit;
+
+    if response.StatusCode <> 200 then
     begin
-      Logger.Error(TErrorCode.E0303_UpgradeDownloadFailed, 'Unable to download the installer : ' + e.Message);
+      Logger.Error(TErrorCode.E0303_UpgradeDownloadFailed, 'Unable to download the installer : ' + IntToStr(response.StatusCode) + ' ' + response.ErrorMessage);
       exit;
     end;
-  end;
+    stopwatch.Stop;
+    //the response holds the file it saved to open.
+    response := nil;
+    request := nil;
 
-  if cancellationToken.IsCancelled then
-    exit;
+    if not TFile.Exists(partialFile) then
+    begin
+      Logger.Error(TErrorCode.E0303_UpgradeDownloadFailed, 'The installer download reported success but no file was written to [' + partialFile + '].');
+      exit;
+    end;
 
-  if response.StatusCode <> 200 then
-  begin
-    Logger.Error(TErrorCode.E0303_UpgradeDownloadFailed, 'Unable to download the installer : ' + IntToStr(response.StatusCode) + ' ' + response.ErrorMessage);
-    exit;
-  end;
-  stopwatch.Stop;
+    if upgradeInfo.Digest <> '' then
+    begin
+      hash := THashSHA256.GetHashStringFromFile(partialFile);
+      if not SameText(hash, upgradeInfo.Digest) then
+      begin
+        Logger.Error(TErrorCode.E0307_UpgradeInstallerHashMismatch, 'The downloaded ' + upgradeInfo.AssetName + ' does not match the hash github ' +
+                     'published for it (sha256 ' + LowerCase(hash) + ', expected ' + upgradeInfo.Digest + '), so it was deleted.');
+        exit;
+      end;
+    end
+    else
+      Logger.Verbose('github published no digest for ' + upgradeInfo.AssetName + ' - relying on its Authenticode signature.');
 
-  if not TFile.Exists(destFile) then
-  begin
-    Logger.Error(TErrorCode.E0303_UpgradeDownloadFailed, 'The installer download reported success but no file was written to [' + destFile + '].');
-    exit;
+    if not VerifyInstallerSignature(partialFile, upgradeInfo.AssetName) then
+      exit;
+
+    if not TFileUtils.TryReplaceFile(partialFile, destFile, lastError) then
+    begin
+      Logger.Error(TErrorCode.E0303_UpgradeDownloadFailed, 'The installer was downloaded, but [' + destFile + '] could not be written : ' +
+                   SysErrorMessage(lastError));
+      exit;
+    end;
+  finally
+    response := nil;
+    request := nil;
+    if FileExists(partialFile) then
+      System.SysUtils.DeleteFile(partialFile);
   end;
 
   Logger.Information('Downloaded to ' + destFile + ' [' + IntToStr(stopwatch.ElapsedMilliseconds) + 'ms]');
   installerFile := destFile;
   result := true;
+end;
+
+function TGithubUpgradeService.VerifyInstallerSignature(const fileName : string; const displayName : string) : boolean;
+var
+  reason : string;
+begin
+  result := TPEUtils.VerifyAuthenticode(fileName, true, reason);
+  if not result then
+    Logger.Error(TErrorCode.E0306_UpgradeInstallerNotTrusted, 'dpm will not run the installer ' + displayName + ' - the file ' + reason + '.');
 end;
 
 function TGithubUpgradeService.LaunchInstaller(const installerFile : string) : boolean;
@@ -416,6 +523,17 @@ begin
   if not TFile.Exists(installerFile) then
   begin
     Logger.Error(TErrorCode.E0304_UpgradeInstallerFailed, 'The installer [' + installerFile + '] does not exist.');
+    exit;
+  end;
+
+  //it has sat in temp since it was downloaded (in the IDE, while the user answered the save prompts).
+  if not VerifyInstallerSignature(installerFile, '[' + installerFile + ']') then
+  begin
+    try
+      TFile.Delete(installerFile);
+    except
+      //it isn't going to be run either way.
+    end;
     exit;
   end;
 

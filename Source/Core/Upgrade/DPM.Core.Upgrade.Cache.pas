@@ -106,11 +106,16 @@ uses
   System.IOUtils,
   System.DateUtils,
   VSoft.YAML,
+  VSoft.Uri,
+  DPM.Core.Utils.Files,
   DPM.Core.Utils.System,
   DPM.Core.Utils.DateTime,
   DPM.Core.Diagnostics;
 
 const
+  //the digest is stored as the bare hex, github's form is 'sha256:{hex}'.
+  cGithubDigestPrefix = 'sha256:';
+
   //channel is stored as a readable string rather than the raw boolean so the
   //file is meaningful when someone opens it.
   cChannelStable = 'stable';
@@ -156,9 +161,12 @@ var
   doc : IYAMLDocument;
   entry : IYAMLMapping;
   cachedAt : TDateTime;
-  ageHours : Int64;
+  nowUtc : TDateTime;
   sResult : string;
   version : TPackageVersion;
+  uri : IUri;
+  problem : string;
+  digest : string;
 begin
   result := false;
   checkResult := TUpgradeCheckResult.Error;
@@ -190,9 +198,11 @@ begin
     exit;
 
   //A cachedAt in the future (clock changed, file copied between machines) would
-  //give a negative age and look permanently fresh - treat it as a miss.
-  ageHours := HoursBetween(TTimeZone.Local.ToUniversalTime(Now), cachedAt);
-  if (ageHours > FTTLHours) or (cachedAt > TTimeZone.Local.ToUniversalTime(Now)) then
+  //give a negative age and look permanently fresh - treat it as a miss. The age is
+  //compared exactly - HoursBetween truncates, so an hour's ttl served answers up to
+  //1h59m old.
+  nowUtc := TTimeZone.Local.ToUniversalTime(Now);
+  if (cachedAt > nowUtc) or (nowUtc >= IncHour(cachedAt, FTTLHours)) then
     exit;
 
   //Channel and running version are part of the key : switching channel or
@@ -215,13 +225,26 @@ begin
   if not TPackageVersion.TryParse(entry.S['latestVersion'], version) then
     exit;
 
-  //Without a download url the entry is useless - re-check rather than surface
-  //an upgrade the user cannot action.
-  if entry.S['downloadUrl'] = '' then
+  //The file is just data anything can write - an entry that names an installer the
+  //release check would not have accepted is re-checked, never offered.
+  if not TUpgradeAssetRules.IsInstallerName(entry.S['assetName']) then
+  begin
+    if Assigned(FLogger) then
+      FLogger.Verbose('Ignoring the update check cache [' + FFileName + '] - [' + entry.S['assetName'] + '] is not a DPM installer name');
+    exit;
+  end;
+  if not TUpgradeAssetRules.TryParseDownloadUrl(entry.S['downloadUrl'], uri, problem) then
+  begin
+    if Assigned(FLogger) then
+      FLogger.Verbose('Ignoring the update check cache [' + FFileName + '] - its download url [' + entry.S['downloadUrl'] + '] ' + problem);
+    exit;
+  end;
+  digest := '';
+  if (entry.S['digest'] <> '') and not TUpgradeAssetRules.TryParseDigest(cGithubDigestPrefix + entry.S['digest'], digest) then
     exit;
 
   upgradeInfo := TUpgradeInfo.Create(version, entry.S['tagName'], entry.S['assetName'], entry.S['downloadUrl'],
-                                     entry.S['releaseUrl'], entry.B['isPrerelease']);
+                                     entry.S['releaseUrl'], entry.B['isPrerelease'], digest);
   checkResult := TUpgradeCheckResult.UpgradeAvailable;
   result := true;
 end;
@@ -256,10 +279,13 @@ begin
       entry.S['downloadUrl'] := upgradeInfo.DownloadUrl;
       entry.S['releaseUrl'] := upgradeInfo.ReleaseUrl;
       entry.B['isPrerelease'] := upgradeInfo.IsPrerelease;
+      if upgradeInfo.Digest <> '' then
+        entry.S['digest'] := upgradeInfo.Digest;
     end;
 
     ForceDirectories(ExtractFilePath(FFileName));
-    TFile.WriteAllText(FFileName, TYAML.WriteToJSONString(doc), TEncoding.UTF8);
+    //the IDE checks again whenever a DPM view opens - a reader must never see half a file.
+    TFileUtils.AtomicWriteAllText(FFileName, TYAML.WriteToJSONString(doc), TEncoding.UTF8);
   except
     //Failing to write the cache just means we check again next time - warn, but
     //never let it propagate into the update check.
