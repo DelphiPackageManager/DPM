@@ -138,8 +138,16 @@ type
     FConfigIsLocal : boolean;
 
     // request stuff
+    //the installed / available lists' requests. Each LoadPackages cancels it and starts a new one - a request it
+    //supersedes is delivered as cancelled on its own token, rather than 'reset' and its result applied.
     FCancelTokenSource : ICancellationTokenSource;
-    FRequestsInFlight : integer;
+    //icons are cached by package id whichever load asked for them, so a new load doesn't cancel them (one that is
+    //cancelled stays marked as requested, and never loads) - only closing the view does.
+    FIconTokenSource : ICancellationTokenSource;
+    //which LoadPackages a callback belongs to - one for an earlier load does nothing.
+    FLoadGeneration : integer;
+    //whether the view still exists, for callbacks - see IViewLifetime.
+    FLifetime : IViewLifetime;
     FClosing : boolean;
 
     // Project group should never be nil?
@@ -423,24 +431,17 @@ begin
 end;
 
 procedure TDPMEditViewFrame.Closing;
-var
-  count : integer;
 begin
   FClosing := true;
+  //every result still to come (they arrive by posted message, in whatever message loop runs next - perhaps after
+  //the frame is gone) finds the view dead and does nothing, so there is nothing to wait for here.
+  FLifetime.Kill;
   PackageDetailsFrame.ViewClosing;
   //the search bar owns its own token source for the DPM update check.
   FSearchBar.ViewClosing;
   // cancel any pending requests asap. Needs to return quickly or the IDE will hang.
   FCancelTokenSource.Cancel;
-  // allow the cancellation to happen.
-  // if we don't do this we will get an excepion in the await or cancellation callbacks
-  count := 0;
-  while (FRequestsInFlight > 0) and (count < 10) do
-  begin
-    Application.ProcessMessages;
-    Inc(count);
-  end;
-
+  FIconTokenSource.Cancel;
 end;
 
 procedure TDPMEditViewFrame.Configure(const projectGroup : IOTAProjectGroup; const Project : IOTAProject; const Container : TContainer; const ProjectTreeManager : IDPMProjectTreeManager);
@@ -514,9 +515,11 @@ begin
   FSearchSkip := 0;
   FSearchTake := 0;
   FFirstView := true;
-  FRequestsInFlight := 0;
+  FLoadGeneration := 0;
+  FLifetime := TViewLifetime.Create;
 
   FCancelTokenSource := TCancellationTokenSourceFactory.Create;
+  FIconTokenSource := TCancellationTokenSourceFactory.Create;
 
   FIconCache := TDPMIconCache.Create;
   FRowLayout := TRowLayout.Create(10, 24);
@@ -605,6 +608,13 @@ end;
 
 destructor TDPMEditViewFrame.Destroy;
 begin
+  //destroyed without Closing (the IDE shutting down) - the callbacks still to come must not find the frame.
+  if FLifetime <> nil then
+    FLifetime.Kill;
+  if FCancelTokenSource <> nil then
+    FCancelTokenSource.Cancel;
+  if FIconTokenSource <> nil then
+    FIconTokenSource.Cancel;
   FSearchOptions.Free;
   FIconCache.Free;
   if FLogger <> nil then
@@ -674,7 +684,8 @@ procedure TDPMEditViewFrame.LoadPackages(const refreshInstalled : boolean);
 var
   searchTxt : string;
   filterProc : TFilterProc;
-  count : integer;
+  lifetime : IViewLifetime;
+  generation : integer;
 begin
   if FClosing then
     exit;
@@ -694,17 +705,13 @@ begin
   FScrollList.InvalidateRow(FImplicitHeaderRowIdx);
   ActivityTimer.Enabled := true;
 
-  if FRequestsInFlight > 0 then
-    FCancelTokenSource.Cancel;
-
-  count := 0;
-  while ((FRequestsInFlight > 0) and (count < 10)) do
-  begin
-    Inc(count);
-    Application.ProcessMessages;
-  end;
-
-  FCancelTokenSource.Reset;
+  //A new load. Whatever the last one still has in flight is cancelled on its own token, so it is delivered as
+  //cancelled whenever it finishes - nothing to wait for - and the generation marks anything of it as stale.
+  FCancelTokenSource.Cancel;
+  FCancelTokenSource := TCancellationTokenSourceFactory.Create;
+  Inc(FLoadGeneration);
+  generation := FLoadGeneration;
+  lifetime := FLifetime;
 
   FAvailablePackages.Clear;
   if refreshInstalled then
@@ -750,37 +757,40 @@ begin
       FLock.Release;
     end;
 
+    //Each callback first checks the view still exists (only then is Self safe to touch) and that this is still
+    //the latest load - an earlier one's result must not replace this one's, nor its end stop this one's spinner.
     GetInstalledPackagesAsync
       .OnException(
       procedure(const e : Exception)
       begin
-        Dec(FRequestsInFlight);
-        if FClosing then
+        if (not lifetime.Alive) or (generation <> FLoadGeneration) then
           exit;
+        FInstalledActivity.Stop;
+        FImplicitActivity.Stop;
         LogException(FLogger, e);
       end)
       .OnCancellation(
       procedure
       begin
-        Dec(FRequestsInFlight);
-        if FClosing then
+        if (not lifetime.Alive) or (generation <> FLoadGeneration) then
           exit;
         FLogger.Debug('DPMIDE : Cancelled getting installed packages.');
       end)
       .Await(
       procedure(const theResult : IList<IPackageSearchResultItem>)
       begin
-        Dec(FRequestsInFlight);
+        if (not lifetime.Alive) or (generation <> FLoadGeneration) then
+          exit;
         FInstalledActivity.Stop;
         FImplicitActivity.Stop;
-
-        if FClosing then
-          exit;
         FLogger.Debug('DPMIDE : Got installed packages.');
 
         FLock.Acquire;
         try
-          FAllInstalledPackages := theResult;
+          if theResult <> nil then
+            FAllInstalledPackages := theResult
+          else
+            FAllInstalledPackages := TCollections.CreateList<IPackageSearchResultItem>;
           filterProc(searchTxt);
           CalculateIndexes;
           FScrollList.Invalidate;
@@ -788,7 +798,6 @@ begin
           FLock.Release;
         end;
       end);
-    Inc(FRequestsInFlight);
   end;
 
   FAvailableActivity.Step;
@@ -799,8 +808,7 @@ begin
     .OnException(
     procedure(const e : Exception)
     begin
-      Dec(FRequestsInFlight);
-      if FClosing then
+      if (not lifetime.Alive) or (generation <> FLoadGeneration) then
         exit;
       FAvailableActivity.Stop;
       LogException(FLogger, e);
@@ -808,10 +816,9 @@ begin
     .OnCancellation(
     procedure
     begin
-      Dec(FRequestsInFlight);
-      FAvailableActivity.Stop;
-      if FClosing then
+      if (not lifetime.Alive) or (generation <> FLoadGeneration) then
         exit;
+      FAvailableActivity.Stop;
       FLogger.Debug('DPMIDE : Cancelled searching for packages.');
     end)
     .Await(
@@ -820,34 +827,37 @@ begin
       item : IPackageSearchResultItem;
       packageRef : IPackageReference;
       toRemove : IList<IPackageSearchResultItem>;
+      available : IList<IPackageSearchResultItem>;
     begin
-      Dec(FRequestsInFlight);
-      FAvailableActivity.Stop;
-      if FClosing then
+      if (not lifetime.Alive) or (generation <> FLoadGeneration) then
         exit;
+      FAvailableActivity.Stop;
 
       FLogger.Debug('DPMIDE : Got search results.');
+      //a source that answered nothing gives no list at all.
+      available := theResult;
+      if available = nil then
+        available := TCollections.CreateList<IPackageSearchResultItem>;
       toRemove := TCollections.CreateList<IPackageSearchResultItem>;
       // some of the available packages may already be installed, so we need to check for that.
-      for item in theResult do
+      for item in available do
       begin
         packageRef := FindPackageRef(FPackageReferences, item.Id, false);
         if packageRef <> nil then
           toRemove.Add(item);
       end;
       if toRemove.Any then
-        theResult.RemoveRange(toRemove);
+        available.RemoveRange(toRemove);
 
       FLock.Acquire;
       try
-        FAvailablePackages := theResult;
+        FAvailablePackages := available;
         CalculateIndexes;
         FScrollList.Invalidate;
       finally
         FLock.Release;
       end;
     end);
-  Inc(FRequestsInFlight);
 end;
 
 procedure TDPMEditViewFrame.EndInstall;
@@ -1139,18 +1149,20 @@ begin
 
 end;
 
-procedure TDPMEditViewFrame.ApplyInstalledBookkeeping(const item : IPackageSearchResultItem);
+//Marks item installed / transitive at the version references have for it. A function of its own (not reading the
+//frame) so the installed feed's worker thread can use it on the references it was given.
+procedure ApplyBookkeeping(const references : IPackageReference; const item : IPackageSearchResultItem);
 var
   packageRef : IPackageReference;
 begin
-  if FPackageReferences = nil then
+  if references = nil then
     exit;
-  packageRef := FindPackageRef(FPackageReferences, item.Id, true);
+  packageRef := FindPackageRef(references, item.Id, true);
   if packageRef <> nil then
     item.IsTransitive := false
   else
   begin
-    packageRef := FindPackageRef(FPackageReferences, item.Id, false);
+    packageRef := FindPackageRef(references, item.Id, false);
     if packageRef <> nil then
     begin
       item.IsTransitive := packageRef.IsTransitive;
@@ -1165,6 +1177,11 @@ begin
     item.Version := packageRef.Version;
     item.Installed := true;
   end;
+end;
+
+procedure TDPMEditViewFrame.ApplyInstalledBookkeeping(const item : IPackageSearchResultItem);
+begin
+  ApplyBookkeeping(FPackageReferences, item);
 end;
 
 function TDPMEditViewFrame.BuildInstalledFromCache(const packageIds : IList<IPackageIdentity>) : IList<IPackageSearchResultItem>;
@@ -1194,16 +1211,19 @@ end;
 
 function TDPMEditViewFrame.GetInstalledPackagesAsync : IAwaitable<IList<IPackageSearchResultItem>>;
 var
-  lProjectFile : string;
   repoManager : IPackageRepositoryManager;
   Options : TSearchOptions;
-  searchResultItem : IPackageSearchResultItem;
+  //locals for capture - the worker runs on another thread, and must not read the frame (which may be gone,
+  //and whose FPackageReferences the main thread replaces).
+  logger : IDPMIDELogger;
+  references : IPackageReference;
+  packageIds : IList<IPackageIdentity>;
 begin
-  // local for capture
-  lProjectFile := FProjectGroup.FileName;
-
   repoManager := FRepositoryManager;
   repoManager.Initialize(FConfiguration);
+  logger := FLogger;
+  references := FPackageReferences;
+  packageIds := GetPackageIdsFromReferences;
 
   Options := FSearchOptions.Clone;
   // don't filter for installed packages, we want them all
@@ -1215,19 +1235,20 @@ begin
     function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
     var
       item : IPackageSearchResultItem;
-      packageIds : IList<IPackageIdentity>;
       pkg : IPackageIdentity;
+      searchResultItem : IPackageSearchResultItem;
       i : integer;
     begin
       CoInitialize(nil);
       try
         result := TCollections.CreateList<IPackageSearchResultItem>;
-        FLogger.Debug('DPMIDE : Got Installed package references, fetching metadata...');
-        packageIds := GetPackageIdsFromReferences;
+        logger.Debug('DPMIDE : Got Installed package references, fetching metadata...');
         result := repoManager.GetInstalledPackageFeed(cancelToken, Options, packageIds);
+        if result = nil then
+          result := TCollections.CreateList<IPackageSearchResultItem>;
         for item in result do
         begin
-          ApplyInstalledBookkeeping(item);
+          ApplyBookkeeping(references, item);
           // remove from the list so we can tell if we got them all in the end.
           pkg := nil;
           for i := 0 to packageIds.Count - 1 do
@@ -1253,7 +1274,7 @@ begin
 
             // TODO : We should probably flag these in the list to show there is a problem!
             searchResultItem := TDPMPackageSearchResultItem.FromError(pkg.Id, pkg.Version, Options.CompilerVersion, 'Package not found on enabled sources');
-            ApplyInstalledBookkeeping(searchResultItem);
+            ApplyBookkeeping(references, searchResultItem);
             result.Add(searchResultItem)
           end;
         end;
@@ -1264,8 +1285,10 @@ begin
             result := CompareStr(Left.Id, Right.Id);
           end);
 
-        FLogger.Debug('DPMIDE : Got Installed package metadata.');
+        logger.Debug('DPMIDE : Got Installed package metadata.');
       finally
+        //the clone is the worker's alone.
+        Options.Free;
         CoUninitialize;
       end;
 
@@ -1284,14 +1307,20 @@ begin
   searchOptions.Take := 100;
   result := TAsync.Configure < IList < IPackageSearchResultItem >> (
     function(const cancelToken : ICancellationToken) : IList<IPackageSearchResultItem>
+    var
+      feed : IPackageSearchResult;
     begin
+      result := nil;
       CoInitialize(nil);
       try
-        // Sleep(200);
         if cancelToken.IsCancelled then
-          exit(nil);
-        result := repoManager.GetPackageFeed(cancelToken, searchOptions, IDECompilerVersion).Results;
+          exit;
+        feed := repoManager.GetPackageFeed(cancelToken, searchOptions, IDECompilerVersion);
+        if feed <> nil then
+          result := feed.Results;
       finally
+        //the clone is the worker's alone.
+        searchOptions.Free;
         CoUninitialize;
       end;
     end, FCancelTokenSource.Token);
@@ -1307,6 +1336,7 @@ var
   cachedIcon : IPackageIcon;
   cachedImage : IPackageIconImage;
   identity : IPackageIdentity;
+  lifetime : IViewLifetime;
 begin
   stopWatch.Start;
 
@@ -1342,16 +1372,17 @@ begin
 
   repoManager := FRepositoryManager;
   repoManager.Initialize(FConfiguration);
+  lifetime := FLifetime;
 
   TAsync.Configure<IPackageIcon>(
     function(const cancelToken : ICancellationToken) : IPackageIcon
     begin
       result := repoManager.GetPackageIcon(cancelToken, source, Id, Version, IDECompilerVersion);
-    end, FCancelTokenSource.Token)
+    end, FIconTokenSource.Token)
     .OnException(
     procedure(const e : Exception)
     begin
-      if FClosing then
+      if not lifetime.Alive then
         exit;
       FLogger.Debug('DPMIDE : Unable to get the icon for [' + Id + '.' + Version + '] : ' + e.Message);
     end)
@@ -1360,7 +1391,8 @@ begin
     var
       Icon : IPackageIconImage;
     begin
-      if FClosing then
+      //the icon is for an id, whichever load asked - only the view having gone makes it unwanted.
+      if not lifetime.Alive then
         exit;
 
       // the result can be nil if there is no icon found

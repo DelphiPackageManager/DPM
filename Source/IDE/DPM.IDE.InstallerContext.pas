@@ -20,6 +20,8 @@ type
     PackageId : string;
     BPLPath : string;
     BPLFolder : string;
+    //the bpl folders of the packages it depends on, put on PATH with BPLFolder - see DependencyBPLFolders.
+    DependencyFolders : IList<string>;
     Referencers : IList<string>; //lowercase project paths
   end;
 
@@ -34,6 +36,7 @@ type
     PackageId : string;
     BPLPath : string;
     BPLFolder : string;
+    DependencyFolders : IList<string>;
   end;
 
   TDPMProjectEnvVarRef = record
@@ -54,7 +57,14 @@ type
     //key: lowercase project file. Env vars applied for this project, in apply order.
     FProjectEnvVars : IDictionary<string, IList<TDPMProjectEnvVarRef>>;
     function ResolveDesignBPLPath(const node : IPackageReference; const designEntry : ISpecDesignEntry; const loadPlatform : TDPMPlatform; out bplPath : string; out bplFolder : string) : boolean;
-    function LoadBPLIfNeeded(const bplPath : string; const bplFolder : string; const packageId : string; const lcProject : string) : boolean;
+    //The bpl folders (for loadPlatform) of every package node depends on, directly or not, that has one. A design
+    //bpl's runtime packages - its own and its dependencies' - are found the way Windows finds any dll a module
+    //imports: on PATH, not beside the bpl that imports them. Each package's bpls are in its own cache folder, so
+    //all of them have to be on PATH while the design bpl is loaded, not just its own folder.
+    function DependencyBPLFolders(const node : IPackageReference; const loadPlatform : TDPMPlatform) : IList<string>;
+    procedure EnsurePaths(const folders : IList<string>);
+    procedure RemovePaths(const folders : IList<string>);
+    function LoadBPLIfNeeded(const bplPath : string; const bplFolder : string; const dependencyFolders : IList<string>; const packageId : string; const lcProject : string) : boolean;
     procedure ReleaseBPLRef(const lcBplPath : string; const lcProject : string);
     procedure ReleaseProjectBPLs(const lcProject : string);
     procedure ApplyEnvironmentVariables(const node : IPackageReference; const template : ISpecTemplate; const lcProject : string; const projectEnvVars : IList<TDPMProjectEnvVarRef>);
@@ -270,7 +280,56 @@ begin
   result := nameMatch;
 end;
 
-function TDPMIDEPackageInstallerContext.LoadBPLIfNeeded(const bplPath : string; const bplFolder : string; const packageId : string; const lcProject : string) : boolean;
+function TDPMIDEPackageInstallerContext.DependencyBPLFolders(const node : IPackageReference; const loadPlatform : TDPMPlatform) : IList<string>;
+var
+  visited : ISet<string>;
+  folders : IList<string>;
+
+  procedure Visit(const parent : IPackageReference);
+  var
+    child : IPackageReference;
+    folder : string;
+  begin
+    for child in parent.Children do
+    begin
+      if not visited.Add(LowerCase(child.Id)) then
+        continue;
+      folder := TPath.Combine(FPackageCache.GetPackagePath(child), 'bpl' + PathDelim + DPMPlatformToBDString(loadPlatform));
+      //a source only package, or one not built for this IDE's platform, has nothing to find.
+      if DirectoryExists(folder) then
+        folders.Add(folder);
+      Visit(child);
+    end;
+  end;
+
+begin
+  visited := TCollections.CreateSet<string>;
+  folders := TCollections.CreateList<string>;
+  Visit(node);
+  result := folders;
+end;
+
+procedure TDPMIDEPackageInstallerContext.EnsurePaths(const folders : IList<string>);
+var
+  folder : string;
+begin
+  if folders = nil then
+    exit;
+  for folder in folders do
+    FPathManager.EnsurePath(folder);
+end;
+
+procedure TDPMIDEPackageInstallerContext.RemovePaths(const folders : IList<string>);
+var
+  folder : string;
+begin
+  if folders = nil then
+    exit;
+  for folder in folders do
+    FPathManager.RemovePath(folder);
+end;
+
+function TDPMIDEPackageInstallerContext.LoadBPLIfNeeded(const bplPath : string; const bplFolder : string; const dependencyFolders : IList<string>; const packageId : string; const lcProject : string) : boolean;
 var
   lcBpl : string;
   loaded : TDPMLoadedBPL;
@@ -298,9 +357,11 @@ begin
       //InstallPackage - it is already loaded. EnsurePath so its dependent DLLs still resolve,
       //mirroring the normal load path (ReleaseBPLRef will RemovePath on unload).
       FPathManager.EnsurePath(bplFolder);
+      EnsurePaths(dependencyFolders);
       loaded.PackageId := packageId;
       loaded.BPLPath := bplPath;
       loaded.BPLFolder := bplFolder;
+      loaded.DependencyFolders := dependencyFolders;
       loaded.Referencers := TCollections.CreateList<string>;
       loaded.Referencers.Add(lcProject);
       FLoadedBPLs[lcBpl] := loaded;
@@ -312,7 +373,9 @@ begin
     exit;
   end;
 
+  //its own runtime packages beside it, and its dependencies' in their own package folders.
   FPathManager.EnsurePath(bplFolder);
+  EnsurePaths(dependencyFolders);
 
   installOk := false;
   loadError := '';
@@ -337,6 +400,7 @@ begin
   begin
     FLogger.Warning(TWarningCode.W9101_DesignPackageLoadFailed, 'The IDE did not load the design BPL [' + bplPath + ']' + loadError);
     FPathManager.RemovePath(bplFolder);
+    RemovePaths(dependencyFolders);
     result := false;
     exit;
   end;
@@ -344,6 +408,7 @@ begin
   loaded.PackageId := packageId;
   loaded.BPLPath := bplPath;
   loaded.BPLFolder := bplFolder;
+  loaded.DependencyFolders := dependencyFolders;
   loaded.Referencers := TCollections.CreateList<string>;
   loaded.Referencers.Add(lcProject);
   FLoadedBPLs[lcBpl] := loaded;
@@ -397,6 +462,7 @@ begin
     FLogger.Warning(TWarningCode.W3014_DesignPackageUnloadFailed, 'The IDE did not unload the design BPL [' + ExtractFileName(loaded.BPLPath) + '] - DPM has stopped tracking it' + unloadError);
 
   FPathManager.RemovePath(loaded.BPLFolder);
+  RemovePaths(loaded.DependencyFolders);
   FLoadedBPLs.Remove(lcBplPath);
   FLogger.Success('Unloaded design BPL [' + ExtractFileName(loaded.BPLPath) + ']');
 end;
@@ -541,6 +607,7 @@ begin
         entry.PackageId := node.Id;
         entry.BPLPath := bplPath;
         entry.BPLFolder := bplFolder;
+        entry.DependencyFolders := DependencyBPLFolders(node, loadPlatform);
         desired.Add(entry);
         desiredSet[LowerCase(bplPath)] := 1;
 
@@ -572,7 +639,7 @@ begin
   begin
     if cancellationToken.IsCancelled then
       exit(false);
-    if not LoadBPLIfNeeded(designBpl.BPLPath, designBpl.BPLFolder, designBpl.PackageId, lcProject) then
+    if not LoadBPLIfNeeded(designBpl.BPLPath, designBpl.BPLFolder, designBpl.DependencyFolders, designBpl.PackageId, lcProject) then
       overallResult := false;
   end;
 

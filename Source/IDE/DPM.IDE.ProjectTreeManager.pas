@@ -816,8 +816,10 @@ begin
   if dpmChildren <> nil then
   begin
     dpmChildren.Clear;
+    //the tree node - PVirtualNode is a bare pointer to the proxy, so the container object went through
+    //unchallenged and the tree took it for a node.
     if TryGetContainerTreeNode(dpmContainer, dpmNode) then
-      FVSTProxy.DeleteChildren(dpmContainer);
+      FVSTProxy.DeleteChildren(dpmNode);
   end
   else
   begin

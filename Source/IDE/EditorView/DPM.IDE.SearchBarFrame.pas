@@ -87,6 +87,8 @@ type
     FCancellationTokenSource : ICancellationTokenSource;
     FClosing : boolean;
     FRequestInFlight : boolean;
+    //whether the view still exists, for the update check's callbacks - see IViewLifetime.
+    FLifetime : IViewLifetime;
 
     //update link - painted by hand (see pbUpdateAvailablePaint) rather than
     //being a TLabel/TLinkLabel, because both the vcl style hooks and the IDE's
@@ -429,6 +431,7 @@ var
   upgradeService : IUpgradeService; //local for capture
   logger : IDPMIDELogger;            //local for capture
   cache : IUpgradeCheckCache;        //local for capture
+  lifetime : IViewLifetime;          //local for capture
 begin
   pbUpdateAvailable.Visible := false;
   FUpgradeInfo := nil;
@@ -455,6 +458,7 @@ begin
   upgradeService := FUpgradeService;
   logger := FLogger;
   cache := FUpgradeCache;
+  lifetime := FLifetime;
 
   TAsync.Configure<IUpgradeInfo>(
     function(const cancelToken : ICancellationToken) : IUpgradeInfo
@@ -486,9 +490,10 @@ begin
   .OnException(
     procedure(const e : Exception)
     begin
-      FRequestInFlight := false;
-      if FClosing then
+      //The view may have closed (and the frame gone) while this was in flight - nothing of it may be touched then.
+      if not lifetime.Alive then
         exit;
+      FRequestInFlight := false;
       //Warn rather than error - failing to reach github is not a problem with
       //the user's project.
       logger.Warning(TWarningCode.W0302_UpgradeCheckUnavailable, 'DPMIDE : Unable to check for DPM updates : ' + e.Message);
@@ -496,19 +501,19 @@ begin
   .OnCancellation(
     procedure
     begin
-      FRequestInFlight := false;
-      if FClosing then
+      if not lifetime.Alive then
         exit;
+      FRequestInFlight := false;
       logger.Debug('DPMIDE : Cancelled checking for DPM updates.');
     end)
   .Await(
     procedure(const theResult : IUpgradeInfo)
     begin
-      FRequestInFlight := false;
       //The view may have closed while this was in flight - the frame is being
-      //torn down, so touching controls here would AV.
-      if FClosing then
+      //torn down (or gone), so touching it here would AV.
+      if not lifetime.Alive then
         exit;
+      FRequestInFlight := false;
       if theResult <> nil then
       begin
         logger.Debug('DPMIDE : DPM update available : ' + theResult.Version.ToStringNoMeta);
@@ -521,6 +526,7 @@ end;
 procedure TDPMSearchBarFrame.ViewClosing;
 begin
   FClosing := true;
+  FLifetime.Kill;
   //Must return quickly - the IDE is waiting on us.
   FCancellationTokenSource.Cancel;
 end;
@@ -558,6 +564,7 @@ begin
   //Must outlive any async call, so it is a field created up front rather than a
   //local at the call site.
   FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
+  FLifetime := TViewLifetime.Create;
   pbUpdateAvailable.Visible := false;
   {$IFDEF STYLEELEMENTS}
   //belt and braces - we paint the caption ourselves, but this also stops the
@@ -575,6 +582,11 @@ end;
 
 destructor TDPMSearchBarFrame.Destroy;
 begin
+  //destroyed without ViewClosing (the IDE shutting down) - the update check's callbacks must not find the frame.
+  if FLifetime <> nil then
+    FLifetime.Kill;
+  if FCancellationTokenSource <> nil then
+    FCancellationTokenSource.Cancel;
   FProjects.Free;
   inherited;
 end;

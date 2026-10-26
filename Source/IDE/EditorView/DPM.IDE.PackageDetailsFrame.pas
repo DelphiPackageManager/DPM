@@ -129,8 +129,17 @@ type
     FInstalledVersion : TPackageVersion;
     FSelectedVersion : TPackageVersion;
 
-    FCancellationTokenSource : ICancellationTokenSource;
-    FRequestInFlight : boolean;
+    //the details / versions requests for the package on show. Replaced (the old one cancelled) when the package
+    //changes or an operation starts - a superseded request is delivered as cancelled on its own token, never
+    //'reset' and its result applied to whatever is showing now.
+    FRequestTokenSource : ICancellationTokenSource;
+    //the install / uninstall running now (nil when none), for the log window's cancel button and the view closing.
+    FOperationTokenSource : ICancellationTokenSource;
+    //which request a callback belongs to - one for an earlier request does nothing.
+    FDetailsGeneration : integer;
+    FVersionsGeneration : integer;
+    //whether the view still exists, for callbacks - see IViewLifetime.
+    FLifetime : IViewLifetime;
     FVersionsDelayTimer : TTimer;
 
     FClosing : boolean;
@@ -172,8 +181,11 @@ type
     procedure DoPackageInstall(options : TInstallOptions; const isUpdate : boolean);
     //plans an upgrade or downgrade, confirms any companion packages with the user, then applies it. Frees options.
     procedure DoPackageUpgrade(options : TInstallOptions);
-    //cancels and waits for an in-flight metadata request before an install starts.
+    //cancels the details / versions requests in flight (they are recognised as stale when they arrive - there is
+    //nothing to wait for), for a new package or before an operation.
     procedure CancelPendingRequest;
+    //a token source of its own for an install / uninstall, which ViewClosing cancels.
+    function BeginOperation : ICancellationTokenSource;
     procedure InstallSucceeded(const packageMetadata : IPackageSearchResultItem; const options : TInstallOptions);
 
     function GetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion): IAwaitable<IPackageSearchResultItem>;
@@ -314,6 +326,11 @@ end;
 
 destructor TPackageDetailsFrame.Destroy;
 begin
+  //destroyed without ViewClosing (the IDE shutting down) - the callbacks still to come must not find the frame.
+  if FLifetime <> nil then
+    FLifetime.Kill;
+  if FRequestTokenSource <> nil then
+    FRequestTokenSource.Cancel;
   {$IFNDEF USEIMAGECOLLECTION}
   FUpgradeBmp.Free;
   FDowngradeBmp.Free;
@@ -327,7 +344,15 @@ procedure TPackageDetailsFrame.DoGetPackageMetaDataAsync(const id: string; const
 var
   item : IPackageSearchResultItem ;
   key : string;
+  lifetime : IViewLifetime;
+  generation : integer;
 begin
+  //This version's details supersede whatever was asked for before - a cached answer included, so an older request
+  //still in flight can't overwrite it (or FSelectedVersion, which Install All installs) when it lands.
+  Inc(FDetailsGeneration);
+  generation := FDetailsGeneration;
+  lifetime := FLifetime;
+
   key := LowerCase(id) + '-' + LowerCase(version);
   //try and get it from the cache first rather than going to the repo.
   if FMetaDataCache.TryGetValue(key, item) then
@@ -339,30 +364,30 @@ begin
   end;
 
   //didn't find it in the cache so fire off a task to get it from the repo.
+  //Each callback first checks the view still exists (only then is Self safe to touch) and that this is still the
+  //latest details request.
   GetPackageMetaDataAsync(id, version, compilerVersion)
   .OnException(
     procedure(const e : Exception)
     begin
-      FRequestInFlight := false;
-      if FClosing then
+      if (not lifetime.Alive) or (generation <> FDetailsGeneration) then
         exit;
       LogException(FLogger, e);
     end)
   .OnCancellation(
     procedure
     begin
-      FRequestInFlight := false;
-      //if the view is closing do not do anything else.
-      if FClosing then
+      if (not lifetime.Alive) or (generation <> FDetailsGeneration) then
         exit;
-      FLogger.Debug('Cancelled searching for packages.');
+      FLogger.Debug('Cancelled getting the package details.');
     end)
   .Await(
     procedure(const theResult : IPackageSearchResultItem)
     begin
-      FRequestInFlight := false;
-      //if the view is closing do not do anything else.
-      if FClosing then
+      if (not lifetime.Alive) or (generation <> FDetailsGeneration) then
+        exit;
+      //no source had it.
+      if theResult = nil then
         exit;
       key := LowerCase(theResult.id) + '-' + LowerCase(theResult.version.ToStringNoMeta);
       FMetaDataCache[key] := theResult;
@@ -379,21 +404,23 @@ var
   installResult : boolean;
   packageMetadata : IPackageSearchResultItem;
   projectCount : integer;
+  operation : ICancellationTokenSource;
 begin
   installResult := false;
   //capture the current package metadata before we pump any messages - pumping
-  //(the wait loop below and progress updates during install) can re-enter
-  //SetPackage from the editor view and set FPackageMetaData to nil.
+  //(progress updates during install) can re-enter SetPackage from the editor
+  //view and set FPackageMetaData to nil.
   packageMetadata := FPackageMetaData;
   try
     CancelPendingRequest;
     FLogger.Clear;
-    FLogger.StartInstall(FCancellationTokenSource);
+    operation := BeginOperation;
+    FLogger.StartInstall(operation);
     projectCount := Length(options.Projects);
     if projectCount = 0 then
       projectCount := 1;
     FHost.BeginInstall(projectCount);
-    installResult := FPackageInstaller.Install(FCancellationTokenSource.Token, options, FInstallerContext);
+    installResult := FPackageInstaller.Install(operation.Token, options, FInstallerContext);
     //the installer reported why - this is the outcome.
     if installResult then
       InstallSucceeded(packageMetadata, options)
@@ -402,20 +429,30 @@ begin
 
 
   finally
+    FOperationTokenSource := nil;
     FLogger.EndInstall(installResult);
-    FHost.EndInstall;
+    //ViewClosing lets go of the host - the view may have closed while this ran.
+    if FHost <> nil then
+      FHost.EndInstall;
   end;
 
 end;
 
 procedure TPackageDetailsFrame.CancelPendingRequest;
 begin
-  if FRequestInFlight then
-    FCancellationTokenSource.Cancel;
+  //Cancelled on their token, so they are delivered as cancelled whenever they finish, and their generation no
+  //longer matches - no waiting (pumping messages here re-entered SetPackage), and no Reset (that un-cancelled the
+  //old requests, and their results were applied).
+  FRequestTokenSource.Cancel;
+  FRequestTokenSource := TCancellationTokenSourceFactory.Create;
+  Inc(FDetailsGeneration);
+  Inc(FVersionsGeneration);
+end;
 
-  while FRequestInFlight do
-    Application.ProcessMessages;
-  FCancellationTokenSource.Reset;
+function TPackageDetailsFrame.BeginOperation : ICancellationTokenSource;
+begin
+  result := TCancellationTokenSourceFactory.Create;
+  FOperationTokenSource := result;
 end;
 
 procedure TPackageDetailsFrame.InstallSucceeded(const packageMetadata : IPackageSearchResultItem; const options : TInstallOptions);
@@ -425,7 +462,8 @@ begin
     packageMetadata.Installed := true;
     packageMetadata.IsTransitive := false;
   end;
-  FHost.PackageInstalled;
+  if FHost <> nil then
+    FHost.PackageInstalled;
   if packageMetadata <> nil then
   begin
     UpdateProjectPackageVersions(packageMetaData.Id);
@@ -450,6 +488,7 @@ var
   packageMetadata : IPackageSearchResultItem;
   line : string;
   message : string;
+  operation : ICancellationTokenSource;
 begin
   installResult := false;
   sessionOpen := false;
@@ -460,10 +499,11 @@ begin
     try
       CancelPendingRequest;
       FLogger.Clear;
-      FLogger.StartInstall(FCancellationTokenSource);
+      operation := BeginOperation;
+      FLogger.StartInstall(operation);
       sessionOpen := true;
 
-      if not FPackageInstaller.PlanInstall(FCancellationTokenSource.Token, options, plan) then
+      if not FPackageInstaller.PlanInstall(operation.Token, options, plan) then
       begin
         LogPlanErrors(FLogger, plan);
         FLogger.Information('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' cannot be installed.', true);
@@ -482,23 +522,28 @@ begin
         message := message + sLineBreak + 'Continue?';
         if MessageDlg(message, mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
           exit;
-        FCancellationTokenSource.Reset;
+        //the view may have closed while the question was up.
+        if FHost = nil then
+          exit;
+        //a fresh one - the planning session's may have been cancelled from its log window.
+        operation := BeginOperation;
         FLogger.Clear;
-        FLogger.StartInstall(FCancellationTokenSource);
+        FLogger.StartInstall(operation);
         sessionOpen := true;
       end;
 
       FHost.BeginInstall(plan.Projects.Count);
       hostInstalling := true;
-      installResult := FPackageInstaller.ApplyInstallPlan(FCancellationTokenSource.Token, options, plan, FInstallerContext);
+      installResult := FPackageInstaller.ApplyInstallPlan(operation.Token, options, plan, FInstallerContext);
       if installResult then
         InstallSucceeded(packageMetadata, options)
       else
         FLogger.Information('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' did not install.', true);
     finally
+      FOperationTokenSource := nil;
       if sessionOpen then
         FLogger.EndInstall(installResult);
-      if hostInstalling then
+      if hostInstalling and (FHost <> nil) then
         FHost.EndInstall;
     end;
   finally
@@ -511,32 +556,30 @@ var
   uninstallResult : boolean;
   packageMetaData : IPackageSearchResultItem;
   projectCount : integer;
+  operation : ICancellationTokenSource;
 begin
   uninstallResult := false;
   //capture the current package metadata before we pump any messages - pumping
-  //(the wait loop below and progress updates during uninstall) can re-enter
-  //SetPackage from the editor view and set FPackageMetaData to nil.
+  //(progress updates during uninstall) can re-enter SetPackage from the editor
+  //view and set FPackageMetaData to nil.
   packageMetaData := FPackageMetaData;
   try
-    if FRequestInFlight then
-      FCancellationTokenSource.Cancel;
-
-    while FRequestInFlight do
-      Application.ProcessMessages;
-    FCancellationTokenSource.Reset;
+    CancelPendingRequest;
     FLogger.Clear;
-    FLogger.StartUnInstall(FCancellationTokenSource);
+    operation := BeginOperation;
+    FLogger.StartUnInstall(operation);
     projectCount := Length(options.Projects);
     if projectCount = 0 then
       projectCount := 1;
     FHost.BeginUninstall(projectCount);
 
     FLogger.Information('UnInstalling package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta);
-    uninstallResult := FPackageInstaller.UnInstall(FCancellationTokenSource.Token, options, FInstallerContext);
+    uninstallResult := FPackageInstaller.UnInstall(operation.Token, options, FInstallerContext);
     if uninstallResult then
     begin
       FLogger.Information('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' uninstalled.');
-      FHost.PackageUninstalled;
+      if FHost <> nil then
+        FHost.PackageUninstalled;
       UpdateProjectPackageVersions(options.PackageId);
 
       if FProjectsGrid.HasAnyInstalled then
@@ -558,8 +601,11 @@ begin
       FLogger.Information('Package ' + options.PackageId + ' - ' + options.Version.ToStringNoMeta + ' did not uninstall.', true);
 
   finally
+    FOperationTokenSource := nil;
     FLogger.EndUnInstall(uninstallResult);
-    FHost.EndInstall;
+    //ViewClosing lets go of the host - the view may have closed while this ran.
+    if FHost <> nil then
+      FHost.EndInstall;
   end;
 end;
 
@@ -668,7 +714,8 @@ begin
   FVersionsDelayTimer.Interval := 100;
   FVersionsDelayTimer.Enabled := false;
   FVersionsDelayTimer.OnTimer := VersionsDelayTimerEvent;
-  FCancellationTokenSource := TCancellationTokenSourceFactory.Create;
+  FRequestTokenSource := TCancellationTokenSourceFactory.Create;
+  FLifetime := TViewLifetime.Create;
 
 
   {$IFNDEF USEIMAGECOLLECTION } //10.4 or later
@@ -905,8 +952,7 @@ begin
         CoUninitialize;
       end;
 
-      //simulating long running.
-    end, FCancellationTokenSource.Token);
+    end, FRequestTokenSource.Token);
 
 end;
 
@@ -1151,9 +1197,8 @@ begin
   FIncludePreRelease := preRelease;
   DebounceTimer.Enabled := false;
   FVersionsDelayTimer.Enabled := false;
-  if FRequestInFlight then
-    FCancellationTokenSource.Cancel;
-  //todo - should we wait here?
+  //another package - what was being fetched for the last one is no longer wanted.
+  CancelPendingRequest;
 
   FMetaDataCache.Clear;
 
@@ -1482,8 +1527,8 @@ begin
   //work: everything is already in the cache, only the search paths change.
 
   FInstallerContext.SetUseSource(project, packageId, useSource);
-  FCancellationTokenSource.Reset;
-  if FPackageInstaller.RefreshProjectSearchPaths(FCancellationTokenSource.Token, project, IDECompilerVersion, FConfiguration.FileName, FInstallerContext) then
+  //a token of its own - nothing else's cancelling (a package change, a request) applies to it.
+  if FPackageInstaller.RefreshProjectSearchPaths(TCancellationTokenSourceFactory.Create.Token, project, IDECompilerVersion, FConfiguration.FileName, FInstallerContext) then
   begin
     FLogger.Information('Updated search paths for [' + packageId + '] in project [' + project + '] (use source = ' + BoolToStr(useSource, true) + ').');
     //Re-sync the IDE's in-memory copy of the dproj so Alt-Tab doesn't prompt to reload. This does
@@ -1630,18 +1675,20 @@ var
   sReferenceVersion : string;
   includePreRelease : boolean;
   cachedVersions : IList<TPackageVersion>;
-
-
+  //locals for capture - the worker runs on another thread and must not read the frame.
+  packageId : string;
+  lifetime : IViewLifetime;
+  generation : integer;
 begin
   FVersionsDelayTimer.Enabled := false;
   //a queued/already-fired tick can run after the package was deselected.
   if FPackageMetaData = nil then
     exit;
-  if FRequestInFlight then
-    FCancellationTokenSource.Cancel;
-  while FRequestInFlight do
-    Application.ProcessMessages;
-  FCancellationTokenSource.Reset;
+  //supersedes any versions request still in flight (a new package's cancelled it already).
+  Inc(FVersionsGeneration);
+  generation := FVersionsGeneration;
+  lifetime := FLifetime;
+  packageId := FPackageMetaData.Id;
 
   cboVersions.Clear;
 
@@ -1668,42 +1715,37 @@ begin
       //need this for the http api/
       CoInitializeEx(nil, COINIT_APARTMENTTHREADED);
       try
-        result := repoManager.GetPackageVersions(cancelToken, IDECompilerVersion, FPackageMetaData.Id, includePreRelease);
+        result := repoManager.GetPackageVersions(cancelToken, IDECompilerVersion, packageId, includePreRelease);
       finally
         CoUninitialize;
       end;
-    end, FCancellationTokenSource.Token)
+    end, FRequestTokenSource.Token)
   .OnException(
     procedure(const e : Exception)
     begin
-      FRequestInFlight := false;
-      if FClosing then
+      if (not lifetime.Alive) or (generation <> FVersionsGeneration) then
         exit;
       LogException(FLogger, e);
     end)
   .OnCancellation(
     procedure
     begin
-      FRequestInFlight := false;
-      //if the view is closing do not do anything else.
-      if FClosing then
+      if (not lifetime.Alive) or (generation <> FVersionsGeneration) then
         exit;
       FLogger.Debug('Cancelled getting package versions.');
     end)
   .Await(
     procedure(const versions : IList<TPackageVersion>)
     begin
-      FRequestInFlight := false;
-      //if the view is closing do not do anything else.
-      if FClosing then
+      //the view gone, or this request superseded (another package shown) - its versions are not this one's, and
+      //caching them under the current package's id would show them for it from then on.
+      if (not lifetime.Alive) or (generation <> FVersionsGeneration) then
         exit;
       FLogger.Debug('Got package versions .');
-      //the package may have been deselected while this request was in flight - drop the stale result.
-      if FPackageMetaData <> nil then
-      begin
-        UpdateVersionsCache(FPackageMetaData.Id, includePreRelease, versions);
-        DoUpdateVersions(sReferenceVersion, versions);
-      end;
+      if (versions = nil) or (FPackageMetaData = nil) then
+        exit;
+      UpdateVersionsCache(packageId, includePreRelease, versions);
+      DoUpdateVersions(sReferenceVersion, versions);
     end);
 
 end;
@@ -1711,8 +1753,13 @@ end;
 procedure TPackageDetailsFrame.ViewClosing;
 begin
   FClosing := true;
+  //the callbacks still to come find the view dead and do nothing.
+  FLifetime.Kill;
   FHost := nil;
-  FCancellationTokenSource.Cancel;
+  FRequestTokenSource.Cancel;
+  //an install running now stops too, as it always has.
+  if FOperationTokenSource <> nil then
+    FOperationTokenSource.Cancel;
 end;
 
 end.

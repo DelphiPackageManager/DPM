@@ -56,6 +56,30 @@ type
   /// </summary>
   TDPMUpdateChannel = (Stable, Beta);
 
+  /// <summary>
+  ///  Whether the view an async request was made for still exists. VSoft.Awaitable delivers a result (or the
+  ///  cancellation, or the exception) by posted message, inside whatever message loop runs next - which can be
+  ///  after the frame has been closed and destroyed. So a callback captures this, never Self, and does nothing
+  ///  once the view is gone; only then is it safe to touch the frame. Main thread only.
+  /// </summary>
+  IViewLifetime = interface
+    ['{5C7D2E91-6A3B-4F8E-9D10-2B4C6E8A1F37}']
+    function GetAlive : boolean;
+    /// <summary>The view is going - every callback from here on does nothing.</summary>
+    procedure Kill;
+    property Alive : boolean read GetAlive;
+  end;
+
+  TViewLifetime = class(TInterfacedObject, IViewLifetime)
+  private
+    FAlive : boolean;
+  protected
+    function GetAlive : boolean;
+    procedure Kill;
+  public
+    constructor Create;
+  end;
+
 
 const
   //The current IDE version to TCompilerVersion.
@@ -115,6 +139,24 @@ begin
     result := cDPMLinkColorDark
   else
     result := cDPMLinkColorLight;
+end;
+
+{ TViewLifetime }
+
+constructor TViewLifetime.Create;
+begin
+  inherited Create;
+  FAlive := true;
+end;
+
+function TViewLifetime.GetAlive : boolean;
+begin
+  result := FAlive;
+end;
+
+procedure TViewLifetime.Kill;
+begin
+  FAlive := false;
 end;
 
 end.
