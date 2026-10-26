@@ -116,9 +116,11 @@ const
   cRsaSha256 = '1.2.840.113549.1.1.11';
   cRsaSha384 = '1.2.840.113549.1.1.12';
   cRsaSha512 = '1.2.840.113549.1.1.13';
-  // ECDSA signature OIDs (ANSI X9.62)
+  // ECDSA signature OIDs (ANSI X9.62). SHA-512 pairs with P-521, which the
+  // signer picks for P-521 keys and SignerKeyProblem accepts.
   cEcdsaSha256 = '1.2.840.10045.4.3.2';
   cEcdsaSha384 = '1.2.840.10045.4.3.3';
+  cEcdsaSha512 = '1.2.840.10045.4.3.4';
   // Bare RSA — discouraged but allowed for legacy CAs; the hash declared on
   // the signed-attribute side still determines actual digest strength.
   cRsa = '1.2.840.113549.1.1.1';
@@ -128,7 +130,7 @@ const
 begin
   result :=
     (oid = cRsaSha256) or (oid = cRsaSha384) or (oid = cRsaSha512) or
-    (oid = cEcdsaSha256) or (oid = cEcdsaSha384) or
+    (oid = cEcdsaSha256) or (oid = cEcdsaSha384) or (oid = cEcdsaSha512) or
     (oid = cRsa) or (oid = cEcPublicKey);
 end;
 

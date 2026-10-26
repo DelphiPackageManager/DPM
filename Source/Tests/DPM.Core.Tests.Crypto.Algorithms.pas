@@ -33,6 +33,7 @@ type
     [TestCase('RSA-SHA512', '1.2.840.113549.1.1.13')]
     [TestCase('ECDSA-SHA256', '1.2.840.10045.4.3.2')]
     [TestCase('ECDSA-SHA384', '1.2.840.10045.4.3.3')]
+    [TestCase('ECDSA-SHA512', '1.2.840.10045.4.3.4')]
     [TestCase('Bare-RSA', '1.2.840.113549.1.1.1')]
     [TestCase('Bare-ecPublicKey', '1.2.840.10045.2.1')]
     procedure SignatureAlg_Accepts(const oid : string);

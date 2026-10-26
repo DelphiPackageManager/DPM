@@ -1074,7 +1074,7 @@ begin
   // declares a signed author. Without the binding an attacker could strip
   // or swap the author signature without detection — the repo signature
   // covers the manifest, not the author sig blob. Gallery is expected to
-  // emit dpmVerifiedAuthorSigHash (OID 1.3.6.1.4.1.95860.1.3) for every
+  // emit dpmVerifiedAuthorSigHash (OID 1.3.6.1.4.1.65863.1.3) for every
   // attested author signature.
   if Length(repoSigInfo.Attestation.BoundAuthorSigHashesHex) = 0 then
   begin
