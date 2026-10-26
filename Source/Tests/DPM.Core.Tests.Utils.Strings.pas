@@ -71,6 +71,9 @@ type
     procedure Join_SingleValue_HasNoSeparator;
     procedure Join_MultipleValues_AreSeparated;
     procedure Join_PreservesEmptyElements;
+    //the --sources value - a source's name may contain a space.
+    procedure SplitTrimmed_KeepsSpacesInsideItems;
+    procedure SplitTrimmed_TrimsAndDropsEmptyItems;
   end;
 
 implementation
@@ -140,6 +143,27 @@ begin
   Assert.IsFalse(TStringUtils.IsWebUrl('https://example.com/" --some-switch "'), 'quote');
   Assert.IsFalse(TStringUtils.IsWebUrl('https://example.com/'#9'x'), 'tab');
   Assert.IsFalse(TStringUtils.IsWebUrl('https://example.com/'#13#10'x'), 'line break');
+end;
+
+procedure TStringUtilsTests.SplitTrimmed_KeepsSpacesInsideItems;
+var
+  items : TArray<string>;
+begin
+  items := TStringUtils.SplitTrimmed('DPM,My Private Feed', ',');
+  Assert.AreEqual(2, Length(items));
+  Assert.AreEqual('DPM', items[0], false);
+  Assert.AreEqual('My Private Feed', items[1], false);
+end;
+
+procedure TStringUtilsTests.SplitTrimmed_TrimsAndDropsEmptyItems;
+var
+  items : TArray<string>;
+begin
+  items := TStringUtils.SplitTrimmed(' DPM , ,My Feed ,', ',');
+  Assert.AreEqual(2, Length(items));
+  Assert.AreEqual('DPM', items[0], false);
+  Assert.AreEqual('My Feed', items[1], false);
+  Assert.AreEqual(0, Length(TStringUtils.SplitTrimmed('', ',')));
 end;
 
 initialization

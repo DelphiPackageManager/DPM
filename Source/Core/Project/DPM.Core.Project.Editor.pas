@@ -988,6 +988,8 @@ begin
 
   sList := TStringList.Create;
   try
+    //strict - a space is part of a path, not a separator (and the list is written back unquoted).
+    sList.StrictDelimiter := true;
     sList.Delimiter := ';';
     sList.DelimitedText := dpmSearchElement.text;
 

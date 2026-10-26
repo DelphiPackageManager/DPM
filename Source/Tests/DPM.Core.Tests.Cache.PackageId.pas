@@ -31,6 +31,9 @@ type
     procedure Feed_Json_With_An_Invalid_Id_Is_Refused;
     [Test]
     procedure Feed_Json_With_A_Valid_Id_Is_Read;
+    //a feed's searchPaths is ';' separated - a space is part of a path.
+    [Test]
+    procedure Feed_Json_Search_Paths_Keep_Their_Spaces;
     [Test]
     procedure Package_Spec_With_An_Invalid_Id_Is_Refused;
   end;
@@ -148,6 +151,24 @@ begin
   try
     Assert.IsTrue(TPackageInfo.TryLoadFromJson(logger, json, 'feed', info), 'precondition : the json is otherwise readable');
     Assert.AreEqual('VSoft.Foo', info.Id, false);
+  finally
+    json.Free;
+  end;
+end;
+
+procedure TPackageIdTests.Feed_Json_Search_Paths_Keep_Their_Spaces;
+var
+  logger : ILogger;
+  json : TJsonObject;
+  metadata : IPackageMetadata;
+begin
+  logger := TTestLogger.Create;
+  json := TJsonObject.Parse('{"id":"VSoft.Foo","compiler":"12.0","version":"1.0.0","searchPaths":"Source;Source\\Some Folder"}') as TJsonObject;
+  try
+    Assert.IsTrue(TPackageMetadata.TryLoadFromJson(logger, json, 'feed', metadata));
+    Assert.AreEqual(2, metadata.SearchPaths.Count);
+    Assert.AreEqual('Source', metadata.SearchPaths[0], false);
+    Assert.AreEqual('Source\Some Folder', metadata.SearchPaths[1], false);
   finally
     json.Free;
   end;

@@ -110,19 +110,21 @@ end;
 
 
 
+//the first of AnyOf in value[StartIndex .. StartIndex + Count - 1] (1 based, clipped to the string), -1 if none.
 function IndexOfAny(const value : string; const AnyOf : array of Char; StartIndex, Count : Integer) : Integer;
 var
   I : Integer;
   C : Char;
   Max : Integer;
 begin
-  if (StartIndex + Count) >= Length(value) then
+  if (StartIndex + Count - 1) >= Length(value) then
     Max := Length(value)
   else
-    Max := StartIndex + Count;
+    Max := StartIndex + Count - 1;
 
   I := StartIndex;
-  while I < Max do
+  //the last character is a candidate too - missing it attached a trailing separator to the last segment.
+  while I <= Max do
   begin
     for C in AnyOf do
       if value[I] = C then
@@ -186,7 +188,8 @@ begin
     NextSeparator := IndexOfAny(value, Separator, LastIndex, Length(value));
   end;
 
-  if (LastIndex < Length(value)) and (Total < Count) then
+  //<= : a one character last segment ('C:\work\A', 'src\*') is a segment like any other.
+  if (LastIndex <= Length(value)) and (Total < Count) then
   begin
     Inc(Total);
     SetLength(Result, Total);
@@ -244,6 +247,7 @@ var
   baseSegments : TArray<string>;
   baseSegLength : integer;
   isUnc : boolean;
+  rooted : boolean;
 begin
   if path = '' then
     exit(path);
@@ -255,7 +259,13 @@ begin
     begin
       isUnc := true;
       Delete(basePath,1,2);
-      if StartsWith(path, PathDelim) then
+      //a rooted path is not joined to the base - the same as for a drive base below.
+      if TPathUtils.IsPathRooted(path) then
+      begin
+        if not StartsWith(path, '\\' + basePath) then
+          exit(path);
+      end
+      else if StartsWith(path, PathDelim) then
         path := basePath + path
       else
         path := IncludeTrailingPathDelimiter(basePath) + path;
@@ -285,6 +295,8 @@ begin
     Delete(path,1,2);
     isUnc := true;
   end;
+  //the first segment of a rooted path is its root (the drive, or for unc the server), which '..' can't climb out of.
+  rooted := isUnc or TPathUtils.IsPathRooted(path);
 
   segments := AntSplit(path, [PathDelim, '/'], MaxInt);
 
@@ -293,8 +305,16 @@ begin
   begin
     if segment = '..' then
     begin
-      if stack.Count > 1 then
-        stack.Pop; //up one and don't add
+      if rooted then
+      begin
+        if stack.Count > 1 then
+          stack.Pop; //up one and don't add
+      end
+      //a relative path keeps the '..'s it can't resolve - '..\a' is not 'a'.
+      else if (stack.Count > 0) and (stack.Peek <> '..') then
+        stack.Pop
+      else
+        stack.Push(segment);
     end
     else if segment <> '.' then
       stack.Push(segment);
@@ -319,16 +339,6 @@ begin
 
   if isUnc then
     result := '\\' +  result;
-
-  if (basePath <> '') then
-  begin
-    if isUnc then
-      basePath := '\\' + basePath;
-      //TODO : this is bogus, because a ..\ could change this
-      // it was added for copylocal so need to test that.
-//    if not StartsWith(result, basePath) then
-//      exit(path);
-  end;
 end;
 
 
@@ -433,7 +443,9 @@ end;
 
 class function TPathUtils.IsPathRooted(const value: string): boolean;
 begin
-  result := TRegEx.IsMatch(value, '^[a-zA-z]\:\\|\\\\');
+  //a drive and a separator (either kind), or a unc path. Both alternatives anchored - unanchored, a '\\' anywhere
+  //counted as rooted - and a-z, A-Z rather than A-z, which takes in [\]^_` too.
+  result := TRegEx.IsMatch(value, '^([a-zA-Z]:[\\/]|\\\\)');
 end;
 
 class function TPathUtils.IsDspecFile(const filename : string) : boolean;

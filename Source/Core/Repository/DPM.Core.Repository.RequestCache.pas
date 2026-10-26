@@ -3,6 +3,7 @@ unit DPM.Core.Repository.RequestCache;
 interface
 
 uses
+  System.SyncObjs,
   Spring.Collections,
   DPM.Core.Types,
   DPM.Core.Dependency.Version,
@@ -16,9 +17,11 @@ type
   ///  project has resolved now.
   ///  Only active between BeginScope and the matching EndScope (scopes nest). Outside a scope nothing is
   ///  stored, so a long lived repository manager (the IDE keeps one) never serves stale results.
-  ///  Lists are copied in and out - callers may modify what they get back. </summary>
+  ///  Lists are copied in and out - callers may modify what they get back.
+  ///  Thread safe - the repository manager is shared by the IDE's background requests. </summary>
   TRepositoryRequestCache = class
   private
+    FLock : TCriticalSection;
     FDepth : integer;
     FVersionsWithDependencies : IDictionary<string, IList<IPackageInfo>>;
     FVersions : IDictionary<string, IList<TPackageVersion>>;
@@ -26,6 +29,7 @@ type
     class function VersionsKey(const packageId : string; const compilerVersion : TCompilerVersion; const includePrerelease : boolean) : string;
   public
     constructor Create;
+    destructor Destroy; override;
     procedure BeginScope;
     procedure EndScope;
     function Active : boolean;
@@ -49,30 +53,52 @@ uses
 constructor TRepositoryRequestCache.Create;
 begin
   inherited Create;
+  FLock := TCriticalSection.Create;
   FDepth := 0;
   FVersionsWithDependencies := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
   FVersions := TCollections.CreateDictionary<string, IList<TPackageVersion>>;
 end;
 
+destructor TRepositoryRequestCache.Destroy;
+begin
+  FLock.Free;
+  inherited;
+end;
+
 function TRepositoryRequestCache.Active : boolean;
 begin
-  result := FDepth > 0;
+  FLock.Enter;
+  try
+    result := FDepth > 0;
+  finally
+    FLock.Leave;
+  end;
 end;
 
 procedure TRepositoryRequestCache.BeginScope;
 begin
-  Inc(FDepth);
+  FLock.Enter;
+  try
+    Inc(FDepth);
+  finally
+    FLock.Leave;
+  end;
 end;
 
 procedure TRepositoryRequestCache.EndScope;
 begin
-  if FDepth = 0 then
-    exit;
-  Dec(FDepth);
-  if FDepth = 0 then
-  begin
-    FVersionsWithDependencies.Clear;
-    FVersions.Clear;
+  FLock.Enter;
+  try
+    if FDepth = 0 then
+      exit;
+    Dec(FDepth);
+    if FDepth = 0 then
+    begin
+      FVersionsWithDependencies.Clear;
+      FVersions.Clear;
+    end;
+  finally
+    FLock.Leave;
   end;
 end;
 
@@ -92,11 +118,16 @@ var
   cached : IList<IPackageInfo>;
 begin
   versions := nil;
-  result := Active and FVersionsWithDependencies.TryGetValue(VersionsWithDependenciesKey(packageId, compilerVersion, versionRange, includePrerelease), cached);
-  if result then
-  begin
-    versions := TCollections.CreateList<IPackageInfo>;
-    versions.AddRange(cached);
+  FLock.Enter;
+  try
+    result := (FDepth > 0) and FVersionsWithDependencies.TryGetValue(VersionsWithDependenciesKey(packageId, compilerVersion, versionRange, includePrerelease), cached);
+    if result then
+    begin
+      versions := TCollections.CreateList<IPackageInfo>;
+      versions.AddRange(cached);
+    end;
+  finally
+    FLock.Leave;
   end;
 end;
 
@@ -105,11 +136,15 @@ procedure TRepositoryRequestCache.AddVersionsWithDependencies(const packageId : 
 var
   copied : IList<IPackageInfo>;
 begin
-  if not Active then
-    exit;
   copied := TCollections.CreateList<IPackageInfo>;
   copied.AddRange(versions);
-  FVersionsWithDependencies[VersionsWithDependenciesKey(packageId, compilerVersion, versionRange, includePrerelease)] := copied;
+  FLock.Enter;
+  try
+    if FDepth > 0 then
+      FVersionsWithDependencies[VersionsWithDependenciesKey(packageId, compilerVersion, versionRange, includePrerelease)] := copied;
+  finally
+    FLock.Leave;
+  end;
 end;
 
 function TRepositoryRequestCache.TryGetVersions(const packageId : string; const compilerVersion : TCompilerVersion; const includePrerelease : boolean; out versions : IList<TPackageVersion>) : boolean;
@@ -117,11 +152,16 @@ var
   cached : IList<TPackageVersion>;
 begin
   versions := nil;
-  result := Active and FVersions.TryGetValue(VersionsKey(packageId, compilerVersion, includePrerelease), cached);
-  if result then
-  begin
-    versions := TCollections.CreateList<TPackageVersion>;
-    versions.AddRange(cached);
+  FLock.Enter;
+  try
+    result := (FDepth > 0) and FVersions.TryGetValue(VersionsKey(packageId, compilerVersion, includePrerelease), cached);
+    if result then
+    begin
+      versions := TCollections.CreateList<TPackageVersion>;
+      versions.AddRange(cached);
+    end;
+  finally
+    FLock.Leave;
   end;
 end;
 
@@ -129,11 +169,15 @@ procedure TRepositoryRequestCache.AddVersions(const packageId : string; const co
 var
   copied : IList<TPackageVersion>;
 begin
-  if not Active then
-    exit;
   copied := TCollections.CreateList<TPackageVersion>;
   copied.AddRange(versions);
-  FVersions[VersionsKey(packageId, compilerVersion, includePrerelease)] := copied;
+  FLock.Enter;
+  try
+    if FDepth > 0 then
+      FVersions[VersionsKey(packageId, compilerVersion, includePrerelease)] := copied;
+  finally
+    FLock.Leave;
+  end;
 end;
 
 end.

@@ -560,6 +560,8 @@ begin
   begin
     sList := TStringList.Create;
     try
+      //a space is part of a path, not a separator.
+      sList.StrictDelimiter := true;
       sList.Delimiter := ';';
       sList.DelimitedText := searchPaths;
       for i := 0 to sList.Count -1 do

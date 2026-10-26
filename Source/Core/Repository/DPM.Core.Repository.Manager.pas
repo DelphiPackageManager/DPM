@@ -40,19 +40,31 @@ uses
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Package.Interfaces,
   DPM.Core.Repository.Interfaces,
-  DPM.Core.Repository.RequestCache;
+  DPM.Core.Repository.RequestCache,
+  System.SyncObjs;
 
 type
+  //The IDE asks the manager from many threads at once (TAsync), so : the repository list is built afresh when
+  //the configuration changes and published under FLock - never changed once published, and a repository in it
+  //never reconfigured, so a query can use the list it took while another rebuilds it. What a query found
+  //(unavailable sources, each repository's LastError) belongs to the thread that ran it.
   TPackageRepositoryManager = class(TInterfacedObject, IPackageRepositoryManager)
   private
     FLogger : ILogger;
+    FLock : TCriticalSection;
     FConfiguration : IConfiguration;
     FRepositories : IList<IPackageRepository>;
+    //what each repository in FRepositories was configured from (by lowercase name), and the whole configuration.
+    FRepositoryFingerprints : IDictionary<string, string>;
+    FConfigurationFingerprint : string;
+    FConfigured : boolean;
     FRepoFactory : IPackageRepositoryFactory;
     FRequestCache : TRepositoryRequestCache;
-    //the sources the current query could not use - see UnavailableSources.
-    FUnavailable : string;
-    //starts a query : forgets which sources failed the last one.
+    //the sources the current query could not use, by thread - see UnavailableSources.
+    FUnavailable : IDictionary<Cardinal, string>;
+    //the published repository list - a query iterates what it took, whatever happens to FRepositories meanwhile.
+    function CurrentRepositories : IList<IPackageRepository>;
+    //starts a query : forgets which sources failed this thread's last one.
     procedure BeginRequest;
     //after asking a repository : a source that failed a query is a warning - another source may have the
     //answer, and the caller decides whether finding nothing is an error.
@@ -116,8 +128,35 @@ uses
   VSoft.URI,
   DPM.Core.Diagnostics,
   DPM.Core.Constants,
+  WinApi.Windows,
   DPM.Core.Utils.System,
+  DPM.Core.Utils.Strings,
   DPM.Core.Package.SearchResults;
+
+//The source names a --sources value lists (comma separated, trimmed), for IndexOf - which is case insensitive,
+//like source names. A name may contain a space, so the list is not split on spaces.
+function SourceNameList(const sources : string) : TStringList;
+var
+  names : TArray<string>;
+  i : integer;
+begin
+  result := TStringList.Create;
+  names := TStringUtils.SplitTrimmed(sources, ',');
+  for i := 0 to High(names) do
+    result.Add(names[i]);
+end;
+
+function FindRepository(const repositories : IList<IPackageRepository>; const name : string) : IPackageRepository;
+var
+  candidate : IPackageRepository;
+begin
+  result := nil;
+  for candidate in repositories do
+  begin
+    if SameText(candidate.Name, name) then
+      exit(candidate);
+  end;
+end;
 
 { TRespositoryManager }
 
@@ -125,15 +164,29 @@ constructor TPackageRepositoryManager.Create(const logger : ILogger; const repoF
 begin
   inherited Create;
   FLogger := logger;
+  FLock := TCriticalSection.Create;
   FRepoFactory := repoFactory;
   FRepositories := TCollections.CreateList<IPackageRepository>;
+  FRepositoryFingerprints := TCollections.CreateDictionary<string, string>;
+  FUnavailable := TCollections.CreateDictionary<Cardinal, string>;
   FRequestCache := TRepositoryRequestCache.Create;
 end;
 
 destructor TPackageRepositoryManager.Destroy;
 begin
   FRequestCache.Free;
+  FLock.Free;
   inherited;
+end;
+
+function TPackageRepositoryManager.CurrentRepositories : IList<IPackageRepository>;
+begin
+  FLock.Enter;
+  try
+    result := FRepositories;
+  finally
+    FLock.Leave;
+  end;
 end;
 
 procedure TPackageRepositoryManager.BeginRequestCache;
@@ -180,7 +233,7 @@ begin
   //try each source - one that fails only matters if no other has the package.
   failures := '';
   failureCode := TErrorCode.E1201_PackageDownloadFailed;
-  for repo in FRepositories do
+  for repo in CurrentRepositories do
   begin
     if not repo.Enabled then
       continue;
@@ -230,9 +283,7 @@ begin
 
   if sources <> '' then
   begin
-    sourcesList := TStringList.Create;
-    sourcesList.Delimiter := ',';
-    sourcesList.DelimitedText := sources;
+    sourcesList := SourceNameList(sources);
   end
   else
     sourcesList := nil;
@@ -240,7 +291,7 @@ begin
   currentPackage := nil;
   packages := TCollections.CreateList<IPackageInfo>;
   try
-    for repo in FRepositories do
+    for repo in CurrentRepositories do
     begin
       if cancellationToken.IsCancelled then
         exit;
@@ -311,7 +362,7 @@ begin
   packages := TCollections.CreateDictionary<string, IPackageSearchResultItem>;
 
   //loop through enabled repo and get the feed.. then combine to get latest versions
-  for repo in FRepositories do
+  for repo in CurrentRepositories do
   begin
     if not repo.Enabled then
       continue;
@@ -375,9 +426,7 @@ begin
 
   if options.Sources <> '' then
   begin
-    sources := TStringList.Create;
-    sources.Delimiter := ',';
-    sources.DelimitedText := options.Sources;
+    sources := SourceNameList(options.Sources);
   end
   else
     sources := nil;
@@ -385,7 +434,7 @@ begin
   allResults := TCollections.CreateList<IPackageSearchResultItem>;
 
   try
-    for repo in FRepositories do
+    for repo in CurrentRepositories do
     begin
       if cancelToken.IsCancelled then
         exit;
@@ -487,7 +536,7 @@ begin
     exit;
   BeginRequest;
 
-  for repo in FRepositories do
+  for repo in CurrentRepositories do
   begin
     if cancellationToken.IsCancelled then
       exit;
@@ -525,7 +574,7 @@ begin
   BeginRequest;
 
   
-  for repo in FRepositories do
+  for repo in CurrentRepositories do
   begin
     if cancellationToken.IsCancelled then
       exit;
@@ -567,7 +616,7 @@ begin
   if FRequestCache.TryGetVersions(packageId, compilerVersion, includePrerelease, searchResult) then
     exit(searchResult);
 
-  for repo in FRepositories do
+  for repo in CurrentRepositories do
   begin
     if cancellationToken.IsCancelled then
       exit;
@@ -591,7 +640,7 @@ begin
       result := right.CompareTo(left);
     end);
   //a cancelled query may be partial - don't remember it.
-  if (not cancellationToken.IsCancelled) and (FUnavailable = '') then
+  if (not cancellationToken.IsCancelled) and (UnavailableSources = '') then
     FRequestCache.AddVersions(packageId, compilerVersion, includePrerelease, result);
 end;
 
@@ -605,7 +654,7 @@ end;
 //begin
 //  result := TCollections.CreateDictionary<string, IPackageLatestVersionInfo>;
 //
-//  for repo in FRepositories do
+//  for repo in CurrentRepositories do
 //  begin
 //    if cancellationToken.IsCancelled then
 //      exit;
@@ -667,7 +716,7 @@ begin
   if FRequestCache.TryGetVersionsWithDependencies(packageId, compilerVersion, versionRange, includePrerelease, searchResult) then
     exit(searchResult);
 
-  for repo in FRepositories do
+  for repo in CurrentRepositories do
   begin
     if cancellationToken.IsCancelled then
       exit;
@@ -691,58 +740,83 @@ begin
       result := right.Version.CompareTo(left.Version); ;
     end);
   //a cancelled query may be partial - don't remember it.
-  if (not cancellationToken.IsCancelled) and (FUnavailable = '') then
+  if (not cancellationToken.IsCancelled) and (UnavailableSources = '') then
     FRequestCache.AddVersionsWithDependencies(packageId, compilerVersion, versionRange, includePrerelease, result);
 end;
 
 
 function TPackageRepositoryManager.GetRepositories : IList<IPackageRepository>;
 begin
-  result := FRepositories;
+  //a copy - the published list is never changed.
+  result := TCollections.CreateList<IPackageRepository>;
+  result.AddRange(CurrentRepositories);
 end;
 
 function TPackageRepositoryManager.GetRepositoryByName(const value : string) : IPackageRepository;
 begin
-  result := FRepositories.FirstOrDefault(function(const repo : IPackageRepository) : boolean
-    begin
-      result := SameText(value, repo.Name);
-    end);
+  result := FindRepository(CurrentRepositories, value);
 end;
 
 
 function TPackageRepositoryManager.HasSources: Boolean;
 begin
-  result := FRepositories.Any;
+  result := CurrentRepositories.Any;
 end;
 
 function TPackageRepositoryManager.Initialize(const configuration : IConfiguration) : boolean;
 begin
-  FConfiguration := configuration;
+  FLock.Enter;
+  try
+    FConfiguration := configuration;
+  finally
+    FLock.Leave;
+  end;
   result := UpdateRepositories(true);
 end;
 
 function TPackageRepositoryManager.UnavailableSources : string;
 begin
-  result := FUnavailable;
+  FLock.Enter;
+  try
+    if not FUnavailable.TryGetValue(GetCurrentThreadId, result) then
+      result := '';
+  finally
+    FLock.Leave;
+  end;
 end;
 
 procedure TPackageRepositoryManager.BeginRequest;
 var
   repo : IPackageRepository;
 begin
-  FUnavailable := '';
-  for repo in FRepositories do
+  FLock.Enter;
+  try
+    FUnavailable.Remove(GetCurrentThreadId);
+  finally
+    FLock.Leave;
+  end;
+  //each repository's LastError is this thread's too - another thread's query is left alone.
+  for repo in CurrentRepositories do
     repo.ClearLastError;
 end;
 
 procedure TPackageRepositoryManager.NoteUnavailable(const repo : IPackageRepository);
+var
+  names : string;
 begin
   if repo.LastError = '' then
     exit;
   FLogger.Warning(TWarningCode.W1004_SourceUnavailable, 'Source [' + repo.Name + '] ' + repo.LastError);
-  if FUnavailable <> '' then
-    FUnavailable := FUnavailable + ', ';
-  FUnavailable := FUnavailable + repo.Name;
+  FLock.Enter;
+  try
+    if FUnavailable.TryGetValue(GetCurrentThreadId, names) and (names <> '') then
+      names := names + ', ' + repo.Name
+    else
+      names := repo.Name;
+    FUnavailable[GetCurrentThreadId] := names;
+  finally
+    FLock.Leave;
+  end;
   repo.ClearLastError;
 end;
 
@@ -768,9 +842,7 @@ begin
 
   if options.Sources <> '' then
   begin
-    sources := TStringList.Create;
-    sources.Delimiter := ',';
-    sources.DelimitedText := options.Sources;
+    sources := SourceNameList(options.Sources);
   end
   else
     sources := nil;
@@ -780,7 +852,7 @@ begin
   searchResult := TCollections.CreateList<IPackageListItem>;
 
   try
-    for repo in FRepositories do
+    for repo in CurrentRepositories do
     begin
       if cancellationToken.IsCancelled then
         exit;
@@ -869,7 +941,7 @@ begin
     exit;
   BeginRequest;
 
-  repo := FRepositories.Where(
+  repo := CurrentRepositories.Where(
     function(const repository : IPackageRepository) : Boolean
     begin
       result := SameText(pushOptions.Source, repository.Name);
@@ -931,6 +1003,16 @@ begin
   result := gitRepo.InstallPackageInPlace(cancellationToken, packageInfo, targetDir);
 end;
 
+//Everything a repository is configured from - one whose fingerprint is unchanged is kept as it is.
+function SourceFingerprint(const source : ISourceConfig; const refreshIntervalMinutes : integer) : string;
+begin
+  result := source.Name + #1 + IntToStr(Ord(source.SourceType)) + #1 + source.Source + #1 + source.UserName + #1 +
+            source.Password + #1 + BoolToStr(source.IsEnabled, true);
+  //the global git registry refresh interval is configured into every git repository.
+  if source.SourceType = TSourceType.GitRegistry then
+    result := result + #1 + IntToStr(refreshIntervalMinutes);
+end;
+
 function TPackageRepositoryManager.UpdateRepositories(const report : boolean) : boolean;
 var
   uri : IUri;
@@ -938,59 +1020,74 @@ var
   source : ISourceConfig;
   repo : IPackageRepository;
   gitRepo : IGitRegistryRepository;
-  i : integer;
+  repositories : IList<IPackageRepository>;
+  fingerprints : IDictionary<string, string>;
+  fingerprint : string;
+  previous : string;
+  configurationFingerprint : string;
 begin
   //FLogger.Debug('TPackageRepositoryManager.UpdateRepositories');
   result := false;
+  FLock.Enter;
+  try
+    configurationFingerprint := '';
+    for source in FConfiguration.Sources do
+      configurationFingerprint := configurationFingerprint + SourceFingerprint(source, FConfiguration.RegistryRefreshIntervalMinutes) + #2;
+    //every query comes through here - nothing has changed, so there is nothing to do.
+    if FConfigured and (configurationFingerprint = FConfigurationFingerprint) then
+      exit(true);
 
-  //update and remove
-  for i := FRepositories.Count -1 downto 0 do
-  begin
-    repo := FRepositories[i];
-    source := FConfiguration.GetSourceByName(repo.Name);
-    if source <> nil then
-      repo.Configure(source)
-    else
-      FRepositories.Remove(repo);
-  end;
-
-  //add missing repos.
-  for source in FConfiguration.Sources do
-  begin
-    repo := GetRepositoryByName(source.Name);
-    if repo = nil then
+    //A new list, so a query iterating the published one is undisturbed. A repository whose source is unchanged
+    //carries over as it is (with what it has fetched, a service index say); any other is created afresh rather
+    //than reconfigured, as a query on another thread may be using it.
+    repositories := TCollections.CreateList<IPackageRepository>;
+    fingerprints := TCollections.CreateDictionary<string, string>;
+    for source in FConfiguration.Sources do
     begin
-      //git registry sources can be a git url (including git@/ssh forms) or a local
-      //folder, so the strict file/http/https scheme check does not apply to them.
-      if source.SourceType <> TSourceType.GitRegistry then
+      //the first of two sources with the same name wins, as it always has.
+      if fingerprints.ContainsKey(LowerCase(source.Name)) then
+        continue;
+      fingerprint := SourceFingerprint(source, FConfiguration.RegistryRefreshIntervalMinutes);
+      repo := FindRepository(FRepositories, source.Name);
+      if (repo = nil) or (not FRepositoryFingerprints.TryGetValue(LowerCase(source.Name), previous)) or (previous <> fingerprint) then
       begin
-        if not TUriFactory.TryParseWithError(source.Source, false, uri, error) then
+        //git registry sources can be a git url (including git@/ssh forms) or a local
+        //folder, so the strict file/http/https scheme check does not apply to them.
+        if source.SourceType <> TSourceType.GitRegistry then
         begin
-          if report then
-            FLogger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + source.Name + '] is not valid - [' + source.Source + '] is not a valid uri : ' + error);
-          exit;
+          if not TUriFactory.TryParseWithError(source.Source, false, uri, error) then
+          begin
+            if report then
+              FLogger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + source.Name + '] is not valid - [' + source.Source + '] is not a valid uri : ' + error);
+            exit;
+          end;
+
+          if not MatchText(uri.Scheme, ['file', 'http', 'https']) then
+          begin
+            if report then
+              FLogger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + source.Name + '] is not valid - [' + uri.Scheme + '] is not a supported scheme (file, http or https).');
+            exit;
+          end;
         end;
 
-        if not MatchText(uri.Scheme, ['file', 'http', 'https']) then
-        begin
-          if report then
-            FLogger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + source.Name + '] is not valid - [' + uri.Scheme + '] is not a supported scheme (file, http or https).');
-          exit;
-        end;
+        repo := FRepoFactory.CreateRepository(source.SourceType);
+        repo.Configure(source);
+        //apply the global git-registry refresh interval (from app config).
+        if Supports(repo, IGitRegistryRepository, gitRepo) then
+          gitRepo.SetRefreshIntervalMinutes(FConfiguration.RegistryRefreshIntervalMinutes);
       end;
-
-      repo := FRepoFactory.CreateRepository(source.SourceType);
-      repo.Configure(source);
-      FRepositories.Add(repo);
+      repositories.Add(repo);
+      fingerprints[LowerCase(source.Name)] := fingerprint;
     end;
+
+    FRepositories := repositories;
+    FRepositoryFingerprints := fingerprints;
+    FConfigurationFingerprint := configurationFingerprint;
+    FConfigured := true;
+    result := true;
+  finally
+    FLock.Leave;
   end;
-
-  //apply the global git-registry refresh interval (from app config) to every git repo.
-  for i := 0 to FRepositories.Count - 1 do
-    if Supports(FRepositories[i], IGitRegistryRepository, gitRepo) then
-      gitRepo.SetRefreshIntervalMinutes(FConfiguration.RegistryRefreshIntervalMinutes);
-
-  result := true;
 end;
 
 end.

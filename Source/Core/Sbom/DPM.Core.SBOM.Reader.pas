@@ -384,6 +384,7 @@ end;
 
 function TCycloneDXReader.ReadFromString(const json : string) : TSBOMReport;
 var
+  parsed : TJsonBaseObject;
   root : TJsonObject;
   meta : TJsonObject;
   rootCompObj : TJsonObject;
@@ -404,11 +405,19 @@ begin
   root := nil;
   try
     try
-      root := TJsonBaseObject.Parse(json) as TJsonObject;
+      parsed := TJsonBaseObject.Parse(json);
     except
       on e : Exception do
         raise EArgumentException.Create('Could not parse SBOM JSON: ' + e.Message);
     end;
+    //Parse hands back whatever the document's root is - 'as TJsonObject' leaked an array root and called it an
+    //invalid typecast.
+    if not (parsed is TJsonObject) then
+    begin
+      parsed.Free;
+      raise EArgumentException.Create('The SBOM JSON is not a CycloneDX document - its root is not a json object.');
+    end;
+    root := TJsonObject(parsed);
 
     if root.Contains('bomFormat') then
     begin

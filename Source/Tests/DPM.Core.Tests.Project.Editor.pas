@@ -90,6 +90,10 @@ type
     [Test]
     procedure UninstallAll_CollapsesPackagesElement;
 
+    //the search path is ';' separated - a space in another package's path is part of the path.
+    [Test]
+    procedure Uninstall_KeepsAnotherPackagesPathWithASpace;
+
     [Test]
     procedure Install_TabIndentedProject_IndentsNewElementsWithTabs;
   end;
@@ -543,6 +547,30 @@ begin
                              '$(DPMSearch);' + cBaseSearchPath,
                              cPackagesHead + cBazReference + cPackagesTail,
                              cCopyLocalImport);
+    AssertSameText(expected, ReadProjectFile(sandbox));
+  finally
+    TFile.Delete(sandbox);
+  end;
+end;
+
+procedure TProjectEditorFormattingTests.Uninstall_KeepsAnotherPackagesPathWithASpace;
+var
+  editor : IProjectEditor;
+  sandbox : string;
+  rest : string;
+  expected : string;
+begin
+  rest := cPackagesHead + cBazReference + cFooReference + cPackagesTail;
+  sandbox := MakeTempFile;
+  WriteProjectFile(sandbox, BuildProject(DPMGroup('$(DPM)\Foo\1.0.0\lib\Win32;$(DPM)\Baz\3.1.0\src\Some Folder;'),
+                                         '$(DPMSearch);' + cBaseSearchPath, rest, cCopyLocalImport), true);
+  try
+    editor := CreateEditor;
+    Assert.IsTrue(editor.LoadProject(sandbox), 'LoadProject should succeed');
+    editor.RemoveFromSearchPath(TDPMPlatform.Win32, 'Foo');
+    Assert.IsTrue(editor.SaveProject, 'SaveProject should succeed');
+
+    expected := BuildProject(DPMGroup('$(DPM)\Baz\3.1.0\src\Some Folder'), '$(DPMSearch);' + cBaseSearchPath, rest, cCopyLocalImport);
     AssertSameText(expected, ReadProjectFile(sandbox));
   finally
     TFile.Delete(sandbox);

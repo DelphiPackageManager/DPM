@@ -105,7 +105,7 @@ type
     /// (use dest + the glob's wildcard tail). Returns forward-slash separators. </summary>
     function BuildCopyToLibGlob(const basePath, source, dest : string) : string;
 
-    procedure ValidateBuildEntries(const template : ISpecTemplate; const antPattern : IAntPattern);
+    procedure ValidateBuildEntries(const basePath : string; const template : ISpecTemplate; const antPattern : IAntPattern);
 
     /// <summary> Rejects any package that declares a reserved/banned IDE environment variable name. </summary>
     function ValidateEnvironmentVariables(const spec : IPackageSpec) : boolean;
@@ -731,7 +731,7 @@ begin
 end;
 
 
-procedure TPackageWriter.ValidateBuildEntries(const template : ISpecTemplate; const antPattern : IAntPattern);
+procedure TPackageWriter.ValidateBuildEntries(const basePath : string; const template : ISpecTemplate; const antPattern : IAntPattern);
 var
   buildEntry  : ISpecBuildEntry;
   designEntry : ISpecDesignEntry;
@@ -741,12 +741,13 @@ var
 
   function NormalisedProjectPath(const value : string) : string;
   begin
-    //Trim first - ConvertAntToRegexString trims source patterns and anchors them with ^..$,
-    //so a trailing/leading space on a build or design project path would never match an
-    //otherwise-covering source entry (and would also miss the exact-path FArchivePaths compare).
-    result := Trim(value);
-    result := StringReplace(result, '/', '\', [rfReplaceAll]);
-    result := TPathUtils.CompressRelativePath(result);
+    //Where the path ends up in the package : relative to the effective root, the same transform the
+    //build/design entries are rewritten with once they pass - so FArchivePaths, the source patterns and
+    //the project file inspected below all agree. The paths are authored relative to the dspec folder,
+    //and one in a sub-folder reaches its content with '..\' ('..\Sources\X.dproj' is 'Sources\X.dproj').
+    //Trimmed (by ToEffectiveRelative) - ConvertAntToRegexString trims source patterns and anchors them
+    //with ^..$, so a stray space would never match an otherwise-covering source entry.
+    result := StringReplace(ToEffectiveRelative(basePath, value), '/', '\', [rfReplaceAll]);
     result := LowerCase(result);
   end;
 
@@ -972,7 +973,7 @@ begin
 
     //Every build/design entry's dproj must be covered by a source entry,
     //otherwise install will fail on every consumer when MSBuild tries to load the missing file.
-    ValidateBuildEntries(template, antPattern);
+    ValidateBuildEntries(basePath, template, antPattern);
 
     //Rewrite build/design/packagedef project (and packagedef file) paths into the same archive-relative
     //form used when packing the source files, so install can find the dproj/files inside the package

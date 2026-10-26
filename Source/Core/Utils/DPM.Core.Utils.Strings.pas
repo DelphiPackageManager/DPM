@@ -38,6 +38,9 @@ type
     class function PadRight(const theString : string; TotalWidth : Integer; PaddingChar : Char) : string; overload; inline;
     class function SplitStr(const value : string; const Separator : Char; const options : TSplitStringOptions) : TArray<string>; overload;
     class function SplitStr(const value : string; const Separator : Char) : TArray<string>; overload;
+    //value split on separator alone (a space inside an item is part of it - unlike a TStringList without
+    //StrictDelimiter), each item trimmed, the empty ones dropped. 'DPM, My Feed,' -> ['DPM', 'My Feed'].
+    class function SplitTrimmed(const value : string; const separator : Char) : TArray<string>;
     class function StartsWith(const theString : string; const value : string; const IgnoreCase : boolean = false) : boolean;
     class function Contains(const theString : string; const value : string; const IgnoreCase : boolean = false) : boolean;
     //Stands in for string.Join - TStringHelper does not exist before XE3, and Core is compiled
@@ -179,6 +182,25 @@ end;
 class function TStringUtils.SplitStr(const value : string; const Separator : Char) : TArray<string>;
 begin
   result := SplitStr(value, Separator, TSplitStringOptions.ExcludeEmpty);
+end;
+
+class function TStringUtils.SplitTrimmed(const value : string; const separator : Char) : TArray<string>;
+var
+  items : TArray<string>;
+  i : integer;
+  count : integer;
+begin
+  items := SplitStr(value, separator, TSplitStringOptions.None);
+  SetLength(result, Length(items));
+  count := 0;
+  for i := 0 to High(items) do
+  begin
+    if Trim(items[i]) = '' then
+      continue;
+    result[count] := Trim(items[i]);
+    Inc(count);
+  end;
+  SetLength(result, count);
 end;
 
 //copied from XE7

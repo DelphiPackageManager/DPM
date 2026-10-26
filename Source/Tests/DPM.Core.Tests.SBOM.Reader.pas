@@ -29,6 +29,9 @@ type
     procedure ReadsToolsFromObjectForm;
     [Test]
     procedure ReadsLicenseExpression;
+    //json, but not an object - said so (not 'invalid class typecast'), and the parsed array freed.
+    [Test]
+    procedure RejectsArrayRoot;
   end;
 
 implementation
@@ -104,6 +107,22 @@ begin
       reader.ReadFromString('{"bomFormat":"SPDX","specVersion":"2.3"}').Free;
     end,
     EArgumentException);
+end;
+
+procedure TSBOMReaderTests.RejectsArrayRoot;
+var
+  reader : ISBOMReader;
+  message : string;
+begin
+  reader := TCycloneDXReader.Create;
+  message := '';
+  try
+    reader.ReadFromString('[{"bomFormat":"CycloneDX"}]').Free;
+  except
+    on e : EArgumentException do
+      message := e.Message;
+  end;
+  Assert.Contains(message, 'not a json object');
 end;
 
 procedure TSBOMReaderTests.ReadsRootComponentAndComponents;

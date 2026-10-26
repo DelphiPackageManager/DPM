@@ -30,6 +30,7 @@ interface
 
 uses
   Generics.Defaults,
+  System.SyncObjs,
   VSoft.CancellationToken,
   Spring.Collections,
   DPM.Core.Types,
@@ -43,6 +44,11 @@ uses
   DPM.Core.Repository.Interfaces;
 
 type
+  TRepositoryError = record
+    Reason : string;
+    Code : TErrorCode;
+  end;
+
   TBaseRepository = class(TInterfacedObject)
   private
     FLogger : ILogger;
@@ -52,8 +58,10 @@ type
     FPassword : string;
     FRepositoryType : TSourceType;
     FEnabled : boolean;
-    FLastError : string;
-    FLastErrorCode : TErrorCode;
+    FLock : TCriticalSection;
+    //A request's error belongs to the thread that made it (keyed by thread id) : the IDE asks one repository
+    //from many threads at once, and one query's ClearLastError must not wipe another's failure.
+    FLastErrors : IDictionary<Cardinal, TRepositoryError>;
   protected
     //IPackageRepository;
     function GetRepositoryType : TSourceType;
@@ -68,6 +76,9 @@ type
     //a request failed - remembered for the repository manager to report (see IPackageRepository.LastError).
     //reason reads on from 'Source [name] ', eg 'could not be reached : ...'.
     procedure RequestFailed(const reason : string; const code : TErrorCode = TErrorCode.E1201_PackageDownloadFailed);
+    //for state a descendant sets up lazily (a service index, a catalog) - several threads may get there first.
+    procedure EnterLock;
+    procedure LeaveLock;
 
     //exposing these for descendants
     property Logger : ILogger read FLogger;
@@ -80,39 +91,89 @@ type
     property RepositoryType : TSourceType read GetRepositoryType;
   public
     constructor Create(const logger : ILogger); virtual;
-
+    destructor Destroy; override;
   end;
 
 implementation
+
+uses
+  WinApi.Windows;
 
 { TBaseRepository }
 
 constructor TBaseRepository.Create(const logger : ILogger);
 begin
   FLogger := logger;
-  FLastErrorCode := TErrorCode.E1201_PackageDownloadFailed;
+  FLock := TCriticalSection.Create;
+  FLastErrors := TCollections.CreateDictionary<Cardinal, TRepositoryError>;
+end;
+
+destructor TBaseRepository.Destroy;
+begin
+  FLock.Free;
+  inherited;
+end;
+
+procedure TBaseRepository.EnterLock;
+begin
+  FLock.Enter;
+end;
+
+procedure TBaseRepository.LeaveLock;
+begin
+  FLock.Leave;
 end;
 
 procedure TBaseRepository.ClearLastError;
 begin
-  FLastError := '';
-  FLastErrorCode := TErrorCode.E1201_PackageDownloadFailed;
+  FLock.Enter;
+  try
+    FLastErrors.Remove(GetCurrentThreadId);
+  finally
+    FLock.Leave;
+  end;
 end;
 
 function TBaseRepository.GetLastError : string;
+var
+  error : TRepositoryError;
 begin
-  result := FLastError;
+  result := '';
+  FLock.Enter;
+  try
+    if FLastErrors.TryGetValue(GetCurrentThreadId, error) then
+      result := error.Reason;
+  finally
+    FLock.Leave;
+  end;
 end;
 
 function TBaseRepository.GetLastErrorCode : TErrorCode;
+var
+  error : TRepositoryError;
 begin
-  result := FLastErrorCode;
+  result := TErrorCode.E1201_PackageDownloadFailed;
+  FLock.Enter;
+  try
+    if FLastErrors.TryGetValue(GetCurrentThreadId, error) then
+      result := error.Code;
+  finally
+    FLock.Leave;
+  end;
 end;
 
 procedure TBaseRepository.RequestFailed(const reason : string; const code : TErrorCode);
+var
+  error : TRepositoryError;
 begin
-  FLastError := reason;
-  FLastErrorCode := code;
+  error.Reason := reason;
+  error.Code := code;
+  FLock.Enter;
+  try
+    FLastErrors[GetCurrentThreadId] := error;
+  finally
+    FLock.Leave;
+  end;
   FLogger.Verbose('Source [' + FName + '] ' + reason);
 end;
 

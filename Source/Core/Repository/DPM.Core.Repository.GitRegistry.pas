@@ -139,23 +139,39 @@ procedure TGitRegistryPackageRepository.Configure(const source : ISourceConfig);
 begin
   inherited Configure(source);
   //recreate the catalog lazily from the (possibly new) source + current TTL.
-  FCatalog := nil;
+  EnterLock;
+  try
+    FCatalog := nil;
+  finally
+    LeaveLock;
+  end;
 end;
 
 procedure TGitRegistryPackageRepository.SetRefreshIntervalMinutes(const value : integer);
 begin
-  if value <> FRefreshIntervalMinutes then
-  begin
-    FRefreshIntervalMinutes := value;
-    FCatalog := nil; //recreate with the new TTL on next use
+  EnterLock;
+  try
+    if value <> FRefreshIntervalMinutes then
+    begin
+      FRefreshIntervalMinutes := value;
+      FCatalog := nil; //recreate with the new TTL on next use
+    end;
+  finally
+    LeaveLock;
   end;
 end;
 
 function TGitRegistryPackageRepository.GetCatalog : IRegistryCatalog;
 begin
-  if FCatalog = nil then
-    FCatalog := TRegistryCatalog.Create(Logger, FGitClient, Name, SourceUri, cDefaultRegistriesFolder, FRefreshIntervalMinutes);
-  result := FCatalog;
+  //several threads may ask at once - one catalog, created by whichever gets here first.
+  EnterLock;
+  try
+    if FCatalog = nil then
+      FCatalog := TRegistryCatalog.Create(Logger, FGitClient, Name, SourceUri, cDefaultRegistriesFolder, FRefreshIntervalMinutes);
+    result := FCatalog;
+  finally
+    LeaveLock;
+  end;
 end;
 
 function TGitRegistryPackageRepository.GetSpec(const cancellationToken : ICancellationToken; const id : string) : IPackageSpec;

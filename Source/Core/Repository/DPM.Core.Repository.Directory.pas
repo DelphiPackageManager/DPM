@@ -330,6 +330,48 @@ begin
   result := DoGetPackageMetaData(cancellationToken, packageFile, false, readManifestFunc) as IPackageInfo;
 end;
 
+//The icon in fileName. The icon owns the stream; a stream that never reaches it is freed here.
+function ReadIconFile(const iconKind : TPackageIconKind; const fileName : string) : IPackageIcon;
+var
+  stream : TMemoryStream;
+begin
+  stream := TMemoryStream.Create;
+  try
+    stream.LoadFromFile(fileName);
+  except
+    stream.Free;
+    raise;
+  end;
+  result := CreatePackageIcon(iconKind, stream);
+end;
+
+//The icon entry index of zipFile, saved beside the package as cacheFileName so the next request reads it from
+//there - when it can be : a folder feed is often read only (a share), and the icon is the point, not the copy.
+function ReadIconEntry(const logger : ILogger; const zipFile : TZipFile; const index : integer; const iconKind : TPackageIconKind;
+                       const cacheFileName : string) : IPackageIcon;
+var
+  bytes : TBytes;
+  stream : TMemoryStream;
+begin
+  //the TBytes overload - the stream one is broken for STORED entries in some versions (see DPM.Core.Package.Signing).
+  zipFile.Read(index, bytes);
+  stream := TMemoryStream.Create;
+  try
+    if Length(bytes) > 0 then
+      stream.WriteBuffer(bytes[0], Length(bytes));
+  except
+    stream.Free;
+    raise;
+  end;
+  try
+    stream.SaveToFile(cacheFileName);
+  except
+    on e : Exception do
+      logger.Debug('Unable to save the icon [' + cacheFileName + '] : ' + e.Message);
+  end;
+  result := CreatePackageIcon(iconKind, stream);
+end;
+
 function TDirectoryPackageRepository.GetPackageIcon(const cancelToken : ICancellationToken; const packageId, packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageIcon;
 var
   matchingFiles : IList<string>;
@@ -338,10 +380,6 @@ var
   packagFileName : string;
   svgIconFileName : string;
   pngIconFileName : string;
-  stream : TMemoryStream;
-  DecompressionStream : TStream;
-  fileStream : TFileStream;
-  zipHeader : TZipHeader;
 begin
   result := nil;
   matchingFiles := DoExactList(packageId, compilerVersion, [], packageVersion);
@@ -351,71 +389,27 @@ begin
   svgIconFileName := ChangeFileExt(packagFileName, '.svg');
   pngIconFileName := ChangeFileExt(packagFileName, '.png');
 
-  //it quite likely already extracted so look for that first
-  //icons can be svg or png.
-  if FileExists(svgIconFileName) then
-  begin
-    fileStream := TFileStream.Create(svgIconFileName, fmOpenRead);
-    stream := TMemoryStream.Create;
-    try
-      stream.CopyFrom(fileStream, fileStream.Size);
-    finally
-      fileStream.Free;
-    end;
-    //the icon now owns the stream.
-    result := CreatePackageIcon(TPackageIconKind.ikSvg, stream);
-    exit;
-  end;
-
-  if FileExists(pngIconFileName) then
-  begin
-    fileStream := TFileStream.Create(pngIconFileName, fmOpenRead);
-    stream := TMemoryStream.Create;
-    try
-      stream.CopyFrom(fileStream, fileStream.Size);
-    finally
-      fileStream.Free;
-    end;
-    //the icon now owns the stream.
-    result := CreatePackageIcon(TPackageIconKind.ikPng, stream);
-    exit;
-  end;
-
-  //not already extracted, so check the package
   zipFile := TZipFile.Create;
   try
     try
+      //it quite likely already extracted so look for that first
+      //icons can be svg or png.
+      if FileExists(svgIconFileName) then
+        exit(ReadIconFile(TPackageIconKind.ikSvg, svgIconFileName));
+      if FileExists(pngIconFileName) then
+        exit(ReadIconFile(TPackageIconKind.ikPng, pngIconFileName));
+
+      //not already extracted, so check the package
       zipFile.Open(packagFileName, TZipMode.zmRead);
       zipIdx := zipFile.IndexOf(cIconFileSVG);
       if zipIdx <> -1 then
-      begin
-        stream := TMemoryStream.Create;
-        //casting due to broken overload resolution in XE7
-        zipFile.Read(zipIdx, DecompressionStream, zipHeader);
-        stream.CopyFrom(DecompressionStream, DecompressionStream.Size);
-        FreeAndNil(DecompressionStream);
-        //save it to speed up things next time.
-        stream.SaveToFile(svgIconFileName);
-        //result now owns the stream.
-        result := CreatePackageIcon(TPackageIconKind.ikSvg, stream);
-        exit;
-      end;
+        exit(ReadIconEntry(Logger, zipFile, zipIdx, TPackageIconKind.ikSvg, svgIconFileName));
       if cancelToken.IsCancelled then
         exit;
 
       zipIdx := zipFile.IndexOf(cIconFilePNG);
       if zipIdx <> -1 then
-      begin
-        stream := TMemoryStream.Create;
-        //casting due to broken overload resolution in XE7
-        zipFile.Read(zipIdx, DecompressionStream, zipHeader);
-        stream.CopyFrom(DecompressionStream, DecompressionStream.Size);
-        FreeAndNil(DecompressionStream);
-        stream.SaveToFile(pngIconFileName);
-        //result now owns the stream.
-        result := CreatePackageIcon(TPackageIconKind.ikPng, stream);
-        exit;
-      end;
+        exit(ReadIconEntry(Logger, zipFile, zipIdx, TPackageIconKind.ikPng, pngIconFileName));
     except
       on e : Exception do
       begin

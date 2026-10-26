@@ -249,6 +249,7 @@ uses
   DPM.Core.Tests.Crypto.Chain in 'Tests\DPM.Core.Tests.Crypto.Chain.pas',
   DPM.Core.Tests.Crypto.Pfx in 'Tests\DPM.Core.Tests.Crypto.Pfx.pas',
   DPM.Core.Tests.Repository.Directory in 'Tests\DPM.Core.Tests.Repository.Directory.pas',
+  DPM.Core.Tests.Repository.Manager in 'Tests\DPM.Core.Tests.Repository.Manager.pas',
   DPM.Core.Tests.Compiler.MSBuild in 'Tests\DPM.Core.Tests.Compiler.MSBuild.pas',
   DPM.Core.Tests.Utils.PE in 'Tests\DPM.Core.Tests.Utils.PE.pas',
   DPM.Core.Tests.Crypto.Algorithms in 'Tests\DPM.Core.Tests.Crypto.Algorithms.pas',

@@ -146,6 +146,35 @@ begin
     result := result + ' - ' + Copy(response.Response, 1, 300);
 end;
 
+//A response body that should be a json object - the caller frees jsonObj. False, with nothing to free and
+//error saying why, when it isn't one : unreadable, or json whose root is something else (an array, a string).
+//Parse hands back whatever the root is, so 'Parse(...) as TJsonObject' leaked it when the cast failed.
+function TryParseJsonObject(const text : string; out jsonObj : TJsonObject; out error : string) : boolean;
+var
+  parsed : TJsonBaseObject;
+begin
+  result := false;
+  jsonObj := nil;
+  error := '';
+  try
+    parsed := TJsonBaseObject.Parse(text);
+  except
+    on e : Exception do
+    begin
+      error := e.Message;
+      exit;
+    end;
+  end;
+  if not (parsed is TJsonObject) then
+  begin
+    parsed.Free;
+    error := 'it is not a json object';
+    exit;
+  end;
+  jsonObj := TJsonObject(parsed);
+  result := true;
+end;
+
 //function GetBaseUri(const uri : IUri) : string;
 //begin
 //  result := uri.Scheme + '://' + uri.Host;
@@ -170,8 +199,13 @@ begin
   //if the uri changes service index will be invalid.
   if source.Source <> Self.SourceUri then
   begin
-    FServiceIndex := nil;
-    FServiceIndexError := '';
+    EnterLock;
+    try
+      FServiceIndex := nil;
+      FServiceIndexError := '';
+    finally
+      LeaveLock;
+    end;
   end;
   inherited;
 end;
@@ -314,6 +348,7 @@ var
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
   jsonObj : TJsonObject;
+  parseError : string;
   uri : IUri;
   requestUrl : string;
 begin
@@ -378,14 +413,10 @@ begin
   end;
   Logger.Information('OK ' + requestUrl);
 
-  try
-    jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
-  except
-    on e : Exception do
-    begin
-      RequestFailed('returned a response DPM could not read : ' + e.Message);
-      exit;
-    end;
+  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
+  begin
+    RequestFailed('returned a response DPM could not read : ' + parseError);
+    exit;
   end;
   try
     TPackageInfo.TryLoadFromJson(Logger, jsonObj, Self.Name, Result);
@@ -402,6 +433,7 @@ var
   serviceIndex : IServiceIndex;
   serviceItem : IServiceIndexItem;
   jsonObj : TJsonObject;
+  parseError : string;
   jsonArr : TJsonArray;
   itemObj : TJsonObject;
   i: Integer;
@@ -469,14 +501,10 @@ begin
     exit;
   end;
 
-  try
-    jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
-  except
-    on e : Exception do
-    begin
-      RequestFailed('returned a response DPM could not read : ' + e.Message);
-      exit;
-    end;
+  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
+  begin
+    RequestFailed('returned a response DPM could not read : ' + parseError);
+    exit;
   end;
 
   try
@@ -510,6 +538,7 @@ var
   serviceItem : IServiceIndexItem;
   uri : IUri;
   jsonObj : TJsonObject;
+  parseError : string;
   itemObj : TJsonObject;
   idArray : TJsonArray;
   jsonArr : TJsonArray;
@@ -579,14 +608,10 @@ begin
   end;
   Logger.Verbose('OK ' + uri.ToString);
 
-  try
-    jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
-  except
-    on e : Exception do
-    begin
-      RequestFailed('returned a response DPM could not read : ' + e.Message);
-      exit;
-    end;
+  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
+  begin
+    RequestFailed('returned a response DPM could not read : ' + parseError);
+    exit;
   end;
 
   try
@@ -691,6 +716,7 @@ var
   serviceItem : IServiceIndexItem;
   path : string;
   jsonObj : TJsonObject;
+  parseError : string;
   uri : IUri;
 begin
   result := nil;
@@ -748,19 +774,18 @@ begin
   end;
   Logger.Information('OK ' + uri.BaseUriString + path);
 
-  try
-    jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
-  except
-    on e : Exception do
-    begin
-      RequestFailed('returned a response DPM could not read : ' + e.Message);
-      exit;
-    end;
+  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
+  begin
+    RequestFailed('returned a response DPM could not read : ' + parseError);
+    exit;
   end;
 
-  if not TPackageInfo.TryLoadFromJson(Logger, jsonObj, Self.Name, result) then
-    result := nil;
-
+  try
+    if not TPackageInfo.TryLoadFromJson(Logger, jsonObj, Self.Name, result) then
+      result := nil;
+  finally
+    jsonObj.Free;
+  end;
 end;
 
 
@@ -776,6 +801,7 @@ var
   serviceItem : IServiceIndexItem;
   path : string;
   jsonObj : TJsonObject;
+  parseError : string;
   uri : IUri;
 begin
   Logger.Debug('TDPMServerPackageRepository.GetPackageMetaData');
@@ -819,25 +845,25 @@ begin
   end;
   Logger.Information('OK ' + uri.BaseUriString + path);
 
-  try
-    jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
-  except
-    on e : Exception do
-    begin
-      RequestFailed('returned a response DPM could not read : ' + e.Message);
-      exit;
-    end;
+  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
+  begin
+    RequestFailed('returned a response DPM could not read : ' + parseError);
+    exit;
   end;
 
   try
-    result := TDPMPackageSearchResultItem.FromJson(Name, jsonObj);
-    Logger.Information('OK ' + uri.BaseUriString + path);
-  except
-    on e : Exception do
-    begin
-      RequestFailed('returned a response DPM could not read : ' + e.Message);
-      exit;
+    try
+      result := TDPMPackageSearchResultItem.FromJson(Name, jsonObj);
+      Logger.Information('OK ' + uri.BaseUriString + path);
+    except
+      on e : Exception do
+      begin
+        RequestFailed('returned a response DPM could not read : ' + e.Message);
+        exit;
+      end;
     end;
+  finally
+    jsonObj.Free;
   end;
 end;
 
@@ -850,6 +876,7 @@ var
   serviceItem : IServiceIndexItem;
   path : string;
   jsonObj : TJsonObject;
+  parseError : string;
   versionsArr : TJsonArray;
   i : integer;
   sVersion : string;
@@ -898,29 +925,27 @@ begin
   end;
   Logger.Information('OK ' + requestUrl);
 
-  try
-    jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
-  except
-    on e : Exception do
-    begin
-      RequestFailed('returned a response DPM could not read : ' + e.Message);
-      exit;
-    end;
-  end;
-
-  if not jsonObj.Contains('versions') then
-    exit;
-
-  versionsArr := jsonObj.A['versions'];
-
-  for i := 0 to versionsArr.Count -1 do
+  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
   begin
-    sVersion := versionsArr.Items[i].Value;
-    if TPackageVersion.TryParse(sVersion, packageVersion) then
-      result.Add(packageVersion);
+    RequestFailed('returned a response DPM could not read : ' + parseError);
+    exit;
   end;
 
+  try
+    if not jsonObj.Contains('versions') then
+      exit;
 
+    versionsArr := jsonObj.A['versions'];
+
+    for i := 0 to versionsArr.Count -1 do
+    begin
+      sVersion := versionsArr.Items[i].Value;
+      if TPackageVersion.TryParse(sVersion, packageVersion) then
+        result.Add(packageVersion);
+    end;
+  finally
+    jsonObj.Free;
+  end;
 end;
 
 function TDPMServerPackageRepository.GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const versionRange : TVersionRange; const preRelease : Boolean) : IList<IPackageInfo>;
@@ -932,6 +957,7 @@ var
   serviceItem : IServiceIndexItem;
   path : string;
   jsonObj : TJsonObject;
+  parseError : string;
   versionsArr : TJsonArray;
   versionObj : TJsonObject;
   i: Integer;
@@ -990,26 +1016,26 @@ begin
   end;
   Logger.Information('OK ' + requestUrl + ' [' + IntTostr(stopwatch.ElapsedMilliseconds) + 'ms]');
 
-  try
-    jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
-  except
-    on e : Exception do
-    begin
-      RequestFailed('returned a response DPM could not read : ' + e.Message);
-      exit;
-    end;
+  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
+  begin
+    RequestFailed('returned a response DPM could not read : ' + parseError);
+    exit;
   end;
 
-  if not jsonObj.Contains('versions') then
-    exit;
+  try
+    if not jsonObj.Contains('versions') then
+      exit;
 
-  versionsArr := jsonObj.A['versions'];
+    versionsArr := jsonObj.A['versions'];
 
-  for i := 0 to versionsArr.Count -1 do
-  begin
-    versionObj := versionsArr.O[i];
-    if TPackageInfo.TryLoadFromJson(Logger, versionObj, Name, packageInfo) then
-      result.Add(packageInfo)
+    for i := 0 to versionsArr.Count -1 do
+    begin
+      versionObj := versionsArr.O[i];
+      if TPackageInfo.TryLoadFromJson(Logger, versionObj, Name, packageInfo) then
+        result.Add(packageInfo)
+    end;
+  finally
+    jsonObj.Free;
   end;
 
   //TODO : should make sure the server returns a sorted result.
@@ -1028,14 +1054,25 @@ var
   request : IHttpRequest;
   response : IHttpResponse;
   uri : IUri;
+  recentError : string;
 begin
-  result := FServiceIndex;
+  //Several threads may ask at once - the fields are read and set under the lock, the request made outside it
+  //(two threads fetching the index together both get one, and the last to finish is kept).
+  recentError := '';
+  EnterLock;
+  try
+    result := FServiceIndex;
+    //a source that could not be reached a moment ago isn't asked again straight away.
+    if (result = nil) and (FServiceIndexError <> '') and (MilliSecondsBetween(Now, FServiceIndexFailedAt) < cServiceIndexRetryMs) then
+      recentError := FServiceIndexError;
+  finally
+    LeaveLock;
+  end;
   if result <> nil then
     exit;
-  //a source that could not be reached a moment ago isn't asked again straight away.
-  if (FServiceIndexError <> '') and (MilliSecondsBetween(Now, FServiceIndexFailedAt) < cServiceIndexRetryMs) then
+  if recentError <> '' then
   begin
-    RequestFailed(FServiceIndexError);
+    RequestFailed(recentError);
     exit;
   end;
   uri := TUriFactory.Parse(self.SourceUri);
@@ -1075,14 +1112,24 @@ begin
       exit;
     end;
   end;
-  FServiceIndex := result;
-  FServiceIndexError := '';
+  EnterLock;
+  try
+    FServiceIndex := result;
+    FServiceIndexError := '';
+  finally
+    LeaveLock;
+  end;
 end;
 
 procedure TDPMServerPackageRepository.ServiceIndexFailed(const reason : string);
 begin
-  FServiceIndexError := reason;
-  FServiceIndexFailedAt := Now;
+  EnterLock;
+  try
+    FServiceIndexError := reason;
+    FServiceIndexFailedAt := Now;
+  finally
+    LeaveLock;
+  end;
   RequestFailed(reason);
 end;
 
@@ -1095,6 +1142,7 @@ var
   serviceItem : IServiceIndexItem;
   uri : IUri;
   jsonObj : TJsonObject;
+  parseError : string;
   jsonArr : TJsonArray;
 
   listItem : IPackageListItem;
@@ -1170,29 +1218,27 @@ begin
   end;
   Logger.Information('OK ' + requestUrl);
 
-  try
-    jsonObj := TJsonObject.Parse(response.Response) as TJsonObject;
-  except
-    on ex : Exception do
-    begin
-      RequestFailed('returned a response DPM could not read : ' + ex.Message);
-      exit;
-    end;
-  end;
-
-  jsonArr := jsonObj.A['results'];
-  if jsonArr.Count > 0 then
+  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
   begin
-    for I := 0 to jsonArr.Count -1 do
-    begin
-      if TPackageListItem.TryLoadFromJson(Logger, jsonArr.O[i], listItem) then
-        Result.Add(listItem)
-      else
-        exit; //error would have been logged in the tryloadfromjson
-    end;
-
+    RequestFailed('returned a response DPM could not read : ' + parseError);
+    exit;
   end;
 
+  try
+    jsonArr := jsonObj.A['results'];
+    if jsonArr.Count > 0 then
+    begin
+      for I := 0 to jsonArr.Count -1 do
+      begin
+        if TPackageListItem.TryLoadFromJson(Logger, jsonArr.O[i], listItem) then
+          Result.Add(listItem)
+        else
+          exit; //error would have been logged in the tryloadfromjson
+      end;
+    end;
+  finally
+    jsonObj.Free;
+  end;
 end;
 
 
@@ -1263,6 +1309,7 @@ var
   fileStream : TFileStream;
   fileName : string;
   jsonObj : TJsonObject;
+  parseError : string;
   packageVersionId : string;
   status : string;
   statusUrl : string;
@@ -1375,7 +1422,7 @@ begin
         status := '';
         statusUrl := '';
         try
-          jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+          if not TryParseJsonObject(response.Response, jsonObj, parseError) then raise EJsonException.Create(parseError);
           try
             if jsonObj.Contains('packageVersionId') then
               packageVersionId := jsonObj.S['packageVersionId'];
@@ -1405,7 +1452,7 @@ begin
         errorMsg := '';
         status := '';
         try
-          jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+          if not TryParseJsonObject(response.Response, jsonObj, parseError) then raise EJsonException.Create(parseError);
           try
             if jsonObj.Contains('error') then
               errorMsg := jsonObj.S['error'];
@@ -1439,7 +1486,7 @@ begin
   else
     errorMsg := '';
     try
-      jsonObj := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+      if not TryParseJsonObject(response.Response, jsonObj, parseError) then raise EJsonException.Create(parseError);
       try
         if jsonObj.Contains('error') then
           errorMsg := jsonObj.S['error'];

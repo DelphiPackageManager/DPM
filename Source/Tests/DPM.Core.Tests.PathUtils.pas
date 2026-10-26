@@ -17,6 +17,17 @@ type
     [TestCase('ForwardSlashDot', 'c:\test\.\foo\bar,c:\test\foo\bar')]
     [TestCase('MixedSlashesDot', 'c:\test\.\packages/Rad Studio 12/X.dproj,c:\test\packages\Rad Studio 12\X.dproj')]
     [TestCase('AllForwardDot', 'c:/test/./foo/bar,c:\test\foo\bar')]
+    //a one character last segment used to be dropped - 'dpm restore C:\work\A' restored all of C:\work.
+    [TestCase('OneCharLastSegment', 'c:\src\A,c:\src\A')]
+    [TestCase('OneCharFolder', 'c:\a,c:\a')]
+    [TestCase('LoneStarKept', 'c:\src\bpl\Win32\*,c:\src\bpl\Win32\*')]
+    [TestCase('DotDotRooted', 'c:\x\..\y,c:\y')]
+    [TestCase('TrailingDotDot', 'c:\x\y\..\,c:\x\')]
+    [TestCase('RootedCantClimbAboveDrive', 'c:\..\x,c:\x')]
+    //a relative path keeps the '..'s it can't resolve.
+    [TestCase('RelativeLeadingDotDot', '..\a,..\a')]
+    [TestCase('RelativeTwoDotDots', '..\..\a,..\..\a')]
+    [TestCase('RelativeClimbsPastStart', 'a\..\..\b,..\b')]
     procedure TestCompressRelativePath(const input, expected : string);
 
     [Test]
@@ -26,7 +37,23 @@ type
     [TestCase('UNCBase4', '\\test\,\foo\..\bar,\\test\bar')]
     [TestCase('Rooted', 'c:\test\,foo\..\bar,c:\test\bar')]
     [TestCase('PosixRelative', 'c:\test\,./foo/bar,c:\test\foo\bar')]
+    [TestCase('BaseOneCharLast', 'c:\work,A,c:\work\A')]
+    [TestCase('DotDotFromDspecFolder', 'c:\work\dpm,..\src\X.dproj,c:\work\src\X.dproj')]
+    //a rooted path is not joined to a unc base, any more than to a drive one.
+    [TestCase('UNCBaseDrivePath', '\\srv\share,d:\x\y,d:\x\y')]
+    [TestCase('UNCBaseUncPathInside', '\\srv\share,\\srv\share\a\..\b,\\srv\share\b')]
     procedure TestCompressRelativePathWithBase(const base, input, expected : string);
+
+    [Test]
+    [TestCase('Drive', 'c:\x,true')]
+    [TestCase('DriveForwardSlash', 'c:/x,true')]
+    [TestCase('Unc', '\\srv\share,true')]
+    [TestCase('DoubleBackslashInside', 'x\\y,false')]
+    [TestCase('LeadingBackslash', '\x,false')]
+    [TestCase('Bare', 'x,false')]
+    [TestCase('NotADriveLetter', '[:\x,false')]
+    [TestCase('DriveRelative', 'c:x,false')]
+    procedure TestIsPathRooted(const value : string; const expected : boolean);
 
     [Test]
     procedure TestIsRelativePath;
@@ -150,6 +177,11 @@ var
 begin
   actual := TPathUtils.CompressRelativePath(input);
   Assert.AreEqual(expected, actual);
+end;
+
+procedure TPathUtilsTests.TestIsPathRooted(const value : string; const expected : boolean);
+begin
+  Assert.AreEqual(expected, TPathUtils.IsPathRooted(value), value);
 end;
 
 procedure TPathUtilsTests.TestCompressRelativePathWithBase(const base, input, expected: string);

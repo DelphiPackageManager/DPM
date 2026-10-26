@@ -58,6 +58,7 @@ type
 implementation
 
 uses
+  System.Classes,
   System.IOUtils;
 
 { TFileUtils }
@@ -143,6 +144,42 @@ begin
   Int64Rec(result).Hi := fad.nFileSizeHigh;
 end;
 
+//true when the two files hold the same bytes.
+function SameContent(const fileA, fileB : string) : boolean;
+const
+  cBufferSize = 65536;
+var
+  streamA : TFileStream;
+  streamB : TFileStream;
+  bufferA : TBytes;
+  bufferB : TBytes;
+  readA : integer;
+  readB : integer;
+begin
+  result := false;
+  SetLength(bufferA, cBufferSize);
+  SetLength(bufferB, cBufferSize);
+  streamA := TFileStream.Create(fileA, fmOpenRead or fmShareDenyWrite);
+  try
+    streamB := TFileStream.Create(fileB, fmOpenRead or fmShareDenyWrite);
+    try
+      if streamA.Size <> streamB.Size then
+        exit;
+      repeat
+        readA := streamA.Read(bufferA[0], cBufferSize);
+        readB := streamB.Read(bufferB[0], cBufferSize);
+        if (readA <> readB) or ((readA > 0) and not CompareMem(@bufferA[0], @bufferB[0], readA)) then
+          exit;
+      until readA = 0;
+      result := true;
+    finally
+      streamB.Free;
+    end;
+  finally
+    streamA.Free;
+  end;
+end;
+
 class function TFileUtils.AreSameFiles(const fileA, fileB: string): boolean;
 var
   fatA: TWin32FileAttributeData;
@@ -203,12 +240,10 @@ begin
     exit(SameFileVersion(PVerValueA^, PVerValueB^));
   end;
 
-  //if we get here, the file sizes match but there is no version info, so we cannot be sure.
-  //ideally we would hash the files and compare hashes, but that might be slow (compared to copying files again).
-  //so for now, we assume they are not equal.
-
-  result := false;
-
+  //the file sizes match and there is no version info - what is in them decides. "Assume they differ" isn't the
+  //safe answer it looks : copying over a dll another process has loaded fails. Reading both costs about what
+  //copying again would, and stops at the first difference.
+  result := SameContent(fileA, fileB);
 end;
 
 end.

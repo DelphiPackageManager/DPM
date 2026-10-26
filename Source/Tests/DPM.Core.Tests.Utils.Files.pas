@@ -19,6 +19,9 @@ type
     [Test] procedure SameFileVersion_DiffersInAnyPart;
     [Test] procedure AreSameFiles_IdenticalCopies;
     [Test] procedure AreSameFiles_SameSizeDifferentFileVersion;
+    //a dll without version info, data files : what is in them decides.
+    [Test] procedure AreSameFiles_NoVersionInfo_SameContent;
+    [Test] procedure AreSameFiles_NoVersionInfo_SameSizeDifferentContent;
 
     [Test] procedure AtomicWriteAllText_CreatesFile;
     [Test] procedure AtomicWriteAllText_ReplacesExisting;
@@ -127,6 +130,42 @@ begin
 
   Assert.AreEqual(TFileUtils.GetSize(fileA), TFileUtils.GetSize(fileB), 'the copies should still be the same size');
   Assert.IsFalse(TFileUtils.AreSameFiles(fileA, fileB), 'files with different file versions were reported as the same');
+end;
+
+procedure TFileUtilsTests.AreSameFiles_NoVersionInfo_SameContent;
+var
+  fileA, fileB : string;
+  bytes : TBytes;
+  i : integer;
+begin
+  //bigger than one read buffer, so the compare is not just of the first chunk.
+  SetLength(bytes, 200000);
+  for i := 0 to High(bytes) do
+    bytes[i] := Byte(i mod 251);
+  fileA := TPath.Combine(FRoot, 'a.dat');
+  fileB := TPath.Combine(FRoot, 'b.dat');
+  TFile.WriteAllBytes(fileA, bytes);
+  TFile.WriteAllBytes(fileB, bytes);
+  //copying again over a file another process has loaded fails - an identical copy is the same file.
+  Assert.IsTrue(TFileUtils.AreSameFiles(fileA, fileB));
+end;
+
+procedure TFileUtilsTests.AreSameFiles_NoVersionInfo_SameSizeDifferentContent;
+var
+  fileA, fileB : string;
+  bytes : TBytes;
+  i : integer;
+begin
+  SetLength(bytes, 200000);
+  for i := 0 to High(bytes) do
+    bytes[i] := Byte(i mod 251);
+  fileA := TPath.Combine(FRoot, 'a.dat');
+  fileB := TPath.Combine(FRoot, 'b.dat');
+  TFile.WriteAllBytes(fileA, bytes);
+  //the difference is past the first read buffer.
+  bytes[150000] := bytes[150000] xor $FF;
+  TFile.WriteAllBytes(fileB, bytes);
+  Assert.IsFalse(TFileUtils.AreSameFiles(fileA, fileB));
 end;
 
 procedure TFileUtilsTests.AtomicWriteAllText_CreatesFile;
