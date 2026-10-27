@@ -221,7 +221,10 @@ begin
       provider.EndSession;
   end;
 
-  if files.Count > 1 then
+  //stopped part way - not 'signed successfully'. Saying it was cancelled is the application's (W0004).
+  if cancellationToken.IsCancelled then
+    Logger.Information(Format('%d of %d package(s) signed before it was stopped, %d failed.', [okCount, files.Count, failCount]), true)
+  else if files.Count > 1 then
   begin
     if failCount = 0 then
       Logger.Success(Format('Signed %d package(s) successfully.', [okCount]))
@@ -229,7 +232,7 @@ begin
       Logger.Information(Format('%d signed, %d failed.', [okCount, failCount]), true);
   end;
 
-  if failCount > 0 then
+  if (failCount > 0) or cancellationToken.IsCancelled then
     result := TExitCode.Error
   else
     result := TExitCode.OK;

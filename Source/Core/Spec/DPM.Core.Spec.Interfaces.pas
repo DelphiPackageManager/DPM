@@ -472,6 +472,8 @@ type
     function GetPackageKind : TDPMPackageKind;
     procedure SetPackageKind(const value : TDPMPackageKind);
     function GetVariables : IVariables;
+    function GetMinClientVersion : string;
+    procedure SetMinClientVersion(const value : string);
 
     // targetPlatforms, templates and variabls collections are not backed with a node
     // so we are collecting the comments here
@@ -499,6 +501,9 @@ type
     procedure ToYAMLFile(const fileName : string);
 
     property PackageKind : TDPMPackageKind read GetPackageKind write SetPackageKind;
+    //the oldest DPM that can read the package - what the spec declares (or pack --minclientversion), '' for none.
+    //Never this DPM's own version : that would make every package unreadable by older clients once it moves on.
+    property MinClientVersion : string read GetMinClientVersion write SetMinClientVersion;
     property MetaData : ISpecMetaData read GetMetaData;
     property TargetPlatforms : IList<ISpecTargetPlatform>read GetTargetPlatforms;
     property TargetPlatform : ISpecTargetPlatform read GetTargetPlatform;

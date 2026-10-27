@@ -180,7 +180,10 @@ begin
   if defaultProject <> '' then
     Logger.Information('  default project  : ' + defaultProject);
 
-  context := TMCPToolContext.Create(FRepositoryManager, config, Logger, fallbackCompiler, defaultProject);
+  //--source - parsed, and then never applied : every query went to every source.
+  if options.Sources <> '' then
+    Logger.Information('  sources          : ' + options.Sources);
+  context := TMCPToolContext.Create(FRepositoryManager, config, Logger, fallbackCompiler, defaultProject, options.Sources);
 
   registry := TMCPToolRegistry.Create;
   //Registration order is the order tools/list reports them, which the spec asks to be stable.
@@ -211,8 +214,11 @@ begin
                               BuildInstructions(fallbackCompiler, defaultProject));
   try
     try
-      server.Run(cancellationToken);
-      result := TExitCode.OK;
+      //stopped by a failure (it is in the log), not the client closing the session.
+      if server.Run(cancellationToken) then
+        result := TExitCode.OK
+      else
+        result := TExitCode.Error;
     except
       //Nothing may escape into the RTL exception handler in dpm.dpr, which writes to stdout.
       on E : Exception do

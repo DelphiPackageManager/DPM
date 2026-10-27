@@ -83,6 +83,16 @@ type
     procedure ResolveCompatiblePlatform_Falls_Back_To_Counterpart;
     [Test]
     procedure PlatformSatisfiedBy_False_When_No_Compatible_Platform;
+
+    //a ProjectVersion DPM can't map is an unknown compiler for the caller to report - not an exception.
+    [Test]
+    [TestCase('TooOld', '12.0')]
+    [TestCase('TooNew', '21.1')]
+    [TestCase('Blank', '   ')]
+    [TestCase('NotANumber', 'abc')]
+    procedure ProjectVersion_It_Cannot_Map_Is_Unknown(const value : string);
+    [Test]
+    procedure ProjectVersion_Maps_A_Known_Version;
   end;
 
 implementation
@@ -188,6 +198,22 @@ procedure TCoreTypesTests.PlatformSatisfiedBy_False_When_No_Compatible_Platform;
 begin
   //The compatibility rule is Win64<->Win64x only - it must not bridge unrelated platforms.
   Assert.IsFalse(PlatformSatisfiedBy(TDPMPlatform.Win64x, [TDPMPlatform.Win32, TDPMPlatform.Linux64]));
+end;
+
+procedure TCoreTypesTests.ProjectVersion_It_Cannot_Map_Is_Unknown(const value : string);
+var
+  compiler : TCompilerVersion;
+  versions : string;
+begin
+  compiler := ProjectVersionToCompilerVersion(value);
+  Assert.IsTrue(compiler = TCompilerVersion.UnknownVersion, '[' + value + '] gave ' + CompilerToString(compiler));
+  Assert.IsFalse(IsAmbigousProjectVersion(value, versions));
+end;
+
+procedure TCoreTypesTests.ProjectVersion_Maps_A_Known_Version;
+begin
+  Assert.IsTrue(ProjectVersionToCompilerVersion('20.1') = TCompilerVersion.Delphi12_0);
+  Assert.IsTrue(ProjectVersionToCompilerVersion('13.4') = TCompilerVersion.DelphiXE2);
 end;
 
 initialization

@@ -182,6 +182,8 @@ const
 implementation
 
 uses
+  DPM.Core.Utils.Json,
+  DPM.Core.Utils.DateTime,
   System.DateUtils,
   System.IOUtils,
   System.StrUtils,
@@ -512,7 +514,7 @@ begin
   end;
   if timestampToken = nil then
     raise EPackageSigning.Create('Timestamp authority returned no token');
-  FLogger.Information(Format('  Timestamp received : signing time %s UTC (%d bytes)', [FormatDateTime('yyyy-mm-dd hh:nn:ss', timestampToken.SigningTime),
+  FLogger.Information(Format('  Timestamp received : signing time %s (%d bytes)', [TDPMDateTimeUtils.FormatIso8601Utc(timestampToken.SigningTime),
      Length(timestampToken.RawToken)]));
   if timestampToken.TsaCertificate <> nil then
     FLogger.Verbose('  Timestamp authority : ' + timestampToken.TsaCertificate.SubjectDistinguishedName);
@@ -994,7 +996,7 @@ begin
   doc := nil;
   try
     try
-      doc := TJsonBaseObject.Parse(text) as TJsonObject;
+      doc := TJsonText.ParseObject(text);
     except
       on e : Exception do
         raise EPackageSigning.Create(

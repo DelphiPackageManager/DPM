@@ -293,7 +293,10 @@ var
     if spec = nil then
       exit;
 
-    template := spec.FindTemplate(spec.TargetPlatform.TemplateName);
+    //a spec with no target platform has no template - the runtime bpls (step 2) are still copied.
+    template := nil;
+    if spec.TargetPlatform <> nil then
+      template := spec.FindTemplate(spec.TargetPlatform.TemplateName);
     packagePath := FPackageCache.GetPackagePath(identity);
     platformFolder := DPMPlatformToBDString(options.Platform);
 

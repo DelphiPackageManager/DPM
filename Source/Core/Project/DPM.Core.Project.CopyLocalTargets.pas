@@ -61,7 +61,8 @@ implementation
 uses
   System.SysUtils,
   System.IOUtils,
-  DPM.Core.Diagnostics;
+  DPM.Core.Diagnostics,
+  DPM.Core.Utils.Files;
 
 const
   //The Exec Command must stay on a single line - MSBuild turns embedded newlines into separate
@@ -158,7 +159,8 @@ begin
     end;
     if not TDirectory.Exists(cacheRoot) then
       TDirectory.CreateDirectory(cacheRoot);
-    TFile.WriteAllText(targetsFile, content, TEncoding.UTF8);
+    //a build that runs while it is written must not see half of it.
+    TFileUtils.AtomicWriteAllText(targetsFile, content, TEncoding.UTF8);
     logger.Debug('Wrote copy-local targets file [' + targetsFile + '].');
   except
     on e : Exception do

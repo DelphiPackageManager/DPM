@@ -162,6 +162,7 @@ uses
   DPM.Core.Utils.Process in 'Core\Utils\DPM.Core.Utils.Process.pas',
   DPM.Core.Utils.Spdx in 'Core\Utils\DPM.Core.Utils.Spdx.pas',
   DPM.Core.Utils.Strings in 'Core\Utils\DPM.Core.Utils.Strings.pas',
+  DPM.Core.Utils.Json in 'Core\Utils\DPM.Core.Utils.Json.pas',
   DPM.Core.Utils.System in 'Core\Utils\DPM.Core.Utils.System.pas',
   DPM.Core.Utils.XML in 'Core\Utils\DPM.Core.Utils.XML.pas',
   DPM.Core.MSXML in 'Core\Xml\DPM.Core.MSXML.pas',
@@ -294,6 +295,9 @@ begin
   // how 'dpm help > out.txt' used to die with a context-free 'I/O error 6'.
   // Reading IOResult returns the pending code and resets it to zero.
   IOResult;
+  //under the debugger, leaks are reported (on stderr) at shutdown.
+  {$WARN SYMBOL_PLATFORM OFF}
+  ReportMemoryLeaksOnShutdown := DebugHook <> 0;
   CoInitializeEx(nil, COINIT_MULTITHREADED); //needed for msxml
   //Put our own folder on the process PATH so any msbuild we spawn can resolve a bare 'dpm'.
   TSystemUtils.EnsureModuleDirOnPath;

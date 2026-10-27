@@ -53,7 +53,8 @@ type
     class procedure EnsureModuleDirOnPath;
     class function IsIDEProcess : boolean;
     class function Is64BitIDE : boolean;
-    class procedure SetIsIDE;
+    //value false is for tests - the IDE plugin sets it once, at load.
+    class procedure SetIsIDE(const value : boolean = true);
     class function GetStackTrace(const ex: Exception; const exAddressAddress: Pointer): string;
   end;
 
@@ -206,9 +207,9 @@ begin
 end;
 
 
-class procedure TSystemUtils.SetIsIDE;
+class procedure TSystemUtils.SetIsIDE(const value : boolean);
 begin
-  _isIDE := true;
+  _isIDE := value;
 end;
 
 end.

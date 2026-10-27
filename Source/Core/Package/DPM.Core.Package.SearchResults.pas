@@ -37,7 +37,6 @@ type
     FReportUrl : string;
     FTags : TStringList;
     FSearchPaths : IList<string>;
-    FUseSource : boolean;
     FSupportedPlatforms : TDPMPlatforms;
 
     FVersion : TPackageVersion;
@@ -95,8 +94,6 @@ type
     function GetIsLatestStableVersion : boolean;
     function GetIsStableVersion : boolean;
     function GetSearchPaths : IList<string>;
-    function GetUseSource : boolean;
-    procedure SetUseSource(const value : boolean);
     function GetSupportedPlatforms : TDPMPlatforms;
     procedure SetSupportedPlatforms(const value : TDPMPlatforms);
     function GetVersionRange : TVersionRange;
@@ -257,7 +254,11 @@ begin
   //servers omit it (blank). Directory sources fill this from the file date.
   FPublishedDate    := TDPMDateTimeUtils.ISO8601ToDisplayDate(jsonObject.S['publishedUtc']);
 
-  FLatestVersion    := TPackageVersion.Parse(jsonObject.S['latestVersion']);
+  //older servers don't send it - the version is the latest they know of.
+  if jsonObject.S['latestVersion'] <> '' then
+    FLatestVersion := TPackageVersion.Parse(jsonObject.S['latestVersion'])
+  else
+    FLatestVersion := FVersion;
   latestStable := jsonObject.S['latestStableVersion'];
   if latestStable <> '' then
     FLatestStableVersion := TPackageVersion.Parse(latestStable)
@@ -274,11 +275,11 @@ begin
       depId := depArr.O[i].S['packageId'];
       depVersion := depArr.O[i].S['versionRange'];
 
-      if TVersionRange.TryParse(depVersion, range) then
-      begin
-        dependency := TPackageDependency.Create(depId, range);
-        FDependencies.Add(dependency);
-      end;
+      //one left out would make the package look as if it doesn't need it.
+      if not TVersionRange.TryParse(depVersion, range) then
+        raise EArgumentException.Create('The dependency [' + depId + '] has a version range DPM can''t read [' + depVersion + ']');
+      dependency := TPackageDependency.Create(depId, range);
+      FDependencies.Add(dependency);
     end;
   end;
 
@@ -530,16 +531,6 @@ end;
 function TDPMPackageSearchResultItem.GetSearchPaths : IList<string>;
 begin
   result := FSearchPaths;
-end;
-
-function TDPMPackageSearchResultItem.GetUseSource : boolean;
-begin
-  result := FUseSource;
-end;
-
-procedure TDPMPackageSearchResultItem.SetUseSource(const value : boolean);
-begin
-  FUseSource := value;
 end;
 
 function TDPMPackageSearchResultItem.GetSupportedPlatforms : TDPMPlatforms;

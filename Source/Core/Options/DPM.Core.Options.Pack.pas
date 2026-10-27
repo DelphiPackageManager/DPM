@@ -47,6 +47,7 @@ type
       FDefault : TPackOptions;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TPackOptions read FDefault;
     constructor Create; override;
 
@@ -69,12 +70,19 @@ uses
 constructor TPackOptions.Create;
 begin
   inherited;
-  FMinClientVer := cDPMClientVersion;
+  //none unless asked for - the spec's own declaration stands (see IPackageSpec.MinClientVersion).
+  FMinClientVer := '';
 end;
 
 class constructor TPackOptions.CreateDefault;
 begin
   FDefault := TPackOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TPackOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 

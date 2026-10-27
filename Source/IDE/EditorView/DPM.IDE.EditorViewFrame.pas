@@ -162,6 +162,9 @@ type
     FSearchTake : integer;
 
     FPackageReferences : IPackageReference;
+    //what GetPackageReferences last read, and the projects (and their write times) it read it from.
+    FReferencesCache : IPackageReference;
+    FReferencesStamp : string;
 
     FRowCount : Int64;
     // all installed packages, direct and transitive
@@ -179,8 +182,10 @@ type
     FImplicitActivity : TActivityIndicator;
     FAvailableActivity : TActivityIndicator;
 
-    // true when we first load the view
+    // true until the view is first shown
     FFirstView : boolean;
+    //when LoadPackages last ran - switching back to the view reloads it only once this is old.
+    FLastLoaded : TDateTime;
 
     FLock : TCriticalSection;
   protected
@@ -196,6 +201,7 @@ type
     procedure EndInstall;
 
     function GetPackageReferences : IPackageReference;
+    procedure InvalidatePackageReferences;
     function GetPackageIdsFromReferences : IList<IPackageIdentity>;
     procedure RequestPackageIcon(const index : integer; const Package : IPackageSearchResultItem);
 
@@ -283,6 +289,15 @@ uses
 
 type
   TFilterProc = procedure(const searchTxt : string) of object;
+
+//the item at index, or nil when there isn't one.
+function ItemAt(const list : IList<IPackageSearchResultItem>; const index : Int64) : IPackageSearchResultItem;
+begin
+  if (list <> nil) and (index >= 0) and (index < list.Count) then
+    result := list[index]
+  else
+    result := nil;
+end;
 
 function FindPackageRef(const node : IPackageReference; const searchId : string; const topLevelOnly : boolean) : IPackageReference;
 var
@@ -689,6 +704,7 @@ var
 begin
   if FClosing then
     exit;
+  FLastLoaded := Now;
 
   // note refreshInstalled controls whether installed packages are re-fetched; available packages are always fetched.
   FLogger.Debug('DPMIDE : LoadPackages');
@@ -713,12 +729,19 @@ begin
   generation := FLoadGeneration;
   lifetime := FLifetime;
 
-  FAvailablePackages.Clear;
-  if refreshInstalled then
-  begin
-    FAllInstalledPackages.Clear;
-    FInstalledPackages.Clear;
-    FImplicitPackages.Clear;
+  FLock.Acquire;
+  try
+    FAvailablePackages.Clear;
+    if refreshInstalled then
+    begin
+      FAllInstalledPackages.Clear;
+      FInstalledPackages.Clear;
+      FImplicitPackages.Clear;
+    end;
+    //the rows, and where the headers are, follow the lists - left as they were they point past the ends of them.
+    CalculateIndexes;
+  finally
+    FLock.Release;
   end;
 
   if (not refreshInstalled) and (FAllInstalledPackages <> nil) and (FAllInstalledPackages.count > 0) then
@@ -913,6 +936,12 @@ begin
   end;
 end;
 
+procedure TDPMEditViewFrame.InvalidatePackageReferences;
+begin
+  FReferencesCache := nil;
+  FReferencesStamp := '';
+end;
+
 function TDPMEditViewFrame.GetPackageReferences : IPackageReference;
 var
   projectEditor : IProjectEditor;
@@ -921,10 +950,25 @@ var
   packageReference : IPackageReference;
   projectFile : string;
   basePath : string;
+  stamp : string;
+  writeTime : TDateTime;
 begin
+  Assert(FProjectGroup <> nil);
+  //Every package selected asks, and reading them all means loading every project in the group - so what was read
+  //is kept while the projects are the same ones, written when they were. Nothing changes what is handed out.
+  stamp := '';
+  for i := 0 to FProjectGroup.ProjectCount - 1 do
+  begin
+    projectFile := FProjectGroup.Projects[i].FileName;
+    if not FileAge(projectFile, writeTime) then
+      writeTime := 0;
+    stamp := stamp + LowerCase(projectFile) + '|' + FloatToStr(writeTime) + ';';
+  end;
+  if (FReferencesCache <> nil) and (stamp = FReferencesStamp) then
+    exit(FReferencesCache);
+
   projectEditor := TProjectEditor.Create(FLogger, FConfiguration, IDECompilerVersion);
   result := TPackageReference.CreateRoot(IDECompilerVersion);
-  Assert(FProjectGroup <> nil);
   basePath := FProjectGroup.FileName;
   // unsaved project group still seems to have a file name.
   if FileExists(basePath) then
@@ -944,6 +988,8 @@ begin
     if packageReference <> nil then
       result.AddExistingChild(Lowercase(projectFile), packageReference);
   end;
+  FReferencesCache := result;
+  FReferencesStamp := stamp;
 end;
 
 function TDPMEditViewFrame.GetPlatforms : TDPMPlatforms;
@@ -1090,6 +1136,8 @@ end;
 procedure TDPMEditViewFrame.ProjectChanged;
 begin
   FLogger.Debug('DPMIDE : ProjectChanged');
+  //an install or a reload - read the projects again, whatever their write times say.
+  InvalidatePackageReferences;
 
   //A Use Source search-path-only change reloaded a single project purely to re-sync the IDE's
   //cached timestamp with disk. There is nothing to reload here and we must not hit the server.
@@ -1124,7 +1172,8 @@ procedure TDPMEditViewFrame.ProjectClosed(const projectName : string);
 begin
   TSystemUtils.OutputDebugString('TDPMEditViewFrame2.ProjectClosed : ' + projectName);
   FLogger.Debug('DPMIDE : ProjectClosed');
-  PackageDetailsFrame.ProjectReloaded;
+  //the IDE says so as it closes - the project is still in the group.
+  PackageDetailsFrame.ProjectClosing(projectName);
 end;
 
 procedure TDPMEditViewFrame.ProjectLoaded(const projectName : string);
@@ -1493,21 +1542,13 @@ begin
       ;
     rkAvailableHeader :
       ;
+    //the row may be a step ahead of the lists while they are reloaded.
     rkInstalledPackage :
-      begin
-        if FInstalledPackages <> nil then
-          item := FInstalledPackages[newRowIndex - 1];
-      end;
+      item := ItemAt(FInstalledPackages, newRowIndex - FInstalledHeaderRowIdx - 1);
     rkImplicitPackage :
-      begin
-        if FImplicitPackages <> nil then
-          item := FImplicitPackages[newRowIndex - FImplicitHeaderRowIdx - 1];
-      end;
+      item := ItemAt(FImplicitPackages, newRowIndex - FImplicitHeaderRowIdx - 1);
     rkAvailablePackage :
-      begin
-        if FAvailablePackages <> nil then
-          item := FAvailablePackages[newRowIndex - FAvailableHeaderRowIdx - 1];
-      end;
+      item := ItemAt(FAvailablePackages, newRowIndex - FAvailableHeaderRowIdx - 1);
     rkUnknown :
       ;
   end;
@@ -1803,12 +1844,16 @@ begin
   else
     FSearchOptions.Sources := '';
 
+  if refresh then
+    PackageDetailsFrame.ClearVersionsCache;
   LoadPackages(refresh);
 end;
 
 procedure TDPMEditViewFrame.SearchBarConfigChanged(const Configuration : IConfiguration);
 begin
   FConfiguration := Configuration;
+  InvalidatePackageReferences;
+  PackageDetailsFrame.ClearVersionsCache;
   LoadPackages(true);
 end;
 
@@ -1846,14 +1891,17 @@ begin
   // The view tab was deselected.
   FLogger.Debug('DPMIDE : View Deselected');
   // platformChangeDetectTimer.Enabled := false;
-  FFirstView := true;
 end;
 
 procedure TDPMEditViewFrame.ViewSelected;
+const
+  cStaleSeconds = 5 * 60;
 begin
   FLogger.Debug('DPMIDE : View Selected');
   // For some reason this get's called twice for each time the view is selected.
-  if FFirstView then
+  //The first time it is shown, and then only when what it shows is old - not every time the tab is switched
+  //to (both lists, from every source, again). A project that changed while it was hidden reloaded it then.
+  if FFirstView or ((Now - FLastLoaded) * SecsPerDay > cStaleSeconds) then
   begin
     FFirstView := false;
     Application.ProcessMessages; // allow the frame to paint

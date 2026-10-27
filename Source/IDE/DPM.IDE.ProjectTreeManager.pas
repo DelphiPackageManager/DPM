@@ -95,6 +95,8 @@ type
 
     FWindowHandle : THandle;
     FTimerRunning : boolean;
+    //timer ticks spent looking for the project tree since the last load - see cMaxTreeAttempts.
+    FTreeAttempts : integer;
 
     FProjectTreeInstance : TControl;
     FVSTProxy : TVirtualStringTreeProxy;
@@ -178,6 +180,9 @@ uses
 
 const
   cCategoryContainerClass = 'Containers.TStdContainerCategory';
+  //half a second apart - a tree that isn't there after 20 seconds (no Project Manager, or one this version of
+  //DPM doesn't know) isn't looked for until the next project loads.
+  cMaxTreeAttempts = 40;
 
 
 { TProjectTreeDblClickHook }
@@ -316,7 +321,8 @@ begin
       end;
     end;
   end;
-  Application.ProcessMessages;
+  //no message pump here - the node was added above, there is nothing to wait for, and pumping inside the
+  //timer's loop let another tick or load run in the middle of it.
   UpdateProjectDPMPackages(targetPlatformContainer, dpmContainer, projectFile, projectEditor);
 
 end;
@@ -444,7 +450,8 @@ begin
       FPlatformImageIndexes[TDPMPlatform.MacOS64] := FPlatformImageIndexes[TDPMPlatform.MacOS32];
 
       FPlatformImageIndexes[TDPMPlatform.Android] := imageList.GetIndexByName('Platforms\PlatformAndroid');
-      FPlatformImageIndexes[TDPMPlatform.Android64] := FPlatformImageIndexes[TDPMPlatform.Android64];
+      //Android's - it was assigned itself, so it stayed -1 (no icon).
+      FPlatformImageIndexes[TDPMPlatform.Android64] := FPlatformImageIndexes[TDPMPlatform.Android];
       
       FPlatformImageIndexes[TDPMPlatform.iOS32] := imageList.GetIndexByName('Platforms\PlatformiOS');
       FPlatformImageIndexes[TDPMPlatform.iOS64] := FPlatformImageIndexes[TDPMPlatform.iOS32];
@@ -654,17 +661,25 @@ begin
 end;
 
 procedure TDPMProjectTreeManager.ProjectLoaded(const fileName: string);
+var
+  queued : string;
 begin
   if not FOptions.AddDPMToProjectTree then
     exit;
   //The project tree nodes do not seem to have been added at this stage
   //just enqueue the project, and we'll deal with it when all projects are loaded.
+  //Once is enough - a project can load again (a reload) before the queue is worked through.
+  for queued in FProjectLoadList do
+    if SameText(queued, fileName) then
+      exit;
   FProjectLoadList.Enqueue(fileName);
 end;
 
 procedure TDPMProjectTreeManager.ProjectGroupClosed;
 begin
   FNodeCache.Clear;
+  //the projects still waiting for their DPM node have gone with the group.
+  FProjectLoadList.Clear;
 end;
 
 procedure TDPMProjectTreeManager.Shutdown;
@@ -997,6 +1012,7 @@ begin
       //if we try too early, the tree might not exist yet
       //or the images are not added to the list and we get the
       //wrong image indexes for the platforms.
+      FTreeAttempts := 0;
       SetTimer(FWindowHandle, 1, 500, nil);
       FTimerRunning := true;
       msg.Result := 1;
@@ -1020,6 +1036,16 @@ begin
             end;
           finally
             FVSTProxy.EndUpdate;
+          end;
+        end
+        else
+        begin
+          Inc(FTreeAttempts);
+          if FTreeAttempts >= cMaxTreeAttempts then
+          begin
+            FTimerRunning := false;
+            KillTimer(FWindowHandle, 1);
+            FLogger.Debug('DPMIDE : The project tree was not found - DPM nodes were not added to it.');
           end;
         end;
         msg.Result := 1;

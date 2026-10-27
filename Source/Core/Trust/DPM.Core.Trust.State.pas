@@ -110,15 +110,8 @@ const
 
 //one mutex per state file - a test's file, or a redirected APPDATA, doesn't wait on the real one.
 function MutexNameFor(const filePath : string) : string;
-var
-  stream : TBytesStream;
 begin
-  stream := TBytesStream.Create(TEncoding.UTF8.GetBytes(LowerCase(ExpandFileName(filePath))));
-  try
-    result := 'Local\DPM.TrustState.' + Copy(THashSHA256.GetHashString(stream), 1, 16);
-  finally
-    stream.Free;
-  end;
+  result := 'Local\DPM.TrustState.' + Copy(THashSHA256.GetHashStringFromText(LowerCase(ExpandFileName(filePath))), 1, 16);
 end;
 
 //An AV scanner or the search indexer briefly holding the file is not a reason to call it corrupt.

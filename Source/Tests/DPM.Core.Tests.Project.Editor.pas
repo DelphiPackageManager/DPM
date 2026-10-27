@@ -68,6 +68,17 @@ type
     [Test]
     procedure SaveAs_Unmodified_LFLineBreaks_IsByteIdentical;
 
+    //saved over itself - the new project replaces the old one whole, nothing is left beside it.
+    [Test]
+    procedure Save_Over_The_Project_Leaves_Nothing_Beside_It;
+
+    //a package cache under the user's profile is recorded relative to it, so the project isn't tied to this
+    //machine's (or this user's) path. One anywhere else is recorded as it is.
+    [Test]
+    procedure PortableCacheLocation_Is_Relative_To_The_Profile_Folders;
+    [Test]
+    procedure Install_Records_A_Cache_Under_AppData_Relative_To_It;
+
     [Test]
     procedure Install_LFLineBreaks_StaysLF;
 
@@ -354,6 +365,64 @@ begin
     result.Add(ids[i] + '\lib\Win32');
 end;
 
+procedure TProjectEditorFormattingTests.PortableCacheLocation_Is_Relative_To_The_Profile_Folders;
+begin
+  Assert.AreEqual('$(APPDATA)\my-cache', TProjectEditor.PortableCacheLocation(GetEnvironmentVariable('APPDATA') + '\my-cache'));
+  Assert.AreEqual('$(LOCALAPPDATA)\dpm\cache', TProjectEditor.PortableCacheLocation(GetEnvironmentVariable('LOCALAPPDATA') + '\dpm\cache'));
+  Assert.AreEqual('$(USERPROFILE)\caches\dpm', TProjectEditor.PortableCacheLocation(GetEnvironmentVariable('USERPROFILE') + '\caches\dpm'));
+  Assert.AreEqual('$(APPDATA)\my-cache', TProjectEditor.PortableCacheLocation('%APPDATA%\my-cache'), 'as configured');
+  Assert.AreEqual('D:\dpmcache', TProjectEditor.PortableCacheLocation('D:\dpmcache'), 'nothing to be relative to');
+  //a folder that only starts with the same name isn't in it - C:\Users\BobX isn't in C:\Users\Bob.
+  Assert.AreEqual(GetEnvironmentVariable('USERPROFILE') + 'X\cache', TProjectEditor.PortableCacheLocation(GetEnvironmentVariable('USERPROFILE') + 'X\cache'));
+end;
+
+procedure TProjectEditorFormattingTests.Install_Records_A_Cache_Under_AppData_Relative_To_It;
+var
+  config : IConfiguration;
+  editor : IProjectEditor;
+  sandbox : string;
+  cacheFolder : string;
+begin
+  cacheFolder := TPath.Combine(GetEnvironmentVariable('APPDATA'), 'custom-dpm-cache');
+  config := TConfiguration.Create(TTestLogger.Create);
+  config.PackageCacheLocation := cacheFolder;
+  sandbox := MakeTempFile;
+  WriteProjectFile(sandbox, OriginalProject, true);
+  try
+    editor := TProjectEditor.Create(TTestLogger.Create, config, TCompilerVersion.Delphi12_0);
+    Assert.IsTrue(editor.LoadProject(sandbox), 'LoadProject should succeed');
+    Assert.IsTrue(editor.AddSearchPaths(TDPMPlatform.Win32, SearchPaths(['Foo\1.0.0']), cacheFolder), 'AddSearchPaths should succeed');
+    Assert.IsTrue(editor.SaveProject, 'SaveProject should succeed');
+    Assert.Contains(ReadProjectFile(sandbox), '''$(DPMCache)'' == ''''">$(APPDATA)\custom-dpm-cache</DPMCache>');
+  finally
+    TFile.Delete(sandbox);
+  end;
+end;
+
+procedure TProjectEditorFormattingTests.Save_Over_The_Project_Leaves_Nothing_Beside_It;
+var
+  editor : IProjectEditor;
+  folder : string;
+  projectFile : string;
+  files : TArray<string>;
+begin
+  folder := TPath.Combine(TPath.GetTempPath, 'dpm-editor-save-' + IntToHex(Random(MaxInt), 8));
+  ForceDirectories(folder);
+  try
+    projectFile := TPath.Combine(folder, 'Project.dproj');
+    WriteProjectFile(projectFile, OriginalProject, true);
+    editor := CreateEditor;
+    Assert.IsTrue(editor.LoadProject(projectFile), 'LoadProject should succeed');
+    Assert.IsTrue(editor.SaveProject(projectFile), 'SaveProject should succeed');
+    Assert.IsTrue(FileHasBOM(projectFile), 'byte order mark was dropped');
+    AssertSameText(OriginalProject, ReadProjectFile(projectFile));
+    files := TArray<string>(TDirectory.GetFiles(folder));
+    Assert.AreEqual(1, Length(files), 'only the project is left in its folder');
+  finally
+    TDirectory.Delete(folder, true);
+  end;
+end;
+
 procedure TProjectEditorFormattingTests.SaveAs_Unmodified_WithBOM_IsByteIdentical;
 var
   editor : IProjectEditor;
@@ -582,13 +651,16 @@ var
   editor : IProjectEditor;
   sandbox : string;
   expected : string;
+  graph : IPackageReference;
 begin
   sandbox := MakeTempFile;
   WriteProjectFile(sandbox, InstalledProject, true);
   try
     editor := CreateEditor;
     Assert.IsTrue(editor.LoadProject(sandbox), 'LoadProject should succeed');
-    editor.UpdatePackageReferences(TPackageReference.CreateRoot(TCompilerVersion.Delphi12_0));
+    //held in a local - created inline into the const parameter, nothing would ever release it.
+    graph := TPackageReference.CreateRoot(TCompilerVersion.Delphi12_0);
+    editor.UpdatePackageReferences(graph);
     Assert.IsTrue(editor.SaveProject, 'SaveProject should succeed');
 
     expected := BuildProject(DPMGroup('$(DPM)\Foo\1.0.0\lib\Win32;$(DPM)\Bar\2.0.0\lib\Win32;$(DPM)\Baz\3.1.0\lib\Win32;'),

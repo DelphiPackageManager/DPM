@@ -219,8 +219,8 @@ begin
   if EndsText(cSegmentsSuffix, body) then
     SetLength(body, Length(body) - Length(cSegmentsSuffix));
   body := TrimRight(body);
-  //find UnitName(SourcePath)
-  openParen := LastDelimiter('(', body);
+  //find UnitName(SourcePath) - the first '(' : a unit name has none, a path can ('C:\Program Files (x86)\..').
+  openParen := Pos('(', body);
   closeParen := LastDelimiter(')', body);
   if (openParen = 0) or (closeParen = 0) or (closeParen <= openParen) then
     exit;
@@ -230,11 +230,11 @@ end;
 
 function TMapFileReader.Read(const fileName : string) : IMapFileInfo;
 var
-  lines : TStringList;
+  reader : TStreamReader;
+  firstLine : boolean;
   units : IList<TMapUnit>;
   unitIndex : IDictionary<string, integer>;
   section : TSection;
-  i : integer;
   line : string;
   trimmed : string;
   unitName : string;
@@ -253,30 +253,39 @@ begin
   units := TCollections.CreateList<TMapUnit>;
   unitIndex := TCollections.CreateDictionary<string, integer>;
 
-  lines := TStringList.Create;
+  //A line at a time - a MAP file with line numbers runs to hundreds of megabytes, and loading it into a string list
+  //held all of it (and more again as strings). The encoding as the string list read it : a BOM if there is one,
+  //otherwise the ANSI code page the linker wrote it in.
   try
-    try
-      lines.LoadFromFile(fileName);
-    except
-      on e : Exception do
-      begin
-        if FLogger <> nil then
-          FLogger.Warning(TWarningCode.W8116_MapFileUnreadable, '[MapFile] unable to read [' + fileName + '] : ' + e.Message);
-        exit;
-      end;
-    end;
-
-    if lines.Count > 0 then
+    reader := TStreamReader.Create(fileName, TEncoding.Default, true);
+  except
+    on e : Exception do
     begin
-      line := lines[0];
-      StripUtf8Bom(line);
-      lines[0] := line;
+      if FLogger <> nil then
+        FLogger.Warning(TWarningCode.W8116_MapFileUnreadable, '[MapFile] unable to read [' + fileName + '] : ' + e.Message);
+      exit;
     end;
-
+  end;
+  try
     section := TSection.None;
-    for i := 0 to lines.Count - 1 do
+    firstLine := true;
+    while not reader.EndOfStream do
     begin
-      line := lines[i];
+      try
+        line := reader.ReadLine;
+      except
+        on e : Exception do
+        begin
+          if FLogger <> nil then
+            FLogger.Warning(TWarningCode.W8116_MapFileUnreadable, '[MapFile] unable to read [' + fileName + '] : ' + e.Message);
+          exit;
+        end;
+      end;
+      if firstLine then
+      begin
+        StripUtf8Bom(line);
+        firstLine := false;
+      end;
       trimmed := Trim(line);
       if trimmed = '' then
         continue;
@@ -342,7 +351,7 @@ begin
 
     result := TMapFileInfo.Create(fileName, units);
   finally
-    lines.Free;
+    reader.Free;
   end;
 end;
 

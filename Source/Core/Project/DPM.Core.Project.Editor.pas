@@ -112,6 +112,8 @@ type
     function GetConfigNames: IReadOnlyList<string>;
     function GetSourceFiles : IList<string>;
   public
+    //the package cache location as the DPMCache default in a project records it - see the implementation.
+    class function PortableCacheLocation(const location : string) : string;
     constructor Create(const logger : ILogger; const config : IConfiguration; const compilerVersion : TCompilerVersion);
   end;
 
@@ -402,10 +404,7 @@ begin
   if FConfig.IsDefaultPackageCacheLocation then
     SetElementText(dpmCondition, StringReplace(cDefaultPackageCache, '%APPDATA%', '$(APPDATA)', [rfIgnoreCase])) //
   else
-  begin
-    //see if we can covert this to a relative path
-    SetElementText(dpmCondition, FConfig.PackageCacheLocation);
-  end;
+    SetElementText(dpmCondition, PortableCacheLocation(FConfig.PackageCacheLocation));
 
   dpmElement := result.selectSingleNode('x:DPM') as IXMLDOMElement;
   if dpmElement = nil then
@@ -418,6 +417,39 @@ begin
   //Per-platform paths are formed by appending \$(Platform) to the lib folder where applicable.
   SetElementText(dpmElement, '$(DPMCache)\$(DPMCompiler)');
 
+end;
+
+//The cache location as a project records it : relative to the user's profile folders when it is under one of
+//them, so the project works for another user, or on another machine, that keeps its cache in the same place
+//relative to theirs. msbuild reads environment variables as properties. A location anywhere else can only be
+//recorded as it is - this machine's builds need it.
+class function TProjectEditor.PortableCacheLocation(const location : string) : string;
+const
+  cProfileFolders : array[0..2] of string = ('APPDATA', 'LOCALAPPDATA', 'USERPROFILE');
+var
+  i : integer;
+  folder : string;
+  path : string;
+begin
+  //as configured - %APPDATA%\x is $(APPDATA)\x to msbuild.
+  if Pos('%', location) > 0 then
+  begin
+    result := location;
+    for i := 0 to High(cProfileFolders) do
+      result := StringReplace(result, '%' + cProfileFolders[i] + '%', '$(' + cProfileFolders[i] + ')', [rfReplaceAll, rfIgnoreCase]);
+    exit;
+  end;
+  path := ExcludeTrailingPathDelimiter(location);
+  //the most specific first - APPDATA and LOCALAPPDATA are under USERPROFILE.
+  for i := 0 to High(cProfileFolders) do
+  begin
+    folder := ExcludeTrailingPathDelimiter(GetEnvironmentVariable(cProfileFolders[i]));
+    if folder = '' then
+      continue;
+    if SameText(path, folder) or SameText(Copy(path, 1, Length(folder) + 1), folder + PathDelim) then
+      exit('$(' + cProfileFolders[i] + ')' + Copy(path, Length(folder) + 1, MaxInt));
+  end;
+  result := location;
 end;
 
 function TProjectEditor.GetHasDPM: boolean;

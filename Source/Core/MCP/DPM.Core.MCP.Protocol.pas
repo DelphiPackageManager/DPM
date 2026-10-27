@@ -130,7 +130,7 @@ type
     function IsRequest : boolean;
   end;
 
-  TMCPParseOutcome = (poOk, poNotJson, poNotAnObject, poBatch, poNotJsonRpc2, poNoMethod);
+  TMCPParseOutcome = (poOk, poNotJson, poNotAnObject, poBatch, poNotJsonRpc2, poNoMethod, poInvalidId);
 
   TMCPProtocol = record
   public
@@ -296,10 +296,17 @@ begin
       message.Id.Kind := TMCPRequestIdKind.ridStr;
       message.Id.StrValue := idValue.AsString;
     end
-    else
+    else if idValue.IsInteger then
     begin
       message.Id.Kind := TMCPRequestIdKind.ridInt;
       message.Id.IntValue := idValue.AsInteger;
+    end
+    else
+    begin
+      //a fraction, a boolean, an object - JSON-RPC allows a string, a number without a fraction, or null. It was
+      //read as an integer, which raised (or made one up), and the session ended.
+      message.Id.Kind := TMCPRequestIdKind.ridNull;
+      exit(TMCPParseOutcome.poInvalidId);
     end;
     message.IsNotification := message.Id.Kind = TMCPRequestIdKind.ridNull;
   end;

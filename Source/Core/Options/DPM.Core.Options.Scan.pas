@@ -49,6 +49,7 @@ type
     constructor CreateClone(const original : TScanOptions); reintroduce;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TScanOptions read FDefault;
     constructor Create; override;
     function Validate(const logger : ILogger) : boolean; override;
@@ -109,6 +110,12 @@ end;
 class constructor TScanOptions.CreateDefault;
 begin
   FDefault := TScanOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TScanOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 function TScanOptions.Validate(const logger : ILogger) : boolean;

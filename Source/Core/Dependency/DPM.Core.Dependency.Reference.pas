@@ -160,7 +160,9 @@ begin
   if (not result) or (depth = 0)  then
     exit;
 
-  result := HasChildren = otherPackageReference.HasChildren;
+  //the same number of children, and each of ours in the other - checking only ours would miss a
+  //dependency the other has gained (a BOM would then skip a compile the new dependency needs).
+  result := FDependencies.Count = otherPackageReference.Children.Count;
   if not result then
     exit;
 

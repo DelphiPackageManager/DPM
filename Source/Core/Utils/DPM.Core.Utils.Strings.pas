@@ -54,6 +54,8 @@ type
     //value a hand-written YAML file holds keeps it from being read back as something else ("02" as 2,
     //"no" as false) and keeps a quote in it from ending the scalar.
     class function YamlSingleQuote(const value : string) : string;
+    //value as XML text or a double or single quoted attribute value - & < > " and ' escaped.
+    class function XmlEscape(const value : string) : string;
   end;
 
 implementation
@@ -261,6 +263,16 @@ end;
 class function TStringUtils.YamlSingleQuote(const value : string) : string;
 begin
   result := '''' + StringReplace(value, '''', '''''', [rfReplaceAll]) + '''';
+end;
+
+class function TStringUtils.XmlEscape(const value : string) : string;
+begin
+  //& first - the others add one.
+  result := StringReplace(value, '&', '&amp;', [rfReplaceAll]);
+  result := StringReplace(result, '<', '&lt;', [rfReplaceAll]);
+  result := StringReplace(result, '>', '&gt;', [rfReplaceAll]);
+  result := StringReplace(result, '"', '&quot;', [rfReplaceAll]);
+  result := StringReplace(result, '''', '&apos;', [rfReplaceAll]);
 end;
 
 class function TStringUtils.StartsWith(const theString, value : string; const IgnoreCase : boolean) : boolean;

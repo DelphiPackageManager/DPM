@@ -75,6 +75,7 @@ type
     FResolved : IList<IPackageInfo>;
     FLocks : IDictionary<string, TRecordedLock>;
     FFailedPlatforms : TDPMPlatforms;
+    FDesignHostNotBuilt : ISet<string>;
   public
     constructor Create(const projectFile : string; const editor : IProjectEditor; const options : TInstallOptions; const platforms : TDPMPlatforms);
     destructor Destroy; override;
@@ -92,6 +93,9 @@ type
     property Locks : IDictionary<string, TRecordedLock> read FLocks write FLocks;
     //the platforms that didn't build - the project is still installed into the others.
     property FailedPlatforms : TDPMPlatforms read FFailedPlatforms write FFailedPlatforms;
+    //the packages (lowercase ids) whose design BPLs weren't built for the IDE host platform - see
+    //EnsureDesignHostPlatformCompiled.
+    property DesignHostNotBuilt : ISet<string> read FDesignHostNotBuilt write FDesignHostNotBuilt;
   end;
 
   TPackageInstaller = class(TInterfacedObject, IPackageInstaller)
@@ -151,14 +155,19 @@ type
     //design BPL the IDE needs. This compiles the host platform into the cache so the BPL exists. It is
     //cache-only and IDE-only : the project (search paths, copy-local, dproj references) is untouched
     //because the host platform is not one of the project's targets, and it is a no-op in the CLI.
-    //Not the operation's failure if it doesn't build - that is reported as one warning.
-    procedure EnsureDesignHostPlatformCompiled(const cancellationToken: ICancellationToken; const options: TSearchOptions;
-                                               const graph: IPackageReference; const installedPlatforms: TDPMPlatforms);
+    //A package that doesn't declare the host platform is not built for it, nor is one that depends on a
+    //package that couldn't be built. Not the operation's failure if something doesn't build - every
+    //problem is reported in one warning. Returns the packages (lowercase ids) whose design BPLs weren't
+    //built, for LoadDesignPackages - never nil.
+    function EnsureDesignHostPlatformCompiled(const cancellationToken: ICancellationToken; const options: TSearchOptions;
+                                              const graph: IPackageReference; const installedPlatforms: TDPMPlatforms) : ISet<string>;
 
     //Loads the project's design-time packages, unless the build for the platform the IDE loads them for
-    //(see DesignHostPlatform) is one of failedPlatforms - then there are no design BPLs to load.
+    //(see DesignHostPlatform) is one of failedPlatforms - then there are no design BPLs to load. Packages
+    //with no design BPL for that platform are left out (notBuilt, and those that don't declare it) - the
+    //build has already said why.
     procedure LoadDesignPackages(const cancellationToken: ICancellationToken; const projectFile: string; const graph: IPackageReference;
-                                 const compilerVersion: TCompilerVersion; const failedPlatforms: TDPMPlatforms);
+                                 const compilerVersion: TCompilerVersion; const failedPlatforms: TDPMPlatforms; const notBuilt : ISet<string>);
 
     //Returns the path to dpm.exe to record in the copy-local targets file in the package cache, or ''
     //when it can't be found (the IDE plugin, with no dpm.exe beside it) - the file then keeps the path
@@ -227,9 +236,14 @@ type
     //The project's package graph, validated - or re-resolved when it is stale (see ValidateRestoreGraph).
     //projectGraph is nil when the project has no packages. The graph is the project's, not a platform's,
     //so restore does this once per project.
+    //reResolved : the graph was re-resolved (the slow path) - otherwise it is the one the project records.
     function ResolveRestoreGraph(const cancellationToken: ICancellationToken; const options: TRestoreOptions; const projectFile: string;
                                  const projectEditor: IProjectEditor; out projectGraph: IPackageReference;
-                                 out resolvedPackages: IList<IPackageInfo>): boolean;
+                                 out resolvedPackages: IList<IPackageInfo>; out reResolved : boolean): boolean;
+
+    //Records the resolutions a graph the project already records makes, for the other projects in the group to
+    //be checked against - what the resolver records when it resolves one.
+    procedure RecordGraphResolutions(const projectFile : string; const graph : IPackageReference; const resolvedPackages : IList<IPackageInfo>);
 
     // Records the graph and downloads the resolved packages (bundled no-ops left out) - the platform
     // independent part of an install or restore.
@@ -288,8 +302,11 @@ type
     function UnInstallFromProject(const cancellationToken: ICancellationToken; const Options: TUnInstallOptions; const projectFile: string; const config: IConfiguration;
                                   const context: IPackageInstallerContext): boolean;
 
+    //What a project's restore records for the other projects only counts once the project holds it - see DoRestoreProject.
     function RestoreProject(const cancellationToken: ICancellationToken; const Options: TRestoreOptions; const projectFile: string; const config: IConfiguration;
                             const context: IPackageInstallerContext): boolean;
+    function DoRestoreProject(const cancellationToken: ICancellationToken; const Options: TRestoreOptions; const projectFile: string; const config: IConfiguration;
+                              const context: IPackageInstallerContext): boolean;
 
     //the entry points' work - the entry points add the operation guard (see TOperationGuard).
     function DoRestore(const cancellationToken: ICancellationToken; const Options: TRestoreOptions; const context: IPackageInstallerContext): boolean;
@@ -355,6 +372,7 @@ uses
   DPM.Core.Project.GroupProjReader,
   DPM.Core.Options.List,
   DPM.Core.Dependency.Reference,
+  DPM.Core.Dependency.Resolution,
   DPM.Core.Dependency.Version,
   DPM.Core.Package.Classes,
   DPM.Core.Package.InstallPlan,
@@ -368,6 +386,23 @@ type
     HaveReceipt : boolean;
     ManifestHashHex : string;
   end;
+
+//A package declaring no platforms is left to the build to sort out, as DoConfigurePackageForPlatform does.
+function DeclaresPlatform(const spec : IPackageSpec; const platform : TDPMPlatform) : boolean;
+begin
+  result := (spec.TargetPlatform = nil) or (spec.TargetPlatform.Platforms = []) or PlatformSatisfiedBy(platform, spec.TargetPlatform.Platforms);
+end;
+
+//Design entries DPM compiles into a design BPL - prebuilt ones ship theirs, for the IDE bitness they name.
+function HasCompiledDesignEntries(const template : ISpecTemplate; const compilerVersion : TCompilerVersion) : boolean;
+var
+  designEntry : ISpecDesignEntry;
+begin
+  result := false;
+  for designEntry in template.DesignEntries do
+    if (not designEntry.IsPrebuilt) and designEntry.AppliesTo(compilerVersion) then
+      exit(true);
+end;
 
 { TPackageInstaller }
 
@@ -453,7 +488,11 @@ var
   projectEditor : IProjectEditor;
   graph : IPackageReference;
   resolvedPackages : IList<IPackageInfo>;
+  supportedPackages : IList<IPackageInfo>;
   infoCache : IDictionary<string, IPackageInfo>;
+  packageSpecs : IDictionary<string, IPackageSpec>;
+  spec : IPackageSpec;
+  info : IPackageInfo;
   platforms : TDPMPlatforms;
   platform : TDPMPlatform;
   searchPaths : IList<string>;
@@ -510,13 +549,25 @@ begin
   //All installed packages are already built in the cache, so pass them all as 'compiled' - the lib
   //branch in CollectSearchPaths still guards each lib\{platform} path with DirectoryExists, and
   //UseSource packages fall through to the source branch regardless.
+  packageSpecs := BuildPackageSpecsFromGraph(cancellationToken, graph, compilerVersion);
   platforms := projectEditor.platforms;
   for platform in platforms do
   begin
     if cancellationToken.IsCancelled then
       exit(false);
+    //A package that doesn't support the platform has no place on its search path - restore leaves it out
+    //(and said so, W3011), so the refresh does too, quietly. Otherwise its source folder would be added,
+    //as it has no lib\{platform}.
+    supportedPackages := TCollections.CreateList<IPackageInfo>;
+    for info in resolvedPackages do
+    begin
+      if packageSpecs.TryGetValue(LowerCase(info.Id), spec) and (not DeclaresPlatform(spec, platform)) then
+        FLogger.Verbose('[' + info.Id + '] does not support [' + DPMPlatformToString(platform) + '] - no search path for it.')
+      else
+        supportedPackages.Add(info);
+    end;
     searchPaths := TCollections.CreateList<string>;
-    if not CollectSearchPaths(cancellationToken, graph, resolvedPackages, resolvedPackages, compilerVersion, platform, searchPaths) then
+    if not CollectSearchPaths(cancellationToken, graph, supportedPackages, supportedPackages, compilerVersion, platform, searchPaths) then
       exit(false);
     if not projectEditor.AddSearchPaths(platform, searchPaths, config.PackageCacheLocation) then
       exit(false);
@@ -538,6 +589,7 @@ var
   destination: string;
   platformLibPath: string;
   seenPaths: IDictionary<string, boolean>;
+  sourceIds: ISet<string>;
   byId: IDictionary<string, IPackageInfo>;
   visited: IDictionary<string, boolean>;
   orderedPackages: IList<IPackageInfo>;
@@ -583,9 +635,32 @@ var
       FLogger.Warning(TWarningCode.W5012_PathOutsidePackage, 'Ignoring the source folder [' + folder + '] of [' + pkgInfo.Id + '] - it resolves outside the package folder.');
   end;
 
+  //What DPM puts in the package folder that isn't the package's source : the compiled output in
+  //lib\{platform} and bpl\{platform} - which can hold .dfm/.res files, as copyToLib puts them beside the
+  //dcus - and the package's signatures. A folder the package itself calls lib or bpl is still searched.
+  function IsPackageOutputFolder(const pkgAbs, dir: string): boolean;
+  var
+    relative: string;
+    outputPlatform: TDPMPlatform;
+  begin
+    relative := LowerCase(Copy(dir, Length(pkgAbs) + 1, MaxInt));
+    if relative = 'signatures' then
+      exit(true);
+    for outputPlatform := Low(TDPMPlatform) to High(TDPMPlatform) do
+    begin
+      if outputPlatform = TDPMPlatform.UnknownPlatform then
+        continue;
+      if (relative = 'lib' + PathDelim + LowerCase(DPMPlatformToBDString(outputPlatform))) or
+         (relative = 'bpl' + PathDelim + LowerCase(DPMPlatformToBDString(outputPlatform))) then
+        exit(true);
+    end;
+    result := false;
+  end;
+
   //Add every subfolder under absBase that contains .pas/.inc/.dfm/.fmx/.res files. relSub is
   //computed relative to pkgAbs so the search path matches packageBasePath layout. Skips .git
-  //metadata. Delphi search paths are not recursive, so each folder must be listed individually.
+  //metadata and DPM's own output (see IsPackageOutputFolder). Delphi search paths are not recursive,
+  //so each folder must be listed individually.
   //A junction or symbolic link is not followed - it can lead anywhere, out of the package folder (a
   //git package is a clone of someone else's repository).
   procedure AddPasSubdirs(const pkgAbs, absBase, basePath: string);
@@ -599,6 +674,8 @@ var
     begin
       //skip the git metadata folder and anything under it
       if SameText(ExtractFileName(subDir), '.git') then
+        continue;
+      if IsPackageOutputFolder(pkgAbs, subDir) then
         continue;
       if (GetFileAttributes(PChar(subDir)) and FILE_ATTRIBUTE_REPARSE_POINT) <> 0 then
         continue;
@@ -688,31 +765,16 @@ begin
   result := true;
   seenPaths := TCollections.CreateDictionary<string, boolean>;
 
-  // IPackageInfo instances are memoized in the package cache (a process singleton), so UseSource
-  // can carry over from a previous install/restore/refresh. Reset it here before we OR the current
-  // graph's values on - otherwise a package that used source last time can never revert to lib
-  // (the OR below would keep seeing the stale true), which is exactly what breaks un-ticking
-  // 'use source' in the IDE.
-  for packageInfo in resolvedPackages do
-    packageInfo.UseSource := false;
-
-  // we need to apply usesource from the graph to the package info's
+  //The packages consumed as source in this project - the graph's choice (the caller has applied the IDE's
+  //current-session choices to it), which flows from a node down to its dependencies. Kept here, not on the
+  //IPackageInfo : those are shared (memoized in the package cache), so a choice made for one project would
+  //carry over to the next.
+  sourceIds := TCollections.CreateSet<string>;
   packageGraph.VisitDFS(
     procedure(const node: IPackageReference)
-    var
-      pkgInfo: IPackageInfo;
     begin
-      // not the most efficient thing to do
-      pkgInfo := resolvedPackages.FirstOrDefault(
-        function(const pkg: IPackageInfo): boolean
-        begin
-          result := SameText(pkg.Id, node.Id);
-        end);
-      // A graph node may legitimately be absent from resolvedPackages when it has been
-      // excluded for this platform (it doesn't support it) - nothing to propagate then.
-      if pkgInfo = nil then
-        exit;
-      pkgInfo.UseSource := pkgInfo.UseSource or node.UseSource;
+      if node.UseSource then
+        sourceIds.Add(LowerCase(node.Id));
     end);
 
   //Build a deterministic, dependency-ordered (bottom up) list to drive search-path order.
@@ -775,7 +837,8 @@ begin
     //contributed nothing to the search path. Source consumption (UseSource) is handled by the source
     //branch below so the consumer compiles the .pas directly.
     addedLibPath := false;
-    if ((template.BuildEntries.Count > 0) or (template.DesignEntries.Count > 0)) and (not packageInfo.UseSource) and compiledPackages.Contains(packageInfo) then
+    if ((template.BuildEntries.Count > 0) or (template.DesignEntries.Count > 0)) and (not sourceIds.Contains(LowerCase(packageInfo.Id))) and
+       compiledPackages.Contains(packageInfo) then
     begin
       //Win64/Win64x binaries are interchangeable - point at whichever the package actually built
       //to (e.g. a Win64-only package consumed by a Win64x project resolves to lib\Win64).
@@ -813,8 +876,8 @@ begin
         //Packed packages have their source entries stripped from the manifest (see the packaging
         //writer), but the source files were still extracted into the cache. Add every subfolder that
         //contains source/form/resource files (.pas/.inc/.dfm/.fmx/.res) so a UseSource (or source-only)
-        //package still contributes its source to the search path. The lib\ and bpl\ folders hold
-        //dcu/dcp/bpl and none of those, so they are skipped.
+        //package still contributes its source to the search path. DPM's compiled output under lib\ and
+        //bpl\ is skipped by AddPasSubdirs - it can hold .dfm/.res files too.
         pkgAbsRoot := IncludeTrailingPathDelimiter(FPackageCache.GetPackagePath(packageInfo));
         AddPasSubdirs(pkgAbsRoot, ExcludeTrailingPathDelimiter(pkgAbsRoot), packageBasePath);
       end;
@@ -1390,6 +1453,7 @@ begin
   FOptions := options;
   FPlatforms := platforms;
   FPackages := TCollections.CreateList<IPackageInfo>;
+  FDesignHostNotBuilt := TCollections.CreateSet<string>;
 end;
 
 destructor TProjectInstallWork.Destroy;
@@ -1538,6 +1602,8 @@ begin
     //so DoBuildCachedPackage (and the resolver) target the right compiler.
     Options.compilerVersion := packageIdentity.CompilerVersion;
     Options.Version := packageIdentity.Version;
+    //and the id - --force rebuilds the package asked for (see IsRequestedPackage), which is this one.
+    Options.PackageId := packageIdentity.Id;
     packageInfo := FPackageCache.GetPackageInfo(cancellationToken, packageIdentity);
   end
   else if not Options.Version.IsEmpty then
@@ -1734,14 +1800,14 @@ var
         if not packageRefLookup.TryGetValue(LowerCase(dependency.Id), newPackageRef) then
           raise EDPMError.Create(TErrorCode.E0003_InternalError, 'The package reference [' + dependency.Id + '] was not found in the lookup.');
         if dependency.UseSource then
-        begin
           newPackageRef.UseSource := true;
-          newPackageRef.PackageInfo.UseSource := true;
-        end;
       end
       else
       begin
-        info := GetPackageInfo(cancellationToken, dependency);
+        //a resolved graph already has it - a package that isn't in the cache yet would be looked up on the sources again.
+        info := dependency.PackageInfo;
+        if info = nil then
+          info := GetPackageInfo(cancellationToken, dependency);
         if info = nil then
         begin
           if not cancellationToken.IsCancelled then
@@ -1750,8 +1816,6 @@ var
         end;
         if cancellationToken.IsCancelled then
           exit;
-
-        info.UseSource := dependency.UseSource;
 
         newPackageRef := TPackageReference.Create(rootnode, info.Id, info.Version, info.CompilerVersion, dependency.VersionRange, dependency.UseSource);
         newPackageRef.PackageInfo := info;
@@ -1789,7 +1853,7 @@ end;
 
 function TPackageInstaller.ResolveRestoreGraph(const cancellationToken : ICancellationToken; const options : TRestoreOptions; const projectFile : string;
                                                const projectEditor : IProjectEditor; out projectGraph : IPackageReference;
-                                               out resolvedPackages : IList<IPackageInfo>) : boolean;
+                                               out resolvedPackages : IList<IPackageInfo>; out reResolved : boolean) : boolean;
 var
   graphState : TRestoreGraphState;
   preferredVersions : IDictionary<string, TPackageVersion>;
@@ -1797,6 +1861,7 @@ var
   locks : IDictionary<string, TRecordedLock>;
 begin
   result := false;
+  reResolved := false;
   resolvedPackages := TCollections.CreateList<IPackageInfo>;
   projectGraph := projectEditor.GetPackageReferences;
   // can return nil - no packages, nothing to do.
@@ -1820,12 +1885,44 @@ begin
   //The dproj acts as a lock file - collect every recorded (id, version) from the existing graph
   //so the resolver re-uses those exact versions where they still satisfy the parent's range, and
   //only picks a new version for genuinely missing transients.
+  reResolved := true;
   preferredVersions := CollectGraphVersions(projectGraph);
   locks := CollectGraphLocks(projectGraph, nil);
   topLevelGraph := BuildTopLevelOnlyGraph(projectGraph, options.CompilerVersion);
   result := RestoreUsingInstallResolver(cancellationToken, options, projectFile, topLevelGraph, preferredVersions, projectGraph, resolvedPackages);
   if result then
     ApplyGraphLocks(projectGraph, locks);
+end;
+
+procedure TPackageInstaller.RecordGraphResolutions(const projectFile : string; const graph : IPackageReference; const resolvedPackages : IList<IPackageInfo>);
+var
+  infos : IDictionary<string, IPackageInfo>;
+  info : IPackageInfo;
+  resolutions : IList<IResolvedPackage>;
+  seen : ISet<string>;
+begin
+  infos := TCollections.CreateDictionary<string, IPackageInfo>;
+  for info in resolvedPackages do
+    infos[LowerCase(info.Id)] := info;
+  resolutions := TCollections.CreateList<IResolvedPackage>;
+  seen := TCollections.CreateSet<string>;
+  graph.VisitDFS(
+    procedure(const node : IPackageReference)
+    var
+      nodeInfo : IPackageInfo;
+    begin
+      if seen.Contains(LowerCase(node.Id)) then
+        exit;
+      seen.Add(LowerCase(node.Id));
+      if not infos.TryGetValue(LowerCase(node.Id), nodeInfo) then
+        exit;
+      //as the resolver records them : a top level is pinned to its version, under the root.
+      if node.IsTopLevel then
+        resolutions.Add(TResolvedPackage.Create(nodeInfo, TVersionRange.Create(nodeInfo.Version), cRootNode, projectFile, IsBundledPackageInfo(nodeInfo)))
+      else
+        resolutions.Add(TResolvedPackage.Create(nodeInfo, node.VersionRange, node.ParentId, projectFile, IsBundledPackageInfo(nodeInfo)));
+    end);
+  FContext.RecordResolutions(projectFile, resolutions.ToArray);
 end;
 
 //True for a package the user asked to install - force only rebuilds those, not their dependencies.
@@ -1918,7 +2015,13 @@ begin
 end;
 
 procedure TPackageInstaller.LoadDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const graph : IPackageReference;
-                                               const compilerVersion : TCompilerVersion; const failedPlatforms : TDPMPlatforms);
+                                               const compilerVersion : TCompilerVersion; const failedPlatforms : TDPMPlatforms; const notBuilt : ISet<string>);
+var
+  packageSpecs : IDictionary<string, IPackageSpec>;
+  spec : IPackageSpec;
+  template : ISpecTemplate;
+  skipped : IList<string>;
+  id : string;
 begin
   //The design BPLs are built for the IDE's own platform - when that build failed there are none to load,
   //and trying would only add a 'not found' for each. The CLI loads none anyway.
@@ -1928,20 +2031,50 @@ begin
       '] build, which the IDE loads them from, failed.', true);
     exit;
   end;
-  InstallDesignPackages(cancellationToken, projectFile, BuildPackageSpecsFromGraph(cancellationToken, graph, compilerVersion));
+  packageSpecs := BuildPackageSpecsFromGraph(cancellationToken, graph, compilerVersion);
+  if TSystemUtils.IsIDEProcess then
+  begin
+    //No design BPL was built for these - the build said why (W3011, W5010), so loading them would only add a
+    //'not found' for the same thing.
+    skipped := TCollections.CreateList<string>;
+    for id in packageSpecs.Keys do
+    begin
+      spec := packageSpecs[id];
+      if (notBuilt <> nil) and notBuilt.Contains(id) then
+        skipped.Add(id)
+      else if (spec.TargetPlatform <> nil) and (not DeclaresPlatform(spec, DesignHostPlatform)) then
+      begin
+        template := spec.FindTemplate(spec.TargetPlatform.TemplateName);
+        if (template <> nil) and HasCompiledDesignEntries(template, compilerVersion) then
+          skipped.Add(id);
+      end;
+    end;
+    for id in skipped do
+    begin
+      FLogger.Verbose('The design-time packages of [' + id + '] were not loaded - none were built for [' + DPMPlatformToString(DesignHostPlatform) + '].');
+      packageSpecs.Remove(id);
+    end;
+  end;
+  InstallDesignPackages(cancellationToken, projectFile, packageSpecs);
 end;
 
-procedure TPackageInstaller.EnsureDesignHostPlatformCompiled(const cancellationToken : ICancellationToken; const options : TSearchOptions;
-                                                             const graph : IPackageReference; const installedPlatforms : TDPMPlatforms);
+function TPackageInstaller.EnsureDesignHostPlatformCompiled(const cancellationToken : ICancellationToken; const options : TSearchOptions;
+                                                            const graph : IPackageReference; const installedPlatforms : TDPMPlatforms) : ISet<string>;
 var
   hostPlatform : TDPMPlatform;
-  quietLogger : IDemotingLogger;
-  packageCompiler : ICompiler;
+  hostName : string;
+  notBuilt : ISet<string>;
   packageSpecs : IDictionary<string, IPackageSpec>;
-  resolvedPackages : IList<IPackageInfo>;
-  compiledPackages : IList<IPackageInfo>;
   infoCache : IDictionary<string, IPackageInfo>;
+  visited : ISet<string>;
+  unbuildable : IDictionary<string, string>;
+  problems : IList<string>;
+  problem : string;
+  problemText : string;
+  announced : boolean;
 begin
+  notBuilt := TCollections.CreateSet<string>;
+  result := notBuilt;
   //CLI never loads design packages - InstallDesignPackages is a no-op there, so the host-platform
   //compile would be wasted work.
   if not TSystemUtils.IsIDEProcess then
@@ -1953,47 +2086,111 @@ begin
   if hostPlatform in installedPlatforms then
     exit;
 
-  //Flatten the resolved graph to the set of packages to compile. Prefer the PackageInfo the resolver
-  //already attached to each node, falling back to a cache/repo lookup if absent.
+  hostName := DPMPlatformToString(hostPlatform);
+  packageSpecs := BuildPackageSpecsFromGraph(cancellationToken, graph, options.compilerVersion);
   infoCache := TCollections.CreateDictionary<string, IPackageInfo>;
-  resolvedPackages := TCollections.CreateList<IPackageInfo>;
+  visited := TCollections.CreateSet<string>;
+  //lowercase id -> why it can't be built for the host, as its dependents give it : '<id>, which ...'
+  unbuildable := TCollections.CreateDictionary<string, string>;
+  problems := TCollections.CreateList<string>;
+  announced := false;
+
+  //Cache-only : CompilePackage populates bpl\{host} and lib\{host} in the cache. We deliberately do not call
+  //CollectSearchPaths/CopyLocal/AddSearchPaths - the host platform is not a project target. Dependencies are
+  //visited before the packages that use them. Unlike the project's own platforms, a package that doesn't
+  //build doesn't stop the rest - every one that can be is built, so as many design components as possible load.
   graph.VisitDFS(
     procedure(const node : IPackageReference)
     var
-      info : IPackageInfo;
       key : string;
+      info : IPackageInfo;
+      spec : IPackageSpec;
+      template : ISpecTemplate;
+      child : IPackageReference;
+      cause : string;
+      packageLogger : IDemotingLogger;
+      packageCompiler : ICompiler;
     begin
-      key := LowerCase(node.Id);
-      if infoCache.ContainsKey(key) then
+      if cancellationToken.IsCancelled then
         exit;
+      key := LowerCase(node.Id);
+      if visited.Contains(key) then
+        exit;
+      visited.Add(key);
+
+      //Prefer the PackageInfo the resolver already attached to the node, falling back to a cache/repo lookup.
       info := node.PackageInfo;
       if info = nil then
-        info := GetOrLoadPackageInfo(cancellationToken, node.Id, node.Version, options.compilerVersion, infoCache)
-      else
-        infoCache[key] := info;
-      //bundled no-ops (e.g. Indy) have no package to compile - the graph already excludes them,
-      //this guards the fallback load path defensively.
-      if (info <> nil) and (not IsBundledPackageInfo(info)) then
-        resolvedPackages.Add(info);
+        info := GetOrLoadPackageInfo(cancellationToken, node.Id, node.Version, options.compilerVersion, infoCache);
+      //bundled no-ops (e.g. Indy) have no package to compile - the graph already excludes them, this guards
+      //the fallback load path defensively.
+      if (info = nil) or IsBundledPackageInfo(info) then
+        exit;
+      if (not packageSpecs.TryGetValue(key, spec)) or (spec.TargetPlatform = nil) then
+        exit;
+      template := spec.FindTemplate(spec.TargetPlatform.TemplateName);
+      if (template = nil) or (not (template.BuildEntries.Any or template.DesignEntries.Any)) then
+        exit;
+
+      //Not built for a platform it doesn't declare - that would add the platform to the package's own projects.
+      if not DeclaresPlatform(spec, hostPlatform) then
+      begin
+        unbuildable[key] := node.Id + ', which does not support [' + hostName + ']';
+        if HasCompiledDesignEntries(template, options.compilerVersion) then
+        begin
+          notBuilt.Add(key);
+          problems.Add(node.Id + ' does not support [' + hostName + ']');
+        end;
+        exit;
+      end;
+
+      //It can't compile without its dependencies.
+      for child in node.Children do
+      begin
+        if unbuildable.TryGetValue(LowerCase(child.Id), cause) then
+        begin
+          unbuildable[key] := cause;
+          if HasCompiledDesignEntries(template, options.compilerVersion) then
+          begin
+            notBuilt.Add(key);
+            problems.Add(node.Id + ' needs ' + cause);
+          end;
+          exit;
+        end;
+      end;
+
+      if not announced then
+      begin
+        FLogger.Information('Compiling design-time packages for the IDE host platform [' + hostName + '].', true);
+        announced := true;
+      end;
+      //Not the operation's failure : the project's own platforms are built, a failure here just means the
+      //design components may not load. A logger (and compiler) of its own, so each failure gives its own first
+      //problem for the warning.
+      packageLogger := TDemotingLogger.Create(FLogger);
+      packageCompiler := FCompilerFactory.CreateCompiler(options.compilerVersion, hostPlatform, packageLogger);
+      if (not CompilePackage(cancellationToken, packageLogger, packageCompiler, info, node, spec,
+                             options.force and IsRequestedPackage(options, info.Id), false)) and
+         (not cancellationToken.IsCancelled) then
+      begin
+        unbuildable[key] := node.Id + ', which did not build';
+        if HasCompiledDesignEntries(template, options.compilerVersion) then
+          notBuilt.Add(key);
+        problems.Add(node.Id + ' : ' + packageLogger.FirstProblem);
+      end;
     end);
 
-  if resolvedPackages.Count = 0 then
+  if cancellationToken.IsCancelled or (problems.Count = 0) then
     exit;
-
-  packageSpecs := BuildPackageSpecsFromGraph(cancellationToken, graph, options.compilerVersion);
-  //not the operation's failure : the project's own platforms are built, a failure here just means the
-  //design components may not load - so its problems become one warning.
-  quietLogger := TDemotingLogger.Create(FLogger);
-  packageCompiler := FCompilerFactory.CreateCompiler(options.compilerVersion, hostPlatform, quietLogger);
-  compiledPackages := TCollections.CreateList<IPackageInfo>;
-
-  FLogger.Information('Compiling design-time packages for the IDE host platform [' + DPMPlatformToString(hostPlatform) + '].', true);
-  //Cache-only : BuildDependencies populates bpl\{host} and lib\{host} in the cache. We deliberately do
-  //not call CollectSearchPaths/CopyLocal/AddSearchPaths - the host platform is not a project target.
-  if (not BuildDependencies(cancellationToken, quietLogger, packageCompiler, graph, resolvedPackages, compiledPackages, packageSpecs, options)) and
-     (not cancellationToken.IsCancelled) then
-    FLogger.Warning(TWarningCode.W5010_DesignHostCompileFailed, 'Unable to compile the design-time packages for the IDE host platform [' + DPMPlatformToString(hostPlatform) +
-                    '] - design components may not load. The first problem was : ' + quietLogger.FirstProblem);
+  problemText := '';
+  for problem in problems do
+  begin
+    if problemText <> '' then
+      problemText := problemText + '; ';
+    problemText := problemText + problem;
+  end;
+  FLogger.Warning(TWarningCode.W5010_DesignHostCompileFailed, 'Unable to compile the design-time packages for the IDE host platform [' + hostName +
+                  '] - design components may not load : ' + problemText);
 end;
 
 function TPackageInstaller.EnsurePackageInCache(const cancellationToken: ICancellationToken; const packageInfo: IPackageInfo): boolean;
@@ -2103,8 +2300,7 @@ begin
     // Only treat as unsupported when the package actually declares platform support and
     // this platform isn't in it - a package that declares nothing is left to the existing
     // downstream handling rather than being excluded here.
-    if (spec <> nil) and (spec.TargetPlatform <> nil) and (spec.TargetPlatform.Platforms <> []) and
-       (not PlatformSatisfiedBy(platform, spec.TargetPlatform.Platforms)) then
+    if (spec <> nil) and (not DeclaresPlatform(spec, platform)) then
       unsupportedPackageIds.Add(packageInfo.Id)
     else
       supportedPackages.Add(packageInfo);
@@ -2644,8 +2840,6 @@ begin
       FLogger.Information('Installing package ' + packageInfo.ToString + ' (signed)')
     else
       FLogger.Information('Installing package ' + packageInfo.ToString);
-    // we need this later when collecting search paths.
-    packageInfo.UseSource := options.UseSource;
     requested.Add(packageInfo);
   end;
 end;
@@ -2871,7 +3065,7 @@ begin
   //the loop above only built the project's target platforms. Non-fatal : a failure here just means the
   //design components may not load. (When the host platform was one of them and failed, it isn't tried
   //again - LoadDesignPackages leaves the design packages out.)
-  EnsureDesignHostPlatformCompiled(cancellationToken, work.Options, work.Graph, work.Platforms);
+  work.DesignHostNotBuilt := EnsureDesignHostPlatformCompiled(cancellationToken, work.Options, work.Graph, work.Platforms);
 
   // Update package references once using the new platform-independent format
   work.Editor.UpdatePackageReferences(work.Graph);
@@ -2887,7 +3081,7 @@ begin
   //the dproj now reflects the install, so its resolutions and graph count for the other projects.
   FContext.CommitProject(work.ProjectFile);
   //Load design-time packages once per project - design BPLs are per-IDE, not per-platform. CLI context is a no-op.
-  LoadDesignPackages(cancellationToken, work.ProjectFile, work.Graph, work.Options.CompilerVersion, work.FailedPlatforms);
+  LoadDesignPackages(cancellationToken, work.ProjectFile, work.Graph, work.Options.CompilerVersion, work.FailedPlatforms, work.DesignHostNotBuilt);
   if work.FailedPlatforms = [] then
   begin
     FLogger.Success('Install succeeded for [' + work.ProjectFile + ']', true);
@@ -3349,6 +3543,7 @@ var
   i: integer;
   projectGuard : TOperationGuard;
   projectResult : boolean;
+  projectOptions : TRestoreOptions;
 begin
   result := false;
   config := Init(Options);
@@ -3374,7 +3569,14 @@ begin
     //each project is an operation of its own - its errors show even when an earlier project had the same
     //ones, and a project that fails without saying why is still caught.
     projectGuard := TOperationGuard.Start(FLogger);
-    projectResult := RestoreProject(cancellationToken, Options, projectFile, config, context);
+    //a copy for each project - the compiler a project is restored for (its own, unless one was given) must not
+    //carry over to the next.
+    projectOptions := Options.Clone;
+    try
+      projectResult := RestoreProject(cancellationToken, projectOptions, projectFile, config, context);
+    finally
+      projectOptions.Free;
+    end;
     projectGuard.Finish(projectResult, cancellationToken.IsCancelled, 'Restoring [' + projectFile + ']');
     // order is important so we avoid shortcut boolean eval
     result := projectResult and result;
@@ -3383,6 +3585,23 @@ end;
 
 function TPackageInstaller.RestoreProject(const cancellationToken : ICancellationToken; const Options: TRestoreOptions; const projectFile: string; const config: IConfiguration;
                                           const context: IPackageInstallerContext): boolean;
+var
+  projectFiles : IList<string>;
+begin
+  //The project's resolutions and graph are held back until the project holds them (see DoRestoreProject) -
+  //a restore that changes nothing doesn't leave the other projects checked against what it didn't keep.
+  projectFiles := TCollections.CreateList<string>;
+  projectFiles.Add(projectFile);
+  FContext.BeginOperation(projectFiles);
+  try
+    result := DoRestoreProject(cancellationToken, Options, projectFile, config, context);
+  finally
+    FContext.EndOperation;
+  end;
+end;
+
+function TPackageInstaller.DoRestoreProject(const cancellationToken : ICancellationToken; const Options: TRestoreOptions; const projectFile: string; const config: IConfiguration;
+                                            const context: IPackageInstallerContext): boolean;
 var
   projectEditor: IProjectEditor;
   platforms: TDPMPlatforms;
@@ -3399,6 +3618,8 @@ var
   mismatchedPackageIds : IList<string>;
   packageSpecs : IDictionary<string, IPackageSpec>;
   mismatchedId : string;
+  designHostNotBuilt : ISet<string>;
+  reResolved : boolean;
 begin
   result := false;
 
@@ -3418,11 +3639,18 @@ begin
 
   //The package graph is the project's, not a platform's - validate it (re-resolving when it is stale)
   //and download its packages once, then configure each platform.
-  if not ResolveRestoreGraph(cancellationToken, Options, projectFile, projectEditor, finalGraph, resolvedPackages) then
+  if not ResolveRestoreGraph(cancellationToken, Options, projectFile, projectEditor, finalGraph, resolvedPackages, reResolved) then
     exit;
   //no packages - nothing to restore.
   if finalGraph = nil then
     exit(true);
+  //The graph the project records is what it uses, whether or not its packages build - it counts for the other
+  //projects now. A re-resolved one only counts once the project is saved with it.
+  if not reResolved then
+  begin
+    RecordGraphResolutions(projectFile, finalGraph, resolvedPackages);
+    FContext.CommitProject(projectFile);
+  end;
   if not PrepareProjectPackages(cancellationToken, projectFile, finalGraph, resolvedPackages, packagesToConfigure, packageSpecs) then
     exit;
 
@@ -3504,6 +3732,9 @@ begin
   // Update package references once using the new platform-independent format
   projectEditor.UpdatePackageReferences(finalGraph);
   result := projectEditor.SaveProject();
+  //the project holds the graph now - before the design packages are loaded from it.
+  if result then
+    FContext.CommitProject(projectFile);
   //Load design-time packages once after all platforms are restored - design BPLs are per-IDE,
   //not per-platform, so this runs at the project level. CLI context is a no-op. A SaveProject
   //failure (disk errors) suppresses it.
@@ -3513,8 +3744,8 @@ begin
     //loop above only built the project's target platforms. Non-fatal : a failure here just means the
     //design components may not load. (When the host platform was one of them and failed, it isn't
     //tried again - LoadDesignPackages leaves the design packages out.)
-    EnsureDesignHostPlatformCompiled(cancellationToken, Options, finalGraph, platforms);
-    LoadDesignPackages(cancellationToken, projectFile, finalGraph, Options.compilerVersion, errorPlatforms);
+    designHostNotBuilt := EnsureDesignHostPlatformCompiled(cancellationToken, Options, finalGraph, platforms);
+    LoadDesignPackages(cancellationToken, projectFile, finalGraph, Options.compilerVersion, errorPlatforms, designHostNotBuilt);
   end;
   //this is the outcome.
   if errorPlatforms <> [] then
@@ -3547,6 +3778,7 @@ var
   i: integer;
   projectGuard : TOperationGuard;
   projectResult : boolean;
+  projectOptions : TUnInstallOptions;
 begin
   result := false;
   // commandline would have validated already, but IDE probably not.
@@ -3575,7 +3807,13 @@ begin
     projectFile := projectList[i];
     //each project is an operation of its own - a project that fails without saying why is still caught.
     projectGuard := TOperationGuard.Start(FLogger);
-    projectResult := UnInstallFromProject(cancellationToken, Options, projectFile, config, context);
+    //a copy for each project - see DoRestore.
+    projectOptions := Options.Clone;
+    try
+      projectResult := UnInstallFromProject(cancellationToken, projectOptions, projectFile, config, context);
+    finally
+      projectOptions.Free;
+    end;
     projectGuard.Finish(projectResult, cancellationToken.IsCancelled, 'Uninstalling from [' + projectFile + ']');
     result := projectResult and result;
   end;
@@ -3657,13 +3895,16 @@ begin
   if not context.UninstallDesignPackages(cancellationToken, projectFile, orphanedIds) then
     FLogger.Warning(TWarningCode.W3014_DesignPackageUnloadFailed, 'Unable to unload the design packages of the removed package(s) - continuing.');
 
-  //TODO : Tell context to upgrade graph (FContext.PackageGraphTrimmed once that exists).
-
   //Project-level: write the updated graph (single <Packages> node, no platform attribute) and save once.
   projectEditor.UpdatePackageReferences(projectPackageGraph);
   result := projectEditor.SaveProject();
   if result then
+  begin
+    //what the project recorded for the other projects no longer includes what was removed.
+    context.RecordGraph(projectFile, projectPackageGraph);
+    context.PackageGraphPruned(projectFile, projectPackageGraph);
     FLogger.Success('Uninstall succeeded for [' + Options.packageId + ']', true);
+  end;
 end;
 
 end.

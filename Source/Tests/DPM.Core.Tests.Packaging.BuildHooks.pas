@@ -71,6 +71,22 @@ type
     procedure Pack_Lone_Star_Source_With_Dest_Keeps_Its_Folder;
   end;
 
+  // What a pack leaves in the output folder : the package when it worked, and nothing new when it didn't - not
+  // half a package, and not a package from before replaced by one that failed.
+  {$M+}
+  [TestFixture]
+  TPackOutputTests = class
+  public
+    [SetupFixture]
+    procedure FixtureSetup;
+    [TearDownFixture]
+    procedure FixtureTearDown;
+  published
+    procedure Pack_That_Works_Leaves_Only_The_Package;
+    procedure Pack_That_Fails_Leaves_The_Package_From_Before;
+    procedure Pack_With_A_Token_It_Can_Not_Replace_Fails;
+  end;
+
 implementation
 
 uses
@@ -81,7 +97,9 @@ uses
   System.Zip,
   VSoft.CancellationToken,
   TestLogger,
+  DPM.Core.Types,
   DPM.Core.Logging,
+  DPM.Core.Diagnostics,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Reader,
   DPM.Core.Crypto.Hashing,
@@ -546,8 +564,113 @@ begin
   end;
 end;
 
+{ TPackOutputTests }
+
+//the package WriteDspec's spec makes.
+function PackageFileName(const workDir : string) : string;
+begin
+  result := TPath.Combine(workDir, 'Test.Hooks-' + CompilerToString(TCompilerVersion.Delphi12_0) + '-' +
+                                   DPMPlatformsToBinString([TDPMPlatform.Win32]) + '-1.0.0.dpkg');
+end;
+
+//the files in the work folder, apart from the ones WriteDspec and WriteProjectFile put there.
+function OutputFiles(const workDir : string) : TStringList;
+var
+  f : string;
+begin
+  result := TStringList.Create;
+  for f in TDirectory.GetFiles(workDir) do
+    if not SameText(ExtractFileName(f), 'test.dspec.yaml') then
+      result.Add(ExtractFileName(f));
+end;
+
+procedure TPackOutputTests.FixtureSetup;
+begin
+  CoInitialize(nil);
+end;
+
+procedure TPackOutputTests.FixtureTearDown;
+begin
+  CoUninitialize;
+end;
+
+procedure TPackOutputTests.Pack_That_Works_Leaves_Only_The_Package;
+var
+  workDir : string;
+  files : TStringList;
+begin
+  workDir := MakeWorkDir;
+  try
+    WriteProjectFile(workDir, 'Pkg.dproj', cCleanDproj);
+    WriteDspec(workDir, 'Pkg.dproj', '');
+    Assert.IsTrue(Pack(workDir), 'precondition : a clean package packs');
+    files := OutputFiles(workDir);
+    try
+      Assert.AreEqual(1, files.Count, files.Text);
+      Assert.AreEqual(ExtractFileName(PackageFileName(workDir)), files[0], false);
+    finally
+      files.Free;
+    end;
+  finally
+    Cleanup(workDir);
+  end;
+end;
+
+procedure TPackOutputTests.Pack_That_Fails_Leaves_The_Package_From_Before;
+var
+  workDir : string;
+  files : TStringList;
+begin
+  workDir := MakeWorkDir;
+  try
+    //what an earlier pack of the same version left.
+    TFile.WriteAllText(PackageFileName(workDir), 'the package from before', TEncoding.UTF8);
+    //the build project is refused part way through the pack - after the package file was started.
+    WriteProjectFile(workDir, 'Pkg.dproj', cDprojWithTarget);
+    WriteDspec(workDir, 'Pkg.dproj', '');
+    Assert.IsTrue(PackExpectingFailure(workDir) <> '', 'precondition : the pack fails');
+    Assert.AreEqual('the package from before', TFile.ReadAllText(PackageFileName(workDir), TEncoding.UTF8),
+                    'the failed pack must not touch the package already there');
+    files := OutputFiles(workDir);
+    try
+      Assert.AreEqual(1, files.Count, 'nothing left of the failed pack : ' + files.Text);
+    finally
+      files.Free;
+    end;
+  finally
+    Cleanup(workDir);
+  end;
+end;
+
+procedure TPackOutputTests.Pack_With_A_Token_It_Can_Not_Replace_Fails;
+var
+  workDir : string;
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  spec : string;
+  didPack : boolean;
+begin
+  workDir := MakeWorkDir;
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  try
+    WriteProjectFile(workDir, 'Pkg.dproj', cCleanDproj);
+    WriteDspec(workDir, 'Pkg.dproj', '');
+    spec := TFile.ReadAllText(TPath.Combine(workDir, 'test.dspec.yaml'), TEncoding.UTF8);
+    spec := StringReplace(spec, 'description: build hook pack test', 'description: built for $nosuchtoken$', []);
+    TFile.WriteAllText(TPath.Combine(workDir, 'test.dspec.yaml'), spec, TEncoding.UTF8);
+    didPack := Pack(workDir, loggerIntf);
+    Assert.IsFalse(didPack, 'a package with a token left in it is no use');
+    Assert.IsTrue(logger.HasError(TErrorCode.E6103_VariableReplacementFailed), logger.Messages.Text);
+    Assert.IsFalse(FileExists(PackageFileName(workDir)), 'no package was written');
+  finally
+    Cleanup(workDir);
+  end;
+end;
+
 initialization
   TDUnitX.RegisterTestFixture(TBuildHookPackTests);
   TDUnitX.RegisterTestFixture(TPackPathTests);
+  TDUnitX.RegisterTestFixture(TPackOutputTests);
 
 end.

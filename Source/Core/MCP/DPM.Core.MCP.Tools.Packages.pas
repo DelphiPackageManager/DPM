@@ -115,6 +115,31 @@ begin
       'search. Add one with: dpm sources add -name=DPM -source=https://delphi.dev/api');
 end;
 
+///<summary> Nothing was found - and when a source couldn't be asked that isn't an answer (the package may be on
+///  it), so the call fails, naming it. what says what wasn't found. </summary>
+procedure CheckSourcesAnswered(const context : IMCPToolContext; const what : string);
+var
+  unavailable : string;
+begin
+  unavailable := context.RepositoryManager.UnavailableSources;
+  if unavailable <> '' then
+    raise EMCPToolError.Create(what + ' - but the source(s) ' + unavailable + ' could not be used, so it may be ' +
+      'on one of them. Try again later, or check the source with dpm sources list.');
+end;
+
+///<summary> Something was found - but when a source couldn't be asked, it may not be all there is. Said in the
+///  result. </summary>
+procedure AddUnavailableSources(const context : IMCPToolContext; const root : IYAMLMapping);
+var
+  unavailable : string;
+begin
+  unavailable := context.RepositoryManager.UnavailableSources;
+  if unavailable = '' then
+    exit;
+  root.AddOrSetValue('unavailableSources', unavailable);
+  root.AddOrSetValue('note', 'The source(s) ' + unavailable + ' could not be used - there may be more than this.');
+end;
+
 { TMCPSearchPackagesTool }
 
 function TMCPSearchPackagesTool.GetName : string;
@@ -193,11 +218,14 @@ begin
     options.Trial := true;
     options.Skip := 0;
     options.Take := OptionalIntArg(arguments, 'limit', 20, 1, 100);
+    options.Sources := FContext.Sources;
 
     searchResult := FContext.RepositoryManager.GetPackageFeed(cancellationToken, options, compiler);
   finally
     options.Free;
   end;
+  if searchResult.Results.Count = 0 then
+    CheckSourcesAnswered(FContext, 'No packages matched "' + RequireStringArg(arguments, 'query') + '"');
 
   doc := TYAML.CreateMapping;
   root := doc.AsMapping;
@@ -220,6 +248,7 @@ begin
 
   if platformText <> '' then
     root.AddOrSetValue('platformFilter', DPMPlatformToString(wantedPlatform));
+  AddUnavailableSources(FContext, root);
 
   result := TJsonUtils.ToCompactJson(doc);
 end;
@@ -282,7 +311,9 @@ begin
   if versionText = '' then
   begin
     latest := FContext.RepositoryManager.FindLatestVersion(cancellationToken, packageId, compiler,
-                TPackageVersion.Empty, OptionalBoolArg(arguments, 'includePrerelease', false), '');
+                TPackageVersion.Empty, OptionalBoolArg(arguments, 'includePrerelease', false), FContext.Sources);
+    if latest = nil then
+      CheckSourcesAnswered(FContext, 'No package "' + packageId + '" was found for ' + CompilerToString(compiler));
     if latest = nil then
       raise EMCPToolError.Create('No package "' + packageId + '" was found for ' +
         CompilerToString(compiler) + '. Check the id with dpm_search_packages, and note that a ' +
@@ -290,7 +321,9 @@ begin
     versionText := latest.Version.ToStringNoMeta;
   end;
 
-  metadata := FContext.RepositoryManager.GetPackageMetaData(cancellationToken, packageId, versionText, compiler);
+  metadata := FContext.RepositoryManager.GetPackageMetaData(cancellationToken, packageId, versionText, compiler, FContext.Sources);
+  if metadata = nil then
+    CheckSourcesAnswered(FContext, 'No metadata was found for "' + packageId + '" version ' + versionText);
   if metadata = nil then
     raise EMCPToolError.Create('No metadata found for "' + packageId + '" version ' + versionText +
       ' on ' + CompilerToString(compiler) + '. Use dpm_package_versions to see which versions exist.');
@@ -298,6 +331,7 @@ begin
   doc := TYAML.CreateMapping;
   root := doc.AsMapping;
   TJsonProjections.SearchResultItem(metadata, root, true);
+  AddUnavailableSources(FContext, root);
   result := TJsonUtils.ToCompactJson(doc);
 end;
 
@@ -351,7 +385,9 @@ begin
   packageId := RequireStringArg(arguments, 'packageId');
 
   versions := FContext.RepositoryManager.GetPackageVersions(cancellationToken, compiler, packageId,
-                OptionalBoolArg(arguments, 'includePrerelease', false));
+                OptionalBoolArg(arguments, 'includePrerelease', false), FContext.Sources);
+  if (versions = nil) or (versions.Count = 0) then
+    CheckSourcesAnswered(FContext, 'No versions of "' + packageId + '" were found for ' + CompilerToString(compiler));
 
   doc := TYAML.CreateMapping;
   root := doc.AsMapping;
@@ -369,7 +405,9 @@ begin
   //published for this Delphi version. Say so, since a bare [] invites the wrong conclusion.
   if seq.Count = 0 then
     root.AddOrSetValue('note', 'No versions of "' + packageId + '" are published for ' +
-      CompilerToString(compiler) + '. It may exist for a different Delphi version.');
+      CompilerToString(compiler) + '. It may exist for a different Delphi version.')
+  else
+    AddUnavailableSources(FContext, root);
 
   result := TJsonUtils.ToCompactJson(doc);
 end;

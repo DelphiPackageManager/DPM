@@ -50,6 +50,7 @@ type
       FDefault : TPushOptions;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TPushOptions read FDefault;
     constructor Create; override;
 
@@ -82,6 +83,12 @@ end;
 class constructor TPushOptions.CreateDefault;
 begin
   FDefault := TPushOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TPushOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 end.

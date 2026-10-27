@@ -170,7 +170,8 @@ begin
   //files is required - a package with no units can't produce a usable bpl.
   if yamlObject.ContainsKey('files') then
   begin
-    filesSeq := yamlObject.A['files'];
+    if not SequenceOf(yamlObject, 'files', 'the package definition [' + FProject + ']', filesSeq) then
+      result := false;
     for i := 0 to filesSeq.Count - 1 do
     begin
       entry := Trim(filesSeq.S[i]);
@@ -186,7 +187,8 @@ begin
 
   if yamlObject.ContainsKey('exclude') then
   begin
-    excludeSeq := yamlObject.A['exclude'];
+    if not SequenceOf(yamlObject, 'exclude', 'the package definition [' + FProject + ']', excludeSeq) then
+      result := false;
     for i := 0 to excludeSeq.Count - 1 do
     begin
       entry := Trim(excludeSeq.S[i]);
@@ -197,7 +199,8 @@ begin
 
   if yamlObject.ContainsKey('requires') then
   begin
-    requiresSeq := yamlObject.A['requires'];
+    if not SequenceOf(yamlObject, 'requires', 'the package definition [' + FProject + ']', requiresSeq) then
+      result := false;
     for i := 0 to requiresSeq.Count - 1 do
     begin
       entry := Trim(requiresSeq.S[i]);
@@ -207,7 +210,8 @@ begin
   end;
 
   FPlatforms := [];
-  platformsSeq := yamlObject.A['platforms'];
+  if not SequenceOf(yamlObject, 'platforms', 'the package definition [' + FProject + ']', platformsSeq) then
+    result := false;
   if platformsSeq.Count > 0 then
   begin
     for i := 0 to platformsSeq.Count - 1 do
@@ -215,7 +219,13 @@ begin
       sPlatform := platformsSeq.S[i];
       platform := StringToDPMPlatform(sPlatform);
       if platform <> TDPMPlatform.UnknownPlatform then
-        FPlatforms := FPlatforms + [platform];
+        FPlatforms := FPlatforms + [platform]
+      else
+      begin
+        //not dropped - no platforms means all of them, so leaving it out would widen the entry.
+        Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The platform [' + sPlatform + '] of the package definition [' + FProject + '] is not a platform DPM knows.');
+        result := false;
+      end;
     end;
   end;
 

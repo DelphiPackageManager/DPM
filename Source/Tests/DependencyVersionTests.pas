@@ -102,6 +102,25 @@ type
 
     [Test]
     procedure No_Intersection_At_Exclusive_Max;
+
+    //patches are Cardinals - an exclusive bound at patch 0 used to wrap round to 65535 and let the whole line in.
+    [Test]
+    [TestCase('ExclusiveMaxAtZero', '[1.0.0,1.0.0)', '|')]
+    [TestCase('BothExclusiveAtZero', '(1.0.0,1.0.0)', '|')]
+    [TestCase('OpenStartExclusiveAtZero', '(,1.0.0)', '|')]
+    [TestCase('MinAboveTheFloat', '[1.0.70000,]', '|')]
+    procedure Will_Fail_On_A_Range_With_No_Version(const value : string);
+
+    [Test]
+    procedure Can_Parse_A_Range_Past_A_Word_Patch;
+
+    [Test]
+    [TestCase('OpenEndBelowTheTop', '[1.0.65534,)', '|')]
+    [TestCase('OpenStartOneVersion', '(,1.0.1]', '|')]
+    procedure Can_Parse_A_Range_With_One_Version(const value : string);
+
+    [Test]
+    procedure Normalize_Leaves_An_Exclusive_Bound_It_Cannot_Move;
   end;
 
 implementation
@@ -358,6 +377,54 @@ begin
   depVersion.Normalize;
   Assert.IsTrue(depVersion.IsFixed);
   Assert.AreEqual('1.0.1', depVersion.ToString);
+end;
+
+procedure TVersionRangeTests.Will_Fail_On_A_Range_With_No_Version(const value : string);
+var
+  depVersion : TVersionRange;
+  error : string;
+begin
+  Assert.IsFalse(TVersionRange.TryParseWithError(value, depVersion, error), value + ' has no version in it');
+  Assert.IsFalse(depVersion.IsValid);
+end;
+
+procedure TVersionRangeTests.Can_Parse_A_Range_Past_A_Word_Patch;
+var
+  depVersion : TVersionRange;
+  error : string;
+begin
+  Assert.IsTrue(TVersionRange.TryParseWithError('[1.0.65535,1.0.65537]', depVersion, error), error);
+  Assert.IsTrue(depVersion.IsSatisfiedBy(TPackageVersion.Parse('1.0.65536')));
+  Assert.IsFalse(depVersion.IsSatisfiedBy(TPackageVersion.Parse('1.0.1')), 'the max patch must not be truncated');
+  Assert.AreEqual(2, depVersion.PatchWidth);
+end;
+
+procedure TVersionRangeTests.Can_Parse_A_Range_With_One_Version(const value : string);
+var
+  depVersion : TVersionRange;
+  error : string;
+begin
+  Assert.IsTrue(TVersionRange.TryParseWithError(value, depVersion, error), error);
+  Assert.AreEqual(0, depVersion.PatchWidth);
+end;
+
+procedure TVersionRangeTests.Normalize_Leaves_An_Exclusive_Bound_It_Cannot_Move;
+var
+  range : TVersionRange;
+begin
+  //made directly (an intersection, a feed's bounds) - Parse refuses it.
+  range := TVersionRange.Create('', TPackageVersion.Create(1, 0, 0), true, TPackageVersion.Create(1, 0, 0), false);
+  range.Normalize;
+  Assert.IsFalse(range.MaxVersionIsInclusive, 'max - 1 must not wrap to the top of the line');
+  Assert.AreEqual<Cardinal>(0, range.MaxVersion.Patch);
+  Assert.IsFalse(range.IsSatisfiedBy(TPackageVersion.Create(1, 0, 5)));
+  Assert.IsFalse(range.IsSatisfiedBy(TPackageVersion.Create(1, 0, 0)));
+
+  range := TVersionRange.Create('', TPackageVersion.Create(1, 0, High(Cardinal)), false, TPackageVersion.Create(1, 0, High(Cardinal)), true);
+  range.Normalize;
+  Assert.IsFalse(range.MinVersionIsInclusive, 'min + 1 must not wrap to the bottom of the line');
+  Assert.AreEqual<Cardinal>(High(Cardinal), range.MinVersion.Patch);
+  Assert.IsFalse(range.IsSatisfiedBy(TPackageVersion.Create(1, 0, 0)));
 end;
 
 initialization

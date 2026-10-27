@@ -88,6 +88,10 @@ type
     procedure GroupProject_SharedThirdParty_IsLinkedFromEachProject;
     [Test]
     procedure GroupProject_SharedComponents_DoNotBreakSPDXOutput;
+    //two projects of the same name (in different folders) were given the same bom-ref - CycloneDX that isn't
+    //valid, and an SPDX writer that failed on the duplicate.
+    [Test]
+    procedure GroupProject_ProjectsWithTheSameName_GetDistinctBomRefs;
     [Test]
     procedure GroupProject_ProjectVersionsComeFromVersionInfo;
     [Test]
@@ -122,6 +126,15 @@ type
     procedure GroupProject_ProjectSidecarOverridesGroupSupplier;
     [Test]
     procedure GroupProject_GroupVersion_DoesNotReplaceProjectVersions;
+
+    //IDE macros a library path holds - GetIt's catalog folder, and the user's Environment Variables overrides.
+    [Test]
+    procedure ExpandBDSTokens_CatalogRepository;
+    [Test]
+    procedure ExpandBDSTokens_UsesTheIDEOverrides;
+    //a library path over 1023 characters came back with its %VARIABLES% unexpanded.
+    [Test]
+    procedure ExpandBDSTokens_LongValue_IsExpanded;
 
     //CRA / BSI header warnings
     [Test]
@@ -947,6 +960,60 @@ begin
   finally
     doc.Free;
   end;
+end;
+
+procedure TSBOMGeneratorTests.GroupProject_ProjectsWithTheSameName_GetDistinctBomRefs;
+var
+  doc : TJsonObject;
+begin
+  WriteDproj(TPath.Combine(FTempDir, 'same\a\App.dproj'), 'App', VerInfo('FileVersion=1.0.0.0;ProductVersion=1.0'), '');
+  WriteDproj(TPath.Combine(FTempDir, 'same\b\App.dproj'), 'App', VerInfo('FileVersion=2.0.0.0;ProductVersion=2.0'), '');
+  WriteGroupProj(TPath.Combine(FTempDir, 'same\Same.groupproj'), ['a\App.dproj', 'b\App.dproj']);
+
+  Assert.IsTrue(Generate(TPath.Combine(FTempDir, 'same\Same.groupproj'), 'Release', TPath.Combine(FTempDir, 'out'), true),
+                'both formats written');
+
+  doc := LoadJson(TPath.Combine(FTempDir, 'out\Same-Win32.cdx.json'));
+  try
+    AssertBomRefsAreUnique(doc);
+  finally
+    doc.Free;
+  end;
+  doc := LoadJson(TPath.Combine(FTempDir, 'out\Same-Win32.spdx.json'));
+  try
+    Assert.AreEqual('SPDX-2.3', doc.S['spdxVersion']);
+  finally
+    doc.Free;
+  end;
+end;
+
+procedure TSBOMGeneratorTests.ExpandBDSTokens_CatalogRepository;
+var
+  userDocs : string;
+begin
+  userDocs := IncludeTrailingPathDelimiter(GetEnvironmentVariable('USERPROFILE')) + 'Documents\Embarcadero\Studio\23.0';
+  Assert.AreEqual(userDocs + '\CatalogRepository\Lib', ExpandBDSTokens('$(BDSCatalogRepository)\Lib', '', TDPMPlatform.Win32, '23.0'));
+end;
+
+procedure TSBOMGeneratorTests.ExpandBDSTokens_UsesTheIDEOverrides;
+var
+  overrides : IDictionary<string, string>;
+begin
+  overrides := TCollections.CreateDictionary<string, string>;
+  overrides['MYLIBS'] := 'C:\libs';
+  //the IDE's value of one of its own - it wins, as it does in the IDE.
+  overrides['BDSCOMMONDIR'] := 'D:\common';
+  Assert.AreEqual('C:\libs\src;D:\common\lib', ExpandBDSTokens('$(MYLIBS)\src;$(BDSCOMMONDIR)\lib', '', TDPMPlatform.Win32, '23.0', overrides));
+end;
+
+procedure TSBOMGeneratorTests.ExpandBDSTokens_LongValue_IsExpanded;
+var
+  expanded : string;
+begin
+  expanded := ExpandBDSTokens(StringOfChar('x', 1100) + ';%WINDIR%\system32', '', TDPMPlatform.Win32, '');
+  Assert.IsFalse(Pos('%WINDIR%', expanded) > 0, 'unexpanded');
+  Assert.IsTrue(SameText(IncludeTrailingPathDelimiter(GetEnvironmentVariable('WINDIR')) + 'system32',
+                         Copy(expanded, 1102, MaxInt)), expanded);
 end;
 
 procedure TSBOMGeneratorTests.GroupProject_ProjectVersionsComeFromVersionInfo;

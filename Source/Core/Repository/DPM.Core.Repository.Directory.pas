@@ -455,7 +455,7 @@ var
   searchFiles : IList<string>;
   allFiles : IList<string>;
   distinctFiles : IEnumerable<string>;
-//  take : integer;
+  first : integer;
 begin
   Logger.Debug('TDirectoryPackageRepository.GetPackageFeed');
   result := TDPMPackageSearchResult.Create(options.Skip,0);
@@ -481,15 +481,26 @@ begin
   end;
 
   distinctFiles := TDistinctIterator<string>.Create(allFiles, TStringComparer.OrdinalIgnoreCase);
-//  if options.Skip > 0 then
-//    distinctFiles := distinctFiles.Skip(options.Skip);
-//  if options.Take > 0 then
-//    distinctFiles := distinctFiles.Take(options.Take);
   searchFiles := TCollections.CreateList<string>(distinctFiles);
 
+  //a package per id, from all of its versions' files - the page is of those, in id order so it is the same page
+  //each time.
   results := DoGetPackageFeed(cancelToken, options, searchFiles);
-  result.Results.AddRange(results);
-
+  results.Sort(
+    function(const Left, Right : IPackageSearchResultItem) : integer
+    begin
+      result := CompareText(Left.Id, Right.Id);
+    end);
+  result.TotalCount := results.Count;
+  first := options.Skip;
+  if first < 0 then
+    first := 0;
+  for i := first to results.Count - 1 do
+  begin
+    if (options.Take > 0) and (result.Results.Count >= options.Take) then
+      break;
+    result.Results.Add(results[i]);
+  end;
 end;
 
 
@@ -902,6 +913,9 @@ begin
   readManifestFunc := function (const name : string; const manifest : IPackageSpec; const fileHash :string; const hashAlgorithm : string) : IInterface
                   begin
                     result := nil;
+                    //worked out (and written beside the package) for this - it goes in the result.
+                    _fileHash := fileHash;
+                    _hashAlgorithm := hashAlgorithm;
                     if (manifest = nil) or (manifest.TargetPlatform = nil) then
                       exit;
                     try

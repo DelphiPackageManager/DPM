@@ -54,7 +54,8 @@ uses
   System.SysUtils,
   DPM.Core.Types,
   DPM.Core.Options.Common,
-  DPM.Core.Options.Install;
+  DPM.Core.Options.Install,
+  DPM.Core.Diagnostics;
 
 { TInstallCommand }
 
@@ -81,6 +82,12 @@ begin
     result := TExitCode.InvalidArguments;
     exit;
   end;
+
+  //parsed, and then never used - say so rather than let it be taken for the compatibility check it promised.
+  if TInstallOptions.Default.ProjectGroup <> '' then
+    Logger.Warning(TWarningCode.W0108_OptionHasNoEffect, '--group has no effect yet - the other projects of [' +
+      TInstallOptions.Default.ProjectGroup + '] are not taken into account. Install into the group itself (dpm install <id> ' +
+      ExtractFileName(TInstallOptions.Default.ProjectGroup) + ') to keep its projects on one version of each package.');
 
  //TODO : This is not ideal, we have no way of returning more specific exit codes here - rethink api?
   if not FPackageInstaller.Install(cancellationToken, TInstallOptions.Default, FContext) then

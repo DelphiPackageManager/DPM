@@ -69,6 +69,9 @@ type
 
 implementation
 
+uses
+  DPM.IDE.MessageForm;
+
 const
   cFormWidth   = 600;
   cFormHeight  = 340;
@@ -178,7 +181,15 @@ begin
     form.FTechPrev.Caption    := techPrev;
     form.FTechNew.Caption     := techNew;
 
-    form.ShowModal;
+    //it comes up mid install, over the log window - owned by the IDE, and not behind the log window.
+    form.PopupMode := pmExplicit;
+    form.PopupParent := Application.MainForm;
+    TDPMMessageForm.BeginModalPrompt;
+    try
+      form.ShowModal;
+    finally
+      TDPMMessageForm.EndModalPrompt;
+    end;
     decision := form.FResult;
     result := decision = tprOverride;
   finally

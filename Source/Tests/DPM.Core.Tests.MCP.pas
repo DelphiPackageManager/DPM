@@ -31,6 +31,13 @@ type
 
     [Test]
     procedure Partial_Line_Is_Not_Returned;
+
+    //it is dropped and said to be bad - the lines after it still come out.
+    [Test]
+    procedure Line_That_Is_Not_Utf8_Is_A_Frame_Error;
+    //what decoding would quietly have turned into replacement characters - and what is fine.
+    [Test]
+    procedure Strict_Utf8_Is_Required;
   end;
 
   {$M+}
@@ -105,6 +112,26 @@ type
     [Test]
     procedure A_Bad_Frame_Does_Not_End_The_Session;
 
+    //bytes that aren't UTF-8 ended the session (the reader raised out of the loop).
+    [Test]
+    procedure A_Frame_That_Is_Not_Utf8_Is_A_Parse_Error;
+
+    //an id JSON-RPC doesn't allow (a fraction, true, an object) ended the session.
+    [Test]
+    procedure An_Id_That_Is_Not_A_String_Or_Integer_Is_An_Invalid_Request;
+
+    //a notification is never answered - and a notification of a method only a request may use is not carried out.
+    [Test]
+    procedure A_Request_Method_Sent_As_A_Notification_Is_Ignored;
+
+    //our own fault handling one message - answered as an internal error, and the session goes on.
+    [Test]
+    procedure A_Fault_Handling_A_Message_Is_An_Internal_Error;
+
+    //dpm mcp says (exit code) when the server stopped because something failed, not because the client went.
+    [Test]
+    procedure Run_Says_Whether_It_Ended_Cleanly;
+
     [Test]
     procedure Tools_List_Reports_Registered_Tools_In_Order;
 
@@ -125,6 +152,23 @@ type
     procedure Tools_Call_Does_Not_Carry_Caching_Hints;
   end;
 
+  //The package tools, over a repository manager whose sources may not all answer.
+  [TestFixture]
+  TMCPPackageToolTests = class
+  public
+    //nothing found while a source couldn't be asked is not 'there is no such package' - it may be on that source.
+    [Test]
+    procedure Nothing_Found_With_A_Source_Unavailable_Is_A_Tool_Error;
+    //what was found may not be all there is - the result says so.
+    [Test]
+    procedure Found_With_A_Source_Unavailable_Says_So;
+    [Test]
+    procedure Nothing_Found_With_Every_Source_Answering_Is_An_Answer;
+    //dpm mcp --source restricts what the tools ask.
+    [Test]
+    procedure Source_Option_Restricts_The_Queries;
+  end;
+
 implementation
 
 uses
@@ -140,6 +184,15 @@ uses
   DPM.Core.MCP.Protocol,
   DPM.Core.MCP.Transport.Memory,
   DPM.Core.MCP.Server,
+  DPM.Core.MCP.Tools.Common,
+  DPM.Core.MCP.Tools.Packages,
+  DPM.Core.Dependency.Version,
+  DPM.Core.Package.Interfaces,
+  DPM.Core.Package.Classes,
+  DPM.Core.Repository.Interfaces,
+  DPM.Core.Configuration.Interfaces,
+  DPM.Core.Configuration.Classes,
+  DPM.Core.Tests.Dependency.Fakes,
   TestLogger;
 
 type
@@ -199,6 +252,92 @@ begin
   if FFail then
     raise EMCPToolError.Create('stub failure the caller could fix');
   result := '{"ok":true}';
+end;
+
+type
+  //a tool whose schema can't be built - tools/list fails while handling it.
+  TBrokenSchemaTool = class(TStubTool, IMCPTool)
+  protected
+    procedure BuildInputSchema(const target : IYAMLMapping);
+  end;
+
+  //Reads scripted messages - cBadFrame stands for a line the frame buffer couldn't decode, cReadFailure for the
+  //reading itself failing.
+  TScriptedReader = class(TInterfacedObject, IMCPMessageReader)
+  private
+    FMessages : TArray<string>;
+    FIndex : integer;
+  protected
+    function ReadMessage(out message : string) : boolean;
+  public
+    constructor Create(const messages : array of string);
+  end;
+
+const
+  cBadFrame = '<not utf-8>';
+  cReadFailure = '<read failure>';
+
+procedure TBrokenSchemaTool.BuildInputSchema(const target : IYAMLMapping);
+begin
+  raise Exception.Create('the schema could not be built');
+end;
+
+constructor TScriptedReader.Create(const messages : array of string);
+var
+  i : integer;
+begin
+  inherited Create;
+  SetLength(FMessages, Length(messages));
+  for i := 0 to High(messages) do
+    FMessages[i] := messages[i];
+  FIndex := 0;
+end;
+
+function TScriptedReader.ReadMessage(out message : string) : boolean;
+begin
+  message := '';
+  if FIndex >= Length(FMessages) then
+    exit(false);
+  message := FMessages[FIndex];
+  Inc(FIndex);
+  if message = cBadFrame then
+    raise EMCPFrameError.Create('the message is not valid UTF-8');
+  if message = cReadFailure then
+    raise Exception.Create('the pipe broke');
+  result := true;
+end;
+
+function IdIsNull(const reply : IYAMLMapping) : boolean;
+var
+  idValue : IYAMLValue;
+begin
+  result := reply.TryGetValue('id', idValue) and idValue.IsNull;
+end;
+
+//As RunSession, with the reader and tools given - and what Run returned.
+function RunWith(const reader : IMCPMessageReader; const registry : IMCPToolRegistry; out ranCleanly : boolean) : IList<string>;
+var
+  writer : TMCPMemoryWriter;
+  writerIntf : IMCPMessageWriter;
+  server : TMCPServer;
+  tokenSource : ICancellationTokenSource;
+begin
+  writer := TMCPMemoryWriter.Create;
+  writerIntf := writer;
+  tokenSource := TCancellationTokenSourceFactory.Create;
+  server := TMCPServer.Create(reader, writerIntf, registry, TTestLogger.Create, 'test instructions');
+  try
+    ranCleanly := server.Run(tokenSource.Token);
+  finally
+    server.Free;
+  end;
+  result := writer.Messages;
+end;
+
+function StubRegistry : IMCPToolRegistry;
+begin
+  result := TMCPToolRegistry.Create;
+  result.Add(TStubTool.Create('alpha'));
 end;
 
 ///<summary> Runs a scripted session and returns everything the server wrote. </summary>
@@ -658,9 +797,230 @@ begin
   Assert.IsTrue(tools.O[0].O['annotations'].B['readOnlyHint']);
 end;
 
+procedure TMCPFrameBufferTests.Line_That_Is_Not_Utf8_Is_A_Frame_Error;
+var
+  buffer : TMCPFrameBuffer;
+  message : string;
+  raised : boolean;
+begin
+  buffer := TMCPFrameBuffer.Create;
+  try
+    //$FF is never part of UTF-8.
+    buffer.AppendBytes(BytesOf([Ord('{'), Ord('"'), Ord('a'), Ord('"'), Ord(':'), Ord('"'), $FF, Ord('"'), Ord('}'), 10]), 10);
+    buffer.AppendBytes(Utf8Bytes('{"b":1}' + #10), 8);
+    raised := false;
+    try
+      buffer.TryGetMessage(message);
+    except
+      on e : EMCPFrameError do
+        raised := true;
+    end;
+    Assert.IsTrue(raised, 'not taken for a message : [' + message + ']');
+    Assert.IsTrue(buffer.TryGetMessage(message), 'the next line is still there');
+    Assert.AreEqual('{"b":1}', message);
+  finally
+    buffer.Free;
+  end;
+end;
+
+//true if the bytes, as a line, are a frame error.
+function IsFrameError(const bytes : TBytes) : boolean;
+var
+  buffer : TMCPFrameBuffer;
+  line : TBytes;
+  message : string;
+begin
+  result := false;
+  line := Copy(bytes, 0, Length(bytes));
+  SetLength(line, Length(line) + 1);
+  line[High(line)] := 10;
+  buffer := TMCPFrameBuffer.Create;
+  try
+    buffer.AppendBytes(line, Length(line));
+    try
+      buffer.TryGetMessage(message);
+    except
+      on e : EMCPFrameError do
+        result := true;
+    end;
+  finally
+    buffer.Free;
+  end;
+end;
+
+procedure TMCPFrameBufferTests.Strict_Utf8_Is_Required;
+begin
+  Assert.IsTrue(IsFrameError(BytesOf([Ord('a'), $C0, $AF])), 'overlong form of /');
+  Assert.IsTrue(IsFrameError(BytesOf([Ord('a'), $ED, $A0, $80])), 'a surrogate');
+  Assert.IsTrue(IsFrameError(BytesOf([Ord('a'), $F4, $90, $80, $80])), 'past U+10FFFF');
+  Assert.IsTrue(IsFrameError(BytesOf([Ord('a'), $E2, $82])), 'cut short');
+  Assert.IsTrue(IsFrameError(BytesOf([Ord('a'), $80])), 'a continuation byte on its own');
+  //U+1F600, four bytes - it must still be a message.
+  Assert.IsFalse(IsFrameError(BytesOf([Ord('"'), $F0, $9F, $98, $80, Ord('"')])), 'a four byte character');
+end;
+
+procedure TMCPServerTests.A_Frame_That_Is_Not_Utf8_Is_A_Parse_Error;
+var
+  sent : IList<string>;
+  ranCleanly : boolean;
+  reply : IYAMLMapping;
+begin
+  sent := RunWith(TScriptedReader.Create([cBadFrame, '{"jsonrpc":"2.0","id":2,"method":"ping"}']), StubRegistry, ranCleanly);
+  Assert.AreEqual(2, sent.Count, 'answered, and the session went on');
+  reply := ParseOne(sent[0]);
+  Assert.AreEqual(Int64(-32700), reply.O['error'].L['code']);
+  Assert.IsTrue(IdIsNull(reply), sent[0]);
+  Assert.AreEqual(Int64(2), ParseOne(sent[1]).L['id']);
+  Assert.IsTrue(ranCleanly);
+end;
+
+procedure TMCPServerTests.An_Id_That_Is_Not_A_String_Or_Integer_Is_An_Invalid_Request;
+var
+  sent : IList<string>;
+  i : integer;
+  reply : IYAMLMapping;
+begin
+  sent := RunSession(['{"jsonrpc":"2.0","id":1.5,"method":"ping"}',
+                      '{"jsonrpc":"2.0","id":true,"method":"ping"}',
+                      '{"jsonrpc":"2.0","id":{"x":1},"method":"ping"}',
+                      '{"jsonrpc":"2.0","id":4,"method":"ping"}']);
+  Assert.AreEqual(4, sent.Count, 'each is answered');
+  for i := 0 to 2 do
+  begin
+    reply := ParseOne(sent[i]);
+    Assert.AreEqual(Int64(-32600), reply.O['error'].L['code'], sent[i]);
+    Assert.IsTrue(IdIsNull(reply), sent[i]);
+  end;
+  Assert.AreEqual(Int64(4), ParseOne(sent[3]).L['id']);
+end;
+
+procedure TMCPServerTests.A_Request_Method_Sent_As_A_Notification_Is_Ignored;
+var
+  sent : IList<string>;
+begin
+  sent := RunSession(['{"jsonrpc":"2.0","method":"tools/call","params":{"name":"alpha","arguments":{}}}',
+                      '{"jsonrpc":"2.0","method":"tools/list"}',
+                      '{"jsonrpc":"2.0","method":"ping"}',
+                      '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25"}}']);
+  //the count alone - IfThen would read sent[0] whether there is one or not.
+  Assert.AreEqual(0, sent.Count, 'notifications were answered');
+end;
+
+procedure TMCPServerTests.A_Fault_Handling_A_Message_Is_An_Internal_Error;
+var
+  registry : IMCPToolRegistry;
+  sent : IList<string>;
+  ranCleanly : boolean;
+  reply : IYAMLMapping;
+begin
+  registry := TMCPToolRegistry.Create;
+  registry.Add(TBrokenSchemaTool.Create('broken'));
+  sent := RunWith(TScriptedReader.Create(['{"jsonrpc":"2.0","id":1,"method":"tools/list"}',
+                                          '{"jsonrpc":"2.0","id":2,"method":"ping"}']), registry, ranCleanly);
+  Assert.AreEqual(2, sent.Count);
+  reply := ParseOne(sent[0]);
+  Assert.AreEqual(Int64(-32603), reply.O['error'].L['code'], sent[0]);
+  Assert.AreEqual(Int64(1), reply.L['id']);
+  Assert.AreEqual(Int64(2), ParseOne(sent[1]).L['id']);
+  Assert.IsTrue(ranCleanly);
+end;
+
+procedure TMCPServerTests.Run_Says_Whether_It_Ended_Cleanly;
+var
+  ranCleanly : boolean;
+begin
+  RunWith(TScriptedReader.Create(['{"jsonrpc":"2.0","id":1,"method":"ping"}']), StubRegistry, ranCleanly);
+  Assert.IsTrue(ranCleanly, 'the client closing the stream is the end of a session');
+  RunWith(TScriptedReader.Create(['{"jsonrpc":"2.0","id":1,"method":"ping"}', cReadFailure]), StubRegistry, ranCleanly);
+  Assert.IsFalse(ranCleanly, 'reading failed');
+end;
+
+{ TMCPPackageToolTests }
+
+//dpm_package_versions over repository - asked for Some.Pkg on 12.0, the server started with --source=sources.
+function InvokeVersionsTool(const repository : IPackageRepositoryManager; const sources : string = '') : string;
+var
+  logger : ILogger;
+  configuration : IConfiguration;
+  context : IMCPToolContext;
+  tool : IMCPTool;
+  argsDoc : IYAMLDocument;
+begin
+  logger := TTestLogger.Create;
+  configuration := TConfiguration.Create(logger);
+  context := TMCPToolContext.Create(repository, configuration, logger, TCompilerVersion.Delphi12_0, '', sources);
+  tool := TMCPPackageVersionsTool.Create(context);
+  argsDoc := TYAML.CreateMapping;
+  argsDoc.AsMapping.AddOrSetValue('packageId', 'Some.Pkg');
+  argsDoc.AsMapping.AddOrSetValue('compiler', '12.0');
+  result := tool.Invoke(TCancellationTokenSourceFactory.Create.Token, argsDoc.AsMapping);
+end;
+
+procedure TMCPPackageToolTests.Nothing_Found_With_A_Source_Unavailable_Is_A_Tool_Error;
+var
+  repository : TFakeRepositoryManager;
+  repositoryIntf : IPackageRepositoryManager;
+  error : string;
+begin
+  repository := TFakeRepositoryManager.Create;
+  repositoryIntf := repository;
+  repository.Unavailable := 'Gallery (timed out)';
+  error := '';
+  try
+    InvokeVersionsTool(repositoryIntf);
+  except
+    on e : EMCPToolError do
+      error := e.Message;
+  end;
+  Assert.IsTrue(Pos('Gallery', error) > 0, 'a tool error naming the source : [' + error + ']');
+end;
+
+procedure TMCPPackageToolTests.Found_With_A_Source_Unavailable_Says_So;
+var
+  repository : TFakeRepositoryManager;
+  repositoryIntf : IPackageRepositoryManager;
+  versions : IList<IPackageInfo>;
+  reply : IYAMLMapping;
+begin
+  repository := TFakeRepositoryManager.Create;
+  repositoryIntf := repository;
+  versions := TCollections.CreateList<IPackageInfo>;
+  versions.Add(TPackageInfo.Create('Mirror', 'Some.Pkg', TPackageVersion.Parse('1.0.0'), TCompilerVersion.Delphi12_0, '', ''));
+  repository.SetVersions('Some.Pkg', versions);
+  repository.Unavailable := 'Gallery (timed out)';
+  reply := ParseOne(InvokeVersionsTool(repositoryIntf));
+  Assert.AreEqual(1, reply.A['versions'].Count);
+  Assert.IsTrue(Pos('Gallery', reply.S['unavailableSources']) > 0, 'the source that could not be asked is named');
+end;
+
+procedure TMCPPackageToolTests.Nothing_Found_With_Every_Source_Answering_Is_An_Answer;
+var
+  repository : TFakeRepositoryManager;
+  repositoryIntf : IPackageRepositoryManager;
+  reply : IYAMLMapping;
+begin
+  repository := TFakeRepositoryManager.Create;
+  repositoryIntf := repository;
+  reply := ParseOne(InvokeVersionsTool(repositoryIntf));
+  Assert.AreEqual(0, reply.A['versions'].Count);
+  Assert.IsFalse(reply.ContainsKey('unavailableSources'));
+end;
+
+procedure TMCPPackageToolTests.Source_Option_Restricts_The_Queries;
+var
+  repository : TFakeRepositoryManager;
+  repositoryIntf : IPackageRepositoryManager;
+begin
+  repository := TFakeRepositoryManager.Create;
+  repositoryIntf := repository;
+  InvokeVersionsTool(repositoryIntf, 'Mine,Theirs');
+  Assert.AreEqual('Mine,Theirs', repository.VersionsSources);
+end;
+
 initialization
   TDUnitX.RegisterTestFixture(TMCPFrameBufferTests);
   TDUnitX.RegisterTestFixture(TMCPProtocolTests);
   TDUnitX.RegisterTestFixture(TMCPServerTests);
+  TDUnitX.RegisterTestFixture(TMCPPackageToolTests);
 
 end.

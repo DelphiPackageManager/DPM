@@ -44,6 +44,7 @@ type
       FDefault : TCommonOptions;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TCommonOptions read FDefault;
     constructor Create;
 
@@ -70,6 +71,12 @@ end;
 class constructor TCommonOptions.CreateDefault;
 begin
   FDefault := TCommonOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TCommonOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 end.

@@ -34,6 +34,7 @@ uses
   System.SysUtils,
   WinApi.Windows,
   DPM.Core.Types,
+  DPM.Console.RawIO,
   DPM.Console.Types,
   DPM.Console.Options,
   DPM.Core.Sources.Types,
@@ -130,7 +131,7 @@ begin
         raise EArgumentException.Create('Invalid compiler version : ' + value);
     end);
 
-  option := cmd.RegisterOption<boolean>('force','f', 'Skip the confirmation prompt for `cache remove`.',
+  option := cmd.RegisterOption<boolean>('force','f', 'For `cache remove`, skip the confirmation prompt. For `cache install`, build the package even if it is already built.',
    procedure(const value : boolean)
     begin
       TCacheOptions.Default.Force := value;
@@ -212,7 +213,7 @@ begin
       TInstallOptions.Default.VersionString := value;
     end);
 
-  option := cmd.RegisterOption<string>('group','g', 'The project group the projects belong to. Used to ensure package compatibility.',
+  option := cmd.RegisterOption<string>('group','g', 'Not supported yet, and has no effect - install into the .groupproj itself to keep its projects on one version of each package.',
    procedure(const value : string)
     begin
       TInstallOptions.Default.ProjectGroup := value;
@@ -553,8 +554,8 @@ begin
     end);
   option.Required := true;
 
-  //TODO : Not implemented yet.
-  option := cmd.RegisterOption<boolean>('excludeEmptyDirectories','e','Prevent inclusion of empty directories when building the package.',
+  //Kept for the scripts that pass it - pack only ever adds files, so an empty directory is never in a package.
+  option := cmd.RegisterOption<boolean>('excludeEmptyDirectories','e','Has no effect - empty directories are never included in a package.',
     procedure(const value : boolean)
     begin
       TPackOptions.Default.Exclude := value;
@@ -1227,7 +1228,8 @@ begin
         raise EArgumentException.Create('Invalid compiler version : ' + value);
     end);
 
-  option := cmd.RegisterOption<string>('platforms','p', 'The platforms to install for (comma separated). Default is to install for all platforms the project targets.',
+  //into the uninstall options - it was written into the install options, so uninstall never saw it.
+  option := cmd.RegisterOption<string>('platforms','p', 'The platforms to uninstall for (comma separated). Default is every platform the project targets.',
    procedure(const value : string)
    var
      platformStrings : TArray<string>;
@@ -1239,7 +1241,7 @@ begin
       begin
         platform := StringToDPMPlatform(Trim(platformString));
         if platform <> TDPMPlatform.UnknownPlatform then
-          TInstallOptions.Default.Platforms := TInstallOptions.Default.Platforms + [platform]
+          TUninstallOptions.Default.Platforms := TUninstallOptions.Default.Platforms + [platform]
         else
           raise Exception.Create('Invalid platform [' + platformString + ']');
       end;
@@ -1642,6 +1644,15 @@ begin
       TCommonOptions.Default.ConfigFile := value;
     end);
 
+  //What every command that would ask something does instead - see PromptsAreInteractive. A session whose input
+  //or output isn't a console is taken as one too.
+  option := TOptionsRegistry.RegisterOption<boolean>('non-interactive','','Never prompt - take the non-interactive path, or fail with an error, wherever a command would ask.',
+    procedure(const value : boolean)
+    begin
+      TCommonOptions.Default.NonInteractive := value;
+    end);
+  option.HasValue := false;
+
   RegisterCacheCommand;
   RegisterConfigCommand;
   RegisterDeleteCommand;
@@ -1681,12 +1692,9 @@ initialization
   except
     on e : Exception do
     begin
-      //This runs during unit initialization, so it is the one RTL text write that the
-      //IOResult call at the top of dpm.dpr cannot protect - another unit's initializer
-      //may already have left InOutRes set (see the note in dpm.dpr). Clear it, otherwise
-      //'I/O error 6' is all the user sees instead of the real registration failure.
-      IOResult;
-      Writeln(FormatError(TErrorCode.E0003_InternalError, 'Error registering options : ' + e.Message));
+      //Straight to stderr - not the RTL's text file, which this early (unit initialization) can be left with
+      //InOutRes set by another unit's initializer, so 'I/O error 6' was all the user saw - nor stdout.
+      TStdErr.WriteLine(FormatError(TErrorCode.E0003_InternalError, 'Error registering options : ' + e.Message));
       ExitProcess(999);
     end;
   end;

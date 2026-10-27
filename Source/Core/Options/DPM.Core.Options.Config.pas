@@ -40,6 +40,7 @@ type
       FDefault : TConfigOptions;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TConfigOptions read FDefault;
 
     property UseSymLinks : Boolean read FUseSymLinks write FUseSymLinks;
@@ -53,6 +54,12 @@ implementation
 class constructor TConfigOptions.CreateDefault;
 begin
   FDefault := TConfigOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TConfigOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 end.

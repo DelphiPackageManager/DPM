@@ -82,8 +82,6 @@ type
   IPackageInfo = interface(IPackageIdentity)
     ['{5672DB4A-40BC-45E0-857C-39117D03C322}']
     function GetDependencies : IList<IPackageDependency>;
-    function GetUseSource : boolean;
-    procedure SetUseSource(const value : boolean);
     function GetHash : string;
     function GetHashAlgorithm : string;
     function GetSupportedPlatforms : TDPMPlatforms;
@@ -98,7 +96,6 @@ type
     function GetSignedBy : string;
 
     property Dependencies : IList<IPackageDependency>read GetDependencies;
-    property UseSource : boolean read GetUseSource write SetUseSource;
     property Hash : string read GetHash;
     property HashAlgorithm : string read GetHashAlgorithm;
     property SupportedPlatforms : TDPMPlatforms read GetSupportedPlatforms write SetSupportedPlatforms;
@@ -283,8 +280,8 @@ type
     property LatestVersion : TPackageVersion read GetLatestVersion write SetLatestVersion;
   end;
 
-  //note : only compares Id
-
+  //compares id, compiler and version - ignoring the case, as package ids are case insensitive. The hash
+  //must ignore it too, or two equal items can land in different buckets.
   TPackageInfoComparer = class(TInterfacedObject, IEqualityComparer<IPackageInfo>)
   protected
     function Equals(const Left, Right : IPackageInfo) : Boolean; reintroduce;
@@ -332,7 +329,7 @@ function TPackageInfoComparer.GetHashCode(const Value : IPackageInfo) : Integer;
 var
   s : string;
 begin
-  s := Value.ToString;
+  s := LowerCase(Value.ToString);
   {$IF CompilerVersion >= 29.0}
   Result := System.Hash.THashBobJenkins.GetHashValue(s);
   {$ELSE}
@@ -351,7 +348,7 @@ function TPackageSearchResultItemComparer.GetHashCode(const Value : IPackageSear
 var
   s : string;
 begin
-  s := Value.Id;
+  s := LowerCase(Value.Id);
   {$IF CompilerVersion >= 29.0}
   Result := System.Hash.THashBobJenkins.GetHashValue(s);
   {$ELSE}
@@ -368,14 +365,16 @@ end;
 
 function TPackageListItemEqualityComparer.Equals(const Left, Right: IPackageListItem): Boolean;
 begin
-  result := (Left.Id = Right.Id) and (left.CompilerVersion = right.CompilerVersion) and (left.Version = right.Version);// and (left.Platforms = right.Platforms);
+  //platforms are not compared - the same package version from two sources may list different ones.
+  result := SameText(Left.Id, Right.Id) and (left.CompilerVersion = right.CompilerVersion) and (left.Version = right.Version);
 end;
 
 function TPackageListItemEqualityComparer.GetHashCode(const Value: IPackageListItem): Integer;
 var
   s : string;
 begin
-  s := Value.Id + CompilerToString(value.CompilerVersion) + Value.Version.ToStringNoMeta + DPMPlatformsToString(Value.Platforms);
+  //only what Equals compares.
+  s := LowerCase(Value.Id + CompilerToString(value.CompilerVersion) + Value.Version.ToStringNoMeta);
   {$IF CompilerVersion >= 29.0}
   Result := System.Hash.THashBobJenkins.GetHashValue(s);
   {$ELSE}

@@ -42,6 +42,7 @@ type
       FDefault : TProjectOptions;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TProjectOptions read FDefault;
     constructor Create; override;
 
@@ -66,6 +67,12 @@ end;
 class constructor TProjectOptions.CreateDefault;
 begin
   FDefault := TProjectOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TProjectOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 end.

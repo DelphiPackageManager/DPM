@@ -26,6 +26,17 @@ type
     [Test] procedure AtomicWriteAllText_CreatesFile;
     [Test] procedure AtomicWriteAllText_ReplacesExisting;
     [Test] procedure AtomicWriteAllText_LockedTargetLeavesOriginalAndNoTemp;
+
+    //the pattern is for the files - every subfolder is searched (dpm sign <folder> -r).
+    [Test] procedure GetFiles_Recursive_Searches_Every_Subfolder;
+    [Test] procedure GetFiles_Recursive_Does_Not_Follow_A_Junction;
+  end;
+
+  [TestFixture]
+  TFileMatcherTests = class
+  public
+    //pack's exclude masks are full paths - a folder with a '[' in its name is just a name.
+    [Test] procedure Mask_With_A_Bracket_In_The_Path_Matches;
   end;
 
 implementation
@@ -36,6 +47,11 @@ uses
   System.Classes,
   System.IOUtils,
   System.Types,
+  Spring.Collections,
+  VSoft.CancellationToken,
+  DPM.Core.Utils.Process,
+  DPM.Core.Utils.Directory,
+  DPM.Core.Utils.Masks,
   DPM.Core.Utils.Files;
 
 const
@@ -214,7 +230,63 @@ begin
   Assert.AreEqual(1, Length(files), 'the temporary file was not removed after the failure');
 end;
 
+procedure TFileUtilsTests.GetFiles_Recursive_Searches_Every_Subfolder;
+var
+  files : IList<string>;
+begin
+  ForceDirectories(TPath.Combine(FRoot, 'sub\deeper'));
+  TFile.WriteAllText(TPath.Combine(FRoot, 'a.dpkg'), 'a');
+  TFile.WriteAllText(TPath.Combine(FRoot, 'sub\b.dpkg'), 'b');
+  TFile.WriteAllText(TPath.Combine(FRoot, 'sub\deeper\c.dpkg'), 'c');
+  TFile.WriteAllText(TPath.Combine(FRoot, 'sub\notes.txt'), 'not a package');
+  files := TDirectoryUtils.GetFiles(FRoot, '*.dpkg', TSearchOption.soAllDirectories);
+  Assert.AreEqual(3, files.Count, 'the folders are not called *.dpkg - they are still searched');
+  Assert.IsTrue(files.Contains(TPath.Combine(FRoot, 'sub\deeper\c.dpkg')));
+
+  files := TDirectoryUtils.GetFiles(FRoot, '*.dpkg', TSearchOption.soTopDirectoryOnly);
+  Assert.AreEqual(1, files.Count, 'not recursive - the top folder only');
+end;
+
+procedure TFileUtilsTests.GetFiles_Recursive_Does_Not_Follow_A_Junction;
+var
+  outside : string;
+  linkFolder : string;
+  exitCode : Cardinal;
+  files : IList<string>;
+begin
+  outside := TPath.Combine(FRoot, 'outside');
+  ForceDirectories(outside);
+  TFile.WriteAllText(TPath.Combine(outside, 'z.dpkg'), 'z');
+  ForceDirectories(TPath.Combine(FRoot, 'walked'));
+  TFile.WriteAllText(TPath.Combine(FRoot, 'walked\a.dpkg'), 'a');
+  linkFolder := TPath.Combine(FRoot, 'walked\link');
+  exitCode := TProcess.Execute2(TCancellationTokenSourceFactory.Create.Token, GetEnvironmentVariable('COMSPEC'),
+                                '/c mklink /J "' + linkFolder + '" "' + outside + '"', '');
+  Assert.IsTrue((exitCode = 0) and DirectoryExists(linkFolder), 'could not make the junction');
+  try
+    files := TDirectoryUtils.GetFiles(TPath.Combine(FRoot, 'walked'), '*.dpkg', TSearchOption.soAllDirectories);
+    Assert.AreEqual(1, files.Count, 'the junction leads out of the folder - it is not followed');
+  finally
+    //the junction itself, not what it points at.
+    RemoveDirectory(PChar(linkFolder));
+  end;
+end;
+
+{ TFileMatcherTests }
+
+procedure TFileMatcherTests.Mask_With_A_Bracket_In_The_Path_Matches;
+var
+  matcher : IFileMatcher;
+begin
+  matcher := TFileMatcher.Create;
+  matcher.AddMask('C:\work\MyLib [fork]\source\*.dproj');
+  Assert.IsTrue(matcher.Matches('C:\work\MyLib [fork]\source\MyLib.dproj'));
+  Assert.IsFalse(matcher.Matches('C:\work\MyLib [fork]\source\MyLib.pas'));
+  Assert.IsFalse(matcher.Matches('C:\work\MyLib f\source\MyLib.dproj'), 'the brackets are not a set of characters');
+end;
+
 initialization
   TDUnitX.RegisterTestFixture(TFileUtilsTests);
+  TDUnitX.RegisterTestFixture(TFileMatcherTests);
 
 end.

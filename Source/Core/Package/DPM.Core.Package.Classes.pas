@@ -64,7 +64,6 @@ type
   TPackageInfo = class(TPackageIdentity, IPackageInfo, IPackageIdentity)
   private
     FDependencies : IList<IPackageDependency>;
-    FUseSource : boolean;
     FHash : string;
     FHashAlgorithm : string;
     FSupportedPlatforms : TDPMPlatforms;
@@ -72,8 +71,6 @@ type
     FSignedBy : string;
   protected
     function GetDependencies : IList<IPackageDependency>;
-    function GetUseSource : boolean;
-    procedure SetUseSource(const value : boolean);
     function GetHash : string;
     function GetHashAlgorithm : string;
     function GetSupportedPlatforms : TDPMPlatforms;
@@ -307,6 +304,7 @@ var
   range : TVersionRange;
   dependency : IPackageDependency;
   bytes : TBytes;
+  sError : string;
 begin
   inherited Create(sourceName, jsonObj);
   FDependencies := TCollections.CreateList<IPackageDependency>;
@@ -338,11 +336,12 @@ begin
     begin
       depId := depArr.O[i].S['packageId'];
       depVersion := depArr.O[i].S['versionRange'];
-      if TVersionRange.TryParse(depVersion, range) then
-      begin
-        dependency := TPackageDependency.Create(depId, range);
-        FDependencies.Add(dependency);
-      end;
+      //dropping the dependency would leave a version that installs without it - refuse the version
+      //instead (TryLoadFromJson reports it and the version is skipped).
+      if not TVersionRange.TryParseWithError(depVersion, range, sError) then
+        raise Exception.Create('the dependency [' + depId + '] has a version range [' + depVersion + '] that is not valid - ' + sError);
+      dependency := TPackageDependency.Create(depId, range);
+      FDependencies.Add(dependency);
     end;
   end;
 
@@ -428,16 +427,6 @@ end;
 function TPackageInfo.GetHashAlgorithm: string;
 begin
   result := FHashAlgorithm;
-end;
-
-function TPackageInfo.GetUseSource: boolean;
-begin
-  result := FUseSource;
-end;
-
-procedure TPackageInfo.SetUseSource(const value: boolean);
-begin
-  FUseSource := value;
 end;
 
 function TPackageInfo.GetSupportedPlatforms : TDPMPlatforms;

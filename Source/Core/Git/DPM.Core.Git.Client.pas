@@ -33,10 +33,17 @@ uses
   VSoft.CancellationToken,
   Spring.Collections,
   DPM.Core.Logging,
+  DPM.Core.Utils.Process,
   DPM.Core.Git.Interfaces;
 
 type
   TGitClient = class(TInterfacedObject, IGitClient)
+  private
+    class var
+      FTimeoutSeconds : integer;
+    class constructor Create;
+    //whether the user's git config says which ssh to use (core.sshCommand) - asked once, the first time it matters.
+    class function SshCommandConfigured(const exeFile : string) : boolean; static;
   private
     FLogger : ILogger;
     FLastError : string;
@@ -52,6 +59,7 @@ type
     function Clone(const cancellationToken : ICancellationToken; const url : string; const targetDir : string) : boolean;
     function Pull(const cancellationToken : ICancellationToken; const repoDir : string) : boolean;
     function Checkout(const cancellationToken : ICancellationToken; const repoDir : string; const commitOrRef : string) : boolean;
+    function GetRemoteUrl(const cancellationToken : ICancellationToken; const repoDir : string; out url : string) : boolean;
     function LastError : string;
   public
     constructor Create(const logger : ILogger);
@@ -64,6 +72,14 @@ type
     //entry is relative to the current folder, which for a checkout is a repository someone else wrote - and
     //only for git.exe, never a git.cmd or git.bat.
     class function FindGitExe(const searchPath : string) : string;
+
+    //What every command runs with. DPM's git has no console anyone can see, so a prompt - git asking for a
+    //password, the credential manager's window, ssh asking about a host key or a passphrase - would wait until the
+    //timeout. ssh runs in batch mode unless the user has said which ssh to use (GIT_SSH_COMMAND, GIT_SSH, or
+    //core.sshCommand - sshConfigured) : GIT_SSH_COMMAND would win over theirs.
+    class procedure MakeNonInteractive(const env : IEnvironmentBlock; const sshConfigured : boolean); static;
+    //How long a command may run before it is stopped - git waiting on a network that has gone, say.
+    class property TimeoutSeconds : integer read FTimeoutSeconds write FTimeoutSeconds;
 
     //Pure parsing helpers - exposed for testing (no git/network required).
     //Parses 'git ls-remote --tags' output into a tagName -> commit map.
@@ -80,8 +96,8 @@ uses
   System.SyncObjs,
   System.IOUtils,
   System.StrUtils,
-  DPM.Core.Utils.Strings,
-  DPM.Core.Utils.Process;
+  System.Diagnostics,
+  DPM.Core.Utils.Strings;
 
 const
   cTagRefPrefix = 'refs/tags/';
@@ -93,6 +109,8 @@ var
   StartupSearchPath : string;
   GitExeLock : TCriticalSection;
   GitExeResolved : boolean;
+  SshConfigResolved : boolean;
+  SshConfigured : boolean;
   GitExePath : string;
 
 function QuoteArg(const value : string) : string;
@@ -110,6 +128,11 @@ begin
 end;
 
 { TGitClient }
+
+class constructor TGitClient.Create;
+begin
+  FTimeoutSeconds := 5 * 60;
+end;
 
 constructor TGitClient.Create(const logger : ILogger);
 begin
@@ -175,10 +198,43 @@ begin
   end;
 end;
 
+class procedure TGitClient.MakeNonInteractive(const env : IEnvironmentBlock; const sshConfigured : boolean);
+begin
+  env.AddOrSet('GIT_TERMINAL_PROMPT', '0');
+  env.AddOrSet('GCM_INTERACTIVE', 'never');
+  if sshConfigured or (env.GetValue('GIT_SSH_COMMAND') <> '') or (env.GetValue('GIT_SSH') <> '') then
+    exit;
+  env.AddOrSet('GIT_SSH_COMMAND', 'ssh -oBatchMode=yes');
+end;
+
+class function TGitClient.SshCommandConfigured(const exeFile : string) : boolean;
+begin
+  GitExeLock.Enter;
+  try
+    if not SshConfigResolved then
+    begin
+      //exits 1 when it isn't set. Its own token - a cancelled operation mustn't leave the answer 'no'.
+      try
+        SshConfigured := TProcess.Execute2(TCancellationTokenSourceFactory.Create.Token, exeFile, 'config --get core.sshCommand', '', nil, 30 * 1000) = 0;
+      except
+        on e : EOSError do
+          SshConfigured := false;
+      end;
+      SshConfigResolved := true;
+    end;
+    result := SshConfigured;
+  finally
+    GitExeLock.Leave;
+  end;
+end;
+
 function TGitClient.RunGit(const cancellationToken : ICancellationToken; const args : string; const workingDir : string; const output : TStrings) : Cardinal;
 var
   tmpFile : string;
   exeFile : string;
+  env : IEnvironmentBlock;
+  stopwatch : TStopwatch;
+  timedOut : boolean;
 begin
   output.Clear;
   exeFile := GitExe;
@@ -195,8 +251,13 @@ begin
     //cmd looks for 'git' in the current folder before PATH, and the working folder of a checkout is a
     //repository someone else wrote, which could hold a git.cmd.
     FLogger.Debug('[git] ' + exeFile + ' ' + args);
+    env := TEnvironmentBlockFactory.Create(nil, true);
+    MakeNonInteractive(env, SshCommandConfigured(exeFile));
     try
-      result := TProcess.Execute2(cancellationToken, exeFile, args, workingDir, nil, -1, tmpFile);
+      stopwatch := TStopwatch.StartNew;
+      result := TProcess.Execute2(cancellationToken, exeFile, args, workingDir, env, FTimeoutSeconds * 1000, tmpFile);
+      //stopped - by the token, or because it ran out of time.
+      timedOut := (result <> 0) and (not cancellationToken.IsCancelled) and (stopwatch.ElapsedMilliseconds >= Int64(FTimeoutSeconds) * 1000);
     except
       //git couldn't be started - that is the output.
       on e : EOSError do
@@ -214,6 +275,8 @@ begin
         //ignore - output is best effort for diagnostics/parsing.
       end;
     end;
+    if timedOut then
+      output.Insert(0, 'git did not finish within ' + IntToStr(FTimeoutSeconds) + ' seconds - it was stopped.');
   finally
     if TFile.Exists(tmpFile) then
     begin
@@ -372,6 +435,33 @@ begin
     result := RunGit(cancellationToken, 'pull --ff-only', repoDir, output) = 0;
     if not result then
       CommandFailed('git pull failed in [' + repoDir + ']', output);
+  finally
+    output.Free;
+  end;
+end;
+
+function TGitClient.GetRemoteUrl(const cancellationToken : ICancellationToken; const repoDir : string; out url : string) : boolean;
+var
+  output : TStringList;
+  i : integer;
+begin
+  url := '';
+  output := TStringList.Create;
+  try
+    FLastError := '';
+    result := RunGit(cancellationToken, 'config --get remote.origin.url', repoDir, output) = 0;
+    if result then
+    begin
+      for i := 0 to output.Count - 1 do
+      begin
+        url := Trim(output.Strings[i]);
+        if url <> '' then
+          break;
+      end;
+      result := url <> '';
+    end;
+    if not result then
+      CommandFailed('git config --get remote.origin.url failed in [' + repoDir + ']', output);
   finally
     output.Free;
   end;

@@ -29,6 +29,8 @@ unit DPM.Core.Registry.Catalog;
 interface
 
 uses
+  System.SyncObjs,
+  System.Diagnostics,
   VSoft.CancellationToken,
   Spring.Collections,
   DPM.Core.Logging,
@@ -37,8 +39,15 @@ uses
   DPM.Core.Registry.Interfaces;
 
 type
+  //Thread safe - the IDE queries a source from several threads, and the first to need it clones it while the
+  //others wait.
   TRegistryCatalog = class(TInterfacedObject, IRegistryCatalog)
   private
+    class var
+      FCloneRetrySeconds : integer;
+    class constructor Create;
+  private
+    FLock : TCriticalSection;
     FLogger : ILogger;
     FGitClient : IGitClient;
     FSpecReader : IPackageSpecReader;
@@ -49,8 +58,13 @@ type
     FLoaded : boolean;
     FWorkingDir : string;
     FSpecs : IDictionary<string, IPackageSpec>; //key = lowercase id
+    //since the clone of a git url registry failed (not running when it hasn't), and what git said.
+    FCloneFailed : TStopwatch;
+    FCloneError : string;
     function IsFolderSource : boolean;
     function MirrorDir : string;
+    function MirrorIsCloneOfSource(const cancellationToken : ICancellationToken; const mirror : string) : boolean;
+    function CloneMirror(const cancellationToken : ICancellationToken; const mirror : string; const forceRefresh : boolean) : boolean;
     function FetchStampFile(const mirrorDir : string) : string;
     function MirrorNeedsRefresh(const mirrorDir : string; const forceRefresh : boolean) : boolean;
     procedure TouchFetchStamp(const mirrorDir : string);
@@ -63,8 +77,11 @@ type
   public
     constructor Create(const logger : ILogger; const gitClient : IGitClient; const name : string; const source : string;
                        const registriesFolder : string; const ttlMinutes : integer = 60);
+    destructor Destroy; override;
     //exposed for diagnostics/testing
     property WorkingDir : string read FWorkingDir;
+    //how long a query waits after a failed clone before it tries again (an explicit refresh always tries).
+    class property CloneRetrySeconds : integer read FCloneRetrySeconds write FCloneRetrySeconds;
   end;
 
   //true if source looks like a git url rather than a local folder path.
@@ -81,6 +98,7 @@ uses
   DPM.Core.Constants,
   DPM.Core.Spec.Reader,
   DPM.Core.Utils.Path,
+  DPM.Core.Utils.Hash,
   DPM.Core.Utils.System;
 
 const
@@ -116,6 +134,11 @@ end;
 
 { TRegistryCatalog }
 
+class constructor TRegistryCatalog.Create;
+begin
+  FCloneRetrySeconds := 60;
+end;
+
 constructor TRegistryCatalog.Create(const logger : ILogger; const gitClient : IGitClient; const name : string; const source : string;
                                     const registriesFolder : string; const ttlMinutes : integer);
 begin
@@ -129,6 +152,13 @@ begin
   FTTLMinutes := ttlMinutes;
   FLoaded := false;
   FSpecs := TCollections.CreateDictionary<string, IPackageSpec>;
+  FLock := TCriticalSection.Create;
+end;
+
+destructor TRegistryCatalog.Destroy;
+begin
+  FLock.Free;
+  inherited;
 end;
 
 function TRegistryCatalog.IsFolderSource : boolean;
@@ -144,7 +174,66 @@ end;
 
 function TRegistryCatalog.MirrorDir : string;
 begin
-  result := IncludeTrailingPathDelimiter(FRegistriesFolder) + SanitizeForFolderName(FName);
+  //the name keeps the folder recognisable, the url hash keeps two sources that share a name (one renamed to
+  //what the other was called) out of each other's mirror.
+  result := IncludeTrailingPathDelimiter(FRegistriesFolder) + SanitizeForFolderName(FName) + '-' +
+            Copy(THashSHA256.GetHashStringFromText(LowerCase(Trim(FSource))), 1, 12);
+end;
+
+function TRegistryCatalog.MirrorIsCloneOfSource(const cancellationToken : ICancellationToken; const mirror : string) : boolean;
+var
+  origin : string;
+begin
+  //when git can't say, the mirror is used - git not working is no reason to throw it away, and the refresh
+  //that follows will say git isn't working.
+  if not FGitClient.GetRemoteUrl(cancellationToken, mirror, origin) then
+    exit(true);
+  result := SameText(origin, Trim(FSource));
+  if not result then
+    FLogger.Information('The registry folder [' + mirror + '] is a clone of ' + origin + ', not ' + FSource + ' - cloning it again.');
+end;
+
+function TRegistryCatalog.CloneMirror(const cancellationToken : ICancellationToken; const mirror : string; const forceRefresh : boolean) : boolean;
+var
+  waitSeconds : Int64;
+begin
+  //a failed clone is not retried by every query that follows it - in the IDE that is every search and
+  //selection, each running git against a url that just failed. Each still says why it couldn't use the source.
+  if (not forceRefresh) and FCloneFailed.IsRunning and (FCloneFailed.Elapsed.TotalSeconds < FCloneRetrySeconds) then
+  begin
+    waitSeconds := FCloneRetrySeconds - Trunc(FCloneFailed.Elapsed.TotalSeconds);
+    FLogger.Warning(TWarningCode.W1004_SourceUnavailable, 'Source [' + FName + '] could not be used - unable to clone the registry : ' + FCloneError +
+                    sLineBreak + '  (not tried again for ' + IntToStr(waitSeconds) + ' seconds)');
+    exit(false);
+  end;
+
+  ForceDirectories(FRegistriesFolder);
+  //a stale/partial folder would make clone fail - clear it.
+  if DirectoryExists(mirror) then
+  begin
+    try
+      TDirectory.Delete(mirror, true);
+    except
+      //best effort
+    end;
+  end;
+  FLogger.Information('Cloning package registry [' + FName + '] from ' + FSource);
+  result := FGitClient.Clone(cancellationToken, FSource, mirror);
+  if result then
+  begin
+    FCloneFailed.Reset;
+    FCloneError := '';
+    TouchFetchStamp(mirror);
+  end
+  else if not cancellationToken.IsCancelled then
+  begin
+    FCloneError := FGitClient.LastError;
+    FCloneFailed := TStopwatch.StartNew;
+    if forceRefresh then
+      FLogger.Error(TErrorCode.E1203_GitCommandFailed, 'Unable to clone the registry [' + FName + '] from ' + FSource + ' : ' + FCloneError)
+    else
+      FLogger.Warning(TWarningCode.W1004_SourceUnavailable, 'Source [' + FName + '] could not be used - unable to clone the registry : ' + FCloneError);
+  end;
 end;
 
 function TRegistryCatalog.FetchStampFile(const mirrorDir : string) : string;
@@ -202,31 +291,13 @@ begin
   //git-url registry - clone on first use, refresh per TTL.
   mirror := MirrorDir;
   FWorkingDir := mirror;
-  if not DirectoryExists(IncludeTrailingPathDelimiter(mirror) + '.git') then
+  if (not DirectoryExists(IncludeTrailingPathDelimiter(mirror) + '.git')) or (not MirrorIsCloneOfSource(cancellationToken, mirror)) then
   begin
-    ForceDirectories(FRegistriesFolder);
-    //a stale/partial folder would make clone fail - clear it.
-    if DirectoryExists(mirror) then
-    begin
-      try
-        TDirectory.Delete(mirror, true);
-      except
-        //best effort
-      end;
-    end;
-    FLogger.Information('Cloning package registry [' + FName + '] from ' + FSource);
-    result := FGitClient.Clone(cancellationToken, FSource, mirror);
-    if result then
-      TouchFetchStamp(mirror)
-    else if not cancellationToken.IsCancelled then
-    begin
-      if forceRefresh then
-        FLogger.Error(TErrorCode.E1203_GitCommandFailed, 'Unable to clone the registry [' + FName + '] from ' + FSource + ' : ' + FGitClient.LastError)
-      else
-        FLogger.Warning(TWarningCode.W1004_SourceUnavailable, 'Source [' + FName + '] could not be used - unable to clone the registry : ' + FGitClient.LastError);
-    end;
+    result := CloneMirror(cancellationToken, mirror, forceRefresh);
     exit;
   end;
+  if cancellationToken.IsCancelled then
+    exit(false);
 
   if MirrorNeedsRefresh(mirror, forceRefresh) then
   begin
@@ -306,15 +377,22 @@ end;
 
 function TRegistryCatalog.EnsureUpdated(const cancellationToken : ICancellationToken; const forceRefresh : boolean) : boolean;
 begin
-  if FLoaded and (not forceRefresh) then
-    exit(true);
+  //held across the clone/pull - a second thread waits for the first one's result rather than cloning into the
+  //same folder at the same time.
+  FLock.Enter;
+  try
+    if FLoaded and (not forceRefresh) then
+      exit(true);
 
-  result := ResolveWorkingDir(cancellationToken, forceRefresh);
-  if not result then
-    exit;
+    result := ResolveWorkingDir(cancellationToken, forceRefresh);
+    if not result then
+      exit;
 
-  LoadCatalog;
-  FLoaded := true;
+    LoadCatalog;
+    FLoaded := true;
+  finally
+    FLock.Leave;
+  end;
 end;
 
 function TRegistryCatalog.GetPackageSpec(const cancellationToken : ICancellationToken; const id : string) : IPackageSpec;
@@ -322,7 +400,12 @@ begin
   result := nil;
   if not EnsureUpdated(cancellationToken, false) then
     exit;
-  FSpecs.TryGetValue(LowerCase(id), result);
+  FLock.Enter;
+  try
+    FSpecs.TryGetValue(LowerCase(id), result);
+  finally
+    FLock.Leave;
+  end;
 end;
 
 function TRegistryCatalog.GetPackageIds(const cancellationToken : ICancellationToken) : IList<string>;
@@ -332,8 +415,13 @@ begin
   result := TCollections.CreateList<string>;
   if not EnsureUpdated(cancellationToken, false) then
     exit;
-  for spec in FSpecs.Values do
-    result.Add(spec.MetaData.Id);
+  FLock.Enter;
+  try
+    for spec in FSpecs.Values do
+      result.Add(spec.MetaData.Id);
+  finally
+    FLock.Leave;
+  end;
 end;
 
 end.

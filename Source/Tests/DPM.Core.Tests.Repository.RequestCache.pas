@@ -39,6 +39,9 @@ type
 
     [Test]
     procedure Versions_Keyed_By_Id_Compiler_And_Prerelease;
+
+    [Test]
+    procedure Package_Info_Keyed_By_Id_Compiler_And_Version;
   end;
 
 implementation
@@ -146,6 +149,30 @@ begin
   Assert.IsFalse(FCache.TryGetVersions('Ext', cCompiler, false, found), 'a different prerelease flag is a different query');
   Assert.IsFalse(FCache.TryGetVersions('Ext', TCompilerVersion.Delphi11_0, true, found), 'a different compiler is a different query');
   FCache.EndScope;
+end;
+
+procedure TRepositoryRequestCacheTests.Package_Info_Keyed_By_Id_Compiler_And_Version;
+var
+  info : IPackageInfo;
+  found : IPackageInfo;
+  identity : IPackageIdentity;
+begin
+  info := TPackageInfo.Create('src', 'Base', TPackageVersion.Parse('1.0.3'), cCompiler, '', '');
+  FCache.AddPackageInfo(info, info);
+  Assert.IsFalse(FCache.TryGetPackageInfo(info, found), 'nothing is kept outside a scope');
+
+  FCache.BeginScope;
+  FCache.AddPackageInfo(info, info);
+  //held in a local - created inline for the const parameter it would never be freed.
+  identity := TPackageIdentity.Create('', 'base', TPackageVersion.Parse('1.0.3'), cCompiler);
+  Assert.IsTrue(FCache.TryGetPackageInfo(identity, found), 'the id is case insensitive');
+  Assert.AreEqual('1.0.3', found.Version.ToStringNoMeta);
+  identity := TPackageIdentity.Create('', 'Base', TPackageVersion.Parse('1.0.4'), cCompiler);
+  Assert.IsFalse(FCache.TryGetPackageInfo(identity, found), 'another version');
+  identity := TPackageIdentity.Create('', 'Base', TPackageVersion.Parse('1.0.3'), TCompilerVersion.Delphi11_0);
+  Assert.IsFalse(FCache.TryGetPackageInfo(identity, found), 'another compiler');
+  FCache.EndScope;
+  Assert.IsFalse(FCache.TryGetPackageInfo(info, found), 'forgotten at the end of the scope');
 end;
 
 initialization

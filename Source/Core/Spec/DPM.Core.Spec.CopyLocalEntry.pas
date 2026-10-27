@@ -108,7 +108,8 @@ begin
   end;
 
   FPlatforms := [];
-  platformsSeq := yamlObject.A['platforms'];
+  if not SequenceOf(yamlObject, 'platforms', 'the copyLocal entry [' + FSource + ']', platformsSeq) then
+    result := false;
   if platformsSeq.Count > 0 then
   begin
     for i := 0 to platformsSeq.Count -1 do
@@ -116,7 +117,13 @@ begin
       sPlatform := platformsSeq.S[i];
       platform := StringToDPMPlatform(sPlatform);
       if platform <> TDPMPlatform.UnknownPlatform then
-        FPlatforms := FPlatforms + [platform];
+        FPlatforms := FPlatforms + [platform]
+      else
+      begin
+        //not dropped - no platforms means all of them, so leaving it out would widen the entry.
+        Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The platform [' + sPlatform + '] of the copyLocal entry [' + FSource + '] is not a platform DPM knows.');
+        result := false;
+      end;
     end;
   end;
   //A legacy 'mode' key (always/runtimeOnly) is no longer used - runtime bpls are auto-copied and

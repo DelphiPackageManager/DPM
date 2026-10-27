@@ -89,7 +89,7 @@ type
     function GetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion) : IPackageSearchResult;
     function GetInstalledPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IList<IPackageIdentity>) : IList<IPackageSearchResultItem>;
     //
-    function GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageSearchResultItem;
+    function GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const sources : string = '') : IPackageSearchResultItem;
 
 
     function FindLatestVersion(const cancellationToken : ICancellationToken; const id : string; const compilerVersion : TCompilerVersion; const version : TPackageVersion; const includePrerelease : boolean; const sources : string) : IPackageInfo;
@@ -101,7 +101,7 @@ type
     function InstallPackageInPlace(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const targetDir : string) : boolean;
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
     function GetPackageIcon(const cancelToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageIcon;
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const packageId : string; const includePrerelease : boolean) : IList<TPackageVersion>; overload;
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const packageId : string; const includePrerelease : boolean; const sources : string = '') : IList<TPackageVersion>; overload;
 
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
                                                 const packageId : string; const versionRange : TVersionRange; const includePrerelease : boolean ) : IList<IPackageInfo>;
@@ -413,6 +413,12 @@ var
   currentResult : IPackageSearchResultItem;
   nextResult : IPackageSearchResultItem;
   count : integer;
+  queried : IList<IPackageRepository>;
+  sourceOptions : TSearchOptions;
+  totalCount : Int64;
+  sourceTotal : Int64;
+  skip : integer;
+  page : IEnumerable<IPackageSearchResultItem>;
 begin
   FLogger.Debug('TPackageRepositoryManager.GetPackageFeed');
 
@@ -433,11 +439,10 @@ begin
 
   allResults := TCollections.CreateList<IPackageSearchResultItem>;
 
+  queried := TCollections.CreateList<IPackageRepository>;
   try
     for repo in CurrentRepositories do
     begin
-      if cancelToken.IsCancelled then
-        exit;
       if not repo.Enabled then
         continue;
       if sources <> nil then
@@ -445,13 +450,47 @@ begin
         if sources.IndexOf(repo.Name) = -1 then
           continue;
       end;
-      searchResult := repo.GetPackageFeed(cancelToken, options, compilerVersion);
-      NoteUnavailable(repo);
-      allResults.AddRange(searchResult.Results);
+      queried.Add(repo);
     end;
   finally
     if sources <> nil then
       sources.Free;
+  end;
+
+  //One source pages itself - a server asked for a page sends just that page, and says how many there are in all.
+  //With several, the page is of the merged list : each is asked for everything up to the end of the page, and the
+  //page is cut from what they sent between them.
+  if queried.Count > 1 then
+  begin
+    sourceOptions := options.Clone;
+    sourceOptions.Skip := 0;
+    if options.Take > 0 then
+      sourceOptions.Take := options.Skip + options.Take;
+    skip := options.Skip;
+  end
+  else
+  begin
+    sourceOptions := options;
+    skip := 0;
+  end;
+  totalCount := 0;
+  try
+    for repo in queried do
+    begin
+      if cancelToken.IsCancelled then
+        exit;
+      searchResult := repo.GetPackageFeed(cancelToken, sourceOptions, compilerVersion);
+      NoteUnavailable(repo);
+      //a source that doesn't say still has at least what it sent.
+      sourceTotal := searchResult.TotalCount;
+      if sourceTotal < sourceOptions.Skip + searchResult.Results.Count then
+        sourceTotal := sourceOptions.Skip + searchResult.Results.Count;
+      Inc(totalCount, sourceTotal);
+      allResults.AddRange(searchResult.Results);
+    end;
+  finally
+    if sourceOptions <> options then
+      sourceOptions.Free;
   end;
 
   //sort by id so we can pick out the highest version
@@ -486,13 +525,15 @@ begin
       distinctResults.Add(currentResult);
   end;
 
+  page := distinctResults;
+  if skip > 0 then
+    page := page.Skip(skip);
   if options.Take > 0 then
-    result.Results.AddRange(distinctResults.Take(options.Take))
-  else
-    result.Results.AddRange(distinctResults);
+    page := page.Take(options.Take);
+  result.Results.AddRange(page);
 
-  result.TotalCount := result.Results.Count;
-
+  //a package in several sources is in each one's total - take off the ones seen.
+  result.TotalCount := totalCount - (allResults.Count - distinctResults.Count);
 end;
 
 function TPackageRepositoryManager.GetPackageIcon(const cancelToken : ICancellationToken; const source, packageId, packageVersion : string;
@@ -535,6 +576,9 @@ begin
   if not UpdateRepositories then
     exit;
   BeginRequest;
+  //asked once per operation - the installer asks again for packages a resolve already found.
+  if FRequestCache.TryGetPackageInfo(packageId, result) then
+    exit;
 
   for repo in CurrentRepositories do
   begin
@@ -546,16 +590,20 @@ begin
     result := repo.GetPackageInfo(cancellationToken, packageId);
     NoteUnavailable(repo);
     if result <> nil then
+    begin
+      FRequestCache.AddPackageInfo(packageId, result);
       exit;
+    end;
     if cancellationToken.IsCancelled then
       exit;
   end;
 end;
 
 
-function TPackageRepositoryManager.GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion): IPackageSearchResultItem;
+function TPackageRepositoryManager.GetPackageMetaData(const cancellationToken: ICancellationToken; const packageId, packageVersion: string; const compilerVersion: TCompilerVersion; const sources : string): IPackageSearchResultItem;
 var
   repo : IPackageRepository;
+  sourcesList : TStringList;
 begin
   FLogger.Debug('TPackageRepositoryManager.GetPackageMetaData');
   result := nil;
@@ -573,29 +621,39 @@ begin
     exit;
   BeginRequest;
 
-  
-  for repo in CurrentRepositories do
-  begin
-    if cancellationToken.IsCancelled then
-      exit;
-    if not repo.Enabled then
-      continue;
+  if sources <> '' then
+    sourcesList := SourceNameList(sources)
+  else
+    sourcesList := nil;
+  try
+    for repo in CurrentRepositories do
+    begin
+      if cancellationToken.IsCancelled then
+        exit;
+      if not repo.Enabled then
+        continue;
+      if (sourcesList <> nil) and (sourcesList.IndexOf(repo.Name) = -1) then
+        continue;
 
-    result := repo.GetPackageMetaData(cancellationToken, packageId, packageVersion, compilerVersion);
-    NoteUnavailable(repo);
-    if result <> nil then
-      exit;
+      result := repo.GetPackageMetaData(cancellationToken, packageId, packageVersion, compilerVersion);
+      NoteUnavailable(repo);
+      if result <> nil then
+        exit;
+    end;
+  finally
+    sourcesList.Free;
   end;
 end;
 
 function TPackageRepositoryManager.GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
-                                                      const packageId : string; const includePrerelease : boolean) : IList<TPackageVersion>;
+                                                      const packageId : string; const includePrerelease : boolean; const sources : string) : IList<TPackageVersion>;
 var
   repo : IPackageRepository;
   searchResult : IList<TPackageVersion>;
   unfilteredResults : IList<TPackageVersion>;
   distinctResults : IEnumerable<TPackageVersion>;
   comparer : IEqualityComparer<TPackageVersion>;
+  sourcesList : TStringList;
 begin
   FLogger.Debug('TPackageRepositoryManager.GetPackageVersions');
   result := TCollections.CreateList<TPackageVersion>;
@@ -613,19 +671,30 @@ begin
     exit;
   end;
 
-  if FRequestCache.TryGetVersions(packageId, compilerVersion, includePrerelease, searchResult) then
+  //the cache is of every source's answer - not what some of them say.
+  if (sources = '') and FRequestCache.TryGetVersions(packageId, compilerVersion, includePrerelease, searchResult) then
     exit(searchResult);
 
-  for repo in CurrentRepositories do
-  begin
-    if cancellationToken.IsCancelled then
-      exit;
-    if not repo.Enabled then
-      continue;
+  if sources <> '' then
+    sourcesList := SourceNameList(sources)
+  else
+    sourcesList := nil;
+  try
+    for repo in CurrentRepositories do
+    begin
+      if cancellationToken.IsCancelled then
+        exit;
+      if not repo.Enabled then
+        continue;
+      if (sourcesList <> nil) and (sourcesList.IndexOf(repo.Name) = -1) then
+        continue;
 
-    searchResult := repo.GetPackageVersions(cancellationToken, packageId, compilerVersion, includePrerelease);
-    NoteUnavailable(repo);
-    unfilteredResults.AddRange(searchResult);
+      searchResult := repo.GetPackageVersions(cancellationToken, packageId, compilerVersion, includePrerelease);
+      NoteUnavailable(repo);
+      unfilteredResults.AddRange(searchResult);
+    end;
+  finally
+    sourcesList.Free;
   end;
 
   comparer := TPackageVersionComparer.Create;
@@ -640,7 +709,7 @@ begin
       result := right.CompareTo(left);
     end);
   //a cancelled query may be partial - don't remember it.
-  if (not cancellationToken.IsCancelled) and (UnavailableSources = '') then
+  if (sources = '') and (not cancellationToken.IsCancelled) and (UnavailableSources = '') then
     FRequestCache.AddVersions(packageId, compilerVersion, includePrerelease, result);
 end;
 
@@ -1025,6 +1094,7 @@ var
   fingerprint : string;
   previous : string;
   configurationFingerprint : string;
+  invalidReason : string;
 begin
   //FLogger.Debug('TPackageRepositoryManager.UpdateRepositories');
   result := false;
@@ -1056,16 +1126,24 @@ begin
         if source.SourceType <> TSourceType.GitRegistry then
         begin
           if not TUriFactory.TryParseWithError(source.Source, false, uri, error) then
+            invalidReason := '[' + source.Source + '] is not a valid uri : ' + error
+          else if not MatchText(uri.Scheme, ['file', 'http', 'https']) then
+            invalidReason := '[' + uri.Scheme + '] is not a supported scheme (file, http or https).'
+          else
+            invalidReason := '';
+          if invalidReason <> '' then
           begin
+            //nothing uses a disabled source - it doesn't stop the others being used. It has no repository; its
+            //name is still taken, so a later source of the same name doesn't stand in for it.
+            if not source.IsEnabled then
+            begin
+              if report then
+                FLogger.Warning(TWarningCode.W1006_DisabledSourceInvalid, 'The disabled source [' + source.Name + '] is not valid - ' + invalidReason);
+              fingerprints[LowerCase(source.Name)] := fingerprint;
+              continue;
+            end;
             if report then
-              FLogger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + source.Name + '] is not valid - [' + source.Source + '] is not a valid uri : ' + error);
-            exit;
-          end;
-
-          if not MatchText(uri.Scheme, ['file', 'http', 'https']) then
-          begin
-            if report then
-              FLogger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + source.Name + '] is not valid - [' + uri.Scheme + '] is not a supported scheme (file, http or https).');
+              FLogger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + source.Name + '] is not valid - ' + invalidReason);
             exit;
           end;
         end;

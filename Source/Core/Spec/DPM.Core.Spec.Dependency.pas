@@ -161,8 +161,8 @@ begin
     result := false;
 
   end
-  else if Trim(sValue) = cVersionToken then
-    //deferred - resolved to this package's own version at pack time (ResolveVersionToken).
+  else if SameText(Trim(sValue), cVersionToken) then
+    //deferred (any case, as the other tokens are) - resolved to this package's own version at pack time (ResolveVersionToken).
     FVersionString := cVersionToken
   else if SameText(Trim(sValue), cBundledDependencyToken) then
   begin

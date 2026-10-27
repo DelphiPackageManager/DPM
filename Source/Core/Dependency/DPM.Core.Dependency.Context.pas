@@ -2,7 +2,7 @@
 {                                                                           }
 {           Delphi Package Manager - DPM                                    }
 {                                                                           }
-{           Copyright � 2019 Vincent Parrett and contributors               }
+{           Copyright © 2019 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -29,6 +29,7 @@ unit DPM.Core.Dependency.Context;
 interface
 
 uses
+  System.SysUtils,
   Spring.Collections,
   DPM.Core.Logging,
   DPM.Core.Types,
@@ -37,374 +38,521 @@ uses
   DPM.Core.Package.Interfaces,
   DPM.Core.Package.Installer.Interfaces;
 
-//only intended for internal use by the resolver so interfaces can stay here
+//The state of one resolve - only intended for use by the resolver (DPM.Core.Dependency.Resolver), which does
+//the searching. Everything the search changes goes through Assign and the agenda, and can be undone back to a
+//Mark - so a choice that is given up leaves nothing behind.
 type
-  /// <summary>
-  /// Used to cache information during dependency resolution.
-  /// </summary>
-  IResolverContext = interface
-    ['{B97E7843-4C13-490A-A776-DFAC1BC60A0D}']
-    procedure RecordNoGood(const bad : IPackageInfo);
-    function IsNoGood(const package : IPackageInfo) : boolean;
-    procedure RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
+  TAssignmentKind = (
+    //a package being installed, or the top level restore is re-resolving - its version is not negotiable.
+    akTopLevel,
+    //what the project already has. Kept as it is, and its own dependencies are not checked again, unless a
+    //requirement needs it to change - which a top level reference never does.
+    akProjectReference,
+    //adopted from another project in the group - the group shares one version of each package.
+    akImported,
+    //a version the search chose.
+    akChosen,
+    //the no-op for a dependency the IDE ships (e.g. Indy), when no real package provides it.
+    akBundled
+  );
 
-    ///  Records a synthetic no-op resolution for a bundled dependency (e.g. Indy) when no real
-    ///  package for the id is present. Idempotent and never overwrites an existing (real)
-    ///  resolution. The resolution carries no files - the installer skips it and it is excluded
-    ///  from the dproj graph.
-    procedure RecordBundledResolution(const packageId : string);
-
-    ///  Read-only lookup against the local resolution table. Returns false (and resolution=nil)
-    ///  if the package isn't already recorded in THIS context's FResolved. Does not consult the
-    ///  cross-project installer context. Use this for parent / backtrack lookups where importing
-    ///  another project's resolution would be incorrect.
-    function TryGetResolvedPackage(const packageId : string; out resolution : IResolvedPackage) : boolean;
-
-    ///  Like TryGetResolvedPackage, but on miss also consults the cross-project installer
-    ///  context. If a sibling project has resolved this id, the resolution is cloned (with the
-    ///  supplied parentId) into FResolved and its transitive resolutions are imported. Mutates
-    ///  the context's resolution state - use only at the primary dep-resolution call site.
-    function GetOrImportResolvedPackage(const packageId : string; const parentId : string; out resolution : IResolvedPackage) : boolean;
-
-    procedure RemoveResolvedPackage(const packageId : string);
-    procedure PushRequirement(const package : IPackageInfo);
-    function PopRequirement : IPackageInfo;
-    function GetResolvedPackages : TArray<IResolvedPackage>;
-    function AnyOpenRequrements : boolean;
-    function GetPackageVersions(const packageId : string) : IList<IPackageInfo>;
-    procedure CachePackageVersions(const packageId : string; const versions : IList<IPackageInfo>);
-    function GetResolvedPackageInfos : IList<IPackageInfo>;
-    function BuildDependencyGraph : IPackageReference;
-    function ProjectFile : string;
-    procedure RecordUnresolvable(const conflict : TUnresolvableConflict);
-    function HasUnresolvable : boolean;
-    function GetUnresolvable : IList<TUnresolvableConflict>;
-
-    ///  When restore re-uses the dproj's recorded graph as a lock file, the installer hands the
-    ///  recorded (id -> version) map to the resolver via the context. Returns true and the
-    ///  pinned version when there is a hint for this id - the resolver should try to honour it
-    ///  before picking a new version from the cache or repo. Returns false otherwise.
-    function TryGetPreferredVersion(const packageId : string; out version : TPackageVersion) : boolean;
-
-    ///  Records that a parent's dependency on (depId) has been narrowed to a tighter range than
-    ///  the parent's manifest declares - used when an intersection is found with another already-
-    ///  resolved version. Stored on the context so the next iteration sees the narrower range
-    ///  without mutating the parent's IPackageInfo (which would corrupt the manifest's view if
-    ///  the same info is re-evaluated).
-    procedure NarrowDependencyRange(const parentId, depId : string; const range : TVersionRange);
-
-    ///  Returns the effective range for a dependency: the narrowed range if NarrowDependencyRange
-    ///  was called for this (parentId, depId) pair, otherwise the supplied declared range.
-    function GetEffectiveDependencyRange(const parentId, depId : string; const declaredRange : TVersionRange) : TVersionRange;
-
-    ///  Returns true if any package recorded as top-level in this context is a prerelease.
-    ///  Used by the resolver to implement NuGet-style implicit promotion: when the user pins
-    ///  a prerelease (or has one in their project), prereleases become eligible globally for
-    ///  the whole resolve - matching what NuGet does when you install a prerelease by name.
-    function AnyTopLevelIsPrerelease : boolean;
-
-    ///  Returns true the first time we see this id (caller should sort dependencies now),
-    ///  false on subsequent calls (sort already done in a previous iteration). Mutates the
-    ///  context's "already sorted" set as a side effect. Sort order is stable across iterations
-    ///  because the resolver no longer mutates IPackageDependency ranges - so re-sorting on
-    ///  every backtrack-driven re-push of the same parent is wasted work.
-    function ShouldSortDependencies(const packageId : string) : boolean;
-
-    ///  True when this package is at the version the project already had : a project reference the
-    ///  resolve kept as it was, or (restore) a package at the version the project's graph records - restore
-    ///  re-resolves each top level as a 'new' package, but that doesn't make it a change. Used to tell an
-    ///  edge the install made inconsistent from one that already was.
-    function IsUnchanged(const package : IPackageInfo) : boolean;
+  //The decisions (by level) something depends on - sorted, without duplicates. Empty for a fact.
+  TLevels = record
+  private
+    FItems : TArray<integer>;
+  public
+    class function Empty : TLevels; static;
+    class function Single(const level : integer) : TLevels; static;
+    procedure Add(const level : integer);
+    procedure AddAll(const other : TLevels);
+    function Without(const level : integer) : TLevels;
+    function IsEmpty : boolean;
+    //the latest decision, 0 when there is none.
+    function Highest : integer;
   end;
 
-  TResolverContext = class(TInterfacedObject, IResolverContext)
+  //A package in the solution, at its version, and why it is there. Replaced whole, never changed in place, so
+  //the trail can put back the one it replaced.
+  TAssignment = record
+    PackageInfo : IPackageInfo;
+    Kind : TAssignmentKind;
+    //the decisions it depends on - undoing any of them takes it out again.
+    Responsible : TLevels;
+    ParentId : string;
+    VersionRange : TVersionRange;
+    //akImported : the other project's resolution.
+    Imported : IResolvedPackage;
+    //akProjectReference : one the project references directly.
+    TopLevelReference : boolean;
+    function IsTopLevel : boolean;
+  end;
+
+  //a package's requirement of one of its dependencies, waiting to be checked.
+  TRequirement = record
+    Owner : IPackageInfo;
+    Dependency : IPackageDependency;
+  end;
+
+  //the range a package in the solution declares for one of its dependencies.
+  TConstraint = record
+    Owner : IPackageInfo;
+    Responsible : TLevels;
+    Range : TVersionRange;
+  end;
+
+  //what UndoTo goes back to.
+  TResolverMark = record
+    Trail : integer;
+    AgendaHead : integer;
+    AgendaCount : integer;
+    DeferredHead : integer;
+    DeferredCount : integer;
+  end;
+
+  TResolverContext = class
   private
     FLogger : ILogger;
-    FNoGoods : IDictionary<string, ISet<TPackageVersion>>;
-    FResolved : IDictionary<string, IResolvedPackage>;
-    FOpenRequirements : IQueue<IPackageInfo>;
-    FVersionCache : IDictionary<string, IList<IPackageInfo>>;
-    FUnresolvable : IList<TUnresolvableConflict>;
-    FCompilerVersion : TCompilerVersion;
-    FProjectFile : string;
     FPackageInstallerContext : IPackageInstallerContext;
+    FProjectFile : string;
+    FCompilerVersion : TCompilerVersion;
+    FAssignments : IDictionary<string, TAssignment>;
+    //lowercase id -> the ranges the packages in the solution declare for it.
+    FConstraints : IDictionary<string, IList<TConstraint>>;
+    //requirements still to check, oldest first. Only ever appended to, so going back is just restoring
+    //the head and the count.
+    FAgenda : IList<TRequirement>;
+    FAgendaHead : integer;
+    //bundled requirements (e.g. Indy) - checked once everything else is, so a real package always wins.
+    FDeferred : IList<TRequirement>;
+    FDeferredHead : integer;
+    FTrail : IList<TProc>;
+    //'id@version' -> why it can't be used, whatever else is chosen.
+    FNoGoods : IDictionary<string, string>;
+    FVersionLists : IDictionary<string, IList<IPackageInfo>>;
     FPreferredVersions : IDictionary<string, TPackageVersion>;
-    FNarrowedRanges : IDictionary<string, TVersionRange>;
-    //Tracks ids already imported via GetOrImportResolvedPackage's CopyDependencies, so a
-    //cyclic cross-project resolution graph can't re-enter the same node and loop forever.
-    FImportedIds : ISet<string>;
-    FSortedDependencyIds : ISet<string>;
-    //lowercase id -> version of each project reference recorded as resolved by the constructor.
     FProjectReferenceVersions : IDictionary<string, TPackageVersion>;
-  protected
-    procedure RecordNoGood(const bad : IPackageInfo);
-    function IsNoGood(const package : IPackageInfo) : boolean;
-
-    procedure RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
-    procedure RecordBundledResolution(const packageId : string);
-    function TryGetResolvedPackage(const packageId : string; out resolution : IResolvedPackage) : boolean;
-    function GetOrImportResolvedPackage(const packageId : string; const parentId : string; out resolution : IResolvedPackage) : boolean;
-    procedure RemoveResolvedPackage(const packageId : string);
-    procedure PushRequirement(const package : IPackageInfo);
-    function PopRequirement : IPackageInfo;
-    function GetResolvedPackages : TArray<IResolvedPackage>;
-    function AnyOpenRequrements : boolean;
-    function GetPackageVersions(const packageId : string) : IList<IPackageInfo>;
-    procedure CachePackageVersions(const packageId : string; const versions : IList<IPackageInfo>);
-    function GetResolvedPackageInfos : IList<IPackageInfo>;
-    function BuildDependencyGraph : IPackageReference;
-    function ProjectFile : string;
-    procedure RecordUnresolvable(const conflict : TUnresolvableConflict);
-    function HasUnresolvable : boolean;
-    function GetUnresolvable : IList<TUnresolvableConflict>;
-    function TryGetPreferredVersion(const packageId : string; out version : TPackageVersion) : boolean;
-    procedure NarrowDependencyRange(const parentId, depId : string; const range : TVersionRange);
-    function GetEffectiveDependencyRange(const parentId, depId : string; const declaredRange : TVersionRange) : TVersionRange;
-    function AnyTopLevelIsPrerelease : boolean;
-    function ShouldSortDependencies(const packageId : string) : boolean;
-    function IsUnchanged(const package : IPackageInfo) : boolean;
+    //the top levels, in the order they go in the graph : the project's, then the new ones.
+    FTopLevels : IList<string>;
+    FSortedDependencies : IDictionary<IPackageInfo, IList<IPackageDependency>>;
+    procedure SetAssignment(const packageId : string; const assignment : TAssignment);
+    procedure AddConstraints(const assignment : TAssignment);
+    procedure RemoveConstraints(const assignment : TAssignment);
   public
-    /// sharedVersionCache: when supplied, the resolver shares a version cache across multiple
-    /// ResolveForInstall calls (e.g. one per top-level package in a restore). nil = create a
-    /// fresh per-call cache, which is the historical behaviour.
-    /// preferredVersions: lock-file-style hints (id -> version) - the resolver prefers these
-    /// versions over picking the latest in-range alternative. nil for install/update, populated
-    /// by restore from the existing project graph.
-    /// newPackages: the packages being installed (an upgrade and its companions, or the top level
-    /// restore is re-resolving) - each is recorded as a top level at its exact version.
-    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackages : IList<IPackageInfo>; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>);overload;
-    /// newPackageIds: lowercase ids of the packages the caller records as top level resolutions
-    /// itself. Any reference to those ids in projectReferences is skipped - see the note in the
-    /// constructor body. nil when there are none.
-    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const newPackageIds : ISet<string>);overload;
-    destructor Destroy;override;
+    /// newPackages : the packages being installed (an upgrade and its companions, or the top level restore is
+    /// re-resolving) - each is a top level at its exact version, and replaces any project reference with its id.
+    /// sharedVersionCache : version lookups shared by several resolves (restore resolves one top level at a
+    /// time) - nil for a cache of its own.
+    /// preferredVersions : lock-file style hints (id -> version) tried before anything else - restore passes
+    /// the project's graph, install nil.
+    constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string;
+                       const compilerVersion : TCompilerVersion; const newPackages : IList<IPackageInfo>;
+                       const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>;
+                       const preferredVersions : IDictionary<string, TPackageVersion>);
+
+    function TryGetAssignment(const packageId : string; out assignment : TAssignment) : boolean;
+    //puts the assignment in the solution, replacing any with its id - undone by UndoTo.
+    procedure Assign(const assignment : TAssignment);
+    //the ranges the packages in the solution declare for packageId.
+    function ConstraintsOn(const packageId : string) : IList<TConstraint>;
+
+    //queues the owner's dependencies to be checked - narrowest range first.
+    procedure Require(const owner : IPackageInfo);
+    function NextRequirement(out requirement : TRequirement; out deferred : boolean) : boolean;
+
+    function Mark : TResolverMark;
+    procedure UndoTo(const mark : TResolverMark);
+
+    function IsNoGood(const package : IPackageInfo; out reason : string) : boolean;
+    procedure RecordNoGood(const package : IPackageInfo; const reason : string);
+    function TryGetVersionList(const key : string; out versions : IList<IPackageInfo>) : boolean;
+    procedure CacheVersionList(const key : string; const versions : IList<IPackageInfo>);
+    //the dependencies sorted narrowest range first (fail early), equal ones in the manifest's order - the
+    //manifest itself is never reordered.
+    function SortedDependencies(const package : IPackageInfo) : IList<IPackageDependency>;
+
+    function TryGetPreferredVersion(const packageId : string; out version : TPackageVersion) : boolean;
+    //another project in the group's resolution of packageId, nil when none has one.
+    function FindSiblingResolution(const packageId : string) : IResolvedPackage;
+    ///  True when the package is at the version the project already had : a project reference kept as it was,
+    ///  another project's version, or (restore) the version the project's graph records - restore re-resolves
+    ///  each top level as a 'new' package, but that doesn't make it a change. Used to tell an edge this resolve
+    ///  made inconsistent from one that already was.
+    function IsUnchanged(const assignment : TAssignment) : boolean;
+    function AnyTopLevelIsPrerelease : boolean;
+
+    //What the solution holds, reachable from the top levels, dependencies before the packages that need them.
+    //(A choice that was given up is not in it, nor anything only it needed.)
+    function ResolvedOrder : IList<TAssignment>;
+    function GetResolvedPackageInfos : IList<IPackageInfo>;
+    function GetResolvedPackages : TArray<IResolvedPackage>;
+    function BuildDependencyGraph : IPackageReference;
+
+    property ProjectFile : string read FProjectFile;
+    property CompilerVersion : TCompilerVersion read FCompilerVersion;
+    property TopLevels : IList<string> read FTopLevels;
   end;
 
+//an assignment with every field set (a record local's unmanaged fields start as garbage).
+function MakeAssignment(const packageInfo : IPackageInfo; const kind : TAssignmentKind; const responsible : TLevels; const parentId : string;
+                        const versionRange : TVersionRange) : TAssignment;
 
 implementation
 
 uses
-  System.SysUtils,
   DPM.Core.Constants,
   DPM.Core.Package.Classes,
   DPM.Core.Dependency.Reference,
   DPM.Core.Dependency.Resolution;
 
-  { TResolverContext }
-
-procedure TResolverContext.CachePackageVersions(const packageId : string; const versions : IList<IPackageInfo>);
-var
-  list : IList<IPackageInfo>;
+function MakeAssignment(const packageInfo : IPackageInfo; const kind : TAssignmentKind; const responsible : TLevels; const parentId : string;
+                        const versionRange : TVersionRange) : TAssignment;
 begin
-  if not FVersionCache.TryGetValue(LowerCase(packageId), list) then
-  begin
-    list := TCollections.CreateList<IPackageInfo>;
-    FVersionCache.Add(LowerCase(packageId), list);
-  end;
-  list.AddRange(versions);
+  result.PackageInfo := packageInfo;
+  result.Kind := kind;
+  result.Responsible := responsible;
+  result.ParentId := parentId;
+  result.VersionRange := versionRange;
+  result.Imported := nil;
+  result.TopLevelReference := false;
 end;
 
-function TResolverContext.AnyOpenRequrements : boolean;
+function NoGoodKey(const package : IPackageInfo) : string;
 begin
-  result := FOpenRequirements.Any;
+  result := LowerCase(package.Id) + '@' + package.Version.ToStringNoMeta;
 end;
 
-function TResolverContext.BuildDependencyGraph : IPackageReference;
-var
-  toplevelPackages : TArray<IResolvedPackage>;
-  topLevelPackage : IResolvedPackage;
+{ TLevels }
 
-  //Returns true if [id] is already on the parent chain of [node] - used to short-circuit
-  //recursion in cyclic resolved sets (which can survive when the resolver hits its iteration
-  //limit on an A->B->A graph).
-  function IsAncestor(const node : IPackageReference; const id : string) : boolean;
-  var
-    p : IPackageReference;
-  begin
-    result := false;
-    p := node;
-    while p <> nil do
-    begin
-      if SameText(p.Id, id) then
-        exit(true);
-      p := p.Parent;
-    end;
-  end;
-
-  //Tolerates partial resolution: when a package's dependency isn't in FResolved (because the
-  //resolver couldn't satisfy it OR backtracked and removed it), skip the dep instead of raising.
-  //Also tolerates cycles surviving in the resolved set - we skip transients whose id is already
-  //on the path. Either way the graph is then partial, which is useful for diagnostics; callers
-  //that need a complete graph already check the DoResolve return value before consuming this.
-  procedure AddNode(const parent : IPackageReference; const package : IPackageInfo; const versionRange : TVersionRange);
-  var
-    resolution : IResolvedPackage;
-    dependency : IPackageDependency;
-    dependencyReference : IPackageReference;
-    childRange : TVersionRange;
-  begin
-    dependencyReference := parent.AddChild(package.Id, package.Version, versionRange);
-    dependencyReference.UseSource := package.UseSource;
-    if package.Dependencies <> nil then
-      for dependency in package.Dependencies do
-      begin
-        if not TryGetResolvedPackage(dependency.Id, resolution) then
-        begin
-          FLogger.Debug('BuildDependencyGraph: no resolution for [' + dependency.Id +
-                        '] required by [' + package.Id + '-' + package.Version.ToStringNoMeta +
-                        '] - graph will be incomplete');
-          continue;
-        end;
-        //bundled deps (e.g. Indy) are a no-op satisfied by the IDE - never emit a graph edge,
-        //else the dproj gets a dangling 999.999.999 PackageReference and restore would pin it.
-        if resolution.IsBundled then
-          continue;
-        if IsAncestor(dependencyReference, dependency.Id) then
-        begin
-          FLogger.Debug('BuildDependencyGraph: cycle detected for [' + dependency.Id +
-                        '] under [' + package.Id + '] - skipping to avoid an infinite graph');
-          continue;
-        end;
-        //The recorded edge range must be THIS parent's declared dependency range, not the child's
-        //shared resolution.VersionRange - that single per-id value can be collapsed to a single
-        //version (TVersionRange.Create) by the resolver's promotion path or narrowed by a sibling,
-        //which is what was incorrectly persisting in the dproj. dependency.VersionRange is the
-        //authoritative, per-edge declared range and is never mutated by the resolver.
-        childRange := dependency.VersionRange;
-        if childRange.IsEmpty then
-          childRange := resolution.VersionRange; //defensive fallback only
-        AddNode(dependencyReference, resolution.PackageInfo, childRange);
-      end;
-  end;
-
+class function TLevels.Empty : TLevels;
 begin
-  result := TPackageReference.CreateRoot(FCompilerVersion);
-  toplevelPackages := FResolved.Values.Where(function(const value : IResolvedPackage) : boolean
-    begin
-      //exclude synthetic bundled no-ops - they are not real packages and must not appear in the graph.
-      result := value.IsTopLevel and (not value.IsBundled);
-    end).ToArray;
-
-  for toplevelPackage in toplevelPackages do
-    AddNode(result, topLevelPackage.PackageInfo, TVersionRange.Empty);
+  result.FItems := nil;
 end;
 
-constructor TResolverContext.Create(const logger: ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const compilerVersion : TCompilerVersion; const projectReferences: IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const newPackageIds : ISet<string>);
+class function TLevels.Single(const level : integer) : TLevels;
+begin
+  SetLength(result.FItems, 1);
+  result.FItems[0] := level;
+end;
+
+procedure TLevels.Add(const level : integer);
 var
-  projectReference : IPackageReference;
+  items : TArray<integer>;
+  i : integer;
+  j : integer;
+begin
+  i := 0;
+  while (i < Length(FItems)) and (FItems[i] < level) do
+    Inc(i);
+  if (i < Length(FItems)) and (FItems[i] = level) then
+    exit;
+  //a new array - a TLevels copied from this one shares FItems.
+  SetLength(items, Length(FItems) + 1);
+  for j := 0 to i - 1 do
+    items[j] := FItems[j];
+  items[i] := level;
+  for j := i to Length(FItems) - 1 do
+    items[j + 1] := FItems[j];
+  FItems := items;
+end;
 
-  function IsProjectRef(const id : string) : boolean;
-  begin
-    result := projectReferences.Any(
-      function (const projectRef : IPackageReference) : boolean
-      begin
-           result := SameText(id, projectRef.Id);
-      end);
-  end;
+procedure TLevels.AddAll(const other : TLevels);
+var
+  i : integer;
+begin
+  for i := 0 to Length(other.FItems) - 1 do
+    Add(other.FItems[i]);
+end;
 
+function TLevels.Without(const level : integer) : TLevels;
+var
+  i : integer;
+begin
+  result := TLevels.Empty;
+  for i := 0 to Length(FItems) - 1 do
+    if FItems[i] <> level then
+      result.Add(FItems[i]);
+end;
+
+function TLevels.IsEmpty : boolean;
+begin
+  result := Length(FItems) = 0;
+end;
+
+function TLevels.Highest : integer;
+begin
+  if Length(FItems) = 0 then
+    result := 0
+  else
+    result := FItems[Length(FItems) - 1];
+end;
+
+{ TAssignment }
+
+function TAssignment.IsTopLevel : boolean;
+begin
+  result := (Kind = akTopLevel) or ((Kind = akProjectReference) and TopLevelReference);
+end;
+
+{ TResolverContext }
+
+constructor TResolverContext.Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string;
+                                    const compilerVersion : TCompilerVersion; const newPackages : IList<IPackageInfo>;
+                                    const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>;
+                                    const preferredVersions : IDictionary<string, TPackageVersion>);
+var
+  newIds : ISet<string>;
+  newPackage : IPackageInfo;
+  reference : IPackageReference;
+  assignment : TAssignment;
+  id : string;
 begin
   inherited Create;
-  FCompilerVersion := compilerVersion;
+  Assert((newPackages <> nil) and newPackages.Any);
   FLogger := logger;
   FPackageInstallerContext := packageInstallerContext;
   FProjectFile := projectFile;
-  FNoGoods := TCollections.CreateDictionary<string, ISet<TPackageVersion>>;
-  FResolved := TCollections.CreateDictionary<string, IResolvedPackage>;
-  FOpenRequirements := TCollections.CreateQueue<IPackageInfo>;
-  //honour the caller-supplied cache so version lookups can be reused across multiple
-  //ResolveForInstall iterations during a single restore.
+  FCompilerVersion := compilerVersion;
+  FAssignments := TCollections.CreateDictionary<string, TAssignment>;
+  FConstraints := TCollections.CreateDictionary<string, IList<TConstraint>>;
+  FAgenda := TCollections.CreateList<TRequirement>;
+  FDeferred := TCollections.CreateList<TRequirement>;
+  FTrail := TCollections.CreateList<TProc>;
+  FNoGoods := TCollections.CreateDictionary<string, string>;
   if sharedVersionCache <> nil then
-    FVersionCache := sharedVersionCache
+    FVersionLists := sharedVersionCache
   else
-    FVersionCache := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
-  FUnresolvable := TCollections.CreateList<TUnresolvableConflict>;
-  //Lock-file hints. nil for install/update (the caller doesn't pin anything), populated by
-  //restore from the existing dproj graph so the resolver re-uses recorded versions.
+    FVersionLists := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
   FPreferredVersions := preferredVersions;
-  //Per-(parentId, depId) overlay of narrowed dependency ranges. Used by the resolver when a
-  //sibling has already constrained a shared transient - it stores the intersection here rather
-  //than mutating the parent's manifest IPackageDependency.
-  FNarrowedRanges := TCollections.CreateDictionary<string, TVersionRange>;
-  FImportedIds := TCollections.CreateSet<string>;
-  FSortedDependencyIds := TCollections.CreateSet<string>;
   FProjectReferenceVersions := TCollections.CreateDictionary<string, TPackageVersion>;
+  FTopLevels := TCollections.CreateList<string>;
+  FSortedDependencies := TCollections.CreateDictionary<IPackageInfo, IList<IPackageDependency>>;
 
-  for projectReference in projectReferences do
+  newIds := TCollections.CreateSet<string>;
+  for newPackage in newPackages do
   begin
-    //The package being installed - or, on restore's slow path, the top level currently being
-    //re-resolved - is recorded as a top level resolution by the calling constructor. It can also
-    //appear in projectReferences: restore feeds the previous iteration's flattened references
-    //(top levels AND transients) back in, so a package that is both a top level of the project
-    //and a transient of an earlier top level arrives in both places. Recording it here would make
-    //the caller's RecordResolution fail with 'Resolution already exists' and abort the restore.
-    //The top level pin is not negotiable, so skip the reference and let the caller record it.
-    if (newPackageIds <> nil) and newPackageIds.Contains(LowerCase(projectReference.Id)) then
+    Assert(not newIds.Contains(LowerCase(newPackage.Id)), 'duplicate new package [' + newPackage.Id + ']');
+    newIds.Add(LowerCase(newPackage.Id));
+  end;
+
+  for reference in projectReferences do
+  begin
+    id := LowerCase(reference.Id);
+    //The package being installed - or, on restore's slow path, the top level being re-resolved - can also be
+    //among the references : restore feeds the previous iteration's flattened graph (top levels AND transients)
+    //back in. It replaces the reference - the top level pin is not negotiable.
+    if newIds.Contains(id) or FAssignments.ContainsKey(id) then
       continue;
-
-    //don't add to the list of packages to resolve if it has no dependencies..
-
-    //this is causing unnecessary work during restore.
-    //what we should be doing here is checking if there are any missing dependencies and only resolving them.
-    if projectReference.PackageInfo.Dependencies.Any and (not IsProjectRef(projectReference.Id))  then
-      PushRequirement(projectReference.PackageInfo);
-
-    //record the project reference as already resolved so that we do not change the version used.
-    RecordResolution(projectReference.PackageInfo, projectReference.VersionRange, projectReference.ParentId);
-    FProjectReferenceVersions[LowerCase(projectReference.Id)] := projectReference.PackageInfo.Version;
+    assignment := MakeAssignment(reference.PackageInfo, akProjectReference, TLevels.Empty, reference.ParentId, reference.VersionRange);
+    assignment.TopLevelReference := reference.IsTopLevel;
+    SetAssignment(id, assignment);
+    FProjectReferenceVersions[id] := reference.PackageInfo.Version;
+    if reference.IsTopLevel then
+      FTopLevels.Add(id);
   end;
 
+  for newPackage in newPackages do
+  begin
+    id := LowerCase(newPackage.Id);
+    SetAssignment(id, MakeAssignment(newPackage, akTopLevel, TLevels.Empty, cRootNode, TVersionRange.Create(newPackage.Version)));
+    FTopLevels.Add(id);
+  end;
+  //once every top level is in, so their ranges constrain the first choice already.
+  for newPackage in newPackages do
+    Require(newPackage);
 end;
 
-destructor TResolverContext.Destroy;
+procedure TResolverContext.SetAssignment(const packageId : string; const assignment : TAssignment);
 begin
-  FLogger := nil;
-  FPackageInstallerContext := nil;
-  FNoGoods := nil;
-  FResolved := nil;
-  FOpenRequirements := nil;
-  FVersionCache := nil;
-  FUnresolvable := nil;
-  FPreferredVersions := nil;
-  FNarrowedRanges := nil;
-  FImportedIds := nil;
-  FSortedDependencyIds := nil;
-  FProjectReferenceVersions := nil;
-  inherited;
+  FAssignments[packageId] := assignment;
+  AddConstraints(assignment);
 end;
 
-procedure TResolverContext.RecordUnresolvable(const conflict : TUnresolvableConflict);
-begin
-  FUnresolvable.Add(conflict);
-end;
-
-function TResolverContext.HasUnresolvable : boolean;
-begin
-  result := FUnresolvable.Any;
-end;
-
-function TResolverContext.GetUnresolvable : IList<TUnresolvableConflict>;
-begin
-  result := FUnresolvable;
-end;
-
-constructor TResolverContext.Create(const logger : ILogger;  const packageInstallerContext : IPackageInstallerContext; const projectFile : string; const newPackages : IList<IPackageInfo>; const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>);
+procedure TResolverContext.AddConstraints(const assignment : TAssignment);
 var
-  newPackageIds : ISet<string>;
-  newPackage : IPackageInfo;
+  dependency : IPackageDependency;
+  list : IList<TConstraint>;
+  constraint : TConstraint;
 begin
-  Assert((newPackages <> nil) and newPackages.Any);
-  newPackageIds := TCollections.CreateSet<string>;
-  for newPackage in newPackages do
+  if assignment.PackageInfo.Dependencies = nil then
+    exit;
+  for dependency in assignment.PackageInfo.Dependencies do
   begin
-    Assert(not newPackageIds.Contains(LowerCase(newPackage.Id)), 'duplicate new package [' + newPackage.Id + ']');
-    newPackageIds.Add(LowerCase(newPackage.Id));
+    //any version (or the IDE's own) satisfies a bundled dependency - it constrains nothing.
+    if dependency.VersionRange.IsBundledSentinel then
+      continue;
+    if not FConstraints.TryGetValue(LowerCase(dependency.Id), list) then
+    begin
+      list := TCollections.CreateList<TConstraint>;
+      FConstraints[LowerCase(dependency.Id)] := list;
+    end;
+    constraint.Owner := assignment.PackageInfo;
+    constraint.Responsible := assignment.Responsible;
+    constraint.Range := dependency.VersionRange;
+    list.Add(constraint);
   end;
-  Create(logger, packageInstallerContext, projectFile, newPackages[0].CompilerVersion, projectReferences, sharedVersionCache, preferredVersions, newPackageIds);
-  for newPackage in newPackages do
+end;
+
+procedure TResolverContext.RemoveConstraints(const assignment : TAssignment);
+var
+  dependency : IPackageDependency;
+  list : IList<TConstraint>;
+  i : integer;
+begin
+  if assignment.PackageInfo.Dependencies = nil then
+    exit;
+  for dependency in assignment.PackageInfo.Dependencies do
   begin
-    PushRequirement(newPackage);
-    RecordResolution(newPackage, TVersionRange.Create(newPackage.Version), cRootNode);
+    if dependency.VersionRange.IsBundledSentinel then
+      continue;
+    if not FConstraints.TryGetValue(LowerCase(dependency.Id), list) then
+      continue;
+    //undo runs newest first, so it is the last one this package added.
+    for i := list.Count - 1 downto 0 do
+      if list[i].Owner = assignment.PackageInfo then
+      begin
+        list.Delete(i);
+        break;
+      end;
   end;
+end;
+
+function TResolverContext.TryGetAssignment(const packageId : string; out assignment : TAssignment) : boolean;
+begin
+  result := FAssignments.TryGetValue(LowerCase(packageId), assignment);
+end;
+
+procedure TResolverContext.Assign(const assignment : TAssignment);
+var
+  id : string;
+  current : TAssignment;
+  previous : TAssignment;
+  hadPrevious : boolean;
+begin
+  id := LowerCase(assignment.PackageInfo.Id);
+  current := assignment;
+  hadPrevious := FAssignments.TryGetValue(id, previous);
+  if hadPrevious then
+    RemoveConstraints(previous);
+  SetAssignment(id, current);
+  FTrail.Add(
+    procedure
+    begin
+      RemoveConstraints(current);
+      if hadPrevious then
+        SetAssignment(id, previous)
+      else
+        FAssignments.Remove(id);
+    end);
+end;
+
+function TResolverContext.ConstraintsOn(const packageId : string) : IList<TConstraint>;
+begin
+  if not FConstraints.TryGetValue(LowerCase(packageId), result) then
+    result := TCollections.CreateList<TConstraint>;
+end;
+
+procedure TResolverContext.Require(const owner : IPackageInfo);
+var
+  dependency : IPackageDependency;
+  requirement : TRequirement;
+begin
+  for dependency in SortedDependencies(owner) do
+  begin
+    requirement.Owner := owner;
+    requirement.Dependency := dependency;
+    if dependency.VersionRange.IsBundledSentinel then
+      FDeferred.Add(requirement)
+    else
+      FAgenda.Add(requirement);
+  end;
+end;
+
+function TResolverContext.NextRequirement(out requirement : TRequirement; out deferred : boolean) : boolean;
+begin
+  result := true;
+  if FAgendaHead < FAgenda.Count then
+  begin
+    requirement := FAgenda[FAgendaHead];
+    Inc(FAgendaHead);
+    deferred := false;
+    exit;
+  end;
+  if FDeferredHead < FDeferred.Count then
+  begin
+    requirement := FDeferred[FDeferredHead];
+    Inc(FDeferredHead);
+    deferred := true;
+    exit;
+  end;
+  deferred := false;
+  result := false;
+end;
+
+function TResolverContext.Mark : TResolverMark;
+begin
+  result.Trail := FTrail.Count;
+  result.AgendaHead := FAgendaHead;
+  result.AgendaCount := FAgenda.Count;
+  result.DeferredHead := FDeferredHead;
+  result.DeferredCount := FDeferred.Count;
+end;
+
+procedure TResolverContext.UndoTo(const mark : TResolverMark);
+var
+  undo : TProc;
+begin
+  while FTrail.Count > mark.Trail do
+  begin
+    undo := FTrail[FTrail.Count - 1];
+    FTrail.Delete(FTrail.Count - 1);
+    undo();
+  end;
+  while FAgenda.Count > mark.AgendaCount do
+    FAgenda.Delete(FAgenda.Count - 1);
+  FAgendaHead := mark.AgendaHead;
+  while FDeferred.Count > mark.DeferredCount do
+    FDeferred.Delete(FDeferred.Count - 1);
+  FDeferredHead := mark.DeferredHead;
+end;
+
+function TResolverContext.IsNoGood(const package : IPackageInfo; out reason : string) : boolean;
+begin
+  result := FNoGoods.TryGetValue(NoGoodKey(package), reason);
+end;
+
+procedure TResolverContext.RecordNoGood(const package : IPackageInfo; const reason : string);
+begin
+  FNoGoods[NoGoodKey(package)] := reason;
+end;
+
+function TResolverContext.TryGetVersionList(const key : string; out versions : IList<IPackageInfo>) : boolean;
+begin
+  result := FVersionLists.TryGetValue(key, versions);
+end;
+
+procedure TResolverContext.CacheVersionList(const key : string; const versions : IList<IPackageInfo>);
+begin
+  FVersionLists[key] := versions;
+end;
+
+function TResolverContext.SortedDependencies(const package : IPackageInfo) : IList<IPackageDependency>;
+var
+  dependency : IPackageDependency;
+  i : integer;
+begin
+  if FSortedDependencies.TryGetValue(package, result) then
+    exit;
+  result := TCollections.CreateList<IPackageDependency>;
+  if package.Dependencies <> nil then
+    for dependency in package.Dependencies do
+    begin
+      //insertion sort - stable, so dependencies of the same width keep the manifest's order.
+      i := result.Count;
+      while (i > 0) and (result[i - 1].VersionRange.PatchWidth > dependency.VersionRange.PatchWidth) do
+        Dec(i);
+      result.Insert(i, dependency);
+    end;
+  FSortedDependencies[package] := result;
 end;
 
 function TResolverContext.TryGetPreferredVersion(const packageId : string; out version : TPackageVersion) : boolean;
@@ -415,201 +563,160 @@ begin
   result := FPreferredVersions.TryGetValue(LowerCase(packageId), version);
 end;
 
-procedure TResolverContext.NarrowDependencyRange(const parentId, depId : string; const range : TVersionRange);
+function TResolverContext.FindSiblingResolution(const packageId : string) : IResolvedPackage;
 begin
-  FNarrowedRanges[LowerCase(parentId) + '|' + LowerCase(depId)] := range;
+  result := FPackageInstallerContext.FindPackageResolution(FProjectFile, packageId);
 end;
 
-function TResolverContext.GetEffectiveDependencyRange(const parentId, depId : string; const declaredRange : TVersionRange) : TVersionRange;
-begin
-  if not FNarrowedRanges.TryGetValue(LowerCase(parentId) + '|' + LowerCase(depId), result) then
-    result := declaredRange;
-end;
-
-function TResolverContext.AnyTopLevelIsPrerelease : boolean;
-var
-  res : IResolvedPackage;
-begin
-  result := false;
-  for res in FResolved.Values do
-    if res.IsTopLevel and (not res.PackageInfo.Version.IsStable) then
-      exit(true);
-end;
-
-function TResolverContext.ShouldSortDependencies(const packageId : string) : boolean;
-var
-  key : string;
-begin
-  key := LowerCase(packageId);
-  result := not FSortedDependencyIds.Contains(key);
-  if result then
-    FSortedDependencyIds.Add(key);
-end;
-
-function TResolverContext.IsUnchanged(const package : IPackageInfo) : boolean;
+function TResolverContext.IsUnchanged(const assignment : TAssignment) : boolean;
 var
   key : string;
   version : TPackageVersion;
 begin
-  key := LowerCase(package.Id);
-  result := FProjectReferenceVersions.TryGetValue(key, version) and (version = package.Version);
+  if assignment.Kind = akImported then
+    exit(true);
+  key := LowerCase(assignment.PackageInfo.Id);
+  result := FProjectReferenceVersions.TryGetValue(key, version) and (version = assignment.PackageInfo.Version);
   if (not result) and (FPreferredVersions <> nil) then
-    result := FPreferredVersions.TryGetValue(key, version) and (version = package.Version);
+    result := FPreferredVersions.TryGetValue(key, version) and (version = assignment.PackageInfo.Version);
 end;
 
-
-procedure TResolverContext.PushRequirement(const package : IPackageInfo);
+function TResolverContext.AnyTopLevelIsPrerelease : boolean;
+var
+  assignment : TAssignment;
 begin
-  FOpenRequirements.Enqueue(package);
+  result := false;
+  for assignment in FAssignments.Values do
+    if assignment.IsTopLevel and (not assignment.PackageInfo.Version.IsStable) then
+      exit(true);
 end;
 
-function TResolverContext.GetResolvedPackages: TArray<IResolvedPackage>;
+function TResolverContext.ResolvedOrder : IList<TAssignment>;
+var
+  order : IList<TAssignment>;
+  visited : ISet<string>;
+  id : string;
+
+  procedure Visit(const packageId : string);
+  var
+    assignment : TAssignment;
+    dependency : IPackageDependency;
+  begin
+    if visited.Contains(packageId) then
+      exit;
+    if not FAssignments.TryGetValue(packageId, assignment) then
+      exit;
+    visited.Add(packageId);
+    if assignment.PackageInfo.Dependencies <> nil then
+      for dependency in assignment.PackageInfo.Dependencies do
+        Visit(LowerCase(dependency.Id));
+    order.Add(assignment);
+  end;
+
 begin
-  result := FResolved.Values.ToArray;
+  order := TCollections.CreateList<TAssignment>;
+  visited := TCollections.CreateSet<string>;
+  for id in FTopLevels do
+    Visit(id);
+  result := order;
 end;
 
 function TResolverContext.GetResolvedPackageInfos : IList<IPackageInfo>;
 var
-  resolution : IResolvedPackage;
+  assignment : TAssignment;
 begin
   result := TCollections.CreateList<IPackageInfo>;
-  for resolution in FResolved.Values do
-    result.Add(resolution.PackageInfo);
+  for assignment in ResolvedOrder do
+    result.Add(assignment.PackageInfo);
 end;
 
-function TResolverContext.GetPackageVersions(const packageId : string) : IList<IPackageInfo>;
-begin
-  result := nil;
-  FVersionCache.TryGetValue(LowerCase(packageId), result);
-end;
-
-function TResolverContext.IsNoGood(const package : IPackageInfo) : boolean;
+function TResolverContext.GetResolvedPackages : TArray<IResolvedPackage>;
 var
-  nogoods : ISet<TPackageVersion>;
+  order : IList<TAssignment>;
+  i : integer;
 begin
-  result := false;
-  if FNoGoods.TryGetValue(LowerCase(package.Id), nogoods) then
+  order := ResolvedOrder;
+  SetLength(result, order.Count);
+  for i := 0 to order.Count - 1 do
   begin
-    if nogoods.Contains(package.Version) then
-      result := true;
+    if order[i].Kind = akImported then
+      result[i] := order[i].Imported.Clone(order[i].ParentId)
+    else
+      result[i] := TResolvedPackage.Create(order[i].PackageInfo, order[i].VersionRange, order[i].ParentId, FProjectFile, order[i].Kind = akBundled);
   end;
 end;
 
-function TResolverContext.PopRequirement : IPackageInfo;
-begin
-  if FOpenRequirements.Any then
-    result := FOpenRequirements.Dequeue
-  else
-    result := nil;
-end;
-
-function TResolverContext.ProjectFile: string;
-begin
-  result := FProjectFile;
-end;
-
-procedure TResolverContext.RecordNoGood(const bad : IPackageInfo);
+function TResolverContext.BuildDependencyGraph : IPackageReference;
 var
-  nogoods : ISet<TPackageVersion>;
-begin
-  if not FNoGoods.TryGetValue(LowerCase(bad.Id), nogoods) then
-  begin
-    nogoods := TCollections.CreateSet<TPackageVersion>;
-    FNoGoods.Add(LowerCase(bad.Id), nogoods);
-  end;
-  nogoods.Add(bad.Version);
-end;
+  root : IPackageReference;
+  id : string;
+  assignment : TAssignment;
 
-procedure TResolverContext.RecordResolution(const package : IPackageInfo; const versionRange : TVersionRange; const parentId : string);
-var
-  resolution : IResolvedPackage;
-begin
-  if FResolved.ContainsKey(LowerCase(package.Id)) then
-    raise Exception.Create('Resolution already exists for package [' + package.Id + ']');
-  resolution := TResolvedPackage.Create(package, versionRange, parentId, FProjectFile);
-  FResolved.Add(LowerCase(package.Id), resolution);
-end;
-
-procedure TResolverContext.RecordBundledResolution(const packageId : string);
-var
-  info : IPackageInfo;
-  range : TVersionRange;
-  resolution : IResolvedPackage;
-begin
-  //never clobber a real resolution - if one is already present the bundled dep is satisfied.
-  if FResolved.ContainsKey(LowerCase(packageId)) then
-    exit;
-  info := TPackageInfo.CreateBundled(packageId, FCompilerVersion);
-  range := TVersionRange.Parse(cBundledDependencyVersion);
-  //parent under root - it has no dependencies and contributes nothing to the graph/install.
-  resolution := TResolvedPackage.Create(info, range, cRootNode, FProjectFile, true);
-  FResolved.Add(LowerCase(packageId), resolution);
-end;
-
-procedure TResolverContext.RemoveResolvedPackage(const packageId : string);
-begin
-  if FResolved.ContainsKey(LowerCase(packageId)) then
-    FResolved.Remove(LowerCase(packageId));
-end;
-
-
-function TResolverContext.TryGetResolvedPackage(const packageId : string; out resolution : IResolvedPackage) : boolean;
-begin
-  result := FResolved.TryGetValue(LowerCase(packageId), resolution);
-end;
-
-function TResolverContext.GetOrImportResolvedPackage(const packageId : string; const parentId : string; out resolution : IResolvedPackage) : boolean;
-
-  procedure CopyDependencies(const res : IResolvedPackage);
+  //true if [id] is already on the parent chain of [node] - a cycle (reported by the resolver) must not make
+  //the graph infinite.
+  function IsAncestor(const node : IPackageReference; const packageId : string) : boolean;
   var
-    i: Integer;
-    id : string;
-    childRes : IResolvedPackage;
+    p : IPackageReference;
   begin
-    for i := 0 to res.PackageInfo.Dependencies.Count - 1 do
+    result := false;
+    p := node;
+    while p <> nil do
     begin
-      id := res.PackageInfo.Dependencies[i].Id;
-      //Defend against cyclic cross-project resolution graphs by tracking which ids we've
-      //already pulled in. Without this guard, a sibling project whose resolved set has
-      //A->B->A would re-enter the same nodes indefinitely.
-      if FImportedIds.Contains(LowerCase(id)) then
-        continue;
-      //never overwrite a resolution this project already has - the resolver checks it against the
-      //imported package's range when it processes that package's dependencies.
-      if FResolved.ContainsKey(LowerCase(id)) then
-        continue;
-      childRes := FPackageInstallerContext.FindPackageResolution(FProjectFile, id);
-      if childRes <> nil then
+      if SameText(p.Id, packageId) then
+        exit(true);
+      p := p.Parent;
+    end;
+  end;
+
+  //Tolerates a partial solution : a dependency the resolve couldn't satisfy is left out, which is still useful
+  //for diagnostics - callers that need the whole graph check the resolve's result first.
+  procedure AddNode(const parent : IPackageReference; const package : TAssignment; const versionRange : TVersionRange);
+  var
+    node : IPackageReference;
+    dependency : IPackageDependency;
+    child : TAssignment;
+    childRange : TVersionRange;
+  begin
+    node := parent.AddChild(package.PackageInfo.Id, package.PackageInfo.Version, versionRange);
+    //what was resolved - so nothing downstream has to look it up again.
+    node.PackageInfo := package.PackageInfo;
+    if package.PackageInfo.Dependencies = nil then
+      exit;
+    for dependency in package.PackageInfo.Dependencies do
+    begin
+      if not FAssignments.TryGetValue(LowerCase(dependency.Id), child) then
       begin
-        FImportedIds.Add(LowerCase(id));
-        //clone under the package that needs it here - the sibling's own parent (possibly the root,
-        //when it is a top level there) means nothing in this project.
-        FResolved[LowerCase(id)] := childRes.Clone(res.PackageInfo.Id);
-        if childRes.PackageInfo.Dependencies.Any then
-          CopyDependencies(childRes);
+        FLogger.Debug('BuildDependencyGraph: no resolution for [' + dependency.Id + '] required by [' + package.PackageInfo.Id + '-' +
+                      package.PackageInfo.Version.ToStringNoMeta + '] - graph will be incomplete');
+        continue;
       end;
+      //bundled deps (e.g. Indy) are a no-op satisfied by the IDE - never an edge, else the dproj gets a
+      //dangling 999.999.999 PackageReference and restore would pin it.
+      if child.Kind = akBundled then
+        continue;
+      //a manifest that lists a dependency twice still gets one node for it.
+      if node.FindTopLevelChild(dependency.Id) <> nil then
+        continue;
+      if IsAncestor(node, dependency.Id) then
+      begin
+        FLogger.Debug('BuildDependencyGraph: cycle detected for [' + dependency.Id + '] under [' + package.PackageInfo.Id + '] - skipping to avoid an infinite graph');
+        continue;
+      end;
+      //The edge records THIS parent's declared range - the one the next restore checks it against - not the
+      //range the dependency was first selected on, which belongs to whichever package needed it first.
+      childRange := dependency.VersionRange;
+      if childRange.IsEmpty then
+        childRange := child.VersionRange; //defensive fallback only
+      AddNode(node, child, childRange);
     end;
   end;
 
 begin
-  result := FResolved.TryGetValue(LowerCase(packageId), resolution);
-  if result then
-    exit;
-
-  //Miss locally - consult the cross-project installer context. If a sibling project has
-  //resolved this id, clone its resolution into ours under the supplied parentId and pull
-  //in any transitive resolutions it relied on.
-  resolution := FPackageInstallerContext.FindPackageResolution(FProjectFile, packageId);
-  result := resolution <> nil;
-  if not result then
-    exit;
-
-  FImportedIds.Add(LowerCase(packageId));
-  FResolved[LowerCase(packageId)] := resolution.Clone(parentId) as IResolvedPackage;
-  if resolution.PackageInfo.Dependencies.Any then
-    CopyDependencies(resolution);
+  root := TPackageReference.CreateRoot(FCompilerVersion);
+  for id in FTopLevels do
+    if FAssignments.TryGetValue(id, assignment) and (assignment.Kind <> akBundled) then
+      AddNode(root, assignment, TVersionRange.Empty);
+  result := root;
 end;
 
 end.
-
-

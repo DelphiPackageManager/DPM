@@ -130,8 +130,38 @@ end;
 
 { TStdOut }
 
+//A console takes text, not bytes - UTF-8 written to one is shown in its code page (the OEM one), so anything that
+//isn't ASCII comes out as the wrong characters. True when the handle is a console and value went to it; a pipe or a
+//file gets the UTF-8 bytes instead.
+function TryWriteConsole(const value : string; const useStdErr : boolean) : boolean;
+{$IFDEF MSWINDOWS}
+var
+  handle : THandle;
+  mode : DWORD;
+  written : DWORD;
+{$ENDIF}
+begin
+  result := false;
+{$IFDEF MSWINDOWS}
+  if useStdErr then
+    handle := GetStdHandle(STD_ERROR_HANDLE)
+  else
+    handle := GetStdHandle(STD_OUTPUT_HANDLE);
+  if (handle = 0) or (handle = INVALID_HANDLE_VALUE) then
+    exit;
+  if not GetConsoleMode(handle, mode) then
+    exit;
+  if value <> '' then
+    WriteConsoleW(handle, PChar(value), DWORD(Length(value)), written, nil);
+  //a console that refused it has nothing more to try - the bytes would go to the same place.
+  result := true;
+{$ENDIF}
+end;
+
 class procedure TStdOut.Write(const value : string);
 begin
+  if TryWriteConsole(value, false) then
+    exit;
   //GetBytes never emits a preamble - GetPreamble is a separate call - so this is BOM free.
   WriteBytes(TEncoding.UTF8.GetBytes(value), false);
 end;
@@ -141,6 +171,8 @@ var
   bytes : TBytes;
   len : integer;
 begin
+  if TryWriteConsole(value + #10, false) then
+    exit;
   bytes := TEncoding.UTF8.GetBytes(value);
   len := Length(bytes);
   SetLength(bytes, len + 1);
@@ -152,12 +184,16 @@ end;
 
 class procedure TStdErr.Write(const value : string);
 begin
+  if TryWriteConsole(value, true) then
+    exit;
   WriteBytes(TEncoding.UTF8.GetBytes(value), true);
 end;
 
 class procedure TStdErr.WriteLine(const value : string);
 begin
   //sLineBreak, not a bare LF - unlike stdout this is read by a person in a terminal.
+  if TryWriteConsole(value + sLineBreak, true) then
+    exit;
   WriteBytes(TEncoding.UTF8.GetBytes(value + sLineBreak), true);
 end;
 

@@ -67,6 +67,23 @@ There is only one "resolve" entry point on `IDependencyResolver` — `ResolveFor
 `ResolveForRestore` method existed but was never working (the context filtered out its requirements)
 and has been removed; both paths above now go through `ResolveForInstall`.
 
+### How the resolver searches
+
+`TResolveSearch` (`Resolver.pas`) is a depth-first search with conflict-directed backjumping. It
+works over the undo trail in `TResolverContext` (`Context.pas`).
+- **Facts:** each assignment records the set of decision levels it depends on (`TLevels`). Project
+  references, top levels and imports are fixed facts at level 0.
+- **Candidates:** they must satisfy every declared range on the package. They come from three tiers:
+  the preferred (lock) version, then the package cache, then the repository, which is asked once per
+  range.
+- **On a failure:** the search jumps back to the highest level involved. A version is marked no-good
+  only when it fails on fixed facts alone.
+- **Unavoidable failures:** a failure with an empty level set is recorded once, and that package is
+  given up.
+- **Outputs:** they are what is reachable from the top levels, post-ordered (dependencies first).
+- **Errors:** the step budget (`TDependencyResolver.MaxSteps`) gives E2004, and cycles give E2013.
+  Cancelling reports nothing.
+
 ### Core Subsystems (`Source/Core/`)
 
 | Folder | Purpose |

@@ -42,6 +42,7 @@ type
       FDefault : TSpecOptions;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TSpecOptions read FDefault;
     property PackageId : string read FPackageId write FPackageId;
     property Overwrite : boolean read FOverwrite write FOverwrite;
@@ -56,6 +57,12 @@ implementation
 class constructor TSpecOptions.CreateDefault;
 begin
   FDefault := TSpecOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TSpecOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 end.

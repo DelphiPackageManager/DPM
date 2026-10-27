@@ -44,6 +44,7 @@ type
       FDefault : TMCPOptions;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TMCPOptions read FDefault;
     constructor Create; override;
 
@@ -75,6 +76,12 @@ end;
 class constructor TMCPOptions.CreateDefault;
 begin
   FDefault := TMCPOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TMCPOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 end.

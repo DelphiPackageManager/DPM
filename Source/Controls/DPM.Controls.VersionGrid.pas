@@ -1516,7 +1516,9 @@ begin
   InflateRect(r,-1,-1);
 
   LCanvas.Brush.Style := bsClear;
-  LCanvas.Font.Assign(Canvas.Font);
+  //the grid's font (scaled, the IDE's) - Canvas.Font isn't kept in step with it, and the rows painted after the
+  //header were left with it too.
+  LCanvas.Font.Assign(Self.Font);
   LCanvas.Font.Color := HeaderTextColor;
 
   for i := 0 to 5 do

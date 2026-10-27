@@ -187,6 +187,10 @@ type
     ///<summary> Check for an existing package resolution in already loaded projects in the group.</summary>
     function FindPackageResolution(const projectFile: string; const packageId : string ) : IResolvedPackage;
 
+    ///<summary> Called from the package installer once an uninstall has saved the project - drops the project's
+    ///  resolutions of the packages no longer in its graph, so they don't constrain the other projects. </summary>
+    procedure PackageGraphPruned(const projectFile : string; const graph : IPackageReference);
+
     ///<summary> Starts an install that changes several projects at once. The resolutions already recorded
     ///  for these projects are hidden from FindPackageResolution (they are about to be replaced, so a
     ///  project not yet processed must not block one that is), and RecordResolutions/RecordGraph for

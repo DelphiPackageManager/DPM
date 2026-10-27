@@ -30,37 +30,33 @@ interface
 
 uses
   Spring.Collections,
-  System.Diagnostics,
   VSoft.CancellationToken,
   DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Package.Interfaces,
-  DPM.Core.Project.Interfaces,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Cache.Interfaces,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Dependency.Interfaces,
   DPM.Core.Dependency.Version,
-  DPM.Core.Dependency.Context,
   DPM.Core.Options.Search,
   DPM.Core.Package.Installer.Interfaces;
 
 type
   TDependencyResolver = class(TInterfacedObject, IDependencyResolver)
   private
+    class var
+      FMaxSteps : integer;
+      FLastStepCount : integer;
+    class constructor Create;
+  private
     FLogger : ILogger;
     FRepositoryManager : IPackageRepositoryManager;
     FPackageCache : IPackageCache;
     FPackageInstallerContext : IPackageInstallerContext;
-    FStopwatch : TStopWatch;
     FConfiguration : IConfiguration;
   protected
     function Initialize(const config: IConfiguration) : boolean;
-
-    function DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const includePrerelease : boolean; const context : IResolverContext) : boolean;
-
-    //checks every resolved dependency edge against the version selected for it - see the implementation.
-    procedure ValidateResolvedDependencies(const context : IResolverContext);
 
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean; overload;
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>) : boolean; overload;
@@ -69,484 +65,817 @@ type
   public
     constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageCache : IPackageCache; const packageInstallerContext : IPackageInstallerContext);
 
+    //how many steps a resolve may take before it gives up (E2004).
+    class property MaxSteps : integer read FMaxSteps write FMaxSteps;
+    //how many steps the last resolve took - for tests and diagnostics.
+    class property LastStepCount : integer read FLastStepCount;
   end;
 
 implementation
 
 uses
   System.SysUtils,
-  Generics.Defaults,
+  System.Diagnostics,
   DPM.Core.Constants,
   DPM.Core.Diagnostics,
-  DPM.Core.Package.Classes;
+  DPM.Core.Package.Classes,
+  DPM.Core.Dependency.Context;
+
+/// The search
+/// ----------
+/// A depth-first search over versions, with conflict-directed backjumping. Requirements (a package's dependency
+/// on another) are checked oldest first. A requirement on a package not yet in the solution is a decision : the
+/// versions that satisfy every range declared for it so far are tried in turn - the version the project's graph
+/// records first (restore), then the package cache's, newest first, then the repository's. Choosing a version
+/// queues its own requirements.
+///
+/// Every change goes through the context, which can undo back to a mark. When something can't be satisfied, the
+/// failure carries the decisions it depends on (TLevels) - the search goes back to the latest of them and tries
+/// its next version, undoing everything after it. A version that fails on fixed facts alone (the top levels, the
+/// project's references, the other projects' versions, the versions that exist) is a no-good and never tried
+/// again; one that only clashed with another choice is tried again once that choice changes. A failure that
+/// depends on no decision at all can't be avoided : it is recorded, the requirement is skipped, and the search
+/// carries on, so every problem is reported in one run - once, at the end, and only those (a conflict in a
+/// branch that was given up is not reported).
+///
+/// The top levels are not negotiable. What the project already has stays as it is, its dependencies unchecked
+/// (an inconsistency that was already there is not this resolve's to report), unless a requirement needs a
+/// version that isn't the one it has - a package another project in the group uses then takes that project's
+/// version, any other is chosen again. A package the project references directly is never changed.
+
+type
+  //something that can't be satisfied, ready to report.
+  TResolveFailure = record
+    Code : TErrorCode;
+    Message : string;
+    Conflict : TUnresolvableConflict;
+  end;
+
+  //a choice of version for a package, and what's needed to go back and try the next one.
+  TDecision = class
+  public
+    Level : integer;
+    Requirement : TRequirement;
+    PackageId : string;
+    //the decisions the requirement's owner depends on.
+    OwnerResponsible : TLevels;
+    //where trying another version starts from : the requirement taken, nothing chosen.
+    Mark : TResolverMark;
+    //the ranges declared for the package when the decision was made.
+    Constraints : IList<TConstraint>;
+    //every version in the requirement's range found so far, in the order they are tried.
+    Candidates : IList<IPackageInfo>;
+    Seen : ISet<string>;
+    NextIndex : integer;
+    //0 nothing looked up yet, 1 the preferred version, 2 the package cache, 3 the repository.
+    Tier : integer;
+    SourcesUnavailable : string;
+    Current : IPackageInfo;
+    //the earlier decisions the versions tried so far failed because of.
+    Accumulated : TLevels;
+    //version -> why it failed.
+    FailureReasons : IDictionary<string, string>;
+    LastFailure : TResolveFailure;
+    constructor Create;
+  end;
+
+  TResolveSearch = class
+  private
+    FLogger : ILogger;
+    FRepositoryManager : IPackageRepositoryManager;
+    FPackageCache : IPackageCache;
+    FCancellationToken : ICancellationToken;
+    FContext : TResolverContext;
+    FPreRelease : boolean;
+    FMaxSteps : integer;
+    FDecisions : IList<TDecision>;
+    FFailures : IList<TResolveFailure>;
+    //packages a requirement can't be met for whatever is chosen - later requirements on them are the same
+    //problem, already reported.
+    FGivenUp : ISet<string>;
+    FSteps : integer;
+    FStopped : boolean;
+    FBudgetExceeded : boolean;
+    function Step : boolean;
+    procedure ProcessRequirement(const requirement : TRequirement);
+    procedure ProcessBundled(const requirement : TRequirement);
+    procedure ChooseFor(const requirement : TRequirement; const owner : TAssignment);
+    procedure Import(const resolution : IResolvedPackage; const owner : TAssignment);
+    procedure Decide(const requirement : TRequirement; const owner : TAssignment);
+    function Acceptable(const decision : TDecision; const candidate : IPackageInfo) : boolean;
+    function NextCandidate(const decision : TDecision) : IPackageInfo;
+    procedure LoadNextTier(const decision : TDecision);
+    procedure AddCandidates(const decision : TDecision; const versions : IList<IPackageInfo>);
+    procedure AssignCandidate(const decision : TDecision; const candidate : IPackageInfo);
+    procedure Exhausted(const decision : TDecision; out failure : TResolveFailure; out levels : TLevels);
+    procedure HandleFailure(failure : TResolveFailure; levels : TLevels; giveUpId : string);
+    procedure RecordFailure(const failure : TResolveFailure);
+    function AlreadyRecorded(const packageId : string; const parentId : string) : boolean;
+    procedure CheckCycles;
+    procedure ValidateResolvedDependencies;
+    function VersionListKey(const packageId : string; const range : TVersionRange; const tier : string) : string;
+  public
+    constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageCache : IPackageCache;
+                       const cancellationToken : ICancellationToken; const context : TResolverContext; const preRelease : boolean;
+                       const maxSteps : integer);
+    //true when everything was satisfied. Reports what wasn't (nothing when cancelled).
+    function Run : boolean;
+    property Steps : integer read FSteps;
+    property Failures : IList<TResolveFailure> read FFailures;
+  end;
+
+function MakeFailure(const code : TErrorCode; const message : string; const packageId : string; const parentId : string;
+                     const range : TVersionRange; const reason : string) : TResolveFailure;
+begin
+  result.Code := code;
+  result.Message := message;
+  result.Conflict.PackageId := packageId;
+  result.Conflict.ParentId := parentId;
+  result.Conflict.RequestedRange := range;
+  result.Conflict.Reason := reason;
+end;
+
+function FirstLine(const value : string) : string;
+var
+  p : integer;
+begin
+  p := Pos(#13, value);
+  if p = 0 then
+    p := Pos(#10, value);
+  if p = 0 then
+    result := value
+  else
+    result := Copy(value, 1, p - 1);
+end;
+
+{ TDecision }
+
+constructor TDecision.Create;
+begin
+  inherited Create;
+  Candidates := TCollections.CreateList<IPackageInfo>;
+  Seen := TCollections.CreateSet<string>;
+  FailureReasons := TCollections.CreateDictionary<string, string>;
+  Accumulated := TLevels.Empty;
+end;
+
+{ TResolveSearch }
+
+constructor TResolveSearch.Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageCache : IPackageCache;
+                                  const cancellationToken : ICancellationToken; const context : TResolverContext; const preRelease : boolean;
+                                  const maxSteps : integer);
+begin
+  inherited Create;
+  FLogger := logger;
+  FRepositoryManager := repositoryManager;
+  FPackageCache := packageCache;
+  FCancellationToken := cancellationToken;
+  FContext := context;
+  FPreRelease := preRelease;
+  FMaxSteps := maxSteps;
+  FDecisions := TCollections.CreateObjectList<TDecision>(true);
+  FFailures := TCollections.CreateList<TResolveFailure>;
+  FGivenUp := TCollections.CreateSet<string>;
+end;
+
+function TResolveSearch.Step : boolean;
+begin
+  result := false;
+  if FStopped then
+    exit;
+  if FCancellationToken.IsCancelled then
+  begin
+    FStopped := true;
+    exit;
+  end;
+  Inc(FSteps);
+  if FSteps > FMaxSteps then
+  begin
+    FStopped := true;
+    FBudgetExceeded := true;
+    exit;
+  end;
+  result := true;
+end;
+
+function TResolveSearch.VersionListKey(const packageId : string; const range : TVersionRange; const tier : string) : string;
+begin
+  //keyed by the range looked up with - a lookup for a narrow range must not stand in for a wider one.
+  result := LowerCase(packageId) + '|' + CompilerToString(FContext.CompilerVersion) + '|' + BoolToStr(FPreRelease, true) + '|' + tier + '|' + range.ToString;
+end;
+
+function TResolveSearch.Run : boolean;
+var
+  requirement : TRequirement;
+  deferred : boolean;
+begin
+  result := false;
+  while Step do
+  begin
+    if not FContext.NextRequirement(requirement, deferred) then
+      break;
+    if deferred then
+      ProcessBundled(requirement)
+    else
+      ProcessRequirement(requirement);
+  end;
+  //whoever owns the token says it was cancelled - the resolver says nothing.
+  if FCancellationToken.IsCancelled then
+    exit;
+  if FBudgetExceeded then
+    RecordFailure(MakeFailure(TErrorCode.E2004_ResolverIterationLimit, 'Dependency resolution stopped after ' + IntToStr(FMaxSteps) +
+                              ' steps without finding versions that work together.', '', '', TVersionRange.Empty, 'resolver step limit exceeded'))
+  else
+  begin
+    CheckCycles;
+    ValidateResolvedDependencies;
+  end;
+  result := FFailures.Count = 0;
+end;
+
+procedure TResolveSearch.ProcessRequirement(const requirement : TRequirement);
+var
+  id : string;
+  range : TVersionRange;
+  owner : TAssignment;
+  assignment : TAssignment;
+  levels : TLevels;
+  dependency : IPackageDependency;
+begin
+  dependency := requirement.Dependency;
+  id := LowerCase(dependency.Id);
+  range := dependency.VersionRange;
+  //requirements are only queued for a package in the solution, and undone with it - but be sure.
+  if (not FContext.TryGetAssignment(requirement.Owner.Id, owner)) or (owner.PackageInfo <> requirement.Owner) then
+    exit;
+
+  if FContext.TryGetAssignment(id, assignment) and (assignment.Kind <> akBundled) then
+  begin
+    if range.IsSatisfiedBy(assignment.PackageInfo.Version) then
+      exit;
+    if FGivenUp.Contains(id) then
+      exit;
+    case assignment.Kind of
+      akTopLevel :
+        HandleFailure(MakeFailure(TErrorCode.E2002_TopLevelVersionConflict, 'Package conflict - ' + owner.PackageInfo.Id + ' requires ' + dependency.Id + ' ' + range.ToString +
+                                  ', but the top level reference is ' + dependency.Id + '-' + assignment.PackageInfo.Version.ToString + '.',
+                                  dependency.Id, owner.PackageInfo.Id, range,
+                                  'top-level version ' + assignment.PackageInfo.Version.ToString + ' is not negotiable and does not satisfy ' + range.ToString),
+                      owner.Responsible, '');
+      akProjectReference :
+      begin
+        //a version the project references directly is never changed for it.
+        if assignment.TopLevelReference then
+          HandleFailure(MakeFailure(TErrorCode.E2002_TopLevelVersionConflict, 'Package conflict - ' + owner.PackageInfo.Id + ' requires ' + dependency.Id + ' ' + range.ToString +
+                                    ', but the top level reference is ' + dependency.Id + '-' + assignment.PackageInfo.Version.ToString + '.',
+                                    dependency.Id, owner.PackageInfo.Id, range,
+                                    'top-level version ' + assignment.PackageInfo.Version.ToString + ' is not negotiable and does not satisfy ' + range.ToString),
+                        owner.Responsible, '')
+        else
+          ChooseFor(requirement, owner);
+      end;
+      akImported :
+        HandleFailure(MakeFailure(TErrorCode.E2003_ProjectGroupConflict, 'Package conflict - ' + owner.PackageInfo.Id + ' requires ' + dependency.Id + ' ' + range.ToString +
+                                  ', but project [' + assignment.Imported.ProjectFile + '] uses ' + dependency.Id + '-' + assignment.PackageInfo.Version.ToString + '.',
+                                  dependency.Id, owner.PackageInfo.Id, range,
+                                  'cross-project: version ' + assignment.PackageInfo.Version.ToString + ' selected in project [' + assignment.Imported.ProjectFile +
+                                  '] does not satisfy ' + range.ToString),
+                      owner.Responsible, '');
+      akChosen :
+      begin
+        levels := owner.Responsible;
+        levels.AddAll(assignment.Responsible);
+        HandleFailure(MakeFailure(TErrorCode.E2005_SelectedVersionConflict, 'Package conflict - ' + owner.PackageInfo.Id + '-' + owner.PackageInfo.Version.ToStringNoMeta +
+                                  ' requires ' + dependency.Id + ' ' + range.ToString + ' but ' + dependency.Id + '-' + assignment.PackageInfo.Version.ToStringNoMeta + ' is selected.',
+                                  dependency.Id, owner.PackageInfo.Id, range,
+                                  owner.PackageInfo.Id + '-' + owner.PackageInfo.Version.ToStringNoMeta + ' requires ' + range.ToString + ' but version ' +
+                                  assignment.PackageInfo.Version.ToStringNoMeta + ' is selected'),
+                      levels, '');
+      end;
+    end;
+    exit;
+  end;
+  if FGivenUp.Contains(id) then
+    exit;
+  ChooseFor(requirement, owner);
+end;
+
+procedure TResolveSearch.ChooseFor(const requirement : TRequirement; const owner : TAssignment);
+var
+  dependency : IPackageDependency;
+  sibling : IResolvedPackage;
+begin
+  dependency := requirement.Dependency;
+  //the projects in a group share one version of a package - another project's is the one.
+  sibling := FContext.FindSiblingResolution(dependency.Id);
+  if sibling <> nil then
+  begin
+    Import(sibling, owner);
+    if not dependency.VersionRange.IsSatisfiedBy(sibling.PackageInfo.Version) then
+      HandleFailure(MakeFailure(TErrorCode.E2003_ProjectGroupConflict, 'Package conflict - ' + owner.PackageInfo.Id + ' requires ' + dependency.Id + ' ' +
+                                dependency.VersionRange.ToString + ', but project [' + sibling.ProjectFile + '] uses ' + dependency.Id + '-' +
+                                sibling.PackageInfo.Version.ToString + '.',
+                                dependency.Id, owner.PackageInfo.Id, dependency.VersionRange,
+                                'cross-project: version ' + sibling.PackageInfo.Version.ToString + ' selected in project [' + sibling.ProjectFile +
+                                '] does not satisfy ' + dependency.VersionRange.ToString),
+                    owner.Responsible, '');
+    exit;
+  end;
+  Decide(requirement, owner);
+end;
+
+procedure TResolveSearch.Import(const resolution : IResolvedPackage; const owner : TAssignment);
+var
+  assignment : TAssignment;
+begin
+  //here because owner needs it - it goes if owner does.
+  assignment := MakeAssignment(resolution.PackageInfo, akImported, owner.Responsible, owner.PackageInfo.Id, resolution.VersionRange);
+  assignment.Imported := resolution;
+  FContext.Assign(assignment);
+  //its dependencies are this project's requirements too.
+  FContext.Require(resolution.PackageInfo);
+  FLogger.Debug('    adopted ' + resolution.PackageInfo.Id + '-' + resolution.PackageInfo.Version.ToStringNoMeta + ' from [' + resolution.ProjectFile + ']');
+end;
+
+procedure TResolveSearch.ProcessBundled(const requirement : TRequirement);
+var
+  id : string;
+  owner : TAssignment;
+  assignment : TAssignment;
+  sibling : IResolvedPackage;
+begin
+  //Checked once everything else is. Satisfied by any real package with the id - a top level, a transient, or
+  //another project's - at whatever version; only when there is none is it the IDE's own (a no-op).
+  id := LowerCase(requirement.Dependency.Id);
+  if FContext.TryGetAssignment(id, assignment) then
+    exit;
+  if (not FContext.TryGetAssignment(requirement.Owner.Id, owner)) or (owner.PackageInfo <> requirement.Owner) then
+    exit;
+  sibling := FContext.FindSiblingResolution(id);
+  if sibling <> nil then
+  begin
+    Import(sibling, owner);
+    exit;
+  end;
+  //under the package that needs it, not the root - it is not something the project references.
+  FContext.Assign(MakeAssignment(TPackageInfo.CreateBundled(requirement.Dependency.Id, FContext.CompilerVersion), akBundled, owner.Responsible,
+                                 owner.PackageInfo.Id, TVersionRange.Parse(cBundledDependencyVersion)));
+end;
+
+procedure TResolveSearch.Decide(const requirement : TRequirement; const owner : TAssignment);
+var
+  decision : TDecision;
+  candidate : IPackageInfo;
+  failure : TResolveFailure;
+  levels : TLevels;
+  mark : TResolverMark;
+  packageId : string;
+begin
+  decision := TDecision.Create;
+  decision.Level := FDecisions.Count + 1;
+  decision.Requirement := requirement;
+  decision.PackageId := LowerCase(requirement.Dependency.Id);
+  decision.OwnerResponsible := owner.Responsible;
+  //before anything is chosen - going back here also puts back a project reference being replaced.
+  decision.Mark := FContext.Mark;
+  decision.Constraints := TCollections.CreateList<TConstraint>(FContext.ConstraintsOn(decision.PackageId));
+  FDecisions.Add(decision);
+
+  candidate := NextCandidate(decision);
+  if FStopped then
+    exit;
+  if candidate <> nil then
+  begin
+    AssignCandidate(decision, candidate);
+    exit;
+  end;
+  Exhausted(decision, failure, levels);
+  packageId := decision.PackageId;
+  mark := decision.Mark;
+  FDecisions.Delete(FDecisions.Count - 1);
+  FContext.UndoTo(mark);
+  HandleFailure(failure, levels, packageId);
+end;
+
+function TResolveSearch.Acceptable(const decision : TDecision; const candidate : IPackageInfo) : boolean;
+var
+  constraint : TConstraint;
+  reason : string;
+begin
+  result := false;
+  if not decision.Requirement.Dependency.VersionRange.IsSatisfiedBy(candidate.Version) then
+    exit;
+  for constraint in decision.Constraints do
+    if not constraint.Range.IsSatisfiedBy(candidate.Version) then
+      exit;
+  if FContext.IsNoGood(candidate, reason) then
+    exit;
+  result := true;
+end;
+
+function TResolveSearch.NextCandidate(const decision : TDecision) : IPackageInfo;
+var
+  candidate : IPackageInfo;
+begin
+  result := nil;
+  while true do
+  begin
+    while decision.NextIndex < decision.Candidates.Count do
+    begin
+      candidate := decision.Candidates[decision.NextIndex];
+      Inc(decision.NextIndex);
+      if Acceptable(decision, candidate) then
+        exit(candidate);
+    end;
+    if decision.Tier >= 3 then
+      exit;
+    LoadNextTier(decision);
+    if FStopped then
+      exit;
+  end;
+end;
+
+procedure TResolveSearch.AddCandidates(const decision : TDecision; const versions : IList<IPackageInfo>);
+var
+  info : IPackageInfo;
+begin
+  if versions = nil then
+    exit;
+  for info in versions do
+  begin
+    if not decision.Requirement.Dependency.VersionRange.IsSatisfiedBy(info.Version) then
+      continue;
+    if decision.Seen.Contains(info.Version.ToStringNoMeta) then
+      continue;
+    decision.Seen.Add(info.Version.ToStringNoMeta);
+    decision.Candidates.Add(info);
+  end;
+end;
+
+procedure TResolveSearch.LoadNextTier(const decision : TDecision);
+var
+  dependency : IPackageDependency;
+  versions : IList<IPackageInfo>;
+  preferredVersion : TPackageVersion;
+  preferred : IPackageInfo;
+  identity : IPackageIdentity;
+  key : string;
+  unavailable : string;
+begin
+  dependency := decision.Requirement.Dependency;
+  Inc(decision.Tier);
+  case decision.Tier of
+    1 :
+    begin
+      //restore : the version the project's graph records, when it is still in range and in the cache.
+      if FContext.TryGetPreferredVersion(dependency.Id, preferredVersion) and dependency.VersionRange.IsSatisfiedBy(preferredVersion) then
+      begin
+        //held in a local - an object made in a const interface argument is never freed.
+        identity := TPackageIdentity.Create('', dependency.Id, preferredVersion, FContext.CompilerVersion);
+        preferred := FPackageCache.GetPackageInfo(FCancellationToken, identity);
+        if preferred <> nil then
+        begin
+          versions := TCollections.CreateList<IPackageInfo>;
+          versions.Add(preferred);
+          AddCandidates(decision, versions);
+        end;
+      end;
+    end;
+    2 :
+    begin
+      //the package cache holds the manifests of what has been downloaded - usually what a restore needs.
+      key := VersionListKey(dependency.Id, dependency.VersionRange, 'cache');
+      if not FContext.TryGetVersionList(key, versions) then
+      begin
+        versions := FPackageCache.GetCachedPackageVersionsWithDependencies(FCancellationToken, dependency.Id, FContext.CompilerVersion, dependency.VersionRange, FPreRelease);
+        if versions = nil then
+          versions := TCollections.CreateList<IPackageInfo>;
+        FContext.CacheVersionList(key, versions);
+      end;
+      AddCandidates(decision, versions);
+    end;
+    3 :
+    begin
+      //what the cache has is used up (or it had nothing) - the sources may have more. Asked once per range.
+      key := VersionListKey(dependency.Id, dependency.VersionRange, 'repo');
+      if not FContext.TryGetVersionList(key, versions) then
+      begin
+        versions := FRepositoryManager.GetPackageVersionsWithDependencies(FCancellationToken, FContext.CompilerVersion, dependency.Id, dependency.VersionRange, FPreRelease);
+        unavailable := FRepositoryManager.UnavailableSources;
+        if FCancellationToken.IsCancelled then
+        begin
+          //a cancelled lookup finds nothing - that is not an answer to keep.
+          FStopped := true;
+          exit;
+        end;
+        if versions = nil then
+          versions := TCollections.CreateList<IPackageInfo>;
+        //only an answer every source gave is kept - the next lookup may get through.
+        if unavailable = '' then
+          FContext.CacheVersionList(key, versions)
+        else
+          decision.SourcesUnavailable := unavailable;
+      end;
+      AddCandidates(decision, versions);
+    end;
+  end;
+end;
+
+procedure TResolveSearch.AssignCandidate(const decision : TDecision; const candidate : IPackageInfo);
+begin
+  decision.Current := candidate;
+  FContext.Assign(MakeAssignment(candidate, akChosen, TLevels.Single(decision.Level), decision.Requirement.Owner.Id, decision.Requirement.Dependency.VersionRange));
+  FContext.Require(candidate);
+  FLogger.Debug('    [' + IntToStr(decision.Level) + '] trying ' + candidate.Id + '-' + candidate.Version.ToStringNoMeta + ' for ' +
+                decision.Requirement.Owner.Id + ' ' + decision.Requirement.Dependency.VersionRange.ToString);
+end;
+
+procedure TResolveSearch.Exhausted(const decision : TDecision; out failure : TResolveFailure; out levels : TLevels);
+var
+  owner : IPackageInfo;
+  dependency : IPackageDependency;
+  constraint : TConstraint;
+  candidate : IPackageInfo;
+  reasons : string;
+  reason : string;
+  excludedByConstraint : boolean;
+  allExcludedByConstraints : boolean;
+  conflictingRanges : string;
+begin
+  owner := decision.Requirement.Owner;
+  dependency := decision.Requirement.Dependency;
+  levels := decision.Accumulated;
+
+  //nothing in the range at all - only the requirement's own range matters.
+  if decision.Candidates.Count = 0 then
+  begin
+    levels.AddAll(decision.OwnerResponsible);
+    if decision.SourcesUnavailable <> '' then
+      failure := MakeFailure(TErrorCode.E1102_PackageNotFoundSourcesUnavailable, 'Unable to satisfy dependency : ' + owner.Id + ' -> ' + dependency.Id + ' ' +
+                             dependency.VersionRange.ToString + ' - the source(s) [' + decision.SourcesUnavailable + '] could not be used, see the warning(s) above.',
+                             dependency.Id, owner.Id, dependency.VersionRange,
+                             'no version satisfying the range was found - source(s) [' + decision.SourcesUnavailable + '] could not be used')
+    else
+      failure := MakeFailure(TErrorCode.E2001_DependencyUnsatisfiable, 'Unable to satisfy dependency : ' + owner.Id + ' -> ' + dependency.Id + ' ' +
+                             dependency.VersionRange.ToString + ' - no available version satisfies the range.',
+                             dependency.Id, owner.Id, dependency.VersionRange, 'no available version satisfies the requested range');
+    exit;
+  end;
+
+  //the versions in range were ruled out by the other ranges declared for the package, or failed.
+  for constraint in decision.Constraints do
+    levels.AddAll(constraint.Responsible);
+
+  //one version, tried and failed : its failure is the problem, said as it was found.
+  if (decision.Candidates.Count = 1) and (decision.FailureReasons.Count = 1) then
+  begin
+    failure := decision.LastFailure;
+    exit;
+  end;
+
+  reasons := '';
+  allExcludedByConstraints := decision.FailureReasons.Count = 0;
+  for candidate in decision.Candidates do
+  begin
+    if decision.FailureReasons.TryGetValue(candidate.Version.ToStringNoMeta, reason) then
+    begin
+      reasons := reasons + sLineBreak + '  ' + candidate.Id + '-' + candidate.Version.ToStringNoMeta + ' : ' + FirstLine(reason);
+      continue;
+    end;
+    excludedByConstraint := false;
+    for constraint in decision.Constraints do
+      if not constraint.Range.IsSatisfiedBy(candidate.Version) then
+      begin
+        excludedByConstraint := true;
+        reasons := reasons + sLineBreak + '  ' + candidate.Id + '-' + candidate.Version.ToStringNoMeta + ' : ' + constraint.Owner.Id + '-' +
+                   constraint.Owner.Version.ToStringNoMeta + ' requires ' + constraint.Range.ToString;
+        break;
+      end;
+    if excludedByConstraint then
+      continue;
+    allExcludedByConstraints := false;
+    if FContext.IsNoGood(candidate, reason) then
+      reasons := reasons + sLineBreak + '  ' + candidate.Id + '-' + candidate.Version.ToStringNoMeta + ' : ' + FirstLine(reason);
+  end;
+
+  if allExcludedByConstraints then
+  begin
+    conflictingRanges := '';
+    for constraint in decision.Constraints do
+      conflictingRanges := conflictingRanges + sLineBreak + '  ' + constraint.Owner.Id + '-' + constraint.Owner.Version.ToStringNoMeta + ' requires ' + constraint.Range.ToString;
+    failure := MakeFailure(TErrorCode.E2005_SelectedVersionConflict, 'Package conflict - no version of ' + dependency.Id + ' satisfies every package that needs it :' +
+                           conflictingRanges, dependency.Id, owner.Id, dependency.VersionRange,
+                           'no version of ' + dependency.Id + ' satisfies every range declared for it');
+    exit;
+  end;
+  failure := MakeFailure(TErrorCode.E2001_DependencyUnsatisfiable, 'Unable to satisfy dependency : ' + owner.Id + ' -> ' + dependency.Id + ' ' +
+                         dependency.VersionRange.ToString + ' - none of its versions can be used :' + reasons,
+                         dependency.Id, owner.Id, dependency.VersionRange, 'none of the versions in range can be used');
+end;
+
+procedure TResolveSearch.HandleFailure(failure : TResolveFailure; levels : TLevels; giveUpId : string);
+var
+  level : integer;
+  rest : TLevels;
+  decision : TDecision;
+  candidate : IPackageInfo;
+  mark : TResolverMark;
+begin
+  while true do
+  begin
+    if FStopped then
+      exit;
+    //a cancelled lookup finds nothing - that is not a problem to report.
+    if FCancellationToken.IsCancelled then
+    begin
+      FStopped := true;
+      exit;
+    end;
+    //no choice can avoid it.
+    if levels.IsEmpty then
+    begin
+      RecordFailure(failure);
+      if giveUpId <> '' then
+        FGivenUp.Add(giveUpId);
+      exit;
+    end;
+
+    //back to the latest decision it depends on - the ones after it go with what they were built on.
+    level := levels.Highest;
+    while FDecisions.Count > level do
+      FDecisions.Delete(FDecisions.Count - 1);
+    decision := FDecisions[level - 1];
+    FContext.UndoTo(decision.Mark);
+    rest := levels.Without(level);
+    decision.Accumulated.AddAll(rest);
+    decision.FailureReasons[decision.Current.Version.ToStringNoMeta] := failure.Message;
+    decision.LastFailure := failure;
+    //it failed on fixed facts alone - whatever else is chosen, it would again.
+    if rest.IsEmpty then
+      FContext.RecordNoGood(decision.Current, failure.Message);
+    FLogger.Debug('    [' + IntToStr(level) + '] ' + decision.Current.Id + '-' + decision.Current.Version.ToStringNoMeta + ' fails : ' + FirstLine(failure.Message));
+
+    if not Step then
+      exit;
+    candidate := NextCandidate(decision);
+    if FStopped then
+      exit;
+    if candidate <> nil then
+    begin
+      AssignCandidate(decision, candidate);
+      exit;
+    end;
+    //every version failed - the failure belongs to what limited the choice.
+    Exhausted(decision, failure, levels);
+    giveUpId := decision.PackageId;
+    mark := decision.Mark;
+    FDecisions.Delete(FDecisions.Count - 1);
+    FContext.UndoTo(mark);
+  end;
+end;
+
+function TResolveSearch.AlreadyRecorded(const packageId : string; const parentId : string) : boolean;
+var
+  failure : TResolveFailure;
+begin
+  result := false;
+  for failure in FFailures do
+    if SameText(failure.Conflict.PackageId, packageId) and SameText(failure.Conflict.ParentId, parentId) then
+      exit(true);
+end;
+
+procedure TResolveSearch.RecordFailure(const failure : TResolveFailure);
+var
+  existing : TResolveFailure;
+begin
+  //the same problem found again, by another requirement or after going back, is said once.
+  for existing in FFailures do
+    if (existing.Code = failure.Code) and SameText(existing.Conflict.PackageId, failure.Conflict.PackageId) and
+       SameText(existing.Conflict.ParentId, failure.Conflict.ParentId) then
+      exit;
+  FFailures.Add(failure);
+end;
+
+/// A package that needs itself, directly or through others, can't be built - Delphi packages can't require each
+/// other. Only what this resolve expanded is followed : a project reference's dependencies are as they were.
+procedure TResolveSearch.CheckCycles;
+var
+  visiting : ISet<string>;
+  done : ISet<string>;
+  path : IList<string>;
+  id : string;
+
+  procedure Visit(const packageId : string);
+  var
+    assignment : TAssignment;
+    dependency : IPackageDependency;
+    target : string;
+    cycle : string;
+    i : integer;
+    start : integer;
+  begin
+    if done.Contains(packageId) then
+      exit;
+    if not FContext.TryGetAssignment(packageId, assignment) then
+      exit;
+    if not (assignment.Kind in [akTopLevel, akChosen, akImported]) then
+    begin
+      done.Add(packageId);
+      exit;
+    end;
+    visiting.Add(packageId);
+    path.Add(assignment.PackageInfo.Id + '-' + assignment.PackageInfo.Version.ToStringNoMeta);
+    if assignment.PackageInfo.Dependencies <> nil then
+      for dependency in assignment.PackageInfo.Dependencies do
+      begin
+        if dependency.VersionRange.IsBundledSentinel then
+          continue;
+        target := LowerCase(dependency.Id);
+        if visiting.Contains(target) then
+        begin
+          start := 0;
+          for i := 0 to path.Count - 1 do
+            if SameText(Copy(path[i], 1, Length(dependency.Id) + 1), dependency.Id + '-') then
+              start := i;
+          cycle := '';
+          for i := start to path.Count - 1 do
+            cycle := cycle + path[i] + ' -> ';
+          cycle := cycle + path[start];
+          RecordFailure(MakeFailure(TErrorCode.E2013_DependencyCycle, 'Packages depend on each other in a cycle : ' + cycle + '.', dependency.Id,
+                                    assignment.PackageInfo.Id, dependency.VersionRange, 'dependency cycle : ' + cycle));
+          continue;
+        end;
+        Visit(target);
+      end;
+    path.Delete(path.Count - 1);
+    visiting.Remove(packageId);
+    done.Add(packageId);
+  end;
+
+begin
+  visiting := TCollections.CreateSet<string>;
+  done := TCollections.CreateSet<string>;
+  path := TCollections.CreateList<string>;
+  for id in FContext.TopLevels do
+    Visit(id);
+end;
+
+/// The search checks the requirements of what it expands - the new packages and what they pull in. The project's
+/// references are kept as they are and not expanded, so a reference that pins a package this resolve changed
+/// (e.g. Ext 1.0.1 pinning Base 1.0.1 while Base 1.0.3 is installed) is caught here - otherwise an inconsistent
+/// graph would be written, one the next restore rejects. An edge between two packages this resolve did not
+/// change is skipped - an inconsistency that was already there is not this resolve's to report, and must not
+/// make an unrelated install (or a restore) fail.
+procedure TResolveSearch.ValidateResolvedDependencies;
+var
+  assignment : TAssignment;
+  target : TAssignment;
+  dependency : IPackageDependency;
+begin
+  for assignment in FContext.ResolvedOrder do
+  begin
+    if (assignment.Kind = akBundled) or (assignment.PackageInfo.Dependencies = nil) then
+      continue;
+    for dependency in assignment.PackageInfo.Dependencies do
+    begin
+      if dependency.VersionRange.IsBundledSentinel then
+        continue;
+      //the problems with a package that couldn't be resolved are reported already.
+      if FGivenUp.Contains(LowerCase(dependency.Id)) then
+        continue;
+      if not FContext.TryGetAssignment(dependency.Id, target) then
+        continue;
+      if target.Kind = akBundled then
+        continue;
+      if dependency.VersionRange.IsSatisfiedBy(target.PackageInfo.Version) then
+        continue;
+      if FContext.IsUnchanged(assignment) and FContext.IsUnchanged(target) then
+        continue;
+      if AlreadyRecorded(dependency.Id, assignment.PackageInfo.Id) then
+        continue;
+      RecordFailure(MakeFailure(TErrorCode.E2005_SelectedVersionConflict, 'Package conflict - ' + assignment.PackageInfo.Id + '-' + assignment.PackageInfo.Version.ToStringNoMeta +
+                                ' requires ' + dependency.Id + ' ' + dependency.VersionRange.ToString + ' but ' + dependency.Id + '-' +
+                                target.PackageInfo.Version.ToStringNoMeta + ' is selected.',
+                                dependency.Id, assignment.PackageInfo.Id, dependency.VersionRange,
+                                assignment.PackageInfo.Id + '-' + assignment.PackageInfo.Version.ToStringNoMeta + ' requires ' + dependency.VersionRange.ToString +
+                                ' but version ' + target.PackageInfo.Version.ToStringNoMeta + ' is selected'));
+    end;
+  end;
+end;
 
 { TDependencyResolver }
+
+class constructor TDependencyResolver.Create;
+begin
+  FMaxSteps := 20000;
+end;
 
 constructor TDependencyResolver.Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageCache : IPackageCache; const packageInstallerContext : IPackageInstallerContext);
 begin
   FLogger := logger;
   FRepositoryManager := repositoryManager;
   FPackageCache := packageCache;
-  FStopwatch := TStopwatch.Create;
   FPackageInstallerContext := packageInstallerContext;
-end;
-
-function SortDependencies(const Left, Right : IPackageDependency) : integer;
-var
-  w : integer;
-begin
-  //check the width of the range.. smaller range equals less dep versions
-  //so we can fail faster.
-  w := Left.VersionRange.PatchWidth - Right.VersionRange.PatchWidth;
-  if w = 0 then
-    result := 0
-  else if w > 0 then
-    result := 1
-  else
-    result := -1;
-end;
-
-/// This a simple depth first search with backtracking. It records unresolvable paths (nogoods) to avoid searching those again
-/// When a conflict is found, it tries to resolve that by finding an overlapping dependency version range between the new
-/// dependency range and the one already resolved. If found then it will undo the previous resolution and push it back on
-/// the stack to be redone with the overlapping range. If not then we have an unresolvable conflict and exit.
-///
-/// Note that top level (non transitive) dependencies always win out in conflicts with transient dependencies.
-/// A small optimisation is to sort the dependencies by the width of their dependency version range and
-/// process them from small to large. The idea there is to fail as early as possible.
-///
-/// In basic testing, this seems to be fast enough, however as the eco system grows and dependencies become
-/// deeper and more widespread, this simple algorithm may become slow.
-///
-/// The current algorithm is not great at explaining the problem when conflicts are found.
-///
-/// In the future we can implement a better algorithms which provides faster resolution
-///
-/// The PubGrub algorithm used in the dart package manager (pub) looks to be a good contender
-/// https://medium.com/@nex3/pubgrub-2fb6470504f
-/// ://github.com/dart-lang/pub/blob/master/doc/solver.md
-/// If anyone is good math and want's to have a stab at implementing it in Delphi that would be great!
-
-function TDependencyResolver.DoResolve(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const includePrerelease : boolean; const context : IResolverContext) : boolean;
-const
-  //Hard ceiling on resolver iterations. The depth-first / backtrack algorithm can in principle
-  //loop on pathological inputs (e.g. cyclic manifests, or oscillating no-good resolution chains).
-  //Real graphs land in the hundreds of iterations at most; 100k is well above that while still
-  //guaranteeing termination in seconds rather than indefinitely.
-  cMaxIterations = 100000;
-var
-  currentPackage : IPackageInfo;
-  dependency : IPackageDependency;
-  effectiveRange : TVersionRange;
-  resolution : IResolvedPackage;
-  parentResolution : IResolvedPackage;
-  intersectingRange : TVersionRange;
-  versions : IList<IPackageInfo>;
-  version : IPackageInfo;
-  selected : boolean;
-  versionsFromCache : boolean;
-  sourcesUnavailable : string;
-  preferredVersion : TPackageVersion;
-  preferredIdentity : IPackageIdentity;
-  preferredInfo : IPackageInfo;
-  backtrackOk : boolean;
-  choices : integer;
-  preRelease : boolean;
-  conflict : TUnresolvableConflict;
-  iterations : integer;
-  limitConflict : TUnresolvableConflict;
-  bundledIds : IList<string>;
-  bundledId : string;
-begin
-  FStopwatch.Reset;
-  FStopwatch.Start;
-  FLogger.Verbose('Starting dependency resolution...');
-
-  iterations := 0;
-  //Bundled dependencies (sentinel version 999.999.999, e.g. Indy) are collected here and
-  //resolved in a finalization pass after the main loop, once every real resolution is in place.
-  bundledIds := TCollections.CreateList<string>;
-  //NuGet-style prerelease handling: compute eligibility ONCE per resolve, from the user's
-  //explicit flag plus an implicit promotion if any top-level package is itself a prerelease.
-  //This matches what NuGet does when you `Install-Package Foo -Version 1.0.0-beta` - the
-  //prerelease flag is implicitly turned on for the whole resolve so the install can complete,
-  //and the same applies if the project already contains a prerelease top-level. Picking the
-  //flag per-package (e.g. only when currentPackage is itself prerelease) leads to a stable
-  //sibling resolving its transient as stable while a prerelease sibling resolves the same
-  //transient as prerelease - two versions of the same id in one resolve.
-  preRelease := includePrerelease or context.AnyTopLevelIsPrerelease;
-
-  //NOTE : we are only resolving dependencies here - the requirements on the stack are already deemed to be resolved.
-  while context.AnyOpenRequrements do
-  begin
-    Inc(iterations);
-    if iterations > cMaxIterations then
-    begin
-      FLogger.Error(TErrorCode.E2004_ResolverIterationLimit, 'Dependency resolution exceeded ' + IntToStr(cMaxIterations) + ' iterations - aborting (most likely a cyclic dependency).');
-      limitConflict.PackageId := '';
-      limitConflict.ParentId := '';
-      limitConflict.RequestedRange := TVersionRange.Empty;
-      limitConflict.Reason := 'resolver iteration limit (' + IntToStr(cMaxIterations) + ') exceeded - suspected infinite loop';
-      context.RecordUnresolvable(limitConflict);
-      break;
-    end;
-    currentPackage := context.PopRequirement;
-    //if the package has no dependencies then we are done with it.
-    if (currentPackage.Dependencies = nil) or (not currentPackage.Dependencies.Any) then
-      continue;
-
-    //Sort dependencies by versionrange patch-width (smaller = fewer candidate versions = fail
-    //faster). Sort order is stable across iterations now that the resolver no longer mutates
-    //dependency.VersionRange, so we only sort the first time we see each package id - skip on
-    //the re-pushes that happen during backtracking.
-    if context.ShouldSortDependencies(currentPackage.Id) then
-      currentPackage.Dependencies.Sort(TComparer<IPackageDependency>.Construct(SortDependencies));
-
-    for dependency in currentPackage.Dependencies do
-    begin
-      //Bundled lib (e.g. Indy): satisfied by ANY real resolution of this id, otherwise a no-op
-      //resolved after the main loop. Detected on the raw declared range (never narrowed). Skips
-      //cache/repo lookup, the no-good cache, backtracking and conflict recording entirely.
-      if dependency.VersionRange.IsBundledSentinel then
-      begin
-        if not bundledIds.Contains(LowerCase(dependency.Id)) then
-          bundledIds.Add(LowerCase(dependency.Id));
-        continue;
-      end;
-
-      //effectiveRange overlays the parent's declared range with any narrowing the resolver
-      //already applied (from sibling intersections). We never mutate dependency.VersionRange.
-      effectiveRange := context.GetEffectiveDependencyRange(currentPackage.Id, dependency.Id, dependency.VersionRange);
-      FLogger.Information('Resolving dependency : ' + currentPackage.Id + '.' + currentPackage.Version.ToStringNoMeta + '->' + dependency.Id + ' ' + effectiveRange.ToString);
-      //first see if we have resolved this package already. That may be in this project, or another project in the group.
-      if context.GetOrImportResolvedPackage(dependency.Id, currentPackage.Id, resolution) then
-      begin
-        //check if the dependency range is satisfied by already resolved version
-        if not effectiveRange.IsSatisfiedBy(resolution.PackageInfo.Version) then
-        begin
-          FLogger.Information('       conflict - selected version : ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + ' does not satisfy ' + effectiveRange.ToString);
-
-          //Check if the resolution comes from a different project, if so record the conflict and carry on
-          //- we want to surface every conflict in one run rather than bail on the first.
-          if not SameText(resolution.ProjectFile, context.ProjectFile) then
-          begin
-            FLogger.Error(TErrorCode.E2003_ProjectGroupConflict, 'Package conflict - ' + currentPackage.Id + ' requires ' + dependency.Id + ' ' + effectiveRange.ToString + ', but project [' +
-                          resolution.ProjectFile + '] uses ' + dependency.Id + '-' + resolution.PackageInfo.Version.ToString + '.');
-            conflict.PackageId := dependency.Id;
-            conflict.ParentId := currentPackage.Id;
-            conflict.RequestedRange := effectiveRange;
-            conflict.Reason := 'cross-project: version ' + resolution.PackageInfo.Version.ToString + ' selected in project [' + resolution.ProjectFile + '] does not satisfy ' + effectiveRange.ToString;
-            context.RecordUnresolvable(conflict);
-            continue;
-          end
-          else if resolution.IsTopLevel then //if it's a top level package then the version is not negotiable.
-          begin
-            FLogger.Error(TErrorCode.E2002_TopLevelVersionConflict, 'Package conflict - ' + currentPackage.Id + ' requires ' + dependency.Id + ' ' + effectiveRange.ToString + ', but the top level reference is ' +
-                          dependency.Id + '-' + resolution.PackageInfo.Version.ToString + '.');
-            conflict.PackageId := dependency.Id;
-            conflict.ParentId := currentPackage.Id;
-            conflict.RequestedRange := effectiveRange;
-            conflict.Reason := 'top-level version ' + resolution.PackageInfo.Version.ToString + ' is not negotiable and does not satisfy ' + effectiveRange.ToString;
-            context.RecordUnresolvable(conflict);
-            continue;
-          end;
-
-          FLogger.Verbose('Attempting to find overalapping versionrange with dependency and earlier resolution');
-          //see if we can reduce to an overlapping versionrange that satisfies both
-          if resolution.VersionRange.TryGetIntersectingRange(effectiveRange, intersectingRange) then
-          begin
-            //Stored in the resolver context rather than mutating dependency.VersionRange, which
-            //lives on the parent's manifest IPackageInfo and would corrupt re-evaluation if the
-            //same package is processed again.
-            context.NarrowDependencyRange(currentPackage.Id, dependency.Id, intersectingRange);
-            FLogger.Debug('       overlapping range found : ' + dependency.Id + '-' + intersectingRange.ToString);
-          end
-          else
-          begin
-            //Record the resolved version as no good so we don't try it again, then backtrack
-            //the parent. The previous "RecordNoGood returned true means we've been here before"
-            //loop-detection branch was fragile - the global iteration limit in DoResolve catches
-            //true infinite loops, so the early-detection path no longer earns its keep.
-            context.RecordNoGood(resolution.PackageInfo);
-            if context.TryGetResolvedPackage(resolution.ParentId, parentResolution) then
-            begin
-              context.RecordNoGood(parentResolution.PackageInfo);
-              context.PushRequirement(parentResolution.PackageInfo);
-            end;
-          end;
-          //unresolve the dependency
-          context.RemoveResolvedPackage(dependency.Id);
-          //try the current package again
-          context.PushRequirement(currentPackage);
-        end
-        else
-        begin
-          if resolution.ProjectFile <> context.ProjectFile then
-          begin
-            FLogger.Information('    resolved earlier : ' + dependency.Id + '.' + resolution.PackageInfo.Version.ToString);
-          end
-          else
-            FLogger.Information('            selected : ' + dependency.Id + '.' + resolution.PackageInfo.Version.ToString);
-          //in the case where we are promoting a transitive to a direct dependency, we need a range.
-          //the direct will not have a range so we convert the version to a range.
-          if resolution.VersionRange.IsEmpty then
-            resolution.VersionRange := TVersionRange.Create(resolution.PackageInfo.Version);
-          //if the resolution came from another project, then we still need to deal with it's dependencies.
-          if resolution.PackageInfo.Dependencies.Any then
-            context.PushRequirement(resolution.PackageInfo);
-        end;
-        //we're good.. this is resolved.
-        continue;
-      end
-      else
-      begin
-        selected := false;
-
-        //Restore lock-file behaviour: if the project graph recorded a specific version for this
-        //transient, use it directly when it's available in the cache and still satisfies the
-        //parent's declared range. We only fall through to range-based selection when the recorded
-        //version is missing, out of range, or already marked no-good.
-        if context.TryGetPreferredVersion(dependency.Id, preferredVersion) then
-        begin
-          if effectiveRange.IsSatisfiedBy(preferredVersion) then
-          begin
-            preferredIdentity := TPackageIdentity.Create('', dependency.Id, preferredVersion, compilerVersion);
-            preferredInfo := FPackageCache.GetPackageInfo(cancellationToken, preferredIdentity);
-            if (preferredInfo <> nil) and (not context.IsNoGood(preferredInfo)) then
-            begin
-              context.RecordResolution(preferredInfo, effectiveRange, currentPackage.Id);
-              if preferredInfo.Dependencies.Any then
-                context.PushRequirement(preferredInfo);
-              FLogger.Information('            selected (from graph) : ' + preferredInfo.Id + '.' + preferredInfo.Version.ToStringNoMeta);
-              selected := true;
-            end;
-          end;
-        end;
-
-        //it wasn't resolved before, so get the available versions
-        versionsFromCache := false;
-        sourcesUnavailable := '';
-        if not selected then
-        begin
-          versions := context.GetPackageVersions(dependency.Id);
-          if versions = nil then
-          begin
-            //cache-first: the local package cache stores manifests for any version we've previously
-            //downloaded. For a restore (where the dproj effectively pins exact versions) the cache
-            //usually has exactly what we need. Only fall through to the network if the cache is empty
-            //for this id.
-            versions := FPackageCache.GetCachedPackageVersionsWithDependencies(cancellationToken, dependency.Id, compilerVersion, effectiveRange, preRelease);
-            versionsFromCache := versions.Any;
-            if not versionsFromCache then
-            begin
-              versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, dependency.Id, effectiveRange, preRelease);
-              sourcesUnavailable := FRepositoryManager.UnavailableSources;
-            end;
-            if versions.Any then //cache the versions in the context in case we need them again
-              context.CachePackageVersions(dependency.Id, versions);
-          end;
-
-          for version in versions do
-          begin
-            //skip versions we already know are no good.
-            if context.IsNoGood(version) then
-              continue;
-            if effectiveRange.IsSatisfiedBy(version.Version) then
-            begin
-              context.RecordResolution(version, effectiveRange, currentPackage.Id);
-              if version.Dependencies.Any then //no point pushing it if there are no dependencies - see top of loop
-                context.PushRequirement(version); //resolve it's dependencies
-              FLogger.Information('            selected : ' + version.Id + '.' + version.Version.ToStringNoMeta);
-              selected := true;
-              break;
-            end
-            else
-              context.RecordNoGood(version); // doesn't satisfy the dependency version range - record so we don't try to use it again.
-          end;
-          //If we couldn't select from the cached set, the repo may have a newer in-range version
-          //that we haven't downloaded yet. Re-query the repo and retry once before backtracking.
-          if (not selected) and versionsFromCache then
-          begin
-            FLogger.Debug('         No cached version of ' + dependency.Id + ' satisfies ' + effectiveRange.ToString + ' - querying repository');
-            versions := FRepositoryManager.GetPackageVersionsWithDependencies(cancellationToken, compilerVersion, dependency.Id, effectiveRange, preRelease);
-            sourcesUnavailable := FRepositoryManager.UnavailableSources;
-            if versions.Any then
-              context.CachePackageVersions(dependency.Id, versions);
-            for version in versions do
-            begin
-              if context.IsNoGood(version) then
-                continue;
-              if effectiveRange.IsSatisfiedBy(version.Version) then
-              begin
-                context.RecordResolution(version, effectiveRange, currentPackage.Id);
-                if version.Dependencies.Any then
-                  context.PushRequirement(version);
-                FLogger.Information('            selected : ' + version.Id + '.' + version.Version.ToStringNoMeta);
-                selected := true;
-                break;
-              end
-              else
-                context.RecordNoGood(version);
-            end;
-          end;
-        end;
-        if not selected then
-        begin
-          //if we get here we are blocked on this path.
-          //make sure we never try the currentPackage version again
-          context.RecordNoGood(currentPackage);
-          FLogger.Debug('         Unable to satisfy dependency ' + dependency.Id + '-' + effectiveRange.ToString);
-
-          //Try to backtrack to a point where a different choice could have been made.
-          //If currentPackage has alternative untried versions cached, hand control back to its
-          //parent so the parent re-evaluates against those alternatives. Otherwise the conflict
-          //is genuine - record it and move on so the rest of the graph still gets evaluated.
-          backtrackOk := false;
-          versions := context.GetPackageVersions(currentPackage.id);
-          if (versions <> nil) and versions.Any then
-          begin
-            choices := 0;
-            for version in versions do
-            begin
-              if context.IsNoGood(version) then
-                continue;
-              Inc(choices);
-            end;
-            if choices > 0 then
-            begin
-              if context.TryGetResolvedPackage(currentPackage.Id, resolution) then
-              begin
-                //can't backtrack to a root (direct dependency)
-                if (not resolution.IsTopLevel) and context.TryGetResolvedPackage(resolution.ParentId, parentResolution) then
-                begin
-                  FLogger.Debug('Backtracking to : ' + parentResolution.PackageInfo.Id + '-' + parentResolution.PackageInfo.Version.ToString);
-                  context.RemoveResolvedPackage(currentPackage.Id);
-                  context.PushRequirement(parentResolution.PackageInfo); //force the currentpackage dependencies to be re-evaluated.
-                  break;
-                end;
-              end;
-            end;
-          end;
-
-          if not backtrackOk then
-          begin
-            conflict.PackageId := dependency.Id;
-            conflict.ParentId := currentPackage.Id;
-            conflict.RequestedRange := effectiveRange;
-            if sourcesUnavailable <> '' then
-            begin
-              conflict.Reason := 'no version satisfying the range was found - source(s) [' + sourcesUnavailable + '] could not be used';
-              FLogger.Error(TErrorCode.E1102_PackageNotFoundSourcesUnavailable, 'Unable to satisfy dependency : ' + currentPackage.Id + ' -> ' + dependency.Id + ' ' + effectiveRange.ToString +
-                            ' - the source(s) [' + sourcesUnavailable + '] could not be used, see the warning(s) above.');
-            end
-            else
-            begin
-              conflict.Reason := 'no available version satisfies the requested range';
-              FLogger.Error(TErrorCode.E2001_DependencyUnsatisfiable, 'Unable to satisfy dependency : ' + currentPackage.Id + ' -> ' + dependency.Id + ' ' + effectiveRange.ToString +
-                            ' - no available version satisfies the range.');
-            end;
-            context.RecordUnresolvable(conflict);
-            continue;
-          end;
-        end;
-      end;
-    end;
-  end;
-
-  //Finalize bundled dependencies now that every real resolution exists. A real package of the
-  //same id - added top-level or pulled in transitively, locally or in a sibling project - always
-  //wins (at whatever version). Only when none exists do we synthesize the bundled no-op. This
-  //after-the-fact pass is what guarantees real-wins regardless of queue order.
-  for bundledId in bundledIds do
-  begin
-    if context.TryGetResolvedPackage(bundledId, resolution) then
-      continue;
-    if context.GetOrImportResolvedPackage(bundledId, cRootNode, resolution) then
-      continue;
-    FLogger.Information('            bundled : ' + bundledId + ' (using IDE-provided version)');
-    context.RecordBundledResolution(bundledId);
-  end;
-
-  ValidateResolvedDependencies(context);
-
-  if context.HasUnresolvable then
-  begin
-    FLogger.Information('Dependency resolution failed : ' + IntToStr(context.GetUnresolvable.Count) + ' conflict(s).', true);
-    result := false;
-  end
-  else
-  begin
-    FLogger.Success('Dependency resolution done in [' + IntToStr(FStopwatch.ElapsedMilliseconds) + 'ms]');
-    result := true;
-  end;
-  FLogger.NewLine;
-
-end;
-
-/// The main loop only evaluates the dependencies of packages it pushes - the new packages and what they
-/// pull in. Project references are recorded as resolved but never re-evaluated, so a reference that pins
-/// a package this install changes (e.g. Ext 1.0.1 pinning Base 1.0.1 while Base 1.0.3 is installed) would
-/// otherwise go unnoticed and an inconsistent graph would be written - one the next restore rejects.
-/// So every resolved edge is checked here. An edge between two packages this install did not change (a
-/// project reference kept as it was, a package restore found at its recorded version, or a sibling
-/// project's resolution) is skipped - an inconsistency that was already there is not this install's to
-/// report, and must not make an unrelated install (or a restore) fail.
-procedure TDependencyResolver.ValidateResolvedDependencies(const context : IResolverContext);
-var
-  resolution : IResolvedPackage;
-  dependencyResolution : IResolvedPackage;
-  dependency : IPackageDependency;
-  effectiveRange : TVersionRange;
-  conflict : TUnresolvableConflict;
-
-  function IsUnchanged(const res : IResolvedPackage) : boolean;
-  begin
-    result := (not SameText(res.ProjectFile, context.ProjectFile)) or context.IsUnchanged(res.PackageInfo);
-  end;
-
-  function AlreadyRecorded(const packageId, parentId : string) : boolean;
-  var
-    existing : TUnresolvableConflict;
-  begin
-    result := false;
-    for existing in context.GetUnresolvable do
-    begin
-      if SameText(existing.PackageId, packageId) and SameText(existing.ParentId, parentId) then
-        exit(true);
-    end;
-  end;
-
-begin
-  for resolution in context.GetResolvedPackages do
-  begin
-    if resolution.IsBundled or (resolution.PackageInfo.Dependencies = nil) then
-      continue;
-    for dependency in resolution.PackageInfo.Dependencies do
-    begin
-      if dependency.VersionRange.IsBundledSentinel then
-        continue;
-      //a dependency with no resolution has already been reported where it failed.
-      if not context.TryGetResolvedPackage(dependency.Id, dependencyResolution) then
-        continue;
-      if dependencyResolution.IsBundled then
-        continue;
-      effectiveRange := context.GetEffectiveDependencyRange(resolution.PackageInfo.Id, dependency.Id, dependency.VersionRange);
-      if effectiveRange.IsSatisfiedBy(dependencyResolution.PackageInfo.Version) then
-        continue;
-      if IsUnchanged(resolution) and IsUnchanged(dependencyResolution) then
-        continue;
-      if AlreadyRecorded(dependency.Id, resolution.PackageInfo.Id) then
-        continue;
-      FLogger.Error(TErrorCode.E2005_SelectedVersionConflict, 'Package conflict - ' + resolution.PackageInfo.Id + '-' + resolution.PackageInfo.Version.ToStringNoMeta + ' requires ' +
-                    dependency.Id + ' ' + effectiveRange.ToString + ' but ' + dependency.Id + '-' + dependencyResolution.PackageInfo.Version.ToStringNoMeta + ' is selected.');
-      conflict.PackageId := dependency.Id;
-      conflict.ParentId := resolution.PackageInfo.Id;
-      conflict.RequestedRange := effectiveRange;
-      conflict.Reason := resolution.PackageInfo.Id + '-' + resolution.PackageInfo.Version.ToStringNoMeta + ' requires ' + effectiveRange.ToString +
-                         ' but version ' + dependencyResolution.PackageInfo.Version.ToStringNoMeta + ' is selected';
-      context.RecordUnresolvable(conflict);
-    end;
-  end;
 end;
 
 //The repository manager is shared, and its owner initializes it - doing it again here would re-check (and
@@ -590,9 +919,16 @@ function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancel
                                                out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>;
                                                const preferredVersions : IDictionary<string, TPackageVersion>; const conflicts : IList<TUnresolvableConflict>) : boolean;
 var
-  context : IResolverContext;
   packageRef : IPackageReference;
   resolution : IResolvedPackage;
+  context : TResolverContext;
+  search : TResolveSearch;
+  failure : TResolveFailure;
+  failureCount : integer;
+  assignment : TAssignment;
+  parent : TAssignment;
+  parentText : string;
+  stopwatch : TStopwatch;
 begin
   Assert(FConfiguration <> nil, 'config is nil, Initialize has not been called');
 
@@ -607,20 +943,62 @@ begin
       FLogger.Warning(TWarningCode.W2010_ProjectGroupMismatch, 'Package project group mismatch : ' + packageRef.Id + '-' + packageRef.Version.ToStringNoMeta + ' in project [' + projectFile +
                       '] does not satisfy ' + resolution.VersionRange.ToString + ' used in project [' + resolution.ProjectFile + ']');
   end;
-  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, newPackages, projectReferences, sharedVersionCache, preferredVersions);
 
-  result := DoResolve(cancellationToken, compilerVersion, options.Prerelease, context);
-  resolved := context.GetResolvedPackageInfos;
-  dependencyGraph := context.BuildDependencyGraph;
-  if conflicts <> nil then
-    conflicts.AddRange(context.GetUnresolvable);
-  //record the resolutions so they can be checked against by other projects in the group. Only when the
-  //resolve succeeded - a failed install leaves the project as it was, so its resolutions must not claim
-  //otherwise.
-  if result then
-    FPackageInstallerContext.RecordResolutions(projectFile, context.GetResolvedPackages);
+  stopwatch := TStopwatch.StartNew;
+  FLogger.Verbose('Starting dependency resolution...');
+  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, compilerVersion, newPackages, projectReferences, sharedVersionCache, preferredVersions);
+  try
+    //NuGet-style prerelease handling, decided once for the whole resolve : the user's flag, or any top level
+    //being a prerelease (installing Foo 1.0.0-beta turns it on, as NuGet does). Deciding it per package lets a
+    //stable sibling resolve a transient as stable while a prerelease one resolves it as prerelease - two
+    //versions of the same id in one resolve.
+    search := TResolveSearch.Create(FLogger, FRepositoryManager, FPackageCache, cancellationToken, context,
+                                    options.Prerelease or context.AnyTopLevelIsPrerelease, FMaxSteps);
+    try
+      result := search.Run;
+      FLastStepCount := search.Steps;
+      failureCount := search.Failures.Count;
+      //cancelled : whoever owns the token says so, and what was found before it is moot.
+      if not cancellationToken.IsCancelled then
+        for failure in search.Failures do
+        begin
+          FLogger.Error(failure.Code, failure.Message);
+          if conflicts <> nil then
+            conflicts.Add(failure.Conflict);
+        end;
+    finally
+      search.Free;
+    end;
+
+    resolved := context.GetResolvedPackageInfos;
+    dependencyGraph := context.BuildDependencyGraph;
+    if result then
+    begin
+      for assignment in context.ResolvedOrder do
+      begin
+        if not (assignment.Kind in [akChosen, akImported]) then
+          continue;
+        parentText := assignment.ParentId;
+        if context.TryGetAssignment(assignment.ParentId, parent) then
+          parentText := parent.PackageInfo.Id + '.' + parent.PackageInfo.Version.ToStringNoMeta;
+        FLogger.Information('Resolving dependency : ' + parentText + '->' + assignment.PackageInfo.Id + ' ' + assignment.VersionRange.ToString);
+        if assignment.Kind = akImported then
+          FLogger.Information('    resolved earlier : ' + assignment.PackageInfo.Id + '.' + assignment.PackageInfo.Version.ToString)
+        else
+          FLogger.Information('            selected : ' + assignment.PackageInfo.Id + '.' + assignment.PackageInfo.Version.ToStringNoMeta);
+      end;
+      //record the resolutions so they can be checked against by other projects in the group. Only when the
+      //resolve succeeded - a failed install leaves the project as it was, so its resolutions must not claim
+      //otherwise.
+      FPackageInstallerContext.RecordResolutions(projectFile, context.GetResolvedPackages);
+      FLogger.Success('Dependency resolution done in [' + IntToStr(stopwatch.ElapsedMilliseconds) + 'ms]');
+    end
+    else if not cancellationToken.IsCancelled then
+      FLogger.Information('Dependency resolution failed : ' + IntToStr(failureCount) + ' conflict(s).', true);
+    FLogger.NewLine;
+  finally
+    context.Free;
+  end;
 end;
 
-
 end.
-

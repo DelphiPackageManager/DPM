@@ -66,6 +66,8 @@ type
     //Background brush for the TDPMMessageForm window CLASS - see CreateParams for the reasoning
     //and the lifetime rules. Created once, never deleted or replaced.
     class var FClassBackgroundBrush : HBRUSH;
+    //how many prompts are up - while any are, the log window isn't topmost (see BeginModalPrompt).
+    class var FPromptDepth : integer;
 
     procedure SetCancellationTokenSource(const Value: ICancellationTokenSource);
     procedure SetCloseDelayInSeconds(const Value: integer);
@@ -118,6 +120,12 @@ type
     //Called by the message service to mark a task as running / finished. While running the
     //Close button and the window close box are disabled.
     procedure SetTaskRunning(const value : boolean);
+
+    //A prompt (a MessageDlg, the trust prompt) is about to be shown, and the log window may be up. The log window
+    //is topmost and the prompt isn't, so the prompt could open behind it and the IDE look hung - until
+    //EndModalPrompt the log window isn't topmost. Prompts inside prompts count. Main thread only.
+    class procedure BeginModalPrompt;
+    class procedure EndModalPrompt;
 
     property CancellationTokenSource : ICancellationTokenSource read FCancellationTokenSource write SetCancellationTokenSource;
     property CloseDelayInSeconds : integer read FCloseDelayInSeconds write SetCloseDelayInSeconds;
@@ -283,6 +291,39 @@ begin
     KillTimer(Handle, CCloseTimerId);
 end;
 
+//The log windows there are (there is one) - topmost, or just above the IDE's own windows.
+procedure SetLogWindowsTopmost(const topmost : boolean);
+var
+  i : integer;
+  insertAfter : HWND;
+begin
+  if topmost then
+    insertAfter := HWND_TOPMOST
+  else
+    insertAfter := HWND_NOTOPMOST;
+  for i := 0 to Screen.CustomFormCount - 1 do
+  begin
+    if (Screen.CustomForms[i] is TDPMMessageForm) and Screen.CustomForms[i].HandleAllocated then
+      SetWindowPos(Screen.CustomForms[i].Handle, insertAfter, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE);
+  end;
+end;
+
+class procedure TDPMMessageForm.BeginModalPrompt;
+begin
+  Inc(FPromptDepth);
+  if FPromptDepth = 1 then
+    SetLogWindowsTopmost(false);
+end;
+
+class procedure TDPMMessageForm.EndModalPrompt;
+begin
+  if FPromptDepth = 0 then
+    exit;
+  Dec(FPromptDepth);
+  if FPromptDepth = 0 then
+    SetLogWindowsTopmost(true);
+end;
+
 procedure TDPMMessageForm.CreateWnd;
 begin
   inherited;
@@ -395,7 +436,9 @@ var
   brushColor : TColor;
 begin
   inherited;
-  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST;
+  //not while a prompt is up - a handle made now must not go on top of it.
+  if FPromptDepth = 0 then
+    Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST;
 
   //Kill the white flash on the first show. This is a TOP LEVEL window concern, not a control one :
   //child windows share the top level window's DWM redirection surface, and that surface is white
@@ -455,9 +498,15 @@ var
   ideThemeSvc : IOTAIDEThemingServices;
   {$ENDIF}
 begin
-  FOptions.LogWindowWidth := Self.Width;
-  FOptions.LogWindowHeight := Self.Height;
-  FOptions.SaveToFile();
+  //the size is remembered if it can be. A failure to save it went out of the destructor, leaving the form half
+  //freed and the theme notifier below in place - the IDE then called into a freed form when the theme changed.
+  try
+    FOptions.LogWindowWidth := Self.Width;
+    FOptions.LogWindowHeight := Self.Height;
+    FOptions.SaveToFile();
+  except
+    //nothing to be done - it is only the window's size.
+  end;
 
   {$IFDEF THEMESERVICES}
   ideThemeSvc := (BorlandIDEServices as IOTAIDEThemingServices);
@@ -574,6 +623,24 @@ procedure TDPMMessageForm.ProcessMessages;
 var
   msg : TMsg;
 
+  //Not what would start a loop of its own that pumps the whole queue again - a context menu (the right button,
+  //the menu key), a click on the non-client area (a scrollbar's tracking loop) or a system key (the menu loop).
+  //Those are dropped : the operation is still running.
+  function ShouldDispatch(const m : TMsg) : boolean;
+  begin
+    case m.message of
+      WM_CONTEXTMENU,
+      WM_RBUTTONDOWN, WM_RBUTTONUP, WM_RBUTTONDBLCLK,
+      WM_NCLBUTTONDOWN..WM_NCXBUTTONDBLCLK,
+      WM_SYSKEYDOWN, WM_SYSKEYUP, WM_SYSCHAR :
+        result := false;
+      WM_KEYDOWN, WM_KEYUP :
+        result := m.wParam <> VK_APPS;
+    else
+      result := true;
+    end;
+  end;
+
   //Takes the control, not a handle - reading .Handle would force handle creation, and
   //creating child handles outside the form's own Show cascade breaks that cascade.
   procedure PumpControlInput(const ctrl : TWinControl);
@@ -582,6 +649,8 @@ var
       exit;
     while PeekMessage(msg, ctrl.Handle, 0, 0, PM_REMOVE) do
     begin
+      if not ShouldDispatch(msg) then
+        continue;
       TranslateMessage(msg);
       DispatchMessage(msg);
     end;

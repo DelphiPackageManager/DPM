@@ -109,12 +109,13 @@ end;
 
 function TPackageListItem.IsSamePackageId(const item: IPackageListItem): boolean;
 begin
-  result := (FCompilerVersion = item.CompilerVersion) and (FId = item.Id);
+  //package ids are case insensitive - two sources may not agree on the casing.
+  result := (FCompilerVersion = item.CompilerVersion) and SameText(FId, item.Id);
 end;
 
 function TPackageListItem.IsSamePackageVersion(const item: IPackageListItem): Boolean;
 begin
-  result := (FCompilerVersion = item.CompilerVersion) and (FId = item.Id) and (FVersion = item.Version);
+  result := (FCompilerVersion = item.CompilerVersion) and SameText(FId, item.Id) and (FVersion = item.Version);
 end;
 
 function TPackageListItem.MergeWith(const item: IPackageListItem): IPackageListItem;

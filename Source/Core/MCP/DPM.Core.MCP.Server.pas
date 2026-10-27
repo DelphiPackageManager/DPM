@@ -41,9 +41,10 @@ type
   ///</summary>
   ///<remarks>
   ///  Exactly three things end the loop: end of stream on the reader (the client closed our
-  ///  stdin - the primary and only portable shutdown signal), a write failure (nothing useful
-  ///  can be said if the client is gone), and cancellation. Every other condition is answered
-  ///  and the session continues. A server that dies on one malformed frame is useless.
+  ///  stdin - the primary and only portable shutdown signal), a failure reading or writing
+  ///  (nothing useful can be said if the client is gone), and cancellation. Every other condition
+  ///  - a frame that isn't UTF-8, a message that isn't JSON-RPC, a fault of our own handling one -
+  ///  is answered and the session continues. A server that dies on one malformed frame is useless.
   ///</remarks>
   TMCPServer = class
   private
@@ -74,8 +75,9 @@ type
     constructor Create(const reader : IMCPMessageReader; const writer : IMCPMessageWriter;
                        const registry : IMCPToolRegistry; const logger : ILogger;
                        const instructions : string);
-    ///<summary> Runs until end of stream, cancellation, or an unwritable output. </summary>
-    procedure Run(const cancellationToken : ICancellationToken);
+    ///<summary> Runs until end of stream, cancellation, or a failure reading or writing - false for the last,
+    ///  so dpm mcp can say (its exit code) that it stopped rather than finished. </summary>
+    function Run(const cancellationToken : ICancellationToken) : boolean;
   end;
 
 implementation
@@ -347,6 +349,9 @@ begin
     TMCPParseOutcome.poNoMethod :
       if message.IsRequest then
         SendError(message.Id, cJsonRpcInvalidRequest, 'Invalid request - missing method');
+    TMCPParseOutcome.poInvalidId :
+      //the id it has can't be echoed, so null - as JSON-RPC says for an id that can't be determined.
+      SendError(TMCPRequestId.CreateNull, cJsonRpcInvalidRequest, 'Invalid request - the id must be a string or an integer');
   end;
 end;
 
@@ -371,52 +376,73 @@ begin
     exit;
   end;
 
+  //A notification never gets a reply, not even an error - and none needs acting on. Initialized and cancelled
+  //are the only ones a client sends us : cancellation can't be actioned because the loop is single threaded (by
+  //the time it is read, the request it refers to has been answered). A request's method sent as a notification
+  //(a tools/call without an id) was carried out and answered.
+  if not message.IsRequest then
+    exit;
+
   //Note there is deliberately no "not initialized yet" check. The modern protocol is stateless
   //and has no handshake at all, so refusing work before an initialize we may never receive
   //would break every modern client.
-  if message.Method = cMethodInitialize then
-    HandleInitialize(message)
-  else if message.Method = cMethodDiscover then
-    HandleDiscover(message)
-  else if message.Method = cMethodToolsList then
-    HandleToolsList(message)
-  else if message.Method = cMethodToolsCall then
-    HandleToolsCall(cancellationToken, message)
-  else if message.Method = cMethodPing then
-    HandlePing(message)
-  else if (message.Method = cMethodInitialized) or (message.Method = cMethodCancelled) then
-  begin
-    //Accepted and ignored. Cancellation cannot be actioned because the loop is single
-    //threaded - by the time the notification is read, the request it refers to has already
-    //been answered.
-  end
-  else if message.IsRequest then
-    SendError(message.Id, cJsonRpcMethodNotFound, 'Method not found: ' + message.Method);
-  //An unknown NOTIFICATION gets no reply at all - a notification never receives one, not even
-  //an error.
+  try
+    if message.Method = cMethodInitialize then
+      HandleInitialize(message)
+    else if message.Method = cMethodDiscover then
+      HandleDiscover(message)
+    else if message.Method = cMethodToolsList then
+      HandleToolsList(message)
+    else if message.Method = cMethodToolsCall then
+      HandleToolsCall(cancellationToken, message)
+    else if message.Method = cMethodPing then
+      HandlePing(message)
+    else
+      SendError(message.Id, cJsonRpcMethodNotFound, 'Method not found: ' + message.Method);
+  except
+    //A fault of our own handling it - answered, and the session goes on. Should the answer fail too (the client
+    //has gone), that ends the loop.
+    on E : Exception do
+    begin
+      FLogger.Error(TErrorCode.E0001_UnexpectedException, 'mcp: unhandled exception handling ' + message.Method + ' : ' + E.Message);
+      SendError(message.Id, cJsonRpcInternalError, E.ClassName + ': ' + E.Message);
+    end;
+  end;
 end;
 
-procedure TMCPServer.Run(const cancellationToken : ICancellationToken);
+function TMCPServer.Run(const cancellationToken : ICancellationToken) : boolean;
 var
   text : string;
 begin
-  while FReader.ReadMessage(text) do
-  begin
-    if cancellationToken.IsCancelled then
-      exit;
-    try
-      DispatchMessage(cancellationToken, text);
-    except
-      //A write failure means the client is gone; there is nowhere to report it.
-      on E : Exception do
-      begin
-        FLogger.Warning(TWarningCode.W9501_MCPConnectionFailed, 'mcp : stopping - ' + E.Message);
-        exit;
+  result := true;
+  try
+    while true do
+    begin
+      try
+        //false : end of stream. The client closed our stdin, which is the graceful shutdown signal, so exit
+        //promptly.
+        if not FReader.ReadMessage(text) then
+          exit;
+      except
+        //a line that isn't UTF-8 - the reader has dropped it. It can't be correlated with a request, so null.
+        on E : EMCPFrameError do
+        begin
+          SendError(TMCPRequestId.CreateNull, cJsonRpcParseError, 'Parse error - ' + E.Message);
+          continue;
+        end;
       end;
+      if cancellationToken.IsCancelled then
+        exit;
+      DispatchMessage(cancellationToken, text);
+    end;
+  except
+    //Reading or writing failed - the client is gone, or going; there is nowhere to report it but the log.
+    on E : Exception do
+    begin
+      FLogger.Warning(TWarningCode.W9501_MCPConnectionFailed, 'mcp : stopping - ' + E.Message);
+      result := false;
     end;
   end;
-  //Reader returned false: end of stream. The client closed our stdin, which is the graceful
-  //shutdown signal, so exit promptly.
 end;
 
 end.

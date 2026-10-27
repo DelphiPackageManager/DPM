@@ -55,6 +55,15 @@ type
     FGitClient : IGitClient;
     FCatalog : IRegistryCatalog;
     FRefreshIntervalMinutes : integer;
+    FRegistriesFolder : string;
+    //a package repo's tags by lowercase url, and when they were listed - see ListTags.
+    FTags : IDictionary<string, IDictionary<string, string>>;
+    FTagsListed : IDictionary<string, TDateTime>;
+
+    //the package repo's tags (tag name -> commit). Listing versions, resolving, then installing each wanted
+    //them - they are remembered for a few minutes (no longer than the registry refresh interval), so one
+    //operation asks git once. A listing that failed is not remembered.
+    function ListTags(const cancellationToken : ICancellationToken; const url : string; out tags : IDictionary<string, string>) : boolean;
 
     //the registry catalog, created lazily from the configured source + current TTL.
     function GetCatalog : IRegistryCatalog;
@@ -96,6 +105,8 @@ type
     function List(const cancellationToken : ICancellationToken; const options : TSearchOptions) : IList<IPackageListItem>; overload;
   public
     constructor Create(const logger : ILogger; const gitClient : IGitClient); reintroduce;
+    //where git url registries are cloned to - cDefaultRegistriesFolder unless a test says otherwise.
+    property RegistriesFolder : string read FRegistriesFolder write FRegistriesFolder;
   end;
 
 implementation
@@ -105,6 +116,7 @@ uses
   System.SysUtils,
   System.StrUtils,
   System.IOUtils,
+  System.DateUtils,
   DPM.Core.Diagnostics,
   DPM.Core.Constants,
   DPM.Core.Spec.Reader,
@@ -125,6 +137,8 @@ const
   //records the git commit a cached package folder was built from (for HEAD tracking of
   //untagged repos) and marks the folder as a source-built git package for the cache.
   cGitCommitMarker = cGitPackageMarkerFile;
+  //how long a package repo's tags are remembered - long enough for one operation (list, resolve, install).
+  cTagsLifetimeSeconds = 300;
 
 { TGitRegistryPackageRepository }
 
@@ -133,15 +147,25 @@ begin
   inherited Create(logger);
   FGitClient := gitClient;
   FRefreshIntervalMinutes := cDefaultRegistryRefreshMinutes;
+  FRegistriesFolder := cDefaultRegistriesFolder;
+  FTags := TCollections.CreateDictionary<string, IDictionary<string, string>>;
+  FTagsListed := TCollections.CreateDictionary<string, TDateTime>;
 end;
 
 procedure TGitRegistryPackageRepository.Configure(const source : ISourceConfig);
+var
+  oldName : string;
+  oldSource : string;
 begin
-  inherited Configure(source);
-  //recreate the catalog lazily from the (possibly new) source + current TTL.
+  //the repository manager configures its repositories each time the configuration loads - a catalog that is
+  //still right is kept, rather than loading (and maybe pulling) the registry again.
   EnterLock;
   try
-    FCatalog := nil;
+    oldName := Name;
+    oldSource := SourceUri;
+    inherited Configure(source);
+    if not (SameText(oldName, Name) and SameText(oldSource, SourceUri)) then
+      FCatalog := nil; //recreated lazily from the new source + current TTL.
   finally
     LeaveLock;
   end;
@@ -167,8 +191,42 @@ begin
   EnterLock;
   try
     if FCatalog = nil then
-      FCatalog := TRegistryCatalog.Create(Logger, FGitClient, Name, SourceUri, cDefaultRegistriesFolder, FRefreshIntervalMinutes);
+      FCatalog := TRegistryCatalog.Create(Logger, FGitClient, Name, SourceUri, FRegistriesFolder, FRefreshIntervalMinutes);
     result := FCatalog;
+  finally
+    LeaveLock;
+  end;
+end;
+
+function TGitRegistryPackageRepository.ListTags(const cancellationToken : ICancellationToken; const url : string; out tags : IDictionary<string, string>) : boolean;
+var
+  key : string;
+  lifetimeSeconds : integer;
+  listed : TDateTime;
+begin
+  key := LowerCase(url);
+  EnterLock;
+  try
+    //a refresh interval of 0 asks for the registry every time, so the tags are listed every time too. A
+    //negative one (never pull) still lets the tags change.
+    lifetimeSeconds := cTagsLifetimeSeconds;
+    if (FRefreshIntervalMinutes >= 0) and (FRefreshIntervalMinutes * 60 < lifetimeSeconds) then
+      lifetimeSeconds := FRefreshIntervalMinutes * 60;
+    if FTagsListed.TryGetValue(key, listed) and (SecondsBetween(Now, listed) < lifetimeSeconds) and FTags.TryGetValue(key, tags) then
+      exit(true);
+  finally
+    LeaveLock;
+  end;
+
+  //not under the lock - other queries needn't wait for git.
+  result := FGitClient.LsRemoteTags(cancellationToken, url, tags);
+  if not result then
+    exit;
+  //nothing changes a listing once it is remembered, so the threads that read it share it.
+  EnterLock;
+  try
+    FTags[key] := tags;
+    FTagsListed[key] := Now;
   finally
     LeaveLock;
   end;
@@ -216,7 +274,7 @@ begin
     exit;
   end;
 
-  if not FGitClient.LsRemoteTags(cancellationToken, url, tags) then
+  if not ListTags(cancellationToken, url, tags) then
   begin
     if not cancellationToken.IsCancelled then
       RequestFailed('could not list the versions of [' + spec.MetaData.Id + '] : ' + FGitClient.LastError);
@@ -429,6 +487,9 @@ function TGitRegistryPackageRepository.GetPackageFeed(const cancellationToken : 
 var
   ids : IList<string>;
   id : string;
+  candidates : IList<IPackageSpec>;
+  first : integer;
+  i : integer;
   spec : IPackageSpec;
   versions : IList<TPackageVersion>;
   latest : TPackageVersion;
@@ -438,15 +499,35 @@ var
 begin
   result := TDPMPackageSearchResult.Create(options.Skip, 0);
   ids := GetCatalog.GetPackageIds(cancellationToken);
+  //in id order, so a page is the same page each time.
+  ids.Sort(
+    function(const Left, Right : string) : integer
+    begin
+      result := CompareText(Left, Right);
+    end);
+  //what matches is known from the registry alone - only the entries on the page have their tags listed.
+  candidates := TCollections.CreateList<IPackageSpec>;
   for id in ids do
   begin
-    if cancellationToken.IsCancelled then
-      exit;
     if not MatchesSearch(id, options) then
       continue;
     spec := GetSpec(cancellationToken, id);
     if (spec = nil) or (not SpecSupportsCompiler(spec, compilerVersion)) then
       continue;
+    candidates.Add(spec);
+  end;
+  result.TotalCount := candidates.Count;
+
+  first := options.Skip;
+  if first < 0 then
+    first := 0;
+  for i := first to candidates.Count - 1 do
+  begin
+    if cancellationToken.IsCancelled then
+      exit;
+    if (options.Take > 0) and (result.Results.Count >= options.Take) then
+      break;
+    spec := candidates[i];
     versions := EnumerateVersions(cancellationToken, spec, options.Prerelease);
     latest := MaxVersion(versions);
     if latest.IsEmpty then
@@ -553,7 +634,7 @@ var
   tagVersion : TPackageVersion;
 begin
   result := '';
-  if not FGitClient.LsRemoteTags(cancellationToken, url, tags) then
+  if not ListTags(cancellationToken, url, tags) then
     exit;
   for tagName in tags.Keys do
   begin

@@ -14,8 +14,7 @@
         <DPMCompiler>delphi10.1</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.3-beta.3\lib\Win32;$(DPM)\Spring4D.Core\2.0.3-beta.3\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.3-beta.3\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.11\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win32;$(DPM)\VSoft.Awaitable\1.0.1\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.12\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.13.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\0.3.0\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.YAML\2.1.0\lib\Win32;</DPMSearch>
-        <DPMExe>I:\Github\DelphiPackageManager\DPMMaster\Output\dpm.exe</DPMExe>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Spring4D.Base\2.0.3-beta.3\lib\Win32;$(DPM)\Spring4D.Core\2.0.3-beta.3\lib\Win32;$(DPM)\Spring4D.Extensions\2.0.3-beta.3\lib\Win32;$(DPM)\VSoft.AntPatterns\0.1.11\lib\Win32;$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win32;$(DPM)\VSoft.Awaitable\1.0.1\lib\Win32;$(DPM)\VSoft.Base64.Polyfill\0.1.12\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;$(DPM)\VSoft.HttpClient\2.13.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.SemanticVersion\1.0.0\lib\Win32;$(DPM)\VSoft.VirtualListView\0.4.6\lib\Win32;$(DPM)\VSoft.YAML\2.1.0\lib\Win32;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -222,6 +221,7 @@
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Path.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Process.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.Strings.pas"/>
+        <DCCReference Include="Core\Utils\DPM.Core.Utils.Json.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.System.pas"/>
         <DCCReference Include="Core\Utils\DPM.Core.Utils.XML.pas"/>
         <DCCReference Include="Core\Xml\DPM.Core.MSXML.pas"/>
@@ -809,23 +809,23 @@
         <DPM>
             <Packages>
                 <PackageReference id="Spring4D.Core" version="2.0.3-beta.3" manifestHash="sha256:687a038bbe5c4ef137f84d48eedcfe40974112683c6f041058072370abcac47b">
-                    <PackageReference id="Spring4D.Base" version="2.0.3-beta.3" range="2.0.3-beta.3"/>
+                    <PackageReference id="Spring4D.Base" version="2.0.3-beta.3" range="2.0.3-beta.3" manifestHash="sha256:54e4c39c62911455f441b47140f5cb8cfb56afb03ccd1a3556cd4bf83f9febdb"/>
                 </PackageReference>
                 <PackageReference id="Spring4D.Extensions" version="2.0.3-beta.3" manifestHash="sha256:51abab52f07c1b1b12b9402f6e06dcbc981e0fad8d557cd75a3333721ab02857">
-                    <PackageReference id="Spring4D.Base" version="2.0.3-beta.3" range="2.0.3-beta.3"/>
+                    <PackageReference id="Spring4D.Base" version="2.0.3-beta.3" range="2.0.3-beta.3" manifestHash="sha256:54e4c39c62911455f441b47140f5cb8cfb56afb03ccd1a3556cd4bf83f9febdb"/>
                 </PackageReference>
                 <PackageReference id="VSoft.AntPatterns" version="0.1.11" manifestHash="sha256:da2c24a04ae8baa06d6a10a16594f943e810c11b18da15c549a6fc6dafc099bb"/>
                 <PackageReference id="VSoft.Awaitable" version="1.0.1" manifestHash="sha256:50de3cbc1ac2fd2f91ad6792c473ed55d5bcdc9568fb7bb9a6478c9b9fea5e47">
-                    <PackageReference id="VSoft.CancellationToken" version="0.1.6" range="[0.1.4,]"/>
+                    <PackageReference id="VSoft.CancellationToken" version="0.1.6" range="[0.1.4,]" manifestHash="sha256:9c6e4d77597142122c43c999f18e275e2db1799e5a11149fea85c1dadbbcf1b2"/>
                 </PackageReference>
                 <PackageReference id="VSoft.Base64.Polyfill" version="0.1.12" manifestHash="sha256:a7f4bc7103acfef97b01bf2f2a7b4039b2a0af36d7655874a91888d888865f6f"/>
                 <PackageReference id="VSoft.CancellationToken" version="0.1.6" manifestHash="sha256:9c6e4d77597142122c43c999f18e275e2db1799e5a11149fea85c1dadbbcf1b2"/>
                 <PackageReference id="VSoft.HttpClient" version="2.13.0" manifestHash="sha256:e345cb11df61f028d7a38e4cb4fd73176413af72d86c730dc24168419a503ab4">
-                    <PackageReference id="VSoft.CancellationToken" version="0.1.6" range="[0.1.4,]"/>
-                    <PackageReference id="VSoft.Uri" version="0.3.3" range="[0.3.3,]"/>
+                    <PackageReference id="VSoft.CancellationToken" version="0.1.6" range="[0.1.4,]" manifestHash="sha256:9c6e4d77597142122c43c999f18e275e2db1799e5a11149fea85c1dadbbcf1b2"/>
+                    <PackageReference id="VSoft.Uri" version="0.3.3" range="[0.3.3,]" manifestHash="sha256:7bf6c9108395f083408f83e18180f2c4d135fb8912072c85ba529a69073b11c2"/>
                 </PackageReference>
                 <PackageReference id="VSoft.JsonDataObjects" version="0.3.2" manifestHash="sha256:c59c4e3296fc2f5316af7e4495bceeffd4864f2af03112af99ba2dd7827ddc89"/>
-                <PackageReference id="VSoft.SemanticVersion" version="0.3.0" manifestHash="sha256:63c7fd24f750ffd46997fb22c304a9a5c6ffe7b89a954861a02dddc848d10a1f"/>
+                <PackageReference id="VSoft.SemanticVersion" version="1.0.0" manifestHash="sha256:c72526a2aeabe356ceaafbef300c3295366822b4acb95e2d8ea5ce36e1db0189"/>
                 <PackageReference id="VSoft.Uri" version="0.3.3" manifestHash="sha256:7bf6c9108395f083408f83e18180f2c4d135fb8912072c85ba529a69073b11c2"/>
                 <PackageReference id="VSoft.VirtualListView" version="0.4.6" manifestHash="sha256:e69be3e75d9a79d879abccad44ce5f99514367f053fb17450788ca6fc527c0db"/>
                 <PackageReference id="VSoft.YAML" version="2.1.0" manifestHash="sha256:f4746ee6d7074299dc745e6477382e7ed3c91af9a29e463ec287c81f33a37d22"/>

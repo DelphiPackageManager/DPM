@@ -81,6 +81,7 @@ type
     constructor CreateClone(const original : TInstallOptions); reintroduce;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TInstallOptions read FDefault;
     constructor Create; override;
     function Validate(const logger : ILogger) : Boolean; override;
@@ -150,6 +151,12 @@ end;
 class constructor TInstallOptions.CreateDefault;
 begin
   FDefault := TInstallOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TInstallOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 function TInstallOptions.GetPackageId : string;

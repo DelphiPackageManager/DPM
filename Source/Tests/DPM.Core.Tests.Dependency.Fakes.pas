@@ -34,7 +34,9 @@ type
     FVersionsCallCount : IDictionary<string, integer>;
     FInfoCallCount : integer;
     FUnavailable : string;
+    FVersionsSources : string;
     FDownloaded : IList<IPackageInfo>;
+    FCancelOn : IDictionary<string, ICancellationTokenSource>;
     procedure Count(const counts : IDictionary<string, integer>; const id : string);
   protected
     function UnavailableSources : string;
@@ -51,14 +53,17 @@ type
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
                                                 const packageId : string; const versionRange : TVersionRange; const includePrerelease : boolean) : IList<IPackageInfo>;
-    function GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const packageId : string; const includePrerelease : boolean) : IList<TPackageVersion>;
-    function GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageSearchResultItem;
+    function GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const packageId : string; const includePrerelease : boolean; const sources : string = '') : IList<TPackageVersion>;
+    function GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const sources : string = '') : IPackageSearchResultItem;
     function GetPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion) : IPackageSearchResult;
     function GetPackageIcon(const cancellationToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageIcon;
     function GetInstalledPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IList<IPackageIdentity>) : IList<IPackageSearchResultItem>;
   public
     constructor Create;
     procedure SetVersions(const id : string; const versions : IList<IPackageInfo>);
+    //The versions lookup for id cancels source - as Ctrl+C during that request would - and, like a cancelled
+    //request, finds nothing.
+    procedure CancelOnCallFor(const id : string; const source : ICancellationTokenSource);
     //GetPackageVersionsWithDependencies calls for this id
     function GetCallCount(const id : string) : integer;
     //GetPackageVersions calls for this id
@@ -67,6 +72,8 @@ type
     property InfoCallCount : integer read FInfoCallCount;
     //what UnavailableSources returns - set it to pretend a source could not be used.
     property Unavailable : string read FUnavailable write FUnavailable;
+    //the sources the last GetPackageVersions was restricted to.
+    property VersionsSources : string read FVersionsSources;
     //the package infos DownloadPackage was asked for - it downloads nothing, and fails.
     property Downloaded : IList<IPackageInfo> read FDownloaded;
   end;
@@ -222,6 +229,12 @@ begin
   FCallCount := TCollections.CreateDictionary<string, integer>;
   FVersionsCallCount := TCollections.CreateDictionary<string, integer>;
   FDownloaded := TCollections.CreateList<IPackageInfo>;
+  FCancelOn := TCollections.CreateDictionary<string, ICancellationTokenSource>;
+end;
+
+procedure TFakeRepositoryManager.CancelOnCallFor(const id : string; const source : ICancellationTokenSource);
+begin
+  FCancelOn[LowerCase(id)] := source;
 end;
 
 procedure TFakeRepositoryManager.Count(const counts : IDictionary<string, integer>; const id : string);
@@ -284,11 +297,18 @@ var
   all : IList<IPackageInfo>;
   filtered : IList<IPackageInfo>;
   info : IPackageInfo;
+  cancelSource : ICancellationTokenSource;
 begin
   key := LowerCase(packageId);
   Count(FCallCount, packageId);
 
   filtered := TCollections.CreateList<IPackageInfo>;
+  if FCancelOn.TryGetValue(key, cancelSource) then
+  begin
+    cancelSource.Cancel;
+    result := filtered;
+    exit;
+  end;
   if not FCanned.TryGetValue(key, all) then
   begin
     result := filtered;
@@ -359,12 +379,13 @@ begin
   end;
 end;
 
-function TFakeRepositoryManager.GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const packageId : string; const includePrerelease : boolean) : IList<TPackageVersion>;
+function TFakeRepositoryManager.GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const packageId : string; const includePrerelease : boolean; const sources : string) : IList<TPackageVersion>;
 var
   all : IList<IPackageInfo>;
   info : IPackageInfo;
 begin
   Count(FVersionsCallCount, packageId);
+  FVersionsSources := sources;
   result := TCollections.CreateList<TPackageVersion>;
   if not FCanned.TryGetValue(LowerCase(packageId), all) then
     exit;
@@ -382,7 +403,7 @@ begin
     end));
 end;
 
-function TFakeRepositoryManager.GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageSearchResultItem;
+function TFakeRepositoryManager.GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const sources : string) : IPackageSearchResultItem;
 begin
   raise ENotImplemented.Create('TFakeRepositoryManager.GetPackageMetaData');
 end;

@@ -133,6 +133,13 @@ begin
         //out of being asked anything.
         if options.NonInteractive then
           proceed := true
+        else if not PromptsAreInteractive then
+        begin
+          //nobody can answer (input or output redirected) - that is not being told to go ahead, nor a success.
+          Logger.Error(TErrorCode.E0107_ConfirmationNeeded, 'Installing the upgrade needs a confirmation, but this ' +
+            'is not an interactive console - pass --non-interactive to install it without asking.');
+          exit(TExitCode.Error);
+        end
         else
         begin
           Logger.Information('');

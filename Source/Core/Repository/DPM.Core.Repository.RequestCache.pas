@@ -25,6 +25,8 @@ type
     FDepth : integer;
     FVersionsWithDependencies : IDictionary<string, IList<IPackageInfo>>;
     FVersions : IDictionary<string, IList<TPackageVersion>>;
+    FPackageInfos : IDictionary<string, IPackageInfo>;
+    class function PackageInfoKey(const packageId : IPackageIdentity) : string;
     class function VersionsWithDependenciesKey(const packageId : string; const compilerVersion : TCompilerVersion; const versionRange : TVersionRange; const includePrerelease : boolean) : string;
     class function VersionsKey(const packageId : string; const compilerVersion : TCompilerVersion; const includePrerelease : boolean) : string;
   public
@@ -41,6 +43,10 @@ type
 
     function TryGetVersions(const packageId : string; const compilerVersion : TCompilerVersion; const includePrerelease : boolean; out versions : IList<TPackageVersion>) : boolean;
     procedure AddVersions(const packageId : string; const compilerVersion : TCompilerVersion; const includePrerelease : boolean; const versions : IList<TPackageVersion>);
+
+    //one package version's info - only one that was found is kept (a miss may be a source that was down).
+    function TryGetPackageInfo(const packageId : IPackageIdentity; out info : IPackageInfo) : boolean;
+    procedure AddPackageInfo(const packageId : IPackageIdentity; const info : IPackageInfo);
   end;
 
 implementation
@@ -57,6 +63,7 @@ begin
   FDepth := 0;
   FVersionsWithDependencies := TCollections.CreateDictionary<string, IList<IPackageInfo>>;
   FVersions := TCollections.CreateDictionary<string, IList<TPackageVersion>>;
+  FPackageInfos := TCollections.CreateDictionary<string, IPackageInfo>;
 end;
 
 destructor TRepositoryRequestCache.Destroy;
@@ -96,6 +103,7 @@ begin
     begin
       FVersionsWithDependencies.Clear;
       FVersions.Clear;
+      FPackageInfos.Clear;
     end;
   finally
     FLock.Leave;
@@ -105,6 +113,11 @@ end;
 class function TRepositoryRequestCache.VersionsWithDependenciesKey(const packageId : string; const compilerVersion : TCompilerVersion; const versionRange : TVersionRange; const includePrerelease : boolean) : string;
 begin
   result := LowerCase(packageId) + '|' + CompilerToString(compilerVersion) + '|' + versionRange.ToString + '|' + BoolToStr(includePrerelease, true);
+end;
+
+class function TRepositoryRequestCache.PackageInfoKey(const packageId : IPackageIdentity) : string;
+begin
+  result := LowerCase(packageId.Id) + '|' + CompilerToString(packageId.CompilerVersion) + '|' + LowerCase(packageId.Version.ToStringNoMeta);
 end;
 
 class function TRepositoryRequestCache.VersionsKey(const packageId : string; const compilerVersion : TCompilerVersion; const includePrerelease : boolean) : string;
@@ -175,6 +188,30 @@ begin
   try
     if FDepth > 0 then
       FVersions[VersionsKey(packageId, compilerVersion, includePrerelease)] := copied;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TRepositoryRequestCache.TryGetPackageInfo(const packageId : IPackageIdentity; out info : IPackageInfo) : boolean;
+begin
+  info := nil;
+  FLock.Enter;
+  try
+    result := (FDepth > 0) and FPackageInfos.TryGetValue(PackageInfoKey(packageId), info);
+  finally
+    FLock.Leave;
+  end;
+end;
+
+procedure TRepositoryRequestCache.AddPackageInfo(const packageId : IPackageIdentity; const info : IPackageInfo);
+begin
+  if info = nil then
+    exit;
+  FLock.Enter;
+  try
+    if FDepth > 0 then
+      FPackageInfos[PackageInfoKey(packageId)] := info;
   finally
     FLock.Leave;
   end;

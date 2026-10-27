@@ -85,6 +85,66 @@ type
     procedure Install_Failing_On_Every_Platform_Changes_Nothing;
     [Test]
     procedure Restore_A_Failing_Platform_Still_Restores_The_Others;
+
+    //In the IDE the design-time packages are also built for the platform the IDE runs on, when the project
+    //doesn't target it. A package that doesn't declare that platform isn't built for it (that would add the
+    //platform to its projects), nor is one that needs it; a package that doesn't build doesn't stop the
+    //others; every problem is in one warning, and a design package that wasn't built isn't loaded.
+    [Test]
+    procedure Design_Host_Build_Skips_A_Package_That_Does_Not_Declare_The_Host;
+    [Test]
+    procedure Design_Host_Build_Keeps_Going_And_Warns_Once;
+    [Test]
+    procedure Design_Host_Package_That_Was_Not_Built_Is_Not_Loaded;
+
+    //A package's search paths come from the folders that hold its source - not the ones DPM puts its compiled
+    //output in (which can hold .dfm/.res files, copied there by copyToLib), nor its signatures.
+    [Test]
+    procedure Packed_Package_Source_Walk_Skips_The_Package_Output;
+    [Test]
+    procedure Git_Source_Walk_Skips_The_Package_Output;
+
+    //'use source' is a choice for one project in the IDE session - another project using the same package, in
+    //the same session, still gets its compiled output.
+    [Test]
+    procedure Use_Source_In_One_Project_Does_Not_Carry_Over_To_Another;
+
+    //Refreshing the search paths (what the IDE does when 'use source' changes) leaves a package out of the
+    //search path of a platform it doesn't support, as restore does.
+    [Test]
+    procedure Refresh_Leaves_A_Package_Out_Of_A_Platform_It_Does_Not_Support;
+
+    //What a project resolved is recorded for the other projects in the group to be checked against - the graph
+    //a restore found intact as well as one it re-resolved, but not one it didn't keep, and not packages an
+    //uninstall removed.
+    [Test]
+    procedure Restore_Records_The_Graph_It_Validates_For_The_Other_Projects;
+    [Test]
+    procedure Restore_That_Keeps_Nothing_Records_Nothing;
+    [Test]
+    procedure Uninstall_Drops_What_The_Project_Recorded;
+
+    //With no compiler given, each project in a group is restored (or uninstalled from) for its own compiler -
+    //not the one the first project was for.
+    [Test]
+    procedure Restore_Uses_Each_Projects_Own_Compiler;
+    [Test]
+    procedure Uninstall_Uses_Each_Projects_Own_Compiler;
+
+    //dpm cache install --force builds the package again, though its BOM says nothing changed - asked for by id or
+    //by package file.
+    [Test]
+    procedure Cache_Install_With_Force_Builds_The_Package_Again;
+
+    //A cached spec with no target platform (one that didn't read cleanly) has nothing for copylocal to copy - it is
+    //not a crash.
+    [Test]
+    procedure CopyLocal_Of_A_Package_With_No_Target_Platform_Copies_Nothing;
+
+    //A restore that re-resolves has the package infos the resolve found - a package not in the cache yet isn't
+    //looked up on the sources again.
+    [Test]
+    procedure Restore_Re_Resolve_Does_Not_Look_Up_What_It_Resolved;
   end;
 
 implementation
@@ -104,12 +164,14 @@ uses
   DPM.Core.Logging,
   DPM.Core.Dependency.Version,
   DPM.Core.Dependency.Interfaces,
+  DPM.Core.Dependency.Resolution,
   DPM.Core.Dependency.Resolver,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Configuration.Classes,
   DPM.Core.Options.Cache,
   DPM.Core.Options.Restore,
   DPM.Core.Options.Install,
+  DPM.Core.Options.UnInstall,
   DPM.Core.Options.CopyLocal,
   DPM.Core.Package.CopyLocal,
   DPM.Core.Package.Interfaces,
@@ -123,6 +185,7 @@ uses
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Reader,
   DPM.Core.Package.Cache.Receipt,
+  DPM.Core.Utils.System,
   DPM.Core.Tests.Dependency.Fakes,
   TestLogger;
 
@@ -189,6 +252,8 @@ type
     FSpec : IPackageSpec;
   protected
     function EnsurePackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean;
+    //the package file is already extracted, as the package folder.
+    function InstallPackageFromFile(const cancellationToken : ICancellationToken; const packageFileName : string; const skipTrustRatchets : boolean = false) : boolean;
     function GetPackageSpec(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageSpec;
     function GetPackagePath(const packageId : IPackageIdentity) : string; overload;
     function GetPackagePath(const id : string; const version : string; const compilerVersion : TCompilerVersion) : string; overload;
@@ -201,6 +266,7 @@ type
   private
     FRoot : string;
     FSpec : IPackageSpec;
+    FSpecs : IDictionary<string, IPackageSpec>;
     FMissing : ISet<string>;
   protected
     function EnsurePackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean;
@@ -212,6 +278,20 @@ type
     constructor Create(const root : string; const spec : IPackageSpec);
     //ids (lowercase) that are not extracted - EnsurePackage says so, and the installer downloads them.
     property Missing : ISet<string> read FMissing;
+    //the spec of a package (lowercase id) that isn't the one given.
+    property Specs : IDictionary<string, IPackageSpec> read FSpecs;
+  end;
+
+  //Records the packages it is asked to load the design-time packages of.
+  TRecordingInstallerContext = class(TFakeInstallerContext)
+  private
+    FLoadedIds : IList<string>;
+  protected
+    function InstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const packageSpecs : IDictionary<string, IPackageSpec>) : boolean; override;
+  public
+    constructor Create(const logger : ILogger);override;
+    //lowercase ids, from the last call.
+    property LoadedIds : IList<string> read FLoadedIds;
   end;
 
   //The receipts the cache wrote - just each package folder's manifest hash.
@@ -243,6 +323,10 @@ type
 var
   //how many projects the fake compiler was asked to build - CachePackageSpec resets it.
   BuildCount : integer;
+  //every build the fake compiler was asked for, as '<platform> <project file>' - when set.
+  BuiltProjects : IList<string>;
+  //builds that fail whatever the outcome, as '<platform>|<part of the project file>' - when set.
+  FailingBuilds : IList<string>;
 
 const
   cPackageId = 'VSoft.Compiles';
@@ -366,9 +450,24 @@ end;
 
 function TFakeCompiler.BuildProject(const cancellationToken : ICancellationToken; const platform : TDPMPlatform; const projectFile : string;
                                     const configName : string; const packageVersion : TPackageVersion; const forDesign : boolean) : boolean;
+var
+  outcome : TCompileOutcome;
+  failing : string;
+  separator : integer;
 begin
   Inc(BuildCount);
-  case FOutcome of
+  if BuiltProjects <> nil then
+    BuiltProjects.Add(DPMPlatformToString(platform) + ' ' + projectFile);
+  outcome := FOutcome;
+  if FailingBuilds <> nil then
+    for failing in FailingBuilds do
+    begin
+      separator := Pos('|', failing);
+      if SameText(Copy(failing, 1, separator - 1), DPMPlatformToString(platform)) and
+         (Pos(LowerCase(Copy(failing, separator + 1, MaxInt)), LowerCase(projectFile)) > 0) then
+        outcome := coFail;
+    end;
+  case outcome of
     coSucceed :
       result := true;
     coFail :
@@ -494,6 +593,11 @@ begin
   result := true;
 end;
 
+function TExtractedPackageCache.InstallPackageFromFile(const cancellationToken : ICancellationToken; const packageFileName : string; const skipTrustRatchets : boolean) : boolean;
+begin
+  result := true;
+end;
+
 function TExtractedPackageCache.GetPackagePath(const packageId : IPackageIdentity) : string;
 begin
   result := FPackageFolder;
@@ -516,6 +620,7 @@ begin
   inherited Create;
   FRoot := root;
   FSpec := spec;
+  FSpecs := TCollections.CreateDictionary<string, IPackageSpec>;
   FMissing := TCollections.CreateSet<string>;
 end;
 
@@ -541,7 +646,26 @@ end;
 
 function TPerPackageCache.GetPackageSpec(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageSpec;
 begin
-  result := FSpec;
+  if not FSpecs.TryGetValue(LowerCase(packageId.Id), result) then
+    result := FSpec;
+end;
+
+{ TRecordingInstallerContext }
+
+constructor TRecordingInstallerContext.Create(const logger : ILogger);
+begin
+  inherited Create(logger);
+  FLoadedIds := TCollections.CreateList<string>;
+end;
+
+function TRecordingInstallerContext.InstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const packageSpecs : IDictionary<string, IPackageSpec>) : boolean;
+var
+  id : string;
+begin
+  FLoadedIds.Clear;
+  for id in packageSpecs.Keys do
+    FLoadedIds.Add(LowerCase(id));
+  result := true;
 end;
 
 { TFakeReceiptService }
@@ -697,6 +821,41 @@ begin
   result := CachePackageSpec(tempFolder, logger, outcome, cancellation, cPackageSpec);
 end;
 
+//dpm cache install <package> again, with --force when force - package is the id or a package file. Unlike
+//CachePackageSpec, the BOM the last build left is kept.
+function CacheAgain(const tempFolder : string; const logger : ILogger; const package : string; const force : boolean) : boolean;
+var
+  repo : TFakeRepositoryManager;
+  repoIntf : IPackageRepositoryManager;
+  cache : TExtractedPackageCache;
+  cacheIntf : IPackageCache;
+  info : IPackageInfo;
+  installer : IPackageInstaller;
+  options : TCacheOptions;
+  cancellation : ICancellationTokenSource;
+  reader : IPackageSpecReader;
+begin
+  BuildCount := 0;
+  info := MakeInfo(cPackageId, '1.0.0', []);
+  repo := TFakeRepositoryManager.Create;
+  repoIntf := repo;
+  repo.SetVersions(cPackageId, ListOf([info]));
+  reader := TPackageSpecReader.Create(logger);
+  cache := TExtractedPackageCache.Create(TPath.Combine(tempFolder, 'package'), reader.ReadSpecString(cPackageSpec));
+  cacheIntf := cache;
+  cache.RegisterInfo(info);
+  cancellation := TCancellationTokenSourceFactory.Create;
+  installer := NewInstaller(logger, repoIntf, cacheIntf, TFakeInstallerContext.Create(logger), TFakeCompilerFactory.Create(logger, coSucceed, cancellation));
+  options := NewCacheOptions;
+  try
+    options.PackageId := package;
+    options.Force := force;
+    result := installer.Cache(cancellation.Token, options);
+  finally
+    options.Free;
+  end;
+end;
+
 //project with the base configuration the IDE writes - where the search path goes.
 function ConsumerProjectWithBaseFor(const project : string) : string;
 begin
@@ -738,12 +897,26 @@ begin
 end;
 
 //An installer over a cache holding VSoft.Foo (depending on fooDependencies), VSoft.Bar and VSoft.Baz, each in its
-//own folder with the spec given, whose receipts say they are cFooHash, cBarHash and cBazHash - with projectFile,
-//holding the project text given, beside them. Their builds fail for failPlatforms.
-function NewLockedFixture(const tempFolder : string; const logger : ILogger; const project : string;
-                          const fooDependencies : array of IPackageDependency; const spec : string;
-                          const failPlatforms : TDPMPlatforms; out projectFile : string;
-                          out context : IPackageInstallerContext) : IPackageInstaller;
+//own folder with the spec given - or the one in specOverrides (lowercase id -> spec, may be nil) - whose receipts say
+//they are cFooHash, cBarHash and cBazHash - with projectFile, holding the project text given, beside them. Their
+//builds fail for failPlatforms. The sources have all three - the cache has no package info for those in uncachedIds,
+//as for a package not downloaded yet. repository is the fake the installer uses.
+function NewLockedFixtureWith(const tempFolder : string; const logger : ILogger; const project : string;
+                              const fooDependencies : array of IPackageDependency; const spec : string;
+                              const specOverrides : IDictionary<string, string>; const uncachedIds : array of string;
+                              const failPlatforms : TDPMPlatforms; const context : IPackageInstallerContext;
+                              out projectFile : string; out repository : TFakeRepositoryManager) : IPackageInstaller;
+
+  function IsUncached(const info : IPackageInfo) : boolean;
+  var
+    i : integer;
+  begin
+    result := false;
+    for i := 0 to High(uncachedIds) do
+      if SameText(uncachedIds[i], info.Id) then
+        exit(true);
+  end;
+
 var
   root : string;
   repo : TFakeRepositoryManager;
@@ -756,6 +929,7 @@ var
   reader : IPackageSpecReader;
   fooInfo, barInfo, bazInfo : IPackageInfo;
   id : string;
+  overridePair : TPair<string, string>;
 begin
   root := TPath.Combine(tempFolder, 'locks');
   if DirectoryExists(root) then
@@ -764,6 +938,7 @@ begin
   begin
     ForceDirectories(TPath.Combine(root, id + '\source'));
     TFile.WriteAllText(TPath.Combine(root, id + '\source\Pkg.dproj'), cPackageProject, TEncoding.UTF8);
+    TFile.WriteAllText(TPath.Combine(root, id + '\source\PkgD.dproj'), cPackageProject, TEncoding.UTF8);
   end;
   projectFile := TPath.Combine(root, 'Consumer.dproj');
   TFile.WriteAllText(projectFile, project, TEncoding.UTF8);
@@ -773,27 +948,45 @@ begin
   bazInfo := MakeInfo('VSoft.Baz', '1.0.0', []);
   repo := TFakeRepositoryManager.Create;
   repoIntf := repo;
+  repository := repo;
   repo.SetVersions('VSoft.Foo', ListOf([fooInfo]));
   repo.SetVersions('VSoft.Bar', ListOf([barInfo]));
   repo.SetVersions('VSoft.Baz', ListOf([bazInfo]));
   reader := TPackageSpecReader.Create(logger);
   cache := TPerPackageCache.Create(root, reader.ReadSpecString(spec));
   cacheIntf := cache;
-  cache.RegisterInfo(fooInfo);
-  cache.RegisterInfo(barInfo);
-  cache.RegisterInfo(bazInfo);
+  if specOverrides <> nil then
+    for overridePair in specOverrides do
+      cache.Specs[overridePair.Key] := reader.ReadSpecString(overridePair.Value);
+  if not IsUncached(fooInfo) then
+    cache.RegisterInfo(fooInfo);
+  if not IsUncached(barInfo) then
+    cache.RegisterInfo(barInfo);
+  if not IsUncached(bazInfo) then
+    cache.RegisterInfo(bazInfo);
   receipts := TFakeReceiptService.Create;
   receiptsIntf := receipts;
   receipts.SetHash(TPath.Combine(root, 'VSoft.Foo'), cFooHash);
   receipts.SetHash(TPath.Combine(root, 'VSoft.Bar'), cBarHash);
   receipts.SetHash(TPath.Combine(root, 'VSoft.Baz'), cBazHash);
-  context := TFakeInstallerContext.Create(logger);
   config := TConfiguration.Create(logger);
   result := TPackageInstaller.Create(logger, TFakeConfigurationManager.Create(config), repoIntf, cacheIntf,
                                      TDependencyResolver.Create(logger, repoIntf, cacheIntf, context), context,
                                      TFakeCompilerFactory.Create(logger, coSucceed, nil, failPlatforms), receiptsIntf, nil, nil,
                                      TInstallPlanner.Create(logger, repoIntf, cacheIntf));
   BuildCount := 0;
+  BuiltProjects := TCollections.CreateList<string>;
+end;
+
+function NewLockedFixture(const tempFolder : string; const logger : ILogger; const project : string;
+                          const fooDependencies : array of IPackageDependency; const spec : string;
+                          const failPlatforms : TDPMPlatforms; out projectFile : string;
+                          out context : IPackageInstallerContext) : IPackageInstaller;
+var
+  repository : TFakeRepositoryManager;
+begin
+  context := TFakeInstallerContext.Create(logger);
+  result := NewLockedFixtureWith(tempFolder, logger, project, fooDependencies, spec, nil, [], failPlatforms, context, projectFile, repository);
 end;
 
 //Restores the project text given over the locked fixture for the platforms given - projectText is the project afterwards.
@@ -880,10 +1073,10 @@ begin
     result := Copy(projectText, startPos, endPos - startPos);
 end;
 
-//Refreshes the search paths of a project using VSoft.Foo, cached in packageFolder with the source entries
-//given, the way the IDE does when 'use source' changes - projectText is the project file afterwards.
-function RefreshSearchPaths(const packageFolder : string; const sourceEntries : string; const logger : ILogger;
-                            out projectText : string) : boolean;
+//Refreshes the search paths of a project using VSoft.Foo, cached in packageFolder with the spec given, the way
+//the IDE does when 'use source' changes - projectText is the project file afterwards.
+function RefreshSearchPathsWithSpec(const packageFolder : string; const spec : string; const logger : ILogger;
+                                    out projectText : string) : boolean;
 var
   repo : TFakeRepositoryManager;
   repoIntf : IPackageRepositoryManager;
@@ -899,13 +1092,20 @@ begin
   repo := TFakeRepositoryManager.Create;
   repoIntf := repo;
   reader := TPackageSpecReader.Create(logger);
-  cache := TExtractedPackageCache.Create(packageFolder, reader.ReadSpecString(cSourcePackageSpecHead + sourceEntries));
+  cache := TExtractedPackageCache.Create(packageFolder, reader.ReadSpecString(spec));
   cacheIntf := cache;
   cache.RegisterInfo(MakeInfo('VSoft.Foo', '1.0.0', []));
   context := TFakeInstallerContext.Create(logger);
   installer := NewInstaller(logger, repoIntf, cacheIntf, context, TFakeCompilerFactory.Create(logger, coSucceed, nil));
   result := installer.RefreshProjectSearchPaths(TCancellationTokenSourceFactory.Create.Token, projectFile, cTestCompiler, 'dpm.config.yaml', context);
   projectText := TFile.ReadAllText(projectFile);
+end;
+
+//As RefreshSearchPathsWithSpec, VSoft.Foo being for Win32 and Win64 with the source entries given.
+function RefreshSearchPaths(const packageFolder : string; const sourceEntries : string; const logger : ILogger;
+                            out projectText : string) : boolean;
+begin
+  result := RefreshSearchPathsWithSpec(packageFolder, cSourcePackageSpecHead + sourceEntries, logger, projectText);
 end;
 
 procedure TInstallerDiagnosticsTests.Compile_Failure_Is_One_Error;
@@ -1276,6 +1476,61 @@ begin
   Assert.AreEqual(2, outsideWarnings, 'one warning per pattern : ' + logger.Messages.Text);
 end;
 
+procedure TInstallerDiagnosticsTests.CopyLocal_Of_A_Package_With_No_Target_Platform_Copies_Nothing;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  packageFolder : string;
+  outputFolder : string;
+  projectFile : string;
+  reader : IPackageSpecReader;
+  spec : IPackageSpec;
+  cache : TExtractedPackageCache;
+  cacheIntf : IPackageCache;
+  service : ICopyLocalService;
+  options : TCopyLocalOptions;
+  copied : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  packageFolder := TPath.Combine(FTempFolder, 'copylocal-no-target');
+  outputFolder := TPath.Combine(FTempFolder, 'copylocal-no-target-output');
+  ForceDirectories(TPath.Combine(packageFolder, 'bin'));
+  TFile.WriteAllText(TPath.Combine(packageFolder, 'bin\Good.dll'), 'not really a dll', TEncoding.UTF8);
+  projectFile := TPath.Combine(FTempFolder, 'copylocal-no-target.dproj');
+  TFile.WriteAllText(projectFile, ConsumerProjectWithBase, TEncoding.UTF8);
+  //read with a logger of its own - the spec's own problem was reported when it was read.
+  reader := TPackageSpecReader.Create(TTestLogger.Create);
+  spec := reader.ReadSpecString(StringReplace(cSourcePackageSpecHead,
+    'targetPlatforms:' + sLineBreak +
+    '  - compiler: 12.0' + sLineBreak +
+    '    platforms: [Win32, Win64]' + sLineBreak +
+    '    template: default' + sLineBreak, '', []) +
+    '      - src: ''.\source\*.pas''' + sLineBreak +
+    '    copyLocal:' + sLineBreak +
+    '      - src: ''bin\*.dll''' + sLineBreak);
+  Assert.IsNotNull(spec);
+  Assert.IsNull(spec.TargetPlatform, 'precondition : the spec has no target platform');
+  cache := TExtractedPackageCache.Create(packageFolder, spec);
+  cacheIntf := cache;
+  service := TCopyLocalService.Create(loggerIntf, TFakeConfigurationManager.Create(TConfiguration.Create(loggerIntf)), cacheIntf);
+  options := TCopyLocalOptions.Create;
+  try
+    options.ProjectPath := projectFile;
+    options.Platform := TDPMPlatform.Win32;
+    options.Config := 'Debug';
+    options.OutputDir := outputFolder;
+    options.CompilerVersion := cTestCompiler;
+    options.ConfigFile := 'dpm.config.yaml';
+    copied := service.CopyLocal(TCancellationTokenSourceFactory.Create.Token, options);
+  finally
+    options.Free;
+  end;
+  Assert.IsTrue(copied, logger.Messages.Text);
+  Assert.AreEqual(0, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsFalse(TFile.Exists(TPath.Combine(outputFolder, 'Good.dll')), 'with no template there is nothing to copy');
+end;
+
 procedure TInstallerDiagnosticsTests.Restore_Matching_Locks_Builds_And_Keeps_Them;
 var
   logger : TTestLogger;
@@ -1462,6 +1717,167 @@ begin
   Assert.IsFalse(context.AnyProjectCommitted, 'no project was saved');
 end;
 
+//The platform the IDE would load design packages for, were this process the IDE - and one it isn't.
+function HostPlatform : TDPMPlatform;
+begin
+  if TSystemUtils.Is64BitProcess then
+    result := TDPMPlatform.Win64
+  else
+    result := TDPMPlatform.Win32;
+end;
+
+function OtherPlatform : TDPMPlatform;
+begin
+  if HostPlatform = TDPMPlatform.Win32 then
+    result := TDPMPlatform.Win64
+  else
+    result := TDPMPlatform.Win32;
+end;
+
+//cPackageSpec for the platforms given (eg 'Win32, Win64'), with a design entry when withDesign.
+function PackageSpecFor(const platforms : string; const withDesign : boolean) : string;
+begin
+  result := StringReplace(cPackageSpec, 'platforms: [Win32]', 'platforms: [' + platforms + ']', []);
+  if withDesign then
+    result := result +
+      '    design:' + sLineBreak +
+      '      - project: .\source\PkgD.dproj' + sLineBreak +
+      '        platforms: [' + platforms + ']' + sLineBreak;
+end;
+
+//The locked consumer project with VSoft.Baz installed as well.
+function LockedConsumerProjectWithBaz : string;
+begin
+  result := StringReplace(LockedConsumerProject(cBarHash), '            </Packages>' + sLineBreak,
+    '                <PackageReference id="VSoft.Baz" version="1.0.0" manifestHash="sha256:' + cBazHash + '"/>' + sLineBreak +
+    '            </Packages>' + sLineBreak, []);
+end;
+
+//Restores the project text given over the locked fixture, in the IDE, for the platform the IDE doesn't run on - so
+//the design-time packages are also built for the one it does. VSoft.Foo uses VSoft.Bar; the packages build for
+//both platforms unless specOverrides says otherwise.
+function RestoreInTheIDE(const tempFolder : string; const logger : ILogger; const project : string;
+                         const specOverrides : IDictionary<string, string>; const context : IPackageInstallerContext) : boolean;
+var
+  projectFile : string;
+  installer : IPackageInstaller;
+  options : TRestoreOptions;
+  repository : TFakeRepositoryManager;
+begin
+  installer := NewLockedFixtureWith(tempFolder, logger, project, [MakeDep('VSoft.Bar', '1.0.0')], PackageSpecFor('Win32, Win64', false),
+                                    specOverrides, [], [], context, projectFile, repository);
+  options := TRestoreOptions.Create;
+  TSystemUtils.SetIsIDE(true);
+  try
+    options.ProjectPath := projectFile;
+    options.CompilerVersion := cTestCompiler;
+    options.ConfigFile := 'dpm.config.yaml';
+    options.Platforms := [OtherPlatform];
+    result := installer.Restore(TCancellationTokenSourceFactory.Create.Token, options, context);
+  finally
+    TSystemUtils.SetIsIDE(false);
+    options.Free;
+  end;
+end;
+
+//Whether the fake compiler was asked to build a project of the package (id) for the platform.
+function WasBuilt(const platform : TDPMPlatform; const id : string) : boolean;
+var
+  build : string;
+begin
+  result := false;
+  for build in BuiltProjects do
+    if StartsText(DPMPlatformToString(platform) + ' ', build) and ContainsText(build, '\' + id + '\') then
+      exit(true);
+end;
+
+//The items, a line each - for assertion messages.
+function ListText(const items : IList<string>) : string;
+var
+  item : string;
+begin
+  result := '';
+  for item in items do
+    result := result + sLineBreak + item;
+end;
+
+//The W5010s logged.
+function DesignHostWarnings(const logger : TTestLogger) : IList<string>;
+var
+  i : integer;
+begin
+  result := TCollections.CreateList<string>;
+  for i := 0 to logger.Messages.Count - 1 do
+    if ContainsText(logger.Messages[i], WarningCodeToString(TWarningCode.W5010_DesignHostCompileFailed)) then
+      result.Add(logger.Messages[i]);
+end;
+
+//A package folder as DPM leaves it after a build : the source, DPM's compiled output (with the .dfm/.res
+//copyToLib puts beside it) and the signatures - and a lib folder of source the package has itself.
+procedure WritePackageFolderWithOutput(const packageFolder : string);
+begin
+  ForceDirectories(TPath.Combine(packageFolder, 'source'));
+  TFile.WriteAllText(TPath.Combine(packageFolder, 'source\Foo.pas'), 'unit Foo; interface implementation end.', TEncoding.UTF8);
+  ForceDirectories(TPath.Combine(packageFolder, 'lib\Win32'));
+  TFile.WriteAllText(TPath.Combine(packageFolder, 'lib\Win32\Foo.dfm'), 'object Foo end', TEncoding.UTF8);
+  TFile.WriteAllText(TPath.Combine(packageFolder, 'lib\Common.pas'), 'unit Common; interface implementation end.', TEncoding.UTF8);
+  ForceDirectories(TPath.Combine(packageFolder, 'bpl\Win64'));
+  TFile.WriteAllText(TPath.Combine(packageFolder, 'bpl\Win64\Foo.res'), 'not really a res', TEncoding.UTF8);
+  ForceDirectories(TPath.Combine(packageFolder, 'signatures'));
+  TFile.WriteAllText(TPath.Combine(packageFolder, 'signatures\Evil.pas'), 'unit Evil; interface implementation end.', TEncoding.UTF8);
+end;
+
+procedure CheckOnlySourceFoldersAdded(const projectText : string);
+begin
+  Assert.IsTrue(ContainsText(projectText, '$(DPM)\VSoft.Foo\1.0.0\source;'), 'the source folder : ' + projectText);
+  Assert.IsTrue(ContainsText(projectText, '$(DPM)\VSoft.Foo\1.0.0\lib;'), 'the package''s own folder of source : ' + projectText);
+  Assert.IsFalse(ContainsText(projectText, '\lib\Win32'), 'DPM''s compiled output is not source : ' + projectText);
+  Assert.IsFalse(ContainsText(projectText, '\bpl\Win64'), 'DPM''s compiled output is not source : ' + projectText);
+  Assert.IsFalse(ContainsText(projectText, '\signatures'), 'the signatures are not source : ' + projectText);
+end;
+
+const
+  cOtherProject = 'C:\test\other.dproj';
+
+//The consumer project with VSoft.Foo locked but not the VSoft.Bar it uses - restoring it resolves VSoft.Bar again.
+function FooOnlyLockedProject : string;
+begin
+  result := StringReplace(ConsumerProjectWithBase,
+    '<PackageReference id="VSoft.Foo" version="1.0.0"/>',
+    '<PackageReference id="VSoft.Foo" version="1.0.0" manifestHash="sha256:' + cFooHash + '"/>', []);
+end;
+
+//Restores the project over the fixture for Win32.
+function RestoreForWin32(const installer : IPackageInstaller; const context : IPackageInstallerContext; const projectFile : string) : boolean;
+var
+  options : TRestoreOptions;
+begin
+  options := TRestoreOptions.Create;
+  try
+    options.ProjectPath := projectFile;
+    options.CompilerVersion := cTestCompiler;
+    options.ConfigFile := 'dpm.config.yaml';
+    options.Platforms := [TDPMPlatform.Win32];
+    result := installer.Restore(TCancellationTokenSourceFactory.Create.Token, options, context);
+  finally
+    options.Free;
+  end;
+end;
+
+//A folder holding two projects with no packages, one for Delphi 12 (ProjectVersion 20.1) and one for Delphi 11 (19.5).
+function TwoCompilerProjectsFolder(const tempFolder : string) : string;
+var
+  noPackages : string;
+begin
+  result := TPath.Combine(tempFolder, 'two-compilers');
+  if DirectoryExists(result) then
+    TDirectory.Delete(result, true);
+  ForceDirectories(result);
+  noPackages := StringReplace(ConsumerProjectWithBase, '                <PackageReference id="VSoft.Foo" version="1.0.0"/>' + sLineBreak, '', []);
+  TFile.WriteAllText(TPath.Combine(result, 'A12.dproj'), noPackages, TEncoding.UTF8);
+  TFile.WriteAllText(TPath.Combine(result, 'B11.dproj'), StringReplace(noPackages, '<ProjectVersion>20.1</ProjectVersion>', '<ProjectVersion>19.5</ProjectVersion>', []), TEncoding.UTF8);
+end;
+
 procedure TInstallerDiagnosticsTests.Restore_A_Failing_Platform_Still_Restores_The_Others;
 var
   logger : TTestLogger;
@@ -1476,6 +1892,373 @@ begin
   Assert.AreEqual(1, loggerIntf.ErrorCount, 'the failed build, once : ' + logger.Messages.Text);
   Assert.IsTrue(Pos('VSoft.Foo', SearchPathFor(projectText, 'Win32')) > 0, 'the Win32 search path was not written : ' + projectText);
   Assert.AreEqual(0, Pos('VSoft.Foo', SearchPathFor(projectText, 'Win64')), 'the failed platform''s search path must not change : ' + projectText);
+end;
+
+procedure TInstallerDiagnosticsTests.Design_Host_Build_Skips_A_Package_That_Does_Not_Declare_The_Host;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  overrides : IDictionary<string, string>;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  //VSoft.Bar is only for the project's platform.
+  overrides := TCollections.CreateDictionary<string, string>;
+  overrides['vsoft.bar'] := PackageSpecFor(DPMPlatformToString(OtherPlatform), false);
+
+  Assert.IsTrue(RestoreInTheIDE(FTempFolder, loggerIntf, LockedConsumerProject(cBarHash), overrides, TFakeInstallerContext.Create(loggerIntf)),
+                logger.Messages.Text);
+  Assert.IsTrue(WasBuilt(OtherPlatform, 'VSoft.Bar'), 'precondition : the project''s platform is built');
+  Assert.IsFalse(WasBuilt(HostPlatform, 'VSoft.Bar'), 'VSoft.Bar does not declare the platform the IDE runs on : ' + ListText(BuiltProjects));
+  Assert.IsFalse(WasBuilt(HostPlatform, 'VSoft.Foo'), 'VSoft.Foo can''t build without VSoft.Bar : ' + ListText(BuiltProjects));
+  Assert.AreEqual(0, DesignHostWarnings(logger).Count, 'neither has design packages to load : ' + logger.Messages.Text);
+end;
+
+procedure TInstallerDiagnosticsTests.Design_Host_Build_Keeps_Going_And_Warns_Once;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  warnings : IList<string>;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  //VSoft.Baz is built first, and fails - VSoft.Bar fails too.
+  FailingBuilds := TCollections.CreateList<string>;
+  FailingBuilds.Add(DPMPlatformToString(HostPlatform) + '|\VSoft.Baz\');
+  FailingBuilds.Add(DPMPlatformToString(HostPlatform) + '|\VSoft.Bar\');
+  try
+    Assert.IsTrue(RestoreInTheIDE(FTempFolder, loggerIntf, LockedConsumerProjectWithBaz, nil, TFakeInstallerContext.Create(loggerIntf)),
+                  'the project''s own platform built : ' + logger.Messages.Text);
+  finally
+    FailingBuilds := nil;
+  end;
+  Assert.IsTrue(WasBuilt(HostPlatform, 'VSoft.Baz') and WasBuilt(HostPlatform, 'VSoft.Bar'),
+                'one failure must not stop the other packages being built : ' + ListText(BuiltProjects));
+  Assert.IsFalse(WasBuilt(HostPlatform, 'VSoft.Foo'), 'VSoft.Foo can''t build without VSoft.Bar : ' + ListText(BuiltProjects));
+  Assert.AreEqual(0, loggerIntf.ErrorCount, 'not the operation''s failure : ' + logger.Messages.Text);
+  warnings := DesignHostWarnings(logger);
+  Assert.AreEqual(1, warnings.Count, 'one warning : ' + logger.Messages.Text);
+  Assert.IsTrue(ContainsText(warnings[0], 'VSoft.Baz') and ContainsText(warnings[0], 'VSoft.Bar'), 'it names every failure : ' + warnings[0]);
+end;
+
+procedure TInstallerDiagnosticsTests.Design_Host_Package_That_Was_Not_Built_Is_Not_Loaded;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  overrides : IDictionary<string, string>;
+  context : TRecordingInstallerContext;
+  contextIntf : IPackageInstallerContext;
+  warnings : IList<string>;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  context := TRecordingInstallerContext.Create(loggerIntf);
+  contextIntf := context;
+  //VSoft.Foo has design packages - but needs VSoft.Bar, which is only for the project's platform.
+  overrides := TCollections.CreateDictionary<string, string>;
+  overrides['vsoft.bar'] := PackageSpecFor(DPMPlatformToString(OtherPlatform), false);
+  overrides['vsoft.foo'] := PackageSpecFor('Win32, Win64', true);
+
+  Assert.IsTrue(RestoreInTheIDE(FTempFolder, loggerIntf, LockedConsumerProject(cBarHash), overrides, contextIntf), logger.Messages.Text);
+  Assert.IsFalse(WasBuilt(HostPlatform, 'VSoft.Foo'), 'VSoft.Foo can''t build without VSoft.Bar : ' + ListText(BuiltProjects));
+  warnings := DesignHostWarnings(logger);
+  Assert.AreEqual(1, warnings.Count, logger.Messages.Text);
+  Assert.IsTrue(ContainsText(warnings[0], 'VSoft.Foo') and ContainsText(warnings[0], 'VSoft.Bar'), 'it says what was not built, and why : ' + warnings[0]);
+  Assert.IsTrue(context.LoadedIds.Contains('vsoft.bar'), 'precondition : the design packages were loaded : ' + ListText(context.LoadedIds));
+  Assert.IsFalse(context.LoadedIds.Contains('vsoft.foo'), 'VSoft.Foo has no design package for the IDE to load');
+end;
+
+procedure TInstallerDiagnosticsTests.Packed_Package_Source_Walk_Skips_The_Package_Output;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  packageFolder : string;
+  projectText : string;
+  refreshed : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  packageFolder := TPath.Combine(FTempFolder, 'search-output');
+  WritePackageFolderWithOutput(packageFolder);
+  //a packed package's source entries are not in the manifest - every folder with source in it is added.
+  refreshed := RefreshSearchPaths(packageFolder, '      []' + sLineBreak, loggerIntf, projectText);
+  Assert.IsTrue(refreshed, logger.Messages.Text);
+  CheckOnlySourceFoldersAdded(projectText);
+end;
+
+procedure TInstallerDiagnosticsTests.Git_Source_Walk_Skips_The_Package_Output;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  packageFolder : string;
+  projectText : string;
+  refreshed : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  packageFolder := TPath.Combine(FTempFolder, 'search-git-output');
+  WritePackageFolderWithOutput(packageFolder);
+  //a git package is built where it was cloned - its output is in the folder the ** walk starts from.
+  TFile.WriteAllText(TPath.Combine(packageFolder, cGitPackageMarkerFile), 'abc', TEncoding.UTF8);
+  refreshed := RefreshSearchPaths(packageFolder, '      - src: ''**\*.pas''' + sLineBreak, loggerIntf, projectText);
+  Assert.IsTrue(refreshed, logger.Messages.Text);
+  CheckOnlySourceFoldersAdded(projectText);
+end;
+
+procedure TInstallerDiagnosticsTests.Use_Source_In_One_Project_Does_Not_Carry_Over_To_Another;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectFile : string;
+  otherProject : string;
+  otherText : string;
+  root : string;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+  options : TRestoreOptions;
+  done : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  installer := NewLockedFixture(FTempFolder, loggerIntf, LockedConsumerProject(cBarHash), [MakeDep('VSoft.Bar', '1.0.0')], cPackageSpec, [],
+                                projectFile, context);
+  root := ExtractFileDir(projectFile);
+  //both are built - the search paths point at their compiled output unless source is wanted.
+  ForceDirectories(TPath.Combine(root, 'VSoft.Foo\lib\Win32'));
+  ForceDirectories(TPath.Combine(root, 'VSoft.Bar\lib\Win32'));
+
+  //'use source' ticked for VSoft.Foo in the project - VSoft.Bar, which it uses, comes as source too.
+  context.SetUseSource(projectFile, 'VSoft.Foo', true);
+  done := installer.RefreshProjectSearchPaths(TCancellationTokenSourceFactory.Create.Token, projectFile, cTestCompiler, 'dpm.config.yaml', context);
+  Assert.IsTrue(done, logger.Messages.Text);
+  Assert.IsTrue(ContainsText(SearchPathFor(TFile.ReadAllText(projectFile), 'Win32'), 'VSoft.Bar\1.0.0\source'),
+                'precondition : the project uses the source : ' + TFile.ReadAllText(projectFile));
+
+  //another project using VSoft.Foo, which hasn't recorded VSoft.Bar - restoring it resolves VSoft.Bar again.
+  otherProject := TPath.Combine(root, 'Other.dproj');
+  TFile.WriteAllText(otherProject, StringReplace(ConsumerProjectWithBase,
+    '<PackageReference id="VSoft.Foo" version="1.0.0"/>',
+    '<PackageReference id="VSoft.Foo" version="1.0.0" manifestHash="sha256:' + cFooHash + '"/>', []), TEncoding.UTF8);
+  options := TRestoreOptions.Create;
+  try
+    options.ProjectPath := otherProject;
+    options.CompilerVersion := cTestCompiler;
+    options.ConfigFile := 'dpm.config.yaml';
+    options.Platforms := [TDPMPlatform.Win32];
+    done := installer.Restore(TCancellationTokenSourceFactory.Create.Token, options, context);
+  finally
+    options.Free;
+  end;
+  Assert.IsTrue(done, logger.Messages.Text);
+  otherText := TFile.ReadAllText(otherProject);
+  Assert.IsTrue(ContainsText(SearchPathFor(otherText, 'Win32'), 'VSoft.Bar\1.0.0\lib\Win32'), 'the other project uses the compiled VSoft.Bar : ' + otherText);
+  Assert.IsFalse(ContainsText(SearchPathFor(otherText, 'Win32'), '\source'), 'the other project did not choose source : ' + otherText);
+end;
+
+procedure TInstallerDiagnosticsTests.Refresh_Leaves_A_Package_Out_Of_A_Platform_It_Does_Not_Support;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  packageFolder : string;
+  projectText : string;
+  refreshed : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  packageFolder := TPath.Combine(FTempFolder, 'search-one-platform');
+  ForceDirectories(TPath.Combine(packageFolder, 'source'));
+  TFile.WriteAllText(TPath.Combine(packageFolder, 'source\Foo.pas'), 'unit Foo; interface implementation end.', TEncoding.UTF8);
+  //the project targets Win32 and Win64 - VSoft.Foo is for Win32 only.
+  refreshed := RefreshSearchPathsWithSpec(packageFolder,
+                 StringReplace(cSourcePackageSpecHead, 'platforms: [Win32, Win64]', 'platforms: [Win32]', []) +
+                 '      - src: ''.\source\*.pas''' + sLineBreak +
+                 '        dest: source' + sLineBreak, loggerIntf, projectText);
+  Assert.IsTrue(refreshed, logger.Messages.Text);
+  Assert.IsTrue(ContainsText(SearchPathFor(projectText, 'Win32'), 'VSoft.Foo'), 'precondition : Win32 has it : ' + projectText);
+  Assert.IsFalse(ContainsText(SearchPathFor(projectText, 'Win64'), 'VSoft.Foo'), 'VSoft.Foo is not for Win64 : ' + projectText);
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Records_The_Graph_It_Validates_For_The_Other_Projects;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectFile : string;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+  done : boolean;
+  resolution : IResolvedPackage;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  //the project's graph is intact - the restore doesn't need the resolver.
+  installer := NewLockedFixture(FTempFolder, loggerIntf, LockedConsumerProject(cBarHash), [MakeDep('VSoft.Bar', '1.0.0')], cPackageSpec, [],
+                                projectFile, context);
+  done := RestoreForWin32(installer, context, projectFile);
+  Assert.IsTrue(done, logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('verbose', 'skipping resolution'), 'precondition : the graph was found intact : ' + logger.Messages.Text);
+  resolution := context.FindPackageResolution(cOtherProject, 'VSoft.Bar');
+  Assert.IsNotNull(resolution, 'another project in the group must be checked against what this one uses');
+  Assert.AreEqual('1.0.0', resolution.PackageInfo.Version.ToStringNoMeta);
+  Assert.IsNotNull(context.FindPackageResolution(cOtherProject, 'VSoft.Foo'));
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_That_Keeps_Nothing_Records_Nothing;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectFile : string;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+  done : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  //VSoft.Bar is resolved again - but nothing builds, so the project isn't saved with it.
+  installer := NewLockedFixture(FTempFolder, loggerIntf, FooOnlyLockedProject, [MakeDep('VSoft.Bar', '1.0.0')], cPackageSpec, [TDPMPlatform.Win32],
+                                projectFile, context);
+  done := RestoreForWin32(installer, context, projectFile);
+  Assert.IsFalse(done, 'precondition : the restore failed : ' + logger.Messages.Text);
+  Assert.IsNull(context.FindPackageResolution(cOtherProject, 'VSoft.Bar'), 'the project did not keep the resolution - nothing may be checked against it');
+end;
+
+procedure TInstallerDiagnosticsTests.Uninstall_Drops_What_The_Project_Recorded;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectFile : string;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+  options : TUnInstallOptions;
+  done : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  installer := NewLockedFixture(FTempFolder, loggerIntf, LockedConsumerProject(cBarHash), [MakeDep('VSoft.Bar', '1.0.0')], cPackageSpec, [],
+                                projectFile, context);
+  //what an earlier install or restore of the project recorded.
+  (context as TFakeInstallerContext).SeedResolutions(projectFile,
+    [TResolvedPackage.Create(MakeInfo('VSoft.Foo', '1.0.0', [MakeDep('VSoft.Bar', '1.0.0')]), MakeRange('1.0.0'), cRootNode, projectFile),
+     TResolvedPackage.Create(MakeInfo('VSoft.Bar', '1.0.0', []), MakeRange('1.0.0'), 'VSoft.Foo', projectFile)]);
+  Assert.IsNotNull(context.FindPackageResolution(cOtherProject, 'VSoft.Bar'), 'precondition');
+
+  options := TUnInstallOptions.Create;
+  try
+    options.ProjectPath := projectFile;
+    options.PackageId := 'VSoft.Foo';
+    options.CompilerVersion := cTestCompiler;
+    options.ConfigFile := 'dpm.config.yaml';
+    done := installer.Uninstall(TCancellationTokenSourceFactory.Create.Token, options, context);
+  finally
+    options.Free;
+  end;
+  Assert.IsTrue(done, logger.Messages.Text);
+  Assert.IsNull(context.FindPackageResolution(cOtherProject, 'VSoft.Foo'), 'VSoft.Foo was removed from the project');
+  Assert.IsNull(context.FindPackageResolution(cOtherProject, 'VSoft.Bar'), 'nothing else in the project uses VSoft.Bar');
+end;
+
+procedure TInstallerDiagnosticsTests.Cache_Install_With_Force_Builds_The_Package_Again;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  packageFile : string;
+  done : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  //built once - the BOM it leaves says nothing has changed since.
+  done := CachePackage(FTempFolder, loggerIntf, coSucceed, TCancellationTokenSourceFactory.Create);
+  Assert.IsTrue(done, logger.Messages.Text);
+  Assert.IsTrue(FileExists(TPath.Combine(FTempFolder, 'package\package.Win32.bom')), 'precondition : the build left its BOM');
+  done := CacheAgain(FTempFolder, loggerIntf, cPackageId, false);
+  Assert.IsTrue(done, logger.Messages.Text);
+  Assert.AreEqual(0, BuildCount, 'precondition : without --force it is not built again');
+
+  done := CacheAgain(FTempFolder, loggerIntf, cPackageId, true);
+  Assert.IsTrue(done, logger.Messages.Text);
+  Assert.IsTrue(BuildCount > 0, 'asked for by id, --force builds it again');
+
+  packageFile := TPath.Combine(FTempFolder, cPackageId + '-' + CompilerToString(cTestCompiler) + '-win32-1.0.0.dpkg');
+  TFile.WriteAllText(packageFile, 'the fake cache does not read it', TEncoding.UTF8);
+  done := CacheAgain(FTempFolder, loggerIntf, packageFile, true);
+  Assert.IsTrue(done, logger.Messages.Text);
+  Assert.IsTrue(BuildCount > 0, 'from a package file, --force builds it again');
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Uses_Each_Projects_Own_Compiler;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  installer : IPackageInstaller;
+  context : IPackageInstallerContext;
+  options : TRestoreOptions;
+  done : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  context := TFakeInstallerContext.Create(loggerIntf);
+  installer := NewInstaller(loggerIntf, TFakeRepositoryManager.Create, TFakePackageCache.Create, context,
+                            TFakeCompilerFactory.Create(loggerIntf, coSucceed, nil));
+  options := TRestoreOptions.Create;
+  try
+    options.ProjectPath := TwoCompilerProjectsFolder(FTempFolder);
+    options.ConfigFile := 'dpm.config.yaml';
+    done := installer.Restore(TCancellationTokenSourceFactory.Create.Token, options, context);
+  finally
+    options.Free;
+  end;
+  Assert.IsTrue(done, logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('information', 'compiler version  [' + CompilerToString(TCompilerVersion.Delphi12_0) + ']'), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('information', 'compiler version  [' + CompilerToString(TCompilerVersion.Delphi11_0) + ']'), 'each project is restored for its own compiler : ' + logger.Messages.Text);
+end;
+
+procedure TInstallerDiagnosticsTests.Uninstall_Uses_Each_Projects_Own_Compiler;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  installer : IPackageInstaller;
+  context : IPackageInstallerContext;
+  options : TUnInstallOptions;
+  done : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  context := TFakeInstallerContext.Create(loggerIntf);
+  installer := NewInstaller(loggerIntf, TFakeRepositoryManager.Create, TFakePackageCache.Create, context,
+                            TFakeCompilerFactory.Create(loggerIntf, coSucceed, nil));
+  options := TUnInstallOptions.Create;
+  try
+    options.ProjectPath := TwoCompilerProjectsFolder(FTempFolder);
+    options.PackageId := 'VSoft.Foo';
+    options.ConfigFile := 'dpm.config.yaml';
+    done := installer.Uninstall(TCancellationTokenSourceFactory.Create.Token, options, context);
+  finally
+    options.Free;
+  end;
+  Assert.IsTrue(done, logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('information', 'compiler version  [' + CompilerToString(TCompilerVersion.Delphi12_0) + ']'), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('information', 'compiler version  [' + CompilerToString(TCompilerVersion.Delphi11_0) + ']'), 'each project is uninstalled from for its own compiler : ' + logger.Messages.Text);
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Re_Resolve_Does_Not_Look_Up_What_It_Resolved;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectFile : string;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+  repository : TFakeRepositoryManager;
+  done : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  context := TFakeInstallerContext.Create(loggerIntf);
+  //the project hasn't recorded VSoft.Bar, and it isn't in the cache - the resolve finds it on the source.
+  installer := NewLockedFixtureWith(FTempFolder, loggerIntf, FooOnlyLockedProject, [MakeDep('VSoft.Bar', '1.0.0')], cPackageSpec, nil,
+                                    ['VSoft.Bar'], [], context, projectFile, repository);
+  done := RestoreForWin32(installer, context, projectFile);
+  Assert.IsTrue(done, logger.Messages.Text);
+  Assert.IsTrue(repository.GetCallCount('VSoft.Bar') > 0, 'precondition : VSoft.Bar was resolved from the source');
+  Assert.AreEqual(0, repository.InfoCallCount, 'what the resolve found is not looked up again');
 end;
 
 initialization

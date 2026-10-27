@@ -52,6 +52,7 @@ type
     function GetLogger : ILogger;
     function GetFallbackCompiler : TCompilerVersion;
     function GetDefaultProjectPath : string;
+    function GetSources : string;
     property RepositoryManager : IPackageRepositoryManager read GetRepositoryManager;
     property Configuration : IConfiguration read GetConfiguration;
     property Logger : ILogger read GetLogger;
@@ -62,6 +63,9 @@ type
     ///</summary>
     property FallbackCompiler : TCompilerVersion read GetFallbackCompiler;
     property DefaultProjectPath : string read GetDefaultProjectPath;
+    ///<summary> --source - the sources every package query is restricted to (comma separated names), '' for
+    ///  every enabled one. </summary>
+    property Sources : string read GetSources;
   end;
 
   TMCPToolContext = class(TInterfacedObject, IMCPToolContext)
@@ -71,16 +75,18 @@ type
     FLogger : ILogger;
     FFallbackCompiler : TCompilerVersion;
     FDefaultProjectPath : string;
+    FSources : string;
   protected
     function GetRepositoryManager : IPackageRepositoryManager;
     function GetConfiguration : IConfiguration;
     function GetLogger : ILogger;
     function GetFallbackCompiler : TCompilerVersion;
     function GetDefaultProjectPath : string;
+    function GetSources : string;
   public
     constructor Create(const repositoryManager : IPackageRepositoryManager; const configuration : IConfiguration;
                        const logger : ILogger; const fallbackCompiler : TCompilerVersion;
-                       const defaultProjectPath : string);
+                       const defaultProjectPath : string; const sources : string = '');
   end;
   ///<summary> Boilerplate for IMCPTool, plus a small JSON Schema builder. </summary>
   TMCPToolBase = class(TInterfacedObject, IMCPTool)
@@ -393,7 +399,7 @@ end;
 
 constructor TMCPToolContext.Create(const repositoryManager : IPackageRepositoryManager; const configuration : IConfiguration;
                                    const logger : ILogger; const fallbackCompiler : TCompilerVersion;
-                                   const defaultProjectPath : string);
+                                   const defaultProjectPath : string; const sources : string);
 begin
   inherited Create;
   FRepositoryManager := repositoryManager;
@@ -401,6 +407,12 @@ begin
   FLogger := logger;
   FFallbackCompiler := fallbackCompiler;
   FDefaultProjectPath := defaultProjectPath;
+  FSources := sources;
+end;
+
+function TMCPToolContext.GetSources : string;
+begin
+  result := FSources;
 end;
 
 function TMCPToolContext.GetRepositoryManager : IPackageRepositoryManager;

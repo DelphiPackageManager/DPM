@@ -71,6 +71,7 @@ type
 implementation
 
 uses
+  DPM.Core.Utils.Json,
   System.SysUtils,
   System.Classes,
   JsonDataObjects,
@@ -377,7 +378,7 @@ begin
     begin
       idList := TCollections.CreateList<string>;
       try
-        responseJson := TJsonBaseObject.Parse(cacheJson) as TJsonObject;
+        responseJson := TJsonText.ParseObject(cacheJson);
         try
           if responseJson.Contains('vulnIds') then
           begin
@@ -453,7 +454,7 @@ begin
 
   fetchedResponse := response.Response;
   try
-    responseJson := TJsonBaseObject.Parse(fetchedResponse) as TJsonObject;
+    responseJson := TJsonText.ParseObject(fetchedResponse);
   except
     on e : Exception do
       raise EDPMError.Create(TErrorCode.E8003_VulnerabilityQueryFailed, 'Unable to read the answer from ' + cOSVBaseUri + ' : ' + e.Message);
@@ -537,7 +538,7 @@ begin
   end;
 
   try
-    responseJson := TJsonBaseObject.Parse(cacheJson) as TJsonObject;
+    responseJson := TJsonText.ParseObject(cacheJson);
   except
     on e : Exception do
       raise EDPMError.Create(TErrorCode.E8003_VulnerabilityQueryFailed, 'Unable to read the details of ' + vulnId + ' : ' + e.Message);

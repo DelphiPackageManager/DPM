@@ -29,6 +29,7 @@ unit DPM.Core.Sources.Manager;
 interface
 
 uses
+  DPM.Core.Types,
   DPM.Core.Logging,
   DPM.Core.Options.Sources,
   DPM.Core.Sources.Interfaces,
@@ -49,13 +50,22 @@ type
   public
     constructor Create(const logger : ILogger; const configManager : IConfigurationManager); reintroduce;
 
+    //The type a source is, from what it is - for add and update alike. A git url, an existing registry folder
+    //(folder-per-id dspecs) or sourceType GitRegistry is a git registry; git checks those when it first uses them.
+    //An http(s) url is a DPM server, a file uri or path a folder (and only a folder). False, having said why
+    //(E1002), when source can't be a package source at all.
+    class function TryResolveSourceType(const logger : ILogger; const source : string; var sourceType : TSourceType) : boolean; static;
+    //true if path is an existing folder laid out as a registry (folder-per-id <id>.dspec.yaml).
+    class function LooksLikeRegistryFolder(const path : string) : boolean; static;
   end;
 
 implementation
 
 uses
   System.SysUtils,
-  DPM.Core.Types,
+  System.IOUtils,
+  VSoft.Uri,
+  DPM.Core.Utils.Path,
   DPM.Core.Utils.System,
   DPM.Core.Sources.Types,
   DPM.Core.Constants,
@@ -63,6 +73,59 @@ uses
   DPM.Core.Diagnostics;
 
 { TSourcesManager }
+
+class function TSourcesManager.LooksLikeRegistryFolder(const path : string) : boolean;
+var
+  subDir : string;
+begin
+  result := false;
+  if not TDirectory.Exists(path) then
+    exit;
+  //a registry folder has a sub-folder per package id, each containing a dspec file.
+  for subDir in TDirectory.GetDirectories(path) do
+  begin
+    if Length(TPathUtils.FindDspecFiles(subDir)) > 0 then
+      exit(true);
+  end;
+end;
+
+class function TSourcesManager.TryResolveSourceType(const logger : ILogger; const source : string; var sourceType : TSourceType) : boolean;
+var
+  uri : IUri;
+  uriError : string;
+begin
+  result := false;
+  if (sourceType = TSourceType.GitRegistry) or IsGitRegistryUri(source) or LooksLikeRegistryFolder(source) then
+  begin
+    //git handles the url/path, so the file/http uri checks don't apply - a bad one is reported when it is first
+    //cloned or refreshed.
+    sourceType := TSourceType.GitRegistry;
+    exit(true);
+  end;
+
+  if not TUriFactory.TryParseWithError(source, false, uri, uriError) then
+  begin
+    logger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + source + '] is not a valid uri : ' + uriError);
+    exit;
+  end;
+
+  if uri.Scheme = 'file' then
+  begin
+    if sourceType <> TSourceType.Folder then
+    begin
+      logger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + source + '] is a file uri, which is only valid for a folder source.');
+      exit;
+    end;
+  end
+  else if (uri.Scheme = 'http') or (uri.Scheme = 'https') then
+    sourceType := TSourceType.DPMServer
+  else
+  begin
+    logger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + source + '] is not valid - [' + uri.Scheme + '] is not a supported scheme (file, http or https).');
+    exit;
+  end;
+  result := true;
+end;
 
 function TSourcesManager.AddSource(const options : TSourcesOptions) : Boolean;
 var
@@ -295,6 +358,8 @@ function TSourcesManager.UpdateSource(const options : TSourcesOptions) : Boolean
 var
   config : IConfiguration;
   source : ISourceConfig;
+  newSource : string;
+  newType : TSourceType;
 begin
   result := false;
   if options.ConfigFile = '' then
@@ -321,10 +386,30 @@ begin
     FLogger.Error(TErrorCode.E1003_UnknownSource, 'There is no source named [' + options.Name + '].');
     exit;
   end;
-  source.Name := options.Name;
-  source.Source := options.Source;
-  source.UserName := options.UserName;
-  source.Password := options.Password;
+
+  //only what was given changes - and what is saved is a source that can be used, checked as add checks it.
+  if options.SourceSpecified then
+    newSource := options.Source
+  else
+    newSource := source.Source;
+  if options.SourceTypeSpecified then
+    newType := options.SourceType
+  else
+    newType := source.SourceType;
+  if newSource = '' then
+  begin
+    FLogger.Error(TErrorCode.E0101_MissingArgument, 'The --source option can''t be empty.');
+    exit;
+  end;
+  if not TryResolveSourceType(FLogger, newSource, newType) then
+    exit;
+
+  source.Source := newSource;
+  source.SourceType := newType;
+  if options.UserNameSpecified then
+    source.UserName := options.UserName;
+  if options.PasswordSpecified then
+    source.Password := options.Password;
   result := FConfigManager.SaveConfig(config);
   if result then
     FLogger.Information('Source [' + options.Name + '] updated.', false);

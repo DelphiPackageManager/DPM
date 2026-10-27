@@ -16,6 +16,8 @@ type
   TDateTimeUtilsTests = class
   public
     [Test] procedure FormatUtc_KnownDateTime;
+    //manifests, receipts and SBOMs - the same text whatever the locale's separators are.
+    [Test] procedure FormatIso8601Utc_Ignores_The_Locale_Separators;
     [Test] procedure ParseUtc_KnownDateTime;
     [Test] procedure RoundTripUtc_PreservesValue;
     [Test] procedure RoundTripUtc_PreservesMilliseconds;
@@ -279,6 +281,25 @@ begin
   s := TDPMDateTimeUtils.FormatPublishedDate(EncodeDate(2026, 9, 8));
   Assert.IsTrue(s.Contains('2026'), 'expected year in "' + s + '"');
   Assert.IsTrue(s.Contains('8'), 'expected day in "' + s + '"');
+end;
+
+procedure TDateTimeUtilsTests.FormatIso8601Utc_Ignores_The_Locale_Separators;
+var
+  timeSeparator : Char;
+  dateSeparator : Char;
+  formatted : string;
+begin
+  timeSeparator := FormatSettings.TimeSeparator;
+  dateSeparator := FormatSettings.DateSeparator;
+  FormatSettings.TimeSeparator := '.';
+  FormatSettings.DateSeparator := '/';
+  try
+    formatted := TDPMDateTimeUtils.FormatIso8601Utc(EncodeDateTime(2026, 10, 27, 13, 5, 9, 0));
+  finally
+    FormatSettings.TimeSeparator := timeSeparator;
+    FormatSettings.DateSeparator := dateSeparator;
+  end;
+  Assert.AreEqual('2026-10-27T13:05:09Z', formatted);
 end;
 
 initialization

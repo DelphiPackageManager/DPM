@@ -388,7 +388,16 @@ begin
   FLogger := FContainer.Resolve<IDPMIDELogger>;
   dpmIDEOptions := FContainer.Resolve<IDPMIDEOptions>;
   if FileExists(dpmIDEOptions.FileName) then
-    dpmIDEOptions.LoadFromFile()
+  begin
+    //a file that can't be read (edited by hand, cut short) stopped the plugin loading - the defaults instead, and
+    //say so. The file is left for whoever wants to look at it; saving the options replaces it.
+    try
+      dpmIDEOptions.LoadFromFile();
+    except
+      on e : Exception do
+        FLogger.Warning(TWarningCode.W9108_IDEOptionsUnreadable, e.Message + sLineBreak + 'Using the default options.');
+    end;
+  end
   else
   begin
     TConfigUtils.EnsureDefaultConfigDir;
@@ -669,6 +678,15 @@ end;
 
 destructor TDPMWizard.Destroy;
 begin
+  //Destroyed has already shut everything down. The container goes too - it held every singleton, so they all
+  //outlived the plugin (the managers' window procedures among them, into a dll that was going). What is still
+  //held here is let go first, so it goes while the container is whole.
+  FPackageCacheForVerify := nil;
+  FLogger := nil;
+  FDPMIDEMessageService := nil;
+  FProjectTreeManager := nil;
+  FEditorViewManager := nil;
+  FContainer.Free;
   inherited;
 end;
 

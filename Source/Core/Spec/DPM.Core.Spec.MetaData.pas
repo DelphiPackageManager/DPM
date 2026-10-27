@@ -318,7 +318,8 @@ begin
     result := false;
   end;
 
-  authorsSeq := yamlObject.A['authors'];
+  if not SequenceOf(yamlObject, 'authors', 'the metadata', authorsSeq) then
+    result := false;
   if authorsSeq.Count = 0 then
   begin
     logger.Error(TErrorCode.E6003_SpecElementMissing, 'The required [authors] were not found.');
@@ -341,14 +342,16 @@ begin
   FCopyright := yamlObject.S['copyright'];
   FReadme := yamlObject.S['readme'];
 
-  tagsSeq := yamlObject.A['tags'];
+  if not SequenceOf(yamlObject, 'tags', 'the metadata', tagsSeq) then
+    result := false;
   for i := 0 to tagsSeq.Count - 1 do
     FTags.Add(tagsSeq.S[i]);
 
   FIsTrial := yamlObject.B['isTrial'];
   FIsCommercial := yamlObject.B['isCommercial'];
 
-  frameworksSeq := yamlObject.A['frameworks'];
+  if not SequenceOf(yamlObject, 'frameworks', 'the metadata', frameworksSeq) then
+    result := false;
   if frameworksSeq.Count > 0 then
   begin
     for i := 0 to frameworksSeq.Count -1 do

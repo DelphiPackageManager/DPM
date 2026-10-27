@@ -49,6 +49,13 @@ type
     class function DateToISO8601(const value : TDateTime; asUtc : boolean = false) : string; static;
 
     /// <summary>
+    /// Format a UTC date/time as "yyyy-mm-ddThh:nn:ssZ" (whole seconds) - the form manifests, receipts and
+    /// SBOMs carry. Not FormatDateTime with a bare ':' - that is the locale's time separator, which is '.' in
+    /// some locales.
+    /// </summary>
+    class function FormatIso8601Utc(const utcValue : TDateTime) : string; static;
+
+    /// <summary>
     /// Parse an ISO 8601 date/time string. Accepts both "T" and " " as the
     /// date/time separator; accepts optional fractional seconds (up to 9
     /// digits, truncated to ms); accepts "Z", "+HH:MM", "-HH:MM" or no zone
@@ -110,6 +117,11 @@ begin
   if (pos > Length(s)) or (s[pos] <> expected) then
     raise EConvertError.CreateFmt('Expected "%s" at position %d', [expected, pos]);
   Inc(pos);
+end;
+
+class function TDPMDateTimeUtils.FormatIso8601Utc(const utcValue : TDateTime) : string;
+begin
+  result := FormatDateTime('yyyy"-"mm"-"dd"T"hh":"nn":"ss"Z"', utcValue);
 end;
 
 class function TDPMDateTimeUtils.DateToISO8601(const value : TDateTime; asUtc : boolean) : string;

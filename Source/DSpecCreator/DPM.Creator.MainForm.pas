@@ -419,7 +419,17 @@ type
     procedure edtProjectURLChange(Sender : TObject);
     procedure edtRepositoryURLChange(Sender : TObject);
     procedure edtTagsChange(Sender : TObject);
-    procedure edtTemplateNameChange(Sender : TObject);
+    procedure edtTemplateNameExit(Sender : TObject);
+    //pack, test and upload share the log and the cancellation token - one at a time.
+    function IsBusy : boolean;
+    //The open spec may be thrown away (new, open, recent, wizard) - asks about unsaved changes. False when the user
+    //cancelled, or chose to save and then didn't.
+    function ConfirmDiscardChanges : boolean;
+    //the icon's preview - see the implementation.
+    procedure ShowIcon(const fileName : string);
+    //renames the template - in the spec (and the platforms that name it), the tree node and the platforms' list -
+    //false, having said why, when the name can't be used.
+    function TryRenameTemplate(const node : TTemplateTreeNode; const currentName : string; const newName : string) : boolean;
     procedure edtVersionChange(Sender : TObject);
     procedure FormCreate(Sender : TObject);
     procedure FormCloseQuery(Sender : TObject; var CanClose : Boolean);
@@ -504,6 +514,9 @@ type
     LogMemo : TLogMemo;
     FInVariableUpdate : Boolean;
     FLoadingCard : Boolean;
+    //LoadDspecStructure is putting the spec into the controls - their change events mustn't write it back (the
+    //author box held only the first author, and wrote that back as the only one).
+    FLoadingSpec : Boolean;
     FMRUMenu : TMRUMenu;
     // In-process pack / sign / upload
     FContainer : TContainer;
@@ -623,6 +636,7 @@ type
 
     procedure LoadSPDXList;
     procedure LoadDspecStructure;
+    procedure DoLoadDspecStructure;
     procedure SaveDspecStructure(const filename : string);
 
   public
@@ -800,7 +814,8 @@ var
   packStartTime : TDateTime;
   cleanup : TProc;
 begin
-  if FPacking then
+  //not while a test or an upload runs either - they share the log and the cancellation token.
+  if IsBusy then
     Exit;
 
   // The packer resolves relative source/readme paths against the current
@@ -980,7 +995,7 @@ var
 begin
   // Mutually exclusive with pack / sign / upload - they share FOpsLogger and the
   // cancellation token source.
-  if FTesting or FPacking or FUploading then
+  if IsBusy then
     Exit;
 
   // The Start button is only enabled after a successful pack, but guard anyway.
@@ -1818,7 +1833,7 @@ var
   src : ISourceConfig;
   cleanup : TProc;
 begin
-  if FPacking or FUploading then
+  if IsBusy then
     Exit;
 
   sourceName := cboUploadSource.Text;
@@ -2210,6 +2225,9 @@ end;
 
 procedure TDSpecCreatorForm.edtAuthorChange(Sender : TObject);
 begin
+  //the box shows the first author - loading it mustn't make that the only one.
+  if FLoadingSpec then
+    exit;
   FOpenFile.PackageSpec.metadata.authors.Clear;
   if Trim(edtAuthor.Text) <> '' then
     FOpenFile.PackageSpec.metadata.authors.Add(Trim(edtAuthor.Text));
@@ -3139,12 +3157,17 @@ end;
 
 procedure TDSpecCreatorForm.actFileNewExecute(Sender : TObject);
 begin
+  //the spec that is open goes - as on closing, say so if it has changes.
+  if IsBusy or (not ConfirmDiscardChanges) then
+    exit;
   FreeAndNil(FOpenFile);
   PackLogMemo.Clear;
   UploadLogMemo.Clear;
   TestLogMemo.Clear;
   FOpenFile := TDSpecFile.Create(FLogger);
   FOpenFile.PackageSpec.newTemplate('default');
+  //as set up, nothing has changed.
+  FOpenFile.MarkUnmodified;
   UpdateFormCaption('');
   EnableControls(false);
   PageControl.ActivePageIndex :=  0;
@@ -3185,6 +3208,8 @@ var
   fileOpen : TFileOpenDialog;
   fileType : TFileTypeItem;
 begin
+  if IsBusy or (not ConfirmDiscardChanges) then
+    exit;
   initialDir := GetFileOpenInitialDir;
 
   //TOpenDialog.InitialDir maps to the Vista shell's "default folder" (SetDefaultFolder),
@@ -3546,7 +3571,35 @@ begin
   FOpenFile.PackageSpec.metadata.tags.CommaText := edtTags.Text;
 end;
 
-procedure TDSpecCreatorForm.edtTemplateNameChange(Sender : TObject);
+function TDSpecCreatorForm.TryRenameTemplate(const node : TTemplateTreeNode; const currentName : string; const newName : string) : boolean;
+var
+  i : integer;
+begin
+  result := false;
+  if newName = '' then
+  begin
+    MessageDlg('A template needs a name.', mtError, [mbOK], 0);
+    exit;
+  end;
+  try
+    FOpenFile.PackageSpec.RenameTemplate(currentName, newName);
+  except
+    on e : Exception do
+    begin
+      MessageDlg('The template can''t be renamed : ' + e.Message, mtError, [mbOK], 0);
+      exit;
+    end;
+  end;
+  if node <> nil then
+    node.Text := newName;
+  i := cboTemplate.Items.IndexOf(currentName);
+  if i <> -1 then
+    cboTemplate.Items[i] := newName;
+  result := true;
+end;
+
+//On leaving the box - renamed for every key typed, a name on the way to the one wanted could be another template's.
+procedure TDSpecCreatorForm.edtTemplateNameExit(Sender : TObject);
 var
   templateName : string;
   templateNode : TTemplateTreeNode;
@@ -3554,12 +3607,13 @@ begin
   if Assigned(tvTemplates.Selected) then
   begin
     templateNode := (tvTemplates.Selected as TTemplateTreeNode);
+    if templateNode.Template = nil then
+      exit;
     templateName := templateNode.Template.name;
     if SameText(templateName, Trim(edtTemplateName.Text)) then
       Exit;
-
-    templateNode.Text := Trim(edtTemplateName.Text);
-    FOpenFile.PackageSpec.RenameTemplate(templateName, Trim(edtTemplateName.Text));
+    if not TryRenameTemplate(templateNode, templateName, Trim(edtTemplateName.Text)) then
+      edtTemplateName.Text := templateName;
   end;
 end;
 
@@ -3579,10 +3633,19 @@ end;
 procedure TDSpecCreatorForm.edtVersionExit(Sender : TObject);
 var
   versionStr : string;
+  version : TPackageVersion;
 begin
   versionStr := Trim(edtVersion.Text);
-  if Length(versionStr) > 0 then
-    FOpenFile.PackageSpec.metadata.Version := TPackageVersion.Parse(versionStr);
+  if Length(versionStr) = 0 then
+    exit;
+  //Parse raised out of the exit event - said, and the box put back to the version the spec has.
+  if TPackageVersion.TryParse(versionStr, version) then
+    FOpenFile.PackageSpec.metadata.Version := version
+  else
+  begin
+    MessageDlg('[' + versionStr + '] is not a valid version - eg 1.0.0', mtError, [mbOK], 0);
+    edtVersion.Text := FOpenFile.PackageSpec.metadata.Version.ToString;
+  end;
 end;
 
 procedure TDSpecCreatorForm.FormCreate(Sender : TObject);
@@ -3617,6 +3680,7 @@ begin
   FConfigManagerUI := TConfigurationManager.Create(FLogger);
   FOpenFile := TDSpecFile.Create(FLogger);
   FOpenFile.PackageSpec.newTemplate('default');
+  FOpenFile.MarkUnmodified;
   // Pack / sign / upload run in-process via the DPM core; output goes to the
   // active page's memo (retargeted per operation). Pack/sign default to PackLogMemo.
   FOpsLogger := TDSpecQueuedLogger.Create(PackLogMemo);
@@ -3701,6 +3765,17 @@ begin
 end;
 
 procedure TDSpecCreatorForm.LoadDspecStructure;
+begin
+  //the controls' change events see the spec being shown, not edited - see FLoadingSpec.
+  FLoadingSpec := true;
+  try
+    DoLoadDspecStructure;
+  finally
+    FLoadingSpec := false;
+  end;
+end;
+
+procedure TDSpecCreatorForm.DoLoadDspecStructure;
 var
   i : integer;
   j : integer;
@@ -3724,13 +3799,11 @@ begin
   chkIsCommercial.Checked := FOpenFile.PackageSpec.metadata.IsCommercial;
   chkIsTrial.Checked := FOpenFile.PackageSpec.metadata.IsTrial;
   if Length(FOpenFile.PackageSpec.metadata.Icon) > 0 then
-  begin
-    ImgIcon.Picture.LoadFromFile(TPath.Combine(FOpenFile.WorkingDir, FOpenFile.PackageSpec.metadata.Icon));
-  end
+    ShowIcon(TPath.Combine(FOpenFile.WorkingDir, FOpenFile.PackageSpec.metadata.Icon))
   else
     // No icon in the spec - clear any image left over from a previously loaded
     // spec (otherwise file/new and opening an icon-less spec keep the old image).
-    ImgIcon.Picture.Assign(nil);
+    ShowIcon('');
 
   //package-level (global) variables - shared across all compilers, overridden by per-platform vars.
   FInVariableUpdate := true;
@@ -3942,49 +4015,60 @@ begin
   MRUListService.SaveMRU;
 end;
 
-procedure TDSpecCreatorForm.FormCloseQuery(Sender : TObject; var CanClose : Boolean);
+function TDSpecCreatorForm.IsBusy : boolean;
+begin
+  result := FPacking or FUploading or FTesting;
+end;
+
+function TDSpecCreatorForm.ConfirmDiscardChanges : boolean;
 var
   UserChoice : integer;
 begin
-  if FOpenFile.IsModified then
-  begin
-    UserChoice := MessageDlg('Do you want to save the changes?', mtConfirmation, [mbYes, mbNo, mbCancel], 0);
-    case UserChoice of
-      mrYes :
-        begin
-          // Call your save function here
-          if not FOpenFile.filename.IsEmpty then
-          begin
-            SaveDspecStructure(FOpenFile.filename);
-          end
-          else
-          begin
-            if SaveDialog.Execute then
-            begin
-              SaveDspecStructure(SaveDialog.filename);
-            end
-            else
-            begin
-              CanClose := false;
-              Exit;
-            end;
-          end;
-          CanClose := true;
-        end;
-      mrNo :
-        begin
-          // Close without saving
-          CanClose := true;
-        end;
-      mrCancel :
-        begin
-          // Do not close the form
-          CanClose := false;
-        end;
-    end;
-  end
+  if not FOpenFile.IsModified then
+    exit(true); // No changes were made, so it's okay to lose it
+  UserChoice := MessageDlg('Do you want to save the changes?', mtConfirmation, [mbYes, mbNo, mbCancel], 0);
+  case UserChoice of
+    mrYes :
+      begin
+        if not FOpenFile.filename.IsEmpty then
+          SaveDspecStructure(FOpenFile.filename)
+        else if SaveDialog.Execute then
+          SaveDspecStructure(SaveDialog.filename)
+        else
+          exit(false);
+        result := true;
+      end;
+    mrNo :
+      result := true;
   else
-    CanClose := true; // No changes were made, so it's okay to close
+    result := false;
+  end;
+end;
+
+procedure TDSpecCreatorForm.FormCloseQuery(Sender : TObject; var CanClose : Boolean);
+begin
+  //a pack, test or upload running on - closing would free what it is using.
+  if IsBusy then
+  begin
+    MessageDlg('An operation is still running - cancel it (Esc) or wait for it to finish before closing.', mtWarning, [mbOK], 0);
+    CanClose := false;
+    exit;
+  end;
+  CanClose := ConfirmDiscardChanges;
+end;
+
+//The VCL has no SVG graphic, so an svg icon (which a package may have, and the picker offers) is kept but not shown -
+//LoadFromFile raised for it, which stopped the spec loading part way. One that can't be read is shown as none.
+procedure TDSpecCreatorForm.ShowIcon(const fileName : string);
+begin
+  ImgIcon.Picture.Assign(nil);
+  if (fileName = '') or SameText(ExtractFileExt(fileName), '.svg') or (not FileExists(fileName)) then
+    exit;
+  try
+    ImgIcon.Picture.LoadFromFile(fileName);
+  except
+    ImgIcon.Picture.Assign(nil);
+  end;
 end;
 
 procedure TDSpecCreatorForm.ImgIconClick(Sender : TObject);
@@ -3999,7 +4083,7 @@ begin
 
   if OpenPictureDialog1.Execute then
   begin
-    ImgIcon.Picture.LoadFromFile(OpenPictureDialog1.filename);
+    ShowIcon(OpenPictureDialog1.filename);
     relativePath := ExtractRelativePath(FOpenFile.WorkingDir, OpenPictureDialog1.filename);
     FOpenFile.PackageSpec.metadata.Icon := relativePath;
   end;
@@ -4032,6 +4116,8 @@ procedure TDSpecCreatorForm.actFilePackageWizardExecute(Sender : TObject);
 var
   wizard : TPackageWizardForm;
 begin
+  if IsBusy or (not ConfirmDiscardChanges) then
+    exit;
   wizard := TPackageWizardForm.Create(nil, FLogger, FConfigManagerUI);
   try
     if (wizard.ShowModal = mrOk) and (wizard.ResultFile <> '') then
@@ -4043,6 +4129,9 @@ end;
 
 procedure TDSpecCreatorForm.mmoDescriptionChange(Sender : TObject);
 begin
+  //loading it mustn't trim what the spec has.
+  if FLoadingSpec then
+    exit;
   FOpenFile.PackageSpec.metadata.Description := Trim(mmoDescription.Text);
 end;
 
@@ -4059,10 +4148,14 @@ end;
 
 procedure TDSpecCreatorForm.MRUListClick(Sender : TObject; const filename : string);
 begin
-  if FileExists(filename) then
-    OpenProject(filename)
-  else
+  if not FileExists(filename) then
+  begin
     MRURemove(filename);
+    exit;
+  end;
+  if IsBusy or (not ConfirmDiscardChanges) then
+    exit;
+  OpenProject(filename);
 end;
 
 procedure TDSpecCreatorForm.MRULoad(const list : TStrings);
@@ -4085,9 +4178,15 @@ end;
 procedure TDSpecCreatorForm.OpenProject(const filename : string);
 var
   errorMessage : string;
+  loaded : TDSpecFile;
 begin
-  if FOpenFile.LoadFromFile(filename, errorMessage) then
+  //Loaded into a model of its own and swapped in once it has - loading into the open one overwrote it as it went,
+  //and a failure left it broken (and the replacement made for it leaked the old one).
+  loaded := TDSpecFile.Create(FLogger);
+  if loaded.LoadFromFile(filename, errorMessage) then
   begin
+    FreeAndNil(FOpenFile);
+    FOpenFile := loaded;
     UpdateFormCaption(filename);
     LoadDspecStructure;
     MRUListService.Add(filename);
@@ -4098,9 +4197,8 @@ begin
   end
   else
   begin
-    // restore back to default if we fail to open dspec
-    FOpenFile := TDSpecFile.Create(FLogger);
-    FOpenFile.PackageSpec.newTemplate('default');
+    //the spec that was open stays as it was.
+    loaded.Free;
     ShowMessage(errorMessage);
     PageControl.ActivePage := tsLogging;
   end;
@@ -4313,7 +4411,15 @@ end;
 
 procedure TDSpecCreatorForm.tvTemplatesEdited(Sender : TObject; Node : TTreeNode; var S : string);
 begin
-  FOpenFile.PackageSpec.RenameTemplate(Node.Text, S);
+  S := Trim(S);
+  if SameText(Node.Text, S) then
+    exit;
+  //the node keeps its name when the new one can't be used.
+  if not TryRenameTemplate(nil, Node.Text, S) then
+  begin
+    S := Node.Text;
+    exit;
+  end;
   edtTemplateName.Text := S;
 end;
 

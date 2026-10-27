@@ -207,7 +207,7 @@ end;
 
 function FormatRfc3339Utc(value : TDateTime) : string;
 begin
-  result := FormatDateTime('yyyy"-"mm"-"dd"T"hh":"nn":"ss"Z"', value);
+  result := TDPMDateTimeUtils.FormatIso8601Utc(value);
 end;
 
 function ParseRfc3339Utc(const value : string; out dt : TDateTime) : boolean;

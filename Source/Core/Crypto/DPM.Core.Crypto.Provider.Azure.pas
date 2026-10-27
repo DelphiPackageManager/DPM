@@ -151,6 +151,7 @@ type
 implementation
 
 uses
+  DPM.Core.Utils.Json,
   System.IOUtils,
   System.DateUtils,
   System.StrUtils,
@@ -256,7 +257,7 @@ begin
     exit;
   try
     text := TFile.ReadAllText(path, TEncoding.UTF8);
-    doc := TJsonBaseObject.Parse(text) as TJsonObject;
+    doc := TJsonText.ParseObject(text);
     try
       if doc.Contains('accessToken') then
         token.AccessToken := doc.S['accessToken'];
@@ -336,7 +337,7 @@ begin
       'AAD token request failed (HTTP %d): %s',
       [response.StatusCode, response.Response]);
 
-  doc := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+  doc := TJsonText.ParseObject(response.Response);
   try
     if not doc.Contains('access_token') then
       raise EAzureKeyVault.Create('AAD response missing access_token');
@@ -419,7 +420,7 @@ begin
       'Key Vault certificate fetch failed (HTTP %d): %s',
       [response.StatusCode, response.Response]);
 
-  doc := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+  doc := TJsonText.ParseObject(response.Response);
   try
     if not doc.Contains('cer') then
       raise EAzureKeyVault.Create('Key Vault certificate response missing "cer" field');
@@ -477,7 +478,7 @@ begin
       'Key Vault sign failed (HTTP %d): %s',
       [response.StatusCode, response.Response]);
 
-  respDoc := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+  respDoc := TJsonText.ParseObject(response.Response);
   try
     if not respDoc.Contains('value') then
       raise EAzureKeyVault.Create('Key Vault sign response missing "value" field');

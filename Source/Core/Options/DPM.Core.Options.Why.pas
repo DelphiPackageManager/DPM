@@ -42,6 +42,7 @@ type
     constructor CreateClone(const original : TWhyOptions); reintroduce;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TWhyOptions read FDefault;
     constructor Create; override;
     function Validate(const logger : ILogger) : Boolean; override;
@@ -76,6 +77,12 @@ end;
 class constructor TWhyOptions.CreateDefault;
 begin
   FDefault := TWhyOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TWhyOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 function TWhyOptions.Validate(const logger : ILogger) : Boolean;

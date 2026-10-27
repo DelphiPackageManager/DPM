@@ -875,9 +875,11 @@ var
   minor : integer;
 begin
   result := false;
-  if value = '' then
+  if Trim(value) = '' then
     exit;
   elements := TStringUtils.SplitStr(Trim(value), '.');
+  if Length(elements) = 0 then
+    exit;
   major := StrToIntDef(elements[0], -1);
   if major = -1 then
     exit;
@@ -943,6 +945,8 @@ end;
 
 //garnered from stackoverflow and the versions of delphi I have installed
 //todo - need checking
+//UnknownVersion for a value it can't map - blank, not a number, or a ProjectVersion older than XE2 or newer than
+//this version of DPM knows. The callers report it (they know which project it came from).
 function ProjectVersionToCompilerVersion(const value : string) : TCompilerVersion;
 var
   elements : TArray<string>;
@@ -950,9 +954,11 @@ var
   minor : integer;
 begin
   result := TCompilerVersion.UnknownVersion;
-  if value = '' then
+  if Trim(value) = '' then
     exit;
   elements := TStringUtils.SplitStr(Trim(value), '.');
+  if Length(elements) = 0 then
+    exit;
   major := StrToIntDef(elements[0], -1);
   if major = -1 then
     exit;
@@ -1011,8 +1017,6 @@ begin
           result := TCompilerVersion.Delphi13_0;
       end;
     end;
-  else
-    raise EArgumentOutOfRangeException.Create('Unknown project version');
   end;
 end;
 

@@ -140,7 +140,8 @@ var
   mode : word;
 begin
   try
-    line := FormatDateTime('hh:nn:ss.zzz', Now) + ' ' + direction + ' ' + message + sLineBreak;
+    //quoted - a bare ':' is the locale's time separator.
+    line := FormatDateTime('hh":"nn":"ss"."zzz', Now) + ' ' + direction + ' ' + message + sLineBreak;
     bytes := TEncoding.UTF8.GetBytes(line);
 
     if FileExists(FFileName) then

@@ -6,6 +6,8 @@ program DPM.Core.Tests;
 {$APPTYPE CONSOLE}
 {$ENDIF}{$STRONGLINKTYPES ON}
 uses
+  //must stay first - see the unit.
+  DPM.Core.Tests.LeakCheck in 'Tests\DPM.Core.Tests.LeakCheck.pas',
   System.SysUtils,
   {$IFDEF TESTINSIGHT}
   TestInsight.DUnitX,
@@ -13,6 +15,7 @@ uses
   DUnitX.Loggers.Console,
   DUnitX.Loggers.Xml.NUnit,
   DUnitX.TestFramework,
+  DUnitX.CommandLine.Options,
   DPM.Core.Diagnostics in 'Core\Logging\DPM.Core.Diagnostics.pas',
   DPM.Core.Logging in 'Core\Logging\DPM.Core.Logging.pas',
   DPM.Core.Constants in 'Core\DPM.Core.Constants.pas',
@@ -27,6 +30,7 @@ uses
   DPM.Core.Utils.Path in 'Core\Utils\DPM.Core.Utils.Path.pas',
   DPM.Core.Utils.Process in 'Core\Utils\DPM.Core.Utils.Process.pas',
   DPM.Core.Utils.Strings in 'Core\Utils\DPM.Core.Utils.Strings.pas',
+  DPM.Core.Utils.Json in 'Core\Utils\DPM.Core.Utils.Json.pas',
   DPM.Core.Utils.System in 'Core\Utils\DPM.Core.Utils.System.pas',
   DPM.Core.Utils.XML in 'Core\Utils\DPM.Core.Utils.XML.pas',
   DPM.Core.Spec.DesignEntry in 'Core\Spec\DPM.Core.Spec.DesignEntry.pas',
@@ -193,6 +197,9 @@ uses
   DPM.Core.Tests.Dependency.Resolver in 'Tests\DPM.Core.Tests.Dependency.Resolver.pas',
   DPM.Core.Tests.Package.InstallerContext in 'Tests\DPM.Core.Tests.Package.InstallerContext.pas',
   DPM.Core.Tests.Dependency.Fakes in 'Tests\DPM.Core.Tests.Dependency.Fakes.pas',
+  DPM.Core.Tests.Package.Dependencies in 'Tests\DPM.Core.Tests.Package.Dependencies.pas',
+  DPM.Core.Tests.Spec.Validation in 'Tests\DPM.Core.Tests.Spec.Validation.pas',
+  DPM.Core.Tests.Utils.Json in 'Tests\DPM.Core.Tests.Utils.Json.pas',
   DPM.Core.Tests.Repository.RequestCache in 'Tests\DPM.Core.Tests.Repository.RequestCache.pas',
   DPM.Core.Tests.Options.Install in 'Tests\DPM.Core.Tests.Options.Install.pas',
   DPM.Core.Tests.Diagnostics in 'Tests\DPM.Core.Tests.Diagnostics.pas',
@@ -250,6 +257,8 @@ uses
   DPM.Core.Tests.Crypto.Pfx in 'Tests\DPM.Core.Tests.Crypto.Pfx.pas',
   DPM.Core.Tests.Repository.Directory in 'Tests\DPM.Core.Tests.Repository.Directory.pas',
   DPM.Core.Tests.Repository.Manager in 'Tests\DPM.Core.Tests.Repository.Manager.pas',
+  DPM.Core.Tests.Repository.Http in 'Tests\DPM.Core.Tests.Repository.Http.pas',
+  DPM.Core.Tests.Sources.Manager in 'Tests\DPM.Core.Tests.Sources.Manager.pas',
   DPM.Core.Tests.Compiler.MSBuild in 'Tests\DPM.Core.Tests.Compiler.MSBuild.pas',
   DPM.Core.Tests.Utils.PE in 'Tests\DPM.Core.Tests.Utils.PE.pas',
   DPM.Core.Tests.Crypto.Algorithms in 'Tests\DPM.Core.Tests.Crypto.Algorithms.pas',
@@ -279,12 +288,22 @@ var
   results : IRunResults;
   logger : ITestLogger;
   nunitLogger : ITestLogger;
+  leakCheckOption : IOptionDefinition;
 begin
+  //under the debugger, leaks are reported at shutdown; --leakcheck (see DPM.Core.Tests.LeakCheck) fails the run on them.
+  {$WARN SYMBOL_PLATFORM OFF}
+  ReportMemoryLeaksOnShutdown := DebugHook <> 0;
 {$IFDEF TESTINSIGHT}
   TestInsight.DUnitX.RunRegisteredTests;
   exit;
 {$ENDIF}
   try
+    leakCheckOption := TOptionsRegistry.RegisterOption<boolean>('leakcheck', 'lc', 'Fail the run (exit code 2) if memory is still allocated at shutdown',
+      procedure(value : boolean)
+      begin
+        TLeakCheck.Enabled := value;
+      end);
+    leakCheckOption.HasValue := false;
     //Check command line options, will exit if invalid
     TDUnitX.CheckCommandLine;
     //Create the test runner

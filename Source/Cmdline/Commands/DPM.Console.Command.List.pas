@@ -62,6 +62,26 @@ uses
   DPM.Core.Json.Projections,
   DPM.Core.Diagnostics;
 
+//The page of items - skip, then at most take (0 : all).
+function PageOf(const items : IList<IPackageListItem>; const skip : integer; const take : integer) : IList<IPackageListItem>;
+var
+  i : integer;
+  first : integer;
+begin
+  if (skip <= 0) and (take <= 0) then
+    exit(items);
+  result := TCollections.CreateList<IPackageListItem>;
+  first := skip;
+  if first < 0 then
+    first := 0;
+  for i := first to items.Count - 1 do
+  begin
+    if (take > 0) and (result.Count >= take) then
+      break;
+    result.Add(items[i]);
+  end;
+end;
+
 { TListCommand }
 
 constructor TListCommand.Create(const logger: ILogger; const configurationManager: IConfigurationManager; const repositoryManager : IPackageRepositoryManager);
@@ -92,6 +112,8 @@ var
   resultString : string;
   signingTag : string;
   config : IConfiguration;
+  skip : integer;
+  take : integer;
 begin
   result := TExitCode.Error;
   TListOptions.Default.ApplyCommon(TCommonOptions.Default);
@@ -108,6 +130,11 @@ begin
     exit;
   end;
 
+  //-skip/-take page the merged list - every source is asked for all of it (each paging itself would page only its
+  //own). -take was overridden here, so it never applied.
+  skip := TListOptions.Default.Skip;
+  take := TListOptions.Default.Take;
+  TListOptions.Default.Skip := 0;
   TListOptions.Default.Take := MaxInt;
 
   config := FConfigurationManager.LoadConfig(TListOptions.Default.ConfigFile);
@@ -117,13 +144,20 @@ begin
   if not FRepositoryManager.Initialize(config) then
     exit(TExitCode.InitException);
 
-  searchResults := FRepositoryManager.List(cancellationToken, TListOptions.Default);
+  searchResults := PageOf(FRepositoryManager.List(cancellationToken, TListOptions.Default), skip, take);
 
   if TListOptions.Default.OutputFormat = TOutputFormat.Json then
   begin
     //An empty result is a legitimate answer in json mode, not a failure - emit an empty
-    //array and exit OK. Text mode keeps its existing behaviour.
+    //array and exit OK. Text mode keeps its existing behaviour. Unless a source couldn't be asked - then
+    //nothing found is not the answer, as in text mode.
     EmitJsonResults(searchResults);
+    if (not searchResults.Any) and (FRepositoryManager.UnavailableSources <> '') then
+    begin
+      Logger.Error(TErrorCode.E1102_PackageNotFoundSourcesUnavailable, 'No packages were found - and the source(s) ' +
+        FRepositoryManager.UnavailableSources + ' could not be used.');
+      exit(TExitCode.Error);
+    end;
     result := TExitCode.OK;
     exit;
   end;

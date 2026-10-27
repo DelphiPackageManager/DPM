@@ -94,6 +94,8 @@ class function TDirectoryUtils.GetFiles(const Path, SearchPattern : string; cons
 var
   foundFiles : IList<string>;
 
+  //The pattern is for the files - every subfolder is searched, whatever its name. A junction or symbolic
+  //link is not followed : it can lead anywhere, even back up the tree.
   procedure DoSearch(const dir : string);
   var
     searchRec : TSearchRec;
@@ -105,12 +107,21 @@ var
       try
         repeat
           if (searchRec.Attr and faDirectory) = 0 then
-            foundFiles.Add(theDir + searchRec.Name)
-          else if SearchOption = TSearchOption.soAllDirectories then
-          begin
-            if (searchRec.Name <> '.') and (searchRec.Name <> '..') then
-              DoSearch(theDir + searchRec.Name);
-          end;
+            foundFiles.Add(theDir + searchRec.Name);
+        until (FindNext(searchRec) <> 0);
+      finally
+        FindClose(searchRec);
+      end;
+    end;
+    if SearchOption <> TSearchOption.soAllDirectories then
+      exit;
+    if FindFirst(theDir + '*', faDirectory, searchRec) = 0 then
+    begin
+      try
+        repeat
+          if ((searchRec.Attr and faDirectory) <> 0) and ((Cardinal(searchRec.Attr) and FILE_ATTRIBUTE_REPARSE_POINT) = 0) and
+             (searchRec.Name <> '.') and (searchRec.Name <> '..') then
+            DoSearch(theDir + searchRec.Name);
         until (FindNext(searchRec) <> 0);
       finally
         FindClose(searchRec);

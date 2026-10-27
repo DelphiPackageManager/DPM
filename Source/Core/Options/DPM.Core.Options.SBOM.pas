@@ -73,6 +73,7 @@ type
     constructor CreateClone(const original : TSBOMOptions); reintroduce;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TSBOMOptions read FDefault;
     constructor Create; override;
     function Validate(const logger : ILogger) : Boolean; override;
@@ -232,6 +233,12 @@ end;
 class constructor TSBOMOptions.CreateDefault;
 begin
   FDefault := TSBOMOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TSBOMOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 function TSBOMOptions.Validate(const logger : ILogger) : Boolean;

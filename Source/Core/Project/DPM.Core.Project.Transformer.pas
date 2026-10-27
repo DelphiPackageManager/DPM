@@ -116,6 +116,7 @@ type
 implementation
 
 uses
+  WinApi.Windows,
   System.Classes,
   System.SysUtils,
   System.StrUtils,
@@ -396,16 +397,27 @@ begin
   result := match.Groups[1].Value + FRewriteSuffix + match.Groups[3].Value;
 end;
 
+//True when the bytes after offset are UTF-8 (all ASCII is).
+function IsValidUtf8(const bytes : TBytes; const offset : integer) : boolean;
+begin
+  if Length(bytes) <= offset then
+    exit(true);
+  result := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, PAnsiChar(@bytes[offset]), Length(bytes) - offset, nil, 0) > 0;
+end;
+
 procedure TDpkTransformer.RewriteLibSuffix(const inputFile, outputFile : string; const compiler : TCompilerVersion);
+const
+  cUtf8Bom : array[0..2] of byte = ($EF, $BB, $BF);
 var
   inputBytes : TBytes;
   contents : string;
   regex : TRegEx;
   rewritten : string;
   outStream : TFileStream;
-  utf8 : TEncoding;
+  encoding : TEncoding;
+  ownsEncoding : boolean;
+  preambleLength : integer;
   outBytes : TBytes;
-  preamble : TBytes;
   evaluator : TMatchEvaluator;
 begin
   //Build the entire directive body (everything between '{$LIBSUFFIX ' and '}'):
@@ -419,41 +431,60 @@ begin
 
   //read raw bytes so we can preserve the file's existing encoding/line endings.
   inputBytes := TFile.ReadAllBytes(inputFile);
-  utf8 := TEncoding.UTF8;
-  contents := utf8.GetString(inputBytes);
 
   //Match both forms: {$LIBSUFFIX 'xxx'} (quoted, old) and {$LIBSUFFIX AUTO} (bare keyword).
   //Group 1 = prefix incl. trailing whitespace, Group 2 = the value (quoted or keyword),
   //Group 3 = closing brace. We discard Group 2 and substitute FRewriteSuffix instead.
-  regex := TRegEx.Create('(\{\$LIBSUFFIX\s+)(''[^'']*''|"[^"]*"|\w+)(\})', [roIgnoreCase]);
-  if not regex.IsMatch(contents) then
+  //The file is written back in the encoding it was read in : UTF-8 with or without a BOM, or - for anything that
+  //isn't UTF-8 - the Windows-1252 code page Delphi sources are usually saved in, in which every byte round trips.
+  //The BOM is not part of the text (GetString would keep it as a character and it would be written twice).
+  preambleLength := 0;
+  ownsEncoding := false;
+  if (Length(inputBytes) >= 3) and CompareMem(@inputBytes[0], @cUtf8Bom[0], 3) then
   begin
-    //no directive present - copy bytes through unchanged.
-    if not SameFileName(inputFile, outputFile) then
-      TFile.WriteAllBytes(outputFile, inputBytes);
-    exit;
+    encoding := TEncoding.UTF8;
+    preambleLength := 3;
+  end
+  else if IsValidUtf8(inputBytes, 0) then
+    encoding := TEncoding.UTF8
+  else
+  begin
+    encoding := TEncoding.GetEncoding(1252);
+    ownsEncoding := true;
   end;
-
-  //use a match evaluator so the new suffix is treated as a literal — otherwise
-  //replacement-string substitution would interpret `$(...)` sequences specially.
-  //assigning an instance method to a TMatchEvaluator works around a Delphi
-  //overload-resolution issue with inline anonymous functions (see TPackageWriter
-  //for the same workaround).
-  evaluator := LibSuffixMatchEvaluator;
-  rewritten := regex.Replace(contents, evaluator);
-
-  //preserve UTF-8 BOM if the original had one; otherwise write without BOM.
-  preamble := utf8.GetPreamble;
-  outStream := TFileStream.Create(outputFile, fmCreate);
   try
-    if (Length(inputBytes) >= Length(preamble)) and (Length(preamble) > 0) and
-       CompareMem(@inputBytes[0], @preamble[0], Length(preamble)) then
-      outStream.WriteBuffer(preamble[0], Length(preamble));
-    outBytes := utf8.GetBytes(rewritten);
-    if Length(outBytes) > 0 then
-      outStream.WriteBuffer(outBytes[0], Length(outBytes));
+    contents := encoding.GetString(inputBytes, preambleLength, Length(inputBytes) - preambleLength);
+
+    regex := TRegEx.Create('(\{\$LIBSUFFIX\s+)(''[^'']*''|"[^"]*"|\w+)(\})', [roIgnoreCase]);
+    if not regex.IsMatch(contents) then
+    begin
+      //no directive present - copy bytes through unchanged.
+      if not SameFileName(inputFile, outputFile) then
+        TFile.WriteAllBytes(outputFile, inputBytes);
+      exit;
+    end;
+
+    //use a match evaluator so the new suffix is treated as a literal — otherwise
+    //replacement-string substitution would interpret `$(...)` sequences specially.
+    //assigning an instance method to a TMatchEvaluator works around a Delphi
+    //overload-resolution issue with inline anonymous functions (see TPackageWriter
+    //for the same workaround).
+    evaluator := LibSuffixMatchEvaluator;
+    rewritten := regex.Replace(contents, evaluator);
+
+    outStream := TFileStream.Create(outputFile, fmCreate);
+    try
+      if preambleLength > 0 then
+        outStream.WriteBuffer(inputBytes[0], preambleLength);
+      outBytes := encoding.GetBytes(rewritten);
+      if Length(outBytes) > 0 then
+        outStream.WriteBuffer(outBytes[0], Length(outBytes));
+    finally
+      outStream.Free;
+    end;
   finally
-    outStream.Free;
+    if ownsEncoding then
+      encoding.Free;
   end;
 end;
 

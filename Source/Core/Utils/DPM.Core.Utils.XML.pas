@@ -70,7 +70,8 @@ uses
   System.Classes,
   System.SysUtils,
   System.Variants,
-  WinApi.ActiveX;
+  WinApi.ActiveX,
+  DPM.Core.Utils.Files;
 
 procedure DoPrettyFormatXML(const node : IXMLDOMNode; const indentSize : integer; var indentLen : integer);
 const
@@ -392,13 +393,14 @@ const
   cCRLF : array[0..1] of byte = (13, 10);
 var
   ms : TMemoryStream;
-  fs : TFileStream;
+  fs : TMemoryStream;
   stream : IStream;
   destination : OleVariant;
   data : PByte;
   size : integer;
   isUTF16 : boolean;
   hasBOM : boolean;
+  bytes : TBytes;
 begin
   ms := TMemoryStream.Create;
   try
@@ -418,7 +420,9 @@ begin
     if fileFormat.LFLineBreaks and (not isUTF16) then
       size := StripCRBeforeLF(data, size);
 
-    fs := TFileStream.Create(filename, fmCreate);
+    //built in memory, then written in one go - a failure part way (disk full, a crash) mustn't leave a
+    //truncated project behind.
+    fs := TMemoryStream.Create;
     try
       if fileFormat.HasBOM and (not hasBOM) then
         fs.WriteBuffer(cUTF8BOM, SizeOf(cUTF8BOM));
@@ -436,6 +440,10 @@ begin
             fs.WriteBuffer(cCRLF, SizeOf(cCRLF));
         end;
       end;
+      SetLength(bytes, fs.Size);
+      if fs.Size > 0 then
+        Move(fs.Memory^, bytes[0], fs.Size);
+      TFileUtils.AtomicWriteAllBytes(filename, bytes);
     finally
       fs.Free;
     end;

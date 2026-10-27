@@ -125,6 +125,7 @@ const
 implementation
 
 uses
+  DPM.Core.Utils.Json,
   System.Classes,
   JsonDataObjects,
   VSoft.Base64,
@@ -255,7 +256,7 @@ begin
       [response.StatusCode, response.Response]);
 
   try
-    respDoc := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+    respDoc := TJsonText.ParseObject(response.Response);
   except
     on e : Exception do
       raise ESignotaur.CreateFmt(
@@ -432,7 +433,7 @@ begin
       [response.StatusCode, response.Response]);
 
   try
-    respDoc := TJsonBaseObject.Parse(response.Response) as TJsonObject;
+    respDoc := TJsonText.ParseObject(response.Response);
   except
     on e : Exception do
       raise ESignotaur.CreateFmt(

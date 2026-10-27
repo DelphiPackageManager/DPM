@@ -22,6 +22,10 @@ type
     //a program that can't be started has no exit code - it used to report the Windows error as one.
     [Test]
     procedure Execute2_OfAProgramThatCanNotStart_Raises;
+
+    //the value of a variable, by a name in any case - not NAME=value.
+    [Test]
+    procedure EnvironmentBlock_GetValue_Returns_The_Value;
   end;
 
 implementation
@@ -158,6 +162,16 @@ begin
     begin
       TProcess.Execute2(TCancellationTokenSourceFactory.Create.Token, missing, '', '');
     end, EOSError);
+end;
+
+procedure TProcessTests.EnvironmentBlock_GetValue_Returns_The_Value;
+var
+  env : IEnvironmentBlock;
+begin
+  env := TEnvironmentBlockFactory.Create(nil, false);
+  env.AddOrSet('DPM_TEST_VALUE', 'C:\some=path');
+  Assert.AreEqual('C:\some=path', env.GetValue('dpm_test_value'), false);
+  Assert.AreEqual('', env.GetValue('DPM_NOT_SET'));
 end;
 
 initialization

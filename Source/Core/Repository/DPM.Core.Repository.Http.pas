@@ -89,6 +89,7 @@ type
 implementation
 
 uses
+  DPM.Core.Utils.Json,
   System.SysUtils,
   System.IOUtils,
   System.Classes,
@@ -136,6 +137,23 @@ begin
     result := Trim(Copy(result, 2, MaxInt));
 end;
 
+//One entry of the results a server sent - one DPM can't read is left out, and said, rather than failing the page.
+function TryReadResultItem(const logger : ILogger; const sourceName : string; const jsonArr : TJsonArray; const index : integer;
+                           out item : IPackageSearchResultItem) : boolean;
+begin
+  result := false;
+  item := nil;
+  try
+    if jsonArr.Types[index] <> jdtObject then
+      raise EJsonException.Create('it is not a json object');
+    item := TDPMPackageSearchResultItem.FromJson(sourceName, jsonArr.O[index]);
+    result := true;
+  except
+    on e : Exception do
+      logger.Warning(TWarningCode.W1207_PackageEntryUnreadable, 'An entry in the results from [' + sourceName + '] could not be read - it was left out : ' + e.Message);
+  end;
+end;
+
 //'404 Not Found - <the start of what the server said>'
 function ResponseError(const response : IHttpResponse) : string;
 begin
@@ -144,35 +162,6 @@ begin
     result := result + ' ' + CleanMessage(response.ErrorMessage);
   if response.Response <> '' then
     result := result + ' - ' + Copy(response.Response, 1, 300);
-end;
-
-//A response body that should be a json object - the caller frees jsonObj. False, with nothing to free and
-//error saying why, when it isn't one : unreadable, or json whose root is something else (an array, a string).
-//Parse hands back whatever the root is, so 'Parse(...) as TJsonObject' leaked it when the cast failed.
-function TryParseJsonObject(const text : string; out jsonObj : TJsonObject; out error : string) : boolean;
-var
-  parsed : TJsonBaseObject;
-begin
-  result := false;
-  jsonObj := nil;
-  error := '';
-  try
-    parsed := TJsonBaseObject.Parse(text);
-  except
-    on e : Exception do
-    begin
-      error := e.Message;
-      exit;
-    end;
-  end;
-  if not (parsed is TJsonObject) then
-  begin
-    parsed.Free;
-    error := 'it is not a json object';
-    exit;
-  end;
-  jsonObj := TJsonObject(parsed);
-  result := true;
 end;
 
 //function GetBaseUri(const uri : IUri) : string;
@@ -413,7 +402,7 @@ begin
   end;
   Logger.Information('OK ' + requestUrl);
 
-  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
+  if not TJsonText.TryParseObject(response.Response, jsonObj, parseError) then
   begin
     RequestFailed('returned a response DPM could not read : ' + parseError);
     exit;
@@ -435,7 +424,6 @@ var
   jsonObj : TJsonObject;
   parseError : string;
   jsonArr : TJsonArray;
-  itemObj : TJsonObject;
   i: Integer;
   uri : IUri;
   resultItem : IPackageSearchResultItem;
@@ -501,7 +489,7 @@ begin
     exit;
   end;
 
-  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
+  if not TJsonText.TryParseObject(response.Response, jsonObj, parseError) then
   begin
     RequestFailed('returned a response DPM could not read : ' + parseError);
     exit;
@@ -517,9 +505,8 @@ begin
       begin
         if cancellationToken.IsCancelled then
           exit;
-        itemObj := jsonArr.O[i];
-        resultItem := TDPMPackageSearchResultItem.FromJson(Name, itemObj);
-        Result.Results.Add(resultItem);
+        if TryReadResultItem(Logger, Name, jsonArr, i, resultItem) then
+          Result.Results.Add(resultItem);
       end;
 
     end;
@@ -539,7 +526,6 @@ var
   uri : IUri;
   jsonObj : TJsonObject;
   parseError : string;
-  itemObj : TJsonObject;
   idArray : TJsonArray;
   jsonArr : TJsonArray;
   sBody : string;
@@ -608,7 +594,7 @@ begin
   end;
   Logger.Verbose('OK ' + uri.ToString);
 
-  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
+  if not TJsonText.TryParseObject(response.Response, jsonObj, parseError) then
   begin
     RequestFailed('returned a response DPM could not read : ' + parseError);
     exit;
@@ -625,9 +611,8 @@ begin
         if cancellationToken.IsCancelled then
           exit;
 
-        itemObj := jsonArr.O[i];
-        resultItem := TDPMPackageSearchResultItem.FromJson(Name, itemObj);
-        Result.Results.Add(resultItem);
+        if TryReadResultItem(Logger, Name, jsonArr, i, resultItem) then
+          Result.Results.Add(resultItem);
       end;
 
     end;
@@ -774,7 +759,7 @@ begin
   end;
   Logger.Information('OK ' + uri.BaseUriString + path);
 
-  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
+  if not TJsonText.TryParseObject(response.Response, jsonObj, parseError) then
   begin
     RequestFailed('returned a response DPM could not read : ' + parseError);
     exit;
@@ -838,6 +823,13 @@ begin
     end;
   end;
 
+  if response.StatusCode = 404 then
+  begin
+    //not an error - the package isn't on this server (another source may have it).
+    Logger.Information('Package ' + packageId + ' ' + packageVersion + ' not found on server');
+    exit;
+  end;
+
   if response.StatusCode <> 200 then
   begin
     RequestFailed('returned an error : ' + ResponseError(response));
@@ -845,7 +837,7 @@ begin
   end;
   Logger.Information('OK ' + uri.BaseUriString + path);
 
-  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
+  if not TJsonText.TryParseObject(response.Response, jsonObj, parseError) then
   begin
     RequestFailed('returned a response DPM could not read : ' + parseError);
     exit;
@@ -925,7 +917,7 @@ begin
   end;
   Logger.Information('OK ' + requestUrl);
 
-  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
+  if not TJsonText.TryParseObject(response.Response, jsonObj, parseError) then
   begin
     RequestFailed('returned a response DPM could not read : ' + parseError);
     exit;
@@ -1016,7 +1008,7 @@ begin
   end;
   Logger.Information('OK ' + requestUrl + ' [' + IntTostr(stopwatch.ElapsedMilliseconds) + 'ms]');
 
-  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
+  if not TJsonText.TryParseObject(response.Response, jsonObj, parseError) then
   begin
     RequestFailed('returned a response DPM could not read : ' + parseError);
     exit;
@@ -1218,7 +1210,7 @@ begin
   end;
   Logger.Information('OK ' + requestUrl);
 
-  if not TryParseJsonObject(response.Response, jsonObj, parseError) then
+  if not TJsonText.TryParseObject(response.Response, jsonObj, parseError) then
   begin
     RequestFailed('returned a response DPM could not read : ' + parseError);
     exit;
@@ -1230,10 +1222,14 @@ begin
     begin
       for I := 0 to jsonArr.Count -1 do
       begin
+        //one entry DPM can't read is left out (TryLoadFromJson says so) - not the rest of the list with it.
+        if jsonArr.Types[i] <> jdtObject then
+        begin
+          Logger.Warning(TWarningCode.W1207_PackageEntryUnreadable, 'A package list entry could not be read : it is not a json object');
+          continue;
+        end;
         if TPackageListItem.TryLoadFromJson(Logger, jsonArr.O[i], listItem) then
-          Result.Add(listItem)
-        else
-          exit; //error would have been logged in the tryloadfromjson
+          Result.Add(listItem);
       end;
     end;
   finally
@@ -1422,7 +1418,7 @@ begin
         status := '';
         statusUrl := '';
         try
-          if not TryParseJsonObject(response.Response, jsonObj, parseError) then raise EJsonException.Create(parseError);
+          if not TJsonText.TryParseObject(response.Response, jsonObj, parseError) then raise EJsonException.Create(parseError);
           try
             if jsonObj.Contains('packageVersionId') then
               packageVersionId := jsonObj.S['packageVersionId'];
@@ -1452,7 +1448,7 @@ begin
         errorMsg := '';
         status := '';
         try
-          if not TryParseJsonObject(response.Response, jsonObj, parseError) then raise EJsonException.Create(parseError);
+          if not TJsonText.TryParseObject(response.Response, jsonObj, parseError) then raise EJsonException.Create(parseError);
           try
             if jsonObj.Contains('error') then
               errorMsg := jsonObj.S['error'];
@@ -1486,7 +1482,7 @@ begin
   else
     errorMsg := '';
     try
-      if not TryParseJsonObject(response.Response, jsonObj, parseError) then raise EJsonException.Create(parseError);
+      if not TJsonText.TryParseObject(response.Response, jsonObj, parseError) then raise EJsonException.Create(parseError);
       try
         if jsonObj.Contains('error') then
           errorMsg := jsonObj.S['error'];

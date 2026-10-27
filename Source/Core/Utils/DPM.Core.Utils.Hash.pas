@@ -42,6 +42,8 @@ type
     class function GetHashBytes(const Stream: TStream): TBytes;static;
     class function GetHashBytesFromFile(const fileName : string) : TBytes;static;
     class function GetHashStringFromFile(const fileName : string) : string;static;
+    //the hash of value's UTF-8 bytes - for names derived from a path or url.
+    class function GetHashStringFromText(const value : string) : string;static;
     class function DigestAsString(const Digest: TBytes): string;static;
   end;
 
@@ -350,6 +352,18 @@ begin
     Result := DigestAsString(SHA256FromStream(fs));
   finally
     fs.Free;
+  end;
+end;
+
+class function THashSHA256.GetHashStringFromText(const value : string) : string;
+var
+  stream : TBytesStream;
+begin
+  stream := TBytesStream.Create(TEncoding.UTF8.GetBytes(value));
+  try
+    Result := DigestAsString(SHA256FromStream(stream));
+  finally
+    stream.Free;
   end;
 end;
 

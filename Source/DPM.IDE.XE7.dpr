@@ -146,6 +146,7 @@ uses
   DPM.Core.Utils.Path in 'Core\Utils\DPM.Core.Utils.Path.pas',
   DPM.Core.Utils.Process in 'Core\Utils\DPM.Core.Utils.Process.pas',
   DPM.Core.Utils.Strings in 'Core\Utils\DPM.Core.Utils.Strings.pas',
+  DPM.Core.Utils.Json in 'Core\Utils\DPM.Core.Utils.Json.pas',
   DPM.Core.Utils.System in 'Core\Utils\DPM.Core.Utils.System.pas',
   DPM.Core.Utils.XML in 'Core\Utils\DPM.Core.Utils.XML.pas',
   DPM.Core.MSXML in 'Core\Xml\DPM.Core.MSXML.pas',

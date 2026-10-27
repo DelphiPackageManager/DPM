@@ -63,6 +63,7 @@ type
 implementation
 
 uses
+  DPM.Core.Utils.Strings,
   System.SysUtils,
   System.Classes,
   System.StrUtils,
@@ -296,12 +297,14 @@ end;
 
 procedure THTMLReportWriter.Write(const report : TSBOMReport; const fileName : string);
 
+  //only an http(s) link is linked - they come from a package's author, and a javascript: or file: one in a report
+  //runs when it is clicked.
   function ExternalLinks(const comp : TSBOMComponent) : string;
   begin
     result := '';
-    if comp.ProjectUrl <> '' then
+    if TStringUtils.IsWebUrl(comp.ProjectUrl) then
       result := result + '<a href="' + HtmlEscape(comp.ProjectUrl) + '">project</a>';
-    if comp.RepositoryUrl <> '' then
+    if TStringUtils.IsWebUrl(comp.RepositoryUrl) then
     begin
       if result <> '' then
         result := result + ' &middot; ';
@@ -457,12 +460,13 @@ end;
 
 procedure TMarkdownReportWriter.Write(const report : TSBOMReport; const fileName : string);
 
+  //only http(s) links, as for the html report.
   function LinksCell(const comp : TSBOMComponent) : string;
   begin
     result := '';
-    if comp.ProjectUrl <> '' then
+    if TStringUtils.IsWebUrl(comp.ProjectUrl) then
       result := '[project](' + comp.ProjectUrl + ')';
-    if comp.RepositoryUrl <> '' then
+    if TStringUtils.IsWebUrl(comp.RepositoryUrl) then
     begin
       if result <> '' then
         result := result + ' · ';

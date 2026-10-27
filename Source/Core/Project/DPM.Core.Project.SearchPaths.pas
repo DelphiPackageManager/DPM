@@ -75,6 +75,8 @@ type
       end;
   private
     FPaths : IList<TEntry>;
+    //lowercase paths already added - see AddSearchPath.
+    FKnownPaths : ISet<string>;
     //LowerCase(unitName) -> file path / origin. First path-list entry to claim
     //a unit wins; later paths cannot shadow it (mirrors the compiler).
     FUnits : IDictionary<string, THit>;
@@ -99,6 +101,7 @@ constructor TUnitSearchIndex.Create;
 begin
   inherited Create;
   FPaths := TCollections.CreateList<TEntry>;
+  FKnownPaths := TCollections.CreateSet<string>;
   FUnits := TCollections.CreateDictionary<string, THit>;
 end;
 
@@ -111,6 +114,10 @@ begin
   if trimmed = '' then
     exit;
   entry.Path := ExcludeTrailingPathDelimiter(trimmed);
+  //Once - the first path to name a unit wins anyway, so a second entry for the folder only made each lookup that
+  //misses walk it again (a project's source folder was added once for every unit in it).
+  if not FKnownPaths.Add(LowerCase(entry.Path)) then
+    exit;
   entry.Origin := origin;
   entry.Scanned := false;
   FPaths.Add(entry);

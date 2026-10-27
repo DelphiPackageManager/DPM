@@ -46,7 +46,6 @@ type
     FVersion : TPackageVersion;
     FVerifyAll : boolean;
     FCommand : TCacheSubCommand;
-    FForce : boolean;
     FPackageFile : string;
     FSkipTrustRatchets : boolean;
     class var
@@ -58,6 +57,7 @@ type
 
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TCacheOptions read FDefault;
     constructor Create; override;
     function Validate(const logger : ILogger) : Boolean; override;
@@ -88,8 +88,9 @@ type
     // Which sub-command was requested. The CLI dispatches on this.
     property Command : TCacheSubCommand read FCommand write FCommand;
 
-    // `dpm cache remove --force` — skip the y/N confirmation prompt.
-    property Force : boolean read FForce write FForce;
+    // Force (inherited) : `dpm cache remove --force` skips the y/N confirmation prompt, `dpm cache install
+    // --force` rebuilds the package even when it is already built. One field - the installer reads the
+    // inherited one, so a field of our own here would never reach it.
 
     // `dpm cache verify` — re-hash every cached package against its manifest
     // and re-run signature verification (plan §1.6, V-34). When set, the
@@ -129,7 +130,6 @@ begin
   FVersion := original.FVersion;
   FVerifyAll := original.FVerifyAll;
   FCommand := original.FCommand;
-  FForce := original.FForce;
   FPackageFile := original.FPackageFile;
   FSkipTrustRatchets := original.FSkipTrustRatchets;
 end;
@@ -138,6 +138,12 @@ class constructor TCacheOptions.CreateDefault;
 begin
   FDefault := TCacheOptions.Create;
   FDefault.FCommand := TCacheSubCommand.Invalid;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TCacheOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 function TCacheOptions.GetPackageId : string;

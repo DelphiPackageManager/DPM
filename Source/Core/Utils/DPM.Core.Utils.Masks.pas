@@ -35,6 +35,7 @@ type
 implementation
 
 uses
+  System.SysUtils,
   System.IOUtils,
   DPM.Core.Utils.Strings;
 
@@ -44,7 +45,9 @@ procedure TFileMatcher.AddMask(const mask: string);
 var
   maskObj : TMask;
 begin
-  maskObj := TMask.Create(mask);
+  //TMask reads [..] as a set of characters - DPM's patterns have none, so a '[' is part of a name ('MyLib [fork]')
+  //and is escaped as a set holding just '['.
+  maskObj := TMask.Create(StringReplace(mask, '[', '[[]', [rfReplaceAll]));
   FMasks.Add(maskObj);
 end;
 

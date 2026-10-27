@@ -148,6 +148,7 @@ uses
   DPM.Core.Packaging.EnvironmentVariableValidator,
   DPM.Core.Project.BuildHookValidator,
   DPM.Core.Spec,
+  DPM.Core.Utils.Files,
   DPM.Core.Utils.PE,
   DPM.Core.Utils.Strings,
   DPM.Core.Utils.Path,
@@ -888,6 +889,8 @@ var
   iconPath : string;
   readmePath : string;
   readmeArchiveName : string;
+  writeFileName : string;
+  lastError : Cardinal;
 begin
   result := false;
 
@@ -909,7 +912,9 @@ begin
   //this compiler, so it must not be token-replaced, validated or used to work out the package root.
   template.ApplyCompilerExclusions(targetPlatform.Compiler);
 
-  ReplaceTokens(version, reducedSpec, targetPlatform, variables);
+  //it said what it couldn't replace - a package with the tokens left in is no use to anyone.
+  if not ReplaceTokens(version, reducedSpec, targetPlatform, variables) then
+    exit;
   platforms := targetPlatform.Platforms;
   packageFileName := reducedSpec.MetaData.Id + '-' + CompilerToString(targetPlatform.Compiler) + '-' + DPMPlatformsToBinString(platforms) + '-' + version.ToStringNoMeta + cPackageFileExt;
   packageFileName := IncludeTrailingPathDelimiter(outputFolder) + packageFileName;
@@ -919,11 +924,15 @@ begin
   //clean, root-relative path. For a dspec at the root of its content this is just basePath.
   FEffectiveBasePath := ComputeEffectiveBasePath(basePath, reducedSpec, template);
   FArchiveWriter.SetBasePath(FEffectiveBasePath);
-  if not FArchiveWriter.Open(packageFileName) then
+  //Written to a file of its own beside the package, which becomes the package only once it is complete and
+  //valid - a pack that fails leaves no package behind (nor half of one), and doesn't replace one from before.
+  writeFileName := TFileUtils.TempFileNameFor(packageFileName);
+  if not FArchiveWriter.Open(writeFileName) then
     exit;
   FLogger.Information('Writing package to file : ' + packageFileName);
   FArchivePaths := TCollections.CreateList<string>;
   FPrecompiledBinaries := TCollections.CreateList<string>;
+  try
   try
     //Trim stray whitespace on path values - the YAML reader preserves trailing spaces in
     //quoted scalars, which would break file lookups (icon/readme) and pattern matching (source).
@@ -1062,12 +1071,11 @@ begin
   // package is malformed and we don't want to ship it.
   if result and (FArchiveValidator <> nil) then
   begin
-    archiveValidation := FArchiveValidator.Validate(packageFileName);
+    archiveValidation := FArchiveValidator.Validate(writeFileName);
     if not archiveValidation.Ok then
     begin
       FLogger.Error(TErrorCode.E6107_PackageInvalid, Format('The package written is not valid : %s (entry "%s") - it was deleted.',
         [archiveValidation.Reason, archiveValidation.Entry]));
-      DeleteFile(packageFileName);
       result := false;
       exit;
     end;
@@ -1076,20 +1084,30 @@ begin
   if result and (FManifestService <> nil) then
   begin
     try
-      manifest := FManifestService.GenerateFromArchive(packageFileName,
+      manifest := FManifestService.GenerateFromArchive(writeFileName,
         reducedSpec.MetaData.Id, version.ToStringNoMeta, haSha256);
-      FManifestService.InjectIntoArchive(packageFileName, manifest);
+      FManifestService.InjectIntoArchive(writeFileName, manifest);
       FLogger.Debug(Format('Emitted dpm-manifest.json (%d entries)',
         [Length(manifest.Files)]));
     except
       on e : Exception do
       begin
         FLogger.Error(TErrorCode.E6108_ManifestWriteFailed, 'Unable to write the package manifest : ' + e.Message);
-        DeleteFile(packageFileName);
         result := false;
         exit;
       end;
     end;
+  end;
+
+  if result and (not TFileUtils.TryReplaceFile(writeFileName, packageFileName, lastError)) then
+  begin
+    FLogger.Error(TErrorCode.E6106_PackageWriteFailed, 'Unable to write the package [' + packageFileName + '] : ' + SysErrorMessage(lastError));
+    result := false;
+  end;
+  finally
+    //anything that didn't become the package - a failure, an exception.
+    if FileExists(writeFileName) then
+      DeleteFile(writeFileName);
   end;
 end;
 
@@ -1099,6 +1117,7 @@ var
   targetPlatform : ISpecTargetPlatform;
   clonedTargetPlatform : ISpecTargetPlatform;
   version : TPackageVersion;
+  minClientVersion : TPackageVersion;
   error : string;
   variables : TStringList;
   props : TArray<string>;
@@ -1163,6 +1182,17 @@ begin
   begin
     FLogger.Error(TErrorCode.E6109_GitPackageNotPackable, 'The spec is for a git registry package, and those cannot be packed.');
     exit;
+  end;
+
+  //--minclientversion : the oldest DPM that can read the package, in place of what the spec declares.
+  if options.MinClientVersion <> '' then
+  begin
+    if not TPackageVersion.TryParseWithError(options.MinClientVersion, minClientVersion, error) then
+    begin
+      FLogger.Error(TErrorCode.E0102_InvalidArgument, 'The minimum client version [' + options.MinClientVersion + '] is not valid : ' + error);
+      exit;
+    end;
+    spec.MinClientVersion := minClientVersion.ToStringNoMeta;
   end;
 
   //Reject reserved/banned IDE environment variable names before doing any real work.

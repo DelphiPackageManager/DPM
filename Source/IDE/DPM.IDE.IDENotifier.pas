@@ -55,6 +55,10 @@ type
   private
     FLogger : IDPMIDELogger;
     FLoadingGroup : boolean;
+    {$IF CompilerVersion < 34.0}
+    //the group being loaded - 10.4 and later say when a group load ends.
+    FGroupFile : string;
+    {$IFEND}
     FGroupProjects : IList<string>;
     FProjectController : IDPMIDEProjectController;
     FProjectNotifiers : IDictionary<string, IOTAProjectNotifier>;
@@ -83,6 +87,13 @@ type
     procedure FileNotification(NotifyCode : TOTAFileNotification; const FileName : string; var Cancel : Boolean);
 
     function LoadProjectGroup(const fileName : string) : boolean;
+    //XE2-10.3 - FGroupProjects is how the end of a group load is known. Takes fileName off it (any case), true if
+    //it was there.
+    function RemoveGroupProject(const fileName : string) : boolean;
+    function IsGroupProject(const fileName : string) : boolean;
+    //Ends the group load - when its last project has opened, or when something else happening shows it is over
+    //(a project that isn't in it, or one of its projects never opening).
+    procedure EndGroupLoading;
 
     procedure AddProjectNotifier(const fileName : string);
     procedure RemoveProjectNotifier(const fileName : string);
@@ -246,8 +257,51 @@ begin
           FGroupProjects[i] := TPathUtils.CompressRelativePath(projectRoot, FGroupProjects[i])
       end;
     end;
+    //only what will be opened, and said so - a project the group lists that isn't there never opens, nor does the
+    //IDE tell us about anything but a .dproj, and either would leave the load waiting for it forever.
+    for i := FGroupProjects.Count - 1 downto 0 do
+    begin
+      if (not SameText(ExtractFileExt(FGroupProjects[i]), '.dproj')) or (not FileExists(FGroupProjects[i])) then
+        FGroupProjects.Delete(i);
+    end;
     result := true;
   end;
+end;
+
+function TDPMIDENotifier.IsGroupProject(const fileName : string) : boolean;
+var
+  i : integer;
+begin
+  result := false;
+  for i := 0 to FGroupProjects.Count - 1 do
+  begin
+    if SameText(FGroupProjects[i], fileName) then
+      exit(true);
+  end;
+end;
+
+function TDPMIDENotifier.RemoveGroupProject(const fileName : string) : boolean;
+var
+  i : integer;
+begin
+  result := false;
+  for i := FGroupProjects.Count - 1 downto 0 do
+  begin
+    if SameText(FGroupProjects[i], fileName) then
+    begin
+      FGroupProjects.Delete(i);
+      result := true;
+    end;
+  end;
+end;
+
+procedure TDPMIDENotifier.EndGroupLoading;
+begin
+  if not FLoadingGroup then
+    exit;
+  FLoadingGroup := false;
+  FGroupProjects.Clear;
+  FProjectController.EndLoading(TProjectMode.pmGroup);
 end;
 
 procedure TDPMIDENotifier.FileNotification(NotifyCode : TOTAFileNotification; const FileName : string; var Cancel : Boolean);
@@ -278,6 +332,10 @@ begin
         }
         if ext = '.groupproj' then
         begin
+          //another group, while the last one still hadn't finished - it has now. The same one again is the IDE
+          //saying so twice.
+          if FLoadingGroup and (not SameText(FileName, FGroupFile)) then
+            EndGroupLoading;
           if not FLoadingGroup then
           begin
             //if the groupproj doesn't exist, it's a placeholder and we are about to load a single project
@@ -289,6 +347,7 @@ begin
             end;
             //the group file exists, so we are definitely loading a group
             FLoadingGroup := true;
+            FGroupFile := FileName;
 
             //need this to determine when we are done loading the project group.
             if not LoadProjectGroup(FileName) then
@@ -298,11 +357,20 @@ begin
               exit;
             end;
             FProjectController.BeginLoading(TProjectMode.pmGroup);
+            //none of its projects are there to open.
+            if FGroupProjects.Count = 0 then
+              EndGroupLoading;
           end;
           exit;
         end
-        else if not FLoadingGroup then //we are loading a single project that is not part of a project group.
-          FProjectController.BeginLoading(TProjectMode.pmSingle);
+        else
+        begin
+          //a project that isn't the group's - the group load is over, whatever is still on the list never opened.
+          if FLoadingGroup and (not IsGroupProject(FileName)) then
+            EndGroupLoading;
+          if not FLoadingGroup then //we are loading a single project that is not part of a project group.
+            FProjectController.BeginLoading(TProjectMode.pmSingle);
+        end;
         {$ELSE}
         //10.4 adds ofnBeginProjectGroupOpen, ofnEndProjectGroupOpen, ofnBeginProjectGroupClose, ofnEndProjectGroupClose
         //so we will use those for the project group.
@@ -325,12 +393,9 @@ begin
         {$IF CompilerVersion < 34.0}
         if FLoadingGroup then
         begin
-          FGroupProjects.Remove(FileName);
+          RemoveGroupProject(FileName);
           if FGroupProjects.Count = 0 then
-          begin
-            FLoadingGroup := false;
-            FProjectController.EndLoading(TProjectMode.pmGroup);
-          end;
+            EndGroupLoading;
         end
         else
           FProjectController.EndLoading(TProjectMode.pmSingle);
@@ -348,7 +413,14 @@ begin
         if (ext = '.dproj') then
           FProjectController.ProjectClosed(FileName)
         else
+        begin
+          {$IF CompilerVersion < 34.0}
+          //closed before it finished loading - there is nothing left to wait for.
+          FLoadingGroup := false;
+          FGroupProjects.Clear;
+          {$IFEND}
           FProjectController.ProjectGroupClosed;
+        end;
         RemoveProjectNotifier(FileName);
       end;
 

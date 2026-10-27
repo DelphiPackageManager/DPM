@@ -65,6 +65,7 @@ type
 implementation
 
 uses
+  DPM.Core.Utils.DateTime,
   System.SysUtils,
   VSoft.YAML,
   DPM.Console.RawIO,
@@ -368,7 +369,7 @@ begin
       sigObj.AddOrSetValue('untrustedRoot', sigInfo.UntrustedRoot);
     if sigInfo.EffectiveSigningTime > 0 then
       sigObj.AddOrSetValue('effectiveSigningTime',
-        FormatDateTime('yyyy-mm-dd"T"hh:nn:ss"Z"', sigInfo.EffectiveSigningTime));
+        TDPMDateTimeUtils.FormatIso8601Utc(sigInfo.EffectiveSigningTime));
     TJsonUtils.AddIfNotEmpty(sigObj, 'timestampAuthority', sigInfo.TimestampAuthority);
     if sigInfo.TimestampAuthorityUntrusted then
       sigObj.AddOrSetValue('timestampAuthorityUntrusted', true);

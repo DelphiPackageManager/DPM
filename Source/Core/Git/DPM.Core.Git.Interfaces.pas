@@ -59,6 +59,9 @@ type
     //git checkout <commitOrRef> in repoDir.
     function Checkout(const cancellationToken : ICancellationToken; const repoDir : string; const commitOrRef : string) : boolean;
 
+    //git config --get remote.origin.url in repoDir - the url repoDir is a clone of.
+    function GetRemoteUrl(const cancellationToken : ICancellationToken; const repoDir : string; out url : string) : boolean;
+
     //what the last command that failed said - the commands log nothing themselves, the caller decides
     //whether a failure is an error.
     function LastError : string;

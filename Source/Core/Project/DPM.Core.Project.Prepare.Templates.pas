@@ -79,7 +79,8 @@ uses
   System.Classes,
   System.SysUtils,
   System.StrUtils,
-  DPM.Core.Utils.Hash;
+  DPM.Core.Utils.Hash,
+  DPM.Core.Utils.Strings;
 
 //Pull in the dpk/dproj scaffold templates. Delphi compiles the .rc on demand via
 //brcc32, so rebuilding any binary that uses this unit embeds the latest template
@@ -202,7 +203,8 @@ begin
         formSuffix := ' {' + entry.FormName + '}'
       else
         formSuffix := '';
-      containsBlock := containsBlock + '  ' + unitName + ' in ''' + entry.Path + '''' + formSuffix + separator + #13#10;
+      //a ' in the path (O'Brien\src) is doubled in a dpk string.
+      containsBlock := containsBlock + '  ' + unitName + ' in ''' + StringReplace(entry.Path, '''', '''''', [rfReplaceAll]) + '''' + formSuffix + separator + #13#10;
     end;
     //trim trailing CRLF for cleaner output (template already adds the closing CRLF after).
     if (Length(containsBlock) >= 2) and (Copy(containsBlock, Length(containsBlock) - 1, 2) = #13#10) then
@@ -374,20 +376,21 @@ begin
   if requiredPackages <> nil then
     for i := 0 to requiredPackages.Count - 1 do
       if Trim(requiredPackages[i]) <> '' then
-        references := references + '        <DCCReference Include="' + requiredPackages[i] + '.dcp"/>'#13#10;
+        references := references + '        <DCCReference Include="' + TStringUtils.XmlEscape(requiredPackages[i]) + '.dcp"/>'#13#10;
 
   if sourceFiles <> nil then
     for i := 0 to sourceFiles.Count - 1 do
     begin
       //Form units expand to a non-self-closing DCCReference with a child <Form>
       //element so the IDE knows to bundle the matching .dfm at build time.
+      //paths are XML - an & in a folder name (R&D\src) would make the project unreadable.
       if sourceFiles[i].FormName <> '' then
         references := references +
-          '        <DCCReference Include="' + sourceFiles[i].Path + '">'#13#10 +
-          '            <Form>' + sourceFiles[i].FormName + '</Form>'#13#10 +
+          '        <DCCReference Include="' + TStringUtils.XmlEscape(sourceFiles[i].Path) + '">'#13#10 +
+          '            <Form>' + TStringUtils.XmlEscape(sourceFiles[i].FormName) + '</Form>'#13#10 +
           '        </DCCReference>'#13#10
       else
-        references := references + '        <DCCReference Include="' + sourceFiles[i].Path + '"/>'#13#10;
+        references := references + '        <DCCReference Include="' + TStringUtils.XmlEscape(sourceFiles[i].Path) + '"/>'#13#10;
     end;
 
   //defensive: never emit a dproj with zero <Platform> entries - that would prevent

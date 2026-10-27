@@ -79,6 +79,7 @@ type
     class var FDefault : TSignOptions;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TSignOptions read FDefault;
     function Validate(const logger : ILogger) : boolean; override;
 
@@ -128,6 +129,12 @@ begin
   FDefault.FFilePattern := '*.dpkg';
   FDefault.FRecursive := false;
   FDefault.FFailFast := false;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TSignOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 function TSignOptions.Validate(const logger : ILogger) : boolean;

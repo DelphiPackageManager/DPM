@@ -42,8 +42,6 @@ type
   private
     FSourcesManager : ISourcesManager;
     FGitClient : IGitClient;
-    //true if path is an existing folder laid out as a registry (folder-per-id <id>.dspec.yaml).
-    function LooksLikeRegistryFolder(const path : string) : boolean;
     //force-refresh the cached mirror for git registry sources (all, or the named one).
     function RefreshSources(const cancellationToken : ICancellationToken) : boolean;
   protected
@@ -59,14 +57,12 @@ implementation
 
 uses
   System.SysUtils,
-  System.IOUtils,
-  VSoft.Uri,
   DPM.Core.Types,
   DPM.Core.Constants,
-  DPM.Core.Utils.Path,
   DPM.Core.Options.Common,
   DPM.Core.Options.Sources,
   DPM.Core.Sources.Types,
+  DPM.Core.Sources.Manager,
   DPM.Core.Registry.Interfaces,
   DPM.Core.Registry.Catalog,
   DPM.Core.Diagnostics;
@@ -79,21 +75,6 @@ begin
   inherited Create(logger,configurationManager);
   FSourcesManager := sourcesManager;
   FGitClient := gitClient;
-end;
-
-function TSourcesCommand.LooksLikeRegistryFolder(const path : string) : boolean;
-var
-  subDir : string;
-begin
-  result := false;
-  if not TDirectory.Exists(path) then
-    exit;
-  //a registry folder has a sub-folder per package id, each containing a dspec file.
-  for subDir in TDirectory.GetDirectories(path) do
-  begin
-    if Length(TPathUtils.FindDspecFiles(subDir)) > 0 then
-      exit(true);
-  end;
 end;
 
 function TSourcesCommand.RefreshSources(const cancellationToken : ICancellationToken) : boolean;
@@ -144,8 +125,7 @@ function TSourcesCommand.Execute(const cancellationToken : ICancellationToken) :
 var
   success : boolean;
   newConfig : IConfiguration;
-  uri : IUri;
-  uriError : string;
+  sourceType : TSourceType;
 begin
   TSourcesOptions.Default.ApplyCommon(TCommonOptions.Default);
 
@@ -186,43 +166,13 @@ begin
         result := TExitCode.MissingArg;
         exit;
       end;
-      if (TSourcesOptions.Default.SourceType = TSourceType.GitRegistry) or
-         IsGitRegistryUri(TSourcesOptions.Default.Source) or
-         LooksLikeRegistryFolder(TSourcesOptions.Default.Source) then
+      sourceType := TSourcesOptions.Default.SourceType;
+      if not TSourcesManager.TryResolveSourceType(Logger, TSourcesOptions.Default.Source, sourceType) then
       begin
-        //git registry source - either a git url or a local registry folder.
-        //git handles the url/path, so we don't apply the file/http uri validation;
-        //a bad source surfaces a clear error on first use (clone/refresh).
-        TSourcesOptions.Default.SourceType := TSourceType.GitRegistry;
-      end
-      else
-      begin
-        if not TUriFactory.TryParseWithError(TSourcesOptions.Default.Source, false, uri, uriError) then
-        begin
-          Logger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + TSourcesOptions.Default.Source + '] is not a valid uri : ' + uriError);
-          result := TExitCode.InvalidArguments;
-          exit;
-        end;
-
-        //this logic is not quite all there.. more testing required.
-        if (uri.Scheme = 'file') and (TSourcesOptions.Default.SourceType <> TSourceType.Folder)  then
-        begin
-          Logger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + TSourcesOptions.Default.Source + '] is a file uri, which is only valid for a folder source.');
-          result := TExitCode.InvalidArguments;
-          exit;
-        end
-        else if uri.Scheme <> 'file' then
-        begin
-          if (uri.Scheme = 'http') or (uri.Scheme = 'https') then
-            TSourcesOptions.Default.SourceType := TSourceType.DPMServer
-          else
-          begin
-            Logger.Error(TErrorCode.E1002_InvalidSource, 'The source [' + TSourcesOptions.Default.Source + '] is not valid - [' + uri.Scheme + '] is not a supported scheme (file, http or https).');
-            result := TExitCode.InvalidArguments;
-            exit;
-          end;
-        end;
+        result := TExitCode.InvalidArguments;
+        exit;
       end;
+      TSourcesOptions.Default.SourceType := sourceType;
 
       success := FSourcesManager.AddSource(TSourcesOptions.Default);
     end;

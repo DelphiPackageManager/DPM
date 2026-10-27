@@ -41,7 +41,6 @@ type
   TConsoleTrustPromptStrategy = class(TInterfacedObject, ITrustPromptStrategy)
   private
     FLogger : ILogger;
-    function StdinIsTty : boolean;
     function AskUser(out decision : TTrustPromptDecision) : boolean;
   protected
     function PromptAuthorDowngrade(const context : TTrustPromptContext;
@@ -56,6 +55,7 @@ implementation
 
 uses
   WinApi.Windows,
+  DPM.Console.Prompts,
   System.SysUtils;
 
 constructor TConsoleTrustPromptStrategy.Create(const logger : ILogger);
@@ -64,28 +64,14 @@ begin
   FLogger := logger;
 end;
 
-function TConsoleTrustPromptStrategy.StdinIsTty : boolean;
-var
-  handle : THandle;
-  mode : DWORD;
-begin
-  handle := GetStdHandle(STD_INPUT_HANDLE);
-  if (handle = INVALID_HANDLE_VALUE) or (handle = 0) then
-  begin
-    result := false;
-    exit;
-  end;
-  // GetConsoleMode succeeds only when the handle is a real console — pipes
-  // and redirected files return false.
-  result := GetConsoleMode(handle, mode);
-end;
-
 function TConsoleTrustPromptStrategy.AskUser(out decision : TTrustPromptDecision) : boolean;
 var
   line : string;
   ch : Char;
+  cancelled : boolean;
 begin
-  if not StdinIsTty then
+  //the same test every prompt uses - a console in and out, and not --non-interactive.
+  if not PromptsAreInteractive then
   begin
     //the install is blocked, and the cache says so.
     FLogger.Information('  This is not an interactive session, so the install is blocked. Set ' +
@@ -95,9 +81,10 @@ begin
     exit;
   end;
 
-  Write('  [o]verride and install, [c]ancel install, [a]lways block? (c) ');
-  ReadLn(line);
-  line := Trim(line);
+  //not the RTL's ReadLn - it can't be cancelled (Ctrl+C), and its Write goes out in the ANSI code page.
+  line := Trim(PromptLine('  [o]verride and install, [c]ancel install, [a]lways block?', 'c', cancelled));
+  if cancelled then
+    line := 'c';
   if line = '' then
     ch := 'c'
   else

@@ -702,8 +702,9 @@ var
 begin
   result := '';
   idx := FVariables.IndexOfName(name);
+  //the value - the list holds NAME=value.
   if idx <> -1 then
-    result := FVariables.Strings[idx];
+    result := FVariables.ValueFromIndex[idx];
 end;
 
 procedure TEnvBlock.LoadCurrentEnvironmentBlock;

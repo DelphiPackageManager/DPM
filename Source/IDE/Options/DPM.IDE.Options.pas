@@ -214,7 +214,7 @@ end;
 
 function TDPMIDEOptions.LoadFromFile(const fileName: string): Boolean;
 var
-  jsonObj : TJsonObject;
+  parsed : TJsonBaseObject;
   sFileName : string;
 begin
   if fileName <> '' then
@@ -227,16 +227,19 @@ begin
 
 
   try
-    jsonObj := TJsonObject.ParseFromFile(sFileName) as TJsonObject;
+    //a root that isn't an object is freed, not leaked by a failed cast.
+    parsed := TJsonBaseObject.ParseFromFile(sFileName);
     try
-      Result := LoadFromJson(jsonObj);
+      if not (parsed is TJsonObject) then
+        raise EJsonException.Create('it is not a json object');
+      Result := LoadFromJson(TJsonObject(parsed));
       FFileName := sFileName;
     finally
-      jsonObj.Free;
+      parsed.Free;
     end;
   except
     on e : Exception do
-      raise Exception.Create('Exception while loading config file [' + fileName + ']' + #13#10 + e.Message);
+      raise Exception.Create('Exception while loading config file [' + sFileName + ']' + #13#10 + e.Message);
   end;
 end;
 

@@ -63,6 +63,7 @@ uses
   DPM.Console.Types,
   DPM.Console.Options,
   DPM.Console.Writer,
+  DPM.Console.RawIO,
   DPM.Console.Banner,
   DPM.Console.Command,
   DPM.Console.Prompts,
@@ -120,8 +121,8 @@ begin
   except
     on e : Exception do
     begin
-      //we don't have a logger or console here so using system.writeln is ok.
-      System.Writeln(FormatError(TErrorCode.E0001_UnexpectedException, 'Exception while initializing : ' + e.Message));
+      //no logger or console yet - straight to stderr, so stdout (json, the mcp stream) carries nothing it shouldn't.
+      TStdErr.WriteLine(FormatError(TErrorCode.E0001_UnexpectedException, 'Exception while initializing : ' + e.Message));
       result := TExitCode.InitException;
     end;
   end;
@@ -204,6 +205,10 @@ begin
     guard := TOperationGuard.Start(FLogger, true);
     result := commandHandler.ExecuteCommand(FCancellationTokenSource.Token);
     guard.Finish(result = TExitCode.OK, FCancellationTokenSource.Token.IsCancelled, 'dpm ' + CommandString[command]);
+    //Cancelled (said above, W0004) is not a success, whatever the command returned when it broke off - a batch
+    //(sign, scan) stopped part way by Ctrl+C exited 0.
+    if (result = TExitCode.OK) and FCancellationTokenSource.Token.IsCancelled then
+      result := TExitCode.Error;
     if error then //an error occured earlier so ignore command result.
       result := TExitCode.InvalidArguments;
   finally

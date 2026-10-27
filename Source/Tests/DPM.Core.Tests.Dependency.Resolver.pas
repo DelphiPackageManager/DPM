@@ -221,6 +221,43 @@ type
 
     [Test]
     procedure Operation_Project_Out_Of_Scope_Still_Blocks;
+
+    //The search (T1-T15) : a solution that exists is found, nothing is left behind by a branch that was given up,
+    //only a conflict no choice can avoid is reported, and the output is the same every time.
+    [Test]
+    procedure T01_Exhausted_Dependency_Backtracks_To_An_Older_Parent;
+    [Test]
+    procedure T02_Preferred_Version_With_Failing_Dependencies_Falls_Back;
+    [Test]
+    procedure T03_Exact_Pin_Family_Finds_The_Versions_That_Fit;
+    [Test]
+    procedure T04_Narrow_Range_Lookup_Does_Not_Hide_Other_Versions;
+    [Test]
+    procedure T05_Cache_Versions_Exhausted_Falls_Back_To_The_Repository;
+    [Test]
+    procedure T06_Version_Rejected_For_One_Requester_Is_Still_Tried_Later;
+    [Test]
+    procedure T07_Narrowing_Does_Not_Follow_A_Requester_To_Another_Version;
+    [Test]
+    procedure T08_Backtracking_Leaves_No_Orphans;
+    [Test]
+    procedure T09_Backtracking_Undoes_Cross_Project_Imports;
+    [Test]
+    procedure T10_Conflict_In_An_Abandoned_Branch_Is_Not_Reported;
+    [Test]
+    procedure T11_Bundled_Dependency_Imported_From_A_Sibling_Is_Not_A_Top_Level;
+    [Test]
+    procedure T12_Dependency_Cycle_Is_Reported_Once_And_Quickly;
+    [Test]
+    procedure T13_Cancellation_Stops_Without_Errors;
+    [Test]
+    procedure T14_Layered_Diamonds_Resolve_In_Linear_Steps;
+    [Test]
+    procedure T15_Output_Is_Topological_And_Manifests_Are_Not_Reordered;
+    [Test]
+    procedure T16_Unavoidable_Conflict_Is_Reported_Once;
+    [Test]
+    procedure T17_Transient_The_New_Version_Drops_Is_Not_Output;
   end;
 
 implementation
@@ -229,6 +266,7 @@ uses
   System.TypInfo,
   VSoft.CancellationToken.Impl,
   DPM.Core.Constants,
+  DPM.Core.Diagnostics,
   DPM.Core.Package.Classes,
   DPM.Core.Package.Dependency,
   DPM.Core.Dependency.Reference,
@@ -2138,6 +2176,512 @@ begin
   finally
     FContextIntf.EndOperation;
   end;
+end;
+
+//-----------------------------------------------------------------------------
+// The search (T1-T15)
+//-----------------------------------------------------------------------------
+
+function LogText(const logger : ILogger) : string;
+begin
+  result := (logger as TTestLogger).Messages.Text;
+end;
+
+//the version resolved for id, '' when it wasn't.
+function VersionOf(const resolved : IList<IPackageInfo>; const id : string) : string;
+var
+  info : IPackageInfo;
+begin
+  result := '';
+  if resolved = nil then
+    exit;
+  for info in resolved do
+    if SameText(info.Id, id) then
+      exit(info.Version.ToStringNoMeta);
+end;
+
+//every transitive edge is satisfied by the version below it, and an id has one version.
+procedure AssertGraphConsistent(const graph : IPackageReference);
+var
+  versions : IDictionary<string, string>;
+begin
+  Assert.IsNotNull(graph, 'no graph');
+  versions := TCollections.CreateDictionary<string, string>;
+  graph.VisitDFS(
+    procedure(const node : IPackageReference)
+    var
+      seen : string;
+    begin
+      if (node.Parent <> nil) and (not node.Parent.IsRoot) then
+        Assert.IsTrue(node.VersionRange.IsSatisfiedBy(node.Version),
+          node.Parent.Id + '-' + node.Parent.Version.ToStringNoMeta + ' requires ' + node.Id + ' ' + node.VersionRange.ToString +
+          ' but the graph has ' + node.Version.ToStringNoMeta);
+      if versions.TryGetValue(LowerCase(node.Id), seen) then
+        Assert.AreEqual(seen, node.Version.ToStringNoMeta, node.Id + ' appears at two versions')
+      else
+        versions[LowerCase(node.Id)] := node.Version.ToStringNoMeta;
+    end);
+end;
+
+procedure TDependencyResolverTests.T01_Exhausted_Dependency_Backtracks_To_An_Older_Parent;
+var
+  root : IPackageInfo;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // Every B needs a C 2.0.x nobody has, so A 1.0.2 - the A that needs B - can't be used. That is A 1.0.2's
+  // failure, not the install's : A 1.0.1 works.
+  root := MakeInfo('Root', '1.0.0', [MakeDep('A', '[1.0.0,1.0.9]')]);
+  FRepo.SetVersions('A', ListOf([MakeInfo('A', '1.0.2', [MakeDep('B', '[1.0.0,1.0.9]')]),
+                                 MakeInfo('A', '1.0.1', [MakeDep('C', '[1.0.0,1.0.9]')])]));
+  FRepo.SetVersions('B', ListOf([MakeInfo('B', '1.0.1', [MakeDep('C', '[2.0.0,2.0.9]')]),
+                                 MakeInfo('B', '1.0.0', [MakeDep('C', '[2.0.0,2.0.9]')])]));
+  FRepo.SetVersions('C', ListOf([MakeInfo('C', '1.0.0', [])]));
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, root, TCollections.CreateList<IPackageReference>, graph, resolved);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual(0, FLogger.ErrorCount, LogText(FLogger));
+  Assert.AreEqual('1.0.1', VersionOf(resolved, 'A'));
+  Assert.AreEqual('1.0.0', VersionOf(resolved, 'C'));
+  Assert.AreEqual('', VersionOf(resolved, 'B'), 'only the A that was given up needs B');
+  AssertGraphConsistent(graph);
+end;
+
+procedure TDependencyResolverTests.T02_Preferred_Version_With_Failing_Dependencies_Falls_Back;
+var
+  c02, c05, root : IPackageInfo;
+  preferred : IDictionary<string, TPackageVersion>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // The project's graph records C 1.0.2, which needs a D nobody has. Preferring the recorded version must not
+  // mean failing with it - another C in range works.
+  c02 := MakeInfo('C', '1.0.2', [MakeDep('D', '[9.0.0,9.0.9]')]);
+  c05 := MakeInfo('C', '1.0.5', []);
+  root := MakeInfo('Root', '1.0.0', [MakeDep('C', '[1.0.0,1.0.9]')]);
+  FCache.SetCachedVersions('C', ListOf([c05, c02]));
+  FRepo.SetVersions('C', ListOf([c05, c02]));
+  preferred := TCollections.CreateDictionary<string, TPackageVersion>;
+  preferred['c'] := c02.Version;
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, root, TCollections.CreateList<IPackageReference>,
+                                    graph, resolved, nil, preferred);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual(0, FLogger.ErrorCount, LogText(FLogger));
+  Assert.AreEqual('1.0.5', VersionOf(resolved, 'C'));
+end;
+
+procedure TDependencyResolverTests.T03_Exact_Pin_Family_Finds_The_Versions_That_Fit;
+var
+  app : IPackageInfo;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // Spring4D style : Core and Ext pin Base exactly, so they only fit at the same version. The newest Core
+  // (1.0.3) has no Ext to go with it - 1.0.1 of all three does.
+  app := MakeInfo('App', '1.0.0', [MakeDep('Core', '[1.0.0,1.0.9]'), MakeDep('Ext', '[1.0.0,1.0.9]')]);
+  FRepo.SetVersions('Core', ListOf([MakeInfo('Core', '1.0.3', [MakeDep('Base', '1.0.3')]), MakeInfo('Core', '1.0.1', [MakeDep('Base', '1.0.1')])]));
+  FRepo.SetVersions('Ext', ListOf([MakeInfo('Ext', '1.0.1', [MakeDep('Base', '1.0.1')])]));
+  FRepo.SetVersions('Base', ListOf([MakeInfo('Base', '1.0.3', []), MakeInfo('Base', '1.0.1', [])]));
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, app, TCollections.CreateList<IPackageReference>, graph, resolved);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual(0, FLogger.ErrorCount, LogText(FLogger));
+  Assert.AreEqual('1.0.1', VersionOf(resolved, 'Core'));
+  Assert.AreEqual('1.0.1', VersionOf(resolved, 'Ext'));
+  Assert.AreEqual('1.0.1', VersionOf(resolved, 'Base'));
+  AssertGraphConsistent(graph);
+end;
+
+procedure TDependencyResolverTests.T04_Narrow_Range_Lookup_Does_Not_Hide_Other_Versions;
+var
+  app : IPackageInfo;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // X is first looked up for P 1.0.1's exact 1.0.1, which Q rules out. Once P drops to 1.0.0, X 1.0.5 is
+  // needed - the earlier lookup for the narrow range must not stand in for this one.
+  app := MakeInfo('App', '1.0.0', [MakeDep('P', '[1.0.0,1.0.9]'), MakeDep('Q', '[1.0.0,1.0.9]')]);
+  FRepo.SetVersions('P', ListOf([MakeInfo('P', '1.0.1', [MakeDep('X', '1.0.1')]), MakeInfo('P', '1.0.0', [MakeDep('X', '[1.0.0,1.0.9]')])]));
+  FRepo.SetVersions('Q', ListOf([MakeInfo('Q', '1.0.0', [MakeDep('X', '[1.0.2,1.0.9]')])]));
+  FRepo.SetVersions('X', ListOf([MakeInfo('X', '1.0.5', []), MakeInfo('X', '1.0.1', [])]));
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, app, TCollections.CreateList<IPackageReference>, graph, resolved);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual(0, FLogger.ErrorCount, LogText(FLogger));
+  Assert.AreEqual('1.0.0', VersionOf(resolved, 'P'));
+  Assert.AreEqual('1.0.5', VersionOf(resolved, 'X'));
+  AssertGraphConsistent(graph);
+end;
+
+procedure TDependencyResolverTests.T05_Cache_Versions_Exhausted_Falls_Back_To_The_Repository;
+var
+  root : IPackageInfo;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // The cache only has C 1.0.2, which can't be used (no D). The repository has C 1.0.1 as well.
+  root := MakeInfo('Root', '1.0.0', [MakeDep('C', '[1.0.0,1.0.9]')]);
+  FCache.SetCachedVersions('C', ListOf([MakeInfo('C', '1.0.2', [MakeDep('D', '[9.0.0,9.0.9]')])]));
+  FRepo.SetVersions('C', ListOf([MakeInfo('C', '1.0.2', [MakeDep('D', '[9.0.0,9.0.9]')]), MakeInfo('C', '1.0.1', [])]));
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, root, TCollections.CreateList<IPackageReference>, graph, resolved);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual(0, FLogger.ErrorCount, LogText(FLogger));
+  Assert.AreEqual('1.0.1', VersionOf(resolved, 'C'));
+  Assert.AreEqual(1, FRepo.GetCallCount('C'), 'the repository is asked once, when the cache''s versions are used up');
+end;
+
+procedure TDependencyResolverTests.T06_Version_Rejected_For_One_Requester_Is_Still_Tried_Later;
+var
+  app : IPackageInfo;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // A only works at 1.0.2 (X 2.0.0). B 1.0.1 wants X 1.0.0, which rules out X 2.0.0 - but only while B is at
+  // 1.0.1. B 1.0.0 wants X 2.0.0 too, so X 2.0.0 is the answer once B moves.
+  app := MakeInfo('App', '1.0.0', [MakeDep('A', '[1.0.0,1.0.9]'), MakeDep('B', '[1.0.0,1.0.9]')]);
+  FRepo.SetVersions('A', ListOf([MakeInfo('A', '1.0.2', [MakeDep('X', '2.0.0')]), MakeInfo('A', '1.0.1', [MakeDep('Y', '[9.0.0,9.0.9]')])]));
+  FRepo.SetVersions('B', ListOf([MakeInfo('B', '1.0.1', [MakeDep('X', '1.0.0')]), MakeInfo('B', '1.0.0', [MakeDep('X', '2.0.0')])]));
+  FRepo.SetVersions('X', ListOf([MakeInfo('X', '2.0.0', []), MakeInfo('X', '1.0.0', [])]));
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, app, TCollections.CreateList<IPackageReference>, graph, resolved);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual(0, FLogger.ErrorCount, LogText(FLogger));
+  Assert.AreEqual('1.0.2', VersionOf(resolved, 'A'));
+  Assert.AreEqual('1.0.0', VersionOf(resolved, 'B'));
+  Assert.AreEqual('2.0.0', VersionOf(resolved, 'X'));
+  AssertGraphConsistent(graph);
+end;
+
+procedure TDependencyResolverTests.T07_Narrowing_Does_Not_Follow_A_Requester_To_Another_Version;
+var
+  app : IPackageInfo;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // Q 1.0.2 holds D to [1.0.0,1.0.3], then fails (no M). Q 1.0.1 wants D [1.0.6,1.0.9] - what Q 1.0.2 asked for
+  // must go with it.
+  app := MakeInfo('App', '1.0.0', [MakeDep('P', '[1.0.0,1.0.9]'), MakeDep('Q', '[1.0.0,1.0.9]')]);
+  FRepo.SetVersions('P', ListOf([MakeInfo('P', '1.0.0', [MakeDep('D', '[1.0.0,1.0.9]')])]));
+  FRepo.SetVersions('Q', ListOf([MakeInfo('Q', '1.0.2', [MakeDep('D', '[1.0.0,1.0.3]'), MakeDep('M', '[1.0.0,1.0.99]')]),
+                                 MakeInfo('Q', '1.0.1', [MakeDep('D', '[1.0.6,1.0.9]')])]));
+  FRepo.SetVersions('D', ListOf([MakeInfo('D', '1.0.9', []), MakeInfo('D', '1.0.7', []), MakeInfo('D', '1.0.3', [])]));
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, app, TCollections.CreateList<IPackageReference>, graph, resolved);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual(0, FLogger.ErrorCount, LogText(FLogger));
+  Assert.AreEqual('1.0.1', VersionOf(resolved, 'Q'));
+  Assert.AreEqual('1.0.9', VersionOf(resolved, 'D'));
+  AssertGraphConsistent(graph);
+end;
+
+procedure TDependencyResolverTests.T08_Backtracking_Leaves_No_Orphans;
+var
+  app : IPackageInfo;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // A 1.0.2 gets as far as choosing C before it fails (no B). A 1.0.1 doesn't use C - so nothing may install it.
+  app := MakeInfo('App', '1.0.0', [MakeDep('A', '[1.0.0,1.0.9]')]);
+  FRepo.SetVersions('A', ListOf([MakeInfo('A', '1.0.2', [MakeDep('C', '[1.0.0,1.0.9]'), MakeDep('B', '[9.0.0,9.0.99]')]),
+                                 MakeInfo('A', '1.0.1', [])]));
+  FRepo.SetVersions('C', ListOf([MakeInfo('C', '1.0.0', [])]));
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, app, TCollections.CreateList<IPackageReference>, graph, resolved);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual('1.0.1', VersionOf(resolved, 'A'));
+  Assert.AreEqual('', VersionOf(resolved, 'C'), 'C was only needed by the A that was given up');
+  Assert.IsNull(graph.FindFirstChild('C'));
+  Assert.AreEqual(2, resolved.Count, 'App and A');
+end;
+
+procedure TDependencyResolverTests.T09_Backtracking_Undoes_Cross_Project_Imports;
+const
+  cSibling = 'C:\test\sibling.dproj';
+var
+  app : IPackageInfo;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // A 1.0.2 adopts the sibling's S (and S's T) before it fails. A 1.0.1 uses neither.
+  FContext.SeedResolutions(cSibling, [TResolvedPackage.Create(MakeInfo('S', '1.0.0', [MakeDep('T', '[1.0.0,1.0.9]')]), MakeRange('1.0.0'), cRootNode, cSibling),
+                                      TResolvedPackage.Create(MakeInfo('T', '1.0.0', []), MakeRange('[1.0.0,1.0.9]'), 'S', cSibling)]);
+  app := MakeInfo('App', '1.0.0', [MakeDep('A', '[1.0.0,1.0.9]')]);
+  FRepo.SetVersions('A', ListOf([MakeInfo('A', '1.0.2', [MakeDep('S', '[1.0.0,1.0.9]'), MakeDep('B', '[9.0.0,9.0.99]')]),
+                                 MakeInfo('A', '1.0.1', [])]));
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, app, TCollections.CreateList<IPackageReference>, graph, resolved);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual('1.0.1', VersionOf(resolved, 'A'));
+  Assert.AreEqual('', VersionOf(resolved, 'S'), 'S was only adopted for the A that was given up');
+  Assert.AreEqual('', VersionOf(resolved, 'T'), 'nor T');
+end;
+
+procedure TDependencyResolverTests.T10_Conflict_In_An_Abandoned_Branch_Is_Not_Reported;
+var
+  app : IPackageInfo;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // The project references T 1.0.0 directly. A 1.0.2 wants T 2.0.x - a conflict with the top level, but only
+  // for A 1.0.2. A 1.0.1 is fine with T 1.0.0, so there is nothing to report.
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(MakeTopLevelRef(MakeInfo('T', '1.0.0', []), MakeRange('1.0.0')));
+  app := MakeInfo('App', '1.0.0', [MakeDep('A', '[1.0.0,1.0.9]')]);
+  FRepo.SetVersions('A', ListOf([MakeInfo('A', '1.0.2', [MakeDep('T', '[2.0.0,2.0.9]')]), MakeInfo('A', '1.0.1', [MakeDep('T', '[1.0.0,1.0.9]')])]));
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, app, projectRefs, graph, resolved);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual(0, FLogger.ErrorCount, 'the conflict belonged to a version that was given up : ' + LogText(FLogger));
+  Assert.AreEqual('1.0.1', VersionOf(resolved, 'A'));
+end;
+
+procedure TDependencyResolverTests.T11_Bundled_Dependency_Imported_From_A_Sibling_Is_Not_A_Top_Level;
+const
+  cSibling = 'C:\test\sibling.dproj';
+var
+  a : IPackageInfo;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  aNode : IPackageReference;
+begin
+  // A's bundled Indy is satisfied by the sibling's real Indy - adopted for A, so it belongs under A. It is
+  // not a package this project references directly.
+  FContext.SeedResolutions(cSibling, [TResolvedPackage.Create(MakeInfo('Indy', '10.6.2', []), MakeRange('10.6.2'), cRootNode, cSibling)]);
+  a := MakeInfo('A', '1.0.0', [MakeBundledDep('Indy')]);
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, a, TCollections.CreateList<IPackageReference>, graph, resolved);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual('10.6.2', VersionOf(resolved, 'Indy'));
+  Assert.IsNull(graph.FindTopLevelChild('Indy'), 'the adopted Indy is not a top level');
+  aNode := graph.FindTopLevelChild('A');
+  Assert.IsNotNull(aNode);
+  Assert.IsNotNull(aNode.FindFirstChild('Indy'), 'the adopted Indy belongs under A');
+end;
+
+procedure TDependencyResolverTests.T12_Dependency_Cycle_Is_Reported_Once_And_Quickly;
+var
+  a : IPackageInfo;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  a := MakeInfo('A', '1.0.0', [MakeDep('B', '[1.0.0,1.0.9]')]);
+  FRepo.SetVersions('B', ListOf([MakeInfo('B', '1.0.0', [MakeDep('A', '[1.0.0,1.0.9]')])]));
+  FRepo.SetVersions('A', ListOf([a]));
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, a, TCollections.CreateList<IPackageReference>, graph, resolved);
+
+  Assert.IsFalse(ok);
+  Assert.AreEqual(1, FLogger.ErrorCount, LogText(FLogger));
+  Assert.IsTrue((FLogger as TTestLogger).HasError(TErrorCode.E2013_DependencyCycle), LogText(FLogger));
+  Assert.IsTrue(TDependencyResolver.LastStepCount < 100, 'a cycle is found, not run into the step limit : ' + IntToStr(TDependencyResolver.LastStepCount));
+end;
+
+procedure TDependencyResolverTests.T13_Cancellation_Stops_Without_Errors;
+var
+  app : IPackageInfo;
+  source : ICancellationTokenSource;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // Ctrl+C while B's versions are looked up - the lookup finds nothing, which is not a missing dependency.
+  // Whoever owns the token says it was cancelled; the resolver says nothing.
+  source := TCancellationTokenSourceFactory.Create;
+  app := MakeInfo('App', '1.0.0', [MakeDep('A', '[1.0.0,1.0.9]'), MakeDep('B', '[1.0.0,1.0.9]'), MakeDep('C', '[1.0.0,1.0.9]')]);
+  FRepo.SetVersions('A', ListOf([MakeInfo('A', '1.0.0', [])]));
+  FRepo.SetVersions('B', ListOf([MakeInfo('B', '1.0.0', [])]));
+  FRepo.SetVersions('C', ListOf([MakeInfo('C', '1.0.0', [])]));
+  FRepo.CancelOnCallFor('B', source);
+
+  ok := FResolver.ResolveForInstall(source.Token, cTestCompiler, cTestProject, FOptions, app, TCollections.CreateList<IPackageReference>, graph, resolved);
+
+  Assert.IsFalse(ok);
+  Assert.AreEqual(0, FLogger.ErrorCount, LogText(FLogger));
+  Assert.AreEqual(0, FRepo.GetCallCount('C'), 'the search stops when it is cancelled');
+end;
+
+procedure TDependencyResolverTests.T14_Layered_Diamonds_Resolve_In_Linear_Steps;
+const
+  cLayers = 8;
+  cNames : array[0..1] of string = ('A', 'B');
+var
+  layer : integer;
+  name : string;
+  version : integer;
+  versions : IList<IPackageInfo>;
+  root : IPackageInfo;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+  range : string;
+  expected : string;
+begin
+  // Each layer's A asks for the next layer's A and B in [1.0.0,1.0.9], its B for [1.0.0,1.0.5] - so below the
+  // top every package ends up at 1.0.5, and every package is needed by two others.
+  for layer := 1 to cLayers do
+    for name in cNames do
+    begin
+      if name = 'A' then
+        range := '[1.0.0,1.0.9]'
+      else
+        range := '[1.0.0,1.0.5]';
+      versions := TCollections.CreateList<IPackageInfo>;
+      for version := 9 downto 0 do
+      begin
+        if layer < cLayers then
+          versions.Add(MakeInfo(name + IntToStr(layer), '1.0.' + IntToStr(version), [MakeDep('A' + IntToStr(layer + 1), range), MakeDep('B' + IntToStr(layer + 1), range)]))
+        else
+          versions.Add(MakeInfo(name + IntToStr(layer), '1.0.' + IntToStr(version), []));
+      end;
+      FRepo.SetVersions(name + IntToStr(layer), versions);
+    end;
+  root := MakeInfo('Root', '1.0.0', [MakeDep('A1', '[1.0.0,1.0.9]'), MakeDep('B1', '[1.0.0,1.0.9]')]);
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, root, TCollections.CreateList<IPackageReference>, graph, resolved);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual(0, FLogger.ErrorCount, LogText(FLogger));
+  for layer := 1 to cLayers do
+    for name in cNames do
+    begin
+      if layer = 1 then
+        expected := '1.0.9'
+      else
+        expected := '1.0.5';
+      Assert.AreEqual(expected, VersionOf(resolved, name + IntToStr(layer)), name + IntToStr(layer));
+    end;
+  AssertGraphConsistent(graph);
+  //30 requirements between 17 packages.
+  Assert.IsTrue(TDependencyResolver.LastStepCount <= 200, 'took ' + IntToStr(TDependencyResolver.LastStepCount) + ' steps');
+end;
+
+procedure TDependencyResolverTests.T15_Output_Is_Topological_And_Manifests_Are_Not_Reordered;
+var
+  infos : IList<IPackageInfo>;
+  app : IPackageInfo;
+  firstOrder : string;
+  secondOrder : string;
+
+  function ResolveOrder : string;
+  var
+    context : IPackageInstallerContext;
+    resolver : IDependencyResolver;
+    resolved : IList<IPackageInfo>;
+    graph : IPackageReference;
+    seen : ISet<string>;
+    info : IPackageInfo;
+    dependency : IPackageDependency;
+  begin
+    context := TFakeInstallerContext.Create(FLogger);
+    resolver := TDependencyResolver.Create(FLogger, FRepoIntf, FCacheIntf, context);
+    resolver.Initialize(FConfig);
+    Assert.IsTrue(resolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, app, TCollections.CreateList<IPackageReference>, graph, resolved),
+                  LogText(FLogger));
+    result := '';
+    seen := TCollections.CreateSet<string>;
+    for info in resolved do
+    begin
+      for dependency in info.Dependencies do
+        Assert.IsTrue(seen.Contains(LowerCase(dependency.Id)), info.Id + ' comes before its dependency ' + dependency.Id);
+      seen.Add(LowerCase(info.Id));
+      result := result + info.Id + ' ';
+    end;
+  end;
+
+begin
+  // Z is listed before Y in App's manifest, though Y's range is the narrower one.
+  infos := ListOf([MakeInfo('X', '1.0.0', [])]);
+  FRepo.SetVersions('X', infos);
+  FRepo.SetVersions('Z', ListOf([MakeInfo('Z', '1.0.0', [MakeDep('X', '[1.0.0,1.0.9]')])]));
+  FRepo.SetVersions('Y', ListOf([MakeInfo('Y', '1.0.0', [MakeDep('X', '[1.0.0,1.0.9]')])]));
+  app := MakeInfo('App', '1.0.0', [MakeDep('Z', '[1.0.0,1.0.99]'), MakeDep('Y', '1.0.0')]);
+
+  firstOrder := ResolveOrder;
+  Assert.AreEqual('Z', app.Dependencies[0].Id, 'the manifest''s dependencies must keep their order');
+  secondOrder := ResolveOrder;
+  Assert.AreEqual(firstOrder, secondOrder, 'the same input resolves in the same order');
+end;
+
+procedure TDependencyResolverTests.T16_Unavoidable_Conflict_Is_Reported_Once;
+var
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // Core 1.0.3 and Ext 1.0.1 are both being installed, and pin different Bases - one problem, found from Core's
+  // requirement and again from Ext's.
+  FRepo.SetVersions('Base', ListOf([MakeInfo('Base', '1.0.3', []), MakeInfo('Base', '1.0.1', [])]));
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, FamilyNewPackages('1.0.3', '1.0.1'),
+                                    TCollections.CreateList<IPackageReference>, graph, resolved, nil, nil, nil);
+
+  Assert.IsFalse(ok);
+  Assert.AreEqual(1, FLogger.ErrorCount, LogText(FLogger));
+  Assert.IsTrue((FLogger as TTestLogger).HasError(TErrorCode.E2005_SelectedVersionConflict), LogText(FLogger));
+  Assert.IsTrue((FLogger as TTestLogger).Logged('error', 'Ext-1.0.1 requires 1.0.1'), 'the error names both requirements : ' + LogText(FLogger));
+end;
+
+procedure TDependencyResolverTests.T17_Transient_The_New_Version_Drops_Is_Not_Output;
+var
+  a100 : IPackageInfo;
+  a101 : IPackageInfo;
+  x : IPackageInfo;
+  root : IPackageReference;
+  aRef : IPackageReference;
+  xRef : IPackageReference;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // The project has A 1.0.0 -> X 1.0.0. A 1.0.1 no longer uses X - X is still among the project's references,
+  // but nothing being installed needs it, so it is not installed.
+  x := MakeInfo('X', '1.0.0', []);
+  a100 := MakeInfo('A', '1.0.0', [MakeDep('X', '[1.0.0,]')]);
+  a101 := MakeInfo('A', '1.0.1', []);
+
+  root := TPackageReference.CreateRoot(cTestCompiler);
+  aRef := root.AddChild(a100.Id, a100.Version, MakeRange('1.0.0'));
+  aRef.PackageInfo := a100;
+  xRef := aRef.AddChild(x.Id, x.Version, MakeRange('[1.0.0,]'));
+  xRef.PackageInfo := x;
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(aRef);
+  projectRefs.Add(xRef);
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, a101, projectRefs, graph, resolved);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual('1.0.1', VersionOf(resolved, 'A'));
+  Assert.AreEqual('', VersionOf(resolved, 'X'), 'X was only needed by the A being replaced');
+  Assert.IsNull(graph.FindFirstChild('X'));
+  Assert.AreEqual(1, resolved.Count);
 end;
 
 initialization

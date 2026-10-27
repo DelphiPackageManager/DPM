@@ -50,6 +50,7 @@ type
 
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TRestoreOptions read FDefault;
     constructor Create; override;
     function Validate(const logger : ILogger) : Boolean; override;
@@ -89,6 +90,12 @@ end;
 class constructor TRestoreOptions.CreateDefault;
 begin
   FDefault := TRestoreOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TRestoreOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 function TRestoreOptions.Validate(const logger : ILogger) : Boolean;

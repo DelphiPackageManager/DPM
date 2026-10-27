@@ -132,7 +132,10 @@ var
 begin
   TSpecOptions.Default.ApplyCommon(TCommonOptions.Default);
   options := TSpecOptions.Default;
-  ctx.NonInteractive := options.NonInteractive;
+  //--non-interactive, or nobody there to answer (input or output redirected) - every prompt below has a
+  //non-interactive path that says what it needs. A prompt that couldn't be answered was taken as cancelled, and
+  //the command 'succeeded' having done nothing.
+  ctx.NonInteractive := options.NonInteractive or (not PromptsAreInteractive);
 
   rootDir := ExcludeTrailingPathDelimiter(GetCurrentDir);
   ctx.RootDir := rootDir;

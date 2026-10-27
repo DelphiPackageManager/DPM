@@ -40,6 +40,7 @@ type
       FDefault : TListOptions;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TListOptions read FDefault;
     constructor Create; override;
 
@@ -63,6 +64,12 @@ end;
 class constructor TListOptions.CreateDefault;
 begin
   FDefault := TListOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TListOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 end.

@@ -31,6 +31,12 @@ type
     procedure Download_OfAFileNotMatchingItsHashFile_FailsAndKeepsTheCachedCopy;
     [Test]
     procedure Download_OfAFileChangedSinceItWasListed_Fails;
+    //--skip/--take did nothing for a folder source - every search was the whole folder.
+    [Test]
+    procedure Feed_Honours_Skip_And_Take;
+    //the feed worked out each package's hash (writing it beside the package) and then left it out of the results.
+    [Test]
+    procedure Feed_Items_Carry_The_Package_Hash;
   end;
 
 implementation
@@ -53,6 +59,7 @@ uses
   DPM.Core.Package.Classes,
   DPM.Core.Repository.Interfaces,
   DPM.Core.Repository.Directory,
+  DPM.Core.Options.Search,
   TestLogger;
 
 const
@@ -92,6 +99,31 @@ begin
   for f in files do
     Assert.IsTrue(SameText(ExtractFileName(f), cPackageFile) or SameText(ExtractFileName(f), cPackageFile + cPackageHashAlgorithmExt),
                   'left behind : ' + f);
+end;
+
+//A package in the folder, as the feed reads it : the .dpkg (only looked for) and the dspec read from it beside it.
+procedure WriteFeedPackage(const folder : string; const id : string);
+var
+  packageFile : string;
+begin
+  packageFile := TPath.Combine(folder, id + '-delphi12.0-0000000000000001-1.0.0.dpkg');
+  TFile.WriteAllText(packageFile, 'a package', TEncoding.ASCII);
+  TFile.WriteAllText(ChangeFileExt(packageFile, cLegacyPackageSpecExt),
+    'metadata:' + sLineBreak +
+    '  id: ' + id + sLineBreak +
+    '  version: 1.0.0' + sLineBreak +
+    '  description: feed test package' + sLineBreak +
+    '  authors:' + sLineBreak +
+    '    - DPM' + sLineBreak +
+    '  license: Apache-2.0' + sLineBreak +
+    'targetPlatforms:' + sLineBreak +
+    '  - compiler: 12.0' + sLineBreak +
+    '    platforms: [Win32]' + sLineBreak +
+    '    template: default' + sLineBreak +
+    'templates:' + sLineBreak +
+    '  - name: default' + sLineBreak +
+    '    source:' + sLineBreak +
+    '      - src: Source\*.pas' + sLineBreak, TEncoding.UTF8);
 end;
 
 { TDirectoryRepositoryDownloadTests }
@@ -170,6 +202,57 @@ begin
   Assert.AreEqual(Ord(TErrorCode.E1202_PackageHashMismatch), Ord(repo.LastErrorCode), repo.LastError);
   Assert.IsFalse(FileExists(FCachedFile), 'a copy that fails must not be left in the cache');
   AssertNoLeftovers(FCacheFolder);
+end;
+
+procedure TDirectoryRepositoryDownloadTests.Feed_Honours_Skip_And_Take;
+var
+  feedFolder : string;
+  repo : IPackageRepository;
+  options : TSearchOptions;
+  feed : IPackageSearchResult;
+begin
+  feedFolder := TPath.Combine(FRoot, 'paged');
+  ForceDirectories(feedFolder);
+  WriteFeedPackage(feedFolder, 'Gamma.Pkg');
+  WriteFeedPackage(feedFolder, 'Alpha.Pkg');
+  WriteFeedPackage(feedFolder, 'Beta.Pkg');
+  repo := NewRepository(feedFolder);
+  options := TSearchOptions.Create;
+  try
+    options.CompilerVersion := TCompilerVersion.Delphi12_0;
+    options.Skip := 1;
+    options.Take := 1;
+    feed := repo.GetPackageFeed(TCancellationTokenSourceFactory.Create.Token, options, TCompilerVersion.Delphi12_0);
+  finally
+    options.Free;
+  end;
+  Assert.AreEqual(1, feed.Results.Count);
+  Assert.AreEqual('Beta.Pkg', feed.Results[0].Id, 'the second, in id order');
+  Assert.AreEqual(Int64(3), feed.TotalCount);
+end;
+
+procedure TDirectoryRepositoryDownloadTests.Feed_Items_Carry_The_Package_Hash;
+var
+  feedFolder : string;
+  repo : IPackageRepository;
+  options : TSearchOptions;
+  feed : IPackageSearchResult;
+begin
+  feedFolder := TPath.Combine(FRoot, 'hashed');
+  ForceDirectories(feedFolder);
+  WriteFeedPackage(feedFolder, 'Alpha.Pkg');
+  repo := NewRepository(feedFolder);
+  options := TSearchOptions.Create;
+  try
+    options.CompilerVersion := TCompilerVersion.Delphi12_0;
+    feed := repo.GetPackageFeed(TCancellationTokenSourceFactory.Create.Token, options, TCompilerVersion.Delphi12_0);
+  finally
+    options.Free;
+  end;
+  Assert.AreEqual(1, feed.Results.Count);
+  Assert.AreEqual(THashSHA256.GetHashStringFromFile(TPath.Combine(feedFolder, 'Alpha.Pkg-delphi12.0-0000000000000001-1.0.0.dpkg')),
+                  feed.Results[0].Hash);
+  Assert.AreEqual(cPackageHashAlgorithm, feed.Results[0].HashAlgorithm);
 end;
 
 initialization

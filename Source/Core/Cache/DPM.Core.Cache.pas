@@ -229,17 +229,11 @@ end;
 function AcquirePackageLock(const logger : ILogger; const packageFolder : string; const cancellationToken : ICancellationToken;
                             out lock : THandle) : boolean;
 var
-  stream : TBytesStream;
   lockName : string;
   waitResult : Cardinal;
 begin
   result := false;
-  stream := TBytesStream.Create(TEncoding.UTF8.GetBytes(LowerCase(ExcludeTrailingPathDelimiter(ExpandFileName(packageFolder)))));
-  try
-    lockName := 'Local\DPM.Cache.' + Copy(THashSHA256.GetHashString(stream), 1, 16);
-  finally
-    stream.Free;
-  end;
+  lockName := 'Local\DPM.Cache.' + Copy(THashSHA256.GetHashStringFromText(LowerCase(ExcludeTrailingPathDelimiter(ExpandFileName(packageFolder)))), 1, 16);
   lock := CreateMutex(nil, false, PChar(lockName));
   if lock = 0 then
   begin

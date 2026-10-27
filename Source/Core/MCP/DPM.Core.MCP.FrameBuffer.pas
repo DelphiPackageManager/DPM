@@ -62,7 +62,8 @@ type
     ///<summary>
     ///  Returns the next complete message, if one has arrived. Blank lines are skipped rather
     ///  than returned as empty messages - some clients pad with them and an empty line is not
-    ///  a message.
+    ///  a message. A line that isn't UTF-8 is dropped and raises EMCPFrameError - the lines after
+    ///  it are still there.
     ///</summary>
     function TryGetMessage(out message : string) : boolean;
     ///<summary> Bytes currently buffered but not yet forming a complete message. </summary>
@@ -71,12 +72,72 @@ type
 
 implementation
 
+uses
+  DPM.Core.MCP.Interfaces;
+
 const
   cLF = 10;
   cCR = 13;
   cInitialCapacity = 8192;
 
 { TMCPFrameBuffer }
+
+//Strict UTF-8 - every sequence complete, no overlong forms, no surrogates, nothing past U+10FFFF. Decoding
+//anything else would quietly turn it into replacement characters, and a message that isn't UTF-8 isn't one.
+function IsValidUtf8(const bytes : TBytes; const count : integer) : boolean;
+var
+  i : integer;
+  j : integer;
+  need : integer;
+  b : byte;
+  codePoint : Cardinal;
+  minCodePoint : Cardinal;
+begin
+  result := false;
+  i := 0;
+  while i < count do
+  begin
+    b := bytes[i];
+    if b < $80 then
+    begin
+      Inc(i);
+      continue;
+    end;
+    if (b and $E0) = $C0 then
+    begin
+      need := 1;
+      codePoint := b and $1F;
+      minCodePoint := $80;
+    end
+    else if (b and $F0) = $E0 then
+    begin
+      need := 2;
+      codePoint := b and $0F;
+      minCodePoint := $800;
+    end
+    else if (b and $F8) = $F0 then
+    begin
+      need := 3;
+      codePoint := b and $07;
+      minCodePoint := $10000;
+    end
+    else
+      exit;
+    if i + need >= count then
+      exit;
+    for j := 1 to need do
+    begin
+      b := bytes[i + j];
+      if (b and $C0) <> $80 then
+        exit;
+      codePoint := (codePoint shl 6) or (b and $3F);
+    end;
+    if (codePoint < minCodePoint) or (codePoint > $10FFFF) or ((codePoint >= $D800) and (codePoint <= $DFFF)) then
+      exit;
+    Inc(i, need + 1);
+  end;
+  result := true;
+end;
 
 constructor TMCPFrameBuffer.Create;
 begin
@@ -178,6 +239,9 @@ begin
     if lineLen > 0 then
     begin
       FSeenFirstMessage := true;
+      //consumed above - dropped, and the caller told.
+      if not IsValidUtf8(lineBytes, lineLen) then
+        raise EMCPFrameError.Create('the message is not valid UTF-8');
       message := TEncoding.UTF8.GetString(lineBytes);
       //A line of nothing but whitespace is padding, not a message.
       if Trim(message) <> '' then

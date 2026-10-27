@@ -40,6 +40,28 @@ type
     [Test]
     procedure LsRemoteTags_Reads_The_Tags_Of_A_Local_Repository;
     [Test]
+    procedure GetRemoteUrl_Reads_The_Origin_Of_A_Repository;
+    [Test]
+    procedure GetRemoteUrl_Fails_For_A_Repository_Without_An_Origin;
+
+    //git has no console anyone can see - nothing it starts may wait for an answer.
+    [Test]
+    procedure NonInteractive_Turns_Off_Git_And_Credential_Manager_Prompts;
+    [Test]
+    procedure NonInteractive_Runs_Ssh_In_Batch_Mode;
+    //GIT_SSH_COMMAND wins over the ssh the user chose - so it is only set when they haven't.
+    [Test]
+    procedure NonInteractive_Keeps_The_Users_Ssh_Command;
+    [Test]
+    procedure NonInteractive_Keeps_The_Users_Git_Ssh;
+    [Test]
+    procedure NonInteractive_Keeps_The_Configured_Ssh_Command;
+    //what the commands git starts actually see.
+    [Test]
+    procedure Git_Commands_Run_Without_Prompts;
+    [Test]
+    procedure Git_Command_That_Does_Not_Finish_Is_Stopped;
+    [Test]
     procedure Failed_Command_Reports_What_Git_Said;
 
     [Test]
@@ -86,6 +108,7 @@ uses
   System.Classes,
   System.SysUtils,
   System.IOUtils,
+  System.Diagnostics,
   Spring.Collections,
   VSoft.CancellationToken,
   DPM.Core.Logging,
@@ -282,6 +305,151 @@ begin
   Assert.IsTrue(client.LsRemoteTags(TCancellationTokenSourceFactory.Create.Token, repoDir, tags), client.LastError);
   Assert.IsTrue(tags.ContainsKey('v1.2.3'), 'the tag is read from what git printed');
   Assert.AreEqual(40, Length(tags['v1.2.3']), tags['v1.2.3']);
+end;
+
+procedure TGitClientTests.GetRemoteUrl_Reads_The_Origin_Of_A_Repository;
+var
+  repoDir : string;
+  client : IGitClient;
+  url : string;
+begin
+  if TGitClient.GitExe = '' then
+    Assert.Pass('git is not installed');
+  repoDir := MakeFolder('origin-repo');
+  RunGitForSetup('init --quiet', repoDir);
+  RunGitForSetup('remote add origin https://example.invalid/registry.git', repoDir);
+  client := TGitClient.Create(TTestLogger.Create);
+  Assert.IsTrue(client.GetRemoteUrl(TCancellationTokenSourceFactory.Create.Token, repoDir, url), client.LastError);
+  Assert.AreEqual('https://example.invalid/registry.git', url);
+end;
+
+procedure TGitClientTests.GetRemoteUrl_Fails_For_A_Repository_Without_An_Origin;
+var
+  repoDir : string;
+  client : IGitClient;
+  url : string;
+begin
+  if TGitClient.GitExe = '' then
+    Assert.Pass('git is not installed');
+  repoDir := MakeFolder('no-origin-repo');
+  RunGitForSetup('init --quiet', repoDir);
+  client := TGitClient.Create(TTestLogger.Create);
+  Assert.IsFalse(client.GetRemoteUrl(TCancellationTokenSourceFactory.Create.Token, repoDir, url));
+  Assert.AreEqual('', url);
+end;
+
+procedure TGitClientTests.NonInteractive_Turns_Off_Git_And_Credential_Manager_Prompts;
+var
+  env : IEnvironmentBlock;
+begin
+  env := TEnvironmentBlockFactory.Create(nil, false);
+  //whatever the user's own environment says.
+  env.AddOrSet('GIT_TERMINAL_PROMPT', '1');
+  TGitClient.MakeNonInteractive(env, false);
+  Assert.AreEqual('0', env.GetValue('GIT_TERMINAL_PROMPT'));
+  Assert.AreEqual('never', env.GetValue('GCM_INTERACTIVE'));
+end;
+
+procedure TGitClientTests.NonInteractive_Runs_Ssh_In_Batch_Mode;
+var
+  env : IEnvironmentBlock;
+begin
+  env := TEnvironmentBlockFactory.Create(nil, false);
+  TGitClient.MakeNonInteractive(env, false);
+  Assert.AreEqual('ssh -oBatchMode=yes', env.GetValue('GIT_SSH_COMMAND'));
+end;
+
+procedure TGitClientTests.NonInteractive_Keeps_The_Users_Ssh_Command;
+var
+  env : IEnvironmentBlock;
+begin
+  env := TEnvironmentBlockFactory.Create(nil, false);
+  env.AddOrSet('GIT_SSH_COMMAND', 'C:/Windows/System32/OpenSSH/ssh.exe');
+  TGitClient.MakeNonInteractive(env, false);
+  Assert.AreEqual('C:/Windows/System32/OpenSSH/ssh.exe', env.GetValue('GIT_SSH_COMMAND'));
+end;
+
+procedure TGitClientTests.NonInteractive_Keeps_The_Users_Git_Ssh;
+var
+  env : IEnvironmentBlock;
+begin
+  env := TEnvironmentBlockFactory.Create(nil, false);
+  env.AddOrSet('GIT_SSH', 'C:\Program Files\PuTTY\plink.exe');
+  TGitClient.MakeNonInteractive(env, false);
+  Assert.AreEqual('', env.GetValue('GIT_SSH_COMMAND'));
+  Assert.AreEqual('C:\Program Files\PuTTY\plink.exe', env.GetValue('GIT_SSH'));
+end;
+
+procedure TGitClientTests.NonInteractive_Keeps_The_Configured_Ssh_Command;
+var
+  env : IEnvironmentBlock;
+begin
+  env := TEnvironmentBlockFactory.Create(nil, false);
+  //core.sshCommand is set.
+  TGitClient.MakeNonInteractive(env, true);
+  Assert.AreEqual('', env.GetValue('GIT_SSH_COMMAND'));
+end;
+
+//A repository whose origin is an ext:: url - fetching from it runs the command, through sh, and what the command
+//writes to stderr ends up in what git said.
+function RepositoryFetchingWith(const repoDir : string; const command : string) : string;
+begin
+  result := repoDir;
+  RunGitForSetup('init --quiet', repoDir);
+  RunGitForSetup('config protocol.ext.allow always', repoDir);
+  //ext:: urls escape a space as '% '.
+  RunGitForSetup('remote add origin "ext::sh -c ' + StringReplace(command, ' ', '% ', [rfReplaceAll]) + '"', repoDir);
+end;
+
+procedure TGitClientTests.Git_Commands_Run_Without_Prompts;
+var
+  repoDir : string;
+  client : IGitClient;
+  oldPrompt : string;
+  oldInteractive : string;
+begin
+  if TGitClient.GitExe = '' then
+    Assert.Pass('git is not installed');
+  repoDir := RepositoryFetchingWith(MakeFolder('prompt-repo'), 'echo GTP=$GIT_TERMINAL_PROMPT GCM=$GCM_INTERACTIVE >&2');
+  client := TGitClient.Create(TTestLogger.Create);
+  //some hosts (CI, coding agents) already set these - git must get them from DPM, not from the process it runs in.
+  oldPrompt := GetEnvironmentVariable('GIT_TERMINAL_PROMPT');
+  oldInteractive := GetEnvironmentVariable('GCM_INTERACTIVE');
+  SetEnvironmentVariable('GIT_TERMINAL_PROMPT', nil);
+  SetEnvironmentVariable('GCM_INTERACTIVE', nil);
+  try
+    Assert.IsFalse(client.Pull(TCancellationTokenSourceFactory.Create.Token, repoDir), 'nothing to pull from');
+  finally
+    if oldPrompt <> '' then
+      SetEnvironmentVariable('GIT_TERMINAL_PROMPT', PChar(oldPrompt));
+    if oldInteractive <> '' then
+      SetEnvironmentVariable('GCM_INTERACTIVE', PChar(oldInteractive));
+  end;
+  Assert.IsTrue(Pos('GTP=0 GCM=never', client.LastError) > 0, client.LastError);
+end;
+
+procedure TGitClientTests.Git_Command_That_Does_Not_Finish_Is_Stopped;
+var
+  repoDir : string;
+  client : IGitClient;
+  oldTimeout : integer;
+  stopwatch : TStopwatch;
+begin
+  if TGitClient.GitExe = '' then
+    Assert.Pass('git is not installed');
+  repoDir := RepositoryFetchingWith(MakeFolder('slow-repo'), 'sleep 60');
+  client := TGitClient.Create(TTestLogger.Create);
+  oldTimeout := TGitClient.TimeoutSeconds;
+  TGitClient.TimeoutSeconds := 2;
+  try
+    stopwatch := TStopwatch.StartNew;
+    Assert.IsFalse(client.Pull(TCancellationTokenSourceFactory.Create.Token, repoDir));
+    stopwatch.Stop;
+  finally
+    TGitClient.TimeoutSeconds := oldTimeout;
+  end;
+  Assert.IsTrue(stopwatch.ElapsedMilliseconds < 30000, 'stopped, not waited for : ' + IntToStr(stopwatch.ElapsedMilliseconds) + 'ms');
+  Assert.IsTrue(Pos('did not finish within 2 seconds', client.LastError) > 0, client.LastError);
 end;
 
 procedure TGitClientTests.Failed_Command_Reports_What_Git_Said;

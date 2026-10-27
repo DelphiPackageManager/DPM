@@ -56,7 +56,15 @@ type
     function LoadFromYAML(const yamlObject : IYAMLMapping) : boolean;virtual;abstract;
 
     procedure ToYAML(const parent : IYAMLValue; const packageKind : TDPMPackageKind);virtual;abstract;
-    function LoadYAMLCollection(const collection : IYAMLSequence; const nodeClass : TSpecNodeClass; const action : TConstProc<IInterface>) : boolean;
+    //what : the list's key and owner, for the error when an item isn't a mapping - eg '[build] of the template [default]'.
+    function LoadYAMLCollection(const collection : IYAMLSequence; const nodeClass : TSpecNodeClass; const what : string; const action : TConstProc<IInterface>) : boolean;
+
+    //The list under key - a missing or empty key is an empty list. A value that isn't a list is reported naming
+    //the key and owner (rather than a bare 'Value is not a sequence' for the whole spec) and comes back as an
+    //empty list, so the rest still loads and its problems are reported too.
+    function SequenceOf(const yamlObject : IYAMLMapping; const key : string; const owner : string; out sequence : IYAMLSequence) : boolean;
+    //Item index of a list as a mapping (key: value lines) - reported as SequenceOf does when it is something else.
+    function MappingAt(const sequence : IYAMLSequence; const index : integer; const what : string; out mapping : IYAMLMapping) : boolean;
 
     //Reads the compiler names under key - a sequence, or a single scalar - into compilers. An unknown
     //name is logged and fails the load rather than being skipped, since the caller acts on what is
@@ -129,7 +137,34 @@ begin
 end;
 
 
-function TSpecNode.LoadYAMLCollection(const collection: IYAMLSequence; const nodeClass: TSpecNodeClass; const action: TConstProc<IInterface>): boolean;
+function TSpecNode.SequenceOf(const yamlObject : IYAMLMapping; const key : string; const owner : string; out sequence : IYAMLSequence) : boolean;
+var
+  value : IYAMLValue;
+begin
+  result := true;
+  if yamlObject.TryGetValue(key, value) and value.IsSequence then
+  begin
+    sequence := value.AsSequence;
+    exit;
+  end;
+  sequence := TYAML.CreateSequence.AsSequence;
+  if (value = nil) or value.IsNull then
+    exit;
+  Logger.Error(TErrorCode.E6002_SpecUnreadable, 'The [' + key + '] of ' + owner + ' must be a list.');
+  result := false;
+end;
+
+function TSpecNode.MappingAt(const sequence : IYAMLSequence; const index : integer; const what : string; out mapping : IYAMLMapping) : boolean;
+begin
+  mapping := nil;
+  result := sequence.Items[index].IsMapping;
+  if result then
+    mapping := sequence.Items[index].AsMapping
+  else
+    Logger.Error(TErrorCode.E6002_SpecUnreadable, 'Item ' + IntToStr(index + 1) + ' of the ' + what + ' must be a set of key: value lines.');
+end;
+
+function TSpecNode.LoadYAMLCollection(const collection: IYAMLSequence; const nodeClass: TSpecNodeClass; const what : string; const action: TConstProc<IInterface>): boolean;
 var
   item : ISpecNode;
   i : Integer;
@@ -141,8 +176,12 @@ begin
 
   for i := 0 to collection.Count - 1 do
   begin
+    if not MappingAt(collection, i, what, obj) then
+    begin
+      result := false;
+      continue;
+    end;
     item := nodeClass.Create(Logger) as ISpecNode;
-    obj := collection.O[i];
     //keep loading the rest so every error is reported, but an item that failed fails the collection.
     result := item.LoadFromYAML(obj) and result;
     action(item);

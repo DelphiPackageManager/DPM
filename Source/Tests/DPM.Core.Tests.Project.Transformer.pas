@@ -96,6 +96,18 @@ type
 
     [Test]
     procedure DpkTransformer_CaseInsensitiveOnDirectiveKeyword;
+
+    //the dpk is written back in its own encoding - one BOM if it had one, and a Windows-1252 file stays one.
+    [Test]
+    procedure DpkTransformer_Keeps_A_Single_BOM;
+    [Test]
+    procedure DpkTransformer_Keeps_A_Cp1252_File;
+
+    //the projects prepare generates are valid whatever is in the source paths - an & in a dproj, a ' in a dpk.
+    [Test]
+    procedure Generated_Dproj_Escapes_The_Source_Paths;
+    [Test]
+    procedure Generated_Dpk_Doubles_A_Quote_In_A_Source_Path;
   end;
 
 implementation
@@ -105,6 +117,10 @@ uses
   System.SysUtils,
   System.Classes,
   System.IOUtils,
+  System.Variants,
+  Winapi.msxml,
+  Spring.Collections,
+  DPM.Core.Project.Prepare.Templates,
   TestLogger;
 
 const
@@ -188,6 +204,63 @@ const
     'end.'#13#10;
 
 { TProjectTransformerTests }
+
+procedure TProjectTransformerTests.DpkTransformer_Keeps_A_Single_BOM;
+var
+  dpk : IDpkTransformer;
+  inFile, outFile : string;
+  bytes : TBytes;
+begin
+  dpk := TDpkTransformer.Create(TTestLogger.Create);
+  inFile := MakeTempFile('dpmpkg_', '.dpk');
+  outFile := MakeTempFile('dpmpkg_', '.dpk');
+  try
+    //TEncoding.UTF8 writes a BOM.
+    TFile.WriteAllText(inFile, cDpkWithDigits, TEncoding.UTF8);
+    dpk.RewriteLibSuffix(inFile, outFile, TCompilerVersion.Delphi10_4);
+    bytes := TFile.ReadAllBytes(outFile);
+    Assert.IsTrue((Length(bytes) > 6) and (bytes[0] = $EF) and (bytes[1] = $BB) and (bytes[2] = $BF), 'the BOM is kept');
+    Assert.IsFalse((bytes[3] = $EF) and (bytes[4] = $BB) and (bytes[5] = $BF), 'only one BOM');
+    Assert.Contains(TFile.ReadAllText(outFile, TEncoding.UTF8), '{$LIBSUFFIX AUTO}');
+  finally
+    if FileExists(inFile) then
+      TFile.Delete(inFile);
+    if FileExists(outFile) then
+      TFile.Delete(outFile);
+  end;
+end;
+
+procedure TProjectTransformerTests.DpkTransformer_Keeps_A_Cp1252_File;
+const
+  cCopyright = #$00A9;
+var
+  dpk : IDpkTransformer;
+  inFile, outFile : string;
+  cp1252 : TEncoding;
+  bytes : TBytes;
+  text : string;
+begin
+  dpk := TDpkTransformer.Create(TTestLogger.Create);
+  inFile := MakeTempFile('dpmpkg_', '.dpk');
+  outFile := MakeTempFile('dpmpkg_', '.dpk');
+  cp1252 := TEncoding.GetEncoding(1252);
+  try
+    //a (c) as the single byte $A9 - not valid UTF-8.
+    TFile.WriteAllBytes(inFile, cp1252.GetBytes('// ' + cCopyright + ' 2019 VSoft' + #13#10 + cDpkWithDigits));
+    dpk.RewriteLibSuffix(inFile, outFile, TCompilerVersion.Delphi10_4);
+    bytes := TFile.ReadAllBytes(outFile);
+    Assert.AreEqual(Integer($A9), Integer(bytes[3]), 'the (c) is still the one byte it was');
+    text := cp1252.GetString(bytes);
+    Assert.Contains(text, '// ' + cCopyright + ' 2019 VSoft');
+    Assert.Contains(text, '{$LIBSUFFIX AUTO}');
+  finally
+    cp1252.Free;
+    if FileExists(inFile) then
+      TFile.Delete(inFile);
+    if FileExists(outFile) then
+      TFile.Delete(outFile);
+  end;
+end;
 
 procedure TProjectTransformerTests.FixtureSetup;
 begin
@@ -509,6 +582,36 @@ begin
     if FileExists(outFile) then
       TFile.Delete(outFile);
   end;
+end;
+
+//one source file, in a folder with the name given.
+function SourceIn(const folder : string) : IList<TPrepareSourceFile>;
+var
+  entry : TPrepareSourceFile;
+begin
+  result := TCollections.CreateList<TPrepareSourceFile>;
+  entry.Path := folder + '\Unit1.pas';
+  entry.FormName := '';
+  result.Add(entry);
+end;
+
+procedure TProjectTransformerTests.Generated_Dproj_Escapes_The_Source_Paths;
+var
+  dproj : string;
+  doc : IXMLDOMDocument;
+begin
+  dproj := TPrepareTemplates.RenderDproj('MyPkg', TCompilerVersion.Delphi12_0, SourceIn('..\R&D'), nil, pkRuntime, [TDPMPlatform.Win32]);
+  Assert.Contains(dproj, 'Include="..\R&amp;D\Unit1.pas"');
+  doc := CoDOMDocument60.Create;
+  Assert.IsTrue(doc.loadXML(dproj), 'the generated project is XML : ' + VarToStr(doc.parseError.reason));
+end;
+
+procedure TProjectTransformerTests.Generated_Dpk_Doubles_A_Quote_In_A_Source_Path;
+var
+  dpk : string;
+begin
+  dpk := TPrepareTemplates.RenderDpk('MyPkg', TCompilerVersion.Delphi12_0, SourceIn('..\O''Brien'), nil, pkRuntime);
+  Assert.Contains(dpk, 'Unit1 in ''..\O''''Brien\Unit1.pas''');
 end;
 
 initialization

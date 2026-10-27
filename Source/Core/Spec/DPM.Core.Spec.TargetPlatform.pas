@@ -370,7 +370,8 @@ begin
   end
   else // hasCompilers
   begin
-    compilersSeq := yamlObject.A['compilers'];
+    if not SequenceOf(yamlObject, 'compilers', 'a targetPlatform', compilersSeq) then
+      result := false;
     if compilersSeq.Count > 0 then
     begin
       for i := 0 to compilersSeq.Count -1 do
@@ -393,7 +394,8 @@ begin
     end;
   end;
 
-  platformsSeq := yamlObject.A['platforms'];
+  if not SequenceOf(yamlObject, 'platforms', 'a targetPlatform', platformsSeq) then
+    result := false;
   if platformsSeq.Count > 0 then
   begin
     for i := 0 to platformsSeq.Count -1 do

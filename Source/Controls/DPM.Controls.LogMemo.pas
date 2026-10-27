@@ -143,7 +143,6 @@ type
     //The one place the client background colour is decided. Both the background fill and the row
     //text colour derive from this, so they can never disagree.
     function GetBackgroundColor : TColor;
-    function GetMaxWidth : integer;
     function GetRowCount : integer;
     procedure RowsChanged(Sender: TObject);
 
@@ -799,7 +798,8 @@ begin
   oldTopRow := FTopRow;
   oldCurrentRow := FCurrentRow;
   FCurrentRow := RowCount - 1;
-  FTopRow := RowCount - FSelectableRows;
+  //fewer rows than fit - the top one is the first.
+  FTopRow := Max(0, RowCount - FSelectableRows);
   FVScrollPos := RowCount -1;
 
   if FTopRow <> oldTopRow then
@@ -1183,6 +1183,9 @@ var
 begin
   if not HandleAllocated then
     exit;
+  //callers repaint the row the caret was on - -1 when there was no caret (Top/Bottom before anything is selected).
+  if (index < 0) or (index >= FItems.Count) then
+    exit;
 
   LCanvas := FPaintBmp.Canvas;
   LCanvas.Font.Assign(Self.Font);
@@ -1190,11 +1193,11 @@ begin
   messageType := TLogMessageType(FItems.Objects[index]);
 
 
+  //the back buffer is the visible span (client sized) - see RenderTo. The text is drawn scrolled across it.
   viewRow := GetViewRow(index);
   rowRect := ClientRect;
   rowRect.Top := viewRow * FRowHeight;
   rowRect.Bottom := rowRect.Top + FRowHeight;
-  rowRect.Width := FPaintBmp.Width; //paint bitmap may be wider.
 
 
   if (state in [TPaintRowState.rsFocusedSelected, TPaintRowState.rsFocusedHot, TPaintRowState.rsHot]) then
@@ -1219,15 +1222,13 @@ begin
 
   LCanvas.Brush.Style := bsClear;
   txt := FItems.Strings[index];
-  LCanvas.TextRect(rowRect, txt, [tfLeft, tfSingleLine, tfVerticalCenter] );
-
+  //starts FHScrollPos to the left of the buffer - TextRect clips it to the row.
   destRect := rowRect;
-
-  OffsetRect(rowRect, FHScrollPos,0);
-
+  destRect.Left := rowRect.Left - FHScrollPos;
+  LCanvas.TextRect(destRect, txt, [tfLeft, tfSingleLine, tfVerticalCenter] );
 
   if copyCanvas then
-    Canvas.CopyRect(destRect, LCanvas, rowRect);
+    Canvas.CopyRect(rowRect, LCanvas, rowRect);
 
 end;
 
@@ -1251,11 +1252,6 @@ begin
     result := FStyleServices.GetSystemColor(clWindow)
   else
     result := clWindow;
-end;
-
-function TLogMemo.GetMaxWidth: integer;
-begin
-  result := Max(ClientWidth, FMaxWidth);
 end;
 
 function TLogMemo.GetRowCount: integer;
@@ -1420,10 +1416,10 @@ begin
   FRendering := true;
   try
     //The back buffer is normally sized by Resize, but a paint can happen before that has run
-    //(eg during handle creation, or after the handle is recreated by a theme change). The blit
-    //below reads from FHScrollPos to FHScrollPos + ClientWidth, so that - not ClientWidth alone -
-    //is what the buffer has to cover.
-    neededWidth := Max(ClientWidth + FHScrollPos, GetMaxWidth);
+    //(eg during handle creation, or after the handle is recreated by a theme change). It is the visible span only
+    //- the rows are drawn scrolled across it (DoPaintRow). It used to be as wide as the widest line ever logged,
+    //and one long line (a search path list, say) made it tens of thousands of pixels wide.
+    neededWidth := ClientWidth;
     if (FPaintBmp.Width < neededWidth) or (FPaintBmp.Height < ClientHeight) then
     begin
       //SetSize(0,0) first - TBitmap otherwise tries to preserve the existing content, which is
@@ -1446,7 +1442,6 @@ begin
 
     //paint background
     r := Self.ClientRect;
-    r.Width := Max(FPaintBmp.Width, r.Width); //paintbmp may be wider than the client.
     LCanvas.Brush.Style := bsSolid;
     LCanvas.Brush.Color := backgroundColor;
     LCanvas.FillRect(r);
@@ -1463,9 +1458,7 @@ begin
 
 
     r := ClientRect;
-    OffsetRect(r, FHScrollPos,0);
-
-    BitBlt(dc, 0, 0, r.Width, r.Height, FPaintBmp.Canvas.Handle, r.Left, r.Top, SRCCOPY);
+    BitBlt(dc, 0, 0, r.Width, r.Height, FPaintBmp.Canvas.Handle, 0, 0, SRCCOPY);
   finally
     FRendering := false;
   end;
@@ -1569,10 +1562,9 @@ begin
   if csDestroying in ComponentState then
     Exit;
 
-  NewWidth := Max(ClientWidth, GetMaxWidth);
+  //the visible span - see RenderTo.
+  NewWidth := ClientWidth;
   NewHeight := ClientHeight;
-
-  FMaxWidth := Min(FMaxWidth, NewWidth);
 
   if (NewWidth <> FPaintBmp.Width) or (NewHeight <> FPaintBmp.Height) then
   begin

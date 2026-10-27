@@ -144,7 +144,7 @@ begin
   if yamlObject.Contains('copyToLib') then
     FCopyToLib := yamlObject.B['copyToLib']
   else if  yamlObject.Contains('copytoLib') then
-    FCopyToLib := yamlObject.B['copytolib']
+    FCopyToLib := yamlObject.B['copytoLib']
   else if  yamlObject.Contains('copytolib') then
     FCopyToLib := yamlObject.B['copytolib'];
 
@@ -158,7 +158,8 @@ begin
 
   if yamlObject.Contains('exclude') then
   begin
-    excludeArray := yamlObject.A['exclude'];
+    if not SequenceOf(yamlObject, 'exclude', 'the source entry [' + FSource + ']', excludeArray) then
+      result := false;
 
     for i := 0 to excludeArray.Count - 1 do
     begin

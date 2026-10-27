@@ -549,7 +549,8 @@ begin
   actAddSource.ImageIndex := 0;
   actRemoveSource.ImageIndex := 1;
   actMoveSourceUp.ImageIndex := 2;
-  actMoveSourceDown.Index := 3;
+  //ImageIndex - Index moved the action within the list, and it had no image.
+  actMoveSourceDown.ImageIndex := 3;
   dpmOptionsActionList.Images := FImageList;
 
   txtPackageCacheLocation.RightButton.ImageIndex := 4;

@@ -24,6 +24,9 @@ type
     procedure MissingFileReturnsNil;
     [Test]
     procedure DedupesGenericInstantiations;
+    //the unit name ends at the first '(' - a source path may have one too.
+    [Test]
+    procedure SourcePathWithParenthesesIsRead;
   end;
 
   //Where the SBOM generator looks for the linker MAP file. Pure path rules - no
@@ -133,6 +136,42 @@ begin
     end;
     Assert.AreEqual('System.pas', systemPath);
     Assert.AreEqual('C:\packages\Spring.Collections\1.0.0\src\Spring.Collections.pas', springPath);
+  finally
+    if FileExists(fixturePath) then
+      DeleteFile(fixturePath);
+  end;
+end;
+
+procedure TMapFileReaderTests.SourcePathWithParenthesesIsRead;
+const
+  cFixture =
+    'Detailed map of segments' + sLineBreak +
+    ' 0001:00400000 0000A000 C=CODE     S=.text    G=(none)   M=System.SysUtils ACBP=A9' + sLineBreak +
+    sLineBreak +
+    'Line numbers for System.SysUtils(C:\Program Files (x86)\Embarcadero\Studio\23.0\source\rtl\sys\System.SysUtils.pas) segment .text' + sLineBreak +
+    '   1 0001:00400000   2 0001:00400010' + sLineBreak;
+var
+  fixturePath : string;
+  reader : IMapFileReader;
+  info : IMapFileInfo;
+  u : TMapUnit;
+  found : boolean;
+begin
+  fixturePath := WriteFixture(cFixture);
+  try
+    reader := TMapFileReader.Create(TTestLogger.Create);
+    info := reader.Read(fixturePath);
+    Assert.IsNotNull(info);
+    found := false;
+    for u in info.Units do
+    begin
+      if SameText(u.UnitName, 'System.SysUtils') then
+      begin
+        found := true;
+        Assert.AreEqual('C:\Program Files (x86)\Embarcadero\Studio\23.0\source\rtl\sys\System.SysUtils.pas', u.SourcePath, false);
+      end;
+    end;
+    Assert.IsTrue(found, 'the unit is System.SysUtils - not cut at the ( in its path');
   finally
     if FileExists(fixturePath) then
       DeleteFile(fixturePath);

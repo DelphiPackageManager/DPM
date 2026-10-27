@@ -75,14 +75,16 @@ begin
     raise Exception.Create('Category node not found');
 end;
 
+//Each delete removes the entry the node holds - by the name, it was the first entry of that name, which needn't be
+//this one (two build entries for one project, say).
 procedure TTemplateTreeNode.DeleteBuild;
 begin
-  Template.DeleteBuildEntry(build.Project);
+  Template.BuildEntries.Remove(build);
 end;
 
 procedure TTemplateTreeNode.DeleteDependency;
 begin
-  Template.DeleteDependency(dependency.Id);
+  Template.Dependencies.Remove(dependency);
 end;
 
 procedure TTemplateTreeNode.DeleteDesign;
@@ -90,14 +92,14 @@ begin
   if not IsDesign  then
     raise Exception.Create('Node is not of type Design');
 
-  Template.DeleteDesignEntry(designEntry.Project);
+  Template.DesignEntries.Remove(designEntry);
 end;
 
 procedure TTemplateTreeNode.DeleteCopyLocal;
 begin
   if not IsCopyLocal then
     raise Exception.Create('Node is not of type CopyLocal');
-  Template.DeleteCopyLocalEntry(copyLocalEntry.Source);
+  Template.CopyLocalEntries.Remove(copyLocalEntry);
 end;
 
 procedure TTemplateTreeNode.DeleteEntry;
@@ -119,14 +121,14 @@ begin
   if not IsPackageDef then
     raise Exception.Create('Node is not of type Package Definition');
 
-  Template.DeletePackageDefinition(packageDef.Project);
+  Template.PackageDefinitions.Remove(packageDef);
 end;
 
 procedure TTemplateTreeNode.DeleteSource;
 begin
   if not IsSource  then
     raise Exception.Create('Node is not of type Source');
-  Template.DeleteSource(sourceEntry.Source);
+  Template.SourceEntries.Remove(sourceEntry);
 end;
 
 function TTemplateTreeNode.IsBuild: Boolean;

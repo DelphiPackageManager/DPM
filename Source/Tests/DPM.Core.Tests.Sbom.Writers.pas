@@ -49,6 +49,16 @@ type
     procedure SPDX_SpdxLicenseIdIsDeclaredVerbatim;
     [Test]
     procedure SPDX_CompoundLicenseExpressionIsDeclared;
+    //an operator between words isn't an expression - every member has to be an SPDX licence id.
+    [Test]
+    procedure SPDX_CompoundOfFreeTextBecomesNoAssertion;
+    [Test]
+    procedure CycloneDX_CompoundOfFreeTextEmittedAsLicenseName;
+    [Test]
+    procedure SPDX_GroupedExpressionWithAnExceptionIsDeclared;
+    //an operator with nothing on one side, or members with no operator between them.
+    [Test]
+    procedure SPDX_MalformedExpressionBecomesNoAssertion;
     [Test]
     procedure SPDX_PrimaryPackagePurposeReflectsComponentKind;
     [Test]
@@ -613,6 +623,45 @@ end;
 procedure TSBOMWritersTests.SPDX_CompoundLicenseExpressionIsDeclared;
 begin
   Assert.AreEqual('MIT OR Apache-2.0', SpdxLicenseDeclaredFor('MIT OR Apache-2.0'));
+end;
+
+procedure TSBOMWritersTests.SPDX_CompoundOfFreeTextBecomesNoAssertion;
+begin
+  Assert.AreEqual('NOASSERTION', SpdxLicenseDeclaredFor('MIT OR Commercial license'));
+end;
+
+procedure TSBOMWritersTests.CycloneDX_CompoundOfFreeTextEmittedAsLicenseName;
+var
+  report : TSBOMReport;
+  doc : TJsonObject;
+  licArr : TJsonArray;
+begin
+  report := BuildReportWithLicense('MIT OR Commercial license');
+  try
+    doc := WriteCycloneDXAndParse(report);
+    try
+      licArr := doc.A['components'].O[0].A['licenses'];
+      Assert.IsFalse(licArr.O[0].Contains('expression'), 'not an expression');
+      Assert.AreEqual('MIT OR Commercial license', licArr.O[0].O['license'].S['name']);
+    finally
+      doc.Free;
+    end;
+  finally
+    report.Free;
+  end;
+end;
+
+procedure TSBOMWritersTests.SPDX_GroupedExpressionWithAnExceptionIsDeclared;
+begin
+  Assert.AreEqual('(MIT OR Apache-2.0) AND BSD-3-Clause', SpdxLicenseDeclaredFor('(MIT OR Apache-2.0) AND BSD-3-Clause'));
+  Assert.AreEqual('GPL-2.0-only WITH Classpath-exception-2.0', SpdxLicenseDeclaredFor('GPL-2.0-only WITH Classpath-exception-2.0'));
+end;
+
+procedure TSBOMWritersTests.SPDX_MalformedExpressionBecomesNoAssertion;
+begin
+  Assert.AreEqual('NOASSERTION', SpdxLicenseDeclaredFor('OR MIT'));
+  Assert.AreEqual('NOASSERTION', SpdxLicenseDeclaredFor('MIT AND'));
+  Assert.AreEqual('NOASSERTION', SpdxLicenseDeclaredFor('MIT Apache-2.0 OR BSD-3-Clause'));
 end;
 
 procedure TSBOMWritersTests.SPDX_PrimaryPackagePurposeReflectsComponentKind;

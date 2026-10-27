@@ -156,9 +156,19 @@ function GetOutputFileCandidates(const dprojDir, outputDir, fileName, configName
 function GetMapFileCandidates(const dprojDir, outputDir, projectName, configName : string;
                               const platform : TDPMPlatform) : TArray<string>;
 
+//Expands the MSBuild macros of an IDE Library Path (or project search path) value - the IDE's own (BDSLIB, BDS,
+//BDSCOMMONDIR, BDSCatalogRepository, ...) and the user's Environment Variables overrides (name -> value), which
+//win as they do in the IDE - and then any %VARIABLE%. Exposed so it can be unit tested.
+function ExpandBDSTokens(const value, delphiRoot : string; const platform : TDPMPlatform; const bdsVersion : string;
+                         const overrides : IDictionary<string, string> = nil) : string;
+
+//The IDE's Environment Variables overrides for bdsVersion (HKCU), name -> value - empty when there are none.
+function ReadIDEEnvironmentOverrides(const bdsVersion : string) : IDictionary<string, string>;
+
 implementation
 
 uses
+  DPM.Core.Utils.DateTime,
   System.SysUtils,
   System.Classes,
   System.IOUtils,
@@ -177,6 +187,7 @@ uses
   DPM.Core.Dependency.Version,
   DPM.Core.Utils.Path,
   DPM.Core.Utils.Strings,
+  DPM.Core.Utils.System,
   DPM.Core.Utils.PEImports,
   DPM.Core.Crypto.Algorithms,
   DPM.Core.Diagnostics;
@@ -194,7 +205,7 @@ var
   utc : TDateTime;
 begin
   utc := TTimeZone.Local.ToUniversalTime(Now);
-  result := FormatDateTime('yyyy-mm-dd"T"hh:nn:ss"Z"', utc);
+  result := TDPMDateTimeUtils.FormatIso8601Utc(utc);
 end;
 
 function NewGuidString : string;
@@ -280,29 +291,32 @@ end;
 //Without this expansion the registry-derived paths point at literal "$(BDSLIB)\..."
 //directories that don't exist, the search index can't scan them, and we lose every
 //IDE-installed third-party library as a source of unit-name evidence.
-function ExpandBDSTokens(const value, delphiRoot : string;
-                        const platform : TDPMPlatform;
-                        const bdsVersion : string) : string;
+function ExpandBDSTokens(const value, delphiRoot : string; const platform : TDPMPlatform; const bdsVersion : string;
+                         const overrides : IDictionary<string, string>) : string;
 
+  //as long as the value is - a fixed 1024 char buffer left a long library path unexpanded.
   function ExpandEnv(const s : string) : string;
-  var
-    buf : array[0..1023] of Char;
-    n : DWORD;
   begin
     if Pos('%', s) = 0 then
       exit(s);
-    n := ExpandEnvironmentStrings(PChar(s), @buf[0], Length(buf));
-    if (n = 0) or (n > DWORD(Length(buf))) then
-      exit(s);
-    SetString(result, PChar(@buf[0]), n - 1);
+    result := TSystemUtils.ExpandEnvironmentStrings(s);
+    if result = '' then
+      result := s;
   end;
 
 var
   s : string;
   publicDocs : string;
   userDocs : string;
+  pair : TPair<string, string>;
 begin
   s := value;
+  //the user's overrides first - an override of one of the IDE's own (BDSCOMMONDIR, say) is the value the IDE uses.
+  if overrides <> nil then
+  begin
+    for pair in overrides do
+      s := StringReplace(s, '$(' + pair.Key + ')', pair.Value, [rfReplaceAll, rfIgnoreCase]);
+  end;
   if delphiRoot <> '' then
   begin
     s := StringReplace(s, '$(BDSLIB)', IncludeTrailingPathDelimiter(delphiRoot) + 'lib', [rfReplaceAll, rfIgnoreCase]);
@@ -317,11 +331,44 @@ begin
     s := StringReplace(s, '$(BDSCOMMONDIR)', publicDocs, [rfReplaceAll, rfIgnoreCase]);
     s := StringReplace(s, '$(BDSUSERDIR)', userDocs, [rfReplaceAll, rfIgnoreCase]);
     s := StringReplace(s, '$(BDSPROJECTSDIR)', IncludeTrailingPathDelimiter(userDocs) + 'Projects', [rfReplaceAll, rfIgnoreCase]);
+    //where GetIt puts what it installs - the library paths of those packages are under it.
+    s := StringReplace(s, '$(BDSCatalogRepositoryAllUsers)', IncludeTrailingPathDelimiter(publicDocs) + 'CatalogRepository', [rfReplaceAll, rfIgnoreCase]);
+    s := StringReplace(s, '$(BDSCatalogRepository)', IncludeTrailingPathDelimiter(userDocs) + 'CatalogRepository', [rfReplaceAll, rfIgnoreCase]);
   end;
   //$(PLATFORM) - uppercase variant the IDE uses in Library Path entries (the project uses $(Platform))
   s := StringReplace(s, '$(PLATFORM)', DPMPlatformToBDString(platform), [rfReplaceAll, rfIgnoreCase]);
   //Generic environment-variable expansion catches anything else (e.g. %ProgramFiles%)
   result := ExpandEnv(s);
+end;
+
+function ReadIDEEnvironmentOverrides(const bdsVersion : string) : IDictionary<string, string>;
+var
+  reg : TRegistry;
+  names : TStringList;
+  i : integer;
+begin
+  result := TCollections.CreateDictionary<string, string>;
+  if bdsVersion = '' then
+    exit;
+  reg := TRegistry.Create(KEY_READ);
+  names := TStringList.Create;
+  try
+    reg.RootKey := HKEY_CURRENT_USER;
+    if not reg.OpenKeyReadOnly('Software\Embarcadero\BDS\' + bdsVersion + '\Environment Variables') then
+      exit;
+    reg.GetValueNames(names);
+    for i := 0 to names.Count - 1 do
+    begin
+      try
+        result[names[i]] := reg.ReadString(names[i]);
+      except
+        //not a string - the IDE only writes strings here.
+      end;
+    end;
+  finally
+    names.Free;
+    reg.Free;
+  end;
 end;
 
 function ResolveAgainstDproj(const dprojPath, relativeOrAbsolute : string) : string;
@@ -1036,6 +1083,7 @@ var
   sourceFile : string;
   resolvedSourcePath : string;
   sourceFolder : string;
+  overrides : IDictionary<string, string>;
 begin
   result := TUnitSearchIndex.Create;
 
@@ -1046,6 +1094,7 @@ begin
   except
     //unknown compiler - leave bdsVersion blank; ExpandBDSTokens will just no-op the BDSCOMMONDIR/BDSUSERDIR substitutions
   end;
+  overrides := ReadIDEEnvironmentOverrides(bdsVersion);
 
   //The dproj's own directory is implicitly on the compiler's search path - any
   //.pas / .dpr sitting next to the dproj resolves without being explicitly listed
@@ -1086,7 +1135,7 @@ begin
       loader := TDPMProjectSettingsLoader.Create(FLogger, editor.ProjectFile, configName, platform);
       projectSearchPath := loader.GetSearchPath;
       projectSearchPath := ExpandProjectTokens(projectSearchPath, platform, configName);
-      projectSearchPath := ExpandBDSTokens(projectSearchPath, delphiRoot, platform, bdsVersion);
+      projectSearchPath := ExpandBDSTokens(projectSearchPath, delphiRoot, platform, bdsVersion, overrides);
       AddSemicolonPaths(result, projectSearchPath, TUnitOrigin.Other);
     except
       on e : Exception do
@@ -1098,7 +1147,7 @@ begin
   //The registry value is what the IDE writes; macros are unexpanded literals
   //("$(BDSLIB)\$(PLATFORM)\release"). Expansion is essential here or every IDE
   //library path becomes a non-existent directory and the scan finds nothing.
-  ideSearchPath := ExpandBDSTokens(ideSearchPath, delphiRoot, platform, bdsVersion);
+  ideSearchPath := ExpandBDSTokens(ideSearchPath, delphiRoot, platform, bdsVersion, overrides);
   AddSemicolonPaths(result, ideSearchPath, TUnitOrigin.IdeLibrary);
 end;
 
@@ -1578,7 +1627,8 @@ begin
         //dproj's package edges, so the dependency tree shows which packages each
         //dproj pulls in (vs. just a flat list under the group root).
         dprojApp := report.AddComponent(TSBOMComponentKind.Application);
-        ctx.AppBomRef := 'project:' + ctx.Name + ':' + DPMPlatformToString(platform);
+        //unique - two projects of the same name (in different folders) were the same component.
+        ctx.AppBomRef := report.MakeUniqueBomRef('project:' + ctx.Name + ':' + DPMPlatformToString(platform));
         dprojApp.BomRef := ctx.AppBomRef;
         dprojApp.Id := ctx.Name;
         //as for a single dproj's root - runtime loads by name can't be seen

@@ -77,6 +77,9 @@ type
     class function GetMinFromMax(const maxVersion : TPackageVersion) : TPackageVersion; static;
     class function GetMaxFromMin(const minVersion : TPackageVersion) : TPackageVersion; static;
     class function IsValidFloat(const minVersion : TPackageVersion; const maxVersion : TPackageVersion) : boolean; static;
+    //the highest patch the bounds admit less the lowest - negative when no version fits. In Int64 so an
+    //exclusive bound at patch 0 or High(Cardinal) can't wrap.
+    class function PatchSpan(const minVersion : TPackageVersion; const minInclusive : boolean; const maxVersion : TPackageVersion; const maxInclusive : boolean) : Int64; static;
   public
 
     constructor Create(const original : string; const minVersion : TPackageVersion; const minInclusive : boolean; const maxVersion : TPackageVersion; const maxInclusive : boolean); overload;
@@ -221,15 +224,31 @@ begin
   (minVersion.Minor = maxVersion.Minor);
 end;
 
+class function TVersionRange.PatchSpan(const minVersion : TPackageVersion; const minInclusive : boolean; const maxVersion : TPackageVersion; const maxInclusive : boolean) : Int64;
+var
+  lowPatch : Int64;
+  highPatch : Int64;
+begin
+  lowPatch := minVersion.Patch;
+  if not minInclusive then
+    lowPatch := lowPatch + 1;
+  highPatch := maxVersion.Patch;
+  if not maxInclusive then
+    highPatch := highPatch - 1;
+  result := highPatch - lowPatch;
+end;
+
 procedure TVersionRange.Normalize;
 begin
-  if not FMinVersionIsInclusive then
+  //an exclusive bound with no patch beyond it stays exclusive - the next patch would wrap round and let
+  //in every version on the line.
+  if (not FMinVersionIsInclusive) and (FMinVersion.Patch < High(Cardinal)) then
   begin
     FMinVersion.Patch := FMinVersion.Patch + 1;
     FMinVersionIsInclusive := true;
     FOriginal := '';
   end;
-  if not FMaxVersionIsInclusive then
+  if (not FMaxVersionIsInclusive) and (FMaxVersion.Patch > 0) then
   begin
     FMaxVersion.Patch := FMaxVersion.Patch - 1;
     FMaxVersionIsInclusive := true;
@@ -249,8 +268,6 @@ var
   maxInclusive : boolean;
   range : TArray<string>;
   sError : string;
-  minPatch : word;
-  maxPatch : word;
 begin
   result := TVersionRange.CreateInvalid(0);
   sValue := Trim(value);
@@ -310,12 +327,8 @@ begin
             if not TPackageVersion.TryParseWithError(range[0], maxVersion, sError) then
               raise Exception.Create('Invalid VersionRange - ' + sError);
             minVersion := GetMinFromMax(maxVersion);
-            //if exclusive range, then max must be 2 more than min
-            if (not minInclusive) or (not maxInclusive) then
-            begin
-              if Abs(maxVersion.Patch - minVersion.Patch) < 2 then
-                raise EArgumentException.Create('Invalid VersionRange "' + sValue + '" - invalid range - no valid version in range.');
-            end;
+            if PatchSpan(minVersion, minInclusive, maxVersion, maxInclusive) < 0 then
+              raise EArgumentException.Create('Invalid VersionRange "' + sValue + '" - invalid range - no valid version in range.');
             result := TVersionRange.Create(value, minVersion, minInclusive, maxVersion, maxInclusive);
             exit;
           end
@@ -324,12 +337,9 @@ begin
             if not TPackageVersion.TryParseWithError(range[0], minVersion, sError) then
               raise Exception.Create('Invalid dependency version - ' + sError);
             maxVersion := GetMaxFromMin(minVersion);
-            //if exclusive range, then max must be 2 more than min
-            if (not minInclusive) or (not maxInclusive) then
-            begin
-              if Abs(maxVersion.Patch - minVersion.Patch) < 2 then
-                raise EArgumentException.Create('Invalid VersionRange "' + sValue + '" - invalid range - no valid version in range.');
-            end;
+            //a min above the top of the float has nothing in range.
+            if PatchSpan(minVersion, minInclusive, maxVersion, maxInclusive) < 0 then
+              raise EArgumentException.Create('Invalid VersionRange "' + sValue + '" - invalid range - no valid version in range.');
             result := TVersionRange.Create(value, minVersion, minInclusive, maxVersion, maxInclusive);
             exit;
           end;
@@ -344,20 +354,7 @@ begin
           if not IsValidFloat(minVersion, maxVersion) then
             raise EArgumentException.Create('Invalid VersionRange "' + sValue + '" - invalid range - only the Patch may float.');
 
-
-          minPatch := minVersion.Patch;
-          maxPatch := maxVersion.Patch;
-          if minInclusive and (not maxInclusive) then
-            Dec(maxPatch)
-          else if (not minInclusive) and maxInclusive then
-            Inc(minPatch)
-          else if (not minInclusive) and (not maxInclusive) then
-          begin
-            Inc(minPatch);
-            Dec(maxPatch);
-          end;
-
-          if (maxPatch - minPatch) < 0 then
+          if PatchSpan(minVersion, minInclusive, maxVersion, maxInclusive) < 0 then
             raise EArgumentException.Create('Invalid VersionRange "' + sValue + '" - invalid range - no valid version in range.');
 
           result := TVersionRange.Create(value, minVersion, minInclusive, maxVersion, maxInclusive);
@@ -371,10 +368,15 @@ end;
 
 function TVersionRange.PatchWidth : integer;
 var
-  x : TVersionRange;
+  span : Int64;
 begin
-  x := self.Clone(true); //normalize to make calc simpler.
-  result := integer(x.MaxVersion.Patch) - integer(x.MinVersion.Patch);
+  span := PatchSpan(FMinVersion, FMinVersionIsInclusive, FMaxVersion, FMaxVersionIsInclusive);
+  if span > MaxInt then
+    result := MaxInt
+  else if span < -MaxInt then
+    result := -MaxInt
+  else
+    result := span;
 end;
 
 function TVersionRange.IsBundledSentinel : boolean;

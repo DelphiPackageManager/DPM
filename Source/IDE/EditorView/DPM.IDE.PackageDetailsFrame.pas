@@ -148,9 +148,11 @@ type
 
     FFetchVersions : boolean;
 
+    //the versions of the packages looked at (key id-prerelease) - dropped a minute after the first of them was
+    //got (FVersionsCacheAge), or on Refresh.
     FVersionsCache : IDictionary<string, IList<TPackageVersion>>;
     FMetaDataCache : IDictionary<string, IPackageSearchResultItem>;
-    FVersionsCacheUdate : TStopWatch;
+    FVersionsCacheAge : TStopWatch;
     //The package id the projects grid rows were last populated for. Used by the use-source toggle
     //as a fallback - project reloads can re-enter SetPackage(nil) and null FPackageMetaData while
     //the grid is still showing (and clickable for) this package.
@@ -208,7 +210,11 @@ type
     procedure UpdateSigningBadge(const package : IPackageSearchResultItem);
     procedure AddCurrentSignerToTrustedPublishers;
 
+    //a row per project in the group, but not excluding (a project that is closing) - then the versions shown.
+    procedure RebuildProjectRows(const excluding : string);
+
     //versions cache
+    procedure ExpireVersionsCache;
     function TryGetCachedVersions(const Id : string; const includePrerelease : boolean; out versions : IList<TPackageVersion>) : boolean;
     procedure UpdateVersionsCache(const id : string; const includePrerelease : boolean; const versions : IList<TPackageVersion>);
 
@@ -223,6 +229,10 @@ type
     procedure ViewClosing;
     procedure ThemeChanged(const StyleServices : TCustomStyleServices {$IFDEF THEMESERVICES}; const ideThemeSvc : IOTAIDEThemingServices{$ENDIF});
     procedure ProjectReloaded;
+    //projectFile is closing - it is still in the group when the IDE says so, so the rows are rebuilt without it.
+    procedure ProjectClosing(const projectFile : string);
+    //Refresh, or the sources changed - the versions are asked for again.
+    procedure ClearVersionsCache;
 
 
     property ImageList : {$IFDEF USEIMAGECOLLECTION} TVirtualImageList {$ELSE} TImageList {$ENDIF} read FImageList write SetImageList;
@@ -250,7 +260,20 @@ uses
   DPM.Core.Configuration.Classes,
   DPM.Core.Dependency.Interfaces,
   DPM.IDE.ToolsAPI,
+  DPM.IDE.MessageForm,
   DPM.Core.Diagnostics;
+
+//A MessageDlg that can't open behind the log window - see TDPMMessageForm.BeginModalPrompt.
+function PromptDlg(const msg : string; const dlgType : TMsgDlgType; const buttons : TMsgDlgButtons) : integer;
+begin
+  TDPMMessageForm.BeginModalPrompt;
+  try
+    result := MessageDlg(msg, dlgType, buttons, 0);
+  finally
+    TDPMMessageForm.EndModalPrompt;
+  end;
+end;
+
 { TGroupPackageDetailsFrame }
 
 procedure TPackageDetailsFrame.btnInstallAllClick(Sender: TObject);
@@ -468,7 +491,8 @@ begin
   end;
   if FHost <> nil then
     FHost.PackageInstalled;
-  if packageMetadata <> nil then
+  //not when the view closed while it ran (a prompt during it runs a message loop) - there is nothing to show it in.
+  if (packageMetadata <> nil) and (FHost <> nil) then
   begin
     UpdateProjectPackageVersions(packageMetaData.Id);
     SetPackage(packageMetadata, FIncludePreRelease, true);
@@ -528,7 +552,7 @@ begin
         for line in plan.SummaryLines do
           message := message + line + sLineBreak;
         message := message + sLineBreak + 'Continue?';
-        if MessageDlg(message, mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
+        if PromptDlg(message, mtConfirmation, [mbYes, mbNo]) <> mrYes then
           exit;
         //the view may have closed while the question was up.
         if FHost = nil then
@@ -768,7 +792,7 @@ begin
 
 
   FVersionsCache := TCollections.CreateDictionary<string, IList<TPackageVersion>>;
-  FVersionsCacheUdate := TStopWatch.Create;
+  FVersionsCacheAge := TStopWatch.Create;
   FMetaDataCache := TCollections.CreateDictionary<string, IPackageSearchResultItem>;
   SetPackage(nil,false);
 
@@ -847,8 +871,8 @@ begin
   if TStringUtils.IsWebUrl(uri) then
     ShellExecute(Application.Handle, 'open', PChar(uri), nil, nil, SW_SHOWNORMAL)
   else
-    MessageDlg('DPM only opens http and https links. The link the package gives is :' + sLineBreak + sLineBreak + uri,
-               mtInformation, [mbOK], 0);
+    PromptDlg('DPM only opens http and https links. The link the package gives is :' + sLineBreak + sLineBreak + uri,
+              mtInformation, [mbOK]);
 end;
 
 procedure TPackageDetailsFrame.OnDetailsUriClick(Sender: TObject; const uri: string; const element: TDetailElement);
@@ -866,6 +890,16 @@ begin
 end;
 
 procedure TPackageDetailsFrame.ProjectReloaded;
+begin
+  RebuildProjectRows('');
+end;
+
+procedure TPackageDetailsFrame.ProjectClosing(const projectFile : string);
+begin
+  RebuildProjectRows(projectFile);
+end;
+
+procedure TPackageDetailsFrame.RebuildProjectRows(const excluding : string);
 var
   i : integer;
 begin
@@ -873,7 +907,11 @@ begin
   try
     FProjectsGrid.Clear;
     for i := 0 to FProjectGroup.ProjectCount -1 do
+    begin
+      if (excluding <> '') and SameText(FProjectGroup.Projects[i].FileName, excluding) then
+        continue;
       FProjectsGrid.AddProject(FProjectGroup.Projects[i].FileName, '');
+    end;
   finally
     FProjectsGrid.EndUpdate;
   end;
@@ -905,6 +943,9 @@ var
 begin
   //remember which package the grid rows now represent - see FProjectsGridPackageId.
   FProjectsGridPackageId := packageId;
+  //the view has closed (during an operation, from one of its prompts) - the projects are read through it.
+  if FHost = nil then
+    exit;
   packageRefs := FHost.GetPackageReferences;
   FProjectsGrid.BeginUpdate;
   try
@@ -914,7 +955,8 @@ begin
       if packageRefs <> nil then
       begin
         projectRef := nil;
-        projectRefs := packageRefs.FindTopLevelChild(LowerCase(FProjectGroup.Projects[i].FileName));
+        //by the row's project - the group's projects needn't be the rows, a row at a time (one is closing, say).
+        projectRefs := packageRefs.FindTopLevelChild(LowerCase(FProjectsGrid.ProjectName[i]));
         if projectRefs <> nil then
           projectRef := projectRefs.FindTopLevelChild(LowerCase(packageId));
       end;
@@ -925,7 +967,7 @@ begin
         //'use source' can only be offered for an installed package that actually ships source.
         //HasSource is a cache check on the installed version; UseSource is the current-session choice.
         FProjectsGrid.ProjectHasSource[i] := FPackageCache.HasSource(projectRef);
-        FProjectsGrid.ProjectUseSource[i] := FInstallerContext.GetUseSource(FProjectGroup.Projects[i].FileName, packageId);
+        FProjectsGrid.ProjectUseSource[i] := FInstallerContext.GetUseSource(FProjectsGrid.ProjectName[i], packageId);
       end
       else
       begin
@@ -1013,17 +1055,17 @@ begin
   // version-portable.
   if (FCurrentBadge.State = sbsUntrustedPublisher) and (FCurrentBadge.SignerSpkiHex <> '') then
   begin
-    if MessageDlg(FCurrentBadge.Caption + sLineBreak + sLineBreak +
-                  FCurrentBadge.Detail + sLineBreak + sLineBreak +
-                  'Add this publisher to your trusted publishers?',
-                  mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+    if PromptDlg(FCurrentBadge.Caption + sLineBreak + sLineBreak +
+                 FCurrentBadge.Detail + sLineBreak + sLineBreak +
+                 'Add this publisher to your trusted publishers?',
+                 mtConfirmation, [mbYes, mbNo]) = mrYes then
       AddCurrentSignerToTrustedPublishers;
     exit;
   end;
   // Plain MessageDlg keeps this version-portable. A proper dedicated form
   // is a follow-up if/when we want richer formatting.
-  MessageDlg(FCurrentBadge.Caption + sLineBreak + sLineBreak +
-             FCurrentBadge.Detail, mtInformation, [mbOK], 0);
+  PromptDlg(FCurrentBadge.Caption + sLineBreak + sLineBreak +
+            FCurrentBadge.Detail, mtInformation, [mbOK]);
 end;
 
 procedure TPackageDetailsFrame.AddCurrentSignerToTrustedPublishers;
@@ -1133,8 +1175,8 @@ begin
     FSigningLabel.Invalidate;
   end;
 
-  MessageDlg('Added "' + publisherName + '" to your trusted publishers.',
-             mtInformation, [mbOK], 0);
+  PromptDlg('Added "' + publisherName + '" to your trusted publishers.',
+            mtInformation, [mbOK]);
 end;
 
 procedure TPackageDetailsFrame.SigningLabelPaint(Sender : TObject);
@@ -1345,22 +1387,23 @@ begin
     FSigningLabel.Invalidate;
 end;
 
+procedure TPackageDetailsFrame.ClearVersionsCache;
+begin
+  FVersionsCache.Clear;
+  FVersionsCacheAge.Reset;
+end;
+
+procedure TPackageDetailsFrame.ExpireVersionsCache;
+begin
+  //TotalSeconds - Elapsed.Seconds is the seconds part (0-59), so the versions were never dropped.
+  if FVersionsCacheAge.IsRunning and (FVersionsCacheAge.Elapsed.TotalSeconds > 60) then
+    ClearVersionsCache;
+end;
+
 function TPackageDetailsFrame.TryGetCachedVersions(const Id: string;  const includePrerelease : boolean; out versions: IList<TPackageVersion>): boolean;
 begin
-  result := false;
-  if FVersionsCacheUdate.IsRunning and (FVersionsCacheUdate.Elapsed.Seconds > 60) then
-  begin
-    FVersionsCache.Clear;
-    FVersionsCacheUdate.Reset;
-    FVersionsCacheUdate.Start;
-    exit;
-  end
-  else
-  begin
-    result := FVersionsCache.TryGetValue(LowerCase(id + '-' + BoolToStr(includePrerelease,true)), versions);
-    FVersionsCacheUdate.Start;
-  end;
-
+  ExpireVersionsCache;
+  result := FVersionsCache.TryGetValue(LowerCase(id + '-' + BoolToStr(includePrerelease,true)), versions);
 end;
 
 procedure TPackageDetailsFrame.UpdateButtonState;
@@ -1436,14 +1479,10 @@ end;
 
 procedure TPackageDetailsFrame.UpdateVersionsCache(const id: string; const includePrerelease : boolean; const versions: IList<TPackageVersion>);
 begin
-  FVersionsCacheUdate.Stop;
-  if FVersionsCacheUdate.Elapsed.Seconds > 120 then
-  begin
-    FVersionsCache.Clear;
-    FVersionsCacheUdate.Reset;
-  end;
+  ExpireVersionsCache;
+  if not FVersionsCacheAge.IsRunning then
+    FVersionsCacheAge.Start;
   FVersionsCache[LowerCase(id + '-' + BoolToStr(includePrerelease,true))] := versions;
-  FVersionsCacheUdate.Start;
 end;
 
 procedure TPackageDetailsFrame.VersionGridOnDowngradeEvent(const project: string);
@@ -1542,7 +1581,8 @@ begin
     FLogger.Information('Updated search paths for [' + packageId + '] in project [' + project + '] (use source = ' + BoolToStr(useSource, true) + ').');
     //Re-sync the IDE's in-memory copy of the dproj so Alt-Tab doesn't prompt to reload. This does
     //NOT refetch the package list (see TDPMEditViewFrame.SearchPathsChanged).
-    FHost.SearchPathsChanged;
+    if FHost <> nil then
+      FHost.SearchPathsChanged;
   end
   else
     FLogger.Information('The search paths for [' + packageId + '] in [' + project + '] were not updated.', true);

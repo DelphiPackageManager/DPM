@@ -51,6 +51,7 @@ type
   TSpec = class(TSpecNode, IPackageSpec, IPackageSpecPrivate)
   private
     FPackageKind : TDPMPackageKind;
+    FMinClientVersion : string;
     FMetaData : ISpecMetaData;
     FTargetPlatforms : IList<ISpecTargetPlatform>;
     FTemplates : IList<ISpecTemplate>;
@@ -85,6 +86,8 @@ type
     function GetTemplates : IList<ISpecTemplate>;
     function GetPackageKind : TDPMPackageKind;
     procedure SetPackageKind(const value : TDPMPackageKind);
+    function GetMinClientVersion : string;
+    procedure SetMinClientVersion(const value : string);
     function GetVariables : IVariables;
     function GetTargetPlatformsComments : TStrings;
     function GetTemplatesComments : TStrings;
@@ -169,6 +172,7 @@ var
 begin
   inherited Create(logger);
   FPackageKind := source.PackageKind;
+  FMinClientVersion := source.MinClientVersion;
   FFileName := source.FileName;
   if source.AsObject.FTargetPlatformsComments <> nil then
   begin
@@ -212,12 +216,18 @@ end;
 procedure TSpec.DeleteTemplate(const templateName: string);
 var
   i: Integer;
+  targetPlatform : ISpecTargetPlatform;
 begin
   for i := 0 to FTemplates.Count - 1 do
   begin
     if SameText(FTemplates[i].Name, templateName) then
     begin
       FTemplates.Delete(i);
+      //the platforms that used it have none now - not a name that leads nowhere. The spec then says it isn't
+      //valid until they are given one.
+      for targetPlatform in FTargetPlatforms do
+        if SameText(targetPlatform.TemplateName, templateName) then
+          targetPlatform.TemplateName := '';
       Exit;
     end;
   end;
@@ -419,6 +429,8 @@ begin
     begin
       if minClient > currentVersion then
         raise EDPMError.Create(TErrorCode.E6005_SpecNeedsNewerDPM, 'The spec needs DPM ' + sMinClient + ' or later - update dpm.');
+      //kept, so it is written back as declared.
+      FMinClientVersion := minClient.ToStringNoMeta;
     end;
   end;
 
@@ -427,6 +439,8 @@ begin
     FPackageKind := StringToPackageKind(sPackageKind)
   else
     FPackageKind := TDPMPackageKind.dpm;
+  //before the metadata is read - what it requires depends on it (a git package's version is optional).
+  FMetaData.PackageKind := FPackageKind;
 
   if yamlObject.Contains('metadata') then
   begin
@@ -434,7 +448,13 @@ begin
     //the metadata result must feed into the spec's validity - an invalid id (or any
     //other metadata failure) has to make the whole spec invalid, otherwise pack and
     //install just log the error and carry on regardless.
-    result := FMetaData.LoadFromYAML(metaData.AsMapping) and result;
+    if metaData.IsMapping then
+      result := FMetaData.LoadFromYAML(metaData.AsMapping) and result
+    else
+    begin
+      Logger.Error(TErrorCode.E6002_SpecUnreadable, 'The [metadata] of the spec must be a set of key: value lines.');
+      result := false;
+    end;
   end
   else
   begin
@@ -452,7 +472,8 @@ begin
   end
   else
   begin
-    targetPlatforms := yamlObject.A['targetPlatforms'];
+    if not SequenceOf(yamlObject, 'targetPlatforms', 'the spec', targetPlatforms) then
+      result := false;
     result := LoadTargetPlatformsFromYAML(targetPlatforms) and result;
     //Cross-targetPlatform invariant: each compiler must appear in at most one targetPlatform.
     //Done here (rather than in pack) so the IDE and any other consumer of TSpec also see the
@@ -464,7 +485,8 @@ begin
 
   if yamlObject.Contains('templates') then
   begin
-    templates := yamlObject.A['templates'];
+    if not SequenceOf(yamlObject, 'templates', 'the spec', templates) then
+      result := false;
     result := LoadTemplatesFromYAML(templates) and result;
   end
   else
@@ -517,6 +539,7 @@ function TSpec.LoadTargetPlatformsFromYAML(const targetPlatformsSeq: IYAMLSequen
 var
   i : integer;
   targetPlatform : ISpecTargetPlatform;
+  targetPlatformObj : IYAMLMapping;
 begin
   if targetPlatformsSeq.HasComments then
   begin
@@ -529,9 +552,14 @@ begin
   begin
     for i := 0 to targetPlatformsSeq.Count - 1 do
     begin
+      if not MappingAt(targetPlatformsSeq, i, '[targetPlatforms]', targetPlatformObj) then
+      begin
+        result := false;
+        continue;
+      end;
       targetPlatform := TSpecTargetPlatform.Create(Logger);
       FTargetPlatforms.Add(targetPlatform);
-      result := targetPlatform.LoadFromYAML(targetPlatformsSeq.O[i]) and result;
+      result := targetPlatform.LoadFromYAML(targetPlatformObj) and result;
     end;
   end
   else
@@ -561,6 +589,7 @@ end;
 function TSpec.LoadTemplatesFromYAML(const templatesSeq: IYAMLSequence): boolean;
 var
   i : integer;
+  templateObj : IYAMLMapping;
 begin
   result := true;
   if templatesSeq.HasComments then
@@ -571,7 +600,12 @@ begin
   if templatesSeq.Count > 0 then
   begin
     for i := 0 to templatesSeq.Count - 1 do
-      result := LoadTemplateFromYAML(templatesSeq.O[i], i + 1) and result;
+    begin
+      if MappingAt(templatesSeq, i, '[templates]', templateObj) then
+        result := LoadTemplateFromYAML(templateObj, i + 1) and result
+      else
+        result := false;
+    end;
   end
   else
   begin
@@ -622,18 +656,39 @@ end;
 procedure TSpec.RenameTemplate(const currentTemplateName, NewTemplateName: string);
 var
   currentTemplate : ISpecTemplate;
+  existing : ISpecTemplate;
+  targetPlatform : ISpecTargetPlatform;
 begin
   currentTemplate := FindTemplate(currentTemplateName);
   if not Assigned(currentTemplate) then
     raise Exception.Create('Template not found');
+  //two templates of one name - which one a platform means can't be told.
+  existing := FindTemplate(NewTemplateName);
+  if (existing <> nil) and (existing <> currentTemplate) then
+    raise Exception.Create('There is already a template named [' + NewTemplateName + ']');
 
   currentTemplate.Name := NewTemplateName;
+  //and the platforms that name it - they went on naming one that wasn't there.
+  for targetPlatform in FTargetPlatforms do
+    if SameText(targetPlatform.TemplateName, currentTemplateName) then
+      targetPlatform.TemplateName := NewTemplateName;
 end;
 
+
+function TSpec.GetMinClientVersion : string;
+begin
+  result := FMinClientVersion;
+end;
+
+procedure TSpec.SetMinClientVersion(const value : string);
+begin
+  FMinClientVersion := value;
+end;
 
 procedure TSpec.SetPackageKind(const value: TDPMPackageKind);
 begin
   FPackageKind := value;
+  FMetaData.PackageKind := value;
 end;
 
 
@@ -668,7 +723,8 @@ begin
     //extra '#' then accumulates on every load/save round-trip.
     root.Comments.Add('DPM package spec file');
 
-  root.S['min dpm client version'] := cDPMClientVersion;
+  if FMinClientVersion <> '' then
+    root.S['min dpm client version'] := FMinClientVersion;
   if packageKind <> TDPMPackageKind.dpm then
     root.S['packageKind'] := PackageKindToString(FPackageKind);
 

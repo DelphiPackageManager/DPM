@@ -45,6 +45,7 @@ type
     constructor CreateClone(const original : TUninstallOptions); reintroduce;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TUninstallOptions read FDefault;
     constructor Create; override;
     function Validate(const logger : ILogger) : Boolean; override;
@@ -77,11 +78,18 @@ constructor TUninstallOptions.CreateClone(const original : TUninstallOptions);
 begin
   inherited CreateClone(original);
   FProjectPath := original.FProjectPath;
+  FProjects := original.FProjects;
 end;
 
 class constructor TUninstallOptions.CreateDefault;
 begin
   FDefault := TUninstallOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TUninstallOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 function TUninstallOptions.GetPackageId : string;

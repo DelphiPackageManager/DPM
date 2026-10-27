@@ -184,6 +184,13 @@ begin
   else
     EmitTextResults(searchResult);
 
+  //nothing found while a source couldn't be asked is not 'there is no such package' - as dpm list says too.
+  if (not searchResult.Results.Any) and (FRepositoryManager.UnavailableSources <> '') then
+  begin
+    Logger.Error(TErrorCode.E1102_PackageNotFoundSourcesUnavailable, 'No packages were found - and the source(s) ' +
+      FRepositoryManager.UnavailableSources + ' could not be used.');
+    exit(TExitCode.Error);
+  end;
   result := TExitCode.OK;
 end;
 

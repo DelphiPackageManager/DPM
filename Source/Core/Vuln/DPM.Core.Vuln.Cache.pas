@@ -61,6 +61,7 @@ type
 implementation
 
 uses
+  DPM.Core.Utils.Json,
   System.SysUtils,
   System.IOUtils,
   System.DateUtils,
@@ -93,17 +94,8 @@ begin
 end;
 
 function HashStringToHex(const s : string) : string;
-var
-  bytes : TBytes;
-  stream : TBytesStream;
 begin
-  bytes := TEncoding.UTF8.GetBytes(s);
-  stream := TBytesStream.Create(bytes);
-  try
-    result := THashSHA256.GetHashString(stream);
-  finally
-    stream.Free;
-  end;
+  result := THashSHA256.GetHashStringFromText(s);
 end;
 
 { TVulnResponseCache }
@@ -178,7 +170,7 @@ begin
   entry := nil;
   try
     try
-      entry := TJsonBaseObject.Parse(rawJson) as TJsonObject;
+      entry := TJsonText.ParseObject(rawJson);
     except
       on e : Exception do
       begin

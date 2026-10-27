@@ -42,6 +42,7 @@ type
       FDefault : TUpgradeOptions;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TUpgradeOptions read FDefault;
     constructor Create; override;
 
@@ -71,6 +72,12 @@ end;
 class constructor TUpgradeOptions.CreateDefault;
 begin
   FDefault := TUpgradeOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TUpgradeOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 end.

@@ -41,6 +41,7 @@ type
     class var FDefault : TVerifyOptions;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TVerifyOptions read FDefault;
     function Validate(const logger : ILogger) : boolean; override;
 
@@ -60,6 +61,12 @@ uses
 class constructor TVerifyOptions.CreateDefault;
 begin
   FDefault := TVerifyOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TVerifyOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 function TVerifyOptions.Validate(const logger : ILogger) : boolean;

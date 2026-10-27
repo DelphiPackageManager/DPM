@@ -41,6 +41,7 @@ type
       FDefault : TPrepareOptions;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TPrepareOptions read FDefault;
     constructor Create; override;
 
@@ -68,6 +69,12 @@ end;
 class constructor TPrepareOptions.CreateDefault;
 begin
   FDefault := TPrepareOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TPrepareOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 end.

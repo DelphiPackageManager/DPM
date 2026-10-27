@@ -46,6 +46,7 @@ type
     class var FDefault : TTrustOptions;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TTrustOptions read FDefault;
     function Validate(const logger : ILogger) : boolean; override;
 
@@ -66,6 +67,12 @@ begin
   FDefault := TTrustOptions.Create;
   FDefault.FCommand := tsList;
   FDefault.FKind := tkPublisher;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TTrustOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 function TTrustOptions.Validate(const logger : ILogger) : boolean;

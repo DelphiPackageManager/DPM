@@ -30,6 +30,9 @@ type
     procedure Markdown_EscapesPipeInCellContent;
     [Test]
     procedure BothWriters_OmitEmptyComponentSections;
+    //a package's links come from its author - only an http(s) one is linked (javascript:, file: are not).
+    [Test]
+    procedure BothWriters_LinkOnlyWebUrls;
   end;
 
 implementation
@@ -43,6 +46,39 @@ uses
   DPM.Core.SBOM.Interfaces,
   DPM.Core.Options.SBOM,
   DPM.Core.SBOM.Writers.Reports;
+
+//The output of writer for one package whose project and repository links are projectUrl and repositoryUrl.
+function WriteWithLinks(const writer : ISbomWriter; const ext : string; const projectUrl : string; const repositoryUrl : string) : string;
+var
+  report : TSBOMReport;
+  comp : TSBOMComponent;
+  outPath : string;
+  g : TGUID;
+begin
+  report := TSBOMReport.Create;
+  try
+    report.ProjectName := 'LinkProject';
+    report.RootComponent.BomRef := 'project:LinkProject:win32';
+    report.RootComponent.Id := 'LinkProject';
+    comp := report.AddComponent(TSBOMComponentKind.DpmPackage);
+    comp.BomRef := 'dpm:Linked@1.0';
+    comp.Id := 'Linked';
+    comp.Version := '1.0';
+    comp.ProjectUrl := projectUrl;
+    comp.RepositoryUrl := repositoryUrl;
+    CreateGUID(g);
+    outPath := TPath.Combine(TPath.GetTempPath, 'dpm-sbom-links-' + LowerCase(Copy(GUIDToString(g), 2, 36)) + ext);
+    try
+      writer.Write(report, outPath);
+      result := TEncoding.UTF8.GetString(TFile.ReadAllBytes(outPath));
+    finally
+      if FileExists(outPath) then
+        DeleteFile(outPath);
+    end;
+  finally
+    report.Free;
+  end;
+end;
 
 function TSBOMReportsTests.NewTempPath(const ext : string) : string;
 var
@@ -206,6 +242,29 @@ begin
   finally
     report.Free;
   end;
+end;
+
+procedure TSBOMReportsTests.BothWriters_LinkOnlyWebUrls;
+var
+  htmlWriter : ISbomWriter;
+  markdownWriter : ISbomWriter;
+  html : string;
+  markdown : string;
+begin
+  //locals - created inline for the const parameter they would never be freed.
+  htmlWriter := THTMLReportWriter.Create;
+  markdownWriter := TMarkdownReportWriter.Create;
+  html := WriteWithLinks(htmlWriter, '.html', 'javascript:alert(1)', 'file:///c:/tools/run.exe');
+  Assert.IsFalse(Pos('href="javascript:', html) > 0, 'a javascript: link');
+  Assert.IsFalse(Pos('href="file:', html) > 0, 'a file: link');
+  markdown := WriteWithLinks(markdownWriter, '.md', 'javascript:alert(1)', 'file:///c:/tools/run.exe');
+  Assert.IsFalse(Pos('(javascript:', markdown) > 0, 'a javascript: link');
+  Assert.IsFalse(Pos('(file:', markdown) > 0, 'a file: link');
+  //a web link still is one.
+  html := WriteWithLinks(htmlWriter, '.html', 'https://example.com/project', '');
+  Assert.IsTrue(Pos('href="https://example.com/project"', html) > 0, html);
+  markdown := WriteWithLinks(markdownWriter, '.md', 'https://example.com/project', '');
+  Assert.IsTrue(Pos('[project](https://example.com/project)', markdown) > 0, markdown);
 end;
 
 procedure TSBOMReportsTests.HTML_HasEmbeddedCSS;

@@ -47,6 +47,10 @@ type
   ///</remarks>
   EMCPToolError = class(Exception);
 
+  ///<summary> A line read that isn't a message at all (it isn't UTF-8). The reader has dropped it - the server
+  ///  answers it with a parse error and reads on. </summary>
+  EMCPFrameError = class(Exception);
+
   ///<summary> A JSON-RPC id. MCP forbids null ids on requests, but an error reply to an
   ///  unparseable message still has to carry one, so the absent/null cases are modelled. </summary>
   TMCPRequestIdKind = (ridAbsent, ridNull, ridInt, ridStr);

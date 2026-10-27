@@ -24,6 +24,20 @@ type
     procedure Repository_LastError_Belongs_To_The_Thread;
     [Test]
     procedure Unavailable_Sources_Belong_To_The_Thread;
+    //dpm search --skip/--take across several sources - the page is of the merged list, not of each source's.
+    [Test]
+    procedure Feed_From_Several_Sources_Pages_The_Merged_List;
+    [Test]
+    procedure Feed_From_Several_Sources_Without_A_Take_Skips_The_Merged_List;
+    //one source pages itself (a server, the whole gallery) - it is asked for just the page, and its total is the total.
+    [Test]
+    procedure Feed_From_One_Source_Is_Paged_By_The_Source;
+    //a disabled source nothing uses failed every operation when its uri wasn't valid.
+    [Test]
+    procedure Invalid_Disabled_Source_Is_A_Warning;
+    //dpm mcp --source - the versions query asks only the sources named.
+    [Test]
+    procedure Versions_Query_Asks_Only_The_Sources_Named;
   end;
 
 implementation
@@ -46,6 +60,7 @@ uses
   DPM.Core.Repository.Interfaces,
   DPM.Core.Repository.Base,
   DPM.Core.Repository.Manager,
+  DPM.Core.Package.SearchResults,
   TestLogger;
 
 type
@@ -53,6 +68,8 @@ type
   TCountingSource = class(TBaseRepository, IPackageRepository)
   private
     FConfigureCount : integer;
+    FFeedSkip : integer;
+    FFeedTake : integer;
     function Answer : boolean;
   protected
     procedure Configure(const source : ISourceConfig); override;
@@ -71,6 +88,9 @@ type
     //a request on this thread failing.
     procedure Fail(const reason : string);
     property ConfigureCount : integer read FConfigureCount;
+    //what the last feed request asked for.
+    property FeedSkip : integer read FFeedSkip;
+    property FeedTake : integer read FFeedTake;
   end;
 
   //hands out a new counting source each time, and remembers them.
@@ -96,6 +116,10 @@ type
   public
     constructor Create(const proc : TProc);
   end;
+
+var
+  //the ids each source's feed has (by source name), in its order - pages of it are served as a server would.
+  SourceFeeds : IDictionary<string, TArray<string>>;
 
 { TCountingSource }
 
@@ -155,8 +179,21 @@ begin
 end;
 
 function TCountingSource.GetPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion) : IPackageSearchResult;
+var
+  ids : TArray<string>;
+  i : integer;
 begin
-  result := nil;
+  FFeedSkip := options.Skip;
+  FFeedTake := options.Take;
+  if (SourceFeeds = nil) or (not SourceFeeds.TryGetValue(Name, ids)) then
+    SetLength(ids, 0);
+  result := TDPMPackageSearchResult.Create(options.Skip, Length(ids));
+  for i := options.Skip to Length(ids) - 1 do
+  begin
+    if (options.Take > 0) and (result.Results.Count >= options.Take) then
+      break;
+    result.Results.Add(TDPMPackageSearchResultItem.FromError(ids[i], TPackageVersion.Parse('1.0.0'), compilerVersion, ''));
+  end;
 end;
 
 function TCountingSource.GetPackageFeedByIds(const cancellationToken : ICancellationToken; const ids : IList<IPackageIdentity>; const compilerVersion : TCompilerVersion) : IPackageSearchResult;
@@ -375,6 +412,142 @@ begin
     queried.Free;
     checked.Free;
   end;
+end;
+
+function FeedIds(const feed : IPackageSearchResult) : string;
+var
+  item : IPackageSearchResultItem;
+begin
+  result := '';
+  for item in feed.Results do
+  begin
+    if result <> '' then
+      result := result + ',';
+    result := result + item.Id;
+  end;
+end;
+
+function SearchFeed(const manager : IPackageRepositoryManager; const skip : integer; const take : integer) : IPackageSearchResult;
+var
+  options : TSearchOptions;
+begin
+  options := TSearchOptions.Create;
+  try
+    options.CompilerVersion := TCompilerVersion.Delphi12_0;
+    options.Skip := skip;
+    options.Take := take;
+    result := manager.GetPackageFeed(TCancellationTokenSourceFactory.Create.Token, options, TCompilerVersion.Delphi12_0);
+  finally
+    options.Free;
+  end;
+end;
+
+procedure TRepositoryManagerTests.Feed_From_Several_Sources_Pages_The_Merged_List;
+var
+  factory : TCountingFactory;
+  factoryIntf : IPackageRepositoryFactory;
+  manager : IPackageRepositoryManager;
+  feed : IPackageSearchResult;
+begin
+  factory := TCountingFactory.Create;
+  factoryIntf := factory;
+  manager := TPackageRepositoryManager.Create(TTestLogger.Create, factoryIntf);
+  Assert.IsTrue(manager.Initialize(NewConfig(['One', 'Two'])));
+  SourceFeeds := TCollections.CreateDictionary<string, TArray<string>>;
+  try
+    SourceFeeds['One'] := TArray<string>.Create('A', 'C', 'E');
+    SourceFeeds['Two'] := TArray<string>.Create('B', 'C', 'D');
+    feed := SearchFeed(manager, 1, 2);
+  finally
+    SourceFeeds := nil;
+  end;
+  //A B C D E - the second page of two.
+  Assert.AreEqual('B,C', FeedIds(feed));
+  Assert.AreEqual(Int64(5), feed.TotalCount, 'what the sources have, C once');
+  Assert.AreEqual(1, Integer(feed.Skip));
+  Assert.AreEqual(0, (factory.Created[0] as TCountingSource).FeedSkip, 'each source is asked for everything up to the end of the page');
+  Assert.AreEqual(3, (factory.Created[0] as TCountingSource).FeedTake);
+end;
+
+procedure TRepositoryManagerTests.Feed_From_Several_Sources_Without_A_Take_Skips_The_Merged_List;
+var
+  factory : TCountingFactory;
+  factoryIntf : IPackageRepositoryFactory;
+  manager : IPackageRepositoryManager;
+  feed : IPackageSearchResult;
+begin
+  factory := TCountingFactory.Create;
+  factoryIntf := factory;
+  manager := TPackageRepositoryManager.Create(TTestLogger.Create, factoryIntf);
+  Assert.IsTrue(manager.Initialize(NewConfig(['One', 'Two'])));
+  SourceFeeds := TCollections.CreateDictionary<string, TArray<string>>;
+  try
+    SourceFeeds['One'] := TArray<string>.Create('A', 'C', 'E');
+    SourceFeeds['Two'] := TArray<string>.Create('B', 'C', 'D');
+    feed := SearchFeed(manager, 2, 0);
+  finally
+    SourceFeeds := nil;
+  end;
+  Assert.AreEqual('C,D,E', FeedIds(feed));
+  Assert.AreEqual(Int64(5), feed.TotalCount);
+  Assert.AreEqual(0, (factory.Created[1] as TCountingSource).FeedSkip);
+  Assert.AreEqual(0, (factory.Created[1] as TCountingSource).FeedTake);
+end;
+
+procedure TRepositoryManagerTests.Feed_From_One_Source_Is_Paged_By_The_Source;
+var
+  factory : TCountingFactory;
+  factoryIntf : IPackageRepositoryFactory;
+  manager : IPackageRepositoryManager;
+  feed : IPackageSearchResult;
+begin
+  factory := TCountingFactory.Create;
+  factoryIntf := factory;
+  manager := TPackageRepositoryManager.Create(TTestLogger.Create, factoryIntf);
+  Assert.IsTrue(manager.Initialize(NewConfig(['One'])));
+  SourceFeeds := TCollections.CreateDictionary<string, TArray<string>>;
+  try
+    SourceFeeds['One'] := TArray<string>.Create('A', 'B', 'C', 'D', 'E');
+    feed := SearchFeed(manager, 2, 2);
+  finally
+    SourceFeeds := nil;
+  end;
+  Assert.AreEqual('C,D', FeedIds(feed));
+  Assert.AreEqual(Int64(5), feed.TotalCount, 'the source''s total, not the page''s count');
+  Assert.AreEqual(2, (factory.Created[0] as TCountingSource).FeedSkip, 'just the page is asked for');
+  Assert.AreEqual(2, (factory.Created[0] as TCountingSource).FeedTake);
+end;
+
+procedure TRepositoryManagerTests.Invalid_Disabled_Source_Is_A_Warning;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  config : IConfiguration;
+  manager : IPackageRepositoryManager;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  config := NewConfig(['Good']);
+  config.Sources.Add(TSourceConfig.Create('Broken', 'ftp://nowhere.example', TSourceType.DPMServer, '', '', false));
+  manager := TPackageRepositoryManager.Create(loggerIntf, TCountingFactory.Create);
+  Assert.IsTrue(manager.Initialize(config), logger.Messages.Text);
+  Assert.AreEqual(0, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(logger.HasWarning(TWarningCode.W1006_DisabledSourceInvalid), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('warning', 'Broken'), 'it names the source : ' + logger.Messages.Text);
+  AnyQuery(manager);
+  Assert.AreEqual(1, logger.WarningCount, 'said once : ' + logger.Messages.Text);
+end;
+
+procedure TRepositoryManagerTests.Versions_Query_Asks_Only_The_Sources_Named;
+var
+  manager : IPackageRepositoryManager;
+begin
+  manager := TPackageRepositoryManager.Create(TTestLogger.Create, TCountingFactory.Create);
+  Assert.IsTrue(manager.Initialize(NewConfig(['BadOne', 'Good'])));
+  manager.GetPackageVersions(TCancellationTokenSourceFactory.Create.Token, TCompilerVersion.Delphi12_0, 'Some.Package', false, 'Good');
+  Assert.AreEqual('', manager.UnavailableSources, 'BadOne was asked');
+  manager.GetPackageVersions(TCancellationTokenSourceFactory.Create.Token, TCompilerVersion.Delphi12_0, 'Some.Package', false);
+  Assert.AreEqual('BadOne', manager.UnavailableSources, 'precondition : unrestricted, it is asked');
 end;
 
 initialization

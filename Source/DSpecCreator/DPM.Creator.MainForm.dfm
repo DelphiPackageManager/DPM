@@ -1037,7 +1037,7 @@ object DSpecCreatorForm: TDSpecCreatorForm
             Width = 401
             Height = 23
             TabOrder = 0
-            OnChange = edtTemplateNameChange
+            OnExit = edtTemplateNameExit
           end
         end
         object crdBuildHeading: TCard

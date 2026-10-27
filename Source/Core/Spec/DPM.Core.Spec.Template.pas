@@ -137,6 +137,7 @@ implementation
 
 uses
   System.SysUtils,
+  DPM.Core.Diagnostics,
   DPM.Core.Spec.SourceEntry,
   DPM.Core.Spec.DesignEntry,
   DPM.Core.Spec.Dependency,
@@ -638,7 +639,7 @@ end;
 
 function TSpecTemplate.LoadBuildEntriesFromYAML(const buildArray: IYAMLSequence): Boolean;
 begin
-  result := LoadYAMLCollection(buildArray, TSpecBuildEntry,
+  result := LoadYAMLCollection(buildArray, TSpecBuildEntry, '[build] of the template [' + FName + ']',
     procedure(const value : IInterface)
     begin
       FBuildEntries.Add(value as ISpecBuildEntry);
@@ -657,10 +658,20 @@ begin
     exit;
   for i := 0 to dependenciesArray.Count - 1 do
   begin
-    dependencyObj := dependenciesArray.O[i];
+    if not MappingAt(dependenciesArray, i, '[dependencies] of the template [' + FName + ']', dependencyObj) then
+    begin
+      result := false;
+      continue;
+    end;
     dependency := TSpecDependency.Create(Logger);
-    FDependencies.Add(dependency);
     result := dependency.LoadFromYAML(dependencyObj) and result;
+    //one package, two ranges - which one holds is a guess, so refuse it.
+    if (dependency.Id <> '') and (FindDependency(dependency.Id) <> nil) then
+    begin
+      Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The dependency [' + dependency.Id + '] is listed more than once in the template [' + FName + '].');
+      result := false;
+    end;
+    FDependencies.Add(dependency);
   end;
 
 end;
@@ -669,7 +680,7 @@ end;
 
 function TSpecTemplate.LoadDesignFromYAML(const designArray: IYAMLSequence): Boolean;
 begin
-  result := LoadYAMLCollection(designArray, TSpecDesignEntry,
+  result := LoadYAMLCollection(designArray, TSpecDesignEntry, '[design] of the template [' + FName + ']',
     procedure(const value : IInterface)
     begin
       FDesignFiles.Add(value as ISpecDesignEntry);
@@ -678,7 +689,7 @@ end;
 
 function TSpecTemplate.LoadSourceFromYAML(const sourceArray: IYAMLSequence): Boolean;
 begin
-  result := LoadYAMLCollection(sourceArray, TSpecSourceEntry,
+  result := LoadYAMLCollection(sourceArray, TSpecSourceEntry, '[source] of the template [' + FName + ']',
     procedure(const value : IInterface)
     begin
       FSourceFiles.Add(value as ISpecSourceEntry);
@@ -687,7 +698,7 @@ end;
 
 function TSpecTemplate.LoadPackageDefinitionsFromYAML(const packageDefArray: IYAMLSequence): Boolean;
 begin
-  result := LoadYAMLCollection(packageDefArray, TSpecPackageDefinition,
+  result := LoadYAMLCollection(packageDefArray, TSpecPackageDefinition, '[package definitions] of the template [' + FName + ']',
     procedure(const value : IInterface)
     begin
       FPackageDefinitions.Add(value as ISpecPackageDefinition);
@@ -696,7 +707,7 @@ end;
 
 function TSpecTemplate.LoadCopyToLibFromYAML(const copyToLibArray: IYAMLSequence): Boolean;
 begin
-  result := LoadYAMLCollection(copyToLibArray, TSpecSourceEntry,
+  result := LoadYAMLCollection(copyToLibArray, TSpecSourceEntry, '[copyToLib] of the template [' + FName + ']',
     procedure(const value : IInterface)
     begin
       FCopyToLibEntries.Add(value as ISpecSourceEntry);
@@ -705,7 +716,7 @@ end;
 
 function TSpecTemplate.LoadCopyToBinFromYAML(const copyToBinArray: IYAMLSequence): Boolean;
 begin
-  result := LoadYAMLCollection(copyToBinArray, TSpecSourceEntry,
+  result := LoadYAMLCollection(copyToBinArray, TSpecSourceEntry, '[copyToBin] of the template [' + FName + ']',
     procedure(const value : IInterface)
     begin
       FCopyToBinEntries.Add(value as ISpecSourceEntry);
@@ -714,7 +725,7 @@ end;
 
 function TSpecTemplate.LoadCopyLocalFromYAML(const copyLocalArray: IYAMLSequence): Boolean;
 begin
-  result := LoadYAMLCollection(copyLocalArray, TSpecCopyLocalEntry,
+  result := LoadYAMLCollection(copyLocalArray, TSpecCopyLocalEntry, '[copyLocal] of the template [' + FName + ']',
     procedure(const value : IInterface)
     begin
       FCopyLocalEntries.Add(value as ISpecCopyLocalEntry);
@@ -732,47 +743,55 @@ begin
 
   FName := yamlObject.S['name'];
 
-  collectionObj := yamlObject.A['dependencies'];
+  if not SequenceOf(yamlObject, 'dependencies', 'the template [' + FName + ']', collectionObj) then
+    result := false;
   if collectionObj.Count > 0 then
     result := LoadDependenciesFromYAML(collectionObj) and result;
 
 
-  collectionObj := yamlObject.A['source'];
+  if not SequenceOf(yamlObject, 'source', 'the template [' + FName + ']', collectionObj) then
+    result := false;
   if collectionObj.Count > 0 then
     result := LoadSourceFromYAML(collectionObj) and result;
 
-  collectionObj := yamlObject.A['build'];
+  if not SequenceOf(yamlObject, 'build', 'the template [' + FName + ']', collectionObj) then
+    result := false;
   if collectionObj.Count > 0 then
     result := LoadBuildEntriesFromYAML(collectionObj) and result;
 
-  collectionObj := yamlObject.A['design'];
+  if not SequenceOf(yamlObject, 'design', 'the template [' + FName + ']', collectionObj) then
+    result := false;
   if collectionObj.Count > 0 then
     result := LoadDesignFromYAML(collectionObj) and result;
 
   if yamlObject.ContainsKey('copyToLib') then
   begin
-    collectionObj := yamlObject.A['copyToLib'];
+    if not SequenceOf(yamlObject, 'copyToLib', 'the template [' + FName + ']', collectionObj) then
+      result := false;
     if collectionObj.Count > 0 then
       result := LoadCopyToLibFromYAML(collectionObj) and result;
   end;
 
   if yamlObject.ContainsKey('copyToBin') then
   begin
-    collectionObj := yamlObject.A['copyToBin'];
+    if not SequenceOf(yamlObject, 'copyToBin', 'the template [' + FName + ']', collectionObj) then
+      result := false;
     if collectionObj.Count > 0 then
       result := LoadCopyToBinFromYAML(collectionObj) and result;
   end;
 
   if yamlObject.ContainsKey('copyLocal') then
   begin
-    collectionObj := yamlObject.A['copyLocal'];
+    if not SequenceOf(yamlObject, 'copyLocal', 'the template [' + FName + ']', collectionObj) then
+      result := false;
     if collectionObj.Count > 0 then
       result := LoadCopyLocalFromYAML(collectionObj) and result;
   end;
 
   if yamlObject.ContainsKey('package definitions') then
   begin
-    collectionObj := yamlObject.A['package definitions'];
+    if not SequenceOf(yamlObject, 'package definitions', 'the template [' + FName + ']', collectionObj) then
+      result := false;
     if collectionObj.Count > 0 then
       result := LoadPackageDefinitionsFromYAML(collectionObj) and result;
   end;
@@ -781,7 +800,8 @@ begin
   //Auto-derived at pack time; read here for round-tripping and so the gallery/IDE can consume it.
   if yamlObject.ContainsKey('precompiledBinaries') then
   begin
-    collectionObj := yamlObject.A['precompiledBinaries'];
+    if not SequenceOf(yamlObject, 'precompiledBinaries', 'the template [' + FName + ']', collectionObj) then
+      result := false;
     for i := 0 to collectionObj.Count - 1 do
       if collectionObj.S[i] <> '' then
         FPrecompiledBinaries.Add(collectionObj.S[i]);

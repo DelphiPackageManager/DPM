@@ -60,6 +60,7 @@ implementation
 uses
   System.SysUtils,
   System.Classes,
+  System.Types,
   System.StrUtils,
   Spring.Collections,
   JsonDataObjects,
@@ -141,27 +142,71 @@ begin
   result := true;
 end;
 
+//A member of an expression - a licence id the shipped SPDX list has, with an optional '+' ('or later'). Not a
+//LicenseRef- : the document doesn't define any, and one it doesn't define makes it invalid.
+function IsSpdxLicenseMember(const token : string) : boolean;
+var
+  base : string;
+  id : string;
+begin
+  base := token;
+  if (Length(base) > 1) and (base[Length(base)] = '+') then
+    Delete(base, Length(base), 1);
+  result := TSpdxLicenses.TryGetCanonicalLicenseId(base, id);
+end;
+
 //A compound SPDX expression ('MIT OR Apache-2.0', 'GPL-2.0+', 'GPL-2.0-only WITH Classpath-exception-2.0')
 //is not a licence id - CycloneDX carries it in licenses[0].expression instead. SPDX operators
-//are case sensitive, so we only accept the uppercase forms.
+//are case sensitive, so we only accept the uppercase forms. Every member has to be a licence id, with an
+//operator between each - 'MIT OR Commercial license' was taken for one because it had an operator in it.
 function IsSpdxLicenseExpression(const value : string) : boolean;
 var
   trimmed : string;
-  id : string;
+  tokens : TStringDynArray;
+  token : string;
+  lastMember : string;
+  i : integer;
+  expectMember : boolean;
+  afterWith : boolean;
+  operators : integer;
 begin
   result := false;
   trimmed := Trim(value);
   if not LooksLikeSpdxExpression(trimmed) then
     exit;
-  if (Pos(' AND ', trimmed) > 0) or (Pos(' OR ', trimmed) > 0) or (Pos(' WITH ', trimmed) > 0) then
+  //parentheses only group - what they hold is checked as the rest is.
+  trimmed := StringReplace(StringReplace(trimmed, '(', ' ', [rfReplaceAll]), ')', ' ', [rfReplaceAll]);
+  tokens := SplitString(trimmed, ' ');
+  expectMember := true;
+  afterWith := false;
+  operators := 0;
+  for i := 0 to Length(tokens) - 1 do
   begin
-    result := true;
-    exit;
+    token := tokens[i];
+    if token = '' then
+      continue;
+    if (token = 'AND') or (token = 'OR') or (token = 'WITH') then
+    begin
+      if expectMember then
+        exit;
+      Inc(operators);
+      afterWith := token = 'WITH';
+      expectMember := true;
+      continue;
+    end;
+    if not expectMember then
+      exit;
+    //after WITH an exception id - the shipped list has only licences, so an id shaped token is taken.
+    if (not afterWith) and (not IsSpdxLicenseMember(token)) then
+      exit;
+    afterWith := false;
+    expectMember := false;
+    lastMember := token;
   end;
-  //'GPL-2.0+' - the 'or later' shorthand. Only treat it as an expression when the base is
-  //an identifier we recognise, otherwise it's just free text that happens to end in a plus.
-  if (Length(trimmed) > 1) and (trimmed[Length(trimmed)] = '+') then
-    result := TSpdxLicenses.TryGetCanonicalLicenseId(Copy(trimmed, 1, Length(trimmed) - 1), id);
+  if expectMember then
+    exit;
+  //an id on its own is a licence id, not an expression - unless it is 'or later' ('GPL-2.0+').
+  result := (operators > 0) or EndsStr('+', lastMember);
 end;
 
 //The DPM component kind, as carried in CycloneDX properties[] and SPDX annotations[].
@@ -864,7 +909,10 @@ begin
     for comp in report.Components do
     begin
       spdxId := SpdxIdFor(comp, usedIds);
-      bomRefToSpdxId.Add(comp.BomRef, spdxId);
+      //the generator keeps bom-refs unique; a report that doesn't (one built by hand) mustn't stop the writing -
+      //the relationships go to the first.
+      if not bomRefToSpdxId.ContainsKey(comp.BomRef) then
+        bomRefToSpdxId.Add(comp.BomRef, spdxId);
       FillPackage(packagesArr.AddObject, comp, spdxId);
     end;
 

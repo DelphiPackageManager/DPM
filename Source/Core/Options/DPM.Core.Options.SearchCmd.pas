@@ -48,6 +48,7 @@ type
       FDefault : TSearchCmdOptions;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TSearchCmdOptions read FDefault;
     constructor Create; override;
     function Validate(const logger : ILogger) : boolean; override;
@@ -76,6 +77,12 @@ end;
 class constructor TSearchCmdOptions.CreateDefault;
 begin
   FDefault := TSearchCmdOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TSearchCmdOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 function TSearchCmdOptions.Validate(const logger : ILogger) : boolean;

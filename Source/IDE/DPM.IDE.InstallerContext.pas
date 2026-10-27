@@ -95,6 +95,37 @@ uses
 
 { helpers }
 
+//What a project holds when its design packages stop loading part way : the BPLs it had that are still wanted (the
+//rest were released), and the first loadedCount of newRefs (those were loaded) - each once.
+function HeldBPLRefs(const oldRefs : IList<TDPMProjectBPLRef>; const desiredSet : IDictionary<string, integer>;
+                     const newRefs : IList<TDPMProjectBPLRef>; const loadedCount : integer) : IList<TDPMProjectBPLRef>;
+var
+  i : integer;
+  seen : IDictionary<string, integer>;
+begin
+  result := TCollections.CreateList<TDPMProjectBPLRef>;
+  seen := TCollections.CreateDictionary<string, integer>;
+  if oldRefs <> nil then
+  begin
+    for i := 0 to oldRefs.Count - 1 do
+    begin
+      if desiredSet.ContainsKey(oldRefs[i].BPLPath) and (not seen.ContainsKey(oldRefs[i].BPLPath)) then
+      begin
+        result.Add(oldRefs[i]);
+        seen[oldRefs[i].BPLPath] := 1;
+      end;
+    end;
+  end;
+  for i := 0 to loadedCount - 1 do
+  begin
+    if not seen.ContainsKey(newRefs[i].BPLPath) then
+    begin
+      result.Add(newRefs[i]);
+      seen[newRefs[i].BPLPath] := 1;
+    end;
+  end;
+end;
+
 procedure RunOnMainThread(const proc : TThreadProcedure);
 begin
   if TThread.CurrentThread.ThreadID = MainThreadID then
@@ -635,10 +666,17 @@ begin
   end;
 
   //Load-new phase: forward (post-order DFS) order. Already-loaded BPLs are no-ops in LoadBPLIfNeeded.
-  for designBpl in desired do
+  //newRefs[i] is desired[i]'s ref.
+  for i := 0 to desired.Count - 1 do
   begin
     if cancellationToken.IsCancelled then
+    begin
+      //the orphans are gone and some of the new ones are loaded - recorded as they are, so closing the project (or
+      //the next install) releases them. Left as the old refs, the loaded ones stayed in the IDE for good.
+      FProjectBPLs[lcProject] := HeldBPLRefs(oldRefs, desiredSet, newRefs, i);
       exit(false);
+    end;
+    designBpl := desired[i];
     if not LoadBPLIfNeeded(designBpl.BPLPath, designBpl.BPLFolder, designBpl.DependencyFolders, designBpl.PackageId, lcProject) then
       overallResult := false;
   end;

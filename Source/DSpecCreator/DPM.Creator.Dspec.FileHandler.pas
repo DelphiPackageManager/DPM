@@ -15,7 +15,8 @@ type
     FLogger: ILogger;
     FReader: IPackageSpecReader;
     FFilename : string;
-    FLoadedSpec : IPackageSpec;
+    //the spec as it was loaded, saved, or set up (collapsed) - IsModified compares with it.
+    FBaselineYAML : string;
     FPackageSpec : IPackageSpec;
 
     //The UI edits one compiler per row, so we expand ranges/lists into single-compiler entries on
@@ -38,6 +39,8 @@ type
     procedure SaveToFile(const filename: string);
     function WorkingDir: string;
     function IsModified: Boolean;
+    //what the spec is now is what IsModified compares with - called once a new spec has been set up.
+    procedure MarkUnmodified;
     function AsString: string;
     constructor Create(logger: ILogger);
     destructor Destroy; override;
@@ -127,7 +130,15 @@ constructor TDSpecFile.Create(logger: ILogger);
 begin
   FLogger := logger;
   FPackageSpec := TSpec.Create(FLogger, '');
-  FLoadedSpec := TSpec.Create(FLogger, '');
+  MarkUnmodified;
+end;
+
+procedure TDSpecFile.MarkUnmodified;
+begin
+  if FPackageSpec <> nil then
+    FBaselineYAML := CollapsedYAML(FPackageSpec)
+  else
+    FBaselineYAML := '';
 end;
 
 procedure TDSpecFile.DeleteTemplate(const templateName: string);
@@ -210,12 +221,11 @@ end;
 
 function TDSpecFile.IsModified: Boolean;
 begin
-//TODO : This is wasteful - implement a modified flag.
-
-  //compare the collapsed form of both - it is canonically ordered, so reordering during editing
-  //(e.g. appending a newly added compiler) does not register as a change on its own.
-  if (FPackageSpec <> nil) and (FLoadedSpec <> nil) then
-    Result := not SameText(CollapsedYAML(FPackageSpec), CollapsedYAML(FLoadedSpec))
+  //compare the collapsed form - it is canonically ordered, so reordering during editing (e.g. appending a newly
+  //added compiler) does not register as a change on its own. Exactly - a change of case is a change. The baseline
+  //was an empty spec until a file was loaded, so a new one was 'modified' before anything was typed.
+  if FPackageSpec <> nil then
+    Result := CollapsedYAML(FPackageSpec) <> FBaselineYAML
   else
     result := false;
 end;
@@ -231,8 +241,7 @@ begin
     //expand compiler ranges/lists into one entry per compiler so the UI can edit each
     //independently. The baseline is expanded too so the modified check compares like with like.
     ExpandTargetPlatforms(FPackageSpec);
-    FLoadedSpec := FReader.ReadSpec(filename);
-    ExpandTargetPlatforms(FLoadedSpec);
+    MarkUnmodified;
   except
     on E : Exception do
     begin
@@ -248,10 +257,8 @@ begin
   //collapse the per-compiler editing entries back into ranges/lists for the on-disk file.
   SaveCollapsed(FPackageSpec, filename);
   FFilename := filename;
-  //reload so the modified-check baseline matches what was just written (expanded to match FPackageSpec).
-  FReader := TPackageSpecReader.Create(FLogger);
-  FLoadedSpec := FReader.ReadSpec(filename);
-  ExpandTargetPlatforms(FLoadedSpec);
+  //what was just written is the new baseline.
+  MarkUnmodified;
 end;
 
 function TDSpecFile.WorkingDir: string;

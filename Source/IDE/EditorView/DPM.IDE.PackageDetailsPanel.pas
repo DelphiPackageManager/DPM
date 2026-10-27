@@ -374,7 +374,9 @@ begin
               exit;
           end;
         deProjectUrl : sUri := FPackage.ProjectUrl;
-        deReportUrl : sUri := FPackage.ProjectUrl;
+        //each its own - the report link opened the project url, and the repository link nothing.
+        deReportUrl : sUri := FPackage.ReportUrl;
+        deRepositoryUrl : sUri := FPackage.RepositoryUrl;
         deRepositoryCommit :
         begin
           if StartsText('https://github.com', FPackage.RepositoryUrl)  then
@@ -386,6 +388,9 @@ begin
       else
         exit;
       end;
+      //a commit of a repository that isn't on github has no link.
+      if sUri = '' then
+        exit;
       FOnUriClickEvent(self, sUri, FHitElement);
     end;
   end;

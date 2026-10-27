@@ -51,6 +51,7 @@ type
     constructor CreateClone(const original : TCopyLocalOptions); reintroduce;
   public
     class constructor CreateDefault;
+    class destructor DestroyDefault;
     class property Default : TCopyLocalOptions read FDefault;
     constructor Create; override;
     function Validate(const logger : ILogger) : Boolean; override;
@@ -109,6 +110,12 @@ end;
 class constructor TCopyLocalOptions.CreateDefault;
 begin
   FDefault := TCopyLocalOptions.Create;
+end;
+
+//the singleton goes with the unit - it was never freed, so every run reported it as a leak.
+class destructor TCopyLocalOptions.DestroyDefault;
+begin
+  FDefault.Free;
 end;
 
 function TCopyLocalOptions.Validate(const logger : ILogger) : Boolean;

@@ -106,6 +106,7 @@ begin
   FTake := original.FTake;
   FCompilerVersion := original.FCompilerVersion;
   FPlatforms := original.FPlatforms;
+  FForce := original.FForce;
   FVersion := original.FVersion;
   FPrerelease := original.FPrerelease;
   FIncludeDelisted := original.FIncludeDelisted;

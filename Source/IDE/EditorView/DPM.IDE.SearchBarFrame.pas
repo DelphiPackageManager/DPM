@@ -69,6 +69,8 @@ type
     FConfiguration : IConfiguration;
     FLogger : IDPMIDELogger;
     FSearchHistFile : string;
+    //the search text as it was when it last changed - see txtSearchChange.
+    FChangedText : string;
     FConfigFile : string;
     FHasSources : boolean;
     FLoading : boolean;
@@ -712,16 +714,23 @@ end;
 procedure TDPMSearchBarFrame.txtSearchChange(Sender: TObject);
 begin
   txtSearch.RightButton.Visible := txtSearch.Text <> '';
+  //A search when what is typed changes - started here, after the change, not on every key down (a key that only
+  //moved the caret searched again, and one pressed while a search was pending cancelled it).
+  if txtSearch.Text = FChangedText then
+    exit;
+  FChangedText := txtSearch.Text;
+  DebounceTimer.Enabled := false;
+  DebounceTimer.Enabled := true;
 end;
 
 procedure TDPMSearchBarFrame.txtSearchKeyDown(Sender: TObject; var Key: Word;  Shift: TShiftState);
 var
   i : integer;
 begin
-  DebounceTimer.Enabled := false;
   case key of
     VK_RETURN :
       begin
+        DebounceTimer.Enabled := false;
         i := txtSearch.ACStrings.IndexOf(txtSearch.Text);
         if i = -1 then
           txtSearch.ACStrings.Insert(0, txtSearch.Text)
@@ -740,6 +749,7 @@ begin
         if txtSearch.Text <> '' then
         begin
           txtSearch.Text := '';
+          //now - the change above started the debounce, and DebounceTimerTimer stops it.
           DebounceTimerTimer(DebounceTimer);
         end;
       end;
@@ -751,15 +761,15 @@ begin
         FOnFocusList(self);
         Key := 0;
       end;
-    end
-  else
-    DebounceTimer.Enabled := true;
+    end;
   end;
 end;
 
 procedure TDPMSearchBarFrame.txtSearchRightButtonClick(Sender: TObject);
 begin
   txtSearch.Text := '';
+  //searched now - not again when the debounce the change started runs out.
+  DebounceTimer.Enabled := false;
   DoSearchEvent(true);
 end;
 

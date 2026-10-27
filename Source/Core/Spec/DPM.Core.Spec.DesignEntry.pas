@@ -216,7 +216,8 @@ begin
   end;
 
   FDefines := yamlObject.S['defines'];
-  platformsSeq := yamlObject.A['platforms'];
+  if not SequenceOf(yamlObject, 'platforms', 'the design entry [' + FProject + ']', platformsSeq) then
+    result := false;
   FPlatforms := [];
   if platformsSeq.Count > 0 then
   begin
@@ -225,13 +226,20 @@ begin
       sPlatform := platformsSeq.S[i];
       platform := StringToDPMPlatform(sPlatform);
       if platform <> TDPMPlatform.UnknownPlatform then
-        FPlatforms := FPlatforms + [platform];
+        FPlatforms := FPlatforms + [platform]
+      else
+      begin
+        //not dropped - no platforms means all of them, so leaving it out would widen the entry.
+        Logger.Error(TErrorCode.E6004_SpecValueInvalid, 'The platform [' + sPlatform + '] of the design entry [' + FProject + '] is not a platform DPM knows.');
+        result := false;
+      end;
     end;
   end;
 
   if yamlObject.Contains('references') then
   begin
-    refsSeq := yamlObject.A['references'];
+    if not SequenceOf(yamlObject, 'references', 'the design entry [' + FProject + ']', refsSeq) then
+      result := false;
     for i := 0 to refsSeq.Count - 1 do
     begin
       refName := Trim(refsSeq.S[i]);
@@ -242,7 +250,8 @@ begin
 
   if yamlObject.Contains('searchPaths') then
   begin
-    searchSeq := yamlObject.A['searchPaths'];
+    if not SequenceOf(yamlObject, 'searchPaths', 'the design entry [' + FProject + ']', searchSeq) then
+      result := false;
     for i := 0 to searchSeq.Count - 1 do
     begin
       searchPath := Trim(searchSeq.S[i]);

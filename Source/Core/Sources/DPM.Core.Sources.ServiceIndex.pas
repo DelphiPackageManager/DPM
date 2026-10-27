@@ -37,6 +37,7 @@ type
 implementation
 
 uses
+  DPM.Core.Utils.Json,
   System.SysUtils;
 
 { TServiceIndexItem }
@@ -115,7 +116,7 @@ class function TServiceIndex.LoadFromString(const jsonString: string): IServiceI
 var
   jsonObj : TJsonObject;
 begin
-  jsonObj := TJsonObject.Parse(jsonString) as TJsonObject;
+  jsonObj := TJsonText.ParseObject(jsonString);
   try
     result := LoadFromJson(jsonObj);
   finally
