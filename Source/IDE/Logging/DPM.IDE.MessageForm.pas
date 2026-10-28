@@ -44,6 +44,8 @@ type
     FCloseDelayInSeconds : integer;
     FCurrentCloseDelay : integer;
     FStopwatch : TStopwatch;
+    //Running since the window last came on screen - see WaitUntilShownFor.
+    FShownStopwatch : TStopwatch;
     //True between TaskStarted and TaskDone. While set, the Close button and the window's
     //system-menu close are blocked so the user can't dismiss the log (and lose sight of a
     //running operation) without going through Cancel. Driven explicitly by the message
@@ -80,6 +82,7 @@ type
     procedure CMStyleChanged(var Message: TMessage); message CM_STYLECHANGED;
     procedure CMShowingChanged(var Message: TMessage); message CM_SHOWINGCHANGED;
     procedure WMTimer(var Message: TWMTimer); message WM_TIMER;
+    procedure WMWindowPosChanging(var Message: TWMWindowPosChanging); message WM_WINDOWPOSCHANGING;
 
     //INTAIDEThemingServicesNotifier
     procedure ChangingTheme;
@@ -117,6 +120,11 @@ type
 
     procedure DelayHide;
 
+    //Returns once the window has been on screen for at least milliseconds (at once if it isn't showing), keeping
+    //its own controls live meanwhile - the same filtered pump the logging methods use, so nothing re-enters the
+    //IDE. Closing it ends the wait.
+    procedure WaitUntilShownFor(const milliseconds : integer);
+
     //Called by the message service to mark a task as running / finished. While running the
     //Close button and the window close box are disabled.
     procedure SetTaskRunning(const value : boolean);
@@ -144,6 +152,10 @@ const
   //Timer id for the auto close countdown. Scoped to our own window handle, so it cannot
   //collide with anything else in the IDE.
   CCloseTimerId = 1;
+
+type
+  //PopupChildren is protected - see CreateParams.
+  TCustomFormAccess = class(TCustomForm);
 
 //Windows replaces the top level windows of a GUI thread that has stopped servicing its message
 //queue with GHOST windows - a frozen copy with "(Not Responding)" appended. Detection kicks in
@@ -275,6 +287,17 @@ begin
   end;
 end;
 
+//TApplication.Minimize hides the visible windows the application window owns, and Restore shows that same list
+//again with a raw ShowWindow - whatever happened in between. Hidden while the IDE was minimised (the auto close
+//countdown running out), the log window came back on restore with Visible false, and Close then did nothing. It
+//is only ever shown when the VCL says it is visible.
+procedure TDPMMessageForm.WMWindowPosChanging(var Message: TWMWindowPosChanging);
+begin
+  if (not Visible) and ((Message.WindowPos.flags and SWP_SHOWWINDOW) <> 0) then
+    Message.WindowPos.flags := Message.WindowPos.flags and (not SWP_SHOWWINDOW);
+  inherited;
+end;
+
 procedure TDPMMessageForm.StartCloseCountdown;
 begin
   FCloseTimerRunning := true;
@@ -362,7 +385,10 @@ begin
   if FLogMemo <> nil then
     FLogMemo.ResetPaintState;
   if Showing then
+  begin
+    FShownStopwatch := TStopwatch.StartNew;
     PaintNow;
+  end;
 end;
 
 procedure TDPMMessageForm.PaintNow;
@@ -429,6 +455,7 @@ begin
   Self.OnCloseQuery := FormCloseQuery;
 
   FStopwatch := TStopwatch.Create;
+  FShownStopwatch := TStopwatch.Create;
 end;
 
 procedure TDPMMessageForm.CreateParams(var Params: TCreateParams);
@@ -439,6 +466,21 @@ begin
   //not while a prompt is up - a handle made now must not go on top of it.
   if FPromptDepth = 0 then
     Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST;
+
+  //Owned by the application window, never by the IDE main form. The IDE recreates its main form's window - every
+  //project desktop load does (TDesktopForm.LoadWindowState -> SetPosition -> RecreateWnd) - and the VCL destroys
+  //and recreates every window that form owns along with it. A log window that was up when a project opened
+  //vanished and came back (twice in 13.x), which looked like the restore running again. The application window
+  //lasts as long as the IDE. Still a top level window, so focus and keyboard work, and the VCL hides the windows
+  //the application window owns when the IDE is minimised (see WMWindowPosChanging for what it gets wrong).
+  if Application.Handle <> 0 then
+  begin
+    //inherited lists us as a popup of the main form when it picks that as the owner (pmNone with
+    //MainFormOnTaskBar) - that list is what the main form destroys and recreates.
+    if Application.MainForm <> nil then
+      TCustomFormAccess(Application.MainForm).PopupChildren.Remove(Self);
+    Params.WndParent := Application.Handle;
+  end;
 
   //Kill the white flash on the first show. This is a TOP LEVEL window concern, not a control one :
   //child windows share the top level window's DWM redirection surface, and that surface is white
@@ -490,6 +532,15 @@ begin
   lblClosing.Visible := true;
   lblDontClose.Visible := true;
   lblClosing.Update;
+end;
+
+procedure TDPMMessageForm.WaitUntilShownFor(const milliseconds : integer);
+begin
+  while Showing and FShownStopwatch.IsRunning and (FShownStopwatch.ElapsedMilliseconds < milliseconds) do
+  begin
+    ProcessMessages;
+    Sleep(10);
+  end;
 end;
 
 destructor TDPMMessageForm.Destroy;
@@ -681,6 +732,7 @@ begin
     //DefWindowProc's modal move loop, which pumps the whole thread queue again.
     PumpControlInput(btnCancel);
     PumpControlInput(btnCopy);
+    PumpControlInput(btnClose); //disabled while a task runs - live for WaitUntilShownFor.
     PumpControlInput(FLogMemo); //scroll/selection - handlers are self contained.
   end;
 end;

@@ -113,6 +113,9 @@ const
   //Bounded so a session that never opens the log window cannot accumulate worker log lines
   //for the life of the IDE. The oldest go first - the most recent are the useful ones.
   CMaxPendingLines = 500;
+  //A successful restore closes the log window at once (see TaskDone) - but not before it has been up this long, or
+  //a fast one is just a flash.
+  CMinRestoreLogVisibleMs = 2000;
 
 { TDPMMessageService }
 
@@ -154,7 +157,6 @@ begin
     FOptions.LogWindowWidth := FMessageForm.Width;
     FOptions.LogWindowHeight := FMessageForm.Height;
     FOptions.SaveToFile();
-    FMessageForm.PopupParent := nil;
     FMessageForm.Free;
   end;
   FPendingLines := nil;
@@ -244,14 +246,12 @@ begin
     exit;
   if FMessageForm = nil then
   begin
+    //No Parent - that makes the form a WS_CHILD embedded in the IDE main form, which never receives
+    //WM_ACTIVATE, so it never becomes Screen.ActiveCustomForm and its focus/keyboard handling is broken
+    //(Ctrl+A/Ctrl+C in the log memo, and the form's IsShortCut override, never fire). Nor PopupParent :=
+    //Application.MainForm - the IDE recreates that window, taking the log window with it. The form owns
+    //itself to the application window - see TDPMMessageForm.CreateParams.
     FMessageForm := TDPMMessageForm.Create(nil, FOptions);
-    //Use PopupParent (owned top-level window) rather than Parent. Setting Parent makes the form a
-    //WS_CHILD embedded in the IDE main form, which never receives WM_ACTIVATE - so it never becomes
-    //Screen.ActiveCustomForm and its focus/keyboard handling is broken (Ctrl+A/Ctrl+C in the log
-    //memo, and the form's IsShortCut override, never fire). PopupParent keeps it above the IDE main
-    //form and owned by it while remaining a proper top-level window with working keyboard focus.
-    FMessageForm.PopupMode := pmExplicit;
-    FMessageForm.PopupParent := Application.MainForm;
   end;
   FMessageForm.CancellationTokenSource := FCancellationTokenSource;
   FMessageForm.CloseDelayInSeconds := FOptions.AutoCloseLogDelaySeconds;
@@ -338,10 +338,7 @@ begin
     FPendingLock.Leave;
   end;
   if FMessageForm <> nil then
-  begin
-    FMessageForm.PopupParent := nil;
     FreeAndNil(FMessageForm);
-  end;
 end;
 
 procedure TDPMIDEMessageService.Success(const data: string;  const important: Boolean);
@@ -357,6 +354,8 @@ begin
 end;
 
 procedure TDPMIDEMessageService.TaskDone(const success : boolean);
+var
+  endedTask : TMessageTask;
 begin
   //Nothing was ever started, so there is nothing to finish - and in particular nothing worth
   //showing. Without this, a TaskDone(false) arriving from a load that never called TaskStarted
@@ -365,6 +364,7 @@ begin
   if FCurrentTask = mtNone then
     exit;
 
+  endedTask := FCurrentTask;
   FCancellationTokenSource := nil;
   FCurrentTask := mtNone;
   //Re-enable the Close button / close box now the work is done. Done unconditionally up
@@ -382,7 +382,17 @@ begin
     if FMessageForm <> nil then
     begin
       FMessageForm.CancellationTokenSource := nil;
-      HideMessageWindow;
+      //A restore only ever runs while a project opens, and ends with the IDE still loading it (desktop, editors,
+      //designer) for several more seconds without pumping messages. The countdown can't tick through that - the
+      //window sat there frozen until the IDE was done, then counted down. It goes now instead - after a minimum
+      //time on screen, held here rather than on a timer for the same reason.
+      if endedTask = mtRestore then
+      begin
+        FMessageForm.WaitUntilShownFor(CMinRestoreLogVisibleMs);
+        FMessageForm.Hide;
+      end
+      else
+        HideMessageWindow;
     end;
   end;
 end;
