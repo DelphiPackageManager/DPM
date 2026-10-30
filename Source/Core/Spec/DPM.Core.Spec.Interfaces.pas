@@ -41,6 +41,9 @@ uses
 
 
 type
+  //Variable names are case insensitive. A spec's and a target platform's variables keep each name as it was written
+  //(so a save writes it back that way) in a dictionary that ignores case. Anything that copies them into a lookup
+  //table of its own must lowercase the keys - TPackageWriter.PopulateVariables, TPrepareSourceGatherer.BuildVariables.
   IVariables = IOrderedDictionary<string,string>;
 
   ISpecNode = interface

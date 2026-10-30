@@ -161,7 +161,7 @@ begin
       result := CompareText(Left.Name, Right.Name);
    end
   );
-  FVariables := TCollections.CreateDictionary<string,string>;
+  FVariables := TCollections.CreateDictionary<string,string>(TIStringComparer.Ordinal); //see LoadVariablesFromYAML
 end;
 
 constructor TSpec.CreateClone(const logger: ILogger; const source: IPackageSpecPrivate);
@@ -207,7 +207,7 @@ begin
     FTemplates.Add(newTemplate);
   end;
 
-  FVariables := TCollections.CreateDictionary<string,string>;
+  FVariables := TCollections.CreateDictionary<string,string>(TIStringComparer.Ordinal); //see LoadVariablesFromYAML
   FVariables.AddRange(source.Variables);
 end;
 
@@ -626,10 +626,12 @@ begin
   end;
   if variablesObj.Count > 0 then
   begin
+    //Variable names are case insensitive - FVariables compares them that way - but kept as written, so a load and save
+    //(DSpecCreator) doesn't rewrite them. They used to be lowercased here.
     for i := 0 to variablesObj.Count -1 do
     begin
       try
-        FVariables[LowerCase(variablesObj.Keys[i])] := variablesObj.Items[variablesObj.Keys[i]].AsString;
+        FVariables[variablesObj.Keys[i]] := variablesObj.Items[variablesObj.Keys[i]].AsString;
       except
         on e : Exception do
         begin

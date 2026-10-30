@@ -117,6 +117,7 @@ implementation
 uses
   System.SysUtils,
   System.StrUtils,
+  System.Generics.Defaults,
   DPM.Core.Constants,
   DPM.Core.TargetPlatform,
   DPM.Core.Utils.Strings,
@@ -206,14 +207,14 @@ begin
   FMaxCompilerVersion := TCompilerVersion.UnknownVersion;
 
   FTemplateName := cUnset;
-  FVariables := TCollections.CreateDictionary<string,string>;
+  FVariables := TCollections.CreateDictionary<string,string>(TIStringComparer.Ordinal); //see TSpec.LoadVariablesFromYAML
 end;
 
 
 constructor TSpecTargetPlatform.CreateClone(const logger : ILogger; const source : ISpecTargetPlatform);
 begin
   inherited Create(logger);
-  FVariables := TCollections.CreateDictionary<string,string>;
+  FVariables := TCollections.CreateDictionary<string,string>(TIStringComparer.Ordinal); //see TSpec.LoadVariablesFromYAML
   FTemplateName := source.TemplateName;
   FCompiler := source.Compiler;
   FPlatforms := source.Platforms;
@@ -426,8 +427,9 @@ begin
     variablesObj := yamlObject.O['variables'];
     if variablesObj <> nil then
     begin
+      //kept as written - see TSpec.LoadVariablesFromYAML.
       for i := 0 to variablesObj.Count -1 do
-        FVariables[LowerCase(variablesObj.Keys[i])] := variablesObj.Items[variablesObj.Keys[i]].AsString;
+        FVariables[variablesObj.Keys[i]] := variablesObj.Items[variablesObj.Keys[i]].AsString;
     end;
   end;
 

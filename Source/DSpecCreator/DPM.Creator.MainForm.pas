@@ -4466,7 +4466,7 @@ begin
   begin
     key := PackageVariablesList.Strings.Names[i];
     if key <> '' then
-      FOpenFile.PackageSpec.Variables[LowerCase(key)] := PackageVariablesList.Strings.ValueFromIndex[i];
+      FOpenFile.PackageSpec.Variables[key] := PackageVariablesList.Strings.ValueFromIndex[i];
   end;
 end;
 

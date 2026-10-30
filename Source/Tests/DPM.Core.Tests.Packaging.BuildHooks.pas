@@ -85,6 +85,7 @@ type
     procedure Pack_That_Works_Leaves_Only_The_Package;
     procedure Pack_That_Fails_Leaves_The_Package_From_Before;
     procedure Pack_With_A_Token_It_Can_Not_Replace_Fails;
+    procedure Pack_Resolves_Variables_Whatever_Their_Case;
   end;
 
 implementation
@@ -98,6 +99,7 @@ uses
   VSoft.CancellationToken,
   TestLogger,
   DPM.Core.Types,
+  DPM.Core.Constants,
   DPM.Core.Logging,
   DPM.Core.Diagnostics,
   DPM.Core.Spec.Interfaces,
@@ -663,6 +665,66 @@ begin
     Assert.IsFalse(didPack, 'a package with a token left in it is no use');
     Assert.IsTrue(logger.HasError(TErrorCode.E6103_VariableReplacementFailed), logger.Messages.Text);
     Assert.IsFalse(FileExists(PackageFileName(workDir)), 'no package was written');
+  finally
+    Cleanup(workDir);
+  end;
+end;
+
+//the dspec packed into dpkgPath.
+function ReadPackedSpec(const dpkgPath : string) : IPackageSpec;
+var
+  zip : TZipFile;
+  bytes : TBytes;
+  i : integer;
+  found : boolean;
+  reader : IPackageSpecReader;
+begin
+  found := false;
+  zip := TZipFile.Create;
+  try
+    zip.Open(dpkgPath, zmRead);
+    for i := 0 to zip.FileCount - 1 do
+    begin
+      if SameText(zip.FileName[i], cPackageDspecFile) then
+      begin
+        zip.Read(i, bytes);
+        found := true;
+        break;
+      end;
+    end;
+  finally
+    zip.Free;
+  end;
+  Assert.IsTrue(found, cPackageDspecFile + ' missing from the package');
+  reader := TPackageSpecReader.Create(TTestLogger.Create);
+  result := reader.ReadSpecString(TEncoding.UTF8.GetString(bytes));
+  Assert.IsNotNull(result, 'the packed dspec reads');
+end;
+
+procedure TPackOutputTests.Pack_Resolves_Variables_Whatever_Their_Case;
+var
+  workDir : string;
+  specFile : string;
+  spec : string;
+  packedSpec : IPackageSpec;
+begin
+  //variable names are case insensitive : the platform's PACKAGESOURCE overrides the package's PackageSource, and tokens
+  //in another case again find both it and the package's Company.
+  workDir := MakeWorkDir;
+  try
+    WriteProjectFile(workDir, 'Pkg.dproj', cCleanDproj);
+    WriteDspec(workDir, 'Pkg.dproj', '');
+    specFile := TPath.Combine(workDir, 'test.dspec.yaml');
+    spec := TFile.ReadAllText(specFile, TEncoding.UTF8);
+    spec := StringReplace(spec, 'description: build hook pack test', 'description: built from $packagesource$ by $COMPANY$', []);
+    spec := StringReplace(spec, 'targetPlatforms:', 'variables:' + sLineBreak + '  PackageSource: the package' + sLineBreak +
+                                                    '  Company: VSoft' + sLineBreak + 'targetPlatforms:', []);
+    spec := StringReplace(spec, '    template: default', '    template: default' + sLineBreak + '    variables:' + sLineBreak +
+                                                        '      PACKAGESOURCE: the platform', []);
+    TFile.WriteAllText(specFile, spec, TEncoding.UTF8);
+    Assert.IsTrue(Pack(workDir), 'pack');
+    packedSpec := ReadPackedSpec(PackageFileName(workDir));
+    Assert.AreEqual('built from the platform by VSoft', packedSpec.MetaData.Description, false);
   finally
     Cleanup(workDir);
   end;
