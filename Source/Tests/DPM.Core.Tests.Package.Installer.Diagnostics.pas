@@ -85,6 +85,13 @@ type
     procedure Install_Failing_On_Every_Platform_Changes_Nothing;
     [Test]
     procedure Restore_A_Failing_Platform_Still_Restores_The_Others;
+    //dpm cache install - and DSpecCreator's test of a package, which is one - builds every platform the package supports.
+    [Test]
+    procedure Cache_A_Failing_Platform_Still_Builds_The_Others;
+    //On Linux and macOS a package links against its dependencies' runtime packages (.so / .dylib), which are in their
+    //bpl folders - not needed on Windows, where the .dcp in lib is linked against.
+    [Test]
+    procedure Package_Built_For_Linux_Finds_Its_Dependencies_Runtime_Packages;
 
     //In the IDE the design-time packages are also built for the platform the IDE runs on, when the project
     //doesn't target it. A package that doesn't declare that platform isn't built for it (that would add the
@@ -327,6 +334,8 @@ var
   BuiltProjects : IList<string>;
   //builds that fail whatever the outcome, as '<platform>|<part of the project file>' - when set.
   FailingBuilds : IList<string>;
+  //every build's search paths, as '<platform> <project file>|<search paths, ; separated>' - when set.
+  BuildSearchPaths : IList<string>;
 
 const
   cPackageId = 'VSoft.Compiles';
@@ -454,10 +463,20 @@ var
   outcome : TCompileOutcome;
   failing : string;
   separator : integer;
+  paths : string;
+  path : string;
 begin
   Inc(BuildCount);
   if BuiltProjects <> nil then
     BuiltProjects.Add(DPMPlatformToString(platform) + ' ' + projectFile);
+  if BuildSearchPaths <> nil then
+  begin
+    paths := '';
+    if FSearchPaths <> nil then
+      for path in FSearchPaths do
+        paths := paths + path + ';';
+    BuildSearchPaths.Add(DPMPlatformToString(platform) + ' ' + projectFile + '|' + paths);
+  end;
   outcome := FOutcome;
   if FailingBuilds <> nil then
     for failing in FailingBuilds do
@@ -469,7 +488,12 @@ begin
     end;
   case outcome of
     coSucceed :
+    begin
+      //where msbuild would have written the package.
+      if FBPLOutput <> '' then
+        ForceDirectories(FBPLOutput);
       result := true;
+    end;
     coFail :
     begin
       FLogger.Error(TErrorCode.E5003_PackageCompileFailed, 'Unable to compile [' + projectFile + '] for ' + DPMPlatformToString(platform) + ' - msbuild exited with 1.');
@@ -796,6 +820,7 @@ begin
   packageFolder := TPath.Combine(tempFolder, 'package');
   //the BOM a successful build leaves would skip the next build.
   DeleteFile(TPath.Combine(packageFolder, 'package.Win32.bom'));
+  DeleteFile(TPath.Combine(packageFolder, 'package.Win64.bom'));
   BuildCount := 0;
   info := MakeInfo(cPackageId, '1.0.0', []);
   repo := TFakeRepositoryManager.Create;
@@ -1892,6 +1917,80 @@ begin
   Assert.AreEqual(1, loggerIntf.ErrorCount, 'the failed build, once : ' + logger.Messages.Text);
   Assert.IsTrue(Pos('VSoft.Foo', SearchPathFor(projectText, 'Win32')) > 0, 'the Win32 search path was not written : ' + projectText);
   Assert.AreEqual(0, Pos('VSoft.Foo', SearchPathFor(projectText, 'Win64')), 'the failed platform''s search path must not change : ' + projectText);
+end;
+
+procedure TInstallerDiagnosticsTests.Cache_A_Failing_Platform_Still_Builds_The_Others;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  build : string;
+  builtWin64 : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  BuiltProjects := TCollections.CreateList<string>;
+  //Win32 - the first platform built.
+  FailingBuilds := TCollections.CreateList<string>;
+  FailingBuilds.Add(DPMPlatformToString(TDPMPlatform.Win32) + '|Pkg.dproj');
+  try
+    Assert.IsFalse(CachePackageSpec(FTempFolder, loggerIntf, coSucceed, TCancellationTokenSourceFactory.Create, TwoPlatformPackageSpec),
+                   'a platform failed - the cache install did not entirely succeed : ' + logger.Messages.Text);
+  finally
+    FailingBuilds := nil;
+  end;
+  builtWin64 := false;
+  for build in BuiltProjects do
+    if StartsText(DPMPlatformToString(TDPMPlatform.Win64) + ' ', build) then
+      builtWin64 := true;
+  Assert.IsTrue(builtWin64, 'Win32 failing must not stop Win64 being built : ' + ListText(BuiltProjects));
+  Assert.AreEqual(1, loggerIntf.ErrorCount, 'the failed build, once : ' + logger.Messages.Text);
+  Assert.IsTrue(ContainsText(logger.Messages.Text, 'failed on platforms [' + DPMPlatformToString(TDPMPlatform.Win32) + ']'),
+                'it says which platform didn''t build : ' + logger.Messages.Text);
+end;
+
+//The search paths package id's build for platform was given (see BuildSearchPaths) - fails when it wasn't built.
+function SearchPathsOfBuild(const platform : TDPMPlatform; const id : string) : string;
+var
+  build : string;
+  separator : integer;
+begin
+  for build in BuildSearchPaths do
+  begin
+    separator := Pos('|', build);
+    if StartsText(DPMPlatformToString(platform) + ' ', build) and ContainsText(Copy(build, 1, separator - 1), '\' + id + '\') then
+      exit(Copy(build, separator + 1, MaxInt));
+  end;
+  Assert.Fail(id + ' was not built for ' + DPMPlatformToString(platform) + ' : ' + ListText(BuildSearchPaths));
+  result := '';
+end;
+
+procedure TInstallerDiagnosticsTests.Package_Built_For_Linux_Finds_Its_Dependencies_Runtime_Packages;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  project : string;
+  spec : string;
+  projectText : string;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  //a consumer of VSoft.Foo, which depends on VSoft.Bar, for Win32 and Linux64.
+  project := StringReplace(LockedConsumerProject(cBarHash), '<Platform value="Win64">True</Platform>', '<Platform value="Linux64">True</Platform>', []);
+  spec := StringReplace(cPackageSpec, 'platforms: [Win32]', 'platforms: [Win32, Linux64]', []);
+  BuildSearchPaths := TCollections.CreateList<string>;
+  try
+    Assert.IsTrue(RestoreLockedProjectFor(FTempFolder, loggerIntf, project, [MakeDep('VSoft.Bar', '1.0.0')], spec,
+                                          [TDPMPlatform.Win32, TDPMPlatform.Linux64], [], projectText),
+                  'the restore : ' + logger.Messages.Text);
+    Assert.IsTrue(ContainsText(SearchPathsOfBuild(TDPMPlatform.Linux64, 'VSoft.Foo'), '\VSoft.Bar\bpl\Linux64'),
+                  'VSoft.Bar''s runtime package is linked against : ' + ListText(BuildSearchPaths));
+    Assert.IsTrue(ContainsText(SearchPathsOfBuild(TDPMPlatform.Linux64, 'VSoft.Foo'), '\VSoft.Bar\lib\Linux64'),
+                  'and its units are still found : ' + ListText(BuildSearchPaths));
+    Assert.IsFalse(ContainsText(SearchPathsOfBuild(TDPMPlatform.Win32, 'VSoft.Foo'), '\VSoft.Bar\bpl\'),
+                   'Windows links against the .dcp in lib : ' + ListText(BuildSearchPaths));
+  finally
+    BuildSearchPaths := nil;
+  end;
 end;
 
 procedure TInstallerDiagnosticsTests.Design_Host_Build_Skips_A_Package_That_Does_Not_Declare_The_Host;

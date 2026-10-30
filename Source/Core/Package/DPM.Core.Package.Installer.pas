@@ -404,6 +404,13 @@ begin
       exit(true);
 end;
 
+const
+  //The platforms whose runtime packages are shared libraries (.dylib / .so) the linker links a package against -
+  //Delphi's own library path has $(BDSCOMMONDIR)\Bpl\$(Platform) for these and only these. Everywhere else the .dcp
+  //in lib is what is linked against.
+  cSharedLibraryPackagePlatforms : TDPMPlatforms = [TDPMPlatform.MacOS32, TDPMPlatform.MacOS64, TDPMPlatform.MacOSARM64,
+                                                    TDPMPlatform.Linux64];
+
 { TPackageInstaller }
 
 function TPackageInstaller.Cache(const cancellationToken: ICancellationToken;  const Options: TCacheOptions): boolean;
@@ -1230,7 +1237,8 @@ begin
       procedure(const dependencyReference : IPackageReference)
       var
         dependencyKey: string;
-        dependencyLibPath: string;
+        dependencyPath: string;
+        dependencyBplPath: string;
       begin
         if dependencyReference = packageReference then
           exit;
@@ -1238,9 +1246,17 @@ begin
         if seenDependencies.ContainsKey(dependencyKey) then
           exit;
         seenDependencies[dependencyKey] := true;
-        dependencyLibPath := FPackageCache.GetPackagePath(dependencyReference.Id, dependencyReference.Version.ToStringNoMeta, Compiler.compilerVersion);
-        dependencyLibPath := TPath.Combine(dependencyLibPath, 'lib' + PathDelim + DPMPlatformToBDString(effectivePlatform));
-        searchPaths.Add(dependencyLibPath);
+        dependencyPath := FPackageCache.GetPackagePath(dependencyReference.Id, dependencyReference.Version.ToStringNoMeta, Compiler.compilerVersion);
+        searchPaths.Add(TPath.Combine(dependencyPath, 'lib' + PathDelim + DPMPlatformToBDString(effectivePlatform)));
+        //The linker finds a dependency's runtime package (see cSharedLibraryPackagePlatforms) on this same path - without
+        //it 'ld: file not found: bplX.dylib'. Built before this package, so the folder is there if it made one - a
+        //source only dependency has none, and a folder that isn't there is a linker warning.
+        if effectivePlatform in cSharedLibraryPackagePlatforms then
+        begin
+          dependencyBplPath := TPath.Combine(dependencyPath, 'bpl' + PathDelim + DPMPlatformToBDString(effectivePlatform));
+          if DirectoryExists(dependencyBplPath) then
+            searchPaths.Add(dependencyBplPath);
+        end;
       end);
   end;
 
@@ -1661,6 +1677,7 @@ var
   packageSpecs: IDictionary<string, IPackageSpec>;
   spec: IPackageSpec;
   supportedPlatforms: TDPMPlatforms;
+  failedPlatforms: TDPMPlatforms;
   platform: TDPMPlatform;
   packageCompiler: ICompiler;
   packagesToBuild: IList<IPackageInfo>;
@@ -1725,6 +1742,7 @@ begin
     exit;
   end;
 
+  failedPlatforms := [];
   for platform in supportedPlatforms do
   begin
     if cancellationToken.IsCancelled then
@@ -1750,9 +1768,22 @@ begin
 
     compiledPackages := TCollections.CreateList<IPackageInfo>;
     FLogger.Information('Building package [' + packageInfo.Id + '] for platform [' + DPMPlatformToString(platform) + ']');
-    //the build said why.
+    //The build said why. A platform that can't be built (no SDK for it, say) mustn't stop the others being built -
+    //same as install and restore.
     if not BuildDependencies(cancellationToken, FLogger, packageCompiler, dependencyGraph, packagesToCompile, compiledPackages, packageSpecs, Options) then
-      exit;
+    begin
+      if cancellationToken.IsCancelled then
+        exit;
+      Include(failedPlatforms, platform);
+    end;
+  end;
+
+  if failedPlatforms <> [] then
+  begin
+    //the failures were reported where they happened - this is the outcome.
+    FLogger.Information('Caching [' + packageInfo.ToString + '] failed on platforms [' + DPMPlatformsToString(failedPlatforms) +
+      '] - the platforms that built are in the cache.', true);
+    exit;
   end;
 
   result := true;
